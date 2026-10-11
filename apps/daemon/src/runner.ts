@@ -31,6 +31,7 @@ import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
   buildPlanFirstRoundInstruction,
+  buildReworkFallbackPrompt,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
@@ -1048,6 +1049,33 @@ export async function runStep(
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
   let handle: AgentSessionHandle;
   let resumed = Boolean(continueId);
+  // #1204 返工降级注入：continue 意图步回退新会话时，claim 载荷的
+  // reworkContext（方案全文 + 历史返工意见）组合进首轮 prompt——新会话无
+  // 前轮记忆，凭注入的既有事实重建（形状单源 = shared buildReworkFallbackPrompt，
+  // #720 组合形 + 降级上下文段）。载荷缺席（旧 server）/空上下文/todo 缺席
+  // （防御）→ 原 prompt 逐字节不动（零回归；注入只发生在回退分支，续接成功
+  // 路径不消费）。transcript prompt 行保持原续轮指令（呈现面零改动——降级
+  // 事实由 RESUME_FRESH_SESSION_NOTE 既有行标记）。
+  const reworkFallbackSessionOpts = (): SessionOpts => {
+    const ctx = claimed.reworkContext;
+    if (
+      ctx === undefined ||
+      (ctx.planText === null && ctx.feedbacks.length === 0) ||
+      sessionOpts.prompt === undefined ||
+      claimed.todo === undefined
+    ) {
+      return sessionOpts;
+    }
+    return {
+      ...sessionOpts,
+      prompt: buildReworkFallbackPrompt({
+        taskText: buildTaskPromptText(claimed.todo.title, claimed.todo.spec),
+        instruction: sessionOpts.prompt,
+        planText: ctx.planText,
+        feedbacks: ctx.feedbacks,
+      }),
+    };
+  };
   // 会话开面（两轮共用）：continue 优先 + 会话文件未落盘的冷重试回退
   // （02 §5.7 崩溃竞态 [设计]）；回落轮沿同开面续会话——误差轮不追加历史，
   // pi 重试机制本就摘除错误轮，续开即从误差前状态继续。
@@ -1068,7 +1096,7 @@ export async function runStep(
         content: RESUME_FRESH_SESSION_NOTE,
         createdAt: now(),
       });
-      return backend.createSession(sessionOpts);
+      return backend.createSession(reworkFallbackSessionOpts());
     });
   };
   for (let pass = 0; ; pass++) {

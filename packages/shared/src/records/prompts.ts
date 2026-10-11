@@ -94,6 +94,36 @@ export function composeTaskPromptWithInstruction(taskText: string, instruction: 
   return `${taskText}\n\n${instruction}`;
 }
 
+const REWORK_FALLBACK_HEAD =
+  '原会话不可复用，已用新会话重跑。以下是本会话的既有事实，新会话无前轮记忆，凭此重建：';
+
+/** #1204 返工降级注入组合（daemon 续接失败回退分支单源）：continue 意图步
+ *  的会话续接失败回退新会话时，首轮 prompt = #720 组合形状（任务文本 +
+ *  续轮指令）+ 降级上下文——最新版方案全文与全部历史返工意见（claim 载荷
+ *  reworkContext 位）。返工步的新会话里除任务与反馈外一无所知（票面缺陷二
+ *  实锤：卡 #24 agent 靠读仓库现场自救，首跑踩过的坑与否决过的方案全丢）。
+ *  注入不进 transcript 行（呈现面零改动——降级事实由 RESUME_FRESH_SESSION_NOTE
+ *  既有行标记），消费面 = backend createSession 的首轮 prompt。两段皆空 =
+ *  纯 #720 形（调用方跳过注入，此处形状兜底）。 */
+export function buildReworkFallbackPrompt(args: {
+  taskText: string;
+  instruction: string;
+  planText: string | null;
+  feedbacks: string[];
+}): string {
+  const sections: string[] = [];
+  if (args.planText !== null) {
+    sections.push(`当前方案（plan.md 全文）：\n${args.planText}`);
+  }
+  if (args.feedbacks.length > 0) {
+    const list = args.feedbacks.map((f, i) => `${i + 1}. ${f}`).join('\n');
+    sections.push(`历史返工意见（按时间序，全部）：\n${list}`);
+  }
+  const context =
+    sections.length > 0 ? `\n\n${REWORK_FALLBACK_HEAD}\n\n${sections.join('\n\n')}` : '';
+  return `${composeTaskPromptWithInstruction(args.taskText, args.instruction)}${context}`;
+}
+
 /** plan 步补写指令（#113 / #703 单源）：plan 步完成而 plan.md 缺席时的自动
  *  补写轮 prompt。#703 起该指令经 claim 载荷 instruction 真的进会话（runner
  *  续轮投递），daemon 把它记成 user 行——呈现层过滤侧按本模板识别（模板行

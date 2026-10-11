@@ -41,10 +41,12 @@ import {
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_REMOTE_TOOLS,
   CHIEF_TURN_ERROR_KIND,
+  classifyUserText,
   createSkillBodySchema,
   derivePlaceholderTitle,
   FIXED_TAGS,
   formatSkillRouteSection,
+  GATE_ANNOUNCEMENTS,
   GITHUB_ACCESS_TOKEN_USERNAME,
   isBackendRuntimeId,
   isChiefConversationId,
@@ -119,7 +121,6 @@ import {
 import {
   agentForStep as agentForStepEligibility,
   runtimeGatePasses,
-  stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { SESSION_WEDGE_GRACE_MS, stepActivityAt } from './dispatch-timeouts.js';
@@ -808,6 +809,40 @@ function agentForStep(
   return agentForStepEligibility(deps.db, todoRow, kind, prompt);
 }
 
+/** #1204 返工降级上下文组装（claim 载荷 reworkContext 位，continue 意图步
+ *  携带）：planText = 本 build 最新版方案全文（返工步的新会话凭此知道「方案
+ *  现在是什么」——返工指令只说改什么）；feedbacks = 会话内全部真实用户行
+ *  （返工意见/重启反馈族），createdAt 升序。滤除面 = classifyUserText 的
+ *  'task-prompt'/'synthetic' 分类（daemon 上传的组合 prompt 行）+
+ *  GATE_ANNOUNCEMENTS 关卡宣告行（机械动作行，非意见）。两样皆空 = 返回
+ *  undefined（字段省略，不载空手）。 */
+function reworkContextFor(
+  db: Db,
+  buildId: string,
+  todoRow: typeof todo.$inferSelect,
+): { planText: string | null; feedbacks: string[] } | undefined {
+  const planRow = db
+    .select({ content: planTable.content })
+    .from(planTable)
+    .where(eq(planTable.buildId, buildId))
+    .orderBy(desc(planTable.version))
+    .get();
+  const planText = planRow?.content ?? null;
+  const rows = db
+    .select({ content: message.content })
+    .from(message)
+    .where(and(eq(message.conversationId, buildId), eq(message.role, 'user')))
+    .orderBy(asc(message.createdAt))
+    .all();
+  const task = { title: todoRow.title, spec: todoRow.spec };
+  const feedbacks = rows
+    .map((r) => (typeof r.content === 'string' ? r.content : null))
+    .filter((c): c is string => c !== null)
+    .filter((c) => !GATE_ANNOUNCEMENTS.includes(c) && classifyUserText(c, task) === 'user');
+  if (planText === null && feedbacks.length === 0) return undefined;
+  return { planText, feedbacks };
+}
+
 /** chief 步 claim 载荷组装（remoteTools 51 词表全量 + chief 块 + 会话续轮判定）。
  * 无 todo/project 语境：chief「探测仓库」经 docs relay（server 端裸库读，A4
  * 黑盒逼近 r5 §3.1 的 worktree `git show`），故不下发 repo/git 载荷——避免死
@@ -1172,6 +1207,13 @@ function tryClaim(
             action: priorSessionId ? ('continue' as const) : ('new' as const),
             sessionId: priorSessionId,
           };
+    // #1204 返工降级上下文：continue 意图步（本会话已有 prior session）携带
+    // 最新方案全文 + 全部历史返工意见——daemon 续接失败回退新会话时注入首轮
+    // prompt（续接成功不消费）。空上下文省略字段。
+    const reworkContext =
+      session.action === 'continue'
+        ? reworkContextFor(db, cand.stepRow.buildId, cand.todoRow)
+        : undefined;
     const projectRow = db
       .select()
       .from(project)
@@ -1216,6 +1258,7 @@ function tryClaim(
       conversationId: cand.stepRow.buildId, // buildId ≡ conversationId（CONTEXT.md）
       session,
       ...(cand.stepRow.prompt !== null ? { instruction: cand.stepRow.prompt } : {}),
+      ...(reworkContext !== undefined ? { reworkContext } : {}),
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,

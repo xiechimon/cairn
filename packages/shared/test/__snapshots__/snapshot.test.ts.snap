@@ -225,6 +225,28 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       },
       "type": "array",
     },
+    "reworkContext": {
+      "additionalProperties": false,
+      "properties": {
+        "feedbacks": {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
+        },
+        "planText": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+      },
+      "required": [
+        "planText",
+        "feedbacks",
+      ],
+      "type": "object",
+    },
     "session": {
       "additionalProperties": false,
       "properties": {
@@ -597,6 +619,28 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                 "type": "object",
               },
               "type": "array",
+            },
+            "reworkContext": {
+              "additionalProperties": false,
+              "properties": {
+                "feedbacks": {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
+                },
+                "planText": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+              },
+              "required": [
+                "planText",
+                "feedbacks",
+              ],
+              "type": "object",
             },
             "session": {
               "additionalProperties": false,
