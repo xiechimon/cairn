@@ -619,7 +619,7 @@ export function TodoDetailPage() {
         <AppSidebar fixture={fixture} todos={todos} searchPanel={false} />
         <div className="relative flex min-w-0 flex-1 flex-col items-center justify-center bg-(--card)">
           <div
-            className="detail-unavailable max-w-[420px] px-6 text-center"
+            className="max-w-[420px] px-6 text-center"
             data-testid="detail-unavailable"
             data-state={state}
           >

@@ -219,7 +219,7 @@ export function TodoCard({
             <Button
               variant={action.kind === 'primary' ? 'default' : 'outline'}
               size="xs"
-              className="todo-card-action todo-card-action--orchestrating relative z-10 h-[26px] flex-none px-[7.25px] text-xs"
+              className="todo-card-action relative z-10 h-[26px] flex-none px-[7.25px] text-xs"
               data-orchestrating="true"
               disabled
             >
