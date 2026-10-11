@@ -14,7 +14,7 @@ import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
-import { MachineWakeHub } from '../src/services/machines.js';
+import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 
 export function bootServer(
   opts: {

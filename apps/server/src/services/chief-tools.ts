@@ -53,7 +53,7 @@ import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from 
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
-import type { MachineWakeHub } from './machines.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { notifyChiefMessage } from './notifications.js';
 import { getModelSources } from './providers.js';

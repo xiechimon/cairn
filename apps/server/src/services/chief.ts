@@ -67,7 +67,7 @@ import {
   stepActivityAt,
 } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import type { MachineWakeHub } from './machines.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
 import { claudeCodeModelSource } from './providers.js';
 import { scanLocalSkills } from './skills.js';

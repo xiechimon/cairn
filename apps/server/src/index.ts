@@ -14,7 +14,8 @@ import { seed } from './db/seed.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
-import { MachineWakeHub, seedLocalMachine } from './services/machines.js';
+import { MachineWakeHub } from './services/machine-wake-hub.js';
+import { seedLocalMachine } from './services/machines.js';
 import { createScheduler } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 
