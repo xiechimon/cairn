@@ -52,6 +52,22 @@ jobs:
             exit 1
           fi
 
+      # Lane file gate (#1199): herdr lane threads draft PROGRESS.md /
+      # BLOCKED.md at the worktree root and the files keep riding PR
+      # branches into main (#1189 merged BLOCKED.md in; #1153's PROGRESS.md
+      # was caught in review). Zero-dependency, pre-install, one-minute red
+      # for the offending lane. Takes the PR base sha the same way the
+      # #851 ui-debt-gate takes UI_DEBT_BASE_SHA: the added-only diff leg
+      # runs on pull_request; push runs self-check the tracked set.
+      - name: Lane file gate (#1199)
+        env:
+          LANE_FILE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$LANE_FILE_BASE_SHA" ]; then
+            git fetch --depth=1 origin "$LANE_FILE_BASE_SHA"
+          fi
+          node scripts/lane-file-gate.mjs
+
       # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
       # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数与裸控件
       # 总数只许降不许升。封版终态即地板（0 per-face 文件；3 裸控件 = 全部

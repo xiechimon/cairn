@@ -104,3 +104,8 @@ credentials.enc
 # playwright test artefacts
 test-results/
 playwright-report/
+# Lane process files (#1199): lane threads draft PROGRESS.md / BLOCKED.md at
+# the worktree root. Root-anchored so same-named docs in subdirectories stay
+# unaffected.
+/PROGRESS.md
+/BLOCKED.md
