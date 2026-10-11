@@ -41,6 +41,10 @@
 //     - object-literal keys, and brace-nested literals that do not look
 //       like class lists (no space/hyphen) — keeps cva({variant:'link'})
 //       lookups out while cva class values stay in;
+//     - variant-lookup call values (`buttonVariants({ size: 'icon-sm' })`)
+//       whose literal is a key harvested from a cva config — lookup keys,
+//       not rendered classes (#1178; a bogus value like 'nope-x' is not in
+//       the key set and is still extracted);
 //     - tokens touching a template interpolation (`chief-${kind}`) — the
 //       runtime name is unknowable statically;
 //     - non-ASCII tokens and tokens with backslashes — CSS class names in
@@ -430,6 +434,63 @@ function scanContainer(text, start, baseBraceDepth = 0) {
 // class-token extraction (contexts A + B + C)
 // ---------------------------------------------------------------------------
 
+/** Harvest every cva variant-lookup key in the repo (#1178). A lookup call
+ *  like `buttonVariants({ variant: 'ghost', size: 'icon-sm' })` passes
+ *  hyphenated strings that are config keys, not class lists; the shape test
+ *  below (space/hyphen = class-like) cannot tell them apart from real dead
+ *  tokens. The keys live in the config object of `cva(base, { variants: {
+ *  size: { 'icon-sm': 'size-7 …' } } })` — mostly inside pristine registry
+ *  files, which this pass reads for keys only (data, not class vocabulary;
+ *  the pristine skip protects token extraction, and buildReferenceIndex
+ *  already reads other non-src corpora). Keys are single tokens: no
+ *  whitespace, one value per variant property. Configs referenced through
+ *  an identifier (`cva(base, config)`) yield no keys — fail-open to the
+ *  pre-#1178 behavior; every cva config in this repo is inline. */
+function collectVariantKeys() {
+  const keys = new Set();
+  for (const file of walkFiles(SRC_DIR, ['.ts', '.tsx'])) {
+    const text = stripComments(readFileSync(file, 'utf8'));
+    for (const m of text.matchAll(/\bcva\s*\(/g)) {
+      // walk to the config object: skip whitespace, the base string/template
+      // argument, whitespace, the comma, whitespace — then expect `{`
+      let i = m.index + m[0].length;
+      while (i < text.length && /\s/.test(text[i])) i++;
+      if (text[i] === '"' || text[i] === "'") i = skipQuoted(text, i) + 1;
+      else if (text[i] === '`') i = scanTemplate(text, i, 0).end;
+      else continue; // non-literal base (cn(...) build, identifier) — bail
+      while (i < text.length && /[\s,]/.test(text[i])) i++;
+      if (text[i] !== '{') continue;
+      // scanContainer from the config `{`: its own brace does not count, so
+      // keys of the objects nested under `variants:` sit at braceDepth >= 2
+      const { strings } = scanContainer(text, i);
+      for (const lit of strings) {
+        if (lit.isKey && lit.braceDepth >= 2 && !/\s/.test(lit.value)) keys.add(lit.value);
+      }
+    }
+  }
+  return keys;
+}
+
+/** Start index of every string literal inside a `*Variants(…)` argument
+ *  object whose value is a harvested variant key — the lookup occurrences
+ *  extraction must skip (#1178). Index-keyed, so the skip is precise to the
+ *  exact call site; bogus values (`size: 'nope-x'`) are not in the key set
+ *  and stay extracted, keeping real dead-class detection intact. */
+function lookupSkipIndexes(text, variantKeys) {
+  const skips = new Set();
+  for (const m of text.matchAll(/\b[A-Za-z0-9_$]*Variants\s*\(/g)) {
+    let start = m.index + m[0].length;
+    while (start < text.length && /\s/.test(text[start])) start++;
+    if (text[start] !== '{') continue; // not a lookup-object call site
+    const { strings } = scanContainer(text, start);
+    for (const lit of strings) {
+      if (lit.isKey) continue;
+      if (!/\s/.test(lit.value) && variantKeys.has(lit.value)) skips.add(lit.index);
+    }
+  }
+  return skips;
+}
+
 /** A literal inside object braces counts as a class list only when it looks
  *  like one (space or hyphen) and is not an object key. */
 function braceLiteralIsClassLike(lit) {
@@ -471,8 +532,11 @@ const ANY_STRING_RE = /(['"])((?:\\.|(?!\1)[^\\\n])*)\1/g;
  *  `live` is the living-selector set — context C needs it for the ratio
  *  heuristic, so extraction runs after the selector universe is built.
  *  Pass contextC:false for pure dictionary-data files (src/i18n/*): their
- *  literals are translation values, never rendered as class attributes. */
-function extractFromFile(text, live, { contextC = true } = {}) {
+ *  literals are translation values, never rendered as class attributes.
+ *  `lookupSkips` (optional, #1178) is a set of literal start indexes that
+ *  hold cva variant-lookup keys (`buttonVariants({ size: 'icon-sm' })`) —
+ *  config keys, not class lists. */
+function extractFromFile(text, live, { contextC = true, lookupSkips } = {}) {
   const found = [];
   const seen = new Set();
   const pushToken = (tok, index) => {
@@ -484,6 +548,7 @@ function extractFromFile(text, live, { contextC = true } = {}) {
   const consume = (strings) => {
     for (const lit of strings) {
       if (lit.isComparison) continue;
+      if (lookupSkips?.has(lit.index)) continue;
       if (lit.braceDepth > 0 && !braceLiteralIsClassLike(lit)) continue;
       for (const tok of tokenize(lit.value, lit)) {
         if (!TOKEN_SHAPE_RE.test(tok)) continue;
@@ -526,6 +591,7 @@ function extractFromFile(text, live, { contextC = true } = {}) {
       // the wrapper paren shifts every index by 1
       const mapped = { ...lit, index: start + lit.index - 1 };
       if (mapped.isComparison) continue;
+      if (lookupSkips?.has(mapped.index)) continue;
       if (mapped.braceDepth > 0 && !braceLiteralIsClassLike(mapped)) continue;
       for (const tok of tokenize(lit.value, lit)) {
         if (!TOKEN_SHAPE_RE.test(tok)) continue;
@@ -757,6 +823,7 @@ async function main() {
 
   // 2. extraction over src (pristine registry files skipped)
   const pristine = pristineRegistryFiles();
+  const variantKeys = collectVariantKeys();
   const occurrences = new Map(); // token -> [{file,line}]
   const srcTexts = [];
   let tokenCount = 0;
@@ -771,7 +838,11 @@ async function main() {
     const text = stripComments(readFileSync(file, 'utf8'));
     srcTexts.push([file, text]);
     const inI18n = file.startsWith(join(SRC_DIR, 'i18n'));
-    for (const { token, index } of extractFromFile(text, live, { contextC: !inI18n })) {
+    const lookupSkips = lookupSkipIndexes(text, variantKeys);
+    for (const { token, index } of extractFromFile(text, live, {
+      contextC: !inI18n,
+      lookupSkips,
+    })) {
       tokenCount++;
       if (live.has(token)) continue;
       if (!occurrences.has(token)) occurrences.set(token, []);
