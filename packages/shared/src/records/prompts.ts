@@ -10,6 +10,7 @@
 // 宣告行（MERGE_ANNOUNCEMENT / REVIEW_ANNOUNCEMENT，message.ts）不在本词表：
 // 它们是要渲染的行（note 家族），不是要消失的行。
 
+import { chiefThreadTitle } from './chief.js';
 import { PLAN_FILE_NAME } from './plan.js';
 import { parseReviewPromptMeta } from './review.js';
 import type { StepKind } from './step.js';
@@ -178,6 +179,14 @@ function stripPlanLocationNote(text: string): string {
   return wrappedBy(note, PLAN_NOTE_HEAD, PLAN_NOTE_TAIL) ? text.slice(0, idx) : text;
 }
 
+/** 编排请求首行（#640 词表）：buildOrchestratePrompt 的首行与
+ *  orchestrateThreadTitle 的推导共用这一句——线程标题由 chiefThreadTitle
+ *  取首行派生，web 侧「该任务是否有在飞编排回合」的判定按标题匹配
+ *  （#1216），首行文案单源在此，改它即改双端契约。 */
+export function orchestratePromptHead(seqNum: number): string {
+  return `开始任务 #${seqNum}`;
+}
+
 /** 开始任务编排请求（#640 / r14 §5.2：编排回合的会话 user 消息 = 总目标
  *  正本，任务原文逐字内嵌 = 稳定锚点；实体引用 [#n](todo:<id>) 走 chief
  *  正文引用族）。首行短且无 markdown——chiefThreadTitle 取首行前 12 字符做
@@ -203,7 +212,15 @@ export function buildOrchestratePrompt(todo: {
     todo.pinnedMachineName !== undefined
       ? `\n\n机器：${todo.pinnedMachineName}（用户指定本任务在该机器执行，派发时保持钉选）`
       : '';
-  return `开始任务 #${todo.seqNum}\n\n编排请求：[#${todo.seqNum}](todo:${todo.id}) —— ${intent}\n\n任务原文：\n${quoted}${machine}`;
+  return `${orchestratePromptHead(todo.seqNum)}\n\n编排请求：[#${todo.seqNum}](todo:${todo.id}) —— ${intent}\n\n任务原文：\n${quoted}${machine}`;
+}
+
+/** 编排线程标题（#1216）：server 建线程时 title = chiefThreadTitle(编排
+ *  请求全文)，而标题律只吃首行——本函数按同一律从 seqNum 直接推导，与
+ *  server 落库值逐字节相同。web 侧「在飞编排回合」判定（开始/重跑的
+ *  编排中态与重入拒绝）以它匹配线程，不另立 wire 字段。 */
+export function orchestrateThreadTitle(seqNum: number): string {
+  return chiefThreadTitle(orchestratePromptHead(seqNum));
 }
 
 /** 非空续轮指令集（chief/review 的占位空串不入集——空文本行由呈现层自有

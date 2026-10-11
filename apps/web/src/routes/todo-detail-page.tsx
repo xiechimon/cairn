@@ -24,6 +24,7 @@ import {
   useBuild,
   useBuildChanges,
   useBuildUsage,
+  useChiefThreads,
   useDocumentDiff,
   useGithubIssueEcho,
   useMachines,
@@ -59,7 +60,9 @@ import { useConversationStream } from '../api/sse.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { ChiefAgentDialog } from '../chief/chief-agent-dialog.js';
 import { useChiefRoot } from '../chief/chief-root.js';
+import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
+import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
@@ -166,6 +169,8 @@ export function TodoDetailPage() {
   // #640：开始任务单出口——todo 相位主按钮直发总管编排回合（T0 反馈 =
   // toast + 查看会话深链，use-orchestrate-start.ts）。
   const orchestrateStart = useOrchestrateStart();
+  // #1216 在飞编排态数据位：与 ChiefRoot 抽屉读面同键去重（零新增流量）。
+  const chiefThreadsQ = useChiefThreads(teamId, live);
   // 右 pane 视图 (#366)：doc = DocPane（方案/变更/diff，相位派生），其余三
   // 值 = 原 head 图标 overlay 三件的静止 section。纯渲染态，capture 场景经
   // ui.paneView 冻结（r7 30/31/32、r8 57/77 的新家）。
@@ -585,7 +590,82 @@ export function TodoDetailPage() {
     revisionAvailable: fixture.detail?.revision != null,
   });
 
-  if (todo == null) return null;
+  // #1216 在飞编排回合（todo 开始 / failed 重跑 主钮禁用位）：编排落位不写
+  // 相位（#640），click→chief 派发之间此前是零标识的静默窗口，实测用户连点
+  // 出重复线程（生产库同卡 3–5 条「开始任务 #N」）。判定单源 =
+  // chief/orchestration-inflight.ts；其余相位恒 false（confirm/review 等主钮
+  // 行为不变，#1216 回归面）。
+  const actionInFlight =
+    live && todo != null && (todo.phase === 'todo' || todo.phase === 'failed')
+      ? inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null
+      : false;
+
+  // #1216：live 详情缺失三态（加载中/加载失败/不存在）——旧 `return null`
+  // 把缺失渲染成永久空白壳：无解释、无重试、无回看板，删除入口也够不着
+  // （生产实测 failed 卡详情页白屏即此面）。fixture 面保持 null 基线。
+  if (todo == null) {
+    if (!live) return null;
+    const err = todoQ.error;
+    const state: 'loading' | 'error' | 'not-found' =
+      todoQ.isPending || todosQ.isPending
+        ? 'loading'
+        : err instanceof ApiError && err.status === 404
+          ? 'not-found'
+          : err != null
+            ? 'error'
+            : 'not-found';
+    return (
+      <div className="detail-shell flex h-full overflow-hidden" data-route="todo-detail">
+        <AppSidebar fixture={fixture} todos={todos} searchPanel={false} />
+        <div className="relative flex min-w-0 flex-1 flex-col items-center justify-center bg-(--card)">
+          <div
+            className="detail-unavailable max-w-[420px] px-6 text-center"
+            data-testid="detail-unavailable"
+            data-state={state}
+          >
+            {state === 'loading' && (
+              <p className="m-0 text-sm text-(--text-tertiary)">{t('加载中…')}</p>
+            )}
+            {state === 'error' && (
+              <>
+                <h2 className="m-0 text-base font-semibold text-(--foreground)">
+                  {t('任务加载失败')}
+                </h2>
+                {err instanceof Error && err.message !== '' && (
+                  <p className="mt-2 text-xs leading-5 break-words text-(--text-tertiary)">
+                    {err.message}
+                  </p>
+                )}
+              </>
+            )}
+            {state === 'not-found' && (
+              <h2 className="m-0 text-base font-semibold text-(--foreground)">
+                {t('任务不存在或已被删除')}
+              </h2>
+            )}
+            <div className="mt-6 flex items-center justify-center gap-3">
+              {state === 'error' && (
+                <Button
+                  onClick={() => {
+                    void todoQ.refetch();
+                    void todosQ.refetch();
+                  }}
+                >
+                  {t('重试')}
+                </Button>
+              )}
+              <Button
+                variant={state === 'error' ? 'outline' : 'default'}
+                onClick={() => navigate('/app')}
+              >
+                {t('回看板')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const content = live
     ? wireTodo && buildId
@@ -697,7 +777,7 @@ export function TodoDetailPage() {
       // 不再经 dialog 选择面）：todo 开始 = orchestrate / confirm 确认 /
       // review 验收弹层 / failed 重跑弹层（重跑 = 编排回合 + 复用方案）/
       // done 重开 = 新一轮 build。
-      if (phase === 'todo') orchestrateStart.orchestrate(todo.id);
+      if (phase === 'todo') orchestrateStart.orchestrate({ id: todo.id, seqNum: todo.seqNum });
       else if (phase === 'confirm' && buildId)
         mutations.stepAction.mutate({ buildId, body: { action: 'confirm' } });
       else if (phase === 'review') setOverlay({ kind: 'accept' });
@@ -744,6 +824,7 @@ export function TodoDetailPage() {
           phase={live ? phase : (view.phaseOverride ?? todo.phase)}
           onMore={() => setMoreOpen(true)}
           reviewActive={reviewActive}
+          actionInFlight={actionInFlight}
           onAction={handlePrimaryAction}
           chipPopoverOpen={fixture.ui?.chipPopoverOpen === true}
           onEditAssign={() => setAssignOpen(true)}
@@ -773,6 +854,7 @@ export function TodoDetailPage() {
                   todo={todo}
                   tags={freshTags}
                   action={ui.action}
+                  actionInFlight={actionInFlight}
                   onAction={handlePrimaryAction}
                   // #612：live 有 spec = 下方简报卡在场，「尚无描述」占位让位
                   // （两行同屏自相矛盾）；fixture 面恒缺省，r7 23 基线不动。
@@ -1047,7 +1129,7 @@ export function TodoDetailPage() {
             live
               ? () => {
                   closeOverlay();
-                  orchestrateStart.orchestrate(todo.id);
+                  orchestrateStart.orchestrate({ id: todo.id, seqNum: todo.seqNum });
                 }
               : undefined
           }

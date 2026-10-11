@@ -22,6 +22,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError, api } from '../api/client.js';
 import {
   useApiMutations,
+  useChiefThreads,
   useMachines,
   useProjects,
   useProjectTags,
@@ -46,6 +47,7 @@ import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { buildTagOptions, matchesTagFilter, parseTagParam } from '../board/tag-filter.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
+import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
@@ -86,6 +88,9 @@ export function BoardPage() {
   // useNewTaskSurface（eager 位保持原状）。——
   const todosQ = useTodos(teamId, live);
   const projectsQ = useProjects(teamId, live);
+  // #1216 在飞编排态数据位：与 ChiefRoot 的抽屉读面同键去重（零新增流量），
+  // SSE step/message 事件失效重取——回合起飞/收尾卡面即时翻转。
+  const chiefThreadsQ = useChiefThreads(teamId, live);
   const mutations = useApiMutations(teamId);
   // #640（r14 §5.7）：开始任务 = 单出口直发总管编排回合——board 的两个
   // 入口（卡片 开始 钮 / 拖入执行中）共用；#318 dialog 数据位（机器行 +
@@ -456,9 +461,14 @@ export function BoardPage() {
   const startTask = useCallback(
     (todo: TodoRecord) => {
       if (!live) return;
-      orchestrateStart.orchestrate(todo.id);
+      orchestrateStart.orchestrate({ id: todo.id, seqNum: todo.seqNum });
     },
     [live, orchestrateStart.orchestrate],
+  );
+  // #1216：逐卡在飞编排判定（开始/重试 钮位翻「编排中」禁用态的数据源）。
+  const isOrchestrating = useCallback(
+    (todo: TodoRecord) => inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null,
+    [chiefThreadsQ.data],
   );
 
   // 拖拽落位（#73 / M5 / #160，#616 收窄成纯改相）：待开始/已完成列的静默
@@ -611,6 +621,7 @@ export function BoardPage() {
           hasBranch={(todo) =>
             live ? todo.latestBuildId != null : overlayContent(todo.id) != null
           }
+          isOrchestrating={live ? isOrchestrating : undefined}
           // #73→#616→#640: 静默改相落位（待处理/已完成 + 待开始的未开始卡）
           // commit into the same client-side todo set as create/delete — column
           // counts and folds re-derive from it；执行中落位 = 开始意图 → 直发

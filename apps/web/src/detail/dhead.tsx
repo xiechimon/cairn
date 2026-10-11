@@ -50,6 +50,10 @@ interface DetailHeadProps {
   /** M7 #312 / r8 §3.1：审核中态旗标——chip 改「审核中」、composer placeholder
    * 改「AI 审核进行中…」、期间显示停止钮（复用 #308）。 */
   reviewActive?: boolean;
+  /** #1216：在飞编排回合（todo 开始 / failed 重跑 已发出，chief 尚未落位）
+   *  ——主钮翻禁用「编排中」，相位不动的静默窗口显性化。缺省 false =
+   *  fixture 面与既有行为零变化。 */
+  actionInFlight?: boolean;
   /** #1008: 更多 钮的定位锚 ref（MoreMenu 迁 DropdownMenu 后触发钮与菜单体
    *  分住两层，页面层持 ref 双投：这里挂到钮上，Content 走 anchor）。 */
   moreButtonRef?: Ref<HTMLButtonElement>;
@@ -63,6 +67,7 @@ export function DetailHead({
   chipPopoverOpen,
   onEditAssign,
   reviewActive,
+  actionInFlight,
   moreButtonRef,
 }: DetailHeadProps) {
   const { t } = useI18n();
@@ -191,13 +196,21 @@ export function DetailHead({
         >
           <EllipsisVertical />
         </Button>
-        {ui.action != null && (
-          // #1006 原型（#980 前提④）：主钮 50.5×28 @12px 冻结几何退役——
-          // registry Button default 档默认几何（h-8 text-sm font-medium）。
-          <Button className="detail-head-action flex-none" onClick={onAction}>
-            {t(ui.action)}
-          </Button>
-        )}
+        {ui.action != null &&
+          (actionInFlight === true ? (
+            // #1216 在飞编排态：主钮禁用 +「编排中」——重入点击此前会静默
+            // 多发一轮编排线程（生产实测同卡 3–5 条），拒绝反馈住
+            // use-orchestrate-start 的 toast 位。
+            <Button className="detail-head-action flex-none" data-orchestrating="true" disabled>
+              {t('编排中')}
+            </Button>
+          ) : (
+            // #1006 原型（#980 前提④）：主钮 50.5×28 @12px 冻结几何退役——
+            // registry Button default 档默认几何（h-8 text-sm font-medium）。
+            <Button className="detail-head-action flex-none" onClick={onAction}>
+              {t(ui.action)}
+            </Button>
+          ))}
       </div>
     </header>
   );

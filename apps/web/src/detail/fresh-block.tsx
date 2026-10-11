@@ -60,12 +60,22 @@ interface FreshBlockProps {
   action?: string | null;
   /** The page's single primary handler — same one the head button calls. */
   onAction?: () => void;
+  /** #1216：在飞编排回合——开始钮翻禁用「编排中」（dhead 主钮同律）。
+   *  缺省 false = fixture 面与既有行为零变化。 */
+  actionInFlight?: boolean;
   /** #612：live 面有 spec 时「尚无描述」占位与其下的任务简报卡自相矛盾——
    *  有描述即让位。fixture 面缺省 = 占位照旧（r7 23 基线字节不变）。 */
   hasSpec?: boolean;
 }
 
-export function FreshBlock({ todo, tags, action, onAction, hasSpec }: FreshBlockProps) {
+export function FreshBlock({
+  todo,
+  tags,
+  action,
+  onAction,
+  actionInFlight,
+  hasSpec,
+}: FreshBlockProps) {
   const { t } = useI18n();
   return (
     <div className="fresh-block mx-auto max-w-[720px] px-4 pt-[72px]" data-testid="fresh-block">
@@ -91,10 +101,17 @@ export function FreshBlock({ todo, tags, action, onAction, hasSpec }: FreshBlock
       {action != null && onAction != null && (
         <div className="mt-8 flex items-center gap-3">
           {/* #1006 原型（#980 前提④）：老 primary/standard 的 13px/px-12
-              冻结几何与描边中和退役——registry Button default 档默认形态。 */}
-          <Button className="fresh-start" onClick={onAction}>
-            {t(action)}
-          </Button>
+              冻结几何与描边中和退役——registry Button default 档默认形态。
+              #1216：在飞编排态翻禁用「编排中」（dhead 主钮同律）。 */}
+          {actionInFlight === true ? (
+            <Button className="fresh-start" data-orchestrating="true" disabled>
+              {t('编排中')}
+            </Button>
+          ) : (
+            <Button className="fresh-start" onClick={onAction}>
+              {t(action)}
+            </Button>
+          )}
           <span className="text-xs leading-4 text-(--text-tertiary)">
             {t('点开始后由总管编排派发，Agent 在你的机器上跑')}
           </span>

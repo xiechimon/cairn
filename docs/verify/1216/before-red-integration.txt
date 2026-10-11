@@ -1,0 +1,18 @@
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/board-trio-e2e.test.ts > #1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假机器 wire） > ① 保存并开始：一次点击进派发流，在飞态拒重复编排
+Error: expect(locator).toHaveText(expected) failed
+Locator: locator('[data-todo-id="fgZPinXnNShsjpiEVRNsc"]').locator('.todo-card-action[data-orchestrating="true"]')
+Timeout: 15000ms
+Error: element(s) not found
+ FAIL  test/board-trio-e2e.test.ts > #1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假机器 wire） > ② failed 重跑：线程必落 + 在飞态可见 + chief 派发后 buildHistory 增长
+Error: expect(locator).toHaveText(expected) failed
+Locator: locator('.detail-head-action[data-orchestrating="true"]')
+Timeout: 15000ms
+Error: element(s) not found
+ FAIL  test/board-trio-e2e.test.ts > #1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假机器 wire） > ③ failed 卡详情可删除；缺失/失败详情出解释态不出空白壳
+Error: expect(locator).toBeVisible() failed
+Locator: locator('[data-testid="detail-unavailable"]')
+Timeout: 15000ms
+Error: element(s) not found
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
