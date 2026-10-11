@@ -37,20 +37,19 @@ import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
+import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { precheckShellCommand, reportShellResult } from './services/machine-shell.js';
 import { createUploadUrls, receivePlanUpload, receiveUpload } from './services/machine-uploads.js';
 import {
   authorizeEnrollmentMachine,
   claimStep,
   enrollMachine,
-  executeRelayToolCall,
   fetchSteer,
   fetchStop,
   findApiKeyByPlain,
   findMachineByToken,
   finishStep,
   heartbeatStep,
-  machineAsk,
   machineAttachmentDownload,
   machineRunningCount,
   machineSkillFile,
