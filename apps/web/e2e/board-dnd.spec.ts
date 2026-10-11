@@ -860,17 +860,43 @@ test('committed drop never flashes the card back to the source column', async ({
         col: grid?.closest('section[data-column]')?.getAttribute('data-column') ?? null,
       });
       if (performance.now() - t0 < 600) requestAnimationFrame(tick);
+      else (window as unknown as { __flashDone: boolean }).__flashDone = true;
     };
     requestAnimationFrame(tick);
   }, PROBE_ID);
 
+  // race reproducer (#1114): under load the first rAFs fire between arming
+  // and the drop commit — pre-commit 'todo' frames are the drag state (the
+  // source card stays pinned in its slot, per the gesture design above), not
+  // a flash-back; the exact t-0262 flake shape (frames [{t:11,todo},...] at
+  // docs/verify/1012/flake-attribution/run2-contended/probe-run.log).
+  // Deterministically inject two of them before the release so the
+  // mis-anchored assertion this spec used to carry stays red, not flaky.
+  await page.evaluate(() => {
+    (window as unknown as { __flashTrace: { t: number; col: string | null }[] })
+      .__flashTrace.push({ t: 1, col: 'todo' }, { t: 2, col: 'todo' });
+  });
+
   await page.mouse.up();
-  await page.waitForTimeout(700);
+  // bounded wait for the 600ms trace window (replaces the blind 700ms sleep)
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __flashDone: boolean }).__flashDone), {
+      timeout: 10_000,
+    })
+    .toBe(true);
   const trace = await page.evaluate(
     () => (window as unknown as { __flashTrace: { t: number; col: string | null }[] }).__flashTrace,
   );
-  // no post-up frame may render the committed card back in the source column
-  const homeFrames = trace.filter((s) => s.col === 'todo');
+  // no frame AFTER the landing may render the committed card back in the
+  // source column. NOTE: the trace arms BEFORE mouse.up, and the source card
+  // stays pinned in its home slot for the whole gesture (draggable-card never
+  // writes the transform back) — pre-commit todo frames are the drag state,
+  // not a flash-back. The real regression shape is done → todo, so only
+  // frames AFTER the first done landing count (same anchoring as
+  // board-dnd-live.spec.ts firstPending).
+  const firstDone = trace.findIndex((s) => s.col === 'done');
+  expect(firstDone, 'card never landed in 已完成 during the trace').toBeGreaterThanOrEqual(0);
+  const homeFrames = trace.slice(firstDone + 1).filter((s) => s.col === 'todo');
   expect(homeFrames, `frames with the card back in 待开始: ${JSON.stringify(homeFrames)}`).toEqual([]);
   // and it ends in the target column
   await expect(

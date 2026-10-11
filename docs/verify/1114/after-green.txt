@@ -1,0 +1,8 @@
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e/board-dnd.spec.ts:844:1 › committed drop never flashes the card back to the source column (1.6s)
+
+  1 passed (4.9s)
