@@ -215,7 +215,7 @@ export const chiefThreadsOpen: FixtureSet = {
  *  纵向滚动可达 + 尾部行可点，短列表面（116）零变化对照。 */
 const CHIEF_THREADS_LONG: ChiefThreadRef[] = [
   ...CHIEF_THREADS,
-  ...Array.from({ length: 20 }, (_, i) => ({ title: '长列表主题 ' + (i + 1) })),
+  ...Array.from({ length: 20 }, (_, i) => ({ title: `长列表主题 ${i + 1}` })),
 ];
 
 export const chiefThreadsLong: FixtureSet = {
