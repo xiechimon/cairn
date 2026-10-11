@@ -1,20 +1,13 @@
 ## What
 
-<!-- What this PR does and why, plus the ticket it answers. This
-section must embed one explanatory diagram -- not a screenshot, but
-what the change does (structure, flow, call tree, state machine;
-before/after is best). The format is specified, not a suggestion:
-.drawio.svg, draw.io's editable SVG export:
-
-  drawio -x -f svg -e --embed-svg-images -o name.drawio.svg name.drawio
-
-Before committing the diagram, run the text-fit gate over it -- a label that spills out of its shape fails the check (#1087): python3 scripts/check-diagram-text-fit.py 'docs/verify/**/*.drawio.svg'
-
-GitHub renders it as an inline SVG, draw.io reopens it for edits, and
-the pr-evidence gate probes it like any embedded image. Commit it
-under docs/verify/<ticket>/ and embed it here as ![label](raw-url).
-The gate checks that an image link is embedded and reachable; whether
-it explains the change is the reviewer's call. -->
+<!-- What this PR does and why, plus the ticket it answers. Prose only.
+No diagram: draw.io sources and exports were required until 2026-10-11 and
+are now retired (2026-10-11 user call: they cost a render step and a text-fit
+gate run each, and reviewers read the diff instead). State the change and the
+ticket; if a structure or flow genuinely needs a picture, describe it in
+sentences. Screenshots of running UI still belong here when the change is
+visible, committed under docs/verify/<ticket>/ and embedded as
+![label](raw-url) with a SHA-pinned raw URL. -->
 
 ## Verified
 

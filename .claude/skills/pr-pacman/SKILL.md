@@ -5,40 +5,55 @@ description: Use when writing a PR body for this repo. Carries the pacman PR bod
 
 # pr-pacman — writing a PR body in pacman
 
-The body is a hard contract, not a style suggestion: two CI gates check it
-(`pr-evidence`, `diagram-text-fit`) and review checks the rest. The global
-`pr` skill (Humanlayer show-me: `## Summary` / `## Evidence` / `## Merge
+The body is a hard contract, not a style suggestion: the `pr-evidence` CI gate
+checks the section names and the links. The global `pr` skill (Humanlayer
+show-me: `## Summary` / `## Evidence` / `## Merge
 Danger`) does not pass this repo's gate — four lanes in one day each followed
 it, failed, and hand-rewrote the body (#1100, #1103, #1105, #1111; issue
 #1110). When writing a PR body in this repo, follow this skill; do not use
 the global template even if it also matches.
 
+## Write it plainly
+
+The body is read by someone who did not watch the work. Apply the `unslop`
+rules to it, and write like a person reporting what they did.
+
+- No em dashes. Use a period or a comma. Rule 13.
+- No AI vocabulary: crucial, delve, robust, seamless, leverage, showcase,
+  landscape, testament, tapestry. Use the plain word. Rules 7 and 31.
+- No "not just X, but Y", no rule of three, no synonym cycling. Rules 9, 10, 11.
+- No bold label followed by a restatement of the label. Write the sentence. Rule 16.
+- No chatbot lines, no closing pleasantries. Rules 20, 22.
+- No metaphor nouns: substrate, surface, harness, ratchet, primitive, north
+  star. Name the thing. Rule 26.
+- Sentence case headings. Straight quotes. Rules 17, 19.
+- One idea per sentence. If a sentence needs a second read, split it. Rule 28.
+- Say what the change does, not how it feels. A number or a symbol beats an
+  adjective. Rules 27 and 30.
+
+The same rules apply to ticket bodies, commit messages, code comments and
+lane briefs.
+
 ## The six sections (exact headings)
 
 ### `## What`
 
-What this PR does and why, plus the ticket it answers. Must embed one
-explanatory diagram — structure, flow, call tree, state machine,
-before/after is best — as a `.drawio.svg` (draw.io's editable SVG export),
-never a screenshot:
+What this PR does and why, plus the ticket it answers. Prose. Say what
+changed and what it replaces or fixes; name files and symbols instead of
+describing them.
 
-```sh
-drawio -x -f svg -e --embed-svg-images -o docs/verify/<ticket>/name.drawio.svg docs/verify/<ticket>/name.drawio
-python3 scripts/check-diagram-text-fit.py 'docs/verify/**/*.drawio.svg'  # before committing the diagram
-```
-
-Commit the diagram under `docs/verify/<ticket>/` and embed it with a
-SHA-pinned raw URL (the repo is public, raw is anonymously readable):
+Diagrams are retired (2026-10-11 user call). Do not draw a `.drawio.svg`, do
+not commit one under `docs/verify/`, and do not spend a render step on it. A
+screenshot still belongs here when the change is visible in the running app:
+commit it under `docs/verify/<ticket>/` and embed it with a SHA-pinned raw URL
+(the repo is public, raw is anonymously readable):
 
 ```markdown
-![label](https://raw.githubusercontent.com/xiechimon/pacman/<sha>/docs/verify/<ticket>/name.drawio.svg)
+![label](https://raw.githubusercontent.com/xiechimon/pacman/<sha>/docs/verify/<ticket>/shot.png)
 ```
 
-The SHA must already be on the remote, so: commit and push the branch first,
-then write the body. Headless `drawio -x` sometimes hangs; when it does, edit
-the SVG's `rect`/`div` geometry directly (the file is small) and re-run the
-text-fit gate. Exported labels must not sit next to CJK in source — keep
-diagram labels plain and let the text-fit gate judge the fit.
+The SHA must already be on the remote, so commit and push the branch first,
+then write the body.
 
 ### `## Verified`
 
@@ -99,5 +114,4 @@ not carry the closing keyword for the parent ticket.
 |---|---|
 | `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
-| diagram labels fit their shapes | diagram-text-fit (advisory) |
-| `.drawio.svg` present in `## What` | review only — the gate passes a text-only body, do not rely on it |
+| `.drawio.svg` in `## What` | retired 2026-10-11 — no longer asked for, not checked |
