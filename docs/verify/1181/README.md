@@ -5,6 +5,9 @@
 退役，`apps/web/src` 下零定义），按 #1166（PR #1179）在 `drive.mjs` search
 probe 落地的同款形态迁到现行语义载体。
 
+本票两条平行车道（PR #1202 与 PR #1205）各自跑通了全链迁移；合并取
+PR #1205 的脚本版本，差异与取舍记录见下「双车道差异」一节。
+
 ## 迁移映射（5 处票面病灶 + 同文件内被同一根因挡住的陈旧断言）
 
 | 旧选择器 | 新载体 |
@@ -22,11 +25,21 @@ probe 落地的同款形态迁到现行语义载体。
 2. **schedules 页 C 开面判据**：旧断言 `page.url().includes('/app/schedules')`
    恒真（goto 后 URL 必然如此）——改为真判据「dialog 8 次重按后可见」，同时
    给冷栈首编译窗留足余量。
-3. **Esc 关抽屉等待**：8s 容 Base UI 退出动画，`.catch(() => {})` 容冷栈慢
-   退出（关抽屉不是本 probe 的断言面，下一段 schedules 才是）。
+3. **抽屉收起方式**：ADR 0013 D3 裁定 Esc 永不关面板（`onOpenChange` 对
+   `escape-key` 只收内层弹层）——收起走 ⌘J toggle，与 e2e hotkeys.spec 同律
+   （本版与 #1202 版的差异点，见下节）。
 
 `drive-949-overlays.mjs` / `drive-947-secondary.mjs` 里的同名类是退役审计
 清单（断言规则不存在），未动。
+
+## 双车道差异（#1202 已并入 / #1205 本版）
+
+| 面 | #1202（已在 main） | #1205（本版，合并后生效） |
+|---|---|---|
+| 搜索 5 处 + kbd-hint 迁移 | 同形态 | 同形态 |
+| 抽屉收起 | Esc + 8s 容忍等待（`.catch` 容关不掉——Esc 实际不收窗，靠超时吞掉） | ⌘J toggle 收起（对接 ADR 0013 D3 现行为） |
+| schedules 判据 | dialog 8 次重按可见 | dialog 可见（pressUntil） |
+| feature map / changelog | 未更新 | `features/hotkeys.md` + `changelog/2026-10-11-1181.md` 已更新 |
 
 ## 复跑配方
 
@@ -42,12 +55,18 @@ node .claude/skills/verify-pacman/scripts/drive-newtask-key.mjs
 
 ## 证据（before 红 / after 绿成对）
 
+两条车道各留一套成对证据，目录名区分车道：
+
 | 腿 | 结果 | 证据 |
 |---|---|---|
-| before · drive-hotkeys（迁移前 HEAD 跑） | `Meta+k never opened .search-panel` 崩于 pressUntil；kbd-hint 两 check 同栈红（#1008 退役的第二处欠账） | `before/hotkeys/run.log` |
-| before · drive-newtask-key（迁移前 HEAD 跑） | `waitForSelector('.search-panel')` 5s 超时崩 | `before/newtask-key/run.log` |
-| after · drive-hotkeys | 15/15 PASS | `after/hotkeys/run.log` + `result.json` |
-| after · drive-newtask-key | 18/18 PASS | `after/newtask-key/run.log` + `result.json` |
+| before · drive-hotkeys（#1202 车道，迁移前跑） | `Meta+k never opened .search-panel` 崩于 pressUntil；kbd-hint 两 check 同栈红 | `before/hotkeys/run.log` |
+| before · drive-newtask-key（#1202 车道，迁移前跑） | `waitForSelector('.search-panel')` 5s 超时崩 | `before/newtask-key/run.log` |
+| after · drive-hotkeys（#1202 车道） | 15/15 PASS | `after/hotkeys/run.log` + `result.json` |
+| after · drive-newtask-key（#1202 车道） | 18/18 PASS | `after/newtask-key/run.log` + `result.json` |
+| before · drive-hotkeys（#1205 车道，迁移前跑） | 同形状红 | `before-red/hotkeys/console.log` |
+| before · drive-newtask-key（#1205 车道，迁移前跑） | `waitForSelector('.search-panel')` 5s 超时崩 | `before-red/newtask-key/console.log` |
+| after · drive-hotkeys（#1205 车道） | 16/16 PASS | `after-green/hotkeys/result.json`（ok=true）+ console.log |
+| after · drive-newtask-key（#1205 车道） | 22/22 PASS | `after-green/newtask-key/result.json`（ok=true）+ console.log |
 
 双脚本 grep 零退役 class 残留（`search-panel` / `search-input-row`，
 审计清单除外）：
@@ -59,7 +78,7 @@ grep -n "search-panel\|search-input-row" \
 # (no matches)
 ```
 
-## 判读 gotcha（本轮实测）
+## 判读 gotcha（两车道实测）
 
 - **kbd-hint 退役是第二处同型欠账**：#1166 只迁了搜索载体，`drive-hotkeys`
   的 ⌘J 提示断言还钉在 #950 时代的 `.kbd-hint` 类上——#1008（#983 判决）把

@@ -71,17 +71,21 @@ const dbQuery = (fn) => {
 };
 
 /** 热键监听注册在被动 effect（hydration 后）——丢键重按，目标可见即停
- *  （e2e search-focus/hotkeys 同配方；open-only 热键重按幂等）。 */
-async function pressUntil(page, key, selector) {
+ *  （e2e search-focus/hotkeys 同配方；open-only 热键重按幂等）。
+ *  target 接受 CSS 串或语义 Locator（#1181 起两类并存：search 面板迁
+ *  role 载体后传 getByRole('dialog')；串形态走 .first() 保持原
+ *  waitForSelector 的首匹配语义，不受 strict mode 拘束）。 */
+async function pressUntil(page, key, target) {
+  const loc = (typeof target === 'string' ? page.locator(target) : target).first();
   for (let attempt = 0; attempt < 8; attempt += 1) {
     await page.keyboard.press(key);
-    const opened = await page
-      .waitForSelector(selector, { state: 'visible', timeout: 1000 })
+    const opened = await loc
+      .waitFor({ state: 'visible', timeout: 1000 })
       .then(() => true)
       .catch(() => false);
     if (opened) return;
   }
-  throw new Error(`${key} never opened ${selector}`);
+  throw new Error(`${key} never opened ${String(target)}`);
 }
 
 const stamp = Date.now() % 100000;
@@ -126,74 +130,54 @@ try {
   check('board-save', true, 'board 面 C 开 → 保存');
   await shot(page, '02-board-saved.png');
 
-  // 3b. FAB 的 ⌘J 悬浮提示（#468）。#1008 载体（#983 判决，XMON-14 落点的
-  // 第二代）：kbd-hint chip 退役 → registry Tooltip+Kbd 组合——静息 = tooltip
-  // 不挂载（挂载点是 body 级 portal，定位器走页面级）；悬浮浮出且内层 Kbd
-  // 文案 = ⌘J（hotkeys.spec「robot FAB surfaces the ⌘J hint」同律）。
-  // #950 载体：board FAB = aria-label 总管 钮。
-  const hint = page.locator('[data-slot="tooltip-content"]');
-  const hintCount = await hint.count();
-  await page.locator('button[aria-label="总管"]').hover();
-  await hint
-    .first()
-    .waitFor({ state: 'visible', timeout: 3000 })
-    .catch(() => {});
-  const hintRevealed = (await hint.count()) > 0 && (await hint.first().isVisible());
-  const hintText =
-    hintRevealed && (await hint.first().locator('[data-slot="kbd"]').count()) > 0
-      ? ((await hint.first().locator('[data-slot="kbd"]').textContent())?.trim() ?? null)
-      : null;
+  // 3b. FAB 的 ⌘J 悬浮提示（#468）随 #983/#1004/#1008 退役 .kbd-hint
+  // 类名，改 registry Tooltip + Kbd 组合承载——探法与 drive-1008 E1 同律：
+  // trigger = aria-label 总管 钮，tooltip 壳 = [data-slot="tooltip-content"]，
+  // 键帽 = 壳内 [data-slot="kbd"]。静息隐藏（tooltip 未挂载）与悬浮浮出
+  // （hover 后可见、键帽 ⌘J）两条可见性律不变。
+  const fab = page.getByRole('button', { name: '总管' });
+  const tooltip = page.locator('[data-slot="tooltip-content"]');
+  const restCount = await tooltip.count();
   check(
-    'kbd-hint-registry',
-    hintCount === 0 && hintRevealed && hintText === '⌘J',
-    `⌘J 提示:静息 n=${hintCount} 悬浮浮出=${hintRevealed} Kbd 文案=${JSON.stringify(hintText)}`,
+    'fab-tooltip-rest-hidden',
+    restCount === 0,
+    `静息 tooltip 数=${restCount}（未挂载=隐藏）`,
   );
-  await shot(page, '02b-kbd-hint.png');
+  await fab.hover();
+  await tooltip.waitFor({ state: 'visible', timeout: 5000 });
+  const tipKbd = await tooltip.locator('[data-slot="kbd"]').textContent();
+  check(
+    'fab-tooltip-hover-reveals',
+    tipKbd?.trim() === '⌘J',
+    `悬浮浮出，键帽=${JSON.stringify(tipKbd?.trim() ?? '缺失')}（registry Tooltip+Kbd）`,
+  );
+  await shot(page, '02b-fab-tooltip.png');
   await page.mouse.move(0, 0);
-  // tooltip 卸载有延迟，鼠标移开后等它消失再进入下一段（避免 tooltip 干扰
-  // 后续 focus 读取）。
-  await hint.first().waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  await tooltip.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
   // 4. 输入态负向：⌘K 面板输入框持焦时 C / ⌘J 均不误触，字符照常入框
-  // #1181 迁语义载体（spec 22 §5，#949/#910 裁定后类名退役，与 e2e
-  // search-focus.spec.ts / drive.mjs search probe 同律）：面板 = role
-  // dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。
-  const searchPanel = page.getByRole('dialog', { name: '搜索' });
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await searchPanel
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) break;
-    if (attempt === 7) throw new Error('Meta+k never opened 搜索 dialog');
-  }
-  const searchField = searchPanel.getByRole('textbox');
+  // #1166/#1181 载体（#949/#910 裁定后类名退役，与 e2e search-focus.spec.ts
+  // 同律）：面板 = role dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。
+  await pressUntil(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
+  const searchField = page.getByRole('dialog', { name: '搜索' }).getByRole('textbox');
   await page.keyboard.press('c');
   await page.keyboard.press(' ');
-  // ⌘J 的守卫同律：输入态吞键（#442 editable-only guard）——按 #468 toggle
-  // 律，搜框内按 ⌘J 只许关它自己开的面；面板开着 → 抽屉必须保持关闭。
+  // ⌘J 的守卫同律：输入态吞键（#442 editable-only guard）
   await page.keyboard.press('Meta+j');
   const dialogCount = await page.locator('.new-task-dialog').count();
-  const drawerOpen = await page
-    .locator('.chief-drawer')
-    .first()
-    .isVisible()
-    .catch(() => false);
+  // ADR 0013 D6：抽屉随根 layout 单实例常驻挂载（关态 hidden-but-mounted），
+  // 开态判据 = 可见性不是计数——e2e hotkeys.spec「swallows C and ⌘J」同律。
+  const drawerOpen = await page.locator('.chief-drawer').first().isVisible();
   const typed = await searchField.inputValue();
   check(
     'editable-guard',
     dialogCount === 0 && !drawerOpen && typed === 'c ',
-    `输入态:dialog=${dialogCount} drawer=${drawerOpen} 入框=${JSON.stringify(typed)}`,
+    `输入态:dialog=${dialogCount} drawer开=${drawerOpen} 入框=${JSON.stringify(typed)}`,
   );
   await page.keyboard.press('Escape');
 
-  // 5. ⌘J 呼出总管抽屉，焦点在草稿框；Esc 关（#442 起 ⌘J 取代 Space）。
-  // #950 载体：抽屉 = aria-label 总管 的 aside（.chief-drawer 类仍是零规则
-  // 钩子，作结构锚点存活——chief-root.tsx 注释「零规则载体钩子」同源）。
-  // Esc 关抽屉后 Base UI 的退出动画期内 aside 仍可见——按 hidden 等待即可
-  // （waitFor state:hidden 会穿过动画看到终态），超时容忍（冷栈首开动画慢）。
-  const chiefDrawer = page.locator('.chief-drawer');
+  // 5. ⌘J 呼出总管抽屉，焦点在草稿框；⌘J toggle 收起（#442 起 ⌘J 取代 Space；
+  // ADR 0013 D3：Esc 不收窗，收起走 ⌘J toggle，e2e 同律）
   await pressUntil(page, 'Meta+j', '.chief-drawer');
   // #950 载体：草稿框焦点判定改 data-testid（旧 chief-composer-input 类退役，
   // Textarea 件上只有 data-testid="chief-composer-input"）。
@@ -202,26 +186,14 @@ try {
   );
   check('cmdj-wakes-focused', composerFocused, '⌘J 开抽屉且草稿框持焦');
   await shot(page, '03-chief-drawer.png');
-  await page.keyboard.press('Escape');
-  await chiefDrawer.first().waitFor({ state: 'hidden', timeout: 8000 }).catch(() => {});
+  await page.keyboard.press('Meta+j');
+  await page.locator('.chief-drawer').first().waitFor({ state: 'hidden', timeout: 5000 });
 
-  // 6. 非看板页（/app/schedules）C 开全局 dialog（AppSidebar 内面）→ 保存。
-  // pressUntil 的 1s/次探测在 schedules 冷栈首编译下可能全程赶不上，给足
-  // 8 次重按（e2e 同配方 6 次起步，这里翻倍容编译窗）。
+  // 6. 非看板页（/app/schedules）C 开全局 dialog（AppSidebar 内面）→ 保存
   await page.goto(`${WEB}/app/schedules`);
   await page.waitForSelector('.page-shell', { timeout: 15_000 });
-  let schedulesOpened = false;
-  for (let attempt = 0; attempt < 8; attempt += 1) {
-    await page.keyboard.press('c');
-    schedulesOpened = await page
-      .locator('.new-task-dialog')
-      .first()
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (schedulesOpened) break;
-  }
-  check('schedules-c-opens', schedulesOpened, 'schedules 页原地开 dialog');
+  await pressUntil(page, 'c', '.new-task-dialog');
+  check('schedules-c-opens', page.url().includes('/app/schedules'), 'schedules 页原地开 dialog');
   await page.fill('.new-task-spec', titleSched);
   await page.click('.new-task-save');
   await page.waitForSelector('.new-task-dialog', { state: 'hidden', timeout: 5000 });
