@@ -37,10 +37,10 @@ import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
+import { createUploadUrls, receivePlanUpload, receiveUpload } from './services/machine-uploads.js';
 import {
   authorizeEnrollmentMachine,
   claimStep,
-  createUploadUrls,
   enrollMachine,
   executeRelayToolCall,
   fetchSteer,
@@ -57,8 +57,6 @@ import {
   markOffline,
   markPresence,
   precheckShellCommand,
-  receivePlanUpload,
-  receiveUpload,
   recoverSteps,
   reportActivity,
   reportShellResult,

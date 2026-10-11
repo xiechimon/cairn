@@ -3,7 +3,10 @@
 //   （r3 §1.2 实测，按 key/team 认机器 [推断]）。
 // - claim：长轮询领取（~75s 节奏，r3 §1.5）+ wake 即时唤醒；step 队列 server
 //   持有、机器 claim 三类步（02 §4.2/A6）。
-// - journal：heartbeat/tool/done/upload-urls/token（02 §5.4 词表）。
+// - journal：heartbeat/tool/done/token（02 §5.4 词表）。
+// verb 面（#1134 拆分）：产物上传 = machine-uploads.ts（journal 内核
+//   ownedStep / publishStepStatus / upsertMessage / upsertChiefRow 自本模块
+//   导出供其消费）。
 // 载荷细形 r3 未采处 = [推断]/[设计]（04 §3 不判负口径），补采后回写 02 §11。
 
 import { createHash } from 'node:crypto';
@@ -27,7 +30,6 @@ import type {
   StepRecord,
   ToolCallRecord,
   TranscriptRow,
-  TranscriptUpload,
   UserRecord,
 } from '@pacman/shared';
 import {
@@ -172,8 +174,9 @@ export interface MachineDeps {
   githubFetch?: FetchLike;
 }
 
-/** 步状态位透出会话流（journal 状态 [内部] 列 → step 事件 [设计]）。 */
-function publishStepStatus(deps: MachineDeps, stepId: string): void {
+/** 步状态位透出会话流（journal 状态 [内部] 列 → step 事件 [设计]）。verb 面
+ * 拆分模块（machine-uploads.ts 等）同消费，journal 内核导出面。 */
+export function publishStepStatus(deps: MachineDeps, stepId: string): void {
   if (!deps.convHub) return;
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) return;
@@ -1197,7 +1200,9 @@ export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: stri
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
 
-function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {
+/** 机器步所有权校验（journal 内核导出面：verb 面拆分模块共用同一条判据——
+ * 未知步 404、他机步 404「(not yours)」，不做第二份实现）。 */
+export function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);
@@ -1728,8 +1733,9 @@ type MessageRowInput = {
 };
 
 /** transcript 行幂等落库 + 会话流即时推送（live 工具行与终稿上传共用；
- * 与终稿按 id 去重 = onConflict upsert [设计]）。 */
-function upsertMessage(
+ * 与终稿按 id 去重 = onConflict upsert [设计]）。journal 内核导出面
+ * （machine-uploads.ts 终稿上传同消费）。 */
+export function upsertMessage(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { conversationId: string },
 ): void {
@@ -1744,8 +1750,9 @@ function upsertMessage(
   deps.convHub?.publishMessage(row.conversationId, row);
 }
 
-/** chief 线程行同形（chief_message 表 + 会话流键 = chief-<threadId>）。 */
-function upsertChiefRow(
+/** chief 线程行同形（chief_message 表 + 会话流键 = chief-<threadId>）。
+ * journal 内核导出面（machine-uploads.ts 终稿上传同消费）。 */
+export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { threadId: string },
 ): void {
@@ -1861,131 +1868,6 @@ function chiefStepToken(
     secrets: bundle.secrets,
     git: null,
   };
-}
-
-// —— upload-urls（预签名产物上传，r3 §1.6；self-host = server 自出一次性
-// PUT 端点 [设计]，无对象存储）———————————————————————————————————————————————
-
-export interface PendingUpload {
-  stepId: string;
-  name: string;
-  machineId: string;
-}
-
-export function createUploadUrls(
-  deps: MachineDeps,
-  machineId: string,
-  stepId: string,
-  files: { name: string }[],
-  origin: string,
-  uploads: Map<string, PendingUpload>,
-): { uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[] } {
-  ownedStep(deps, machineId, stepId);
-  const out = files.map((f) => {
-    const uploadId = newRecordId();
-    uploads.set(uploadId, { stepId, name: f.name, machineId });
-    return {
-      name: f.name,
-      url: `${origin}/api/machine/upload/${uploadId}`,
-      method: 'PUT' as const,
-      headers: {},
-    };
-  });
-  return { uploads: out };
-}
-
-/** plan.md 产物落库（M3b；02 §4.2/r5 §4「plan 即文件（plan.md），版本 =
- * 文件版本」）：每上传一版插一行 plan（version = max+1，驳回重规划轮自然
- * v2）+ build.planDocId 指向最新版（documents/{id}/diff 的 {id} 同值，
- * diff 端点面归 M4）。
- * #1027 入参校验：只接受处于规划语义的步（kind=plan 且未收尾）——此前只验
- * 机器归属，机器可对自持的 build/review 步落方案版本。非 plan kind = 400
- * （chiefStepToken「is not a … step」同族）；已收尾 = 409（恢复真路径只对
- * 仍 claimed 的步重传——recover 只返回 claimed，收尾后的迟到上传是改写
- * 历史版本面）。
- * #1026 幂等（键 = 步+内容）：「PUT 成功 / done 失败 → 恢复重传」把同一份
- * 内容再传一次时不落重复版本——最新版本就是本步同文产物时原样复用（版本/
- * 内容不动，planDocId 重指同 id = 幂等）。换步同文（驳回重规划轮照抄）不
- * 去重：版本面如实记录「新一轮规划发生过」。 */
-export function receivePlanUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
-  const stepRow = ownedStep(deps, upload.machineId, upload.stepId);
-  if (stepRow.kind !== 'plan') {
-    throw new HttpError(400, `step ${upload.stepId} is a ${stepRow.kind} step, not a plan step`);
-  }
-  if (stepRow.status !== 'claimed') {
-    throw new HttpError(409, `step ${upload.stepId} is ${stepRow.status}, plan upload rejected`);
-  }
-  const buildId = stepRow.buildId;
-  if (!buildId) throw new NotFoundError(`step ${upload.stepId}`);
-  const last = deps.db
-    .select({
-      id: planTable.id,
-      version: planTable.version,
-      content: planTable.content,
-      stepId: planTable.stepId,
-    })
-    .from(planTable)
-    .where(eq(planTable.buildId, buildId))
-    .orderBy(desc(planTable.version))
-    .limit(1)
-    .get();
-  if (last !== undefined && last.stepId === upload.stepId && last.content === content) {
-    deps.db.update(build).set({ planDocId: last.id }).where(eq(build.id, buildId)).run();
-    publishStepStatus(deps, upload.stepId);
-    return;
-  }
-  const id = newRecordId();
-  deps.db
-    .insert(planTable)
-    .values({
-      id,
-      buildId,
-      version: (last?.version ?? 0) + 1,
-      content,
-      stepId: upload.stepId,
-      createdAt: nowMs(),
-    })
-    .run();
-  deps.db.update(build).set({ planDocId: id }).where(eq(build.id, buildId)).run();
-  // 落库即发会话流 step 事件（XMON-59 第二断口）：plan 行此前静默落库，web
-  // ['plans', buildId] 在挂载取数读早于提交时无人再失效（方案卡停 v1/空）。
-  // step 事件是既有 web 失效面（sse.ts step 分支已列 plans——message 事件与
-  // plan.md 上传赛跑的兜底），把发布点从 done 收尾提前到落库点：done 面失
-  // 联/延迟/重放均不吞。载荷 = 当前 step 行（stepJournalRow 单源形状）。
-  publishStepStatus(deps, upload.stepId);
-}
-
-/** transcript 终稿落库（02 §1.3 数据所有权：transcript 消息/工具行经上传回传
- * 落 server DB）；id 幂等 upsert（与 tool live 行去重）。 */
-export function receiveUpload(
-  deps: MachineDeps,
-  upload: PendingUpload,
-  body: TranscriptUpload,
-): void {
-  ownedStep(deps, upload.machineId, upload.stepId);
-  if (body.stepId !== upload.stepId) throw new NotFoundError(`upload for step ${upload.stepId}`);
-  const stepRow = deps.db.select().from(step).where(eq(step.id, upload.stepId)).get();
-  const conversationId = stepRow?.buildId;
-  if (!conversationId) throw new NotFoundError(`step ${upload.stepId}`);
-  for (const m of body.messages) {
-    if (isChiefConversation(conversationId)) {
-      upsertChiefRow(deps, {
-        id: m.id,
-        threadId: conversationId,
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-      });
-      continue;
-    }
-    upsertMessage(deps, {
-      id: m.id,
-      conversationId,
-      role: m.role,
-      content: m.content,
-      createdAt: m.createdAt,
-    });
-  }
 }
 
 // —— done（步骤收尾 + phase 推进 + token 记账，02 §5.4/§4.2）——————————————————

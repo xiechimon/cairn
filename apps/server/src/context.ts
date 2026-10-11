@@ -4,8 +4,8 @@ import type { SecretBox, TeamRecord, UserRecord } from '@pacman/shared';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
+import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
-import type { PendingUpload } from './services/machines.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 
