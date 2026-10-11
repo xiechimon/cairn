@@ -37,6 +37,7 @@ import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
+import { precheckShellCommand, reportShellResult } from './services/machine-shell.js';
 import { createUploadUrls, receivePlanUpload, receiveUpload } from './services/machine-uploads.js';
 import {
   authorizeEnrollmentMachine,
@@ -56,10 +57,8 @@ import {
   machineSkillsManifest,
   markOffline,
   markPresence,
-  precheckShellCommand,
   recoverSteps,
   reportActivity,
-  reportShellResult,
   reportTool,
   reportTranscriptDelta,
   reportTranscriptRow,
@@ -507,7 +506,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   // 登记位）：远程 shell 每命令预检——双闸（agent「远程 shell」开关 ∩
   // machine.shellEnabled）每调用重读 + 审计行先于放行落库。2xx ⇔ allowed
   // （响应 {allowed:true, runId}）；拒绝 = 403 {error: 原因}（denied 审计行
-  // 已落库）。服务层 = services/machines.ts precheckShellCommand。 ——————————
+  // 已落库）。服务层 = services/machine-shell.ts precheckShellCommand。 ——————
   app.post('/api/machine/shell/:stepId', async (c) => {
     const row = me(c);
     const body = parseWith(machineShellPrecheckBodySchema, await jsonBody(c), 'body');
@@ -517,7 +516,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   // —— POST /api/machine/shell/{runId}/result（XMON-108 R1，MACHINE_WIRE
   // EXTENSIONS 登记位）：daemon 按预检下发的 runId 回写执行终态
   // （done/failed；running → 终态只写一次，重复回写幂等 200）。跨机回写 = 403
-  // （sync-result 同律）。服务层 = reportShellResult。 ——————————————————————
+  // （sync-result 同律）。服务层 = machine-shell.ts reportShellResult。 ——————
   app.post('/api/machine/shell/:runId/result', async (c) => {
     const row = me(c);
     const body = parseWith(machineShellResultBodySchema, await jsonBody(c), 'body');
