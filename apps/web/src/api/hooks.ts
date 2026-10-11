@@ -39,6 +39,7 @@ import type {
   PatchAgentBody,
   PatchChiefBody,
   PatchMachineBody,
+  PatchProjectBody,
   PatchUserBody,
   PlanRow,
   ProjectCommitDetailResponse,
@@ -773,6 +774,14 @@ export function useApiMutations(teamId: string | undefined) {
     createProject: useMutation({
       mutationFn: (body: CreateProjectBody) =>
         api.post<ProjectRecord>('/api/projects', { ...body, ...(teamId ? { teamId } : {}) }),
+      onSuccess: invalidateAll,
+    }),
+    // #1213/ADR 0017：github 形态项目 localPath 加速位写面（设置页字段）。
+    // body 单源 = shared patchProjectBodySchema——清除必须发**显式 null**
+    // （缺键 = 不动是另一态，#1169 序列化坑族：undefined 会被 stringify 丢键）。
+    patchProject: useMutation({
+      mutationFn: (input: { id: string; body: PatchProjectBody }) =>
+        api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
       onSuccess: invalidateAll,
     }),
     // #440 原生文件夹选取（ADR 0003）：取消 = {path:null} 正常结局非错误面；

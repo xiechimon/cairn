@@ -1,0 +1,2 @@
+2026-10-11 22:58:36 [workspace] Repo source: github-clone (local-path /definitely/not/here-1213-1791730621740 not found)
+2026-10-11 22:58:36 [workspace] Cloning octocat/Hello-World (branch: main)

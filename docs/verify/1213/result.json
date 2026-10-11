@@ -1,0 +1,90 @@
+{
+  "probe": "drive-1213-dual-source",
+  "server": "http://127.0.0.1:8791",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0304-1213-dual-execution-source/.claude/verify-run/home/server/server.db",
+  "ghRepo": "octocat/Hello-World",
+  "localSourceSeed": "https://github.com/octocat/Hello-World.git cloned, master ref rewound to a stale commit",
+  "daemonHomes": {
+    "a": "/tmp/pacman-1213-daemon-a-1791730621740",
+    "b": "/tmp/pacman-1213-daemon-b-1791730621740"
+  },
+  "passed": 15,
+  "total": 15,
+  "checks": [
+    {
+      "name": "POST github 项目 201（kind=github 无 localPath）",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "PATCH 挂 localPath 200 + record 回显（松绑面：server 只验形态不验存在）",
+      "ok": true,
+      "detail": "200 localPath=/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1213-local-k0n8ms/Hello-World"
+    },
+    {
+      "name": "SQLite project 行 localPath 落库（githubRepo 与加速位并存）",
+      "ok": true,
+      "detail": "{\"repoKind\":\"github\",\"githubRepo\":\"octocat/Hello-World\",\"localPath\":\"/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1213-local-k0n8ms/Hello-World\"}"
+    },
+    {
+      "name": "设置页显示本机加速路径字段且值为 server 真值",
+      "ok": true,
+      "detail": "shown=/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1213-local-k0n8ms/Hello-World"
+    },
+    {
+      "name": "设置页改值落 PATCH：record.localPath = 新路径",
+      "ok": true,
+      "detail": "localPath=/definitely/not/here-1213-1791730621740"
+    },
+    {
+      "name": "PATCH 恢复有效加速位（腿 A 前置）",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "daemon A 日志：走本地源（Repo source: local-path）",
+      "ok": true,
+      "detail": "2026-10-11 22:57:10 [workspace] Repo source: local-path /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1213-local-k0n8ms/Hello-World"
+    },
+    {
+      "name": "build 1 步入终态（材料化已完成；stub 零改动 failed 属预期）",
+      "ok": true,
+      "detail": "{\"id\":\"kOIp08aESSWpPgPAUDooB\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "daemon A 基座 origin 重指 GitHub 真值 URL",
+      "ok": true,
+      "detail": "origin=https://github.com/octocat/Hello-World.git"
+    },
+    {
+      "name": "新鲜度不松：本地源落后一提交，fetch 后 origin tip 与 worktree HEAD = 真值远端 tip（非本地旧 sha）",
+      "ok": true,
+      "detail": "convHead=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d remoteTip=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d tip=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d stale=553c2077f0edc3d5dc5d17262f6aa498e69d6f8e"
+    },
+    {
+      "name": "PATCH localPath → 不存在路径（回落腿前置）",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "daemon B 日志：静默回落 GitHub（Repo source: github-clone + 原因）",
+      "ok": true,
+      "detail": "2026-10-11 22:58:36 [workspace] Repo source: github-clone (local-path /definitely/not/here-1213-1791730621740 not found)"
+    },
+    {
+      "name": "build 2 步入终态（回落 clone 后照常开工，不报错不卡步）",
+      "ok": true,
+      "detail": "{\"id\":\"164R5B5MZYAYpOvRSDMJb\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "daemon B 基座 = 真 GitHub clone（origin 直指真值 URL）",
+      "ok": true,
+      "detail": "origin=https://github.com/octocat/Hello-World.git"
+    },
+    {
+      "name": "daemon B worktree HEAD = 真值远端 tip",
+      "ok": true,
+      "detail": "convHead=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d remoteTip=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d tip=7fd1a60b01f91b314f59955a4e4d4e80d8edf11d"
+    }
+  ]
+}

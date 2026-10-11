@@ -541,6 +541,9 @@ export async function runStep(
         cloneUrl: repo.cloneUrl,
         workspacesRoot: deps.workspacesDir,
         credentials: creds.git,
+        // 双执行源（ADR 0017 / #1213）：github 形态加速位随 claim 载荷透传到
+        // workspace 物化处做选源；其余形态 null（现行为）。
+        localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
       });
     } catch (err) {
       clearCredentials(creds);

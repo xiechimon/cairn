@@ -21,6 +21,7 @@ import { useLiveData } from '../api/provider.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card, CardContent, CardHeader } from '../components/ui/card.js';
+import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { markDeleted } from '../fixtures/deletions.js';
 import { PROJECT_INITIAL } from '../fixtures/fixtures.js';
@@ -59,6 +60,9 @@ export function ProjectSettingsPage() {
   const fixture = resolveScenario(searchParams);
   const [tab, setTab] = useState('basic');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  // #1213/ADR 0017：github 形态 localPath 加速位草稿态——null = 未编辑，
+  // 显示值回落 server 真值；保存成功后清草稿（invalidate 重取收敛）。
+  const [accelDraft, setAccelDraft] = useState<string | null>(null);
   // M5 live：设置行 = GET /api/projects 检索真值（名称/仓库/托管 chip）。
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
@@ -128,6 +132,46 @@ export function ProjectSettingsPage() {
               </Badge>
             </span>
           </CardContent>
+          {/* #1213/ADR 0017 双执行源：github 形态显示「本机加速路径」——
+              githubRepo 恒为真值源，localPath 只是同机执行加速位（daemon 侧
+              双条件判定，失格静默回落 GitHub clone）。清空保存 = 显式 null
+              （wire 契约，不是不带键）。其余形态不显示（local 形态的
+              localPath 是创建闸绑定，不在本面改写）。 */}
+          {live && wireProject?.repoKind === 'github' && (
+            <CardContent className={ROW_CLS}>
+              <span className={LABEL_CLS}>{t('本机加速路径')}</span>
+              <span className={VALUE_CLS}>
+                <Input
+                  aria-label={t('本机加速路径')}
+                  className="h-8 w-72 font-mono"
+                  placeholder={t('绝对路径，留空即清除')}
+                  value={accelDraft ?? wireProject.localPath ?? ''}
+                  onChange={(event) => setAccelDraft(event.target.value)}
+                />
+                <Button
+                  size="sm"
+                  disabled={
+                    mutations.patchProject.isPending ||
+                    (accelDraft ?? wireProject.localPath ?? '') === (wireProject.localPath ?? '')
+                  }
+                  onClick={() => {
+                    if (id === undefined) return;
+                    const next = (accelDraft ?? '').trim();
+                    mutations.patchProject.mutate(
+                      // 空串归一 null（空 ≡ 未设，与 server 侧同口径）。
+                      { id, body: { localPath: next === '' ? null : next } },
+                      {
+                        onSuccess: () => setAccelDraft(null),
+                        onError: (error) => toastError(t('保存失败，请重试。'), error),
+                      },
+                    );
+                  }}
+                >
+                  {t('保存')}
+                </Button>
+              </span>
+            </CardContent>
+          )}
           <CardContent className={ROW_CLS}>
             <span className={LABEL_CLS}>{t('描述')}</span>
             <span className={`${VALUE_CLS} text-muted-foreground`}>
