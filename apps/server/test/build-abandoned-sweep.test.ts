@@ -628,7 +628,9 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('钉选在线 + runtime 开：不动（步等它认领，合法排队——闸判负例）', () => {
+  test('钉选在线 + runtime 开 + 满载：不动（步在它队列里排队，合法——闸判负例）', () => {
+    // #1219 起该负例的成立条件收紧到「满载」：有闲位的在线不领超宽限 = 楔住
+    // 按失败收尾（见 queued-cancel-release.test.ts ④c）；满载 = 真排队不动。
     const w = makeWorld({
       status: 'pending',
       createdAgo: PIN_OFFLINE_GRACE_MS * 3,
@@ -638,6 +640,23 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
       machineRuntimes: ['pi', 'claude-code'],
       pin: 'self',
     });
+    // 满载：钉选机的并发位被在跑步占满（makeWorld 机器缺省 maxConcurrent=3）。
+    for (let i = 0; i < 3; i++) {
+      const loadStepId = `step-load-${i}-${Math.random().toString(36).slice(2)}`;
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: loadStepId,
+          buildId: w.buildId,
+          kind: 'build',
+          status: 'claimed',
+          machineId: w.machineId,
+          claimedAt: w.base - 60_000,
+          lastHeartbeatAt: w.base,
+          createdAt: w.base,
+        })
+        .run();
+    }
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 

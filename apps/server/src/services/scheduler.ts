@@ -19,7 +19,13 @@ import { build, schedule, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { ATTACHMENT_GC_INTERVAL_MS, type GcLogger, sweepAttachments } from './attachment-gc.js';
-import { type BuildDeps, startBuilds, sweepAbandonedBuildSteps, toBuildRecord } from './builds.js';
+import {
+  type BuildDeps,
+  startBuilds,
+  sweepAbandonedBuildSteps,
+  sweepZombieQueuedTodos,
+  toBuildRecord,
+} from './builds.js';
 import { failAbandonedChiefSteps, fireDueChiefWakes } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
@@ -138,6 +144,9 @@ export function createScheduler(
     // 的 pending 步按失败收尾（step 事件 + build.errorMessage + todo → failed，
     // 与机器报失败同漏斗）。
     sweepAbandonedBuildSteps(deps, now);
+    // #1219 僵尸 reconcile：queued 却无活步的 todo（旧 cancel 裸 UPDATE /
+    // 崩溃窗口遗留）回落释放——不修则 run_builds 409 queued→queued 停摆。
+    sweepZombieQueuedTodos(deps, now);
     // #759 附件回收：tick piggyback，每小时最多扫一次（启动首 tick 即补扫）。
     // sweep 自带 try/catch——回收失败不许打断定时闭环。
     if (gc !== undefined && gc !== null && now - lastGcAt >= ATTACHMENT_GC_INTERVAL_MS) {
