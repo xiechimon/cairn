@@ -129,6 +129,17 @@ node .../scripts/drive-provider-picker.mjs   # 添加服务商 picker(provider-p
 node .../scripts/drive-machines-local.mjs    # machines 本机行+switches(machines-local-row.md,spec 11 A8/A9)
 ```
 
+## ego 真点击走查（UI 面票判断层）
+
+脚本探针 = 回归层（可复跑、进 CI）；ego-browser 真点击走查 = 判断层（「这行字该不该存在」「掠过烦不烦」「信息层级对不对」——这类需求本源是用户的眼睛，UI 面票 agent 自己必须在真浏览器里以用户身份走一遍，否则 dogfood 环不闭；2026-10-10 #1175 用户裁决立本节）。
+
+- **适用面**：改 `apps/web/src` 可见面的票（布局/组件/文案上屏/交互）；纯 backend/wire 票不硬套。
+- **两遍**：实现前对当前 build 走一遍形成自己的产品判断（发现即 triage 输入）；实现后走一遍验手感。
+- **走查读数三件**：① 横穿计量——指针匀速掠过触发面去相邻控件，采样弹层开态次数与残留（delay=0 路过闪的读数化）；② hover 保持 + 键盘 Tab 到控件（focus-visible 应弹）；③ 真点击写链（拨/填/提交 → API + SQLite 回读 → 复原）。
+- 手感能度量的度量掉；度量不了的（十分钟累积烦感）在走查记录里明标「仍需人眼」，不假装。
+- **证据**：截图 + 读数归档 `docs/verify/<票号>/ego-*.png` 与走查 JSON；ego 会话不可复跑，回归仍以脚本探针为正源——ego 不取代探针。
+- **车道纪律**：ego 驱动用户真 Chrome 只连隔离栈（`VERIFY_WEB_PORT`），绝不连用户活跃 dev 栈 5173/8787；worktree 闸拦 heredoc → 脚本落 /tmp 再朴素 `bash /tmp/<x>.sh` 调用。
+
 ## Evidence
 
 证据目录 = `VERIFY_EVIDENCE_DIR`(默认**主仓** `<主仓>/.claude/verify-evidence/<时间戳>-<probe>/`),含 `result.json`(probe、checks 逐条 ok/label、stack 坐标)+ 截图 PNG。**cleanup 不删证据**;proof 标准 = 截图可见动作前后态 + result.json 的 checks 全 ok + API/DB 真值字段(不是只看终屏)。
