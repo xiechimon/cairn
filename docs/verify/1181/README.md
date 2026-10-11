@@ -71,3 +71,15 @@ grep -n "search-panel\|search-input-row" \
   报 `drawer=1`——DOM 常驻的 `.chief-drawer`（`display:none`）在
   `count()` 断言下恒 1。守卫的真语义是「不可见」（#468 toggle 律），不是
   「零节点」。
+
+## Carrier map (retired selector -> current semantic carrier)
+
+| retired selector | current carrier | where |
+|---|---|---|
+| `.search-panel` (wait open) | `role=dialog` named 搜索 | drive-hotkeys.mjs, drive-newtask-key.mjs |
+| `.search-input-row input` | textbox inside the dialog scope | drive-hotkeys.mjs |
+| `.search-panel` (wait hidden) | dialog detached / absent | drive-newtask-key.mjs |
+| board row target | `[data-row-kind="todo"]` | drive-newtask-key.mjs |
+
+The drawio variant of this map was removed: drawio diagrams are retired
+(2026-10-11); this table is the canonical carrier reference for #1181.
