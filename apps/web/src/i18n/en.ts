@@ -571,11 +571,22 @@ export const EN: Record<string, string> = {
   将改动合并到默认分支: 'Merge the changes into the default branch',
   // XMON-89 合并被拒的可见化：前置缺项行（{tools} = 1~2 个开关名的顿号串；
   // 开关名本身是 shared AGENT_TOOL_SWITCHES 的 zh 值域词，locate 后仍按 zh
-  // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 非 403 失败的固定
-  // 兜底句（403 的 server 原文不翻译：它逐字点名缺哪项，翻一遍反而对不上）。
+  // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 5xx/网络失败的
+  // 固定兜底句（4xx 的 server 原文不翻译：它逐字点名拒因，翻一遍反而对不
+  // 上）。#1236：完成弹层的勾选分流反馈四串（合并委派回执 / 不合并完成回
+  // 执 / 目标缺位报错 / 不合并腿兜底句）＋ failed 卡勾选锁定行。
   '缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。':
     'Missing the "{tools}" permission, so this merge cannot go through. Turn it on in the agent’s permissions.',
   '合并请求未送出，请重试。': 'The merge request was not sent. Try again.',
+  '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
+  '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
+    'Todo data is not ready, so the request was not sent. Refresh the page and try again.',
+  '已发起合并，机器执行完成后任务进入已完成。':
+    'Merge started. The todo moves to done once the machine finishes the merge.',
+  '任务已完成，改动保留在会话分支。':
+    'Todo completed. The changes stay on the conversation branch.',
+  '失败任务只能经合并完成，不能跳过合并。':
+    'A failed todo can only be completed through the merge; merging cannot be skipped.',
   输入: 'Input',
   输出: 'Output',
   缓存读取: 'Cache read',

@@ -39,14 +39,16 @@ export function missingMergeTools(tools: readonly string[] | null | undefined): 
   return MERGE_GATE_TOOLS.filter((tool) => !tools.includes(tool));
 }
 
-/** 服务端拒绝的可见文案。403 = 闸自己给的、点名缺哪项的句子，原样透出（它
- *  就是可操作的那一半）；其余失败（5xx / 网络）的原文对用户不可操作，且网络
- *  级的原文是英文串，混进中文面反而更糊——退一句固定话（同律见
- *  agent-detail-page 的保存失败文案）。 */
-export function mergeRejectCopy(error: unknown, t: TFunc): string {
-  return error instanceof ApiError && error.status === 403
+/** 服务端拒绝的可见文案。4xx = server 带着可操作理由拒的（403 点名缺哪项
+ *  授权、409 点名相位漂移/双 PR 守卫），原样透出——压成固定句会丢理由，还
+ *  把「送出了被拒」说成「未送出」（#1236）。5xx / 网络失败的原文对用户不可
+ *  操作，且网络级的原文是英文串，混进中文面反而更糊——退一句固定话（同律见
+ *  agent-detail-page 的保存失败文案）；fallback 可覆写（不合并完成腿的失败
+ *  不是「合并请求」）。 */
+export function mergeRejectCopy(error: unknown, t: TFunc, fallback?: string): string {
+  return error instanceof ApiError && error.status < 500 && error.message !== ''
     ? error.message
-    : t('合并请求未送出，请重试。');
+    : (fallback ?? t('合并请求未送出，请重试。'));
 }
 
 /** 执行 Agent 的授权集：live = GET teams/{id}/members 的 actor 投影（server

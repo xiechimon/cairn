@@ -49,7 +49,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { BranchDialog } from '../detail/branch-dialog.js';
 import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
@@ -442,6 +442,12 @@ export function BoardPage() {
   const mergeMissing = useMergeGate(
     live ? (overlayWire?.assignment?.build?.agentId ?? null) : null,
   );
+  // #1236 不合并完成腿的在飞判据：patchTodo 是多用途写面（拖拽落位/重置），
+  // 只有弹层目标卡的 phase done 在飞请求才计入 confirming 禁用位。
+  const donePatchPending =
+    mutations.patchTodo.isPending &&
+    mutations.patchTodo.variables?.body.phase === 'done' &&
+    mutations.patchTodo.variables?.id === overlayTodo?.id;
   const openFor = (todo: TodoRecord, kind: OverlayState['kind']) => {
     setOverlayTodo(todo);
     setOverlay({ kind });
@@ -656,13 +662,44 @@ export function BoardPage() {
         onClose={closeOverlay}
         missingTools={mergeMissing}
         rejectReason={mergeReject}
+        mergeLocked={overlayWire?.phase === 'failed'}
+        confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={
-          live && overlayTodo?.latestBuildId
-            ? () => {
-                // XMON-89：关弹层改挂 onSuccess——被拒（403）时弹层留着显原
-                // 因，不再静默关掉。
-                mutations.mergeBuild.mutate(overlayTodo.latestBuildId as string, {
-                  onSuccess: () => closeOverlay(),
+          live
+            ? (merge) => {
+                // 目标取 overlayWire（列表读面现值）兜底 overlayTodo（开窗快照）
+                // ——rework 轮换过 latestBuildId 时快照会指旧 build。#1236：
+                // live 面确认钮恒有真动作，目标缺位时弹层不关、alert 行点名
+                // 原因，不再静默关闭。
+                const target = overlayWire ?? overlayTodo;
+                if (target == null || target.latestBuildId == null) {
+                  setMergeReject(t('任务数据未就绪，完成请求未送出。请刷新页面后重试。'));
+                  return;
+                }
+                if (!merge) {
+                  // 不勾 = 完成但不合并（todo 级改相，#901 done 落位闸同一写
+                  // 面语义，server 落 DONE_ANNOUNCEMENT 审计行）。
+                  mutations.patchTodo.mutate(
+                    { id: target.id, body: { phase: 'done' } },
+                    {
+                      onSuccess: () => {
+                        closeOverlay();
+                        toastSuccess(t('任务已完成，改动保留在会话分支。'));
+                      },
+                      onError: (error) =>
+                        setMergeReject(mergeRejectCopy(error, t, t('完成请求未送出，请重试。'))),
+                    },
+                  );
+                  return;
+                }
+                // XMON-89：关弹层改挂 onSuccess——被拒（403/409）时弹层留着
+                // 显原因；#1236：202 委派到相位推进之间隔着机器执行，toast
+                // 是这段窗口的可见回执。
+                mutations.mergeBuild.mutate(target.latestBuildId, {
+                  onSuccess: () => {
+                    closeOverlay();
+                    toastSuccess(t('已发起合并，机器执行完成后任务进入已完成。'));
+                  },
                   onError: (error) => setMergeReject(mergeRejectCopy(error, t)),
                 });
               }

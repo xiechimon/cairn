@@ -3,25 +3,32 @@
 // checked by default (`将改动合并到默认分支`), footer 取消 + 完成. Fixture
 // phase: 完成 closes the dialog, no state transition yet (M5 cuts the
 // fixture cord).
+//
+// 勾选语义（#1236，参照产品 r1 §153：leave the box unchecked to complete the
+// todo and keep the branch as it is）：勾选 = 发起合并（live 面 merge 202
+// delegated，机器合并步收尾才落 done）；不勾 = 仅完成不合并（todo 级改相，
+// 分支/PR 保持原状——#901 板面 done 落位闸同一语义）。onConfirm 携带勾选位，
+// 写面分流归调用点（详情页 / 看板各一处）。
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
-// #1006 段 2（迁完即删）：#951 时代的 ACCEPT_* 同族律常量六枚随最后两个
-// 消费点（board done-confirm / reset-confirm 的 #1004 挂账）清账退役——
-// 全族皮肤收敛 registry DialogFooter band + Button outline/default/
-// destructive 档（#980 前提②④）。
-
 interface AcceptDialogProps {
   /** #73 retained-mount open flag. */
   open?: boolean;
   onClose: () => void;
-  /** M5 live 面：完成 = merge 202 delegated（r3 §3.6）；缺省 = fixture
-   *  行为（关闭即止）。 */
-  onConfirm?: () => void;
+  /** live 面：完成 = 按勾选位分流（merge 参数 = 勾选位）；缺省 = fixture
+   *  行为（关闭即止）。live 调用点必须给函数——缺位时确认钮回落 onClose，
+   *  弹层静默关闭且零请求（#1236 主症状）。 */
+  onConfirm?: (merge: boolean) => void;
+  /** 确认在飞（请求已发出未回执）：完成钮禁用，双击不双发合并步。 */
+  confirming?: boolean;
+  /** failed 卡（#702 恢复面）：done 只能经合并步落地（failed→done 不是相位
+   *  机边），勾选框锁死在勾选态——不给出「不合并完成」的假选项，原因行写明。 */
+  mergeLocked?: boolean;
   /** XMON-89 前置检查：执行 Agent 缺这几项授权（detail/merge-gate.ts 的
    *  missingMergeTools）。非空 = 完成禁用 + 写明缺哪项——点得动才谈得上
    *  「点了没反应」，禁掉它并把原因写在旁边是同一件事的两半。 */
@@ -36,12 +43,21 @@ export function AcceptDialog({
   open,
   onClose,
   onConfirm,
+  confirming,
+  mergeLocked,
   missingTools,
   rejectReason,
 }: AcceptDialogProps) {
   const { t } = useI18n();
   const [merge, setMerge] = useState(true);
+  // retained-mount 弹层的状态跨开窗残留：勾选位是真语义开关（#1236），上一张
+  // 卡取消掉的不勾选不得带进下一张——每次开窗回默认勾选。
+  useEffect(() => {
+    if (open === true) setMerge(true);
+  }, [open]);
   const blocked = (missingTools?.length ?? 0) > 0;
+  const locked = mergeLocked === true;
+  const mergeChecked = locked || merge;
   return (
     <DialogShell
       title={t('完成任务')}
@@ -57,9 +73,9 @@ export function AcceptDialog({
             {t('取消')}
           </Button>
           <Button
-            disabled={blocked}
+            disabled={blocked || confirming === true}
             onClick={() => {
-              if (onConfirm) onConfirm();
+              if (onConfirm) onConfirm(mergeChecked);
               else onClose();
             }}
           >
@@ -75,13 +91,23 @@ export function AcceptDialog({
         {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
         <label className="inline-flex cursor-pointer items-center gap-2">
           <Checkbox
-            checked={merge}
-            onCheckedChange={setMerge}
+            checked={mergeChecked}
+            onCheckedChange={(next) => {
+              if (!locked) setMerge(next === true);
+            }}
+            disabled={locked}
             aria-label={t('将改动合并到默认分支')}
           />
           <span>{t('将改动合并到默认分支')}</span>
         </label>
       </div>
+      {locked && (
+        // failed 卡锁定行：与缺项行同档 tertiary 说明位（「禁掉它并把原因写
+        // 在旁边是同一件事的两半」，XMON-89 律）。
+        <p className="mt-2 text-xs leading-4 text-(--text-tertiary)">
+          {t('失败任务只能经合并完成，不能跳过合并。')}
+        </p>
+      )}
       {blocked && (
         // XMON-89 缺项行：禁用态由 default disabled 档承载，本行只说「缺什么」。
         <p className="mt-2 text-xs leading-4 text-(--text-tertiary)">

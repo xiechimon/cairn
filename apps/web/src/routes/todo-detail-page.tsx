@@ -63,7 +63,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DetailHead } from '../detail/dhead.js';
@@ -288,6 +288,12 @@ export function TodoDetailPage() {
   const [stopping, setStopping] = useState(false);
 
   const phase: Phase = todo?.phase ?? 'todo';
+  // #1236 不合并完成腿的在飞判据：patchTodo 是多用途写面（指派/钉选/改相），
+  // 只有本卡 phase done 的在飞请求才计入 accept 弹层的 confirming 禁用位。
+  const donePatchPending =
+    mutations.patchTodo.isPending &&
+    mutations.patchTodo.variables?.body.phase === 'done' &&
+    mutations.patchTodo.variables?.id === todo?.id;
   const showsChanges = phase === 'review' || phase === 'done' || phase === 'failed';
   const changesQ = useBuildChanges(buildId, live && (showsChanges || compareOpen));
   const latestPlan = plansQ.data?.length ? plansQ.data[plansQ.data.length - 1] : null;
@@ -1071,15 +1077,46 @@ export function TodoDetailPage() {
         onClose={closeOverlay}
         missingTools={mergeMissing}
         rejectReason={mergeReject}
+        mergeLocked={phase === 'failed'}
+        confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={
-          live && buildId
-            ? () => {
+          live
+            ? (merge) => {
+                // #1236 静默 no-op 收口：live 面确认钮恒有真动作——单卡读面
+                // 未就位（buildId 缺位）时弹层不关、alert 行点名原因，不再走
+                // onClose 静默关闭（生产卡 #44：零请求落库、零反馈）。
+                if (buildId == null || todo == null) {
+                  setMergeReject(t('任务数据未就绪，完成请求未送出。请刷新页面后重试。'));
+                  return;
+                }
+                if (!merge) {
+                  // 不勾 = 完成但不合并（参照产品 r1 §153：complete the todo
+                  // and keep the branch as it is）——todo 级改相，与 build 数
+                  // 无关；#901 板面 done 落位闸同一写面语义（server 落
+                  // DONE_ANNOUNCEMENT 审计行，#902）。
+                  mutations.patchTodo.mutate(
+                    { id: todo.id, body: { phase: 'done' } },
+                    {
+                      onSuccess: () => {
+                        closeOverlay();
+                        toastSuccess(t('任务已完成，改动保留在会话分支。'));
+                      },
+                      onError: (error) =>
+                        setMergeReject(mergeRejectCopy(error, t, t('完成请求未送出，请重试。'))),
+                    },
+                  );
+                  return;
+                }
                 // merge = 202 delegated（r3 §3.6）：合并步机器执行，phase 经
                 // SSE 推进到 done（🎉 时间线行由 server 落库）。XMON-89：关
-                // 弹层改挂 onSuccess——被拒（403）时弹层留着显原因，不再静默
-                // 关掉。
+                // 弹层改挂 onSuccess——被拒（403/409）时弹层留着显原因，不再
+                // 静默关掉；202 到相位推进之间隔着机器执行，toast 是这段窗口
+                // 的可见回执（#1236）。
                 mutations.mergeBuild.mutate(buildId, {
-                  onSuccess: () => closeOverlay(),
+                  onSuccess: () => {
+                    closeOverlay();
+                    toastSuccess(t('已发起合并，机器执行完成后任务进入已完成。'));
+                  },
                   onError: (error) => setMergeReject(mergeRejectCopy(error, t)),
                 });
               }
