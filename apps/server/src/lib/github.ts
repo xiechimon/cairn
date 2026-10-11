@@ -97,14 +97,17 @@ export interface GithubPullState {
 /** 单条 PR 状态只读探测（#931）：GET /repos/{o}/{r}/pulls/{n}。null = 未知
  * （网络/404/限流/响应形坏不区分——「查不到」不构成新分支的依据，fail-open
  * 语义归调用方）。token 可空（匿名梯，公开仓可达；私仓 404 = 未知）。单次
- * 尝试、FETCH_TIMEOUT_MS 上界，不重试——readJsonFull 的 HttpError 映射在
- * 这里收敛为 null（探测是判定的辅助面，不是用户请求的主错误面）。 */
+ * 尝试、不重试——上界缺省 FETCH_TIMEOUT_MS；claim 长轮询热路径（#1217 守卫
+ * 探测）传更短的超时（daemon 侧 REQUEST_TIMEOUT_MS = HOLD_MS + 15s，一次
+ * 5s 探测仍在预算内），readJsonFull 的 HttpError 映射在这里收敛为 null（探测
+ * 是判定的辅助面，不是用户请求的主错误面）。 */
 export async function githubPullState(
   fetchImpl: FetchLike,
   token: string | null,
   owner: string,
   repo: string,
   prNumber: number,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<GithubPullState | null> {
   const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}`;
   let data: unknown;
@@ -114,7 +117,7 @@ export async function githubPullState(
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
       },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
     data = await res.json();

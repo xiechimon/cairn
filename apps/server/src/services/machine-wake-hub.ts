@@ -11,6 +11,11 @@ import type { MachineStreamEvent, MachineSyncCommand } from '@pacman/shared';
 export class MachineWakeHub {
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
+  /** team → 单调递增 wake 序号（#1217）：claim 面在首个 await 前取基线，
+   * waitWake 携带基线武装——检查与武装之间插入微任务后 wake 可能落在缝里
+   * （武装前发 = 纯 pubsub 丢事件），基线之后的 wake 补醒，missed-wake 竞态
+   * 由此在 hub 层消灭（否则 claim 醒不过 hold = 低延迟派发失守）。 */
+  private readonly wakeSeqs = new Map<string, number>();
   /** 机器定向派发索引（M7 #319，08 册附录 B）：单条 SSE 流的 team key
    * 粒度不够——sync 命令须按 machineId 派发给单台机器（团队可挂多机）。订阅
    * 时同步登记到 streamsByMachine，pushSync 走此索引；streams（team key）
@@ -25,11 +30,26 @@ export class MachineWakeHub {
    * abort）——断连时即刻 settle(false) 并摘除 waiter，不等 hold 到期：否则死
    * 机 waiter 会在 ≤75s 窗口内替死机抢领新步入队的 wake（waiter Set 按插入
    * 序，僵尸先注册先醒），步落死机无人执行。 */
-  waitWake(teamId: string, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
+  /** 当前 wake 序号（claim 面取基线用，同步无副作用）。 */
+  wakeSeq(teamId: string): number {
+    return this.wakeSeqs.get(teamId) ?? 0;
+  }
+
+  waitWake(
+    teamId: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+    sinceSeq?: number,
+  ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       // 请求已断：不注册等待（响应无处投递，领取即孤儿步）。
       if (signal?.aborted) {
         resolve(false);
+        return;
+      }
+      // #1217 基线之后已有 wake（武装晚于 wake 的缝）→ 立即补醒，不睡 hold。
+      if (sinceSeq !== undefined && this.wakeSeq(teamId) > sinceSeq) {
+        resolve(true);
         return;
       }
       let settled = false;
@@ -61,6 +81,7 @@ export class MachineWakeHub {
 
   /** 新步入队 → 唤醒该团队全部等待者 + 推送 SSE wake（低延迟派发，02 §1.2）。 */
   wake(teamId: string): void {
+    this.wakeSeqs.set(teamId, (this.wakeSeqs.get(teamId) ?? 0) + 1);
     for (const send of this.streams.get(teamId) ?? []) {
       try {
         send({ type: 'wake' });

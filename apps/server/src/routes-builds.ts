@@ -149,9 +149,9 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ builds }, 201); // 封套 [推断]（响应 wire 未采）
   });
 
-  app.post('/api/builds/:id/merge', (c) => {
+  app.post('/api/builds/:id/merge', async (c) => {
     try {
-      const result = requestMerge(svc, c.req.param('id'));
+      const result = await requestMerge(svc, c.req.param('id'));
       return c.json(result, 202); // 202 {delegated:true}（r3 §3.6 实测）
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
