@@ -100,18 +100,7 @@ function readStoredChiefOpen(): boolean {
   }
 }
 
-export interface ChiefSurfaceOptions {
-  /** ⌘J 唤醒监听门（default true）：chief 面被路由抑制时（chief-root 的
-   *  suppressed 集）解除注册——抑制路由上按 ⌘J 不得有可见零效果之外的
-   *  状态漂移（今天这些路由根本没有监听实例，语义保持）。 */
-  wake?: boolean;
-}
-
-export function useChiefSurface(
-  fixture: FixtureSet,
-  deepLink?: ChiefDeepLink,
-  opts?: ChiefSurfaceOptions,
-): ChiefSurface {
+export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): ChiefSurface {
   const { live, teamId } = useLiveData();
   const { t } = useI18n();
   const chiefQ = useChief(teamId, live);
@@ -150,7 +139,7 @@ export function useChiefSurface(
     () => setChiefView((prev) => (prev === 'drawer' ? 'none' : 'drawer')),
     [],
   );
-  useChiefToggleHotkey(toggleDrawer, opts?.wake ?? true);
+  useChiefToggleHotkey(toggleDrawer);
 
   // —— chief live 面（r5 §2/§3.6）：envelope + threads + 活动线程消息 +
   // 会话流订阅；发送 = POST threads / conversations messages。——

@@ -106,6 +106,19 @@ import { expect, type Page, test } from '@playwright/test';
 //     live fire / scope / input-guard faces ride the verify-pacman probe
 //     drive-chief-new-thread-key.mjs (docs/verify/645) — fixture faces
 //     cannot observe the fire (onNewThread is live-only)
+//
+// #1141 retires the last two suppressed routes (agent detail, machine
+// authorize — the docked-era wake-pair absence kept as suppression by
+// #1009 A0): the FAB renders and ⌘J stays registered everywhere. Each
+// test pins one route's failure mode.
+// 29. the agent-detail edit face renders the FAB and ⌘J wakes the drawer
+//     in place (composer focused, toggle closes — the #468 contract now
+//     on this route)
+// 30. the machine-authorize page does the same (route fixed inset-0 card
+//     shares the viewport with the corner FAB — z-(--z-floating) rung)
+// 31. route switch keeps the window open (ADR 0013 D6 persistence): the
+//     drawer opened on the authorize page survives navigating back to the
+//     board
 
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=01';
@@ -115,6 +128,10 @@ const PROJECTS = '/app?scenario=newtask-projects';
 /** 该场景首行的项目 id（显示名 r3-lifecycle）；记忆位存的是 id 不是名字。 */
 const FIRST_PROJECT_ID = 'ZAQczKCu0MOAzC1ZqcFlX';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';
+/** #1141：两条原抑制路由。agent 详情走 agent-detail 场景（fixtures.ts 的
+ *  r3-builder 详情记录，agent-delete.spec 同款 URL 形态）。 */
+const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
+const AUTHORIZE = '/app/machines/authorize';
 
 const dialog = (page: Page) => page.locator('.new-task-dialog');
 const drawer = (page: Page) => page.locator('.chief-drawer');
@@ -756,4 +773,52 @@ test('with the dialog closed Tab stays native', async ({ page }) => {
     .poll(() => page.evaluate(() => document.activeElement?.tagName ?? ''))
     .not.toBe('BODY');
   await expect(page.locator('.new-task-project-menu')).toHaveCount(0);
+});
+
+// ---- #1141: suppression retired — the chief surface is site-wide ---------
+
+// The FAB assertion uses the chief-fab class hook (the spec-facing carrier,
+// #1009 A0 ⑨) — the editable-guard faces are already pinned by tests 7/8
+// above, these only pin that the formerly suppressed routes now render the
+// launcher and answer the chord.
+test.describe('#1141 suppression retired', () => {
+  const fab = (page: Page) => page.locator('.chief-fab');
+
+  test('agent detail renders the FAB; ⌘J wakes the drawer in place', async ({ page }) => {
+    await page.goto(AGENT_DETAIL);
+    await expect(page.locator('.agent-detail')).toBeVisible();
+    await expect(fab(page)).toBeVisible();
+    await pressUntil(page, 'Meta+j', drawer(page));
+    await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+    await expect(page).toHaveURL(/\/app\/resources\/agents\/r3-builder/);
+    await toggleUntilHidden(page, drawer(page));
+    await expect(drawer(page)).toBeHidden();
+  });
+
+  test('machine authorize renders the FAB; ⌘J wakes the drawer in place', async ({ page }) => {
+    await page.goto(AUTHORIZE);
+    await expect(page.locator('.authorize-backdrop')).toBeVisible();
+    await expect(fab(page)).toBeVisible();
+    await pressUntil(page, 'Meta+j', drawer(page));
+    await expect(page.getByTestId('chief-composer-input')).toBeFocused();
+    await expect(page).toHaveURL(/\/app\/machines\/authorize/);
+    await toggleUntilHidden(page, drawer(page));
+    await expect(drawer(page)).toBeHidden();
+  });
+
+  test('the window opened on the authorize page survives navigating back to the board', async ({
+    page,
+  }) => {
+    // ADR 0013 D6 persistence on the formerly suppressed detour: the drawer
+    // stays open across the route switch (single persistent instance). The
+    // authorize page is a standalone shell (no sidebar), so the hop rides a
+    // full navigation — exactly the persistence stress the detour promised.
+    await page.goto(AUTHORIZE);
+    await pressUntil(page, 'Meta+j', drawer(page));
+    await page.goto(BOARD);
+    await expect(page.getByRole('complementary')).toBeVisible();
+    await expect(drawer(page)).toBeVisible();
+    await toggleUntilHidden(page, drawer(page));
+    await expect(drawer(page)).toBeHidden();
+  });
 });
