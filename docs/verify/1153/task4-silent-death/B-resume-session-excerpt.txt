@@ -1,0 +1,273 @@
+TEXT: {"todoId":"yUSk9_q-oNhNRhT6NxFxU","title":"修复 documents.ts diff 增删行统计误杀 ++/-- 前缀行","tagIds":[]}
+TEXT: total 348
+drwxrwxr-x 12 measure measure   4096 Oct 11 16:42 .
+drwxrwxr-x  6 measure measure   4096 Oct 11 16:42 ..
+-rw-rw-r--  1 measure measure    348 Oct 11 16:42 .ckignore
+drwxrwxr-x  4 measure measure   4096 Oct 11 16:42 .claude
+-rw-rw-r--  1 measure measure    126 Oct 11 16:42 .git
+drwxrwxr-x  4 measure measure   4096 Oct 11 16:42 .github
+-rw-rw-r--  1 measure measure   2065 Oct 11 16:42 .git
+TEXT: workspace 即 pacman 仓本体，且根目录有 plan.md（应为已确认方案）。先读方案与目标文件，并确认 git 状态。
+TEXT: // 文档 diff 面（02 §4.2/r5 §4：plan 即文件 plan.md，版本 = 文件版本；驳回 →
+// v2 + plan.md 文件级 unified diff，端点 GET /api/documents/{id}/diff）。
+// document_diff 记录形状 = shared documentDiffSchema（{fromVersion,toVersion,
+// files:[{path,additions,deletions,hunks:[{header,lines}]}]}）。
+// diff 计算 = npm `diff`（01 §4.1「npm diff 算数据」，pin 9.0.0）；wire 响应
+// 形状未实测（r5 §4 UI 触点为靶），hunks 结构 = structuredPatch 投影 [推断]。
+
+import typ
+TEXT: On branch pacman/conv-01a12a17-aa98-73aa-8eb8-92fee791a1d4
+Your branch is up to date with 'origin/pacman/conv-01a12a17-aa98-73aa-8eb8-92fee791a1d4'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   AGENTS.md
+
+no changes added to commit (use "git add" and/or "git commit -
+TEXT: 方案已在 plan.md 落盘，git 状态符合预期（规划提交在 conv 分支，AGENTS.md 是 runtime 注入的未提交改动，不动它）。按方案执行：先探针红腿 → 改 documents.ts → 同向量复跑转绿 → 闸（lint/typecheck）→ 显式 add 单文件 commit。
+
+先勘察探针运行条件（node 版本、node_modules 物化状态、依赖链、既有探针脚本）：
+TEXT: node v22.23.2（支持 `registerHooks`），node_modules 尚未物化（需先 `corepack pnpm install`）。/tmp 有历史探针，先看是否有上一会话留下的可用脚本：
+TEXT: 上一会话的三个探针文件都在（16:24 时间戳）：`ts-remap-hook.mjs` / `ts-remap-loader.mjs` / `verify-doc-diff.mjs`。读出来核对是否匹配 plan.md 的三向量：
+TEXT: 上一会话的探针是旧向量且 import 路径指向规划工作树（01a12a09），本工作树是 01a12a17——按 plan.md 的 A/B/C 三向量重写探针（仍放 /tmp 不进仓）。先物化 node_modules（闸顺序第一步）：
+TEXT: install 完成（380 包全 reuse）。确认锁文件零改动、jsdiff 钉版，然后写探针跑红腿：
+TEXT: `diff` 经 apps/server 的工作区链接解析（apps/server/node_modules/diff → .pnpm/diff@9.0.0）。确认后写探针：
+TEXT: 写本任务的探针（按 plan.md A/B/C 三向量，import 指向本工作树真源码，带 red/green 两相期望）：
+TEXT: 跑红腿（改前：red 相=旧逻辑漏计数真值全匹配；green 相=目标期望应失败，即缺陷实物）：
+TEXT: 红腿实物到手，与 plan.md 红期望完全一致：`+++x`/`---y` 两类真增删行被 startsWith('+++')/('---') 吞掉漏计（A: 0/1、B: 1/0），no-newline 标记行不计（C: 1/1）。现在落改动：
+TEXT: 跑绿腿（同三向量复跑，目标期望全过）：
+TEXT: 绿腿全过（A/B 转正、C 看护不变）。跑闸（lint → typecheck），并核对 diff 落盘形状：
+TEXT: lint 过（684 文件，无 error）。跑 typecheck + 既有回归用例：
+TEXT: 根 script `typecheck` 内嵌的裸 `pnpm` 落到 PATH 上的 v11.13.1 撞了 packageManager 钉版。绕开 script 层直接用 corepack 跑递归 typecheck：
+TEXT: typecheck 全绿（shared/daemon/web/server/integration 五包全 Done）。跑既有回归用例（chief-reject-diff.test.ts，方案标注的可选回归）：
+TEXT: 回归用例 2/2 过。提交前最后核对 git 状态（证 lockfile/package.json 零改动、只 add 目标文件），然后显式单文件 commit：
+TEXT: 改动完成并已按方案收尾。交付摘要：
+
+**改动**（`apps/server/src/services/documents.ts`，commit `926d393b`，单文件 4+/2-）
+
+统计循环删去 `+++`/`---` 排除闸，仅按单字符 `+`/`-` 前缀计数，并补两行注释防回归（hunk 行只有 `' '/'+'/'-'/'\'` 四种前缀，文件头是 patch 文本层元信息、从不进 `hunk.lines`）。
+
+**红绿对（真源码 + 仓钉 jsdiff 9.0.0，探针 /tmp 不进仓）**
+
+| 向量 | hunk 行实物 | 改前 | 改后 |
+|---|---|---|---|
+| A：新增内容 `++x` | `|-a|`、`|+++x|` | additions=0（漏计） | 1/1 |
+| B：删除内容 `--y` | `|---y|`、`|+b|` 
+user: 方案已确认。请按方案执行，完成改动。
+system: 原会话不可复用，已用新会话重跑（上下文可能不完整）
+system: 
+TEXT: /home/measure/.pacman-1153b/workspaces/01a12a17-aa98-73aa-8eb8-92fee791a1d4/apps/server/src/services/documents.ts
+
+TEXT: # plan — 修复 documents.ts diff 增删行统计误杀 ++x/--y 前缀行
+
+## Context
+
+- 缺陷位置：`apps/server/src/services/documents.ts` computeUnifiedDiff 的 hunk 行统计循环（规划时点 63-64 行）：
+  `if (l.startsWith('+') && !l.startsWith('+++')) additions += 1; else if (l.startsWith('-') && !l.startsWith('---')) deletions += 1;`
+  —— +++/--- 文件头排除闸加在了 hunk 层。
+- 机制（已从实物源码核实，不靠记忆）：lockfile 钉 `diff@9.0.0`，读 `node_modules/.pnpm/diff@9.0.0/
+TEXT: v22.23.2
+/tmp/asl-current.ts
+/tmp/asl-good.ts
+/tmp/cropdiff.mjs
+/tmp/diag.mjs
+/tmp/diff-probe.mjs
+/tmp/elemdiff-final.mjs
+/tmp/elemdiff-noise2.mjs
+/tmp/elemdiff.mjs
+/tmp/en-head.ts
+/tmp/genfile.mjs
+/tmp/groupcount.mjs
+/tmp/httpgit-probe.mjs
+/tmp/httpgit-probe2.mjs
+/tmp/mA.ts
+/tmp/mB.ts
+/tmp/perm-shot.mjs
+/tmp/ph.mjs
+/tmp/pixdiff-noise.mjs
+/tmp/pixdiff.mjs
+/tmp/pixdiff2.mjs
+
+TEXT: // Drizzle schema——01 §6 锁定清单（24 record 投影表 + `todo_tag` 纯 join 表）。
+// 纪律：列 = 02 §6.2 record 形状投影（字段即契约，02/A9）；不发明 02 之外的
+// wire 字段。内部列（journal 状态、密文槽、哈希槽）按 01 §6 表注/02 §8 展开，
+// 标注 [内部]；表名 = shared DB_TABLES 单源（test/schema.test.ts 对拍）。
+
+import type {
+  ActiveRun,
+  Assignment,
+  ChiefCompactionModel,
+  ChiefWatch,
+  ClaudeCodeReport,
+  DocumentDiffFile,
+  Phase,
+  ProjectRepoKind,
+  ProviderApi,
+TEXT: {
+  "name": "@pacman/shared",
+  "private": true,
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+---
+agent-delete.test.ts
+agent-skills-split
+TEXT: -rw-rw-r-- 1 measure measure  301 Oct 11 16:24 /tmp/ts-remap-hook.mjs
+-rw-rw-r-- 1 measure measure  228 Oct 11 16:24 /tmp/ts-remap-loader.mjs
+-rw-rw-r-- 1 measure measure 1228 Oct 11 16:24 /tmp/verify-doc-diff.mjs
+-rw-rw-r-- 1 measure measure 3431 Oct 10 20:26 /tmp/recon-1166.mjs
+-rw-rw-r-- 1 measure measure 2075 Oct  2 03:13 /tmp/probe.mjs
+-rw-rw-r-- 1 measure measure 1926 Oct  2 01:06 /tmp/xmon2
+TEXT: import { readFileSync } from 'node:fs';
+const a = JSON.parse(readFileSync('/tmp/probe-before/dump.json', 'utf8'));
+const b = JSON.parse(readFileSync('/tmp/probe-after/dump.json', 'utf8'));
+const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+let diffs = 0;
+for (const k of keys) {
+  const x = a[k], y = b[k];
+  if (!x || !y) { console.log(`### ${k}: MISSING one side`); diffs++; 
+TEXT: // red/green probe: computeUnifiedDiff hunk-line counting (documents.ts)
+// Imports the REAL source module (node 22 type-stripping) + project-pinned jsdiff.
+import { computeUnifiedDiff } from '/home/measure/.pacman/workspaces/01a12a09-8b21-7c1a-8381-16c80ac1a976/apps/server/src/services/documents.ts';
+
+// plan.md v1 -> v2: delete a `---` separator line, add a `++`-prefixed content line,
+// plus on
+TEXT: export async function resolve(specifier, context, nextResolve) {
+  try {
+    return await nextResolve(specifier, context);
+  } catch (err) {
+    if (specifier.startsWith('.') && specifier.endsWith('.js')) {
+      return nextResolve(specifier.slice(0, -3) + '.ts', context);
+    }
+    throw err;
+  }
+}
+===
+// loader: register a resolve hook that remaps relative `.js` specifiers to `.ts`
+// (node type
+TEXT:   "packageManager": "pnpm@12.5.1",
+12.5.1
+
+TEXT: ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 380, reused 380, downloaded 0, added 380, done
+. prepare$ husky
+. prepare: Done
+
+devDependencies:
++ @biomejs/biome 2.5.14
++ @playwright/test 1.63.0
++ concurrently 10.0.5
++ husky 9.1.7
++ lucide-static 1.48.0
++ typescript 7.0.2
++ vitest 5.0.1
+
+Done in 320ms using pnpm v12.5.1
+
+TEXT:  M AGENTS.md
+diff@8.0.4
+diff@9.0.0
+ls: cannot access 'node_modules/diff/package.json': No such file or directory
+
+
+Command exited with code 2
+TEXT: node_modules/.pnpm/diff@9.0.0/node_modules/diff/package.json
+9.0.0
+
+TEXT: lrwxrwxrwx 1 measure measure 56 Oct 11 16:44 apps/server/node_modules/diff -> ../../../node_modules/.pnpm/diff@9.0.0/node_modules/diff
+Node.js v22.23.2
+
+TEXT: ok: function
+
+TEXT: Successfully wrote to /tmp/doc-diff-count-probe.mjs
+TEXT: (node:1028356) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[A add-line content "++x"]
+  @@ -1,1 +1,1 @@
+  |-a|
+  |+++x|
+  additions=0 deletions=1 | expected(phase=red) 0/1 -> PASS
+
+[B del-line content "--y"]
+  @@ -1,1 +1,1 @@
+  |---y|
+  |+b|
+  additions=1 deletions=0 | expected
+TEXT: Successfully replaced 1 block(s) in apps/server/src/services/documents.ts.
+TEXT: (node:1029011) ExperimentalWarning: Transform Types is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[A add-line content "++x"]
+  @@ -1,1 +1,1 @@
+  |-a|
+  |+++x|
+  additions=1 deletions=1 | expected(phase=green) 1/1 -> PASS
+
+[B del-line content "--y"]
+  @@ -1,1 +1,1 @@
+  |---y|
+  |+b|
+  additions=1 deletions=1 | expect
+TEXT: diff --git a/apps/server/src/services/documents.ts b/apps/server/src/services/documents.ts
+index 3e36a39d..b332e1d9 100644
+--- a/apps/server/src/services/documents.ts
++++ b/apps/server/src/services/documents.ts
+@@ -60,8 +60,10 @@ export function computeUnifiedDiff(
+     hunks: patch.hunks.map((h) => {
+       const lines = h.lines.map((l) => l);
+       for (const l of lines) {
+-        if (l.starts
+TEXT: [0m[0m  [0m[0m
+[0m
+[0m[34mChecked 684 files in 313[0m[0m[2m[34mms[0m[0m[34m.[0m[0m[34m No fixes applied.[0m[0m
+[0m[0m[33mFound [0m[0m[33m30[0m[0m[33m warnings.[0m[0m
+[0m[0m[34mFound [0m[0m[34m29[0m[0m[34m infos.[0m
+
+TEXT: lint exit=0
+$ pnpm -r typecheck
+[ERROR] This project is configured to use 12.5.1 of pnpm. Your current pnpm is v11.13.1
+Corepack invoked pnpm with this version, and pnpm does not switch versions when running under corepack.
+Align the "packageManager" field in package.json with "devEngines.packageManager", or invoke pnpm directly (without corepack) so it can switch versions automatically.
+If you wa
+TEXT: /home/measure/.npm-global/bin/pnpm
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/server typecheck: Done
+apps/daemon typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+TEXT: 
+ [32m✓[39m test/chief-reject-diff.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m   Start at [22m 16:46:57
+[2m   Duration [22m 1.60s[2m (transform 61%, import 32%, tests 6%)[22m
+
+
+TEXT:  M AGENTS.md
+ M apps/server/src/services/documents.ts
+===
+
+TEXT: [0m[0m  [0m[0m  [0m[0m [0m[0m [0m[0m [0m[0m [0m[0m[1m  3[0m[0m[1m │ [0m[0m[32m+[0m[0m [0m[0m[1m[32m/[0m[0m[1m[32m/[0m[0m[1m[2m[32m·[0m[0m[1m[32m溯[0m[0m[1m[32m源[0m[0m[1m[2m[32m·[0m[0m[1m[32m/[0m[0m[1m[2m[32m·[0m[0m[1m[32mr[0m[0m[1m[32mu[0m[0m[1m[32mn[0m[0m[1m[32m_[0m[0m[1m[32mb[0m[0m[1m[32mu[0m[0m[1m[32mi[0m[0m

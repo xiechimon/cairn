@@ -1,0 +1,13 @@
+== server-side step row ==
+id|status|machineId|checkpointCommit
+7ju9aYzPevcPagif1k7v7|claimed|Pakgtz1UfmlmMqC2Pq4xe|
+== B worktree tip ==
+b1afaf2be4117a5eb491a9b1443b2ede82fa65b9
+ M AGENTS.md
+pacman/conv-01a12a17-aa98-73aa-8eb8-92fee791a1d4
+== origin conv branch tip ==
+== origin conv tip (from Mac, pacman origin) at resume+90s ==
+b1afaf2be4117a5eb491a9b1443b2ede82fa65b9	refs/heads/pacman/conv-01a12a17-aa98-73aa-8eb8-92fee791a1d4
+== pre-freeze origin tip (08:38:5x) ==
+origin conv tip pre-freeze:
+=== FREEZE leg8 at 2026-10-11T08:39:00.336206000Z ===
