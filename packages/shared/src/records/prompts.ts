@@ -127,9 +127,11 @@ export function buildReworkFallbackPrompt(args: {
 /** plan 步补写指令（#113 / #703 单源）：plan 步完成而 plan.md 缺席时的自动
  *  补写轮 prompt。#703 起该指令经 claim 载荷 instruction 真的进会话（runner
  *  续轮投递），daemon 把它记成 user 行——呈现层过滤侧按本模板识别（模板行
- *  不是用户话语）。 */
+ *  不是用户话语）。#1203 起位置无关化：写入位置由 daemon 追加的交接位置
+ *  注记行（buildPlanLocationNote）承载——路径是执行机本地事实，server 侧
+ *  模板无法预知。 */
 export function buildPlanRewritePrompt(): string {
-  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入工作区根目录的 ${PLAN_FILE_NAME}（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`;
+  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`;
 }
 
 /** 首轮 plan 步的 plan.md 契约指令（#1025 单源）：此前契约只存在于纠错
@@ -139,9 +141,41 @@ export function buildPlanRewritePrompt(): string {
  *  buildTaskPrompt 对无 instruction 的 plan 步把本指令组合进任务文本
  *  （composeTaskPromptWithInstruction 形状）；纠错轮指令自带契约句不叠注。
  *  四段名与补写轮同族逐字对齐；呈现层过滤侧按 SYNTHETIC_EXACT 收录识别
- *  （组合行不是用户话语）。 */
+ *  （组合行不是用户话语）。#1203 起位置无关化（见 buildPlanRewritePrompt：
+ *  「工作区根目录」= local-repo 项目的 checkout 根，plan.md 落那里会被
+ *  agent 提交进仓库根——#24 / PR #1201 首版实锤）。 */
 export function buildPlanFirstRoundInstruction(): string {
-  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入工作区根目录的 ${PLAN_FILE_NAME}（覆盖 Context/Changes/Edge cases/Verification 四段）。`;
+  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。`;
+}
+
+/** #1203 交接位置注记行的头尾（写侧组装与过滤侧剥离共用的锚点）。 */
+const PLAN_NOTE_HEAD = `${PLAN_FILE_NAME} 交接位置：`;
+const PLAN_NOTE_TAIL = `。该位置在仓库检出之外——将方案写入此文件；不要在仓库工作区里创建 ${PLAN_FILE_NAME}，也不要把它 git add 或提交。`;
+
+/** #1203 plan.md 交接位置注记行（daemon 投递面单源）：plan 步 prompt 尾部
+ *  追加的一行——plan.md 交接物搬到 repo 检出之外（PACMAN_HOME 面
+ *  `<home>/plans/<conversationId>/`），路径是执行机本地事实，由 daemon 组装
+ *  后随 prompt 投递并记 wire 行。写侧（runner appendPlanLocationNote）与
+ *  过滤侧（stripPlanLocationNote）单源在此。 */
+export function buildPlanLocationNote(planFile: string): string {
+  return `${PLAN_NOTE_HEAD}${planFile}${PLAN_NOTE_TAIL}`;
+}
+
+/** 交接位置注记行追加（幂等：注记已在场 = 原文返回——recover 面 resume
+ *  prompt 已含注记时不双注）。单换行拼接：注记是指令段的收尾行，不是独立
+ *  段落。 */
+export function appendPlanLocationNote(prompt: string, planFile: string): string {
+  return prompt.includes(PLAN_NOTE_HEAD) ? prompt : `${prompt}\n${buildPlanLocationNote(planFile)}`;
+}
+
+/** 尾部交接位置注记行剥离（过滤侧）：prompt 以 '\n' + 注记行收尾时剥掉注记，
+ *  余段走模板比对——追加注记不改变合成行识别（组合行/裸指令/续轮占位句/
+ *  驳回/重启全族）。非注记收尾 = 原文返回。 */
+function stripPlanLocationNote(text: string): string {
+  const idx = text.lastIndexOf(`\n${PLAN_NOTE_HEAD}`);
+  if (idx === -1) return text;
+  const note = text.slice(idx + 1);
+  return wrappedBy(note, PLAN_NOTE_HEAD, PLAN_NOTE_TAIL) ? text.slice(0, idx) : text;
 }
 
 /** 开始任务编排请求（#640 / r14 §5.2：编排回合的会话 user 消息 = 总目标
@@ -186,9 +220,9 @@ function wrappedBy(text: string, head: string, tail: string): boolean {
   return text.length >= head.length + tail.length && text.startsWith(head) && text.endsWith(tail);
 }
 
-/** 纯合成指令判定（SYNTHETIC 词表全量）：CONTINUE 占位句 / replan /
- *  review-reject（#701）/ restart 模板 / 审核材料 meta。 */
-function isSyntheticInstruction(text: string): boolean {
+/** 模板比对（SYNTHETIC 词表全量）：CONTINUE 占位句 / replan / review-reject
+ *  （#701）/ restart 模板 / 审核材料 meta。 */
+function matchesSyntheticTemplates(text: string): boolean {
   return (
     SYNTHETIC_EXACT.has(text) ||
     wrappedBy(text, REPLAN_HEAD, REPLAN_TAIL) ||
@@ -196,6 +230,13 @@ function isSyntheticInstruction(text: string): boolean {
     wrappedBy(text, RESTART_HEAD, RESTART_TAIL) ||
     parseReviewPromptMeta(text) !== null
   );
+}
+
+/** 纯合成指令判定（SYNTHETIC 词表全量 + #1203 注记剥离）：plan 步投递串
+ *  尾部带交接位置注记行——剥注记后比对。余段须命中模板才算合成（注记本身
+ *  不构成合成判定：用户话语带注记形尾行不因此误杀）。 */
+function isSyntheticInstruction(text: string): boolean {
+  return matchesSyntheticTemplates(text) || matchesSyntheticTemplates(stripPlanLocationNote(text));
 }
 
 /** role-user wire 行文本的归属判定：

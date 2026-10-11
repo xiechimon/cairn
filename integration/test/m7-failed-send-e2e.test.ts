@@ -22,9 +22,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  appendPlanLocationNote,
   buildRestartPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
+  PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -205,9 +207,15 @@ describe('M7 失败面发送 E2E：failed 发消息 → restart → 反馈随新
     // 不是只落 DB）—— stub LLM 全量录请求体（不从截断 dump 推结论），重启轮
     // 会话首条 user 消息 = 任务文本 + 重启指令组合串（compose 单源），与
     // transcript 读面的 user-<stepId> wire 行同串。 ——
-    const expectedPrompt = composeTaskPromptWithInstruction(
-      buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。'),
-      buildRestartPrompt('把测试也补上'),
+    // #1203：restart 复用轮首步是 plan 步（withPlan），daemon 投递串尾部
+    // 附 plan.md 交接位置注记行（路径 = daemon home 的 plans 面，conv id =
+    // build id）——stub 对账与 transcript 读面同串。
+    const expectedPrompt = appendPlanLocationNote(
+      composeTaskPromptWithInstruction(
+        buildTaskPromptText('restart 探针', '这个任务的第一轮会失败。'),
+        buildRestartPrompt('把测试也补上'),
+      ),
+      join(paths.plansDir, newBuildId, PLAN_FILE_NAME),
     );
     const llmSawFeedback = stub.requests.some((r) =>
       r.messages.some((m) => m.role === 'user' && userWireText(m) === expectedPrompt),

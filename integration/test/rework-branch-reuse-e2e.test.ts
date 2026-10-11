@@ -20,11 +20,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
+  appendPlanLocationNote,
   buildRestartPrompt,
   buildReviewRejectPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   conversationBranch,
+  PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -287,10 +289,12 @@ describe('#931 两条返工路回原分支（E2E）', () => {
     // 失败方式 6：restart 轮是 new session（不是续接旧会话）。
     expect(countLog(`new session ${buildId}`)).toBe(newSessionCountBefore + 1);
 
-    // 失败方式 2：新会话首条 user = 任务全文 + 返工指令组合串（#720 形）。
-    const expectedReworkPrompt = composeTaskPromptWithInstruction(
-      TASK_TEXT,
-      buildRestartPrompt(FEEDBACK),
+    // 失败方式 2：新会话首条 user = 任务全文 + 返工指令组合串（#720 形）；
+    // #1203：restart 复用轮首步是 plan 步，daemon 投递串尾部附 plan.md 交接
+    // 位置注记行（路径 = daemon home 的 plans 面，conv id = build id）。
+    const expectedReworkPrompt = appendPlanLocationNote(
+      composeTaskPromptWithInstruction(TASK_TEXT, buildRestartPrompt(FEEDBACK)),
+      join(paths.plansDir, buildId, PLAN_FILE_NAME),
     );
     expect(
       stub.requests.some((r) =>

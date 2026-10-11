@@ -19,7 +19,8 @@
 //      system 行（用户合并前看得见为何没推上去）
 //   9.（XMON-77）tools 缺省（老 server 版本墙）→ 两闸均不生效（fail-open）
 
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -33,6 +34,7 @@ import type {
   TranscriptUpload,
   WorktreeOps,
 } from '@pacman/shared';
+import { PLAN_FILE_NAME } from '@pacman/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -81,7 +83,7 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
 }
 
 function claimedStep(
-  kind: 'build' | 'merge',
+  kind: 'build' | 'merge' | 'plan',
   repo: NonNullable<ClaimedStep['project']>['repo'],
   opts: { tools?: string[] } = {},
 ): ClaimedStep {
@@ -107,6 +109,8 @@ function claimedStep(
 class FakeClient implements MachineApi {
   calls: string[] = [];
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
+  uploads: { url: string; body: TranscriptUpload | string }[] = [];
+  uploadNames: string[][] = [];
   git: GitCredentials | null = null;
 
   async enroll(): Promise<never> {
@@ -154,6 +158,7 @@ class FakeClient implements MachineApi {
     throw new Error('unused');
   }
   async uploadUrls(_stepId: string, files: { name: string }[]) {
+    this.uploadNames.push(files.map((f) => f.name));
     return {
       uploads: files.map((f, i) => ({
         name: f.name,
@@ -163,11 +168,9 @@ class FakeClient implements MachineApi {
       })),
     };
   }
-  async putUpload(
-    _url: string,
-    _headers: Record<string, string>,
-    _body: TranscriptUpload | string,
-  ) {}
+  async putUpload(url: string, _headers: Record<string, string>, body: TranscriptUpload | string) {
+    this.uploads.push({ url, body });
+  }
   async done(stepId: string, body: MachineDoneBody) {
     this.doneBodies.push({ stepId, body });
     this.calls.push(`done:${stepId}:${body.status}`);
@@ -422,5 +425,199 @@ describe('runner 权限闸：合并分支/推送分支（XMON-77）', () => {
   test('失败方式 9：tools 缺省（老 server 版本墙）→ 两闸 fail-open，push 照常', async () => {
     const { calls } = await setup(claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }));
     expect(calls).toContain('push:pacman/conv-conv-1');
+  });
+});
+
+describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）', () => {
+  /** 真实 git 检出当 conv 工作区（local-repo 形态：工作区根 = repo checkout，
+   *  正是 plan.md 撞仓库根的形态）。 */
+  function gitCheckout(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-plan-checkout-'));
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+    git('init', '-b', 'main');
+    execFileSync(
+      'git',
+      [
+        '-C',
+        dir,
+        '-c',
+        'user.name=probe',
+        '-c',
+        'user.email=probe@pacman.test',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'seed',
+      ],
+      { encoding: 'utf8' },
+    );
+    return dir;
+  }
+
+  /** 听话 agent：按投递注记行解析交接位置，把 plan.md 写到那里。 */
+  function planWritingBackend(): {
+    backend: AgentBackend;
+    prompts: string[];
+    notePaths: string[];
+  } {
+    const prompts: string[] = [];
+    const notePaths: string[] = [];
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession(opts): Promise<AgentSessionHandle> {
+        prompts.push(opts.prompt ?? '');
+        const m = /plan\.md 交接位置：(.+?)。该位置在仓库检出之外/.exec(opts.prompt ?? '');
+        if (m?.[1]) {
+          notePaths.push(m[1]);
+          writeFileSync(m[1], '# 方案\nContext: x\nChanges: y');
+        }
+        return {
+          sessionId: 'pi-sess-plan',
+          events: (async function* () {
+            yield { type: 'done', usage: [] } as never;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession(): Promise<never> {
+        throw new Error('unused');
+      },
+    };
+    return { backend, prompts, notePaths };
+  }
+
+  test('local-repo plan 步：交接位置在 repo 检出外 → 检出 git status 零 plan.md（未跟踪也没有）+ plan 上传在案', async () => {
+    probeMock.mockReset();
+    probeMock.mockResolvedValue(null);
+    const checkout = gitCheckout();
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-plan-local-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const { logger } = captureLogger();
+    const client = new FakeClient();
+    const journal = new StepJournal(paths.outboxDir);
+    const ws: WorktreeOps = {
+      async prepare(input) {
+        return {
+          cwd: checkout,
+          baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
+          branch: `pacman/conv-${input.conversationId}`,
+          defaultBranch: 'main',
+          reused: false,
+        };
+      },
+      async commitAll() {
+        return { committed: true, head: 'abc123' };
+      },
+      async push() {},
+      async mergeDefaultBranch() {
+        return { output: '' };
+      },
+      async landLocalFastForward() {},
+      async headCommit() {
+        return 'abc123';
+      },
+      async countAhead() {
+        return 0;
+      },
+      async restoreCheckpoint() {},
+      async cleanupOrphans() {
+        return [];
+      },
+    };
+    const { backend, notePaths } = planWritingBackend();
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => backend,
+        logger,
+        paths,
+        workspace: ws,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+      },
+      claimedStep('plan', { kind: 'local', cloneUrl: checkout }),
+    );
+
+    // 验收正面：checkout 里 plan.md 未跟踪也没有。
+    expect(existsSync(join(checkout, PLAN_FILE_NAME))).toBe(false);
+    const status = execFileSync('git', ['-C', checkout, 'status', '--porcelain'], {
+      encoding: 'utf8',
+    });
+    expect(status).toBe('');
+    // 交接位置真在 repo 检出外（PACMAN_HOME 面）。
+    expect(notePaths).toEqual([join(home, 'plans', 'conv-1', PLAN_FILE_NAME)]);
+    expect(notePaths[0]?.startsWith(checkout)).toBe(false);
+    // 方案仍被收集上传（「打开方案」读面的数据源）。
+    expect(client.uploadNames).toEqual([['transcript.json', PLAN_FILE_NAME]]);
+    const planPut = client.uploads.find((u) => u.url === 'http://server/up/1');
+    expect(planPut?.body).toBe('# 方案\nContext: x\nChanges: y');
+  });
+
+  test('fresh-session 返工轮：残留在新交接位的上一轮 plan.md 随回退清掉（#113 闸语义保持）', async () => {
+    probeMock.mockReset();
+    probeMock.mockResolvedValue(null);
+    const checkout = gitCheckout();
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-plan-rewind-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const { logger } = captureLogger();
+    const client = new FakeClient();
+    const journal = new StepJournal(paths.outboxDir);
+    const ws: WorktreeOps = {
+      async prepare(input) {
+        return {
+          cwd: checkout,
+          baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
+          branch: `pacman/conv-${input.conversationId}`,
+          defaultBranch: 'main',
+          reused: true,
+        };
+      },
+      async commitAll() {
+        return { committed: true, head: 'abc123' };
+      },
+      async push() {},
+      async mergeDefaultBranch() {
+        return { output: '' };
+      },
+      async landLocalFastForward() {},
+      async headCommit() {
+        return 'abc123';
+      },
+      async countAhead() {
+        return 0;
+      },
+      async restoreCheckpoint() {},
+      async cleanupOrphans() {
+        return [];
+      },
+    };
+    // 上一轮残留在新交接位的 plan.md（旧位残渣此前随 clean -fd 消失）。
+    const stalePlan = join(home, 'plans', 'conv-1', PLAN_FILE_NAME);
+    mkdirSync(join(home, 'plans', 'conv-1'), { recursive: true });
+    writeFileSync(stalePlan, '# 上一轮旧方案');
+    // lazy 轮：backend 全程不写任何文件（agent 无视交接指令的形状）。
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => completingBackend(),
+        logger,
+        paths,
+        workspace: ws,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+      },
+      claimedStep('plan', { kind: 'local', cloneUrl: checkout }),
+    );
+    // 回退把残渣清掉：lazy 轮（agent 未写）收不到旧方案——#113 闸的
+    // 「重试后仍空」判定不被旧残渣绕过。
+    expect(existsSync(stalePlan)).toBe(false);
+    expect(client.uploadNames).toEqual([['transcript.json']]);
   });
 });

@@ -14,6 +14,9 @@
 //   5. 无指令回归：instruction 缺席的 new session build 步 → prompt = 纯任务
 //      文本（现行行为不动；plan 步自 #1025 起首轮注入 plan.md 契约，见
 //      runner-plan-contract.test.ts）
+// #1203：plan 步（含重启轮形）投递串尾部附 plan.md 交接位置注记行——重启
+// new session 上下文真空，位置行是 agent 唯一知道「写哪里」的通道；build 步
+// 不附。断言里的组合串 = withNote(home, compose(...)) 同形。
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,9 +32,11 @@ import type {
   TranscriptUpload,
 } from '@pacman/shared';
 import {
+  appendPlanLocationNote,
   buildRestartPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
+  PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -211,17 +216,24 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
     },
     claimed,
   );
-  return { client };
+  return { client, home };
+}
+
+/** #1203：plan 步投递串尾部附交接位置注记行（build 步不附）。 */
+function withNote(home: string, basePrompt: string): string {
+  return appendPlanLocationNote(basePrompt, join(home, 'plans', 'conv-1', PLAN_FILE_NAME));
 }
 
 describe('重启轮反馈投递（#720）', () => {
   test('new session + instruction 在位 → 会话 prompt = 任务文本 + 重启指令组合串', async () => {
     const instruction = buildRestartPrompt('把测试也补上');
     const { backend, prompts } = recordingBackend();
-    await setup(restartStep({ instruction }), backend);
+    const { home } = await setup(restartStep({ instruction }), backend);
     expect(prompts).toHaveLength(1);
     const delivered = prompts[0];
-    expect(delivered).toBe(composeTaskPromptWithInstruction(TASK_TEXT, instruction));
+    expect(delivered).toBe(
+      withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, instruction)),
+    );
     // 反馈真的进了会话（主 bug 的对账面：任务语境与返工理由同串在位）
     expect(delivered).toContain('把测试也补上');
     expect(delivered?.startsWith(TASK_TEXT)).toBe(true);
@@ -230,11 +242,13 @@ describe('重启轮反馈投递（#720）', () => {
   test('transcript 终稿的 user-<stepId> 行 = 组合串（wire 行与投递内容一致）', async () => {
     const instruction = buildRestartPrompt('把测试也补上');
     const { backend } = recordingBackend();
-    const { client } = await setup(restartStep({ instruction }), backend);
+    const { client, home } = await setup(restartStep({ instruction }), backend);
     const transcript = client.uploads.find((u) => u.stepId === 's1');
     const promptRow = transcript?.messages.find((m) => m.id === 'user-s1');
     expect(promptRow?.role).toBe('user');
-    expect(promptRow?.content).toBe(composeTaskPromptWithInstruction(TASK_TEXT, instruction));
+    expect(promptRow?.content).toBe(
+      withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, instruction)),
+    );
   });
 
   test('new session + 空白 instruction → 不注入空壳，prompt = 纯任务文本（build 负例；plan 步空白指令 = 首轮语义，契约照注，见 runner-plan-contract.test.ts）', async () => {

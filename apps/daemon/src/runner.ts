@@ -8,7 +8,7 @@
 // machine-loop recover 面对账续跑。
 
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -30,6 +30,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
   buildReworkFallbackPrompt,
   buildTaskPromptText,
@@ -372,7 +373,7 @@ export async function runStep(
   // （无该字段的存量 prompt）= confirm 语义——不开检出、材料不含变更。
   const reviewGate: ReviewGate =
     (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
-  const prompt =
+  const basePrompt =
     opts.resume?.prompt ??
     (isChief || isReview
       ? (claimed.instruction ?? '')
@@ -383,6 +384,21 @@ export async function runStep(
           // 两轮全空同源）。缺省回落词表（合并轮/确认后执行轮等无指令续轮）。
           (claimed.instruction ?? CONTINUE_PROMPTS[claimed.step.kind])
         : buildTaskPrompt(claimed));
+  // #1203 plan.md 交接位置注记行：plan 步交接物搬到 repo 检出之外
+  // （`<home>/plans/<convId>/plan.md`，step-attachments 同律的 worktree 外
+  // PACMAN_HOME 面目录）——local-repo 项目的 conv 工作区即 checkout，plan.md
+  // 落工作区根会被 agent 提交进仓库根（#24 / PR #1201 首版实锤）。路径是
+  // 执行机本地事实，server 侧模板位置无关化，由 daemon 在投递前单点组装
+  // （journal/wire 行与投递内容同串——recover 面 resume prompt 已含注记时
+  // appendPlanLocationNote 幂等不双注）。plan 步一律附注（含续轮/重启轮：
+  // new session 上下文真空时注记是 agent 唯一知道「写哪里」的通道）。
+  const prompt =
+    basePrompt !== null && claimed.step.kind === 'plan'
+      ? appendPlanLocationNote(basePrompt, join(deps.paths.plansDir, convId, PLAN_FILE_NAME))
+      : basePrompt;
+  if (claimed.step.kind === 'plan') {
+    mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
+  }
 
   // journal：claimed（recover 面即时落盘，02 §5.4）。
   journal.claim({
@@ -806,6 +822,11 @@ export async function runStep(
   ) {
     try {
       await deps.workspace.restoreCheckpoint(ws.cwd, headAtStart);
+      // #1203：交接位同律——上一轮写在 repo 检出外的 plan.md 也是本轮真空
+      // 语义下的残渣，一并清掉（旧位 plan.md 此前随 clean -fd 消失；不清会
+      // 在 agent 未重写时把旧方案收走当本轮产物，#113 闸的「重试后仍空」
+      // 判定被旧残渣绕过）。upload 已落 server DB，删本地副本无读面损失。
+      rmSync(join(deps.paths.plansDir, convId, PLAN_FILE_NAME), { force: true });
       logger.workspace('返工新会话：工作区回退到分支头');
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -1635,16 +1656,20 @@ export async function runStep(
   const messages = transcript.messages();
   let planContent: string | null = null;
   if (claimed.step.kind === 'plan' && !stopped) {
-    // #703 闸 1 真值面：产物契约不随 repo 形态变化——cwd = worktree 检出或
-    // 无 repo 裸任务目录（此前仅 worktree 收集，无 repo withPlan 恒无方案，
-    // 闸会把它们全拦死）。空白文件不算产物（空方案 = 无方案）。
-    const planPath = join(cwd, PLAN_FILE_NAME);
-    if (existsSync(planPath)) {
-      const content = readFileSync(planPath, 'utf8');
-      if (content.trim() !== '') {
-        planContent = content;
-      }
-    }
+    // #703 闸 1 真值面：产物契约不随 repo 形态变化——空白文件不算产物（空
+    // 方案 = 无方案）。#1203 起正位 = repo 检出外的 PACMAN_HOME 面
+    // （`<plansDir>/<convId>/plan.md`，prompt 注记行指定的路径）；旧位
+    // （cwd = worktree 检出 / 无 repo 裸任务目录）只作回落腿——在飞 conv
+    // 的方案仍写在旧位时读一次，不写回（新位空白也不回落：空方案语义不被
+    // 旧位残留覆盖）。
+    const readAt = (p: string): string | null => {
+      if (!existsSync(p)) return null;
+      const content = readFileSync(p, 'utf8');
+      return content.trim() !== '' ? content : null;
+    };
+    const planPath = join(deps.paths.plansDir, convId, PLAN_FILE_NAME);
+    planContent =
+      (existsSync(planPath) ? readAt(planPath) : readAt(join(cwd, PLAN_FILE_NAME))) ?? null;
   }
   // AI 审核步 findings（M7 #330，r8 §3.1；#700）：仅 review 步提取——其它
   // 步类无该输出契约，不提取避免假阳。提取成功 → findings；提取失败 →

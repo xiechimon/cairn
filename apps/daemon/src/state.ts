@@ -32,6 +32,11 @@ export interface StatePaths {
    * （`<home>/step-attachments/<stepId>/`）——素材落这里保证步后
    * git status clean（构造性，票面失败方式 1）；resolver 首用即建。 */
   stepAttachmentsDir: string;
+  /** plan 步交接物根（#1203）：`<home>/plans/<conversationId>/plan.md`——
+   *  同 step-attachments 的「worktree 外 PACMAN_HOME 面目录」律：local-repo
+   *  项目的 conv 工作区即 repo checkout，plan.md 落工作区根会被 agent 提交
+   *  进仓库根。runner 组装交接位置注记行时首用即建。 */
+  plansDir: string;
 }
 
 export function statePaths(home: string, workspacesDir?: string): StatePaths {
@@ -47,6 +52,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     workspacesDir: workspacesDir ?? join(home, 'workspaces'),
     teamSkillsCacheDir: join(home, 'team-skills'),
     stepAttachmentsDir: join(home, 'step-attachments'),
+    plansDir: join(home, 'plans'),
   };
 }
 
