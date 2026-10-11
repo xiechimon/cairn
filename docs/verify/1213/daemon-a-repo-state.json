@@ -1,0 +1,8 @@
+{
+  "base": "/tmp/pacman-1213-daemon-a-1791730621740/workspaces/WLe9SIXxgstmmTtTwIL1C/repo",
+  "conv": "/tmp/pacman-1213-daemon-a-1791730621740/workspaces/01a12b77-b4f6-78a5-89ec-91004beca19e",
+  "origin": "https://github.com/octocat/Hello-World.git",
+  "originDefault": "origin/master",
+  "remoteTip": "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d",
+  "convHead": "7fd1a60b01f91b314f59955a4e4d4e80d8edf11d"
+}
