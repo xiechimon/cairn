@@ -68,6 +68,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
   useMessageScroller,
+  useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -238,6 +239,9 @@ export function ChiefDrawer(props: DrawerProps) {
   const { open = true, chief } = props;
   const { t } = useI18n();
   const [threadsOpen, setThreadsOpen] = useState(chief.threadsOpen ?? false);
+  // #1067 跟随武装位（atBottom）：读者贴最新端才跟随新消息——最小化/离底
+  // 阅读期间 autoScroll 关死，重开不抢滚动条（停泊载体保留的位置原样交回）。
+  const [atBottom, setAtBottom] = useState(true);
   return (
     <DialogPrimitive.Root
       open={open}
@@ -271,16 +275,21 @@ export function ChiefDrawer(props: DrawerProps) {
           {/* #1009 A1：MessageScroller Provider 包住整列窗内容——滚动律单源
               从 useChatFollow 换成原语原生 autoScroll，#873 语义逐条保留：
               贴底阈值 80px = FOLLOW_THRESHOLD 同值（scrollEdgeThreshold）、
-              关窗解除武装 = 旧 active=open 同律（autoScroll）、打开落底 =
-              chat 面通行律（defaultScrollPosition="end"）、发送跳最新 =
-              scrollToEnd()（实审裁决 2：不采 scrollAnchor 逐条锚定）。
-              消费点（composer wire 的 onSend 与切线程 effect）住内容列
-              hook 里，必须整体下沉到 Provider 之下——拆分点即此。 */}
+              打开落底 = chat 面通行律（defaultScrollPosition="end"，仅初次
+              挂载跑一次）、发送跳最新 = scrollToEnd()（实审裁决 2：不采
+              scrollAnchor 逐条锚定）。#1067 起跟随武装位 = 读者贴底
+              （autoScroll={open && atBottom}，ChiefFollowArmed 读表）：
+              停泊载体让滚动位置跨最小化存活后，「重开钉回最新」不再是
+              载体副作用而是 armed 门的行为——贴底时重开/新消息照旧跟随，
+              离底阅读位置原样交回。消费点（composer wire 的 onSend 与切
+              线程 effect）住内容列 hook 里，必须整体下沉到 Provider 之下
+              ——拆分点即此。 */}
           <MessageScrollerProvider
-            autoScroll={open}
+            autoScroll={open && atBottom}
             scrollEdgeThreshold={80}
             defaultScrollPosition="end"
           >
+            <ChiefFollowArmed onAtBottom={setAtBottom} />
             <ChiefDrawerInner
               {...props}
               threadsOpen={threadsOpen}
@@ -291,6 +300,19 @@ export function ChiefDrawer(props: DrawerProps) {
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
+}
+
+/**
+ * #1067 跟随武装位的读表腿：消费 stateStore（stateFrame 同步面）取「读者
+ * 是否贴底」。Provider 与消费者不能同组件（context 拿不到自己渲染树），
+ * 故挂在 ChiefDrawer 之下、内容列之上。
+ */
+function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolean) => void }) {
+  const scrollable = useMessageScrollerScrollable();
+  useEffect(() => {
+    onAtBottom(!scrollable.end);
+  }, [scrollable.end, onAtBottom]);
+  return null;
 }
 
 function ChiefDrawerInner({
@@ -522,19 +544,22 @@ function ChiefDrawerInner({
     prevOpenRef.current = open;
     if (!open || wasOpen) return;
     // keepMounted 关态 = hidden 属性驻 DOM（app.css 把 display:none 中和成
-    // visibility 停靠，#1067）：Base UI 摘 hidden 的提交时机晚于本 effect，
-    // focus() 打在 visibility:hidden 节点上静默失败（实测首焦全丢）——帧重试
-    // 到节点脱离 [hidden] 祖先再落焦（有界 5 帧；中途关窗则 closest 命中
-    // hidden 自然放弃）。
+    // visibility 停靠，#1067）：重开瞬间有两段瞬态窗体还不可聚焦——Base UI
+    // 摘 hidden 的提交时机晚于本 effect，且进场首帧 aside 仍带
+    // data-starting-style（tw v4 对该属性生成 visibility:hidden，进场动画
+    // 首帧起播时摘除，实测 focus() 打在两种状态上都静默失败）——帧重试到
+    // 节点既脱离 [hidden] 祖先、祖先又不再带 data-starting-style 再落焦
+    // （有界 12 帧 ≈ 200ms 动画周期；中途关窗则 closest 命中 hidden 自然放弃）。
     let frames = 0;
     const tryFocus = () => {
       const node = textareaRef.current;
       if (node == null) return;
-      if (node.closest('[hidden]') == null) {
+      const shell = node.closest('[hidden], [data-starting-style]');
+      if (shell == null) {
         node.focus({ preventScroll: true });
         return;
       }
-      if (frames < 5) {
+      if (frames < 12) {
         frames += 1;
         requestAnimationFrame(tryFocus);
       }
