@@ -56,7 +56,7 @@ import {
   MIN_CLAUDE_PLUGIN_VERSION,
   resolveTeamSkillsPluginDir,
 } from '../src/backend/claude-code.js';
-import { collectTeamSkillEntries } from '../src/backend/pi.js';
+import { collectTeamSkillEntries } from '../src/backend/skills.js';
 import {
   ensureTeamSkillsPlugin,
   materializeTeamSkills,
