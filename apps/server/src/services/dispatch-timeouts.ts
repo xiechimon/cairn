@@ -41,6 +41,15 @@ export const PIN_OFFLINE_GRACE_MS = 10 * 60_000;
  *  同 10 分钟量级让「有界等待」一族数字可读。 */
 export const SESSION_WEDGE_GRACE_MS = 10 * 60_000;
 
+/** #1219 ④c：钉选机在线、runtime 闸开、有空闲并发位，pending 步仍未被领的
+ *  宽限。在线健康机器领步在一两个 claim 周期内（≤~105s）；有闲位仍超此不领
+ *  = 该机 daemon 不在领取（实测形态：#1053 时代串行循环被一条长跑 chief 步
+ *  顶住——chief 步不占 worker 槽，DB 面看是「有闲位却不动」）。宽限后按
+ *  失败收尾：钉选不自动改派（④/④b 同律），失败文案点名机器与出口。
+ *  已知残余（注释钉住，不静默）：机器 env 上限低于 DB 行时（#1148 server 闸
+ *  取 min），「DB 有闲位」可能是假闲——失败可见可重跑，不是误删。 */
+export const PIN_ONLINE_WEDGE_GRACE_MS = 10 * 60_000;
+
 /** 步的最后活动时刻：心跳 → 领取 → 入队（T1 释放保留 claimedAt/lastHeartbeatAt
  *  作死亡时刻审计，故释放后的 pending 步锚在失联时刻）。 */
 export function stepActivityAt(row: {
@@ -86,3 +95,13 @@ export const WORKER_PIN_RUNTIME_HINT =
 /** #881 ① chief 回合尾注：动作面是「重发」。 */
 export const CHIEF_PIN_RUNTIME_HINT =
   '请在机器页为它开启该 runtime 后重发，或把任务的机器改为其它在线机器。';
+
+/** #1219 ④c：钉选机器在线且有空闲并发位、超宽限仍未认领的失败文案
+ *  （点名机器；出口 = 检查/重启该机 daemon 或改钉）。 */
+export function pinWedgeReason(machineName: string, hint: string): string {
+  return `本轮无人认领：钉选的机器「${machineName}」在线且有空闲并发位，但 ${PIN_ONLINE_WEDGE_GRACE_MS / 60_000} 分钟未认领本步（其 daemon 可能未在领取或为旧版串行循环）。${hint}`;
+}
+
+/** #1219 ④c worker 步尾注。 */
+export const WORKER_PIN_WEDGE_HINT =
+  '请检查该机器的 daemon（重启或升级后重跑），或把任务的机器改为其它在线机器（重跑沿用任务的钉选）。';

@@ -179,7 +179,6 @@ function fakeWorkspace(cwd: string): WorktreeOps {
     async mergeDefaultBranch() {
       return { output: 'Already up to date' };
     },
-    async landLocalFastForward() {},
     async headCommit() {
       return 'abc123';
     },

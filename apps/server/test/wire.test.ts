@@ -32,6 +32,7 @@ import { bootServer, postProject, req } from './helpers.js';
 /** 已登记 [推断] 路由（词表外扩面，出处注记；补采真值后回写 02 §11）。 */
 const INFERRED_ROUTES = [
   'POST /api/projects', // 项目创建流（02 §3/r2 §9 UI 证据，wire 未采）
+  'PATCH /api/projects/{id}', // #1213/ADR 0017：localPath 加速位写面（GitHub 真值 + 同机加速位），wire 未采
   'PATCH /api/user/me', // #1031 改名落盘面：GET 同名 PATCH [推断]（02 §6.1 REST 同名规则族，wire 未采）
   'PATCH /api/todos/{id}', // update_todo 面（r5 §3.1 词表证据；02 §6.1 PATCH 未抓）
   'DELETE /api/todos/{id}', // DELETE_FACE 'todos' 同名 DELETE（02 §6.1 [推断] 规则）

@@ -199,9 +199,6 @@ function fakeWorkspace(cwd: string, diff: string | null) {
       calls.push('mergeDefaultBranch');
       return { output: 'Already up to date' };
     },
-    async landLocalFastForward(userRepoDir: string, branch: string) {
-      calls.push(`landLocalFastForward:${userRepoDir}:${branch}`);
-    },
     async headCommit() {
       calls.push('headCommit');
       return 'abc123';

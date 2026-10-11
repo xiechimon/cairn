@@ -339,7 +339,6 @@ describe('#1149 环境钩子投影（runner transcript）', () => {
       async mergeDefaultBranch() {
         return { output: 'Already up to date' };
       },
-      async landLocalFastForward() {},
       async headCommit() {
         return 'abc123';
       },
@@ -420,7 +419,6 @@ describe('#1149 环境钩子投影（runner transcript）', () => {
       async mergeDefaultBranch() {
         return { output: 'Already up to date' };
       },
-      async landLocalFastForward() {},
       async headCommit() {
         return 'abc123';
       },

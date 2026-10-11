@@ -48,7 +48,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { applyBuildStepAction, requestMerge, startBuilds } from './builds.js';
+import { applyBuildStepAction, cancelBuild, requestMerge, startBuilds } from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -195,6 +195,20 @@ function requireTeamMachine(db: Db, machineId: string, teamId: string) {
     .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId)))
     .get();
   if (!row) throw new HttpError(404, `machine ${machineId}（不在本团队，或 id 抄错了）`);
+  return row;
+}
+/** #1219 cancel_builds 归属校验（requireTeamAgent/Machine 同律，mcp-face
+ * requireTeamBuild 同形）：build 表无 teamId 列，经 build → todo 联查；跨团队/
+ * 不存在一律 404（不泄露存在性）。 */
+function requireTeamBuild(db: Db, buildId: string, teamId: string) {
+  const row = db.select({ todoId: build.todoId }).from(build).where(eq(build.id, buildId)).get();
+  if (!row) throw new HttpError(404, `build ${buildId}`);
+  const owned = db
+    .select({ id: todo.id })
+    .from(todo)
+    .where(and(eq(todo.id, row.todoId), eq(todo.teamId, teamId)))
+    .get();
+  if (!owned) throw new HttpError(404, `build ${buildId}`);
   return row;
 }
 /** 51 词表服务端执行。未识别工具名 = 400（词表外不执行，02 §7.2 白名单纪律
@@ -774,11 +788,11 @@ export async function executeChiefTool(
     case 'cancel_builds': {
       const buildIds = strArr(params, 'buildIds');
       for (const buildId of buildIds) {
-        db.update(build).set({ errorMessage: 'Cancelled' }).where(eq(build.id, buildId)).run();
-        db.update(step)
-          .set({ status: 'failed' })
-          .where(and(eq(step.buildId, buildId), eq(step.status, 'pending')))
-          .run();
+        requireTeamBuild(db, buildId, ctx.teamId);
+        // #1219：走取消漏斗（pending→stopped 落账 / claimed→stop 委托 /
+        // 无活动步→僵尸释放）——旧裸 UPDATE 只写 errorMessage + 步 failed，
+        // todo 不离 queued，run_builds 随后 409 queued→queued 整队停摆。
+        cancelBuild(deps, buildId);
       }
       return json({ cancelled: buildIds });
     }

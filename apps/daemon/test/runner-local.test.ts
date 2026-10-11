@@ -1,20 +1,24 @@
 // runner repo 形态接线（spec 12 G2-T2，#362）：local/github kind 进入
-// worktree 契约 + local merge 步 push 后 ff-only 落回用户仓库。
-// harness 同 runner-stop.test.ts（FakeClient + fake WorktreeOps 录制调用序）。
+// worktree 契约；local 落地 = conv 分支 push 回用户仓库（#1211：主检出分支
+// 永不被移动——用户仓库只多 pacman/ 分支）。harness 同 runner-stop.test.ts
+// （FakeClient + fake WorktreeOps 录制调用序）。
 // 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. local merge 步：prepare 开 worktree（cloneUrl = 用户仓库路径）→
-//      commitAll → mergeDefaultBranch → push（凭证 null）→
-//      landLocalFastForward(用户仓库, conv 分支)，序在 push 之后；done success
-//   2. landing 抛错（git 自拒）→ done failed，errorMessage 含 git 拒绝原文
+//      commitAll → mergeDefaultBranch → push（凭证 null）= 落地全链；merge 步
+//      的 workspace 操作序完整钉死，push 后即收尾（#1211：用户主检出的分支/
+//      工作树永不被 pacman 推进）；done success
+//   2.（#1211 真值面）local merge 步全链真 git（真 WorkspaceManager + 真
+//      用户仓库）：收尾后用户仓库 HEAD/reflog/status 零变化、工作树零新
+//      文件；conv 分支在 refs/heads 在位（分支即交付）
 //   3. github merge 步：prepare 开 worktree（https clone）→ push 消费 per-step
 //      凭证 {x-access-token, token}；收尾探测同消费 per-step token（#966：
-//      探测经 mock，真实网络面不进单测）；不触发 landing（v1 done = conv 分支已推上）
-//   4. local build 步：push 照常，不触发 landing（落地仅 merge 步）
+//      探测经 mock，真实网络面不进单测）；done = conv 分支已推上，不落地
+//   4. local build 步：push 照常（conv 分支每步都推，用户仓库收分支）
 //   5. 无 repo 项目（repo null）：不开 worktree，裸任务目录退化形不变
 //   6.（XMON-77 权限闸）merge 步 tools 携带但缺任一开关 → 会话/工作区之前
 //      failStep（done failed，errorMessage 点名缺失开关；无 prepare/commit）
 //   7.（XMON-77）merge 步双开关齐 → 失败方式 1 全流程不变
-//   8.（XMON-77）build 步缺「推送分支」→ commitAll 照做、push/landing 不做、
+//   8.（XMON-77）build 步缺「推送分支」→ commitAll 照做、push 不做、
 //      done success（软拒：提交留本地工作分支）+ transcript 落 push-skip
 //      system 行（用户合并前看得见为何没推上去）
 //   9.（XMON-77）tools 缺省（老 server 版本墙）→ 两闸均不生效（fail-open）
@@ -42,6 +46,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { WorkspaceManager } from '../src/workspace.js';
 
 // #966 flake 根因：github 形态步成功收尾时 runStep 会调 probeGithubPr——真
 // gh CLI + api.github.com 双梯，各带 10s 预算。本文件只有失败方式 3 命中它：
@@ -189,8 +194,8 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 录制型 fake worktree：全操作进 calls；landing 可注入失败。 */
-function fakeWorkspace(opts: { landError?: string } = {}) {
+/** 录制型 fake worktree：全操作进 calls。 */
+function fakeWorkspace() {
   const calls: string[] = [];
   const pushes: { branch: string; cred: GitCredentials | null }[] = [];
   const ws: WorktreeOps = {
@@ -215,10 +220,6 @@ function fakeWorkspace(opts: { landError?: string } = {}) {
     async mergeDefaultBranch() {
       calls.push('mergeDefaultBranch');
       return { output: 'Already up to date' };
-    },
-    async landLocalFastForward(userRepoDir, branch) {
-      calls.push(`landLocalFastForward:${userRepoDir}:${branch}`);
-      if (opts.landError) throw new Error(opts.landError);
     },
     async headCommit() {
       return 'abc123';
@@ -256,10 +257,55 @@ function completingBackend(): AgentBackend {
   };
 }
 
-async function setup(
-  claimed: ClaimedStep,
-  opts: { landError?: string; git?: GitCredentials | null } = {},
-) {
+/** 写探针 backend：会话开启即往 worktree cwd 落 probe.txt（agent 产出形）。 */
+function probeWritingBackend(): AgentBackend {
+  return {
+    capabilities: PI_CAPABILITIES,
+    async createSession(opts): Promise<AgentSessionHandle> {
+      writeFileSync(join(opts.cwd, 'probe.txt'), 'merge landing probe\n');
+      return {
+        sessionId: 'pi-sess-merge-real',
+        events: (async function* () {
+          yield { type: 'text_delta', text: 'ok' } as never;
+          yield { type: 'done', usage: [] } as never;
+        })(),
+        async steer() {},
+        async stop() {},
+        usage: () => [],
+      };
+    },
+    async continueSession(): Promise<never> {
+      throw new Error('unused');
+    },
+  };
+}
+
+/** 真用户仓库种子（非 bare 工作树仓、main、单提交——#1211 判据的最小形态）。 */
+function seedUserRepo(dir: string): void {
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+  git('init', '-b', 'main');
+  writeFileSync(join(dir, 'README.md'), '# user repo\n');
+  git('add', '-A');
+  execFileSync(
+    'git',
+    [
+      '-C',
+      dir,
+      '-c',
+      'user.name=probe',
+      '-c',
+      'user.email=probe@pacman.test',
+      'commit',
+      '--allow-empty',
+      '-m',
+      'seed',
+    ],
+    { encoding: 'utf8' },
+  );
+}
+
+async function setup(claimed: ClaimedStep, opts: { git?: GitCredentials | null } = {}) {
   probeMock.mockReset();
   // 不存在的仓库（o/r）的真值：gh / REST 双梯 404 → null（面板 PR 槽留空）。
   probeMock.mockResolvedValue(null);
@@ -269,9 +315,7 @@ async function setup(
   const client = new FakeClient();
   client.git = opts.git ?? null;
   const journal = new StepJournal(paths.outboxDir);
-  const { ws, calls, pushes } = fakeWorkspace(
-    opts.landError !== undefined ? { landError: opts.landError } : {},
-  );
+  const { ws, calls, pushes } = fakeWorkspace();
   const deps = {
     client,
     journal,
@@ -288,33 +332,65 @@ async function setup(
 }
 
 describe('runner repo 形态接线（spec 12 G2-T2）', () => {
-  test('失败方式 1：local merge 步 → worktree + push 回用户仓库 + ff-only 落地（序在 push 后）+ done success', async () => {
+  test('失败方式 1：local merge 步 → worktree + push 回用户仓库 = 落地全链（workspace 操作序完整钉死，无第四步）+ done success', async () => {
     const { client, calls } = await setup(
       claimedStep('merge', { kind: 'local', cloneUrl: USER_REPO }),
     );
-    expect(calls).toContain(`prepare:${USER_REPO}`);
-    expect(calls).toContain('mergeDefaultBranch');
-    expect(calls).toContain('push:pacman/conv-conv-1');
-    expect(calls).toContain(`landLocalFastForward:${USER_REPO}:pacman/conv-conv-1`);
-    expect(calls.indexOf('push:pacman/conv-conv-1')).toBeLessThan(
-      calls.indexOf(`landLocalFastForward:${USER_REPO}:pacman/conv-conv-1`),
-    );
+    // #1211：merge 步的 workspace 操作序 = prepare → commitAll → merge → push，
+    // push 即收尾——对用户仓库目录不再有后续 git 操作。
+    expect(calls).toEqual([
+      `prepare:${USER_REPO}`,
+      'commitAll',
+      'mergeDefaultBranch',
+      'push:pacman/conv-conv-1',
+    ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 
-  test('失败方式 2：landing git 自拒 → done failed，errorMessage 含拒绝原文', async () => {
-    const refusal =
-      'git merge --ff-only pacman/conv-conv-1 refused: fatal: Not possible to fast-forward, aborting.';
-    const { client } = await setup(claimedStep('merge', { kind: 'local', cloneUrl: USER_REPO }), {
-      landError: refusal,
-    });
-    expect(client.doneBodies[0]!.body.status).toBe('failed');
-    expect(client.doneBodies[0]!.body.errorMessage).toContain('Not possible to fast-forward');
-  });
+  test('失败方式 2（#1211 真值面）：local merge 步真 git 全链 → 用户仓库只多 conv 分支，HEAD/reflog/工作树零变化', async () => {
+    probeMock.mockReset();
+    probeMock.mockResolvedValue(null);
+    const userRepo = mkdtempSync(join(tmpdir(), 'pacman-user-main-'));
+    seedUserRepo(userRepo);
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', userRepo, ...args], { encoding: 'utf8' });
+    const headBefore = git('rev-parse', 'HEAD').trim();
+    const reflogBefore = git('reflog', 'main');
+
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-merge-real-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const { logger } = captureLogger();
+    const client = new FakeClient();
+    const journal = new StepJournal(paths.outboxDir);
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => probeWritingBackend(),
+        logger,
+        paths,
+        workspace: new WorkspaceManager({ logger }),
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+      },
+      claimedStep('merge', { kind: 'local', cloneUrl: userRepo }),
+    );
+
+    // 主检出零触碰：HEAD 不动、reflog 无新增、工作树无新文件、status 干净。
+    expect(git('rev-parse', 'HEAD').trim()).toBe(headBefore);
+    expect(git('reflog', 'main')).toBe(reflogBefore);
+    expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false);
+    expect(git('status', '--porcelain').trim()).toBe('');
+    // 落地面：conv 分支落用户仓库 refs/heads（分支即交付，合并由用户自取）。
+    const branchSha = git('rev-parse', '--verify', 'refs/heads/pacman/conv-conv-1').trim();
+    expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
+    expect(client.doneBodies[0]!.body.status).toBe('success');
+  }, 30_000);
 
   // #966 双保险：探测 mock 后本用例回到毫秒级，显式预算留给高载 CI 的调度
   // 噪音——「偶发慢」不再误报，「真挂」仍会在上限处失败。
-  test('失败方式 3：github merge 步 → worktree（https clone）+ push 消费 per-step 凭证；不触发 landing', {
+  test('失败方式 3：github merge 步 → worktree（https clone）+ push 消费 per-step 凭证', {
     timeout: 20_000,
   }, async () => {
     const { client, calls, pushes } = await setup(
@@ -332,16 +408,12 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
         token: GITHUB_TOKEN.password,
       }),
     );
-    expect(calls.some((c) => c.startsWith('landLocalFastForward'))).toBe(false);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 
-  test('失败方式 4：local build 步 → push 照常、无 landing（落地仅 merge 步）', async () => {
+  test('失败方式 4：local build 步 → push 照常（conv 分支每步都推，用户仓库收分支）', async () => {
     const { calls } = await setup(claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }));
-    expect(calls).toContain(`prepare:${USER_REPO}`);
-    expect(calls).toContain('push:pacman/conv-conv-1');
-    expect(calls.some((c) => c.startsWith('landLocalFastForward'))).toBe(false);
-    expect(calls).not.toContain('mergeDefaultBranch');
+    expect(calls).toEqual([`prepare:${USER_REPO}`, 'commitAll', 'push:pacman/conv-conv-1']);
   });
 
   test('失败方式 5：repo null → 不开 worktree（裸任务目录退化形不变）', async () => {
@@ -394,19 +466,20 @@ describe('runner 权限闸：合并分支/推送分支（XMON-77）', () => {
         },
       ),
     );
-    expect(calls).toContain('mergeDefaultBranch');
-    expect(calls).toContain('push:pacman/conv-conv-1');
-    expect(calls).toContain(`landLocalFastForward:${USER_REPO}:pacman/conv-conv-1`);
+    expect(calls).toEqual([
+      `prepare:${USER_REPO}`,
+      'commitAll',
+      'mergeDefaultBranch',
+      'push:pacman/conv-conv-1',
+    ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 
-  test('失败方式 8：build 步缺「推送分支」→ 提交留本地，push/landing 不做，transcript 落 push-skip 行', async () => {
+  test('失败方式 8：build 步缺「推送分支」→ 提交留本地，push 不做，transcript 落 push-skip 行', async () => {
     const { client, calls, paths, lines } = await setup(
       claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }, { tools: ['合并分支'] }),
     );
-    expect(calls).toContain('commitAll');
-    expect(calls.some((c) => c.startsWith('push'))).toBe(false);
-    expect(calls.some((c) => c.startsWith('landLocalFastForward'))).toBe(false);
+    expect(calls).toEqual([`prepare:${USER_REPO}`, 'commitAll']);
     // 软拒：步本身成功（提交在本地工作分支），拒的是推送。
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const skip = transcriptRows(paths).find((r) => r.id === 'push-skip-s1');
@@ -515,7 +588,6 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
       async mergeDefaultBranch() {
         return { output: '' };
       },
-      async landLocalFastForward() {},
       async headCommit() {
         return 'abc123';
       },
@@ -584,7 +656,6 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
       async mergeDefaultBranch() {
         return { output: '' };
       },
-      async landLocalFastForward() {},
       async headCommit() {
         return 'abc123';
       },

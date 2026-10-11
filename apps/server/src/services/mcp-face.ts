@@ -33,7 +33,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyApiKey } from './api-keys.js';
-import { startBuilds } from './builds.js';
+import { cancelBuild, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, mergeBuild, transitionTodos } from './chief-tools.js';
 import { isChiefConversation } from './machines.js';
@@ -363,11 +363,9 @@ export async function executeMcpTool(
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) {
         requireTeamBuild(db, buildId, ctx.teamId);
-        db.update(build).set({ errorMessage: 'Cancelled' }).where(eq(build.id, buildId)).run();
-        db.update(step)
-          .set({ status: 'failed' })
-          .where(and(eq(step.buildId, buildId), eq(step.status, 'pending')))
-          .run();
+        // #1219：与 chief cancel_builds 同漏斗（cancelBuild——pending stopped /
+        // claimed stop 委托 / 僵尸释放；旧裸 UPDATE 的 todo-留-queued 僵尸不复存在）。
+        cancelBuild(svc, buildId);
       }
       return json({ cancelled: buildIds });
     }

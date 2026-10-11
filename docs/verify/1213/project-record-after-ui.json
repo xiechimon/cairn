@@ -1,0 +1,9 @@
+{
+  "id": "WLe9SIXxgstmmTtTwIL1C",
+  "name": "probe-1213-1791730623262",
+  "teamId": "S1GkPsbm5C9fe-qQE7O1J",
+  "repoKind": "github",
+  "githubRepo": "octocat/Hello-World",
+  "localPath": "/definitely/not/here-1213-1791730621740",
+  "cloneUrl": "https://github.com/octocat/Hello-World.git"
+}

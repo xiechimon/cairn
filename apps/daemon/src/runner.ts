@@ -541,6 +541,9 @@ export async function runStep(
         cloneUrl: repo.cloneUrl,
         workspacesRoot: deps.workspacesDir,
         credentials: creds.git,
+        // 双执行源（ADR 0017 / #1213）：github 形态加速位随 claim 载荷透传到
+        // workspace 物化处做选源；其余形态 null（现行为）。
+        localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
       });
     } catch (err) {
       clearCredentials(creds);
@@ -1581,14 +1584,10 @@ export async function runStep(
             `brief marker scan failed: ${err instanceof Error ? err.message : String(err)}`,
           );
         }
-        // local 形态落地（spec 12 G2-T2）：merge 步 push 回用户仓库后
-        // `git merge --ff-only <convBranch>` 推进用户当前分支；脏工作区/非 ff
-        // → git 自拒 → lastError（failed 收尾，reason 含 git 拒绝原文）——
-        // 永不 force、永不动用户工作树。hosted 落地在 server applyMergeLanding
-        // （hosted-only 不变）；github v1 done 语义 = conv 分支已推上，不落地。
-        if (repo?.kind === 'local' && claimed.step.kind === 'merge') {
-          await git.landLocalFastForward(repo.cloneUrl, ws.branch);
-        }
+        // local 形态落地 = conv 分支 push 回用户仓库（#1211：push 即收尾，
+        // 用户主检出的分支/工作树永不被 pacman 推进——合并到默认分支由用户
+        // 自取）。hosted 落地在 server applyMergeLanding（hosted-only 不变）；
+        // github v1 done 语义 = conv 分支已推上，不落地。
       }
       headCommit = committed.head ?? (await git.headCommit(ws.cwd));
       // hasChanges = conv 分支领先默认分支的提交在位（02 §4.1/r5 §8 列位双键；

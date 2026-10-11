@@ -120,7 +120,8 @@ import {
 } from './credentials.js';
 import {
   agentForStep as agentForStepEligibility,
-  agentIdForStep,
+  agentRunningCount,
+  machineRunningCount,
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -463,32 +464,7 @@ export function findApiKeyByPlain(db: Db, plain: string) {
  *  非 chief 步**（chief 不占并发槽——容量闸、机器页 `执行中 n/N`、排队
  *  waitingFor 快照三处同源同数：满载 worker + chief 在跑时 n 不超 N，chief
  *  步不受闸也不进计数）。 */
-export function machineRunningCount(db: Db, machineId: string): number {
-  return db
-    .select({ id: step.id })
-    .from(step)
-    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
-    .all().length;
-}
-
-/** #1138 agent 级在跑计数：该 Agent 名下 claimed worker 步数（机器无关
- *  ——agent 池跨机器，与 Multica agent 层闸同形，r10 §5.4）。归账 = 槽位
- *  解析（dispatch-eligibility agentIdForStep 单源，与 claim 候选解析同一
- *  份事实）：join step⋈build⋈todo，孤儿步（无 build 行——测试占位与极端
- *  残行）天然不计；chief 步 buildId 是线程 id 无 build 行，join 自动缺席
- *  =「#1148 chief 不占槽」的 agent 面同律。步领取后 assignment 改派的窄
- *  窗按当前槽位归账（闸是公平性约束，不是所有权账本——与亲和面读 prior
- *  session 步的 machineId 同款现读口径）。 */
-function agentRunningCount(db: Db, agentId: string): number {
-  const rows = db
-    .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
-    .from(step)
-    .innerJoin(build, eq(step.buildId, build.id))
-    .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief')))
-    .all();
-  return rows.filter((r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId).length;
-}
+export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
   return machineRecordSchema.parse({
