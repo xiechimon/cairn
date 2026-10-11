@@ -33,6 +33,7 @@ import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Switch } from '../components/ui/switch.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -42,7 +43,6 @@ import { CreateMachineDialog } from './create-machine-dialog.js';
 import {
   GroupCard,
   OnlineDot,
-  RowDesc,
   RowGrow,
   RowLine,
   RowText,
@@ -68,9 +68,10 @@ const RUNTIME_MARKS: Record<MachineRuntime, typeof PiMark> = {
   'claude-code': ClaudeMark,
 };
 
-/** 机器行开关副文案（行内第二行）——机器侧的那半边语义：Agent 权限 tab 的
- * 同名开关说的是「在哪台机器上能用」，这里说的是「这台机器让不让用」，两者
- * 齐开预检才放行（XMON-108 R1 双闸）。工具名经 {tool} 插值走 shared
+/** 机器层 shell 开关的说明句（#1175：不再作为行副行常驻——挂在开关簇的
+ * tooltip 上，hover/focus 弹出。机器侧的那半边语义：Agent 权限 tab 的同名
+ * 开关说的是「在哪台机器上能用」，这里说的是「这台机器让不让用」，两者齐开
+ * 预检才放行（XMON-108 R1 双闸）。工具名经 {tool} 插值走 shared
  * AGENT_TOOL_SHELL 单源——两层开关共用同一个词，词变了不会只改一处。 */
 const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执行命令。';
 
@@ -262,7 +263,6 @@ export function MachinesPage() {
                     data-on 是状态载体（#910 裁定 3）。 */}
                   {machine.online !== undefined && <OnlineDot on={machine.online !== false} />}
                 </RowLine>
-                <RowDesc>{t(MACHINE_SHELL_HINT, { tool: t(AGENT_TOOL_SHELL) })}</RowDesc>
               </RowText>
               {machine.kind === 'local' ? (
                 <span className="ml-auto flex items-center gap-4">
@@ -332,23 +332,35 @@ export function MachinesPage() {
                 权限 tab 看到的是同一个词。与左侧 runtime mark / status pill
                 之间留 20px——mark 是展示、开关是控件，贴太近会被读成同一组
                 （#503 摘 mark 的歧义正是「这是不是又在开关 runtime」）；
-                行内无 mark 无 pill 时（接入机未观测态）自己撑到右缘。 */}
-              <span
-                className={cn(
-                  'flex flex-none items-center gap-2',
-                  machine.kind === 'local' || machine.pill != null ? 'ml-5' : 'ml-auto',
-                )}
-              >
-                <span className="text-xs leading-4 whitespace-nowrap text-(--text-tertiary)">
-                  {t(AGENT_TOOL_SHELL)}
-                </span>
-                <Switch
-                  data-machine-id={machine.id}
-                  aria-label={t(AGENT_TOOL_SHELL)}
-                  checked={shellOn(machine)}
-                  onCheckedChange={(on) => toggleShell(machine, on)}
-                />
-              </span>
+                行内无 mark 无 pill 时（接入机未观测态）自己撑到右缘。
+                #1175：说明句挂 tooltip（hover/focus 弹出，不再常驻副行）——
+                触发面 = 开关簇整体（词 + 开关，词是 aria-label/可见词，键盘
+                Tab 到开关时说明随 focus 可达）。 */}
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      className={cn(
+                        'flex flex-none items-center gap-2',
+                        machine.kind === 'local' || machine.pill != null ? 'ml-5' : 'ml-auto',
+                      )}
+                    />
+                  }
+                >
+                  <span className="text-xs leading-4 whitespace-nowrap text-(--text-tertiary)">
+                    {t(AGENT_TOOL_SHELL)}
+                  </span>
+                  <Switch
+                    data-machine-id={machine.id}
+                    aria-label={t(AGENT_TOOL_SHELL)}
+                    checked={shellOn(machine)}
+                    onCheckedChange={(on) => toggleShell(machine, on)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent side="top" sideOffset={8}>
+                  {t(MACHINE_SHELL_HINT, { tool: t(AGENT_TOOL_SHELL) })}
+                </TooltipContent>
+              </Tooltip>
               {/* #1108 并发面（读标注 + 上限选择器）：字段缺席 = 整组退场。
                   读标注 = 该机 claimed 步数 / 上限（`执行中 n/N`——全 kind 计
                   数，与 server 闸 / 排队投影同源同数）；数据随 machine_presence

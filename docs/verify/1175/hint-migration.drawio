@@ -1,0 +1,31 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="hint1175" name="hint-migration">
+    <mxGraphModel dx="800" dy="400" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="before" value="Before: every machine row" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="before-row" value="Row: name + [hint sentence always visible]" style="text;html=1;align=left;verticalAlign=top;" vertex="1" parent="before">
+          <mxGeometry x="10" y="10" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="before-row2" value="Row: name + [hint sentence always visible]" style="text;html=1;align=left;verticalAlign=top;" vertex="1" parent="before">
+          <mxGeometry x="10" y="90" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="after" value="After: rows are one line" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="480" y="40" width="300" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="after-row" value="Row: name only" style="text;html=1;align=left;verticalAlign=top;" vertex="1" parent="after">
+          <mxGeometry x="10" y="10" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="after-switch" value="Switch cluster: hover/focus pops tooltip with the hint" style="text;html=1;align=left;verticalAlign=top;" vertex="1" parent="after">
+          <mxGeometry x="10" y="80" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="before" target="after">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,66 @@
+{
+  "probe": "new-task",
+  "ok": true,
+  "at": "2026-10-10T15:25:09.329Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/1175-shell-tooltip/.claude/verify-run/home",
+    "root": "/Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/1175-shell-tooltip"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "新建任务 dialog 打开"
+    },
+    {
+      "ok": true,
+      "label": "卡片落「待开始」列,序号 #1"
+    },
+    {
+      "ok": true,
+      "label": "GET /api/todos 含新任务(phase=todo)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite todo 表有行(seqNum=1)"
+    }
+  ],
+  "artifacts": [
+    "01-board-before.png",
+    "02-new-task-card.png"
+  ],
+  "apiTodo": {
+    "id": "wBgQTnTUz_qTON0drdEdW",
+    "teamId": "zLUNm8_C_2Nz-RU9we9Q4",
+    "projectId": "A5XRoXPqrxu1YT6vZr8TZ",
+    "title": "验证任务 9750",
+    "spec": "验证任务 9750",
+    "phase": "todo",
+    "phaseAt": 1791645910865,
+    "seqNum": 1,
+    "orderIndex": 0,
+    "tagIds": [],
+    "assignment": null,
+    "agent": null,
+    "latestBuildId": null,
+    "lastRunAt": null,
+    "hasChanges": false,
+    "hasPlan": false,
+    "buildHistory": [],
+    "sourceTodo": null,
+    "v": 1,
+    "createdBy": "b2jKhH8fULB9vrh1FHrRy",
+    "ownerId": "b2jKhH8fULB9vrh1FHrRy",
+    "sourceBuildId": null,
+    "sourceKind": null,
+    "sourceRef": null,
+    "machineId": null
+  },
+  "dbTodo": {
+    "id": "wBgQTnTUz_qTON0drdEdW",
+    "title": "验证任务 9750",
+    "phase": "todo",
+    "seqNum": 1
+  }
+}

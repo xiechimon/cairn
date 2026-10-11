@@ -1,0 +1,129 @@
+{
+  "probe": "machines-local",
+  "ok": true,
+  "at": "2026-10-10T15:34:06.640Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/1175-shell-tooltip/.claude/verify-run/home"
+  },
+  "checks": [
+    {
+      "name": "page-ready",
+      "ok": true,
+      "detail": "/app/resources/machines shell 就绪"
+    },
+    {
+      "name": "api-team-ready",
+      "ok": true,
+      "detail": "GET /api/teams 取到 teamId=zLUNm8_C_2Nz-RU9we9Q4"
+    },
+    {
+      "name": "no-hosted-facade",
+      "ok": true,
+      "detail": "页面无「Pacman 托管机器」facade 行"
+    },
+    {
+      "name": "api-local-row",
+      "ok": true,
+      "detail": "GET machines 含本机记录（name=\"xmonsMac-3574.local\", kind=local）"
+    },
+    {
+      "name": "ui-local-row-first",
+      "ok": true,
+      "detail": "本机行在列表首（data-kind=local），行文本含 hostname \"xmonsMac-3574.local\""
+    },
+    {
+      "name": "local-row-nodelete",
+      "ok": true,
+      "detail": "本机行无删除控件（不可删）"
+    },
+    {
+      "name": "marks-present",
+      "ok": true,
+      "detail": "本机行内 pi + Claude Code 两个品牌 mark 在位（svg + aria-label 可读名）"
+    },
+    {
+      "name": "marks-ui-api-consistent",
+      "ok": true,
+      "detail": "mark 亮度分态与 API 一致（enabledRuntimes=[pi]）"
+    },
+    {
+      "name": "shell-switch-single",
+      "ok": true,
+      "detail": "本机行内活控件 = shell 开关 + 并发触发钮（switch=1 button=1，#1108 canon；per-runtime 位仍是 mark 展示）"
+    },
+    {
+      "name": "shell-ui-api-consistent",
+      "ok": true,
+      "detail": "开关读真值一致（API shellEnabled=false / UI aria-checked=false）"
+    },
+    {
+      "name": "subline-hint-tooltip",
+      "ok": true,
+      "detail": "hint 句静息不在行内（portal 计数 0），真 hover 开关簇弹出「已授权「远程 shell」的 Agent 可在该机器上执行命令。」"
+    },
+    {
+      "name": "shell-write-api",
+      "ok": true,
+      "detail": "点击后 API 回读 shellEnabled=true（写入真落库，初值 false）"
+    },
+    {
+      "name": "shell-write-db",
+      "ok": true,
+      "detail": "SQLite machine.shellEnabled=1（与 API 写法一致）"
+    },
+    {
+      "name": "shell-persist-reload",
+      "ok": true,
+      "detail": "reload 后开关回显 true（读侧投影持久）"
+    },
+    {
+      "name": "shell-restore",
+      "ok": true,
+      "detail": "开关已拨回初值 false（栈状态复原）"
+    },
+    {
+      "name": "db-kind-local",
+      "ok": true,
+      "detail": "SQLite machine 行 kind=local（期望 local）"
+    },
+    {
+      "name": "db-enabled-runtimes",
+      "ok": true,
+      "detail": "SQLite enabledRuntimes=[pi]（API=[pi]）"
+    },
+    {
+      "name": "persist-reload",
+      "ok": true,
+      "detail": "reload 后 mark 亮度分态持久（API enabledRuntimes=[pi]，UI 一致）"
+    },
+    {
+      "name": "add-machine-intact",
+      "ok": true,
+      "detail": "「添加机器」钮开 CLI 命令 dialog（流程不变）"
+    },
+    {
+      "name": "rows-no-affordance",
+      "ok": true,
+      "detail": "spec 11 A7：无 handler 行不渲染 chevron（行级 role=button / 行内链接计数 0）——实测 0 个"
+    }
+  ],
+  "artifacts": [
+    "01-machines-arrival.png",
+    "02-local-row.png",
+    "03-tooltip-hover.png",
+    "03-marks.png",
+    "03b-shell-flipped.png",
+    "03b-row-zoom.png",
+    "03c-shell-after-reload.png",
+    "04-after-reload.png",
+    "05-add-machine-dialog.png",
+    "06-final.png"
+  ],
+  "hostname": "xmonsMac-3574.local",
+  "localMachineId": "x1HbSrJdVfyDOaD1azVqV",
+  "enabledRuntimes": [
+    "pi"
+  ]
+}

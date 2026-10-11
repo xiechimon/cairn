@@ -287,13 +287,17 @@ try {
   const SHELL_SW = `${LOCAL_ROW} [role="switch"]`;
   const swCount = localRowOk ? await softCount(page, `${LOCAL_ROW} [role="switch"]`) : -1;
   const btnCount = localRowOk ? await softCount(page, `${LOCAL_ROW} button`) : -1;
-  const swOnly = swCount === 1 && btnCount === 0;
+  // #1108 起行内活控件 = 两个：shell 开关 + 并发上限选择器触发钮（live 行带
+  // maxConcurrent 时 button=1；e2e machines-local 同 canon 钉 ===1）。闸口
+  // 放宽到 btnCount<=1：写链必须真跑（#1175 维护轮实测：旧闸 btnCount===0
+  // 在 #1108 后永不开，写链四 check 级联假红、一次真点击都没发生）。
+  const swOnly = swCount === 1 && btnCount <= 1;
   check(
     'shell-switch-single',
     swOnly,
     swOnly
-      ? '本机行内恰一个控件 = [role="switch"]（无 button；per-runtime 位仍是 mark 展示）'
-      : `XMON-113：本机行应恰有一个 role=switch（shell 开关）、零 button——实测 switch=${swCount} button=${btnCount}${swCount < 0 ? '（前置本机行缺失）' : ''}`,
+      ? `本机行内活控件 = shell 开关 + 并发触发钮（switch=${swCount} button=${btnCount}，#1108 canon；per-runtime 位仍是 mark 展示）`
+      : `XMON-113/#1108：本机行应恰有一个 role=switch（shell 开关）、至多一个 button（并发触发钮）——实测 switch=${swCount} button=${btnCount}${swCount < 0 ? '（前置本机行缺失）' : ''}`,
   );
 
   // 7b) 开关读真值：UI aria-checked === API machine.shellEnabled（幂等基线，
@@ -308,18 +312,32 @@ try {
       : `XMON-113：开关态应等于 GET machines 的 shellEnabled——API=${apiShell0} UI=${uiShell0}`,
   );
 
-  // 8) 副行只剩「这一个控件是什么」（#503 的 id 尾巴 / 并发上限仍负向）。
-  //    #944 载体迁移：.res-row-desc 类名钩 → 文案一级（整句精确文本节点，
-  //    machines-local.spec 的 getByText 整句同 canon）。
-  const subText = localRowOk ? await softText(page, `${LOCAL_ROW} span:text-is("已授权「远程 shell」的 Agent 可在该机器上执行命令。")`) : '';
-  const subOk = subText.includes('远程 shell') && !localRowText.includes('· max');
+  // 8) #1175：hint 句不再常驻副行——改挂 shell 开关簇 tooltip（hover/focus
+  //    弹出，base-ui portal 落 body）。两面钉：静息 = 行内无常驻载体且
+  //    portal 未挂载；真 hover 开关簇 = portal 出现成品句（{tool} 插值后）。
+  //    #503 的 id 尾巴 / 并发上限负向原样保留。machines-local.spec 同 canon。
+  const HINT_CANON = '已授权「远程 shell」的 Agent 可在该机器上执行命令。';
+  const tipLocator = page.locator('[data-slot="tooltip-content"]');
+  const restNoHint = localRowOk && !localRowText.includes('已授权');
+  const tipAtRest = await tipLocator.count();
+  await page.hover(SHELL_SW).catch(() => {});
+  const tipShown = await tipLocator
+    .waitFor({ state: 'visible', timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  const tipText = tipShown ? await tipLocator.innerText().catch(() => '') : '';
+  const subOk =
+    restNoHint && tipAtRest === 0 && tipShown && tipText.includes(HINT_CANON) && !localRowText.includes('· max');
   check(
-    'subline-shell-hint-only',
+    'subline-hint-tooltip',
     subOk,
     subOk
-      ? `副行 = shell 开关说明（「${oneLine(subText)}」）`
-      : `XMON-113：副行应只承载 shell 开关说明、且不含 id 尾巴 / 并发上限——实测副行文案载体「${oneLine(subText)}」，行文本「${oneLine(localRowText)}」`,
+      ? `hint 句静息不在行内（portal 计数 ${tipAtRest}），真 hover 开关簇弹出「${oneLine(tipText)}」`
+      : `#1175：hint 句应静息缺席 + hover 开关簇弹 tooltip——静息无句=${restNoHint} 静息 portal=${tipAtRest} hover 弹出=${tipShown} tooltip 文案「${oneLine(tipText)}」行文本「${oneLine(localRowText)}」`,
   );
+  await shot(page, '03-tooltip-hover.png');
+  // 移开指针收 tooltip，避免 portal 干扰后续写链点击的命中判定。
+  await page.mouse.move(5, 5);
   await shot(page, '03-marks.png');
 
   // 8b) 开关写全链：真点击 → PATCH → API 回读 → SQLite 列 → reload 回显。
@@ -449,20 +467,23 @@ try {
   );
   await shot(page, '04-after-reload.png');
 
-  // 11) A8：「添加机器」流程不变（button:text-is("添加机器") → CLI 命令 dialog）
+  // 11) A8：「添加机器」流程不变（button:text-is("添加机器") → CLI 命令 dialog）。
+  //     dialog 定位必须带 :has-text 定域：ADR 0013 起 chief 悬浮窗是根级
+  //     [role="dialog"]（关闭态 display:none 常驻 DOM），裸选择器的
+  //     waitForSelector 只等 DOM 首匹配 → 永等隐藏窗、假红（#1175 维护轮实测：
+  //     钮点击后 dialog 实开（count=2），旧选择器仍判 false）。
+  const ADD_DLG = '[role="dialog"]:has-text("添加机器")';
   const addOk = await softVisible(page, `${SHELL} button:text-is("添加机器")`);
   let addDialogOk = false;
   if (addOk) {
     await page.click(`${SHELL} button:text-is("添加机器")`).catch(() => {});
-    addDialogOk = await softVisible(page, '[role="dialog"]');
+    addDialogOk = await softVisible(page, ADD_DLG);
     if (addDialogOk) {
-      const dlgText = (await softText(page, '[role="dialog"]')).toLowerCase();
+      const dlgText = (await softText(page, ADD_DLG)).toLowerCase();
       addDialogOk = dlgText.includes('pacman');
       await shot(page, '05-add-machine-dialog.png');
-      await page.click('[role="dialog"] button[aria-label="关闭"]').catch(() => {});
-      await page
-        .waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 5000 })
-        .catch(() => {});
+      await page.click(`${ADD_DLG} button[aria-label="关闭"]`).catch(() => {});
+      await page.waitForSelector(ADD_DLG, { state: 'hidden', timeout: 5000 }).catch(() => {});
     }
   }
   check(

@@ -7,7 +7,7 @@
 // 3. per-runtime 品牌 mark 在位（data-runtime），亮度分态 = fixture enabledRuntimes canon；
 //    #887 图标独形——文字名不上屏，可读名走 aria-label + title
 // 4. 行内恰一个控件 = shell 开关（XMON-113）；button / per-runtime switch 仍无（负向）
-// 5. 副行只承载 shell 开关说明（#503 的 id 尾巴 / 并发上限仍负向）
+// 5. 副行 hint 摘除 → 开关簇 tooltip（#1175；#503 的 id 尾巴 / 并发上限仍负向）
 // 6. 本机行不可删（行内无删除类控件，负向）
 // 7. 行无 chevron 可点感装饰（A7 负向）
 // 开关的读写/回滚行为面（live 打桩）在 machines-shell-switch.spec.ts。
@@ -87,17 +87,23 @@ test('行内控件面 = shell 开关 + 并发选择器两个（XMON-113 + #1108�
   await expect(page.locator(`${LOCAL_ROW} [data-runtime] [role="switch"]`)).toHaveCount(0);
 });
 
-// 副行仍只承载控件说明：id 尾巴与「· max 3」死显示不许回来（#503 摘的是
-// 只读死字段；#1108 的活控件与读标注在上一条钉——副行文案不受它影响）。
-// 文案走 {tool} 插值（shared AGENT_TOOL_SHELL 单源），故断言按插值后的成品串钉。
-test('副行只剩 shell 开关说明（#503 的 id 尾巴 / · max 死显示不许回来）', async ({ page }) => {
+// 副行已摘（#1175）：hint 句不再常驻，改挂 shell 开关簇的 tooltip（hover
+// 弹出）；#503 摘掉的 id 尾巴 / · max 死显示负向原样保留。断言两面：
+// 静息 = 常驻文本不在（tooltip 只在 hover 后挂 body 级 portal）；触发 =
+// hover 开关簇后 portal 里出现成品句（{tool} 插值后的串）。
+test('副行 hint 摘除，改挂 shell 开关簇 tooltip（#1175）', async ({ page }) => {
   await page.goto(MACHINES);
-  const desc = page.locator(LOCAL_ROW).getByText(
+  const hint = page.locator('[data-slot="tooltip-content"]');
+  // 静息：行内无该句常驻（#503 的 id 尾巴 / · max 死显示负向保留）。
+  await expect(page.locator(LOCAL_ROW)).not.toContainText(
     '已授权「远程 shell」的 Agent 可在该机器上执行命令。',
   );
-  await expect(desc).toHaveCount(1);
-  await expect(desc).toHaveText('已授权「远程 shell」的 Agent 可在该机器上执行命令。');
+  await expect(hint).toHaveCount(0);
   await expect(page.locator(LOCAL_ROW)).not.toContainText('· max');
+  // 触发：hover 开关簇（词 + 开关整体）→ tooltip 弹出成品句。
+  await page.locator(`${LOCAL_ROW} [data-slot="tooltip-trigger"]`).hover();
+  await expect(hint).toBeVisible();
+  await expect(hint).toHaveText('已授权「远程 shell」的 Agent 可在该机器上执行命令。');
 });
 
 test('本机行不可删：行内无删除类控件（负向）', async ({ page }) => {
