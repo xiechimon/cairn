@@ -4581,6 +4581,18 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
     "id": {
       "type": "string",
     },
+    "maxConcurrentTasks": {
+      "anyOf": [
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "mcpServers": {
       "items": {
         "type": "string",

@@ -124,6 +124,9 @@ export function agentRecordOf(row: typeof agent.$inferSelect): AgentRecord {
     defaultSkill: row.defaultSkill,
     skillsAllowlist: row.skillsAllowlist,
     mcpServers: row.mcpServers,
+    // #1138：agent 并发上限（null = 不限），恒随行（optional 形只留给老
+    // server 响应的解析兼容，见 records/agent.ts 加法契约注释）。
+    maxConcurrentTasks: row.maxConcurrentTasks,
   };
 }
 

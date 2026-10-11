@@ -37,6 +37,23 @@ export function runtimeGatePasses(
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));
 }
 
+/** 步的 Agent id 解析（槽位单源，无 DB 查询）：agentForStep 的解析半边
+ *  （agent 表存在性查询留在那半边）。#1138 起计数面（agent 在跑计数）单独
+ *  消费本原语——归账只要槽位指向，不需要行存在（指向已删 Agent 的在跑步
+ *  恒不会被任何候选命中，存在性检查对计数无增益）。 */
+export function agentIdForStep(
+  todoRow: typeof todo.$inferSelect,
+  kind: StepKind,
+  prompt: string | null = null,
+): string | null {
+  // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
+  // 入队，不走 assignment 槽——执行/规划 Agent 不一定适合审核）。
+  if (kind === 'review') {
+    return parseReviewPromptMeta(prompt)?.agentId ?? null;
+  }
+  return planSlotFor(todoRow, kind, prompt)?.agentId ?? null;
+}
+
 /** 步的 Agent 解析（claim 载荷组装与 #881 sweep 判据共用）：
  *  - review 步：agentId 在 prompt meta header 里（M7 #330，step 表无 agentId
  *    列；测试已钉此口径，apps/server/test/review.test.ts）；
@@ -58,17 +75,8 @@ export function agentForStep(
    *  prompt 非空 = 带续轮指令的返工步，plan 槽空回落 build 槽）。 */
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
-  // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
-  // 入队，不走 assignment 槽——执行/规划 Agent 不一定适合审核）。
-  if (kind === 'review') {
-    const meta = parseReviewPromptMeta(prompt);
-    const agentId = meta?.agentId ?? null;
-    if (!agentId) return null;
-    return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
-  }
-  const slot = planSlotFor(todoRow, kind, prompt);
-  const agentId = slot?.agentId ?? null;
-  if (!agentId) return null;
+  const agentId = agentIdForStep(todoRow, kind, prompt);
+  if (agentId === null) return null;
   return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
 }
 

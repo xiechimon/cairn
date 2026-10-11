@@ -349,6 +349,14 @@ export const agent = sqliteTable('agent', {
    * 授权半边；notNull + default '[]' 的旧形随迁移退役（[] 行已迁 null）。 */
   skillsAllowlist: json<string[]>('skillsAllowlist'),
   mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
+  /** agent 级并发上限（#1138）：该 Agent 名下同时执行的 worker 步数 N。
+   * NULL = 不限（缺省——存量行与未设置的新建行同值，不强制默认值；只对
+   * 显式设置的 Agent 生效）。消费面 = claim 候选级闸（machines.ts tryClaim
+   * 在 agentForStep 之后按 agent 计数 gate）+ PATCH 写位（值域 1..50，与
+   * Multica agent 层闸同区间，r10 §5.4）。机器 maxConcurrent 是机器面容量
+   * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
+   * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
+  maxConcurrentTasks: integer('maxConcurrentTasks'),
 });
 
 // —— agent_memory（02 §4.4/r5 §6：配额 100 + 三级溯源；写路径归 M4）———————————

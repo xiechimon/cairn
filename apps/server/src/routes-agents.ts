@@ -100,6 +100,8 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
             ? null
             : filterKnownSkillIds(ctx.skillsDir, body.skillsAllowlist),
         mcpServers: body.mcpServers ?? [],
+        // #1138 agent 并发上限：nullish——显式 null 与缺省同值（不限）。
+        maxConcurrentTasks: body.maxConcurrentTasks ?? null,
       })
       .run();
     return c.json({ id }, 201); // r5 §1/§8 补录：创建 → 201 {id}
@@ -145,6 +147,9 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       'thinkingLevel',
       'secrets',
       'mcpServers',
+      // #1138：可空列同律——显式 null = 清回不限（undefined = 不动，值域
+      // 1..50 的边界校验在 patchAgentBodySchema）。
+      'maxConcurrentTasks',
     ] as const) {
       if (body[key] !== undefined) {
         // null 语义：可空列显式清空（description/provider/modelId/thinkingLevel）。
