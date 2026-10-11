@@ -40,18 +40,46 @@ test.describe('chief minimize keeps the scroll position (#1067)', () => {
   test('scroll to the middle → minimize → reopen lands at the same spot', async ({ page }) => {
     await page.goto('/app?scenario=chief-scroll-long');
     await settled(page);
+    // the mount-time defaultScrollPosition="end" marks the viewport
+    // data-autoscrolling for a 180ms window; a programmatic scrollTop
+    // write inside that window is misattributed to the follow pass, so
+    // wait for the flag to clear before scrolling (the wheel path below
+    // would unlock it regardless — belt and suspenders for both the
+    // timing and the input channel)
+    await expect(viewport(page)).not.toHaveAttribute('data-autoscrolling', 'true');
 
     // a real middle: park the viewport at half its scrollable range —
     // neither 0 (an unscrolled box would vacuously pass) nor max (the
-    // defaultScrollPosition="end" landing spot would mask the loss)
+    // defaultScrollPosition="end" landing spot would mask the loss).
+    // Scroll with the wheel, not a programmatic scrollTop write: the
+    // scroller's follow mode only unlocks on user input intent
+    // (wheel/touch/scroll keys), so a raw scrollTop setter can leave
+    // the mode latched to following-bottom and the reopen would jump
+    // to the end — an input no reader can produce.
     const range = await viewport(page).evaluate(
       (el) => el.scrollHeight - el.clientHeight,
     );
     expect(range).toBeGreaterThan(200);
-    await viewport(page).evaluate((el) => {
-      el.scrollTop = Math.floor((el.scrollHeight - el.clientHeight) / 2);
-    });
-    const parked = await scrollTopOf(page);
+    await viewport(page).hover();
+    const target = Math.floor(range / 2);
+    for (let i = 0; i < 40; i++) {
+      const cur = await scrollTopOf(page);
+      const remaining = target - cur;
+      if (Math.abs(remaining) <= 4) break;
+      await page.mouse.wheel(0, Math.sign(remaining) * Math.min(500, Math.abs(remaining)));
+    }
+    // wheel ticks land asynchronously (one rAF behind the dispatch), so
+    // the loop above can read its exit condition before the last tick
+    // applies — settle before measuring: two consecutive reads that
+    // agree mean the tail has landed
+    let settledTop = -1;
+    for (let i = 0; i < 20; i++) {
+      const cur = await scrollTopOf(page);
+      if (cur === settledTop) break;
+      settledTop = cur;
+      await page.waitForTimeout(50);
+    }
+    const parked = settledTop;
     expect(parked).toBeGreaterThan(50);
     expect(parked).toBeLessThan(range - 50);
     await evidencePanelShot(page, 'scroll-mid-before-minimize.png', drawer(page));
