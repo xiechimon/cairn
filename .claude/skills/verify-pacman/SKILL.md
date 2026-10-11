@@ -1,6 +1,6 @@
 ---
 name: verify-pacman
-description: pacman 行为验证——起隔离 live 栈(server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273,独立 PACMAN_HOME scratch),Playwright 走真用户路径(新建任务/建 API 密钥/搜索/主题),证据(截图 + API JSON + SQLite 行)归档进 docs/verify/<票号>/ 随 PR 提交、body 以 SHA 永久链引用。改动后要证明功能真的能跑、要可复核证据时用;fixture 面回归走 apps/web e2e(含视觉 spec 的几何断言),不用本 skill。
+description: pacman 行为验证——起隔离 live 栈(server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273,独立 PACMAN_HOME scratch),Playwright 走真用户路径(新建任务/建 API 密钥/搜索/主题),证据(截图 + API JSON + SQLite 行)归档进 docs/verify/<票号>/ 随 PR 提交、body 以 SHA 永久链引用。改动后要证明功能真的能跑、要可复核证据时用;fixture 面回归走 apps/web e2e(含视觉 spec 的几何断言),不用本 skill。UI 面票实现前后各一遍 ego 真点击走查(判断层;mandate 在仓 CLAUDE.md 测试规则,读数三件/证据/分工见本技能「ego 真点击走查」节)。
 ---
 
 # verify-pacman
@@ -131,7 +131,7 @@ node .../scripts/drive-machines-local.mjs    # machines 本机行+switches(machi
 
 ## ego 真点击走查（UI 面票判断层）
 
-脚本探针 = 回归层（可复跑、进 CI）；ego-browser 真点击走查 = 判断层（「这行字该不该存在」「掠过烦不烦」「信息层级对不对」——这类需求本源是用户的眼睛，UI 面票 agent 自己必须在真浏览器里以用户身份走一遍，否则 dogfood 环不闭；2026-10-10 #1175 用户裁决立本节）。
+脚本探针 = 回归层（可复跑、进 CI）；ego-browser 真点击走查 = 判断层（「这行字该不该存在」「掠过烦不烦」「信息层级对不对」——这类需求本源是用户的眼睛，UI 面票 agent 自己必须在真浏览器里以用户身份走一遍，否则 dogfood 环不闭）。**mandate 源 = 仓 CLAUDE.md（AGENTS.md）测试规则硬规则条**（UI 面票实现前后各一遍）；本节是方法学正本（怎么走/读数/证据/分工）。2026-10-10 #1175 用户裁决立规；2026-10-11 placement 纠正：曾整节误置本技能——实现前约束放在「验证时才读」的技能里 = 不跑 verify 的车道永远读不到，等于没写，mandate 遂抬到仓 CLAUDE.md。
 
 - **适用面**：改 `apps/web/src` 可见面的票（布局/组件/文案上屏/交互）；纯 backend/wire 票不硬套。
 - **两遍**：实现前对当前 build 走一遍形成自己的产品判断（发现即 triage 输入）；实现后走一遍验手感。
