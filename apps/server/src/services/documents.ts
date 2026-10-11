@@ -59,9 +59,11 @@ export function computeUnifiedDiff(
     deletions: 0,
     hunks: patch.hunks.map((h) => {
       const lines = h.lines.map((l) => l);
+      // structuredPatch 的 hunk 行 = 前缀字符（+/-/空格）+ 原文内容，不含
+      // +++/--- 文件头（那是 createPatch 字符串形态才有的），按行首前缀计数即可。
       for (const l of lines) {
-        if (l.startsWith('+') && !l.startsWith('+++')) additions += 1;
-        else if (l.startsWith('-') && !l.startsWith('---')) deletions += 1;
+        if (l.startsWith('+')) additions += 1;
+        else if (l.startsWith('-')) deletions += 1;
       }
       return {
         header: `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`,
