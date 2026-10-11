@@ -60,8 +60,10 @@ export function computeUnifiedDiff(
     hunks: patch.hunks.map((h) => {
       const lines = h.lines.map((l) => l);
       for (const l of lines) {
-        if (l.startsWith('+') && !l.startsWith('+++')) additions += 1;
-        else if (l.startsWith('-') && !l.startsWith('---')) deletions += 1;
+        // structuredPatch 的 hunk 行只有 ' '（上下文）、'+'/'-'（增/删）、'\'（no-newline 标记）
+        // 四种前缀；+++/--- 文件头是 patch 文本层元信息、从不进 hunk.lines，勿按其排除。
+        if (l.startsWith('+')) additions += 1;
+        else if (l.startsWith('-')) deletions += 1;
       }
       return {
         header: `@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@`,
