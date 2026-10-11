@@ -10,3 +10,5 @@
 !node_modules/.pnpm
 !node_modules/.pnpm/**/*.d.ts
 !node_modules/.pnpm/**/package.json
+!node_modules/@base-ui/react
+!node_modules/@base-ui/react/**
