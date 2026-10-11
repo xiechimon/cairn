@@ -278,18 +278,13 @@ export class WorkspaceManager implements WorktreeOps {
     await withGitNetRetries(() => gitPrim.push(cwd, branch, credentials));
   }
 
+  /** 合并步 conv 分支与默认分支的合并（02 §5.5/r3 §3.6）。local 形态的落地
+   * = conv 分支 push 回用户仓库（#1211：用户主检出的分支/工作树永不被
+   * pacman 触碰——本类所有 git 操作的作用域都限于基座 clone 与其 worktree，
+   * 从不对用户仓库目录执行 merge/branch 类写操作）。 */
   async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {
     const output = await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`);
     return { output };
-  }
-
-  /** local 形态合并落地（spec 12 G2-T2）：merge 步 conv 分支 push 回用户仓库
-   * 后，在用户仓库目录 ff-only 推进其当前分支。脏工作区 / 非 ff → gitPrim
-   * 抛错携带 git 拒绝原文（调用方按 failed 收尾）；永不 force、永不动用户
-   * 工作树。 */
-  async landLocalFastForward(userRepoDir: string, branch: string): Promise<void> {
-    await gitPrim.mergeFfOnly(userRepoDir, branch);
-    this.logger.workspace(`Local merge landed (${branch} fast-forwarded in user repo)`);
   }
 
   async headCommit(cwd: string): Promise<string | null> {

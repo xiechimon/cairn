@@ -232,9 +232,6 @@ function fakeWorkspace(
     async mergeDefaultBranch() {
       return { output: 'Already up to date' };
     },
-    async landLocalFastForward() {
-      calls.push('landLocalFastForward');
-    },
     async headCommit() {
       return 'abc123';
     },

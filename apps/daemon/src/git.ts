@@ -345,19 +345,6 @@ export const gitPrim = {
     });
   },
 
-  /** `git merge --ff-only <ref>`（spec 12 local 落地）：脏工作区 / 非 ff =
-   * git 自拒 → 抛错，消息携带 git 拒绝原文（failed reason 面）；ff-only 拒绝
-   * 时不产生合并状态，无 abort 收尾；永不 force。 */
-  async mergeFfOnly(dir: string, ref: string): Promise<void> {
-    const r = await runGit(['merge', '--ff-only', '--end-of-options', ref], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
-    if (r.code !== 0) {
-      throw new Error(`git merge --ff-only ${ref} refused: ${r.stderr.trim() || r.stdout.trim()}`);
-    }
-  },
-
   /** `git merge --no-edit origin/<defaultBranch>`（02 §5.5/r3 §3.6）；冲突 =
    * 自动 `merge --abort` 后抛错（失败仅人工重跑，02/A6）。 */
   async mergeNoEdit(dir: string, ref: string): Promise<string> {

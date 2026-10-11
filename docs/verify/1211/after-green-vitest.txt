@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0308-1211-no-main-checkout-mutation/apps/daemon
+
+
+ Test Files  2 passed (2)
+      Tests  17 passed (17)
+   Start at  23:55:09
+   Duration  2.31s (tests 70%, transform 15%, import 14%)
+

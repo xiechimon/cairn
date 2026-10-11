@@ -74,7 +74,7 @@
 
 ### 环 5 · 回传与闭环
 
-- 收尾：`commitAll`（`runner.ts:803`）→（合并步）merge `origin/<default>` → `push` conv 分支（带步级凭证，`runner.ts:838`）→ transcript/plan 上传（`runner.ts:860-895`）→ `done`（status/sessionId/usage/hasChanges/checkpoint commit，`runner.ts:900-910`）→ server `finishStep` 推进 todo 相位。local 形态合并落地 = ff-only 推进用户仓库（`workspace.ts:133-140`）。
+- 收尾：`commitAll`（`runner.ts:803`）→（合并步）merge `origin/<default>` → `push` conv 分支（带步级凭证，`runner.ts:838`）→ transcript/plan 上传（`runner.ts:860-895`）→ `done`（status/sessionId/usage/hasChanges/checkpoint commit，`runner.ts:900-910`）→ server `finishStep` 推进 todo 相位。local 形态合并落地 = conv 分支 push 回用户仓库（#1211：用户主检出的分支永不被推进）。
 - 停止/丢弃 = rewind 到步起点 checkpoint；审核步只读检出 + 收尾强制回退——两条路共用同一处回退护栏（`runner.ts:743-765`）。
 
 ## 3. 「任意机器」的实测证据
