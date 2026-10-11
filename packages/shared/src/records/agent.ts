@@ -124,6 +124,12 @@ export const agentRecordSchema = z.object({
   skillsAllowlist: z.array(z.string()).nullable(),
   /** MCP 逐个勾选（关联 mcp_server id [推断]，02 §7.1）。 */
   mcpServers: z.array(z.string()),
+  /** agent 级并发上限（#1138）：该 Agent 名下同时执行的 worker 步数上限；
+   * null = 不限（缺省——单用户低并发不强制默认值，只对显式设置的 Agent
+   * 生效）。claim 候选级闸消费（machines.ts tryClaim，与机器 maxConcurrent
+   * 双层各自 gate）。optional 形 = 加法契约（machine maxConcurrent 同律）：
+   * 老 server 响应缺字段可解析（消费面回退不渲染）；server 恒发全块。 */
+  maxConcurrentTasks: z.number().int().nullable().optional(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
 
@@ -142,6 +148,9 @@ export const createAgentBodySchema = z.object({
   /** nullish（#1169）：显式 null = 不限制（与缺省同值）；[] = 显式全拒。 */
   skillsAllowlist: z.array(z.string()).nullish(),
   mcpServers: z.array(z.string()).optional(),
+  /** agent 级并发上限（#1138）：值域 1..50（Multica agent 层闸同区间，
+   * r10 §5.4）；nullish——显式 null = 不限（与缺省同值）。 */
+  maxConcurrentTasks: z.number().int().min(1).max(50).nullish(),
 });
 export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
 

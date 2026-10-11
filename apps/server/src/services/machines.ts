@@ -118,6 +118,7 @@ import {
 } from './credentials.js';
 import {
   agentForStep as agentForStepEligibility,
+  agentRunningCount,
   machineRunningCount,
   runtimeGatePasses,
   unassignedStepReason,
@@ -943,6 +944,29 @@ function tryClaim(
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
     if (!runtimeGatePasses(machineRow, agentRow.provider)) continue;
+    // #1138 agent 级并发闸（候选级判）：该 Agent 名下 claimed worker 步数达
+    // maxConcurrentTasks → 跳过本候选（步留 pending 等该 Agent 释放空位，
+    // 不进失败漏斗——公平排队是合法态，与机器闸同语义）。三层分工钉死，
+    // 不得互相代位：
+    // - 机器闸（上方 running >= workerCap）= 机器面容量，整批收口
+    //   （workerCands 置空）；agent 闸 = 公平性分池，单候选粒度——同批
+    //   其它 Agent 的候选照领（无队头阻塞，与 #1104 失败收口同款 continue
+    //   形）。与机器闸的合成 = min（步须同时过两闸），是两层各自 gate 的
+    //   自然结果（与 Multica daemon ∩ agent 双层闸同形，r10 §5.4）——不
+    //   发明一处集中取 min 的判定。
+    // - 亲和让行（下方 sessionContinuing 分支）=「本步的会话在别的活机器
+    //   上」的软让步，让行对象是机器不是 Agent；agent 闸不消费亲和事实，
+    //   亲和的 ownerBusy 忙判定也只数机器槽位、不吃 agent 计数——闸判在
+    //   候选级、让行在亲和级，两层各查各的事实，亲和让行的步不被 agent 闸
+    //   误伤（先过本闸的候选本就不领，轮到亲和分支的候选只按亲和让行）。
+    // - 零值语义：maxConcurrentTasks null = 不限（缺省/存量行）——闸恒
+    //   开，不设上限的 Agent 行为完全不变（回归红线，测试钉死）。
+    if (
+      agentRow.maxConcurrentTasks !== null &&
+      agentRunningCount(db, agentRow.id) >= agentRow.maxConcurrentTasks
+    ) {
+      continue;
+    }
     // continue session 判定（02 §5.7：合并轮/重规划轮复用同 conv pi 会话）。
     // #863 T2 起判定前移到领取前——会话亲和闸需要同一份事实（prior session +
     // 交接缺失位）；候选步自身 pending ⇒ sessionId 恒空不进结果集，且判定与

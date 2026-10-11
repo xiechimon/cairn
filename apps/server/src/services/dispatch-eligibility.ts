@@ -17,7 +17,7 @@ import {
 } from '@pacman/shared';
 import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, step, type todo } from '../db/schema.js';
+import { agent, build, step, todo } from '../db/schema.js';
 
 /** #682 enabledRuntimes 真闸——步的 runtime 判定（与 daemon runner 的
  *  backendFor 同律：agent provider ∈ BACKEND_RUNTIME_IDS → claude-code，
@@ -35,6 +35,23 @@ export function runtimeGatePasses(
   agentProvider: string | null | undefined,
 ): boolean {
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));
+}
+
+/** 步的 Agent id 解析（槽位单源，无 DB 查询）：agentForStep 的解析半边
+ *  （agent 表存在性查询留在那半边）。#1138 起计数面（agent 在跑计数）单独
+ *  消费本原语——归账只要槽位指向，不需要行存在（指向已删 Agent 的在跑步
+ *  恒不会被任何候选命中，存在性检查对计数无增益）。 */
+export function agentIdForStep(
+  todoRow: typeof todo.$inferSelect,
+  kind: StepKind,
+  prompt: string | null = null,
+): string | null {
+  // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
+  // 入队，不走 assignment 槽——执行/规划 Agent 不一定适合审核）。
+  if (kind === 'review') {
+    return parseReviewPromptMeta(prompt)?.agentId ?? null;
+  }
+  return planSlotFor(todoRow, kind, prompt)?.agentId ?? null;
 }
 
 /** 步的 Agent 解析（claim 载荷组装与 #881 sweep 判据共用）：
@@ -58,17 +75,8 @@ export function agentForStep(
    *  prompt 非空 = 带续轮指令的返工步，plan 槽空回落 build 槽）。 */
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
-  // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
-  // 入队，不走 assignment 槽——执行/规划 Agent 不一定适合审核）。
-  if (kind === 'review') {
-    const meta = parseReviewPromptMeta(prompt);
-    const agentId = meta?.agentId ?? null;
-    if (!agentId) return null;
-    return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
-  }
-  const slot = planSlotFor(todoRow, kind, prompt);
-  const agentId = slot?.agentId ?? null;
-  if (!agentId) return null;
+  const agentId = agentIdForStep(todoRow, kind, prompt);
+  if (agentId === null) return null;
   return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
 }
 
@@ -126,4 +134,25 @@ export function machineRunningCount(db: Db, machineId: string): number {
     .from(step)
     .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
     .all().length;
+}
+
+/** #1138 agent 级在跑计数：该 Agent 名下 claimed worker 步数（机器无关
+ *  ——agent 池跨机器，与 Multica agent 层闸同形，r10 §5.4）。归账 = 槽位
+ *  解析（本文件 agentIdForStep 单源，与 claim 候选解析同一份事实）：join
+ *  step⋈build⋈todo，孤儿步（无 build 行——测试占位与极端残行）天然不计；
+ *  chief 步 buildId 是线程 id 无 build 行，join 自动缺席 =「#1148 chief 不
+ *  占槽」的 agent 面同律。步领取后 assignment 改派的窄窗按当前槽位归账
+ *  （闸是公平性约束，不是所有权账本——与亲和面读 prior session 步的
+ *  machineId 同款现读口径）。与 machineRunningCount 同居本叶子：消费同
+ *  文件的 agentIdForStep，machines.ts 的 tryClaim 跨文件消费（machines →
+ *  本叶子是既有正向边，本文件不 import 任何 service，无环）。 */
+export function agentRunningCount(db: Db, agentId: string): number {
+  const rows = db
+    .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief')))
+    .all();
+  return rows.filter((r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId).length;
 }
