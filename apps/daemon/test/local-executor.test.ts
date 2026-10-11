@@ -1,17 +1,16 @@
-// local 形态执行面（spec 12 G2-T2，#362）：镜像 clone 硬链接证据 + ff-only
-// 落地三态 + per-step 凭证不进 argv。真 git 落地（workspace.test.ts 同律；
-// 用户仓库 = 非 bare 工作树仓，origin 即用户仓库本体）。
+// local 形态执行面（spec 12 G2-T2，#362）：镜像 clone 硬链接证据 + conv 分支
+// 落地面（#1211：push 即交付，用户主检出零触碰）+ per-step 凭证不进 argv。
+// 真 git 落地（workspace.test.ts 同律；用户仓库 = 非 bare 工作树仓，origin 即
+// 用户仓库本体）。
 // 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. 硬链接面：基座 clone 的 .git/objects 文件 nlink ≥ 2（与用户仓库共享
 //      inode）且占比 ≥ 50%；对照直接 copy 全部 nlink == 1（硬链接数 0）
-//   2. ff happy path：worktree 提交 + push 回用户仓库 + landLocalFastForward
-//      → 用户仓库当前分支前进到 conv tip、工作树可见探针文件
-//   3. 脏工作区：用户仓库有与合并重叠的未提交改动 → 抛错含 git 拒绝原文
-//      （"would be overwritten by merge"）；用户 HEAD 不动、脏文件内容原样
-//      （永不动用户工作树）
-//   4. 非 ff：clone 后用户仓库 main 独自前进（分叉）→ 抛错含 git 拒绝原文
-//      （"Not possible to fast-forward"）；用户 main 不动
-//   5. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
+//   2. push 落地：worktree 提交 + push 回用户仓库 → 用户仓库 refs/heads 多出
+//      conv 分支（tip = worktree HEAD）；用户当前分支 HEAD/reflog/工作树零
+//      变化——即便 ff 可行也不推进用户分支（#1211：合并到默认分支由用户自取）
+//   3. 脏工作区：用户仓库有未提交改动 → push 照常成功（push 只写
+//      refs/heads/<conv>，不碰用户工作树）；用户 HEAD 与脏文件内容原样
+//   4. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
 //      clone/fetch/push 全程 token 不出现在 argv；对照 env 面
 //      GIT_CONFIG_VALUE_1 携带 token（凭证确实经 env credential.helper 注入）
 
@@ -137,64 +136,55 @@ describe('local 形态镜像 clone（spec 12 G2-T2：硬链接近零成本）', 
   }, 30_000);
 });
 
-describe('local 形态 ff-only 落地（spec 12 G2-T2：永不 force、永不动用户工作树）', () => {
-  test('失败方式 2：happy path——worktree 提交 push 回用户仓库后 ff-only 落地，用户 main 前进且工作树见探针', async () => {
+describe('local 形态落地（#1211：conv 分支 push 即交付，用户主检出零触碰）', () => {
+  test('失败方式 2：worktree 提交 push 回用户仓库 → refs/heads 多 conv 分支；用户 HEAD/reflog/工作树零变化（即便 ff 可行也不推进）', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
     writeFileSync(join(prepared.cwd, 'probe.txt'), 'local landing probe\n');
     const committed = await ws.commitAll(prepared.cwd, 'build: probe', IDENTITY);
     expect(committed.committed).toBe(true);
+    const headBefore = await headOf(userRepo);
+    const reflogBefore = await runGit(['reflog', 'main'], { cwd: userRepo });
+
     await ws.push(prepared.cwd, prepared.branch, null);
+
     // push 回用户仓库：conv 分支在用户仓库 refs/heads 在位（非 bare 收 push）。
     const onUser = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
       cwd: userRepo,
     });
     expect(onUser.code).toBe(0);
     expect(onUser.stdout.trim()).toBe(committed.head);
-
-    const before = await headOf(userRepo);
-    await ws.landLocalFastForward(userRepo, prepared.branch);
-
-    expect(await headOf(userRepo)).toBe(committed.head); // main fast-forward 到 conv tip
-    expect(await headOf(userRepo)).not.toBe(before);
-    expect(readFileSync(join(userRepo, 'probe.txt'), 'utf8')).toBe('local landing probe\n');
+    // conv tip 是 main 的后代（正 ff 形）——但用户 main 不被推进（#1211：
+    // 落地只多分支，合并到默认分支由用户自取）。
+    const ffShape = await runGit(
+      ['merge-base', '--is-ancestor', 'main', `refs/heads/${prepared.branch}`],
+      { cwd: userRepo },
+    );
+    expect(ffShape.code).toBe(0);
+    expect(await headOf(userRepo)).toBe(headBefore);
+    const reflogAfter = await runGit(['reflog', 'main'], { cwd: userRepo });
+    expect(reflogAfter.stdout).toBe(reflogBefore.stdout); // reflog 无新增
+    expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false); // 工作树无新文件
     const status = await runGit(['status', '--porcelain'], { cwd: userRepo });
-    expect(status.stdout.trim()).toBe(''); // 落地后用户工作树干净
+    expect(status.stdout.trim()).toBe('');
   }, 30_000);
 
-  test('失败方式 3：脏工作区（改动与合并重叠）→ git 自拒，reason 含拒绝原文；用户 HEAD 与脏文件原样', async () => {
+  test('失败方式 3：脏工作区 → push 照常成功（push 只写 conv 分支 ref）；用户 HEAD 与脏文件原样', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
     writeFileSync(join(prepared.cwd, 'README.md'), '# user repo\n\nagent line\n');
     await ws.commitAll(prepared.cwd, 'build: readme', IDENTITY);
-    await ws.push(prepared.cwd, prepared.branch, null);
 
-    // 用户对同一文件有未提交改动（与合并重叠 → git 必拒）。
+    // 用户对同一文件有未提交改动——不阻断 push，也不被 push 触碰。
     writeFileSync(join(userRepo, 'README.md'), '# user repo\nUSER UNCOMMITTED\n');
     const headBefore = await headOf(userRepo);
 
-    await expect(ws.landLocalFastForward(userRepo, prepared.branch)).rejects.toThrow(
-      /would be overwritten by merge/,
-    );
-    expect(await headOf(userRepo)).toBe(headBefore); // 永不 force：HEAD 不动
-    expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).toContain('USER UNCOMMITTED');
-  }, 30_000);
-
-  test('失败方式 4：非 ff（clone 后用户 main 独自前进）→ git 自拒含原文；用户 main 不动', async () => {
-    const prepared = await ws.prepare(prepareInput(CONV_A, userRepo));
-    writeFileSync(join(prepared.cwd, 'agent-note.txt'), 'from agent\n');
-    await ws.commitAll(prepared.cwd, 'build: note', IDENTITY);
     await ws.push(prepared.cwd, prepared.branch, null);
 
-    // 用户仓库 main 在 clone 之后自行提交 → conv tip 与 main 分叉（非 ff）。
-    writeFileSync(join(userRepo, 'user-note.txt'), 'from user\n');
-    await runGit(['add', '-A'], { cwd: userRepo });
-    await runGit(['commit', '-m', 'user: own commit'], { cwd: userRepo, env: commitEnv(IDENTITY) });
-    const mainAfter = await headOf(userRepo);
-
-    await expect(ws.landLocalFastForward(userRepo, prepared.branch)).rejects.toThrow(
-      /[Nn]ot possible to fast-forward/,
-    );
-    expect(await headOf(userRepo)).toBe(mainAfter);
-    expect(existsSync(join(userRepo, 'agent-note.txt'))).toBe(false); // 用户工作树未被触碰
+    const onUser = await runGit(['rev-parse', '--verify', `refs/heads/${prepared.branch}`], {
+      cwd: userRepo,
+    });
+    expect(onUser.code).toBe(0);
+    expect(await headOf(userRepo)).toBe(headBefore);
+    expect(readFileSync(join(userRepo, 'README.md'), 'utf8')).toContain('USER UNCOMMITTED');
   }, 30_000);
 });
 

@@ -200,9 +200,6 @@ function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): Wo
       calls.push('mergeDefaultBranch');
       return { output: 'Already up to date' };
     },
-    async landLocalFastForward() {
-      calls.push('landLocalFastForward');
-    },
     async headCommit() {
       calls.push('headCommit');
       return 'abc123';

@@ -26,7 +26,7 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 - 删除「新的 Todos 托管仓库」web 入口（server REST 与 MCP create_project 仍接受 `kind: 'hosted'`，存量项目不受影响）。
 - 名称自动回填：local = `basename(localPath)`；github = repo 名。仅当名称字段为空或仍等于上次回填值时覆盖（用户手改过则不动）。
 - 输入框去默认蓝：与仓共享 input 原语同款 focus-visible（outline none + indigo 边框 + 1px ring）+ `-webkit-autofill` 覆盖。
-- daemon 端 `kind === 'local'` 分支走硬链接镜像 clone + `--ff-only` 落地；GitHub 绑定走 per-step `GIT_CONFIG_*` env credential.helper 注入（不进 argv / 不落盘），conv 分支 push 回远端。
+- daemon 端 `kind === 'local'` 分支走硬链接镜像 clone + conv 分支 push 回用户仓库即落地（#1211：用户主检出的分支/工作树永不被 pacman 推进）；GitHub 绑定走 per-step `GIT_CONFIG_*` env credential.helper 注入（不进 argv / 不落盘），conv 分支 push 回远端。
 
 ## User Stories
 
@@ -37,11 +37,11 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 5. 作为管理员，我不希望 web 表单可以创造任何新的「新的 Todos 托管仓库」项目；存量 hosted 项目继续可用。
 6. 作为 UI 审阅者，我看新建项目表单的输入框（项目名、GitHub owner/repo、本地路径）focus-visible 高亮是仓内统一 indigo 描边，不再是 UA 默认蓝。
 7. 作为开发者，我从 web 触发 OAuth 失败时，pacman 给我清楚的失败 reason（denied / state 过期 / 令牌交换失败）并保留手动输入 owner/repo 兜底入口，让我永远能完成 GitHub 绑定。
-8. 作为开发者，我在本地仓库项目里改完文件提交 conv 分支，pacman 自动 `git merge --ff-only` 回到我的原仓库目录；我的工作区若有未提交改动，pacman 给出失败提示而非强改。
+8. 作为开发者，我在本地仓库项目里改完文件提交 conv 分支，pacman 把 conv 分支 push 回我的原仓库（我的仓库多出 `pacman/conv-<id>` 分支）；我当前检出的分支与工作区永不被 pacman 触碰，把分支合进默认分支由我自己决定。
 9. 作为开发者，我在 GitHub 绑定项目里改完文件提交 conv 分支，pacman 把 conv 分支 push 上 GitHub 远端，发起方凭证（OAuth 注入的 GitHub token）仅在该步骤使用，步收尾即清。
 10. 作为安全审阅者，我看 github_connection 表里的 accessToken 走与 secrets 同款的 SecretBox AES-256-GCM 密封存储，never 落盘到 argv 与日志，never 离开 server 出站边界。
 11. 作为多机部署的运维者，我看 server 对 local 路径校验降级为「不可见即跳过」（daemon 侧真实存在性兜底），避免误判挂掉新项目流。
-12. 作为回归测试者，我看 verify-pacman feature map 先扩到位（GitHub OAuth + picker + local clone + ff-only），实现票消费的 web spec / integration locator / 视觉几何同步翻红转绿，证据进 review。
+12. 作为回归测试者，我看 verify-pacman feature map 先扩到位（GitHub OAuth + picker + local clone + local 落地），实现票消费的 web spec / integration locator / 视觉几何同步翻红转绿，证据进 review。
 
 ## Implementation Decisions
 
@@ -65,7 +65,7 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 
 **daemon executor**
 - runner 增 `kind === 'local'` 分支：`git clone <localPath>` → `workspacesRoot/<projectId>/repo`（本地 clone 走硬链接，近零成本）；worktree 契约零改动；conv 分支 push 回用户仓库。
-- merge 步后 `git merge --ff-only pacman/conv-<id>` 到用户仓库；脏工作区/非 ff → git 自拒 → failed 提示，永不 force、永不动用户工作树。
+- merge 步 = 在独立 worktree 里 `git merge origin/<default>` 后 conv 分支 push 回用户仓库 refs/heads（#1211：落地即分支交付，用户主检出的分支/reflog/工作树零变化；合并到默认分支由用户自取）。
 - 应用面 `applyMergeLanding` 保持 hosted-only；本地落地面在 daemon 侧。
 - GitHub 执行：server 从 `github_connection` 取 token，per-step 下发 `GitCredentials{username:'x-access-token', password:token}` 复用 `GIT_CONFIG_*` env credential.helper 注入缝（不进 argv、不落盘；步收尾即清）。
 - daemon 对 `kind === 'github'` 开 worktree（https clone，契约零改动）；conv 分支 push 上 GitHub。
@@ -75,7 +75,7 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 - en/zh 同步新增/修改文案；按仓 i18n-coverage 闸走 PR。
 
 **verify / e2e**
-- verify-pacman feature map 扩 GitHub OAuth + picker + local clone + ff-only + 路径校验各一条；G2-T1..T4 同步 web spec + integration locator + 视觉几何（钉扎四面）。
+- verify-pacman feature map 扩 GitHub OAuth + picker + local clone + local 落地 + 路径校验各一条；G2-T1..T4 同步 web spec + integration locator + 视觉几何（钉扎四面）。
 
 ### 数据契约（票内可微调）
 
@@ -89,9 +89,8 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 
 - **daemon executor E2E**：
   - local 镜像 clone 走的硬链接数低于直 copy（合理阈值 由 OS fs 决定）
-  - `git merge --ff-only` 成功的 happy path
-  - 脏工作区（用户有未提交改动）→ failed 路径，failure reason 含 git 自身拒绝原文
-  - 非 ff（如 conv 与用户仓库 main 偏离）→ failed 路径
+  - local 落地 happy path：conv 分支 push 回用户仓库 refs/heads、用户主检出 HEAD/reflog/工作树零变化（#1211）
+  - 脏工作区（用户有未提交改动）→ push 照常成功、用户工作区原样
   - GitHub 执行：mock server 出 `/api/github/repos`；daemon per-step token 消费验证（捕获 fork+exec 命令行，断言无 token 在 argv）
 - **web e2e**：
   - 未点 OAuth 直接点「GitHub 仓库」→ 显示「认证 GitHub」钮
@@ -114,7 +113,7 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 
 ### Premortem（三大死因 + 护栏）
 
-- **ff 落地撞用户脏工作区** → 护栏：仅 `--ff-only`，git 自拒即 failed 提示，永不 force、永不动用户工作树
+- **落地写进用户主检出** → 护栏：落地 = conv 分支 push（`refs/heads/pacman/…`），pacman 对用户仓库的工作区与当前分支零写操作——主检出的分支/reflog/工作树永不被碰（#1211）
 - **多机部署下 server 校验本地路径误判** → 护栏：单机假设票面 `[设计]` 标注；校验实现为「不可见即跳过」，执行面（daemon 侧）兜底报错
 - **OAuth App scope/callback 与既有 GitHub Copilot provider OAuth 配置冲突** → 护栏：复用同 App 仅加 scope，callback 路由以 state 区分族；not-configured 错误族已存在；手动 owner/repo 兜底保证 GitHub 绑定永远可用
 
