@@ -6,6 +6,7 @@
 //  1. 注入缺位：回退新会话只发续轮指令，方案与历史意见丢失 → 组合 prompt
 //     必须含任务文本、续轮指令、方案全文、每一条意见。
 //  2. 旧 server 形（载荷无 reworkContext）→ 回退 prompt 逐字节保持续轮指令
+//     + plan.md 交接注记行（见下方 withNote；#1207 起计划步一律附注）
 //     （零回归——不能给旧载荷加任务文本拼接，那是 #720 new-session 载荷面）。
 //  3. 误注入：续接成功路径不得注入（continueSession 收原 opts，createSession
 //     不被调用）——注入只发生在回退分支。
@@ -24,6 +25,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@pacman/shared';
+import { appendPlanLocationNote, PLAN_FILE_NAME } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -52,6 +54,14 @@ function captureLogger(): DaemonLogger {
 }
 
 const INSTRUCTION = '用户在审核关口请求修改。修改反馈：「改掉按钮文案」。';
+
+// #1207 落地后的基准（#1215 刷新）：plan 步 prompt 由 daemon 投递前单点追加
+// plan.md 交接位置注记行（runner appendPlanLocationNote，路径执行机本地）。
+// 期望字节从实现组装——appendPlanLocationNote 是 shared 写侧单源，路径与
+// runner 同律（statePaths 的 <home>/plans/<convId>/plan.md），模板文本不手抄。
+function withNote(home: string, basePrompt: string): string {
+  return appendPlanLocationNote(basePrompt, join(home, 'plans', 'conv-rework', PLAN_FILE_NAME));
+}
 
 function claimedContinueStep(reworkContext?: {
   planText: string | null;
@@ -204,7 +214,10 @@ function successScript(): StepEvent[] {
   ];
 }
 
-async function runClaimed(backend: AgentBackend, claimed: ClaimedStep): Promise<CaptureClient> {
+async function runClaimed(
+  backend: AgentBackend,
+  claimed: ClaimedStep,
+): Promise<{ client: CaptureClient; home: string }> {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-rework-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new CaptureClient();
@@ -223,13 +236,13 @@ async function runClaimed(backend: AgentBackend, claimed: ClaimedStep): Promise<
     claimed,
     {},
   );
-  return client;
+  return { client, home };
 }
 
 describe('#1204 返工降级注入（runner resume fallback context）', () => {
   test('失败方式 1：reworkContext 在位 + 续接失败 → 新会话首轮 prompt 含任务文本、指令、方案全文与全部意见', async () => {
     const backend = captureBackend(false, successScript());
-    const client = await runClaimed(
+    const { client } = await runClaimed(
       backend,
       claimedContinueStep({
         planText: '# 方案 v1\n\n- Context: 探针',
@@ -249,17 +262,17 @@ describe('#1204 返工降级注入（runner resume fallback context）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('失败方式 2：旧 server 载荷（无 reworkContext）→ 回退 prompt 逐字节保持续轮指令', async () => {
+  test('失败方式 2：旧 server 载荷（无 reworkContext）→ 回退 prompt 逐字节保持指令 + 交接注记', async () => {
     const backend = captureBackend(false, successScript());
-    await runClaimed(backend, claimedContinueStep());
+    const { home } = await runClaimed(backend, claimedContinueStep());
 
     expect(backend.createOpts).toHaveLength(1);
-    expect(backend.createOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.createOpts[0]!.prompt).toBe(withNote(home, INSTRUCTION));
   });
 
   test('失败方式 3：续接成功 → 不注入（continue 收原 opts，create 不被调）', async () => {
     const backend = captureBackend(true, successScript());
-    await runClaimed(
+    const { home } = await runClaimed(
       backend,
       claimedContinueStep({
         planText: '# 方案 v1',
@@ -269,14 +282,17 @@ describe('#1204 返工降级注入（runner resume fallback context）', () => {
 
     expect(backend.continueOpts).toHaveLength(1);
     expect(backend.createOpts).toHaveLength(0);
-    expect(backend.continueOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.continueOpts[0]!.prompt).toBe(withNote(home, INSTRUCTION));
   });
 
   test('失败方式 4：空上下文（planText null + feedbacks []）→ 不注入（与旧载荷同形）', async () => {
     const backend = captureBackend(false, successScript());
-    await runClaimed(backend, claimedContinueStep({ planText: null, feedbacks: [] }));
+    const { home } = await runClaimed(
+      backend,
+      claimedContinueStep({ planText: null, feedbacks: [] }),
+    );
 
     expect(backend.createOpts).toHaveLength(1);
-    expect(backend.createOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.createOpts[0]!.prompt).toBe(withNote(home, INSTRUCTION));
   });
 });
