@@ -190,9 +190,12 @@ try {
   await scenario(page, 'board');
 
   // —— 场景 2：看板页输入态守卫（原热键在输入态本就不触发，改键须保持）
+  // #1166/#1181 载体（#949/#910 裁定后类名退役，与 e2e search-focus.spec.ts
+  // 同律）：面板 = role dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。
   await page.keyboard.press('Meta+k');
-  await page.waitForSelector('.search-panel', { timeout: 5000 });
-  const field = page.locator('.search-input-row input');
+  const searchPanel = page.getByRole('dialog', { name: '搜索' });
+  await searchPanel.waitFor({ state: 'visible', timeout: 5000 });
+  const field = searchPanel.getByRole('textbox');
   await field.click();
   await page.keyboard.press(NEW_KEY);
   const typed = await field.inputValue();
@@ -203,7 +206,7 @@ try {
     `输入态按 ${JSON.stringify(NEW_KEY)}：入框=${JSON.stringify(typed)} 弹层=${!guardClosed}`,
   );
   await page.keyboard.press('Escape');
-  await page.waitForSelector('.search-panel', { state: 'hidden', timeout: 5000 }).catch(() => {});
+  await searchPanel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
   // —— 场景 3：非看板页（AppSidebar 全局面）
   await page.goto(`${WEB}/app/schedules`);
