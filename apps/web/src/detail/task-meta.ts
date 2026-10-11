@@ -15,6 +15,11 @@ export function buildTaskMeta(input: {
   build: ReturnType<typeof useBuild>['data'];
   machineField: string | null;
   machineWaiting: boolean;
+  /** #1208：todo 钉选机器名（页面从 machines × wireTodo.machineId 反解）。
+   *  派发面 pin 是硬约束（claim 过滤，别机领不到——machine-pin.test.ts
+   *  失败方式 4/6 钉死），与 machineField 不同名的唯一现实来源 =
+   *  run_builds 显式 machineId 改派（transcript 有因）。 */
+  todoPinnedMachine: string | null;
   agentModel: string | null;
   usage: ReturnType<typeof useBuildUsage>['data'];
   /** ADR 0006 D5：来源 issue 标题的真值在 issue 侧（echo 查询）；拉不到
@@ -26,6 +31,13 @@ export function buildTaskMeta(input: {
   const ref = wireTodo.sourceRef != null ? parseGithubIssueSourceRef(wireTodo.sourceRef) : null;
   const prUrl = build?.prUrl ?? null;
   const prNumber = build?.prNumber ?? null;
+  // #1208：分歧才标注（机器行 = 钉选机时不产噪声；未钉/无可显机器恒 null）。
+  const todoPinnedMachine =
+    input.todoPinnedMachine != null &&
+    machineField != null &&
+    input.todoPinnedMachine !== machineField
+      ? input.todoPinnedMachine
+      : null;
   return {
     sourceIssue:
       ref != null
@@ -39,6 +51,7 @@ export function buildTaskMeta(input: {
     pr: prUrl != null && prNumber != null ? { number: prNumber, url: prUrl } : null,
     machine: machineField,
     machineWaiting,
+    todoPinnedMachine,
     model: agentModel ?? usage?.[0]?.model ?? null,
     createdAt: wireTodo.buildHistory[0]?.createdAt ?? build?.createdAt ?? null,
   };

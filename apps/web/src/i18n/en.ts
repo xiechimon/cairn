@@ -347,6 +347,9 @@ export const EN: Record<string, string> = {
   创建时间: 'Created',
   方案产出后显示于此: 'The plan will appear here once produced',
   '（等待机器上线）': '(waiting for the machine to come online)',
+  // #1208 机器行改派标注：任务钉了机器而实际执行机器不同名（run_builds
+  // 显式改派）→ 行尾揭示钉选值，换机不静默。
+  '（任务钉选 {machine}）': '(task pins {machine})',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',

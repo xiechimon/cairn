@@ -390,6 +390,16 @@ export function TodoDetailPage() {
   // 而 #864 超时收尾后步已经是 failed）。
   const machineWaiting =
     machineName == null && pinnedMachine != null && !pinnedMachine.online && phase !== 'closed';
+  // #1208：任务级钉选机器名（machines × wireTodo.machineId 反解）。与
+  // machineField 不同名 = run_builds 显式改派（派发面 pin 是硬约束，别机
+  // 领不到）——meta 机器行尾注「（任务钉选 {machine}）」，换机不静默。
+  const todoPinnedMachine = useMemo(
+    () =>
+      wireTodo?.machineId != null
+        ? (machinesQ.data?.find((m) => m.id === wireTodo.machineId)?.name ?? null)
+        : null,
+    [wireTodo?.machineId, machinesQ.data],
+  );
 
   const liveDetail: DetailContent | undefined = useMemo(() => {
     if (!live || !wireTodo || buildId == null) return undefined;
@@ -463,6 +473,7 @@ export function TodoDetailPage() {
         build: buildQ.data,
         machineField,
         machineWaiting,
+        todoPinnedMachine,
         agentModel,
         usage: usageQ.data,
         sourceEchoTitle: sourceEchoQ.data?.title,
@@ -474,6 +485,7 @@ export function TodoDetailPage() {
       buildQ.data,
       machineField,
       machineWaiting,
+      todoPinnedMachine,
       agentModel,
       usageQ.data,
       sourceEchoQ.data,
