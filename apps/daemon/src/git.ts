@@ -8,7 +8,7 @@
 // ——不进 argv（ps 面）、不进 .git/config、不进 ~/.git-credentials、不落任何盘。
 
 import { spawn } from 'node:child_process';
-import type { CommitIdentity, GitCredentials } from '@pacman/shared';
+import type { CommitIdentity, GitCredentialSource, GitCredentials } from '@pacman/shared';
 
 export interface GitRunResult {
   code: number;
@@ -75,6 +75,84 @@ export function gitCredentialEnv(cred: GitCredentials): NodeJS.ProcessEnv {
   };
 }
 
+/** #1225 machine 路的 git env：执行机自己的 credential helper（osxkeychain /
+ * store / gh）原样生效——**不**带 credential.helper 空值重置（那是 integration
+ * 路的独有语义，见 gitCredentialEnv 注），也不碰代理变量（mea 的
+ * HTTP_PROXY / NO_PROXY 语义只经进程环境传递，runGit 合并 process.env 原样
+ * 透传）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。
+ * Multica 先例（repocache gitEnv）：完整环境 + GIT_TERMINAL_PROMPT=0，服务端
+ * 零分发 git 凭据。 */
+export function machineGitEnv(): NodeJS.ProcessEnv {
+  return { GIT_TERMINAL_PROMPT: '0' };
+}
+
+/** git 失败文本 → 认证失败判定（#1225 降级触发器）。命中族：GitHub 无效
+ * token（Invalid username or token / Authentication failed）、无凭据
+ * （could not read Username / terminal prompts disabled）、http 401 族。故意
+ * 不收 403/404（认证已过、权限/存在性面——降级重试同样救不了它们，还把
+ * 确定性失败变成双倍流量）。 */
+export function isGitAuthFailure(message: string): boolean {
+  return (
+    /authentication failed/i.test(message) ||
+    /invalid username or token/i.test(message) ||
+    /could not read username/i.test(message) ||
+    /terminal prompts disabled/i.test(message) ||
+    /http basic: access denied/i.test(message) ||
+    /http 401\b/i.test(message) ||
+    /returned error: 401\b/.test(message)
+  );
+}
+
+/** 降级事件载荷（#1225 失败方式 2：只回传 git 原文——凭据对象/token 值
+ * 永不进事件面，日志与 build 记录按此形状消费）。 */
+export type GitFallbackReason = string;
+
+export interface GitCredentialFallbackOpts {
+  /** 操作名（错误文案点名用，如 'push' / 'clone' / 'fetch'）。 */
+  what: string;
+  /** machine 兜底闸：github 形态才开。hosted 走 server per-step key 恒关
+   * （票失败方式 3），local 无凭据面恒关。 */
+  allowMachineFallback: boolean;
+  /** auth 失败降级事件（原文回传；调用方落日志/transcript，禁携带凭据值）。 */
+  onFallback?: (reason: GitFallbackReason) => void;
+}
+
+/** #1225 凭据序执行器：① per-step integration token 先行（集成有效时行为
+ * 不变——单次执行即返回 'integration'）；② auth 失败（isGitAuthFailure）且
+ * 闸开 → 以 null cred（machine 路，machineGitEnv）二发，成功返回 'machine'；
+ * ③ 两路都 auth 失败 → 合并错误点名两路（票失败方式 1：明确报错，不静默
+ * 匿名撞 401）。非 auth 失败（网络/5xx/冲突）原错误直抛——降级只在凭据
+ * 语义成立时发生。cred 为 null（server 未下发，如未连 GitHub）= machine 路
+ * 单次执行，无降级事件。 */
+export async function withGitCredentialFallback(
+  op: (cred: GitCredentials | null) => Promise<void>,
+  cred: GitCredentials | null,
+  opts: GitCredentialFallbackOpts,
+): Promise<GitCredentialSource> {
+  if (cred === null) {
+    await op(null);
+    return 'machine';
+  }
+  try {
+    await op(cred);
+    return 'integration';
+  } catch (err) {
+    const first = err instanceof Error ? err.message : String(err);
+    if (!opts.allowMachineFallback || !isGitAuthFailure(first)) throw err;
+    opts.onFallback?.(first);
+    try {
+      await op(null);
+      return 'machine';
+    } catch (err2) {
+      const second = err2 instanceof Error ? err2.message : String(err2);
+      throw new Error(
+        `git ${opts.what} authentication failed on both credential paths — ` +
+          `per-step token: ${first}; machine credentials: ${second}`,
+      );
+    }
+  }
+}
+
 export function commitEnv(identity: CommitIdentity): NodeJS.ProcessEnv {
   return {
     GIT_AUTHOR_NAME: identity.name,
@@ -94,7 +172,7 @@ const NET_TIMEOUT_MS = 480_000;
 export const gitPrim = {
   async clone(url: string, dir: string, cred: GitCredentials | null): Promise<void> {
     await runGitOk(['clone', '--end-of-options', url, dir], {
-      env: cred ? gitCredentialEnv(cred) : undefined,
+      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
@@ -102,7 +180,7 @@ export const gitPrim = {
   async fetch(repoDir: string, cred: GitCredentials | null): Promise<void> {
     await runGitOk(['fetch', '--prune', 'origin'], {
       cwd: repoDir,
-      env: cred ? gitCredentialEnv(cred) : undefined,
+      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
@@ -156,7 +234,7 @@ export const gitPrim = {
   async remoteSetHeadAuto(repoDir: string, cred: GitCredentials | null): Promise<void> {
     await runGitOk(['remote', 'set-head', 'origin', '--auto'], {
       cwd: repoDir,
-      env: cred ? gitCredentialEnv(cred) : undefined,
+      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
@@ -310,7 +388,7 @@ export const gitPrim = {
   async push(dir: string, branch: string, cred: GitCredentials | null): Promise<void> {
     await runGitOk(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
       cwd: dir,
-      env: cred ? gitCredentialEnv(cred) : undefined,
+      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
@@ -340,7 +418,7 @@ export const gitPrim = {
   async tagPush(dir: string, tag: string, cred: GitCredentials | null): Promise<void> {
     await runGitOk(['push', '--end-of-options', 'origin', `refs/tags/${tag}`], {
       cwd: dir,
-      env: cred ? gitCredentialEnv(cred) : undefined,
+      env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
@@ -405,7 +483,9 @@ export const gitPrim = {
 };
 
 /** 网络重试预算 [设计]（02 §5.5「push 重试覆盖 git-host 5xx 窗口」的最小
- * 等价物：两档退避；冷 worktree 长预算由 NET_TIMEOUT_MS 兜）。 */
+ * 等价物：两档退避；冷 worktree 长预算由 NET_TIMEOUT_MS 兜）。auth 失败是
+ * 确定性失败（#1225：401 重试不翻红），直接抛——不烧退避预算，也让凭据
+ * 降级序（withGitCredentialFallback）立刻接手。 */
 export const GIT_NET_RETRY_DELAYS_MS = [1_000, 5_000] as const;
 
 export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
@@ -415,7 +495,10 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       return await fn();
     } catch (err) {
       lastErr = err;
-      const delay = GIT_NET_RETRY_DELAYS_MS[i - 1];
+      if (isGitAuthFailure(err instanceof Error ? err.message : String(err))) break;
+      // 退避下标 = 已失败次数（i=0 失败 → DELAYS[0]）：旧实现取 DELAYS[i-1]，
+      // 首次失败即 undefined → break——重试预算从未生效（死代码）。#1225 修正。
+      const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
       await new Promise((r) => setTimeout(r, delay));
     }

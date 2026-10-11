@@ -1,0 +1,2 @@
+server=/tmp/pacman-1225-server-home-1791739597311
+daemon=/tmp/pacman-1225-daemon-home-1791739597311
