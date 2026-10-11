@@ -120,6 +120,7 @@ import {
 } from './credentials.js';
 import {
   agentForStep as agentForStepEligibility,
+  machineRunningCount,
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -462,13 +463,7 @@ export function findApiKeyByPlain(db: Db, plain: string) {
  *  非 chief 步**（chief 不占并发槽——容量闸、机器页 `执行中 n/N`、排队
  *  waitingFor 快照三处同源同数：满载 worker + chief 在跑时 n 不超 N，chief
  *  步不受闸也不进计数）。 */
-export function machineRunningCount(db: Db, machineId: string): number {
-  return db
-    .select({ id: step.id })
-    .from(step)
-    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
-    .all().length;
-}
+export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
   return machineRecordSchema.parse({

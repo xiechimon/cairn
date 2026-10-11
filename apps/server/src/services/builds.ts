@@ -54,14 +54,22 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, githubPullState } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
-import { agentForStep, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
+import {
+  agentForStep,
+  machineRunningCount,
+  runtimeGatePasses,
+  stepRuntimeFor,
+} from './dispatch-eligibility.js';
 import {
   PIN_OFFLINE_GRACE_MS,
+  PIN_ONLINE_WEDGE_GRACE_MS,
   pinOfflineReason,
   pinRuntimeBlockedReason,
+  pinWedgeReason,
   stepActivityAt,
   WORKER_PIN_OFFLINE_HINT,
   WORKER_PIN_RUNTIME_HINT,
+  WORKER_PIN_WEDGE_HINT,
 } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasRepoBinding, readBuildChanges } from './git.js';
@@ -276,6 +284,107 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
     .run();
   const record = getTodo(deps, todoRow.id);
   if (record) deps.hub.publishTodoDoc(record.teamId, record);
+}
+
+// —— #1219 queued build 取消/僵尸释放（chief cancel_builds 的漏斗单源）—————
+
+/** 僵尸 queued todo 释放（cancelBuild 无活动步分支与 sweepZombieQueuedTodos
+ * 共用）：todo 卡在 queued 而 latest build 已无 pending/claimed 步 = 占着
+ * 调度位不可再入（run_builds 的 queued→queued 断言 409）。释放 = 回落
+ * stopFallbackPhase（与 stop 漏斗同面：最近 done 步关口 / prevPhase / todo）
+ * + build.errorMessage 兜底（已写原因保留）+ build/todo 事件。回落直写 todo
+ * （applyStoppedStep 同律：取消回退边不在前进流转表，不触发关口通知与
+ * chief wake）。幂等：todo 非 queued 或已落目标相位 = no-op。 */
+function releaseZombieQueued(
+  deps: BuildDeps,
+  buildRow: BuildRow,
+  todoRow: typeof todo.$inferSelect,
+): void {
+  const { db } = deps;
+  if (todoRow.phase !== 'queued') return;
+  if (buildRow.errorMessage === null) {
+    db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
+  }
+  const target = stopFallbackPhase(db, buildRow);
+  if (todoRow.phase === target) return;
+  db.update(todo)
+    .set({ phase: target, phaseAt: nowMs(), v: todoRow.v + 1 })
+    .where(eq(todo.id, todoRow.id))
+    .run();
+  const fresh = db.select().from(build).where(eq(build.id, buildRow.id)).get();
+  if (fresh) publishBuild(deps, fresh);
+  const record = getTodo(deps, todoRow.id);
+  if (record) deps.hub.publishTodoDoc(record.teamId, record);
+}
+
+/** #1219 chief/mcp cancel_builds 的取消漏斗（替代旧裸 UPDATE——只写
+ * build.errorMessage + pending 步 failed、todo 不离 queued 的僵尸形）：
+ * - pending 步 → applyStoppedStep（与用户 stop 面同账：步 stopped + build
+ *   errorMessage「已取消」+ todo 回落 + 事件）；
+ * - claimed 步 → stop 委托（stopPending 单槽 + machine stream stop 事件，
+ *   done(stopped) 回报落账）——在跑步不再零通知地占并发位；
+ * - 无活动步（已终态/僵尸）→ releaseZombieQueued 幂等释放；
+ * - build 不存在 → not-found（调用方按需 404）。返回值 = 各形态回执。 */
+export function cancelBuild(
+  deps: BuildDeps,
+  buildId: string,
+): 'stopped' | 'delegated' | 'released' | 'not-found' {
+  const { db } = deps;
+  const buildRow = db.select().from(build).where(eq(build.id, buildId)).get();
+  if (!buildRow) return 'not-found';
+  const active = db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+    .orderBy(asc(step.createdAt))
+    .all()
+    .at(-1);
+  if (!active) {
+    const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+    if (!todoRow) return 'released';
+    releaseZombieQueued(deps, buildRow, todoRow);
+    return 'released';
+  }
+  if (active.status === 'pending') {
+    applyStoppedStep(deps, active.id);
+    return 'stopped';
+  }
+  const now = nowMs();
+  db.insert(stopPending)
+    .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
+    .onConflictDoUpdate({
+      target: stopPending.conversationId,
+      set: { stepId: active.id, discard: true, createdAt: now },
+    })
+    .run();
+  const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (todoRow) deps.machineHub?.stopSignal(todoRow.teamId, active.id);
+  return 'delegated';
+}
+
+/** #1219 存量僵尸 reconcile（scheduler tick + 启动各一次）：todo phase =
+ * queued 但 latest build 已无 pending/claimed 步 = 「占调度位却无事可领」
+ * （旧 cancel 裸 UPDATE / 崩溃窗口的遗留态）。修复 = releaseZombieQueued
+ * 回落释放；活步控制组（有 pending/claimed 步）不动。无龄判据：僵尸不是
+ * 过渡态——startBuilds 的建 build/入队/置 queued 与 claim 的置 claimed/推
+ * 相位都是同步块，合法流转不会产出「queued 无活步」的中间窗。 */
+export function sweepZombieQueuedTodos(deps: BuildDeps, now: number = nowMs()): number {
+  const rows = deps.db.select().from(todo).where(eq(todo.phase, 'queued')).all();
+  let released = 0;
+  for (const todoRow of rows) {
+    if (todoRow.latestBuildId === null) continue; // 无 build 的 queued 不属本面
+    const buildRow = deps.db.select().from(build).where(eq(build.id, todoRow.latestBuildId)).get();
+    if (!buildRow) continue;
+    const active = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, buildRow.id), inArray(step.status, ['pending', 'claimed'])))
+      .all();
+    if (active.length > 0) continue;
+    releaseZombieQueued(deps, buildRow, todoRow);
+    released += 1;
+  }
+  return released;
 }
 
 // #1150 起对 services/ci-loop.ts 导出（CI 磨绿环的修复步追加复用同一入队面）。
@@ -981,9 +1090,14 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  *    （出口 = 开 runtime 或改钉，不自动改派）。判据单源 = claim 面（agentForStep
  *    / runtimeGatePasses 下沉 dispatch-eligibility，本 sweep 与 tryClaim 同一
  *    份事实，判定漂移 = sweep 误杀 claim 能领的步）。
+ * ④c #1219：pending 且钉选机**在线、闸开、有闲位**但超宽限未领（旧串行
+ *    daemon / claim 循环 wedge 的实测形态——DB 面看「有闲位却不动」）→ 失败
+ *    收尾（点名机器，出口 = 检查该机 daemon 或改钉，不自动改派）。与 ④/④b
+ *    合称「有界等待」：钉选在线的等待不再是无限期静默。
  * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；团队有在线机器且
- * 钉选机在线且闸开的 pending 步（合法排队，含 #682 钉选在线机器的等待语义
- * ——步等它认领，别机不抢）；在线机器上曾有心跳后停更的 claimed 步（执行/
+ * 钉选机在线且闸开且（满载或宽限内）的 pending 步（合法排队，含 #682 钉选
+ * 在线机器的等待语义——步等它认领，别机不抢；满载超宽限同样不动，忙是真
+ * 满）；在线机器上曾有心跳后停更的 claimed 步（执行/
  * 推送通道部分存活的歧义态，等 presence 过期走 ②）。chief 步不在本面
  * （chief.ts 扫尾）。已知缝（另行登记，不属「有界等待」两缝）：Agent 在但
  * 无模型位的步（无 modelId = 无人可领，runtime 判据单源在此无从计算）与未
@@ -1051,6 +1165,20 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
             stepRuntimeFor(agentRow.provider),
             WORKER_PIN_RUNTIME_HINT,
           );
+        }
+        // ④c #1219：钉选机在线且闸开（「合法排队」判定的尽头）——有闲位仍
+        // 超宽限不领 = 该机不在领取（旧串行 daemon 被长跑步顶住 / claim 循环
+        // wedge），无期静默 = 卡死 queued。可见失败收尾（点名机器与出口，
+        // 不自动改派，④/④b 同律）。判据单源：闲位 = machineRunningCount
+        // （#1108 非 chief claimed 数）< 行 maxConcurrent；满载 = 合法排队不动。
+        if (
+          reason === null &&
+          agentRow?.modelId != null &&
+          runtimeGatePasses(pinnedRow, agentRow.provider) &&
+          now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
+          machineRunningCount(deps.db, pinnedId) < pinnedRow.maxConcurrent
+        ) {
+          reason = pinWedgeReason(pinnedRow.name, WORKER_PIN_WEDGE_HINT);
         }
       }
       if (reason === null) {

@@ -15,9 +15,9 @@ import {
   parseReviewPromptMeta,
   type StepKind,
 } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, type todo } from '../db/schema.js';
+import { agent, step, type todo } from '../db/schema.js';
 
 /** #682 enabledRuntimes 真闸——步的 runtime 判定（与 daemon runner 的
  *  backendFor 同律：agent provider ∈ BACKEND_RUNTIME_IDS → claude-code，
@@ -113,4 +113,17 @@ export function unassignedStepReason(
     return `plan 步无指派 Agent：assignment 的 plan 槽与 build 槽均为空（返工步已尝试回落 build 槽），无人可领。指派 Agent 后重新运行任务。`;
   }
   return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;
+}
+
+/** #1108 机器在跑 worker 步数（非 chief——chief 不占并发槽；容量闸、机器页
+ * `执行中 n/N`、排队快照三处同源同数）。#1219 从 machines.ts 下沉本叶子：
+ * sweepAbandonedBuildSteps（builds.ts）的 ④c 宽限判据要「钉选机有无空闲
+ * 并发位」——machines → builds 是既有正向边，值 import 会成环，与 #881 把
+ * runtime 判定下沉至此同理。machines.ts re-export 保持既有导入面不变。 */
+export function machineRunningCount(db: Db, machineId: string): number {
+  return db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
+    .all().length;
 }
