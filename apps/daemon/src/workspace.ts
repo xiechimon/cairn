@@ -23,11 +23,18 @@ import {
   type OrphanCleanupInput,
   type PreparedWorkspace,
   RemoteBranchDivergedError,
+  WORKSPACE_HOOK_TIMEOUT_MS,
+  type WorkspaceHookNoteData,
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@pacman/shared';
 import { gitPrim, withGitNetRetries } from './git.js';
 import type { DaemonLogger } from './log.js';
+import {
+  runWorkspaceHook,
+  WorkspaceHookError,
+  workspaceHookErrorMessage,
+} from './workspace-hooks.js';
 
 /** conversationId 目录形状（UUIDv7，r3 §1.4 样本）——孤儿扫描的判别式。 */
 const CONV_DIR_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -36,6 +43,9 @@ export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
   /** 测试注入（缺省 7×24h，02 §5.5）。 */
   orphanTtlMs?: number;
+  /** #1149 环境钩子超时（缺省 20min，WORKSPACE_HOOK_TIMEOUT_MS；测试注入
+   * 缩短时标）。 */
+  hookTimeoutMs?: number;
 }
 
 export class WorkspaceManager implements WorktreeOps {
@@ -43,10 +53,12 @@ export class WorkspaceManager implements WorktreeOps {
   private readonly locks = new Map<string, Promise<unknown>>();
   private readonly logger: DaemonLogger;
   private readonly orphanTtlMs: number;
+  private readonly hookTimeoutMs: number;
 
   constructor(opts: WorkspaceManagerOpts) {
     this.logger = opts.logger;
     this.orphanTtlMs = opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS;
+    this.hookTimeoutMs = opts.hookTimeoutMs ?? WORKSPACE_HOOK_TIMEOUT_MS;
   }
 
   private async withProjectLock<T>(projectId: string, fn: () => Promise<T>): Promise<T> {
@@ -95,7 +107,10 @@ export class WorkspaceManager implements WorktreeOps {
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
         }
         this.logger.workspace('Worktree reused');
-        return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: true };
+        // #1149：reused = 唤醒面 → .agents/resume（失败/超时非致命 warn，
+        // 不挡步）。钩子消费步级下发凭据（同 gitPrim 注入面，不新开口子）。
+        const hooks = await this.runHookStage(convDir, 'resume', input.credentials);
+        return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: true, hooks };
       }
 
       // 陈旧残留（目录在但非 worktree / 分支在但 worktree 不在）→ 清理三步
@@ -111,8 +126,53 @@ export class WorkspaceManager implements WorktreeOps {
       }
       await gitPrim.worktreeAdd(baseRepoDir, branch, convDir, base);
       this.logger.workspace(`Worktree added (${branch} from ${base})`);
-      return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: false };
+      // #1149：fresh = 装机面 → .agents/setup（失败=步失败：抛 WorkspaceHookError
+      // → runner 的 prepare catch → done failed；失败即回滚 worktree，使重试
+      // 认领重新走 fresh → setup 重跑，而不是 reused→resume 掩盖装机缺口）。
+      const hooks = await this.runHookStage(convDir, 'setup', input.credentials);
+      return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: false, hooks };
     });
+  }
+
+  /** #1149 环境钩子挂点（prepare 两出口各一次）：
+   * - setup（fresh 检出后）：失败/超时 = 步失败——WorkspaceHookError 直接
+   *   抛出（runner prepare catch → done failed），且**回滚 worktree**（刚
+   *   检出的树上没有 agent 工作，可安全清），使重试认领重新走 fresh→setup
+   *   而非 reused→resume 掩盖装机缺口。
+   * - resume（reused 复用时）：失败/超时非致命——warning 落 workspace 日志，
+   *   步继续；note（ok/timeout）仍随 PreparedWorkspace 投影进步日志。
+   * 钩子文件缺失 = 静默跳过（零日志零进程，无钩子仓行为与现状一致）。
+   * 同项目串行化由 projectLock 免费提供（两 conv 并发 setup 不互踩）。 */
+  private async runHookStage(
+    cwd: string,
+    name: 'setup' | 'resume',
+    credentials: GitCredentials | null,
+  ): Promise<WorkspaceHookNoteData[]> {
+    try {
+      const note = await runWorkspaceHook({
+        cwd,
+        name,
+        credentials,
+        timeoutMs: this.hookTimeoutMs,
+        log: (line) => this.logger.workspace(line),
+      });
+      return note === null ? [] : [note];
+    } catch (err) {
+      if (err instanceof WorkspaceHookError) {
+        if (name === 'resume') {
+          this.logger.workspace(`resume hook failed (non-fatal, continuing): ${err.message}`);
+          return [err.note];
+        }
+        // setup：回滚刚检出的 worktree 再抛（装机失败不留半成品树）。
+        try {
+          await this.removeStale(cwd);
+        } catch {
+          // 回滚失败不掩盖钩子错误（钩子错误是第一因）。
+        }
+        throw new Error(workspaceHookErrorMessage(err.note), { cause: err });
+      }
+      throw err;
+    }
   }
 
   async commitAll(cwd: string, message: string, identity: { name: string; email: string }) {

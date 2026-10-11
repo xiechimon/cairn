@@ -763,6 +763,30 @@ export async function runStep(
       createdAt: now(),
     });
   }
+  // —— #1149 环境钩子投影：prepare 的 hooks 槽（跑过才记）→ transcript
+  // system 行（用户在步日志里看得见 setup/resume 做了什么；web 侧走既有
+  // 纯文本 system→note 渲染，零 web 改动）。缺失 = 零行（无钩子仓 transcript
+  // 与现状逐字节一致——验收红线）。setup 失败不进本面（prepare 已抛错，
+  // 步走 failed 收尾，错误文案经 done.failed.errorMessage 上浮）。
+  for (const hook of ws?.hooks ?? []) {
+    const head =
+      hook.status === 'ok'
+        ? `.agents/${hook.name} hook ok (${hook.ms}ms)`
+        : hook.status === 'timeout'
+          ? `.agents/${hook.name} hook timed out after ${Math.round(hook.ms / 1000)}s — process group killed`
+          : `.agents/${hook.name} hook failed (exit ${hook.exitCode})`;
+    const truncated =
+      hook.totalChars > hook.output.length
+        ? `\n… output truncated (${hook.totalChars - hook.output.length} more chars)`
+        : '';
+    const body = hook.output.trim() === '' ? '' : `\n${hook.output.trimEnd()}${truncated}`;
+    transcript.upsert({
+      id: `hook-${hook.name}-${stepId}`,
+      role: 'system',
+      content: `${head}${body}`,
+      createdAt: now(),
+    });
+  }
 
   // —— #931 返工轮的 git 半边：fresh session 步（restart 复用 PR build 的
   // 首步；plan 交接缺失强制轮同判据族）在 reused worktree 上回退到分支头——

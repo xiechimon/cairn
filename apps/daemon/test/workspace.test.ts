@@ -5,7 +5,16 @@
 // merge --no-edit 两态/孤儿回收 TTL 7×24h/防分叉护栏 REMOTE_BRANCH_DIVERGED/
 // projectLock 串行化。
 
-import { existsSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -72,6 +81,14 @@ function prepareInput(conversationId: string) {
     workspacesRoot: root,
     credentials: null,
   };
+}
+
+/** #1149：种子仓写 .agents/<name> 钩子（可执行位）。 */
+function seedHook(name: 'setup' | 'resume', body: string): void {
+  mkdirSync(join(seedDir, '.agents'), { recursive: true });
+  const p = join(seedDir, '.agents', name);
+  writeFileSync(p, body);
+  chmodSync(p, 0o755);
 }
 
 beforeEach(async () => {
@@ -280,5 +297,98 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(b.cwd).toBe(join(root, CONV_B));
     // 基座只 clone 一次（第二进 = fetch 路径）。
     expect(logger.lines.filter((l) => l.includes('Cloning'))).toHaveLength(1);
+  }, 30_000);
+});
+
+describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
+  test('fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout）', async () => {
+    // 钩子经种子提交进仓（真实路径：hook 在 worktree 树上）。
+    seedHook('setup', '#!/bin/sh\necho setup-ran-marker\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    expect(prepared.hooks).toHaveLength(1);
+    expect(prepared.hooks![0]).toMatchObject({
+      name: 'setup',
+      status: 'ok',
+      exitCode: 0,
+    });
+    expect(prepared.hooks![0]!.output).toContain('setup-ran-marker');
+    expect(logger.lines.some((l) => l.includes('setup hook: running'))).toBe(true);
+  }, 30_000);
+
+  test('无钩子仓：hooks 缺省 []，零钩子日志行（行为与现状一致）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    expect(prepared.hooks).toEqual([]);
+    expect(logger.lines.some((l) => l.includes('hook'))).toBe(false);
+  }, 30_000);
+
+  test('reused → .agents/resume 跑（setup 不重跑）；失败/超时非致命，步继续', async () => {
+    seedHook('setup', '#!/bin/sh\necho setup-ran\n');
+    seedHook('resume', '#!/bin/sh\necho resume-ran-marker\necho boom >&2\nexit 1\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const first = await ws.prepare(prepareInput(CONV_A));
+    expect(first.reused).toBe(false);
+    expect(first.hooks![0]!.name).toBe('setup');
+    // 第二进 = reused → resume（exit 1，非致命——步继续，note 照落）。
+    const second = await ws.prepare(prepareInput(CONV_A));
+    expect(second.reused).toBe(true);
+    expect(second.hooks).toHaveLength(1);
+    expect(second.hooks![0]!.name).toBe('resume');
+    expect(second.hooks![0]!.status).toBe('failed');
+    expect(second.hooks![0]!.output).toContain('resume-ran-marker');
+    // 非致命日志行点名（policy 层 warn 形）。
+    expect(logger.lines.some((l) => l.includes('resume hook failed (non-fatal'))).toBe(true);
+  }, 30_000);
+
+  test('setup 失败 → prepare 抛错（步失败面）；worktree 回滚 → 重试重新走 fresh→setup', async () => {
+    seedHook('setup', '#!/bin/sh\necho boom >&2\nexit 3\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    await expect(ws.prepare(prepareInput(CONV_A))).rejects.toThrow(/exited 3/);
+    // 回滚真值：convDir 已清（重试认领重新走 fresh → setup 重跑）。
+    expect(existsSync(join(root, CONV_A))).toBe(false);
+    expect(
+      await gitPrim.hasLocalBranch(join(root, PROJECT_ID, 'repo'), conversationBranch(CONV_A)),
+    ).toBe(false);
+  }, 30_000);
+
+  test('陈旧重建（worktree 目录被手工删）→ 仍走 fresh → setup 重跑', async () => {
+    seedHook('setup', '#!/bin/sh\necho setup-again-marker\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const first = await ws.prepare(prepareInput(CONV_A));
+    expect(first.hooks![0]!.output).toContain('setup-again-marker');
+    rmSync(join(root, CONV_A), { recursive: true, force: true });
+    const second = await ws.prepare(prepareInput(CONV_A));
+    expect(second.reused).toBe(false);
+    expect(second.hooks![0]!.output).toContain('setup-again-marker');
+  }, 30_000);
+
+  test('钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env', async () => {
+    seedHook('setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const prepared = await ws.prepare({
+      ...prepareInput(CONV_A),
+      credentials: { username: 'x-access-token', password: 'step-token' },
+    });
+    expect(prepared.hooks![0]!.output).toContain('cred=2');
+  }, 30_000);
+
+  test('钩子超时 → setup 面致命（步失败），resume 面非致命', async () => {
+    seedHook('setup', '#!/bin/sh\nsleep 10\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const short = new WorkspaceManager({ logger, hookTimeoutMs: 300 });
+    await expect(short.prepare(prepareInput(CONV_A))).rejects.toThrow(/timed out/);
+    expect(existsSync(join(root, CONV_A))).toBe(false); // 回滚面
   }, 30_000);
 });

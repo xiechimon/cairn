@@ -1,0 +1,17 @@
+# #1149 acceptance (票面验收 2): setup exit-1 -> step failed w/ readable error; setup sleep past timeout -> process group killed, step failed
+
+$ pnpm exec vitest run test/workspace-acceptance.test.ts --silent=false   (cwd apps/daemon)
+
+```
+✓ test/workspace-acceptance.test.ts > #1149 验收演示（票面验收 2） > setup 故意 exit 1 → prepare 抛错，错误可读（exit code + stderr 尾） 469ms
+✓ test/workspace-acceptance.test.ts > #1149 验收演示（票面验收 2） > setup 故意 sleep 超过超时 → 被杀、步失败（timed out after 300ms） 783ms
+Test Files  1 passed (1)
+      Tests  2 passed (2)
+
+ACCEPTANCE-EXIT1: workspace hook .agents/setup exited 1 — starting env bootstrap
+                   fatal: registry unreachable
+
+ACCEPTANCE-TIMEOUT: workspace hook .agents/setup timed out after 0s and its process group was killed — last output: bootstrapping elapsed=530ms
+```
+
+Note: timeout is 300ms in the demo (PACMAN_HOOK_TIMEOUT_MS override path); the contract (20min default, tree-kill) is the same code path.

@@ -1,0 +1,30 @@
+# RED — old code (stash of the #1149 src changes), 2026-10-11
+
+Command: pnpm exec vitest run test/workspace.test.ts test/runner-resume-note.test.ts test/config-state.test.ts  (cwd apps/daemon)
+
+
+== test/workspace.test.ts ==
+     × fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout） 383ms
+     × 无钩子仓：hooks 缺省 []，零钩子日志行（行为与现状一致） 285ms
+     × reused → .agents/resume 跑（setup 不重跑）；失败/超时非致命，步继续 402ms
+     × setup 失败 → prepare 抛错（步失败面）；worktree 回滚 → 重试重新走 fresh→setup 384ms
+     × 陈旧重建（worktree 目录被手工删）→ 仍走 fresh → setup 重跑 381ms
+     × 钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env 379ms
+     × 钩子超时 → setup 面致命（步失败），resume 面非致命 380ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  7 failed | 11 passed (18)
+
+== test/runner-resume-note.test.ts ==
+     × setup ok note → system 行（头部 + stdout）；resume 失败 note → 行带 exit code + stderr 1896ms
+     × 输出超限 → truncated 标记（totalChars > output.length） 1216ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  2 failed | 3 passed (5)
+
+== test/config-state.test.ts ==
+     × env 覆盖（PACMAN_HOOK_TIMEOUT_MS） 2ms
+     × 显式入参 > env 0ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  2 failed | 16 passed (18)

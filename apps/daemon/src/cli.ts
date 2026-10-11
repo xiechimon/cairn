@@ -75,7 +75,15 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   }
   const paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog, stdout: true });
-  const handle = await runMachine({ config, paths, logger, idleSleepPrevention: true });
+  const handle = await runMachine({
+    config,
+    paths,
+    logger,
+    idleSleepPrevention: true,
+    // #1149：环境钩子超时（config 已解析 env/默认；machine-loop 注给
+    // WorkspaceManager）。
+    hookTimeoutMs: config.hookTimeoutMs,
+  });
   // #691：信号名透传进退出行（SIGTERM/SIGINT 面事后可考）。
   const onSignal = (signal: string) => {
     void handle.stop(signal);

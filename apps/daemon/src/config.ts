@@ -9,6 +9,7 @@ import {
   BRAND,
   CLAUDE_CONFIG_FILE_NAME,
   ENV_VARS,
+  WORKSPACE_HOOK_TIMEOUT_MS,
   WORKSPACES_DIR_GUARD_CANON,
 } from '@pacman/shared';
 import { z } from 'zod';
@@ -31,6 +32,9 @@ export const daemonConfigSchema = z.object({
    * 默认 ~/.claude.json；PACMAN_MCP_CONFIG 覆盖。执行机各读各机——stdio
    * 命令在真正的执行机上起，密钥值从不跨 wire。 */
   mcpConfigPath: z.string(),
+  /** #1149 环境钩子超时 ms（缺省 WORKSPACE_HOOK_TIMEOUT_MS 20min；
+   * PACMAN_HOOK_TIMEOUT_MS 覆写，非正整数 = 忽略用缺省）。 */
+  hookTimeoutMs: z.number().int().positive(),
 });
 export type DaemonConfig = z.infer<typeof daemonConfigSchema>;
 
@@ -44,6 +48,8 @@ export interface DaemonConfigInput {
   foreground?: boolean;
   mcpConfigPath?: string;
   skillsDir?: string;
+  /** #1149 环境钩子超时 ms 覆写（env PACMAN_HOOK_TIMEOUT_MS 同位）。 */
+  hookTimeoutMs?: number;
 }
 
 /** 默认 server URL [设计]（官方默认不可观测——todos.dev 云常量；复刻
@@ -81,6 +87,15 @@ export function loadDaemonConfig(
   const skillsDir = resolve(
     input.skillsDir ?? env[ENV_VARS.skillsDir] ?? join(homedir(), '.agents', 'skills'),
   );
+  // #1149 环境钩子超时（优先级同律：显式入参 > env > 默认 20min）。env 值
+  // 非正整数 = 忽略（静默回缺省——config 层不抛，钩子超时不是启动护栏面）。
+  const hookTimeoutRaw = input.hookTimeoutMs ?? env[ENV_VARS.hookTimeoutMs];
+  const hookTimeoutParsed = Number(hookTimeoutRaw);
+  const hookTimeoutMs =
+    input.hookTimeoutMs ??
+    (Number.isInteger(hookTimeoutParsed) && hookTimeoutParsed > 0
+      ? hookTimeoutParsed
+      : WORKSPACE_HOOK_TIMEOUT_MS);
   return daemonConfigSchema.parse({
     serverUrl: serverUrl.replace(/\/$/, ''),
     ...(apiKey !== undefined ? { apiKey } : {}),
@@ -94,5 +109,6 @@ export function loadDaemonConfig(
     mcpConfigPath: resolve(
       input.mcpConfigPath ?? env[ENV_VARS.mcpConfig] ?? join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
+    hookTimeoutMs,
   });
 }

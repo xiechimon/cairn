@@ -72,6 +72,9 @@ export interface MachineLoopOpts {
   idleSleepPrevention?: boolean;
   /** 孤儿 worktree 回收 TTL（缺省 7×24h，02 §5.5/r3 §1.4；测试注入缩短）。 */
   orphanTtlMs?: number;
+  /** #1149 环境钩子超时（缺省 WORKSPACE_HOOK_TIMEOUT_MS 20min；测试注入
+   * 缩短时标；PACMAN_HOOK_TIMEOUT_MS 覆写在 cli.ts 组装入参时生效）。 */
+  hookTimeoutMs?: number;
 }
 
 export interface MachineHandle {
@@ -316,6 +319,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const workspace = new WorkspaceManager({
     logger,
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
+    ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
   });
   // 在跑 session 句柄注册表（W3 #279 steer 投递面）。声明位必须在 recover 块
   // 之前——stepDeps() 是函数声明（提升）且 recover 路径会先于下方流段调用它，

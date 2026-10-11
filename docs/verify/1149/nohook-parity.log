@@ -1,0 +1,8 @@
+# #1149 acceptance (票面验收 3): no-hook repo — hooks defaults to [], zero hook log lines
+
+$ pnpm exec vitest run test/workspace-nohook.test.ts
+
+```
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+```

@@ -109,6 +109,9 @@ export const ENV_VARS = {
    * 落请求面）；未设/其它值 = `short`（pi 缺省档，请求面与既往零漂移）。
    * long 会向网关发送新字段——部分通道拒未知字段（#654 同族），故 opt-in。 */
   piCacheRetention: 'PACMAN_PI_CACHE_RETENTION',
+  /** #1149 环境钩子超时毫秒覆写（缺省 20min，WORKSPACE_HOOK_TIMEOUT_MS）。
+   * 非 20min 缺省即 opt-in：数值非法（非正整数）= 忽略 env，用缺省。 */
+  hookTimeoutMs: 'PACMAN_HOOK_TIMEOUT_MS',
 } as const;
 
 /** API key 形态 `pacman_<48hex>`（02 §5.8 前缀 = 品牌槽；r3 §6 掩码样例原形

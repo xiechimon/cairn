@@ -5,6 +5,8 @@
 // spawn/import git 包装依赖。
 // 字节面用 Uint8Array（shared 零 node 依赖）。
 
+import type { WorkspaceHookNoteData } from './protocol/executor.js';
+
 /** `ls-tree` 行投影（tree?ref= 端点源，02 §3 文件浏览面）。 */
 export interface GitTreeEntry {
   name: string;
@@ -125,6 +127,11 @@ export interface PreparedWorkspace {
   defaultBranch: string;
   /** `Worktree reused` 行语义（r3 §1.4）。 */
   reused: boolean;
+  /** #1149 环境钩子注记：本次 prepare 实际跑过的钩子（跑过才记；缺失/跳过
+   * = 缺省 []——「无钩子的仓行为与现状一致」面）。setup 失败不落此槽
+   * （prepare 抛错，步失败）；resume 失败也不落（warning 行已落日志）。
+   * runner 把 ok/timeout note 投影成 transcript system 行。 */
+  hooks?: WorkspaceHookNoteData[];
 }
 
 /** 孤儿回收输入（r3 §1.4 `cleanupOrphanWorktrees(ttlMs = 7*24h)`）。 */

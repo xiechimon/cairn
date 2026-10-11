@@ -6376,6 +6376,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > executor CLI 面（02 §
     "githubOauthClientId": "PACMAN_GITHUB_OAUTH_CLIENT_ID",
     "githubOauthClientSecret": "PACMAN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "PACMAN_HOME",
+    "hookTimeoutMs": "PACMAN_HOOK_TIMEOUT_MS",
     "mcpConfig": "PACMAN_MCP_CONFIG",
     "piCacheRetention": "PACMAN_PI_CACHE_RETENTION",
     "server": "PACMAN_SERVER",

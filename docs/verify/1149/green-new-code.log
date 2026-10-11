@@ -1,0 +1,7 @@
+# GREEN — this change restored, same command
+
+$ pnpm exec vitest run test/workspace.test.ts test/runner-resume-note.test.ts test/config-state.test.ts
+
+ Test Files  3 passed (3)
+      Tests  41 passed (41)
+   Duration  8.73s (tests 88%, import 6%, transform 6%)

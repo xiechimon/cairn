@@ -22,6 +22,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
+  WorktreeOps,
 } from '@pacman/shared';
 import { RESUME_FRESH_SESSION_NOTE } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -260,5 +261,204 @@ describe('#862 T1 会话续接降级标记（runner resume note）', () => {
       contentText(m.content).includes(RESUME_FRESH_SESSION_NOTE),
     );
     expect(notes).toHaveLength(0);
+  });
+});
+
+// —— #1149 环境钩子投影 ——
+// 失败方式固化（issue #1149 验收）：
+//   a. 钩子缺失 = 零 system 行（无钩子仓 transcript 与现状一致——红线）。
+//   b. setup ok note → 一条 system 行：头部 `.agents/setup hook ok (Nms)` +
+//      stdout 正文（用户在步日志里看得见装机做了什么）。
+//   c. resume 失败 note → system 行带 exit code + stderr（非致命面：步照常
+//      success，用户看得见失败原文）。
+//   d. 输出超限 → 正文贴 truncated 标记（totalChars > output.length）。
+describe('#1149 环境钩子投影（runner transcript）', () => {
+  test('钩子缺失（hooks 缺省）→ 零 hook system 行（红线：无钩子仓零噪音）', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-hook-none-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const client = new CaptureClient();
+    const journal = new StepJournal(paths.outboxDir);
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => resumeFallbackBackend(successScript()),
+        logger: captureLogger(),
+        paths,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+      },
+      claimedContinueStep(),
+      {},
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    const hookRows = uploadedMessages(client).filter(
+      (m) => m.role === 'system' && contentText(m.content).includes('.agents/'),
+    );
+    expect(hookRows).toHaveLength(0);
+  });
+
+  test('setup ok note → system 行（头部 + stdout）；resume 失败 note → 行带 exit code + stderr', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-hook-notes-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const client = new CaptureClient();
+    const journal = new StepJournal(paths.outboxDir);
+    const fakeWs: WorktreeOps = {
+      async prepare() {
+        return {
+          cwd: join(home, 'ws'),
+          baseRepoDir: join(home, 'repo'),
+          branch: 'pacman/conv-resume',
+          defaultBranch: 'main',
+          reused: true,
+          hooks: [
+            {
+              name: 'setup',
+              status: 'ok',
+              exitCode: 0,
+              output: 'installing deps…\n',
+              totalChars: 15,
+              ms: 1200,
+            },
+            {
+              name: 'resume',
+              status: 'failed',
+              exitCode: 2,
+              output: 'restarting services…\nsvc not found\n',
+              totalChars: 32,
+              ms: 300,
+            },
+          ],
+        };
+      },
+      async commitAll() {
+        return { committed: true, head: 'def456' };
+      },
+      async push() {},
+      async mergeDefaultBranch() {
+        return { output: 'Already up to date' };
+      },
+      async landLocalFastForward() {},
+      async headCommit() {
+        return 'abc123';
+      },
+      async countAhead() {
+        return 1;
+      },
+      async restoreCheckpoint() {},
+      async cleanupOrphans() {
+        return [];
+      },
+    };
+    const claim = {
+      ...claimedContinueStep(),
+      project: {
+        id: 'p1',
+        name: 'demo',
+        repo: { kind: 'github' as const, cloneUrl: 'https://github.com/x/y' },
+      },
+    };
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => resumeFallbackBackend(successScript()),
+        logger: captureLogger(),
+        paths,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+        workspace: fakeWs,
+      },
+      claim,
+      {},
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    const hookRows = uploadedMessages(client).filter(
+      (m) => m.role === 'system' && contentText(m.content).startsWith('.agents/'),
+    );
+    expect(hookRows).toHaveLength(2);
+    const setupRow = contentText(hookRows[0]!.content);
+    expect(setupRow).toContain('.agents/setup hook ok (1200ms)');
+    expect(setupRow).toContain('installing deps…');
+    const resumeRow = contentText(hookRows[1]!.content);
+    expect(resumeRow).toContain('.agents/resume hook failed (exit 2)');
+    expect(resumeRow).toContain('svc not found');
+  });
+
+  test('输出超限 → truncated 标记（totalChars > output.length）', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-hook-trunc-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const client = new CaptureClient();
+    const journal = new StepJournal(paths.outboxDir);
+    const big = 'A'.repeat(120_000);
+    const fakeWs: WorktreeOps = {
+      async prepare() {
+        return {
+          cwd: join(home, 'ws'),
+          baseRepoDir: join(home, 'repo'),
+          branch: 'pacman/conv-resume',
+          defaultBranch: 'main',
+          reused: true,
+          hooks: [
+            {
+              name: 'setup',
+              status: 'ok',
+              exitCode: 0,
+              output: big.slice(0, 100_000),
+              totalChars: 120_000,
+              ms: 5,
+            },
+          ],
+        };
+      },
+      async commitAll() {
+        return { committed: true, head: 'def456' };
+      },
+      async push() {},
+      async mergeDefaultBranch() {
+        return { output: 'Already up to date' };
+      },
+      async landLocalFastForward() {},
+      async headCommit() {
+        return 'abc123';
+      },
+      async countAhead() {
+        return 1;
+      },
+      async restoreCheckpoint() {},
+      async cleanupOrphans() {
+        return [];
+      },
+    };
+    const claim = {
+      ...claimedContinueStep(),
+      project: {
+        id: 'p1',
+        name: 'demo',
+        repo: { kind: 'github' as const, cloneUrl: 'https://github.com/x/y' },
+      },
+    };
+    await runStep(
+      {
+        client,
+        journal,
+        backendFor: () => resumeFallbackBackend(successScript()),
+        logger: captureLogger(),
+        paths,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        heartbeatIntervalMs: 60_000,
+        workspace: fakeWs,
+      },
+      claim,
+      {},
+    );
+    const hookRows = uploadedMessages(client).filter(
+      (m) => m.role === 'system' && contentText(m.content).startsWith('.agents/'),
+    );
+    expect(hookRows).toHaveLength(1);
+    expect(contentText(hookRows[0]!.content)).toContain('output truncated');
   });
 });

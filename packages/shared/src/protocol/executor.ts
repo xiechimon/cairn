@@ -131,6 +131,24 @@ export const WORKTREE_CONTRACT = {
 
 /** 孤儿 worktree 回收 TTL = 7×24h（02 §5.5/r3 §1.4 cleanupOrphanWorktrees）。 */
 export const ORPHAN_WORKTREE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** 环境生命周期钩子（#1149，形态照 Amp docs/research/amp-native-sandbox-orb.md
+ * §3.2）：仓内 `.agents/setup`（装机，幂等契约）/ `.agents/resume`（唤醒后
+ * 修复钩子）。同路径同名 = 一份配置 Amp 与 pacman 两用。默认超时 20 分钟
+ * （票面钉死），超时杀整组进程；可用 PACMAN_HOOK_TIMEOUT_MS 覆写。 */
+export const WORKSPACE_HOOK_TIMEOUT_MS = 20 * 60 * 1000;
+/** 钩子运行注记（PreparedWorkspace.hooks 槽，workspace → runner 投影面）：
+ * runner 把它落成 transcript system 行（用户在步日志里看得见 setup/resume
+ * 做了什么）。status 全集照原语 note：setup 失败不落此槽（prepare 抛错，
+ * 步失败，错误进 done.failed.errorMessage）；resume 失败/超时照落（步继续，
+ * 用户在 transcript 里看得见失败原文）。 */
+export interface WorkspaceHookNoteData {
+  name: 'setup' | 'resume';
+  status: 'ok' | 'failed' | 'timeout';
+  exitCode: number | null;
+  output: string;
+  totalChars: number;
+  ms: number;
+}
 
 /** pi 流事件词表 17 件（02 §5.6，r3 §1.5 bundle 静态提取；01 §5 AgentBackend
  * 缝事件面 = 本词表 1:1，不得增删改名）。 */

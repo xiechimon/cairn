@@ -4,7 +4,13 @@
 import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BRAND, DEVICE_ID_PATTERN, ENV_VARS, MACHINE_TOKEN_PATTERN } from '@pacman/shared';
+import {
+  BRAND,
+  DEVICE_ID_PATTERN,
+  ENV_VARS,
+  MACHINE_TOKEN_PATTERN,
+  WORKSPACE_HOOK_TIMEOUT_MS,
+} from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_SERVER_URL, loadDaemonConfig, WorkspacesDirError } from '../src/config.js';
 import {
@@ -106,6 +112,27 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
       { [ENV_VARS.mcpConfig]: '/env-claude.json' },
     );
     expect(cfg.mcpConfigPath).toBe('/explicit-claude.json');
+  });
+});
+
+describe('#1149 环境钩子超时（hookTimeoutMs，Settings 缝优先级同律）', () => {
+  test('缺省 = WORKSPACE_HOOK_TIMEOUT_MS（20min，票面钉死）', () => {
+    const cfg = loadDaemonConfig({}, {});
+    expect(cfg.hookTimeoutMs).toBe(WORKSPACE_HOOK_TIMEOUT_MS);
+  });
+  test('env 覆盖（PACMAN_HOOK_TIMEOUT_MS）', () => {
+    const cfg = loadDaemonConfig({}, { [ENV_VARS.hookTimeoutMs]: '45000' });
+    expect(cfg.hookTimeoutMs).toBe(45_000);
+  });
+  test('显式入参 > env', () => {
+    const cfg = loadDaemonConfig({ hookTimeoutMs: 60_000 }, { [ENV_VARS.hookTimeoutMs]: '45000' });
+    expect(cfg.hookTimeoutMs).toBe(60_000);
+  });
+  test('env 非正整数（0/负/NaN/浮点）= 忽略，用缺省（静默回缺省面）', () => {
+    for (const bad of ['0', '-5', 'abc', '1.5']) {
+      const cfg = loadDaemonConfig({}, { [ENV_VARS.hookTimeoutMs]: bad });
+      expect(cfg.hookTimeoutMs).toBe(WORKSPACE_HOOK_TIMEOUT_MS);
+    }
   });
 });
 
