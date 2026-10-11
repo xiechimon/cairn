@@ -129,10 +129,10 @@ export class WorkspaceManager implements WorktreeOps {
       // （TOCTOU：判定与 clone 之间路径被抽走）→ 静默回落 GitHub clone，
       // 一行选源日志，不报错不卡步。基座已在位（后续步）= 纯 fetch，选源
       // 只发生在首次物化。
-      // #1225 凭据序：per-step token 先行，auth 失败且闸开（machineCredential
-      // Fallback——github 形态）→ 降级执行机本机 git 凭据（null cred +
-      // machineGitEnv），来源上浮进 PreparedWorkspace.credentialSource；
-      // hosted/local 恒关（hosted 走 server per-step key，local 无凭据面）。
+      // #1225 凭据序：per-step token 先行；auth 失败且 machineCredential
+      // Fallback 闸开（github 形态）→ 降级执行机本机 git 凭据（null cred +
+      // machineGitEnv），来源经 runNet 上浮到 PreparedWorkspace 的
+      // credentialSource；hosted/local 恒关（hosted 走 server per-step key）。
       const credFallback = input.machineCredentialFallback === true;
       let credentialSource: GitCredentialSource = 'integration';
       const runNet = async (
