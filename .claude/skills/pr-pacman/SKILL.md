@@ -30,6 +30,9 @@ rules to it, and write like a person reporting what they did.
 - One idea per sentence. If a sentence needs a second read, split it. Rule 28.
 - Say what the change does, not how it feels. A number or a symbol beats an
   adjective. Rules 27 and 30.
+- Describe the current state only. Do not write that something was removed,
+  retired, dropped, or "used to be" something else; the reader never saw the
+  old version, so the note is noise. Delete the thing and say what stands now.
 
 The same rules apply to ticket bodies, commit messages, code comments and
 lane briefs.
@@ -42,10 +45,8 @@ What this PR does and why, plus the ticket it answers. Prose. Say what
 changed and what it replaces or fixes; name files and symbols instead of
 describing them.
 
-Diagrams are retired (2026-10-11 user call). Do not draw a `.drawio.svg`, do
-not commit one under `docs/verify/`, and do not spend a render step on it. A
-screenshot still belongs here when the change is visible in the running app:
-commit it under `docs/verify/<ticket>/` and embed it with a SHA-pinned raw URL
+Screenshots belong here when the change is visible in the running app: commit
+them under `docs/verify/<ticket>/` and embed them with a SHA-pinned raw URL
 (the repo is public, raw is anonymously readable):
 
 ```markdown
@@ -114,4 +115,3 @@ not carry the closing keyword for the parent ticket.
 |---|---|
 | `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
-| `.drawio.svg` in `## What` | retired 2026-10-11 — no longer asked for, not checked |

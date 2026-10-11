@@ -1,13 +1,10 @@
 ## What
 
-<!-- What this PR does and why, plus the ticket it answers. Prose only.
-No diagram: draw.io sources and exports were required until 2026-10-11 and
-are now retired (2026-10-11 user call: they cost a render step and a text-fit
-gate run each, and reviewers read the diff instead). State the change and the
-ticket; if a structure or flow genuinely needs a picture, describe it in
-sentences. Screenshots of running UI still belong here when the change is
-visible, committed under docs/verify/<ticket>/ and embedded as
-![label](raw-url) with a SHA-pinned raw URL. -->
+<!-- What this PR does and why, plus the ticket it answers. Prose: name the
+files and symbols that changed and what they replace or fix. Screenshots
+belong here when the change is visible in the running app; commit them under
+docs/verify/<ticket>/ and embed them as ![label](raw-url) with a SHA-pinned
+raw URL. -->
 
 ## Verified
 
