@@ -117,8 +117,9 @@ import { expect, type Page, test } from '@playwright/test';
 // 30. the machine-authorize page does the same (route fixed inset-0 card
 //     shares the viewport with the corner FAB — z-(--z-floating) rung)
 // 31. route switch keeps the window open (ADR 0013 D6 persistence): the
-//     drawer opened on the authorize page survives navigating back to the
-//     board
+//     drawer opened on the authorize page survives the SPA route back
+//     (machines → dialog link → authorize, browser back — the D6 contract
+//     covers client-side route switches only, not a document reload)
 
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=01';
@@ -132,6 +133,9 @@ const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24b&tab=tasks';
  *  r3-builder 详情记录，agent-delete.spec 同款 URL 形态）。 */
 const AGENT_DETAIL = '/app/resources/agents/r3-builder?scenario=agent-detail';
 const AUTHORIZE = '/app/machines/authorize';
+/** #1141 D6 腿：机器页（scenario 06，machine-add-dialog.spec 同款 URL）——
+ *  添加机器弹层里的「浏览器授权注册 →」Link 是通往授权页的真实 SPA 入口。 */
+const MACHINES = '/app/resources/machines?scenario=06';
 
 const dialog = (page: Page) => page.locator('.new-task-dialog');
 const drawer = (page: Page) => page.locator('.chief-drawer');
@@ -806,17 +810,27 @@ test.describe('#1141 suppression retired', () => {
     await expect(drawer(page)).toBeHidden();
   });
 
-  test('the window opened on the authorize page survives navigating back to the board', async ({
-    page,
-  }) => {
+  test('the window opened on the authorize page survives the route back', async ({ page }) => {
     // ADR 0013 D6 persistence on the formerly suppressed detour: the drawer
-    // stays open across the route switch (single persistent instance). The
-    // authorize page is a standalone shell (no sidebar), so the hop rides a
-    // full navigation — exactly the persistence stress the detour promised.
-    await page.goto(AUTHORIZE);
+    // stays open across a client-side route switch (single persistent
+    // instance). D6 does NOT cover a document reload — page.goto would be one
+    // (and on the fixture face localStorage persistence is read-only-disabled
+    // by design, chief-draft-persist A0 S11), so the route switch rides the
+    // real user path instead: machines → 添加机器 dialog → 浏览器授权注册 →
+    // Link (#121 Link 律, scenario 随行) lands the authorize page, browser
+    // back pops the SPA history to machines — no document request in between.
+    await page.goto(MACHINES);
+    await page.getByRole('button', { name: '添加机器' }).click();
+    const dialog = page.getByRole('dialog', { name: '添加机器' });
+    await expect(dialog).toBeVisible();
+    // leaving the dialog via the link is itself a client-side navigation
+    await dialog.getByRole('link', { name: '浏览器授权注册 →' }).click();
+    await page.waitForURL((u) => u.pathname === '/app/machines/authorize');
+    await expect(page.locator('.authorize-backdrop')).toBeVisible();
     await pressUntil(page, 'Meta+j', drawer(page));
-    await page.goto(BOARD);
-    await expect(page.getByRole('complementary')).toBeVisible();
+    await page.goBack();
+    await page.waitForURL((u) => u.pathname === '/app/resources/machines');
+    await expect(page.getByRole('button', { name: '添加机器' })).toBeVisible();
     await expect(drawer(page)).toBeVisible();
     await toggleUntilHidden(page, drawer(page));
     await expect(drawer(page)).toBeHidden();
