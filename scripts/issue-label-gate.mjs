@@ -45,5 +45,5 @@ if (violations.length === 0) {
 console.log(
   `issue-label-gate: ${violations.length}/${issues.length} open issues missing dual labels:`,
 );
-for (const v of violations) console.log('  - ' + v);
+for (const v of violations) console.log(`  - ${v}`);
 process.exit(0); // advisory
