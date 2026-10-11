@@ -1,4 +1,4 @@
-import { buildPlanFirstRoundInstruction } from '@pacman/shared';
+import { appendPlanLocationNote, buildPlanFirstRoundInstruction } from '@pacman/shared';
 import { expect, type Page, test } from '@playwright/test';
 
 // 会话列用户话语面（#612）：live transcript 的 role-user wire 行里混着系统
@@ -31,8 +31,13 @@ const SPEC = [
   '- 悬停态加过渡',
 ].join('\n');
 // #1025：withPlan build 的首轮 plan 步 wire 行 = 任务文本 + 契约指令同串
-//（daemon buildTaskPrompt 注入形，fixture 与现行 daemon 写侧同形）。
-const TASK_PROMPT = `${TITLE}\n\n${SPEC}\n\n${buildPlanFirstRoundInstruction()}`;
+//（daemon buildTaskPrompt 注入形）；#1203 起尾部附交接位置注记行（daemon
+// appendPlanLocationNote 注入形）——fixture 与现行 daemon 写侧同形，过滤侧
+// 剥注记后整行退场。
+const TASK_PROMPT = appendPlanLocationNote(
+  `${TITLE}\n\n${SPEC}\n\n${buildPlanFirstRoundInstruction()}`,
+  '/home/u/.pacman/plans/conv-uw-1/plan.md',
+);
 
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: USER_ID, displayName: 'Xmon Dai', avatarUrl: null };

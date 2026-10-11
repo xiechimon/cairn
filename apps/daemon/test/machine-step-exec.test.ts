@@ -5,9 +5,11 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ToolCallRecord } from '@pacman/shared';
 import {
+  appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
+  PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
@@ -58,11 +60,15 @@ describe('步执行全链（02 §5.7 生命周期行 + journal 端点词表）',
       modelId: string;
     };
     // #1025：plan 步（无 instruction）首轮任务 prompt = 任务文本 + plan.md 契约
-    // 指令组合串（buildTaskPrompt 注入；compose 单源形状）。
+    // 指令组合串（buildTaskPrompt 注入；compose 单源形状）；#1203 起尾部附
+    // 交接位置注记行（路径 = <home>/plans/<convId>/plan.md，repo 检出之外）。
     expect(opts.prompt).toBe(
-      composeTaskPromptWithInstruction(
-        buildTaskPromptText('探针任务', '写一行探针'),
-        buildPlanFirstRoundInstruction(),
+      appendPlanLocationNote(
+        composeTaskPromptWithInstruction(
+          buildTaskPromptText('探针任务', '写一行探针'),
+          buildPlanFirstRoundInstruction(),
+        ),
+        join(paths.home, 'plans', 'conv-1', PLAN_FILE_NAME),
       ),
     );
     // agent.description 注入（02 §4.4 同缝）+ spec 15 #394 元信息回填指令块

@@ -107,5 +107,8 @@ playwright-report/
 # Lane process files (#1199): lane threads draft PROGRESS.md / BLOCKED.md at
 # the worktree root. Root-anchored so same-named docs in subdirectories stay
 # unaffected.
+# plan.md (#1203): pacman plan-step handoff — the daemon writes it outside the
+# repo checkout; a root plan.md is always a leak (gate: scripts/lane-file-gate.mjs).
 /PROGRESS.md
 /BLOCKED.md
+/plan.md

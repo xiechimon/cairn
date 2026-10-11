@@ -6,6 +6,10 @@
 // 任务文本 + 契约指令（composeTaskPromptWithInstruction 单源形状，指令殿后
 // 拿最强注意力，#720 同律）；纠错轮自带契约句，不叠注。组合行的呈现层过滤
 // 由 shared classifyUserText 承担（F17 见 web 侧单测），此处钉投递面与 wire 面。
+// #1203 增面：plan 步 prompt 尾部追加交接位置注记行（shared
+// appendPlanLocationNote 单源；路径 = <home>/plans/<convId>/plan.md，repo 检出
+// 之外——local-repo 项目的 conv 工作区即 checkout，plan.md 落工作区根会被
+// agent 提交进仓库根，#24 / PR #1201 首版实锤）。
 // 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. 契约不进会话（主 bug）：首轮 plan 步 prompt 仍只有 title+spec
 //   2. wire 行缺位/漂移：transcript user-<stepId> 行 ≠ 投递串（呈现层与对账
@@ -16,6 +20,8 @@
 //      指令自带契约句，叠注 = 同一指令双份）
 //   5. 空白指令误判：plan 步 + 空白 instruction 被当纠错轮（契约缺席）——
 //      空白 = 无指令（#720 同判），仍是首轮语义，契约必须照注
+//   6.（#1203）注记行缺席/路径错树：plan 步投递串不含交接位置行，或路径落
+//      在任务目录树里（等于没搬出 checkout）；build 步被误附（语义污染）
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,10 +37,12 @@ import type {
   TranscriptUpload,
 } from '@pacman/shared';
 import {
+  appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
   buildRestartPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
+  PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -214,51 +222,65 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
     },
     claimed,
   );
-  return { client };
+  return { client, home };
+}
+
+/** #1203 期望投递形：基础 prompt + 交接位置注记行（路径在 PACMAN_HOME 面）。 */
+function withNote(home: string, basePrompt: string): string {
+  return appendPlanLocationNote(basePrompt, join(home, 'plans', 'conv-1', PLAN_FILE_NAME));
 }
 
 describe('首轮 plan 步契约注入（#1025）', () => {
-  test('plan 步 + instruction 缺席 → 会话 prompt = 任务文本 + 契约指令组合串（主 bug 对账面）', async () => {
+  test('plan 步 + instruction 缺席 → 会话 prompt = 任务文本 + 契约指令组合串 + 交接位置注记行（主 bug 对账面）', async () => {
     const { backend, prompts } = recordingBackend();
-    await setup(firstRoundStep(), backend);
+    const { home } = await setup(firstRoundStep(), backend);
     expect(prompts).toHaveLength(1);
     const delivered = prompts[0];
-    expect(delivered).toBe(composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT));
+    expect(delivered).toBe(withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT)));
     // 契约真的进了会话：文件名 + 四段名同串在位
     expect(delivered).toContain('plan.md');
     expect(delivered).toContain('（覆盖 Context/Changes/Edge cases/Verification 四段）');
     expect(delivered?.startsWith(TASK_TEXT)).toBe(true);
+    // #1203：交接位置行带绝对路径，且不在任务目录树里（repo 检出之外）
+    expect(delivered).toContain(
+      `plan.md 交接位置：${join(home, 'plans', 'conv-1', PLAN_FILE_NAME)}`,
+    );
   });
 
-  test('transcript 终稿的 user-<stepId> 行 = 同一组合串（wire 行与投递内容一致）', async () => {
+  test('transcript 终稿的 user-<stepId> 行 = 同一投递串（wire 行与投递内容一致，含注记行）', async () => {
     const { backend } = recordingBackend();
-    const { client } = await setup(firstRoundStep(), backend);
+    const { client, home } = await setup(firstRoundStep(), backend);
     const transcript = client.uploads.find((u) => u.stepId === 's1');
     const promptRow = transcript?.messages.find((m) => m.id === 'user-s1');
     expect(promptRow?.role).toBe('user');
-    expect(promptRow?.content).toBe(composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT));
+    expect(promptRow?.content).toBe(
+      withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT)),
+    );
   });
 
-  test('build 步 + instruction 缺席 → prompt = 纯任务文本（直执行首步不注入，负例）', async () => {
+  test('build 步 + instruction 缺席 → prompt = 纯任务文本（直执行首步不注入契约与注记，负例）', async () => {
     const { backend, prompts } = recordingBackend();
     await setup(firstRoundStep({ kind: 'build' }), backend);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toBe(TASK_TEXT);
+    expect(prompts[0]).not.toContain('交接位置');
   });
 
   test('plan 步 + 空白 instruction → 契约照注（空白 = 无指令，仍是首轮语义，不注入空壳）', async () => {
     const { backend, prompts } = recordingBackend();
-    await setup(firstRoundStep({ instruction: '   ' }), backend);
+    const { home } = await setup(firstRoundStep({ instruction: '   ' }), backend);
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]).toBe(composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT));
+    expect(prompts[0]).toBe(withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT)));
   });
 
-  test('plan 步 + 纠错 instruction 在位 → 只组合该指令，不叠注契约（重启轮形）', async () => {
+  test('plan 步 + 纠错 instruction 在位 → 只组合该指令，不叠注契约（重启轮形）；注记行照附', async () => {
     const instruction = buildRestartPrompt('把测试也补上');
     const { backend, prompts } = recordingBackend();
-    await setup(firstRoundStep({ instruction }), backend);
+    const { home } = await setup(firstRoundStep({ instruction }), backend);
     expect(prompts).toHaveLength(1);
-    expect(prompts[0]).toBe(composeTaskPromptWithInstruction(TASK_TEXT, instruction));
+    expect(prompts[0]).toBe(
+      withNote(home, composeTaskPromptWithInstruction(TASK_TEXT, instruction)),
+    );
     // 契约句不双份（重启指令自带一份，不重复注入首轮契约）
     const delivered = prompts[0] ?? '';
     expect(delivered.split('Context/Changes/Edge cases/Verification').length - 1).toBe(1);
