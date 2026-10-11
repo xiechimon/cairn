@@ -15,6 +15,7 @@
 - `fresh-no-right-pane` fresh 相位右栏整栏不渲染(XMON-55 P0 #563:三 section 都要
   build 载荷,文档面在无 build 时也只是空占位);三栏几何改在 thread 面钉。
 - `composer-sole-card` composer 16px 内衬锚中心列、12px 圆角 + recessed fill,是中心列唯一卡片;总管 FAB 贴中心列右下角、composer 在场时让位上移(#347 律保留)。
+- `meta-machine-pin-note` 方案空态 meta 块机器行改派尾注(#1208):任务钉了机器(todo.machineId)而机器行值不同名(唯一现实来源 = run_builds 显式 machineId 改派;派发面 pin 是硬约束,别机领不到)→ 行尾 `（任务钉选 {machine}）` tertiary 尾注,换机在看板层不再静默。遵守(同名)与未钉 = 零噪声;钉机离线的等待标注「（等待机器上线）」是相邻独立尾注(#682)。驱动:drive-1208-machine-pin.mjs。
 
 ## How to get to it (user POV)
 

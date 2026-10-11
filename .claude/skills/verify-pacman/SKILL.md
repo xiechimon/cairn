@@ -105,6 +105,7 @@ node .../scripts/drive-1034-thinking-truncate.mjs --expect=new|old  # 思考行�
 node .../scripts/drive-1065-zombie-claim.mjs   # 僵尸认领最小场景(#1065;死机=子进程 claim 长轮询被 SIGKILL、活机=探针本进程 claim;双向断言死机零认领+活机 wake 路径领走,零 daemon 零 LLM 零浏览器;before 栈对拍见配方;配方与判读 = docs/verify/1065/README.md)
 node .../scripts/drive-902-gate-actor.mjs --expect=new|old  # 过闸 actor 审计三票联合(#902/#900/#901;真机器 wire 推到 confirm/review + REST/chief relay 过闸 + 浏览器真拖拽录像转 GIF;--expect=old 打 origin/main 基线栈取 before;证据 docs/verify/900/)
 node .../scripts/drive-903-dispatch-judgment.mjs  # chief 派发判定(#903/ADR 0014;设置槽死态 + 逐次判定 + dispatchReason 回执三条腿,假机器 claim chief 回合步 relay run_builds 三形态对拍 SQLite,零 daemon 零 LLM;配方与 gotcha = features/chief-dispatch-judgment.md)
+node .../scripts/drive-1208-machine-pin.mjs  # 机器钉选派发可见性(#1208;todo 钉选派发硬约束 wire 真值 + run_builds 显式改派后详情机器行「（任务钉选 {machine}）」尾注 + 遵守/自动双对照,--expect=old 打 origin/main 基线;零 daemon 零 LLM;配方与 gotcha = changelog/2026-10-11-1208.md)
 node .../scripts/drive-1033-avatar.mjs         # 总管思考行/工具行头像几何(#1033;真 Lorelei 形态桩 + 同帧几何量取;--expect=old 取 before 基线;证据 docs/verify/1033/)
 node .../scripts/drive-952-finale.mjs          # 散件收尾(#952;dialog-shell 载体/表单族几何/详情-记忆-权限真值链/退役审计/双主题对比度)
 node .../scripts/drive-1008-overlay-registry.mjs  # overlay+overlays 域 registry 族拆(#1008;Popover/DropdownMenu/Dialog/AlertDialog/Tooltip+Kbd 壳族实物 + 外点穿透裁决面;配方与判读 = docs/verify/1008/README.md)
