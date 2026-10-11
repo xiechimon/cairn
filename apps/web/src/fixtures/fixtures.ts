@@ -1687,6 +1687,29 @@ export const chiefThreadsLong: FixtureSet = {
   },
 };
 
+/** #1067 滚动停靠面（synthetic scenario，chief-threads-long 先例）：30 段
+ *  robot 段落的单线程——600px 窗体下 scrollHeight 远超 clientHeight，钉
+ *  「滚到中间 → 最小化 → 重开落在原位置」（inert/opacity 停靠载体）与
+ *  停靠态的焦点/可及树缺席断言（e2e/chief-park-scroll.spec）。段文本带
+ *  序号使滚动位置可按行断言（首个可见行 ≠ 首行 ≠ 尾行）。 */
+const CHIEF_SCROLL_STREAM = Array.from({ length: 30 }, (_, i) => ({
+  kind: 'robot' as const,
+  paragraphs: [[{ text: `滚动停靠语料第 ${i + 1} 段：最小化后这行所在的位置必须原样回来。` }]],
+  seconds: '1s',
+}));
+
+export const chiefScrollPark: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(13, 14),
+  chief: {
+    view: 'drawer',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '给 r3-lifecycle 做三件小事…',
+    stream: CHIEF_SCROLL_STREAM,
+  },
+};
+
 /** #650/#651 named scenario (no capture, mdToolout / chiefStreaming 先例):
  *  总管抽屉的 markdown 面——定稿 robot 行携带 raw block markdown（`markdown`
  *  槽优先于段数组，渲染期走共用 chat-markdown 解析，live mapper 同路），

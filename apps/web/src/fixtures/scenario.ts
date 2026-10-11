@@ -40,6 +40,7 @@ import {
   chiefGated,
   chiefMarkdown,
   chiefReady,
+  chiefScrollPark,
   chiefSettings,
   chiefSettingsMachines,
   chiefSettingsStaleModel,
@@ -394,6 +395,10 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // #650/#651 markdown 面命名场景（无 capture，md-toolout 先例）：定稿
       // robot 行 raw markdown + typing 打字尾行，钉共用解析器进抽屉的渲染形。
       'chief-md': chiefMarkdown,
+      // #1067 滚动停靠面（无 capture，chief-threads-long 先例）：30 段长流
+      // 单线程，钉 inert/opacity 停靠载体的滚动位置保留 + 停靠态焦点/可及
+      // 树缺席（e2e/chief-park-scroll.spec）。
+      'chief-scroll-park': chiefScrollPark,
       // #741 agent 身份可点进设置命名场景（无 capture，chief-md 先例）：
       // robot 行身份 chip（头像+名字，带 id 成链）+ 五种提及 scheme 的
       // 成链/惰性对照 + 详情页 transcript 同场景第二消费面。

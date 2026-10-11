@@ -4,9 +4,10 @@
 // corner, radius 12px, opaque card ground, --floating-shadow, non-modal,
 // no scrim. It is an overlay again, not a layout citizen: nothing yields
 // (0004 D2/D7/D8 retired), the root layout hosts the single persistent
-// instance (chief-root.tsx, D6), and closing minimizes — Base UI
-// keepMounted parks the popup `hidden` in the DOM with the draft, scroll
-// and thread state intact. Header = thread chip + model row + icon
+// instance (chief-root.tsx, D6), and closing minimizes — the popup stays
+// mounted in the DOM parked as inert/opacity-0 (#1067, Multica's real form;
+// the pre-#1067 `hidden`/display:none carrier physically dropped scrollTop),
+// with the draft, scroll and thread state intact. Header = thread chip + model row + icon
 // buttons (Minimize, no X — D3); body = gate bar (unbound) or hero
 // examples / thread message flow; composer pinned at the bottom. The
 // switcher popover (116) and the view swap to 总管设置 are real state so
@@ -116,9 +117,26 @@ const WINDOW_CLS =
  *  同款 animate-in/out + fade/zoom-95 词表），零自定义曲线（ADR 0009 收敛
  *  律），时长走 --dur-overlay 200ms（Multica 实测 scale 0.2s 同值）；
  *  0004 D4 的 translateX 滑入退役。reduced-motion 降级走 motion.css 全站
- *  法（tw-animate-css keyframe 含）。 */
+ *  法（tw-animate-css keyframe 含）。
+ *  #1067 停靠腿：退场动画播完后，窗不再摘 hidden（display:none），改落
+ *  inert + aria-hidden + visibility/opacity/pointer-events 的停靠态——
+ *  浏览器在 display:none 上不保留滚动位置（#1009 A1 实测），Multica 的
+ *  真实停靠形态是「停在原地但不可见不可达」；visibility:hidden 保留布局
+ *  盒与 scrollTop（机制注记见 Popup 消费点）。 */
 const WINDOW_MOTION_CLS =
   'origin-bottom-right duration-(--dur-overlay) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95';
+
+/** #1067 停靠态（退场腿播完后的常驻形）：inert 吃掉整棵子树的焦点/编辑/
+ *  指针语义（Tab 不可达、点击不落、表单不可改——DOM 断言可证，非「看着
+ *  像」）；aria-hidden 把窗从可及树摘出（screen reader 面）；visibility
+ *  hidden + opacity-0 双通道零像素（visibility 兜住「动画结束但 opacity
+ *  有残值」的边角）；pointer-events-none 是冗余护栏（inert 已含），留下
+ *  是让点击穿透不依赖 inert 的浏览器支持面。挂 data-closed（Base UI 退场
+ *  态属性）——退场动画期间窗仍可见可交互（动画 leg 本体），播完才由这些
+ *  类落定停靠形（data-closed 在整个关态期持续在位，visibility 的
+ *  transition 延迟走 --dur-overlay 与退场腿同步收口）。 */
+const WINDOW_PARKED_CLS =
+  'data-closed:invisible data-closed:opacity-0 data-closed:pointer-events-none';
 
 /** 头部 icon 钮（旧 .chief-head-actions button 元素选择器等值：20×20 /
  *  零装饰 / tertiary 墨 / 无 hover 反馈——旧 unlayered 规则恒压 ghost 件
@@ -182,9 +200,9 @@ function readStoredChiefDraft(): string {
 }
 
 interface DrawerProps {
-  /** 常驻窗的开态旗（ADR 0013 D6）：关闭 = 最小化——Base UI keepMounted
-   *  把窗以 hidden 停驻在 DOM，草稿/滚动/线程态全保；退场动画 outlives
-   *  the minimize（transition-status）。 */
+  /** 常驻窗的开态旗（ADR 0013 D6）：关闭 = 最小化——窗以 inert/opacity-0
+   *  停驻在 DOM（#1067 停靠载体，注记见 WINDOW_PARKED_CLS），草稿/滚动/
+   *  线程态全保；退场动画 outlives the minimize（transition-status）。 */
   open?: boolean;
   chief: ChiefContent;
   /** Opens 总管设置: board route = content swap (r5 101–104); 非 board 路由
@@ -249,17 +267,32 @@ export function ChiefDrawer(props: DrawerProps) {
       }}
     >
       {/* D6/D10：Portal 回 body（dock 行发现随让位退役），keepMounted 承载
-          「关 = 在 DOM 但 inert」的常驻契约——Base UI 把关态 Popup 以
-          hidden 属性停驻（tailwind preflight 的 [hidden] display:none
-          !important 钉死 flex utility 的覆盖面），草稿/滚动/线程态全保；
-          退场动画仍先播（transition-status），播完才落 hidden。「关」的
-          可观测契约从「不在 DOM」改「在 DOM 但 hidden/inert」（D6，e2e
-          count-0 断言族按 0012 D6 载体重钉，行为语义不变）。 */}
+          「关 = 在 DOM」的常驻契约。#1067：Base UI 默认把关态 Popup 以
+          hidden 属性停驻（display:none），浏览器在该载体上不保留滚动位置
+          （#1009 A1 实测，物理不可达非未做）——本消费点以 hidden={false}
+          覆写库的 hidden 注入（useRenderElement 的 elementProps 后合并，
+          右位胜出；React 对 hidden={false} 不落属性），停靠改走
+          WINDOW_PARKED_CLS 的 inert/opacity 形态（Multica 真实形态）：
+          草稿/滚动/线程态全保（visibility:hidden 保留布局盒与 scrollTop），
+          停靠态不进焦点序、不进可及树、不吃指针。退场动画仍先播
+          （transition-status），播完落停靠形。「关」的可观测契约 =
+          「在 DOM 但 inert/aria-hidden/不可见」（D6 e2e 断言面随
+          chief-park-scroll.spec 载体重钉）。 */}
       <DialogPrimitive.Portal keepMounted>
         <DialogPrimitive.Popup
           // render 令 Popup 即 aside（悬浮窗本体）；fade+scale 进出场落在
-          // aside 上，origin bottom-right = 窗从 FAB 角长出（D7）。
-          render={<aside className={`${WINDOW_CLS} ${WINDOW_MOTION_CLS}`} aria-label={t('总管')} />}
+          // aside 上，origin bottom-right = 窗从 FAB 角长出（D7）。#1067：
+          // 停靠三件套——hidden={false} 摘 display:none、inert/aria-hidden
+          // 随关态挂（open 时 undefined，React 摘属性）、停靠类并入皮肤串。
+          render={
+            <aside
+              className={`${WINDOW_CLS} ${WINDOW_MOTION_CLS} ${WINDOW_PARKED_CLS}`}
+              aria-label={t('总管')}
+              aria-hidden={open ? undefined : true}
+              inert={!open}
+              hidden={false}
+            />
+          }
           initialFocus={false}
           finalFocus={false}
         >
@@ -516,15 +549,17 @@ function ChiefDrawerInner({
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
     if (!open || wasOpen) return;
-    // keepMounted 关态 = hidden 驻 DOM：Base UI 摘 hidden 的提交时机晚于本
-    // effect，focus() 打在 display:none 上静默失败（实测首焦全丢）——帧重试
-    // 到节点脱离 [hidden] 祖先再落焦（有界 5 帧；中途关窗则 closest 命中
-    // hidden 自然放弃）。
+    // #1067 停靠态 = visibility:hidden 驻 DOM（不再是 [hidden]/display:none）：
+    // Base UI 摘停靠态的提交时机与退场动画收口晚于本 effect，focus() 打在
+    // 不可见/inert 的节点上静默失败——帧重试到窗真正解除停靠再落焦（有界
+    // 5 帧；中途关窗则窗根已挂停靠态自然放弃）。
     let frames = 0;
     const tryFocus = () => {
       const node = textareaRef.current;
       if (node == null) return;
-      if (node.closest('[hidden]') == null) {
+      const win = node.closest('.chief-drawer');
+      // HTMLElement.inert（dom lib 未上该接口，hasAttribute 同源断言）
+      if (win == null || !win.hasAttribute('inert')) {
         node.focus({ preventScroll: true });
         return;
       }
