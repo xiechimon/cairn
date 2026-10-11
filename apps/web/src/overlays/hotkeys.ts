@@ -150,9 +150,8 @@ export function useNewTaskHotkey(onOpen: () => void): void {
 
 /** ⌘J / Ctrl+J → 总管悬浮窗 toggle（useChiefSurface 全局面；#468 起可开
  *  可关，FAB 点击维持 open-only）。守卫 = drawer 外输入态；按钮/链接不承担
- *  ⌘J 的原生激活语义，聚焦控件不得挡住和弦。enabled = 路由抑制门
- *  （ADR 0013 D6 根 layout 单实例后，chief 面缺席的路由解除注册——
- *  监听随实例常驻，不再随路由挂载自然缺席）。 */
+ *  ⌘J 的原生激活语义，聚焦控件不得挡住和弦。#1141 全站可达后监听随根
+ *  layout 单实例常驻所有路由（原「抑制路由解除注册」门已退役）。 */
 export function useChiefToggleHotkey(onToggle: () => void, enabled = true): void {
   useChordHotkey('j', isEditableOutsideChiefDrawer, onToggle, enabled);
 }
