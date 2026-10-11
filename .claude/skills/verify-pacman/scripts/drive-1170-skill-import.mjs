@@ -162,7 +162,7 @@ try {
   await dlgB
     .getByRole('button', { name: '导入', exact: true })
     .waitFor({ state: 'visible' });
-  check(dlgB.locator('#dlg-skill-import-url').isEnabled(), 'B1 弹窗再开（url 字段在位）');
+  check(await dlgB.locator('#dlg-skill-import-url').isEnabled(), 'B1 弹窗再开（url 字段在位）');
   await dlgB.locator('#dlg-skill-import-url').fill('https://github.com/anthropics/skills/tree/main/skills/pdf');
   await dlgB.getByRole('button', { name: '导入', exact: true }).click();
   await dlgB.waitFor({ state: 'hidden', timeout: 120_000 });
@@ -238,7 +238,7 @@ try {
     displayName: '物化验证 Agent',
     provider: 'p',
     modelId: 'm',
-    skills: ['my-live-skill'],
+    skillsAllowlist: ['my-live-skill'],
   });
   const agentRec = await agentRes.json();
   const agentId = agentRec.id ?? agentRec.agent?.id;
