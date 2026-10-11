@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "a06592799818a2eb47ccfdfab7b5558d6bed5f74",
-    "date": "2026-10-09"
+    "sha": "0846fff858fbaad1a7b14150741ba72730837e0e",
+    "date": "2026-10-11"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -193,8 +193,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values.",
-      "hash": "40e6e442d9e10ef9f41e719f5e07b888988ccd8ea6d176ace62224eaf405a182"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts).",
+      "hash": "20f80e6c7edf31252fa68b5548bf7a6845e318646dc392e3e7ed027cee123796"
     },
     "tooltip.tsx": {
       "kind": "registry",

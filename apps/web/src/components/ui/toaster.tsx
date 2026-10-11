@@ -27,6 +27,12 @@ export function toastError(title: string, error: unknown): void {
   toast.error(title, reason !== null ? { description: reason } : undefined);
 }
 
+/** 成功反馈原语（#1236）：委派/落定类动作的可见回执——「点了然后呢」不能
+ *  只剩弹层关闭一个信号（merge 202 到相位推进之间隔着机器执行）。 */
+export function toastSuccess(title: string): void {
+  toast.success(title);
+}
+
 /** sonner 主题位 = 根元素 .light 位的即时镜像（见文件头注）。 */
 function useSonnerTheme(): ToasterProps['theme'] {
   const [theme, setTheme] = useState<ToasterProps['theme']>(() =>
