@@ -1,0 +1,9 @@
+unit=pacman-daemon.service cgroup=/user.slice/user-1000.slice/user@1000.service/app.slice/pacman-daemon.service mainpid=684219 ts=2026-10-11T07:20:45.238793904Z
+pids: 684219 684237 684279 
+STOPPED 2026-10-11T07:20:45.246646532Z count=3
+    PID STAT COMMAND
+ 684219 Tsl  node
+=== CONT A at 2026-10-11T07:25:30.286350000Z ===
+CONTINUED 2026-10-11T07:25:34.400381744Z
+    PID STAT COMMAND
+ 684219 Ssl  node

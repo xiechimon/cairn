@@ -1,0 +1,7 @@
+now=2026-10-11T07:31:53.424775000Z claim_epoch=1791703891 delta=22s
+id|status|machineId|checkpointCommit|build|prNumber
+jVRVon8eS0MAs7wyupEVn|done|DHS9BRFaSnKYVHx38VyOm|028aa983665f8ac7ef125fd013dbc6ef22c19643|01a129dc-63eb-7909-aaaa-4e0c3e8b8fee|14
+0V3WqdMozsbx0sg_W2o58|claimed|DHS9BRFaSnKYVHx38VyOm||01a129dc-63eb-7909-aaaa-4e0c3e8b8fee|14
+build=01a129dc-63eb-7909-aaaa-4e0c3e8b8fee
+PR14 head=e0ab3a5348864493b75ba93bb6fca63f8b415c8a
+=== FREEZE leg4 at 2026-10-11T07:32:01.131417000Z ===

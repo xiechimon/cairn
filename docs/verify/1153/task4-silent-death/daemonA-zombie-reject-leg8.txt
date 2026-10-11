@@ -1,0 +1,5 @@
+[step] segment row relay failed: machine api 404: {"error":"step 7ju9aYzPevcPagif1k7v7 (not yours) not found"}
+[step] activity relay failed (suppressed until next step): machine api 404: {"error":"step 7ju9aYzPevcPagif1k7v7 (not yours) not found"}
+[step] upload attempt 1 failed (machine api 404: {"error":"step 7ju9aYzPevcPagif1k7v7 (not yours) not found"}) — re-requesting presigned urls
+[step] upload attempt 2 failed (machine api 404: {"error":"step 7ju9aYzPevcPagif1k7v7 (not yours) not found"}) — re-requesting presigned urls
+[step] transcript upload failed: machine api 404: {"error":"step 7ju9aYzPevcPagif1k7v7 (not yours) not found"}

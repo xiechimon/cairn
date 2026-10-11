@@ -1,0 +1,12 @@
+2026-10-11T06:48:43Z claimed=0 pending=0
+2026-10-11T06:48:55Z claimed=0 pending=0
+2026-10-11T06:49:06Z claimed=0 pending=0
+2026-10-11T06:49:17Z claimed=0 pending=0
+2026-10-11T06:49:28Z claimed=0 pending=0
+2026-10-11T06:49:40Z claimed=0 pending=0
+2026-10-11T06:49:51Z claimed=0 pending=0
+2026-10-11T06:50:02Z claimed=0 pending=0
+2026-10-11T06:50:13Z claimed=1 pending=1
+QUEUE_WINDOW
+
+[exited with code 0]
