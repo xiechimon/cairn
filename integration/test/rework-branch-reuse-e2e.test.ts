@@ -403,7 +403,7 @@ describe('#931 两条返工路回原分支（E2E）', () => {
       );
       evidenceText(
         'daemon-canon-lines.txt',
-        logLines()
+        `${logLines()
           .filter((l) =>
             [
               `step `,
@@ -417,7 +417,7 @@ describe('#931 两条返工路回原分支（E2E）', () => {
               'finished',
             ].some((needle) => l.includes(needle)),
           )
-          .join('\n') + '\n',
+          .join('\n')}\n`,
       );
       evidenceJson(
         'stub-user-prompts.json',

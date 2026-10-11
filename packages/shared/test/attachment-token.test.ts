@@ -111,7 +111,7 @@ describe('attachment token 契约（#730）', () => {
   test('失败方式 1：ATTACHMENT_TOKEN_LINE 行级正则与批量解析一致', () => {
     const line = '![x](attachment:t1/id1.png)';
     expect(ATTACHMENT_TOKEN_LINE.test(line)).toBe(true);
-    expect(ATTACHMENT_TOKEN_LINE.test('prefix ' + line)).toBe(false);
+    expect(ATTACHMENT_TOKEN_LINE.test(`prefix ${line}`)).toBe(false);
   });
 });
 

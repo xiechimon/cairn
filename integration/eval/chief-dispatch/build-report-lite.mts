@@ -88,7 +88,7 @@ const fmt = (x: number | null): string => (x == null ? '' : x.toFixed(3));
 // byte-identical scores.tsv.
 const tsvCell = (s: string): string => {
   const flat = s.replace(/[\t\n\r]/g, ' ');
-  return /^[=+\-@]/.test(flat) ? "'" + flat : flat;
+  return /^[=+\-@]/.test(flat) ? `'${flat}` : flat;
 };
 
 // Variant directories: exactly `baseline` or `v<N>`, numeric order.
@@ -132,12 +132,12 @@ function loadRows(p: string, warnings: string[], dir: string): RowsById {
       try {
         r = JSON.parse(line) as ResultRow;
       } catch {
-        warnings.push(dir + '/results.jsonl:' + (i + 1) + ': malformed JSON, skipped');
+        warnings.push(`${dir}/results.jsonl:${i + 1}: malformed JSON, skipped`);
         return;
       }
       const pid = String(r.prompt_id ?? r.id ?? r.case_id ?? '');
       if (!pid) {
-        warnings.push(dir + '/results.jsonl:' + (i + 1) + ': no prompt_id, skipped');
+        warnings.push(`${dir}/results.jsonl:${i + 1}: no prompt_id, skipped`);
         return;
       }
       if (byId[pid] === undefined) byId[pid] = [];
@@ -233,10 +233,10 @@ type Agg = {
 function build(flowArg: string) {
   const flow = resolve(flowArg);
   if (!statSync(flow, { throwIfNoEntry: false })?.isDirectory())
-    throw new Error('not a directory: ' + flow);
+    throw new Error(`not a directory: ${flow}`);
   const variants = discoverVariants(flow);
   if (!variants.length)
-    throw new Error('no variant directories (baseline/, v1/, ...) under ' + flow);
+    throw new Error(`no variant directories (baseline/, v1/, ...) under ${flow}`);
   const warnings: string[] = [];
   // Same warning the full builder gives: a mis-named variant dir is the usual
   // reason the header shows one variant fewer than expected.
@@ -266,7 +266,7 @@ function build(flowArg: string) {
 
   const splitOf: Record<string, string> = Object.create(null);
   for (const sp of ['train', 'val', 'test']) {
-    const ids = state[sp + '_ids'];
+    const ids = state[`${sp}_ids`];
     for (const pid of Array.isArray(ids) ? ids : []) splitOf[String(pid)] = sp;
   }
 
@@ -281,13 +281,13 @@ function build(flowArg: string) {
     const v = variants[i] as string;
     if (Object.keys(rows[v] ?? NO_ROWS).length) continue;
     warnings.push(
-      v + ': zero result rows - dropping (run not started or results.jsonl missing/empty)',
+      `${v}: zero result rows - dropping (run not started or results.jsonl missing/empty)`,
     );
     variants.splice(i, 1);
   }
   const firstVariant = variants[0] as string;
   if (!Object.keys(rows[firstVariant] ?? NO_ROWS).length)
-    throw new Error(firstVariant + '/ has no result rows under ' + flow + ' - nothing to report');
+    throw new Error(`${firstVariant}/ has no result rows under ${flow} - nothing to report`);
 
   const header: Record<string, Header> = Object.create(null);
   for (const v of variants) {
@@ -368,10 +368,10 @@ function build(flowArg: string) {
             // traces/<id>.json a single-rep runner may write (the full builder
             // reads it as rep 0 too).
             const rep = r.rep ?? k;
-            const repStem = pid + '_rep' + String(rep);
+            const repStem = `${pid}_rep${String(rep)}`;
             const stems = Number(rep) === 0 ? [repStem, pid] : [repStem];
             for (const stem of stems) {
-              const rel = v + '/traces/' + stem + '.json';
+              const rel = `${v}/traces/${stem}.json`;
               const abs = resolve(flow, rel);
               if (dirname(abs) !== join(flow, v, 'traces')) return null;
               if (lstatSync(abs, { throwIfNoEntry: false })?.isFile()) return { rep, rel };
@@ -413,7 +413,7 @@ function build(flowArg: string) {
         ...variants.map((v) => fmt(c.per[v]?.mean ?? null)),
       ].join('\t'),
     );
-  writeFileSync(join(flow, 'trajectory', 'scores.tsv'), tsv.join('\n') + '\n');
+  writeFileSync(join(flow, 'trajectory', 'scores.tsv'), `${tsv.join('\n')}\n`);
 
   // _state.json's `best` is {round, test_score}; map the round to a variant
   // name the way the full builder does (0 = baseline), and drop it when the
@@ -421,7 +421,7 @@ function build(flowArg: string) {
   let best: string | null = null;
   const bestRound = state.best?.round;
   if (typeof bestRound === 'number' && Number.isInteger(bestRound)) {
-    best = bestRound === 0 ? 'baseline' : 'v' + bestRound;
+    best = bestRound === 0 ? 'baseline' : `v${bestRound}`;
     if (!variants.includes(best)) best = null;
   }
 
@@ -466,8 +466,7 @@ function render({
 }: RenderInput) {
   const hasSplit = cases.some((c) => c.split);
   const hasTest = variants.some((v) => (agg[v]?.nTest ?? 0) > 0);
-  const th = (label: string, key: string) =>
-    '<th data-k="' + esc(key) + '">' + esc(label) + '</th>';
+  const th = (label: string, key: string) => `<th data-k="${esc(key)}">${esc(label)}</th>`;
 
   const variantRows = variants
     .map((v) => {
@@ -478,7 +477,7 @@ function render({
         ? h.errors.total +
           ' (' +
           Object.entries(h.errors.byClass)
-            .map(([k, n]) => esc(k) + ' ' + n)
+            .map(([k, n]) => `${esc(k)} ${n}`)
             .join(', ') +
           ')'
         : '0';
@@ -499,9 +498,7 @@ function render({
         '</td><td class="num">' +
         a.n +
         '</td>' +
-        (hasTest
-          ? '<td class="num">' + fmt(a.test) + '</td><td class="num">' + a.nTest + '</td>'
-          : '') +
+        (hasTest ? `<td class="num">${fmt(a.test)}</td><td class="num">${a.nTest}</td>` : '') +
         '<td class="num">' +
         a.truncated +
         '</td><td>' +
@@ -518,27 +515,27 @@ function render({
           // build() fills c.per for every entry of `variants`.
           const p = c.per[v] as CasePer;
           const links = p.traces
-            .map((t) => '<a href="' + esc(t.rel) + '">rep' + esc(t.rep) + '</a>')
+            .map((t) => `<a href="${esc(t.rel)}">rep${esc(t.rep)}</a>`)
             .join(' ');
           return (
             '<td class="num" data-v="' +
             fmt(p.mean) +
             '">' +
             fmt(p.mean) +
-            (p.truncated ? ' <span class="pill warn">' + p.truncated + ' truncated</span>' : '') +
-            (links ? '<div class="links">' + links + '</div>' : '') +
+            (p.truncated ? ` <span class="pill warn">${p.truncated} truncated</span>` : '') +
+            (links ? `<div class="links">${links}</div>` : '') +
             '</td>'
           );
         })
         .join('');
-      const prompt = c.prompt.length > 600 ? c.prompt.slice(0, 600) + '...' : c.prompt;
+      const prompt = c.prompt.length > 600 ? `${c.prompt.slice(0, 600)}...` : c.prompt;
       return (
         '<tr><td class="id">' +
         esc(c.id) +
         '</td>' +
-        (hasSplit ? '<td>' + esc(c.split) + '</td>' : '') +
+        (hasSplit ? `<td>${esc(c.split)}</td>` : '') +
         '<td>' +
-        c.tags.map((t) => '<span class="pill">' + esc(t) + '</span>').join(' ') +
+        c.tags.map((t) => `<span class="pill">${esc(t)}</span>`).join(' ') +
         '</td>' +
         cells +
         '<td class="prompt"><details><summary>' +
@@ -552,7 +549,7 @@ function render({
 
   const warn = warnings.length
     ? '<section class="warnings"><h2>Warnings</h2><ul>' +
-      warnings.map((w) => '<li>' + esc(w) + '</li>').join('') +
+      warnings.map((w) => `<li>${esc(w)}</li>`).join('') +
       '</ul></section>'
     : '';
 
@@ -594,7 +591,7 @@ function render({
     th('variant', 's') +
     th('change', 's') +
     th('model', 's') +
-    th('mean ' + primary, 'n') +
+    th(`mean ${primary}`, 'n') +
     th('cases', 'n') +
     (hasTest ? th('test mean', 'n') + th('test cases', 'n') : '') +
     th('truncated', 'n') +
@@ -654,7 +651,7 @@ if (!arg || arg === '-h' || arg === '--help') {
 }
 try {
   const { variants, cases, warnings } = build(arg);
-  for (const w of warnings) console.error('warning: ' + w);
+  for (const w of warnings) console.error(`warning: ${w}`);
   console.error(
     'wrote ' +
       join(resolve(arg), 'report.html') +
@@ -667,6 +664,6 @@ try {
 } catch (e) {
   // A thrown value is untrusted too: prefer its `message`, else stringify it.
   const msg = (e as { message?: unknown })?.message;
-  console.error('build-report-lite: ' + String(msg || e));
+  console.error(`build-report-lite: ${String(msg || e)}`);
   process.exit(1);
 }
