@@ -14,15 +14,17 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  AgentBackend,
-  AgentSessionHandle,
-  ClaimedStep,
-  MachineDoneBody,
-  MachineStreamEvent,
-  SessionOpts,
-  StepEvent,
-  ToolCallRecord,
+import {
+  type AgentBackend,
+  type AgentSessionHandle,
+  buildPlanLocationNote,
+  type ClaimedStep,
+  type MachineDoneBody,
+  type MachineStreamEvent,
+  PLAN_FILE_NAME,
+  type SessionOpts,
+  type StepEvent,
+  type ToolCallRecord,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
@@ -204,7 +206,10 @@ function successScript(): StepEvent[] {
   ];
 }
 
-async function runClaimed(backend: AgentBackend, claimed: ClaimedStep): Promise<CaptureClient> {
+async function runClaimed(
+  backend: AgentBackend,
+  claimed: ClaimedStep,
+): Promise<{ client: CaptureClient; planNote: string }> {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-rework-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new CaptureClient();
@@ -223,13 +228,19 @@ async function runClaimed(backend: AgentBackend, claimed: ClaimedStep): Promise<
     claimed,
     {},
   );
-  return client;
+  // #1203/#1207：plan 步 prompt 尾部恒附交接位置注记行（含续轮/重启轮）——
+  // 断言期望 = 续轮指令 + 注记行（注记路径是 runClaimed 内 mkdtemp 的执行机
+  // 本地事实，由本返回值透出）。
+  const planNote = buildPlanLocationNote(
+    join(paths.plansDir, claimed.conversationId, PLAN_FILE_NAME),
+  );
+  return { client, planNote };
 }
 
 describe('#1204 返工降级注入（runner resume fallback context）', () => {
   test('失败方式 1：reworkContext 在位 + 续接失败 → 新会话首轮 prompt 含任务文本、指令、方案全文与全部意见', async () => {
     const backend = captureBackend(false, successScript());
-    const client = await runClaimed(
+    const { client } = await runClaimed(
       backend,
       claimedContinueStep({
         planText: '# 方案 v1\n\n- Context: 探针',
@@ -249,17 +260,17 @@ describe('#1204 返工降级注入（runner resume fallback context）', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('失败方式 2：旧 server 载荷（无 reworkContext）→ 回退 prompt 逐字节保持续轮指令', async () => {
+  test('失败方式 2：旧 server 载荷（无 reworkContext）→ 回退 prompt 逐字节保持续轮指令 + plan 交接注记', async () => {
     const backend = captureBackend(false, successScript());
-    await runClaimed(backend, claimedContinueStep());
+    const { planNote } = await runClaimed(backend, claimedContinueStep());
 
     expect(backend.createOpts).toHaveLength(1);
-    expect(backend.createOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.createOpts[0]!.prompt).toBe(`${INSTRUCTION}\n${planNote}`);
   });
 
   test('失败方式 3：续接成功 → 不注入（continue 收原 opts，create 不被调）', async () => {
     const backend = captureBackend(true, successScript());
-    await runClaimed(
+    const { planNote } = await runClaimed(
       backend,
       claimedContinueStep({
         planText: '# 方案 v1',
@@ -269,14 +280,17 @@ describe('#1204 返工降级注入（runner resume fallback context）', () => {
 
     expect(backend.continueOpts).toHaveLength(1);
     expect(backend.createOpts).toHaveLength(0);
-    expect(backend.continueOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.continueOpts[0]!.prompt).toBe(`${INSTRUCTION}\n${planNote}`);
   });
 
   test('失败方式 4：空上下文（planText null + feedbacks []）→ 不注入（与旧载荷同形）', async () => {
     const backend = captureBackend(false, successScript());
-    await runClaimed(backend, claimedContinueStep({ planText: null, feedbacks: [] }));
+    const { planNote } = await runClaimed(
+      backend,
+      claimedContinueStep({ planText: null, feedbacks: [] }),
+    );
 
     expect(backend.createOpts).toHaveLength(1);
-    expect(backend.createOpts[0]!.prompt).toBe(INSTRUCTION);
+    expect(backend.createOpts[0]!.prompt).toBe(`${INSTRUCTION}\n${planNote}`);
   });
 });
