@@ -29,7 +29,7 @@ import {
   collectDeniedSkillDirs,
   createSkillReadGate,
   type DeniedSkillEntry,
-} from '../src/backend/pi.js';
+} from '../src/backend/skills.js';
 
 function fixtureRoot(tag: string): string {
   return mkdtempSync(join(tmpdir(), `pacman-hardblock-${tag}-`));

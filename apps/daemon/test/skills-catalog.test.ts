@@ -14,7 +14,7 @@ import {
   appendSkillsCatalog,
   buildSkillsCatalog,
   SKILLS_CATALOG_BUDGET_BYTES,
-} from '../src/backend/pi.js';
+} from '../src/backend/skills.js';
 import { createDaemonLogger, isLogPrefix } from '../src/log.js';
 
 function fixtureRoot(tag: string): string {

@@ -289,7 +289,7 @@ export interface BriefChannel {
    *
    * 把「拼接」也放在后端而不是只返回增量：目录构造吃的是**后端私有**的
    * skillsDir 与 cwd（spec 14 §49 刻意用 daemon home 而非 worktree），而拼接函数
-   * （appendSkillsCatalog）住在 backend/pi.ts——runner 去 import 它会破坏缝纪律
+   * （appendSkillsCatalog）住在 backend/skills.ts——runner 去 import 它会破坏缝纪律
    * （runner 不消费 @earendil-works 那一层）。返回空串 = 本后端无贡献。 */
   composeBody(opts: SessionOpts, base: string | undefined): string;
 }

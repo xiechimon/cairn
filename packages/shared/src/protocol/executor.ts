@@ -53,7 +53,7 @@ export const DAEMON_LOG_PREFIXES = [
   'mcp',
   // skills 执行面注入诊断行（#371，spec 14：`[skills] <type>: <msg>` 族，
   // type ∈ loaded/collision/invalid-frontmatter/missing-skill-md/cap/invalid，
-  // 词表正源 = daemon backend/pi.ts classifySkillDiagnostic + buildSkillsCatalog）。
+  // 词表正源 = daemon backend/skills.ts classifySkillDiagnostic + buildSkillsCatalog）。
   'skills',
   // 命令闸裁决行（#866 T5：`[gate] <ask|reject>: rule=<id> command=<…>`——只记
   // 非放行裁决，allow 静默；词表正源 = daemon backend/command-gate.ts）。

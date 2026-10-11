@@ -71,7 +71,7 @@ import {
   collectTeamSkillEntries,
   composeSkillsSection,
   type DeniedSkillEntry,
-} from './pi.js';
+} from './skills.js';
 
 /** spec 17 :108 能力面。thinkingLevels = SDK effort 五档（pi 七档里
  *  off/minimal 无 SDK 对应——不发 effort 即缺省，见 toEffort）。 */
