@@ -190,20 +190,11 @@ try {
   await scenario(page, 'board');
 
   // —— 场景 2：看板页输入态守卫（原热键在输入态本就不触发，改键须保持）
-  // #1181 迁语义载体（spec 22 §5，#949/#910 裁定后类名退役，与 e2e
-  // search-focus.spec.ts / drive.mjs search probe 同律）：面板 = role
-  // dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。热键监听在被动
-  // effect 注册（hydration 后），丢键就重按（面板可见即停，不双 toggle）。
+  // #1166/#1181 载体（#949/#910 裁定后类名退役，与 e2e search-focus.spec.ts
+  // 同律）：面板 = role dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。
+  await page.keyboard.press('Meta+k');
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await searchPanel
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) break;
-    if (attempt === 5) throw new Error('Meta+k never opened 搜索 dialog');
-  }
+  await searchPanel.waitFor({ state: 'visible', timeout: 5000 });
   const field = searchPanel.getByRole('textbox');
   await field.click();
   await page.keyboard.press(NEW_KEY);
