@@ -5,8 +5,11 @@
 // no scrim. It is an overlay again, not a layout citizen: nothing yields
 // (0004 D2/D7/D8 retired), the root layout hosts the single persistent
 // instance (chief-root.tsx, D6), and closing minimizes — Base UI
-// keepMounted parks the popup `hidden` in the DOM with the draft, scroll
-// and thread state intact. Header = thread chip + model row + icon
+// keepMounted parks the popup in the DOM with the draft, scroll and thread
+// state intact: the `hidden` attribute stays (a11y tree / focus removal,
+// browser-native) while app.css neutralises its display:none side effect
+// into a visibility/opacity park, so the scroll position survives the
+// minimize (#1067). Header = thread chip + model row + icon
 // buttons (Minimize, no X — D3); body = gate bar (unbound) or hero
 // examples / thread message flow; composer pinned at the bottom. The
 // switcher popover (116) and the view swap to 总管设置 are real state so
@@ -183,8 +186,9 @@ function readStoredChiefDraft(): string {
 
 interface DrawerProps {
   /** 常驻窗的开态旗（ADR 0013 D6）：关闭 = 最小化——Base UI keepMounted
-   *  把窗以 hidden 停驻在 DOM，草稿/滚动/线程态全保；退场动画 outlives
-   *  the minimize（transition-status）。 */
+   *  把窗以 hidden 属性停驻在 DOM，草稿/滚动/线程态全保（#1067：hidden 的
+   *  display:none 副作用被 app.css 中和成 visibility 停靠，scrollTop 跨
+   *  最小化存活）；退场动画 outlives the minimize（transition-status）。 */
   open?: boolean;
   chief: ChiefContent;
   /** Opens 总管设置: board route = content swap (r5 101–104); 非 board 路由
@@ -250,11 +254,12 @@ export function ChiefDrawer(props: DrawerProps) {
     >
       {/* D6/D10：Portal 回 body（dock 行发现随让位退役），keepMounted 承载
           「关 = 在 DOM 但 inert」的常驻契约——Base UI 把关态 Popup 以
-          hidden 属性停驻（tailwind preflight 的 [hidden] display:none
-          !important 钉死 flex utility 的覆盖面），草稿/滚动/线程态全保；
-          退场动画仍先播（transition-status），播完才落 hidden。「关」的
-          可观测契约从「不在 DOM」改「在 DOM 但 hidden/inert」（D6，e2e
-          count-0 断言族按 0012 D6 载体重钉，行为语义不变）。 */}
+          hidden 属性停驻（可及树/焦点剔除由属性原生承载），app.css 的
+          .chief-drawer[hidden] 规则把 preflight 的 display:none 中和成
+          visibility/opacity 停靠（#1067：不塌缩布局盒，滚动位置跨最小化
+          保留），草稿/滚动/线程态全保；退场动画仍先播（transition-status），
+          播完才落 hidden。「关」的可观测契约 = 在 DOM 但 hidden/inert（D6，
+          e2e count-0 断言族按 0012 D6 载体重钉，行为语义不变）。 */}
       <DialogPrimitive.Portal keepMounted>
         <DialogPrimitive.Popup
           // render 令 Popup 即 aside（悬浮窗本体）；fade+scale 进出场落在
@@ -516,8 +521,9 @@ function ChiefDrawerInner({
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
     if (!open || wasOpen) return;
-    // keepMounted 关态 = hidden 驻 DOM：Base UI 摘 hidden 的提交时机晚于本
-    // effect，focus() 打在 display:none 上静默失败（实测首焦全丢）——帧重试
+    // keepMounted 关态 = hidden 属性驻 DOM（app.css 把 display:none 中和成
+    // visibility 停靠，#1067）：Base UI 摘 hidden 的提交时机晚于本 effect，
+    // focus() 打在 visibility:hidden 节点上静默失败（实测首焦全丢）——帧重试
     // 到节点脱离 [hidden] 祖先再落焦（有界 5 帧；中途关窗则 closest 命中
     // hidden 自然放弃）。
     let frames = 0;

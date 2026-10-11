@@ -4,6 +4,7 @@ import type {
   ChiefContent,
   ChiefExample,
   ChiefSettingsTab,
+  ChiefStreamItem,
   ChiefThreadRef,
   FixtureSet,
 } from './records.js';
@@ -235,6 +236,39 @@ export const chiefThreadsLong: FixtureSet = {
         seconds: '31s',
       },
     ],
+  },
+};
+
+/** #1067 滚动保留面命名场景（无 capture，chief-threads-long / chief-md
+ *  先例）：r5 114 的线程形态 + 程序拼装 40 条交替 user/robot 行——流高远超
+ *  600px 窗高，钉「滚到中部→最小化→重开落在原位置」的载体能力（关态窗
+ *  不得塌缩 display:none——浏览器在 display:none 上丢 scrollTop）。行文
+ *  取 chief-md 同款回执语料变体，内容对断言无意义，只有高度有意义。 */
+const CHIEF_SCROLL_ROWS: ChiefStreamItem[] = Array.from({ length: 40 }, (_, i) =>
+  i % 2 === 0
+    ? { kind: 'user', text: `滚动保留探针第 ${i + 1} 条：检查最小化后滚动位置是否存活。` }
+    : {
+        kind: 'robot',
+        paragraphs: [
+          [
+            {
+              text: `第 ${i + 1} 条回执：这条只负责撑高消息流，让滚动位置有可测的中间值；内容本身不参与任何断言。`,
+            },
+          ],
+        ],
+        seconds: '10s',
+      },
+);
+
+export const chiefScrollLong: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(13, 14),
+  chief: {
+    view: 'drawer',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '滚动保留探针…',
+    stream: CHIEF_SCROLL_ROWS,
   },
 };
 

@@ -99,6 +99,27 @@
   z-index: var(--z-modal-scrim);
 }
 
+/* #1067：chief 悬浮窗的停靠载体。Base UI keepMounted 把关态窗以 `hidden`
+   属性停驻（DialogPopup 恒渲染 hidden: !mounted，退场动画播完才落），而
+   tailwind preflight 的 [hidden] { display: none !important } 把关态窗塌缩
+   成 display:none——浏览器在这种盒子上丢弃 scrollTop，「最小化后滚动位置
+   保留」物理不可达。本条中和 hidden 的 display 副作用。落位必须在
+   @layer base：preflight 的 display:none 带 !important，而 CSS 级联对
+   important 声明反转层序——unlayered 的 !important 反而输给 layered 的
+   （实测钉死）；同层内则以特异性决胜，.chief-drawer[hidden]（0,2,0）压
+   [hidden]:where(…)（0,1-0，:where 计零）——两条缺一不可。窗保持 flex
+   布局盒、visibility:hidden 停靠：布局/scrollHeight 保留，scrollTop 存活，
+   指针 hit-test 不命中。可及树/焦点剔除由 `hidden` 属性自身承载（浏览器
+   原生：aria 查询、Tab 焦点、Playwright toBeHidden 全走它），属性选择器
+   又只在退场动画播完那一刻命中——进场/退场动效零剪裁。 */
+@layer base {
+  .chief-drawer[hidden] {
+    display: flex !important;
+    visibility: hidden;
+    opacity: 0;
+  }
+}
+
 /* 右下角预约制度（ADR 0013 D10，Multica base.css:10-33 同律同形）：
    总管 launcher（FAB / 悬浮窗）常驻内容区右下角，吸底元素给该角让位。
    命名而非逐点写死：意图可读、每个让位点可被这三个类检索到、距离由

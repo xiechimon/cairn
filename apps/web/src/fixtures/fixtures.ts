@@ -40,6 +40,7 @@ export {
   chiefGated,
   chiefMarkdown,
   chiefReady,
+  chiefScrollLong,
   chiefSettings,
   chiefSettingsMachines,
   chiefSettingsStaleModel,
