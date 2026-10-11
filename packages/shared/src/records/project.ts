@@ -32,7 +32,10 @@ export const projectRecordSchema = z.object({
   /** GitHub 接入 `owner/repo`（02 §3 接入形态；字段名 [推断]）。 */
   githubRepo: z.string().optional(),
   /** local 形态：用户本机 git 工作树仓绝对路径（spec 12 / #359；server 端
-   * `~` 展开后的规范化值，daemon 镜像 clone 同源消费）。 */
+   * `~` 展开后的规范化值，daemon 镜像 clone 同源消费）。github 形态（ADR
+   * 0017 / #1213）：可选同机执行加速位——server 只做形态校验（绝对路径），
+   * 存在性与 git 仓判定在 daemon 侧（路径可能活在执行机上，server 看不见），
+   * 失格静默回落 GitHub clone。 */
   localPath: z.string().optional(),
   /** clone URL（「Git 复制检出命令」卡数据源，02 §9.3）。托管 = 本地主机代位
    * （02 §5.8 gitHostDomain 槽）；github = github.com 派生 [设计]；local 形态
@@ -61,8 +64,10 @@ export type GithubRepoRef = z.infer<typeof githubRepoRefSchema>;
  * server 路由与 web 表单 mutation 同吃）。repo 形态双名同义：`kind` = spec 12
  * 契约名，`repoKind` = 既有 wire 名（r2 §9 项目创建流），并存时 kind 优先；
  * 两者皆缺 = 无 repo 普通项目。githubRepo 双面（字符串 / {owner,repo} 对象）
- * 归一后同过 isGithubRepoRef 闸；localPath 仅 kind=local 消费（必填，`~`
- * 展开与 git 工作树校验在 server 端，失败 400）。 */
+ * 归一后同过 isGithubRepoRef 闸；localPath 双形态消费（ADR 0017 / #1213）：
+ * kind=local 必填（`~` 展开与 git 工作树校验在 server 端，失败 400）；
+ * kind=github 可选加速位（server 只验绝对路径形态，存在性判定归 daemon，
+ * 失格静默回落 GitHub clone）。 */
 export const createProjectBodySchema = z.object({
   name: z.string(),
   teamId: z.string().optional(),
@@ -72,6 +77,16 @@ export const createProjectBodySchema = z.object({
   githubRepo: z.union([z.string(), githubRepoRefSchema]).optional(),
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
+
+/** `PATCH /api/projects/{id}` body 单源（ADR 0017 / #1213）：单字段写面——
+ * `localPath` 缺键 = 不动；null / 空串 = 显式清空（显式 null 是 wire 契约，
+ * 不是「不带键」，#1169 序列化坑族）；字符串 = 加速位落值（server 只验
+ * 绝对路径形态）。仅 github 形态项目消费本字段（local 形态的 localPath 是
+ * 创建闸绑定，不经本面改写）。 */
+export const patchProjectBodySchema = z.object({
+  localPath: z.string().nullish(),
+});
+export type PatchProjectBody = z.infer<typeof patchProjectBodySchema>;
 
 // —— localPath 400 reason code（#386：错误分类从消息子串契约升级为结构化
 // code；server 校验抛 code，web 按 code 分译，词汇三端同源）———————————————

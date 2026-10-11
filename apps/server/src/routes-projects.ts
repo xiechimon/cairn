@@ -11,6 +11,7 @@ import {
   type FsPickResult,
   githubIssuesResponseSchema,
   importGithubIssueBodySchema,
+  patchProjectBodySchema,
 } from '@pacman/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -43,6 +44,7 @@ import {
   slugifyRepoName,
   toProjectRecord,
   uniqueRepoName,
+  validateGithubLocalSlotPath,
   validateLocalRepoPath,
 } from './services/git.js';
 import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
@@ -210,9 +212,21 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
         throw new HttpError(400, 'invalid body at githubRepo: expected "owner/repo"');
       }
       githubRepo = ref;
+    } else if (kind === 'local' && body.githubRepo !== undefined) {
+      // local 形态语义不变（ADR 0017 决策 2）：无 githubRepo 槽——带键显式拒，
+      // 不静默吞（吞了用户会以为接上了 GitHub 真值）。
+      throw new HttpError(400, 'invalid body at githubRepo: not allowed for kind "local"');
     }
     // local 形态：localPath 三态校验 400 闸（services/git.ts，spec 12 / #359）。
-    const localPath = kind === 'local' ? await validateLocalRepoPath(body.localPath) : null;
+    // github 形态：localPath = 同机加速位（ADR 0017 / #1213）——server 只做
+    // 形态校验（绝对路径），存在性 / git 仓判定归 daemon（路径可能活在执行
+    // 机上，server 看不见；失格静默回落 GitHub clone）。
+    const localPath =
+      kind === 'local'
+        ? await validateLocalRepoPath(body.localPath)
+        : kind === 'github'
+          ? validateGithubLocalSlotPath(body.localPath)
+          : null;
     const id = newRecordId();
     let repoName: string | null = null;
     if (kind === 'hosted') {
@@ -238,6 +252,30 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     if (kind !== 'github') seedFixedTags(ctx.db, id);
     const row = requireProject(ctx, id);
     return c.json(toProjectRecord(row, requestOrigin(c)), 201);
+  });
+
+  // PATCH /api/projects/{id}（ADR 0017 / #1213）：localPath 加速位写面。
+  // body 单源 = shared patchProjectBodySchema；单字段语义：缺键 = 不动（与
+  // null 的显式清空两态分离——null 是 wire 契约，不是「不带键」，#1169
+  // 序列化坑族）；null / 空串 = 清空；字符串 = 落值（server 只验绝对路径
+  // 形态，可达性判定归 daemon）。仅 github 形态消费本字段——local 形态的
+  // localPath 是创建闸的仓绑定，不经本面改写；非 github 形态带键 400。
+  app.patch('/api/projects/:id', async (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    const body = parseWith(patchProjectBodySchema, await jsonBody(c), 'body');
+    if (body.localPath === undefined) {
+      return c.json(toProjectRecord(row, requestOrigin(c)));
+    }
+    if (row.repoKind !== 'github') {
+      throw new HttpError(
+        400,
+        'invalid body at localPath: localPath acceleration slot only applies to github projects',
+      );
+    }
+    const localPath = validateGithubLocalSlotPath(body.localPath);
+    ctx.db.update(project).set({ localPath }).where(eq(project.id, row.id)).run();
+    const updated = requireProject(ctx, row.id);
+    return c.json(toProjectRecord(updated, requestOrigin(c)));
   });
 
   // POST /api/fs/pick（ADR 0003 / #440）：server 代弹 macOS 原生选文件夹

@@ -115,6 +115,12 @@ export interface WorktreePrepareInput {
   workspacesRoot: string;
   /** per-step 凭证（托管 http 远端必需；GitHub 形态凭证面归后票）。 */
   credentials: GitCredentials | null;
+  /** github 形态同机执行加速位（ADR 0017 / #1213）：claim 载荷的
+   * project.repo.localPath。双条件判定（路径存在 + origin 归一化后与
+   * cloneUrl 同仓）通过 → 基座自该路径本地 clone（省传输）后 origin 重指
+   * cloneUrl 照常 fetch 到远端 tip；任一不符或 clone 当刻失格 → 静默回落
+   * GitHub clone + 一行选源日志。null / 缺省 = 现行为（直接 cloneUrl）。 */
+  localPath?: string | null;
 }
 
 export interface PreparedWorkspace {

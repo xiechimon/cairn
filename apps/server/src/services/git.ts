@@ -114,16 +114,22 @@ export function hasRepoBinding(row: ProjectRow | undefined): boolean {
   return projectRepoRef(row, '') !== null;
 }
 
-/** 项目行 → 执行侧 repo 位（三形态 cloneUrl 派生；未绑 = null）。 */
+/** 项目行 → 执行侧 repo 位（三形态 cloneUrl 派生；未绑 = null）。github
+ * 形态行上 localPath 非空时随位携带（ADR 0017 / #1213 同机加速位——daemon
+ * 侧双条件判定，失格回落 GitHub clone）；local 形态不携带（cloneUrl 即路径）。 */
 export function projectRepoRef(
   row: ProjectRow | undefined,
   origin: string,
-): { kind: 'hosted' | 'github' | 'local'; cloneUrl: string } | null {
+): { kind: 'hosted' | 'github' | 'local'; cloneUrl: string; localPath?: string } | null {
   if (row?.repoKind === 'hosted' && row.repoName !== null) {
     return { kind: 'hosted', cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) };
   }
   if (row?.repoKind === 'github' && row.githubRepo !== null) {
-    return { kind: 'github', cloneUrl: githubCloneUrl(row.githubRepo) };
+    return {
+      kind: 'github',
+      cloneUrl: githubCloneUrl(row.githubRepo),
+      ...(row.localPath !== null ? { localPath: row.localPath } : {}),
+    };
   }
   if (row?.repoKind === 'local' && row.localPath !== null) {
     return { kind: 'local', cloneUrl: row.localPath };
@@ -176,6 +182,26 @@ export async function validateLocalRepoPath(rawPath: string | null | undefined):
     );
   }
   return expanded;
+}
+
+/** github 形态 localPath 加速位校验（ADR 0017 / #1213）：**只做形态校验**——
+ * trim + 绝对路径（非绝对 = 400 + reason not_absolute，词表同 local 形态）。
+ * 不做存在性 / git 仓校验：路径可能活在执行机上，server 进程看不见它
+ * （多机部署 server 与 daemon 异机），硬验会把合法形态 400 掉；真实可达性
+ * 判定在 daemon 侧（existsSync + origin 对账，失格静默回落 GitHub clone）。
+ * `~` 不展开——那是 local 形态的 server 同机语义；加速位只收绝对路径。
+ * 空串归一 null（空 ≡ 未设，与 PATCH 清空语义一致）。 */
+export function validateGithubLocalSlotPath(rawPath: string | null | undefined): string | null {
+  const raw = rawPath?.trim() ?? '';
+  if (raw === '') return null;
+  if (!isAbsolute(raw)) {
+    throw new HttpError(
+      400,
+      `invalid body at localPath: expected absolute path, got "${raw}"`,
+      'not_absolute',
+    );
+  }
+  return raw;
 }
 
 export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord {

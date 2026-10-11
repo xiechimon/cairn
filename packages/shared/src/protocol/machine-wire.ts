@@ -185,6 +185,12 @@ export const claimedStepSchema = z.object({
           // 即随 wire，免三处散射编辑）。
           kind: z.enum(PROJECT_REPO_KINDS),
           cloneUrl: z.string(),
+          /** github 形态同机加速位（ADR 0017 / #1213）：项目行 localPath
+           * 非空时携带。daemon 物化时双条件判定（路径存在 + 该路径 origin
+           * 归一化后与 cloneUrl 同仓），不过则静默回落 GitHub clone——
+           * 路径活在执行机，server 侧不预判。local 形态不携带（cloneUrl
+           * 即路径本身）。 */
+          localPath: z.string().optional(),
         })
         .nullable(),
     })

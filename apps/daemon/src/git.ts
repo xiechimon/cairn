@@ -129,6 +129,38 @@ export const gitPrim = {
     return r.code === 0;
   },
 
+  /** origin remote URL（#1213/ADR 0017 选源对账用）；无 origin / git 失败 =
+   * null（调用方按失格回落处理，不抛）。只读 config，不触网络。 */
+  async remoteUrl(dir: string): Promise<string | null> {
+    const r = await runGit(['remote', 'get-url', 'origin'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) return null;
+    const url = r.stdout.trim();
+    return url === '' ? null : url;
+  },
+
+  /** origin remote URL 重指（#1213/ADR 0017：本地源 clone 后把 origin 指回
+   * GitHub 真值，后续 fetch/push 照常走真值远端）。 */
+  async setRemoteUrl(repoDir: string, url: string): Promise<void> {
+    await runGitOk(['remote', 'set-url', 'origin', '--', url], {
+      cwd: repoDir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+  },
+
+  /** `git remote set-head origin -a`（#1213/ADR 0017）：向真值远端查询其 HEAD
+   * 并重钉 origin/HEAD——clone 自本地源的 origin/HEAD 是**用户检出分支**，
+   * 默认分支判定会漂；本原语把 defaultBranch 真值源拉回远端。 */
+  async remoteSetHeadAuto(repoDir: string, cred: GitCredentials | null): Promise<void> {
+    await runGitOk(['remote', 'set-head', 'origin', '--auto'], {
+      cwd: repoDir,
+      env: cred ? gitCredentialEnv(cred) : undefined,
+      timeoutMs: NET_TIMEOUT_MS,
+    });
+  },
+
   async hasLocalBranch(repoDir: string, branch: string): Promise<boolean> {
     const r = await runGit(['rev-parse', '--verify', `refs/heads/${branch}`], {
       cwd: repoDir,

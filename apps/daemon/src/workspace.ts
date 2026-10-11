@@ -39,6 +39,41 @@ import {
 /** conversationId 目录形状（UUIDv7，r3 §1.4 样本）——孤儿扫描的判别式。 */
 const CONV_DIR_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// —— 双执行源（ADR 0017 / #1213）：github 形态 localPath 同机加速位 ——————
+
+/** git remote URL → 归一化同仓判别串：`host/owner/repo`（scheme / user /
+ * `.git` 后缀 / 尾斜杠消除；scp 形 `git@host:path` 与 `ssh://git@host/path`
+ * 同收）。本地路径归一为去 `.git` 路径（两侧同串自然相等）。异 host 同
+ * owner/repo 不同串（防误吸 fork / 内网同名仓）。 */
+export function normalizedRepoRef(url: string): string {
+  let ref = url.trim();
+  if (ref.endsWith('/')) ref = ref.slice(0, -1);
+  if (ref.endsWith('.git')) ref = ref.slice(0, -4);
+  // scp 形：user@host:path（无 scheme 前缀、含冒号）。
+  const scp = /^([^@/]+)@([^:/]+):(.+)$/.exec(ref);
+  if (scp) return `${scp[2]}/${scp[3]}`;
+  // scheme 形：scheme://[user@]host[:port]/path。
+  const scheme = /^[a-z][a-z0-9+.-]*:\/\/(?:([^@/]+)@)?([^/]+)\/(.+)$/i.exec(ref);
+  if (scheme) return `${scheme[2]}/${scheme[3]}`;
+  return ref;
+}
+
+/** 双条件判定（ADR 0017 决策 4）：localPath 存在 + 该路径 origin 归一化后与
+ * cloneUrl 同仓 → 可作本地 clone 源；任一不符 = 不可（带原因，静默回落
+ * GitHub clone——不报错不卡步）。 */
+async function localSourceUsable(
+  localPath: string,
+  cloneUrl: string,
+): Promise<{ ok: true } | { ok: false; reason: string }> {
+  if (!existsSync(localPath)) return { ok: false, reason: 'not found' };
+  const origin = await gitPrim.remoteUrl(localPath);
+  if (origin === null) return { ok: false, reason: 'no origin remote' };
+  if (normalizedRepoRef(origin) !== normalizedRepoRef(cloneUrl)) {
+    return { ok: false, reason: `origin mismatch (got ${origin})` };
+  }
+  return { ok: true };
+}
+
 export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
   /** 测试注入（缺省 7×24h，02 §5.5）。 */
@@ -85,13 +120,49 @@ export class WorkspaceManager implements WorktreeOps {
 
       // —— 基座 clone / fetch（r3 §1.5 日志行 `Cloning <teamId>/<repoName>
       // (branch: main)` 形状；teamId/repoName = cloneUrl 路径段）——
+      // 双执行源（ADR 0017 / #1213）：github 形态带 localPath 加速位时，基座
+      // 首次 clone 前做双条件选源——判定过 → 自本地路径 clone（省 GitHub
+      // 传输），origin 重指 cloneUrl 后照常 fetch 到真值远端 tip（加速位省
+      // 的是传输不是新鲜度判定）+ set-head -a 重钉默认分支（clone 自本地的
+      // origin/HEAD 是用户检出分支，会漂）；任一不符或 clone 当刻失格
+      // （TOCTOU：判定与 clone 之间路径被抽走）→ 静默回落 GitHub clone，
+      // 一行选源日志，不报错不卡步。基座已在位（后续步）= 纯 fetch，选源
+      // 只发生在首次物化。
       if (!existsSync(join(baseRepoDir, '.git')) && !isBareish(baseRepoDir)) {
-        const label = repoLabel(input.cloneUrl);
-        const defaultBranchGuess = 'main';
-        this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
-        await withGitNetRetries(() =>
-          gitPrim.clone(input.cloneUrl, baseRepoDir, input.credentials),
-        );
+        let fromLocal = false;
+        if (input.localPath != null && input.localPath !== '') {
+          const verdict = await localSourceUsable(input.localPath, input.cloneUrl);
+          if (verdict.ok) {
+            try {
+              await gitPrim.clone(input.localPath, baseRepoDir, null);
+              await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
+              await withGitNetRetries(() => gitPrim.fetch(baseRepoDir, input.credentials));
+              await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
+              this.logger.workspace(`Repo source: local-path ${input.localPath}`);
+              fromLocal = true;
+            } catch (err) {
+              // 半成品基座必须清场再回落（残目录会让 GitHub clone 拒绝落地）。
+              rmSync(baseRepoDir, { recursive: true, force: true });
+              this.logger.workspace(
+                `Repo source: github-clone (local-path ${input.localPath} clone failed: ${
+                  err instanceof Error ? err.message : String(err)
+                })`,
+              );
+            }
+          } else {
+            this.logger.workspace(
+              `Repo source: github-clone (local-path ${input.localPath} ${verdict.reason})`,
+            );
+          }
+        }
+        if (!fromLocal) {
+          const label = repoLabel(input.cloneUrl);
+          const defaultBranchGuess = 'main';
+          this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
+          await withGitNetRetries(() =>
+            gitPrim.clone(input.cloneUrl, baseRepoDir, input.credentials),
+          );
+        }
       } else {
         await withGitNetRetries(() => gitPrim.fetch(baseRepoDir, input.credentials));
       }
