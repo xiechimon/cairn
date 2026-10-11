@@ -47,12 +47,16 @@ test.describe('chief parked-window carrier (#1067)', () => {
       const r = el.getBoundingClientRect();
       return { x: r.x, y: r.y, width: r.width, height: r.height };
     });
+    // mouse.wheel's args are the scroll deltas, not a position — park the
+    // pointer over the window's center first (wheel events go to wherever
+    // the pointer is; the viewport center is the page's board/sidebar face)
+    await page.mouse.move(
+      winBox.x + winBox.width / 2,
+      winBox.y + winBox.height / 2,
+    );
     for (let i = 0; i < 14; i++) {
-      await page.mouse.wheel(
-        winBox.x + winBox.width / 2,
-        winBox.y + winBox.height / 2,
-        { deltaY: 120 },
-      );
+      // scroll up (away from the end edge): the stream starts at the bottom
+      await page.mouse.wheel(0, -120);
       await page.waitForTimeout(30);
     }
     // let the scroller's own scroll-state settle
