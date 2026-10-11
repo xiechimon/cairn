@@ -3,7 +3,11 @@
 //   （r3 §1.2 实测，按 key/team 认机器 [推断]）。
 // - claim：长轮询领取（~75s 节奏，r3 §1.5）+ wake 即时唤醒；step 队列 server
 //   持有、机器 claim 三类步（02 §4.2/A6）。
-// - journal：heartbeat/tool/done/upload-urls/token（02 §5.4 词表）。
+// - journal：heartbeat/tool/done/token（02 §5.4 词表）。
+// verb 面（#1134 拆分）：产物上传 = machine-uploads.ts、远程 shell =
+//   machine-shell.ts、问答/relay 工具 = machine-relay.ts（journal 内核
+//   ownedStep / publishStepStatus / upsertMessage / upsertChiefRow /
+//   agentForStep 自本模块导出供其消费）。
 // 载荷细形 r3 未采处 = [推断]/[设计]（04 §3 不判负口径），补采后回写 02 §11。
 
 import { createHash } from 'node:crypto';
@@ -13,12 +17,8 @@ import type {
   ClaimedStep,
   ClaudeCodeReport,
   GitCredentials,
-  MachineAskBody,
-  MachineAskResponse,
   MachineAttachmentResponse,
   MachineDoneBody,
-  MachineShellPrecheckBody,
-  MachineShellResultBody,
   MachineSkillsManifestResponse,
   MachineTokenResponse,
   ProviderConfig,
@@ -27,22 +27,16 @@ import type {
   StepRecord,
   ToolCallRecord,
   TranscriptRow,
-  TranscriptUpload,
   UserRecord,
 } from '@pacman/shared';
 import {
   AGENT_TOOL_SHELL,
-  AGENT_TOOL_SKILL_CREATE,
-  AGENT_TOOL_SKILL_UPDATE,
   AGENT_TOOL_TAG,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_REMOTE_TOOLS,
   CHIEF_TURN_ERROR_KIND,
   classifyUserText,
-  createSkillBodySchema,
-  derivePlaceholderTitle,
-  FIXED_TAGS,
   formatSkillRouteSection,
   GATE_ANNOUNCEMENTS,
   GITHUB_ACCESS_TOKEN_USERNAME,
@@ -55,7 +49,6 @@ import {
   type SkillInjectionRecord,
   selectSkillsForTask,
   suggestSkillsForMessage,
-  updateSkillToolParamsSchema,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@pacman/shared';
@@ -72,14 +65,12 @@ import {
   message,
   plan as planTable,
   project,
-  shellCommand,
   steerPending,
   step,
   stopPending,
   todo,
   tokenUsage,
 } from '../db/schema.js';
-import { HttpError, parseWith } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
@@ -101,14 +92,7 @@ import {
   parseChiefTrigger,
   upsertChiefMessage,
 } from './chief.js';
-import {
-  ASK_HOLD_MS,
-  type ChiefQuestionDeps,
-  cancelPendingQuestions,
-  createOrGetQuestion,
-  holdForQuestion,
-} from './chief-questions.js';
-import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import { cancelPendingQuestions } from './chief-questions.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
   issueStepGitCredential,
@@ -129,15 +113,9 @@ import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
-import {
-  createLocalSkill,
-  listSkillFiles,
-  readSkillFileBytes,
-  scanLocalSkills,
-  updateLocalSkill,
-} from './skills.js';
-import { listProjectTagVocab, resolveFixedTagId, resolveProjectTagIds } from './tags.js';
-import { setTodoPhase, updateTodo, writebackSelfIssueTitle } from './todos.js';
+import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
+import { listProjectTagVocab } from './tags.js';
+import { setTodoPhase } from './todos.js';
 
 /** chief 步 conv id 判别（单源 = shared isChiefConversationId；thread id 形
  * `chief-<uuid>`，无 build 行，r5 §3.1）。 */
@@ -172,8 +150,9 @@ export interface MachineDeps {
   githubFetch?: FetchLike;
 }
 
-/** 步状态位透出会话流（journal 状态 [内部] 列 → step 事件 [设计]）。 */
-function publishStepStatus(deps: MachineDeps, stepId: string): void {
+/** 步状态位透出会话流（journal 状态 [内部] 列 → step 事件 [设计]）。verb 面
+ * 拆分模块（machine-uploads.ts 等）同消费，journal 内核导出面。 */
+export function publishStepStatus(deps: MachineDeps, stepId: string): void {
   if (!deps.convHub) return;
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) return;
@@ -633,14 +612,14 @@ function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: stri
     .all();
 }
 
-function agentForStep(
+export function agentForStep(
   deps: MachineDeps,
   todoRow: typeof todo.$inferSelect,
   kind: StepRecord['kind'],
   prompt: string | null = null,
 ) {
   // #881 起判定原语下沉 dispatch-eligibility（claim 与 sweep 单源），此处仅
-  // 适配 MachineDeps → db 形参。
+  // 适配 MachineDeps → db 形参。verb 面拆分模块（machine-shell.ts）同消费。
   return agentForStepEligibility(deps.db, todoRow, kind, prompt);
 }
 
@@ -714,8 +693,8 @@ function claimMcpSlugs(
  * 判定单源在此——
  * - remote_shell = agent 层「远程 shell」开关 ∩ machine.shellEnabled 双闸齐开
  *   （词值 = shared LOCAL_TOOL_REMOTE_SHELL）。claim 期只管注册；步中每条命令
- *   真实闸在预检端点复核双闸（precheckShellCommand，机器开关秒级热加载由此
- *   兑现——claim 时快照不作数）。
+ *   真实闸在预检端点复核双闸（machine-shell.ts precheckShellCommand，机器开
+ *   关秒级热加载由此兑现——claim 时快照不作数）。
  * - create_tag = agent 层「创建标签」开关即可（机器层无对应闸，leader 裁定
  *   #4：词值 = shared LOCAL_TOOL_CREATE_TAG；词面量单源 = AGENT_TOOL_TAG，
  *   T1/XMON-111 落地后此处消费常量）。
@@ -1091,8 +1070,8 @@ function tryClaim(
     // github 形态项目的任务元信息注入面（#446 / ADR 0005 分叉律）：词表 =
     // 项目标签集镜像（claim 时现取 DB 真值，不缓存第二份）；titleFinal =
     // issue 来源标题已真值（daemon 不指示回填）。local/hosted 缺省 meta ——
-    // daemon 回落 FIXED_TAGS 现行为，文本逐字节不变。校验真值在 setTaskMeta
-    // （按项目形态分支），meta 只驱动提示词面。
+    // daemon 回落 FIXED_TAGS 现行为，文本逐字节不变。校验真值在 machine-relay.ts
+    // setTaskMeta（按项目形态分支），meta 只驱动提示词面。
     const isGithubProject = projectRow?.repoKind === 'github';
     // titleFinal = 仅**导入**任务（'github-issue'，标题真值在 issue 侧，ADR
     // 0005 D5）；自建 issue 任务（'github-issue-self'，#452 / ADR 0006 D3）
@@ -1197,7 +1176,9 @@ export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: stri
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
 
-function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {
+/** 机器步所有权校验（journal 内核导出面：verb 面拆分模块共用同一条判据——
+ * 未知步 404、他机步 404「(not yours)」，不做第二份实现）。 */
+export function ownedStep(deps: MachineDeps, machineId: string, stepId: string) {
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);
@@ -1307,181 +1288,6 @@ export function reportActivity(
 ): void {
   const row = ownedStep(deps, machineId, stepId);
   deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: nowMs() });
-}
-
-/** 机器问答通道（#1049：POST /api/machine/ask/<stepId>）。与 relay 工具面分道
- * 的理由：ask_user 的等待语义（挂到人答为止）与 relayTool 的 10s 超时互斥——
- * 专用端点 + hold 长轮询（claim 同律：到期回 pending，daemon 原样重发同
- * requestId，幂等命中既有卡不叠不重通知）。步必须是被本机认领的 chief 步；
- * 非 chief 步（worker 词表无 ask_user）400。signal = 请求断连（#1065 僵尸
- * 认领同律：死请求不占线，hold 循环即刻退）。 */
-export async function machineAsk(
-  deps: MachineDeps,
-  machineId: string,
-  stepId: string,
-  body: MachineAskBody,
-  opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
-): Promise<MachineAskResponse> {
-  const row = ownedStep(deps, machineId, stepId);
-  if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
-    throw new HttpError(400, `step ${stepId} is not a chief step`);
-  }
-  const qDeps: ChiefQuestionDeps = {
-    db: deps.db,
-    hub: deps.hub,
-    user: deps.user,
-    ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-  };
-  const { content } = createOrGetQuestion(qDeps, {
-    threadId: row.buildId,
-    requestId: body.requestId,
-    questions: body.questions,
-  });
-  const final =
-    content.status === 'pending'
-      ? await holdForQuestion(qDeps, {
-          threadId: row.buildId,
-          requestId: body.requestId,
-          holdMs: opts.holdMs,
-          ...(opts.signal !== undefined ? { signal: opts.signal } : {}),
-        })
-      : content;
-  const settled = final ?? content;
-  return {
-    status: settled.status,
-    requestId: body.requestId,
-    answers: settled.status === 'answered' ? (settled.answers ?? null) : null,
-    reason: settled.status === 'cancelled' ? (settled.cancelReason ?? null) : null,
-  };
-}
-
-/** remoteTools relay 执行（02 §4.3「服务端定义并执行」；r5 §3.1 bundle：POST
- * /api/machine/tool/<stepId> {name, params} → {text}）。机器所有权校验后按步类
- * 分流：chief 步 = 51 词表（溯源上下文 step → chief_thread → chief）；worker
- * 步 = 记忆三件套 + 附件读 + set_task_meta + 技能写词（02 §4.4/r5 §6 worker
- * 写路径 + XMON-109 技能写，溯源 step → build → todo → assignment 槽）。
- * 返回 JSON 串（daemon 侧包 {text} 回 pi）。 */
-export async function executeRelayToolCall(
-  deps: MachineDeps,
-  machineId: string,
-  stepId: string,
-  name: string,
-  params: Record<string, unknown>,
-): Promise<string> {
-  const row = ownedStep(deps, machineId, stepId);
-  if (row.kind !== 'chief') {
-    return executeWorkerMemoryToolCall(deps, row, name, params);
-  }
-  if (!isChiefConversation(row.buildId)) {
-    throw new HttpError(400, `step ${stepId} is not a chief step`);
-  }
-  const threadId = row.buildId;
-  const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
-  if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
-  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
-  return executeChiefTool(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      machineHub: deps.machineHub,
-      box: deps.box,
-      user: deps.user,
-      reposDir: deps.reposDir,
-      attachmentsDir: deps.attachmentsDir,
-      skillsDir: deps.skillsDir,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-      ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
-      ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-    },
-    {
-      teamId: threadRow.teamId,
-      userId: threadRow.userId,
-      chiefId: chiefRow.id,
-      threadId,
-      chiefAgentId: chiefRow.agentId,
-      conversationId: threadId,
-    },
-    name,
-    params,
-  );
-}
-
-/** worker 步 relay = 记忆三件套 + set_task_meta + 技能写词 create_skill/
- * update_skill（白名单在 executeWorkerMemoryTool / 下方拦截；词表外 400；
- * 技能写词按 agent 行 tools 开关执法 403）。溯源上下文（r5 §6 实测
- * 样本 = 运行中 todo/build）：step → build → todo → assignment 槽 Agent
- * （02 §4.2 按步类取槽）。 */
-async function executeWorkerMemoryToolCall(
-  deps: MachineDeps,
-  row: typeof step.$inferSelect,
-  name: string,
-  params: Record<string, unknown>,
-): Promise<string> {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
-  if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  // spec 15 #394：任务元信息回填（ADR 0002 D3）。窄工具——todoId 从步钉死、
-  // 不走 agent 槽闸（写面是 todo 不是 agent 资产），词表外 tag name 400。
-  if (name === 'set_task_meta') return setTaskMeta(deps, todoRow, params);
-  const slot = row.kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
-  const agentId = slot?.agentId;
-  // XMON-109 S1：技能写词（词表恒列，授权执法在 agent 行 tools——403 同
-  // requestMerge 形）。无 agent 步无执行者可审计 = 409（纵深防御位：agent
-  // 空槽步不入 claim 候选，正常流走不到）。
-  if (name === 'create_skill' || name === 'update_skill') {
-    if (!agentId) throw new HttpError(409, 'step has no assigned agent — skill write has no actor');
-    return executeWorkerSkillTool(deps, todoRow, agentId, name, params);
-  }
-  if (!agentId) throw new HttpError(409, 'step has no assigned agent — memory has no store');
-  return executeWorkerMemoryTool(
-    deps.db,
-    {
-      teamId: todoRow.teamId,
-      agentId,
-      todoId: todoRow.id,
-      projectId: todoRow.projectId,
-      buildId: row.buildId,
-      attachmentsDir: deps.attachmentsDir,
-    },
-    name,
-    params,
-  );
-}
-
-/** worker 技能写词执行（XMON-109 S1）：agent 行 tools 开关执法——「创建
- * 技能/更新技能」未开 = 403（requestMerge 同形：点名开关 + 指路 Agent
- * 详情页权限 tab；词表恒列与授权执法解耦，缺权调用在此拒）。通过后走
- * createLocalSkill/updateLocalSkill 单源写路径，审计 actor = 该步 Agent。 */
-async function executeWorkerSkillTool(
-  deps: MachineDeps,
-  todoRow: typeof todo.$inferSelect,
-  agentId: string,
-  name: 'create_skill' | 'update_skill',
-  params: Record<string, unknown>,
-): Promise<string> {
-  const agentRow = deps.db.select().from(agent).where(eq(agent.id, agentId)).get();
-  if (!agentRow) throw new NotFoundError(`agent ${agentId}`);
-  const want = name === 'create_skill' ? AGENT_TOOL_SKILL_CREATE : AGENT_TOOL_SKILL_UPDATE;
-  if (!agentRow.tools.includes(want)) {
-    throw new HttpError(
-      403,
-      `Agent ${agentRow.displayName} 未获「${want}」授权（Agent 详情页权限 tab），无法${name === 'create_skill' ? '创建' : '更新'}技能`,
-    );
-  }
-  const opts = {
-    db: deps.db,
-    skillsDir: deps.skillsDir,
-    teamId: todoRow.teamId,
-    actor: { type: 'agent' as const, id: agentId },
-  };
-  if (name === 'create_skill') {
-    const body = parseWith(createSkillBodySchema, params, 'params');
-    return JSON.stringify(createLocalSkill(opts, body));
-  }
-  const body = parseWith(updateSkillToolParamsSchema, params, 'params');
-  return JSON.stringify(updateLocalSkill(opts, body.skillId, body));
 }
 
 /** GET /api/machine/attachment/{stepId}/{attachmentId} 服务层（#730）：daemon
@@ -1604,122 +1410,6 @@ export function machineSkillFile(
   return bytes;
 }
 
-/** set_task_meta（spec 15 #394 + #446/ADR 0005 分叉律 + #452 写向）：校验按
- * 项目形态分支——local/hosted = FIXED_TAGS 白名单 + 单 tag + title 必填
- * （现行为逐字节不变，ADR 0002 D3/D4 收窄后的 local 适用域）；github =
- * 项目标签集（仓库 label 镜像）+ tags 多枚 + title 可选（导入任务标题已真
- * 值；自建 issue 任务回填并写回 issue，ADR 0006 D3）。
- * 两形态共用一条不变式：贴的标签必须在本项目标签集内。标题归一（首行
- * ≤50 字符，derivePlaceholderTitle 复用）同形。更新走 updateTodo 既有面
- * （v++ + SSE 广播，看板实时刷新）。async = github 形态的 issue 标题回写
- * 出站位（local 形态零出站，行为不变）。 */
-async function setTaskMeta(
-  deps: MachineDeps,
-  todoRow: typeof todo.$inferSelect,
-  params: Record<string, unknown>,
-): Promise<string> {
-  const projectRow = deps.db
-    .select({ repoKind: project.repoKind })
-    .from(project)
-    .where(eq(project.id, todoRow.projectId))
-    .get();
-  if (projectRow?.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
-  const title = normalizedMetaTitle(params.title);
-  let tagIds: string[] | undefined;
-  if (params.tag !== undefined) {
-    const tagName = params.tag;
-    if (typeof tagName !== 'string' || !FIXED_TAGS.some((t) => t.name === tagName)) {
-      throw new HttpError(
-        400,
-        `invalid params.tag: expected one of ${FIXED_TAGS.map((t) => t.name).join(', ')}`,
-      );
-    }
-    const tagId = resolveFixedTagId(deps.db, todoRow.projectId, tagName);
-    if (tagId === null) throw new HttpError(400, `tag ${tagName} not seeded in project`);
-    tagIds = [tagId];
-  }
-  const record = updateTodo(
-    { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
-    todoRow.id,
-    { title, ...(tagIds !== undefined ? { tagIds } : {}) },
-  );
-  if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
-  return JSON.stringify({ todoId: record.id, title: record.title, tagIds: record.tagIds });
-}
-
-/** set_task_meta 标题归一（两形态共用单点）：derivePlaceholderTitle 首行
- * ≤50 字符；非串 / 归一后空白 → 400。 */
-function normalizedMetaTitle(raw: unknown): string {
-  const title = typeof raw === 'string' ? derivePlaceholderTitle(raw) : '';
-  if (title === '') throw new HttpError(400, 'invalid params.title: expected non-empty string');
-  return title;
-}
-
-/** github 形态 set_task_meta（#446 + #452 写向）：title 可选（归一规则同
- * local——多行/超长传值归一到首行 ≤50）；**导入**任务（sourceKind =
- * 'github-issue'）的标题已是真值——带 title 的调用一律 400（AC「不被回填
- * 覆盖」的机械闸，提示词面不注入回填指令是第一道，本闸是第二道）；自建
- * issue 任务（'github-issue-self'，ADR 0006 D3）title 放行且落库后写进那
- * 枚 issue（回写失败吞——relay 恒 200，漂移交详情页只读回显提示面，B2）；
- * tags = name 数组，逐个按项目标签集现查解析，集合外 name = 400；title 与
- * tags 全缺 = 400（无意义调用）。混部容忍：旧形单 `tag` 字符串并入 tags
- * （server 校验按项目形态分支，不按工具面形状——旧 daemon 发旧参数不断
- * 约）。 */
-async function setTaskMetaGithubForm(
-  deps: MachineDeps,
-  todoRow: typeof todo.$inferSelect,
-  params: Record<string, unknown>,
-): Promise<string> {
-  let title: string | undefined;
-  if (params.title !== undefined) {
-    if (todoRow.sourceKind === 'github-issue') {
-      throw new HttpError(400, 'invalid params.title: title is final (issue-sourced)');
-    }
-    title = normalizedMetaTitle(params.title);
-  }
-  let tagIds: string[] | undefined;
-  const rawTags = params.tags !== undefined ? params.tags : params.tag;
-  if (rawTags !== undefined) {
-    const names = typeof rawTags === 'string' ? [rawTags] : rawTags;
-    if (!Array.isArray(names) || names.some((n) => typeof n !== 'string' || n === '')) {
-      throw new HttpError(400, 'invalid params.tags: expected an array of tag names');
-    }
-    const resolved = resolveProjectTagIds(deps.db, todoRow.projectId, names);
-    for (const name of names) {
-      if (!resolved.has(name)) {
-        throw new HttpError(400, `tag ${name} not in project tag set`);
-      }
-    }
-    tagIds = [...new Set(names.map((n) => resolved.get(n)))].filter(
-      (id): id is string => id !== undefined,
-    );
-  }
-  if (title === undefined && tagIds === undefined) {
-    throw new HttpError(400, 'invalid params: expected at least one of title / tags');
-  }
-  const todoDeps = {
-    db: deps.db,
-    hub: deps.hub,
-    machineHub: deps.machineHub,
-    user: deps.user,
-    box: deps.box,
-    ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-  };
-  const record = updateTodo(todoDeps, todoRow.id, {
-    ...(title !== undefined ? { title } : {}),
-    ...(tagIds !== undefined ? { tagIds } : {}),
-  });
-  if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
-  // #452 / ADR 0006 D3：自建 issue 任务的回填标题写进那枚 issue（await 出站
-  // ——relay 面非建任务关键路径；lib 超时 15s 封顶）。失败吞（B2）：本地标题
-  // 已生效不回滚，不一致由详情页只读回显给中性提示。未建成 → 静默跳过
-  // （后建 issue 现读当前标题，自然一致）。
-  if (title !== undefined && record.sourceKind === 'github-issue-self') {
-    await writebackSelfIssueTitle(todoDeps, todoRow.id, record.title).catch(() => undefined);
-  }
-  return JSON.stringify({ todoId: record.id, title: record.title, tagIds: record.tagIds });
-}
-
 type MessageRowInput = {
   id: string;
   role: 'system' | 'user' | 'assistant';
@@ -1728,8 +1418,9 @@ type MessageRowInput = {
 };
 
 /** transcript 行幂等落库 + 会话流即时推送（live 工具行与终稿上传共用；
- * 与终稿按 id 去重 = onConflict upsert [设计]）。 */
-function upsertMessage(
+ * 与终稿按 id 去重 = onConflict upsert [设计]）。journal 内核导出面
+ * （machine-uploads.ts 终稿上传同消费）。 */
+export function upsertMessage(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { conversationId: string },
 ): void {
@@ -1744,8 +1435,9 @@ function upsertMessage(
   deps.convHub?.publishMessage(row.conversationId, row);
 }
 
-/** chief 线程行同形（chief_message 表 + 会话流键 = chief-<threadId>）。 */
-function upsertChiefRow(
+/** chief 线程行同形（chief_message 表 + 会话流键 = chief-<threadId>）。
+ * journal 内核导出面（machine-uploads.ts 终稿上传同消费）。 */
+export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
   row: MessageRowInput & { threadId: string },
 ): void {
@@ -1861,131 +1553,6 @@ function chiefStepToken(
     secrets: bundle.secrets,
     git: null,
   };
-}
-
-// —— upload-urls（预签名产物上传，r3 §1.6；self-host = server 自出一次性
-// PUT 端点 [设计]，无对象存储）———————————————————————————————————————————————
-
-export interface PendingUpload {
-  stepId: string;
-  name: string;
-  machineId: string;
-}
-
-export function createUploadUrls(
-  deps: MachineDeps,
-  machineId: string,
-  stepId: string,
-  files: { name: string }[],
-  origin: string,
-  uploads: Map<string, PendingUpload>,
-): { uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[] } {
-  ownedStep(deps, machineId, stepId);
-  const out = files.map((f) => {
-    const uploadId = newRecordId();
-    uploads.set(uploadId, { stepId, name: f.name, machineId });
-    return {
-      name: f.name,
-      url: `${origin}/api/machine/upload/${uploadId}`,
-      method: 'PUT' as const,
-      headers: {},
-    };
-  });
-  return { uploads: out };
-}
-
-/** plan.md 产物落库（M3b；02 §4.2/r5 §4「plan 即文件（plan.md），版本 =
- * 文件版本」）：每上传一版插一行 plan（version = max+1，驳回重规划轮自然
- * v2）+ build.planDocId 指向最新版（documents/{id}/diff 的 {id} 同值，
- * diff 端点面归 M4）。
- * #1027 入参校验：只接受处于规划语义的步（kind=plan 且未收尾）——此前只验
- * 机器归属，机器可对自持的 build/review 步落方案版本。非 plan kind = 400
- * （chiefStepToken「is not a … step」同族）；已收尾 = 409（恢复真路径只对
- * 仍 claimed 的步重传——recover 只返回 claimed，收尾后的迟到上传是改写
- * 历史版本面）。
- * #1026 幂等（键 = 步+内容）：「PUT 成功 / done 失败 → 恢复重传」把同一份
- * 内容再传一次时不落重复版本——最新版本就是本步同文产物时原样复用（版本/
- * 内容不动，planDocId 重指同 id = 幂等）。换步同文（驳回重规划轮照抄）不
- * 去重：版本面如实记录「新一轮规划发生过」。 */
-export function receivePlanUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
-  const stepRow = ownedStep(deps, upload.machineId, upload.stepId);
-  if (stepRow.kind !== 'plan') {
-    throw new HttpError(400, `step ${upload.stepId} is a ${stepRow.kind} step, not a plan step`);
-  }
-  if (stepRow.status !== 'claimed') {
-    throw new HttpError(409, `step ${upload.stepId} is ${stepRow.status}, plan upload rejected`);
-  }
-  const buildId = stepRow.buildId;
-  if (!buildId) throw new NotFoundError(`step ${upload.stepId}`);
-  const last = deps.db
-    .select({
-      id: planTable.id,
-      version: planTable.version,
-      content: planTable.content,
-      stepId: planTable.stepId,
-    })
-    .from(planTable)
-    .where(eq(planTable.buildId, buildId))
-    .orderBy(desc(planTable.version))
-    .limit(1)
-    .get();
-  if (last !== undefined && last.stepId === upload.stepId && last.content === content) {
-    deps.db.update(build).set({ planDocId: last.id }).where(eq(build.id, buildId)).run();
-    publishStepStatus(deps, upload.stepId);
-    return;
-  }
-  const id = newRecordId();
-  deps.db
-    .insert(planTable)
-    .values({
-      id,
-      buildId,
-      version: (last?.version ?? 0) + 1,
-      content,
-      stepId: upload.stepId,
-      createdAt: nowMs(),
-    })
-    .run();
-  deps.db.update(build).set({ planDocId: id }).where(eq(build.id, buildId)).run();
-  // 落库即发会话流 step 事件（XMON-59 第二断口）：plan 行此前静默落库，web
-  // ['plans', buildId] 在挂载取数读早于提交时无人再失效（方案卡停 v1/空）。
-  // step 事件是既有 web 失效面（sse.ts step 分支已列 plans——message 事件与
-  // plan.md 上传赛跑的兜底），把发布点从 done 收尾提前到落库点：done 面失
-  // 联/延迟/重放均不吞。载荷 = 当前 step 行（stepJournalRow 单源形状）。
-  publishStepStatus(deps, upload.stepId);
-}
-
-/** transcript 终稿落库（02 §1.3 数据所有权：transcript 消息/工具行经上传回传
- * 落 server DB）；id 幂等 upsert（与 tool live 行去重）。 */
-export function receiveUpload(
-  deps: MachineDeps,
-  upload: PendingUpload,
-  body: TranscriptUpload,
-): void {
-  ownedStep(deps, upload.machineId, upload.stepId);
-  if (body.stepId !== upload.stepId) throw new NotFoundError(`upload for step ${upload.stepId}`);
-  const stepRow = deps.db.select().from(step).where(eq(step.id, upload.stepId)).get();
-  const conversationId = stepRow?.buildId;
-  if (!conversationId) throw new NotFoundError(`step ${upload.stepId}`);
-  for (const m of body.messages) {
-    if (isChiefConversation(conversationId)) {
-      upsertChiefRow(deps, {
-        id: m.id,
-        threadId: conversationId,
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-      });
-      continue;
-    }
-    upsertMessage(deps, {
-      id: m.id,
-      conversationId,
-      role: m.role,
-      content: m.content,
-      createdAt: m.createdAt,
-    });
-  }
 }
 
 // —— done（步骤收尾 + phase 推进 + token 记账，02 §5.4/§4.2）——————————————————
@@ -2189,122 +1756,4 @@ async function applyMergeLanding(
   }
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
-}
-
-// —— machine shell（XMON-108 R1：每调用预检 + 审计先落 + 终态一次回写）——————
-
-/** 预检（POST /api/machine/shell/{stepId}）：claim 期 localTools 只是注册面，
- * 每条命令的真实闸在这里。双闸每调用重读——agent「远程 shell」开关（agent 行
- * 现值，步中被摘同样立即拒）∩ machine.shellEnabled（机器行现值，验收 #3 的
- * 「秒级热加载」由此兑现，claim 时快照不作数）。审计先于放行落库：拒绝 =
- * denied 行（含拒绝原因）落库后 403；放行 = running 行落库后返回 runId，
- * daemon 执行完毕经 result 端点回写终态（执行侧唯一标识 = runId，与 stepId
- * 解耦——同步多条命令各领各的 runId）。403 措辞先例 = requestMerge
- * （builds.ts）双开关校验。 */
-export function precheckShellCommand(
-  deps: MachineDeps,
-  machineId: string,
-  stepId: string,
-  body: MachineShellPrecheckBody,
-): { allowed: true; runId: string } {
-  const { db } = deps;
-  const stepRow = ownedStep(deps, machineId, stepId);
-  // 只对在跑步预检（pending 未领 / done/failed 已收尾 = 409 协议错）。
-  if (stepRow.status !== 'claimed') {
-    throw new HttpError(409, `step ${stepId} is not in flight (status: ${stepRow.status})`);
-  }
-  // chief 步无 shell 语义（claim 也不携带 localTools——见 buildChiefClaim）。
-  if (stepRow.kind === 'chief' || isChiefConversation(stepRow.buildId)) {
-    throw new HttpError(409, `step ${stepId} is a chief step (no shell semantics)`);
-  }
-  const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-  const todoRow = buildRow
-    ? db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
-    : undefined;
-  const agentRow = todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : undefined;
-  // claim 门槛已保证 worker 步有可解 Agent（modelId 非空才可领）；此处不可
-  // 解 = 协议层破坏（409，不落审计行——审计只记授权决定，见 schema 注释）。
-  if (!todoRow || !agentRow) {
-    throw new HttpError(409, `step ${stepId} has no resolvable agent for shell gating`);
-  }
-  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (!machineRow) throw new NotFoundError(`machine ${machineId}`);
-  // 拒绝路径：denied 审计行（终态，插入即终局）先落库，再抛 403 带原因——
-  // 「未授权命令从未跑过」是审计事实本身。
-  const deny = (reason: string): never => {
-    db.insert(shellCommand)
-      .values({
-        id: newRecordId(),
-        stepId,
-        machineId,
-        agentId: agentRow.id,
-        teamId: machineRow.teamId,
-        command: body.command,
-        status: 'denied',
-        errorMessage: reason,
-        createdAt: nowMs(),
-        finishedAt: nowMs(),
-      })
-      .run();
-    throw new HttpError(403, reason);
-  };
-  if (!agentRow.tools.includes(AGENT_TOOL_SHELL)) {
-    deny(
-      `Agent ${agentRow.displayName} 未获「远程 shell」授权（Agent 详情页权限 tab），无法执行命令`,
-    );
-  }
-  if (!machineRow.shellEnabled) {
-    deny(`机器 ${machineRow.name} 未开启 shell 访问（机器详情页），无法执行命令`);
-  }
-  // 放行路径：running 审计行先于 runId 下发落库（命令将执行的事实先入账）。
-  const runId = newRecordId();
-  db.insert(shellCommand)
-    .values({
-      id: runId,
-      stepId,
-      machineId,
-      agentId: agentRow.id,
-      teamId: machineRow.teamId,
-      command: body.command,
-      status: 'running',
-      createdAt: nowMs(),
-    })
-    .run();
-  return { allowed: true as const, runId };
-}
-
-/** 终态回写（POST /api/machine/shell/{runId}/result）：daemon 执行完毕按
- * runId 回写。状态机 = running → done | failed，终态只写一次——已终态行
- * 收到重复回写 = 幂等 200 不改写（branch-sync transitionBranchSync 同律：
- * 网络重试不产生第二份终账）。done = 进程跑完（exitCode 任意值含非零）；
- * failed = 执行没跑完（超时/杀进程/异常，errorMessage 携因）。denied 行收到
- * 回写 = 409（denied 的 runId 从未下发，只可能协议错）。 */
-export function reportShellResult(
-  deps: MachineDeps,
-  machineId: string,
-  runId: string,
-  body: MachineShellResultBody,
-): void {
-  const { db } = deps;
-  const row = db.select().from(shellCommand).where(eq(shellCommand.id, runId)).get();
-  if (!row) throw new HttpError(404, `shell run ${runId} not found`);
-  if (row.machineId !== machineId) {
-    throw new HttpError(403, `shell run ${runId} not owned by machine ${machineId}`);
-  }
-  if (row.status === 'denied') {
-    throw new HttpError(409, `shell run ${runId} was denied (no result to report)`);
-  }
-  if (row.status === 'done' || row.status === 'failed') return; // 终态幂等不改写
-  db.update(shellCommand)
-    .set({
-      status: body.status,
-      exitCode: body.status === 'done' ? (body.exitCode ?? null) : null,
-      output: body.output ?? null,
-      ...(body.status === 'failed' && body.errorMessage !== undefined
-        ? { errorMessage: body.errorMessage }
-        : {}),
-      finishedAt: nowMs(),
-    })
-    .where(eq(shellCommand.id, runId))
-    .run();
 }
