@@ -160,7 +160,7 @@ describe('EN dict liveness', () => {
     // 标题，api/sse.ts）是活键——liveness 面计入。
     const corpus = files
       .map((f) => readFileSync(f, 'utf8'))
-      .concat(readFileSync(join(SRC, 'fixtures/fixtures.ts'), 'utf8'))
+      .concat(sourceFiles(join(SRC, 'fixtures')).map((f) => readFileSync(f, 'utf8')))
       .concat(sourceFiles(join(SRC, 'api')).map((f) => readFileSync(f, 'utf8')))
       .join('\n');
     const dead = Object.keys(EN).filter(
