@@ -37,6 +37,10 @@ import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
   AGENT_TOOL_TAG,
+  appendMergedPrGuard,
+  buildMergedPrGuardInstruction,
+  buildMergedPrGuardNote,
+  buildSecondPrWarningNote,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_REMOTE_TOOLS,
@@ -54,7 +58,9 @@ import {
   LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
   machineRecordSchema,
+  mergedPrGuardNoteRowId,
   type SkillInjectionRecord,
+  secondPrWarningNoteRowId,
   selectSkillsForTask,
   suggestSkillsForMessage,
   updateSkillToolParamsSchema,
@@ -93,6 +99,7 @@ import {
   applyStoppedStep,
   completeStep,
   failStepWithEvents,
+  mergedPrElsewhere,
   NotFoundError,
   toBuildRecord,
 } from './builds.js';
@@ -228,6 +235,11 @@ function workerSkillInjection(
 export class MachineWakeHub {
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
+  /** team → 单调递增 wake 序号（#1217）：claim 面在首个 await 前取基线，
+   * waitWake 携带基线武装——检查与武装之间插入微任务后 wake 可能落在缝里
+   * （武装前发 = 纯 pubsub 丢事件），基线之后的 wake 补醒，missed-wake 竞态
+   * 由此在 hub 层消灭（否则 claim 醒不过 hold = 低延迟派发失守）。 */
+  private readonly wakeSeqs = new Map<string, number>();
   /** 机器定向派发索引（M7 #319，08 册附录 B）：单条 SSE 流的 team key
    * 粒度不够——sync 命令须按 machineId 派发给单台机器（团队可挂多机）。订阅
    * 时同步登记到 streamsByMachine，pushSync 走此索引；streams（team key）
@@ -242,11 +254,26 @@ export class MachineWakeHub {
    * abort）——断连时即刻 settle(false) 并摘除 waiter，不等 hold 到期：否则死
    * 机 waiter 会在 ≤75s 窗口内替死机抢领新步入队的 wake（waiter Set 按插入
    * 序，僵尸先注册先醒），步落死机无人执行。 */
-  waitWake(teamId: string, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
+  /** 当前 wake 序号（claim 面取基线用，同步无副作用）。 */
+  wakeSeq(teamId: string): number {
+    return this.wakeSeqs.get(teamId) ?? 0;
+  }
+
+  waitWake(
+    teamId: string,
+    timeoutMs: number,
+    signal?: AbortSignal,
+    sinceSeq?: number,
+  ): Promise<boolean> {
     return new Promise<boolean>((resolve) => {
       // 请求已断：不注册等待（响应无处投递，领取即孤儿步）。
       if (signal?.aborted) {
         resolve(false);
+        return;
+      }
+      // #1217 基线之后已有 wake（武装晚于 wake 的缝）→ 立即补醒，不睡 hold。
+      if (sinceSeq !== undefined && this.wakeSeq(teamId) > sinceSeq) {
+        resolve(true);
         return;
       }
       let settled = false;
@@ -278,6 +305,7 @@ export class MachineWakeHub {
 
   /** 新步入队 → 唤醒该团队全部等待者 + 推送 SSE wake（低延迟派发，02 §1.2）。 */
   wake(teamId: string): void {
+    this.wakeSeqs.set(teamId, (this.wakeSeqs.get(teamId) ?? 0) + 1);
     for (const send of this.streams.get(teamId) ?? []) {
       try {
         send({ type: 'wake' });
@@ -1043,13 +1071,13 @@ function buildChiefClaim(
   };
 }
 
-function tryClaim(
+async function tryClaim(
   deps: MachineDeps,
   machineId: string,
   teamId: string,
   origin: string,
   maxWorkers?: number,
-): ClaimedStep | null {
+): Promise<ClaimedStep | null> {
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
@@ -1182,6 +1210,16 @@ function tryClaim(
     // 失败至多白算一次扫描），随同一次 claim 写落 step 行——持久记录与
     // claim 载荷因此不可能漂移（「注入了什么」的正本 = 本列）。
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
+    // #1217 已合并 PR 守卫探测（claim 面主防线）：todo 的首张 PR 已在 GitHub
+    // merged 真值合并后，后续 build 的 plan/build 步 claim 在指令面追加「不
+    // 要再开 PR」守卫（merge 步本身不开 PR、review 无关，不设防）。探测先于
+    // 原子领取——#1106 同位律：领取竞态失败至多白算一次出站（无先前 PR build
+    // 时零出站）。守卫命中 → 指令追加 + conv 落生效 note；open / closed-
+    // unmerged / 探测不到 = null 不设防（fail-open，判据信 GitHub 真值）。
+    const guardPr =
+      cand.stepRow.kind === 'plan' || cand.stepRow.kind === 'build'
+        ? await mergedPrElsewhere(deps, cand.todoRow.id, cand.stepRow.buildId)
+        : null;
     // 原子领取：仅当仍 pending 时置 claimed（单进程 better-sqlite3 同步写）。
     const claimedAt = nowMs();
     const res = db
@@ -1196,6 +1234,20 @@ function tryClaim(
       .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
       .run();
     if (res.changes === 0) continue;
+    // 守卫生效即落 conv system note（板面可见——指令被 #612 词表过滤出用户
+    // 话语后，可见性由本行承担；deterministic id = 同 build 多步 claim 幂等）。
+    if (guardPr !== null) {
+      upsertMessage(deps, {
+        id: mergedPrGuardNoteRowId(cand.stepRow.buildId),
+        conversationId: cand.stepRow.buildId,
+        role: 'system',
+        content: buildMergedPrGuardNote({
+          prNumber: guardPr.prNumber,
+          prUrl: guardPr.prUrl,
+        }),
+        createdAt: nowMs(),
+      });
+    }
     // claim 即 phase 推进（phase.ts 边集：queued→planning/building，02 §4.2）。
     if (cand.todoRow.phase === 'queued') {
       setTodoPhase(deps, cand.todoRow.id, cand.stepRow.kind === 'plan' ? 'planning' : 'building');
@@ -1247,6 +1299,18 @@ function tryClaim(
           }
         : undefined;
     publishStepStatus(deps, cand.stepRow.id);
+    // #1217 守卫指令拼装：原 prompt 在前、守卫以尾行拼接（appendPlanLocationNote
+    // 同律——单换行、包含判幂等）；原 prompt null 时守卫独占 instruction（裸守
+    // 卫形，#612 词表判 synthetic 退场用户话语面）。
+    const instruction =
+      guardPr === null
+        ? cand.stepRow.prompt
+        : cand.stepRow.prompt !== null
+          ? appendMergedPrGuard(cand.stepRow.prompt, {
+              prNumber: guardPr.prNumber,
+              prUrl: guardPr.prUrl,
+            })
+          : buildMergedPrGuardInstruction({ prNumber: guardPr.prNumber, prUrl: guardPr.prUrl });
     return {
       step: {
         id: cand.stepRow.id,
@@ -1257,7 +1321,7 @@ function tryClaim(
       },
       conversationId: cand.stepRow.buildId, // buildId ≡ conversationId（CONTEXT.md）
       session,
-      ...(cand.stepRow.prompt !== null ? { instruction: cand.stepRow.prompt } : {}),
+      ...(instruction !== null ? { instruction } : {}),
       ...(reworkContext !== undefined ? { reworkContext } : {}),
       todo: {
         id: cand.todoRow.id,
@@ -1325,9 +1389,13 @@ export async function claimStep(
   body?: { maxWorkers?: number },
 ): Promise<ClaimedStep | null> {
   if (signal?.aborted) return null;
-  const first = tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
+  // #1217：wake 基线先于一切 await 取（同步）——tryClaim 异步化（#1217 守卫
+  // 探测）后「检查完 → 武装 waitWake」之间出现微任务缝，入队 wake 若落在缝里，
+  // 纯 pubsub 会丢事件、claim 睡满 hold；waitWake 携带基线即可补醒。
+  const sinceWake = deps.machineHub.wakeSeq(teamId);
+  const first = await tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
   if (first) return first;
-  await deps.machineHub.waitWake(teamId, holdMs, signal);
+  await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
   if (signal?.aborted) return null;
   return tryClaim(deps, machineId, teamId, origin, body?.maxWorkers);
 }
@@ -2184,6 +2252,31 @@ export async function finishStep(
           ? db.select().from(todo).where(eq(todo.id, row.todoId)).get()
           : undefined;
         if (row && todoRow) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
+      }
+    }
+  }
+  // #1217 第二张 PR 警告（done 回填面兜底）：本步回填了新 PR 且同 todo 已有
+  // 更早的 GitHub merged PR（守卫探测判，排除本 build 自身）——agent 无视
+  // claim 面守卫指令仍开了第二张 PR，疑似重复交付。落 conv system 警告
+  // note 点名双 PR（PR 面可见；合并面 409 之外的第二道兜底——即便合并闸
+  // 也会拦，警告先让板面看得见）。deterministic id = 同 build 重报幂等；
+  // 无先前 PR build / 探测不到 = 不警告（fail-open，正常落地路零出站）。
+  if (body.prUrl !== undefined && body.prNumber !== undefined) {
+    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (buildRow) {
+      const priorMerged = await mergedPrElsewhere(deps, buildRow.todoId, stepRow.buildId);
+      if (priorMerged !== null) {
+        upsertMessage(deps, {
+          id: secondPrWarningNoteRowId(stepRow.buildId),
+          conversationId: stepRow.buildId,
+          role: 'system',
+          content: buildSecondPrWarningNote({
+            prNumber: body.prNumber,
+            mergedPrNumber: priorMerged.prNumber,
+            mergedPrUrl: priorMerged.prUrl,
+          }),
+          createdAt: nowMs(),
+        });
       }
     }
   }

@@ -355,7 +355,7 @@ export async function executeMcpTool(
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) {
         requireTeamBuild(db, buildId, ctx.teamId);
-        mergeBuild(deps, buildId);
+        await mergeBuild(deps, buildId);
       }
       return json({ mergeDelegated: buildIds }); // 202 delegated 语义族（r3 §3.6）
     }

@@ -178,6 +178,47 @@ function stripPlanLocationNote(text: string): string {
   return wrappedBy(note, PLAN_NOTE_HEAD, PLAN_NOTE_TAIL) ? text.slice(0, idx) : text;
 }
 
+// —— #1217 已合并 PR 守卫指令（claim 面追加 / 过滤侧剥离共用锚点）————————
+
+/** #1217 守卫指令头尾（写侧组装与过滤侧剥离共用的锚点）。 */
+const MERGED_PR_GUARD_HEAD = '已合并 PR 守卫：本任务此前已有已合并的 PR #';
+const MERGED_PR_GUARD_TAIL =
+  '。不要再开新的 Pull Request——该 PR 已把改动合入默认分支，再开就是重复交付；本步及后续步都不要调用 gh pr create，如确有改动，在会话分支上提交并推送即可。';
+
+/** #1217 守卫指令（claim 面单源）：todo 已有 GitHub merged 真值 PR 时，后续
+ *  build 的 plan/build 步 instruction 尾部追加的禁令行。pacman 不写 GitHub
+ *  （link-back 只读），PR 由执行侧 agent 经机器 gh CLI 开——预防面 = 指令层
+ *  明说（首 PR 已合并、再开即重复交付），合并面 409 与回填警告 note 是兜底。
+ *  写侧（server claim）与过滤侧（classifyUserText）单源在此。 */
+export function buildMergedPrGuardInstruction(input: {
+  prNumber: number;
+  prUrl: string | null;
+}): string {
+  const url = input.prUrl !== null ? `（${input.prUrl}）` : '';
+  return `${MERGED_PR_GUARD_HEAD}${input.prNumber}${url}${MERGED_PR_GUARD_TAIL}`;
+}
+
+/** 守卫追加（幂等：守卫已在场 = 原文返回——同 build 多步 claim 不叠注）。
+ *  单换行拼接（appendPlanLocationNote 同律：守卫是指令段的收尾行）。 */
+export function appendMergedPrGuard(
+  prompt: string,
+  input: { prNumber: number; prUrl: string | null },
+): string {
+  if (prompt.includes(MERGED_PR_GUARD_HEAD)) return prompt;
+  const instruction = buildMergedPrGuardInstruction(input);
+  return prompt === '' ? instruction : `${prompt}\n${instruction}`;
+}
+
+/** 尾部守卫行剥离（过滤侧）：prompt 以 '\n' + 守卫行收尾时剥掉守卫，余段
+ *  走模板比对——追加守卫不改变合成行识别（restart/续轮指令 + 守卫尾行
+ *  全族，裸守卫直接命中 wrappedBy）。非守卫收尾 = 原文返回。 */
+function stripMergedPrGuard(text: string): string {
+  const idx = text.lastIndexOf(`\n${MERGED_PR_GUARD_HEAD}`);
+  if (idx === -1) return text;
+  const guard = text.slice(idx + 1);
+  return wrappedBy(guard, MERGED_PR_GUARD_HEAD, MERGED_PR_GUARD_TAIL) ? text.slice(0, idx) : text;
+}
+
 /** 开始任务编排请求（#640 / r14 §5.2：编排回合的会话 user 消息 = 总目标
  *  正本，任务原文逐字内嵌 = 稳定锚点；实体引用 [#n](todo:<id>) 走 chief
  *  正文引用族）。首行短且无 markdown——chiefThreadTitle 取首行前 12 字符做
@@ -221,22 +262,31 @@ function wrappedBy(text: string, head: string, tail: string): boolean {
 }
 
 /** 模板比对（SYNTHETIC 词表全量）：CONTINUE 占位句 / replan / review-reject
- *  （#701）/ restart 模板 / 审核材料 meta。 */
+ *  （#701）/ restart 模板 / 守卫指令（#1217，middle = PR 号 + url）/ 审核材料
+ *  meta。 */
 function matchesSyntheticTemplates(text: string): boolean {
   return (
     SYNTHETIC_EXACT.has(text) ||
     wrappedBy(text, REPLAN_HEAD, REPLAN_TAIL) ||
     wrappedBy(text, REVIEW_REJECT_HEAD, REVIEW_REJECT_TAIL) ||
     wrappedBy(text, RESTART_HEAD, RESTART_TAIL) ||
+    wrappedBy(text, MERGED_PR_GUARD_HEAD, MERGED_PR_GUARD_TAIL) ||
     parseReviewPromptMeta(text) !== null
   );
 }
 
-/** 纯合成指令判定（SYNTHETIC 词表全量 + #1203 注记剥离）：plan 步投递串
- *  尾部带交接位置注记行——剥注记后比对。余段须命中模板才算合成（注记本身
- *  不构成合成判定：用户话语带注记形尾行不因此误杀）。 */
+/** 纯合成指令判定（SYNTHETIC 词表全量 + 尾部附加行剥离）：plan 步投递串尾部
+ *  带交接位置注记行（#1203）/ 已合并 PR 守卫行（#1217）——剥附加行后比对。
+ *  余段须命中模板才算合成（附加行本身不构成合成判定：用户话语带守卫形尾行
+ *  不因此误杀）。剥离严格缩短文本 → 递归必然终结；非附加行收尾 = 原文返回，
+ *  链路零推进。 */
 function isSyntheticInstruction(text: string): boolean {
-  return matchesSyntheticTemplates(text) || matchesSyntheticTemplates(stripPlanLocationNote(text));
+  if (matchesSyntheticTemplates(text)) return true;
+  const withoutGuard = stripMergedPrGuard(text);
+  if (withoutGuard !== text) return isSyntheticInstruction(withoutGuard);
+  const withoutNote = stripPlanLocationNote(text);
+  if (withoutNote !== text) return isSyntheticInstruction(withoutNote);
+  return false;
 }
 
 /** role-user wire 行文本的归属判定：

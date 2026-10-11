@@ -460,6 +460,35 @@ function latestPrBuild(db: Db, todoId: string): BuildRow | null {
   );
 }
 
+/** 出站 PR 状态探测的公共半边（#931 / #1217 共用）：项目形态闸 + owner/repo
+ *  拆分 + token 阶梯。非 github 形态或 prNumber 缺位（无从探测）→ null，
+ *  fail-open 语义归各调用方。timeoutMs 缺省回落 githubPullState 自带值
+ *  （#1217 claim 热路径传 5s 短预算，#931 restart 非热路径用缺省）。 */
+async function probePullState(
+  deps: BuildDeps,
+  teamId: string,
+  projectId: string,
+  prNumber: number,
+  timeoutMs?: number,
+): Promise<{ state: 'open' | 'closed'; merged: boolean } | null> {
+  const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+  if (projRow?.repoKind !== 'github' || projRow.githubRepo === null) return null;
+  const slash = projRow.githubRepo.indexOf('/');
+  const owner = projRow.githubRepo.slice(0, slash);
+  const repo = projRow.githubRepo.slice(slash + 1);
+  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
+  // box 缺席按未连接处理（探测是辅助面，不把主请求 500 掉）。
+  let token: string | null = null;
+  if (deps.box) {
+    try {
+      token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
+    } catch {
+      token = null;
+    }
+  }
+  return githubPullState(deps.githubFetch ?? fetch, token, owner, repo, prNumber, timeoutMs);
+}
+
 /** 复用目标的 PR 状态判定（#931 失败方式 3）：open / 探测不到 → null（复用
  * ——探测失败时盲开新分支会把本票的 bug 原样带回来，而误复用已合并分支只是
  * 提交落旧分支〔可见、可收拾〕，代价不对称）；closed → 'merged' | 'closed'
@@ -472,30 +501,57 @@ async function probeReworkTargetPr(
   todo: { projectId: string; teamId: string },
 ): Promise<'merged' | 'closed' | null> {
   if (target.prNumber === null) return null;
-  const projRow = deps.db.select().from(project).where(eq(project.id, todo.projectId)).get();
-  if (projRow?.repoKind !== 'github' || projRow.githubRepo === null) return null;
-  const slash = projRow.githubRepo.indexOf('/');
-  const owner = projRow.githubRepo.slice(0, slash);
-  const repo = projRow.githubRepo.slice(slash + 1);
-  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
-  // box 缺席按未连接处理（探测是辅助面，不把 restart 请求 500 掉）。
-  let token: string | null = null;
-  if (deps.box) {
-    try {
-      token = openGithubToken({ db: deps.db, box: deps.box }, projRow.teamId);
-    } catch {
-      token = null;
-    }
-  }
-  const state = await githubPullState(
-    deps.githubFetch ?? fetch,
-    token,
-    owner,
-    repo,
-    target.prNumber,
-  );
+  const state = await probePullState(deps, todo.teamId, todo.projectId, target.prNumber);
   if (state === null || state.state === 'open') return null;
   return state.merged ? 'merged' : 'closed';
+}
+
+// —— #1217 同 todo 第二张 PR 守卫判定（claim / merge / done 回填三面消费）———
+
+/** 守卫探测超时（claim 热路径版）：5s 上界——claim 长轮询预算（daemon
+ *  REQUEST_TIMEOUT_MS = HOLD_MS + 15s）内绰绰有余，慢网至多延迟一步 claim，
+ *  不拖死整轮。 */
+const MERGED_PR_GUARD_PROBE_TIMEOUT_MS = 5_000;
+
+/** 同 todo 已合并 PR 探测（#1217）：todoId 下除 excludeBuildId 外的更早 PR
+ *  build（prUrl/prNumber 任一非空），按 createdAt 降序逐个出站探测，merged
+ *  真值命中即返回该 build 的 PR 字段（prNumber 恒非空——缺位行被跳过，调用
+ *  方点名 PR 无需再判 null）；全部 open / closed-unmerged / 探测不到 → null
+ *  （fail-open：守卫不拦正常路径，判据信 GitHub 真值不信本地 git）。
+ *  excludeBuildId = 本 build——自身 PR 已合并属正常落地路，不误拦；无先前
+ *  PR build 时列表为空、零出站（守卫在常规首 PR 流程上不花网络）。closed-
+ *  unmerged 继续向更旧的 build 探（首 PR 关闭后更早一张已合并的形仍算已交付）。 */
+export async function mergedPrElsewhere(
+  deps: BuildDeps,
+  todoId: string,
+  excludeBuildId: string,
+): Promise<{ prNumber: number; prUrl: string | null } | null> {
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
+  if (todoRow === undefined) return null;
+  const prior = deps.db
+    .select()
+    .from(build)
+    .where(
+      and(
+        eq(build.todoId, todoId),
+        ne(build.id, excludeBuildId),
+        or(isNotNull(build.prUrl), isNotNull(build.prNumber)),
+      ),
+    )
+    .orderBy(desc(build.createdAt))
+    .all();
+  for (const row of prior) {
+    if (row.prNumber === null) continue;
+    const state = await probePullState(
+      deps,
+      todoRow.teamId,
+      todoRow.projectId,
+      row.prNumber,
+      MERGED_PR_GUARD_PROBE_TIMEOUT_MS,
+    );
+    if (state?.merged) return { prNumber: row.prNumber, prUrl: row.prUrl };
+  }
+  return null;
 }
 
 /** 确认回路（02 §4.2，r5 §4 实走）：POST /api/builds/{id}/steps
@@ -833,13 +889,13 @@ function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
 
 /** 合并（02 §4.2/A6：merge = 202 delegated 机器执行；机器领合并步 continue
  * session 复用执行轮会话 → git merge --no-edit → phase=done，执行面归 M3）。 */
-export function requestMerge(
+export async function requestMerge(
   deps: BuildDeps,
   buildId: string,
   /** 宣告行 actor 位（#902）：REST 缺省 = 用户；chief merge_builds = Chief
    * 绑定 Agent；MCP = key 属主。权限闸拒否与 actor 无关（403 在行之前）。 */
   actor?: string,
-): { delegated: true } {
+): Promise<{ delegated: true }> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
@@ -852,6 +908,21 @@ export function requestMerge(
   }
   // 合并关口 = review（「将改动合并到默认分支」确认弹层，r3 §3.6）。
   assertPhaseTransition(todoRow.phase, 'done');
+  // #1217 第二张 PR 守卫（合并面兜底）：本 build 自己开了 PR 且同 todo 已有
+  // 更早的 GitHub merged PR → 409 点名双 PR，拒收（同一 todo 两张 PR 先后落地
+  // = 重复交付，卡 #25 实锤：首 PR #1202 合并后重跑轮又开 #1205 并被合并）。
+  // 本 build 无自身 PR 不拦（合并步本身是合法路径）；首 PR closed-unmerged 不
+  // 拦（返工重投正当）；探测不到不拦（fail-open——守卫主防线在 claim 面指令，
+  // 此处是机器面外的第二道）。放在权限闸/宣告行/入队之前：拒收即无痕。
+  if (row.prNumber !== null) {
+    const priorMerged = await mergedPrElsewhere(deps, row.todoId, row.id);
+    if (priorMerged !== null) {
+      throw new HttpError(
+        409,
+        `本任务已有已合并的 PR #${priorMerged.prNumber}，本 build 又开了 PR #${row.prNumber}——疑似重复交付，拒绝发起合并（请人工复核后处理）`,
+      );
+    }
+  }
   // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
   // 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、
   // github done 语义即已推），assignment.build 槽 Agent 必须同时持有两开关；
