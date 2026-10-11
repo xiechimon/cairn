@@ -28,7 +28,7 @@ import {
 } from 'node:fs';
 import { access as fsAccess, readFile as fsReadFile } from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
-import { join, sep } from 'node:path';
+import { basename, join, sep } from 'node:path';
 import {
   type AgentSession,
   createAgentSession,
@@ -736,6 +736,54 @@ export function collectDeniedSkillDirs(
   return loaded
     .filter((s) => !allowed.has(s.name))
     .map((s) => ({ name: s.name, baseDir: s.baseDir }));
+}
+
+/** 团队 view 内 allowed 条目（#1171 native 插件面消费形）：dirName = view
+ * 子目录名（插件装配位）；name = frontmatter name 回落目录名（#367 wire
+ * 同源——与 catalog/deny 同匹配语义）；baseDir 供测试/诊断指位。 */
+export interface TeamSkillEntry {
+  name: string;
+  dirName: string;
+  baseDir: string;
+}
+
+/** native 插件面 allowed 集单源（#1171）：与 catalog/deny 同一
+ * scanSessionSkills 扫描（消费面对同一技能全集负责，参数形状不得各自漂移
+ * ——本函数是该族的第三个消费面），取 baseDir 在 teamSkillsDir 之下的子集
+ * （本机 skillsDir 条目不混入），按 skillsAllowlist 过滤（缺省 = 全量直通，
+ * chief/null 面）。**不以 injectedSkills 收窄**——注入选择是 catalog 通道的
+ * 噪声语义、不越授权面（#917「deny 面不随选择收窄」同律）。前缀比较两侧
+ * 过 realpath 归一（createSkillReadGate 同律，macOS `/tmp` 漂移不得丢条目）。
+ * 扫描失败 fail-open 空集（catalog 同律：注入面为空时无「目录里有、插件
+ * 挡不住」的错位）。 */
+export function collectTeamSkillEntries(
+  skills: { skillsDir: string; cwd: string } | undefined,
+  opts: { skillsAllowlist?: string[]; teamSkillsDir?: string },
+): TeamSkillEntry[] {
+  if (!skills || opts.teamSkillsDir === undefined) return [];
+  let loaded: Skill[];
+  try {
+    loaded = scanSessionSkills(skills, opts.teamSkillsDir).skills;
+  } catch {
+    return [];
+  }
+  const resolve = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  const viewReal = resolve(opts.teamSkillsDir);
+  const allowed = opts.skillsAllowlist !== undefined ? new Set(opts.skillsAllowlist) : null;
+  const out: TeamSkillEntry[] = [];
+  for (const s of loaded) {
+    if (allowed !== null && !allowed.has(s.name)) continue;
+    const baseReal = resolve(s.baseDir);
+    if (baseReal !== viewReal && !baseReal.startsWith(viewReal + sep)) continue;
+    out.push({ name: s.name, dirName: basename(s.baseDir), baseDir: s.baseDir });
+  }
+  return out;
 }
 
 /** 门控 read 的判定 + operations 面。check：null = 放行；条目 = 拒绝（命中

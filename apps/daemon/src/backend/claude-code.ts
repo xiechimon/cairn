@@ -21,6 +21,12 @@
 // bypassPermissions + readOnly → disallowedTools 收 Edit/Write（SDK 工具名）
 // + AskUserQuestion（非交互 daemon 面，Multica claude.go:1078-1092 同律）；
 // thinkingLevel → SDK effort（域内透传，off/minimal 缺省不发，域外 fail-closed）。
+//
+// #1171 原生插件通道：团队技能另经 SDK `plugins`（→ `--plugin-dir`）进 CLI
+// 原生 Skill 发现面——落点 daemon 缓存 plugins/ 分区（team-skills.ts
+// ensureTeamSkillsPlugin），任务 worktree 零写入；与 A9 catalog 通道并存
+// （票面边界），deny 三条规则形不改（alias 命中插件限定名，实测见票评论
+// 探针 2）。版本闸/装配失败一律显式日志行 + catalog 兜底，不阻断步。
 
 import { randomUUID } from 'node:crypto';
 import { existsSync, realpathSync } from 'node:fs';
@@ -36,6 +42,7 @@ import {
   type SDKMessage,
   type SDKUserMessage,
   type SdkMcpToolDefinition,
+  type SdkPluginConfig,
   type SettingSource,
   tool,
 } from '@anthropic-ai/claude-agent-sdk';
@@ -56,10 +63,12 @@ import type {
 } from '@pacman/shared';
 import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
+import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { SessionNotResumableError } from './errors.js';
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
+  collectTeamSkillEntries,
   composeSkillsSection,
   type DeniedSkillEntry,
 } from './pi.js';
@@ -754,6 +763,101 @@ export function buildSkillDenyRules(denied: readonly DeniedSkillEntry[]): string
   ]);
 }
 
+// —— 原生插件通道（#1171）：团队技能进 Claude Code 原生 Skill 发现面 ——————
+// SDK `plugins` 选项（pluginDelivery 缺省 'argv' → 每插件一个 `--plugin-dir`
+// 旗标）把 daemon 缓存 plugins/ 分区里的插件目录交给 CLI 原生加载：技能以
+// `pacman-team-skills:<name>` 限定形进 Skill 工具清单（alias = 非限定名），
+// 任务 worktree 零写入。deny 三条规则形不改一字即命中插件限定名（alias
+// 匹配；#1171 调研评论探针 2 实测），allowed 技能不误伤。catalog XML 简报
+// 通道照常并存（票面边界）——本通道任何失败都回落 catalog，不阻断步。
+
+/** 版本下限：`--plugin-dir` 旗标的最早可证版本（anthropics/claude-code
+ *  CHANGELOG 2.1.74「Changed --plugin-dir so local dev copies now override
+ *  installed marketplace plugins…」——Changed 条目 = 该版旗标已在；插件系统
+ *  本身 2.0.12 发布）。低于下限的 CLI 收到 --plugin-dir 会以 unknown-option
+ *  退出——跳过插件通道保 catalog 兜底（零回归），别把步炸在旗标上。 */
+export const MIN_CLAUDE_PLUGIN_VERSION = '2.1.74';
+
+/** 版本号数值段比较（前三段数值；`2.1.289-beta.3` 取数值前缀）。解析失败 /
+ *  null / 缺省 = false（fail-closed：版本不可证 → 跳过插件通道，catalog
+ *  兜底）。版本源 = #1050 探测单源（machine-loop executableVersion 接线）。 */
+export function claudeVersionAtLeast(version: string | null | undefined, min: string): boolean {
+  const parse = (v: string): number[] | null => {
+    const parts = v
+      .split('.')
+      .slice(0, 3)
+      .map((p) => {
+        const m = /^(\d+)/.exec(p);
+        return m === null ? Number.NaN : Number.parseInt(m[1] ?? '', 10);
+      });
+    return parts.length === 3 && parts.every((n) => !Number.isNaN(n)) ? parts : null;
+  };
+  if (version == null) return false;
+  const a = parse(version);
+  const b = parse(min);
+  if (a === null || b === null) return false;
+  for (let i = 0; i < 3; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return true;
+}
+
+export interface TeamSkillsPluginParts {
+  /** 后端 skills 扫描配置（catalog/deny 同源）；缺省 = 未配置注入面。 */
+  skills: { skillsDir: string; cwd: string } | undefined;
+  /** 团队技能缓存根（StatePaths.teamSkillsCacheDir 单源，machine-loop 接线）；
+   * 缺省 = 通道未接线 → null + 显式行（接线缺失必须可见，不静默死）。 */
+  cacheRoot: string | undefined;
+  /** #1050 探测版本（null/不可解析 = 按下限以下处理，fail-closed）。 */
+  executableVersion: string | null | undefined;
+  /** 会话面技能参数（SessionOpts 投影：授权白名单 + 团队视图目录）。
+   * injectedSkills 在形但**不消费**——注入选择是 catalog 通道语义，不越
+   * native 授权面（#917 同律；P3 测试钉住）。 */
+  session: { skillsAllowlist?: string[]; injectedSkills?: string[]; teamSkillsDir?: string };
+  log?: (msg: string) => void;
+}
+
+/** 插件通道解析面（纯组合可单测；open() 只接线）。顺序 = 版本闸 → allowed
+ * 集（collectTeamSkillEntries，与 catalog/deny 同扫描源；白名单外技能构造性
+ * 不在插件里 = deny 面零回退）→ ensureTeamSkillsPlugin 装配。null = 通道关；
+ * 除 teamSkillsDir 缺省（纯本机步，无信号噪声）外每个 null 都有显式日志行。
+ * injectedSkills 不参与——注入选择是 catalog 通道语义（#917 同律）。 */
+export function resolveTeamSkillsPluginDir(parts: TeamSkillsPluginParts): string | null {
+  const viewDir = parts.session.teamSkillsDir;
+  if (viewDir === undefined) return null;
+  const log = parts.log;
+  if (parts.cacheRoot === undefined) {
+    log?.('native-plugin: skipped (team-skills cache root not wired; catalog channel only)');
+    return null;
+  }
+  if (!claudeVersionAtLeast(parts.executableVersion, MIN_CLAUDE_PLUGIN_VERSION)) {
+    log?.(
+      `native-plugin: skipped (claude ${parts.executableVersion ?? 'unparsed'} < ${MIN_CLAUDE_PLUGIN_VERSION}; catalog channel only)`,
+    );
+    return null;
+  }
+  const entries = collectTeamSkillEntries(parts.skills, {
+    ...(parts.session.skillsAllowlist !== undefined
+      ? { skillsAllowlist: parts.session.skillsAllowlist }
+      : {}),
+    teamSkillsDir: viewDir,
+  });
+  if (entries.length === 0) {
+    log?.('native-plugin: 0 allowed team skill(s); not delivered (catalog channel only)');
+    return null;
+  }
+  const dir = ensureTeamSkillsPlugin({
+    cacheRoot: parts.cacheRoot,
+    viewDir,
+    dirNames: entries.map((e) => e.dirName),
+    ...(log !== undefined ? { log } : {}),
+  });
+  if (dir !== null) log?.(`native-plugin: ${entries.length} skill(s) → ${dir}`);
+  return dir;
+}
+
 /** sdkOptions 组装面（纯函数可单测；open() 只备料）。skillDenyRules =
  * buildSkillDenyRules 产物（口径 4 硬挡）；空/缺省 = settings 键不发
  * （chief 面 CLI 默认行为零回归）。SDK `skills` 键恒不发——见
@@ -774,6 +878,13 @@ export interface ClaudeSdkOptionParts {
   /** #1148 步级 env（SessionOpts.env 透传；worker 步端口基座）。缺席 = 不发
    * env 键（subprocess 继承 process.env，现行为）。 */
   env?: Record<string, string>;
+  /** #1171 原生插件通道（resolveTeamSkillsPluginDir 产物）。缺席/空 = 键
+   * 不发（chief 面与无团队技能面零漂移）。pluginDelivery 恒不发：缺省
+   * 'argv'（每插件一个 --plugin-dir 旗标）兼容全版本段；'initialize' 形要求
+   * CLI ≥ 2.1.261，高于本通道的证据下限 2.1.74，不采。skipMcpDiscovery 同理
+   * 不发（翻译成 --plugin-dir-no-mcp，下限无实证）——插件目录由 daemon 自建
+   * （只有 .claude-plugin/ + skills/），构造面无 .mcp.json 可读。 */
+  plugins?: SdkPluginConfig[];
   abortController: AbortController;
 }
 
@@ -806,6 +917,8 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     // #1148：SDK env 是**整替**语义（不与 process.env 合并）——必须先展开
     // process.env 保 PATH/HOME/ANTHROPIC_* 等继承位，per-step 值最后覆盖。
     ...(parts.env !== undefined ? { env: { ...process.env, ...parts.env } } : {}),
+    // #1171：原生插件通道（团队技能 → CLI Skill 发现面）。空/缺省 = 键不发。
+    ...(parts.plugins !== undefined && parts.plugins.length > 0 ? { plugins: parts.plugins } : {}),
     abortController: parts.abortController,
   };
 }
@@ -824,6 +937,12 @@ export interface ClaudeCodeBackendOpts {
    *  SDK 的 pathToClaudeCodeExecutable）。缺席 = 探测没找到（启动即报）或
    *  注入面测试——两种情况都回到 SDK 自己的 PATH 解析。 */
   executablePath?: string;
+  /** #1171 原生插件通道：团队技能缓存根（StatePaths.teamSkillsCacheDir 单源，
+   *  machine-loop 接线；plugins/ 分区在其下）。缺席 = 通道关（注入面测试）。 */
+  teamSkillsCacheDir?: string;
+  /** #1050 探测版本（插件通道版本下限闸输入，MIN_CLAUDE_PLUGIN_VERSION）。
+   *  缺席/null/不可解析 = fail-closed 跳过插件通道（catalog 兜底）。 */
+  executableVersion?: string | null;
 }
 
 export class ClaudeCodeBackend implements AgentBackend {
@@ -911,6 +1030,17 @@ export class ClaudeCodeBackend implements AgentBackend {
     if (deniedSkills.length > 0) {
       this.opts.onSkillsLog?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
     }
+    // #1171 原生插件通道：团队技能经 SDK plugins（→ --plugin-dir）进 CLI
+    // 原生 Skill 发现面（落点 = daemon 缓存 plugins/ 分区，任务 worktree 零
+    // 写入）。白名单外技能构造性不在插件里（deny 面零回退，规则三条不改）；
+    // 版本闸/装配失败 = 显式日志行 + catalog XML 通道兜底，不阻断步。
+    const nativePluginDir = resolveTeamSkillsPluginDir({
+      skills: this.opts.skills,
+      cacheRoot: this.opts.teamSkillsCacheDir,
+      executableVersion: this.opts.executableVersion,
+      session: opts,
+      ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
+    });
     const sdkOptions: Options = buildClaudeSdkOptions({
       cwd: opts.cwd,
       modelId: opts.modelId,
@@ -926,6 +1056,10 @@ export class ClaudeCodeBackend implements AgentBackend {
         : {}),
       // #1148 步级 env（worker 步端口基座）→ SDK 子进程环境（整替 + 展开）。
       ...(opts.env !== undefined ? { env: opts.env } : {}),
+      // #1171 原生插件通道（null = 通道关，键不发）。
+      ...(nativePluginDir !== null
+        ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
+        : {}),
       abortController: abort,
     });
     const state = createClaudeMapState({

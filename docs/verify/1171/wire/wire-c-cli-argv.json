@@ -1,0 +1,24 @@
+[
+  {
+    "time": "2026-10-10T17:53:13.978Z",
+    "cwd": "/private/tmp/pacman-1171-wire-home1/workspaces/01a126f2-91d7-72c9-870c-ff58f833dcd4",
+    "argv": [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--input-format",
+      "stream-json",
+      "--model",
+      "glm-5.3",
+      "--disallowedTools",
+      "AskUserQuestion",
+      "--setting-sources=user,project,local",
+      "--permission-mode",
+      "bypassPermissions",
+      "--include-partial-messages",
+      "--session-id=9658dff3-c229-45ab-aa37-de6ccd251a86",
+      "--settings",
+      "{\"permissions\":{\"deny\":[\"Read(//tmp/pacman-1171-local-skills/local-only-1171/**)\",\"Skill(local-only-1171)\",\"Skill(skill:local-only-1171)\"]}}"
+    ]
+  }
+]

@@ -1,0 +1,6 @@
+[skills] team: 2 skill(s), 2 file(s) materialized → /tmp/pacman-1171-wire-home1/team-skills/views/0277f398a3f812d7eddc8b93b866def25441227491af1aec8774815bca6f1f85 (fetched 1 file(s) / 153 byte(s), reused 1)
+[skills] filtered: marker-alpha not in injected selection
+[skills] filtered: marker-beta not in injected selection
+[skills] filtered: local-only-1171 not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[skills] native-plugin: 2 skill(s) → /tmp/pacman-1171-wire-home1/team-skills/plugins/2df6ebcc7182b38426fb8a88aff34d86c16e03029e76d190d13964cf74265af3

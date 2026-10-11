@@ -1,0 +1,6 @@
+[skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-1171-wire-home2/team-skills/views/cd21315cb76591528570ac706d04586c970dfc61dab4ef56207fd30a23cab5a2 (fetched 1 file(s) / 148 byte(s), reused 0)
+[skills] filtered: local-only-1171 not in agent allowlist
+[skills] filtered: marker-alpha not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[skills] deny: 1 skill dir(s) hard-blocked
+[skills] native-plugin: skipped (claude 2.0.5 < 2.1.74; catalog channel only)

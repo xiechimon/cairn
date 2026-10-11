@@ -1,0 +1,10 @@
+{
+  "id": "call_a57e3be527ea4b2c9d77b999",
+  "name": "Skill",
+  "arguments": {
+    "args": "主题：深夜调试；三行俳句；保存到仓库根目录 haiku.txt",
+    "skill": "pacman-team-skills:haiku-native-1171"
+  },
+  "result": "Launching skill: pacman-team-skills:haiku-native-1171",
+  "isError": false
+}

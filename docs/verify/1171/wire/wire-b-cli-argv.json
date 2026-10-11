@@ -1,0 +1,46 @@
+[
+  {
+    "time": "2026-10-10T17:46:17.418Z",
+    "cwd": "/private/tmp/pacman-1171-wire-home2/workspaces/01a126ec-3690-7593-9b22-4536b936466b",
+    "argv": [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--input-format",
+      "stream-json",
+      "--model",
+      "glm-5.3",
+      "--disallowedTools",
+      "AskUserQuestion",
+      "--setting-sources=user,project,local",
+      "--permission-mode",
+      "bypassPermissions",
+      "--include-partial-messages",
+      "--session-id=93043c18-baad-49d6-8ae8-d687ddc8ab6a",
+      "--settings",
+      "{\"permissions\":{\"deny\":[\"Read(//tmp/pacman-1171-local-skills/local-only-1171/**)\",\"Skill(local-only-1171)\",\"Skill(skill:local-only-1171)\"]}}"
+    ]
+  },
+  {
+    "time": "2026-10-10T17:54:40.548Z",
+    "cwd": "/private/tmp/pacman-1171-wire-home2/workspaces/01a126f3-e3ec-7bcb-ae5e-e6d144a846b9",
+    "argv": [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--input-format",
+      "stream-json",
+      "--model",
+      "glm-5.3",
+      "--disallowedTools",
+      "AskUserQuestion",
+      "--setting-sources=user,project,local",
+      "--permission-mode",
+      "bypassPermissions",
+      "--include-partial-messages",
+      "--session-id=829803b2-dc3d-49fa-a911-1ba229826c4f",
+      "--settings",
+      "{\"permissions\":{\"deny\":[\"Read(//tmp/pacman-1171-local-skills/local-only-1171/**)\",\"Skill(local-only-1171)\",\"Skill(skill:local-only-1171)\"]}}"
+    ]
+  }
+]

@@ -1,0 +1,1 @@
+[machine] claude binary: /tmp/pacman-1171-evidence-wire/fake-claude.mjs (2.0.5)

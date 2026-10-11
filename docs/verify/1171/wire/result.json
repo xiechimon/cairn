@@ -1,0 +1,171 @@
+{
+  "probe": "drive-1171-native-plugin/wire",
+  "server": "http://127.0.0.1:8797",
+  "web": "http://127.0.0.1:5279",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0296-1171-cli/.claude/verify-run/home/server/server.db",
+  "model": null,
+  "passed": 32,
+  "total": 32,
+  "checks": [
+    {
+      "name": "A0 步到终态（假 CLI 必 failed——判据在日志/argv/目录面）",
+      "ok": true,
+      "detail": "{\"id\":\"JIW1mLEbS71g-phv1DXlH\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "A1 daemon.log native-plugin 交付行（1 skill）",
+      "ok": true,
+      "detail": "[skills] native-plugin: 1 skill(s) → /tmp/pacman-1171-wire-home1/team-skills/plugins/9358fa4d75527bab024c4ad2856c4c2f6958522a0fb2a4f804310180eac45840"
+    },
+    {
+      "name": "A1 插件目录在 daemon 缓存 plugins/ 分区",
+      "ok": true,
+      "detail": "/tmp/pacman-1171-wire-home1/team-skills/plugins/9358fa4d75527bab024c4ad2856c4c2f6958522a0fb2a4f804310180eac45840"
+    },
+    {
+      "name": "A2 plugin.json name = pacman-team-skills、无 mcpServers",
+      "ok": true,
+      "detail": "{\"name\":\"pacman-team-skills\",\"description\":\"Materialized pacman team skills (native Skill discovery channel)\",\"version\":\"0.0.0\"}"
+    },
+    {
+      "name": "A2 skills/ 只含 allowed（marker-alpha），白名单外零条目",
+      "ok": true,
+      "detail": "[\"marker-alpha\"]"
+    },
+    {
+      "name": "A2 SKILL.md 内容逐字节 = server 分发源",
+      "ok": true,
+      "detail": "148B vs 148B"
+    },
+    {
+      "name": "A2 marker-beta 在插件目录零文件（deny 面零回退）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A2 本机技能 local-only-1171 不混入插件",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A7 插件文件与 view 文件同 inode（hardlink 装配）",
+      "ok": true,
+      "detail": "view=cd21315cb76591528570ac706d04586c970dfc61dab4ef56207fd30a23cab5a2 sameInode=true"
+    },
+    {
+      "name": "A3 CLI argv 含 --plugin-dir 且指向该插件目录",
+      "ok": true,
+      "detail": "--plugin-dir /tmp/pacman-1171-wire-home1/team-skills/plugins/9358fa4d75527bab024c4ad2856c4c2f6958522a0fb2a4f804310180eac45840"
+    },
+    {
+      "name": "A4 deny 规则同 argv：白名单外本机技能 Skill(local-only-1171) 在 settings 面",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A4 deny 规则同 argv：白名单内 marker-alpha 不在 deny 面",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A4 marker-beta 未被 server 分发（本机 view 零落盘 = 授权面最早收口）",
+      "ok": true,
+      "detail": "views=1"
+    },
+    {
+      "name": "A5 worktree git status 无 .claude 残留（失败收尾同样干净）",
+      "ok": true,
+      "detail": "(clean)"
+    },
+    {
+      "name": "A5 插件落点不在任何任务 worktree 下",
+      "ok": true,
+      "detail": "/tmp/pacman-1171-wire-home1/team-skills/plugins/9358fa4d75527bab024c4ad2856c4c2f6958522a0fb2a4f804310180eac45840"
+    },
+    {
+      "name": "A6 deny 汇总行在位（1 dir = local-only-1171；团队 view 已被 server 白名单过滤）",
+      "ok": true,
+      "detail": "[skills] deny: 1 skill dir(s) hard-blocked"
+    },
+    {
+      "name": "C0 步到终态",
+      "ok": true,
+      "detail": "{\"id\":\"unOjYy8YKgGQpc3QqBy9Y\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "C1 team-manifest-empty 行（server 空清单 = 配置事实）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C1 无 native-plugin 交付行（无 view = 无插件）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "C2 CLI argv 无 --plugin-dir",
+      "ok": true,
+      "detail": "1 capture(s)"
+    },
+    {
+      "name": "D0 步到终态",
+      "ok": true,
+      "detail": "{\"id\":\"kYoQtM0GFKiqHSxrAcUBy\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "D1 native-plugin 交付行（2 skills = 团队全量）",
+      "ok": true,
+      "detail": "[skills] native-plugin: 2 skill(s) → /tmp/pacman-1171-wire-home1/team-skills/plugins/2df6ebcc7182b38426fb8a88aff34d86c16e03029e76d190d13964cf74265af3"
+    },
+    {
+      "name": "D1 skills/ = marker-alpha + marker-beta（本机 local-only-1171 不混入）",
+      "ok": true,
+      "detail": "[\"marker-alpha\",\"marker-beta\"]"
+    },
+    {
+      "name": "D2 零 deny 行（null = 不限制）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D2 argv 含 --plugin-dir（null 面同样交付）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D3 catalog 通道照常并存（扫描 3 技能全命中 filtered 行；entries=0 = 任务文本零命中的 #1106 选择语义，非故障）",
+      "ok": true,
+      "detail": "[skills] catalog: entries=0 chars=0 bytes=0 filtered=3"
+    },
+    {
+      "name": "D3 P3 活体演示：injected 选择零命中而 native 面照交付全量授权集",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B0 步到终态",
+      "ok": true,
+      "detail": "{\"id\":\"4MRgY6UUTMemXXKfs3J_G\",\"kind\":\"build\",\"status\":\"failed\"}"
+    },
+    {
+      "name": "B1 skipped 行点名版本与下限（2.0.5 < 2.1.74）",
+      "ok": true,
+      "detail": "[skills] native-plugin: skipped (claude 2.0.5 < 2.1.74; catalog channel only)"
+    },
+    {
+      "name": "B2 argv 无 --plugin-dir（版本闸 fail-closed）",
+      "ok": true,
+      "detail": "2 capture(s)"
+    },
+    {
+      "name": "B2 无插件目录创建",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B3 catalog 通道照常（版本闸只关插件面；扫描 filtered 行在位 = 通道活）",
+      "ok": true,
+      "detail": "[skills] catalog: entries=0 chars=0 bytes=0 filtered=2"
+    }
+  ]
+}

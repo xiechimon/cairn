@@ -1,0 +1,6 @@
+---
+name: repo-native
+description: pre-existing repo skill that must survive untouched (REPO-NATIVE-1171)
+---
+
+Do nothing. Marker: REPO-NATIVE-1171

@@ -1,0 +1,4 @@
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] filtered: local-only-1171 not in agent allowlist
+[skills] catalog: entries=0 chars=0 bytes=0
+[skills] deny: 1 skill dir(s) hard-blocked

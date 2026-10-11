@@ -1,0 +1,24 @@
+[
+  {
+    "time": "2026-10-10T17:53:16.120Z",
+    "cwd": "/private/tmp/pacman-1171-wire-home1/workspaces/01a126f2-9a2c-7872-ab11-3105f5a50cf7",
+    "argv": [
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--input-format",
+      "stream-json",
+      "--model",
+      "glm-5.3",
+      "--disallowedTools",
+      "AskUserQuestion",
+      "--setting-sources=user,project,local",
+      "--permission-mode",
+      "bypassPermissions",
+      "--include-partial-messages",
+      "--plugin-dir",
+      "/tmp/pacman-1171-wire-home1/team-skills/plugins/2df6ebcc7182b38426fb8a88aff34d86c16e03029e76d190d13964cf74265af3",
+      "--session-id=66555dec-8ecd-44ed-8187-c76004d63e56"
+    ]
+  }
+]

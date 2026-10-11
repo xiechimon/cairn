@@ -2,7 +2,7 @@
 // GET /api/machine/skills/{stepId} 的文件清单 + GET .../file 单文件按需拉
 // → 本机缓存目录，供 buildSkillsCatalog 与本机目录合并扫描。
 //
-// 缓存拓扑 = 双层内容寻址：
+// 缓存拓扑 = 双层内容寻址 + 一个派生分区：
 // - blobs/<sha256>：单文件内容库，一次写入终身复用（tmp + rename 原子落
 //   位）——「只拉本地缺失或 hash 不同的文件」的增量面即由它承载：改一个
 //   文件只传那一个，其余命中 blob 零传输。
@@ -10,8 +10,12 @@
 //   blobs hardlink 装配（跨设备/无权限时回落 copy）；digest = sha256(清单
 //   的确定性序列化)——清单任何变化 = 新视图目录，同清单跨步命中即复用
 //   （零请求、mtime 触摸 = LRU 最新）。
+// - plugins/<key>（#1171）：claude 后端原生插件通道的派生装配（view 子集
+//   的 hardlink 拷贝 + 插件 manifest），key = sha256(view digest + 排序
+//   allowed dirNames)——同 manifest × 同授权集跨步复用。见
+//   ensureTeamSkillsPlugin。
 // hardlink 使视图与 blob 共享 inode：blob 路径被 LRU 回收不影响已装配视图
-// 的可读性，视图回收后数据才真正释放。
+// 的可读性，视图回收后数据才真正释放（plugins 分区同性质）。
 //
 // 失败语义（#920 口径：显式报错，不许静默降级）：拉取失败 / 清单路径逃逸
 // / sha256 或 sizeBytes 不符 = 抛 TeamSkillsError，runner 按 failed 收尾并
@@ -40,7 +44,7 @@ import {
   utimesSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import type { MachineSkillsManifestResponse } from '@pacman/shared';
 
 /** 视图目录保留上限（mtime LRU）[设计]：视图 = hardlink 装配，内容占用在
@@ -253,11 +257,13 @@ function findUnsafeEntry(manifest: MachineSkillsManifestResponse): string | null
   return null;
 }
 
-/** 三段回收（best-effort——失败只记日志，不影响本步物化结果）：
+/** 四段回收（best-effort——失败只记日志，不影响本步物化结果）：
  * 1. 视图 LRU：views/ 下 digest 目录（含 .tmp-* 残留）超上限删最旧；
  * 2. blob LRU：blobs/ 下内容文件（含 .tmp-* 残留）超上限删最旧；
- * 3. 旧形态残骸：cacheRoot 顶层 views/blobs 之外的条目（#920 前单层内容
- *    寻址目录与根级 .tmp-*）整体回收——纯缓存数据，删除安全。 */
+ * 3. 插件 LRU（#1171）：plugins/ 下 key 目录超上限删最旧（派生装配，与
+ *    views 同上限——key 数受同一「清单版本 × 授权集」因子约束）；
+ * 4. 旧形态残骸：cacheRoot 顶层 views/blobs/plugins 之外的条目（#920 前
+ *    单层内容寻址目录与根级 .tmp-*）整体回收——纯缓存数据，删除安全。 */
 function pruneCache(
   cacheRoot: string,
   maxViewEntries: number,
@@ -267,8 +273,9 @@ function pruneCache(
   try {
     pruneDirLru(join(cacheRoot, 'views'), maxViewEntries);
     pruneDirLru(join(cacheRoot, 'blobs'), maxBlobEntries);
+    pruneDirLru(join(cacheRoot, 'plugins'), maxViewEntries);
     for (const name of readdirSync(cacheRoot)) {
-      if (name === 'views' || name === 'blobs') continue;
+      if (name === 'views' || name === 'blobs' || name === 'plugins') continue;
       rmSync(join(cacheRoot, name), { recursive: true, force: true });
     }
   } catch (err) {
@@ -287,4 +294,128 @@ function pruneDirLru(dir: string, maxEntries: number): void {
   for (const entry of entries.slice(maxEntries)) {
     rmSync(entry.p, { recursive: true, force: true });
   }
+}
+
+// —— 原生插件通道（#1171）：团队技能进 Claude Code 原生 Skill 发现面 ——————
+// claude 后端把团队技能经 SDK `plugins` 选项（→ CLI `--plugin-dir`）交给
+// Claude Code 原生发现（插件布局 = `.claude-plugin/plugin.json` +
+// `skills/<dirName>/SKILL.md`；技能名成为 `pacman-team-skills:<name>` 限定形
+// 并自动生成非限定 alias——与 project/user 技能同名共存、非限定名归既有侧，
+// issue #1171 调研评论探针 1/5/7 实测）。落点在 daemon 缓存 plugins/ 分区，
+// 任务 worktree 零写入；catalog XML 简报通道照常并存（票面边界，#1106 注入
+// 选择面不动）。
+
+/** 插件名（CLI 撞名面 = 技能限定前缀 `pacman-team-skills:<skill>`）。 */
+export const TEAM_SKILLS_PLUGIN_NAME = 'pacman-team-skills';
+
+export interface EnsureTeamSkillsPluginOpts {
+  /** 缓存根（与 materializeTeamSkills 的 cacheRoot 同源）；plugins/ = 其下
+   * 第三分区（pruneCache keep 集已含它）。 */
+  cacheRoot: string;
+  /** 团队视图目录（materializeTeamSkills 产物，views/<digest>）。 */
+  viewDir: string;
+  /** 允许进插件的技能 dirName 集（collectTeamSkillEntries 产物——授权过滤
+   * 在调用侧单源完成，本函数只装配不裁决）；空集 = null 零创建。不安全
+   *  dirName（含 '/' 或 '.'/'..' 段）逐条跳过 + 日志行（防御位）。 */
+  dirNames: readonly string[];
+  /** plugins 分区保留上限覆写（测试注入面 [设计]；缺省 =
+   * TEAM_SKILLS_CACHE_MAX_ENTRIES）。 */
+  maxEntries?: number;
+  /** `[skills]` 日志行出口。 */
+  log?: (msg: string) => void;
+}
+
+/** 装配/缓存团队技能插件目录。`<cacheRoot>/plugins/<key>/`，key =
+ * sha256(view digest + 排序后 dirNames)——内容寻址：同清单 × 同授权集跨步
+ * 复用（mtime 触摸 = LRU 最新），授权集不同则不同 key（并发步的白名单互不
+ * 覆写）。装配 = 逐文件 hardlink（linkOrCopy，与 views 同法）：与 blob 共享
+ * inode，view 被 LRU 回收后插件仍可读，且不依赖跨平台 symlink-following
+ * 语义（daemon 机器含 Linux/WSL2；symlink 形 CLI 也认——探针 6——但 hardlink
+ * 确定性更高）。
+ *
+ * 失败语义：任何装配失败（view 缺失 / 条目缺位 / fs 错误）= null +
+ * `plugin-failed:` 行，**不抛**——本通道是原生可见性的增量面，catalog XML
+ * 通道兜底，失败不得阻断步（与物化通道 #920「显式报错阻断」的语义分界：
+ * 那条是授权/分发的承重面，这条不是）。 */
+export function ensureTeamSkillsPlugin(opts: EnsureTeamSkillsPluginOpts): string | null {
+  const { cacheRoot, viewDir, log } = opts;
+  const safe: string[] = [];
+  for (const dirName of opts.dirNames) {
+    if (isSafeRelPath(dirName) && !dirName.includes('/')) {
+      safe.push(dirName);
+    } else {
+      log?.(`plugin: skipped unsafe dirName ${JSON.stringify(dirName)}`);
+    }
+  }
+  if (safe.length === 0) return null;
+  const sorted = [...safe].sort(); // key 归一：dirNames 顺序无关
+  const key = createHash('sha256')
+    .update(JSON.stringify([basename(viewDir), sorted]))
+    .digest('hex');
+  const pluginsRoot = join(cacheRoot, 'plugins');
+  const target = join(pluginsRoot, key);
+  if (existsSync(target)) {
+    touch(target);
+    return target;
+  }
+  mkdirSync(pluginsRoot, { recursive: true });
+  const tmp = join(pluginsRoot, `.tmp-${key}-${process.pid}-${randomBytes(4).toString('hex')}`);
+  try {
+    mkdirSync(join(tmp, '.claude-plugin'), { recursive: true });
+    writeFileSync(
+      join(tmp, '.claude-plugin', 'plugin.json'),
+      `${JSON.stringify(
+        {
+          name: TEAM_SKILLS_PLUGIN_NAME,
+          description: 'Materialized pacman team skills (native Skill discovery channel)',
+          version: '0.0.0',
+        },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+    for (const dirName of sorted) {
+      const src = join(viewDir, dirName);
+      if (!existsSync(src) || !statSync(src).isDirectory()) {
+        // 整插件拒绝，不半装配（缺条目 = view/授权集漂移，点名根因）。
+        throw new TeamSkillsError(`skill dir missing in view: ${dirName}`);
+      }
+      for (const rel of walkFiles(src)) {
+        const dest = join(tmp, 'skills', dirName, rel);
+        mkdirSync(dirname(dest), { recursive: true });
+        linkOrCopy(join(src, rel), dest);
+      }
+    }
+    renameSync(tmp, target);
+  } catch (err) {
+    rmSync(tmp, { recursive: true, force: true });
+    // 并发步竞争同一 key：对方已落位 = 内容相同，直接复用（幂等）。
+    if (existsSync(target)) {
+      touch(target);
+      return target;
+    }
+    log?.(`plugin-failed: ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+  pruneDirLru(pluginsRoot, opts.maxEntries ?? TEAM_SKILLS_CACHE_MAX_ENTRIES);
+  return target;
+}
+
+/** 目录的递归相对路径清单（只收普通文件；symlink 条目跳过——view 装配面
+ * 无链接，防御位：链出 view 的文件不进插件）。 */
+function walkFiles(dir: string): string[] {
+  const out: string[] = [];
+  const walk = (d: string, prefix: string): void => {
+    for (const entry of readdirSync(d, { withFileTypes: true })) {
+      const rel = prefix === '' ? entry.name : `${prefix}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(join(d, entry.name), rel);
+      } else if (entry.isFile()) {
+        out.push(rel);
+      }
+    }
+  };
+  walk(dir, '');
+  return out;
 }

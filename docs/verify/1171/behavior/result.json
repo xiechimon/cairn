@@ -1,0 +1,61 @@
+{
+  "probe": "drive-1171-native-plugin/behavior",
+  "server": "http://127.0.0.1:8797",
+  "web": "http://127.0.0.1:5279",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0296-1171-cli/.claude/verify-run/home/server/server.db",
+  "model": "glm-5.3",
+  "passed": 10,
+  "total": 10,
+  "checks": [
+    {
+      "name": "E0 hosted bare repo 定位（预植面前提）",
+      "ok": true,
+      "detail": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0296-1171-cli/.claude/verify-run/home/server/repos/Bk_czNp0B6a9l1SoSi3Yv/probe-1171-behavior-1791655185471.git"
+    },
+    {
+      "name": "E1 真模型步 done（≤3 次尝试）",
+      "ok": true,
+      "detail": "build=01a126f8-8d69-7757-8714-090e65132ef7"
+    },
+    {
+      "name": "E2 transcript 有 Skill 工具调用（原生发现面，点名 haiku-native-1171）",
+      "ok": true,
+      "detail": "{\"args\":\"主题：深夜调试；三行俳句；保存到仓库根目录 haiku.txt\",\"skill\":\"pacman-team-skills:haiku-native-1171\"}"
+    },
+    {
+      "name": "E3 transcript 复述了技能 marker 行",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E4 daemon.log native-plugin 交付行",
+      "ok": true,
+      "detail": "[skills] native-plugin: 1 skill(s) → /tmp/pacman-1171-behavior-home/team-skills/plugins/2887458420de4c4bbc4116158b1c30efac34790ae66a5618759d77da643be34c"
+    },
+    {
+      "name": "E4 插件 skills/ 只含 allowed（haiku-native-1171）",
+      "ok": true,
+      "detail": "[\"haiku-native-1171\"]"
+    },
+    {
+      "name": "E5 done 收尾后 worktree git status 干净（验收 2）",
+      "ok": true,
+      "detail": "(clean)"
+    },
+    {
+      "name": "E6 预植 .claude/skills/repo-native 在 HEAD 逐字节保留",
+      "ok": true,
+      "detail": "148B vs 148B"
+    },
+    {
+      "name": "E6 预植技能目录未被改名/删除（盘上在位）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E7 产物面 HEAD:haiku.txt 在（真会话真产出）",
+      "ok": true,
+      "detail": "夜半屏光冷\n千行栈影觅孤虫\n窗外蟋蟀鸣\n"
+    }
+  ]
+}

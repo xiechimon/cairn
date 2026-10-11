@@ -221,6 +221,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         // #1050 路径单源：探到的绝对路径钉给 SDK，免掉「探的二进制」与
         // 「执行的二进制」不是一个（PACMAN_CLAUDE_BIN 此前只喂 auth 探针）。
         ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
+        // #1171 原生插件通道两位：缓存分区单源（plugins/ 在 team-skills 缓存
+        // 根下）+ #1050 探测版本（下限闸输入；探测缺位 = 版本不可证 →
+        // fail-closed 跳过插件通道，catalog 兜底）。
+        teamSkillsCacheDir: paths.teamSkillsCacheDir,
+        ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
       });
     }
     return claudeBackend;

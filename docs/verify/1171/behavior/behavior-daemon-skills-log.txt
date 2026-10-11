@@ -1,0 +1,6 @@
+[skills] team: 1 skill(s), 1 file(s) materialized → /tmp/pacman-1171-behavior-home/team-skills/views/4967f792eb09777ec825c66db7a0582ceb9ae5947e0993008df82264e3cb7312 (fetched 1 file(s) / 287 byte(s), reused 0)
+[skills] filtered: local-only-1171 not in agent allowlist
+[skills] filtered: haiku-native-1171 not in injected selection
+[skills] catalog: entries=0 chars=0 bytes=0
+[skills] deny: 1 skill dir(s) hard-blocked
+[skills] native-plugin: 1 skill(s) → /tmp/pacman-1171-behavior-home/team-skills/plugins/2887458420de4c4bbc4116158b1c30efac34790ae66a5618759d77da643be34c
