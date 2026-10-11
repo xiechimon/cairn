@@ -1,6 +1,6 @@
 ---
 name: verify-pacman
-description: pacman 行为验证——起隔离 live 栈(server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273,独立 PACMAN_HOME scratch),Playwright 走真用户路径(新建任务/建 API 密钥/搜索/主题),证据(截图 + API JSON + SQLite 行)归档进 docs/verify/<票号>/ 随 PR 提交、body 以 SHA 永久链引用。改动后要证明功能真的能跑、要可复核证据时用;fixture 面回归走 apps/web e2e(含视觉 spec 的几何断言),不用本 skill。UI 面票实现前后各一遍 ego 真点击走查(判断层;mandate 在仓 CLAUDE.md 测试规则,读数三件/证据/分工见本技能「ego 真点击走查」节)。
+description: pacman 行为验证——起隔离 live 栈(server VERIFY_PORT 8791 + vite dev VERIFY_WEB_PORT 5273,独立 PACMAN_HOME scratch),Playwright 走真用户路径(新建任务/建 API 密钥/搜索/主题),证据(截图 + API JSON + SQLite 行)归档进 docs/verify/<票号>/ 随 PR 提交、body 以 SHA 永久链引用。改动后要证明功能真的能跑、要可复核证据时用;fixture 面回归走 apps/web e2e(含视觉 spec 的几何断言),不用本 skill。
 ---
 
 # verify-pacman
@@ -128,17 +128,6 @@ node .../scripts/drive-providers-tabs.mjs    # providers runtime tabs(providers-
 node .../scripts/drive-provider-picker.mjs   # 添加服务商 picker(provider-picker.md,spec 11 A5/A6)
 node .../scripts/drive-machines-local.mjs    # machines 本机行+switches(machines-local-row.md,spec 11 A8/A9)
 ```
-
-## ego 真点击走查（UI 面票判断层）
-
-脚本探针 = 回归层（可复跑、进 CI）；ego-browser 真点击走查 = 判断层（「这行字该不该存在」「掠过烦不烦」「信息层级对不对」——这类需求本源是用户的眼睛，UI 面票 agent 自己必须在真浏览器里以用户身份走一遍，否则 dogfood 环不闭）。**mandate 源 = 仓 CLAUDE.md（AGENTS.md）测试规则硬规则条**（UI 面票实现前后各一遍）；本节是方法学正本（怎么走/读数/证据/分工）。2026-10-10 #1175 用户裁决立规；2026-10-11 placement 纠正：曾整节误置本技能——实现前约束放在「验证时才读」的技能里 = 不跑 verify 的车道永远读不到，等于没写，mandate 遂抬到仓 CLAUDE.md。
-
-- **适用面**：改 `apps/web/src` 可见面的票（布局/组件/文案上屏/交互）；纯 backend/wire 票不硬套。
-- **两遍**：实现前对当前 build 走一遍形成自己的产品判断（发现即 triage 输入）；实现后走一遍验手感。
-- **走查读数三件**：① 横穿计量——指针匀速掠过触发面去相邻控件，采样弹层开态次数与残留（delay=0 路过闪的读数化）；② hover 保持 + 键盘 Tab 到控件（focus-visible 应弹）；③ 真点击写链（拨/填/提交 → API + SQLite 回读 → 复原）。
-- 手感能度量的度量掉；度量不了的（十分钟累积烦感）在走查记录里明标「仍需人眼」，不假装。
-- **证据**：截图 + 读数归档 `docs/verify/<票号>/ego-*.png` 与走查 JSON；ego 会话不可复跑，回归仍以脚本探针为正源——ego 不取代探针。
-- **车道纪律**：ego 驱动用户真 Chrome 只连隔离栈（`VERIFY_WEB_PORT`），绝不连用户活跃 dev 栈 5173/8787；worktree 闸拦 heredoc → 脚本落 /tmp 再朴素 `bash /tmp/<x>.sh` 调用。
 
 ## Evidence
 
