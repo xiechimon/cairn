@@ -798,7 +798,7 @@ export async function executeChiefTool(
     }
     case 'merge_builds': {
       const buildIds = strArr(params, 'buildIds');
-      for (const buildId of buildIds) mergeBuild(deps, buildId, chiefActor.name);
+      for (const buildId of buildIds) await mergeBuild(deps, buildId, chiefActor.name);
       return json({ mergeDelegated: buildIds });
     }
 
@@ -1004,6 +1004,10 @@ function buildDeps(deps: ChiefToolDeps) {
     user: deps.user,
     convHub: deps.convHub,
     reposDir: deps.reposDir,
+    // box/githubFetch：#1217 守卫探测（requestMerge 409 闸）需要——token 阶梯
+    // 与测试注入位与 BuildDeps 同源。
+    box: deps.box,
+    githubFetch: deps.githubFetch,
   };
 }
 export async function confirmBuild(
@@ -1017,16 +1021,16 @@ export async function confirmBuild(
   }
   await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
 }
-export function mergeBuild(
+export async function mergeBuild(
   deps: ChiefToolDeps,
   buildId: string,
   /** 宣告行 actor 位（#902）；缺省 = 用户（MCP key 属主语义）。 */
   actor?: string,
-): void {
+): Promise<void> {
   if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
     throw new HttpError(404, `build ${buildId}`);
   }
-  requestMerge(buildDeps(deps), buildId, actor);
+  await requestMerge(buildDeps(deps), buildId, actor);
 }
 
 // —— memory 写路径共用面（02 §4.4/r5 §6，M4b）———————————————————————————————

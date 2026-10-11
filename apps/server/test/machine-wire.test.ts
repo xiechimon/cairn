@@ -310,6 +310,25 @@ describe('claim/wake 时序（r3 §1.5 对照：~75s 长轮询节奏 + wake 低�
     expect(elapsed).toBeLessThan(3_000); // wake 路径 ≪ 30s hold
   });
 
+  // #1217 missed-wake 补醒（hub 契约）：claim 面检查与武装 waitWake 之间出现
+  // 微任务缝（tryClaim 异步化），wake 落在缝里时纯 pubsub 丢事件 → claim 睡满
+  // hold。基线之后的 wake 由 waitWake(sinceSeq) 即刻补醒——不依赖 claimStep
+  // 内部时序成立。
+  test('#1217 missed-wake 补醒：基线后 wake 先于武装 → waitWake 即刻返回', async () => {
+    const s = bootServer();
+    const since = s.machineHub.wakeSeq(s.team.id);
+    s.machineHub.wake(s.team.id); // 缝内 wake：基线已取、waitWake 未武装
+    const t0 = Date.now();
+    const woken = await s.machineHub.waitWake(s.team.id, 30_000, undefined, since);
+    expect(woken).toBe(true);
+    expect(Date.now() - t0).toBeLessThan(1_000);
+    // 无基线（老调用形）仍纯等待：同缝内 wake 不补醒（缺省语义不变）。
+    const bare = s.machineHub.waitWake(s.team.id, 50);
+    const wokenBare = await bare;
+    expect(wokenBare).toBe(false);
+    s.dispose();
+  });
+
   test('machine stream SSE 推送 wake 事件（02 §1.2 机器通道）', async () => {
     const w = await setupWorld({ claimHoldMs: 30_000 });
     const ctrl = new AbortController();

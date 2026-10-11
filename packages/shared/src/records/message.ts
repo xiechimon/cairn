@@ -236,6 +236,44 @@ export function buildReworkNewBranchNote(input: {
   return `原 PR ${pr} ${tail}（${input.branch}）。`;
 }
 
+// —— #1217 已合并 PR 守卫（note 家族：守卫生效 note + 第二张 PR 警告）——————
+
+/** #1217 守卫生效 note（claim 面落守卫目标 build conv 的 system 行）：
+ *  todo 已有 GitHub merged 真值 PR 时，后续 build 的每一步 claim 都会带守卫
+ *  指令——指令被 classifyUserText 过滤出用户话语（#612 词表），板面可见性
+ *  由本行承担（RESUME_FRESH_SESSION_NOTE 同族：纯文本、无花括号——花括号
+ *  会被呈现端当 machine_selected 同族 JSON 跳过）。文本单源：server 写侧
+ *  （machines.ts claim）与测试断言消费同一份。 */
+export function buildMergedPrGuardNote(input: { prNumber: number; prUrl: string | null }): string {
+  const url = input.prUrl !== null ? `（${input.prUrl}）` : '';
+  return `守卫生效：本任务首 PR #${input.prNumber}${url} 已在 GitHub 合并，本轮已指示执行侧不再开新 PR（如确有改动，在会话分支上提交并推送）。`;
+}
+
+/** #1217 第二张 PR 警告 note（done 回填面落本 build conv 的 system 行）：
+ *  agent 无视守卫仍开出新 PR 时（prNumber 回填且探测到同 todo 更早的 merged
+ *  PR），疑似重复交付——人从板面直接看到点名双 PR 的警告，合并面 409 之外
+ *  的第二道兜底。同族行形（纯文本、无花括号）。 */
+export function buildSecondPrWarningNote(input: {
+  prNumber: number;
+  mergedPrNumber: number;
+  mergedPrUrl: string | null;
+}): string {
+  const mergedUrl = input.mergedPrUrl !== null ? `（${input.mergedPrUrl}）` : '';
+  return `警告：本轮开出了新 PR #${input.prNumber}，而本任务首 PR #${input.mergedPrNumber}${mergedUrl} 已合并——疑似重复交付，请人工复核。`;
+}
+
+/** 守卫生效 note 行 id（server 写侧单源；deterministic per build，重投覆盖
+ *  不叠行——transcriptResumeNoteRowId 同律：同 build 多步 claim 各自触发时
+ *  幂等）。 */
+export function mergedPrGuardNoteRowId(buildId: string): string {
+  return `merged-pr-guard-${buildId}`;
+}
+
+/** 第二张 PR 警告 note 行 id（同上，per build 幂等）。 */
+export function secondPrWarningNoteRowId(buildId: string): string {
+  return `second-pr-warn-${buildId}`;
+}
+
 /** GET /api/conversations/{id}/messages 响应封套（r5 §3.6 原样）。 */
 export const conversationMessagesResponseSchema = z.object({
   messages: z.array(transcriptRowSchema),
