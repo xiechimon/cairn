@@ -45,6 +45,11 @@ interface TodoCardProps {
   /** #445：卡片标签行（cardTag 解析结果，每卡至多 1 = 渲染上限）；
    *  null/缺省 = 不渲染占位——无标签卡几何与 r7 基线零漂移。 */
   tag?: TagChipData | null;
+  /** #1216：该卡有一轮总管编排在飞（live 派生态，orchestration-inflight.ts
+   *  单源）——开始/重试 钮位改渲染禁用「编排中」：编排回合落位不写相位
+   *  （#640），click→chief 派发之间卡片此前零在飞标识、钮还照亮，实测用户
+   *  连点出重复线程。缺省 false = fixture 面与既有 live 卡零变化。 */
+  orchestrating?: boolean;
 }
 
 /** Badge on the agent avatar: amber magnifier while the run is waiting on
@@ -71,6 +76,7 @@ export function TodoCard({
   hasBranch = true,
   projectName,
   tag,
+  orchestrating = false,
 }: TodoCardProps) {
   // XMON-105: executor avatar override join (same identity as team page).
   const agentAvatarUrl = useAgentAvatarUrlById();
@@ -206,16 +212,29 @@ export function TodoCard({
           </span>
         )}
         <span className="flex-1" />
-        {action != null && (
-          <Button
-            variant={action.kind === 'primary' ? 'default' : 'outline'}
-            size="xs"
-            className={`todo-card-action todo-card-action--${action.kind} relative z-10 h-[26px] flex-none px-[7.25px] text-xs`}
-            onClick={() => onAction?.(todo)}
-          >
-            {t(action.label)}
-          </Button>
-        )}
+        {action != null &&
+          (orchestrating && (todo.phase === 'todo' || todo.phase === 'failed') ? (
+            // #1216 在飞编排态：钮位不禁用会被连点成重复编排线程——禁用 +
+            // 「编排中」把 click→chief 派发的静默窗口显性化（相位不动，#640）。
+            <Button
+              variant={action.kind === 'primary' ? 'default' : 'outline'}
+              size="xs"
+              className="todo-card-action relative z-10 h-[26px] flex-none px-[7.25px] text-xs"
+              data-orchestrating="true"
+              disabled
+            >
+              {t('编排中')}
+            </Button>
+          ) : (
+            <Button
+              variant={action.kind === 'primary' ? 'default' : 'outline'}
+              size="xs"
+              className={`todo-card-action todo-card-action--${action.kind} relative z-10 h-[26px] flex-none px-[7.25px] text-xs`}
+              onClick={() => onAction?.(todo)}
+            >
+              {t(action.label)}
+            </Button>
+          ))}
       </div>
     </Card>
   );

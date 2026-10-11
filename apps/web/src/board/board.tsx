@@ -103,6 +103,10 @@ interface BoardProps {
   /** #828：逐卡分支钮可见性（调用方按数据源判定——fixture 面走
    *  overlayContent 有无、live 面走 latestBuildId 有无；缺省 = 全显旧行）。 */
   hasBranch?: (todo: TodoRecord) => boolean;
+  /** #1216：逐卡在飞编排态（live 面由 chiefThreads 读面派生，判定单源
+   *  chief/orchestration-inflight.ts；缺省 = fixture 面恒 false，卡片 DOM
+   *  零变化）。 */
+  isOrchestrating?: (todo: TodoRecord) => boolean;
   /** #616: silent phase-commit drop (待开始/已完成 targets) — the page owns
    *  the write path (fixture 本地集 / live 乐观 PATCH)。 */
   onPhaseDrop?: (todo: TodoRecord, columnId: string) => void;
@@ -133,6 +137,7 @@ export function BoardSurface({
   onAction,
   onBranch,
   hasBranch,
+  isOrchestrating,
   onPhaseDrop,
   onStartIntent,
   onResetIntent,
@@ -369,6 +374,7 @@ export function BoardSurface({
                         onAction={onAction}
                         onBranch={onBranch}
                         hasBranch={hasBranch == null ? undefined : hasBranch(todo)}
+                        orchestrating={isOrchestrating?.(todo) === true}
                         projectName={fixture.projectNames?.[todo.projectId]}
                         tag={tagsById == null ? null : cardTag(todo, tagsById)}
                       />

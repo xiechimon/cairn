@@ -25,6 +25,8 @@ interface DraggableCardProps {
   projectName?: string;
   /** #445：卡片标签行（cardTag 解析结果；null = 不渲染占位）。 */
   tag?: TagChipData | null;
+  /** #1216：透传 TodoCard 的在飞编排态。 */
+  orchestrating?: boolean;
 }
 
 export function DraggableCard({
@@ -35,6 +37,7 @@ export function DraggableCard({
   hasBranch,
   projectName,
   tag,
+  orchestrating,
 }: DraggableCardProps) {
   const { listeners, setNodeRef, isDragging } = useDraggable({ id: todo.id });
   const style = { opacity: isDragging ? 0.4 : undefined };
@@ -48,6 +51,7 @@ export function DraggableCard({
         hasBranch={hasBranch}
         projectName={projectName}
         tag={tag}
+        orchestrating={orchestrating}
       />
     </div>
   );

@@ -1,0 +1,13 @@
+== after（修复后，本分支代码）integration/test/board-trio-e2e.test.ts ==
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Duration  8.91s (tests 86%, import 8%, transform 6%)
+
+== 回归：m5 主时序脊柱（review/confirm/building 既有按钮行为）==
+Test Files  1 passed (1)
+Tests  3 passed (3)
+
+== 回归：apps/web e2e 全量（916）==
+  ✓  461 e2e/dead-buttons.spec.ts:497:1 › failed rerun dialog is the slim single-exit face — no agent selector, no split switch, no plan/run branch (#640) (622ms)
+  1 failed
+  915 passed (3.2m)

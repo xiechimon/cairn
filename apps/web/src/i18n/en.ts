@@ -914,6 +914,15 @@ export const EN: Record<string, string> = {
     'The chief plans first, then dispatches each piece to the right agent.',
   查看会话: 'View session',
   未能开始编排: 'Could not start orchestration',
+  // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
+  编排中: 'Orchestrating',
+  '总管正在编排这张任务，等这一轮结束再发起。':
+    'The chief is already orchestrating this task — wait for this round to finish.',
+  '重复发起只会多排一轮编排，不会更快开始。':
+    'Firing again only queues one more orchestration round; it will not start sooner.',
+  任务加载失败: 'Failed to load the task',
+  任务不存在或已被删除: 'This task does not exist or was deleted',
+  回看板: 'Back to board',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
   // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
   // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
