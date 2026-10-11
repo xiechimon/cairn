@@ -95,6 +95,13 @@ export interface GitCredentials {
   password: string;
 }
 
+/** 本步 git 网络操作的凭据来源（#1225）：'integration' = server per-step
+ * 下发 token（既有唯一路）；'machine' = 执行机本机 git 凭据（credential
+ * helper / ~/.git-credentials / gh——integration token 认证失败时降级，或
+ * server 未下发 token 时直行）。只作来源名上报（build 记录凭据来源行），
+ * 永不携带凭据值。 */
+export type GitCredentialSource = 'integration' | 'machine';
+
 /** GitHub 执行凭证用户名（spec 12 G2-T2）：OAuth token 经 basic auth 消费时
  * 用户名固定 `x-access-token`（GitHub 约定）；server stepToken 组装
  * GitCredentials 与 daemon 消费两侧同吃本单源。 */
@@ -121,6 +128,10 @@ export interface WorktreePrepareInput {
    * cloneUrl 照常 fetch 到远端 tip；任一不符或 clone 当刻失格 → 静默回落
    * GitHub clone + 一行选源日志。null / 缺省 = 现行为（直接 cloneUrl）。 */
   localPath?: string | null;
+  /** #1225 machine 凭据降级闸：true = per-step token 认证失败时 clone/
+   * fetch 自动降级执行机本机 git 凭据（github 形态）；缺省/false = 现行为
+   * （hosted 走 server per-step key 恒不降级，local 无凭据面）。 */
+  machineCredentialFallback?: boolean;
 }
 
 export interface PreparedWorkspace {
@@ -138,6 +149,10 @@ export interface PreparedWorkspace {
    * （prepare 抛错，步失败）；resume 失败也不落（warning 行已落日志）。
    * runner 把 ok/timeout note 投影成 transcript system 行。 */
   hooks?: WorkspaceHookNoteData[];
+  /** #1225 本次 prepare 网络操作（clone/fetch）实际使用的凭据来源；缺省 =
+   * 'integration'（无降级发生——兼容既有实现与测试桩）。runner 把它投影成
+   * 步 transcript 的凭据来源行（build 记录面）。 */
+  credentialSource?: GitCredentialSource;
 }
 
 /** 孤儿回收输入（r3 §1.4 `cleanupOrphanWorktrees(ttlMs = 7*24h)`）。 */

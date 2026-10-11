@@ -18,6 +18,7 @@ import type {
   ClaimedStep,
   CommitIdentity,
   DeliveredImage,
+  GitCredentialSource,
   LocalToolDef,
   MachineAskBody,
   MachineDoneBody,
@@ -64,6 +65,7 @@ import {
   probeClaudeCodeAuth,
 } from './claude-code-auth.js';
 import { clearCredentials, pushCredential } from './credentials.js';
+import { withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
@@ -81,6 +83,14 @@ import { materializeTeamSkills } from './team-skills.js';
  * true 时收尾 rewind worktree 到步起点 checkpoint（r9 §3.3）。 */
 export interface StopRequest {
   discard: boolean;
+}
+
+/** #1225 凭据来源行文案（build 记录面 = transcript system 行）。只写来源名；
+ * 本函数不接收凭据对象——结构上杜绝 token 值进记录（票失败方式 2）。 */
+function gitCredentialSourceRowContent(source: GitCredentialSource): string {
+  return source === 'machine'
+    ? 'git 凭据来源：machine（执行机本机 git 凭据）'
+    : 'git 凭据来源：integration（per-step 下发 token）';
 }
 
 export interface RunStepDeps {
@@ -544,6 +554,10 @@ export async function runStep(
         // 双执行源（ADR 0017 / #1213）：github 形态加速位随 claim 载荷透传到
         // workspace 物化处做选源；其余形态 null（现行为）。
         localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
+        // #1225 machine 凭据降级闸：github 形态开（per-step token auth 失败 →
+        // 执行机本机 git 凭据）；hosted 走 server per-step key 恒关、local 无
+        // 凭据面恒关。
+        machineCredentialFallback: repo.kind === 'github',
       });
     } catch (err) {
       clearCredentials(creds);
@@ -804,6 +818,19 @@ export async function runStep(
       id: `hook-${hook.name}-${stepId}`,
       role: 'system',
       content: `${head}${body}`,
+      createdAt: now(),
+    });
+  }
+
+  // —— #1225 凭据来源行（build 记录面）：github 形态才落——hosted 恒走
+  // server per-step key（transcript 面行为零改动），local 无凭据面。行内容
+  // 只写来源名（integration/machine），token 值永不进记录（02 §8 纪律）。
+  // push 收尾若降级会以同 id 更新本行为 machine。——
+  if (repo !== null && repo.kind === 'github' && ws !== null) {
+    transcript.upsert({
+      id: `git-credential-${stepId}`,
+      role: 'system',
+      content: gitCredentialSourceRowContent(ws.credentialSource ?? 'integration'),
       createdAt: now(),
     });
   }
@@ -1561,7 +1588,31 @@ export async function runStep(
         });
         logger.step(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
       } else if (pushWarranted) {
-        await git.push(ws.cwd, ws.branch, creds.git);
+        // #1225 凭据序：per-step token 先行（集成有效 = 单发即成，行为不变）；
+        // auth 失败且 github 形态 → machine 二发（执行机本机 git 凭据）；两路
+        // 皆败 = 合并错误点名两路（票失败方式 1），步 failed 收尾。降级成功 →
+        // 来源行更新为 machine（prepare 落的 integration 行让位）。
+        const pushSource = await withGitCredentialFallback(
+          (cred) => git.push(ws.cwd, ws.branch, cred),
+          creds.git,
+          {
+            what: 'push',
+            allowMachineFallback: repo?.kind === 'github',
+            onFallback: (reason) => {
+              logger.step(
+                `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,
+              );
+            },
+          },
+        );
+        if (pushSource === 'machine') {
+          transcript.upsert({
+            id: `git-credential-${stepId}`,
+            role: 'system',
+            content: gitCredentialSourceRowContent('machine'),
+            createdAt: now(),
+          });
+        }
         logger.raw(`pushed ${ws.branch}`);
         // —— #958 闸 4 的检测半：推送后查分支里有没有我们的标记 ——
         // 预防做不到：agent 在 bash 里自己 `git add && git commit` 时，标记块在

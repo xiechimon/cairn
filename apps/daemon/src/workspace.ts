@@ -18,6 +18,7 @@ import {
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
   conversationBranch,
+  type GitCredentialSource,
   type GitCredentials,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
@@ -28,7 +29,7 @@ import {
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@pacman/shared';
-import { gitPrim, withGitNetRetries } from './git.js';
+import { gitPrim, withGitCredentialFallback, withGitNetRetries } from './git.js';
 import type { DaemonLogger } from './log.js';
 import {
   runWorkspaceHook,
@@ -128,6 +129,30 @@ export class WorkspaceManager implements WorktreeOps {
       // （TOCTOU：判定与 clone 之间路径被抽走）→ 静默回落 GitHub clone，
       // 一行选源日志，不报错不卡步。基座已在位（后续步）= 纯 fetch，选源
       // 只发生在首次物化。
+      // #1225 凭据序：per-step token 先行，auth 失败且闸开（machineCredential
+      // Fallback——github 形态）→ 降级执行机本机 git 凭据（null cred +
+      // machineGitEnv），来源上浮进 PreparedWorkspace.credentialSource；
+      // hosted/local 恒关（hosted 走 server per-step key，local 无凭据面）。
+      const credFallback = input.machineCredentialFallback === true;
+      let credentialSource: GitCredentialSource = 'integration';
+      const runNet = async (
+        what: string,
+        op: (cred: GitCredentials | null) => Promise<void>,
+        onFallback?: (reason: string) => void,
+      ): Promise<GitCredentialSource> => {
+        const source = await withGitCredentialFallback(op, input.credentials, {
+          what,
+          allowMachineFallback: credFallback,
+          onFallback: (reason) => {
+            onFallback?.(reason);
+            this.logger.workspace(
+              `git ${what} auth failed (per-step token), retrying with machine credentials: ${reason}`,
+            );
+          },
+        });
+        if (source === 'machine') credentialSource = 'machine';
+        return source;
+      };
       if (!existsSync(join(baseRepoDir, '.git')) && !isBareish(baseRepoDir)) {
         let fromLocal = false;
         if (input.localPath != null && input.localPath !== '') {
@@ -136,8 +161,12 @@ export class WorkspaceManager implements WorktreeOps {
             try {
               await gitPrim.clone(input.localPath, baseRepoDir, null);
               await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
-              await withGitNetRetries(() => gitPrim.fetch(baseRepoDir, input.credentials));
-              await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
+              const fetchSource = await runNet('fetch', (cred) =>
+                withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)),
+              );
+              // token 已证死（fetch 降级）则 set-head 直接走 machine，不再撞一次 401。
+              const setHeadCred = fetchSource === 'machine' ? null : input.credentials;
+              await gitPrim.remoteSetHeadAuto(baseRepoDir, setHeadCred);
               this.logger.workspace(`Repo source: local-path ${input.localPath}`);
               fromLocal = true;
             } catch (err) {
@@ -159,12 +188,16 @@ export class WorkspaceManager implements WorktreeOps {
           const label = repoLabel(input.cloneUrl);
           const defaultBranchGuess = 'main';
           this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
-          await withGitNetRetries(() =>
-            gitPrim.clone(input.cloneUrl, baseRepoDir, input.credentials),
+          await runNet(
+            'clone',
+            (cred) => withGitNetRetries(() => gitPrim.clone(input.cloneUrl, baseRepoDir, cred)),
+            // 失败 clone 的残目录清场（同 local-path 失败路径；残目录会让 machine
+            // 路 clone 拒绝落地）。
+            () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
         }
       } else {
-        await withGitNetRetries(() => gitPrim.fetch(baseRepoDir, input.credentials));
+        await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));
       }
       const defaultBranch = await gitPrim.remoteDefaultBranch(baseRepoDir);
 
@@ -181,7 +214,15 @@ export class WorkspaceManager implements WorktreeOps {
         // #1149：reused = 唤醒面 → .agents/resume（失败/超时非致命 warn，
         // 不挡步）。钩子消费步级下发凭据（同 gitPrim 注入面，不新开口子）。
         const hooks = await this.runHookStage(convDir, 'resume', input.credentials);
-        return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: true, hooks };
+        return {
+          cwd: convDir,
+          baseRepoDir,
+          branch,
+          defaultBranch,
+          reused: true,
+          hooks,
+          credentialSource,
+        };
       }
 
       // 陈旧残留（目录在但非 worktree / 分支在但 worktree 不在）→ 清理三步
@@ -201,7 +242,15 @@ export class WorkspaceManager implements WorktreeOps {
       // → runner 的 prepare catch → done failed；失败即回滚 worktree，使重试
       // 认领重新走 fresh → setup 重跑，而不是 reused→resume 掩盖装机缺口）。
       const hooks = await this.runHookStage(convDir, 'setup', input.credentials);
-      return { cwd: convDir, baseRepoDir, branch, defaultBranch, reused: false, hooks };
+      return {
+        cwd: convDir,
+        baseRepoDir,
+        branch,
+        defaultBranch,
+        reused: false,
+        hooks,
+        credentialSource,
+      };
     });
   }
 
