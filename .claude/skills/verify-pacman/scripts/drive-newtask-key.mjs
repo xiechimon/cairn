@@ -190,9 +190,21 @@ try {
   await scenario(page, 'board');
 
   // —— 场景 2：看板页输入态守卫（原热键在输入态本就不触发，改键须保持）
-  await page.keyboard.press('Meta+k');
-  await page.waitForSelector('.search-panel', { timeout: 5000 });
-  const field = page.locator('.search-input-row input');
+  // #1181 迁语义载体（spec 22 §5，#949/#910 裁定后类名退役，与 e2e
+  // search-focus.spec.ts / drive.mjs search probe 同律）：面板 = role
+  // dialog + 可及名「搜索」，输入 = 面板 scope 的 textbox。热键监听在被动
+  // effect 注册（hydration 后），丢键就重按（面板可见即停，不双 toggle）。
+  const searchPanel = page.getByRole('dialog', { name: '搜索' });
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await page.keyboard.press('Meta+k');
+    const opened = await searchPanel
+      .waitFor({ state: 'visible', timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
+    if (opened) break;
+    if (attempt === 5) throw new Error('Meta+k never opened 搜索 dialog');
+  }
+  const field = searchPanel.getByRole('textbox');
   await field.click();
   await page.keyboard.press(NEW_KEY);
   const typed = await field.inputValue();
@@ -203,7 +215,7 @@ try {
     `输入态按 ${JSON.stringify(NEW_KEY)}：入框=${JSON.stringify(typed)} 弹层=${!guardClosed}`,
   );
   await page.keyboard.press('Escape');
-  await page.waitForSelector('.search-panel', { state: 'hidden', timeout: 5000 }).catch(() => {});
+  await searchPanel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
   // —— 场景 3：非看板页（AppSidebar 全局面）
   await page.goto(`${WEB}/app/schedules`);
