@@ -25,7 +25,7 @@ import { seed } from '../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
-import { MachineWakeHub } from '../../apps/server/src/services/machines.js';
+import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { createScheduler } from '../../apps/server/src/services/scheduler.js';
 
 export const AGENT_ID = 'agent-it-1';

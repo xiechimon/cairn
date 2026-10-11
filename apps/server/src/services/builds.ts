@@ -74,7 +74,7 @@ import {
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
-import type { MachineWakeHub } from './machines.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo, setTodoPhase } from './todos.js';

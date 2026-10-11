@@ -45,7 +45,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
-import type { MachineWakeHub } from './machines.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import { insertGateAnnouncement } from './transcript.js';

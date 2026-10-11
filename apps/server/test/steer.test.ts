@@ -16,7 +16,7 @@ import { type ClaimedStep, claimedStepSchema } from '@pacman/shared';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';
-import { MachineWakeHub } from '../src/services/machines.js';
+import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
 import { bootServer, issueApiKey, postProject, req } from './helpers.js';
 
