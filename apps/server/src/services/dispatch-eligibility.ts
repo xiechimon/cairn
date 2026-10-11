@@ -9,7 +9,12 @@
 // 是 sweep 误杀 claim 能领的步，或放过 claim 永远领不了的步（后者即无期
 // pending 的缝本身）。
 
-import { isBackendRuntimeId, parseReviewPromptMeta, type StepKind } from '@pacman/shared';
+import {
+  type Assignment,
+  isBackendRuntimeId,
+  parseReviewPromptMeta,
+  type StepKind,
+} from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, type todo } from '../db/schema.js';
@@ -37,6 +42,11 @@ export function runtimeGatePasses(
  *    列；测试已钉此口径，apps/server/test/review.test.ts）；
  *  - 其它步类：assignment 双槽按步类取（02 §4.2/r5 §5）——规划步 → plan 槽；
  *    执行/合并步 → build 槽（合并轮复用执行轮会话，同 Agent）。
+ *  - 规划步的返工回落（#1204）：带续轮指令的规划步（revision 打回 / #330
+ *    自动回流 / 失败重启轮 / #113 补写轮——prompt 非空即此族）plan 槽空时
+ *    回落 build 槽（持有全部施工上下文，本就是最合适的 replan 者）；两槽
+ *    皆空才无主。首轮规划步（prompt 空）不回落——#1104 B 的失败收尾是
+ *    chief 400 自纠回路的既有语义，首跑行为是回归红线。
  *  无 Agent（槽空 / 槽指向已删 Agent / review meta 无 agentId）= null：claim
  *  面按失败收尾该步（#1104 B：applyStepFailure 落 build.errorMessage + todo
  *  → failed 终态，不再静默跳过候选）；sweep 面无从计算 runtime（不进闸挡判）。 */
@@ -44,7 +54,8 @@ export function agentForStep(
   db: Db,
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
-  /** review 步的 prompt（meta header 解析用）。 */
+  /** review 步的 prompt（meta header 解析用）；规划步的返工判别（#1204：
+   *  prompt 非空 = 带续轮指令的返工步，plan 槽空回落 build 槽）。 */
   prompt: string | null = null,
 ): typeof agent.$inferSelect | null {
   // review 步：agentId 经 prompt meta header 透出（r8 §3.1：模态选 Agent
@@ -55,16 +66,30 @@ export function agentForStep(
     if (!agentId) return null;
     return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
   }
-  const slot = kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
+  const slot = planSlotFor(todoRow, kind, prompt);
   const agentId = slot?.agentId ?? null;
   if (!agentId) return null;
   return db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null;
 }
 
+/** 规划步的槽位解析（agentForStep 与 unassignedStepReason 同一映射，本文件
+ *  单源）：返工步（prompt 非空）plan 槽空 → 回落 build 槽；首轮步与执行/
+ *  合并步按步类直取。 */
+function planSlotFor(
+  todoRow: typeof todo.$inferSelect,
+  kind: StepKind,
+  prompt: string | null,
+): Assignment['plan'] | Assignment['build'] {
+  if (kind !== 'plan') return todoRow.assignment?.build ?? null;
+  if (todoRow.assignment?.plan != null) return todoRow.assignment.plan;
+  return prompt !== null ? (todoRow.assignment?.build ?? null) : null;
+}
+
 /** #1104 B 无主步失败文案（agentForStep 返 null 的三族分类）：assignment 槽
  * 空 / 槽指向已删 Agent / review meta 缺 agentId。与 agentForStep 同文件同
- * 槽位映射（kind → plan/build 槽只此一处），各族点名各自的补法，落
- * build.errorMessage（看板失败终态可见），claim 面失败收尾时消费。 */
+ * 槽位映射（planSlotFor 单源），各族点名各自的补法，落 build.errorMessage
+ * （看板失败终态可见），claim 面失败收尾时消费。#1204：规划步返工族文案
+ * 按回落后的事实点名——两槽皆空说两槽（回落已试），首轮步维持 plan 槽单点。 */
 export function unassignedStepReason(
   todoRow: typeof todo.$inferSelect,
   kind: StepKind,
@@ -73,10 +98,19 @@ export function unassignedStepReason(
   if (kind === 'review') {
     return 'review 步无 Agent：审核 prompt meta 未携带 agentId，无人可领。';
   }
-  const slot = kind === 'plan' ? todoRow.assignment?.plan : todoRow.assignment?.build;
-  const slotName = kind === 'plan' ? 'plan' : 'build';
-  if (slot?.agentId == null) {
-    return `${slotName} 步无指派 Agent：assignment 的 ${slotName} 槽为空，无人可领。指派 Agent 后重新运行任务。`;
+  if (kind !== 'plan') {
+    const slot = todoRow.assignment?.build;
+    if (slot?.agentId == null) {
+      return `build 步无指派 Agent：assignment 的 build 槽为空，无人可领。指派 Agent 后重新运行任务。`;
+    }
+    return `build 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
   }
-  return `${slotName} 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
+  // 规划步：返工族（prompt 非空）回落后仍无主 = 两槽皆空；首轮族 = plan 槽空。
+  if (todoRow.assignment?.plan?.agentId != null) {
+    return `plan 步指派的 Agent 不存在（agentId ${todoRow.assignment.plan.agentId} 已删除或不在本团队），无人可领。改派 Agent 后重新运行任务。`;
+  }
+  if (prompt !== null) {
+    return `plan 步无指派 Agent：assignment 的 plan 槽与 build 槽均为空（返工步已尝试回落 build 槽），无人可领。指派 Agent 后重新运行任务。`;
+  }
+  return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;
 }
