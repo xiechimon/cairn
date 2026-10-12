@@ -1,0 +1,43 @@
+{
+  "bubble": {
+    "h": 114,
+    "radius": "18px",
+    "font": "15px",
+    "padding": "9px 16px",
+    "bg": "rgb(234, 228, 224)"
+  },
+  "rightGap": 0,
+  "leftGap": 155,
+  "userAvatarCount": 0,
+  "copyOpacity": [
+    "0",
+    null,
+    null,
+    null,
+    null,
+    "0",
+    "0",
+    null,
+    null,
+    null,
+    null,
+    "0",
+    "0",
+    null,
+    null,
+    "0",
+    "0",
+    null,
+    null,
+    null,
+    "0",
+    null,
+    null,
+    null,
+    null,
+    "0",
+    "1",
+    null,
+    null
+  ]
+}

@@ -29,6 +29,12 @@ import type { TVars } from '../../i18n/translate.js';
 import { ChevronDown, ChevronRight } from '../../icons/index.js';
 import { Button } from '../ui/button.js';
 
+/** 2026-10-13 发送黑盒拆除：标签静默超过本阈值（s）时折叠行挂「· 信号 Ns
+ *  前」走表——静默本身成为可见事实（相位标签可能冻结在早先的上报，用户
+ *  实测「59s 正在连接模型」零下文）。阈值取 10s：正常相位迁移/增量流都在
+ *  秒级，10s 静默已经值得可见。 */
+export const QUIET_AFTER_SECONDS = 10;
+
 /** Elapsed whole seconds since `startedAt`, re-read on a 1s beat while a
  *  start stamp is present. Returns null when there is no stamp — the caller
  *  then renders no counter (never a fabricated one). */
@@ -119,6 +125,10 @@ export interface LiveRowProps {
   /** Present ⇒ the row head is a real button (with a chevron) that toggles
    *  `children`; absent ⇒ plain text, and no chevron is rendered at all. */
   disclosure?: { expand: string; collapse: string } | null;
+  /** 2026-10-13 发送黑盒拆除：最近信号时刻（相位 at 与文本增量取新）。在位
+   *  且静默超过 QUIET_AFTER_SECONDS ⇒ 标签后挂「· 信号 Ns 前」走表（1s
+   *  计时器，#471 同律：真时刻驱动，不摆冻结数）；缺省 = 无信号面不挂。 */
+  lastSignalAt?: number | null;
   /** The disclosure panel. Rendered only while expanded. */
   children?: ReactNode;
 }
@@ -129,6 +139,7 @@ export function LiveRow({
   labelVars,
   startedAt,
   seconds,
+  lastSignalAt,
   disclosure = null,
   children,
 }: LiveRowProps) {
@@ -136,6 +147,10 @@ export function LiveRow({
   const [expanded, setExpanded] = useState(false);
   const tick = useLiveSeconds(startedAt);
   const shown = tick ?? seconds ?? null;
+  // 静默走表（发送黑盒拆除）：同一枚 1s 计时器族驱动，超过阈值才挂——
+  // 新鲜信号期零噪声；无 lastSignalAt（fixture / 旧 server）整段不渲染。
+  const quietSecs = useLiveSeconds(lastSignalAt ?? null);
+  const quiet = quietSecs != null && quietSecs > QUIET_AFTER_SECONDS ? quietSecs : null;
   const skin = SKIN[variant];
   const labelText = t(label, labelVars);
   const body = (
@@ -158,6 +173,14 @@ export function LiveRow({
             本类注），aria-hidden 只为保险。 */}
         <span className="chat-shimmer-sweep" aria-hidden="true" />
       </span>
+      {/* 静默走表（发送黑盒拆除）：标签之后挂「· 信号 Ns 前」——标签可能
+          冻结在早先的相位上报，静默时长让「卡住」与「在长考」可区分。不进
+          扫光标签 span（它是 meta 不是标签文本；进 textContent 会重复）。 */}
+      {quiet != null && (
+        <span className={`${skin.secs} flex-none`} data-testid="live-quiet">
+          {t('· 信号 {n}s 前', { n: quiet })}
+        </span>
+      )}
     </>
   );
   return (

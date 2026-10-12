@@ -60,6 +60,8 @@ function render(overrides: {
   stopping?: boolean;
   activity?: StepActivity | null;
   messages?: import('../src/api/mappers.js').MessageRow[];
+  lastTextDeltaAt?: number | null;
+  phaseHistory?: readonly StepActivity[];
 }): TranscriptItem[] {
   return mapTranscript({
     messages: overrides.messages ?? [],
@@ -72,6 +74,8 @@ function render(overrides: {
     liveText: '',
     ...(overrides.stopping !== undefined ? { stopping: overrides.stopping } : {}),
     ...(overrides.activity !== undefined ? { activity: overrides.activity } : {}),
+    ...(overrides.lastTextDeltaAt !== undefined ? { lastTextDeltaAt: overrides.lastTextDeltaAt } : {}),
+    ...(overrides.phaseHistory !== undefined ? { phaseHistory: overrides.phaseHistory } : {}),
   });
 }
 
@@ -235,6 +239,59 @@ describe('mapTranscript 技能事实（#918）', () => {
     expect(summary(pending)).toBeUndefined();
     const settled = render({ messages: [readSkill('c1', 'x')] });
     expect(summary(settled)).toEqual({ kind: 'skills', read: ['x'], denied: [] });
+  });
+});
+
+// —— 2026-10-13 发送黑盒拆除（静默表 + 过程时间线）的 mapper 半 ————————
+// 失败方式（先固化；渲染半 = LiveRow 的 QUIET_AFTER_SECONDS 阈值与走表，
+// live 探针在真栈驱动）：
+//   W12 lastSignalAt 合成：相位 at 与 text_delta 时刻取新；只delta → delta；
+//      只相位 → 相位；两源皆无 → 字段缺席（无信号面不摆数）
+//   W13 phases 按在跑步 stepId 过滤——上一跑步的相位史不串到本步时间线
+//   W14 排队行（pending + queue 投影）不挂静默表也不挂时间线——排队不是
+//      执行态信号（相位是上一步残留，挂上是谎）
+
+describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
+  test('W12: lastSignalAt = 相位 at 与 delta 时刻取新；两源皆无 = 缺席', () => {
+    const running = step('claimed');
+    const both = render({
+      steps: [running],
+      activity: act(running.id, 'thinking'), // at = NOW-2000
+      lastTextDeltaAt: NOW - 500,
+    });
+    expect(tail(both)).toMatchObject({ kind: 'streaming', lastSignalAt: NOW - 500 });
+    const deltaOnly = render({ steps: [running], activity: null, lastTextDeltaAt: NOW - 800 });
+    expect(tail(deltaOnly)).toMatchObject({ kind: 'streaming', lastSignalAt: NOW - 800 });
+    const none = render({ steps: [running], activity: null, lastTextDeltaAt: null });
+    expect(tail(none)?.lastSignalAt).toBeUndefined();
+  });
+
+  test('W13: phases 只含在跑步的迁移史，陈旧步不串场', () => {
+    const running = step('claimed');
+    const history = [
+      act(running.id, 'preparing', { at: NOW - 20_000 }),
+      act(running.id, 'starting', { at: NOW - 18_000 }),
+      act('step-previous-run', 'responding', { at: NOW - 60_000 }),
+    ];
+    const items = render({ steps: [running], phaseHistory: history });
+    expect(tail(items)?.phases?.map((p) => p.phase)).toEqual(['preparing', 'starting']);
+  });
+
+  test('W14: 排队行不挂静默表与时间线（排队不是执行态信号）', () => {
+    const pending = {
+      ...step('pending'),
+      queue: { position: 1, waitingFor: null },
+    } as StepJournalRow;
+    const items = render({
+      steps: [pending],
+      activity: act(pending.id, 'thinking'),
+      lastTextDeltaAt: NOW - 500,
+      phaseHistory: [act(pending.id, 'preparing', { at: NOW - 20_000 })],
+    });
+    const row = tail(items);
+    expect(row?.label).toBe('排队中：等空闲机器（前面 {ahead} 个）');
+    expect(row?.lastSignalAt).toBeUndefined();
+    expect(row?.phases).toBeUndefined();
   });
 });
 

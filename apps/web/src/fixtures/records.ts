@@ -21,6 +21,7 @@ import {
   type ProviderRecord,
   type SecretRecord,
   type SkillFact,
+  type StepActivity,
   type TagRecord,
 } from '@pacman/shared';
 
@@ -539,6 +540,14 @@ export type TranscriptItem =
        *  过滤）——披露面逐条渲染 `▶ skill: <名>`（denied = `✕ …（已挡下）`）。
        *  缺省/空 = 本步尚无技能命中，不产任何条目（对照组）。 */
       skills?: SkillFact[];
+      /** 2026-10-13 发送黑盒拆除：最近信号时刻（活动相位 at 与 text_delta
+       *  最后增量取新）——折叠行静默超阈值时挂「· 信号 Ns 前」走表。缺省
+       *  = 无信号面（fixture / 旧 server），不挂。 */
+      lastSignalAt?: number | null;
+      /** 2026-10-13 同批：本步相位迁移历史（有界 ≤8，mapper 已按在跑步
+       *  stepId 过滤）——披露面的过程时间线（每行 `HH:mm:ss 相位`），
+       *  把「只有最新一行标签」的黑盒拆成可见过程。缺省 = 无历史不渲染。 */
+      phases?: readonly StepActivity[];
     }
   /** #918 技能事实汇总行（详情页的持久一份）：从落库 toolcall 行派生
    *  （分类单源 shared/skill-facts，与活行判定永不漂移），read = 读到的

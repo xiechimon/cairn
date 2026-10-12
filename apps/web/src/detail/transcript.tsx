@@ -10,7 +10,8 @@
 // names the message flow `transcript`.
 
 import { useState } from 'react';
-import { inlineSegments } from '../api/mappers.js';
+import { activityLabel } from '../api/activity.js';
+import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
@@ -545,6 +546,7 @@ function Row({
             labelVars={item.labelVars}
             startedAt={item.startedAt}
             seconds={item.seconds}
+            lastSignalAt={item.lastSignalAt}
             disclosure={
               liveStep != null ? { expand: '展开实时步骤', collapse: '收起实时步骤' } : null
             }
@@ -556,6 +558,21 @@ function Row({
                 <span className="[overflow-wrap:anywhere]">
                   {t('本步：{n}', { n: liveStep.step })}
                 </span>
+                {/* 2026-10-13 发送黑盒拆除：过程时间线——本步相位迁移逐行
+                    （HH:mm:ss 相位名），「只有最新标签」的黑盒拆成可见过程；
+                    冻结在长相位时最后一行就是它已停留的起点。无历史不渲染。 */}
+                {(item.phases ?? []).map((p, i) => {
+                  const phaseLabel = activityLabel(p);
+                  return (
+                    <span
+                      key={`${p.at}:${i}`}
+                      className="[overflow-wrap:anywhere]"
+                      data-testid="live-phase-line"
+                    >
+                      {clockTimeHms(p.at)} {t(phaseLabel.label, phaseLabel.vars)}
+                    </span>
+                  );
+                })}
                 {liveStep.machine != null && (
                   <span className="[overflow-wrap:anywhere]">
                     {t('执行机器：{n}', { n: liveStep.machine })}

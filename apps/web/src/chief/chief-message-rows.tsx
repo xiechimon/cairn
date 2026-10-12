@@ -436,6 +436,9 @@ export function ChiefStreamRow({
               variant="chief"
               label={item.label}
               labelVars={item.labelVars}
+              // 2026-10-13 发送黑盒拆除（两面同脸）：最近信号时刻喂给共享行
+              // 的静默走表——折叠态超过阈值即见「· 信号 Ns 前」，不必展开。
+              lastSignalAt={item.signalAt ?? null}
               disclosure={{ expand: '展开实时步骤', collapse: '收起实时步骤' }}
             >
               <div className={TURN_TOOLS_CLS} data-testid="chief-turn-tools">

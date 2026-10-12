@@ -475,6 +475,11 @@ export function TodoDetailPage() {
         liveText,
         stopping,
         activity,
+        // 2026-10-13 发送黑盒拆除：静默判定与过程时间线的两源。读取挂在
+        // 既有依赖上（activity/liveText 变化即触发本 memo 重算），不另起
+        // 订阅。
+        lastTextDeltaAt: buildId != null ? liveTextStore.getLastDeltaAt(buildId) : null,
+        phaseHistory: buildId != null ? activityStore.getHistory(buildId) : [],
       }),
       ...(latestPlan ? { doc: mapPlanDoc(latestPlan.content) } : {}),
       ...(changesQ.data

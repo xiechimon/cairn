@@ -156,6 +156,18 @@ export function clockTime(ms: number): string {
   }).format(ms);
 }
 
+/** `HH:MM:SS`（2026-10-13 发送黑盒拆除）：相位迁移时间线的时刻位——相位
+ *  迁移常以秒计（准备工作区 → 正在连接模型 同分钟发生），分钟精度会让
+ *  相邻条目撞成同一时刻，过程感尽失。 */
+export function clockTimeHms(ms: number): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(ms);
+}
+
 // —— 消息内容归一（pi 内容块 / 纯文本 / toolcall 行 / system JSON）———————————
 
 export function textOfContent(content: unknown): string {
@@ -506,6 +518,13 @@ export interface TranscriptInput {
    *  fixture 捕获或静默窗口，streaming 行回落既有基础标签）。消费侧带
    *  stepId 过滤：陈旧步的相位不挂到在跑步头上（W1）。 */
   activity?: StepActivity | null;
+  /** 2026-10-13 发送黑盒拆除：本会话最后一次 text_delta 的本机时刻
+   *  （liveTextStore.getLastDeltaAt）——与 act.at 取新合成 streaming 行的
+   *  lastSignalAt（响应期的信号是 delta 流，相位 at 会误报静默）。 */
+  lastTextDeltaAt?: number | null;
+  /** 2026-10-13 同批：相位迁移历史（activityStore.getHistory，有界 ≤8）——
+   *  披露面的过程时间线。消费侧按在跑步 stepId 过滤（W1 同律）。 */
+  phaseHistory?: readonly StepActivity[];
 }
 
 export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
@@ -520,6 +539,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     liveText,
     stopping = false,
     activity = null,
+    lastTextDeltaAt = null,
+    phaseHistory = [],
   } = input;
   const head: TranscriptItem[] = [];
   if (build?.triggerSource === 'schedule') head.push({ kind: 'scheduled' });
@@ -747,6 +768,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
       running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;
+    // 2026-10-13 发送黑盒拆除：lastSignalAt = 相位信号 at 与 text_delta 最后
+    // 增量取新（响应期相位不动但 delta 流是活信号；两源皆无 = 无信号面，行
+    // 不挂静默表）；phases = 本步相位迁移史（W1 同律按在跑步 stepId 过滤），
+    // 披露面的过程时间线。
+    const lastSignal =
+      act != null || lastTextDeltaAt != null ? Math.max(act?.at ?? 0, lastTextDeltaAt ?? 0) : null;
+    const stepPhases = phaseHistory.filter((p) => p.stepId === running.id);
     items.push({
       kind: 'streaming',
       // #873：不在投影期把「已用秒数」算成一个死数——投影只在别的事件驱动
@@ -776,6 +804,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       ...(queued == null && act?.skills !== undefined && act.skills.length > 0
         ? { skills: act.skills }
         : {}),
+      ...(queued == null && lastSignal != null ? { lastSignalAt: lastSignal } : {}),
+      ...(queued == null && stepPhases.length > 0 ? { phases: stepPhases } : {}),
     });
   } else if (build && todo.phase === 'building' && !steps.some((s) => s.status === 'stopped')) {
     // 静止态 live 线索（#471）：building 的步间隙 / agent 非流式窗口没有

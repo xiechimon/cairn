@@ -529,6 +529,8 @@ export const EN: Record<string, string> = {
   '正在压缩上下文...': 'Compacting context...',
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
+  // 2026-10-13 发送黑盒拆除：折叠行标签后的静默走表（同一事实的压缩形）。
+  '· 信号 {n}s 前': '· signal {n}s ago',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
   '▶ skill: {n}': '▶ skill: {n}',
   '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',

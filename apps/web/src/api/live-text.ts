@@ -16,6 +16,10 @@ const buffers = new Map<string, string>();
 /** 待交接：conversationId → { messageId, prefixLen }。单调单槽——后到的
  *  事件快照更长的前缀，天然覆盖前者（同一次 messages 重取必同时含两者）。 */
 const handoffs = new Map<string, { messageId: string; prefixLen: number }>();
+/** 2026-10-13 发送黑盒拆除：每个会话最后一次 text_delta 到达的本机时刻——
+ *  「安静多久了」的另一半真值（activity.at 只在相位变化时动，响应期的信号
+ *  是 delta 流；两时钟取新 = 静默判定不冤枉输出中的模型）。 */
+const lastDeltaAt = new Map<string, number>();
 const listeners = new Set<Listener>();
 
 function emit(): void {
@@ -25,13 +29,15 @@ function emit(): void {
 export const liveTextStore = {
   append(conversationId: string, text: string): void {
     buffers.set(conversationId, (buffers.get(conversationId) ?? '') + text);
+    lastDeltaAt.set(conversationId, Date.now());
     emit();
   },
   /** 终稿行到达：整段缓冲作废（消息重取接管呈现）。 */
   clear(conversationId: string): void {
     const hadBuffer = buffers.delete(conversationId);
     const hadHandoff = handoffs.delete(conversationId);
-    if (hadBuffer || hadHandoff) emit();
+    const hadDelta = lastDeltaAt.delete(conversationId);
+    if (hadBuffer || hadHandoff || hadDelta) emit();
   },
   /** #857：assistant 文本行落库事件——记 handoff，不清缓冲。buffer 为空时
    *  无可交接内容，不记（保持 map 干净）。 */
@@ -63,6 +69,10 @@ export const liveTextStore = {
   },
   get(conversationId: string): string {
     return buffers.get(conversationId) ?? '';
+  },
+  /** 最后一次 text_delta 的本机时刻；从未收到 = null（无增量面不摆数）。 */
+  getLastDeltaAt(conversationId: string): number | null {
+    return lastDeltaAt.get(conversationId) ?? null;
   },
   subscribe(listener: Listener): () => void {
     listeners.add(listener);
