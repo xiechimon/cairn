@@ -73,6 +73,33 @@ export const teamOrgChart: FixtureSet = {
   },
 };
 
+/** 单成员团队 + chief 显式绑定（#1246 单链态命名场景）：成员即根，子列只剩
+ *  创建槽——组织图退化为 root → link → 创建卡的单链，无括号列。字段形状照
+ *  TEAM_ORG_CHART 同款。 */
+export const teamOrgChartSingle: FixtureSet = {
+  todos: boardDefault.todos,
+  now: boardDefault.now,
+  team: {
+    members: 1,
+    agents: [
+      {
+        id: 'org-sole',
+        displayName: 'r3-builder',
+        model: 'claude-sonnet-5',
+        isDefault: true,
+        role: null,
+        provider: 'r3-gw',
+      },
+    ],
+  },
+  chief: {
+    view: 'drawer',
+    bound: true,
+    agent: { id: 'org-sole', displayName: 'r3-builder', avatarUrl: null },
+    threadTitle: '新主题',
+  },
+};
+
 /** 零成员团队（r2 §8.1 17c：无成员时整块内容 = 暂无成员，不渲组织图）。 */
 export const teamOrgChartEmpty: FixtureSet = {
   todos: boardDefault.todos,

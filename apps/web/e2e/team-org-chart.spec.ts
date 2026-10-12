@@ -153,3 +153,28 @@ test('chart 组织图：布局选择刷新后持久', async ({ page }) => {
   await page.reload();
   await expect(page.getByRole('tab', { name: 'chart' })).toHaveAttribute('aria-selected', 'true');
 });
+
+// #1246 单链态（team-org-chart-single：成员即根，子列只剩创建槽）。括号列
+// 按 ≥2 子设计，单链下塌成 0 高叠边短横 + 28px 断口——修复为跳过括号列
+// 直连。以下断言为新增尺子，只钉单链面；既有 ≥2 / 0 态断言不动。
+test('chart 组织图单链：不渲染括号列，link 直连创建槽', async ({ page }) => {
+  await openChart(page, 'team-org-chart-single');
+  // 单链态成员卡只有根节点
+  await expect(page.getByTestId('team-chart-node')).toHaveCount(1);
+  await expect(page.getByText('暂无成员')).toHaveCount(0);
+  // 无括号元素（塌片消失）
+  await expect(page.getByTestId('team-chart-bracket')).toHaveCount(0);
+  // link 仍 44×1
+  const link = await page.getByTestId('team-chart-link').boundingBox();
+  expect(link).not.toBeNull();
+  expect(link?.width).toBe(LINK_W);
+  expect(link?.height).toBe(1);
+  // 无断口：link 右缘 x == 创建槽左缘 x（精确相等）
+  const create = await page.getByRole('button', { name: '创建 Agent' }).boundingBox();
+  expect(create).not.toBeNull();
+  expect(link!.x + link!.width).toBe(create!.x);
+  // 同轴：link 中心 y 与创建槽中心 y 差 ≤1px
+  const linkCenterY = link!.y + link!.height / 2;
+  const createCenterY = create!.y + create!.height / 2;
+  expect(Math.abs(linkCenterY - createCenterY)).toBeLessThanOrEqual(1);
+});

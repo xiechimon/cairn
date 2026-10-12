@@ -139,4 +139,10 @@ export {
   schedulesFormOnce,
   schedulesList,
 } from './schedules.js';
-export { TEAM_R7, teamGrid, teamOrgChart, teamOrgChartEmpty } from './team.js';
+export {
+  TEAM_R7,
+  teamGrid,
+  teamOrgChart,
+  teamOrgChartEmpty,
+  teamOrgChartSingle,
+} from './team.js';

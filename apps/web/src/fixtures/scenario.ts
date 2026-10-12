@@ -101,6 +101,7 @@ import {
   teamGrid,
   teamOrgChart,
   teamOrgChartEmpty,
+  teamOrgChartSingle,
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
@@ -319,6 +320,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // team chart 组织图（命名场景，无 capture）：3 成员树 + 零成员空态
       'team-org-chart': teamOrgChart,
       'team-org-chart-empty': teamOrgChartEmpty,
+      // 单链态（#1246）：成员即根，子列只剩创建槽——钉无括号直连几何
+      'team-org-chart-single': teamOrgChartSingle,
       // Agent 详情编辑面（r3 §4）：团队 roster + 该 agent 的全记录 + providers
       // 行集，一套内容同时供 /app/team 与 /app/resources/agents/:id 两个路由。
       'agent-detail': agentDetail,

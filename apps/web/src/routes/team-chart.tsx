@@ -163,26 +163,32 @@ export function TeamChart({
       <div className="mt-10 text-center text-[13px] text-(--text-tertiary)">{t('暂无成员')}</div>
     );
   }
+  // 单链判定：子节点只有创建槽（成员卡除根外为 0）。括号形态按 ≥2 子设计，
+  // 单链下括号盒塌到 0 高但 border 仍画 2px 叠边短横，且 w-7 坐标架占位
+  // 在 link 与子卡之间露 28px 断口（#1246）——跳过括号列直连。
+  const children = agents.filter((a) => a.id !== root.id);
   return (
     <div className="mt-[9px] flex items-center">
       <ChartNode agent={root} crown />
       <div className="h-px w-11 flex-none bg-(--input)" data-testid="team-chart-link" />
       <div className="flex" data-testid="team-chart-children">
-        {/* 括号列本身不画东西，只给绝对定位的括号当坐标架：高度随子列撑满，
-            于是括号 top/bottom 各留半个卡片高（28），正好落在首/末子节点的
-            垂直中心上。 */}
-        <div className="relative w-7 flex-none">
-          <div
-            className="absolute bottom-7 left-0 top-7 w-7 rounded-l-[7px] border border-r-0 border-(--input)"
-            data-testid="team-chart-bracket"
-          />
-        </div>
+        {children.length > 0 && (
+          <>
+            {/* 括号列本身不画东西，只给绝对定位的括号当坐标架：高度随子列撑满，
+                于是括号 top/bottom 各留半个卡片高（28），正好落在首/末子节点的
+                垂直中心上。 */}
+            <div className="relative w-7 flex-none">
+              <div
+                className="absolute bottom-7 left-0 top-7 w-7 rounded-l-[7px] border border-r-0 border-(--input)"
+                data-testid="team-chart-bracket"
+              />
+            </div>
+          </>
+        )}
         <div className="flex flex-col gap-2" data-testid="team-chart-nodes">
-          {agents
-            .filter((a) => a.id !== root.id)
-            .map((a) => (
-              <ChartNode key={a.id} agent={a} />
-            ))}
+          {children.map((a) => (
+            <ChartNode key={a.id} agent={a} />
+          ))}
           {/* 虚线创建卡：与成员卡同族盒模型（NODE_CLS layout），border-style
               换 dashed、文本左对齐。#1005 registry 对齐：outline 默认档
               （hover bg-muted / 按下位移由件承载，七通道中和退役），节点卡
