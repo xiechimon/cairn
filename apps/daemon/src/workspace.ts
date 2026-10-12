@@ -362,6 +362,20 @@ export class WorkspaceManager implements WorktreeOps {
     return gitPrim.countAhead(cwd, defaultBranch);
   }
 
+  /** HEAD 所在分支（#1195 收尾偏离检测面；detached / 查询失败 = null）。 */
+  async currentBranch(cwd: string): Promise<string | null> {
+    return gitPrim.currentBranch(cwd);
+  }
+
+  /** 步窗口内有新提交的本地分支集（#1195 产物并集面；归属裁决在 runner）。 */
+  async branchesWithNewCommits(
+    cwd: string,
+    baseCommit: string,
+    sinceMs: number,
+  ): Promise<string[]> {
+    return gitPrim.branchesWithNewCommits(cwd, baseCommit, sinceMs);
+  }
+
   /** conv 分支 unified diff（#704 非 hosted 形态投影上报数据源）：
    * `git diff origin/<default>...HEAD`——merge-base 到工作头的变更，与 server
    * readBuildChanges 的 `${baseSha}...${headSha}` 同语义。 */

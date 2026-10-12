@@ -1486,7 +1486,7 @@ function releaseClaimedStep(
 function stepArtifactGate(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-  outcome: { hasChanges?: boolean },
+  outcome: { hasChanges?: boolean; workBranchDrift?: { expected: string; actual: string } },
 ): string | null {
   if (stepRow.kind === 'plan') {
     const planRow = deps.db
@@ -1507,6 +1507,14 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (stepRow.kind === 'build' && outcome.hasChanges === false) {
+    // #1195 偏离点名：daemon 收尾检测到 HEAD 停在契约分支之外的具名分支、
+    // 且产物并集面（含步窗口分支扫描）处处无提交——「构建零改动」把失败
+    // 原因说反（看起来像 agent 没干活，实际可能已在自建分支交付）。失败
+    // 原因点名两分支，读者能直接对上 transcript 的偏离行。
+    const drift = outcome.workBranchDrift;
+    if (drift !== undefined) {
+      return `agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
+    }
     return '构建零改动';
   }
   return null;
@@ -1523,6 +1531,9 @@ export function completeStep(
   stepId: string,
   outcome: {
     hasChanges?: boolean;
+    /** #1195 工作分支偏离（daemon 收尾检测）：闸 2 在 hasChanges=false 时
+     *  据此点名分支偏离而非误导性「构建零改动」。 */
+    workBranchDrift?: { expected: string; actual: string };
     findings?: ReviewVerdict;
     findingsError?: string;
     /** verify 步 verdict（#1250）：daemon 从 agent 终轮 JSON 提取；两字段

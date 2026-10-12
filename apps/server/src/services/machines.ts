@@ -1780,6 +1780,10 @@ export async function finishStep(
   if (outcome.status === 'success') {
     completeStep(deps, stepId, {
       hasChanges: outcome.hasChanges,
+      // #1195 工作分支偏离透传（闸 2 点名分支偏离的入参面）。
+      ...(outcome.workBranchDrift !== undefined
+        ? { workBranchDrift: outcome.workBranchDrift }
+        : {}),
       ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
       ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
       // #1250 verify 步 verdict 透传（completeStep verify 分支消费）。

@@ -222,6 +222,41 @@ function stripMergedPrGuard(text: string): string {
   return wrappedBy(guard, MERGED_PR_GUARD_HEAD, MERGED_PR_GUARD_TAIL) ? text.slice(0, idx) : text;
 }
 
+// —— #1195 工作分支注记（daemon 投递面追加 / 过滤侧剥离共用锚点）——————————
+
+/** #1195 工作分支注记头尾（写侧组装与过滤侧剥离共用的锚点）。 */
+const WORK_BRANCH_NOTE_HEAD = '工作分支注记：本步的工作分支是 ';
+const WORK_BRANCH_NOTE_TAIL =
+  '。工作区已检出该分支——本步的全部提交与推送都必须落在它上面：不要创建或切换到自己的分支，不要另开 worktree 或 clone 到别处干活；开 Pull Request 时 head 分支也必须是它。';
+
+/** #1195 工作分支注记行（daemon 投递面单源）：交付步（build/merge/verify）
+ *  prompt 尾部追加的一行——「只在会话分支提交」的硬约束。分支名对 agent 是
+ *  执行机本地事实（worktree 检出即契约），事故形（mea 2026-10-11）恰是 agent
+ *  自建分支交付后产物闸按会话分支计数判零。写侧（runner 投递前组装）与过滤侧
+ *  （stripWorkBranchNote）单源在此。 */
+export function buildWorkBranchNote(branch: string): string {
+  return `${WORK_BRANCH_NOTE_HEAD}${branch}${WORK_BRANCH_NOTE_TAIL}`;
+}
+
+/** 工作分支注记追加（幂等：注记已在场 = 原文返回——recover 面 resume prompt
+ *  已含注记时不双注；appendPlanLocationNote / appendMergedPrGuard 同律。单
+ *  换行拼接：注记是指令段的收尾行）。 */
+export function appendWorkBranchNote(prompt: string, branch: string): string {
+  if (prompt.includes(WORK_BRANCH_NOTE_HEAD)) return prompt;
+  const note = buildWorkBranchNote(branch);
+  return prompt === '' ? note : `${prompt}\n${note}`;
+}
+
+/** 尾部工作分支注记剥离（过滤侧）：prompt 以 '\n' + 注记行收尾时剥掉注记，
+ *  余段走模板比对（stripPlanLocationNote / stripMergedPrGuard 同族）。非注记
+ *  收尾 = 原文返回。 */
+export function stripWorkBranchNote(text: string): string {
+  const idx = text.lastIndexOf(`\n${WORK_BRANCH_NOTE_HEAD}`);
+  if (idx === -1) return text;
+  const note = text.slice(idx + 1);
+  return wrappedBy(note, WORK_BRANCH_NOTE_HEAD, WORK_BRANCH_NOTE_TAIL) ? text.slice(0, idx) : text;
+}
+
 /** 编排请求首行（#640 词表）：buildOrchestratePrompt 的首行与
  *  orchestrateThreadTitle 的推导共用这一句——线程标题由 chiefThreadTitle
  *  取首行派生，web 侧「该任务是否有在飞编排回合」的判定按标题匹配
@@ -305,6 +340,8 @@ function isSyntheticInstruction(text: string): boolean {
   if (withoutGuard !== text) return isSyntheticInstruction(withoutGuard);
   const withoutNote = stripPlanLocationNote(text);
   if (withoutNote !== text) return isSyntheticInstruction(withoutNote);
+  const withoutBranchNote = stripWorkBranchNote(text);
+  if (withoutBranchNote !== text) return isSyntheticInstruction(withoutBranchNote);
   return false;
 }
 
@@ -326,6 +363,10 @@ export function classifyUserText(
   // wire 行经呈现层 trim 后比对（daemon 记录的是未 trim 原文）。
   const taskText = buildTaskPromptText(task.title, task.spec).trim();
   if (text === taskText) return 'task-prompt';
+  // #1195 工作分支注记是任务文本的投递附加行（交付步新会话形 = 任务文本 +
+  // 注记）：剥掉注记后与任务文本精确相等仍判 task-prompt，不然任务简报成
+  // 用户气泡双渲染。
+  if (stripWorkBranchNote(text) === taskText) return 'task-prompt';
   if (isSyntheticInstruction(text)) return 'synthetic';
   // #720 组合行（composeTaskPromptWithInstruction 投递形）：任务前缀剥除后
   // 余段是合成指令 → 整行退场——任务简报已有描述区、反馈已有独立用户行，
