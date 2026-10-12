@@ -1,9 +1,11 @@
 name: pr-evidence
 
-# PR body evidence gate (#750, #939, #940, #1079): the body must answer the
-# "Upstream" and "Verified" template sections, and
-# image links (any host by extension; media hosts by URL shape) must be
-# embedded (`![...]()`, not `[...]()`) and must answer HTTP 200.
+# PR body evidence gate (#750, #939, #940, #1079; tasks check added by
+# #1240): the body must answer the "Upstream" and "Verified" template
+# sections, and image links (any host by extension; media hosts by URL
+# shape) must be embedded (`![...]()`, not `[...]()`) and must answer
+# HTTP 200. The body's Acceptance section must carry at least one
+# task-list item and none may be unchecked.
 #
 # Separate file from ci.yml on purpose: the default `pull_request` activity
 # types are only opened/synchronize/reopened, and the body is editable, so
@@ -30,3 +32,12 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: python3 scripts/pr-evidence-gate.py
+
+      # !cancelled() so both gates' findings show in one run even when the
+      # first step reds (#1240): a lane fixing a link problem should not
+      # have to push again to discover a tasks problem.
+      - name: Check PR body tasks (Acceptance checklist exists and is fully checked)
+        if: ${{ !cancelled() }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: python3 scripts/pr-tasks-gate.py
