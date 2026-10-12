@@ -28,6 +28,8 @@ export {
   boardMachinePicker,
   boardOverflow,
   boardProjectPicker,
+  // #1261 等额度看板场景（quota-wait 命名场景底）。
+  boardQuotaWait,
   boardRepoFilter,
   boardResetGate,
   boardStress,

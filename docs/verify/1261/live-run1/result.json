@@ -1,0 +1,92 @@
+{
+  "probe": "drive-1261-quota-wait",
+  "server": "http://127.0.0.1:18997",
+  "web": "http://127.0.0.1:18998",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0329-1261/.claude/verify-run/home/server/server.db",
+  "daemonHome": "/tmp/pacman-1261-dh6",
+  "relayId": "stub-1261-mv5e7v5c",
+  "passed": 14,
+  "total": 14,
+  "checks": [
+    {
+      "name": "1a 熔断在案：daemon.log 两行 quota circuit breaker（每任务一行）",
+      "ok": true,
+      "detail": "2026-10-12 23:14:38 [step] quota circuit breaker: capacity on stub-1261-mv5e7v5c — stopping session (no auto-retry spin) | 2026-10-12 23:14:38 [step] quota circuit breaker: capacity on stub-1261-mv5e7v5c — stopping session (no auto-retry spin)"
+    },
+    {
+      "name": "1b 风暴未起：零 retry storm、auto_retry_start ≤ 2（旧路径烧至 4+）",
+      "ok": true,
+      "detail": "storm=0 auto_retry=0"
+    },
+    {
+      "name": "2a 挂起不判死：两任务 todo 仍 building、build.errorMessage 空",
+      "ok": true,
+      "detail": "phaseA=building errA=null"
+    },
+    {
+      "name": "2b Retry-After 链：quotaBlock.kind=capacity、retryAfterMs=5000、relay 指名",
+      "ok": true,
+      "detail": "{\"kind\":\"capacity\",\"providerId\":\"stub-1261-mv5e7v5c\",\"label\":\"Relay 1261 Probe\",\"reason\":\"429: {\\\"message\\\":\\\"rate limit exceeded for this key\\\",\\\"type\\\":\\\"rate_limit_error\\\"}\\nprovider response: POST http://127.0.0.1:65439/v1/chat/completions -> 429 application/json (not an SSE stream) retry-after:"
+    },
+    {
+      "name": "4 in-app 通知两行（每任务一条 quota_wait，snippet 指名 relay lane）",
+      "ok": true,
+      "detail": "Relay 1261 Probe 限流：任务挂起等额度，额度恢复后自动续跑 | Relay 1261 Probe 限流：任务挂起等额度，额度恢复后自动续跑"
+    },
+    {
+      "name": "3a 板面横幅出现（SSE live-push）且指名 relay + 限流 + 双任务计数",
+      "ok": true,
+      "detail": "… Relay 1261 Probe 限流，2 个任务挂起等额度 额度恢复后自动续跑；23:14 自动探测"
+    },
+    {
+      "name": "3b 验收红线：建任务 → 横幅可见 ≤ 3 分钟（实测含冷编译与派发）",
+      "ok": true,
+      "detail": "elapsed=6s"
+    },
+    {
+      "name": "3c 两卡「等额度」芯片在位（capacity 档）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "3d 详情头 chip = 等额度（不再谎称执行中）",
+      "ok": true,
+      "detail": "等额度"
+    },
+    {
+      "name": "3e 详情进度行 = 等额度：relay + 限流 + 自动探测续跑",
+      "ok": true,
+      "detail": "等额度：Relay 1261 Probe 限流，23:14 自动探测续跑"
+    },
+    {
+      "name": "5a 自动续跑：两步 done（无人工操作，翻转即恢复）",
+      "ok": true,
+      "detail": "resume→done=11s"
+    },
+    {
+      "name": "5b 额度恢复后正常收尾：todo 进 review 关口（产物在、判据走常轨）",
+      "ok": true,
+      "detail": "phaseA=review"
+    },
+    {
+      "name": "5c 恢复后横幅退场（板面回常态）",
+      "ok": true,
+      "detail": "banner count=0"
+    },
+    {
+      "name": "5d 续跑产物在案：ok 轮工具调用进 transcript（marker 命令行）",
+      "ok": true,
+      "detail": "rows=4"
+    }
+  ],
+  "timeline": {
+    "buildStartAt": 1791818075174,
+    "bannerVisibleAt": 1791818081199,
+    "resumeAt": 1791818083423,
+    "elapsedToBannerMs": 6025,
+    "elapsedResumeToDoneMs": 11080
+  },
+  "relayRequests": 6,
+  "quotaHits": 2,
+  "okHits": 4
+}

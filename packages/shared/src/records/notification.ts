@@ -5,11 +5,20 @@
 // 触发矩阵（r5 §7.2）：plan_ready（进 confirm）/ build_review（进 review，
 // 含定时轮停 review——无独立「定时轮结束」类型）/ chief_message（Chief 线程
 // 消息，snippet=消息全文）；进 done、进 failed 无 in-app 通知事件。
+// #1261 增 quota_wait：任务因 relay 额度空/限流挂起「等额度」（不是失败——
+// 失败不通知的原判不破；挂起是「需要你知道但无需你动手」的新一类：额度恢复
+// 自动续跑，通知的意义 = 零进展期间不再静默）。snippet = 哪一路 relay + 恢复
+// 探测时刻。
 
 import { z } from 'zod';
 import { epochMs, recordId } from './common.js';
 
-export const NOTIFICATION_TYPES = ['plan_ready', 'build_review', 'chief_message'] as const;
+export const NOTIFICATION_TYPES = [
+  'plan_ready',
+  'build_review',
+  'chief_message',
+  'quota_wait',
+] as const;
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;
 

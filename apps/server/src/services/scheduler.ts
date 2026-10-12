@@ -31,6 +31,8 @@ import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loo
 import type { TeamStreamHub } from './events.js';
 import { sweepStaleMachines } from './machines.js';
 import { PhaseTransitionError } from './phase.js';
+// #1261 配额挂起探测 sweep（tick 驱动）。
+import { sweepQuotaWaitSteps } from './quota-wait.js';
 import { computeNextRunAt, dueSchedules, isRecurring, updateNextRunAt } from './schedules.js';
 
 export interface SchedulerOptions {
@@ -147,6 +149,9 @@ export function createScheduler(
     // #1219 僵尸 reconcile：queued 却无活步的 todo（旧 cancel 裸 UPDATE /
     // 崩溃窗口遗留）回落释放——不修则 run_builds 409 queued→queued 停摆。
     sweepZombieQueuedTodos(deps, now);
+    // #1261 配额挂起探测：waiting_quota 步 probeAt 到期 → 释放回 pending
+    // （额度恢复自动续跑的 server 半；仍配额则 daemon 再报、退避重挂）。
+    sweepQuotaWaitSteps(deps, now);
     // #759 附件回收：tick piggyback，每小时最多扫一次（启动首 tick 即补扫）。
     // sweep 自带 try/catch——回收失败不许打断定时闭环。
     if (gc !== undefined && gc !== null && now - lastGcAt >= ATTACHMENT_GC_INTERVAL_MS) {

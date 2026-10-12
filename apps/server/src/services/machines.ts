@@ -119,6 +119,8 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+// #1261 配额挂起面（quotaBlock → waiting_quota，不走 failed 漏斗）。
+import { applyQuotaWaitStep } from './quota-wait.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -1738,6 +1740,15 @@ export async function finishStep(
   // stop_pending 卫生清理（全终态共通，M7 #308）：stop 与自然完成/失败的
   // 竞态残留随收尾即清（拉取-确认面另有定向步校验双保险，不复活）。
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  // #1261 配额熔断分支：daemon 识别 quota/capacity 后随 done 携带 quotaBlock
+  // ——挂起等额度（waiting_quota + 通知 + 探测续跑），**不**走下方 failed 漏斗
+  // （todo 不落 failed）。早于 chief/success/stopped/failed 各分支：配额事件
+  // 与步形态无关（chief 步挂起 = 回合冻结，activeRun 保持；worker 步挂起 =
+  // todo building 保持）。旧 daemon（无 quotaBlock）零改动走原分支。
+  if (outcome.status === 'failed' && outcome.quotaBlock !== undefined) {
+    applyQuotaWaitStep(deps, stepRow, outcome.quotaBlock);
+    return;
+  }
   // chief 步收尾（无 build/phase/merge；thread 面 + chief_message 通知，r5 §3.6/
   // §7.2）。token 记账已按 buildId=chief conv id 落位（context.tokens 数据源）。
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {

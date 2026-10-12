@@ -219,6 +219,7 @@ describe('enrichProviderError（三形态文案可区分）', () => {
       statusText: 'OK',
       contentType: 'text/html',
       eventStream: false,
+      retryAfterMs: null, // #1261 字段位（无头恒 null）
       preview: '<html>',
     };
     const text = describeProviderResponse(shape, {});
