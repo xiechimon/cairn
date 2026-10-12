@@ -23,6 +23,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
+  machine as machineTable,
   notification as notificationTable,
   provider as providerTable,
   step as stepTable,
@@ -102,6 +103,14 @@ async function setupWorld(): Promise<QuotaWorld> {
   });
   expect(enrollRes.status).toBe(200);
   const token = ((await enrollRes.json()) as { token: string }).token;
+  // #1259：归属机绑定（quota 世界可领缺省形——in-process call 不走
+  // fetchImpl 的 enroll 绑定缺省，显式绑到本机）。
+  const machineRow = s.db.select().from(machineTable).limit(1).all()[0]!;
+  s.db
+    .update(agentTable)
+    .set({ machineId: machineRow.id })
+    .where(eq(agentTable.id, AGENT_ID))
+    .run();
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '配额挂起探针', spec: '写一行探针' },

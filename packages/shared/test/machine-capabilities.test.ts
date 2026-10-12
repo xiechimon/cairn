@@ -138,17 +138,29 @@ describe('record 加法契约（老 server / 老 daemon 双向可解析）', () 
 
   it('createAgentBodySchema：requiredCapabilities 可写、可缺省、null = 清空', () => {
     expect(
-      createAgentBodySchema.parse({ displayName: 'a', requiredCapabilities: { models: ['m'] } })
-        .requiredCapabilities,
+      createAgentBodySchema.parse({
+        displayName: 'a',
+        machineId: 'machine-1',
+        requiredCapabilities: { models: ['m'] },
+      }).requiredCapabilities,
     ).toEqual({ models: ['m'] });
-    expect(createAgentBodySchema.parse({ displayName: 'a' }).requiredCapabilities).toBeUndefined();
     expect(
-      createAgentBodySchema.parse({ displayName: 'a', requiredCapabilities: null })
+      createAgentBodySchema.parse({ displayName: 'a', machineId: 'machine-1' })
         .requiredCapabilities,
+    ).toBeUndefined();
+    expect(
+      createAgentBodySchema.parse({
+        displayName: 'a',
+        machineId: 'machine-1',
+        requiredCapabilities: null,
+      }).requiredCapabilities,
     ).toBeNull();
     expect(
-      createAgentBodySchema.safeParse({ displayName: 'a', requiredCapabilities: { mcpServers: 1 } })
-        .success,
+      createAgentBodySchema.safeParse({
+        displayName: 'a',
+        machineId: 'machine-1',
+        requiredCapabilities: { mcpServers: 1 },
+      }).success,
     ).toBe(false);
   });
 
