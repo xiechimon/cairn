@@ -874,6 +874,39 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
     "prUrl": {
       "type": "string",
     },
+    "quotaBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "quota",
+            "capacity",
+          ],
+          "type": "string",
+        },
+        "label": {
+          "type": "string",
+        },
+        "providerId": {
+          "type": "string",
+        },
+        "reason": {
+          "maxLength": 500,
+          "type": "string",
+        },
+        "retryAfterMs": {
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "kind",
+        "providerId",
+        "reason",
+      ],
+      "type": "object",
+    },
     "sessionId": {
       "type": "string",
     },
@@ -2807,6 +2840,52 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
               ],
               "type": "object",
             },
+            "quotaWait": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "quota",
+                    "capacity",
+                  ],
+                  "type": "string",
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "probeAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "providerId": {
+                  "type": "string",
+                },
+                "retryAfterMs": {
+                  "anyOf": [
+                    {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "kind",
+                "providerId",
+                "label",
+                "retryAfterMs",
+                "probeAt",
+              ],
+              "type": "object",
+            },
             "skillInjection": {
               "anyOf": [
                 {
@@ -2859,6 +2938,7 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
                 "done",
                 "failed",
                 "stopped",
+                "waiting_quota",
               ],
               "type": "string",
             },
@@ -3885,6 +3965,52 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
       ],
       "type": "object",
     },
+    "quotaWait": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "quota",
+            "capacity",
+          ],
+          "type": "string",
+        },
+        "label": {
+          "type": [
+            "string",
+            "null",
+          ],
+        },
+        "probeAt": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "providerId": {
+          "type": "string",
+        },
+        "retryAfterMs": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "kind",
+        "providerId",
+        "label",
+        "retryAfterMs",
+        "probeAt",
+      ],
+      "type": "object",
+    },
     "skillInjection": {
       "anyOf": [
         {
@@ -3937,6 +4063,7 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
         "done",
         "failed",
         "stopped",
+        "waiting_quota",
       ],
       "type": "string",
     },
@@ -4224,6 +4351,59 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             },
             "projectId": {
               "type": "string",
+            },
+            "quotaWait": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "quota",
+                        "capacity",
+                      ],
+                      "type": "string",
+                    },
+                    "label": {
+                      "type": [
+                        "string",
+                        "null",
+                      ],
+                    },
+                    "probeAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    "providerId": {
+                      "type": "string",
+                    },
+                    "retryAfterMs": {
+                      "anyOf": [
+                        {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "providerId",
+                    "label",
+                    "retryAfterMs",
+                    "probeAt",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
             },
             "seqNum": {
               "maximum": 9007199254740991,
@@ -4570,6 +4750,7 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                 "plan_ready",
                 "build_review",
                 "chief_message",
+                "quota_wait",
               ],
               "type": "string",
             },
@@ -5618,6 +5799,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > notificati
         "plan_ready",
         "build_review",
         "chief_message",
+        "quota_wait",
       ],
       "type": "string",
     },
@@ -6346,6 +6528,59 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     },
     "projectId": {
       "type": "string",
+    },
+    "quotaWait": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "quota",
+                "capacity",
+              ],
+              "type": "string",
+            },
+            "label": {
+              "type": [
+                "string",
+                "null",
+              ],
+            },
+            "probeAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "providerId": {
+              "type": "string",
+            },
+            "retryAfterMs": {
+              "anyOf": [
+                {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+          },
+          "required": [
+            "kind",
+            "providerId",
+            "label",
+            "retryAfterMs",
+            "probeAt",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "seqNum": {
       "maximum": 9007199254740991,

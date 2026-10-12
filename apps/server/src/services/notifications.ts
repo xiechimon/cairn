@@ -146,3 +146,37 @@ export function notifyChiefMessage(
     snippet: input.message,
   });
 }
+
+/** quota_wait（#1261）：任务因 relay 额度空/限流挂起「等额度」——不是失败
+ * （失败不通知的原判不破）；挂起是「需要你知道但无需你动手」的新一类。
+ * snippet = 哪一路 relay + 事件类型 + 自动续跑指引；agent 归因 = assignment
+ * build 槽（挂起的是执行步），缺则属主代行（notifyTodoPhase 同律）。 */
+export function notifyQuotaWait(
+  deps: NotificationDeps,
+  todoRow: {
+    id: string;
+    teamId: string;
+    title: string;
+    projectId: string;
+    seqNum: number;
+    assignment?: { plan?: { agentId?: string } | null; build?: { agentId?: string } | null } | null;
+  },
+  block: { kind: 'quota' | 'capacity'; providerId: string; label: string | null },
+): NotificationRecord {
+  const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
+  const agentRow = agentId
+    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
+    : undefined;
+  const lane = block.label ?? block.providerId;
+  const kindText = block.kind === 'quota' ? '额度空' : '限流';
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'quota_wait',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: agentRow
+      ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
+      : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    snippet: `${lane} ${kindText}：任务挂起等额度，额度恢复后自动续跑`,
+  });
+}

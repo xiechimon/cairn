@@ -269,6 +269,40 @@ export const boardOverflow: FixtureSet = {
   now: r7(13, 55),
 };
 
+/** #1261 等额度命名场景（无 capture，board-overflow 先例）：执行中一卡
+ *  quotaWait 在位（等额度芯片 + 横幅 + 详情行标签的判定面），另一执行中卡
+ *  无 quotaWait（负向钉——普通执行中不染等额度色）。probeAt 定在 now + 2min
+ *  的整刻，让「{probe} 自动探测续跑」的时序文案确定性。 */
+export const boardQuotaWait: FixtureSet = {
+  ...boardDefault,
+  todos: [
+    {
+      ...probeTodo('building', r7(13, 40)),
+      id: 'quota-waiting-1',
+      seqNum: 61,
+      title: '等额度探针（relay-186 断粮）',
+      spec: '等额度探针（relay-186 断粮）。',
+      quotaWait: {
+        kind: 'quota',
+        providerId: 'relay-186',
+        label: 'Relay 186',
+        retryAfterMs: null,
+        probeAt: r7(13, 56),
+      },
+    },
+    {
+      ...probeTodo('building', r7(13, 42)),
+      id: 'quota-plain-1',
+      seqNum: 62,
+      title: '普通执行中探针（无配额信号）',
+      spec: '普通执行中探针（无配额信号）。',
+    },
+    legacyReview,
+    legacyDone,
+  ],
+  now: r7(13, 54),
+};
+
 /** #692 压力探针卡工厂（无 capture，overflowProbe 先例）：相位可指定，
  *  同式无标签、单项目。orderIndex 递增 = 列视图序即数组序。 */
 function stressProbe(

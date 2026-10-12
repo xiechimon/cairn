@@ -25,5 +25,8 @@ export * from './skill-facts.js';
 export * from './skill-inject.js';
 export * from './skill-route.js';
 export * from './tables.js';
+// #1261：agent 失败分类（quota/capacity/provider_network/other 四桶 +
+// Retry-After 解析）——daemon 检测面单源，server 只消费结构化 quotaBlock。
+export * from './task-failure.js';
 // spec 15 #394：占位标题派生 + 固定标签词表（ADR 0002 自觉背离原站的面）。
 export * from './task-meta.js';
