@@ -40,6 +40,7 @@ import {
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
+  stripAnsiEscapes,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@pacman/shared';
 import { relativeTime } from '../board/rel-time.js';
@@ -779,11 +780,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({ kind: 'streaming', label: '执行中...' });
   }
 
-  // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。
+  // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。#1262：显示侧纯文本
+  // 兜底——写入侧（daemon 落库前）已剥，这里再剥一次覆盖存量脏行与漏网路径
+  // （幂等，无转义输入零改动）。
   if (build?.errorMessage && todo.phase === 'failed') {
     items.push({
       kind: 'fail',
-      title: build.errorMessage,
+      title: stripAnsiEscapes(build.errorMessage),
       body: '请将其重新上线，或重新运行任务以改派其他机器。',
       links: ['查看原始错误', '排查指南'],
     });
@@ -940,7 +943,8 @@ export function mapRunHistory(
     const parts = [relativeTime(entry.createdAt, now)];
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
-    if (failed && b) parts.push(b.errorMessage ?? '');
+    // #1262 显示侧纯文本兜底（与失败行同律）：存量脏行的转义残片不进 meta。
+    if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));
     rows.push({
       label: `第 ${n} 次运行`,
       meta: parts.join(' · '),

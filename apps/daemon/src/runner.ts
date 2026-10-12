@@ -51,6 +51,7 @@ import {
   STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
+  stripAnsiEscapes,
   transcriptPromptRowId,
   transcriptResumeNoteRowId,
 } from '@pacman/shared';
@@ -1730,7 +1731,10 @@ export async function runStep(
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
   const doneBody: MachineDoneBody = {
     status,
-    ...(lastError !== null ? { errorMessage: lastError } : {}),
+    // #1262：捕获侧剥 ANSI（SGR + OSC8）——工具输出（biome 等）的颜色码/
+    // 超链接转义不落 build.errorMessage（板面纯文本）；单源 = shared
+    // stripAnsiEscapes，web 渲染侧同函数兜底存量脏行。
+    ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
     sessionId: handle.sessionId,
     usage: [...usage],
     hasChanges,

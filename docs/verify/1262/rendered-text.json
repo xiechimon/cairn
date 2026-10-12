@@ -1,0 +1,30 @@
+{
+  "checks": [
+    {
+      "name": "seed：污染行落库（build.errorMessage 含 ESC/OSC8）",
+      "ok": true,
+      "detail": "359698 字符"
+    },
+    {
+      "name": "渲染 textContent 无 ESC 残留",
+      "ok": true,
+      "detail": "显示侧兜底生效"
+    },
+    {
+      "name": "渲染 textContent 无 ]8;; 残留",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "失败行含 文件:行:列 + 规则名（biome 诊断头）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "失败行不重复展开几百行（截断/折叠面存在）",
+      "ok": true,
+      "detail": "textContent 长度 47771"
+    }
+  ],
+  "textSample": "\n    Pacman搜索⌘K新任务C工作台2定时项目新建项目aansi-1262aansi-1262资源技能MCP密钥机器模型服务Owner#1失败1262 ANSI 污染行探针重跑探针：污染行渲染。18:02git commit failed (1): apps/web/src/fixtures/fixtures.ts:1667:53 lint/style/useTemplate  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  ℹ Template literals are preferred over string concatenation.\n  \n    1665 │ const CHIEF_THREADS_LONG: ChiefThreadRef[] = [\n    1666 │   ...CHIEF_THREADS,\n  > 1667 │   ...Array.from({ length: 20 }, (_, i) => ({ title: '长列表主题 ' + (i + 1) })),\n         │                                                     ^^^^^^^^^^^^^^^^^^^^^^^\n    1668 │ ];\n    1669 │ \n  \n  ℹ Unsafe "
+}
