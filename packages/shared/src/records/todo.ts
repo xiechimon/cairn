@@ -143,8 +143,20 @@ export const todoRecordSchema = z.object({
    *  （语义同 build.pinnedMachineId）。写面 = 新建任务 REST body / PATCH 面；
    *  startBuilds 缺省回落本值，orchestrate 落 chief_thread.pinnedMachineId。 */
   machineId: recordId.nullable(),
+  /** #1257 板面挂起态（server 读侧派生，不落列）：在飞 todo 的当前步挂起时
+   *  透出——`quota` = 等额度（retryAt = 退避到期/下次尝试时刻，null = 不适用）；
+   *  `machine` = 等机器（钉选机不在 / 团队零在线）。缺席 = 未挂起（正常排队 /
+   *  在跑 / 终态）——板面据此区分「等机器/等额度」挂起态与「执行失败」红态。
+   *  optional 加法契约：老 server / fixture 面缺席 = 板面无挂起 chip，零回归。 */
+  waitingOn: z
+    .object({
+      on: z.enum(['machine', 'quota']),
+      retryAt: epochMs.nullable(),
+    })
+    .optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
+export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 
 /** POST /api/projects/{id}/todos body（r3 §3.1 抓包原样 {title, spec}；
  *  tagIds 携带位 = r9 §3.4 实测（观测样本空数组），#309 补录。machineId =
