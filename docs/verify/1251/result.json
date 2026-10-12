@@ -5,13 +5,13 @@
     "web": "http://127.0.0.1:5283",
     "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0333-1251/.claude/verify-run/home/server/server.db"
   },
-  "teamId": "Uc5scRhzD2BLKI5ubX8_b",
+  "teamId": "1Rdsc23sls9TlAtsigmF7",
   "machines": {
-    "A": "hdDmXjifOPHq6We0xlRXB",
-    "B": "H4tuKM9CBAp9REeykgdYZ"
+    "A": "eQ9GYtiMAH7CCuJ2Y35Vc",
+    "B": "LvofJNg-n_5gMcR6eAXJK"
   },
-  "agentId": "akUlneP-3xVUyYPUpUrKG",
-  "buildId": "01a130db-f626-7fd6-baf0-1e383f01e521",
+  "agentId": "rtkWQLSr1zRkay5CIwCD5",
+  "buildId": "01a13102-5043-78c3-be5d-1e55188f1d74",
   "checks": [
     {
       "name": "R1 enroll 携带能力清单 → machine.capabilities 列落库 + record 读面透出（GET me / teams machines）",
@@ -46,12 +46,12 @@
     {
       "name": "G2 machine-fit 读面：缺项机 canRun=false + missing 点名可读形 + 声明对账缺口；未上报机 fail-open（missing null / canRun true）",
       "ok": true,
-      "detail": "A={\"machineId\":\"hdDmXjifOPHq6We0xlRXB\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[\"MCP server \\\"figma\\\"\"],\"mcpGaps\":[\"figma\"],\"canRun\":false} B={\"machineId\":\"H4tuKM9CBAp9REeykgdYZ\",\"name\":\"cap-legacy\",\"online\":false,\"runtimeOk\":true,\"missing\":null,\"mcpGaps\":null,\"canRun\":true}"
+      "detail": "A={\"machineId\":\"eQ9GYtiMAH7CCuJ2Y35Vc\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[\"MCP server \\\"figma\\\"\"],\"mcpGaps\":[\"figma\"],\"canRun\":false} B={\"machineId\":\"LvofJNg-n_5gMcR6eAXJK\",\"name\":\"cap-legacy\",\"online\":false,\"runtimeOk\":true,\"missing\":null,\"mcpGaps\":null,\"canRun\":true}"
     },
     {
       "name": "G3 chief relay run_builds → build 步入队 pending（assignment.build = 被测 Agent）",
       "ok": true,
-      "detail": "step=47TeTxBwxW15i1KDQV1HK"
+      "detail": "step=8s3cZ2pb7lHr1TGLSVwyE"
     },
     {
       "name": "G4 缺 figma 的在线机器 claim 空手（5s 截断）→ build 步仍 pending、machineId 空（步留 pending 给能力齐机器）",
@@ -71,12 +71,12 @@
     {
       "name": "G7 装齐 figma 后下一拍 presence → 同一机器即领该步（缺能力 = 给修法，修法即时闭环）",
       "ok": true,
-      "detail": "claimed={\"id\":\"47TeTxBwxW15i1KDQV1HK\",\"kind\":\"build\"}"
+      "detail": "claimed={\"id\":\"8s3cZ2pb7lHr1TGLSVwyE\",\"kind\":\"build\"}"
     },
     {
       "name": "G8 能力齐后 machine-fit：canRun true + missing [] + 对账缺口清零（声明 figma/ctx 双装）",
       "ok": true,
-      "detail": "A={\"machineId\":\"hdDmXjifOPHq6We0xlRXB\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[],\"mcpGaps\":[],\"canRun\":true}"
+      "detail": "A={\"machineId\":\"eQ9GYtiMAH7CCuJ2Y35Vc\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[],\"mcpGaps\":[],\"canRun\":true}"
     },
     {
       "name": "G9 机器页能力读标注：上报机 = 「MCP 2 · 本机技能 0」计数形，未上报机 = 「能力清单未上报（旧版 daemon）」（两态不塌缩）",

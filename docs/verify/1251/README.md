@@ -3,6 +3,9 @@
 探针：`.claude/skills/verify-pacman/scripts/drive-1251-capability-gate.mjs`
 （假机器 wire + 浏览器真点击 + 一段真 daemon 腿；零 LLM）。
 结果：`result.json` 15/15 PASS（checks 逐条 ok，无约数）。
+归档证据为合入 #1257（pending 挂起律）后的合并树复跑产物——能力挡的 pending
+步在新律下不失败收尾，可见成因由 queue.blocked（步级）与 todo waitingOn
+（板面）承担；本探针判据面（claim 闸 / 读面 / 真 daemon 上报）两律同形。
 
 ## 复跑配方
 

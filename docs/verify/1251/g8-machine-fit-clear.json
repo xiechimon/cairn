@@ -1,7 +1,7 @@
 {
   "machines": [
     {
-      "machineId": "H4tuKM9CBAp9REeykgdYZ",
+      "machineId": "LvofJNg-n_5gMcR6eAXJK",
       "name": "cap-legacy",
       "online": false,
       "runtimeOk": true,
@@ -10,7 +10,7 @@
       "canRun": true
     },
     {
-      "machineId": "hdDmXjifOPHq6We0xlRXB",
+      "machineId": "eQ9GYtiMAH7CCuJ2Y35Vc",
       "name": "cap-mbp",
       "online": true,
       "runtimeOk": true,
@@ -19,7 +19,7 @@
       "canRun": true
     },
     {
-      "machineId": "Xen3Nl4RPwjhSLuelrPSU",
+      "machineId": "TUVroxeaojTpveIiqLLag",
       "name": "xmonsMac-3574.local",
       "online": false,
       "runtimeOk": true,
