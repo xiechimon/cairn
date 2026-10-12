@@ -38,11 +38,17 @@ touch, and what was run to rule that out (name the runs). -->
 
 ## Acceptance
 
-<!-- Conditional. If the ticket carries an acceptance checklist,
-reconcile it item by item, each item pointing at its evidence. If the
-ticket has no checklist, write exactly that in one line. Not
-gate-checked: whether a ticket has acceptance items is a property of
-the ticket, and a hard check here would force performative paragraphs. -->
+<!-- Required; the pr-tasks step of the pr-evidence CI gate checks this
+section: it must carry at least one task-list item, and none may be
+unchecked at merge. Reconcile the ticket's acceptance checklist item by
+item, each task pointing at its evidence. Merge-time reconciliation
+items belong in the ticket, not in this body. If the ticket truly has
+no task surface (docs-only rename and the like), replace the seed task
+with: - [x] no task surface: <one-line reason>. An exemption line on a
+PR that clearly has a task surface is a reviewer Bad, not a gate
+matter. -->
+
+- [ ] <ticket acceptance item, with its evidence>
 
 ## Issues
 

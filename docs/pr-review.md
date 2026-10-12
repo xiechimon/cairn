@@ -52,9 +52,10 @@ Open questions:
 
 ## 机械检查不归评审者（别做 CI 的复读机）
 
-lint / typecheck / spec:parse / vitest / e2e 由 CI `check` job 与 `pack-smoke` / `e2e-gate` 必需检查覆盖；Upstream / Failure-path 两节「有答案」由 `pr-evidence-gate.py` 钉住。评审者把判断力花在机器看不见的地方：
+lint / typecheck / spec:parse / vitest / e2e 由 CI `check` job 与 `pack-smoke` / `e2e-gate` 必需检查覆盖；Upstream / Failure-path 两节「有答案」由 `pr-evidence-gate.py` 钉住；Acceptance 段 tasks 存在且全勾由 `pr-tasks-gate.py`（pr-evidence job 的 pr-tasks 步）钉住。评审者把判断力花在机器看不见的地方：
 
 - **语义冲突**：两条并行 PR 各自改同一件事、各自能跑绿（git 合并干净、typecheck 才露馅或根本不露）——对照在飞的 open PR 看 `gh pr diff --name-only` 有没有撞件。
 - **缝纪律**：`biome.json` 的 `noRestrictedImports` 锁死的依赖是否绕开了薄桥模块（`apps/daemon/src/backend/` 是 GitOps / MCP / LLM provider 缝）。
 - **快照面**：动 `packages/shared` 的 wire schema，`snapshot.test.ts` 是否同步更新（JSON 投影变了没更快照 = CI 必红）。
 - **尾标纪律**：`closes #N` 是否在 commit message 里（squash 只带 commit message，PR body 不进 main）；分段 PR 是否**误带**了整票的尾标。
+- **豁免真实性**（pr-tasks 闸管不了的）：PR 写了 `- [x] no task surface: <理由>` 但明明有任务面 → 机器只验「已勾」，真假归评审者，记 Bad。

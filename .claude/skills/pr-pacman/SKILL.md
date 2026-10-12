@@ -79,9 +79,14 @@ which runs ruled that out (name the runs).
 
 ### `## Acceptance`
 
-If the ticket carries an acceptance checklist, reconcile it item by item,
-each item pointing at its evidence. If the ticket has no checklist, write
-exactly that in one line.
+A task-list checklist: at least one item, none unchecked at merge (the
+pr-tasks step of the pr-evidence CI gate checks both). Reconcile the
+ticket's acceptance checklist item by item, each task pointing at its
+evidence. Merge-time reconciliation items belong in the ticket, not in
+the body. If the ticket has no task surface (docs-only rename and the
+like), write exactly `- [x] no task surface: <one-line reason>`; an
+exemption line on a PR that clearly has a task surface is a reviewer
+Bad, not a gate matter.
 
 ### `## Issues`
 
@@ -97,10 +102,12 @@ not carry the closing keyword for the parent ticket.
   `--body`.
 - Create from a worktree lane:
   `gh pr create --repo xiechimon/pacman --head xiechimon:<branch> --body-file /tmp/pr.md`.
-- Run the gate locally before opening:
+- Run both gates locally before opening:
   `python3 scripts/pr-evidence-gate.py /tmp/pr.md` — exit 1 names each
   problem (`missing-section` / `empty-section` / `not-embedded` /
-  `unreachable`).
+  `unreachable`); then `python3 scripts/pr-tasks-gate.py /tmp/pr.md` —
+  exit 1 names `no-tasks` (Acceptance carries no task-list item) or
+  `unchecked-task` (a `- [ ]` still open, with its line number).
 - Editing an open PR: `gh pr edit` breaks on Projects-classic GraphQL
   errors; use `gh api -X PATCH repos/xiechimon/pacman/pulls/<n> -F
   body=@/tmp/pr.md`, then re-read with `gh pr view <n> --json body` and
@@ -115,3 +122,4 @@ not carry the closing keyword for the parent ticket.
 |---|---|
 | `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
+| Acceptance carries >=1 task-list item, all checked | pr-evidence job (pr-tasks step) |
