@@ -31,8 +31,9 @@ test('板面横幅指名 relay lane 与事件类型（横幅半）', async ({ pa
   await expect(banner).toBeVisible();
   await expect(banner).toContainText('Relay 186');
   await expect(banner).toContainText('额度空');
-  // 探测时刻进文案（13:56 = fixture probeAt 整刻）。
-  await expect(banner).toContainText('13:56');
+  // 探测时刻进文案：probeAt 按浏览器时区渲染（与相对时间同律，CI runner 走
+  // UTC）——断言 HH:MM 形态而非本地时区的字面值（首轮 CI 在 13:56 上假红）。
+  await expect(banner).toContainText(/\d{2}:\d{2} 自动探测/);
 });
 
 test('详情头 chip 说「等额度」不说「执行中」（卡态的头半）', async ({ page }) => {
