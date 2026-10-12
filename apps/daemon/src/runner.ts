@@ -24,6 +24,7 @@ import type {
   MachineDoneBody,
   PreparedWorkspace,
   ProviderConfig,
+  QuotaBlock,
   SessionOpts,
   TranscriptUpload,
   WorktreeOps,
@@ -38,6 +39,7 @@ import {
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
+  classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
   composeTaskPromptWithInstruction,
@@ -48,6 +50,7 @@ import {
   LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
   PLAN_FILE_NAME,
+  parseRetryAfterMs,
   parseReviewPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   type ReviewGate,
@@ -517,6 +520,20 @@ export async function runStep(
     );
     return;
   }
+  // #1261 配额熔断信号组装（wire 形）：providerId = 「哪一路 relay」
+  // （`<providerId>/<modelId>` 串的 provider 段）；label 缺席时 server 侧回落
+  // providerId 显示。闭包读 provider 当前值（回落闸翻旋钮后的形态同步）。
+  const quotaBlockOf = (
+    kind: 'quota' | 'capacity',
+    reason: string,
+    retryAfterMs: number | null,
+  ): QuotaBlock => ({
+    kind,
+    providerId: provider?.providerId ?? 'unknown',
+    ...(provider?.label !== undefined ? { label: provider.label } : {}),
+    reason: reason.slice(0, 500),
+    ...(retryAfterMs !== null ? { retryAfterMs } : {}),
+  });
   // 合并权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态
   // repo 落地都以推送为前置），Agent 必须同时持「合并分支」「推送分支」。闸在
   // 会话/工作区之前——无授权的合并不烧模型回合。tools 携带才判（claim 恒携
@@ -1007,6 +1024,14 @@ export async function runStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
+  // #1261 配额熔断态：首个 quota/capacity 分类的错误事件置位（后续同形错误
+  // 不重复记录，reason 保首见原文——诊断回查）。终局据此组装 quotaBlock 随
+  // done 上报（server 挂起等额度，不判死）。
+  let quotaTrip: {
+    kind: 'quota' | 'capacity';
+    reason: string;
+    retryAfterMs: number | null;
+  } | null = null;
   // #1257 provider_network 流断重试计数（会话续跑；上限与末次延迟见常量）。
   let networkRetries = 0;
   const providerNetworkFinalWaitMs =
@@ -1356,6 +1381,26 @@ export async function runStep(
             lastError = ev.error.message;
             lastModelError = ev.error.message;
             logger.step(`error: ${ev.error.message} (retryable=${ev.error.retryable})`);
+            // #1261 配额熔断：quota/capacity 分类命中即停会话——不打满 pi 的
+            // auto_retry 预算（用户实测 attempt=4 打破 max 3 的同形重试风暴；
+            // #708 有界护栏是兜底，这里是前哨）。检测面单源 =
+            // shared classifyAgentFailure（HTTP 状态码经 #882 诊断行透传）。
+            {
+              const failureKind = classifyAgentFailure(ev.error.message);
+              if (failureKind === 'quota' || failureKind === 'capacity') {
+                if (quotaTrip === null) {
+                  quotaTrip = {
+                    kind: failureKind,
+                    reason: ev.error.message,
+                    retryAfterMs: parseRetryAfterMs(ev.error.message),
+                  };
+                  logger.step(
+                    `quota circuit breaker: ${failureKind} on ${provider?.providerId ?? 'unknown'} — stopping session (no auto-retry spin)`,
+                  );
+                }
+                void handle.stop();
+              }
+            }
             break;
           case 'auto_retry_start':
             lastError = null; // pi 流级自动重试吸收前错（02 §4.2）
@@ -1442,7 +1487,7 @@ export async function runStep(
     // → done 映射，settled 在 _runAgentPrompt 的 finally 恒发，错误流也带；#654
     // 脚本流只喂 error 漏测此点，真 400 会被 sawDone 闭死闸门）；sawProgress
     // 已排除错误终局行（见事件分支）。——
-    if (pass === 0 && !sawProgress) {
+    if (pass === 0 && !sawProgress && quotaTrip === null) {
       const failureText = lastModelError ?? lastError;
       if (
         failureText !== null &&
@@ -1503,6 +1548,29 @@ export async function runStep(
   if (stopReq !== undefined) deps.stopRequests?.delete(stepId);
   const stopped = stopReq !== undefined && !sawDone;
   if (stopReq !== undefined && sawDone) logger.step('stop arrived after completion — ignored');
+  // —— #1261 配额熔断收尾：两路汇合成 quotaBlock 随 done 上报——
+  // ① 中途熔断（error 事件分类命中即停，quotaTrip 在位）；
+  // ② 终局分类（pi 不重试的 402：error + done 自然收尾，quotaTrip 可能未置
+  //    ——停止竞态下事件流中断也会落到这）——对终局错误文案再分类一次。
+  // 停止中断（用户意图）不携带：stopped 收尾语义优先，配额块给挂起漏斗会
+  // 与「用户已放弃」打架。有进展后遇配额同样挂起：continue session 续跑
+  // 语义可用（sessionId 已在 done body），半成品不被判死。
+  const quotaBlock: QuotaBlock | null = (() => {
+    if (quotaTrip !== null) {
+      return quotaBlockOf(quotaTrip.kind, quotaTrip.reason, quotaTrip.retryAfterMs);
+    }
+    if (stopped) return null;
+    const failureText = lastModelError ?? lastError;
+    if (failureText === null) return null;
+    const failureKind = classifyAgentFailure(failureText);
+    if (failureKind !== 'quota' && failureKind !== 'capacity') return null;
+    return quotaBlockOf(failureKind, failureText, parseRetryAfterMs(failureText));
+  })();
+  if (quotaBlock !== null && lastError === null) {
+    // 熔断路径根因直报：auto_retry 吸收前错时 lastError 已清（02 §4.2），不补
+    // 则收尾判 success——配额挂起漏斗吃的是 done(failed + quotaBlock)。
+    lastError = quotaBlock.reason;
+  }
   // —— #698 静默 no-op 闸：零进展 + 零错误 + 无 done 的轮 = 会话面空转收尾
   // （backend 事件流自然耗尽而无终局——claude-code pump 生成器耗尽形：终局
   // 事件缺席时直接 queue.end()）。按 failed 收尾并点名形态：零进展轮不可能
@@ -1856,6 +1924,9 @@ export async function runStep(
     // 在 hasChanges=false 时据此把失败原因从误导性「构建零改动」换成点名
     // 分支偏离。
     ...(branchDrift !== null ? { workBranchDrift: branchDrift } : {}),
+    // #1261 配额熔断信号（server 侧挂起等额度的判据；旧 server zod strip =
+    // 普通失败，混版本零破坏）。
+    ...(quotaBlock !== null ? { quotaBlock } : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {

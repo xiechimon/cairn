@@ -1,46 +1,46 @@
 {
   "evacuate": {
     "moved": [
-      "BYBcliZHGmItwWM7lNiv1"
+      "ttP2Tc-6NFCjeoskaChcY"
     ],
     "rejected": [
       {
-        "agentId": "CXSqGP9BTEHhdkA335JUP",
+        "agentId": "6Cgop79pKY4ZRJXC04NdD",
         "reason": "机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。"
       }
     ]
   },
   "agents": [
     {
-      "id": "2A9HXB4cEIBnKiDhG4kGu",
+      "id": "27cb37UKm2zhm84eTXEts",
       "machineId": null
     },
     {
-      "id": "BYBcliZHGmItwWM7lNiv1",
-      "machineId": "JBwFCcz3gCDHMg1Ovnl6R"
+      "id": "6Cgop79pKY4ZRJXC04NdD",
+      "machineId": "ey7sJIX2TYd3yZ77cr6lW"
     },
     {
-      "id": "CXSqGP9BTEHhdkA335JUP",
-      "machineId": "9XR5vOci-Yng1JMRTjyTP"
-    },
-    {
-      "id": "GLzAwKopO7zqFLDMPf1fY",
+      "id": "Jc2BCgV1kiTUUdsRRJoYh",
       "machineId": null
     },
     {
-      "id": "H-ZXBukRaM6fRDgDahVn-",
+      "id": "fu4c7PAcmUY21klErvujC",
       "machineId": null
     },
     {
-      "id": "LfxkJpNhzQn2CPve_GB-M",
+      "id": "mSjKFry2JKqsNKUz34rYA",
       "machineId": null
     },
     {
-      "id": "SgDa0QR-dIkijJeKKBH7_",
+      "id": "tmI6w8jY71w1LLI7rWVXn",
       "machineId": null
     },
     {
-      "id": "cg_uqSlN7YOXybrp3nDkz",
+      "id": "ttP2Tc-6NFCjeoskaChcY",
+      "machineId": "eCP9XkUuFxtTAA8ntos5E"
+    },
+    {
+      "id": "yoSa5fO1GgdRQOxyW73rC",
       "machineId": null
     }
   ]

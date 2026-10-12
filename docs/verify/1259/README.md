@@ -3,7 +3,7 @@
 probe：`drive-1259-1260-binding.mjs`（verify-pacman 定制探针，与 #1260 共用一栈一
 脚本；栈 = launch.mjs 隔离实例 server 8792 + web 5274 + 独立 PACMAN_HOME 全新库——
 8791/5273 被别的 lane 占用，按端口纪律换口；零 daemon、零 LLM——派发面全走真
-machine wire，UI 面走真浏览器）。结果：**29/29 checks PASS**（`result.json`）。
+machine wire，UI 面走真浏览器）。结果：**28/28 checks PASS**（`result.json`）。
 
 ## 场景
 

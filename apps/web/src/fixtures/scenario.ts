@@ -27,6 +27,7 @@ import {
   boardMachinePicker,
   boardOverflow,
   boardProjectPicker,
+  boardQuotaWait,
   boardR8Overlay,
   boardRepoFilter,
   boardResetGate,
@@ -182,6 +183,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // #692 看板最坏数据：命名场景（无 capture，board-overflow 先例）——
       // 超长标题 + 120 卡计数 + 空列，e2e 钉停靠/窄窗/RTL 下列不塌。
       'board-stress': boardStress,
+      // #1261 等额度：执行中卡挂 quotaWait（芯片/横幅）+ 无信号负向卡。
+      'quota-wait': boardQuotaWait,
       // detail (r7 16–17, 23, 26–28, 36, 38)
       '16': detailPlanning,
       '16d': detailConfirm(true),

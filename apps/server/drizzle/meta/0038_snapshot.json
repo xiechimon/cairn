@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "90f6cbc3-dafe-40a4-a098-e0bc0e89504f",
+  "id": "ae75aedb-c27c-4038-a7b3-505d1ce3ebd2",
   "prevId": "e4450ad9-2a49-4d0c-b6e6-7b788138189b",
   "tables": {
     "agent": {
@@ -78,13 +78,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "machineId": {
-          "name": "machineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "tools": {
           "name": "tools",
           "type": "text",
@@ -149,19 +142,6 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "agent_machineId_machine_id_fk": {
-          "name": "agent_machineId_machine_id_fk",
-          "tableFrom": "agent",
-          "tableTo": "machine",
-          "columnsFrom": [
-            "machineId"
           ],
           "columnsTo": [
             "id"
@@ -626,6 +606,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "pinnedMachineId": {
+          "name": "pinnedMachineId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "planDocId": {
           "name": "planDocId",
           "type": "text",
@@ -722,6 +709,34 @@
         },
         "agentId": {
           "name": "agentId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "thinkingLevel": {
+          "name": "thinkingLevel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "compactionModel": {
+          "name": "compactionModel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "machineId": {
+          "name": "machineId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -936,6 +951,13 @@
         "pendingSessionResumeAt": {
           "name": "pendingSessionResumeAt",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pinnedMachineId": {
+          "name": "pinnedMachineId",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1614,6 +1636,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "machineId": {
+          "name": "machineId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "nextRunAt": {
           "name": "nextRunAt",
           "type": "integer",
@@ -1937,6 +1966,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
+        },
+        "quotaBlock": {
+          "name": "quotaBlock",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "sessionId": {
           "name": "sessionId",
@@ -2335,6 +2371,13 @@
         },
         "sourceRef": {
           "name": "sourceRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "machineId": {
+          "name": "machineId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attachment-token.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
+import { stepQueueBlockedSchema } from './machine-capabilities.js';
 
 /** chief 实例 id 形 `chief-<userId>-<teamId>`（r5 §3.6/r2 §1.5 实测）。 */
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
@@ -161,6 +162,8 @@ export const chiefThreadSchema = z.object({
           capacity: z.number().int(),
         })
         .nullable(),
+      /** pending 成因（#1251，StepQueueInfo.blocked 同源同形）。 */
+      blocked: stepQueueBlockedSchema.optional(),
     })
     .nullable()
     .optional(),

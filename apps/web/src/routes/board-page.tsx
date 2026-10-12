@@ -38,6 +38,8 @@ import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
+// #1261 等额度横幅（todos 集合派生，挂起即显性）。
+import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
 import {
   buildRepoOptions,
   matchesProjectFilter,
@@ -578,6 +580,9 @@ export function BoardPage() {
   const fixtureWithTodos: FixtureSet = live
     ? { ...fixture, todos, now: Date.now(), ...(projectNames ? { projectNames } : {}) }
     : { ...fixture, todos };
+  // #1261 等额度横幅：挂起优先于浏览器通知引导条（断粮是告警，权限引导是
+  // 提示——同槽互斥，横幅更该被看见）。todo doc SSE 失效重取驱动出现/消失。
+  const quotaInfos = quotaBannerInfo(todos);
   return (
     // ADR 0013 D1：让位退役——悬浮窗是覆盖层，board 列不再随面板开合变轨。
     // #1035 的两态地板（常态 200 / 停靠 280）随 data-chief-open 标记收敛回
@@ -604,7 +609,11 @@ export function BoardPage() {
         <BoardSurface
           fixture={fixtureWithTodos}
           banner={
-            notifyBanner.visible ? <NotificationBanner onEnable={notifyBanner.enable} /> : undefined
+            quotaInfos != null ? (
+              <QuotaBanner infos={quotaInfos} />
+            ) : notifyBanner.visible ? (
+              <NotificationBanner onEnable={notifyBanner.enable} />
+            ) : undefined
           }
           onAction={(todo) => {
             if (live) {

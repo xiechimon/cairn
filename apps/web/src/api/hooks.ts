@@ -3,6 +3,7 @@
 // 查询键词表 = 本文件 QK 单源；wire 类型单源 = @pacman/shared（02/A9）。
 
 import type {
+  AgentMachineFitResponse,
   AgentRecord,
   AgentTask,
   ApiKeyRow,
@@ -364,6 +365,23 @@ export const useAgentTasks = (
     enabled: enabled && teamId !== undefined && agentId !== undefined,
   });
 
+/** Agent 机器匹配面（#1251 / ADR 0018 决策 4.6「哪些机器可跑它」）：
+ *  requiredCapabilities × 各机上报快照的交集，判定单源在 server（claim/sweep
+ *  同一份 dispatch-eligibility 原语）——读面不自算，防两套判据漂移。
+ *  staleTime 0：能力快照随 30s 心跳上行，进页即取现值。 */
+export const useAgentMachineFit = (
+  teamId: string | undefined,
+  agentId: string | undefined,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['agentMachineFit', teamId, agentId],
+    queryFn: () =>
+      api.get<AgentMachineFitResponse>(`/api/teams/${teamId}/agents/${agentId}/machine-fit`),
+    enabled: enabled && teamId !== undefined && agentId !== undefined,
+    staleTime: 0,
+  });
+
 // providers 页 runtime tabs 数据源（spec 11 §A3/A4，#356）：pi + claude-code
 // 两段。staleTime 0 = 每次 mount 重取——claude-code 段承载「实时反映
 // ~/.claude/settings.json」语义（server 侧每次 GET 重读文件）。
@@ -667,9 +685,6 @@ export function useApiMutations(teamId: string | undefined) {
           phase?: string;
           orderIndex?: number;
           tagIds?: string[];
-          /** 任务钉选机器 patch(#864 T3 重跑面出口接线;server #682:
-           *  null = 清回自动,只影响之后新起的 build)。 */
-          machineId?: string | null;
           /** 指派槽级 patch(#209「编辑分配」接线;server #208 槽级 merge:
            *  提供的槽覆盖,未提供的槽保持现状)。 */
           assignment?: {

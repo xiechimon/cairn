@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { BRAND } from '../brand.js';
 import { phaseSchema, recordId } from './common.js';
+import { requiredCapabilitiesSchema } from './machine-capabilities.js';
 import { SECRET_MIN_CLI_VERSION } from './secret.js';
 
 // —— persona 角色词表（#1250 / ADR 0018 决策 0）—————————————————————————————
@@ -165,6 +166,13 @@ export const agentRecordSchema = z.object({
    * 归属机（存量回填漏网）——不可领步，UI 可补。optional 形 = 加法契约
    * （maxConcurrentTasks 同律）：老 server 响应缺字段可解析。 */
   machineId: recordId.nullable().optional(),
+  /** 能力要求声明（#1251 / ADR 0018 决策 4.2）：该 Agent 的步对执行机的
+   *  能力要求（MCP slug 集 / claude-code 模型 id 集）。null = 无要求（缺省/
+   *  存量行）。消费面 = dispatch-eligibility 能力闸（机器上报快照不满足 →
+   *  不领该 Agent 的步）+ agent 面「哪些机器可跑它」。与归属机正交串联：
+   *  归属机定「必须哪台」，能力闸定「那台能不能」。nullish 加法契约
+   *  （maxConcurrentTasks 同律）：老 server 响应缺字段照常解析。 */
+  requiredCapabilities: requiredCapabilitiesSchema.nullish(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
 
@@ -193,6 +201,9 @@ export const createAgentBodySchema = z.object({
    * 退役）。server 校验该机在本团队、启用了对应 runtime、且（claude-code
    * 时）已配 modelId。 */
   machineId: recordId,
+  /** 能力要求声明（#1251）：nullish——显式 null = 清空回无要求（与缺省
+   * 同值）；对象形状由 requiredCapabilitiesSchema 收严（类型错 400）。 */
+  requiredCapabilities: requiredCapabilitiesSchema.nullish(),
 });
 export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
 

@@ -6,12 +6,12 @@
     {
       "name": "铺底：双机 enroll（各持各 key）",
       "ok": true,
-      "detail": "home=9XR5vOci-Yng1JMRTjyTP other=JBwFCcz3gCDHMg1Ovnl6R"
+      "detail": "home=ey7sJIX2TYd3yZ77cr6lW other=eCP9XkUuFxtTAA8ntos5E"
     },
     {
       "name": "A0 创建 agent（归属机 = home）→ 201",
       "ok": true,
-      "detail": "{\"id\":\"BYBcliZHGmItwWM7lNiv1\"}"
+      "detail": "{\"id\":\"ttP2Tc-6NFCjeoskaChcY\"}"
     },
     {
       "name": "A0b 创建缺 machineId → 400",
@@ -56,7 +56,7 @@
     {
       "name": "C0 创建 claude-code agent（home 有该模型）→ 201",
       "ok": true,
-      "detail": "{\"id\":\"CXSqGP9BTEHhdkA335JUP\"}"
+      "detail": "{\"id\":\"6Cgop79pKY4ZRJXC04NdD\"}"
     },
     {
       "name": "C1 换绑到缺模型的机器 → 400 指名模型",
@@ -86,12 +86,12 @@
     {
       "name": "D2 整机迁移：合格的迁走（verify-bound-agent → other）",
       "ok": true,
-      "detail": "{\"moved\":[\"BYBcliZHGmItwWM7lNiv1\"],\"rejected\":[{\"agentId\":\"CXSqGP9BTEHhdkA335JUP\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+      "detail": "{\"moved\":[\"ttP2Tc-6NFCjeoskaChcY\"],\"rejected\":[{\"agentId\":\"6Cgop79pKY4ZRJXC04NdD\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
     },
     {
       "name": "D3 部分迁移合法：模型不合的留原机 + 响应列原因",
       "ok": true,
-      "detail": "{\"moved\":[\"BYBcliZHGmItwWM7lNiv1\"],\"rejected\":[{\"agentId\":\"CXSqGP9BTEHhdkA335JUP\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+      "detail": "{\"moved\":[\"ttP2Tc-6NFCjeoskaChcY\"],\"rejected\":[{\"agentId\":\"6Cgop79pKY4ZRJXC04NdD\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
     },
     {
       "name": "D4 目标机补模型报告后换绑 → 200",

@@ -45,6 +45,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import {
   agentForStep as agentForStepEligibility,
+  capabilityGatePasses,
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -103,6 +104,31 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
   const agentRow = buildAgentId
     ? db.select().from(agent).where(eq(agent.id, buildAgentId)).get()
     : undefined;
+  // #1261 等额度投影：latest build 的活动步 waiting_quota 时在位（板面卡态/
+  // 横幅数据源）。此处不 import services/quota-wait.ts（那边 apply/sweep 消费
+  // 本模块 getTodo——反向即环）；行内查询 + 投影与 toQuotaWait 同形，漂移由
+  // quota-wait.test W3 的读面断言钉住。
+  let quotaWait: TodoRecord['quotaWait'] = null;
+  if (row.latestBuildId !== null) {
+    const waiting = db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'waiting_quota')))
+      .all()
+      .at(-1);
+    const block = waiting?.quotaBlock ?? null;
+    if (block !== null) {
+      quotaWait = {
+        kind: block.kind,
+        providerId: block.providerId,
+        label: block.label,
+        retryAfterMs: block.retryAfterMs,
+        probeAt: block.probeAt,
+      };
+    }
+  }
+  // #1257 板面挂起态（等机器/等额度）——与 quotaWait 并存（1261 板面消费
+  // quotaWait，waitingOn 供后续板面挂起 chip 消费）。
   const waitingOn = waitingOnOf(deps, row);
   return {
     id: row.id,
@@ -132,6 +158,9 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceRef: row.sourceRef,
     // #1257 板面挂起态（读侧派生；缺省不带键）。
     ...(waitingOn !== undefined ? { waitingOn } : {}),
+    // #1261 等额度投影（null 时也带键——web 面以 null 清态，SSE 全量文档
+    // 事件需要字段在位才能把挂起态翻回去）。
+    quotaWait,
   };
 }
 
@@ -168,6 +197,13 @@ function waitingOnOf(
     const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
     if (home === undefined || !home.online) return { on: 'machine', retryAt: null };
     if (!runtimeGatePasses(home, agentRow.provider)) {
+      return { on: 'machine', retryAt: null };
+    }
+    // #1251：归属机在线且 runtime 闸开，但能力快照缺 Agent 要求项——机器在
+    // 也领不走（claim 面 capabilityGatePasses 同判据），同为「等机器」挂起
+    // 态（板面 chip 粗粒度；缺项点名 + 修法文案在步队列 blocked 面，读侧
+    // 单源 dispatch-eligibility）。
+    if (!capabilityGatePasses(home, agentRow)) {
       return { on: 'machine', retryAt: null };
     }
   }
