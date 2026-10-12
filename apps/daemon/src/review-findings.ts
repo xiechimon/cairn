@@ -33,8 +33,10 @@ type TranscriptMessageLike = {
 };
 
 /** 把 content 归一为纯文本（与 web mappers.ts textOfContent 同形——内容可
- * 是 string / {type:"text", text} / text block 数组）。 */
-function contentToText(content: unknown): string {
+ * 是 string / {type:"text", text} / text block 数组）。
+ * #1250 起导出：verify 步的 verdict 提取（verify-verdict.ts）同用——
+ * transcript 文本归一是步类无关的通用件，单源在此。 */
+export function contentToText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
@@ -70,8 +72,9 @@ function capReason(text: string, limit: number = REASON_CHAR_LIMIT): string {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 
-/** 从末尾 ```json ...``` code fence 取一段；无 fence = null。 */
-function extractCodeFence(text: string): string | null {
+/** 从末尾 ```json ...``` code fence 取一段；无 fence = null。
+ * #1250 起导出：verify 步 verdict 提取同用（code fence 抓取步类无关）。 */
+export function extractCodeFence(text: string): string | null {
   // 抓最后一个 ```json ... ``` 块；容忍空尾行与 windows 换行。
   const matches = [...text.matchAll(/```(?:json)?\s*\n([\s\S]*?)```/gi)];
   if (matches.length === 0) return null;
@@ -192,8 +195,8 @@ function tryDegradedVerdict(parsed: unknown): ReviewVerdict | null {
 }
 
 /** 从文本中抠出首段 `{...}` 顶层 JSON 跨度（粗略花括号配对——LLM 偶尔在
- * JSON 外补说明段）。 */
-function extractJsonSpan(text: string): string | null {
+ * JSON 外补说明段）。#1250 起导出：verify 步 verdict 提取同用。 */
+export function extractJsonSpan(text: string): string | null {
   const start = text.indexOf('{');
   if (start === -1) return null;
   let depth = 0;

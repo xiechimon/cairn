@@ -78,6 +78,7 @@ import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
+import { extractVerifyVerdict } from './verify-verdict.js';
 
 /** 停止请求（M7 #308）：discard = 确认弹层「丢弃本轮修改」勾选位——
  * true 时收尾 rewind worktree 到步起点 checkpoint（r9 §3.3）。 */
@@ -377,15 +378,18 @@ export async function runStep(
   // （用户消息 / wake 事实），无 todo 语境；remoteTools relay + systemPrompt 走
   // chief 块。worker 步：title+spec 或续轮指令。review 步（#511）= server 合成
   // 的审核材料（meta + 输出契约 + 方案全文 + 变更），同 chief 走 instruction。
+  // verify 步（#1250 / ADR 0018 层 1）= server 合成的验证材料（票号段 + 输出
+  // 契约 + 任务文本 + 方案 + PR 面），同 review 走 instruction。
   const isChief = claimed.step.kind === 'chief';
   const isReview = claimed.step.kind === 'review';
+  const isVerify = claimed.step.kind === 'verify';
   // 关口（#511）：step 表无相位列，prompt 的 meta 头即是它的持久载体。缺省
   // （无该字段的存量 prompt）= confirm 语义——不开检出、材料不含变更。
   const reviewGate: ReviewGate =
     (isReview ? parseReviewPromptMeta(claimed.instruction ?? null)?.gate : undefined) ?? 'confirm';
   const basePrompt =
     opts.resume?.prompt ??
-    (isChief || isReview
+    (isChief || isReview || isVerify
       ? (claimed.instruction ?? '')
       : claimed.session.action === 'continue' && claimed.session.sessionId
         ? // #703 续轮指令投递：claim 载荷 instruction 在位（补写轮 #113 /
@@ -529,7 +533,9 @@ export async function runStep(
   // 黑盒逼近 04 §1 A4）→ 裸任务目录。review 步（M7 #312 / #511）= 审核关口
   // 开**只读检出**：给它产物分支的检出，它才能回答「这段代码跑起来对不对」
   // ——只给 diff 文本只能回答「看起来对不对」。确认关口无产物可读 → 裸任务
-  // 目录（不开工作区）。
+  // 目录（不开工作区）。verify 步（#1250）= 会话分支的**可写工作区**（证据包
+  // 要 git add/commit/push 进 docs/verify/、PR body 回贴走机器 gh——只读检出
+  // 会把「落证据」变成违规动作），与 build 同形不是 review 的只读形。
   // repo 三形态同吃 worktree 契约（spec 12 G2-T2，契约零改动）：hosted =
   // http 远端 + per-step key；github = https 远端 + per-step x-access-token
   // （server 从 github_connection 下发）；local = cloneUrl 即用户仓库绝对路径
@@ -1728,6 +1734,12 @@ export async function runStep(
   // 均不触发修订。（#1026：随 doneBody 持久化，快路径补报不再重提取。）
   const reviewExtraction =
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
+  // 验证步 verdict（#1250 / ADR 0018 层 1）：仅 verify 步提取（同律——步类
+  // 开解析面，规避假阳）。成功 → verifyVerdict；失败 → verifyVerdictError
+  //（server 侧区分「判定提取失败」与「验证未返回结论」兜底）。passed=false
+  // 是有效结论不折成 error。
+  const verifyExtraction =
+    claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
   const doneBody: MachineDoneBody = {
     status,
     ...(lastError !== null ? { errorMessage: lastError } : {}),
@@ -1739,6 +1751,10 @@ export async function runStep(
     ...(headCommit !== null ? { commit: headCommit } : {}),
     ...(reviewExtraction?.status === 'ok' ? { findings: reviewExtraction.verdict } : {}),
     ...(reviewExtraction?.status === 'failed' ? { findingsError: reviewExtraction.reason } : {}),
+    ...(verifyExtraction?.status === 'ok' ? { verifyVerdict: verifyExtraction.verdict } : {}),
+    ...(verifyExtraction?.status === 'failed'
+      ? { verifyVerdictError: verifyExtraction.reason }
+      : {}),
     // 交付面回填（#704）：探测命中才带（无 PR / 失败 = 缺席）；diff 上报
     // 恒带算得值（含空串——「已上报且零改动」与「未上报」在 server 侧分列）。
     ...(prProbe !== null ? { prUrl: prProbe.url, prNumber: prProbe.number } : {}),
