@@ -139,8 +139,21 @@ export const todoRecordSchema = z.object({
   /** 来源引用（`github:owner/repo#123` 形 = githubIssueSourceRef 单源；
    * `chief:<uuid>` 形 = orchestrationSourceRef 单源，#640）；无来源 = null。 */
   sourceRef: z.string().nullable(),
+  /** #1257 板面挂起态（server 读侧派生，不落列）：在飞 todo 的当前步挂起时
+   *  透出——`quota` = 等额度（retryAt = 退避到期/下次尝试时刻，null = 不适用）；
+   *  `machine` = 等机器（#1259 起语义 = 归属机不在线/团队零在线）。缺席 = 未挂
+   *  起（正常排队 / 在跑 / 终态）——板面据此区分「等机器/等额度」挂起态与
+   *  「执行失败」红态。optional 加法契约：老 server / fixture 面缺席 = 板面
+   *  无挂起 chip，零回归。 */
+  waitingOn: z
+    .object({
+      on: z.enum(['machine', 'quota']),
+      retryAt: epochMs.nullable(),
+    })
+    .optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
+export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
 
 /** POST /api/projects/{id}/todos body（r3 §3.1 抓包原样 {title, spec}；
  *  tagIds 携带位 = r9 §3.4 实测（观测样本空数组），#309 补录）。 */

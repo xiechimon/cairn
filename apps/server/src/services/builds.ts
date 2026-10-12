@@ -62,25 +62,8 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, githubPullState } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
-import {
-  agentForStep,
-  machineRunningCount,
-  runtimeGatePasses,
-  stepRuntimeFor,
-} from './dispatch-eligibility.js';
-import {
-  homeOfflineReason,
-  homeRuntimeBlockedReason,
-  homeWedgeReason,
-  noHomeReason,
-  PIN_OFFLINE_GRACE_MS,
-  PIN_ONLINE_WEDGE_GRACE_MS,
-  stepActivityAt,
-  WORKER_NO_HOME_HINT,
-  WORKER_PIN_OFFLINE_HINT,
-  WORKER_PIN_RUNTIME_HINT,
-  WORKER_PIN_WEDGE_HINT,
-} from './dispatch-timeouts.js';
+import { agentForStep } from './dispatch-eligibility.js';
+import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
@@ -477,6 +460,8 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
             id: r.id,
             createdAt: r.createdAt,
             homeMachineId: agentForStep(deps.db, todoRow, r.kind, r.prompt)?.machineId ?? null,
+            holdReason: r.holdReason,
+            holdUntil: r.holdUntil,
           });
           return [r.id, projected ?? undefined];
         }),
@@ -1296,46 +1281,28 @@ export function failStepWithEvents(
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 
 /** worker 步（plan/build/merge/review）失联 sweep（scheduler tick 驱动）：
- * 失联 claimed 步**释放回 pending**供他机认领续跑（#862 T1 tracer）；pending
- * 步在「没有机器能接它」持续超时后按失败收尾（①/#706、④④b/#864+#881 三条）：
- * ① pending 无人认领且团队零在线机器（daemon 全灭/未注册）→ 失败收尾；
+ * 失联 claimed 步**释放回 pending**供他机认领续跑（#862 T1 tracer）；无人
+ * 认领的 pending 步挂起等机器（#1257：无人认领是 infra 事件，机器回来走
+ * 既有 claim 循环自动续跑，「等机器」可见态由 todo waitingOn 派生承担，
+ * 不进 failed）。判定只剩 claimed 面两支：
  * ② claimed 心跳停更超阈值且机器离线/失踪（daemon 步中途死亡）→ 释放；
  * ③ claimed 自领取后零心跳进展超阈值（B-C7 claim 移交竞态：server 标 claimed
  *    但机器侧零执行——claim 把 lastHeartbeatAt 置为 claimedAt，故「零进展」
- *    即 heartbeat 从未推进；机器在线也命中）→ 释放；
- * ④ #864 T3：pending 且**钉选的机器不在线**（被删 = 同离线）× 步最后活动已过
- *    PIN_OFFLINE_GRACE_MS → 失败收尾（不自动改派：pin 是确定性约束，静默换机
- *    会违背它；文案点名机器与出口）。判据先于 ①——两条同时成立时点名钉选机
- *    的那句更能指向动作。
- * ④b #881：pending 且钉选的机器**在线但 enabledRuntimes 闸挡住该步的
- *    runtime**（钉选 SQL 过滤令唯有该机可见 + claim 闸恒 false = 步无期
- *    pending，#864 登记的缝）× 同宽限 → 失败收尾，文案点名机器与 runtime
- *    （出口 = 开 runtime 或改钉，不自动改派）。判据单源 = claim 面（agentForStep
- *    / runtimeGatePasses 下沉 dispatch-eligibility，本 sweep 与 tryClaim 同一
- *    份事实，判定漂移 = sweep 误杀 claim 能领的步）。
- * ④c #1219：pending 且钉选机**在线、闸开、有闲位**但超宽限未领（旧串行
- *    daemon / claim 循环 wedge 的实测形态——DB 面看「有闲位却不动」）→ 失败
- *    收尾（点名机器，出口 = 检查该机 daemon 或改钉，不自动改派）。与 ④/④b
- *    合称「有界等待」：钉选在线的等待不再是无限期静默。
- * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；团队有在线机器且
- * 钉选机在线且闸开且（满载或宽限内）的 pending 步（合法排队，含 #682 钉选
- * 在线机器的等待语义——步等它认领，别机不抢；满载超宽限同样不动，忙是真
- * 满）；在线机器上曾有心跳后停更的 claimed 步（执行/
- * 推送通道部分存活的歧义态，等 presence 过期走 ②）。chief 步不在本面
- * （chief.ts 扫尾）。已知缝（另行登记，不属「有界等待」两缝）：Agent 在但
- * 无模型位的步（无 modelId = 无人可领，runtime 判据单源在此无从计算）与未
- * 钉选但全团无人开该 runtime 的步（无唯一责任人可点名）仍是无期 pending。
- * 无 Agent 的步已由 #1104 收口：claim 面当场失败收尾（machines.ts tryClaim），
- * 本 sweep 不重复判（机器全灭时 ① 的零在线兜底仍覆盖其可见性）。
- * 释放语义：status → pending + machineId 清空（认领原子位复位，他机/同机可
- * 重领）；pinnedMachineId 保留（钉选过滤重算，钉选机才能接）；claimedAt/
+ *    即 heartbeat 从未推进；机器在线也命中 = 「已证明病了」的派发未生效形，
+ *    #1257 唯一保留的杀位）→ 释放。
+ * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；pending 步一律
+ * 不动（挂起等机器——含钉选机离线/闸挡/楔住的形态，机器回归、开 runtime、
+ * daemon 恢复领取后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
+ * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
+ * chief 步不在本面（chief.ts 扫尾）。
+ * 释放语义：status → pending + machineId 清空（认领原子位复位，归属机回来
+ * 经 claim 循环重领——#1259 起机器可见性由 agent 归属机闸单源判定）；claimedAt/
  * lastHeartbeatAt 保留作死亡时刻审计（重领即覆写）；createdAt 不动（FIFO
- * 序 + pending 扫尾宽限语义不变）；todo 相位不动（building + pending 步 =
- * 合法排队）；build.errorMessage 不写（非失败）；会话流 step 事件（pending
- * 态）+ 团队 wake（他机 75s 长轮询不等满）。new-session 降级标记归 daemon
- * 侧（续接失败回退即插 transcript 注记）。
- * 幂等：只扫 pending/claimed，终态步天然跳过。已知缝（归 T2/T3）：释放后仍
- * 无在线机器 → 下一轮命中 ① 按失败收尾（释放不是无期等待）。 */
+ * 序）；todo 相位不动（building + pending 步 = 合法排队）；build.errorMessage
+ * 不写（非失败）；会话流 step 事件（pending 态）+ 团队 wake（他机 75s 长轮询
+ * 不等满）。new-session 降级标记归 daemon 侧（续接失败回退即插 transcript
+ * 注记）。
+ * 幂等：只扫 pending/claimed，终态步天然跳过。 */
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
   const candidates = deps.db
     .select()
@@ -1348,95 +1315,30 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     )
     .all();
   for (const row of candidates) {
+    if (row.status === 'pending') continue; // #1257：挂起等机器，pending 面无失败
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
     if (!buildRow) continue; // 孤儿步：无呈现面
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) continue;
-    let reason: string | null = null;
-    if (row.status === 'pending') {
-      // #1259 归属机判族（原 ④/④b/④c 钉选判族）：步的去处 = agent 归属机。
-      // 先于「团队零在线机器」判——归属机判族成立时，点名归属机的文案更
-      // 具体、出口更明确。判据 = 归属机状态 × 步最后活动已过宽限（锚在
-      // 心跳/领取而非入队，给 T1 释放后的机器回归留窗口）。agent 解析与
-      // 闸判单源 = claim 面的 dispatch-eligibility 原语；无 Agent 的步不
-      // 进本判（#1104 起 claim 面已按失败收尾，不留无期 pending）。
-      const agentRow = agentForStep(deps.db, todoRow, row.kind, row.prompt);
-      if (agentRow !== null && agentRow.modelId != null) {
-        if (agentRow.machineId === null) {
-          // 未设归属机：任何机器都不可领（claim 面归属机闸恒拒）。无期
-          // 静默 pending 是 bug——宽限后可见失败，文案指名补法。
-          if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
-            reason = noHomeReason(agentRow.displayName, WORKER_NO_HOME_HINT);
-          }
-        } else {
-          const homeRow = deps.db
-            .select()
-            .from(machine)
-            .where(eq(machine.id, agentRow.machineId))
-            .get();
-          if (
-            (homeRow === undefined || !homeRow.online) &&
-            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-          ) {
-            reason = homeOfflineReason(homeRow?.name ?? null, WORKER_PIN_OFFLINE_HINT);
-          }
-          if (
-            reason === null &&
-            homeRow !== undefined &&
-            homeRow.online &&
-            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-          ) {
-            if (!runtimeGatePasses(homeRow, agentRow.provider)) {
-              reason = homeRuntimeBlockedReason(
-                homeRow.name,
-                stepRuntimeFor(agentRow.provider),
-                WORKER_PIN_RUNTIME_HINT,
-              );
-            } else if (
-              now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
-              machineRunningCount(deps.db, homeRow.id) < homeRow.maxConcurrent
-            ) {
-              reason = homeWedgeReason(homeRow.name, WORKER_PIN_WEDGE_HINT);
-            }
-          }
-        }
-      }
-      if (reason === null) {
-        const online = deps.db
-          .select({ id: machine.id })
-          .from(machine)
-          .where(and(eq(machine.teamId, todoRow.teamId), eq(machine.online, true)))
-          .all();
-        if (online.length === 0 && now - row.createdAt > BUILD_ABANDONED_STEP_MS) {
-          reason = `本轮无人认领：团队当前没有在线机器（等待 ${Math.round(BUILD_ABANDONED_STEP_MS / 1000)} 秒超时）。请确认执行机 daemon 在线后重跑。`;
-        }
-      }
-    } else {
-      // claimed：claim 置位 heartbeat（machines claim 面），故 null/陈旧一律
-      // 可判——有效心跳取三级回落（heartbeat → 领取时刻 → 入队时刻）。
-      const effectiveBeat = stepActivityAt(row);
-      if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
-        const machineRow = row.machineId
-          ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-          : undefined;
-        const progressed =
-          row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-        if (machineRow === undefined || !machineRow.online) {
-          releaseClaimedStep(deps, row, todoRow);
-          continue;
-        } else if (!progressed) {
-          releaseClaimedStep(deps, row, todoRow);
-          continue;
-        }
+    // claimed：claim 置位 heartbeat（machines claim 面），故 null/陈旧一律
+    // 可判——有效心跳取三级回落（heartbeat → 领取时刻 → 入队时刻）。
+    const effectiveBeat = stepActivityAt(row);
+    if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
+      const machineRow = row.machineId
+        ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
+        : undefined;
+      const progressed =
+        row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
+      if (machineRow === undefined || !machineRow.online || !progressed) {
+        releaseClaimedStep(deps, row, todoRow);
       }
     }
-    if (reason === null) continue;
-    failStepWithEvents(deps, row, reason);
   }
 }
 
-/** 失联 claimed 步释放（#862 T1 跨机续跑的 server 半）：认领原子位复位，他机
- * 经 claimCandidates（含钉选过滤）重领。调用方已取 todo 行，透传免重查。 */
+/** 失联 claimed 步释放（#862 T1 跨机续跑的 server 半）：认领原子位复位，归属
+ * 机回来（或他面任何可见机）经 claimCandidates 重领。调用方已取 todo 行，
+ * 透传免重查。 */
 function releaseClaimedStep(
   deps: BuildDeps,
   row: typeof step.$inferSelect,
@@ -1474,7 +1376,7 @@ function releaseClaimedStep(
 function stepArtifactGate(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-  outcome: { hasChanges?: boolean },
+  outcome: { hasChanges?: boolean; workBranchDrift?: { expected: string; actual: string } },
 ): string | null {
   if (stepRow.kind === 'plan') {
     const planRow = deps.db
@@ -1495,6 +1397,14 @@ function stepArtifactGate(
     return '规划未产出方案';
   }
   if (stepRow.kind === 'build' && outcome.hasChanges === false) {
+    // #1195 偏离点名：daemon 收尾检测到 HEAD 停在契约分支之外的具名分支、
+    // 且产物并集面（含步窗口分支扫描）处处无提交——「构建零改动」把失败
+    // 原因说反（看起来像 agent 没干活，实际可能已在自建分支交付）。失败
+    // 原因点名两分支，读者能直接对上 transcript 的偏离行。
+    const drift = outcome.workBranchDrift;
+    if (drift !== undefined) {
+      return `agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
+    }
     return '构建零改动';
   }
   return null;
@@ -1511,6 +1421,9 @@ export function completeStep(
   stepId: string,
   outcome: {
     hasChanges?: boolean;
+    /** #1195 工作分支偏离（daemon 收尾检测）：闸 2 在 hasChanges=false 时
+     *  据此点名分支偏离而非误导性「构建零改动」。 */
+    workBranchDrift?: { expected: string; actual: string };
     findings?: ReviewVerdict;
     findingsError?: string;
     /** verify 步 verdict（#1250）：daemon 从 agent 终轮 JSON 提取；两字段

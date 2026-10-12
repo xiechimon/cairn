@@ -1,26 +1,22 @@
-// #684 失联超时兜底（chief 步无人认领 / 执行机失联的可见性面；
-// #1260 起 chief 回合的归属 = 绑定 Agent 的归属机）：
-// #631 只闭环了「认领后失败」路径；daemon 死亡后 pending 步永挂、claimed 步
-// 心跳停更永挂——线程 activeRun 卡死、零反馈（用户实测：10-03 零回复零 toast）。
-// 本文件钉 sweep 判定的全部边界：超龄 × 机器在线态 × 步状态 × 步 kind，
-// 以及落库行/会话流事件与 #631 链的对接形状（chief_turn_error → toast）。
+// #684 失联超时兜底 + #1257 无人认领挂起（chief 步的 infra 事件面）：
+// #631 只闭环了「认领后失败」路径；#1257 起无人认领的 pending 回合挂起等
+// 机器（机器回来走既有 claim 循环自动续跑），claimed 心跳停更且机器离线
+// 释放回 pending（联系不上不杀）。本文件钉 sweep 判定的全部边界：超龄 ×
+// 机器在线态 × 步状态 × 步 kind，以及落库行/会话流事件的对接形状。
 // 机器在线位直写 DB（生产置位路径 wake SSE 断连面归 machine-wire 测试）。
 
 import type { ClaimedStep } from '@pacman/shared';
-import { chiefTurnErrorContentSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   chiefMessage,
-  chief as chiefTable,
   chiefThread,
   machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
-import { CHIEF_ABANDONED_STEP_MS, failAbandonedChiefSteps } from '../src/services/chief.js';
-import { PIN_OFFLINE_GRACE_MS } from '../src/services/dispatch-timeouts.js';
+import { CHIEF_ABANDONED_STEP_MS, sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, issueApiKey, type TestServer } from './helpers.js';
 
@@ -57,10 +53,8 @@ interface World {
   sentAt: number;
 }
 
-/** 绑定 Agent + 发一条 chief 消息 → 线程 + pending 步（机器面全部缺席；
- *  Agent 出生不设归属机——需要可领/归属机语义的用例 enroll 后调
- *  bindAgentHome）。#881：provider 可覆写（'claude-code' = runtime 闸判的
- *  反例位）。 */
+/** 绑定 Agent + 发一条 chief 消息 → 线程 + pending 步（机器面全部缺席）。
+ *  #881：provider 可覆写（'claude-code' = runtime 闸判的反例位）。 */
 async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<World> {
   const s = bootServer();
   disposables.push(() => s.dispose());
@@ -90,12 +84,6 @@ async function sendChiefTurn(content = '你好', provider = 'stub-gw'): Promise<
   return { s, teamId, threadId: thread.id, stepId: stepRow.id, sentAt };
 }
 
-/** 把 chief 绑定 Agent 的归属机设为 machineId（#1260：chief 步去处的
- *  唯一来源——chief 行不再持机器槽）。 */
-function bindAgentHome(w: World, machineId: string): void {
-  w.s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
-}
-
 /** 注册一台机器并返回其 token（不认领、不置在线）。 */
 async function enrollMachine(s: TestServer, teamId: string): Promise<string> {
   const key = await issueApiKey(s);
@@ -120,6 +108,16 @@ function setMachineOnline(s: TestServer, machineId: string, online: boolean): vo
   s.db.update(machineTable).set({ online }).where(eq(machineTable.id, machineId)).run();
 }
 
+/** #1260：chief 步的机器去处 = 绑定 Agent 的归属机——本文件所有「钉选线程」
+ *  形态（原 chiefThread.pinnedMachineId）一律改绑 Agent（钉选列已退役）。 */
+function bindChiefAgent(s: TestServer, machineId: string): void {
+  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
+}
+
+function chiefAgentRowOf(s: TestServer) {
+  return s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!;
+}
+
 /** 会话流事件捕获桩（钉 web SSE 契约：message 事件携带失败行原形）。 */
 function tapConvStream(s: TestServer, conversationId: string): { events: object[] } {
   const events: object[] = [];
@@ -137,10 +135,6 @@ function threadRowOf(w: World) {
   return w.s.db.select().from(chiefThread).where(eq(chiefThread.id, w.threadId)).get()!;
 }
 
-function chiefRowOf(w: World) {
-  return w.s.db.select().from(chiefTable).where(eq(chiefTable.teamId, w.teamId)).get()!;
-}
-
 function stepRowOf(w: World) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
 }
@@ -154,42 +148,25 @@ function turnErrorRow(w: World) {
     .get();
 }
 
-function turnErrorMessage(w: World): string | null {
-  const row = turnErrorRow(w);
-  if (!row) return null;
-  const parsed = chiefTurnErrorContentSchema.safeParse(JSON.parse(row.content as string));
-  return parsed.success ? parsed.data.message : null;
-}
-
-describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
-  test('pending 超龄 + 零在线机器：全链落位（步 failed + chief_turn_error 行 + activeRun 清 + 会话流 message 事件）', async () => {
+describe('#684 chief 失联超时兜底（sweepAbandonedChiefSteps）', () => {
+  test('pending 超龄 + 零在线机器：挂起等机器（#1257：不判死，activeRun 保持、零失败痕迹）', async () => {
     const w = await sendChiefTurn();
     const { events } = tapConvStream(w.s, w.threadId);
     expect(threadRowOf(w).activeRun).not.toBeNull(); // 发送后回合挂起
 
     // 锚步自身 createdAt（sentAt 取样早于落库数毫秒，直接用会被阈值余量吃掉）。
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS + 1);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS * 10);
 
-    expect(stepRowOf(w).status).toBe('failed');
+    expect(stepRowOf(w).status).toBe('pending');
     const thread = threadRowOf(w);
-    expect(thread.activeRun).toBeNull(); // #631 收尾语义：回合不再卡「进行中」
-    expect(thread.lastTurnAt).not.toBeNull();
-    const message = turnErrorMessage(w);
-    expect(message).not.toBeNull();
-    expect(message).toContain('没有在线机器'); // 失败原因含可操作指引
-    // 会话流 message 事件携带失败行原形（web toast 挂在此事件上，#631 链）。
-    const row = turnErrorRow(w)!;
-    const ev = events.find(
-      (e): e is { type: string; message: unknown } => (e as { type?: string }).type === 'message',
-    );
-    if (ev === undefined) throw new Error('no message event on the conversation stream');
-    expect((ev.message as { id: string }).id).toBe(row.id);
-    expect((ev.message as { role: string }).role).toBe('system');
+    expect(thread.activeRun).not.toBeNull(); // 挂起可见性由 pending 队列面承担
+    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行（#1257：infra 事件）
+    expect(events).toHaveLength(0); // 不推终态事件
   });
 
   test('pending 未超龄 → 不动（无行、activeRun 保持）', async () => {
     const w = await sendChiefTurn();
-    failAbandonedChiefSteps(w.s.svc, w.sentAt + 30_000);
+    sweepAbandonedChiefSteps(w.s.svc, w.sentAt + 30_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();
     expect(threadRowOf(w).activeRun).not.toBeNull();
@@ -199,37 +176,43 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const machineId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, machineId); // 归属机在线且闸开 = 合法排队（agent 无归属机会被 noHome 分支收）
     setMachineOnline(w.s, machineId, true);
-    failAbandonedChiefSteps(w.s.svc, w.sentAt + CHIEF_ABANDONED_STEP_MS * 5);
+    sweepAbandonedChiefSteps(w.s.svc, w.sentAt + CHIEF_ABANDONED_STEP_MS * 5);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('claimed + 机器离线 + 心跳停更超时 → 失败（daemon 中途死亡面）', async () => {
+  test('claimed + 机器离线 + 心跳停更超时 → 释放回 pending（#1257：联系不上不杀，机器回来续跑回合）', async () => {
     const w = await sendChiefTurn();
     const token = await enrollMachine(w.s, w.teamId);
-    const machineId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, machineId); // 归属机 = 认领机（#1260 后步才可得）
-    setMachineOnline(w.s, machineId, true);
+    bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
     const claimed = await claimStep(w.s, token);
     expect(claimed.step.id).toBe(w.stepId);
     // daemon 死亡形态：机器离线（wake SSE 断连面）+ 心跳停更（认领时刻即最后心跳）。
     setMachineOnline(w.s, claimed.step.machineId!, false);
+    const { events } = tapConvStream(w.s, w.threadId);
+    const woken = w.s.svc.machineHub.waitWake(w.teamId, 50);
     // 锚 claim 时刻（lastHeartbeatAt = claimedAt，均晚于 sentAt）。
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).lastHeartbeatAt! + CHIEF_ABANDONED_STEP_MS + 1);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).lastHeartbeatAt! + CHIEF_ABANDONED_STEP_MS + 1);
 
-    expect(stepRowOf(w).status).toBe('failed');
-    expect(threadRowOf(w).activeRun).toBeNull();
-    expect(turnErrorMessage(w)).toContain('失联');
+    const row = stepRowOf(w);
+    expect(row.status).toBe('pending');
+    expect(row.machineId).toBeNull(); // 认领原子位复位，他机/本机可重领
+    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合仍挂起等续跑
+    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
+    // 会话流 step 事件携带 pending 态（与 worker 释放同形）+ wake 唤醒认领循环。
+    const ev = events.find(
+      (e): e is { type: string; step: unknown } => (e as { type?: string }).type === 'step',
+    );
+    if (ev === undefined) throw new Error('no step event on the conversation stream');
+    expect((ev.step as { status: string }).status).toBe('pending');
+    await expect(woken).resolves.toBe(true);
   });
 
   test('claimed + 机器离线但心跳新鲜 → 不动（重连窗口）', async () => {
     const w = await sendChiefTurn();
     const token = await enrollMachine(w.s, w.teamId);
-    const machineId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, machineId);
-    setMachineOnline(w.s, machineId, true);
+    bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
     const claimed = await claimStep(w.s, token);
     setMachineOnline(w.s, claimed.step.machineId!, false);
     // 心跳刚打过（步运行中 daemon 仍活着——仅推送通道瞬断）。
@@ -239,17 +222,17 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
       .set({ lastHeartbeatAt: heartbeatedAt })
       .where(eq(stepTable.id, w.stepId))
       .run();
-    failAbandonedChiefSteps(w.s.svc, heartbeatedAt + 30_000);
+    sweepAbandonedChiefSteps(w.s.svc, heartbeatedAt + 30_000);
     expect(stepRowOf(w).status).toBe('claimed');
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('#864 T3 归属机离线 + 别的机器在线 + 超宽限：回合按失败收尾，文案点名归属机', async () => {
+  test('#1257 归属机离线 + 别的机器在线 + 超龄：回合挂起等机器（不判死、不静默改派）', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId); // 归属机：注册但离线
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, pinnedId);
-    // 团队里另有在线机器——判据必须是「钉的那台不在」，不是「团队没机器」。
+    bindChiefAgent(w.s, pinnedId);
+    // 团队里另有在线机器——判据必须是「归属机不在」，不是「团队没机器」。
     await enrollMachine(w.s, w.teamId);
     const otherId = w.s.db
       .select()
@@ -258,39 +241,34 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
       .find((m) => m.id !== pinnedId)!.id;
     setMachineOnline(w.s, otherId, true);
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
 
-    expect(stepRowOf(w).status).toBe('failed');
-    expect(threadRowOf(w).activeRun).toBeNull();
-    // 不静默改派：Agent 的归属机保持不动。
-    expect(
-      w.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.machineId,
-    ).toBe(pinnedId);
-    const message = turnErrorMessage(w);
-    expect(message).toContain('归属机「sweep-mbp」');
-    expect(message).toContain('离线超过 10 分钟');
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合挂起可见
+    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId); // 不静默改绑
+    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
   });
 
-  test('#864 T3 归属机离线 + 未超宽限 → 不动（给机器回来的窗口）', async () => {
+  test('归属机离线：不动（挂起等机器，机器回来即续跑）', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, pinnedId);
+    bindChiefAgent(w.s, pinnedId);
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();
   });
 
-  test('#864 T3 归属机在线 → 不动（回合等它认领）', async () => {
+  test('归属机在线 → 不动（回合等它认领）', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
-    bindAgentHome(w, pinnedId);
+    bindChiefAgent(w.s, pinnedId);
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 3_000_000);
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();
@@ -311,48 +289,34 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
         createdAt: now - CHIEF_ABANDONED_STEP_MS * 5,
       })
       .run();
-    failAbandonedChiefSteps(w.s.svc, now);
+    sweepAbandonedChiefSteps(w.s.svc, now);
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, 'step-worker-x')).get()!;
     expect(row.status).toBe('pending');
   });
 
-  // 失败文案出口律（T6：报机器 + 报修法）：chief 面出口的落点 = 总管绑定
-  // Agent 的归属机（#1260 后「改 chief 设置」无机器槽可改）。
-  test('归属机离线超宽限的失败文案带出口（换绑绑定 Agent 的归属机）', async () => {
-    const w = await sendChiefTurn();
-    await enrollMachine(w.s, w.teamId);
-    const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
-    bindAgentHome(w, pinnedId);
-
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
-
-    expect(stepRowOf(w).status).toBe('failed');
-    const message = turnErrorMessage(w);
-    expect(message).toContain('总管绑定 Agent 的归属机');
-  });
-
-  test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径）', async () => {
+  test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径；#1257 挂起不判死）', async () => {
     const w = await sendChiefTurn();
     const scheduler = createScheduler(w.s.svc, { tickMs: 60_000 });
-    scheduler.tick(stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS + 1);
-    expect(stepRowOf(w).status).toBe('failed');
-    expect(turnErrorRow(w)).toBeDefined();
+    scheduler.tick(stepRowOf(w).createdAt + CHIEF_ABANDONED_STEP_MS * 10);
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(turnErrorRow(w)).toBeUndefined();
+    scheduler.stop();
   });
 });
 
-describe('#881 归属机在线但 runtime 闸挡（failAbandonedChiefSteps 的闸挡分支）', () => {
-  // 失败方式（先于实现固化）：绑定 Agent 的归属机在线、但该机
-  //  enabledRuntimes 不含绑定 Agent 的 runtime → buildChiefClaim 的
-  //  runtime 闸恒 false + 归属机过滤令唯有该机可见 → 回合无期 pending。
-  //  #864 只收了「离线」半边。
+describe('#881 归属机在线但 runtime 闸挡（sweepAbandonedChiefSteps，#1257 挂起语义）', () => {
+  // 归属机在线但 enabledRuntimes 不含绑定 Agent 的 runtime → buildChiefClaim
+  // 的 runtime 闸恒 false + 归属机闸令唯有该机可见 → 回合挂起等 runtime
+  // （#1257：不判死，开 runtime 后自动续跑）。
 
-  test('归属机在线 + 闸挡（claude-code 档 × 只开 pi 的机器）+ 超宽限：回合按失败收尾，文案点名机器与 runtime', async () => {
+  test('归属机在线 + 闸挡（claude-code 档 × 只开 pi 的机器）+ 超龄：回合挂起等机器（#1257：不判死，开 runtime 后续跑）', async () => {
     const w = await sendChiefTurn('你好', 'claude-code');
     await enrollMachine(w.s, w.teamId); // 归属机：enroll 缺省只开 pi
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
-    bindAgentHome(w, pinnedId);
-    // 团队里另有能跑 claude-code 的在线机器——判据是「钉的那台开不了」。
+    bindChiefAgent(w.s, pinnedId);
+    // 团队里另有能跑 claude-code 的在线机器——归属机闸恒拒（不换机），等
+    // 的是归属机自己开 runtime。
     await enrollMachine(w.s, w.teamId);
     const otherRow = w.s.db
       .select()
@@ -366,28 +330,22 @@ describe('#881 归属机在线但 runtime 闸挡（failAbandonedChiefSteps 的�
       .where(eq(machineTable.id, otherRow.id))
       .run();
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
 
-    expect(stepRowOf(w).status).toBe('failed');
-    expect(threadRowOf(w).activeRun).toBeNull();
-    // 不静默改派：Agent 的归属机保持不动。
-    expect(
-      w.s.db.select().from(agentTable).where(eq(agentTable.id, AGENT_ID)).get()!.machineId,
-    ).toBe(pinnedId);
-    const message = turnErrorMessage(w);
-    expect(message).toContain('归属机「sweep-mbp」');
-    expect(message).toContain('claude-code');
-    expect(message).toContain('总管绑定 Agent 的归属机');
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合挂起可见
+    expect(chiefAgentRowOf(w.s).machineId).toBe(pinnedId); // 不静默改绑
+    expect(turnErrorRow(w)).toBeUndefined(); // 不产失败行
   });
 
-  test('归属机在线 + 闸挡 + 宽限内：不动（给「正在开 runtime」留窗口）', async () => {
+  test('归属机在线 + 闸挡：不动（runtime 开关 PATCH 热写，开闸即续跑）', async () => {
     const w = await sendChiefTurn('你好', 'claude-code');
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
-    bindAgentHome(w, pinnedId);
+    bindChiefAgent(w.s, pinnedId);
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();
@@ -403,9 +361,9 @@ describe('#881 归属机在线但 runtime 闸挡（failAbandonedChiefSteps 的�
       .set({ enabledRuntimes: ['pi', 'claude-code'] })
       .where(eq(machineTable.id, pinnedId))
       .run();
-    bindAgentHome(w, pinnedId);
+    bindChiefAgent(w.s, pinnedId);
 
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 3_000_000);
 
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorRow(w)).toBeUndefined();

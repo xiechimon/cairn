@@ -30,7 +30,6 @@ import type {
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_THREAD_ID_PREFIX,
-  CHIEF_TURN_ERROR_KIND,
   CHIEF_WATCH_REASON_DISPATCH,
   chiefIdFormat,
   chiefThreadTitle,
@@ -55,22 +54,6 @@ import {
 import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
-import { cancelPendingQuestions } from './chief-questions.js';
-import { machineRunningCount, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
-import {
-  CHIEF_NO_HOME_HINT,
-  CHIEF_PIN_OFFLINE_HINT,
-  CHIEF_PIN_RUNTIME_HINT,
-  CHIEF_PIN_WEDGE_HINT,
-  CHIEF_UNBOUND_REASON,
-  homeOfflineReason,
-  homeRuntimeBlockedReason,
-  homeWedgeReason,
-  noHomeReason,
-  PIN_OFFLINE_GRACE_MS,
-  PIN_ONLINE_WEDGE_GRACE_MS,
-  stepActivityAt,
-} from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -908,25 +891,17 @@ export function notifyChiefTurn(deps: ChiefDeps, threadId: string): void {
  * ~30s、daemon 冷启秒级）；机器在线时不触发——在线排队是合法语义。 */
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
-/** chief 步失联扫尾（scheduler tick 驱动，#684）：把「永不失败也就永不
- * 可见」的永挂收进 #631 失败闭环——
- * ① pending 无人认领且团队零在线机器（daemon 死亡/未注册：步永不 claim，
- *    #631 的 done(failed) 路径永不触发，线程 activeRun 永挂——用户实测
- *    2026-10-03「零回复零 toast」即此形）；
- * ② claimed 心跳停更且机器离线（daemon 步中途死亡：lastHeartbeatAt 此前
- *    只写不读，步与 activeRun 双挂）；
- * ③ #1260 归属机判族（与 worker 步同一套，dispatch-timeouts.ts 单源）：
- *    chief 回合的归属机 = 绑定 Agent 的归属机——总管未绑定 Agent / Agent
- *    未设归属机 / 归属机离线 / 归属机在线但 runtime 闸挡 / 归属机有闲位
- *    却超宽限不领（楔住）——各按同族宽限给可见失败，文案指名补法。
- *    Agent 在但无模型位 = 可恢复配置缺口，不进失败漏斗（worker 面同律）。
- * 失败收尾 = finishStep chief 分支同语义：step 标 failed + finishChiefTurn
- * 清 activeRun + chief_turn_error system 行（会话流 message 事件即时推送 →
- * web toast + 失败行，#631 链原样消费）。机器在线且闸开时一律不动（busy
- * 排队合法）；非 chief 步不在本面（build 卡 building 归 #682）。幂等：行键 =
- * chief-err-<stepId>（upsert），步状态翻转后不再进候选集。 */
-export function failAbandonedChiefSteps(
-  deps: { db: Db; convHub?: ConversationStreamHub },
+/** chief 步失联扫尾（scheduler tick 驱动，#684 + #1257）：
+ * - pending 回合一律不动（#1257：无人认领是 infra 事件——挂起等机器，
+ *   机器回来走既有 claim 循环自动续跑，可见性由 pending 队列面承担）。
+ * - claimed 心跳停更且机器离线（daemon 步中途死亡）→ **释放回 pending**
+ *   （#1257：联系不上不杀——认领原子位复位，他机/本机回来即重领续跑，
+ *   activeRun 保持 = 回合仍挂起可见）；心跳缺位（null）视为不可判，不动；
+ *   仅推送通道瞬断而心跳仍在（步还在跑）不动。
+ * 释放语义与 worker 面（builds.ts releaseClaimedStep）同形：machineId 清空
+ * + 会话流 step pending 事件 + 团队 wake（75s 长轮询不等满）。 */
+export function sweepAbandonedChiefSteps(
+  deps: { db: Db; convHub?: ConversationStreamHub; machineHub?: MachineWakeHub },
   now: number = nowMs(),
 ): void {
   const candidates = deps.db
@@ -934,116 +909,34 @@ export function failAbandonedChiefSteps(
     .from(step)
     .where(eq(step.kind, 'chief'))
     .all()
-    .filter((r) => r.status === 'pending' || r.status === 'claimed');
+    .filter((r) => r.status === 'claimed');
   for (const row of candidates) {
     const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (!thread) continue; // 线程已删：无呈现面
-    let reason: string | null = null;
-    if (row.status === 'pending') {
-      // #1260：chief 回合的归属 = 绑定 Agent 的归属机（与 worker 步同一套
-      // 判族同宽限，见 dispatch-timeouts.ts）。未绑定 Agent / Agent 未设
-      // 归属机 = 任何机器不可领——无期静默 pending 是 bug，宽限后可见失败。
-      const chiefRow = deps.db.select().from(chief).where(eq(chief.id, thread.chiefId)).get();
-      const agentRow = chiefRow?.agentId
-        ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-        : undefined;
-      if (chiefRow?.agentId == null || agentRow === undefined) {
-        if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
-          reason = CHIEF_UNBOUND_REASON;
-        }
-      } else if (agentRow.modelId != null) {
-        // Agent 在但无模型位 = 可恢复的配置缺口（补模型即可领），不按失败
-        // 收口——worker 面同律（#1104 只收「无 Agent」族）。
-        if (agentRow.machineId === null) {
-          if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
-            reason = noHomeReason(agentRow.displayName, CHIEF_NO_HOME_HINT);
-          }
-        } else {
-          const homeRow = deps.db
-            .select()
-            .from(machine)
-            .where(eq(machine.id, agentRow.machineId))
-            .get();
-          if (
-            (homeRow === undefined || !homeRow.online) &&
-            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-          ) {
-            reason = homeOfflineReason(homeRow?.name ?? null, CHIEF_PIN_OFFLINE_HINT);
-          }
-          if (
-            reason === null &&
-            homeRow !== undefined &&
-            homeRow.online &&
-            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-          ) {
-            // 闸判原语单源 = dispatch-eligibility（与 buildChiefClaim 同源，
-            // 漂移 = sweep 误杀 claim 能领的回合）。
-            if (!runtimeGatePasses(homeRow, agentRow.provider)) {
-              reason = homeRuntimeBlockedReason(
-                homeRow.name,
-                stepRuntimeFor(agentRow.provider),
-                CHIEF_PIN_RUNTIME_HINT,
-              );
-            } else if (
-              now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
-              machineRunningCount(deps.db, homeRow.id) < homeRow.maxConcurrent
-            ) {
-              reason = homeWedgeReason(homeRow.name, CHIEF_PIN_WEDGE_HINT);
-            }
-          }
-        }
-      }
-      if (reason === null) {
-        const online = deps.db
-          .select({ id: machine.id })
-          .from(machine)
-          .where(and(eq(machine.teamId, thread.teamId), eq(machine.online, true)))
-          .all();
-        if (online.length === 0 && now - row.createdAt > CHIEF_ABANDONED_STEP_MS) {
-          reason = `本轮无人认领：团队当前没有在线机器（等待 ${Math.round(CHIEF_ABANDONED_STEP_MS / 1000)} 秒超时）。请确认执行机 daemon 在线后重发。`;
-        }
-      }
-    } else {
-      // claimed：心跳停更 + 机器离线双条件——仅推送通道瞬断而心跳仍在（步
-      // 还在跑）不判死；心跳缺位（null）视为不可判，不动。
-      const machineRow = row.machineId
-        ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-        : undefined;
-      const stale =
-        row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
-      if (machineRow !== undefined && !machineRow.online && stale) {
-        reason = `执行机器失联（心跳停更超过 ${Math.round(CHIEF_ABANDONED_STEP_MS / 1000)} 秒且机器已离线）。请检查执行机 daemon 状态后重发。`;
-      }
+    const machineRow = row.machineId
+      ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
+      : undefined;
+    const stale =
+      row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
+    if (machineRow === undefined || !machineRow.online) {
+      if (!stale) continue;
+      deps.db
+        .update(step)
+        .set({ status: 'pending', machineId: null })
+        .where(eq(step.id, row.id))
+        .run();
+      deps.convHub?.publishStep(thread.id, {
+        id: row.id,
+        buildId: row.buildId,
+        kind: row.kind,
+        machineId: null,
+        createdAt: row.createdAt,
+        status: 'pending',
+        checkpointCommit: row.checkpointCommit,
+        skillInjection: row.skillInjection ?? null,
+      });
+      deps.machineHub?.wake(thread.teamId);
     }
-    if (reason === null) continue;
-    deps.db.update(step).set({ status: 'failed' }).where(eq(step.id, row.id)).run();
-    // #1049 失联收口同款：pending 问答卡翻 cancelled（机器死等答的 hold 随
-    // poll 命中退场；卡片不再谎称还在等答）。
-    cancelPendingQuestions(
-      { db: deps.db, ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}) },
-      thread.id,
-      '执行机器失联，回合已失败收尾',
-    );
-    finishChiefTurn(deps, thread.id, { status: 'failed' });
-    const errorRow = {
-      id: `chief-err-${row.id}`,
-      threadId: thread.id,
-      role: 'system' as const,
-      content: JSON.stringify({ kind: CHIEF_TURN_ERROR_KIND, message: reason }),
-      createdAt: now,
-    };
-    upsertChiefMessage(deps.db, errorRow);
-    deps.convHub?.publishMessage(thread.id, errorRow);
-    deps.convHub?.publishStep(thread.id, {
-      id: row.id,
-      buildId: row.buildId,
-      kind: row.kind,
-      machineId: row.machineId,
-      createdAt: row.createdAt,
-      status: 'failed',
-      checkpointCommit: row.checkpointCommit,
-      skillInjection: row.skillInjection ?? null,
-    });
   }
 }
 

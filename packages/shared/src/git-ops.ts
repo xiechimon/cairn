@@ -197,6 +197,15 @@ export interface WorktreeOps {
   /** conv 分支领先 origin/<defaultBranch> 的提交数（hasChanges 判定，
    * 02 §4.1/r5 §8 列位双键）。 */
   countAhead(cwd: string, defaultBranch: string): Promise<number>;
+  /** HEAD 所在分支短名（detached HEAD / 查询失败 = null）。#1195 收尾偏离
+   * 检测面：与 PreparedWorkspace.branch 不等即「agent 自建分支」形。
+   * 可选实现：缺省 = 不检测（测试桩与旧实现零破坏）。 */
+  currentBranch?(cwd: string): Promise<string | null>;
+  /** 步窗口内有新提交的本地分支短名集（#1195 产物并集面）：tip 提交时刻
+   * ≥ sinceMs 且 baseCommit 之外有提交的 refs/heads/*。base 不可解析 / git
+   * 失败 = 空集（探测是收尾附加面，不阻断步收尾）。归属裁决（邻座 conv
+   * 分支排除）是调用方策略，本原语只报事实。可选实现：缺省 = 不扫描。 */
+  branchesWithNewCommits?(cwd: string, baseCommit: string, sinceMs: number): Promise<string[]>;
   /** conv 分支相对 origin/<defaultBranch> 的 unified diff 原文
    * （`git diff origin/<default>...HEAD`，#704 变更投影 daemon 上报数据源）。
    * 可选方法：非 hosted 形态投影走 daemon 步收尾上报，hosted 形态真值源

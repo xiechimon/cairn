@@ -40,6 +40,7 @@ import {
   CHANGES_DIFF_MAX_BYTES,
   CHIEF_REMOTE_TOOLS,
   CHIEF_TURN_ERROR_KIND,
+  classifyStepFailure,
   classifyUserText,
   formatSkillRouteSection,
   GATE_ANNOUNCEMENTS,
@@ -58,7 +59,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@pacman/shared';
-import { and, asc, desc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -114,7 +115,7 @@ import {
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
-
+import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
@@ -585,7 +586,16 @@ function claimCandidates(deps: MachineDeps, machineId: string, teamId: string): 
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId)))
+    .where(
+      and(
+        eq(step.status, 'pending'),
+        eq(todo.teamId, teamId),
+        // #1257 额度挂起退避：holdUntil 未到不可领（到期 = 下一次重领即
+        // 探测额度是否恢复）。null = 未挂起。（#1259 钉选过滤已退役——
+        // 候选的机器可见性改由 agent 归属机判定，见下方 per-candidate 闸。）
+        or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
+      ),
+    )
     .orderBy(asc(step.createdAt))
     .all();
   return rows;
@@ -610,7 +620,11 @@ function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: stri
         eq(step.status, 'pending'),
         eq(step.kind, 'chief'),
         eq(chiefThread.teamId, teamId),
+        // #1260：候选只对本机可见 ⇔ 本机 = 绑定 Agent 的归属机（chief 钉选
+        // 过滤随 #1259 退役，归属机单源判定）。
         eq(agent.machineId, machineId),
+        // #1257 额度挂起退避（worker 候选同律）。
+        or(isNull(step.holdUntil), lte(step.holdUntil, sql`${nowMs()}`)),
       ),
     )
     .orderBy(asc(step.createdAt))
@@ -700,7 +714,15 @@ function buildChiefClaim(
   const claimedAt = nowMs();
   const res = deps.db
     .update(step)
-    .set({ status: 'claimed', machineId, claimedAt, lastHeartbeatAt: claimedAt })
+    .set({
+      status: 'claimed',
+      machineId,
+      claimedAt,
+      lastHeartbeatAt: claimedAt,
+      // #1257 挂起位清零（worker claim 同律）。
+      holdReason: null,
+      holdUntil: null,
+    })
     .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
     .run();
   if (res.changes === 0) return null;
@@ -855,7 +877,8 @@ async function tryClaim(
     if (!agentRow.modelId) continue;
     // #1259 归属机闸：步只投给 agent 的归属机（机器归属单源在 agent 层，
     // 任务层钉选已退役）。null = 未设归属机——任何机器都不可领（留
-    // pending；sweep 的「未设归属机」分支到宽限后给可见失败，补设即解锁）。
+    // pending 等补设；#1257 挂起语义下由板面 waitingOn chip 透出「等机器」，
+    // 补设即自动续领）。
     if (agentRow.machineId !== machineId) continue;
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
@@ -929,6 +952,10 @@ async function tryClaim(
         claimedAt,
         lastHeartbeatAt: claimedAt,
         skillInjection,
+        // #1257 挂起位清零：领取即不再是挂起态（holdCount 保留——退避档位
+        // 在同一挂起系列内递进，重领后再挂起按次数升级）。
+        holdReason: null,
+        holdUntil: null,
       })
       .where(and(eq(step.id, cand.stepRow.id), eq(step.status, 'pending')))
       .run();
@@ -1371,6 +1398,48 @@ export function upsertChiefRow(
   deps.convHub?.publishMessage(row.threadId, row);
 }
 
+/** #1257 额度挂起（done 面分类 quota 的收口）：步回 pending（认领位复位 +
+ * sessionId 续接面已在 finishStep 落位，重领走 continue）+ 退避档位按
+ * holdCount 递进；可见性 = 会话 system 行（原因原文 + 下次尝试时刻，
+ * deterministic id 幂等覆盖——多次挂起更新同一行，不叠行）；事件面 =
+ * step pending 事件（与失联释放同形）+ 团队 wake（退避到期后 75s 长轮询
+ * 不等满）。todo/build 不落任何失败痕迹（挂起不是失败）。重领成功路径在
+ * claim 面（holdUntil 过滤 + hold 清位）。 */
+function holdStepForQuota(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  outcome: MachineDoneBody,
+): void {
+  const { db } = deps;
+  const holdCount = stepRow.holdCount + 1;
+  const holdUntil = nowMs() + quotaHoldBackoffMs(holdCount);
+  db.update(step)
+    .set({ status: 'pending', machineId: null, holdReason: 'quota', holdUntil, holdCount })
+    .where(eq(step.id, stepRow.id))
+    .run();
+  const note = quotaHoldNote(outcome.errorMessage ?? '', holdUntil);
+  if (isChiefConversation(stepRow.buildId)) {
+    upsertChiefRow(deps, {
+      id: `quota-hold-${stepRow.id}`,
+      threadId: stepRow.buildId,
+      role: 'system',
+      content: note,
+      createdAt: nowMs(),
+    });
+  } else {
+    upsertMessage(deps, {
+      id: `quota-hold-${stepRow.id}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: note,
+      createdAt: nowMs(),
+    });
+  }
+  publishStepStatus(deps, stepRow.id);
+  const teamId = stepTeamId(deps, stepRow);
+  if (teamId !== null) deps.machineHub.wake(teamId);
+}
+
 /** per-step 凭证下发（02 §5.4/§8：模型 key + git 凭证 + 团队密钥取用面，
  * daemon 内存持有不落盘常驻）。解析链单源 = M2c services/credentials.ts
  * （step → build → todo → assignment → agent → provider → SecretBox 解密 +
@@ -1610,6 +1679,14 @@ export async function finishStep(
   // stop_pending 卫生清理（全终态共通，M7 #308）：stop 与自然完成/失败的
   // 竞态残留随收尾即清（拉取-确认面另有定向步校验双保险，不复活）。
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  // #1257 额度挂起：done(failed) 且错误分类 quota → 步不判死（配额事件，
+  // 不是任务失败）——挂起等额度：退避到期重领即一次「额度恢复了吗」探测，
+  // 恢复后自动续跑，无需人工重跑。sessionId 续接面已在上方落位（重领走
+  // continue）。
+  if (outcome.status === 'failed' && classifyStepFailure(outcome.errorMessage ?? '') === 'quota') {
+    holdStepForQuota(deps, stepRow, outcome);
+    return;
+  }
   // chief 步收尾（无 build/phase/merge；thread 面 + chief_message 通知，r5 §3.6/
   // §7.2）。token 记账已按 buildId=chief conv id 落位（context.tokens 数据源）。
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
@@ -1652,6 +1729,10 @@ export async function finishStep(
   if (outcome.status === 'success') {
     completeStep(deps, stepId, {
       hasChanges: outcome.hasChanges,
+      // #1195 工作分支偏离透传（闸 2 点名分支偏离的入参面）。
+      ...(outcome.workBranchDrift !== undefined
+        ? { workBranchDrift: outcome.workBranchDrift }
+        : {}),
       ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
       ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
       // #1250 verify 步 verdict 透传（completeStep verify 分支消费）。

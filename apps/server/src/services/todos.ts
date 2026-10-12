@@ -43,6 +43,10 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
+import {
+  agentForStep as agentForStepEligibility,
+  runtimeGatePasses,
+} from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -99,6 +103,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
   const agentRow = buildAgentId
     ? db.select().from(agent).where(eq(agent.id, buildAgentId)).get()
     : undefined;
+  const waitingOn = waitingOnOf(deps, row);
   return {
     id: row.id,
     teamId: row.teamId,
@@ -125,7 +130,62 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceBuildId: row.sourceBuildId,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
+    // #1257 板面挂起态（读侧派生；缺省不带键）。
+    ...(waitingOn !== undefined ? { waitingOn } : {}),
   };
+}
+
+/** #1257 板面挂起态派生（等机器/等额度）：在飞 todo 的 latest build 存在
+ *  pending 步且（额度挂起中 | 钉选机不在 | 团队零在线）时透出；健康排队
+ *  （机器在、能领，只是没轮到）与终态/未启动恒缺席——挂起 ≠ 排队 ≠ 失败。
+ *  读侧派生不落列：机器 presence 变化不重写 todo 行，板面新鲜度走 web 侧
+ *  machine_presence → todos 失效重取（sse-team-events，#1257 补的失效键）。 */
+function waitingOnOf(
+  deps: TodoDeps,
+  row: TodoRow,
+): { on: 'machine' | 'quota'; retryAt: number | null } | undefined {
+  if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
+    return undefined;
+  const pendingSteps = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'pending')))
+    .all();
+  if (pendingSteps.length === 0) return undefined;
+  // 等额度：任一 pending 步处于 quota 挂起（退避中；到期未重领仍算挂起，
+  // 重领成功即由 claim 面清位）。
+  const held = pendingSteps.find((s) => s.holdReason === 'quota');
+  if (held !== undefined) {
+    return { on: 'quota', retryAt: held.holdUntil ?? null };
+  }
+  // 等机器（#1259 起语义 = 归属机）：任一 pending 步的 Agent 未设归属机、
+  // 归属机行不在/离线、或在线但 runtime 闸挡本步 → 等机器；或团队零在线。
+  // 归属机在线且闸开 = 正常排队（忙/将领，只是没轮到）——挂起 ≠ 排队。
+  // 无 Agent 的步不判（claim 面 #1104 失败收口，本派生不重复判）。
+  for (const s of pendingSteps) {
+    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    if (agentRow === null) continue;
+    // 未设归属机：任何机器都不可领——等机器（补设即解锁）。
+    if (agentRow.machineId === null) {
+      return { on: 'machine', retryAt: null };
+    }
+    const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
+    if (home === undefined || !home.online) {
+      return { on: 'machine', retryAt: null };
+    }
+    if (!runtimeGatePasses(home, agentRow.provider)) {
+      return { on: 'machine', retryAt: null };
+    }
+  }
+  const online = deps.db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
+    .all();
+  if (online.length === 0) {
+    return { on: 'machine', retryAt: null };
+  }
+  return undefined;
 }
 
 function getRow(deps: TodoDeps, id: string): TodoRow | undefined {
