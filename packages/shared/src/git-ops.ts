@@ -6,6 +6,7 @@
 // 字节面用 Uint8Array（shared 零 node 依赖）。
 
 import type { WorkspaceHookNoteData } from './protocol/executor.js';
+import type { LocalErrorReason, ProjectRepoKind } from './records/project.js';
 
 /** `ls-tree` 行投影（tree?ref= 端点源，02 §3 文件浏览面）。 */
 export interface GitTreeEntry {
@@ -119,6 +120,12 @@ export interface WorktreePrepareInput {
   /** 任务目录位 `<workspacesRoot>/<conversationId>`；分支 `conv-` 后缀同值。 */
   conversationId: string;
   cloneUrl: string;
+  /** 项目 repo 形态（词表单源 PROJECT_REPO_KINDS）。local = cloneUrl 是
+   * 登记机文件系统上的绝对路径，其它执行机看不到——prepare 在 clone/fetch
+   * 之前做可达预检，不可达抛 LocalRepoUnreachableError（#1210 执行面兜底，
+   * spec 12 Out of Scope 的多机替代实现）。缺省 = 兼容形（老调用方/测试
+   * 桩），不做预检（fail-open，与 machineCredentialFallback 版本墙同形）。 */
+  repoKind?: ProjectRepoKind;
   workspacesRoot: string;
   /** per-step 凭证（托管 http 远端必需；GitHub 形态凭证面归后票）。 */
   credentials: GitCredentials | null;
@@ -222,5 +229,26 @@ export class RemoteBranchDivergedError extends Error {
   constructor(branch: string) {
     super(`${REMOTE_BRANCH_DIVERGED}: ${branch}`);
     this.name = 'RemoteBranchDivergedError';
+  }
+}
+
+/** local 形态执行面不可达 reason 值域（#1210）：登记面三态词表里属于执行
+ * 面判定的两态——not_absolute 只属创建面（登记行里的路径恒为绝对路径）。
+ * 词表单源 = PROJECT_LOCAL_ERROR_REASONS（records/project.ts）。 */
+export type LocalRepoUnreachableReason = Extract<LocalErrorReason, 'not_found' | 'not_git'>;
+
+/** local 形态仓在执行机不可达（#1210 C 兜底）：repoKind=local 的 cloneUrl
+ * 是登记机文件系统上的绝对路径（ADR 0016：真值在该机，机器可丢性不属
+ * local 形态），其它执行机上没有该路径。prepare 在 clone/fetch 之前抛本
+ * 类型化错误；runner 把它合成点名机器/路径/原因/补法的步失败文案
+ * （daemon localRepoUnreachableMessage，#867 T6 缺凭据文案同形）。
+ * message 是日志/transcript 面的短标记，用户可读文案归合成器。 */
+export class LocalRepoUnreachableError extends Error {
+  constructor(
+    readonly repoPath: string,
+    readonly reason: LocalRepoUnreachableReason,
+  ) {
+    super(`local repo unreachable: ${repoPath} (${reason})`);
+    this.name = 'LocalRepoUnreachableError';
   }
 }

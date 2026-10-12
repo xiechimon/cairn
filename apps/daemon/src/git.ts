@@ -219,6 +219,17 @@ export const gitPrim = {
     return url === '' ? null : url;
   },
 
+  /** git 仓判定（`rev-parse --git-dir` code 0；工作树仓与裸库同形——#1210
+   * 执行面 fail-loud 预检只问「能否作为 clone 源」，worktree-only 的收紧
+   * 属 server 创建闸 validateLocalRepoPath，不在执行面重判）。 */
+  async isGitDir(dir: string): Promise<boolean> {
+    const r = await runGit(['rev-parse', '--git-dir'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    return r.code === 0;
+  },
+
   /** origin remote URL 重指（#1213/ADR 0017：本地源 clone 后把 origin 指回
    * GitHub 真值，后续 fetch/push 照常走真值远端）。 */
   async setRemoteUrl(repoDir: string, url: string): Promise<void> {

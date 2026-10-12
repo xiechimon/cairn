@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "id": "xxIyG9TOlXdP9GQssA3sU",
+      "kind": "build",
+      "status": "failed"
+    }
+  ],
+  "stepStatus": "failed",
+  "errorMessage": "构建零改动",
+  "elapsedMs": 1003
+}

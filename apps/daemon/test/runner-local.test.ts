@@ -22,6 +22,10 @@
 //      done success（软拒：提交留本地工作分支）+ transcript 落 push-skip
 //      system 行（用户合并前看得见为何没推上去）
 //   9.（XMON-77）tools 缺省（老 server 版本墙）→ 两闸均不生效（fail-open）
+//   10.（#1210 C 兜底）local 步 prepare 抛 LocalRepoUnreachableError →
+//      done failed，errorMessage = 点名机器 + 仓路径 + 原因 + 补法的合成文案
+//      （不再是裸 git 错误）；无 commit/push 后续操作
+//   11.（#1210 回归）prepare 抛普通错误 → errorMessage 保持裸消息直透
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
@@ -38,7 +42,7 @@ import type {
   TranscriptUpload,
   WorktreeOps,
 } from '@pacman/shared';
-import { PLAN_FILE_NAME } from '@pacman/shared';
+import { LocalRepoUnreachableError, PLAN_FILE_NAME } from '@pacman/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -194,13 +198,15 @@ class FakeClient implements MachineApi {
   async stream(_signal: AbortSignal, _onEvent: (ev: MachineStreamEvent) => void) {}
 }
 
-/** 录制型 fake worktree：全操作进 calls。 */
-function fakeWorkspace() {
+/** 录制型 fake worktree：全操作进 calls。prepareError 注入 = prepare 抛错
+ * （#1210 执行面 fail-loud 路径用）。 */
+function fakeWorkspace(opts: { prepareError?: Error } = {}) {
   const calls: string[] = [];
   const pushes: { branch: string; cred: GitCredentials | null }[] = [];
   const ws: WorktreeOps = {
     async prepare(input) {
       calls.push(`prepare:${input.cloneUrl}`);
+      if (opts.prepareError) throw opts.prepareError;
       return {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
@@ -305,7 +311,10 @@ function seedUserRepo(dir: string): void {
   );
 }
 
-async function setup(claimed: ClaimedStep, opts: { git?: GitCredentials | null } = {}) {
+async function setup(
+  claimed: ClaimedStep,
+  opts: { git?: GitCredentials | null; machineName?: string; prepareError?: Error } = {},
+) {
   probeMock.mockReset();
   // 不存在的仓库（o/r）的真值：gh / REST 双梯 404 → null（面板 PR 槽留空）。
   probeMock.mockResolvedValue(null);
@@ -315,7 +324,9 @@ async function setup(claimed: ClaimedStep, opts: { git?: GitCredentials | null }
   const client = new FakeClient();
   client.git = opts.git ?? null;
   const journal = new StepJournal(paths.outboxDir);
-  const { ws, calls, pushes } = fakeWorkspace();
+  const { ws, calls, pushes } = fakeWorkspace(
+    opts.prepareError ? { prepareError: opts.prepareError } : {},
+  );
   const deps = {
     client,
     journal,
@@ -326,6 +337,7 @@ async function setup(claimed: ClaimedStep, opts: { git?: GitCredentials | null }
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'), // runner-stop 同款占位（步无 mcpServers slug = 不读）
     heartbeatIntervalMs: 60_000,
+    ...(opts.machineName !== undefined ? { machineName: opts.machineName } : {}),
   };
   await runStep(deps, claimed);
   return { client, calls, pushes, lines, paths };
@@ -690,5 +702,35 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
     // 「重试后仍空」判定不被旧残渣绕过。
     expect(existsSync(stalePlan)).toBe(false);
     expect(client.uploadNames).toEqual([['transcript.json']]);
+  });
+});
+
+describe('runner local 形态执行面 fail-loud（#1210 C 兜底）', () => {
+  test('失败方式 10：prepare 抛 LocalRepoUnreachableError → done failed，errorMessage 点名机器+路径+补法', async () => {
+    const { client, calls } = await setup(
+      claimedStep('build', { kind: 'local', cloneUrl: '/definitely/not/here/repo' }),
+      {
+        machineName: 'mea-probe',
+        prepareError: new LocalRepoUnreachableError('/definitely/not/here/repo', 'not_found'),
+      },
+    );
+    expect(client.doneBodies[0]!.body.status).toBe('failed');
+    const msg = client.doneBodies[0]!.body.errorMessage ?? '';
+    expect(msg).toContain('mea-probe'); // 哪台机器
+    expect(msg).toContain('/definitely/not/here/repo'); // 哪个路径
+    expect(msg).toContain('路径不存在'); // 原因人话
+    expect(msg).toContain('GitHub 形态'); // 补法：跨机开发的项目形态
+    // 失败在 prepare 处收口：无 commit/push 后续操作。
+    expect(calls).not.toContain('commitAll');
+    expect(calls.some((c) => c.startsWith('push'))).toBe(false);
+  });
+
+  test('失败方式 11：prepare 抛普通错误 → errorMessage 裸消息直透（回归）', async () => {
+    const { client } = await setup(
+      claimedStep('build', { kind: 'local', cloneUrl: '/definitely/not/here/repo' }),
+      { machineName: 'mea-probe', prepareError: new Error('boom raw git noise') },
+    );
+    expect(client.doneBodies[0]!.body.status).toBe('failed');
+    expect(client.doneBodies[0]!.body.errorMessage).toBe('boom raw git noise');
   });
 });

@@ -1,0 +1,84 @@
+{
+  "probe": "drive-1210-local-unreachable",
+  "expect": "old",
+  "repo": "/tmp/pacman-before-1210",
+  "server": "http://127.0.0.1:8805",
+  "db": "/tmp/pacman-before-1210/.claude/verify-run/home/server/server.db",
+  "machineName": "verify-1210",
+  "daemonHome": "/tmp/pacman-1210-daemon-1791818396574",
+  "repoDir": "/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-9aDtay/repo",
+  "passed": 14,
+  "total": 14,
+  "checks": [
+    {
+      "name": "POST local 项目 201（路径在位，创建闸过）",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "腿 A：步入终态 failed（不是挂起等待）",
+      "ok": true,
+      "detail": "stepStatus=failed"
+    },
+    {
+      "name": "腿 A(old)：errorMessage = 裸 git 错误（fatal/does not exist）",
+      "ok": true,
+      "detail": "git clone failed (128): fatal: repository '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-9aDtay/repo' does not exist"
+    },
+    {
+      "name": "腿 A(old)：errorMessage 无合成文案",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A(old)：daemon.log 有 Cloning 行（clone 被尝试）",
+      "ok": true,
+      "detail": "elapsed=7026ms"
+    },
+    {
+      "name": "腿 A：errorMessage 零凭据字样",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：workspace 未材料化（基座目录不存在）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：REST todo record phase=failed（API 真值）",
+      "ok": true,
+      "detail": "phase=failed"
+    },
+    {
+      "name": "腿 A(old)：详情页可见裸 git 错误",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：daemon.log 自仓路径 clone（Cloning 行含路径）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：Worktree added 行落日志",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：基座 clone 在位",
+      "ok": true,
+      "detail": "/tmp/pacman-1210-daemon-1791818396574/workspaces/pO6mT9ibXmEfdFkVIVIkB/repo"
+    },
+    {
+      "name": "腿 B：conv worktree 检出 README 内容对",
+      "ok": true,
+      "detail": "readme=\"# 1210 local repo\\n\""
+    },
+    {
+      "name": "腿 B：步终态 errorMessage 不含不可达文案（stub 零改动产物闸 failed 属预期）",
+      "ok": true,
+      "detail": "stepStatus=failed msg=构建零改动"
+    }
+  ]
+}

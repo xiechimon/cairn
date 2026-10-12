@@ -20,6 +20,8 @@ import {
   conversationBranch,
   type GitCredentialSource,
   type GitCredentials,
+  LOCAL_ERROR_REASON_COPY,
+  LocalRepoUnreachableError,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
@@ -118,6 +120,22 @@ export class WorkspaceManager implements WorktreeOps {
       const branch = conversationBranch(input.conversationId);
       const baseRepoDir = join(input.workspacesRoot, input.projectId, 'repo');
       const convDir = join(input.workspacesRoot, input.conversationId);
+
+      // —— local 形态可达预检（#1210 执行面兜底，spec 12 Out of Scope 的
+      // 多机替代实现）：cloneUrl = 登记机文件系统上的绝对路径，其它执行机
+      // 看不到。不可达时在 clone/fetch 之前抛类型化错误——runner 合成点名
+      // 机器/路径/原因/补法的步失败文案；裸 git clone 错误（还会先烧掉
+      // withGitNetRetries 的 1s+5s 退避）对用户与 chief 都是噪音。预检对
+      // 首次物化与复用步同判：local 形态基座的 origin 就是该路径，fetch/
+      // push 每个步都要它。repoKind 缺省 = 兼容形，跳过（fail-open）。
+      if (input.repoKind === 'local') {
+        if (!existsSync(input.cloneUrl)) {
+          throw new LocalRepoUnreachableError(input.cloneUrl, 'not_found');
+        }
+        if (!(await gitPrim.isGitDir(input.cloneUrl))) {
+          throw new LocalRepoUnreachableError(input.cloneUrl, 'not_git');
+        }
+      }
 
       // —— 基座 clone / fetch（r3 §1.5 日志行 `Cloning <teamId>/<repoName>
       // (branch: main)` 形状；teamId/repoName = cloneUrl 路径段）——
@@ -422,6 +440,22 @@ function isWorktreeDir(dir: string): boolean {
 
 function isBareish(dir: string): boolean {
   return existsSync(join(dir, 'HEAD'));
+}
+
+/** local 形态不可达的用户可读文案（#1210，步 errorMessage 面）：点名机器 +
+ * 仓路径 + 原因人话 + 两条补法——与 claudeCodeAuthFailureMessage（#867 T6）
+ * 同形，三件缺一即回到「笼统失败」。原因人话复用 LOCAL_ERROR_REASON_COPY
+ * （server 创建闸 / web 读面 / daemon 执行面三端词表单源）。 */
+export function localRepoUnreachableMessage(
+  machineName: string,
+  err: LocalRepoUnreachableError,
+): string {
+  return [
+    `local 形态项目无法在机器「${machineName}」上执行步骤：仓库路径 ${err.repoPath} 在本机不可达（${LOCAL_ERROR_REASON_COPY[err.reason]}）。`,
+    'local 形态的仓库真值在登记机的文件系统上（ADR 0016），其它执行机看不到该路径——本项目只能在仓库所在机器上运行。',
+    '补法（任选其一）：① 把任务的钉选机器改回仓库所在机器（或取消钉选，由该机器认领）；',
+    '② 跨机开发请用 GitHub 形态建项目（githubRepo 为真值，同机可加挂 localPath 加速位，ADR 0017）。',
+  ].join('');
 }
 
 /** `Cloning <teamId>/<repoName>` 标签（r3 §1.5 行形；托管 = /git/ 后两段，

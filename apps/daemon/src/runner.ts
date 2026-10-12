@@ -43,6 +43,7 @@ import {
   isBackendRuntimeId,
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
+  LocalRepoUnreachableError,
   PLAN_FILE_NAME,
   parseReviewPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
@@ -80,6 +81,7 @@ import { resolveStepImages } from './step-attachments.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
+import { localRepoUnreachableMessage } from './workspace.js';
 
 /** 停止请求（M7 #308）：discard = 确认弹层「丢弃本轮修改」勾选位——
  * true 时收尾 rewind worktree 到步起点 checkpoint（r9 §3.3）。 */
@@ -556,6 +558,9 @@ export async function runStep(
         projectId: claimed.project?.id ?? '',
         conversationId: convId,
         cloneUrl: repo.cloneUrl,
+        // local 形态可达预检（#1210）：cloneUrl 是登记机路径，他机不可达
+        // 时 prepare 抛 LocalRepoUnreachableError（下方 catch 合成用户文案）。
+        repoKind: repo.kind,
         workspacesRoot: deps.workspacesDir,
         credentials: creds.git,
         // 双执行源（ADR 0017 / #1213）：github 形态加速位随 claim 载荷透传到
@@ -568,7 +573,17 @@ export async function runStep(
       });
     } catch (err) {
       clearCredentials(creds);
-      await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
+      // local 形态不可达（#1210）：合成点名机器/路径/原因/补法的文案——
+      // 裸 git 错误对用户与 chief 都读不出「去修哪台机、哪个路径」。
+      await failStep(
+        deps,
+        stepId,
+        err instanceof LocalRepoUnreachableError
+          ? localRepoUnreachableMessage(deps.machineName ?? hostname(), err)
+          : err instanceof Error
+            ? err.message
+            : String(err),
+      );
       return;
     }
   }
