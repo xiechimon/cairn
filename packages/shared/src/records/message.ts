@@ -250,8 +250,7 @@ export function buildSecondPrWarningNote(input: {
 }
 
 /** 守卫生效 note 行 id（server 写侧单源；deterministic per build，重投覆盖
- *  不叠行——transcriptResumeNoteRowId 同律：同 build 多步 claim 各自触发时
- *  幂等）。 */
+ *  不叠行——同 build 多步 claim 各自触发时幂等）。 */
 export function mergedPrGuardNoteRowId(buildId: string): string {
   return `merged-pr-guard-${buildId}`;
 }
