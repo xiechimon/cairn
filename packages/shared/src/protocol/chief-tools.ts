@@ -1,18 +1,19 @@
 // Chief remoteTools 词表——raw 观测 49 件（r5 §3.1，一手来源 = thread 记录
 // toolDefHashes 全键 `docs/research/assets/r5/raw/chief-threads-testA.json`），
-// 现行 51 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence
+// 现行 52 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence
 // 双向登记，登记处见两常量）。复刻口径（02 §4.3 尾注）：Chief = 挂团队
 // 工具的 pi 会话，行为分毫不求同；工具「名单」为实测一手，各工具的
 // description/parameters 细形未采到 wire 原件 = 全部 [推断] 黑盒逼近
 // （04 §1 A4：不冒充实测），语义按 r1 docs 六能力组 + r3/r5 行为证据投影。
 // 分组计数按 raw 键集实数：读 15 + 组织 19 + 执行 5 + 私有 10 = 49
 // （r5 §3.1 正文枚举漏 `delete_skills`，02 §4.3 分组计数随之偏差——raw 键集
-// 为权威，vocabulary.test 对拍）；现行分组 = 组织 20（delete_skills 一件
+// 为权威，vocabulary.test 对拍）；现行分组 = 组织 21（delete_skills 一件
 // 除名；create_skill、update_skill 两件随 XMON-109 spec 13 回摆加入——raw
 // 无此二键，经 CHIEF_TOOLS_ADDED 登记；set_remote_shell 随 XMON-115 回摆——
 // 「远程 shell」本体（XMON-108 双闸 + XMON-110 daemon 工具）落地，写入点
-// 恢复正式形态）+ 读 16（#627 models 加入——chief 建/改 Agent 指定模型前
-// 先读候选清单，raw 无此键，经 CHIEF_TOOLS_ADDED 登记）。
+// 恢复正式形态；split_todo 随 #1250 加入——大票拆解编排，raw 无此键，经
+// CHIEF_TOOLS_ADDED 登记）+ 读 16（#627 models 加入——chief 建/改 Agent
+// 指定模型前先读候选清单，raw 无此键，经 CHIEF_TOOLS_ADDED 登记）。
 // replaySafe = 读工具（bundle 提取：读侧带重试预算 RETRY_DELAYS_MS=[500,2000]、
 // 超时 remoteTool:10s，r5 §3.1）。
 
@@ -60,13 +61,14 @@ export const CHIEF_TOOLS_REMOVED = ['delete_skills'] as const;
  * removed + added）。XMON-109（spec 13 回摆）：create_skill / update_skill
  * ——chief 自动制作/维护技能收进 scope（chief 免开关，leader 拍板）。
  * #627：models——读侧候选清单（建/改 Agent 的 provider/modelId 合法值域），
- * 行语义对齐 web toModelOptions 并集投影（server 侧独立实现）。 */
-export const CHIEF_TOOLS_ADDED = ['create_skill', 'update_skill', 'models'] as const;
+ * 行语义对齐 web toModelOptions 并集投影（server 侧独立实现）。
+ * #1250（ADR 0018 层 2）：split_todo——大票拆子卡 + 依赖边的编排工具。 */
+export const CHIEF_TOOLS_ADDED = ['create_skill', 'update_skill', 'models', 'split_todo'] as const;
 
 /** 词表分组（r5 §3.1 正文分组语义；成员按 raw 键集归位 [推断]；
  * delete_skills 已除名；create_skill、update_skill 随 XMON-109 归组织面——
  * raw 的 delete_skills 即组织位，写件同位；set_remote_shell 随 XMON-115
- * 回摆归位 raw 原位）。 */
+ * 回摆归位 raw 原位；split_todo 随 #1250 归组织面（拆票是编排组织件）。 */
 export const CHIEF_TOOL_CATEGORIES = {
   read: [
     'projects',
@@ -88,6 +90,7 @@ export const CHIEF_TOOL_CATEGORIES = {
   ],
   organize: [
     'create_todo',
+    'split_todo',
     'update_todo',
     'delete_todos',
     'close_todos',
@@ -264,8 +267,8 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     ]),
     replaySafe: true,
   },
-  // —— 组织侧 20（raw 19 − delete_skills + create_skill/update_skill
-  // + set_remote_shell 回摆 XMON-115）——
+  // —— 组织侧 21（raw 19 − delete_skills + create_skill/update_skill
+  // + set_remote_shell 回摆 XMON-115 + split_todo #1250）——
   {
     name: 'create_todo',
     description:
@@ -277,6 +280,37 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         spec: str('Structured spec markdown.'),
       },
       ['projectId', 'title', 'spec'],
+    ),
+  },
+  // split_todo（#1250 / ADR 0018 层 2）：大票拆 N 子卡 + blocking 依赖边。
+  // 拆解方案落父卡 plan 文档并停 confirm 关口给人审（人可整树驳回）——确认
+  // 即派发无阻塞子卡，后续波次随 blocker 完成自动起，子全 done 父自动收。
+  {
+    name: 'split_todo',
+    description:
+      'Split a big todo into N sub-cards with blocking dependency edges (ADR 0018 layer 2). Each sub-card pins one role agent and runs direct-execute (no per-card plan gate). The split scheme lands on the parent plan doc and parks at the parent confirm gate for human review — confirming the parent dispatches the unblocked sub-cards; later waves auto-start as their blockers finish; the parent auto-completes when every sub-card is done. Split only when subtasks are truly independent or orderable — single-view single-artifact work should run as one todo, not be split.',
+    parameters: obj(
+      {
+        todoId: str('Parent todo id to split.'),
+        subtodos: arr(
+          obj(
+            {
+              title: str('Sub-card title (verb phrase).'),
+              spec: str(
+                'Self-contained task text — the sub-card agent sees only this, not the parent ticket.',
+              ),
+              agentId: str('Role agent id pinned to the sub-card (execution slot).'),
+              blockedBy: arr(
+                { type: 'number' },
+                'Optional 1-based indices of prerequisite sub-cards in this array (e.g. [1, 2] = waits for the 1st and 2nd).',
+              ),
+            },
+            ['title', 'spec', 'agentId'],
+          ),
+          'Sub-cards to create, in dispatch order.',
+        ),
+      },
+      ['todoId', 'subtodos'],
     ),
   },
   {
@@ -485,6 +519,18 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           {
             plan: obj({ agentId: str('Planning agent id.') }),
             build: obj({ agentId: str('Executing agent id.') }),
+            // #1250（ADR 0018 层 1）：review/verify 槽随派发可带——review
+            // 槽 = 无 persona 时的单审核人回落位；verify 槽在位时 review
+            // 关口抵达即入队验证步（槽空零动作，语义与 REST builds 面
+            // 同一 assignmentSchema）。
+            review: obj({
+              agentId: str('Fallback review agent id (used when no review persona is seeded).'),
+            }),
+            verify: obj({
+              agentId: str(
+                'Verifier agent id — set to enqueue a verify step when the review gate is reached.',
+              ),
+            }),
           },
           [],
         ),
@@ -505,7 +551,11 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'run_review',
-    description: 'Request an independent review run of a build.',
+    // #1250（ADR 0018 层 1）：fan-out 三视角——persona 三员各入队一条 review
+    // 步（agentId 走各自 prompt meta header），三份 verdict 并行落会话；无
+    // persona 时回落 assignment.review 槽单步。
+    description:
+      'Request an independent review run of a build: fans out the three review perspectives (CodeReviewer / SecurityAuditor / TestEngineer) as parallel read-only review steps, each reporting its own verdict; falls back to the assignment review slot when personas are absent.',
     parameters: obj({ buildId: str('Build id.') }, ['buildId']),
   },
   {
@@ -630,9 +680,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-/** 词表自检：现行 51 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED
- * 3 + set_remote_shell 回摆）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */
-export const CHIEF_TOOL_COUNT = 51;
+/** 词表自检：现行 52 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED
+ * 4 + set_remote_shell 回摆）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */
+export const CHIEF_TOOL_COUNT = 52;
 
 /** worker 步记忆三件套（02 §4.4 写路径 / r5 §6：worker 侧同族工具经
  * remoteTools 下发——「bundle 无本地记忆实现」，写路径 = agent 工具 → 服务端

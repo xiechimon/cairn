@@ -32,13 +32,15 @@ export function transcriptPromptRowId(stepId: string): string {
 }
 
 /** continue session 续轮指令（daemon 步 kind → prompt 单源；chief/review 走
- *  instruction 分支，本表保占位空串防 TS 缺键）。 */
+ *  instruction 分支，本表保占位空串防 TS 缺键；verify 同走 instruction 分支
+ *  （#1250：server 组装验证材料即 instruction，占位空串同律）。 */
 export const CONTINUE_PROMPTS: Record<StepKind, string> = {
   plan: '请重新规划该任务，输出更新后的方案。',
   build: '方案已确认。请按方案执行，完成改动。',
   merge: '请把本会话分支的改动合并到默认分支。',
   chief: '',
   review: '',
+  verify: '',
 };
 
 const REPLAN_HEAD = '用户对方案提出驳回。驳回反馈：「';
