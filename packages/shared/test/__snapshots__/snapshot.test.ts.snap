@@ -5867,6 +5867,9 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > 
     "cloneUrl": {
       "type": "string",
     },
+    "description": {
+      "type": "string",
+    },
     "githubRepo": {
       "type": "string",
     },

@@ -1,5 +1,8 @@
 // Project settings route (issue #71, r2 24c): 基本信息|仓库|标签 tab group
 // and one card — avatar circle + 更换 link, then 名称/仓库/目标分支/描述 rows.
+// #1242 身份可变面：名称/描述行接 PATCH（live 输入 + 保存钮，失败 toast
+// 可见）；local 项目新增「转换为 GitHub 形态」卡（repoKind/githubRepo/
+// localPath 三键 PATCH）。fixture 面保静态捕获形状（SquarePen 占位）。
 // #177 (local-first 裁决, endpoint 实测): no project mutation endpoint exists
 // anywhere in the stack — no PATCH, no DELETE /api/projects/:id, and the
 // schema has no defaultBranch column — so the route's three dead buttons
@@ -14,6 +17,7 @@
 // services/projects.ts),删除卡归位 + DeleteConfirm 家族确认弹层(r2 24d,
 // 键入项目名闸门) + deleteProject mutation(invalidateAll 正典);确认后跳
 // /app(fixture 走 #66 deletions 覆面,侧栏项目行随行隐去)。
+import { isGithubRepoRef } from '@pacman/shared';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects } from '../api/hooks.js';
@@ -63,6 +67,14 @@ export function ProjectSettingsPage() {
   // #1213/ADR 0017：github 形态 localPath 加速位草稿态——null = 未编辑，
   // 显示值回落 server 真值；保存成功后清草稿（invalidate 重取收敛）。
   const [accelDraft, setAccelDraft] = useState<string | null>(null);
+  // #1242 身份面草稿态（accelDraft 同律）：null = 未编辑回落真值。
+  const [nameDraft, setNameDraft] = useState<string | null>(null);
+  const [descDraft, setDescDraft] = useState<string | null>(null);
+  // #1242 转换面草稿：githubRepo 手输串 + localPath（null = 未编辑回落
+  // 现值——local 绑定路径预填为加速位候选）。
+  const [convRepo, setConvRepo] = useState('');
+  const [convPathDraft, setConvPathDraft] = useState<string | null>(null);
+  const [convError, setConvError] = useState<string | null>(null);
   // M5 live：设置行 = GET /api/projects 检索真值（名称/仓库/托管 chip）。
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
@@ -77,7 +89,7 @@ export function ProjectSettingsPage() {
           repoName: wireProject.repoName ?? wireProject.githubRepo ?? '',
           hosted: wireProject.repoKind === 'hosted',
           defaultBranch: 'main',
-          description: null,
+          description: wireProject.description ?? null,
         }
       : undefined
     : fixture.project;
@@ -105,8 +117,45 @@ export function ProjectSettingsPage() {
           <CardContent className={ROW_CLS}>
             <span className={LABEL_CLS}>{t('名称')}</span>
             <span className={VALUE_CLS}>
-              {project?.name ?? ''}
-              <SquarePen width={14} height={14} />
+              {/* #1242 身份面：改名接 PATCH（失败可见）；fixture 面保静态
+                  捕获形状（SquarePen 占位）。 */}
+              {live && wireProject !== undefined ? (
+                <>
+                  <Input
+                    aria-label={t('名称')}
+                    className="h-8 w-72"
+                    value={nameDraft ?? wireProject.name}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    aria-label={t('保存名称')}
+                    disabled={
+                      mutations.patchProject.isPending ||
+                      (nameDraft ?? '').trim() === wireProject.name ||
+                      (nameDraft ?? '').trim() === ''
+                    }
+                    onClick={() => {
+                      if (id === undefined) return;
+                      mutations.patchProject.mutate(
+                        { id, body: { name: (nameDraft ?? '').trim() } },
+                        {
+                          onSuccess: () => setNameDraft(null),
+                          // 失败可见（#638 同律）：toast 报错，草稿保留重试。
+                          onError: (error) => toastError(t('保存失败，请重试。'), error),
+                        },
+                      );
+                    }}
+                  >
+                    {t('保存')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {project?.name ?? ''}
+                  <SquarePen width={14} height={14} />
+                </>
+              )}
             </span>
           </CardContent>
           <CardContent className={ROW_CLS}>
@@ -175,11 +224,126 @@ export function ProjectSettingsPage() {
           <CardContent className={ROW_CLS}>
             <span className={LABEL_CLS}>{t('描述')}</span>
             <span className={`${VALUE_CLS} text-muted-foreground`}>
-              {project?.description ?? t('尚无描述')}
-              <SquarePen width={14} height={14} />
+              {/* #1242 描述面：接 PATCH（null/空 = 清空——显式 null 上 wire，
+                  #1169 序列化坑族）；fixture 面保静态捕获形状。 */}
+              {live && wireProject !== undefined ? (
+                <>
+                  <Input
+                    aria-label={t('描述')}
+                    className="h-8 w-72"
+                    placeholder={t('尚无描述')}
+                    value={descDraft ?? wireProject.description ?? ''}
+                    onChange={(event) => setDescDraft(event.target.value)}
+                  />
+                  <Button
+                    size="sm"
+                    aria-label={t('保存描述')}
+                    disabled={
+                      mutations.patchProject.isPending ||
+                      (descDraft ?? wireProject.description ?? '') ===
+                        (wireProject.description ?? '')
+                    }
+                    onClick={() => {
+                      if (id === undefined) return;
+                      const next = (descDraft ?? '').trim();
+                      mutations.patchProject.mutate(
+                        // 空串归一 null（空 ≡ 未设，server 侧同口径）。
+                        { id, body: { description: next === '' ? null : next } },
+                        {
+                          onSuccess: () => setDescDraft(null),
+                          onError: (error) => toastError(t('描述保存失败，请重试。'), error),
+                        },
+                      );
+                    }}
+                  >
+                    {t('保存')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {project?.description ?? t('尚无描述')}
+                  <SquarePen width={14} height={14} />
+                </>
+              )}
             </span>
           </CardContent>
         </Card>
+        {/* #1242 local→github 转换卡（live local 项目专用）：用户 2026-10-11
+            定案「原 pacman 项目转 github 形态 + localPath 加速位」的 UI 出口。
+            提交闸：owner/repo 形状（isGithubRepoRef，与新建页同单源）——
+            预检不过落中性提示行（inline，非 toast——输入未完成不是错误事件）；
+            server 侧语义闸（可达性/在飞 build 409）失败走 toastError（失败
+            可见）。localPath 预填现值（local 绑定路径就地转加速位），空串 =
+            显式 null 清空。转换成功 → invalidate 重取 → repoKind 切面：本卡
+            卸载、基本信息卡的加速位行上线。 */}
+        {live && wireProject?.repoKind === 'local' && (
+          <Card className="mt-4 gap-1.5 p-4">
+            <div className="text-sm font-medium">{t('转换为 GitHub 形态')}</div>
+            <div className="text-sm text-muted-foreground">
+              {t('转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。')}
+            </div>
+            <div className="mt-1.5 flex flex-col items-start gap-1.5">
+              <Input
+                aria-label={t('GitHub 仓库（owner/repo）')}
+                className="h-8 w-72 font-mono"
+                placeholder="owner/repo"
+                value={convRepo}
+                onChange={(event) => {
+                  setConvRepo(event.target.value);
+                  setConvError(null);
+                }}
+              />
+              <Input
+                aria-label={t('本机加速路径')}
+                className="h-8 w-72 font-mono"
+                placeholder={t('绝对路径，留空即清除')}
+                value={convPathDraft ?? wireProject.localPath ?? ''}
+                onChange={(event) => setConvPathDraft(event.target.value)}
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={mutations.patchProject.isPending || convRepo.trim() === ''}
+                  onClick={() => {
+                    if (id === undefined) return;
+                    const repo = convRepo.trim();
+                    if (!isGithubRepoRef(repo)) {
+                      setConvError(t('GitHub 仓库格式应为 owner/repo。'));
+                      return;
+                    }
+                    const nextPath = (convPathDraft ?? wireProject.localPath ?? '').trim();
+                    mutations.patchProject.mutate(
+                      // 空串归一 null（空 ≡ 未设，server 侧同口径）。
+                      {
+                        id,
+                        body: {
+                          repoKind: 'github',
+                          githubRepo: repo,
+                          localPath: nextPath === '' ? null : nextPath,
+                        },
+                      },
+                      {
+                        onSuccess: () => {
+                          setConvRepo('');
+                          setConvPathDraft(null);
+                          setConvError(null);
+                        },
+                        onError: (error) => toastError(t('转换失败，请重试。'), error),
+                      },
+                    );
+                  }}
+                >
+                  {t('转换')}
+                </Button>
+                {convError !== null && (
+                  <span role="alert" className="text-xs text-destructive">
+                    {convError}
+                  </span>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
         {/* 危险操作区(#207 复活): #189 DELETE /api/projects/:id 已落地,
             钮接真确认流。#983 判决执行：Panel quiet 退役 → registry Card；
             destructive 钮回件默认软底档（#946 实底皮肤配方退役——皮肤超出

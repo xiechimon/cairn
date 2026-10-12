@@ -92,6 +92,7 @@ node .../scripts/drive-1025-plan-first-round.mjs   # 首轮 plan 契约注入(#1
 node .../scripts/drive-1213-dual-source.mjs  # 双执行源:github 项目 localPath 同机加速位(#1213/ADR 0017;server 松绑 + 设置页字段真用户路径 + daemon ×2 选源:本地源/失格回落 GitHub 各一行日志与 git 实物;真值远端=公共仓 octocat/Hello-World;配方与判读 = docs/verify/1213/README.md)
 node .../scripts/drive-1210-local-unreachable.mjs  # local 形态执行面 fail-loud(#1210 C 兜底;mv 走仓目录→步显式失败 errorMessage 点名机器/路径/原因/补法 + clone 零尝试 + 详情页失败卡截图;mv 回→材料化照常零漂移;stub LLM + 真 daemon ×1 自回收;配方与判读 = docs/verify/1210/README.md)
 node .../scripts/drive-1250-persona-verify.mjs  # 角色名册+verify 步+三视角 fan-out+split_todo(#1250/ADR 0018;四相位:播种六员 persona/verify 步入队-认领-verdict/fan-out 浏览器真点击三步各挂 persona/拆解波次+父自动收;假机器 wire 零 daemon 零 LLM;配方与判读 = docs/verify/1250/README.md)
+node .../scripts/drive-1242-project-identity.mjs  # 项目身份可变面(#1242;六腿:五字段 PATCH 静默族判死 + 浏览器改名/描述/转换卡 + 在飞 build 409 toast + 注记落板 + claim 载荷转换前后形态对照;假机器 wire 零 daemon 零 LLM;真调 api.github.com 匿名梯验可达;配方与判读 = docs/verify/1242/README.md)
 cd apps/daemon && corepack pnpm exec tsx .../scripts/drive-926-convergence.mts  # 重试与收敛时序显式化(#926;.mts 走 daemon 包 tsx,不起 web/server 栈——直接 import daemon 源码 + pi 包;三相:pi 真 SettingsManager 读回显式 retry 配置、真 pi AgentSession×stub LLM 捕获原始事件序 agent_end→agent_settled 且 done 只落 settled、mapPiSessionEvent 对照;自起 stub 并自回收,配方与判读 = docs/verify/926/README.md)
 ```
 

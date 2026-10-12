@@ -279,6 +279,26 @@ export function secondPrWarningNoteRowId(buildId: string): string {
   return `second-pr-warn-${buildId}`;
 }
 
+// —— #1242 项目身份变更注记（改名 / local→github 转换）———————————————
+
+/** #1242 改名注记（server updateProject 真改名时落项目各 todo 最新会话的
+ *  system 行）：纯文本、无花括号（花括号会被呈现端当 machine_selected 同族
+ *  JSON 跳过，#931 同律）。文本单源：server 写侧与测试断言消费同一份。 */
+export function projectRenamedNote(input: { from: string; to: string }): string {
+  return `项目已从「${input.from}」改名为「${input.to}」。`;
+}
+
+/** #1242 local→github 转换注记（同落位、同律）：点名转换后的 GitHub 仓与
+ *  同机加速路径（null = 无加速位，文案省略该段）——板面读者能看出「这个
+ *  项目为什么现在走 GitHub clone」。 */
+export function projectConvertedNote(input: {
+  githubRepo: string;
+  localPath: string | null;
+}): string {
+  const accel = input.localPath !== null ? `，本机加速路径 ${input.localPath}` : '';
+  return `项目形态已从 local 转换为 GitHub（${input.githubRepo}${accel}）。`;
+}
+
 /** GET /api/conversations/{id}/messages 响应封套（r5 §3.6 原样）。 */
 export const conversationMessagesResponseSchema = z.object({
   messages: z.array(transcriptRowSchema),

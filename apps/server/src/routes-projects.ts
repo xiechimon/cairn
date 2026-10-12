@@ -48,7 +48,7 @@ import {
   validateLocalRepoPath,
 } from './services/git.js';
 import { importGithubIssue, listProjectGithubIssues } from './services/github-issues.js';
-import { deleteProject } from './services/projects.js';
+import { deleteProject, updateProject } from './services/projects.js';
 import { seedFixedTags } from './services/tags.js';
 import { listTodos } from './services/todos.js';
 
@@ -254,27 +254,26 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     return c.json(toProjectRecord(row, requestOrigin(c)), 201);
   });
 
-  // PATCH /api/projects/{id}（ADR 0017 / #1213）：localPath 加速位写面。
-  // body 单源 = shared patchProjectBodySchema；单字段语义：缺键 = 不动（与
-  // null 的显式清空两态分离——null 是 wire 契约，不是「不带键」，#1169
-  // 序列化坑族）；null / 空串 = 清空；字符串 = 落值（server 只验绝对路径
-  // 形态，可达性判定归 daemon）。仅 github 形态消费本字段——local 形态的
-  // localPath 是创建闸的仓绑定，不经本面改写；非 github 形态带键 400。
+  // PATCH /api/projects/{id}（#1242 五字段身份/形态写面；#1213 localPath
+  // 单字段时代的超集）：name/description/repoKind/githubRepo/localPath。
+  // 语义执法单源 = services/projects.ts updateProject（缺键不动、未知键
+  // strict 400、五键全缺 400 杀静默 no-op 族、local→github 转换闸 =
+  // 在飞 build 409 + githubRepo 可达 + validateGithubLocalSlotPath 同闸、
+  // 真改名/转换落 board 注记）；路由层只做 parse + 404 + record 投影。
   app.patch('/api/projects/:id', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
     const body = parseWith(patchProjectBodySchema, await jsonBody(c), 'body');
-    if (body.localPath === undefined) {
-      return c.json(toProjectRecord(row, requestOrigin(c)));
-    }
-    if (row.repoKind !== 'github') {
-      throw new HttpError(
-        400,
-        'invalid body at localPath: localPath acceleration slot only applies to github projects',
-      );
-    }
-    const localPath = validateGithubLocalSlotPath(body.localPath);
-    ctx.db.update(project).set({ localPath }).where(eq(project.id, row.id)).run();
-    const updated = requireProject(ctx, row.id);
+    const updated = await updateProject(
+      {
+        db: ctx.db,
+        box: ctx.secretBox,
+        ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+        ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),
+      },
+      row.id,
+      body,
+    );
+    if (updated === null) throw notFound(`project ${row.id}`);
     return c.json(toProjectRecord(updated, requestOrigin(c)));
   });
 

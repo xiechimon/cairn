@@ -165,12 +165,14 @@ describe('PATCH /api/projects/{id}——localPath 加速位写面（#1213）', (
     expect(r.status).toBe(404);
   });
 
-  test('P5 缺 localPath 键 → 200 no-op（与 null 清空两态分离）', async () => {
+  test('P5 五键全缺（空 body）→ 400（#1242 推翻 #1213 的 200 no-op 钉：缺键早退 = 静默族判死；null 显式清空两态仍分离）', async () => {
     const id = await createGithubProject('p-dual-p5');
     await patchProject(id, { localPath: '/Users/who/code/pacman' });
     const r = await patchProject(id, {});
-    expect(r.status).toBe(200);
-    expect(r.body.localPath).toBe('/Users/who/code/pacman');
+    expect(r.status).toBe(400);
+    expect(String(r.body.error)).toContain('body');
+    const row = s.db.select().from(projectTable).where(eq(projectTable.id, id)).get();
+    expect(row?.localPath).toBe('/Users/who/code/pacman');
   });
 
   test('P6 相对路径 → 400 + reason not_absolute', async () => {

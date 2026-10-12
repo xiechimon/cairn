@@ -288,6 +288,13 @@
       "when": 1791820139046,
       "tag": "0040_new_ma_gnuci",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "6",
+      "when": 1791835525573,
+      "tag": "0041_project_identity_edit",
+      "breakpoints": true
     }
   ]
 }

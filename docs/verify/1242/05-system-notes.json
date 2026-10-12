@@ -1,0 +1,14 @@
+[
+  {
+    "conversationId": "01a131ca-ac41-7161-912a-5018b2b753de",
+    "text": "项目已从「probe-1242-local」改名为「probe-1242-renamed」。"
+  },
+  {
+    "conversationId": "01a131ca-ac41-7161-912a-5018b2b753de",
+    "text": "项目形态已从 local 转换为 GitHub（octocat/Hello-World，本机加速路径 /home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo）。"
+  },
+  {
+    "conversationId": "01a131ca-bcde-79fd-a2c7-2253e3f9323d",
+    "text": "项目形态已从 local 转换为 GitHub（octocat/Hello-World，本机加速路径 /home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo）。"
+  }
+]
