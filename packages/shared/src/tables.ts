@@ -42,6 +42,7 @@ export const DB_TABLES = [
   'github_connection', // spec 12 / #359：GitHub OAuth 连接行（teamId 单行；accessToken 经 SecretBox 密封，token 只写不读出 wire）
   'skill_audit', // XMON-109 S1：技能写审计行（REST/relay 三入口同表；actor_type member|agent + action create|update + bytes）
   'shell_command', // XMON-108 R1 机器 shell 审计行（预检 denied/running → done/failed 终态一次）；内部审计表无 record 投影
+  'webhook_token', // #1137：GitHub webhook 入口路径 token（哈希反查 + 行掩码，api_key 凭证同族）
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -59,7 +60,10 @@ export const JOIN_ONLY_TABLES = ['todo_tag'] as const;
  * attachment 读位 = GET /api/attachments/{id} 二进制流（r9 §3.1），无 JSON
  * record 形状。spec 12 / #359：github_connection 为凭证表——accessToken 只写
  * 不读出（server 出站边界 Authorization 头唯一消费点，02 §8 同族纪律），
- * 连接状态读位（login/scope）内嵌于认证面端点封套，不立 record 投影。 */
+ * 连接状态读位（login/scope）内嵌于认证面端点封套，不立 record 投影。
+ * #1137：webhook_token 为路径 token 凭证表——tokenHash 只写不读出（receiver
+ * 按路径段哈希反查，02 §8 同律），读位 = team webhook token 管理端点封套
+ * （masked 投影），不立 record 投影。 */
 export const INTERNAL_ONLY_TABLES = [
   'steer_pending',
   'branch_sync',
@@ -71,4 +75,6 @@ export const INTERNAL_ONLY_TABLES = [
   // XMON-108 R1：shell_command 读位 = 无 REST 读面（审计消费——团队审计
   // 视图归后续票；本票只有预检/回写两个写端点 + server 侧直查）。
   'shell_command',
+  // #1137：webhook_token 读位 = 管理三端点自有封套（masked 列表行）。
+  'webhook_token',
 ] as const;
