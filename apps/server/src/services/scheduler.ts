@@ -26,7 +26,7 @@ import {
   sweepZombieQueuedTodos,
   toBuildRecord,
 } from './builds.js';
-import { failAbandonedChiefSteps, fireDueChiefWakes } from './chief.js';
+import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
 import { sweepStaleMachines } from './machines.js';
@@ -141,7 +141,7 @@ export function createScheduler(
     sweepStaleMachines(deps);
     // #684 失联超时兜底：daemon 死亡后 pending/claimed chief 步永挂零反馈，
     // tick 扫尾把失联回合按失败收进 #631 可见面（chief_turn_error 行 + toast）。
-    failAbandonedChiefSteps(deps, now);
+    sweepAbandonedChiefSteps(deps, now);
     // #706/#862 失联扫尾：失联 claimed 步释放回 pending 供他机认领、无人认领
     // 的 pending 步按失败收尾（step 事件 + build.errorMessage + todo → failed，
     // 与机器报失败同漏斗）。

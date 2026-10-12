@@ -34,6 +34,10 @@ export interface QueueTargetStep {
   /** 该步的钉选机器（worker = build.pinnedMachineId；chief =
    * chiefThread.pinnedMachineId）；null = 未钉。 */
   pinnedMachineId: string | null;
+  /** #1257 额度挂起面（step 行位；缺省 = 未挂起）：挂起中的排队行呈现
+   * 「等额度」而非「等空闲机器」。 */
+  holdReason?: string | null;
+  holdUntil?: number | null;
 }
 
 /** team 域排队投影器：一次取全 pending 集（worker + chief 两族），调用方按
@@ -55,6 +59,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
       createdAt: step.createdAt,
       pin: chiefThread.pinnedMachineId,
       threadId: step.buildId,
+      holdReason: step.holdReason,
+      holdUntil: step.holdUntil,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
@@ -114,7 +120,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
       // 行缺失（机器被删）：waitingFor 保持 null——钉残值语义同离线失败路径
       // （失败漏斗点名机器），排队面不编造对象。
     }
-    return { position, waitingFor };
+    // #1257 额度挂起：退避中的排队行带 hold（reason + 下次尝试时刻）。
+    const hold: StepQueueInfo['hold'] =
+      target.holdReason === 'quota' && target.holdUntil != null
+        ? { reason: 'quota', retryAt: target.holdUntil }
+        : undefined;
+    return { position, waitingFor, ...(hold !== undefined ? { hold } : {}) };
   }
 
   /** 线程的活动 pending 回合步（threads 投影取位面）：该线程 pending chief
@@ -124,7 +135,13 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const rows = chiefRows.filter((r) => r.threadId === threadId);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
-    return { id: last.id, createdAt: last.createdAt, pinnedMachineId: last.pin };
+    return {
+      id: last.id,
+      createdAt: last.createdAt,
+      pinnedMachineId: last.pin,
+      holdReason: last.holdReason,
+      holdUntil: last.holdUntil,
+    };
   }
 
   return { project, pendingChiefOf };

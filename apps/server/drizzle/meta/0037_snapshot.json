@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f7b69d0d-433b-4341-8db9-44e1442a0731",
+  "id": "e4450ad9-2a49-4d0c-b6e6-7b788138189b",
   "prevId": "7517cca2-be43-458e-a7b7-acbc17f0ae17",
   "tables": {
     "agent": {
@@ -1967,13 +1967,6 @@
           "autoincrement": false,
           "default": "'pending'"
         },
-        "quotaBlock": {
-          "name": "quotaBlock",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "sessionId": {
           "name": "sessionId",
           "type": "text",
@@ -2023,6 +2016,28 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "holdReason": {
+          "name": "holdReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "holdUntil": {
+          "name": "holdUntil",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "holdCount": {
+          "name": "holdCount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         },
         "createdAt": {
           "name": "createdAt",

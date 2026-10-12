@@ -59,7 +59,7 @@ function readFromGit(ref) {
 // no content (common in snapshots); both must open an entry, otherwise the
 // inline form leaks into the previous entry's body and every diff is wrong.
 const SECTION_RE = /^([A-Za-z][\w.-]*):/;
-const ENTRY_RE = /^  (\S.*?):(.*)$/;
+const ENTRY_RE = /^ {2}(\S.*?):(.*)$/;
 
 // Returns { ok, entries } — ok=false means the text is non-empty but no
 // packages/snapshots section was found, i.e. it does not look like a pnpm

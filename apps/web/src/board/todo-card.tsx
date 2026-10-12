@@ -184,6 +184,28 @@ export function TodoCard({
         <span className="relative top-[1.5px] ml-[7px] text-[11px] leading-4 text-muted-foreground">
           {relativeTime(todo.phaseAt, now, t)}
         </span>
+        {/* #1257 挂起态 chip（等机器 / 等额度）：infra 事件不判死步——卡面
+            与「执行失败」红态的区分位。neutral 描边 pill（与 chiefCreated 同
+            档）；等额度 title 带下次尝试时刻。 */}
+        {todo.waitingOn != null && (
+          <Badge
+            variant="outline"
+            className="ml-[10.5px] h-4 flex-none rounded-4xl border-border px-1.5 py-0 text-[10px] leading-none font-normal text-muted-foreground"
+            title={
+              todo.waitingOn.on === 'quota' && todo.waitingOn.retryAt != null
+                ? t('下次尝试 {time}', {
+                    time: new Date(todo.waitingOn.retryAt).toLocaleTimeString('zh-CN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: false,
+                    }),
+                  })
+                : undefined
+            }
+          >
+            {todo.waitingOn.on === 'quota' ? t('等额度') : t('等机器')}
+          </Badge>
+        )}
         {/* #640 / r14 §5.4：总管建卡芯片（参考站 11-todo12-card-zoom 同构，
             判定位 = chiefCreated ← wire sourceBuildId）。row-flush 16px 档
             随 todo-card-tag 同律（26px 底行不溢出行盒）；中性描边 pill，

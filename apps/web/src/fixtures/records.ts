@@ -77,6 +77,10 @@ export interface TodoRecord {
    *  的卡，参考站 11-todo12-card-zoom 同构）。fixture 捕获缺省 = 无芯片，
    *  基线像素零漂移。 */
   chiefCreated?: boolean;
+  /** #1257 板面挂起态（server 读侧派生，wire todoRecordSchema.waitingOn）：
+   *  等机器 / 等额度——看板卡挂起芯片的判定位（与「执行失败」红态区分）。
+   *  fixture 捕获缺省 = 无芯片，基线像素零漂移。 */
+  waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
   /** #1261 等额度（display 扩展，wire todo.quotaWait 同形）：latest build
    *  活动步 waiting_quota 时在位——卡面「等额度」芯片 + 看板横幅的判定
    *  位。undefined/null = 无挂起（fixture 基线与 live 无挂起面零漂移）。 */

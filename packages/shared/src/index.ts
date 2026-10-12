@@ -25,8 +25,9 @@ export * from './skill-facts.js';
 export * from './skill-inject.js';
 export * from './skill-route.js';
 export * from './tables.js';
-// #1261：agent 失败分类（quota/capacity/provider_network/other 四桶 +
-// Retry-After 解析）——daemon 检测面单源，server 只消费结构化 quotaBlock。
+// 失败分类单源（#1257 步失败三桶 classifyStepFailure + #1261 的
+// classifyAgentFailure/parseRetryAfterMs）——daemon 检测面与 server done 面
+// 共用（详见 task-failure.ts 头注）。
 export * from './task-failure.js';
 // spec 15 #394：占位标题派生 + 固定标签词表（ADR 0002 自觉背离原站的面）。
 export * from './task-meta.js';

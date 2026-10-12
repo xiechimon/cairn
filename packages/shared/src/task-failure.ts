@@ -1,18 +1,138 @@
-// agent 失败分类（#1261）：Multica `server/pkg/taskfailure/classify.go` 同形
-// 四桶——quota（额度空：402 / usage-limit）与 capacity（限流：429/529）明确
-// **不可重试**（挂起等额度，不是任务失败），唯一可重试的 agent 侧原因是
-// provider_network（#1257 流断族；本模块只分桶，重试策略归消费方）。
+// 失败分类单源（两个分类器同文件共存，词表规则序对齐 Multica
+// taskfailure/classify.go；MUL-1949 SQL 是其正本，此处同律）：
+// - classifyStepFailure（#1257）：把 agent 后端自由文本错误分到
+//   quota / capacity / network / other 四桶。daemon 侧 network 桶驱动会话
+//   续跑重试（runner），server 侧 quota 桶驱动「等额度」挂起（done 面的
+//   文本兜底腿——quotaBlock 结构化信号优先，见 machine-wire.ts）。
+// - classifyAgentFailure（#1261）：daemon 检测面分类 + 板面文案复用，
+//   值域多一档 provider_network（与 #1257 network 同义，命名保持各自
+//   消费面原文）。附带 parseRetryAfterMs（Retry-After 头/诊断行 → 毫秒）。
+// 两个分类器的差异是有意的（#1257 桶序规则更细：语义先于词面、数字边界），
+// 消费面各钉各自测试（task-failure.test.ts 两 describe 块），不互相代偿。
 //
-// 不可见即污染可观测性（Multica 同注）：分桶失败 = 额度事件落回普通失败
-// 漏斗，板面零「等额度」态——这正是 #1261 的用户实测形态。分类面单源在
-// shared（daemon runner 检测 + 诊断文案复用），server 只消费结构化
-// quotaBlock（machine-wire.ts），不再对 errorMessage 二次猜桶（两处分类
-// = 漂移面）。
-//
-// 词表覆盖三来源：① HTTP 状态码（#882 诊断行 `-> 402` 形态携带真状态码）；
-// ② SSE 流内错误文案（anthropic usage_limit_reached / relay JSON body）；
-// ③ 中英文 relay 文案（new-api/one-api 族实测中文消息在位）。判定序 =
-// quota → capacity → provider_network → other（quota 语义最绑定，先判）。
+// 通用规则（两分类器同律，Multica 同注）：
+// - 语义先于词面：concurrent request limit（403 形的瞬态并发拒绝）归
+//   capacity，先于 token/quota 词面；token limit 归上下文（other）不归
+//   quota——「额度用完」与「窗口装不下」是两种病。
+// - 桶序 quota > capacity > network：额度致死常以流断文案浮出（#1257 评论
+//   1），quota 词面在串里即归 quota，不被 network 抢走。
+// - 数字边界：402/403/429/529 只在非更长数字里命中（Multica 同款防
+//   「402913 tokens」「15290ms」「exit status 4030」误触）。
+// - 不可见即污染可观测性：分桶失败 = 额度事件落回普通失败漏斗，板面零
+//   「等额度」态——这正是 #1261 的用户实测形态。
+// 本模块刻意零依赖（不 import zod）：daemon / server / web 三端可直接消费。
+
+// ---------------------------------------------------------------------------
+// #1257：classifyStepFailure（server done 面文本兜底 + network 重试判定）
+// ---------------------------------------------------------------------------
+
+/** 失败桶（行为面枚举：quota → 挂起等额度；network → 续跑重试；其余 → 既有失败漏斗）。 */
+export const STEP_FAILURE_KINDS = ['quota', 'capacity', 'network', 'other'] as const;
+export type StepFailureKind = (typeof STEP_FAILURE_KINDS)[number];
+
+/** 三位数状态码的数字边界正则（Multica 同款：两侧不贴其它数字才算命中）。 */
+const digitBounded = (codes: string): RegExp => new RegExp(`(^|[^0-9])(${codes})([^0-9]|$)`);
+
+const httpQuotaCodeRe = digitBounded('402');
+const httpCapacityCodeRe = digitBounded('429|529');
+
+function containsAny(haystack: string, needles: readonly string[]): boolean {
+  return needles.some((n) => haystack.includes(n));
+}
+
+/** 把 agent 后端错误文本分桶。空串/无规则命中 → other。
+ *  规则序（先具体后宽泛，同 Multica Classify）：
+ *  1. concurrent request limit → capacity（语义先于 403/token 词面）
+ *  2. 上下文超长（context length / prompt too long / token×limit）→ other
+ *  3. quota：402 | usage limit | insufficient balance | quota | credits | hit your limit
+ *  4. capacity：429 | 529 | rate limit | overloaded | no capacity available
+ *  5. network：流断 / 连接失败 / DNS / IO 超时族
+ *  6. 其余 → other（auth 401/403、model not found、provider 5xx、空） */
+export function classifyStepFailure(rawError: string): StepFailureKind {
+  const trimmed = rawError.trim();
+  if (trimmed === '') return 'other';
+  const lower = trimmed.toLowerCase();
+
+  // 1. 瞬态并发拒绝（Anthropic 形 403）：凭证有效、稍后能成——归 capacity
+  //    而不是 auth/quota 词面。
+  if (lower.includes('concurrent request limit')) return 'capacity';
+
+  // 2. 上下文 / token 窗口超长 → other（Multica context_overflow 桶：不是配额）。
+  //    「token」与「limit」双在场近似 SQL 的 %token%limit%（TPM 限速文案
+  //    同落此桶——Multica 同律，宁可保守不把限速当额度）。
+  if (
+    containsAny(lower, [
+      'context length',
+      'context_length_exceeded',
+      'maximum context',
+      'prompt is too long',
+      'context size has been exceeded',
+    ]) ||
+    (lower.includes('token') && lower.includes('limit'))
+  ) {
+    return 'other';
+  }
+
+  // 3. quota / 计费：402（数字边界）、usage limit（403 形同样命中——凭证
+  //    有效、额度用尽）、余额/配额/credits 词面。
+  if (
+    httpQuotaCodeRe.test(lower) ||
+    containsAny(lower, [
+      'insufficient_balance',
+      'balance is too low',
+      'monthly usage limit',
+      'usage limit',
+      "you've hit your limit",
+      'you’ve hit your limit',
+      'quota',
+      'credits',
+    ])
+  ) {
+    return 'quota';
+  }
+
+  // 4. capacity / 限速：429 / 529（数字边界）+ 限速词面。
+  if (
+    httpCapacityCodeRe.test(lower) ||
+    containsAny(lower, ['rate limit', 'overloaded', 'no capacity available'])
+  ) {
+    return 'capacity';
+  }
+
+  // 5. network：流断 / 连接失败 / DNS / IO 超时。pi/OpenAI SDK 裸串
+  //    （Request timed out.）与 Node 错误码（ECONNRESET）同桶。
+  if (
+    containsAny(lower, [
+      'stream disconnected',
+      'connection closed',
+      'mid-response',
+      'connection reset',
+      'econnreset',
+      'etimedout',
+      'socket hang up',
+      'error sending request',
+      'unable to connect',
+      'dial tcp',
+      'connection refused',
+      'connectionrefused',
+      'dns',
+      'i/o timeout',
+      'deadline exceeded',
+      'timeout exceeded while awaiting',
+      'request timed out',
+    ])
+  ) {
+    return 'network';
+  }
+
+  // 6. 其余（auth 401/403、model not found、provider 5xx、未识别）→ other。
+  //    403 单独出现无 usage-limit 词面 = 授权/访问问题（非配额）。
+  return 'other';
+}
+
+// ---------------------------------------------------------------------------
+// #1261：classifyAgentFailure（daemon 检测面）+ parseRetryAfterMs
+// ---------------------------------------------------------------------------
 
 /** 失败桶词表（classifyAgentFailure 的值域）。 */
 export const AGENT_FAILURE_KINDS = ['quota', 'capacity', 'provider_network', 'other'] as const;
@@ -34,7 +154,8 @@ const CAPACITY_PATTERN =
 const NETWORK_PATTERN =
   /connection\s+(?:reset|refused|closed)|upstream\s+stream\s+disconnected|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|network\s+error|temporarily\s+unavailable/i;
 
-/** 四桶分类（纯函数；空串/未知形态 → other，不抛）。 */
+/** 四桶分类（纯函数；空串/未知形态 → other，不抛）。判定序 =
+ * quota → capacity → provider_network → other（quota 语义最绑定，先判）。 */
 export function classifyAgentFailure(message: string): AgentFailureKind {
   if (message === '') return 'other';
   if (QUOTA_PATTERN.test(message)) return 'quota';
