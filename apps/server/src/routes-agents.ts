@@ -102,6 +102,10 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         mcpServers: body.mcpServers ?? [],
         // #1138 agent 并发上限：nullish——显式 null 与缺省同值（不限）。
         maxConcurrentTasks: body.maxConcurrentTasks ?? null,
+        // #1250 persona 角色位：nullish——词表校验在 createAgentBodySchema
+        //（personaRoleSchema），团队内唯一性由 partial unique index 兜底
+        //（撞角色 = sqlite 唯一约束错，写面如实上抛）。
+        persona: body.persona ?? null,
       })
       .run();
     return c.json({ id }, 201); // r5 §1/§8 补录：创建 → 201 {id}
@@ -147,6 +151,9 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       'thinkingLevel',
       'secrets',
       'mcpServers',
+      // #1250：persona 同律——显式 null = 摘掉角色（词表校验在
+      // patchAgentBodySchema；团队唯一性由 partial unique index 兜底）。
+      'persona',
       // #1138：可空列同律——显式 null = 清回不限（undefined = 不动，值域
       // 1..50 的边界校验在 patchAgentBodySchema）。
       'maxConcurrentTasks',

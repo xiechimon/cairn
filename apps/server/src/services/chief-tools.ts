@@ -48,7 +48,13 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { applyBuildStepAction, cancelBuild, requestMerge, startBuilds } from './builds.js';
+import {
+  advanceSplitWaves,
+  applyBuildStepAction,
+  cancelBuild,
+  requestMerge,
+  startBuilds,
+} from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -61,6 +67,7 @@ import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { seedFixedTags } from './tags.js';
+import { createSplitTodo, type SplitSubtodoInput } from './todo-split.js';
 import { createTodo, deleteTodo, getTodo, listTodos, setTodoPhase, updateTodo } from './todos.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -459,6 +466,61 @@ export async function executeChiefTool(
       db.update(todo).set({ sourceBuildId: ctx.chiefId }).where(eq(todo.id, record.id)).run();
       return json({ ...record, sourceBuildId: ctx.chiefId });
     }
+    case 'split_todo': {
+      // #1250（ADR 0018 层 2）：大票拆 N 子卡 + blocking 依赖边——落库半边
+      // 在 services/todo-split.ts（子卡/父方案文档/父停 confirm）。工具参数
+      // 的 subtodos[].blockedBy 是 1-based 兄弟序号，server 侧解析成子卡 id。
+      const todoId = str(params, 'todoId');
+      requireTeamTodo(db, todoId, ctx.teamId);
+      const rawSubtodos = params.subtodos;
+      if (!Array.isArray(rawSubtodos) || rawSubtodos.length === 0) {
+        throw new HttpError(400, 'invalid params.subtodos: expected non-empty array');
+      }
+      const subtodos: SplitSubtodoInput[] = rawSubtodos.map((raw, i) => {
+        if (typeof raw !== 'object' || raw === null) {
+          throw new HttpError(400, `invalid params.subtodos[${i}]: expected object`);
+        }
+        const item = raw as Record<string, unknown>;
+        const blockedByRaw = item.blockedBy;
+        const blockedBy =
+          blockedByRaw === undefined || blockedByRaw === null
+            ? undefined
+            : Array.isArray(blockedByRaw)
+              ? blockedByRaw.map((n) => {
+                  if (typeof n !== 'number' || !Number.isInteger(n)) {
+                    throw new HttpError(
+                      400,
+                      `invalid params.subtodos[${i}].blockedBy: expected integer[]`,
+                    );
+                  }
+                  return n;
+                })
+              : (() => {
+                  throw new HttpError(
+                    400,
+                    `invalid params.subtodos[${i}].blockedBy: expected array`,
+                  );
+                })();
+        return {
+          title: str(item, 'title'),
+          spec: str(item, 'spec'),
+          agentId: str(item, 'agentId'),
+          ...(blockedBy !== undefined ? { blockedBy } : {}),
+        };
+      });
+      const result = createSplitTodo(
+        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+        {
+          parentId: todoId,
+          subtodos,
+          chiefAgentId: ctx.chiefAgentId,
+          chiefId: ctx.chiefId,
+          threadId: ctx.threadId,
+          actorName: chiefActor.name,
+        },
+      );
+      return json(result);
+    }
     case 'update_todo': {
       const todoId = str(params, 'todoId');
       requireTeamTodo(db, todoId, ctx.teamId); // 团队归属校验（纵深防御）
@@ -728,11 +790,23 @@ export async function executeChiefTool(
       const machineIdIn = optStr(params, 'machineId');
       if (machineIdIn !== undefined) requireTeamMachine(db, machineIdIn, ctx.teamId);
       const assignmentIn = params.assignment as
-        | { plan?: { agentId?: string }; build?: { agentId?: string } }
+        | {
+            plan?: { agentId?: string };
+            build?: { agentId?: string };
+            review?: { agentId?: string };
+            verify?: { agentId?: string };
+          }
         | undefined;
+      // #1250（ADR 0018 层 1）：assignment 四槽——plan/build 为主槽（#1104 A
+      // 两槽全空 400 律不变：review/verify 是关口的回落/验证位，不能独立
+      // 撑起一次 build）；review = 无 persona 时的单审核人回落位；verify 槽
+      // 在位时 review 关口抵达即入队验证步（REST builds 面同一 assignment
+      // 语义，chief 派发不得少一半槽）。
       const assignment = {
         plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
         build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
+        review: assignmentIn?.review?.agentId ? { agentId: assignmentIn.review.agentId } : null,
+        verify: assignmentIn?.verify?.agentId ? { agentId: assignmentIn.verify.agentId } : null,
       };
       // #1104 A：两槽全空（含整参缺失）= 无主 build——步无人可领，只能静默
       // 卡死在 pending。400 打回（requireTeamAgent/machineId 同律：错当场折进
@@ -744,7 +818,12 @@ export async function executeChiefTool(
           'assignment 整参缺失或两槽全空：无指派 Agent 的 build 无人可领。请传 assignment 指派 Agent（至少一个槽非空），例如 {"assignment":{"build":{"agentId":"<agentId>"}}}，然后重试 run_builds。',
         );
       }
-      for (const slot of [assignment.plan, assignment.build]) {
+      for (const slot of [
+        assignment.plan,
+        assignment.build,
+        assignment.review,
+        assignment.verify,
+      ]) {
         if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
       }
       const started: unknown[] = [];
@@ -777,8 +856,14 @@ export async function executeChiefTool(
       return json({ builds: started, withPlan, dispatchReason, triggerSource: 'chief' });
     }
     case 'run_review': {
+      // #1250（ADR 0018 层 1）：接通独立审核运行——与 REST review 动作同一
+      // 面块（applyBuildStepAction review 分支；agentId 缺省 = fan-out 三视角
+      // 路径：persona 三员各入队一条 review 步，无 persona 回落 assignment
+      // .review 槽）。相位闸/材料组装/宣告行全走同一条缝，不另立第二实现。
       const buildId = str(params, 'buildId');
-      return json({ buildId, note: 'independent review run not wired [推断]' });
+      requireTeamBuild(db, buildId, ctx.teamId);
+      await applyBuildStepAction(deps, buildId, { action: 'review' }, chiefActor.name);
+      return json({ buildId, review: 'fanned-out', dispatchedBy: 'chief' });
     }
     case 'confirm_builds': {
       const buildIds = strArr(params, 'buildIds');
@@ -985,6 +1070,14 @@ export function transitionTodos(
         // 审计记发生的流转，不记重放。
         if (to === 'done' && owned.phase !== 'done' && owned.latestBuildId !== null) {
           insertGateAnnouncement(deps, owned.latestBuildId, DONE_ANNOUNCEMENT, actor.name);
+        }
+        // #1250（ADR 0018 层 2）：done 落地即推进拆卡波次（completeStep 的
+        // merge 半边同律——子卡 done 解锁后续波次自动派发）。
+        if (to === 'done' && owned.phase !== 'done') {
+          advanceSplitWaves(
+            { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+            id,
+          );
         }
       } else skipped.push(id);
     } catch {
