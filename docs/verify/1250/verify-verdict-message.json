@@ -1,0 +1,25 @@
+[
+  {
+    "id": "yT9sgfyI63qLIK-XcObxy",
+    "conversationId": "01a13024-f096-7fbf-b329-08509f088951",
+    "role": "system",
+    "content": {
+      "kind": "verify_verdict",
+      "verdict": {
+        "passed": false,
+        "conclusion": "两条失败用例需修复后复验。",
+        "evidence": [
+          {
+            "path": "docs/verify/1250/e2e.json",
+            "note": "923 条全过"
+          },
+          {
+            "path": "docs/verify/1250/failures.txt"
+          }
+        ]
+      }
+    },
+    "createdAt": 1791809091325,
+    "actor": null
+  }
+]

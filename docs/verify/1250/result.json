@@ -1,0 +1,170 @@
+{
+  "probe": "1250-persona-verify",
+  "ticket": "#1250",
+  "adr": "docs/adr/0018-多agent团队三层与机器能力闸.md",
+  "stack": {
+    "server": "http://127.0.0.1:8795",
+    "web": "http://127.0.0.1:5277",
+    "repo": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0325-1250-1-7-seeding",
+    "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0325-1250-1-7-seeding/.claude/verify-run/home/server/server.db"
+  },
+  "ids": {
+    "teamId": "UC7A178nxwiqEffmumvE8",
+    "projectId": "PEsOu9blrC8LdYeqwrDPg",
+    "TASK_V": "Ij7cMZkMXaFf2ezUD4MCI",
+    "TASK_F": "Q0witwIwjsvJ7PbLeVrp5",
+    "TASK_P": "zXEO5zG1yT_rwhZOAgAoa",
+    "buildV": "01a13024-f096-7fbf-b329-08509f088951",
+    "buildF": "01a13024-f9c9-77ec-a24d-aa030cf9362f",
+    "parentBuild": "01a13025-0074-750c-9521-67276eef29f2"
+  },
+  "checks": [
+    {
+      "name": "S1 全新库首启 → 六员 persona agent 自动落库（persona 位 + 契约名 + 档位），modelId 缺省 null",
+      "ok": true,
+      "detail": "roles=[\"planner\",\"implementer\",\"code_reviewer\",\"security_auditor\",\"test_engineer\",\"verifier\"]"
+    },
+    {
+      "name": "S2 REST PATCH 模型位回读齐（六员 provider/modelId；implementer 带合并+推送）",
+      "ok": true,
+      "detail": "[\"推送分支\",\"合并分支\"]"
+    },
+    {
+      "name": "S3 铺底：project + 三 todo 落库",
+      "ok": true,
+      "detail": "project=PEsOu9blrC8LdYeqwrDPg"
+    },
+    {
+      "name": "V0 claim 载荷 remoteTools 含 split_todo 定义（todoId + subtodos[].blockedBy 参数面）",
+      "ok": true,
+      "detail": "blockedBy={\"type\":\"array\",\"items\":{\"type\":\"number\"},\"description\":\"Optional 1-based indices of prerequisite sub-cards in this array (e.g. [1, 2] = waits for the 1st and 2nd).\"}"
+    },
+    {
+      "name": "V1 relay run_builds 四槽指派 → build 行落库 + assignment 四槽持久（todo 表）",
+      "ok": true,
+      "detail": "assignment={\"plan\":{\"agentId\":\"jaM_brgd1xJqcAXyHPdYZ\"},\"build\":{\"agentId\":\"ADqztp3rUr9GUxRi9nGcU\"},\"review\":{\"agentId\":\"o4CvGih2M_CEu1WBdsq9t\"},\"verify\":{\"agentId\":\"m4bc8yCQBJgyKPs_fzqJS\"}}"
+    },
+    {
+      "name": "V2 build 步认领：claim 载荷 agent 块 = assignment.build 槽（implementer persona）",
+      "ok": true,
+      "detail": "kind=build agent=ADqztp3rUr9GUxRi9nGcU"
+    },
+    {
+      "name": "V3 build 成（非 PR 分支）→ verify 步入队（pending + 验证材料在 prompt；agent 解析在 claim 面 = V5）",
+      "ok": true,
+      "detail": "steps=[[\"build\",\"done\"],[\"verify\",\"pending\"]]"
+    },
+    {
+      "name": "V4 浏览器：verify 步 pending → 头带 chip「验证中」（优先于审核中）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "V5 verify 步认领：agent 块 = verify 槽（verifier persona）+ session=new + 材料含工作区纪律",
+      "ok": true,
+      "detail": "agent=m4bc8yCQBJgyKPs_fzqJS session={\"action\":\"new\",\"sessionId\":null}"
+    },
+    {
+      "name": "V6 verify done 带 verifyVerdict → VERIFY_VERDICT 消息行（passed=false 有效结论）+ phase 留 review",
+      "ok": true,
+      "detail": "phase=review msgs=1"
+    },
+    {
+      "name": "V7 浏览器：verdict 行「验证未通过」+ 证据条目 2 条渲染",
+      "ok": true,
+      "detail": "evidence=2"
+    },
+    {
+      "name": "F1 对照：review/verify 槽空 → build 成零 verify 步（槽空零动作，存量语义不变）",
+      "ok": true,
+      "detail": "steps=[\"build\"]"
+    },
+    {
+      "name": "F2 浏览器：review 弹层出现「三视角并行审」行（persona 命中点亮）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F3 提交（无 agentId）→ 三条 review 步各挂 persona agent（prompt meta header 首行 JSON；步行 agentId 列恒 null——agentId 走 meta 载体）",
+      "ok": true,
+      "detail": "meta=[\"o4CvGih2M_CEu1WBdsq9t\",\"RNLTgdkor8AGWIIeabqlu\",\"-gTHoN--qEWFFDlzKn08Y\"]"
+    },
+    {
+      "name": "F4.1 review 步认领（code_reviewer）：材料含「本视角重点：五轴 review」",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F4.2 review 步认领（security_auditor）：材料含「本视角重点：OWASP」",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F4.3 review 步认领（test_engineer）：材料含「本视角重点：测试覆盖缺口」",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F5 三份 verdict 消息并行落会话 + 零 blocking → 零重规划步",
+      "ok": true,
+      "detail": "msgs=3 replan=0 roles=[\"code_reviewer\",\"security_auditor\",\"test_engineer\"]"
+    },
+    {
+      "name": "P1 split_todo → 子卡两张（sourceTodo/blockedBy 依赖边）+ 父停 confirm（hasPlan + 方案文档）",
+      "ok": true,
+      "detail": "parent=confirm blockedBy=[\"pmfN84PXwF5TBgkTblhZs\"]"
+    },
+    {
+      "name": "P2 父方案文档（拆解方案：子卡清单 + 依赖 + agent 名）+ SPLIT_ANNOUNCEMENT 宣告行",
+      "ok": true,
+      "detail": "planHead=# 拆解方案：拆解探针\n\n由 Chief 拆为 2 张子卡（blocking 依赖边）。确认后：无阻塞子卡自动派发直执行"
+    },
+    {
+      "name": "P3 confirm → 派发无阻塞子卡（A queued + build 步）+ 阻塞子卡 B 不动 + 父进 building",
+      "ok": true,
+      "detail": "confirm=202 A=queued B=todo"
+    },
+    {
+      "name": "P4 子卡 build 成 → review 关口（无 verify 槽零 verify 步）",
+      "ok": true,
+      "detail": "phase=review"
+    },
+    {
+      "name": "P4 merge 步认领（kind=merge）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "P5 子卡 A done → 波次推进：B 解锁自动派发（queued + build 步入队）",
+      "ok": true,
+      "detail": "A=done B=queued"
+    },
+    {
+      "name": "P6 子卡 build 成 → review 关口（无 verify 槽零 verify 步）",
+      "ok": true,
+      "detail": "phase=review"
+    },
+    {
+      "name": "P6 merge 步认领（kind=merge）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "P7 全子卡 done → 父自动收（done + DONE_ANNOUNCEMENT「标记为已完成」actor=Chief）",
+      "ok": true,
+      "detail": "parent=done"
+    }
+  ],
+  "artifacts": [
+    "seeding-personas.json",
+    "verify-step.json",
+    "01-detail-verify-active.png",
+    "verify-verdict-message.json",
+    "02-detail-verify-verdict.png",
+    "03-review-dialog-fanout.png",
+    "fanout-steps.json",
+    "04-detail-fanout-verdicts.png",
+    "05-split-parent-confirm.png",
+    "06-split-parent-done.png"
+  ]
+}
