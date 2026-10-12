@@ -5,17 +5,14 @@
 // 后的 app，不是文件布局）。编排位 = routes.ts 的 registerRoutes。
 
 import {
-  buildOrchestratePrompt,
   createTodoBodySchema,
   githubIssueEchoSchema,
   phaseSchema,
   type TodoRecord,
 } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { machine } from './db/schema.js';
 import { conflict, notFound, parseWith } from './lib/errors.js';
 import {
   githubIssueDepsOf,
@@ -24,8 +21,8 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
-import { sendChiefMessage } from './services/chief.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
+import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
 import {
   createTodo,
@@ -68,37 +65,11 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
 
   // 开始任务 = 单出口直发总管编排回合（#640 / r14 §5.7，用户 2026-10-02
   // 前置裁决：入口不再给「先做规划/立即执行」选择，编排为唯一默认路径）。
-  // 新 chief 线程 + 编排请求首条用户消息（任务原文逐字 = 稳定锚点，
-  // r14 §5.2）+ chief 步入队；总管裁定单任务直派或拆子卡（纪律在其 system
-  // prompt 工作约定）。相位闸：todo（开始）/ failed（重跑），其余 409。
-  // #682：todo 钉了机器 → 线程落 pinnedMachineId（chief 会话机器亲和，claim
-  // 过滤面）+ 编排请求行明示机器名（chief 裁量改派时有据）。未钉 = 现行为。
+  // #1137：实现收口 services/orchestrate.ts（REST 与 webhook receiver 共用），
+  // 路由变薄转发——行为面由 orchestration-source.test.ts D 组钉住。
   // wire 未采 → INFERRED_ROUTES 登记（todos/{id}/… REST 同族规则）。
   app.post('/api/todos/:id/orchestrate', (c) => {
-    const id = c.req.param('id');
-    const record = getTodo(svc, id);
-    if (!record) throw notFound(`todo ${id}`);
-    if (record.phase !== 'todo' && record.phase !== 'failed') {
-      throw conflict(`orchestrate 仅适用于 待开始/失败 相位（当前 ${record.phase}）`);
-    }
-    const machineRow =
-      record.machineId !== null
-        ? ctx.db.select().from(machine).where(eq(machine.id, record.machineId)).get()
-        : undefined;
-    const content = buildOrchestratePrompt({
-      id: record.id,
-      seqNum: record.seqNum,
-      spec: record.spec,
-      failed: record.phase === 'failed',
-      ...(machineRow ? { pinnedMachineName: machineRow.name } : {}),
-    });
-    const result = sendChiefMessage(svc, record.teamId, {
-      threadId: null,
-      content,
-      ...(record.machineId !== null ? { pinnedMachineId: record.machineId } : {}),
-    });
-    // 会话流即时推送（chief 会话 = chief-<threadId> 键，POST threads 同形）。
-    ctx.convHub?.publishMessage(result.thread.id, { ...result.message });
+    const result = orchestrateTodo(svc, c.req.param('id'));
     return c.json(result, 201);
   });
 

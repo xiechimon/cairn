@@ -128,6 +128,13 @@ const INFERRED_ROUTES = [
   // 缺省 2000/最大 5000 + truncated）。自有设计面，02 §6.1 词表外 =
   // INFERRED 入位。
   'GET /api/projects/{id}/files',
+  // #1137 GitHub webhook 事件入口：receiver（自有路径 token 闸，token-auth
+  // 豁免条 6）+ webhook token mgmt 三端点（api-keys 同族，管理面不豁免）。
+  // 自有设计面，02 §6.1 词表外 = INFERRED 入位。
+  'POST /api/webhook/github/{token}',
+  'GET /api/teams/{id}/webhook-tokens',
+  'POST /api/teams/{id}/webhook-tokens',
+  'DELETE /api/teams/{id}/webhook-tokens/{tid}',
 ];
 
 /** M2 已实现核心面（M2a：todo/build CRUD + team stream + seed 保形；

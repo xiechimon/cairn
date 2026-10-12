@@ -21,6 +21,7 @@ import { registerProjectRoutes } from './routes-projects.js';
 import { registerResourceRoutes } from './routes-resources.js';
 import { registerTodoRoutes } from './routes-todos.js';
 import { registerUploadRoutes } from './routes-uploads.js';
+import { registerWebhookRoutes } from './routes-webhook.js';
 import { handleMcpRequest } from './services/mcp-face.js';
 
 export function registerRoutes(app: Hono, ctx: AppContext): void {
@@ -33,6 +34,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerAgentRoutes(app, ctx);
   registerResourceRoutes(app, ctx);
   registerGitHostingRoutes(app, ctx);
+  registerWebhookRoutes(app, ctx);
 
   // —— 埋点空实现（词表内「形状保留、可空实现」，02 §6.1：analytics/first-touch
   // + PostHog 风格 batch track；复刻无埋点后端，204 收下即弃）——————————

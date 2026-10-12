@@ -1,0 +1,120 @@
+
+ RUN  v5.0.1 /home/measure/.pacman-chief/workspaces/01a12e1b-77aa-7417-9484-9ef8be0eb3fa/apps/server
+
+ ✓ test/token-auth.test.ts > token 鉴权：保护面（失败方式 1/2/6） > 开 + 无 token → /api/* 401 {error} 同形 78ms
+ ✓ test/token-auth.test.ts > token 鉴权：保护面（失败方式 1/2/6） > 开 + 错 Bearer token → 401 35ms
+ ✓ test/orchestration-source.test.ts > A 落库面：create_todo 编排来源（#640 / r14 §5.3） > A1 local 项目 → sourceKind=orchestration + sourceRef=chief:<uuid>，溯源三层旧值不动 97ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B4 形态错配：local(plain)/hosted 项目 → 404，不出站 90ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B5 未连接：github 项目无 connection → 404，不出站 44ms
+ ✓ test/delivery-surface.test.ts > done 通道交付面回填（#704 / B-C16） > 失败方式 1：done 带 prUrl/prNumber → build 行回填 149ms
+ ✓ test/wire.test.ts > 路由面 = 02 §6.1 词表 > M2a 核心面全部在位 2ms
+ ✓ test/wire.test.ts > 路由面 = 02 §6.1 词表 > M2c 密钥/搜索面全部在位 0ms
+ ✓ test/wire.test.ts > 路由面 = 02 §6.1 词表 > M5 汇合面全部在位（词表补齐 + conversation stream + 详情读面） 1ms
+ ✓ test/wire.test.ts > 路由面 = 02 §6.1 词表 > 无词表外发明路径（[推断] 面显式登记） 2ms
+ ✓ test/wire.test.ts > seed 保形端点（02 §2） > GET /api/auth/session 与 /api/user/me 保形返回 seed 用户 41ms
+ ✓ test/wire.test.ts > seed 保形端点（02 §2） > GET /api/teams 恒 seed 一行 5ms
+ ✓ test/wire.test.ts > seed 保形端点（02 §2） > GET /api/teams/{id}/members 自己一行（r2 缓存样本形） 5ms
+ ✓ test/wire.test.ts > seed 保形端点（02 §2） > 未知 team id 一律 404 {error}（team 恒一行） 2ms
+ ✓ test/wire.test.ts > seed 保形端点（02 §2） > GET /api/teams/{id}/notifications → {unreadThreadIds} 3ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > POST /api/projects [推断] → 201 ProjectRecord 29ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 增：POST todos {title,spec}（r3 §3.1 body 原样）→ 201 TodoRecord 36ms
+ ✓ test/webhook.test.ts > A created 全链（请求/落库/派发三段 tracer） > A1/A2 触发 label → 202 created；todo + chief 派发行 + lastUsedAt 三段落值 119ms
+ ✓ test/webhook.test.ts > B 去重双层 > B1 同 delivery 60s 窗口二次投递 → duplicate，无双建 44ms
+ ✓ test/webhook.test.ts > B 去重双层 > B2 同 issue 不同 delivery（重放）→ duplicate（sourceRef 持久闸） 35ms
+ ✓ test/token-auth.test.ts > token 鉴权：保护面（失败方式 1/2/6） > 开 + 正确 Bearer token → 照常 200（对照组） 30ms
+ ✓ test/token-auth.test.ts > token 鉴权：保护面（失败方式 1/2/6） > 开 + 非 stream 端点带 ?token=（值正确）→ 401——query 面仅限两条 stream 26ms
+ ✓ test/token-auth.test.ts > token 鉴权：豁免面四条（失败方式 3/4/5/8） > 开 + /api/machine/* 持机器凭证（enroll Bearer apiKey）→ 照常，无需 PACMAN_TOKEN 39ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B3/B6/B10 代理面：state/page 透传上游，token 只进 Authorization 头 30ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B7/B8 封套：PR 条目滤除、畸形条目跳过、shape 过 schema 21ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B10 hasMore：Link 头 rel=next → true；缺 Link → false 60ms
+ ✓ test/orchestration-source.test.ts > A 落库面：create_todo 编排来源（#640 / r14 §5.3） > A2 GitHub 接入项目 → 镜像槽位优先（github-issue-self），出站零回归 46ms
+ ✓ test/orchestration-source.test.ts > A 落库面：create_todo 编排来源（#640 / r14 §5.3） > A3 MCP create_todo → 不落编排来源 53ms
+ ✓ test/orchestration-source.test.ts > A 落库面：create_todo 编排来源（#640 / r14 §5.3） > A4 用户 REST POST todos → 不落编排来源 24ms
+ ✓ test/delivery-surface.test.ts > done 通道交付面回填（#704 / B-C16） > 失败方式 2：done 不带 PR 字段 → 行保持 null（不造空数据） 53ms
+ ✓ test/delivery-surface.test.ts > done 通道交付面回填（#704 / B-C16） > 失败方式 3：done 带 changesDiff → changes 端点返回真 diff 文件集 73ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 查：项目/团队两个 list 面 + 单读 35ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 改：PATCH todos/{id} → v 递增；非法 phase 流转 409 48ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 改：PATCH todos/{id} assignment 双槽——槽级 merge + agent 派生投影随动（#208） 34ms
+ ✓ test/webhook.test.ts > C ignored / noop（GitHub 重试风暴防御） > C1 ping 事件 → 202 ignored，零副作用零出站 33ms
+ ✓ test/webhook.test.ts > C ignored / noop（GitHub 重试风暴防御） > C2 未知事件（push）→ 202 ignored 32ms
+ ✓ test/webhook.test.ts > C ignored / noop（GitHub 重试风暴防御） > C3 非 labeled / 非触发 label → 202 ignored，零出站 33ms
+ ✓ test/webhook.test.ts > C ignored / noop（GitHub 重试风暴防御） > C4 载荷形坏（缺 issue.number）→ 202 ignored（不 400） 30ms
+ ✓ test/token-auth.test.ts > token 鉴权：豁免面四条（失败方式 3/4/5/8） > 开 + /git/* → 新闸放行至 git 自有 Basic 面（无凭证 = git 401；api_key = 照常） 87ms
+ ✓ test/token-auth.test.ts > token 鉴权：豁免面四条（失败方式 3/4/5/8） > 开 + OAuth callback 无 token → 可达（bad state 仍走既有 302 error 面） 30ms
+ ✓ test/token-auth.test.ts > token 鉴权：豁免面四条（失败方式 3/4/5/8） > 开 + /_mp/* 与静态 SPA 壳 → 豁免（204 no-op 与非密 UI） 29ms
+ ✓ test/orchestration-source.test.ts > A 落库面：create_todo 编排来源（#640 / r14 §5.3） > C1 落库 ref 与 shared 单源严格互逆（详情面板链回会话的消费位） 33ms
+ ✓ test/orchestration-source.test.ts > D 入口面：POST /todos/:id/orchestrate = 开始任务单出口（r14 §5.7） > D1 todo 相位 → 201：新 chief 线程 + 编排请求消息（spec 逐字）+ chief 步入队 54ms
+ ✓ test/orchestration-source.test.ts > D 入口面：POST /todos/:id/orchestrate = 开始任务单出口（r14 §5.7） > D2 failed 相位 → 201，消息带重编排上下文 35ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B10 参数闸：state 非法 / page 非法 → 400，不出站 33ms
+ ✓ test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B9 上游映射：404 → 404；限流 403+remaining=0 → 429 66ms
+ ✓ test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C16 github 项目创建不播种 6 词；plain/local 项目播种不变 29ms
+ ✓ test/delivery-surface.test.ts > done 通道交付面回填（#704 / B-C16） > 失败方式 4：changesDiff 超上限 → 丢弃（done 仍 200，行不落半截） 50ms
+ ✓ test/delivery-surface.test.ts > done 通道交付面回填（#704 / B-C16） > 失败方式 6：未上报 build / 无 repo 项目 → {files:[]}（null ≠ 空数组） 65ms
+ ✓ test/webhook.test.ts > D misconfigured / 上游瞬时失败 > D1 repo 无映射项目 → 202 misconfigured 26ms
+ ✓ test/webhook.test.ts > D misconfigured / 上游瞬时失败 > D2 GitHub 未连接 → 202 misconfigured 29ms
+ ✓ test/webhook.test.ts > D misconfigured / 上游瞬时失败 > D3 上游瞬时失败（issue 详情 502 族）→ 502 直透 46ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 删：DELETE todos/{id} → 204；再读 404；再删 404 25ms
+ ✓ test/wire.test.ts > todo CRUD（demo 面：curl 增删改查） > 错误形状：未知 id 404 / 坏 body 400（{error} 单形状） 37ms
+ ✓ test/wire.test.ts > tag 面（#309，r9 §3.4 wire 对拍） > POST /api/projects/{id}/tags {name,color} → 201 TagRecord（r9 §3.4 实测形） 33ms
+ ✓ test/wire.test.ts > tag 面（#309，r9 §3.4 wire 对拍） > POST tags 坏 body → 400；未知项目 → 404（{error} 单形状） 38ms
+ ✓ test/orchestration-source.test.ts > D 入口面：POST /todos/:id/orchestrate = 开始任务单出口（r14 §5.7） > D3 运行中/已完成相位 → 409（相位闸） 33ms
+ ✓ test/orchestration-source.test.ts > D 入口面：POST /todos/:id/orchestrate = 开始任务单出口（r14 §5.7） > D4 总管未绑定 Agent → 409（门控条 canon，不静默） 57ms
+ ✓ test/token-auth.test.ts > token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁免五条） > 开 + /api/mcp 持有效 apiKey（无 PACMAN_TOKEN）→ 穿闸达 mcp 自有面（initialize 200） 53ms
+ ✓ test/token-auth.test.ts > token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁免五条） > 开 + /api/mcp 无凭证 → mcp 自有 401（错误文案 ≠ 闸形状，钉来源面） 20ms
+ ✓ test/token-auth.test.ts > token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁免五条） > 开 + /api/mcp 持 PACMAN_TOKEN 冒充 apiKey → mcp 面 401（token 不升格为 MCP 凭证） 21ms
+ ✓ test/token-auth.test.ts > token 鉴权：SSE stream ?token= 例外（失败方式 7） > 开 + team stream ?token= 正确 → 流建立（SSE 面） 20ms
+ ✓ test/orchestration-source.test.ts > B prompt 面：编排回合拆分纪律（r14 §5.2 护栏进 system prompt） > B1 system prompt 含粒度=核销次数 / spec 内嵌原文片段 / 单任务直派 / 拆分关原卡 27ms
+ ✓ test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C12/C13/C15 导入同步：新 label 建行（color 补 #）、二次导入被去重护栏拒绝 36ms
+ ✓ test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C13 既有行颜色跟随 GitHub 真值更新 31ms
+ ✓ test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C14 仓库侧删 label：行保留，已挂 todo_tag 不动 41ms
+ ✓ test/delivery-surface.test.ts > hosted 形态真值源不漂移（#704：bare repo 仍是唯一真值） > 失败方式 5：hosted build 上报 changesDiff 也不改变投影来源（bare repo 读面） 108ms
+ ✓ test/wire.test.ts > tag 面（#309，r9 §3.4 wire 对拍） > POST todos 携 tagIds → record.tagIds 往返（r9 §3.4 携带位；join 真值） 37ms
+ ✓ test/wire.test.ts > tag 面（#309，r9 §3.4 wire 对拍） > POST todos 携非本项目/未知 tag → 400（项目边界防御） 20ms
+ ✓ test/wire.test.ts > build 面 + phase 九值流转（02 §4.2 主时序 server 侧脊柱） > POST builds body = startBuildsBodySchema（r5 §3.4 抓包原样） 27ms
+ ✓ test/wire.test.ts > build 面 + phase 九值流转（02 §4.2 主时序 server 侧脊柱） > 直执行（withPlan:false）入队执行步（02 §4.2 开始 dialog 两分支） 21ms
+ ✓ test/webhook.test.ts > E token 面 > E1 错 token → 401 {error} 同形，不写 lastUsedAt、零出站 28ms
+ ✓ test/webhook.test.ts > E token 面 > E2 吊销后投递 → 401 27ms
+ ✓ test/webhook.test.ts > E token 面 > E3 token mgmt：创建一次性明文 + 列表掩码 + 删除 404/跨 team 26ms
+ ✓ test/webhook.test.ts > E token 面 > E3 requireTeam 闸：错 team id → 404 16ms
+ ✓ test/token-auth.test.ts > token 鉴权：SSE stream ?token= 例外（失败方式 7） > 开 + conversation stream ?token= 正确 → 流建立 22ms
+ ✓ test/token-auth.test.ts > token 鉴权：SSE stream ?token= 例外（失败方式 7） > 开 + stream 端点 ?token= 错 → 401；Bearer 头正确 → 同样放行 18ms
+ ✓ test/token-auth.test.ts > 保护面守卫：路径变体不绕过（审查加固，Spec#4/5 + 编码前缀绕过类） > 开 + 大小写/双斜杠变体无 token → 不达保护面（404，非 200 数据） 15ms
+ ✓ test/token-auth.test.ts > 保护面守卫：路径变体不绕过（审查加固，Spec#4/5 + 编码前缀绕过类） > 开 + 编码前缀 /%61pi/teams 无 token → 401（Hono getPath decodeURI 后命中保护路由，豁免判定不得漏） 17ms
+ ✓ test/token-auth.test.ts > 保护面守卫：路径变体不绕过（审查加固，Spec#4/5 + 编码前缀绕过类） > 开 + 编码绕过类变体无 token → 一律 401（双重编码/大小写混合/编码后缀/编码豁免面） 15ms
+ ✓ test/token-auth.test.ts > 保护面守卫：路径变体不绕过（审查加固，Spec#4/5 + 编码前缀绕过类） > 开 + /api/mcp 段边界变体（/api/mcpfoo）无 token → 401（豁免 = 精确匹配，非前缀） 22ms
+ ✓ test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D17/D18/D19/D20 导入落值：标题原样、spec=body、来源两列、多标签 29ms
+ ✓ test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D18 body null → spec 空串 17ms
+ ✓ test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D21 issue 不存在 → 404，不留半成品任务 24ms
+ ✓ test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D13/D19 形态与连接闸：plain 项目 404；未连接 404；普通建任务来源两列 null 22ms
+ ✓ test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D 参数闸：number 缺失/非正整数 → 400 16ms
+ ✓ test/token-auth.test.ts > 保护面守卫：路径变体不绕过（审查加固，Spec#4/5 + 编码前缀绕过类） > 开 + 编码前缀路径持正确 Bearer → 闸放行，Hono 解码路由照常可达（200） 16ms
+ ✓ test/token-auth.test.ts > 0.0.0.0 裸绑 WARN（失败方式 9/10） > 显式 0.0.0.0 + 鉴权关 → WARN 文案；默认绑定/回环/鉴权开 → 无 WARN 2ms
+ ✓ test/token-auth.test.ts > 0.0.0.0 裸绑 WARN（失败方式 9/10） > 入口接线：warnInsecureBind → logger.warn 恰发一行（stub 钉点，防接线回归） 1ms
+ ✓ test/token-auth.test.ts > 0.0.0.0 裸绑 WARN（失败方式 9/10） > env 映射：PACMAN_TOKEN → authToken（空串 = 关）；HOST → host 1ms
+ ✓ test/wire.test.ts > build 面 + phase 九值流转（02 §4.2 主时序 server 侧脊柱） > 主时序全链：queued→planning→confirm→(驳回 v2 回路)→building→review→merge 202→done 56ms
+ ✓ test/wire.test.ts > build 面 + phase 九值流转（02 §4.2 主时序 server 侧脊柱） > 失败重跑边：failed→queued 经 POST builds（r3 §3.7） 23ms
+ ✓ test/wire.test.ts > build 面 + phase 九值流转（02 §4.2 主时序 server 侧脊柱） > 未知 build 404；坏 steps body 400 26ms
+ ✓ test/webhook.test.ts > F token-auth 豁免面（PACMAN_TOKEN 开） > F1 receiver 免 Bearer 可达（自有 token 闸照常：错值 401） 42ms
+ ✓ test/webhook.test.ts > F token-auth 豁免面（PACMAN_TOKEN 开） > F2 token mgmt 端点仍要 Bearer（无凭证 401，闸形状） 43ms
+ ✓ test/webhook.test.ts > F token-auth 豁免面（PACMAN_TOKEN 开） > F3 /api/webhookfoo 段边界不豁免 → 401 39ms
+ ✓ test/webhook.test.ts > 服务面直达（delivery 头缺省 + logger 静默） > 无 delivery 头 → 不进去重册，仍正常分诊 16ms
+ ✓ test/wire.test.ts > 响应 shape 全量 zod 复验（字段即契约，02/A9） > CRUD 全链每个响应体过 shared schema 17ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F27 local(plain) claim：todo.meta 缺省，工具面 = 单 tag 形（现行为不变） 40ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F28 github + issue 来源 claim：meta.titleFinal=true，vocab=镜像 name 列，工具面 = tags 数组形 28ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F28 github 手工建任务 claim：meta.titleFinal=false（占位标题仍走回填） 29ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E24 github relay：tags 数组多枚落值；集合外 name 400；title/tags 全缺 400 33ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E26 github relay 兼容旧形单 tag 字符串（混部容忍，仅 tags 面） 27ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > titleFinal 机械闸（AC「不被回填覆盖」）：issue 来源任务带 title = 400，tags 仍放行；手工建任务 title 放行 50ms
+ ✓ test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E23 local(plain) relay：FIXED_TAGS 白名单不变——自定义 tag 行也拒 27ms
+ ✓ test/github-issues.test.ts > todo 溯源两列（#446 D6） > 导入任务两列落值；级联面不动既有列 16ms
+ ✓ test/github-issues.test.ts > 出站纪律 > mock 未配置路径 = 404（漏配显形） 14ms
+
+ Test Files  6 passed (6)
+      Tests  107 passed (107)
+   Start at  11:25:54
+   Duration  2.67s (transform 47%, import 26%, tests 26%)
+
+  Transform  transforming modules took 6.56s · 47% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

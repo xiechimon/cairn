@@ -71,6 +71,9 @@ const app = createApp(
     webDir: config.webDir,
     authToken: config.authToken,
     mcpConfigPath: config.mcpConfigPath,
+    // #1137：pino 实例进 ctx（webhook receiver 的 deliveryId 日志行；此前
+    // 只喂 onError）。bootServer 测试世界不传 = 静默。
+    logger,
   },
   logger,
 );

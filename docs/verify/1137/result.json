@@ -1,0 +1,244 @@
+{
+  "probe": "drive-1137",
+  "stamp": "2026-10-12T03:29:35.720Z",
+  "checks": [
+    {
+      "ok": true,
+      "label": "A1 created: 202 + result=created",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "A2 envelope has todoId/threadId",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "B1 duplicate: 202 + result=duplicate",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "E1 wrong token: 401",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "C1 ping: 202 ignored",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "todo count = 1",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "todo sourceKind/sourceRef",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "token row: hash only, lastUsedAt set",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "thread count = 1 (no double dispatch)",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "chief first message embeds issue body",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "chief step pending",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "github outbound: issue detail + labels mirror",
+      "detail": null
+    }
+  ],
+  "request": {
+    "created": {
+      "status": 202,
+      "body": {
+        "result": "created",
+        "deliveryId": "live-delivery-1",
+        "todoId": "V-BoBX3LVEKvk5JLJFy3j",
+        "threadId": "chief-01a12e28-9be1-7e64-a097-23703c2645a4"
+      }
+    },
+    "duplicate": {
+      "status": 202,
+      "body": {
+        "result": "duplicate",
+        "deliveryId": "live-delivery-1",
+        "detail": "delivery within window"
+      }
+    },
+    "wrongToken": {
+      "status": 401,
+      "body": {
+        "error": "invalid webhook token"
+      }
+    },
+    "ping": {
+      "status": 202,
+      "body": {
+        "result": "ignored",
+        "deliveryId": "",
+        "detail": "event ping not consumed"
+      }
+    },
+    "githubFetchCalls": [
+      "/repos/octo/alpha/issues/7",
+      "/repos/octo/alpha/labels"
+    ]
+  },
+  "persist": {
+    "todo": [
+      {
+        "id": "V-BoBX3LVEKvk5JLJFy3j",
+        "teamId": "bZcVr2pg9B0L0fYFDyZec",
+        "projectId": "LWvhZ5Eq1bB-0T0VISaou",
+        "title": "webhook live evidence issue",
+        "spec": "trigger label pacman auto task",
+        "phase": "todo",
+        "phaseAt": 1791775775711,
+        "seqNum": 1,
+        "orderIndex": 0,
+        "assignment": null,
+        "latestBuildId": null,
+        "lastRunAt": null,
+        "hasChanges": false,
+        "hasPlan": false,
+        "sourceTodo": null,
+        "v": 1,
+        "createdBy": "KYGaySJKarwZAnfKyYME7",
+        "ownerId": "KYGaySJKarwZAnfKyYME7",
+        "sourceBuildId": null,
+        "sourceKind": "github-issue",
+        "sourceRef": "github:octo/alpha#7",
+        "machineId": null
+      }
+    ],
+    "webhookToken": [
+      {
+        "id": "aljlrSXpA4LhZwBMa3YCx",
+        "teamId": "bZcVr2pg9B0L0fYFDyZec",
+        "name": "live-evidence",
+        "tokenHash": "6026e01ebfcafd9da3c14320026fd0183a3fc3ced2efe97a45aea62a604bc8dd",
+        "masked": "pacman_wh_60100…",
+        "createdAt": 1791775775705,
+        "lastUsedAt": 1791775775719
+      }
+    ]
+  },
+  "dispatch": {
+    "chiefThread": [
+      {
+        "id": "chief-01a12e28-9be1-7e64-a097-23703c2645a4",
+        "chiefId": "chief-KYGaySJKarwZAnfKyYME7-bZcVr2pg9B0L0fYFDyZec",
+        "userId": "KYGaySJKarwZAnfKyYME7",
+        "teamId": "bZcVr2pg9B0L0fYFDyZec",
+        "title": "开始任务 #1",
+        "createdAt": 1791775775713,
+        "updatedAt": 1791775775714,
+        "lastTurnAt": null,
+        "sessionRuntime": "pi",
+        "sessionId": "",
+        "sessionOpenedAt": 1791775775713,
+        "pendingSessionResumeAt": null,
+        "pinnedMachineId": null,
+        "toolDefHashes": {
+          "projects": "FW60_FjNnZL4",
+          "todos": "BaQoNAIL_beH",
+          "agents": "GWdG2KpgKv5_",
+          "models": "60ZlTYhl5ads",
+          "machines": "pCsJIF7evK6-",
+          "skills": "qrlBCLlVVAG_",
+          "secrets": "CX0KIW3tpMKf",
+          "mcp_servers": "YK5D0P3KMuMC",
+          "schedules": "v4_VyDYhdqeH",
+          "docs": "wzcaieklSJAX",
+          "usage": "XvKL3XM6tHOZ",
+          "issues": "HQAcL8I8JrP8",
+          "pull_requests": "NYhH6jSAWiYU",
+          "workflow_runs": "f7TvwnnXVM3t",
+          "attachment": "_E-u1oKHyVBj",
+          "conversation": "5SZwdjAPW5UY",
+          "create_todo": "uftUgcHCQunI",
+          "update_todo": "en4FUwLcq5H0",
+          "delete_todos": "hZFJUor4NH5H",
+          "close_todos": "PD7BAQB8NXYZ",
+          "reopen_todos": "h0Esa6EoRR_i",
+          "complete_todos": "-zSk9Q7oPJV6",
+          "message_todo": "MT-6EYFrPWai",
+          "create_project": "50Xg5pl5Sfuz",
+          "update_project": "4C2iO3t5l-nh",
+          "connect_repo": "TGxFoySYg_Mn",
+          "create_agent": "Ue_N86ODAg81",
+          "update_agent": "TJ_kbRO9X18X",
+          "delete_agents": "XKQDbdR_F1jq",
+          "create_skill": "3Yn6RqD7IrgE",
+          "update_skill": "1EvHxVIrCjqw",
+          "set_secret": "gFag3kaqJh2w",
+          "delete_secrets": "5w-QjvnoCgqX",
+          "set_remote_shell": "DhxW0o_-26p3",
+          "schedule_todo": "qqjEvlbNxkF6",
+          "unschedule_todo": "0ZyPOUtmsoa6",
+          "run_builds": "CbsrdLelNm40",
+          "run_review": "Y7De8aCK_0Fx",
+          "confirm_builds": "Y7xbAmvYhTqo",
+          "cancel_builds": "60i3R2mDrr9P",
+          "merge_builds": "JYGelNxYitax",
+          "ask_user": "OvlyeHsXUWlv",
+          "notify_user": "rPIgCSgaVDJj",
+          "save_memory": "ew2T_hIVpSfw",
+          "delete_memory": "NQROnfvEUP9q",
+          "memories": "6GdxF7R2yLeI",
+          "watch_todos": "FEd8hcCSmKHq",
+          "unwatch_todos": "3x95_gGi2QmK",
+          "wakes": "dLUw1wjUh5uG",
+          "set_wake": "QAandJbUK-ep",
+          "clear_wake": "FfZbBcW3XWzA"
+        },
+        "toolResultHashes": {},
+        "activeRun": {
+          "phase": "chief"
+        }
+      }
+    ],
+    "chiefMessage": [
+      {
+        "id": "scP1OtDcRgmzgeUzXxXJ1",
+        "threadId": "chief-01a12e28-9be1-7e64-a097-23703c2645a4",
+        "role": "user",
+        "content": "开始任务 #1\n\n编排请求：[#1](todo:V-BoBX3LVEKvk5JLJFy3j) —— 直接规划，并按活的类型派发执行。\n\n任务原文：\n> trigger label pacman auto task",
+        "createdAt": 1791775775713
+      }
+    ],
+    "step": [
+      {
+        "id": "mOwMEIX2zND1cIPHjW7NJ",
+        "buildId": "chief-01a12e28-9be1-7e64-a097-23703c2645a4",
+        "kind": "chief",
+        "machineId": null,
+        "status": "pending",
+        "sessionId": null,
+        "checkpointCommit": null,
+        "claimedAt": null,
+        "lastHeartbeatAt": null,
+        "prompt": "开始任务 #1\n\n编排请求：[#1](todo:V-BoBX3LVEKvk5JLJFy3j) —— 直接规划，并按活的类型派发执行。\n\n任务原文：\n> trigger label pacman auto task",
+        "freshSession": false,
+        "skillInjection": null,
+        "createdAt": 1791775775714
+      }
+    ]
+  }
+}
