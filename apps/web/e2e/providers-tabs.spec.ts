@@ -25,7 +25,10 @@ import { expect, test } from '@playwright/test';
 
 const PAGE = '/app/resources/providers?scenario=10';
 const SHELL = '[data-route="/app/resources/providers"]';
-const CANON_HOST = 'xmonsMac-3574.local'; // fixtures.ts MACHINE_NAME
+const CANON_HOST = 'xmonsMac-3574.local'; // fixtures.ts MACHINE_NAME（pi 段 = 本机）
+// #1259：claude-code 段挂 remote canon 机（本机 canon pi-only）——cc 卡读
+// 远端机的 hostname。
+const CANON_CC_HOST = 'mea-wsl'; // fixtures.ts MACHINE_REMOTE_NAME
 
 test('tablist = 恰 pi / Claude Code 两 tab，默认选中 pi', async ({ page }) => {
   await page.goto(PAGE);
@@ -101,7 +104,7 @@ test('header 卡：runtime 名 + 说明 + 「已安装在 <hostname>」（两 ta
     `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`,
   );
   await expect(ccHead).toContainText('Claude Code');
-  await expect(ccHead).toContainText(`已安装在 ${CANON_HOST}`);
+  await expect(ccHead).toContainText(`已安装在 ${CANON_CC_HOST}`);
   await expect(ccHead).toContainText('~/.claude/settings.json');
 });
 
@@ -132,7 +135,7 @@ test('#1050 装了 + 已登录：细字行报版本与路径，无「未登录�
   const head = page.locator(
     `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`,
   );
-  await expect(head).toContainText(`已安装在 ${CANON_HOST}`);
+  await expect(head).toContainText(`已安装在 ${CANON_CC_HOST}`);
   await expect(head).toContainText('claude 2.1.289 · /home/u/.local/bin/claude');
   await expect(head).not.toContainText('未登录');
   await expect(head).toHaveAttribute('data-auth', 'logged-in');
@@ -147,7 +150,7 @@ test('#1050 装了 + 未登录：细字行尾出「未登录」角标（主句�
   const head = page.locator(
     `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`,
   );
-  await expect(head).toContainText(`已安装在 ${CANON_HOST}`);
+  await expect(head).toContainText(`已安装在 ${CANON_CC_HOST}`);
   await expect(head).toContainText('claude 2.1.289 · /home/u/.local/bin/claude');
   await expect(head).toContainText('未登录');
   await expect(head).toHaveAttribute('data-auth', 'not-logged-in');
@@ -204,7 +207,7 @@ test('#1050 bin 键缺席（老 daemon 没探过）：维持只看 installed 的
     `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`,
   );
   await expect(head).toHaveAttribute('data-state', 'installed');
-  await expect(head).toContainText(`已安装在 ${CANON_HOST}`);
+  await expect(head).toContainText(`已安装在 ${CANON_CC_HOST}`);
   await expect(head.locator('[data-testid="runtime-bin"]')).toHaveCount(0);
   await expect(head).not.toContainText('未知');
 });
