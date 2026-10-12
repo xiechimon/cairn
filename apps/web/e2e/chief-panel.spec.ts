@@ -36,9 +36,11 @@ import { expect, type Page, test } from '@playwright/test';
 //      r5 113 running face carries the steer canon, the idle faces the idle
 //      canon — both single-sourced from @pacman/shared.
 // 载体契约（D6）：关 = 在 DOM 但 hidden/inert（keepMounted 常驻）——count-0
-// 断言族退役，关态断言走 toBeHidden + count 1；收起钮 = aria-label 最小化
-// （Minus，无 X）；FAB 单实例载体 = .chief-fab（根 layout 常驻，D4 族 FAB
-// 类名退役）。
+// 断言族退役，关态断言走 toBeHidden + count 1（#1067：hidden 的
+// display:none 副作用被 app.css 中和成 visibility/opacity 停靠，布局盒
+// 存活、滚动位置保留，toBeHidden 仍以 hidden 属性为判据）；收起钮 =
+// aria-label 最小化（Minus，无 X）；FAB 单实例载体 = .chief-fab（根
+// layout 常驻，D4 族 FAB 类名退役）。
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
 const fab = (page: Page) => page.locator('.chief-fab');

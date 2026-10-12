@@ -40,6 +40,7 @@ import {
   chiefGated,
   chiefMarkdown,
   chiefReady,
+  chiefScrollLong,
   chiefSettings,
   chiefSettingsMachines,
   chiefSettingsStaleModel,
@@ -391,6 +392,10 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // #1094 长列表滚动面命名场景（无 capture，chief-md 先例）：22 行线程
       // 的切换器——钉封顶 + 滚动可达 + 尾部可点（116 短列表面当零变化对照）。
       'chief-threads-long': chiefThreadsLong,
+      // #1067 滚动保留面命名场景（无 capture，chief-threads-long 先例）：
+      // 40 行消息流撑出远超窗高的滚动——钉「滚到中部→最小化→重开落原位」
+      // 与停靠态可及树/焦点剔除（e2e/chief-minimize-scroll.spec）。
+      'chief-scroll-long': chiefScrollLong,
       // #650/#651 markdown 面命名场景（无 capture，md-toolout 先例）：定稿
       // robot 行 raw markdown + typing 打字尾行，钉共用解析器进抽屉的渲染形。
       'chief-md': chiefMarkdown,

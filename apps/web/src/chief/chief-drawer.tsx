@@ -5,8 +5,11 @@
 // no scrim. It is an overlay again, not a layout citizen: nothing yields
 // (0004 D2/D7/D8 retired), the root layout hosts the single persistent
 // instance (chief-root.tsx, D6), and closing minimizes — Base UI
-// keepMounted parks the popup `hidden` in the DOM with the draft, scroll
-// and thread state intact. Header = thread chip + model row + icon
+// keepMounted parks the popup in the DOM with the draft, scroll and thread
+// state intact: the `hidden` attribute stays (a11y tree / focus removal,
+// browser-native) while app.css neutralises its display:none side effect
+// into a visibility/opacity park, so the scroll position survives the
+// minimize (#1067). Header = thread chip + model row + icon
 // buttons (Minimize, no X — D3); body = gate bar (unbound) or hero
 // examples / thread message flow; composer pinned at the bottom. The
 // switcher popover (116) and the view swap to 总管设置 are real state so
@@ -65,6 +68,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
   useMessageScroller,
+  useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -183,8 +187,9 @@ function readStoredChiefDraft(): string {
 
 interface DrawerProps {
   /** 常驻窗的开态旗（ADR 0013 D6）：关闭 = 最小化——Base UI keepMounted
-   *  把窗以 hidden 停驻在 DOM，草稿/滚动/线程态全保；退场动画 outlives
-   *  the minimize（transition-status）。 */
+   *  把窗以 hidden 属性停驻在 DOM，草稿/滚动/线程态全保（#1067：hidden 的
+   *  display:none 副作用被 app.css 中和成 visibility 停靠，scrollTop 跨
+   *  最小化存活）；退场动画 outlives the minimize（transition-status）。 */
   open?: boolean;
   chief: ChiefContent;
   /** Opens 总管设置: board route = content swap (r5 101–104); 非 board 路由
@@ -234,6 +239,9 @@ export function ChiefDrawer(props: DrawerProps) {
   const { open = true, chief } = props;
   const { t } = useI18n();
   const [threadsOpen, setThreadsOpen] = useState(chief.threadsOpen ?? false);
+  // #1067 跟随武装位（atBottom）：读者贴最新端才跟随新消息——最小化/离底
+  // 阅读期间 autoScroll 关死，重开不抢滚动条（停泊载体保留的位置原样交回）。
+  const [atBottom, setAtBottom] = useState(true);
   return (
     <DialogPrimitive.Root
       open={open}
@@ -250,11 +258,12 @@ export function ChiefDrawer(props: DrawerProps) {
     >
       {/* D6/D10：Portal 回 body（dock 行发现随让位退役），keepMounted 承载
           「关 = 在 DOM 但 inert」的常驻契约——Base UI 把关态 Popup 以
-          hidden 属性停驻（tailwind preflight 的 [hidden] display:none
-          !important 钉死 flex utility 的覆盖面），草稿/滚动/线程态全保；
-          退场动画仍先播（transition-status），播完才落 hidden。「关」的
-          可观测契约从「不在 DOM」改「在 DOM 但 hidden/inert」（D6，e2e
-          count-0 断言族按 0012 D6 载体重钉，行为语义不变）。 */}
+          hidden 属性停驻（可及树/焦点剔除由属性原生承载），app.css 的
+          .chief-drawer[hidden] 规则把 preflight 的 display:none 中和成
+          visibility/opacity 停靠（#1067：不塌缩布局盒，滚动位置跨最小化
+          保留），草稿/滚动/线程态全保；退场动画仍先播（transition-status），
+          播完才落 hidden。「关」的可观测契约 = 在 DOM 但 hidden/inert（D6，
+          e2e count-0 断言族按 0012 D6 载体重钉，行为语义不变）。 */}
       <DialogPrimitive.Portal keepMounted>
         <DialogPrimitive.Popup
           // render 令 Popup 即 aside（悬浮窗本体）；fade+scale 进出场落在
@@ -266,16 +275,21 @@ export function ChiefDrawer(props: DrawerProps) {
           {/* #1009 A1：MessageScroller Provider 包住整列窗内容——滚动律单源
               从 useChatFollow 换成原语原生 autoScroll，#873 语义逐条保留：
               贴底阈值 80px = FOLLOW_THRESHOLD 同值（scrollEdgeThreshold）、
-              关窗解除武装 = 旧 active=open 同律（autoScroll）、打开落底 =
-              chat 面通行律（defaultScrollPosition="end"）、发送跳最新 =
-              scrollToEnd()（实审裁决 2：不采 scrollAnchor 逐条锚定）。
-              消费点（composer wire 的 onSend 与切线程 effect）住内容列
-              hook 里，必须整体下沉到 Provider 之下——拆分点即此。 */}
+              打开落底 = chat 面通行律（defaultScrollPosition="end"，仅初次
+              挂载跑一次）、发送跳最新 = scrollToEnd()（实审裁决 2：不采
+              scrollAnchor 逐条锚定）。#1067 起跟随武装位 = 读者贴底
+              （autoScroll={open && atBottom}，ChiefFollowArmed 读表）：
+              停泊载体让滚动位置跨最小化存活后，「重开钉回最新」不再是
+              载体副作用而是 armed 门的行为——贴底时重开/新消息照旧跟随，
+              离底阅读位置原样交回。消费点（composer wire 的 onSend 与切
+              线程 effect）住内容列 hook 里，必须整体下沉到 Provider 之下
+              ——拆分点即此。 */}
           <MessageScrollerProvider
-            autoScroll={open}
+            autoScroll={open && atBottom}
             scrollEdgeThreshold={80}
             defaultScrollPosition="end"
           >
+            <ChiefFollowArmed onAtBottom={setAtBottom} />
             <ChiefDrawerInner
               {...props}
               threadsOpen={threadsOpen}
@@ -286,6 +300,19 @@ export function ChiefDrawer(props: DrawerProps) {
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );
+}
+
+/**
+ * #1067 跟随武装位的读表腿：消费 stateStore（stateFrame 同步面）取「读者
+ * 是否贴底」。Provider 与消费者不能同组件（context 拿不到自己渲染树），
+ * 故挂在 ChiefDrawer 之下、内容列之上。
+ */
+function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolean) => void }) {
+  const scrollable = useMessageScrollerScrollable();
+  useEffect(() => {
+    onAtBottom(!scrollable.end);
+  }, [scrollable.end, onAtBottom]);
+  return null;
 }
 
 function ChiefDrawerInner({
@@ -516,19 +543,23 @@ function ChiefDrawerInner({
     const wasOpen = prevOpenRef.current;
     prevOpenRef.current = open;
     if (!open || wasOpen) return;
-    // keepMounted 关态 = hidden 驻 DOM：Base UI 摘 hidden 的提交时机晚于本
-    // effect，focus() 打在 display:none 上静默失败（实测首焦全丢）——帧重试
-    // 到节点脱离 [hidden] 祖先再落焦（有界 5 帧；中途关窗则 closest 命中
-    // hidden 自然放弃）。
+    // keepMounted 关态 = hidden 属性驻 DOM（app.css 把 display:none 中和成
+    // visibility 停靠，#1067）：重开瞬间有两段瞬态窗体还不可聚焦——Base UI
+    // 摘 hidden 的提交时机晚于本 effect，且进场首帧 aside 仍带
+    // data-starting-style（tw v4 对该属性生成 visibility:hidden，进场动画
+    // 首帧起播时摘除，实测 focus() 打在两种状态上都静默失败）——帧重试到
+    // 节点既脱离 [hidden] 祖先、祖先又不再带 data-starting-style 再落焦
+    // （有界 12 帧 ≈ 200ms 动画周期；中途关窗则 closest 命中 hidden 自然放弃）。
     let frames = 0;
     const tryFocus = () => {
       const node = textareaRef.current;
       if (node == null) return;
-      if (node.closest('[hidden]') == null) {
+      const shell = node.closest('[hidden], [data-starting-style]');
+      if (shell == null) {
         node.focus({ preventScroll: true });
         return;
       }
-      if (frames < 5) {
+      if (frames < 12) {
         frames += 1;
         requestAnimationFrame(tryFocus);
       }

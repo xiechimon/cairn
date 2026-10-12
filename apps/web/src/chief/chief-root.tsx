@@ -7,7 +7,8 @@
 // in-page deep link) the surface through context. Route switches no longer
 // remount the surface: the window state (view, thread, unread) survives
 // navigation, and minimize keeps the draft/scroll inside the keepMounted
-// popup (chief-drawer.tsx).
+// popup (chief-drawer.tsx — the hidden attribute parks the closed window
+// out of the a11y tree while app.css keeps its layout box alive, #1067).
 //
 // Coverage is site-wide (#1141): every route renders the FAB/window and
 // keeps ⌘J registered — the two-route suppression of the docked era
