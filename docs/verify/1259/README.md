@@ -27,6 +27,26 @@ node .claude/skills/verify-pacman/scripts/drive-1259-1260-binding.mjs
 node .claude/skills/verify-pacman/scripts/cleanup.mjs
 ```
 
+## 真 mea 链（真实 daemon + 真 claude-code CLI）
+
+分支栈部署在 mea 本机（`/home/measure/pacman-verify`，8792/5274，scratch
+PACMAN_HOME 与用户的活栈零接触）+ 真 daemon（`mea-wsl-verify`，claude 2.1.285）。
+浏览器探针在 mea 本机跑（tailnet 上 vite dev 模块图分钟级，HTTP/1.1 六连上界
+——探针移位是拓扑修正，不是测试内容变化）。
+
+- 级联可见性（`mea-1..5` 截图）：详情页创建槽预选归属机；运行时选
+  claude-code 后模型清单 = mea settings.json 自报真实模型（fable /
+  deepseek-v4.1-flash[1M] / qwen3.8-max-0902[1M] / gpt-5.6-luna[1M] /
+  MiniMax-M3[1M]）——「能不能看到 mea 的运行时、选它的模型」的实锤答
+  案 = 能。
+- 真任务（`mea-real-task.txt`）：agent 绑 mea + qwen 模型，todo「README
+  末尾追加今日日期」由 mea 的 claude 真跑完——`verify-target` 仓实物
+  commit `4404316 docs: append today's date to README`，README 末行
+  `2026-10-12`。
+- 边界实录（不是本 PR 的 bug）：mea 的 `fable` 别名解析到
+  deepseek-v4.1-flash，网关拒（无权限）——上报清单 ≠ 网关可达性，绑定
+  模型的闸管前者，后者是机器侧配置问题（用户已知情）。
+
 ## 单元 / e2e 面
 
 - server：`test/agent-home-machine.test.ts`（8 例）+ `test/machine-exit.test.ts`

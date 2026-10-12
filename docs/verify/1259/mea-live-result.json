@@ -1,0 +1,50 @@
+{
+  "checks": [
+    {
+      "name": "M1 mea 详情页可进（列表行名链接）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "M2 详情页创建槽预选归属机 = mea",
+      "ok": true,
+      "detail": "mea-wsl-verify▼"
+    },
+    {
+      "name": "M3 运行时清单含 claude-code",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "M4 模型清单 = mea 自报真实模型",
+      "ok": true,
+      "detail": "fable,deepseek-v4.1-flash,qwen3.8-max,gpt-5.6-luna,MiniMax-M3"
+    },
+    {
+      "name": "M5 三槽齐 → 创建钮可用",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "M6 创建成功（弹窗关闭）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "M7 agent 落库：provider=claude-code、modelId=fable、归属机=mea",
+      "ok": true,
+      "detail": "{\"provider\":\"claude-code\",\"modelId\":\"fable\"}"
+    },
+    {
+      "name": "M8 真任务 build 入队",
+      "ok": true,
+      "detail": "{\"builds\":[{\"id\":\"01a13052-491a-73f5-9de4-8d5ce4a1a681\",\"todoId\":\"cbC8rhPzF0lJD4COA0UED\",\"withPlan\":false,\"prevPhase\":\"t"
+    },
+    {
+      "name": "M9 真任务推进到 confirm/done（claude 在 mea 真跑完）",
+      "ok": false,
+      "detail": "null"
+    }
+  ],
+  "ok": false
+}
