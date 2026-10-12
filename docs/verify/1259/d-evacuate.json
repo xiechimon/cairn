@@ -1,0 +1,23 @@
+{
+  "evacuate": {
+    "moved": [
+      "eunNbE2AwRaCCbL7oM460"
+    ],
+    "rejected": [
+      {
+        "agentId": "ANzIWnIBT3lHw468LZ9QD",
+        "reason": "机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。"
+      }
+    ]
+  },
+  "agents": [
+    {
+      "id": "ANzIWnIBT3lHw468LZ9QD",
+      "machineId": "Yz9w037hNcAo9r8jJAQ-f"
+    },
+    {
+      "id": "eunNbE2AwRaCCbL7oM460",
+      "machineId": "iuRlRFy4uoWgjYE7SyuYM"
+    }
+  ]
+}
