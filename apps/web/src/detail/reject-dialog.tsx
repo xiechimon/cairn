@@ -56,7 +56,9 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
       <div className="flex flex-col gap-2">
         {/* #1006 原型：标签走 registry Label 件（批次 0b 引入），--label-size
             手写标签律退役（前提④：排版收敛 registry 默认 text-sm/500）。 */}
-        <Label>{label}</Label>
+        {/* CJK 标签行高修正（leading-none → 1.25，墨盒不贴行底被邻位
+            focus 环压住）：就地 className，件保持 pristine（#980 S5）。 */}
+        <Label className="leading-tight">{label}</Label>
         {/* #945（#851 裸控件账）：裸 textarea 收编 components/ui Textarea；
             #1006 原型：FOCUS_TEXTAREA 中和皮退役，件默认形态生效
             （field-sizing-content 自增高 + rounded-lg border-input）。 */}

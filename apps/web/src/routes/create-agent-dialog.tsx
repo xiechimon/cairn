@@ -153,7 +153,12 @@ export function CreateAgentDialog({
               wontfix）：栈内无上传面。 */}
           <SeededAvatar name={name.trim()} fallback="/avatar-robot-1.svg" className="size-10" />
         </div>
-        <Label htmlFor="dlg-agent-name">{t('名称')}</Label>
+        {/* CJK 墨盒满 em 见方：registry Label 默认 leading-none 让标签贴行底、
+            被邻位 Input focus 环压住（本行实踩）——leading-tight（1.25）就地
+            修正，件保持 pristine（#980 S5 棘轮：偏差只进 adapter/调用位）。 */}
+        <Label htmlFor="dlg-agent-name" className="leading-tight">
+          {t('名称')}
+        </Label>
         <Input
           id="dlg-agent-name"
           value={name}

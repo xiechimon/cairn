@@ -486,7 +486,9 @@ export function ProjectNewPage() {
         <div className="mt-3 text-center text-xs leading-4 text-muted-foreground">
           {t('可选。未设置时以首字母代替。')}
         </div>
-        <Label className="mt-6 mb-2" htmlFor="prj-new-name">
+        {/* CJK 标签行高修正（leading-none → 1.25，墨盒不贴行底被邻位
+            focus 环压住）：就地 className，件保持 pristine（#980 S5）。 */}
+        <Label className="mt-6 mb-2 leading-tight" htmlFor="prj-new-name">
           {t('项目名称')}
         </Label>
         {/* Input 件默认形态（40 高手写盒 + 品牌 focus 配方退役——registry
@@ -498,7 +500,7 @@ export function ProjectNewPage() {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Label className="mt-6 mb-2" htmlFor="prj-new-repo">
+        <Label className="mt-6 mb-2 leading-tight" htmlFor="prj-new-repo">
           {t('仓库')}
         </Label>
         {/* t-0070 收编：repo 种类菜单 → components/ui/dropdown-menu（Base UI
