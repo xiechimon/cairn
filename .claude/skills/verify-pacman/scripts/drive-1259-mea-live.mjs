@@ -84,8 +84,12 @@ await shot(page, 'mea-5-after-create.png');
 // —— 腿 2：真任务 —— README 加日期行，mea 的 claude 真跑 ————————————
 const teams = await (await fetch(SERVER + '/api/teams')).json();
 const teamId = teams[0].id;
-const agents = await (await fetch(SERVER + `/api/teams/${teamId}/agents`)).json();
-const agent = (agents.agents ?? agents).find((a) => a.displayName === 'mea-live-agent');
+// 成员读面（词表端点 /members）：agent 行 = memberType 'agent'，记录挂在 actor 上。
+const members = await (await fetch(SERVER + `/api/teams/${teamId}/members`)).json();
+const member = (Array.isArray(members) ? members : []).find(
+  (m) => m.memberType === 'agent' && m.actor?.displayName === 'mea-live-agent',
+);
+const agent = member?.actor ? { ...member.actor, id: member.actorId } : undefined;
 check('M7 agent 落库：provider=claude-code、modelId=fable、归属机=mea', agent?.provider === 'claude-code' && agent?.modelId === 'fable' && agent?.machineId != null, JSON.stringify({ provider: agent?.provider, modelId: agent?.modelId }));
 
 const projects = await (await fetch(SERVER + '/api/projects')).json();
