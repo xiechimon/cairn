@@ -9,7 +9,7 @@
 // from the r7 16/17/26/27/28/36/38 and r8 54–77 captures; CONTEXT.md canon
 // names the message flow `transcript`.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { activityLabel } from '../api/activity.js';
 import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -293,10 +293,13 @@ function ProcessGroup({
   onOpenPlan?: () => void;
 }) {
   // 落定收拢：live→false 翻转一刻闭合（滑行由 region 承担）。页面加载即落定
-  // 的组初始 open=false——装载不播动画。
+  // 的组初始 open=false——装载不播动画。wasLive = 「本组曾在飞过」——折叠行
+  // 的长入动画只在落定一刻播（dsh fold clock 律），装载即落定的组不播。
   const [open, setOpen] = useState(item.live);
+  const wasLive = useRef(item.live);
   useEffect(() => {
-    if (!item.live) setOpen(false);
+    if (item.live) wasLive.current = true;
+    else setOpen(false);
   }, [item.live]);
   const parts = item.parts.map((part, j) => (
     <Row
@@ -314,7 +317,9 @@ function ProcessGroup({
       {!item.live && (
         <button
           type="button"
-          className="flex h-[33px] w-full cursor-pointer items-center border-0 border-b-[0.5px] border-(--border) bg-transparent pb-2 text-left text-[13px] leading-6 text-(--text-tertiary) transition-colors duration-100 hover:text-(--text-secondary)"
+          className={`flex h-[33px] w-full cursor-pointer items-center border-0 border-b-[0.5px] border-(--border) bg-transparent pb-2 text-left text-[13px] leading-6 text-(--text-tertiary) transition-colors duration-100 hover:text-(--text-secondary)${
+            wasLive.current ? ' process-fold-row--enter' : ''
+          }`}
           aria-expanded={open}
           data-testid="process-fold"
           onClick={() => setOpen((v) => !v)}

@@ -130,6 +130,32 @@ body[data-board-dragging] .todo-card:hover {
   overflow: hidden;
 }
 
+/* 折叠行的落定长入（dsh ChatGroupSeat 的 fold clock 律：「header appears
+   while the body closes」——折叠行从 0 高长到 33px，与过程区收拢同一拍）。
+   只在落定一刻播（ProcessGroup 的 wasLive ref 挂类）；页面装载时（组从未
+   在飞）不播——装载无动画（dsh 同律）。 */
+@keyframes fold-row-in {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 33px;
+  }
+}
+
+.process-fold-row--enter {
+  overflow: hidden;
+  animation: fold-row-in var(--dur-fast) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-fold-row--enter {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .process-region {
     transition: none;
