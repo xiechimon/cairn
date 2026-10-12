@@ -96,6 +96,28 @@ export const WORKER_PIN_RUNTIME_HINT =
 export const CHIEF_PIN_RUNTIME_HINT =
   '请在机器页为它开启该 runtime 后重发，或把任务的机器改为其它在线机器。';
 
+/** #1251 ④d：钉选机器在线、runtime 闸开、但能力快照缺 agent 要求项的失败
+ *  文案（点名机器 + 缺项可读名 + 修法——「缺能力 = 给修法」，Multica
+ *  dispatch/reason.go 族 runtime_unusable 语义对位：等待本身不解锁，装 X
+ *  才解锁）。宽限与离线/闸挡同档（PIN_OFFLINE_GRACE_MS）：能力清单随心跳
+ *  30s 上行，宽限给的是「用户正在装」的窗口。 */
+export function pinCapabilityBlockedReason(
+  machineName: string,
+  missing: string[],
+  hint: string,
+): string {
+  return `本轮无人认领：钉选的机器「${machineName}」缺少本步 Agent 要求的能力（${missing.join('、')}）。${hint}`;
+}
+
+/** #1251 ④d worker 步尾注：修法 = 在该机装齐缺项（下一拍心跳上报即解锁）
+ *  或改钉能力齐的机器（不自动改派，④/④b 同律）。 */
+export const WORKER_PIN_CAPABILITY_HINT =
+  '请在该机器安装/配置缺失项（下一拍心跳上报后即解锁）后重跑，或把任务的机器改为能力齐的在线机器（重跑沿用任务的钉选）。';
+
+/** #1251 ④d chief 回合尾注：动作面是「重发」（runtime 挡尾注同形）。 */
+export const CHIEF_PIN_CAPABILITY_HINT =
+  '请在该机器安装/配置缺失项（下一拍心跳上报后即解锁）后重发，或改 chief 设置的主力机，或把任务的机器改为能力齐的在线机器。';
+
 /** #1219 ④c：钉选机器在线且有空闲并发位、超宽限仍未认领的失败文案
  *  （点名机器；出口 = 检查/重启该机 daemon 或改钉）。 */
 export function pinWedgeReason(machineName: string, hint: string): string {

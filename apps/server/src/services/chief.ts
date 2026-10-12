@@ -57,11 +57,13 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { cancelPendingQuestions } from './chief-questions.js';
-import { runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
+import { missingCapabilities, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import {
+  CHIEF_PIN_CAPABILITY_HINT,
   CHIEF_PIN_OFFLINE_HINT,
   CHIEF_PIN_RUNTIME_HINT,
   PIN_OFFLINE_GRACE_MS,
+  pinCapabilityBlockedReason,
   pinOfflineReason,
   pinRuntimeBlockedReason,
   stepActivityAt,
@@ -1026,6 +1028,15 @@ export function failAbandonedChiefSteps(
             stepRuntimeFor(agentRow.provider),
             CHIEF_PIN_RUNTIME_HINT,
           );
+        }
+        // #1251 ④d（chief 半边）：钉选机在线、runtime 闸开、能力快照缺绑定
+        // Agent 要求项 → 失败收尾（文案点名机器 + 缺项 + 修法，worker 面
+        // 同律；判据单源 = buildChiefClaim 的 dispatch-eligibility 原语）。
+        if (reason === null && agentRow?.modelId != null) {
+          const missing = missingCapabilities(pinnedRow, agentRow);
+          if (missing.length > 0) {
+            reason = pinCapabilityBlockedReason(pinnedRow.name, missing, CHIEF_PIN_CAPABILITY_HINT);
+          }
         }
       }
       if (reason === null) {

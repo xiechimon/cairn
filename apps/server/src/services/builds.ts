@@ -64,17 +64,21 @@ import { type FetchLike, githubPullState } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import {
   agentForStep,
+  capabilityGatePasses,
   machineRunningCount,
+  missingCapabilities,
   runtimeGatePasses,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import {
   PIN_OFFLINE_GRACE_MS,
   PIN_ONLINE_WEDGE_GRACE_MS,
+  pinCapabilityBlockedReason,
   pinOfflineReason,
   pinRuntimeBlockedReason,
   pinWedgeReason,
   stepActivityAt,
+  WORKER_PIN_CAPABILITY_HINT,
   WORKER_PIN_OFFLINE_HINT,
   WORKER_PIN_RUNTIME_HINT,
   WORKER_PIN_WEDGE_HINT,
@@ -1398,15 +1402,34 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
             WORKER_PIN_RUNTIME_HINT,
           );
         }
+        // ④d #1251：钉选机在线、runtime 闸开、但能力快照缺 agent 要求项
+        // （能力闸恒 false = 又一个「钉选在线却无期 pending」的缝，④b 同族
+        // 收口）。判据单源 = claim 面（missingCapabilities 下沉
+        // dispatch-eligibility）；文案 = 点名机器 + 缺项 + 修法（装 X 即解锁
+        // ——「缺能力给修法，离线给等待」的分野）。未上报快照 = fail-open
+        // 不进本判（老 daemon 零回归）。
+        if (reason === null && agentRow?.modelId != null) {
+          const missing = missingCapabilities(pinnedRow, agentRow);
+          if (missing.length > 0) {
+            reason = pinCapabilityBlockedReason(
+              pinnedRow.name,
+              missing,
+              WORKER_PIN_CAPABILITY_HINT,
+            );
+          }
+        }
         // ④c #1219：钉选机在线且闸开（「合法排队」判定的尽头）——有闲位仍
         // 超宽限不领 = 该机不在领取（旧串行 daemon 被长跑步顶住 / claim 循环
         // wedge），无期静默 = 卡死 queued。可见失败收尾（点名机器与出口，
         // 不自动改派，④/④b 同律）。判据单源：闲位 = machineRunningCount
         // （#1108 非 chief claimed 数）< 行 maxConcurrent；满载 = 合法排队不动。
+        // #1251：能力闸也须过——能力挡的机器「有闲位不领」是正确行为，不是
+        // 楔住（④d 先判，此处双保险防 wedge 文案错位）。
         if (
           reason === null &&
           agentRow?.modelId != null &&
           runtimeGatePasses(pinnedRow, agentRow.provider) &&
+          capabilityGatePasses(pinnedRow, agentRow) &&
           now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
           machineRunningCount(deps.db, pinnedId) < pinnedRow.maxConcurrent
         ) {
