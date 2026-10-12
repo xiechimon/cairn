@@ -1,10 +1,31 @@
-# #1268 发送流行为对齐 — 实测证据
+# #1268 发送流行为对齐 + 对话流行为复刻 — 实测证据
 
-2026-10-12，真链路栈（web 5273 + server 8791 + daemon chain-demo + Builder
-agent，claude-code runtime，glm-5.3），驱动脚本 =
-`.claude/verify-run/drive-pacman-send.mjs` / `drive-pacman-steer.mjs`
-（运行时目录，gitignored），参照侧 = 本机源码构建的 dsh web
-（`drive-dsh.mjs`，一条测试消息）。
+2026-10-12~13，真链路栈（web 5273 + server 8791 + daemon chain-demo +
+Builder agent，claude-code runtime，glm-5.3），驱动脚本 =
+`.claude/verify-run/drive-*.mjs`（运行时目录，gitignored），参照侧 =
+本机源码构建的 dsh web（`drive-dsh.mjs`，一条测试消息）+ dsh 源码
+（scratch/dsh-ref/deepseek-harness，读后可能已清；配方沉淀在 wiki
+[[DeepSeek Harness 的界面配方]]）。
+
+## 2026-10-13 夜：行为复刻批（第二晚）
+
+- `pacman-user-turn-anatomy.png` + `-facts.json`：dsh 用户行解剖——右贴
+  气泡（42px 药丸、70% 列宽上限、零头像）、气泡下贴右的时钟 + 28px
+  复制钮、新近律（实测 copyOpacity：早先回合 "0"、最新回合 "1"）。
+- `pacman-process-timeline.png` + `-facts.json`：发送黑盒拆除——展开的
+  live 行带过程时间线（00:50:38 准备工作区 → 正在连接模型 → 模型思考中，
+  逐相位 HH:mm:ss）+ 最近信号 4s 前；折叠行静默超 10s 挂「· 信号 Ns 前」
+  走表（单测 W12–W14 钉 mapper 半）。
+- `pacman-process-fold.png` + `-facts.json`：落定回合过程折叠——「过程 ·
+  完成 10s ›」单行（全宽 + 0.5px 底缝 + chevron 180°/100ms），展开收拢
+  滑行实测 0.15s（grid-rows 1fr↔0fr）；在飞回合的过程组不折（live 尾）。
+- 代码块横幅（语言标签 + 复制钮恒显，copy→check 1s 换回）与答复行动作
+  簇尾部的消息时钟（dsh clock='end' 位）随批落地（chat-markdown /
+  ActionRow）。
+- 本批发现的既有缺陷（与本 lane 无关，未顺手修）：#1279 restart 组合行
+  漏过 classifyUserText 渲染成用户气泡。
+
+## 2026-10-12：发送流批（第一晚）
 
 ## 参照侧实测（dsh，dsh-motion-facts.json + dsh-send-00.png）
 
