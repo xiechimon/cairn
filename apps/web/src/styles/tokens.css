@@ -164,6 +164,13 @@
      look grounded, not floating. Both themes follow the same shape;
      opacity differs because the canvas itself differs */
   --card-shadow: 0 2px 6px rgb(0 0 0 / 0.24);
+  /* 静止卡微抬升（2026-10-12 用户派：看板卡对齐 deepseek-harness 对话框观感
+     ——dsh packages/client/ui-theme/src/styles/gradient-shadow-text.css 的
+     elevation 配方：浮层分离由发丝描边承担，柔光只做「贴地」暗示。本槽 =
+     该配方的 pacman 卡面移植：比 --card-shadow 更宽更淡、无偏移硬边，
+     只由 .todo-card 消费；列容器保持素面（列是画布，卡才是内容）。
+     暗侧按 dsh 同律「柔光近乎不可见、描边承重」取低透明度宽柔光。 */
+  --card-lift: 0 4px 16px rgb(0 0 0 / 0.14), 0 1px 4px rgb(0 0 0 / 0.08);
   /* drag-tier shadow (#616): the lifted drag clone floats on the reference
      product's live recipe (todos.dev 2026-10-02 capture: inline
      `box-shadow: rgba(0,0,0,0.18) 0 8px 24px`, one value in BOTH themes) —
@@ -250,6 +257,9 @@
      side — only the opacity drops because the light surface itself already
      has less visual depth, so the shadow needs less to do its job */
   --card-shadow: 0 2px 8px rgb(28 25 23 / 0.08);
+  /* --card-lift 亮侧（dsh elevation 配方的暖墨移植）：低透明度暖墨双晕，
+     贴地感而非浮起感。 */
+  --card-lift: 0 3px 10px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.04);
   /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
      (#915 spot), mirrored explicitly so .light stays the full
      semantic-token mirror */

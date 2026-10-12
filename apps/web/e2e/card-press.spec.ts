@@ -9,6 +9,9 @@ import { expect, type Page, test } from '@playwright/test';
 //     none；按住微移零 dragstart（Chrome 拖影 chip = 用户报的「偶尔出现
 //     一个小链接」，绝迹）；dnd overlay（#753 起 done 卡也会升起）不是原生
 //     拖影，两者判据分开钉；
+//   · 悬停 = 中性升档微染（--card-hover；2026-10-12 用户派对齐
+//     deepseek-harness 对话框的交互面 hover 反馈，取代「卡面无 hover」的
+//     todos.dev 静止正典）；
 //   · 按压 = 整卡 bg tint 一档（--surface-press：dark surface-tertiary /
 //     light surface-secondary，参考站 active:bg-* 同源），标题链接不吃全局
 //     a:active 压暗（参考站单一反馈）；
@@ -56,6 +59,12 @@ for (const theme of ['light', 'dark'] as const) {
     expect(restBg).not.toBe(expectedPress);
 
     await page.mouse.move(cx, cy);
+    // 悬停微染（2026-10-12 用户派 dsh 对话框观感对齐）：hover = --card-hover
+    // 中性升档（dsh interactive-bg-hover 同族），与按压档互不混淆。
+    const expectedHover = await resolveVar(page, 'background-color', 'var(--card-hover)');
+    expect(restBg).not.toBe(expectedHover);
+    expect(expectedHover).not.toBe(expectedPress);
+    await expect(card).toHaveCSS('background-color', expectedHover);
     await page.mouse.down();
     await expect(card).toHaveCSS('background-color', expectedPress);
     // single feedback: the stretched link does NOT dim under the global a:active

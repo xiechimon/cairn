@@ -1,8 +1,11 @@
-// Board todo card（V2 骨架，base-ui-theme §1.1）：卡壳方角无圆角——Card 承载
-// 盒型（bg-card/border/ring 1px/shadow-sm），动作钮走 shadcn Button。行为与锚点原位：stretched title link、data-todo-id、
+// Board todo card（V2 骨架，base-ui-theme §1.1）：Card 承载
+// 盒型（bg-card/ring 1px）。2026-10-12 用户派「看板卡对齐 deepseek-harness
+// 对话框观感」：几何升一档圆角（rounded-2xl = 18px，dsh 卡件档 16-20 区间）、
+// 静止吃 --card-lift 微抬升投影（dsh elevation 柔光律）；hover 微染 / 入场
+// 浮入 / superellipse 面形三件套在 motion.css / app.css 的承载层。
+// 行为与锚点原位：stretched title link、data-todo-id、
 // todo-card/todo-card-action--* 类别名、相对时间、phase 徽标全部保留；
-// 几何沿用 r7 实测（9.5-13.5-11.5 padding / 26 底行）；宽度随 #351 的
-// 四列流体网格铺满列宽（原 262 定宽随横向滚动一起退役）。
+// 宽度随 #351 的四列流体网格铺满列宽。
 // 阶段点与徽标的语义色（蓝/琥珀/绿/灰）不随 B 换——它们承载 phase 语义，
 // 不是中性表面；全面 chart 化留待铺开期裁决。
 
@@ -94,7 +97,7 @@ export function TodoCard({
        （标题链接 -webkit-user-drag）在下方 Link。 */
     <Card
       data-todo-id={todo.id}
-      className="todo-card relative w-full gap-0 px-[13.5px] pt-[9.5px] pb-[11.5px] select-none"
+      className="todo-card relative w-full gap-0 rounded-2xl px-[13.5px] pt-[9.5px] pb-[11.5px] shadow-(--card-lift) select-none"
     >
       <div className="flex min-h-4 items-center">
         <ProjectAvatar char={chipInitial} />

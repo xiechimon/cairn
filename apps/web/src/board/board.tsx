@@ -324,11 +324,11 @@ export function BoardSurface({
                      原位保留（e2e 与 a11y 载体）；cn 合并保证 hover 档压过
                      base 档（同组工具类后者胜，等价旧 CSS 的规则序）。 */
                   /* #1054 清点（RECONCILIATION 1004 遗留面）：列容器与
-                     notify-banner 同吃 card-tier 投影 + edge-ring，几何接
-                     registry Card 依据（rounded-xl，ADR 0012 D1）；drop 染色
-                     是列盒的状态层，随列几何。 */
+                     notify-banner 同吃 card-tier 投影 + edge-ring，几何随卡族
+                     （2026-10-12 用户派 dsh 对齐：rounded-2xl = 18px，卡件同
+                     档）；drop 染色是列盒的状态层，随列几何。 */
                   className={cn(
-                    'board-column relative flex h-full flex-col rounded-xl border border-border bg-background',
+                    'board-column relative flex h-full flex-col rounded-2xl border border-border bg-background',
                     isValidDropTarget(column.id) &&
                       'border-(--drop-tint-border) bg-(--drop-tint-base)',
                     dropColumnId === column.id &&
