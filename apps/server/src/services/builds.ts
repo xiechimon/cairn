@@ -818,9 +818,8 @@ export async function applyBuildStepAction(
       throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
     }
     // 承接位 [设计]（原站 body 未录，r9 §5）：withPlan 随失败轮，assignment
-    // 随 todo 现值（失败轮跑过 = 指派在位），机器不继承失败轮的 pin（schedule
-    // 钉的旧值不带入），回落 #682 的任务级 todo.machineId（任务默认机器是新
-    // 轮的合理起点）。
+    // 随 todo 现值（失败轮跑过 = 指派在位），机器面不继承失败轮——#1259 起
+    // 步的去处 = 指派 Agent 的归属机，新一轮由归属机闸照常路由。
     const assignment = todoRecord.assignment ?? { plan: null, build: null };
     // #720 负例守卫：空白反馈（'  '——schema min(1) 拦不住空串以外的空白，
     // UI composer 的 text!=='' 同拦不住）不成发送：不落空白用户行、不注入
@@ -1308,8 +1307,8 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  *    即 heartbeat 从未推进；机器在线也命中 = 「已证明病了」的派发未生效形，
  *    #1257 唯一保留的杀位）→ 释放。
  * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；pending 步一律
- * 不动（挂起等机器——含钉选机离线/闸挡/楔住的形态，机器回归、开 runtime、
- * daemon 恢复领取后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
+ * 不动（挂起等机器——含归属机离线/闸挡/楔住/未设的形态，机器回归、开
+ * runtime、补设归属机后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
  * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
  * chief 步不在本面（chief.ts 扫尾）。
  * 释放语义：status → pending + machineId 清空（认领原子位复位，归属机回来

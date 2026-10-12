@@ -15,10 +15,6 @@ export function buildTaskMeta(input: {
   build: ReturnType<typeof useBuild>['data'];
   machineField: string | null;
   machineWaiting: boolean;
-  /** #1208：todo 钉选机器名（页面从 machines × wireTodo.machineId 反解）。
-   *  派发面 pin 是硬约束（claim 过滤，别机领不到——machine-pin.test.ts
-   *  失败方式 4/6 钉死），与 machineField 不同名的唯一现实来源 =
-   *  run_builds 显式 machineId 改派（transcript 有因）。 */
   agentModel: string | null;
   usage: ReturnType<typeof useBuildUsage>['data'];
   /** ADR 0006 D5：来源 issue 标题的真值在 issue 侧（echo 查询）；拉不到

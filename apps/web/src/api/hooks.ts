@@ -685,9 +685,6 @@ export function useApiMutations(teamId: string | undefined) {
           phase?: string;
           orderIndex?: number;
           tagIds?: string[];
-          /** 任务钉选机器 patch(#864 T3 重跑面出口接线;server #682:
-           *  null = 清回自动,只影响之后新起的 build)。 */
-          machineId?: string | null;
           /** 指派槽级 patch(#209「编辑分配」接线;server #208 槽级 merge:
            *  提供的槽覆盖,未提供的槽保持现状)。 */
           assignment?: {
