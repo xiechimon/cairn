@@ -9,12 +9,14 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
+  MachineCapabilities,
   PersonaRole,
   Phase,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
   ProviderModel,
+  RequiredCapabilities,
   SkillInjectionRecord,
   StepKind,
   TodoSourceKind,
@@ -154,6 +156,23 @@ export const build = sqliteTable('build', {
 });
 
 // —— step（三类步队列 server 持有、机器 claim，02 §4.2/A6；M4a +chief 步）—————
+
+/** #1261 step.quotaBlock 列形态：daemon 上报的 quotaBlock（kind/providerId/
+ * label/reason/retryAfterMs）+ server 侧挂起史（firstSeenAt 首挂时刻、lastAt
+ * 本次挂起时刻、attempts 连续挂起次数）+ probeAt 下次探测时刻（到期 sweep
+ * 释放回 pending——「额度恢复自动续跑」的 server 半）。 */
+export interface QuotaWaitRow {
+  kind: 'quota' | 'capacity';
+  providerId: string;
+  label: string | null;
+  reason: string;
+  retryAfterMs: number | null;
+  firstSeenAt: number;
+  lastAt: number;
+  attempts: number;
+  probeAt: number;
+}
+
 export const step = sqliteTable('step', {
   id: text('id').primaryKey(),
   /** ≡ conversationId。worker 步 = build.id（cascade 随行）；chief 步 =
@@ -165,9 +184,15 @@ export const step = sqliteTable('step', {
   /** [内部] journal 状态（02 §5.4；M3a 展开：claimed = 机器领取未收尾；
    * stopped = 停止钮中断，M7 #308）。 */
   status: text('status')
-    .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped'>()
+    .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped' | 'waiting_quota'>()
     .notNull()
     .default('pending'),
+  /** [内部] #1261 配额挂起块（status=waiting_quota 时在位）：kind/providerId/
+   * label/reason/retryAfterMs + 挂起史（firstSeenAt/lastAt/attempts）+ 探测时刻
+   * （probeAt，sweep 释放判据）。json 列不拆散——读面按步级一次性投影
+   * （quotaWait），列内字段集单源 = shared quotaBlockSchema + services/quota-wait.ts
+   * 的 QuotaWaitRow 形。null = 未挂起。 */
+  quotaBlock: json<QuotaWaitRow>('quotaBlock'),
   /** [内部] 引擎会话标识（done 回传；continue session 复用面——合并轮/重规划轮
    * 同 conv 续跑，02 §4.2/§5.7）。 */
   sessionId: text('sessionId'),
@@ -324,7 +349,9 @@ export const notification = sqliteTable('notification', {
   id: text('id').primaryKey(),
   teamId: text('teamId').notNull(),
   userId: text('userId').notNull(),
-  type: text('type').$type<'plan_ready' | 'build_review' | 'chief_message'>().notNull(),
+  type: text('type')
+    .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait'>()
+    .notNull(),
   entityId: text('entityId').notNull(),
   entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
     'entityRef',
@@ -378,6 +405,11 @@ export const agent = sqliteTable(
      * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
      *  chief 步同占本闸（#1260：chief 步经 chiefThread→chief.agentId 归账绑定 Agent）。 */
     maxConcurrentTasks: integer('maxConcurrentTasks'),
+    /** 能力要求声明（#1251 / ADR 0018 决策 4.2）：该 Agent 的步对执行机的
+     *  能力要求（MCP slug 集 / claude-code 模型 id 集）。NULL = 无要求（缺省/
+     *  存量行——闸恒开，零回归）。消费面 = dispatch-eligibility 能力闸
+     *  （claim/sweep/排队投影/machine-fit 四处单源）。JSON 列（tools 同形）。 */
+    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
   },
   (t) => [
     // (teamId, persona) partial unique（#1250）：一队一角色——fan-out 与
@@ -518,6 +550,12 @@ export const machine = sqliteTable('machine', {
    * 存量行）：无数据不判，下一拍 presence（≤30s）补齐，绝不当场翻
    * offline。 */
   lastSeenAt: epochMs('lastSeenAt'),
+  /** 机器能力清单（#1251 / ADR 0018 决策 4.1）：daemon 经 enroll/presence
+   *  上报的已装 MCP slug 集 + 本机技能名集。NULL = 从未上报（老 daemon——
+   *  能力闸对未知快照放行，显示面标「未上报」）。字段级容错在写路径
+   *  （markPresence/enrollMachine 单独 safeParse，坏字段丢弃保留旧值——
+   *  心跳红线 02 §5.4）。JSON 列（claudeCodeReport 同形）。 */
+  capabilities: json<MachineCapabilities | null>('capabilities'),
 });
 
 // —— shell_command（XMON-108 R1 机器 shell 审计）：预检/回写两写端点的

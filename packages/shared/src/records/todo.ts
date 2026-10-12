@@ -6,6 +6,8 @@
 import { z } from 'zod';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
+// #1261 quotaWait 投影形态（step.ts 单源——等额度读面 todo/step 同形）。
+import { quotaWaitSchema } from './step.js';
 
 /** 指派槽（02 §6.2：todo.assignment 双槽 `{plan:{agentId}, build:{agentId}}`，
  * r5 §3.4/§5 实测）。槽空 = 未指派（开始 dialog Agent 可空，r3 §3.2）——
@@ -151,6 +153,12 @@ export const todoRecordSchema = z.object({
       retryAt: epochMs.nullable(),
     })
     .optional(),
+  /** #1261 等额度投影（读侧派生，不存列）：latest build 活动步 waiting_quota
+   * 时在位——板面卡态/横幅的数据源（哪一路 relay、下次探测时刻，形态比
+   * waitingOn.on='quota' 多 lane/kind/retryAfterMs 三位）。null = 无挂起；
+   * 键缺席 = fixture/老 server 面（optional 加法契约，零回归）。
+   * 形态单源 = records/step.ts quotaWaitSchema。 */
+  quotaWait: quotaWaitSchema.nullable().optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;

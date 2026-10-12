@@ -132,6 +132,8 @@ export function agentRecordOf(row: typeof agent.$inferSelect): AgentRecord {
     // #1250：persona 角色位（null = 普通 agent），恒随行（同律——optional
     // 形只留给老 server 响应的解析兼容）。
     persona: row.persona,
+    // #1251：能力要求声明（null = 无要求），恒随行（persona 同律）。
+    requiredCapabilities: row.requiredCapabilities,
   };
 }
 

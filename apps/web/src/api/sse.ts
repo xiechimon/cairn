@@ -131,7 +131,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
       ? t('方案已就绪')
       : record.type === 'build_review'
         ? t('构建待审核')
-        : record.entityRef.title;
+        : record.type === 'quota_wait'
+          ? t('等额度')
+          : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null

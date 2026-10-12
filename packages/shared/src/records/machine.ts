@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { recordId } from './common.js';
+import { machineCapabilitiesSchema } from './machine-capabilities.js';
 
 /** per-runtime 开关词表（spec 11 A8/A9 单源：machine.enabledRuntimes 元素、
  * PATCH body、machines 页 switch data-runtime、providers tab runtime 同词表；
@@ -52,6 +53,11 @@ export const machineRecordSchema = z.object({
    * 时点计数），不落库。optional 形同 maxConcurrent——老 server 缺席时机器
    * 页不渲染该标注。 */
   runningSteps: z.number().int().optional(),
+  /** 机器能力清单（#1251 / ADR 0018 决策 4.1）：daemon 经 enroll/presence
+   *  上报的已装 MCP slug 集 + 本机技能名集。三态：清单 = 已上报；null =
+   *  从未上报（老 daemon——机器页显示「未上报」，能力闸按未知放行）；缺席 =
+   *  老 server 响应（读侧加法契约，消费面回落不渲染）。 */
+  capabilities: machineCapabilitiesSchema.nullish(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 

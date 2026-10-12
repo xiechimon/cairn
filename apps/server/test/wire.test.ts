@@ -69,6 +69,11 @@ const INFERRED_ROUTES = [
   // 直读原版产线 bundle（i18n agent_modal.*）+ todos.dev 官方 docs 补采，wire
   // 未采——DELETE_FACE 'teams/{id}/agents/{aid}'，02 §6.1 同名 DELETE 规则族。
   'DELETE /api/teams/{id}/agents/{aid}',
+  // Agent 机器匹配面（#1251 / ADR 0018 决策 4.6「哪些机器可跑它」）：本仓自设
+  // 读面（参照产品无此端点——其 agent 绑 runtime，无交集计算需求），路径 =
+  // agents/{aid}/tasks 先例同族规则（02 §6.1）；响应 = shared
+  // agentMachineFitResponseSchema。
+  'GET /api/teams/{id}/agents/{aid}/machine-fit',
   // —— build 详情读面（M5：详情页 overlay 数据源；wire 未采，路径 =
   // builds/{id}/… REST 同族规则（steps 端点先例），02 §6.1 规则族）——
   'GET /api/projects/{id}/commits', // 文件|历史 分段「历史」读面（#149；r2 07e/24 分段 UI 证据，wire 未采，projects/{id}/… REST 同族规则）

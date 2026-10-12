@@ -19,6 +19,8 @@ import {
   type Phase,
   type ProjectRepoKind,
   type ProviderRecord,
+  // #1261 等额度投影形态（wire/fixture 同形单源）。
+  type QuotaWait,
   type SecretRecord,
   type SkillFact,
   type TagRecord,
@@ -79,6 +81,10 @@ export interface TodoRecord {
    *  等机器 / 等额度——看板卡挂起芯片的判定位（与「执行失败」红态区分）。
    *  fixture 捕获缺省 = 无芯片，基线像素零漂移。 */
   waitingOn?: { on: 'machine' | 'quota'; retryAt: number | null };
+  /** #1261 等额度（display 扩展，wire todo.quotaWait 同形）：latest build
+   *  活动步 waiting_quota 时在位——卡面「等额度」芯片 + 看板横幅的判定
+   *  位。undefined/null = 无挂起（fixture 基线与 live 无挂起面零漂移）。 */
+  quotaWait?: QuotaWait | null;
 }
 
 /** Token 用量 content (issue #68, r7 30): the cumulative-run figures,
@@ -407,6 +413,11 @@ export interface MachineRow {
   maxConcurrent?: number;
   /** #1108 该机 claimed 步数（全 kind；`执行中 n/N` 的 n）。absent 同上。 */
   runningSteps?: number;
+  /** #1251 能力清单读标注（daemon 上报的已装 MCP slug 集 + 本机技能名集；
+   *  契约单源 = shared machineRecordSchema.capabilities）。null = 从未上报
+   *  （行显「能力清单未上报」）；absent = 老服务器/存量 fixture——读标注
+   *  退场，呈现零漂移。 */
+  capabilities?: { mcpServers: string[]; skills: string[] } | null;
 }
 
 /** The six resource surfaces' row sets (issue #69). */

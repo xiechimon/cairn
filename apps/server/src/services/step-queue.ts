@@ -20,11 +20,16 @@
 // 闸挡的步也计入位次——它们「在队列里」从用户视角为真，排障入口在失败漏斗
 // 不在位次里扣。
 
-import type { StepQueueInfo } from '@pacman/shared';
+import type { StepQueueBlocked, StepQueueInfo } from '@pacman/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
-import { agentForStep } from './dispatch-eligibility.js';
+import {
+  agentForStep,
+  agentIdForStep,
+  missingCapabilities,
+  runtimeGatePasses,
+} from './dispatch-eligibility.js';
 
 /** 投影目标步的最小形状（调用方从各自读面取齐）。 */
 export interface QueueTargetStep {
@@ -48,6 +53,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .select({
       id: step.id,
       createdAt: step.createdAt,
+      // #1251 blocked 位的 Agent 解析材料（agentIdForStep 三参 + 行存在查询）。
       kind: step.kind,
       prompt: step.prompt,
       todoRow: todo,
@@ -58,8 +64,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId)))
     .all();
   const workerQueue = workerRows.map((r) => ({
-    id: r.id,
-    createdAt: r.createdAt,
+    ...r,
     home: agentForStep(db, r.todoRow, r.kind, r.prompt)?.machineId ?? null,
   }));
   // buildId = chief thread id（conv 等式，CONTEXT.md）。chief 步的归属 =
@@ -73,6 +78,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       home: agent.machineId,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
+      chiefId: chiefThread.chiefId,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
@@ -80,10 +86,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
     .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
     .all();
-  const queue = [
-    ...workerQueue.map((r) => ({ id: r.id, createdAt: r.createdAt, home: r.home })),
-    ...chiefRows.map((r) => ({ id: r.id, createdAt: r.createdAt, home: r.home })),
-  ].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
+  const queue = [...workerQueue, ...chiefRows].sort(
+    (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
+  );
 
   // 该机 claimed 步数 / machine 行（waitingFor 快照；按需缓存——调用方行集
   // 分布稀，n 次查询封顶 n 个被等待机器）。#1260：chief 步占槽——口径与
@@ -108,16 +113,69 @@ export function stepQueueProjector(db: Db, teamId: string) {
     return machineCache.get(machineId);
   };
 
+  // —— #1251 blocked 位（可见 pending reason）的事实面 ————————————————
+  // 团队机器一次性取齐（在线判定 + runtime/能力闸判据）；Agent 行按需缓存
+  // （worker = 槽位解析 agentIdForStep；chief = chiefId→chief.agentId）。
+  // 闸判单源 = dispatch-eligibility（claim/sweep 同一份事实——投影面撒谎的
+  // 形态就是「显示能跑但永远没人领」或反之）。fail-open 律同 claim 面：
+  // 未上报快照的机器不产出缺项（未知 ≠ 缺失，不编造 blocked）。
+  const teamMachines = db.select().from(machine).where(eq(machine.teamId, teamId)).all();
+  const agentCache = new Map<string, typeof agent.$inferSelect | null>();
+  const agentRowOf = (agentId: string | null): typeof agent.$inferSelect | null => {
+    if (agentId === null) return null;
+    if (!agentCache.has(agentId)) {
+      agentCache.set(agentId, db.select().from(agent).where(eq(agent.id, agentId)).get() ?? null);
+    }
+    return agentCache.get(agentId) ?? null;
+  };
+
+  /** 队列行的 Agent 行（两族各自的解析路径；解析不到 = null，blocked 只出
+   *  machine-offline 维——无主步的失败收尾归 #1104 claim 面，不在这里编因）。 */
+  function agentForRow(row: (typeof queue)[number]): typeof agent.$inferSelect | null {
+    if ('todoRow' in row) {
+      return agentRowOf(agentIdForStep(row.todoRow, row.kind, row.prompt));
+    }
+    const chiefRow = db.select().from(chief).where(eq(chief.id, row.chiefId)).get();
+    return agentRowOf(chiefRow?.agentId ?? null);
+  }
+
+  /** pending 成因（#1251，ADR 0018 决策 4.4；#1259 起机器去处 = agent
+   * 归属机，钉选退役——成因判据从「钉选机/全队」收口到「归属机」单机）：
+   *  - machine-offline：归属机不在线 / 未设归属机（补设即领——等待有用）。
+   *  - capability-missing：归属机在线且 runtime 闸开，但缺该 Agent 声明的
+   *    能力——装 X 才解锁（missing = 归属机的缺项清单）。
+   *  不进本判：runtime 闸挡（既有已知缝，呈现面维持现状——能力闸不越权
+   *  代言 runtime 成因）；agent 无 modelId（不可派发族归 claim 失败面）。 */
+  function blockedFor(
+    target: QueueTargetStep,
+    row: (typeof queue)[number],
+  ): StepQueueBlocked | undefined {
+    if (target.homeMachineId === null) {
+      // 无归属机：任何机器不可领（claim 面归属机闸恒拒）——补设即领。
+      return { kind: 'machine-offline', missing: [] };
+    }
+    const home = teamMachines.find((m) => m.id === target.homeMachineId);
+    if (home === undefined || !home.online) {
+      return { kind: 'machine-offline', missing: [] };
+    }
+    const agentRow = agentForRow(row);
+    if (agentRow?.modelId != null && runtimeGatePasses(home, agentRow.provider)) {
+      const missing = missingCapabilities(home, agentRow);
+      if (missing.length > 0) return { kind: 'capability-missing', missing };
+    }
+    return undefined;
+  }
+
   /** 按行投影：目标不在队列（非 pending——调用方读面与投影器构造之间的竞窗
    *  里步被领走）→ null，呈现面回落「不在排队」。 */
   function project(target: QueueTargetStep): StepQueueInfo | null {
-    const inQueue = queue.some((r) => r.id === target.id);
-    if (!inQueue) return null;
+    const queueRow = queue.find((r) => r.id === target.id);
+    if (queueRow === undefined) return null;
     // 同归属机池 = 该机可见集（tryClaim 候选循环同集）；无归属步只在「无
     // 归属机」池里互排（任何机器都不可见它们）。
     const pool = queue.filter((r) => r.home === target.homeMachineId);
     const position = pool.findIndex((r) => r.id === target.id) + 1;
-    if (position === 0) return null; // 理论不达（inQueue 已判）；防御位。
+    if (position === 0) return null; // 理论不达（queueRow 已判）；防御位。
     let waitingFor: StepQueueInfo['waitingFor'] = null;
     if (target.homeMachineId !== null) {
       const row = machineRowOf(target.homeMachineId);
@@ -137,7 +195,16 @@ export function stepQueueProjector(db: Db, teamId: string) {
       target.holdReason === 'quota' && target.holdUntil != null
         ? { reason: 'quota', retryAt: target.holdUntil }
         : undefined;
-    return { position, waitingFor, ...(hold !== undefined ? { hold } : {}) };
+    // #1251 pending 成因位（blockedFor 判据注释见上）：缺席 = 正常排队。
+    // 与 hold 可并存（额度挂起是步级退避，成因是机器级事实）；呈现优先级
+    // 归 web queueLabel（hold 先——步级挂起带下次尝试时刻，更具体）。
+    const blocked = blockedFor(target, queueRow);
+    return {
+      position,
+      waitingFor,
+      ...(hold !== undefined ? { hold } : {}),
+      ...(blocked !== undefined ? { blocked } : {}),
+    };
   }
 
   /** 线程的活动 pending 回合步（threads 投影取位面）：该线程 pending chief

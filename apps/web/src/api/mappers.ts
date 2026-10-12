@@ -79,7 +79,11 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
  *  label/vars（t() 键 + 插值；queue = server 排队投影真值）。形 =
  *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。
  *  #1257：额度挂起中（queue.hold）的排队行呈现「等额度」而非「等空闲机器」
- *  ——挂起 ≠ 排队，可见态钉住下次尝试时刻。 */
+ *  ——挂起 ≠ 排队，可见态钉住下次尝试时刻。
+ *  #1251 blocked 位次之（成因仍先于位次——「等谁」比「排第几」更可操作）：
+ *  capability-missing = 给修法（缺项点名 + 装齐即解锁）；machine-offline =
+ *  给等待（等机器上线，钉选面点名机器）。hold 先于 blocked：步级挂起带
+ *  下次尝试时刻，更具体。 */
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -90,6 +94,21 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
       vars: { time: clockTime(queue.hold.retryAt) },
     };
+  }
+  if (queue.blocked?.kind === 'capability-missing') {
+    return {
+      label:
+        '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+      vars: { missing: queue.blocked.missing.join('、'), ahead },
+    };
+  }
+  if (queue.blocked?.kind === 'machine-offline') {
+    return queue.waitingFor != null
+      ? {
+          label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
+          vars: { machine: queue.waitingFor.name, ahead },
+        }
+      : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
   }
   return queue.waitingFor != null
     ? {
@@ -102,6 +121,22 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
         },
       }
     : { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead } };
+}
+
+/** #1261 等额度行标签（waiting_quota 步）：哪一路 relay + 事件类型 + 下次
+ * 探测时刻——「静默窗口里板面说真话」的详情页半（queueLabel 同族）。 */
+function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
+  label: string;
+  vars: Record<string, string | number>;
+} {
+  return {
+    label: '等额度：{lane} {kind}，{probe} 自动探测续跑',
+    vars: {
+      lane: q.label ?? q.providerId,
+      kind: q.kind === 'quota' ? '额度空' : '限流',
+      probe: clockTime(q.probeAt),
+    },
+  };
 }
 
 /** transcript 消息行（GET messages 封套行形，shared transcriptRowSchema）。
@@ -149,6 +184,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     // #1257 板面挂起态（server 读侧派生）：等机器 / 等额度——卡面挂起 chip
     // 消费；缺席 = 未挂起（正常排队 / 在跑 / 终态）。
     waitingOn: w.waitingOn ?? undefined,
+    // #1261 等额度投影（板面卡态/横幅判定位）；无挂起 = null（fixture 面
+    // 键缺席同形——undefined 折叠进 null）。
+    quotaWait: w.quotaWait ?? null,
   };
 }
 
@@ -778,8 +816,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
 
   // live 尾部：进行中文本（打字面）+ streaming 行（r7 16 `准备工作区...` /
-  // 26 `处理中...`）。running 步存在才挂尾。
-  const running = steps.find((s) => s.status === 'claimed' || s.status === 'pending');
+  // 26 `处理中...`）。running 步存在才挂尾。#1261 增 waiting_quota（配额挂起
+  // 步在跑语义：agent 不在跑但步在飞——标签走「等额度」而非「处理中」，
+  // 静默窗口里板面说真话）。
+  const running = steps.find(
+    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
+  );
   if (running && build) {
     if (liveText.trim() !== '') {
       items.push({
@@ -798,6 +840,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
       running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;
+    // #1261 等额度标签（waiting_quota 步）：优先于活动相位——挂起步不在跑，
+    // act 是断粮前轮的陈旧信号（用户实测「正在连接模型」跨整段静默期说谎，
+    // live 探针两跑两形复现）；queued 是 pending 专属恒不冲突。投影缺席
+    // （老 server / fixture 无该字段）= 落回既有标签，零回归。
+    const quota =
+      running.status === 'waiting_quota' && running.quotaWait != null
+        ? quotaWaitLabel(running.quotaWait)
+        : null;
     items.push({
       kind: 'streaming',
       // #873：不在投影期把「已用秒数」算成一个死数——投影只在别的事件驱动
@@ -807,24 +857,31 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       label:
         queued != null
           ? queued.label
-          : actLabel != null
-            ? actLabel.label
-            : stopping
-              ? '正在停止…' // 停止过渡态（M7 #308，r9 §3.3：中断在途）
-              : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
-                ? '准备工作区...'
-                : '处理中...',
+          : quota != null
+            ? quota.label
+            : actLabel != null
+              ? actLabel.label
+              : stopping
+                ? '正在停止…' // 停止过渡态（M7 #308，r9 §3.3：中断在途）
+                : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
+                  ? '准备工作区...'
+                  : '处理中...',
       ...(queued != null
         ? { labelVars: queued.vars }
-        : actLabel?.vars !== undefined
-          ? { labelVars: actLabel.vars }
-          : {}),
+        : quota != null
+          ? { labelVars: quota.vars }
+          : actLabel?.vars !== undefined
+            ? { labelVars: actLabel.vars }
+            : {}),
       // 排队行不挂相位面（signalAt/skills 是执行态信号——步没在跑，相位是
-      // 上一步残留；W1 的 stepId 过滤管跨步，这里管「排队的当前步」）。
-      ...(queued == null && actLabel != null && act != null ? { signalAt: act.at } : {}),
+      // 上一步残留；W1 的 stepId 过滤管跨步，这里管「排队的当前步」）。#1261
+      // 等额度行同律：act 是断粮前轮的陈旧信号（挂起期步不在跑），不随行披露。
+      ...(queued == null && quota == null && actLabel != null && act != null
+        ? { signalAt: act.at }
+        : {}),
       // #918：本步技能事实清单随 activity 事件进披露面（stepId 过滤已由上面
       // 的 act 判定承担——陈旧步的技能条目不跨步串场）。空/缺省不产字段。
-      ...(queued == null && act?.skills !== undefined && act.skills.length > 0
+      ...(queued == null && quota == null && act?.skills !== undefined && act.skills.length > 0
         ? { skills: act.skills }
         : {}),
     });
@@ -1080,6 +1137,9 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     // 行回到 shell 闸单控件面（存量 capture 零漂移）。
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
+    // #1251 能力清单：三态原样透传（清单 / null = 未上报 / absent = 老
+    // server——读标注退场，maxConcurrent 同律）。
+    ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
   }));
 }
 

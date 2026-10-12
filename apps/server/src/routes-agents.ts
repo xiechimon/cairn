@@ -5,7 +5,9 @@
 
 import {
   AGENT_TOOL_DEFAULTS,
+  agentMachineFitResponseSchema,
   agentTaskSchema,
+  capabilityMissingLabels,
   createAgentBodySchema,
   filterAgentTools,
   IN_PROGRESS_PHASES,
@@ -25,7 +27,12 @@ import {
   toMemoryRecord,
 } from './routes-helpers.js';
 import { deleteAgent } from './services/agents.js';
-import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
+import {
+  declaredMcpGaps,
+  homeMachineRejectReason,
+  missingCapabilityItems,
+  runtimeGatePasses,
+} from './services/dispatch-eligibility.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
 export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
@@ -122,6 +129,9 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         //（personaRoleSchema），团队内唯一性由 partial unique index 兜底
         //（撞角色 = sqlite 唯一约束错，写面如实上抛）。
         persona: body.persona ?? null,
+        // #1251 能力要求声明：nullish——显式 null 与缺省同值（无要求）；
+        // 形状校验在 createAgentBodySchema（requiredCapabilitiesSchema）。
+        requiredCapabilities: body.requiredCapabilities ?? null,
       })
       .run();
     return c.json({ id }, 201); // r5 §1/§8 补录：创建 → 201 {id}
@@ -204,6 +214,9 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       // #1138：可空列同律——显式 null = 清回不限（undefined = 不动，值域
       // 1..50 的边界校验在 patchAgentBodySchema）。
       'maxConcurrentTasks',
+      // #1251：可空列同律——显式 null = 清回无要求（undefined = 不动，形状
+      // 校验在 patchAgentBodySchema）。
+      'requiredCapabilities',
     ] as const) {
       if (body[key] !== undefined) {
         // null 语义：可空列显式清空（description/provider/modelId/thinkingLevel）。
@@ -241,6 +254,43 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
   //   build 的在跑 todo 不存在，不收进来。
   // 实测反证（2026-09-30，参考账号）：3 条 phase=review 且双槽指向该 Agent 的
   // todo，该端点恒返回 []——故「按 assignment 过滤 todo」的旧实现是错的。
+  // —— Agent 机器匹配面（#1251 / ADR 0018 决策 4.6：「哪些机器可跑它」=
+  // requiredCapabilities × 各机上报清单的交集）。判定单源 = claim/sweep 同一
+  // 份 dispatch-eligibility 原语（读面不得与派发面各说各话）；MCP 对账位
+  // （mcpGaps）= agent.mcpServers 声明 vs 机器实装的缺口，可见不挡（daemon
+  // 对未知 slug 跳过降级的既有语义不动）。行序 = 机器名字典序（确定性）。
+  app.get('/api/teams/:id/agents/:aid/machine-fit', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const row = requireAgentRow(ctx, teamId, c.req.param('aid'));
+    const machines = ctx.db
+      .select()
+      .from(machine)
+      .where(eq(machine.teamId, teamId))
+      .all()
+      .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const rows = machines.map((m) => {
+      const runtimeOk = runtimeGatePasses(m, row.provider);
+      // 未上报任何快照（capabilities 与 claudeCodeReport 双 null）= 未知：
+      // missing null（显示面闭嘴），canRun 跟随 runtimeOk（fail-open 与闸
+      // 同律——读面说的就是派发面做的）。
+      const noSnapshot = m.capabilities === null && m.claudeCodeReport === null;
+      const missing = noSnapshot
+        ? null
+        : capabilityMissingLabels(missingCapabilityItems(m, row.requiredCapabilities));
+      return {
+        machineId: m.id,
+        name: m.name,
+        online: m.online,
+        runtimeOk,
+        missing,
+        mcpGaps: declaredMcpGaps(m, row),
+        canRun: runtimeOk && (missing === null || missing.length === 0),
+      };
+    });
+    return c.json(agentMachineFitResponseSchema.parse({ machines: rows }));
+  });
+
   app.get('/api/teams/:id/agents/:aid/tasks', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);

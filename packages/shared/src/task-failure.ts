@@ -1,8 +1,16 @@
-// 失败分类器（#1257，Multica 同形三桶）：把 agent 后端的自由文本错误分到
-// quota / capacity / network / other 四桶。双端单源——daemon 侧 network 桶
-// 驱动会话续跑重试（runner），server 侧 quota 桶驱动「等额度」挂起（done
-// 面）；词表与规则序对齐 Multica taskfailure/classify.go（MUL-1949 SQL 是
-// 其正本，此处同律）：
+// 失败分类单源（两个分类器同文件共存，词表规则序对齐 Multica
+// taskfailure/classify.go；MUL-1949 SQL 是其正本，此处同律）：
+// - classifyStepFailure（#1257）：把 agent 后端自由文本错误分到
+//   quota / capacity / network / other 四桶。daemon 侧 network 桶驱动会话
+//   续跑重试（runner），server 侧 quota 桶驱动「等额度」挂起（done 面的
+//   文本兜底腿——quotaBlock 结构化信号优先，见 machine-wire.ts）。
+// - classifyAgentFailure（#1261）：daemon 检测面分类 + 板面文案复用，
+//   值域多一档 provider_network（与 #1257 network 同义，命名保持各自
+//   消费面原文）。附带 parseRetryAfterMs（Retry-After 头/诊断行 → 毫秒）。
+// 两个分类器的差异是有意的（#1257 桶序规则更细：语义先于词面、数字边界），
+// 消费面各钉各自测试（task-failure.test.ts 两 describe 块），不互相代偿。
+//
+// 通用规则（两分类器同律，Multica 同注）：
 // - 语义先于词面：concurrent request limit（403 形的瞬态并发拒绝）归
 //   capacity，先于 token/quota 词面；token limit 归上下文（other）不归
 //   quota——「额度用完」与「窗口装不下」是两种病。
@@ -10,7 +18,13 @@
 //   1），quota 词面在串里即归 quota，不被 network 抢走。
 // - 数字边界：402/403/429/529 只在非更长数字里命中（Multica 同款防
 //   「402913 tokens」「15290ms」「exit status 4030」误触）。
+// - 不可见即污染可观测性：分桶失败 = 额度事件落回普通失败漏斗，板面零
+//   「等额度」态——这正是 #1261 的用户实测形态。
 // 本模块刻意零依赖（不 import zod）：daemon / server / web 三端可直接消费。
+
+// ---------------------------------------------------------------------------
+// #1257：classifyStepFailure（server done 面文本兜底 + network 重试判定）
+// ---------------------------------------------------------------------------
 
 /** 失败桶（行为面枚举：quota → 挂起等额度；network → 续跑重试；其余 → 既有失败漏斗）。 */
 export const STEP_FAILURE_KINDS = ['quota', 'capacity', 'network', 'other'] as const;
@@ -114,4 +128,59 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
   // 6. 其余（auth 401/403、model not found、provider 5xx、未识别）→ other。
   //    403 单独出现无 usage-limit 词面 = 授权/访问问题（非配额）。
   return 'other';
+}
+
+// ---------------------------------------------------------------------------
+// #1261：classifyAgentFailure（daemon 检测面）+ parseRetryAfterMs
+// ---------------------------------------------------------------------------
+
+/** 失败桶词表（classifyAgentFailure 的值域）。 */
+export const AGENT_FAILURE_KINDS = ['quota', 'capacity', 'provider_network', 'other'] as const;
+export type AgentFailureKind = (typeof AGENT_FAILURE_KINDS)[number];
+
+/** quota（额度空）：余额/欠费/用量上限族。403+usage-limit 同入本桶
+ * （Multica classify.go 同律——Anthropic 的用量上限以 403 形态出现）。 */
+const QUOTA_PATTERN =
+  /\b402\b|usage[_\s-]?limit|insufficient\s+(?:quota|credit|balance)|(?:quota|credit|balance)\s+is\s+insufficient|quota\s+(?:exceed|exhaust|limit)|credit\s+balance|billing|余额不足|额度(?:不足|用完|耗尽|已用尽)|欠费/i;
+
+/** capacity（限流）：429/529/请求过频族。与 quota 的分桶差异 = 恢复语义
+ * （限流有 Retry-After 短窗，额度要充值/等月结）——板面文案与探测窗起点
+ * 分道。 */
+const CAPACITY_PATTERN =
+  /\b(?:429|529)\b|rate[_\s-]?limit|too\s+many\s+requests|overloaded|请求过于频繁|限流|负载(?:已)?饱和/i;
+
+/** provider_network（网络瞬态，可重试）：连接重置 / 上游流断（#1257 家族）/
+ * 连接拒绝 / 超时。 */
+const NETWORK_PATTERN =
+  /connection\s+(?:reset|refused|closed)|upstream\s+stream\s+disconnected|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket\s+hang\s+up|fetch\s+failed|network\s+error|temporarily\s+unavailable/i;
+
+/** 四桶分类（纯函数；空串/未知形态 → other，不抛）。判定序 =
+ * quota → capacity → provider_network → other（quota 语义最绑定，先判）。 */
+export function classifyAgentFailure(message: string): AgentFailureKind {
+  if (message === '') return 'other';
+  if (QUOTA_PATTERN.test(message)) return 'quota';
+  if (CAPACITY_PATTERN.test(message)) return 'capacity';
+  if (NETWORK_PATTERN.test(message)) return 'provider_network';
+  return 'other';
+}
+
+/** Retry-After 解析的秒数上限：超过即视为 bogus relay 值丢弃（不造数值）。
+ * 24h——限流窗口的物理上界之上的值对探测排程没有信息量。 */
+export const RETRY_AFTER_MAX_MS = 24 * 60 * 60 * 1000;
+
+/** Retry-After 解析（纯函数）：接受 `retry-after: 120` / `Retry-After: 30` /
+ * `retry after 45 seconds` / `retry-after=60s` / `2 minutes` 形态（诊断行与
+ * HTTP 头同源复用）。返回毫秒；HTTP 日期形态与非法值 → null（降级为缺省
+ * 探测窗，不造数值）。秒/分/时单位归一，上限 RETRY_AFTER_MAX_MS。 */
+export function parseRetryAfterMs(text: string): number | null {
+  const match = /retry[ _-]?after[\s:=]+(\d+)\s*(s|sec|seconds?|m|min|minutes?|h|hours?)?/i.exec(
+    text,
+  );
+  if (match === null) return null;
+  const value = Number(match[1]);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  const unit = match[2]?.toLowerCase() ?? 's';
+  const multiplier = unit.startsWith('m') ? 60_000 : unit.startsWith('h') ? 3_600_000 : 1_000;
+  const ms = value * multiplier;
+  return ms <= RETRY_AFTER_MAX_MS ? ms : null;
 }

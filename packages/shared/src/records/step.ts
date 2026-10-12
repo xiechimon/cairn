@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { skillFactSchema } from '../skill-facts.js';
 import { skillInjectionSchema } from '../skill-inject.js';
 import { epochMs, recordId } from './common.js';
+import { stepQueueBlockedSchema } from './machine-capabilities.js';
 
 /** 三类步（02 §4.2 中文语义名的 wire 投影 [推断]）+ `chief`（M4a [设计]：
  * Chief 回合 = 机器 step 为一手实测（r5 §3.1 daemon.log `claim step=…` →
@@ -48,9 +49,31 @@ export type StepRecord = z.infer<typeof stepRecordSchema>;
 
 /** journal 状态词（02 §5.4 [内部] 展开：claimed = 机器领取未收尾；
  * stopped = 用户停止钮中断（M7 #308，r9 §3.3 运行行「已取消」数据源——
- * machineDoneBody status 词表原含 stopped，此为 db/读面对位补齐）。 */
-export const stepStatusSchema = z.enum(['pending', 'claimed', 'done', 'failed', 'stopped']);
+ * machineDoneBody status 词表原含 stopped，此为 db/读面对位补齐）。
+ * waiting_quota = #1261 配额挂起：daemon 上报 quotaBlock 后 server 侧挂起
+ * （不判死、不发机器信号——探测到期 sweep 释放回 pending 自动续跑）。 */
+export const stepStatusSchema = z.enum([
+  'pending',
+  'claimed',
+  'done',
+  'failed',
+  'stopped',
+  'waiting_quota',
+]);
 export type StepStatus = z.infer<typeof stepStatusSchema>;
+
+/** #1261 等额度读面投影（stepJournalRowSchema.quotaWait 与 todo record
+ * quotaWait 同形——步在哪个读面，「哪一路 relay / 下次探测」只有一套口径）。
+ * kind 两值对齐 quotaBlockSchema；probeAt = 下次探测时刻（sweep 释放判据）；
+ * label/retryAfterMs null = 未携带（呈现层回落 providerId / 缺省窗文案）。 */
+export const quotaWaitSchema = z.object({
+  kind: z.enum(['quota', 'capacity']),
+  providerId: z.string(),
+  label: z.string().nullable(),
+  retryAfterMs: z.number().int().nullable(),
+  probeAt: z.number().int(),
+});
+export type QuotaWait = z.infer<typeof quotaWaitSchema>;
 
 /** steps 读面/会话流 step 事件行 = record + journal 位透出 [设计]（M5 详情
  * 面进度行/分支 dialog 目标提交数据源；stepRecordSchema 最小投影不含 =
@@ -90,9 +113,18 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           retryAt: epochMs,
         })
         .optional(),
+      /** pending 成因（#1251，加法契约 optional）：machine-offline = 等机器
+       *  上线（等待有用）；capability-missing = 无机器满足能力要求（装 X 即
+       *  解锁，missing 携缺项可读名）。缺席 = 正常排队（有可领机器）或老
+       *  server——呈现回落既有排队标签，零回归。 */
+      blocked: stepQueueBlockedSchema.optional(),
     })
     .optional(),
   skillInjection: skillInjectionSchema.nullable(),
+  /** #1261 配额挂起投影：status=waiting_quota 行在位（其余缺席——zod strip
+   * 下 record 对拍不漂移；老 server / fixture 面缺席 = 呈现回落既有标签，
+   * 零回归）。 */
+  quotaWait: quotaWaitSchema.optional(),
 });
 export type StepJournalRow = z.infer<typeof stepJournalRowSchema>;
 
