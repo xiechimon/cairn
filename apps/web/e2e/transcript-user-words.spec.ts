@@ -10,7 +10,8 @@ import { expect, type Page, test } from '@playwright/test';
 //  2. CONTINUE 续轮指令渲染成用户气泡
 //  3. 审核宣告行渲染成用户气泡（应与「发起了合并」同族 note 行）
 //  4. 真实 steer 话语丢 markdown（围栏成字面 ``` 文本）
-//  5. 单段短消息的气泡几何漂移（24px 药丸高度，chat-type-measure 同律）
+//  5. 单段短消息的气泡几何漂移（42px 药丸高度 = dsh 用户行解剖律，
+//     chat-type-measure 同律）
 //  6. taskline（#seq+标题行）在任务文本行退场后错挂到 steer 气泡上
 //  7. 首轮 plan 契约组合行（任务文本 + 契约指令同串，#1025 buildTaskPrompt
 //     注入形）渲染成用户气泡——任务原文与契约指令都该退场
@@ -230,7 +231,10 @@ test('4. 真实 steer 话语走 markdown：围栏成代码块，字面 ``` 不�
   await expect(md).not.toContainText('```');
 });
 
-test('5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）', async ({ page }) => {
+test('5. 单段短消息气泡保持 42px 药丸高度（dsh 用户行解剖律）', async ({ page }) => {
+  // 2026-10-12 重钉：dsh 用户气泡 = 42px 药丸（14px/22px + py 10px，源码
+  // MessageItem.module.css）；本面字阶 15px/24px + py 9px 同落 42px。旧钉
+  // 24px 是无内距的裸文行——dsh 律下它长成药丸卡。
   await stubWorld(page);
   const short = page.getByTestId('user-bubble').filter({ hasText: '收到，谢谢' });
   await expect(short).toBeVisible();
@@ -238,7 +242,7 @@ test('5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）', as
     const r = el.getBoundingClientRect();
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
-  expect(box.h).toBe(24);
+  expect(box.h).toBe(42);
   expect(box.font).toBe('15px');
 });
 

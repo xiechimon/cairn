@@ -149,6 +149,34 @@ body[data-board-dragging] .todo-card:hover {
     display: none;
   }
 }
+
+/* 动作行复制钮的新近律（2026-10-12 dsh 对齐，MessageIconActions 源码实测）：
+   只有最新一条带复制钮的回合在静置时露出它；更早的回合 hover /
+   focus-within 浮现（80ms opacity，布局不动）。触屏（hover:none）不进本块
+   = 恒显。载体 = scroller item 兄弟链：「本行之后还有带复制钮的行」即本行
+   非最新。判据键在 .chat-copy 上而不是 msg-actions——纯秒数/纯 toggle 的
+   动作行（没有复制钮）不算「更近的回合」（实测：终态行的 elapsed 尾会把
+   最后一条真复制钮误压隐）。 */
+@media (hover: hover) {
+  [data-slot="message-scroller-item"]:has(.chat-copy):has(
+      ~ [data-slot="message-scroller-item"] .chat-copy
+    )
+    .chat-copy {
+    opacity: 0;
+    transition: opacity 80ms ease;
+  }
+
+  [data-slot="message-scroller-item"]:has(.chat-copy):has(
+      ~ [data-slot="message-scroller-item"] .chat-copy
+    ):hover
+    .chat-copy,
+  [data-slot="message-scroller-item"]:has(.chat-copy):has(
+      ~ [data-slot="message-scroller-item"] .chat-copy
+    ):focus-within
+    .chat-copy {
+    opacity: 1;
+  }
+}
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
   .new-task-project-row,

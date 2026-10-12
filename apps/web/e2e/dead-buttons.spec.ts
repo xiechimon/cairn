@@ -628,7 +628,11 @@ test('detail transcript action rows carry no restore glyph (#884)', async ({ pag
   // The user row's action row is exactly the copy button: one glyph, and
   // it sits inside its button (the task-start bubble row carries a
   // taskline between the bubble and the action row).
-  const userRow = page.locator('.chat-row:has(.chat-bubble) ~ .chat-row-icons').first();
+  // 2026-10-12 重钉（#1268 dsh 用户行解剖）：气泡行改 flex justify-end 容器
+  // （chat-row 死类名退役），选择器改「气泡行的后续兄弟 msg-actions」。
+  const userRow = page
+    .locator('div:has(> [data-testid="user-bubble"]) ~ [data-testid="msg-actions"]')
+    .first();
   await expect(userRow.locator('svg')).toHaveCount(1);
   await expect(userRow.locator('button svg')).toHaveCount(1);
 });

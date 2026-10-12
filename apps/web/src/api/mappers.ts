@@ -593,7 +593,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       // 退场后没有合法宿主——且本循环按落库序迭代、显示序在 sort 之后才
       // 成立，「首条」在 steer 早于终稿上传落库时会认错行；#seq+标题的真值
       // 展示位是 dhead。fixture 捕获面自带 seq/title，渲染路径保留。
-      entries.push({ at: m.createdAt, item: { kind: 'user', text, markdown: text, id: m.id } });
+      // 2026-10-12 dsh 用户行解剖：时钟随 item 下发（预格式化 HH:mm），
+      // 渲染在气泡下的动作行（dsh MessageIconActions clock='start' 位）。
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'user', text, markdown: text, id: m.id, clock: clockTime(m.createdAt) },
+      });
       continue;
     }
     if (m.role === 'system') {
@@ -657,7 +662,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   if (build?.withPlan === true) {
     for (const s of steps) {
       if (s.kind === 'build') {
-        entries.push({ at: s.createdAt, item: { kind: 'user', text: '确认' } });
+        entries.push({
+          at: s.createdAt,
+          item: { kind: 'user', text: '确认', clock: clockTime(s.createdAt) },
+        });
       }
     }
   }

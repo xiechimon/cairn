@@ -15,10 +15,14 @@ const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=skills-routing';
 const ROUTE_NO_SKILLS = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27';
 
 test('the durable summary row names reads and denials in two columns', async ({ page }) => {
+  // 2026-10-12 重钉（#1268 行为批）：汇总行换 dsh ContextInjectionRow 形——
+  // 图标 + 标题「技能注入」+ 点隔 + 名单副题，居中灰通知退役。两列事实
+  // （read / denied）的钉扎不变。
   await page.goto(ROUTE);
   const summary = page.getByTestId('skills-summary');
   await expect(summary).toBeVisible();
-  await expect(summary).toContainText('技能：haiku-helper');
+  await expect(summary).toContainText('技能注入');
+  await expect(summary).toContainText('haiku-helper');
   await expect(summary).toContainText('挡下：secret-local');
 });
 

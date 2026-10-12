@@ -137,24 +137,37 @@ test('composer placeholder steps to 14px — one notch under the 15px body', asy
 });
 
 test('bubble / avatar / footer keep their own geometry (#470 scope fence)', async ({ page }) => {
+  // 2026-10-12 dsh 用户行解剖重钉（#1268 行为批）：用户行 = 贴右缘气泡（无
+  // 头像）+ 气泡下动作行（时钟 + 复制）。气泡几何 = dsh 42px 药丸律（本面
+  // 15px/24px 文 + py 9px）；agent 侧头像 20² 与 footer 31px inset 不动
+  // （探针改钉 agent 行，用户行已无此两物）。
   await page.goto(DONE);
   const geo = await page.evaluate(() => {
     const bubble = document.querySelector('[data-testid="user-bubble"]')!;
-    const avatar = document.querySelector('[data-testid="msg-avatar"] img')!;
-    const footer = document.querySelector('[data-testid="msg-actions"]')!;
+    const avatar = document.querySelector('[data-row="agent"] [data-testid="msg-avatar"] img')!;
+    const agentFooter = document.querySelector('[data-row="agent"] [data-testid="msg-actions"]')!;
+    const userTurn = bubble.parentElement!;
+    const userActions = userTurn.parentElement!.querySelector('[data-testid="msg-actions"]')!;
     const b = bubble.getBoundingClientRect();
     const a = avatar.getBoundingClientRect();
     return {
       bubbleH: Math.round(b.height),
       bubbleFont: getComputedStyle(bubble).fontSize,
       avatarBox: { w: Math.round(a.width), h: Math.round(a.height) },
-      footerPad: getComputedStyle(footer).paddingLeft,
+      footerPad: getComputedStyle(agentFooter).paddingLeft,
+      userRowJustify: getComputedStyle(userTurn).justifyContent,
+      userActionsJustify: getComputedStyle(userActions).justifyContent,
+      // 用户行无头像（自己的话不自报身份）
+      userHasAvatar: userTurn.querySelector('[data-testid="msg-avatar"]') != null,
     };
   });
-  expect(geo.bubbleH).toBe(24);
+  expect(geo.bubbleH).toBe(42);
   expect(geo.bubbleFont).toBe('15px');
   expect(geo.avatarBox).toEqual({ w: 20, h: 20 });
   expect(geo.footerPad).toBe('31px');
+  expect(geo.userRowJustify).toBe('flex-end');
+  expect(geo.userActionsJustify).toBe('flex-end');
+  expect(geo.userHasAvatar).toBe(false);
 });
 
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({

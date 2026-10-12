@@ -486,6 +486,10 @@ export type TranscriptItem =
       /** #1009 A2 行 id 贯通：live 面源 message id（React key +
        *  MessageScroller messageId 锚）；fixture 捕获形与合成行缺省。 */
       id?: string;
+      /** 2026-10-12 dsh 用户行解剖对齐：气泡下动作行的时钟（mapper 预格式化
+       *  HH:mm）。fixture 捕获形与乐观回声缺省 = 该行不摆钟（回声还没有真实
+       *  落库时刻，不摆假数）。 */
+      clock?: string;
     }
   /** Agent prose: one or more paragraphs of inline segments (r7 36 merge
    *  row, r7 38 legacy rows). `footer` renders the message action row

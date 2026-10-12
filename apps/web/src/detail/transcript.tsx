@@ -11,7 +11,6 @@
 
 import { useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
-import { type CurrentUser, useLiveData } from '../api/provider.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
@@ -27,6 +26,7 @@ import {
   Copy,
   ExternalLink,
   FileTab,
+  Puzzle,
   Terminal,
 } from '../icons/index.js';
 import { ChatMarkdown } from './chat-markdown.js';
@@ -198,13 +198,12 @@ function ActionRow({
         // geometry the #470 fence pins does not move. #945：.chat-copy 的
         // 无边框透明底迁 utilities（ghost hover 底双档中和，墨色走 inherit
         // = 行的 tertiary；老面无 cursor 规则，不加 cursor-pointer）。
-        // 2026-10-12 dsh 对齐：复制钮平时隐身、行 hover/聚焦浮现（dsh
-        // MessageIconActions 同律；触屏（hover:none）与键盘 focus-within
-        // 恒显——信息不丢，只收视觉噪音）。秒数/完成尾段是信息不是操作，
-        // 不参与隐身。
+        // 2026-10-12 dsh 对齐：复制钮可见性 = 新近律（motion.css .chat-copy
+        // 规则：最新一条带动作行的回合静置恒显，更早回合 hover/focus 浮现，
+        // 触屏恒显）。秒数/完成尾段是信息不是操作，不参与隐现。
         <Button
           variant="ghost"
-          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
           aria-label={t('复制')}
           onClick={() => {
             void navigator.clipboard.writeText(copy);
@@ -229,6 +228,33 @@ function ActionRow({
           {tail}
         </Button>
       )}
+    </div>
+  );
+}
+
+/** 2026-10-12 dsh 用户行解剖（MessageItem UserStyleBubble + MessageIconActions
+ *  源码实测）：气泡下贴右缘的动作行——时钟（tertiary 13px，clock='start'
+ *  位 = 钟在图标前）+ 复制图标钮（28px 盒 / 15px 字形 / rounded-md hover
+ *  底）。可见性 = 新近律（motion.css .chat-copy 规则：只有最新一条带动作
+ *  行的回合静置露出，更早的 hover/focus 浮现，触屏恒显）。时钟缺省
+ *  （fixture 捕获形 / 发送乐观回声）= 不摆假时刻。 */
+function UserActions({ copy, clock, t }: { copy: string; clock?: string; t: TFunc }) {
+  return (
+    <div
+      className="chat-row-icons mt-1.5 flex items-center justify-end gap-2 text-(--text-tertiary)"
+      data-testid="msg-actions"
+    >
+      {clock != null && <span className="text-[13px] leading-6 whitespace-nowrap">{clock}</span>}
+      <Button
+        variant="ghost"
+        className="chat-copy flex size-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-secondary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+        aria-label={t('复制')}
+        onClick={() => {
+          void navigator.clipboard.writeText(copy);
+        }}
+      >
+        <Copy width={15} height={15} />
+      </Button>
     </div>
   );
 }
@@ -297,7 +323,6 @@ function Row({
   t,
   onOpenPlan,
   agent,
-  user,
   liveStep,
 }: {
   item: TranscriptItem;
@@ -306,7 +331,6 @@ function Row({
   t: TFunc;
   onOpenPlan?: () => void;
   agent: { displayName: string; avatarUrl: string | null } | null;
-  user: CurrentUser;
   liveStep: LiveStep | null;
 }) {
   const margin = rowMargin(item, prev);
@@ -398,29 +422,23 @@ function Row({
         </div>
       );
     case 'user':
+      // 2026-10-12 dsh 用户行解剖（MessageItem.module.css 源码实测）：用户话
+      // = 贴右缘的列（userRow: flex column items-end），无头像——自己的话不
+      // 需要自报身份（agent 头像保留：多 agent 会话里它是身份载体，dsh 单
+      //  agent 会话才不挂）。气泡几何 = dsh 42px 药丸律（dsh 14px/22px + py
+      //  10px；本面字阶 15px/24px + py 9px，同落 42px），宽上限 = 列宽 70%
+      // （dsh userStack 的 0.702 列宽比）与 68ch 阅读上限取窄。动作行 =
+      //  UserActions（时钟 + 复制）贴右。DOM 序 = 气泡行 / taskline / 动作
+      //  行，动作行收尾（turn 边界探针钉 Item 末节点 = msg-actions）。
       return (
         <>
-          <div className={`${ROW_BASE} ${margin}`}>
-            <span
-              className="chat-avatar flex-none size-5 [&_img]:block [&_img]:size-5"
-              data-testid="msg-avatar"
-            >
-              <SeededAvatar
-                className="size-5"
-                name={user.displayName}
-                src={user.avatarUrl}
-                fallback="/avatar-user.png"
-              />
-            </span>
+          <div className={`${margin} flex justify-end`}>
             {/* #612：真实用户话语带 markdown 槽（live mapper 设置；robot 行
                 #469 同款渲染期解析）——围栏/列表/标题不再按字面裸排。纯文本
-                槽 = fixture 捕获形，DOM 与几何保持不变。XMON-55 P3：
-                min-height 保单行药丸 24px、多行随文长。2026-10-12 用户派
-                dsh 对话框对齐：气泡圆角升卡族档 rounded-2xl（18px，dsh 气泡
-                20px 的阶梯邻近值），composer 输入卡同批升档——页面上两个
-                用户说话的面仍同材质。 */}
+                槽 = fixture 捕获形，DOM 与几何保持不变。气泡 = 卡族
+                rounded-2xl（18px），与 composer 输入卡同材质。 */}
             <span
-              className={`chat-bubble ml-[11px] mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-2xl bg-(--secondary) px-[13px] text-[15px] leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble min-w-0 max-w-[min(70%,68ch)] rounded-2xl bg-(--secondary) px-4 py-[9px] text-[15px] leading-6 break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'
@@ -432,7 +450,7 @@ function Row({
             </span>
           </div>
           {item.seq != null && item.title != null && (
-            <div className="mt-1.5 flex items-center pl-[49px]" data-testid="taskline">
+            <div className="mt-1.5 flex items-center justify-end" data-testid="taskline">
               <span className="flex h-[18px] flex-none items-center rounded-[4px] bg-(--muted) px-[7px] text-[11px] leading-4 text-(--text-secondary)">
                 #{item.seq}
               </span>
@@ -444,7 +462,7 @@ function Row({
           {/* #634 follow-up: the user row's copy is real too — the bubble's
               own text (the reference copies its todo markdown link here;
               our share surface for that is the 更多 menu's 复制链接). */}
-          <ActionRow copy={item.markdown ?? item.text} t={t} />
+          <UserActions copy={item.markdown ?? item.text} clock={item.clock} t={t} />
         </>
       );
     case 'robot':
@@ -607,17 +625,39 @@ function Row({
     case 'tools':
       return <ToolsRow item={item} t={t} />;
     case 'skills':
-      // #918 技能事实汇总行（详情页的持久一份）：活行披露面的 activity 事实
-      // 是瞬态（步终态即清），本行从落库 toolcall 行派生、随消息重取常在。
-      // note 行同视觉族（居中 tertiary 小字），独立 testid 供探针定位。
+      // 2026-10-12 dsh ContextInjectionRow 形（用户点名「这种 context 的注入」
+      // 排版）：居中灰通知 → 流内左列行——14px 图标 + 标题 + 2px 点隔 +
+      // 名单副题（tertiary 13px/24px）。不挂 chevron：名单即全部事实，展开
+      // 背后没有更多内容（#634 形必须带义）。#918 持久汇总语义不变（活行
+      // 披露面是瞬态，本行随消息重取常在）。
       return (
-        <div
-          className="chat-note mx-auto mt-5 flex max-w-[68ch] flex-wrap items-baseline justify-center gap-x-1.5 text-center text-xs leading-4 text-(--text-tertiary)"
-          data-testid="skills-summary"
-        >
-          {item.read.length > 0 && <span>{t('技能：{n}', { n: item.read.join(', ') })}</span>}
-          {item.read.length > 0 && item.denied.length > 0 && <span aria-hidden="true">·</span>}
-          {item.denied.length > 0 && <span>{t('挡下：{n}', { n: item.denied.join(', ') })}</span>}
+        <div className="mt-5 flex h-6 items-center" data-testid="skills-summary">
+          <Puzzle width={14} height={14} className="flex-none text-(--text-tertiary)" />
+          <span className="ml-1.5 flex-none text-[13px] leading-6 text-(--text-secondary)">
+            {t('技能注入')}
+          </span>
+          {item.read.length > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                className="mx-2 size-0.5 flex-none rounded-[1px] bg-(--text-tertiary)"
+              />
+              <span className="min-w-0 truncate text-[13px] leading-6 text-(--text-tertiary)">
+                {item.read.join(', ')}
+              </span>
+            </>
+          )}
+          {item.denied.length > 0 && (
+            <>
+              <span
+                aria-hidden="true"
+                className="mx-2 size-0.5 flex-none rounded-[1px] bg-(--text-tertiary)"
+              />
+              <span className="min-w-0 truncate text-[13px] leading-6 text-(--text-tertiary)">
+                {t('挡下：{n}', { n: item.denied.join(', ') })}
+              </span>
+            </>
+          )}
         </div>
       );
     case 'elapsed':
@@ -855,9 +895,6 @@ export function Transcript({
   liveStep = null,
 }: TranscriptProps) {
   const { t } = useI18n();
-  // XMON-105: the user row's avatar is the logged-in user's own identity
-  // (sidebar chip / account head share it), not a per-surface static asset.
-  const { user } = useLiveData();
   return (
     <>
       {transcript.map((item, i) => {
@@ -878,7 +915,6 @@ export function Transcript({
               t={t}
               onOpenPlan={onOpenPlan}
               agent={agent}
-              user={user}
               liveStep={liveStep}
             />
           </MessageScrollerItem>

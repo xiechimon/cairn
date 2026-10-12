@@ -534,6 +534,9 @@ export const EN: Record<string, string> = {
   '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
+  // 2026-10-12 dsh ContextInjectionRow 对齐：技能汇总行的标题列（dsh 的
+  // 「Context injection」对应位）。
+  技能注入: 'Skill injection',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
   '注入技能：': 'Injected skills: ',
