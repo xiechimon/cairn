@@ -18,6 +18,7 @@ import type {
   ClaudeCodeReport,
   GitCredentials,
   MachineAttachmentResponse,
+  MachineCapabilities,
   MachineDoneBody,
   MachineSkillsManifestResponse,
   MachineTokenResponse,
@@ -50,6 +51,7 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
+  machineCapabilitiesSchema,
   machineRecordSchema,
   mergedPrGuardNoteRowId,
   type SkillInjectionRecord,
@@ -111,6 +113,7 @@ import {
 import {
   agentForStep as agentForStepEligibility,
   agentRunningCount,
+  capabilityGatePasses,
   machineRunningCount,
   runtimeGatePasses,
   unassignedStepReason,
@@ -313,7 +316,20 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     // 不渲染并发面的读端（如老调用面），maxConcurrent 恒随行）。
     maxConcurrent: row.maxConcurrent,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
+    // #1251：能力清单三态随行（清单 / null = 从未上报 / 列缺省不成立——
+    // server 恒发全块，nullish 形只留给老 server 响应的解析兼容）。
+    capabilities: row.capabilities,
   });
+}
+
+/** #1251 capabilities 字段的 server 侧收严（心跳红线 02 §5.4 的服务端半边）：
+ *  wire 位是 z.unknown（坏形状不 400 心跳），落库前单独 safeParse——合法 =
+ *  覆写；坏形状 = 丢弃该字段（保留旧值）；缺席 = 不动。任何一支都不影响
+ *  presence/enroll 的成功响应。 */
+function parseCapabilitiesField(raw: unknown): MachineCapabilities | undefined {
+  if (raw === undefined) return undefined;
+  const parsed = machineCapabilitiesSchema.safeParse(raw);
+  return parsed.success ? parsed.data : undefined;
 }
 
 /** 本机匹配键（spec 11 A8/A9，#357）：daemon `--name` 默认 hostname（r3
@@ -377,11 +393,15 @@ export function enrollMachine(
     cliVersion?: string;
     serverUrl: string;
     claudeCode?: ClaudeCodeReport;
+    /** #1251 能力清单（wire 宽松位原样进——收严在 parseCapabilitiesField，
+     *  坏形状丢弃不阻注册）。 */
+    capabilities?: unknown;
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
+  const capabilities = parseCapabilitiesField(input.capabilities);
   // 重注册复用同一 machineId（r3 §1.2：logout 后重注册 machineId 不变）；
   // 本机律（spec 11 A9）优先认领 seed placeholder 行——loopback enroll 不与
   // 启动 seed 建 duplicate。
@@ -400,6 +420,7 @@ export function enrollMachine(
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(isLocal ? { kind: 'local' as const } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
+        ...(capabilities !== undefined ? { capabilities } : {}),
       })
       .where(eq(machine.id, existing.id))
       .run();
@@ -423,6 +444,7 @@ export function enrollMachine(
       kind: isLocal ? 'local' : 'remote',
       enabledRuntimes: ['pi'],
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
+      ...(capabilities !== undefined ? { capabilities } : {}),
     })
     .run();
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
@@ -474,12 +496,15 @@ export function authorizeEnrollmentMachine(
 export function markPresence(
   deps: MachineDeps,
   machineId: string,
-  body: { cliVersion?: string; claudeCode?: ClaudeCodeReport },
+  body: { cliVersion?: string; claudeCode?: ClaudeCodeReport; capabilities?: unknown },
 ): void {
   const { db, hub } = deps;
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
   const becameOnline = !row.online;
+  // #1251：capabilities 单独 safeParse（心跳红线——坏字段丢弃保留旧值，
+  // 永不打出本函数之外的失败）。
+  const capabilities = parseCapabilitiesField(body.capabilities);
   db.update(machine)
     .set({
       online: true,
@@ -487,6 +512,7 @@ export function markPresence(
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
+      ...(capabilities !== undefined ? { capabilities } : {}),
     })
     .where(eq(machine.id, machineId))
     .run();
@@ -790,6 +816,9 @@ function buildChiefClaim(
   // #682 enabledRuntimes 真闸（chief 步同律）：chief 绑定 agent 的 runtime
   // 机器未开 = 该机不可领本回合（候选循环自动试下一条 chief 步）。
   if (!machineRow || !runtimeGatePasses(machineRow, agentRow.provider)) return null;
+  // #1251 能力闸（chief 回合同律——绑定 Agent 的能力要求对回合生效；判据
+  // 单源 dispatch-eligibility，fail-open 律同 worker 面）。
+  if (!capabilityGatePasses(machineRow, agentRow)) return null;
   // 思考强度覆盖（PATCH body agent.thinkingLevel，r5 §2）优先，回退绑定 Agent 值。
   const thinkingLevel = chiefRow.thinkingLevel ?? agentRow.thinkingLevel;
   // 主模型覆盖（#615，r5 107/108 独立「模型」选择器落库面）优先，回退绑定
@@ -951,6 +980,11 @@ async function tryClaim(
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
     if (!runtimeGatePasses(machineRow, agentRow.provider)) continue;
+    // #1251 能力闸（ADR 0018 决策 4.3，判据单源 dispatch-eligibility）：机器
+    // 上报快照不满足 agent.requiredCapabilities = 不可领（步留 pending 给能力
+    // 齐的机器；未上报快照 = 未知放行，老 daemon 零回归）。候选级 continue
+    // ——#1138 agent 闸同形，被挡候选不队头阻塞同批其它候选。
+    if (!capabilityGatePasses(machineRow, agentRow)) continue;
     // #1138 agent 级并发闸（候选级判）：该 Agent 名下 claimed worker 步数达
     // maxConcurrentTasks → 跳过本候选（步留 pending 等该 Agent 释放空位，
     // 不进失败漏斗——公平排队是合法态，与机器闸同语义）。三层分工钉死，

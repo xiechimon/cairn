@@ -40,6 +40,12 @@ export const machineEnrollBodySchema = z.object({
   /** 本机 claude-code 模型上报（#707）：daemon 读本机 settings.json 随注册
    *  上行，免等首个 presence 节拍。缺席 = 旧 daemon（server 视为未知）。 */
   claudeCode: claudeCodeReportSchema.optional(),
+  /** 机器能力清单（#1251 / ADR 0018 决策 4.1）：已装 MCP slug 集 + 本机
+   *  技能名集，随注册上行免等首个 presence 节拍。wire 级宽松位（z.unknown，
+   *  心跳红线 02 §5.4——坏形状永不 400 注册/心跳）；server 侧对
+   *  machineCapabilitiesSchema 单独 safeParse 收严落库，失败丢弃保留旧值。
+   *  缺席 = 旧 daemon（server 视为未知，能力闸放行）。 */
+  capabilities: z.unknown().optional(),
 });
 export type MachineEnrollBody = z.infer<typeof machineEnrollBodySchema>;
 
@@ -87,6 +93,11 @@ export const machineMeResponseSchema = machineRecordSchema;
 export const machinePresenceBodySchema = z.object({
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
+  /** 机器能力清单（#1251，enroll 同律）：wire 级宽松位（z.unknown）——
+   *  字段级解析失败不阻心跳（02 §5.4 红线），收严在 server 侧 safeParse
+   *  （machineCapabilitiesSchema），失败丢弃该字段保留旧值、presence 恒
+   *  {ok:true}。缺席 = 旧 daemon，server 保留旧值。 */
+  capabilities: z.unknown().optional(),
 });
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
 

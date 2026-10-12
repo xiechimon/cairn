@@ -415,6 +415,11 @@ export interface MachineRow {
   maxConcurrent?: number;
   /** #1108 该机 claimed 步数（全 kind；`执行中 n/N` 的 n）。absent 同上。 */
   runningSteps?: number;
+  /** #1251 能力清单读标注（daemon 上报的已装 MCP slug 集 + 本机技能名集；
+   *  契约单源 = shared machineRecordSchema.capabilities）。null = 从未上报
+   *  （行显「能力清单未上报」）；absent = 老服务器/存量 fixture——读标注
+   *  退场，呈现零漂移。 */
+  capabilities?: { mcpServers: string[]; skills: string[] } | null;
 }
 
 /** The six resource surfaces' row sets (issue #69). */

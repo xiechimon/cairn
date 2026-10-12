@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attachment-token.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
+import { stepQueueBlockedSchema } from './machine-capabilities.js';
 import type { ModelSource } from './model-source.js';
 import { modelSourceRuntimeSchema } from './model-source.js';
 
@@ -221,6 +222,8 @@ export const chiefThreadSchema = z.object({
           capacity: z.number().int(),
         })
         .nullable(),
+      /** pending 成因（#1251，StepQueueInfo.blocked 同源同形）。 */
+      blocked: stepQueueBlockedSchema.optional(),
     })
     .nullable()
     .optional(),

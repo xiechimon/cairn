@@ -172,6 +172,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: body.name ?? 'machine', // --name 默认 hostname（客户端已带则覆盖）
       ...(body.cliVersion !== undefined ? { cliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCode: body.claudeCode } : {}),
+      // #1251：能力清单原样透传（wire 宽松位——收严与丢弃在 enrollMachine
+      // 的 parseCapabilitiesField，坏形状不阻注册）。
+      ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
       serverUrl: originOf(c),
     });
     return c.json(result); // = machine.json 形状（r3 §1.3）

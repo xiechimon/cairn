@@ -79,7 +79,11 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
  *  label/vars（t() 键 + 插值；queue = server 排队投影真值）。形 =
  *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。
  *  #1257：额度挂起中（queue.hold）的排队行呈现「等额度」而非「等空闲机器」
- *  ——挂起 ≠ 排队，可见态钉住下次尝试时刻。 */
+ *  ——挂起 ≠ 排队，可见态钉住下次尝试时刻。
+ *  #1251 blocked 位次之（成因仍先于位次——「等谁」比「排第几」更可操作）：
+ *  capability-missing = 给修法（缺项点名 + 装齐即解锁）；machine-offline =
+ *  给等待（等机器上线，钉选面点名机器）。hold 先于 blocked：步级挂起带
+ *  下次尝试时刻，更具体。 */
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
@@ -90,6 +94,21 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
       label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
       vars: { time: clockTime(queue.hold.retryAt) },
     };
+  }
+  if (queue.blocked?.kind === 'capability-missing') {
+    return {
+      label:
+        '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+      vars: { missing: queue.blocked.missing.join('、'), ahead },
+    };
+  }
+  if (queue.blocked?.kind === 'machine-offline') {
+    return queue.waitingFor != null
+      ? {
+          label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
+          vars: { machine: queue.waitingFor.name, ahead },
+        }
+      : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
   }
   return queue.waitingFor != null
     ? {
@@ -1117,6 +1136,9 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     // 行回到 shell 闸单控件面（存量 capture 零漂移）。
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
+    // #1251 能力清单：三态原样透传（清单 / null = 未上报 / absent = 老
+    // server——读标注退场，maxConcurrent 同律）。
+    ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
   }));
 }
 

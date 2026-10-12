@@ -1,0 +1,35 @@
+{
+  "machines": [
+    {
+      "machineId": "LvofJNg-n_5gMcR6eAXJK",
+      "name": "cap-legacy",
+      "online": false,
+      "runtimeOk": true,
+      "missing": null,
+      "mcpGaps": null,
+      "canRun": true
+    },
+    {
+      "machineId": "eQ9GYtiMAH7CCuJ2Y35Vc",
+      "name": "cap-mbp",
+      "online": true,
+      "runtimeOk": true,
+      "missing": [
+        "MCP server \"figma\""
+      ],
+      "mcpGaps": [
+        "figma"
+      ],
+      "canRun": false
+    },
+    {
+      "machineId": "TUVroxeaojTpveIiqLLag",
+      "name": "xmonsMac-3574.local",
+      "online": false,
+      "runtimeOk": true,
+      "missing": null,
+      "mcpGaps": null,
+      "canRun": true
+    }
+  ]
+}
