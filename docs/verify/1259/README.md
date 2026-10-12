@@ -5,6 +5,12 @@ probe：`drive-1259-1260-binding.mjs`（verify-pacman 定制探针，与 #1260 �
 8791/5273 被别的 lane 占用，按端口纪律换口；零 daemon、零 LLM——派发面全走真
 machine wire，UI 面走真浏览器）。结果：**27/27 checks PASS**（`result.json`）。
 
+**2026-10-13 merge 后复跑**（main #1257 挂起语义并入后，栈 8806/5286）：**28/28
+checks PASS**——A/C/D/F 腿逐字节同判据（路由/占槽/换绑/生命周期/UI 闭环零回归）；
+E 腿按 #1257 裁决改挂起语义：无归属机存量步**不再 failed**，调度拍后仍 pending +
+`build.errorMessage` 空 + 板面 `waitingOn = {on:"machine"}`（`e-legacy-sweep.json`
+的 todo 记录实载）。本目录同名文件已覆盖为复跑产物（`result.json` = 复跑真值）。
+
 ## 场景
 
 双机各持各 api-key（`verify-home-1259` / `verify-other-1259`，enroll 时各带
@@ -16,7 +22,7 @@ agent 出生绑归属机（创建必填，缺省 400）。
 | A 路由 | 创建（machineId 必填）→ todo+build + chief 回合 → 别机/归属机 claim | `a-claims.json`：别机 75s 长轮询空手、归属机先后领到 build 步与 chief 步（kind + machineId） |
 | C 换绑 | claude-code agent 换绑到缺模型的机器 → 400；合法换绑 → 新步即时改派 | result.json `C1`（400 文案含模型 id `stub-cc-model`）/ `C3`（原机空手）/ `C4`（新机领到） |
 | D 生命周期 | 删有绑定的机器 → 409 点名；整机迁移（合格迁走、模型不合留机列原因）；腾空后删 204 | `d-evacuate.json`（evacuate 响应 + SQLite agent 行机器归属前后态） |
-| E 存量兜底 | DB 直插无归属机存量 agent + 老化其 pending 步 → 调度拍扫 | `e-legacy-sweep.json`：步 failed + build.errorMessage 含「未设归属机」 |
+| E 存量兜底 | DB 直插无归属机存量 agent + 老化其 pending 步 → 调度拍扫 | `e-legacy-sweep.json`：步仍 pending（#1257 挂起）+ errorMessage 空 + waitingOn「等机器」（merge 后复跑判据） |
 | F UI 闭环 | machines 列表行机器名 → 详情页（fact 条 + 归属网格 + 预选归属机的创建弹窗） | `f1-machine-detail.png` / `f3-create-dialog.png` |
 
 ## 复跑配方

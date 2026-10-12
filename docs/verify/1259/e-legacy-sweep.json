@@ -1,8 +1,52 @@
 {
   "step": {
-    "status": "failed"
+    "status": "pending"
   },
   "build": {
-    "errorMessage": "本轮无人认领：Agent「verify-legacy-nohome」未设归属机，没有机器能认领本步。请在 agent 设置里指定归属机后重跑任务。"
+    "errorMessage": null
+  },
+  "todo": {
+    "id": "todo-legacy-1",
+    "teamId": "5Z_CllnAQP1pbZWF9Yb1A",
+    "projectId": "sT8DNgJJEIZskqN-7wLcv",
+    "title": "存量任务",
+    "spec": "",
+    "phase": "building",
+    "phaseAt": 1791823961965,
+    "seqNum": 9901,
+    "orderIndex": 0,
+    "tagIds": [],
+    "assignment": {
+      "plan": null,
+      "build": {
+        "agentId": "agent-legacy-nohome"
+      }
+    },
+    "agent": {
+      "id": "agent-legacy-nohome",
+      "displayName": "verify-legacy-nohome"
+    },
+    "latestBuildId": "build-legacy-1",
+    "lastRunAt": null,
+    "hasChanges": false,
+    "hasPlan": false,
+    "buildHistory": [
+      {
+        "buildId": "build-legacy-1",
+        "createdAt": 1791823961965
+      }
+    ],
+    "sourceTodo": null,
+    "blockedBy": null,
+    "v": 1,
+    "createdBy": null,
+    "ownerId": null,
+    "sourceBuildId": null,
+    "sourceKind": null,
+    "sourceRef": null,
+    "waitingOn": {
+      "on": "machine",
+      "retryAt": null
+    }
   }
 }

@@ -11,8 +11,8 @@
 //     （claude-code agent → 目标机自报清单无该模型）→ 400 指名。
 //   D 机器生命周期：删机保护 409 点名 → 整机迁移（模型不合的留机列原因，
 //     合格的迁走）→ 腾空后删除 204。
-//   E sweep 可见失败：DB 直插无归属机的存量 agent + 老化其 pending 步 →
-//     调度拍后 failed + 文案指名「未设归属机」。
+//   E sweep 挂起：DB 直插无归属机的存量 agent + 老化其 pending 步 →
+//     调度拍后仍 pending（#1257 挂起语义：不判死）+ 板面 waitingOn「等机器」。
 //   F UI 闭环（浏览器）：machines 列表行名可点 → 详情页（fact 条/归属
 //     agent 网格/迁移与删除出口）→ 详情页建 agent 弹窗预选归属机；chief
 //     抽屉模型行只读（无触发钮）；总管设置 Agent tab 只读信息卡在位、
@@ -324,41 +324,44 @@ check('D4 目标机补模型报告后换绑 → 200', fixRebind.status === 200);
 const del2 = await sendJson(SERVER + '/api/machines/' + home.id, undefined, 'DELETE');
 check('D5 腾空后删除 → 204 + 行消失', del2.status === 204 && db((d) => d.prepare('SELECT COUNT(*) n FROM machine WHERE id = ?').get(home.id).n) === 0);
 
-// —— E 腿：sweep 可见失败（存量无归属机 agent）———————————————————
+// —— E 腿：sweep 挂起（存量无归属机 agent）———————————————————
 // DB 直插存量形态（创建面已禁设 null——这条腿钉的是迁移前的存量行）。
+// #1257 裁决后的挂起语义：无归属机的 pending 步不判死（机器回来/补设即自动
+// 续领），可见性 = 板面 waitingOn「等机器」chip（todos.ts 读侧派生）。
 db((d) => {
   d.prepare(
     `INSERT INTO agent (id, teamId, displayName, provider, modelId, machineId) VALUES (?, ?, ?, ?, ?, NULL)`,
   ).run('agent-legacy-nohome', teamId, 'verify-legacy-nohome', 'stub-gw', 'stub-model');
   const now = Date.now();
+  // phase = building（在飞形：confirm 已过、步在等机——waitingOn 派生只答
+  // 在飞卡的挂起态；queued 形板面自显「排队中」，不进本腿判读）。
   d.prepare(
-    `INSERT INTO todo (id, teamId, projectId, seqNum, title, spec, phase, phaseAt, assignment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run('todo-legacy-1', teamId, proj.body.id, 9901, '存量任务', '', 'queued', now, JSON.stringify({ plan: null, build: { agentId: 'agent-legacy-nohome' } }));
+    `INSERT INTO todo (id, teamId, projectId, seqNum, title, spec, phase, phaseAt, assignment, latestBuildId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run('todo-legacy-1', teamId, proj.body.id, 9901, '存量任务', '', 'building', now, JSON.stringify({ plan: null, build: { agentId: 'agent-legacy-nohome' } }), 'build-legacy-1');
   d.prepare(
     `INSERT INTO build (id, todoId, withPlan, planDocId, triggerSource, createdAt) VALUES (?, ?, 0, NULL, 'user', ?)`,
   ).run('build-legacy-1', 'todo-legacy-1', now);
-  // 步的最后活动锚回拨到宽限之前（PIN_OFFLINE_GRACE_MS = 10min）。
   d.prepare(
     `INSERT INTO step (id, buildId, kind, status, createdAt) VALUES (?, ?, 'build', 'pending', ?)`,
   ).run('step-legacy-1', 'build-legacy-1', now - 11 * 60_000);
 }, false);
-// 等调度拍（15s 间隔）扫到。
-let legacyStep = null;
-for (let i = 0; i < 8; i++) {
-  await new Promise((r) => setTimeout(r, 5000));
-  legacyStep = db((d) => d.prepare(`SELECT status FROM step WHERE id = 'step-legacy-1'`).get());
-  if (legacyStep?.status === 'failed') break;
-}
+// 等三个调度拍（15s 间隔）——「不动」是有界等待：到点后仍是 pending 即挂起。
+await new Promise((r) => setTimeout(r, 35_000));
+const legacyStep = db((d) => d.prepare(`SELECT status FROM step WHERE id = 'step-legacy-1'`).get());
 const legacyBuild = db((d) =>
   d.prepare(`SELECT errorMessage FROM build WHERE id = 'build-legacy-1'`).get(),
 );
-check('E1 无归属机存量步：调度拍后 failed', legacyStep?.status === 'failed', JSON.stringify(legacyStep));
-check(
-  'E2 失败文案指名「未设归属机」',
-  (legacyBuild?.errorMessage ?? '').includes('未设归属机'),
-  legacyBuild?.errorMessage ?? null,
+const legacyTodo = (await getJson(SERVER + '/api/projects/' + proj.body.id + '/todos')).find(
+  (t) => t.id === 'todo-legacy-1',
 );
-saveJson('e-legacy-sweep.json', { step: legacyStep, build: legacyBuild });
+check('E1 无归属机存量步：调度拍后仍 pending（#1257 挂起不判死）', legacyStep?.status === 'pending', JSON.stringify(legacyStep));
+check('E2 build 无 errorMessage（挂起 ≠ 失败）', legacyBuild?.errorMessage == null, legacyBuild?.errorMessage ?? null);
+check(
+  'E3 板面 waitingOn = 等机器（补设即解锁）',
+  legacyTodo?.waitingOn?.on === 'machine',
+  JSON.stringify(legacyTodo?.waitingOn ?? null),
+);
+saveJson('e-legacy-sweep.json', { step: legacyStep, build: legacyBuild, todo: legacyTodo });
 
 // —— F 腿：UI 闭环（浏览器）——————————————————————————————————
 const browser = await chromium.launch();

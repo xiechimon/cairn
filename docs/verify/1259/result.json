@@ -1,17 +1,17 @@
 {
   "probe": "1259-1260-binding",
-  "server": "http://127.0.0.1:8792",
-  "web": "http://127.0.0.1:5274",
+  "server": "http://127.0.0.1:8806",
+  "web": "http://127.0.0.1:5286",
   "checks": [
     {
       "name": "铺底：双机 enroll（各持各 key）",
       "ok": true,
-      "detail": "home=Yz9w037hNcAo9r8jJAQ-f other=iuRlRFy4uoWgjYE7SyuYM"
+      "detail": "home=zzWiIWz5xwjLeYm6amAvF other=idJnLEB5N3rNbkKEjrmCC"
     },
     {
       "name": "A0 创建 agent（归属机 = home）→ 201",
       "ok": true,
-      "detail": "{\"id\":\"eunNbE2AwRaCCbL7oM460\"}"
+      "detail": "{\"id\":\"S9MSBLCUVVeIvKoUAKZGw\"}"
     },
     {
       "name": "A0b 创建缺 machineId → 400",
@@ -56,7 +56,7 @@
     {
       "name": "C0 创建 claude-code agent（home 有该模型）→ 201",
       "ok": true,
-      "detail": "{\"id\":\"ANzIWnIBT3lHw468LZ9QD\"}"
+      "detail": "{\"id\":\"hn1o_atcBYLTKgiPTRpnF\"}"
     },
     {
       "name": "C1 换绑到缺模型的机器 → 400 指名模型",
@@ -86,12 +86,12 @@
     {
       "name": "D2 整机迁移：合格的迁走（verify-bound-agent → other）",
       "ok": true,
-      "detail": "{\"moved\":[\"eunNbE2AwRaCCbL7oM460\"],\"rejected\":[{\"agentId\":\"ANzIWnIBT3lHw468LZ9QD\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+      "detail": "{\"moved\":[\"S9MSBLCUVVeIvKoUAKZGw\"],\"rejected\":[{\"agentId\":\"hn1o_atcBYLTKgiPTRpnF\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
     },
     {
       "name": "D3 部分迁移合法：模型不合的留原机 + 响应列原因",
       "ok": true,
-      "detail": "{\"moved\":[\"eunNbE2AwRaCCbL7oM460\"],\"rejected\":[{\"agentId\":\"ANzIWnIBT3lHw468LZ9QD\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+      "detail": "{\"moved\":[\"S9MSBLCUVVeIvKoUAKZGw\"],\"rejected\":[{\"agentId\":\"hn1o_atcBYLTKgiPTRpnF\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
     },
     {
       "name": "D4 目标机补模型报告后换绑 → 200",
@@ -104,14 +104,19 @@
       "detail": null
     },
     {
-      "name": "E1 无归属机存量步：调度拍后 failed",
+      "name": "E1 无归属机存量步：调度拍后仍 pending（#1257 挂起不判死）",
       "ok": true,
-      "detail": "{\"status\":\"failed\"}"
+      "detail": "{\"status\":\"pending\"}"
     },
     {
-      "name": "E2 失败文案指名「未设归属机」",
+      "name": "E2 build 无 errorMessage（挂起 ≠ 失败）",
       "ok": true,
-      "detail": "本轮无人认领：Agent「verify-legacy-nohome」未设归属机，没有机器能认领本步。请在 agent 设置里指定归属机后重跑任务。"
+      "detail": null
+    },
+    {
+      "name": "E3 板面 waitingOn = 等机器（补设即解锁）",
+      "ok": true,
+      "detail": "{\"on\":\"machine\",\"retryAt\":null}"
     },
     {
       "name": "F1 机器名链接 → 详情页（fact 条在位）",
