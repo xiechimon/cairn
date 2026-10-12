@@ -349,9 +349,22 @@ export const EN: Record<string, string> = {
   '（等待机器上线）': '(waiting for the machine to come online)',
   // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
   归属机: 'Home machine',
+  ' · 归属机 {machine}': ' · on {machine}',
+  ' · 未设归属机': ' · no home machine',
   离线: 'Offline',
   还没有接入机器: 'No machines connected yet',
   接入机器: 'Connect a machine',
+  在线: 'Online',
+  '无 runtime 开启': 'No runtimes enabled',
+  '并发 {running}/{cap}': '{running}/{cap} concurrent',
+  '迁移到…': 'Migrate to…',
+  迁移到: 'Migrate to',
+  整机迁移: 'Migrate all agents',
+  '删除（先迁走 {n} 个 agent）': 'Delete (move {n} agents first)',
+  机器不存在或已移除: 'Machine missing or removed',
+  '整机迁移失败，请重试。': 'Migration failed. Try again.',
+  '删除机器失败，请重试。': 'Could not delete the machine. Try again.',
+  '{n} 个 agent 未过校验留在原机': '{n} agents failed validation and stayed put',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',

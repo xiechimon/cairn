@@ -976,6 +976,7 @@ export function mapTeam(members: TeamMember[]): TeamContent {
       modelId?: string | null;
       description?: string | null;
       provider?: string | null;
+      machineId?: string | null;
     };
     return {
       id: m.actorId,
@@ -985,6 +986,7 @@ export function mapTeam(members: TeamMember[]): TeamContent {
       isDefault: false,
       role: a.description ?? null,
       provider: a.provider ?? null,
+      machineId: a.machineId ?? null,
     };
   });
   return { members: members.length, agents: cards };

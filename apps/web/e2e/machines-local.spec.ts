@@ -9,14 +9,15 @@
 // 4. 行内恰一个控件 = shell 开关（XMON-113）；button / per-runtime switch 仍无（负向）
 // 5. 副行 hint 摘除 → 开关簇 tooltip（#1175；#503 的 id 尾巴 / 并发上限仍负向）
 // 6. 本机行不可删（行内无删除类控件，负向）
-// 7. 行无 chevron 可点感装饰（A7 负向）
+// 7. 行本体不可点；行内唯一链接 = 机器名 → 机器详情页（#1259）
 // 开关的读写/回滚行为面（live 打桩）在 machines-shell-switch.spec.ts。
 // #944/#910 载体：.res-grow → div[data-kind]（行 div 的既有契约句柄；
 // Switch 也带 data-machine-id，元素名限定防串）；.mach-runtime →
 // [data-runtime]；.mach-mark → 其内 svg；.mach-runtime--on 状态类 →
 // data-enabled 属性（裁定 3：状态断言载体走 data-*）；.mach-shell-switch →
 // role=switch；.res-row-title/-desc → 文案一级；.res-row-more/-chev 负向 →
-// 行内 menu 触发/可点语义计数 0。.res-main = chief docking 跨域句柄（#950）。
+// 行内 menu 触发计数 0 + 行无 button 语义；行内唯一链接 = 机器名。
+// .res-main = chief docking 跨域句柄（#950）。
 
 import { expect, test } from '@playwright/test';
 
@@ -112,13 +113,18 @@ test('本机行不可删：行内无删除类控件（负向）', async ({ page 
   await expect(page.locator(`${LOCAL_ROW} [aria-haspopup="menu"]`)).toHaveCount(0);
 });
 
-test('行无 chevron 可点感装饰（spec 11 A7 负向）', async ({ page }) => {
+test('行本体不可点；机器名 = 机器详情页链接（#1259）', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(LOCAL_ROW)).toBeVisible();
-  // A7 语义 = 行不可点：行本体无 button 语义/链接（chevron 装饰类已退役，
-  // 断言从「装饰不在」改钉「可点语义不在」）。
+  // A7 语义收窄 = 行本体不可点：行不挂 button 语义、行不整包成链接；
+  // 行内唯一锚点 = 机器名 → 详情页（#1259 机器详情面入口）。
   await expect(page.locator(`${SHELL} [data-kind][role="button"]`)).toHaveCount(0);
-  await expect(page.locator(`${SHELL} [data-kind] a`)).toHaveCount(0);
+  const nameLinks = page.locator(`${LOCAL_ROW} a`);
+  await expect(nameLinks).toHaveCount(1);
+  await expect(nameLinks).toHaveAttribute(
+    'href',
+    `/app/resources/machines/${LOCAL_ID}?scenario=06`,
+  );
 });
 
 // 钉扎四面之视觉几何断言面：mach-runtime 族硬契约（16×16 官方 mark；on/off

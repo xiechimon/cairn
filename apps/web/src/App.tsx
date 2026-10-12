@@ -10,6 +10,7 @@ import { ProjectPage } from './pages/project-page.js';
 import { ProjectSettingsPage } from './pages/project-settings-page.js';
 import { SchedulesPage } from './pages/schedules-page.js';
 import { PwaBridge } from './pwa/register.js';
+import { MachineDetailPage } from './resources/machine-detail-page.js';
 import { MACHINES_HREF, MachinesPage } from './resources/machines-page.js';
 import { MCP_HREF, McpServersPage } from './resources/mcp-servers-page.js';
 import { PROVIDERS_HREF, ProvidersPage } from './resources/providers-page.js';
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
               { path: MCP_HREF, element: <McpServersPage /> },
               { path: SECRETS_HREF, element: <SecretsPage /> },
               { path: MACHINES_HREF, element: <MachinesPage /> },
+              { path: `${MACHINES_HREF}/:id`, element: <MachineDetailPage /> },
               { path: '/app/machines/authorize', element: <MachineAuthorizePage /> },
               { path: PROVIDERS_HREF, element: <ProvidersPage /> },
               { path: '*', element: <Navigate to="/app" replace /> },

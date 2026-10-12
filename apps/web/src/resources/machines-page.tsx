@@ -24,7 +24,7 @@
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -255,7 +255,13 @@ export function MachinesPage() {
               <Tile Icon={Monitor} size="lg" tone="orange" />
               <RowText>
                 <RowLine>
-                  <RowTitle>{t(machine.name)}</RowTitle>
+                  <RowTitle>
+                    {/* #1259：机器名 = 详情页入口（行内开关控件不动，整行不
+                        改链接——控件与导航分家）。 */}
+                    <Link to={`${MACHINES_HREF}/${machine.id}?${searchParams.toString()}`}>
+                      {t(machine.name)}
+                    </Link>
+                  </RowTitle>
                   {/* online 读 machine.online（与 new-task-machine-dot /
                     dlg-machine-dot 同族语义）：在线绿点，离线灰点——离线行
                     此前无任何表示，daemon 死后机器页看不出。undefined（无该

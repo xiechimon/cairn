@@ -242,6 +242,8 @@ export interface TeamAgentCard {
   model: string;
   /** Model line carries the `· 默认` suffix for the team's default agent. */
   isDefault: boolean;
+  /** #1259 归属机（agent.machineId；null = 未设——卡上指名警示）。 */
+  machineId?: string | null;
   /** Role line text; null renders the `未设置职责` placeholder (r7 12). */
   role: string | null;
   /** 服务商标识（r3 §4 样本 `provider:"r3-gw"`；records/agent.ts 同名栏）。
