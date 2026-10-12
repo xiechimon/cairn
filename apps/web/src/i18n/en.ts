@@ -690,6 +690,9 @@ export const EN: Record<string, string> = {
   复用方案: 'Reuse plan',
   选择接下来如何使用这个方案: 'Choose how to use this plan next',
   查看方案: 'View plan',
+  // #1258 失败行原始错误弹窗面
+  查看原始错误: 'View raw error',
+  原始错误: 'Raw error',
   直接执行: 'Run directly',
   重试: 'Retry',
   失败: 'Failed',
