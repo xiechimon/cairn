@@ -1,0 +1,12 @@
+{
+  "steps": [
+    {
+      "id": "ZNmSvSjWHMVejZwZVnTfr",
+      "kind": "build",
+      "status": "failed"
+    }
+  ],
+  "stepStatus": "failed",
+  "errorMessage": "git clone failed (128): fatal: repository '/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-9aDtay/repo' does not exist",
+  "elapsedMs": 7026
+}

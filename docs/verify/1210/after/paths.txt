@@ -1,0 +1,3 @@
+repoDir=/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo
+repoGone=/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo-gone
+DAEMON_HOME=/tmp/pacman-1210-daemon-1791818350235

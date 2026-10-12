@@ -1,0 +1,99 @@
+{
+  "probe": "drive-1210-local-unreachable",
+  "expect": "new",
+  "repo": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0334-1210",
+  "server": "http://127.0.0.1:8804",
+  "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0334-1210/.claude/verify-run/home/server/server.db",
+  "machineName": "verify-1210",
+  "daemonHome": "/tmp/pacman-1210-daemon-1791818350235",
+  "repoDir": "/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo",
+  "passed": 17,
+  "total": 17,
+  "checks": [
+    {
+      "name": "POST local 项目 201（路径在位，创建闸过）",
+      "ok": true,
+      "detail": "201"
+    },
+    {
+      "name": "腿 A：步入终态 failed（不是挂起等待）",
+      "ok": true,
+      "detail": "stepStatus=failed"
+    },
+    {
+      "name": "腿 A：errorMessage 点名机器名",
+      "ok": true,
+      "detail": "local 形态项目无法在机器「verify-1210」上执行步骤：仓库路径 /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo 在本机"
+    },
+    {
+      "name": "腿 A：errorMessage 点名仓路径",
+      "ok": true,
+      "detail": "/var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo"
+    },
+    {
+      "name": "腿 A：errorMessage 带原因人话（路径不存在）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：errorMessage 带补法①钉选机器 / ②GitHub 形态",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：daemon.log 落 [step] failed 合成文案行",
+      "ok": true,
+      "detail": "2026-10-12 23:19:12 [step] failed: local 形态项目无法在机器「verify-1210」上执行步骤：仓库路径 /var/folders/ck/75kcczb50ys656v28t2qrb140000gn/T/pacman-1210-repo-tvWr3z/repo 在本机不可达（路"
+    },
+    {
+      "name": "腿 A：clone 未尝试（无 Cloning 行 = fail-fast，不烧重试退避）",
+      "ok": true,
+      "detail": "elapsed=1013ms"
+    },
+    {
+      "name": "腿 A：errorMessage 零凭据字样",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：workspace 未材料化（基座目录不存在）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 A：REST todo record phase=failed（API 真值）",
+      "ok": true,
+      "detail": "phase=failed"
+    },
+    {
+      "name": "腿 A：详情页可见失败文案（点名机器）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：daemon.log 自仓路径 clone（Cloning 行含路径）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：Worktree added 行落日志",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "腿 B：基座 clone 在位",
+      "ok": true,
+      "detail": "/tmp/pacman-1210-daemon-1791818350235/workspaces/d8d0-ydHfnQNztZE0miVm/repo"
+    },
+    {
+      "name": "腿 B：conv worktree 检出 README 内容对",
+      "ok": true,
+      "detail": "readme=\"# 1210 local repo\\n\""
+    },
+    {
+      "name": "腿 B：步终态 errorMessage 不含不可达文案（stub 零改动产物闸 failed 属预期）",
+      "ok": true,
+      "detail": "stepStatus=failed msg=构建零改动"
+    }
+  ]
+}
