@@ -32,7 +32,8 @@ node .claude/skills/verify-pacman/scripts/cleanup.mjs
 ## 单元 / e2e 面
 
 - server：`test/chief-demotion.test.ts`（9 条失败方式先行：路由换源/占机器槽/
- 占 Agent 槽/无继承/退役槽 wire/sweep 三分支）+ `chief-abandoned-sweep` /
+ 占 Agent 槽/无继承/退役槽 wire/sweep 挂起面——#1257 裁决后为挂起断言，
+ 步留 pending 不产失败行）+ `chief-abandoned-sweep` /
  `machine-pin` / `chief-settings` 翻转重写；`chief-affinity` /
  `chief-model-slot` 随机制退役删除。
 - shared：快照重生 = 纯退役槽删除（chief 记录四键 + PATCH 槽 + claim 载荷
