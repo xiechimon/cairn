@@ -19,7 +19,8 @@ import { evidencePanelShot } from './evidence';
 const drawer = (page: Page) => page.locator('.chief-drawer');
 // #1260: 模型行只读载体 = data-testid（行无 role 语义，aria 无处挂）。
 const modelRow = (page: Page) => page.getByTestId('chief-model-row');
-// 行内 span 序：0 = 包装 span，1 = 运行时 mark，2 = 模型名。\nconst modelName = (page: Page) => modelRow(page).locator('span').nth(2);
+// 行内 span 序：0 = 包装 span，1 = 运行时 mark，2 = 模型名。
+const modelName = (page: Page) => modelRow(page).locator('span').nth(2);
 
 test.describe('chief drawer model row (#615)', () => {
 
