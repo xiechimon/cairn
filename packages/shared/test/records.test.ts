@@ -34,7 +34,6 @@ import {
   parseOrchestrationSourceRef,
   patchChiefBodySchema,
   providerRecordSchema,
-  resolveChiefModelFallback,
   scheduleRecordSchema,
   searchResponseSchema,
   startBuildsBodySchema,
@@ -70,7 +69,6 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     sourceBuildId: 'chief-6ItyfRe7Q7hru5xFmMu-u-',
     sourceKind: null,
     sourceRef: null,
-    machineId: null, // #682 任务级钉选机器（r5 采集样本时无此列 = null 自动）
   };
 
   it('parses the full observed field set', () => {
@@ -136,7 +134,6 @@ describe('build record (02 §6.2, r5 §3.4/§7.2 SSE 实测)', () => {
     withPlan: false,
     prevPhase: 'todo',
     triggerSource: 'chief',
-    pinnedMachineId: null,
     planDocId: null,
     errorMessage: null,
     prUrl: null,
@@ -208,7 +205,6 @@ describe('schedule record (r3 §8.3 实测原样)', () => {
     kind: 'once',
     at: 1758263400000,
     tz: 'Asia/Shanghai',
-    machineId: null, // 自动 (r3 §9)
     nextRunAt: 1758263400000,
     createdBy: 'usr_mon',
     todo: {
@@ -480,7 +476,6 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
       lastTurnAt: 1758532000000,
       session: { runtime: 'pi', id: 'sess_01', openedAt: 1758531000000 },
       pendingSessionResumeAt: null,
-      pinnedMachineId: null, // #682 chief 机器亲和（r5 采集样本时无此列 = null）
       toolDefHashes: { projects: 'h1', todos: 'h2' },
       toolResultHashes: {},
       activeRun: null,
@@ -526,7 +521,7 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
     expect(chiefGetResponseSchema.parse(sample)).toEqual(sample);
   });
 
-  it('parses the chief GET envelope with the orchestration block (#895)', () => {
+  it('parses the chief GET envelope with the orchestration block（#895；#1260 homeMachineId 换源）', () => {
     const sample = {
       chief: {
         id: 'chief-usr_mon-BoZYfvqKSGanlxsXVbXSa',
@@ -534,7 +529,6 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
         teamId: 'BoZYfvqKSGanlxsXVbXSa',
         agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' },
         charter: null,
-        machineId: 'mach_895',
         lastTurnAt: 1758532000000,
         createdAt: 1758531000000,
       },
@@ -543,103 +537,36 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
       watches: [],
       wakes: [],
       orchestration: {
-        defaultMachineId: 'mach_895',
+        homeMachineId: 'mach_895',
         activity: [{ machineId: 'mach_895', running: 1, waiting: 0 }],
       },
     };
     expect(chiefGetResponseSchema.parse(sample)).toEqual(sample);
   });
 
-  it('parses the PATCH chief body verbatim (r5 §2 抓包)', () => {
+  it('parses the PATCH chief body verbatim（r5 §2 抓包；#1260 起 thinkingLevel 覆盖键剥离）', () => {
     expect(
       patchChiefBodySchema.parse({
         agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn', thinkingLevel: null },
       }),
-    ).toEqual({ agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn', thinkingLevel: null } });
+    ).toEqual({ agent: { agentId: 'TVv0DxUu3jTIhYpeWh6mn' } });
   });
 
-  it('PATCH chief body compactionModel 槽：对象/null 收，裸串/缺字段/空 body 拒（#203）', () => {
-    // 对象往返（model id 只在 provider 内有意义——records/agent.ts provider+modelId
-    // 同构——裸字符串跨 provider 撞名，故收对象形）。
+  it('PATCH chief body 退役槽（#1260）：machineId/model/compactionModel 被剥离；仅剩退役槽的 body 被 refine 拒', () => {
+    // 合法槽照常。
+    expect(patchChiefBodySchema.parse({ charter: '常设指示' })).toEqual({ charter: '常设指示' });
+    // 退役槽混入被剥离（zod 非 strict）。
     expect(
-      patchChiefBodySchema.parse({ compactionModel: { provider: 'r3-gw', modelId: 'm-fast' } }),
-    ).toEqual({ compactionModel: { provider: 'r3-gw', modelId: 'm-fast' } });
-    // null = 清空（回默认「与 Chief 相同」）。
-    expect(patchChiefBodySchema.parse({ compactionModel: null })).toEqual({
-      compactionModel: null,
-    });
-    // 裸字符串拒。
-    expect(patchChiefBodySchema.safeParse({ compactionModel: 'm-fast' }).success).toBe(false);
-    // 缺 modelId 拒。
-    expect(patchChiefBodySchema.safeParse({ compactionModel: { provider: 'r3-gw' } }).success).toBe(
-      false,
-    );
-    // 三槽全缺仍被 refine 拒。
+      patchChiefBodySchema.parse({
+        charter: 'x',
+        machineId: 'm-1',
+        model: { provider: 'pi', modelId: 'm' },
+      }),
+    ).toEqual({ charter: 'x' });
+    // 只剩退役槽 = 空 body 同判，refine 拒。
+    expect(patchChiefBodySchema.safeParse({ machineId: 'm-1' }).success).toBe(false);
+    expect(patchChiefBodySchema.safeParse({ compactionModel: null }).success).toBe(false);
     expect(patchChiefBodySchema.safeParse({}).success).toBe(false);
-  });
-
-  it('chief record 回显 compactionModel（server 长槽 [设计]，null = 默认与 Chief 相同）', () => {
-    const record = {
-      id: 'chief-usr_mon-BoZYfvqKSGanlxsXVbXSa',
-      userId: 'usr_mon',
-      teamId: 'BoZYfvqKSGanlxsXVbXSa',
-      agent: null,
-      charter: null,
-      lastTurnAt: null,
-      createdAt: 1758531000000,
-      compactionModel: { provider: 'r3-gw', modelId: 'm-fast' },
-    };
-    expect(chiefRecordSchema.parse(record)).toEqual(record);
-    expect(chiefRecordSchema.parse({ ...record, compactionModel: null })).toEqual({
-      ...record,
-      compactionModel: null,
-    });
-  });
-
-  it('收单回落判定 resolveChiefModelFallback（#774：一槽一判六态）', () => {
-    const sources: ModelSource[] = [
-      { runtime: 'pi', installed: true, hostname: 'h', models: [] },
-      {
-        runtime: 'claude-code',
-        installed: true,
-        hostname: 'h',
-        models: [{ id: 'new-model', name: 'new-model', slot: 'default' }],
-      },
-    ];
-    // F1 槽 null → 无动作。
-    expect(resolveChiefModelFallback(null, sources)).toEqual({
-      effective: null,
-      fellBackFrom: null,
-    });
-    // F2 命中候选 → 保留。
-    const hit = { provider: 'claude-code', modelId: 'new-model' };
-    expect(resolveChiefModelFallback(hit, sources)).toEqual({
-      effective: hit,
-      fellBackFrom: null,
-    });
-    // F3 claude-code 旧 id → 愈合 null + 上报原值。
-    const stale = { provider: 'claude-code', modelId: 'old-model' };
-    expect(resolveChiefModelFallback(stale, sources)).toEqual({
-      effective: null,
-      fellBackFrom: stale,
-    });
-    // F4 custom provider 存量值（无对应段）→ 不动（候选面无权裁决）。
-    const custom = { provider: 'my-relay', modelId: 'm-x' };
-    expect(resolveChiefModelFallback(custom, sources)).toEqual({
-      effective: custom,
-      fellBackFrom: null,
-    });
-    // F5 provider 为 pi → 不动（picker 从无此行）。
-    const pi = { provider: 'pi', modelId: 'm-x' };
-    expect(resolveChiefModelFallback(pi, sources)).toEqual({
-      effective: pi,
-      fellBackFrom: null,
-    });
-    // F6 段缺席（settings.json 缺失态）→ 该段存量值照样 stale。
-    expect(resolveChiefModelFallback(stale, [])).toEqual({
-      effective: null,
-      fellBackFrom: stale,
-    });
   });
 });
 
@@ -738,7 +665,6 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 实测扩充)', () => {
     sourceBuildId: null,
     sourceKind: null,
     sourceRef: null,
-    machineId: null, // #682 任务级钉选机器；null = 自动
   });
 
   it('parses the ~15s ping heartbeat', () => {

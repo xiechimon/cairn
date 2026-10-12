@@ -36,7 +36,6 @@ import {
   appendWorkBranchNote,
   BRAND,
   buildPlanFirstRoundInstruction,
-  buildReworkFallbackPrompt,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
@@ -54,14 +53,12 @@ import {
   parseRetryAfterMs,
   parseReviewPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
-  RESUME_FRESH_SESSION_NOTE,
   type ReviewGate,
   STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
   stripAnsiEscapes,
   transcriptPromptRowId,
-  transcriptResumeNoteRowId,
 } from '@pacman/shared';
 import { createActivityTracker } from './activity.js';
 import { SessionNotResumableError } from './backend/errors.js';
@@ -1186,56 +1183,12 @@ export async function runStep(
   // 律）：第一轮零进展且终局错误命中自适配签名 → backend 翻 compat 旋钮 →
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
   let handle: AgentSessionHandle;
-  let resumed = Boolean(continueId);
-  // #1204 返工降级注入：continue 意图步回退新会话时，claim 载荷的
-  // reworkContext（方案全文 + 历史返工意见）组合进首轮 prompt——新会话无
-  // 前轮记忆，凭注入的既有事实重建（形状单源 = shared buildReworkFallbackPrompt，
-  // #720 组合形 + 降级上下文段）。载荷缺席（旧 server）/空上下文/todo 缺席
-  // （防御）→ 原 prompt 逐字节不动（零回归；注入只发生在回退分支，续接成功
-  // 路径不消费）。transcript prompt 行保持原续轮指令（呈现面零改动——降级
-  // 事实由 RESUME_FRESH_SESSION_NOTE 既有行标记）。
-  const reworkFallbackSessionOpts = (): SessionOpts => {
-    const ctx = claimed.reworkContext;
-    if (
-      ctx === undefined ||
-      (ctx.planText === null && ctx.feedbacks.length === 0) ||
-      sessionOpts.prompt === undefined ||
-      claimed.todo === undefined
-    ) {
-      return sessionOpts;
-    }
-    return {
-      ...sessionOpts,
-      prompt: buildReworkFallbackPrompt({
-        taskText: buildTaskPromptText(claimed.todo.title, claimed.todo.spec),
-        instruction: sessionOpts.prompt,
-        planText: ctx.planText,
-        feedbacks: ctx.feedbacks,
-      }),
-    };
-  };
-  // 会话开面（两轮共用）：continue 优先 + 会话文件未落盘的冷重试回退
-  // （02 §5.7 崩溃竞态 [设计]）；回落轮沿同开面续会话——误差轮不追加历史，
-  // pi 重试机制本就摘除错误轮，续开即从误差前状态继续。
+  // #1260：会话续接失败的跨机降级链退役（归属机模型下 chief/worker 会话文件
+  // 恒在归属机上；SessionNotResumableError 直传 = 步可见失败，不再静默换新
+  // 会话重跑）。重开新会话走用户显式动作（返工/重跑入口）。
   const openSession = (): Promise<AgentSessionHandle> => {
-    resumed = Boolean(continueId);
     if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts).catch((err: unknown) => {
-      if (!(err instanceof SessionNotResumableError)) throw err;
-      logger.step(`continue session unavailable (${continueId}) — falling back to new session`);
-      resumed = false;
-      // #862 T1 跨机续跑显式标记：续接失败的事实点在 daemon（server 只知
-      // continue 载荷下发，不知对端有无会话文件）。注记进 transcript 终稿
-      // system 行（shared 单源 canon；web 既有纯文本 system→note 路渲染），
-      // id deterministic per step，重传覆盖不叠行。
-      transcript.upsert({
-        id: transcriptResumeNoteRowId(stepId),
-        role: 'system',
-        content: RESUME_FRESH_SESSION_NOTE,
-        createdAt: now(),
-      });
-      return backend.createSession(reworkFallbackSessionOpts());
-    });
+    return backend.continueSession(continueId, sessionOpts);
   };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
@@ -1262,7 +1215,7 @@ export async function runStep(
       await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
       return;
     }
-    logger.raw(resumed ? `continue session ${convId}` : `new session ${convId}`);
+    logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
     // 会话持久化索引即时落 journal（崩溃 recover 的 continue 解析键）。
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     // steer 投递面注册（W3 #279）：在跑期间 deliverSteer 可达；各收尾路径注销。

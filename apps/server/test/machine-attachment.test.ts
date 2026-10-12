@@ -16,7 +16,14 @@ import {
   attachment as attachmentTable,
   team as teamTable,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
 
@@ -58,6 +65,7 @@ async function setupWorld(): Promise<World> {
       mcpServers: [],
     })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const projectId = await postProject(s.app);
   const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '附件探针',
@@ -175,6 +183,7 @@ describe('GET /api/machine/attachment/{stepId}/{attachmentId}（#730）', () => 
         headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey2}` },
         body: JSON.stringify({ teamId: w.s.team.id, name: 'att-machine-2' }),
       });
+
       const m2 = machineEnrollResponseSchema.parse(await enroll2.json());
       const res = await w.s.app.request(`/api/machine/attachment/${w.stepId}/${id}`, {
         method: 'GET',

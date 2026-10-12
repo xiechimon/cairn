@@ -193,8 +193,8 @@ describe('#1148 E2E：端口基座分段（两个并发 worker 步不同段）',
   }, 150_000);
 });
 
-describe('#1148 E2E：chief 满载立即被领（上限 1）', () => {
-  test('worker 在跑（cap 1）时 chief 立即被领；第二个 worker 不领', async () => {
+describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
+  test('worker 在跑（cap 1）时 chief 排队等空位，空位即领；后来的 worker FIFO 在其后', async () => {
     const stack = await bootStack({
       responses: [
         // worker r1：延迟的 bash 轮（占住唯一 worker 槽 6s）。
@@ -230,7 +230,9 @@ describe('#1148 E2E：chief 满载立即被领（上限 1）', () => {
     const w1 = await startBuild(stack, '并发探针一');
     await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'claimed', 30_000);
 
-    // chief 回合入队（满载时）→ 立即被领：步行 claimed，不等 worker 收尾。
+    // chief 回合入队（满载时）→ 排队等空位：#1260 起 chief 占机器并发槽，
+    // cap 1 被 worker 占满即同槽互斥（旧「chief 不占槽满载立即领」语义已
+    // 退役——本测试就是它的反向钉）。
     const sent = await api(
       stack.server.url,
       'POST',
@@ -239,26 +241,27 @@ describe('#1148 E2E：chief 满载立即被领（上限 1）', () => {
     );
     expect(sent.status).toBe(201);
     const threadId = (sent.body as { thread: { id: string } }).thread.id;
-    // chief 立即被领：状态面（claimed 窗 ≥2s——上方 delayMs 拉宽）与
-    // daemon.log 持久面（launch canon 行）双取一。日志行不受回合快慢影响：
-    // 极快回合的 claimed→done 转换可能整段落在一个轮询间隔里（本地快机/
-    // CI 慢机两形都撞过），日志行是窗口无关的被领证据。
+    // 满载窗口内 chief 留 pending（worker 的 6s bash 占着唯一槽）。
+    await new Promise((r) => setTimeout(r, 1_500));
+    expect(stepsOf(stack, threadId)[0]?.status).toBe('pending');
+
+    // 第二个 worker 也不领（排在 chief 之后：FIFO 以入队时刻为序）。
+    const w2 = await startBuild(stack, '并发探针二');
+    await new Promise((r) => setTimeout(r, 1_500));
+    expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
+
+    // worker 收尾释放槽 → chief 空位即领（状态面与 daemon.log 持久面双取
+    // 一：极快回合的 claimed→done 可能整段落在一个轮询间隔里，日志行是
+    // 窗口无关的被领证据）。
     await waitFor(
       () =>
         stepsOf(stack, threadId)[0]?.status === 'claimed' ||
         stack.lines().some((l) => l.includes(`for conv ${threadId}`)),
       30_000,
     );
-    // chief 被领时 worker 仍在跑（并发在飞：1 worker + 1 chief——chief 没有
-    // 等满载 worker 收尾；若被饿死（旧码），worker 此刻已 done，本断言红）。
-    expect(stepsOf(stack, w1.buildId)[0]?.status).toBe('claimed');
+    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
 
-    // 第二个 worker 不领（cap 1 被 worker 占满 → 留 pending 排队）。
-    const w2 = await startBuild(stack, '并发探针二');
-    await new Promise((r) => setTimeout(r, 1_500));
-    expect(stepsOf(stack, w2.buildId)[0]?.status).toBe('pending');
-
-    // chief 收尾（快速文本轮）后线程闭环。
+    // chief 收尾（快速文本轮）后线程闭环；空位再释放 → w2 被领并跑完。
     await waitFor(() => {
       const chiefSteps = stack.server.db
         .select()
@@ -267,9 +270,6 @@ describe('#1148 E2E：chief 满载立即被领（上限 1）', () => {
         .all();
       return chiefSteps[0]?.status === 'done';
     }, 120_000);
-
-    // worker 1 收尾释放槽 → 第二个 worker 被领并跑完（空位即领闭环）。
-    await waitFor(() => stepsOf(stack, w1.buildId)[0]?.status === 'done', 120_000);
     await waitFor(() => stepsOf(stack, w2.buildId)[0]?.status === 'done', 120_000);
   }, 240_000);
 });

@@ -18,8 +18,6 @@ export const buildRecordSchema = z.object({
   /** 本轮启动前 phase（重跑/定时语义用）；null 形状 [推断]。 */
   prevPhase: phaseSchema.nullable(),
   triggerSource: triggerSourceSchema,
-  /** 钉选机器；null = 自动（schedule.machineId 同语义，r3 §9）。 */
-  pinnedMachineId: recordId.nullable(),
   /** plan 文档 id（plan 即文件 plan.md，02 §4.2）；无 plan 时 null [推断]。 */
   planDocId: recordId.nullable(),
   /** 定时重跑时旧 build = "Cancelled"（r5 §7.2 实测）；失败原因同槽（02 §4.2

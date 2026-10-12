@@ -25,11 +25,6 @@ export interface TaskMetaFields {
   /** 机器行等待标注（#682）：build 钉了机器、步未领、且该机离线 = true——
    *  机器行尾注「（等待机器上线）」。钉选语义 = 步只等它，不自动改派。 */
   machineWaiting: boolean;
-  /** 机器行改派标注（#1208）：任务钉选机器名——非 null（= 与 machine 行值
-   *  不同名，改派发生）时行尾「（任务钉选 {machine}）」。派发面 pin 是硬
-   *  约束，唯一分歧源 = run_builds 显式 machineId 改派；标注让换机在看板
-   *  层可见，不留「选 A 结果在 B 跑」的静默回落。 */
-  todoPinnedMachine: string | null;
   /** 模型 id（指派 agent 的 members actor.modelId，退 usage 首行 model）。 */
   model: string | null;
   /** 创建时间 = 首轮运行 createdAt（todo 表无创建列，buildHistory 首条目
@@ -107,11 +102,6 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
           {meta.machine}
           {meta.machineWaiting && (
             <span className="text-(--text-tertiary)">{t('（等待机器上线）')}</span>
-          )}
-          {meta.todoPinnedMachine != null && (
-            <span className="text-(--text-tertiary)">
-              {t('（任务钉选 {machine}）', { machine: meta.todoPinnedMachine })}
-            </span>
           )}
         </>
       ),

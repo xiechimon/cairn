@@ -37,7 +37,7 @@ import {
   todo as todoTable,
   tokenUsage,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
 
@@ -117,6 +117,8 @@ async function setupWorld(
     cred: key.plain,
     body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const machineJson = machineEnrollResponseSchema.parse(await enrollRes.json());
   const projectId = await postProject(s.app);

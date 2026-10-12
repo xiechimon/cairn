@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 // 测试引导：内存库 + migration + seed + app（wire 对拍面，04 §3）。
 
 import { randomUUID } from 'node:crypto';
@@ -8,7 +9,7 @@ import type { Hono } from 'hono';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
-import { apiKey } from '../src/db/schema.js';
+import { agent as agentTable, apiKey, machine as machineTable } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId } from '../src/lib/ids.js';
@@ -242,4 +243,54 @@ async function openSse(app: Hono, path: string) {
       void reader.cancel().catch(() => {});
     },
   };
+}
+
+/** #1259 归属机供给：创建 agent 的 API 契约要求 machineId（归属机必填）。
+ *  直插 machine 行（默认双 runtime 全开 + 在线），返回机器 id。 */
+export function insertMachine(
+  s: TestServer,
+  opts: {
+    name?: string;
+    enabledRuntimes?: string[];
+    claudeCodeReport?: import('@pacman/shared').ClaudeCodeReport | null;
+  } = {},
+): string {
+  const id = opts.name
+    ? `machine-${opts.name}`
+    : `machine-${Math.random().toString(36).slice(2, 10)}`;
+  s.db
+    .insert(machineTable)
+    .values({
+      id,
+      teamId: s.team.id,
+      name: opts.name ?? 'test-machine',
+      online: true,
+      enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
+      claudeCodeReport: opts.claudeCodeReport ?? null,
+    })
+    .run();
+  return id;
+}
+
+/** #1259 测试世界绑定器：把团队全部 agent 绑到指定机器（缺省 = 团队首台）。
+ *  绑定模型下「可领」的缺省形态——世界工厂在 agent 插行后调用一次。 */
+export function bindAllAgents(s: TestServer, machineId?: string): void {
+  const mid =
+    machineId ??
+    s.db.select().from(machineTable).where(eq(machineTable.teamId, s.team.id)).get()?.id;
+  if (mid === undefined) throw new Error('bindAllAgents: 世界里还没有机器（先 enroll/插入）');
+  s.db.update(agentTable).set({ machineId: mid }).run();
+}
+
+/** #1260 单 agent 绑定器：chief 绑定 Agent 的归属机 = chief 步去处——chief
+ *  语义测试在 enroll 认领机后调一次（bindAllAgents 的逐机变体）。 */
+export function bindAgentHome(s: TestServer, agentId: string, machineId: string): void {
+  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, agentId)).run();
+}
+
+/** 按名字取本队机器 id（enroll 后读本队机器行）。 */
+export function machineIdByName(s: TestServer, name: string): string {
+  const row = s.db.select().from(machineTable).where(eq(machineTable.name, name)).get();
+  if (row === undefined) throw new Error(`machineIdByName: ${name} 不在库里`);
+  return row.id;
 }

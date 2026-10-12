@@ -19,7 +19,7 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, build as buildTable, todo as todoTable } from '../src/db/schema.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-704-1';
 
@@ -70,6 +70,8 @@ async function setupWorld(): Promise<World> {
     .insert(agentTable)
     .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'b704', modelId: 'm' })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
   // B-C1 形态：手动输入 owner/repo 不连 GitHub。
   const ghRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'probe-704', kind: 'github', githubRepo: 'octocat/Hello-World' },

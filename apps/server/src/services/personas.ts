@@ -22,7 +22,7 @@
 //   只读角色不持交付面权限）。
 
 import { PERSONA_PROFILES, type PersonaRole } from '@pacman/shared';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, machine as machineTable, provider as providerTable, team } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
@@ -54,11 +54,24 @@ function pickPersonaModel(db: Db, teamId: string): { provider: string; modelId: 
   return null;
 }
 
+/** #1259：persona 的归属机 = 团队 mea 机（name LIKE 'mea%' 惯例，与迁移
+ *  回填同口径）；团队无机（daemon 未接入）= null——卡片出「未设归属机」
+ *  警示，接入后补值（下方 null 补值半边同律）。 */
+function pickPersonaHome(db: Db, teamId: string): string | null {
+  const row = db
+    .select({ id: machineTable.id })
+    .from(machineTable)
+    .where(and(eq(machineTable.teamId, teamId), like(machineTable.name, 'mea%')))
+    .get();
+  return row?.id ?? null;
+}
+
 /** 为单个团队补齐 persona 角色 agent（缺谁补谁 + null 模型补值）。返回新
  *  插入的行数。已在位的角色行不动（编辑保留）；modelId 为 null 的角色行在
  *  模型清单有值时补值（用户设置过的值永不覆盖）。 */
 export function ensurePersonasSeeded(db: Db, teamId: string): number {
   const pick = pickPersonaModel(db, teamId);
+  const home = pickPersonaHome(db, teamId);
   let inserted = 0;
   for (const profile of PERSONA_PROFILES) {
     const existing = db
@@ -74,6 +87,11 @@ export function ensurePersonasSeeded(db: Db, teamId: string): number {
           .set({ provider: pick.provider, modelId: pick.modelId })
           .where(eq(agent.id, existing.id))
           .run();
+      }
+      // 归属机补值（#1259）：null + mea 机在 → 填（用户换绑过的值不碰——
+      // 非 null 即用户态）。
+      if (existing.machineId === null && home !== null) {
+        db.update(agent).set({ machineId: home }).where(eq(agent.id, existing.id)).run();
       }
       continue;
     }
@@ -95,6 +113,7 @@ export function ensurePersonasSeeded(db: Db, teamId: string): number {
         skillsAllowlist: null,
         mcpServers: [],
         maxConcurrentTasks: null,
+        machineId: home,
       })
       .run();
     inserted += 1;

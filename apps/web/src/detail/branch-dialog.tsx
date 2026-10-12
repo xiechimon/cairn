@@ -145,7 +145,9 @@ export function BranchSyncFields({
     <div className="flex flex-col gap-4">
       <BranchBox info={info} />
       <div className="flex flex-col gap-2">
-        <Label>{t('目标机器')}</Label>
+        {/* CJK 标签行高修正（leading-none → 1.25，墨盒不贴行底被 focus 环压
+            住）：就地 className，Label 件保持 pristine（#980 S5 棘轮）。 */}
+        <Label className="leading-tight">{t('目标机器')}</Label>
         {canSync ? (
           <MachinePicker
             machines={machines}
@@ -165,7 +167,9 @@ export function BranchSyncFields({
         )}
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="branch-sync-directory">{t('同步目录')}</Label>
+        <Label htmlFor="branch-sync-directory" className="leading-tight">
+          {t('同步目录')}
+        </Label>
         {canSync ? (
           // XMON-24：目录输入 = registry Input 默认形态；mono 是路径数据的
           // 排版语义。aria-label 与 label 关联双载体（m7 集成钉 aria-label，
@@ -185,7 +189,7 @@ export function BranchSyncFields({
       </div>
       <div className="flex items-start gap-3">
         <div className="flex flex-1 flex-col gap-1">
-          <Label className="text-sm">{t('强制同步')}</Label>
+          <Label className="text-sm leading-tight">{t('强制同步')}</Label>
           <div className="text-xs leading-[18px] text-(--text-tertiary)">
             {t('丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。')}
           </div>

@@ -25,7 +25,6 @@ const scheduleOnce: ScheduleRecord = {
   kind: 'once',
   at: at(R3_DAY, 14, 30),
   tz: 'Asia/Shanghai',
-  machineId: null,
   nextRunAt: at(R3_DAY, 14, 30),
   createdBy: 'u-xmon-dai',
   todo: {

@@ -113,9 +113,13 @@ describe('assignment 四槽与 agent persona 位（#1250）', () => {
         mcpServers: [],
       }).persona,
     ).toBe('planner');
-    expect(createAgentBodySchema.safeParse({ displayName: 'X', persona: 'chief' }).success).toBe(
-      false,
-    );
-    expect(createAgentBodySchema.parse({ displayName: 'X', persona: null }).persona).toBeNull();
+    // #1259：创建体 machineId 必填——词表校验的合法 body 都带上它。
+    expect(
+      createAgentBodySchema.safeParse({ displayName: 'X', persona: 'chief', machineId: 'm-1' })
+        .success,
+    ).toBe(false);
+    expect(
+      createAgentBodySchema.parse({ displayName: 'X', persona: null, machineId: 'm-1' }).persona,
+    ).toBeNull();
   });
 });

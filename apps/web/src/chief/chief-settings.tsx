@@ -5,47 +5,23 @@
 // #182 三钮接线:agent 行 = 选择总管 Agent dialog(清单 = members 读面
 // memberType:"agent" 行,r5 §1;选定 → PATCH chief agent 槽,换绑带二次
 // 确认 canon);章程编辑 = DialogShell 编辑弹窗(#180 裁决;保存 → PATCH
-// charter 槽)。#204 压缩模型翻回交互(#182 曾静态化:当时 PATCH schema
-// 无模型槽;server #203 落 compactionModel 可空 JSON 槽 + PATCH 第三槽后
-// 启用)= ChiefModelSelect anchored popover,#358 数据源(model-sources 非 pi
-// 段;#770 起 providers 段已除,spec 11 §A10)落账口径见 chief-model-select.tsx
-// 文件头。#895 主力机槽(spec 21 A6) = Agent tab 新「机器」行
-// ChiefMachineSelect:live 选定 → PATCH chief machineId 槽(null = 清回
-// 自动),行形态沿 new-task 机器 chip 的 listbox 族。#903(ADR 0014):
-// 派发不设槽——先规划/直接修由 chief 逐次派发自行判定(run_builds withPlan
-// + dispatchReason 回执),settings 无「派发方式」行。
+// charter 槽)。#1260 总管降级:chief 不再持模型/机器覆盖槽——Agent tab
+// 一张只读信息卡说明「模型与归属机跟随绑定 Agent」并回显其值,改动去
+// Agent 设置面/机器详情页。#903(ADR 0014):派发不设槽——先规划/直接修
+// 由 chief 逐次派发自行判定(run_builds withPlan + dispatchReason 回执),
+// settings 无「派发方式」行。
 
-import {
-  BRAND,
-  type ChiefCompactionModel,
-  MEMORY_EMPTY_COPY,
-  MEMORY_QUOTA_PER_AGENT,
-} from '@pacman/shared';
+import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@pacman/shared';
 import { useState } from 'react';
-import {
-  useApiMutations,
-  useChief,
-  useMachines,
-  useMembers,
-  useMemories,
-  useModelSources,
-} from '../api/hooks.js';
-import { toModelOptions } from '../api/mappers.js';
+import { useApiMutations, useChief, useMachines, useMembers, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '../components/ui/tabs.js';
-import type {
-  ChiefContent,
-  ChiefSettingsTab,
-  MachineRow,
-  ModelOption,
-} from '../fixtures/records.js';
+import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight, ChiefFaceDashed } from '../icons/index.js';
 import { ChiefAgentDialog, type ChiefAgentOption } from './chief-agent-dialog.js';
-import { type ChiefMachineOption, ChiefMachineSelect } from './chief-machine-select.js';
-import { ChiefModelSelect } from './chief-model-select.js';
 import { EditCharterDialog } from './edit-charter-dialog.js';
 
 const TABS: { id: ChiefSettingsTab; label: string }[] = [
@@ -129,7 +105,6 @@ export function ChiefSettings({
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live);
   const membersQ = useMembers(teamId, live);
-  const modelSourcesQ = useModelSources(teamId, live);
   const machinesQ = useMachines(teamId, live);
   const mutations = useApiMutations(teamId);
   const charter = live ? (chiefQ.data?.chief.charter ?? '') : '';
@@ -167,9 +142,8 @@ export function ChiefSettings({
   // fixture 面 callbacks 缺省 → dialog 走 accept 律(提交即关)。
   const bindAgent = live
     ? (agentId: string) =>
-        // r5 §2 wire 原样:thinkingLevel null(绑定不带覆盖)。
         mutations.patchChief.mutate(
-          { agent: { agentId, thinkingLevel: null } },
+          { agent: { agentId } },
           { onSuccess: () => setAgentOpen(false) },
         )
     : undefined;
@@ -177,36 +151,15 @@ export function ChiefSettings({
     ? (value: string) =>
         mutations.patchChief.mutate({ charter: value }, { onSuccess: () => setCharterOpen(false) })
     : undefined;
-  // #204 压缩模型(#358 数据源切换,spec 11 §A10;#770 起 providers 段已除):
-  // live 值 = chief 封套真值(null = 默认);选项 = model-sources 非 pi 段投影
-  // (mappers.toModelOptions 单源;查询未决 = 空清单,不退 fixture
-  // canon);选定 = PATCH compactionModel 槽(null = 清空回默认),invalidateAll
-  // 重取回显——选择即关,不持本地乐观态(S8)。存量 provider 模型值命中不了
-  // 选项,走裸串兜底回显(不空白不崩);执行面不受影响。
-  const compaction = live
-    ? (chiefQ.data?.chief.compactionModel ?? null)
-    : (chief.compactionModel ?? null);
-  const modelOptions: ModelOption[] | undefined = live
-    ? toModelOptions(modelSourcesQ.data?.sources ?? [])
-    : undefined;
-  const pickModel = live
-    ? (value: ChiefCompactionModel | null) =>
-        mutations.patchChief.mutate({ compactionModel: value })
-    : undefined;
-  // #895 spec 21 A6 主力机槽（值/行集/写面三段,compactionModel 槽同构）:
-  // live 值 = chief 封套 chief.machineId(null = 自动);行集 = machines 读面
-  // 最小投影;选定 = PATCH chief machineId 槽(null 清回自动),invalidateAll
-  // 重取回显,无本地乐观态。fixture 面 = ChiefContent.machineId 回显 +
-  // resources machines 行集,无 mutation(accept 律)。
-  const machineOptions: ChiefMachineOption[] = live
-    ? (machinesQ.data ?? []).map((m) => ({ id: m.id, name: m.name, online: m.online }))
-    : (machines ?? []).flatMap((m) =>
-        m.id != null ? [{ id: m.id, name: m.name, online: m.online }] : [],
-      );
-  const machineValue = live ? (chiefQ.data?.chief.machineId ?? null) : (chief.machineId ?? null);
-  const pickMachine = live
-    ? (machineId: string | null) => mutations.patchChief.mutate({ machineId })
-    : undefined;
+  // #1260 只读信息行：绑定 Agent 的模型与归属机（chief 的步跟着它走）——
+  // live 回显真值;改动落 Agent 设置面/机器详情页,本面不设写位。
+  const boundMachineId = live ? (chiefQ.data?.agentActor?.machineId ?? null) : null;
+  const boundModelId = live ? (chiefQ.data?.agentActor?.modelId ?? null) : null;
+  const boundMachineName =
+    boundMachineId !== null
+      ? ((live ? (machinesQ.data ?? []) : (machines ?? [])).find((m) => m.id === boundMachineId)
+          ?.name ?? null)
+      : null;
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="relative flex h-[57px] flex-none items-center">
@@ -295,38 +248,20 @@ export function ChiefSettings({
                 <span>{boundAgent != null ? boundAgent.name : t('未设置')}</span>
                 <ChevronRight width={14} height={14} className="ml-auto text-(--text-tertiary)" />
               </Button>
-              <div className={CARD_CLS}>
+              {/* #1260：模型与归属机是绑定 Agent 的自身配置（chief 无覆盖
+                槽）——只读回显 + 指路，写位在 Agent 设置面/机器详情页。 */}
+              <div className={CARD_CLS} data-testid="chief-follows-agent">
                 <div>
-                  <h3 className={CARD_TITLE_CLS}>{t('压缩模型')}</h3>
+                  <h3 className={CARD_TITLE_CLS}>{t('模型与归属机')}</h3>
                   <p className={CARD_DESC_CLS}>
-                    {t(
-                      '压缩上下文时用来生成摘要的模型，选更快的模型可缩短等待。需要 {cli} CLI 0.1.49 及以上版本。',
-                      {
-                        cli: BRAND.cliCommandName,
-                      },
-                    )}
+                    {boundAgent != null && boundModelId !== null
+                      ? t('跟随绑定 Agent：模型 {model} · 归属机 {machine}', {
+                          model: boundModelId,
+                          machine: boundMachineName ?? t('未设归属机'),
+                        })
+                      : t('跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。')}
                   </p>
                 </div>
-                {/* #204 翻回交互(server #203 槽就位,见文件头):ChiefModelSelect
-                  保 r5 101 捕获 select 形状(button + chevron)。 */}
-                <ChiefModelSelect value={compaction} options={modelOptions} onPick={pickModel} />
-              </div>
-              {/* #895 spec 21 A6「机器」槽：主力机（chief 的默认执行机器，决策
-                面与绑定 Agent / 模型同层，N6——machines 页只有读态徽标）。 */}
-              <div className={CARD_CLS}>
-                <div>
-                  <h3 className={CARD_TITLE_CLS}>{t('机器')}</h3>
-                  <p className={CARD_DESC_CLS}>
-                    {t(
-                      '总管回合默认在哪台机器上执行。选「自动」时由在线机器认领，并粘住持有会话的那台。',
-                    )}
-                  </p>
-                </div>
-                <ChiefMachineSelect
-                  value={machineValue}
-                  machines={machineOptions}
-                  onPick={pickMachine}
-                />
               </div>
             </>
           )}

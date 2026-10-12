@@ -1,7 +1,9 @@
 // Chief 服务面（02 §4.3 结构契约 + r5 §2/§3 实测行为；M4a）。
-// - 身份：每「用户×团队」一个（chiefIdFormat）；特例 Agent 实例——绑定 Agent
-//   经 PATCH /chief（二次确认告示 canon = shared CHIEF_REBIND_CONFIRM_COPY，
-//   记忆不迁移：Chief 无独立记忆存储，r5 §2）。
+// - 身份：每「用户×团队」一个（chiefIdFormat）；名册里的普通 agent
+//   （#1260，对齐 Multica squad.leader_id → agent 行——无并发特权、无模型
+//   继承、步的去处 = 绑定 Agent 的归属机）——绑定 Agent 经 PATCH /chief
+//  （二次确认告示 canon = shared CHIEF_REBIND_CONFIRM_COPY，记忆不迁移：
+//   Chief 无独立记忆存储，r5 §2）。
 // - 执行形态：Chief 回合 = 机器 step（kind 'chief'，conv = thread id
 //   `chief-<uuid>`，r5 §3.1 daemon.log 实测）+ pi 会话；模型 = 绑定 Agent 模型。
 // - 线程面落库：chief_thread/chief_message（01 §6）；toolDefHashes = 51 词表
@@ -12,11 +14,9 @@
 // - 策略层（措辞→spec/分派权重/单 todo 直派）= system prompt 指引 + 51 词表
 //   relay 工具面，由 LLM 决策——黑盒逼近（04 §1 A4：[推断]/[设计] 不冒充实测）。
 
-import { homedir } from 'node:os';
 import type {
   ActiveRun,
   AgentRecord,
-  ChiefCompactionModel,
   ChiefGetResponse,
   ChiefThread,
   ChiefWakeKind,
@@ -35,7 +35,6 @@ import {
   chiefThreadTitle,
   isBackendRuntimeId,
   newChiefThreadId,
-  resolveChiefModelFallback,
 } from '@pacman/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -58,7 +57,6 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
-import { claudeCodeModelSource } from './providers.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 
@@ -99,10 +97,6 @@ export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
       userId: deps.user.id,
       teamId,
       agentId: null,
-      thinkingLevel: null,
-      compactionModel: null, // 默认「与 Chief 相同」（#203）
-      model: null, // 默认继承绑定 Agent 模型（#615）
-      machineId: null, // #895 默认「自动」（系统不预填，A2）
       charter: '', // raw 观测默认空串（chief-record-testA.json 一手）
       watches: [],
       wakes: [],
@@ -123,10 +117,6 @@ function toChiefRecord(row: ChiefRow): ChiefGetResponse['chief'] {
     teamId: row.teamId,
     agent: row.agentId !== null ? { agentId: row.agentId } : null,
     charter: row.charter,
-    compactionModel: row.compactionModel,
-    model: row.model,
-    // #895 spec 21 A1：主力机（null = 自动）。
-    machineId: row.machineId ?? null,
     lastTurnAt: row.lastTurnAt,
     createdAt: row.createdAt,
     tz: row.tz,
@@ -149,6 +139,7 @@ export function agentRecordOfRow(row: typeof agent.$inferSelect): AgentRecord {
     defaultSkill: row.defaultSkill,
     skillsAllowlist: row.skillsAllowlist,
     mcpServers: row.mcpServers,
+    machineId: row.machineId,
   };
 }
 
@@ -197,20 +188,20 @@ function chiefRuntimeGatePasses(
 }
 
 /** orchestration 块（#895 spec 21 A5）：machines 页三态读标注的数据源。
- *  defaultMachineId = 请求者主力机（chief.machineId，null = 自动）；
- *  activity = team 域 chief 步计数（machines 页是团队面，多用户已知边界）：
- *  running = 该机 claimed chief 步数（回合进行中）；waiting = 被钉到该机且
- *  pending 的 chief 步数 × 该机当前不可执行（离线，或 runtime 闸关 = 在线
- *  但开不了 chief 步所需 runtime——T3 已知缝隙「在线但闸关 = 无界等待」的
- *  可见性面）。闸判 provider = 请求者 chief 绑定 Agent（未绑定 = 闸判缺席，
- *  只看离线）；零计数机器不进清单（页面 join machines 查询行集）。 */
+ *  homeMachineId = 绑定 Agent 的归属机（#1260：chief 步去处的唯一答案，
+ *  未绑定/未设 = null）；activity = team 域 chief 步计数（machines 页是团
+ *  队面，多用户已知边界）：running = 该机 claimed chief 步数（回合进行
+ *  中）；waiting = 归属该机且 pending 的 chief 步数 × 该机当前不可执行
+ * （离线，或 runtime 闸关 = 在线但开不了 chief 步所需 runtime）。闸判
+ *  provider = 请求者 chief 绑定 Agent（未绑定 = 闸判缺席，只看离线）；
+ *  零计数机器不进清单（页面 join machines 查询行集）。 */
 function chiefOrchestration(
   deps: ChiefDeps,
   teamId: string,
   row: ChiefRow,
 ): ChiefGetResponse['orchestration'] {
   const steps = deps.db
-    .select({ machineId: step.machineId, status: step.status, pin: chiefThread.pinnedMachineId })
+    .select({ machineId: step.machineId, status: step.status })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .where(
@@ -239,16 +230,17 @@ function chiefOrchestration(
       if (s.machineId !== null) bump(s.machineId).running += 1;
       continue;
     }
-    // pending：只数「被钉且钉的机器当前不可执行」的（未钉 = FIFO 排队，
-    // 不指向任何机器）。
-    if (s.pin === null) continue;
-    const machineRow = deps.db.select().from(machine).where(eq(machine.id, s.pin)).get();
+    // pending：归属机当前不可执行（离线/被 runtime 闸挡）才计 waiting——
+    // 归属机未设 = 任何机器不可领（sweep 负责可见失败），不指向任何机器。
+    const home = agentRow?.machineId ?? null;
+    if (home === null) continue;
+    const machineRow = deps.db.select().from(machine).where(eq(machine.id, home)).get();
     const offline = machineRow === undefined || !machineRow.online;
     if (!offline && chiefRuntimeGatePasses(machineRow, agentRow?.provider)) continue;
-    bump(s.pin).waiting += 1;
+    bump(home).waiting += 1;
   }
   return {
-    defaultMachineId: row.machineId ?? null,
+    homeMachineId: agentRow?.machineId ?? null,
     activity: [...counts.entries()].map(([machineId, { running, waiting }]) => ({
       machineId,
       running,
@@ -257,8 +249,6 @@ function chiefOrchestration(
   };
 }
 
-/** GET /api/teams/{id}/chief 响应封套（r5 §3.6 API 原样 + #895 orchestration
- *  块）。 */
 export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
   const agentRow = row.agentId
@@ -275,10 +265,11 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
 }
 
 /** PATCH /api/teams/{id}/chief——`agent` 槽 = r5 §2 抓包原样（绑定/换绑；
- * 记忆不迁移 = 无迁移动作，共用绑定 Agent 存储）；`charter` 槽 = 章程 tab
- * 保存面 [推断]（保存 wire 未采）。agent:null = 解绑 [推断]。
- * `compactionModel` 槽 = 压缩模型长槽（#203 [设计]）：undefined = 不动，
- * null = 清空回默认「与 Chief 相同」。body 型 = shared PatchChiefBody 单源。 */
+ * 记忆不迁移 = 无迁移动作，共用绑定 Agent 存储）。agent:null = 解绑 [推断]。
+ * `charter` 槽 = 章程 tab 保存面 [推断]（保存 wire 未采）。
+ * #1260：模型/思考强度/归属机不再是 chief 的设置面——全部读绑定 Agent
+ * 自身配置（模型闸与可见失败归派发面）。body 型 = shared PatchChiefBody
+ * 单源。 */
 export function patchChief(
   deps: ChiefDeps,
   teamId: string,
@@ -289,7 +280,6 @@ export function patchChief(
   if (body.agent !== undefined) {
     if (body.agent === null) {
       sets.agentId = null;
-      sets.thinkingLevel = null;
     } else {
       const agentRow = deps.db
         .select()
@@ -298,27 +288,9 @@ export function patchChief(
         .get();
       if (!agentRow) throw new HttpError(404, `agent ${body.agent.agentId}`);
       sets.agentId = agentRow.id;
-      sets.thinkingLevel = body.agent.thinkingLevel;
     }
   }
   if (body.charter !== undefined) sets.charter = body.charter ?? '';
-  if (body.compactionModel !== undefined) sets.compactionModel = body.compactionModel;
-  // #615 主模型覆盖槽：undefined = 不动，null = 清空回绑定 Agent 继承。
-  if (body.model !== undefined) sets.model = body.model;
-  // #895 spec 21 A7 主力机槽：undefined = 不动，null = 清回自动；值限本团队
-  // 机器集（队外 400，todos machineId 同律边界防御）。机器后续被删 = 残值
-  // 语义同钉选（claim 过滤自然不命中，T3 离线失败路径点名机器），不级联。
-  if (body.machineId !== undefined) {
-    if (body.machineId !== null) {
-      const machineRow = deps.db
-        .select({ id: machine.id })
-        .from(machine)
-        .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
-        .get();
-      if (!machineRow) throw new HttpError(400, `machine ${body.machineId} not in team`);
-    }
-    sets.machineId = body.machineId;
-  }
   if (Object.keys(sets).length > 0) {
     deps.db.update(chief).set(sets).where(eq(chief.id, row.id)).run();
   }
@@ -355,7 +327,6 @@ export function toChiefThreadRecord(
     lastTurnAt: row.lastTurnAt,
     session: { runtime: 'pi', id: row.sessionId, openedAt: row.sessionOpenedAt },
     pendingSessionResumeAt: row.pendingSessionResumeAt,
-    pinnedMachineId: row.pinnedMachineId,
     toolDefHashes: row.toolDefHashes,
     toolResultHashes: row.toolResultHashes,
     activeRun: row.activeRun,
@@ -400,36 +371,18 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
 
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =
  * 首句截断 + …，r5 §3.6）+ user 消息行落库 + chief 步入队（回合 = 机器 step，
- * r5 §3.1）+ 机器 wake。
- *
- * #774 收单回落（落点 = 服务端收单而非客户端发送前：① 原子——槽愈合与入队同
- * 函数，客户端先 PATCH 再 POST 会在 daemon claim 处留竞争窗；② 全入口——新
- * 主题 / 续消息 / 内部编排三路同走本函数，客户端方案只盖得住抽屉 composer；
- * ③ 加法契约——响应添可空字段，老 web 忽略即退化现状）。存量槽在当前候选里
- * 消失（本地换过模型）→ 同步置 null（继承绑定 Agent = picker 默认行）再入队，
- * claim 恒读到可执行值；调用方（web onSend）凭返回的 modelFallback 显式 toast。
- * homeDir 注入位：生产缺省 os.homedir()，测试给 mkdtemp（含 .claude/settings.json）。 */
+ * r5 §3.1）+ 机器 wake。模型 = 绑定 Agent 自身配置（#1260 无继承态——
+ * 收单面无槽可愈合，step 载荷恒可读）。 */
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
-  body: { threadId: string | null; content: string; pinnedMachineId?: string | null },
-  opts?: { homeDir?: string },
+  body: { threadId: string | null; content: string },
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
-  /** 存量槽回落上报：被愈合掉的原值，无回落 null（web 凭此 toast 告知用户）。 */
-  modelFallback: ChiefCompactionModel | null;
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const { effective, fellBackFrom } = resolveChiefModelFallback(chiefRow.model, [
-    claudeCodeModelSource(opts?.homeDir ?? homedir()),
-  ]);
-  let modelFallback: ChiefCompactionModel | null = null;
-  if (fellBackFrom !== null) {
-    deps.db.update(chief).set({ model: effective }).where(eq(chief.id, chiefRow.id)).run();
-    modelFallback = fellBackFrom;
-  }
 
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
@@ -456,12 +409,6 @@ export function sendChiefMessage(
         sessionId: '', // 引擎会话未开——首轮 new session（done 回传后落值）
         sessionOpenedAt: now,
         pendingSessionResumeAt: null,
-        // #682/#895 机器亲和钉选缺省链（spec 21 A3）：编排入口的 todo 钉选
-        // （body.pinnedMachineId，现状第一级）→ chief 主力机（chiefRow.
-        // machineId，新第二级）→ null。既有线程不回写：会话在哪台机器续跑
-        // 由线程创建时刻决定，中途换机丢上下文（N7；未钉存量线程由 A4 会话
-        // 亲和粘住当前会话机）。
-        pinnedMachineId: body.pinnedMachineId ?? chiefRow.machineId ?? null,
         toolDefHashes: chiefToolDefHashes(),
         toolResultHashes: {},
         activeRun: null,
@@ -500,7 +447,6 @@ export function sendChiefMessage(
       pendingTurn === null ? null : projector.project(pendingTurn),
     ),
     message,
-    modelFallback,
   };
 }
 

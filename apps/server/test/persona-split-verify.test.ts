@@ -32,7 +32,7 @@ import { agentIdForStep, unassignedStepReason } from '../src/services/dispatch-e
 import { ensurePersonasSeeded } from '../src/services/personas.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
 import type { TestServer } from './helpers.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, insertMachine, issueApiKey, postProject } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -109,6 +109,9 @@ async function setupWorld(): Promise<World> {
   });
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
+  // #1259：认领机 = 全部 agent 的归属机（persona 播种在 enroll 前、彼时无
+  // 机器可绑——补值路径的机器侧真值归 personas.test；本文件钉派发行为）。
+  bindAllAgents(s);
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '流水线探针', spec: '验证 #1250 的层 1 流水线' },
@@ -673,5 +676,37 @@ describe('#1250 split_todo（层 2）', () => {
     expect(w.messagesOf(result.parentBuildId).some((m) => m.content === DONE_ANNOUNCEMENT)).toBe(
       true,
     );
+  });
+});
+
+describe('#1259 persona 归属机（seeding × 绑定模型桥接）', () => {
+  // 失败方式（先于实现固化）：
+  // 1. 团队无机器时播种 → persona 行 machineId null（不编造机器）。
+  // 2. mea 机在场时播种 → machineId = 该机（与迁移回填同口径）。
+  // 3. 补值半边：先 null 后有机 → 再播种填上；用户换绑过的值（非 null）不碰。
+  test('无机器播种 → null；mea 在场播种 → 绑 mea；补值不覆盖用户换绑', async () => {
+    const s = bootServer({});
+    // 无机器播种 → null。
+    ensurePersonasSeeded(s.db, s.team.id);
+    const homeless = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
+    expect(homeless.machineId).toBeNull();
+    // 换绑标记：把 planner 钉到一台「非 mea」机器（模拟用户换绑过）。
+    const otherMachine = insertMachine(s, { name: 'user-mac' });
+    s.db
+      .update(agentTable)
+      .set({ machineId: otherMachine })
+      .where(eq(agentTable.id, homeless.id))
+      .run();
+    // mea 机接入 → 再播种：planner 是用户值（不动），其余 null 行补到 mea。
+    const meaMachine = insertMachine(s, { name: 'mea-wsl' });
+    ensurePersonasSeeded(s.db, s.team.id);
+    const planner = s.db.select().from(agentTable).where(eq(agentTable.persona, 'planner')).get()!;
+    expect(planner.machineId).toBe(otherMachine);
+    const implementer = s.db
+      .select()
+      .from(agentTable)
+      .where(eq(agentTable.persona, 'implementer'))
+      .get()!;
+    expect(implementer.machineId).toBe(meaMachine);
   });
 });

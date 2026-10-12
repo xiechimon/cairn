@@ -17,7 +17,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { agent, agentMemory, machine, todo } from './db/schema.js';
-import { notFound, parseWith } from './lib/errors.js';
+import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import {
   agentRecordOf,
@@ -29,6 +29,7 @@ import {
 import { deleteAgent } from './services/agents.js';
 import {
   declaredMcpGaps,
+  homeMachineRejectReason,
   missingCapabilityItems,
   runtimeGatePasses,
 } from './services/dispatch-eligibility.js';
@@ -74,6 +75,20 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(createAgentBodySchema, await jsonBody(c), 'body');
+    // #1259 归属机：创建必填（契约在 createAgentBodySchema）。机器须在本
+    // 团队，且过归属机校验（runtime 已启用 + claude-code 模型已配——
+    // 单源 = dispatch-eligibility.homeMachineRejectReason）。
+    const machineRow = ctx.db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
+      .get();
+    if (!machineRow) throw notFound(`machine ${body.machineId}`);
+    const createReject = homeMachineRejectReason(machineRow, {
+      provider: body.provider ?? null,
+      modelId: body.modelId ?? null,
+    });
+    if (createReject) throw new HttpError(400, createReject);
     const id = newRecordId();
     ctx.db
       .insert(agent)
@@ -109,6 +124,7 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         mcpServers: body.mcpServers ?? [],
         // #1138 agent 并发上限：nullish——显式 null 与缺省同值（不限）。
         maxConcurrentTasks: body.maxConcurrentTasks ?? null,
+        machineId: body.machineId,
         // #1250 persona 角色位：nullish——词表校验在 createAgentBodySchema
         //（personaRoleSchema），团队内唯一性由 partial unique index 兜底
         //（撞角色 = sqlite 唯一约束错，写面如实上抛）。
@@ -152,6 +168,37 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
     // XMON-77：tools[] 与 create 同律——写侧过滤（词表外值静默丢弃）。
     if (body.tools !== undefined) {
       sets.tools = filterAgentTools(body.tools);
+    }
+    // #1259 换绑：目标机须在本团队并过归属机校验（按 patch 后的有效
+    // provider/modelId 判——同 body 换 provider/model 时以新值为准）。
+    if (body.machineId !== undefined) {
+      const target = ctx.db
+        .select()
+        .from(machine)
+        .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
+        .get();
+      if (!target) throw notFound(`machine ${body.machineId}`);
+      const reject = homeMachineRejectReason(target, {
+        provider: body.provider !== undefined ? body.provider : row.provider,
+        modelId: body.modelId !== undefined ? body.modelId : row.modelId,
+      });
+      if (reject) throw new HttpError(400, reject);
+      sets.machineId = body.machineId;
+    } else if ((body.provider !== undefined || body.modelId !== undefined) && row.machineId) {
+      // 未换绑但改了 provider/modelId：对当前归属机复核，洞不从 patch 后门
+      // 溜回（机器行缺失 = 归属机已被移除，留 null 形态给 UI 补）。
+      const home = ctx.db
+        .select()
+        .from(machine)
+        .where(and(eq(machine.id, row.machineId), eq(machine.teamId, teamId)))
+        .get();
+      if (home) {
+        const reject = homeMachineRejectReason(home, {
+          provider: body.provider !== undefined ? body.provider : row.provider,
+          modelId: body.modelId !== undefined ? body.modelId : row.modelId,
+        });
+        if (reject) throw new HttpError(400, reject);
+      }
     }
     for (const key of [
       'displayName',

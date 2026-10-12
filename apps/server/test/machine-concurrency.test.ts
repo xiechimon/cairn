@@ -62,6 +62,7 @@ async function setupWorld(): Promise<World> {
       id: AGENT_ID,
       teamId: s.team.id,
       displayName: 'cap-agent',
+      machineId: machineAId,
       status: 'active',
       avatarUrl: null,
       provider: 'stub-gw',
@@ -98,7 +99,7 @@ let seqCounter = 9_000;
 function insertPendingBuildStep(
   s: TestServer,
   world: World,
-  opts: { pin?: string | null } = {},
+  opts: { agentId?: string } = {},
 ): { todoId: string; buildId: string; stepId: string } {
   const suffix = Math.random().toString(36).slice(2, 8);
   seqCounter += 1;
@@ -114,8 +115,7 @@ function insertPendingBuildStep(
       spec: '探针',
       phase: 'queued',
       phaseAt: now,
-      assignment: { plan: null, build: { agentId: AGENT_ID } },
-      machineId: opts.pin ?? null,
+      assignment: { plan: null, build: { agentId: opts.agentId ?? AGENT_ID } },
     })
     .run();
   s.db
@@ -127,7 +127,6 @@ function insertPendingBuildStep(
       planDocId: null,
       triggerSource: 'user',
       createdAt: now,
-      pinnedMachineId: opts.pin ?? null,
     })
     .run();
   const stepId = `step-cap-${suffix}`;
@@ -239,50 +238,60 @@ describe('#1108 claim 容量闸（满载不领 / 空位即领 / 调整即时生�
 });
 
 describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
-  test('失败方式 4：钉选步位次只数该机可见集；未钉步数全队；waitingFor 快照', async () => {
+  test('失败方式 4（#1259 归属机版）：归属机步位次只数同归属机集；waitingFor 快照', async () => {
     const w = await setupWorld();
     setCap(w, 2);
     // 机器 A 满载（2 claimed）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 9000 });
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 8000 });
-    // 队列：早 pending（未钉）、中 pending（钉 A）、晚 pending（钉 B 机）、
-    // 目标（钉 A，最晚）。
-    const early = insertPendingBuildStep(w.s, w); // 未钉
-    insertPendingBuildStep(w.s, w, { pin: w.machineAId });
-    const latePinB = insertPendingBuildStep(w.s, w, { pin: 'machine-b-other' });
-    const target = insertPendingBuildStep(w.s, w, { pin: w.machineAId });
+    // 第二台机器 B + 绑 B 的 agent。
+    const machineBId = `machine-b-${Math.random().toString(36).slice(2)}`;
+    w.s.db
+      .insert(machineTable)
+      .values({
+        id: machineBId,
+        teamId: w.s.team.id,
+        name: 'cap-mbp-b',
+        online: true,
+        enabledRuntimes: ['pi'],
+        maxConcurrent: 3,
+      })
+      .run();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-cap-b',
+        teamId: w.s.team.id,
+        displayName: 'cap-agent-b',
+        modelId: 'stub-model',
+        machineId: machineBId,
+      })
+      .run();
+    // 队列：中 pending（归 A）、晚 pending（归 B）、目标（归 A，最晚）。
+    insertPendingBuildStep(w.s, w);
+    const lateB = insertPendingBuildStep(w.s, w, { agentId: 'agent-cap-b' });
+    const target = insertPendingBuildStep(w.s, w);
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
-    // 钉 A 目标：可见集 = [early(未钉), midPinA(钉A), target(钉A)]——latePinB
-    // 钉 B 不可见不计；位次 = 3。
+    // 归 A 目标：可见集 = [midA, target]——归 B 的步不可见不计；位次 = 2。
     const targetInfo = projector.project({
       id: target.stepId,
       createdAt: Date.now(),
-      pinnedMachineId: w.machineAId,
+      homeMachineId: w.machineAId,
     });
-    expect(targetInfo?.position).toBe(3);
+    expect(targetInfo?.position).toBe(2);
     expect(targetInfo?.waitingFor).toMatchObject({
       machineId: w.machineAId,
       running: 2,
       capacity: 2,
     });
-    // 未钉步（early）：全队位次 = 1（最早）。
-    const earlyInfo = projector.project({
-      id: early.stepId,
-      createdAt: Date.now(),
-      pinnedMachineId: null,
-    });
-    expect(earlyInfo?.position).toBe(1);
-    expect(earlyInfo?.waitingFor).toBeNull();
-    // 钉 B 步（机器行不存在）：waitingFor = null（不编造对象），位次照算。
+    // 归 B 步：B 机可见集只它自己 → 位次 1；waitingFor = B 快照。
     const bInfo = projector.project({
-      id: latePinB.stepId,
+      id: lateB.stepId,
       createdAt: Date.now(),
-      pinnedMachineId: 'machine-b-other',
+      homeMachineId: machineBId,
     });
-    expect(bInfo?.waitingFor).toBeNull();
-    // 钉 B 步的位次 = B 机可见集（early 未钉对它可见 + 自身）= 2，不是全队位次
-    // 3——钉选步按「该机真实认领序」计（claimCandidates 同过滤）。
-    expect(bInfo?.position).toBe(2);
+    expect(bInfo?.position).toBe(1);
+    expect(bInfo?.waitingFor).toMatchObject({ machineId: machineBId, running: 0, capacity: 3 });
   });
 
   test('失败方式 4b：steps 查询挂 queue；步被领走 → 投影退场', async () => {
@@ -317,6 +326,8 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
         teamId: w.s.team.id,
         agentId: AGENT_ID,
         charter: '',
+        // #1260：chief 步的归属 = 绑定 Agent 的归属机（AGENT_ID 出生绑 A；
+        // 投影的 waitingFor 快照源）。
         createdAt: now,
       })
       .run();
@@ -334,7 +345,6 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
         sessionId: '',
         sessionOpenedAt: now,
         pendingSessionResumeAt: null,
-        pinnedMachineId: w.machineAId,
         toolDefHashes: {},
         toolResultHashes: {},
         activeRun: { phase: 'chief' },

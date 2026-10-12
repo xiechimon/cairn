@@ -57,7 +57,7 @@ import {
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 // —— 脚手架（隔离技能根 + 隔离来源目录 + GitHub mock）———————————————————
 
@@ -982,6 +982,8 @@ describe('refresh 与 machine-wire 清单（#920 接力）', () => {
           skillsAllowlist: ['dist-skill'],
         })
         .run();
+      bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
       const projectId = await postProject(s.app);
       const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
         body: { title: '', spec: '干活\n\n现在的情况：没技能' },

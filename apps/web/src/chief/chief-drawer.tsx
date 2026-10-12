@@ -46,7 +46,6 @@ import {
   type AskUserAnswer,
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
-  type ChiefCompactionModel,
 } from '@pacman/shared';
 import {
   type Dispatch,
@@ -72,7 +71,7 @@ import {
 } from '../components/ui/message-scroller.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import type { ChiefContent, ModelOption } from '../fixtures/records.js';
+import type { ChiefContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   ArrowDown,
@@ -97,7 +96,6 @@ import { type MentionGroups, MentionInline, MentionPicker } from '../overlay/men
 import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { useChiefNewThreadHotkey } from '../overlays/hotkeys.js';
 import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
-import { ChiefModelPopover } from './chief-model-popover.js';
 
 /** 悬浮窗壳（ADR 0013 D2/D10：几何皮肤整套采 Multica 原值——默认
  *  380×600、距内容区右/下各 8px、圆角 12px、--floating-shadow、不透明卡底
@@ -221,14 +219,6 @@ interface DrawerProps {
    * （threadId null = 新主题，wire 注记见 shared chief send schema）；
    * 缺省 = fixture 静态面，钮惰性。 */
   onNewThread?: () => void;
-  /** #615 主模型覆盖槽当前值（live = chief 封套真值；null = 继承绑定
-   *  Agent）；fixture 面缺省 = null。 */
-  modelValue?: ChiefCompactionModel | null;
-  /** #615 主模型候选（live = toModelOptions 投影，非 pi runtime 段）；缺省 = 仅默认行。 */
-  modelOptions?: ModelOption[];
-  /** #615 live 面：模型 dialog 选定 = PATCH chief model 槽；缺省 = fixture
-   *  律（选择即关，零请求）。 */
-  onPickModel?: (value: ChiefCompactionModel | null) => void;
   /** #615 返工 live 面：恢复钮确认后 = POST chief threads rewind（截断锚后
    *  消息 + 新会话重发）；缺省 = fixture 律（确认层 accept 关窗零请求）。 */
   onRewind?: (messageId: string) => void;
@@ -334,9 +324,6 @@ function ChiefDrawerInner({
   onSend,
   onThread,
   onNewThread,
-  modelValue = null,
-  modelOptions,
-  onPickModel,
   onRewind,
   onAnswerQuestion,
   onCancelQuestion,
@@ -384,7 +371,6 @@ function ChiefDrawerInner({
   // 注入由 wire hook 行原子做）。fixture 面无委托 → wire 附件链全惰。
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
-  const [modelOpen, setModelOpen] = useState(false);
   // #651 → #1009 A1 滚动模型替换：真滚动容器 = MessageScroller Viewport
   // （data-testid chief-body 载体随迁；overflowY auto 面由原语承载），贴底
   // 跟随/打开落底 = Provider 原生 autoScroll + defaultScrollPosition（壳层
@@ -527,13 +513,12 @@ function ChiefDrawerInner({
     helpRows,
     helpSkillCount,
   } = wire;
-  // #773：抽屉收起联动收弹层——模型 popover / 切换器 / 提及 picker /
-  // 内联补全 / 恢复确认的 open 态都自持在抽屉内部，抽屉只收容器时它们跟
-  // 着失活（FloatingShell 的 portal 锚随容器走）却不清零，重开即带回
-  // stale 开态。X / Esc / ⌘J 同走 open=false，这里一处收敛。
+  // #773：抽屉收起联动收弹层——切换器 / 提及 picker / 内联补全 / 恢复
+  // 确认的 open 态都自持在抽屉内部，抽屉只收容器时它们跟着失活
+  //（FloatingShell 的 portal 锚随容器走）却不清零，重开即带回 stale 开
+  // 态。X / Esc / ⌘J 同走 open=false，这里一处收敛。
   useEffect(() => {
     if (open) return;
-    setModelOpen(false);
     setThreadsOpen(false);
     setRewindConfirm(null);
     closePicker();
@@ -672,47 +657,23 @@ function ChiefDrawerInner({
           </div>
         </div>
         {/* 模型行（旧 .chief-model 等值：12px tertiary、gap 5、3 上距）。
-                  #615 A/B：显示行翻控制件——行首 = 运行时标记（FAB / 消息流的
-                  Agent 头像脸不受影响，XMON-105 律），点开 = 主模型覆盖锚定
-                  弹层（#751：贴行底下，家族律见 ChiefModelPopover；live
-                  PATCH 落库回显）。wrap 只承布局（-4px 光学内缩），定位正本
-                  在 Popover Positioner。中和件同头部 chip 族：h-auto/
-                  leading-[inherit]/font-normal 防原语定值撑高 12px 行、
-                  hover 底/墨 = 旧 per-face 配方（surface-secondary +
-                  secondary 墨）、svg size-auto（ChevronDown 12 属性尺寸）。 */}
-        <div className="mt-[3px] flex items-center gap-[5px] text-xs text-(--text-tertiary)">
+                  #1260 总管降级：chief 无模型覆盖槽——行 = 绑定 Agent 自身
+                  模型的只读展示（行首运行时标记同前：pi 块状 π / claude-code
+                  品牌星标）；改模型去 Agent 设置面。 */}
+        <div
+          className="mt-[3px] flex items-center gap-[5px] text-xs text-(--text-tertiary)"
+          data-testid="chief-model-row"
+        >
           {chief.bound ? (
-            <span className="relative block min-w-0 -ml-1">
-              <ChiefModelPopover
-                open={modelOpen}
-                onOpenChange={setModelOpen}
-                value={modelValue}
-                options={modelOptions}
-                onPick={onPickModel}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    className="h-auto min-w-0 max-w-full shrink cursor-pointer justify-start gap-[5px] rounded-none border-none bg-transparent px-1 py-px leading-[inherit] font-normal text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-                    aria-label={t('总管主模型')}
-                  >
-                    {/* #615 返工（用户裁决）：行首 = 运行时标记，不是 Agent 头像
-                          ——标记正本 = 参考站 providers 运行时 tab 的 SVG（用户指认
-                          /app/resources/providers?runtime=pi 面，DOM 捕获入库）：
-                          pi = RuntimePi 块状 π，claude-code = RuntimeClaudeCode
-                          品牌星标（填色随捕获）。FAB / 消息流的 Agent 头像脸不受
-                          影响（XMON-105 律在其各自面继续生效）。 */}
-                    <span className="inline-flex flex-none items-center">
-                      {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
-                        <RuntimeClaudeCode width={12} height={12} />
-                      ) : (
-                        <RuntimePi width={12} height={12} />
-                      )}
-                    </span>
-                    <span className="min-w-0 truncate">{chief.modelSlot}</span>
-                    <ChevronDown width={12} height={12} />
-                  </Button>
-                }
-              />
+            <span className="flex min-w-0 items-center gap-[5px] px-1">
+              <span className="inline-flex flex-none items-center">
+                {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
+                  <RuntimeClaudeCode width={12} height={12} />
+                ) : (
+                  <RuntimePi width={12} height={12} />
+                )}
+              </span>
+              <span className="min-w-0 truncate">{chief.modelSlot}</span>
             </span>
           ) : (
             <span>n/a</span>

@@ -25,7 +25,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, apiKey as apiKeyTable } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-g2t2-1';
 const GH_TOKEN = 'ghp_connection_row_token_probe';
@@ -75,6 +75,8 @@ async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWor
     .insert(agentTable)
     .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'g2t2-builder', modelId: 'm' })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
   const projRes = await call(s.app, 'POST', '/api/projects', { body: projectBody });
   expect(projRes.status).toBe(201);
   const project = (await projRes.json()) as { id: string };

@@ -178,9 +178,7 @@ export interface OverlayUi {
   notificationPermission?: NotificationPermission;
 }
 
-/** Scheduled rule (02 §9.2 / r3 §8.3 wire shape, copied verbatim:
- *  `{id, teamId, projectId, todoId, kind, at, tz, machineId, nextRunAt,
- *  createdBy, todo{seqNum,title,phase,projectName,ownerId}}`). */
+/** Scheduled rule（02 §9.2 / r3 §8.3 wire 形状）。 */
 export interface ScheduleRecord {
   id: string;
   teamId: string;
@@ -190,8 +188,6 @@ export interface ScheduleRecord {
   kind: 'hourly' | 'daily' | 'weekly' | 'once';
   at: number;
   tz: string;
-  /** null = 自动 (r3 §9 机器 row). */
-  machineId: string | null;
   nextRunAt: number;
   createdBy: string;
   todo: {
@@ -256,6 +252,8 @@ export interface TeamAgentCard {
   model: string;
   /** Model line carries the `· 默认` suffix for the team's default agent. */
   isDefault: boolean;
+  /** #1259 归属机（agent.machineId；null = 未设——卡上指名警示）。 */
+  machineId?: string | null;
   /** Role line text; null renders the `未设置职责` placeholder (r7 12). */
   role: string | null;
   /** 服务商标识（r3 §4 样本 `provider:"r3-gw"`；records/agent.ts 同名栏）。
@@ -401,7 +399,7 @@ export interface MachineRow {
    *  shared machineRecordSchema.shellEnabled）。 */
   shellEnabled?: boolean;
   /** #895 三态读标注（spec 21 A8；live = GET /chief 封套 orchestration 块
-   *  join useMachines 行集）：chiefHost = 总管主机徽标行（defaultMachineId
+   *  join useMachines 行集）：chiefHost = 总管主机徽标行（homeMachineId
    *  命中）；chiefRunning = 总管回合进行中（activity.running > 0）；
    *  chiefWaiting = 总管等待机器（activity.waiting > 0，被钉 pending 回合
    *  等该机上线/开闸）。fixture 静态投影同一语义；absent = 无标注（存量
@@ -929,6 +927,9 @@ export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
  *  存量 custom providerId 只出现在旧值回显，不再是候选）。 */
 export interface ModelOption {
   provider: string;
+  /** #1259 归属机维：候选来自哪台机器的上报段（claude-code 段有；pi 段
+   *  缺席）。创建弹窗按归属机过滤候选。 */
+  machineId?: string;
   /** 显示用来源名（r5 §2 捕获行 `r3-gw · 128k` 徽标位；runtime 段 =
    *  品牌名 `Claude Code`，不译）。 */
   providerLabel: string;
@@ -948,13 +949,6 @@ export interface ChiefContent {
   /** Agent bound to the chief: hides the gate bar, fills the model slot
    *  and swaps the header icon set (r5 100 vs 111/114). */
   bound: boolean;
-  /** #204 压缩模型槽值(settings Agent tab 选择器回显位,wire 形随 server
-   *  #203);缺省/null = 默认（与 Chief 相同）。 */
-  compactionModel?: { provider: string; modelId: string } | null;
-  /** #895 主力机槽值（settings Agent tab 机器选择器回显位；live = GET
-   *  chief 封套 chief.machineId 投影）。缺省/null = 自动；值 = resources
-   *  machines 行 id（命中行集才回显机器名，悬空 = 裸串回显）。 */
-  machineId?: string | null;
   /** Model slot line when bound (`claude-sonnet-5 · 默认`); `n/a` else. */
   modelSlot?: string;
   /** #444 绑定 Agent 的头像位（总管 FAB 图标源）：语义走 Avatar 原语
@@ -963,7 +957,7 @@ export interface ChiefContent {
    *  从 GET chief 封套的 agentActor 投影，不新增请求。 */
   agent?: { id?: string; displayName: string; avatarUrl: string | null };
   /** #615 返工：模型行首 = 运行时标记（用户裁决：要运行时 SVG 不要 Agent
-   *  头像）。值 = 生效模型的 provider 位（覆盖槽优先，回退绑定 Agent）；
+   *  头像）。值 = 绑定 Agent 模型的 provider 位（#1260：chief 无覆盖槽）；
    *  'claude-code' = Claude Code 运行时，其余（custom provider / 缺省）= pi
    *  运行时。absent = fixture 未录 provider 位，按 pi 正典呈现（r5 111）。 */
   modelProvider?: string | null;

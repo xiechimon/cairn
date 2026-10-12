@@ -6,7 +6,6 @@
 import type {
   ActiveRun,
   Assignment,
-  ChiefCompactionModel,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
@@ -103,10 +102,6 @@ export const todo = sqliteTable('todo', {
   /** 外部引用（#446）：形如 `github:owner/repo#123`（shared
    * githubIssueSourceRef 单源）；无来源 = null。 */
   sourceRef: text('sourceRef'),
-  /** 任务的钉选机器（#682，t-0047）：任务级默认机器单源，null = 自动
-   * （语义同 build.pinnedMachineId）。startBuilds 缺省回落本值；orchestrate
-   * 落 chief_thread.pinnedMachineId；写面 = 新建任务 REST / PATCH 面。 */
-  machineId: text('machineId'),
 });
 
 // tag record 三位补全（#309，r9 §3.4 实测 wire {id, projectId, name, color,
@@ -146,7 +141,6 @@ export const build = sqliteTable('build', {
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
-  pinnedMachineId: text('pinnedMachineId'),
   planDocId: text('planDocId'),
   errorMessage: text('errorMessage'),
   prUrl: text('prUrl'),
@@ -345,7 +339,6 @@ export const schedule = sqliteTable('schedule', {
   kind: text('kind').$type<'once' | 'hourly' | 'daily' | 'weekly'>().notNull(),
   at: epochMs('at'),
   tz: text('tz').notNull(),
-  machineId: text('machineId'),
   nextRunAt: epochMs('nextRunAt'),
   createdBy: text('createdBy').notNull(),
 });
@@ -393,6 +386,8 @@ export const agent = sqliteTable(
      *  partial unique index（一队一角色，fan-out 查重确定性）；词表单源 =
      *  shared records/agent.ts PERSONA_ROLES，写侧 zod 闸（personaRoleSchema）。 */
     persona: text('persona').$type<PersonaRole | null>(),
+    /** 归属机（#1259）：该 agent 的步只投这台机器——创建必填。 */
+    machineId: text('machineId').references(() => machine.id),
     tools: json<string[]>('tools').notNull().default(sql`'[]'`),
     secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
     /** 默认携带技能（#1169）：单值，可空——旧 skills 列拆出的「skills[0] 单值」半边。 */
@@ -408,7 +403,7 @@ export const agent = sqliteTable(
      * 在 agentForStep 之后按 agent 计数 gate）+ PATCH 写位（值域 1..50，与
      * Multica agent 层闸同区间，r10 §5.4）。机器 maxConcurrent 是机器面容量
      * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
-     * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
+     *  chief 步同占本闸（#1260：chief 步经 chiefThread→chief.agentId 归账绑定 Agent）。 */
     maxConcurrentTasks: integer('maxConcurrentTasks'),
     /** 能力要求声明（#1251 / ADR 0018 决策 4.2）：该 Agent 的步对执行机的
      *  能力要求（MCP slug 集 / claude-code 模型 id 集）。NULL = 无要求（缺省/
@@ -625,22 +620,10 @@ export const chief = sqliteTable('chief', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
-  /** 绑定 Agent id（PATCH /chief + 二次确认，记忆不迁移告示，r5 §2）；未绑定 null。 */
+  /** 绑定 Agent id（PATCH /chief + 二次确认，记忆不迁移告示，r5 §2）；未绑定
+   *  null。#1260：chief = 名册里的普通 agent——步的去处（归属机）、模型、
+   *  思考强度、并发槽全部取绑定 Agent 自身配置，chief 行不再持覆盖槽。 */
   agentId: text('agentId'),
-  /** 绑定 Agent 的思考强度覆盖（PATCH body agent.thinkingLevel，r5 §2）。 */
-  thinkingLevel: text('thinkingLevel'),
-  /** 压缩模型长槽（#203 [设计]；records/chief.ts chiefCompactionModelSchema
-   * 值形，null = 默认「与 Chief 相同」）；JSON 列。 */
-  compactionModel: json<ChiefCompactionModel>('compactionModel'),
-  /** 主模型覆盖长槽（#615 [设计]，r5 107/108 独立「模型」选择器的落库面；
-   * 值形同 compactionModel，null = 继承绑定 Agent 模型）；JSON 列。 */
-  model: json<ChiefCompactionModel>('model'),
-  /** 主力机（#895 spec 21 A1）：chief 级执行机器缺省，null = 自动（未钉 =
-   *  任何在线机器 FIFO + A4 会话亲和兜正确性）。新线程钉选缺省链第二级
-   *  （todo.machineId → 本列 → null）；既有线程不回写（creation-time 语义，
-   *  N7）。钉选律镜像 todo.machineId（todo 表注释同律）：确定性、无自动
-   *  回退，解除归用户。存量行不回填。 */
-  machineId: text('machineId'),
   /** 章程 = 常设指示（r5 §2 章程 tab；raw 默认空串）。 */
   charter: text('charter').notNull().default(''),
   /** watch 条目集（records/chief.ts chiefWatchSchema[]；派工即建、settle/failed
@@ -670,10 +653,6 @@ export const chiefThread = sqliteTable('chief_thread', {
   sessionId: text('sessionId').notNull(),
   sessionOpenedAt: epochMs('sessionOpenedAt').notNull(),
   pendingSessionResumeAt: epochMs('pendingSessionResumeAt'),
-  /** 机器亲和（#682）：chief 会话文件（pi sessionDir）是执行机本地资产，
-   * 轮换认领会降级 new session——chief 步按本列钉给固定机器（claimChief
-   * Candidates 过滤，与 worker 步的 build.pinnedMachineId 同语义）。 */
-  pinnedMachineId: text('pinnedMachineId'),
   toolDefHashes: json<Record<string, string>>('toolDefHashes').notNull().default(sql`'{}'`),
   toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
   activeRun: json<ActiveRun>('activeRun'),

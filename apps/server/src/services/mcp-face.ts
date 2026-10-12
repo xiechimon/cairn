@@ -92,7 +92,6 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
     todoId: s,
     kind: z.enum(['once', 'hourly', 'daily', 'weekly']),
     at: z.number(),
-    machineId: s.optional(),
   },
   unschedule_todo: { todoId: s },
 };
@@ -392,7 +391,6 @@ export async function executeMcpTool(
             kind: args.kind as 'once' | 'hourly' | 'daily' | 'weekly',
             at,
             tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            machineId: optStr(args, 'machineId') ?? null,
             createdBy: ctx.user.id,
           },
         ),

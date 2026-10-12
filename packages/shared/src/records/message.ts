@@ -210,22 +210,9 @@ export const machineAskResponseSchema = z.object({
 });
 export type MachineAskResponse = z.infer<typeof machineAskResponseSchema>;
 
-/** 跨机续跑降级标记 canon（#862 T1）：daemon 会话续接失败
- *（SessionNotResumable，典型 = 他机认领释放步、原会话文件不在本机）回退新
- * 会话时插 transcript system 行。写入端（daemon runner 回退面）与呈现端（web
- * transcript mapper 纯文本 system→note 路）双端单源；content 恒纯文本无花括
- * 号（花括号会被呈现端当 machine_selected 同族跳过）。 */
-export const RESUME_FRESH_SESSION_NOTE = '原会话不可复用，已用新会话重跑（上下文可能不完整）';
-
-/** transcript 续跑注记行 id（daemon 写侧单源；deterministic per step，重传
- * 覆盖不叠行——transcriptPromptRowId 同律）。 */
-export function transcriptResumeNoteRowId(stepId: string): string {
-  return `resume-note-${stepId}`;
-}
-
 /** #931 返工回原分支——复用轮边界 note（server restart 复用旧 build 时落旧
- * conv 的 system 行；RESUME_FRESH_SESSION_NOTE 同族：纯文本、无花括号——花括
- * 号会被呈现端当 machine_selected 同族 JSON 跳过）。文本单源：server 写侧
+ * conv 的 system 行）：纯文本、无花括号——花括号会被呈现端当
+ * machine_selected 同族 JSON 跳过。文本单源：server 写侧
  * （builds.ts restart 复用分支）与测试断言消费同一份。prNumber 在位点名 PR
  * （原 PR 就地更新的事实），failureReason 承接被清空的 build.errorMessage
  * 原文（失败原因不随轮界蒸发）。 */
@@ -260,8 +247,8 @@ export function buildReworkNewBranchNote(input: {
 /** #1217 守卫生效 note（claim 面落守卫目标 build conv 的 system 行）：
  *  todo 已有 GitHub merged 真值 PR 时，后续 build 的每一步 claim 都会带守卫
  *  指令——指令被 classifyUserText 过滤出用户话语（#612 词表），板面可见性
- *  由本行承担（RESUME_FRESH_SESSION_NOTE 同族：纯文本、无花括号——花括号
- *  会被呈现端当 machine_selected 同族 JSON 跳过）。文本单源：server 写侧
+ *  由本行承担（纯文本、无花括号——花括号会被呈现端当 machine_selected
+ *  同族 JSON 跳过）。文本单源：server 写侧
  *  （machines.ts claim）与测试断言消费同一份。 */
 export function buildMergedPrGuardNote(input: { prNumber: number; prUrl: string | null }): string {
   const url = input.prUrl !== null ? `（${input.prUrl}）` : '';
@@ -282,8 +269,7 @@ export function buildSecondPrWarningNote(input: {
 }
 
 /** 守卫生效 note 行 id（server 写侧单源；deterministic per build，重投覆盖
- *  不叠行——transcriptResumeNoteRowId 同律：同 build 多步 claim 各自触发时
- *  幂等）。 */
+ *  不叠行——同 build 多步 claim 各自触发时幂等）。 */
 export function mergedPrGuardNoteRowId(buildId: string): string {
   return `merged-pr-guard-${buildId}`;
 }

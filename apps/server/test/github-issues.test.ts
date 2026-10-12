@@ -19,7 +19,14 @@ import { describe, expect, test } from 'vitest';
 import { agent as agentTable, tag as tagTable, todoTag } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const TOKEN = 'ghp_issue_face_token';
 const REPO = 'octo/alpha';
@@ -530,6 +537,8 @@ describe('set_task_meta 词表不变式两形态（E23-E26 / F27-F28）', () => 
         modelId: 'm',
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projectId = kind === 'github' ? await postGithubProject(s.app) : await postProject(s.app);
     let todoId: string;
     if (viaImport) {

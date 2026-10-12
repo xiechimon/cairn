@@ -134,11 +134,17 @@ function insertAgent(
     .run();
 }
 
-/** 建 todo + build + pending build 步（assignment.build 指 agentId）。 */
+/** 建 todo + build + pending build 步（assignment.build 指 agentId）。
+ *  #1259：机器去处 = agent 归属机——homeMachineId 即把该 agent 绑到该机。 */
 function insertPendingStep(
   w: World,
-  opts: { agentId: string; pinnedMachineId?: string | null },
+  opts: { agentId: string; homeMachineId?: string | null },
 ): { stepId: string; buildId: string } {
+  w.s.db
+    .update(agentTable)
+    .set({ machineId: opts.homeMachineId ?? null })
+    .where(eq(agentTable.id, opts.agentId))
+    .run();
   const suffix = Math.random().toString(36).slice(2, 8);
   seqCounter += 1;
   const now = seqCounter;
@@ -157,7 +163,6 @@ function insertPendingStep(
       phase: 'queued',
       phaseAt: now,
       assignment: { plan: null, build: { agentId: opts.agentId } },
-      machineId: null,
     })
     .run();
   w.s.db
@@ -169,7 +174,6 @@ function insertPendingStep(
       planDocId: null,
       triggerSource: 'user',
       createdAt: now,
-      pinnedMachineId: opts.pinnedMachineId ?? null,
     })
     .run();
   w.s.db
@@ -296,7 +300,8 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
 describe('#1251 claim 能力闸', () => {
   test('失败方式 3：MCP 维——缺 slug 的机器 claim 空手留 pending，齐的照领', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-mcp', requiredCapabilities: { mcpServers: ['figma'] } });
+    insertAgent(w, { id: 'agent-cap-mcp-a', requiredCapabilities: { mcpServers: ['figma'] } });
+    insertAgent(w, { id: 'agent-cap-mcp-b', requiredCapabilities: { mcpServers: ['figma'] } });
     const lacking = await enrollMachineRest(w, {
       name: 'cap-lacking',
       capabilities: { mcpServers: ['ctx'], skills: [] },
@@ -305,19 +310,29 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-capable',
       capabilities: { mcpServers: ['figma', 'ctx'], skills: [] },
     });
-    const { stepId } = insertPendingStep(w, { agentId: 'agent-cap-mcp' });
+    // #1259：归属机 = 被测机（claim 面先过归属闸再过能力闸——要测能力闸，
+    // 本机必须就是归属机）。一个 agent 只有一个归属机，两形态各用各的 agent。
+    const blocked = insertPendingStep(w, {
+      agentId: 'agent-cap-mcp-a',
+      homeMachineId: lacking.machineId,
+    });
+    const runnable = insertPendingStep(w, {
+      agentId: 'agent-cap-mcp-b',
+      homeMachineId: capable.machineId,
+    });
 
     expect(await claimAs(w, lacking.machineId)).toBeNull();
-    expect(stepRow(w, stepId).status).toBe('pending');
+    expect(stepRow(w, blocked.stepId).status).toBe('pending');
 
     const claimed = await claimAs(w, capable.machineId);
-    expect(claimed?.step.id).toBe(stepId);
-    expect(stepRow(w, stepId).status).toBe('claimed');
+    expect(claimed?.step.id).toBe(runnable.stepId);
+    expect(stepRow(w, runnable.stepId).status).toBe('claimed');
   });
 
   test('失败方式 4：模型维——claudeCodeReport 缺模型 id 挡、含则放行', async () => {
     const w = await setupWorld();
-    insertAgent(w, { id: 'agent-cap-model', requiredCapabilities: { models: ['glm-5.3'] } });
+    insertAgent(w, { id: 'agent-cap-model-a', requiredCapabilities: { models: ['glm-5.3'] } });
+    insertAgent(w, { id: 'agent-cap-model-b', requiredCapabilities: { models: ['glm-5.3'] } });
     const noModel = await enrollMachineRest(w, {
       name: 'cap-model-no',
       capabilities: { mcpServers: [], skills: [] },
@@ -328,17 +343,27 @@ describe('#1251 claim 能力闸', () => {
       capabilities: { mcpServers: [], skills: [] },
       claudeCodeModels: ['glm-5.3'],
     });
-    const { stepId } = insertPendingStep(w, { agentId: 'agent-cap-model' });
+    const blocked = insertPendingStep(w, {
+      agentId: 'agent-cap-model-a',
+      homeMachineId: noModel.machineId,
+    });
+    const runnable = insertPendingStep(w, {
+      agentId: 'agent-cap-model-b',
+      homeMachineId: hasModel.machineId,
+    });
     expect(await claimAs(w, noModel.machineId)).toBeNull();
-    expect(stepRow(w, stepId).status).toBe('pending');
-    expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(stepId);
+    expect(stepRow(w, blocked.stepId).status).toBe('pending');
+    expect((await claimAs(w, hasModel.machineId))?.step.id).toBe(runnable.stepId);
   });
 
   test('失败方式 5：未上报快照 fail-open——老 daemon 机器照领', async () => {
     const w = await setupWorld();
     insertAgent(w, { id: 'agent-cap-open', requiredCapabilities: { mcpServers: ['figma'] } });
     const legacy = await enrollMachineRest(w, { name: 'cap-open-legacy' }); // 无 capabilities
-    const { stepId } = insertPendingStep(w, { agentId: 'agent-cap-open' });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-cap-open',
+      homeMachineId: legacy.machineId,
+    });
     expect((await claimAs(w, legacy.machineId))?.step.id).toBe(stepId);
   });
 
@@ -350,7 +375,10 @@ describe('#1251 claim 能力闸', () => {
       capabilities: { mcpServers: [], skills: [] },
       // claudeCodeModels 缺省 = claudeCodeReport 列 null
     });
-    const { stepId } = insertPendingStep(w, { agentId: 'agent-cap-open2' });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-cap-open2',
+      homeMachineId: noReport.machineId,
+    });
     expect((await claimAs(w, noReport.machineId))?.step.id).toBe(stepId);
   });
 
@@ -361,7 +389,10 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-regress',
       capabilities: { mcpServers: [], skills: [] },
     });
-    const { stepId } = insertPendingStep(w, { agentId: 'agent-cap-none' });
+    const { stepId } = insertPendingStep(w, {
+      agentId: 'agent-cap-none',
+      homeMachineId: m.machineId,
+    });
     expect((await claimAs(w, m.machineId))?.step.id).toBe(stepId);
   });
 
@@ -373,9 +404,13 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-hol',
       capabilities: { mcpServers: [], skills: [] },
     });
-    // 更早的候选 = 被挡 agent；更晚的候选 = 无要求 agent。
-    const blocked = insertPendingStep(w, { agentId: 'agent-cap-blocked' });
-    const free = insertPendingStep(w, { agentId: 'agent-cap-free' });
+    // 更早的候选 = 被挡 agent；更晚的候选 = 无要求 agent。两者同机（归属
+    // 机 = 被测机 m：被挡候选过不了能力闸，同机更晚的自由候选照领）。
+    const blocked = insertPendingStep(w, {
+      agentId: 'agent-cap-blocked',
+      homeMachineId: m.machineId,
+    });
+    const free = insertPendingStep(w, { agentId: 'agent-cap-free', homeMachineId: m.machineId });
     const claimed = await claimAs(w, m.machineId);
     expect(claimed?.step.id).toBe(free.stepId);
     expect(stepRow(w, blocked.stepId).status).toBe('pending');
@@ -392,6 +427,13 @@ describe('#1251 claim 能力闸', () => {
       name: 'cap-chief-yes',
       capabilities: { mcpServers: ['figma'], skills: [] },
     });
+    // #1259：chief 步去处 = 绑定 Agent 的归属机——先绑 lacking 测「不领」，
+    // 再换绑 capable 测「领到」（换绑即时改派，#1259 律）。
+    w.s.db
+      .update(agentTable)
+      .set({ machineId: lacking.machineId })
+      .where(eq(agentTable.id, 'agent-cap-chief'))
+      .run();
     const suffix = Math.random().toString(36).slice(2, 8);
     const now = Date.now();
     const chiefId = `chief-cap-${suffix}`;
@@ -422,7 +464,6 @@ describe('#1251 claim 能力闸', () => {
         sessionId: '',
         sessionOpenedAt: now,
         pendingSessionResumeAt: null,
-        pinnedMachineId: null,
         toolDefHashes: {},
         toolResultHashes: {},
         activeRun: { phase: 'chief' },
@@ -442,6 +483,11 @@ describe('#1251 claim 能力闸', () => {
       .run();
     expect(await claimAs(w, lacking.machineId)).toBeNull();
     expect(stepRow(w, stepId).status).toBe('pending');
+    w.s.db
+      .update(agentTable)
+      .set({ machineId: capable.machineId })
+      .where(eq(agentTable.id, 'agent-cap-chief'))
+      .run();
     expect((await claimAs(w, capable.machineId))?.step.id).toBe(stepId);
   });
 });
@@ -449,10 +495,12 @@ describe('#1251 claim 能力闸', () => {
 describe('#1251 agent requiredCapabilities 写读面', () => {
   test('失败方式 9：POST 创建带位、PATCH 改写、显式 null 清空、类型错 400', async () => {
     const w = await setupWorld();
+    const home = await enrollMachineRest(w, { name: 'cap-write-home' });
     const created = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/agents`, {
       displayName: 'cap-agent',
       provider: 'stub-gw',
       modelId: 'stub-model',
+      machineId: home.machineId,
       requiredCapabilities: { mcpServers: ['figma'] },
     });
     expect(created.status).toBe(201);

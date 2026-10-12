@@ -44,7 +44,7 @@ import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, completeStep } from '../src/services/builds.js';
 import { claimStep } from '../src/services/machines.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-rework-1';
 const PR_URL = 'https://github.com/demo-owner/demo-repo/pull/888';
@@ -75,7 +75,6 @@ interface WorldOpts {
   /** PR 字段（daemon 探测回填的落库形，直插模拟）；缺省 true。 */
   prFields?: boolean;
   /** todo 钉选机器（#682 回落链）；缺省不钉。 */
-  todoMachineId?: string | null;
   /** 复用前的旧会话（prior done 步）；缺省无。 */
   priorSession?: { sessionId: string; machineId: string } | null;
   /** github 探测 mock（githubFetch 注入位）。 */
@@ -137,6 +136,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       enabledRuntimes: ['pi'],
     })
     .run();
+  bindAllAgents(s, machineAId); // #1259：双机世界显式绑 A（会话机 = A）
   s.db
     .insert(todoTable)
     .values({
@@ -152,7 +152,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       hasPlan: true,
       latestBuildId: buildId,
       v: 1,
-      ...(opts.todoMachineId !== undefined ? { machineId: opts.todoMachineId } : {}),
     })
     .run();
   s.db
@@ -163,7 +162,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       withPlan: true,
       prevPhase: 'review',
       triggerSource: 'user',
-      pinnedMachineId: 'machine-old-pin',
       planDocId: null,
       errorMessage: '本轮无人认领：团队当前没有在线机器',
       prUrl: opts.prFields === false ? null : PR_URL,
@@ -279,17 +277,25 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
       .run();
     await restart(w, '换个思路再来');
 
-    // 无 freshSession 时亲和闸会把步留给会话机 A（在线、零 claimed、步活动
-    // 在宽限内）→ 他机空手；freshSession 必须让本机直接领到。
+    // #1259：亲和闸已退役，去处 = agent 归属机——别机（B）恒空手，归属机
+    // （A）领到且 freshSession 恒新会话。
     const machineDeps = {
       ...w.s.svc,
       box: w.s.secretBox,
       reposDir: w.s.reposDir,
       attachmentsDir: w.s.attachmentsDir,
     };
-    const got = (await claimStep(
+    const foreign = (await claimStep(
       machineDeps,
       w.machineBId,
+      w.teamId,
+      10,
+      'http://localhost',
+    )) as ClaimedStep | null;
+    expect(foreign).toBeNull();
+    const got = (await claimStep(
+      machineDeps,
+      w.machineAId,
       w.teamId,
       10,
       'http://localhost',
@@ -413,7 +419,6 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
         withPlan: true,
         prevPhase: 'review',
         triggerSource: 'chief',
-        pinnedMachineId: null,
         planDocId: null,
         errorMessage: null,
         prUrl: 'https://github.com/demo-owner/demo-repo/pull/777',
@@ -430,13 +435,6 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
     expect(stepsOf(w, w.buildId).some((st) => st.kind === 'plan')).toBe(true);
     // 更旧 PR build 不入轮（无新步）。
     expect(stepsOf(w, older)).toHaveLength(0);
-  });
-
-  test('失败方式 8：复用轮 pin 回落 todo.machineId（不继承失败轮 pin）', async () => {
-    const w = makeWorld({ todoMachineId: 'm-todo-pin' });
-    await restart(w, '钉住机器再跑');
-    const buildRow = buildsOf(w)[0]!;
-    expect(buildRow.pinnedMachineId).toBe('m-todo-pin');
   });
 
   test('失败方式 10：空白反馈 → 纯重启轮语义保持（无反馈行、无 instruction、note 照落）', async () => {

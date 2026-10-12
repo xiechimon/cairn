@@ -98,7 +98,8 @@ test('着陆参 oauth=error&reason=state 走过期文案 + 重开弹窗', async 
 
 test('着陆参 oauth=connected 静默：不弹窗、无错误行', async ({ page }) => {
   await page.goto(`${PROVIDERS}&oauth=connected&provider=github-copilot`);
-  await page.waitForLoadState('networkidle');
+  // 落参处理本身是观测面（URL 摘参）——SSE 长连接令 networkidle 永不落定
+  // （本机实测 30s 恒超时），等处理完成的可观测信号而不是网络静默。
+  await expect(page).toHaveURL((url) => !url.searchParams.has('oauth'), { timeout: 10_000 });
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toHaveCount(0);
-  await expect(page).toHaveURL((url) => !url.searchParams.has('oauth'));
 });

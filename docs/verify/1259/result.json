@@ -1,0 +1,157 @@
+{
+  "probe": "1259-1260-binding",
+  "server": "http://127.0.0.1:8806",
+  "web": "http://127.0.0.1:5286",
+  "checks": [
+    {
+      "name": "铺底：双机 enroll（各持各 key）",
+      "ok": true,
+      "detail": "home=zzWiIWz5xwjLeYm6amAvF other=idJnLEB5N3rNbkKEjrmCC"
+    },
+    {
+      "name": "A0 创建 agent（归属机 = home）→ 201",
+      "ok": true,
+      "detail": "{\"id\":\"S9MSBLCUVVeIvKoUAKZGw\"}"
+    },
+    {
+      "name": "A0b 创建缺 machineId → 400",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A1 chief 绑定 agent → 200",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A2 别机 claim 空手（worker 步 + chief 步都不投它）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A3 归属机领到 build 步",
+      "ok": true,
+      "detail": "build"
+    },
+    {
+      "name": "A3b 载荷 agent.modelId = 自身配置（stub-model）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "A4 归属机领到 chief 步（降级后 = 绑定 Agent 归属机路由）",
+      "ok": true,
+      "detail": "chief"
+    },
+    {
+      "name": "A4b chief 载荷模型 = 绑定 Agent 自身（无覆盖槽）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "B1 cap 1 + chief 在跑 → 归属机 claim 空手（chief 步占槽）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C0 创建 claude-code agent（home 有该模型）→ 201",
+      "ok": true,
+      "detail": "{\"id\":\"hn1o_atcBYLTKgiPTRpnF\"}"
+    },
+    {
+      "name": "C1 换绑到缺模型的机器 → 400 指名模型",
+      "ok": true,
+      "detail": "{\"error\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}"
+    },
+    {
+      "name": "C2 合法换绑 → 200",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C3 换绑后原归属机 claim 空手（改派即时生效）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C4 新归属机领到",
+      "ok": true,
+      "detail": "build"
+    },
+    {
+      "name": "D1 删有绑定 agent 的机器 → 409 点名两台",
+      "ok": true,
+      "detail": "{\"error\":\"机器「verify-home-1259」上有 2 个 agent 的归属机是它（verify-bound-agent、verify-cc-agent）——先换绑或整机迁移，再删除。\"}"
+    },
+    {
+      "name": "D2 整机迁移：合格的迁走（verify-bound-agent → other）",
+      "ok": true,
+      "detail": "{\"moved\":[\"S9MSBLCUVVeIvKoUAKZGw\"],\"rejected\":[{\"agentId\":\"hn1o_atcBYLTKgiPTRpnF\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+    },
+    {
+      "name": "D3 部分迁移合法：模型不合的留原机 + 响应列原因",
+      "ok": true,
+      "detail": "{\"moved\":[\"S9MSBLCUVVeIvKoUAKZGw\"],\"rejected\":[{\"agentId\":\"hn1o_atcBYLTKgiPTRpnF\",\"reason\":\"机器 verify-other-1259 未配置模型 stub-cc-model（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。\"}]}"
+    },
+    {
+      "name": "D4 目标机补模型报告后换绑 → 200",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "D5 腾空后删除 → 204 + 行消失",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "E1 无归属机存量步：调度拍后仍 pending（#1257 挂起不判死）",
+      "ok": true,
+      "detail": "{\"status\":\"pending\"}"
+    },
+    {
+      "name": "E2 build 无 errorMessage（挂起 ≠ 失败）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "E3 板面 waitingOn = 等机器（补设即解锁）",
+      "ok": true,
+      "detail": "{\"on\":\"machine\",\"retryAt\":null}"
+    },
+    {
+      "name": "F1 机器名链接 → 详情页（fact 条在位）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F2 详情页网格列出归属本机的 2 个 agent",
+      "ok": true,
+      "detail": "cards=2"
+    },
+    {
+      "name": "F3 创建弹窗预选归属机 = 本机",
+      "ok": true,
+      "detail": "verify-other-1259▼"
+    },
+    {
+      "name": "F4 chief 抽屉无模型覆盖触发钮（只读行）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F5 设置面只读信息卡在位 + 压缩模型/机器选择器退役",
+      "ok": true,
+      "detail": "info=1 compress=0 machine=0"
+    }
+  ],
+  "artifacts": [
+    "a-claims.json",
+    "d-evacuate.json",
+    "e-legacy-sweep.json",
+    "f1-machine-detail.png",
+    "f3-create-dialog.png",
+    "f4-chief-drawer.png",
+    "f5-chief-settings.png"
+  ],
+  "ok": true
+}

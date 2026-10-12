@@ -38,10 +38,6 @@
 // XMON-87 续二：Tab 直接换项目（chip 上挂 Tab 悬浮提示 chip，#468 族）——循环
 // 而不是开面（「直接切换」要的是按一下就换）；开态门与守卫见
 // overlays/hotkeys.ts 的 useProjectCycleHotkey。
-// #758 机器选择记忆：机器 chip 接上与 XMON-87 同一套 localStorage 机制（键
-// pacman.newTaskMachineId，选即写、选「自动」清、挂载与关闭重开时恢复）。
-// 设计裁决（无条件记忆、不加 hover 线索）与两条恢复降级路径（悬空 → 自动、
-// 离线 → 如实显示）见记忆位与 machinePin 处注释。
 
 import type { ClipboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -82,22 +78,11 @@ import { usePendingAttachments } from './pending-attachments.js';
 const PROJECT_CHIP_CLS =
   "new-task-project flex h-auto min-w-0 cursor-pointer items-center justify-start gap-2 border-none bg-transparent p-0 font-normal text-(--foreground) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg]:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
 
-/** 底栏机器 chip（原 .new-task-machine）：有边界控件（方角选择触发钮，
- *  .dlg-machine 惯用法）；30px 高对齐工具钮（光学同排，better-ui 对齐律）；
- *  hover 吃 #791 家族同值 --accent-soft；shrink=0（机器标签是派发关键短
- *  数据，永不截断）。 */
-const MACHINE_CHIP_CLS =
-  "flex h-[30px] flex-none cursor-pointer items-center justify-start gap-2 border border-(--border) bg-(--card) pl-2.5 pr-3 text-[13px] font-normal text-(--foreground) hover:bg-(--accent-soft) hover:text-(--foreground) dark:hover:bg-(--accent-soft) aria-expanded:bg-(--card) aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg]:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto";
-
 /** 项目/机器 popover 面板 layout 槽（#1008：V2 弹层壳皮肤 / 描边 Arrow /
  *  absolute 定位 / z 档全退役——皮肤与动效归 PopoverContent 默认，定位归
  *  Positioner 参数，z 归件内 --z-dialog 单梯）：220 宽是内容 layout（行 =
  *  avatar+名+勾 的捕获节奏），行距归零（旧面行带紧贴）。别名类原样（e2e）。 */
 const PROJECT_MENU_CLS = 'new-task-project-menu w-[220px] gap-0';
-
-/** 机器 popover：自底栏向上开（footer 在底，向下开出对话框边界）——
- *  Positioner side=top 承载（#1008，旧 bottom CSS + Arrow 翻转退役）。 */
-const MACHINE_MENU_CLS = 'w-[220px] gap-0';
 
 /** popover 选项行（原 .new-task-project-row）：32px 行、8px 圆角；hover
  *  tint 归 motion.css #73 家族律（此处不写 hover bg，件配方被家族压掉）。 */
@@ -127,17 +112,6 @@ interface ProjectOption {
   name: string;
 }
 
-/** #682 机器选择器行：live = MachineRecord 最小投影(id/name/online)；
- * fixture = scenario resources machines（id 缺省退 name）。与项目 chip 同族
- * （anchored popover + listbox），但选择集多一行「自动」（null = 不钉，
- * 任何在线机器可领）。offline 机器可选——钉选语义 = 等它上线（claim 过滤
- * 面保证步只投给该机），与 branch-dialog 的「只列在线」是两个面。 */
-export interface MachineOption {
-  id: string;
-  name: string;
-  online?: boolean;
-}
-
 /** XMON-87 选择记忆位(localStorage 键;e2e 镜像 newtask-project-persist.spec.ts)。
  *  单租户单机、无账号维度——与 pacman.sidebar-collapsed /
  *  pacman.dirBrowser.lastDir 同律。 */
@@ -162,38 +136,10 @@ function writeRememberedProject(storage: Storage | null, projectId: string): voi
   }
 }
 
-/** #758 机器 chip 选择记忆位(localStorage 键;e2e 镜像
- *  newtask-machine-persist.spec.ts)。设计裁决(票面要求先给结论再动手):
- *  **无条件记忆**——选即写、选「自动」= 清记忆位,不加专门的 hover 线索。
- *  理由:① chip 常显选中机器名(非「自动」),每次开对话框在保存前都看得到
- *  钉了哪台——常显的机器名比 hover 才出现的提示是更强的线索,「钉过一次
- *  之后忘了」的风险已被覆盖;② 「只在非默认时记住」与无条件记在存储面上
- *  功能等价(恢复「自动」与无记忆不可区分),两方案的差别只剩线索本身;
- *  ③ 与项目 chip 同一套机制同一个心智模型,不引入新 i18n 字符串。
- *  不像 rememberProject 那样走 prop 门控:锚定面例外(#404 project 页)来自
- *  「锚恒等于路由项目」的项目语义(#305 律);机器是全局执行选择,没有任何
- *  路由要顶掉它的缺省。 */
-export const NEW_TASK_MACHINE_STORAGE_KEY = 'pacman.newTaskMachineId';
-
 /** 读记忆位:隐私模式等抛 = 无记忆(readRememberedProject 同律,含 #1091 的
  *  实参纪律:调用点传 safeLocalStorage())。 */
-function readRememberedMachine(storage: Storage | null): string | null {
-  try {
-    return storage?.getItem(NEW_TASK_MACHINE_STORAGE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** 写记忆位:null(选「自动」) = 清。写不进 = 不记住,选择本身不受损(W13 同律)。 */
-function writeRememberedMachine(storage: Storage | null, machineId: string | null): void {
-  try {
-    if (machineId === null) storage?.removeItem(NEW_TASK_MACHINE_STORAGE_KEY);
-    else storage?.setItem(NEW_TASK_MACHINE_STORAGE_KEY, machineId);
-  } catch {
-    // 写不进 = 不记住,选择本身不受损(W13 同律)
-  }
-}
 
 /** fixture 面项目集兜底:scenarios 不带 projectNames 时退 canon 单默认
  *  项目(r3-lifecycle,#176 票面「至少默认项目」)。 */
@@ -221,16 +167,15 @@ export interface NewTaskDialogProps {
    *  占位、agent 回填；标签固定词表由 agent 归类）。
    *  #311：spec 参数携带 mention token 内容——父级负责透传到
    *  createTodo body。 */
-  onSave: (spec: string, projectId?: string, machineId?: string | null) => void;
+  onSave: (spec: string, projectId?: string) => void;
   /** M5 live 面：保存并开始 = 创建 + POST builds（r2 §4.2 双钮语义）；
    * 缺省 = fixture 行为（同 保存）。#682 机器参数同 保存 面。 */
-  onSaveAndStart?: (spec: string, projectId?: string, machineId?: string | null) => void;
+  onSaveAndStart?: (spec: string, projectId?: string) => void;
   /** M5 live：项目集真值(选择器行数据源);缺省 = fixture canon 单默认
    * 项目(live = projectsQ 投影,fixture = scenario projectNames)。 */
   projects?: ProjectOption[];
   /** #682：机器集真值（选择器行数据源）；缺省 = 空集（chip 只显「自动」，
    * 选择器只有自动一行——单机/未加载的降级面）。 */
-  machines?: MachineOption[];
   /** M7 #310 受控 spec：live 创建面父持 state,附件 token 才能注入;fixture
    * 面不传 → 内部 useState fallback。 */
   spec?: string;
@@ -257,7 +202,6 @@ export function NewTaskDialog({
   onSave,
   onSaveAndStart,
   projects,
-  machines,
   spec: specProp,
   onSpecChange,
   onAttachment,
@@ -287,16 +231,6 @@ export function NewTaskDialog({
   const [projectOpen, setProjectOpen] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(() =>
     rememberProject ? readRememberedProject(safeLocalStorage()) : null,
-  );
-  // #682 机器 chip：popover 开态 + 选中行（null = 自动）。#758 接上 XMON-87
-  // 同一套记忆机制：初值 = 上次钉的机器（挂载读一次）。存的值可能不在行集
-  // 里（机器被删/改名，或查询未决行集还没到）——悬空 id 由下方 machinePin
-  // 解析位统一落回「自动」（显示与提交同吃解析值）；记忆位留着不动（项目
-  // 记忆位同律：行集可能只是还没加载，按缺省清记忆会误伤真值）。开一个
-  // popover 收另一个（head 同层双 chip，两面同开会让 Esc 分层歧义）。
-  const [machineOpen, setMachineOpen] = useState(false);
-  const [machineId, setMachineId] = useState<string | null>(() =>
-    readRememberedMachine(safeLocalStorage()),
   );
   // #1060 手势消费闸（CI 偶发双关的根因位）：非模态 registry Popover 的外点
   // 自收与 dialog 自己的关闭判定（React 背板 onClick 链、Base UI native
@@ -347,16 +281,6 @@ export function NewTaskDialog({
   const rows = projects ?? [DEFAULT_PROJECT];
   const selected = rows.find((row) => row.id === projectId) ?? rows[0];
   const projectName = selected?.name ?? PROJECT_NAME;
-  // #682：机器行集 + 选中行（首行恒「自动」）。offline 行照常可选——钉选
-  // 语义 = 步只投给该机并等它上线（server claim 过滤面），UI 不替用户挡。
-  const machineRows = machines ?? [];
-  const machineSelected = machineRows.find((row) => row.id === machineId) ?? null;
-  // #758 解析后的钉选:显示、aria 与提交同吃这一个值。悬空记忆(机器被删/
-  // 改名/行集未决) → null = 自动,不把指向不存在机器的 pin 带上提交面;
-  // 离线机器 → 行照常命中,id 原样保留并如实显示离线 dot(#687 钉选 =
-  // 等它上线语义,不静默改派)。
-  const machinePin = machineSelected?.id ?? null;
-  const machineLabel = machineSelected?.name ?? t('自动');
   // #318: 附件 token 注入 spec 后由 spec 非空承载 dirty,不另计。
 
   const dirty = spec.trim() !== '';
@@ -376,10 +300,9 @@ export function NewTaskDialog({
     discardOpen: false,
     pickerOpen: false,
     projectOpen: false,
-    machineOpen: false,
     dirty: false,
   });
-  gateRef.current = { discardOpen, pickerOpen, projectOpen, machineOpen, dirty };
+  gateRef.current = { discardOpen, pickerOpen, projectOpen, dirty };
   const requestClose = () => {
     // #1060 双闸（汇流点）：dialog 的一切关闭意图——Base UI native dismiss
     // （经 DialogShell onClose）、背板 onClick、X 钮、保存/放弃之外的落穿——
@@ -413,11 +336,6 @@ export function NewTaskDialog({
       setProjectOpen(false);
       return;
     }
-    if (gate.machineOpen) {
-      markGestureConsumed();
-      setMachineOpen(false);
-      return;
-    }
     if (gate.dirty) {
       // 未保存闸开确认层同样消费本次手势（二次进闸不得把刚开的确认层又收掉）。
       markGestureConsumed();
@@ -437,13 +355,9 @@ export function NewTaskDialog({
   useEffect(() => {
     if (!open) {
       setProjectOpen(false);
-      setMachineOpen(false);
       setDiscardOpen(false);
       setPickerOpen(false);
       setSpec('');
-      // #758 重开净面 = 记忆面：reset 目标从恒 null 改为记忆值（选即写，
-      // 故通常与当前 state 等值；重读兜住「记忆被并发改动」的边角）。
-      setMachineId(readRememberedMachine(safeLocalStorage()));
     }
   }, [open]);
   // retained mount：关闭退场后子树卸载,重开 = 重新挂载。autofocus 挂 ref
@@ -586,12 +500,12 @@ export function NewTaskDialog({
     });
   };
 
-  // spec 15 #394: 提交 = 正文 + 项目 id；#682 加机器 chip 选中（null = 自动）。
+  // spec 15 #394: 提交 = 正文 + 项目 id。
   // #729 失败方式 3：附件上传在途时阻提交——spec 不得带着还没上传完的
   // 附件离场（draft 保全，token 落地后提交照常）。
   const save = () => {
     if (attachInFlightRef.current > 0) return;
-    onSave(spec, selected?.id, machinePin);
+    onSave(spec, selected?.id);
   };
 
   // XMON-95：保存并开始 = 按钮点击与 ⌘↵ 共用的同一提交位。闸写在闭包里而
@@ -600,7 +514,7 @@ export function NewTaskDialog({
   const saveAndStart = () => {
     if (attachInFlightRef.current > 0) return;
     if (spec.trim() === '') return;
-    if (onSaveAndStart) onSaveAndStart(spec, selected?.id, machinePin);
+    if (onSaveAndStart) onSaveAndStart(spec, selected?.id);
     else save();
   };
   // enabled = open ∩ ¬discardOpen（useChordHotkey 的 opened-gate）。两条都
@@ -737,7 +651,6 @@ export function NewTaskDialog({
                           className={PROJECT_CHIP_CLS}
                           data-testid="new-task-project-chip"
                           aria-haspopup="listbox"
-                          onClick={() => setMachineOpen(false)}
                         />
                       }
                     />
@@ -881,120 +794,6 @@ export function NewTaskDialog({
                 <Grid2x2 />
               </Button>
             </div>
-            {/* #682 第三轮（用户三审）：机器选择住底栏选项区——执行选择与
-                「保存并开始」同层（语义），与工具簇 12px 组间（工具簇内 6px，
-                2× 律）。popover 向上开（footer 在底，向下开会出对话框边界）。
-                类名独立 new-task-machine* 家族：e2e 的 `.new-task-project*`
-                选择器钉单元素（strict mode），双 chip 共类名会打红整组。 */}
-            <span className="relative ms-3 flex flex-none items-center">
-              {/* #656/#1008：壳 = registry Popover，与 head 的项目 popover
-                  同族同律（#666 toggle 面：initialFocus=false 焦点留触发位，
-                  toggle/aria-expanded 归 Trigger 原语）。向上开几何从
-                  bottom:calc(100%+8px) CSS 迁 Positioner side=top。 */}
-              <Popover
-                open={machineOpen}
-                onOpenChange={(next: boolean, details) => {
-                  // #1060：与项目 popover 同款手势消费闸（外点自收先行）。
-                  if (!next && details.reason === 'outside-press') markGestureConsumed();
-                  setMachineOpen(next);
-                }}
-              >
-                <PopoverTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      className={MACHINE_CHIP_CLS}
-                      aria-haspopup="listbox"
-                      data-testid="new-task-machine-chip"
-                      onClick={() => setProjectOpen(false)}
-                    />
-                  }
-                >
-                  {/* 机器状态点（项目 chip 的 avatar 槽位换成 dot，dlg-machine-dot /
-                      res-dot 同族几何）；data-on=false = 离线机器——可钉选（钉选
-                      语义 = 步等它上线），灰点不是禁选态（属性载体 #910 裁定 3，
-                      newtask-machine-persist.spec 钉）。 */}
-                  <span
-                    className="size-1.5 flex-none rounded-full bg-(--col-dot-done) data-[on=false]:bg-(--col-dot-idle)"
-                    data-testid="new-task-machine-dot"
-                    data-on={machineSelected?.online ?? true}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 max-w-[120px] truncate text-[13px] leading-4 text-(--foreground)">
-                    {machineLabel}
-                  </span>
-                  <ChevronDown width={12} height={12} />
-                </PopoverTrigger>
-                <PopoverContent
-                  side="top"
-                  align="start"
-                  sideOffset={8}
-                  initialFocus={false}
-                  role="listbox"
-                  aria-label={t('机器')}
-                  className={MACHINE_MENU_CLS}
-                >
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    className={OPTION_ROW_CLS}
-                    role="option"
-                    aria-selected={machinePin === null}
-                    onClick={() => {
-                      setMachineId(null);
-                      // #758 选「自动」= 清记忆位（写时机与项目 chip 同：选即写）
-                      writeRememberedMachine(safeLocalStorage(), null);
-                      setMachineOpen(false);
-                    }}
-                  >
-                    <span
-                      className="size-1.5 flex-none rounded-full bg-(--col-dot-done) data-[on=false]:bg-(--col-dot-idle)"
-                      data-on={true}
-                      aria-hidden="true"
-                    />
-                    <span className="new-task-project-row-name text-xs leading-4 text-(--foreground)">
-                      {t('自动')}
-                    </span>
-                    {machinePin === null && (
-                      <span className="ml-auto flex text-(--card-button)">
-                        <Check width={14} height={14} />
-                      </span>
-                    )}
-                  </Button>
-                  {machineRows.map((row) => (
-                    <Button
-                      key={row.id}
-                      variant="ghost"
-                      type="button"
-                      className={OPTION_ROW_CLS}
-                      role="option"
-                      aria-selected={row.id === machinePin}
-                      onClick={() => {
-                        setMachineId(row.id);
-                        // #758 选即写（项目 chip 同时机）
-                        writeRememberedMachine(safeLocalStorage(), row.id);
-                        setMachineOpen(false);
-                      }}
-                    >
-                      <span
-                        className="size-1.5 flex-none rounded-full bg-(--col-dot-done) data-[on=false]:bg-(--col-dot-idle)"
-                        data-on={row.online ?? true}
-                        aria-hidden="true"
-                      />
-                      <span className="new-task-project-row-name text-xs leading-4 text-(--foreground)">
-                        {row.name}
-                      </span>
-                      {row.id === machinePin && (
-                        <span className="ml-auto flex text-(--card-button)">
-                          <Check width={14} height={14} />
-                        </span>
-                      )}
-                    </Button>
-                  ))}
-                </PopoverContent>
-              </Popover>
-            </span>
             <div>
               {/* e2e 别名叠加：integration/test/m5-web-e2e.test.ts 钉
                   .new-task-start（overlays lane 误删致 CI 红，此处恢复；

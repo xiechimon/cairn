@@ -13,7 +13,7 @@
 //  5. 第三档起退避封顶（15 分钟）。
 //  6. 非 quota 失败（network 文案）→ 走既有失败漏斗（step/todo failed +
 //     build.errorMessage）。
-//  7. waitingOn 派生：quota 挂起 → {on:'quota'}；钉选机离线 / 团队零在线 →
+//  7. waitingOn 派生：quota 挂起 → {on:'quota'}；归属机离线 / 团队零在线 →
 //     {on:'machine'}；机器健康可领 → 缺席（正常排队）；非在飞相位 → 缺席。
 
 import type { ClaimedStep } from '@pacman/shared';
@@ -59,7 +59,7 @@ const AGENT_ID = 'agent-quota-1';
 
 /** provider/agent + enroll + 项目/todo 就位（项目不绑 repo：本测试只走 claim →
  * done 面，不产物件）。直执行 build 步（withPlan=false）简化相位链。 */
-async function setupWorld(opts: { withPin?: boolean } = {}) {
+async function setupWorld() {
   const s = bootServer({ claimHoldMs: 200 });
   const key = await issueApiKey(s);
   s.db
@@ -97,6 +97,8 @@ async function setupWorld(opts: { withPin?: boolean } = {}) {
   const { token } = (await enrollRes.json()) as { token: string };
   const machineId = s.db.select().from(machineTable).limit(1).all()[0]!.id;
   s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, machineId)).run();
+  // #1259 归属机绑定：quota 世界可领的缺省形态（agent 绑到唯一机器）。
+  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, AGENT_ID)).run();
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     body: { title: '额度探针任务', spec: '写一行探针到 README.md' },
@@ -109,7 +111,6 @@ async function setupWorld(opts: { withPin?: boolean } = {}) {
         todoIds: [todoId],
         assignment: { plan: null, build: { agentId: AGENT_ID } },
         withPlan: false,
-        ...(opts.withPin ? { machineId } : {}),
       },
     });
     expect(res.status).toBe(201);
@@ -350,8 +351,8 @@ describe('#1257 waitingOn 板面派生（「等机器」/「等额度」与失�
     expect(buildId).not.toBeNull();
   });
 
-  test('钉选机离线 → waitingOn {on:"machine"}', async () => {
-    const w = await setupWorld({ withPin: true });
+  test('归属机离线 → waitingOn {on:"machine"}', async () => {
+    const w = await setupWorld();
     await w.startBuild();
     w.s.db
       .update(machineTable)

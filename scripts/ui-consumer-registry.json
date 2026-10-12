@@ -42,13 +42,6 @@
       "kind": "rides-primitive",
       "basis": "Button registry default rounded-lg",
       "reason": "#1008 user-reviewed sweep: SELECT_TRIGGER_CLS override removed, radius rides the Button base (comment on the constant records the ruling)."
-    },
-    {
-      "file": "apps/web/src/overlay/new-task-dialog.tsx",
-      "anchor": "h-[30px] flex-none cursor-pointer",
-      "kind": "rides-primitive",
-      "basis": "Button registry default rounded-lg (PopoverTrigger render Button carrier)",
-      "reason": "#1008 overlay migration kept the chip's border/bg skin on a Button carrier with no rounded class — the registry radius shows through."
     }
   ],
   "brandInkText": [

@@ -55,7 +55,6 @@ const BUILD: BuildRecord = {
   withPlan: false,
   prevPhase: null,
   triggerSource: 'user',
-  pinnedMachineId: null,
   planDocId: null,
   errorMessage: null,
   prUrl: null,
@@ -293,7 +292,7 @@ describe('mapTranscript 合成 prompt 过滤（#612）', () => {
     expect(items.some((i) => i.kind === 'robot')).toBe(true);
   });
 
-  // —— #931 返工轮界 note（system → note 路，RESUME_FRESH_SESSION_NOTE 同族）：
+  // —— #931 返工轮界 note（system → note 路）：
   // 判定可见 = 两条 note 落进时间线成 dim note 行——「为什么这次是新 PR」
   // 用户可辨；渲染成用户气泡或被 JSON/echo 过滤误杀都算失败。——
   test('F14 #931 返工轮界 note：复用轮与新建轮的 system 行都渲染成 note（不冒名气泡）', () => {

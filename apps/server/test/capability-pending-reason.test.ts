@@ -7,13 +7,14 @@
 // - 板面 = todo waitingOn 派生（#1257 律：pending 不再失败收尾，挂起等机器；
 //   todos.ts waitingOnOf 钉选机在线但能力闸挡 → 同 {on:'machine'} 挂起态，
 //   chip 粗粒度，缺项点名 + 修法文案归 queue.blocked 面）。
-// 失败方式（先于实现固化）：
-// 1. 未钉 + 在线机全缺能力 → blocked capability-missing，missing 点名可读形。
-// 2. 未钉 + 团队零在线机器 → blocked machine-offline（missing 空集）——
+// 失败方式（先于实现固化；#1259 起机器去处 = agent 归属机，钉选退役——
+// 原「钉选机」语义一律落到 agent 绑定，两 agent 可各绑各机）：
+// 1. 归属机在线但缺能力 → blocked capability-missing，missing 点名可读形。
+// 2. 归属机离线 → blocked machine-offline（missing 空集）——
 //    无 requiredCapabilities 的 agent 同样给（离线等待与能力无关，是事实）。
-// 3. 有能力齐的在线机 → blocked 缺席（正常排队，零回归）。
-// 4. fail-open 显示面同律：在线机未上报快照 → blocked 缺席（未知不编造缺项）。
-// 5. 钉选离线机 → machine-offline；钉选在线缺能力机 → capability-missing。
+// 3. 归属机能力齐 → blocked 缺席（正常排队，零回归）。
+// 4. fail-open 显示面同律：归属机未上报快照 → blocked 缺席（未知不编造缺项）。
+// 5. 归属机离线 → machine-offline；归属机在线缺能力 → capability-missing。
 // 6. runtime 闸挡（机器在线但没开 runtime）不冒充能力成因——既有已知缝
 //    保持既有呈现（blocked 缺席），能力闸不越权。
 // 7. chief 回合同律（turnQueue 投影同形）。
@@ -124,14 +125,16 @@ function insertAgent(
     .run();
 }
 
-/** pending worker 步三行组（todo/build/step），返回投影目标。 */
+/** pending worker 步三行组（todo/build/step），返回投影目标。
+ *  #1259：机器去处 = agent 归属机——homeMachineId 即把该 agent 绑到该机
+ *  （钉选退役）。 */
 function insertPendingWorkerStep(
   w: ReasonWorld,
-  opts: { agentId: string; pinnedMachineId?: string | null; createdAgo?: number },
+  opts: { agentId: string; homeMachineId?: string | null; createdAgo?: number },
 ): {
   id: string;
   createdAt: number;
-  pinnedMachineId: string | null;
+  homeMachineId: string | null;
   buildId: string;
   todoId: string;
 } {
@@ -141,7 +144,12 @@ function insertPendingWorkerStep(
   const todoId = `todo-cr-${suffix}`;
   const buildId = `build-cr-${suffix}`;
   const id = `step-cr-${suffix}`;
-  const pinnedMachineId = opts.pinnedMachineId ?? null;
+  const homeMachineId = opts.homeMachineId ?? null;
+  w.s.db
+    .update(agentTable)
+    .set({ machineId: homeMachineId })
+    .where(eq(agentTable.id, opts.agentId))
+    .run();
   w.s.db
     .insert(todoTable)
     .values({
@@ -154,7 +162,6 @@ function insertPendingWorkerStep(
       phase: 'queued',
       phaseAt: createdAt,
       assignment: { plan: null, build: { agentId: opts.agentId } },
-      machineId: null,
     })
     .run();
   w.s.db
@@ -166,7 +173,6 @@ function insertPendingWorkerStep(
       planDocId: null,
       triggerSource: 'user',
       createdAt,
-      pinnedMachineId,
     })
     .run();
   w.s.db
@@ -182,20 +188,26 @@ function insertPendingWorkerStep(
       createdAt,
     })
     .run();
-  return { id, createdAt, pinnedMachineId, buildId, todoId };
+  return { id, createdAt, homeMachineId, buildId, todoId };
 }
 
-/** pending chief 步三行组（chief/chiefThread/step），返回投影目标。 */
+/** pending chief 步三行组（chief/chiefThread/step），返回投影目标。
+ *  #1259：chief 步去处 = 绑定 Agent 的归属机——homeMachineId 即绑该 agent。 */
 function insertPendingChiefStep(
   w: ReasonWorld,
-  opts: { agentId: string; pinnedMachineId?: string | null; createdAgo?: number },
-): { id: string; createdAt: number; pinnedMachineId: string | null; threadId: string } {
+  opts: { agentId: string; homeMachineId?: string | null; createdAgo?: number },
+): { id: string; createdAt: number; homeMachineId: string | null; threadId: string } {
   const suffix = Math.random().toString(36).slice(2, 8);
   const createdAt = w.base - (opts.createdAgo ?? 0);
   const chiefId = `chief-cr-${suffix}`;
   const threadId = `chief-thread-cr-${suffix}`;
   const id = `step-chief-cr-${suffix}`;
-  const pinnedMachineId = opts.pinnedMachineId ?? null;
+  const homeMachineId = opts.homeMachineId ?? null;
+  w.s.db
+    .update(agentTable)
+    .set({ machineId: homeMachineId })
+    .where(eq(agentTable.id, opts.agentId))
+    .run();
   w.s.db
     .insert(chiefTable)
     .values({
@@ -221,7 +233,6 @@ function insertPendingChiefStep(
       sessionId: '',
       sessionOpenedAt: createdAt,
       pendingSessionResumeAt: null,
-      pinnedMachineId,
       toolDefHashes: {},
       toolResultHashes: {},
       activeRun: { phase: 'chief' },
@@ -239,7 +250,7 @@ function insertPendingChiefStep(
       createdAt,
     })
     .run();
-  return { id, createdAt, pinnedMachineId, threadId };
+  return { id, createdAt, homeMachineId, threadId };
 }
 
 function buildRowOf(w: ReasonWorld, buildId: string) {
@@ -256,7 +267,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     insertAgent(w, { id: 'agent-r1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r1a', capabilities: { mcpServers: ['ctx'], skills: [] } });
     insertMachine(w, { id: 'm-r1b', capabilities: { mcpServers: [], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r1' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r1', homeMachineId: 'm-r1a' });
     const info = stepQueueProjector(w.s.db, w.teamId).project(target);
     expect(info?.blocked).toEqual({
       kind: 'capability-missing',
@@ -269,7 +280,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r2' });
     insertMachine(w, { id: 'm-r2', online: false, capabilities: { mcpServers: [], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r2' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r2', homeMachineId: 'm-r2' });
     const info = stepQueueProjector(w.s.db, w.teamId).project(target);
     expect(info?.blocked).toEqual({ kind: 'machine-offline', missing: [] });
   });
@@ -279,7 +290,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     insertAgent(w, { id: 'agent-r3', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r3a', capabilities: { mcpServers: ['ctx'], skills: [] } });
     insertMachine(w, { id: 'm-r3b', capabilities: { mcpServers: ['figma'], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r3' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r3', homeMachineId: 'm-r3b' });
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
@@ -287,13 +298,15 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-r4', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-r4', capabilities: null });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r4' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r4', homeMachineId: 'm-r4' });
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
-  test('失败方式 5：钉选离线机 → machine-offline；钉选在线缺能力机 → capability-missing', () => {
+  test('失败方式 5：归属机离线 → machine-offline；归属机在线缺能力 → capability-missing', () => {
     const w = makeWorld();
-    insertAgent(w, { id: 'agent-r5', requiredCapabilities: { mcpServers: ['figma'] } });
+    // 一个 agent 只有一个归属机——两形态各用各的 agent（#1259 绑定律）。
+    insertAgent(w, { id: 'agent-r5a', requiredCapabilities: { mcpServers: ['figma'] } });
+    insertAgent(w, { id: 'agent-r5b', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, {
       id: 'm-r5-off',
       online: false,
@@ -301,12 +314,12 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     });
     insertMachine(w, { id: 'm-r5-on', capabilities: { mcpServers: [], skills: [] } });
     const offlineTarget = insertPendingWorkerStep(w, {
-      agentId: 'agent-r5',
-      pinnedMachineId: 'm-r5-off',
+      agentId: 'agent-r5a',
+      homeMachineId: 'm-r5-off',
     });
     const onlineTarget = insertPendingWorkerStep(w, {
-      agentId: 'agent-r5',
-      pinnedMachineId: 'm-r5-on',
+      agentId: 'agent-r5b',
+      homeMachineId: 'm-r5-on',
     });
     const projector = stepQueueProjector(w.s.db, w.teamId);
     expect(projector.project(offlineTarget)?.blocked).toEqual({
@@ -324,7 +337,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
     insertAgent(w, { id: 'agent-r6', requiredCapabilities: { mcpServers: ['figma'] } });
     // 在线但 pi 关（runtime 闸挡）——即使能力也缺，成因不归能力维。
     insertMachine(w, { id: 'm-r6', runtimes: [], capabilities: { mcpServers: [], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r6' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r6', homeMachineId: 'm-r6' });
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toBeUndefined();
   });
 
@@ -336,7 +349,7 @@ describe('#1251 排队投影 blocked 位（worker 步）', () => {
       capabilities: { mcpServers: [], skills: [] },
       claudeModels: ['other-model'],
     });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-r7' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-r7', homeMachineId: 'm-r7' });
     expect(stepQueueProjector(w.s.db, w.teamId).project(target)?.blocked).toEqual({
       kind: 'capability-missing',
       missing: ['model "glm-5.3"'],
@@ -349,7 +362,7 @@ describe('#1251 排队投影 blocked 位（chief 回合）', () => {
     const w = makeWorld();
     insertAgent(w, { id: 'agent-c1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-c1', capabilities: { mcpServers: [], skills: [] } });
-    insertPendingChiefStep(w, { agentId: 'agent-c1' });
+    insertPendingChiefStep(w, { agentId: 'agent-c1', homeMachineId: 'm-c1' });
     const projector = stepQueueProjector(w.s.db, w.teamId);
     const target = projector.pendingChiefOf(w.s.db.select().from(chiefThreadTable).get()!.id);
     expect(target).not.toBeNull();
@@ -366,7 +379,7 @@ describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 wa
     const w = makeWorld();
     insertAgent(w, { id: 'agent-s1', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-s1', capabilities: { mcpServers: ['ctx'], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-s1', pinnedMachineId: 'm-s1' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-s1', homeMachineId: 'm-s1' });
 
     // #1257 律：pending 步一律不动（挂起等机器，claim 循环自动续跑）。远超
     // 既有失联阈也照样不失败——能力挡不是 infra 事件，失败收尾会烧掉用户的步。
@@ -379,7 +392,7 @@ describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 wa
     const w = makeWorld();
     insertAgent(w, { id: 'agent-s2', requiredCapabilities: { mcpServers: ['figma'] } });
     insertMachine(w, { id: 'm-s2', capabilities: { mcpServers: ['ctx'], skills: [] } });
-    const target = insertPendingWorkerStep(w, { agentId: 'agent-s2', pinnedMachineId: 'm-s2' });
+    const target = insertPendingWorkerStep(w, { agentId: 'agent-s2', homeMachineId: 'm-s2' });
     // waitingOn 派生要求在飞位：latestBuildId 指向本 build（phase queued ∈
     // IN_PROGRESS_PHASES；healthy 排队与挂起的分界 = 闸判，不是相位）。
     w.s.db
@@ -410,7 +423,7 @@ describe('#1251×#1257 能力挡挂起：sweep 不失败收尾，可见态归 wa
     insertMachine(w, { id: 'm-s3', capabilities: { mcpServers: [], skills: [] } });
     const target = insertPendingChiefStep(w, {
       agentId: 'agent-s3',
-      pinnedMachineId: 'm-s3',
+      homeMachineId: 'm-s3',
     });
     sweepAbandonedChiefSteps(w.s.svc, w.base + BUILD_ABANDONED_STEP_MS * 10);
     expect(stepRowOf(w, target.id).status).toBe('pending');

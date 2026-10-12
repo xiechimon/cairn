@@ -104,7 +104,6 @@ const THREAD: ChiefThread = {
   lastTurnAt: null,
   session: { runtime: 'pi', id: 's2', openedAt: 2 },
   pendingSessionResumeAt: null,
-  pinnedMachineId: null,
   toolDefHashes: {},
   toolResultHashes: {},
   activeRun: { phase: 'chief' },

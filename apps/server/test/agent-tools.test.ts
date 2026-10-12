@@ -17,7 +17,7 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
-import { bootServer, req } from './helpers.js';
+import { bootServer, insertMachine, req } from './helpers.js';
 
 const AGENT_ID = 'agent-tools-1';
 
@@ -26,6 +26,7 @@ describe('Agent tools 写侧过滤（XMON-77）', () => {
     const s = bootServer();
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '权限探针',
+      machineId: insertMachine(s),
       tools: ['推送分支', '远程 shell', '创建标签', '自造档', '更新技能'],
     });
     expect(create.status).toBe(201);
@@ -43,6 +44,7 @@ describe('Agent tools 写侧过滤（XMON-77）', () => {
     const s = bootServer();
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '默认探针',
+      machineId: insertMachine(s),
     });
     expect(create.status).toBe(201);
     const id = ((await create.json()) as { id: string }).id;
@@ -56,6 +58,7 @@ describe('Agent tools 写侧过滤（XMON-77）', () => {
     const s = bootServer();
     const create = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: '全关探针',
+      machineId: insertMachine(s),
       tools: [],
     });
     expect(create.status).toBe(201);

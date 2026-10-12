@@ -37,7 +37,7 @@ import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { scanLocalSkills } from '../src/services/skills.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
 
 // —— 隔离技能根脚手架（每个 describe 自建自清）——————————————————————————————
 
@@ -371,6 +371,7 @@ describe('agent.skillsAllowlist / defaultSkill 现扫校验（#1169 拆字段）
   ): Promise<{ id: string; row: Record<string, unknown> }> {
     const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
       displayName: 'a1',
+      machineId: insertMachine(s),
       ...body,
     });
     expect(res.status).toBe(201);
@@ -443,6 +444,7 @@ describe('agent.skillsAllowlist / defaultSkill 现扫校验（#1169 拆字段）
       // 数组（含单元素）进单值槽 = 400（不是静默取 [0]）。
       const arr = await req(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
         displayName: 'arr',
+        machineId: insertMachine(s),
         defaultSkill: ['deploy'],
       });
       expect(arr.status).toBe(400);

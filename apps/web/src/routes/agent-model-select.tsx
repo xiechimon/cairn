@@ -13,8 +13,7 @@
 //
 // 候选清单投影 = api/mappers.ts `toModelOptions`（model-sources 非 pi 段；
 // #770 起 providers 段已除——存量 provider 绑定值命中不了选项，走裸串兜底
-// 回显；与总管压缩模型选择器同源，不各写一份）。一级分组 =
-// 该投影的 provider 位去重保序。
+// 回显）。一级分组 = 该投影的 provider 位去重保序。
 //
 // 壳 = components/ui/select.tsx registry compound 族（#1010 回源，#982 判决：
 // XMON-75 手写 options 单体件退役；几何/皮肤归 registry 默认，ADR 0012 D1，
@@ -26,11 +25,10 @@
 // #222 死钮）。「内置 (pi)」清空行 = Base UI 的 null item（value=null 是
 // 一等选中值，ItemIndicator/回显都认它）。
 //
-// 与 chief/chief-model-select.tsx 的关系不变：两者是同一投影上的两个面——总管
-// 那个带「默认（与 Chief 相同）」行与 compactionModel 语义（可空槽 = 继承
-// Chief），Agent 的模型是自身配置项，没有「继承」态。值回显兜底裸串律两面
-// 共用一份，单源在 components/model-select-core（#626 收敛）：本件一级消费
-// providerEchoLabel、二级消费 modelEchoLabel，壳与两级级联律仍归本件。
+// #1260：chief 模型覆盖槽退役后，本件是模型选择的唯一面——Agent 的模型
+// 是自身配置项，没有「继承」态，也没有「默认（与 Chief 相同）」行。值回显
+// 兜底裸串律的单源在 components/model-select-core（#626 收敛）：本件一级
+// 消费 providerEchoLabel、二级消费 modelEchoLabel，壳与两级级联律仍归本件。
 //
 // 标签只出模型名：原版下拉项的 `· 128k` 是原版内置模型目录的上下文窗口——
 // pacman 是本地 BYOK，没有这个数据源，不编造；provider 位升去一级后二级行内
@@ -128,6 +126,9 @@ interface AgentModelSelectProps {
   provider: string | null;
   modelId: string | null;
   options: ModelOption[];
+  /** #1259 额外禁用位：claude-code 选了运行时但还没选归属机（候选按机
+   *  过滤，无机无可选）。 */
+  disabled?: boolean;
   /** 选定回调（modelId 或 null 清空）；provider 位由调用面自持。 */
   onPick?: (modelId: string | null) => void;
   /** 类名前缀——同 AgentRuntimeSelect。 */
@@ -141,6 +142,7 @@ export function AgentModelSelect({
   provider,
   modelId,
   options,
+  disabled = false,
   onPick,
   prefix,
   triggerClassName,
@@ -155,7 +157,7 @@ export function AgentModelSelect({
   return (
     <Select
       value={modelId}
-      disabled={provider === null}
+      disabled={disabled || provider === null}
       onValueChange={(next) => onPick?.(next as string | null)}
     >
       <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
@@ -166,7 +168,13 @@ export function AgentModelSelect({
           {unset}
         </SelectItem>
         {rows.map((row) => (
-          <SelectItem key={row.modelId} className={`${prefix}-row`} value={row.modelId}>
+          // #1259：两台机器可上报同名模型——key 带归属机防撞（value 仍是
+          // modelId，归属机由提交面的 machineId 字段承担）。
+          <SelectItem
+            key={`${row.machineId ?? ''}/${row.modelId}`}
+            className={`${prefix}-row`}
+            value={row.modelId}
+          >
             {row.modelName}
           </SelectItem>
         ))}

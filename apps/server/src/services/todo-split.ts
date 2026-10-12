@@ -175,7 +175,6 @@ export function createSplitTodo(
       withPlan: true,
       prevPhase: parent.phase,
       triggerSource: 'chief',
-      pinnedMachineId: parent.machineId ?? null,
       planDocId: null,
       errorMessage: null,
       prUrl: null,

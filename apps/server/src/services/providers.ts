@@ -182,6 +182,8 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           runtime: 'claude-code' as const,
           installed: report.installed,
           hostname: report.hostname,
+          // #1259 归属机维：段与机器行同 id（创建三级级联的过滤键）。
+          machineId: row.id,
           models: report.models,
           // #1050 两个事实位原样透传（server 不合成、不猜）：`bin` = null
           // 是「探过了、没有」（页面对它说未安装），键缺席才是「没探过」

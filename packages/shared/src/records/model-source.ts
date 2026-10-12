@@ -67,6 +67,9 @@ export const modelSourceSchema = z.object({
   /** 上报机器的 hostname（os.hostname()）——「已安装在 <hostname>」文案源。
    *  #707 起跟随执行机，不再是 server 主机。 */
   hostname: z.string(),
+  /** #1259 归属机维：该段来自哪台机器（machine id）——创建 agent 三级
+   *  级联按它过滤模型清单。pi 段缺席（server 侧目录，机器无关）。 */
+  machineId: z.string().optional(),
   models: z.array(modelSourceModelSchema),
   /** claude 二进制事实（#1050）。三态，别压平：
    *  - 对象 = 探到了（path + version）；
@@ -143,3 +146,11 @@ export const claudeCodeReportSchema = z.object({
   auth: claudeAuthStateSchema.optional(),
 });
 export type ClaudeCodeReport = z.infer<typeof claudeCodeReportSchema>;
+
+/** provider+modelId 值对（model id 只在 provider 内有意义——裸串跨
+ *  provider 撞名，对象形是 wire/存储两面的唯一合法形）。 */
+export const modelRefSchema = z.object({
+  provider: z.string(),
+  modelId: z.string(),
+});
+export type ModelRef = z.infer<typeof modelRefSchema>;

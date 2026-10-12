@@ -21,7 +21,12 @@ import { fileURLToPath } from 'node:url';
 import { type ClaimedStep, claimedStepSchema, ENV_VARS, PLAN_FILE_NAME } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
-import { plan as planTable, step as stepTable } from '../../apps/server/src/db/schema.js';
+import {
+  agent as agentTable,
+  machine as machineTable,
+  plan as planTable,
+  step as stepTable,
+} from '../../apps/server/src/db/schema.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
 import {
   AGENT_ID,
@@ -362,6 +367,21 @@ describe('#1026/#1028 终稿回传失败恢复（真进程重启）', () => {
     );
     const apiKeyOfFirstServer = server.apiKey;
     const first = spawnDaemon(server.url, 'restart-mbp', apiKeyOfFirstServer);
+    // #1259：本腿双机（probe 直连机 + daemon 机）共用 AGENT_ID——probe 先
+    // enroll 吃掉了 helpers 的首台绑定缺省；daemon 腿的步只归 daemon 机，
+    // 在它 enroll 落行后把归属机改绑到它（此后 claim 长轮询即领到）。
+    await waitFor(() => logLines().some((l) => l.includes('Enrolled in team')), 30_000);
+    const daemonMachine = server.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'restart-mbp'))
+      .get();
+    if (daemonMachine === undefined) throw new Error('daemon 机器行缺席（enroll 未落库）');
+    server.db
+      .update(agentTable)
+      .set({ machineId: daemonMachine.id })
+      .where(eq(agentTable.id, AGENT_ID))
+      .run();
     await waitFor(
       () => logLines().some((l) => l.includes(`new session ${daemonWorld.buildId}`)),
       90_000,

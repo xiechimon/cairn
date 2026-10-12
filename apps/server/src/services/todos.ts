@@ -156,7 +156,6 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceBuildId: row.sourceBuildId,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
-    machineId: row.machineId,
     // #1257 板面挂起态（读侧派生；缺省不带键）。
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     // #1261 等额度投影（null 时也带键——web 面以 null 清态，SSE 全量文档
@@ -188,30 +187,31 @@ function waitingOnOf(
   if (held !== undefined) {
     return { on: 'quota', retryAt: held.holdUntil ?? null };
   }
-  // 等机器：钉选机不在（行缺失/离线/闸挡本步 runtime）或团队零在线。
-  const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  const pinnedId = buildRow?.pinnedMachineId ?? null;
-  if (pinnedId !== null) {
-    const pinned = deps.db.select().from(machine).where(eq(machine.id, pinnedId)).get();
-    if (pinned === undefined || !pinned.online) {
+  // 等机器（#1259 起语义 = 归属机）：任一 pending 步的 Agent 未设归属机、
+  // 归属机行不在/离线、或在线但 runtime 闸挡本步 → 等机器；或团队零在线。
+  // 归属机在线且闸开 = 正常排队（忙/将领，只是没轮到）——挂起 ≠ 排队。
+  // 无 Agent 的步不判（claim 面 #1104 失败收口，本派生不重复判）。
+  for (const s of pendingSteps) {
+    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    if (agentRow === null) continue;
+    // 未设归属机：任何机器都不可领——等机器（补设即解锁）。
+    if (agentRow.machineId === null) {
       return { on: 'machine', retryAt: null };
     }
-    if (pendingSteps.some((s) => !runtimeGatePasses(pinned, agentProviderOfStep(deps, row, s)))) {
+    const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
+    if (home === undefined || !home.online) {
       return { on: 'machine', retryAt: null };
     }
-    // #1251：钉选机在线且 runtime 闸开，但能力快照缺 Agent 要求项——机器回来
-    // 也领不走（claim 面 capabilityGatePasses 同判据），同为「等机器」挂起态
-    // （板面 chip 粗粒度；缺项点名 + 修法文案在步队列 blocked 面，读侧单源
-    // dispatch-eligibility）。无 Agent 的步不进本判（恒过闸，同 runtime 律）。
-    if (
-      pendingSteps.some((s) => {
-        const agentRow = agentRowOfStep(deps, row, s);
-        return agentRow !== null && !capabilityGatePasses(pinned, agentRow);
-      })
-    ) {
+    if (!runtimeGatePasses(home, agentRow.provider)) {
       return { on: 'machine', retryAt: null };
     }
-    return undefined; // 钉选机在线且闸开：正常排队（忙/将领）
+    // #1251：归属机在线且 runtime 闸开，但能力快照缺 Agent 声明项——机器
+    // 在也领不走（claim 面 capabilityGatePasses 同判据），同为「等机器」chip
+    // 态（缺项点名 + 修法文案在步队列 blocked 面，读侧单源
+    // dispatch-eligibility）。
+    if (!capabilityGatePasses(home, agentRow)) {
+      return { on: 'machine', retryAt: null };
+    }
   }
   const online = deps.db
     .select({ id: machine.id })
@@ -222,27 +222,6 @@ function waitingOnOf(
     return { on: 'machine', retryAt: null };
   }
   return undefined;
-}
-
-/** pending 步的 Agent provider（runtime 闸判用；解析单源 = dispatch
- *  eligibility 的 agentForStep——与 claim 面同一份事实，无 Agent = null 恒过闸
- * （无主步的失败收口在 claim 面 #1104，本派生不重复判）。 */
-function agentProviderOfStep(
-  deps: TodoDeps,
-  row: TodoRow,
-  stepRow: typeof step.$inferSelect,
-): string | null | undefined {
-  return agentRowOfStep(deps, row, stepRow)?.provider;
-}
-
-/** pending 步的 Agent 行（runtime + 能力两闸共用解析；单源 = dispatch
- *  eligibility 的 agentForStep，无 Agent = null）。 */
-function agentRowOfStep(
-  deps: TodoDeps,
-  row: TodoRow,
-  stepRow: typeof step.$inferSelect,
-): ReturnType<typeof agentForStepEligibility> {
-  return agentForStepEligibility(deps.db, row, stepRow.kind, stepRow.prompt);
 }
 
 function getRow(deps: TodoDeps, id: string): TodoRow | undefined {
@@ -301,9 +280,6 @@ export function createTodo(
      * 答「哪次请求拆的」）。至多一个来源：GitHub 接入项目的自建 issue 写向
      * 优先占槽（#452 出站零回归；r14 §5.7 GitHub 镜像面开放问题）。 */
     orchestration?: { threadId: string };
-    /** 任务的钉选机器（#682）：null/缺省 = 自动。本团队机器集之外的 id =
-     * 400（tagIds 同律的项目边界防御）。 */
-    machineId?: string | null;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -322,18 +298,6 @@ export function createTodo(
     for (const tagId of tagIds) {
       if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
     }
-  }
-  // #682：钉选机器限本团队机器集（tagIds 同律边界防御）；机器被删后任务
-  // 行残值 = startBuilds 回落 todo.machineId 时 claim 过滤自然不命中（步
-  // pending 等待语义同「pin 的机器离线」），不做写时级联。
-  const machineId = input.machineId ?? null;
-  if (machineId !== null) {
-    const machineRow = db
-      .select({ id: machine.id })
-      .from(machine)
-      .where(and(eq(machine.id, machineId), eq(machine.teamId, input.teamId)))
-      .get();
-    if (!machineRow) throw new HttpError(400, `machine ${machineId} not in team`);
   }
   // seqNum = 团队内持久序号（CONTEXT.md `#seqNum`；观测 #11–#14 跨项目递增，
   // 团队级计数 [推断]）。
@@ -399,7 +363,6 @@ export function createTodo(
         (selfIssue === null && input.orchestration !== undefined
           ? orchestrationSourceRef(input.orchestration.threadId)
           : null),
-      machineId,
     })
     .run();
   for (const tagId of tagIds) {
@@ -427,7 +390,6 @@ export function updateTodo(
     /** 钉选机器 patch（#682）：string = 改钉，null = 清回自动，undefined =
      * 不动。只影响之后新起的 build（claim 过滤按 build 落值）。team 外机器
      * id = 400（createTodo 同律）。 */
-    machineId?: string | null;
     /** 指派槽级 patch（#208「编辑分配」）：提供的槽覆盖，未提供的槽保持现状；
      * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表；#1250 扩
      * review/verify 槽——四槽同 merge 语义）。 */
@@ -450,18 +412,6 @@ export function updateTodo(
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) sets.spec = patch.spec;
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
-  if (patch.machineId !== undefined) {
-    // #682 边界防御同建面：非 null 值必须落在本团队机器集内。
-    if (patch.machineId !== null) {
-      const machineRow = db
-        .select({ id: machine.id })
-        .from(machine)
-        .where(and(eq(machine.id, patch.machineId), eq(machine.teamId, row.teamId)))
-        .get();
-      if (!machineRow) throw new HttpError(400, `machine ${patch.machineId} not in team`);
-    }
-    sets.machineId = patch.machineId;
-  }
   if (patch.assignment !== undefined) {
     // 槽级 merge：未提供的槽保持现状（字段级 patch 语义延伸）。真值 = todo 表
     // JSON 列（db/schema.ts assignment 列），agent 投影随 build 槽自动派生。

@@ -375,8 +375,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
             teamId: TEAM_ID,
             agent: null,
             charter: '',
-            compactionModel: null,
-            model: null,
             lastTurnAt: null,
             createdAt: 0,
             tz: null,

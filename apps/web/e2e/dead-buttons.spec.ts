@@ -219,9 +219,10 @@ test('machines rows carry only live controls, no dead inline buttons (#222 出�
   // 选择器触发钮（Popover listbox 形，aria-label 承载语义；真实写路径
   // PATCH /api/machines/{id}，有消费链不是死钮——「零 button」钉随死字段
   // 摘除理由的翻案收窄为「零死钮」）。shell 闸是 switch 不入此数；
-  // resourcesDefault fixture 的机器行 canon 带并发位（max 3），故 = 1。
-  await expect(page.locator('div[data-kind] button')).toHaveCount(1);
-  await expect(page.locator('div[data-kind] button[aria-label="并发上限"]')).toHaveCount(1);
+  // #1259 fixture 双机（canon 本机 + mea-wsl 远端）各带并发位（max 3）
+  // ——每行一个并发上限钮，故 = 2。
+  await expect(page.locator('div[data-kind] button')).toHaveCount(2);
+  await expect(page.locator('div[data-kind] button[aria-label="并发上限"]')).toHaveCount(2);
 });
 
 // —— 8. 语音输入钮（#304 C5）——————————————————————————————————————————

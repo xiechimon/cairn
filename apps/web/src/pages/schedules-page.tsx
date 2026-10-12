@@ -59,7 +59,7 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Clock, EllipsisVertical, Lock, PlusSmall, Server, Trash2 } from '../icons/index.js';
+import { Clock, EllipsisVertical, Lock, PlusSmall, Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
 import { PAGE_COL_CLS } from './parts.js';
@@ -219,9 +219,6 @@ function ScheduleCard({
             day: dayWord(schedule.nextRunAt, now, t),
             time: hourMinute(schedule.nextRunAt),
           })}
-          <span aria-hidden="true">·</span>
-          <Server width={12} height={12} />
-          {schedule.machineId == null ? t('自动') : schedule.machineId}
           <span aria-hidden="true">·</span>
           {schedule.todo.projectName}
         </div>
@@ -411,10 +408,6 @@ function ScheduleForm({
         <div className="text-xs leading-4 text-muted-foreground">
           {t('按你的本地时区运行（Asia/Shanghai）')}
         </div>
-        <div className={FORM_ROW_CLS}>
-          <span className="text-sm leading-5 text-muted-foreground">{t('机器')}</span>
-          <span className={FORM_ROW_VALUE_CLS}>{t('自动')}</span>
-        </div>
       </div>
     </DialogShell>
   );
@@ -475,7 +468,6 @@ export function SchedulesPage() {
         kind: formKind,
         at: base.getTime(),
         tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        machineId: null,
       },
       // #638：表单提交即关（下方 setFormOpen），失败 = 定时没建上却零解释。
       { onError: (error) => toastError(t('新建定时失败，请重试。'), error) },
@@ -518,7 +510,6 @@ export function SchedulesPage() {
       kind: fixtureKind,
       at,
       tz: 'Asia/Shanghai',
-      machineId: null,
       nextRunAt,
       // fixture canon（scheduleOnce 同款占位，卡面不渲染）。
       createdBy: 'u-xmon-dai',

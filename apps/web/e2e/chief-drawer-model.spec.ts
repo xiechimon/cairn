@@ -1,86 +1,52 @@
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
-// Issue #615 (总管抽屉四连报 A/B/C 的 fixture 面回归): the drawer's model
-// row used to be a display-only `<span>` carrying a broken π trace — the
-// live loop (verify probe drive-chief-drawer) covers 显示→可改→落库→回显;
-// this spec pins the fixture-face half of the same contract:
-//   1. the model row is a control (aria-label 总管主模型 钮, #950 载体) that opens
-//      the model popover anchored under the row (#751: the #615 centered
-//      DialogShell read as 「在中间出现」 against the switcher's under-trigger
-//      anchoring); geometry is asserted from live rects, and the selected
-//      row's readability from computed contrast in both themes (#751 A);
-//      picking a row closes the face (accept 律, #148 同律) and the fixture
-//      face sends no PATCH (onPick absent).
-//   2. the row carries the runtime mark (RuntimePi 块状 π / RuntimeClaudeCode
-//      品牌星标 — 正本 = 参考站 providers 运行时 tab SVG; 用户返工裁决：运行时
-//      SVG，不是 Agent 头像; the broken 「ㅋ」 trace is gone); unbound keeps the
-//      plain `n/a` line with no control at all.
-//   3. the message-row copy glyphs are real clipboard buttons (local-first
-//      face exists); 恢复 / foot chevron had no backend and no local-first
-//      object face, so per the #306/#146 二分律 they are gone, not inert.
-//   4. the gear is reachable off-board: wake shells render it and it lands
+// Issue #615/#1260 (总管抽屉 fixture 面回归): #1260 总管降级后模型行 =
+// 绑定 Agent 自身模型的只读展示（chief 行 model/compaction/thinkingLevel
+// 覆盖槽退役——改模型去 Agent 设置面）。本 spec 钉 fixture 面：
+//   1. the model row is a read-only display: the bound Agent's model name +
+//      runtime mark render, and no picker control / model popover exists
+//      (the #615/#950 control carrier 总管主模型 retired with the slot).
+//   2. the row stays readable in both themes (rendered-pair contrast).
+//   3. the row carries the runtime mark (RuntimePi 块状 π / RuntimeClaudeCode
+//      品牌星标), not an agent avatar; unbound keeps the plain n/a line.
+//   4. the message-row copy glyphs are real clipboard buttons; 恢复 / foot
+//      chevron had no backend and no local-first object face, so per the
+//      #306/#146 二分律 they are gone, not inert.
+//   5. the gear is reachable off-board: wake shells render it and it lands
 //      on the board settings view via the ?chief=settings deep link.
 
 const drawer = (page: Page) => page.locator('.chief-drawer');
-// #950: 类名 locator 退役——触发钮载体 = role + aria-label（一级）。
-const modelBtn = (page: Page) => page.getByRole('button', { name: '总管主模型' });
-const modelMenu = (page: Page) => page.getByRole('dialog', { name: '模型' });
+// #1260: 模型行只读载体 = data-testid（行无 role 语义，aria 无处挂）。
+const modelRow = (page: Page) => page.getByTestId('chief-model-row');
+// 行内 span 序：0 = 包装 span，1 = 运行时 mark，2 = 模型名。
+const modelName = (page: Page) => modelRow(page).locator('span').nth(2);
 
 test.describe('chief drawer model row (#615)', () => {
-  test('the model row is a control that opens the anchored model popover', async ({ page }) => {
+
+  test('the model row is a read-only display of the bound Agent model (#1260)', async ({ page }) => {
     await page.goto('/app?scenario=111');
     await expect(drawer(page)).toBeVisible();
-    const btn = modelBtn(page);
-    await expect(btn).toBeVisible();
-    await expect(btn).toContainText('claude-sonnet-5 · 默认');
-
-    await btn.click();
-    const menu = modelMenu(page);
-    await expect(menu).toBeVisible();
-    // the enter animation (V2 scale-fade 100ms, #790 P3) transforms the menu
-    // for 100ms; rects sampled mid-flight are not the resting geometry.
-    await menu.evaluate((el) =>
-      Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
-    );
-    // the inherit row rides first (compaction select 同律: null = 默认)
-    await expect(menu.getByRole('option').nth(0)).toContainText('默认（与绑定 Agent 相同）');
-
-    // #751 B: the menu hangs under its trigger like the thread switcher,
-    // not centered over the viewport — live rects, not CSS values.
-    const btnBox = await btn.boundingBox();
-    const menuBox = await menu.boundingBox();
-    const drawerBox = await drawer(page).boundingBox();
-    expect(btnBox).not.toBeNull();
-    expect(menuBox).not.toBeNull();
-    expect(drawerBox).not.toBeNull();
-    if (btnBox == null || menuBox == null || drawerBox == null) throw new Error('missing rects');
-    // V2 顶部锚距（#790 P3）: menu.top = trigger.bottom + 8（原家族基线 4）。
-    expect(Math.abs(menuBox.y - (btnBox.y + btnBox.height + 8))).toBeLessThanOrEqual(2);
-    expect(Math.abs(menuBox.x - btnBox.x)).toBeLessThanOrEqual(2);
-    expect(menuBox.x).toBeGreaterThanOrEqual(drawerBox.x);
-    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(drawerBox.x + drawerBox.width);
-
-    // fixture accept 律: picking closes; no live callback, no request
-    await menu.getByRole('option').nth(0).click();
-    await expect(menu).toHaveCount(0);
+    const row = modelRow(page);
+    await expect(row).toBeVisible();
+    await expect(modelName(page)).toHaveText('claude-sonnet-5 · 默认');
+    // 覆盖槽退役：行不是控制件——旧 #615/#950 载体（总管主模型钮）与
+    // 模型 popover 均不存在；点行无任何开面。
+    await expect(page.getByRole('button', { name: '总管主模型' })).toHaveCount(0);
+    await row.click();
+    await expect(page.getByRole('dialog', { name: '模型' })).toHaveCount(0);
     await expect(drawer(page)).toBeVisible();
   });
 
-  test('the selected model row is readable in both themes (#751 A)', async ({ page }) => {
-    // #751 A: the retired rule painted --seg-active (a segmented-control
-    // fill) as the selected row's text — 1.24:1 light. Assert the rendered
-    // pair instead of the CSS value: computed name color against the
-    // background it actually renders on must clear AA, and the selected
-    // state must not ride color alone (the row carries a fill).
+  test('the row is readable in both themes (#751 A 同律)', async ({ page }) => {
+    // #751 A 同律：断渲染对（计算字色 × 实际背景），不断 CSS 值。行是
+    // tertiary 12px 小字——AA 正文档 4.5:1 是地板。
     for (const theme of ['dark', 'light'] as const) {
       await page.goto('/app?scenario=111');
       await page.evaluate((t) => localStorage.setItem('pacman-theme', t), theme);
       await page.reload();
       await expect(drawer(page)).toBeVisible();
-      await modelBtn(page).click();
-      const row = page.getByRole('option', { selected: true });
-      const name = row.getByTestId('model-pick-name');
+      const name = modelName(page);
       await expect(name).toBeVisible();
       const ratio = await name.evaluate((el) => {
         const lin = (c: number) => {
@@ -90,8 +56,6 @@ test.describe('chief drawer model row (#615)', () => {
         const lum = (rgb: number[]) =>
           0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2]);
         const parse = (s: string) => {
-          // color-mix() tokens serialize computed as color(srgb …) fractions,
-          // not rgb() 0–255 ints (#788: the selected-row fill rides --spot-soft)
           const m = s.match(/color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
           if (m) return [m[1], m[2], m[3]].map((v) => Number(v) * 255);
           return (s.match(/\d+(\.\d+)?/g) ?? []).slice(0, 3).map(Number);
@@ -107,127 +71,12 @@ test.describe('chief drawer model row (#615)', () => {
         );
         return (hi + 0.05) / (lo + 0.05);
       });
-      expect(ratio, `${theme} selected-row contrast`).toBeGreaterThanOrEqual(4.5);
-      expect(await row.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-        'rgba(0, 0, 0, 0)',
-      );
-      await page.keyboard.press('Escape');
-      await expect(modelMenu(page)).toHaveCount(0);
+      expect(ratio, `${theme} model-row contrast`).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  // #872: 选中行底色整行铺满（用户报「中间还有间隙，要全覆盖的」）。修法 = 把
-  // 弹层壳的横向内边距移到行上（壳 padding: 12px 0，行自带内衬），选中/hover
-  // 底色因此伸到弹层内缘。钉住的失败方式：① 底色仍内缩（壳还留着横垫）；② 行
-  // 盒被撑出行外（负外边距式修法的退化：清单作为滚动容器会长出横向溢出）；
-  // ③ 字墨与行尾勾的位置跟着挪（行内衬没补回壳垫的量）。
-  test('the selected row fill bleeds to the popover edges (#872)', async ({ page }) => {
-    // 用户报的是亮面（截图即亮面）——证据帧与它同面；几何本身与主题无关。
-    await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
-    await page.goto('/app?scenario=111');
-    await expect(drawer(page)).toBeVisible();
-    await modelBtn(page).click();
-    const menu = modelMenu(page);
-    await expect(menu).toBeVisible();
-    await menu.evaluate((el) =>
-      Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
-    );
-    const row = menu.getByRole('option', { selected: true });
-    await expect(row).toHaveCount(1);
-    // 证据帧（PACMAN_E2E_EVIDENCE 未设时零写入）：整块弹层连底色到边一起拍
-    await evidencePanelShot(page, '872-drawer-picker.png', menu);
 
-    const geo = await row.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      const panelEl = el.closest('[role="dialog"]') as HTMLElement;
-      const p = panelEl.getBoundingClientRect();
-      const cs = getComputedStyle(el);
-      const pcs = getComputedStyle(panelEl);
-      const name = el.querySelector('[data-testid="model-pick-name"]') as HTMLElement;
-      const check = el.querySelector('[data-testid="model-pick-check"]') as HTMLElement;
-      return {
-        fillLeft: r.left - p.left,
-        fillRight: p.right - r.right,
-        panelBorder: parseFloat(pcs.borderLeftWidth),
-        bg: cs.backgroundColor,
-        padLeft: parseFloat(cs.paddingLeft),
-        padRight: parseFloat(cs.paddingRight),
-        nameInset: name.getBoundingClientRect().left - r.left,
-        checkInset: r.right - check.getBoundingClientRect().right,
-      };
-    });
-    expect(geo.bg).not.toBe('rgba(0, 0, 0, 0)');
-    expect(geo.fillLeft).toBeCloseTo(geo.panelBorder, 1);
-    expect(geo.fillRight).toBeCloseTo(geo.panelBorder, 1);
-    // 字墨与勾仍骑在行的内衬上（壳垫移进行内后零位移）
-    expect(geo.nameInset).toBeCloseTo(geo.padLeft, 1);
-    expect(geo.checkInset).toBeCloseTo(geo.padRight, 1);
 
-    // 清单是滚动容器：铺满不许把内容撑成横向溢出
-    const scroll = await menu
-      .getByRole('listbox')
-      .evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth }));
-    expect(scroll.sw).toBe(scroll.cw);
-  });
-
-  test('the picker search is typeahead-only: absent until a key, retracted on clear (#756)', async ({
-    page,
-  }) => {
-    await page.goto('/app?scenario=111');
-    await expect(drawer(page)).toBeVisible();
-    const chipBtn = page.getByRole('button', { name: '主题', exact: true });
-    const chipTitle = await chipBtn.textContent();
-    await modelBtn(page).click();
-    const menu = modelMenu(page);
-    await expect(menu).toBeVisible();
-    // open state carries zero search footprint (not rendered, not transparent)
-    await expect(menu.getByPlaceholder('搜索模型…')).toHaveCount(0);
-    // scenario 111 is fixture mode: modelOptions is undefined (live-only
-    // union), so the face shows the default row alone by design
-    const rowsOpen = await menu.getByRole('option').count();
-    expect(rowsOpen).toBe(1);
-
-    // typeahead 接的是面内焦点：FloatingShell 把焦点移进面是异步的，
-    // 没落定就打字会打在触发钮上（抽屉面还会触发 N 新主题热键）——等落定再敲
-    await page.waitForFunction(
-      (sel) => {
-        const el = document.querySelector(sel);
-        return el != null && el.contains(document.activeElement);
-      },
-      '[role="dialog"][aria-label="模型"]',
-    );
-
-    // a printable key is consumed by the face: the box reveals with the key
-    // prefilled, focus in the input — and the drawer's N hotkey must not
-    // steal it (no new-thread view, chip title unchanged). With no fixture
-    // options the key matches nothing, so the default row plus empty state
-    // show (the filtered-list path is pinned on the settings face instead)
-    await page.keyboard.press('n');
-    const search = menu.getByPlaceholder('搜索模型…');
-    await expect(search).toBeVisible();
-    await expect(search).toHaveValue('n');
-    await expect(search).toBeFocused();
-    await expect(menu).toBeVisible();
-    expect(await chipBtn.textContent()).toBe(chipTitle);
-    await expect(menu.getByRole('option')).toHaveCount(1);
-    await expect(menu.getByText('没有匹配的模型')).toBeVisible();
-
-    // a key matching nothing filters to the default row plus the empty state
-    await search.fill('x');
-    await expect(menu.getByRole('option')).toHaveCount(1);
-    await expect(menu.getByText('没有匹配的模型')).toBeVisible();
-
-    // retract rule: clearing collapses the box and restores the full list,
-    // and typeahead re-arms afterwards
-    await search.fill('');
-    await expect(menu.getByPlaceholder('搜索模型…')).toHaveCount(0);
-    await expect(menu.getByRole('option')).toHaveCount(rowsOpen);
-    await page.keyboard.press('c');
-    await expect(search).toBeVisible();
-    await expect(search).toHaveValue('c');
-    await expect(menu.getByRole('option')).toHaveCount(1);
-    await expect(menu.getByText('没有匹配的模型')).toBeVisible();
-  });
 
   test('the model row carries the runtime mark, not an agent avatar', async ({ page }) => {
     await page.goto('/app?scenario=fab-avatar');
@@ -235,18 +84,17 @@ test.describe('chief drawer model row (#615)', () => {
     await page.locator('.chief-fab').click();
     await expect(drawer(page)).toBeVisible();
     await drawer(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-    const btn = modelBtn(page);
-    await expect(btn).toBeVisible();
+    const row = modelRow(page);
+    await expect(row).toBeVisible();
     // #615 返工裁决：行首 = 运行时标记（fixture 未录 provider 位 = pi 正典
-    // π 字形），不是 Agent 头像——头像脸归 FAB / 消息流各自的面
-    // #950: mark 槽 = 行钮首个 span（结构载体；svg 存在 + 无 img 语义不变）。
-    await expect(btn.locator('span').first().locator('svg')).toHaveCount(1);
-    await expect(btn.locator('img')).toHaveCount(0);
+    // π 字形），不是 Agent 头像——头像脸归 FAB / 消息流各自的面。#1260 只读
+    // 行同律：mark 槽 = 行内首个 span（结构载体；svg 存在 + 无 img）。
+    await expect(row.locator('span').first().locator('svg')).toHaveCount(1);
+    await expect(row.locator('img')).toHaveCount(0);
 
     // unbound: plain n/a line, no control (nothing to pick until an agent binds)
     await page.goto('/app?scenario=100');
     await expect(drawer(page)).toBeVisible();
-    await expect(modelBtn(page)).toHaveCount(0);
     await expect(page.getByText('n/a', { exact: true })).toBeVisible();
   });
 
@@ -326,25 +174,4 @@ test.describe('chief drawer model row (#615)', () => {
     await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
   });
 
-  test('closing the drawer (⌘J) recycles the model popover with it (#773)', async ({
-    page,
-  }) => {
-    await page.goto('/app?scenario=111');
-    await expect(drawer(page)).toBeVisible();
-    await modelBtn(page).click();
-    const menu = modelMenu(page);
-    await expect(menu).toBeVisible();
-
-    // ⌘J 收起抽屉：弹层跟随回收（Minimize/⌘J 同走 open=false，见
-    // chief-drawer；ADR 0013 D6 载体：窗关态驻 DOM hidden，portaled 弹层
-    // 的 open 态清零后节点归零）
-    await page.keyboard.press('Meta+j');
-    await expect(drawer(page)).toBeHidden();
-    await expect(menu).toHaveCount(0);
-
-    // 再按 ⌘J 重开：弹层不带回 stale open 态
-    await page.keyboard.press('Meta+j');
-    await expect(drawer(page)).toBeVisible();
-    await expect(menu).toHaveCount(0);
-  });
 });

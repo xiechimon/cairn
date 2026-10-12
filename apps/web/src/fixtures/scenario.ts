@@ -43,8 +43,6 @@ import {
   chiefReady,
   chiefScrollLong,
   chiefSettings,
-  chiefSettingsMachines,
-  chiefSettingsStaleModel,
   chiefStreaming,
   chiefThread,
   chiefThreadsLong,
@@ -146,6 +144,12 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // state — r7 baselines carry no banner, so the strip gets a named id
       // and rides smoke rows (04 §2: no-baseline rows self-compare)
       'notify-banner': { ...boardDefault, ui: { notificationBanner: true } },
+      // #1259 创建弹窗的服务商告警行（信息性，不顶掉表单）：机器在、
+      // providerSources 空——pi 创建照跑，claude-code 无候选才见告警。
+      'team-no-sources': {
+        ...resourcesDefault,
+        resources: { ...resourcesDefault.resources!, providerSources: [] },
+      },
       // #176 new-task dialog 项目选择器:命名场景(无 capture)——boardDefault
       // 面加 projectNames 双项目,e2e 钉选择器行为;无 fixture 行。
       'newtask-projects': boardProjectPicker,
@@ -390,12 +394,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '102': chiefSettings('charter'),
       '103': chiefSettings('memory'),
       '104': chiefSettings('watches'),
-      // #358 AC2（spec 11 §A10）：compactionModel 仍引用已废 preset →
-      // 裸串兜底回显的 fixture 钉（合成 scenario，10-cc-missing 先例）
-      '101-stale-model': chiefSettingsStaleModel,
-      // #895 主力机槽（spec 21 A6）：Agent tab 机器 chip 的回显/清单钉面
-      //（合成 scenario，101-stale-model 先例；live PATCH 写读归 verify 证据）
-      '101-machines': chiefSettingsMachines,
       '111': chiefReady,
       // #624 r5 113 流式面（回合进行中）：composer 占位 = steer canon 的钉面
       // （running 位；命名场景手法循 #499/#444 先例，流内容 [推断] 拼装）。

@@ -228,28 +228,6 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       },
       "type": "array",
     },
-    "reworkContext": {
-      "additionalProperties": false,
-      "properties": {
-        "feedbacks": {
-          "items": {
-            "type": "string",
-          },
-          "type": "array",
-        },
-        "planText": {
-          "type": [
-            "string",
-            "null",
-          ],
-        },
-      },
-      "required": [
-        "planText",
-        "feedbacks",
-      ],
-      "type": "object",
-    },
     "session": {
       "additionalProperties": false,
       "properties": {
@@ -626,28 +604,6 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                 "type": "object",
               },
               "type": "array",
-            },
-            "reworkContext": {
-              "additionalProperties": false,
-              "properties": {
-                "feedbacks": {
-                  "items": {
-                    "type": "string",
-                  },
-                  "type": "array",
-                },
-                "planText": {
-                  "type": [
-                    "string",
-                    "null",
-                  ],
-                },
-              },
-              "required": [
-                "planText",
-                "feedbacks",
-              ],
-              "type": "object",
             },
             "session": {
               "additionalProperties": false,
@@ -3171,12 +3127,6 @@ exports[`body/封套 schema 快照 > createScheduleBody > createScheduleBody.jso
       ],
       "type": "string",
     },
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "projectId": {
       "type": "string",
     },
@@ -3201,12 +3151,6 @@ exports[`body/封套 schema 快照 > createTodoBody > createTodoBody.json 1`] = 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "spec": {
       "type": "string",
     },
@@ -3418,16 +3362,9 @@ exports[`body/封套 schema 快照 > patchChiefBody > patchChiefBody.json 1`] = 
             "agentId": {
               "type": "string",
             },
-            "thinkingLevel": {
-              "type": [
-                "string",
-                "null",
-              ],
-            },
           },
           "required": [
             "agentId",
-            "thinkingLevel",
           ],
           "type": "object",
         },
@@ -3440,58 +3377,6 @@ exports[`body/封套 schema 快照 > patchChiefBody > patchChiefBody.json 1`] = 
       "type": [
         "string",
         "null",
-      ],
-    },
-    "compactionModel": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "modelId": {
-              "type": "string",
-            },
-            "provider": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "provider",
-            "modelId",
-          ],
-          "type": "object",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
-    "model": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "modelId": {
-              "type": "string",
-            },
-            "provider": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "provider",
-            "modelId",
-          ],
-          "type": "object",
-        },
-        {
-          "type": "null",
-        },
       ],
     },
   },
@@ -4401,12 +4286,6 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                 "null",
               ],
             },
-            "machineId": {
-              "type": [
-                "string",
-                "null",
-              ],
-            },
             "orderIndex": {
               "type": "number",
             },
@@ -4604,7 +4483,6 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "sourceBuildId",
             "sourceKind",
             "sourceRef",
-            "machineId",
           ],
           "type": "object",
         },
@@ -4656,12 +4534,6 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             },
             "id": {
               "type": "string",
-            },
-            "pinnedMachineId": {
-              "type": [
-                "string",
-                "null",
-              ],
             },
             "planDocId": {
               "type": [
@@ -4729,7 +4601,6 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
             "withPlan",
             "prevPhase",
             "triggerSource",
-            "pinnedMachineId",
             "planDocId",
             "errorMessage",
             "prUrl",
@@ -5035,6 +4906,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
     "id": {
       "type": "string",
     },
+    "machineId": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "maxConcurrentTasks": {
       "anyOf": [
         {
@@ -5305,12 +5182,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > build > bu
     "id": {
       "type": "string",
     },
-    "pinnedMachineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "planDocId": {
       "type": [
         "string",
@@ -5377,7 +5248,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > build > bu
     "withPlan",
     "prevPhase",
     "triggerSource",
-    "pinnedMachineId",
     "planDocId",
     "errorMessage",
     "prUrl",
@@ -5419,29 +5289,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief > ch
         "null",
       ],
     },
-    "compactionModel": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "modelId": {
-              "type": "string",
-            },
-            "provider": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "provider",
-            "modelId",
-          ],
-          "type": "object",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
     "createdAt": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -5456,35 +5303,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief > ch
           "maximum": 9007199254740991,
           "minimum": -9007199254740991,
           "type": "integer",
-        },
-        {
-          "type": "null",
-        },
-      ],
-    },
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
-    "model": {
-      "anyOf": [
-        {
-          "additionalProperties": false,
-          "properties": {
-            "modelId": {
-              "type": "string",
-            },
-            "provider": {
-              "type": "string",
-            },
-          },
-          "required": [
-            "provider",
-            "modelId",
-          ],
-          "type": "object",
         },
         {
           "type": "null",
@@ -5609,12 +5427,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thre
         {
           "type": "null",
         },
-      ],
-    },
-    "pinnedMachineId": {
-      "type": [
-        "string",
-        "null",
       ],
     },
     "session": {
@@ -5764,7 +5576,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thre
     "lastTurnAt",
     "session",
     "pendingSessionResumeAt",
-    "pinnedMachineId",
     "toolDefHashes",
     "toolResultHashes",
     "activeRun",
@@ -6254,12 +6065,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > schedule >
       ],
       "type": "string",
     },
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "nextRunAt": {
       "anyOf": [
         {
@@ -6334,7 +6139,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > schedule >
     "kind",
     "at",
     "tz",
-    "machineId",
     "nextRunAt",
     "createdBy",
     "todo",
@@ -6684,12 +6488,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
         "null",
       ],
     },
-    "machineId": {
-      "type": [
-        "string",
-        "null",
-      ],
-    },
     "orderIndex": {
       "type": "number",
     },
@@ -6887,7 +6685,6 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
     "sourceBuildId",
     "sourceKind",
     "sourceRef",
-    "machineId",
   ],
   "type": "object",
 }

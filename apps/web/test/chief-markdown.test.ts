@@ -79,8 +79,8 @@ const ENV: ChiefGetResponse = {
   context: null,
   watches: [],
   wakes: [],
-  // #895：orchestration 块本测试面不消费，取空态（未设主力机 + 无计数）。
-  orchestration: { defaultMachineId: null, activity: [] },
+  // orchestration 块本测试面不消费，取空态（chief 未绑定 + 无计数）。
+  orchestration: { homeMachineId: null, activity: [] },
 };
 
 function thread(activeRun: ChiefThread['activeRun']): ChiefThread {
@@ -95,7 +95,6 @@ function thread(activeRun: ChiefThread['activeRun']): ChiefThread {
     lastTurnAt: null,
     session: { runtime: 'pi', id: 's1', openedAt: NOW },
     pendingSessionResumeAt: null,
-    pinnedMachineId: null,
     toolDefHashes: {},
     toolResultHashes: {},
     activeRun,

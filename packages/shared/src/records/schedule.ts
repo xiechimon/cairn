@@ -29,14 +29,12 @@ export const scheduleTodoEmbedSchema = z.object({
  * - 周期档：at = 墙钟锚点（hourly 取分钟档、daily 取时:分、weekly 另取星期），
  *   nextRunAt 由 cron 按 tz 滚动计算；
  * - tz 缺省 = server 本地时区（「按你的本地时区运行（…）」注，01 §4.2）；
- * - machineId null/缺省 = 自动（r3 §9 机器（自动））。 */
-export const createScheduleBodySchema = z.object({
+ */ export const createScheduleBodySchema = z.object({
   todoId: recordId,
   projectId: recordId.optional(),
   kind: scheduleKindSchema,
   at: epochMs,
   tz: z.string().optional(),
-  machineId: recordId.nullable().optional(),
 });
 export type CreateScheduleBody = z.infer<typeof createScheduleBodySchema>;
 
@@ -53,8 +51,6 @@ export const scheduleRecordSchema = z.object({
    * （r3 §9），server 侧取 Intl.DateTimeFormat().resolvedOptions().timeZone
    * （01 §4.2）。 */
   tz: z.string(),
-  /** null = 自动（r3 §9 机器（自动）；02 §6.2 machineId(null=自动)）。 */
-  machineId: recordId.nullable(),
   nextRunAt: epochMs.nullable(),
   createdBy: recordId,
   todo: scheduleTodoEmbedSchema,

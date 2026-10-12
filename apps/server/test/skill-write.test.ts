@@ -61,7 +61,7 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 // —— 脚手架（隔离技能根 + 技能 body 组装）——————————————————————————————————
 
@@ -508,6 +508,8 @@ describe('worker relay 技能写词（POST /api/machine/tool/{stepId}）', () =>
         skillsAllowlist: null,
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '', spec: '写一个部署技能\n\n现在的情况：部署靠手工' },
@@ -773,6 +775,7 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
         skillsAllowlist: opts.skillsAllowlist ?? null,
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '', spec: '干活\n\n现在的情况：没技能' },
@@ -840,6 +843,8 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
         cred: key2,
         body: { teamId: s.team.id, name: 'other-machine', cliVersion: '0.1.0' },
       });
+
+      bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
       const { token: token2 } = (await enroll2.json()) as { token: string };
       const notYours = await pkg(s.app, token2, step.step.id);
       expect(notYours.status).toBe(404);
@@ -935,6 +940,8 @@ describe('machine-wire 技能清单与按需拉取（GET /api/machine/skills/{st
         skillsAllowlist: null,
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
       body: { agent: { agentId: WORKER_AGENT_ID, thinkingLevel: null } },
     });

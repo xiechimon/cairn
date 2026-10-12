@@ -79,6 +79,17 @@ function makeWorld(): World {
   const buildId = `build-${suffix}`;
   const machineAId = `machine-a-${suffix}`;
   const machineBId = `machine-b-${suffix}`;
+  for (const [id, name] of [
+    [machineAId, 'dead-daemon'],
+    [machineBId, 'live-daemon'],
+  ] as const) {
+    s.db
+      .insert(machineTable)
+      .values({ id, teamId, name, online: true, enabledRuntimes: ['pi'] })
+      .run();
+  }
+  // #1259：agent 绑活机 B——A（死机位）在归属机闸下恒不可见，abort 语义
+  // 的测试对象改为「B 自己的请求死了不得替它领」。
   s.db
     .insert(agentTable)
     .values({
@@ -87,6 +98,7 @@ function makeWorld(): World {
       displayName: 'zombie-agent',
       provider: 'stub-gw',
       modelId: 'stub-model',
+      machineId: machineBId,
     })
     .run();
   s.db
@@ -116,15 +128,6 @@ function makeWorld(): World {
       createdAt: base - 600_000,
     })
     .run();
-  for (const [id, name] of [
-    [machineAId, 'dead-daemon'],
-    [machineBId, 'live-daemon'],
-  ] as const) {
-    s.db
-      .insert(machineTable)
-      .values({ id, teamId, name, online: true, enabledRuntimes: ['pi'] })
-      .run();
-  }
   let seq = 0;
   const insert = () => {
     const id = `step-${suffix}-${seq}`;
@@ -171,12 +174,14 @@ function stepRow(w: World, id: string) {
 }
 
 describe('#1065 僵尸认领（service 面：claimStep 绑请求存活态）', () => {
-  test('hold 中 abort → 新步入队 wake：死机不领，步留 pending，活机照领', async () => {
+  test('hold 中 abort → 新步入队 wake：死请求不领，步留 pending，归属机新请求照领', async () => {
     const w = makeWorld();
     const ctrl = new AbortController();
+    // #1259：abort 语义打在合格机器（归属机 B）自己身上才有牙——A 在归属机
+    // 闸下本就恒不可见，拿它测不到 abort 面。
     const claim = claimStep(
       machineDepsOf(w),
-      w.machineAId,
+      w.machineBId,
       w.teamId,
       HOLD_MS,
       'http://localhost',
@@ -194,7 +199,14 @@ describe('#1065 僵尸认领（service 面：claimStep 绑请求存活态）', (
     const row = stepRow(w, stepId);
     expect(row.machineId).toBeNull(); // 步没被死机领走
     expect(row.status).toBe('pending');
-    // 活侧：同一步由不带 signal 的活机照领（双向验收）。
+    // 活侧：同一步由不带 signal 的新请求照领（双向验收）；别机（A）恒空手
+    // （归属机闸，附证）。
+    const foreign = await settleSoon(
+      claimStep(machineDepsOf(w), w.machineAId, w.teamId, 10, 'http://localhost'),
+      1_000,
+      '别机 claim 未返回',
+    );
+    expect(foreign).toBeNull();
     const live = await settleSoon(
       claimStep(machineDepsOf(w), w.machineBId, w.teamId, 10, 'http://localhost'),
       1_000,
@@ -208,7 +220,7 @@ describe('#1065 僵尸认领（service 面：claimStep 绑请求存活态）', (
     const ctrl = new AbortController();
     const claim = claimStep(
       machineDepsOf(w),
-      w.machineAId,
+      w.machineBId,
       w.teamId,
       HOLD_MS,
       'http://localhost',
@@ -229,7 +241,7 @@ describe('#1065 僵尸认领（service 面：claimStep 绑请求存活态）', (
     const stepId = w.enqueueStep();
     const out = await claimStep(
       machineDepsOf(w),
-      w.machineAId,
+      w.machineBId,
       w.teamId,
       10,
       'http://localhost',
@@ -294,6 +306,8 @@ describe('#1065 路由接线（claim 路由透传请求 signal）', () => {
     };
     const machineA = await enroll('dead-daemon');
     const machineB = await enroll('live-daemon');
+    // #1259：agent 绑 B（合格机）——abort 语义打在 B 自己的死请求上；A 在
+    // 归属机闸下恒不可见，留作「别机空手」附证。
     const projectId = await postProject(s.app);
     const todoRes = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       title: '路由接线目标',
@@ -301,11 +315,16 @@ describe('#1065 路由接线（claim 路由透传请求 signal）', () => {
     });
     const todoId = ((await todoRes.json()) as { id: string }).id;
 
-    // 死机先发 claim（挂起在 hold 上，无 pending 步）。
+    // 合格机先发 claim（挂起在 hold 上，无 pending 步），随后它的连接死。
+    s.db
+      .update(agentTable)
+      .set({ machineId: machineB.machineId })
+      .where(eq(agentTable.id, 'agent-route'))
+      .run();
     const ctrl = new AbortController();
     const claimReq = new Request('http://localhost/api/machine/tasks/claim', {
       method: 'POST',
-      headers: { authorization: `Bearer ${machineA.token}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${machineB.token}`, 'content-type': 'application/json' },
       body: '{}',
       signal: ctrl.signal,
     });
@@ -322,9 +341,9 @@ describe('#1065 路由接线（claim 路由透传请求 signal）', () => {
     const res = await settleSoon(resPromise, 300, '路由 claim 未随 abort 即时返回');
     expect(res.status).toBe(200);
     const body = machineClaimResponseSchema.parse(await res.json());
-    expect(body.step).toBeNull(); // 死机的长轮询没替它把首步领走
+    expect(body.step).toBeNull(); // 死请求的长轮询没替它把首步领走
 
-    // 活侧：B 的 claim 照领（双向验收）。
+    // 活侧：B 的新请求照领（双向验收）。
     const claimB = await settleSoon(
       Promise.resolve(
         s.app.request('/api/machine/tasks/claim', {

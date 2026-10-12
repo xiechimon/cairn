@@ -24,7 +24,7 @@
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -79,7 +79,7 @@ const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执
  * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/** #1108 并发上限选择器（机器行第二个活控件，形态沿 chief-machine-select
+/** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
  * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。 */
@@ -171,7 +171,7 @@ export function MachinesPage() {
   ): { host: boolean; running: boolean; waiting: boolean } =>
     live
       ? {
-          host: orchestration?.defaultMachineId === machine.id,
+          host: orchestration?.homeMachineId === machine.id,
           running: (activityOf(machine.id)?.running ?? 0) > 0,
           waiting: (activityOf(machine.id)?.waiting ?? 0) > 0,
         }
@@ -255,7 +255,13 @@ export function MachinesPage() {
               <Tile Icon={Monitor} size="lg" tone="orange" />
               <RowText>
                 <RowLine>
-                  <RowTitle>{t(machine.name)}</RowTitle>
+                  <RowTitle>
+                    {/* #1259：机器名 = 详情页入口（行内开关控件不动，整行不
+                        改链接——控件与导航分家）。 */}
+                    <Link to={`${MACHINES_HREF}/${machine.id}?${searchParams.toString()}`}>
+                      {t(machine.name)}
+                    </Link>
+                  </RowTitle>
                   {/* online 读 machine.online（与 new-task-machine-dot /
                     dlg-machine-dot 同族语义）：在线绿点，离线灰点——离线行
                     此前无任何表示，daemon 死后机器页看不出。undefined（无该

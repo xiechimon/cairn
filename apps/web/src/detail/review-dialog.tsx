@@ -246,7 +246,9 @@ export function ReviewDialog({
         <div className="flex flex-col gap-2">
           {/* #1006 原型：标签走 registry Label 件（批次 0b 引入），--label-size
               手写标签律退役。 */}
-          <Label>{t('希望 Agent 审核时重点关注什么？（可选）')}</Label>
+          {/* CJK 标签行高修正（leading-none → 1.25，墨盒不贴行底被邻位
+              focus 环压住）：就地 className，件保持 pristine（#980 S5）。 */}
+          <Label className="leading-tight">{t('希望 Agent 审核时重点关注什么？（可选）')}</Label>
           <Textarea
             value={focus}
             onChange={(event) => setFocus(event.target.value)}

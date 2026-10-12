@@ -1,5 +1,4 @@
-import { boardMachinePicker } from './board.js';
-import { legacyDone, legacyReview, MACHINE_ID, MACHINE_NAME, r7 } from './core.js';
+import { legacyDone, legacyReview, MACHINE_NAME, r7 } from './core.js';
 import type {
   ChiefContent,
   ChiefExample,
@@ -331,37 +330,6 @@ export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
     chief: { view: 'settings', tab, bound: false, threadTitle: '新主题' },
   };
 }
-
-/** #358 AC2 canon（spec 11 §A10）：compactionModel 仍引用已废 preset
- *  （`anthropic` ∈ PROVIDER_PRESET_IDS，preset 方案退役后不再是选项来源），
- *  命中不了 fixture canon 单行（#770 起为 claude-code 行）→ 选择器落裸串
- *  `provider/modelId`
- *  兜底回显，不空白不崩。scenario = 101-stale-model。 */
-export const chiefSettingsStaleModel: FixtureSet = {
-  ...chiefSettings('agent'),
-  chief: {
-    view: 'settings',
-    tab: 'agent',
-    bound: false,
-    threadTitle: '新主题',
-    compactionModel: { provider: 'anthropic', modelId: 'claude-3-5-haiku-20241022' },
-  },
-};
-
-/** #895 主力机槽命名场景（无 capture，101-stale-model 先例）：settings
- *  Agent tab + resources 两机（在线本机 + 离线远端，boardMachinePicker 同
- *  行集）+ 槽值钉本机——e2e 钉机器 chip 的回显/清单/accept 律。 */
-export const chiefSettingsMachines: FixtureSet = {
-  ...chiefSettings('agent'),
-  resources: boardMachinePicker.resources,
-  chief: {
-    view: 'settings',
-    tab: 'agent',
-    bound: false,
-    threadTitle: '新主题',
-    machineId: MACHINE_ID,
-  },
-};
 
 /** Default drawer content for a FAB-opened drawer on a scenario without a
  *  chief surface (dev interactivity; fixture rows always carry a set). */

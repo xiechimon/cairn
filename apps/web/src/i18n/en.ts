@@ -344,16 +344,37 @@ export const EN: Record<string, string> = {
   '来源 issue': 'Source issue',
   与本地标题不一致: 'Differs from the local title',
   // #476（#473 决策候选 A + C 尾注）右栏方案空态任务元信息块：行 label
-  // （机器复用侧栏键）+ 尾注引导句。#682 机器行等待标注（钉选机器离线，
-  // 步只等它上线不自动改派）+ 新建任务机器 chip（自动 = 缺省行）。
+  // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
+  // 步只等它上线不自动改派）。
   '分支 / PR': 'Branch / PR',
   模型: 'Model',
   创建时间: 'Created',
   方案产出后显示于此: 'The plan will appear here once produced',
   '（等待机器上线）': '(waiting for the machine to come online)',
-  // #1208 机器行改派标注：任务钉了机器而实际执行机器不同名（run_builds
-  // 显式改派）→ 行尾揭示钉选值，换机不静默。
-  '（任务钉选 {machine}）': '(task pins {machine})',
+  // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
+  归属机: 'Home machine',
+  ' · 归属机 {machine}': ' · on {machine}',
+  模型与归属机: 'Model & home machine',
+  '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
+    'Follows the bound Agent: model {model} · home {machine}',
+  '跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。':
+    "Follows the bound Agent's own configuration; adjust it in the Agent's settings.",
+
+  ' · 未设归属机': ' · no home machine',
+  未设归属机: 'no home machine',
+  还没有接入机器: 'No machines connected yet',
+  接入机器: 'Connect a machine',
+  在线: 'Online',
+  '无 runtime 开启': 'No runtimes enabled',
+  '并发 {running}/{cap}': '{running}/{cap} concurrent',
+  '迁移到…': 'Migrate to…',
+  迁移到: 'Migrate to',
+  整机迁移: 'Migrate all agents',
+  '删除（先迁走 {n} 个 agent）': 'Delete (move {n} agents first)',
+  机器不存在或已移除: 'Machine missing or removed',
+  '整机迁移失败，请重试。': 'Migration failed. Try again.',
+  '删除机器失败，请重试。': 'Could not delete the machine. Try again.',
+  '{n} 个 agent 未过校验留在原机': '{n} agents failed validation and stayed put',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
@@ -444,8 +465,6 @@ export const EN: Record<string, string> = {
   压缩模型: 'Compaction model',
   // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
   用户菜单: 'User menu',
-  '压缩上下文时用来生成摘要的模型，选更快的模型可缩短等待。需要 {cli} CLI 0.1.49 及以上版本。':
-    'The model used to summarize context during compaction — a faster one shortens the wait. Requires {cli} CLI 0.1.49 or later.',
   '默认（与 Chief 相同）': 'Default (same as Chief)',
   '尚无章程。点击编辑，为总管添加常设指示。':
     'No charter yet. Click edit to give the Chief standing instructions.',
@@ -463,7 +482,6 @@ export const EN: Record<string, string> = {
   '搜索 Agent…': 'Search Agents…',
   '没有匹配的 Agent': 'No matching Agents',
   // #615 总管抽屉主模型闭环文案（模型行 aria + 覆盖 dialog 默认行/搜索/空态）。
-  总管主模型: 'Chief main model',
   // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
   '恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。':
@@ -485,9 +503,6 @@ export const EN: Record<string, string> = {
   // #822 的「展开/收起实时步骤」——同一手势两面同词。
   '本步：{n}': 'This step: {n}',
   '执行机器：{n}': 'Machine: {n}',
-  '默认（与绑定 Agent 相同）': 'Default (same as bound Agent)',
-  '搜索模型…': 'Search models…',
-  没有匹配的模型: 'No matching models',
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
   // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
   '选择审核 Agent': 'Choose review Agent',
@@ -894,8 +909,6 @@ export const EN: Record<string, string> = {
   总管主机: 'Chief host',
   总管回合进行中: 'Chief turn in progress',
   总管等待机器: 'Chief waiting for machine',
-  '总管回合默认在哪台机器上执行。选「自动」时由在线机器认领，并粘住持有会话的那台。':
-    'Which machine runs chief turns by default. With Auto, any online machine can claim a turn, sticking to the one that holds the session.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
@@ -952,9 +965,6 @@ export const EN: Record<string, string> = {
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
-  模型已回落到默认: 'Model fell back to default',
-  '“{stale}”已不可用，本次改用默认模型（与绑定 Agent 相同）发送。':
-    '“{stale}” is no longer available; sent with the default model (same as the bound agent) instead.',
   // —— #729 附件上传失败面（toast 家族同上；大小/类型拒是本地预检可自救，
   // 各给专名，其余归通用失败）——
   '附件超过 10MB 上限': 'Attachment exceeds the 10 MB limit',
@@ -968,12 +978,6 @@ export const EN: Record<string, string> = {
   来源: 'Source',
   总管编排会话: 'Chief orchestration session',
   '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
-  // #864 T3 重跑面的钉选出口（钉选机离线时：重跑沿用任务钉选 = 再失败一轮）。
-  '钉选的机器「{machine}」当前离线，重跑仍会等它。':
-    'Pinned machine "{machine}" is offline — a rerun would wait for it again.',
-  '（已移除）': '(removed)',
-  改为自动: 'Switch to automatic',
-  '改为自动失败，请重试。': 'Could not switch to automatic. Try again.',
   已交给总管编排: 'Handed to the chief',
   '已保存，交给总管编排': 'Saved — handed to the chief',
   '总管将直接规划，并按活的类型派发执行。':

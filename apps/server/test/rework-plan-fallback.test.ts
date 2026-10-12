@@ -3,9 +3,6 @@
 //    接管，不再 failed。票面实锤（卡 #25）：assignment {plan:null, build:{…}}
 //    在 review 收「请求修改」→ 重规划步无人可领 → todo failed 终态，恢复只能
 //    整卡重跑。
-//  B（缺陷二）：continue 意图的返工步 claim 载荷携带降级上下文 reworkContext
-//    （最新方案全文 + 会话内真实用户行）——daemon 续接失败回退新会话时注入
-//    （daemon 侧收尾见 apps/daemon/test/runner-rework-context.test.ts）。
 // 失败方式（先于实现固化，仓测试纪律）：
 //  A1. plan 槽空（build 槽在）+ review 收请求修改 → 重规划步由 build agent
 //      认领，不再 failed（回落生效）。
@@ -13,9 +10,6 @@
 //  A3. 首轮规划步（无 prompt）plan 槽空 → 仍按 #1104 B 失败收尾——回落只作用
 //      于带续轮指令的返工步，首跑语义是回归红线（chief 400 自纠回路不摘）。
 //  A4. plan 槽在位的返工步 → plan agent 认领（现状行为不变，卡 #24 形）。
-//  B1. continue 步的 claim 载荷含 reworkContext：planText = 最新版方案全文；
-//      feedbacks = 真实用户行（合成模板行与关卡宣告行滤除）。
-//  B2. 首轮步（session new）不携带 reworkContext（空手不增重）。
 
 import type { ClaimedStep } from '@pacman/shared';
 import { claimedStepSchema } from '@pacman/shared';
@@ -30,7 +24,14 @@ import {
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_PLAN = 'agent-rw-plan';
 const AGENT_BUILD = 'agent-rw-build';
@@ -81,6 +82,7 @@ async function setupWorld(): Promise<World> {
       .values({ id, teamId: s.team.id, displayName: id, modelId: 'stub-model' })
       .run();
   }
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const projectId = await postProject(s.app, 'rework-proj');
   return { s, tokenA: token, projectId };
 }
@@ -243,45 +245,5 @@ describe('#1204 A：返工回 plan 步的槽位回落（agentForStep）', () => 
     const claimed = await claim(w);
     expect(claimed?.step.kind).toBe('plan');
     expect(claimed?.agent?.id).toBe(AGENT_PLAN);
-  });
-});
-
-describe('#1204 B：返工降级上下文（claim 载荷 reworkContext）', () => {
-  test('B1：continue 返工步携带 reworkContext（方案全文 + 真实用户行；宣告/合成行滤除）', async () => {
-    const w = await setupWorld();
-    const rw = await worldInReview(w, {
-      plan: null,
-      build: { agentId: AGENT_BUILD },
-    });
-    await rejectInReview(rw);
-
-    const claimed = await claim(w);
-    expect(claimed?.step.kind).toBe('plan');
-    // continue 步（prior session 在位）→ 载荷带降级上下文。
-    expect(claimed?.session.action).toBe('continue');
-    // planText = 最新版方案全文。
-    expect(claimed?.reworkContext?.planText).toBe('# 方案 v1');
-    // feedbacks = 真实用户行；confirm 关卡宣告（「通过了确认」）与合成模板行
-    // （CONTINUE_PROMPTS）不进意见清单。
-    expect(claimed?.reworkContext?.feedbacks).toEqual([REJECT_BODY.feedback]);
-  });
-
-  test('B2：首轮步（session new）不携带 reworkContext', async () => {
-    const w = await setupWorld();
-    const todoRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
-      title: 'fresh probe',
-      spec: 'body',
-    });
-    const todoId = ((await todoRes.json()) as { id: string }).id;
-    await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
-      todoIds: [todoId],
-      assignment: { plan: { agentId: AGENT_PLAN }, build: { agentId: AGENT_BUILD } },
-      withPlan: true,
-    });
-
-    const claimed = await claim(w);
-    expect(claimed?.step.kind).toBe('plan');
-    expect(claimed?.session.action).toBe('new');
-    expect(claimed?.reworkContext).toBeUndefined();
   });
 });

@@ -20,7 +20,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-m4a-chief';
 
@@ -79,7 +79,9 @@ async function setupChiefWorld(opts?: {
     },
   });
   const { token } = (await enrollRes.json()) as { token: string };
-  // 绑定 Agent（带 modelId → 可派发；provider 面本环不断言）。
+  // 绑定 Agent（带 modelId → 可派发；provider 面本环不断言）。#1260：
+  // 归属机 = 认领机（chief 步只投绑定 Agent 的归属机）。
+  const machineId = machineIdByName(s, 'm4a-mbp');
   s.db
     .insert(agentTable)
     .values({
@@ -89,6 +91,7 @@ async function setupChiefWorld(opts?: {
       description: '负责调度',
       modelId: 'stub-model',
       provider: 'stub-gw',
+      machineId,
     })
     .run();
   // 项目（无 repo → chief 探索基座为裸目录，chiefWorkspaceProject 返回 null）。

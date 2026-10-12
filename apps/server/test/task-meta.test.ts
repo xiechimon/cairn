@@ -6,7 +6,7 @@ import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
 import { backfillFixedTags, seedFixedTags } from '../src/services/tags.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -99,6 +99,8 @@ describe('set_task_meta worker 窄工具（ADR 0002 D3：stepId 钉 todoId）', 
       .insert(agentTable)
       .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'meta', provider: 'p', modelId: 'm' })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: '', spec: '给登录页加图形验证码\n\n现在的情况：暴力破解无成本' },

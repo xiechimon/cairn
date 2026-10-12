@@ -1080,7 +1080,6 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     kind: r.kind,
     at: r.at ?? 0,
     tz: r.tz,
-    machineId: r.machineId,
     nextRunAt: r.nextRunAt ?? 0,
     createdBy: r.createdBy,
     todo: r.todo,
@@ -1096,6 +1095,7 @@ export function mapTeam(members: TeamMember[]): TeamContent {
       modelId?: string | null;
       description?: string | null;
       provider?: string | null;
+      machineId?: string | null;
     };
     return {
       id: m.actorId,
@@ -1105,6 +1105,7 @@ export function mapTeam(members: TeamMember[]): TeamContent {
       isDefault: false,
       role: a.description ?? null,
       provider: a.provider ?? null,
+      machineId: a.machineId ?? null,
     };
   });
   return { members: members.length, agents: cards };
@@ -1196,7 +1197,9 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   const options: ModelOption[] = [];
   const seen = new Set<string>();
   const push = (option: ModelOption) => {
-    const key = `${option.provider}/${option.modelId}`;
+    // #1259：同一模型 id 可来自多台机器的上报段——去重键带上归属机，
+    // 两台机器各配同名模型时两行都留（创建弹窗按归属机过滤消费）。
+    const key = `${option.provider}/${option.machineId ?? ''}/${option.modelId}`;
     if (seen.has(key)) return;
     seen.add(key);
     options.push(option);
@@ -1211,6 +1214,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
         providerLabel,
         modelId: m.id,
         modelName: m.name,
+        ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
       });
     }
   }
@@ -1548,12 +1552,8 @@ export function mapChief(
     bound,
     ...(bound && env.agentActor
       ? {
-          // #615: 行值 = 生效模型（覆盖槽优先，回退绑定 Agent 模型）；`· 默认`
-          // 徽标只在继承态（覆盖槽 null）挂——覆盖态裸模型名，dialog 的 check
-          // 位承担「显式选过」的语义。
-          modelSlot: `${env.chief.model?.modelId ?? env.agentActor.modelId ?? 'n/a'}${
-            env.chief.model == null ? ' · 默认' : ''
-          }`,
+          // #1260：行值 = 绑定 Agent 自身模型（chief 无覆盖槽）。
+          modelSlot: env.agentActor.modelId ?? 'n/a',
           // #444: FAB 头像位 = 绑定 Agent 全记录里的既有字段（封套已带，
           // 零新增请求）；id 供 team chart 组织图定位根节点（同一封套，
           // 同为零新增请求）。
@@ -1562,8 +1562,8 @@ export function mapChief(
             displayName: env.agentActor.displayName,
             avatarUrl: env.agentActor.avatarUrl,
           },
-          // #615 返工：运行时标记位 = 生效模型 provider（覆盖槽优先）。
-          modelProvider: env.chief.model?.provider ?? env.agentActor.provider,
+          // 运行时标记位 = 绑定 Agent 的 provider。
+          modelProvider: env.agentActor.provider,
         }
       : {}),
     threadTitle: active?.title ?? '新主题',

@@ -14,7 +14,7 @@
 // runs exactly one instance of this hook, so the listener stays a
 // singleton per route.
 
-import type { AskUserAnswer, ChiefCompactionModel, TranscriptRow } from '@pacman/shared';
+import type { AskUserAnswer, TranscriptRow } from '@pacman/shared';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
@@ -23,16 +23,15 @@ import {
   useChief,
   useChiefThreads,
   useMessages,
-  useModelSources,
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
-import { chiefTurnErrorOfContent, mapChief, toModelOptions } from '../api/mappers.js';
+import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
 import { toastError } from '../components/ui/toaster.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
-import type { ChiefContent, FixtureSet, ModelOption } from '../fixtures/records.js';
+import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useChiefToggleHotkey } from '../overlays/hotkeys.js';
 
@@ -57,13 +56,6 @@ export interface ChiefSurface {
    *  examples + `新主题` chip; the next send opens a new chief thread
    *  (threadId null, same wire as the hero-example click). */
   onNewThread?: () => void;
-  /** #615 主模型覆盖槽当前值（live = 封套真值；null = 继承绑定 Agent）。 */
-  modelValue: ChiefCompactionModel | null;
-  /** #615 主模型候选（live = toModelOptions 投影，非 pi runtime 段；未决 = 空清单）。 */
-  modelOptions?: ModelOption[];
-  /** #615 live only：模型 dialog 选定 = PATCH chief model 槽（invalidateAll
-   *  重取回显，S8 不持本地乐观态）。 */
-  onPickModel?: (value: ChiefCompactionModel | null) => void;
   /** #615 返工 live only：恢复钮「恢复到此处」= POST chief threads rewind
    *  （threadId 由 surface 持活动线程闭包携带）。 */
   onRewind?: (messageId: string) => void;
@@ -109,7 +101,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   // #615 主模型候选数据源（chief-settings 同配方：model-sources 非 pi 段，
   // spec 11 §A10；#770 起 providers 段已除）——查询 enabled=live，fixture
   // 面零请求不动。
-  const modelSourcesQ = useModelSources(teamId, live);
   const mutations = useApiMutations(teamId);
 
   const chief = fixture.chief;
@@ -228,19 +219,10 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     : 0;
   const chiefUnread = live ? liveUnread : (fixture.chiefUnread ?? 0);
 
-  // #615 主模型闭环三件：槽值（封套真值）/ 候选并集 / 选定即 PATCH。
   // #631 失败反馈（同步半）：PATCH / rewind / 发送失败 → toastError（共享
   // 原语住 components/ui/toaster.tsx：server 原因进 description 透传不翻译
   // ——server 数据同 user 内容律；#638 由本文件局部版提为全站单源）。
-  const modelValue = live ? (chiefQ.data?.chief.model ?? null) : null;
-  const modelOptions = live ? toModelOptions(modelSourcesQ.data?.sources ?? []) : undefined;
-  const onPickModel = live
-    ? (value: ChiefCompactionModel | null) =>
-        mutations.patchChief.mutate(
-          { model: value },
-          { onError: (e) => toastError(t('保存失败，请重试。'), e) },
-        )
-    : undefined;
+  // #1260：chief 无模型覆盖槽——模型读绑定 Agent 自身配置，本面不设写位。
   const onRewind = live
     ? (messageId: string) => {
         if (activeThread === null) return;
@@ -277,18 +259,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
         // toast 在此承担后 rethrow 交契约面。
         return mutations.chiefSend
           .mutateAsync({ threadId: activeThread?.id ?? null, content: text })
-          .then((result) => {
-            // #774 收单回落显式告知（用户裁决：静默不要）：server 在存量槽失效
-            // 时已同步愈合，响应带回原值 → 成功 toast 点名 stale 值；发送本身
-            // 成功，draft 照常清空（下行新主题切 0 位同）。
-            if (result.modelFallback != null) {
-              const { provider, modelId } = result.modelFallback;
-              toast.success(t('模型已回落到默认'), {
-                description: t('“{stale}”已不可用，本次改用默认模型（与绑定 Agent 相同）发送。', {
-                  stale: `${provider}/${modelId}`,
-                }),
-              });
-            }
+          .then(() => {
             // 新主题落线程首位（listChiefThreads 新在前）——切回 0 位。
             if (activeThread === null) setActiveThreadIdx(0);
           })
@@ -309,9 +280,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     onSend,
     onThread,
     onNewThread,
-    modelValue,
-    modelOptions,
-    onPickModel,
     onRewind,
     onAnswerQuestion,
     onCancelQuestion,

@@ -24,7 +24,14 @@ import { claimedStepSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, chief as chiefTable, step as stepTable } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-si-1';
 const CHIEF_AGENT_ID = 'agent-si-chief';
@@ -127,6 +134,7 @@ async function setupWorld(): Promise<World> {
         mcpServers: [],
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   }
   const projectId = await postProject(s.app, 'si-proj');
   return { s, token, projectId };

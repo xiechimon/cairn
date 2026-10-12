@@ -14,7 +14,7 @@
 // 本层不碰 i18n（api/mappers.ts toThinkingLevelDisplay 同律）：词典键单源在
 // 各调用面的 t()，默认行/未设槽文案一律作参数传入。
 
-import type { ChiefCompactionModel } from '@pacman/shared';
+import type { ModelRef } from '@pacman/shared';
 import { cn } from 'cn';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ModelOption } from '../fixtures/records.js';
@@ -85,10 +85,10 @@ export function providerEchoLabel(
  *  不上报；不同值先关面再上报（live 真值经 invalidateAll 重取回显，不做
  *  本地乐观态；fixture 面 onPick 缺省 = 选择即关）。 */
 export function createModelPicker(params: {
-  value: ChiefCompactionModel | null;
+  value: ModelRef | null;
   close: () => void;
-  onPick?: (value: ChiefCompactionModel | null) => void;
-}): (next: ChiefCompactionModel | null) => void {
+  onPick?: (value: ModelRef | null) => void;
+}): (next: ModelRef | null) => void {
   const { value, close, onPick } = params;
   return (next) => {
     close();
@@ -104,7 +104,7 @@ export interface ModelRowVm {
   label: string;
   providerLabel: string;
   selected: boolean;
-  value: ChiefCompactionModel;
+  value: ModelRef;
 }
 
 /** 行投影：候选清单 × 当前槽值 → 行视图形清单（顺序 = 候选序，不排序——
@@ -167,7 +167,7 @@ interface ModelPickRowProps {
   label: string;
   /** 行副题 = provider 显示名；默认行不传即不出。副题只投影 providerLabel
    *  ——原版捕获位 r3-gw 后那段 128k 是原版内置模型目录的上下文窗口，本地
-   *  BYOK 无此数据源，不编造（chief-model-popover 文件头既有裁决）。 */
+   *  BYOK 无此数据源，不编造。 */
   providerLabel?: string;
   onPick: () => void;
 }
@@ -245,7 +245,7 @@ export interface ModelPickListProps {
   listLabel: string;
   searchPlaceholder?: string;
   emptyLabel?: string;
-  onPick: (value: ChiefCompactionModel | null) => void;
+  onPick: (value: ModelRef | null) => void;
 }
 
 /** 行清单 + typeahead 搜索的单源壳（#756 续）：chief 两个 picker 面共用。

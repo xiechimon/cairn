@@ -22,7 +22,6 @@ const POLLUTED_BUILD: BuildRecord = {
   withPlan: false,
   prevPhase: null,
   triggerSource: 'user',
-  pinnedMachineId: null,
   planDocId: null,
   errorMessage: POLLUTED,
   prUrl: null,
@@ -48,7 +47,6 @@ const FAILED_WIRE_CARD: WireTodo = {
   sourceBuildId: null,
   sourceKind: null,
   sourceRef: null,
-  machineId: null,
 };
 
 describe('mapTranscript 失败行（#1262 兜底）', () => {

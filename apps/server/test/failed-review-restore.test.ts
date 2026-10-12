@@ -15,9 +15,9 @@
 //      物，责任在人）；手动改相面（PATCH phase）不收这条边。
 //   4. 重跑语义被破坏：failed→queued（r3 §3.7 新 conv/新 build）原路不动。
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { claimedStepSchema, conversationBranch } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -32,7 +32,7 @@ import {
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 const AGENT_ID = 'agent-702-1';
 const REVIEW_AGENT_ID = 'agent-702-reviewer';
@@ -132,6 +132,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       tools: ['合并分支', '推送分支'],
     })
     .run();
+
   s.db
     .insert(agentTable)
     .values({
@@ -146,6 +147,8 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     cred: key,
     body: { teamId: s.team.id, name: 'restore-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
   let projectId: string;
@@ -445,7 +448,7 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
 
     test('手动改相面不收这条边：PATCH phase=review（from failed）→ 409', async () => {
       try {
-        const buildId = await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
+        await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
         expect(w.todoRow().phase).toBe('failed');
         const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
           body: { phase: 'review' },

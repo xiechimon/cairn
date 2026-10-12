@@ -62,6 +62,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, githubPullState } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasRepoBinding, readBuildChanges } from './git.js';
@@ -106,7 +107,6 @@ export function toBuildRecord(row: BuildRow): BuildRecord {
     withPlan: row.withPlan,
     prevPhase: row.prevPhase ?? null,
     triggerSource: row.triggerSource,
-    pinnedMachineId: row.pinnedMachineId,
     planDocId: row.planDocId,
     errorMessage: row.errorMessage,
     prUrl: row.prUrl,
@@ -471,7 +471,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
           const projected = projector.project({
             id: r.id,
             createdAt: r.createdAt,
-            pinnedMachineId: buildRow.pinnedMachineId,
+            homeMachineId: agentForStep(deps.db, todoRow, r.kind, r.prompt)?.machineId ?? null,
             holdReason: r.holdReason,
             holdUntil: r.holdUntil,
           });
@@ -512,10 +512,6 @@ export function startBuilds(
     assignment: Assignment;
     withPlan: boolean;
     triggerSource?: TriggerSource; // 默认 user；schedule = 定时触发（services/scheduler.ts）；chief 面归 M4
-    /** 钉选机器（#682 优先级：调用方显式值 > todo.machineId > null 自动）。
-     * schedule.machineId 透传（null = 该 schedule 未钉 → 回落 todo 值）；
-     * chief run_builds 显式 machineId 覆盖；REST 人工启动不传 = todo 值。 */
-    pinnedMachineId?: string | null;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -537,9 +533,6 @@ export function startBuilds(
         withPlan: input.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource,
-        // #682 缺省回落 todo.machineId（任务级默认机器）：null（未钉/清回
-        // 自动）与 undefined（调用方无意见）都落到 todo 值；显式钉 > todo > 自动。
-        pinnedMachineId: input.pinnedMachineId ?? todoRecord.machineId ?? null,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -878,15 +871,13 @@ export async function applyBuildStepAction(
         restartPrompt,
         true,
       );
-      // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed（本
-      // 轮起点）、pin 回落 todo 值（#682 缺省链——失败轮的 pin 不继承，钉选
-      // 语义与新 build 路一致）。
+      // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed
+      // （本轮起点）。
       deps.db
         .update(build)
         .set({
           errorMessage: null,
           prevPhase: 'failed',
-          pinnedMachineId: todoRecord.machineId ?? null,
         })
         .where(eq(build.id, reworkTarget.id))
         .run();
@@ -912,7 +903,6 @@ export async function applyBuildStepAction(
         withPlan: row.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource: 'user',
-        pinnedMachineId: todoRecord.machineId,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -1322,8 +1312,8 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  * daemon 恢复领取后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
  * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
  * chief 步不在本面（chief.ts 扫尾）。
- * 释放语义：status → pending + machineId 清空（认领原子位复位，他机/同机可
- * 重领）；pinnedMachineId 保留（钉选过滤重算，钉选机才能接）；claimedAt/
+ * 释放语义：status → pending + machineId 清空（认领原子位复位，归属机回来
+ * 经 claim 循环重领——#1259 起机器可见性由 agent 归属机闸单源判定）；claimedAt/
  * lastHeartbeatAt 保留作死亡时刻审计（重领即覆写）；createdAt 不动（FIFO
  * 序）；todo 相位不动（building + pending 步 = 合法排队）；build.errorMessage
  * 不写（非失败）；会话流 step 事件（pending 态）+ 团队 wake（他机 75s 长轮询
@@ -1363,8 +1353,9 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
   }
 }
 
-/** 失联 claimed 步释放（#862 T1 跨机续跑的 server 半）：认领原子位复位，他机
- * 经 claimCandidates（含钉选过滤）重领。调用方已取 todo 行，透传免重查。 */
+/** 失联 claimed 步释放（#862 T1 跨机续跑的 server 半）：认领原子位复位，归属
+ * 机回来（或他面任何可见机）经 claimCandidates 重领。调用方已取 todo 行，
+ * 透传免重查。 */
 function releaseClaimedStep(
   deps: BuildDeps,
   row: typeof step.$inferSelect,

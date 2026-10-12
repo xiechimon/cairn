@@ -30,7 +30,14 @@ import {
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-unassigned-1';
 
@@ -83,6 +90,8 @@ async function setupWorld(): Promise<World> {
       modelId: 'stub-model',
     })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
   const projectId = await postProject(s.app, 'unassigned-proj');
   return { s, tokenA: token, projectId };
 }

@@ -30,6 +30,11 @@ export const PROJECT_INITIAL = 'r';
 export const USER_NAME = 'Xmon Dai';
 export const MACHINE_NAME = 'xmonsMac-3574.local';
 export const MACHINE_ID = 'TlZ2sSD4EJCxjNJqVhdo_';
+/** #1259 归属机级联的第二台 fixture 机（remote，双 runtime 开）：claude-code
+ *  模型段挂它——canon 本机保持 pi-only（machines-local 的亮度分态 canon
+ *  不动）。 */
+export const MACHINE_REMOTE_ID = 'Kd8fG2hJ4mN9pQ1rStUvWx3';
+export const MACHINE_REMOTE_NAME = 'mea-wsl';
 export const R7_BUILD_ID = '01a0c26e-23ea-734f-9847-cf9cdbce7802';
 export const R7_BUILD_BRANCH = conversationBranch(R7_BUILD_ID);
 /** Target commit of the probe's build branch (r7 31 分支与PR overlay). */
