@@ -167,6 +167,11 @@ const META_TIMEOUT_MS = 30_000;
  * ls-remote+fetch「~2 min typical, ~8 min worst on /done's path」r3 原文）。 */
 const NET_TIMEOUT_MS = 480_000;
 
+/** #1195 分支扫描预算：tip 时刻边距（提交时刻秒粒度截断 + 同源时钟微漂）
+ * 与 rev-list 调用上限（基座仓分支巨多时收尾不被扫描烧穿）。 */
+const BRANCH_SCAN_SKEW_MS = 2_000;
+const BRANCH_SCAN_MAX_REVS = 20;
+
 // —— 原语面（workspace.ts 组装 02 §5.5 契约行为）——————————————————————————
 
 export const gitPrim = {
@@ -447,6 +452,49 @@ export const gitPrim = {
     if (r.code !== 0) return 0;
     const n = Number.parseInt(r.stdout.trim(), 10);
     return Number.isNaN(n) ? 0 : n;
+  },
+
+  /** 步窗口内有新提交的本地分支短名集（#1195 产物并集面：agent 自建分支
+   * 交付后 HEAD 切回会话分支时，收尾按 HEAD 计数恒 0——本原语把「base 之
+   * 外、tip 落在窗口内」的分支捞回来）。for-each-ref 按 tip 提交时刻降序，
+   * 出窗即断（其后全更早）；rev-list 调用数有上限（基座仓分支巨多时不烧
+   * 收尾预算）。提交时刻是秒粒度、与步起点墙钟同源同机——留 2s 边距吸收
+   * 秒内截断。base 不可解析 = rev-list 恒非零退 = 空集（fail-open，探测
+   * 是收尾附加面不阻断）。归属裁决（邻座 conv 分支排除）在调用方。 */
+  async branchesWithNewCommits(
+    dir: string,
+    baseCommit: string,
+    sinceMs: number,
+  ): Promise<string[]> {
+    const r = await runGit(
+      [
+        'for-each-ref',
+        'refs/heads',
+        '--sort=-committerdate',
+        '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
+      ],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (r.code !== 0) return [];
+    const found: string[] = [];
+    let revCalls = 0;
+    for (const line of r.stdout.split('\n')) {
+      if (revCalls >= BRANCH_SCAN_MAX_REVS) break;
+      const [name, unix, sha] = line.split('\t');
+      if (name === undefined || unix === undefined || sha === undefined) continue;
+      const tipMs = Number.parseInt(unix, 10) * 1_000;
+      if (Number.isNaN(tipMs)) continue;
+      if (tipMs < sinceMs - BRANCH_SCAN_SKEW_MS) break; // 降序：其后全出窗
+      revCalls++;
+      const c = await runGit(['rev-list', '--count', `${baseCommit}..${sha}`], {
+        cwd: dir,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      if (c.code !== 0) continue;
+      const n = Number.parseInt(c.stdout.trim(), 10);
+      if (!Number.isNaN(n) && n > 0) found.push(name);
+    }
+    return found;
   },
 
   /** conv 分支相对 origin/<default> 的 unified diff 原文（#704 非 hosted 形态

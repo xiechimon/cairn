@@ -993,6 +993,24 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       "maxLength": 2000,
       "type": "string",
     },
+    "workBranchDrift": {
+      "additionalProperties": false,
+      "properties": {
+        "actual": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "expected": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "expected",
+        "actual",
+      ],
+      "type": "object",
+    },
   },
   "required": [
     "status",
