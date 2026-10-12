@@ -28,6 +28,7 @@ import {
   machineTranscriptRowBodySchema,
   machineUploadUrlsBodySchema,
   PLAN_FILE_NAME,
+  stripAnsiEscapes,
   transcriptUploadSchema,
 } from '@pacman/shared';
 import type { Context, Hono } from 'hono';
@@ -476,7 +477,13 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/machine/done/:stepId', async (c) => {
     const row = me(c);
     const body = parseWith(machineDoneBodySchema, await jsonBody(c), 'body');
-    await finishStep(deps, row.id, c.req.param('stepId'), body);
+    // #1262：wire 入口剥 ANSI——旧 daemon 方向也净（新 daemon 出口已剥，
+    // 此处幂等包裹无副作用）。
+    const sanitized: typeof body =
+      body.errorMessage !== undefined
+        ? { ...body, errorMessage: stripAnsiEscapes(body.errorMessage) }
+        : body;
+    await finishStep(deps, row.id, c.req.param('stepId'), sanitized);
     return c.json({ ok: true as const });
   });
 
@@ -495,7 +502,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         syncId: c.req.param('syncId'),
         machineId: row.id,
         status: body.status,
-        ...(body.errorMessage !== undefined ? { errorMessage: body.errorMessage } : {}),
+        ...(body.errorMessage !== undefined
+          ? { errorMessage: stripAnsiEscapes(body.errorMessage) } // #1262 同 done 入口
+          : {}),
       },
     );
     return c.json({ ok: true as const });

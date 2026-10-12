@@ -40,6 +40,7 @@ import {
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
+  stripAnsiEscapes,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
 } from '@pacman/shared';
 import { relativeTime } from '../board/rel-time.js';
@@ -783,7 +784,8 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   if (build?.errorMessage && todo.phase === 'failed') {
     items.push({
       kind: 'fail',
-      title: build.errorMessage,
+      // #1262：读侧兜底剥（旧脏数据不迁移，渲染纯文本不解释转义）。
+      title: stripAnsiEscapes(build.errorMessage),
       body: '请将其重新上线，或重新运行任务以改派其他机器。',
       links: ['查看原始错误', '排查指南'],
     });
@@ -940,7 +942,7 @@ export function mapRunHistory(
     const parts = [relativeTime(entry.createdAt, now)];
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
-    if (failed && b) parts.push(b.errorMessage ?? '');
+    if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? '')); // #1262 读侧兜底
     rows.push({
       label: `第 ${n} 次运行`,
       meta: parts.join(' · '),

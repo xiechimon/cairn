@@ -51,6 +51,7 @@ import {
   STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
+  stripAnsiEscapes,
   transcriptPromptRowId,
   transcriptResumeNoteRowId,
 } from '@pacman/shared';
@@ -1730,7 +1731,9 @@ export async function runStep(
     claimed.step.kind === 'review' ? extractReviewVerdict(transcript.messages()) : null;
   const doneBody: MachineDoneBody = {
     status,
-    ...(lastError !== null ? { errorMessage: lastError } : {}),
+    // #1262：出口剥 ANSI（lastError 原始值保留参与回落闸/超时文案判据，
+    // 仅出口净化——SGR/OSC8 随工具 stderr 混入的噪声不进 DB）。
+    ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
     sessionId: handle.sessionId,
     usage: [...usage],
     hasChanges,
@@ -1877,7 +1880,7 @@ async function failStep(deps: RunStepDeps, stepId: string, message: string): Pro
   deps.stopRequests?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
-    await deps.client.done(stepId, { status: 'failed', errorMessage: message });
+    await deps.client.done(stepId, { status: 'failed', errorMessage: stripAnsiEscapes(message) });
     deps.journal.remove(stepId);
   } catch (err) {
     // 离线：journal 保持 claimed/running（pending 面），recover 对账重报
