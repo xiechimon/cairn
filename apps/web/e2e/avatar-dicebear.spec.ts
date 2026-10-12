@@ -205,23 +205,24 @@ test('search agent rows + project task rows are seeded (Agent 列表 / 任务行
   await expect(page.locator('.prj-task-avatar img').first()).toHaveAttribute('src', USER_SRC);
 });
 
-test('conversation transcript: agent rows carry the assigned agent avatar, user rows the user avatar', async ({
+test('conversation transcript: agent rows carry the assigned agent avatar, user rows carry none (dsh anatomy)', async ({
   page,
 }) => {
   await stubDicebear(page);
   // scenario=36 = done 详情面:同一条 todo(执行 agent = r3-builder)的对话列。
   // 对话是用户点名的面:agent 消息行必须显示该 agent 的头像(与看板卡/团队页
-  // 同种子),用户消息行与侧栏用户 chip 同种子——不再落静态 Notionists 资产。
+  // 同种子)。2026-10-12 dsh 用户行解剖重钉（#1268）：用户行不再挂头像——
+  // 自己的话不需要自报身份（dsh UserStyleBubble 同律）；用户身份的展示面 =
+  // 侧栏 chip / 账户头（下一条用例同种子钉扎），会话列的用户侧只留气泡。
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36');
   await expect(page.locator('.chat-row--agent .chat-avatar img').first()).toHaveAttribute(
     'src',
     AGENT_SRC,
   );
+  // 用户行 = 贴右气泡行（无 chat-row--agent 标记）：零头像。
   await expect(
-    page
-      .locator('.chat-row:not(.chat-row--agent):not(.chat-row--chief) .chat-avatar img')
-      .first(),
-  ).toHaveAttribute('src', USER_SRC);
+    page.locator('div:has(> [data-testid="user-bubble"]) [data-testid="msg-avatar"]'),
+  ).toHaveCount(0);
 });
 
 test('account head shares the seeded user src (same identity as the sidebar chip)', async ({
