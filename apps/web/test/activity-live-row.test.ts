@@ -295,6 +295,85 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
   });
 });
 
+// —— 2026-10-13 dsh 回合过程折叠的 mapper 半 ————————————————————————
+// 失败方式（先固化；渲染半 = ProcessGroup 的落定收拢与滑行，live 探针在
+// 真栈驱动）：
+//   P1 连续 thinking+tools 段收成一组（墙钟 = 首末时间窗）
+//   P2 被答复行切开的两段各自成组（不跨内容合并）
+//   P3 在飞（running 步在位）→ 末组 live=true 铺开，早先组照折
+//   P4 无在跑步 → 全部 live=false（装载即折叠）
+//   P5 无过程行 → 零组（对照组零噪声）
+
+describe('mapTranscript 过程折叠（2026-10-13）', () => {
+  const thinkMsg = (id: string, at: number): import('../src/api/mappers.js').MessageRow =>
+    ({
+      id,
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: `想一想 ${id}` }],
+      createdAt: at,
+    }) as unknown as import('../src/api/mappers.js').MessageRow;
+  const toolMsg2 = (id: string, at: number): import('../src/api/mappers.js').MessageRow =>
+    ({
+      id,
+      role: 'assistant',
+      content: {
+        kind: 'toolcall',
+        call: { id, name: 'bash', arguments: { command: 'ls' }, result: 'ok', isError: false },
+      },
+      createdAt: at,
+    }) as unknown as import('../src/api/mappers.js').MessageRow;
+  const robotMsg = (id: string, at: number): import('../src/api/mappers.js').MessageRow =>
+    ({
+      id,
+      role: 'assistant',
+      content: [{ type: 'text', text: `答复 ${id}` }],
+      createdAt: at,
+    }) as unknown as import('../src/api/mappers.js').MessageRow;
+  const groups = (items: TranscriptItem[]) =>
+    items.filter((i): i is Extract<TranscriptItem, { kind: 'process' }> => i.kind === 'process');
+
+  test('P1: 连续 thinking+tools 收成一组，墙钟取首末时间窗', () => {
+    const items = render({
+      messages: [thinkMsg('t1', 1_000), toolMsg2('c1', 5_000), toolMsg2('c2', 9_000)],
+    });
+    expect(groups(items)).toHaveLength(1);
+    const g = groups(items)[0];
+    expect(g?.parts.map((p) => p.kind)).toEqual(['thinking', 'tools']);
+    expect(g?.seconds).toBe(8); // (9000-1000)/1000
+    expect(g?.live).toBe(false);
+    expect(g?.id).toBe('t1');
+  });
+
+  test('P2: 答复行切开的两段各自成组', () => {
+    const items = render({
+      messages: [thinkMsg('t1', 1_000), robotMsg('r1', 2_000), toolMsg2('c1', 5_000)],
+    });
+    expect(groups(items)).toHaveLength(2);
+  });
+
+  test('P3: 在飞回合的末组铺开（live=true），早先组照折', () => {
+    const running = step('claimed');
+    const items = render({
+      steps: [running],
+      messages: [toolMsg2('c1', 1_000), robotMsg('r1', 2_000), toolMsg2('c2', 5_000)],
+    });
+    const gs = groups(items);
+    expect(gs).toHaveLength(2);
+    expect(gs[0]?.live).toBe(false);
+    expect(gs[1]?.live).toBe(true);
+  });
+
+  test('P4: 无在跑步 → 全部折叠（装载即落定）', () => {
+    const items = render({ messages: [toolMsg2('c1', 1_000)] });
+    expect(groups(items)[0]?.live).toBe(false);
+  });
+
+  test('P5: 无过程行 → 零组', () => {
+    const items = render({ messages: [robotMsg('r1', 1_000)] });
+    expect(groups(items)).toHaveLength(0);
+  });
+});
+
 describe('mapChief 活动相位（#905 W7）', () => {
   // harness 同 chief-flight-expand.test.ts（#822）：封套最小形 + threads 走
   // opts；activeRun 在位（回合在飞）+ user 行 → 尾挂存在行。

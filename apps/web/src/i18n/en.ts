@@ -531,6 +531,9 @@ export const EN: Record<string, string> = {
   '最近信号：{n}s 前': 'Last signal {n}s ago',
   // 2026-10-13 发送黑盒拆除：折叠行标签后的静默走表（同一事实的压缩形）。
   '· 信号 {n}s 前': '· signal {n}s ago',
+  // 2026-10-13 dsh TurnProcessNodeView 对齐：落定回合过程折叠行的标签
+  // （n = 「完成 Ns」族译文，dsh 原文 "Worked for Xs"）。
+  '过程 · {n}': 'Process · {n}',
   // #918 skill facts: live-panel entries (read / denied) + the detail summary.
   '▶ skill: {n}': '▶ skill: {n}',
   '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',

@@ -693,11 +693,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 
   entries.sort((a, b) => a.at - b.at);
   const items: TranscriptItem[] = [...head];
+  // 每条目的时间窗（与 items 平行；head 段恒 0、不参与过程分组）：process
+  // 折叠组的墙钟真值 = 首条目起点 → 末条目终点（工具组终点含自身秒数合计）。
+  const itemTimes: { start: number; end: number }[] = head.map(() => ({ start: 0, end: 0 }));
   // 连续工具行折叠成 tools 组（r7 27 collapsed `完成 Ns ▸` + pills）。#469：
   // 每个 call 的 stdout/stderr（call.result）按 index 平行收进 outputs，渲染
   // 层在展开的组里给每个 pill 挂一块左对齐等宽输出——终端内容不再摊平进
   // .chat-note 居中灰通知。
-  let toolRun: { seconds: number; pills: string[]; outputs: (string | null)[] } | null = null;
+  let toolRun: {
+    seconds: number;
+    pills: string[];
+    outputs: (string | null)[];
+    firstId: string | null;
+    start: number;
+    end: number;
+  } | null = null;
   const flushTools = () => {
     if (toolRun !== null) {
       items.push({
@@ -706,6 +716,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         expanded: false,
         pills: toolRun.pills,
         outputs: toolRun.outputs,
+        ...(toolRun.firstId != null ? { id: toolRun.firstId } : {}),
+      });
+      itemTimes.push({
+        start: toolRun.start,
+        end: toolRun.end + toolRun.seconds * 1000,
       });
       toolRun = null;
     }
@@ -713,8 +728,18 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const e of entries) {
     if (e.item.kind === '__tool__') {
       const secs = durationSeconds(e.item.call);
-      toolRun = toolRun ?? { seconds: 0, pills: [], outputs: [] };
+      if (toolRun === null) {
+        toolRun = {
+          seconds: 0,
+          pills: [],
+          outputs: [],
+          firstId: e.item.call.id,
+          start: e.at,
+          end: e.at,
+        };
+      }
       toolRun.seconds += secs;
+      toolRun.end = e.at;
       toolRun.pills.push(pillOf(e.item.call));
       // #634: 纯 JSON 结果（host 工具回声同族管线）不挂输出板——展开组里那
       // 条灰板正是用户红圈一的不协调源；终端文本输出照旧（#469 律）。
@@ -724,6 +749,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     }
     flushTools();
     items.push(e.item);
+    itemTimes.push({ start: e.at, end: e.at });
   }
   flushTools();
 
@@ -747,9 +773,55 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({ kind: 'skills', read: readSkills, denied: skillDeniedNames });
   }
 
-  // live 尾部：进行中文本（打字面）+ streaming 行（r7 16 `准备工作区...` /
-  // 26 `处理中...`）。running 步存在才挂尾。
+  // 2026-10-13 dsh 回合过程折叠（TurnProcessNodeView 对齐）：落定回合里连续
+  // 的 thinking/tools 段收成 process 组——折叠态一行「过程 · 完成 Ns ›」，
+  // 展开见原行序；在飞回合的末组保持铺开（live=true），落定一刻渲染层收拢
+  // （160ms 滑行，motion.css .process-region）。墙钟 = 组内首末条目时间窗
+  // （itemTimes；#471 真起止差，非工具秒合计）。组边界 = 任何非过程条目
+  // （user/robot/note/plan/review/skills/elapsed 行）——跨阶段连段被方案卡
+  // 与答复行天然切开。锚 id = 组内首条目的源 id（无 id 组缺省，key 回落
+  // 渲染序）。
   const running = steps.find((s) => s.status === 'claimed' || s.status === 'pending');
+  {
+    const grouped: TranscriptItem[] = items.slice(0, head.length);
+    let runStart = -1;
+    const flushProcess = (endExclusive: number) => {
+      if (runStart < 0) return;
+      const parts = items.slice(runStart, endExclusive);
+      const t0 = itemTimes[runStart]?.start ?? 0;
+      const t1 = itemTimes[endExclusive - 1]?.end ?? t0;
+      const first = parts[0];
+      grouped.push({
+        kind: 'process',
+        seconds: Math.max(1, Math.round((t1 - t0) / 1000)),
+        parts,
+        live: false,
+        ...(first != null && 'id' in first && first.id != null ? { id: first.id } : {}),
+      });
+      runStart = -1;
+    };
+    for (let i = head.length; i < items.length; i++) {
+      const it = items[i];
+      if (it == null) continue;
+      if (it.kind === 'thinking' || it.kind === 'tools') {
+        if (runStart < 0) runStart = i;
+        continue;
+      }
+      flushProcess(i);
+      grouped.push(it);
+    }
+    flushProcess(items.length);
+    if (running != null && build != null) {
+      const last = grouped.at(-1);
+      if (last?.kind === 'process') grouped[grouped.length - 1] = { ...last, live: true };
+    }
+    items.length = 0;
+    items.push(...grouped);
+  }
+
+  // live 尾部：进行中文本（打字面）+ streaming 行（r7 16 `准备工作区...` /
+  // 26 `处理中...`）。running 步存在才挂尾（running 已于上方过程分组段
+  // 算出）。
   if (running && build) {
     if (liveText.trim() !== '') {
       items.push({

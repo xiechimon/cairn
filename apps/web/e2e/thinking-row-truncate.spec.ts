@@ -160,6 +160,18 @@ async function stubWorld(page: Page) {
   });
   await page.goto(`/app/todo/${CARD_ID}`);
   await expect(page.getByTestId('transcript-col')).toBeVisible();
+  // 2026-10-13（#1268 过程折叠）：落定回合的过程行收在折叠组里——本 spec
+  // 量的是 thinking 行本体，先把折叠组展开并等滑行播完（160ms），让被测行
+  // 处于可见态（两级披露 = 新交互律）。
+  const fold = page.getByTestId('process-fold');
+  if ((await fold.count()) > 0) {
+    await fold.first().click();
+    await expect(fold.first()).toHaveAttribute('aria-expanded', 'true');
+    await page
+      .locator('.process-region')
+      .first()
+      .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  }
 }
 
 /** 被测行：thinking 行 = 唯一带展开钮的 agent 行。 */
@@ -234,6 +246,7 @@ test('T4: 页面级零横向溢出；展开交互不被截断修法砸掉', asyn
   );
   expect(pageOverflow).toBeLessThanOrEqual(0);
   // 截断只动折叠态预览；点开仍见全文（pre 走 pre-wrap + break-words）。
+  // （2026-10-13：过程折叠组已在 stubWorld 展开——两级披露 = 新交互律。）
   await row.getByRole('button', { name: '展开思考' }).click();
   await expect(row.locator('pre')).toHaveText(LONG_THINKING);
 });

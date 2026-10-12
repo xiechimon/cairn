@@ -111,6 +111,31 @@ body[data-board-dragging] .todo-card:hover {
    已撤。卡面入场（.todo-card）保留：新卡上板是系统增项，不是读者自己的
    话音，两族语义不同。 */
 
+/* 过程折叠区收拢滑行（2026-10-13 dsh 落定折叠同族，TurnProcessNodeView /
+   data-chat-motion 的 160ms）：grid-template-rows 1fr→0fr，内部件恒挂载、
+   折叠只裁视觉（组内工具组/思考行的展开态不随折叠丢；0fr 要内层
+   min-height 0 + overflow hidden 才压得住）。 */
+.process-region {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--dur-fast) var(--ease-standard);
+}
+
+.process-region:not([data-open]) {
+  grid-template-rows: 0fr;
+}
+
+.process-region-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .process-region {
+    transition: none;
+  }
+}
+
 /* 跑动行标签的扫光（2026-10-12 dsh 对齐第三批）：dsh TextShimmer 的
    pacman 平铺版。注意 2026-10-12 实测坑：**扫光层不能携带文本**——aria-hidden
    的重复文案会把 textContent 翻倍，钉文案的断言全红（reject-chain 的

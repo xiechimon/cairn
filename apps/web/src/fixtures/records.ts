@@ -549,6 +549,20 @@ export type TranscriptItem =
        *  把「只有最新一行标签」的黑盒拆成可见过程。缺省 = 无历史不渲染。 */
       phases?: readonly StepActivity[];
     }
+  /** 2026-10-13 dsh 回合过程折叠（TurnProcessNodeView 对齐）：落定回合的
+   *  过程行（thinking / tools 连段）收成一组——折叠态一行「过程 · 完成 Ns ›」，
+   *  点开展见原行序。seconds = 组内首末条目的真实墙钟（末条目含工具组自身
+   *  秒数；#471：真起止时刻差，不是拍脑袋近似）。live = 本组是在飞回合的
+   *  尾巴：流式铺开不挂折叠行；落定一刻渲染层收拢滑行（160ms）。id = 组内
+   *  首条目的源 message id（React key 稳态锚）。live 面 mapTranscript 派生；
+   *  fixture 捕获形不产本条目。 */
+  | {
+      kind: 'process';
+      seconds: number;
+      parts: TranscriptItem[];
+      live: boolean;
+      id?: string;
+    }
   /** #918 技能事实汇总行（详情页的持久一份）：从落库 toolcall 行派生
    *  （分类单源 shared/skill-facts，与活行判定永不漂移），read = 读到的
    *  技能名（首见序），denied = 被挡下的（同名 denied 粘滞，两列互斥）。
@@ -579,6 +593,10 @@ export type TranscriptItem =
       expanded: boolean;
       pills: string[];
       outputs?: (string | null)[];
+      /** 2026-10-13：组内首个工具调用的源 message id——process 折叠组的
+       *  key 锚（本组自己被 process 组收编时供稳态锚定）。fixture 捕获形
+       *  缺省。 */
+      id?: string;
     }
   /** Bare elapsed row: `完成 Ns` action row (r7 36 merge round, r7 38
    *  legacy card). */

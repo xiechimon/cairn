@@ -9,7 +9,7 @@
 // from the r7 16/17/26/27/28/36/38 and r8 54–77 captures; CONTEXT.md canon
 // names the message flow `transcript`.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { activityLabel } from '../api/activity.js';
 import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
@@ -256,6 +256,75 @@ function UserActions({ copy, clock, t }: { copy: string; clock?: string; t: TFun
       >
         <Copy width={15} height={15} />
       </Button>
+    </div>
+  );
+}
+
+/** 2026-10-13 dsh 回合过程折叠（TurnProcessNodeView 源码实测值）：落定回合
+ *  的过程行（thinking/tools 连段，mapper 收成 process 组）折叠成单行
+ *  「过程 · 完成 Ns」——全宽行、0.5px 底缝（dsh root 的 border-b l2）、
+ *  tertiary 墨 hover 升 secondary、chevron 14px 展开转 180°/100ms、秒数走
+ *  tabular-nums。在飞回合（item.live）不挂折叠行、过程区铺开；落定一刻
+ *  （live→false）折叠行出现、过程区 160ms 收拢滑行（grid-rows 1fr→0fr，
+ *  motion.css .process-region）——dsh 的「header 出现与 body 关闭同一拍」。
+ *  部件保持挂载（折叠只裁视觉：组内工具组/思考行的展开态不随折叠丢）。 */
+function ProcessGroup({
+  item,
+  prev,
+  t,
+  agent,
+  liveStep,
+  onOpenPlan,
+}: {
+  item: Extract<TranscriptItem, { kind: 'process' }>;
+  prev: TranscriptItem | undefined;
+  t: TFunc;
+  agent: { displayName: string; avatarUrl: string | null } | null;
+  liveStep: LiveStep | null;
+  onOpenPlan?: () => void;
+}) {
+  // 落定收拢：live→false 翻转一刻闭合（滑行由 region 承担）。页面加载即落定
+  // 的组初始 open=false——装载不播动画。
+  const [open, setOpen] = useState(item.live);
+  useEffect(() => {
+    if (!item.live) setOpen(false);
+  }, [item.live]);
+  const parts = item.parts.map((part, j) => (
+    <Row
+      key={('id' in part && part.id) || j}
+      item={part}
+      prev={j === 0 ? prev : item.parts[j - 1]}
+      t={t}
+      agent={agent}
+      liveStep={liveStep}
+      onOpenPlan={onOpenPlan}
+    />
+  ));
+  return (
+    <div>
+      {!item.live && (
+        <button
+          type="button"
+          className="flex h-[33px] w-full cursor-pointer items-center border-0 border-b-[0.5px] border-(--border) bg-transparent pb-2 text-left text-[13px] leading-6 text-(--text-tertiary) transition-colors duration-100 hover:text-(--text-secondary)"
+          aria-expanded={open}
+          data-testid="process-fold"
+          onClick={() => setOpen((v) => !v)}
+        >
+          <span className="min-w-0 truncate tabular-nums">
+            {t('过程 · {n}', { n: formatElapsed(item.seconds, t) })}
+          </span>
+          <ChevronDown
+            width={14}
+            height={14}
+            className={`ml-1 flex-none transition-transform duration-100 ease-(--ease-standard)${
+              open ? ' rotate-180' : ''
+            }`}
+          />
+        </button>
+      )}
+      <div className="process-region" data-open={open || undefined}>
+        <div className="process-region-inner">{parts}</div>
+      </div>
     </div>
   );
 }
@@ -641,6 +710,17 @@ function Row({
       );
     case 'tools':
       return <ToolsRow item={item} t={t} />;
+    case 'process':
+      return (
+        <ProcessGroup
+          item={item}
+          prev={prev}
+          t={t}
+          agent={agent}
+          liveStep={liveStep}
+          onOpenPlan={onOpenPlan}
+        />
+      );
     case 'skills':
       // 2026-10-12 dsh ContextInjectionRow 形（用户点名「这种 context 的注入」
       // 排版）：居中灰通知 → 流内左列行——14px 图标 + 标题 + 2px 点隔 +
