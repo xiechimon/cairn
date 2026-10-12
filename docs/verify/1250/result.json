@@ -9,14 +9,14 @@
     "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0325-1250-1-7-seeding/.claude/verify-run/home/server/server.db"
   },
   "ids": {
-    "teamId": "UC7A178nxwiqEffmumvE8",
-    "projectId": "PEsOu9blrC8LdYeqwrDPg",
-    "TASK_V": "Ij7cMZkMXaFf2ezUD4MCI",
-    "TASK_F": "Q0witwIwjsvJ7PbLeVrp5",
-    "TASK_P": "zXEO5zG1yT_rwhZOAgAoa",
-    "buildV": "01a13024-f096-7fbf-b329-08509f088951",
-    "buildF": "01a13024-f9c9-77ec-a24d-aa030cf9362f",
-    "parentBuild": "01a13025-0074-750c-9521-67276eef29f2"
+    "teamId": "oSIZoRTNkYr-WjBby0aEU",
+    "projectId": "7vaSAijDW-vg2uYUP4fh-",
+    "TASK_V": "wD0J17qkcQePUPLwvRBnM",
+    "TASK_F": "0-eINuZEOhrhCO6g0twb0",
+    "TASK_P": "Sse60eWmwCedfmRmBCyVP",
+    "buildV": "01a13031-2fd9-7023-911c-373b546b9398",
+    "buildF": "01a13031-3afc-712c-837e-9facd66dcd98",
+    "parentBuild": "01a13031-4216-7583-be18-690a03c164d8"
   },
   "checks": [
     {
@@ -32,7 +32,7 @@
     {
       "name": "S3 铺底：project + 三 todo 落库",
       "ok": true,
-      "detail": "project=PEsOu9blrC8LdYeqwrDPg"
+      "detail": "project=7vaSAijDW-vg2uYUP4fh-"
     },
     {
       "name": "V0 claim 载荷 remoteTools 含 split_todo 定义（todoId + subtodos[].blockedBy 参数面）",
@@ -42,12 +42,12 @@
     {
       "name": "V1 relay run_builds 四槽指派 → build 行落库 + assignment 四槽持久（todo 表）",
       "ok": true,
-      "detail": "assignment={\"plan\":{\"agentId\":\"jaM_brgd1xJqcAXyHPdYZ\"},\"build\":{\"agentId\":\"ADqztp3rUr9GUxRi9nGcU\"},\"review\":{\"agentId\":\"o4CvGih2M_CEu1WBdsq9t\"},\"verify\":{\"agentId\":\"m4bc8yCQBJgyKPs_fzqJS\"}}"
+      "detail": "assignment={\"plan\":{\"agentId\":\"igJOnyYFIO14YHc7eE-Kx\"},\"build\":{\"agentId\":\"OFyRl7lIn60kl3o9GHlhd\"},\"review\":{\"agentId\":\"4LfWnQix4ZhAwChrC-QEv\"},\"verify\":{\"agentId\":\"celUTQEuhxH7AGdcUJ6p-\"}}"
     },
     {
       "name": "V2 build 步认领：claim 载荷 agent 块 = assignment.build 槽（implementer persona）",
       "ok": true,
-      "detail": "kind=build agent=ADqztp3rUr9GUxRi9nGcU"
+      "detail": "kind=build agent=OFyRl7lIn60kl3o9GHlhd"
     },
     {
       "name": "V3 build 成（非 PR 分支）→ verify 步入队（pending + 验证材料在 prompt；agent 解析在 claim 面 = V5）",
@@ -62,7 +62,7 @@
     {
       "name": "V5 verify 步认领：agent 块 = verify 槽（verifier persona）+ session=new + 材料含工作区纪律",
       "ok": true,
-      "detail": "agent=m4bc8yCQBJgyKPs_fzqJS session={\"action\":\"new\",\"sessionId\":null}"
+      "detail": "agent=celUTQEuhxH7AGdcUJ6p- session={\"action\":\"new\",\"sessionId\":null}"
     },
     {
       "name": "V6 verify done 带 verifyVerdict → VERIFY_VERDICT 消息行（passed=false 有效结论）+ phase 留 review",
@@ -87,7 +87,7 @@
     {
       "name": "F3 提交（无 agentId）→ 三条 review 步各挂 persona agent（prompt meta header 首行 JSON；步行 agentId 列恒 null——agentId 走 meta 载体）",
       "ok": true,
-      "detail": "meta=[\"o4CvGih2M_CEu1WBdsq9t\",\"RNLTgdkor8AGWIIeabqlu\",\"-gTHoN--qEWFFDlzKn08Y\"]"
+      "detail": "meta=[\"4LfWnQix4ZhAwChrC-QEv\",\"N9MGtxkWitpeqO2RICvwJ\",\"v1sN-iVteCip9fF5wz6or\"]"
     },
     {
       "name": "F4.1 review 步认领（code_reviewer）：材料含「本视角重点：五轴 review」",
@@ -112,7 +112,7 @@
     {
       "name": "P1 split_todo → 子卡两张（sourceTodo/blockedBy 依赖边）+ 父停 confirm（hasPlan + 方案文档）",
       "ok": true,
-      "detail": "parent=confirm blockedBy=[\"pmfN84PXwF5TBgkTblhZs\"]"
+      "detail": "parent=confirm blockedBy=[\"xYikLmhc3Dg58m2Skq-wQ\"]"
     },
     {
       "name": "P2 父方案文档（拆解方案：子卡清单 + 依赖 + agent 名）+ SPLIT_ANNOUNCEMENT 宣告行",

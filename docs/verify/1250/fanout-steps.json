@@ -1,7 +1,7 @@
 [
   {
-    "id": "MfwDhKPgbuk4uNPTrgCg6",
-    "buildId": "01a13024-f9c9-77ec-a24d-aa030cf9362f",
+    "id": "fheljq51BZjsilPeRjOrC",
+    "buildId": "01a13031-3afc-712c-837e-9facd66dcd98",
     "kind": "review",
     "machineId": null,
     "status": "pending",
@@ -9,14 +9,14 @@
     "checkpointCommit": null,
     "claimedAt": null,
     "lastHeartbeatAt": null,
-    "prompt": "{\"kind\":\"review\",\"agentId\":\"o4CvGih2M_CEu1WBdsq9t\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：五轴 review：正确性、边界、可读性、一致性、性能。",
-    "createdAt": 1791809092932,
+    "prompt": "{\"kind\":\"review\",\"agentId\":\"4LfWnQix4ZhAwChrC-QEv\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：五轴 review：正确性、边界、可读性、一致性、性能。",
+    "createdAt": 1791809896088,
     "freshSession": 0,
     "skillInjection": null
   },
   {
-    "id": "19t56Llyi9hZC-Am9x6PP",
-    "buildId": "01a13024-f9c9-77ec-a24d-aa030cf9362f",
+    "id": "0eULC-427c2sF4QRrKLNQ",
+    "buildId": "01a13031-3afc-712c-837e-9facd66dcd98",
     "kind": "review",
     "machineId": null,
     "status": "pending",
@@ -24,14 +24,14 @@
     "checkpointCommit": null,
     "claimedAt": null,
     "lastHeartbeatAt": null,
-    "prompt": "{\"kind\":\"review\",\"agentId\":\"RNLTgdkor8AGWIIeabqlu\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：OWASP 式安全审计：注入、越权、密钥泄漏、不安全依赖。",
-    "createdAt": 1791809092932,
+    "prompt": "{\"kind\":\"review\",\"agentId\":\"N9MGtxkWitpeqO2RICvwJ\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：OWASP 式安全审计：注入、越权、密钥泄漏、不安全依赖。",
+    "createdAt": 1791809896088,
     "freshSession": 0,
     "skillInjection": null
   },
   {
-    "id": "jne6D36TsI6Xb1iOAjvj3",
-    "buildId": "01a13024-f9c9-77ec-a24d-aa030cf9362f",
+    "id": "H6puwLpX65Wr3QdUChEqV",
+    "buildId": "01a13031-3afc-712c-837e-9facd66dcd98",
     "kind": "review",
     "machineId": null,
     "status": "pending",
@@ -39,8 +39,8 @@
     "checkpointCommit": null,
     "claimedAt": null,
     "lastHeartbeatAt": null,
-    "prompt": "{\"kind\":\"review\",\"agentId\":\"-gTHoN--qEWFFDlzKn08Y\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：测试覆盖缺口：哪条失败方式没有测试钉住（Prove-It）。",
-    "createdAt": 1791809092933,
+    "prompt": "{\"kind\":\"review\",\"agentId\":\"v1sN-iVteCip9fF5wz6or\",\"gate\":\"review\"}\n请审核以下方案与本轮变更。**只读**：不得修改文件、不得提交、不得推送；如有 blocking 风险请明确标注，suggestion / info 请按需给出。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 findings —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"conclusion\": \"<一句话结论：方案是否通过、关键风险概览>\",\n  \"findings\": [\n    {\n      \"id\": \"1\",\n      \"severity\": \"blocking | suggestion | info\",\n      \"summary\": \"<finding 标题>\",\n      \"description\": \"<finding 解释>\",\n      \"file\": \"<可选：受影响文件相对路径>\",\n      \"line\": 42,\n      \"suggestion\": \"<可选：修复建议>\"\n    }\n  ]\n}\n```\n注意：line 是数字行号（如 42），不要写成字符串；没有行号时省略该字段。\n\n## 待审核方案\n\n\n## 本轮变更\n变更面为空——本轮无改动。请如实说明这一点，不要臆造代码层面的结论。\n\n\n## 用户关注点\n本视角重点：测试覆盖缺口：哪条失败方式没有测试钉住（Prove-It）。",
+    "createdAt": 1791809896088,
     "freshSession": 0,
     "skillInjection": null
   }

@@ -13,6 +13,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
+import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
@@ -149,16 +150,14 @@ export function ReviewDialog({
             review 步——三份 verdict 并行落会话。勾选后 agent 列表与独立性
             提示退场（视角并行本身即独立复核）。 */}
         {fanoutAvailable === true && (
+          /* #908 债闸（D2 裸控件只减不增）：勾选态走 registry Checkbox 原语
+             （stop-confirm 同族），不养新裸 input。 */
+          /* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */
           <label
             className="flex cursor-pointer items-center gap-2.5 rounded-lg bg-(--secondary) px-3 py-2 text-sm text-(--foreground)"
             data-testid="review-fanout-toggle"
           >
-            <input
-              type="checkbox"
-              className="size-4 accent-(--spot)"
-              checked={fanout}
-              onChange={(event) => setFanout(event.target.checked)}
-            />
+            <Checkbox checked={fanout} onCheckedChange={setFanout} />
             <span className="flex min-w-0 flex-col">
               <span className="font-medium">{t('三视角并行审')}</span>
               <span className="text-xs leading-[1.5] text-(--text-secondary)">

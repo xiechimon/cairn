@@ -474,7 +474,9 @@ await page.locator('[role="dialog"][aria-label="AI 审核"]').waitFor({ state: '
 const fanoutRow = page.getByTestId('review-fanout-toggle');
 check('F2 浏览器：review 弹层出现「三视角并行审」行（persona 命中点亮）', (await fanoutRow.count()) === 1);
 await shot(page, '03-review-dialog-fanout.png');
-await fanoutRow.locator('input[type="checkbox"]').check();
+// registry Checkbox 原语藏了 native input（Base UI Root），勾选改点行——
+// label 包裹整行，点行即翻勾。
+await fanoutRow.click();
 await page
   .locator('[role="dialog"][aria-label="AI 审核"]')
   .getByRole('button', { name: '开始三视角审核' })

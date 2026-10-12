@@ -1,7 +1,7 @@
 {
   "step": {
-    "id": "PA0wJUVHpeRxi5UYJi5GL",
-    "buildId": "01a13024-f096-7fbf-b329-08509f088951",
+    "id": "XZukgAhmF-FmZfslIHsU8",
+    "buildId": "01a13031-2fd9-7023-911c-373b546b9398",
     "kind": "verify",
     "machineId": null,
     "status": "pending",
@@ -10,7 +10,7 @@
     "claimedAt": null,
     "lastHeartbeatAt": null,
     "prompt": "请验证以下任务的本轮交付。**验证步**：在会话分支的可写工作区上起真实栈跑 e2e / 关键路径，把证据（截图、API JSON、落库行、日志摘录）落进 docs/verify/1/，回贴 PR body，结尾按下方契约输出 verdict。工作区对验证产物可写：证据文件正常 git add / commit / push；除此之外不改动交付物本身。\n\n## 输出契约\n本步以单一 JSON 对象结尾输出 verdict —— 你的最后一条消息内容必须是下列\n形式的合法 JSON（可前置解释性段落，但最后一段必须且仅能是这段 JSON）：\n```json\n{\n  \"passed\": true,\n  \"conclusion\": \"<一句话：跑通了什么、对账结果>\",\n  \"evidence\": [\n    {\n      \"path\": \"docs/verify/1250/<证据文件>\",\n      \"note\": \"<可选：这份证据证明了什么>\"\n    }\n  ]\n}\n```\n注意：passed 如实报——验证发现缺陷时传 false 并在 conclusion 写明，这是有效结论不是本步失败；evidence.path 必须是仓内真实落盘的路径。\n\n## 待验证任务\n验证步探针\n\n用于 #1250 verify 步链实证：build 成 → 验证步入队 → verdict 落消息。\n\n## 本轮交付\n本任务无 GitHub PR（非 github 形态交付）——证据只落 docs/verify/ 并随会话分支提交，PR body 回贴段跳过。\n",
-    "createdAt": 1791809089710,
+    "createdAt": 1791809892349,
     "freshSession": 0,
     "skillInjection": null
   },
