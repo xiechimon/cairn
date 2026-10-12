@@ -46,6 +46,7 @@ import {
   AGENT_PERMISSION_COPY,
   AGENT_TOOL_COPY,
   AGENT_TOOL_SWITCHES,
+  type AgentMachineFitRow,
   type AgentRecord,
   MEMORY_EMPTY_COPY,
   MEMORY_QUOTA_PER_AGENT,
@@ -58,6 +59,7 @@ import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import {
   useAgent,
+  useAgentMachineFit,
   useAgentTasks,
   useApiMutations,
   useCapabilities,
@@ -106,6 +108,7 @@ import { toastError } from '../components/ui/toaster.js';
 import { isDeleted, markDeleted } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { ArrowUpDown, ChevronDown, ChevronRight, Search, SquarePen } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
@@ -138,6 +141,23 @@ const AGENT_ICON_EDIT_CLS = 'text-muted-foreground';
 const AGENT_TASK_ROW_CLS =
   'agent-task-row h-auto w-full justify-start gap-2 px-4 py-2.5 text-left font-normal';
 
+/** #1251 机器匹配行副文案：按成因优先级点名（离线 > runtime 闸 > 能力缺项
+ *  > 快照未上报 > MCP 对账缺口 > 可跑）——「缺能力 = 给修法，离线 = 等」的
+ *  分野在文案层保持（Multica reason 族语义对位）。判定本身在 server
+ *  （machine-fit 端点，claim/sweep 单源），这里只翻译成因。 */
+function machineFitHint(m: AgentMachineFitRow, t: TFunc): string {
+  if (!m.online) return t('离线');
+  if (!m.runtimeOk) return t('未开启该 Agent 所需的 runtime');
+  if (m.missing !== null && m.missing.length > 0) {
+    return t('缺 {missing}（在该机装齐即解锁）', { missing: m.missing.join('、') });
+  }
+  if (m.missing === null) return t('能力快照未上报（旧版 daemon）——按可跑放行');
+  if (m.mcpGaps !== null && m.mcpGaps.length > 0) {
+    return t('可跑；声明的 MCP 缺 {gaps}（执行时跳过）', { gaps: m.mcpGaps.join('、') });
+  }
+  return t('可跑');
+}
+
 type AgentTab = 'overview' | 'memory' | 'permissions';
 
 const TAB_LABELS: { id: AgentTab; label: string }[] = [
@@ -164,6 +184,9 @@ export function AgentDetailPage() {
 
   const agentQ = useAgent(teamId, agentId, live);
   const agentTasksQ = useAgentTasks(teamId, agentId, live);
+  // #1251 机器匹配面（live 专属读面——fixture 场景无机器上报快照，缺席 =
+  // 该段不渲染，fixture 面零变化）。
+  const machineFitQ = useAgentMachineFit(teamId, agentId, live);
   const memoriesQ = useMemories(teamId, agentId, live);
   const modelSourcesQ = useModelSources(teamId, live);
   const capabilitiesQ = useCapabilities(live);
@@ -312,6 +335,21 @@ export function AgentDetailPage() {
   const toggleMcp = (id: string, on: boolean) => {
     const next = on ? [...agent.mcpServers, id] : agent.mcpServers.filter((v) => v !== id);
     patch({ mcpServers: next });
+  };
+  // #1251 能力要求（requiredCapabilities.mcpServers 维）：与上方 MCP 授权
+  // 勾选同形不同账——授权 = 执行时可用哪些（缺装跳过降级，不挡派发）；
+  // 要求 = 派发硬闸（机器快照缺项 = 不领该 Agent 的步）。两维皆空时清回
+  // null（显式「无要求」，与存量行同值——不留空对象壳）。
+  const toggleRequiredMcp = (id: string, on: boolean) => {
+    const current = agent.requiredCapabilities ?? {};
+    const nextMcp = on
+      ? [...(current.mcpServers ?? []), id]
+      : (current.mcpServers ?? []).filter((v) => v !== id);
+    const hasModels = (current.models ?? []).length > 0;
+    patch({
+      requiredCapabilities:
+        nextMcp.length === 0 && !hasModels ? null : { ...current, mcpServers: nextMcp },
+    });
   };
   // #1169 授权技能：限制态（数组）下的逐技能勾选。两态互转入口 = 上方
   // 「不限制」开关（null ↔ []）；勾集只在限制态渲染（不限制态逐技能开关
@@ -798,6 +836,75 @@ export function AgentDetailPage() {
                       />
                     </ProfileRow>
                   ))}
+                </ProfileCard>
+              )}
+            </section>
+
+            <section className="agent-perm-group agent-machine-fit flex flex-col gap-2">
+              {/* #1251 机器匹配（ADR 0018 决策 4.6）：执行要求写面（能力闸的
+                  声明位）+「哪些机器可跑它」读面（判定单源在 server——claim/
+                  sweep 同一份 dispatch-eligibility 原语，本面只呈现）。读面
+                  live 专属：fixture 场景无机器上报快照，缺席 = 只渲染写面。 */}
+              <h3 className="m-0 text-sm font-medium text-foreground">{t('机器匹配')}</h3>
+              <p className={PROFILE_HINT_CLS}>
+                {t(
+                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。',
+                )}
+              </p>
+              {mcpOptions.length === 0 ? (
+                <ProfileCard>
+                  <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
+                    <p className="agent-perm-empty m-0 text-sm text-muted-foreground">
+                      {t('暂无 MCP 服务器。')}
+                    </p>
+                  </div>
+                </ProfileCard>
+              ) : (
+                <ProfileCard>
+                  {mcpOptions.map((server) => (
+                    <ProfileRow
+                      key={server.id}
+                      className="agent-required-mcp-row"
+                      label={server.name}
+                      hint={t('要求执行机已安装该 MCP 服务器')}
+                      hintClassName="agent-perm-hint"
+                    >
+                      <Switch
+                        className="agent-required-mcp-switch"
+                        aria-label={t('要求安装 {name}', { name: server.name })}
+                        checked={(agent.requiredCapabilities?.mcpServers ?? []).includes(server.id)}
+                        onCheckedChange={(checked) => toggleRequiredMcp(server.id, checked)}
+                      />
+                    </ProfileRow>
+                  ))}
+                </ProfileCard>
+              )}
+              {live && machineFitQ.data !== undefined && (
+                <ProfileCard>
+                  {machineFitQ.data.machines.length === 0 ? (
+                    <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
+                      <p className="m-0 text-sm text-muted-foreground">{t('暂无机器。')}</p>
+                    </div>
+                  ) : (
+                    machineFitQ.data.machines.map((m) => (
+                      <ProfileRow
+                        key={m.machineId}
+                        className="agent-fit-row"
+                        label={m.name}
+                        hint={machineFitHint(m, t)}
+                        hintClassName="agent-perm-hint"
+                      >
+                        <span
+                          className={cn(
+                            'text-xs',
+                            m.canRun ? 'text-muted-foreground' : 'text-destructive',
+                          )}
+                        >
+                          {m.canRun ? t('可跑') : t('不可跑')}
+                        </span>
+                      </ProfileRow>
+                    ))
+                  )}
                 </ProfileCard>
               )}
             </section>

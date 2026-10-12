@@ -45,6 +45,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
 import {
   agentForStep as agentForStepEligibility,
+  capabilityGatePasses,
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -198,6 +199,18 @@ function waitingOnOf(
     if (pendingSteps.some((s) => !runtimeGatePasses(pinned, agentProviderOfStep(deps, row, s)))) {
       return { on: 'machine', retryAt: null };
     }
+    // #1251：钉选机在线且 runtime 闸开，但能力快照缺 Agent 要求项——机器回来
+    // 也领不走（claim 面 capabilityGatePasses 同判据），同为「等机器」挂起态
+    // （板面 chip 粗粒度；缺项点名 + 修法文案在步队列 blocked 面，读侧单源
+    // dispatch-eligibility）。无 Agent 的步不进本判（恒过闸，同 runtime 律）。
+    if (
+      pendingSteps.some((s) => {
+        const agentRow = agentRowOfStep(deps, row, s);
+        return agentRow !== null && !capabilityGatePasses(pinned, agentRow);
+      })
+    ) {
+      return { on: 'machine', retryAt: null };
+    }
     return undefined; // 钉选机在线且闸开：正常排队（忙/将领）
   }
   const online = deps.db
@@ -219,8 +232,17 @@ function agentProviderOfStep(
   row: TodoRow,
   stepRow: typeof step.$inferSelect,
 ): string | null | undefined {
-  const agentRow = agentForStepEligibility(deps.db, row, stepRow.kind, stepRow.prompt);
-  return agentRow?.provider;
+  return agentRowOfStep(deps, row, stepRow)?.provider;
+}
+
+/** pending 步的 Agent 行（runtime + 能力两闸共用解析；单源 = dispatch
+ *  eligibility 的 agentForStep，无 Agent = null）。 */
+function agentRowOfStep(
+  deps: TodoDeps,
+  row: TodoRow,
+  stepRow: typeof step.$inferSelect,
+): ReturnType<typeof agentForStepEligibility> {
+  return agentForStepEligibility(deps.db, row, stepRow.kind, stepRow.prompt);
 }
 
 function getRow(deps: TodoDeps, id: string): TodoRow | undefined {

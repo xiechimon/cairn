@@ -9,6 +9,7 @@ import {
   type MachineAskBody,
   type MachineAskResponse,
   type MachineAttachmentResponse,
+  type MachineCapabilities,
   type MachineClaimBody,
   type MachineDoneBody,
   type MachineEnrollResponse,
@@ -83,9 +84,15 @@ export interface MachineApi {
     cliVersion?: string;
     apiKey: string;
     claudeCode?: ClaudeCodeReport;
+    /** 机器能力清单（#1251）：注册即上行，免等首个 presence 节拍。 */
+    capabilities?: MachineCapabilities;
   }): Promise<MachineEnrollResponse>;
   me(): Promise<MachineRecord>;
-  presence(body: { cliVersion?: string; claudeCode?: ClaudeCodeReport }): Promise<void>;
+  presence(body: {
+    cliVersion?: string;
+    claudeCode?: ClaudeCodeReport;
+    capabilities?: MachineCapabilities;
+  }): Promise<void>;
   recover(): Promise<MachineRecoverResponse>;
   /** claim 长轮询（server hold ~75s，r3 §1.5）；调用方给 signal 控制中断。
    * body = #1148 maxWorkers 自报（调用方传 effective cap）；缺省 = 空 body
@@ -236,6 +243,7 @@ export class MachineClient implements MachineApi {
     cliVersion?: string;
     apiKey: string;
     claudeCode?: ClaudeCodeReport;
+    capabilities?: MachineCapabilities;
   }): Promise<MachineEnrollResponse> {
     const { apiKey, ...rest } = body;
     return this.request<MachineEnrollResponse>('POST', '/api/machine/enroll', {
@@ -277,7 +285,11 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async presence(body: { cliVersion?: string; claudeCode?: ClaudeCodeReport }): Promise<void> {
+  async presence(body: {
+    cliVersion?: string;
+    claudeCode?: ClaudeCodeReport;
+    capabilities?: MachineCapabilities;
+  }): Promise<void> {
     await this.request('POST', '/api/machine/presence', {
       body,
       parse: (raw) => machineOkResponseSchema.parse(raw),

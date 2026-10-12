@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { skillFactSchema } from '../skill-facts.js';
 import { skillInjectionSchema } from '../skill-inject.js';
 import { epochMs, recordId } from './common.js';
+import { stepQueueBlockedSchema } from './machine-capabilities.js';
 
 /** 三类步（02 §4.2 中文语义名的 wire 投影 [推断]）+ `chief`（M4a [设计]：
  * Chief 回合 = 机器 step 为一手实测（r5 §3.1 daemon.log `claim step=…` →
@@ -112,6 +113,11 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           retryAt: epochMs,
         })
         .optional(),
+      /** pending 成因（#1251，加法契约 optional）：machine-offline = 等机器
+       *  上线（等待有用）；capability-missing = 无机器满足能力要求（装 X 即
+       *  解锁，missing 携缺项可读名）。缺席 = 正常排队（有可领机器）或老
+       *  server——呈现回落既有排队标签，零回归。 */
+      blocked: stepQueueBlockedSchema.optional(),
     })
     .optional(),
   skillInjection: skillInjectionSchema.nullable(),

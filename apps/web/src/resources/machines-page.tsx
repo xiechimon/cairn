@@ -386,6 +386,25 @@ export function MachinesPage() {
                   />
                 </span>
               )}
+              {/* #1251 能力清单读标注（daemon 上报的已装 MCP slug 数 + 本机
+                  技能数；null = 从未上报——「未上报」与「报了空集」是两态，
+                  前者闭嘴后者如实）。字段缺席（老 server / 存量 fixture）=
+                  整组退场，呈现零漂移（maxConcurrent 同律）。 */}
+              {machine.capabilities !== undefined && (
+                <span
+                  className="ml-5 flex-none text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
+                  data-machine-capabilities={
+                    machine.capabilities === null ? 'unreported' : 'reported'
+                  }
+                >
+                  {machine.capabilities === null
+                    ? t('能力清单未上报（旧版 daemon）')
+                    : t('MCP {n} · 本机技能 {m}', {
+                        n: machine.capabilities.mcpServers.length,
+                        m: machine.capabilities.skills.length,
+                      })}
+                </span>
+              )}
             </RowGrow>
           );
         })}

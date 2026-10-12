@@ -545,7 +545,18 @@ export const EN: Record<string, string> = {
   '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）':
     'Queued: waiting for {machine} ({running}/{cap} running, {ahead} ahead)',
   '排队中：等空闲机器（前面 {ahead} 个）': 'Queued: waiting for a free machine ({ahead} ahead)',
+  // #1251 visible pending reasons (queue blocked face): missing capability =
+  // the fix, offline = waiting.
+  '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
+    'Queued: no machine meets the capability requirements (missing {missing}) — installs unlock it on the next heartbeat ({ahead} ahead)',
+  '排队中：等 {machine} 上线（前面 {ahead} 个）':
+    'Queued: waiting for {machine} to come online ({ahead} ahead)',
+  '排队中：等机器上线（前面 {ahead} 个）':
+    'Queued: waiting for a machine to come online ({ahead} ahead)',
   '执行中 {n}/{cap}': 'Running {n}/{cap}',
+  // #1251 machines page capability annotation (daemon-reported inventory).
+  '能力清单未上报（旧版 daemon）': 'Capabilities not reported (old daemon)',
+  'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
   并发: 'Concurrency',
   并发上限: 'Concurrency limit',
   // #905 activity phases (live row labels) + the freshness disclosure line.
@@ -857,6 +868,22 @@ export const EN: Record<string, string> = {
   去添加密钥: 'Add a secret',
   // XMON-80/P2：权限 tab 保存失败的可见反馈。
   '保存失败，请重试。': 'Save failed. Try again.',
+  // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
+  机器匹配: 'Machine fit',
+  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。':
+    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); old daemons that never reported a snapshot are let through.',
+  '要求执行机已安装该 MCP 服务器': 'Require this MCP server installed on the executing machine',
+  '要求安装 {name}': 'Require {name} installed',
+  离线: 'Offline',
+  '未开启该 Agent 所需的 runtime': 'Required runtime not enabled for this agent',
+  '缺 {missing}（在该机装齐即解锁）': 'Missing {missing} (install on that machine to unlock)',
+  '能力快照未上报（旧版 daemon）——按可跑放行':
+    'Capability snapshot not reported (old daemon) — treated as runnable',
+  '可跑；声明的 MCP 缺 {gaps}（执行时跳过）':
+    'Runnable; declared MCP missing {gaps} (skipped at runtime)',
+  可跑: 'Runnable',
+  不可跑: 'Not runnable',
+  '暂无机器。': 'No machines yet.',
   // XMON-113：机器行 shell 开关的副文案（机器侧半边；{tool} 插值 = 上面那条
   // AGENT_TOOL_SHELL 的 en 值，两层开关共用同一词）。
   '已授权「{tool}」的 Agent 可在该机器上执行命令。':
