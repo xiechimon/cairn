@@ -103,6 +103,31 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
   const agentRow = buildAgentId
     ? db.select().from(agent).where(eq(agent.id, buildAgentId)).get()
     : undefined;
+  // #1261 等额度投影：latest build 的活动步 waiting_quota 时在位（板面卡态/
+  // 横幅数据源）。此处不 import services/quota-wait.ts（那边 apply/sweep 消费
+  // 本模块 getTodo——反向即环）；行内查询 + 投影与 toQuotaWait 同形，漂移由
+  // quota-wait.test W3 的读面断言钉住。
+  let quotaWait: TodoRecord['quotaWait'] = null;
+  if (row.latestBuildId !== null) {
+    const waiting = db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'waiting_quota')))
+      .all()
+      .at(-1);
+    const block = waiting?.quotaBlock ?? null;
+    if (block !== null) {
+      quotaWait = {
+        kind: block.kind,
+        providerId: block.providerId,
+        label: block.label,
+        retryAfterMs: block.retryAfterMs,
+        probeAt: block.probeAt,
+      };
+    }
+  }
+  // #1257 板面挂起态（等机器/等额度）——与 quotaWait 并存（1261 板面消费
+  // quotaWait，waitingOn 供后续板面挂起 chip 消费）。
   const waitingOn = waitingOnOf(deps, row);
   return {
     id: row.id,
@@ -133,6 +158,9 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     machineId: row.machineId,
     // #1257 板面挂起态（读侧派生；缺省不带键）。
     ...(waitingOn !== undefined ? { waitingOn } : {}),
+    // #1261 等额度投影（null 时也带键——web 面以 null 清态，SSE 全量文档
+    // 事件需要字段在位才能把挂起态翻回去）。
+    quotaWait,
   };
 }
 

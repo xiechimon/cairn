@@ -503,6 +503,20 @@ export type TranscriptUpload = z.infer<typeof transcriptUploadSchema>;
  * daemon 单条打爆 DB）。 */
 export const FINDINGS_ERROR_CHAR_LIMIT = 2_000;
 
+/** #1261 配额熔断结构化信号（quotaBlock 形态）：daemon 对 quota/capacity
+ * 分桶命中的步收尾携带。kind 两值 = 分类桶的前两档（quota = 额度空 /
+ * capacity = 限流——恢复语义分道：限流带 Retry-After 短窗，额度等充值）。
+ * providerId = 「哪一路 relay」（`<providerId>/<modelId>` 串的 provider 段，
+ * 板面显示面）。reason = 信号原文（截断 500 字符，诊断回查）。 */
+export const quotaBlockSchema = z.object({
+  kind: z.enum(['quota', 'capacity']),
+  providerId: z.string(),
+  label: z.string().optional(),
+  reason: z.string().max(500),
+  retryAfterMs: z.number().int().positive().optional(),
+});
+export type QuotaBlock = z.infer<typeof quotaBlockSchema>;
+
 /** POST /api/machine/done/{stepId}——步骤收尾 body [推断]（02 §5.4 端点名；
  * status 词 = 步级失败无自动重跑语义的最小三值，02 §4.2）。
  * M7 #330：审核步终态可携带 findings（reviewVerdict 形态，shared 单源）——
@@ -564,6 +578,13 @@ export const machineDoneBodySchema = z.object({
    *  缺位）。server 据此落「验证判定提取失败」兜底消息，不静默吞错。长度
    *  上限同 findingsError（schema 面第二道闸）。 */
   verifyVerdictError: z.string().max(FINDINGS_ERROR_CHAR_LIMIT).optional(),
+  /** #1261 配额熔断信号：daemon 识别 quota/capacity（分类单源 =
+   * shared/task-failure.ts）后随 done 携带——server 据此挂起「等额度」
+   * （step waiting_quota + 通知 + 探测续跑），而非走 failed 漏斗判死。
+   * status 仍为 'failed'（旧 server zod strip 掉本字段 = 普通失败收尾，
+   * 混版本零破坏；同 findingsError 的无害冗余律）。空流/非配额错误不携带
+   * （分类面不猜——不可见即污染可观测性）。 */
+  quotaBlock: quotaBlockSchema.optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;

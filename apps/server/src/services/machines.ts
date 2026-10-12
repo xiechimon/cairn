@@ -125,6 +125,8 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+// #1261 配额挂起面（quotaBlock → waiting_quota，不走 failed 漏斗）。
+import { applyQuotaWaitStep } from './quota-wait.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
 import { listProjectTagVocab } from './tags.js';
@@ -1803,10 +1805,20 @@ export async function finishStep(
   // stop_pending 卫生清理（全终态共通，M7 #308）：stop 与自然完成/失败的
   // 竞态残留随收尾即清（拉取-确认面另有定向步校验双保险，不复活）。
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
-  // #1257 额度挂起：done(failed) 且错误分类 quota → 步不判死（配额事件，
-  // 不是任务失败）——挂起等额度：退避到期重领即一次「额度恢复了吗」探测，
-  // 恢复后自动续跑，无需人工重跑。sessionId 续接面已在上方落位（重领走
-  // continue）。
+  // #1261 配额熔断分支：daemon 识别 quota/capacity 后随 done 携带 quotaBlock
+  // ——挂起等额度（waiting_quota + 通知 + 探测续跑），**不**走下方 failed 漏斗
+  // （todo 不落 failed）。早于 chief/success/stopped/failed 各分支：配额事件
+  // 与步形态无关（chief 步挂起 = 回合冻结，activeRun 保持；worker 步挂起 =
+  // todo building 保持）。新 daemon 携带结构化 quotaBlock 走本分支；无
+  // quotaBlock 的旧 daemon 落到下方 #1257 文本分类兜底分支（同挂起语义）。
+  if (outcome.status === 'failed' && outcome.quotaBlock !== undefined) {
+    applyQuotaWaitStep(deps, stepRow, outcome.quotaBlock);
+    return;
+  }
+  // #1257 额度挂起（文本兜底腿）：done(failed) 且错误分类 quota → 步不判死
+  // （配额事件，不是任务失败）——挂起等额度：退避到期重领即一次「额度恢复
+  // 了吗」探测，恢复后自动续跑，无需人工重跑。sessionId 续接面已在上方落位
+  // （重领走 continue）。
   if (outcome.status === 'failed' && classifyStepFailure(outcome.errorMessage ?? '') === 'quota') {
     holdStepForQuota(deps, stepRow, outcome);
     return;

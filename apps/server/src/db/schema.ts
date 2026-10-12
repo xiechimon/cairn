@@ -160,6 +160,23 @@ export const build = sqliteTable('build', {
 });
 
 // —— step（三类步队列 server 持有、机器 claim，02 §4.2/A6；M4a +chief 步）—————
+
+/** #1261 step.quotaBlock 列形态：daemon 上报的 quotaBlock（kind/providerId/
+ * label/reason/retryAfterMs）+ server 侧挂起史（firstSeenAt 首挂时刻、lastAt
+ * 本次挂起时刻、attempts 连续挂起次数）+ probeAt 下次探测时刻（到期 sweep
+ * 释放回 pending——「额度恢复自动续跑」的 server 半）。 */
+export interface QuotaWaitRow {
+  kind: 'quota' | 'capacity';
+  providerId: string;
+  label: string | null;
+  reason: string;
+  retryAfterMs: number | null;
+  firstSeenAt: number;
+  lastAt: number;
+  attempts: number;
+  probeAt: number;
+}
+
 export const step = sqliteTable('step', {
   id: text('id').primaryKey(),
   /** ≡ conversationId。worker 步 = build.id（cascade 随行）；chief 步 =
@@ -171,9 +188,15 @@ export const step = sqliteTable('step', {
   /** [内部] journal 状态（02 §5.4；M3a 展开：claimed = 机器领取未收尾；
    * stopped = 停止钮中断，M7 #308）。 */
   status: text('status')
-    .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped'>()
+    .$type<'pending' | 'claimed' | 'done' | 'failed' | 'stopped' | 'waiting_quota'>()
     .notNull()
     .default('pending'),
+  /** [内部] #1261 配额挂起块（status=waiting_quota 时在位）：kind/providerId/
+   * label/reason/retryAfterMs + 挂起史（firstSeenAt/lastAt/attempts）+ 探测时刻
+   * （probeAt，sweep 释放判据）。json 列不拆散——读面按步级一次性投影
+   * （quotaWait），列内字段集单源 = shared quotaBlockSchema + services/quota-wait.ts
+   * 的 QuotaWaitRow 形。null = 未挂起。 */
+  quotaBlock: json<QuotaWaitRow>('quotaBlock'),
   /** [内部] 引擎会话标识（done 回传；continue session 复用面——合并轮/重规划轮
    * 同 conv 续跑，02 §4.2/§5.7）。 */
   sessionId: text('sessionId'),
@@ -331,7 +354,9 @@ export const notification = sqliteTable('notification', {
   id: text('id').primaryKey(),
   teamId: text('teamId').notNull(),
   userId: text('userId').notNull(),
-  type: text('type').$type<'plan_ready' | 'build_review' | 'chief_message'>().notNull(),
+  type: text('type')
+    .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait'>()
+    .notNull(),
   entityId: text('entityId').notNull(),
   entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
     'entityRef',

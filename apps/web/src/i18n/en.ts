@@ -358,6 +358,19 @@ export const EN: Record<string, string> = {
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
   构建待审核: 'Build awaiting review',
+  // #1261 等额度族（桌面通知标题 + 卡芯片 + 横幅 + 详情行标签）。
+  等额度: 'Waiting for quota',
+  '等额度：{lane} {kind}，{probe} 自动探测续跑':
+    'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
+  '{lane} {kind}，{count} 个任务挂起等额度': '{lane} {kind}, {count} task(s) waiting for quota',
+  '额度恢复后自动续跑；{probe} 自动探测':
+    'Runs resume automatically once quota recovers; next probe at {probe}',
+  '{count} 个任务因额度/限流挂起': '{count} task(s) suspended on quota/rate limits',
+  '额度恢复后自动续跑，无需人工操作':
+    'Runs resume automatically once quota recovers — no action needed',
+  // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
+  额度空: 'out of quota',
+  限流: 'rate limited',
   请选择一个文件查看: 'Select a file to view',
   // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
@@ -463,8 +476,8 @@ export const EN: Record<string, string> = {
   '正在调用 {n}': 'Calling {n}',
   '等待 Agent 响应…': 'Waiting for the agent…',
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
+  // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
   等机器: 'Waiting for a machine',
-  等额度: 'Waiting for quota',
   '下次尝试 {time}': 'Next attempt at {time}',
   '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）':
     'Waiting for quota: model quota exhausted, suspended until it recovers (next attempt {time})',

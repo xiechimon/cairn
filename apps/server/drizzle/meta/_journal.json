@@ -267,6 +267,13 @@
       "when": 1791819779869,
       "tag": "0037_aspiring_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1791821412358,
+      "tag": "0038_quota_wait_step",
+      "breakpoints": true
     }
   ]
 }
