@@ -41,7 +41,9 @@ export function teamEventInvalidations(
     case 'notification':
       return [['notifications', teamId], ['chiefThreads', teamId], ['todos']];
     case 'machine_presence':
-      return [['machines', teamId]];
+      // #1257：todo 的挂起态（等机器）派生自机器 presence——机器上下线必须
+      // 连带失效 todos，否则板面挂起 chip 停在旧值直到下一次 todo 文档事件。
+      return [['machines', teamId], ['todos']];
     case 'branch_sync': {
       // M7 #319（08 册附录 B）：分支对话框「同步到机器」结果落账→ team
       // stream 推回 web，按 buildId 键失效结果卡查询（pending → running

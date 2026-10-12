@@ -54,23 +54,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, githubPullState } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
-import {
-  agentForStep,
-  machineRunningCount,
-  runtimeGatePasses,
-  stepRuntimeFor,
-} from './dispatch-eligibility.js';
-import {
-  PIN_OFFLINE_GRACE_MS,
-  PIN_ONLINE_WEDGE_GRACE_MS,
-  pinOfflineReason,
-  pinRuntimeBlockedReason,
-  pinWedgeReason,
-  stepActivityAt,
-  WORKER_PIN_OFFLINE_HINT,
-  WORKER_PIN_RUNTIME_HINT,
-  WORKER_PIN_WEDGE_HINT,
-} from './dispatch-timeouts.js';
+import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
@@ -468,6 +452,8 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
             id: r.id,
             createdAt: r.createdAt,
             pinnedMachineId: buildRow.pinnedMachineId,
+            holdReason: r.holdReason,
+            holdUntil: r.holdUntil,
           });
           return [r.id, projected ?? undefined];
         }),
@@ -1144,46 +1130,28 @@ export function failStepWithEvents(
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 
 /** worker 步（plan/build/merge/review）失联 sweep（scheduler tick 驱动）：
- * 失联 claimed 步**释放回 pending**供他机认领续跑（#862 T1 tracer）；pending
- * 步在「没有机器能接它」持续超时后按失败收尾（①/#706、④④b/#864+#881 三条）：
- * ① pending 无人认领且团队零在线机器（daemon 全灭/未注册）→ 失败收尾；
+ * 失联 claimed 步**释放回 pending**供他机认领续跑（#862 T1 tracer）；无人
+ * 认领的 pending 步挂起等机器（#1257：无人认领是 infra 事件，机器回来走
+ * 既有 claim 循环自动续跑，「等机器」可见态由 todo waitingOn 派生承担，
+ * 不进 failed）。判定只剩 claimed 面两支：
  * ② claimed 心跳停更超阈值且机器离线/失踪（daemon 步中途死亡）→ 释放；
  * ③ claimed 自领取后零心跳进展超阈值（B-C7 claim 移交竞态：server 标 claimed
  *    但机器侧零执行——claim 把 lastHeartbeatAt 置为 claimedAt，故「零进展」
- *    即 heartbeat 从未推进；机器在线也命中）→ 释放；
- * ④ #864 T3：pending 且**钉选的机器不在线**（被删 = 同离线）× 步最后活动已过
- *    PIN_OFFLINE_GRACE_MS → 失败收尾（不自动改派：pin 是确定性约束，静默换机
- *    会违背它；文案点名机器与出口）。判据先于 ①——两条同时成立时点名钉选机
- *    的那句更能指向动作。
- * ④b #881：pending 且钉选的机器**在线但 enabledRuntimes 闸挡住该步的
- *    runtime**（钉选 SQL 过滤令唯有该机可见 + claim 闸恒 false = 步无期
- *    pending，#864 登记的缝）× 同宽限 → 失败收尾，文案点名机器与 runtime
- *    （出口 = 开 runtime 或改钉，不自动改派）。判据单源 = claim 面（agentForStep
- *    / runtimeGatePasses 下沉 dispatch-eligibility，本 sweep 与 tryClaim 同一
- *    份事实，判定漂移 = sweep 误杀 claim 能领的步）。
- * ④c #1219：pending 且钉选机**在线、闸开、有闲位**但超宽限未领（旧串行
- *    daemon / claim 循环 wedge 的实测形态——DB 面看「有闲位却不动」）→ 失败
- *    收尾（点名机器，出口 = 检查该机 daemon 或改钉，不自动改派）。与 ④/④b
- *    合称「有界等待」：钉选在线的等待不再是无限期静默。
- * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；团队有在线机器且
- * 钉选机在线且闸开且（满载或宽限内）的 pending 步（合法排队，含 #682 钉选
- * 在线机器的等待语义——步等它认领，别机不抢；满载超宽限同样不动，忙是真
- * 满）；在线机器上曾有心跳后停更的 claimed 步（执行/
- * 推送通道部分存活的歧义态，等 presence 过期走 ②）。chief 步不在本面
- * （chief.ts 扫尾）。已知缝（另行登记，不属「有界等待」两缝）：Agent 在但
- * 无模型位的步（无 modelId = 无人可领，runtime 判据单源在此无从计算）与未
- * 钉选但全团无人开该 runtime 的步（无唯一责任人可点名）仍是无期 pending。
- * 无 Agent 的步已由 #1104 收口：claim 面当场失败收尾（machines.ts tryClaim），
- * 本 sweep 不重复判（机器全灭时 ① 的零在线兜底仍覆盖其可见性）。
+ *    即 heartbeat 从未推进；机器在线也命中 = 「已证明病了」的派发未生效形，
+ *    #1257 唯一保留的杀位）→ 释放。
+ * 不动：心跳新鲜的 claimed 步（心跳年龄是活判据，不是墙）；pending 步一律
+ * 不动（挂起等机器——含钉选机离线/闸挡/楔住的形态，机器回归、开 runtime、
+ * daemon 恢复领取后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
+ * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
+ * chief 步不在本面（chief.ts 扫尾）。
  * 释放语义：status → pending + machineId 清空（认领原子位复位，他机/同机可
  * 重领）；pinnedMachineId 保留（钉选过滤重算，钉选机才能接）；claimedAt/
  * lastHeartbeatAt 保留作死亡时刻审计（重领即覆写）；createdAt 不动（FIFO
- * 序 + pending 扫尾宽限语义不变）；todo 相位不动（building + pending 步 =
- * 合法排队）；build.errorMessage 不写（非失败）；会话流 step 事件（pending
- * 态）+ 团队 wake（他机 75s 长轮询不等满）。new-session 降级标记归 daemon
- * 侧（续接失败回退即插 transcript 注记）。
- * 幂等：只扫 pending/claimed，终态步天然跳过。已知缝（归 T2/T3）：释放后仍
- * 无在线机器 → 下一轮命中 ① 按失败收尾（释放不是无期等待）。 */
+ * 序）；todo 相位不动（building + pending 步 = 合法排队）；build.errorMessage
+ * 不写（非失败）；会话流 step 事件（pending 态）+ 团队 wake（他机 75s 长轮询
+ * 不等满）。new-session 降级标记归 daemon 侧（续接失败回退即插 transcript
+ * 注记）。
+ * 幂等：只扫 pending/claimed，终态步天然跳过。 */
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
   const candidates = deps.db
     .select()
@@ -1196,93 +1164,24 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     )
     .all();
   for (const row of candidates) {
+    if (row.status === 'pending') continue; // #1257：挂起等机器，pending 面无失败
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
     if (!buildRow) continue; // 孤儿步：无呈现面
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
     if (!todoRow) continue;
-    let reason: string | null = null;
-    if (row.status === 'pending') {
-      // ④ #864 T3：钉选机器离线超时。先于「团队零在线机器」判——同一条步上
-      // 两条判据都成立时，点名钉选机的文案更具体、出口更明确。判据 = 钉选机
-      // 不在线（行缺失 = 已移除，同离线语义）× 步最后活动已过宽限（锚在心跳/
-      // 领取而非入队，给 T1 释放后的机器回归留窗口）。
-      const pinnedId = buildRow.pinnedMachineId;
-      const pinnedRow =
-        pinnedId === null
-          ? undefined
-          : deps.db.select().from(machine).where(eq(machine.id, pinnedId)).get();
-      if (
-        pinnedId !== null &&
-        (pinnedRow === undefined || !pinnedRow.online) &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        reason = pinOfflineReason(pinnedRow?.name ?? null, WORKER_PIN_OFFLINE_HINT);
-      }
-      // ④b #881：钉选机在线但 runtime 闸挡（#864 登记缝的收口）。判据与 ④ 同
-      // 宽限同漏斗（同一套「有界等待」机制），agent 解析与闸判单源 = claim 面
-      // 的 dispatch-eligibility 原语；无 Agent 的步不进本判（#1104 起 claim 面
-      // 已按失败收尾，不留无期 pending）。
-      if (
-        reason === null &&
-        pinnedId !== null &&
-        pinnedRow !== undefined &&
-        pinnedRow.online &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        const agentRow = agentForStep(deps.db, todoRow, row.kind, row.prompt);
-        if (agentRow?.modelId != null && !runtimeGatePasses(pinnedRow, agentRow.provider)) {
-          reason = pinRuntimeBlockedReason(
-            pinnedRow.name,
-            stepRuntimeFor(agentRow.provider),
-            WORKER_PIN_RUNTIME_HINT,
-          );
-        }
-        // ④c #1219：钉选机在线且闸开（「合法排队」判定的尽头）——有闲位仍
-        // 超宽限不领 = 该机不在领取（旧串行 daemon 被长跑步顶住 / claim 循环
-        // wedge），无期静默 = 卡死 queued。可见失败收尾（点名机器与出口，
-        // 不自动改派，④/④b 同律）。判据单源：闲位 = machineRunningCount
-        // （#1108 非 chief claimed 数）< 行 maxConcurrent；满载 = 合法排队不动。
-        if (
-          reason === null &&
-          agentRow?.modelId != null &&
-          runtimeGatePasses(pinnedRow, agentRow.provider) &&
-          now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
-          machineRunningCount(deps.db, pinnedId) < pinnedRow.maxConcurrent
-        ) {
-          reason = pinWedgeReason(pinnedRow.name, WORKER_PIN_WEDGE_HINT);
-        }
-      }
-      if (reason === null) {
-        const online = deps.db
-          .select({ id: machine.id })
-          .from(machine)
-          .where(and(eq(machine.teamId, todoRow.teamId), eq(machine.online, true)))
-          .all();
-        if (online.length === 0 && now - row.createdAt > BUILD_ABANDONED_STEP_MS) {
-          reason = `本轮无人认领：团队当前没有在线机器（等待 ${Math.round(BUILD_ABANDONED_STEP_MS / 1000)} 秒超时）。请确认执行机 daemon 在线后重跑。`;
-        }
-      }
-    } else {
-      // claimed：claim 置位 heartbeat（machines claim 面），故 null/陈旧一律
-      // 可判——有效心跳取三级回落（heartbeat → 领取时刻 → 入队时刻）。
-      const effectiveBeat = stepActivityAt(row);
-      if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
-        const machineRow = row.machineId
-          ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
-          : undefined;
-        const progressed =
-          row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
-        if (machineRow === undefined || !machineRow.online) {
-          releaseClaimedStep(deps, row, todoRow);
-          continue;
-        } else if (!progressed) {
-          releaseClaimedStep(deps, row, todoRow);
-          continue;
-        }
+    // claimed：claim 置位 heartbeat（machines claim 面），故 null/陈旧一律
+    // 可判——有效心跳取三级回落（heartbeat → 领取时刻 → 入队时刻）。
+    const effectiveBeat = stepActivityAt(row);
+    if (now - effectiveBeat > BUILD_ABANDONED_STEP_MS) {
+      const machineRow = row.machineId
+        ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
+        : undefined;
+      const progressed =
+        row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
+      if (machineRow === undefined || !machineRow.online || !progressed) {
+        releaseClaimedStep(deps, row, todoRow);
       }
     }
-    if (reason === null) continue;
-    failStepWithEvents(deps, row, reason);
   }
 }
 
