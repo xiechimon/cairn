@@ -77,12 +77,20 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 /** #1108 排队行标签（transcript / chief 两面单源）：位次 + 等待对象 →
  *  label/vars（t() 键 + 插值；queue = server 排队投影真值）。形 =
- *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。 */
+ *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。
+ *  #1257：额度挂起中（queue.hold）的排队行呈现「等额度」而非「等空闲机器」
+ *  ——挂起 ≠ 排队，可见态钉住下次尝试时刻。 */
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
 } {
   const ahead = Math.max(0, queue.position - 1);
+  if (queue.hold != null) {
+    return {
+      label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
+      vars: { time: clockTime(queue.hold.retryAt) },
+    };
+  }
   return queue.waitingFor != null
     ? {
         label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
@@ -138,6 +146,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     // #640：总管建卡判定位 = sourceBuildId（chief 实例 id，r5 §3.2 溯源层
     // 「谁建的」）——看板卡「由总管创建」芯片消费。
     chiefCreated: w.sourceBuildId !== null,
+    // #1257 板面挂起态（server 读侧派生）：等机器 / 等额度——卡面挂起 chip
+    // 消费；缺席 = 未挂起（正常排队 / 在跑 / 终态）。
+    waitingOn: w.waitingOn ?? undefined,
   };
 }
 

@@ -39,7 +39,6 @@ import {
   sweepAbandonedBuildSteps,
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
-import { PIN_ONLINE_WEDGE_GRACE_MS } from '../src/services/dispatch-timeouts.js';
 import { claimStep } from '../src/services/machines.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -445,25 +444,24 @@ describe('#1219 钉选机在线不认领的宽限', () => {
     return { s, teamId, todoId, buildId, stepId, machineId, base };
   }
 
-  test('在线 + 闸开 + 有空闲并发位 + 超宽限：可见失败（点名机器与出口）', () => {
+  test('在线 + 闸开 + 有空闲并发位 + 超宽限：挂起等机器（#1257：不判死，daemon 恢复领取即续跑）', () => {
     const w = makeWedgeWorld({
-      ago: PIN_ONLINE_WEDGE_GRACE_MS + 60_000,
+      ago: 660_000,
       machineCap: 8,
       machineLoad: 0,
     });
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     const stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
-    expect(stepRow.status).toBe('failed');
+    expect(stepRow.status).toBe('pending');
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
-    expect(todoRow.phase).toBe('failed');
+    expect(todoRow.phase).toBe('queued');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
-    expect(buildRow.errorMessage).toContain('在线');
-    expect(buildRow.errorMessage).toContain('机器');
+    expect(buildRow.errorMessage).toBeNull();
   });
 
   test('控制组：钉选机满载（claimed 达 cap）→ 合法排队不失败', () => {
     const w = makeWedgeWorld({
-      ago: PIN_ONLINE_WEDGE_GRACE_MS + 60_000,
+      ago: 660_000,
       machineCap: 1,
       machineLoad: 1,
     });

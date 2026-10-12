@@ -40,6 +40,7 @@ import {
   CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
   classifySkillFact,
+  classifyStepFailure,
   composeTaskPromptWithInstruction,
   conversationBranch,
   FIXED_TAGS,
@@ -151,7 +152,19 @@ export interface RunStepOptions {
   /** 步级流时长上界覆盖（测试注入；缺省 = env PACMAN_STREAM_DURATION_CAP_MS
    * 或 STREAM_DURATION_CAP_DEFAULT_MS）。 */
   streamDurationCapMs?: number;
+  /** #1257 provider_network 末次重试前延迟覆盖（测试注入毫秒级；缺省 =
+   * PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS）。 */
+  providerNetworkFinalWaitMs?: number;
 }
+
+/** #1257 provider_network 流断重试上限（Multica providerNetworkMaxAttempts 同
+ * 值 3）：首跑 + 立即重试 + 末次延迟重试。会话续跑（continueSession 同一
+ * 会话），不重放整轮——断流是瞬态基础设施毛刺，不是任务失败。 */
+export const PROVIDER_NETWORK_MAX_ATTEMPTS = 3;
+
+/** #1257 末次重试前延迟（Multica providerNetworkFinalRetryWait 同值 5s）：短
+ * 冷却让瞬态故障（连接池抖动 / 网关重启）先自愈，再打最后一发。 */
+export const PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS = 5_000;
 
 /** auto_retry 有界生命周期预算（#708 失败方式 2）——单源与理据正本见 backend/pi-retry.ts
  *  （#926：与 pi 会话 retry.maxRetries 同源派生，不再各处硬编码）。runner 侧行为：连续零进展
@@ -827,7 +840,8 @@ export async function runStep(
 
   // continue 解析键：journal 快照（recover 面）优先，其次 claim 载荷携带的
   // server 侧 sessionId（02 §5.7 合并轮/续轮复用同 conv 会话）。
-  const continueId =
+  // let（#1257）：provider_network 流断重试把锚改到当前轮会话（续跑不断会话）。
+  let continueId =
     claimed.session.action === 'continue'
       ? (opts.resume?.sessionId ?? claimed.session.sessionId)
       : null;
@@ -996,6 +1010,10 @@ export async function runStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
+  // #1257 provider_network 流断重试计数（会话续跑；上限与末次延迟见常量）。
+  let networkRetries = 0;
+  const providerNetworkFinalWaitMs =
+    opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
   // 流超时护栏（02 §5.6 三值 + #699 语义修订）：三臂全部「事件到达即重置」
   // ——first = 首事件期限、idle = 事件间空闲、body = 流 body 预算（#654 先
   // 把重置粒度从步推进到轮，#699 推进到事件，对齐 pi 在树参考实现的
@@ -1431,6 +1449,37 @@ export async function runStep(
       clearCredentials(creds);
       await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
       return;
+    }
+    // —— #1257 provider_network 流断重试（Multica MUL-4910 同形）：终局错误
+    // 分类 network（upstream stream disconnected / connection reset 族）→
+    // 会话续跑重试（continueSession 同一会话，不重放整轮），总尝试 3 次
+    // （首跑 + 立即重试 + 末次延迟 finalWaitMs）；退避后仍断才按失败收尾。
+    // 判据取轮内原值（先于下方超时文案覆盖 lastError）；quota/capacity 桶不
+    // 进此闸（quota 的挂起语义在 server done 面）；停止钮在位不重试（用户
+    // 意图优先于续跑）。
+    {
+      const failureText = lastModelError ?? lastError;
+      const stopPending = deps.stopRequests?.get(stepId) !== undefined;
+      if (
+        failureText !== null &&
+        lastError !== null &&
+        !stopPending &&
+        classifyStepFailure(failureText) === 'network' &&
+        networkRetries < PROVIDER_NETWORK_MAX_ATTEMPTS - 1
+      ) {
+        networkRetries += 1;
+        if (networkRetries === PROVIDER_NETWORK_MAX_ATTEMPTS - 1) {
+          logger.step(
+            `provider network retry ${networkRetries}: waiting ${providerNetworkFinalWaitMs}ms before final attempt`,
+          );
+          await new Promise((r) => setTimeout(r, providerNetworkFinalWaitMs));
+        } else {
+          logger.step(`provider network retry ${networkRetries}: resuming session immediately`);
+        }
+        continueId = handle.sessionId;
+        deps.sessionHandles?.delete(stepId);
+        continue;
+      }
     }
     // —— #654 回落闸（判据取轮内原值，先于下方超时文案覆盖 lastError）：
     // 零进展 + 终局失败（超时收尸 / storm 掐断但底层模型错误在位 / 终局

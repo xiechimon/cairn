@@ -5,7 +5,7 @@
 // 三条消费路径共用本模块：
 // ① 机器面 POST /api/machine/ask/{stepId}（daemon 阻塞等待的主通道，hold 长轮询）；
 // ② web 答题面 POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/answer|cancel；
-// ③ 步终态收口（finishStep chief 分支 + failAbandonedChiefSteps）——pending 问题
+// ③ 步终态收口（finishStep chief 分支 + sweepAbandonedChiefSteps）——pending 问题
 //   随步终态翻 cancelled，等答的 hold 轮询随即返回（D4：挂住的回合有出口，
 //   不是无限占线）。
 // D3 纪律：本模块**永不**因超时把 pending 翻成任何终态——hold 到期只回

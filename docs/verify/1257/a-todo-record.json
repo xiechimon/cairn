@@ -1,0 +1,46 @@
+{
+  "id": "1bCsB8okanHH7SdjnQS-c",
+  "teamId": "BI_LR_Ad43pAgqUg3fAsW",
+  "projectId": "l-I45PZnCFJ7ftipjNymz",
+  "title": "1257A 等机器探针",
+  "spec": "挂起续跑探针。",
+  "phase": "queued",
+  "phaseAt": 1791818746663,
+  "seqNum": 1,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "UN07HvgIURXc7M-vSuOTN"
+    },
+    "build": {
+      "agentId": "UN07HvgIURXc7M-vSuOTN"
+    }
+  },
+  "agent": {
+    "id": "UN07HvgIURXc7M-vSuOTN",
+    "displayName": "probe-1257-a"
+  },
+  "latestBuildId": "01a130b8-4b25-7d4f-9fc9-10e3153642c1",
+  "lastRunAt": 1791818746661,
+  "hasChanges": false,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a130b8-4b25-7d4f-9fc9-10e3153642c1",
+      "createdAt": 1791818746661
+    }
+  ],
+  "sourceTodo": null,
+  "v": 2,
+  "createdBy": "XNmFoLLXyjTbLC0nyZfwt",
+  "ownerId": "XNmFoLLXyjTbLC0nyZfwt",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "machineId": null,
+  "waitingOn": {
+    "on": "machine",
+    "retryAt": null
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "i6vLZujmaA8d9bybkL3VV",
+  "teamId": "BI_LR_Ad43pAgqUg3fAsW",
+  "projectId": "dplqHPVojQwIRfLeKkb43",
+  "title": "1257B 等额度探针",
+  "spec": "挂起续跑探针。",
+  "phase": "planning",
+  "phaseAt": 1791818932079,
+  "seqNum": 2,
+  "orderIndex": 0,
+  "tagIds": [],
+  "assignment": {
+    "plan": {
+      "agentId": "Sap8z6zrR06PgK1LPjFC0"
+    },
+    "build": {
+      "agentId": "Sap8z6zrR06PgK1LPjFC0"
+    }
+  },
+  "agent": {
+    "id": "Sap8z6zrR06PgK1LPjFC0",
+    "displayName": "probe-1257-b"
+  },
+  "latestBuildId": "01a130bb-1f56-7c35-9747-f7598009080f",
+  "lastRunAt": 1791818932054,
+  "hasChanges": false,
+  "hasPlan": false,
+  "buildHistory": [
+    {
+      "buildId": "01a130bb-1f56-7c35-9747-f7598009080f",
+      "createdAt": 1791818932054
+    }
+  ],
+  "sourceTodo": null,
+  "v": 3,
+  "createdBy": "XNmFoLLXyjTbLC0nyZfwt",
+  "ownerId": "XNmFoLLXyjTbLC0nyZfwt",
+  "sourceBuildId": null,
+  "sourceKind": null,
+  "sourceRef": null,
+  "machineId": null,
+  "waitingOn": {
+    "on": "quota",
+    "retryAt": 1791818995438
+  }
+}
