@@ -1,11 +1,12 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// 创建 Agent 弹窗的模型槽两级选择（t-0024 诉求 2）：先选运行时
-// （一级 = provider 维，候选分组自 toModelOptions 的 provider 位），再选它名下
-// 的具体模型（二级按一级过滤）。改前是单个平铺下拉（`provider · 模型名` 混在
-// 一列），用户原话「全部混杂在一起，只有一个模型的方框」。
-// 原版两态保留（r2 §8.1 capture 20 + r3 §2）：无候选 = 告警行 + `配置服务商`
-// 外链；有候选 = 弹窗内两级选择，全程不跳页。
+// 创建 Agent 弹窗的三级选择（t-0024 两级 + #1259 归属机级）：先选运行时
+// （一级 = provider 维），再选归属机（二级 = 开了该 runtime 的团队机器），
+// 再选该机上报的具体模型（三级按机过滤，候选带 machineId——同名模型两台
+// 机器各报各的）。
+// 原版两态的承接：无机器 = 「还没有接入机器」告警行 + 机器页外链（创建不
+// 可能，归属机必填）；无 claude-code 候选 = 「尚未配置模型服务商」告警行退成
+// 信息性（pi 创建不受阻，不再顶掉表单）。
 // #770 起候选只剩 model-sources 非 pi 段（providers 段已除）：一级恒是
 // 「内置 (pi)」清空行 + runtime 源分组（当下即 `Claude Code` 一组）。
 //
@@ -35,6 +36,9 @@ const TEAM_NO_SOURCES = '/app/team?scenario=12';
  *  需要的几条读面，其余 GET 一律 500（skills-readonly.spec 的 stubBoot 同律；
  *  Playwright 路由匹配序 = 注册逆序，这里用单条路由内分派避免顺序陷阱）。 */
 const TEAM_ID = 'team-1';
+/** #1259 归属机：stub 机（双 runtime 开），cc 模型段的 machineId 指它。 */
+const STUB_MACHINE_ID = 'machine-cc-stub';
+const STUB_MACHINE_NAME = 'stub-mea';
 
 const CC_MODELS = [
   { id: 'claude-opus-4-5', name: 'claude-opus-4-5', slot: 'default' },
@@ -73,6 +77,24 @@ async function stubLive(
       // #770 起创建弹窗不再读 providers 面：恒空，候选只看 model-sources。
       return route.fulfill({ json: { presets: [], providers: [] } });
     }
+    if (path === `/api/teams/${TEAM_ID}/machines`) {
+      return route.fulfill({
+        json: [
+          {
+            id: STUB_MACHINE_ID,
+            teamId: TEAM_ID,
+            name: STUB_MACHINE_NAME,
+            online: true,
+            latestCliVersion: null,
+            kind: 'remote',
+            enabledRuntimes: ['pi', 'claude-code'],
+            shellEnabled: false,
+            maxConcurrent: 3,
+            runningSteps: 0,
+          },
+        ],
+      });
+    }
     if (path === `/api/teams/${TEAM_ID}/model-sources`) {
       const sources = opts.hasSources
         ? [
@@ -90,6 +112,7 @@ async function stubLive(
               runtime: 'claude-code',
               installed: true,
               hostname: 'test-host',
+              machineId: STUB_MACHINE_ID,
               models: opts.models ?? CC_MODELS,
             },
           ]
@@ -110,22 +133,45 @@ async function openDialog(page: Page, teamUrl: string) {
   return dialog;
 }
 
-test('无候选：报告警行并给「配置服务商」外链，两级选择器都不出', async ({ page }) => {
+test('无机器：报机器告警行并给「接入机器」外链，选择器都不出', async ({ page }) => {
   const dialog = await openDialog(page, TEAM_NO_SOURCES);
-  // #951/#910 重钉：.dlg-agent-warn → 告警行文案一级；.dlg-agent-configure
-  // → getByRole(link 配置服务商)（detail/overlays.css 清零，类名钩退役）。
-  await expect(dialog.getByText('尚未配置模型服务商')).toBeVisible();
-  await expect(dialog.getByRole('link', { name: '配置服务商' })).toBeVisible();
+  // #1259：归属机必填 → 无机器时创建不可能，机器告警行顶替整个表单。
+  await expect(dialog.getByText('还没有接入机器')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: '接入机器' })).toBeVisible();
   await expect(dialog.locator('.dlg-agent-model-select')).toHaveCount(0);
   await expect(dialog.locator('.dlg-agent-runtime-select')).toHaveCount(0);
+  await expect(dialog.locator('.dlg-agent-machine-select')).toHaveCount(0);
 });
 
-test('有候选：不出告警行，出两级选择器且模型级先禁用', async ({ page }) => {
+test('有机器无候选：服务商告警行退成信息性，运行时/归属机两槽照出（pi 创建不受阻）', async ({
+  page,
+}) => {
+  const dialog = await openDialog(page, '/app/team?scenario=team-no-sources');
+  await expect(dialog.locator('.dlg-agent-runtime-select')).toBeVisible();
+  await expect(dialog.locator('.dlg-agent-machine-select')).toBeVisible();
+  await expect(dialog.getByText('尚未配置模型服务商')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: '配置服务商' })).toBeVisible();
+  // pi 路径直通：选归属机即可创建，不需模型。
+  await dialog.getByLabel('名称').fill('pi-only agent');
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: 'mea-wsl' }).click();
+  await expect(dialog.getByRole('button', { name: '创建', exact: true })).toBeEnabled();
+});
+
+test('有候选：不出告警行，出三级选择器且模型级先禁用', async ({ page }) => {
   const dialog = await openDialog(page, TEAM_WITH_SOURCES);
   await expect(dialog.getByText('尚未配置模型服务商')).toHaveCount(0);
   await expect(dialog.locator('.dlg-agent-runtime-select')).toBeVisible();
-  // 未选运行时模型级不可点——两级退成一级就是「候选又混回一列」的退形。
+  await expect(dialog.locator('.dlg-agent-machine-select')).toBeVisible();
+  // 未选运行时模型级不可点——级联退形就是「候选又混回一列」。
   await expect(dialog.locator('.dlg-agent-model-select')).toBeDisabled();
+  // #1259：选了运行时但没选归属机，模型级仍禁用（候选按机过滤，无机无候选）。
+  await dialog.locator('.dlg-agent-runtime-select').click();
+  await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await expect(dialog.locator('.dlg-agent-model-select')).toBeDisabled();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row').first().click();
+  await expect(dialog.locator('.dlg-agent-model-select')).toBeEnabled();
 });
 
 test('一级列运行时与内置清空行，二级只列所选运行时的模型（pi 段不泄漏）', async ({
@@ -145,6 +191,8 @@ test('一级列运行时与内置清空行，二级只列所选运行时的模�
   );
   // 选 Claude Code 后模型菜单只有它的模型——pi 段的模型不得混进来。
   await runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   const modelMenu = page.locator('.dlg-agent-model-menu');
   await expect(modelMenu).toBeVisible();
@@ -158,6 +206,8 @@ test('模型行只出模型名：不带 provider 徽标、不编造上下文窗�
   const dialog = await openDialog(page, TEAM_WITH_SOURCES);
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: 'mea-wsl' }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   const menu = page.locator('.dlg-agent-model-menu');
   const row = menu.locator('.dlg-agent-model-row', { hasText: 'claude-sonnet-5' });
@@ -193,6 +243,8 @@ test('创建弹窗：两级菜单整块落在视口内（几何）', async ({ pa
   }
   await runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
 
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: 'mea-wsl' }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   const modelMenu = page.locator('.dlg-agent-model-menu');
   await expect(modelMenu).toBeVisible();
@@ -228,6 +280,8 @@ test('模型很多：选过运行时后菜单不越出视口，首行可点，40
   if (viewport === null) return;
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   const menu = page.locator('.dlg-agent-model-menu');
   await expect(menu).toBeVisible();
@@ -260,6 +314,8 @@ test('选齐运行时与模型后提交，POST body 带 provider 与 modelId', a
   await dialog.getByLabel('名称').fill('带模型的 agent');
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   await page.locator('.dlg-agent-model-row', { hasText: 'claude-sonnet-5' }).click();
   await dialog.getByRole('button', { name: '创建', exact: true }).click();
@@ -269,20 +325,32 @@ test('选齐运行时与模型后提交，POST body 带 provider 与 modelId', a
     displayName: '带模型的 agent',
     provider: 'claude-code',
     modelId: 'claude-sonnet-5',
+    machineId: STUB_MACHINE_ID,
   });
 });
 
-test('只选运行时提交：body 带 provider、modelId 为 null（半态不丢字段）', async ({ page }) => {
+test('只选运行时与归属机提交：body 带 provider、machineId、modelId 为 null（半态不丢字段）', async ({
+  page,
+}) => {
   const bodies: unknown[] = [];
   await stubLive(page, { hasSources: true, bodies });
   const dialog = await openDialog(page, '/app/team');
   await dialog.getByLabel('名称').fill('半态 agent');
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  // 归属机未选 = 创建钮保持禁用（#1259 必填闸）。
+  await expect(dialog.getByRole('button', { name: '创建', exact: true })).toBeDisabled();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.getByRole('button', { name: '创建', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '创建 agent' })).toBeHidden();
   expect(bodies).toHaveLength(1);
-  expect(bodies[0]).toMatchObject({ displayName: '半态 agent', provider: 'claude-code', modelId: null });
+  expect(bodies[0]).toMatchObject({
+    displayName: '半态 agent',
+    provider: 'claude-code',
+    modelId: null,
+    machineId: STUB_MACHINE_ID,
+  });
 });
 
 test('切换运行时清掉旧模型：body 不带跨 provider 的脏 modelId', async ({ page }) => {
@@ -292,15 +360,21 @@ test('切换运行时清掉旧模型：body 不带跨 provider 的脏 modelId', 
   await dialog.getByLabel('名称').fill('换运行时 agent');
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.locator('.dlg-agent-model-select').click();
   await page.locator('.dlg-agent-model-row', { hasText: 'claude-sonnet-5' }).click();
   // 切回内置 (pi)：Claude Code 名下的 claude-sonnet-5 必须被清掉（modelId 只在
-  // provider 内有意义，带过去就是脏值）。
+  // provider 内有意义，带过去就是脏值）；归属机随运行时切换一并清（#1259
+  // 级联），需重选才能提交。
   await dialog.locator('.dlg-agent-runtime-select').click();
   await page.locator('.dlg-agent-runtime-row', { hasText: '内置 (pi)' }).click();
   await expect(dialog.locator('.dlg-agent-model-select')).not.toContainText('claude-sonnet-5');
+  await expect(dialog.getByRole('button', { name: '创建', exact: true })).toBeDisabled();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
   await dialog.getByRole('button', { name: '创建', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '创建 agent' })).toBeHidden();
   expect(bodies).toHaveLength(1);
-  expect(bodies[0]).toMatchObject({ provider: null, modelId: null });
+  expect(bodies[0]).toMatchObject({ provider: null, modelId: null, machineId: STUB_MACHINE_ID });
 });

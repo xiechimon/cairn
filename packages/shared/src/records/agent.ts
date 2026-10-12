@@ -130,6 +130,10 @@ export const agentRecordSchema = z.object({
    * 双层各自 gate）。optional 形 = 加法契约（machine maxConcurrent 同律）：
    * 老 server 响应缺字段可解析（消费面回退不渲染）；server 恒发全块。 */
   maxConcurrentTasks: z.number().int().nullable().optional(),
+  /** 归属机（#1259）：agent 绑定的机器 id，其步只投给该机。null = 未设
+   * 归属机（存量回填漏网）——不可领步，UI 可补。optional 形 = 加法契约
+   * （maxConcurrentTasks 同律）：老 server 响应缺字段可解析。 */
+  machineId: recordId.nullable().optional(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
 
@@ -151,6 +155,10 @@ export const createAgentBodySchema = z.object({
   /** agent 级并发上限（#1138）：值域 1..50（Multica agent 层闸同区间，
    * r10 §5.4）；nullish——显式 null = 不限（与缺省同值）。 */
   maxConcurrentTasks: z.number().int().min(1).max(50).nullish(),
+  /** 归属机（#1259）：创建必填——机器归属单源在 agent 层（任务层钉选已
+   * 退役）。server 校验该机在本团队、启用了对应 runtime、且（claude-code
+   * 时）已配 modelId。 */
+  machineId: recordId,
 });
 export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
 

@@ -127,6 +127,8 @@ export function agentRecordOf(row: typeof agent.$inferSelect): AgentRecord {
     // #1138：agent 并发上限（null = 不限），恒随行（optional 形只留给老
     // server 响应的解析兼容，见 records/agent.ts 加法契约注释）。
     maxConcurrentTasks: row.maxConcurrentTasks,
+    // #1259 归属机（null = 未设，不可领步，UI 可补）。
+    machineId: row.machineId,
   };
 }
 

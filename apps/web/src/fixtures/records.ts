@@ -902,6 +902,9 @@ export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
  *  存量 custom providerId 只出现在旧值回显，不再是候选）。 */
 export interface ModelOption {
   provider: string;
+  /** #1259 归属机维：候选来自哪台机器的上报段（claude-code 段有；pi 段
+   *  缺席）。创建弹窗按归属机过滤候选。 */
+  machineId?: string;
   /** 显示用来源名（r5 §2 捕获行 `r3-gw · 128k` 徽标位；runtime 段 =
    *  品牌名 `Claude Code`，不译）。 */
   providerLabel: string;

@@ -144,6 +144,12 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // state — r7 baselines carry no banner, so the strip gets a named id
       // and rides smoke rows (04 §2: no-baseline rows self-compare)
       'notify-banner': { ...boardDefault, ui: { notificationBanner: true } },
+      // #1259 创建弹窗的服务商告警行（信息性，不顶掉表单）：机器在、
+      // providerSources 空——pi 创建照跑，claude-code 无候选才见告警。
+      'team-no-sources': {
+        ...resourcesDefault,
+        resources: { ...resourcesDefault.resources!, providerSources: [] },
+      },
       // #176 new-task dialog 项目选择器:命名场景(无 capture)——boardDefault
       // 面加 projectNames 双项目,e2e 钉选择器行为;无 fixture 行。
       'newtask-projects': boardProjectPicker,

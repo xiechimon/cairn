@@ -8,7 +8,7 @@ import type { Hono } from 'hono';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
-import { apiKey } from '../src/db/schema.js';
+import { apiKey, machine as machineTable } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId } from '../src/lib/ids.js';
@@ -242,4 +242,31 @@ async function openSse(app: Hono, path: string) {
       void reader.cancel().catch(() => {});
     },
   };
+}
+
+/** #1259 归属机供给：创建 agent 的 API 契约要求 machineId（归属机必填）。
+ *  直插 machine 行（默认双 runtime 全开 + 在线），返回机器 id。 */
+export function insertMachine(
+  s: TestServer,
+  opts: {
+    name?: string;
+    enabledRuntimes?: string[];
+    claudeCodeReport?: import('@pacman/shared').ClaudeCodeReport | null;
+  } = {},
+): string {
+  const id = opts.name
+    ? `machine-${opts.name}`
+    : `machine-${Math.random().toString(36).slice(2, 10)}`;
+  s.db
+    .insert(machineTable)
+    .values({
+      id,
+      teamId: s.team.id,
+      name: opts.name ?? 'test-machine',
+      online: true,
+      enabledRuntimes: opts.enabledRuntimes ?? ['pi', 'claude-code'],
+      claudeCodeReport: opts.claudeCodeReport ?? null,
+    })
+    .run();
+  return id;
 }

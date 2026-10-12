@@ -67,6 +67,9 @@ export const modelSourceSchema = z.object({
   /** 上报机器的 hostname（os.hostname()）——「已安装在 <hostname>」文案源。
    *  #707 起跟随执行机，不再是 server 主机。 */
   hostname: z.string(),
+  /** #1259 归属机维：该段来自哪台机器（machine id）——创建 agent 三级
+   *  级联按它过滤模型清单。pi 段缺席（server 侧目录，机器无关）。 */
+  machineId: z.string().optional(),
   models: z.array(modelSourceModelSchema),
   /** claude 二进制事实（#1050）。三态，别压平：
    *  - 对象 = 探到了（path + version）；

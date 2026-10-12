@@ -1074,7 +1074,9 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   const options: ModelOption[] = [];
   const seen = new Set<string>();
   const push = (option: ModelOption) => {
-    const key = `${option.provider}/${option.modelId}`;
+    // #1259：同一模型 id 可来自多台机器的上报段——去重键带上归属机，
+    // 两台机器各配同名模型时两行都留（创建弹窗按归属机过滤消费）。
+    const key = `${option.provider}/${option.machineId ?? ''}/${option.modelId}`;
     if (seen.has(key)) return;
     seen.add(key);
     options.push(option);
@@ -1089,6 +1091,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
         providerLabel,
         modelId: m.id,
         modelName: m.name,
+        ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
       });
     }
   }

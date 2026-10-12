@@ -27,12 +27,13 @@ import { Link, useLocation } from 'react-router';
 import {
   useApiMutations,
   useChief,
+  useMachines,
   useMembers,
   useModelSources,
   useTeams,
   useTodos,
 } from '../api/hooks.js';
-import { mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
+import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { Button, buttonVariants } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -116,6 +117,10 @@ export function TeamPage() {
   const modelOptions = live
     ? toModelOptions(modelSourcesQ.data?.sources ?? [])
     : toModelOptions(fixture.resources?.providerSources ?? []);
+  // #1259 归属机：创建弹窗的机器候选（live = GET machines；fixture 同
+  //  machines 页面）。
+  const machinesQ = useMachines(teamId, live);
+  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
   return (
     <SecondaryShell
       route="team"
@@ -240,6 +245,7 @@ export function TeamPage() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         modelOptions={modelOptions}
+        machines={machines}
         onCreate={
           live
             ? (input) =>

@@ -29,8 +29,11 @@ test('the 创建 Agent slot opens the dialog', async ({ page }) => {
   const dialog = await openDialog(page);
   await expect(dialog).toHaveAccessibleName('创建 agent');
   await expect(dialog.getByLabel('名称')).toBeVisible();
-  // #951/#910 重钉：.dlg-agent-warn → 告警行文案一级（overlays.css 清零）。
-  await expect(dialog.getByText('尚未配置模型服务商')).toBeVisible();
+  // #1259：scenario 12 无机器 → 机器告警行（归属机必填，创建不可能）；
+  // 原「尚未配置模型服务商」面让位——服务商告警只在有机器无候选时出
+  // （team-no-sources 场景钉，见配置服务商导航测试）。
+  await expect(dialog.getByText('还没有接入机器')).toBeVisible();
+  await expect(dialog.getByRole('link', { name: '接入机器' })).toBeVisible();
 });
 
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {
@@ -49,11 +52,21 @@ test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({
   await expect(page.getByRole('dialog', { name: '创建 agent' })).toBeHidden();
 });
 
-test('empty name keeps 创建 disabled; typing lifts it; fixture submit closes', async ({ page }) => {
-  const dialog = await openDialog(page);
+test('empty name keeps 创建 disabled; #1259 归属机未选同样禁用；选齐提交关闭', async ({
+  page,
+}) => {
+  // 名字闸 + 归属机闸的场景得有机器——scenario 06（resources canon 两机）。
+  await page.goto('/app/team?scenario=06');
+  await page.getByRole('button', { name: '创建 Agent' }).click();
+  const dialog = page.getByRole('dialog', { name: '创建 agent' });
+  await expect(dialog).toBeVisible();
   const create = dialog.getByRole('button', { name: '创建', exact: true });
   await expect(create).toBeDisabled();
   await dialog.getByLabel('名称').fill('r7 probe agent');
+  // 只有名字不够：归属机未选仍禁用。
+  await expect(create).toBeDisabled();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: 'xmonsMac-3574.local' }).click();
   await expect(create).toBeEnabled();
   await create.click();
   await expect(page.getByRole('dialog', { name: '创建 agent' })).toBeHidden();
@@ -73,13 +86,23 @@ test('chart layout drops the grid 创建 Agent slot for the org chart', async ({
 });
 
 test('配置服务商 SPA-navigates to the providers route, scenario rides along', async ({ page }) => {
-  const dialog = await openDialog(page);
+  // #1259：服务商告警行退成信息性（有机器无候选才出）——team-no-sources。
+  await page.goto('/app/team?scenario=team-no-sources');
+  await page.getByRole('button', { name: '创建 Agent' }).click();
+  const dialog = page.getByRole('dialog', { name: '创建 agent' });
+  await expect(dialog).toBeVisible();
   await page.evaluate(() => {
     (window as unknown as Record<string, unknown>).__spaMarker = 'alive';
   });
   await dialog.getByRole('link', { name: '配置服务商' }).click();
-  await expect(page).toHaveURL('/app/resources/providers?scenario=12');
+  await expect(page).toHaveURL('/app/resources/providers?scenario=team-no-sources');
   expect(await page.evaluate(() => (window as unknown as Record<string, unknown>).__spaMarker)).toBe(
     'alive',
   );
+});
+
+test('无机器时「接入机器」SPA-navigates to the machines route', async ({ page }) => {
+  const dialog = await openDialog(page);
+  await dialog.getByRole('link', { name: '接入机器' }).click();
+  await expect(page).toHaveURL('/app/resources/machines?scenario=12');
 });

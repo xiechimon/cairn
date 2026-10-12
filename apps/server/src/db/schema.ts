@@ -357,6 +357,11 @@ export const agent = sqliteTable('agent', {
    * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
    * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
   maxConcurrentTasks: integer('maxConcurrentTasks'),
+  /** 归属机（#1259）：agent 绑定的机器，该 agent 的步只投给这台机器（取代
+   * 任务层钉选）。创建必填（API 层强制）；列可空是因为迁移无法替存量行
+   * 编造归属——null = 未设归属机（回填漏网/他团队无机匹配），不可领步，
+   * UI 可补。换绑/整机迁移过模型校验（dispatch-eligibility 单源）。 */
+  machineId: text('machineId').references(() => machine.id),
 });
 
 // —— agent_memory（02 §4.4/r5 §6：配额 100 + 三级溯源；写路径归 M4）———————————

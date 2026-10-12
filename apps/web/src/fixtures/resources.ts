@@ -1,5 +1,13 @@
 import type { ModelSource } from '@pacman/shared';
-import { legacyDone, legacyReview, MACHINE_ID, MACHINE_NAME, r7 } from './core.js';
+import {
+  legacyDone,
+  legacyReview,
+  MACHINE_ID,
+  MACHINE_NAME,
+  MACHINE_REMOTE_ID,
+  MACHINE_REMOTE_NAME,
+  r7,
+} from './core.js';
 import type { FixtureSet, ResourcesContent } from './records.js';
 
 /** Resource surfaces (r7 06–10, issue #69): the r3 session left one skill,
@@ -28,7 +36,10 @@ const PROVIDER_SOURCE_PI: ModelSource = {
 const PROVIDER_SOURCE_CC: ModelSource = {
   runtime: 'claude-code',
   installed: true,
-  hostname: MACHINE_NAME,
+  // #1259：claude-code 段挂 remote canon 机（本机 canon 保持 pi-only，
+  // machines-local 的亮度分态不动）；hostname 与该机同名。
+  hostname: MACHINE_REMOTE_NAME,
+  machineId: MACHINE_REMOTE_ID,
   // #1050：canon fixture 带上两个可用性事实位（装了 + 已登录），三态的另两支
   // 由 e2e 按 scenario 覆写（页面断言需要「装了没配」与「没装」同时可见）。
   bin: { path: '/home/u/.local/bin/claude', version: '2.1.289' },
@@ -65,6 +76,16 @@ export const RESOURCES: ResourcesContent = {
       shellEnabled: false,
       // #1108：并发面 fixture canon = 历史默认 3 / 空载 0（与 migration 回填
       // DEFAULT 3 同态）。
+      maxConcurrent: 3,
+      runningSteps: 0,
+    },
+    {
+      id: MACHINE_REMOTE_ID,
+      kind: 'remote',
+      name: MACHINE_REMOTE_NAME,
+      online: true,
+      enabledRuntimes: ['pi', 'claude-code'],
+      shellEnabled: false,
       maxConcurrent: 3,
       runningSteps: 0,
     },

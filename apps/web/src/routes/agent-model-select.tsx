@@ -128,6 +128,9 @@ interface AgentModelSelectProps {
   provider: string | null;
   modelId: string | null;
   options: ModelOption[];
+  /** #1259 额外禁用位：claude-code 选了运行时但还没选归属机（候选按机
+   *  过滤，无机无可选）。 */
+  disabled?: boolean;
   /** 选定回调（modelId 或 null 清空）；provider 位由调用面自持。 */
   onPick?: (modelId: string | null) => void;
   /** 类名前缀——同 AgentRuntimeSelect。 */
@@ -141,6 +144,7 @@ export function AgentModelSelect({
   provider,
   modelId,
   options,
+  disabled = false,
   onPick,
   prefix,
   triggerClassName,
@@ -155,7 +159,7 @@ export function AgentModelSelect({
   return (
     <Select
       value={modelId}
-      disabled={provider === null}
+      disabled={disabled || provider === null}
       onValueChange={(next) => onPick?.(next as string | null)}
     >
       <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
@@ -166,7 +170,13 @@ export function AgentModelSelect({
           {unset}
         </SelectItem>
         {rows.map((row) => (
-          <SelectItem key={row.modelId} className={`${prefix}-row`} value={row.modelId}>
+          // #1259：两台机器可上报同名模型——key 带归属机防撞（value 仍是
+          // modelId，归属机由提交面的 machineId 字段承担）。
+          <SelectItem
+            key={`${row.machineId ?? ''}/${row.modelId}`}
+            className={`${prefix}-row`}
+            value={row.modelId}
+          >
             {row.modelName}
           </SelectItem>
         ))}

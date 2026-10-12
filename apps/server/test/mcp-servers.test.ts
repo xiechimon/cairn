@@ -28,7 +28,7 @@ import { describe, expect, test } from 'vitest';
 import { agentMemory, agent as agentTable } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
-import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
+import { bootServer, insertMachine, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -198,7 +198,7 @@ describe('agent 授权面：mcpServers[] = config 键名，未知键静默容忍
   test('PATCH 未知键 = 200 原样存（DB 存在性校验已随管理面删除）', async () => {
     const s = bootServer();
     const agentRes = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-      body: { displayName: 'worker-a' },
+      body: { displayName: 'worker-a', machineId: insertMachine(s) },
     });
     expect(agentRes.status).toBe(201);
     const { id: agentId } = (await agentRes.json()) as { id: string };
@@ -221,7 +221,7 @@ describe('agent 授权面：mcpServers[] = config 键名，未知键静默容忍
   test('POST agents 携带 mcpServers = 同律容忍', async () => {
     const s = bootServer();
     const res = await call(s.app, 'POST', `/api/teams/${s.team.id}/agents`, {
-      body: { displayName: 'w', mcpServers: ['ghost'] },
+      body: { displayName: 'w', machineId: insertMachine(s), mcpServers: ['ghost'] },
     });
     expect(res.status).toBe(201);
     s.dispose();

@@ -11,6 +11,7 @@
 
 import {
   type Assignment,
+  type ClaudeCodeReport,
   isBackendRuntimeId,
   parseReviewPromptMeta,
   type StepKind,
@@ -155,4 +156,33 @@ export function agentRunningCount(db: Db, agentId: string): number {
     .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief')))
     .all();
   return rows.filter((r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId).length;
+}
+
+/** #1259 归属机校验（创建/换绑/整机迁移共用单源）：归属机必须启用该 agent
+ *  的 runtime；claude-code agent 的 modelId 还须在该机上报的模型清单内
+ *  （modelId 空 = 跟随该机默认槽，恒过；pi 等 server 下发配置的 provider
+ *  免模型查）。返回 null = 通过，否则 = 人话原因（点名缺什么、怎么修）。
+ *  机器未上报过模型清单（老 daemon）= 拒——无法证明该机配了该模型。 */
+export function homeMachineRejectReason(
+  machineRow: {
+    name: string;
+    enabledRuntimes: string[];
+    claudeCodeReport: ClaudeCodeReport | null;
+  },
+  agentRow: { provider: string | null | undefined; modelId: string | null | undefined },
+): string | null {
+  const runtime = stepRuntimeFor(agentRow.provider);
+  if (!machineRow.enabledRuntimes.includes(runtime)) {
+    return `机器 ${machineRow.name} 未启用 ${runtime} runtime（在机器页开启后再试）。`;
+  }
+  if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
+    const report = machineRow.claudeCodeReport;
+    if (report == null) {
+      return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
+    }
+    if (!report.installed || !report.models.some((m) => m.id === agentRow.modelId)) {
+      return `机器 ${machineRow.name} 未配置模型 ${agentRow.modelId}（在该机 ~/.claude/settings.json 配上，或为 agent 换模型）。`;
+    }
+  }
+  return null;
 }
