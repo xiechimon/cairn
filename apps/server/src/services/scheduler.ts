@@ -26,7 +26,7 @@ import {
   sweepZombieQueuedTodos,
   toBuildRecord,
 } from './builds.js';
-import { failAbandonedChiefSteps, fireDueChiefWakes } from './chief.js';
+import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
 import { sweepStaleMachines } from './machines.js';
@@ -130,7 +130,7 @@ export function createScheduler(
     fireDueChiefWakes(deps, now);
     // #1136 机器行陈旧扫掠：先于步扫尾跑——同 tick 内把静默死机（无 FIN，SSE
     // abort 抓不住）的机器翻 offline，下方两族步扫尾的「机器在线」判据立即
-    // 生效（钉选宽限/释放同拍起算，不再多等一个 tick）。只翻 online 不动步。
+    // 生效（挂起面/释放同拍起算，不再多等一个 tick）。只翻 online 不动步。
     // 钟面取真实时钟而非本 tick 的 now：机器活性是 presence 数据的墙钟属性，
     // 而定时触发的既有驱动约定（schedules/m5 集成）会用「未来时刻」手动 tick
     // ——拿合成 now 判陈旧会把健康机器的 30s 新鲜列龄看成超龄误翻 offline
@@ -138,7 +138,7 @@ export function createScheduler(
     sweepStaleMachines(deps);
     // #684 失联超时兜底：daemon 死亡后 pending/claimed chief 步永挂零反馈，
     // tick 扫尾把失联回合按失败收进 #631 可见面（chief_turn_error 行 + toast）。
-    failAbandonedChiefSteps(deps, now);
+    sweepAbandonedChiefSteps(deps, now);
     // #706/#862 失联扫尾：失联 claimed 步释放回 pending 供他机认领、无人认领
     // 的 pending 步按失败收尾（step 事件 + build.errorMessage + todo → failed，
     // 与机器报失败同漏斗）。

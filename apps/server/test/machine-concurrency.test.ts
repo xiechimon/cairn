@@ -277,6 +277,8 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
       id: target.stepId,
       createdAt: Date.now(),
       homeMachineId: w.machineAId,
+      holdReason: null,
+      holdUntil: null,
     });
     expect(targetInfo?.position).toBe(2);
     expect(targetInfo?.waitingFor).toMatchObject({
@@ -289,6 +291,8 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
       id: lateB.stepId,
       createdAt: Date.now(),
       homeMachineId: machineBId,
+      holdReason: null,
+      holdUntil: null,
     });
     expect(bInfo?.position).toBe(1);
     expect(bInfo?.waitingFor).toMatchObject({ machineId: machineBId, running: 0, capacity: 3 });

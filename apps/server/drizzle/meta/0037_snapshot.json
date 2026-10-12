@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "fdd0b551-0c2f-4c46-868a-025448605eae",
+  "id": "e4450ad9-2a49-4d0c-b6e6-7b788138189b",
   "prevId": "7517cca2-be43-458e-a7b7-acbc17f0ae17",
   "tables": {
     "agent": {
@@ -78,13 +78,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "machineId": {
-          "name": "machineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "tools": {
           "name": "tools",
           "type": "text",
@@ -149,19 +142,6 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "agent_machineId_machine_id_fk": {
-          "name": "agent_machineId_machine_id_fk",
-          "tableFrom": "agent",
-          "tableTo": "machine",
-          "columnsFrom": [
-            "machineId"
           ],
           "columnsTo": [
             "id"
@@ -626,6 +606,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "pinnedMachineId": {
+          "name": "pinnedMachineId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "planDocId": {
           "name": "planDocId",
           "type": "text",
@@ -722,6 +709,34 @@
         },
         "agentId": {
           "name": "agentId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "thinkingLevel": {
+          "name": "thinkingLevel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "compactionModel": {
+          "name": "compactionModel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "machineId": {
+          "name": "machineId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -936,6 +951,13 @@
         "pendingSessionResumeAt": {
           "name": "pendingSessionResumeAt",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "pinnedMachineId": {
+          "name": "pinnedMachineId",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1614,6 +1636,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "machineId": {
+          "name": "machineId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "nextRunAt": {
           "name": "nextRunAt",
           "type": "integer",
@@ -1988,6 +2017,28 @@
           "notNull": false,
           "autoincrement": false
         },
+        "holdReason": {
+          "name": "holdReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "holdUntil": {
+          "name": "holdUntil",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "holdCount": {
+          "name": "holdCount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
         "createdAt": {
           "name": "createdAt",
           "type": "integer",
@@ -2313,6 +2364,13 @@
         },
         "sourceRef": {
           "name": "sourceRef",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "machineId": {
+          "name": "machineId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

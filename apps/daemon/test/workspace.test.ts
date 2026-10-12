@@ -300,6 +300,89 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
   }, 30_000);
 });
 
+// #1195 产物并集面的 git 原语（真 git）：agent 在步内自建分支提交后把 HEAD
+// 切回会话分支——收尾按 HEAD 计数恒 0，「构建零改动」把真交付判成没干活
+// （mea 事故形）。扫描原语 = 「base 之外、tip 落在步窗口内」的本地分支集；
+// 邻座 conv 分支的排除是 runner 侧策略，原语只报事实（分工钉扎）。
+describe('#1195 branchesWithNewCommits（步窗口分支扫描原语）', () => {
+  async function commitOn(
+    dir: string,
+    branch: string,
+    file: string,
+    content: string,
+    env: NodeJS.ProcessEnv = {},
+  ): Promise<void> {
+    await runGit(['checkout', '-B', branch], { cwd: dir });
+    writeFileSync(join(dir, file), content);
+    await runGit(['add', '-A'], { cwd: dir });
+    await runGit(['commit', '-m', `work on ${branch}`], {
+      cwd: dir,
+      env: { ...commitEnv(IDENTITY), ...env },
+    });
+  }
+
+  test('事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    const base = (await gitPrim.head(prepared.cwd)) as string;
+    const sinceMs = Date.now();
+    await commitOn(prepared.cwd, 'dogfood/tracer-1153', 'note.md', 'verification note\n');
+    await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
+    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, sinceMs);
+    expect(found).toContain('dogfood/tracer-1153');
+    expect(found).not.toContain(prepared.branch); // HEAD 切回后 conv 分支无 base 外提交
+  }, 30_000);
+
+  test('窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    await commitOn(prepared.cwd, 'user/old-feature', 'old.md', 'old work\n', {
+      GIT_COMMITTER_DATE: '2020-01-01T00:00:00+00:00',
+      GIT_AUTHOR_DATE: '2020-01-01T00:00:00+00:00',
+    });
+    await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
+    const base = (await gitPrim.head(prepared.cwd)) as string;
+    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, Date.now());
+    expect(found).not.toContain('user/old-feature');
+  }, 30_000);
+
+  test('base 之外无提交的分支不中（同 tip 空分支）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    const base = (await gitPrim.head(prepared.cwd)) as string;
+    await runGit(['branch', 'agent/empty', base], { cwd: prepared.cwd });
+    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, Date.now() - 60_000);
+    expect(found).not.toContain('agent/empty');
+  }, 30_000);
+
+  test('邻座 conv 分支照实上报（排除是 runner 侧策略，原语不做归属裁决）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    const base = (await gitPrim.head(prepared.cwd)) as string;
+    const sibling = conversationBranch(CONV_B);
+    await commitOn(prepared.cwd, sibling, 'sib.md', 'sibling work\n');
+    await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
+    const found = await gitPrim.branchesWithNewCommits(prepared.cwd, base, Date.now());
+    expect(found).toContain(sibling);
+  }, 30_000);
+
+  test('base 不可解析 → 空集（fail-open，不抛错不阻断收尾）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    const found = await gitPrim.branchesWithNewCommits(
+      prepared.cwd,
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      Date.now(),
+    );
+    expect(found).toEqual([]);
+  }, 30_000);
+
+  test('WorkspaceManager 透传同语义（WorktreeOps 缝消费面）', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    const base = (await gitPrim.head(prepared.cwd)) as string;
+    await commitOn(prepared.cwd, 'dogfood/passthrough', 'p.md', 'x\n');
+    await runGit(['checkout', prepared.branch], { cwd: prepared.cwd });
+    const found = await ws.branchesWithNewCommits(prepared.cwd, base, Date.now());
+    expect(found).toContain('dogfood/passthrough');
+    expect(await ws.currentBranch(prepared.cwd)).toBe(prepared.branch);
+  }, 30_000);
+});
+
 describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
   test('fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout）', async () => {
     // 钩子经种子提交进仓（真实路径：hook 在 worktree 树上）。

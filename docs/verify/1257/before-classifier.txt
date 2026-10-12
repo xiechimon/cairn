@@ -1,0 +1,12 @@
+       | ^
+     20|
+     21| describe('classifyStepFailure（#1257 三桶分类）', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  21:13:25
+   Duration  277ms (worker 97%, environment 3%)
+

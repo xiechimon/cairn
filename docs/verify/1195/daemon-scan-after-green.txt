@@ -1,0 +1,27 @@
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0335-1195/apps/daemon
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 pacman/conv-* 364ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 同项目第二 conv：基座 fetch 复用（不重 clone）；同 conv 再来 = Worktree reused 523ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > base 二择：origin/<convBranch> 已 fetch 时优先（异机续跑面） 449ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > commitAll + push：每步结束自动 push 本 conversation 工作分支；干净树 = committed false 506ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > #958 闸 5：带简报标记的文件被剔出提交，无标记的同名文件照常提交 393ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > #958 闸 4：分支历史里带标记时 briefMarkerInRef 点名，干净分支为空 421ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > checkpoint 恢复：reset --hard + clean -fd → Worktree restored（r3 §1.4/§3.5） 465ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > merge --no-edit 两态：Already up to date / 真合并（main 前进时） 540ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 防分叉护栏：origin/<branch> 领先且 worktree 不在该分支 → remote branch diverged 704ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 孤儿回收：龄超 TTL(7×24h) 的 conv worktree 清理三步；活步/新目录不动 684ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > projectLock：同项目并发 prepare 串行化（clone 竞态护栏） 462ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支 637ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认） 581ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > base 之外无提交的分支不中（同 tip 空分支） 388ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 邻座 conv 分支照实上报（排除是 runner 侧策略，原语不做归属裁决） 451ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > base 不可解析 → 空集（fail-open，不抛错不阻断收尾） 438ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > WorkspaceManager 透传同语义（WorktreeOps 缝消费面） 680ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout） 582ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 无钩子仓：hooks 缺省 []，零钩子日志行（行为与现状一致） 362ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > reused → .agents/resume 跑（setup 不重跑）；失败/超时非致命，步继续 614ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > setup 失败 → prepare 抛错（步失败面）；worktree 回滚 → 重试重新走 fresh→setup 1754ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 陈旧重建（worktree 目录被手工删）→ 仍走 fresh → setup 重跑 1009ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env 453ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 钩子超时 → setup 面致命（步失败），resume 面非致命 806ms
+ Test Files  1 passed (1)
+      Tests  24 passed (24)

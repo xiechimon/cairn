@@ -78,7 +78,7 @@ function rootLaneFiles(list) {
   return list.split('\n').filter((p) => p.includes('/') === false && NAMES.has(p.toLowerCase()));
 }
 
-let violations = [];
+const violations = [];
 
 try {
   // Leg 1: tracked set of the tested tree.

@@ -43,6 +43,10 @@ import type { FetchLike } from '../lib/github.js';
 import { githubCreateIssue, githubUpdateIssueTitle } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { triggerChiefWakes } from './chief.js';
+import {
+  agentForStep as agentForStepEligibility,
+  runtimeGatePasses,
+} from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -99,6 +103,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
   const agentRow = buildAgentId
     ? db.select().from(agent).where(eq(agent.id, buildAgentId)).get()
     : undefined;
+  const waitingOn = waitingOnOf(deps, row);
   return {
     id: row.id,
     teamId: row.teamId,
@@ -125,7 +130,56 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceBuildId: row.sourceBuildId,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
+    // #1257 板面挂起态（读侧派生；缺省不带键）。
+    ...(waitingOn !== undefined ? { waitingOn } : {}),
   };
+}
+
+/** #1257 板面挂起态派生（等机器/等额度）：在飞 todo 的 latest build 存在
+ *  pending 步且（额度挂起中 | 归属机不在/闸挡/未设 | 团队零在线）时透出；
+ *  健康排队（机器在、能领，只是没轮到）与终态/未启动恒缺席——挂起 ≠ 排队
+ *  ≠ 失败。读侧派生不落列：机器 presence 变化不重写 todo 行，板面新鲜度走
+ *  web 侧 machine_presence → todos 失效重取（sse-team-events，#1257 补的
+ *  失效键）。 */
+function waitingOnOf(
+  deps: TodoDeps,
+  row: TodoRow,
+): { on: 'machine' | 'quota'; retryAt: number | null } | undefined {
+  if (!(IN_PROGRESS_PHASES as readonly string[]).includes(row.phase) || row.latestBuildId === null)
+    return undefined;
+  const pendingSteps = deps.db
+    .select()
+    .from(step)
+    .where(and(eq(step.buildId, row.latestBuildId), eq(step.status, 'pending')))
+    .all();
+  if (pendingSteps.length === 0) return undefined;
+  // 等额度：任一 pending 步处于 quota 挂起（退避中；到期未重领仍算挂起，
+  // 重领成功即由 claim 面清位）。
+  const held = pendingSteps.find((s) => s.holdReason === 'quota');
+  if (held !== undefined) {
+    return { on: 'quota', retryAt: held.holdUntil ?? null };
+  }
+  // 等机器（#1259 归属机版）：任一 pending 步的归属机不在（行缺失/离线/
+  // 闸挡该步 runtime）或归属未设（agent 无归属机 = 无机可领）或团队零在线。
+  for (const s of pendingSteps) {
+    const agentRow = agentForStepEligibility(deps.db, row, s.kind, s.prompt);
+    if (agentRow === null) continue; // 无主步的失败收口在 claim 面（#1104），不重复判
+    if (agentRow.machineId === null) return { on: 'machine', retryAt: null };
+    const home = deps.db.select().from(machine).where(eq(machine.id, agentRow.machineId)).get();
+    if (home === undefined || !home.online) return { on: 'machine', retryAt: null };
+    if (!runtimeGatePasses(home, agentRow.provider)) {
+      return { on: 'machine', retryAt: null };
+    }
+  }
+  const online = deps.db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
+    .all();
+  if (online.length === 0) {
+    return { on: 'machine', retryAt: null };
+  }
+  return undefined;
 }
 
 function getRow(deps: TodoDeps, id: string): TodoRow | undefined {
@@ -291,9 +345,6 @@ export function updateTodo(
     phase?: Phase;
     tagIds?: string[];
     orderIndex?: number;
-    /** 钉选机器 patch（#682）：string = 改钉，null = 清回自动，undefined =
-     * 不动。只影响之后新起的 build（claim 过滤按 build 落值）。team 外机器
-     * id = 400（createTodo 同律）。 */
     /** 指派槽级 patch（#208「编辑分配」）：提供的槽覆盖，未提供的槽保持现状；
      * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表；#1250 扩
      * review/verify 槽——四槽同 merge 语义）。 */
@@ -538,7 +589,7 @@ export function isStartedTodoRow(row: {
  *    无 build 即无领取）。
  *  - 清空 = 硬删除（参考站「清空对话、方案和改动记录」字面）：build 行 +
  *    step/message/plan/steer/stop 单槽。分支
- *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派/钉选机器是
+ *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派是
  *    任务定义，不是产物）。执行机工作区文件与会话资产不动（daemon 本地物，
  *    server 够不着——dialog 文案如实声明）。
  *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后任何上报

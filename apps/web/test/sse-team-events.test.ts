@@ -53,9 +53,11 @@ describe('team 事件 → 失效键', () => {
     expect(keys).toEqual([`notifications/${TEAM}`, `chiefThreads/${TEAM}`, 'todos']);
   });
 
-  it('machine_presence / branch_sync：原样单键', () => {
+  it('machine_presence 带板面 todo 失效（#1257 挂起态派生）；branch_sync 原样单键', () => {
+    // #1257：todo 的等机器态派生自机器 presence——上下线连带失效 todos。
     expect(keysOf({ type: 'machine_presence', machineId: 'm-1', online: true })).toEqual([
       `machines/${TEAM}`,
+      'todos',
     ]);
     expect(keysOf({ type: 'branch_sync', sync: { buildId: 'build-1' } })).toEqual([
       'branchSync/build-1',

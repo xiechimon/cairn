@@ -949,6 +949,24 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       "maxLength": 2000,
       "type": "string",
     },
+    "workBranchDrift": {
+      "additionalProperties": false,
+      "properties": {
+        "actual": {
+          "minLength": 1,
+          "type": "string",
+        },
+        "expected": {
+          "minLength": 1,
+          "type": "string",
+        },
+      },
+      "required": [
+        "expected",
+        "actual",
+      ],
+      "type": "object",
+    },
   },
   "required": [
     "status",
@@ -2698,6 +2716,25 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
             "queue": {
               "additionalProperties": false,
               "properties": {
+                "hold": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "reason": {
+                      "const": "quota",
+                      "type": "string",
+                    },
+                    "retryAt": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                  },
+                  "required": [
+                    "reason",
+                    "retryAt",
+                  ],
+                  "type": "object",
+                },
                 "position": {
                   "maximum": 9007199254740991,
                   "minimum": 1,
@@ -3705,6 +3742,25 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
     "queue": {
       "additionalProperties": false,
       "properties": {
+        "hold": {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "const": "quota",
+              "type": "string",
+            },
+            "retryAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+          },
+          "required": [
+            "reason",
+            "retryAt",
+          ],
+          "type": "object",
+        },
         "position": {
           "maximum": 9007199254740991,
           "minimum": 1,
@@ -4143,6 +4199,35 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
               "type": "integer",
+            },
+            "waitingOn": {
+              "additionalProperties": false,
+              "properties": {
+                "on": {
+                  "enum": [
+                    "machine",
+                    "quota",
+                  ],
+                  "type": "string",
+                },
+                "retryAt": {
+                  "anyOf": [
+                    {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+              },
+              "required": [
+                "on",
+                "retryAt",
+              ],
+              "type": "object",
             },
           },
           "required": [
@@ -6184,6 +6269,35 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",
+    },
+    "waitingOn": {
+      "additionalProperties": false,
+      "properties": {
+        "on": {
+          "enum": [
+            "machine",
+            "quota",
+          ],
+          "type": "string",
+        },
+        "retryAt": {
+          "anyOf": [
+            {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+      },
+      "required": [
+        "on",
+        "retryAt",
+      ],
+      "type": "object",
     },
   },
   "required": [

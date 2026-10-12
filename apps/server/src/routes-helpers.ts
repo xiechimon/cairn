@@ -69,9 +69,6 @@ export const patchTodoBodySchema = z.object({
   phase: phaseSchema.optional(),
   tagIds: z.array(z.string()).optional(),
   orderIndex: z.number().optional(),
-  // #682 任务级钉选机器：string = 改钉 / null = 清回自动 / 缺省 = 不动
-  // （只影响之后新起的 build；team 外 id 400）。
-  machineId: z.string().nullable().optional(),
   // 指派双槽（#208「编辑分配」）：槽位词表复用 shared assignmentSlotSchema
   // （02 §6.2）；槽级 optional = 槽级 merge，未提供的槽保持现状。
   assignment: z

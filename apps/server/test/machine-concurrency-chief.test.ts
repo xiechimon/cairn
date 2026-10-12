@@ -326,6 +326,8 @@ describe('#1260 读面口径（runningSteps 含 chief 在跑）', () => {
       id: target,
       createdAt: Date.now(),
       homeMachineId: w.machineAId,
+      holdReason: null,
+      holdUntil: null,
     });
     expect(info?.waitingFor).toMatchObject({
       machineId: w.machineAId,

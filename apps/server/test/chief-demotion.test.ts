@@ -17,10 +17,10 @@
 // 6. 退役槽 wire 面：PATCH /chief 只带 machineId/model/compactionModel →
 //    400；GET /chief 的 chief 记录无这三个键；orchestration.homeMachineId =
 //    绑定 Agent 的归属机。
-// 7. 未绑定 Agent 的 chief 步：任何机器不可领，sweep 宽限后 failed，文案
-//    指「总管未绑定 Agent」（无期静默 pending 是 bug）。
-// 8. 绑定 Agent 未设归属机：同上，文案指名 Agent 未设归属机。
-// 9. 归属机离线超宽限：failed + 点名归属机（homeOfflineReason 同 worker 族）。
+// 7. 未绑定 Agent 的 chief 步：任何机器不可领 → 挂起不判死（#1257：配置/
+//    infra 缺口不杀回合，绑定后由 claim 循环续跑；可见性 = 排队面）。
+// 8. 绑定 Agent 未设归属机：同上挂起（补设归属机即解锁）。
+// 9. 归属机离线：同上挂起（机器回归即续跑，activeRun 保持 = 回合仍可见）。
 
 import { chiefTurnErrorContentSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -35,8 +35,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { failAbandonedChiefSteps } from '../src/services/chief.js';
-import { PIN_OFFLINE_GRACE_MS } from '../src/services/dispatch-timeouts.js';
+import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { claimStep, type MachineDeps } from '../src/services/machines.js';
 import { bootServer, insertMachine, postProject, req, type TestServer } from './helpers.js';
 
@@ -137,6 +136,10 @@ function claimOn(w: World, machineId: string) {
 
 function stepRowOf(w: World, id = w.stepId) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, id)).get()!;
+}
+
+function threadRowOf(w: World) {
+  return w.s.db.select().from(chiefThreadTable).where(eq(chiefThreadTable.id, w.threadId)).get()!;
 }
 
 /** 该线程回合的失败行文案（#631 链：chief-err-<stepId>）。 */
@@ -385,40 +388,38 @@ describe('#1260 退役槽 wire 面', () => {
   });
 });
 
-describe('#1260 sweep 失败漏斗（failAbandonedChiefSteps 归属机版）', () => {
-  test('失败方式 7：未绑定 Agent → 宽限后 failed，文案指「总管未绑定 Agent」', async () => {
+describe('#1260 sweep 挂起面（sweepAbandonedChiefSteps 归属机版）', () => {
+  test('失败方式 7：未绑定 Agent → 挂起不判死（绑定后由 claim 循环续跑）', async () => {
     const w = await setupWorld({ bindAgent: false });
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
-    expect(stepRowOf(w).status).toBe('failed');
-    expect(turnErrorMessage(w)).toContain('总管未绑定 Agent');
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(turnErrorMessage(w)).toBeNull();
+    expect(threadRowOf(w).activeRun).not.toBeNull(); // 回合挂起可见
   });
 
-  test('失败方式 8：绑定 Agent 未设归属机 → 宽限后 failed，文案指名 Agent', async () => {
+  test('失败方式 8：绑定 Agent 未设归属机 → 挂起不判死（补设归属机即解锁）', async () => {
     const w = await setupWorld({ agentMachineId: null });
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
-    expect(stepRowOf(w).status).toBe('failed');
-    const message = turnErrorMessage(w);
-    expect(message).toContain('demote-agent');
-    expect(message).toContain('未设归属机');
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(turnErrorMessage(w)).toBeNull();
   });
 
-  test('失败方式 9：归属机离线超宽限 → failed + 点名归属机', async () => {
+  test('失败方式 9：归属机离线 → 挂起不判死（机器回归自动续跑）', async () => {
     const w = await setupWorld();
     w.s.db
       .update(machineTable)
       .set({ online: false })
       .where(eq(machineTable.id, w.machineAId))
       .run();
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
-    expect(stepRowOf(w).status).toBe('failed');
-    const message = turnErrorMessage(w);
-    expect(message).toContain('demote-a');
-    expect(message).toContain('离线');
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 700_000);
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(turnErrorMessage(w)).toBeNull();
+    expect(threadRowOf(w).activeRun).not.toBeNull();
   });
 
-  test('归属机在线且闸开 → 不误杀（合法排队）', async () => {
+  test('归属机在线且闸开 → 不动（合法排队）', async () => {
     const w = await setupWorld();
-    failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
+    sweepAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
     expect(stepRowOf(w).status).toBe('pending');
     expect(turnErrorMessage(w)).toBeNull();
   });

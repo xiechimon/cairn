@@ -1,0 +1,15 @@
+ RUN  v5.0.1 /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0335-1195/apps/daemon
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 1：HEAD 在偏离分支且其上有提交 → hasChanges=true + drift 携带 + transcript 点名 6ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 2（事故形）：HEAD 切回会话分支、自建分支留新提交 → 并集面认领 + PR 按候选 head 回填 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 3：HEAD 偏离且处处无提交 → hasChanges=false + drift 携带（闸点名入参面） 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 4：无偏离无提交 → hasChanges=false 且无 drift 字段（现状钉扎） 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 5：邻座会话分支有新提交 → 不算本步产物（共享基座仓不误认） 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 6：老实现桩（新可选方法缺席）→ 行为与现状一致（fail-open） 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 7：currentBranch null（detached/查询失败）→ 无 drift 不炸 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 8：探测封顶 3 次（conv + 偏离 + 首候选） 4ms
+ ✓ test/runner-branch-drift.test.ts > #1195 收尾偏离检测与产物并集面 > 失败方式 10：扫描入参 = 步起点 checkpoint + 步窗口起点墙钟 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 工作分支注记投递面（预防半） > 失败方式 9：repo 绑定 build 步 prompt 尾行 = 工作分支注记（含契约分支名） 2ms
+ ✓ test/runner-branch-drift.test.ts > #1195 工作分支注记投递面（预防半） > review 步不附注记（只读步无交付契约） 3ms
+ ✓ test/runner-branch-drift.test.ts > #1195 工作分支注记投递面（预防半） > 无 repo 步不附注记（裸任务目录无分支契约可言） 2ms
+ Test Files  1 passed (1)
+      Tests  12 passed (12)

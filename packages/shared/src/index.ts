@@ -25,5 +25,7 @@ export * from './skill-facts.js';
 export * from './skill-inject.js';
 export * from './skill-route.js';
 export * from './tables.js';
+// #1257：步失败三桶分类（quota/capacity/network/other，Multica 同形）。
+export * from './task-failure.js';
 // spec 15 #394：占位标题派生 + 固定标签词表（ADR 0002 自觉背离原站的面）。
 export * from './task-meta.js';

@@ -1,8 +1,12 @@
 {
   "step": {
-    "status": "failed"
+    "status": "pending"
   },
   "build": {
-    "errorMessage": "本轮无人认领：Agent「verify-legacy-nohome」未设归属机，没有机器能认领本步。请在 agent 设置里指定归属机后重跑任务。"
+    "errorMessage": null
+  },
+  "waitingOn": {
+    "on": "machine",
+    "retryAt": null
   }
 }

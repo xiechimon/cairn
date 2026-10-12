@@ -66,7 +66,10 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
    *  派生（steps 查询按行计算），SSE step 事件不带（事件只报状态流转，
    *  队列细节由查询重取承载）。claimed/done 等非 pending 行缺席 = 不在
    *  排队。optional 加法契约：老 server / fixture 面缺席 = 排队呈现退
-   *  化（回落既有 `处理中...` 标签），零回归。 */
+   *  化（回落既有 `处理中...` 标签），零回归。
+   *  hold（#1257）：额度挂起中的 pending 步带（reason + retryAt = 退避到期/
+   *  下次尝试时刻）——排队行呈现「等额度」而非「等空闲机器」；非挂起步
+   *  缺席。 */
   queue: z
     .object({
       /** 团队 FIFO 位次（1-based；钉选步只数该机可见集——钉同机或未钉）。 */
@@ -81,6 +84,12 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
           capacity: z.number().int(),
         })
         .nullable(),
+      hold: z
+        .object({
+          reason: z.literal('quota'),
+          retryAt: epochMs,
+        })
+        .optional(),
     })
     .optional(),
   skillInjection: skillInjectionSchema.nullable(),

@@ -294,7 +294,7 @@ describe('触发闭环 E2E（04 §4 M2：触发 → 新 build 全新重跑，r3 
       kind: 'once',
       at,
       tz: TZ,
-      machineId: 'mach_pin', // 钉选机器 → build.pinnedMachineId（null=自动同槽）
+      // #1259 起定时步的机器面 = 指派 Agent 的归属机（schedule 钉选槽退役）。
     });
     s.scheduler.tick();
     // 新 build：全新重跑（直执行 withPlan:false，观测轮 32s 直达审核关口 [推断]）

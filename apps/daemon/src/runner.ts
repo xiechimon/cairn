@@ -32,12 +32,16 @@ import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
   appendPlanLocationNote,
+  appendWorkBranchNote,
+  BRAND,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
   CHANGES_DIFF_MAX_BYTES,
   CONTINUE_PROMPTS,
   classifySkillFact,
+  classifyStepFailure,
   composeTaskPromptWithInstruction,
+  conversationBranch,
   FIXED_TAGS,
   isBackendRuntimeId,
   LOCAL_TOOL_CREATE_TAG,
@@ -145,7 +149,19 @@ export interface RunStepOptions {
   /** 步级流时长上界覆盖（测试注入；缺省 = env PACMAN_STREAM_DURATION_CAP_MS
    * 或 STREAM_DURATION_CAP_DEFAULT_MS）。 */
   streamDurationCapMs?: number;
+  /** #1257 provider_network 末次重试前延迟覆盖（测试注入毫秒级；缺省 =
+   * PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS）。 */
+  providerNetworkFinalWaitMs?: number;
 }
+
+/** #1257 provider_network 流断重试上限（Multica providerNetworkMaxAttempts 同
+ * 值 3）：首跑 + 立即重试 + 末次延迟重试。会话续跑（continueSession 同一
+ * 会话），不重放整轮——断流是瞬态基础设施毛刺，不是任务失败。 */
+export const PROVIDER_NETWORK_MAX_ATTEMPTS = 3;
+
+/** #1257 末次重试前延迟（Multica providerNetworkFinalRetryWait 同值 5s）：短
+ * 冷却让瞬态故障（连接池抖动 / 网关重启）先自愈，再打最后一发。 */
+export const PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS = 5_000;
 
 /** auto_retry 有界生命周期预算（#708 失败方式 2）——单源与理据正本见 backend/pi-retry.ts
  *  （#926：与 pi 会话 retry.maxRetries 同源派生，不再各处硬编码）。runner 侧行为：连续零进展
@@ -406,10 +422,27 @@ export async function runStep(
   // （journal/wire 行与投递内容同串——recover 面 resume prompt 已含注记时
   // appendPlanLocationNote 幂等不双注）。plan 步一律附注（含续轮/重启轮：
   // new session 上下文真空时注记是 agent 唯一知道「写哪里」的通道）。
-  const prompt =
+  const promptWithPlanNote =
     basePrompt !== null && claimed.step.kind === 'plan'
       ? appendPlanLocationNote(basePrompt, join(deps.paths.plansDir, convId, PLAN_FILE_NAME))
       : basePrompt;
+  // #1195 工作分支注记：repo 绑定的交付步（build/merge/verify）prompt 尾部
+  // 追加「只在会话分支提交」硬约束——事故形（mea 2026-10-11）是 agent 自建
+  // 分支交付后产物闸按会话分支计数判零。分支名对 agent 是执行机本地事实
+  // （conversationBranch 单源，与 workspace prepare 同值），daemon 投递前
+  // 单点组装（#1203 交接位置注记同律；appendWorkBranchNote 幂等，recover 面
+  // resume prompt 已含注记不双注）。plan 步不附（交接物在 repo 外的 plan.md，
+  // 无提交交付面）；review/chief 不附（只读/编排步）；空白 basePrompt 不附
+  // （空文本行由呈现层跳过，注记不该把空行变成非空孤行）。
+  const prompt =
+    promptWithPlanNote !== null &&
+    promptWithPlanNote.trim() !== '' &&
+    (claimed.step.kind === 'build' ||
+      claimed.step.kind === 'merge' ||
+      claimed.step.kind === 'verify') &&
+    (claimed.project?.repo ?? null) !== null
+      ? appendWorkBranchNote(promptWithPlanNote, conversationBranch(convId))
+      : promptWithPlanNote;
   if (claimed.step.kind === 'plan') {
     mkdirSync(join(deps.paths.plansDir, convId), { recursive: true });
   }
@@ -588,7 +621,9 @@ export async function runStep(
   if (!ws) mkdirSync(cwd, { recursive: true });
 
   // 步起点 head（M7 #308：停止 + 丢弃本轮修改的 rewind 目标 checkpoint——
-  // prepare 后即时捕获，pi 会话期间的提交/脏树都在其上层）。
+  // prepare 后即时捕获，pi 会话期间的提交/脏树都在其上层）。步起点墙钟同刻
+  // 捕获（#1195 分支扫描的「步窗口」下界）。
+  const stepStartMs = Date.now();
   let headAtStart: string | null = null;
   if (ws !== null && deps.workspace) {
     try {
@@ -802,7 +837,8 @@ export async function runStep(
 
   // continue 解析键：journal 快照（recover 面）优先，其次 claim 载荷携带的
   // server 侧 sessionId（02 §5.7 合并轮/续轮复用同 conv 会话）。
-  const continueId =
+  // let（#1257）：provider_network 流断重试把锚改到当前轮会话（续跑不断会话）。
+  let continueId =
     claimed.session.action === 'continue'
       ? (opts.resume?.sessionId ?? claimed.session.sessionId)
       : null;
@@ -971,6 +1007,10 @@ export async function runStep(
   let zeroProgressRetries = 0;
   let retryStorm = false;
   const retryStormMax = opts.retryStormMax ?? RETRY_STORM_MAX;
+  // #1257 provider_network 流断重试计数（会话续跑；上限与末次延迟见常量）。
+  let networkRetries = 0;
+  const providerNetworkFinalWaitMs =
+    opts.providerNetworkFinalWaitMs ?? PROVIDER_NETWORK_FINAL_RETRY_WAIT_MS;
   // 流超时护栏（02 §5.6 三值 + #699 语义修订）：三臂全部「事件到达即重置」
   // ——first = 首事件期限、idle = 事件间空闲、body = 流 body 预算（#654 先
   // 把重置粒度从步推进到轮，#699 推进到事件，对齐 pi 在树参考实现的
@@ -1363,6 +1403,37 @@ export async function runStep(
       await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
       return;
     }
+    // —— #1257 provider_network 流断重试（Multica MUL-4910 同形）：终局错误
+    // 分类 network（upstream stream disconnected / connection reset 族）→
+    // 会话续跑重试（continueSession 同一会话，不重放整轮），总尝试 3 次
+    // （首跑 + 立即重试 + 末次延迟 finalWaitMs）；退避后仍断才按失败收尾。
+    // 判据取轮内原值（先于下方超时文案覆盖 lastError）；quota/capacity 桶不
+    // 进此闸（quota 的挂起语义在 server done 面）；停止钮在位不重试（用户
+    // 意图优先于续跑）。
+    {
+      const failureText = lastModelError ?? lastError;
+      const stopPending = deps.stopRequests?.get(stepId) !== undefined;
+      if (
+        failureText !== null &&
+        lastError !== null &&
+        !stopPending &&
+        classifyStepFailure(failureText) === 'network' &&
+        networkRetries < PROVIDER_NETWORK_MAX_ATTEMPTS - 1
+      ) {
+        networkRetries += 1;
+        if (networkRetries === PROVIDER_NETWORK_MAX_ATTEMPTS - 1) {
+          logger.step(
+            `provider network retry ${networkRetries}: waiting ${providerNetworkFinalWaitMs}ms before final attempt`,
+          );
+          await new Promise((r) => setTimeout(r, providerNetworkFinalWaitMs));
+        } else {
+          logger.step(`provider network retry ${networkRetries}: resuming session immediately`);
+        }
+        continueId = handle.sessionId;
+        deps.sessionHandles?.delete(stepId);
+        continue;
+      }
+    }
     // —— #654 回落闸（判据取轮内原值，先于下方超时文案覆盖 lastError）：
     // 零进展 + 终局失败（超时收尸 / storm 掐断但底层模型错误在位 / 终局
     // error 行）+ 签名命中且旋钮可翻 → 翻旋钮重开一轮。停止钮经
@@ -1512,6 +1583,9 @@ export async function runStep(
   // 分支；合并步先走 `git merge --no-edit origin/<default>`，r3 §3.6；
   // 停止步跳过——中断步不产交接物；审核步跳过——只读步不产交接物）——
   let headCommit: string | null = null;
+  // #1195 偏离与产物并集面（git 收尾块内产出，探测块与 doneBody 消费）。
+  let branchDrift: { expected: string; actual: string } | null = null;
+  let artifactBranches: string[] = [];
   // 审核步不产改动（#511）：它跑 bash 跑验证命令会被 CHANGE_TOOLS 记为「写过」，
   // 但那不是本轮的变更——如实报 false（server 侧同样不计入 todo.hasChanges）。
   let hasChanges = isReview ? false : sawChangeTool; // 未绑 repo 退化形 = transcript 写类工具行 [推断骨架]
@@ -1528,6 +1602,22 @@ export async function runStep(
   ) {
     const git = deps.workspace;
     try {
+      // #1195 偏离检测：收尾时 HEAD 停在契约分支之外的具名分支 = agent 自建
+      // 分支干活（Multica verifyDeliveryPoint 同律：off-branch 交付必须点名，
+      // 不得以「零改动」冒充）。commit/push 收尾语义本身不变——commitAll 把
+      // 未提交残留保留在 HEAD 所在分支（工作不丢），conv 分支推送照常；
+      // 查询失败 / detached HEAD（null）不按偏离处理（无具名分支可点名）。
+      const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
+      if (headBranch !== null && headBranch !== ws.branch) {
+        branchDrift = { expected: ws.branch, actual: headBranch };
+        logger.step(`work branch drift: HEAD on ${headBranch}, contract branch ${ws.branch}`);
+        transcript.upsert({
+          id: `branch-drift-${stepId}`,
+          role: 'system',
+          content: `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
+          createdAt: now(),
+        });
+      }
       const committed = await git.commitAll(
         ws.cwd,
         `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`,
@@ -1616,9 +1706,25 @@ export async function runStep(
         // github v1 done 语义 = conv 分支已推上，不落地。
       }
       headCommit = committed.head ?? (await git.headCommit(ws.cwd));
-      // hasChanges = conv 分支领先默认分支的提交在位（02 §4.1/r5 §8 列位双键；
-      // git 真值面取代 M3a transcript 推断骨架）。
-      hasChanges = (await git.countAhead(ws.cwd, ws.defaultBranch)) > 0;
+      // hasChanges = 产物并集面（02 §4.1/r5 §8 列位双键；git 真值面取代 M3a
+      // transcript 推断骨架；#1195 扩展）：HEAD 领先默认分支的提交计数（现行
+      // 面，HEAD 在偏离分支上时天然覆盖它）∪ 步窗口内有新提交的本地分支
+      // （agent 自建分支交付后切回会话分支的事故形——base = 步起点
+      // checkpoint、窗口下界 = 步起点墙钟）。扫描只在 HEAD 计数为 0 时启动
+      // （有物不烧 git 调用）；邻座会话分支（共享基座仓里其它 build 的
+      // pacman/conv-<他>）按品牌前缀排除——别的 build 的产物不能记到本步。
+      const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
+      if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
+        try {
+          const candidates = await git.branchesWithNewCommits(ws.cwd, headAtStart, stepStartMs);
+          artifactBranches = candidates.filter(
+            (b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix),
+          );
+        } catch (err) {
+          logger.step(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      hasChanges = headAhead > 0 || artifactBranches.length > 0;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
     }
@@ -1645,20 +1751,35 @@ export async function runStep(
   if (ws !== null && repo !== null && lastError === null && !stopped && !isReview) {
     const ghRef = repo.kind === 'github' ? githubRepoRefOf(repo.cloneUrl) : null;
     if (ghRef !== null) {
-      prProbe = await probeGithubPr({
-        owner: ghRef.owner,
-        repo: ghRef.repo,
-        branch: ws.branch,
-        // per-step token（github_connection 下发时）；未连接 = null → 匿名梯
-        // （公开仓可达）。机器 gh 梯在前——agent 开 PR 用的就是它。
-        token: creds.git?.password ?? null,
-      }).catch((err: unknown) => {
-        logger.step(
-          `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,
-        );
-        return null;
-      });
-      if (prProbe !== null) logger.step(`pr probe: #${prProbe.number} for ${ws.branch}`);
+      // #1195 探测 head 集：会话分支先行（现行语义），未命中且有偏离/候选
+      // 分支 → 按实际交付 head 续探——agent 自建分支开的 PR 由此回填（归属
+      // 依据 = 分支名精确匹配，与 PR 回填同源）。封顶 3 个 head（gh/REST 梯
+      // × N 分支不烧收尾预算）。
+      const probeHeads: string[] = [ws.branch];
+      if (branchDrift !== null) probeHeads.push(branchDrift.actual);
+      for (const b of artifactBranches) {
+        if (probeHeads.length >= 3) break;
+        if (!probeHeads.includes(b)) probeHeads.push(b);
+      }
+      for (const head of probeHeads) {
+        prProbe = await probeGithubPr({
+          owner: ghRef.owner,
+          repo: ghRef.repo,
+          branch: head,
+          // per-step token（github_connection 下发时）；未连接 = null → 匿名梯
+          // （公开仓可达）。机器 gh 梯在前——agent 开 PR 用的就是它。
+          token: creds.git?.password ?? null,
+        }).catch((err: unknown) => {
+          logger.step(
+            `pr probe failed: ${err instanceof Error ? err.message : String(err)} (panel will show branch without PR)`,
+          );
+          return null;
+        });
+        if (prProbe !== null) {
+          logger.step(`pr probe: #${prProbe.number} for ${head}`);
+          break;
+        }
+      }
     }
     if (repo.kind !== 'hosted' && deps.workspace?.diffAgainstDefault) {
       const diff = await deps.workspace.diffAgainstDefault(ws.cwd, ws.defaultBranch);
@@ -1731,6 +1852,10 @@ export async function runStep(
     // 恒带算得值（含空串——「已上报且零改动」与「未上报」在 server 侧分列）。
     ...(prProbe !== null ? { prUrl: prProbe.url, prNumber: prProbe.number } : {}),
     ...(changesDiff !== null ? { changesDiff } : {}),
+    // #1195 工作分支偏离（检测到时恒带，与 hasChanges 无关）：server 产物闸
+    // 在 hasChanges=false 时据此把失败原因从误导性「构建零改动」换成点名
+    // 分支偏离。
+    ...(branchDrift !== null ? { workBranchDrift: branchDrift } : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {

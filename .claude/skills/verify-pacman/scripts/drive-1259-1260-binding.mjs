@@ -11,8 +11,9 @@
 //     （claude-code agent → 目标机自报清单无该模型）→ 400 指名。
 //   D 机器生命周期：删机保护 409 点名 → 整机迁移（模型不合的留机列原因，
 //     合格的迁走）→ 腾空后删除 204。
-//   E sweep 可见失败：DB 直插无归属机的存量 agent + 老化其 pending 步 →
-//     调度拍后 failed + 文案指名「未设归属机」。
+//   E sweep 挂起语义（#1257）：DB 直插无归属机的存量 agent + 老化其
+//     pending 步 → 调度拍扫过仍 pending（不判死）、零失败痕迹、todo
+//     waitingOn = machine（「等机器」可见态承担出口）。
 //   F UI 闭环（浏览器）：machines 列表行名可点 → 详情页（fact 条/归属
 //     agent 网格/迁移与删除出口）→ 详情页建 agent 弹窗预选归属机；chief
 //     抽屉模型行只读（无触发钮）；总管设置 Agent tab 只读信息卡在位、
@@ -324,7 +325,7 @@ check('D4 目标机补模型报告后换绑 → 200', fixRebind.status === 200);
 const del2 = await sendJson(SERVER + '/api/machines/' + home.id, undefined, 'DELETE');
 check('D5 腾空后删除 → 204 + 行消失', del2.status === 204 && db((d) => d.prepare('SELECT COUNT(*) n FROM machine WHERE id = ?').get(home.id).n) === 0);
 
-// —— E 腿：sweep 可见失败（存量无归属机 agent）———————————————————
+// —— E 腿：sweep 挂起语义（存量无归属机 agent，#1257）———————————————————
 // DB 直插存量形态（创建面已禁设 null——这条腿钉的是迁移前的存量行）。
 db((d) => {
   d.prepare(
@@ -332,33 +333,46 @@ db((d) => {
   ).run('agent-legacy-nohome', teamId, 'verify-legacy-nohome', 'stub-gw', 'stub-model');
   const now = Date.now();
   d.prepare(
-    `INSERT INTO todo (id, teamId, projectId, seqNum, title, spec, phase, phaseAt, assignment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run('todo-legacy-1', teamId, proj.body.id, 9901, '存量任务', '', 'queued', now, JSON.stringify({ plan: null, build: { agentId: 'agent-legacy-nohome' } }));
+    `INSERT INTO todo (id, teamId, projectId, seqNum, title, spec, phase, phaseAt, assignment, latestBuildId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run('todo-legacy-1', teamId, proj.body.id, 9901, '存量任务', '', 'queued', now, JSON.stringify({ plan: null, build: { agentId: 'agent-legacy-nohome' } }), 'build-legacy-1');
   d.prepare(
     `INSERT INTO build (id, todoId, withPlan, planDocId, triggerSource, createdAt) VALUES (?, ?, 0, NULL, 'user', ?)`,
   ).run('build-legacy-1', 'todo-legacy-1', now);
-  // 步的最后活动锚回拨到宽限之前（PIN_OFFLINE_GRACE_MS = 10min）。
+  // 超龄形态：挂起与龄期无关（无宽限概念），老化只为钉「超龄也不判死」。
   d.prepare(
     `INSERT INTO step (id, buildId, kind, status, createdAt) VALUES (?, ?, 'build', 'pending', ?)`,
   ).run('step-legacy-1', 'build-legacy-1', now - 11 * 60_000);
 }, false);
-// 等调度拍（15s 间隔）扫到。
-let legacyStep = null;
-for (let i = 0; i < 8; i++) {
-  await new Promise((r) => setTimeout(r, 5000));
-  legacyStep = db((d) => d.prepare(`SELECT status FROM step WHERE id = 'step-legacy-1'`).get());
-  if (legacyStep?.status === 'failed') break;
+// 挂起是稳态断言（不是「等到某事件」）：poll 到「≥2 个调度拍（15s 间隔）扫过」
+// 的时点再验——拍跑过而步仍 pending 才是挂起证据，早于首拍断言什么都没证。
+const eStart = Date.now();
+while (Date.now() - eStart < 32_000) {
+  await new Promise((r) => setTimeout(r, 1000));
 }
+const legacyStep = db((d) => d.prepare(`SELECT status FROM step WHERE id = 'step-legacy-1'`).get());
 const legacyBuild = db((d) =>
   d.prepare(`SELECT errorMessage FROM build WHERE id = 'build-legacy-1'`).get(),
 );
-check('E1 无归属机存量步：调度拍后 failed', legacyStep?.status === 'failed', JSON.stringify(legacyStep));
 check(
-  'E2 失败文案指名「未设归属机」',
-  (legacyBuild?.errorMessage ?? '').includes('未设归属机'),
+  'E1 无归属机存量步：调度拍扫过仍 pending（#1257 挂起不判死）',
+  legacyStep?.status === 'pending',
+  JSON.stringify(legacyStep),
+);
+check(
+  'E2 零失败痕迹（build.errorMessage 空）',
+  (legacyBuild?.errorMessage ?? null) === null,
   legacyBuild?.errorMessage ?? null,
 );
-saveJson('e-legacy-sweep.json', { step: legacyStep, build: legacyBuild });
+// 可见性出口：todo waitingOn 派生 = machine（agent 无归属机 = 无机可领）。
+const legacyTodos = await sendJson(SERVER + '/api/projects/' + proj.body.id + '/todos', undefined, 'GET');
+const legacyTodoList = Array.isArray(legacyTodos.body) ? legacyTodos.body : [];
+const legacyTodo = legacyTodoList.find((t) => t.id === 'todo-legacy-1');
+check(
+  'E3 挂起可见：todo.waitingOn = machine',
+  legacyTodo?.waitingOn?.on === 'machine',
+  JSON.stringify(legacyTodo?.waitingOn ?? null),
+);
+saveJson('e-legacy-sweep.json', { step: legacyStep, build: legacyBuild, waitingOn: legacyTodo?.waitingOn ?? null });
 
 // —— F 腿：UI 闭环（浏览器）——————————————————————————————————
 const browser = await chromium.launch();
@@ -368,6 +382,9 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await page.goto(WEB + '/app/resources/machines', { waitUntil: 'networkidle' });
 await page.getByRole('link', { name: OTHER_NAME }).click();
 await page.waitForURL('**/app/resources/machines/*');
+// SPA 换页：URL 先翻、组件后渲染——isVisible 抢跑会吃到旧页像素（实测竞态），
+// 一律 waitFor 到目标 testid 再截图再断言。
+await page.getByTestId('machine-detail-online').waitFor();
 await shot(page, 'f1-machine-detail.png');
 check('F1 机器名链接 → 详情页（fact 条在位）', await page.getByTestId('machine-detail-online').isVisible());
 
