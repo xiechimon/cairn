@@ -51,6 +51,11 @@ animationName 不出现）、跑动行「深度求索中，用时 1 秒…」同
   （跑动行全程不断帧）。
 - 气泡入场动画撤除：全帧序列 `lastBubbleAnim = none`，钉进
   `visual-polish.spec.ts` 的 detail face 用例（animationName === 'none'）。
+- 分支覆盖精确口径（2026-10-13 补正）：回声存在后实测过三条分支——
+  confirm 驳回（本包帧）、building steer（steer 探针）、failed 带反馈重启
+  （settle-fold 驱动的发送腿）；review 静息驳回分支在回声落地前的首跑
+  覆盖（其写入路径与 failed-restart 同一 mutateAsync 形态，分歧只在相位
+  判定）。四条分支共享同一 onOptimisticSend/clearOptimisticSend 口。
 
 ## 不搬的（划界）
 
@@ -58,6 +63,8 @@ animationName 不出现）、跑动行「深度求索中，用时 1 秒…」同
 - 待定阶段的停止钮：步未认领时没有可停之物，钮面只在真 running 时出现
   （形必须带义；dsh 的即时停止取消的是客户端请求，pacman 的停止是服务端
   步语义，不摆不能用的钮）。
-- 落定折叠的 160ms 间距滑行（dsh data-chat-motion margin transition）：
-  动 message-scroller 布局层的手术，本批不动，另票再议。
+- 行挂载/卸载时的间距滑行（dsh data-chat-motion 的 margin transition 通
+  例）：动 message-scroller 布局层的手术，另票再议。**落定折叠自身的
+  收拢滑行已在第二晚落地**（grid-rows 1fr↔0fr，150ms 实测）——本条仅指
+  「行挂载瞬间周围间距滑行」那一层。
 - 总管抽屉发送面：有自己的 #1216 在飞指示族，本批只管详情页发送流。
