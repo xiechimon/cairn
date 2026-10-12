@@ -1,7 +1,9 @@
 // Chief 服务面（02 §4.3 结构契约 + r5 §2/§3 实测行为；M4a）。
-// - 身份：每「用户×团队」一个（chiefIdFormat）；特例 Agent 实例——绑定 Agent
-//   经 PATCH /chief（二次确认告示 canon = shared CHIEF_REBIND_CONFIRM_COPY，
-//   记忆不迁移：Chief 无独立记忆存储，r5 §2）。
+// - 身份：每「用户×团队」一个（chiefIdFormat）；名册里的普通 agent
+//   （#1260，对齐 Multica squad.leader_id → agent 行——无并发特权、无模型
+//   继承、步的去处 = 绑定 Agent 的归属机）——绑定 Agent 经 PATCH /chief
+//  （二次确认告示 canon = shared CHIEF_REBIND_CONFIRM_COPY，记忆不迁移：
+//   Chief 无独立记忆存储，r5 §2）。
 // - 执行形态：Chief 回合 = 机器 step（kind 'chief'，conv = thread id
 //   `chief-<uuid>`，r5 §3.1 daemon.log 实测）+ pi 会话；模型 = 绑定 Agent 模型。
 // - 线程面落库：chief_thread/chief_message（01 §6）；toolDefHashes = 51 词表
@@ -12,11 +14,9 @@
 // - 策略层（措辞→spec/分派权重/单 todo 直派）= system prompt 指引 + 51 词表
 //   relay 工具面，由 LLM 决策——黑盒逼近（04 §1 A4：[推断]/[设计] 不冒充实测）。
 
-import { homedir } from 'node:os';
 import type {
   ActiveRun,
   AgentRecord,
-  ChiefCompactionModel,
   ChiefGetResponse,
   ChiefThread,
   ChiefWakeKind,
@@ -36,7 +36,6 @@ import {
   chiefThreadTitle,
   isBackendRuntimeId,
   newChiefThreadId,
-  resolveChiefModelFallback,
 } from '@pacman/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -57,19 +56,24 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { cancelPendingQuestions } from './chief-questions.js';
-import { runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
+import { machineRunningCount, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import {
+  CHIEF_NO_HOME_HINT,
   CHIEF_PIN_OFFLINE_HINT,
   CHIEF_PIN_RUNTIME_HINT,
+  CHIEF_PIN_WEDGE_HINT,
+  CHIEF_UNBOUND_REASON,
   homeOfflineReason,
   homeRuntimeBlockedReason,
+  homeWedgeReason,
+  noHomeReason,
   PIN_OFFLINE_GRACE_MS,
+  PIN_ONLINE_WEDGE_GRACE_MS,
   stepActivityAt,
 } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyChiefMessage } from './notifications.js';
-import { claudeCodeModelSource } from './providers.js';
 import { scanLocalSkills } from './skills.js';
 import { stepQueueProjector } from './step-queue.js';
 
@@ -110,10 +114,6 @@ export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
       userId: deps.user.id,
       teamId,
       agentId: null,
-      thinkingLevel: null,
-      compactionModel: null, // 默认「与 Chief 相同」（#203）
-      model: null, // 默认继承绑定 Agent 模型（#615）
-      machineId: null, // #895 默认「自动」（系统不预填，A2）
       charter: '', // raw 观测默认空串（chief-record-testA.json 一手）
       watches: [],
       wakes: [],
@@ -134,10 +134,6 @@ function toChiefRecord(row: ChiefRow): ChiefGetResponse['chief'] {
     teamId: row.teamId,
     agent: row.agentId !== null ? { agentId: row.agentId } : null,
     charter: row.charter,
-    compactionModel: row.compactionModel,
-    model: row.model,
-    // #895 spec 21 A1：主力机（null = 自动）。
-    machineId: row.machineId ?? null,
     lastTurnAt: row.lastTurnAt,
     createdAt: row.createdAt,
     tz: row.tz,
@@ -160,6 +156,7 @@ export function agentRecordOfRow(row: typeof agent.$inferSelect): AgentRecord {
     defaultSkill: row.defaultSkill,
     skillsAllowlist: row.skillsAllowlist,
     mcpServers: row.mcpServers,
+    machineId: row.machineId,
   };
 }
 
@@ -208,13 +205,13 @@ function chiefRuntimeGatePasses(
 }
 
 /** orchestration 块（#895 spec 21 A5）：machines 页三态读标注的数据源。
- *  defaultMachineId = 请求者主力机（chief.machineId，null = 自动）；
- *  activity = team 域 chief 步计数（machines 页是团队面，多用户已知边界）：
- *  running = 该机 claimed chief 步数（回合进行中）；waiting = 被钉到该机且
- *  pending 的 chief 步数 × 该机当前不可执行（离线，或 runtime 闸关 = 在线
- *  但开不了 chief 步所需 runtime——T3 已知缝隙「在线但闸关 = 无界等待」的
- *  可见性面）。闸判 provider = 请求者 chief 绑定 Agent（未绑定 = 闸判缺席，
- *  只看离线）；零计数机器不进清单（页面 join machines 查询行集）。 */
+ *  homeMachineId = 绑定 Agent 的归属机（#1260：chief 步去处的唯一答案，
+ *  未绑定/未设 = null）；activity = team 域 chief 步计数（machines 页是团
+ *  队面，多用户已知边界）：running = 该机 claimed chief 步数（回合进行
+ *  中）；waiting = 归属该机且 pending 的 chief 步数 × 该机当前不可执行
+ * （离线，或 runtime 闸关 = 在线但开不了 chief 步所需 runtime）。闸判
+ *  provider = 请求者 chief 绑定 Agent（未绑定 = 闸判缺席，只看离线）；
+ *  零计数机器不进清单（页面 join machines 查询行集）。 */
 function chiefOrchestration(
   deps: ChiefDeps,
   teamId: string,
@@ -250,10 +247,9 @@ function chiefOrchestration(
       if (s.machineId !== null) bump(s.machineId).running += 1;
       continue;
     }
-    // pending：主力机当前不可执行（离线/被 runtime 闸挡）才计 waiting——
-    // 主力机未设 = 浮动 FIFO 排队，不指向任何机器（#1259 线程钉选列已退役，
-    // chief 步去处 = chief.machineId 单源）。
-    const home = row.machineId;
+    // pending：归属机当前不可执行（离线/被 runtime 闸挡）才计 waiting——
+    // 归属机未设 = 任何机器不可领（sweep 负责可见失败），不指向任何机器。
+    const home = agentRow?.machineId ?? null;
     if (home === null) continue;
     const machineRow = deps.db.select().from(machine).where(eq(machine.id, home)).get();
     const offline = machineRow === undefined || !machineRow.online;
@@ -261,7 +257,7 @@ function chiefOrchestration(
     bump(home).waiting += 1;
   }
   return {
-    defaultMachineId: row.machineId ?? null,
+    homeMachineId: agentRow?.machineId ?? null,
     activity: [...counts.entries()].map(([machineId, { running, waiting }]) => ({
       machineId,
       running,
@@ -270,8 +266,6 @@ function chiefOrchestration(
   };
 }
 
-/** GET /api/teams/{id}/chief 响应封套（r5 §3.6 API 原样 + #895 orchestration
- *  块）。 */
 export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetResponse {
   const row = ensureChief(deps, teamId);
   const agentRow = row.agentId
@@ -288,10 +282,11 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
 }
 
 /** PATCH /api/teams/{id}/chief——`agent` 槽 = r5 §2 抓包原样（绑定/换绑；
- * 记忆不迁移 = 无迁移动作，共用绑定 Agent 存储）；`charter` 槽 = 章程 tab
- * 保存面 [推断]（保存 wire 未采）。agent:null = 解绑 [推断]。
- * `compactionModel` 槽 = 压缩模型长槽（#203 [设计]）：undefined = 不动，
- * null = 清空回默认「与 Chief 相同」。body 型 = shared PatchChiefBody 单源。 */
+ * 记忆不迁移 = 无迁移动作，共用绑定 Agent 存储）。agent:null = 解绑 [推断]。
+ * `charter` 槽 = 章程 tab 保存面 [推断]（保存 wire 未采）。
+ * #1260：模型/思考强度/归属机不再是 chief 的设置面——全部读绑定 Agent
+ * 自身配置（模型闸与可见失败归派发面）。body 型 = shared PatchChiefBody
+ * 单源。 */
 export function patchChief(
   deps: ChiefDeps,
   teamId: string,
@@ -302,7 +297,6 @@ export function patchChief(
   if (body.agent !== undefined) {
     if (body.agent === null) {
       sets.agentId = null;
-      sets.thinkingLevel = null;
     } else {
       const agentRow = deps.db
         .select()
@@ -311,27 +305,9 @@ export function patchChief(
         .get();
       if (!agentRow) throw new HttpError(404, `agent ${body.agent.agentId}`);
       sets.agentId = agentRow.id;
-      sets.thinkingLevel = body.agent.thinkingLevel;
     }
   }
   if (body.charter !== undefined) sets.charter = body.charter ?? '';
-  if (body.compactionModel !== undefined) sets.compactionModel = body.compactionModel;
-  // #615 主模型覆盖槽：undefined = 不动，null = 清空回绑定 Agent 继承。
-  if (body.model !== undefined) sets.model = body.model;
-  // #895 spec 21 A7 主力机槽：undefined = 不动，null = 清回自动；值限本团队
-  // 机器集（队外 400，todos machineId 同律边界防御）。机器后续被删 = 残值
-  // 语义同钉选（claim 过滤自然不命中，T3 离线失败路径点名机器），不级联。
-  if (body.machineId !== undefined) {
-    if (body.machineId !== null) {
-      const machineRow = deps.db
-        .select({ id: machine.id })
-        .from(machine)
-        .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
-        .get();
-      if (!machineRow) throw new HttpError(400, `machine ${body.machineId} not in team`);
-    }
-    sets.machineId = body.machineId;
-  }
   if (Object.keys(sets).length > 0) {
     deps.db.update(chief).set(sets).where(eq(chief.id, row.id)).run();
   }
@@ -412,36 +388,18 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
 
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =
  * 首句截断 + …，r5 §3.6）+ user 消息行落库 + chief 步入队（回合 = 机器 step，
- * r5 §3.1）+ 机器 wake。
- *
- * #774 收单回落（落点 = 服务端收单而非客户端发送前：① 原子——槽愈合与入队同
- * 函数，客户端先 PATCH 再 POST 会在 daemon claim 处留竞争窗；② 全入口——新
- * 主题 / 续消息 / 内部编排三路同走本函数，客户端方案只盖得住抽屉 composer；
- * ③ 加法契约——响应添可空字段，老 web 忽略即退化现状）。存量槽在当前候选里
- * 消失（本地换过模型）→ 同步置 null（继承绑定 Agent = picker 默认行）再入队，
- * claim 恒读到可执行值；调用方（web onSend）凭返回的 modelFallback 显式 toast。
- * homeDir 注入位：生产缺省 os.homedir()，测试给 mkdtemp（含 .claude/settings.json）。 */
+ * r5 §3.1）+ 机器 wake。模型 = 绑定 Agent 自身配置（#1260 无继承态——
+ * 收单面无槽可愈合，step 载荷恒可读）。 */
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
   body: { threadId: string | null; content: string },
-  opts?: { homeDir?: string },
 ): {
   thread: ChiefThread;
   message: { id: string; role: 'user'; content: string; createdAt: number };
-  /** 存量槽回落上报：被愈合掉的原值，无回落 null（web 凭此 toast 告知用户）。 */
-  modelFallback: ChiefCompactionModel | null;
 } {
   const chiefRow = ensureChief(deps, teamId);
   requireBoundAgent(deps, chiefRow);
-  const { effective, fellBackFrom } = resolveChiefModelFallback(chiefRow.model, [
-    claudeCodeModelSource(opts?.homeDir ?? homedir()),
-  ]);
-  let modelFallback: ChiefCompactionModel | null = null;
-  if (fellBackFrom !== null) {
-    deps.db.update(chief).set({ model: effective }).where(eq(chief.id, chiefRow.id)).run();
-    modelFallback = fellBackFrom;
-  }
 
   let threadRow: ThreadRow | undefined;
   if (body.threadId !== null) {
@@ -506,7 +464,6 @@ export function sendChiefMessage(
       pendingTurn === null ? null : projector.project(pendingTurn),
     ),
     message,
-    modelFallback,
   };
 }
 
@@ -951,19 +908,18 @@ export function notifyChiefTurn(deps: ChiefDeps, threadId: string): void {
  * ~30s、daemon 冷启秒级）；机器在线时不触发——在线排队是合法语义。 */
 export const CHIEF_ABANDONED_STEP_MS = 120_000;
 
-/** chief 步失联扫尾（scheduler tick 驱动，#684）：把三类「永不失败也就永不
+/** chief 步失联扫尾（scheduler tick 驱动，#684）：把「永不失败也就永不
  * 可见」的永挂收进 #631 失败闭环——
  * ① pending 无人认领且团队零在线机器（daemon 死亡/未注册：步永不 claim，
  *    #631 的 done(failed) 路径永不触发，线程 activeRun 永挂——用户实测
  *    2026-10-03「零回复零 toast」即此形）；
  * ② claimed 心跳停更且机器离线（daemon 步中途死亡：lastHeartbeatAt 此前
  *    只写不读，步与 activeRun 双挂）；
- * ③ #864 T3：pending 且**线程钉选的机器不在线**（#682 chief 亲和的镜像面：
- *    钉了离线的机器 = 别机领不走，回合永挂）× 步最后活动已过 PIN_OFFLINE_
- *    GRACE_MS → 失败收尾（与 worker 步同政策同阈值，见 dispatch-timeouts.ts）。
- * ③b #881：pending 且钉选的机器**在线但 enabledRuntimes 闸挡住绑定 Agent
- *    的 runtime**（钉选过滤令唯有该机可见 + buildChiefClaim 闸恒 false =
- *    回合无期 pending）× 同宽限 → 失败收尾，文案点名机器与 runtime。
+ * ③ #1260 归属机判族（与 worker 步同一套，dispatch-timeouts.ts 单源）：
+ *    chief 回合的归属机 = 绑定 Agent 的归属机——总管未绑定 Agent / Agent
+ *    未设归属机 / 归属机离线 / 归属机在线但 runtime 闸挡 / 归属机有闲位
+ *    却超宽限不领（楔住）——各按同族宽限给可见失败，文案指名补法。
+ *    Agent 在但无模型位 = 可恢复配置缺口，不进失败漏斗（worker 面同律）。
  * 失败收尾 = finishStep chief 分支同语义：step 标 failed + finishChiefTurn
  * 清 activeRun + chief_turn_error system 行（会话流 message 事件即时推送 →
  * web toast + 失败行，#631 链原样消费）。机器在线且闸开时一律不动（busy
@@ -984,45 +940,57 @@ export function failAbandonedChiefSteps(
     if (!thread) continue; // 线程已删：无呈现面
     let reason: string | null = null;
     if (row.status === 'pending') {
-      // #864 T3：归属机离线超时（worker 步同政策，见 dispatch-timeouts.ts）。
-      // 先于「团队零在线机器」判——总管主力机离线时，别机领不走
-      // （claimChiefCandidates 过滤），回合同 worker 步一样会永挂。
-      // #1259：chief 回合的归属 = 总管主力机（chief.machineId 单源，线程
-      // 钉选列已退役）。
+      // #1260：chief 回合的归属 = 绑定 Agent 的归属机（与 worker 步同一套
+      // 判族同宽限，见 dispatch-timeouts.ts）。未绑定 Agent / Agent 未设
+      // 归属机 = 任何机器不可领——无期静默 pending 是 bug，宽限后可见失败。
       const chiefRow = deps.db.select().from(chief).where(eq(chief.id, thread.chiefId)).get();
-      const pinnedId = chiefRow?.machineId ?? null;
-      const pinnedRow =
-        pinnedId === null
-          ? undefined
-          : deps.db.select().from(machine).where(eq(machine.id, pinnedId)).get();
-      if (
-        pinnedId !== null &&
-        (pinnedRow === undefined || !pinnedRow.online) &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        reason = homeOfflineReason(pinnedRow?.name ?? null, CHIEF_PIN_OFFLINE_HINT);
-      }
-      // #881 ④b：钉选机在线但 runtime 闸挡（#864 登记缝的 chief 半边）。判据
-      // 镜像 buildChiefClaim 的闸——**绑定 Agent 的 provider**（模型覆盖
-      // provider+modelId 但不改闸判，两处须同源，漂移 = sweep 误杀 claim 能领
-      // 的回合）；闸判原语单源 = dispatch-eligibility。未绑定 Agent / 无模型位
-      // = 无人可领的另一族缝，不进本判。
-      if (
-        reason === null &&
-        pinnedId !== null &&
-        pinnedRow !== undefined &&
-        pinnedRow.online &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        const agentRow = chiefRow?.agentId
-          ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-          : undefined;
-        if (agentRow?.modelId != null && !runtimeGatePasses(pinnedRow, agentRow.provider)) {
-          reason = homeRuntimeBlockedReason(
-            pinnedRow.name,
-            stepRuntimeFor(agentRow.provider),
-            CHIEF_PIN_RUNTIME_HINT,
-          );
+      const agentRow = chiefRow?.agentId
+        ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
+        : undefined;
+      if (chiefRow?.agentId == null || agentRow === undefined) {
+        if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
+          reason = CHIEF_UNBOUND_REASON;
+        }
+      } else if (agentRow.modelId != null) {
+        // Agent 在但无模型位 = 可恢复的配置缺口（补模型即可领），不按失败
+        // 收口——worker 面同律（#1104 只收「无 Agent」族）。
+        if (agentRow.machineId === null) {
+          if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
+            reason = noHomeReason(agentRow.displayName, CHIEF_NO_HOME_HINT);
+          }
+        } else {
+          const homeRow = deps.db
+            .select()
+            .from(machine)
+            .where(eq(machine.id, agentRow.machineId))
+            .get();
+          if (
+            (homeRow === undefined || !homeRow.online) &&
+            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
+          ) {
+            reason = homeOfflineReason(homeRow?.name ?? null, CHIEF_PIN_OFFLINE_HINT);
+          }
+          if (
+            reason === null &&
+            homeRow !== undefined &&
+            homeRow.online &&
+            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
+          ) {
+            // 闸判原语单源 = dispatch-eligibility（与 buildChiefClaim 同源，
+            // 漂移 = sweep 误杀 claim 能领的回合）。
+            if (!runtimeGatePasses(homeRow, agentRow.provider)) {
+              reason = homeRuntimeBlockedReason(
+                homeRow.name,
+                stepRuntimeFor(agentRow.provider),
+                CHIEF_PIN_RUNTIME_HINT,
+              );
+            } else if (
+              now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
+              machineRunningCount(deps.db, homeRow.id) < homeRow.maxConcurrent
+            ) {
+              reason = homeWedgeReason(homeRow.name, CHIEF_PIN_WEDGE_HINT);
+            }
+          }
         }
       }
       if (reason === null) {

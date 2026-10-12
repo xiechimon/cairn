@@ -1430,12 +1430,8 @@ export function mapChief(
     bound,
     ...(bound && env.agentActor
       ? {
-          // #615: 行值 = 生效模型（覆盖槽优先，回退绑定 Agent 模型）；`· 默认`
-          // 徽标只在继承态（覆盖槽 null）挂——覆盖态裸模型名，dialog 的 check
-          // 位承担「显式选过」的语义。
-          modelSlot: `${env.chief.model?.modelId ?? env.agentActor.modelId ?? 'n/a'}${
-            env.chief.model == null ? ' · 默认' : ''
-          }`,
+          // #1260：行值 = 绑定 Agent 自身模型（chief 无覆盖槽）。
+          modelSlot: env.agentActor.modelId ?? 'n/a',
           // #444: FAB 头像位 = 绑定 Agent 全记录里的既有字段（封套已带，
           // 零新增请求）；id 供 team chart 组织图定位根节点（同一封套，
           // 同为零新增请求）。
@@ -1444,8 +1440,8 @@ export function mapChief(
             displayName: env.agentActor.displayName,
             avatarUrl: env.agentActor.avatarUrl,
           },
-          // #615 返工：运行时标记位 = 生效模型 provider（覆盖槽优先）。
-          modelProvider: env.chief.model?.provider ?? env.agentActor.provider,
+          // 运行时标记位 = 绑定 Agent 的 provider。
+          modelProvider: env.agentActor.provider,
         }
       : {}),
     threadTitle: active?.title ?? '新主题',

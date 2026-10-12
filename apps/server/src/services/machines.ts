@@ -114,7 +114,7 @@ import {
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
-import { SESSION_WEDGE_GRACE_MS, stepActivityAt } from './dispatch-timeouts.js';
+
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
@@ -591,24 +591,26 @@ function claimCandidates(deps: MachineDeps, machineId: string, teamId: string): 
   return rows;
 }
 
-/** chief 步候选（step.buildId = `chief-<threadId>`，join chief_thread 取 teamId；
- * 无 build/todo 行——Chief 回合 = 机器 step，r5 §3.1）。#1259：只投总管主力机
- * （chief.machineId；chief 会话文件是执行机本地资产，主力机固定 = 会话恒可
- * 续）；主力机未设 = 任何机器。 */
+/** chief 步候选（step.buildId = `chief-<threadId>`，join chief_thread 取
+ *  teamId；无 build/todo 行——Chief 回合 = 机器 step，r5 §3.1）。#1260：
+ *  chief = 名册里的普通 agent——去处 = 绑定 Agent 的归属机
+ *  （agent.machineId；chief 会话文件是执行机本地资产，归属固定 = 会话恒
+ *  可续）；未绑定 Agent / Agent 未设归属机 = 无候选（任何机器不可领，
+ *  sweep 负责可见失败）。候选携带 chiefRow/agentRow——buildChiefClaim 与
+ *  agent 并发闸不再回库重查。 */
 function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: string) {
   return deps.db
-    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief })
+    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief, agentRow: agent })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(
       and(
         eq(step.status, 'pending'),
         eq(step.kind, 'chief'),
         eq(chiefThread.teamId, teamId),
-        // #1259：chief 步只投总管主力机（chief.machineId，原线程钉选列已
-        // 退役）；主力机未设 = 任何机器（旧「未钉」语义）。
-        or(isNull(chief.machineId), eq(chief.machineId, machineId)),
+        eq(agent.machineId, machineId),
       ),
     )
     .orderBy(asc(step.createdAt))
@@ -626,44 +628,6 @@ export function agentForStep(
   return agentForStepEligibility(deps.db, todoRow, kind, prompt);
 }
 
-/** #1204 返工降级上下文组装（claim 载荷 reworkContext 位，continue 意图步
- *  携带）：planText = 本 build 最新版方案全文（返工步的新会话凭此知道「方案
- *  现在是什么」——返工指令只说改什么）；feedbacks = 会话内全部真实用户行
- *  （返工意见/重启反馈族），createdAt 升序。滤除面 = classifyUserText 的
- *  'task-prompt'/'synthetic' 分类（daemon 上传的组合 prompt 行）+
- *  GATE_ANNOUNCEMENTS 关卡宣告行（机械动作行，非意见）。两样皆空 = 返回
- *  undefined（字段省略，不载空手）。 */
-function reworkContextFor(
-  db: Db,
-  buildId: string,
-  todoRow: typeof todo.$inferSelect,
-): { planText: string | null; feedbacks: string[] } | undefined {
-  const planRow = db
-    .select({ content: planTable.content })
-    .from(planTable)
-    .where(eq(planTable.buildId, buildId))
-    .orderBy(desc(planTable.version))
-    .get();
-  const planText = planRow?.content ?? null;
-  const rows = db
-    .select({ content: message.content })
-    .from(message)
-    .where(and(eq(message.conversationId, buildId), eq(message.role, 'user')))
-    .orderBy(asc(message.createdAt))
-    .all();
-  const task = { title: todoRow.title, spec: todoRow.spec };
-  const feedbacks = rows
-    .map((r) => (typeof r.content === 'string' ? r.content : null))
-    .filter((c): c is string => c !== null)
-    .filter((c) => !GATE_ANNOUNCEMENTS.includes(c) && classifyUserText(c, task) === 'user');
-  if (planText === null && feedbacks.length === 0) return undefined;
-  return { planText, feedbacks };
-}
-
-/** chief 步 claim 载荷组装（remoteTools 51 词表全量 + chief 块 + 会话续轮判定）。
- * 无 todo/project 语境：chief「探测仓库」经 docs relay（server 端裸库读，A4
- * 黑盒逼近 r5 §3.1 的 worktree `git show`），故不下发 repo/git 载荷——避免死
- * 载荷（runner chief 分支本就不开 worktree）。 */
 /** executor 最低版本门（02 §7.1 版本墙形状；数值 = 复刻版本线 MCP_MIN_CLI_VERSION
  * [设计]）：机器自报 cliVersion 低于门 = claim 不携带 mcpServers（老 executor
  * 无薄桥，携带即死载荷）。未知版本（老注册行）= 不携带（保守 [设计]）。 */
@@ -716,70 +680,23 @@ function claimLocalTools(
   return tools;
 }
 
-/** #895 A4：chief 绑定 Agent 的 provider（亲和闸判与 buildChiefClaim 内闸
- * 同源——会话机开不了 chief 步所需 runtime = 它不是有效候选人）。 */
-function chiefAgentProviderOf(deps: MachineDeps, chiefId: string): string | null {
-  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow?.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
-  return agentRow?.provider ?? null;
-}
-
-/** #895 A4 chief 会话亲和（T2 对称，spec 21 机制总图）：未钉线程 + 会话已开
- * 时，持有链尾会话文件的机器（= 链尾 session 步的 machineId，查询与 worker
- * T2 prior 查询同型）若在线且 runtime 闸开 → 本机跳过该候选（步留 pending
- * 等会话机领；跳过只作用于当前候选，不挡同机领其它线程的步——每机可见性
- * 语义，无队头阻塞）。会话机离线/被删/闸关/归属空 → 放行本机（换机 =
- * daemon SessionNotResumable 回退新会话 + RESUME_FRESH_SESSION_NOTE 显式
- * 降级，#862 T1 契约不预判；亲和是软偏好，机器消失即刻放行，不等 T3 宽限
- * ——未钉线程不因亲和产生新的无界等待）。#1259：主力机已设的线程不亲和
- * （候选过滤下唯有主力机可见，亲和再挡 = 唯一可见者被挡死）。 */
-function chiefAffinityHeldByOther(
-  deps: MachineDeps,
-  threadRow: typeof chiefThread.$inferSelect,
-  machineId: string,
-): boolean {
-  // #1259：主力机已设的线程不亲和（SQL 过滤下唯有主力机可见，亲和再挡 =
-  // 唯一可见者被挡死）。
-  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  if (chiefRow?.machineId != null) return false;
-  if (threadRow.sessionId === '') return false; // 首轮：无会话文件依赖
-  const prior = deps.db
-    .select({ sessionId: step.sessionId, machineId: step.machineId })
-    .from(step)
-    .where(and(eq(step.buildId, threadRow.id), sql`${step.sessionId} is not null`))
-    .orderBy(asc(step.createdAt))
-    .all();
-  const owner = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
-  if (owner === null || owner.machineId === null || owner.machineId === machineId) return false;
-  const ownerRow = deps.db.select().from(machine).where(eq(machine.id, owner.machineId)).get();
-  if (ownerRow === undefined || !ownerRow.online) return false;
-  return runtimeGatePasses(ownerRow, chiefAgentProviderOf(deps, threadRow.chiefId));
-}
-
 function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
   stepRow: typeof step.$inferSelect,
   threadRow: typeof chiefThread.$inferSelect,
+  agentRow: typeof agent.$inferSelect,
   machineRow?: typeof machine.$inferSelect,
 ): ClaimedStep | null {
-  // 绑定 Agent（模型 = 绑定 Agent 模型，r5 §3.1）：未绑定/无模型 = 不可派发
-  // （server 侧不派发 [设计]，与门控条 canon 一致）。单次读 chief 行。
-  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-  const agentRow = chiefRow?.agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-    : undefined;
-  if (!chiefRow || !agentRow?.modelId) return null;
-  // #682 enabledRuntimes 真闸（chief 步同律）：chief 绑定 agent 的 runtime
-  // 机器未开 = 该机不可领本回合（候选循环自动试下一条 chief 步）。
+  // 绑定 Agent 无模型位 = 不可派发（server 侧不派发 [设计]，与门控条 canon
+  // 一致；sweep 的未设归属机/闸挡分支负责可见失败）。候选已 join 出
+  //  chiefRow/agentRow（claimChiefCandidates），此处零回库。
+  if (!agentRow.modelId) return null;
+  // #682 enabledRuntimes 真闸（chief 步同律）：绑定 agent 的 runtime 机器
+  // 未开 = 该机不可领本回合（候选循环自动试下一条 chief 步）。
   if (!machineRow || !runtimeGatePasses(machineRow, agentRow.provider)) return null;
-  // 思考强度覆盖（PATCH body agent.thinkingLevel，r5 §2）优先，回退绑定 Agent 值。
-  const thinkingLevel = chiefRow.thinkingLevel ?? agentRow.thinkingLevel;
-  // 主模型覆盖（#615，r5 107/108 独立「模型」选择器落库面）优先，回退绑定
-  // Agent 的 provider/modelId——覆盖是整对象换（provider+modelId 同槽）。
-  const model = chiefRow.model ?? { provider: agentRow.provider, modelId: agentRow.modelId };
+  // #1260 无继承态：模型/思考强度恒 = 绑定 Agent 自身配置（chief 行不再持
+  // model/compactionModel/thinkingLevel 覆盖槽）。
   const claimedAt = nowMs();
   const res = deps.db
     .update(step)
@@ -842,9 +759,9 @@ function buildChiefClaim(
       id: agentRow.id,
       displayName: agentRow.displayName,
       description: agentRow.description,
-      provider: model.provider,
-      modelId: model.modelId,
-      thinkingLevel,
+      provider: agentRow.provider,
+      modelId: agentRow.modelId,
+      thinkingLevel: agentRow.thinkingLevel,
       memories,
       // skills 白名单不携带（#372）：chief 是信任面，catalog 全量直通不受
       // 绑定 Agent 勾选约束（daemon 侧 isChief 判定双保险）。tools 同律不
@@ -872,34 +789,45 @@ async function tryClaim(
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
-  // #1108 并发门回归（maxConcurrent 列随本票复位——#503 摘除的前提「daemon
-  // 串行永不触顶」被 daemon 并行循环作废）：本机非 chief claimed 步数达上限 =
-  // worker 步不发，步留 pending（排队——对钉选机可见的步即该机队列，对未钉
-  // 步它机照领）。机器释放空位（finishStep 终态 wake）后下一轮 claim 即领。
-  // 老 daemon（串行循环）恒 1 ≤ N，闸对其永不触发 = 混版本零回归。
-  // #1148 chief 步不占槽：machineRunningCount 只数非 chief 步——满载 worker
-  // 时 chief 候选照发（workerCands 置空、earliestWorker = ∞，下方 chief 循
-  // 环不被挡）；仅 chief 在跑的机器满载不发 = 现状语义收窄到 worker 面。
-  // #1148 maxWorkers（claim body 自报）：worker 闸取 min(DB, 自报)——daemon
-  // 侧 env PACMAN_DAEMON_MAX_CONCURRENT 覆盖 DB 的 server 落点；缺省（老
-  // daemon）只按机器行。chief 不受它约束。
+  // #1108 并发门（maxConcurrent）：本机 claimed 步数达上限 = 步不发，留
+  // pending 排队（对归属本机的步即该机队列）。机器释放空位（finishStep
+  // 终态 wake）后下一轮 claim 即领。老 daemon（串行循环）恒 1 ≤ N，闸对
+  // 其永不触发 = 混版本零回归。#1260：chief 步占槽——machineRunningCount
+  // 不再剔除 chief，chief 候选与 worker 候选同闸（chief = 普通 agent，
+  // 无并发特权；Multica leader 同律）。
+  // #1148 maxWorkers（claim body 自报）：闸取 min(DB, 自报)——daemon 侧
+  // env PACMAN_DAEMON_MAX_CONCURRENT 覆盖 DB 的 server 落点；缺省（老
+  // daemon）只按机器行。
   const running = machineRunningCount(db, machineId);
   const workerCap = Math.min(
     machineRow.maxConcurrent,
     ...(maxWorkers !== undefined ? [maxWorkers] : []),
   );
-  const workerCands = running >= workerCap ? [] : claimCandidates(deps, machineId, teamId);
-  const chiefCands = claimChiefCandidates(deps, machineId, teamId);
+  const full = running >= workerCap;
+  const workerCands = full ? [] : claimCandidates(deps, machineId, teamId);
+  const chiefCands = full ? [] : claimChiefCandidates(deps, machineId, teamId);
   // chief 步与 worker 步共队列，按 createdAt FIFO 交错（chief 派工先于其产生的
-  // worker 步入队，天然领先；跨类型仍按 createdAt 保序 [设计]）。闸关（worker
-  // 满载）时 workerCands 空 = earliestWorker ∞——chief 照走（被挡的 worker 本
-  // 就不可领，不让它反过来饿死 chief）。
+  // worker 步入队，天然领先；跨类型仍按 createdAt 保序 [设计]）。
   const earliestWorker = workerCands[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
   for (const cand of chiefCands) {
     if (cand.stepRow.createdAt > earliestWorker) break; // worker 更早 → 先走 worker
-    // #895 A4：会话机持有本候选（在线且闸开）→ 让给它（见函数头注释）。
-    if (chiefAffinityHeldByOther(deps, cand.threadRow, machineId)) continue;
-    const claimed = buildChiefClaim(deps, machineId, cand.stepRow, cand.threadRow, machineRow);
+    // #1138 agent 级并发闸（chief 同律，#1260）：绑定 Agent 名下 claimed
+    // 步数（含 chief 步，dispatch-eligibility 单源归账）达 maxConcurrentTasks
+    // → 跳过本候选（公平排队是合法态，不进失败漏斗）。
+    if (
+      cand.agentRow.maxConcurrentTasks !== null &&
+      agentRunningCount(db, cand.agentRow.id) >= cand.agentRow.maxConcurrentTasks
+    ) {
+      continue;
+    }
+    const claimed = buildChiefClaim(
+      deps,
+      machineId,
+      cand.stepRow,
+      cand.threadRow,
+      cand.agentRow,
+      machineRow,
+    );
     if (claimed) {
       publishStepStatus(deps, claimed.step.id);
       return claimed;
@@ -1030,13 +958,6 @@ async function tryClaim(
             action: priorSessionId ? ('continue' as const) : ('new' as const),
             sessionId: priorSessionId,
           };
-    // #1204 返工降级上下文：continue 意图步（本会话已有 prior session）携带
-    // 最新方案全文 + 全部历史返工意见——daemon 续接失败回退新会话时注入首轮
-    // prompt（续接成功不消费）。空上下文省略字段。
-    const reworkContext =
-      session.action === 'continue'
-        ? reworkContextFor(db, cand.stepRow.buildId, cand.todoRow)
-        : undefined;
     const projectRow = db
       .select()
       .from(project)
@@ -1093,7 +1014,6 @@ async function tryClaim(
       conversationId: cand.stepRow.buildId, // buildId ≡ conversationId（CONTEXT.md）
       session,
       ...(instruction !== null ? { instruction } : {}),
-      ...(reworkContext !== undefined ? { reworkContext } : {}),
       todo: {
         id: cand.todoRow.id,
         seqNum: cand.todoRow.seqNum,

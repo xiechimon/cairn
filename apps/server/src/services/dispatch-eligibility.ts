@@ -18,7 +18,7 @@ import {
 } from '@pacman/shared';
 import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, step, todo } from '../db/schema.js';
+import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
 
 /** #682 enabledRuntimes 真闸——步的 runtime 判定（与 daemon runner 的
  *  backendFor 同律：agent provider ∈ BACKEND_RUNTIME_IDS → claude-code，
@@ -124,29 +124,31 @@ export function unassignedStepReason(
   return `plan 步无指派 Agent：assignment 的 plan 槽为空，无人可领。指派 Agent 后重新运行任务。`;
 }
 
-/** #1108 机器在跑 worker 步数（非 chief——chief 不占并发槽；容量闸、机器页
- * `执行中 n/N`、排队快照三处同源同数）。#1219 从 machines.ts 下沉本叶子：
- * sweepAbandonedBuildSteps（builds.ts）的 ④c 宽限判据要「钉选机有无空闲
- * 并发位」——machines → builds 是既有正向边，值 import 会成环，与 #881 把
- * runtime 判定下沉至此同理。machines.ts re-export 保持既有导入面不变。 */
+/** #1108 机器在跑步数（worker + chief 同数——#1260 起 chief 占并发槽，
+ *  容量闸、机器页 `执行中 n/N`、排队快照三处同源同数）。#1219 从
+ *  machines.ts 下沉本叶子：sweepAbandonedBuildSteps（builds.ts）的 ④c
+ *  宽限判据要「归属机有无空闲并发位」——machines → builds 是既有正向
+ *  边，值 import 会成环，与 #881 把 runtime 判定下沉至此同理。
+ *  machines.ts re-export 保持既有导入面不变。 */
 export function machineRunningCount(db: Db, machineId: string): number {
   return db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
+    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
     .all().length;
 }
 
-/** #1138 agent 级在跑计数：该 Agent 名下 claimed worker 步数（机器无关
- *  ——agent 池跨机器，与 Multica agent 层闸同形，r10 §5.4）。归账 = 槽位
+/** #1138 agent 级在跑计数：该 Agent 名下 claimed 步数（机器无关——agent
+ *  池跨机器，与 Multica agent 层闸同形，r10 §5.4）。worker 步归账 = 槽位
  *  解析（本文件 agentIdForStep 单源，与 claim 候选解析同一份事实）：join
  *  step⋈build⋈todo，孤儿步（无 build 行——测试占位与极端残行）天然不计；
- *  chief 步 buildId 是线程 id 无 build 行，join 自动缺席 =「#1148 chief 不
- *  占槽」的 agent 面同律。步领取后 assignment 改派的窄窗按当前槽位归账
- *  （闸是公平性约束，不是所有权账本——与亲和面读 prior session 步的
- *  machineId 同款现读口径）。与 machineRunningCount 同居本叶子：消费同
- *  文件的 agentIdForStep，machines.ts 的 tryClaim 跨文件消费（machines →
- *  本叶子是既有正向边，本文件不 import 任何 service，无环）。 */
+ *  chief 步归账 = chiefThread→chief.agentId（#1260：chief = 普通 agent，
+ *  其回合占绑定 Agent 的槽——Multica leader 无并发特权同律，agent 表
+ *  max_concurrent_tasks 对 leader 一视同仁）。步领取后 assignment 改派的
+ *  窄窗按当前槽位归账（闸是公平性约束，不是所有权账本——现读口径）。
+ *  与 machineRunningCount 同居本叶子：消费同文件的 agentIdForStep，
+ *  machines.ts 的 tryClaim 跨文件消费（machines → 本叶子是既有正向边，
+ *  本文件不 import 任何 service，无环）。 */
 export function agentRunningCount(db: Db, agentId: string): number {
   const rows = db
     .select({ kind: step.kind, prompt: step.prompt, todoRow: todo })
@@ -155,7 +157,17 @@ export function agentRunningCount(db: Db, agentId: string): number {
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(step.status, 'claimed'), ne(step.kind, 'chief')))
     .all();
-  return rows.filter((r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId).length;
+  const workerCount = rows.filter(
+    (r) => agentIdForStep(r.todoRow, r.kind, r.prompt) === agentId,
+  ).length;
+  const chiefCount = db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .where(and(eq(step.status, 'claimed'), eq(step.kind, 'chief'), eq(chief.agentId, agentId)))
+    .all().length;
+  return workerCount + chiefCount;
 }
 
 /** #1259 归属机校验（创建/换绑/整机迁移共用单源）：归属机必须启用该 agent

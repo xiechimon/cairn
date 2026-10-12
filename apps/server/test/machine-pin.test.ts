@@ -6,10 +6,12 @@
 //    build-abandoned-sweep.test.ts）。
 // 2. runtime 真闸（#682 语义不变）：归属机未开步所需 runtime → 领不到；
 //    开回 → 领到（PATCH 热写秒级生效）。
-// 3. chief 主力机投递：chief.machineId 设 → 唯它可领 chief 步；未设 → 任意机。
-// 4. PATCH /chief machineId 槽三态（界外 400 / null 清回 / undefined 不动）。
-// 5. GET /chief orchestration 封套：defaultMachineId + running/waiting 计数
-//    （waiting = 主力机当前不可执行的 pending 回合）。
+// 3. chief 步投递（#1260）：去处 = 绑定 Agent 的归属机——Agent 绑 B → 唯
+//    B 可领 chief 步；Agent 换绑 A → A 领（chief 行不再持机器槽）。
+// 4. PATCH /chief 退役槽：machineId/model/compactionModel 不再受理（schema
+//    面归 chief-demotion.test.ts 与 shared records 测试）。
+// 5. GET /chief orchestration 封套：homeMachineId（= 绑定 Agent 的归属机）
+//    + running/waiting 计数（waiting = 归属机当前不可执行的 pending 回合）。
 // 6. 0022 回填（存量 [] 机器行 → ['pi']）幂等，与本票解耦保留。
 
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -259,8 +261,8 @@ describe('#682 runtime 真闸（语义不变，归属机版）', () => {
   });
 });
 
-describe('#1259 chief 主力机投递', () => {
-  async function bindChief(w: World, machineId: string | null): Promise<string> {
+describe('#1260 chief 步投递 = 绑定 Agent 归属机', () => {
+  function bindChief(w: World): void {
     const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
     w.s.db
       .insert(chiefTable)
@@ -271,81 +273,45 @@ describe('#1259 chief 主力机投递', () => {
         agentId: AGENT_ID,
         charter: '',
         createdAt: Date.now(),
-        machineId,
       })
       .run();
-    return chiefId;
   }
 
-  test('主力机设 → 唯它可领 chief 步；未设 → 任意机', async () => {
+  test('Agent 绑 B → 唯 B 可领 chief 步；Agent 换绑 A → A 领（改派即时生效）', async () => {
     const w = await setupWorld();
-    await bindChief(w, w.machineBId);
+    bindChief(w);
+    // Agent 换绑 B：chief 步只投 B。
+    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
+      machineId: w.machineBId,
+    });
+    expect(rebind.status).toBe(200);
     const todoId = await createTodo(w.s, w.projectId);
     const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
     expect(res.status).toBe(201);
-
-    // A 领不到（chief 步只投主力机 B）；B 领到。
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
     const got = await claim(w.s.app, w.tokenB);
     expect(got).not.toBeNull();
     expect(got!.step.kind).toBe('chief');
 
-    // 对照：主力机清回（PATCH null）→ 任意机可领。
-    const clear = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      machineId: null,
+    // 换回 A：新回合 A 领、B 空手。
+    const back = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
+      machineId: w.machineAId,
     });
-    expect(clear.status).toBe(200);
+    expect(back.status).toBe(200);
     const todoId2 = await createTodo(w.s, w.projectId);
     const res2 = await req(w.s.app, 'POST', `/api/todos/${todoId2}/orchestrate`, {});
     expect(res2.status).toBe(201);
+    expect(await claim(w.s.app, w.tokenB)).toBeNull();
     const got2 = await claim(w.s.app, w.tokenA);
     expect(got2).not.toBeNull();
     expect(got2!.step.kind).toBe('chief');
   });
 });
 
-describe('#895 PATCH /chief machineId 槽（spec 21 A7）', () => {
-  async function patchMachine(
-    w: World,
-    body: Record<string, unknown>,
-  ): Promise<{ status: number; json: () => Promise<unknown> }> {
-    return req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, body);
-  }
-
-  function envelopeMachineId(res: unknown): string | null {
-    const body = res as { chief: { machineId: string | null } };
-    return body.chief.machineId;
-  }
-
-  test('失败方式 E：界外机器 400（todos 同律）；合法 id 落库并经封套透出', async () => {
-    const w = await setupWorld();
-    const bad = await patchMachine(w, { machineId: 'machine-not-in-team' });
-    expect(bad.status).toBe(400);
-
-    const ok = await patchMachine(w, { machineId: w.machineAId });
-    expect(ok.status).toBe(200);
-    expect(envelopeMachineId(await ok.json())).toBe(w.machineAId);
-  });
-
-  test('失败方式 F：null 清回自动；undefined 不动（charter PATCH 不碰 machineId）', async () => {
-    const w = await setupWorld();
-    await patchMachine(w, { machineId: w.machineAId });
-    const cleared = await patchMachine(w, { machineId: null });
-    expect(cleared.status).toBe(200);
-    expect(envelopeMachineId(await cleared.json())).toBeNull();
-
-    // 重设后走「槽缺席」路径：PATCH charter 不带 machineId → 值不动。
-    await patchMachine(w, { machineId: w.machineBId });
-    const untouched = await patchMachine(w, { charter: '优先本机执行。' });
-    expect(untouched.status).toBe(200);
-    expect(envelopeMachineId(await untouched.json())).toBe(w.machineBId);
-  });
-});
-
-describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
+describe('#895 GET /chief orchestration 封套（spec 21 A5；#1260 换源）', () => {
   interface OrchestrationBlock {
     orchestration: {
-      defaultMachineId: string | null;
+      homeMachineId: string | null;
       activity: { machineId: string; running: number; waiting: number }[];
     };
   }
@@ -371,11 +337,11 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
       .run();
   }
 
-  test('失败方式 G：投影——defaultMachineId + running（claimed）/ waiting（主力机不可执行的 pending）计数', async () => {
+  test('失败方式 G：投影——homeMachineId + running（claimed）/ waiting（归属机不可执行的 pending）计数', async () => {
     const w = await setupWorld();
+    // chief 绑定 AGENT_ID（出生绑 A）→ homeMachineId = A。
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
-      machineId: w.machineAId,
+      agent: { agentId: AGENT_ID },
     });
     // running：A 上一个 claimed chief 步。
     const t1 = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
@@ -383,7 +349,7 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
     });
     const thread1 = ((await t1.json()) as { thread: { id: string } }).thread.id;
     setChiefStep(w.s, thread1, { status: 'claimed', machineId: w.machineAId });
-    // waiting：主力机 A 离线（直写 DB），新回合 pending → 计入 A 的 waiting。
+    // waiting：归属机 A 离线（直写 DB），新回合 pending → 计入 A 的 waiting。
     w.s.db
       .update(machineTable)
       .set({ online: false })
@@ -394,19 +360,22 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
     });
 
     const body = await getEnvelope(w);
-    expect(body.orchestration.defaultMachineId).toBe(w.machineAId);
+    expect(body.orchestration.homeMachineId).toBe(w.machineAId);
     const activityA = body.orchestration.activity.find((a) => a.machineId === w.machineAId);
     expect(activityA?.running).toBe(1);
     expect(activityA?.waiting).toBe(1);
   });
 
-  test('失败方式 H：waiting 判据——主力机在线但 runtime 闸关也计入（T3 缝隙可见性）', async () => {
+  test('失败方式 H：waiting 判据——归属机在线但 runtime 闸关也计入（T3 缝隙可见性）', async () => {
     const w = await setupWorld();
-    // B 只开 claude-code；chief 绑定 agent = stub-gw → pi 档；主力机 = B。
+    // B 只开 claude-code；chief 绑定 agent = stub-gw → pi 档；Agent 换绑 B。
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      agent: { agentId: AGENT_ID, thinkingLevel: null },
+      agent: { agentId: AGENT_ID },
+    });
+    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineBId,
     });
+    expect(rebind.status).toBe(200);
     await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
       enabledRuntimes: ['claude-code'],
     });
@@ -420,14 +389,15 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
     });
 
     const body = await getEnvelope(w);
+    expect(body.orchestration.homeMachineId).toBe(w.machineBId);
     const activityB = body.orchestration.activity.find((a) => a.machineId === w.machineBId);
     expect(activityB?.waiting).toBe(1);
   });
 
-  test('回归红线：未设主力机 + 无 chief 步 → defaultMachineId null + activity 空', async () => {
+  test('回归红线：chief 未绑定 Agent + 无 chief 步 → homeMachineId null + activity 空', async () => {
     const w = await setupWorld();
     const body = await getEnvelope(w);
-    expect(body.orchestration.defaultMachineId).toBeNull();
+    expect(body.orchestration.homeMachineId).toBeNull();
     expect(body.orchestration.activity).toEqual([]);
   });
 });

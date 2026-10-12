@@ -15,7 +15,14 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { agent as agentTable, chief as chiefTable, chiefThread } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
-import { bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import {
+  bindAgentHome,
+  bootServer,
+  issueApiKey,
+  machineIdByName,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-route-1';
 
@@ -76,6 +83,8 @@ async function claimToken(): Promise<string> {
     body: JSON.stringify({ teamId, name: 'route-probe', cliVersion: '0.1.0' }),
   });
   expect(enroll.status).toBe(200);
+  // #1260：chief 步只投绑定 Agent 的归属机——认领机即归属机。
+  bindAgentHome(s, AGENT_ID, machineIdByName(s, 'route-probe'));
   return ((await enroll.json()) as { token: string }).token;
 }
 

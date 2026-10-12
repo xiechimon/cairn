@@ -134,18 +134,6 @@ export const claimedStepSchema = z.object({
    * 「v2 内容忠实执行反馈」的宿主等价物）、chief 回合任务文本/wake 事实。
    * 缺省 = daemon 按 kind 兜底（CONTINUE_PROMPTS）或 title+spec 任务文本。 */
   instruction: z.string().nullable().optional(),
-  /** #1204 返工降级上下文：continue 意图步在 daemon 侧续接失败
-   *  （SessionNotResumable 回退新会话）时补注的既有事实——最新版方案全文
-   *  （plan 表 max version）+ 会话内全部真实用户行（返工意见族，合成模板与
-   *  关卡宣告行滤除）。新会话无前轮记忆，凭此重建；续接成功路径不消费。
-   *  server 在 session.action='continue' 的 worker 步携带（空上下文 = 省略）；
-   *  纯增可选字段无版本墙：旧 daemon 忽略 = 现行为。 */
-  reworkContext: z
-    .object({
-      planText: z.string().nullable(),
-      feedbacks: z.array(z.string()),
-    })
-    .optional(),
   /** worker 步任务面；chief 步缺省（无 todo 语境，r5 §3.1）。 */
   todo: z
     .object({

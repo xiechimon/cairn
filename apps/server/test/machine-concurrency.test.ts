@@ -326,8 +326,8 @@ describe('#1108 排队投影（位次 + 等待对象 + 读面挂载）', () => {
         teamId: w.s.team.id,
         agentId: AGENT_ID,
         charter: '',
-        // #1259：总管主力机 = A（chief 步归属单源；投影的 waitingFor 快照源）。
-        machineId: w.machineAId,
+        // #1260：chief 步的归属 = 绑定 Agent 的归属机（AGENT_ID 出生绑 A；
+        // 投影的 waitingFor 快照源）。
         createdAt: now,
       })
       .run();

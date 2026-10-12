@@ -6,9 +6,11 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
   agentMemory,
+  agent as agentTable,
   chiefMessage,
   chief as chiefTable,
   chiefThread,
+  machine as machineTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -78,73 +80,26 @@ describe('总管设置 4 tab + PATCH /chief（r5 §2）', () => {
     expect(patched.chief.charter).toBe('');
   });
 
-  test('PATCH /chief compactionModel 槽往返：写→GET 回显同值；缺省不动；null 清空（#203）', async () => {
-    type Env = { chief: { compactionModel: { provider: string; modelId: string } | null } };
-    // 默认 null（= 与 Chief 相同）。
-    const fresh = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(fresh.chief.compactionModel).toBeNull();
-    // 写 → 响应回显同值。
-    const model = { provider: 'stub-gw', modelId: 'm-fast' };
-    const set = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      compactionModel: model,
-    });
-    expect(set.status).toBe(200);
-    expect(((await set.json()) as Env).chief.compactionModel).toEqual(model);
-    // GET 回显同值。
-    const got = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(got.chief.compactionModel).toEqual(model);
-    // 缺省不动：PATCH 别的槽不清压缩模型。
-    const other = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      charter: '不动它',
-    });
-    expect(((await other.json()) as Env).chief.compactionModel).toEqual(model);
-    // null 清空 → GET 回显 null。
-    const cleared = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      compactionModel: null,
-    });
-    expect(cleared.status).toBe(200);
-    expect(((await cleared.json()) as Env).chief.compactionModel).toBeNull();
-    const after = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(after.chief.compactionModel).toBeNull();
-  });
-
-  test('PATCH /chief model 槽往返：写→GET 回显同值；缺省不动；null 清空回绑定 Agent 继承（#615）', async () => {
-    type Env = { chief: { model: { provider: string; modelId: string } | null } };
-    // 默认 null（= 继承绑定 Agent 模型）。
-    const fresh = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(fresh.chief.model).toBeNull();
-    // 写 → 响应回显同值。
-    const model = { provider: 'stub-gw', modelId: 'm-override' };
-    const set = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, { model });
-    expect(set.status).toBe(200);
-    expect(((await set.json()) as Env).chief.model).toEqual(model);
-    // GET 回显同值。
-    const got = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(got.chief.model).toEqual(model);
-    // 缺省不动：PATCH 别的槽不清主模型覆盖。
-    const other = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
-      charter: '不动它',
-    });
-    expect(((await other.json()) as Env).chief.model).toEqual(model);
-    // null 清空 → GET 回显 null（回继承）。
-    const cleared = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, { model: null });
-    expect(cleared.status).toBe(200);
-    expect(((await cleared.json()) as Env).chief.model).toBeNull();
-    const after = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
-    expect(after.chief.model).toBeNull();
-  });
-
-  // #903（ADR 0014）：派发设置槽已删——判定权归 chief（run_builds 的
-  // withPlan 逐次判定），服务端不再留常设槽。失败方式——① PATCH 单独
-  // dispatchWithPlan 仍被当槽受理（僵尸槽没拆干净）；② GET 封套仍投影该键
-  // （契约面残留，web 会重建哑控件）；③ 与合法槽混发时该键被落库。
-  test('PATCH /chief 不再受理 dispatchWithPlan：设置槽已删、封套无该键（#903）', async () => {
+  // 退役槽族（#903 dispatchWithPlan——ADR 0014 判定权归 chief；#1260
+  // machineId/model/compactionModel——总管降级，模型与去处读绑定 Agent
+  // 自身配置）。失败方式——① PATCH 单独发退役槽仍被受理（僵尸槽没拆干净）；
+  // ② GET 封套仍投影该键（契约面残留，web 会重建哑控件）；③ 与合法槽混发
+  // 时该键被落库。
+  test('PATCH /chief 不再受理退役槽（#903 dispatchWithPlan；#1260 machineId/model/compactionModel）', async () => {
     type Env = { chief: Record<string, unknown> };
-    // 单独发 = 五槽皆无 → refine 400（dispatchWithPlan 不再是槽位）。
+    // 单独发 = 两槽皆无 → refine 400（退役键被剥离后视同空 body）。
     const lone = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       dispatchWithPlan: false,
     });
     expect(lone.status).toBe(400);
+    for (const retired of [
+      { machineId: 'm-x' },
+      { model: { provider: 'stub-gw', modelId: 'm-x' } },
+      { compactionModel: { provider: 'stub-gw', modelId: 'm-x' } },
+    ]) {
+      const res = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, retired);
+      expect(res.status).toBe(400);
+    }
     // 与合法槽混发 → 200，但该键被 schema 剥离：封套不回显、不落库。
     const withCharter = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       charter: '章程照常',
@@ -156,11 +111,17 @@ describe('总管设置 4 tab + PATCH /chief（r5 §2）', () => {
     expect('dispatchWithPlan' in patched.chief).toBe(false);
     const got = (await (await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief`)).json()) as Env;
     expect('dispatchWithPlan' in got.chief).toBe(false);
+    // #1260：封套投影面无三键（records 面同钉，见 shared records 测试）。
+    expect('machineId' in got.chief).toBe(false);
+    expect('model' in got.chief).toBe(false);
+    expect('compactionModel' in got.chief).toBe(false);
   });
 
-  test('chief 步 claim 载荷消费 model 覆盖：覆盖在 → 覆盖值；null → 绑定 Agent 模型（#615）', async () => {
+  test('chief 步 claim 载荷恒 = 绑定 Agent 自身模型（#1260 无继承态）', async () => {
     // 机器面（machine-wire 同配方）：发行 key → Bearer key enroll 拿 machine
-    // token → Bearer token claim。pending step 在队时 claim 立即返回。
+    // token → Bearer token claim。#1260：chief 步只投绑定 Agent 的归属机——
+    // 把 AGENT_ID 的归属机指到刚注册的探针机（DB 直写，claim 闸读
+    // agent.machineId）。
     const plain = await issueApiKey(H.s);
     const enroll = await H.s.app.request('/api/machine/enroll', {
       method: 'POST',
@@ -169,6 +130,12 @@ describe('总管设置 4 tab + PATCH /chief（r5 §2）', () => {
     });
     expect(enroll.status).toBe(200);
     const { token } = (await enroll.json()) as { token: string };
+    const probe = H.s.db
+      .select()
+      .from(machineTable)
+      .where(eq(machineTable.name, 'chief-override-probe'))
+      .get()!;
+    H.s.db.update(agentTable).set({ machineId: probe.id }).where(eq(agentTable.id, AGENT_ID)).run();
     const claim = async () => {
       const res = await H.s.app.request('/api/machine/tasks/claim', {
         method: 'POST',
@@ -180,27 +147,23 @@ describe('总管设置 4 tab + PATCH /chief（r5 §2）', () => {
       if (body.step === null) throw new Error('claim 空手：chief 步未入队或被抢');
       return body.step.agent.modelId;
     };
-    const turn = async (content: string) => {
-      const send = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, { content });
-      expect(send.status).toBe(201);
-    };
 
-    // 无覆盖 → 绑定 Agent 模型（seedAgent 默认 stub-model）。
-    await turn('覆盖前回合。');
+    // 载荷 = 绑定 Agent 的 modelId（harness seed stub-model）。
+    const send = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
+      content: '模型来源探针。',
+    });
+    expect(send.status).toBe(201);
     expect(await claim()).toBe('stub-model');
 
-    // 覆盖在 → 载荷带覆盖值（provider+modelId 都换）。
+    // 覆盖入口已不存在：PATCH model → 400；下一回合载荷不变。
     const override = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, {
       model: { provider: 'stub-gw', modelId: 'm-override' },
     });
-    expect(override.status).toBe(200);
-    await turn('覆盖中回合。');
-    expect(await claim()).toBe('m-override');
-
-    // 清空 → 回绑定 Agent 模型。
-    const cleared = await req(H.s.app, 'PATCH', `/api/teams/${H.teamId}/chief`, { model: null });
-    expect(cleared.status).toBe(200);
-    await turn('清空后回合。');
+    expect(override.status).toBe(400);
+    const send2 = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, {
+      content: '覆盖已退役回合。',
+    });
+    expect(send2.status).toBe(201);
     expect(await claim()).toBe('stub-model');
   });
 

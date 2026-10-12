@@ -11,8 +11,9 @@
 // 5. 跨机归账 + 与机器闸的 min 合成：机器有空位（machine 闸开）但该
 //    Agent 在**其它机器**上的 claimed 步已计入 → 仍不领（agent 池跨机器；
 //    两层各自 gate 的自然结果，无集中取 min 的判定）。
-// 6. chief 步不占 agent 槽（#1148 对称）：该 Agent 的 chief 步在跑 →
-//    worker 步照领（agent 计数只数非 chief worker 步）。
+// 6. chief 步占 agent 槽（#1260）：该 Agent 的 chief 步在跑 → 同 Agent
+//    的 worker 步被闸（agent 计数经 chiefThread→chief.agentId 归账含
+//    chief 步——chief = 名册里的普通 agent，无并发特权）。
 // 7. review 步归账：claimed review 步的 agentId 在 prompt meta 头里 →
 //    计入该 Agent 的在跑数。
 // 8. 写面与投影：PATCH maxConcurrentTasks 落库即时生效；显式 null 清回
@@ -360,13 +361,16 @@ describe('#1138 闸间交互（跨机归账 / min 合成 / chief 不占槽 / rev
     );
   });
 
-  test('失败方式 6：chief 步不占 agent 槽（#1148 对称）——chief 在跑照领 worker', async () => {
+  test('失败方式 6：chief 步占 agent 槽（#1260 总管降级）——chief 在跑则同 Agent worker 被闸', async () => {
     const w = await setupWorld();
     setAgentCap(w, AGENT_A, 1);
     insertClaimedChiefStep(w.s, w, AGENT_A); // 该 agent 的 chief 步 claimed
     const { stepId } = insertPendingBuildStep(w.s, w, { agentId: AGENT_A });
-    const claimed = await claimAs(w);
-    expect(claimed?.step.id).toBe(stepId);
+    // agent 计数含 chief 步（经 chiefThread→chief.agentId 归账）→ 槽满。
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!.status).toBe(
+      'pending',
+    );
   });
 
   test('失败方式 7：review 步按 prompt meta 归账——计入该 agent 在跑数', async () => {

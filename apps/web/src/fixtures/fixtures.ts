@@ -42,8 +42,6 @@ export {
   chiefReady,
   chiefScrollLong,
   chiefSettings,
-  chiefSettingsMachines,
-  chiefSettingsStaleModel,
   chiefStreaming,
   chiefThread,
   chiefThreadsLong,

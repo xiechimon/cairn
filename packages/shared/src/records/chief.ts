@@ -1,7 +1,9 @@
 // chief records（chief_thread + chief_message 投影）——02 §4.3（r5 §2/§3 实测）。
-// Chief = 每「用户×团队」一个的调度与对话代理，特例 Agent 实例（记忆亦共用
-// 绑定 Agent）；执行形态 = 机器 step（conv 名 `chief-<threadId>`，UUIDv7）+
-// pi 会话（thread 记录 session.runtime:"pi"）。
+// Chief = 每「用户×团队」一个的调度与对话代理。#1260：chief = 名册里的普通
+// agent（对齐 Multica squad.leader_id → agent 行）——步的去处（归属机）、
+// 模型、思考强度、并发槽全部取绑定 Agent 自身配置；记忆亦共用绑定 Agent。
+// 执行形态 = 机器 step（conv 名 `chief-<threadId>`，UUIDv7）+ pi 会话
+//（thread 记录 session.runtime:"pi"）。
 // 复刻口径（02 §4.3 尾注）：Chief = 挂团队工具的 pi 会话，行为分毫不求同；
 // 下表为平价参照而非逐条复刻清单。
 
@@ -9,8 +11,6 @@ import { z } from 'zod';
 import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attachment-token.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
-import type { ModelSource } from './model-source.js';
-import { modelSourceRuntimeSchema } from './model-source.js';
 
 /** chief 实例 id 形 `chief-<userId>-<teamId>`（r5 §3.6/r2 §1.5 实测）。 */
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
@@ -30,70 +30,17 @@ export function newChiefThreadId(uuidv7: string): string {
   return `${CHIEF_THREAD_ID_PREFIX}${uuidv7}`;
 }
 
-/** 压缩模型槽值形（#203 server 长槽 [设计]：数据源 = 自定义 providers 真值 +
- * presets 兜底，#180 裁决）。对象形而非裸字符串：model id 只在 provider 内有
- * 意义（records/agent.ts provider+modelId 同构），裸串跨 provider 撞名。 */
-export const chiefCompactionModelSchema = z.object({
-  provider: z.string(),
-  modelId: z.string(),
-});
-export type ChiefCompactionModel = z.infer<typeof chiefCompactionModelSchema>;
-
-/** 存量主模型槽的发送前回落判定（#774 纯函数：server 收单 + 单测同源消费，
- *  web 不需要——回落由 server 算好随响应返回，客户端只管 toast 告知）。
- *
- * 触发条件：槽非空，且 provider 是已知非 pi runtime（toModelOptions 同律，
- * pi 段恒跳过），且 (provider, modelId) 未命中该段。典型案 = 本地 Claude
- * 运行时换过模型，旧 id 在 settings.json 里已无对应；段整体缺席（文件缺失/
- * 未安装）同判——该段零候选，存量值无从执行。
- *
- * 回落目标恒为 null（继承绑定 Agent = picker 默认行）：回到用户做覆盖选择
- * 之前的状态，不替用户发明模型选择（列表第一项可能是不同价格/质量的模型）。
- *
- * 不碰的（原样返回，fellBackFrom null）：
- * - 槽已 null / 命中候选——无动作；
- * - provider 不在 runtime 词表里（#770 前的 custom provider 存量值）：执行面
- *   仍按原值解析且可用，候选面无权裁决，动它等于毁掉可用配置；
- * - provider 为 pi：picker 从无此行，slot 不该持有，保守不动。 */
-export function resolveChiefModelFallback(
-  stored: ChiefCompactionModel | null,
-  sources: ModelSource[],
-): { effective: ChiefCompactionModel | null; fellBackFrom: ChiefCompactionModel | null } {
-  if (stored === null) return { effective: null, fellBackFrom: null };
-  // 未知命名空间先行：不是 runtime 词表成员 = custom relay 存量，无权裁决。
-  if (modelSourceRuntimeSchema.safeParse(stored.provider).success === false) {
-    return { effective: stored, fellBackFrom: null };
-  }
-  if (stored.provider === 'pi') return { effective: stored, fellBackFrom: null };
-  const hit = sources
-    .find((s) => s.runtime === stored.provider)
-    ?.models.some((m) => m.id === stored.modelId);
-  if (hit === true) return { effective: stored, fellBackFrom: null };
-  return { effective: null, fellBackFrom: stored };
-}
-
 export const chiefRecordSchema = z.object({
   id: z.string(),
   userId: recordId,
   teamId: recordId,
   /** 绑定 Agent（走 PATCH teams/{id}/chief + 二次确认，记忆不迁移告示，
-   * r5 §2）；未绑定 null。 */
+   * r5 §2）；未绑定 null。#1260：chief 的模型/思考强度/归属机全部读这
+   * 个 Agent 的自身配置，chief 记录不持覆盖槽。 */
   agent: z.object({ agentId: recordId }).nullable(),
   /** 章程 = 常设指示（r5 §2 章程 tab；空态「尚无章程。点击编辑，为总管添加
    * 常设指示。」）；raw 观测默认空串（chief-record-testA.json 一手）。 */
   charter: z.string().nullable(),
-  /** 压缩模型长槽（#203 [设计]，raw wire 无此键故 optional）；null = 默认
-   * （与 Chief 相同）。 */
-  compactionModel: chiefCompactionModelSchema.nullable().optional(),
-  /** 主模型覆盖长槽（#615 [设计]：r5 107/108 设置 Agent tab 的独立「模型」
-   * 选择器——可覆盖绑定 Agent 默认模型；pacman 此前缺整槽，抽屉模型行纯
-   * 显示）。值形同 compactionModel（model id 只在 provider 内有意义）；
-   * null = 继承绑定 Agent 模型（抽屉行尾 `· 默认` 徽标语义）。 */
-  model: chiefCompactionModelSchema.nullable().optional(),
-  /** 主力机（#895 spec 21 A1 [设计]，加法契约：老 web 忽略即退化现状）：
-   *  chief 的默认执行机器，null = 自动。#1259 起为 chief 步的归属单源
-   *  （线程钉选列已退役）：确定性、无自动回退、解除归用户。 */
-  machineId: recordId.nullable().optional(),
   lastTurnAt: epochMs.nullable(),
   createdAt: epochMs,
   /** 用户时区（raw chief-record-testA.json 一手 `tz:"Asia/Shanghai"`；
@@ -136,9 +83,8 @@ export type ActiveRun = z.infer<typeof activeRunSchema>;
 
 /** per 机编排活动计数（#895 spec 21 A5 [设计]）：machines 页三态读标注的
  * 数据源。running = 该机上 status='claimed' 的 chief 步数（总管回合正在该机
- * 执行）；waiting = 被钉到该机且 status='pending' 的 chief 步数 × 该机当前
- * 不可执行（离线或 runtime 闸关——T3 已知缝隙「在线但闸关 = 无界等待」
- * 借此获得可见性）。只出有计数的机器行（零计数码不进清单）。 */
+ * 执行）；waiting = 归属该机且 status='pending' 的 chief 步数 × 该机当前
+ * 不可执行（离线或 runtime 闸关）。只出有计数的机器行（零计数机器不进清单）。 */
 export const chiefOrchestrationActivitySchema = z.object({
   machineId: recordId,
   running: z.number().int(),
@@ -162,14 +108,14 @@ export const chiefGetResponseSchema = z.object({
   /** wakes[] 非空形态未实测（r5 §10：set_wake 实走遗留）[推断]，开放条目。 */
   wakes: z.array(z.record(z.string(), z.unknown())),
   /** 编排状态块（#895 spec 21 A5 [设计]，加法契约——optional：老封套/老
-   *  web 不带它仍可 parse，忽略即退化现状，machineId 槽同律）：defaultMachineId =
-   *  请求者主力机（chief.machineId，null = 自动）；activity = per 机
-   *  running/waiting 计数（team 域 chief 步计数——machines 页是团队面）。
-   *  消费方 = machines 页三态读标注（A8：join useMachines，行内零控件）。
-   *  server 恒发全块（getChiefEnvelope）；缺省仅出现在旧响应/旧客户端面。 */
+   *  web 不带它仍可 parse，忽略即退化现状）：homeMachineId = 绑定 Agent
+   *  的归属机（#1260：chief 步去处的唯一答案；未绑定/未设 = null）；
+   *  activity = per 机 running/waiting 计数（team 域 chief 步计数——
+   *  machines 页是团队面）。消费方 = machines 页三态读标注（A8：join
+   *  useMachines，行内零控件）。server 恒发全块（getChiefEnvelope）。 */
   orchestration: z
     .object({
-      defaultMachineId: recordId.nullable(),
+      homeMachineId: recordId.nullable(),
       activity: z.array(chiefOrchestrationActivitySchema),
     })
     .optional(),
@@ -194,10 +140,6 @@ export const chiefThreadSchema = z.object({
     openedAt: epochMs,
   }),
   pendingSessionResumeAt: epochMs.nullable(),
-  /** 机器亲和（#682，t-0047 ②-7/④-4）：chief 会话文件（pi sessionDir）是
-   * 执行机本地资产，轮换认领会降级 new session——chief 步按本列钉给固定
-   * 机器（claimChiefCandidates 过滤）。编排入口从 todo.machineId 落值；
-   * null = 未钉（现状：任何在线机器可认领）。 */
   /** 工具定义/结果哈希表（51 词表的哈希键面，r5 §3.1；词表本体归 M4）。 */
   toolDefHashes: z.record(z.string(), z.string()),
   toolResultHashes: z.record(z.string(), z.string()),
@@ -229,40 +171,23 @@ export type ChiefThread = z.infer<typeof chiefThreadSchema>;
  * `[#n](todo:<id>)`，自定义 URI markdown；消息形状见 records/message.ts）。 */
 export const CHIEF_ENTITY_REF_SCHEMES = ['agent', 'todo'] as const;
 
-/** PATCH /api/teams/{id}/chief body——`agent` 槽 = r5 §2 抓包原样；`charter`
- * 槽 = 章程 tab 保存面（保存 wire 未采 [推断]，同径 PATCH 最小逼近，04 §3
- * 不判负）；`compactionModel` 槽 = 压缩模型长槽（#203 [设计]，undefined =
- * 不动 / null = 清空回默认）；`model` 槽 = 主模型覆盖长槽（#615 [设计]，
- * undefined = 不动 / null = 清空回绑定 Agent 继承）；`machineId` 槽 =
- * 主力机（#895 spec 21 A7 [设计]，undefined = 不动 / null = 清回自动）。
- * 五槽至少一位。派发方式不设槽（#903，ADR 0014：判定权归 chief，
- * run_builds 的 withPlan 逐次判定，不留常设设置面）。 */
+/** PATCH /api/teams/{id}/chief body——`agent` 槽 = r5 §2 抓包原样（绑定/
+ * 换绑；#1260 起不再携带 thinkingLevel 覆盖——思考强度读绑定 Agent 自身
+ * 配置）；`charter` 槽 = 章程 tab 保存面（保存 wire 未采 [推断]，同径 PATCH
+ * 最小逼近，04 §3 不判负）。两槽至少一位。派发方式不设槽（#903，ADR 0014：
+ * 判定权归 chief，run_builds 的 withPlan 逐次判定，不留常设设置面）。 */
 export const patchChiefBodySchema = z
   .object({
     agent: z
       .object({
         agentId: recordId,
-        thinkingLevel: z.string().nullable(),
       })
       .nullish(),
     charter: z.string().nullish(),
-    compactionModel: chiefCompactionModelSchema.nullish(),
-    model: chiefCompactionModelSchema.nullish(),
-    /** 主力机槽（#895 spec 21 A7 [设计]）：undefined = 不动，null = 清回
-     *  自动；值 = 本团队机器 id（队外 400，todos machineId 同律）。 */
-    machineId: recordId.nullish(),
   })
-  .refine(
-    (b) =>
-      b.agent !== undefined ||
-      b.charter !== undefined ||
-      b.compactionModel !== undefined ||
-      b.model !== undefined ||
-      b.machineId !== undefined,
-    {
-      message: 'expected agent and/or charter and/or compactionModel and/or model and/or machineId',
-    },
-  );
+  .refine((b) => b.agent !== undefined || b.charter !== undefined, {
+    message: 'expected agent and/or charter',
+  });
 export type PatchChiefBody = z.infer<typeof patchChiefBodySchema>;
 
 /** 用户 → Chief 发消息（面板输入框 `有什么可以帮你的？`/steer 占位，r5 §3.6；

@@ -1,17 +1,16 @@
-// #1148 chief 步不占并发槽（server 面）：容量闸、读面 runningSteps、排队投影
-// 与 claim body maxWorkers（env 兜底的 server 消费面）。失败方式（先于实现
-// 固化）：
-// 1. chief 饿死回归：满载（非 chief claimed ≥ maxConcurrent）时 chief 步
-//    照领——闸只挡 worker 候选。
-// 2. chief 占位回归：仅 chief 在跑的机器满载不发 worker 步——chief 步不
-//    占槽，worker 照领。
-// 3. 读面口径：runningSteps（me / machines 列表 / waitingFor.running）只数
-//    非 chief claimed 步——chief 在跑不计入「执行中 n/N」的 n。
+// #1260 chief 步占并发槽（server 面）：总管降级为普通 agent——容量闸、
+// 读面 runningSteps、排队投影与 claim body maxWorkers 对 chief 与 worker
+// 同律（Multica leader 无并发特权同形）。失败方式（先于实现固化）：
+// 1. 满载（claimed ≥ maxConcurrent，含 chief 步计数）→ chief 候选同被闸：
+//    claim 空手、步留 pending（公平排队，不进失败漏斗）。
+// 2. chief 占位：仅 chief 在跑即占满（cap 1）→ worker 步空手。
+// 3. 读面口径：runningSteps（me / machines 列表 / waitingFor.running）
+//    含 chief 在跑步——「执行中 n/N」的 n 是全数。
 // 4. FIFO 保序（闸开时不变）：chief 候选晚于最早 worker 候选 → worker 先
-//    领；chief 更早 → chief 先领（现行行为零漂移）。
+//    领；chief 更早 → chief 先领（交错零漂移）。
 // 5. claim body maxWorkers（#1148 env 兜底的 server 侧）：DB 3 / body 1、
-//    1 worker 在跑 → worker 不发（min(DB, body) 闸），chief 照发；body 缺席
-//    （老 daemon）= 只按 DB 行。
+//    1 步在跑 → min(3,1) 闸满，chief 与 worker 同被闸；body 缺席（老
+//    daemon）= 只按 DB 行。
 // 6. body 校验：maxWorkers 0 → 400。
 
 import { eq } from 'drizzle-orm';
@@ -162,10 +161,7 @@ function insertClaimedStep(
 }
 
 /** 建线程 + pending chief 回合步（直插——sendChiefMessage 面归 chief.test）。 */
-function insertPendingChiefStep(
-  s: TestServer,
-  opts: { createdAt?: number; pin?: string | null } = {},
-): string {
+function insertPendingChiefStep(s: TestServer, opts: { createdAt?: number } = {}): string {
   const suffix = Math.random().toString(36).slice(2, 8);
   const threadId = `chief-cc-${suffix}`;
   const now = opts.createdAt ?? Date.now();
@@ -254,37 +250,40 @@ function setCap(w: World, cap: number): void {
     .run();
 }
 
-describe('#1148 chief 步不占并发槽（容量闸）', () => {
-  test('失败方式 1：满载 worker 时 chief 照领——闸只挡 worker', async () => {
+describe('#1260 chief 步占并发槽（容量闸）', () => {
+  test('失败方式 1：满载（worker 在跑占满）→ chief 空手、步留 pending', async () => {
     const w = await setupWorld();
     setCap(w, 1);
     // 占满唯一槽（worker claimed）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 });
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: Date.now() - 4000 });
-    const claimed = await claimAs(w);
-    expect(claimed?.step.id).toBe(chiefStepId); // chief 不被 worker 满载饿死
-    expect(claimed?.step.kind).toBe('chief');
+    expect(await claimAs(w)).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
   });
 
-  test('失败方式 2：仅 chief 在跑 → 槽不算占用，worker 照领', async () => {
+  test('失败方式 2：仅 chief 在跑即占满（cap 1）→ worker 空手', async () => {
     const w = await setupWorld();
     setCap(w, 1);
-    // 唯一在跑步是 chief——不占 worker 槽。
+    // 唯一在跑步是 chief——chief 步占槽。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     const workerStepId = insertPendingBuildStep(w.s, w);
-    const claimed = await claimAs(w);
-    expect(claimed?.step.id).toBe(workerStepId); // worker 不被 chief 在跑挡住
+    expect(await claimAs(w)).toBeNull();
+    expect(
+      w.s.db.select().from(stepTable).where(eq(stepTable.id, workerStepId)).get()!.status,
+    ).toBe('pending');
   });
 
   test('失败方式 4：闸开时 FIFO 保序零漂移（chief 更早 → chief 先；worker 更早 → worker 先）', async () => {
     const w = await setupWorld();
-    setCap(w, 2);
+    setCap(w, 4); // chief 占槽后三次在跑仍不触顶（3 < 4），保序断言不受闸干扰
     // 方向一：chief 更早入队 → chief 先领（闸开时现行交错保序）。
     const olderChief = insertPendingChiefStep(w.s, { createdAt: 1_000 });
     const worker = insertPendingBuildStep(w.s, w);
     const first = await claimAs(w);
     expect(first?.step.id).toBe(olderChief);
-    // 闸仍开（0 个 worker 在跑 < 2）→ 下一次领 worker。
+    // 闸仍开（1 在跑 < 4）→ 下一次领 worker。
     expect((await claimAs(w))?.step.id).toBe(worker);
     // 方向二：worker 更早 → worker 先领（同一 world 逆序再排一対）。
     const worker2 = insertPendingBuildStep(w.s, w);
@@ -295,14 +294,13 @@ describe('#1148 chief 步不占并发槽（容量闸）', () => {
       .get()!.createdAt;
     const newerChief = insertPendingChiefStep(w.s, { createdAt: worker2At + 1 });
     expect((await claimAs(w))?.step.id).toBe(worker2);
-    // 收尾一格后：newerChief（晚于 worker2）是唯一候选 → 照领（闸开时无饥饿）。
-    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, worker)).run();
+    // newerChief（晚于 worker2）是剩余唯一候选 → 照领（闸开时无饥饿）。
     expect((await claimAs(w))?.step.id).toBe(newerChief);
   });
 });
 
-describe('#1148 读面口径（runningSteps 只数非 chief 在跑）', () => {
-  test('失败方式 3：me / 机器列表 runningSteps 剔除 chief', async () => {
+describe('#1260 读面口径（runningSteps 含 chief 在跑）', () => {
+  test('失败方式 3：me / 机器列表 runningSteps 含 chief', async () => {
     const w = await setupWorld();
     setCap(w, 3);
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
@@ -311,16 +309,16 @@ describe('#1148 读面口径（runningSteps 只数非 chief 在跑）', () => {
       headers: { authorization: `Bearer ${w.tokenA}` },
     });
     const meBody = (await me.json()) as { maxConcurrent: number; runningSteps: number };
-    expect(meBody.runningSteps).toBe(1); // 2 claimed 中只数 worker
+    expect(meBody.runningSteps).toBe(2); // chief + worker 全数
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const rows = (await list.json()) as { id: string; runningSteps?: number }[];
-    expect(rows.find((r) => r.id === w.machineAId)?.runningSteps).toBe(1);
+    expect(rows.find((r) => r.id === w.machineAId)?.runningSteps).toBe(2);
   });
 
-  test('失败方式 3b：waitingFor.running 只数非 chief（排队投影）', async () => {
+  test('失败方式 3b：waitingFor.running 含 chief（排队投影）', async () => {
     const w = await setupWorld();
     setCap(w, 1);
-    // 归属本机的 pending 步在排队；本机在跑 1 chief（不占槽）。
+    // 归属本机的 pending 步在排队；本机在跑 1 chief（占槽）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     const target = insertPendingBuildStep(w.s, w);
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
@@ -331,7 +329,7 @@ describe('#1148 读面口径（runningSteps 只数非 chief 在跑）', () => {
     });
     expect(info?.waitingFor).toMatchObject({
       machineId: w.machineAId,
-      running: 0,
+      running: 1,
       capacity: 1,
     });
   });
@@ -355,21 +353,22 @@ describe('#1148 读面口径（runningSteps 只数非 chief 在跑）', () => {
   });
 });
 
-describe('#1148 claim body maxWorkers（env 兜底的 server 消费面）', () => {
-  test('失败方式 5：DB 3 / body 1、1 worker 在跑 → worker 不发；chief 照发', async () => {
+describe('#1148/#1260 claim body maxWorkers（env 兜底的 server 消费面）', () => {
+  test('失败方式 5：DB 3 / body 1、1 worker 在跑 → worker 与 chief 同被闸', async () => {
     const w = await setupWorld();
     setCap(w, 3); // DB 行给 3
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000 }); // 1 worker
     const workerStepId = insertPendingBuildStep(w.s, w);
-    // body 自报 1 → 闸取 min(3, 1)：running 1 ≥ 1 → worker 不发。
+    // body 自报 1 → 闸取 min(3, 1)：running 1 ≥ 1 → 满载，chief 同律不发。
     expect(await claimAs(w, { maxWorkers: 1 })).toBeNull();
     expect(
       w.s.db.select().from(stepTable).where(eq(stepTable.id, workerStepId)).get()!.status,
     ).toBe('pending');
-    // chief 不受 body 闸约束（#1148 语义）。
     const chiefStepId = insertPendingChiefStep(w.s, { createdAt: Date.now() - 4000 });
-    const claimed = await claimAs(w, { maxWorkers: 1 });
-    expect(claimed?.step.id).toBe(chiefStepId);
+    expect(await claimAs(w, { maxWorkers: 1 })).toBeNull();
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, chiefStepId)).get()!.status).toBe(
+      'pending',
+    );
   });
 
   test('失败方式 5b：body 缺席（老 daemon）= 只按 DB 行', async () => {

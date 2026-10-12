@@ -281,3 +281,16 @@ export function bindAllAgents(s: TestServer, machineId?: string): void {
   if (mid === undefined) throw new Error('bindAllAgents: 世界里还没有机器（先 enroll/插入）');
   s.db.update(agentTable).set({ machineId: mid }).run();
 }
+
+/** #1260 单 agent 绑定器：chief 绑定 Agent 的归属机 = chief 步去处——chief
+ *  语义测试在 enroll 认领机后调一次（bindAllAgents 的逐机变体）。 */
+export function bindAgentHome(s: TestServer, agentId: string, machineId: string): void {
+  s.db.update(agentTable).set({ machineId }).where(eq(agentTable.id, agentId)).run();
+}
+
+/** 按名字取本队机器 id（enroll 后读本队机器行）。 */
+export function machineIdByName(s: TestServer, name: string): string {
+  const row = s.db.select().from(machineTable).where(eq(machineTable.name, name)).get();
+  if (row === undefined) throw new Error(`machineIdByName: ${name} 不在库里`);
+  return row.id;
+}

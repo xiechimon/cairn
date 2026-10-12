@@ -295,6 +295,8 @@ describe('chief 写入点 → claim 反映（XMON-115）', () => {
         displayName: 'chief-agent-115',
         modelId: 'stub-model',
         provider: 'stub-gw',
+        // #1260：chief 步只投绑定 Agent 的归属机——认领机即归属机。
+        machineId: w.machineId,
       })
       .run();
     const patchRes = await call(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {

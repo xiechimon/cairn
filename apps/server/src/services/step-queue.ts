@@ -14,23 +14,24 @@
 // - 归属机未设（agent.machineId null）：没有机器可见该步——位次照算（同
 //   「无归属机」池），等待对象 = null（sweep 的未设归属机分支负责可见失败，
 //   排队面不编造机器）。
-// - chief 回合步：去处 = 总管主力机（chief.machineId），同口径。
+// - chief 回合步：去处 = 绑定 Agent 的归属机（#1260 总管降级——chief 无
+//   第二答案），同口径。
 // 已知近似（不修，登记）：无 Agent 的死步（#1104 修复后转 Fail）与 runtime
 // 闸挡的步也计入位次——它们「在队列里」从用户视角为真，排障入口在失败漏斗
 // 不在位次里扣。
 
 import type { StepQueueInfo } from '@pacman/shared';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
 import { agentForStep } from './dispatch-eligibility.js';
 
 /** 投影目标步的最小形状（调用方从各自读面取齐）。 */
 export interface QueueTargetStep {
   id: string;
   createdAt: number;
-  /** 该步的归属机（worker = agent.machineId；chief = chief.machineId）；
-   *  null = 无归属（任何机器不可见）。 */
+  /** 该步的归属机（worker = agent.machineId；chief = 绑定 Agent 的
+   *  machineId，#1260）；null = 无归属（任何机器不可见）。 */
   homeMachineId: string | null;
 }
 
@@ -57,17 +58,20 @@ export function stepQueueProjector(db: Db, teamId: string) {
     createdAt: r.createdAt,
     home: agentForStep(db, r.todoRow, r.kind, r.prompt)?.machineId ?? null,
   }));
-  // buildId = chief thread id（conv 等式，CONTEXT.md）。
+  // buildId = chief thread id（conv 等式，CONTEXT.md）。chief 步的归属 =
+  // 绑定 Agent 的归属机（#1260）；未绑定 Agent 的 chief 步 join 缺席——
+  // 不入队投影（claim 面同样不可见，sweep 负责可见失败）。
   const chiefRows = db
     .select({
       id: step.id,
       createdAt: step.createdAt,
       threadId: step.buildId,
-      home: chief.machineId,
+      home: agent.machineId,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
+    .innerJoin(agent, eq(chief.agentId, agent.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
     .all();
   const queue = [
@@ -76,8 +80,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
   ].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 
   // 该机 claimed 步数 / machine 行（waitingFor 快照；按需缓存——调用方行集
-  // 分布稀，n 次查询封顶 n 个被等待机器）。#1148：只数非 chief 步（chief 不
-  // 占并发槽；口径与 machineRunningCount 同源——machines.ts 的容量闸同数）。
+  // 分布稀，n 次查询封顶 n 个被等待机器）。#1260：chief 步占槽——口径与
+  // machineRunningCount 同源（machines.ts 的容量闸同数）。
   const claimedCountCache = new Map<string, number>();
   const claimedCount = (machineId: string): number => {
     const hit = claimedCountCache.get(machineId);
@@ -85,7 +89,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const n = db
       .select({ id: step.id })
       .from(step)
-      .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed'), ne(step.kind, 'chief')))
+      .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
       .all().length;
     claimedCountCache.set(machineId, n);
     return n;

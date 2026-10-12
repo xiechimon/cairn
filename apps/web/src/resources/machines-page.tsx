@@ -79,7 +79,7 @@ const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执
  * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-/** #1108 并发上限选择器（机器行第二个活控件，形态沿 chief-machine-select
+/** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
  * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。 */
@@ -171,7 +171,7 @@ export function MachinesPage() {
   ): { host: boolean; running: boolean; waiting: boolean } =>
     live
       ? {
-          host: orchestration?.defaultMachineId === machine.id,
+          host: orchestration?.homeMachineId === machine.id,
           running: (activityOf(machine.id)?.running ?? 0) > 0,
           waiting: (activityOf(machine.id)?.waiting ?? 0) > 0,
         }

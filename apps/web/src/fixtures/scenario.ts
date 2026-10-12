@@ -42,8 +42,6 @@ import {
   chiefReady,
   chiefScrollLong,
   chiefSettings,
-  chiefSettingsMachines,
-  chiefSettingsStaleModel,
   chiefStreaming,
   chiefThread,
   chiefThreadsLong,
@@ -383,12 +381,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '102': chiefSettings('charter'),
       '103': chiefSettings('memory'),
       '104': chiefSettings('watches'),
-      // #358 AC2（spec 11 §A10）：compactionModel 仍引用已废 preset →
-      // 裸串兜底回显的 fixture 钉（合成 scenario，10-cc-missing 先例）
-      '101-stale-model': chiefSettingsStaleModel,
-      // #895 主力机槽（spec 21 A6）：Agent tab 机器 chip 的回显/清单钉面
-      //（合成 scenario，101-stale-model 先例；live PATCH 写读归 verify 证据）
-      '101-machines': chiefSettingsMachines,
       '111': chiefReady,
       // #624 r5 113 流式面（回合进行中）：composer 占位 = steer canon 的钉面
       // （running 位；命名场景手法循 #499/#444 先例，流内容 [推断] 拼装）。

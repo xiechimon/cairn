@@ -4,7 +4,6 @@
 // 步状态 × 步 kind）+ 落账面 + 事件面（会话流 step 事件，不另起通知面）。机器
 // 在线位直写 DB（生产置位路径 wake SSE 断连面归 machine-wire 测试）。
 
-import { RESUME_FRESH_SESSION_NOTE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -430,10 +429,6 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
 
   test('阈值与 #684 同节奏（120 秒，不自造新节奏）', () => {
     expect(BUILD_ABANDONED_STEP_MS).toBe(120_000);
-  });
-  test('降级标记文案单源：daemon 回退注记复用 shared 常量（双端一致）', () => {
-    expect(RESUME_FRESH_SESSION_NOTE.length).toBeGreaterThan(0);
-    expect(RESUME_FRESH_SESSION_NOTE).not.toMatch(/[{}]/);
   });
 
   test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径）', () => {

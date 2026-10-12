@@ -26,7 +26,7 @@ import {
   ConversationStreamHub,
   type TeamStreamConnection,
 } from '../src/services/events.js';
-import { bootServer, issueApiKey, openConvStream } from './helpers.js';
+import { bootServer, issueApiKey, machineIdByName, openConvStream } from './helpers.js';
 
 // —— hub 单元面：替身连接直接驱动 ————————————————————————————————————
 
@@ -263,6 +263,7 @@ async function setupChief(opts: { pingIntervalMs?: number } = {}) {
     body: { teamId: s.team.id, name: 'm740', cliVersion: '0.1.0' },
   });
   const { token } = (await enrollRes.json()) as { token: string };
+  const machineId = machineIdByName(s, 'm740');
   s.db
     .insert(agentTable)
     .values({
@@ -271,6 +272,7 @@ async function setupChief(opts: { pingIntervalMs?: number } = {}) {
       displayName: 'agent-740',
       modelId: 'stub-model',
       provider: 'stub-gw',
+      machineId,
     })
     .run();
   const patchRes = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {

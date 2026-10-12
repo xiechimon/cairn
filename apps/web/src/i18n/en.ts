@@ -350,7 +350,14 @@ export const EN: Record<string, string> = {
   // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
   归属机: 'Home machine',
   ' · 归属机 {machine}': ' · on {machine}',
+  模型与归属机: 'Model & home machine',
+  '跟随绑定 Agent：模型 {model} · 归属机 {machine}':
+    'Follows the bound Agent: model {model} · home {machine}',
+  '跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。':
+    "Follows the bound Agent's own configuration; adjust it in the Agent's settings.",
+
   ' · 未设归属机': ' · no home machine',
+  未设归属机: 'no home machine',
   离线: 'Offline',
   还没有接入机器: 'No machines connected yet',
   接入机器: 'Connect a machine',
@@ -442,8 +449,6 @@ export const EN: Record<string, string> = {
   压缩模型: 'Compaction model',
   // #854 收编 popover 后用户菜单面板的 aria-label（原 FloatingShell 壳无标签）
   用户菜单: 'User menu',
-  '压缩上下文时用来生成摘要的模型，选更快的模型可缩短等待。需要 {cli} CLI 0.1.49 及以上版本。':
-    'The model used to summarize context during compaction — a faster one shortens the wait. Requires {cli} CLI 0.1.49 or later.',
   '默认（与 Chief 相同）': 'Default (same as Chief)',
   '尚无章程。点击编辑，为总管添加常设指示。':
     'No charter yet. Click edit to give the Chief standing instructions.',
@@ -461,7 +466,6 @@ export const EN: Record<string, string> = {
   '搜索 Agent…': 'Search Agents…',
   '没有匹配的 Agent': 'No matching Agents',
   // #615 总管抽屉主模型闭环文案（模型行 aria + 覆盖 dialog 默认行/搜索/空态）。
-  总管主模型: 'Chief main model',
   // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
   '恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。':
@@ -477,9 +481,6 @@ export const EN: Record<string, string> = {
   // #822 的「展开/收起实时步骤」——同一手势两面同词。
   '本步：{n}': 'This step: {n}',
   '执行机器：{n}': 'Machine: {n}',
-  '默认（与绑定 Agent 相同）': 'Default (same as bound Agent)',
-  '搜索模型…': 'Search models…',
-  没有匹配的模型: 'No matching models',
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
   // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
   '选择审核 Agent': 'Choose review Agent',
@@ -854,8 +855,6 @@ export const EN: Record<string, string> = {
   总管主机: 'Chief host',
   总管回合进行中: 'Chief turn in progress',
   总管等待机器: 'Chief waiting for machine',
-  '总管回合默认在哪台机器上执行。选「自动」时由在线机器认领，并粘住持有会话的那台。':
-    'Which machine runs chief turns by default. With Auto, any online machine can claim a turn, sticking to the one that holds the session.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
   团队密钥: 'Team secrets',
   // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
@@ -912,9 +911,6 @@ export const EN: Record<string, string> = {
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
   // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
-  模型已回落到默认: 'Model fell back to default',
-  '“{stale}”已不可用，本次改用默认模型（与绑定 Agent 相同）发送。':
-    '“{stale}” is no longer available; sent with the default model (same as the bound agent) instead.',
   // —— #729 附件上传失败面（toast 家族同上；大小/类型拒是本地预检可自救，
   // 各给专名，其余归通用失败）——
   '附件超过 10MB 上限': 'Attachment exceeds the 10 MB limit',

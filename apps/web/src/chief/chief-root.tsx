@@ -142,9 +142,6 @@ export function ChiefRoot() {
         onSend={surface.onSend}
         onThread={surface.onThread}
         onNewThread={surface.onNewThread}
-        modelValue={surface.modelValue}
-        modelOptions={surface.modelOptions}
-        onPickModel={surface.onPickModel}
         onRewind={surface.onRewind}
         onAnswerQuestion={surface.onAnswerQuestion}
         onCancelQuestion={surface.onCancelQuestion}

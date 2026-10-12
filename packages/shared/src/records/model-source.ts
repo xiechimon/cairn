@@ -146,3 +146,11 @@ export const claudeCodeReportSchema = z.object({
   auth: claudeAuthStateSchema.optional(),
 });
 export type ClaudeCodeReport = z.infer<typeof claudeCodeReportSchema>;
+
+/** provider+modelId 值对（model id 只在 provider 内有意义——裸串跨
+ *  provider 撞名，对象形是 wire/存储两面的唯一合法形）。 */
+export const modelRefSchema = z.object({
+  provider: z.string(),
+  modelId: z.string(),
+});
+export type ModelRef = z.infer<typeof modelRefSchema>;

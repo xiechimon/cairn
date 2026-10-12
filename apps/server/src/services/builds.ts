@@ -68,6 +68,7 @@ import {
   PIN_OFFLINE_GRACE_MS,
   PIN_ONLINE_WEDGE_GRACE_MS,
   stepActivityAt,
+  WORKER_NO_HOME_HINT,
   WORKER_PIN_OFFLINE_HINT,
   WORKER_PIN_RUNTIME_HINT,
   WORKER_PIN_WEDGE_HINT,
@@ -1204,7 +1205,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
           // 未设归属机：任何机器都不可领（claim 面归属机闸恒拒）。无期
           // 静默 pending 是 bug——宽限后可见失败，文案指名补法。
           if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
-            reason = noHomeReason(agentRow.displayName);
+            reason = noHomeReason(agentRow.displayName, WORKER_NO_HOME_HINT);
           }
         } else {
           const homeRow = deps.db

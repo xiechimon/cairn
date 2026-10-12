@@ -20,7 +20,7 @@ import {
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bindAgentHome, bootServer, machineIdByName, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-ask-unit';
 
@@ -95,6 +95,8 @@ async function makeWorld(): Promise<World> {
     body: { teamId, name: 'ask-mbp', cliVersion: '0.1.0' },
   });
   const { token } = (await enrollRes.json()) as { token: string };
+  // #1260：chief 步只投绑定 Agent 的归属机——认领机即归属机。
+  bindAgentHome(s, AGENT_ID, machineIdByName(s, 'ask-mbp'));
   const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
     cred: token,
     body: {},
