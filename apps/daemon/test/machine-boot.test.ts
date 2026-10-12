@@ -38,9 +38,37 @@ describe('上线序列 canon（02 §5.4/r3 §1.5）', () => {
     // presence 首跳同样带上报。
     await waitFor(() => api.presenceBodies.length > 0);
     expect((api.presenceBodies[0] as { claudeCode?: unknown }).claudeCode !== undefined).toBe(true);
+    // #1251：enroll/presence 同带机器能力清单（形状断言——真探针读测试机
+    // 真实 ~/.claude.json / 技能目录，内容不断言；内容级钉桩见下一用例）。
+    const caps = (enrollBody as { capabilities?: unknown }).capabilities as {
+      mcpServers: unknown;
+      skills: unknown;
+    };
+    expect(Array.isArray(caps.mcpServers)).toBe(true);
+    expect(Array.isArray(caps.skills)).toBe(true);
+    expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities !== undefined).toBe(
+      true,
+    );
     await handle.stop();
     await handle.done;
     expect(lines).toContain('[machine] Shutting down…'); // r3 §1.5 退出行
+  });
+
+  test('#1251 能力清单随 enroll 与每拍 presence 上行（注入桩钉内容）', async () => {
+    const { handle, api } = await boot({
+      capabilitiesProbe: () => ({ mcpServers: ['figma'], skills: ['verify-pacman'] }),
+    });
+    await waitFor(() => api.presenceBodies.length > 0);
+    expect((api.enrollBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
+      mcpServers: ['figma'],
+      skills: ['verify-pacman'],
+    });
+    expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
+      mcpServers: ['figma'],
+      skills: ['verify-pacman'],
+    });
+    await handle.stop();
+    await handle.done;
   });
 
   test('stop(cause) 退出行带原因后缀（#691：信号名可考）', async () => {
