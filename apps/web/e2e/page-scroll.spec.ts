@@ -175,10 +175,12 @@ async function openChiefSettings(page: Page) {
   await expect(drawer).toBeVisible();
   await drawer.locator('button[aria-label="总管设置"]').click();
   await expect(page.getByRole('heading', { name: '总管设置' })).toBeVisible();
-  // #1009 A0（ADR 0013）：设置面 = 悬浮窗内内容交换，不再有抽屉卸载腿——
-  // 旧贴右竖板的退场腿（absolute 滑出瞬时顶宽 documentElement.scrollWidth，
-  // F4 页面级溢出量的噪声源）随形态反转消失；窗体稳定在场即可量。
-  await expect(page.locator('.chief-drawer')).toBeVisible();
+  // #1009 A0（ADR 0013）：设置面 = board 路由内容交换，窗体自身停在泊位
+  // （chiefView 三态互斥，settings 态 windowOpen=false，keepMounted 以
+  // hidden 属性驻 DOM）——溢出量测要的是窗体节点不卸载（无退场腿顶宽
+  // documentElement.scrollWidth，F4 页面级溢出量的噪声源），载体判据 =
+  // 节点在场（attached），不是可见。
+  await expect(page.locator('.chief-drawer')).toBeAttached();
 }
 
 test('总管设置三个长内容 tab 都能滚到底 (#1032)', async ({ page }) => {

@@ -120,9 +120,20 @@ const WINDOW_CLS =
  *  同款 animate-in/out + fade/zoom-95 词表），零自定义曲线（ADR 0009 收敛
  *  律），时长走 --dur-overlay 200ms（Multica 实测 scale 0.2s 同值）；
  *  0004 D4 的 translateX 滑入退役。reduced-motion 降级走 motion.css 全站
- *  法（tw-animate-css keyframe 含）。 */
+ *  法（tw-animate-css keyframe 含）。
+ *  #1266 两件防闪件：① data-closed:fill-mode-forwards——exit keyframe 缺省
+ *  fill:none，动画收尾帧一摘除、计算 opacity 即弹回基值 1，而 Base UI 的
+ *  hidden 停靠在同一拍才提交；停靠态是 visibility 泊位（#1067，盒子仍在
+ *  渲染），这一帧弹回会被真实绘制 = 关窗瞬间整窗复亮再消（用户报的闪）。
+ *  forwards 让退场终值（opacity 0 / scale 0.95）驻留到 data-closed 摘除，
+ *  弹回无从发生；重开时 data-open 换上 enter keyframe，驻留随类摘除。
+ *  ② transition-none——duration-* 工具类在设 --tw-duration（喂 animation
+ *  时长）的同时副产 transition-duration，而 transition-property 的浏览器
+ *  缺省是 all：本件因此背着一条没人声明过的 transition:all 200ms，正是它
+ *  把 ①的弹回放大成 200ms 重绘淡出。本件动效契约 = 纯 keyframe（ADR
+ *  0009），显式归零 transition 通道，副产过渡不再有机会参与进出场。 */
 const WINDOW_MOTION_CLS =
-  'origin-bottom-right duration-(--dur-overlay) data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95';
+  'origin-bottom-right duration-(--dur-overlay) transition-none data-closed:fill-mode-forwards data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95';
 
 /** 头部 icon 钮（旧 .chief-head-actions button 元素选择器等值：20×20 /
  *  零装饰 / tertiary 墨 / 无 hover 反馈——旧 unlayered 规则恒压 ghost 件
