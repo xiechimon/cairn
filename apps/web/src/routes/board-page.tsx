@@ -34,7 +34,7 @@ import { mapBranchInfo, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { type BoardFilters, BoardSurface } from '../board/board.js';
-import { moveTodo, resetTodoLocal } from '../board/dnd.js';
+import { completeTodoLocal, moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
@@ -534,20 +534,40 @@ export function BoardPage() {
     [live, todos, fixture.now, teamId, mutations.patchTodo, queryClient, t],
   );
 
-  // #901 done 落位闸：闸相位（confirm/review）有变更产物的卡拖向已完成 =
-  // 跳过合并语义，先开确认弹层（判据单源 board.tsx needsDoneGate）。取消 =
-  // 零提交（拖拽路由未写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路
-  // （fixture 本地集 / live 乐观 PATCH + server 审计行 #902）。无 reset 闸的
-  // 快照/409 复核位：确认走的是普通改相 PATCH，竞态由乐观回滚 + toast 兜底
-  // （#638 同律），不需要 stale 重确认面。
+  // #901 done 落位闸（#1247 收窄为待处理三相恒闸，与 hasChanges 无关）：
+  // confirm/review/failed 卡拖向已完成 = 手动关边，先开确认弹层（判据单源
+  // board.tsx needsDoneGate）。取消 = 零提交（拖拽路由未写任何乐观值）；
+  // 确认 = #1247 专属写面——fixture 面 completeTodoLocal 本地投影，live 面
+  // POST /api/todos/:id/complete（先中断该任务在飞构建再直写 done；异步
+  #1247 备注：complete 是中断面，不做乐观落位，回包 invalidate 后收真值，
+  // 与 reset 闸同形）。三相外的 done 落位（todo/building 源）仍走
+  // handlePhaseDrop 静默改相，不动。
   const [doneTarget, setDoneTarget] = useState<TodoRecord | null>(null);
+  const [doneConfirming, setDoneConfirming] = useState(false);
   const openDoneGate = useCallback((todo: TodoRecord) => setDoneTarget(todo), []);
   const closeDoneGate = useCallback(() => setDoneTarget(null), []);
-  const confirmDone = useCallback(() => {
+  const confirmDone = useCallback(async () => {
     if (doneTarget == null) return;
-    handlePhaseDrop(doneTarget, 'done');
-    setDoneTarget(null);
-  }, [doneTarget, handlePhaseDrop]);
+    // fixture 面无后端：dialog 面 parity + 本地关边投影（dnd.ts
+    // completeTodoLocal，与 server completeTodo 的 todo 写面逐位对齐）。
+    if (!live) {
+      setFixtureTodos((prev) => completeTodoLocal(prev, doneTarget.id, fixture.now));
+      closeDoneGate();
+      return;
+    }
+    setDoneConfirming(true);
+    try {
+      await api.post<TodoRecord>(`/api/todos/${doneTarget.id}/complete`);
+      closeDoneGate();
+      await queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+    } catch (error) {
+      closeDoneGate();
+      await queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+      toastError(t('标记完成失败，请重试。'), error);
+    } finally {
+      setDoneConfirming(false);
+    }
+  }, [doneTarget, live, fixture.now, teamId, queryClient, t, closeDoneGate]);
 
   // #828: 看板 branch 弹层的数据面——fixture 面走 overlayContent 冻结值；
   // live 面按 overlayTodo.latestBuildId 经 mapBranchInfo 现算（与详情页右
@@ -723,12 +743,14 @@ export function BoardPage() {
         confirming={resetting}
         stale={resetStale}
       />
-      {/* #901 done 落位闸：闸相位有产物在审的卡拖向已完成的确认位——取消
-          零提交，确认走 handlePhaseDrop（server 同落审计行 #902）。 */}
+      {/* #901 done 落位闸（#1247 三相手动关边）：待处理卡拖向已完成的确认位
+          ——取消零提交，确认走 POST /api/todos/:id/complete（fixture 面本地
+          投影 completeTodoLocal）。 */}
       <DoneConfirmDialog
         open={doneTarget != null}
         onClose={closeDoneGate}
-        onConfirm={confirmDone}
+        onConfirm={() => void confirmDone()}
+        confirming={doneConfirming}
       />
     </div>
   );

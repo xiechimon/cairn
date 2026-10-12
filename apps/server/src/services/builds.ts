@@ -32,6 +32,7 @@ import {
   buildReworkReuseNote,
   CONFIRM_ANNOUNCEMENT,
   conversationBranch,
+  DONE_ANNOUNCEMENT,
   hasBlockingFinding,
   MERGE_ANNOUNCEMENT,
   REVIEW_ANNOUNCEMENT,
@@ -276,6 +277,10 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (cancelledRow) publishBuild(deps, cancelledRow);
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) return;
+  // #1247 done 守卫：手动关边（completeTodo）已把相位直写 done 时，委托
+  // 停止的 claimed 步迟到回报不得按 stopFallbackPhase 把 done 拽回
+  // review/confirm——步/build/事件落账照旧，只有 gate 回落写相跳过。
+  if (todoRow.phase === 'done') return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)

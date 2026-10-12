@@ -13,11 +13,16 @@
 // stays: every column's committed view order is re-sequenced so the manual
 // order remains the persisted truth (02 §6.2). #753（2026-10-03/04 重测，推翻
 // #351「待处理不作落点」）: 合法边 = columns.ts canDropOnColumn 的 per-source
-// 矩阵单源——待处理 吃 已完成(有变更) 的重开落位（写 review），failed→已完成
-// 不收（#702），执行中 只吃 待开始。执行中 does not route through here at
-// all — its drop hands the todo to the start path (board.tsx onStartIntent,
-// #640 直发编排；2026-10-04 实测参考站该落位开 开始任务 dialog，差异归后续
-// 票，本仓载体不动).
+// 矩阵单源——待处理 吃 已完成(有变更) 的重开落位（写 review），执行中 只吃
+// 待开始。#1247: 待处理三相（confirm/review/failed）→ 已完成 = 手动关边
+// （failed 边新开，确认闸 needsDoneGate 三相一律咬；确认后 fixture 面走本
+// 文件 completeTodoLocal，live 面 POST /api/todos/:id/complete）。done 列
+// 显示序 = phaseAt 倒序（#1247，columns.ts sortColumnTodos）——moveTodo 的
+// 数组落位仍写列尾 + 最新 phaseAt，渲染面自然落列顶；orderIndex 写回保留但
+// 不再是 done 列显示真值。执行中 does not route through here at all — its
+// drop hands the todo to the start path (board.tsx onStartIntent, #640 直发
+// 编排；2026-10-04 实测参考站该落位开 开始任务 dialog，差异归后续票，
+// 本仓载体不动).
 import type { TodoRecord } from '../fixtures/records.js';
 import { COLUMNS, canDropOnColumn, needsResetGate } from './columns.js';
 
@@ -30,10 +35,10 @@ export const DRAG_THRESHOLD_PX = 5;
  * canon (BoardColumnDef.dropPhase) with a fresh phaseAt so the in-column
  * relative time restarts, landing the card at the END of the target
  * column's view (#616: the reference keeps no manual in-column rank —
- * done 列是时间序，改相卡落尾即「最新」). Identity returns: unknown
- * todo/column, and every pair canDropOnColumn rejects (#753 per-source
- * matrix — same-column, 待开始→待处理, →执行中 from 待处理/已完成,
- * 无变更 done→待处理, failed→已完成). Every column's view order is
+ * #1247 done 列显示序 = phaseAt 倒序，改相卡落尾 + 最新 phaseAt 渲到列顶).
+ * Identity returns: unknown todo/column, and every pair canDropOnColumn
+ * rejects (#753 per-source matrix — same-column, 待开始→待处理, →执行中
+ * from 待处理/已完成, 无变更 done→待处理). Every column's view order is
  * written back as sequential `orderIndex`.
  */
 export function moveTodo(
@@ -104,4 +109,21 @@ export function resetTodoLocal(todos: TodoRecord[], todoId: string, now: number)
       ? { ...t, hasPlan: false, hasChanges: false, latestBuildId: null, lastRunAt: null }
       : t,
   );
+}
+
+/**
+ * 手动关边本地投影（#1247 fixture 面：无后端可调，done 闸确认的本地落位）
+ * ——与 server completeTodo 的写面逐位对齐：相位直写 done + 最新 phaseAt
+ * （不走 moveTodo 的 orderIndex 回写——server complete 端点不写 orderIndex，
+ * 本地投影同形），产物位（hasPlan/hasChanges/latestBuildId/lastRunAt）保留
+ * （手动关边不清产物——与 reset 语义相反：关进已完成是审计事件，不是清理）。
+ * 非关边源（非 confirm/review/failed）或非 done 落点 = 恒等（调用方本不该调）。
+ */
+export function completeTodoLocal(todos: TodoRecord[], todoId: string, now: number): TodoRecord[] {
+  const moved = todos.find((t) => t.id === todoId);
+  if (moved == null) return todos;
+  if (moved.phase !== 'confirm' && moved.phase !== 'review' && moved.phase !== 'failed') {
+    return todos;
+  }
+  return todos.map((t) => (t.id === todoId ? { ...t, phase: 'done', phaseAt: now } : t));
 }

@@ -117,9 +117,9 @@ interface BoardProps {
    *  零提交（本面在 opened 前不写任何乐观值，卡片不动），确认走
    *  POST /api/todos/:id/reset。 */
   onResetIntent?: (todo: TodoRecord) => void;
-  /** #901: 闸相位（confirm/review）有变更产物的卡拖向已完成 = done 意图——
-   *  page 开确认 dialog（跳过合并的显式确认）；取消 = 零提交，确认走既有
-   *  onPhaseDrop 提交路（server 同落审计行，#902）。 */
+  /** #1247 手动关边：待处理三相（confirm/review/failed）的卡拖向已完成 =
+   *  done 意图——page 开确认 dialog（中断在飞构建 + 标记完成的显式确认）；
+   *  取消 = 零提交，确认走 POST /api/todos/:id/complete。 */
   onDoneIntent?: (todo: TodoRecord) => void;
   /** #114: the notification-permission strip between topbar and columns
    *  (r2 §1.3). The route owns the permission state and passes the
@@ -202,8 +202,11 @@ export function BoardSurface({
   // 本地不写相位；唯一合法源 = 待开始）；待开始/待处理/已完成 = 静默改相
   // 提交（待处理 = 已完成有变更卡的重开，写 review）；#755：待开始落点 +
   // 已开始卡 = 重置意图（开确认 dialog，本面零提交——乐观值与 PATCH 都不发，
-  // 卡片停在源列）；非法对/源列/列外 = 无操作（实测：静默无拒绝动画），
-  // overlay 随指针松开同帧卸载（无 drop 动画——dropAnimation={null}）。
+  // 卡片停在源列）；#1247：待处理三相（confirm/review/failed）拖已完成 =
+  // 手动关边意图（开 done 确认闸，确认前零提交——判据单源
+  // columns.needsDoneGate，三相一律闸）；非法对/源列/列外 = 无操作（实测：
+  // 静默无拒绝动画），overlay 随指针松开同帧卸载（无 drop 动画——
+  // dropAnimation={null}）。
   const onDragEnd = (event: DragEndEvent) => {
     const { over } = event;
     const overColumnId = over == null ? null : String(over.id);
@@ -211,8 +214,9 @@ export function BoardSurface({
       const column = COLUMNS.find((c) => c.id === overColumnId);
       if (column?.startGate === true) onStartIntent?.(dragged);
       else if (overColumnId === 'todo' && needsResetGate(dragged)) onResetIntent?.(dragged);
-      // #901 done 落位闸：闸相位有产物在审的卡要先显式确认（跳过合并语义），
-      // 确认前零提交；其余落位保持静默改相（判据单源 columns.needsDoneGate）。
+      // #1247 done 手动关边闸：待处理三相（confirm/review/failed）拖已完成
+      // 要先显式确认（中断在飞构建 + 直写 done），确认前零提交；其余落位
+      // 保持静默改相（判据单源 columns.needsDoneGate）。
       else if (overColumnId === 'done' && needsDoneGate(dragged)) onDoneIntent?.(dragged);
       else if (overColumnId != null) onPhaseDrop?.(dragged, overColumnId);
     }
