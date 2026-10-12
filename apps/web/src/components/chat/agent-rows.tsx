@@ -32,20 +32,27 @@ export function ThinkingRow({ text }: { text: string }) {
       {/* #1034：Button 基类写死 whitespace-nowrap + shrink-0，w-fit 在 nowrap 下
           min-content == max-content，fit-content 解成整段文本宽（实测 626px 钮
           冲出 384px 列）——min-w-0 max-w-full 把钮收回列宽（chief-drawer 模型行钮
-          同款），预览 span 挂 #772 截断律 min-w-0 flex-auto truncate 出省略号；
-          chevron 由基类 [&_svg]:shrink-0 保住 10px 不被挤。 */}
+          同款），预览 span 挂 #772 截断律 min-w-0 flex-auto truncate 出省略号。
+          2026-10-12 dsh 对齐：chevron 单枚旋转（150ms 标准步，取代双图标瞬切）
+          + hover 微染（--seg-hover，dsh disclosure 行的 hover 底同族）。 */}
       <Button
         variant="ghost"
-        className="h-auto w-fit min-w-0 max-w-full shrink justify-start gap-1.5 rounded-none px-0 font-normal text-[12px] leading-5 text-[var(--text-dim)] active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+        className="h-auto w-fit min-w-0 max-w-full shrink justify-start gap-1.5 -ml-1 rounded-md px-1 font-normal text-[12px] leading-5 text-[var(--text-dim)] transition-colors duration-(--dur-fast) ease-(--ease-standard) hover:bg-(--seg-hover) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
         aria-label={t(open ? '收起思考' : '展开思考')}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {open ? <ChevronDown width={10} height={10} /> : <ChevronRight width={10} height={10} />}
+        <ChevronRight
+          width={10}
+          height={10}
+          className={`transition-transform duration-(--dur-fast) ease-(--ease-standard)${open ? ' rotate-90' : ''}`}
+        />
         <span className="min-w-0 flex-auto truncate italic">{open ? t('思考') : preview}</span>
       </Button>
       {open && (
-        <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-5 text-[var(--text-secondary)]">
+        // 展开体缩进 16px = chevron(10) + gap(6)，对齐到预览文列（dsh
+        // DisclosureRow 的 title 下缩进同律）。
+        <pre className="m-0 pl-4 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-5 text-[var(--text-secondary)]">
           {text}
         </pre>
       )}

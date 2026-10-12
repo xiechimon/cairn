@@ -56,9 +56,16 @@ test('A1: tool output is collapsed behind the group toggle by default', async ({
   await expect(toggle(page)).toBeVisible();
 });
 
-test('A2: expanding the group reveals one standalone block per tool output', async ({ page }) => {
+test('A2: expanding the group reveals one disclosure row per call; each output opens from its own row', async ({ page }) => {
   await page.goto(ROUTE);
   await toggle(page).click();
+  // 2026-10-12 dsh 对齐（#1268 批）：组展开后 = 逐调用 disclosure 行
+  // （dsh GenericCommandCard 同族），输出块不再整组平铺——每行的输出
+  // 由该行自己的 chevron 展开。
+  const rows = page.getByTestId('tool-pill');
+  await expect(rows).toHaveCount(2);
+  await rows.nth(0).click();
+  await rows.nth(1).click();
   const outputs = page.getByTestId('tool-output');
   await expect(outputs).toHaveCount(2);
   // verbatim stdout, whitespace preserved
@@ -72,6 +79,8 @@ test('A3: the output block is left aligned, mono, normal contrast — not a chat
 }) => {
   await page.goto(ROUTE);
   await toggle(page).click();
+  // 逐调用 disclosure 行（2026-10-12 dsh 对齐）：输出块由所在行展开。
+  await page.getByTestId('tool-pill').first().click();
   const ink = await primaryInk(page);
   const box = await page.getByTestId('tool-output').first().evaluate((el) => {
     const cs = getComputedStyle(el);

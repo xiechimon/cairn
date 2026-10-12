@@ -137,6 +137,7 @@ export function LiveRow({
   const tick = useLiveSeconds(startedAt);
   const shown = tick ?? seconds ?? null;
   const skin = SKIN[variant];
+  const labelText = t(label, labelVars);
   const body = (
     <>
       <Atom size={16} duration={1800} className={skin.spinner} />
@@ -147,7 +148,16 @@ export function LiveRow({
         ) : (
           <ChevronRight width={10} height={10} />
         ))}
-      <span className={skin.label}>{t(label, labelVars)}</span>
+      {/* 2026-10-12 dsh 对齐：跑动期标签带扫光（dsh TextShimmer 同族）——
+          真文本保持 tertiary 原色，aria-hidden 叠加层走 105° mask 扫
+          （样式在 motion.css 的 chat-shimmer-sweep；reduced-motion 整层
+          摘除）。本行是「在跑」的载体——挂载期即在跑，扫光恒随。 */}
+      <span className={`${skin.label} relative`}>
+        {labelText}
+        {/* 扫光层是纯光带、零文本（textContent 翻倍的实测坑见 motion.css
+            本类注），aria-hidden 只为保险。 */}
+        <span className="chat-shimmer-sweep" aria-hidden="true" />
+      </span>
     </>
   );
   return (

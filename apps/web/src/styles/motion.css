@@ -110,6 +110,45 @@ body[data-board-dragging] .todo-card:hover {
 .chat-bubble {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
+
+/* 跑动行标签的扫光（2026-10-12 dsh 对齐第三批）：dsh TextShimmer 的
+   pacman 平铺版。注意 2026-10-12 实测坑：**扫光层不能携带文本**——aria-hidden
+   的重复文案会把 textContent 翻倍，钉文案的断言全红（reject-chain 的
+   「处理中...」精确匹配实测撞中）。所以本层是纯光带：零文本、105° 一道
+   前景色 18% 的柔光扫过标签，视觉与 dsh 的字形扫光同族。reduced-motion
+   整层摘除（dsh 同律）。 */
+@keyframes chat-shimmer-sweep {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.chat-shimmer-sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background-image: linear-gradient(
+    105deg,
+    transparent 40%,
+    color-mix(in srgb, var(--foreground) 18%, transparent) 50%,
+    transparent 60%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  animation: chat-shimmer-sweep 1.5s steps(48, end) infinite;
+  animation-delay: 0.3s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-shimmer-sweep {
+    display: none;
+  }
+}
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
   .new-task-project-row,

@@ -198,9 +198,13 @@ function ActionRow({
         // geometry the #470 fence pins does not move. #945：.chat-copy 的
         // 无边框透明底迁 utilities（ghost hover 底双档中和，墨色走 inherit
         // = 行的 tertiary；老面无 cursor 规则，不加 cursor-pointer）。
+        // 2026-10-12 dsh 对齐：复制钮平时隐身、行 hover/聚焦浮现（dsh
+        // MessageIconActions 同律；触屏（hover:none）与键盘 focus-within
+        // 恒显——信息不丢，只收视觉噪音）。秒数/完成尾段是信息不是操作，
+        // 不参与隐身。
         <Button
           variant="ghost"
-          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 opacity-0 transition-opacity duration-(--dur-fast) ease-(--ease-standard) group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
           aria-label={t('复制')}
           onClick={() => {
             void navigator.clipboard.writeText(copy);
@@ -753,6 +757,54 @@ function toolsCopyText(item: Extract<TranscriptItem, { kind: 'tools' }>): string
  *  now names the group (工具过程 + terminal glyph, the #615 过程 word family)
  *  and the copy affordance rides the expanded state only, where the text it
  *  copies is actually on screen. */
+/** 单次工具调用行（2026-10-12 dsh 对齐，dsh GenericCommandCard 同族）：
+ *  每条调用 = 一行 disclosure 位（图标 + mono 名 + 有输出时右侧 chevron），
+ *  整行 hover 微染；有输出的行可展开，输出 mono 块缩进挂在行下。
+ *  无输出的行不是按钮（不可展开就不渲染 affordance——#634 形必带义）。 */
+function ToolCallRow({ name, output }: { name: string; output?: string | null }) {
+  const [open, setOpen] = useState(false);
+  const hasBody = output != null && output !== '';
+  const face =
+    'chat-tool-pill flex h-6 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-[12px] leading-5 whitespace-nowrap text-(--text-dim) transition-colors duration-(--dur-fast) ease-(--ease-standard)';
+  if (!hasBody) {
+    return (
+      <div className={face} data-testid="tool-pill">
+        <Terminal width={12} height={12} className="flex-none" />
+        <span className="min-w-0 flex-auto truncate font-[var(--font-mono)]">{name}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="min-w-0">
+      <button
+        type="button"
+        className={`${face} cursor-pointer hover:bg-(--seg-hover)`}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        data-testid="tool-pill"
+      >
+        <Terminal width={12} height={12} className="flex-none" />
+        <span className="min-w-0 flex-auto truncate font-[var(--font-mono)]">{name}</span>
+        <ChevronRight
+          width={10}
+          height={10}
+          className={`flex-none transition-transform duration-(--dur-fast) ease-(--ease-standard)${open ? ' rotate-90' : ''}`}
+        />
+      </button>
+      {open && (
+        // 输出块缩进 26px = 行内 icon(12) + gap(8) + px-2 的列对齐；
+        // 终端内容孪生（#469）：pre-wrap 不横滚，240px 封顶内滚。
+        <pre
+          className="mt-1 mr-[5px] mb-1 ml-[26px] max-h-60 overflow-auto rounded-md border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+          data-testid="tool-output"
+        >
+          {output}
+        </pre>
+      )}
+    </div>
+  );
+}
+
 function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }>; t: TFunc }) {
   const [expanded, setExpanded] = useState(item.expanded);
   return (
@@ -766,35 +818,16 @@ function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }
       />
       {expanded && (
         <>
-          {/* r7 28：完成 Ns ▾ 头下的满宽 pill 列（组间 8px）。 */}
-          <div className="mt-[13px] flex flex-col gap-2 pl-[31px] pr-[5px]">
+          {/* 2026-10-12 dsh 对齐：展开态的满宽 pill 列换成逐调用 disclosure
+              行（ToolCallRow，dsh GenericCommandCard 同族）——图标 + mono 名 +
+              整行 hover 微染 + 有输出的行自带 chevron 展开。组间距 4px。 */}
+          <div className="mt-[13px] flex flex-col gap-1 pl-[31px] pr-[5px]">
             {item.pills.map((pill, i) => {
               // #469: the call's stdout/stderr rides index-aligned in
-              // `outputs`; render it as its own left-aligned mono block
-              // under the pill instead of flattening into `.chat-note`.
+              // `outputs`; the row expands to show it instead of flattening
+              // into a bare block.
               const output = item.outputs?.[i];
-              return (
-                <div key={`${i}-${pill}`} className="flex min-w-0 flex-col gap-1">
-                  <div
-                    className="chat-tool-pill flex h-[18px] items-center gap-2 overflow-hidden rounded-[3px] border border-(--border) bg-(--secondary) pl-2.5 font-mono text-[11px] leading-4 whitespace-nowrap text-(--text-tertiary) [&_svg]:flex-none"
-                    data-testid="tool-pill"
-                  >
-                    <Terminal width={12} height={12} />
-                    <span className="truncate">{pill}</span>
-                  </div>
-                  {output != null && output !== '' && (
-                    // 工具 stdout/stderr 独立块（#469）：左对齐 mono 正常
-                    // 对比度——.chat-code 的终端内容孪生；pre-wrap 保留换行
-                    // 不横滚，240px 封顶内滚。
-                    <pre
-                      className="m-0 max-h-60 overflow-auto rounded-[3px] border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
-                      data-testid="tool-output"
-                    >
-                      {output}
-                    </pre>
-                  )}
-                </div>
-              );
+              return <ToolCallRow key={`${i}-${pill}`} name={pill} output={output} />;
             })}
           </div>
           {/* XMON-24 收起钮 shadcn ghost 底座不变；#945 皮肤迁 utilities
@@ -833,7 +866,12 @@ export function Transcript({
         // 回落 index。fixture order is stable。
         const id = 'id' in item ? item.id : undefined;
         return (
-          <MessageScrollerItem key={id ?? i} messageId={id} style={SCROLLER_ITEM_STYLE}>
+          <MessageScrollerItem
+            key={id ?? i}
+            messageId={id}
+            className="group"
+            style={SCROLLER_ITEM_STYLE}
+          >
             <Row
               item={item}
               prev={transcript[i - 1]}
