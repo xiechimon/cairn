@@ -522,13 +522,17 @@ test('任务卡渲染标签 chip：词表配色、无标签零占位、卡面 ch
     };
     return { tagged: probe('tagfilter-bug'), plain: probe('tagfilter-plain') };
   });
-  expect(geo.tagged.row1H).toBe(20);
-  expect(geo.plain.row1H).toBe(16);
-  expect(geo.tagged.chipH).toBe(20);
+  // 亚像素口径：getBoundingClientRect 返回浮点布局值，CI 量 20px 档会得
+  // 19.99999237060547（#1281 实测）。护栏钉的是像素档位（20 挡 19/16），
+  // 不是 float 末位——对齐 chief-panel.spec 的 toBeCloseTo(…, 0)（±0.5px）。
+  expect(geo.tagged.row1H).toBeCloseTo(20, 0);
+  expect(geo.plain.row1H).toBeCloseTo(16, 0);
+  expect(geo.tagged.chipH).toBeCloseTo(20, 0);
   // R5 回流：tagged 卡随 20px chip 长高 4px（旧「卡高一致」契约由裁决作废）
-  expect(geo.tagged.cardH - geo.plain.cardH).toBe(4);
+  expect(geo.tagged.cardH - geo.plain.cardH).toBeCloseTo(4, 0);
   // seq 保持右锚（同一列宽网格下两卡右缘差一致）
-  expect(geo.tagged.cardRight - geo.tagged.seqRight).toBe(
+  expect(geo.tagged.cardRight - geo.tagged.seqRight).toBeCloseTo(
     geo.plain.cardRight - geo.plain.seqRight,
+    0,
   );
 });
