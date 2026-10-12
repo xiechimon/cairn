@@ -12,7 +12,7 @@ import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { ProjectRepoKind, Scheduler } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
@@ -130,7 +130,7 @@ export async function bootRealServer(opts: {
   );
 
   let claims = 0;
-  const fetchImpl: typeof app.fetch = (input, init) => {
+  const fetchImpl: typeof app.fetch = async (input, init) => {
     const url =
       typeof input === 'string'
         ? input
@@ -138,6 +138,30 @@ export async function bootRealServer(opts: {
           ? input.toString()
           : (input as Request).url;
     if (url.includes('/api/machine/tasks/claim')) claims += 1;
+    // #1259 归属机绑定的测试世界缺省：首台 enroll 的机器 = 未绑 agent 的
+    // 归属机（bindAllAgents 同款语义——单机世界「可领」缺省形）。多机用例
+    // 自行换绑；只绑 machineId IS NULL 的行，不覆盖已设归属。
+    if (
+      url.includes('/api/machine/enroll') &&
+      ((init as RequestInit | undefined)?.method ?? 'POST') === 'POST'
+    ) {
+      const res = await app.fetch(input as never, init);
+      if (res.status === 200) {
+        const body = (await res
+          .clone()
+          .json()
+          .catch(() => null)) as {
+          machineId?: string;
+        } | null;
+        if (typeof body?.machineId === 'string') {
+          db.update(agentTable)
+            .set({ machineId: body.machineId })
+            .where(and(eq(agentTable.teamId, team.id), isNull(agentTable.machineId)))
+            .run();
+        }
+      }
+      return res;
+    }
     return app.fetch(input as never, init);
   };
 

@@ -36,7 +36,6 @@ let server: RealServer;
 let browser: Browser;
 let page: Page;
 let projectId = '';
-let machines: { m1: string; m2: string; m3: string }; // machineId
 let tokens: { m1: string; m2: string; m3: string }; // machine wire token
 
 const SPECS = {
@@ -101,7 +100,7 @@ async function claimStep(token: string): Promise<ClaimedStep | null> {
 async function relayRunBuilds(
   stepId: string,
   token: string,
-  input: { todoIds: string[]; withPlan: boolean; machineId?: string },
+  input: { todoIds: string[]; withPlan: boolean },
 ): Promise<void> {
   const res = await machineFetch(token, 'POST', `/api/machine/tool/${stepId}`, {
     name: 'run_builds',
@@ -110,7 +109,6 @@ async function relayRunBuilds(
       withPlan: input.withPlan,
       dispatchReason: '#1216 集成探针派发',
       assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
-      ...(input.machineId !== undefined ? { machineId: input.machineId } : {}),
     },
   });
   if (res.status !== 200)
@@ -159,7 +157,7 @@ async function waitForStep(
 async function runChiefDispatch(
   token: string,
   threadId: string,
-  input: { todoIds: string[]; withPlan: boolean; machineId?: string },
+  input: { todoIds: string[]; withPlan: boolean },
 ): Promise<void> {
   const claimed = await waitForStep(token, (s) => s.buildId === threadId && s.kind === 'chief');
   await relayRunBuilds(claimed.id, token, input);
@@ -270,9 +268,10 @@ beforeAll(async () => {
       throw new Error(`enroll ${name} → ${res.status} ${JSON.stringify(body)}`);
     return { id: body.machineId, token: body.token };
   };
+  // #1259：三台照旧 enroll（wire 配方不变），agent 归属 = 首台 M1（helpers
+  // 绑定缺省）——认领面统一走 M1，m2/m3 只是「团队里别的机器」的在场形。
   const [e1, e2, e3] = [await enroll('trio-m1'), await enroll('trio-m2'), await enroll('trio-m3')];
   tokens = { m1: e1.token, m2: e2.token, m3: e3.token };
-  machines = { m1: e1.id, m2: e2.id, m3: e3.id };
   browser = await chromium.launch();
   page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 }, 300_000);
@@ -317,22 +316,22 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
     // 重复点击不可能：钮已禁用；线程数保持 1（无重复编排回合）。
     expect(orchestrateThreads(seqNum).length).toBe(1);
 
-    // chief 派发（假机器认领编排回合 → relay run_builds 钉 M1 → done）：
-    // 一次点击的因果链走到底——相位离开 待开始（queued = 已启动等机器，
-    // 02 §4.2），规划步入队。
+    // chief 派发（假机器认领编排回合 → relay run_builds → done）：一次点击
+    // 的因果链走到底——相位离开 待开始（queued = 已启动等机器，02 §4.2），
+    // 规划步入队。#1259：agent 归属机 = 首台 enroll 的 M1（helpers 绑定
+    // 缺省），认领面统一走 M1（钉选已退役）。
     const thread = orchestrateThreads(seqNum)[0];
     if (thread === undefined) throw new Error('编排线程缺席');
-    await runChiefDispatch(tokens.m2, thread.id, {
+    await runChiefDispatch(tokens.m1, thread.id, {
       todoIds: [todoId],
       withPlan: true,
-      machineId: machines.m1,
     });
     await waitFor(() => server.todoPhase(todoId) === 'queued', 15_000);
     const buildId = latestBuildIdOf(todoId);
     if (buildId == null) throw new Error('run_builds 后 latestBuildId 缺席');
 
-    // M1 认领规划步 → planning（「进规划」的机器侧真值；钉选使它只对 M1
-    // 可见，后续用例的认领面不受它干扰）。
+    // M1 认领规划步 → planning（「进规划」的机器侧真值；归属机闸使它只对
+    // M1 可见，后续用例的认领面不受它干扰）。
     const planStep = await waitForStep(
       tokens.m1,
       (s) => s.buildId === buildId && s.kind === 'plan',
@@ -346,7 +345,7 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
   }, 180_000);
 
   test('② failed 重跑：线程必落 + 在飞态可见 + chief 派发后 buildHistory 增长', async () => {
-    const seeded = await seedFailedTodo('重跑探针卡', SPECS.rerun, tokens.m3);
+    const seeded = await seedFailedTodo('重跑探针卡', SPECS.rerun, tokens.m1);
     await openDetailByTitle('重跑探针卡');
 
     // failed 详情主钮 = 重跑（相位词表），点开 dialog 再点 重跑。
@@ -369,7 +368,7 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
     // 相位离开 failed——「重跑必产生新 build」的可见闭环。
     const thread = orchestrateThreads(seeded.seqNum)[0];
     if (thread === undefined) throw new Error('重跑编排线程缺席');
-    await runChiefDispatch(tokens.m2, thread.id, {
+    await runChiefDispatch(tokens.m1, thread.id, {
       todoIds: [seeded.id],
       withPlan: false,
     });
@@ -388,15 +387,15 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
     const rerunBuildId = latestBuildIdOf(seeded.id);
     if (rerunBuildId == null) throw new Error('重跑后 latestBuildId 缺席');
     const buildStep = await waitForStep(
-      tokens.m2,
+      tokens.m1,
       (s) => s.buildId === rerunBuildId && s.kind === 'build',
     );
-    await doneStep(tokens.m2, buildStep.id, 'success', { hasChanges: false });
+    await doneStep(tokens.m1, buildStep.id, 'success', { hasChanges: false });
     await waitFor(() => server.todoPhase(seeded.id) === 'failed', 15_000);
   }, 180_000);
 
   test('③ failed 卡详情可删除；缺失/失败详情出解释态不出空白壳', async () => {
-    const seeded = await seedFailedTodo('删除探针卡', SPECS.deletable, tokens.m3);
+    const seeded = await seedFailedTodo('删除探针卡', SPECS.deletable, tokens.m1);
 
     // failed 详情正常渲染（改前生产实测：failed 卡详情白屏，删除够不着）。
     await openDetailByTitle('删除探针卡');

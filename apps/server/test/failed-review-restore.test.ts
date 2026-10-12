@@ -15,9 +15,9 @@
 //      物，责任在人）；手动改相面（PATCH phase）不收这条边。
 //   4. 重跑语义被破坏：failed→queued（r3 §3.7 新 conv/新 build）原路不动。
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { claimedStepSchema, conversationBranch } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -448,7 +448,7 @@ describe('#702 failed→review 恢复（B-C17 死锁形态）', () => {
 
     test('手动改相面不收这条边：PATCH phase=review（from failed）→ 409', async () => {
       try {
-        const buildId = await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
+        await driveToDeadlock(w, { buildCommit: 'sha-702-probe' });
         expect(w.todoRow().phase).toBe('failed');
         const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, {
           body: { phase: 'review' },
