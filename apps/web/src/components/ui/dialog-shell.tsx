@@ -253,7 +253,10 @@ export function DialogShell({
             <DialogTitle>{title}</DialogTitle>
           ) : null}
         </DialogHeader>
-        <div data-testid="dialog-body" className="min-h-0 overflow-y-auto">
+        {/* ring 房：body 是滚动容器（overflow-y-auto ⇒ 两轴都裁），w-full
+            控件的 focus 环（ring-3 = 外沿 3px）会贴到裁切缘被左右各切一刀
+            ——负边距补偿把裁切缘外移 4px，内容列原位不动。 */}
+        <div data-testid="dialog-body" className="-mx-1 min-h-0 overflow-y-auto px-1">
           {children}
         </div>
         {footer != null && <DialogFooter data-testid="dialog-foot">{footer}</DialogFooter>}
