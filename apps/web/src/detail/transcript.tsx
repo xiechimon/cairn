@@ -143,6 +143,7 @@ function ActionRow({
   t,
   toggle,
   label,
+  clock,
 }: {
   seconds?: number;
   /** `完成` with no seconds (reused-plan card, r8 76). */
@@ -159,6 +160,9 @@ function ActionRow({
    *  tail, so a collapsed group reads as a folded tool process instead of
    *  a stray pill. Only the tools group passes one. */
   label?: string;
+  /** 2026-10-13 dsh MessageIconActions clock='end' 位：答复行的消息时刻，
+   *  渲染在动作簇尾段之后（tertiary 12px tabular）。缺省不摆。 */
+  clock?: string;
 }) {
   const tail = (
     <>
@@ -228,6 +232,11 @@ function ActionRow({
         >
           {tail}
         </Button>
+      )}
+      {/* dsh clock='end' 位（2026-10-13）：答复时刻在动作簇尾段之后
+          （信息不是操作，不参与新近律隐现）。 */}
+      {clock != null && (
+        <span className="ml-2 text-[12px] leading-4 whitespace-nowrap tabular-nums">{clock}</span>
       )}
     </div>
   );
@@ -556,7 +565,12 @@ function Row({
             )}
           </span>
           {item.footer != null && (
-            <ActionRow seconds={item.footer.seconds} copy={robotCopyText(item)} t={t} />
+            <ActionRow
+              seconds={item.footer.seconds}
+              copy={robotCopyText(item)}
+              t={t}
+              clock={item.clock}
+            />
           )}
         </div>
       );

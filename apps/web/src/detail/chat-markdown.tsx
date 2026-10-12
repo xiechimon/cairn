@@ -20,10 +20,12 @@
 // 独立行」拼接，web api/attachments.ts 契约）。行中内联的 token 不在块语法
 // 内（保持字面文本，与 agent 回复同律）。
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import type { DocSegment } from '../fixtures/records.js';
+import { useI18n } from '../i18n/provider.js';
+import { Check, Copy } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { Segments } from './segments.js';
 
@@ -164,6 +166,31 @@ const HEAD_SIZE: Record<number, string> = {
   5: 'text-[13px]',
   6: 'text-[13px]',
 };
+
+/** 2026-10-13 dsh CodeBlock 横幅对齐：围栏块的块头 = 语言标签（mono 11px
+ *  tertiary）+ 复制钮（28px 盒，copy→check 1s 换回，dsh MessageIconActions
+ *  同律）。横幅恒显（块的自带 chrome，不参与行级新近律）。 */
+function CodeCopyButton({ text }: { text: string }) {
+  const { t } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  return (
+    <Button
+      variant="ghost"
+      className="flex size-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-secondary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+      aria-label={copied ? t('已复制') : t('复制')}
+      onClick={() => {
+        void navigator.clipboard.writeText(text).then(() => {
+          setCopied(true);
+          if (timer.current !== null) clearTimeout(timer.current);
+          timer.current = setTimeout(() => setCopied(false), 1000);
+        });
+      }}
+    >
+      {copied ? <Check width={15} height={15} /> : <Copy width={15} height={15} />}
+    </Button>
+  );
+}
 
 function HeadingTag({ level, segments }: { level: number; segments: DocSegment[] }) {
   const clamped = Math.min(6, Math.max(1, level));
@@ -328,15 +355,27 @@ export function ChatMarkdown({ text }: { text: string }) {
           case 'code':
             return (
               // 围栏块 = .chat-code 的块级孪生：mono、正常对比度、自带底 +
-              // 缝线，短行折行不横滚、长块 320px 封顶内滚。
-              <pre
+              // 缝线，短行折行不横滚、长块 320px 封顶内滚。2026-10-13 dsh
+              // CodeBlock 对齐：块头横幅 = 语言标签 + 复制钮（恒显，块自带
+              // chrome 不参与行级新近律）；pre 本体保持内滚，缝线与底归外包。
+              <div
                 key={i}
-                className="chat-md-code my-2 max-h-80 overflow-auto rounded-[4px] border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
-                data-lang={block.lang ?? ''}
-                data-testid="md-code"
+                className="chat-md-codeblock my-2 overflow-hidden rounded-[4px] border border-(--border) bg-(--muted)"
               >
-                {block.text}
-              </pre>
+                <div className="flex h-7 items-center justify-between border-b-[0.5px] border-(--border) px-2.5">
+                  <span className="font-mono text-[11px] leading-4 text-(--text-tertiary)">
+                    {block.lang ?? ''}
+                  </span>
+                  <CodeCopyButton text={block.text} />
+                </div>
+                <pre
+                  className="chat-md-code m-0 max-h-80 overflow-auto px-2.5 py-2 font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                  data-lang={block.lang ?? ''}
+                  data-testid="md-code"
+                >
+                  {block.text}
+                </pre>
+              </div>
             );
           case 'attachment':
             return (

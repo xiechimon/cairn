@@ -511,6 +511,10 @@ export type TranscriptItem =
        *  renderer, not the mapper, so the fixture surface exercises the
        *  same parse+render path as live (spec-block.tsx precedent). */
       markdown?: string;
+      /** 2026-10-13 dsh MessageIconActions clock='end' 位对齐：答复行的消息
+       *  时刻（mapper 预格式化 HH:mm），渲染在动作行尾。fixture 捕获形缺省
+       *  不摆。 */
+      clock?: string;
       footer?: RobotFooter;
       /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
       id?: string;

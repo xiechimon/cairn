@@ -651,7 +651,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     // 把块结构摊平成 chat-para；行内 code 仍走 inlineSegments 的 .chat-code
     // 芯片。空文本行跳过——pi 工具轮的空 content）。
     if (text !== '') {
-      entries.push({ at: m.createdAt, item: { kind: 'robot', markdown: text, id: m.id } });
+      entries.push({
+        at: m.createdAt,
+        item: { kind: 'robot', markdown: text, id: m.id, clock: clockTime(m.createdAt) },
+      });
       continue;
     }
     // #955：思考段行——无正文的 assistant 行若是 thinking 块，单列一行（与

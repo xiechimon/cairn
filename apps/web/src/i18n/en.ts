@@ -236,6 +236,8 @@ export const EN: Record<string, string> = {
     'API keys connect machines from the command line and let MCP clients reach your workbench.',
   新建密钥: 'New key',
   复制: 'Copy',
+  // 2026-10-13 dsh CodeBlock 横幅复制钮的确认态（1s 换回，dsh copied 同律）。
+  已复制: 'Copied',
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
