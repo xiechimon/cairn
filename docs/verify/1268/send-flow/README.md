@@ -63,8 +63,9 @@ animationName 不出现）、跑动行「深度求索中，用时 1 秒…」同
 - 待定阶段的停止钮：步未认领时没有可停之物，钮面只在真 running 时出现
   （形必须带义；dsh 的即时停止取消的是客户端请求，pacman 的停止是服务端
   步语义，不摆不能用的钮）。
-- 行挂载/卸载时的间距滑行（dsh data-chat-motion 的 margin transition 通
-  例）：动 message-scroller 布局层的手术，另票再议。**落定折叠自身的
-  收拢滑行已在第二晚落地**（grid-rows 1fr↔0fr，150ms 实测）——本条仅指
-  「行挂载瞬间周围间距滑行」那一层。
+- ~~行挂载/卸载时的间距滑行~~（2026-10-13 核销）：复读 dsh 源码后确认
+  data-chat-motion 的 margin-top 过渡只服务于 fold clock 编排（折叠行长入
+  与过程区收拢同一拍）——该编排已 1:1 落地（grid-rows 收拢 150ms +
+  fold-row-in 长入同行，实测 foldEnterClasses=[true]）；行挂载本身在 dsh
+  不播动画（帧证），pacman 同。无残余滑行缺口。
 - 总管抽屉发送面：有自己的 #1216 在飞指示族，本批只管详情页发送流。
