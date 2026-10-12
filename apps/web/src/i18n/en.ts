@@ -107,6 +107,10 @@ export const EN: Record<string, string> = {
   'AI 审核进行中…': 'AI review in progress…',
   提及: 'Mention',
   停止: 'Stop',
+  // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
+  验证中: 'Verifying',
+  验证通过: 'Verification passed',
+  验证未通过: 'Verification failed',
   // #731 `/` slash completion vocabulary (zh keys, en values).
   命令: 'Commands',
   '没有匹配"/{query}"的命令': 'No commands match "/{query}"',
@@ -471,6 +475,11 @@ export const EN: Record<string, string> = {
   '希望 Agent 审核时重点关注什么？（可选）':
     'What do you want the Agent to focus on during review? (optional)',
   开始审核: 'Start review',
+  // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
+  三视角并行审: 'Run the three review perspectives in parallel',
+  'CodeReviewer · SecurityAuditor · TestEngineer 各审一轮，三份结论并行落会话':
+    'CodeReviewer · SecurityAuditor · TestEngineer each review once; three verdicts land in the conversation in parallel',
+  开始三视角审核: 'Start three-perspective review',
   // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
   // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
   本次审核与产出同源: 'This review shares a vendor with the producing step',

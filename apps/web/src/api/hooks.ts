@@ -717,7 +717,9 @@ export function useApiMutations(teamId: string | undefined) {
           | { action: 'confirm' }
           | { action: 'revision'; side: 'plan'; feedback: string; clientMessageId: string }
           // M7 #312 AI 审核（r8 §3.1）：入队审核步,可选 focus 入参透传 server。
-          | { action: 'review'; agentId: string; focus: string }
+          // #1250（ADR 0018 层 1）：agentId 可缺省——缺省 = fan-out 三视角
+          //（server 按 persona 三员各入队一条 review 步）。
+          | { action: 'review'; agentId?: string; focus: string }
           // #320 失败面发送 = 带反馈重启（r9 §3.3；shared buildStepActionBodySchema 同形）。
           | { action: 'restart'; feedback: string; clientMessageId: string };
       }) => api.post<{ delegated: true }>(`/api/builds/${input.buildId}/steps`, input.body),

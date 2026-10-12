@@ -338,6 +338,46 @@ export function detailReview(opts: {
   };
 }
 
+/** #1250（ADR 0018 层 1）verify verdict 行三态（named scenario，无 capture —
+ *  skills-routing 先例）：review 面之上叠一条 passed、一条 failed（带两条
+ *  证据）与一条判定提取失败行——pass 徽标（绿）与 fail 徽标（红）都是有效
+ *  结论，extractionError 在位才走「判定提取失败」档。证据条目 = path 等宽
+ *  块 + 可选注记，是验证面「读 verdict 即知证据落哪」的核心交付。 */
+export function detailVerifyVerdict(): FixtureSet {
+  const base = detailReview({ userMenuOpen: false });
+  const verifyRows: TranscriptItem[] = [
+    {
+      kind: 'verify',
+      passed: true,
+      conclusion: 'e2e 与单测全绿，证据已入仓。',
+      evidence: [{ path: 'docs/verify/1250/e2e.json', note: '923 条全过' }],
+    },
+    {
+      kind: 'verify',
+      passed: false,
+      conclusion: '两条失败用例需修复后复验。',
+      evidence: [
+        { path: 'docs/verify/1250/fulltest.log' },
+        { path: 'docs/verify/1250/failures.txt', note: '第 3/41 条' },
+      ],
+    },
+    {
+      kind: 'verify',
+      passed: false,
+      conclusion: '判定提取失败',
+      evidence: [],
+      extractionError: '终轮输出不含合法 JSON',
+    },
+  ];
+  return {
+    ...base,
+    detail: {
+      ...base.detail,
+      transcript: [...(base.detail?.transcript ?? []), ...verifyRows],
+    },
+  };
+}
+
 /** #1101 diff-pane stress changeset (named scenario, no capture —
  *  chief-threads-long precedent). One file, three hunks, pinning the five
  *  shapes the word-level highlight + horizontal-scroll fixes must handle:

@@ -713,6 +713,58 @@ function Row({
           <ActionRow copy={reviewCopyText(item)} t={t} />
         </div>
       );
+    case 'verify':
+      return (
+        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+          <AgentRowAvatar agent={agent} />
+          <span
+            className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
+            data-testid="agent-text"
+          >
+            {/* 结论先行（review verdict 同族）：chip = pass/fail 徽标（pass 绿
+                / fail 红）或「判定提取失败」（extractionError 在位，review 同
+                律）。passed=false 是有效结论——fail 徽标不是错误态。 */}
+            <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
+              <span
+                className={`chat-review-tag flex-shrink-0 rounded-[4px] px-1.5 py-px text-[11px] leading-[1.5] font-semibold ${
+                  item.extractionError !== undefined
+                    ? 'bg-(--danger-soft) text-destructive'
+                    : item.passed
+                      ? 'bg-(--chip-plan-bg) text-(--chip-plan-fg)'
+                      : 'bg-(--danger-soft) text-destructive'
+                }`}
+              >
+                {t(
+                  item.extractionError !== undefined
+                    ? '判定提取失败'
+                    : item.passed
+                      ? '验证通过'
+                      : '验证未通过',
+                )}
+              </span>
+              <Segments
+                segments={inlineSegments(item.extractionError ?? item.conclusion)}
+                codeClassName="chat-code"
+              />
+            </p>
+            {/* 证据条目（#1250）：path 等宽块 + 可选注记——证据的可点入仓路径
+                是验证面的核心交付，读 verdict 即知证据落哪。 */}
+            {item.evidence.map((e) => (
+              <p
+                key={e.path}
+                className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-[15px] text-xs [background-clip:content-box] text-(--text-secondary)`}
+                data-testid="verify-evidence"
+              >
+                <Segments
+                  segments={inlineSegments(e.note !== undefined ? `${e.path} — ${e.note}` : e.path)}
+                  codeClassName="chat-code"
+                />
+              </p>
+            ))}
+          </span>
+          <ActionRow copy={verifyCopyText(item)} t={t} />
+        </div>
+      );
   }
 }
 
@@ -730,6 +782,13 @@ function reviewCopyText(item: Extract<TranscriptItem, { kind: 'review' }>): stri
   return [
     item.extractionError ?? item.conclusion,
     ...item.findings.map((f) => `${f.id}. (${f.severity}) ${f.summary}`),
+  ].join('\n');
+}
+
+function verifyCopyText(item: Extract<TranscriptItem, { kind: 'verify' }>): string {
+  return [
+    item.extractionError ?? `${item.passed ? 'PASS' : 'FAIL'} ${item.conclusion}`,
+    ...item.evidence.map((e) => (e.note !== undefined ? `${e.path} — ${e.note}` : e.path)),
   ].join('\n');
 }
 

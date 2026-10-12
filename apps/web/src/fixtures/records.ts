@@ -602,6 +602,18 @@ export type TranscriptItem =
       /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
       id?: string;
     }
+  /** 验证步 verdict 行（#1250 / ADR 0018 层 1）：pass/fail 徽标 + 总结 +
+   * 证据条目清单（path + 可选注记）——review verdict 行的验证面同族。
+   *  dataSource = server VERIFY_VERDICT_KIND 消息解出的 verifyVerdict。 */
+  | {
+      kind: 'verify';
+      passed: boolean;
+      conclusion: string;
+      evidence: { path: string; note?: string }[];
+      extractionError?: string;
+      /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
+      id?: string;
+    }
   /** #955 思考段行（详情页与总管抽屉共用同一张脸）：模型内部推理按段单列。 */
   | {
       kind: 'thinking';
