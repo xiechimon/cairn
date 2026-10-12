@@ -59,7 +59,8 @@ claimed ≥ cap 即不发步）+ daemon 本地闸（GET me 读 cap，混版本�
   turnQueue/排队行/读标注、空位交接、PATCH 值域）。证据
   `docs/verify/1108/`（含复跑配方 README）。
 - 单测面：server `test/machine-concurrency.test.ts`（闸/投影/写面 9）+
-  `machine-session-affinity.test.ts` 忙判定改容量口径；daemon
+  `test/machine-pin.test.ts`（#1259 归属机版：步只投 agent 归属机，钉选
+  过滤退役——会话亲和族随 #1259 退役删除）；daemon
   `test/machine-loop.test.ts` 并行循环 P1–P5；web
   `test/activity-live-row.test.ts` 排队标签 Q1–Q6。
 - e2e 面：`machines-local.spec.ts`（行内活控件 = 两件）+

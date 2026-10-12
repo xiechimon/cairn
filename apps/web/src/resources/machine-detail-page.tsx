@@ -152,7 +152,7 @@ export function MachineDetailPage() {
                 {others.find((m) => m.id === evacuateTarget)?.name ?? t('迁移到…')}
               </SelectValue>
             </SelectTrigger>
-            <SelectContent aria-label={t('迁移到')} className="machine-evacuate-menu">
+            <SelectContent aria-label={t('迁移到')}>
               {others.map((m) => (
                 <SelectItem key={m.id} className="machine-evacuate-row" value={m.id ?? ''}>
                   {m.name}
