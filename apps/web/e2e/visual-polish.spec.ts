@@ -35,6 +35,8 @@ async function edgeContract(page: Page, selector: string) {
     edgeShadowProbe.style.boxShadow = 'var(--edge-shadow)';
     const plateShadowProbe = document.createElement('div');
     plateShadowProbe.style.boxShadow = 'var(--plate-shadow)';
+    const cardLiftProbe = document.createElement('div');
+    cardLiftProbe.style.boxShadow = 'var(--card-lift)';
     const borderTokenProbe = document.createElement('div');
     borderTokenProbe.style.backgroundColor = 'var(--border)';
     document.body.append(
@@ -43,6 +45,7 @@ async function edgeContract(page: Page, selector: string) {
       cardShadowProbe,
       edgeShadowProbe,
       plateShadowProbe,
+      cardLiftProbe,
       borderTokenProbe,
     );
     const cs = getComputedStyle(el);
@@ -55,6 +58,7 @@ async function edgeContract(page: Page, selector: string) {
       cardShadow: getComputedStyle(cardShadowProbe).boxShadow,
       edgeShadow: getComputedStyle(edgeShadowProbe).boxShadow,
       plateShadow: getComputedStyle(plateShadowProbe).boxShadow,
+      cardLift: getComputedStyle(cardLiftProbe).boxShadow,
       radius: cs.borderTopLeftRadius,
       border: cs.borderTopWidth,
     };
@@ -63,6 +67,7 @@ async function edgeContract(page: Page, selector: string) {
     cardShadowProbe.remove();
     edgeShadowProbe.remove();
     plateShadowProbe.remove();
+    cardLiftProbe.remove();
     borderTokenProbe.remove();
     return out;
   });
@@ -79,13 +84,15 @@ for (const theme of ['light', 'dark'] as const) {
     // #425 基切换后的配方（政策见 #411「配方类」）：base 形态的 Card 用
     // 1px ring 外环（`ring-1 ring-foreground/10`）替代 #414 的 1px 实描边 +
     // shadow-sm。**保留的原意图**：不得回到 #139 的 inset 环（分数缩放下发丝
-    // 不匀）——那条断言是本测试的真回归守卫。半径：#1004 实审裁决 1
-    // （2026-10-08，ADR 0012 D1 registry 默认几何为正典）回 registry card
-    // rounded-xl（=14px），V2 骨架的半径归零退役。
+    // 不匀）——那条断言是本测试的真回归守卫。半径与投影：2026-10-12 用户派
+    // 「看板卡对齐 deepseek-harness 对话框观感」——圆角升卡族档 rounded-2xl
+    // （=18px，dsh 卡件 16-20 区间），静止吃 --card-lift 微抬升柔光
+    // （dsh elevation 律：描边承担分离、柔光只暗示贴地）。
     expect(card.border).toBe('0px');
-    expect(card.radius).toBe('14px');
+    expect(card.radius).toBe('18px');
     expect(card.shadow).toContain('0px 0px 0px 1px');
     expect(card.shadow).not.toContain('inset');
+    expect(card.shadow).toContain(card.cardLift);
   });
 
   test(`board column container rides the same edge ring + card-tier shadow (${theme})`, async ({
@@ -96,11 +103,10 @@ for (const theme of ['light', 'dark'] as const) {
 
     const column = await edgeContract(page, '.board-column');
     // #414（B 面）：列容器与卡片同行——1px 实描边 + card-tier 投影。
-    // 半径：#1004 对账声明留的遗留面（"residue for a later ruling"）由
-    // #1054 消费点清点裁定——列与 banner/卡片同吃 card-tier 投影，几何接
-    // registry Card 依据 rounded-xl（=14px，ADR 0012 D1），V2 骨架方角退役。
+    // 半径随卡族档（2026-10-12 用户派 dsh 对齐：rounded-2xl = 18px，
+    // 卡/列/通知条同档）。
     expect(column.border).toBe('1px');
-    expect(column.radius).toBe('14px');
+    expect(column.radius).toBe('18px');
     expect(column.borderColorOwn).toBe(column.borderToken);
     expect(column.shadow).not.toContain('inset');
   });
@@ -114,11 +120,10 @@ for (const theme of ['light', 'dark'] as const) {
     const banner = await edgeContract(page, '.board-notify-banner');
     // #161 通知条↔看板列边框对齐: the banner sits at the same elevation
     // tier as the column container — same ring, same shadow — so the two
-    // surfaces read as one language. 半径：#1004 实审裁决 3（2026-10-08）回
-    // 默认圆角，取最接近的 registry 表面件 card 的 rounded-xl（=14px）；
-    // #1054 起列容器同回 card 档，两者复归同半径（对账遗留面已裁）。
+    // surfaces read as one language. 半径随卡族档（2026-10-12 用户派 dsh
+    // 对齐：rounded-2xl = 18px，卡/列/通知条同档）。
     expect(banner.border).toBe('0px');
-    expect(banner.radius).toBe('14px');
+    expect(banner.radius).toBe('18px');
     expect(banner.shadow.startsWith(banner.ring)).toBe(true);
     expect(banner.ring.startsWith(`${banner.borderColor} `)).toBe(true);
     expect(banner.shadow).toContain(banner.cardShadow);

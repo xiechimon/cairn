@@ -132,6 +132,12 @@
      press 板面卡按压档（#629，= tertiary 深一档关系保持） */
   --surface-tertiary: #403c39;
   --surface-press: var(--surface-tertiary);
+  /* 卡面 hover 档（2026-10-12 用户派：看板卡对齐 deepseek-harness 对话框观感
+     ——dsh 交互面 hover = 墨 8% 微染，packages/client/ui-theme
+     design-platform.css 的 interactive-bg-hover 族）。公式槽：卡底向文字色
+     走一步，双主题各持配比（暗侧提亮、亮侧压暗），品牌/色板翻值自动跟随。
+     唯一消费点 = motion.css 的 .todo-card:hover（卡面按压仍走 --surface-press）。 */
+  --card-hover: color-mix(in srgb, var(--card), var(--foreground) 8%);
   /* text 三阶（官方只有 muted-foreground 一阶次级文本，三阶是全仓最大消费面
      的真扩展，#987 §3.4-C）：secondary / tertiary / dim（dim 仅装饰：
      时间戳/占位/非活动图标，沿 XMON-55 口径；UI 3 门实测见 docs/verify/988/） */
@@ -267,6 +273,9 @@
      深一档；press = tertiary 一档深（#629） */
   --surface-tertiary: #e2dcd7;
   --surface-press: var(--surface-tertiary);
+  /* --card-hover 亮侧镜像（dsh interactive-bg-hover 亮侧 = 墨 6%）：卡底向
+     文字色压暗 6%，悬停反馈同律。 */
+  --card-hover: color-mix(in srgb, var(--card), var(--foreground) 6%);
   /* XMON-55 P4 亮侧文字族随定版暖灰 ramp 走：secondary / tertiary 过 4.5，
      dim 过 UI 3 门仍只做装饰：时间戳、非活动图标、占位规则（实测见
      docs/verify/988/）。 */

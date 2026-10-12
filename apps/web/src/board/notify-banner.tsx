@@ -87,9 +87,10 @@ export function NotificationBanner({ onEnable }: { onEnable: () => void }) {
   return (
     /* 几何/色出处（r2 01 亮 / 28 暗实测，原 board.css 规则族，#943 迁工具
        类）：条带挂在 topbar 边框下 12px（top 56 = 44 + 12）、64px 高卡片、
-       与 scroller 列同 17px 内缩；发丝环 + 卡投影双层。 */
+       与 scroller 列同 17px 内缩；发丝环 + 卡投影双层。圆角随卡族档
+       （2026-10-12 dsh 对齐：rounded-2xl = 18px，与卡/列容器同）。 */
     <section
-      className="board-notify-banner absolute inset-x-[17px] top-14 flex h-16 items-center rounded-xl border-0 bg-(--secondary) px-4 [box-shadow:var(--edge-ring),var(--card-shadow)]"
+      className="board-notify-banner absolute inset-x-[17px] top-14 flex h-16 items-center rounded-2xl border-0 bg-(--secondary) px-4 [box-shadow:var(--edge-ring),var(--card-shadow)]"
       aria-label={t(NOTIFICATION_BANNER_COPY.title)}
     >
       <span className="flex size-7 flex-none items-center justify-center rounded-full bg-(--notify-icon-bg) text-(--card-button)">

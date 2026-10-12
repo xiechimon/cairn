@@ -85,6 +85,12 @@ test('列头固定：列表滚动时 header 的视口位置不动', async ({ pag
 
 test('卡片上下缘由块向内边距保位：首卡上缘、滚到底的末卡下缘都不贴裁切线', async ({ page }) => {
   await page.goto(OVERFLOW);
+  // 卡面入场浮入（2026-10-12 dsh 对齐：card-enter 150ms，translateY 4px）
+  // 播完再量卡缘——中途量会多读一个动画位移（#1008 的 getAnimations 钉法）。
+  await page
+    .locator('.todo-card')
+    .first()
+    .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const listEl = list(page);
   // 卡环是 border box 外的 1px box-shadow，滚动容器按 padding box 裁切：
   // 卡的上缘正好落在裁切线上时，那道 1px 环与圆角上半段被裁掉（XMON-42
