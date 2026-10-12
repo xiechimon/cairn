@@ -11,6 +11,8 @@
 // 缝纪律：本文件不 import `@earendil-works/*`——`fetch` 契约是 WHATWG 标准面，
 // 宿主（pi.ts）负责把它接进 pi 的请求选项。
 
+import { parseRetryAfterMs } from '@pacman/shared';
+
 /** 响应形态记录（每次 provider HTTP 响应一份）。 */
 export interface ProviderResponseShape {
   /** 真实请求 URL（含 provider baseUrl 与路径）——baseUrl 少一段时这里看得出来。 */
@@ -21,6 +23,9 @@ export interface ProviderResponseShape {
   contentType: string | null;
   /** 响应体是不是 SSE 流（content-type = text/event-stream）。 */
   eventStream: boolean;
+  /** #1261 响应头 `retry-after`（限流恢复窗，毫秒）：429/529 诊断行携带，
+   *  quotaBlock.retryAfterMs 的数据源。缺失/非法 = null（不造数值）。 */
+  retryAfterMs: number | null;
   /** 非 SSE 时的前若干字节摘要（空白折叠、控制字符剥除、截断）；SSE = null
    *  （流不读、不缓存：正常路径零开销）。读取失败 = null（诊断降级，不炸）。 */
   preview: string | null;
@@ -119,12 +124,18 @@ export function wrapProviderFetch(
     const response = await inner(input, init);
     const contentType = response.headers.get('content-type');
     const eventStream = isEventStreamContentType(contentType);
+    // #1261 Retry-After 头：值是裸秒数（"5"），parseRetryAfterMs 的词法要
+    // 「retry-after」关键字在文——拼回头形再解析（同一函数同一次词法，诊断
+    // 行与 quotaBlock 的数值不会漂移）。
+    const retryAfterRaw = response.headers.get('retry-after');
     const shape: ProviderResponseShape = {
       url: requestUrl(input),
       status: response.status,
       statusText: response.statusText,
       contentType,
       eventStream,
+      retryAfterMs:
+        retryAfterRaw === null ? null : parseRetryAfterMs(`retry-after: ${retryAfterRaw}`),
       preview: null,
     };
     // 先落判定再读体：读取失败 / 超时都不影响「不是 SSE」这条结论。
@@ -147,6 +158,11 @@ export function describeProviderResponse(
     parts.push('(SSE stream)');
   } else {
     parts.push('(not an SSE stream)');
+  }
+  // #1261：Retry-After 头原文进诊断行（毫秒化与解析单源 = shared
+  // parseRetryAfterMs——runner 侧对同一函数再解析诊断行，数值双端一致）。
+  if (shape.retryAfterMs !== null) {
+    parts.push(`retry-after: ${Math.round(shape.retryAfterMs / 1000)}`);
   }
   const facts = [parts.join(' ')];
   if (ctx.providerBaseUrl !== undefined) {

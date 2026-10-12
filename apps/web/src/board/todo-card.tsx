@@ -196,6 +196,17 @@ export function TodoCard({
             {t('由总管创建')}
           </Badge>
         )}
+        {/* #1261 等额度芯片（waiting_quota 挂起）：attention 底（todo-card 徽标
+            族同 token，深/亮双模各有值）——「执行中」列里静默断粮的卡显性
+            说「等额度」。e2e 锚 = data-todo-quota。 */}
+        {todo.quotaWait != null && (
+          <Badge
+            data-todo-quota={todo.quotaWait.kind}
+            className="ml-[10.5px] h-4 flex-none rounded-4xl border-0 bg-(--badge-attention) px-1.5 py-0 text-[10px] leading-none font-normal text-(--badge-attention-fg)"
+          >
+            {t('等额度')}
+          </Badge>
+        )}
         {todo.hasPlan && (
           <span
             className="ml-[10.5px] flex flex-none items-center text-muted-foreground"

@@ -76,6 +76,8 @@ import { hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
+// #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
+import { toQuotaWait } from './quota-wait.js';
 import { stepQueueProjector } from './step-queue.js';
 import { getTodo, setTodoPhase } from './todos.js';
 // #902：transcript 行写入单源提出（todos 面同用，避免 todos→builds 依赖环）。
@@ -188,7 +190,8 @@ export function readSteerPending(db: Db, conversationId: string): string[] {
  * - claimed 步 = 机器信号面（stop_pending 单槽 upsert + machine stream stop
  *   事件 → GET /api/machine/stop 拉取-确认 → daemon live.stop()，#278 steer
  *   同律）→ {delegated:true} 202；中断在途，done(stopped) 回报才落账。
- * - pending 步 = 无机器可通知，server 侧即时取消 → {delegated:false} 200。
+ * - pending / waiting_quota 步（#1261）= 无机器可通知，server 侧即时取消 →
+ *   {delegated:false} 200（配额挂起步无 daemon 在跑，停 = 放弃挂起）。
  * 无活动步 = 409 不静默（steer 门同律）。 */
 export function requestStop(
   deps: BuildDeps,
@@ -198,19 +201,21 @@ export function requestStop(
   const { db } = deps;
   const buildRow = db.select().from(build).where(eq(build.id, buildId)).get();
   if (!buildRow) throw new NotFoundError(`build ${buildId}`);
-  // 活动步 = pending/claimed（步序贯，取最新一条；orderBy 显式钉死语义，
-  // 不依赖隐式 rowid 序）。
+  // 活动步 = pending/claimed/waiting_quota（步序贯，取最新一条；orderBy 显式
+  // 钉死语义，不依赖隐式 rowid 序）。
   const active = db
     .select()
     .from(step)
-    .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+    .where(
+      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
+    )
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
   if (!active) {
     throw new HttpError(409, 'no active step on this build (stop 只对运行中的任务生效)');
   }
-  if (active.status === 'pending') {
+  if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
     return { delegated: false };
   }
@@ -335,7 +340,9 @@ export function cancelBuild(
   const active = db
     .select()
     .from(step)
-    .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+    .where(
+      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
+    )
     .orderBy(asc(step.createdAt))
     .all()
     .at(-1);
@@ -345,7 +352,7 @@ export function cancelBuild(
     releaseZombieQueued(deps, buildRow, todoRow);
     return 'released';
   }
-  if (active.status === 'pending') {
+  if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
     return 'stopped';
   }
@@ -378,7 +385,12 @@ export function sweepZombieQueuedTodos(deps: BuildDeps, now: number = nowMs()): 
     const active = deps.db
       .select({ id: step.id })
       .from(step)
-      .where(and(eq(step.buildId, buildRow.id), inArray(step.status, ['pending', 'claimed'])))
+      .where(
+        and(
+          eq(step.buildId, buildRow.id),
+          inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+        ),
+      )
       .all();
     if (active.length > 0) continue;
     releaseZombieQueued(deps, buildRow, todoRow);
@@ -486,6 +498,11 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
     // #1106 注入选择记录（详情面回查正本）：null = 未计算（chief 步/旧
     // 数据），hits=[] = 已计算零命中。
     skillInjection: r.skillInjection ?? null,
+    // #1261 配额挂起投影（waiting_quota 行携带——详情页「等额度」进度行
+    // 数据源；投影单源 = services/quota-wait.ts toQuotaWait）。
+    ...(r.status === 'waiting_quota' && r.quotaBlock !== null
+      ? { quotaWait: toQuotaWait(r.quotaBlock) }
+      : {}),
   }));
 }
 

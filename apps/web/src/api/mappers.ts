@@ -94,6 +94,22 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
     : { label: '排队中：等空闲机器（前面 {ahead} 个）', vars: { ahead } };
 }
 
+/** #1261 等额度行标签（waiting_quota 步）：哪一路 relay + 事件类型 + 下次
+ * 探测时刻——「静默窗口里板面说真话」的详情页半（queueLabel 同族）。 */
+function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
+  label: string;
+  vars: Record<string, string | number>;
+} {
+  return {
+    label: '等额度：{lane} {kind}，{probe} 自动探测续跑',
+    vars: {
+      lane: q.label ?? q.providerId,
+      kind: q.kind === 'quota' ? '额度空' : '限流',
+      probe: clockTime(q.probeAt),
+    },
+  };
+}
+
 /** transcript 消息行（GET messages 封套行形，shared transcriptRowSchema）。
  * actor（#902）：过闸宣告行的动作主体 displayName；存量旧行/daemon 上传行 =
  * null/缺省，宣告行呈现回落当前用户名（旧语义不变）。 */
@@ -136,6 +152,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     // #640：总管建卡判定位 = sourceBuildId（chief 实例 id，r5 §3.2 溯源层
     // 「谁建的」）——看板卡「由总管创建」芯片消费。
     chiefCreated: w.sourceBuildId !== null,
+    // #1261 等额度投影（板面卡态/横幅判定位）；无挂起 = null（fixture 面
+    // 键缺席同形——undefined 折叠进 null）。
+    quotaWait: w.quotaWait ?? null,
   };
 }
 
@@ -720,8 +739,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   }
 
   // live 尾部：进行中文本（打字面）+ streaming 行（r7 16 `准备工作区...` /
-  // 26 `处理中...`）。running 步存在才挂尾。
-  const running = steps.find((s) => s.status === 'claimed' || s.status === 'pending');
+  // 26 `处理中...`）。running 步存在才挂尾。#1261 增 waiting_quota（配额挂起
+  // 步在跑语义：agent 不在跑但步在飞——标签走「等额度」而非「处理中」，
+  // 静默窗口里板面说真话）。
+  const running = steps.find(
+    (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
+  );
   if (running && build) {
     if (liveText.trim() !== '') {
       items.push({
@@ -740,6 +763,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const actLabel = act != null && !stopping ? activityLabel(act) : null;
     const queued =
       running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;
+    // #1261 等额度标签（waiting_quota 步）：优先于活动相位——挂起步不在跑，
+    // act 是断粮前轮的陈旧信号（用户实测「正在连接模型」跨整段静默期说谎，
+    // live 探针两跑两形复现）；queued 是 pending 专属恒不冲突。投影缺席
+    // （老 server / fixture 无该字段）= 落回既有标签，零回归。
+    const quota =
+      running.status === 'waiting_quota' && running.quotaWait != null
+        ? quotaWaitLabel(running.quotaWait)
+        : null;
     items.push({
       kind: 'streaming',
       // #873：不在投影期把「已用秒数」算成一个死数——投影只在别的事件驱动
@@ -749,24 +780,31 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       label:
         queued != null
           ? queued.label
-          : actLabel != null
-            ? actLabel.label
-            : stopping
-              ? '正在停止…' // 停止过渡态（M7 #308，r9 §3.3：中断在途）
-              : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
-                ? '准备工作区...'
-                : '处理中...',
+          : quota != null
+            ? quota.label
+            : actLabel != null
+              ? actLabel.label
+              : stopping
+                ? '正在停止…' // 停止过渡态（M7 #308，r9 §3.3：中断在途）
+                : running.kind === 'plan' && steps.length === 1 && running.status === 'pending'
+                  ? '准备工作区...'
+                  : '处理中...',
       ...(queued != null
         ? { labelVars: queued.vars }
-        : actLabel?.vars !== undefined
-          ? { labelVars: actLabel.vars }
-          : {}),
+        : quota != null
+          ? { labelVars: quota.vars }
+          : actLabel?.vars !== undefined
+            ? { labelVars: actLabel.vars }
+            : {}),
       // 排队行不挂相位面（signalAt/skills 是执行态信号——步没在跑，相位是
-      // 上一步残留；W1 的 stepId 过滤管跨步，这里管「排队的当前步」）。
-      ...(queued == null && actLabel != null && act != null ? { signalAt: act.at } : {}),
+      // 上一步残留；W1 的 stepId 过滤管跨步，这里管「排队的当前步」）。#1261
+      // 等额度行同律：act 是断粮前轮的陈旧信号（挂起期步不在跑），不随行披露。
+      ...(queued == null && quota == null && actLabel != null && act != null
+        ? { signalAt: act.at }
+        : {}),
       // #918：本步技能事实清单随 activity 事件进披露面（stepId 过滤已由上面
       // 的 act 判定承担——陈旧步的技能条目不跨步串场）。空/缺省不产字段。
-      ...(queued == null && act?.skills !== undefined && act.skills.length > 0
+      ...(queued == null && quota == null && act?.skills !== undefined && act.skills.length > 0
         ? { skills: act.skills }
         : {}),
     });

@@ -74,9 +74,13 @@ export function DetailHead({
   // AI 审核中态（M7 #312，r8 §3.1）：chip 文案与 phase 解耦——「审核中」字面
   // 反映活动步 kind 而非 phase（review 步是额外 agent 步，phase 留 confirm/
   // review）。tone 用 confirm（同色与待确认期一致，不引入新色）。
+  // #1261 等额度态同律：waiting_quota 挂起时 chip 直说「等额度」（不引入
+  // 新色，confirm 档）——票面「卡态」半，用户不再从「执行中」猜断粮。
   const ui = reviewActive
     ? { ...PHASE_UI[phase ?? todo.phase], chip: '审核中' }
-    : PHASE_UI[phase ?? todo.phase];
+    : todo.quotaWait != null
+      ? { ...PHASE_UI[phase ?? todo.phase], chip: '等额度' }
+      : PHASE_UI[phase ?? todo.phase];
   const { search } = useLocation();
   const [popover, setPopover] = useState(chipPopoverOpen === true);
   return (
