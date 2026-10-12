@@ -708,11 +708,13 @@ test('记忆 tab：记忆行住在模板卡里', async ({ page }) => {
   await expect(card.locator('.profile-row.agent-memory-row')).toHaveCount(3);
 });
 
-test('权限 tab：四组开关各自住在模板卡里（#1169 起新增授权技能段）', async ({ page }) => {
+test('权限 tab：五组开关各自住在模板卡里（#1251 起新增机器匹配段）', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(2).click();
   const cards = detail.locator('.agent-perms .profile-card');
-  await expect(cards).toHaveCount(4); // 工具 / 授权技能(#1169) / 密钥 / MCP 服务器
+  // 工具 / 授权技能(#1169) / 密钥 / MCP 服务器 / 机器匹配(#1251——执行要求
+  // 写面卡；机器匹配读面卡是 live 专属读面，fixture 面缺席)。
+  await expect(cards).toHaveCount(5);
   // 六档工具开关全在工具组的卡里（不靠散行的 .agent-perm-row 撑）
   await expect(cards.first().locator('.profile-row')).toHaveCount(6);
   await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(6);
@@ -731,9 +733,10 @@ test('记忆/权限卡：首行不吃卡的上圆角与描边（无方角外溢�
   await assertTopCorner(memoryFirst);
 
   await detail.locator('.agent-tab').nth(2).click();
-  // 4 张权限卡：工具 / 授权技能(#1169) / 密钥（零密钥时空态也是模板行）/ MCP 服务器
+  // 5 张权限卡：工具 / 授权技能(#1169) / 密钥（零密钥时空态也是模板行）/
+  // MCP 服务器 / 机器匹配(#1251，fixture 面 = 执行要求写面卡)。
   const permFirst = detail.locator('.agent-perms .profile-card > .profile-row:first-child');
-  await expect(permFirst).toHaveCount(4);
+  await expect(permFirst).toHaveCount(5);
   await assertTopCorner(permFirst);
 });
 

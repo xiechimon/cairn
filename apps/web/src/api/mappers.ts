@@ -77,12 +77,30 @@ import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
 
 /** #1108 排队行标签（transcript / chief 两面单源）：位次 + 等待对象 →
  *  label/vars（t() 键 + 插值；queue = server 排队投影真值）。形 =
- *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。 */
+ *  shared stepJournalRowSchema.queue / chiefThreadSchema.turnQueue。
+ *  #1251 blocked 位优先（成因先于位次——「等谁」比「排第几」更可操作）：
+ *  capability-missing = 给修法（缺项点名 + 装齐即解锁）；machine-offline =
+ *  给等待（等机器上线，钉选面点名机器）。 */
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
 } {
   const ahead = Math.max(0, queue.position - 1);
+  if (queue.blocked?.kind === 'capability-missing') {
+    return {
+      label:
+        '排队中：没有机器满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
+      vars: { missing: queue.blocked.missing.join('、'), ahead },
+    };
+  }
+  if (queue.blocked?.kind === 'machine-offline') {
+    return queue.waitingFor != null
+      ? {
+          label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
+          vars: { machine: queue.waitingFor.name, ahead },
+        }
+      : { label: '排队中：等机器上线（前面 {ahead} 个）', vars: { ahead } };
+  }
   return queue.waitingFor != null
     ? {
         label: '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）',
@@ -1068,6 +1086,9 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     // 行回到 shell 闸单控件面（存量 capture 零漂移）。
     ...(m.maxConcurrent !== undefined ? { maxConcurrent: m.maxConcurrent } : {}),
     ...(m.runningSteps !== undefined ? { runningSteps: m.runningSteps } : {}),
+    // #1251 能力清单：三态原样透传（清单 / null = 未上报 / absent = 老
+    // server——读标注退场，maxConcurrent 同律）。
+    ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
   }));
 }
 
