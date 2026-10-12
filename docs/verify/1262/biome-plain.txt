@@ -1,0 +1,34 @@
+apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables  FIXABLE  ━━━━━━━━━━━━━━━
+
+  ! This variable greeting is unused.
+  
+  > 1 │ const greeting = "hello" + " world";
+      │       ^^^^^^^^
+    2 │ 
+  
+  i Unused variables are often the result of typos, incomplete refactors, or other sources of bugs.
+  
+  i Unsafe fix: If this is intentional, prepend greeting with an underscore.
+  
+    1   │ - const·greeting·=·"hello"·+·"·world";
+      1 │ + const·_greeting·=·"hello"·+·"·world";
+    2 2 │   
+  
+
+apps/daemon/test/1262-ansi-probe.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    1   │ - const·greeting·=·"hello"·+·"·world";
+      1 │ + const·greeting·=·'hello'·+·'·world';
+    2 2 │   
+  
+
+Checked 1 file in 2ms. No fixes applied.
+Found 1 error.
+Found 1 warning.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+

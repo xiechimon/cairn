@@ -1,0 +1,8 @@
+[diag] todo phase: failed
+2026-10-12 18:06:12 [step] step failed: git commit failed (1): ^[[0mapps/daemon/test/1262-ansi-probe.ts^[[0m^[[0m:^[[0m^[[0m1^[[0m^[[0m:^[[0m^[[0m7^[[0m^[[0m ^[[0m^[[0m^[]8;;https://biomejs.dev/linter/rules/no-unused-variables^[\lint/correctness/noUnusedVariables^[]8;;^[\^[[0m^[[0m ^[[0m^[[0m^[[30m^[[47m FIXABLE ^[[0m^[[0m ^[[0m^[[0m━━━━━━━━━━━━━━━^[[0m^[[0m
+#1262 E2E（integration/test/ansi-errormessage-e2e.test.ts）——真 server + 真 daemon + 真 git + stub LLM。
+
+捕获侧原文（daemon.log 的 step failed 行，落库前 raw 面——done 上报前被剥）：
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:06:09

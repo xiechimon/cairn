@@ -1,0 +1,40 @@
+{
+  "ticketAcceptance": "biome colored on/off two modes stripped to consistent",
+  "firstLineIdentical": true,
+  "diagnosticLinesEqual": true,
+  "residualDiffCount": 6,
+  "residualDiffNature": "biome symbol-glyph variants (⚠/ℹ/✖ vs !/i/×) + the timing line (Checked 1 file in Xms) — not ANSI escapes",
+  "firstLine": "apps/daemon/test/1262-ansi-probe.ts:1:7 lint/correctness/noUnusedVariables  FIXABLE  ━━━━━━━━━━━━━━━",
+  "diffs": [
+    {
+      "line": 2,
+      "colored": "  ⚠ This variable greeting is unused.",
+      "plain": "  ! This variable greeting is unused."
+    },
+    {
+      "line": 8,
+      "colored": "  ℹ Unused variables are often the result of typos, incomplete refactors, or other sources of bugs.",
+      "plain": "  i Unused variables are often the result of typos, incomplete refactors, or other sources of bugs."
+    },
+    {
+      "line": 10,
+      "colored": "  ℹ Unsafe fix: If this is intentional, prepend greeting with an underscore.",
+      "plain": "  i Unsafe fix: If this is intentional, prepend greeting with an underscore."
+    },
+    {
+      "line": 19,
+      "colored": "  ✖ Formatter would have printed the following content:",
+      "plain": "  × Formatter would have printed the following content:"
+    },
+    {
+      "line": 26,
+      "colored": "Checked 1 file in 64ms. No fixes applied.",
+      "plain": "Checked 1 file in 2ms. No fixes applied."
+    },
+    {
+      "line": 31,
+      "colored": "  ✖ Some errors were emitted while running checks.",
+      "plain": "  × Some errors were emitted while running checks."
+    }
+  ]
+}
