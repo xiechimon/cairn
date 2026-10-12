@@ -344,6 +344,12 @@ export function TodoDetailPage() {
   const reviewActive = steps.some(
     (s) => s.kind === 'review' && (s.status === 'claimed' || s.status === 'pending'),
   );
+  // 验证中态（#1250 / ADR 0018 层 1）：同律——存在 kind=verify 的活动步时
+  // chip 改「验证中」（dhead 同 review 的覆盖位）；phase 不动（verify 步是
+  // 额外 agent 步，合并闸在 verdict 落地后仍留人）。
+  const verifyActive = steps.some(
+    (s) => s.kind === 'verify' && (s.status === 'claimed' || s.status === 'pending'),
+  );
   // 「正在停止…」过渡态出口：活动步消失（stopped 落账/自然收尾）即清；
   // 换 build（重开/重跑）同样复位——新轮不继承上一轮的停止态。
   useEffect(() => {
@@ -575,6 +581,7 @@ export function TodoDetailPage() {
     reviewAgents,
     reviewDefaultId,
     reviewProducerProvider,
+    fanoutAvailable,
   } = actions;
   const { onSend, onAttachment } = useDetailComposer({
     live,
@@ -823,6 +830,7 @@ export function TodoDetailPage() {
           phase={live ? phase : (view.phaseOverride ?? todo.phase)}
           onMore={() => setMoreOpen(true)}
           reviewActive={reviewActive}
+          verifyActive={verifyActive}
           actionInFlight={actionInFlight}
           onAction={handlePrimaryAction}
           chipPopoverOpen={fixture.ui?.chipPopoverOpen === true}
@@ -1201,16 +1209,22 @@ export function TodoDetailPage() {
         agents={reviewAgents}
         defaultAgentId={reviewDefaultId ?? undefined}
         producerProvider={reviewProducerProvider}
+        fanoutAvailable={live ? fanoutAvailable : undefined}
         onStart={
-          // 入队审核步（r8 §3.1 实测）：POST steps {action:"review", agentId, focus?}
+          // 入队审核步（r8 §3.1 实测）：POST steps {action:"review", agentId?, focus?}
           // → server 入队审核步 + 时间线插 REVIEW_ANNOUNCEMENT + phase 留 confirm
-          // /review。乐观 closeOverlay；终态由 SSE step 事件推进 reviewActive。
+          // /review。#1250：agentId 缺省 = fan-out 三视角（persona 三员各一条）。
+          // 乐观 closeOverlay；终态由 SSE step 事件推进 reviewActive。
           live && buildId
             ? (input) => {
                 mutations.stepAction.mutate(
                   {
                     buildId,
-                    body: { action: 'review', agentId: input.agentId, focus: input.focus },
+                    body: {
+                      action: 'review',
+                      ...(input.agentId !== undefined ? { agentId: input.agentId } : {}),
+                      focus: input.focus,
+                    },
                   },
                   { onSuccess: () => closeOverlay() },
                 );

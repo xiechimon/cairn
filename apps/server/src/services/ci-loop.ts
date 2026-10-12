@@ -36,7 +36,7 @@ import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import { type FetchLike, type GithubCheckRun, githubCommitCheckRuns } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { type BuildDeps, enqueueStep, toBuildRecord } from './builds.js';
+import { type BuildDeps, enqueueStep, maybeEnqueueVerifyStep, toBuildRecord } from './builds.js';
 import { openGithubToken } from './github-connection.js';
 import { setTodoPhase } from './todos.js';
 
@@ -309,6 +309,9 @@ export function createCiPoller(
     }
     // 绿 → phase 推进 review 闸（通知 + chief wake 走 setTodoPhase 漏斗）。
     setTodoPhase(deps, cand.todoId, 'review');
+    // #1250（ADR 0018 层 1）：CI 磨绿抵达 review 关口 = verify 入队的第二
+    // 落点（第一 = completeStep 直进 review 的非 PR 面；槽空零动作幂等）。
+    maybeEnqueueVerifyStep(deps, todoRow, cand.buildId);
     tally.advanced += 1;
   }
 

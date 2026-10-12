@@ -106,7 +106,7 @@ web 新建项目表单收敛为两可选条 + 一兜底：
 - **PR/合并落地**：GitHub 项目构建完的 PR/合并 UI 归后票；本轮 done 语义 = conv 分支已 push 上 GitHub
 - **Files tab 隐藏的完成 UI**：仅 disable + 一行文案，详细列表/编辑器响应式后续【#1030 已推翻：Files tab 开闸】
 - **chief-tools / MCP create_project 支持 local**：v1 拒；待 spec 后续票
-- **多机部署的 server 本地路径校验替代**：v1 降级为跳过；替代实现归后票【#1030 起读面侧已正面处理：不可达 = 404 + reason 分类降级（创建校验面仍单机假设）】
+- **多机部署的 server 本地路径校验替代**：v1 降级为跳过；替代实现归后票【#1030 起读面侧已正面处理：不可达 = 404 + reason 分类降级（创建校验面仍单机假设）；#1210 起执行面已正面处理：local 步的仓路径在执行机不可达 = clone/fetch 之前显式失败，步 errorMessage 点名机器、路径、原因与补法】
 - **GitHub App 本身注册与配置指引**：env 槽 `config.githubOauth` 用户自配（已在 v0 配），本票前提「env 已配 App」
 
 ## Further Notes

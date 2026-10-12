@@ -86,6 +86,7 @@ export {
   detailPlanning,
   detailReview,
   detailSpinnerQuiescent,
+  detailVerifyVerdict,
   overlayContent,
   PROBE_TOOL_CALL_LABEL,
   PROBE_TOOL_PILLS,

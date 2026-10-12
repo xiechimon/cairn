@@ -7,6 +7,8 @@
 // 消费方向（01 §3）：web / server / daemon → shared，三端互不依赖，shared 零反向。
 
 export * from './agent-backend.js';
+// #1262：ANSI/OSC8 转义剥离单源（daemon 写入侧 + web 渲染兜底共用）。
+export * from './ansi.js';
 export * from './attachment-token.js';
 export * from './brand.js';
 // #958：运行简报落 worktree 上下文文件的词表与落点判定（spec 24）。

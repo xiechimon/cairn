@@ -58,13 +58,51 @@
    tint instead. Hover is gated to fine pointers like the official sheet's
    @media (hover:hover) and (pointer:fine) block, and coarse pointers zero
    the transition on press (same sheet, pointer:coarse block).
-   Board cards carry NO hover styling: r2 28 vs 28b (hover-moment recapture)
-   are pixel-identical, so a card hover lift/tint would be a divergence.
    不跟本 tint 的行 hover（有意为例外，见各自注释）：侧栏行（§2.2 [保留]
    cds alpha 梯）、提及/下拉选中行（hover 即选中语义）、分段 chip
    （--seg-hover 自立 token，有专属 spec 钉扎）。搜索行/型选盘行/chip
    popover 行原挂本族（搜索行以 --row-selected 覆写），#949 per-face 清零
    随各自行的 utility 自持同值 tint，不再走本选择子族。 */
+
+/* 卡面 hover（2026-10-12 用户派：看板卡对齐 deepseek-harness 对话框观感——
+   dsh 交互面 hover 一律有微染反馈，interactive-bg-hover 族）。卡不吃本族
+   的 accent-soft 玫 tint（卡片是大面不是行，品牌 tint 会读成选中态），吃
+   中性升档 --card-hover（shadcn.css 补位族）。本块必须在 .todo-card:active
+   之前：hover 与 active 同特异性，按压面靠规则序赢。 */
+@media (hover: hover) and (pointer: fine) {
+  .todo-card {
+    transition: background-color var(--dur-fast) var(--ease-standard);
+  }
+
+  .todo-card:hover {
+    background-color: var(--card-hover);
+  }
+}
+
+/* 拖拽在飞时源卡不读 hover：指针按住在拖，hover 染色会跟在飞的克隆
+   打架。特异性（0,2,1）压上面的裸 hover 规则。 */
+body[data-board-dragging] .todo-card:hover {
+  background-color: var(--card);
+}
+
+/* 卡面入场（dsh 对话框的消息入场同族：快、小幅、只动 opacity/transform）：
+   新卡上板 / 落位换列 / 筛选命中重现时 150ms 浮入。reduced-motion 由本文件
+   的全站 keyframe 冻结兜底；拖拽克隆是 board-drag-card（另一组件）不吃本
+   动画；dnd-kit 的位移 transform 写在 wrapper 上，与卡本体互不覆盖。 */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.todo-card {
+  animation: card-enter var(--dur-fast) var(--ease-pop);
+}
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
   .new-task-project-row,

@@ -10,7 +10,7 @@
 |---|---|---|---|
 | 团队 | Team | `team` | 顶层租户边界，项目、Agent、机器、资源与套餐（plan）都归属其下。 |
 | 项目 | Project | `project` | 团队下聚合任务、仓库与文件的单位。 |
-| 仓库 | Repo | `repo` | 项目绑定的代码来源，两种形态：GitHub 接入（`githubRepo`）或本地文件夹（`localPath`，必须是 git 仓库——server 三态校验 not_absolute / not_found / not_git）。是 Project 的属性，不是独立租户层。hosted（Pacman 托管）形态已移除。**形态的可丢性分叉**（ADR 0016）：`githubRepo` 真值在远端、机器死了换机续跑；`localPath` 是单机器缓存形态——真值在该机文件系统，机器损坏进度随机器走，不享受换机续跑。**双执行源**（ADR 0017 / #1213）：`githubRepo` 形态项目可加挂可选 `localPath` 作同机执行加速位——真值恒为 GitHub（server 只验绝对路径形态，daemon 物化时双条件判定「路径存在 + 该路径 origin 与 githubRepo 同仓」，不过则静默回落 GitHub clone）；同一项目被两种机器执行，各走各能到的源。 |
+| 仓库 | Repo | `repo` | 项目绑定的代码来源，两种形态：GitHub 接入（`githubRepo`）或本地文件夹（`localPath`，必须是 git 仓库——server 三态校验 not_absolute / not_found / not_git）。是 Project 的属性，不是独立租户层。hosted（Pacman 托管）形态已移除。**形态的可丢性分叉**（ADR 0016）：`githubRepo` 真值在远端、机器死了换机续跑；`localPath` 是单机器缓存形态——真值在该机文件系统，机器损坏进度随机器走，不享受换机续跑。**双执行源**（ADR 0017 / #1213）：`githubRepo` 形态项目可加挂可选 `localPath` 作同机执行加速位——真值恒为 GitHub（server 只验绝对路径形态，daemon 物化时双条件判定「路径存在 + 该路径 origin 与 githubRepo 同仓」，不过则静默回落 GitHub clone）；同一项目被两种机器执行，各走各能到的源。**local 形态的执行边界**（#1210）：local 形态的 `localPath` 是登记机文件系统上的路径，步骤只在仓库所在机器上可执行；其它执行机上路径不可达 = daemon 在 clone/fetch 之前显式失败，步 errorMessage 点名机器、路径、原因与补法（把任务钉选改回仓库所在机器，或跨机开发用 GitHub 形态建项目）。 |
 
 _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的任务检出目录（`~/.pacman/workspaces/<conversationId>`）；禁止用它指代团队或任何界面层级。
 

@@ -16,6 +16,7 @@ import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { seedLocalMachine } from './services/machines.js';
+import { backfillPersonas } from './services/personas.js';
 import { createScheduler } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 
@@ -42,6 +43,10 @@ seedLocalMachine(db, seeded.team.id);
 // 固定标签词表存量补齐（spec 15 #394 / ADR 0002 D4）：按项目幂等，二次启动
 // 零动作。测试世界（bootServer）不经本位——播种单测直调 services/tags。
 backfillFixedTags(db);
+// persona 名册补齐（#1250 / ADR 0018 决策 0）：按团队幂等（缺谁补谁，已在位
+// 的编辑保留），二次启动零动作。测试世界同 backfillFixedTags 律——直调
+// services/personas。
+backfillPersonas(db);
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();

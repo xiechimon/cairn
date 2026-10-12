@@ -40,7 +40,10 @@ import {
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
+  stripAnsiEscapes,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
+  VERIFY_VERDICT_KIND,
+  verifyVerdictSchema,
 } from '@pacman/shared';
 import { relativeTime } from '../board/rel-time.js';
 import type {
@@ -251,6 +254,45 @@ function reviewVerdictOfContent(
       ...(f.file !== undefined ? { file: f.file } : {}),
       ...(f.line !== undefined ? { line: f.line } : {}),
       ...(f.suggestion !== undefined ? { suggestion: f.suggestion } : {}),
+    })),
+    ...(typeof extractionError === 'string' ? { extractionError } : {}),
+  };
+}
+
+/** 解析 VERIFY_VERDICT_KIND 系统消息的 verdict（#1250 / ADR 0018 层 1）：
+ * server completeStep verify 分支 emit `{kind:'verify_verdict', verdict:
+ * VerifyVerdict}` system 消息；校验失败 = null（退化退场——service 侧 zod
+ * 已固）。extractionError 同 review 律（#700）：提取失败原因原文，验证面
+ * 据此渲染「判定提取失败」（区别于「验证未返回结论」兜底）。 */
+function verifyVerdictOfContent(content: unknown): {
+  passed: boolean;
+  conclusion: string;
+  evidence: { path: string; note?: string }[];
+  extractionError?: string;
+} | null {
+  if (typeof content !== 'string') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return null;
+  }
+  if (
+    parsed === null ||
+    typeof parsed !== 'object' ||
+    (parsed as { kind?: string }).kind !== VERIFY_VERDICT_KIND
+  ) {
+    return null;
+  }
+  const verdict = verifyVerdictSchema.safeParse((parsed as { verdict?: unknown }).verdict);
+  if (!verdict.success) return null;
+  const extractionError = (parsed as { extractionError?: unknown }).extractionError;
+  return {
+    passed: verdict.data.passed,
+    conclusion: verdict.data.conclusion,
+    evidence: verdict.data.evidence.map((e) => ({
+      path: e.path,
+      ...(e.note !== undefined ? { note: e.note } : {}),
     })),
     ...(typeof extractionError === 'string' ? { extractionError } : {}),
   };
@@ -604,6 +646,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
           entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          continue;
+        }
+        // 验证步 verdict 消息（#1250）= pass/fail 徽标 + 总结 + 证据清单。
+        const verifyVerdict = verifyVerdictOfContent(m.content);
+        if (verifyVerdict !== null) {
+          entries.push({ at: m.createdAt, item: { kind: 'verify', ...verifyVerdict, id: m.id } });
         }
         continue;
       }
@@ -779,11 +827,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({ kind: 'streaming', label: '执行中...' });
   }
 
-  // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。
+  // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。#1262：显示侧纯文本
+  // 兜底——写入侧（daemon 落库前）已剥，这里再剥一次覆盖存量脏行与漏网路径
+  // （幂等，无转义输入零改动）。
   if (build?.errorMessage && todo.phase === 'failed') {
     items.push({
       kind: 'fail',
-      title: build.errorMessage,
+      title: stripAnsiEscapes(build.errorMessage),
       body: '请将其重新上线，或重新运行任务以改派其他机器。',
       links: ['查看原始错误', '排查指南'],
     });
@@ -940,7 +990,8 @@ export function mapRunHistory(
     const parts = [relativeTime(entry.createdAt, now)];
     const tokens = tokensByBuild?.get(entry.buildId);
     if (tokens !== undefined) parts.push(`${formatTokens(tokens)} tokens`);
-    if (failed && b) parts.push(b.errorMessage ?? '');
+    // #1262 显示侧纯文本兜底（与失败行同律）：存量脏行的转义残片不进 meta。
+    if (failed && b) parts.push(stripAnsiEscapes(b.errorMessage ?? ''));
     rows.push({
       label: `第 ${n} 次运行`,
       meta: parts.join(' · '),

@@ -23,6 +23,7 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
+import { advanceSplitWaves } from './services/builds.js';
 import { sendChiefMessage } from './services/chief.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { PhaseTransitionError } from './services/phase.js';
@@ -121,6 +122,10 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       throw err;
     }
     if (!record) throw notFound(`todo ${id}`);
+    // #1250（ADR 0018 层 2）：手动 done 落地（拖拽/更多菜单）同触发拆卡
+    // 波次推进（completeStep 的 merge 半边与 transitionTodos 的工具半边
+    // 同律——子卡 done 解锁后续波次自动派发；非子卡零动作）。
+    if (body.phase === 'done') advanceSplitWaves(svc, id);
     return c.json(record);
   });
 

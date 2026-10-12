@@ -10,6 +10,32 @@ import { BRAND } from '../brand.js';
 import { phaseSchema, recordId } from './common.js';
 import { SECRET_MIN_CLI_VERSION } from './secret.js';
 
+// —— persona 角色词表（#1250 / ADR 0018 决策 0）—————————————————————————————
+// 放本文件（不进 records/persona.ts）：agentRecordSchema/createAgentBodySchema
+// 消费 z.enum(PERSONA_ROLES)，而 persona.ts 的档案块消费本文件的
+// AGENT_TOOL_DEFAULTS——词表在此、档案在彼，单向依赖 persona → agent，无环。
+
+/** persona 角色词表（seedable 六名；Chief 不在列——它是既有 chief 机制，
+ * #1260 前机制面不动）。角色名全英文（用户点名）。 */
+export const PERSONA_ROLES = [
+  'planner',
+  'implementer',
+  'code_reviewer',
+  'security_auditor',
+  'test_engineer',
+  'verifier',
+] as const;
+export type PersonaRole = (typeof PERSONA_ROLES)[number];
+
+export const personaRoleSchema = z.enum(PERSONA_ROLES);
+
+/** review fan-out 三视角（ADR 0018 决策 1：同一 artifact 并行独立视角）。 */
+export const REVIEW_FANOUT_ROLES: readonly PersonaRole[] = [
+  'code_reviewer',
+  'security_auditor',
+  'test_engineer',
+];
+
 /** 观测值仅 "active"；其余状态未采到，词表不收窄外值 [推断]。 */
 export const agentStatusSchema = z.enum(['active']);
 
@@ -106,6 +132,11 @@ export const agentRecordSchema = z.object({
   /** provider id（r3 §4 样本 provider:"r3-gw" = BYOK 自定义服务商）。 */
   provider: z.string().nullable(),
   modelId: z.string().nullable(),
+  /** persona 角色位（#1250 / ADR 0018 决策 0）：seeded 角色 agent 的身份键
+   *  （团队内唯一——unique index on (teamId, persona)）；非角色 agent = null。
+   *  消费面 = persona seeding 幂等键 + review fan-out 三视角解析 + web 指派
+   *  面默认槽位。缺省 = 加法契约（老 server 响应/存量行无该键照常解析）。 */
+  persona: z.enum(PERSONA_ROLES).nullish(),
   /** 思考强度（r3 样本 null = UI「默认」；wire 值词表未采 [推断]）。 */
   thinkingLevel: z.string().nullable(),
   /** 权限 6 开关的已开集 + 授予工具；wire 项形 [推断]。读侧宽（string[]，
@@ -145,6 +176,9 @@ export const createAgentBodySchema = z.object({
   provider: z.string().nullish(),
   modelId: z.string().nullish(),
   thinkingLevel: z.string().nullish(),
+  /** persona 角色位（#1250）：nullish——显式 null = 不挂角色（普通 agent）；
+   * 正常创建缺省不带位。值域 PERSONA_ROLES（词表外值 400）。 */
+  persona: z.enum(PERSONA_ROLES).nullish(),
   tools: z.array(z.string()).optional(),
   secrets: z.array(z.string()).optional(),
   /** 单值槽（#1169）：数组（含单元素）拒——携带语义不得再经数组位表达。 */

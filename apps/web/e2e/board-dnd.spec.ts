@@ -666,6 +666,12 @@ test('click navigation survives sensor arming on the newly draggable columns (#7
 
 test('same-column gesture: siblings never shift, drop is a no-op', async ({ page }) => {
   await page.goto('/app?scenario=22');
+  // 卡面入场浮入（2026-10-12 dsh 对齐：card-enter 150ms）播完再量基线——
+  // 等 getAnimations().finished 是 #1008 实测钉死的几何断言前置。
+  await page
+    .locator('.todo-card')
+    .first()
+    .evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const box = await page.locator('[data-column="todo"] [data-todo-id]').first().boundingBox();
   if (box == null) throw new Error('probe card missing');
   const before = await page.getByTestId('board-scroller').locator('[data-todo-id]').evaluateAll((els) =>
@@ -731,9 +737,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(card).toBeVisible();
     const expected = await resolveStyle(page, {
       'box-shadow': 'var(--drag-shadow)',
-      // #1054：拖拽克隆镜像 todo-card 的 registry Card 几何（rounded-xl
-      // = 14px，半径基 10px/#988）；V2 骨架方角（#792 P6）随 ADR 0012 D1 退役。
-      'border-radius': '14px',
+      // 克隆镜像 todo-card 的卡族几何（rounded-2xl = 18px，2026-10-12
+      // 用户派 dsh 对齐随卡面同升，半径基 10px/#988）。
+      'border-radius': '18px',
     });
     const actual = await card.evaluate((el) => {
       const cs = getComputedStyle(el);

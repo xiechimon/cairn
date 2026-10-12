@@ -84,7 +84,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('51 词表（raw 49 − 除名 1 + 新增 3 + 回摆 1）', () => {
+describe('52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1）', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -93,9 +93,9 @@ describe('51 词表（raw 49 − 除名 1 + 新增 3 + 回摆 1）', () => {
     ...added,
   ].sort();
 
-  it('raw 键集恰 49 件；现行词表 = raw − 除名 + 新增 = 51 件', () => {
+  it('raw 键集恰 49 件；现行词表 = raw − 除名 + 新增 = 52 件', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(51);
+    expect(CHIEF_TOOL_COUNT).toBe(52);
     expect(CHIEF_TOOL_COUNT).toBe(rawKeys.length - removed.length + added.length);
   });
 
@@ -104,28 +104,31 @@ describe('51 词表（raw 49 − 除名 1 + 新增 3 + 回摆 1）', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
+  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
     expect(removed).toEqual(['delete_skills']);
-    expect(added).toEqual(['create_skill', 'update_skill', 'models']);
+    expect(added).toEqual(['create_skill', 'update_skill', 'models', 'split_todo']);
     // XMON-115 回摆钉：写入点词条/分组/定义三处在位（claim 判定与 REST 双闸
     // 都指着它——缺席即恢复不完整）。
     expect(CHIEF_TOOL_NAMES).toContain('set_remote_shell');
     expect(CHIEF_TOOL_CATEGORIES.organize).toContain('set_remote_shell');
     expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'set_remote_shell')).toBeDefined();
+    // #1250 split_todo 钉：词条/分组/定义三处在位（chief 拆票编排入口）。
+    expect(CHIEF_TOOL_CATEGORIES.organize).toContain('split_todo');
+    expect(CHIEF_REMOTE_TOOLS.find((t) => t.name === 'split_todo')).toBeDefined();
     for (const name of removed) {
       expect(CHIEF_TOOL_NAMES).not.toContain(name);
       expect(Object.values(CHIEF_TOOL_CATEGORIES).flat()).not.toContain(name);
       expect(CHIEF_REMOTE_TOOLS.map((t) => t.name)).not.toContain(name);
     }
-    // 新增两件不在 raw 键集内（反向登记的语义前提）。
+    // 新增件不在 raw 键集内（反向登记的语义前提）。
     for (const name of added) {
       expect(rawKeys).not.toContain(name);
     }
   });
 
-  it('分组 = 读 16 + 组织 20 + 执行 5 + 私有 10（raw 实数 − delete_skills + 三件新增 + 回摆一件）', () => {
+  it('分组 = 读 16 + 组织 21 + 执行 5 + 私有 10（raw 实数 − delete_skills + 四件新增 + 回摆一件）', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
-    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(20);
+    expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(21);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);
     expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(10);
   });

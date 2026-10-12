@@ -272,6 +272,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
             "merge",
             "chief",
             "review",
+            "verify",
           ],
           "type": "string",
         },
@@ -648,6 +649,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                     "merge",
                     "chief",
                     "review",
+                    "verify",
                   ],
                   "type": "string",
                 },
@@ -905,6 +907,47 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
         "type": "object",
       },
       "type": "array",
+    },
+    "verifyVerdict": {
+      "additionalProperties": false,
+      "properties": {
+        "conclusion": {
+          "type": "string",
+        },
+        "evidence": {
+          "default": [],
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "note": {
+                "type": "string",
+              },
+              "path": {
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "path",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+        "passed": {
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "passed",
+        "conclusion",
+        "evidence",
+      ],
+      "type": "object",
+    },
+    "verifyVerdictError": {
+      "maxLength": 2000,
+      "type": "string",
     },
   },
   "required": [
@@ -1193,6 +1236,7 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
               "merge",
               "chief",
               "review",
+              "verify",
             ],
             "type": "string",
           },
@@ -2395,7 +2439,6 @@ exports[`body/封套 schema 快照 > buildStepActionBody > buildStepActionBody.j
       },
       "required": [
         "action",
-        "agentId",
       ],
       "type": "object",
     },
@@ -2642,6 +2685,7 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
                 "merge",
                 "chief",
                 "review",
+                "verify",
               ],
               "type": "string",
             },
@@ -3555,6 +3599,44 @@ exports[`body/封套 schema 快照 > startBuildsBody > startBuildsBody.json 1`] 
             },
           ],
         },
+        "review": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "agentId": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "agentId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
+        "verify": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "agentId": {
+                  "type": "string",
+                },
+              },
+              "required": [
+                "agentId",
+              ],
+              "type": "object",
+            },
+            {
+              "type": "null",
+            },
+          ],
+        },
       },
       "required": [
         "plan",
@@ -3610,6 +3692,7 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
         "merge",
         "chief",
         "review",
+        "verify",
       ],
       "type": "string",
     },
@@ -3855,12 +3938,63 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                         },
                       ],
                     },
+                    "review": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "agentId": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "agentId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "verify": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "agentId": {
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "agentId",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
                   },
                   "required": [
                     "plan",
                     "build",
                   ],
                   "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "blockedBy": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string",
+                  },
+                  "type": "array",
                 },
                 {
                   "type": "null",
@@ -4486,6 +4620,24 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
       "type": [
         "string",
         "null",
+      ],
+    },
+    "persona": {
+      "anyOf": [
+        {
+          "enum": [
+            "planner",
+            "implementer",
+            "code_reviewer",
+            "security_auditor",
+            "test_engineer",
+            "verifier",
+          ],
+          "type": "string",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "provider": {
@@ -5657,6 +5809,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > step > ste
         "merge",
         "chief",
         "review",
+        "verify",
       ],
       "type": "string",
     },
@@ -5826,12 +5979,63 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > todo > tod
                 },
               ],
             },
+            "review": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "agentId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "verify": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "agentId": {
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "agentId",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
           },
           "required": [
             "plan",
             "build",
           ],
           "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "blockedBy": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string",
+          },
+          "type": "array",
         },
         {
           "type": "null",

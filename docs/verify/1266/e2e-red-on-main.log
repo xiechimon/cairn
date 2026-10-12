@@ -1,0 +1,46 @@
+
+Running 2 tests using 1 worker
+
+[1/2] e2e/chief-toggle-flash.spec.ts:97:3 › chief ⌘J toggle does not flash (#1266) › second ⌘J minimizes without an opacity repaint or remount
+  1) e2e/chief-toggle-flash.spec.ts:97:3 › chief ⌘J toggle does not flash (#1266) › second ⌘J minimizes without an opacity repaint or remount 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 1
+
+      111 |     const rec = await readRecorder(page);
+      112 |     // the flash signature: no opacity transition may run on the close path
+    > 113 |     expect(rec.opacityTransitions).toBe(0);
+          |                                    ^
+      114 |     // intended motion still plays, start to end
+      115 |     expect(rec.animStarts).toContain('exit');
+      116 |     expect(rec.animEnds).toContain('exit');
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0327-1266-j/apps/web/e2e/chief-toggle-flash.spec.ts:113:36
+
+    Error Context: test-results/chief-toggle-flash-chief-⌘-19139--opacity-repaint-or-remount/error-context.md
+
+
+[2/2] e2e/chief-toggle-flash.spec.ts:123:3 › chief ⌘J toggle does not flash (#1266) › summon-then-minimize cycle twice: node identity holds, zero opacity transitions
+  2) e2e/chief-toggle-flash.spec.ts:123:3 › chief ⌘J toggle does not flash (#1266) › summon-then-minimize cycle twice: node identity holds, zero opacity transitions 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 0
+    Received: 2
+
+      136 |
+      137 |     const rec = await readRecorder(page);
+    > 138 |     expect(rec.opacityTransitions).toBe(0);
+          |                                    ^
+      139 |     expect(rec.animStarts.filter((n) => n === 'enter').length).toBe(2);
+      140 |     expect(rec.animEnds.filter((n) => n === 'enter').length).toBe(2);
+      141 |     expect(rec.animStarts.filter((n) => n === 'exit').length).toBe(2);
+        at /Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0327-1266-j/apps/web/e2e/chief-toggle-flash.spec.ts:138:36
+
+    Error Context: test-results/chief-toggle-flash-chief-⌘-f4007-ds-zero-opacity-transitions/error-context.md
+
+
+  2 failed
+    e2e/chief-toggle-flash.spec.ts:97:3 › chief ⌘J toggle does not flash (#1266) › second ⌘J minimizes without an opacity repaint or remount 
+    e2e/chief-toggle-flash.spec.ts:123:3 › chief ⌘J toggle does not flash (#1266) › summon-then-minimize cycle twice: node identity holds, zero opacity transitions 

@@ -118,6 +118,7 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     hasPlan: row.hasPlan,
     buildHistory: history,
     sourceTodo: row.sourceTodo,
+    blockedBy: row.blockedBy ?? null,
     v: row.v,
     createdBy: row.createdBy,
     ownerId: row.ownerId,
@@ -294,10 +295,13 @@ export function updateTodo(
      * 不动。只影响之后新起的 build（claim 过滤按 build 落值）。team 外机器
      * id = 400（createTodo 同律）。 */
     /** 指派槽级 patch（#208「编辑分配」）：提供的槽覆盖，未提供的槽保持现状；
-     * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表）。 */
+     * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表；#1250 扩
+     * review/verify 槽——四槽同 merge 语义）。 */
     assignment?: {
       plan?: NonNullable<Assignment['plan']>;
       build?: NonNullable<Assignment['build']>;
+      review?: NonNullable<Assignment['review']>;
+      verify?: NonNullable<Assignment['verify']>;
     };
   },
   /** manualPhase = HTTP PATCH 面（#160 看板拖拽手动改相）：目标 ∈ 六列
@@ -315,7 +319,8 @@ export function updateTodo(
   if (patch.assignment !== undefined) {
     // 槽级 merge：未提供的槽保持现状（字段级 patch 语义延伸）。真值 = todo 表
     // JSON 列（db/schema.ts assignment 列），agent 投影随 build 槽自动派生。
-    sets.assignment = {
+    // #1250：review/verify 槽同 merge 语义（存量行无该键 = 未指派）。
+    const merged: NonNullable<TodoRow['assignment']> = {
       plan:
         patch.assignment.plan !== undefined
           ? patch.assignment.plan
@@ -325,6 +330,19 @@ export function updateTodo(
           ? patch.assignment.build
           : (row.assignment?.build ?? null),
     };
+    if (patch.assignment.review !== undefined || row.assignment?.review != null) {
+      merged.review =
+        patch.assignment.review !== undefined
+          ? patch.assignment.review
+          : (row.assignment?.review ?? null);
+    }
+    if (patch.assignment.verify !== undefined || row.assignment?.verify != null) {
+      merged.verify =
+        patch.assignment.verify !== undefined
+          ? patch.assignment.verify
+          : (row.assignment?.verify ?? null);
+    }
+    sets.assignment = merged;
   }
   let manualPhaseApplied = false;
   if (patch.phase !== undefined && patch.phase !== row.phase) {
@@ -388,6 +406,9 @@ export function updateTodo(
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
+  // #1250：手动 done 落地同样触发父卡自动收口（settleSplitOnDone 注见
+  // setTodoPhase 尾部——漏斗 done 与手动 done 两路都要挂）。
+  if (sets.phase === 'done') settleSplitOnDone(deps, id);
   return record;
 }
 
@@ -432,7 +453,61 @@ export function setTodoPhase(
   if (!record) return null;
   deps.hub.publishTodoDoc(record.teamId, record);
   notifyPhaseEntry(deps, record, row.phase, to);
+  // #1250（ADR 0018 层 2）：done 落地即查父卡收口——本卡是拆卡子项
+  //（sourceTodo 指父）且兄弟全 done 时父自动收（「子全 done 父自动收」的
+  // 漏斗半边；done 落地的全路径 = 本漏斗 + updateTodo 手动面，两处都挂）。
+  // 幂等：重放（from === to 早退）不到这里；父已 done 时收口函数自跳过。
+  if (to === 'done') settleSplitOnDone(deps, id);
   return record;
+}
+
+// —— 拆卡状态原语（#1250 / ADR 0018 层 2；查询半边在此单源，builds.ts
+//    波次派发与 chief split_todo 消费——写半边 = services/todo-split.ts）———
+
+/** 父卡的子项行集（sourceTodo = 父 id；序 = seqNum）。 */
+export function childrenOfTodo(db: Db, parentId: string): TodoRow[] {
+  return db
+    .select()
+    .from(todo)
+    .where(eq(todo.sourceTodo, parentId))
+    .orderBy(asc(todo.seqNum))
+    .all();
+}
+
+/** 子项的阻塞是否全部解除（blockedBy 全 done）；无依赖行恒 true。 */
+export function splitBlockersSatisfied(db: Db, row: TodoRow): boolean {
+  const ids = row.blockedBy ?? [];
+  if (ids.length === 0) return true;
+  const done = new Set(
+    db
+      .select({ id: todo.id })
+      .from(todo)
+      .where(and(inArray(todo.id, ids), eq(todo.phase, 'done')))
+      .all()
+      .map((r) => r.id),
+  );
+  return ids.every((id) => done.has(id));
+}
+
+/** 父卡自动收口（#1250「子全 done 父自动收」）：本卡 done 落地时，若它是
+ *  拆卡子项（sourceTodo 在位），检查父的全部子项——全 done 则父卡经
+ *  building→done 边落地（phase.ts #1250 边），父会话落 DONE_ANNOUNCEMENT
+ *  审计行（actor = Chief——收口是编排面动作，不是人手）。已 done / 子未齐
+ *  / 父行缺失 = 零副作用。嵌套拆卡自然递归：子父收口落 done 又触发对更上
+ *  层父的同一检查。 */
+function settleSplitOnDone(deps: TodoDeps, childId: string): void {
+  const { db } = deps;
+  const child = getRow(deps, childId);
+  if (child === undefined || child.sourceTodo === null) return;
+  const parent = getRow(deps, child.sourceTodo);
+  if (parent === undefined || parent.phase === 'done') return;
+  const children = childrenOfTodo(db, parent.id);
+  if (children.length === 0) return;
+  if (!children.every((c) => c.phase === 'done')) return;
+  setTodoPhase(deps, parent.id, 'done', { lastRunAt: nowMs() });
+  if (parent.latestBuildId !== null) {
+    insertGateAnnouncement(deps, parent.latestBuildId, DONE_ANNOUNCEMENT, 'Chief');
+  }
 }
 
 /** 任务重置闸的 started 判据（#755，todos.dev 看板指南「已开始的卡片拖回

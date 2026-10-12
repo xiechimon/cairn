@@ -43,6 +43,7 @@ export * from './message.js';
 export * from './model-source.js';
 export * from './notification.js';
 export * from './permission-rules.js';
+export * from './persona.js';
 export * from './plan.js';
 export * from './project.js';
 export * from './prompts.js';
@@ -57,6 +58,7 @@ export * from './team.js';
 export * from './todo.js';
 export * from './token-usage.js';
 export * from './user.js';
+export * from './verify.js';
 export * from './whats-new.js';
 
 /** 表名 → record schema（22 张，键序 = 01 §6 清单序；快照测试的遍历源）。

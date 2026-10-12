@@ -120,6 +120,22 @@
   }
 }
 
+/* 看板卡族的平滑圆角（2026-10-12 用户派：对齐 deepseek-harness 对话框观感——
+   dsh packages/client/ui-theme/src/styles/corner-shape.css 的全局面形机制
+   在看板卡族上的 Scoped 移植）：支持的引擎里角曲率走 superellipse(1.5)
+   （介于圆弧与 squircle 之间，dsh 签名质感）；不支持的引擎该规则整组不
+   生效，圆角保持普通圆弧，属纯渐进增强。只钉四个承载面形圆角的根元素
+   （卡 / 列容器 / 通知条 / 拖拽克隆）；全圆徽标（999px）按 dsh 同律不参与
+   ——superellipse 会把胶囊端头压方。 */
+@supports (corner-shape: superellipse(1.5)) {
+  .todo-card,
+  .board-column,
+  .board-notify-banner,
+  .board-drag-card {
+    corner-shape: superellipse(1.5);
+  }
+}
+
 /* 右下角预约制度（ADR 0013 D10，Multica base.css:10-33 同律同形）：
    总管 launcher（FAB / 悬浮窗）常驻内容区右下角，吸底元素给该角让位。
    命名而非逐点写死：意图可读、每个让位点可被这三个类检索到、距离由

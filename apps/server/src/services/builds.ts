@@ -30,13 +30,21 @@ import {
   buildReviewStepPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
+  buildTaskPromptText,
+  buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
   conversationBranch,
   hasBlockingFinding,
   MERGE_ANNOUNCEMENT,
+  parseGithubIssueSourceRef,
+  personaByRole,
   REVIEW_ANNOUNCEMENT,
+  REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
   STOP_MESSAGE,
+  VERIFY_ANNOUNCEMENT,
+  VERIFY_VERDICT_KIND,
+  type VerifyVerdict,
 } from '@pacman/shared';
 import { and, asc, desc, eq, inArray, isNotNull, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -79,7 +87,7 @@ import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { stepQueueProjector } from './step-queue.js';
-import { getTodo, setTodoPhase } from './todos.js';
+import { childrenOfTodo, getTodo, setTodoPhase, splitBlockersSatisfied } from './todos.js';
 // #902：transcript 行写入单源提出（todos 面同用，避免 todos→builds 依赖环）。
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
@@ -546,6 +554,105 @@ export function startBuilds(
   return created;
 }
 
+// —— #1250 verify 步入队（ADR 0018 层 1：review 关口抵达 → Verifier 派发）——————
+
+/** verify 步入队（#1250）：build 抵达 review 关口（直接落地或 CI 磨绿推进）
+ * 且 assignment.verify 槽在位时入队一条验证步——额外 agent 步不推进主时序
+ * （review 同律：phase 留 review 关口，合并闸留人）。幂等：本 build 已有
+ * verify 步（任意状态）不再入——重跑 = 新 build 新会话自然重验。
+ * 槽空 = 零动作（存量任务/未配 Verifier 的任务行为逐字节不变）。 */
+export function maybeEnqueueVerifyStep(
+  deps: BuildDeps,
+  todoRow: typeof todo.$inferSelect,
+  buildId: string,
+): void {
+  const verifyAgentId = todoRow.assignment?.verify?.agentId;
+  if (verifyAgentId == null) return;
+  const existing = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.buildId, buildId), eq(step.kind, 'verify')))
+    .get();
+  if (existing !== undefined) return;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (buildRow === undefined) return;
+  // 票号段（#1250 票面：docs/verify/<票号>/）：github 关联任务 = issue 号
+  //（sourceRef 单源反解）；无关联 = seqNum（本地仓的同一约定位）。
+  const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
+  const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
+  const planRow = deps.db
+    .select({ content: planTable.content })
+    .from(planTable)
+    .where(eq(planTable.buildId, buildId))
+    .orderBy(desc(planTable.version))
+    .get();
+  const prompt = buildVerifyStepPrompt({
+    ticketRef,
+    taskText: buildTaskPromptText(todoRow.title, todoRow.spec),
+    planText: planRow?.content ?? '',
+    pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+  });
+  insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
+  enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
+}
+
+/** 拆卡波次推进（#1250 / ADR 0018 层 2）：子卡 done 落地时，检查同父兄弟里
+ *  「phase=todo 且阻塞全解」的卡并自动派发（直执行 withPlan=false——方案
+ *  已在父卡 confirm 人审过，逐卡再 confirm 会淹没人工闸；review/merge 闸
+ *  逐卡留人）。失败单卡跳过不中断批次（非法相位等竞态窗记 skipped——与
+ *  transitionTodos 的批次容错同形）。 */
+export function advanceSplitWaves(deps: BuildDeps, childTodoId: string): void {
+  const row = deps.db.select().from(todo).where(eq(todo.id, childTodoId)).get();
+  if (row === undefined || row.sourceTodo === null) return;
+  const ready = childrenOfTodo(deps.db, row.sourceTodo).filter(
+    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
+  );
+  for (const child of ready) {
+    const assignment = child.assignment ?? { plan: null, build: null };
+    if (assignment.build == null) continue;
+    try {
+      startBuilds(deps, {
+        projectId: child.projectId,
+        todoIds: [child.id],
+        assignment,
+        withPlan: false,
+        triggerSource: 'chief',
+      });
+    } catch {
+      // 竞态窗（todo 被并发推进）单卡跳过：波次推进是加法回路，重试面 =
+      // 下一个兄弟 done 或人工 dispatch；不整批中断。
+    }
+  }
+}
+
+/** 拆卡父确认派发（#1250）：confirm 落在拆卡父上（有子项的 confirm）= 派发
+ *  无阻塞子卡（直执行）+ 父进 building（伞形在飞），不是入队 build 步——
+ *  父的「执行」就是子卡们的执行。返回派发张数（0 = 全阻塞的非法形：DAG
+ *  必有源点，正常恒 ≥1）。 */
+export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number {
+  const ready = childrenOfTodo(deps.db, parentId).filter(
+    (c) => c.phase === 'todo' && splitBlockersSatisfied(deps.db, c),
+  );
+  let dispatched = 0;
+  for (const child of ready) {
+    const assignment = child.assignment ?? { plan: null, build: null };
+    if (assignment.build == null) continue;
+    try {
+      startBuilds(deps, {
+        projectId: child.projectId,
+        todoIds: [child.id],
+        assignment,
+        withPlan: false,
+        triggerSource: 'chief',
+      });
+      dispatched += 1;
+    } catch {
+      // 单卡失败跳过（advanceSplitWaves 同律）。
+    }
+  }
+  return dispatched;
+}
+
 // —— #931 返工目标判定（restart 分支消费）———————————————————————————
 
 /** todo 最新的「产过 PR 的 build」（prUrl/prNumber 任一非空 = daemon 步收尾
@@ -690,7 +797,7 @@ export async function applyBuildStepAction(
   body:
     | { action: 'confirm' }
     | { action: 'revision'; side: 'plan'; feedback: string; clientMessageId: string }
-    | { action: 'review'; agentId: string; focus?: string }
+    | { action: 'review'; agentId?: string; focus?: string }
     | { action: 'restart'; feedback: string; clientMessageId: string },
   /** 过闸宣告行的 actor 位（#902）：REST 面缺省 = 用户；chief 工具面传
    * Chief 绑定 Agent displayName；MCP 面 = key 属主（用户身份）。 */
@@ -849,6 +956,14 @@ export async function applyBuildStepAction(
     // #902 确认闸通过宣告行（MERGE/REVIEW 同族行形）：actor 位答「在场的
     // 是谁」——此前 confirm 闸被按过在库里零痕迹（#892 §6 建议 3）。
     insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
+    // #1250（ADR 0018 层 2）：拆卡父的 confirm = 拆解方案过闸——派发无阻塞
+    // 子卡（直执行），父进 building 当伞；不是入队 build 步（父无自己的执行
+    // 面，子卡们就是它的执行面）。
+    if (childrenOfTodo(deps.db, todoRecord.id).length > 0) {
+      dispatchSplitChildren(deps, todoRecord.id);
+      setTodoPhase(deps, todoRecord.id, 'building');
+      return;
+    }
     setTodoPhase(deps, todoRecord.id, 'building');
     enqueueStep(deps, buildId, 'build', todoRecord.teamId);
     return;
@@ -906,12 +1021,58 @@ export async function applyBuildStepAction(
           ? (await readBuildChanges({ db: deps.db, reposDir: deps.reposDir }, buildId)).files
           : []
         : undefined;
-    const reviewPrompt = buildReviewStepPrompt({
-      agentId: body.agentId,
+    const promptArgs = {
       gate,
       planText,
       ...(changes !== undefined ? { changes } : {}),
       checkout,
+    } as const;
+    // #1250（ADR 0018 层 1）：agentId 缺省 = fan-out 三视角——三员 persona
+    // 各入队一条 review 步（agentId 走各自步的 prompt meta header；focus =
+    // 用户 focus + 视角文案拼接），三份 verdict 并行落会话；无 persona 时回落
+    // assignment.review 槽单步（槽位管「默认谁审」）；两者皆缺 400 点名补法。
+    // 携带 agentId = 既有单审核人路径，行为不变。
+    if (body.agentId === undefined) {
+      // const 别名：todoRecord 是 let（failed 恢复分支重读），闭包里 TS 不保
+      // 留 let 的非空收窄——取 const 快照。
+      const currentTodo = todoRecord;
+      const fanout = REVIEW_FANOUT_ROLES.map((role) => ({
+        row: deps.db
+          .select({ id: agent.id })
+          .from(agent)
+          .where(and(eq(agent.teamId, currentTodo.teamId), eq(agent.persona, role)))
+          .get(),
+        focus: personaByRole(role).reviewFocus ?? '',
+      })).filter((p): p is { row: { id: string }; focus: string } => p.row !== undefined);
+      if (fanout.length > 0) {
+        for (const perspective of fanout) {
+          const focus =
+            body.focus !== undefined && body.focus.trim() !== ''
+              ? `${body.focus.trim()}\n\n本视角重点：${perspective.focus}`
+              : `本视角重点：${perspective.focus}`;
+          const prompt = buildReviewStepPrompt({
+            agentId: perspective.row.id,
+            ...promptArgs,
+            focus,
+          });
+          enqueueStep(deps, buildId, 'review', todoRecord.teamId, prompt);
+        }
+        return;
+      }
+      const fallback = todoRecord.assignment?.review?.agentId ?? null;
+      if (fallback === null) {
+        throw new HttpError(
+          400,
+          '无可用审核人：团队未播种 persona（CodeReviewer/SecurityAuditor/TestEngineer）且任务的 assignment.review 槽为空。指派审核 Agent（assignment.review 槽）或在请求里携带 agentId。',
+        );
+      }
+      const prompt = buildReviewStepPrompt({ agentId: fallback, ...promptArgs });
+      enqueueStep(deps, buildId, 'review', todoRecord.teamId, prompt);
+      return;
+    }
+    const reviewPrompt = buildReviewStepPrompt({
+      agentId: body.agentId,
+      ...promptArgs,
       ...(body.focus !== undefined ? { focus: body.focus } : {}),
     });
     enqueueStep(deps, buildId, 'review', todoRecord.teamId, reviewPrompt);
@@ -1348,7 +1509,15 @@ function stepArtifactGate(
 export function completeStep(
   deps: BuildDeps,
   stepId: string,
-  outcome: { hasChanges?: boolean; findings?: ReviewVerdict; findingsError?: string } = {},
+  outcome: {
+    hasChanges?: boolean;
+    findings?: ReviewVerdict;
+    findingsError?: string;
+    /** verify 步 verdict（#1250）：daemon 从 agent 终轮 JSON 提取；两字段
+     *  皆缺（旧 daemon）= 消息落「验证未返回结论」兜底。 */
+    verifyVerdict?: VerifyVerdict;
+    verifyVerdictError?: string;
+  } = {},
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
@@ -1406,6 +1575,9 @@ export function completeStep(
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
       });
+      // #1250（ADR 0018 层 1）：review 关口抵达 → Verifier 入队（槽空零动作，
+      // 幂等见函数注）。
+      maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
       return;
     }
     // 相位已被人工推进/关闭（failed/closed——sweep 失联收尾先落、机器复活迟到
@@ -1453,30 +1625,76 @@ export function completeStep(
       createdAt: nowMs(),
     });
     if (hasBlockingFinding(verdict)) {
-      const blockings = verdict.findings
-        .filter((f) => f.severity === 'blocking')
-        .map(
-          (f) =>
-            `- #${f.id} ${f.summary}${
-              f.file !== undefined ? ` (${f.file}${f.line !== undefined ? `:${f.line}` : ''})` : ''
-            }`,
+      // #1250 fan-out 去重闸：三视角并行报告的 blocking 各自命中时，同 build
+      // 只入队一条修订步（pending/claimed 的 plan 步在位 = 已有一条——三份
+      // blocking 指向同一批问题，重复入队 = 三个重规划轮叠跑）。单审核人
+      // 路径同样受益（两次审核两份 blocking 也只该修一轮）。
+      const revisionInFlight = deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, stepRow.buildId),
+            eq(step.kind, 'plan'),
+            inArray(step.status, ['pending', 'claimed']),
+          ),
         )
-        .join('\n');
-      const revisePrompt = REVIEW_REVISE_PROMPT.replace(
-        '<{conclusion}>',
-        verdict.conclusion,
-      ).replace('{blockings}', blockings);
-      // AI 审核自动修订回路的「调整摘要行」（M7 #330，r8 §3.1 62）：chip →
-      // 规划中自动走 phase 字段；该行 = 时间线 dim note 告诉用户「为什么又
-      // 来一个 plan 步」。
-      enqueueReviewRevision(deps, {
-        buildId: stepRow.buildId,
-        todoId: todoRow.id,
-        teamId: todoRow.teamId,
-        note: `AI 审核检测到 ${blockings.split('\n').length} 处 blocking 风险，已自动入队重规划步`,
-        revisePrompt,
-      });
+        .get();
+      if (revisionInFlight === undefined) {
+        const blockings = verdict.findings
+          .filter((f) => f.severity === 'blocking')
+          .map(
+            (f) =>
+              `- #${f.id} ${f.summary}${
+                f.file !== undefined
+                  ? ` (${f.file}${f.line !== undefined ? `:${f.line}` : ''})`
+                  : ''
+              }`,
+          )
+          .join('\n');
+        const revisePrompt = REVIEW_REVISE_PROMPT.replace(
+          '<{conclusion}>',
+          verdict.conclusion,
+        ).replace('{blockings}', blockings);
+        // AI 审核自动修订回路的「调整摘要行」（M7 #330，r8 §3.1 62）：chip →
+        // 规划中自动走 phase 字段；该行 = 时间线 dim note 告诉用户「为什么又
+        // 来一个 plan 步」。
+        enqueueReviewRevision(deps, {
+          buildId: stepRow.buildId,
+          todoId: todoRow.id,
+          teamId: todoRow.teamId,
+          note: `AI 审核检测到 ${blockings.split('\n').length} 处 blocking 风险，已自动入队重规划步`,
+          revisePrompt,
+        });
+      }
     }
+    return;
+  }
+  if (stepRow.kind === 'verify') {
+    // 验证步完成（#1250 / ADR 0018 层 1）：emit VERIFY_VERDICT_KIND 消息行
+    //（passed + conclusion + evidence 条目，web 时间线渲染 pass/fail 与证据
+    // 清单）；额外 agent 步不推进主时序——phase 留 review 关口，人工合并闸
+    // 读 verdict 决策。verdict 兜底两态与 review 同律：提取失败（verifyVerdict
+    // Error）=「判定提取失败」+ 原因上浮；两字段皆缺（旧 daemon）=「验证未
+    // 返回结论」；passed=false 是有效结论不是本步失败（提取面不会把它折成
+    // error）。
+    const verdict: VerifyVerdict = outcome.verifyVerdict ?? {
+      passed: false,
+      conclusion: outcome.verifyVerdictError !== undefined ? '判定提取失败' : '验证未返回结论',
+      evidence: [],
+    };
+    insertMessageRow(deps, buildRow.id, {
+      id: newRecordId(),
+      role: 'system',
+      content: JSON.stringify({
+        kind: VERIFY_VERDICT_KIND,
+        verdict,
+        ...(outcome.verifyVerdictError !== undefined
+          ? { extractionError: outcome.verifyVerdictError }
+          : {}),
+      }),
+      createdAt: nowMs(),
+    });
     return;
   }
   // merge 步成 → done + 🎉（时间线「发起了合并」+ 结果行 + `🎉 任务已完成`，
@@ -1488,6 +1706,9 @@ export function completeStep(
     content: '🎉 任务已完成',
     createdAt: nowMs(),
   });
+  // #1250（ADR 0018 层 2）：done 落地即查拆卡波次——本卡是子项时推进其父的
+  // 下一波（父自动收口在 setTodoPhase 的 settleSplitOnDone 半边，Todos 层）。
+  advanceSplitWaves(deps, todoRow.id);
 }
 
 export class NotFoundError extends Error {

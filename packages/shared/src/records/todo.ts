@@ -9,11 +9,18 @@ import { epochMs, phaseSchema, recordId } from './common.js';
 
 /** 指派槽（02 §6.2：todo.assignment 双槽 `{plan:{agentId}, build:{agentId}}`，
  * r5 §3.4/§5 实测）。槽空 = 未指派（开始 dialog Agent 可空，r3 §3.2）——
- * 槽级 null 形状 [推断]（抓包样本两槽均有值）。 */
+ * 槽级 null 形状 [推断]（抓包样本两槽均有值）。
+ * #1250（ADR 0018 层 1）扩四步种槽位：`review` = 缺省审核人挂接位（UI
+ * 指派面用——槽位管「默认谁审」，单条 review 步实际跑谁仍由其 prompt meta
+ * header 决定，两层正交）；`verify` = 验证步指派位（与 plan/build 同形，
+ * claim 按本槽解析 Verifier agent）。两新槽 `.nullish()`：存量双槽行（无
+ * 该键）照常解析为缺省 = 未指派，加法契约零迁移。 */
 export const assignmentSlotSchema = z.object({ agentId: recordId });
 export const assignmentSchema = z.object({
   plan: assignmentSlotSchema.nullable(),
   build: assignmentSlotSchema.nullable(),
+  review: assignmentSlotSchema.nullish(),
+  verify: assignmentSlotSchema.nullish(),
 });
 export type Assignment = z.infer<typeof assignmentSchema>;
 
@@ -108,8 +115,14 @@ export const todoRecordSchema = z.object({
   hasChanges: z.boolean(),
   hasPlan: z.boolean(),
   buildHistory: z.array(buildHistoryEntrySchema),
-  /** 来源任务引用；语义未特写 [推断]（r3 §3.0 字段表列名照抄）。 */
+  /** 来源任务引用；语义未特写 [推断]（r3 §3.0 字段表列名照抄）。#1250（ADR
+   * 0018 层 2）落地为拆父子指针：chief split_todo 建的子卡本列 = 父卡 id
+   * （存量恒 null 不变）；「子全 done 父自动收」的归账键。 */
   sourceTodo: recordId.nullable(),
+  /** 依赖边（#1250 / ADR 0018 层 2，blocking 语义）：阻塞本卡的兄弟子卡 id
+   * 集（chief split_todo 写入）；全集 done 前本卡不可派发（startBuilds 闸）。
+   * 缺省 = 无依赖（存量行/非拆卡同形）。 */
+  blockedBy: z.array(recordId).nullish(),
   /** 记录版本号（r3 §3.0 观测值 2–4；SSE 文档事件带 seq/v，02 §1.2/r5 §7.2）。 */
   v: z.number().int(),
   // —— r5 §3.2 SSE todo doc 补录（chief 派工溯源）——

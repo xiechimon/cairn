@@ -65,6 +65,7 @@ import {
   detailReview,
   detailSpinnerQuiescent,
   detailV3Collapsed,
+  detailVerifyVerdict,
   diffV1V2,
   diffV2V3,
   history12,
@@ -231,6 +232,15 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // 隔开的对、超长行与超限对；diff-word-highlight.spec 钉词级高亮与
       // 横向滚动下的底色宽度契约。
       'diff-word-stress': detailDiffWordStress(),
+      // #1250（skills-routing 先例）：verify verdict 行三态钉——review 面叠
+      // passed/failed/判定提取失败三条 verdict 行，persona-verify.spec 骑它。
+      'verify-verdict': detailVerifyVerdict(),
+      // #1250：review 弹层 frozen 面（fixture 面不点开——onReview 仅 live 接
+      // 线，34 号 accept overlay 同律）——钉 fan-out 行在 fixture 面零渲染。
+      'review-dialog-fanout': {
+        ...detailReview({ userMenuOpen: false }),
+        overlay: { kind: 'review' },
+      },
       // frozen right-pane views (issue #68 captures, re-homed by #366):
       // 30/31/32 sit on the review surface with diff + tool rows expanded,
       // exactly as the captures froze them — the former token/branch/

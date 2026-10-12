@@ -428,3 +428,39 @@ describe('runner per-message usage 追溯行（#927）', () => {
     expect(lines.filter((l) => l.includes('message usage:'))).toHaveLength(0);
   });
 });
+
+// —— #1262 写入侧剥离：daemon 落 done.errorMessage 前剥 ANSI/OSC8 ——————————
+
+describe('runner done.errorMessage ANSI 剥离（#1262）', () => {
+  const ESC = '\x1b';
+  /** 实测污染形态（用户库 build.errorMessage 首行）：git commit 钩子 stderr
+   * 带 SGR + OSC8；error 事件载荷原文携带，done 上报前剥。 */
+  const ANSI_FAILURE = `git commit failed (1): ${ESC}[0mapps/web/src/fixtures/fixtures.ts${ESC}[0m${ESC}[0m:${ESC}[0m${ESC}[0m1667${ESC}[0m${ESC}[0m:${ESC}[0m${ESC}[0m53${ESC}[0m${ESC}[0m ${ESC}[0m${ESC}[0m${ESC}]8;;https://biomejs.dev/linter/rules/use-template${ESC}\\lint/style/useTemplate${ESC}]8;;${ESC}\\`;
+  const CLEAN_FAILURE =
+    'git commit failed (1): apps/web/src/fixtures/fixtures.ts:1667:53 lint/style/useTemplate';
+
+  test('error 事件载荷带 SGR + OSC8 → doneBody.errorMessage 纯文本', async () => {
+    // 真形态事件序（同「真 pi 事件形态」describe）：stopReason=error + error +
+    // done——lastError 取 error 载荷原文，done 上报前剥。
+    const script: StepEvent[] = [
+      ...sessionOpenEcho(),
+      { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
+      { type: 'error', error: { message: ANSI_FAILURE, retryable: false } },
+      { type: 'done', usage: [] },
+    ];
+    const { client } = await runLifecycleCase([script], { providerId: 'gw-lc-ansi' });
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(client.doneBodies[0]?.body.errorMessage).toBe(CLEAN_FAILURE);
+  });
+
+  test('干净错误文案逐字透传（零回归，与既有根因透传律一致）', async () => {
+    const script: StepEvent[] = [
+      ...sessionOpenEcho(),
+      { type: 'message_end', message: { role: 'assistant', content: '', stopReason: 'error' } },
+      { type: 'error', error: { message: TRANSIENT_503, retryable: false } },
+      { type: 'done', usage: [] },
+    ];
+    const { client } = await runLifecycleCase([script], { providerId: 'gw-lc-ansi-clean' });
+    expect(client.doneBodies[0]?.body.errorMessage).toBe(TRANSIENT_503);
+  });
+});

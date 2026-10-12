@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "96fe0639-0b6c-4267-bddb-b23da70caac1",
+  "id": "7517cca2-be43-458e-a7b7-acbc17f0ae17",
   "prevId": "942a2ed3-fa29-40eb-bff6-3deea8c80f66",
   "tables": {
     "agent": {
@@ -71,6 +71,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "persona": {
+          "name": "persona",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "tools": {
           "name": "tools",
           "type": "text",
@@ -115,16 +122,19 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "machineId": {
-          "name": "machineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "agent_team_persona_unique": {
+          "name": "agent_team_persona_unique",
+          "columns": [
+            "teamId",
+            "persona"
+          ],
+          "isUnique": true,
+          "where": "\"agent\".\"persona\" is not null"
+        }
+      },
       "foreignKeys": {
         "agent_teamId_team_id_fk": {
           "name": "agent_teamId_team_id_fk",
@@ -132,19 +142,6 @@
           "tableTo": "team",
           "columnsFrom": [
             "teamId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "agent_machineId_machine_id_fk": {
-          "name": "agent_machineId_machine_id_fk",
-          "tableFrom": "agent",
-          "tableTo": "machine",
-          "columnsFrom": [
-            "machineId"
           ],
           "columnsTo": [
             "id"
@@ -2295,6 +2292,13 @@
         },
         "sourceTodo": {
           "name": "sourceTodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blockedBy": {
+          "name": "blockedBy",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

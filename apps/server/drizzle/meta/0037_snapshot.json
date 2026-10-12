@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1d6ed911-49c4-41ae-8ebf-486baa894547",
-  "prevId": "96fe0639-0b6c-4267-bddb-b23da70caac1",
+  "id": "fdd0b551-0c2f-4c46-868a-025448605eae",
+  "prevId": "7517cca2-be43-458e-a7b7-acbc17f0ae17",
   "tables": {
     "agent": {
       "name": "agent",
@@ -71,6 +71,20 @@
           "notNull": false,
           "autoincrement": false
         },
+        "persona": {
+          "name": "persona",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "machineId": {
+          "name": "machineId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "tools": {
           "name": "tools",
           "type": "text",
@@ -115,16 +129,19 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "machineId": {
-          "name": "machineId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "agent_team_persona_unique": {
+          "name": "agent_team_persona_unique",
+          "columns": [
+            "teamId",
+            "persona"
+          ],
+          "isUnique": true,
+          "where": "\"agent\".\"persona\" is not null"
+        }
+      },
       "foreignKeys": {
         "agent_teamId_team_id_fk": {
           "name": "agent_teamId_team_id_fk",
@@ -705,34 +722,6 @@
         },
         "agentId": {
           "name": "agentId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "thinkingLevel": {
-          "name": "thinkingLevel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "compactionModel": {
-          "name": "compactionModel",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "model": {
-          "name": "model",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "machineId": {
-          "name": "machineId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -2274,6 +2263,13 @@
         },
         "sourceTodo": {
           "name": "sourceTodo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blockedBy": {
+          "name": "blockedBy",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
