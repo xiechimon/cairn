@@ -1,0 +1,22 @@
+{
+  "pendingRow": {
+    "id": "47TeTxBwxW15i1KDQV1HK",
+    "buildId": "01a130db-f626-7fd6-baf0-1e383f01e521",
+    "kind": "build",
+    "machineId": null,
+    "createdAt": 1791821084199,
+    "status": "pending",
+    "checkpointCommit": null,
+    "queue": {
+      "position": 1,
+      "waitingFor": null,
+      "blocked": {
+        "kind": "capability-missing",
+        "missing": [
+          "MCP server \"figma\""
+        ]
+      }
+    },
+    "skillInjection": null
+  }
+}

@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import { BRAND } from '../brand.js';
 import { phaseSchema, recordId } from './common.js';
+import { requiredCapabilitiesSchema } from './machine-capabilities.js';
 import { SECRET_MIN_CLI_VERSION } from './secret.js';
 
 // —— persona 角色词表（#1250 / ADR 0018 决策 0）—————————————————————————————
@@ -161,6 +162,12 @@ export const agentRecordSchema = z.object({
    * 双层各自 gate）。optional 形 = 加法契约（machine maxConcurrent 同律）：
    * 老 server 响应缺字段可解析（消费面回退不渲染）；server 恒发全块。 */
   maxConcurrentTasks: z.number().int().nullable().optional(),
+  /** 能力要求声明（#1251 / ADR 0018 决策 4.2）：该 Agent 的步对执行机的
+   *  能力要求（MCP slug 集 / claude-code 模型 id 集）。null = 无要求（缺省/
+   *  存量行）。消费面 = dispatch-eligibility 能力闸（机器上报快照不满足 →
+   *  不领该 Agent 的步）+ agent 面「哪些机器可跑它」。nullish 加法契约
+   *  （maxConcurrentTasks 同律）：老 server 响应缺字段照常解析。 */
+  requiredCapabilities: requiredCapabilitiesSchema.nullish(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
 
@@ -185,6 +192,9 @@ export const createAgentBodySchema = z.object({
   /** agent 级并发上限（#1138）：值域 1..50（Multica agent 层闸同区间，
    * r10 §5.4）；nullish——显式 null = 不限（与缺省同值）。 */
   maxConcurrentTasks: z.number().int().min(1).max(50).nullish(),
+  /** 能力要求声明（#1251）：nullish——显式 null = 清空回无要求（与缺省
+   * 同值）；对象形状由 requiredCapabilitiesSchema 收严（类型错 400）。 */
+  requiredCapabilities: requiredCapabilitiesSchema.nullish(),
 });
 export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
 

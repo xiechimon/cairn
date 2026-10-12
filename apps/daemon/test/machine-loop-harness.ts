@@ -13,6 +13,7 @@ import type {
   AgentSessionHandle,
   ClaimedStep,
   MachineAttachmentResponse,
+  MachineCapabilities,
   MachineDoneBody,
   MachineStreamEvent,
   StepEvent,
@@ -276,6 +277,9 @@ export async function boot(opts: {
   claudeCodeBackend?: AgentBackend;
   /** #867 T6：凭据预检注入面（缺省 = 已登录桩）。 */
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
+  /** #1251：机器能力清单探测注入面（缺省 = 真探针，读测试机真实
+   * ~/.claude.json / 技能目录——内容断言用注入桩，形状断言用缺省）。 */
+  capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   /** 预置 machine.json（既有注册启动路径）：serverUrl 可指向旧 server。 */
   preEnrolled?: { serverUrl: string };
@@ -321,6 +325,7 @@ export async function boot(opts: {
     claudeCodeAuthProbe:
       opts.claudeCodeAuthProbe ??
       (async () => ({ state: 'logged-in', method: 'oauth_token', provider: 'firstParty' })),
+    ...(opts.capabilitiesProbe !== undefined ? { capabilitiesProbe: opts.capabilitiesProbe } : {}),
     idleSleepPrevention: false,
     presenceIntervalMs: 60_000,
     claimBackoffBaseMs: 10,

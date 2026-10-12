@@ -1,0 +1,105 @@
+{
+  "probe": "drive-1251-capability-gate",
+  "stack": {
+    "server": "http://127.0.0.1:8803",
+    "web": "http://127.0.0.1:5283",
+    "db": "/Users/xmon/.herdr/worktrees/pacman/hp-pacman-t-0333-1251/.claude/verify-run/home/server/server.db"
+  },
+  "teamId": "Uc5scRhzD2BLKI5ubX8_b",
+  "machines": {
+    "A": "hdDmXjifOPHq6We0xlRXB",
+    "B": "H4tuKM9CBAp9REeykgdYZ"
+  },
+  "agentId": "akUlneP-3xVUyYPUpUrKG",
+  "buildId": "01a130db-f626-7fd6-baf0-1e383f01e521",
+  "checks": [
+    {
+      "name": "R1 enroll 携带能力清单 → machine.capabilities 列落库 + record 读面透出（GET me / teams machines）",
+      "ok": true,
+      "detail": "row={\"mcpServers\":[\"figma\"],\"skills\":[\"probe-skill\"]}"
+    },
+    {
+      "name": "R1b 读面随行：GET /api/machine/me 与 GET teams/{id}/machines 的 capabilities 同值",
+      "ok": true,
+      "detail": "me={\"mcpServers\":[\"figma\"],\"skills\":[\"probe-skill\"]}"
+    },
+    {
+      "name": "R2 心跳红线：presence capabilities 坏形状三形 → 200 {ok:true}，旧值保留（坏字段永不打死心跳）",
+      "ok": true,
+      "detail": "statuses=[200,200,200]"
+    },
+    {
+      "name": "R3 presence 合法清单 → 覆写落列（闸相位的「缺 figma」前提就位）",
+      "ok": true,
+      "detail": "row={\"mcpServers\":[\"ctx\"],\"skills\":[]}"
+    },
+    {
+      "name": "R4 老 daemon 形（enroll/presence 均不带位）→ 列 NULL ≠ 空集（未知与缺失两态）",
+      "ok": true,
+      "detail": "raw=null"
+    },
+    {
+      "name": "G1 权限 tab 机器匹配段真点击「要求安装 figma」→ PATCH requiredCapabilities 落库（写面真用户路径）",
+      "ok": true,
+      "detail": "required={\"mcpServers\":[\"figma\"]}"
+    },
+    {
+      "name": "G2 machine-fit 读面：缺项机 canRun=false + missing 点名可读形 + 声明对账缺口；未上报机 fail-open（missing null / canRun true）",
+      "ok": true,
+      "detail": "A={\"machineId\":\"hdDmXjifOPHq6We0xlRXB\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[\"MCP server \\\"figma\\\"\"],\"mcpGaps\":[\"figma\"],\"canRun\":false} B={\"machineId\":\"H4tuKM9CBAp9REeykgdYZ\",\"name\":\"cap-legacy\",\"online\":false,\"runtimeOk\":true,\"missing\":null,\"mcpGaps\":null,\"canRun\":true}"
+    },
+    {
+      "name": "G3 chief relay run_builds → build 步入队 pending（assignment.build = 被测 Agent）",
+      "ok": true,
+      "detail": "step=47TeTxBwxW15i1KDQV1HK"
+    },
+    {
+      "name": "G4 缺 figma 的在线机器 claim 空手（5s 截断）→ build 步仍 pending、machineId 空（步留 pending 给能力齐机器）",
+      "ok": true,
+      "detail": "step={\"status\":\"pending\",\"machineId\":null}"
+    },
+    {
+      "name": "G5 steps 读面 queue.blocked = capability-missing + 可读缺项（pending 成因随读面下行）",
+      "ok": true,
+      "detail": "blocked={\"kind\":\"capability-missing\",\"missing\":[\"MCP server \\\"figma\\\"\"]}"
+    },
+    {
+      "name": "G6 详情页排队行文案可见：「没有机器满足能力要求（缺 MCP server \"figma\"）——装齐后下一拍心跳即解锁」",
+      "ok": true,
+      "detail": "text=\"排队中：没有机器满足能力要求（缺 MCP server \\\"figma\\\"）——装齐后下一拍心跳即解锁（前面 0 个）\""
+    },
+    {
+      "name": "G7 装齐 figma 后下一拍 presence → 同一机器即领该步（缺能力 = 给修法，修法即时闭环）",
+      "ok": true,
+      "detail": "claimed={\"id\":\"47TeTxBwxW15i1KDQV1HK\",\"kind\":\"build\"}"
+    },
+    {
+      "name": "G8 能力齐后 machine-fit：canRun true + missing [] + 对账缺口清零（声明 figma/ctx 双装）",
+      "ok": true,
+      "detail": "A={\"machineId\":\"hdDmXjifOPHq6We0xlRXB\",\"name\":\"cap-mbp\",\"online\":true,\"runtimeOk\":true,\"missing\":[],\"mcpGaps\":[],\"canRun\":true}"
+    },
+    {
+      "name": "G9 机器页能力读标注：上报机 = 「MCP 2 · 本机技能 0」计数形，未上报机 = 「能力清单未上报（旧版 daemon）」（两态不塌缩）",
+      "ok": true,
+      "detail": "states=[\"unreported\",\"reported\",\"unreported\"] texts=[\"能力清单未上报（旧版 daemon）\",\"MCP 2 · 本机技能 0\",\"能力清单未上报（旧版 daemon）\"]"
+    },
+    {
+      "name": "D1 真 daemon 注册上行：SQLite 机器行 capabilities = 探测实物（slug 小写归一 probe-mcp、坏条目跳过、技能目录名 probe-local-skill）",
+      "ok": true,
+      "detail": "caps={\"mcpServers\":[\"probe-mcp\"],\"skills\":[\"probe-local-skill\"]}"
+    }
+  ],
+  "artifacts": [
+    "r2-heartbeat-tolerance.json",
+    "g2-machine-fit-blocked.json",
+    "g2-agent-machine-fit-blocked.png",
+    "g5-queue-blocked.json",
+    "g6-queue-blocked-row.png",
+    "g8-machine-fit-clear.json",
+    "g8-agent-machine-fit-clear.png",
+    "g9-machines-capability-annotation.png",
+    "d1-daemon-log-tail.txt"
+  ],
+  "passed": 15,
+  "total": 15
+}

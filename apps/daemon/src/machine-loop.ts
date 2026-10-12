@@ -7,7 +7,13 @@
 // supervisor 侧，02 §5.3/r3 §1.5）。
 
 import { type ChildProcess, spawn } from 'node:child_process';
-import type { AgentBackend, AgentSessionHandle, ClaimedStep, DeliveredImage } from '@pacman/shared';
+import type {
+  AgentBackend,
+  AgentSessionHandle,
+  ClaimedStep,
+  DeliveredImage,
+  MachineCapabilities,
+} from '@pacman/shared';
 import {
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
@@ -22,6 +28,7 @@ import { readClaudeCodeReport } from './claude-code-models.js';
 import type { DaemonConfig } from './config.js';
 import { StepJournal } from './journal.js';
 import type { DaemonLogger } from './log.js';
+import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
 import { setupProxy } from './proxy.js';
 import { resumePendingUpload, runStep, type StopRequest } from './runner.js';
@@ -52,6 +59,9 @@ export interface MachineLoopOpts {
   /** claude-code 凭据预检注入面（#867 T6；缺省 = 真探针
    * `claude auth status`。测试注入固定三态，免得 CI 上真探成「未登录」）。 */
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
+  /** 机器能力清单探测注入面（#1251；缺省 = mtime 缓存真探针，源 =
+   * config.mcpConfigPath + config.skillsDir）。 */
+  capabilitiesProbe?: () => MachineCapabilities;
   fetchImpl?: typeof fetch;
   client?: MachineApi;
   /** claim 客户端侧护栏（server hold + 余量）[设计]。 */
@@ -197,6 +207,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
   claudeAuth = await probeAuthAndRemember();
 
+  // —— #1251：机器能力清单（ADR 0018 决策 4.1）——
+  // 已装 MCP slug 集 + 本机技能名集，随 enroll/presence 上行（模型二进制与
+  // 档位已由上面的 claudeReport 承载，不重复上报）。mtime 缓存探针：源未变
+  // 不重读（~/.claude.json 可达数 MB，30s 节拍重解析是纯浪费）；全函数，
+  // 探测失败 = 该维空集，永不阻心跳（02 §5.4 红线 daemon 半边）。
+  const capabilitiesReport =
+    opts.capabilitiesProbe ??
+    createMachineCapabilitiesProbe({
+      mcpConfigPath: config.mcpConfigPath,
+      skillsDir: config.skillsDir,
+    });
+
   // —— per-step 后端解析 registry（spec 17 A3：runner 的 backendFor 唯一
   // 分叉，此处供解析目标）——claude-code 后端惰性初始化：首 runtime 步才
   // 构造（零 claude 步的机器不付 SDK 构造/扫描成本），canon 行
@@ -264,6 +286,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       name: config.name,
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
+      capabilities: capabilitiesReport(),
     });
     machineJson = {
       machineId: enrolled.machineId,
@@ -277,7 +300,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
 
-  await client.presence({ cliVersion: DAEMON_VERSION, claudeCode: claudeReport() });
+  await client.presence({
+    cliVersion: DAEMON_VERSION,
+    claudeCode: claudeReport(),
+    capabilities: capabilitiesReport(),
+  });
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
   // #1108 本地并发闸：GET me 读本机 maxConcurrent——server claim 闸的客户端
@@ -543,7 +570,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const presenceTimer = setInterval(() => {
     void refreshCap(); // #1108 并发上限刷新骑同一节拍（失败留旧值）。
     client
-      .presence({ cliVersion: DAEMON_VERSION, claudeCode: claudeReport() })
+      .presence({
+        cliVersion: DAEMON_VERSION,
+        claudeCode: claudeReport(),
+        capabilities: capabilitiesReport(),
+      })
       .catch((err: unknown) => {
         logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
       });

@@ -10,12 +10,14 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
+  MachineCapabilities,
   PersonaRole,
   Phase,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
   ProviderModel,
+  RequiredCapabilities,
   SkillInjectionRecord,
   StepKind,
   TodoSourceKind,
@@ -383,6 +385,11 @@ export const agent = sqliteTable(
      * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
      * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
     maxConcurrentTasks: integer('maxConcurrentTasks'),
+    /** 能力要求声明（#1251 / ADR 0018 决策 4.2）：该 Agent 的步对执行机的
+     *  能力要求（MCP slug 集 / claude-code 模型 id 集）。NULL = 无要求（缺省/
+     *  存量行——闸恒开，零回归）。消费面 = dispatch-eligibility 能力闸
+     *  （claim/sweep/排队投影/machine-fit 四处单源）。JSON 列（tools 同形）。 */
+    requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
   },
   (t) => [
     // (teamId, persona) partial unique（#1250）：一队一角色——fan-out 与
@@ -523,6 +530,12 @@ export const machine = sqliteTable('machine', {
    * 存量行）：无数据不判，下一拍 presence（≤30s）补齐，绝不当场翻
    * offline。 */
   lastSeenAt: epochMs('lastSeenAt'),
+  /** 机器能力清单（#1251 / ADR 0018 决策 4.1）：daemon 经 enroll/presence
+   *  上报的已装 MCP slug 集 + 本机技能名集。NULL = 从未上报（老 daemon——
+   *  能力闸对未知快照放行，显示面标「未上报」）。字段级容错在写路径
+   *  （markPresence/enrollMachine 单独 safeParse，坏字段丢弃保留旧值——
+   *  心跳红线 02 §5.4）。JSON 列（claudeCodeReport 同形）。 */
+  capabilities: json<MachineCapabilities | null>('capabilities'),
 });
 
 // —— shell_command（XMON-108 R1 机器 shell 审计）：预检/回写两写端点的

@@ -11,8 +11,11 @@
 
 import {
   type Assignment,
+  capabilityMissingLabels,
   isBackendRuntimeId,
+  type MachineCapabilities,
   parseReviewPromptMeta,
+  type RequiredCapabilities,
   type StepKind,
 } from '@pacman/shared';
 import { and, eq, ne } from 'drizzle-orm';
@@ -35,6 +38,81 @@ export function runtimeGatePasses(
   agentProvider: string | null | undefined,
 ): boolean {
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));
+}
+
+// —— #1251 能力闸（ADR 0018 决策 4.3，本叶子加钉点=F4）———————————————
+// 机器上报的能力快照不满足 agent.requiredCapabilities = 不领该 Agent 的步
+// （步留 pending 给能力齐的机器）。判据单源在本文件：claim 面（tryClaim /
+// buildChiefClaim）、sweep 面（④d 有界等待）、排队投影（queue.blocked）、
+// machine-fit 读面四处共同消费——与 runtimeGatePasses 同一份纪律（两处判定
+// 漂移 = sweep 误杀 claim 能领的步 / 显示面撒谎）。
+//
+// fail-open 律（版本墙纪律，Premortem 2 护栏「闸只看 server 侧已收到的上报
+// 快照」）：机器从未上报该维快照（capabilities 列 null / claudeCodeReport
+// null）= 未知 ≠ 缺失 → 该维放行。老 daemon 行为完全不变；错杀方向由可见
+// reason 兜底（缺项点名 + 修法），漏杀方向由 daemon 既有降级语义兜底（未知
+// MCP slug 执行侧跳过不阻断）。
+
+/** 能力闸的机器事实位（machine 行子集；两处快照列 + runtime 开关）。 */
+export interface MachineCapabilityFacts {
+  capabilities: MachineCapabilities | null;
+  claudeCodeReport: { models: { id: string }[] } | null;
+}
+
+/** 逐维缺项（slug 小写归一后比对——parseClaudeMcpEntries 律同源；模型 id
+ *  精确比对 claudeCodeReport.models[].id）。快照缺席的维度 = 空缺（fail-open
+ *  律）；required 缺省/null = 两维全空（闸恒开，零回归）。 */
+export function missingCapabilityItems(
+  machineRow: MachineCapabilityFacts,
+  required: RequiredCapabilities | null | undefined,
+): { mcpServers: string[]; models: string[] } {
+  if (required == null) return { mcpServers: [], models: [] };
+  const reportedMcp = machineRow.capabilities?.mcpServers;
+  const reportedModels = machineRow.claudeCodeReport?.models;
+  return {
+    mcpServers:
+      reportedMcp === undefined
+        ? []
+        : (required.mcpServers ?? [])
+            .map((slug) => slug.toLowerCase())
+            .filter((slug) => !reportedMcp.includes(slug)),
+    models:
+      reportedModels === undefined
+        ? []
+        : (required.models ?? []).filter((id) => !reportedModels.some((m) => m.id === id)),
+  };
+}
+
+/** 缺项的可读名集（capabilityMissingLabels 单源——reason 文案 / 排队
+ *  blocked.missing / machine-fit.missing 三处同词）。空集 = 闸通过。 */
+export function missingCapabilities(
+  machineRow: MachineCapabilityFacts,
+  agentRow: { requiredCapabilities: RequiredCapabilities | null | undefined },
+): string[] {
+  return capabilityMissingLabels(missingCapabilityItems(machineRow, agentRow.requiredCapabilities));
+}
+
+/** 能力闸判定（runtimeGatePasses 同形消费面）：缺项非空 = 不可领该步。 */
+export function capabilityGatePasses(
+  machineRow: MachineCapabilityFacts,
+  agentRow: { requiredCapabilities: RequiredCapabilities | null | undefined },
+): boolean {
+  return missingCapabilities(machineRow, agentRow).length === 0;
+}
+
+/** MCP 对账面（ADR 0018 决策 4.6「缺口可见」）：agent.mcpServers 声明 vs
+ *  机器实装的差集（小写归一）。null = 机器未上报快照（未知，显示面闭嘴）；
+ *  数组 = 缺口清单（可见不挡——daemon 对未知 slug 的既有语义是跳过降级，
+ *  硬闸只吃 requiredCapabilities 显式声明）。 */
+export function declaredMcpGaps(
+  machineRow: { capabilities: MachineCapabilities | null },
+  agentRow: { mcpServers: string[] },
+): string[] | null {
+  if (machineRow.capabilities === null) return null;
+  const installed = machineRow.capabilities.mcpServers;
+  return agentRow.mcpServers
+    .map((slug) => slug.toLowerCase())
+    .filter((slug) => !installed.includes(slug));
 }
 
 /** 步的 Agent id 解析（槽位单源，无 DB 查询）：agentForStep 的解析半边

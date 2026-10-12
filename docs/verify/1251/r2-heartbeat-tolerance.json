@@ -1,0 +1,40 @@
+{
+  "badResults": [
+    {
+      "bad": {
+        "mcpServers": "oops"
+      },
+      "status": 200,
+      "body": {
+        "ok": true
+      }
+    },
+    {
+      "bad": 42,
+      "status": 200,
+      "body": {
+        "ok": true
+      }
+    },
+    {
+      "bad": {
+        "mcpServers": [
+          1
+        ],
+        "skills": []
+      },
+      "status": 200,
+      "body": {
+        "ok": true
+      }
+    }
+  ],
+  "rowAfter": {
+    "mcpServers": [
+      "figma"
+    ],
+    "skills": [
+      "probe-skill"
+    ]
+  }
+}
