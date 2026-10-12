@@ -32,6 +32,13 @@ export interface DetailComposerInput {
   setChain: Dispatch<SetStateAction<ChainState>>;
   /** fixture 面：detail.revision 在场 = reject-chain 可预演（live 面忽略）。 */
   revisionAvailable: boolean;
+  /** 2026-10-12 dsh 发送流对齐：live 各分支点火即挂乐观回声（自己的气泡 +
+   *  「处理中...」待定行立刻上屏），不等服务端落库 + daemon 认领的回路
+   *  （实测该回路 ~3s 零反馈）。fixture 面本就有 chain 预演同形，不调用。 */
+  onOptimisticSend?: (text: string) => void;
+  /** 写入被拒（409 竞态等）即清回声：消息从未落库，屏上不留谎；draft
+   *  保留律（各分支既有语义）不动。 */
+  clearOptimisticSend?: () => void;
 }
 
 export function useDetailComposer(input: DetailComposerInput) {
@@ -52,15 +59,19 @@ export function useDetailComposer(input: DetailComposerInput) {
         // 驳回回路（r5 §4）：confirm 关口发送 = revision + feedback
         // → 重规划步入队 → plan v(N+1)（会话流即时呈现）。
         if (phase === 'confirm' && buildId && text !== '') {
-          mutations.stepAction.mutate({
-            buildId,
-            body: {
-              action: 'revision',
-              side: 'plan',
-              feedback: text,
-              clientMessageId: crypto.randomUUID(),
+          input.onOptimisticSend?.(text);
+          mutations.stepAction.mutate(
+            {
+              buildId,
+              body: {
+                action: 'revision',
+                side: 'plan',
+                feedback: text,
+                clientMessageId: crypto.randomUUID(),
+              },
             },
-          });
+            { onError: () => input.clearOptimisticSend?.() },
+          );
           return;
         }
         // W3 steer（#280，06 册 D9 / spec #277）：building 态发送 =
@@ -69,11 +80,16 @@ export function useDetailComposer(input: DetailComposerInput) {
         // （claimed 步在跑）收则 201，无在跑步 409 明确拒绝（提示行
         // + draft 保留，不丢字）。返回 Promise = composer 异步清稿面。
         if ((phase === 'building' || (phase === 'review' && running)) && buildId && text !== '') {
+          input.onOptimisticSend?.(text);
           return mutations.sendSteer
             .mutateAsync({ conversationId: buildId, content: text })
             .then(() => {
               input.clearDraft();
               return undefined;
+            })
+            .catch((error: unknown) => {
+              input.clearOptimisticSend?.();
+              throw error;
             });
         }
         // #701（B-C12）：review 关口静息态发送 = 人肉打回——confirm
@@ -82,6 +98,7 @@ export function useDetailComposer(input: DetailComposerInput) {
         // 的 409 死路；「请求修改…」占位符从此诚实（可填即可发）。
         // Promise 面 = restart 同律：成功清稿、被拒（409 竞态）保留。
         if (phase === 'review' && !running && buildId && text !== '') {
+          input.onOptimisticSend?.(text);
           return mutations.stepAction
             .mutateAsync({
               buildId,
@@ -92,13 +109,18 @@ export function useDetailComposer(input: DetailComposerInput) {
                 clientMessageId: crypto.randomUUID(),
               },
             })
-            .then(() => undefined);
+            .then(() => undefined)
+            .catch((error: unknown) => {
+              input.clearOptimisticSend?.();
+              throw error;
+            });
         }
         // #320 失败面发送 = 带反馈重启（r9 §3.3：原站 failed 态发消息
         // 触发新一轮，消息随新轮入会话——非 steer 语义）。走 steps
         // restart 动作位：新 build + 反馈行落新 conv + failed→queued。
         // Promise 面 = 成功清稿、被拒（相位漂移 409）保留 draft。
         if (phase === 'failed' && buildId && text !== '') {
+          input.onOptimisticSend?.(text);
           return mutations.stepAction
             .mutateAsync({
               buildId,
@@ -108,7 +130,11 @@ export function useDetailComposer(input: DetailComposerInput) {
                 clientMessageId: crypto.randomUUID(),
               },
             })
-            .then(() => undefined);
+            .then(() => undefined)
+            .catch((error: unknown) => {
+              input.clearOptimisticSend?.();
+              throw error;
+            });
         }
       }
     : revisionAvailable && chain === 'idle'

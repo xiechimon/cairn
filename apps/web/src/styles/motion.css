@@ -104,12 +104,12 @@ body[data-board-dragging] .todo-card:hover {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
 
-/* 用户气泡同族入场（2026-10-12 dsh 对齐第二批）：发出的消息 150ms 浮入，
-   与卡面入场同一组 keyframes。流式 agent 行不挂——它们逐 token 变，
-   入场动画只在挂载一刻播，气泡发后即定。 */
-.chat-bubble {
-  animation: card-enter var(--dur-fast) var(--ease-pop);
-}
+/* 气泡入场 = 零动画（2026-10-12 dsh 发送流实测律）：dsh 里发出的消息瞬时
+   上屏、不播任何入场（驱动采样 motion-facts：气泡 animationName = none，
+   帧序列里发送后第一帧气泡已就位）。「快」在这里是「立刻在」，不是「快点
+   浮入」——早先给 .chat-bubble 挂 card-enter 是我方自行发挥，与参照相反，
+   已撤。卡面入场（.todo-card）保留：新卡上板是系统增项，不是读者自己的
+   话音，两族语义不同。 */
 
 /* 跑动行标签的扫光（2026-10-12 dsh 对齐第三批）：dsh TextShimmer 的
    pacman 平铺版。注意 2026-10-12 实测坑：**扫光层不能携带文本**——aria-hidden

@@ -53,6 +53,7 @@ import {
   mapRunHistory,
   mapTokenUsage,
   mapTranscript,
+  textOfContent,
   toDisplayTodo,
 } from '../api/mappers.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
@@ -317,6 +318,50 @@ export function TodoDetailPage() {
   useEffect(() => {
     if (buildId != null) liveTextStore.prune(buildId, knownDetailIds);
   }, [buildId, knownDetailIds]);
+
+  // 2026-10-12 dsh 发送流对齐（行为批）：乐观回声态。dsh 实测律 = 回车一刻
+  // 自己的气泡已上屏、「深度求索中」行同帧挂载；本页此前的真值链是 写库 →
+  // （revision/restart 还要等 daemon 认领开新轮）→ 失效重取 → 上屏，实测
+  // ~3s 零反馈窗口。回声态把「自己的话 + 待定行」在点火瞬间挂上，真行落库
+  // 即让位。气泡与待定行是两条独立生命周期：气泡等到真消息落库（文本认亲），
+  // 待定行等到真 live 行挂载（步认领）——消息落库通常比步认领早半拍，若共用
+  // 一个态，行会在那个缝里闪灭一下再亮（实测 frame 级闪烁）。失败方式（先列
+  // 后写）：F1 真行落库后回声不清 = 双份气泡——落库检测 effect 按「发送时未
+  // 知 id + 同文本」认亲；F2 历史同文本旧行误当落库——发送瞬间快照 knownIds
+  // 挡掉；F3 换任务回声串场——[id] effect 清；F4 写入被拒（409）回声成谎——
+  // 各分支 onError/catch 清（composer hook 内联）；F5 待定行与真 live 行双
+  // 挂——渲染侧 running 守卫二选一；F6 运行中补话（steer）回声排在活尾巴之
+  // 后——渲染侧先把活尾拆下、插气泡、再装回；F7 fixture 面被波及——回调只
+  // 在 live 分支调用，chain 预演同形不动。
+  const [pendingSend, setPendingSend] = useState<{ text: string; knownIds: Set<string> } | null>(
+    null,
+  );
+  const [pendingRow, setPendingRow] = useState(false);
+  useEffect(() => {
+    setPendingSend(null);
+    setPendingRow(false);
+  }, [id]);
+  useEffect(() => {
+    if (pendingSend == null) return;
+    const landed = (detailMessagesData?.messages ?? []).some(
+      (m) =>
+        m.role === 'user' &&
+        !pendingSend.knownIds.has(m.id) &&
+        textOfContent(m.content).trim() === pendingSend.text,
+    );
+    if (landed) setPendingSend(null);
+  }, [pendingSend, detailMessagesData]);
+  const optimisticSend = useCallback(
+    (text: string) => {
+      setPendingSend({ text: text.trim(), knownIds: new Set(knownDetailIds) });
+      setPendingRow(true);
+    },
+    [knownDetailIds],
+  );
+  const clearOptimisticSend = useCallback(() => {
+    setPendingSend(null);
+    setPendingRow(false);
+  }, []);
   // #905 活动相位读侧（chief use-chief-surface 同律）：单槽快照引用稳定；
   // stepId 对在跑步的过滤在 mapTranscript 内（W1）。
   const activity = useSyncExternalStore(activityStore.subscribe, () =>
@@ -338,6 +383,10 @@ export function TodoDetailPage() {
   const steps = stepsQ.data ?? [];
   const runningStep = steps.find((s) => s.status === 'claimed' || s.status === 'pending') ?? null;
   const running = runningStep !== null;
+  // 待定行的终点 = 真 live 行认领（回声态定义在上方 liveTextStore 段后）。
+  useEffect(() => {
+    if (running) setPendingRow(false);
+  }, [running]);
   // AI 审核中态（M7 #312，r8 §3.1）：chip 改「审核中」、composer placeholder 改
   // 「AI 审核进行中…」、期间显示停止钮（复用 #308）。判定 = 存在 kind=review
   // 的活动步（claimed/pending）。phase 不动（review 步是额外 agent 步）。
@@ -515,10 +564,47 @@ export function TodoDetailPage() {
       : undefined;
 
   const fixtureView = chainView(fixture.detail, chain, diff);
+  // dsh 发送流对齐（状态块在上方 liveTextStore 段后）：live transcript 尾部
+  // 接乐观回声。序 = dsh 发送流实测：自己的气泡先落、「处理中...」待定行殿
+  // 后；运行中补话（steer）时活尾巴（打字面 robot + streaming 行）先拆下、
+  // 气泡插在其前、再装回——打字面 robot 无 id 无 markdown（mapTranscript
+  // liveText 行形），真 robot 行 id 恒在，据此认尾。待定行不带秒（#471：
+  // 没真实起点就不摆数；真行认领后秒数从真实起点开走，不回跳）。
+  const liveTranscript = useMemo<TranscriptItem[]>(() => {
+    const base = liveDetail?.transcript ?? [];
+    if (pendingSend == null && !pendingRow) return base;
+    const items = [...base];
+    const tail: TranscriptItem[] = [];
+    if (pendingSend != null) {
+      for (;;) {
+        const last = items.at(-1);
+        if (last === undefined) break;
+        if (
+          last.kind === 'streaming' ||
+          (last.kind === 'robot' && last.id == null && last.markdown == null)
+        ) {
+          items.pop();
+          tail.unshift(last);
+        } else break;
+      }
+    }
+    return [
+      ...items,
+      ...(pendingSend != null
+        ? [{ kind: 'user', text: pendingSend.text, markdown: pendingSend.text } as TranscriptItem]
+        : []),
+      ...tail,
+      // 待定行与气泡分命：气泡随真消息落库退，本行守到真 live 行认领
+      // （running effect 清 pendingRow）——缝里没有空屏也不双挂。
+      ...(pendingRow && !running
+        ? [{ kind: 'streaming', label: '处理中...' } as TranscriptItem]
+        : []),
+    ];
+  }, [liveDetail, pendingSend, pendingRow, running]);
   const view = live
     ? {
         phaseOverride: null as Phase | null,
-        transcript: liveDetail?.transcript ?? [],
+        transcript: liveTranscript,
         doc: liveDetail?.doc,
         planVersions: liveDetail?.planVersions,
         planDiff: livePlanDiff,
@@ -594,6 +680,8 @@ export function TodoDetailPage() {
     chain,
     setChain,
     revisionAvailable: fixture.detail?.revision != null,
+    onOptimisticSend: optimisticSend,
+    clearOptimisticSend,
   });
 
   // #1216 在飞编排回合（todo 开始 / failed 重跑 主钮禁用位）：编排落位不写

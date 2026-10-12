@@ -1,0 +1,22 @@
+{
+  "sendFace": {
+    "borderRadius": "8px",
+    "background": "rgba(0, 0, 0, 0)",
+    "opacity": "1",
+    "transition": "all"
+  },
+  "after": {
+    "runningPresent": false,
+    "runningText": null,
+    "bubblePresent": true,
+    "animations": [
+      "z5BDOq_brand z5BDOq_wide :: z5BDOq_wide-in",
+      "z5BDOq_newSessionLabel z5BDOq_wide :: z5BDOq_wide-in",
+      "z5BDOq_panelTitle z5BDOq_wide :: z5BDOq_wide-in",
+      "z5BDOq_panelTitle z5BDOq_wide :: z5BDOq_wide-in",
+      "_2wuE5a_sectionLabel _2wuE5a_wide :: _2wuE5a_wide-in",
+      "_2wuE5a_iconButton _2wuE5a_wide :: _2wuE5a_wide-in",
+      "_2wuE5a_treeBody _2wuE5a_wide :: _2wuE5a_wide-in"
+    ]
+  }
+}
