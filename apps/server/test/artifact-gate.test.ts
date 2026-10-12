@@ -35,7 +35,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -95,6 +95,8 @@ async function setupWorld() {
     cred: key,
     body: { teamId: s.team.id, name: 'ag-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const { token } = (await enrollRes.json()) as { token: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {

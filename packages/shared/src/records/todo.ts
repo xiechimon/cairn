@@ -126,21 +126,14 @@ export const todoRecordSchema = z.object({
   /** 来源引用（`github:owner/repo#123` 形 = githubIssueSourceRef 单源；
    * `chief:<uuid>` 形 = orchestrationSourceRef 单源，#640）；无来源 = null。 */
   sourceRef: z.string().nullable(),
-  /** 任务的钉选机器（#682，t-0047 建议形：任务级默认机器单源）；null = 自动
-   *  （语义同 build.pinnedMachineId）。写面 = 新建任务 REST body / PATCH 面；
-   *  startBuilds 缺省回落本值，orchestrate 落 chief_thread.pinnedMachineId。 */
-  machineId: recordId.nullable(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 
 /** POST /api/projects/{id}/todos body（r3 §3.1 抓包原样 {title, spec}；
- *  tagIds 携带位 = r9 §3.4 实测（观测样本空数组），#309 补录。machineId =
- *  #682 任务级钉选机器（缺省 = 自动）；optional = 旧客户端/chief 派工路径
- *  不带位仍合法。 */
+ *  tagIds 携带位 = r9 §3.4 实测（观测样本空数组），#309 补录）。 */
 export const createTodoBodySchema = z.object({
   title: z.string(),
   spec: z.string(),
   tagIds: z.array(recordId).optional(),
-  machineId: recordId.nullish(),
 });
 export type CreateTodoBody = z.infer<typeof createTodoBodySchema>;

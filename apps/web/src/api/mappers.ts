@@ -961,7 +961,6 @@ export function mapSchedules(rows: WireSchedule[]): DisplaySchedule[] {
     kind: r.kind,
     at: r.at ?? 0,
     tz: r.tz,
-    machineId: r.machineId,
     nextRunAt: r.nextRunAt ?? 0,
     createdBy: r.createdBy,
     todo: r.todo,

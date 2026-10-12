@@ -31,7 +31,14 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { claimStep } from '../src/services/machines.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -84,6 +91,7 @@ async function setupWorld(): Promise<World> {
       })
       .run();
   }
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const projectId = await postProject(s.app, 'agcap-proj');
   return { s, tokenA, machineAId, projectId };
 }
@@ -94,6 +102,7 @@ async function fetchEnroll(s: TestServer, key: string): Promise<{ token: string 
     headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
     body: JSON.stringify({ teamId: s.team.id, name: 'agcap-mbp', cliVersion: '0.1.0' }),
   });
+
   expect(res.status).toBe(200);
   return (await res.json()) as { token: string };
 }
@@ -123,7 +132,6 @@ function insertPendingBuildStep(
       phase: 'queued',
       phaseAt: now,
       assignment: { plan: null, build: { agentId: opts.agentId } },
-      machineId: null,
     })
     .run();
   s.db
@@ -135,7 +143,6 @@ function insertPendingBuildStep(
       planDocId: null,
       triggerSource: 'user',
       createdAt: now,
-      pinnedMachineId: null,
     })
     .run();
   const stepId = `step-agcap-${suffix}`;
@@ -183,7 +190,6 @@ function insertClaimedAgentStep(
       phase: 'building',
       phaseAt: now,
       assignment: { plan: null, build: { agentId: opts.agentId } },
-      machineId: null,
     })
     .run();
   s.db
@@ -195,7 +201,6 @@ function insertClaimedAgentStep(
       planDocId: null,
       triggerSource: 'user',
       createdAt: now,
-      pinnedMachineId: null,
     })
     .run();
   const stepId = `step-agrun-${suffix}`;
@@ -249,7 +254,6 @@ function insertClaimedChiefStep(s: TestServer, world: World, agentId: string): s
       sessionId: '',
       sessionOpenedAt: now,
       pendingSessionResumeAt: null,
-      pinnedMachineId: null,
       toolDefHashes: {},
       toolResultHashes: {},
       activeRun: { phase: 'chief' },

@@ -38,7 +38,7 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 const AGENT_ID = 'agent-stop-1';
 
@@ -103,6 +103,8 @@ async function setupWorld() {
       cred,
       body: { teamId: s.team.id, name, cliVersion: '0.1.0' },
     });
+
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
     expect(res.status).toBe(200);
     return ((await res.json()) as { token: string }).token;
   }

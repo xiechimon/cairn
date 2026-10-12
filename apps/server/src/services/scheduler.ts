@@ -1,7 +1,7 @@
 // Scheduler 缝实现（shared scheduler.ts 接口；02 §9.2 server 端 cron 宿主自持，
 // 00/D3 不外包 pi）。触发闭环（r3 §9 + r5 §8 实测语义）：
 // - 到期 → 新 build 全新重跑：triggerSource="schedule"、直执行（观测轮 32s 直达
-//   审核关口、未在方案关口停驻 [推断]）、machineId → build.pinnedMachineId
+//   审核关口、未在方案关口停驻 [推断]）
 //   （schedule 显式钉 > todo.machineId #682 任务级默认 > null 自动；r3 §9 的
 //   「schedule null = 自动」现在精确为「schedule 未钉 → 回落 todo 值」）；
 //   到确认/审核关口暂停 = 常规 build 流程（02 §9.2）。
@@ -106,7 +106,6 @@ export function createScheduler(
           assignment: todoRow.assignment ?? { plan: null, build: null },
           withPlan: false,
           triggerSource: 'schedule',
-          pinnedMachineId: row.machineId,
         });
       } catch (err) {
         if (err instanceof PhaseTransitionError) {

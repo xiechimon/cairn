@@ -51,7 +51,7 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import { seedLocalMachine } from '../src/services/machines.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
 
@@ -113,6 +113,8 @@ async function setupWorld(opts: { shellEnabled?: boolean } = {}): Promise<World>
     cred: key,
     body: { teamId: s.team.id, name: 'shell-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { machineId: string; token: string };
   // 机器 shell 闸（默认 false——migration 回填律，M 组断言）；setup 直写 DB，
@@ -246,6 +248,8 @@ describe('claim 载荷：chief 步不带 localTools（XMON-108 R1）', () => {
       cred: key,
       body: { teamId: s.team.id, name: 'chief-mbp', cliVersion: '0.1.0' },
     });
+
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
     const { token } = (await enrollRes.json()) as { token: string };
     const patchRes = await call(s.app, 'PATCH', `/api/teams/${s.team.id}/chief`, {
       body: { agent: { agentId: 'chief-agent-1', thinkingLevel: null } },
@@ -537,6 +541,7 @@ describe('预检 POST /api/machine/shell/{stepId}（XMON-108 R1）', () => {
       cred: key2,
       body: { teamId: w.s.team.id, name: 'shell-mbp-2', cliVersion: '0.1.0' },
     });
+
     const token2 = ((await enroll2.json()) as { token: string }).token;
     const foreign = await w.precheck(step.step.id, 'ls', token2);
     expect(foreign.res.status).toBe(404);

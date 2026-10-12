@@ -97,7 +97,6 @@ describe('定时 CRUD（record = r3 §8.3 实测原样）', () => {
       kind: 'once',
       at,
       tz: TZ,
-      machineId: null, // 自动（r3 §9 机器（自动））
       nextRunAt: at, // once：at 即触发时刻
       createdBy: s.user.id,
     });
@@ -306,7 +305,6 @@ describe('触发闭环 E2E（04 §4 M2：触发 → 新 build 全新重跑，r3 
       triggerSource: 'schedule', // 时间线「由定时发起」的数据面（呈现归 web）
       withPlan: false,
       prevPhase: 'todo',
-      pinnedMachineId: 'mach_pin',
     });
     // todo → queued（等空闲机器；机器执行面归 M3）
     const t = await todoOf(s, s.todoDoc.id);

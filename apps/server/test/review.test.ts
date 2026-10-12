@@ -47,7 +47,7 @@ import {
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 const AGENT_ID = 'agent-review-1';
 const REVIEW_AGENT_ID = 'agent-reviewer-1';
@@ -156,6 +156,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       modelId: 'stub-model',
     })
     .run();
+
   s.db
     .insert(agentTable)
     .values({
@@ -170,6 +171,8 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     cred: key,
     body: { teamId: s.team.id, name: 'review-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string; machineId: string };
   // #511：托管形态项目 —— 变更面数据源（readBuildChanges 仅托管形态有本地
@@ -359,6 +362,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
         modelId: 'rival-model',
       })
       .run();
+    bindAllAgents(w.s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
 
     const res = await w.startReview(buildId, { agentId: CROSS_VENDOR_AGENT_ID, focus: '' });
     expect(res.status).toBe(202);

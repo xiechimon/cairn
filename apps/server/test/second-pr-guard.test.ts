@@ -137,6 +137,8 @@ function makeWorld(opts: WorldOpts = {}): World {
       .values({ id, teamId: s.team.id, name, online: true, enabledRuntimes: ['pi'] })
       .run();
   }
+  // #1259：认领面在 B——agent 显式绑 B（agent 插在机器前，FK 故绑放机器后）。
+  s.db.update(agentTable).set({ machineId: machineBId }).where(eq(agentTable.id, AGENT_ID)).run();
   s.db
     .insert(todoTable)
     .values({
@@ -162,7 +164,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       withPlan: true,
       prevPhase: 'review',
       triggerSource: 'user',
-      pinnedMachineId: null,
       planDocId: null,
       errorMessage: null,
       prUrl: opts.b1PrFields === false ? null : PR1_URL,
@@ -180,7 +181,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       withPlan: true,
       prevPhase: 'done',
       triggerSource: 'schedule',
-      pinnedMachineId: null,
       planDocId: null,
       errorMessage: null,
       prUrl: opts.b2PrFields ? PR2_URL : null,
@@ -416,9 +416,10 @@ describe('#1217 同 todo 第二张 PR 守卫（claim 面 + 合并面 + 回填面
       stepCount: 2,
       githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
     });
+    // #1259：同 agent 两步恒同机（归属机 B）——第二步也走 B 领。
     const first = await claimStep(w.machineDeps, w.machineBId, w.teamId, 10, 'http://localhost');
     expect(first).not.toBeNull();
-    const second = await claimStep(w.machineDeps, w.machineAId, w.teamId, 10, 'http://localhost');
+    const second = await claimStep(w.machineDeps, w.machineBId, w.teamId, 10, 'http://localhost');
     expect(second).not.toBeNull();
     const guardNotes = messagesOf(w, w.b2Id).filter(
       (m) =>

@@ -54,7 +54,8 @@ interface WorldOpts {
   /** 会话机 runtime 开关（缺省 ['pi']；chief 绑定 agent = stub-gw → pi 档）。 */
   ownerRuntimes?: string[];
   /** thread.pinnedMachineId（缺省 null = 未钉）。 */
-  threadPin?: string | null;
+  /** 总管主力机（chief.machineId，#1259 后 chief 步归属单源）。 */
+  chiefHome?: string; // 预留给后续主力机场景的 world 槽位
   /** thread.sessionId（缺省 'sess-A'；'' = 未开会话首轮）。 */
   sessionId?: string;
   /** 历史会话链（缺省单条：A/sess-A）；按序插入 done 步。 */
@@ -93,6 +94,7 @@ function makeWorld(opts: WorldOpts = {}): ChiefAffinityWorld {
       teamId,
       agentId,
       charter: '',
+      ...(opts.chiefHome !== undefined ? { machineId: opts.chiefHome } : {}),
       createdAt: base,
     })
     .run();
@@ -130,7 +132,6 @@ function makeWorld(opts: WorldOpts = {}): ChiefAffinityWorld {
       sessionId: opts.sessionId ?? 'sess-A',
       sessionOpenedAt: base - 600_000,
       pendingSessionResumeAt: null,
-      pinnedMachineId: opts.threadPin ?? null,
       toolDefHashes: {},
       toolResultHashes: {},
       activeRun: null,
@@ -217,15 +218,17 @@ describe('#895 A4 chief 步会话亲和（tryClaim chief 候选环，T2 对称�
     expect(got?.step.id).toBe(w.targetStepId);
   });
 
-  test('钉选盖过亲和：线程钉了机器（含主力机来源）→ 钉选机照领', async () => {
-    const w = makeWorld({ threadPin: null });
+  test('主力机盖过亲和：总管主力机设了 B → 唯有 B 可见该步（亲和不再挡）', async () => {
+    const w = makeWorld();
     w.s.db
-      .update(chiefThreadTable)
-      .set({ pinnedMachineId: w.machineBId })
-      .where(eq(chiefThreadTable.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: w.machineBId })
+      .where(eq(chiefTable.id, `chief-${w.s.user.id}-${w.teamId}`))
       .run();
-    // 失败方式 5：钉选 SQL 过滤下只有 B 能见该步；亲和若对 B 也生效（会话
+    // #1259：主力机 SQL 过滤下只有 B 能见该步；亲和若对 B 也生效（会话
     // 机 A 在线）= 唯一可见者被挡死 → 步永挂。
+    const foreign = await claimAs(w, w.machineAId);
+    expect(foreign).toBeNull(); // 会话机 A 反而领不到——主力机是硬约束
     const got = await claimAs(w, w.machineBId);
     expect(got?.step.id).toBe(w.targetStepId);
     expect(got?.session).toEqual({ action: 'continue', sessionId: 'sess-A' });
@@ -257,7 +260,6 @@ describe('#895 A4 chief 步会话亲和（tryClaim chief 候选环，T2 对称�
         sessionId: '',
         sessionOpenedAt: Date.now() - 40_000,
         pendingSessionResumeAt: null,
-        pinnedMachineId: null,
         toolDefHashes: {},
         toolResultHashes: {},
         activeRun: null,

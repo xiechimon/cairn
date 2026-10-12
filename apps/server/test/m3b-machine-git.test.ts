@@ -21,7 +21,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
-import { bootServer, issueApiKey, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-m3b-1';
 
@@ -84,6 +84,7 @@ async function setupGitWorld(): Promise<GitWorld> {
       tools: ['合并分支', '推送分支'],
     })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   // 托管 repo 项目（provision = init bare + 种子提交立 main，services/git.ts）。
   const projRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'm3b-lifecycle', repoKind: 'hosted' },
@@ -243,6 +244,8 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
       .insert(agentTable)
       .values({ id: AGENT_ID, teamId: s.team.id, displayName: 'b', modelId: 'm' })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projRes = await call(s.app, 'POST', '/api/projects', { body: { name: 'plain' } });
     const project = (await projRes.json()) as { id: string };
     const todoRes = await call(s.app, 'POST', `/api/projects/${project.id}/todos`, {

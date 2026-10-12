@@ -1,19 +1,16 @@
-// #682 机器钉选闭环（t-0047 调研落地）：任务级机器 todo.machineId 三条入口
-// 接线 + enabledRuntimes claim 真闸 + chief 线程机器亲和。失败方式（先于实现
-// 固化，仓测试纪律）：
-// 1. 界外机器 id 建/改任务 → 400（tagIds 同律边界防御）
-// 2. startBuilds 缺省链：REST 人工启动不带 pin → build 落 todo.machineId；
-//    schedule 显式值覆盖 todo 值；schedule null 回落 todo 值（不顶掉）
-// 3. restart 不继承失败轮 pin，回落 todo.machineId
-// 4. claim 钉选过滤：pinned build 只有钉的机器能领（现状语义回归钉）
-// 5. enabledRuntimes 真闸：机器未开步所需 runtime → 领不到（worker 与 chief
-//    步同律）；机器开回 pi → 领到（PATCH 热写秒级生效）
-// 6. chief 亲和：orchestrate 落 thread.pinnedMachineId + 请求行机器名；别机
-//    领不到 chief 步
-// 7. run_builds machineId：显式覆盖；缺省继承 todo 值；null 形 400
-// 8. 0022 回填：存量 [] 机器行 → ['pi']；已开 claude-code 的行不动；SQL 幂等
-// #895 单机编排默认策略（spec 21，主力机缺省链四态 + PATCH 机器槽三态 +
-// orchestration 封套投影）：失败方式 A–H 分列对应 describe 块内注释。
+// #1259 agent 归属机闭环：agent.machineId 单源——步只投归属机（worker 闸 +
+// chief 主力机投递）；runtime 真闸（enabledRuntimes）保留不变；换绑即改派。
+// 失败方式（先于实现固化，仓测试纪律）：
+// 1. worker 归属机闸：绑 A → A 领、B 空手；换绑 B → B 领（改派即时生效）；
+//    未设归属机 → 任何机器都领不到（留 pending，sweep 的可见失败归
+//    build-abandoned-sweep.test.ts）。
+// 2. runtime 真闸（#682 语义不变）：归属机未开步所需 runtime → 领不到；
+//    开回 → 领到（PATCH 热写秒级生效）。
+// 3. chief 主力机投递：chief.machineId 设 → 唯它可领 chief 步；未设 → 任意机。
+// 4. PATCH /chief machineId 槽三态（界外 400 / null 清回 / undefined 不动）。
+// 5. GET /chief orchestration 封套：defaultMachineId + running/waiting 计数
+//    （waiting = 主力机当前不可执行的 pending 回合）。
+// 6. 0022 回填（存量 [] 机器行 → ['pi']）幂等，与本票解耦保留。
 
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,21 +26,16 @@ import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import {
   agent as agentTable,
-  build as buildTable,
   chief as chiefTable,
-  chiefThread as chiefThreadTable,
   machine as machineTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
-import { newUuidv7, nowMs } from '../src/lib/ids.js';
-import { executeChiefTool } from '../src/services/chief-tools.js';
-import { createScheduler } from '../src/services/scheduler.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
-const AGENT_ID = 'agent-pin-1';
-const CC_AGENT_ID = 'agent-pin-cc';
+const AGENT_ID = 'agent-home-1';
+const CC_AGENT_ID = 'agent-home-cc';
 
 const temps: string[] = [];
 function temp(prefix: string): string {
@@ -91,7 +83,7 @@ async function claim(app: TestServer['app'], token: string): Promise<ClaimedStep
   return body.step === null ? null : claimedStepSchema.parse(body.step);
 }
 
-function seedAgent(s: TestServer, id: string, provider: string) {
+function seedAgent(s: TestServer, id: string, provider: string, machineId: string | null) {
   s.db
     .insert(agentTable)
     .values({
@@ -108,6 +100,7 @@ function seedAgent(s: TestServer, id: string, provider: string) {
       defaultSkill: null,
       skillsAllowlist: null,
       mcpServers: [],
+      machineId,
     })
     .run();
 }
@@ -124,33 +117,29 @@ interface World {
 async function setupWorld(): Promise<World> {
   const s = bootServer({ claimHoldMs: 200 });
   temps.push(''); // dispose 由 bootServer 拥有的目录自身管理；空占位避免误删
-  const tokenA = await enroll(s, 'pin-mbp');
-  const tokenB = await enroll(s, 'pin-other');
+  const tokenA = await enroll(s, 'home-mbp');
+  const tokenB = await enroll(s, 'home-other');
   const machineAId = s.db
     .select()
     .from(machineTable)
-    .where(eq(machineTable.name, 'pin-mbp'))
+    .where(eq(machineTable.name, 'home-mbp'))
     .get()!.id;
   const machineBId = s.db
     .select()
     .from(machineTable)
-    .where(eq(machineTable.name, 'pin-other'))
+    .where(eq(machineTable.name, 'home-other'))
     .get()!.id;
-  seedAgent(s, AGENT_ID, 'stub-gw');
-  seedAgent(s, CC_AGENT_ID, 'claude-code');
-  const projectId = await postProject(s.app, 'pin-proj');
+  // #1259：agent 出生即绑归属机（worker 面缺省形态）。
+  seedAgent(s, AGENT_ID, 'stub-gw', machineAId);
+  seedAgent(s, CC_AGENT_ID, 'claude-code', machineAId);
+  const projectId = await postProject(s.app, 'home-proj');
   return { s, tokenA, tokenB, machineAId, machineBId, projectId };
 }
 
-async function createTodo(
-  s: TestServer,
-  projectId: string,
-  machineId?: string | null,
-): Promise<string> {
+async function createTodo(s: TestServer, projectId: string): Promise<string> {
   const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
     title: '',
     spec: '探针任务',
-    ...(machineId != null ? { machineId } : {}),
   });
   expect(res.status).toBe(201);
   return ((await res.json()) as { id: string }).id;
@@ -166,314 +155,112 @@ async function startBuild(s: TestServer, projectId: string, todoId: string): Pro
   return ((await res.json()) as { builds: { id: string }[] }).builds[0]!.id as string;
 }
 
-function buildPin(s: TestServer, buildId: string): string | null {
-  return s.db
-    .select({ pin: buildTable.pinnedMachineId })
-    .from(buildTable)
-    .where(eq(buildTable.id, buildId))
-    .get()!.pin;
-}
-
-describe('#682 任务级机器写面（createTodo / PATCH）', () => {
-  test('失败方式 1：界外机器 id 建任务 → 400；合法 id 落库透出', async () => {
+describe('#1259 worker 归属机闸', () => {
+  test('绑 A → A 领、B 空手；换绑 B → B 领（改派即时生效）', async () => {
     const w = await setupWorld();
-    const bad = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
-      title: '',
-      spec: 'x',
-      machineId: 'machine-not-in-team',
-    });
-    expect(bad.status).toBe(400);
+    const todoId = await createTodo(w.s, w.projectId);
+    await startBuild(w.s, w.projectId, todoId);
 
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    const rec = (await (await req(w.s.app, 'GET', `/api/todos/${todoId}`)).json()) as {
-      machineId: string | null;
-    };
-    expect(rec.machineId).toBe(w.machineAId);
+    // 别机空手。
+    expect(await claim(w.s.app, w.tokenB)).toBeNull();
+    // 归属机领到。
+    const got = await claim(w.s.app, w.tokenA);
+    expect(got).not.toBeNull();
+    expect(got!.step.machineId).toBe(w.machineAId);
 
-    // PATCH：改钉 / 清回自动 / 界外 400。
-    const re = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, {
+    // 换绑 B：下一条步 B 领、A 空手。
+    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
       machineId: w.machineBId,
     });
-    expect(re.status).toBe(200);
-    expect(((await re.json()) as { machineId: string | null }).machineId).toBe(w.machineBId);
-    const clear = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, { machineId: null });
-    expect(clear.status).toBe(200);
-    expect(((await clear.json()) as { machineId: string | null }).machineId).toBeNull();
-    const badPatch = await req(w.s.app, 'PATCH', `/api/todos/${todoId}`, {
-      machineId: 'machine-not-in-team',
+    expect(rebind.status).toBe(200);
+    const todoId2 = await createTodo(w.s, w.projectId);
+    await startBuild(w.s, w.projectId, todoId2);
+    expect(await claim(w.s.app, w.tokenA)).toBeNull();
+    const got2 = await claim(w.s.app, w.tokenB);
+    expect(got2).not.toBeNull();
+    expect(got2!.step.machineId).toBe(w.machineBId);
+  });
+
+  test('未设归属机 → 任何机器都领不到（留 pending）', async () => {
+    const w = await setupWorld();
+    seedAgent(w.s, 'agent-homeless', 'stub-gw', null);
+    const todoId = await createTodo(w.s, w.projectId);
+    const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+      assignment: { plan: null, build: { agentId: 'agent-homeless' } },
+      withPlan: false,
     });
-    expect(badPatch.status).toBe(400);
-  });
-});
-
-describe('#682 startBuilds 缺省链（显式钉 > todo > 自动）', () => {
-  test('失败方式 2a：REST 人工启动不带 pin → build 落 todo.machineId；无钉 todo → null', async () => {
-    const w = await setupWorld();
-    const pinned = await createTodo(w.s, w.projectId, w.machineAId);
-    const buildId = await startBuild(w.s, w.projectId, pinned);
-    expect(buildPin(w.s, buildId)).toBe(w.machineAId);
-
-    const unpinned = await createTodo(w.s, w.projectId);
-    const buildId2 = await startBuild(w.s, w.projectId, unpinned);
-    expect(buildPin(w.s, buildId2)).toBeNull();
-  });
-
-  test('失败方式 2b：schedule 显式值覆盖 todo 值；schedule null 回落 todo 值', async () => {
-    const w = await setupWorld();
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    const scheduler = createScheduler(w.s.svc, { tickMs: 60_000 });
-    scheduler.start();
-    try {
-      const at = new Date('2026-10-01T00:00:00+08:00').getTime();
-      // schedule 钉 B → build 落 B（覆盖 todo 的 A）。
-      await req(w.s.app, 'POST', '/api/schedules', {
-        todoId,
-        kind: 'once',
-        at,
-        machineId: w.machineBId,
-      });
-      scheduler.tick();
-      const pins = w.s.db
-        .select({ pin: buildTable.pinnedMachineId })
-        .from(buildTable)
-        .innerJoin(todoTable, eq(buildTable.todoId, todoTable.id))
-        .all();
-      expect(pins.some((p) => p.pin === w.machineBId)).toBe(true);
-
-      // 第二轮：schedule 未钉（null）→ build 回落 todo 的 A（不被 null 顶掉）。
-      const todoId2 = await createTodo(w.s, w.projectId, w.machineAId);
-      await req(w.s.app, 'POST', '/api/schedules', { todoId: todoId2, kind: 'once', at });
-      scheduler.tick();
-      const pin2 = w.s.db
-        .select({ pin: buildTable.pinnedMachineId })
-        .from(buildTable)
-        .where(eq(buildTable.todoId, todoId2))
-        .get()!.pin;
-      expect(pin2).toBe(w.machineAId);
-    } finally {
-      scheduler.stop();
-    }
-  });
-
-  test('失败方式 3：restart 不继承失败轮 pin，回落 todo.machineId', async () => {
-    const w = await setupWorld();
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    // 失败轮被 schedule 钉到 B（制造「失败轮 pin ≠ todo 值」的分离态）。
-    const buildId = newUuidv7();
-    w.s.db
-      .insert(buildTable)
-      .values({
-        id: buildId,
-        todoId,
-        withPlan: false,
-        prevPhase: 'building',
-        triggerSource: 'schedule',
-        pinnedMachineId: w.machineBId,
-        createdAt: nowMs(),
-      })
-      .run();
-    w.s.db
-      .update(todoTable)
-      .set({ phase: 'failed', latestBuildId: buildId })
-      .where(eq(todoTable.id, todoId))
-      .run();
-    const res = await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
-      action: 'restart',
-      feedback: '再试一次',
-      clientMessageId: 'cm-restart-1',
-    });
-    expect(res.status).toBe(202);
-    const newPin = w.s.db
-      .select({ pin: buildTable.pinnedMachineId, id: buildTable.id })
-      .from(buildTable)
-      .where(eq(buildTable.todoId, todoId))
-      .all()
-      .find((r) => r.id !== buildId);
-    expect(newPin?.pin).toBe(w.machineAId);
-  });
-});
-
-describe('#682 claim 钉选过滤与 runtime 真闸', () => {
-  test('失败方式 4：pinned build 只有钉的机器能领；别机领不到', async () => {
-    const w = await setupWorld();
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    await startBuild(w.s, w.projectId, todoId);
-    // 领过一次后步即 claimed——负断言在前防顺序污染。
+    expect(res.status).toBe(201);
+    expect(await claim(w.s.app, w.tokenA)).toBeNull();
     expect(await claim(w.s.app, w.tokenB)).toBeNull();
-    const got = await claim(w.s.app, w.tokenA);
-    expect(got?.step.kind).toBe('build');
-    expect(got?.step.machineId).toBe(w.machineAId);
   });
+});
 
-  test('失败方式 5a：机器 runtime 全关/未开步所需 runtime → 领不到；开回 → 领到', async () => {
+describe('#682 runtime 真闸（语义不变，归属机版）', () => {
+  test('归属机未开步所需 runtime → 领不到；开回 → 领到（PATCH 热写）', async () => {
     const w = await setupWorld();
-    const todoId = await createTodo(w.s, w.projectId); // 不钉，纯闸测试
+    // 关掉 A 的 pi：agent（stub-gw → pi 档）的步领不到。
+    const off = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
+      enabledRuntimes: [],
+    });
+    expect(off.status).toBe(200);
+    const todoId = await createTodo(w.s, w.projectId);
     await startBuild(w.s, w.projectId, todoId);
-    const patch = (id: string, enabledRuntimes: string[]) =>
-      req(w.s.app, 'PATCH', `/api/machines/${id}`, { enabledRuntimes });
+    expect(await claim(w.s.app, w.tokenA)).toBeNull();
 
-    // 全关（存量 [] 形态）→ 领不到。
-    await patch(w.machineAId, []);
-    expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    // 只开 claude-code，步跑 pi agent（provider stub-gw）→ 仍领不到。
-    await patch(w.machineAId, ['claude-code']);
-    expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    // 开回 pi → 领到（PATCH 热写秒级生效的钉面）。
-    await patch(w.machineAId, ['pi']);
+    // 开回 → 领到（热写秒级生效）。
+    const on = await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
+      enabledRuntimes: ['pi'],
+    });
+    expect(on.status).toBe(200);
     const got = await claim(w.s.app, w.tokenA);
-    expect(got?.step.kind).toBe('build');
+    expect(got).not.toBeNull();
   });
 
-  test('失败方式 5b：claude-code agent 步在只开 pi 的机器上领不到', async () => {
+  test('claude-code agent 步在只开 pi 的归属机上领不到；换绑到双开机器领到', async () => {
     const w = await setupWorld();
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
+    // B 开双 runtime。
+    const dual = await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
+      enabledRuntimes: ['pi', 'claude-code'],
+    });
+    expect(dual.status).toBe(200);
+    const todoId = await createTodo(w.s, w.projectId);
     const res = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
       todoIds: [todoId],
       assignment: { plan: null, build: { agentId: CC_AGENT_ID } },
       withPlan: false,
     });
     expect(res.status).toBe(201);
-    // A 只开 pi（enroll 缺省）→ claude-code 步领不到；开两档 → 领到。
+    // A 只开 pi：领不到 claude-code 步。
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
-    await req(w.s.app, 'PATCH', `/api/machines/${w.machineAId}`, {
-      enabledRuntimes: ['pi', 'claude-code'],
+    // 换绑校验（#1259 模型闸）：B 未上报模型清单 → 400 拒。
+    const denied = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${CC_AGENT_ID}`, {
+      machineId: w.machineBId,
     });
-    const got = await claim(w.s.app, w.tokenA);
-    expect(got?.step.kind).toBe('build');
+    expect(denied.status).toBe(400);
+    // B 上报含该模型的清单 → 换绑放行 → 领到。
+    w.s.db
+      .update(machineTable)
+      .set({
+        claudeCodeReport: {
+          installed: true,
+          hostname: 'home-other',
+          models: [{ id: 'stub-model', name: 'stub-model', slot: 'default' }],
+        },
+      })
+      .where(eq(machineTable.id, w.machineBId))
+      .run();
+    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${CC_AGENT_ID}`, {
+      machineId: w.machineBId,
+    });
+    expect(rebind.status).toBe(200);
+    const got = await claim(w.s.app, w.tokenB);
+    expect(got).not.toBeNull();
   });
 });
 
-describe('#682 chief 线程机器亲和', () => {
-  async function bindChief(w: World): Promise<string> {
-    const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
-    const now = nowMs();
-    w.s.db
-      .insert(chiefTable)
-      .values({
-        id: chiefId,
-        userId: w.s.user.id,
-        teamId: w.s.team.id,
-        agentId: AGENT_ID,
-        charter: '',
-        createdAt: now,
-      })
-      .run();
-    return chiefId;
-  }
-
-  test('失败方式 6：orchestrate 落 thread.pinnedMachineId + 请求行机器名；别机领不到 chief 步', async () => {
-    const w = await setupWorld();
-    await bindChief(w);
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { thread: { id: string }; message: { content: string } };
-    const threadRow = w.s.db
-      .select()
-      .from(chiefThreadTable)
-      .where(eq(chiefThreadTable.id, body.thread.id))
-      .get()!;
-    expect(threadRow.pinnedMachineId).toBe(w.machineAId);
-    // 编排请求行明示机器名（chief 裁量改派时有据）。
-    expect(body.message.content).toContain('pin-mbp');
-
-    // 别机领不到 chief 步；钉的机器领到。
-    expect(await claim(w.s.app, w.tokenB)).toBeNull();
-    const got = await claim(w.s.app, w.tokenA);
-    expect(got?.step.kind).toBe('chief');
-    expect(got?.conversationId).toBe(body.thread.id);
-
-    // 对照：未钉 todo 的 orchestrate → thread pin = null（任何机器可领）。
-    const todoId2 = await createTodo(w.s, w.projectId);
-    const res2 = await req(w.s.app, 'POST', `/api/todos/${todoId2}/orchestrate`, {});
-    expect(res2.status).toBe(201);
-    const thread2 = (await res2.json()) as { thread: { id: string } };
-    const row2 = w.s.db
-      .select({ pin: chiefThreadTable.pinnedMachineId })
-      .from(chiefThreadTable)
-      .where(eq(chiefThreadTable.id, thread2.thread.id))
-      .get()!;
-    expect(row2.pin).toBeNull();
-  });
-
-  test('失败方式 7：run_builds machineId 显式覆盖；缺省继承 todo 值；null 形 400', async () => {
-    const w = await setupWorld();
-    const chiefId = await bindChief(w);
-    const threadId = `chief-${newUuidv7()}`;
-    w.s.db
-      .insert(chiefThreadTable)
-      .values({
-        id: threadId,
-        chiefId,
-        userId: w.s.user.id,
-        teamId: w.s.team.id,
-        title: 'pin relay',
-        createdAt: nowMs(),
-        updatedAt: nowMs(),
-        sessionRuntime: 'pi',
-        sessionId: '',
-        sessionOpenedAt: nowMs(),
-        toolDefHashes: {},
-        toolResultHashes: {},
-      })
-      .run();
-    const relay = (params: Record<string, unknown>) =>
-      executeChiefTool(
-        {
-          db: w.s.db,
-          hub: w.s.hub,
-          machineHub: w.s.machineHub,
-          box: w.s.secretBox,
-          user: w.s.user,
-          reposDir: w.s.reposDir,
-          attachmentsDir: w.s.attachmentsDir,
-          skillsDir: w.s.skillsDir,
-        },
-        {
-          teamId: w.s.team.id,
-          userId: w.s.user.id,
-          chiefId,
-          threadId,
-          chiefAgentId: AGENT_ID,
-          conversationId: threadId,
-        },
-        'run_builds',
-        params,
-      );
-
-    // 每个 todo 只派一次（再派撞相位闸 queued→queued 是合法拒绝），三个
-    // 断言各用各的 todo。
-    const todo1 = await createTodo(w.s, w.projectId, w.machineAId);
-    const out1 = JSON.parse(
-      await relay({ todoIds: [todo1], assignment: { build: { agentId: AGENT_ID } } }),
-    ) as { builds: { id: string; pinnedMachineId: string | null }[] };
-    expect(out1.builds[0]!.pinnedMachineId).toBe(w.machineAId);
-
-    // 显式 B → 覆盖。
-    const todo2 = await createTodo(w.s, w.projectId, w.machineAId);
-    const out2 = JSON.parse(
-      await relay({
-        todoIds: [todo2],
-        assignment: { build: { agentId: AGENT_ID } },
-        machineId: w.machineBId,
-      }),
-    ) as { builds: { id: string; pinnedMachineId: string | null }[] };
-    expect(out2.builds[0]!.pinnedMachineId).toBe(w.machineBId);
-
-    // null 形 400（语义误导：会被缺省链回落 todo 值而非「自动」）。
-    const todo3 = await createTodo(w.s, w.projectId, w.machineAId);
-    await expect(
-      relay({ todoIds: [todo3], assignment: { build: { agentId: AGENT_ID } }, machineId: null }),
-    ).rejects.toThrow(/machineId must be a machine id or omitted/);
-  });
-});
-
-// —— #895 单机编排默认策略（spec 21）：主力机 chief.machineId 缺省链 +
-// PATCH /chief 机器槽 + GET /chief orchestration 封套 ——————————————————
-
-describe('#895 主力机缺省链（todo 钉 > chief.machineId > null，spec 21 A3）', () => {
-  /** 直插带主力机的 chief 行（PATCH 面另行覆盖；缺省链测试绕开写面）。 */
-  async function bindChiefWithMachine(w: World, machineId: string | null): Promise<string> {
+describe('#1259 chief 主力机投递', () => {
+  async function bindChief(w: World, machineId: string | null): Promise<string> {
     const chiefId = `chief-${w.s.user.id}-${w.s.team.id}`;
     w.s.db
       .insert(chiefTable)
@@ -483,77 +270,37 @@ describe('#895 主力机缺省链（todo 钉 > chief.machineId > null，spec 21 
         teamId: w.s.team.id,
         agentId: AGENT_ID,
         charter: '',
-        createdAt: nowMs(),
+        createdAt: Date.now(),
         machineId,
       })
       .run();
     return chiefId;
   }
 
-  function threadPin(s: TestServer, threadId: string): string | null {
-    return s.db
-      .select({ pin: chiefThreadTable.pinnedMachineId })
-      .from(chiefThreadTable)
-      .where(eq(chiefThreadTable.id, threadId))
-      .get()!.pin;
-  }
-
-  test('失败方式 A：todo 钉选盖过主力机——两边都设时线程落 todo 的机器', async () => {
+  test('主力机设 → 唯它可领 chief 步；未设 → 任意机', async () => {
     const w = await setupWorld();
-    await bindChiefWithMachine(w, w.machineBId);
-    const todoId = await createTodo(w.s, w.projectId, w.machineAId);
-    const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { thread: { id: string } };
-    expect(threadPin(w.s, body.thread.id)).toBe(w.machineAId);
-  });
-
-  test('失败方式 B：todo 未钉 + 主力机设 → orchestrate 线程与抽屉新主题同落主力机', async () => {
-    const w = await setupWorld();
-    await bindChiefWithMachine(w, w.machineAId);
-    // orchestrate 入口（缺省链第二级接管）。
+    await bindChief(w, w.machineBId);
     const todoId = await createTodo(w.s, w.projectId);
     const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { thread: { id: string } };
-    expect(threadPin(w.s, body.thread.id)).toBe(w.machineAId);
-    // 抽屉新主题（POST /chief/threads，同一条缺省链）。
-    const res2 = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
-      content: '帮我看看现在的任务',
+
+    // A 领不到（chief 步只投主力机 B）；B 领到。
+    expect(await claim(w.s.app, w.tokenA)).toBeNull();
+    const got = await claim(w.s.app, w.tokenB);
+    expect(got).not.toBeNull();
+    expect(got!.step.kind).toBe('chief');
+
+    // 对照：主力机清回（PATCH null）→ 任意机可领。
+    const clear = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
+      machineId: null,
     });
+    expect(clear.status).toBe(200);
+    const todoId2 = await createTodo(w.s, w.projectId);
+    const res2 = await req(w.s.app, 'POST', `/api/todos/${todoId2}/orchestrate`, {});
     expect(res2.status).toBe(201);
-    const body2 = (await res2.json()) as { thread: { id: string } };
-    expect(threadPin(w.s, body2.thread.id)).toBe(w.machineAId);
-  });
-
-  test('失败方式 C：双未设 → 线程 pin null（回归红线：与 main 逐语义等价）', async () => {
-    const w = await setupWorld();
-    await bindChiefWithMachine(w, null);
-    const todoId = await createTodo(w.s, w.projectId);
-    const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/orchestrate`, {});
-    expect(res.status).toBe(201);
-    const body = (await res.json()) as { thread: { id: string } };
-    expect(threadPin(w.s, body.thread.id)).toBeNull();
-  });
-
-  test('失败方式 D：既有线程不回写——主力机后设，旧未钉线程续消息 pin 仍 null', async () => {
-    const w = await setupWorld();
-    await bindChiefWithMachine(w, null);
-    const first = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
-      content: '第一轮',
-    });
-    const { thread } = (await first.json()) as { thread: { id: string } };
-    // 主力机中途落下（PATCH 写面）——既有线程不被重钉（N7：中途换机丢会话
-    // 上下文，creation-time 语义保持）。
-    const patch = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
-      machineId: w.machineAId,
-    });
-    expect(patch.status).toBe(200);
-    const second = await req(w.s.app, 'POST', `/api/conversations/${thread.id}/messages`, {
-      content: '第二轮',
-    });
-    expect(second.status).toBe(201);
-    expect(threadPin(w.s, thread.id)).toBeNull();
+    const got2 = await claim(w.s.app, w.tokenA);
+    expect(got2).not.toBeNull();
+    expect(got2!.step.kind).toBe('chief');
   });
 });
 
@@ -624,7 +371,7 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
       .run();
   }
 
-  test('失败方式 G：投影——defaultMachineId + running（claimed）/ waiting（pending 被钉且不可执行）计数', async () => {
+  test('失败方式 G：投影——defaultMachineId + running（claimed）/ waiting（主力机不可执行的 pending）计数', async () => {
     const w = await setupWorld();
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
       agent: { agentId: AGENT_ID, thinkingLevel: null },
@@ -636,31 +383,30 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
     });
     const thread1 = ((await t1.json()) as { thread: { id: string } }).thread.id;
     setChiefStep(w.s, thread1, { status: 'claimed', machineId: w.machineAId });
-    // waiting：线程钉 B（pending）且 B 离线（enroll 不置在线）。
-    const t2 = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
+    // waiting：主力机 A 离线（直写 DB），新回合 pending → 计入 A 的 waiting。
+    w.s.db
+      .update(machineTable)
+      .set({ online: false })
+      .where(eq(machineTable.id, w.machineAId))
+      .run();
+    await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
       content: '回合二',
     });
-    const thread2 = ((await t2.json()) as { thread: { id: string } }).thread.id;
-    w.s.db
-      .update(chiefThreadTable)
-      .set({ pinnedMachineId: w.machineBId })
-      .where(eq(chiefThreadTable.id, thread2))
-      .run();
 
     const body = await getEnvelope(w);
     expect(body.orchestration.defaultMachineId).toBe(w.machineAId);
     const activityA = body.orchestration.activity.find((a) => a.machineId === w.machineAId);
-    const activityB = body.orchestration.activity.find((a) => a.machineId === w.machineBId);
     expect(activityA?.running).toBe(1);
-    expect(activityB?.waiting).toBe(1);
+    expect(activityA?.waiting).toBe(1);
   });
 
-  test('失败方式 H：waiting 判据——机器在线但 runtime 闸关也计入（T3 缝隙可见性）', async () => {
+  test('失败方式 H：waiting 判据——主力机在线但 runtime 闸关也计入（T3 缝隙可见性）', async () => {
     const w = await setupWorld();
+    // B 只开 claude-code；chief 绑定 agent = stub-gw → pi 档；主力机 = B。
     await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/chief`, {
       agent: { agentId: AGENT_ID, thinkingLevel: null },
+      machineId: w.machineBId,
     });
-    // B 在线但只开 claude-code；chief 绑定 agent = stub-gw → pi 档。
     await req(w.s.app, 'PATCH', `/api/machines/${w.machineBId}`, {
       enabledRuntimes: ['claude-code'],
     });
@@ -669,15 +415,9 @@ describe('#895 GET /chief orchestration 封套（spec 21 A5）', () => {
       .set({ online: true })
       .where(eq(machineTable.id, w.machineBId))
       .run();
-    const t = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
+    await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/chief/threads`, {
       content: '回合',
     });
-    const threadId = ((await t.json()) as { thread: { id: string } }).thread.id;
-    w.s.db
-      .update(chiefThreadTable)
-      .set({ pinnedMachineId: w.machineBId })
-      .where(eq(chiefThreadTable.id, threadId))
-      .run();
 
     const body = await getEnvelope(w);
     const activityB = body.orchestration.activity.find((a) => a.machineId === w.machineBId);
@@ -757,7 +497,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
     return JSON.parse(row.enabledRuntimes);
   }
 
-  test('失败方式 8：升级前旧库 → 补跑全量 migration：[] 行回填 [pi]，已开 claude-code 行不动', () => {
+  test('升级前旧库 → 补跑全量 migration：[] 行回填 [pi]，已开 claude-code 行不动', () => {
     const dbPath = buildPrePinDb();
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });

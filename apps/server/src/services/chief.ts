@@ -61,9 +61,9 @@ import { runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import {
   CHIEF_PIN_OFFLINE_HINT,
   CHIEF_PIN_RUNTIME_HINT,
+  homeOfflineReason,
+  homeRuntimeBlockedReason,
   PIN_OFFLINE_GRACE_MS,
-  pinOfflineReason,
-  pinRuntimeBlockedReason,
   stepActivityAt,
 } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -221,7 +221,7 @@ function chiefOrchestration(
   row: ChiefRow,
 ): ChiefGetResponse['orchestration'] {
   const steps = deps.db
-    .select({ machineId: step.machineId, status: step.status, pin: chiefThread.pinnedMachineId })
+    .select({ machineId: step.machineId, status: step.status })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .where(
@@ -250,13 +250,15 @@ function chiefOrchestration(
       if (s.machineId !== null) bump(s.machineId).running += 1;
       continue;
     }
-    // pending：只数「被钉且钉的机器当前不可执行」的（未钉 = FIFO 排队，
-    // 不指向任何机器）。
-    if (s.pin === null) continue;
-    const machineRow = deps.db.select().from(machine).where(eq(machine.id, s.pin)).get();
+    // pending：主力机当前不可执行（离线/被 runtime 闸挡）才计 waiting——
+    // 主力机未设 = 浮动 FIFO 排队，不指向任何机器（#1259 线程钉选列已退役，
+    // chief 步去处 = chief.machineId 单源）。
+    const home = row.machineId;
+    if (home === null) continue;
+    const machineRow = deps.db.select().from(machine).where(eq(machine.id, home)).get();
     const offline = machineRow === undefined || !machineRow.online;
     if (!offline && chiefRuntimeGatePasses(machineRow, agentRow?.provider)) continue;
-    bump(s.pin).waiting += 1;
+    bump(home).waiting += 1;
   }
   return {
     defaultMachineId: row.machineId ?? null,
@@ -366,7 +368,6 @@ export function toChiefThreadRecord(
     lastTurnAt: row.lastTurnAt,
     session: { runtime: 'pi', id: row.sessionId, openedAt: row.sessionOpenedAt },
     pendingSessionResumeAt: row.pendingSessionResumeAt,
-    pinnedMachineId: row.pinnedMachineId,
     toolDefHashes: row.toolDefHashes,
     toolResultHashes: row.toolResultHashes,
     activeRun: row.activeRun,
@@ -423,7 +424,7 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
 export function sendChiefMessage(
   deps: ChiefDeps,
   teamId: string,
-  body: { threadId: string | null; content: string; pinnedMachineId?: string | null },
+  body: { threadId: string | null; content: string },
   opts?: { homeDir?: string },
 ): {
   thread: ChiefThread;
@@ -467,12 +468,6 @@ export function sendChiefMessage(
         sessionId: '', // 引擎会话未开——首轮 new session（done 回传后落值）
         sessionOpenedAt: now,
         pendingSessionResumeAt: null,
-        // #682/#895 机器亲和钉选缺省链（spec 21 A3）：编排入口的 todo 钉选
-        // （body.pinnedMachineId，现状第一级）→ chief 主力机（chiefRow.
-        // machineId，新第二级）→ null。既有线程不回写：会话在哪台机器续跑
-        // 由线程创建时刻决定，中途换机丢上下文（N7；未钉存量线程由 A4 会话
-        // 亲和粘住当前会话机）。
-        pinnedMachineId: body.pinnedMachineId ?? chiefRow.machineId ?? null,
         toolDefHashes: chiefToolDefHashes(),
         toolResultHashes: {},
         activeRun: null,
@@ -989,10 +984,13 @@ export function failAbandonedChiefSteps(
     if (!thread) continue; // 线程已删：无呈现面
     let reason: string | null = null;
     if (row.status === 'pending') {
-      // #864 T3：钉选机器离线超时（worker 步同政策，见 dispatch-timeouts.ts）。
-      // 先于「团队零在线机器」判——chief 线程被钉到离线机器时，别机领不走
-      // （claimChiefCandidates 的亲和过滤），回合与 worker 步一样会永挂。
-      const pinnedId = thread.pinnedMachineId;
+      // #864 T3：归属机离线超时（worker 步同政策，见 dispatch-timeouts.ts）。
+      // 先于「团队零在线机器」判——总管主力机离线时，别机领不走
+      // （claimChiefCandidates 过滤），回合同 worker 步一样会永挂。
+      // #1259：chief 回合的归属 = 总管主力机（chief.machineId 单源，线程
+      // 钉选列已退役）。
+      const chiefRow = deps.db.select().from(chief).where(eq(chief.id, thread.chiefId)).get();
+      const pinnedId = chiefRow?.machineId ?? null;
       const pinnedRow =
         pinnedId === null
           ? undefined
@@ -1002,7 +1000,7 @@ export function failAbandonedChiefSteps(
         (pinnedRow === undefined || !pinnedRow.online) &&
         now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
       ) {
-        reason = pinOfflineReason(pinnedRow?.name ?? null, CHIEF_PIN_OFFLINE_HINT);
+        reason = homeOfflineReason(pinnedRow?.name ?? null, CHIEF_PIN_OFFLINE_HINT);
       }
       // #881 ④b：钉选机在线但 runtime 闸挡（#864 登记缝的 chief 半边）。判据
       // 镜像 buildChiefClaim 的闸——**绑定 Agent 的 provider**（模型覆盖
@@ -1016,12 +1014,11 @@ export function failAbandonedChiefSteps(
         pinnedRow.online &&
         now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
       ) {
-        const chiefRow = deps.db.select().from(chief).where(eq(chief.id, thread.chiefId)).get();
         const agentRow = chiefRow?.agentId
           ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
           : undefined;
         if (agentRow?.modelId != null && !runtimeGatePasses(pinnedRow, agentRow.provider)) {
-          reason = pinRuntimeBlockedReason(
+          reason = homeRuntimeBlockedReason(
             pinnedRow.name,
             stepRuntimeFor(agentRow.provider),
             CHIEF_PIN_RUNTIME_HINT,

@@ -18,7 +18,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 const AGENT_ID = 'agent-stub-steer';
 
@@ -84,6 +84,8 @@ async function setupWorld(opts: { claimHoldMs?: number } = {}): Promise<World> {
     cred: key,
     body: { teamId: s.team.id, name: 'test-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const machineJson = (await enrollRes.json()) as { token: string; machineId: string };
   const projectId = await postProject(s.app);

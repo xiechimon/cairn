@@ -115,7 +115,6 @@ export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): Schedule
     kind: row.kind,
     at: row.at,
     tz: row.tz,
-    machineId: row.machineId,
     nextRunAt: row.nextRunAt,
     createdBy: row.createdBy,
     todo: {
@@ -166,7 +165,6 @@ export function createSchedule(
       kind: input.kind,
       at: input.at,
       tz,
-      machineId: input.machineId ?? null,
       nextRunAt,
       createdBy: input.createdBy,
     })

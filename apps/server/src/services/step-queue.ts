@@ -7,17 +7,14 @@
 // import 会把环拉直成真环；与 dispatch-timeouts.ts 建叶同一个由（零业务
 // 依赖的叶子让「一个口径一个模块」在代码层可见）。
 //
-// 位次口径（与 claim 实际序对齐的诚实近似，注释即判据）：
-// - 钉选步（build.pinnedMachineId / chiefThread.pinnedMachineId 非空 M）：
-//   只数「该机可见集」——钉 M 或未钉的 pending 步按 createdAt 位次。这与
-//   claimCandidates / claimChiefCandidates 的过滤 + orderBy 完全同集同序
-//   （machines.ts），即该机真实的认领次序。
-// - 未钉步：全团队 pending 按 createdAt 位次。任何在线机都按 createdAt 领
-//   它可见的集——他机的钉选步对该机不可见，全局位次把它们也数进去 = 可能
-//   偏悲观（显示「前面 3 个」实际对将认领它的机器只有 1 个在前）。方向上
-//   宁可多报不漏报（用户去查那 3 个，查得到真队列）。
-// - 等待对象：钉选机器（含 running/capacity 快照）；未钉 = null（等待任何
-//   在线机器）。
+// 位次口径（#1259 归属机版，与 claim 实际序对齐的诚实近似，注释即判据）：
+// - 步的去处 = agent 归属机（agentForStep 单源解析）：归属机 M 的步，可见
+//   集 = 同样归属 M 的 pending 步，按 createdAt 位次——即该机真实认领次序
+//   （machines.ts tryClaim 的候选循环同序）。
+// - 归属机未设（agent.machineId null）：没有机器可见该步——位次照算（同
+//   「无归属机」池），等待对象 = null（sweep 的未设归属机分支负责可见失败，
+//   排队面不编造机器）。
+// - chief 回合步：去处 = 总管主力机（chief.machineId），同口径。
 // 已知近似（不修，登记）：无 Agent 的死步（#1104 修复后转 Fail）与 runtime
 // 闸挡的步也计入位次——它们「在队列里」从用户视角为真，排障入口在失败漏斗
 // 不在位次里扣。
@@ -25,15 +22,16 @@
 import type { StepQueueInfo } from '@pacman/shared';
 import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, machine, step, todo } from '../db/schema.js';
+import { build, chief, chiefThread, machine, step, todo } from '../db/schema.js';
+import { agentForStep } from './dispatch-eligibility.js';
 
 /** 投影目标步的最小形状（调用方从各自读面取齐）。 */
 export interface QueueTargetStep {
   id: string;
   createdAt: number;
-  /** 该步的钉选机器（worker = build.pinnedMachineId；chief =
-   * chiefThread.pinnedMachineId）；null = 未钉。 */
-  pinnedMachineId: string | null;
+  /** 该步的归属机（worker = agent.machineId；chief = chief.machineId）；
+   *  null = 无归属（任何机器不可见）。 */
+  homeMachineId: string | null;
 }
 
 /** team 域排队投影器：一次取全 pending 集（worker + chief 两族），调用方按
@@ -42,27 +40,40 @@ export interface QueueTargetStep {
  *  理论不达——同刻落库只在单进程同步写窗内）。 */
 export function stepQueueProjector(db: Db, teamId: string) {
   const workerRows = db
-    .select({ id: step.id, createdAt: step.createdAt, pin: build.pinnedMachineId })
+    .select({
+      id: step.id,
+      createdAt: step.createdAt,
+      kind: step.kind,
+      prompt: step.prompt,
+      todoRow: todo,
+    })
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
     .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId)))
     .all();
+  const workerQueue = workerRows.map((r) => ({
+    id: r.id,
+    createdAt: r.createdAt,
+    home: agentForStep(db, r.todoRow, r.kind, r.prompt)?.machineId ?? null,
+  }));
   // buildId = chief thread id（conv 等式，CONTEXT.md）。
   const chiefRows = db
     .select({
       id: step.id,
       createdAt: step.createdAt,
-      pin: chiefThread.pinnedMachineId,
       threadId: step.buildId,
+      home: chief.machineId,
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
     .all();
-  const queue = [...workerRows, ...chiefRows].sort(
-    (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
-  );
+  const queue = [
+    ...workerQueue.map((r) => ({ id: r.id, createdAt: r.createdAt, home: r.home })),
+    ...chiefRows.map((r) => ({ id: r.id, createdAt: r.createdAt, home: r.home })),
+  ].sort((a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1));
 
   // 该机 claimed 步数 / machine 行（waitingFor 快照；按需缓存——调用方行集
   // 分布稀，n 次查询封顶 n 个被等待机器）。#1148：只数非 chief 步（chief 不
@@ -92,17 +103,14 @@ export function stepQueueProjector(db: Db, teamId: string) {
   function project(target: QueueTargetStep): StepQueueInfo | null {
     const inQueue = queue.some((r) => r.id === target.id);
     if (!inQueue) return null;
-    // 钉选步：该机可见集 = 钉 M 或未钉（claimCandidates 同过滤）；未钉步：
-    // 全队集（诚实近似见文件头）。
-    const pool =
-      target.pinnedMachineId === null
-        ? queue
-        : queue.filter((r) => r.pin === null || r.pin === target.pinnedMachineId);
+    // 同归属机池 = 该机可见集（tryClaim 候选循环同集）；无归属步只在「无
+    // 归属机」池里互排（任何机器都不可见它们）。
+    const pool = queue.filter((r) => r.home === target.homeMachineId);
     const position = pool.findIndex((r) => r.id === target.id) + 1;
     if (position === 0) return null; // 理论不达（inQueue 已判）；防御位。
     let waitingFor: StepQueueInfo['waitingFor'] = null;
-    if (target.pinnedMachineId !== null) {
-      const row = machineRowOf(target.pinnedMachineId);
+    if (target.homeMachineId !== null) {
+      const row = machineRowOf(target.homeMachineId);
       if (row !== undefined) {
         waitingFor = {
           machineId: row.id,
@@ -111,7 +119,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
           capacity: row.maxConcurrent,
         };
       }
-      // 行缺失（机器被删）：waitingFor 保持 null——钉残值语义同离线失败路径
+      // 行缺失（机器被删）：waitingFor 保持 null——残值语义同离线失败路径
       // （失败漏斗点名机器），排队面不编造对象。
     }
     return { position, waitingFor };
@@ -124,7 +132,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
     const rows = chiefRows.filter((r) => r.threadId === threadId);
     const last = rows[rows.length - 1];
     if (last === undefined) return null;
-    return { id: last.id, createdAt: last.createdAt, pinnedMachineId: last.pin };
+    return { id: last.id, createdAt: last.createdAt, homeMachineId: last.home };
   }
 
   return { project, pendingChiefOf };

@@ -124,7 +124,6 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     sourceBuildId: row.sourceBuildId,
     sourceKind: row.sourceKind,
     sourceRef: row.sourceRef,
-    machineId: row.machineId,
   };
 }
 
@@ -184,9 +183,6 @@ export function createTodo(
      * 答「哪次请求拆的」）。至多一个来源：GitHub 接入项目的自建 issue 写向
      * 优先占槽（#452 出站零回归；r14 §5.7 GitHub 镜像面开放问题）。 */
     orchestration?: { threadId: string };
-    /** 任务的钉选机器（#682）：null/缺省 = 自动。本团队机器集之外的 id =
-     * 400（tagIds 同律的项目边界防御）。 */
-    machineId?: string | null;
   },
 ): TodoRecord {
   const { db, hub } = deps;
@@ -205,18 +201,6 @@ export function createTodo(
     for (const tagId of tagIds) {
       if (!owned.has(tagId)) throw new HttpError(400, `tag ${tagId} not in project`);
     }
-  }
-  // #682：钉选机器限本团队机器集（tagIds 同律边界防御）；机器被删后任务
-  // 行残值 = startBuilds 回落 todo.machineId 时 claim 过滤自然不命中（步
-  // pending 等待语义同「pin 的机器离线」），不做写时级联。
-  const machineId = input.machineId ?? null;
-  if (machineId !== null) {
-    const machineRow = db
-      .select({ id: machine.id })
-      .from(machine)
-      .where(and(eq(machine.id, machineId), eq(machine.teamId, input.teamId)))
-      .get();
-    if (!machineRow) throw new HttpError(400, `machine ${machineId} not in team`);
   }
   // seqNum = 团队内持久序号（CONTEXT.md `#seqNum`；观测 #11–#14 跨项目递增，
   // 团队级计数 [推断]）。
@@ -282,7 +266,6 @@ export function createTodo(
         (selfIssue === null && input.orchestration !== undefined
           ? orchestrationSourceRef(input.orchestration.threadId)
           : null),
-      machineId,
     })
     .run();
   for (const tagId of tagIds) {
@@ -310,7 +293,6 @@ export function updateTodo(
     /** 钉选机器 patch（#682）：string = 改钉，null = 清回自动，undefined =
      * 不动。只影响之后新起的 build（claim 过滤按 build 落值）。team 外机器
      * id = 400（createTodo 同律）。 */
-    machineId?: string | null;
     /** 指派槽级 patch（#208「编辑分配」）：提供的槽覆盖，未提供的槽保持现状；
      * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表）。 */
     assignment?: {
@@ -330,18 +312,6 @@ export function updateTodo(
   if (patch.title !== undefined) sets.title = patch.title;
   if (patch.spec !== undefined) sets.spec = patch.spec;
   if (patch.orderIndex !== undefined) sets.orderIndex = patch.orderIndex;
-  if (patch.machineId !== undefined) {
-    // #682 边界防御同建面：非 null 值必须落在本团队机器集内。
-    if (patch.machineId !== null) {
-      const machineRow = db
-        .select({ id: machine.id })
-        .from(machine)
-        .where(and(eq(machine.id, patch.machineId), eq(machine.teamId, row.teamId)))
-        .get();
-      if (!machineRow) throw new HttpError(400, `machine ${patch.machineId} not in team`);
-    }
-    sets.machineId = patch.machineId;
-  }
   if (patch.assignment !== undefined) {
     // 槽级 merge：未提供的槽保持现状（字段级 patch 语义延伸）。真值 = todo 表
     // JSON 列（db/schema.ts assignment 列），agent 投影随 build 槽自动派生。

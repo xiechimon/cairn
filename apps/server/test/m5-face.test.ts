@@ -32,7 +32,14 @@ import {
   provider as providerTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bootServer, issueApiKey, openConvStream, postProject, req } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  openConvStream,
+  postProject,
+  req,
+} from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
 
@@ -98,6 +105,8 @@ async function setupWorld(opts: { webDir?: string | null; pingIntervalMs?: numbe
     cred: apiKey,
     body: { teamId: s.team.id, name: 'm5-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const { token, machineId } = (await enrollRes.json()) as { token: string; machineId: string };
   const projectId = await postProject(s.app);
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {

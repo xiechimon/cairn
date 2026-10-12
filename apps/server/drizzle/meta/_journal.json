@@ -260,6 +260,13 @@
       "when": 1791787740535,
       "tag": "0036_steep_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1791794905229,
+      "tag": "0037_fearless_beast",
+      "breakpoints": true
     }
   ]
 }

@@ -61,11 +61,12 @@ import {
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import {
+  homeOfflineReason,
+  homeRuntimeBlockedReason,
+  homeWedgeReason,
+  noHomeReason,
   PIN_OFFLINE_GRACE_MS,
   PIN_ONLINE_WEDGE_GRACE_MS,
-  pinOfflineReason,
-  pinRuntimeBlockedReason,
-  pinWedgeReason,
   stepActivityAt,
   WORKER_PIN_OFFLINE_HINT,
   WORKER_PIN_RUNTIME_HINT,
@@ -112,7 +113,6 @@ export function toBuildRecord(row: BuildRow): BuildRecord {
     withPlan: row.withPlan,
     prevPhase: row.prevPhase ?? null,
     triggerSource: row.triggerSource,
-    pinnedMachineId: row.pinnedMachineId,
     planDocId: row.planDocId,
     errorMessage: row.errorMessage,
     prUrl: row.prUrl,
@@ -467,7 +467,7 @@ export function listSteps(deps: BuildDeps, buildId: string): StepJournalRow[] {
           const projected = projector.project({
             id: r.id,
             createdAt: r.createdAt,
-            pinnedMachineId: buildRow.pinnedMachineId,
+            homeMachineId: agentForStep(deps.db, todoRow, r.kind, r.prompt)?.machineId ?? null,
           });
           return [r.id, projected ?? undefined];
         }),
@@ -501,10 +501,6 @@ export function startBuilds(
     assignment: Assignment;
     withPlan: boolean;
     triggerSource?: TriggerSource; // 默认 user；schedule = 定时触发（services/scheduler.ts）；chief 面归 M4
-    /** 钉选机器（#682 优先级：调用方显式值 > todo.machineId > null 自动）。
-     * schedule.machineId 透传（null = 该 schedule 未钉 → 回落 todo 值）；
-     * chief run_builds 显式 machineId 覆盖；REST 人工启动不传 = todo 值。 */
-    pinnedMachineId?: string | null;
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -526,9 +522,6 @@ export function startBuilds(
         withPlan: input.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource,
-        // #682 缺省回落 todo.machineId（任务级默认机器）：null（未钉/清回
-        // 自动）与 undefined（调用方无意见）都落到 todo 值；显式钉 > todo > 自动。
-        pinnedMachineId: input.pinnedMachineId ?? todoRecord.machineId ?? null,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -768,15 +761,13 @@ export async function applyBuildStepAction(
         restartPrompt,
         true,
       );
-      // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed（本
-      // 轮起点）、pin 回落 todo 值（#682 缺省链——失败轮的 pin 不继承，钉选
-      // 语义与新 build 路一致）。
+      // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed
+      // （本轮起点）。
       deps.db
         .update(build)
         .set({
           errorMessage: null,
           prevPhase: 'failed',
-          pinnedMachineId: todoRecord.machineId ?? null,
         })
         .where(eq(build.id, reworkTarget.id))
         .run();
@@ -802,7 +793,6 @@ export async function applyBuildStepAction(
         withPlan: row.withPlan,
         prevPhase: todoRecord.phase,
         triggerSource: 'user',
-        pinnedMachineId: todoRecord.machineId,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -1202,54 +1192,51 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     if (!todoRow) continue;
     let reason: string | null = null;
     if (row.status === 'pending') {
-      // ④ #864 T3：钉选机器离线超时。先于「团队零在线机器」判——同一条步上
-      // 两条判据都成立时，点名钉选机的文案更具体、出口更明确。判据 = 钉选机
-      // 不在线（行缺失 = 已移除，同离线语义）× 步最后活动已过宽限（锚在心跳/
-      // 领取而非入队，给 T1 释放后的机器回归留窗口）。
-      const pinnedId = buildRow.pinnedMachineId;
-      const pinnedRow =
-        pinnedId === null
-          ? undefined
-          : deps.db.select().from(machine).where(eq(machine.id, pinnedId)).get();
-      if (
-        pinnedId !== null &&
-        (pinnedRow === undefined || !pinnedRow.online) &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        reason = pinOfflineReason(pinnedRow?.name ?? null, WORKER_PIN_OFFLINE_HINT);
-      }
-      // ④b #881：钉选机在线但 runtime 闸挡（#864 登记缝的收口）。判据与 ④ 同
-      // 宽限同漏斗（同一套「有界等待」机制），agent 解析与闸判单源 = claim 面
-      // 的 dispatch-eligibility 原语；无 Agent 的步不进本判（#1104 起 claim 面
-      // 已按失败收尾，不留无期 pending）。
-      if (
-        reason === null &&
-        pinnedId !== null &&
-        pinnedRow !== undefined &&
-        pinnedRow.online &&
-        now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
-      ) {
-        const agentRow = agentForStep(deps.db, todoRow, row.kind, row.prompt);
-        if (agentRow?.modelId != null && !runtimeGatePasses(pinnedRow, agentRow.provider)) {
-          reason = pinRuntimeBlockedReason(
-            pinnedRow.name,
-            stepRuntimeFor(agentRow.provider),
-            WORKER_PIN_RUNTIME_HINT,
-          );
-        }
-        // ④c #1219：钉选机在线且闸开（「合法排队」判定的尽头）——有闲位仍
-        // 超宽限不领 = 该机不在领取（旧串行 daemon 被长跑步顶住 / claim 循环
-        // wedge），无期静默 = 卡死 queued。可见失败收尾（点名机器与出口，
-        // 不自动改派，④/④b 同律）。判据单源：闲位 = machineRunningCount
-        // （#1108 非 chief claimed 数）< 行 maxConcurrent；满载 = 合法排队不动。
-        if (
-          reason === null &&
-          agentRow?.modelId != null &&
-          runtimeGatePasses(pinnedRow, agentRow.provider) &&
-          now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
-          machineRunningCount(deps.db, pinnedId) < pinnedRow.maxConcurrent
-        ) {
-          reason = pinWedgeReason(pinnedRow.name, WORKER_PIN_WEDGE_HINT);
+      // #1259 归属机判族（原 ④/④b/④c 钉选判族）：步的去处 = agent 归属机。
+      // 先于「团队零在线机器」判——归属机判族成立时，点名归属机的文案更
+      // 具体、出口更明确。判据 = 归属机状态 × 步最后活动已过宽限（锚在
+      // 心跳/领取而非入队，给 T1 释放后的机器回归留窗口）。agent 解析与
+      // 闸判单源 = claim 面的 dispatch-eligibility 原语；无 Agent 的步不
+      // 进本判（#1104 起 claim 面已按失败收尾，不留无期 pending）。
+      const agentRow = agentForStep(deps.db, todoRow, row.kind, row.prompt);
+      if (agentRow !== null && agentRow.modelId != null) {
+        if (agentRow.machineId === null) {
+          // 未设归属机：任何机器都不可领（claim 面归属机闸恒拒）。无期
+          // 静默 pending 是 bug——宽限后可见失败，文案指名补法。
+          if (now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS) {
+            reason = noHomeReason(agentRow.displayName);
+          }
+        } else {
+          const homeRow = deps.db
+            .select()
+            .from(machine)
+            .where(eq(machine.id, agentRow.machineId))
+            .get();
+          if (
+            (homeRow === undefined || !homeRow.online) &&
+            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
+          ) {
+            reason = homeOfflineReason(homeRow?.name ?? null, WORKER_PIN_OFFLINE_HINT);
+          }
+          if (
+            reason === null &&
+            homeRow !== undefined &&
+            homeRow.online &&
+            now - stepActivityAt(row) > PIN_OFFLINE_GRACE_MS
+          ) {
+            if (!runtimeGatePasses(homeRow, agentRow.provider)) {
+              reason = homeRuntimeBlockedReason(
+                homeRow.name,
+                stepRuntimeFor(agentRow.provider),
+                WORKER_PIN_RUNTIME_HINT,
+              );
+            } else if (
+              now - stepActivityAt(row) > PIN_ONLINE_WEDGE_GRACE_MS &&
+              machineRunningCount(deps.db, homeRow.id) < homeRow.maxConcurrent
+            ) {
+              reason = homeWedgeReason(homeRow.name, WORKER_PIN_WEDGE_HINT);
+            }
+          }
         }
       }
       if (reason === null) {

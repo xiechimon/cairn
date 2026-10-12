@@ -52,8 +52,10 @@ function makeWorld(step: {
   agentProvider?: string;
   /** #881：本机 enabledRuntimes 覆写（缺省维持 withAgent ? ['pi'] : 列缺省）。 */
   machineRuntimes?: string[];
-  /** #864 钉选（build.pinnedMachineId）：'self' = 上面的机器、'ghost' = 团队
-   *  里不存在的 id、其它字符串 = 原样落列。缺省 = 未钉（自动）。 */
+  /** #1259：pin 选项改写为 **agent 归属机**绑定（'self' = 本 world 机器、
+   *  'ghost' = 团队里不存在的 id、其它字符串 = 原样落 agent.machineId）。
+   *  归属机在 agent 上——pin 给出时强制带 agent；withAgent 未给 pin = 绑
+   *  本 world 机器（绑定模型下可领的缺省形态）。 */
   pin?: 'self' | 'ghost' | (string & {});
 }): BuildWorld {
   const s = bootServer();
@@ -64,8 +66,23 @@ function makeWorld(step: {
   const buildId = `build-${Math.random().toString(36).slice(2)}`;
   const stepId = `step-${Math.random().toString(36).slice(2)}`;
   const machineId = `machine-${Math.random().toString(36).slice(2)}`;
-  const agentId = step.withAgent ? `agent-${Math.random().toString(36).slice(2)}` : null;
+  const withAgent = step.withAgent === true || step.pin !== undefined;
+  const agentId = withAgent ? `agent-${Math.random().toString(36).slice(2)}` : null;
   s.db.insert(projectTable).values({ id: 'proj-sweep', name: 'sweep', teamId }).run();
+  s.db
+    .insert(machineTable)
+    .values({
+      id: machineId,
+      teamId,
+      name: 'sweep-box',
+      online: step.machineOnline ?? false,
+      ...(step.machineRuntimes !== undefined
+        ? { enabledRuntimes: step.machineRuntimes }
+        : step.withAgent
+          ? { enabledRuntimes: ['pi'] }
+          : {}),
+    })
+    .run();
   if (agentId !== null) {
     s.db
       .insert(agentTable)
@@ -74,6 +91,12 @@ function makeWorld(step: {
         teamId,
         displayName: 'sweep-agent',
         modelId: 'stub-model',
+        machineId:
+          step.pin === undefined || step.pin === 'self'
+            ? machineId
+            : step.pin === 'ghost'
+              ? 'machine-gone'
+              : step.pin,
         ...(step.agentProvider !== undefined ? { provider: step.agentProvider } : {}),
       })
       .run();
@@ -99,28 +122,6 @@ function makeWorld(step: {
       withPlan: false,
       triggerSource: 'user',
       createdAt: base - step.createdAgo,
-      pinnedMachineId:
-        step.pin === undefined
-          ? null
-          : step.pin === 'self'
-            ? machineId
-            : step.pin === 'ghost'
-              ? 'machine-gone'
-              : step.pin,
-    })
-    .run();
-  s.db
-    .insert(machineTable)
-    .values({
-      id: machineId,
-      teamId,
-      name: 'sweep-box',
-      online: step.machineOnline ?? false,
-      ...(step.machineRuntimes !== undefined
-        ? { enabledRuntimes: step.machineRuntimes }
-        : step.withAgent
-          ? { enabledRuntimes: ['pi'] }
-          : {}),
     })
     .run();
   const createdAt = base - step.createdAgo;
@@ -156,6 +157,10 @@ function todoRowOf(w: BuildWorld) {
   return w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
 }
 
+function agentRowOf(w: BuildWorld) {
+  if (w.agentId === null) throw new Error('world has no agent');
+  return w.s.db.select().from(agentTable).where(eq(agentTable.id, w.agentId)).get()!;
+}
 function buildRowOf(w: BuildWorld) {
   return w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!;
 }
@@ -235,7 +240,7 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('释放后他机可认领：另一台在线机器 claim 拿到同一 步（跨机续跑的 server 半）', async () => {
+  test('释放后归属机可重领：别机空手（#1259 归属机闸）、归属机上线后领到同一步', async () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
@@ -251,15 +256,26 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     expect(stepRowOf(w).status).toBe('pending');
 
-    const claimed = await claimStep(machineDepsOf(w), meaId, w.teamId, 10, 'http://localhost');
-    if (claimed === null) throw new Error('released step was not reclaimable');
+    // 归属机闸：别机（mea）领不到归属机是 w.machineId 的步。
+    const other = await claimStep(machineDepsOf(w), meaId, w.teamId, 10, 'http://localhost');
+    expect(other).toBeNull();
+    // 归属机（上线后）重领同一步。
+    w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, w.machineId)).run();
+    const claimed = await claimStep(
+      machineDepsOf(w),
+      w.machineId,
+      w.teamId,
+      10,
+      'http://localhost',
+    );
+    if (claimed === null) throw new Error('released step was not reclaimable by home machine');
     expect(claimed.step.id).toBe(w.stepId);
-    expect(claimed.step.machineId).toBe(meaId);
+    expect(claimed.step.machineId).toBe(w.machineId);
     // 会话面：无历史 session → 新会话开工；daemon 侧回退标记见 runner-resume-note 测试。
     expect(claimed.session.action).toBe('new');
   });
 
-  test('释放后认领带历史会话：prior session 在位 → continue 载荷（他机 daemon 续不上即回退新会话 + 显式标记）', async () => {
+  test('释放后认领带历史会话：prior session 在位 → continue 载荷（#1259 归属机恒同机，会话文件恒在——回退标记成历史）', async () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: 300_000,
@@ -279,15 +295,16 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
         createdAt: w.base - 600_000,
       })
       .run();
-    const meaId = `machine-mea-${Math.random().toString(36).slice(2)}`;
-    w.s.db
-      .insert(machineTable)
-      .values({ id: meaId, teamId: w.teamId, name: 'mea', online: true, enabledRuntimes: ['pi'] })
-      .run();
-
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    const claimed = await claimStep(machineDepsOf(w), meaId, w.teamId, 10, 'http://localhost');
+    w.s.db.update(machineTable).set({ online: true }).where(eq(machineTable.id, w.machineId)).run();
+    const claimed = await claimStep(
+      machineDepsOf(w),
+      w.machineId,
+      w.teamId,
+      10,
+      'http://localhost',
+    );
     if (claimed === null) throw new Error('released step was not reclaimable');
     expect(claimed.session).toEqual({ action: 'continue', sessionId: 'sess-old' });
   });
@@ -429,8 +446,8 @@ describe('#862 T1 失联 claimed 步释放（sweepAbandonedBuildSteps）', () =>
   });
 });
 
-describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支）', () => {
-  test('钉选机器离线 + 团队有别的在线机器：宽限内不碰（合法等待，#687 语义保留）', () => {
+describe('#864 T3 归属机离线超时（sweepAbandonedBuildSteps 的归属机分支）', () => {
+  test('归属机离线 + 团队有别的在线机器：宽限内不碰（合法等待）', () => {
     const w = makeWorld({ status: 'pending', createdAgo: 90_000, pin: 'self' });
     addOnlineMachine(w);
 
@@ -441,7 +458,7 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('钉选机器离线 + 别的机器在线 + 超宽限：按失败收尾，文案点名钉选的机器与出口（不自动改派）', () => {
+  test('归属机离线 + 别的机器在线 + 超宽限：按失败收尾，文案点名归属机与出口（不自动改派）', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: PIN_OFFLINE_GRACE_MS + 1_000,
@@ -454,11 +471,11 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
 
     const row = stepRowOf(w);
     expect(row.status).toBe('failed');
-    // 钉选在位（不静默改派：pin 的语义就是确定性，t-0047/#682）。
-    expect(buildRowOf(w).pinnedMachineId).toBe(w.machineId);
-    expect(buildRowOf(w).errorMessage).toContain('钉选的机器「sweep-box」');
+    // 归属机在位（不静默改派：归属的语义就是确定性，#1259）。
+    expect(agentRowOf(w).machineId).toBe(w.machineId);
+    expect(buildRowOf(w).errorMessage).toContain('归属机「sweep-box」');
     expect(buildRowOf(w).errorMessage).toContain('离线超过 10 分钟');
-    expect(buildRowOf(w).errorMessage).toContain('改为其它在线机器');
+    expect(buildRowOf(w).errorMessage).toContain('归属机改为其它在线机器');
     expect(todoRowOf(w).phase).toBe('failed');
     // 失败面 = 既有漏斗（#631 链）：会话流 step 事件带终态。
     expect(stepEventOf(events, w.stepId).status).toBe('failed');
@@ -469,7 +486,7 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
     expect(stepRowOf(w).status).toBe('failed');
   });
 
-  test('钉选离线 + 团队零在线机器：走点名钉选机的文案（比「没有在线机器」更具体）', () => {
+  test('归属机离线 + 团队零在线机器：走点名归属机的文案（比「没有在线机器」更具体）', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: PIN_OFFLINE_GRACE_MS + 1_000,
@@ -479,29 +496,53 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
     expect(stepRowOf(w).status).toBe('failed');
-    expect(buildRowOf(w).errorMessage).toContain('钉选的机器「sweep-box」');
+    expect(buildRowOf(w).errorMessage).toContain('归属机「sweep-box」');
   });
 
-  test('钉选机器已被移除（悬空 id）：同「离线」语义 + 文案不吐裸 id', () => {
+  test('未设归属机：超宽限按失败收尾，文案指名补法（补设即解锁，但无期静默是 bug）', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: PIN_OFFLINE_GRACE_MS + 1_000,
-      pin: 'ghost',
+      withAgent: true,
+      machineOnline: true,
     });
+    // 归属机置空 = 迁移漏网/手工清库形态：claim 面恒拒，sweep 负责可见失败。
+    w.s.db.update(agentTable).set({ machineId: null }).where(eq(agentTable.id, w.agentId!)).run();
     addOnlineMachine(w);
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
     expect(stepRowOf(w).status).toBe('failed');
     const message = buildRowOf(w).errorMessage ?? '';
-    expect(message).toContain('钉选的机器「（已移除）」');
-    expect(message).not.toContain('machine-gone');
+    expect(message).toContain('未设归属机');
+    expect(message).toContain('sweep-agent');
+    expect(todoRowOf(w).phase).toBe('failed');
   });
 
-  test('钉选机器在线：不动（步等它认领，合法排队）', () => {
+  test('未设归属机 + 宽限内：不动（补设窗口）', () => {
     const w = makeWorld({
       status: 'pending',
-      createdAgo: PIN_OFFLINE_GRACE_MS * 3,
+      createdAgo: 90_000,
+      withAgent: true,
+      machineOnline: true,
+    });
+    w.s.db.update(agentTable).set({ machineId: null }).where(eq(agentTable.id, w.agentId!)).run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(buildRowOf(w).errorMessage).toBeNull();
+  });
+
+  // 「归属机行缺失」形态已被结构消灭：agent.machineId 带 FK（references
+  // machine.id），悬空 id 插不进去、有绑定 agent 的机器删不掉（删机保护
+  // 见 routes-resources 机器面测试）。sweep 的 homeRow === undefined 分支
+  // 降为防御位（残留库/导入面）。
+
+  test('归属机在线 + 宽限内：不动（步等它认领，合法排队）', () => {
+    const w = makeWorld({
+      status: 'pending',
+      createdAgo: 90_000,
       machineOnline: true,
       pin: 'self',
     });
@@ -512,13 +553,13 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
     expect(todoRowOf(w).phase).toBe('building');
   });
 
-  test('钉选的是另一台在线机器：不动（别的机器不能抢）', () => {
+  test('归属机是另一台在线机器：不动（本机不能抢——归属机闸恒拒）', () => {
     const w = makeWorld({ status: 'pending', createdAgo: PIN_OFFLINE_GRACE_MS * 3 });
     const otherId = addOnlineMachine(w);
     w.s.db
-      .update(buildTable)
-      .set({ pinnedMachineId: otherId })
-      .where(eq(buildTable.id, w.buildId))
+      .update(agentTable)
+      .set({ machineId: otherId })
+      .where(eq(agentTable.id, w.agentId!))
       .run();
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
@@ -545,10 +586,10 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
 
     sweepAbandonedBuildSteps(w.s.svc, w.base + PIN_OFFLINE_GRACE_MS);
     expect(stepRowOf(w).status).toBe('failed');
-    expect(buildRowOf(w).errorMessage).toContain('钉选的机器「sweep-box」');
+    expect(buildRowOf(w).errorMessage).toContain('归属机「sweep-box」');
   });
 
-  test('钉选离线但步心跳新鲜（claimed 在跑）：不动（claimed 面判据不变）', () => {
+  test('归属机离线但步心跳新鲜（claimed 在跑）：不动（claimed 面判据不变）', () => {
     const w = makeWorld({
       status: 'claimed',
       createdAgo: PIN_OFFLINE_GRACE_MS * 2,
@@ -567,12 +608,12 @@ describe('#864 T3 钉选离线超时（sweepAbandonedBuildSteps 的钉选分支�
   });
 });
 
-describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps 的钉选分支）', () => {
-  // 失败方式（先于实现固化）：钉选机在线但 enabledRuntimes 不含本步 runtime
-  // → claim 侧 runtimeGatePasses 恒 false + 钉选 SQL 过滤令唯有该机可见 →
-  // 步无期 pending（机器在、也永远轮不到它领）。#864 只收了「离线」半边。
+describe('#881 归属机在线但 runtime 闸挡（sweepAbandonedBuildSteps 的归属机分支）', () => {
+  // 失败方式（先于实现固化）：归属机在线但 enabledRuntimes 不含本步 runtime
+  // → claim 侧 runtimeGatePasses 恒 false + 归属机闸令唯有该机可见 → 步无期
+  // pending（机器在、也永远轮不到它领）。#864 只收了「离线」半边。
 
-  test('钉选在线 + 闸挡（claude-code 步 × 只开 pi 的机器）+ 超宽限：按失败收尾，文案点名机器与 runtime（不自动改派）', () => {
+  test('归属机在线 + 闸挡（claude-code 步 × 只开 pi 的机器）+ 超宽限：按失败收尾，文案点名机器与 runtime（不自动改派）', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: PIN_OFFLINE_GRACE_MS + 1_000,
@@ -582,7 +623,7 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
       machineRuntimes: ['pi'],
       pin: 'self',
     });
-    // 团队里另有能跑 claude-code 的在线机器——判据是「钉的那台开不了」，不是
+    // 团队里另有能跑 claude-code 的在线机器——判据是「归属机开不了」，不是
     // 「团队没人能跑」。
     const otherId = addOnlineMachine(w);
     w.s.db
@@ -596,12 +637,12 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
 
     const row = stepRowOf(w);
     expect(row.status).toBe('failed');
-    // 钉选在位（pin 语义 = 确定性，静默换机违背它）。
-    expect(buildRowOf(w).pinnedMachineId).toBe(w.machineId);
+    // 归属机在位（归属语义 = 确定性，静默换机违背它）。
+    expect(agentRowOf(w).machineId).toBe(w.machineId);
     const message = buildRowOf(w).errorMessage ?? '';
-    expect(message).toContain('钉选的机器「sweep-box」');
+    expect(message).toContain('归属机「sweep-box」');
     expect(message).toContain('claude-code');
-    expect(message).toContain('改为其它在线机器');
+    expect(message).toContain('归属机改为其它在线机器');
     expect(todoRowOf(w).phase).toBe('failed');
     expect(stepEventOf(events, w.stepId).status).toBe('failed');
     // 幂等：终态步下一轮不再进候选。
@@ -609,7 +650,7 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
     expect(stepRowOf(w).status).toBe('failed');
   });
 
-  test('钉选在线 + 闸挡 + 宽限内：不动（给「刚关错开关/正在开」留窗口）', () => {
+  test('归属机在线 + 闸挡 + 宽限内：不动（给「刚关错开关/正在开」留窗口）', () => {
     const w = makeWorld({
       status: 'pending',
       createdAgo: 90_000,
@@ -628,7 +669,7 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
     expect(buildRowOf(w).errorMessage).toBeNull();
   });
 
-  test('钉选在线 + runtime 开 + 满载：不动（步在它队列里排队，合法——闸判负例）', () => {
+  test('归属机在线 + runtime 开 + 满载：不动（步在它队列里排队，合法——闸判负例）', () => {
     // #1219 起该负例的成立条件收紧到「满载」：有闲位的在线不领超宽限 = 楔住
     // 按失败收尾（见 queued-cancel-release.test.ts ④c）；满载 = 真排队不动。
     const w = makeWorld({
@@ -640,7 +681,7 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
       machineRuntimes: ['pi', 'claude-code'],
       pin: 'self',
     });
-    // 满载：钉选机的并发位被在跑步占满（makeWorld 机器缺省 maxConcurrent=3）。
+    // 满载：归属机的并发位被在跑步占满（makeWorld 机器缺省 maxConcurrent=3）。
     for (let i = 0; i < 3; i++) {
       const loadStepId = `step-load-${i}-${Math.random().toString(36).slice(2)}`;
       w.s.db
@@ -700,13 +741,12 @@ describe('#881 钉选机器在线但 runtime 闸挡（sweepAbandonedBuildSteps �
       createdAgo: PIN_OFFLINE_GRACE_MS * 2,
       machineOnline: true,
       machineRuntimes: ['pi'],
-      pin: 'self',
     });
     addOnlineMachine(w);
 
     sweepAbandonedBuildSteps(w.s.svc, w.base);
 
-    // 钉选机在线 → 「零在线」判不中；无 Agent → runtime 判据无从计算 → 不动。
+    // 机器在线 → 「零在线」判不中；无 Agent → 归属机判族无从计算 → 不动。
     // （未指派步无人可领的缝另行登记，不在本票收口。）
     expect(stepRowOf(w).status).toBe('pending');
   });

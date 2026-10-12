@@ -585,34 +585,30 @@ function claimCandidates(deps: MachineDeps, machineId: string, teamId: string): 
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(
-      and(
-        eq(step.status, 'pending'),
-        eq(todo.teamId, teamId),
-        or(isNull(build.pinnedMachineId), eq(build.pinnedMachineId, machineId)),
-      ),
-    )
+    .where(and(eq(step.status, 'pending'), eq(todo.teamId, teamId)))
     .orderBy(asc(step.createdAt))
     .all();
   return rows;
 }
 
 /** chief 步候选（step.buildId = `chief-<threadId>`，join chief_thread 取 teamId；
- * 无 build/todo 行——Chief 回合 = 机器 step，r5 §3.1）。#682 机器亲和：thread
- * 钉了机器（chief 会话文件是执行机本地资产，轮换认领降级 new session）→ 只
- * 有该机器可领；未钉 = 任何机器（现状）。与 worker 步的 build.pinnedMachineId
- * 过滤同语义。 */
+ * 无 build/todo 行——Chief 回合 = 机器 step，r5 §3.1）。#1259：只投总管主力机
+ * （chief.machineId；chief 会话文件是执行机本地资产，主力机固定 = 会话恒可
+ * 续）；主力机未设 = 任何机器。 */
 function claimChiefCandidates(deps: MachineDeps, machineId: string, teamId: string) {
   return deps.db
-    .select({ stepRow: step, threadRow: chiefThread })
+    .select({ stepRow: step, threadRow: chiefThread, chiefRow: chief })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
     .where(
       and(
         eq(step.status, 'pending'),
         eq(step.kind, 'chief'),
         eq(chiefThread.teamId, teamId),
-        or(isNull(chiefThread.pinnedMachineId), eq(chiefThread.pinnedMachineId, machineId)),
+        // #1259：chief 步只投总管主力机（chief.machineId，原线程钉选列已
+        // 退役）；主力机未设 = 任何机器（旧「未钉」语义）。
+        or(isNull(chief.machineId), eq(chief.machineId, machineId)),
       ),
     )
     .orderBy(asc(step.createdAt))
@@ -737,15 +733,17 @@ function chiefAgentProviderOf(deps: MachineDeps, chiefId: string): string | null
  * 语义，无队头阻塞）。会话机离线/被删/闸关/归属空 → 放行本机（换机 =
  * daemon SessionNotResumable 回退新会话 + RESUME_FRESH_SESSION_NOTE 显式
  * 降级，#862 T1 契约不预判；亲和是软偏好，机器消失即刻放行，不等 T3 宽限
- * ——未钉线程不因亲和产生新的无界等待）。钉选线程（pinnedMachineId 非空，
- * 含主力机来源）不亲和：钉选 SQL 过滤下唯有钉选机可见，亲和再挡 = 唯一
- * 可见者被挡死；钉选 = 用户显式选择，盖过软偏好。 */
+ * ——未钉线程不因亲和产生新的无界等待）。#1259：主力机已设的线程不亲和
+ * （候选过滤下唯有主力机可见，亲和再挡 = 唯一可见者被挡死）。 */
 function chiefAffinityHeldByOther(
   deps: MachineDeps,
   threadRow: typeof chiefThread.$inferSelect,
   machineId: string,
 ): boolean {
-  if (threadRow.pinnedMachineId !== null) return false;
+  // #1259：主力机已设的线程不亲和（SQL 过滤下唯有主力机可见，亲和再挡 =
+  // 唯一可见者被挡死）。
+  const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
+  if (chiefRow?.machineId != null) return false;
   if (threadRow.sessionId === '') return false; // 首轮：无会话文件依赖
   const prior = deps.db
     .select({ sessionId: step.sessionId, machineId: step.machineId })
@@ -927,6 +925,10 @@ async function tryClaim(
     // Agent 在但无模型位 = 不可领（Agent 可空是 UI 语义，派发需模型位
     // [设计]）。补模型后该步可恢复，不按失败收口——#1104 只收「无 Agent」族。
     if (!agentRow.modelId) continue;
+    // #1259 归属机闸：步只投给 agent 的归属机（机器归属单源在 agent 层，
+    // 任务层钉选已退役）。null = 未设归属机——任何机器都不可领（留
+    // pending；sweep 的「未设归属机」分支到宽限后给可见失败，补设即解锁）。
+    if (agentRow.machineId !== machineId) continue;
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
     if (!runtimeGatePasses(machineRow, agentRow.provider)) continue;
@@ -940,11 +942,6 @@ async function tryClaim(
     //   形）。与机器闸的合成 = min（步须同时过两闸），是两层各自 gate 的
     //   自然结果（与 Multica daemon ∩ agent 双层闸同形，r10 §5.4）——不
     //   发明一处集中取 min 的判定。
-    // - 亲和让行（下方 sessionContinuing 分支）=「本步的会话在别的活机器
-    //   上」的软让步，让行对象是机器不是 Agent；agent 闸不消费亲和事实，
-    //   亲和的 ownerBusy 忙判定也只数机器槽位、不吃 agent 计数——闸判在
-    //   候选级、让行在亲和级，两层各查各的事实，亲和让行的步不被 agent 闸
-    //   误伤（先过本闸的候选本就不领，轮到亲和分支的候选只按亲和让行）。
     // - 零值语义：maxConcurrentTasks null = 不限（缺省/存量行）——闸恒
     //   开，不设上限的 Agent 行为完全不变（回归红线，测试钉死）。
     if (
@@ -954,9 +951,10 @@ async function tryClaim(
       continue;
     }
     // continue session 判定（02 §5.7：合并轮/重规划轮复用同 conv pi 会话）。
-    // #863 T2 起判定前移到领取前——会话亲和闸需要同一份事实（prior session +
-    // 交接缺失位）；候选步自身 pending ⇒ sessionId 恒空不进结果集，且判定与
-    // 领取在同一同步块内（单进程 better-sqlite3），前后移零语义差。
+    // 判定前移到领取前（#863 T2）；候选步自身 pending ⇒ sessionId 恒空不进
+    // 结果集，且判定与领取在同一同步块内（单进程 better-sqlite3），前后移
+    // 零语义差。#1259：会话机归属已由 agent 归属机保证（同 agent 恒同机），
+    // 原「会话亲和让行」闸随之退役。
     const prior = db
       .select({ sessionId: step.sessionId, machineId: step.machineId })
       .from(step)
@@ -977,50 +975,7 @@ async function tryClaim(
     // 只有一句占位文案，plan.md 全文/变更/diff 全在 step.prompt 里）。
     // #931 freshSession（返工轮边界）：restart 复用 PR build 的首步恒开新会话
     // ——用户裁定「只复用分支、上下文真空」；续接 prior session 反而会把失败
-    // 轮（典型：审核步之死）的会话语境带进返工轮。新会话无会话文件依赖，
-    // 亲和闸同样不消费（下方 sessionContinuing 的 !freshSession 位）。
-    // #863 T2 会话亲和（machine-execution-plane §4-7，正确性项）：conv 会话
-    // 文件是执行机本地资产——会续接 prior session 的步优先回「持有该会话的
-    // 机器」（= 链尾 session 步的 machineId，与 continue 判定同源）。其机在
-    // 线且 runtime 闸开 = 它是有效候选人，本机跳过该步（步留 pending 等它
-    // 领；跳过只作用于本候选，更晚的它 build 步照领，与钉选过滤同型的每机
-    // 可见性语义，无队头阻塞）。其机离线/被删/闸关/归属空 = 放行本机（换机
-    // → daemon SessionNotResumable 回退新会话 + RESUME_FRESH_SESSION_NOTE
-    // 显式降级标记，#862 T1 契约不替它预判）。恒新会话的步（review/交接缺
-    // 失/首步）无会话文件依赖，不亲和。钉选 build（pinnedMachineId 非空）不
-    // 亲和：钉选 SQL 过滤下唯有钉选机可见，亲和再挡 = 唯一可见者也被挡死；
-    // 且钉选 = 用户显式选择，盖过软偏好。
-    // #881 楔住有界（#863 登记的已知缝）：让行不是无限期——步已等过
-    // SESSION_WEDGE_GRACE_MS 且会话机未达并发上限（#1108 起有闲位就该来领，
-    // 有闲位仍不领 = 楔住）→ 放行本机（换机 + daemon 注记，与离线换机同一条
-    // 降级路）。会话机 claimed 数达上限 = 忙（真满，等它跑完无损续接）→ 让行
-    // 继续；忙步心跳停更的「部分存活歧义态」归属既有 claimed 扫尾政策（等
-    // presence 过期走释放），亲和不越过它抢先换机。
-    // 会话机自己从不受本闸挡（priorRow.machineId === machineId 时闸不进）：
-    // 楔住释放后它恢复即仍可无损认领。
-    const sessionContinuing =
-      priorSessionId !== null &&
-      cand.stepRow.kind !== 'review' &&
-      !planHandoffMissing &&
-      !cand.stepRow.freshSession &&
-      cand.buildRow.pinnedMachineId === null;
-    if (
-      sessionContinuing &&
-      priorRow !== null &&
-      priorRow.machineId !== null &&
-      priorRow.machineId !== machineId
-    ) {
-      const ownerRow = db.select().from(machine).where(eq(machine.id, priorRow.machineId)).get();
-      if (ownerRow?.online && runtimeGatePasses(ownerRow, agentRow.provider)) {
-        // #1108：忙判定从「持有任一 claimed 步」改为「claimed 数达该机上限」——
-        // 并行 daemon 有闲位就会来领（忙 = 真满，等它跑完无损续接）；有闲位仍
-        // 10 分钟不领 = 楔住，放行本机（下方宽限分支，语义不变）。
-        const ownerBusy = machineRunningCount(db, ownerRow.id) >= ownerRow.maxConcurrent;
-        if (ownerBusy || nowMs() - stepActivityAt(cand.stepRow) <= SESSION_WEDGE_GRACE_MS) {
-          continue;
-        }
-      }
-    }
+    // 轮（典型：审核步之死）的会话语境带进返工轮。
     // #1106 派发技能注入选择（worker 步；claim = brief 的组装投递位——与
     // #823 chief 路由同位）：先于原子领取计算（纯函数无副作用，领取竞态
     // 失败至多白算一次扫描），随同一次 claim 写落 step 行——持久记录与

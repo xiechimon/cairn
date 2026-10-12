@@ -69,7 +69,6 @@ const WIRE_BUILD = {
   withPlan: true,
   prevPhase: null,
   triggerSource: 'user',
-  pinnedMachineId: null,
   planDocId: null,
   errorMessage: null,
   prUrl: null,

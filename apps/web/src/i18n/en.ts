@@ -340,16 +340,18 @@ export const EN: Record<string, string> = {
   '来源 issue': 'Source issue',
   与本地标题不一致: 'Differs from the local title',
   // #476（#473 决策候选 A + C 尾注）右栏方案空态任务元信息块：行 label
-  // （机器复用侧栏键）+ 尾注引导句。#682 机器行等待标注（钉选机器离线，
-  // 步只等它上线不自动改派）+ 新建任务机器 chip（自动 = 缺省行）。
+  // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
+  // 步只等它上线不自动改派）。
   '分支 / PR': 'Branch / PR',
   模型: 'Model',
   创建时间: 'Created',
   方案产出后显示于此: 'The plan will appear here once produced',
   '（等待机器上线）': '(waiting for the machine to come online)',
-  // #1208 机器行改派标注：任务钉了机器而实际执行机器不同名（run_builds
-  // 显式改派）→ 行尾揭示钉选值，换机不静默。
-  '（任务钉选 {machine}）': '(task pins {machine})',
+  // #1259 创建 agent 三级级联的归属机槽（+ 无机器告警行）。
+  归属机: 'Home machine',
+  离线: 'Offline',
+  还没有接入机器: 'No machines connected yet',
+  接入机器: 'Connect a machine',
   // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
@@ -913,12 +915,6 @@ export const EN: Record<string, string> = {
   来源: 'Source',
   总管编排会话: 'Chief orchestration session',
   '这张任务将交给总管重新编排。': 'The chief will re-orchestrate this task.',
-  // #864 T3 重跑面的钉选出口（钉选机离线时：重跑沿用任务钉选 = 再失败一轮）。
-  '钉选的机器「{machine}」当前离线，重跑仍会等它。':
-    'Pinned machine "{machine}" is offline — a rerun would wait for it again.',
-  '（已移除）': '(removed)',
-  改为自动: 'Switch to automatic',
-  '改为自动失败，请重试。': 'Could not switch to automatic. Try again.',
   已交给总管编排: 'Handed to the chief',
   '已保存，交给总管编排': 'Saved — handed to the chief',
   '总管将直接规划，并按活的类型派发执行。':

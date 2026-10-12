@@ -61,6 +61,7 @@ async function setupWorld(): Promise<World> {
       id: AGENT_ID,
       teamId: s.team.id,
       displayName: 'chief-cap-agent',
+      machineId: machineAId,
       status: 'active',
       avatarUrl: null,
       provider: 'stub-gw',
@@ -105,7 +106,6 @@ function insertPendingBuildStep(s: TestServer, world: World): string {
       phase: 'queued',
       phaseAt: now,
       assignment: { plan: null, build: { agentId: AGENT_ID } },
-      machineId: null,
     })
     .run();
   s.db
@@ -117,7 +117,6 @@ function insertPendingBuildStep(s: TestServer, world: World): string {
       planDocId: null,
       triggerSource: 'user',
       createdAt: now,
-      pinnedMachineId: null,
     })
     .run();
   const stepId = `step-cc-${suffix}`;
@@ -204,7 +203,6 @@ function insertPendingChiefStep(
       sessionId: '',
       sessionOpenedAt: now,
       pendingSessionResumeAt: null,
-      pinnedMachineId: opts.pin ?? null,
       toolDefHashes: {},
       toolResultHashes: {},
       activeRun: { phase: 'chief' },
@@ -322,14 +320,14 @@ describe('#1148 读面口径（runningSteps 只数非 chief 在跑）', () => {
   test('失败方式 3b：waitingFor.running 只数非 chief（排队投影）', async () => {
     const w = await setupWorld();
     setCap(w, 1);
-    // 钉选本机的 pending 步在排队；本机在跑 1 chief（不占槽）。
+    // 归属本机的 pending 步在排队；本机在跑 1 chief（不占槽）。
     insertClaimedStep(w.s, w.machineAId, { createdAt: Date.now() - 5000, kind: 'chief' });
     const target = insertPendingBuildStep(w.s, w);
     const projector = stepQueueProjector(w.s.db, w.s.team.id);
     const info = projector.project({
       id: target,
       createdAt: Date.now(),
-      pinnedMachineId: w.machineAId,
+      homeMachineId: w.machineAId,
     });
     expect(info?.waitingFor).toMatchObject({
       machineId: w.machineAId,

@@ -13,6 +13,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   chiefMessage,
+  chief as chiefTable,
   chiefThread,
   machine as machineTable,
   step as stepTable,
@@ -127,6 +128,10 @@ function threadRowOf(w: World) {
   return w.s.db.select().from(chiefThread).where(eq(chiefThread.id, w.threadId)).get()!;
 }
 
+function chiefRowOf(w: World) {
+  return w.s.db.select().from(chiefTable).where(eq(chiefTable.teamId, w.teamId)).get()!;
+}
+
 function stepRowOf(w: World) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
 }
@@ -228,9 +233,9 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
     await enrollMachine(w.s, w.teamId); // 钉选机：注册但离线
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
     // 团队里另有在线机器——判据必须是「钉的那台不在」，不是「团队没机器」。
     await enrollMachine(w.s, w.teamId);
@@ -245,9 +250,9 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
 
     expect(stepRowOf(w).status).toBe('failed');
     expect(threadRowOf(w).activeRun).toBeNull();
-    expect(threadRowOf(w).pinnedMachineId).toBe(pinnedId); // 不静默改派
+    expect(chiefRowOf(w).machineId).toBe(pinnedId); // 不静默改派
     const message = turnErrorMessage(w);
-    expect(message).toContain('钉选的机器「sweep-mbp」');
+    expect(message).toContain('归属机「sweep-mbp」');
     expect(message).toContain('离线超过 10 分钟');
   });
 
@@ -256,9 +261,9 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
 
     failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
@@ -273,9 +278,9 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
 
     failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS * 5);
@@ -307,14 +312,14 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
   // #895 失败文案路由（spec 21 §与 T3 的关系）：主力机缺省链把「显式钉选」
   // 的失败路径从 todo 钉选来源扩到 chief.machineId 来源——出口必须指向真实
   // 存在的出口（T6 律：报机器 + 报修法）。
-  test('#895 钉选机离线超宽限的失败文案带主力机出口（改 chief 设置 / 清回自动）', async () => {
+  test('#895 主力机离线超宽限的失败文案带出口（改 chief 设置的主力机）', async () => {
     const w = await sendChiefTurn();
     await enrollMachine(w.s, w.teamId);
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
 
     failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS + 1);
@@ -322,7 +327,6 @@ describe('#684 chief 失联超时兜底（failAbandonedChiefSteps）', () => {
     expect(stepRowOf(w).status).toBe('failed');
     const message = turnErrorMessage(w);
     expect(message).toContain('改 chief 设置的主力机');
-    expect(message).toContain('清回自动');
   });
 
   test('scheduler tick 接线：tick(now) 驱动 sweep（真实宿主路径）', async () => {
@@ -345,9 +349,9 @@ describe('#881 钉选机器在线但 runtime 闸挡（failAbandonedChiefSteps �
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
     // 团队里另有能跑 claude-code 的在线机器——判据是「钉的那台开不了」。
     await enrollMachine(w.s, w.teamId);
@@ -367,11 +371,11 @@ describe('#881 钉选机器在线但 runtime 闸挡（failAbandonedChiefSteps �
 
     expect(stepRowOf(w).status).toBe('failed');
     expect(threadRowOf(w).activeRun).toBeNull();
-    expect(threadRowOf(w).pinnedMachineId).toBe(pinnedId); // 不静默改派
+    expect(chiefRowOf(w).machineId).toBe(pinnedId); // 不静默改派
     const message = turnErrorMessage(w);
-    expect(message).toContain('钉选的机器「sweep-mbp」');
+    expect(message).toContain('归属机「sweep-mbp」');
     expect(message).toContain('claude-code');
-    expect(message).toContain('改为其它在线机器');
+    expect(message).toContain('改 chief 设置的主力机');
   });
 
   test('钉选在线 + 闸挡 + 宽限内：不动（给「正在开 runtime」留窗口）', async () => {
@@ -380,9 +384,9 @@ describe('#881 钉选机器在线但 runtime 闸挡（failAbandonedChiefSteps �
     const pinnedId = w.s.db.select().from(machineTable).limit(1).all()[0]!.id;
     setMachineOnline(w.s, pinnedId, true);
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
 
     failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + 60_000);
@@ -402,9 +406,9 @@ describe('#881 钉选机器在线但 runtime 闸挡（failAbandonedChiefSteps �
       .where(eq(machineTable.id, pinnedId))
       .run();
     w.s.db
-      .update(chiefThread)
-      .set({ pinnedMachineId: pinnedId })
-      .where(eq(chiefThread.id, w.threadId))
+      .update(chiefTable)
+      .set({ machineId: pinnedId })
+      .where(eq(chiefTable.teamId, w.teamId))
       .run();
 
     failAbandonedChiefSteps(w.s.svc, stepRowOf(w).createdAt + PIN_OFFLINE_GRACE_MS * 5);

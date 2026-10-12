@@ -168,9 +168,7 @@ export interface OverlayUi {
   notificationPermission?: NotificationPermission;
 }
 
-/** Scheduled rule (02 §9.2 / r3 §8.3 wire shape, copied verbatim:
- *  `{id, teamId, projectId, todoId, kind, at, tz, machineId, nextRunAt,
- *  createdBy, todo{seqNum,title,phase,projectName,ownerId}}`). */
+/** Scheduled rule（02 §9.2 / r3 §8.3 wire 形状）。 */
 export interface ScheduleRecord {
   id: string;
   teamId: string;
@@ -180,8 +178,6 @@ export interface ScheduleRecord {
   kind: 'hourly' | 'daily' | 'weekly' | 'once';
   at: number;
   tz: string;
-  /** null = 自动 (r3 §9 机器 row). */
-  machineId: string | null;
   nextRunAt: number;
   createdBy: string;
   todo: {

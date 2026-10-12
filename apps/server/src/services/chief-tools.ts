@@ -186,17 +186,6 @@ function requireTeamAgent(db: Db, agentId: string, teamId: string) {
   if (!row) throw new HttpError(404, `agent ${agentId}（不在本团队，或 id 抄错了）`);
   return row;
 }
-/** #682 run_builds machineId 校验（requireTeamAgent 同律）：错 id 当场
- * 400 折进工具结果，模型可重挑——不校验的后果是 build 落一个无人能领的钉。 */
-function requireTeamMachine(db: Db, machineId: string, teamId: string) {
-  const row = db
-    .select()
-    .from(machine)
-    .where(and(eq(machine.id, machineId), eq(machine.teamId, teamId)))
-    .get();
-  if (!row) throw new HttpError(404, `machine ${machineId}（不在本团队，或 id 抄错了）`);
-  return row;
-}
 /** #1219 cancel_builds 归属校验（requireTeamAgent/Machine 同律，mcp-face
  * requireTeamBuild 同形）：build 表无 teamId 列，经 build → todo 联查；跨团队/
  * 不存在一律 404（不泄露存在性）。 */
@@ -682,7 +671,6 @@ export async function executeChiefTool(
       const kind = str(params, 'kind') as 'once' | 'hourly' | 'daily' | 'weekly';
       const at = num(params, 'at');
       if (at === undefined) throw new HttpError(400, 'invalid params.at: expected number');
-      const machineId = optStr(params, 'machineId') ?? null;
       const record = createSchedule(
         { db, hub: deps.hub },
         {
@@ -692,7 +680,6 @@ export async function executeChiefTool(
           kind,
           at,
           tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          machineId,
           createdBy: ctx.userId,
         },
       );
@@ -718,15 +705,6 @@ export async function executeChiefTool(
       const todoIds = strArr(params, 'todoIds');
       const withPlan = bool(params, 'withPlan', true);
       const dispatchReason = optStr(params, 'dispatchReason') ?? null;
-      // #682：chief 的机器杠杆——显式 machineId 覆盖；缺省（undefined）回落
-      // 各 todo 的 machineId（startBuilds 缺省链）。null 形不收（LLM 想表达
-      // 「自动」就省略参数；显式 null 会被缺省链回落到 todo 值而非「自动」，
-      // 语义误导故 400）。
-      if (params.machineId === null) {
-        throw new HttpError(400, 'machineId must be a machine id or omitted');
-      }
-      const machineIdIn = optStr(params, 'machineId');
-      if (machineIdIn !== undefined) requireTeamMachine(db, machineIdIn, ctx.teamId);
       const assignmentIn = params.assignment as
         | { plan?: { agentId?: string }; build?: { agentId?: string } }
         | undefined;
@@ -758,7 +736,6 @@ export async function executeChiefTool(
             assignment,
             withPlan,
             triggerSource: 'chief',
-            ...(machineIdIn !== undefined ? { pinnedMachineId: machineIdIn } : {}),
           },
         );
         started.push(...builds);

@@ -42,7 +42,7 @@ import {
 import { PIN_ONLINE_WEDGE_GRACE_MS } from '../src/services/dispatch-timeouts.js';
 import { claimStep } from '../src/services/machines.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
 
 registerChiefHarness();
 
@@ -75,6 +75,7 @@ function insertMachine(s: TestServer, id: string, opts: { cap?: number; online?:
 describe('#1219 chief cancel→重派全链', () => {
   test('cancel queued build：todo 回落 + 再 run_builds 成功 + 新步秒级被认领', async () => {
     insertMachine(H.s, 'machine-rerun');
+    bindAllAgents(H.s, 'machine-rerun'); // #1259：本测试认领机 = machine-rerun
     const todoRec = (await relay('create_todo', {
       projectId: H.projectId,
       title: '被取消后重派',
@@ -142,11 +143,7 @@ describe('#1219 cancelBuild 漏斗（claimed 委托 / 僵尸幂等释放）', ()
     machineId: string;
     base: number;
   }
-  function makeWorld(step: {
-    status: 'pending' | 'claimed' | 'failed';
-    phase?: Phase;
-    pin?: string;
-  }): World {
+  function makeWorld(step: { status: 'pending' | 'claimed' | 'failed'; phase?: Phase }): World {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const base = Date.now();
@@ -156,6 +153,7 @@ describe('#1219 cancelBuild 漏斗（claimed 委托 / 僵尸幂等释放）', ()
     const stepId = `step-${Math.random().toString(36).slice(2)}`;
     const machineId = `machine-${Math.random().toString(36).slice(2)}`;
     s.db.insert(projectTable).values({ id: 'proj-c', name: 'cancel', teamId }).run();
+    insertMachine(s, machineId);
     s.db
       .insert(agentTable)
       .values({
@@ -164,6 +162,7 @@ describe('#1219 cancelBuild 漏斗（claimed 委托 / 僵尸幂等释放）', ()
         displayName: 'cancel-agent',
         provider: 'stub-gw',
         modelId: 'stub-model',
+        machineId,
       })
       .run();
     s.db
@@ -188,7 +187,6 @@ describe('#1219 cancelBuild 漏斗（claimed 委托 / 僵尸幂等释放）', ()
         withPlan: true,
         prevPhase: 'todo',
         triggerSource: 'chief',
-        ...(step.pin !== undefined ? { pinnedMachineId: step.pin } : {}),
         createdAt: base - 300_000,
       })
       .run();
@@ -205,7 +203,6 @@ describe('#1219 cancelBuild 漏斗（claimed 委托 / 僵尸幂等释放）', ()
         createdAt: base - 300_000,
       })
       .run();
-    insertMachine(s, machineId);
     return { s, teamId, todoId, buildId, stepId, machineId, base };
   }
 
@@ -358,6 +355,7 @@ describe('#1219 钉选机在线不认领的宽限', () => {
     const stepId = `step-w-${Math.random().toString(36).slice(2)}`;
     const machineId = `machine-w-${Math.random().toString(36).slice(2)}`;
     s.db.insert(projectTable).values({ id: 'proj-w', name: 'wedge', teamId }).run();
+    insertMachine(s, machineId, { cap: opts.machineCap });
     s.db
       .insert(agentTable)
       .values({
@@ -366,6 +364,7 @@ describe('#1219 钉选机在线不认领的宽限', () => {
         displayName: 'wedge-agent',
         provider: 'stub-gw',
         modelId: 'stub-model',
+        machineId,
       })
       .run();
     s.db
@@ -390,7 +389,6 @@ describe('#1219 钉选机在线不认领的宽限', () => {
         withPlan: true,
         prevPhase: 'todo',
         triggerSource: 'chief',
-        pinnedMachineId: machineId,
         createdAt: base - opts.ago,
       })
       .run();
@@ -398,7 +396,6 @@ describe('#1219 钉选机在线不认领的宽限', () => {
       .insert(stepTable)
       .values({ id: stepId, buildId, kind: 'plan', status: 'pending', createdAt: base - opts.ago })
       .run();
-    insertMachine(s, machineId, { cap: opts.machineCap });
     // 机器负载：别的 build 的 claimed 步占位（chief 不计数的面不掺和）。
     const loadBuild = `build-load-${Math.random().toString(36).slice(2)}`;
     const loadTodo = `todo-load-${Math.random().toString(36).slice(2)}`;

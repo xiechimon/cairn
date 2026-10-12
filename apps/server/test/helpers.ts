@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm';
 // 测试引导：内存库 + migration + seed + app（wire 对拍面，04 §3）。
 
 import { randomUUID } from 'node:crypto';
@@ -8,7 +9,7 @@ import type { Hono } from 'hono';
 import { createApp } from '../src/app.js';
 import type { AppContext } from '../src/context.js';
 import { openMemoryDb } from '../src/db/client.js';
-import { apiKey, machine as machineTable } from '../src/db/schema.js';
+import { agent as agentTable, apiKey, machine as machineTable } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId } from '../src/lib/ids.js';
@@ -269,4 +270,14 @@ export function insertMachine(
     })
     .run();
   return id;
+}
+
+/** #1259 测试世界绑定器：把团队全部 agent 绑到指定机器（缺省 = 团队首台）。
+ *  绑定模型下「可领」的缺省形态——世界工厂在 agent 插行后调用一次。 */
+export function bindAllAgents(s: TestServer, machineId?: string): void {
+  const mid =
+    machineId ??
+    s.db.select().from(machineTable).where(eq(machineTable.teamId, s.team.id)).get()?.id;
+  if (mid === undefined) throw new Error('bindAllAgents: 世界里还没有机器（先 enroll/插入）');
+  s.db.update(agentTable).set({ machineId: mid }).run();
 }

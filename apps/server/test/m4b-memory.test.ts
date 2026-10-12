@@ -13,7 +13,7 @@ import {
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agentMemory, agent as agentTable, build as buildTable } from '../src/db/schema.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 async function call(
   app: Hono,
@@ -53,6 +53,8 @@ async function world() {
       modelId: 'm',
     })
     .run();
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
   const projectId = await postProject(s.app);
   const spec = '完成后请用你的记忆工具保存一条与本项目相关的一句话经验';
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {

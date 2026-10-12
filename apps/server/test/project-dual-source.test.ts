@@ -24,7 +24,7 @@ import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, project as projectTable } from '../src/db/schema.js';
-import { bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, req, type TestServer } from './helpers.js';
 
 const s = bootServer({ claimHoldMs: 200 });
 afterAll(() => s.dispose());
@@ -238,6 +238,7 @@ async function claimGithubProject(s2: TestServer, localPath: string | null): Pro
     .insert(agentTable)
     .values({ id: AGENT_ID, teamId: s2.team.id, displayName: 'dual-builder', modelId: 'm' })
     .run();
+  bindAllAgents(s2); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const projBody: Record<string, unknown> = {
     name: 'dual-claim',
     kind: 'github',

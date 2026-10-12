@@ -28,7 +28,14 @@ import { describe, expect, test } from 'vitest';
 import { agentMemory, agent as agentTable } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { listMcpServers, readClaudeMcpServers } from '../src/services/mcp-servers.js';
-import { bootServer, insertMachine, issueApiKey, postProject, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  insertMachine,
+  issueApiKey,
+  postProject,
+  type TestServer,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -249,6 +256,8 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
         mcpServers: opts.slugs ?? ['demo'],
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projectId = await postProject(s.app);
     const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
       body: { title: 't', spec: 's' },
@@ -340,6 +349,7 @@ describe('记忆删除 REST 面（02 §4.4「列表/删除 API 保形」；DELET
   test('DELETE memories/{mid} → 204；未知/越权 agent = 404', async () => {
     const s: TestServer = bootServer();
     s.db.insert(agentTable).values({ id: 'a1', teamId: s.team.id, displayName: 'w' }).run();
+
     s.db
       .insert(agentMemory)
       .values({

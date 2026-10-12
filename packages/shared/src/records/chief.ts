@@ -91,9 +91,8 @@ export const chiefRecordSchema = z.object({
    * null = 继承绑定 Agent 模型（抽屉行尾 `· 默认` 徽标语义）。 */
   model: chiefCompactionModelSchema.nullable().optional(),
   /** 主力机（#895 spec 21 A1 [设计]，加法契约：老 web 忽略即退化现状）：
-   *  chief 的默认执行机器，null = 自动。新线程钉选缺省链第二级
-   *  （todo.machineId → 本槽 → null）；钉选律同 todo.machineId（确定性、
-   *  无自动回退、解除归用户）。 */
+   *  chief 的默认执行机器，null = 自动。#1259 起为 chief 步的归属单源
+   *  （线程钉选列已退役）：确定性、无自动回退、解除归用户。 */
   machineId: recordId.nullable().optional(),
   lastTurnAt: epochMs.nullable(),
   createdAt: epochMs,
@@ -199,7 +198,6 @@ export const chiefThreadSchema = z.object({
    * 执行机本地资产，轮换认领会降级 new session——chief 步按本列钉给固定
    * 机器（claimChiefCandidates 过滤）。编排入口从 todo.machineId 落值；
    * null = 未钉（现状：任何在线机器可认领）。 */
-  pinnedMachineId: recordId.nullable(),
   /** 工具定义/结果哈希表（51 词表的哈希键面，r5 §3.1；词表本体归 M4）。 */
   toolDefHashes: z.record(z.string(), z.string()),
   toolResultHashes: z.record(z.string(), z.string()),

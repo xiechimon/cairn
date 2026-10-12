@@ -1,5 +1,6 @@
-// 派发超时策略（#864 T3 + #881 收口）：钉选机器离线/被闸挡的宽限与文案，
-// 会话机楔住的亲和等待上界。
+// 派发超时策略（#864 T3 + #881 收口；#1259 起钉位 = agent 归属机）：归属机
+// 离线/被闸挡的宽限与文案，会话机楔住的亲和等待上界（chief 面，#1260 前
+// 总管主力机未设时仍有浮动线程）。
 //
 // 为什么单列一个叶子模块：这条策略同时管 worker 步（builds.ts 的
 // sweepAbandonedBuildSteps）、chief 回合（chief.ts 的 failAbandonedChiefSteps）
@@ -60,48 +61,52 @@ export function stepActivityAt(row: {
   return row.lastHeartbeatAt ?? row.claimedAt ?? row.createdAt;
 }
 
-/** 钉选机器离线超时的失败文案（worker/chief 两族共用主语与数字，尾注按族给）。
- *  machineName = null 表示钉的机器行已不在（被删/被换团队），不吐裸 id。 */
-export function pinOfflineReason(machineName: string | null, hint: string): string {
+/** 归属机离线超时的失败文案（worker/chief 两族共用主语与数字，尾注按族
+ *  给）。machineName = null 表示归属机行已不在（被删/被换团队），不吐裸 id。 */
+export function homeOfflineReason(machineName: string | null, hint: string): string {
   const label = machineName ?? '（已移除）';
-  return `本轮无人认领：钉选的机器「${label}」离线超过 ${PIN_OFFLINE_GRACE_MS / 60_000} 分钟。${hint}`;
+  return `本轮无人认领：归属机「${label}」离线超过 ${PIN_OFFLINE_GRACE_MS / 60_000} 分钟。${hint}`;
 }
 
-/** worker 步的尾注：出口 = 让机器上线，或显式改钉（不自动改派）。 */
+/** worker 步的尾注：出口 = 让机器上线，或给 agent 换绑（不自动改派——
+ *  归属的语义就是确定性）。 */
 export const WORKER_PIN_OFFLINE_HINT =
-  '请让它上线后重跑，或把任务的机器改为其它在线机器（重跑沿用任务的钉选）。';
+  '请让它上线后重跑，或把 agent 的归属机改为其它在线机器（重跑沿用归属机）。';
 
-/** chief 回合的尾注：回合同律，动作面是「重发」。#895 起「钉选来源」从
- *  todo 机器扩到 chief 主力机（缺省链第二级），出口文案必须同时指向两处
- *  设置面 + 自动档（T6 律：失败信息指向真实存在的出口）——改 chief 设置
- *  的主力机、清回自动，或（todo 钉选来源的线程）把任务的机器改掉。 */
-export const CHIEF_PIN_OFFLINE_HINT =
-  '请让它上线后重发，或改 chief 设置的主力机，或清回自动（任务钉了机器时，把任务的机器改为其它在线机器）。';
+/** chief 回合的尾注：回合同律，动作面是「重发」。chief 步的归属 = 总管
+ *  主力机（chief.machineId）。 */
+export const CHIEF_PIN_OFFLINE_HINT = '请让它上线后重发，或改 chief 设置的主力机。';
 
-/** #881 ①：钉选机器在线但 enabledRuntimes 不含本步 runtime 的失败文案
- *  （离线版同形：点名机器，runtime 名原样透出，出口 = 开 runtime 或改钉）。 */
-export function pinRuntimeBlockedReason(
+/** #881 ①：归属机在线但 enabledRuntimes 不含本步 runtime 的失败文案
+ *  （离线版同形：点名机器，runtime 名原样透出，出口 = 开 runtime 或换绑）。 */
+export function homeRuntimeBlockedReason(
   machineName: string,
   runtimeId: string,
   hint: string,
 ): string {
-  return `本轮无人认领：钉选的机器「${machineName}」未开启本步所需的 runtime「${runtimeId}」。${hint}`;
+  return `本轮无人认领：归属机「${machineName}」未开启本步所需的 runtime「${runtimeId}」。${hint}`;
 }
 
 /** #881 ① worker 步尾注：runtime 开关 PATCH 热写秒级生效，出口即时可动作。 */
 export const WORKER_PIN_RUNTIME_HINT =
-  '请在机器页为它开启该 runtime 后重跑，或把任务的机器改为其它在线机器（重跑沿用任务的钉选）。';
+  '请在机器页为它开启该 runtime 后重跑，或把 agent 的归属机改为其它在线机器。';
 
 /** #881 ① chief 回合尾注：动作面是「重发」。 */
 export const CHIEF_PIN_RUNTIME_HINT =
-  '请在机器页为它开启该 runtime 后重发，或把任务的机器改为其它在线机器。';
+  '请在机器页为它开启该 runtime 后重发，或改 chief 设置的主力机。';
 
-/** #1219 ④c：钉选机器在线且有空闲并发位、超宽限仍未认领的失败文案
- *  （点名机器；出口 = 检查/重启该机 daemon 或改钉）。 */
-export function pinWedgeReason(machineName: string, hint: string): string {
-  return `本轮无人认领：钉选的机器「${machineName}」在线且有空闲并发位，但 ${PIN_ONLINE_WEDGE_GRACE_MS / 60_000} 分钟未认领本步（其 daemon 可能未在领取或为旧版串行循环）。${hint}`;
+/** #1219 ④c：归属机在线且有空闲并发位、超宽限仍未认领的失败文案
+ *  （点名机器；出口 = 检查/重启该机 daemon 或换绑）。 */
+export function homeWedgeReason(machineName: string, hint: string): string {
+  return `本轮无人认领：归属机「${machineName}」在线且有空闲并发位，但 ${PIN_ONLINE_WEDGE_GRACE_MS / 60_000} 分钟未认领本步（其 daemon 可能未在领取或为旧版串行循环）。${hint}`;
 }
 
 /** #1219 ④c worker 步尾注。 */
 export const WORKER_PIN_WEDGE_HINT =
-  '请检查该机器的 daemon（重启或升级后重跑），或把任务的机器改为其它在线机器（重跑沿用任务的钉选）。';
+  '请检查该机器的 daemon（重启或升级后重跑），或把 agent 的归属机改为其它在线机器。';
+
+/** #1259：agent 未设归属机的失败文案（任何机器都不可领——补设即解锁，
+ *  但无期静默 pending 是 bug，宽限后给可见失败）。 */
+export function noHomeReason(agentName: string): string {
+  return `本轮无人认领：Agent「${agentName}」未设归属机，没有机器能认领本步。请在 agent 设置里指定归属机后重跑任务。`;
+}

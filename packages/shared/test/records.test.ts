@@ -70,7 +70,6 @@ describe('todo record (02 §4.1 + r3 §3.0 + r5 §3.2)', () => {
     sourceBuildId: 'chief-6ItyfRe7Q7hru5xFmMu-u-',
     sourceKind: null,
     sourceRef: null,
-    machineId: null, // #682 任务级钉选机器（r5 采集样本时无此列 = null 自动）
   };
 
   it('parses the full observed field set', () => {
@@ -136,7 +135,6 @@ describe('build record (02 §6.2, r5 §3.4/§7.2 SSE 实测)', () => {
     withPlan: false,
     prevPhase: 'todo',
     triggerSource: 'chief',
-    pinnedMachineId: null,
     planDocId: null,
     errorMessage: null,
     prUrl: null,
@@ -208,7 +206,6 @@ describe('schedule record (r3 §8.3 实测原样)', () => {
     kind: 'once',
     at: 1758263400000,
     tz: 'Asia/Shanghai',
-    machineId: null, // 自动 (r3 §9)
     nextRunAt: 1758263400000,
     createdBy: 'usr_mon',
     todo: {
@@ -480,7 +477,6 @@ describe('chief (02 §4.3, r5 §2/§3 实测)', () => {
       lastTurnAt: 1758532000000,
       session: { runtime: 'pi', id: 'sess_01', openedAt: 1758531000000 },
       pendingSessionResumeAt: null,
-      pinnedMachineId: null, // #682 chief 机器亲和（r5 采集样本时无此列 = null）
       toolDefHashes: { projects: 'h1', todos: 'h2' },
       toolResultHashes: {},
       activeRun: null,
@@ -738,7 +734,6 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 实测扩充)', () => {
     sourceBuildId: null,
     sourceKind: null,
     sourceRef: null,
-    machineId: null, // #682 任务级钉选机器；null = 自动
   });
 
   it('parses the ~15s ping heartbeat', () => {

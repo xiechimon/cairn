@@ -95,7 +95,6 @@ function thread(activeRun: ChiefThread['activeRun']): ChiefThread {
     lastTurnAt: null,
     session: { runtime: 'pi', id: 's1', openedAt: NOW },
     pendingSessionResumeAt: null,
-    pinnedMachineId: null,
     toolDefHashes: {},
     toolResultHashes: {},
     activeRun,

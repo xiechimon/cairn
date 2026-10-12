@@ -387,30 +387,27 @@ export function TodoDetailPage() {
     () => machinesQ.data?.find((m) => steps.some((s) => s.machineId === m.id))?.name ?? null,
     [machinesQ.data, steps],
   );
-  // #682 钉选机器（等待面数据源）：build 钉了机器、步未领（machineName 空时）
-  // → meta 机器行回落钉选机器名；该机离线 = 行尾等待标注（步只等它上线，
-  // server claim 过滤面保证不自动改派）。
-  const pinnedMachine = useMemo(
-    () => machinesQ.data?.find((m) => m.id === buildQ.data?.pinnedMachineId) ?? null,
-    [machinesQ.data, buildQ.data?.pinnedMachineId],
-  );
-  const machineField = machineName ?? pinnedMachine?.name ?? null;
+  // #1259 归属机（等待面数据源）：步未领（machineName 空时）→ meta 机器行
+  // 回落「执行 agent 的归属机」名；归属机离线 = 行尾等待标注（步只等它上
+  // 线，归属机闸保证不自动改派）。
+  const homeMachine = useMemo(() => {
+    const agentId =
+      wireTodo?.assignment?.build?.agentId ?? wireTodo?.assignment?.plan?.agentId ?? null;
+    if (agentId == null) return null;
+    const member = (membersQ.data ?? []).find(
+      (m) => m.memberType === 'agent' && m.actorId === agentId,
+    );
+    const homeId = (member?.actor as { machineId?: string | null } | undefined)?.machineId;
+    if (homeId == null) return null;
+    return machinesQ.data?.find((m) => m.id === homeId) ?? null;
+  }, [wireTodo?.assignment, membersQ.data, machinesQ.data]);
+  const machineField = machineName ?? homeMachine?.name ?? null;
   // #864 T3：等待标注只在「还在等」时成立。done/failed 会把右栏切到变更面
   // （本块根本不挂），closed 是唯一还能看到本块的收尾相位——失败后被关掉的
-  // 任务不该继续自称「等待机器上线」（钉选机离线不再是它的阻塞原因，
+  // 任务不该继续自称「等待机器上线」（归属机离线不再是它的阻塞原因，
   // 而 #864 超时收尾后步已经是 failed）。
   const machineWaiting =
-    machineName == null && pinnedMachine != null && !pinnedMachine.online && phase !== 'closed';
-  // #1208：任务级钉选机器名（machines × wireTodo.machineId 反解）。与
-  // machineField 不同名 = run_builds 显式改派（派发面 pin 是硬约束，别机
-  // 领不到）——meta 机器行尾注「（任务钉选 {machine}）」，换机不静默。
-  const todoPinnedMachine = useMemo(
-    () =>
-      wireTodo?.machineId != null
-        ? (machinesQ.data?.find((m) => m.id === wireTodo.machineId)?.name ?? null)
-        : null,
-    [wireTodo?.machineId, machinesQ.data],
-  );
+    machineName == null && homeMachine != null && !homeMachine.online && phase !== 'closed';
 
   const liveDetail: DetailContent | undefined = useMemo(() => {
     if (!live || !wireTodo || buildId == null) return undefined;
@@ -484,7 +481,6 @@ export function TodoDetailPage() {
         build: buildQ.data,
         machineField,
         machineWaiting,
-        todoPinnedMachine,
         agentModel,
         usage: usageQ.data,
         sourceEchoTitle: sourceEchoQ.data?.title,
@@ -496,7 +492,6 @@ export function TodoDetailPage() {
       buildQ.data,
       machineField,
       machineWaiting,
-      todoPinnedMachine,
       agentModel,
       usageQ.data,
       sourceEchoQ.data,
@@ -577,8 +572,6 @@ export function TodoDetailPage() {
     completeTask,
     canClose,
     closeTask,
-    rerunPin,
-    unpinForRerun,
     reviewAgents,
     reviewDefaultId,
     reviewProducerProvider,
@@ -1160,7 +1153,6 @@ export function TodoDetailPage() {
            reuse（失败轮持有方案文档）保留 r8 §3.4 复用方案 家族。 */
         <RerunDialog
           reuse={todo.hasPlan}
-          pin={live ? rerunPin : null}
           onClose={closeOverlay}
           onRerun={
             live
@@ -1171,7 +1163,6 @@ export function TodoDetailPage() {
               : undefined
           }
           onReuse={() => setOverlay({ kind: 'reuse' })}
-          onUnpin={live ? unpinForRerun : undefined}
         />
       )}
       {overlay?.kind === 'reuse' && (

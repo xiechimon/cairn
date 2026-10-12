@@ -15,7 +15,7 @@ import {
   upsertGithubConnection,
 } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 const TOKEN = 'ghp_writeback_token';
 const REPO = 'octo/alpha';
@@ -388,6 +388,8 @@ describe('标题回写与 claim meta（B 族）', () => {
         modelId: 'm',
       })
       .run();
+    bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
+
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
     if (opts.buildIssue) await flushSelfIssueWrites();

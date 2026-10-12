@@ -18,7 +18,6 @@ const BUILD: BuildRecord = {
   withPlan: false,
   prevPhase: null,
   triggerSource: 'user',
-  pinnedMachineId: null,
   planDocId: null,
   errorMessage: null,
   prUrl: null,

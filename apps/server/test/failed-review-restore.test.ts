@@ -32,7 +32,7 @@ import {
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
-import { bootServer, issueApiKey, postProject } from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
 
 const AGENT_ID = 'agent-702-1';
 const REVIEW_AGENT_ID = 'agent-702-reviewer';
@@ -132,6 +132,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
       tools: ['合并分支', '推送分支'],
     })
     .run();
+
   s.db
     .insert(agentTable)
     .values({
@@ -146,6 +147,8 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     cred: key,
     body: { teamId: s.team.id, name: 'restore-mbp', cliVersion: '0.1.0' },
   });
+
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   expect(enrollRes.status).toBe(200);
   const { token: machineToken } = (await enrollRes.json()) as { token: string };
   let projectId: string;

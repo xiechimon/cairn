@@ -30,7 +30,14 @@ import {
 } from '../src/db/schema.js';
 import { completeStep } from '../src/services/builds.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 const AGENT_PLAN = 'agent-rw-plan';
 const AGENT_BUILD = 'agent-rw-build';
@@ -81,6 +88,7 @@ async function setupWorld(): Promise<World> {
       .values({ id, teamId: s.team.id, displayName: id, modelId: 'stub-model' })
       .run();
   }
+  bindAllAgents(s); // #1259：测试世界单机——agent 全部绑它（可领缺省形态）
   const projectId = await postProject(s.app, 'rework-proj');
   return { s, tokenA: token, projectId };
 }

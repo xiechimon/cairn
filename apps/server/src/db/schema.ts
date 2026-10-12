@@ -93,10 +93,6 @@ export const todo = sqliteTable('todo', {
   /** 外部引用（#446）：形如 `github:owner/repo#123`（shared
    * githubIssueSourceRef 单源）；无来源 = null。 */
   sourceRef: text('sourceRef'),
-  /** 任务的钉选机器（#682，t-0047）：任务级默认机器单源，null = 自动
-   * （语义同 build.pinnedMachineId）。startBuilds 缺省回落本值；orchestrate
-   * 落 chief_thread.pinnedMachineId；写面 = 新建任务 REST / PATCH 面。 */
-  machineId: text('machineId'),
 });
 
 // tag record 三位补全（#309，r9 §3.4 实测 wire {id, projectId, name, color,
@@ -136,7 +132,6 @@ export const build = sqliteTable('build', {
   withPlan: bool('withPlan').notNull(),
   prevPhase: text('prevPhase').$type<Phase | null>(),
   triggerSource: text('triggerSource').$type<TriggerSource>().notNull(),
-  pinnedMachineId: text('pinnedMachineId'),
   planDocId: text('planDocId'),
   errorMessage: text('errorMessage'),
   prUrl: text('prUrl'),
@@ -302,7 +297,6 @@ export const schedule = sqliteTable('schedule', {
   kind: text('kind').$type<'once' | 'hourly' | 'daily' | 'weekly'>().notNull(),
   at: epochMs('at'),
   tz: text('tz').notNull(),
-  machineId: text('machineId'),
   nextRunAt: epochMs('nextRunAt'),
   createdBy: text('createdBy').notNull(),
 });
@@ -568,11 +562,9 @@ export const chief = sqliteTable('chief', {
   /** 主模型覆盖长槽（#615 [设计]，r5 107/108 独立「模型」选择器的落库面；
    * 值形同 compactionModel，null = 继承绑定 Agent 模型）；JSON 列。 */
   model: json<ChiefCompactionModel>('model'),
-  /** 主力机（#895 spec 21 A1）：chief 级执行机器缺省，null = 自动（未钉 =
-   *  任何在线机器 FIFO + A4 会话亲和兜正确性）。新线程钉选缺省链第二级
-   *  （todo.machineId → 本列 → null）；既有线程不回写（creation-time 语义，
-   *  N7）。钉选律镜像 todo.machineId（todo 表注释同律）：确定性、无自动
-   *  回退，解除归用户。存量行不回填。 */
+  /** 主力机（#895 spec 21 A1；#1259 起为 chief 步的归属单源）：chief 步只
+   *  投本机；null = 任何在线机器 FIFO + A4 会话亲和兜正确性（亲和随 #1260
+   *  总管降级另行收口）。确定性、无自动回退，解除归用户。存量行不回填。 */
   machineId: text('machineId'),
   /** 章程 = 常设指示（r5 §2 章程 tab；raw 默认空串）。 */
   charter: text('charter').notNull().default(''),
@@ -603,10 +595,6 @@ export const chiefThread = sqliteTable('chief_thread', {
   sessionId: text('sessionId').notNull(),
   sessionOpenedAt: epochMs('sessionOpenedAt').notNull(),
   pendingSessionResumeAt: epochMs('pendingSessionResumeAt'),
-  /** 机器亲和（#682）：chief 会话文件（pi sessionDir）是执行机本地资产，
-   * 轮换认领会降级 new session——chief 步按本列钉给固定机器（claimChief
-   * Candidates 过滤，与 worker 步的 build.pinnedMachineId 同语义）。 */
-  pinnedMachineId: text('pinnedMachineId'),
   toolDefHashes: json<Record<string, string>>('toolDefHashes').notNull().default(sql`'{}'`),
   toolResultHashes: json<Record<string, string>>('toolResultHashes').notNull().default(sql`'{}'`),
   activeRun: json<ActiveRun>('activeRun'),
