@@ -10,6 +10,7 @@ import {
   createProviderBodySchema,
   createScheduleBodySchema,
   createSkillBodySchema,
+  evacuateMachineBodySchema,
   githubReposResponseSchema,
   importSkillBodySchema,
   PHASE_VALUES,
@@ -20,11 +21,11 @@ import {
   skillRecordSchema,
   THINKING_LEVELS,
 } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { machine, provider, todo, whatsNew } from './db/schema.js';
-import { HttpError, notFound, parseWith } from './lib/errors.js';
+import { agent, machine, provider, todo, whatsNew } from './db/schema.js';
+import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubUserRepos } from './lib/github.js';
 import {
   createApiKeyBodySchema,
@@ -34,6 +35,7 @@ import {
   svcOf,
 } from './routes-helpers.js';
 import { createApiKey, listApiKeys } from './services/api-keys.js';
+import { homeMachineRejectReason } from './services/dispatch-eligibility.js';
 import { planDocumentDiff } from './services/documents.js';
 import {
   deleteGithubConnection,
@@ -168,6 +170,63 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const updated = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
     if (!updated) throw notFound(`machine ${id}`);
     return c.json(toMachineRecord(updated, machineRunningCount(ctx.db, id)));
+  });
+
+  // —— #1259 机器生命周期出口：删机保护 + 整机迁移 ————————————————————
+  // 删机：有绑定 agent 的机器拒删（409 点名占用清单；agent.machineId 的 FK
+  // 是结构兜底，人话出口在这里）。
+  app.delete('/api/machines/:id', (c) => {
+    const id = c.req.param('id');
+    const row = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
+    if (!row) throw notFound(`machine ${id}`);
+    requireTeam(ctx, row.teamId);
+    const holders = ctx.db
+      .select({ id: agent.id, displayName: agent.displayName })
+      .from(agent)
+      .where(eq(agent.machineId, id))
+      .all();
+    if (holders.length > 0) {
+      throw conflict(
+        `机器「${row.name}」上有 ${holders.length} 个 agent 的归属机是它（${holders
+          .map((h) => h.displayName)
+          .join('、')}）——先换绑或整机迁移，再删除。`,
+      );
+    }
+    ctx.db.delete(machine).where(eq(machine.id, id)).run();
+    return c.body(null, 204);
+  });
+
+  // 整机迁移（机器退役出口）：源机全部 agent 改绑目标机，逐个过归属机校验
+  // （runtime 开没开 + claude-code 模型配没配，单源 = homeMachineRejectReason）。
+  // 部分迁移合法：合格的移、拒的留原机并列明原因（人逐项处置）。
+  app.post('/api/machines/:id/evacuate', async (c) => {
+    const id = c.req.param('id');
+    const src = ctx.db.select().from(machine).where(eq(machine.id, id)).get();
+    if (!src) throw notFound(`machine ${id}`);
+    requireTeam(ctx, src.teamId);
+    const body = parseWith(evacuateMachineBodySchema, await jsonBody(c), 'body');
+    if (body.targetMachineId === id) {
+      throw new HttpError(400, '源机器与目标机相同——无操作不是迁移。');
+    }
+    const dst = ctx.db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.id, body.targetMachineId), eq(machine.teamId, src.teamId)))
+      .get();
+    if (!dst) throw notFound(`machine ${body.targetMachineId}`);
+    const holders = ctx.db.select().from(agent).where(eq(agent.machineId, id)).all();
+    const moved: string[] = [];
+    const rejected: { agentId: string; reason: string }[] = [];
+    for (const a of holders) {
+      const reject = homeMachineRejectReason(dst, a);
+      if (reject !== null) {
+        rejected.push({ agentId: a.id, reason: reject });
+        continue;
+      }
+      ctx.db.update(agent).set({ machineId: dst.id }).where(eq(agent.id, a.id)).run();
+      moved.push(a.id);
+    }
+    return c.json({ moved, rejected });
   });
 
   // 能力读面（XMON-16 / #499 B3 裁决 A；[设计] 面，参考产品 wire 未采此端点）：

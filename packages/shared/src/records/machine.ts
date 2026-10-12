@@ -75,3 +75,11 @@ export const MACHINE_ADD_DIALOG_COPY = {
   cloudHint: '在云服务器上运行？改用 API key 注册',
   getKeyLink: '获取 API key →',
 } as const;
+
+/** POST /api/machines/{id}/evacuate body（#1259 整机迁移）：目标机 id。
+ *  响应 = { moved: agentId[], rejected: { agentId, reason }[] }（部分迁移
+ *  合法——拒的留原机由人逐项处置）。 */
+export const evacuateMachineBodySchema = z.object({
+  targetMachineId: recordId,
+});
+export type EvacuateMachineBody = z.infer<typeof evacuateMachineBodySchema>;
