@@ -37,6 +37,7 @@ export * from './common.js';
 export * from './document-diff.js';
 export * from './github.js';
 export * from './machine.js';
+export * from './machine-capabilities.js';
 export * from './mcp-server.js';
 export * from './memory.js';
 export * from './message.js';
