@@ -883,9 +883,7 @@ export function AgentDetailPage() {
                 <ProfileCard>
                   {machineFitQ.data.machines.length === 0 ? (
                     <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
-                      <p className="agent-fit-empty m-0 text-sm text-muted-foreground">
-                        {t('暂无机器。')}
-                      </p>
+                      <p className="m-0 text-sm text-muted-foreground">{t('暂无机器。')}</p>
                     </div>
                   ) : (
                     machineFitQ.data.machines.map((m) => (
@@ -898,7 +896,7 @@ export function AgentDetailPage() {
                       >
                         <span
                           className={cn(
-                            'agent-fit-verdict text-xs',
+                            'text-xs',
                             m.canRun ? 'text-muted-foreground' : 'text-destructive',
                           )}
                         >
