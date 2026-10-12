@@ -1,0 +1,10 @@
+{
+  "id": "0M6UgHCj2GEVPEvtUYasv",
+  "teamId": "SN3r4Gn1Qv3K0PDhxKw3e",
+  "name": "verify-1137",
+  "tokenHash": "6577b217953fc6d5c62972f3d56804409de3e740c3497223396914ac43b4dc8d",
+  "masked": "pacman_wh_8130e…",
+  "createdAt": 1791835163939,
+  "lastUsedAt": 1791835163944,
+  "note": "tokenHash 为 SHA-256；plaintext 永不落库"
+}
