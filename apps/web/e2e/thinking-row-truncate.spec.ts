@@ -162,9 +162,16 @@ async function stubWorld(page: Page) {
   await expect(page.getByTestId('transcript-col')).toBeVisible();
   // 2026-10-13（#1268 过程折叠）：落定回合的过程行收在折叠组里——本 spec
   // 量的是 thinking 行本体，先把折叠组展开并等滑行播完（160ms），让被测行
-  // 处于可见态（两级披露 = 新交互律）。
+  // 处于可见态（两级披露 = 新交互律）。注意探测必须等折叠行**出现**
+  // （count() 是瞬时值——全量并跑时 transcript-col 先于数据行可见，裸
+  //  count 会在折叠行挂载前判无、跳过展开，随后点折叠态里的行超时）。
   const fold = page.getByTestId('process-fold');
-  if ((await fold.count()) > 0) {
+  const foldVisible = await fold
+    .first()
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (foldVisible) {
     await fold.first().click();
     await expect(fold.first()).toHaveAttribute('aria-expanded', 'true');
     await page
