@@ -103,6 +103,13 @@ body[data-board-dragging] .todo-card:hover {
 .todo-card {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
+
+/* 用户气泡同族入场（2026-10-12 dsh 对齐第二批）：发出的消息 150ms 浮入，
+   与卡面入场同一组 keyframes。流式 agent 行不挂——它们逐 token 变，
+   入场动画只在挂载一刻播，气泡发后即定。 */
+.chat-bubble {
+  animation: card-enter var(--dur-fast) var(--ease-pop);
+}
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
   .new-task-project-row,

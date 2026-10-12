@@ -411,10 +411,12 @@ function Row({
             {/* #612：真实用户话语带 markdown 槽（live mapper 设置；robot 行
                 #469 同款渲染期解析）——围栏/列表/标题不再按字面裸排。纯文本
                 槽 = fixture 捕获形，DOM 与几何保持不变。XMON-55 P3：
-                min-height 保单行药丸 24px、多行随文长；12px 位圆角与
-                composer 同层（页面上两个用户说话的面同材质）。 */}
+                min-height 保单行药丸 24px、多行随文长。2026-10-12 用户派
+                dsh 对话框对齐：气泡圆角升卡族档 rounded-2xl（18px，dsh 气泡
+                20px 的阶梯邻近值），composer 输入卡同批升档——页面上两个
+                用户说话的面仍同材质。 */}
             <span
-              className={`chat-bubble ml-[11px] mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-none bg-(--secondary) px-[13px] text-[15px] leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble ml-[11px] mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-2xl bg-(--secondary) px-[13px] text-[15px] leading-6 break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'

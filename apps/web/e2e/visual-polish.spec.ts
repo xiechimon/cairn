@@ -221,6 +221,36 @@ for (const theme of ['light', 'dark'] as const) {
     expect(first).toBeGreaterThan(0);
     for (const w of widths) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);
   });
+
+  test(`detail face rides the dsh-aligned card family (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
+
+    // 2026-10-12 用户派「详情页对齐 deepseek-harness 对话框」（随 #1263 同批
+    // 口径）：composer = 卡族里的输入大卡——圆角 4xl（26px，dsh 输入卡 28px
+    // 的阶梯邻近值）+ --card-lift 柔光（取代 --card-shadow 重档）；发送/停止
+    // 钮变全圆片；用户气泡 = 卡族 18px 且挂 card-enter 入场。
+    const composer = await edgeContract(page, '[data-testid="composer-card"]');
+    expect(composer.radius).toBe('26px');
+    expect(composer.shadow).toContain(composer.cardLift);
+
+    const bubble = await edgeContract(page, '.chat-bubble');
+    expect(bubble.radius).toBe('18px');
+    // 气泡入场（computed animationName 是声明值，不读时间窗，无 flake 面）
+    expect(
+      await page
+        .locator('.chat-bubble')
+        .first()
+        .evaluate((el) => getComputedStyle(el).animationName),
+    ).toBe('card-enter');
+
+    // 发送钮 = 全圆片：32px 盒的半径读数 ≥ 半边长（rounded-full 的 computed
+    // 形态随 TW 版本在 9999px / infinity 之间漂移，钉几何阈值不钉字面值）。
+    const sendRadius = await page
+      .locator('.composer-send')
+      .evaluate((el) => Number.parseFloat(getComputedStyle(el).borderRadius));
+    expect(sendRadius).toBeGreaterThanOrEqual(16);
+  });
 }
 
 test('collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2)', async ({ page }) => {

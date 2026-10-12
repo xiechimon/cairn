@@ -131,7 +131,10 @@
   .todo-card,
   .board-column,
   .board-notify-banner,
-  .board-drag-card {
+  .board-drag-card,
+  /* 详情页同族面（2026-10-12 dsh 对齐第二批）：输入大卡与用户气泡。 */
+  .composer,
+  .chat-bubble {
     corner-shape: superellipse(1.5);
   }
 }

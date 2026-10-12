@@ -44,11 +44,13 @@ import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import { ComposerChips } from './composer-chips.js';
 
 // #945（detail.css 清零）：composer 卡皮肤迁 token utilities——中心列唯一
-// 卡（One Card Per Screen，#366）：min-h84 + 方角 + 1px 缝线 +
-// --surface-secondary 底 + --card-shadow 卡级抬升（#775 阴影管层次），
-// 16px 侧/底 margin = 列 inset 律（#472 in-flow）。
+// 卡（One Card Per Screen，#366）：min-h84 + 1px 缝线 +
+// --surface-secondary 底。2026-10-12 用户派 dsh 对话框对齐（#1263 同批口径）：
+// 方角退役升 rounded-4xl（26px，dsh 输入卡 28px 档的阶梯邻近值），投影从
+// --card-shadow 重档换 --card-lift 柔光（dsh elevation 律：缝线承担分离，
+// 柔光只暗示贴地）；16px 侧/底 margin = 列 inset 律（#472 in-flow）。
 const COMPOSER_CARD =
-  'composer relative mx-4 mb-4 flex-none rounded-none border border-(--border) bg-(--secondary) shadow-(--card-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-out)';
+  'composer relative mx-4 mb-4 flex-none rounded-4xl border border-(--border) bg-(--secondary) shadow-(--card-lift) transition-shadow duration-(--dur-fast) ease-(--ease-out)';
 // 占位行/输入行共用几何：13px/15px 内衬 + 14px/16px 墨（#470：一档压正文
 // 15px）。min-h-[84px] 走卡片本体。
 const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-4';
@@ -67,9 +69,10 @@ const COMPOSER_TOOL =
 // 发送/停止（XMON-55 P5 同胞对：32×32、同底、同轴、8px 间隔）共享的定位/
 // 盒形串——漆面（bg/text/hover）不进本串：tailwind-merge 后写者胜，共享串
 // 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
-// （#860），停止的红只住 10px glyph。
+// （#860），停止的红只住 10px glyph。2026-10-12 dsh 对话框对齐：方片退役
+// 变全圆片（dsh 发送钮 = 34px 圆）。
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-none border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-full border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;

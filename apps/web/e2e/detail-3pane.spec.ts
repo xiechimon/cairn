@@ -111,8 +111,10 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
       colPadBottom: Number.parseFloat(colCs.paddingBottom),
     };
   });
-  // the r7 §3.4 card recipe survives the flow move, V2 骨架方角 (#792 P6)
-  expect(geo.radius).toBe('0px');
+  // the card recipe survives the flow move。2026-10-12 用户派 dsh 对话框
+  // 对齐：composer 圆角升 4xl（26px，dsh 输入卡 28px 档的阶梯邻近值），
+  // #792 P6 的方角骨架律在本面被该口径取代。
+  expect(geo.radius).toBe('26px');
   expect(geo.border).toBe('1px');
   // #472 in-flow law: a layout participant, never an overlay again —
   // relative (not static) because the in-card toolbar/send/stop absolutes
