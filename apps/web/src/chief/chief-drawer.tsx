@@ -660,7 +660,10 @@ function ChiefDrawerInner({
                   #1260 总管降级：chief 无模型覆盖槽——行 = 绑定 Agent 自身
                   模型的只读展示（行首运行时标记同前：pi 块状 π / claude-code
                   品牌星标）；改模型去 Agent 设置面。 */}
-        <div className="mt-[3px] flex items-center gap-[5px] text-xs text-(--text-tertiary)">
+        <div
+          className="mt-[3px] flex items-center gap-[5px] text-xs text-(--text-tertiary)"
+          data-testid="chief-model-row"
+        >
           {chief.bound ? (
             <span className="flex min-w-0 items-center gap-[5px] px-1">
               <span className="inline-flex flex-none items-center">

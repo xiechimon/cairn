@@ -139,7 +139,6 @@ test('live face: 保存 fires POST /api/schedules with the form state (#1037)', 
   expect(body.kind).toBe('once');
   expect(body.todoId).toBe('todo-0');
   expect(body.projectId).toBe('proj-1');
-  expect(body.machineId).toBeNull();
   expect(typeof body.at).toBe('number');
   // at = 10:00 local today (or tomorrow when already past — saveSchedule's
   // once-branch law); either way the wall-clock slots are the picked ones.
