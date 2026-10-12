@@ -68,7 +68,9 @@ function stableFirst(rows: readonly ReviewCandidate[]): ReviewCandidate | null {
   return best;
 }
 
-/** 审核模态的默认选中值。候选集为空 → 无默认（呈现层按钮禁用）。 */
+/** 审核模态的默认选中值。候选集为空 → 无默认（呈现层按钮禁用）。
+ *  #1250（ADR 0018 层 1）：assignment.review 槽（「默认谁审」的指派位）优先
+ *  于 #509 的跨厂商偏好——用户显式指派压过启发式。 */
 export function resolveReviewDefault(input: {
   candidates: readonly ReviewCandidate[];
   assignment: Assignment | null;
@@ -79,6 +81,21 @@ export function resolveReviewDefault(input: {
     producerAgentId === null
       ? null
       : (candidates.find((row) => row.id === producerAgentId)?.provider ?? null);
+
+  // review 槽指派在候选集内 → 直接选它（不在集内 = 指向已删 agent，回落
+  // 既有偏好链）。
+  const reviewSlotAgentId = assignment?.review?.agentId ?? null;
+  const reviewSlotHit =
+    reviewSlotAgentId !== null
+      ? (candidates.find((row) => row.id === reviewSlotAgentId) ?? null)
+      : null;
+  if (reviewSlotHit !== null) {
+    return {
+      defaultAgentId: reviewSlotHit.id,
+      producerProvider,
+      independence: classifyReviewChoice(reviewSlotHit, producerProvider),
+    };
+  }
 
   const crossVendor = candidates.filter(
     (row) => classifyReviewChoice(row, producerProvider) === 'cross-vendor',

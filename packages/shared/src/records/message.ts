@@ -70,6 +70,17 @@ export const CONFIRM_ANNOUNCEMENT = '通过了确认';
  * transcript mapper）双端单源。 */
 export const DONE_ANNOUNCEMENT = '标记为已完成';
 
+/** 验证步发起行 content canon（#1250）：verify 步入队时（review 关口抵达且
+ * assignment.verify 槽在位）落 transcript 的宣告行，与 REVIEW_ANNOUNCEMENT 同
+ * 族（role user 纯文本，呈现层拼装时间/actor）。写入端（server
+ * maybeEnqueueVerifyStep）与呈现端（web transcript mapper）双端单源。 */
+export const VERIFY_ANNOUNCEMENT = '发起了交付验证';
+
+/** 拆解发起行 content canon（#1250 / ADR 0018 层 2）：chief split_todo 落库
+ * 后随父会话落的宣告行（actor = 谁拆的），同族行形。写入端（server
+ * todo-split createSplitTodo）与呈现端（web transcript mapper）双端单源。 */
+export const SPLIT_ANNOUNCEMENT = '发起了拆解';
+
 /** 过闸宣告行 content 全集（#902）：呈现端按本表把行折叠成 note（不是用户
  * 气泡），拼装 `${actor ?? 当前用户} ${text}`。新增宣告行必须进本表，否则
  * mapper 会把审计行渲染成用户话语。 */
@@ -78,6 +89,8 @@ export const GATE_ANNOUNCEMENTS: readonly string[] = [
   REVIEW_ANNOUNCEMENT,
   CONFIRM_ANNOUNCEMENT,
   DONE_ANNOUNCEMENT,
+  VERIFY_ANNOUNCEMENT,
+  SPLIT_ANNOUNCEMENT,
 ];
 
 /** AI 审核步完成占位 ack（M7 #312 票 A 占位 emit；#326 真 findings 上线后此
@@ -89,6 +102,12 @@ export const REVIEW_COMPLETE_PLACEHOLDER = 'AI 审核已完成';
  * verdict 形状 = records/review.ts reviewVerdictSchema（含 conclusion + 编号
  * findings，blocking 项触发自动修订回路）。 */
 export const REVIEW_VERDICT_KIND = 'review_verdict';
+
+/** 验证步收尾 verdict 消息 content kind（#1250）：system 角色 + content =
+ * `{"kind":"verify_verdict","verdict":…}` JSON 串（REVIEW_VERDICT 同族，
+ * server completeStep verify 分支 emit）。verdict 形状 = records/verify.ts
+ * verifyVerdictSchema（passed + conclusion + evidence 条目）。 */
+export const VERIFY_VERDICT_KIND = 'verify_verdict';
 
 /** chief 回合失败行 content kind（#631 [设计]）：daemon chief 步失败上报的
  * errorMessage 由 server `finishStep` chief 分支落 chief_message system 行

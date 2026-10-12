@@ -50,6 +50,10 @@ interface DetailHeadProps {
   /** M7 #312 / r8 §3.1：审核中态旗标——chip 改「审核中」、composer placeholder
    * 改「AI 审核进行中…」、期间显示停止钮（复用 #308）。 */
   reviewActive?: boolean;
+  /** #1250 / ADR 0018 层 1：验证中态旗标——chip 改「验证中」（reviewActive
+   *  同律：额外 agent 步，phase 不动）。verify 优先于 review 显示（同刻
+   *  并行时验证是更晚的相位事实）。 */
+  verifyActive?: boolean;
   /** #1216：在飞编排回合（todo 开始 / failed 重跑 已发出，chief 尚未落位）
    *  ——主钮翻禁用「编排中」，相位不动的静默窗口显性化。缺省 false =
    *  fixture 面与既有行为零变化。 */
@@ -67,16 +71,20 @@ export function DetailHead({
   chipPopoverOpen,
   onEditAssign,
   reviewActive,
+  verifyActive,
   actionInFlight,
   moreButtonRef,
 }: DetailHeadProps) {
   const { t } = useI18n();
   // AI 审核中态（M7 #312，r8 §3.1）：chip 文案与 phase 解耦——「审核中」字面
   // 反映活动步 kind 而非 phase（review 步是额外 agent 步，phase 留 confirm/
-  // review）。tone 用 confirm（同色与待确认期一致，不引入新色）。
-  const ui = reviewActive
-    ? { ...PHASE_UI[phase ?? todo.phase], chip: '审核中' }
-    : PHASE_UI[phase ?? todo.phase];
+  // review）。tone 用 confirm（同色与待确认期一致，不引入新色）。#1250
+  // 验证中态同位覆盖（verify 优先）。
+  const ui = verifyActive
+    ? { ...PHASE_UI[phase ?? todo.phase], chip: '验证中' }
+    : reviewActive
+      ? { ...PHASE_UI[phase ?? todo.phase], chip: '审核中' }
+      : PHASE_UI[phase ?? todo.phase];
   const { search } = useLocation();
   const [popover, setPopover] = useState(chipPopoverOpen === true);
   return (

@@ -65,16 +65,48 @@ export function useDetailActions(input: DetailActionsInput) {
     return member?.actorId ?? null;
   }, [members]);
 
+  // #1250（ADR 0018 层 1）：persona 槽位解析——按角色取团队 persona agent
+  //（members 读面 actor.persona；seeded 六员名册的命中键）。fan-out 可用 =
+  // 三视角任一在位（server fan-out 按 persona 三员各入队，缺谁少谁）。
+  const personaAgentId = useCallback(
+    (role: string): string | null => {
+      const member = (members ?? []).find(
+        (m) =>
+          m.memberType === 'agent' &&
+          (m.actor as { persona?: string } | undefined)?.persona === role,
+      );
+      return member?.actorId ?? null;
+    },
+    [members],
+  );
+  const fanoutAvailable = useMemo(
+    () =>
+      (['code_reviewer', 'security_auditor', 'test_engineer'] as const).some(
+        (role) => personaAgentId(role) !== null,
+      ),
+    [personaAgentId],
+  );
+
   const startBuild = useCallback(
     (withPlan: boolean, assignment?: Assignment) => {
       if (!live || !wireTodo) return;
+      // 缺省四槽（#1250 扩 review/verify 槽）：plan/build 优先 persona
+      //（Planner/Implementer，无 persona 回落首 Agent 同旧值）；review/
+      // verify 只在 persona 在位时落（无 persona = 留空，行为 = 不 fan-out
+      // / 不入队 verify 步——存量语义零变化）。
+      const planner = personaAgentId('planner') ?? firstAgentId;
+      const implementer = personaAgentId('implementer') ?? firstAgentId;
+      const reviewer = personaAgentId('code_reviewer');
+      const verifier = personaAgentId('verifier');
       mutations.startBuilds.mutate(
         {
           projectId: wireTodo.projectId,
           todoIds: [wireTodo.id],
           assignment: assignment ?? {
-            plan: firstAgentId ? { agentId: firstAgentId } : null,
-            build: firstAgentId ? { agentId: firstAgentId } : null,
+            plan: planner !== null ? { agentId: planner } : null,
+            build: implementer !== null ? { agentId: implementer } : null,
+            review: reviewer !== null ? { agentId: reviewer } : null,
+            verify: verifier !== null ? { agentId: verifier } : null,
           },
           withPlan,
         },
@@ -84,7 +116,7 @@ export function useDetailActions(input: DetailActionsInput) {
       );
       setOverlay(null);
     },
-    [live, wireTodo, mutations.startBuilds, firstAgentId, t, setOverlay],
+    [live, wireTodo, mutations.startBuilds, firstAgentId, personaAgentId, t, setOverlay],
   );
 
   // —— #209 编辑分配:chip popover「编辑分配」→ agent 选择弹层(#182 家族
@@ -226,5 +258,6 @@ export function useDetailActions(input: DetailActionsInput) {
     reviewAgents,
     reviewDefaultId,
     reviewProducerProvider,
+    fanoutAvailable,
   };
 }

@@ -15,6 +15,7 @@ import { claudeCodeReportSchema } from '../records/model-source.js';
 import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
+import { verifyVerdictSchema } from '../records/verify.js';
 import {
   machineToolRelayBodySchema,
   machineToolRelayResponseSchema,
@@ -546,6 +547,17 @@ export const machineDoneBodySchema = z.object({
    * hosted 分支消费。hosted 形态真值源仍是 server bare repo，daemon 不上报
    * （双真值源漂移面不引入）。 */
   changesDiff: z.string().optional(),
+  /** 验证步 verdict（#1250 / ADR 0018 层 1）：仅 verify 步携带，daemon 解析
+   *  agent 终轮 JSON 输出后置入；server 落 VERIFY_VERDICT_KIND 消息行。
+   *  形状 = records/verify.ts verifyVerdictSchema（passed + conclusion +
+   *  evidence[]）。非 verify 步不携带（findings 的 review 律——解析面按步类
+   *  开，规避假阳）。 */
+  verifyVerdict: verifyVerdictSchema.optional(),
+  /** 验证步 verdict 提取失败原因（#1250，findingsError 同律）：verify 步
+   *  daemon 未能从 transcript 取出合法 verdict 时随 done 携带（verifyVerdict
+   *  缺位）。server 据此落「验证判定提取失败」兜底消息，不静默吞错。长度
+   *  上限同 findingsError（schema 面第二道闸）。 */
+  verifyVerdictError: z.string().max(FINDINGS_ERROR_CHAR_LIMIT).optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;

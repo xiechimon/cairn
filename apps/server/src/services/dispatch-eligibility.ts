@@ -51,6 +51,12 @@ export function agentIdForStep(
   if (kind === 'review') {
     return parseReviewPromptMeta(prompt)?.agentId ?? null;
   }
+  // verify 步（#1250 / ADR 0018 层 1）：assignment.verify 槽（与 plan/build
+  // 同形，不回落 build 槽——Verifier 是独立角色，回落会让验证步静默跑在
+  // Implementer 名下，「验自己的活」破坏独立验证语义）。
+  if (kind === 'verify') {
+    return todoRow.assignment?.verify?.agentId ?? null;
+  }
   return planSlotFor(todoRow, kind, prompt)?.agentId ?? null;
 }
 
@@ -105,6 +111,13 @@ export function unassignedStepReason(
 ): string {
   if (kind === 'review') {
     return 'review 步无 Agent：审核 prompt meta 未携带 agentId，无人可领。';
+  }
+  if (kind === 'verify') {
+    const slot = todoRow.assignment?.verify;
+    if (slot?.agentId == null) {
+      return 'verify 步无指派 Agent：assignment 的 verify 槽为空，无人可领。指派 Verifier（assignment.verify 槽）后重新运行任务。';
+    }
+    return `verify 步指派的 Agent 不存在（agentId ${slot.agentId} 已删除或不在本团队），无人可领。改派 Verifier 后重新运行任务。`;
   }
   if (kind !== 'plan') {
     const slot = todoRow.assignment?.build;

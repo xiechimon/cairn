@@ -1001,6 +1001,9 @@ async function tryClaim(
     const sessionContinuing =
       priorSessionId !== null &&
       cand.stepRow.kind !== 'review' &&
+      // #1250：verify 步恒新会话（review 同律——验证者是与执行者不同的
+      // persona，续接执行会话 = 语境错配 + 上下文浪费）。
+      cand.stepRow.kind !== 'verify' &&
       !planHandoffMissing &&
       !cand.stepRow.freshSession &&
       cand.buildRow.pinnedMachineId === null;
@@ -1069,7 +1072,11 @@ async function tryClaim(
       setTodoPhase(deps, cand.todoRow.id, cand.stepRow.kind === 'plan' ? 'planning' : 'building');
     }
     const session =
-      planHandoffMissing || cand.stepRow.kind === 'review' || cand.stepRow.freshSession
+      planHandoffMissing ||
+      cand.stepRow.kind === 'review' ||
+      // #1250：verify 步恒新会话（上注释同律）。
+      cand.stepRow.kind === 'verify' ||
+      cand.stepRow.freshSession
         ? { action: 'new' as const, sessionId: null }
         : {
             action: priorSessionId ? ('continue' as const) : ('new' as const),
@@ -1775,6 +1782,11 @@ export async function finishStep(
       hasChanges: outcome.hasChanges,
       ...(outcome.findings !== undefined ? { findings: outcome.findings } : {}),
       ...(outcome.findingsError !== undefined ? { findingsError: outcome.findingsError } : {}),
+      // #1250 verify 步 verdict 透传（completeStep verify 分支消费）。
+      ...(outcome.verifyVerdict !== undefined ? { verifyVerdict: outcome.verifyVerdict } : {}),
+      ...(outcome.verifyVerdictError !== undefined
+        ? { verifyVerdictError: outcome.verifyVerdictError }
+        : {}),
     });
     publishStepStatus(deps, stepId);
     return;

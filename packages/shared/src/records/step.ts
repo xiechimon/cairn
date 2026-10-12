@@ -12,14 +12,19 @@ import { epochMs, recordId } from './common.js';
  * Chief 回合 = 机器 step 为一手实测（r5 §3.1 daemon.log `claim step=…` →
  * `conv chief-…`），kind 词未采——自定等价物，04 §3 不判负口径）+ `review`
  * （M7 #312 / r8 §3.1：AI 审核步——额外 agent 步，daemon 不开 worktree 不产
- * 改动，emit findings；#326 占位 ack → 真 findings 演进而 kind 词不变）。 */
-export const stepKindSchema = z.enum(['plan', 'build', 'merge', 'chief', 'review']);
+ * 改动，emit findings；#326 占位 ack → 真 findings 演进而 kind 词不变）
+ * + `verify`（#1250 / ADR 0018 层 1：验证步——Verifier persona 跑
+ * docs/verify/<票号>/ e2e 证据包并回贴 PR body，走 assignment 槽（与
+ * plan/build 同形），agent 经 todo.assignment.verify 解析；额外 agent 步
+ * 不推进主时序（review 同律：phase 留 review 关口等人工合并裁决）。 */
+export const stepKindSchema = z.enum(['plan', 'build', 'merge', 'chief', 'review', 'verify']);
 export type StepKind = z.infer<typeof stepKindSchema>;
 
 /** 团队密钥取用面按 step kind 收窄（02 §8 运行时层）：只有真正需要密钥的步
  * kind 收到非空授权面——规划步/审核步/总管探索步恒空（那三步不构建任何东西，
  * 多一处暴露就多一处风险）。与仓内既有的按 kind 裁剪同族（review 步不开
- * worktree、chief 步只读探索）。
+ * worktree、chief 步只读探索）。验证步（#1250）同律恒空：Verifier 的产物 =
+ * 证据包与 PR body 回贴，团队密钥不在它的交付面上。
  * 单源：服务端凭据解析面与 daemon 取用通道注册面共用（维护者纪律——密钥的
  * 下发形状只有一条，加第二个 backend 不必重答一次「密钥怎么送」）。 */
 export const SECRET_STEP_KINDS: readonly StepKind[] = ['build', 'merge'];
@@ -91,9 +96,11 @@ export type StepQueueInfo = NonNullable<StepJournalRow['queue']>;
  * 驳回 = {action:"revision", side:"plan", feedback, clientMessageId} →
  * server 入队重规划步（同 conv continue session）→ plan v2；
  * 确认 = 同端点 {action:"confirm"}。
- * 审核 = {action:"review", agentId, focus?}（M7 #312 / r8 §3.1）：server 入队
+ * 审核 = {action:"review", agentId?, focus?}（M7 #312 / r8 §3.1）：server 入队
  * 审核步（kind='review'）→ 审核中 chip + composer placeholder + 时间线发起
  * 行（REVIEW_ANNOUNCEMENT）；focus 可空（textarea 透传「关注什么」）。
+ * #1250（ADR 0018 层 1）：agentId 缺省 = fan-out 三视角（三条 review 步并行，
+ * 各挂 persona agent）；携带 agentId = 单审核人既有路径。
  * 失败面发送 = {action:"restart", feedback, clientMessageId}（#320，
  * r9 §3.3 实测：原站 failed 态发消息触发新一轮，消息随新轮入会话；实走
  * steps 端点 body 未录——action 词与形 [设计]，语义 = 带反馈重启）。 */
@@ -110,9 +117,14 @@ export const buildStepActionBodySchema = z.discriminatedUnion('action', [
   z.object({
     action: z.literal('review'),
     /** 执行审核的 Agent id（与 chief-agent-dialog 同源 memberType:"agent" 行
-     * 的 actorId）。 */
-    agentId: z.string(),
-    /** 可选关注点 textarea 内容；空串视为未填。 */
+     * 的 actorId）。#1250（ADR 0018 层 1）：缺省 = fan-out 三视角——server
+     * 按团队 persona（CodeReviewer/SecurityAuditor/TestEngineer）各入队一条
+     * review 步（agentId 经各自步的 prompt meta header 透出）；无 persona
+     * 时回落 assignment.review 槽单步；两者皆缺 400。携带 agentId = 既有
+     * 单审核人路径，行为不变。 */
+    agentId: z.string().optional(),
+    /** 可选关注点 textarea 内容；空串视为未填。fan-out 路径随各视角 prompt
+     * 逐份注入。 */
     focus: z.string().optional(),
   }),
   z.object({

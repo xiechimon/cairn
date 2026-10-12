@@ -10,6 +10,7 @@ import type {
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
+  PersonaRole,
   Phase,
   ProjectRepoKind,
   ProviderApi,
@@ -21,7 +22,7 @@ import type {
   TriggerSource,
 } from '@pacman/shared';
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 /** epoch 毫秒（records/common.ts epochMs 同族）。 */
 const epochMs = (name: string) => integer(name);
@@ -82,7 +83,14 @@ export const todo = sqliteTable('todo', {
   lastRunAt: epochMs('lastRunAt'),
   hasChanges: bool('hasChanges').notNull().default(false),
   hasPlan: bool('hasPlan').notNull().default(false),
+  /** 来源任务引用（r3 §3.0 列名照抄；#1250 / ADR 0018 层 2 落位拆父子指针：
+   *  chief split_todo 建的子卡本列 = 父卡 id——「子全 done 父自动收」的归账键
+   *  + 父 confirm 派发子的回溯键）。存量恒 null。 */
   sourceTodo: text('sourceTodo'),
+  /** 依赖边（#1250 / ADR 0018 层 2，blocking 语义）：阻塞本卡的兄弟子卡 id
+   *  集（json 数组，chief split_todo 写入；分派闸 = startBuilds 全 done 才放
+   *  行，波次推进 = done 落地时解锁自动派发）。null = 无依赖。 */
+  blockedBy: json<string[]>('blockedBy'),
   v: integer('v').notNull().default(1),
   createdBy: text('createdBy'),
   ownerId: text('ownerId'),
@@ -328,36 +336,52 @@ export const notification = sqliteTable('notification', {
 
 // —— agent（02 §6.2；关联面 = JSON 列（01 §6 表注「关联表」在锁定 24+1 表清单内
 // 无独立表位，DB_TABLES 单源不扩）；成员/端点面归 M2b+）————————————————————
-export const agent = sqliteTable('agent', {
-  id: text('id').primaryKey(),
-  teamId: text('teamId')
-    .notNull()
-    .references(() => team.id),
-  displayName: text('displayName').notNull(),
-  description: text('description'),
-  status: text('status').notNull().default('active'),
-  avatarUrl: text('avatarUrl'),
-  provider: text('provider'),
-  modelId: text('modelId'),
-  thinkingLevel: text('thinkingLevel'),
-  tools: json<string[]>('tools').notNull().default(sql`'[]'`),
-  secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
-  /** 默认携带技能（#1169）：单值，可空——旧 skills 列拆出的「skills[0] 单值」半边。 */
-  defaultSkill: text('defaultSkill'),
-  /** 授权白名单（#1169）：可空 json——null = 不限制（创建缺省，本票默认语义），
-   * 数组 = 白名单（#917 deny），[] = 显式全拒（有意选择）。旧 skills 列的
-   * 授权半边；notNull + default '[]' 的旧形随迁移退役（[] 行已迁 null）。 */
-  skillsAllowlist: json<string[]>('skillsAllowlist'),
-  mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
-  /** agent 级并发上限（#1138）：该 Agent 名下同时执行的 worker 步数 N。
-   * NULL = 不限（缺省——存量行与未设置的新建行同值，不强制默认值；只对
-   * 显式设置的 Agent 生效）。消费面 = claim 候选级闸（machines.ts tryClaim
-   * 在 agentForStep 之后按 agent 计数 gate）+ PATCH 写位（值域 1..50，与
-   * Multica agent 层闸同区间，r10 §5.4）。机器 maxConcurrent 是机器面容量
-   * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
-   * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
-  maxConcurrentTasks: integer('maxConcurrentTasks'),
-});
+export const agent = sqliteTable(
+  'agent',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    displayName: text('displayName').notNull(),
+    description: text('description'),
+    status: text('status').notNull().default('active'),
+    avatarUrl: text('avatarUrl'),
+    provider: text('provider'),
+    modelId: text('modelId'),
+    thinkingLevel: text('thinkingLevel'),
+    /** persona 角色位（#1250 / ADR 0018 决策 0）：seeded 角色 agent 的身份键
+     *  ——幂等键（ensurePersonasSeeded 按本列查重）+ fan-out 三视角解析 +
+     *  web 指派面默认槽位。null = 普通 agent。唯一性 = (teamId, persona)
+     *  partial unique index（一队一角色，fan-out 查重确定性）；词表单源 =
+     *  shared records/agent.ts PERSONA_ROLES，写侧 zod 闸（personaRoleSchema）。 */
+    persona: text('persona').$type<PersonaRole | null>(),
+    tools: json<string[]>('tools').notNull().default(sql`'[]'`),
+    secrets: json<string[]>('secrets').notNull().default(sql`'[]'`),
+    /** 默认携带技能（#1169）：单值，可空——旧 skills 列拆出的「skills[0] 单值」半边。 */
+    defaultSkill: text('defaultSkill'),
+    /** 授权白名单（#1169）：可空 json——null = 不限制（创建缺省，本票默认语义），
+     * 数组 = 白名单（#917 deny），[] = 显式全拒（有意选择）。旧 skills 列的
+     * 授权半边；notNull + default '[]' 的旧形随迁移退役（[] 行已迁 null）。 */
+    skillsAllowlist: json<string[]>('skillsAllowlist'),
+    mcpServers: json<string[]>('mcpServers').notNull().default(sql`'[]'`),
+    /** agent 级并发上限（#1138）：该 Agent 名下同时执行的 worker 步数 N。
+     * NULL = 不限（缺省——存量行与未设置的新建行同值，不强制默认值；只对
+     * 显式设置的 Agent 生效）。消费面 = claim 候选级闸（machines.ts tryClaim
+     * 在 agentForStep 之后按 agent 计数 gate）+ PATCH 写位（值域 1..50，与
+     * Multica agent 层闸同区间，r10 §5.4）。机器 maxConcurrent 是机器面容量
+     * 闸，本列是 agent 面公平性闸——两层各自 gate（合成 = min 的自然结果）。
+     * chief 步不占本闸（#1148「chief 不占槽」的 agent 面同律）。 */
+    maxConcurrentTasks: integer('maxConcurrentTasks'),
+  },
+  (t) => [
+    // (teamId, persona) partial unique（#1250）：一队一角色——fan-out 与
+    // seeding 的查重确定性；普通 agent（persona null）不受约束。
+    uniqueIndex('agent_team_persona_unique')
+      .on(t.teamId, t.persona)
+      .where(sql`${t.persona} is not null`),
+  ],
+);
 
 // —— agent_memory（02 §4.4/r5 §6：配额 100 + 三级溯源；写路径归 M4）———————————
 export const agentMemory = sqliteTable('agent_memory', {

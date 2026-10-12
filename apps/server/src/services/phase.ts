@@ -16,13 +16,18 @@
 import { canBoardDrop, type Phase } from '@pacman/shared';
 
 export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
-  todo: ['queued', 'closed'],
+  // #1250（ADR 0018 层 2）：todo→confirm = chief split_todo 的父卡停驻边——
+  // 拆解方案（父卡 plan 文档）就绪等人工过闸，语义与单卡 plan 就绪同关。
+  todo: ['queued', 'confirm', 'closed'],
   // 机器 claim：规划步→planning / 直执行步（withPlan=false）→building（02 §4.2）。
   queued: ['planning', 'building', 'failed'],
   planning: ['confirm', 'failed'],
   // 确认→building；驳回→重规划（02 §4.2 确认回路，r5 §4 实走）；定时轮顶替→queued（r5 §8）。
   confirm: ['building', 'planning', 'failed', 'queued'],
-  building: ['review', 'failed'],
+  // #1250（ADR 0018 层 2）：building→done = 拆卡父的自动收口边——子卡全部
+  // done 时父卡由本边落地（父卡无自己的合并步，合并闸在子卡各自身上）。
+  // 只被 settleSplitOnDone 消费；普通卡的 done 落地路径不变（review→done）。
+  building: ['review', 'failed', 'done'],
   // 完成+合并落地→done（02 §4.2：merge 202 delegated → 机器合并步 → done）；
   // 定时轮顶替→queued（r5 §8）。
   // M7 #330：review → planning = blocking finding 自动修订回路（agent 落
