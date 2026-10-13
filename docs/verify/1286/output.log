@@ -1,0 +1,14 @@
+
+ RUN  v5.0.1 /Users/xmon/.t3/worktrees/pacman/fix-1286-recover-degrade/apps/daemon
+
+ ✓ test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug 修复） 6ms
+ ✓ test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 2. recover + .jsonl 在 → 正常 continue，不触发降级 2ms
+ ✓ test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 3. 非 recover（无 opts.resume）→ continue 失败直传步 failed（#1260 语义保留） 2ms
+ ✓ test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发） 2ms
+ ✓ test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 5. chief 步 recover + .jsonl 缺失 → 降级 new session，同律 2ms
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  12:53:33
+   Duration  1.07s (import 69%, transform 29%, tests 1%)
+
