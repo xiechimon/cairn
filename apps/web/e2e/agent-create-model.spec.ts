@@ -174,7 +174,7 @@ test('有候选：不出告警行，出三级选择器且模型级先禁用', as
   await expect(dialog.locator('.dlg-agent-model-select')).toBeEnabled();
 });
 
-test('一级列运行时与内置清空行，二级只列所选运行时的模型（pi 段不泄漏）', async ({
+test('一级列运行时与内置清空行，且 pi 段进入候选（#1288 翻案不再跳过）', async ({
   page,
 }) => {
   await stubLive(page, { hasSources: true, bodies: [], withPiLeak: true });
@@ -182,14 +182,15 @@ test('一级列运行时与内置清空行，二级只列所选运行时的模�
   await dialog.locator('.dlg-agent-runtime-select').click();
   const runtimeMenu = page.locator('.dlg-agent-runtime-menu');
   await expect(runtimeMenu).toBeVisible();
-  // 首行恒是「内置 (pi)」清空行（provider null 的显示形，与详情概览运行时档同词）。
+  // 首行恒是「内置 (pi)」清空行（provider null 的显示形）。
   await expect(runtimeMenu.locator('.dlg-agent-runtime-row').first()).toContainText('内置 (pi)');
-  // #770 起 providers 段已除：一级只有 runtime 源分组（pi 段恒跳过，不出分组）。
-  await expect(runtimeMenu.locator('.dlg-agent-runtime-row')).toHaveCount(2);
+  // #1288 翻案：pi/relay 段进入候选——runtime 行 = 内置清空行 + pi 分组 + claude-code 分组。
+  await expect(runtimeMenu.locator('.dlg-agent-runtime-row')).toHaveCount(3);
+  await expect(runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'pi' })).toHaveCount(1);
   await expect(runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' })).toHaveCount(
     1,
   );
-  // 选 Claude Code 后模型菜单只有它的模型——pi 段的模型不得混进来。
+  // 选 Claude Code 后模型菜单只有它的模型——pi 段的模型不得混进 claude-code 组。
   await runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
   await dialog.locator('.dlg-agent-machine-select').click();
   await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
@@ -199,6 +200,7 @@ test('一级列运行时与内置清空行，二级只列所选运行时的模�
   await expect(modelMenu.locator('.dlg-agent-model-row', { hasText: 'claude-sonnet-5' })).toHaveCount(
     1,
   );
+  // 当选 claude-code 组时，二级按 provider 过滤——pi 段模型不出在该组下。
   await expect(modelMenu).not.toContainText('pi-sneak');
 });
 
