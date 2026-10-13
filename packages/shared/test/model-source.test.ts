@@ -63,6 +63,71 @@ describe('parseClaudeCodeModelSource', () => {
     ]);
   });
 
+  test('model 别名经 ANTHROPIC_DEFAULT_*_MODEL 映射解析成真名（#1287）', () => {
+    const source = parseClaudeCodeModelSource(
+      {
+        model: 'fable',
+        env: { ANTHROPIC_DEFAULT_FABLE_MODEL: 'deepseek-v4.1-flash[1M]' },
+      },
+      'exec-1',
+    );
+    expect(source.models).toEqual([
+      { id: 'deepseek-v4.1-flash[1M]', name: 'deepseek-v4.1-flash[1M]', slot: 'default' },
+    ]);
+  });
+
+  test('model 别名无映射 → 回落裸值（#1287）', () => {
+    const source = parseClaudeCodeModelSource({ model: 'fable' }, 'exec-1');
+    expect(source.models).toEqual([{ id: 'fable', name: 'fable', slot: 'default' }]);
+  });
+
+  test('别名解析结果与槽位条目同 id → 去重只留 default 行（#1287）', () => {
+    const source = parseClaudeCodeModelSource(
+      {
+        model: 'fable',
+        env: {
+          ANTHROPIC_DEFAULT_FABLE_MODEL: 'deepseek-v4.1-flash[1M]',
+          ANTHROPIC_SONNET_MODEL: 'deepseek-v4.1-flash[1M]',
+        },
+      },
+      'exec-1',
+    );
+    expect(source.models).toEqual([
+      { id: 'deepseek-v4.1-flash[1M]', name: 'deepseek-v4.1-flash[1M]', slot: 'default' },
+    ]);
+  });
+
+  test('model 直写真名无别名 → 原样保留、env 槽照常（#1287）', () => {
+    const source = parseClaudeCodeModelSource(
+      {
+        model: 'claude-opus-4-5',
+        env: { ANTHROPIC_OPUS_MODEL: 'claude-opus-4-1' },
+      },
+      'exec-1',
+    );
+    expect(source.models).toEqual([
+      { id: 'claude-opus-4-5', name: 'claude-opus-4-5', slot: 'default' },
+      { id: 'claude-opus-4-1', name: 'claude-opus-4-1', slot: 'opus' },
+    ]);
+  });
+
+  test('多个 env 槽映同一 id → 按 id 去重（#1287）', () => {
+    const source = parseClaudeCodeModelSource(
+      {
+        env: {
+          ANTHROPIC_OPUS_MODEL: 'claude-opus-4-1',
+          ANTHROPIC_SONNET_MODEL: 'claude-opus-4-1',
+          ANTHROPIC_HAIKU_MODEL: 'claude-haiku-4-5',
+        },
+      },
+      'exec-1',
+    );
+    expect(source.models).toEqual([
+      { id: 'claude-opus-4-1', name: 'claude-opus-4-1', slot: 'opus' },
+      { id: 'claude-haiku-4-5', name: 'claude-haiku-4-5', slot: 'haiku' },
+    ]);
+  });
+
   test('上报载荷 round-trip：report → 段（hostname/模型原样）', () => {
     const source = parseClaudeCodeModelSource({ model: 'm-1' }, 'exec-1');
     const report = claudeCodeReportSchema.parse({
