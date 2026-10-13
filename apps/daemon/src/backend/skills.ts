@@ -80,6 +80,12 @@ export interface SkillsCatalogOpts {
    * 条目居扫描序前端（优先序高档）。缺省 = 纯本机扫描（输出与旧行为逐字节
    * 等价）。 */
   teamSkillsDir?: string;
+  /** #1299 任务 worktree 侧技能目录（如 `.claude/skills`、`.pi/skills`）：
+   * 排在 skillsDir 之后扫描——first-wins 下同名冲突团队/本机条目胜（worktree
+   * 条目是最低优先 loser）。目录缺失 loadSkills 出 warning 诊断（#1299 失败
+   * 方式 2：静默收窄不报错）。pi 后端送 `.claude/skills` + `.pi/skills`（若
+   * 在）；claude-code 不送（其原生技能发现面已覆盖）。缺省 = 不扩（零回归）。 */
+  worktreeSkillsDirs?: string[];
   /** catalog 字节预算覆写（#1116 测试注入面 [设计]；缺省 =
    * SKILLS_CATALOG_BUDGET_BYTES）。 */
   budgetBytes?: number;
@@ -89,17 +95,25 @@ export interface SkillsCatalogOpts {
 
 /** 会话面扫描参数单源（catalog 注入与硬挡拒绝集共用——两个消费面对同一
  * 技能全集负责，参数形状不得各自漂移）：团队目录在前 = first-wins 冲突裁决
- * 的胜出序（XMON-112 S2）；agentDir 钉不存在路径杜绝 pi 默认扫描；缺省
- * teamSkillsDir 时 skillPaths 与旧行为完全一致（零回归判据的扫描面）。 */
+ * 的胜出序（XMON-112 S2）；agentDir 钉不存在路径杜绝 pi 默认扫描；#1299
+ * worktree 侧目录（`.claude/skills`/`.pi/skills`）排尾——first-wins 下同名
+ * 冲突团队/本机条目胜（worktree 条目是最低优先 loser）。缺省 teamSkillsDir
+ * 且缺省 worktreeSkillsDirs 时 skillPaths 与旧行为完全一致（零回归判据的
+ * 扫描面）。 */
 function scanSessionSkills(
   skills: { skillsDir: string; cwd: string },
   teamSkillsDir: string | undefined,
+  worktreeSkillsDirs?: string[],
 ): { skills: Skill[]; diagnostics: ResourceDiagnostic[] } {
+  const skillPaths =
+    teamSkillsDir !== undefined ? [teamSkillsDir, skills.skillsDir] : [skills.skillsDir];
+  if (worktreeSkillsDirs !== undefined && worktreeSkillsDirs.length > 0) {
+    skillPaths.push(...worktreeSkillsDirs);
+  }
   return loadSkills({
     cwd: skills.cwd,
     agentDir: NO_PI_DEFAULT_AGENT_DIR,
-    skillPaths:
-      teamSkillsDir !== undefined ? [teamSkillsDir, skills.skillsDir] : [skills.skillsDir],
+    skillPaths,
     includeDefaults: false,
   });
 }
@@ -164,7 +178,7 @@ export function buildSkillsCatalog(opts: SkillsCatalogOpts): string {
   let skills: Skill[];
   let diagnostics: ResourceDiagnostic[];
   try {
-    const result = scanSessionSkills(opts, opts.teamSkillsDir);
+    const result = scanSessionSkills(opts, opts.teamSkillsDir, opts.worktreeSkillsDirs);
     skills = result.skills;
     diagnostics = result.diagnostics;
   } catch (err) {
@@ -275,7 +289,12 @@ export function appendSkillsCatalog(base: string | undefined, catalog: string): 
  * runner 侧面拿不到这份配置。 */
 export function composeSkillsSection(
   skills: { skillsDir: string; cwd: string } | undefined,
-  opts: { skillsAllowlist?: string[]; injectedSkills?: string[]; teamSkillsDir?: string },
+  opts: {
+    skillsAllowlist?: string[];
+    injectedSkills?: string[];
+    teamSkillsDir?: string;
+    worktreeSkillsDirs?: string[];
+  },
   log?: (msg: string) => void,
 ): string {
   if (!skills) return '';
@@ -285,6 +304,9 @@ export function composeSkillsSection(
     ...(opts.skillsAllowlist !== undefined ? { allowlist: opts.skillsAllowlist } : {}),
     ...(opts.injectedSkills !== undefined ? { injectedSkills: opts.injectedSkills } : {}),
     ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
+    ...(opts.worktreeSkillsDirs !== undefined
+      ? { worktreeSkillsDirs: opts.worktreeSkillsDirs }
+      : {}),
     ...(log ? { log } : {}),
   });
 }
@@ -304,15 +326,17 @@ export interface DeniedSkillEntry {
 
 /** 扫描 → allowlist 外技能的 baseDir 集。allowlist 缺省（chief 面）或 skills
  * 配置缺省 = 空集（全量直通零回归）；扫描失败 fail-open 空集——与 catalog
- * 同律：扫描失败时注入面也为空，无「目录里有、却挡不住」的错位。 */
+ * 同律：扫描失败时注入面也为空，无「目录里有、却挡不住」的错位。
+ * #1299：worktreeSkillsDirs 加入拒绝扫描面——worktree 侧技能同样受 allowlist
+ * 硬挡（catalog 与 deny 同扫描面的既有纪律）。 */
 export function collectDeniedSkillDirs(
   skills: { skillsDir: string; cwd: string } | undefined,
-  opts: { skillsAllowlist?: string[]; teamSkillsDir?: string },
+  opts: { skillsAllowlist?: string[]; teamSkillsDir?: string; worktreeSkillsDirs?: string[] },
 ): DeniedSkillEntry[] {
   if (!skills || opts.skillsAllowlist === undefined) return [];
   let loaded: Skill[];
   try {
-    loaded = scanSessionSkills(skills, opts.teamSkillsDir).skills;
+    loaded = scanSessionSkills(skills, opts.teamSkillsDir, opts.worktreeSkillsDirs).skills;
   } catch {
     return [];
   }
@@ -320,6 +344,56 @@ export function collectDeniedSkillDirs(
   return loaded
     .filter((s) => !allowed.has(s.name))
     .map((s) => ({ name: s.name, baseDir: s.baseDir }));
+}
+
+/** 可见技能名集（#1299 /name 派发判定 + Skill 工具可见集校验）：与
+ * buildSkillsCatalog 同一扫描 + 同一 allowlist/injectedSkills 过滤——可见
+ * 判据两消费面永不漂移。扫描失败 = 空集（fail-open，/name 判定回落 no-op）。 */
+export function collectVisibleSkillNames(opts: SkillsCatalogOpts): Set<string> {
+  let skills: Skill[];
+  try {
+    skills = scanSessionSkills(opts, opts.teamSkillsDir, opts.worktreeSkillsDirs).skills;
+  } catch {
+    return new Set();
+  }
+  if (opts.allowlist !== undefined) {
+    const allowed = new Set(opts.allowlist);
+    skills = skills.filter((s) => allowed.has(s.name));
+  }
+  if (opts.injectedSkills !== undefined) {
+    const selected = new Set(opts.injectedSkills);
+    skills = skills.filter((s) => selected.has(s.name));
+  }
+  return new Set(skills.map((s) => s.name));
+}
+
+/** #1299 pi 后端 worktree 侧技能目录：任务 worktree 的 `.claude/skills` +
+ * `.pi/skills`（目录不存在时 loadSkills 出 warning 诊断，不阻断——与 scan
+ * 面其他目录同律，#1299 失败方式 2）。claude-code 后端不调——其原生技能
+ * 发现面已覆盖 worktree 侧。 */
+export function piWorktreeSkillDirs(cwd: string): string[] {
+  return [join(cwd, '.claude', 'skills'), join(cwd, '.pi', 'skills')];
+}
+
+/** 可见技能名 → SKILL.md 绝对路径映射（#1299 Skill 工具预扫描 + 过滤）：
+ * 与 buildSkillsCatalog 同一扫描 + 同一 allowlist/injectedSkills 过滤——工具
+ * 面与 catalog 面同可见集，判据永不漂移。扫描失败 = 空 Map（fail-open）。 */
+export function collectVisibleSkillFileMap(opts: SkillsCatalogOpts): Map<string, string> {
+  let skills: Skill[];
+  try {
+    skills = scanSessionSkills(opts, opts.teamSkillsDir, opts.worktreeSkillsDirs).skills;
+  } catch {
+    return new Map();
+  }
+  if (opts.allowlist !== undefined) {
+    const allowed = new Set(opts.allowlist);
+    skills = skills.filter((s) => allowed.has(s.name));
+  }
+  if (opts.injectedSkills !== undefined) {
+    const selected = new Set(opts.injectedSkills);
+    skills = skills.filter((s) => selected.has(s.name));
+  }
+  return new Map(skills.map((s) => [s.name, s.filePath]));
 }
 
 /** 团队 view 内 allowed 条目（#1171 native 插件面消费形）：dirName = view

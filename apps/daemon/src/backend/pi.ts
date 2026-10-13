@@ -66,6 +66,7 @@ import {
   collectDeniedSkillDirs,
   composeSkillsSection,
   createSkillReadGate,
+  piWorktreeSkillDirs,
 } from './skills.js';
 
 /** 02 §6.2/#34：oauth 四家订阅；思考强度 = pi 七档。
@@ -935,7 +936,18 @@ export class PiBackend implements AgentBackend {
     composeBody: (opts, base) =>
       appendSkillsCatalog(
         base,
-        composeSkillsSection(this.opts.skills, opts, this.opts.onSkillsLog),
+        composeSkillsSection(
+          this.opts.skills,
+          {
+            ...(opts.skillsAllowlist !== undefined
+              ? { skillsAllowlist: opts.skillsAllowlist }
+              : {}),
+            ...(opts.injectedSkills !== undefined ? { injectedSkills: opts.injectedSkills } : {}),
+            ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
+            worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
+          },
+          this.opts.onSkillsLog,
+        ),
       ) ?? '',
   };
 
@@ -1149,7 +1161,11 @@ export class PiBackend implements AgentBackend {
     // 白名单硬挡（#917 口径 4）：worker 步（allowlist 在位）把内建 read 以同名
     // customTool 覆盖成门控版（注册表按名后写胜出）——未授权技能文件读取被拒。
     // chief 步（allowlist 缺省）拒绝集恒空、不注册门控，read 面零变化。
-    const deniedSkills = collectDeniedSkillDirs(this.opts.skills, opts);
+    const deniedSkills = collectDeniedSkillDirs(this.opts.skills, {
+      ...(opts.skillsAllowlist !== undefined ? { skillsAllowlist: opts.skillsAllowlist } : {}),
+      ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
+      worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
+    });
     const gatedRead =
       deniedSkills.length > 0
         ? defineTool(

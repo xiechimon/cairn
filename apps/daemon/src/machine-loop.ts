@@ -596,6 +596,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       workspace,
       workspacesDir: config.workspacesDir,
       mcpConfigPath: config.mcpConfigPath,
+      skillsDir: config.skillsDir,
       sessionHandles,
       stopRequests,
       // #867 T6：runtime 步凭据预检（机器名进失败文案；探针缺省 = 真 CLI）。

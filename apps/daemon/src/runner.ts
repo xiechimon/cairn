@@ -64,6 +64,12 @@ import { createActivityTracker } from './activity.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
+import {
+  collectVisibleSkillFileMap,
+  collectVisibleSkillNames,
+  piWorktreeSkillDirs,
+  type SkillsCatalogOpts,
+} from './backend/skills.js';
 import { type BriefHandle, caseInsensitiveFsFor, cleanupBrief, writeBrief } from './brief-file.js';
 import {
   type ClaudeCodeAuthProbe,
@@ -80,6 +86,7 @@ import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
 import { buildRemoteShellTool } from './shell-channel.js';
+import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
 import { buildCreateTagTool } from './tag-tool.js';
@@ -128,6 +135,10 @@ export interface RunStepDeps {
   stopRequests?: Map<string, StopRequest>;
   /** heartbeat 节奏 [设计]（r3 未采具体值；presence 同族 ~30s）。 */
   heartbeatIntervalMs?: number;
+  /** PACMAN_SKILLS_DIR 扫描根（#1299 /name 派发判定与 Skill 工具目录面；
+   * config.skillsDir 透传，machine-loop 注入）。缺省 = 不构建 Skill 工具与
+   * /name 检测（旧测试面零回归）。 */
+  skillsDir?: string;
   /** 本机机器名（#867 T6：缺凭据失败文案的「哪台机器」位；缺省 os.hostname()）。 */
   machineName?: string;
   /** claude-code 凭据预检（#867 T6；缺省 = 真探针 `claude auth status`，
@@ -747,6 +758,67 @@ export async function runStep(
   const localToolDefs = [secretTool, remoteShellTool, createTagTool].filter(
     (t): t is LocalToolDef => t !== null,
   );
+  // #1169 defaultSkill → #1116 注入绑定序首位：injectedSkills 在位时把
+  // defaultSkill 提到集首并去重（不在集内也补进——携带语义不因选择算法零
+  // 命中而丢失）；injectedSkills 缺省（旧 server）不造集（回落 allowlist
+  // 全量，defaultSkill 在其内）。chief 步 claim 不带这两字段，恒走缺省。
+  const injectedForSession =
+    agent.injectedSkills === undefined || agent.defaultSkill == null
+      ? agent.injectedSkills
+      : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
+  // —— #1299 Skill 工具 + /name 派发 ——————————————————————————————
+  // pi 后端增专用 Skill 自定义工具（入参 skill name → 返回 SKILL.md 全文 +
+  // [skills] invoke 日志）；claude-code 后端不注册（其原生 Skill 工具已有）。
+  // /name 检测：worker prompt 含 /<skill-name>（可见集内）→ 前置确定性加载
+  // 指令；未知 name → no-op + [skills] unknown-dispatch 日志。
+  const isPi = backend.brief?.backendId === 'pi';
+  const skillsRootDir = deps.skillsDir;
+  const canSkillTool = isPi && skillsRootDir !== undefined;
+  if (canSkillTool) {
+    const worktreeSkillDirs = piWorktreeSkillDirs(cwd);
+    const skillScanOpts: SkillsCatalogOpts = {
+      skillsDir: skillsRootDir,
+      cwd: deps.paths.home,
+      ...(!isChief && agent.skillsAllowlist != null ? { allowlist: agent.skillsAllowlist } : {}),
+      ...(!isChief && injectedForSession !== undefined
+        ? { injectedSkills: injectedForSession }
+        : {}),
+      ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
+      worktreeSkillsDirs: worktreeSkillDirs,
+      log: (msg: string) => logger.skills(msg),
+    };
+    // Skill 工具预扫描：name → SKILL.md 绝对路径映射（与 catalog 同面过滤）
+    const skillFileMap = collectVisibleSkillFileMap(skillScanOpts);
+    const skillLoadTool = buildSkillLoadTool({
+      skillFileMap,
+      onInvoke: (name) => logger.skills(`invoke: ${name}`),
+    });
+    localToolDefs.push(skillLoadTool);
+    // /name 派发检测（worker 步，有任务文本）：匹配 /<skill-name> → 前置指令
+    if (deliveryPrompt !== null) {
+      const visibleNames = collectVisibleSkillNames(skillScanOpts);
+      const slashPattern = /\b\/([a-z][a-z0-9-]*)\b/g;
+      const matched: string[] = [];
+      let m = slashPattern.exec(deliveryPrompt);
+      while (m !== null) {
+        const name = m[1]!;
+        if (visibleNames.has(name)) {
+          matched.push(name);
+        } else {
+          logger.skills(`unknown-dispatch: ${name}`);
+        }
+        m = slashPattern.exec(deliveryPrompt);
+      }
+      if (matched.length > 0) {
+        const uniqueMatched = [...new Set(matched)];
+        const directives = uniqueMatched
+          .map((n) => `Before proceeding, use the Skill tool to load "${n}".`)
+          .join('\n');
+        deliveryPrompt = `${directives}\n\n${deliveryPrompt}`;
+        logger.skills(`dispatch: ${uniqueMatched.map((n) => `/${n}`).join(', ')}`);
+      }
+    }
+  }
   // —— #1049 问答阻塞通道（ask_user 拦截面；两后端共用）———————————————
   // ask_user 不走 relayTool（10s 超时载不动「挂到人答为止」）——专用
   // client.askUser 循环（hold 长轮询 + requestId 幂等）。等答期间无流事件，
@@ -795,10 +867,6 @@ export async function runStep(
   // defaultSkill 提到集首并去重（不在集内也补进——携带语义不因选择算法零
   // 命中而丢失）；injectedSkills 缺省（旧 server）不造集（回落 allowlist
   // 全量，defaultSkill 在其内）。chief 步 claim 不带这两字段，恒走缺省。
-  const injectedForSession =
-    agent.injectedSkills === undefined || agent.defaultSkill == null
-      ? agent.injectedSkills
-      : [agent.defaultSkill, ...agent.injectedSkills.filter((id) => id !== agent.defaultSkill)];
   const sessionOpts: SessionOpts = {
     provider,
     modelId: agent.modelId,
