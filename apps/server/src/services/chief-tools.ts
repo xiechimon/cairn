@@ -26,6 +26,7 @@ import {
   filterAgentTools,
   isChiefConversationId,
   MEMORY_QUOTA_PER_AGENT,
+  MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
@@ -47,13 +48,7 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import {
-  advanceSplitWaves,
-  applyBuildStepAction,
-  cancelBuild,
-  requestMerge,
-  startBuilds,
-} from './builds.js';
+import { advanceSplitWaves, applyBuildStepAction, cancelBuild, startBuilds } from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -859,9 +854,13 @@ export async function executeChiefTool(
       return json({ cancelled: buildIds });
     }
     case 'merge_builds': {
+      // #1256（ADR 0018「合并动作留人，不在名册内」）：合并只由人触发——
+      // chief 不得代合。返回拒绝 JSON（不抛错）：拒绝文案作为工具结果回到
+      // chief 眼前（留痕在会话），指认人工出口（web 界面 review 关口「完成」
+      // 按钮）。与 MCP face merge_builds 同文案（shared MERGE_HUMAN_ONLY_COPY
+      // 单源）。
       const buildIds = strArr(params, 'buildIds');
-      for (const buildId of buildIds) await mergeBuild(deps, buildId, chiefActor.name);
-      return json({ mergeDelegated: buildIds });
+      return json({ rejected: true, buildIds, reason: MERGE_HUMAN_ONLY_COPY });
     }
 
     // —— Chief 私有侧 10 ——
@@ -1090,17 +1089,6 @@ export async function confirmBuild(
     throw new HttpError(404, `build ${buildId}`);
   }
   await applyBuildStepAction(buildDeps(deps), buildId, { action: 'confirm' }, actor);
-}
-export async function mergeBuild(
-  deps: ChiefToolDeps,
-  buildId: string,
-  /** 宣告行 actor 位（#902）；缺省 = 用户（MCP key 属主语义）。 */
-  actor?: string,
-): Promise<void> {
-  if (!deps.db.select().from(build).where(eq(build.id, buildId)).get()) {
-    throw new HttpError(404, `build ${buildId}`);
-  }
-  await requestMerge(buildDeps(deps), buildId, actor);
 }
 
 // —— memory 写路径共用面（02 §4.4/r5 §6，M4b）———————————————————————————————

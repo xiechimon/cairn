@@ -48,6 +48,13 @@ export const SYSTEM_MESSAGE_KINDS = ['machine_selected'] as const;
  * （server requestMerge）与呈现端（web transcript mapper）双端单源。 */
 export const MERGE_ANNOUNCEMENT = '发起了合并';
 
+/** 机器合并入口硬挡文案（#1256，ADR 0018「合并动作留人，不在名册内」）：
+ * chief merge_builds 与 MCP merge_builds 两机器入口被调用时的拒绝文案——合并
+ * 只由人触发，文案指认人工出口（web 界面 review 关口「完成」按钮）。写入端
+ * （server chief-tools merge_builds 分支 / mcp-face merge_builds 分支）双端单源。 */
+export const MERGE_HUMAN_ONLY_COPY =
+  '合并动作只由人触发，机器（chief / MCP）不得合并。请在任务详情页的审阅关口点击「完成」按钮手动合并。';
+
 /** AI 审核发起行 content canon（M7 #312 / r8 §3.1 实测 `23:42 Xmon Dai 发起了
  * AI 审核` 的内容段；行形 = role user 纯文本，呈现层拼装时间/actor）。写入端
  * （server applyBuildStepAction review 分支）与呈现端（web transcript mapper）

@@ -5,10 +5,11 @@
 // wire 级验证 = 裸 JSON-RPC over POST（stateless streamable HTTP，enableJsonResponse）；
 // 真 sdk client 往返归 integration E2E。
 
-import { MCP_TOOL_REGISTRY } from '@pacman/shared';
+import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@pacman/shared';
+import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { todo as todoTable } from '../src/db/schema.js';
+import { step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 interface JsonRpcResponse {
@@ -258,6 +259,50 @@ describe('/api/mcp 工具执行 = key 属主身份（02 §7.2）', () => {
     // 越权 cancel 未落地（errorMessage 不写、存在性不泄露副作用）。
     const row = s.db.select().from(build).all()[0]!;
     expect(row.errorMessage).toBeNull();
+    s.dispose();
+  });
+
+  test('merge_builds 机器入口硬拒（#1256）：同团队合法 build 也拒，文案指认人工出口', async () => {
+    const s = bootServer();
+    const key = await issueMcpKey(s, { read: [], write: ['Merge Builds'] });
+    const projectId = await postProject(s.app);
+    const { build: buildTable, todo: todoT } = await import('../src/db/schema.js');
+    const now = Date.now();
+    s.db
+      .insert(todoT)
+      .values({
+        id: 'todo-merge-mcp',
+        teamId: s.team.id,
+        projectId,
+        title: 'tm',
+        phase: 'review',
+        phaseAt: now,
+        seqNum: 1,
+      })
+      .run();
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-merge-mcp',
+        todoId: 'todo-merge-mcp',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: now,
+      })
+      .run();
+    const res = (
+      await rpc(s.app, key, 'tools/call', {
+        name: 'merge_builds',
+        arguments: { buildIds: ['build-merge-mcp'] },
+      })
+    ).body as JsonRpcResponse;
+    expect(res.result?.isError).toBe(true);
+    expect(res.result?.content?.[0]?.text ?? '').toContain(MERGE_HUMAN_ONLY_COPY);
+    // 拒绝即止：无 merge 步副作用。
+    const { step: stepTable } = await import('../src/db/schema.js');
+    expect(
+      s.db.select().from(stepTable).where(eq(stepTable.buildId, 'build-merge-mcp')).all(),
+    ).toHaveLength(0);
     s.dispose();
   });
 

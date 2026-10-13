@@ -15,7 +15,13 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { BRAND, CHIEF_REMOTE_TOOLS, MCP_TOOL_REGISTRY, type UserRecord } from '@pacman/shared';
+import {
+  BRAND,
+  CHIEF_REMOTE_TOOLS,
+  MCP_TOOL_REGISTRY,
+  MERGE_HUMAN_ONLY_COPY,
+  type UserRecord,
+} from '@pacman/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
@@ -35,7 +41,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { verifyApiKey } from './api-keys.js';
 import { cancelBuild, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
-import { confirmBuild, mergeBuild, transitionTodos } from './chief-tools.js';
+import { confirmBuild, transitionTodos } from './chief-tools.js';
 import { isChiefConversation } from './machines.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
@@ -351,12 +357,13 @@ export async function executeMcpTool(
       return json({ confirmed: buildIds });
     }
     case 'merge_builds': {
+      // #1256（ADR 0018「合并动作留人，不在名册内」）：合并只由人触发——
+      // MCP key 属主（外部 MCP 客户端 = 机器）不得代合。先过跨团队存在性
+      // 守卫（纵深防御，同 cancel/confirm），再抛 403 硬拒——isError 面回
+      // MCP 客户端，文案指认人工出口（web 界面 review 关口「完成」按钮）。
       const buildIds = strArrOf(args, 'buildIds');
-      for (const buildId of buildIds) {
-        requireTeamBuild(db, buildId, ctx.teamId);
-        await mergeBuild(deps, buildId);
-      }
-      return json({ mergeDelegated: buildIds }); // 202 delegated 语义族（r3 §3.6）
+      for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      throw new HttpError(403, MERGE_HUMAN_ONLY_COPY);
     }
     case 'cancel_builds': {
       const buildIds = strArrOf(args, 'buildIds');

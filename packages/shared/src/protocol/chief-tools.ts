@@ -571,7 +571,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'merge_builds',
     description:
-      'Merge reviewed builds into the default branch (delegated to a machine merge step).',
+      '(Blocked — merge is human-only. #1256, ADR 0018.) Merge reviewed builds into the default branch — only through the web UI human exit; calling this tool from a machine (chief/MCP) is hard-rejected.',
     parameters: obj({ buildIds: idArr('Build ids to merge.') }, ['buildIds']),
   },
   // —— Chief 私有侧 10 ——

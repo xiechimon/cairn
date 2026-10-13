@@ -136,10 +136,10 @@ beforeAll(async () => {
     { content: '探针行已写入 README.md 并提交。' },
     // R4 — chief gate wake 轮：停 review 汇报（r5 截图 115 等价物）。
     { content: '「探针任务」已完成，停在 review 等待确认。确认没问题后请告诉我合并。' },
-    // R5/R6 — chief 回合 2（用户：合并）：merge_builds + 「委派已受理」回执。
-    { toolCall: { name: 'merge_builds', arguments: { buildIds: ['__BUILD1__'] } } },
-    { content: '合并已启动，尚未确认落地——等合并结果的 wake 到达后我会告知是否真正完成。' },
-    // R7 — merge 步（continue session，git merge 由 daemon 确定性执行）。
+    // R5 — chief 回合 2（用户：合并）：#1256 合并只由人触发——chief 拒代合回执
+    // （指认人工出口）；merge 步改由测试以人类身份走 REST 触发（R6 位）。
+    { content: '合并只由人触发，我不能代合。请在 web 界面 review 关口点「完成」触发合并。' },
+    // R6 — merge 步（continue session，git merge 由 daemon 确定性执行）。
     { content: '合并执行完成。' },
     // R8 — chief settle wake 轮：「结果已确认」汇报（r5 截图 117 等价物）。
     { content: '「探针任务」已合并完成，状态为 done。README.md 已落地到项目根目录。' },
@@ -226,7 +226,7 @@ beforeAll(async () => {
     },
   });
   script[0] = dispatch(world.todoId);
-  script[9] = dispatch(todo2Id);
+  script[8] = dispatch(todo2Id);
 
   // 绑定 chief（PATCH /chief，r5 §2）。
   const patch = await api(server.url, 'PATCH', `/api/teams/${server.teamId}/chief`, {
@@ -296,9 +296,8 @@ describe('M4b watch/wake 三触发 E2E（r5 §3.5 对照实跑）', () => {
   }, 150_000);
 
   test('settle wake：合并两阶段汇报（委派已受理 → 结果已确认）+ watch 自动解除', async () => {
-    // 用户指令「合并」→ chief merge_builds（r5 §3.5 settle 轮原文流）。
+    // 用户指令「合并」→ #1256：chief 拒代合回执（两阶段汇报其一变为拒绝+指认人工出口）。
     await waitThreadIdle();
-    script[5] = { toolCall: { name: 'merge_builds', arguments: { buildIds: [build1] } } };
     const sent = await api(
       server.url,
       'POST',
@@ -306,9 +305,11 @@ describe('M4b watch/wake 三触发 E2E（r5 §3.5 对照实跑）', () => {
       { content: `合并 ${world.todoId}` },
     );
     expect([200, 201]).toContain(sent.status);
+    await waitFor(() => threadMessages().includes('合并只由人触发'), 120_000);
 
-    // 两阶段汇报其一：「合并已启动，尚未确认落地」（委派已受理）。
-    await waitFor(() => threadMessages().includes('合并已启动'), 120_000);
+    // 人工出口：测试以人类身份走 REST 触发 merge（202 delegated，merge 步 daemon 确定性执行）。
+    const humanMerge = await api(server.url, 'POST', `/api/builds/${build1}/merge`, {});
+    expect(humanMerge.status).toBe(202);
 
     // merge 步落地 → todo done → settle wake → 结果已确认汇报。
     await waitFor(() => server.todoPhase(world.todoId) === 'done', 150_000);
