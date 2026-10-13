@@ -26,14 +26,33 @@ import { and, asc, eq, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, machine as machineTable, provider as providerTable, team } from '../db/schema.js';
 import { newRecordId } from '../lib/ids.js';
+import { mergedCatalogModels } from './model-liveness.js';
 
 /** 当时模型清单的可领模型（claim 闸要求的 provider+modelId 二元组）：
- *  claude-code 上报优先（自托管主车道——machine.claudeCodeReport 现读，
- *  default 槽模型优先），回落 pi 自定义 provider 首模（provider 表 models
- *  列明文直读）；两者皆空 = null（此刻无模型真值，等补齐/用户配置）。
+ *  活目录优先（#1288：探活的 relay /v1/models 目录，标 dead 的不选——
+ *  避免 seed 死模型）；回落 claude-code 上报（自托管主车道——
+ *  machine.claudeCodeReport 现读，default 槽模型优先），再回落 pi 自定义
+ *  provider 首模（provider 表 models 列明文直读）；三者皆空 = null（此刻无
+ *  模型真值，等补齐/用户配置）。
  *  直读表列而非 getModelSources：后者 ProviderDeps 必带 box（密钥解密面），
  *  模型清单本身是明文 json，seed 面不需要密钥。 */
 function pickPersonaModel(db: Db, teamId: string): { provider: string; modelId: string } | null {
+  // #1288 活目录优先：探活目录里标 alive/unknown 的模型可用，dead 跳过。
+  // 取第一个非 dead 的模型（目录序 = 探活返回序）。provider = relay 的
+  // providerId——合并目录不携带 provider 位，回落用 pi provider 首模的
+  // providerId（下方循环），此处按 providerId 取首个 custom provider。
+  const aliveFromCatalog = mergedCatalogModels().find((m) => m.liveness !== 'dead');
+  if (aliveFromCatalog !== undefined) {
+    const p = db
+      .select()
+      .from(providerTable)
+      .where(eq(providerTable.teamId, teamId))
+      .all()
+      .find((row) => row.providerId !== '');
+    if (p !== undefined) {
+      return { provider: p.providerId, modelId: aliveFromCatalog.id };
+    }
+  }
   for (const row of db
     .select({ report: machineTable.claudeCodeReport })
     .from(machineTable)

@@ -42,7 +42,6 @@ import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_TURN_ERROR_KIND,
   classifyStepFailure,
-  classifyUserText,
   formatSkillRouteSection,
   GATE_ANNOUNCEMENTS,
   GITHUB_ACCESS_TOKEN_USERNAME,
@@ -72,7 +71,6 @@ import {
   chiefThread,
   machine,
   message,
-  plan as planTable,
   project,
   steerPending,
   step,
@@ -123,6 +121,7 @@ import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { markModelDead } from './model-liveness.js';
 // #1261 配额挂起面（quotaBlock → waiting_quota，不走 failed 漏斗）。
 import { applyQuotaWaitStep } from './quota-wait.js';
 import type { LocalSkill } from './skills.js';
@@ -1732,6 +1731,27 @@ export async function finishStep(
   if (outcome.status === 'failed' && classifyStepFailure(outcome.errorMessage ?? '') === 'quota') {
     holdStepForQuota(deps, stepRow, outcome);
     return;
+  }
+  // #1288 model_unavailable 回填：step 撞 /v1/messages 404（模型已被上游
+  // 下架）→ 标注 dead 即时生效（后续选择器/闸即时置灰 + 拒绝）。
+  // 发生在 applyStepFailure 之前——dead 回填与失败收尾两条轨道并行，
+  // 回填失败不影响步失败漏斗（markModelDead 是纯内存写，永不抛）。
+  if (
+    outcome.status === 'failed' &&
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
+  ) {
+    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (buildRow) {
+      const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+      const agentId =
+        todoRow?.assignment?.build?.agentId ?? todoRow?.assignment?.plan?.agentId ?? null;
+      if (agentId) {
+        const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
+        if (agentRow?.modelId && agentRow?.provider) {
+          markModelDead(agentRow.provider, agentRow.modelId);
+        }
+      }
+    }
   }
   // chief 步收尾（无 build/phase/merge；thread 面 + chief_message 通知，r5 §3.6/
   // §7.2）。token 记账已按 buildId=chief conv id 落位（context.tokens 数据源）。

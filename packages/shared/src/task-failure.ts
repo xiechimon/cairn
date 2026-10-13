@@ -28,7 +28,13 @@
 
 /** 失败桶（行为面枚举：quota → 挂起等额度；network → 续跑重试；
  *  model_unavailable → 回填 dead + 指认；其余 → 既有失败漏斗）。 */
-export const STEP_FAILURE_KINDS = ['quota', 'capacity', 'model_unavailable', 'network', 'other'] as const;
+export const STEP_FAILURE_KINDS = [
+  'quota',
+  'capacity',
+  'model_unavailable',
+  'network',
+  'other',
+] as const;
 export type StepFailureKind = (typeof STEP_FAILURE_KINDS)[number];
 
 /** 三位数状态码的数字边界正则（Multica 同款：两侧不贴其它数字才算命中）。 */

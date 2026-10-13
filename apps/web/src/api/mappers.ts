@@ -1185,28 +1185,44 @@ export function toThinkingLevelDisplay(
 /** 压缩模型选择器候选投影（#358，spec 11 §A10；#770 起 providers 段已除：
  *  只剩非 pi runtime 段模型（claude-code = server 直读 ~/.claude/settings.json
  *  的槽位；provider 位 = runtime 词表值，未安装段 models 恒空天然无贡献）。
- *  用户裁决原文：「自有 relay 不要，Claude Code 肯定做得比我们好」。custom
- *  providers 的建/改/删（providers 管理页）与存量绑定执行面（daemon
+ *  #1288 翻案（spec 11 A10 superseded-in-part）：pi/relay 段重新进入候选——
+ *  relay /v1/models 探活目录为全量模型源（含不在槽位清单的模型）；跨族按
+ *  model id 去重，活性取严（任一源标 dead 则该 id 标 dead）。
+ *  custom providers 的建/改/删（providers 管理页）与存量绑定执行面（daemon
  *  backendFor 按 agent.provider 原值解析）都不动——本投影只决定 picker 里
  *  能新选什么，不管已存值与执行。存量 provider 模型值读出来命中不了选项，
- *  走 model-select-core 的裸串兜底（`provider/modelId` 即名，不空白不崩）。
- *  同 (provider, modelId) 去重 first-wins（settings.json default 槽 + env 槽
- *  可映同一 id；组件 React key 防撞）；跨 provider 同 modelId 两行都留——
- *  model id 只在 provider 内有意义（chiefCompactionModelSchema 对象形槽值
- *  立法理由）。段卫生：空 id 跳过（shared modelSourceModelSchema min(1)）。 */
+ *  走 model-select-core 的裸串兜底（`provider/modelId` 即名，不空白不崩）。 */
 export function toModelOptions(sources: ModelSource[]): ModelOption[] {
+  // #1288：先扫全量收集活性（跨族 strict：任一源标 dead → dead）。
+  const livenessByModelId = new Map<string, 'alive' | 'dead' | 'unknown'>();
+  for (const source of sources) {
+    for (const m of source.models) {
+      if (m.id === '') continue;
+      const lv = m.liveness ?? 'unknown';
+      const prev = livenessByModelId.get(m.id);
+      if (prev === undefined || (lv === 'dead' && prev !== 'dead')) {
+        livenessByModelId.set(m.id, lv);
+      }
+    }
+  }
+
   const options: ModelOption[] = [];
   const seen = new Set<string>();
   const push = (option: ModelOption) => {
-    // #1259：同一模型 id 可来自多台机器的上报段——去重键带上归属机，
-    // 两台机器各配同名模型时两行都留（创建弹窗按归属机过滤消费）。
-    const key = `${option.provider}/${option.machineId ?? ''}/${option.modelId}`;
+    // #1259：同 provider 内两台机器同模型 id → 两行都留（创建弹窗按
+    //  归属机过滤消费）。跨 pi/claude-code 段按 model id 去重——pi（relay
+    //  目录）与 claude-code（槽位）同一模型 id 只留一行。
+    const ccDim = option.provider === 'claude-code' && option.machineId !== undefined;
+    const key = ccDim ? `${option.provider}/${option.machineId}/${option.modelId}` : option.modelId; // #1288 跨族按 model id 去重
     if (seen.has(key)) return;
     seen.add(key);
+    // 活性取严：跨族已合并的活性填回行。
+    const lv = livenessByModelId.get(option.modelId);
+    if (lv !== undefined && lv !== 'unknown') option.liveness = lv;
     options.push(option);
   };
   for (const source of sources) {
-    if (source.runtime === 'pi') continue;
+    // #1288：pi/relay 段重新进入候选（不再 continue 跳过）。
     const providerLabel = RUNTIME_LABELS[source.runtime] ?? source.runtime;
     for (const m of source.models) {
       if (m.id === '') continue;

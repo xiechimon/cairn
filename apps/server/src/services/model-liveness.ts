@@ -15,11 +15,10 @@
 // - 指派时最小探活（max_tokens=1，5s 超时，失败重试一次再判死）：对真 relay
 //   发最小 completion 验证模型可调通性。结果缓存 TTL 10min。
 
-import { eq, and } from 'drizzle-orm';
-import type { ModelSourceModel } from '@pacman/shared';
+import type { ModelSourceModel, SecretBox } from '@pacman/shared';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { provider } from '../db/schema.js';
-import type { SecretBox } from '@pacman/shared';
 
 // —— 缓存形态 ——————————————————————————————————————————————————————————————
 
@@ -68,10 +67,14 @@ export function getRelayCatalogModels(providerId: string): ModelSourceModel[] {
 /** 异步刷新单 provider 的目录缓存：调用方 fire-and-forget（不阻塞 API 响应）。
  *  - fail-open：fetch 失败不清缓存，上次成功结果继续服刑至过期。
  *  - 密钥损坏/null provider → 不探。 */
-export async function refreshRelayCatalog(deps: {
-  db: Db;
-  box: SecretBox;
-}, teamId: string, providerId: string): Promise<void> {
+export async function refreshRelayCatalog(
+  deps: {
+    db: Db;
+    box: SecretBox;
+  },
+  teamId: string,
+  providerId: string,
+): Promise<void> {
   // 打开密钥：失败 = 不探（该 provider 可能没有 apiKey / SecretBox 损坏）
   let apiKey: string | null = null;
   try {
@@ -136,10 +139,15 @@ export function markModelDead(providerId: string, modelId: string): void {
 /** 指派时最小探活：max_tokens=1 最小 completion（5s 超时、失败重试一次
  *  再判死）。结果缓存 TTL 10min。返回 'alive' | 'dead' | 'unknown'。
  *  调用前先查缓存——命中缓存时恒同步返回（不发请求）。 */
-export async function minProbeModel(deps: {
-  db: Db;
-  box: SecretBox;
-}, teamId: string, providerId: string, modelId: string): Promise<'alive' | 'dead' | 'unknown'> {
+export async function minProbeModel(
+  deps: {
+    db: Db;
+    box: SecretBox;
+  },
+  teamId: string,
+  providerId: string,
+  modelId: string,
+): Promise<'alive' | 'dead' | 'unknown'> {
   const cacheKey = `${providerId}/${modelId}`;
   const cached = minProbeCache.get(cacheKey);
   if (cached !== undefined && Date.now() - cached.at < MIN_PROBE_TTL_MS) {
@@ -233,4 +241,46 @@ export function getModelLiveness(
     return 'unknown';
   }
   return catCached.liveness;
+}
+
+/** 合并目录（跨所有已探测 provider 的 /v1/models 结果，按 model id 合并，
+ *  活性取严——任一 provider 标 dead 则 dead）。供闸与选值面消费。
+ *  返回空数组 = 尚未探测任何 provider（缓存全冷）。 */
+export function mergedCatalogModels(): ModelSourceModel[] {
+  const merged = new Map<
+    string,
+    { id: string; name: string; liveness: 'alive' | 'dead' | 'unknown' }
+  >();
+  const now = Date.now();
+  for (const [_providerId, cache] of catalogCache) {
+    if (now - cache.fetchedAt >= CATALOG_CACHE_TTL_MS) continue;
+    for (const [id, entry] of cache.models) {
+      let liveness: 'alive' | 'dead' | 'unknown' = entry.liveness;
+      if (liveness === 'dead' && now - entry.at >= DEAD_TTL_MS) liveness = 'unknown';
+      const existing = merged.get(id);
+      if (existing === undefined) {
+        merged.set(id, { id, name: id, liveness });
+      } else if (liveness === 'dead' && existing.liveness !== 'dead') {
+        // 活性取严：任一 provider 标 dead → dead
+        existing.liveness = 'dead';
+      }
+    }
+  }
+  return [...merged.values()];
+}
+
+/** 异步刷新所有自定义 provider 的目录缓存。调用方 fire-and-forget。
+ *  并发探测、各自 10s 超时、失败跳过不清缓存。 */
+export async function refreshAllRelayCatalogs(
+  deps: { db: Db; box: SecretBox },
+  teamId: string,
+): Promise<void> {
+  // 收集所有 custom provider 的 providerId
+  const providers = deps.db
+    .select({ providerId: provider.providerId })
+    .from(provider)
+    .where(eq(provider.teamId, teamId))
+    .all();
+  // 并发探测
+  await Promise.allSettled(providers.map((p) => refreshRelayCatalog(deps, teamId, p.providerId)));
 }

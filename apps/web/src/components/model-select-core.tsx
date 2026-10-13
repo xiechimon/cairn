@@ -98,26 +98,30 @@ export function createModelPicker(params: {
 
 /** 行投影后的行视图形（ModelOption → 行形）：key = provider/modelId（与
  *  toModelOptions 去重键同形，React key 防撞）；selected 走 isOptionSelected；
- *  value = 选中时上报的槽值。 */
+ *  value = 选中时上报的槽值。#1288：disabled = dead 模型（置灰不可选）。 */
 export interface ModelRowVm {
   key: string;
   label: string;
   providerLabel: string;
   selected: boolean;
+  /** #1288：dead 模型 = 置灰不可选（不隐藏）。 */
+  disabled: boolean;
   value: ModelRef;
 }
 
 /** 行投影：候选清单 × 当前槽值 → 行视图形清单（顺序 = 候选序，不排序——
- *  序由数据源给，toModelOptions 的投影序即展示序）。 */
+ *  序由数据源给，toModelOptions 的投影序即展示序）。#1288：dead 模型
+ *  投影为 disabled 行（置灰 +「已下架」标注，不隐藏）。 */
 export function toModelRows(
   options: readonly ModelOption[],
   value: ModelSlotValue | null,
 ): ModelRowVm[] {
   return options.map((row) => ({
     key: `${row.provider}/${row.modelId}`,
-    label: row.modelName,
+    label: row.liveness === 'dead' ? `${row.modelName}（已下架）` : row.modelName,
     providerLabel: row.providerLabel,
     selected: isOptionSelected(value, row),
+    disabled: row.liveness === 'dead',
     value: { provider: row.provider, modelId: row.modelId },
   }));
 }
@@ -163,6 +167,8 @@ export const PICK_ROW_BTN_CLS = `w-full cursor-pointer justify-start border-none
 interface ModelPickRowProps {
   skin: ModelRowSkin;
   selected: boolean;
+  /** #1288：dead 模型行禁用（置灰不隐藏）。 */
+  disabled?: boolean;
   /** 行主文案：模型行 = modelName；默认行 = 各面传入的清空/继承语义文案。 */
   label: string;
   /** 行副题 = provider 显示名；默认行不传即不出。副题只投影 providerLabel
@@ -174,7 +180,14 @@ interface ModelPickRowProps {
 
 /** chief 两面共用的 flat 行（Button[role=option] + 名 + 副题 + 选中 check）
  *  单源。行序、搜索过滤、空态归各面壳；本件只出一行。 */
-export function ModelPickRow({ skin, selected, label, providerLabel, onPick }: ModelPickRowProps) {
+export function ModelPickRow({
+  skin,
+  selected,
+  disabled = false,
+  label,
+  providerLabel,
+  onPick,
+}: ModelPickRowProps) {
   // name/check 的 data-testid = #910 二级结构载体（#751/#872 的对比度与
   // 内衬探针钉这两个 span 的 computed 值；无 role 可表达）。
   const name = (
@@ -190,10 +203,16 @@ export function ModelPickRow({ skin, selected, label, providerLabel, onPick }: M
   return (
     <Button
       variant="ghost"
-      className={cn('group', PICK_ROW_BTN_CLS, skin.row)}
+      className={cn(
+        'group',
+        PICK_ROW_BTN_CLS,
+        skin.row,
+        disabled && 'pointer-events-none opacity-50',
+      )}
       role="option"
       aria-selected={selected}
-      onClick={onPick}
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? undefined : onPick}
     >
       {skin.col == null ? (
         <>
@@ -357,6 +376,7 @@ export function ModelPickList({
             key={row.key}
             skin={skin}
             selected={row.selected}
+            disabled={row.disabled}
             label={row.label}
             providerLabel={row.providerLabel}
             onPick={() => onPick(row.value)}

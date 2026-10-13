@@ -263,10 +263,12 @@ export function agentRunningCount(db: Db, agentId: string): number {
 }
 
 /** #1259 归属机校验（创建/换绑/整机迁移共用单源）：归属机必须启用该 agent
- *  的 runtime；claude-code agent 的 modelId 还须在该机上报的模型清单内
- *  （modelId 空 = 跟随该机默认槽，恒过；pi 等 server 下发配置的 provider
- *  免模型查）。返回 null = 通过，否则 = 人话原因（点名缺什么、怎么修）。
- *  机器未上报过模型清单（老 daemon）= 拒——无法证明该机配了该模型。 */
+ *  的 runtime；claude-code agent 的 modelId 还须在合并目录内（relay 活目录
+ *  ∪ 该机上报的 claude-code 槽位清单）且非 dead（#1288 翻案——旧语义只查
+ *  槽位清单，清单外活模型反被 400 拒）。modelId 空 = 跟随该机默认槽，恒过；
+ *  pi 等 server 下发配置的 provider 免模型查。返回 null = 通过，否则 = 人话
+ *  原因（点名缺什么、怎么修）。机器未上报过模型清单（老 daemon）且不在 relay
+ *  目录 = 拒——无法证明该机配了该模型。 */
 export function homeMachineRejectReason(
   machineRow: {
     name: string;
@@ -274,6 +276,9 @@ export function homeMachineRejectReason(
     claudeCodeReport: ClaudeCodeReport | null;
   },
   agentRow: { provider: string | null | undefined; modelId: string | null | undefined },
+  /** #1288 合并目录（relay 探活结果 + claude-code 槽位，活性取严）。缺省
+   *  = 空目录（闸按旧槽位清单语义）。 */
+  catalog?: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>,
 ): string | null {
   const runtime = stepRuntimeFor(agentRow.provider);
   if (!machineRow.enabledRuntimes.includes(runtime)) {
@@ -281,6 +286,17 @@ export function homeMachineRejectReason(
   }
   if (runtime === 'claude-code' && agentRow.modelId != null && agentRow.modelId !== '') {
     const report = machineRow.claudeCodeReport;
+    // #1288：合并目录 = relay 探活目录 ∪ claude-code 槽位清单。活目录里标
+    // dead 的模型直接拒（T6 律指认：模型名 + 哪台机 + 修法）。
+    const catalogEntry = catalog?.find((m) => m.id === agentRow.modelId);
+    if (catalogEntry !== undefined && catalogEntry.liveness === 'dead') {
+      return `机器 ${machineRow.name} 的模型 ${agentRow.modelId} 已被上游下架（/v1/messages 404）。换一个活模型，或联系上游恢复上架。`;
+    }
+    // 在 relay 目录（alive 或 unknown = fail-open）→ 放行，不再要求进槽位清单。
+    if (catalogEntry !== undefined) {
+      return null;
+    }
+    // 不在 relay 目录 → 回落旧语义（槽位清单）。
     if (report == null) {
       return `机器 ${machineRow.name} 尚未上报模型清单（daemon 版本过旧或未上线），无法校验模型 ${agentRow.modelId}。`;
     }

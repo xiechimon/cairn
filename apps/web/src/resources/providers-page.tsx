@@ -235,9 +235,12 @@ export function ProvidersPage() {
                     // + 上下 24px = 60px），分隔线两侧不再贴字。
                     'flex min-h-[52px] items-center px-4 py-3',
                     i > 0 && 'border-t border-(--border)',
+                    // #1288：dead 模型置灰（不隐藏）——透明度降低而非整行退场。
+                    model.liveness === 'dead' && 'opacity-50',
                   )}
                   data-runtime={source.runtime}
                   data-model-id={model.id}
+                  data-liveness={model.liveness ?? 'unknown'}
                 >
                   <RowText>
                     <RowLine>
@@ -248,6 +251,12 @@ export function ProvidersPage() {
                       {model.slot != null && (
                         <Badge variant="outline" className="text-(--tile-orange-fg)">
                           {model.slot}
+                        </Badge>
+                      )}
+                      {/* #1288：死模型标注「已下架」（不隐藏，保可见性）。 */}
+                      {model.liveness === 'dead' && (
+                        <Badge variant="outline" className="text-(--text-tertiary)">
+                          {t('已下架')}
                         </Badge>
                       )}
                     </RowLine>

@@ -929,9 +929,10 @@ export interface ChiefThreadRef {
 export type ChiefSettingsTab = 'agent' | 'charter' | 'memory' | 'watches';
 
 /** 压缩模型选择器行最小投影（#358，spec 11 §A10；#770 起 live = model-sources
- *  非 pi 段，api/mappers.ts `toModelOptions` 单源；fixture = canon 单行）。
- *  `provider` 位 = PATCH 值槽的 provider 归属（runtime 词表值 `claude-code`；
- *  存量 custom providerId 只出现在旧值回显，不再是候选）。 */
+ *  投影，api/mappers.ts `toModelOptions` 单源；fixture = canon 单行）。
+ *  `provider` 位 = PATCH 值槽的 provider 归属（runtime 词表值 `claude-code` /
+ *  `pi`；存量 custom providerId 只出现在旧值回显，不再是候选）。
+ *  #1288：pi/relay 段重新进入候选，行带活性标注（alive/dead/unknown）。 */
 export interface ModelOption {
   provider: string;
   /** #1259 归属机维：候选来自哪台机器的上报段（claude-code 段有；pi 段
@@ -942,6 +943,9 @@ export interface ModelOption {
   providerLabel: string;
   modelId: string;
   modelName: string;
+  /** #1288 活性标注：alive/dead/unknown。dead = 置灰 +「已下架」标注
+   *  （不隐藏）；unknown = 正常可选（fail-open）；缺席同 unknown。 */
+  liveness?: 'alive' | 'dead' | 'unknown';
 }
 
 /** The chief surface a scenario renders. `view: 'drawer'` opens the floating

@@ -169,13 +169,16 @@ export function AgentModelSelect({
         </SelectItem>
         {rows.map((row) => (
           // #1259：两台机器可上报同名模型——key 带归属机防撞（value 仍是
-          // modelId，归属机由提交面的 machineId 字段承担）。
+          // modelId，归属机由提交面的 machineId 字段承担）。#1288：dead 模型
+          // 置灰 +「已下架」标注不隐藏（保留可见性，用户看得到历史值为何
+          // 不可选）。
           <SelectItem
             key={`${row.machineId ?? ''}/${row.modelId}`}
             className={`${prefix}-row`}
             value={row.modelId}
+            disabled={row.liveness === 'dead'}
           >
-            {row.modelName}
+            {row.liveness === 'dead' ? `${row.modelName}（${t('已下架')}）` : row.modelName}
           </SelectItem>
         ))}
       </SelectContent>
