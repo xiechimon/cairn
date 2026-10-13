@@ -782,7 +782,7 @@ function FailRow({
         data-testid="agent-text"
       >
         <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-        <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{item.body}</p>
+        <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{t(item.body)}</p>
         {/* 老相邻律：links 行同为 .chat-para 兄弟，7px 行距压过自身
             margin:0（(0,2,0) > (0,1,0)），迁移显式带上。 */}
         {item.title !== '' && (
