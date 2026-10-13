@@ -151,12 +151,16 @@ export function expandHomePath(rawPath: string, homeDir: string = homedir()): st
   return rawPath;
 }
 
-/** local 形态路径校验（spec 12 / #359 AC 三态）：`~` 展开 → 绝对路径要求
- * → 存在性 → git 工作树仓判定（isGitRepo 经 systemGitOps 缝；bare 仓不算，
- * ff-only 落地面要求工作树）。任一不过 = 400；通过 = 返回规范化绝对路径
- * （落库 localPath 列值，daemon 镜像 clone 同源消费）。
- * [设计] 多机部署（server 看不见 daemon 侧 fs）降级为「不可见即跳过」、
- * 执行面兜底报错——归后票（spec 12 Out of Scope），本实现按单机假设收紧。 */
+/** local 形态路径校验（spec 12 / #359）：`~` 展开 → 绝对路径要求。
+ * **只做形态校验**——存在性 / git 仓判定下沉到 daemon（workspace.ts
+ * `LocalRepoUnreachableError` 预检），server 进程在多机部署下看不见执行机
+ * fs（server 在 Mac、repo 在 mea 是常态），硬验会把合法路径 400 掉。这与
+ * github 形态 localPath 加速位（validateGithubLocalSlotPath）同口径：server
+ * 只验形态，可达性归 daemon。通过 = 返回规范化绝对路径（落库 localPath
+ * 列值，daemon 镜像 clone 同源消费）。
+ * 创建面不再抛 not_found / not_git reason code——daemon 侧 step 失败文案
+ * 点名机器/路径/原因（runner.ts 的 LocalRepoUnreachableError 合成），
+ * 读面（requireRepoReadDir F2/F3）仍按 server 端单机读抛同族 reason。 */
 export async function validateLocalRepoPath(rawPath: string | null | undefined): Promise<string> {
   const raw = rawPath?.trim() ?? '';
   if (raw === '') {
@@ -169,16 +173,6 @@ export async function validateLocalRepoPath(rawPath: string | null | undefined):
       400,
       `invalid body at localPath: expected absolute path, got "${raw}"`,
       'not_absolute',
-    );
-  }
-  if (!existsSync(expanded)) {
-    throw new HttpError(400, `invalid body at localPath: path not found: ${expanded}`, 'not_found');
-  }
-  if (!(await systemGitOps.isGitRepo(expanded))) {
-    throw new HttpError(
-      400,
-      `invalid body at localPath: not a git repository (worktree): ${expanded}`,
-      'not_git',
     );
   }
   return expanded;
