@@ -75,7 +75,8 @@ export const PROFILE_VALUE_GROW_CLS = 'min-w-0 flex-[1_1_auto]';
 
 /** 编辑器形态（原 .profile-value--editor）：值槽转列（输入框在上、动作行在
  *  下），纵向撑满。 */
-export const PROFILE_VALUE_EDITOR_CLS = 'min-w-0 flex-[1_1_auto] flex-col items-stretch gap-2';
+export const PROFILE_VALUE_EDITOR_CLS =
+  'min-w-0 flex-[1_1_auto] flex-col items-stretch justify-normal gap-2';
 
 /** 卡盒：皮肤 = registry Card 默认（ring / 底色 / rounded-xl 只住 Card 一处），
  *  本件只挂 overflow 与首末子件圆角；件默认纵向垫/gap 归零（行满幅贴边，
@@ -169,7 +170,7 @@ export function ProfileRow({
       <span
         className={cn(
           'profile-value flex items-center gap-3.5 text-sm text-foreground [&_svg]:text-muted-foreground',
-          auto && 'min-w-0 flex-[1_1_auto]',
+          auto && 'min-w-0 flex-[1_1_auto] justify-end',
           valueClassName,
         )}
       >
