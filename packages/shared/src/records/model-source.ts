@@ -97,7 +97,14 @@ export const CLAUDE_MODEL_SLOT_PATTERN = /^ANTHROPIC_([A-Z0-9_]+)_MODEL$/;
 /** settings.json 原文 → claude-code 段（#707 纯函数：server 与 daemon 共吃——
  *  谁读谁机器的文件，不存在「server 远程读执行机文件」的通道）。
  *  文件缺失 / 非法 JSON / 非对象 JSON 一律 installed:false，不空报不崩。
- *  槽值非字符串或空串的项跳过（installed 仍为 true）。 */
+ *  槽值非字符串或空串的项跳过（installed 仍为 true）。
+ *
+ *  #1287：顶层 `model` 字段可为**别名**（claude-code 允许 settings.json 的
+ *  model 写别名，真名在同份 settings 的 `ANTHROPIC_DEFAULT_<ALIAS>_MODEL`
+ *  env 映射里，如 `fable` → `ANTHROPIC_DEFAULT_FABLE_MODEL`）。上报前先把
+ *  别名解析成真名；解析不出（映射缺失/值非字符串/空串）才保留裸值。解析
+ *  结果与既有槽位条目按 `id` 去重——一个模型只出现一行，不再「别名行 +
+ *  真名行」双行。 */
 export function parseClaudeCodeModelSource(raw: unknown, hostname: string): ModelSource {
   const notInstalled: ModelSource = {
     runtime: 'claude-code',
@@ -117,18 +124,27 @@ export function parseClaudeCodeModelSource(raw: unknown, hostname: string): Mode
     return notInstalled;
   }
   const settings = parsed as { model?: unknown; env?: unknown };
-  const models: ModelSourceModel[] = [];
-  if (typeof settings.model === 'string' && settings.model !== '') {
-    models.push({ id: settings.model, name: settings.model, slot: 'default' });
-  }
   const env = settings.env;
-  if (typeof env === 'object' && env !== null && !Array.isArray(env)) {
-    for (const [key, value] of Object.entries(env)) {
-      const match = CLAUDE_MODEL_SLOT_PATTERN.exec(key);
-      const slot = match?.[1];
-      if (slot === undefined || typeof value !== 'string' || value === '') continue;
-      models.push({ id: value, name: value, slot: slot.toLowerCase().replace(/_/g, '-') });
-    }
+  const envRecord: Record<string, unknown> =
+    typeof env === 'object' && env !== null && !Array.isArray(env)
+      ? (env as Record<string, unknown>)
+      : {};
+  const models: ModelSourceModel[] = [];
+  const seen = new Set<string>();
+  // #1287：model 字段别名解析成真名后再上报；映射缺失回落裸值。
+  if (typeof settings.model === 'string' && settings.model !== '') {
+    const mapped = envRecord[`ANTHROPIC_DEFAULT_${settings.model.toUpperCase()}_MODEL`];
+    const id = typeof mapped === 'string' && mapped !== '' ? mapped : settings.model;
+    models.push({ id, name: id, slot: 'default' });
+    seen.add(id);
+  }
+  for (const [key, value] of Object.entries(envRecord)) {
+    const match = CLAUDE_MODEL_SLOT_PATTERN.exec(key);
+    const slot = match?.[1];
+    if (slot === undefined || typeof value !== 'string' || value === '') continue;
+    if (seen.has(value)) continue; // #1287 按 id 去重：真名与槽位同 id 只留一行
+    seen.add(value);
+    models.push({ id: value, name: value, slot: slot.toLowerCase().replace(/_/g, '-') });
   }
   return { runtime: 'claude-code', installed: true, hostname, models };
 }
