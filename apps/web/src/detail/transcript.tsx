@@ -10,7 +10,6 @@
 // names the message flow `transcript`.
 
 import { useEffect, useRef, useState } from 'react';
-import { activityLabel } from '../api/activity.js';
 import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
@@ -602,6 +601,21 @@ function Row({
           </span>
         </div>
       );
+    case 'phase':
+      // 2026-10-13 在飞相位行（对话正式行，逐行追加）：暗色小字、缩进到内容
+      // 列（pl-[31px] 与正文同左缘）、时刻 + 相位标签。无头像（过程细节不是
+      // agent 话语）；落定后由落库 thinking/tools 行 + 过程折叠接管。
+      return (
+        <div
+          className="mt-0.5 flex items-baseline gap-2 pl-[31px] text-xs leading-4 text-(--text-tertiary)"
+          data-row="phase"
+        >
+          <span className="flex-none tabular-nums">{clockTimeHms(item.at)}</span>
+          <span className="[overflow-wrap:anywhere]" data-testid="live-phase-line">
+            {t(item.label, item.labelVars)}
+          </span>
+        </div>
+      );
     case 'fail':
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
@@ -666,21 +680,9 @@ function Row({
                 <span className="[overflow-wrap:anywhere]">
                   {t('本步：{n}', { n: liveStep.step })}
                 </span>
-                {/* 2026-10-13 发送黑盒拆除：过程时间线——本步相位迁移逐行
-                    （HH:mm:ss 相位名），「只有最新标签」的黑盒拆成可见过程；
-                    冻结在长相位时最后一行就是它已停留的起点。无历史不渲染。 */}
-                {(item.phases ?? []).map((p, i) => {
-                  const phaseLabel = activityLabel(p);
-                  return (
-                    <span
-                      key={`${p.at}:${i}`}
-                      className="[overflow-wrap:anywhere]"
-                      data-testid="live-phase-line"
-                    >
-                      {clockTimeHms(p.at)} {t(phaseLabel.label, phaseLabel.vars)}
-                    </span>
-                  );
-                })}
+                {/* 2026-10-13 相位时间线迁出披露面：相位迁移已投影成对话正式
+                    行（mapper 的 kind:'phase'，逐行追加、落定收进过程折叠），
+                    披露面只留本步/机器/技能/信号这些非相位事实。 */}
                 {liveStep.machine != null && (
                   <span className="[overflow-wrap:anywhere]">
                     {t('执行机器：{n}', { n: liveStep.machine })}

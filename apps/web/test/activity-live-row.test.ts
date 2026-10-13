@@ -266,7 +266,7 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
     expect(tail(none)?.lastSignalAt).toBeUndefined();
   });
 
-  test('W13: phases 只含在跑步的迁移史，陈旧步不串场', () => {
+  test('W13: 在飞相位行只含在跑步的迁移史，陈旧步不串场', () => {
     const running = step('claimed');
     const history = [
       act(running.id, 'preparing', { at: NOW - 20_000 }),
@@ -274,10 +274,19 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
       act('step-previous-run', 'responding', { at: NOW - 60_000 }),
     ];
     const items = render({ steps: [running], phaseHistory: history });
-    expect(tail(items)?.phases?.map((p) => p.phase)).toEqual(['preparing', 'starting']);
+    // 2026-10-13：相位迁移投影成对话正式行（kind:'phase'，streaming 行之前
+    // 逐行追加），不再挂在 streaming.phases 子面板。陈旧步（previous-run）
+    // 不产行。
+    const phaseRows = items.filter((i) => i.kind === 'phase');
+    expect(phaseRows.map((p) => (p.kind === 'phase' ? p.at : 0))).toEqual([
+      NOW - 20_000,
+      NOW - 18_000,
+    ]);
+    // streaming 行仍是尾行（相位行在它之前）。
+    expect(tail(items)?.kind).toBe('streaming');
   });
 
-  test('W14: 排队行不挂静默表与时间线（排队不是执行态信号）', () => {
+  test('W14: 排队行不挂静默表与相位行（排队不是执行态信号）', () => {
     const pending = {
       ...step('pending'),
       queue: { position: 1, waitingFor: null },
@@ -291,7 +300,8 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
     const row = tail(items);
     expect(row?.label).toBe('排队中：等空闲机器（前面 {ahead} 个）');
     expect(row?.lastSignalAt).toBeUndefined();
-    expect(row?.phases).toBeUndefined();
+    // 排队态不产在飞相位行（步没在跑）。
+    expect(items.filter((i) => i.kind === 'phase')).toHaveLength(0);
   });
 });
 

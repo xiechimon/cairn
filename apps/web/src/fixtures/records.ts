@@ -21,7 +21,6 @@ import {
   type ProviderRecord,
   type SecretRecord,
   type SkillFact,
-  type StepActivity,
   type TagRecord,
 } from '@pacman/shared';
 
@@ -548,10 +547,6 @@ export type TranscriptItem =
        *  最后增量取新）——折叠行静默超阈值时挂「· 信号 Ns 前」走表。缺省
        *  = 无信号面（fixture / 旧 server），不挂。 */
       lastSignalAt?: number | null;
-      /** 2026-10-13 同批：本步相位迁移历史（有界 ≤8，mapper 已按在跑步
-       *  stepId 过滤）——披露面的过程时间线（每行 `HH:mm:ss 相位`），
-       *  把「只有最新一行标签」的黑盒拆成可见过程。缺省 = 无历史不渲染。 */
-      phases?: readonly StepActivity[];
     }
   /** 2026-10-13 dsh 回合过程折叠（TurnProcessNodeView 对齐）：落定回合的
    *  过程行（thinking / tools 连段）收成一组——折叠态一行「过程 · 完成 Ns ›」，
@@ -566,6 +561,17 @@ export type TranscriptItem =
       parts: TranscriptItem[];
       live: boolean;
       id?: string;
+    }
+  /** 2026-10-13 在飞相位行（用户 review 钉「一条一条、跟 dsh 思考行一样」）：
+   *  在飞回合把每次相位迁移投影成对话的正式行（时刻 + 相位标签），随
+   *  activity 事件逐行追加——不再是藏在披露点击后的子面板。落定后本步的
+   *  落库 thinking/tools 行接管并收进过程折叠（相位行退场、内容留痕）。
+   *  仅 live 面派生；fixture 捕获形不产本条目。 */
+  | {
+      kind: 'phase';
+      at: number;
+      label: string;
+      labelVars?: Record<string, string | number>;
     }
   /** #918 技能事实汇总行（详情页的持久一份）：从落库 toolcall 行派生
    *  （分类单源 shared/skill-facts，与活行判定永不漂移），read = 读到的

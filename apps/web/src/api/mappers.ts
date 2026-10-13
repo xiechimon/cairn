@@ -856,6 +856,21 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const lastSignal =
       act != null || lastTextDeltaAt != null ? Math.max(act?.at ?? 0, lastTextDeltaAt ?? 0) : null;
     const stepPhases = phaseHistory.filter((p) => p.stepId === running.id);
+    // 2026-10-13 在飞相位行（用户 review 钉「一条一条、跟 dsh 思考行一样」）：
+    // 每次相位迁移投影成对话的正式行、随 activity 事件逐行追加——不再是藏在
+    // 披露点击后的子面板。落定后本步落库 thinking/tools 行接管并收进过程
+    // 折叠（相位行退场、内容留痕）。排队态不产（同 signalAt 律：步没在跑）。
+    if (queued == null) {
+      for (const p of stepPhases) {
+        const L = activityLabel(p);
+        items.push({
+          kind: 'phase',
+          at: p.at,
+          label: L.label,
+          ...(L.vars !== undefined ? { labelVars: L.vars } : {}),
+        });
+      }
+    }
     items.push({
       kind: 'streaming',
       // #873：不在投影期把「已用秒数」算成一个死数——投影只在别的事件驱动
@@ -886,7 +901,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         ? { skills: act.skills }
         : {}),
       ...(queued == null && lastSignal != null ? { lastSignalAt: lastSignal } : {}),
-      ...(queued == null && stepPhases.length > 0 ? { phases: stepPhases } : {}),
     });
   } else if (build && todo.phase === 'building' && !steps.some((s) => s.status === 'stopped')) {
     // 静止态 live 线索（#471）：building 的步间隙 / agent 非流式窗口没有
