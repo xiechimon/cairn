@@ -35,6 +35,10 @@ export const modelSourceModelSchema = z.object({
   /** 槽位名（claude-code：default / opus / sonnet / …，env.ANTHROPIC_*_MODEL
    *  中段小写化；pi 段缺省）。 */
   slot: z.string().optional(),
+  /** #1288 活性标注：alive = 目录在且未报死 / dead = 运行时 404 回填 /
+   *  unknown = 未探过或探活失败（缺省 = unknown，fail-open）。
+   *  只读位：server 探活回填，web 消费不写。 */
+  liveness: z.enum(['alive', 'dead', 'unknown']).optional(),
 });
 export type ModelSourceModel = z.infer<typeof modelSourceModelSchema>;
 
