@@ -33,6 +33,7 @@ import {
   CHIEF_TURN_ERROR_KIND,
   chiefTurnErrorContentSchema,
   classifySkillFact,
+  classifyStepFailure,
   classifyUserText,
   conversationBranch,
   GATE_ANNOUNCEMENTS,
@@ -904,10 +905,29 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
-      body: '请将其重新上线，或重新运行任务以改派其他机器。',
+      body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
     });
   }
   return items;
+}
+
+/** #1285 失败行指引按分类分族，不走一刀切机器离线文案。
+ *  - network → 连接断（机器离线族）→ 上线 / 改派指引
+ *  - quota → 额度空 → 等待恢复指引
+ *  - capacity → 限流 → 稍后重试指引
+ *  - other → 模型错误/上下文超长/未知 → 通用排查指引 */
+function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
+  switch (kind) {
+    case 'network':
+      return '请将其重新上线，或重新运行任务以改派其他机器。';
+    case 'quota':
+      return '模型额度已用尽，请等待额度恢复后重试。';
+    case 'capacity':
+      return '请求被限流，请稍后重试。';
+    default:
+      // 模型错误、上下文超长、认证失败、未知失败等，不再套机器离线族文案
+      return '运行失败，请查看原始错误排查原因后重试。';
+  }
 }
 
 /** 工具行的中间形态（组装期折叠用；不出现在产物里）。 */

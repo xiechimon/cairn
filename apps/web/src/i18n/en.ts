@@ -704,6 +704,14 @@ export const EN: Record<string, string> = {
   // #1258 失败行原始错误弹窗面
   查看原始错误: 'View raw error',
   原始错误: 'Raw error',
+  // #1285 失败行指引按分类分族
+  '请将其重新上线，或重新运行任务以改派其他机器。':
+    'Reconnect the machine, or rerun the task to assign another machine.',
+  '模型额度已用尽，请等待额度恢复后重试。':
+    'Model quota exhausted — wait for it to recover, then retry.',
+  '请求被限流，请稍后重试。': 'Rate limited — retry later.',
+  '运行失败，请查看原始错误排查原因后重试。':
+    'Run failed — check the raw error to diagnose the cause, then retry.',
   直接执行: 'Run directly',
   重试: 'Retry',
   失败: 'Failed',
