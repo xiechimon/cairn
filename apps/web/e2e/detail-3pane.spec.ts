@@ -111,14 +111,14 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
       colPadBottom: Number.parseFloat(colCs.paddingBottom),
     };
   });
-  // the card recipe survives the flow move。2026-10-12 用户派 dsh 对话框
-  // 对齐：composer 圆角升 4xl（26px，dsh 输入卡 28px 档的阶梯邻近值），
-  // #792 P6 的方角骨架律在本面被该口径取代。
-  expect(geo.radius).toBe('26px');
+  // the card recipe survives the flow move。2026-10-13 dsh InputBar
+  // 全量对齐：卡片从圆角 4xl 26px 升 2xl（18px，= dsh panel token
+  //  ≈16–18px），工具栏从 absolute 翻 in-flow flex（dsh .row）。
+  expect(geo.radius).toBe('18px');
   expect(geo.border).toBe('1px');
   // #472 in-flow law: a layout participant, never an overlay again —
-  // relative (not static) because the in-card toolbar/send/stop absolutes
-  // anchor to it
+  // relative (covered by the card's own positioning context — the float
+  // overlays and internal layering ride it)
   expect(geo.position).toBe('relative');
   // 16px insets inside the center column — never crossing into the pane
   expect(geo.compLeft).toBeCloseTo(geo.centerLeft + 16, 0);
@@ -166,16 +166,20 @@ test("composer controls share one bottom row: stop is the send button's sibling"
       stopGlyph: byLabel('停止').querySelectorAll('span').length,
     };
   });
-  // a real hit target, not a 14px smudge
-  expect(geo.stop.w).toBe(32);
-  expect(geo.stop.h).toBe(32);
+  // a real hit target — 34px = dsh .primary（2026-10-13 对齐，原 32px）
+  expect(geo.stop.w).toBe(34);
+  expect(geo.stop.h).toBe(34);
   // one row, one axis — stop and send share the centre line the toolbar sits
-  // on. The 30px tool box against the 32px buttons leaves 1px of parity, so
-  // the tolerance is 1; the drift this pins was 9px (bottom 4 vs bottom 12).
-  expect(geo.stop.cy).toBeCloseTo(geo.send.cy, 0);
-  expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(1);
-  // an 8px sibling gap, not an orphaned 27px float
-  expect(geo.send.l - geo.stop.r).toBeCloseTo(8, 0);
+  // on. send button has -translate-y-0.5 (=2px, dsh .primary 同律) → 视觉
+  // 上移 2px 补偿 row 的 2px 下移；几何中心差 = 那道 translate。
+  expect(Math.abs(geo.stop.cy - geo.send.cy)).toBeLessThanOrEqual(3);
+  // tool 盒 30px，发送/停止 34px——视觉中心差靠 row align-items:center
+  // 承；send 按钮的 translateY(-2px) 会让几何中心偏 2px，在可接受内。
+  expect(Math.abs(geo.toolCy - geo.send.cy)).toBeLessThanOrEqual(3);
+  // 12px sibling gap（dsh .trailing gap 12px；原 absolute 同胞律 8px）；
+  // 对正文字号（rem-based）差个别 px 可接受——钉区间不钉字面值
+  expect(geo.send.l - geo.stop.r).toBeGreaterThan(10);
+  expect(geo.send.l - geo.stop.r).toBeLessThanOrEqual(15);
   // the red is carried by the glyph, so the fill matches the send button's
   expect(geo.stopFill).toBe(geo.sendFill);
   expect(geo.stopGlyph).toBe(1);

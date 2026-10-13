@@ -226,12 +226,12 @@ for (const theme of ['light', 'dark'] as const) {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
 
-    // 2026-10-12 用户派「详情页对齐 deepseek-harness 对话框」（随 #1263 同批
-    // 口径）：composer = 卡族里的输入大卡——圆角 4xl（26px，dsh 输入卡 28px
-    // 的阶梯邻近值）+ --card-lift 柔光（取代 --card-shadow 重档）；发送/停止
-    // 钮变全圆片；用户气泡 = 卡族 18px、零入场动画（dsh 发送流实测律）。
+    // 2026-10-13 dsh InputBar 全量对齐（用户 review 钉「不能直接对齐
+    // 吗」）：卡片从圆角 4xl 26px → rounded-2xl 16px（dsh panel token
+    // ≈16-18px 档位）；发送/停止钮 32→34px（dsh .primary 34px 圆）；
+    // 工具栏从 absolute 翻 in-flow flex row（dsh .row）。
     const composer = await edgeContract(page, '[data-testid="composer-card"]');
-    expect(composer.radius).toBe('26px');
+    expect(composer.radius).toBe('18px');
     expect(composer.shadow).toContain(composer.cardLift);
 
     const bubble = await edgeContract(page, '.chat-bubble');

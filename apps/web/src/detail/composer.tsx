@@ -49,11 +49,18 @@ import { ComposerChips } from './composer-chips.js';
 // 方角退役升 rounded-4xl（26px，dsh 输入卡 28px 档的阶梯邻近值），投影从
 // --card-shadow 重档换 --card-lift 柔光（dsh elevation 律：缝线承担分离，
 // 柔光只暗示贴地）；16px 侧/底 margin = 列 inset 律（#472 in-flow）。
+// 2026-10-13 dsh InputBar 全量结构对齐：卡片从相对位 absolute 工具栏翻
+// flex-col gap-3（dsh .card gap 12px）；圆角从 rounded-4xl 26px → rounded-2xl
+// 16px（dsh panel token ≈16-18px 档位）；pt-2 = dsh .card padding-top 8px。
+// 投影 --card-lift 不变（dsh elevation 柔光同族）。min-h 退役，内容自驱高。
 const COMPOSER_CARD =
-  'composer relative mx-4 mb-4 flex-none rounded-4xl border border-(--border) bg-(--secondary) shadow-(--card-lift) transition-shadow duration-(--dur-fast) ease-(--ease-out)';
+  'composer relative mx-4 mb-4 flex-none rounded-2xl border border-(--border) bg-(--secondary) shadow-(--card-lift) transition-shadow duration-(--dur-fast) ease-(--ease-out)';
 // 占位行/输入行共用几何：13px/15px 内衬 + 14px/16px 墨（#470：一档压正文
 // 15px）。min-h-[84px] 走卡片本体。
-const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-4';
+// 2026-10-13 dsh InputBar 间距对齐（用户 review 实测「输入框打字时挤挤的」）：
+// px-[14px] = dsh .input 左衬（原 15px）；pt-1 = 4px 顶衬（dsh 原值；原 13px
+// 太高）；leading-6 = 24px 行高（dsh 原值；原 leading-4 16px 太密）。
+const COMPOSER_PLACEHOLDER = 'px-[14px] pt-1 text-[14px] leading-6';
 // 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 96px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老
 // textarea.composer-input 的自定义字体栈（--font-inter + Inter/system-ui/
@@ -61,18 +68,24 @@ const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-4';
 // 差额逐条中和：方角已同形，field-sizing 回 fixed（JS grow 律），边框/
 // focus 环/暗底/过渡清零到老 UA 裸面形。
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-24 overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-4 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  // 2026-10-13 dsh InputBar 间距对齐：min-h-[36px]=dsh .input min-height:36px
+  // （原 h-12 48px）；pl-[14px] pr-2 pt-1 = dsh .input padding 4px 8px 0 14px
+  // （原 px-[15px] pt-[13px] pb-0）；leading-6 = dsh 24px 行高（原 leading-4
+  // =16px）；max-h-24=96px wire cap 不变。基数以以下限定符体为准。
+  "field-sizing-fixed min-h-[36px] max-h-24 overflow-y-auto resize-none border-none bg-transparent pl-[14px] pr-2 pt-1 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-6 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 // 工具钮（30px 盒，XMON-55 P5 光学左缘 10px 由 toolbar 锚承载）：ghost
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
   'flex size-[30px] cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
-// 发送/停止（XMON-55 P5 同胞对：32×32、同底、同轴、8px 间隔）共享的定位/
-// 盒形串——漆面（bg/text/hover）不进本串：tailwind-merge 后写者胜，共享串
-// 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
-// （#860），停止的红只住 10px glyph。2026-10-12 dsh 对话框对齐：方片退役
-// 变全圆片（dsh 发送钮 = 34px 圆）。
-const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-full border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+// 2026-10-13 dsh InputBar 全量结构对齐（用户 review 钉「这俩都不一样，不能
+// 直接对齐吗？」）：卡片翻 flex-col + gap-3（dsh .card gap 12px + pt 8px），
+// 工具栏从绝对定位翻 in-flow（dsh .row space-between + padding 2/8/6），发送/
+// 停止钮从绝对定位翻工具栏右翼内 inline（dsh .primary 34px 圆 + translateY(-2px)
+// 光学居中对齐工具栏的 2px 下移）。浮层不动：它的 bottom-[calc(100%+6px)]
+// 只依赖卡片的 relative 上下文，内部布局无关。
+// 共享钮形（无绝对定位）：34px 圆（dsh .primary）
+const COMPOSER_BTN =
+  'flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;
@@ -196,7 +209,7 @@ export function Composer({
   });
 
   return (
-    <div className={`${COMPOSER_CARD} min-h-[84px]`} data-testid="composer-card">
+    <div className={`${COMPOSER_CARD} flex flex-col gap-3 pt-2`} data-testid="composer-card">
       {editable ? (
         <div>
           {/* #728 combobox wiring: while the inline listbox is open the
@@ -283,15 +296,9 @@ export function Composer({
           {t(placeholder)}
         </div>
       )}
-      {/* #757 附件 strip + #812 提及 strip：同一浮列挂盒外上方（盒底沿
-          min-84 起随内容增高，浮列与 listbox 同锚无布局位移）。共列即天然上下叠放，
-          两面永不互盖；各 strip 空时零节点，列空即零高度不绘制。
-          #948：浮列定位规则自 attachment-strip.css 迁入（该文件退役）——
-          局部 z30 沿旧值（composer 内部层级，#688 阶梯外）；chips 的 static
-          覆写带 !：detail.css 的 .composer-chips{position:absolute} 是
-          unlayered 规则，layered utility 常态压不过（#688 层序教训），过渡期
-          用 important 顶住，detail.css 清零（#945）后 `!` 可降级；strip 的
-          pointer-events auto 复原预览点击（列本身永不拦截）。 */}
+      {/* #757 附件 strip + #812 提及 strip：同一浮列挂盒外上方。定位 = card
+          的 relative 上下文 + bottom-[calc(100%+6px)]（#948 计算依至今），内部
+          布局改 flex-col 不影响。 */}
       <div
         data-testid="composer-float"
         className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+6px)] z-30 flex flex-col gap-1.5 [&>.attachment-strip]:pointer-events-auto [&>.composer-chips]:static!"
@@ -299,90 +306,84 @@ export function Composer({
         <ComposerChips draft={draft} files={mentionFiles} suspended={inlineOpen || slashOpen} />
         <AttachmentStrip draft={draft} pending={pendingAttachments} />
       </div>
-      {/* deliberate-native（#855）：隐藏的文件选择触发器（display:none，
-          编程式打开），可见皮肤在附件 Button 上；Input 原语是可见输入框皮肤，
-          此处无可收编之物。 */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        style={{ display: 'none' }}
-        onChange={onPickFiles}
-        // 客户端 mime 守门（与服务层 ALLOWED_MIME_* 镜像）；note accept 只是
-        // hint，用户 OS 文件选择器仍可给其他类型，最终由 server 强拒兜底。
-        accept="text/*,image/*,application/json,application/pdf,application/xml"
-      />
-      {/* XMON-55 P5 光学左缘 10px（纸夹墨迹对齐 placeholder 首字符）；
-          bottom 12 与 send/stop 同轴（cy 687）。 */}
+      {/* — dsh InputBar .row（2026-10-13 端对端口）：工具栏翻 in-flow（原
+          absolute bottom-3），flex space-between + gap-3 + px-2 pt-0.5 pb-1.5
+          （dsh row padding 2px 8px 6px）。发送/停止钮不再是同胞绝对位 =
+          工具栏同层 inline，用 translateY(-0.5) 光学对齐 row 的 2px 下移
+          （dsh .primary transform:translateY(-2px) 同理——本面 pt-0.5 = 2px）。— */}
       <div
-        className="composer-toolbar absolute bottom-3 left-2.5 flex items-center"
+        className="composer-toolbar flex items-center justify-between gap-3 px-2 pt-0.5 pb-1.5"
         data-testid="composer-toolbar"
       >
-        {/* #304 C5 裁决:语音输入功能不做(local-first 无语音面)——原站
-            首钮移除不渲染,不留死钮;添加附件/AI 审核/提及原样。
-            XMON-24 三工具钮 shadcn ghost 底座不变；#945 皮肤从
-            .composer-tool per-face 迁 COMPOSER_TOOL 中和串；附件钮可
-            disabled，老面无禁用降档（无 :disabled 规则）→ opacity/
-            pointer-events 双双中性化；svg 免底座强制 16px（图标默认
-            18px 属性）。 */}
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('添加附件')}
-          disabled={attaching || !onAttachment}
-          onClick={openFilePicker}
-        >
-          <Paperclip width={16} height={16} />
-        </Button>
-        {aiReview && (
+        {/* — 左侧工具组（dsh .tools gap 12px）————————————————— */}
+        <div className="flex items-center gap-3">
+          {/* #304 C5 裁决:语音输入功能不做(local-first 无语音面)——原站
+              首钮移除不渲染,不留死钮;添加附件/AI 审核/提及原样。
+              XMON-24 三工具钮 shadcn ghost 底座不变；#945 皮肤从
+              .composer-tool per-face 迁 COMPOSER_TOOL 中和串；附件钮可
+              disabled，老面无禁用降档（无 :disabled 规则）→ opacity/
+              pointer-events 双双中性化；svg 免底座强制 16px（图标默认
+              18px 属性）。 */}
           <Button
             variant="ghost"
-            className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-            aria-label={t('AI 审核')}
-            onClick={onReview}
+            className={`composer-tool ${COMPOSER_TOOL} font-normal disabled:pointer-events-auto disabled:opacity-100 [&_svg:not([class*='size-'])]:size-auto`}
+            aria-label={t('添加附件')}
+            disabled={attaching || !onAttachment}
+            onClick={openFilePicker}
           >
-            <SearchPlus width={16} height={16} />
+            <Paperclip width={16} height={16} />
           </Button>
-        )}
-        <Button
-          variant="ghost"
-          className={`composer-tool ${COMPOSER_TOOL} mr-1.5 font-normal [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('提及')}
-          onClick={togglePicker}
-        >
-          <Grid2x2 width={16} height={16} />
-        </Button>
+          {aiReview && (
+            <Button
+              variant="ghost"
+              className={`composer-tool ${COMPOSER_TOOL} font-normal [&_svg:not([class*='size-'])]:size-auto`}
+              aria-label={t('AI 审核')}
+              onClick={onReview}
+            >
+              <SearchPlus width={16} height={16} />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            className={`composer-tool ${COMPOSER_TOOL} font-normal [&_svg:not([class*='size-'])]:size-auto`}
+            aria-label={t('提及')}
+            onClick={togglePicker}
+          >
+            <Grid2x2 width={16} height={16} />
+          </Button>
+        </div>
+        {/* — 右侧控件组（dsh .trailing gap 12px）————————————————— */}
+        <div className="flex items-center gap-3">
+          {streaming && (
+            // XMON-24 停止钮 shadcn ghost 底座不变：34px 圆（与发送同胞），
+            // 红只住 10px 方块 glyph。
+            <Button
+              variant="ghost"
+              className={`composer-stop ${COMPOSER_BTN} bg-(--seg-active) text-(--destructive) hover:bg-(--seg-active) hover:text-(--destructive) dark:hover:bg-(--seg-active) dark:hover:text-(--destructive) [&_svg:not([class*='size-'])]:size-auto`}
+              aria-label={t('停止')}
+              onClick={onStop}
+            >
+              <span className="size-2.5 rounded-[2px] bg-current" />
+            </Button>
+          )}
+          {/* XMON-24 发送钮 shadcn ghost 底座不变：34px 圆（dsh .primary）、
+              translateY(-0.5)=2px 向上微移对齐工具行的 2px 下移（dsh
+              同律）。漆面逻辑原样：draft 在场翻 brand 实底，idle = --seg-active
+              灰底。过渡只动 bg/color 两属性 150ms cubic-bezier(0.2,0,0,1)。 */}
+          <Button
+            variant="ghost"
+            className={`composer-send ${COMPOSER_BTN} -translate-y-0.5 transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
+              draft.trim() === ''
+                ? 'bg-(--seg-active) text-(--text-tertiary) hover:bg-(--seg-active) hover:text-(--text-tertiary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-tertiary)'
+                : 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
+            } [&_svg:not([class*='size-'])]:size-auto`}
+            aria-label={t('发送')}
+            onClick={send}
+          >
+            <ArrowUp width={16} height={16} />
+          </Button>
+        </div>
       </div>
-      {streaming && (
-        // XMON-24 停止钮 shadcn ghost 底座不变；#945 漆底/定位/尺寸迁
-        // utilities（right 53 = send right 13 + width 32 + gap 8，XMON-55
-        // P5 同胞律）；红只住 10px glyph（--stop 墨）。
-        <Button
-          variant="ghost"
-          className={`composer-stop ${COMPOSER_SQUARE} right-[53px] bg-(--seg-active) text-(--destructive) hover:bg-(--seg-active) hover:text-(--destructive) dark:hover:bg-(--seg-active) dark:hover:text-(--destructive) [&_svg:not([class*='size-'])]:size-auto`}
-          aria-label={t('停止')}
-          onClick={onStop}
-        >
-          <span className="size-2.5 rounded-[2px] bg-current" />
-        </Button>
-      )}
-      {/* XMON-24 发送钮 shadcn ghost 底座不变；#945 漆底/过渡钉迁
-          utilities——过渡只动 bg/color 两属性、150ms cubic-bezier(0.2,0,
-          0,1)（逐键状态不抢注意力，better-ui 动效克制）；draft 在场翻
-          --card-button 品牌实底（XMON-55 P5「有东西可发」可见化）。
-          ArrowUp 属性 14px，svg 免底座强制 16px。 */}
-      <Button
-        variant="ghost"
-        className={`composer-send ${COMPOSER_SQUARE} right-[13px] transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
-          draft.trim() === ''
-            ? 'bg-(--seg-active) text-(--text-tertiary) hover:bg-(--seg-active) hover:text-(--text-tertiary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-tertiary)'
-            : 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'
-        } [&_svg:not([class*='size-'])]:size-auto`}
-        aria-label={t('发送')}
-        onClick={send}
-      >
-        <ArrowUp width={14} height={14} />
-      </Button>
       <MentionPicker
         open={pickerOpen}
         onClose={closePicker}
@@ -399,6 +400,17 @@ export function Composer({
         onClose={closeHelp}
         commands={helpRows}
         skillCount={helpSkillCount}
+      />
+      {/* deliberate-native（#855）：隐藏的文件选择触发器 */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={onPickFiles}
+        // 客户端 mime 守门（与服务层 ALLOWED_MIME_* 镜像）；note accept 只是
+        // hint，用户 OS 文件选择器仍可给其他类型，最终由 server 强拒兜底。
+        accept="text/*,image/*,application/json,application/pdf,application/xml"
       />
     </div>
   );
