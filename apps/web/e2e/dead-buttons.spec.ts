@@ -633,3 +633,56 @@ test('detail transcript action rows carry no restore glyph (#884)', async ({ pag
   await expect(userRow.locator('svg')).toHaveCount(1);
   await expect(userRow.locator('button svg')).toHaveCount(1);
 });
+
+// —— 17. 失败行链接位接线（#1258）————————————————————————————————————
+
+// r8 54/73 canon captured the fail row's link line as 查看原始错误 /
+// 排查指南 — rendered here as inert spans, zero onClick: the exact
+// shape-without-semantics bug #634 names. #1258 wires what has content and
+// removes what has no target:
+//   17a 查看原始错误 is a real button that opens the dialog family shell
+//       (DialogShell) whose body carries the row title verbatim — the
+//       title IS the error text's only carrier (build.errorMessage; no
+//       rawError field exists), so the full text must survive the hop
+//       into the dialog. Closes via the family's X (#68 three-path law).
+//   17b 排查指南 is gone: the repo has no failed-build troubleshooting
+//       doc section to point at (docs/ = engineering specs / research /
+//       verify evidence, not user docs) and no doc site to link — the
+//       #136 「查看文档」wontfix law. A dead link is the bug, not a state
+//       to preserve, so it does not render at all (#884: the shape and
+//       its data field leave together — `links` is gone from the type).
+//   No-content law: the fail row itself is mapper-gated on non-empty
+//   build.errorMessage, so the raw-error button never renders
+//   contentless — 17a's positive control pins the row exists.
+
+test('fail row 查看原始错误 opens the raw-error dialog with the full text (#1258)', async ({
+  page,
+}) => {
+  await page.goto('/app/todo/r8-12?scenario=54');
+  // 正控制：失败行在场（标题即错误文本载体），下面的断言不空转。
+  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的机器已离线');
+  await page.getByRole('button', { name: '查看原始错误' }).click();
+  const dialog = page.getByRole('dialog', { name: '原始错误' });
+  await expect(dialog).toBeVisible();
+  // 全文律：弹窗正文 = 行 title 逐字（errorMessage 是唯一错误载体，
+  // 弹窗不是摘要面）。
+  await expect(dialog.locator('[data-testid="fail-raw-error"]')).toHaveText(
+    '运行该任务的机器已离线',
+  );
+  // 家族关闭律（#68 三路）：X 关闭收层。
+  await dialog.getByRole('button', { name: '关闭' }).click();
+  await expect(dialog).toBeHidden();
+});
+
+test('fail row drops the 排查指南 dead link — no doc target, no shape (#1258)', async ({
+  page,
+}) => {
+  await page.goto('/app/todo/r8-12?scenario=54');
+  // 正控制：失败行在场，缺失断言不空转。
+  await expect(page.locator('.chat-para--fail')).toBeVisible();
+  // 无落点的文档链接不渲染（#136「查看文档」wontfix 同律）：任何形态
+  // （span/按钮/置灰）都不许再出现这个死形。
+  await expect(page.getByText('排查指南')).toHaveCount(0);
+  // 留下的那个是真按钮（button 语义，非 inert span）。
+  await expect(page.getByRole('button', { name: '查看原始错误' })).toBeVisible();
+});
