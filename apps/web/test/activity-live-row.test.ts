@@ -374,6 +374,45 @@ describe('mapTranscript 过程折叠（2026-10-13）', () => {
   });
 });
 
+// —— 2026-10-13 失败行双渲染修复 ————————————————————————————————————
+// 失败方式（先固化）：D1 runtime 把终末错误同时落成 assistant 文本行与
+// build.errorMessage → robot 行与失败行同文双渲染（用户读成「有回复」）；
+// D2 误伤：尾部 robot 行与 errorMessage 不同文（正常失败 = agent 遗言 +
+// 失败面各说各话）时不得让位。
+describe('mapTranscript 失败行去重（2026-10-13）', () => {
+  const FAIL_BUILD: BuildRecord = { ...BUILD, errorMessage: '模型上下文打满，自动压缩失败' };
+  const errMsg = (id: string, text: string, at = NOW): import('../src/api/mappers.js').MessageRow =>
+    ({
+      id,
+      role: 'assistant',
+      content: [{ type: 'text', text }],
+      createdAt: at,
+    }) as unknown as import('../src/api/mappers.js').MessageRow;
+  const renderFailed = (messages: import('../src/api/mappers.js').MessageRow[]) =>
+    mapTranscript({
+      messages,
+      steps: [],
+      plans: [],
+      build: FAIL_BUILD,
+      todo: todo(9, 'failed'),
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: '',
+    });
+
+  test('D1: 尾部 robot 行与 errorMessage 同文 → 让位，只剩失败行一份', () => {
+    const items = renderFailed([errMsg('m1', '模型上下文打满，自动压缩失败')]);
+    expect(items.filter((i) => i.kind === 'fail')).toHaveLength(1);
+    expect(items.filter((i) => i.kind === 'robot')).toHaveLength(0);
+  });
+
+  test('D2: 不同文 → 不让位（agent 遗言与失败面各自保留）', () => {
+    const items = renderFailed([errMsg('m1', '写到一半断了')]);
+    expect(items.filter((i) => i.kind === 'robot')).toHaveLength(1);
+    expect(items.filter((i) => i.kind === 'fail')).toHaveLength(1);
+  });
+});
+
 describe('mapChief 活动相位（#905 W7）', () => {
   // harness 同 chief-flight-expand.test.ts（#822）：封套最小形 + threads 走
   // opts；activeRun 在位（回合在飞）+ user 行 → 尾挂存在行。

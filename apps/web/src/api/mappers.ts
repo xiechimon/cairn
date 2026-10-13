@@ -894,6 +894,19 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 
   // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。
   if (build?.errorMessage && todo.phase === 'failed') {
+    // 2026-10-13 双渲染修复：runtime 把终末错误同时落成 assistant 文本行
+    // （autocompact 家族）与 build.errorMessage——robot 行与失败行同一文字
+    // 渲染两遍，用户读成「有回复」。失败行是终末错误的正本面（指引 + 链接
+    // 都在它身上）：尾部 robot 行与之同文 = 让位。
+    const lastRobot = items.findLast((i) => i.kind === 'robot');
+    if (
+      lastRobot != null &&
+      lastRobot.kind === 'robot' &&
+      lastRobot.markdown != null &&
+      lastRobot.markdown.trim() === build.errorMessage.trim()
+    ) {
+      items.splice(items.lastIndexOf(lastRobot), 1);
+    }
     items.push({
       kind: 'fail',
       title: build.errorMessage,
