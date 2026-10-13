@@ -21,7 +21,10 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>@NODE_DIR@:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- homebrew 两槽进模板 PATH（#1290）：launchd 不给 login shell 的 PATH，
+         claude 等 homebrew 装的二进制要靠这里可见；探测侧另有 well-known
+         回落（claude-code-bin.ts），这里是第一道。 -->
+    <string>@NODE_DIR@:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
 @EXTRA_ENV@
   </dict>
   <key>RunAtLoad</key>

@@ -1,0 +1,14 @@
+{
+  "envPATH": "/usr/bin:/bin",
+  "wellKnownDirs": [
+    "/opt/homebrew/bin",
+    "/usr/local/bin",
+    "/Users/xmon/.local/bin"
+  ],
+  "probeWithFallback": {
+    "path": "/opt/homebrew/bin/claude",
+    "version": "2.1.294",
+    "source": "well-known"
+  },
+  "probePathOnlyControl": null
+}
