@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 // Issue #919 seam 4（前端腿，fixture 面）：技能路由事件的可见面。该面的实现
-// 由并行票 #918 先合入 main（shared 分类器 + activity 活行披露 + 持久汇总
-// 行），本 spec 是 #919 验收对那张脸的 CI 钉扎。fixture 面只钉**持久**汇总
-// 行——活行披露面按 #873/918 设计仅 live 态渲染（liveStep 在位才挂面板），
-// 它的钉扎归 #918 的 unit（activity-live-row）与 live 探针（docs/verify/918）：
+// 由并行票 #918 先合入 main（shared 分类器 + 持久汇总行），本 spec 是 #919
+// 验收对那张脸的 CI 钉扎。fixture 面只钉**持久**汇总行——2026-10-13 在飞块
+// 排版重整后详情活行披露面退役，live 技能调用改由工具相位行承载（phase=
+// 'tool' 的 `正在执行工具：skill: X` 标签，钉扎归 activity-live-row 的 W8/W6），
+// 跨步不串场归 W13 的 stepId 过滤：
 //   1. 持久汇总行缺列 / 名字错（read / denied 两列失真）
 //   2. 被 deny 挡下的事实与命中不可区分（deny 面失明）
 //   3. 零技能事件的运行长出技能行（对照组零噪声律）

@@ -1,18 +1,20 @@
 // #905 活动相位的消费面（mapper 半）：活行标签接管、陈旧过滤、优先级与
 // 零回归。失败方式清单（先固化；store/SSE 半在 sse-conversation-stream.test，
 // 渲染半（走表/缺席不摆数）在 e2e 与 live-row 的 #471 既有律）：
-//   W1 陈旧相位跨步：activity.stepId ≠ 在跑步 id → 基础标签原样，signalAt 缺席
-//   W4 stopping 过渡态优先于活动标签（停止在途更要解释）
+//   W1 陈旧相位跨步：activity.stepId ≠ 在跑步 id → 基础标签原样，lastSignalAt 缺席
+//   W4 stopping 过渡态优先于活动标签（停止在途更要解释）；信号新鲜度仍在
+//      （停止也可能挂住，静默表是诚实的「卡住 vs 在长考」判据）
 //   W5 无活动信号（fixture / 旧 server）→ 既有标签逐字不变（零回归）
 //   W6 相位词表 8 件全有标签（穷尽 switch，编译期 + 运行期双保险）
 //   W7 chief 面：tool 相位 → runningTool 投影；标签接管；无信号回落「处理中...」
-// #918 技能事实面（活行条目 + 详情页汇总）续编：
-//   W8 技能条目跨步串场：streaming 项的 skills 只来自**在跑步**的 activity
-//      （W1 同一道 stepId 过滤）——陈旧步的技能条目不得挂到下一步头上。
+// #918 技能事实面（详情页汇总）续编：
+//   2026-10-13 在飞块排版重整：活行披露面退役——live 技能调用改由工具相位行
+//   承载（phase='tool' 的 `正在执行工具：skill: X` 标签，W6/activityLabel 已钉），
+//   跨步不串场由 W13 的 stepId 过滤钉；streaming 项不再带 skills 字段。
 //   W9 汇总派生自落库 toolcall 行：首见序、同名去重、denied 粘滞（挡下的
 //      名字从读列移除，两列互斥）。
-//   W10 对照组：无技能命中的任务不产 skills 汇总条目、streaming 项不带
-//      skills 字段（空条目 = 噪声，验收明令禁止）。
+//   W10 对照组：无技能命中的任务不产 skills 汇总条目（空条目 = 噪声，验收
+//      明令禁止）。
 //   W11 半程行（无 result 的开始半 upsert）不计入汇总——读取完成才是事实；
 //      终态行同 id 覆盖后自然计入。
 
@@ -87,7 +89,7 @@ function tail(items: TranscriptItem[]) {
 }
 
 describe('mapTranscript 活动相位（#905）', () => {
-  test('在跑步的活动接管标签，signalAt/labelVars 随行', () => {
+  test('在跑步的活动接管标签，lastSignalAt/labelVars 随行', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
@@ -97,18 +99,18 @@ describe('mapTranscript 活动相位（#905）', () => {
       kind: 'streaming',
       label: '正在执行工具：{n}',
       labelVars: { n: 'bash' },
-      signalAt: NOW - 2_000,
+      lastSignalAt: NOW - 2_000,
     });
   });
 
-  test('W1: stepId 不匹配（陈旧步相位）→ 基础标签原样、无 signalAt', () => {
+  test('W1: stepId 不匹配（陈旧步相位）→ 基础标签原样、无 lastSignalAt', () => {
     const running = step('claimed');
     const items = render({
       steps: [running],
       activity: act('step-previous-run', 'thinking'),
     });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '处理中...' });
-    expect(tail(items)?.signalAt).toBeUndefined();
+    expect(tail(items)?.lastSignalAt).toBeUndefined();
   });
 
   test('W4: stopping 优先——「正在停止…」不被活动标签劫持', () => {
@@ -119,7 +121,10 @@ describe('mapTranscript 活动相位（#905）', () => {
       activity: act(running.id, 'thinking'),
     });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '正在停止…' });
-    expect(tail(items)?.signalAt).toBeUndefined();
+    // 2026-10-13 在飞块排版重整：信号新鲜度不再随 stopping 抑制——停止也可能
+    // 挂住，静默表（「· 信号 Ns 前」）是诚实的「卡住 vs 在长考」判据。act 在位
+    // （stepId 匹配）即 lastSignalAt = act.at。
+    expect(tail(items)?.lastSignalAt).toBe(NOW - 2_000);
   });
 
   test('W5: 无活动信号 → 既有标签逐字不变（含 pending plan 的准备工作区）', () => {
@@ -127,7 +132,7 @@ describe('mapTranscript 活动相位（#905）', () => {
     const items = render({ steps: [pendingPlan], activity: null });
     expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
     expect(tail(items)?.labelVars).toBeUndefined();
-    expect(tail(items)?.signalAt).toBeUndefined();
+    expect(tail(items)?.lastSignalAt).toBeUndefined();
   });
 
   test('W6: 相位词表 8 件全有标签（穷尽）', () => {
@@ -183,23 +188,28 @@ describe('mapTranscript 技能事实（#918）', () => {
     return items.find((i) => i.kind === 'skills');
   }
 
-  test('W8: 在跑步 activity 的 skills 随行；陈旧步（stepId 不匹配）不串场', () => {
+  test('W8: live 技能调用 = 工具相位行（披露面退役后的可见面）；陈旧步不串场', () => {
     const running = step('claimed');
-    const facts = [
-      { name: 'to-spec', denied: false },
-      { name: 'extra-skill', denied: true },
-    ];
+    // 2026-10-13 在飞块排版重整：技能调用经 activity phase='tool'（tool=
+    // 'skill: X'）上报，相位史投影成对话正式行——标签即 `正在执行工具：skill: X`
+    // （activityLabel 单源），不再是藏在披露点击后的 `▶ skill:` 子面板。
     const items = render({
       steps: [running],
-      activity: act(running.id, 'tool', { tool: 'skill: to-spec', skills: facts }),
+      phaseHistory: [act(running.id, 'tool', { tool: 'skill: to-spec' })],
     });
-    expect(tail(items)).toMatchObject({ kind: 'streaming', skills: facts });
-    // 陈旧步的 activity（上一跑步）：skills 不得挂到当前 streaming 项。
+    const phaseRows = items.filter((i) => i.kind === 'phase');
+    expect(phaseRows).toHaveLength(1);
+    expect(phaseRows[0]).toMatchObject({
+      kind: 'phase',
+      label: '正在执行工具：{n}',
+      labelVars: { n: 'skill: to-spec' },
+    });
+    // 陈旧步（stepId 不匹配）的相位不产行——跨步不串场（W13 同一道过滤）。
     const stale = render({
       steps: [running],
-      activity: act('step-previous-run', 'tool', { skills: facts }),
+      phaseHistory: [act('step-previous-run', 'tool', { tool: 'skill: to-spec' })],
     });
-    expect(tail(stale)?.skills).toBeUndefined();
+    expect(stale.filter((i) => i.kind === 'phase')).toHaveLength(0);
   });
 
   test('W9: 汇总从落库行派生——首见序、去重、denied 粘滞两列互斥', () => {
@@ -227,9 +237,6 @@ describe('mapTranscript 技能事实（#918）', () => {
       ],
     });
     expect(summary(plain)).toBeUndefined();
-    const running = step('claimed');
-    const noSkills = render({ steps: [running], activity: act(running.id, 'thinking') });
-    expect(tail(noSkills)?.skills).toBeUndefined();
   });
 
   test('W11: 半程行（无 result）不计入汇总；终态覆盖后计入', () => {
@@ -274,7 +281,7 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
       act('step-previous-run', 'responding', { at: NOW - 60_000 }),
     ];
     const items = render({ steps: [running], phaseHistory: history });
-    // 2026-10-13：相位迁移投影成对话正式行（kind:'phase'，streaming 行之前
+    // 2026-10-13：相位迁移投影成对话正式行（kind:'phase'，streaming 头之后
     // 逐行追加），不再挂在 streaming.phases 子面板。陈旧步（previous-run）
     // 不产行。
     const phaseRows = items.filter((i) => i.kind === 'phase');
@@ -282,8 +289,13 @@ describe('mapTranscript 黑盒拆除（2026-10-13）', () => {
       NOW - 20_000,
       NOW - 18_000,
     ]);
-    // streaming 行仍是尾行（相位行在它之前）。
-    expect(tail(items)?.kind).toBe('streaming');
+    // 在飞块排版重整：顺序 = 头（streaming）→ 相位日志行 → 打字面回复。头在
+    // 相位行之前（锚定 agent 回合，日志在其下生长）——不再是「日志在上、头在
+    // 中、面板在右」的散排。
+    const streamIdx = items.findIndex((i) => i.kind === 'streaming');
+    const firstPhaseIdx = items.findIndex((i) => i.kind === 'phase');
+    expect(streamIdx).toBeGreaterThanOrEqual(0);
+    expect(firstPhaseIdx).toBeGreaterThan(streamIdx);
   });
 
   test('W14: 排队行不挂静默表与相位行（排队不是执行态信号）', () => {
@@ -630,7 +642,7 @@ describe('mapTranscript 排队投影（#1108 Q1–Q5）', () => {
       kind: 'streaming',
       label: '排队中：等空闲机器（前面 {ahead} 个）',
     });
-    expect(tail(items)?.signalAt).toBeUndefined();
+    expect(tail(items)?.lastSignalAt).toBeUndefined();
   });
 
   test('Q5: claimed 步 → 处理中（现状锁）', () => {

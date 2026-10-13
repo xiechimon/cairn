@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
+import { LiveRow } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
 import { CopyButton } from '../components/ui/copy-button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
@@ -32,20 +32,8 @@ import {
 import { ChatMarkdown } from './chat-markdown.js';
 import { Segments } from './segments.js';
 
-/** Live step facts the streaming row discloses (#873): the panel is the one
- *  thing the row can say that the timeline does not already carry. Null =
- *  no panel, and with it no chevron. */
-export interface LiveStep {
-  /** Phase label of the running step (规划 / 构建 / 审核). */
-  step: string;
-  /** Executing machine name, when one is already known. */
-  machine: string | null;
-}
-
 interface TranscriptProps {
   transcript: TranscriptItem[];
-  /** #873: the running step behind the live row (null = unknown/fixture). */
-  liveStep?: LiveStep | null;
   /** XMON-105: the run's executing agent — agent message rows (robot /
    *  fail / streaming / review) render this agent's avatar (avatarUrl
    *  override > dicebear displayName seed > static robot asset), the same
@@ -272,14 +260,12 @@ function ProcessGroup({
   prev,
   t,
   agent,
-  liveStep,
   onOpenPlan,
 }: {
   item: Extract<TranscriptItem, { kind: 'process' }>;
   prev: TranscriptItem | undefined;
   t: TFunc;
   agent: { displayName: string; avatarUrl: string | null } | null;
-  liveStep: LiveStep | null;
   onOpenPlan?: () => void;
 }) {
   // 落定收拢：live→false 翻转一刻闭合（滑行由 region 承担）。页面加载即落定
@@ -298,7 +284,6 @@ function ProcessGroup({
       prev={j === 0 ? prev : item.parts[j - 1]}
       t={t}
       agent={agent}
-      liveStep={liveStep}
       onOpenPlan={onOpenPlan}
     />
   ));
@@ -402,7 +387,6 @@ function Row({
   t,
   onOpenPlan,
   agent,
-  liveStep,
 }: {
   item: TranscriptItem;
   /** 前一条目——行距律（18/21/14/6px）的相邻判定输入（#945）。 */
@@ -410,7 +394,6 @@ function Row({
   t: TFunc;
   onOpenPlan?: () => void;
   agent: { displayName: string; avatarUrl: string | null } | null;
-  liveStep: LiveStep | null;
 }) {
   const margin = rowMargin(item, prev);
   switch (item.kind) {
@@ -651,13 +634,13 @@ function Row({
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <AgentRowAvatar agent={agent} />
           {/* #873: the row itself is the shared live row (components/chat/
-              live-row) — same skeleton, same disclosure rule and same honest
-              clock as the chief drawer's in-flight row. What differs per
-              surface is the skin and what the panel discloses: here it is
-              the running step (which step, on which machine), which is the
-              only thing this surface knows that the timeline does not
-              already show. No panel data = no panel, and then no chevron
-              either (#634: a shape must carry semantics). */}
+              live-row) — same skeleton and same honest clock as the chief
+              drawer's in-flight row. 2026-10-13 在飞块排版重整（用户 review 钉
+              「超级不协调」）：披露面退役——相位迁移已投影成对话正式行
+              （mapper kind:'phase'，逐行追加在头之后），机器事实由 run 戳
+              「运行在 X 上」承担，技能由工具相位行 + 落定汇总行承担。头-only：
+              无 chevron、无侧挂面板（旧面板是 ROW_BASE flex 里头的并排兄弟 =
+              散排不协调）。 */}
           <LiveRow
             variant="detail"
             label={item.label}
@@ -665,49 +648,7 @@ function Row({
             startedAt={item.startedAt}
             seconds={item.seconds}
             lastSignalAt={item.lastSignalAt}
-            disclosure={
-              liveStep != null ? { expand: '展开实时步骤', collapse: '收起实时步骤' } : null
-            }
-            // 2026-10-13 用户 review 钉「准备中也不知道准备个啥，要一条一条
-            // 看见（跟 dsh 思考行一样）」：相位时间线默认可见、随到随显，
-            // 不再藏在披露点击后面（仍可手动收起）。
-            defaultExpanded
-          >
-            {liveStep != null && (
-              // #873 活行展开面：同一行文字族的暗色小字，左对齐、无底、无
-              // 边框，展开时挂该行下方（不撑行高）。
-              <div className="mt-1 flex flex-col gap-0.5 pl-[31px] text-xs leading-4 text-(--text-tertiary)">
-                <span className="[overflow-wrap:anywhere]">
-                  {t('本步：{n}', { n: liveStep.step })}
-                </span>
-                {/* 2026-10-13 相位时间线迁出披露面：相位迁移已投影成对话正式
-                    行（mapper 的 kind:'phase'，逐行追加、落定收进过程折叠），
-                    披露面只留本步/机器/技能/信号这些非相位事实。 */}
-                {liveStep.machine != null && (
-                  <span className="[overflow-wrap:anywhere]">
-                    {t('执行机器：{n}', { n: liveStep.machine })}
-                  </span>
-                )}
-                {/* #918：本步技能事实（activity 事件随行，mapper 已按在跑步
-                    stepId 过滤）——每条一行 `▶ skill: <名>`；被 deny 挡下的
-                    同线可见（`✕ …（已挡下）`），与「看不见」可区分。 */}
-                {(item.skills ?? []).map((s) => (
-                  <span
-                    key={`${s.name}:${s.denied ? 'x' : 'r'}`}
-                    className="[overflow-wrap:anywhere]"
-                    data-testid="skill-line"
-                  >
-                    {s.denied
-                      ? t('✕ skill: {n}（已挡下）', { n: s.name })
-                      : t('▶ skill: {n}', { n: s.name })}
-                  </span>
-                ))}
-                {/* #905：「在动 vs 卡住」判据——最近活动信号的走表新鲜度；
-                    无信号（fixture / 旧 server / 静默期）整行缺席不摆死数。 */}
-                <LiveSignal at={item.signalAt} className="[overflow-wrap:anywhere]" />
-              </div>
-            )}
-          </LiveRow>
+          />
         </div>
       );
     case 'plan':
@@ -753,16 +694,7 @@ function Row({
     case 'tools':
       return <ToolsRow item={item} t={t} />;
     case 'process':
-      return (
-        <ProcessGroup
-          item={item}
-          prev={prev}
-          t={t}
-          agent={agent}
-          liveStep={liveStep}
-          onOpenPlan={onOpenPlan}
-        />
-      );
+      return <ProcessGroup item={item} prev={prev} t={t} agent={agent} onOpenPlan={onOpenPlan} />;
     case 'skills':
       // 2026-10-12 dsh ContextInjectionRow 形（用户点名「这种 context 的注入」
       // 排版）：居中灰通知 → 流内左列行——14px 图标 + 标题 + 2px 点隔 +
@@ -1032,12 +964,7 @@ function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }
   );
 }
 
-export function Transcript({
-  transcript,
-  agent = null,
-  onOpenPlan,
-  liveStep = null,
-}: TranscriptProps) {
+export function Transcript({ transcript, agent = null, onOpenPlan }: TranscriptProps) {
   const { t } = useI18n();
   return (
     <>
@@ -1053,14 +980,7 @@ export function Transcript({
             className="group"
             style={SCROLLER_ITEM_STYLE}
           >
-            <Row
-              item={item}
-              prev={transcript[i - 1]}
-              t={t}
-              onOpenPlan={onOpenPlan}
-              agent={agent}
-              liveStep={liveStep}
-            />
+            <Row item={item} prev={transcript[i - 1]} t={t} onOpenPlan={onOpenPlan} agent={agent} />
           </MessageScrollerItem>
         );
       })}

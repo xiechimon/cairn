@@ -32,6 +32,7 @@ bubble.tsx               # shadcn Bubble 族（Bubble/Content/Group/Reactions）
 button.tsx               # registry 同源 + 仓内语义映射（type=button 默认、data-variant/data-size 观测点，#411）；主 CTA = default 档（brand 档已退役，#982/#991）
 card.tsx
 checkbox.tsx             # 复选（registry 同源 + 一件零皮肤语义映射：indeterminate 渲染横杠，#952/#982）；行盒 = 消费点 label 包裹；**别直接摆裸 `<input type="checkbox">`**——浏览器自带方框与仓内复选行不同族
+copy-button.tsx          # 复制钮单源（#1268）：dsh MessageIconActions 形（28px 盒 / 15px 字标 / tertiary 墨 / hover --seg-hover 升二级墨）+ copy→check 1s 自动复位；`fadeByRecency`（默认 true）挂 `.chat-copy` 走新近律（最新回合恒显、更早 hover 浮现），块自带 chrome（代码块横幅）传 false 恒显——**聊天面复制钮一律复用它，别在各消息行手搓 useState+Clipboard**
 dialog-shell.tsx         # 对话框共用底座（e2e 载体 = role=dialog 可及名 + dialog-head/-body/-foot testid，spec/22 §5.5）
 dialog.tsx
 dropdown-menu.tsx        # 仓内语义映射：z 走 --z-dialog 单梯（#733）、Content 透出 anchor（#454）；动效 = 上游默认（#991 Q9）

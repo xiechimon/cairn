@@ -28,7 +28,7 @@ import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { SpecBlock } from './spec-block.js';
-import { type LiveStep, Transcript } from './transcript.js';
+import { Transcript } from './transcript.js';
 import { TurnRail, turnsFromTranscript } from './turn-rail.js';
 
 /** Root 中和：原语 size-full 的 h-full 会顶爆 detail-center 的 flex 链。 */
@@ -49,8 +49,6 @@ export interface TranscriptColumnHandle {
 
 interface TranscriptColumnProps {
   transcript: TranscriptItem[];
-  /** #873：活行披露面（在跑步）；fixture 面 null。 */
-  liveStep: LiveStep | null;
   /** XMON-105：agent 消息行头像的身份（board card / team page 同源）。 */
   agent: { displayName: string; avatarUrl: string | null } | null;
   /** #366：线程内 plan 卡激活 = 右 pane 切文档面。 */
@@ -79,7 +77,6 @@ export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptCol
 
 function TranscriptColumnInner({
   transcript,
-  liveStep,
   agent,
   onOpenPlan,
   spec,
@@ -100,12 +97,7 @@ function TranscriptColumnInner({
           {/* #827：简报卡住线程列首（随流滚动，不钉住）。fixture 面无 spec
               数据，捕获字节不动。 */}
           {spec != null && <SpecBlock spec={spec} />}
-          <Transcript
-            transcript={transcript}
-            liveStep={liveStep}
-            agent={agent}
-            onOpenPlan={onOpenPlan}
-          />
+          <Transcript transcript={transcript} agent={agent} onOpenPlan={onOpenPlan} />
         </MessageScrollerContent>
       </MessageScrollerViewport>
       {/* #991 Q6：jump-to-latest 随原语带入（删除才是定制；原型实审过目）。

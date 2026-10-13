@@ -832,12 +832,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   // 26 `处理中...`）。running 步存在才挂尾（running 已于上方过程分组段
   // 算出）。
   if (running && build) {
-    if (liveText.trim() !== '') {
-      items.push({
-        kind: 'robot',
-        paragraphs: [{ segments: [{ text: liveText }] }],
-      });
-    }
     // #905：活动相位接管行标签——stepId 对在跑步过滤（W1 陈旧相位不跨步）；
     // stopping 过渡态优先级更高（停止在途比模型相位更要解释）；无信号 =
     // 既有基础标签原样（fixture 捕获 / 旧 server 零回归）。
@@ -856,21 +850,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     const lastSignal =
       act != null || lastTextDeltaAt != null ? Math.max(act?.at ?? 0, lastTextDeltaAt ?? 0) : null;
     const stepPhases = phaseHistory.filter((p) => p.stepId === running.id);
-    // 2026-10-13 在飞相位行（用户 review 钉「一条一条、跟 dsh 思考行一样」）：
-    // 每次相位迁移投影成对话的正式行、随 activity 事件逐行追加——不再是藏在
-    // 披露点击后的子面板。落定后本步落库 thinking/tools 行接管并收进过程
-    // 折叠（相位行退场、内容留痕）。排队态不产（同 signalAt 律：步没在跑）。
-    if (queued == null) {
-      for (const p of stepPhases) {
-        const L = activityLabel(p);
-        items.push({
-          kind: 'phase',
-          at: p.at,
-          label: L.label,
-          ...(L.vars !== undefined ? { labelVars: L.vars } : {}),
-        });
-      }
-    }
+    // 2026-10-13 在飞块排版重整（用户 review 钉「超级不协调」）：顺序 =
+    // ① 在飞行头（头像+spinner+秒+当前标签）② 相位日志行（逐行追加，含执行
+    // 机器尾行）③ 打字面回复。头在最上锚定 agent 回合，日志在其下生长，回复
+    // 收尾——不再是「日志在上、头在中、面板在右」的散排。
     items.push({
       kind: 'streaming',
       // #873：不在投影期把「已用秒数」算成一个死数——投影只在别的事件驱动
@@ -892,16 +875,36 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         : actLabel?.vars !== undefined
           ? { labelVars: actLabel.vars }
           : {}),
-      // 排队行不挂相位面（signalAt/skills 是执行态信号——步没在跑，相位是
-      // 上一步残留；W1 的 stepId 过滤管跨步，这里管「排队的当前步」）。
-      ...(queued == null && actLabel != null && act != null ? { signalAt: act.at } : {}),
-      // #918：本步技能事实清单随 activity 事件进披露面（stepId 过滤已由上面
-      // 的 act 判定承担——陈旧步的技能条目不跨步串场）。空/缺省不产字段。
-      ...(queued == null && act?.skills !== undefined && act.skills.length > 0
-        ? { skills: act.skills }
-        : {}),
+      // 2026-10-13 在飞块排版重整：signalAt/skills 不再挂 streaming 项——
+      // 披露面退役后二者无渲染消费者（相位时间线走 kind:'phase' 正式行，
+      // 技能走工具相位行 + 落定汇总行，机器走 run 戳）。lastSignalAt 保留：
+      // 头的静默走表（「· 信号 Ns 前」）仍吃它。
       ...(queued == null && lastSignal != null ? { lastSignalAt: lastSignal } : {}),
     });
+    // 2026-10-13 在飞相位行（用户 review 钉「一条一条、跟 dsh 思考行一样」）：
+    // 每次相位迁移投影成对话的正式行、随 activity 事件逐行追加——不再是藏在
+    // 披露点击后的子面板。落定后本步落库 thinking/tools 行接管并收进过程
+    // 折叠（相位行退场、内容留痕）。排队态不产（同 lastSignalAt 律：步没在跑）。
+    if (queued == null) {
+      for (const p of stepPhases) {
+        const L = activityLabel(p);
+        items.push({
+          kind: 'phase',
+          at: p.at,
+          label: L.label,
+          ...(L.vars !== undefined ? { labelVars: L.vars } : {}),
+        });
+      }
+    }
+    // 打字面回复收尾：增量文本作为正式 robot 行压在相位日志之后——头锚定
+    // 回合、日志逐行生长、回复压轴，三块从上到下一条时间线。不挂 clock：
+    // 增量还在流，落库时刻未定（#471 律：没有真实时刻就不摆钟）。
+    if (liveText.trim() !== '') {
+      items.push({
+        kind: 'robot',
+        paragraphs: [{ segments: [{ text: liveText }] }],
+      });
+    }
   } else if (build && todo.phase === 'building' && !steps.some((s) => s.status === 'stopped')) {
     // 静止态 live 线索（#471）：building 的步间隙 / agent 非流式窗口没有
     // claimed/pending 步——对话区不能全静（实测唯一线索只剩头部「执行中」

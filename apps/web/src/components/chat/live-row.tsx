@@ -125,10 +125,6 @@ export interface LiveRowProps {
   /** Present ⇒ the row head is a real button (with a chevron) that toggles
    *  `children`; absent ⇒ plain text, and no chevron is rendered at all. */
   disclosure?: { expand: string; collapse: string } | null;
-  /** 2026-10-13 用户 review 钉「准备中也不知道准备个啥，要一条一条看见」：
-   *  披露面默认展开（相位时间线随到随显，不必先点一下）。缺省 false =
-   *  老折叠态（chief 面不变）。 */
-  defaultExpanded?: boolean;
   /** 2026-10-13 发送黑盒拆除：最近信号时刻（相位 at 与文本增量取新）。在位
    *  且静默超过 QUIET_AFTER_SECONDS ⇒ 标签后挂「· 信号 Ns 前」走表（1s
    *  计时器，#471 同律：真时刻驱动，不摆冻结数）；缺省 = 无信号面不挂。 */
@@ -145,11 +141,10 @@ export function LiveRow({
   seconds,
   lastSignalAt,
   disclosure = null,
-  defaultExpanded = false,
   children,
 }: LiveRowProps) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const [expanded, setExpanded] = useState(false);
   const tick = useLiveSeconds(startedAt);
   const shown = tick ?? seconds ?? null;
   // 静默走表（发送黑盒拆除）：同一枚 1s 计时器族驱动，超过阈值才挂——

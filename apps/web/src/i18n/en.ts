@@ -460,10 +460,6 @@ export const EN: Record<string, string> = {
   收起实时步骤: 'Hide live steps',
   '正在调用 {n}': 'Calling {n}',
   '等待 Agent 响应…': 'Waiting for the agent…',
-  // #873 详情活行披露面：在跑步两行（步类 + 执行机器）；行开关 aria 复用
-  // #822 的「展开/收起实时步骤」——同一手势两面同词。
-  '本步：{n}': 'This step: {n}',
-  '执行机器：{n}': 'Machine: {n}',
   '默认（与绑定 Agent 相同）': 'Default (same as bound Agent)',
   '搜索模型…': 'Search models…',
   没有匹配的模型: 'No matching models',
@@ -536,10 +532,8 @@ export const EN: Record<string, string> = {
   // 2026-10-13 dsh TurnProcessNodeView 对齐：落定回合过程折叠行的标签
   // （n = 「完成 Ns」族译文，dsh 原文 "Worked for Xs"）。
   '过程 · {n}': 'Process · {n}',
-  // #918 skill facts: live-panel entries (read / denied) + the detail summary.
-  '▶ skill: {n}': '▶ skill: {n}',
-  '✕ skill: {n}（已挡下）': '✕ skill: {n} (blocked)',
-  '技能：{n}': 'Skills: {n}',
+  // #918 技能汇总行（详情页持久一份）：挡下列。live 技能调用改由工具相位行
+  // 承载（2026-10-13 在飞块排版重整，披露面退役）。
   '挡下：{n}': 'Blocked: {n}',
   // 2026-10-12 dsh ContextInjectionRow 对齐：技能汇总行的标题列（dsh 的
   // 「Context injection」对应位）。

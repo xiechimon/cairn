@@ -62,14 +62,24 @@ function notes(items: TranscriptItem[]): string[] {
   return items.filter((i): i is Extract<TranscriptItem, { kind: 'note' }> => i.kind === 'note').map((i) => i.text);
 }
 
+/** dsh 回合过程折叠（TurnProcessNodeView 对齐）把连续的 thinking/tools 段收进
+ *  `process` 组——tools 行不再裸在顶层，而在 `process.parts` 里。F1/F5 的断言
+ *  面跨两层都找出来（折叠前 = 顶层，折叠后 = 组内）。 */
+function toolGroups(items: TranscriptItem[]): Extract<TranscriptItem, { kind: 'tools' }>[] {
+  return items
+    .flatMap((i) => (i.kind === 'process' ? i.parts : [i]))
+    .filter((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
+}
+
 test('F1: set_task_meta echo renders no row (title truth lives in the head)', () => {
   const items = render([
     toolMessage(toolCall('set_task_meta', META_JSON), NOW - 4_000),
     echoMessage(META_JSON, NOW - 3_900),
   ]);
   expect(notes(items)).toEqual([]);
-  // the tool group itself stays (process disclosure law) — one pill, no JSON row
-  const groups = items.filter((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
+  // the tool group itself stays (process disclosure law) — one pill, no JSON
+  // row. 折叠后 tools 行在 process.parts 里，toolGroups 跨两层找。
+  const groups = toolGroups(items);
   expect(groups).toHaveLength(1);
   expect(groups[0]?.pills).toEqual(['set_task_meta']);
 });
@@ -105,7 +115,7 @@ test('F5: pure-JSON tool output hangs no slab; terminal text output stays', () =
     toolMessage(toolCall('set_task_meta', META_JSON), NOW - 6_000),
     toolMessage(toolCall('bash', 'probe ok\n'), NOW - 4_000),
   ]);
-  const group = items.find((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
+  const group = toolGroups(items)[0];
   expect(group?.pills).toEqual(['set_task_meta', 'bash']);
   expect(group?.outputs).toEqual([null, 'probe ok\n']);
 });

@@ -80,7 +80,6 @@ import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
 import { buildTaskMeta } from '../detail/task-meta.js';
 import { TaskMetaBlock, type TaskMetaFields } from '../detail/task-meta-block.js';
-import type { LiveStep } from '../detail/transcript.js';
 import { TranscriptColumn, type TranscriptColumnHandle } from '../detail/transcript-column.js';
 import { useDetailActions } from '../detail/use-detail-actions.js';
 import { type ChainState, useDetailComposer } from '../detail/use-detail-composer.js';
@@ -621,26 +620,6 @@ export function TodoDetailPage() {
   // 时拖动视口（原语 autoScroll），读者自己发出去的那条永远跳到最新
   // （列的 imperative handle → scrollToEnd）。
   const transcriptColRef = useRef<TranscriptColumnHandle | null>(null);
-  // 在飞行数据（活行披露面 + 会话跟随时机）：步类词表 = 详情头部 chip 同族。
-  const liveStep = useMemo<LiveStep | null>(
-    () =>
-      runningStep == null
-        ? null
-        : {
-            step:
-              runningStep.kind === 'review'
-                ? '审核中'
-                : runningStep.kind === 'plan'
-                  ? '规划中'
-                  : '执行中',
-            // 真值 = 该步实际领取的机器（machineName 由 steps×machines 解出，
-            // 未领取为 null）。不取 machineField：它会回落到 build 钉选的机器
-            // ——钉了一台还没来领的机器时，面板会声称「执行机器 = 那台」，
-            // 而步其实还在等（钉选等待态在 meta 块另有标注）。
-            machine: machineName,
-          },
-    [runningStep, machineName],
-  );
 
   // #1127：动作簇（开始/指派/完成/关闭/重跑钉选/审核候选）与 composer
   // 发送分流收编进 hooks——detail/use-detail-actions.js 与
@@ -969,9 +948,6 @@ export function TodoDetailPage() {
               <TranscriptColumn
                 ref={transcriptColRef}
                 transcript={view.transcript}
-                // #873：活行披露面 = 在跑步（哪一步、哪台机器）——详情面
-                // 唯一时间线里没有的事；fixture 面无此数据 = 无面板。
-                liveStep={live ? liveStep : null}
                 // XMON-105: agent message rows carry the executing
                 // agent's own avatar (same identity as board card /
                 // team page), never the logged-in user's.

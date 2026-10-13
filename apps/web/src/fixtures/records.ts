@@ -20,7 +20,6 @@ import {
   type ProjectRepoKind,
   type ProviderRecord,
   type SecretRecord,
-  type SkillFact,
   type TagRecord,
 } from '@pacman/shared';
 
@@ -525,9 +524,10 @@ export type TranscriptItem =
    *  between re-renders; `seconds` = a frozen capture value (fixture
    *  surfaces only). Neither = the #471 quiescent variant (the building
    *  gap's live cue, spinner + static 执行中... label, no counter at all —
-   *  never a stale number). The capture's trailing `›` now renders only
-   *  where the row has a panel behind it (#634「形必须带义」, the detail twin
-   *  of #822): live rows disclose the running step, capture rows carry none. */
+   *  never a stale number). 2026-10-13 在飞块排版重整：详情面活行撤披露
+   *  面板——相位迁移改投影成 kind:'phase' 正式行逐行追加在头之后，机器事实
+   *  归 run 戳、技能归工具相位行 + 落定汇总行。头-only 无 chevron（#634
+   *  「形必须带义」：无面板就不挂披露形）。 */
   | {
       kind: 'streaming';
       seconds?: number;
@@ -535,14 +535,6 @@ export type TranscriptItem =
       label: string;
       /** #905：label 的 t() 插值参数（`正在执行工具：{n}` 的工具名等）。 */
       labelVars?: Record<string, string | number>;
-      /** #905：最近一次活动相位信号的 server 盖章时刻——披露面「最近信号
-       *  Ns 前」的走表起点。缺省 = 无活动信号（fixture 捕获 / 旧 server /
-       *  静默窗口），该行不渲染（#471：缺席的数，不是冻结的数）。 */
-      signalAt?: number;
-      /** #918：本步累计技能事实（activity 事件随行，mapper 已按在跑步 stepId
-       *  过滤）——披露面逐条渲染 `▶ skill: <名>`（denied = `✕ …（已挡下）`）。
-       *  缺省/空 = 本步尚无技能命中，不产任何条目（对照组）。 */
-      skills?: SkillFact[];
       /** 2026-10-13 发送黑盒拆除：最近信号时刻（活动相位 at 与 text_delta
        *  最后增量取新）——折叠行静默超阈值时挂「· 信号 Ns 前」走表。缺省
        *  = 无信号面（fixture / 旧 server），不挂。 */
