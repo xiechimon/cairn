@@ -1,7 +1,8 @@
-// spec 12 / #359 G2-T1：POST /api/projects local 形态——localPath 校验三态
-// （不存在 / 非 git 工作树 / 是 git 工作树 → 400/400/201）+ `~` 展开 +
-// 绝对路径要求 + body 双名兼容（kind = spec 12 数据契约面，repoKind = 既有
-// wire 面；kind 优先）。既有 hosted / github 创建面不回归（AC「旧 hosted 不破」）。
+// spec 12 / #359 G2-T1：POST /api/projects local 形态——localPath 校验
+// （`~` 展开 + 绝对路径要求；存在性/git 仓判定下沉到 daemon 端预检，
+// 仿 Multica local_directory：server 只验形态）+ body 双名兼容
+// （kind = spec 12 数据契约面，repoKind = 既有 wire 面；kind 优先）。
+// 既有 hosted / github 创建面不回归（AC「旧 hosted 不破」）。
 // 失败方式先于实现枚举（仓测试纪律）：本文件即 local 校验的失败场景清单。
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -68,28 +69,33 @@ describe('POST /api/projects kind=local——localPath 校验三态（#359 AC）
     expect(r.body.reason).toBeUndefined();
   });
 
-  test('三态一：路径不存在 → 400 + reason=not_found', async () => {
+  // 创建闸松闸（仿 Multica local_directory：server 只验形态，可达性归 daemon）——
+  // 路径不存在 / 非 git 仓不再在创建面 400，server 看不见执行机 fs（多机部署
+  // 常态：server 在 Mac、repo 在 mea）。daemon 侧 workspace.ts 预检抛
+  // LocalRepoUnreachableError，runner 合成步失败文案点名机器/路径/原因。
+  test('松闸一：路径不存在 → 201（可达性归 daemon 端预检）', async () => {
     const missing = join(tempDir('pacman-local-base-'), 'no-such-dir');
     const r = await postCreate({ name: 'p-gone', kind: 'local', localPath: missing });
-    expect(r.status).toBe(400);
-    expect(String(r.body.error)).toContain('localPath');
-    expect(r.body.reason).toBe<LocalErrorReason>('not_found');
+    expect(r.status).toBe(201);
+    expect(r.body.repoKind).toBe('local');
+    expect(r.body.localPath).toBe(missing);
   });
 
-  test('三态二：存在但不是 git 仓 → 400 + reason=not_git', async () => {
+  test('松闸二：存在但不是 git 仓 → 201（可达性归 daemon 端预检）', async () => {
     const plain = tempDir('pacman-local-plain-');
     const r = await postCreate({ name: 'p-plain', kind: 'local', localPath: plain });
-    expect(r.status).toBe(400);
-    expect(String(r.body.error)).toContain('git');
-    expect(r.body.reason).toBe<LocalErrorReason>('not_git');
+    expect(r.status).toBe(201);
+    expect(r.body.repoKind).toBe('local');
+    expect(r.body.localPath).toBe(plain);
   });
 
-  test('三态二变体：指向普通文件 → 400（非目录即非工作树仓）', async () => {
+  test('松闸三：指向普通文件 → 201（非目录形态仍过，可达性归 daemon）', async () => {
     const dir = tempDir('pacman-local-file-');
     const file = join(dir, 'not-a-repo.txt');
     writeFileSync(file, 'x');
     const r = await postCreate({ name: 'p-file', kind: 'local', localPath: file });
-    expect(r.status).toBe(400);
+    expect(r.status).toBe(201);
+    expect(r.body.localPath).toBe(file);
   });
 
   test('相对路径 → 400 + reason=not_absolute（`~` 展开后判定）', async () => {
