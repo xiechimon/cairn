@@ -18,6 +18,11 @@
 //   8. 非零退出但 stdout 有版本 → 照常取（退出码不进判定，同 auth 探针先例）
 //   9. `PACMAN_CLAUDE_BIN` 指向绝对路径 → 不扫 PATH，但仍校验存在与执行位
 //      （不存在 → null：显式路径不校验等于把假绿原样搬进新字段）
+//  #1290（launchd 窄 PATH 下探不到 homebrew 装的 claude）：
+//  10. PATH 空 + well-known 目录有假 claude → 探到且 source 点名 well-known
+//  11. PATH 有 → 不走回落（well-known 目录里的桩不被命中）
+//  12. PATH 空 + well-known 全空 → null（不抛）
+//  13. well-known 目录里文件无执行位 → 跳过（同 PATH 扫描律）
 
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -102,13 +107,89 @@ describe('resolveCommandPath', () => {
   });
 });
 
+describe('probeClaudeBin well-known 回落（#1290）', () => {
+  test('失败方式 10：PATH 空 + well-known 有假 claude → 探到且 source 点名 well-known', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    try {
+      const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
+      const info = await probeClaudeBin({
+        env: { PATH: '/nowhere' },
+        wellKnownDirs: [dir],
+      });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'well-known' });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('失败方式 11：PATH 有 → 不走回落（well-known 目录里的桩不被命中）', async () => {
+    const pathDir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-path-'));
+    const fallbackDir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-fallback-'));
+    try {
+      const pathStub = makeStub(pathDir, 'claude', '#!/bin/sh\necho 2.1.289\n');
+      makeStub(fallbackDir, 'claude', '#!/bin/sh\necho 9.9.9\n');
+      const info = await probeClaudeBin({
+        env: { PATH: pathDir },
+        wellKnownDirs: [fallbackDir],
+      });
+      expect(info).toEqual({ path: pathStub, version: '2.1.289', source: 'PATH' });
+    } finally {
+      rmSync(pathDir, { recursive: true, force: true });
+      rmSync(fallbackDir, { recursive: true, force: true });
+    }
+  });
+
+  test('失败方式 12：PATH 空 + well-known 全空 → null（不抛）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    try {
+      const info = await probeClaudeBin({
+        command: 'pacman-no-such-claude',
+        env: { PATH: '/nowhere' },
+        wellKnownDirs: [dir],
+      });
+      expect(info).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('失败方式 13：well-known 目录里文件无执行位 → 跳过', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    try {
+      writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n'); // 不给 +x
+      const info = await probeClaudeBin({
+        env: { PATH: '/nowhere' },
+        wellKnownDirs: [dir],
+      });
+      expect(info).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('绝对路径命令不走回落（显式路径的判定不变）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    try {
+      makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
+      const info = await probeClaudeBin({
+        command: '/no/such/claude',
+        env: { PATH: '/nowhere' },
+        wellKnownDirs: [dir],
+      });
+      expect(info).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('probeClaudeBin', () => {
   test('成功：真子进程桩 → {path, version}', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -119,7 +200,7 @@ describe('probeClaudeBin', () => {
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\nexit 1\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -147,7 +228,7 @@ describe('probeClaudeBin', () => {
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "hello from a wrapper"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: null });
+      expect(info).toEqual({ path: stub, version: null, source: 'PATH' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -178,7 +259,7 @@ describe('probeClaudeBin', () => {
       const stub = makeStub(dir, 'my-claude', '#!/bin/sh\necho 2.1.289\n');
       process.env.PACMAN_CLAUDE_BIN = 'my-claude';
       const info = await probeClaudeBin({ env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
     } finally {
       if (prev === undefined) delete process.env.PACMAN_CLAUDE_BIN;
       else process.env.PACMAN_CLAUDE_BIN = prev;

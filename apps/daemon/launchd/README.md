@@ -14,7 +14,9 @@ apps/daemon/launchd/install.sh
 Renders the plist into `~/Library/LaunchAgents/com.xiechimon.pacman-daemon.plist`,
 copies the guarded wrapper to `~/.pacman/pacman-daemon-run.sh`, and bootstraps
 `gui/$(id -u)`. Installed copies live outside the repo, so deleting checkouts
-never orphans the job; re-run after pulling daemon updates.
+never orphans the job; re-run after pulling daemon updates. An already-rendered
+plist is never migrated in place — re-running `install.sh` is the fix (it
+re-renders in place; kickstart as printed to apply).
 
 ## Premise (read before rebooting)
 

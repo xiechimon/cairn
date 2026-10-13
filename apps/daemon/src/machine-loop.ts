@@ -188,8 +188,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const claudeBin: ClaudeBinInfo | null = await probeClaudeBin();
   logger.machine(
     claudeBin
-      ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''}`
-      : 'claude binary: not found on PATH',
+      ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''}${claudeBin.source === 'well-known' ? ' [well-known fallback]' : ''}`
+      : 'claude binary: not found on PATH or well-known dirs',
   );
   // 凭据态：探针结果缓存在这里，随下一拍 presence 上行。不进 presence 节拍
   // ——30s 一次 spawn `claude auth status` 是纯浪费（登录态分钟级才变），

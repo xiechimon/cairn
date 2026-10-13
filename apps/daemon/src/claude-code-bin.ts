@@ -15,6 +15,7 @@
 
 import { execFile } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, isAbsolute, join } from 'node:path';
 
 /** 探测结果。`version: null` = 二进制在但输出里没有版本号（wrapper 打了
@@ -22,6 +23,10 @@ import { delimiter, isAbsolute, join } from 'node:path';
 export interface ClaudeBinInfo {
   path: string;
   version: string | null;
+  /** 命中来源（#1290）：'PATH' = 显式路径或 PATH 扫描；'well-known' = PATH
+   *  探空后的 well-known 目录回落（launchd 窄 PATH 场景）。注入 run 面跳过
+   *  解析，此字段缺位。 */
+  source?: 'PATH' | 'well-known';
 }
 
 /** 探针执行的注入面（测试免发真 CLI，同 claude-code-auth 之律）。 */
@@ -39,7 +44,10 @@ export interface ClaudeBinProbeOpts {
   timeoutMs?: number;
   run?: ClaudeBinRun;
   /** PATH 面（缺省 process.env；测试注入隔离 PATH）。 */
-  env?: { PATH?: string };
+  env?: { PATH?: string; HOME?: string };
+  /** well-known 回落目录面（缺省 homebrew 两槽 + ~/.local/bin；测试注入
+   *  隔离目录，免真机 /opt/homebrew/bin 有真 claude 时测试变得不确定）。 */
+  wellKnownDirs?: readonly string[];
 }
 
 const DEFAULT_TIMEOUT_MS = 2_000;
@@ -82,6 +90,24 @@ export function resolveCommandPath(
   return null;
 }
 
+/** #1290：launchd 环境 PATH 窄（plist 模板历史上只有 @NODE_DIR@ 与系统
+ *  四槽），homebrew 装的 claude 探不到——PATH 探空后对裸命令名回落扫
+ *  well-known 目录：homebrew arm64 / intel 两槽 + 安装脚本常用的
+ *  ~/.local/bin。只回落裸名——显式路径的判定（存在 + 执行位）不变。 */
+export function wellKnownClaudeBinDirs(env: { HOME?: string } = process.env): string[] {
+  return ['/opt/homebrew/bin', '/usr/local/bin', join(env.HOME ?? homedir(), '.local/bin')];
+}
+
+/** 裸命令名的 well-known 回落扫描：与 PATH 扫描同律（存在 + 执行位），
+ *  按目录序首个命中返回，全空 → null。 */
+function resolveWellKnown(command: string, dirs: readonly string[]): string | null {
+  for (const dir of dirs) {
+    const candidate = join(dir, command);
+    if (isExecutable(candidate)) return candidate;
+  }
+  return null;
+}
+
 /** 探针命令执行：同 auth 探针的退出码纪律——**退出码不进判定**，只要 stdout
  *  有内容就照常解析（wrapper / 老 CLI 可能带非零码但输出完整）。 */
 function defaultRun(
@@ -106,14 +132,22 @@ export async function probeClaudeBin(opts: ClaudeBinProbeOpts = {}): Promise<Cla
   const command = opts.command ?? process.env.PACMAN_CLAUDE_BIN ?? 'claude';
   if (opts.run === undefined) {
     // 真路径：先解析到绝对路径（同时给出「在不在」的判据），再跑版本。
-    const resolved = resolveCommandPath(command, opts.env ?? process.env);
-    if (resolved === null) return null;
+    const env = opts.env ?? process.env;
+    const resolved = resolveCommandPath(command, env);
+    // #1290：PATH 探空且是裸命令名 → well-known 目录回落（来源点名给日志）。
+    const fallback =
+      resolved === null && !isAbsolute(command) && !command.includes('/')
+        ? resolveWellKnown(command, opts.wellKnownDirs ?? wellKnownClaudeBinDirs(env))
+        : null;
+    const path = resolved ?? fallback;
+    if (path === null) return null;
+    const source: 'PATH' | 'well-known' = fallback !== null ? 'well-known' : 'PATH';
     const run = defaultRun;
     try {
-      const { stdout } = await run(resolved, ['--version'], {
+      const { stdout } = await run(path, ['--version'], {
         timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       });
-      return { path: resolved, version: parseClaudeVersion(stdout) };
+      return { path, version: parseClaudeVersion(stdout), source };
     } catch {
       return null;
     }
