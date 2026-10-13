@@ -425,3 +425,181 @@ body[data-board-dragging] {
 .wide-in {
   animation: wide-in var(--dur-overlay) var(--ease-standard);
 }
+
+/* 2026-10-13 回合跳转纵列（dsh TurnNavigator 源码实测配方，用户 review 钉
+   「3」）：贴对话列右缘的固定节距刻度梯，悬停弹预览、点击跳转到该回合。
+   配方见 dsh TurnNavigator.module.css；简化 = 无虚拟化（本地全量）、无
+   unloaded/busy 面（无分页）。slot 零高铺满列宽、pointer-events none（只有
+   frame 可点）；frame 竖中于列内、宽度 28px 贴右 12px；刻度 = 右缘 2px 横线
+   tick（静置 scaleX 0.6 → 预览 0.9 → active 1.0 全 primary 墨，140ms 过渡）；
+   悬停预览卡在 frame 左侧、120ms 入场（opacity + 左移 4px）；轨道超 420px 内
+   滚 + 端 fade 遮罩；容器 < 900px 整条隐藏；reduced-motion 全部零动画。 */
+
+.turn-rail-slot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 7;
+  height: 0;
+  container-type: inline-size;
+  pointer-events: none;
+}
+
+.turn-rail-frame {
+  position: absolute;
+  /* top = 根元高之半，由 turn-rail.tsx 的 ResizeObserver 内联供（dsh
+     的 --turn-rail-band/2 同义；本面无 dsh 的全局 CSS 变量通道）。 */
+  right: 12px;
+  width: 28px;
+  transform: translateY(-50%);
+  contain: layout;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.turn-rail-scroller {
+  position: relative;
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.turn-rail-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.turn-rail-scroller[data-fade-top] {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 24px, #000 100%);
+}
+
+.turn-rail-scroller[data-fade-bottom] {
+  mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.turn-rail-scroller[data-fade-top][data-fade-bottom] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+.turn-rail-marks {
+  position: relative;
+}
+
+.turn-rail-mark {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.turn-rail-mark::before {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 20px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border);
+  content: "";
+  transform: translateY(-50%) scaleX(0.6);
+  transform-origin: right center;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease;
+}
+
+.turn-rail-mark:hover::before,
+.turn-rail-mark:focus-visible::before {
+  transform: translateY(-50%) scaleX(0.9);
+  background: var(--text-tertiary);
+}
+
+.turn-rail-mark[data-active]::before {
+  transform: translateY(-50%) scaleX(1);
+  background: var(--foreground);
+}
+
+.turn-rail-mark:focus-visible {
+  outline: none;
+}
+
+.turn-rail-mark:focus-visible::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 20px;
+  border-radius: inherit;
+  outline: 1px solid var(--focus-ring);
+  outline-offset: -1px;
+  content: "";
+}
+
+.turn-rail-preview {
+  position: absolute;
+  right: calc(100% + 10px);
+  box-sizing: border-box;
+  width: min(300px, calc(100cqw - 120px));
+  max-height: 100px;
+  overflow: hidden;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--radius-popover);
+  color: var(--foreground);
+  background: var(--popover);
+  box-shadow: var(--shadow-popover);
+  pointer-events: none;
+  animation: turn-rail-preview-enter 120ms ease-out;
+  transition: top 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.turn-rail-preview-prompt {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.turn-rail-preview-response {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+@keyframes turn-rail-preview-enter {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@container (max-width: 500px) {
+  .turn-rail-frame {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .turn-rail-mark::before,
+  .turn-rail-preview {
+    transition: none;
+    animation: none;
+  }
+}

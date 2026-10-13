@@ -544,6 +544,9 @@ export const EN: Record<string, string> = {
   // 2026-10-12 dsh ContextInjectionRow 对齐：技能汇总行的标题列（dsh 的
   // 「Context injection」对应位）。
   技能注入: 'Skill injection',
+  // 2026-10-13 dsh TurnNavigator 对齐：回合跳转纵列的导航标签与刻度文案。
+  回合跳转: 'Jump to turn',
+  '跳到第 {n} 回合': 'Jump to turn {n}',
   // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
   // server data, not t() keys — same law as note #634).
   '注入技能：': 'Injected skills: ',

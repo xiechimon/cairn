@@ -507,7 +507,7 @@ function Row({
       //  行，动作行收尾（turn 边界探针钉 Item 末节点 = msg-actions）。
       return (
         <>
-          <div className={`${margin} flex justify-end`}>
+          <div className={`${margin} flex justify-end`} data-row="user">
             {/* #612：真实用户话语带 markdown 槽（live mapper 设置；robot 行
                 #469 同款渲染期解析）——围栏/列表/标题不再按字面裸排。纯文本
                 槽 = fixture 捕获形，DOM 与几何保持不变。气泡 = 卡族

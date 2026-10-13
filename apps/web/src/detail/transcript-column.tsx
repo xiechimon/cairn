@@ -15,7 +15,7 @@
 // 断言读的就是这里），Content 中和为 block + gap-0（行距留在行自身的 margin
 // 上，原语默认 flex gap-6 会双倍行距）。
 
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, useMemo } from 'react';
 import {
   MessageScroller,
   MessageScrollerButton,
@@ -29,6 +29,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
 import { SpecBlock } from './spec-block.js';
 import { type LiveStep, Transcript } from './transcript.js';
+import { TurnRail, turnsFromTranscript } from './turn-rail.js';
 
 /** Root 中和：原语 size-full 的 h-full 会顶爆 detail-center 的 flex 链。 */
 const ROOT_CLS = 'h-auto min-h-0 flex-1';
@@ -85,6 +86,7 @@ function TranscriptColumnInner({
   const { t } = useI18n();
   const { scrollToEnd } = useMessageScroller();
   useImperativeHandle(handleRef, () => ({ scrollToEnd: () => void scrollToEnd() }), [scrollToEnd]);
+  const turns = useMemo(() => turnsFromTranscript(transcript), [transcript]);
   return (
     <MessageScroller className={ROOT_CLS}>
       {/* 旧 `.chat-col` 的滚动端口：testid 与内垫随迁（detail-3pane 的
@@ -108,6 +110,7 @@ function TranscriptColumnInner({
         <ArrowDown width={16} height={16} />
         <span className="sr-only">{t('滚动到最新')}</span>
       </MessageScrollerButton>
+      <TurnRail turns={turns} />
     </MessageScroller>
   );
 }
