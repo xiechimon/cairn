@@ -247,3 +247,41 @@ export const chiefFabAvatarOverride: FixtureSet = {
     agent: { displayName: R3_BUILDER.displayName, avatarUrl: '/avatar-robot-2.svg' },
   },
 };
+
+/** #1243 长职责压测语料：600+ 字多行职责，钉团队卡 clamp 不溢出卡盒、详情
+ *  页值槽折行不撑破行宽。文案刻意带换行（作者换行保留面）与两个连续空行
+ *  （显示态折叠面——3+ 换行折成 2 个）。多行段落逐字 = 职责注入系统提示词的
+ *  真实用法（非乱码）。 */
+export const AGENT_LONG_ROLE = [
+  '负责该 Agent 名下的全部代码实现与工程修改。',
+  '任务开工前先读取仓库既有规范与构建脚本，确认改动边界；实现阶段以最小可验证改动为单位逐步落盘，每个改动点都给出可复现的验证命令与预期结果；收尾阶段跑通受影响面的 typecheck 与 lint，把失败场景的实测输出留在提交信息里。',
+  '遇到跨模块的接口改动，先列出所有消费面再做缝纪律校验，不在没有完整阅读过的文件里凭搜索片段做广义修改。',
+  '',
+  '',
+  '',
+  '对外部依赖的 API 形状一律以 node_modules 里的类型声明与真源为准，不凭记忆推断；版本以 pnpm ls 钉死。',
+  '删除任何看似有意的功能前先向负责人确认，避免把历史决策当废码。',
+].join('\n');
+
+/** #1243 团队卡 + 机器详情卡压测集：roster 带一个长职责 Agent（卡上 role =
+ *  同一串长文），供 team 卡 clamp 断言。 */
+const AGENT_LONG_ROLE_CARD: TeamContent['agents'][number] = {
+  id: R3_BUILDER.id,
+  displayName: R3_BUILDER.displayName,
+  model: 'claude-sonnet-5',
+  isDefault: true,
+  role: AGENT_LONG_ROLE,
+};
+
+export const agentLongRoleTeam: FixtureSet = {
+  ...agentDetail,
+  team: { members: 1, agents: [AGENT_LONG_ROLE_CARD] },
+};
+
+/** #1243 agent 详情压测集：description = 同一串长文（详情页 RoleRow 消费
+ *  面）。roster 同步带长职责，供团队页卡断言与详情页断言共用同一场景。 */
+export const agentLongRole: FixtureSet = {
+  ...agentDetail,
+  agents: [{ ...AGENT_R3_BUILDER, description: AGENT_LONG_ROLE }],
+  team: { members: 1, agents: [AGENT_LONG_ROLE_CARD] },
+};

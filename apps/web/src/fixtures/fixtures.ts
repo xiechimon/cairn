@@ -9,11 +9,14 @@
 // consuming ./fixtures.js.
 
 export {
+  AGENT_LONG_ROLE,
   agentDelete,
   agentDetail,
   agentDetailActive,
   agentDetailMemory,
   agentDetailSecrets,
+  agentLongRole,
+  agentLongRoleTeam,
   chiefAgentChip,
   chiefFabAvatar,
   chiefFabAvatarOverride,

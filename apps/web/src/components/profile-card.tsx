@@ -169,7 +169,7 @@ export function ProfileRow({
       <span
         className={cn(
           'profile-value flex items-center gap-3.5 text-sm text-foreground [&_svg]:text-muted-foreground',
-          auto && 'flex-none',
+          auto && 'min-w-0 flex-[1_1_auto]',
           valueClassName,
         )}
       >
