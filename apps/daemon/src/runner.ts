@@ -1183,12 +1183,30 @@ export async function runStep(
   // 律）：第一轮零进展且终局错误命中自适配签名 → backend 翻 compat 旋钮 →
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
   let handle: AgentSessionHandle;
-  // #1260：会话续接失败的跨机降级链退役（归属机模型下 chief/worker 会话文件
-  // 恒在归属机上；SessionNotResumableError 直传 = 步可见失败，不再静默换新
-  // 会话重跑）。重开新会话走用户显式动作（返工/重跑入口）。
+  // #1286 会话续接失败双面语义：recover 面（opts.resume 在位，journal 持久
+  // 了 prompt）→ SessionNotResumableError 降级 new session 重发 journal.prompt
+  // （pi 懒落盘窗口重启时 .jsonl 缺失的兜底）；执行面（非 recover）→
+  // continue 失败直传步可见 failed（#1260 语义保留，不静默换新会话重跑）。
   const openSession = (): Promise<AgentSessionHandle> => {
     if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts);
+    return backend.continueSession(continueId, sessionOpts).catch((err: unknown) => {
+      if (!(err instanceof SessionNotResumableError)) throw err;
+      // recover 面降级（#1286）：journal.prompt 已在 sessionOpts 中，new
+      // session 重发。journal.prompt 为 null（无重发素材）→ 显式失败带可读
+      // 文案（不静默空重发占位句）。执行面（无 opts.resume）直传 #1260 语义。
+      if (opts.resume) {
+        if (opts.resume.prompt === null) {
+          throw new Error(
+            `recover step ${stepId}: continue session ${continueId} unavailable and no journal prompt to resend`,
+          );
+        }
+        logger.step(`continue session unavailable (${continueId}) — falling back to new session`);
+        continueId = null;
+        return backend.createSession(sessionOpts);
+      }
+      // 执行面直传（#1260 语义）
+      throw err;
+    });
   };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
