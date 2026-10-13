@@ -26,8 +26,15 @@
 // #1257：classifyStepFailure（server done 面文本兜底 + network 重试判定）
 // ---------------------------------------------------------------------------
 
-/** 失败桶（行为面枚举：quota → 挂起等额度；network → 续跑重试；其余 → 既有失败漏斗）。 */
-export const STEP_FAILURE_KINDS = ['quota', 'capacity', 'network', 'other'] as const;
+/** 失败桶（行为面枚举：quota → 挂起等额度；network → 续跑重试；
+ *  model_unavailable → 回填 dead + 指认；其余 → 既有失败漏斗）。 */
+export const STEP_FAILURE_KINDS = [
+  'quota',
+  'capacity',
+  'model_unavailable',
+  'network',
+  'other',
+] as const;
 export type StepFailureKind = (typeof STEP_FAILURE_KINDS)[number];
 
 /** 三位数状态码的数字边界正则（Multica 同款：两侧不贴其它数字才算命中）。 */
@@ -35,6 +42,8 @@ const digitBounded = (codes: string): RegExp => new RegExp(`(^|[^0-9])(${codes})
 
 const httpQuotaCodeRe = digitBounded('402');
 const httpCapacityCodeRe = digitBounded('429|529');
+
+const httpModelNotFoundCodeRe = digitBounded('404');
 
 function containsAny(haystack: string, needles: readonly string[]): boolean {
   return needles.some((n) => haystack.includes(n));
@@ -91,6 +100,27 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
     return 'quota';
   }
 
+  // 3.5 model_unavailable：/v1/messages 404（模型已被上游下架）。识别在
+  //     quota/capacity 之后、network 之前——404 不抢 quota 词面（额度致死
+  //     的文案也常带状态码），也不被 network 的泛化连接词吞掉（模型死是
+  //     语义事件不是网络事件）。
+  if (lower.includes('/v1/messages') && httpModelNotFoundCodeRe.test(lower)) {
+    return 'model_unavailable';
+  }
+  if (
+    containsAny(lower, [
+      'model not found',
+      'model_not_found',
+      'model unavailable',
+      'model is not available',
+      'no such model',
+    ]) ||
+    (httpModelNotFoundCodeRe.test(lower) &&
+      (lower.includes('model') || lower.includes('not found')))
+  ) {
+    return 'model_unavailable';
+  }
+
   // 4. capacity / 限速：429 / 529（数字边界）+ 限速词面。
   if (
     httpCapacityCodeRe.test(lower) ||
@@ -125,8 +155,9 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
     return 'network';
   }
 
-  // 6. 其余（auth 401/403、model not found、provider 5xx、未识别）→ other。
+  // 6. 其余（auth 401/403、provider 5xx、未识别）→ other。
   //    403 单独出现无 usage-limit 词面 = 授权/访问问题（非配额）。
+  //    model not found 已在 3.5 model_unavailable 分支处理，不进此桶。
   return 'other';
 }
 

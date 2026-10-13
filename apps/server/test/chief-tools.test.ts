@@ -164,6 +164,8 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
       modelName: string;
     }[];
     expect(rows).toEqual([
+      { provider: 'pi', providerLabel: 'pi', modelId: 'model-a', modelName: '模型甲' },
+      { provider: 'pi', providerLabel: 'pi', modelId: 'model-b', modelName: 'model-b' },
       {
         provider: 'claude-code',
         providerLabel: 'Claude Code',
@@ -196,6 +198,7 @@ describe('51 词表 relay 执行面（02 §4.3）', () => {
     // providers 段已除：同名 provider 记录存在，但候选行取执行机上报
     // （品牌 label 'Claude Code'，name 原样）。
     expect(rows).toEqual([
+      { provider: 'pi', providerLabel: 'pi', modelId: 'm-cc', modelName: '同名行' },
       { provider: 'claude-code', providerLabel: 'Claude Code', modelId: 'm-cc', modelName: 'm-cc' },
     ]);
   });

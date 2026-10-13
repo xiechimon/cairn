@@ -33,6 +33,7 @@ import {
   missingCapabilityItems,
   runtimeGatePasses,
 } from './services/dispatch-eligibility.js';
+import { mergedCatalogModels } from './services/model-liveness.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
 export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
@@ -84,10 +85,14 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
       .get();
     if (!machineRow) throw notFound(`machine ${body.machineId}`);
-    const createReject = homeMachineRejectReason(machineRow, {
-      provider: body.provider ?? null,
-      modelId: body.modelId ?? null,
-    });
+    const createReject = homeMachineRejectReason(
+      machineRow,
+      {
+        provider: body.provider ?? null,
+        modelId: body.modelId ?? null,
+      },
+      mergedCatalogModels(),
+    );
     if (createReject) throw new HttpError(400, createReject);
     const id = newRecordId();
     ctx.db
@@ -178,10 +183,14 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         .where(and(eq(machine.id, body.machineId), eq(machine.teamId, teamId)))
         .get();
       if (!target) throw notFound(`machine ${body.machineId}`);
-      const reject = homeMachineRejectReason(target, {
-        provider: body.provider !== undefined ? body.provider : row.provider,
-        modelId: body.modelId !== undefined ? body.modelId : row.modelId,
-      });
+      const reject = homeMachineRejectReason(
+        target,
+        {
+          provider: body.provider !== undefined ? body.provider : row.provider,
+          modelId: body.modelId !== undefined ? body.modelId : row.modelId,
+        },
+        mergedCatalogModels(),
+      );
       if (reject) throw new HttpError(400, reject);
       sets.machineId = body.machineId;
     } else if ((body.provider !== undefined || body.modelId !== undefined) && row.machineId) {
@@ -193,10 +202,14 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         .where(and(eq(machine.id, row.machineId), eq(machine.teamId, teamId)))
         .get();
       if (home) {
-        const reject = homeMachineRejectReason(home, {
-          provider: body.provider !== undefined ? body.provider : row.provider,
-          modelId: body.modelId !== undefined ? body.modelId : row.modelId,
-        });
+        const reject = homeMachineRejectReason(
+          home,
+          {
+            provider: body.provider !== undefined ? body.provider : row.provider,
+            modelId: body.modelId !== undefined ? body.modelId : row.modelId,
+          },
+          mergedCatalogModels(),
+        );
         if (reject) throw new HttpError(400, reject);
       }
     }

@@ -74,9 +74,8 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('connectionECONNRESET')).toBe('network');
   });
 
-  test('失败方式 4：other 桶（auth / model / 上下文 / 5xx / 空）', () => {
+  test('失败方式 4：other 桶（auth / 上下文 / 5xx / 空）', () => {
     expect(classifyStepFailure('401 unauthorized')).toBe('other');
-    expect(classifyStepFailure('model not found: gpt-6-astra')).toBe('other');
     // token limit 归上下文不归 quota（Multica 规则序）。
     expect(classifyStepFailure('maximum context length exceeded')).toBe('other');
     expect(classifyStepFailure('tokens per minute limit reached: token limit')).toBe('other');
@@ -84,6 +83,20 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
     expect(classifyStepFailure('bad gateway')).toBe('other');
     expect(classifyStepFailure('')).toBe('other');
     expect(classifyStepFailure('   ')).toBe('other');
+  });
+
+  test('失败方式 4a：model_unavailable 桶（/v1/messages 404 / model not found）', () => {
+    // #1288：运行时撞 /v1/messages 404 = 模型已被上游下架。
+    expect(classifyStepFailure('404: /v1/messages not found')).toBe('model_unavailable');
+    expect(
+      classifyStepFailure('POST http://relay/v1/messages -> 404 model gpt-5.6-luna not found'),
+    ).toBe('model_unavailable');
+    expect(classifyStepFailure('model not found: gpt-6-astra')).toBe('model_unavailable');
+    expect(classifyStepFailure('model_not_found: deepseek-v4.1-flash')).toBe('model_unavailable');
+    expect(classifyStepFailure('model unavailable for this account')).toBe('model_unavailable');
+    expect(classifyStepFailure('404: no such model')).toBe('model_unavailable');
+    // 数字边界不误触：404913 tokens 不带 model 词面 = other。
+    expect(classifyStepFailure('input tokens: 404913 exceeds nothing')).toBe('other');
   });
 
   test('失败方式 5：桶序 quota > capacity > network', () => {
@@ -107,7 +120,13 @@ describe('classifyStepFailure（#1257 三桶分类）', () => {
   });
 
   test('词表封闭（枚举单源）', () => {
-    expect(STEP_FAILURE_KINDS).toEqual(['quota', 'capacity', 'network', 'other']);
+    expect(STEP_FAILURE_KINDS).toEqual([
+      'quota',
+      'capacity',
+      'model_unavailable',
+      'network',
+      'other',
+    ]);
   });
 });
 

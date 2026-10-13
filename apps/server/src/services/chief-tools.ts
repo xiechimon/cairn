@@ -41,7 +41,6 @@ import {
   message,
   project,
   schedule,
-  step,
   todo,
   tokenUsage,
 } from '../db/schema.js';
@@ -283,12 +282,12 @@ export async function executeChiefTool(
       );
     }
     case 'models': {
-      // #627 候选模型清单：行语义 = web toModelOptions 投影（#770 起 providers
-      // 段已除，只剩 model-sources 非 pi 段，同 (provider, modelId) first-wins
-      // 去重）。本层独立实现（不 import web 代码），数据面复用 model-sources
-      // 路由背后的 service 函数；claude-code 段 = 各执行机 daemon 上报（#707，
-      // 未上报的机器缺席，不报错）。存量 provider 绑定照旧由 agents 读面原值
-      // 返回、执行面按原值解析，本工具只决定 chief 可新选什么。
+      // #627 候选模型清单：行语义 = web toModelOptions 投影（#1288 起 pi/relay
+      // 段重新进入候选，跨族按 model id 去重、活性取严）。本层独立实现
+      // （不 import web 代码），数据面复用 model-sources 路由背后的 service
+      // 函数；claude-code 段 = 各执行机 daemon 上报（#707，未上报的机器缺席，
+      // 不报错）。存量 provider 绑定照旧由 agents 读面原值返回、执行面按原值
+      // 解析，本工具只决定 chief 可新选什么。
       const keysvc = { db, box: deps.box };
       const rows: {
         provider: string;
@@ -298,13 +297,14 @@ export async function executeChiefTool(
       }[] = [];
       const seen = new Set<string>();
       const push = (row: (typeof rows)[number]) => {
-        const key = `${row.provider}/${row.modelId}`;
+        // #1288 跨族按 model id 去重（与 web toModelOptions 同律）。
+        const key = row.provider === 'claude-code' ? `${row.provider}/${row.modelId}` : row.modelId;
         if (seen.has(key)) return;
         seen.add(key);
         rows.push(row);
       };
       for (const source of getModelSources(keysvc, ctx.teamId).sources) {
-        if (source.runtime === 'pi') continue;
+        // #1288：pi/relay 段进入候选（不再 continue 跳过）。
         const providerLabel = MODEL_SOURCE_RUNTIME_LABELS[source.runtime] ?? source.runtime;
         for (const m of source.models) {
           if (m.id === '') continue;

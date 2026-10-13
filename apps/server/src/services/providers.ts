@@ -29,6 +29,7 @@ import type { Db } from '../db/client.js';
 import { machine, provider } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { mergedCatalogModels } from './model-liveness.js';
 
 export interface ProviderDeps {
   db: Db;
@@ -197,16 +198,30 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
 }
 
 /** GET /api/teams/{id}/model-sources 封套（spec 11 数据契约 + #707）：
- *  pi 一段（custom providers models[] 投影，空 id 行丢弃、空 name 回退 id——
- *  封套须过 shared modelSourcesEnvelopeSchema）+ 每台上报过的机器一段
- *  claude-code（序固定：pi 首 + 按机器名）。
- *  从未上报的机器缺席——server 不读本机 settings.json，不下发假清单。 */
+ *  pi 一段（custom providers models[] 投影 ∪ relay 目录探活结果，按 model id
+ *  去重、活性取严，空 id 行丢弃、空 name 回退 id——封套须过 shared
+ *  modelSourcesEnvelopeSchema）+ 每台上报过的机器一段 claude-code（序固定：
+ *  pi 首 + 按机器名）。
+ *  从未上报的机器缺席——server 不读本机 settings.json，不下发假清单。
+ *  #1288：pi 段模型带活性标注（alive/dead/unknown，缺省 unknown fail-open）；
+ *  探活结果按 providerId 缓存（60s），未探测过的 provider 模型标 unknown。 */
 export function getModelSources(deps: ProviderDeps, teamId: string): ModelSourcesEnvelope {
-  const piModels = listProviders(deps, teamId).flatMap((p) =>
-    p.models
-      .filter((m) => m.id !== '')
-      .map((m) => ({ id: m.id, name: m.name !== '' ? m.name : m.id })),
-  );
+  // 合并目录（探活结果，活性取严）——先于用户录入的 models[] 投影，保证
+  // relay /v1/models 的全量目录出现在选择器候选里（#1288 问题 1）。
+  const catalog = mergedCatalogModels();
+  const catalogIds = new Set(catalog.map((m) => m.id));
+  const piModels: ModelSourceModel[] = [...catalog];
+  for (const p of listProviders(deps, teamId)) {
+    for (const m of p.models) {
+      if (m.id === '' || catalogIds.has(m.id)) continue;
+      // 用户录入但目录探活未见：unknown（fail-open，不置灰不拒绝）。
+      piModels.push({
+        id: m.id,
+        name: m.name !== '' ? m.name : m.id,
+        liveness: 'unknown',
+      });
+    }
+  }
   return {
     sources: [
       { runtime: 'pi', installed: true, hostname: hostname(), models: piModels },

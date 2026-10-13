@@ -82,8 +82,8 @@ describe('getModelSources（服务层，按机器聚合）', () => {
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
     const pi = env.sources.find((src) => src.runtime === 'pi');
     expect(pi?.models).toEqual([
-      { id: 'model-a', name: '模型甲' },
-      { id: 'model-b', name: '模型乙' },
+      { id: 'model-a', name: '模型甲', liveness: 'unknown' },
+      { id: 'model-b', name: '模型乙', liveness: 'unknown' },
     ]);
     s.dispose();
   });

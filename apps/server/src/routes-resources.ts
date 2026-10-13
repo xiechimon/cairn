@@ -44,6 +44,7 @@ import {
 } from './services/github-connection.js';
 import { machineRunningCount, toMachineRecord } from './services/machines.js';
 import { listMcpServers } from './services/mcp-servers.js';
+import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
   abortOAuthCallback,
   completeOAuthCallback,
@@ -218,7 +219,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const moved: string[] = [];
     const rejected: { agentId: string; reason: string }[] = [];
     for (const a of holders) {
-      const reject = homeMachineRejectReason(dst, a);
+      const reject = homeMachineRejectReason(dst, a, mergedCatalogModels());
       if (reject !== null) {
         rejected.push({ agentId: a.id, reason: reject });
         continue;
@@ -391,11 +392,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
 
   // model-sources 面（spec 11 数据契约，#356；#707 起 claude-code 段跟随
   // 执行机）：providers 页 runtime tabs 真值——pi = custom providers models[]
-  // 投影；claude-code = 各执行机 daemon 上报的本机 settings.json 解析结果
-  // （按机器聚合，未上报的机器缺席）。
+  // 投影 ∪ relay 目录探活结果（#1288）；claude-code = 各执行机 daemon 上报的
+  // 本机 settings.json 解析结果（按机器聚合，未上报的机器缺席）。
   app.get('/api/teams/:id/model-sources', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    // #1288：触发 relay 目录探活（fire-and-forget——不阻塞 API 响应；
+    // 缓存 60s，首次调用探到后后续请求即可见）。
+    refreshAllRelayCatalogs(keysvc, teamId).catch(() => {});
     return c.json(getModelSources(keysvc, teamId));
   });
 
