@@ -947,7 +947,9 @@ export function AgentDetailPage() {
 }
 
 /** 职责编辑（r3 §4 原文注：「用一两句话说明该 Agent 的职责。…」）。未设置时
- *  出 canon 空态文案（团队页卡同一串）。 */
+ *  出 canon 空态文案（团队页卡同一串）。
+ *  #1243：显示态值槽可收缩折行（whitespace-pre-line 保留作者换行，trim +
+ *  连续空行折叠——编辑态草稿的多余空行不进显示态）；编辑态 Textarea 不变。 */
 function RoleRow({
   value,
   onCommit,
@@ -958,6 +960,9 @@ function RoleRow({
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   const inputRef = useEditorFocus<HTMLTextAreaElement>(draft !== null);
+  // #1243：显示态 trim + 连续空行折叠（3+ 个换行 → 2 个），不把编辑态草稿的
+  // 多余空行带进显示态。
+  const display = value == null ? null : value.trim().replace(/\n{3,}/g, '\n\n');
   // 说明副文案是这一行的常驻部分（编辑态也在）：它是「怎么写」的指导，
   // 编辑时撤掉反而最需要它的时候没了。
   return (
@@ -965,12 +970,12 @@ function RoleRow({
       label={t('职责')}
       hint={t(AGENT_PERMISSION_COPY.responsibility)}
       labelClassName="agent-field-label"
-      valueClassName={draft === null ? undefined : PROFILE_VALUE_EDITOR_CLS}
+      valueClassName={draft === null ? 'items-start' : PROFILE_VALUE_EDITOR_CLS}
     >
       {draft === null ? (
         <>
-          <span className="agent-role-text text-sm text-foreground">
-            {value ?? t('未设置职责')}
+          <span className="agent-role-text min-w-0 flex-[1_1_auto] text-sm whitespace-pre-line break-words text-foreground">
+            {display ?? t('未设置职责')}
           </span>
           <div className="flex justify-end gap-2">
             {/* r3 §4 实测：职责行带编辑图标（点击进编辑态）。图标-only 钮，

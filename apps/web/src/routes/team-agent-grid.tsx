@@ -72,7 +72,10 @@ export function TeamAgentGrid({
                     ? t(' · 归属机 {machine}', { machine: machineName(agent.machineId)! })
                     : t(' · 未设归属机'))}
               </span>
-              <span className="text-xs leading-4 text-(--text-tertiary)">
+              <span
+                className="line-clamp-2 text-xs leading-4 text-(--text-tertiary)"
+                title={agent.role ?? undefined}
+              >
                 {agent.role ?? t('未设置职责')}
               </span>
             </span>

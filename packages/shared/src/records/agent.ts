@@ -90,6 +90,10 @@ export const AGENT_TOOL_TAG: AgentToolSwitch = '创建标签';
  * 与 chief create_agent）同源消费；存量行回填走 migration（PR 内审）。 */
 export const AGENT_TOOL_DEFAULTS: readonly AgentToolSwitch[] = [AGENT_TOOL_PUSH];
 
+/** agent.description 最大长度（#1243）：2000 字——高于现网最长值，不截断存量。
+ *  超限 = server 400 明示「职责过长（最多 2000 字）」。 */
+export const AGENT_DESC_MAX_LENGTH = 2000;
+
 /** 权限面 6 开关各自的说明副文案（键 = AGENT_TOOL_SWITCHES 的同值域词）。
  * 文案原文实测自参考产品 Agent 详情页权限 tab（2026-09-30，#485）。 */
 export const AGENT_TOOL_COPY: Record<(typeof AGENT_TOOL_SWITCHES)[number], string> = {
@@ -117,7 +121,7 @@ export const AGENT_PERMISSION_COPY = {
   mcpServers:
     '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。',
   responsibility:
-    '用一两句话说明该 Agent 的职责。该说明会注入它执行的每个任务，也会提供给总管用于分派。',
+    '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给总管用于分派。',
   defaultSkill: '该 Agent 执行任何任务时自动携带的团队技能，无需在消息中 @ 引用。',
   skillsAllowlist:
     '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。',
@@ -179,7 +183,10 @@ export type AgentRecord = z.infer<typeof agentRecordSchema>;
  * 上文 agentRecordSchema 配置面投影，创建弹窗 r3 §4：名称/职责/模型）。 */
 export const createAgentBodySchema = z.object({
   displayName: z.string().min(1),
-  description: z.string().nullish(),
+  description: z
+    .string()
+    .max(AGENT_DESC_MAX_LENGTH, `职责过长（最多 ${AGENT_DESC_MAX_LENGTH} 字）`)
+    .nullish(),
   provider: z.string().nullish(),
   modelId: z.string().nullish(),
   thinkingLevel: z.string().nullish(),

@@ -17,6 +17,8 @@ import {
   agentDetailActive,
   agentDetailMemory,
   agentDetailSecrets,
+  agentLongRole,
+  agentLongRoleTeam,
   apiKeysCreated,
   boardChiefProbes,
   boardDarkFresh,
@@ -350,6 +352,10 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // 的两行 build（等机器 / 跑起来），钉行形状、状态位映射与点击落点。
       // 空态不另开场景——agentDetail 自身不带 agentTasks，即 canon 空态。
       'agent-detail-active': agentDetailActive,
+      // #1243 长职责压测：详情页 RoleRow 折行（agent-detail-long-role）与
+      // 团队卡/机器卡 clamp（agent-detail-long-role 或 team-long-role 同 roster）。
+      'agent-detail-long-role': agentLongRole,
+      'team-long-role': agentLongRoleTeam,
       '13': boardDefault,
       // account 语言 dropdown open state (issue #74; shape [设计], r2 §11 Q19)
       '13-lang': { ...boardDefault, ui: { langDropdownOpen: true } },
