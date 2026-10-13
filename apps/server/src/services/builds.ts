@@ -1297,7 +1297,7 @@ export function failStepWithEvents(
 
 export const BUILD_ABANDONED_STEP_MS = 120_000;
 
-/** worker 步（plan/build/merge/review）失联 sweep（scheduler tick 驱动）：
+/** worker 步（plan/build/merge/review/verify）失联 sweep（scheduler tick 驱动）：
  * 失联 claimed 步**释放回 pending**供他机认领续跑（#862 T1 tracer）；无人
  * 认领的 pending 步挂起等机器（#1257：无人认领是 infra 事件，机器回来走
  * 既有 claim 循环自动续跑，「等机器」可见态由 todo waitingOn 派生承担，
@@ -1326,7 +1326,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
     .from(step)
     .where(
       and(
-        inArray(step.kind, ['plan', 'build', 'merge', 'review']),
+        inArray(step.kind, ['plan', 'build', 'merge', 'review', 'verify']),
         inArray(step.status, ['pending', 'claimed']),
       ),
     )
