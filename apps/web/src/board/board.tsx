@@ -286,7 +286,7 @@ export function BoardSurface({
             #1009 A0 ⑨ / ADR 0013 D11）。 */}
         <div
           data-testid="board-scroller"
-          className={`board-scroller absolute inset-x-0 bottom-0 grid grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px] ${
+          className={`board-scroller wide-in absolute inset-x-0 bottom-0 grid grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px] ${
             banner == null ? 'top-11' : 'top-[121px]'
           }`}
         >

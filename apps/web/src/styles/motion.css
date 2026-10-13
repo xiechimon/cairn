@@ -343,3 +343,85 @@ body[data-board-dragging] {
     transform: scale(0.92);
   }
 }
+
+/* 2026-10-13 状态弧（dsh StateDot ongoing 源码实测配方，用户 review 钉「6
+   也模仿一下」）：实心态以外的「在飞」面 = 一条完整淡环 + 一段呼吸弧，整枚
+   连续自旋。1.5s 双动画同周期（spin linear + dash ease-in-out），挂载时
+   startTime 钉 0（todo-card 的 pinStateArc）让同屏多张在飞卡同相——dsh 的
+   syncSpinner 同律。在飞 live 行的大 spinner 面不动（用户钉「不换
+   spinner」，Atom 仍是那边的主加载面）。reduced-motion：静止弧（dsh 的
+   降级形 dasharray 18 150 offset -3）。 */
+@keyframes state-arc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes state-arc-dash {
+  0% {
+    stroke-dasharray: 12 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 24 150;
+    stroke-dashoffset: -6;
+  }
+  100% {
+    stroke-dasharray: 12 150;
+    stroke-dashoffset: 0;
+  }
+}
+
+.state-arc {
+  display: block;
+  color: var(--text-tertiary);
+}
+
+.state-arc-motion {
+  transform-origin: center;
+  animation: state-arc-spin 1.5s linear infinite;
+}
+
+.state-arc-track,
+.state-arc-run {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.state-arc-track {
+  opacity: 0.25;
+}
+
+.state-arc-run {
+  stroke-dasharray: 12 150;
+  animation: state-arc-dash 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-arc-motion,
+  .state-arc-run {
+    animation: none;
+  }
+
+  .state-arc-run {
+    stroke-dasharray: 18 150;
+    stroke-dashoffset: -3;
+  }
+}
+
+/* 2026-10-13 wide-in（dsh SidebarRoot / WorkspaceBrowser 源码实测配方，用户
+   review 钉「5 也要」）：侧栏清单与看板卡格两个主浏览面挂载时 200ms 淡入
+   （opacity 单通道，无位移）。200ms = --dur-overlay 档。reduced-motion 由
+   本文件顶部全站 keyframe 冻结兜底。挂载一次性：路由进入重挂才重播，
+   折叠/展开不摘 DOM 不重播。 */
+@keyframes wide-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.wide-in {
+  animation: wide-in var(--dur-overlay) var(--ease-standard);
+}

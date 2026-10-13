@@ -4,6 +4,8 @@
 // bottom). #55 adds the collapsed rail: 40px wide, icon-only rows, 32px row
 // pitch with a 24px selected pill and the user avatar chip at the bottom.
 // All rows render; the collapse toggle persists like the theme.
+// 2026-10-13 展开态 aside 挂 .wide-in（dsh SidebarRoot 的 wide-in 律）：宽态
+// 内容在展开重挂/冷装载时 200ms 淡入，折叠 rail 形不播；配方在 motion.css。
 // #121: the nav rows (rail + expanded, team name and 新建项目 included) are
 // react-router Links — SPA hops carrying the live ?search= along.
 // #127: the avatar chips toggle the user-menu popover (Base UI Popover;
@@ -467,7 +469,7 @@ export function BoardSidebar({
   }
 
   return (
-    <aside className="board-sidebar relative z-(--z-docked) flex w-60 flex-none flex-col overflow-hidden border-r border-[var(--border)] bg-background">
+    <aside className="board-sidebar wide-in relative z-(--z-docked) flex w-60 flex-none flex-col overflow-hidden border-r border-[var(--border)] bg-background">
       {/* 头部几何与选中态无关（dogfood 2026-09-30）：--active 只换底色，不搬
           内容。pill 的 mx-2 内缩 8px，pl 补 11 让图标仍落在 x19——与非选中态
           pl-[19px] 同一条线；名字间距恒 11px。r7 12 探针钉的是 pill 盒子

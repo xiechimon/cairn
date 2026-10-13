@@ -27,6 +27,7 @@ import {
   SearchWhite,
   UserCircle,
 } from '../icons/index.js';
+import { IN_FLIGHT_PHASES } from '../phase.js';
 import { cardAction } from './columns.js';
 import { ProjectAvatar } from './project-avatar.js';
 import { relativeTime } from './rel-time.js';
@@ -69,6 +70,40 @@ function badgeFor(todo: TodoRecord): 'idle' | 'attention' | 'done' | 'failed' | 
   }
   if (todo.phase === 'todo' || todo.phase === 'queued') return 'idle';
   return null;
+}
+
+/** 在飞弧的相位钉（dsh syncSpinner 同律）：CSS 动画随元素挂载各自起跑，
+ *  同屏多枚弧会错相；startTime 钉 0 让一切可见弧共用一条时间轴。挂载钉
+ *  首次起跑，animationstart 钉每次重跑（元素再挂载/再显示）。jsdom 单测道
+ *  无 Web Animations（lib.dom 类型非可选）——可选调用让该道不同步即可。 */
+function pinStateArc(el: SVGSVGElement | null): void {
+  if (el === null) return;
+  const pin = () => {
+    for (const a of el.getAnimations?.({ subtree: true }) ?? []) a.startTime = 0;
+  };
+  pin();
+  el.addEventListener('animationstart', pin);
+}
+
+/** 在飞角标（dsh StateDot ongoing 形）：12px 淡环 + 呼吸弧，盖在头像角
+ *  标槽（实心徽标 9px 的同位放大，dsh ongoing 14px > 实心态 10px 同律）。 */
+function StateArc() {
+  return (
+    <svg
+      ref={pinStateArc}
+      className="state-arc absolute -top-[3.5px] -right-[6.5px]"
+      width={12}
+      height={12}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      data-testid="todo-state-arc"
+    >
+      <g className="state-arc-motion">
+        <circle className="state-arc-track" cx={12} cy={12} r={9.5} />
+        <circle className="state-arc-run" cx={12} cy={12} r={9.5} />
+      </g>
+    </svg>
+  );
 }
 
 export function TodoCard({
@@ -180,6 +215,13 @@ export function TodoCard({
               )}
             </span>
           )}
+          {/* 2026-10-13 在飞状态弧（dsh StateDot ongoing 对齐，用户 review 钉
+              「6 也模仿一下，只是不换 spinner」）：在飞卡（IN_FLIGHT_PHASES
+              = planning/building）此前零徽标（badgeFor 返 null）——看板上
+              「正在跑」不可见。角标槽渲染 dsh 的弧面：淡环 + 呼吸弧 1.5s
+              连续自旋（state-arc 族在 motion.css，reduced-motion 静止弧）。
+              大加载面不换：详情页 live 行仍是 Atom。 */}
+          {badge == null && IN_FLIGHT_PHASES.has(todo.phase) && <StateArc />}
         </span>
         <span className="relative top-[1.5px] ml-[7px] text-[11px] leading-4 text-muted-foreground">
           {relativeTime(todo.phaseAt, now, t)}
