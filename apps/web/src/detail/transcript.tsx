@@ -315,26 +315,31 @@ function ProcessGroup({
   return (
     <div>
       {!item.live && (
-        <button
-          type="button"
-          className={`flex h-[33px] w-full cursor-pointer items-center border-0 border-b-[0.5px] border-(--border) bg-transparent pb-2 text-left text-[13px] leading-6 text-(--text-tertiary) transition-colors duration-100 hover:text-(--text-secondary)${
-            wasLive.current ? ' process-fold-row--enter' : ''
-          }`}
-          aria-expanded={open}
-          data-testid="process-fold"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <span className="min-w-0 truncate tabular-nums">
-            {t('过程 · {n}', { n: formatElapsed(item.seconds, t) })}
-          </span>
-          <ChevronDown
-            width={14}
-            height={14}
-            className={`ml-1 flex-none transition-transform duration-100 ease-(--ease-standard)${
-              open ? ' rotate-180' : ''
+        // 折叠行的横缝（0.5px border-b）= dsh TurnProcessNodeView 的全宽
+        // 底缝；文字起点压内容列（pl-[31px]，与 avatar 列对齐——用户实测
+        // 「排版不协调」即本行裸压左缘与内容列错位）。
+        <div className="border-b-[0.5px] border-(--border)">
+          <button
+            type="button"
+            className={`flex h-[33px] w-full cursor-pointer items-center border-none bg-transparent pb-2 pl-[31px] text-left text-[13px] leading-6 text-(--text-tertiary) transition-colors duration-100 hover:text-(--text-secondary)${
+              wasLive.current ? ' process-fold-row--enter' : ''
             }`}
-          />
-        </button>
+            aria-expanded={open}
+            data-testid="process-fold"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span className="min-w-0 truncate tabular-nums">
+              {t('过程 · {n}', { n: formatElapsed(item.seconds, t) })}
+            </span>
+            <ChevronDown
+              width={14}
+              height={14}
+              className={`ml-1 flex-none transition-transform duration-100 ease-(--ease-standard)${
+                open ? ' rotate-180' : ''
+              }`}
+            />
+          </button>
+        </div>
       )}
       <div className="process-region" data-open={open || undefined}>
         <div className="process-region-inner">{parts}</div>
