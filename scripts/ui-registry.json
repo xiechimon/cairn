@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "248e7a64463eea86b79d167b0c3fb9618e5d6624",
-    "date": "2026-10-12"
+    "sha": "f39bbc97e4c9d46ef0f7d692e08ee172bdbc9a6a",
+    "date": "2026-10-13"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -153,8 +153,9 @@
     "select.tsx": {
       "kind": "registry",
       "upstreamItem": "select",
-      "status": "pristine",
-      "hash": "ab19e7f4d786d003373d4b1750be5efda931d18d388cbb163b83e2d29e7a93de"
+      "status": "deviated",
+      "hash": "c3d9b5c4a20a9e97aca5492711f22a436c4e3012cc21c6d3242640447555039c",
+      "reason": "#1301: SelectContent popover width = trigger-width floor + 320px cap (w-(--anchor-width) -> min-w-(--anchor-width) + max-w-80) so long model ids are not clipped; SelectItemText drops whitespace-nowrap so labels wrap instead of overflowing."
     },
     "separator.tsx": {
       "kind": "registry",
