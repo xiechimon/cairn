@@ -186,7 +186,8 @@ test('一级列运行时与内置清空行，且 pi 段进入候选（#1288 翻�
   await expect(runtimeMenu.locator('.dlg-agent-runtime-row').first()).toContainText('内置 (pi)');
   // #1288 翻案：pi/relay 段进入候选——runtime 行 = 内置清空行 + pi 分组 + claude-code 分组。
   await expect(runtimeMenu.locator('.dlg-agent-runtime-row')).toHaveCount(3);
-  await expect(runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'pi' })).toHaveCount(1);
+  // 内置清空行文本「内置 (pi)」也含 pi——含 pi 行 = 清空行 + pi 分组 = 2。
+  await expect(runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'pi' })).toHaveCount(2);
   await expect(runtimeMenu.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' })).toHaveCount(
     1,
   );
