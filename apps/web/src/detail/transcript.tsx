@@ -654,6 +654,10 @@ function Row({
             disclosure={
               liveStep != null ? { expand: '展开实时步骤', collapse: '收起实时步骤' } : null
             }
+            // 2026-10-13 用户 review 钉「准备中也不知道准备个啥，要一条一条
+            // 看见（跟 dsh 思考行一样）」：相位时间线默认可见、随到随显，
+            // 不再藏在披露点击后面（仍可手动收起）。
+            defaultExpanded
           >
             {liveStep != null && (
               // #873 活行展开面：同一行文字族的暗色小字，左对齐、无底、无
