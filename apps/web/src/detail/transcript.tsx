@@ -15,6 +15,7 @@ import { clockTimeHms, inlineSegments } from '../api/mappers.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
+import { CopyButton } from '../components/ui/copy-button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
@@ -24,7 +25,6 @@ import {
   ChevronDown,
   ChevronRight,
   Clock,
-  Copy,
   ExternalLink,
   FileTab,
   Puzzle,
@@ -199,23 +199,12 @@ function ActionRow({
       data-testid="msg-actions"
     >
       {copy != null && (
-        // p-0 keeps the 13px icon box the inert span carried, so the row
-        // geometry the #470 fence pins does not move. #945：.chat-copy 的
-        // 无边框透明底迁 utilities（ghost hover 底双档中和，墨色走 inherit
-        // = 行的 tertiary；老面无 cursor 规则，不加 cursor-pointer）。
-        // 2026-10-12 dsh 对齐：复制钮可见性 = 新近律（motion.css .chat-copy
-        // 规则：最新一条带动作行的回合静置恒显，更早回合 hover/focus 浮现，
-        // 触屏恒显）。秒数/完成尾段是信息不是操作，不参与隐现。
-        <Button
-          variant="ghost"
-          className="chat-copy h-auto justify-start rounded-none border-none bg-transparent p-0 hover:bg-transparent hover:text-inherit dark:hover:bg-transparent dark:hover:text-inherit active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-          aria-label={t('复制')}
-          onClick={() => {
-            void navigator.clipboard.writeText(copy);
-          }}
-        >
-          <Copy width={13} height={13} />
-        </Button>
+        // 2026-10-13 复制钮单源化（用户 review 钉：复制钮全家不一致）：
+        // CopyButton（components/ui/copy-button）= 唯一行为源——28px 盒 /
+        // 15px 字形 / 复制→对勾 1s 换回 / hover 淡底。可见性 = 新近律
+        // （motion.css .chat-copy 规则随行）。秒数/完成尾段是信息不是操作，
+        // 不参与隐现。
+        <CopyButton text={copy} />
       )}
       {toggle == null ? (
         tail
@@ -248,23 +237,20 @@ function ActionRow({
  *  底）。可见性 = 新近律（motion.css .chat-copy 规则：只有最新一条带动作
  *  行的回合静置露出，更早的 hover/focus 浮现，触屏恒显）。时钟缺省
  *  （fixture 捕获形 / 发送乐观回声）= 不摆假时刻。 */
-function UserActions({ copy, clock, t }: { copy: string; clock?: string; t: TFunc }) {
+function UserActions({ copy, clock }: { copy: string; clock?: string }) {
   return (
     <div
       className="chat-row-icons mt-1.5 flex items-center justify-end gap-2 text-(--text-tertiary)"
       data-testid="msg-actions"
     >
-      {clock != null && <span className="text-[13px] leading-6 whitespace-nowrap">{clock}</span>}
-      <Button
-        variant="ghost"
-        className="chat-copy flex size-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-secondary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-        aria-label={t('复制')}
-        onClick={() => {
-          void navigator.clipboard.writeText(copy);
-        }}
-      >
-        <Copy width={15} height={15} />
-      </Button>
+      {clock != null && (
+        // 时钟面与答复行同一副（dsh MessageIconActions 时刻 = 12px tertiary
+        // tabular）：用户行/答复行/方案卡/失败面全站一张时刻脸。
+        <span className="text-[12px] leading-4 whitespace-nowrap tabular-nums">{clock}</span>
+      )}
+      {/* 2026-10-13 复制钮单源化：CopyButton（components/ui/copy-button）=
+          唯一行为源；新近律随行（.chat-copy 类随件挂）。 */}
+      <CopyButton text={copy} />
     </div>
   );
 }
@@ -551,7 +537,7 @@ function Row({
           {/* #634 follow-up: the user row's copy is real too — the bubble's
               own text (the reference copies its todo markdown link here;
               our share surface for that is the 更多 menu's 复制链接). */}
-          <UserActions copy={item.markdown ?? item.text} clock={item.clock} t={t} />
+          <UserActions copy={item.markdown ?? item.text} clock={item.clock} />
         </>
       );
     case 'robot':
@@ -574,9 +560,14 @@ function Row({
               ))
             )}
           </span>
-          {item.footer != null && (
+          {/* 2026-10-13 答复行动作行普惠（用户 review 钉：「对方没有」=
+              动作行此前只挂带 footer 的行）：每条落库答复行都带 复制 +
+              尾部时钟（dsh MessageIconActions 每条 assistant 消息同款）。
+              例外 = 在飞打字行（无 id 无 footer）：dsh 的动作尾也在落定才
+              出现——流式中途不摆半成品动作。 */}
+          {(item.footer != null || item.id != null) && (
             <ActionRow
-              seconds={item.footer.seconds}
+              seconds={item.footer?.seconds}
               copy={robotCopyText(item)}
               t={t}
               clock={item.clock}
@@ -618,7 +609,11 @@ function Row({
               ))}
             </p>
           </span>
-          <ActionRow copy={[item.title, item.body, ...item.links].join('\n')} t={t} />
+          <ActionRow
+            copy={[item.title, item.body, ...item.links].join('\n')}
+            t={t}
+            clock={item.clock}
+          />
         </div>
       );
     case 'streaming':
@@ -729,6 +724,7 @@ function Row({
             bare={item.seconds == null}
             copy={`${item.title}\n${item.preview}`}
             t={t}
+            clock={item.clock}
           />
         </>
       );
@@ -877,7 +873,7 @@ function Row({
               </div>
             ))}
           </span>
-          <ActionRow copy={reviewCopyText(item)} t={t} />
+          <ActionRow copy={reviewCopyText(item)} t={t} clock={item.clock} />
         </div>
       );
   }

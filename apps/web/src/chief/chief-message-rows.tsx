@@ -15,6 +15,7 @@ import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
+import { CopyButton } from '../components/ui/copy-button.js';
 import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
@@ -22,15 +23,7 @@ import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import type { ChiefContent, ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChiefFaceDashed,
-  Copy,
-  FileText,
-  Restore,
-} from '../icons/index.js';
+import { ChevronDown, ChevronRight, ChiefFaceDashed, FileText, Restore } from '../icons/index.js';
 import { ChiefIdentity } from './chief-identity.js';
 import { ChiefQuestionCard } from './chief-question-card.js';
 import { AVATAR_IMG_CLS, AVATAR_SLOT_CLS } from './recipes.js';
@@ -179,16 +172,15 @@ export function chiefStreamRowKey(item: ChiefStreamItem, index: number): string 
 
 interface ChiefStreamRowProps {
   item: ChiefStreamItem;
-  /** 行序号 i：复制回执键（`u<i>`/`r<i>`）、过程折叠开态集与 rewind 锚都按它编址。 */
+  /** 行序号 i：过程折叠开态集与 rewind 锚都按它编址。 */
   index: number;
   bound: ChiefContent['bound'];
   agent: ChiefContent['agent'];
   runningTool: ChiefContent['runningTool'];
   /** 用户行头像身份（#650/XMON-105 单源：avatarUrl 覆盖 > dicebear 种子 > 静态兜底）。 */
   user: CurrentUser;
-  /** #615 复制钮瞬时回执：键 = 消息位，1.5s 后回 Copy 字形（状态留 drawer）。 */
-  copiedKey: string | null;
-  onCopy: (key: string, text: string) => void;
+  /* 2026-10-13 复制钮单源化：copiedKey/onCopy 钻链退役——CopyButton 自持
+     回执态（复制→对勾 1s 换回），行不再按位编址复制状态。 */
   /** #615 返工 foot 折叠：该回合工具行的展开态集（状态留 drawer）。 */
   toolsOpen: ReadonlySet<number>;
   onToggleTools: (index: number) => void;
@@ -206,8 +198,6 @@ export function ChiefStreamRow({
   agent,
   runningTool,
   user,
-  copiedKey,
-  onCopy,
   toolsOpen,
   onToggleTools,
   onRewindRequest,
@@ -291,20 +281,11 @@ export function ChiefStreamRow({
               className="mt-[7px] flex gap-2.5 text-(--text-tertiary)"
               data-testid="chief-msg-tools"
             >
-              {/* #615 C：复制翻真 clipboard 钮（local-first 面存在）。 */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`u${i}`, item.text)}
-              >
-                {copiedKey === `u${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
+              {/* #615 C：复制翻真 clipboard 钮（local-first 面存在）。
+                  2026-10-13 单源化（用户 review 钉）：CopyButton 共享行为源
+                  （复制→对勾 1s 换回），本面 20px 密族皮随行（className 后
+                  位覆盖）；恒显面 = fadeByRecency=false（drawer 行走自家族）。 */}
+              <CopyButton text={item.text} fadeByRecency={false} className={MSG_TOOL_BTN_CLS} />
               {/* #615 返工（用户裁决覆盖 #306 二分律）：恢复钮闭环
                   ——aria 正词「恢复到此处」= 参考站 live 同名控件；
                   语义 = rewind 锚（截断锚后消息 + 新会话重发该条，
@@ -545,19 +526,11 @@ export function ChiefStreamRow({
               className="mt-[9px] flex items-center gap-[7px] text-xs text-(--text-tertiary)"
               data-testid="chief-msg-foot"
             >
-              <Button
-                variant="ghost"
-                size="icon"
+              <CopyButton
+                text={robotText(item)}
+                fadeByRecency={false}
                 className={MSG_TOOL_BTN_CLS}
-                aria-label={t('复制')}
-                onClick={() => onCopy(`r${i}`, robotText(item))}
-              >
-                {copiedKey === `r${i}` ? (
-                  <Check width={13} height={13} />
-                ) : (
-                  <Copy width={13} height={13} />
-                )}
-              </Button>
+              />
               {/* live 面 seconds 空串（mapChiefStream 无耗时数据源）
                 不再渲染空「完成」行；fixture canon 44s 照旧。 */}
               {item.seconds !== '' && <span>{t('完成 {n}', { n: item.seconds })}</span>}

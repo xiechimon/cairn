@@ -582,8 +582,10 @@ export type TranscriptItem =
    *  `完成 Ns` (r7 17). `seconds` absent renders the bare `完成`
    *  (reused-plan card, r8 76). The r8 captures' trailing `›` is gone:
    *  re-measured 2026-10-02 the reference footer chevron only ever exists
-   *  as a tool-group expander, and a plan card has no group (#634 follow-up). */
-  | { kind: 'plan'; title: string; preview: string; seconds?: number }
+   *  as a tool-group expander, and a plan card has no group (#634 follow-up).
+   *  2026-10-13 时刻普惠：`clock` = 方案就绪时刻（HH:mm，动作行尾段）；
+   *  fixture 捕获形缺省不摆。 */
+  | { kind: 'plan'; title: string; preview: string; seconds?: number; clock?: string }
   /** Tool-call group of a finished run: collapsed = `完成 Ns ▸` single row
    *  (r7 27/36); expanded = `完成 Ns ▾` + one pill per tool call + the
    *  `收起 ^` link (r7 28). #469: `outputs[i]` carries the stdout/stderr of
@@ -621,8 +623,10 @@ export type TranscriptItem =
    *  build; the schedule twin is `scheduled`). */
   | { kind: 'chief' }
   /** Failed-run message: orange title line + body line + link row
-   *  (`查看原始错误` / `排查指南`, r8 54/73, r5 §7 canon). */
-  | { kind: 'fail'; title: string; body: string; links: string[] }
+   *  (`查看原始错误` / `排查指南`, r8 54/73, r5 §7 canon).
+   *  2026-10-13 时刻普惠：`clock` = 终末错误落库时刻（双渲染让位时继承
+   *  被 splice 的 robot 行时刻）；旧数据缺省不摆。 */
+  | { kind: 'fail'; title: string; body: string; links: string[]; clock?: string }
   /** AI 审核消息（M7 #330，r8 §3.1 60）：结论段 + 编号 findings 列表
    * （每条 = 严重度标签 + 标题 + 描述 + 文件:行 + 可选建议）。服务侧 emit
    * 由 server applyBuildStepAction completeStep 落库（REVIEW_VERDICT_KIND
@@ -636,6 +640,9 @@ export type TranscriptItem =
       extractionError?: string;
       /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
       id?: string;
+      /** 2026-10-13 时刻普惠（答复行同律）：verdict 落库时刻 HH:mm，
+       *  渲染在动作行尾。fixture 捕获形缺省不摆。 */
+      clock?: string;
     }
   /** #955 思考段行（详情页与总管抽屉共用同一张脸）：模型内部推理按段单列。 */
   | {

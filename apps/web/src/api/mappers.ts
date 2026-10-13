@@ -629,7 +629,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         // 严重度标签；不是抽象 system kind（具形状）。
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
-          entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          entries.push({
+            at: m.createdAt,
+            item: { kind: 'review', ...verdict, id: m.id, clock: clockTime(m.createdAt) },
+          });
         }
         continue;
       }
@@ -680,6 +683,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         kind: 'plan',
         title: `方案 · v${p.version}`,
         preview: preview.length > 90 ? `${preview.slice(0, 90)}…` : preview,
+        // 2026-10-13 内容行时刻普惠（用户 review 钉「对方没有时间」）：
+        // 方案卡的时刻 = 方案就绪时刻（at 的 +1 是排序微移，不进显示）。
+        clock: clockTime(step?.createdAt ?? p.createdAt),
       },
     });
   });
@@ -899,12 +905,15 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     // 渲染两遍，用户读成「有回复」。失败行是终末错误的正本面（指引 + 链接
     // 都在它身上）：尾部 robot 行与之同文 = 让位。
     const lastRobot = items.findLast((i) => i.kind === 'robot');
+    let failClock: string | undefined;
     if (
       lastRobot != null &&
       lastRobot.kind === 'robot' &&
       lastRobot.markdown != null &&
       lastRobot.markdown.trim() === build.errorMessage.trim()
     ) {
+      // 让位行的时刻由失败行继承（同一终末事件，时刻不随面退场）。
+      failClock = lastRobot.clock;
       items.splice(items.lastIndexOf(lastRobot), 1);
     }
     items.push({
@@ -912,6 +921,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
       title: build.errorMessage,
       body: '请将其重新上线，或重新运行任务以改派其他机器。',
       links: ['查看原始错误', '排查指南'],
+      ...(failClock !== undefined ? { clock: failClock } : {}),
     });
   }
   return items;

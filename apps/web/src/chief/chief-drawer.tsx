@@ -396,19 +396,9 @@ function ChiefDrawerInner({
   const [toolsOpen, setToolsOpen] = useState<Set<number>>(() => new Set());
   // #822→#873 在飞存在行的展开态由共享 LiveRow 自持：typing 行接管那一帧
   // streaming 分支整棵卸载，展开态随之清零（取代 race 不再需要抽屉级护栏）。
-  // #615 复制钮的瞬时回执：键 = 消息位（u<i> / r<i>），1.5s 后回 Copy 字形。
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const copyText = (key: string, text: string) => {
-    const clip = navigator.clipboard; // 非安全上下文无 clipboard：静默不回执
-    if (!clip) return;
-    void clip.writeText(text).then(
-      () => {
-        setCopiedKey(key);
-        window.setTimeout(() => setCopiedKey((cur) => (cur === key ? null : cur)), 1500);
-      },
-      () => {},
-    );
-  };
+  // 2026-10-13 复制钮单源化：#615 的 copiedKey/copyText 钻链退役——
+  // CopyButton（components/ui/copy-button）自持回执态，drawer 不再按位
+  // 编址复制状态。
   // #615 返工 foot 折叠的开态翻转（行渲染器 #1126 迁出后的回调入口）。
   const toggleTools = (i: number) =>
     setToolsOpen((cur) => {
@@ -842,8 +832,6 @@ function ChiefDrawerInner({
                 agent={chief.agent}
                 runningTool={chief.runningTool}
                 user={user}
-                copiedKey={copiedKey}
-                onCopy={copyText}
                 toolsOpen={toolsOpen}
                 onToggleTools={toggleTools}
                 onRewindRequest={(index, id) => setRewindConfirm({ index, id })}

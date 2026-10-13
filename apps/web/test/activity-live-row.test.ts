@@ -19,7 +19,7 @@
 import type { BuildRecord, StepActivity, StepJournalRow, ToolCallRecord } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { activityLabel } from '../src/api/activity.js';
-import { mapChief, mapTranscript } from '../src/api/mappers.js';
+import { clockTime, mapChief, mapTranscript } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
 
@@ -410,6 +410,75 @@ describe('mapTranscript 失败行去重（2026-10-13）', () => {
     const items = renderFailed([errMsg('m1', '写到一半断了')]);
     expect(items.filter((i) => i.kind === 'robot')).toHaveLength(1);
     expect(items.filter((i) => i.kind === 'fail')).toHaveLength(1);
+  });
+});
+
+// —— 2026-10-13 内容行时刻普惠（用户 review 钉「对方没有时间」）———————
+// 失败方式（先固化）：C1 plan 卡无 clock → 方案行动作行缺时刻；C2 review
+// verdict 行无 clock → 审核卡动作行缺时刻；D3 fail 让位时 clock 随被
+// splice 的 robot 行一起消失 → 失败面缺时刻（时刻属同一终末事件，不随面
+// 退场）。对照零回归（fixture 捕获形无 clock 字段 → 不摆假时刻）由
+// chat-type-measure 的捕获钉覆盖。
+describe('mapTranscript 内容行时刻普惠（2026-10-13）', () => {
+  test('C1: plan 卡带方案就绪时刻（step createdAt 优先于 plan createdAt）', () => {
+    const items = mapTranscript({
+      messages: [],
+      steps: [step('pending', 'plan')],
+      plans: [
+        {
+          id: 'plan-1',
+          buildId: BUILD.id,
+          version: 1,
+          createdAt: NOW - 40_000,
+          content: '# 方案标题\n第一段',
+        } as unknown as import('../src/api/hooks.js').PlanRow,
+      ],
+      build: BUILD,
+      todo: todo(9, 'building'),
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: '',
+    });
+    const plan = items.find((i) => i.kind === 'plan');
+    expect(plan?.kind === 'plan' && plan.clock === clockTime(NOW - 30_000)).toBe(true);
+  });
+
+  test('C2: review verdict 行带落库时刻', () => {
+    const verdictMsg = {
+      id: 'm-rev',
+      role: 'system',
+      content: JSON.stringify({
+        kind: 'review_verdict',
+        verdict: { conclusion: '方案通过', findings: [] },
+      }),
+      createdAt: NOW - 10_000,
+    } as unknown as import('../src/api/mappers.js').MessageRow;
+    const items = render({ messages: [verdictMsg] });
+    const review = items.find((i) => i.kind === 'review');
+    expect(review?.kind === 'review' && review.clock === clockTime(NOW - 10_000)).toBe(true);
+  });
+
+  test('D3: fail 让位继承被 splice robot 行的时刻', () => {
+    const FAIL_BUILD: BuildRecord = { ...BUILD, errorMessage: '模型上下文打满，自动压缩失败' };
+    const items = mapTranscript({
+      messages: [
+        {
+          id: 'm-err',
+          role: 'assistant',
+          content: [{ type: 'text', text: '模型上下文打满，自动压缩失败' }],
+          createdAt: NOW,
+        } as unknown as import('../src/api/mappers.js').MessageRow,
+      ],
+      steps: [],
+      plans: [],
+      build: FAIL_BUILD,
+      todo: todo(9, 'failed'),
+      machineName: null,
+      userName: 'Xmon Dai',
+      liveText: '',
+    });
+    const fail = items.find((i) => i.kind === 'fail');
+    expect(fail?.kind === 'fail' && fail.clock === clockTime(NOW)).toBe(true);
   });
 });
 

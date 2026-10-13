@@ -20,12 +20,11 @@
 // 独立行」拼接，web api/attachments.ts 契约）。行中内联的 token 不在块语法
 // 内（保持字面文本，与 agent 回复同律）。
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
+import { CopyButton } from '../components/ui/copy-button.js';
 import type { DocSegment } from '../fixtures/records.js';
-import { useI18n } from '../i18n/provider.js';
-import { Check, Copy } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { Segments } from './segments.js';
 
@@ -168,30 +167,9 @@ const HEAD_SIZE: Record<number, string> = {
 };
 
 /** 2026-10-13 dsh CodeBlock 横幅对齐：围栏块的块头 = 语言标签（mono 11px
- *  tertiary）+ 复制钮（28px 盒，copy→check 1s 换回，dsh MessageIconActions
- *  同律）。横幅恒显（块的自带 chrome，不参与行级新近律）。 */
-function CodeCopyButton({ text }: { text: string }) {
-  const { t } = useI18n();
-  const [copied, setCopied] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  return (
-    <Button
-      variant="ghost"
-      className="flex size-7 cursor-pointer items-center justify-center rounded-md border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-secondary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
-      aria-label={copied ? t('已复制') : t('复制')}
-      onClick={() => {
-        void navigator.clipboard.writeText(text).then(() => {
-          setCopied(true);
-          if (timer.current !== null) clearTimeout(timer.current);
-          timer.current = setTimeout(() => setCopied(false), 1000);
-        });
-      }}
-    >
-      {copied ? <Check width={15} height={15} /> : <Copy width={15} height={15} />}
-    </Button>
-  );
-}
-
+ *  tertiary）+ 复制钮。复制钮 = CopyButton 单源（components/ui/copy-button，
+ *  用户 review 钉的复制钮单源化）——fadeByRecency=false：横幅是块的自带
+ *  chrome，恒显，不参与行级新近律。 */
 function HeadingTag({ level, segments }: { level: number; segments: DocSegment[] }) {
   const clamped = Math.min(6, Math.max(1, level));
   const Tag = `h${clamped}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
@@ -366,7 +344,7 @@ export function ChatMarkdown({ text }: { text: string }) {
                   <span className="font-mono text-[11px] leading-4 text-(--text-tertiary)">
                     {block.lang ?? ''}
                   </span>
-                  <CodeCopyButton text={block.text} />
+                  <CopyButton text={block.text} fadeByRecency={false} />
                 </div>
                 <pre
                   className="chat-md-code m-0 max-h-80 overflow-auto px-2.5 py-2 font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
