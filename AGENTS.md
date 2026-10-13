@@ -66,6 +66,8 @@ Commit 约定：
 - 永远别 `git commit --no-verify`。
 - 被 pre-commit 闸拦下、且改动确属有意时，唯一放行出口是该闸的显式环境变量：锁文件闸 `PACMAN_ALLOW_LOCKFILE_CHANGE=1`、禁词闸 `PACMAN_ALLOW_BANNED_VOCAB=1`（均接受 `1`/`true`/`yes`）；不提供其它出口。
 
+- **squash 合并的 subject/body 取全量 commit message**：`gh pr view --json commits` 的 `messageHeadline` 是**截断首行**（带省略号），拿它当 `--subject` 会把截断行落进 main。取法 = REST：`gh api repos/xiechimon/pacman/pulls/<n>/commits -q '.[0].commit.message'` 再拆首行/余行（2026-10-13 #1289 实测：subject 落成「…claude-code m…」）。
+
 Worktree（pacman 是多 lane 设计，所以特别强调）：
 - **建 worktree 必须绝对路径**。`git worktree add /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/<name>`。相对路径 + cwd 漂移（heredoc / cd 改变 cwd 后）会把 worktree 嵌进 `apps/web/src/.claude/worktrees/`，vite watcher 撞上去触发 reload 风暴拖死 dev server。
 - 切 lane 时从 `origin/main` 切（本地 main 常落后）；PR 合并顺序撞上，GitHub 报 CLEAN 才合，冲突 rebase 重验。
