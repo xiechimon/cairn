@@ -33,8 +33,12 @@ import { TurnRail, turnsFromTranscript } from './turn-rail.js';
 
 /** Root 中和：原语 size-full 的 h-full 会顶爆 detail-center 的 flex 链。 */
 const ROOT_CLS = 'h-auto min-h-0 flex-1';
-/** Viewport = 旧 `.chat-col` 的滚动端口（testid 与内垫逐字随迁）。 */
-const VIEWPORT_CLS = 'chat-col pt-[19px] pr-4 pb-4 pl-[19px]';
+/** Viewport = 旧 `.chat-col` 的滚动端口（testid 与内垫随迁）。
+ *  2026-10-13 回合跳转纵列让位（dsh ChatView 侧 clearance 同律，用户 review
+ *  钉「右侧的条条贴太近」）：右内垫 16→40px（pr-10）——纵列框占右缘
+ *  12+28=40px 带，文本列让出后刻度不再骑在文字上。左垫 19px 不动（纵列只
+ *  占右缘，dsh 同律非对称）。 */
+const VIEWPORT_CLS = 'chat-col pt-[19px] pr-10 pb-4 pl-[19px]';
 /** Content 的 block + gap-0：行距语义保持在行自身的 margin 上。 */
 const CONTENT_CLS = 'block gap-0';
 

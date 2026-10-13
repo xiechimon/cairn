@@ -556,11 +556,15 @@ body[data-board-dragging] {
   max-height: 100px;
   overflow: hidden;
   padding: 10px 12px;
-  border: 0;
+  /* 2026-10-13 用户 review 钉「不像悬浮、边框很模糊」：早先 box-shadow 吃了
+     不存在的 --shadow-popover（var 未定义 = 声明作废 = 零投影），卡面只剩
+     一块与列底近色的平贴色块。修 = tokens.css 的浮层分离律：发丝描边承重
+     + popover 档柔光（--edge-shadow，账户菜单同档）暗示贴地。 */
+  border: 1px solid var(--border);
   border-radius: var(--radius-popover);
   color: var(--foreground);
   background: var(--popover);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--edge-shadow);
   pointer-events: none;
   animation: turn-rail-preview-enter 120ms ease-out;
   transition: top 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
