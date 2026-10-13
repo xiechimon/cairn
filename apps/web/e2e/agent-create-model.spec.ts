@@ -381,3 +381,62 @@ test('切换运行时清掉旧模型：body 不带跨 provider 的脏 modelId', 
   expect(bodies).toHaveLength(1);
   expect(bodies[0]).toMatchObject({ provider: null, modelId: null, machineId: STUB_MACHINE_ID });
 });
+
+// #1301 模型下拉宽度自适应：长模型 id（deepseek-v4-pro[1M] / qwen3.8-max-0902[1M]）
+// 右侧曾被裁切读不全。修法 = SelectContent 的 min-w 取触发器宽、max-w 放开，
+// 长 id 不裁不撑破布局。每条断言钉一个失败方式：
+//   1. 长 id 行在 popover 里被横向裁切（scrollWidth > clientWidth，旧 w=anchor
+//      宽 + overflow-x-hidden 的病灶）
+//   2. 短 id 候选时 popover 异常变宽（min-w 退化回固定宽，不是锚宽）
+//   3. 选长 id 后触发钮值完整回显（行可点、值真选上）
+const LONG_MODELS = [
+  { id: 'deepseek-v4-pro[1M]', name: 'deepseek-v4-pro[1M]' },
+  { id: 'qwen3.8-max-0902[1M]', name: 'qwen3.8-max-0902[1M]' },
+  { id: 'claude-sonnet-5', name: 'claude-sonnet-5' },
+];
+
+test('模型下拉长 id 不裁切：popover scrollWidth <= clientWidth', async ({ page }) => {
+  await stubLive(page, { hasSources: true, bodies: [], models: LONG_MODELS });
+  const dialog = await openDialog(page, '/app/team');
+  await dialog.locator('.dlg-agent-runtime-select').click();
+  await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
+  await dialog.locator('.dlg-agent-model-select').click();
+  const menu = page.locator('.dlg-agent-model-menu');
+  await expect(menu).toBeVisible();
+  // 失败方式 1：popover 不产生横向溢出（旧 w=anchor 宽会裁掉长 id 右端）。
+  const noHorizontalClip = await menu.evaluate(
+    (el) => el.scrollWidth <= el.clientWidth + 1,
+  );
+  expect(noHorizontalClip, 'popover must not clip long model ids horizontally').toBe(true);
+  // 失败方式 1 补充：最长的两行自身也不被裁（行盒内文完整可见）。
+  for (const id of ['deepseek-v4-pro[1M]', 'qwen3.8-max-0902[1M]']) {
+    const row = menu.locator('.dlg-agent-model-row', { hasText: id });
+    await expect(row).toBeVisible();
+    const rowFits = await row.evaluate((el) => el.scrollWidth <= el.clientWidth + 1);
+    expect(rowFits, `${id} row must not clip`).toBe(true);
+  }
+  // 失败方式 3：选长 id 后触发钮值完整回显。
+  await menu.locator('.dlg-agent-model-row', { hasText: 'deepseek-v4-pro[1M]' }).click();
+  await expect(dialog.locator('.dlg-agent-model-select')).toContainText('deepseek-v4-pro[1M]');
+});
+
+test('模型下拉短 id 候选不异常变宽：popover 宽度不低于锚宽', async ({ page }) => {
+  await stubLive(page, { hasSources: true, bodies: [], models: CC_MODELS });
+  const dialog = await openDialog(page, '/app/team');
+  await dialog.locator('.dlg-agent-runtime-select').click();
+  await page.locator('.dlg-agent-runtime-row', { hasText: 'Claude Code' }).click();
+  await dialog.locator('.dlg-agent-machine-select').click();
+  await page.locator('.dlg-agent-machine-row', { hasText: STUB_MACHINE_NAME }).click();
+  await dialog.locator('.dlg-agent-model-select').click();
+  const menu = page.locator('.dlg-agent-model-menu');
+  await expect(menu).toBeVisible();
+  // 失败方式 2：popover 至少与触发钮同宽（min-w 取锚宽，不塌成固定窄条）。
+  const triggerBox = await dialog.locator('.dlg-agent-model-select').boundingBox();
+  const menuBox = await menu.boundingBox();
+  expect(triggerBox).not.toBeNull();
+  expect(menuBox).not.toBeNull();
+  if (triggerBox === null || menuBox === null) return;
+  expect(menuBox.width).toBeGreaterThanOrEqual(triggerBox.width - 0.5);
+});
