@@ -606,6 +606,7 @@ export const EN: Record<string, string> = {
   已取消: 'Cancelled',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
+  '{name}（已下架）': '{name} (Delisted)',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
   '方案 · v1': 'Plan · v1',
   'Xmon Dai 发起了合并': 'Xmon Dai started a merge',
