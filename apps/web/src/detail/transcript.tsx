@@ -144,6 +144,7 @@ function ActionRow({
   toggle,
   label,
   clock,
+  insetCls = 'pl-[31px]',
 }: {
   seconds?: number;
   /** `完成` with no seconds (reused-plan card, r8 76). */
@@ -163,6 +164,10 @@ function ActionRow({
   /** 2026-10-13 dsh MessageIconActions clock='end' 位：答复行的消息时刻，
    *  渲染在动作簇尾段之后（tertiary 12px tabular）。缺省不摆。 */
   clock?: string;
+  /** 左衬档：行级上下文（plan/tools/elapsed，自列左缘起算）= 31px 默认；
+   *  列包裹上下文（robot/review/fail 的正文列内）= 11px（包裹已坐在头像
+   *  右缘，31px 会双计头像宽）。 */
+  insetCls?: string;
 }) {
   const tail = (
     <>
@@ -195,7 +200,7 @@ function ActionRow({
   );
   return (
     <div
-      className="chat-row-icons mt-5 flex items-center gap-3.5 pl-[31px] text-(--text-tertiary)"
+      className={`chat-row-icons mt-5 flex items-center gap-3.5 ${insetCls} text-(--text-tertiary)`}
       data-testid="msg-actions"
     >
       {copy != null && (
@@ -544,35 +549,43 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <AgentRowAvatar agent={agent} />
-          <span
-            className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            {item.markdown != null ? (
-              // #469: block markdown reply — parsed + rendered at render
-              // time (headings / nested lists / code fences); inline code
-              // chips stay `.chat-code`.
-              <ChatMarkdown text={item.markdown} />
-            ) : (
-              (item.paragraphs ?? []).map((raw, i) => (
-                // fixture order is stable; paragraphs carry no ids
-                <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
-              ))
+          {/* 2026-10-13 动作行归位（dsh MessageIconActions 律 = 内容**下方**）：
+              正文与动作行收进列包裹——此前 ActionRow 是 ROW_BASE 的 flex
+              兄弟件，横排在正文右侧（时钟骑首行旁）。包裹列 flex-1 min-w-0
+              吃剩余宽；正文 span 的 68ch 上限与 -mt-px 原样。 */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span
+              className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
+              data-testid="agent-text"
+            >
+              {item.markdown != null ? (
+                // #469: block markdown reply — parsed + rendered at render
+                // time (headings / nested lists / code fences); inline code
+                // chips stay `.chat-code`.
+                <ChatMarkdown text={item.markdown} />
+              ) : (
+                (item.paragraphs ?? []).map((raw, i) => (
+                  // fixture order is stable; paragraphs carry no ids
+                  <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
+                ))
+              )}
+            </span>
+            {/* 2026-10-13 答复行动作行普惠（用户 review 钉：「对方没有」=
+                动作行此前只挂带 footer 的行）：每条落库答复行都带 复制 +
+                尾部时钟（dsh MessageIconActions 每条 assistant 消息同款）。
+                例外 = 在飞打字行（无 id 无 footer）：dsh 的动作尾也在落定才
+                出现——流式中途不摆半成品动作。左衬 11px = 正文同列（包裹列
+                已坐在头像右缘，31px 的行级衬在此会双计）。 */}
+            {(item.footer != null || item.id != null) && (
+              <ActionRow
+                seconds={item.footer?.seconds}
+                copy={robotCopyText(item)}
+                t={t}
+                clock={item.clock}
+                insetCls="pl-[11px]"
+              />
             )}
-          </span>
-          {/* 2026-10-13 答复行动作行普惠（用户 review 钉：「对方没有」=
-              动作行此前只挂带 footer 的行）：每条落库答复行都带 复制 +
-              尾部时钟（dsh MessageIconActions 每条 assistant 消息同款）。
-              例外 = 在飞打字行（无 id 无 footer）：dsh 的动作尾也在落定才
-              出现——流式中途不摆半成品动作。 */}
-          {(item.footer != null || item.id != null) && (
-            <ActionRow
-              seconds={item.footer?.seconds}
-              copy={robotCopyText(item)}
-              t={t}
-              clock={item.clock}
-            />
-          )}
+          </div>
         </div>
       );
     case 'thinking':
@@ -593,27 +606,30 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <AgentRowAvatar agent={agent} />
-          <span
-            className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-            <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{item.body}</p>
-            {/* 老相邻律：links 行同为 .chat-para 兄弟，7px 行距压过自身
-                margin:0（(0,2,0) > (0,1,0)），迁移显式带上。 */}
-            <p
-              className={`${PARA} ${PARA_GAP} flex gap-3 text-xs leading-[15px] text-(--text-tertiary)`}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span
+              className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
+              data-testid="agent-text"
             >
-              {item.links.map((link) => (
-                <span key={link}>{link}</span>
-              ))}
-            </p>
-          </span>
-          <ActionRow
-            copy={[item.title, item.body, ...item.links].join('\n')}
-            t={t}
-            clock={item.clock}
-          />
+              <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
+              <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{item.body}</p>
+              {/* 老相邻律：links 行同为 .chat-para 兄弟，7px 行距压过自身
+                  margin:0（(0,2,0) > (0,1,0)），迁移显式带上。 */}
+              <p
+                className={`${PARA} ${PARA_GAP} flex gap-3 text-xs leading-[15px] text-(--text-tertiary)`}
+              >
+                {item.links.map((link) => (
+                  <span key={link}>{link}</span>
+                ))}
+              </p>
+            </span>
+            <ActionRow
+              copy={[item.title, item.body, ...item.links].join('\n')}
+              t={t}
+              clock={item.clock}
+              insetCls="pl-[11px]"
+            />
+          </div>
         </div>
       );
     case 'streaming':
@@ -783,97 +799,102 @@ function Row({
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
           <AgentRowAvatar agent={agent} />
-          <span
-            className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            {/* 结论先行（r8 §3.1 60）：单段总结 — paragraph chip "审核结论"
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span
+              className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
+              data-testid="agent-text"
+            >
+              {/* 结论先行（r8 §3.1 60）：单段总结 — paragraph chip "审核结论"
                 + 文本。#700：extractionError 在位 = daemon verdict 提取失败
                 —— chip 换「判定提取失败」（danger 色，与 blocking finding
                 同色系），正文 = daemon 原因；与「审核未返回结论」兜底（旧
                 daemon 无信号）在审核面上一眼可分辨——提取器失败不是审核
                 没结论。 */}
-            <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
-              <span
-                className={`chat-review-tag flex-shrink-0 rounded-[4px] bg-(--chip-plan-bg) px-1.5 py-px text-[11px] leading-[1.5] font-semibold text-(--chip-plan-fg)${
-                  item.extractionError !== undefined
-                    ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
-                    : ''
-                }`}
-              >
-                {t(item.extractionError !== undefined ? '判定提取失败' : '审核结论')}
-              </span>
-              <Segments
-                segments={inlineSegments(item.extractionError ?? item.conclusion)}
-                codeClassName="chat-code"
-              />
-            </p>
-            {/* 编号 findings（r8 §3.1 60/61）：每条 = 严重度后缀 + 标题 +
+              <p className={`${PARA} mb-1.5 flex items-baseline gap-2`}>
+                <span
+                  className={`chat-review-tag flex-shrink-0 rounded-[4px] bg-(--chip-plan-bg) px-1.5 py-px text-[11px] leading-[1.5] font-semibold text-(--chip-plan-fg)${
+                    item.extractionError !== undefined
+                      ? ' chat-review-tag--error bg-(--danger-soft) text-destructive'
+                      : ''
+                  }`}
+                >
+                  {t(item.extractionError !== undefined ? '判定提取失败' : '审核结论')}
+                </span>
+                <Segments
+                  segments={inlineSegments(item.extractionError ?? item.conclusion)}
+                  codeClassName="chat-code"
+                />
+              </p>
+              {/* 编号 findings（r8 §3.1 60/61）：每条 = 严重度后缀 + 标题 +
                 描述 + 引用位（文件:行）+ 可选建议。沿用悬挂序号样式（与
                 既有 finding fixture 同族）；严重度染左侧 3px 缝颜色（老
                 修饰类规则的 data-* 无关迁移；chat-para--num 等零引用别名
                 已随 #1036 终摘，chat-review-finding 族 = verify 驱动脚本
                 定位别名原位保留）。 */}
-            {item.findings.map((f) => (
-              <div
-                key={f.id}
-                className={`chat-review-finding chat-review-finding--${f.severity} mt-1 mb-2 border-l-[3px] pl-2.5 ${
-                  f.severity === 'blocking'
-                    ? '[border-left-color:var(--destructive)]'
-                    : f.severity === 'suggestion'
-                      ? '[border-left-color:var(--badge-attention)]'
-                      : '[border-left-color:var(--border)]'
-                }`}
-              >
-                <p
-                  className={`${PARA} relative pl-[19px]`}
-                  data-ordinal={Number.parseInt(f.id, 10) || 0}
+              {item.findings.map((f) => (
+                <div
+                  key={f.id}
+                  className={`chat-review-finding chat-review-finding--${f.severity} mt-1 mb-2 border-l-[3px] pl-2.5 ${
+                    f.severity === 'blocking'
+                      ? '[border-left-color:var(--destructive)]'
+                      : f.severity === 'suggestion'
+                        ? '[border-left-color:var(--badge-attention)]'
+                        : '[border-left-color:var(--border)]'
+                  }`}
                 >
-                  <span className="absolute left-0">{f.id}.</span>
-                  <span
-                    className={`ml-1.5 inline-block text-[11px] font-semibold ${
-                      f.severity === 'blocking'
-                        ? 'text-destructive'
-                        : f.severity === 'suggestion'
-                          ? 'text-(--badge-attention)'
-                          : 'text-(--text-secondary)'
-                    }`}
-                  >
-                    {t(`(${f.severity})` as '(blocking)' | '(suggestion)' | '(info)')}
-                  </span>
-                  <Segments segments={inlineSegments(f.summary)} codeClassName="chat-code" />
-                </p>
-                {f.description !== undefined && f.description !== '' && (
-                  <p className={`${PARA} ${PARA_GAP}`}>
-                    <Segments segments={inlineSegments(f.description)} codeClassName="chat-code" />
-                  </p>
-                )}
-                {(f.file !== undefined || f.line !== undefined) && (
                   <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-[15px] text-xs [background-clip:content-box] text-(--text-secondary)`}
+                    className={`${PARA} relative pl-[19px]`}
+                    data-ordinal={Number.parseInt(f.id, 10) || 0}
                   >
-                    <Segments
-                      segments={inlineSegments(
-                        `${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}`,
-                      )}
-                      codeClassName="chat-code"
-                    />
+                    <span className="absolute left-0">{f.id}.</span>
+                    <span
+                      className={`ml-1.5 inline-block text-[11px] font-semibold ${
+                        f.severity === 'blocking'
+                          ? 'text-destructive'
+                          : f.severity === 'suggestion'
+                            ? 'text-(--badge-attention)'
+                            : 'text-(--text-secondary)'
+                      }`}
+                    >
+                      {t(`(${f.severity})` as '(blocking)' | '(suggestion)' | '(info)')}
+                    </span>
+                    <Segments segments={inlineSegments(f.summary)} codeClassName="chat-code" />
                   </p>
-                )}
-                {f.suggestion !== undefined && f.suggestion !== '' && (
-                  <p
-                    className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-[15px] text-xs [background-clip:content-box] text-(--text-secondary)`}
-                  >
-                    <Segments
-                      segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
-                      codeClassName="chat-code"
-                    />
-                  </p>
-                )}
-              </div>
-            ))}
-          </span>
-          <ActionRow copy={reviewCopyText(item)} t={t} clock={item.clock} />
+                  {f.description !== undefined && f.description !== '' && (
+                    <p className={`${PARA} ${PARA_GAP}`}>
+                      <Segments
+                        segments={inlineSegments(f.description)}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                  {(f.file !== undefined || f.line !== undefined) && (
+                    <p
+                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-[15px] text-xs [background-clip:content-box] text-(--text-secondary)`}
+                    >
+                      <Segments
+                        segments={inlineSegments(
+                          `${f.file ?? ''}${f.line !== undefined ? `:${f.line}` : ''}`,
+                        )}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                  {f.suggestion !== undefined && f.suggestion !== '' && (
+                    <p
+                      className={`${PARA} ${PARA_GAP} border-l-4 border-(--border) bg-(--muted) pt-1.5 pr-2 pb-1.5 pl-[15px] text-xs [background-clip:content-box] text-(--text-secondary)`}
+                    >
+                      <Segments
+                        segments={inlineSegments(t('建议：{body}', { body: f.suggestion }))}
+                        codeClassName="chat-code"
+                      />
+                    </p>
+                  )}
+                </div>
+              ))}
+            </span>
+            <ActionRow copy={reviewCopyText(item)} t={t} clock={item.clock} insetCls="pl-[11px]" />
+          </div>
         </div>
       );
   }

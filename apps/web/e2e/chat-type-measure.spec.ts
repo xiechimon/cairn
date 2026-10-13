@@ -150,11 +150,17 @@ test('bubble / avatar / footer keep their own geometry (#470 scope fence)', asyn
     const userActions = userTurn.parentElement!.querySelector('[data-testid="msg-actions"]')!;
     const b = bubble.getBoundingClientRect();
     const a = avatar.getBoundingClientRect();
+    const row = agentFooter.closest('[data-row="agent"]')!;
+    const r = row.getBoundingClientRect();
+    const f = agentFooter.getBoundingClientRect();
     return {
       bubbleH: Math.round(b.height),
       bubbleFont: getComputedStyle(bubble).fontSize,
       avatarBox: { w: Math.round(a.width), h: Math.round(a.height) },
-      footerPad: getComputedStyle(agentFooter).paddingLeft,
+      // 2026-10-13 动作行归位（正文下方列包裹）：footer 的 31px 对齐改量
+      // **有效**左缘（行左缘→footer 内容左缘 = 头像 20 + 包裹内衬 11），
+      // 不再读裸 paddingLeft（包裹上下文里它是 11px）。
+      footerPad: `${Math.round(f.left + Number.parseFloat(getComputedStyle(agentFooter).paddingLeft) - r.left)}px`,
       userRowJustify: getComputedStyle(userTurn).justifyContent,
       userActionsJustify: getComputedStyle(userActions).justifyContent,
       // 用户行无头像（自己的话不自报身份）
