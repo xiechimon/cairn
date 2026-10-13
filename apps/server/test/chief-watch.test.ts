@@ -144,4 +144,81 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     );
     expect(env.watches).toHaveLength(0);
   });
+
+  test('#1254 拆卡父 gate → wake 文本含 split_todo 父卡停驻指引', async () => {
+    // 建父卡 + 子卡（sourceTodo = 父 id，模拟 split_todo 结果）
+    const parentId = seedWatchedTodo();
+    const childId = newRecordId();
+    const now = nowMs();
+    H.s.db
+      .insert(todoTable)
+      .values({
+        id: childId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: '子卡',
+        spec: '',
+        phase: 'todo',
+        phaseAt: now,
+        seqNum: 2,
+        orderIndex: 1,
+        assignment: null,
+        latestBuildId: null,
+        lastRunAt: null,
+        hasChanges: false,
+        hasPlan: false,
+        sourceTodo: parentId,
+        v: 1,
+        createdBy: null,
+        ownerId: H.userId,
+        sourceBuildId: null,
+      })
+      .run();
+    const parentRec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, parentId)!;
+    addChiefWatch(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      { teamId: H.teamId, todo: parentRec, projectName: 'demo', threadId: H.threadId },
+    );
+    // 父进 confirm
+    setTodoPhase(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      parentId,
+      'queued',
+    );
+    triggerChiefWakes(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, parentId)!,
+      'confirm',
+    );
+    const steps = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, H.threadId)).all();
+    expect(steps.at(-1)!.kind).toBe('chief');
+    expect(steps.at(-1)!.prompt).toContain('[wake:gate]');
+    expect(steps.at(-1)!.prompt).toContain('split_todo 父卡');
+    expect(steps.at(-1)!.prompt).toContain('拆解方案必须人审');
+  });
+
+  test('#1254 普通卡（非拆卡父）gate → wake 文本含自动确认规则', async () => {
+    const todoId = seedWatchedTodo();
+    const rec = getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!;
+    addChiefWatch(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      { teamId: H.teamId, todo: rec, projectName: 'demo', threadId: H.threadId },
+    );
+    setTodoPhase(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      todoId,
+      'queued',
+    );
+    triggerChiefWakes(
+      { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user },
+      getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!,
+      'confirm',
+    );
+    const steps = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, H.threadId)).all();
+    expect(steps.at(-1)!.kind).toBe('chief');
+    expect(steps.at(-1)!.prompt).toContain('[wake:gate]');
+    expect(steps.at(-1)!.prompt).toContain('自动确认规则');
+    expect(steps.at(-1)!.prompt).toContain('confirm_builds');
+    expect(steps.at(-1)!.prompt).not.toContain('split_todo 父卡');
+  });
 });
