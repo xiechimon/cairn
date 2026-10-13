@@ -43,7 +43,7 @@ interface BuildWorld {
  * 模型位；机器开 pi runtime）。 */
 function makeWorld(step: {
   status: 'pending' | 'claimed';
-  kind?: 'plan' | 'build' | 'merge' | 'review' | 'chief';
+  kind?: 'plan' | 'build' | 'merge' | 'review' | 'chief' | 'verify';
   createdAgo: number;
   heartbeatAgo?: number | null;
   machineOnline?: boolean;
@@ -733,5 +733,100 @@ describe('#881 归属机在线但 runtime 闸挡（#1257 挂起语义）', () =>
     // 机器在线 → 「零在线」判不中；无 Agent → 归属机判族无从计算 → 不动。
     // （未指派步无人可领的缝另行登记，不在本票收口。）
     expect(stepRowOf(w).status).toBe('pending');
+  });
+});
+
+describe('#1284 verify 步 sweep（sweepAbandonedBuildSteps 补 verify kind）', () => {
+  test('claimed verify 步心跳过期 + 机器离线：释放回 pending（机位清空、相位不动、无失败痕迹）+ 会话流 step 事件', async () => {
+    const w = makeWorld({
+      status: 'claimed',
+      kind: 'verify',
+      createdAgo: 300_000,
+      heartbeatAgo: 300_000,
+    });
+    const { events } = tapConvStream(w.s, w.buildId);
+    const woken = w.s.svc.machineHub.waitWake(w.teamId, 50);
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    const row = stepRowOf(w);
+    expect(row.status).toBe('pending');
+    expect(row.machineId).toBeNull();
+    expect(todoRowOf(w).phase).toBe('building');
+    expect(buildRowOf(w).errorMessage).toBeNull();
+    expect(stepEventOf(events, w.stepId).status).toBe('pending');
+    await expect(woken).resolves.toBe(true);
+  });
+
+  test('B-C7 同形：claimed verify 步零心跳进展超阈值 + 机器在线：同样释放', () => {
+    const w = makeWorld({
+      status: 'claimed',
+      kind: 'verify',
+      createdAgo: 300_000,
+      machineOnline: true,
+    });
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).machineId).toBeNull();
+    expect(todoRowOf(w).phase).toBe('building');
+    expect(buildRowOf(w).errorMessage).toBeNull();
+  });
+
+  test('负例：心跳新鲜的 claimed verify 步不动', () => {
+    const w = makeWorld({
+      status: 'claimed',
+      kind: 'verify',
+      createdAgo: 300_000,
+      heartbeatAgo: 10_000,
+      machineOnline: true,
+    });
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('claimed');
+    expect(buildRowOf(w).errorMessage).toBeNull();
+  });
+
+  test('负例：done verify 步不动（终态——sweep 只扫 pending/claimed）', () => {
+    const w = makeWorld({
+      status: 'claimed',
+      kind: 'verify',
+      createdAgo: 300_000,
+      heartbeatAgo: 300_000,
+    });
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, w.stepId)).run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('done');
+  });
+
+  test('负例：failed verify 步不动（终态——sweep 只扫 pending/claimed）', () => {
+    const w = makeWorld({
+      status: 'claimed',
+      kind: 'verify',
+      createdAgo: 300_000,
+      heartbeatAgo: 300_000,
+    });
+    w.s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, w.stepId)).run();
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('failed');
+  });
+
+  test('负例：pending verify 步超龄 + 团队零在线：挂起等机器不动（#1257）', () => {
+    const w = makeWorld({
+      status: 'pending',
+      kind: 'verify',
+      createdAgo: 300_000,
+    });
+
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(buildRowOf(w).errorMessage).toBeNull();
   });
 });
