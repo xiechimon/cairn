@@ -1,0 +1,60 @@
+{
+  "probe": "drive-1258-fail-links",
+  "ticket": 1258,
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "db": "/home/measure/.pacman-chief/workspaces/01a1319d-429c-792e-91d4-91beaee01a6b/.claude/verify-run/home/server/server.db"
+  },
+  "checks": [
+    {
+      "name": "wire: todo phase = failed",
+      "ok": true,
+      "detail": "phase=failed"
+    },
+    {
+      "name": "wire: build.errorMessage 全文逐字节",
+      "ok": true,
+      "detail": "len=1385 (期望 1385)"
+    },
+    {
+      "name": "sqlite: build.errorMessage 全文逐字节",
+      "ok": true,
+      "detail": "len=1385"
+    },
+    {
+      "name": "ui: 失败行渲染（行 title = errorMessage 全文）",
+      "ok": true,
+      "detail": "len=1385"
+    },
+    {
+      "name": "ui: 查看原始错误是真按钮",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "ui: 排查指南死链不渲染",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "ui: 弹窗正文 = errorMessage 全文逐字节（多行不截断）",
+      "ok": true,
+      "detail": "len=1385"
+    },
+    {
+      "name": "ui: 弹窗可见首尾 marker",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "ui: X 关闭收层",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "summary": {
+    "total": 9,
+    "failed": 0
+  }
+}

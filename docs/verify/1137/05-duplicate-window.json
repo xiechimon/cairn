@@ -1,0 +1,9 @@
+{
+  "deliveryId": "87c92d61-574c-4d26-b951-61f5324b9773",
+  "status": 202,
+  "body": {
+    "result": "duplicate",
+    "deliveryId": "87c92d61-574c-4d26-b951-61f5324b9773",
+    "detail": "delivery within window"
+  }
+}

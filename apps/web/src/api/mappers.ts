@@ -897,13 +897,14 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
 
   // 失败行（r8 54/73 canon：橙色标题 + 指引 + 链接行）。#1262：显示侧纯文本
   // 兜底——写入侧（daemon 落库前）已剥，这里再剥一次覆盖存量脏行与漏网路径
-  // （幂等，无转义输入零改动）。
+  // （幂等，无转义输入零改动）。#1258：links 硬编码死链出账——查看原始错误
+  // 由渲染层接成真按钮（弹窗给 title 全文），排查指南无文档落点不渲染
+  // （裁决全文见 transcript.tsx FailRow / records.ts 注）。
   if (build?.errorMessage && todo.phase === 'failed') {
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
       body: '请将其重新上线，或重新运行任务以改派其他机器。',
-      links: ['查看原始错误', '排查指南'],
     });
   }
   return items;

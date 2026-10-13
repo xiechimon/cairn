@@ -1,0 +1,102 @@
+{
+  "probe": "drive-1137-webhook-tracer",
+  "server": "http://127.0.0.1:8791",
+  "db": "/home/measure/.pacman-chief/workspaces/01a131a3-8051-7757-b18e-d4f135e4e655/.claude/verify-run/home/server/server.db",
+  "githubRepo": "xiechimon/pacman",
+  "issueNumber": 1137,
+  "passed": 18,
+  "total": 18,
+  "checks": [
+    {
+      "name": "A1 created 202 + result=created + todoId/threadId 回显",
+      "ok": true,
+      "detail": "status=202 result=created"
+    },
+    {
+      "name": "A2 deliveryId 原样回显（请求段对账键）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "B1 todo 行 sourceKind/sourceRef 落值（落库段）",
+      "ok": true,
+      "detail": "sourceRef=github:xiechimon/pacman#1137"
+    },
+    {
+      "name": "B2 todo 行 phase=todo + projectId 归属",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "B3 webhook_token.lastUsedAt 回写（落库段追踪位）",
+      "ok": true,
+      "detail": "lastUsedAt=1791835163944"
+    },
+    {
+      "name": "B4 token 只存哈希（masked 前缀 + tokenHash 非 plaintext）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "C1 chief_thread 行落库 + chief 绑定 agent（派发段）",
+      "ok": true,
+      "detail": "threadId=chief-01a131b2-daff-7d0c-8b23-3f251dec047d"
+    },
+    {
+      "name": "C2 chief_message 首条用户消息含任务锚点（todo id）",
+      "ok": true,
+      "detail": "messages=1"
+    },
+    {
+      "name": "C3 step 行 kind=chief + pending（派发段）",
+      "ok": true,
+      "detail": "steps=1"
+    },
+    {
+      "name": "D1 重复投递 202 duplicate（60s 窗口）",
+      "ok": true,
+      "detail": "status=202 result=duplicate"
+    },
+    {
+      "name": "E1 同 issue 重放 202 duplicate（sourceRef 持久闸）",
+      "ok": true,
+      "detail": "status=202 result=duplicate"
+    },
+    {
+      "name": "E2 重复两路零副作用（todo 恒 1 行 / chief 线程恒 1 条）",
+      "ok": true,
+      "detail": "todos=1 threads=1"
+    },
+    {
+      "name": "F1 错 token 401",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "G1 ping 202 ignored（重试风暴防御）",
+      "ok": true,
+      "detail": "status=202 result=ignored"
+    },
+    {
+      "name": "H1 非触发 label 202 ignored（信噪比闸）",
+      "ok": true,
+      "detail": "status=202 result=ignored"
+    },
+    {
+      "name": "I1 repo 未映射 202 misconfigured（不喂重试风暴）",
+      "ok": true,
+      "detail": "status=202 result=misconfigured"
+    },
+    {
+      "name": "J1 server.log 每投递一条 deliveryId 追踪记录（≥5 条）",
+      "ok": true,
+      "detail": "entries=6"
+    },
+    {
+      "name": "J2 created 投递记录带 result: \"created\"（pino 结构化）",
+      "ok": true,
+      "detail": null
+    }
+  ],
+  "note": "铺底（connection/agent/chief）经服务模块直达——REST 面无 connection 写入口（oauth 独占），agent 创建被 #1259 归属机闸收紧，铺底非被测面，与 webhook.test.ts 同形。token plaintext 不落任何证据文件。"
+}

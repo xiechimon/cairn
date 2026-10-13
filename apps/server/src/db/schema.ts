@@ -509,6 +509,27 @@ export const apiKey = sqliteTable('api_key', {
   createdAt: epochMs('createdAt').notNull(),
 });
 
+// —— webhook_token（#1137 GitHub webhook 入口的路径 token；api_key 同族：
+// 存哈希不存可逆值 + 行掩码，多 lastUsedAt 请求段追踪位）———————————————————
+export const webhookToken = sqliteTable(
+  'webhook_token',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    name: text('name'),
+    /** [内部] token 哈希（receiver 按路径段反查，hashCredential 同族）。 */
+    tokenHash: text('tokenHash').notNull(),
+    /** [内部] 列表行掩码（maskApiKey 同规则）。 */
+    masked: text('masked').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    /** 最近一次 receiver 命中时刻（请求段追踪位；null = 从未投递）。 */
+    lastUsedAt: epochMs('lastUsedAt'),
+  },
+  (t) => [uniqueIndex('webhook_token_tokenHash_unique').on(t.tokenHash)],
+);
+
 // —— machine（02 §6.2 + presence 状态，02 §1.2；token 存哈希 02 §8；接入面归 M3）———
 export const machine = sqliteTable('machine', {
   id: text('id').primaryKey(),

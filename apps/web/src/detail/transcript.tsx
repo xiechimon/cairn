@@ -15,6 +15,7 @@ import { type CurrentUser, useLiveData } from '../api/provider.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { LiveRow, LiveSignal } from '../components/chat/live-row.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
@@ -481,28 +482,7 @@ function Row({
         </div>
       );
     case 'fail':
-      return (
-        <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
-          <AgentRowAvatar agent={agent} />
-          <span
-            className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
-            data-testid="agent-text"
-          >
-            <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
-            <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{item.body}</p>
-            {/* 老相邻律：links 行同为 .chat-para 兄弟，7px 行距压过自身
-                margin:0（(0,2,0) > (0,1,0)），迁移显式带上。 */}
-            <p
-              className={`${PARA} ${PARA_GAP} flex gap-3 text-xs leading-[15px] text-(--text-tertiary)`}
-            >
-              {item.links.map((link) => (
-                <span key={link}>{link}</span>
-              ))}
-            </p>
-          </span>
-          <ActionRow copy={[item.title, item.body, ...item.links].join('\n')} t={t} />
-        </div>
-      );
+      return <FailRow item={item} margin={margin} t={t} agent={agent} />;
     case 'streaming':
       return (
         <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
@@ -766,6 +746,80 @@ function Row({
         </div>
       );
   }
+}
+
+/** Failed-run row (r8 54/73): orange title + guidance + the raw-error
+ *  affordance. #1258 接线裁决——捕获形的链接行是两个无语义 span（#634：形
+ *  不带义即 bug），本票拆成两半各归其位：
+ *  - 查看原始错误 = 真按钮，开 dialog 族常规面（DialogShell），正文 = 行
+ *    title 全文。title 就是终态错误文本的唯一载体（build.errorMessage，全仓
+ *    无 rawError 字段，daemon 侧封顶 2000 字）——行内已渲染全文，弹窗给长文
+ *    一个独占可读面（#193 封顶滚动，等宽 pre-wrap 保换行）。行本身由 mapper
+ *    闸（errorMessage 非空 + phase failed）才产出，按钮结构性不存在「无内容」
+ *    态；title 剥转义后为空的脏行，链接行整行不渲染（无内容 = 不渲染，不是
+ *    置灰死形）。
+ *  - 排查指南 = 不渲染：仓内无「构建失败排查」文档节（docs/ = 工程规范/调研/
+ *    验证证据，非用户文档），无文档站可链（#136「查看文档」wontfix 同律）；
+ *    死链是本票要修的 bug，不是要保留的形——links 字段随 #884 律整个出账
+ *    （records.ts 注同源）。 */
+function FailRow({
+  item,
+  margin,
+  t,
+  agent,
+}: {
+  item: Extract<TranscriptItem, { kind: 'fail' }>;
+  margin: string;
+  t: TFunc;
+  agent: { displayName: string; avatarUrl: string | null } | null;
+}) {
+  const [rawOpen, setRawOpen] = useState(false);
+  return (
+    <div className={`${ROW_BASE} chat-row--agent ${margin}`} data-row="agent">
+      <AgentRowAvatar agent={agent} />
+      <span
+        className="chat-text -mt-px ml-[11px] max-w-[68ch] min-w-0 text-[15px] leading-[1.6] break-words text-(--foreground)"
+        data-testid="agent-text"
+      >
+        <p className={`${PARA} chat-para--fail text-(--fail-fg)`}>{item.title}</p>
+        <p className={`${PARA} ${PARA_GAP} text-(--text-tertiary)`}>{item.body}</p>
+        {/* 老相邻律：links 行同为 .chat-para 兄弟，7px 行距压过自身
+            margin:0（(0,2,0) > (0,1,0)），迁移显式带上。 */}
+        {item.title !== '' && (
+          <p
+            className={`${PARA} ${PARA_GAP} flex gap-3 text-xs leading-[15px] text-(--text-tertiary)`}
+          >
+            {/* XMON-24 收起钮同族配方（ghost 底座 + #945 皮肤中和）：透明底、
+                tertiary 墨、h-auto/p-0 钉回 span 行盒——链接行几何不漂。 */}
+            <Button
+              variant="ghost"
+              className="h-auto cursor-pointer justify-start rounded-none border-none bg-transparent p-0 text-xs leading-[15px] font-normal text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent dark:hover:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0"
+              onClick={() => setRawOpen(true)}
+            >
+              {t('查看原始错误')}
+            </Button>
+          </p>
+        )}
+      </span>
+      <ActionRow copy={[item.title, item.body].join('\n')} t={t} />
+      {/* 原始错误全文弹窗：dialog 族常规面（#68 三路关闭、#389 焦点回陷触发
+          钮、#193 封顶滚动）；正文 = tool-output 同款 mono 块，无自身 max-h
+          ——长文由 dialog 体滚动承载。 */}
+      <DialogShell
+        title={t('原始错误')}
+        open={rawOpen}
+        onClose={() => setRawOpen(false)}
+        width={560}
+      >
+        <pre
+          className="m-0 rounded-[3px] border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+          data-testid="fail-raw-error"
+        >
+          {item.title}
+        </pre>
+      </DialogShell>
+    </div>
+  );
 }
 
 /** #634 follow-up copy payloads — the row's human-readable content, the

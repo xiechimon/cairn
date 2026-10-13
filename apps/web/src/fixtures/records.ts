@@ -598,9 +598,16 @@ export type TranscriptItem =
   /** Chief-origin marker: avatar + `由总管发起` (r8 54, chief-launched
    *  build; the schedule twin is `scheduled`). */
   | { kind: 'chief' }
-  /** Failed-run message: orange title line + body line + link row
-   *  (`查看原始错误` / `排查指南`, r8 54/73, r5 §7 canon). */
-  | { kind: 'fail'; title: string; body: string; links: string[] }
+  /** Failed-run message: orange title line + body line + the raw-error
+   *  affordance (`查看原始错误`, r8 54/73, r5 §7 canon). #1258: the captured
+   *  link row's two strings are no longer data — 查看原始错误 is a real
+   *  button the renderer owns (opens the full error text in the dialog
+   *  family), and 排查指南 is gone: the repo has no failed-build
+   *  troubleshooting doc to point at and no doc site to link (the #136
+   *  「查看文档」wontfix law), so a link that goes nowhere is the dead
+   *  shape this ticket removes. The `links` field is gone with it (#884
+   *  law: the shape and its data field leave together). */
+  | { kind: 'fail'; title: string; body: string }
   /** AI 审核消息（M7 #330，r8 §3.1 60）：结论段 + 编号 findings 列表
    * （每条 = 严重度标签 + 标题 + 描述 + 文件:行 + 可选建议）。服务侧 emit
    * 由 server applyBuildStepAction completeStep 落库（REVIEW_VERDICT_KIND
