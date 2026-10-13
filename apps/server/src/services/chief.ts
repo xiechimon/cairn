@@ -597,7 +597,9 @@ export function removeChiefWatches(deps: ChiefDeps, teamId: string, todoIds: str
 
 /** phase 流转漏斗挂接（services/todos.ts setTodoPhase/updateTodo 调）：
  * gate（confirm/review 停驻）/settle（done）/failed 三触发 wake 轮；
- * settle/failed 后 watch 自动解除（r5 §3.5「watch 生命周期」实测）。 */
+ * settle/failed 后 watch 自动解除（r5 §3.5「watch 生命周期」实测）。
+ * #1254：gate 到 confirm 时探测拆卡父（有子项的 confirm = 拆解方案须人审），
+ * 传给 wakeFacts 供 chief 区分「自动过闸」与「停驻等人」。 */
 export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: Phase): void {
   if (to !== 'confirm' && to !== 'review' && to !== 'done' && to !== 'failed') return;
   const chiefs = deps.db.select().from(chief).where(eq(chief.teamId, todoRecord.teamId)).all();
@@ -609,13 +611,18 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
     const buildRow = buildId
       ? deps.db.select().from(build).where(eq(build.id, buildId)).get()
       : undefined;
+    // #1254：拆卡父探测——有子项的 confirm = 拆解方案（须人审，不自动过闸）。
+    const isSplitParent =
+      kind === 'gate' &&
+      deps.db.select({ id: todo.id }).from(todo).where(eq(todo.sourceTodo, todoRecord.id)).all()
+        .length > 0;
     for (const watch of watches) {
       // 陈旧 watch 自愈：线程已删 → 跳过并解除该 watch（不阻断 phase 流转）。
       if (!getChiefThread(deps, watch.threadId)) {
         removeChiefWatches(deps, todoRecord.teamId, [todoRecord.id]);
         continue;
       }
-      const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null);
+      const facts = wakeFacts(kind, todoRecord, buildRow?.errorMessage ?? null, { isSplitParent });
       enqueueChiefStep(deps, watch.threadId, { prompt: facts, trigger: kind });
     }
     if (kind === 'settle' || kind === 'failed') {
@@ -625,16 +632,33 @@ export function triggerChiefWakes(deps: ChiefDeps, todoRecord: TodoRecord, to: P
 }
 
 /** wake 轮事实文本（server 合成 [设计]；r5 §3.5 汇报行为的宿主侧输入——
- * 汇报措辞由 LLM 产，法证式汇报要点按 r5 §3.5 样本指引）。 */
+ * 汇报措辞由 LLM 产，法证式汇报要点按 r5 §3.5 样本指引）。
+ * #1254：gate 文本注入自动确认判据（isSplitParent / isRevision 位），
+ * chief 据此决定 auto-confirm vs 停驻等人。 */
 export function wakeFacts(
   kind: ChiefWakeKind,
   todo: TodoRecord,
   errorMessage: string | null,
+  context?: { isSplitParent?: boolean },
 ): string {
   const ref = `#${todo.seqNum}「${todo.title}」`;
   switch (kind) {
-    case 'gate':
-      return `任务 ${ref} 停驻在 ${todo.phase} 关口。请查看当前结果并向用户汇报；需要用户确认或答复时，说明下一步动作。`;
+    case 'gate': {
+      const isSplit = context?.isSplitParent === true;
+      if (isSplit) {
+        return [
+          `任务 ${ref} 停驻在 ${todo.phase} 关口。`,
+          '本卡是 split_todo 父卡——拆解方案必须人审，不自动过闸。请向用户汇报拆解方案内容，等用户在对话里确认后才调 confirm_builds。',
+        ].join('');
+      }
+      return [
+        `任务 ${ref} 停驻在 ${todo.phase} 关口。自动确认规则：`,
+        '先读方案全文（用 conversation 工具读本 build 的 plan 步产出），判以下三档——',
+        '1. 用户驳回后的重新规划（revision）→ 汇报新方案内容，不调 confirm_builds，等用户表态；',
+        '2. 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点，不自动过闸；',
+        '3. 方案与票面一致、无分叉 → 直接调 confirm_builds 过闸进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。',
+      ].join('');
+    }
     case 'settle':
       return `任务 ${ref} 已合并完成（done）。请向用户汇报结果已确认落地；该任务的关注已自动解除。`;
     case 'failed':
@@ -771,6 +795,7 @@ export function composeChiefSystemPrompt(deps: ChiefResourceDeps, teamId: string
     '- 症状按改动范围定：同一个用户可见症状可能归不同职责，看要改的代码在哪——接口返回错归后端，界面上点不到归前端。',
     '- 回执：派工后向用户复述要求、点名承接 Agent 的职责语义（如「由文档专职 Agent [名](agent:<id>) 承接」），并说明完成或需要确认时会跟进汇报。',
     '- wake 轮：汇报区分「委派已受理」与「结果已确认」两阶段；failed wake 先调 machines 等工具核实环境，再做法证式汇报（失败原因/定性/工作保全位置/环境建议）。',
+    '- confirm 关口自动确认（#1254）：plan 就绪后默认自动过闸——读方案全文（用 conversation 工具读 plan 步产出），若与票面一致且无分叉（非 revision、非 split_todo 父卡），直接调 confirm_builds 进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。仅以下情况停驻等人：① 本卡是 split_todo 父卡（拆解方案必须人审）→ 汇报拆解内容，等用户确认；② 用户驳回后的重新规划（revision）→ 汇报新方案，不自动过闸；③ 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点。',
     '- 正文内联实体引用用自定义 URI markdown：[名](agent:<id>)、[#n](todo:<id>)。',
     '- 记忆写入：仅在用户明确要求或明显值得沉淀时 save_memory（配额 100 条）。',
     // #823 发送后 skill 路由（claim 时由服务端按用户消息关键词检测，输入时 UI
