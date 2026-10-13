@@ -165,10 +165,11 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
 }
 
 /** #1257 板面挂起态派生（等机器/等额度）：在飞 todo 的 latest build 存在
- *  pending 步且（额度挂起中 | 钉选机不在 | 团队零在线）时透出；健康排队
- *  （机器在、能领，只是没轮到）与终态/未启动恒缺席——挂起 ≠ 排队 ≠ 失败。
- *  读侧派生不落列：机器 presence 变化不重写 todo 行，板面新鲜度走 web 侧
- *  machine_presence → todos 失效重取（sse-team-events，#1257 补的失效键）。 */
+ *  pending 步且（额度挂起中 | 归属机不在/闸挡/未设 | 团队零在线）时透出；
+ *  健康排队（机器在、能领，只是没轮到）与终态/未启动恒缺席——挂起 ≠ 排队
+ *  ≠ 失败。读侧派生不落列：机器 presence 变化不重写 todo 行，板面新鲜度走
+ *  web 侧 machine_presence → todos 失效重取（sse-team-events，#1257 补的
+ *  失效键）。 */
 function waitingOnOf(
   deps: TodoDeps,
   row: TodoRow,
@@ -387,9 +388,6 @@ export function updateTodo(
     phase?: Phase;
     tagIds?: string[];
     orderIndex?: number;
-    /** 钉选机器 patch（#682）：string = 改钉，null = 清回自动，undefined =
-     * 不动。只影响之后新起的 build（claim 过滤按 build 落值）。team 外机器
-     * id = 400（createTodo 同律）。 */
     /** 指派槽级 patch（#208「编辑分配」）：提供的槽覆盖，未提供的槽保持现状；
      * 槽形状 = shared assignmentSlotSchema（02 §6.2 双槽词表；#1250 扩
      * review/verify 槽——四槽同 merge 语义）。 */
@@ -634,7 +632,7 @@ export function isStartedTodoRow(row: {
  *    无 build 即无领取）。
  *  - 清空 = 硬删除（参考站「清空对话、方案和改动记录」字面）：build 行 +
  *    step/message/plan/steer/stop 单槽。分支
- *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派/钉选机器是
+ *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派是
  *    任务定义，不是产物）。执行机工作区文件与会话资产不动（daemon 本地物，
  *    server 够不着——dialog 文案如实声明）。
  *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后任何上报

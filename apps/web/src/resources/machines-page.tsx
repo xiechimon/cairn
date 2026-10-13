@@ -14,12 +14,14 @@
 // 两个：shell 闸 + 并发上限选择器（machine.maxConcurrent，消费方 = server
 // claim 闸 + daemon 本地闸）——两者都有真实消费链，死钮纪律（删除 /
 // chevron / per-runtime 开关）原样由 e2e 负向把守。
-// #895 三态读标注（spec 21 A8，全读态零控件）：「总管主机」徽标（谁是默认
-// 主力机）、「总管回合进行中」（该机正在执行 chief 步）、「总管等待机器」
-// （被钉的 pending 回合等该机上线/开闸）。live 数据 = GET /chief 封套
-// orchestration 块（defaultMachineId + per 机 activity 计数）join 本页行集；
-// fixture = MachineRow chief* 字段静态投影。主力机的设定面在 chief 设置
-// （N6），本页只有观测——「关电脑前确认编排已落在常开机器上」的观测面。
+// 三态读标注（#895 起，全读态零控件；#1260 降级后语义 = 绑定 Agent 的归属
+// 机事实）：「总管主机」徽标（chief 回合的归属机）、「总管回合进行中」
+// （该机正在执行 chief 步）、「总管等待机器」（挂起的 pending 回合等该机
+// 上线/开闸）。live 数据 = GET /chief 封套
+// orchestration 块（homeMachineId + per 机 activity 计数）join 本页行集；
+// fixture = MachineRow chief* 字段静态投影。chief 的归属机 = 绑定 Agent 的
+// 归属机（无独立设定面），本页只有观测——「关电脑前确认编排已落在常开机器
+// 上」的观测面。
 
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';

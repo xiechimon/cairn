@@ -2,7 +2,8 @@
 //
 // 为什么单列叶子：tryClaim（machines.ts，claim 面）与失联扫尾（builds.ts /
 // chief.ts 的 sweep 面）要用**同一份判据**回答「这台机器开没开这条步的
-// runtime」。#864 把「钉选机在线但 runtime 闸挡」登记为已知缝，原因正是
+// runtime」。#864 把「钉选机在线但 runtime 闸挡」登记为已知缝（#1259 起
+// = 归属机在线但闸挡），原因正是
 // 判定藏在 machines.ts 里、sweep 侧值 import 会成环（machines → builds/
 // chief 是既有正向边）。下沉到本叶子（只依赖 db schema 与 shared，不 import
 // 任何 service），claim 面与 sweep 面共用一份事实——两处判定一旦漂移，后果
@@ -26,8 +27,8 @@ import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
 /** #682 enabledRuntimes 真闸——步的 runtime 判定（与 daemon runner 的
  *  backendFor 同律：agent provider ∈ BACKEND_RUNTIME_IDS → claude-code，
  *  其余（含 BYOK 自定义 provider）→ pi）。判定单源在此；claim 侧与 sweep
- *  侧（#881 钉选在线被挡判据）共同消费，机器侧开关 = machine.enabledRuntimes
- *  （PATCH 热写，秒级生效）。 */
+ *  侧（#881 起「归属机在线被挡」判据）共同消费，机器侧开关 =
+ *  machine.enabledRuntimes（PATCH 热写，秒级生效）。 */
 export function stepRuntimeFor(agentProvider: string | null | undefined): 'pi' | 'claude-code' {
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
