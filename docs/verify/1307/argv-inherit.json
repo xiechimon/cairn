@@ -1,0 +1,20 @@
+{
+  "arm": "inherit",
+  "hasStrictMcpConfig": false,
+  "hasMcpConfigFlag": false,
+  "mcpConfigValue": null,
+  "argv": [
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--input-format",
+    "stream-json",
+    "--model",
+    "glm-5.3",
+    "--setting-sources=user,project,local",
+    "--permission-mode",
+    "bypassPermissions",
+    "--include-partial-messages",
+    "--session-id=c074e292-611a-45a7-8b08-4620dd100013"
+  ]
+}

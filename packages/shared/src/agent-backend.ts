@@ -207,7 +207,12 @@ export interface SessionOpts {
   /** daemon 本地工具（02 §8：团队密钥取用通道的落点）。空/缺省 = 不注册
    * （既有调用面零回归）。工具名进会话工具面（backend 构建）。 */
   localTools?: LocalToolDef[];
-  /** per-turn 连接、失败降级不阻断（02 §7.1）。 */
+  /** per-turn 连接、失败降级不阻断（02 §7.1）。三态受管（#1307，对齐
+   * Multica）：缺省 = 继承 runtime 配置（旧 server 形 / 版本墙机器，
+   * power-user 逃生门）；数组（含 [] = 受管严格空）= 受管集合——claude-code
+   * backend 据此发 mcpServers 键（恒发，含 host 缝）+ strictMcpConfig: true
+   * （用户全局 / 项目 .mcp.json / 插件 MCP 全忽略）。pi 不读用户全局 claude
+   * config，两态同义（端点列表照单消费），无 strict 面。 */
   mcpServers?: McpEndpoint[];
   /** skills catalog 白名单（#372；spec 14「SessionOpts 不加字段」的修订——
    * 当时不过滤所以不加，本字段把过滤白名单补进契约）。slug 集 = claim 载荷
