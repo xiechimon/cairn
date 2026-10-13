@@ -18,6 +18,9 @@ env -i HOME="$HOME" PATH=/usr/bin:/bin \
   （version 2.1.294），`source: "well-known"`——回落命中且来源点名。
 - `probePathOnlyControl`（`wellKnownDirs: []`，即改动前的纯 PATH 行为）：
   同一窄 PATH 下 `null`——正是 issue 里 launchd 报的 `not found`。
+- `probe-narrow-path-old-code.json`：同命令跑 origin/main 的
+  `claude-code-bin.ts`（git show 抽出的旧版），窄 PATH 下探测返回
+  `null`——旧代码在 launchd 环境下必丢 homebrew 装的 claude 的直接实物。
 
 ## 2. launchd 模板（`plist-render-lint.log`）
 
