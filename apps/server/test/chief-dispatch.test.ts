@@ -2,6 +2,7 @@
 // ./chief-harness.ts）。共享 harness 收编位 = ./chief-harness.ts，
 // 状态经 H 单出口每用例重绑。
 
+import { MERGE_HUMAN_ONLY_COPY } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
@@ -214,5 +215,53 @@ describe('分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5�
       .where(eq(stepTable.buildId, row.latestBuildId!))
       .all();
     expect(steps[0]!.kind).toBe('plan');
+  });
+});
+
+// —— #1256（ADR 0018「合并动作留人，不在名册内」）：合并只由人触发——————
+
+describe('merge_builds 机器入口硬拒（#1256）', () => {
+  test('chief 调 merge_builds → 拒绝 JSON，文案指认人工出口，不落任何合并步', async () => {
+    const todoRec = (await relay('create_todo', {
+      projectId: H.projectId,
+      title: '合并只由人触发',
+      spec: 's',
+    })) as { id: string };
+    // 造一条 review 态 build（正常合并闸的相位），证明拒绝不是相位不满足而是
+    // 机器入口本身被堵死。
+    const { build: buildTable } = await import('../src/db/schema.js');
+    const now = Date.now();
+    H.s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-merge-reject',
+        todoId: todoRec.id,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: now,
+      })
+      .run();
+    H.s.db
+      .update(todoTable)
+      .set({ phase: 'review', phaseAt: now })
+      .where(eq(todoTable.id, todoRec.id))
+      .run();
+
+    const out = (await relay('merge_builds', { buildIds: ['build-merge-reject'] })) as {
+      rejected: boolean;
+      buildIds: string[];
+      reason: string;
+    };
+    expect(out.rejected).toBe(true);
+    expect(out.buildIds).toEqual(['build-merge-reject']);
+    expect(out.reason).toBe(MERGE_HUMAN_ONLY_COPY); // 文案 = shared 单源
+    expect(out.reason).toContain('完成'); // 指认人工出口（web 界面 review 关口按钮）
+    // 无 merge 步入队（拒绝即止，不落任何副作用）。
+    const steps = H.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, 'build-merge-reject'))
+      .all();
+    expect(steps).toHaveLength(0);
   });
 });
