@@ -1,6 +1,7 @@
 // 请求处理上下文：DB + 事件 hub + SecretBox + seed 单用户/团队（02 §2 保形恒一行）。
 
 import type { SecretBox, TeamRecord, UserRecord } from '@pacman/shared';
+import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -84,4 +85,7 @@ export interface AppContext {
   /** 本机 MCP config 读路径（spec 13/#368：GET mcp-servers 投影源 +
    *  chief mcp_servers 工具源；config.ts 单源，默认 ~/.claude.json）。 */
   mcpConfigPath: string;
+  /** 结构化日志（#1137 webhook receiver 的 deliveryId 追踪行；index.ts
+   *  传 pino 实例，bootServer 缺省不传 = 测试面静默）。 */
+  logger?: Logger;
 }

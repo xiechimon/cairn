@@ -7,14 +7,19 @@
 // token（防日志泄漏面扩散）。比对 = sha256 定长哈希 + timingSafeEqual
 // （routes.ts git Basic 面同款哈希卫生）。
 //
-// 豁免清单（绕过面 = 仅此五条：spec #247 钉死四条 + XMON-49 增补 /api/mcp，
+// 豁免清单（绕过面 = 仅此六条：spec #247 钉死四条 + XMON-49 增补 /api/mcp，
 // 02/A1 分体部署解锁——闸叠在自有 Bearer 面上 = 同一 Authorization header 要
-// 同时装 PACMAN_TOKEN 与 apiKey 两个值，必死锁，远端 MCP 消费面整面死）：
+// 同时装 PACMAN_TOKEN 与 apiKey 两个值，必死锁，远端 MCP 消费面整面死；
+// #1137 增补 /api/webhook/ 前缀——GitHub webhook 无法自定义 Authorization
+// 头，receiver 自带路径 token 闸（webhook_token 哈希反查，machine/mcp 族
+// 同款「自有凭证 + 默认保护」结构））：
 //   1. `/api/machine/*`——自有 Bearer（apiKey enroll + 机器 token 哈希比对）；
 //   2. `/git/*`——自有 Basic → api_key(gitAccess) 哈希比对；
 //   3. `/api/mcp`——自有 Bearer → apiKey 哈希比对（同 1/2 族，XMON-49）；
 //   4. `/api/oauth/callback`——state 参数担 CSRF，豁免后 state 校验仍强制；
-//   5. `/_mp/*` + 静态 SPA 壳——204 no-op 与非密 UI。
+//   5. `/_mp/*` + 静态 SPA 壳——204 no-op 与非密 UI；
+//   6. `/api/webhook/*`——自有路径 token（`POST /api/webhook/github/:token`，
+//      token 哈希反查 + lastUsedAt；token mgmt 端点在 /api/teams/ 下不豁免）。
 // 路径判定用 URL pathname（WHATWG URL 已归一化 `..` 段）。**编码面 fail-
 // closed**：pathname 含 `%` 一律不豁免（走闸）——Hono getPath 对含 % 路径做
 // `%25` 预转义 + decodeURI 后进路由匹配（hono/dist/utils/url.js），编码前缀
@@ -51,6 +56,9 @@ function isExempt(pathname: string): boolean {
   if (pathname === '/api/mcp') return true;
   // OAuth 回跳（豁免条 4）
   if (pathname === '/api/oauth/callback') return true;
+  // webhook receiver（豁免条 6，#1137）——前缀严格到段边界，/api/webhookfoo
+  // 不豁免（machine 同律）；receiver 自带路径 token 闸（哈希反查，错值 401）。
+  if (pathname === '/api/webhook' || pathname.startsWith('/api/webhook/')) return true;
   return false;
 }
 

@@ -1,0 +1,9 @@
+{
+  "deliveryId": "f901a3d8-4223-44f4-baed-74e4cb0f4927",
+  "status": 202,
+  "body": {
+    "result": "duplicate",
+    "deliveryId": "f901a3d8-4223-44f4-baed-74e4cb0f4927",
+    "detail": "issue xiechimon/pacman#1137 already has a task"
+  }
+}

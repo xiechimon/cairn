@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /home/measure/.pacman-chief/workspaces/01a131a3-8051-7757-b18e-d4f135e4e655/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  18 passed (18)
+   Start at  03:59:52
+   Duration  1.98s (transform 42%, tests 32%, import 25%)
+
