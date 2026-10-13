@@ -1,0 +1,100 @@
+{
+  "probe": "drive-1242-project-identity",
+  "ticket": "#1242",
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "repo": "/home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a"
+  },
+  "checks": [
+    {
+      "name": "S0 铺底：local 项目（scratch 真 git 仓）+ 3 todo + 假机器 enroll",
+      "ok": true,
+      "detail": "project=twm7rXuxATEnyif8ERTuh"
+    },
+    {
+      "name": "C1 转换前 claim 载荷 repo = local 形态（cloneUrl = 本机路径）",
+      "ok": true,
+      "detail": "{\"kind\":\"local\",\"cloneUrl\":\"/home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo\"}"
+    },
+    {
+      "name": "A1 空 body → 400（五键全缺 = 静默 no-op 族判死）",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "A2 未知字段 → 400（strict 明示拒绝）",
+      "ok": true,
+      "detail": "status=400 invalid body: Unrecognized key: \"repoName\""
+    },
+    {
+      "name": "B1 设置页改名 → PATCH 落库（SQLite 行）+ invalidate 回显新名",
+      "ok": true,
+      "detail": "row.name=probe-1242-renamed"
+    },
+    {
+      "name": "B2 改名生效于侧栏与卡面（名称纯显示面，projects 面同源收敛）",
+      "ok": true,
+      "detail": "sidebar rows=1 chip=probe-1242-renamed"
+    },
+    {
+      "name": "C1 描述落值（SQLite 行 + invalidate 回显）",
+      "ok": true,
+      "detail": "row=#1242 迁移期描述"
+    },
+    {
+      "name": "C2 清空描述 → 列 null（空 ≡ null）",
+      "ok": true,
+      "detail": "row=null"
+    },
+    {
+      "name": "D1 有在飞 build 时转换 → 409 + 失败 toast 可见（非静默）",
+      "ok": true,
+      "detail": "toast=转换失败，请重试。 kind conversion blocked: project has in-flight builds (1 active step); wait for runs to finish or stop them fi"
+    },
+    {
+      "name": "D2 409 后行未动（仍 local）",
+      "ok": true,
+      "detail": "repoKind=local"
+    },
+    {
+      "name": "E1 local→github 转换落库：repoKind/githubRepo/localPath（local 绑定转加速位）",
+      "ok": true,
+      "detail": "{\"repoKind\":\"github\",\"githubRepo\":\"octocat/Hello-World\",\"localPath\":\"/home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo\"}"
+    },
+    {
+      "name": "E2 转换后设置页：转换卡卸载、基本信息卡加速位行上线（预填原值）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "E3 record 真值：repoKind=github + cloneUrl 切 https 派生",
+      "ok": true,
+      "detail": "cloneUrl=https://github.com/octocat/Hello-World.git"
+    },
+    {
+      "name": "E4 board 项目历史注记：改名（todo1 会话）+ 转换（todo1/todo2 会话）各落行（单源文本）",
+      "ok": true,
+      "detail": "rename=1 convert=2"
+    },
+    {
+      "name": "E5 todo 详情 transcript 可见转换注记行（板面可见性）",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "F1 转换后 claim 载荷 repo = {kind:github, cloneUrl, localPath}（clone 臂 + 加速臂）",
+      "ok": true,
+      "detail": "{\"kind\":\"github\",\"cloneUrl\":\"https://github.com/octocat/Hello-World.git\",\"localPath\":\"/home/measure/.pacman-chief/workspaces/01a131ac-4a78-7f32-bee9-6e047cc4bb0a/.claude/verify-run/local-repo\"}"
+    }
+  ],
+  "pass": "16/16",
+  "artifacts": [
+    "01-board-renamed.png",
+    "02-convert-409-toast.png",
+    "03-settings-converted.png",
+    "04-project-record.json",
+    "05-system-notes.json",
+    "06-transcript-note.png"
+  ]
+}

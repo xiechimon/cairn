@@ -437,6 +437,17 @@ export const EN: Record<string, string> = {
   // #1213/ADR 0017 双执行源：github 形态项目的 localPath 同机加速位字段。
   本机加速路径: 'Local acceleration path',
   '绝对路径，留空即清除': 'Absolute path; empty to clear',
+  // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
+  保存名称: 'Save name',
+  保存描述: 'Save description',
+  '描述保存失败，请重试。': 'Failed to save description. Try again.',
+  '转换失败，请重试。': 'Conversion failed. Try again.',
+  '转换为 GitHub 形态': 'Convert to GitHub form',
+  '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。':
+    'After conversion the GitHub repo becomes the single source of truth and the local path becomes an execution accelerator; conversion is blocked while builds are in flight.',
+  'GitHub 仓库（owner/repo）': 'GitHub repository (owner/repo)',
+  'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
+  转换: 'Convert',
   危险操作: 'Danger zone',
   删除项目: 'Delete project',
   // #1174：删除卡文案列真级联（正本 = server services/projects.ts 清图序：

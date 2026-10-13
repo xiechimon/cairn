@@ -21,6 +21,9 @@ export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
   teamId: recordId,
+  /** 项目描述（#1242 设置页可编辑面）：可空，null/缺键 = 无描述（行值
+   * null 时 toProjectRecord 不带键——与 repoKind 等可空列同口径）。 */
+  description: z.string().optional(),
   /** repo 形态（02 §3）；字段名/值 [推断]。GitHub 接入侧连号授权、
    * executor push conv 分支、建 PR、读 PR/issues/CI workflow runs。 */
   repoKind: projectRepoKindSchema.optional(),
@@ -78,14 +81,32 @@ export const createProjectBodySchema = z.object({
 });
 export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 
-/** `PATCH /api/projects/{id}` body 单源（ADR 0017 / #1213）：单字段写面——
- * `localPath` 缺键 = 不动；null / 空串 = 显式清空（显式 null 是 wire 契约，
- * 不是「不带键」，#1169 序列化坑族）；字符串 = 加速位落值（server 只验
- * 绝对路径形态）。仅 github 形态项目消费本字段（local 形态的 localPath 是
- * 创建闸绑定，不经本面改写）。 */
-export const patchProjectBodySchema = z.object({
-  localPath: z.string().nullish(),
-});
+/** `PATCH /api/projects/{id}` body 单源（#1242 五字段写面，#1213 单字段
+ * localPath 时代的超集）：缺键 = 不动（键态语义与 createProjectBodySchema
+ * 的双名并存族分开——本面不收 `kind`，转换目标恒写 `repoKind`）。字段语义：
+ * - `name`：改名（server trim，空白 = 400——名称不是可清空字段）。
+ * - `description`：null / 空串 = 显式清空（显式 null 是 wire 契约，不是
+ *   「不带键」，#1169 序列化坑族）；字符串 = 落值。
+ * - `repoKind`：**唯一合法值 'github'**（local→github 转换目标；反向禁、
+ *   hosted 禁、普通项目禁——枚举仍收全词表，非目标值由 service 层 400
+ *   明示，schema 只锁形状）。
+ * - `githubRepo`：'owner/repo' 字符串，**只在转换面消费**（与 repoKind
+ *   同体携带；不带 repoKind 的独立 githubRepo 键 = 400，githubRepo 不经
+ *   本面改写已接好的仓）。
+ * - `localPath`：#1213 语义（github 形态加速位：缺键不动 / null 清空 /
+ *   字符串落值只验绝对路径形态）；local→github 转换时缺键 = 保留原值
+ *   （local 创建闸绑定的仓路径就地转为加速位）。
+ * strict：未知键 400（未支持字段明示拒绝，禁静默原样返回——#1242 判死
+ * #1213 时代的缺键早退族；五键全缺同样 400，见 service 层）。 */
+export const patchProjectBodySchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().nullish(),
+    repoKind: projectRepoKindSchema.optional(),
+    githubRepo: z.string().optional(),
+    localPath: z.string().nullish(),
+  })
+  .strict();
 export type PatchProjectBody = z.infer<typeof patchProjectBodySchema>;
 
 // —— localPath 400 reason code（#386：错误分类从消息子串契约升级为结构化

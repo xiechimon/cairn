@@ -8,6 +8,8 @@
 //   <github_connection token>——token 只进头不进 URL，错误 message 只带 URL）
 // - GET repos/{o}/{r}/issues(/n) + labels → issue 列表/单条/label 集（#446
 //   读向，token 纪律同上位）
+// - GET repos/{o}/{r} → #1242 local→github 转换面可达性判定（token 纪律
+//   同上位；匿名梯 = 无连接时公开仓可达）
 // 写面（#452 / ADR 0006——server 唯二的 api.github.com 写入点，穷举律：
 // grep `api.github.com` 的 POST/PATCH 只此两处；不改 scope、不新增凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
@@ -128,6 +130,31 @@ export async function githubPullState(
   const { state, merged } = data as { state?: unknown; merged?: unknown };
   if (state !== 'open' && state !== 'closed') return null;
   return { state, merged: merged === true };
+}
+
+/** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；
+ *  404 = 不可达（含「私仓无 auth 与不存在同形」的 GitHub 防探测语义——
+ *  mapUpstreamStatus 404 分支同文）；限流/网络/5xx 沿 readJson 的 HttpError
+ *  映射上抛（502/429 面与 repos 代理同族）。token 可空（匿名梯：公开仓
+ *  可达、私仓 404——与 githubPullState 的 token 纪律同律：仅进
+ *  Authorization 头，never URL/错误 message）。 */
+export async function githubRepoReachable(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+): Promise<boolean> {
+  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+  try {
+    await readJson(fetchImpl, url, {
+      ...API_HEADERS,
+      ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+    });
+    return true;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return false;
+    throw err;
+  }
 }
 
 function mapFetchThrow(url: string, err: unknown): HttpError {

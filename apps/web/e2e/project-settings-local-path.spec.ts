@@ -81,12 +81,14 @@ test('settings: github project shows local-path field; save writes path; clear w
 
   // 保存：绝对路径上 wire。落定信号 = invalidate 触发的列表重取（先于后续
   // 清空动作——mutation onSuccess 的草稿复位与 fill('') 同拍竞速，不等待
-  // 会把清空输入覆写回 server 真值）。
+  // 会把清空输入覆写回 server 真值）。钮位 exact 钉名：#1242 起设置页有
+  // 三个保存钮（名称/描述带 aria-label，加速位钮保裸文本「保存」）——
+  // substring 匹配会撞名，exact 钉本钮。
   await input.fill('/Users/who/code/pacman');
   const refetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
   await refetched;
   await expect(stub.patches.length).toBeGreaterThanOrEqual(1);
   expect(stub.patches[0]?.body).toEqual({ localPath: '/Users/who/code/pacman' });
@@ -95,7 +97,7 @@ test('settings: github project shows local-path field; save writes path; clear w
 
   // 清空保存：显式 null——键在 wire 上（#1169 同族序列化坑）
   await input.fill('');
-  await page.getByRole('button', { name: '保存' }).click();
+  await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(stub.patches.length).toBeGreaterThanOrEqual(2);
   const clearBody = stub.patches[1]?.body;
   expect(Object.hasOwn(clearBody ?? {}, 'localPath')).toBe(true);

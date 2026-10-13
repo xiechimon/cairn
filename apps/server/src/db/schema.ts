@@ -54,6 +54,8 @@ export const project = sqliteTable('project', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  /** 项目描述（#1242 设置页可编辑面；PATCH 五字段之一）。可空 = 无描述。 */
+  description: text('description'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   /** 托管形态：bare repo 名段（远端 URL `<teamId>/<repoName>`，r3 §1.4）。 */
   repoName: text('repoName'),
