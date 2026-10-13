@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /Users/xmon/.t3/worktrees/pacman/fix-1284-sweep-verify-release
+
+
+ Test Files  1 passed (1)
+      Tests  34 passed (34)
+   Start at  12:31:10
+   Duration  2.25s (transform 40%, tests 33%, import 28%)
+
