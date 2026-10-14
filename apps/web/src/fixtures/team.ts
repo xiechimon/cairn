@@ -79,3 +79,65 @@ export const teamOrgChartEmpty: FixtureSet = {
   now: boardDefault.now,
   team: { members: 0, agents: [] },
 };
+
+/** #1246 单子：只有总管，子列只剩创建槽。括号列按 ≥2 子设计，这一态应直连。 */
+const TEAM_ORG_CHART_SINGLE: TeamContent = {
+  members: 1,
+  agents: [
+    {
+      id: 'solo-chief',
+      displayName: 'solo-root',
+      model: 'claude-sonnet-5',
+      isDefault: true,
+      role: null,
+      provider: 'r3-gw',
+    },
+  ],
+};
+
+export const teamOrgChartSingle: FixtureSet = {
+  todos: boardDefault.todos,
+  now: boardDefault.now,
+  team: TEAM_ORG_CHART_SINGLE,
+  chief: {
+    view: 'drawer',
+    bound: true,
+    agent: { id: 'solo-chief', displayName: 'solo-root', avatarUrl: null },
+    threadTitle: '新主题',
+  },
+};
+
+/** #1246 双子：总管 + 一个成员 + 创建槽 = 2 子。括号形态应与 ≥2 子的冻结面一致。 */
+const TEAM_ORG_CHART_PAIR: TeamContent = {
+  members: 2,
+  agents: [
+    {
+      id: 'pair-chief',
+      displayName: 'pair-root',
+      model: 'claude-sonnet-5',
+      isDefault: true,
+      role: null,
+      provider: 'r3-gw',
+    },
+    {
+      id: 'pair-scribe',
+      displayName: 'pair-child',
+      model: 'qwen3.8-max',
+      isDefault: false,
+      role: null,
+      provider: 'r3-gw',
+    },
+  ],
+};
+
+export const teamOrgChartPair: FixtureSet = {
+  todos: boardDefault.todos,
+  now: boardDefault.now,
+  team: TEAM_ORG_CHART_PAIR,
+  chief: {
+    view: 'drawer',
+    bound: true,
+    agent: { id: 'pair-chief', displayName: 'pair-root', avatarUrl: null },
+    threadTitle: '新主题',
+  },
+};

@@ -163,6 +163,12 @@ export function TeamChart({
       <div className="mt-10 text-center text-[13px] text-(--text-tertiary)">{t('暂无成员')}</div>
     );
   }
+  const subordinates = agents.filter((a) => a.id !== root.id);
+  // 创建槽恒占子列末位，非根成员为 0 时子数是 1。括号列按 ≥2 子设计
+  // （top/bottom 各留半张卡高）；单子时列高被吃光，边框塌成悬浮短横，
+  // w-7 还把连接线隔出断口（#1246）。单子跳过括号，w-11 连接线直接
+  // 接到唯一子卡。外层 items-center 让这条线的 y 落在子卡中心上。
+  const singleChain = subordinates.length === 0;
   return (
     <div className="mt-[9px] flex items-center">
       <ChartNode agent={root} crown />
@@ -170,19 +176,19 @@ export function TeamChart({
       <div className="flex" data-testid="team-chart-children">
         {/* 括号列本身不画东西，只给绝对定位的括号当坐标架：高度随子列撑满，
             于是括号 top/bottom 各留半个卡片高（28），正好落在首/末子节点的
-            垂直中心上。 */}
-        <div className="relative w-7 flex-none">
-          <div
-            className="absolute bottom-7 left-0 top-7 w-7 rounded-l-[7px] border border-r-0 border-(--input)"
-            data-testid="team-chart-bracket"
-          />
-        </div>
+            垂直中心上。单子不挂这一列。 */}
+        {singleChain ? null : (
+          <div className="relative w-7 flex-none">
+            <div
+              className="absolute bottom-7 left-0 top-7 w-7 rounded-l-[7px] border border-r-0 border-(--input)"
+              data-testid="team-chart-bracket"
+            />
+          </div>
+        )}
         <div className="flex flex-col gap-2" data-testid="team-chart-nodes">
-          {agents
-            .filter((a) => a.id !== root.id)
-            .map((a) => (
-              <ChartNode key={a.id} agent={a} />
-            ))}
+          {subordinates.map((a) => (
+            <ChartNode key={a.id} agent={a} />
+          ))}
           {/* 虚线创建卡：与成员卡同族盒模型（NODE_CLS layout），border-style
               换 dashed、文本左对齐。#1005 registry 对齐：outline 默认档
               （hover bg-muted / 按下位移由件承载，七通道中和退役），节点卡
