@@ -94,7 +94,7 @@ export function probeMachineHardware(diskPath: string): MachineHardware | undefi
     const free = diskFreeMb(diskPath);
     if (free === undefined) return undefined;
     const load = loadavg()[0];
-    if (!Number.isFinite(load) || load < 0) return undefined;
+    if (load === undefined || !Number.isFinite(load) || load < 0) return undefined;
     return {
       cpuCores,
       memoryAvailableMb: Math.max(0, Math.floor(freemem() / (1024 * 1024))),
