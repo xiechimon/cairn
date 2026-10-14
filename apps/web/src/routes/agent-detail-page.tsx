@@ -528,7 +528,7 @@ export function AgentDetailPage() {
                       {thinkingLevel === null ? t('未设置') : thinkingLevel}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent aria-label={t('思考强度')} className="agent-thinking-menu">
+                  <SelectContent aria-label={t('思考强度')}>
                     <SelectItem value={null}>{t('未设置')}</SelectItem>
                     {thinkingOptions.map((level) => (
                       <SelectItem key={level} value={level}>
