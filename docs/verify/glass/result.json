@@ -1,0 +1,249 @@
+{
+  "ok": true,
+  "journeys": [
+    {
+      "id": "board",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "topbar title = 工作台 (got 工作台)"
+        },
+        {
+          "ok": true,
+          "label": "4 columns (got 4)"
+        }
+      ],
+      "screenshots": [
+        "01-board.png"
+      ]
+    },
+    {
+      "id": "create-task",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "card is in 待开始"
+        },
+        {
+          "ok": true,
+          "label": "GET /api/todos phase=todo"
+        },
+        {
+          "ok": true,
+          "label": "sqlite phase=todo"
+        }
+      ],
+      "screenshots": [
+        "02-create-task-dialog.png",
+        "03-create-task-card.png"
+      ]
+    },
+    {
+      "id": "dispatch",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "toast 已保存，交给总管编排"
+        },
+        {
+          "ok": true,
+          "label": "chief drawer open"
+        },
+        {
+          "ok": true,
+          "label": "chief threads 0 → 1"
+        },
+        {
+          "ok": true,
+          "label": "card still in 待开始 (no daemon)"
+        }
+      ],
+      "screenshots": [
+        "04-dispatch-toast.png",
+        "05-dispatch-chief.png"
+      ]
+    },
+    {
+      "id": "view-diff",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "changes header visible"
+        },
+        {
+          "ok": true,
+          "label": "src/hello.txt visible"
+        },
+        {
+          "ok": true,
+          "label": "added line visible"
+        },
+        {
+          "ok": true,
+          "label": "changes paths=src/hello.txt"
+        }
+      ],
+      "screenshots": [
+        "06-view-diff.png"
+      ]
+    },
+    {
+      "id": "request-changes",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "chip=规划中"
+        },
+        {
+          "ok": true,
+          "label": "phase=planning"
+        },
+        {
+          "ok": true,
+          "label": "latestBuildId unchanged"
+        }
+      ],
+      "screenshots": [
+        "07-request-changes-dialog.png",
+        "08-request-changes-landed.png"
+      ]
+    },
+    {
+      "id": "merge",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "merge checkbox checked"
+        },
+        {
+          "ok": true,
+          "label": "toast 已发起合并"
+        },
+        {
+          "ok": true,
+          "label": "phase stays review until a machine finishes (got review)"
+        }
+      ],
+      "screenshots": [
+        "09-merge-dialog.png",
+        "10-merge-accepted.png"
+      ]
+    }
+  ],
+  "consoleErrors": [
+    {
+      "text": "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at DetailHead (http://127.0.0.1:5273/src/detail/dhead.tsx:46:20)\n    at TodoDetailPage (http://127.0.0.1:5273/src/routes/todo-detail-pag"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "text": "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at DetailHead (http://127.0.0.1:5273/src/detail/dhead.tsx:46:20)\n    at TodoDetailPage (http://127.0.0.1:5273/src/routes/todo-detail-pag"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "text": "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at DetailHead (http://127.0.0.1:5273/src/detail/dhead.tsx:46:20)\n    at TodoDetailPage (http://127.0.0.1:5273/src/routes/todo-detail-pag"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ],
+  "failedRequests": [
+    {
+      "url": "http://127.0.0.1:5273/api/conversations/chief-01a13b70-08d0-7795-8630-4154eaa436eb/stream",
+      "method": "GET",
+      "failure": "net::ERR_ABORTED"
+    },
+    {
+      "url": "http://127.0.0.1:5273/api/projects/x7UEOBhKQh3BiJWvUZpHh/files",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "url": "http://127.0.0.1:5273/api/projects/x7UEOBhKQh3BiJWvUZpHh/files",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "url": "http://127.0.0.1:5273/api/projects/x7UEOBhKQh3BiJWvUZpHh/files",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "url": "http://127.0.0.1:5273/api/projects/x7UEOBhKQh3BiJWvUZpHh/files",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "url": "http://127.0.0.1:5273/api/projects/x7UEOBhKQh3BiJWvUZpHh/files",
+      "method": "GET",
+      "status": 404
+    }
+  ],
+  "observations": {
+    "doctor": {
+      "displayName": "Owner"
+    },
+    "chief": {
+      "agentId": "XNo8isQFG-Cfauqt2UfHv"
+    },
+    "seed": {
+      "diff": {
+        "todoId": "iSPorXniTVZ-DHZ92dum7",
+        "buildId": "01a13b6f-fa85-7b9c-8e7e-a670dab319b6"
+      },
+      "reject": {
+        "todoId": "zeNK2WK2jgoI50V8AhTuj",
+        "buildId": "01a13b6f-fabd-70eb-a832-835e37fac1fe"
+      },
+      "merge": {
+        "todoId": "s5clzYmwBx9o2Bh9IyJIZ",
+        "buildId": "01a13b6f-faf1-74e9-908b-205c7bddbbfc"
+      }
+    },
+    "createTask": {
+      "title": "Glass created 20261014-172238",
+      "id": "X26i4EfHCRppI_7KtazVR"
+    },
+    "dispatch": {
+      "title": "Glass dispatch 20261014-172239",
+      "threadsBefore": 0,
+      "threadsAfter": 1
+    },
+    "viewDiff": {
+      "todoId": "iSPorXniTVZ-DHZ92dum7",
+      "reported": true,
+      "paths": [
+        "src/hello.txt"
+      ]
+    },
+    "requestChanges": {
+      "todoId": "zeNK2WK2jgoI50V8AhTuj",
+      "phase": "planning"
+    },
+    "merge": {
+      "todoId": "s5clzYmwBx9o2Bh9IyJIZ",
+      "phase": "review"
+    }
+  },
+  "stack": {
+    "serverPort": 8791,
+    "webPort": 5273,
+    "homeDir": "/workspace/.claude/verify-run/home"
+  },
+  "fatal": null
+}
