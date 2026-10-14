@@ -37,6 +37,11 @@ interface AcceptDialogProps {
    *  改之前两处 merge 都是裸 mutate() + 立即关弹层，403 被静默吞掉——用户
    *  看到弹层关了、然后无事发生。 */
   rejectReason?: string | null;
+  /** #1313：已上报 diff 有没有文件。null / 缺省 = 未知，合并勾选照旧。
+   *  false = 空提交（文件集为空），不展示合并行，完成不走 merge，缺合并
+   *  授权也不禁用。failed 锁定（mergeLocked）优先：空 diff 也不给出跳过
+   *  合并的出口。 */
+  substantiveChanges?: boolean | null;
 }
 
 export function AcceptDialog({
@@ -47,6 +52,7 @@ export function AcceptDialog({
   mergeLocked,
   missingTools,
   rejectReason,
+  substantiveChanges,
 }: AcceptDialogProps) {
   const { t } = useI18n();
   const [merge, setMerge] = useState(true);
@@ -55,8 +61,10 @@ export function AcceptDialog({
   useEffect(() => {
     if (open === true) setMerge(true);
   }, [open]);
-  const blocked = (missingTools?.length ?? 0) > 0;
   const locked = mergeLocked === true;
+  // 空提交收口不提供合并。failed 卡的锁定优先于空 diff：done 仍只能经合并。
+  const skipMerge = substantiveChanges === false && !locked;
+  const blocked = !skipMerge && (missingTools?.length ?? 0) > 0;
   const mergeChecked = locked || merge;
   return (
     <DialogShell
@@ -75,7 +83,7 @@ export function AcceptDialog({
           <Button
             disabled={blocked || confirming === true}
             onClick={() => {
-              if (onConfirm) onConfirm(mergeChecked);
+              if (onConfirm) onConfirm(skipMerge ? false : mergeChecked);
               else onClose();
             }}
           >
@@ -87,20 +95,26 @@ export function AcceptDialog({
       {/* XMON-72：复选行收口 components/ui/checkbox 原语（registry 同源件，
           行盒由消费点 label 承载——整行可点走 label 激活转发）。行垫随
           DialogContent p-4，行内 8 gap 是 layout 位。 */}
-      <div className="flex items-center gap-2">
-        {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-        <label className="inline-flex cursor-pointer items-center gap-2">
-          <Checkbox
-            checked={mergeChecked}
-            onCheckedChange={(next) => {
-              if (!locked) setMerge(next === true);
-            }}
-            disabled={locked}
-            aria-label={t('将改动合并到默认分支')}
-          />
-          <span>{t('将改动合并到默认分支')}</span>
-        </label>
-      </div>
+      {skipMerge ? (
+        <p className="text-xs leading-4 text-(--text-tertiary)">
+          {t('本轮没有文件改动，完成不会合并分支。')}
+        </p>
+      ) : (
+        <div className="flex items-center gap-2">
+          {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
+          <label className="inline-flex cursor-pointer items-center gap-2">
+            <Checkbox
+              checked={mergeChecked}
+              onCheckedChange={(next) => {
+                if (!locked) setMerge(next === true);
+              }}
+              disabled={locked}
+              aria-label={t('将改动合并到默认分支')}
+            />
+            <span>{t('将改动合并到默认分支')}</span>
+          </label>
+        </div>
+      )}
       {locked && (
         // failed 卡锁定行：与缺项行同档 tertiary 说明位（「禁掉它并把原因写
         // 在旁边是同一件事的两半」，XMON-89 律）。
