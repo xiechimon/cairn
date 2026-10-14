@@ -1,0 +1,36 @@
+pnpm typecheck — 2026-10-15
+=========================
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+All four projects + integration typecheck green. The autofix-driven
+! -> ?. swap on apps/web/src/resources/machine-detail-page.tsx
+introduced a type regression (n: number | undefined vs t's expected
+string | number); the ?? 0 fallback that landed in the same commit
+restored the contract — see commit a704ac17.
+
+pnpm test (vitest run) — 2026-10-15
+====================================
+ Test Files  284 passed (284)
+      Tests  2945 passed (2945)
+   Duration  ~190-215s (the two runs differ by ~12s of integration
+              harness startup variance; both clean)
+   Project splits: VITEST_PROJECT_SET=light + =integration both green
+                   (the check job runs them separately to avoid the
+                   2-vCPU contention seen in #693 era).
+
+Behavior unchanged: zero diff between baseline and branch on the
+test-side. The autofix and ignore additions are mechanical (unused
+imports, optional-chain on already-typed values, biome-ignore markers);
+the only non-trivial change is the !important preservation in
+app.css, which restores the original CSS — behavior was already
+correct pre-#1192.
