@@ -212,7 +212,7 @@ test.describe('#1244 registry focus outline', () => {
   });
 
   test('the sidebar user button uses the global outline', async ({ page }) => {
-    await themed(page, 'dark', ACCEPT);
+    await themed(page, 'dark', SKILLS);
     const user = page.locator('.sidebar-user');
     await expect(user).toBeVisible();
     await focusKeyboard(user);
