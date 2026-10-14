@@ -386,6 +386,16 @@ export const machineTranscriptDeltaBodySchema = z.object({
 });
 export type MachineTranscriptDeltaBody = z.infer<typeof machineTranscriptDeltaBodySchema>;
 
+/** POST /api/machine/tool/{stepId} 思考增量（#1308）：与第三形同纪律的并行
+ *  体。daemon 把 thinking_delta 按 250ms 窗口聚合后上报，服务端瞬态转发为
+ *  会话流 thinking_delta，不落库。旧 server 收此形按 union 解析失败 400，
+ *  daemon 侧 fire-and-forget，步不受影响。 */
+export const machineThinkingDeltaBodySchema = z.object({
+  kind: z.literal('thinking_delta'),
+  text: z.string(),
+});
+export type MachineThinkingDeltaBody = z.infer<typeof machineThinkingDeltaBodySchema>;
+
 /** POST /api/machine/tool/{stepId} 第四形 [设计]（#905 步活动相位）：daemon
  * 从既有 StepEvent 流派生的「在做什么」信号（相位变化 / 新事件到达时节流
  * 重发）。服务端盖 {stepId, at} 后瞬态转发到 conversation stream 的 activity
@@ -423,6 +433,8 @@ export type MachineTranscriptRowBody = z.infer<typeof machineTranscriptRowBodySc
  *    {name, params})` + `reply.body.text`（r5 §3.1 raw）。
  * ③ transcript delta = {kind:"transcript_delta", text} → {ok:true}。
  * ④ activity = {kind:"activity", activity} → {ok:true}。
+ * ⑤ transcript row = {kind:"transcript_row", row} → {ok:true}。
+ * ⑥ thinking delta = {kind:"thinking_delta", text} → {ok:true}（#1308）。
  * 服务端按 body 形状分流（kind 判别位 = delta/activity；有 params 无 id =
  * relay）。旧 server 收第四形按 union 解析失败 400——daemon 侧 fire-and-forget
  * （与 ③ 同纪律），步不受影响。 */
@@ -430,6 +442,7 @@ export const machineToolBodySchema = z.union([
   toolCallRecordSchema,
   machineToolRelayBodySchema,
   machineTranscriptDeltaBodySchema,
+  machineThinkingDeltaBodySchema,
   machineActivityBodySchema,
   machineTranscriptRowBodySchema,
 ]);

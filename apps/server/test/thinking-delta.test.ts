@@ -9,13 +9,7 @@ import { conversationStreamEventSchema } from '@pacman/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';
-import {
-  bindAllAgents,
-  bootServer,
-  issueApiKey,
-  openConvStream,
-  postProject,
-} from './helpers.js';
+import { bindAllAgents, bootServer, issueApiKey, openConvStream, postProject } from './helpers.js';
 
 const MARKER = 'REASONING-MARKER-1308';
 

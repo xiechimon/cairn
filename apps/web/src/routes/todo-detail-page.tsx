@@ -44,6 +44,7 @@ import {
 } from '../api/hooks.js';
 import { invalidateConverged } from '../api/invalidate.js';
 import { liveTextStore } from '../api/live-text.js';
+import { liveThinkingStore } from '../api/live-thinking.js';
 import {
   mapBranchInfo,
   mapDiffFiles,
@@ -314,8 +315,14 @@ export function TodoDetailPage() {
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     buildId != null ? liveTextStore.getVisible(buildId, knownDetailIds) : '',
   );
+  const liveThinking = useSyncExternalStore(liveThinkingStore.subscribe, () =>
+    buildId != null ? liveThinkingStore.getVisible(buildId, knownDetailIds) : '',
+  );
   useEffect(() => {
-    if (buildId != null) liveTextStore.prune(buildId, knownDetailIds);
+    if (buildId != null) {
+      liveTextStore.prune(buildId, knownDetailIds);
+      liveThinkingStore.prune(buildId, knownDetailIds);
+    }
   }, [buildId, knownDetailIds]);
   // #905 活动相位读侧（chief use-chief-surface 同律）：单槽快照引用稳定；
   // stepId 对在跑步的过滤在 mapTranscript 内（W1）。
@@ -427,6 +434,7 @@ export function TodoDetailPage() {
         machineName,
         userName,
         liveText,
+        liveThinking,
         stopping,
         activity,
       }),
@@ -447,6 +455,7 @@ export function TodoDetailPage() {
     buildQ.data,
     userName,
     liveText,
+    liveThinking,
     activity,
     latestPlan,
     changesQ.data,

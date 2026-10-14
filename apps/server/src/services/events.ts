@@ -122,6 +122,9 @@ export class ConversationStreamHub {
   private readonly byConv = new Map<string, Set<TeamStreamConnection>>();
   /** 在飞段文本缓冲（conversationId → 自上一条落库行以来的增量拼接）。 */
   private readonly textBuffers = new Map<string, string>();
+  /** 在飞思考段（#1308）。与 textBuffers 分开：思考行不清正文缓冲，正文行
+   *  的清空点才一起清思考缓冲。 */
+  private readonly thinkingBuffers = new Map<string, string>();
   /** 每会话最后一份步活动相位（#905，瞬态单槽）：订阅进场补发用，步终态
    *  即清。LRU 上限与 textBuffers 同值（delete+set 触碰序）。 */
   private readonly lastActivity = new Map<string, StepActivity>();
@@ -138,6 +141,10 @@ export class ConversationStreamHub {
     const buffered = this.textBuffers.get(conversationId);
     if (buffered !== undefined && buffered !== '') {
       void conn.send({ type: 'text_delta', text: buffered });
+    }
+    const thinking = this.thinkingBuffers.get(conversationId);
+    if (thinking !== undefined && thinking !== '') {
+      void conn.send({ type: 'thinking_delta', text: thinking });
     }
     // 活动相位同律补发（#905）：断线重连 / 换页进场立即拿到在跑步的当前
     // 相位，不用等下一次相位变化。
@@ -162,6 +169,7 @@ export class ConversationStreamHub {
     // 重试链，可能迟到，一次迟到就把正在流的下一段抹掉；且 web 侧 #857 起已
     // 是只认 assistant 文本行的 handoff，两侧改到同律镜像才重新成立。
     if (endsLiveTextBuffer(message)) this.clearConversationBuffer(conversationId);
+    else if (isThinkingOnlyRow(message.content)) this.thinkingBuffers.delete(conversationId);
     this.publish(conversationId, { type: 'message', message });
   }
 
@@ -180,6 +188,23 @@ export class ConversationStreamHub {
       if (oldest !== undefined) this.textBuffers.delete(oldest);
     }
     this.publish(conversationId, { type: 'text_delta', text });
+  }
+
+  /** thinking_delta 节流批量转发（#1308）。瞬态，不落库；累积进思考段缓冲
+   *  供晚订阅补发。空文本不发。 */
+  publishThinkingDelta(conversationId: string, text: string): void {
+    if (text === '') return;
+    const next = tailWithinBytes(
+      (this.thinkingBuffers.get(conversationId) ?? '') + text,
+      CONV_TEXT_BUFFER_MAX_BYTES,
+    );
+    this.thinkingBuffers.delete(conversationId);
+    this.thinkingBuffers.set(conversationId, next);
+    if (this.thinkingBuffers.size > CONV_TEXT_BUFFER_MAX_CONVS) {
+      const oldest = this.thinkingBuffers.keys().next().value;
+      if (oldest !== undefined) this.thinkingBuffers.delete(oldest);
+    }
+    this.publish(conversationId, { type: 'thinking_delta', text });
   }
 
   /** 步活动相位（#905）：daemon 上报经 reportActivity 盖章后瞬态转发；
@@ -208,6 +233,7 @@ export class ConversationStreamHub {
    *  同清（#905）：终局/重置后不得再向进场订阅补发死相位。 */
   clearConversationBuffer(conversationId: string): void {
     this.textBuffers.delete(conversationId);
+    this.thinkingBuffers.delete(conversationId);
     this.lastActivity.delete(conversationId);
   }
 

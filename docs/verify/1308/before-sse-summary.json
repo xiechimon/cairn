@@ -1,0 +1,10 @@
+{
+  "expect": "old",
+  "types": [
+    "ping",
+    "step",
+    "activity"
+  ],
+  "markerFrames": [],
+  "postStatus": 400
+}

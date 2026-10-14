@@ -105,6 +105,8 @@ export const MACHINE_STREAM_EVENT_TYPES = ['wake', 'shutdown'] as const;
 // - text_delta：当前助手消息的 live 文本增量（pi 词表同名事件，02 §5.6）；
 //   daemon 节流批量转发，服务端瞬态转发不落库——终稿经 upload-urls 兜底，
 //   web 侧以 message 行为准收敛 [设计]。
+// - thinking_delta（#1308）：思考正文增量，载荷与 text_delta 同形。同一套
+//   节流与不落库纪律，web 以 kind:'thinking' 行收敛。
 // - step：步状态流转（journal 词 pending/claimed/done/failed），进度行数据面
 //   [推断]。
 // 补采到官方载荷真值后回写 02 §11 收紧（04 附录 A 纪律）。
@@ -119,6 +121,13 @@ export const conversationMessageEventSchema = z.object({
 
 export const conversationTextDeltaEventSchema = z.object({
   type: z.literal('text_delta'),
+  text: z.string(),
+});
+
+/** 思考增量（#1308）：载荷与 text_delta 同形。daemon 按同一节流窗批量转发，
+ *  服务端瞬态转发不落库，web 以 kind:'thinking' 的 message 行收敛。 */
+export const conversationThinkingDeltaEventSchema = z.object({
+  type: z.literal('thinking_delta'),
   text: z.string(),
 });
 
@@ -144,6 +153,7 @@ export const conversationStreamEventSchema = z.discriminatedUnion('type', [
   pingEventSchema,
   conversationMessageEventSchema,
   conversationTextDeltaEventSchema,
+  conversationThinkingDeltaEventSchema,
   conversationStepEventSchema,
   conversationActivityEventSchema,
 ]);

@@ -1,0 +1,16 @@
+{
+  "expect": "new",
+  "types": [
+    "ping",
+    "step",
+    "activity",
+    "thinking_delta"
+  ],
+  "markerFrames": [
+    {
+      "type": "thinking_delta",
+      "text": "REASONING-MARKER-1308"
+    }
+  ],
+  "postStatus": 200
+}

@@ -183,13 +183,13 @@ export type BuildStepActionBody = z.infer<typeof buildStepActionBodySchema>;
 // 词表零改动——01 §5 的 15 件 1:1 锁不碰），经 tool/{stepId} 第四形上报；
 // server 盖 {stepId, at} 后瞬态转发到会话流 activity 事件，**不落库**——
 // 与 text_delta 同纪律（02 §1.3 数据所有权不变，终稿 transcript 是内容正本）。
-// 安全面（docs/verify/905/baseline.md §B）：只暴露相位事实 + 工具名 + 重试
-// 轮次；thinking/text 的内容增量不走本通道。
+// 安全面（docs/verify/905/baseline.md §B）：activity 只暴露相位事实 + 工具名
+// + 重试轮次。思考正文不走本通道，走会话流 thinking_delta（#1308）。
 
 /** 相位词表 [设计]。语义 = daemon 侧最近一次流事件所指的进行态：
  *  - preparing：claim 后、会话开启前（工作区 / 凭证 / 技能下发）；
  *  - starting：会话开启中，等模型首个事件；
- *  - thinking：思考流到达中（thinking_delta；内容不上 wire）；
+ *  - thinking：思考流到达中（thinking_delta；正文走会话流 thinking_delta）；
  *  - responding：正文流式输出中（text_delta；文本本身走打字面可见）；
  *  - tool：调用块已流完、工具执行中（tool = 最近开始的工具名）；
  *  - retrying：协议层自动重试（attempt = 第几轮，1 起）；

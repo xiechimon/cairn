@@ -3,7 +3,10 @@
 // safeParse 失败，思考正文进不了会话流。
 
 import { describe, expect, it } from 'vitest';
-import { conversationStreamEventSchema, conversationTextDeltaEventSchema } from '../src/protocol/sse.js';
+import {
+  conversationStreamEventSchema,
+  conversationTextDeltaEventSchema,
+} from '../src/protocol/sse.js';
 
 describe('conversation stream thinking_delta', () => {
   it('accepts { type: thinking_delta, text } the same way as text_delta', () => {

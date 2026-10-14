@@ -1208,8 +1208,32 @@ export async function runStep(
   const flushDeltas = (): void => {
     void flushDeltasNow();
   };
+  // 思考增量（#1308）：与 deltaBuf 并行的一路，同一节流窗，进会话流
+  // thinking_delta。segments 仍是落库视图，两路吃同一个 ev.text。
+  let thinkingBuf = '';
+  let thinkingTimer: NodeJS.Timeout | null = null;
+  const flushThinkingNow = async (): Promise<void> => {
+    if (thinkingTimer !== null) {
+      clearTimeout(thinkingTimer);
+      thinkingTimer = null;
+    }
+    const text = thinkingBuf;
+    thinkingBuf = '';
+    if (text === '' || client.thinkingDelta === undefined) return;
+    try {
+      await client.thinkingDelta(stepId, text);
+    } catch (err: unknown) {
+      logger.step(
+        `thinking delta relay failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  };
+  const flushThinking = (): void => {
+    void flushThinkingNow();
+  };
   /** 封段 → journal + 实时上报。顺序硬性：先 await 增量落地，再发段行。 */
   const emitSegment = async (seg: SealedSegment): Promise<void> => {
+    await flushThinkingNow();
     await flushDeltasNow();
     sealedInMessage = true;
     messageSeq += 1;
@@ -1306,6 +1330,7 @@ export async function runStep(
     } catch (err) {
       clearInterval(heartbeat);
       flushDeltas();
+      flushThinking();
       cleanupBriefOnce();
       clearCredentials(creds);
       await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
@@ -1343,9 +1368,14 @@ export async function runStep(
             break;
           }
           case 'thinking_delta': {
-            // #905 的相位面不变（思考内容不上 activity wire）；#955 起内容按
-            // 段落行——思考与正文同律，只是它有「增量」与「块终全文」两个来源。
+            // 相位面仍走 activity（无增量时的兜底标签）。正文另按 text_delta
+            // 的节流窗进会话流（#1308）；段落库路径不变。
             activity.setPhase('thinking');
+            thinkingBuf += ev.text;
+            if (thinkingTimer === null) {
+              thinkingTimer = setTimeout(flushThinking, TRANSCRIPT_DELTA_FLUSH_MS);
+              thinkingTimer.unref?.();
+            }
             const sealedThinking = segments.append('thinking', ev.text);
             if (sealedThinking !== null) await emitSegment(sealedThinking);
             break;
@@ -1539,6 +1569,7 @@ export async function runStep(
       if (bodyTimeout) clearTimeout(bodyTimeout);
       if (durationCap) clearTimeout(durationCap);
       flushDeltas();
+      flushThinking();
       cleanupBriefOnce();
       clearCredentials(creds);
       await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
@@ -1611,6 +1642,7 @@ export async function runStep(
   // #955：收尾封出残留段——终稿 upload-urls 读的就是这份 journal。
   await sealSegment();
   flushDeltas();
+  flushThinking();
   clearInterval(heartbeat);
   if (watchdog) clearTimeout(watchdog);
   if (bodyTimeout) clearTimeout(bodyTimeout);

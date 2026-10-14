@@ -13,6 +13,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activityStore } from '../src/api/activity.js';
 import { liveTextStore } from '../src/api/live-text.js';
+import { liveThinkingStore } from '../src/api/live-thinking.js';
 import { startConversationStream } from '../src/api/sse.js';
 
 /** 替身 EventSource：sse-connection.test.ts 同款（静态 OPEN 量必须留着）。 */
@@ -62,6 +63,7 @@ beforeEach(() => {
   FakeEventSource.instances = [];
   vi.stubGlobal('EventSource', FakeEventSource);
   liveTextStore.clear(CONV);
+  liveThinkingStore.clear(CONV);
   activityStore.clear(CONV);
 });
 
@@ -69,6 +71,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   liveTextStore.clear(CONV);
+  liveThinkingStore.clear(CONV);
   activityStore.clear(CONV);
 });
 
@@ -254,5 +257,92 @@ describe('活动相位单槽（#905）', () => {
     es.fireOpen();
     es.push({ type: 'activity', activity: { stepId: 's1', phase: 'tool', tool: 'read', at: 300 } });
     expect(activityStore.get(CONV)).toMatchObject({ phase: 'tool', tool: 'read' });
+  });
+});
+
+// —— #1308 思考增量（客户端半）——————————————————————————————————————————
+// 失败方式：
+//   1. thinking_delta 不进 liveThinkingStore → 会话只有「模型思考中...」标签。
+//   2. 思考增量误入 text_delta 通道，或正文增量误入思考缓冲。
+//   3. 订阅 / 重连不清旧思考缓冲 → 补发快照叠成双份。
+//   4. 思考段行到达不记 handoff → 落库行与在飞行叠成两份。
+//   5. 步终态不清思考缓冲 → 下一跑残留上一跑的推理文本。
+describe('思考增量（#1308）', () => {
+  const thinkingRow = {
+    id: 'm-think',
+    role: 'assistant' as const,
+    content: [{ type: 'thinking', thinking: 'REASONING-MARKER-1308' }],
+    createdAt: 1,
+  };
+
+  it('thinking_delta 只进思考缓冲，不进正文缓冲', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: 'REASONING-MARKER-1308' });
+    expect(liveThinkingStore.get(CONV)).toBe('REASONING-MARKER-1308');
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+
+  it('text_delta 不进思考缓冲', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'text_delta', text: 'answer' });
+    expect(liveTextStore.get(CONV)).toBe('answer');
+    expect(liveThinkingStore.get(CONV)).toBe('');
+  });
+
+  it('订阅前残留的思考缓冲在补发前已清空', () => {
+    liveThinkingStore.append(CONV, '旧思考');
+    FakeEventSource.instances = [];
+    startConversationStream(CONV, freshClient(), {});
+    expect(liveThinkingStore.get(CONV)).toBe('');
+    const es = FakeEventSource.instances[0] as FakeEventSource;
+    es.fireOpen();
+    es.push({ type: 'thinking_delta', text: '补发思考' });
+    expect(liveThinkingStore.get(CONV)).toBe('补发思考');
+  });
+
+  it('重连 resync 作废旧思考缓冲，补发快照不叠加', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: '断线前' });
+    vi.advanceTimersByTime(20_000);
+    const rebuilt = FakeEventSource.instances[1] as FakeEventSource;
+    rebuilt.fireOpen();
+    expect(liveThinkingStore.get(CONV)).toBe('');
+    rebuilt.push({ type: 'thinking_delta', text: '断线前后缀' });
+    expect(liveThinkingStore.get(CONV)).toBe('断线前后缀');
+  });
+
+  it('思考段行记 handoff：messages 含该行后可见缓冲为空', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: 'REASONING-MARKER-1308' });
+    es.push({ type: 'message', message: thinkingRow });
+    expect(liveThinkingStore.get(CONV)).toBe('REASONING-MARKER-1308');
+    expect(liveThinkingStore.getVisible(CONV, new Set())).toBe('REASONING-MARKER-1308');
+    expect(liveThinkingStore.getVisible(CONV, new Set(['m-think']))).toBe('');
+    expect(liveTextStore.get(CONV)).toBe('');
+  });
+
+  it('正文行不记思考 handoff', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: '仍在飞' });
+    es.push({
+      type: 'message',
+      message: { id: 'm-text', role: 'assistant', content: '终稿', createdAt: 2 },
+    });
+    expect(liveThinkingStore.getVisible(CONV, new Set(['m-text']))).toBe('仍在飞');
+  });
+
+  it('step 终态清思考缓冲；claimed 不清', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: '段' });
+    es.push({
+      type: 'step',
+      step: { id: 's1', buildId: CONV, kind: 'plan', machineId: null, createdAt: 1, status: 'claimed' },
+    });
+    expect(liveThinkingStore.get(CONV)).toBe('段');
+    es.push({
+      type: 'step',
+      step: { id: 's1', buildId: CONV, kind: 'plan', machineId: null, createdAt: 1, status: 'done' },
+    });
+    expect(liveThinkingStore.get(CONV)).toBe('');
   });
 });

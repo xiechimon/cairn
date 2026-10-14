@@ -108,6 +108,7 @@ node .../scripts/drive-agent-identity.mjs      # agent 身份可点进设置(#74
 node .../scripts/drive-chief-segments.mjs      # 段行封口(#955/ADR 0011;按封口后的真 wire 序推帧 + 抽屉在飞态;三个探针坑见 docs/verify/955/README.md)
 node .../scripts/drive-1033-avatar.mjs         # 总管思考行/工具行头像几何(#1033;真 Lorelei 形态桩 + 同帧几何量取;--expect=old 取 before 基线;证据 docs/verify/1033/)
 node .../scripts/drive-1034-thinking-truncate.mjs --expect=new|old  # 思考行宽截断双向证据(#1034;chief 抽屉+详情对话两面几何/computed 实测,零 daemon 零 LLM;--expect=old 打 origin/main 一次性 worktree 基线栈复现缺陷;配方与判读 = docs/verify/1034/README.md)
+node .../scripts/drive-1308-thinking-delta.mjs --expect=new|old  # 思考正文进会话流(#1308;假机器 wire 推 activity+thinking_delta,零 daemon 零 LLM;--expect=old 流上无正文,--expect=new 详情页 Think 行出标记且落定只剩一份;配方 = docs/verify/1308/README.md)
 node .../scripts/drive-1065-zombie-claim.mjs   # 僵尸认领最小场景(#1065;死机=子进程 claim 长轮询被 SIGKILL、活机=探针本进程 claim;双向断言死机零认领+活机 wake 路径领走,零 daemon 零 LLM 零浏览器;before 栈对拍见配方;配方与判读 = docs/verify/1065/README.md)
 node .../scripts/drive-902-gate-actor.mjs --expect=new|old  # 过闸 actor 审计三票联合(#902/#900/#901;真机器 wire 推到 confirm/review + REST/chief relay 过闸 + 浏览器真拖拽录像转 GIF;--expect=old 打 origin/main 基线栈取 before;证据 docs/verify/900/)
 node .../scripts/drive-903-dispatch-judgment.mjs  # chief 派发判定(#903/ADR 0014;设置槽死态 + 逐次判定 + dispatchReason 回执三条腿,假机器 claim chief 回合步 relay run_builds 三形态对拍 SQLite,零 daemon 零 LLM;配方与 gotcha = features/chief-dispatch-judgment.md)
