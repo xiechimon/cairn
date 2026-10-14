@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Replays the git argv of sync.ts runSyncGit (#1329) against the git on PATH.
-#   MODE=old : the checkout argv before this fix. runGit resolves on a non-zero
-#              exit, so a failed checkout is never seen and never retried.
-#   MODE=new : checkout target picked with hasRemoteBranch, then
-#              `checkout --force <full ref> --`.
+#   MODE=old       : the checkout argv before this fix. runGit resolves on a non-zero
+#                    exit, so a failed checkout is never seen and never retried.
+#   MODE=new-force : checkout target picked with hasRemoteBranch, then
+#                    `checkout --force <full ref> --` (the force=true path).
+#   MODE=new-noforce: `checkout <target> --` (the force=false path). Plain checkout
+#                    refuses to clobber dirty tracked files → data loss prevention.
 #   RESET_FORM=argv : `reset --hard --end-of-options <commit>` (current resetHard).
 #   RESET_FORM=oid  : rev-parse the commit first, then `reset --hard <oid>`
 #                     (the form PR #1330 uses for resetHard).
-# Usage: PATH=<git dir>:$PATH GIT_TRACE=1 MODE=old|new RESET_FORM=argv|oid bash repro.sh
+# Usage: PATH=<git dir>:$PATH GIT_TRACE=1 MODE=<old|new-force|new-noforce> \
+#        RESET_FORM=argv|oid bash repro.sh
 set -u
 MODE=${MODE:-old}
 RESET_FORM=${RESET_FORM:-argv}
@@ -51,8 +54,22 @@ make_repo() {
   git -C "$d/work" checkout -q main
 }
 
+checkout_argv() { # echo the argv array (one token per line) for the chosen MODE.
+  local ref=$1 target
+  target="refs/heads/$ref"
+  if git rev-parse --verify -q "refs/remotes/origin/$ref" >/dev/null; then
+    target="refs/remotes/origin/$ref"
+  fi
+  case "$MODE" in
+    old)        echo "checkout" "--end-of-options" "origin/$ref" ;;
+    new-force)  echo "checkout" "--force" "$target" "--" ;;
+    new-noforce)echo "checkout" "$target" "--" ;;
+    *) echo "unknown MODE: $MODE" >&2; exit 2 ;;
+  esac
+}
+
 scenario() { # scenario <label> <ref> <dirty 0|1>
-  local label=$1 ref=$2 dirty=$3 commit co oid rs
+  local label=$1 ref=$2 dirty=$3 commit co rs argv
   make_repo "$label"
   cd "$ROOT/$label/work" || return 1
   commit=$(git rev-parse origin/feat)
@@ -60,22 +77,14 @@ scenario() { # scenario <label> <ref> <dirty 0|1>
   echo "== $label: ref=$ref commit=$commit dirty=$dirty"
   state
 
-  if [ "$MODE" = old ]; then
-    step git checkout --end-of-options "origin/$ref"
-    co=$LAST
-  else
-    local target=refs/heads/$ref
-    if git rev-parse --verify -q "refs/remotes/origin/$ref" >/dev/null; then
-      target=refs/remotes/origin/$ref
-    fi
-    step git checkout --force "$target" --
-    co=$LAST
-    if [ "$co" -ne 0 ]; then
-      echo "    => sync failed at checkout (exit $co)"
-      state
-      echo
-      return 0
-    fi
+  argv=$(checkout_argv "$ref" | tr '\n' ' ')
+  step git $argv
+  co=$LAST
+  if [ "$co" -ne 0 ]; then
+    echo "    => sync failed at checkout (exit $co)"
+    state
+    echo
+    return 0
   fi
 
   if [ "$RESET_FORM" = oid ]; then

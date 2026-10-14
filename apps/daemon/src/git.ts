@@ -11,7 +11,11 @@ import { spawn } from 'node:child_process';
 import type { CommitIdentity, GitCredentialSource, GitCredentials } from '@pacman/shared';
 
 export interface GitRunResult {
-  code: number;
+  /** 子进程退出码；signal 终止（含超时）时 = null（不映射为 0——signaled 退出
+   * 与正常退非零都属于失败语义，runGitOk 同样抛错）。 */
+  code: number | null;
+  /** kill 信号名（如 'SIGTERM' 超时）；正常退出 = null。 */
+  signal: NodeJS.Signals | null;
   stdout: string;
   stderr: string;
 }
@@ -32,9 +36,10 @@ export function runGit(
     child.stdout.on('data', (c: Buffer) => stdout.push(c));
     child.stderr.on('data', (c: Buffer) => stderr.push(c));
     child.on('error', reject);
-    child.on('close', (code) =>
+    child.on('close', (code, signal) =>
       resolve({
-        code: code ?? 0,
+        code,
+        signal,
         stdout: Buffer.concat(stdout).toString('utf8'),
         stderr: Buffer.concat(stderr).toString('utf8'),
       }),
@@ -42,16 +47,19 @@ export function runGit(
   });
 }
 
-/** 非零退 = 抛错（stderr 上浮；调用方按语义捕获）。 */
+/** 非零退 / signal 终止 = 抛错（stderr 上浮；调用方按语义捕获）。 */
 export async function runGitOk(
   args: string[],
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
 ): Promise<string> {
   const r = await runGit(args, opts);
-  if (r.code !== 0) {
-    throw new Error(`git ${args[0]} failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
+  if (r.code === 0) return r.stdout.trim();
+  if (r.code === null) {
+    throw new Error(
+      `git ${args[0]} failed (signal ${r.signal ?? 'unknown'}): ${r.stderr.trim() || r.stdout.trim()}`,
+    );
   }
-  return r.stdout.trim();
+  throw new Error(`git ${args[0]} failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
 }
 
 /** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。密码含 shell 元
@@ -310,12 +318,15 @@ export const gitPrim = {
     return r.code === 0 && r.stdout.trim() !== '' ? r.stdout.trim() : null;
   },
 
-  /** `checkout --force <全限定 ref> --`（#1329）。git 2.43 的 checkout 不认
+  /** `checkout [--force] <全限定 ref> --`（#1329）。git 2.43 的 checkout 不认
    * `--end-of-options`（当 pathspec 吞掉、退 1）。全限定 ref + `--` 不会被当成选项
-   * 或路径。--force：随后的 reset --hard 本就丢弃已跟踪改动、覆盖未跟踪冲突文件，
-   * 不加它，脏工作区的同步会卡在 checkout 上，而 reset 本来就会丢掉同样的改动。 */
-  async checkout(dir: string, ref: string): Promise<void> {
-    await runGitOk(['checkout', '--force', ref, '--'], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+   * 或路径。force 语义（与 sync.ts `force` 字段一致）：非 force 时 plain checkout，
+   * 拒绝覆盖脏跟踪文件——防止 sync 在 reset --hard 之前就把用户的未提交改动
+   * 吃掉（票 HIGH 数据丢失面）。force 时 checkout 强制覆盖（随后 clean -fd
+   * 仍丢弃未跟踪文件）。 */
+  async checkout(dir: string, ref: string, force: boolean): Promise<void> {
+    const args = force ? ['checkout', '--force', ref, '--'] : ['checkout', ref, '--'];
+    await runGitOk(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
   },
 
   /** checkpoint 恢复两步（02 §5.5：`reset --hard` + `clean -fd`）。 */

@@ -19,6 +19,8 @@ import {
   gitCredentialEnv,
   isGitAuthFailure,
   machineGitEnv,
+  runGit,
+  runGitOk,
   withGitCredentialFallback,
   withGitNetRetries,
 } from '../src/git.js';
@@ -256,5 +258,21 @@ describe('withGitCredentialFallback — 凭据序 integration 先行、machine �
     });
     expect(source).toBe('machine');
     expect(calls).toEqual([null]);
+  });
+});
+
+describe('runGit — 信号终止不当作成功（#1329）', () => {
+  // hash-object --stdin 要等 stdin 关闭才返回；超时后被 SIGTERM 杀掉，退出码为 null。
+  const STDIN_BLOCKED = { timeoutMs: 200 };
+
+  test('runGit 保留 null 退出码（信号终止），不映射为 0', async () => {
+    const r = await runGit(['hash-object', '--stdin'], STDIN_BLOCKED);
+    expect(r.code).toBeNull();
+  });
+
+  test('runGitOk 对信号终止抛错，错误文案点名信号', async () => {
+    await expect(runGitOk(['hash-object', '--stdin'], STDIN_BLOCKED)).rejects.toThrow(
+      'failed (signal SIGTERM)',
+    );
   });
 });

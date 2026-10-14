@@ -15,7 +15,7 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MachineSyncCommand } from '@pacman/shared';
-import { gitPrim } from './git.js';
+import { gitPrim, runGitOk } from './git.js';
 import type { DaemonLogger } from './log.js';
 import type { MachineApi } from './machine-client.js';
 
@@ -88,12 +88,11 @@ async function runSyncGit(cmd: MachineSyncCommand): Promise<void> {
     }
   }
 
-  // checkout ref：远端跟踪 ref（`origin/<ref>`）存在则用它，否则退到 `refs/heads/<ref>`。
+  // checkout ref：远端跟踪 ref（`origin/<ref>`）存在则用它，否则退到 `refs/heads/<ref>`，
+  // 再否则用 `rev-parse <ref>^{commit}` 兜底（tag / SHA 等非分支 ref 仍可解析）。
   // 失败直接上抛——reset --hard 会移动当前检出的分支，checkout 未成功时不能继续。
-  const checkoutRef = (await gitPrim.hasRemoteBranch(directory, ref))
-    ? `refs/remotes/origin/${ref}`
-    : `refs/heads/${ref}`;
-  await gitPrim.checkout(directory, checkoutRef);
+  const checkoutRef = await resolveCheckoutRef(directory, ref);
+  await gitPrim.checkout(directory, checkoutRef, force);
 
   // reset --hard 到目标 commit
   await gitPrim.resetHard(directory, commit);
@@ -101,5 +100,31 @@ async function runSyncGit(cmd: MachineSyncCommand): Promise<void> {
   // force = 清未跟踪文件 + 丢弃 stash（spec r1 changelog 09-13 文本语义）
   if (force) {
     await gitPrim.cleanFd(directory);
+  }
+}
+
+/** ref 解析三层兜底（#1329 + 旧 tag/SHA 行为恢复）：
+ *   1. `refs/remotes/origin/<ref>`（origin 跟踪分支，主路径——fetch 后的 refs）
+ *   2. `refs/heads/<ref>`（本地分支——已 clone 但未 fetch，或未推送 origin）
+ *   3. `rev-parse --verify <ref>^{commit}`（tag / SHA / 任意 git 可消解的 rev）
+ * 三层都失败 = 抛错（带 ref 名），调用方 performSync 落 failed。 */
+async function resolveCheckoutRef(directory: string, ref: string): Promise<string> {
+  if (await gitPrim.hasRemoteBranch(directory, ref)) {
+    return `refs/remotes/origin/${ref}`;
+  }
+  if (await gitPrim.hasLocalBranch(directory, ref)) {
+    return `refs/heads/${ref}`;
+  }
+  // 兜底 rev-parse：tag / SHA / 任意可消解 rev。把 git 原文包上 ref 名
+  // 上抛——调用方（performSync）把 errorMessage 落 server，未点名 ref 会让
+  // web 报错读起来像「Needed a single revision」这种无主语（test 守门）。
+  try {
+    return await runGitOk(['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`], {
+      cwd: directory,
+      timeoutMs: 30_000,
+    });
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    throw new Error(`unable to resolve ref ${ref}: ${why}`);
   }
 }
