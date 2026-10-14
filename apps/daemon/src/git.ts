@@ -329,12 +329,19 @@ export const gitPrim = {
     await runGitOk(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
   },
 
-  /** checkpoint 恢复两步（02 §5.5：`reset --hard` + `clean -fd`）。 */
+  /** checkpoint 恢复（02 §5.5：`reset --hard`）。git 2.43 的 reset 开了
+   * PARSE_OPT_KEEP_DASHDASH，`--end-of-options` 留在 argv 里，verify_filename
+   * 见到 `-` 开头就退出 128（#1316）。rev-parse 认这个旗标，先把 commit 解成
+   * 对象 id，再 `reset --hard <oid>`。oid 只有十六进制，不会被 reset 当成选项。 */
   async resetHard(dir: string, commit: string): Promise<void> {
-    await runGitOk(['reset', '--hard', '--end-of-options', commit], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
+    const oid = await runGitOk(
+      ['rev-parse', '--verify', '--end-of-options', `${commit}^{commit}`],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(oid)) {
+      throw new Error(`git reset failed: resolved revision is not an object id (${oid})`);
+    }
+    await runGitOk(['reset', '--hard', oid], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
   },
 
   async cleanFd(dir: string): Promise<void> {

@@ -213,3 +213,57 @@ test('detail route: the trigger opens the menu over the confirm surface', async 
   await expectMenuSettled(page);
   await expectMenuOnTop(page);
 });
+
+/** #1245: the floating menu's registry Popup shell is w-72 + ring-1 around
+ *  the panel's own w-56 border. A point 4px outside the panel must not land
+ *  on that shell, and the panel must stay inside a 732px viewport with the
+ *  #163 4px gap to the trigger row. */
+test('#1245 floating menu is a single skin and stays inside the viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 732 });
+  await page.goto(BOARD);
+  const chip = userChip(page);
+  await chip.click();
+  await expectMenuSettled(page);
+
+  const sample = await menu(page).evaluate((panel) => {
+    const shell = panel.parentElement;
+    if (shell == null) return null;
+    const panelBox = panel.getBoundingClientRect();
+    const shellBox = shell.getBoundingClientRect();
+    const hit = document.elementFromPoint(panelBox.right + 4, panelBox.top + panelBox.height / 2);
+    const before = getComputedStyle(panel, '::before');
+    const panelStyle = getComputedStyle(panel);
+    const shellStyle = getComputedStyle(shell);
+    return {
+      panelW: panelBox.width,
+      shellW: shellBox.width,
+      hitSlot: hit?.getAttribute('data-slot') ?? null,
+      panelBg: panelStyle.backgroundColor,
+      shellBg: shellStyle.backgroundColor,
+      shellRing: shellStyle.getPropertyValue('--tw-ring-shadow'),
+      arrowBottom: before.bottom,
+      arrowHeight: before.height,
+      arrowContent: before.content,
+      panelTop: panelBox.top,
+      panelBottom: panelBox.bottom,
+      vh: window.innerHeight,
+      side: shell.parentElement?.getAttribute('data-side') ?? null,
+    };
+  });
+
+  expect(sample).not.toBeNull();
+  expect(Math.abs(sample!.shellW - sample!.panelW)).toBeLessThanOrEqual(1);
+  expect(sample!.hitSlot).not.toBe('popover-content');
+  expect(sample!.shellRing).not.toContain('1px');
+  expect(sample!.shellBg).toBe('rgba(0, 0, 0, 0)');
+  expect(sample!.panelBg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(sample!.arrowContent).not.toBe('none');
+  expect(sample!.arrowBottom).toBe('1px');
+  expect(sample!.arrowHeight).toBe('6px');
+  expect(sample!.side).toBe('top');
+  expect(sample!.panelTop).toBeGreaterThanOrEqual(0);
+  expect(sample!.panelBottom).toBeLessThanOrEqual(sample!.vh);
+  await expectAnchoredAboveChip(page, chip);
+});

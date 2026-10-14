@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "248e7a64463eea86b79d167b0c3fb9618e5d6624",
-    "date": "2026-10-12"
+    "sha": "e25303db48b13f998861fde0dcca73e34b1b65d2",
+    "date": "2026-10-14"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -143,7 +143,7 @@
       "upstreamItem": "popover",
       "status": "deviated",
       "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form).",
-      "hash": "67acbc37d16288c560eb8187d433c2cbbb767062e99d08705e606ff1689a77e1"
+      "hash": "94838b1bcb7a03d9e0275ac984b4e54f2a5b233f51d3864f77a03ee07f383c3c"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",

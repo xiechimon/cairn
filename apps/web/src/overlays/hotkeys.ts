@@ -1,10 +1,11 @@
 // Global hotkey wiring (issues #389, #442, #468, XMON-95): C opens the
 // new-task dialog from any route (open-only, matching the row click
-// semantics); ⌘J (Ctrl+J off macOS) TOGGLES the chief drawer — the second
-// press closes what the first opened (#468), while the FAB click stays
-// open-only; ⌘↵ (Ctrl+↵ off macOS) fires the new-task dialog's 保存并开始
-// (XMON-95). Each consumer hook registers one window keydown listener (the
-// ⌘K useSearchState precedent). The chord path mirrors the ⌘K registration
+// semantics). ⌘J (Ctrl+J off macOS) toggles the chief drawer. That chord,
+// Escape layer dismissal, and the drawer open/close commands live in
+// gesture-machine.ts (#1267). The FAB click stays open-only. ⌘↵ (Ctrl+↵
+// off macOS) fires the new-task dialog's 保存并开始 (XMON-95). Each
+// remaining consumer hook registers one window keydown listener (the ⌘K
+// useSearchState precedent). The chord path mirrors the ⌘K registration
 // form: cmd and ctrl both accepted, main key compared case-insensitively.
 // Guards keep native semantics intact: editable targets (input/textarea/
 // select/contenteditable) swallow both keys — typing must never wake a
@@ -49,7 +50,7 @@ export const isEditableTarget = (target: EventTarget | null): boolean =>
  *  和弦就关不上自己打开的面。drawer 外的输入态（⌘K 搜索框等）维持原律
  *  ——hotkeys.spec 钉住「搜索框里 ⌘J 不得开 drawer」。类名出处 =
  *  chief-drawer.tsx 的 aside 根。 */
-const isEditableOutsideChiefDrawer = (target: EventTarget | null): boolean =>
+export const isEditableOutsideChiefDrawer = (target: EventTarget | null): boolean =>
   isEditableTarget(target) &&
   !(target instanceof HTMLElement && target.closest('.chief-drawer') !== null);
 
@@ -146,14 +147,6 @@ export function useChordHotkey(
  *  其余场合裸按即开。 */
 export function useNewTaskHotkey(onOpen: () => void): void {
   useHotkey('c', isEditableTarget, onOpen);
-}
-
-/** ⌘J / Ctrl+J → 总管悬浮窗 toggle（useChiefSurface 全局面；#468 起可开
- *  可关，FAB 点击维持 open-only）。守卫 = drawer 外输入态；按钮/链接不承担
- *  ⌘J 的原生激活语义，聚焦控件不得挡住和弦。#1141 全站可达后监听随根
- *  layout 单实例常驻所有路由（原「抑制路由解除注册」门已退役）。 */
-export function useChiefToggleHotkey(onToggle: () => void, enabled = true): void {
-  useChordHotkey('j', isEditableOutsideChiefDrawer, onToggle, enabled);
 }
 
 /** N → 总管新主题（#645）：抽屉头部 + 的裸键同族，作用域 = 抽屉开态（enabled
