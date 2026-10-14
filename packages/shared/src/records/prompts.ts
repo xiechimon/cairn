@@ -320,7 +320,8 @@ function isSyntheticInstruction(text: string): boolean {
  *    任务简报的重复呈现，描述区是用户原话的唯一展示面；
  *  - `synthetic` = 其余合成指令（续轮/replan/restart 模板、审核材料——审核
  *    材料首行是 review prompt meta JSON，records/review.ts 单源解析）+ 组合行
- *    （#720：任务文本前缀 + 合成指令余段同串，new session 重启轮投递形）；
+ *    （#720：任务文本前缀 + 合成指令余段同串，new session 重启轮投递形；
+ *    #1279：前缀改过、不再等于当前任务文本时，重启指令余段仍整行退场）；
  *  - `user` = 真实用户话语（steer/驳回 feedback/重启 feedback），呈现层照常
  *    渲染成用户气泡。
  *  宣告行不在此判定（见文件头）；调用方先行分流。 */
@@ -348,6 +349,15 @@ export function classifyUserText(
     text.startsWith(taskText) &&
     isSyntheticInstruction(text.slice(taskText.length).trim())
   ) {
+    return 'synthetic';
+  }
+  // #1279 组合行按落库当时的任务文本拼成。标题或 spec 改过之后，当前任务
+  // 文本不再是前缀，上面的分支失配，整行落到 user。裸重启行仍被词表认成
+  // synthetic。指令段仍以 RESTART_HEAD 起头：从最后一处空行分隔取余段，
+  // 走同一 isSyntheticInstruction（尾部交接注记 / 工作分支注记一并剥掉）。
+  // 余段不成模板（用户只写了半句头）不退场。
+  const restartAt = text.lastIndexOf(`\n\n${RESTART_HEAD}`);
+  if (restartAt !== -1 && isSyntheticInstruction(text.slice(restartAt + 2).trim())) {
     return 'synthetic';
   }
   return 'user';
