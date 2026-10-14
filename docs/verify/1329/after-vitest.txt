@@ -1,46 +1,39 @@
-# after (#1329): affected-daemon vitest, lint, typecheck
+# after (#1329): affected-daemon vitest, lint, typecheck (post-merge)
 
 ### vitest sync + git tests, git 2.43.0 (/tmp/git243/bin)
 + git --version: git version 2.43.0
++ command: pnpm exec vitest run apps/daemon/test/git.test.ts apps/daemon/test/sync.test.ts
 
- RUN  v5.0.1 /workspace/wt-1329
-
-
- Test Files  2 passed (2)
-      Tests  17 passed (17)
-   Start at  02:54:02
-   Duration  6.24s (tests 97%, transform 2%, import 1%)
-
+   RUN  v5.0.1 /workspace/wt-1329
+   Test Files  2 passed (2)
+        Tests  28 passed (28)
+     Start at  04:27:17
+     Duration  6.73s (tests 97%, transform 2%, import 1%)
 exit=0
 
 ### vitest sync + git tests, git 2.47.3 (box default)
 + git --version: git version 2.47.3
++ command: pnpm exec vitest run apps/daemon/test/git.test.ts apps/daemon/test/sync.test.ts
 
- RUN  v5.0.1 /workspace/wt-1329
-
-
- Test Files  2 passed (2)
-      Tests  17 passed (17)
-   Start at  02:54:09
-   Duration  6.23s (tests 97%, transform 2%, import 1%)
-
+   RUN  v5.0.1 /workspace/wt-1329
+   Test Files  2 passed (2)
+        Tests  28 passed (28)
+     Start at  04:27:25
+     Duration  6.74s (tests 97%, transform 2%, import 1%)
 exit=0
-### vitest related --changed (box default git 2.47.3; 68 files, 377 tests)
-# Command: PATH=/tmp/pnpm-shim:$PATH pnpm exec vitest related --run apps/daemon/src/sync.ts apps/daemon/src/git.ts apps/daemon/test/sync.test.ts
- Test Files  68 passed (68)
-      Tests  377 passed (377)
-   Duration  118.50s (tests 62%, import 37%, transform 1%)
 
-### lint and typecheck (final run)
-$ pnpm -r typecheck
-packages/shared typecheck$ tsc --noEmit
-packages/shared typecheck: Done
-apps/daemon typecheck$ tsc --noEmit
-apps/server typecheck$ tsc --noEmit
-apps/web typecheck$ tsc --noEmit
-apps/web typecheck: Done
-apps/daemon typecheck: Done
-apps/server typecheck: Done
-integration typecheck$ tsc --noEmit
-integration typecheck: Done
+### lint (biome ci)
++ command: pnpm exec biome ci .
+
+  Checked 765 files in 601ms. No fixes applied.
+exit=0
+
+### typecheck (pnpm -r typecheck)
++ command: pnpm -r typecheck
+
+  packages/shared typecheck: Done
+  apps/web typecheck: Done
+  apps/daemon typecheck: Done
+  apps/server typecheck: Done
+  integration typecheck: Done
 exit=0
