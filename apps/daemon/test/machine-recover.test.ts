@@ -150,4 +150,64 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     await handle.stop();
     await handle.done;
   });
+
+  // 失败方式：换机 continue 降级后 journal.sessionId 已是本机新会话，
+  // claim 上的 priorMachineId 仍指旧机器。再续这份本机会话失败时，
+  // 注记应写「本机找不到会话」，不能再点名另一台机器。
+  test('本机新会话再失败不再沿用旧机器号', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
+    ];
+    const claimed: ClaimedStep = {
+      ...CLAIMED,
+      step: { ...CLAIMED.step, kind: 'build' },
+      session: {
+        action: 'continue',
+        sessionId: 'sess-cross',
+        priorMachineId: 'other-box',
+      },
+    };
+    const done: StepEvent = { type: 'done', usage: [] };
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'fresh-2',
+          events: (async function* () {
+            yield done;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new SessionNotResumableError('local-1');
+      },
+    };
+    const { handle } = await boot({
+      api,
+      backend,
+      seedJournal: (paths) => {
+        const journal = new StepJournal(paths.outboxDir);
+        journal.claim({
+          stepId: 's1',
+          buildId: 'conv-1',
+          kind: 'build',
+          conversationId: 'conv-1',
+          sessionAction: 'continue',
+          sessionId: 'local-1',
+          prompt: '方案已确认。请按方案执行，完成改动。',
+          claimed,
+        });
+      },
+    });
+    await waitFor(() => api.uploads.length === 1);
+    const note = api.uploads[0]?.body.messages.find((message) => message.role === 'system');
+    expect(String(note?.content)).toContain('本机找不到会话 local-1');
+    expect(String(note?.content)).not.toContain('另一台机器');
+    await handle.stop();
+    await handle.done;
+  });
 });
