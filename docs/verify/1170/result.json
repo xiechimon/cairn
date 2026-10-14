@@ -47,7 +47,7 @@
       "detail": null
     },
     {
-      "ok": {},
+      "ok": true,
       "label": "B1 弹窗再开（url 字段在位）",
       "detail": null
     },

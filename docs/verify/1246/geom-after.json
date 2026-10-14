@@ -1,0 +1,25 @@
+{
+  "nodes": 1,
+  "names": [
+    "Planner"
+  ],
+  "link": {
+    "x": 677,
+    "y": 127,
+    "w": 44,
+    "h": 1
+  },
+  "bracket": null,
+  "childrenRow": {
+    "x": 721,
+    "y": 99,
+    "w": 220,
+    "h": 56
+  },
+  "createSlot": {
+    "x": 721,
+    "y": 99,
+    "w": 220,
+    "h": 56
+  }
+}

@@ -1,8 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1266: the second ⌘J (the minimizing press) must not repaint the chief
-// window. Failure modes pinned here, from the measured repro (CDP
-// screencast + passive style-event log on the fixture build):
+// #1266, hung on the gesture-machine regression set (#1267): the second ⌘J
+// (the minimizing press) must not repaint the chief window. The state half
+// of that press is reduceGesture chief/toggle in
+// apps/web/src/overlays/gesture-machine.ts. Failure modes pinned here, from
+// the measured repro (CDP screencast + passive style-event log on the
+// fixture build):
 //   1. post-exit opacity bounce (the reported flash): the exit keyframe
 //      ends with fill-mode none, so the computed opacity snaps back to the
 //      base value; the element's incidental `transition: all` (the

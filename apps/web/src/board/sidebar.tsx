@@ -276,6 +276,9 @@ const RAIL_BTN =
  *  内容。定位正本迁 Positioner 参数（side=top align=start alignOffset=8
  *  sideOffset=4 = 原 left:8 底边贴触发行顶 + 4px 家族基线间距，#163/#388/
  *  #610 锚定律）；V2 进出场（scale .98 + fade 100ms）由原语 base 自带。
+ *  #1245: Popup 件默认 w-72 + ring-1 比面板 w-56 宽 64px，环露成空框。
+ *  壳皮肤在这个消费点中和（ring-0 / w-auto / 透明底），皮肤留在面板。
+ *  collisionPadding 8 只留视口边距，不改 sideOffset 的 4px 锚距。
  *
  *  住模块层，不嵌在 BoardSidebar 里：嵌进去每次父 render 都换函数身份，
  *  React 会把 Popover 子树整个卸载重挂——受控 open 被重挂时的关闭回调
@@ -300,8 +303,9 @@ function UserMenuPopover({
         align="start"
         alignOffset={8}
         sideOffset={4}
+        collisionPadding={8}
         aria-label={t('用户菜单')}
-        className="block rounded-none border-none bg-transparent p-0 shadow-none"
+        className="block w-auto rounded-none border-none bg-transparent p-0 shadow-none ring-0"
       >
         <UserMenu floating theme={readStoredTheme(safeLocalStorage())} />
       </PopoverContent>

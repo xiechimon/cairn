@@ -53,6 +53,7 @@ import { readSkillSource, writeSkillSource } from './skill-source-store.js';
 import {
   createLocalSkill,
   resolveLocalSkill,
+  rollbackLocalSkillCreate,
   type SkillAuditActor,
   updateLocalSkill,
 } from './skills.js';
@@ -549,7 +550,9 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
 // —— 编排（import / refresh）——————————————————————————————————————————
 
 /** 导入：收集 → createLocalSkill（全部既有校验/审计）→ 来源登记。
- * 201 的 record 即 createLocalSkill 产物（id = frontmatter name = 目录名）。 */
+ * 201 的 record 即 createLocalSkill 产物（id = frontmatter name = 目录名）。
+ * 登记失败则删掉刚建的目录和对应 create 审计行，调用方看到的仍是登记
+ * 错误；同名可以再导入。 */
 export async function importSkill(
   opts: SkillImportOpts,
   body: ImportSkillBody,
@@ -574,19 +577,36 @@ export async function importSkill(
     { db: opts.db, skillsDir: opts.skillsDir, teamId: opts.teamId, actor: opts.actor },
     create,
   );
-  await writeSkillSource(opts.skillSourcesPath, {
-    skillId: record.id,
-    kind,
-    ref: collected.sourceRef,
-    importedAt: nowMs(),
-    refreshedAt: null,
-  });
+  try {
+    await writeSkillSource(opts.skillSourcesPath, {
+      skillId: record.id,
+      kind,
+      ref: collected.sourceRef,
+      importedAt: nowMs(),
+      refreshedAt: null,
+    });
+  } catch (err) {
+    try {
+      rollbackLocalSkillCreate({ db: opts.db, skillsDir: opts.skillsDir }, record.id);
+    } catch (rollbackErr) {
+      const cause = err instanceof Error ? err.message : String(err);
+      const rollbackMessage =
+        rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+      throw new HttpError(
+        500,
+        `skill source registration failed (${cause}) and removing the new skill directory failed (${rollbackMessage})`,
+      );
+    }
+    throw err;
+  }
   return record;
 }
 
 /** refresh：按登记来源重拉 → 身份不变闸（frontmatter name 必须仍等于 sid）
  * → updateLocalSkill 覆写语义（列出者覆写、未列者保留——源删的文件本地
- * 保留，与手动 PUT 同律，票面指定复用）。无来源 = 409；未知 sid = 404。 */
+ * 保留，与手动 PUT 同律，票面指定复用）。无来源 = 409；未知 sid = 404。
+ * refreshedAt 落盘失败时内容已经覆写，来源文件仍是上一次成功的记录，
+ * 再 refresh 一次即可补上时间戳。 */
 export async function refreshSkill(opts: SkillImportOpts, sid: string): Promise<SkillRecord> {
   const resolved = resolveLocalSkill(opts.skillsDir, sid);
   if (!resolved) throw new NotFoundError(`skill ${sid}`);
