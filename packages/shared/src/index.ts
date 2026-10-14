@@ -23,6 +23,8 @@ export * from './secret-box.js';
 export * from './skill-facts.js';
 // #1106：派发技能注入的纯选择层（server claim 消费；hits 记录进 step 行）。
 export * from './skill-inject.js';
+// #1186：技能注入三前置条件的机器断言（授权面 × 实际注入名集 × 技能事实）。
+export * from './skill-injection-check.js';
 export * from './skill-route.js';
 export * from './tables.js';
 // 失败分类单源（#1257 步失败三桶 classifyStepFailure + #1261 的

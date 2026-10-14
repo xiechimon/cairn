@@ -22,6 +22,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError, api } from '../api/client.js';
 import {
   useApiMutations,
+  useBuildChanges,
   useChiefThreads,
   useMachines,
   useProjects,
@@ -54,6 +55,7 @@ import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
 import { BranchDialog } from '../detail/branch-dialog.js';
+import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
 import { withoutDeleted } from '../fixtures/deletions.js';
 import { localTodo, overlayContent } from '../fixtures/fixtures.js';
@@ -444,6 +446,13 @@ export function BoardPage() {
   const mergeMissing = useMergeGate(
     live ? (overlayWire?.assignment?.build?.agentId ?? null) : null,
   );
+  // #1313：完成弹层要知道这份 diff 是不是空提交。只在弹层打开时读 changes。
+  const acceptBuildId =
+    live && overlay?.kind === 'accept'
+      ? (overlayWire?.latestBuildId ?? overlayTodo?.latestBuildId ?? null)
+      : null;
+  const acceptChangesQ = useBuildChanges(acceptBuildId, acceptBuildId != null);
+  const substantiveChanges = substantiveChangesOf(acceptChangesQ.data, acceptChangesQ.isSuccess);
   // #1236 不合并完成腿的在飞判据：patchTodo 是多用途写面（拖拽落位/重置），
   // 只有弹层目标卡的 phase done 在飞请求才计入 confirming 禁用位。
   const donePatchPending =
@@ -671,6 +680,7 @@ export function BoardPage() {
         onClose={closeOverlay}
         missingTools={mergeMissing}
         rejectReason={mergeReject}
+        substantiveChanges={live ? substantiveChanges : null}
         mergeLocked={overlayWire?.phase === 'failed'}
         confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={

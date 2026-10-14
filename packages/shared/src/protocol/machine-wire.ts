@@ -16,6 +16,7 @@ import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
 import { verifyVerdictSchema } from '../records/verify.js';
+import { skillInjectionFactsSchema } from '../skill-injection-check.js';
 import {
   machineToolRelayBodySchema,
   machineToolRelayResponseSchema,
@@ -587,6 +588,11 @@ export const machineDoneBodySchema = z.object({
    * 混版本零破坏；同 findingsError 的无害冗余律）。空流/非配额错误不携带
    * （分类面不猜——不可见即污染可观测性）。 */
   quotaBlock: quotaBlockSchema.optional(),
+  /** #1186 实际注入名集：daemon 在 scan + 字节预算之后随 done 携带
+   * （injected / omitted / unrendered）。旧 daemon 缺席 = server 不落断言
+   * （zod strip，混版本零破坏）。不是 step.skillInjection：那一列是 claim
+   * 期的选择 hits，预算截断之后的名字只在这里。 */
+  skillInjectionFacts: skillInjectionFactsSchema.optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;
