@@ -2,8 +2,9 @@
 // 拖向已完成先确认，不看 hasChanges。复用 #755 reset 闸形态（DialogShell +
 // 头 + 说明清单 + footer 取消/确认）。取消 = 零提交（board.tsx 落位路由在
 // opened 前不写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路（fixture
-// 本地集 / live 乐观 PATCH）。这条 PATCH 不调用 cancelBuild，也不走
-// AcceptDialog 的合并步。
+// 本地集 / live 乐观 PATCH）。这条 PATCH 不调用 cancelBuild：停止落账
+// （applyStoppedStep）会把相位写回上一关口，和「标完成」对着干。在飞构建
+// 继续跑。也不走 AcceptDialog 的合并步。
 
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -42,10 +43,10 @@ export function DoneConfirmDialog({ open, onClose, onConfirm }: DoneConfirmDialo
           清单、12/16 tertiary 尾注。外垫随壳 DialogContent p-4。 */}
       <div className="block">
         <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--text-primary)">
-          {t('将中断在飞构建并标记完成。PR 不会自动合并。')}
+          {t('标记完成。正在跑的构建会继续，PR 不会自动合并。')}
         </p>
         <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--text-primary)">
-          <li>{t('在飞构建会停下，任务进入已完成列')}</li>
+          <li>{t('任务进入已完成列，这次操作不停构建')}</li>
           <li>{t('已开出的 PR 保持原状，不会自动合并')}</li>
         </ul>
         <p className="m-0 text-xs leading-4 text-(--text-tertiary)">

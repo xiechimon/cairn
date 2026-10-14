@@ -709,9 +709,9 @@ describe('#1250 split_todo（层 2）', () => {
     expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, childB)).get()!.phase).toBe(
       'todo',
     );
-    expect(w.s.db.select().from(buildTable).where(eq(buildTable.todoId, childB)).all()).toHaveLength(
-      0,
-    );
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.todoId, childB)).all(),
+    ).toHaveLength(0);
     expect(w.todoRow().phase).toBe('building');
   });
 

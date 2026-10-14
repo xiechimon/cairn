@@ -139,9 +139,10 @@ export const EN: Record<string, string> = {
     'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
   '把任务标记为已完成？': 'Mark the task as done?',
   确认完成: 'Confirm done',
-  '将中断在飞构建并标记完成。PR 不会自动合并。':
-    'This stops an in-flight build and marks the task done. The PR will not merge on its own.',
-  '在飞构建会停下，任务进入已完成列': 'An in-flight build stops, and the task moves to Done.',
+  '标记完成。正在跑的构建会继续，PR 不会自动合并。':
+    'This marks the task done. A running build keeps going, and the PR will not merge on its own.',
+  '任务进入已完成列，这次操作不停构建':
+    'The task moves to Done. This action does not stop the build.',
   '已开出的 PR 保持原状，不会自动合并': 'An open PR stays as it is and will not merge on its own.',
   '取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
     'Cancel leaves the card where it is. To merge the changes, use the Done button on the card.',
