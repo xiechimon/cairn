@@ -1,0 +1,100 @@
+{
+  "label": "list",
+  "requestedMcpServers": [
+    "dummy_alpha"
+  ],
+  "cliVersion": "0.2.0",
+  "buildId": "01a13afc-4744-7a1b-81fc-5faf9f5e98bd",
+  "steps": [
+    {
+      "id": "FQ8UZfxqwafRGdsjrAdQ5",
+      "kind": "build",
+      "status": "failed",
+      "errorMessage": null
+    }
+  ],
+  "argv": "--output-format stream-json --verbose --input-format stream-json --model stub-1307 --disallowedTools AskUserQuestion --mcp-config {\"mcpServers\":{\"dummy_alpha\":{\"type\":\"stdio\",\"command\":\"node\",\"args\":[\"/tmp/probe-1307/mcp/server.mjs\",\"dummy_alpha\"],\"alwaysLoad\":true}}} --setting-sources=user,project,local --strict-mcp-config --permission-mode bypassPermissions --include-partial-messages --session-id=08900ec7-c53f-4676-a1b6-9e822efed549",
+  "argvHasStrictMcpConfig": true,
+  "argvHasMcpConfig": true,
+  "toolRequests": [
+    {
+      "id": 12,
+      "url": "/v1/messages?beta=true",
+      "toolCount": 0,
+      "toolSchemaBytes": 2,
+      "toolNames": []
+    },
+    {
+      "id": 13,
+      "url": "/v1/messages?beta=true",
+      "toolCount": 34,
+      "toolSchemaBytes": 70488,
+      "toolNames": [
+        "Agent",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "DesignSync",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "Monitor",
+        "NotebookEdit",
+        "PushNotification",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskStop",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write",
+        "mcp__dummy_alpha__dummy_alpha_echo",
+        "mcp__dummy_alpha__dummy_alpha_ping",
+        "mcp__dummy_alpha__dummy_alpha_status",
+        "mcp__pacman__attachment",
+        "mcp__pacman__create_skill",
+        "mcp__pacman__delete_memory",
+        "mcp__pacman__get_secret",
+        "mcp__pacman__memories",
+        "mcp__pacman__save_memory",
+        "mcp__pacman__set_task_meta",
+        "mcp__pacman__update_skill"
+      ]
+    }
+  ],
+  "summary": {
+    "toolCount": 34,
+    "toolSchemaBytes": 70488,
+    "dummyToolCount": 3,
+    "dummyTools": [
+      "mcp__dummy_alpha__dummy_alpha_echo",
+      "mcp__dummy_alpha__dummy_alpha_ping",
+      "mcp__dummy_alpha__dummy_alpha_status"
+    ],
+    "dummyByServer": {
+      "dummy_alpha": 3
+    },
+    "pacmanToolCount": 8,
+    "pacmanTools": [
+      "mcp__pacman__attachment",
+      "mcp__pacman__create_skill",
+      "mcp__pacman__delete_memory",
+      "mcp__pacman__get_secret",
+      "mcp__pacman__memories",
+      "mcp__pacman__save_memory",
+      "mcp__pacman__set_task_meta",
+      "mcp__pacman__update_skill"
+    ],
+    "globalMcpLeaked": true
+  },
+  "daemonMcpLines": [
+    "claim step=FQ8UZfxqwafRGdsjrAdQ5",
+    "using model claude-code/stub-1307",
+    "[mcp] loaded from /tmp/probe-1307/home/.claude.json: dummy_alpha"
+  ]
+}

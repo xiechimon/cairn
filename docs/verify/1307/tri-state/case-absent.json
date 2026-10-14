@@ -1,0 +1,113 @@
+{
+  "label": "absent",
+  "requestedMcpServers": [
+    "dummy_alpha"
+  ],
+  "cliVersion": "0.1.9",
+  "buildId": "01a13afc-3f3e-7925-a805-c0fcd7df2eba",
+  "steps": [
+    {
+      "id": "wj6bv_n6QMS3iYrqbgq9F",
+      "kind": "build",
+      "status": "failed",
+      "errorMessage": null
+    }
+  ],
+  "argv": "--output-format stream-json --verbose --input-format stream-json --model stub-1307 --disallowedTools AskUserQuestion --setting-sources=user,project,local --permission-mode bypassPermissions --include-partial-messages --session-id=c11bd864-3723-4580-a186-e1ef1faa513f",
+  "argvHasStrictMcpConfig": false,
+  "argvHasMcpConfig": false,
+  "toolRequests": [
+    {
+      "id": 4,
+      "url": "/v1/messages?beta=true",
+      "toolCount": 0,
+      "toolSchemaBytes": 2,
+      "toolNames": []
+    },
+    {
+      "id": 5,
+      "url": "/v1/messages?beta=true",
+      "toolCount": 40,
+      "toolSchemaBytes": 71399,
+      "toolNames": [
+        "Agent",
+        "Bash",
+        "CronCreate",
+        "CronDelete",
+        "CronList",
+        "DesignSync",
+        "Edit",
+        "EnterWorktree",
+        "ExitWorktree",
+        "ListAgents",
+        "Monitor",
+        "NotebookEdit",
+        "PushNotification",
+        "Read",
+        "ReportFindings",
+        "ScheduleWakeup",
+        "SendMessage",
+        "Skill",
+        "TaskStop",
+        "WebFetch",
+        "WebSearch",
+        "Workflow",
+        "Write",
+        "mcp__dummy_alpha__dummy_alpha_echo",
+        "mcp__dummy_alpha__dummy_alpha_ping",
+        "mcp__dummy_alpha__dummy_alpha_status",
+        "mcp__dummy_beta__dummy_beta_echo",
+        "mcp__dummy_beta__dummy_beta_ping",
+        "mcp__dummy_beta__dummy_beta_status",
+        "mcp__dummy_gamma__dummy_gamma_echo",
+        "mcp__dummy_gamma__dummy_gamma_ping",
+        "mcp__dummy_gamma__dummy_gamma_status",
+        "mcp__pacman__attachment",
+        "mcp__pacman__create_skill",
+        "mcp__pacman__delete_memory",
+        "mcp__pacman__get_secret",
+        "mcp__pacman__memories",
+        "mcp__pacman__save_memory",
+        "mcp__pacman__set_task_meta",
+        "mcp__pacman__update_skill"
+      ]
+    }
+  ],
+  "summary": {
+    "toolCount": 40,
+    "toolSchemaBytes": 71399,
+    "dummyToolCount": 9,
+    "dummyTools": [
+      "mcp__dummy_alpha__dummy_alpha_echo",
+      "mcp__dummy_alpha__dummy_alpha_ping",
+      "mcp__dummy_alpha__dummy_alpha_status",
+      "mcp__dummy_beta__dummy_beta_echo",
+      "mcp__dummy_beta__dummy_beta_ping",
+      "mcp__dummy_beta__dummy_beta_status",
+      "mcp__dummy_gamma__dummy_gamma_echo",
+      "mcp__dummy_gamma__dummy_gamma_ping",
+      "mcp__dummy_gamma__dummy_gamma_status"
+    ],
+    "dummyByServer": {
+      "dummy_alpha": 3,
+      "dummy_beta": 3,
+      "dummy_gamma": 3
+    },
+    "pacmanToolCount": 8,
+    "pacmanTools": [
+      "mcp__pacman__attachment",
+      "mcp__pacman__create_skill",
+      "mcp__pacman__delete_memory",
+      "mcp__pacman__get_secret",
+      "mcp__pacman__memories",
+      "mcp__pacman__save_memory",
+      "mcp__pacman__set_task_meta",
+      "mcp__pacman__update_skill"
+    ],
+    "globalMcpLeaked": true
+  },
+  "daemonMcpLines": [
+    "claim step=wj6bv_n6QMS3iYrqbgq9F",
+    "using model claude-code/stub-1307"
+  ]
+}
