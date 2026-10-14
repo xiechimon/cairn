@@ -39,3 +39,17 @@ missing docs/spec/a3/diff-audit.md
 missing docs/spec/a3/report-detail.md
 exists docs/a3/diff-audit.md
 exists docs/a3/report-detail.md
+
+## rendered page on origin/main
+GET https://github.com/xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/09-前端风格统一-A6.md
+HTTP 200
+
+anchor text: docs/a3/diff-audit.md
+href: /xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/a3/diff-audit.md
+follow: HTTP 404
+title: File not found · GitHub
+
+anchor text: docs/a3/report-detail.md
+href: /xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/a3/report-detail.md
+follow: HTTP 404
+title: File not found · GitHub

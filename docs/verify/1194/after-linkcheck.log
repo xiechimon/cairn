@@ -34,3 +34,16 @@ GET https://raw.githubusercontent.com/xiechimon/pacman/a2285aa1/docs/a3/report-d
 HTTP 200
 body: # A3-detail 收编报告（detail 域 → ui/ 原语）
 
+## rendered page on the fix commit
+GET https://github.com/xiechimon/pacman/blob/85fdd838abd39a2876599f6bafff45fffff27e00/docs/spec/09-前端风格统一-A6.md
+HTTP 200
+
+anchor text: docs/a3/diff-audit.md
+href: /xiechimon/pacman/blob/85fdd838abd39a2876599f6bafff45fffff27e00/docs/a3/diff-audit.md
+follow: HTTP 200
+title: pacman/docs/a3/diff-audit.md at 85fdd838abd39a2876599f6bafff45fffff27e00 · xiechimon/pacman · GitHub
+
+anchor text: docs/a3/report-detail.md
+href: /xiechimon/pacman/blob/85fdd838abd39a2876599f6bafff45fffff27e00/docs/a3/report-detail.md
+follow: HTTP 200
+title: pacman/docs/a3/report-detail.md at 85fdd838abd39a2876599f6bafff45fffff27e00 · xiechimon/pacman · GitHub
