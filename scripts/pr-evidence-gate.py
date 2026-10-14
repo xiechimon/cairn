@@ -24,6 +24,23 @@ A URL is an image link under two parallel rules (#940):
    whose last path segment carries no file extension -- the shape
    drag-and-drop uploads produce.
 
+A URL counts as embedded under any of three forms (#1335):
+
+1. Markdown image: the target of `![label](url)`.
+2. HTML image: the value of an `<img src="...">` attribute (the
+   fallback an HTML `<picture>` falls back to).
+3. HTML source: any comma-separated URL in a `<source srcset="...">`
+   attribute (the variants a `<picture>` picks between).
+
+Form 2 and form 3 cover the Cursor badge footer the agent injects
+after `<!-- CURSOR_AGENT_PR_BODY_END -->` when it opens a PR: a
+`<picture>` with two `<source>` variants and an `<img>` fallback per
+link. Without them the gate red-flags every badge URL as a bare
+external image link, even though GitHub renders the badge. Stripping
+the footer at the lane that opens the PR is out of bounds (#1335),
+so the gate has to recognize the form. Bare URLs that are not wrapped
+in any of the three forms still fail.
+
 raw.githubusercontent.com is judged by rule 1 alone: it serves every
 committed file type, so an extensionless raw path (LICENSE, a directory
 permalink) is a reference, and non-image evidence files (.json, .md,
@@ -76,6 +93,38 @@ def is_media_host_image(url):
     path = url.split('?', 1)[0].split('#', 1)[0]
     last = path.rsplit('/', 1)[-1]
     return bool(last) and not TAIL_EXT.search(last)
+
+
+# HTML embedding (#1335): `<img src="...">` and `<source srcset="...">`
+# render the URL as an image, the same as markdown `![label](url)`. The
+# Cursor badge footer the agent injects after `<!-- CURSOR_AGENT_PR_BODY_END -->`
+# is a `<picture>` with two `<source>` variants and an `<img>` fallback per
+# link. The opening `<picture>` and the closing `</picture>` are not
+# matched here -- only the attribute values that actually carry the URL.
+# Quotes must balance (single or double) so an attribute containing a stray
+# quote cannot leak into the next attribute.
+HTML_EMBED = re.compile(
+    r'<(?P<tag>img|source)\b[^>]*?\s(?P<attr>src|srcset)'
+    r'=(?P<quote>["\'])(?P<value>[^"\']*?)(?P=quote)',
+    re.IGNORECASE | re.DOTALL)
+
+
+def html_embed_spans(body):
+    """Byte spans of URLs embedded via `<img src>` or `<source srcset>`.
+
+    Returns a set of (start, end) offsets into `body`, one per URL
+    fragment inside an attribute value. `srcset` may carry
+    comma-separated URLs (descriptors are rare on badges but allowed
+    by HTML); each one is its own span.
+    """
+    spans = set()
+    for m in HTML_EMBED.finditer(body):
+        cursor = m.start('value')
+        for part in m.group('value').split(','):
+            part = part.strip()
+            spans.add((cursor, cursor + len(part)))
+            cursor += len(part) + 1  # +1 for the comma separator
+    return spans
 
 
 REQUIRED_SECTIONS = ('Upstream', 'Verified')
@@ -141,10 +190,11 @@ def http_code(url):
 def find_links(body):
     """Every image URL in the body, tagged with its rendering form.
 
-    A URL is embedded only as the target of `![label](url)`. As the
-    target of `[label](url)` it renders as a link, and standing on its
-    own it renders as an autolink or as text; none of those show the
-    image.
+    A URL is embedded as the target of `![label](url)`, as the value
+    of an `<img src="...">` attribute, or as a URL inside a
+    `<source srcset="...">` attribute (#1335). As the target of
+    `[label](url)` it renders as a link, and standing on its own it
+    renders as an autolink or as text; none of those show the image.
     """
     targets = {}
     for m in MD_LINK.finditer(body):
@@ -157,6 +207,8 @@ def find_links(body):
                 return m
         return None
 
+    html_embed = html_embed_spans(body)
+
     matches = list(IMG_URL.finditer(body))
     matches += [m for m in MEDIA_HOST_URL.finditer(body)
                 if is_media_host_image(m.group(0))]
@@ -165,11 +217,17 @@ def find_links(body):
     links = []
     seen = set()
     for m in matches:
-        md = markdown_target(m.start(), m.end())
+        ms, me = m.start(), m.end()
+        if (ms, me) in html_embed:
+            links.append({'form': 'html', 'embedded': True, 'label': None,
+                          'url': m.group(0),
+                          'line': body.count('\n', 0, ms) + 1})
+            continue
+        md = markdown_target(ms, me)
         if md is None:
             links.append({'form': 'bare', 'embedded': False, 'label': None,
                           'url': m.group(0),
-                          'line': body.count('\n', 0, m.start()) + 1})
+                          'line': body.count('\n', 0, ms) + 1})
             continue
         span = md.span('url')
         if span in seen:
@@ -186,6 +244,8 @@ def find_links(body):
 def describe(link):
     if link['form'] == 'bare':
         return f"{link['url']} (bare URL, line {link['line']})"
+    if link['form'] == 'html':
+        return f"{link['url']} (HTML <img>/<source>, line {link['line']})"
     return f"[{link['label']}]({link['url']})"
 
 

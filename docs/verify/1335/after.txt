@@ -1,0 +1,13 @@
+=== Real body with Cursor badge footer (body_1338.orig.md, after fix): ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 10 image link(s)
+pr-evidence: GREEN
+exit=0
+
+=== Control body proving real not-embedded links still fail (fixture-control-bare.md): ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 1 image link(s)
+FAIL not-embedded: https://example.com/evidence-shot.png (bare URL, line 22)
+FAIL unreachable (HTTP 404): https://example.com/evidence-shot.png (bare URL, line 22)
+pr-evidence: RED (2 problem(s))
+exit=1
