@@ -210,4 +210,18 @@ test.describe('#1244 registry focus outline', () => {
     await focusKeyboard(tab);
     expectGlobalOutline(await readFocus(tab));
   });
+
+  test('the sidebar user button uses the global outline', async ({ page }) => {
+    await themed(page, 'dark', ACCEPT);
+    const user = page.locator('.sidebar-user');
+    await expect(user).toBeVisible();
+    await focusKeyboard(user);
+    const info = await readFocus(user);
+    expect(info.focusVisible).toBe(true);
+    expect(info.outlineStyle).toBe('solid');
+    expect(info.outlineWidth).toBe('2px');
+    expect(info.outlineOffset).toBe('2px');
+    expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+    expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
+  });
 });

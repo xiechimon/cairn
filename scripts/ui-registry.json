@@ -20,8 +20,8 @@
       "kind": "registry",
       "upstreamItem": "attachment",
       "status": "deviated",
-      "reason": "#1244: removed focus-within ring-1 of --ring at 50%. Keyboard focus on the inner control uses the global 2px --focus-ring outline.",
-      "hash": "10be4729dffee6688b77a5852d454c7d0bee3e8691d6d7af5da168c71511c8ea"
+      "reason": "#1244: removed focus-within ring-1 of --ring at 50%. The overlay trigger no longer sets outline-none, so that button uses the global 2px --focus-ring outline.",
+      "hash": "9456505bc958b02e778676ff5abae6adf7e74458bf9205eeddf5cd208b86410e"
     },
     "avatar.tsx": {
       "kind": "registry",

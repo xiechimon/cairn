@@ -450,7 +450,7 @@ export function BoardSidebar({
           trigger={
             <Button
               variant="ghost"
-              className="rail-user mb-[11px] h-[38px] w-10 flex-none cursor-pointer border-none bg-transparent outline-none hover:bg-sidebar-hover hover:text-muted-foreground dark:hover:bg-sidebar-hover aria-expanded:bg-transparent [&_img]:block [&_img]:size-6 [&_img]:rounded-full"
+              className="rail-user mb-[11px] h-[38px] w-10 flex-none cursor-pointer border-none bg-transparent hover:bg-sidebar-hover hover:text-muted-foreground dark:hover:bg-sidebar-hover aria-expanded:bg-transparent [&_img]:block [&_img]:size-6 [&_img]:rounded-full"
               aria-label={user.displayName}
             >
               <SeededAvatar
@@ -660,7 +660,7 @@ export function BoardSidebar({
         trigger={
           <Button
             variant="ghost"
-            className="sidebar-user h-11 flex-none cursor-pointer justify-start gap-0 border-0 border-t border-[var(--border)] bg-transparent px-2 font-normal hover:bg-sidebar-hover hover:text-muted-foreground dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-muted-foreground outline-none [&_img]:block [&_img]:size-6 [&_img]:rounded-full"
+            className="sidebar-user h-11 flex-none cursor-pointer justify-start gap-0 border-0 border-t border-[var(--border)] bg-transparent px-2 font-normal hover:bg-sidebar-hover hover:text-muted-foreground dark:hover:bg-sidebar-hover aria-expanded:bg-transparent aria-expanded:text-muted-foreground [&_img]:block [&_img]:size-6 [&_img]:rounded-full"
             aria-label={user.displayName}
           >
             <SeededAvatar
