@@ -1028,6 +1028,11 @@ async function tryClaim(
       .all();
     const priorRow = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
     const priorSessionId = priorRow?.sessionId ?? null;
+    // #1312：上一轮会话的机器与本步领取机不同（归属机换绑 / 迁移）时告诉
+    // daemon。同机不带该字段，claim 形与旧 daemon 逐字段一致。
+    const priorMachineId = priorRow?.machineId ?? null;
+    const sessionOnOtherMachine =
+      priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
     // plan.md 交接缺失的 build 步强制 new session（#113 裁定候选2 兜底）：plan 关
     // 未产交接物时续轮会话里无可指方案（confirm 措辞空转 → agent 反问「哪个方案」，
     // 05 §5 实跑）；new session 令 daemon 以 todo 原始 title+spec 开工（runner
@@ -1102,6 +1107,7 @@ async function tryClaim(
         : {
             action: priorSessionId ? ('continue' as const) : ('new' as const),
             sessionId: priorSessionId,
+            ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
     const projectRow = db
       .select()
