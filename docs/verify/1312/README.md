@@ -54,6 +54,12 @@ The same sentence is a `system` message on the card (`branch-degrade-notes.json`
 
 A second machine is covered by `apps/server/test/machine-pin.test.ts` (`priorMachineId` on the claim) and `apps/daemon/test/runner-recover-degrade.test.ts` case 6 (the card note says the session is on another machine).
 
+## Degraded plan path
+
+The build fallback names `plan.md` only when `<plansDir>/<conversationId>/plan.md` exists on this machine and is non-empty. That is the same path the plan step writes. A missing or blank file is not named. The line is `已确认方案位置：<absolute path>` plus the shared tail, so transcript classification still treats the row as the task prompt.
+
+`plan-path-before.txt` is the same tests on the previous code: case 8 (`existsSync` false) still delivered `已确认的方案在 /tmp/pacman-runner-exec-vVgYdV/plans/conv-1/plan.md`. `plan-path-after.txt` is 56 passed, including case 7 (the prompt contains that existing path) and case 8 (the prompt is the task text alone).
+
 ## Long cwd slug (CLI 2.1.278)
 
 A sanitized slug longer than 200 characters is truncated and given a hash of the resolved path. Measured with the real CLI, cwd length 250, session `cccccccc-dddd-4eee-8fff-111111111111`. The project directory name and the `hm` formula are the same string (`long-slug.json`, `match: true`), length 207, suffix `-ebpasi`. The transcript file is on disk at that path. `apps/daemon/test/claude-transcript-path.test.ts` failure mode 13 pins `sdkTranscriptPath` to this formula, and failure mode 14 pins the `CLAUDE_CONFIG_DIR` / `CLAUDE_CODE_PROJECT_DIR_NAME` override.
