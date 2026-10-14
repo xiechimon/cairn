@@ -378,7 +378,8 @@ test('待处理(confirm) → 已完成 opens the confirm dialog, then lands firs
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await expect(doneDialog(page).getByText('将中断在飞构建并标记完成。PR 不会自动合并。')).toBeVisible();
+  await expect(doneDialog(page).getByText('标记完成。正在跑的构建会继续，PR 不会自动合并。')).toBeVisible();
+  await expect(doneDialog(page).getByText('任务进入已完成列，这次操作不停构建')).toBeVisible();
   await doneDialog(page).getByRole('button', { name: '确认完成' }).click();
   await expect(doneDialog(page)).toBeHidden();
   const inDone = page.locator('[data-column="done"] [data-todo-id="dm-confirm"]');
@@ -551,7 +552,8 @@ test('done 闸·取消：review(有变更) 拖已完成开弹层，取消零提�
   // dm-review = review ∧ hasChanges（probeTodo 相位默认位）：落位开 done 闸，
   // 卡片停在源列，计数不动。
   await expect(doneDialog(page)).toBeVisible();
-  await expect(doneDialog(page).getByText('将中断在飞构建并标记完成。PR 不会自动合并。')).toBeVisible();
+  await expect(doneDialog(page).getByText('标记完成。正在跑的构建会继续，PR 不会自动合并。')).toBeVisible();
+  await expect(doneDialog(page).getByText('任务进入已完成列，这次操作不停构建')).toBeVisible();
   await expect(doneDialog(page).getByText('已开出的 PR 保持原状，不会自动合并')).toBeVisible();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
