@@ -514,14 +514,62 @@ export function toImageBlock(img: DeliveredImage): {
   };
 }
 
+/** CLI 2.1.278 项目目录名上限（sdk `hm`）。超出后截断并附路径哈希。 */
+const CLAUDE_PROJECT_SLUG_MAX = 200;
+
+/** `CLAUDE_CODE_PROJECT_DIR_NAME` 的合法形（sdk `oC`）。 */
+const CLAUDE_PROJECT_DIR_NAME = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Windows 保留设备名。CLI 拒绝把它们当项目目录名。 */
+const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[0-9]|lpt[0-9])$/i;
+
+/** sdk `IC` + `HBe`：对净化前路径做 int32 哈希，再取绝对值的 36 进制。
+ *  用 JS `Math.abs`（INT_MIN 得到正数），与 CLI 同式。 */
+function claudePathHash(path: string): string {
+  let hash = 0;
+  for (let i = 0; i < path.length; i++) {
+    hash = ((hash << 5) - hash + path.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/** sdk `hm`：非字母数字换成 `-`；净化结果超过 200 时截断并附哈希。 */
+function claudeProjectSlug(resolvedPath: string): string {
+  const flat = resolvedPath.replace(/[^a-zA-Z0-9]/g, '-');
+  if (flat.length <= CLAUDE_PROJECT_SLUG_MAX) return flat;
+  return `${flat.slice(0, CLAUDE_PROJECT_SLUG_MAX)}-${claudePathHash(resolvedPath)}`;
+}
+
+/** sdk `N$`：仅当 `CLAUDE_CONFIG_DIR` 有值且目录名合法时覆写 slug。 */
+function claudeProjectDirOverride(): string | undefined {
+  if (!process.env.CLAUDE_CONFIG_DIR) return undefined;
+  const name = process.env.CLAUDE_CODE_PROJECT_DIR_NAME;
+  if (!name || !CLAUDE_PROJECT_DIR_NAME.test(name) || WINDOWS_DEVICE_NAME.test(name)) {
+    return undefined;
+  }
+  return name;
+}
+
+/** sdk `It`：项目根是配置目录（缺省 `~/.claude`）下的 `projects`。 */
+function claudeProjectsRoot(): string {
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  const root = configDir ? configDir : join(homedir(), '.claude');
+  return join(root.normalize('NFC'), 'projects');
+}
+
 /** CLI 会话 store（Claude Code 2.1.278 实测，#1312）：
  *  ~/.claude/projects/<cwd-slug>/<sessionId>.jsonl。slug 把解析后 cwd 里
  *  每个非字母数字字符换成 `-`（`/`、`.`、`_` 都算）。只替换 `/` 时
  *  `~/.pacman` 工作区的预检路径与 CLI 落盘目录不一致，continue 在文件
  *  还在的情况下被判 miss。
+ *  净化后超过 200 字符时截到 200 并附路径哈希（sdk `hm`）。250 字符 cwd
+ *  的 CLI 落盘目录以 `-ebpasi` 结尾，与本式一致；不截断则长路径预检仍 miss。
+ *  `CLAUDE_CONFIG_DIR` 有值且 `CLAUDE_CODE_PROJECT_DIR_NAME` 合法时，目录名
+ *  用该覆写，根目录改到配置目录。
  *  cwd 先过 realpath：CLI 子进程 cwd 由内核解析符号链接（macOS 工作区
  *  /tmp → /private/tmp），slug 按解析后路径计——不解析则 /tmp 起头的工作区
- *  预检恒 miss（#622 verify 实跑：resume 恒回退冷启）。 */
+ *  预检恒 miss（#622 verify 实跑：resume 恒回退冷启）。darwin 上再做 NFC，
+ *  与 CLI `it()` 同序。 */
 export function sdkTranscriptPath(cwd: string, sessionId: string): string {
   let resolved = cwd;
   try {
@@ -529,13 +577,9 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
   } catch {
     // cwd 缺失 = 无会话文件可寻，原路径判 miss（resume 冷重试通道兜底）。
   }
-  return join(
-    homedir(),
-    '.claude',
-    'projects',
-    resolved.replace(/[^a-zA-Z0-9]/g, '-'),
-    `${sessionId}.jsonl`,
-  );
+  if (process.platform === 'darwin') resolved = resolved.normalize('NFC');
+  const slug = claudeProjectDirOverride() ?? claudeProjectSlug(resolved);
+  return join(claudeProjectsRoot(), slug, `${sessionId}.jsonl`);
 }
 
 // —— T4 工具面（#647：SDK mcpServers + createSdkMcpServer in-process 回调）——

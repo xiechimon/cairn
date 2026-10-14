@@ -99,12 +99,22 @@ describe('sdkTranscriptPath 路径解析（A7 resume 预检）', () => {
 
       process.env.CLAUDE_CODE_PROJECT_DIR_NAME = 'bad.name';
       expect(sdkTranscriptPath(cwd, sessionId)).toBe(
-        join(configDir.normalize('NFC'), 'projects', cliProjectSlug(resolved), `${sessionId}.jsonl`),
+        join(
+          configDir.normalize('NFC'),
+          'projects',
+          cliProjectSlug(resolved),
+          `${sessionId}.jsonl`,
+        ),
       );
 
       process.env.CLAUDE_CODE_PROJECT_DIR_NAME = 'CON';
       expect(sdkTranscriptPath(cwd, sessionId)).toBe(
-        join(configDir.normalize('NFC'), 'projects', cliProjectSlug(resolved), `${sessionId}.jsonl`),
+        join(
+          configDir.normalize('NFC'),
+          'projects',
+          cliProjectSlug(resolved),
+          `${sessionId}.jsonl`,
+        ),
       );
 
       delete process.env.CLAUDE_CONFIG_DIR;
