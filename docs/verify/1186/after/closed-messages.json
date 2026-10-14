@@ -1,0 +1,80 @@
+[
+  {
+    "id": "call-1186-mv8br7j3-3",
+    "role": "assistant",
+    "content": {
+      "kind": "toolcall",
+      "call": {
+        "id": "call-1186-mv8br7j3-3",
+        "name": "bash",
+        "arguments": {
+          "command": "printf \"1186-mv8br7j3-3\\n\" >> README.md"
+        },
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "(no output)"
+            }
+          ],
+          "structuredContent": {
+            "output": "",
+            "truncated": false,
+            "exit_code": 0,
+            "wall_time_seconds": 0
+          }
+        },
+        "isError": false,
+        "endedAt": 1791995339307
+      }
+    }
+  },
+  {
+    "id": "msg-WKsH_tUAqsLhw9g9_0fpa-3",
+    "role": "assistant",
+    "content": [
+      {
+        "type": "text",
+        "text": "done"
+      }
+    ]
+  },
+  {
+    "id": "user-WKsH_tUAqsLhw9g9_0fpa",
+    "role": "user",
+    "content": "Please use demo-skill and write a note\n\nWrite a one-line note. The task text names demo-skill."
+  },
+  {
+    "id": "msg-WKsH_tUAqsLhw9g9_0fpa-1",
+    "role": "system",
+    "content": ""
+  },
+  {
+    "id": "msg-WKsH_tUAqsLhw9g9_0fpa-2",
+    "role": "system",
+    "content": [
+      {
+        "type": "text",
+        "text": "(no output)"
+      }
+    ]
+  },
+  {
+    "id": "skill-injection-WKsH_tUAqsLhw9g9_0fpa",
+    "role": "system",
+    "content": {
+      "kind": "skill_injection_check",
+      "level": "red",
+      "reds": [
+        {
+          "code": "allowlist-closed",
+          "detail": "skillsAllowlist is []: the skill surface is closed"
+        }
+      ],
+      "yellows": [],
+      "injected": [],
+      "omitted": [],
+      "unrendered": []
+    }
+  }
+]

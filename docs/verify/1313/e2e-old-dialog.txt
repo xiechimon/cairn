@@ -1,0 +1,47 @@
+Command (AcceptDialog without the empty-diff branch, same spec):
+pnpm exec playwright test e2e/empty-review-closeout.spec.ts --reporter=line
+
+[1/4] e2e/empty-review-closeout.spec.ts:163:1 › 看板：已上报空 diff 的 review 卡完成不合并、不拦授权
+  1) e2e/empty-review-closeout.spec.ts:163:1 › 看板：已上报空 diff 的 review 卡完成不合并、不拦授权
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByRole('dialog', { name: '完成任务' }).getByText('将改动合并到默认分支')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+      178 |
+      179 |   const dialog = await openBoard(page);
+    > 180 |   await expect(dialog.getByText(MERGE_LABEL)).toHaveCount(0);
+          |                                               ^
+      181 |   await expect(dialog.getByText(EMPTY_NOTE)).toBeVisible();
+      182 |   await expect(dialog.getByText(/授权，无法合并/)).toHaveCount(0);
+      183 |   await dialog.getByRole('button', { name: '完成', exact: true }).click();
+        at /workspace/apps/web/e2e/empty-review-closeout.spec.ts:180:47
+
+[2/4] e2e/empty-review-closeout.spec.ts:189:1 › 详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点
+  2) e2e/empty-review-closeout.spec.ts:189:1 › 详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByRole('dialog', { name: '完成任务' }).getByText('将改动合并到默认分支')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+      191 |   await stubSurface(page, { files: [], reported: true }, ['推送分支']);
+      192 |   const dialog = await openDetail(page);
+    > 193 |   await expect(dialog.getByText(MERGE_LABEL)).toHaveCount(0);
+          |                                               ^
+      194 |   await expect(dialog.getByText(EMPTY_NOTE)).toBeVisible();
+      195 |   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeEnabled();
+        at /workspace/apps/web/e2e/empty-review-closeout.spec.ts:193:47
+
+[3/4] e2e/empty-review-closeout.spec.ts:198:1 › 有文件改动的卡仍展示合并行，缺授权时完成禁用
+[4/4] e2e/empty-review-closeout.spec.ts:209:1 › changes 未上报（无 reported）不当成空提交，合并行与授权闸保留
+  2 failed
+    e2e/empty-review-closeout.spec.ts:163:1 › 看板：已上报空 diff 的 review 卡完成不合并、不拦授权
+    e2e/empty-review-closeout.spec.ts:189:1 › 详情：已上报空 diff 的 review 卡同样不展示合并行且完成可点
+  2 passed (15.6s)
+EXIT:1

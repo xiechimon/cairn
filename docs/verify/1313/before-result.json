@@ -1,0 +1,74 @@
+{
+  "probe": "1313-empty-review",
+  "expect": "before",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "ok": true,
+  "checks": [
+    {
+      "name": "session Owner",
+      "ok": true,
+      "detail": "Owner"
+    },
+    {
+      "name": "agent 缺合并分支",
+      "ok": true,
+      "detail": "[\"推送分支\"]"
+    },
+    {
+      "name": "empty hasChanges",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "empty changes files 为空",
+      "ok": true,
+      "detail": "{\"files\":[]}"
+    },
+    {
+      "name": "files changes 有文件",
+      "ok": true,
+      "detail": "[\"README.md\"]"
+    },
+    {
+      "name": "before empty 展示合并行",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "before empty 完成禁用",
+      "ok": true,
+      "detail": "disabled=true"
+    },
+    {
+      "name": "before empty 缺授权文案",
+      "ok": true,
+      "detail": "block=1"
+    },
+    {
+      "name": "before 取消勾选后完成仍禁用",
+      "ok": true,
+      "detail": "disabled=true"
+    },
+    {
+      "name": "before files 仍展示合并行",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "before files 缺授权时完成禁用",
+      "ok": true,
+      "detail": "disabled=true"
+    }
+  ],
+  "artifacts": [
+    "agent-tools.json",
+    "empty-todo.json",
+    "empty-changes.json",
+    "files-todo.json",
+    "files-changes.json",
+    "before-empty-dialog.png",
+    "before-empty-unchecked.png",
+    "before-files-dialog.png"
+  ]
+}

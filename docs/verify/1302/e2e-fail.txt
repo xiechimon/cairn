@@ -1,0 +1,25 @@
+Running 3 tests using 1 worker
+
+[1/3] e2e/agent-detail.spec.ts:428:1 › 思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLevel，刷新后仍是该档
+  1) Error: expect(locator).toContainText(expected) failed
+    Locator: locator('.agent-thinking-select')
+    Expected substring: "未设置"
+    Error: element(s) not found
+
+[2/3] e2e/agent-detail.spec.ts:454:1 › 思考强度：claude-code 菜单含 off，不含 minimal
+  2) Error: locator.click: Test timeout of 30000ms exceeded.
+    waiting for locator('.agent-thinking-select')
+
+[3/3] e2e/agent-detail.spec.ts:468:1 › 思考强度：切到 claude-code 时非法档随模型清空，合法档保留
+  3) Error: expect(received).toEqual(expected)
+
+    - Expected  - 1
+    + Received  + 0
+
+      Object {
+        "modelId": null,
+        "provider": "claude-code",
+    -   "thinkingLevel": null,
+      }
+
+  3 failed

@@ -494,24 +494,43 @@ export function parseUnifiedDiff(text: string): DocumentDiffFile[] {
   return files.filter((f) => f.path !== '' && f.hunks.length > 0);
 }
 
+/** 原始 unified diff 是否点名了文件。二进制、100% 重命名、mode-only、
+ * 新建空文件都有 `diff --git` 头，但没有 @@ hunk，parseUnifiedDiff 会丢掉。
+ * 完成弹层用这个头判断「git 有没有改动」，不用解析后的文件数。 */
+export function diffTextNamesAFile(text: string): boolean {
+  for (const line of text.split('\n')) {
+    if (line.startsWith('diff --git ')) return true;
+  }
+  return false;
+}
+
 /** conv 分支相对默认分支的变更文件集（变更 pane 数据源）；无 repo / 分支缺位 /
  * 空 diff = 空集（占位文案面归 web，r7 38）。
  * 真值源按形态分叉（#704）：hosted = server bare repo（git 单源，本函数既有
  * 计算）；非 hosted（github/local）= daemon 步收尾上报的 build.changes 列
  * （done.changesDiff 解析落库——B-C1 归因「产物核验只能去 GitHub 侧看」的
- * 补口）。列 null = 未上报（旧 build / 上报失败 / hosted）= 空集不造假；
- * 空数组 = 已上报且零改动（与 null 语义分离）。 */
+ * 补口）。列 null = 未上报（旧 build / 上报失败）= 空集不造假；
+ * 空数组 = 已上报且零改动（与 null 语义分离）。
+ * #1313：`reported` 把这两种空集交给完成弹层。`changed` 看原始 diff 的
+ * `diff --git` 头，不看解析后的文件数。files 仍是给变更 pane 的解析结果，
+ * 调用方只读 files 的路径不变。hosted 读到 git diff（含空 diff）= 已上报；
+ * 分支缺位或 git 失败 = 未上报，不把读失败当成零改动。 */
 export async function readBuildChanges(
   ctx: RepoCtx,
   buildId: string,
-): Promise<{ files: DocumentDiffFile[] }> {
+): Promise<{ files: DocumentDiffFile[]; reported: boolean; changed?: boolean }> {
   const buildRow = ctx.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get();
   if (!buildRow) throw notFound(`build ${buildId}`);
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
   const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
   if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
-    return { files: buildRow.changes ?? [] };
+    const stored = buildRow.changes;
+    if (stored == null) return { files: [], reported: false };
+    if (Array.isArray(stored)) {
+      return { files: stored, reported: true, changed: stored.length > 0 };
+    }
+    return { files: stored.files, reported: true, changed: true };
   }
   const dir = repoDirFor(ctx.reposDir, projRow.teamId, projRow.repoName);
   const { defaultBranch } = await systemGitOps.listBranches(dir);
@@ -521,10 +540,11 @@ export async function readBuildChanges(
     dir,
     `refs/heads/${conversationBranch(buildId)}`,
   );
-  if (baseSha === null || headSha === null) return { files: [] };
+  if (baseSha === null || headSha === null) return { files: [], reported: false };
   const r = await runGit(['diff', `${baseSha}...${headSha}`], { cwd: dir, timeoutMs: 30_000 });
-  if (r.code !== 0) return { files: [] };
-  return { files: parseUnifiedDiff(r.stdout.toString('utf8')) };
+  if (r.code !== 0) return { files: [], reported: false };
+  const text = r.stdout.toString('utf8');
+  return { files: parseUnifiedDiff(text), reported: true, changed: diffTextNamesAFile(text) };
 }
 
 // —— diff 全文读面（#224）：conv 分支头单文件全文按需取（#219 裁决 A——独立于

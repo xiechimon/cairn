@@ -1,0 +1,97 @@
+{
+  "probe": "drive-1303-chief-unread",
+  "expect": "new",
+  "ok": true,
+  "passed": 13,
+  "failed": 0,
+  "checks": [
+    {
+      "name": "A1 同一线程两条 assistant 文本落库",
+      "ok": true,
+      "detail": "assistant=2"
+    },
+    {
+      "name": "A2 未读集含该线程且只有它（线程粒度，不是消息数）",
+      "ok": true,
+      "detail": "ids=chief-01a13b2f-7c4c-7541-b808-a30dc95fe985"
+    },
+    {
+      "name": "A3 通知 readAt 为空，snippet = 最后一条 assistant 文本",
+      "ok": true,
+      "detail": "readAt=null snippet=第二条回复，仍是同一会话。"
+    },
+    {
+      "name": "A4 徽标裸数字 = 1（两条消息不计 2）",
+      "ok": true,
+      "detail": "badge=1"
+    },
+    {
+      "name": "A5 tooltip 说明 1 个总管会话有未读",
+      "ok": true,
+      "detail": "tip=1 个总管会话有未读⌘J"
+    },
+    {
+      "name": "A6 打开线程再最小化，徽标仍是 1，readAt 仍空",
+      "ok": true,
+      "detail": "badge=1 readAt=null"
+    },
+    {
+      "name": "B0 无 assistant 文本的用户步不新增未读",
+      "ok": true,
+      "detail": "ids=chief-01a13b2f-7c4c-7541-b808-a30dc95fe985"
+    },
+    {
+      "name": "B1 tick 后领到的步 prompt 带 [wake:wake]",
+      "ok": true,
+      "detail": "prompt=[wake:wake] 回头看任务是否仍在跑。请回头核实相关任务状态并向用户汇报。"
+    },
+    {
+      "name": "B2 tick 把 8 天闲置的 A 置读",
+      "ok": true,
+      "detail": "readAt=1791994337586"
+    },
+    {
+      "name": "B3 wake 收尾落库即已读，B 不进未读",
+      "ok": true,
+      "detail": "readAt=1791994337604 snippet=机器回头：任务仍在跑，无需处理。 ids="
+    },
+    {
+      "name": "C0 未读 chief 线程数 >= 100",
+      "ok": true,
+      "detail": "count=100"
+    },
+    {
+      "name": "C1 100+ 未读徽标渲染 99+",
+      "ok": true,
+      "detail": "badge=99+"
+    },
+    {
+      "name": "C2 tooltip 写出真实未读线程数",
+      "ok": true,
+      "detail": "tip=100 个总管会话有未读⌘J"
+    }
+  ],
+  "artifacts": [
+    "00-session.json",
+    "01-after-user-turn.json",
+    "02-badge-1.png",
+    "03-board-badge-1.png",
+    "04-tooltip-count-1.png",
+    "05-drawer-open.png",
+    "06-after-open.json",
+    "07-badge-after-open.png",
+    "08-wake-step.json",
+    "09-after-tick.json",
+    "10-after-wake-done.json",
+    "11-unread-100.json",
+    "12-badge-cap.png",
+    "13-board-badge-cap.png",
+    "14-tooltip.json",
+    "15-tooltip-cap.png"
+  ],
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/workspace/.claude/verify-run/home"
+  }
+}

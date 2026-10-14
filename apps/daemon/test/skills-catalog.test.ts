@@ -25,13 +25,19 @@ function fixtureRoot(tag: string): string {
 function writeSkill(
   root: string,
   dirName: string,
-  opts: { name?: string; description?: string; body?: string } = {},
+  opts: {
+    name?: string;
+    description?: string;
+    body?: string;
+    disableModelInvocation?: boolean;
+  } = {},
 ): string {
   const dir = join(root, dirName);
   mkdirSync(dir, { recursive: true });
   const fm: string[] = ['---'];
   if (opts.name !== undefined) fm.push(`name: ${opts.name}`);
   if (opts.description !== undefined) fm.push(`description: ${opts.description}`);
+  if (opts.disableModelInvocation) fm.push('disable-model-invocation: true');
   fm.push('---', '');
   const file = join(dir, 'SKILL.md');
   writeFileSync(file, `${fm.join('\n')}\n${opts.body ?? `${dirName} body.`}\n`, 'utf8');
@@ -640,5 +646,34 @@ describe('注入选择收窄（#1106：injectedSkills = 目录注入执行面）
     });
     expect(catalog).toContain('<name>team-vip</name>');
     expect(catalog).not.toContain('<name>local-only</name>');
+  });
+});
+
+describe('实际注入名集（#1186：onResolved，不是日志行）', () => {
+  test('kept 名 = catalog <name>，预算丢掉的全名进 omitted，不渲染的进 unrendered', () => {
+    const root = fixtureRoot('resolved-names');
+    writeSkill(root, 'keep-me', { name: 'keep-me', description: '留下。' });
+    writeSkill(root, 'drop-me', { name: 'drop-me', description: '丢掉。' });
+    writeSkill(root, 'quiet', {
+      name: 'quiet',
+      description: '不进模型目录。',
+      disableModelInvocation: true,
+    });
+    const full = collect(root, ['keep-me', 'drop-me', 'quiet']);
+    const fullBytes = Buffer.byteLength(full.catalog, 'utf8');
+    const names: { injected: string[]; omitted: string[]; unrendered: string[] }[] = [];
+    const catalog = buildSkillsCatalog({
+      skillsDir: root,
+      cwd: tmpdir(),
+      allowlist: ['keep-me', 'drop-me', 'quiet'],
+      budgetBytes: fullBytes - 1,
+      onResolved: (got) => names.push(got),
+    });
+    const keptNames = [...catalog.matchAll(/<name>([^<]+)<\/name>/g)].map((m) => m[1]);
+    expect(names).toHaveLength(1);
+    expect(names[0]?.injected).toEqual(keptNames);
+    expect(names[0]?.omitted).toEqual(['drop-me']);
+    expect(names[0]?.unrendered).toEqual(['quiet']);
+    expect(catalog).not.toContain('<name>quiet</name>');
   });
 });

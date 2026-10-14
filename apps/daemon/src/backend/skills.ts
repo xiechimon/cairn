@@ -22,6 +22,7 @@ import {
   SettingsManager,
   type Skill,
 } from '@earendil-works/pi-coding-agent';
+import type { SkillsInjectionNames } from '@pacman/shared';
 
 // —— skills 执行面注入（spec 14/#371）————————————————————————
 // catalog 是索引不全文：token 预算只与 catalog 长度线性相关，skill 全文由
@@ -91,6 +92,9 @@ export interface SkillsCatalogOpts {
   budgetBytes?: number;
   /** `[skills] <type>: <msg>` 诊断行出口（machine-loop 接 logger.skills）。 */
   log?: (msg: string) => void;
+  /** #1186 实际注入名集（scan + 预算之后；扫描失败交空集）。日志行不是
+   * 可断言面，名字从这里出。缺省 = 不采集。 */
+  onResolved?: (names: SkillsInjectionNames) => void;
 }
 
 /** 会话面扫描参数单源（catalog 注入与硬挡拒绝集共用——两个消费面对同一
@@ -184,6 +188,7 @@ export function buildSkillsCatalog(opts: SkillsCatalogOpts): string {
   } catch (err) {
     log?.(`invalid: ${err instanceof Error ? err.message : String(err)}`);
     log?.('catalog: entries=0 chars=0 bytes=0');
+    opts.onResolved?.({ injected: [], omitted: [], unrendered: [] });
     return '';
   }
   // collision 降噪（#1116 ②）：identical mirror（团队物化视图 = 本机同库副本）
@@ -270,6 +275,11 @@ export function buildSkillsCatalog(opts: SkillsCatalogOpts): string {
   log?.(
     `catalog: entries=${kept.length} chars=${catalog.length} bytes=${Buffer.byteLength(catalog, 'utf8')}`,
   );
+  opts.onResolved?.({
+    injected: kept.map((s) => s.name),
+    omitted: dropped.map((s) => s.name),
+    unrendered: skills.filter((s) => s.disableModelInvocation).map((s) => s.name),
+  });
   return catalog;
 }
 
@@ -294,10 +304,14 @@ export function composeSkillsSection(
     injectedSkills?: string[];
     teamSkillsDir?: string;
     worktreeSkillsDirs?: string[];
+    onSkillsResolved?: (names: SkillsInjectionNames) => void;
   },
   log?: (msg: string) => void,
 ): string {
-  if (!skills) return '';
+  if (!skills) {
+    opts.onSkillsResolved?.({ injected: [], omitted: [], unrendered: [] });
+    return '';
+  }
   return buildSkillsCatalog({
     skillsDir: skills.skillsDir,
     cwd: skills.cwd,
@@ -307,6 +321,7 @@ export function composeSkillsSection(
     ...(opts.worktreeSkillsDirs !== undefined
       ? { worktreeSkillsDirs: opts.worktreeSkillsDirs }
       : {}),
+    ...(opts.onSkillsResolved !== undefined ? { onResolved: opts.onSkillsResolved } : {}),
     ...(log ? { log } : {}),
   });
 }

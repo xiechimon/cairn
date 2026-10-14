@@ -228,6 +228,14 @@ export interface SessionOpts {
    * 白名单硬挡**：#917 denied 判定仍吃 skillsAllowlist（授权语义），
    * 注入选择只管「brief 里提哪些」。 */
   injectedSkills?: string[];
+  /** #1186 目录构造回调（进程内，不是 wire 字段，不进 zod 快照）。
+   * buildSkillsCatalog 在 scan + 预算之后把实际注入名集交回来；扫描失败
+   * 与 skills 配置缺省交空集。缺省 = 不采集（旧调用面）。 */
+  onSkillsResolved?: (names: {
+    injected: string[];
+    omitted: string[];
+    unrendered: string[];
+  }) => void;
   /** 团队技能物化目录（XMON-112 S2，spec 14 增补；#920 清单 + 按需拉）：
    * daemon 步启动经 GET /api/machine/skills/{stepId} 清单 + /file 按需拉取
    * 物化后的本机缓存视图目录。backend 把它排在本机 skillsDir 之前扫描——
