@@ -135,3 +135,18 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
     await expect(fab.locator('img')).toHaveCount(0);
   });
 });
+
+test.describe('chief unread badge cap (#1303)', () => {
+  test('unread 100 renders 99+ and the tooltip names the thread count', async ({ page }) => {
+    await page.goto('/app?scenario=chief-unread-cap');
+    const fab = page.getByRole('button', { name: '总管', exact: true });
+    await expect(fab.locator('.fab-badge')).toHaveText('99+');
+    await fab.hover();
+    await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('100 个总管会话有未读');
+  });
+
+  test('unread 99 stays 99', async ({ page }) => {
+    await page.goto('/app?scenario=chief-unread-99');
+    await expect(page.getByRole('button', { name: '总管', exact: true }).locator('.fab-badge')).toHaveText('99');
+  });
+});
