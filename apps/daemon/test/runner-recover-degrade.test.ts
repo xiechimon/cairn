@@ -4,28 +4,46 @@
 // （#1260 语义保留）。失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug）
 //   2. recover + .jsonl 在 → 正常 continue，不触发降级
-//   3. 非 recover 执行期 continue 失败 → 步 failed 直传（#1260 语义保留）
+//   3. 非 recover 执行期 continue 失败 → 降级 new session，步成功，
+//      卡片注记「本机找不到会话」，投递文本含原任务（#1312）
+//   6. 执行期 continue 失败且 priorMachineId 不是本机 → 同样降级，
+//      注记改为「在另一台机器上」（#1312）
 //   4. journal.prompt 为 null + .jsonl 缺失 → 降级 new session，prompt 走
 //      buildTaskPrompt 单源（不静默空重发——写实现时有 prompt 即投递）
 //   5. chief 步 recover 同律（journal 面相同）
+//   7. 本机交接位有非空 plan.md → 降级 prompt 指向该绝对路径，
+//      wire 行仍判 task-prompt（#1312 评审）
+//   8. 换机且本机没有这份文件 → prompt 不指向交接路径
+//   9. 空白 plan.md 不当成交接物
+//   10. 开会话前 journal 换成原任务，session 键清空（崩溃 recover 不再重发占位句）
+//   11. 降级 prompt 里的附件 token 先展开，不沿用续轮解析出的图片
 
-import { mkdtempSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
   ClaimedStep,
+  DeliveredImage,
   MachineDoneBody,
   MachineStreamEvent,
+  SessionOpts,
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
 } from '@pacman/shared';
+import {
+  buildTaskPromptText,
+  CONTINUE_PROMPTS,
+  classifyUserText,
+  formatAttachmentToken,
+  PLAN_FILE_NAME,
+} from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
-import { StepJournal } from '../src/journal.js';
+import { StepJournal, type StepJournalEntry } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
@@ -162,8 +180,15 @@ class FakeClient implements MachineApi {
     return null;
   }
   async syncResult(_syncId: string, _body: { status: string; errorMessage?: string }) {}
-  async attachment(): Promise<never> {
-    throw new Error('unused');
+  attachments: Record<
+    string,
+    { fileName: string; mimeType: string; sizeBytes: number; contentBase64: string }
+  > = {};
+
+  async attachment(_stepId: string, attachmentId: string) {
+    const hit = this.attachments[attachmentId];
+    if (hit === undefined) throw new Error(`unused attachment ${attachmentId}`);
+    return hit;
   }
   async shellPrecheck(): Promise<never> {
     throw new Error('unused');
@@ -187,18 +212,26 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 function recoveringBackend(
   throwOnContinue: boolean,
   events: StepEvent[] = [DONE_EVENT],
+  hooks?: { onCreate?: () => void },
 ): {
   backend: AgentBackend;
   calls: ('create' | 'continue')[];
   prompts: (string | undefined)[];
+  images: (readonly DeliveredImage[] | undefined)[];
 } {
   const calls: ('create' | 'continue')[] = [];
   const prompts: (string | undefined)[] = [];
+  const images: (readonly DeliveredImage[] | undefined)[] = [];
+  const record = (opts: SessionOpts) => {
+    prompts.push(opts.prompt ?? undefined);
+    images.push(opts.promptImages);
+  };
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(opts) {
       calls.push('create');
-      prompts.push(opts.prompt ?? undefined);
+      record(opts);
+      hooks?.onCreate?.();
       return handle('pi-new-sess', events);
     },
     async continueSession(id, opts) {
@@ -206,11 +239,11 @@ function recoveringBackend(
       if (throwOnContinue) {
         throw new SessionNotResumableError(id);
       }
-      prompts.push(opts.prompt ?? undefined);
+      record(opts);
       return handle(id, events);
     },
   };
-  return { backend, calls, prompts };
+  return { backend, calls, prompts, images };
 }
 
 async function runRecover(
@@ -241,13 +274,24 @@ async function runRecover(
   return { client, home, lines };
 }
 
-async function runExec(claimed: ClaimedStep, backend: AgentBackend) {
+async function runExec(
+  claimed: ClaimedStep,
+  backend: AgentBackend,
+  hooks?: {
+    beforeRun?: (ctx: {
+      paths: ReturnType<typeof statePaths>;
+      journal: StepJournal;
+      client: FakeClient;
+    }) => void;
+  },
+) {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-exec-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
+  hooks?.beforeRun?.({ paths, journal, client });
   await runStep(
     {
       client,
@@ -261,7 +305,7 @@ async function runExec(claimed: ClaimedStep, backend: AgentBackend) {
     },
     claimed,
   );
-  return { client, home, lines };
+  return { client, home, lines, paths, journal };
 }
 
 describe('#1286 recover 面会话降级', () => {
@@ -303,19 +347,21 @@ describe('#1286 recover 面会话降级', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('3. 非 recover（无 opts.resume）→ continue 失败直传步 failed（#1260 语义保留）', async () => {
+  test('3. 非 recover（无 opts.resume）→ continue 失败降级 new session，步成功（#1312）', async () => {
     const claimed = execStep(SESSION_ID);
-    const { backend, calls } = recoveringBackend(true);
-    const { client } = await runExec(claimed, backend);
+    const { backend, calls, prompts } = recoveringBackend(true);
+    const { client, lines } = await runExec(claimed, backend);
 
-    // continueSession 被调用并抛错，createSession 不被调用（执行面不降级）
-    expect(calls).toEqual(['continue']);
-    // 步失败
+    expect(calls).toEqual(['continue', 'create']);
+    expect(prompts).toEqual([expect.stringContaining(TASK.spec)]);
     expect(client.doneBodies).toHaveLength(1);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    // 失败消息包含 SessionNotResumableError 文本
-    expect(client.doneBodies[0]?.body.errorMessage).toContain(SESSION_ID);
-    expect(client.doneBodies[0]?.body.errorMessage).toContain('not found');
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
+    const note = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'system' && String(message.content).includes(SESSION_ID));
+    expect(String(note?.content)).toContain('本机找不到会话');
+    expect(lines.join('\n')).toContain('falling back to new session');
   });
 
   test('4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发）', async () => {
@@ -350,5 +396,126 @@ describe('#1286 recover 面会话降级', () => {
     expect(calls.indexOf('create')).toBeGreaterThan(calls.indexOf('continue'));
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('success');
+  });
+
+  test('6. 执行期会话在另一台机器 → 降级，注记点名异机（#1312）', async () => {
+    const claimed = execStep(SESSION_ID);
+    (claimed.session as { priorMachineId?: string }).priorMachineId = 'other-box';
+    const { backend, calls } = recoveringBackend(true);
+    const { client } = await runExec(claimed, backend);
+
+    expect(calls).toEqual(['continue', 'create']);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    const note = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'system');
+    expect(String(note?.content)).toContain('另一台机器');
+    expect(String(note?.content)).not.toContain('本机找不到会话');
+  });
+
+  test('7. 本机交接位有非空 plan.md → 降级 prompt 指向该文件，wire 行不是用户气泡', async () => {
+    const claimed = execStep(SESSION_ID);
+    const { backend, prompts } = recoveringBackend(true);
+    let planFile = '';
+    const { client, paths } = await runExec(claimed, backend, {
+      beforeRun: ({ paths: statePathsForRun }) => {
+        planFile = join(statePathsForRun.plansDir, claimed.conversationId, PLAN_FILE_NAME);
+        mkdirSync(dirname(planFile), { recursive: true });
+        writeFileSync(planFile, '# 方案\nContext: 已确认\n');
+      },
+    });
+    expect(planFile).toBe(join(paths.plansDir, 'conv-1', PLAN_FILE_NAME));
+    expect(existsSync(planFile)).toBe(true);
+    const delivered = prompts[0] ?? '';
+    expect(delivered).toContain(`已确认方案位置：${planFile}`);
+    expect(delivered).not.toContain('已确认的方案在');
+    const user = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'user');
+    expect(classifyUserText(String(user?.content).trim(), TASK)).toBe('task-prompt');
+  });
+
+  test('8. 换机且本机没有 plan.md → 降级 prompt 不指向交接路径', async () => {
+    const claimed = execStep(SESSION_ID);
+    (claimed.session as { priorMachineId?: string }).priorMachineId = 'other-box';
+    const { backend, prompts } = recoveringBackend(true);
+    const { paths } = await runExec(claimed, backend);
+    const absent = join(paths.plansDir, 'conv-1', PLAN_FILE_NAME);
+    expect(existsSync(absent)).toBe(false);
+    expect(prompts[0]).toBe(buildTaskPromptText(TASK.title, TASK.spec));
+    expect(prompts[0]).not.toContain(absent);
+  });
+
+  test('9. 空白 plan.md 不当成交接物', async () => {
+    const claimed = execStep(SESSION_ID);
+    const { backend, prompts } = recoveringBackend(true);
+    await runExec(claimed, backend, {
+      beforeRun: ({ paths }) => {
+        const planFile = join(paths.plansDir, 'conv-1', PLAN_FILE_NAME);
+        mkdirSync(dirname(planFile), { recursive: true });
+        writeFileSync(planFile, '  \n');
+      },
+    });
+    expect(prompts[0]).toBe(buildTaskPromptText(TASK.title, TASK.spec));
+  });
+
+  test('10. 开会话前 journal 换成原任务，不再留续轮占位句', async () => {
+    const held: { entry: StepJournalEntry | null } = { entry: null };
+    let journal: StepJournal | null = null;
+    const { backend } = recoveringBackend(true, [DONE_EVENT], {
+      onCreate: () => {
+        held.entry = journal?.get('s1') ?? null;
+      },
+    });
+    await runExec(execStep(SESSION_ID), backend, {
+      beforeRun: (ctx) => {
+        journal = ctx.journal;
+      },
+    });
+    expect(held.entry).not.toBeNull();
+    expect(held.entry?.prompt).toContain(TASK.spec);
+    expect(held.entry?.prompt).not.toContain(CONTINUE_PROMPTS.build);
+    expect(held.entry?.sessionAction).toBe('new');
+    expect(held.entry?.sessionId).toBeNull();
+  });
+
+  test('11. 降级 prompt 展开附件 token，不沿用续轮图片', async () => {
+    const specPng = Buffer.from('89504e470d0a1a0a', 'hex');
+    const instrPng = Buffer.from('89504e470d0a1a0b', 'hex');
+    const specToken = formatAttachmentToken('spec.png', 't1/spec.png');
+    const instrToken = formatAttachmentToken('instr.png', 't1/instr.png');
+    const claimed = execStep(SESSION_ID);
+    claimed.todo = { ...TASK, spec: `${TASK.spec}\n\n${specToken}` };
+    claimed.instruction = instrToken;
+    const { backend, prompts, images } = recoveringBackend(true);
+    const { client } = await runExec(claimed, backend, {
+      beforeRun: ({ client: fake }) => {
+        fake.attachments.spec = {
+          fileName: 'spec.png',
+          mimeType: 'image/png',
+          sizeBytes: specPng.byteLength,
+          contentBase64: specPng.toString('base64'),
+        };
+        fake.attachments.instr = {
+          fileName: 'instr.png',
+          mimeType: 'image/png',
+          sizeBytes: instrPng.byteLength,
+          contentBase64: instrPng.toString('base64'),
+        };
+      },
+    });
+    const delivered = prompts[0] ?? '';
+    expect(delivered).not.toContain('attachment:');
+    expect(delivered).toContain('[image attached: spec.png]');
+    expect(delivered).toContain('[image attached: instr.png]');
+    expect(images[0]).toEqual([
+      { data: specPng.toString('base64'), mimeType: 'image/png' },
+      { data: instrPng.toString('base64'), mimeType: 'image/png' },
+    ]);
+    const user = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'user');
+    expect(String(user?.content)).toContain(specToken);
+    expect(String(user?.content)).toContain(instrToken);
   });
 });

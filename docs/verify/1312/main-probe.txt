@@ -1,0 +1,13 @@
+PASS  daemon online before dispatch — GzxoLWf6jO-PK5kj67Zc2
+PASS  agent created — {"id":"2aYDQTUFzHVX9cauA1REw"}
+PASS  withPlan build created — 01a13ad8-d000-7338-904f-77da2dc2e4f1
+PASS  plan done — done 
+PASS  CLI session file exists — /home/ubuntu/.claude/projects/-home-ubuntu--pacman-1312-clean-workspaces-01a13ad8-d000-7338-904f-77da2dc2e4f1/40177e60-3e07-46f3-b5ec-aadbaee34d80.jsonl
+PASS  slash-only precheck path is absent — /home/ubuntu/.claude/projects/-home-ubuntu-.pacman-1312-clean-workspaces-01a13ad8-d000-7338-904f-77da2dc2e4f1/40177e60-3e07-46f3-b5ec-aadbaee34d80.jsonl
+PASS  build failed — failed
+PASS  error names the missing session — session 40177e60-3e07-46f3-b5ec-aadbaee34d80 not found on this machine (continue session impossible)
+PASS  plan logged new session
+PASS  claim path did not degrade
+PASS  resume canon line absent
+11/11
+EXIT:0

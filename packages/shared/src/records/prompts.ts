@@ -227,6 +227,50 @@ export function stripWorkBranchNote(text: string): string {
   return wrappedBy(note, WORK_BRANCH_NOTE_HEAD, WORK_BRANCH_NOTE_TAIL) ? text.slice(0, idx) : text;
 }
 
+// —— #1312 已确认方案位置行（降级 build 步 / 过滤侧剥离共用锚点）——————
+
+/** #1312 已确认方案位置行头尾（写侧组装与过滤侧剥离共用的锚点）。 */
+const CONFIRMED_PLAN_NOTE_HEAD = '已确认方案位置：';
+const CONFIRMED_PLAN_NOTE_TAIL =
+  '。该文件是本机已落盘的 plan.md——阅读它并按它执行，不要改写它，也不要在仓库工作区里另写一份。';
+
+/** #1312 已确认方案位置行（daemon 降级 build 步单源）：本机交接位已有非空
+ *  plan.md 时，任务文本尾部追加的一行。路径是执行机本地事实
+ *  （`<plansDir>/<convId>/plan.md`，与 plan 步落盘位同一表达式）。写侧
+ *  （runner degradedFreshPrompt）与过滤侧（stripConfirmedPlanNote）单源在此。 */
+export function buildConfirmedPlanNote(planFile: string): string {
+  return `${CONFIRMED_PLAN_NOTE_HEAD}${planFile}${CONFIRMED_PLAN_NOTE_TAIL}`;
+}
+
+/** 已确认方案位置行追加（幂等：注记已在场 = 原文返回。单换行拼接）。 */
+export function appendConfirmedPlanNote(prompt: string, planFile: string): string {
+  if (prompt.includes(CONFIRMED_PLAN_NOTE_HEAD)) return prompt;
+  const note = buildConfirmedPlanNote(planFile);
+  return prompt === '' ? note : `${prompt}\n${note}`;
+}
+
+/** 尾部已确认方案位置行剥离（过滤侧）：prompt 以 '\n' + 注记行收尾时剥掉
+ *  注记，余段走模板比对。非注记收尾 = 原文返回。 */
+export function stripConfirmedPlanNote(text: string): string {
+  const idx = text.lastIndexOf(`\n${CONFIRMED_PLAN_NOTE_HEAD}`);
+  if (idx === -1) return text;
+  const note = text.slice(idx + 1);
+  return wrappedBy(note, CONFIRMED_PLAN_NOTE_HEAD, CONFIRMED_PLAN_NOTE_TAIL)
+    ? text.slice(0, idx)
+    : text;
+}
+
+/** 任务文本的投递附加行（工作分支注记、已确认方案位置行）剥到稳定。两行
+ *  叠在一起时顺序不定，每轮只剥当前尾巴，缩短即停。 */
+function stripTaskDeliveryNotes(text: string): string {
+  let cur = text;
+  for (;;) {
+    const next = stripConfirmedPlanNote(stripWorkBranchNote(cur));
+    if (next === cur) return cur;
+    cur = next;
+  }
+}
+
 /** 编排请求首行（#640 词表）：buildOrchestratePrompt 的首行与
  *  orchestrateThreadTitle 的推导共用这一句——线程标题由 chiefThreadTitle
  *  取首行派生，web 侧「该任务是否有在飞编排回合」的判定按标题匹配
@@ -312,6 +356,8 @@ function isSyntheticInstruction(text: string): boolean {
   if (withoutNote !== text) return isSyntheticInstruction(withoutNote);
   const withoutBranchNote = stripWorkBranchNote(text);
   if (withoutBranchNote !== text) return isSyntheticInstruction(withoutBranchNote);
+  const withoutPlan = stripConfirmedPlanNote(text);
+  if (withoutPlan !== text) return isSyntheticInstruction(withoutPlan);
   return false;
 }
 
@@ -334,10 +380,9 @@ export function classifyUserText(
   // wire 行经呈现层 trim 后比对（daemon 记录的是未 trim 原文）。
   const taskText = buildTaskPromptText(task.title, task.spec).trim();
   if (text === taskText) return 'task-prompt';
-  // #1195 工作分支注记是任务文本的投递附加行（交付步新会话形 = 任务文本 +
-  // 注记）：剥掉注记后与任务文本精确相等仍判 task-prompt，不然任务简报成
-  // 用户气泡双渲染。
-  if (stripWorkBranchNote(text) === taskText) return 'task-prompt';
+  // #1195 工作分支注记、#1312 已确认方案位置行都是任务文本的投递附加行。
+  // 剥掉后与任务文本精确相等仍判 task-prompt，不然任务简报成用户气泡双渲染。
+  if (stripTaskDeliveryNotes(text) === taskText) return 'task-prompt';
   if (isSyntheticInstruction(text)) return 'synthetic';
   // #720 组合行（composeTaskPromptWithInstruction 投递形）：任务前缀剥除后
   // 余段是合成指令 → 整行退场——任务简报已有描述区、反馈已有独立用户行，
