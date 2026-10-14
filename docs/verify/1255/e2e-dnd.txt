@@ -1,0 +1,26 @@
+[1/25] e2e/board-dnd.spec.ts:144:1 › 待开始 → 已完成: silent commit, end-of-column landing, counts couple, teardown sweeps
+[2/25] e2e/board-dnd.spec.ts:179:1 › 待开始 → 执行中: the drop fires orchestration directly — no dialog, no local phase write (#640)
+[3/25] e2e/board-dnd.spec.ts:221:1 › per-source target matrix: the tint set follows the dragged card (#753)
+[4/25] e2e/board-dnd.spec.ts:247:1 › hover tier rides the hovered valid target for the new pairs (#753)
+[5/25] e2e/board-dnd.spec.ts:267:1 › invalid pairs: no tint on the hovered target, release commits nothing (#753)
+[6/25] e2e/board-dnd.spec.ts:310:1 › 待开始 → 待处理 stays invalid (#351 pair kept inside the #753 matrix)
+[7/25] e2e/board-dnd.spec.ts:338:1 › 已完成(有变更) → 待处理: reopen commits review, lands after the pinned group
+[8/25] e2e/board-dnd.spec.ts:368:1 › 待处理(confirm) → 已完成 / → 待开始: silent phase commits (#753)
+[9/25] e2e/board-dnd.spec.ts:399:1 › 待处理(confirm，有历史） → 待开始：开重置确认闸，不静默改相 (#755)
+[10/25] e2e/board-dnd.spec.ts:428:1 › 执行中 → 待开始：开重置确认闸 — gesture 只开闸，不写相位 (#755/#640)
+[11/25] e2e/board-dnd.spec.ts:458:1 › 重置闸·确认：started 卡确认后落待开始（fixture 本地重置投影）(#755)
+[12/25] e2e/board-dnd.spec.ts:481:1 › 重置闸·取消：零提交（卡片不动、计数不动、无请求发出）(#755)
+[13/25] e2e/board-dnd.spec.ts:509:1 › 重置闸·静默：零历史卡拖回待开始不设闸 (#755)
+[14/25] e2e/board-dnd.spec.ts:534:1 › done 闸·取消：review(有变更) 拖已完成开弹层，取消零提交（卡不动、计数不动、无写请求）(#901)
+[15/25] e2e/board-dnd.spec.ts:569:1 › done 闸·确认：review(有变更) 确认后落已完成（fixture 本地提交，计数耦合）(#901)
+[16/25] e2e/board-dnd.spec.ts:592:1 › done 闸·静默：无变更产物的 confirm 卡与 building 源拖已完成不设闸 (#901)
+[17/25] e2e/board-dnd.spec.ts:625:1 › cards from every column arm the drag gesture (#753)
+[18/25] e2e/board-dnd.spec.ts:653:1 › click navigation survives sensor arming on the newly draggable columns (#753/#629)
+[19/25] e2e/board-dnd.spec.ts:667:1 › same-column gesture: siblings never shift, drop is a no-op
+[20/25] e2e/board-dnd.spec.ts:721:3 › lifted card rides the compact drag-tier recipe (light)
+[21/25] e2e/board-dnd.spec.ts:721:3 › lifted card rides the compact drag-tier recipe (dark)
+[22/25] e2e/board-dnd.spec.ts:790:3 › valid targets tint base tier, hovered column tints hot (light)
+[23/25] e2e/board-dnd.spec.ts:790:3 › valid targets tint base tier, hovered column tints hot (dark)
+[24/25] e2e/board-dnd.spec.ts:850:1 › committed drop never flashes the card back to the source column
+[25/25] e2e/board-dnd.spec.ts:915:1 › overlay unmounts with the pointerup frame — no glide
+  25 passed (27.8s)
