@@ -1,0 +1,60 @@
+
+ RUN  v5.0.1 /workspace/apps/server
+
+ ❯ test/skill-import.test.ts (35 tests | 2 failed | 33 skipped) 72ms
+   ❯ 来源登记失败（#1185） (2)
+     × LP11：登记失败 → 500，目录与 create 审计行回滚，手建同名技能 refresh 仍 409 67ms
+     × 空登记是新对象：失败的写不会让下一次读取看见那条来源 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/skill-import.test.ts > 来源登记失败（#1185） > LP11：登记失败 → 500，目录与 create 审计行回滚，手建同名技能 refresh 仍 409
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/skill-import.test.ts:1059:59
+    1057|       });
+    1058|       expect(res.status).toBe(500);
+    1059|       expect(existsSync(join(skillsDir, 'orphan-skill'))).toBe(false);
+       |                                                           ^
+    1060|       expect(
+    1061|         s.db.select().from(skillAudit).all().filter((row) => row.skill…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/skill-import.test.ts > 来源登记失败（#1185） > 空登记是新对象：失败的写不会让下一次读取看见那条来源
+AssertionError: expected { skillId: 'phantom-skill', …(4) } to be null
+
+- Expected:
+null
+
++ Received:
+{
+  "importedAt": 1,
+  "kind": "localPath",
+  "ref": "/tmp/phantom-src",
+  "refreshedAt": null,
+  "skillId": "phantom-skill",
+}
+
+ ❯ test/skill-import.test.ts:1095:52
+    1093|       }),
+    1094|     ).rejects.toThrow();
+    1095|     expect(readSkillSource(path, 'phantom-skill')).toBeNull();
+       |                                                    ^
+    1096|   });
+    1097| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 33 skipped (35)
+   Start at  17:12:04
+   Duration  1.62s (transform 60%, import 35%, tests 5%)
+
