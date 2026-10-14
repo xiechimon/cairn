@@ -53,3 +53,7 @@ The same sentence is a `system` message on the card (`branch-degrade-notes.json`
 ![build continued after the session file was removed](branch-build-degraded.png)
 
 A second machine is covered by `apps/server/test/machine-pin.test.ts` (`priorMachineId` on the claim) and `apps/daemon/test/runner-recover-degrade.test.ts` case 6 (the card note says the session is on another machine).
+
+## Long cwd slug (CLI 2.1.278)
+
+A sanitized slug longer than 200 characters is truncated and given a hash of the resolved path. Measured with the real CLI, cwd length 250, session `cccccccc-dddd-4eee-8fff-111111111111`. The project directory name and the `hm` formula are the same string (`long-slug.json`, `match: true`), length 207, suffix `-ebpasi`. The transcript file is on disk at that path. `apps/daemon/test/claude-transcript-path.test.ts` failure mode 13 pins `sdkTranscriptPath` to this formula, and failure mode 14 pins the `CLAUDE_CONFIG_DIR` / `CLAUDE_CODE_PROJECT_DIR_NAME` override.
