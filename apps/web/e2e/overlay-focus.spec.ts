@@ -3,10 +3,9 @@ import { expect, type Page, test } from '@playwright/test';
 // Issue #388 acceptance (弹层与 focus 视觉缺陷组):
 //   #15 — 点击 topbar 钮 / 新建任务钮后键盘交互（Esc/Tab）不再出现 UA 蓝框
 //         (outline auto rgb(0,95,204))；:focus-visible 必有可见环。#1003 起
-//         环配方双轨过渡：ui Button 件级 = 官方 box-shadow 环（ring-3
-//         ring-ring/50，#982 判决回官方形）；仍带 #388 per-face outline 配方
-//         的面（sidebar 行钮等）保持旧环，其退役归波 1 域车道——正向断言因此
-//         配方无关（expectVisibleRing），只钉「换皮，不是删皮」。
+//         #1244 起 ui Button 与 #388 per-face 面共用 2px --focus-ring outline。
+//         正向断言仍配方无关（expectVisibleRing）：solid outline 或可见
+//         box-shadow 都算环，缺环非法。只钉「换皮，不是删皮」。
 //   #10 — /app/schedules 新建定时弹层全屏族（#1007 起壳 = registry Dialog，
 //         入场 = registry fade-in）：scrim 盖全视口（含 sidebar——旧 z auto
 //         被 sidebar z1 压过，阴影只盖右 pane）、Esc 关、背板点击关。
@@ -33,12 +32,9 @@ async function focusedOutline(page: Page) {
   });
 }
 
-/** 焦点环正向断言（「换皮，不是删皮」；#1003 起配方无关）：ui Button 面 =
- *  官方 box-shadow 环（focus-visible:ring-3 ring-ring/50，outline 退场）；仍
- *  带 #388 per-face outline 配方的面（sidebar 行钮等，其退役归波 1 域车道）=
- *  solid outline 环。两种形态都合法，缺环非法——本断言只钉「键盘可达面必有
- *  可见环且永非 UA 蓝框」。注意：上游 transition-all 的过渡属性表含
- *  outline/ring（#15 的旧窄写随 brand 档退役），读数前必须等过渡落定。 */
+/** 焦点环正向断言（「换皮，不是删皮」）：solid outline（#1244 全局环）或
+ *  可见 box-shadow 都算环，缺环非法。本断言只钉「键盘可达面必有可见环且永非
+ *  UA 蓝框」。读数前必须等过渡落定。 */
 function expectVisibleRing(info: { style: string; color: string; shadow: string }) {
   const outlineRing = info.style === 'solid' && info.color !== UA_BLUE;
   const shadowRing = info.shadow !== 'none';
