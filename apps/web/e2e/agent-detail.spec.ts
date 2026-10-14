@@ -11,8 +11,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 // 4. 名称不可编辑 —— 行内编辑提交后回显旧值
 // 5. 职责位不渲染 canon 空态「未设置职责」
 // 6. 模型选择器不列选项 —— 打开后菜单为空
-// 7. 思考强度不是只读值行（原版 r3 §4 观测值恒「默认」）——XMON-18 之后这条同时
-//    看住它的存在：档位交给 agent 编排不等于把这行藏起来
+// 7. 思考强度行消失，或空值不再是可改的「未设置」下拉
 // 7b. 概览长回了「状态」行（XMON-18 已撤；撤行留空壳同判失败）
 // 8. 记忆空态文案与 shared canon 不一致
 // 9. 权限面工具开关不足 6 个（r3 §4 全 list）
@@ -198,17 +197,16 @@ test('概览：两级菜单锚在触发钮上且整块在视口内（几何）',
   }
 });
 
-test('概览：思考强度是只读值行，无模型时显示「默认」', async ({ page }) => {
+test('概览：思考强度空值是「未设置」下拉', async ({ page }) => {
   const detail = await openDetail(page);
-  const thinking = detail.locator('.agent-thinking');
-  await expect(thinking).toHaveText('默认');
-  await expect(thinking.locator('button')).toHaveCount(0);
+  const thinking = detail.locator('.agent-thinking-select');
+  await expect(thinking).toContainText('未设置');
+  await expect(thinking).toHaveRole('combobox');
 });
 
 // XMON-18（2026-10-01 裁决）：概览不再摆「状态」行——`agentStatusSchema` 只有
 // 一个取值 active，摆出来零信息量。这条钉的是「别再长回来」，同时钉住撤行没留下
-// 空壳（类名与标签都不得残留）。注意**思考强度那行要留着**（交给 agent 编排 ≠
-// 藏起来），上面那条只读行断言就是它的看门人。
+// 空壳（类名与标签都不得残留）。思考强度那行留着，上面的下拉断言看住它。
 test('概览：不摆「状态」行', async ({ page }) => {
   const detail = await openDetail(page);
   expect(await detail.locator('.agent-field-label').allTextContents()).not.toContain('状态');

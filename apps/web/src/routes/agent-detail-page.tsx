@@ -12,14 +12,10 @@
 //
 // XMON-18 裁决（2026-10-01）：概览不摆 `状态` 行——`agentStatusSchema` 只有一个
 // 取值 active，摆出来零信息量（原版有这一行，本仓不复刻）；`创建于 …` 也不摆
-// （不需要创建时间，DB 不加 createdAt 列）。**其余只读行保留**：思考强度档位交给
-// agent 编排、不给人手设，但值本身要看得见。
+// （不需要创建时间，DB 不加 createdAt 列）。
 //
-// 本面明确不做的两件（均因证据/结构缺口，不发明）：
-// · `创建于 …` 状态行——AgentRecord 与 DB agent 表都无 createdAt 列；
-// · 思考强度选择器——B1 已裁「保持只读」；档位词表本身有读面了（XMON-16：
-//   `GET /api/capabilities` 投影 shared THINKING_LEVELS），但读面 ≠ 写面，
-//   只读行按读面呈现档位，选择器与 provider 写面的耦合仍不做。
+// 本面明确不做的一件（证据缺口，不发明）：
+// · `创建于 …` 状态行——AgentRecord 与 DB agent 表都无 createdAt 列。
 //
 // 承载结构 = components/ui/Button ghost（XMON-28/B3）：本面四处散写钮
 // （进行中行、记忆排序触发器与选项行、名称行内编辑）换底座。排序钮/盘的
@@ -172,6 +168,26 @@ const TAB_LABELS: { id: AgentTab; label: string }[] = [
  *  到达序（server 投影序，不重排）。 */
 const MEMORY_SORT_OPTIONS = ['默认', '添加时间'] as const;
 type MemorySort = (typeof MEMORY_SORT_OPTIONS)[number];
+
+// claude-code effort 没有 minimal。off 与 minimal 在该 runtime 都是不发
+// effort，菜单只留 off。pi 与其它 provider 用能力读面词表（缺省
+// THINKING_LEVELS，含 minimal）。序跟词表走。
+const CLAUDE_CODE_THINKING_LEVELS: readonly string[] = [
+  'off',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+];
+
+function thinkingLevelsForProvider(
+  provider: string | null,
+  catalog: readonly string[],
+): readonly string[] {
+  if (provider !== 'claude-code') return catalog;
+  return catalog.filter((level) => CLAUDE_CODE_THINKING_LEVELS.includes(level));
+}
 
 export function AgentDetailPage() {
   const { t } = useI18n();
@@ -367,15 +383,14 @@ export function AgentDetailPage() {
   // #1169 拆字段：defaultSkill（携带，单值）直绑 wire 槽——清空 = null，
   // 不再经数组位（旧 skills:[next] 的单值伪装已退役）。
   const defaultSkill = agent.defaultSkill;
-  // 思考强度档位（XMON-16）：live 面词表来自能力读面 `GET /api/capabilities`
-  // （server 投影 shared 单源）；fixture 面与读面未解析时直接取 shared
-  // `THINKING_LEVELS` 本身——那不是第二份真值，就是读面背后的同一个常量。
-  // 存值须落在词表内才呈现，否则落 r3 §4 观测形「默认」。
-  const thinkingLevels = capabilitiesQ.data?.thinkingLevels ?? THINKING_LEVELS;
-  const thinkingLevel = toThinkingLevelDisplay(agent.thinkingLevel, thinkingLevels);
   // 运行时档的存值形：wire 的 provider 位里 'pi' 字面值与 null 同义（都 = 内置），
   // 归一成 null 再进一级选择器（选择器的清空行即「内置 (pi)」）。
   const runtimeValue = agent.provider === 'pi' ? null : agent.provider;
+  // 思考强度档位跟当前 runtime。词表来自能力读面；fixture 与读面未到时用
+  // THINKING_LEVELS。不在该 runtime 词表里的存值呈现为未设置。
+  const thinkingCatalog = capabilitiesQ.data?.thinkingLevels ?? THINKING_LEVELS;
+  const thinkingOptions = thinkingLevelsForProvider(runtimeValue, thinkingCatalog);
+  const thinkingLevel = toThinkingLevelDisplay(agent.thinkingLevel, thinkingOptions);
 
   return (
     <ResourceShell
@@ -482,7 +497,14 @@ export function AgentDetailPage() {
                   options={modelOptions}
                   onPick={(next) => {
                     if (next === runtimeValue) return;
-                    patch({ provider: next, modelId: null });
+                    const nextLevels = thinkingLevelsForProvider(next, thinkingCatalog);
+                    const illegal =
+                      agent.thinkingLevel !== null && !nextLevels.includes(agent.thinkingLevel);
+                    patch({
+                      provider: next,
+                      modelId: null,
+                      ...(illegal ? { thinkingLevel: null } : {}),
+                    });
                   }}
                   prefix="agent-runtime"
                 />
@@ -497,11 +519,24 @@ export function AgentDetailPage() {
                 />
               </ProfileRow>
               <ProfileRow label={t('思考强度')} labelClassName="agent-field-label">
-                {/* 只读值行（B1 裁「保持只读」）：值经能力读面词表解析，不直接
-                    透出存值——引擎没有的档位不呈现（#499 B3 / XMON-16）。 */}
-                <span className="agent-thinking text-sm text-foreground">
-                  {thinkingLevel ?? t('默认')}
-                </span>
+                <Select
+                  value={thinkingLevel}
+                  onValueChange={(next) => patch({ thinkingLevel: next })}
+                >
+                  <SelectTrigger className="agent-thinking-select">
+                    <SelectValue>
+                      {thinkingLevel === null ? t('未设置') : thinkingLevel}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent aria-label={t('思考强度')} className="agent-thinking-menu">
+                    <SelectItem value={null}>{t('未设置')}</SelectItem>
+                    {thinkingOptions.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        {level}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </ProfileRow>
             </ProfileCard>
             {/* 进行中（原版概览最后一段；r3 53 截图拍到的是空态
