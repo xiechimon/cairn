@@ -24,3 +24,9 @@ pr-evidence: sections: 2/2 answered
 pr-evidence: scanned 3 image link(s)
 pr-evidence: GREEN
 exit=0
+
+=== docs/verify/1335/fixture-html-query-string.md (finding 4: ?query/#fragment on embedded URL) ===
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 3 image link(s)
+pr-evidence: GREEN
+exit=0

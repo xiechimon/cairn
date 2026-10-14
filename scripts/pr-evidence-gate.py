@@ -155,6 +155,24 @@ def html_embed_spans(body):
     return spans
 
 
+def in_html_embed(ms, me, html_embed):
+    """True when the URL span [ms, me) is contained in any embed span.
+
+    IMG_URL terminates its match at the file extension, so a
+    `<source srcset="...svg?v=1#x">` and a bare equivalent stop at
+    different offsets. Equality misses the embedded case and the
+    gate red-flags a URL GitHub does render; containment keeps the
+    form recognised (#1335). Containment is one-directional: the
+    embedded span is always at least as wide as the IMAGE span
+    (image extension is a suffix of the embed value), so a simple
+    `[hs, he)` superset test is enough.
+    """
+    for hs, he in html_embed:
+        if hs <= ms and me <= he:
+            return True
+    return False
+
+
 REQUIRED_SECTIONS = ('Upstream', 'Verified')
 # The full body contract a lane must satisfy (#1110). The gate only
 # *requires* the two sections above; the rest are named here so a failing
@@ -267,7 +285,7 @@ def find_links(body):
     seen = set()
     for m in matches:
         ms, me = m.start(), m.end()
-        if (ms, me) in html_embed:
+        if in_html_embed(ms, me, html_embed):
             links.append({'form': 'html', 'embedded': True, 'label': None,
                           'url': m.group(0),
                           'line': clean.count('\n', 0, ms) + 1})
