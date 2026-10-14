@@ -1,0 +1,55 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 44 tests using 2 workers
+
+[1/44] e2e/dialog-ring-room.spec.ts:10:1 › 聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量）
+[2/44] e2e/overlay-focus.spec.ts:45:3 › #15 focus ring收编 › click + key on 新建任务/topbar buttons: never the UA blue box
+[3/44] e2e/project-new-repo.spec.ts:140:1 › the 选择仓库 trigger lists exactly GitHub 仓库 and 本地文件夹
+[4/44] e2e/project-new-repo.spec.ts:153:1 › the GitHub row swaps the trigger for the auth face; manual link reveals the input
+[5/44] e2e/project-new-repo.spec.ts:168:1 › the 本地文件夹 row swaps the trigger for the path input; swap reopens
+[6/44] e2e/overlay-focus.spec.ts:97:3 › #15 focus ring收编 › Tab focus keeps the official ring (keyboard reachability preserved)
+[7/44] e2e/overlay-focus.spec.ts:126:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › scrim covers the full viewport — sidebar included
+[8/44] e2e/project-new-repo.spec.ts:182:1 › switching forms drops the other face input
+[9/44] e2e/overlay-focus.spec.ts:137:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › Esc closes the overlay
+[10/44] e2e/overlay-focus.spec.ts:144:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › backdrop click closes; entry rides the registry fade-in
+[11/44] e2e/project-new-repo.spec.ts:191:1 › Escape closes the repo popover
+[12/44] e2e/overlay-focus.spec.ts:157:3 › #10 schedules 新建定时弹层 = registry Dialog 全屏族（fade-in） › X and 取消 close the fixture face too (no dead buttons)
+[13/44] e2e/project-new-repo.spec.ts:199:1 › local path backfills the project name with the basename
+[14/44] e2e/registry-focus-ring.spec.ts:96:3 › #1244 registry focus outline › input, select, and button use the global outline
+[15/44] e2e/project-new-repo.spec.ts:210:1 › a manual name edit stops the backfill; clearing resumes it
+[16/44] e2e/project-new-repo.spec.ts:224:1 › github owner/repo backfills the repo segment once valid
+[17/44] e2e/project-new-repo.spec.ts:241:1 › the name input focus ring is the global outline, not the UA default
+[18/44] e2e/project-new-repo.spec.ts:263:1 › untouched submit posts a repo-less body and navigates on 201
+[19/44] e2e/registry-focus-ring.spec.ts:116:3 › #1244 registry focus outline › the same three controls use the global outline in light
+[20/44] e2e/project-new-repo.spec.ts:275:1 › local and github submits carry kind + their wire field
+[21/44] e2e/registry-focus-ring.spec.ts:130:3 › #1244 registry focus outline › a default textarea uses the global outline in both themes
+[22/44] e2e/project-new-repo.spec.ts:294:1 › empty local path / invalid github ref keep 创建项目 disabled
+[23/44] e2e/registry-focus-ring.spec.ts:142:3 › #1244 registry focus outline › clicking the name input shows the global outline, not the gray ring
+[24/44] e2e/registry-focus-ring.spec.ts:151:3 › #1244 registry focus outline › aria-invalid keeps a 3px destructive shadow and the global outline
+[25/44] e2e/registry-focus-ring.spec.ts:165:3 › #1244 registry focus outline › checkbox, switch, and badge use the global outline
+[26/44] e2e/project-new-repo.spec.ts:317:3 › a 400 localPath reason renders the error row: 路径不存在
+[27/44] e2e/project-new-repo.spec.ts:317:3 › a 400 localPath reason renders the error row: 不是 git 仓库
+[28/44] e2e/registry-focus-ring.spec.ts:188:3 › #1244 registry focus outline › input-group draws the outline on the shell, not the control
+[29/44] e2e/project-new-repo.spec.ts:317:3 › a 400 localPath reason renders the error row: 需要绝对路径
+[30/44] e2e/registry-focus-ring.spec.ts:206:3 › #1244 registry focus outline › a tab trigger uses the global outline
+[31/44] e2e/project-new-repo.spec.ts:317:3 › a 400 localPath reason renders the error row: invalid body at localPath: case none
+[32/44] e2e/registry-focus-ring.spec.ts:214:3 › #1244 registry focus outline › the sidebar user button uses the global outline
+[33/44] e2e/segmented-controls.spec.ts:90:1 › page-tab: unselected hover steps the chip ink — dark + light
+[34/44] e2e/segmented-controls.spec.ts:106:1 › page-tab: selected chip keeps its fill under hover, same geometry as the rest state
+[35/44] e2e/segmented-controls.spec.ts:143:1 › page-tab group rides the registry TabsList form (bg-muted, 32px, 3px inset)
+[36/44] e2e/segmented-controls.spec.ts:169:1 › page-tab click swaps the active chip and the pane
+[37/44] e2e/segmented-controls.spec.ts:182:1 › sched freq: dark active chip reads against the container, hover steps the rest ink
+[38/44] e2e/segmented-controls.spec.ts:207:1 › files seg + tasks view toggle: hover steps the unselected ink (dark)
+[39/44] e2e/segmented-controls.spec.ts:220:1 › user-menu 外观 seg: hover tints, click switches the theme
+[40/44] e2e/segmented-controls.spec.ts:236:1 › branch-dialog seg: hover tints Git, click swaps the tab body
+[41/44] e2e/segmented-controls.spec.ts:257:1 › team layout toggle: registry default Tabs form (muted group, background chip, no ring)
+[42/44] e2e/segmented-controls.spec.ts:287:1 › chief tabs: hover tints, click swaps the view
+[43/44] e2e/segmented-controls.spec.ts:305:1 › chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height
+[44/44] e2e/segmented-controls.spec.ts:387:1 › chief tabs: reduced motion freezes the pill slide (#644)
+  44 passed (29.6s)
+EXIT:0

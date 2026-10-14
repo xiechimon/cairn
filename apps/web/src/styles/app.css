@@ -68,22 +68,168 @@
     display: block;
   }
 
-  /* #388 全局 focus 环收编：UA 默认蓝框（outline auto）清零，键盘可达面
-     （:focus-visible）统一 indigo ring——配方沿仓内既有 focus-visible 先例
-     （.rerun-switch：2px --focus-ring, offset 2），不是删
-     outline 而是换皮。纯兜底语义靠级联层而非特异性：本规则落 tailwind
-     base 层，unlayered 的面规则（.input / .prj-new-input / .new-task-input
-     等自有 focus 皮肤）无论特异性恒压过 layered 规则，各自配方不动；
-     :where() 只归零元素列表自身的特异性，避免兜底压过同层工具类。
-     role=switch 的 span 面（.rerun-switch）不在本选择器族内，其自有
-     focus-visible 规则仍是唯一环源，勿删。 */
-  :where(button, a, [role="button"], summary, input, select, textarea):focus-visible {
+  /* Safari 等 UA 对纯鼠标点击（:focus 但非 :focus-visible）也画默认环——
+     清零。键盘路径在文件后部的 @layer utilities（#1244），可达性不减。 */
+  :where(
+    button,
+    a,
+    [role="button"],
+    summary,
+    input,
+    select,
+    textarea,
+    [role="checkbox"],
+    [role="switch"],
+    [role="tab"]
+  ):focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* #1244：键盘焦点环放在 utilities 层，并且写在 @import "tailwindcss"
+   之后，所以同层里它排在生成的 utility 后面。特异性与 .outline-none
+   同为 (0,1,0)（:where 把元素列表归零），后写者胜，outline-none 不再
+   把 2px solid var(--focus-ring) 盖掉。显式的 focus-visible:outline-*
+   （(0,2,0)：内描 offset -2、focus-visible:outline-none、菜单行
+   outline-hidden 不在此列）仍压过本规则。
+   ring-3 / border-ring 是另一条属性，(0,2,0)，靠后面更高特异性的声明
+   把 --tw-ring-shadow 归零，并把 border-color 拨回静止色。aria-invalid
+   不在归零范围内，destructive 环留着。 */
+@layer utilities {
+  :where(
+    button,
+    a,
+    [role="button"],
+    summary,
+    input,
+    select,
+    textarea,
+    [role="checkbox"],
+    [role="switch"],
+    [role="tab"]
+  ):where(:not(.outline-hidden)):focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
-  /* Safari 等 UA 对纯鼠标点击（:focus 但非 :focus-visible）也画默认环——
-     清零；键盘路径由上面的 :focus-visible 规则承载，可达性不减。 */
-  :where(button, a, [role="button"], summary, input, select, textarea):focus:not(:focus-visible) {
+
+  :is(
+    button,
+    a,
+    [role="button"],
+    summary,
+    input,
+    select,
+    textarea,
+    [role="checkbox"],
+    [role="switch"],
+    [role="tab"]
+  ):focus-visible:not([aria-invalid="true"]) {
+    --tw-ring-shadow: 0 0 transparent;
+  }
+
+  :is(input, textarea, select, button, [role="combobox"]).border-input:focus-visible:not(
+    [aria-invalid="true"]
+  ) {
+    border-color: var(--input);
+  }
+
+  :is(button, [role="switch"], [role="tab"]).border-transparent:focus-visible:not(
+    [aria-invalid="true"]
+  ) {
+    border-color: transparent;
+  }
+
+  button.border-border:focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--border);
+  }
+
+  html:not(.light) button.dark\:border-input:focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--input);
+  }
+
+  button.border-\[var\(--border\)\]:focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--border);
+  }
+
+  [role="checkbox"]:not([data-checked]):focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--input);
+  }
+
+  [role="checkbox"][data-checked]:focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--primary);
+  }
+
+  [role="tab"]:focus-visible:not([aria-invalid="true"]) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    --tw-ring-shadow: 0 0 transparent;
+  }
+
+  html:not(.light) [role="tab"][data-active]:focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--input);
+  }
+
+  [data-slot="badge"]:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  [data-slot="badge"]:focus-visible:not([aria-invalid="true"]):not(.border-border) {
+    --tw-ring-shadow: 0 0 transparent;
+    border-color: transparent;
+  }
+
+  [data-slot="badge"].border-border:focus-visible:not([aria-invalid="true"]) {
+    --tw-ring-shadow: 0 0 transparent;
+    border-color: var(--border);
+  }
+
+  [data-slot="input-group"]:has([data-slot="input-group-control"]:focus-visible) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  [data-slot="input-group"]:has([data-slot="input-group-control"]:focus-visible):not(
+    :has([aria-invalid="true"])
+  ) {
+    --tw-ring-shadow: 0 0 transparent;
+    border-color: var(--input);
+  }
+
+  [data-slot="input-group-control"]:focus-visible {
+    outline: none;
+  }
+
+  [data-slot="field-label"]:has(> [data-slot="field"]):has(:focus-visible):not(
+    :has([aria-invalid="true"])
+  ) {
+    --tw-ring-shadow: 0 0 transparent;
+  }
+
+  [data-slot="field-label"]:has(> [data-slot="field"]):has(:focus-visible):not(
+    :has([data-checked])
+  ):not(:has([aria-invalid="true"])) {
+    border-color: var(--border);
+  }
+
+  [data-slot="field-label"]:has(> [data-slot="field"]):has(:focus-visible):has([data-checked]):not(
+    :has([aria-invalid="true"])
+  ) {
+    border-color: color-mix(in oklab, var(--primary) 30%, transparent);
+  }
+
+  html:not(.light)
+    [data-slot="field-label"]:has(> [data-slot="field"]):has(:focus-visible):has(
+      [data-checked]
+    ):not(:has([aria-invalid="true"])) {
+    border-color: color-mix(in oklab, var(--primary) 20%, transparent);
+  }
+
+  [data-slot="attachment"]:focus-within {
+    --tw-ring-shadow: 0 0 transparent;
+  }
+
+  .composer textarea:focus-visible {
     outline: none;
   }
 }
