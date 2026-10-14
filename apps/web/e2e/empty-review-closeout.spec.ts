@@ -104,7 +104,7 @@ async function stubBoot(page: Page) {
 
 async function stubSurface(
   page: Page,
-  changes: { files: unknown[]; reported?: boolean },
+  changes: { files: unknown[]; reported?: boolean; changed?: boolean },
   tools: string[],
 ) {
   await page.route(`**/api/teams/${TEAM_ID}/members`, (route) =>
@@ -204,6 +204,15 @@ test('有文件改动的卡仍展示合并行，缺授权时完成禁用', async
   await expect(dialog.getByText(/授权，无法合并/)).toHaveText(
     '缺少「合并分支」授权，无法合并。请在该 Agent 的权限里开启。',
   );
+});
+
+test('git 仍有文件头但解析文件集为空时不跳过合并', async ({ page }) => {
+  await stubBoot(page);
+  await stubSurface(page, { files: [], reported: true, changed: true }, ['推送分支']);
+  const dialog = await openBoard(page);
+  await expect(dialog.getByText(MERGE_LABEL)).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeDisabled();
+  await expect(dialog.getByText(EMPTY_NOTE)).toHaveCount(0);
 });
 
 test('changes 未上报（无 reported）不当成空提交，合并行与授权闸保留', async ({ page }) => {

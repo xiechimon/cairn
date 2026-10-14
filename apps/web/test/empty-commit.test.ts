@@ -13,8 +13,16 @@ describe('substantiveChangesOf', () => {
     expect(substantiveChangesOf({ files: [], reported: false }, true)).toBeNull();
   });
 
-  it('已上报且文件集为空 = 没有实质改动（空提交）', () => {
+  it('已上报且文件集为空、没有 changed = 没有实质改动（空提交）', () => {
     expect(substantiveChangesOf({ files: [], reported: true }, true)).toBe(false);
+  });
+
+  it('changed false = git diff 没有文件头，空提交', () => {
+    expect(substantiveChangesOf({ files: [], reported: true, changed: false }, true)).toBe(false);
+  });
+
+  it('changed true = git 有文件头，解析器丢掉的改动仍要合并', () => {
+    expect(substantiveChangesOf({ files: [], reported: true, changed: true }, true)).toBe(true);
   });
 
   it('已上报且有文件 = 有实质改动', () => {

@@ -118,7 +118,7 @@ import {
 } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
+import { diffTextNamesAFile, parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { markModelDead } from './model-liveness.js';
@@ -1631,7 +1631,11 @@ export async function finishStep(
       sets.prNumber = body.prNumber;
     }
     if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
-      sets.changes = parseUnifiedDiff(body.changesDiff);
+      const files = parseUnifiedDiff(body.changesDiff);
+      sets.changes =
+        files.length === 0 && diffTextNamesAFile(body.changesDiff)
+          ? { files, changed: true }
+          : files;
     }
     if (Object.keys(sets).length > 0) {
       const updated = db.update(build).set(sets).where(eq(build.id, stepRow.buildId)).run();

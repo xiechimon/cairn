@@ -27,6 +27,7 @@ const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../.
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(REPO, '.claude/verify-run');
 const EXPECT = process.argv.includes('--expect=after') ? 'after' : 'before';
+const FOCUS = process.argv.includes('--focus=hunkless') ? 'hunkless' : 'all';
 const portsFile = join(RUN_DIR, 'ports.json');
 if (!existsSync(portsFile)) {
   process.stderr.write('无栈：' + portsFile + ' 不存在。先跑 launch.mjs\n');
@@ -54,6 +55,14 @@ const SAMPLE_DIFF = [
   '@@ -1 +1 @@',
   '-old',
   '+new',
+  '',
+].join('\n');
+// 100% rename：git 有 diff --git 头，parseUnifiedDiff 因没有 @@ hunk 丢掉。
+const RENAME_DIFF = [
+  'diff --git a/old-name.txt b/new-name.txt',
+  'similarity index 100%',
+  'rename from old-name.txt',
+  'rename to new-name.txt',
   '',
 ].join('\n');
 
@@ -206,6 +215,66 @@ const member = (members.body ?? []).find((m) => m.actorId === AGENT_ID);
 const tools = member?.actor?.tools ?? [];
 check('agent 缺合并分支', tools.includes('推送分支') && !tools.includes('合并分支'), JSON.stringify(tools));
 await saveJson('agent-tools.json', { agentId: AGENT_ID, tools });
+
+if (FOCUS === 'hunkless') {
+  const rename = await seedReview('纯重命名', RENAME_DIFF);
+  await saveJson('rename-todo.json', rename.face);
+  await saveJson('rename-changes.json', rename.changes);
+  check(
+    'rename hasChanges',
+    rename.face.hasChanges === true,
+    String(rename.face.hasChanges),
+  );
+  check(
+    'rename parsed files 为空',
+    Array.isArray(rename.changes.files) && rename.changes.files.length === 0,
+    JSON.stringify(rename.changes),
+  );
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 1440, height: 732 } });
+  const page = await context.newPage();
+  await page.goto(WEB + '/app', { waitUntil: 'domcontentloaded' });
+  const card = page.locator('.todo-card[data-todo-id="' + rename.todoId + '"]');
+  await card.waitFor({ state: 'visible', timeout: 60000 });
+  await card.locator('.todo-card-action').click();
+  const dialog = page.getByRole('dialog', { name: '完成任务' });
+  await dialog.waitFor({ state: 'visible', timeout: 15000 });
+  const expectedMerge = EXPECT === 'before' ? 0 : 1;
+  const deadline = Date.now() + 8000;
+  let mergeCount = await dialog.getByText(MERGE_LABEL).count();
+  while (mergeCount !== expectedMerge && Date.now() < deadline) {
+    await page.waitForTimeout(200);
+    mergeCount = await dialog.getByText(MERGE_LABEL).count();
+  }
+  await shot(page, 'hunkless-' + EXPECT + '-rename-dialog.png');
+  const doneDisabled = await dialog.getByRole('button', { name: '完成', exact: true }).isDisabled();
+  const noteCount = await dialog.getByText(EMPTY_NOTE).count();
+  if (EXPECT === 'before') {
+    check('before rename 不展示合并行', mergeCount === 0, 'count=' + mergeCount);
+    check('before rename 说明行在', noteCount === 1, 'note=' + noteCount);
+    check('before rename 完成可点', doneDisabled === false, 'disabled=' + doneDisabled);
+  } else {
+    check('after rename changes.changed', rename.changes.changed === true, JSON.stringify(rename.changes));
+    check('after rename 展示合并行', mergeCount === 1, 'count=' + mergeCount);
+    check('after rename 无空提交说明', noteCount === 0, 'note=' + noteCount);
+    check('after rename 缺授权时完成禁用', doneDisabled === true, 'disabled=' + doneDisabled);
+  }
+  await context.close();
+  await browser.close();
+  const failed = checks.filter((c) => !c.ok);
+  writeFileSync(
+    join(EVIDENCE, 'result.json'),
+    JSON.stringify(
+      { probe: '1313-hunkless-rename', expect: EXPECT, server: SERVER, web: WEB, ok: failed.length === 0, checks, artifacts },
+      null,
+      2,
+    ),
+  );
+  process.stdout.write(
+    (failed.length === 0 ? 'ALL PASS' : 'FAILED ' + failed.length) + '  evidence=' + EVIDENCE + '\n',
+  );
+  process.exit(failed.length === 0 ? 0 : 1);
+}
 
 const empty = await seedReview('空提交收口', '');
 const files = await seedReview('有文件改动', SAMPLE_DIFF);
