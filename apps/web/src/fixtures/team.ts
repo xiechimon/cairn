@@ -80,7 +80,6 @@ export const teamOrgChartEmpty: FixtureSet = {
   team: { members: 0, agents: [] },
 };
 
-/** #1246 单子：只有总管，子列只剩创建槽。括号列按 ≥2 子设计，这一态应直连。 */
 const TEAM_ORG_CHART_SINGLE: TeamContent = {
   members: 1,
   agents: [
@@ -107,7 +106,6 @@ export const teamOrgChartSingle: FixtureSet = {
   },
 };
 
-/** #1246 双子：总管 + 一个成员 + 创建槽 = 2 子。括号形态应与 ≥2 子的冻结面一致。 */
 const TEAM_ORG_CHART_PAIR: TeamContent = {
   members: 2,
   agents: [

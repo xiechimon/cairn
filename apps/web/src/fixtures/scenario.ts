@@ -343,7 +343,6 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // team chart 组织图（命名场景，无 capture）：3 成员树 + 零成员空态
       'team-org-chart': teamOrgChart,
       'team-org-chart-empty': teamOrgChartEmpty,
-      // #1246：单子（仅创建槽）直连，双子保留括号
       'team-org-chart-single': teamOrgChartSingle,
       'team-org-chart-pair': teamOrgChartPair,
       // Agent 详情编辑面（r3 §4）：团队 roster + 该 agent 的全记录 + providers

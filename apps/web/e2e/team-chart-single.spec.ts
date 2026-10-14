@@ -1,10 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
 
-// #1246：组织图括号列按 ≥2 子设计。子数 = 非根成员卡 + 末位创建槽。
-// 成员 0 时子数是 1（只有创建槽），括号盒 top-7+bottom-7 把列高吃光，
-// 边框塌成一条悬浮短横，w-7 坐标架把连接线与子卡隔开 28px。
-// 单子跳过括号，44px 连接线直接接到子卡中心；2 子保留括号；0 成员仍是空态。
-
 const LINK_W = 44;
 const BRACKET_W = 28;
 
