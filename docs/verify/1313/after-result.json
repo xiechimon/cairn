@@ -1,0 +1,101 @@
+{
+  "probe": "1313-empty-review",
+  "expect": "after",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "ok": true,
+  "checks": [
+    {
+      "name": "session Owner",
+      "ok": true,
+      "detail": "Owner"
+    },
+    {
+      "name": "agent 缺合并分支",
+      "ok": true,
+      "detail": "[\"推送分支\"]"
+    },
+    {
+      "name": "empty hasChanges",
+      "ok": true,
+      "detail": "true"
+    },
+    {
+      "name": "empty changes files 为空",
+      "ok": true,
+      "detail": "{\"files\":[],\"reported\":true}"
+    },
+    {
+      "name": "files changes 有文件",
+      "ok": true,
+      "detail": "[\"README.md\"]"
+    },
+    {
+      "name": "after empty changes reported",
+      "ok": true,
+      "detail": "{\"files\":[],\"reported\":true}"
+    },
+    {
+      "name": "after files changes reported",
+      "ok": true,
+      "detail": "{\"reported\":true}"
+    },
+    {
+      "name": "after empty 不展示合并行",
+      "ok": true,
+      "detail": "count=0"
+    },
+    {
+      "name": "after empty 说明行在",
+      "ok": true,
+      "detail": null
+    },
+    {
+      "name": "after empty 完成可点",
+      "ok": true,
+      "detail": "disabled=false"
+    },
+    {
+      "name": "after empty 无缺授权文案",
+      "ok": true,
+      "detail": "block=0"
+    },
+    {
+      "name": "after files 仍展示合并行",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "after files 缺授权时完成禁用",
+      "ok": true,
+      "detail": "disabled=true"
+    },
+    {
+      "name": "after empty 相位 done",
+      "ok": true,
+      "detail": "done"
+    },
+    {
+      "name": "after empty 零 merge 步",
+      "ok": true,
+      "detail": "[{\"kind\":\"build\",\"status\":\"done\"}]"
+    },
+    {
+      "name": "after empty 审计行标记为已完成",
+      "ok": true,
+      "detail": "{\"role\":\"user\",\"content\":\"标记为已完成\",\"actor\":\"Owner\"}"
+    }
+  ],
+  "artifacts": [
+    "agent-tools.json",
+    "empty-todo.json",
+    "empty-changes.json",
+    "files-todo.json",
+    "files-changes.json",
+    "after-empty-dialog.png",
+    "after-empty-done-column.png",
+    "after-files-dialog.png",
+    "empty-steps.json",
+    "empty-messages.json"
+  ]
+}

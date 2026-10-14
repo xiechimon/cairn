@@ -1,0 +1,17 @@
+FAIL  |@xiechimon/pacman| test/documents.test.ts > computeUnifiedDiff line counts > counts a deleted --- separator and an added ++x line
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/documents.test.ts:30:28
+     28|     expect(file.hunks[0]!.lines).toContain('----');
+     29|     expect(file.hunks[0]!.lines).toContain('+++x');
+     30|     expect(file.additions).toBe(1);
+     31|     expect(file.deletions).toBe(1);
+
+Test Files  1 failed (1)
+     Tests  1 failed (1)

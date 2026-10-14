@@ -13,7 +13,7 @@
 // channels 恒 ["in_app"]（r5 §7.2 实测值；复刻按 R1 divergence 恒定，04 §5）。
 
 import type { NotificationRecord, TodoRecord, UserRecord } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, chiefThread, notification } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
@@ -52,6 +52,8 @@ interface NotificationInput {
   entityRef: NotificationRecord['entityRef'];
   agent: { name: string; avatarUrl: string | null };
   snippet: string | null;
+  /** 缺省 null = 未读。机器回合传当前时刻，落库即已读。 */
+  readAt?: number | null;
 }
 
 /** 落行（组合键 upsert）+ SSE 事件（hub.publishNotification）。 */
@@ -70,7 +72,7 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
       agentName: input.agent.name,
       agentAvatarUrl: input.agent.avatarUrl,
       snippet: input.snippet,
-      readAt: null,
+      readAt: input.readAt ?? null,
       createdAt,
       channels: ['in_app'],
     })
@@ -82,7 +84,7 @@ function upsertAndPublish(deps: NotificationDeps, input: NotificationInput): Not
         agentName: input.agent.name,
         agentAvatarUrl: input.agent.avatarUrl,
         snippet: input.snippet,
-        readAt: null, // 新事件重置未读（thread 粒度）
+        readAt: input.readAt ?? null, // 新事件重置未读（thread 粒度）；机器回合保持已读
         createdAt,
       },
     })
@@ -133,10 +135,21 @@ export function notifyChiefMessage(
     threadId: string;
     message: string;
     agent: { name: string; avatarUrl: string | null };
+    /** 非空 = 机器回合。没有既有未读行时落库即已读；既有未读原样返回，不覆盖、不重发。 */
+    readAt?: number | null;
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
   if (!thread) throw notFound(`chief thread ${input.threadId}`);
+  const readAt = input.readAt ?? null;
+  if (readAt !== null) {
+    const existing = deps.db
+      .select()
+      .from(notification)
+      .where(eq(notification.id, `${deps.user.id}:${thread.id}`))
+      .get();
+    if (existing !== undefined && existing.readAt === null) return toNotificationRecord(existing);
+  }
   return upsertAndPublish(deps, {
     teamId: thread.teamId,
     type: 'chief_message',
@@ -144,7 +157,33 @@ export function notifyChiefMessage(
     entityRef: { title: thread.title, projectId: null, seqNum: null },
     agent: input.agent,
     snippet: input.message,
+    readAt,
   });
+}
+
+/** 总管未读闲置窗口（#1303）。最后活动严格早于该值才置读，正好 7 天仍未读。 */
+export const CHIEF_UNREAD_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 闲置超过 7 天的 chief_message 未读置 readAt=now（扫，不删行）。
+ * 最后活动 = max(thread.updatedAt, thread.lastTurnAt ?? 0)。线程已不在则跳过。
+ * 只动 chief_message。不发 SSE：notification 事件在 document.hidden 时会弹桌面通知，
+ * 过期置读不是一条新消息；未读集在下次查询（焦点重取 / 真正的新通知）收敛。 */
+export function sweepIdleChiefUnread(deps: { db: Db }, now: number): void {
+  const rows = deps.db
+    .select({
+      id: notification.id,
+      updatedAt: chiefThread.updatedAt,
+      lastTurnAt: chiefThread.lastTurnAt,
+    })
+    .from(notification)
+    .innerJoin(chiefThread, eq(notification.entityId, chiefThread.id))
+    .where(and(eq(notification.type, 'chief_message'), isNull(notification.readAt)))
+    .all();
+  for (const row of rows) {
+    const last = Math.max(row.updatedAt, row.lastTurnAt ?? 0);
+    if (now - last <= CHIEF_UNREAD_IDLE_MS) continue;
+    deps.db.update(notification).set({ readAt: now }).where(eq(notification.id, row.id)).run();
+  }
 }
 
 /** quota_wait（#1261）：任务因 relay 额度空/限流挂起「等额度」——不是失败

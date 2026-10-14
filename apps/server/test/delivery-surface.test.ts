@@ -11,7 +11,10 @@
 //      不存半截假象）
 //   5. hosted 形态投影仍读 bare repo（真值源不漂移——daemon 不上报该形态，
 //      空 diff 语义同旧）
-//   6. 无 repo 项目 / 未上报 build → {files:[]}（null ≠ 空数组的旧形）
+//   6. 无 repo 项目 / 未上报 build → {files:[], reported:false}
+//      （null ≠ 空数组；#1313 完成弹层靠 reported 区分「没报」和「报了零文件」）
+//   7. changesDiff 空串 → {files:[], reported:true, changed:false}（空提交）
+//   8. changesDiff 只有 100% rename（无 hunk）→ files 空且 changed:true
 
 import type { ClaimedStep } from '@pacman/shared';
 import { CHANGES_DIFF_MAX_BYTES, claimedStepSchema } from '@pacman/shared';
@@ -170,9 +173,46 @@ describe('done 通道交付面回填（#704 / B-C16）', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       files: { path: string; additions: number; deletions: number }[];
+      reported: boolean;
+      changed: boolean;
     };
     expect(body.files).toHaveLength(1);
     expect(body.files[0]).toMatchObject({ path: 'README.md', additions: 1, deletions: 0 });
+    expect(body.reported).toBe(true);
+    expect(body.changed).toBe(true);
+  });
+
+  test('失败方式 7：changesDiff 空串 → files 空且 reported（空提交）', async () => {
+    const w = await setupWorld();
+    const buildId = await w.startBuild(w.githubProjectId);
+    const claimed = await w.claim();
+    await w.done(claimed.step.id, { status: 'success', changesDiff: '' });
+    const res = await call(w.s.app, 'GET', `/api/builds/${buildId}/changes`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { files: unknown[]; reported: boolean; changed: boolean };
+    expect(body.files).toEqual([]);
+    expect(body.reported).toBe(true);
+    expect(body.changed).toBe(false);
+  });
+
+  test('失败方式 8：100% rename 无 hunk → files 空且 changed', async () => {
+    const w = await setupWorld();
+    const buildId = await w.startBuild(w.githubProjectId);
+    const claimed = await w.claim();
+    const rename = [
+      'diff --git a/old-name.txt b/new-name.txt',
+      'similarity index 100%',
+      'rename from old-name.txt',
+      'rename to new-name.txt',
+      '',
+    ].join('\n');
+    await w.done(claimed.step.id, { status: 'success', changesDiff: rename });
+    const res = await call(w.s.app, 'GET', `/api/builds/${buildId}/changes`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { files: unknown[]; reported: boolean; changed: boolean };
+    expect(body.files).toEqual([]);
+    expect(body.reported).toBe(true);
+    expect(body.changed).toBe(true);
   });
 
   test('失败方式 4：changesDiff 超上限 → 丢弃（done 仍 200，行不落半截）', async () => {
@@ -196,15 +236,17 @@ describe('done 通道交付面回填（#704 / B-C16）', () => {
     const claimed = await w.claim();
     await w.done(claimed.step.id, { status: 'success' });
     const res = await call(w.s.app, 'GET', `/api/builds/${buildId}/changes`);
-    const body = (await res.json()) as { files: unknown[] };
+    const body = (await res.json()) as { files: unknown[]; reported: boolean };
     expect(body.files).toEqual([]);
+    expect(body.reported).toBe(false);
     // 无 repo 项目（kind 缺省，daemon 无 worktree 可上报）同形
     const plainBuildId = await w.startBuild(w.plainProjectId);
     const plainClaimed = await w.claim();
     await w.done(plainClaimed.step.id, { status: 'success' });
     const plainRes = await call(w.s.app, 'GET', `/api/builds/${plainBuildId}/changes`);
-    const plainBody = (await plainRes.json()) as { files: unknown[] };
+    const plainBody = (await plainRes.json()) as { files: unknown[]; reported: boolean };
     expect(plainBody.files).toEqual([]);
+    expect(plainBody.reported).toBe(false);
   });
 });
 
@@ -239,7 +281,8 @@ describe('hosted 形态真值源不漂移（#704：bare repo 仍是唯一真值�
     const todoDb = w.s.db.select().from(todoTable).where(eq(todoTable.id, buildRow!.todoId)).get();
     expect(todoDb?.projectId).toBe(project.id);
     const res = await call(w.s.app, 'GET', `/api/builds/${claimed.step.buildId}/changes`);
-    const body = (await res.json()) as { files: unknown[] };
+    const body = (await res.json()) as { files: unknown[]; reported: boolean };
     expect(body.files).toEqual([]);
+    expect(body.reported).toBe(false);
   });
 });

@@ -16,6 +16,7 @@ import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
 import { verifyVerdictSchema } from '../records/verify.js';
+import { skillInjectionFactsSchema } from '../skill-injection-check.js';
 import {
   machineToolRelayBodySchema,
   machineToolRelayResponseSchema,
@@ -276,8 +277,11 @@ export const claimedStepSchema = z.object({
   /** 已授权 MCP slug 列表（spec 13 断约：原 McpEndpoint[] 改 string[]——
    * server 不再解析端点、不再持有任何 MCP 凭证；执行 daemon 读本机
    * `~/.claude.json` 按 slug 自行解析，per-turn 连接、失败降级不阻断，
-   * 工具名 `mcp__<slug>__<tool>`，未知 slug daemon 侧跳过。版本墙
-   * （MCP_MIN_CLI_VERSION，断约时提升）未达 = 缺省不携带——旧 daemon
+   * 工具名 `mcp__<slug>__<tool>`，未知 slug daemon 侧跳过。三态受管
+   * （#1307，对齐 Multica mcp_config.go）：数组（含 [] = 受管严格空——
+   * daemon 据此给 claude-code SDK 上 strictMcpConfig 锁，用户全局 MCP 不进
+   * 会话）= 受管集合；缺省 = 继承 runtime 配置，只在版本墙
+   * （MCP_MIN_CLI_VERSION，断约时提升）未达时由新 server 发出——旧 daemon
    * 视为无 MCP 运行，不存在混发两种形状的失败模式。 */
   mcpServers: z.array(z.string()).optional(),
 });
@@ -535,11 +539,11 @@ export const machineDoneBodySchema = z.object({
   usage: z.array(modelUsageSchema).optional(),
   /** review 列位双键之一（02 §4.1/r5 §8）。 */
   hasChanges: z.boolean().optional(),
-  /** 工作分支偏离（#1195）：daemon 步收尾发现 HEAD 停在契约分支之外的具名
-   * 分支时携带（expected = 会话分支，actual = 实际 HEAD 分支；detached HEAD /
-   * 查询失败不携带）。消费面 = server 产物闸 2：hasChanges=false 时失败原因
-   * 点名分支偏离而非误导性「构建零改动」；hasChanges=true 时不参与判定
-   * （产物并集面已认领交付，偏离可见性归 transcript 行与 PR 面板）。 */
+  /** 工作分支偏离（#1195/#1277）：daemon 步收尾发现 HEAD 停在契约分支之外的
+   * 具名分支时携带（expected = 会话分支，actual = 实际 HEAD 分支；detached
+   * HEAD / 查询失败不携带）。消费面 = server 产物闸 2：build 步携带即硬失败。
+   * hasChanges=false 时原因说明步窗口内无提交；有提交时拒绝自动收工，且不保留
+   * 本步 PR 回填。两态都点名两分支。 */
   workBranchDrift: z.object({ expected: z.string().min(1), actual: z.string().min(1) }).optional(),
   /** 步收尾时 conv 分支 HEAD sha [设计]（M3b）：per-step checkpoint 数据源
    * （「恢复到此处」r3 §3.5/02 §4.2）+ 合并步 fast-forward 落地键
@@ -588,6 +592,11 @@ export const machineDoneBodySchema = z.object({
    * 混版本零破坏；同 findingsError 的无害冗余律）。空流/非配额错误不携带
    * （分类面不猜——不可见即污染可观测性）。 */
   quotaBlock: quotaBlockSchema.optional(),
+  /** #1186 实际注入名集：daemon 在 scan + 字节预算之后随 done 携带
+   * （injected / omitted / unrendered）。旧 daemon 缺席 = server 不落断言
+   * （zod strip，混版本零破坏）。不是 step.skillInjection：那一列是 claim
+   * 期的选择 hits，预算截断之后的名字只在这里。 */
+  skillInjectionFacts: skillInjectionFactsSchema.optional(),
 });
 export type MachineDoneBody = z.infer<typeof machineDoneBodySchema>;
 export const machineDoneResponseSchema = machineOkResponseSchema;

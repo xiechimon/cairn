@@ -26,6 +26,7 @@ import type {
   ProviderConfig,
   QuotaBlock,
   SessionOpts,
+  SkillInjectionFacts,
   TranscriptUpload,
   WorktreeOps,
 } from '@pacman/shared';
@@ -711,18 +712,25 @@ export async function runStep(
   // 坏条目跳过 + 降级行（[mcp] <slug>: not in local config … 族）。每回合
   // 打出实际加载集与来源文件——多机各读各 config 的跑偏一眼可见（spec 13
   // premortem 护栏二）。
-  const mcpSlugs = claimed.mcpServers ?? [];
+  // 三态受管（#1307）：claim 键缺省 = 继承 runtime 配置（旧 server 形 /
+  // 版本墙机器）；数组（含 [] = 受管严格空）= 受管集合。受管性只由键在位
+  // 决定，不随解析结果翻转——勾选 slug 全未知 = 受管空 + 降级行（继承泄漏
+  // 不复活）。
+  const claimedMcp = claimed.mcpServers;
+  const mcpSlugs = claimedMcp ?? [];
   const mcpEndpoints =
     mcpSlugs.length > 0
       ? resolveMcpEndpoints(deps.mcpConfigPath, mcpSlugs, {
           onMissing: (slug) => logger.mcp(notInConfigLine(slug)),
         })
       : [];
-  if (mcpSlugs.length > 0) {
+  if (claimedMcp !== undefined) {
     logger.mcp(
-      `loaded from ${deps.mcpConfigPath}: ${
-        mcpEndpoints.length > 0 ? mcpEndpoints.map((e) => e.slug).join(', ') : '(none)'
-      }`,
+      mcpSlugs.length > 0
+        ? `loaded from ${deps.mcpConfigPath}: ${
+            mcpEndpoints.length > 0 ? mcpEndpoints.map((e) => e.slug).join(', ') : '(none)'
+          }`
+        : 'managed-empty: strict MCP set (runtime config not inherited)',
     );
   }
   // 团队技能物化（#920 清单 + 按需拉；原 XMON-112 S2，spec 14 增补）：按步
@@ -890,6 +898,10 @@ export async function runStep(
       clearInterval(keepAlive);
     }
   };
+  // #1186：简报目录构造（composeBody）把 scan + 预算之后的名字交回来。
+  // 回调在 doneBody 落 journal 之前触发，recover 重放 done 时名字跟着走。
+  // 没走到简报（更早失败）保持 null，done 不带本字段。
+  let skillInjectionFacts: SkillInjectionFacts | null = null;
   // 工具面按步全量透传（#647/T4）：claude-code 后端把 host 注入工具
   // （remoteTools relay + localTools 本地执行）包成 in-process MCP server、
   // McpEndpoint 映射 SDK 原生 config——T1 期的 runtimeDrop 降级（worker/review
@@ -927,7 +939,10 @@ export async function runStep(
           },
         }
       : {}),
-    ...(mcpEndpoints.length > 0 ? { mcpServers: mcpEndpoints } : {}),
+    // 三态透传（#1307）：claim 键在位（含 [] = 受管严格空）→ SessionOpts 键
+    // 在位透传（claude-code backend 据此上 strictMcpConfig 锁）；缺省不造键
+    // （继承态，两态不得在此塌缩——skillsAllowlist #1169 同律）。
+    ...(claimedMcp !== undefined ? { mcpServers: mcpEndpoints } : {}),
     // 授权白名单（#372→#1169 拆字段正名）：worker/review 步 = claim 载荷
     // agent.skillsAllowlist——数组（含 [] = 显式全拒，deny 规则吃它）原样透传；
     // **null（不限制）与缺省（旧 server 未携带）都不传**（backend 面全量直通
@@ -942,6 +957,9 @@ export async function runStep(
     // 未携带 injectedSkills = 不造集（目录注入回落 allowlist 全量，零回归）。
     // deny 面（#917）不受重排影响——授权上限只看 skillsAllowlist。
     ...(isChief || injectedForSession === undefined ? {} : { injectedSkills: injectedForSession }),
+    onSkillsResolved: (names) => {
+      skillInjectionFacts = names;
+    },
     // 团队技能物化目录（XMON-112 S2）：backend 把它排在本机 skillsDir 之前
     // 扫描（同名冲突团队条目胜，pi first-wins）；null = 纯本机（零回归）。
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
@@ -2058,6 +2076,7 @@ export async function runStep(
     // #1261 配额熔断信号（server 侧挂起等额度的判据；旧 server zod strip =
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
+    ...(skillInjectionFacts !== null ? { skillInjectionFacts } : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {

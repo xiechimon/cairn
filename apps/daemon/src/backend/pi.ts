@@ -944,6 +944,9 @@ export class PiBackend implements AgentBackend {
               : {}),
             ...(opts.injectedSkills !== undefined ? { injectedSkills: opts.injectedSkills } : {}),
             ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
+            ...(opts.onSkillsResolved !== undefined
+              ? { onSkillsResolved: opts.onSkillsResolved }
+              : {}),
             worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
           },
           this.opts.onSkillsLog,

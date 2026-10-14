@@ -268,6 +268,20 @@ describe('mapTranscript 合成 prompt 过滤（#612）', () => {
     expect(userItems(items)).toHaveLength(0);
   });
 
+  test('F13d 组合行（任务标题已漂移）退场，feedback 真行保留', () => {
+    const feedback = '先跑 lint 再提交';
+    const composed = `${buildTaskPromptText('旧标题', SPEC)}\n\n${buildRestartPrompt(feedback)}`;
+    const items = render({
+      messages: [
+        msg('user', feedback, NOW - 50_000),
+        msg('user', composed, NOW - 49_000),
+      ],
+    });
+    const users = userItems(items);
+    expect(users).toHaveLength(1);
+    expect(users[0]?.text).toBe(feedback);
+  });
+
   test('F13c 任务文本后跟用户自己话语 → 不是组合行，保留为用户气泡（不误杀）', () => {
     const text = `${buildTaskPromptText(TITLE, SPEC)}\n\n另外移动端也要看一眼`;
     const items = render({ messages: [msg('user', text, NOW - 50_000)] });

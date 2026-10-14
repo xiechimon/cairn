@@ -1,0 +1,16 @@
+{
+  "source_transcript": "/Users/xmon/.claude/projects/-private-tmp-pacman-chain-daemon-home-workspaces-01a12fc2-e005-755a-a661-2b7c26a77059/b70499b7-e534-4574-9803-a847697545c1.jsonl",
+  "tool_count": 319,
+  "prompt_snapshot_bytes": 960035,
+  "histogram": {
+    "mcp__rea": 170,
+    "mcp__plugin_figma_figma": 42,
+    "mcp__agent-native-design": 41,
+    "builtin": 31,
+    "mcp__playwright": 25,
+    "mcp__pacman": 7,
+    "mcp__plugin_context7_context7": 2,
+    "mcp__codegraph": 1
+  },
+  "note": "pre-fix in-vivo baseline: dogfood task abycCXdnb0yXJQN0TXKdF, agent mcpServers=[] in DB, 4/4 autocompact-thrash failures (issue #1307 forensics)"
+}

@@ -471,9 +471,11 @@ describe('[推断] build 详情读面（M5 overlay 数据源，wire.test 登记�
       const buildId = await startBuild(s, projectId, todoId);
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/plans`)).json()).toEqual([]);
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/usage`)).json()).toEqual([]);
-      // 项目无 repoKind（postProject 默认）→ changes 空集。
+      // 项目无 repoKind（postProject 默认），build.changes 仍是 null。
+      // files 空集给变更 pane；reported: false 表示没上报，不是已确认的空 diff。
       expect(await (await req(s.app, 'GET', `/api/builds/${buildId}/changes`)).json()).toEqual({
         files: [],
+        reported: false,
       });
     } finally {
       s.dispose();

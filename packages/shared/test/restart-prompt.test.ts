@@ -13,6 +13,8 @@
 
 import { describe, expect, test } from 'vitest';
 import {
+  appendPlanLocationNote,
+  appendWorkBranchNote,
   buildRestartPrompt,
   buildTaskPromptText,
   CONTINUE_PROMPTS,
@@ -109,5 +111,50 @@ describe('classifyUserText 组合行识别（失败方式 4/5）', () => {
 
   test('反馈原文 → user（真实用户行不受组合识别影响）', () => {
     expect(classifyUserText('把测试也补上', task)).toBe('user');
+  });
+
+  // #1279：组合行按落库时的任务文本拼成。标题或 spec 随后改过，当前
+  // buildTaskPromptText 不再是该行前缀，前缀分支失配。裸重启行仍被词表
+  // 认成 synthetic，这条组合行却落到 user，详情页把它渲染成用户气泡。
+  test('组合行（任务标题已漂移）→ synthetic', () => {
+    const composed = composeTaskPromptWithInstruction(
+      buildTaskPromptText('漂移前标题', SPEC),
+      buildRestartPrompt('把测试也补上'),
+    );
+    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
+  });
+
+  test('组合行（spec 已漂移）→ synthetic', () => {
+    const composed = composeTaskPromptWithInstruction(
+      buildTaskPromptText(TITLE, '旧版目标，句号收尾。'),
+      buildRestartPrompt('把测试也补上'),
+    );
+    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
+  });
+
+  test('漂移组合行尾部的工作分支注记 / plan 交接注记仍 synthetic', () => {
+    const base = composeTaskPromptWithInstruction(
+      buildTaskPromptText('漂移前标题', SPEC),
+      buildRestartPrompt('把测试也补上'),
+    );
+    expect(classifyUserText(appendWorkBranchNote(base, 'pacman/conv-1279').trim(), task)).toBe(
+      'synthetic',
+    );
+    expect(
+      classifyUserText(
+        appendPlanLocationNote(base, '/tmp/pacman/plans/conv-1279/plan.md').trim(),
+        task,
+      ),
+    ).toBe('synthetic');
+  });
+
+  test('漂移后的裸任务文本（无重启指令）仍是 user', () => {
+    const stale = buildTaskPromptText('漂移前标题', SPEC).trim();
+    expect(classifyUserText(stale, task)).toBe('user');
+  });
+
+  test('用户话语含重启头但不成模板 → user', () => {
+    const text = '看这段\n\n上一轮执行失败。用户反馈：「还没写完';
+    expect(classifyUserText(text, task)).toBe('user');
   });
 });

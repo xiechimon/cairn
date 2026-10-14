@@ -8,8 +8,9 @@
 //     时间戳 = 文件 mtime、record 过 mcpServerRecordSchema；
 //   REST 面——GET 换源；POST/PATCH/DELETE 管理写面已删（404）；未知 team 404；
 //   agent 授权面——mcpServers[] 未知键静默容忍（不再 400）；
-//   claim 载荷——mcpServers slug 化（string[] 原样透传不过滤）；版本墙提升：
-//     旧 daemon 版本线收不到该字段（machine-wire 断约，不混发形状）；
+//   claim 载荷——mcpServers slug 化（string[] 原样透传不过滤）；三态受管
+//     （#1307）：勾选空 = 携带 []（受管严格空，下游 strict 锁），缺省只在
+//     版本墙未达时出现（machine-wire 断约，不混发形状）；
 //   chief 工具——mcp_servers 读面换 config 源。
 // 记忆删除 REST 面（02 §4.4）随本文件既有权衡保留在尾部。
 
@@ -293,8 +294,18 @@ describe('claim 载荷：mcpServers slug 化（string[]）+ 版本墙提升（ma
     s.dispose();
   });
 
-  test('未授权（勾选空）= 不携带', async () => {
+  // #1307 三态受管（对齐 Multica mcp_config.go）：勾选空不再是「不携带」——
+  // [] 必须上 wire，下游 daemon 据此给 SDK 上 strictMcpConfig 锁（受管严格空，
+  // 用户全局 MCP 不进会话）。缺省态只留给旧 daemon 形（版本门未达）。
+  test('受管空（勾选空）= 携带 []（strict 语义下游消费，不塌回缺省）', async () => {
     const { s, step } = await world(MCP_MIN_CLI_VERSION, { slugs: [] });
+    expect(step).not.toBeNull();
+    expect(step!.mcpServers).toEqual([]);
+    s.dispose();
+  });
+
+  test('版本门未达 = 缺省不携带（[] 也不发——旧 daemon 无三态消费面）', async () => {
+    const { s, step } = await world('0.1.1', { slugs: [] });
     expect(step).not.toBeNull();
     expect(step!.mcpServers).toBeUndefined();
     s.dispose();
