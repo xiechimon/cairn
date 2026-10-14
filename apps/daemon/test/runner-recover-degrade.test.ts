@@ -35,8 +35,8 @@ import type {
 } from '@pacman/shared';
 import {
   buildTaskPromptText,
-  classifyUserText,
   CONTINUE_PROMPTS,
+  classifyUserText,
   formatAttachmentToken,
   PLAN_FILE_NAME,
 } from '@pacman/shared';
@@ -278,7 +278,11 @@ async function runExec(
   claimed: ClaimedStep,
   backend: AgentBackend,
   hooks?: {
-    beforeRun?: (ctx: { paths: ReturnType<typeof statePaths>; journal: StepJournal; client: FakeClient }) => void;
+    beforeRun?: (ctx: {
+      paths: ReturnType<typeof statePaths>;
+      journal: StepJournal;
+      client: FakeClient;
+    }) => void;
   },
 ) {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-exec-'));
@@ -456,11 +460,11 @@ describe('#1286 recover 面会话降级', () => {
   });
 
   test('10. 开会话前 journal 换成原任务，不再留续轮占位句', async () => {
-    let snap: StepJournalEntry | null = null;
+    const held: { entry: StepJournalEntry | null } = { entry: null };
     let journal: StepJournal | null = null;
     const { backend } = recoveringBackend(true, [DONE_EVENT], {
       onCreate: () => {
-        snap = journal?.get('s1') ?? null;
+        held.entry = journal?.get('s1') ?? null;
       },
     });
     await runExec(execStep(SESSION_ID), backend, {
@@ -468,11 +472,11 @@ describe('#1286 recover 面会话降级', () => {
         journal = ctx.journal;
       },
     });
-    expect(snap).not.toBeNull();
-    expect(snap?.prompt).toContain(TASK.spec);
-    expect(snap?.prompt).not.toContain(CONTINUE_PROMPTS.build);
-    expect(snap?.sessionAction).toBe('new');
-    expect(snap?.sessionId).toBeNull();
+    expect(held.entry).not.toBeNull();
+    expect(held.entry?.prompt).toContain(TASK.spec);
+    expect(held.entry?.prompt).not.toContain(CONTINUE_PROMPTS.build);
+    expect(held.entry?.sessionAction).toBe('new');
+    expect(held.entry?.sessionId).toBeNull();
   });
 
   test('11. 降级 prompt 展开附件 token，不沿用续轮图片', async () => {
