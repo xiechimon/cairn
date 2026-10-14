@@ -20,7 +20,7 @@ const doneDialog = (page: Page) => page.getByRole('dialog', { name: '把任务�
 //     preview retired with it);
 //   · 合法目标 = per-source 矩阵（columns.ts canDropOnColumn 单源，#753）：
 //     执行中 只吃 待开始；待处理 只吃 已完成(有变更)——重开落位写 review；
-//     已完成 吃 待开始/执行中/待处理(failed 卡除外，#702)；待开始 吃全部
+//     已完成 吃 待开始/执行中/待处理（含 failed，#1247）；待开始 吃全部
 //     源列。非法对恒素面 + 落位零提交（实测：无拒绝动画，静默无操作）；
 //     源列全程素面；两级染色（base 5% / hovered 10%）不变；
 //   · 执行中 is the start gate: the drop fires the chief orchestration round
@@ -159,14 +159,14 @@ test('待开始 → 已完成: silent commit, end-of-column landing, counts coup
 
   await page.mouse.up();
   await settleDrop(page);
-  // committed: the probe lands in 已完成 AFTER the incumbent (end of column)
+  // committed: fresh phaseAt sorts the probe above the older incumbent (#1247)
   await expect(
     page.locator(`[data-column="done"] [data-todo-id="${PROBE_ID}"]`),
   ).toBeVisible();
   const doneOrder = await page
     .locator('[data-column="done"] [data-todo-id]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-todo-id')));
-  expect(doneOrder[doneOrder.length - 1]).toBe(PROBE_ID);
+  expect(doneOrder[0]).toBe(PROBE_ID);
   await expect(page.locator('[data-column="todo"] [data-todo-id]')).toHaveCount(0);
   // header counts couple with the committed set (r2 §4.2)
   await expect(page.locator('[data-column="todo"]').getByTestId('column-count')).toHaveText('0');
@@ -211,7 +211,7 @@ test('待开始 → 执行中: the drop fires orchestration directly — no dial
 const MATRIX_CASES = [
   { source: 'dm-todo', column: 'todo', valid: ['building', 'done'] },
   { source: 'dm-building', column: 'building', valid: ['todo', 'done'] },
-  { source: 'dm-failed', column: 'pending', valid: ['todo'] },
+  { source: 'dm-failed', column: 'pending', valid: ['todo', 'done'] },
   { source: 'dm-review', column: 'pending', valid: ['todo', 'done'] },
   { source: 'dm-confirm', column: 'pending', valid: ['todo', 'done'] },
   { source: 'dm-done-changes', column: 'done', valid: ['todo', 'pending'] },
@@ -270,7 +270,6 @@ test('invalid pairs: no tint on the hovered target, release commits nothing (#75
   await page.goto('/app?scenario=board-drag-matrix');
   const invalid = [
     { source: 'dm-confirm', target: 'building' },
-    { source: 'dm-failed', target: 'done' },
     { source: 'dm-done-plain', target: 'pending' },
     { source: 'dm-todo', target: 'pending' },
   ] as const;
@@ -365,10 +364,10 @@ test('已完成(有变更) → 待处理: reopen commits review, lands after the
   expect(order).toEqual(['r3-legacy-1', 'r3-legacy-2']);
 });
 
-test('待处理(confirm) → 已完成 / → 待开始: silent phase commits (#753)', async ({ page }) => {
+test('待处理(confirm) → 已完成 opens the confirm dialog, then lands first (#1247)', async ({
+  page,
+}) => {
   await page.goto('/app?scenario=board-drag-matrix');
-  // confirm → done: the manual acceptance shortcut (载体 = 改相提交；合并步
-  // 不是本面语义)
   let list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   await dragTo(page, '[data-todo-id="dm-confirm"]', {
@@ -378,15 +377,16 @@ test('待处理(confirm) → 已完成 / → 待开始: silent phase commits (#7
   await settleDrag(page);
   await page.mouse.up();
   await settleDrop(page);
+  await expect(doneDialog(page)).toBeVisible();
+  await expect(doneDialog(page).getByText('将中断在飞构建并标记完成。PR 不会自动合并。')).toBeVisible();
+  await doneDialog(page).getByRole('button', { name: '确认完成' }).click();
+  await expect(doneDialog(page)).toBeHidden();
   const inDone = page.locator('[data-column="done"] [data-todo-id="dm-confirm"]');
   await expect(inDone).toBeVisible();
-  // done 卡无动作钮、无文字徽标（columns.ts cardAction: done → null）——列归属
-  // + counts + 末位顺序即提交证据，不另断卡面词
-  // end-of-column landing: after both incumbent done cards
   const doneOrder = await page
     .locator('[data-column="done"] [data-todo-id]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('data-todo-id')));
-  expect(doneOrder[doneOrder.length - 1]).toBe('dm-confirm');
+  expect(doneOrder[0]).toBe('dm-confirm');
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('3');
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('2');
 
@@ -551,7 +551,8 @@ test('done 闸·取消：review(有变更) 拖已完成开弹层，取消零提�
   // dm-review = review ∧ hasChanges（probeTodo 相位默认位）：落位开 done 闸，
   // 卡片停在源列，计数不动。
   await expect(doneDialog(page)).toBeVisible();
-  await expect(doneDialog(page).getByText('变更不会合入默认分支；已开出的 PR 保持原状')).toBeVisible();
+  await expect(doneDialog(page).getByText('将中断在飞构建并标记完成。PR 不会自动合并。')).toBeVisible();
+  await expect(doneDialog(page).getByText('已开出的 PR 保持原状，不会自动合并')).toBeVisible();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
   ).toBeVisible();
@@ -589,24 +590,21 @@ test('done 闸·确认：review(有变更) 确认后落已完成（fixture 本�
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('3');
 });
 
-test('done 闸·静默：无变更产物的 confirm 卡与 building 源拖已完成不设闸 (#901)', async ({
-  page,
-}) => {
+test('done 闸：无变更 confirm 取消留在待处理；building 源仍静默 (#1247)', async ({ page }) => {
   await page.goto('/app?scenario=board-drag-matrix');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
   const to = { x: list.x + list.width / 2, y: list.y + list.height - 24 };
-  // confirm ∧ 无变更（probeTodo confirm 默认 hasChanges=false）= 无码可审的
-  // 人肉清理路径：静默改相，dialog 不出现（#892 实证 10 张测试卡形态）。
   await dragTo(page, '[data-todo-id="dm-confirm"]', to);
   await settleDrag(page);
   await page.mouse.up();
   await settleDrop(page);
+  await expect(doneDialog(page)).toBeVisible();
+  await doneDialog(page).getByRole('button', { name: '取消' }).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(
-    page.locator('[data-column="done"] [data-todo-id="dm-confirm"]'),
+    page.locator('[data-column="pending"] [data-todo-id="dm-confirm"]'),
   ).toBeVisible();
-  // building 源（非闸相位）拖已完成同样保持静默——「其余拖拽不变」。
   await dragTo(page, '[data-todo-id="dm-building"]', to);
   await settleDrag(page);
   await page.mouse.up();
@@ -615,7 +613,36 @@ test('done 闸·静默：无变更产物的 confirm 卡与 building 源拖已完
   await expect(
     page.locator('[data-column="done"] [data-todo-id="dm-building"]'),
   ).toBeVisible();
-  await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('4');
+  await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('3');
+});
+
+test('已完成列首卡完成时间不早于末卡 (#1247)', async ({ page }) => {
+  await page.goto('/app?scenario=board-drag-matrix');
+  const doneOrder = await page
+    .locator('[data-column="done"] [data-todo-id]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-todo-id')));
+  // dm-done-plain phaseAt 13:50 orderIndex 10; dm-done-changes phaseAt 13:20 orderIndex 0.
+  expect(doneOrder).toEqual(['dm-done-plain', 'dm-done-changes']);
+});
+
+test('failed → 已完成 opens the dialog; cancel leaves the card (#1247)', async ({ page }) => {
+  await page.goto('/app?scenario=board-drag-matrix');
+  const list = await page.locator('[data-column-list="done"]').boundingBox();
+  if (list == null) throw new Error('done list missing');
+  await dragTo(page, '[data-todo-id="dm-failed"]', {
+    x: list.x + list.width / 2,
+    y: list.y + list.height - 24,
+  });
+  await settleDrag(page);
+  await expect(page.locator('[data-column="done"]')).toHaveAttribute('data-drop-valid', 'true');
+  await page.mouse.up();
+  await settleDrop(page);
+  await expect(doneDialog(page)).toBeVisible();
+  await doneDialog(page).getByRole('button', { name: '取消' }).click();
+  await expect(
+    page.locator('[data-column="pending"] [data-todo-id="dm-failed"]'),
+  ).toBeVisible();
+  await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('2');
 });
 
 // ---- draggable from every column (#753; rewrites 「待处理/已完成 cards

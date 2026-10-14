@@ -99,11 +99,11 @@ describe('手动落位矩阵（#753）：待处理 源', () => {
     expect((await patchPhase(confirm.s, confirm.id, 'building')).status).toBe(200);
   });
 
-  test('failed→done = 409（#702：done 只能经合并步落地）', async () => {
-    const { s, id } = await setup('failed', true);
+  test('failed→done = 200 without hasChanges (#1247 manual close)', async () => {
+    const { s, id } = await setup('failed', false);
     const res = await patchPhase(s, id, 'done');
-    expect(res.status).toBe(409);
-    expect(await res.json()).toHaveProperty('error');
+    expect(res.status).toBe(200);
+    expect(todoRecordSchema.parse(await res.json()).phase).toBe('done');
   });
 
   test('failed→review = 409 且仍走 #702 动作面专属文案（漏斗合法边被手动面拒收）', async () => {
