@@ -51,8 +51,8 @@ import {
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
-  machineCapabilitiesSchema,
   machineRecordSchema,
+  parseReportedCapabilities,
   mergedPrGuardNoteRowId,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
@@ -118,6 +118,8 @@ import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
+  nextConcurrencyPaused,
+  recommendMachineConcurrency,
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -302,6 +304,7 @@ export function findApiKeyByPlain(db: Db, plain: string) {
 export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
+  const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
   return machineRecordSchema.parse({
     id: row.id,
     name: row.name,
@@ -313,7 +316,12 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     shellEnabled: row.shellEnabled,
     // #1108：并发上限（DB 真值）+ 在跑计数（读侧派生，调用方传——缺席 =
     // 不渲染并发面的读端（如老调用面），maxConcurrent 恒随行）。
+    // #1241：来源与推荐值随行。覆盖时暂停位对读面关掉（claim 同样不读它）。
     maxConcurrent: row.maxConcurrent,
+    maxConcurrentOverridden: row.maxConcurrentOverridden,
+    recommendedConcurrent: recommendation.value,
+    concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
+    concurrencyPaused: row.concurrencyPaused && !row.maxConcurrentOverridden,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     // #1251：能力清单三态随行（清单 / null = 从未上报 / 列缺省不成立——
     // server 恒发全块，nullish 形只留给老 server 响应的解析兼容）。
@@ -322,13 +330,68 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
 }
 
 /** #1251 capabilities 字段的 server 侧收严（心跳红线 02 §5.4 的服务端半边）：
- *  wire 位是 z.unknown（坏形状不 400 心跳），落库前单独 safeParse——合法 =
- *  覆写；坏形状 = 丢弃该字段（保留旧值）；缺席 = 不动。任何一支都不影响
- *  presence/enroll 的成功响应。 */
+ *  wire 位是 z.unknown（坏形状不 400 心跳）。parseReportedCapabilities：
+ *  整包不合法 = 丢弃该字段保留旧值；hardware 单独坏 = 收下 mcp/skills。
+ *  缺席 = 不动。任何一支都不影响 presence/enroll 的成功响应。 */
 function parseCapabilitiesField(raw: unknown): MachineCapabilities | undefined {
   if (raw === undefined) return undefined;
-  const parsed = machineCapabilitiesSchema.safeParse(raw);
-  return parsed.success ? parsed.data : undefined;
+  return parseReportedCapabilities(raw);
+}
+
+/** 这拍上报并上旧指纹：本拍没带 hardware 时留着上一拍的，避免一次探测失败
+ *  把已测到的推荐值打回估算。 */
+function mergeReportedCapabilities(
+  previous: MachineCapabilities | null,
+  reported: MachineCapabilities,
+): MachineCapabilities {
+  if (reported.hardware === undefined && previous?.hardware !== undefined) {
+    return { ...reported, hardware: previous.hardware };
+  }
+  return reported;
+}
+
+/** 心跳/注册写点：未覆盖时把推荐值落 maxConcurrent；暂停位按滞回更新。
+ *  覆盖中的行不改 maxConcurrent。 */
+function reportedConcurrencyPatch(
+  row: {
+    maxConcurrentOverridden: boolean;
+    concurrencyPaused: boolean;
+    capabilities: MachineCapabilities | null;
+  },
+  reported: MachineCapabilities,
+): {
+  capabilities: MachineCapabilities;
+  concurrencyPaused: boolean;
+  maxConcurrent?: number;
+} {
+  const capabilities = mergeReportedCapabilities(row.capabilities, reported);
+  const recommendation = recommendMachineConcurrency(capabilities.hardware);
+  return {
+    capabilities,
+    concurrencyPaused: nextConcurrencyPaused(row.concurrencyPaused, capabilities.hardware),
+    ...(!row.maxConcurrentOverridden ? { maxConcurrent: recommendation.value } : {}),
+  };
+}
+
+/** PATCH /api/machines/{id} 的并发半边（#1241）。数字 = 覆盖并持久；
+ *  null = 清除覆盖，按当前指纹重算（无指纹 = 保守默认）并重算暂停位。 */
+export function machineConcurrencyPatch(
+  row: typeof machine.$inferSelect,
+  maxConcurrent: number | null,
+): {
+  maxConcurrent: number;
+  maxConcurrentOverridden: boolean;
+  concurrencyPaused?: boolean;
+} {
+  if (maxConcurrent === null) {
+    const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
+    return {
+      maxConcurrent: recommendation.value,
+      maxConcurrentOverridden: false,
+      concurrencyPaused: nextConcurrencyPaused(row.concurrencyPaused, row.capabilities?.hardware),
+    };
+  }
+  return { maxConcurrent, maxConcurrentOverridden: true };
 }
 
 /** 本机匹配键（spec 11 A8/A9，#357）：daemon `--name` 默认 hostname（r3
@@ -419,7 +482,7 @@ export function enrollMachine(
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(isLocal ? { kind: 'local' as const } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined ? { capabilities } : {}),
+        ...(capabilities !== undefined ? reportedConcurrencyPatch(existing, capabilities) : {}),
       })
       .where(eq(machine.id, existing.id))
       .run();
@@ -443,7 +506,12 @@ export function enrollMachine(
       kind: isLocal ? 'local' : 'remote',
       enabledRuntimes: ['pi'],
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-      ...(capabilities !== undefined ? { capabilities } : {}),
+      ...(capabilities !== undefined
+        ? reportedConcurrencyPatch(
+            { maxConcurrentOverridden: false, concurrencyPaused: false, capabilities: null },
+            capabilities,
+          )
+        : {}),
     })
     .run();
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
@@ -501,8 +569,8 @@ export function markPresence(
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
   const becameOnline = !row.online;
-  // #1251：capabilities 单独 safeParse（心跳红线——坏字段丢弃保留旧值，
-  // 永不打出本函数之外的失败）。
+  // #1251：capabilities 字段级收严（心跳红线——坏字段丢弃保留旧值，
+  // 永不打出本函数之外的失败）。#1241：同一拍把推荐并发写上未覆盖的行。
   const capabilities = parseCapabilitiesField(body.capabilities);
   db.update(machine)
     .set({
@@ -511,7 +579,7 @@ export function markPresence(
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
-      ...(capabilities !== undefined ? { capabilities } : {}),
+      ...(capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : {}),
     })
     .where(eq(machine.id, machineId))
     .run();
@@ -849,6 +917,9 @@ async function tryClaim(
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
+  // #1241：自动路径的负载暂停。不改在跑的步，不改存储的 maxConcurrent。
+  // 用户覆盖时不读暂停位（用户的数是闸，server 不再加一层封顶）。
+  if (machineRow.concurrencyPaused && !machineRow.maxConcurrentOverridden) return null;
   // #1108 并发门（maxConcurrent）：本机 claimed 步数达上限 = 步不发，留
   // pending 排队（对归属本机的步即该机队列）。机器释放空位（finishStep
   // 终态 wake）后下一轮 claim 即领。老 daemon（串行循环）恒 1 ≤ N，闸对

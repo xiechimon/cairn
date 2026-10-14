@@ -17,10 +17,27 @@
 import { z } from 'zod';
 import { recordId } from './common.js';
 
+/** #1241 机器能力指纹（daemon 启动 + 每个 presence 节拍现探，不缓存）。
+ *  推荐并发只消费核数与可用内存；load 与磁盘余量进依据显示和自动路径的
+ *  负载暂停。缺席 = 这拍没探到（server 沿用上一拍硬件，没有上一拍则估算）。 */
+export const machineHardwareSchema = z.object({
+  /** os.cpus().length。 */
+  cpuCores: z.number().int().positive(),
+  /** os.freemem()，MiB。 */
+  memoryAvailableMb: z.number().int().nonnegative(),
+  /** os.loadavg()[0]，1 分钟负载。 */
+  loadAvg1: z.number().nonnegative(),
+  /** 技能根所在卷的可用空间，MiB（statfs；根不可读则回落 `/`）。 */
+  diskFreeMb: z.number().int().nonnegative(),
+});
+export type MachineHardware = z.infer<typeof machineHardwareSchema>;
+
 /** daemon 上报的机器能力清单（machine.capabilities 列 / presence·enroll body
- *  的 capabilities 位收严后的存储形）。两字段恒发（daemon 探测面是全函数：
- *  文件缺失/坏 JSON → 空集，不缺席）——「报了空集」= 该机确实没有；
- *  「整列 null」= 该机从未上报（老 daemon），能力闸对未知快照放行。 */
+ *  的 capabilities 位收严后的存储形）。mcpServers/skills 恒发（daemon 探测面
+ *  是全函数：文件缺失/坏 JSON → 空集，不缺席）——「报了空集」= 该机确实没有；
+ *  「整列 null」= 该机从未上报（老 daemon），能力闸对未知快照放行。
+ *  hardware 可选：老 daemon 不带；坏形状由 parseReportedCapabilities 丢弃，
+ *  不连坐 mcp/skills（心跳红线的字段级半边）。 */
 export const machineCapabilitiesSchema = z.object({
   /** 已装 MCP server slug 集（小写归一，parseClaudeMcpEntries 单源；与
    *  agent.mcpServers 勾选值 / claim 载荷 slug 同值域）。 */
@@ -28,8 +45,27 @@ export const machineCapabilitiesSchema = z.object({
   /** 本机技能目录名集（machine-owned skills，PACMAN_SKILLS_DIR 扫描根）。
    *  team skills 维持 server 单源按步下发（票面界限），不进本清单。 */
   skills: z.array(z.string()),
+  hardware: machineHardwareSchema.optional(),
 });
 export type MachineCapabilities = z.infer<typeof machineCapabilitiesSchema>;
+
+/** 心跳/注册收严（02 §5.4 字段级）：整包不是能力清单 → undefined（调用方
+ *  保留旧列）。mcp/skills 合法但 hardware 坏或缺失 → 仍收下清单，hardware
+ *  缺席。不在这里做「沿用上一拍硬件」——那是 server 写点对照旧行的事。 */
+export function parseReportedCapabilities(raw: unknown): MachineCapabilities | undefined {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const rec = raw as Record<string, unknown>;
+  const base = z
+    .object({
+      mcpServers: z.array(z.string()),
+      skills: z.array(z.string()),
+    })
+    .safeParse({ mcpServers: rec.mcpServers, skills: rec.skills });
+  if (!base.success) return undefined;
+  if (rec.hardware === undefined) return base.data;
+  const hardware = machineHardwareSchema.safeParse(rec.hardware);
+  return hardware.success ? { ...base.data, hardware: hardware.data } : base.data;
+}
 
 /** agent 能力要求声明（agent.requiredCapabilities 列；ADR 0018 决策 4.2）。
  *  两维各自可选，空对象 = 显式无要求（与 null 同值）；runtime 维不在这里
