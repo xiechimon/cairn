@@ -3,8 +3,8 @@
 // 文档|聊天 tab group (the route is a 3-pane layout now) and the
 // 分支与 PR/Token 用量/运行历史 icon trio (static right-pane sections).
 // #58: the back button carries the current search string home so the
-// dev/fixture ?scenario= selection survives the round trip; the board
-// scroll position is restored by BoardSurface from sessionStorage.
+// dev/fixture ?scenario= selection survives the round trip. #1255: each
+// column list's scrollTop is restored by BoardSurface from sessionStorage.
 // #67: the chip is a real button — it toggles the status popover (r7
 // 19/29), and the chevron rides outside the pill (r7 17 measure).
 
