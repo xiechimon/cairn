@@ -8,6 +8,8 @@
 // （读失败 → null 走各 reader 既有默认值回落）与 writeToken（写失败静默丢）。
 // 已自带 try/catch 的旧缝（auth.ts / use-chief-surface.ts / dir-browser.tsx）
 // 保持原样，不收编——它们已经在获取点内部取值。
+// sessionStorage 同形（#1255 看板列滚动）：获取走 safeSessionStorage，
+// 调用点不出现 sessionStorage 标识符。
 //
 // 消费契约：
 // - 读：`readStored*(safeLocalStorage())`——null 直接进 reader 的既有
@@ -23,6 +25,16 @@ export function safeLocalStorage(): Storage | null {
     return window.localStorage;
   } catch {
     return null; // Storage 不可用面（sandbox iframe / 隐私模式 / ITP）
+  }
+}
+
+/** 获取 sessionStorage；访问本身抛 SecurityError 的环境返回 null。 */
+export function safeSessionStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
   }
 }
 
