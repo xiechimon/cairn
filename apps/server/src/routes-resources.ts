@@ -42,7 +42,11 @@ import {
   openGithubToken,
   readGithubConnectionStatus,
 } from './services/github-connection.js';
-import { machineConcurrencyPatch, machineRunningCount, toMachineRecord } from './services/machines.js';
+import {
+  machineConcurrencyPatch,
+  machineRunningCount,
+  toMachineRecord,
+} from './services/machines.js';
 import { listMcpServers } from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
