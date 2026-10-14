@@ -4,6 +4,7 @@
 // 2. 空 text 不得发事件。
 // 3. 晚订阅要补发当前思考段，思考段行落库后不再补发（避免和落库行叠成两份）。
 // 4. text_delta 通道照旧，不把思考正文当成正文增量。
+// 5. 思考增量把上一段正文封掉时，正文行不得清掉刚写入的思考快照。
 
 import { conversationStreamEventSchema } from '@pacman/shared';
 import type { Hono } from 'hono';
@@ -156,6 +157,38 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
       expect(first.type).not.toBe('thinking_delta');
     } finally {
       after.close();
+    }
+    s.dispose();
+  });
+
+  test('an assistant text row does not wipe a thinking snapshot posted with the seal', async () => {
+    const { s, token, buildId, stepId } = await world();
+    const posted = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: { kind: 'thinking_delta', text: MARKER },
+    });
+    expect(posted.status).toBe(200);
+    const textRow = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: {
+        kind: 'transcript_row',
+        row: {
+          id: `msg-${stepId}-text`,
+          role: 'assistant',
+          content: [{ type: 'text', text: 'answer' }],
+          createdAt: Date.now(),
+        },
+      },
+    });
+    expect(textRow.status).toBe(200);
+    const late = await openConvStream(s.app, buildId);
+    try {
+      // 补发走串行链，排在路由首帧 ping 之前。正文行若把思考缓冲清掉，
+      // 第一帧是 ping，断言立刻失败，不必干等到流超时。
+      const first = await late.next(() => true);
+      expect(first).toEqual({ type: 'thinking_delta', text: MARKER });
+    } finally {
+      await late.close();
     }
     s.dispose();
   });
