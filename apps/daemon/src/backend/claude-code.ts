@@ -869,6 +869,14 @@ export interface ClaudeSdkOptionParts {
   sessionId: string;
   disallowedTools: string[];
   mcpServers: Record<string, McpServerConfig>;
+  /** #1307 三态受管（对齐 Multica mcp_config.go）：true = 受管集合（含空）
+   * → mcpServers 键恒发（{} 也发）+ strictMcpConfig。SDK 把旗翻成 CLI
+   * `--strict-mcp-config`（sdk.d.ts 实测在位），用户全局（~/.claude.json）/
+   * 项目 .mcp.json / 插件 MCP 全部忽略。空表和仅 in-process sdk server 在组
+   * argv 前被 SDK 丢掉，不产生 `--mcp-config`（#1314 探针）；显式端点仍进
+   * `--mcp-config`。缺省 = 继承态（旧 server 形 / 版本墙机器）：非空才发键、
+   * 无 strict 旗。无条件 strict 会把字段缺省塌成受管空锁。 */
+  strictMcpConfig?: boolean;
   effort?: EffortLevel;
   /** systemPrompt preset append（#958 后仅无简报通道的调用面非空）。 */
   append?: string;
@@ -889,6 +897,18 @@ export interface ClaudeSdkOptionParts {
 }
 
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
+  // #1307 三态。受管（strictMcpConfig === true）mcpServers 键恒发，{} 也发。
+  // SDK 在组 argv 前丢掉空表和仅 in-process sdk server（#1314 探针），这两种
+  // 形状没有 --mcp-config；锁是 strictMcpConfig → --strict-mcp-config。没有
+  // 这面旗时，CLI 仍按 settingSources 把 ~/.claude.json 并进来。继承态（旗
+  // 缺省）维持旧条件：非空才发键、不上 strict。#1314 的无条件 strict 不采：
+  // claim 字段缺省（旧 daemon / 版本墙）必须留住机器自己的 MCP 配置。
+  const managedMcp = parts.strictMcpConfig === true;
+  const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = managedMcp
+    ? { mcpServers: parts.mcpServers, strictMcpConfig: true }
+    : Object.keys(parts.mcpServers).length > 0
+      ? { mcpServers: parts.mcpServers }
+      : {};
   return {
     cwd: parts.cwd,
     model: parts.modelId,
@@ -896,11 +916,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     disallowedTools: parts.disallowedTools,
     includePartialMessages: true, // text_delta/thinking_delta 增量面
     settingSources: [...CLAUDE_SETTING_SOURCES],
-    // #1307：空集和仅 in-process sdk server 都不会变成 --mcp-config（SDK 在组 argv
-    // 前丢掉它们）。没有 --strict-mcp-config 时，CLI 仍按 settingSources 把
-    // ~/.claude.json 的 MCP 并进来。显式端点继续走 mcpServers，严格模式只留那些。
-    strictMcpConfig: true,
-    ...(Object.keys(parts.mcpServers).length > 0 ? { mcpServers: parts.mcpServers } : {}),
+    ...mcpSection,
     ...(parts.effort !== undefined ? { effort: parts.effort } : {}),
     ...(parts.append !== undefined
       ? {
@@ -982,8 +998,12 @@ export class ClaudeCodeBackend implements AgentBackend {
   private async open(opts: SessionOpts, resumeId: string | null): Promise<AgentSessionHandle> {
     // T4 工具面（#647）：host 注入工具（remoteTools relay + localTools 本地
     // 执行）包成一个 in-process MCP server；McpEndpoint 映射 SDK 原生 config。
-    // T1 的四条 fail-closed 到此退役——工具面缺席（三面全空）= 不建 server，
-    // Options.mcpServers 不发（既有调用面零变化）。
+    // T1 的四条 fail-closed 到此退役——工具面缺席（三面全空）= 不建 server。
+    // #1307 三态受管：opts.mcpServers 在位（含 []）= 受管集合 → mcpServers
+    // 键恒发（含 host 缝；三面全空则空表）+ strictMcpConfig 锁，用户全局 /
+    // 项目 / 插件 MCP 不进会话；缺省 = 继承 runtime 配置（旧 server 形 /
+    // 版本墙机器，power-user 逃生门）——非空才发键、无 strict 旗（原行为）。
+    const managedMcp = opts.mcpServers !== undefined;
     const hostTools = buildHostTools({
       remoteTools: opts.remoteTools ?? [],
       ...(opts.executeRemoteTool ? { relay: opts.executeRemoteTool } : {}),
@@ -1052,6 +1072,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       sessionId,
       disallowedTools,
       mcpServers,
+      ...(managedMcp ? { strictMcpConfig: true } : {}),
       ...(effort !== undefined ? { effort } : {}),
       ...(append !== undefined ? { append } : {}),
       skillDenyRules,

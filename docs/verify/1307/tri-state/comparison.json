@@ -1,0 +1,45 @@
+{
+  "cli": "2.1.299",
+  "daemon": "tsx src/cli.ts start --foreground",
+  "schemaEncoding": "Buffer.byteLength(JSON.stringify(tools)) on the messages request that carried the tool list",
+  "homeClaudeJson": ["dummy_alpha", "dummy_beta", "dummy_gamma"],
+  "cases": {
+    "absent": {
+      "claimField": "omitted",
+      "machineCliVersion": "0.1.9",
+      "agentMcpServers": ["dummy_alpha"],
+      "argvHasStrictMcpConfig": false,
+      "argvHasMcpConfig": false,
+      "toolCount": 40,
+      "toolSchemaBytes": 71399,
+      "dummyTools": 9,
+      "unlistedGlobalServersLeaked": true,
+      "pacmanTools": 8
+    },
+    "empty": {
+      "claimField": [],
+      "machineCliVersion": "0.2.0",
+      "agentMcpServers": [],
+      "argvHasStrictMcpConfig": true,
+      "argvHasMcpConfig": false,
+      "toolCount": 31,
+      "toolSchemaBytes": 70028,
+      "dummyTools": 0,
+      "unlistedGlobalServersLeaked": false,
+      "pacmanTools": 8
+    },
+    "list": {
+      "claimField": ["dummy_alpha"],
+      "machineCliVersion": "0.2.0",
+      "agentMcpServers": ["dummy_alpha"],
+      "argvHasStrictMcpConfig": true,
+      "mcpConfigServers": ["dummy_alpha"],
+      "toolCount": 34,
+      "toolSchemaBytes": 70488,
+      "dummyTools": 3,
+      "dummyServers": ["dummy_alpha"],
+      "unlistedGlobalServersLeaked": false,
+      "pacmanTools": 8
+    }
+  }
+}

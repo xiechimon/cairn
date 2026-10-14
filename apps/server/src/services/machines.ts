@@ -683,16 +683,18 @@ export function meetsMcpVersionGate(latestCliVersion: string | null): boolean {
   return true;
 }
 
-/** claim 载荷 mcpServers（spec 13/#368 slug 化断约）：勾选 slug 原样透传——
- * server 不再解析端点、不再接触任何 MCP 凭证；解析权在执行 daemon（各读各机
- * `~/.claude.json`，stdio 命令在真正的执行机上起，未知 slug daemon 侧跳过 +
- * 降级行）。版本门未达或无授权 = 缺省（不携带）——版本墙提升后旧 daemon
- * 收不到该字段，视为无 MCP 运行，不混发两种形状。 */
+/** claim 载荷 mcpServers（spec 13/#368 slug 化断约；#1307 三态受管）：勾选
+ * slug 原样透传——server 不再解析端点、不再接触任何 MCP 凭证；解析权在执行
+ * daemon（各读各机 `~/.claude.json`，stdio 命令在真正的执行机上起，未知 slug
+ * daemon 侧跳过 + 降级行）。三态（对齐 Multica mcp_config.go）：数组（含
+ * [] = 受管严格空——daemon 据此给 SDK 上 strictMcpConfig 锁，用户全局 MCP
+ * 不进会话；空集塌回缺省即 #1307 主修位的继承泄漏）= 受管集合；缺省 =
+ * 继承，只在版本门未达时出现——旧 daemon 无三态消费面，携带即死载荷
+ * （版本墙提升后旧 daemon 收不到该字段，视为无 MCP 运行，不混发形状）。 */
 function claimMcpSlugs(
   latestCliVersion: string | null,
   agentSlugs: readonly string[],
 ): string[] | undefined {
-  if (agentSlugs.length === 0) return undefined;
   if (!meetsMcpVersionGate(latestCliVersion)) return undefined;
   return [...agentSlugs];
 }
@@ -827,7 +829,8 @@ function buildChiefClaim(
       trigger,
     },
     remoteTools: [...CHIEF_REMOTE_TOOLS],
-    ...(chiefMcp ? { mcpServers: chiefMcp } : {}),
+    // #1307：[] 也携带（受管严格空）；缺省只留版本门未达形。
+    ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
   };
 }
 
@@ -1123,7 +1126,8 @@ async function tryClaim(
       // 可注册；缺省保留给老 server 形，两态不得混淆）。注册 ≠ 放行：步中
       // 每条命令经预检端点复核（machine.shellEnabled 每调用重读）。
       localTools: claimLocalTools(machineRow, agentRow.tools),
-      ...(workerMcp ? { mcpServers: workerMcp } : {}),
+      // #1307：[] 也携带（受管严格空）；缺省只留版本门未达形。
+      ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
   return null;

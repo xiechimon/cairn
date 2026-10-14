@@ -272,8 +272,11 @@ export const claimedStepSchema = z.object({
   /** 已授权 MCP slug 列表（spec 13 断约：原 McpEndpoint[] 改 string[]——
    * server 不再解析端点、不再持有任何 MCP 凭证；执行 daemon 读本机
    * `~/.claude.json` 按 slug 自行解析，per-turn 连接、失败降级不阻断，
-   * 工具名 `mcp__<slug>__<tool>`，未知 slug daemon 侧跳过。版本墙
-   * （MCP_MIN_CLI_VERSION，断约时提升）未达 = 缺省不携带——旧 daemon
+   * 工具名 `mcp__<slug>__<tool>`，未知 slug daemon 侧跳过。三态受管
+   * （#1307，对齐 Multica mcp_config.go）：数组（含 [] = 受管严格空——
+   * daemon 据此给 claude-code SDK 上 strictMcpConfig 锁，用户全局 MCP 不进
+   * 会话）= 受管集合；缺省 = 继承 runtime 配置，只在版本墙
+   * （MCP_MIN_CLI_VERSION，断约时提升）未达时由新 server 发出——旧 daemon
    * 视为无 MCP 运行，不存在混发两种形状的失败模式。 */
   mcpServers: z.array(z.string()).optional(),
 });
