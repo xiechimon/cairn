@@ -15,7 +15,7 @@
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { MachineSyncCommand } from '@pacman/shared';
-import { gitPrim, runGit } from './git.js';
+import { gitPrim } from './git.js';
 import type { DaemonLogger } from './log.js';
 import type { MachineApi } from './machine-client.js';
 
@@ -88,13 +88,12 @@ async function runSyncGit(cmd: MachineSyncCommand): Promise<void> {
     }
   }
 
-  // checkout ref（remote ref = `origin/<ref>`）；不存在则尝试 `refs/heads/<ref>`
-  // （冷路径刚 clone 时 origin/<ref> 应在）。
-  try {
-    await runGit(['checkout', '--end-of-options', `origin/${ref}`], { cwd: directory });
-  } catch {
-    await runGit(['checkout', '--end-of-options', ref], { cwd: directory });
-  }
+  // checkout ref：远端跟踪 ref（`origin/<ref>`）存在则用它，否则退到 `refs/heads/<ref>`。
+  // 失败直接上抛——reset --hard 会移动当前检出的分支，checkout 未成功时不能继续。
+  const checkoutRef = (await gitPrim.hasRemoteBranch(directory, ref))
+    ? `refs/remotes/origin/${ref}`
+    : `refs/heads/${ref}`;
+  await gitPrim.checkout(directory, checkoutRef);
 
   // reset --hard 到目标 commit
   await gitPrim.resetHard(directory, commit);

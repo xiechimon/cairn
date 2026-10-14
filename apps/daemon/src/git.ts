@@ -310,6 +310,14 @@ export const gitPrim = {
     return r.code === 0 && r.stdout.trim() !== '' ? r.stdout.trim() : null;
   },
 
+  /** `checkout --force <全限定 ref> --`（#1329）。git 2.43 的 checkout 不认
+   * `--end-of-options`（当 pathspec 吞掉、退 1）。全限定 ref + `--` 不会被当成选项
+   * 或路径。--force：随后的 reset --hard 本就丢弃已跟踪改动、覆盖未跟踪冲突文件，
+   * 不加它，脏工作区的同步会卡在 checkout 上，而 reset 本来就会丢掉同样的改动。 */
+  async checkout(dir: string, ref: string): Promise<void> {
+    await runGitOk(['checkout', '--force', ref, '--'], { cwd: dir, timeoutMs: META_TIMEOUT_MS });
+  },
+
   /** checkpoint 恢复两步（02 §5.5：`reset --hard` + `clean -fd`）。 */
   async resetHard(dir: string, commit: string): Promise<void> {
     await runGitOk(['reset', '--hard', '--end-of-options', commit], {

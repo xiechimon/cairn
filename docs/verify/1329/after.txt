@@ -1,0 +1,609 @@
+# after (#1329): reproduction on the fixed checkout (sync.ts + git.ts checkout), GIT_TRACE=1
+# Sections: (1) git 2.43.0 with the reset argv unchanged; (2) git 2.43.0 with the reset in the PR #1330 oid form; (3) git 2.47.3 control.
+# Run: env PATH=/tmp/git243/bin:$PATH GIT_TRACE=1 MODE=new RESET_FORM=argv bash docs/verify/1329/repro.sh
+
+### after: fixed checkout argv (sync.ts), git 2.43.0 (source build /tmp/git243), reset argv unchanged (#1316 / PR #1330 scope)
+mode=new reset_form=argv
+02:53:02.872604 git.c:463               trace: built-in: git version
+git on PATH: /tmp/git243/bin/git -> git version 2.43.0
+02:53:02.873957 git.c:479               trace: built-in: git version
+/usr/bin/git: git version 2.47.3
+
+02:53:02.876562 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-R3jz/reuse-existing-ref/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.878628 git.c:463               trace: built-in: git config receive.autogc false
+02:53:02.879820 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-R3jz/reuse-existing-ref/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.881877 git.c:463               trace: built-in: git add README.md
+02:53:02.883767 git.c:463               trace: built-in: git commit -qm A
+02:53:02.884791 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:02.885664 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:02.887135 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:02.889242 git.c:463               trace: built-in: git add -A
+02:53:02.890815 git.c:463               trace: built-in: git commit -qm B
+02:53:02.891650 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:02.892579 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:02.893922 git.c:463               trace: built-in: git push -q /tmp/repro1329-R3jz/reuse-existing-ref/origin.git main feat
+02:53:02.894149 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-R3jz/reuse-existing-ref/origin.git'\'''
+02:53:02.895958 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-R3jz/reuse-existing-ref/origin.git
+02:53:02.896478 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:02.897435 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:02.898792 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-UQ4Kcx GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-UQ4Kcx git unpack-objects --pack_header=2,7 -q
+02:53:02.898809 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:02.899776 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:02.901113 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-UQ4Kcx GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-UQ4Kcx git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:02.901135 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:02.902181 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:02.902561 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-R3jz/reuse-existing-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:02.903674 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:02.906818 git.c:463               trace: built-in: git clone -q /tmp/repro1329-R3jz/reuse-existing-ref/origin.git /tmp/repro1329-R3jz/reuse-existing-ref/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.907658 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-R3jz/reuse-existing-ref/origin.git'\'''
+02:53:02.909783 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-R3jz/reuse-existing-ref/origin.git
+02:53:02.913696 git.c:463               trace: built-in: git checkout -q main
+02:53:02.916036 git.c:463               trace: built-in: git rev-parse origin/feat
+== reuse-existing-ref: ref=feat commit=da07e070b2d81ed7da5c3ebd0dcc5cb6448f81a9 dirty=0
+02:53:02.917431 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:02.919010 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:02.920394 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=e50e5e1 branch=main refs/heads/main=e50e5e1 README.md=base
+02:53:02.923018 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:02.924434 git.c:463               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at da07e07 B
+    exit=0
+$ git reset --hard --end-of-options da07e070b2d81ed7da5c3ebd0dcc5cb6448f81a9
+    | 02:53:02.928195 git.c:463               trace: built-in: git reset --hard --end-of-options da07e070b2d81ed7da5c3ebd0dcc5cb6448f81a9
+    | fatal: option '--end-of-options' must come before non-option arguments
+    exit=128
+    => sync failed at reset (exit 128); checkout exit was 0
+02:53:02.931047 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:02.932708 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:02.934387 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=da07e07 branch=(detached) refs/heads/main=e50e5e1 README.md=feat
+
+02:53:02.937825 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-R3jz/unknown-ref/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.939601 git.c:463               trace: built-in: git config receive.autogc false
+02:53:02.940873 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-R3jz/unknown-ref/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.943338 git.c:463               trace: built-in: git add README.md
+02:53:02.944972 git.c:463               trace: built-in: git commit -qm A
+02:53:02.945835 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:02.946807 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:02.948357 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:02.950068 git.c:463               trace: built-in: git add -A
+02:53:02.951819 git.c:463               trace: built-in: git commit -qm B
+02:53:02.952642 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:02.953538 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:02.954980 git.c:463               trace: built-in: git push -q /tmp/repro1329-R3jz/unknown-ref/origin.git main feat
+02:53:02.955191 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-R3jz/unknown-ref/origin.git'\'''
+02:53:02.957010 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-R3jz/unknown-ref/origin.git
+02:53:02.957396 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:02.958556 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:02.960232 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects/tmp_objdir-incoming-EH4SC4 GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects/tmp_objdir-incoming-EH4SC4 git unpack-objects --pack_header=2,7 -q
+02:53:02.960253 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:02.961467 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:02.962751 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects/tmp_objdir-incoming-EH4SC4 GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/unknown-ref/origin.git/./objects/tmp_objdir-incoming-EH4SC4 git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:02.962779 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:02.963909 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:02.964342 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-R3jz/unknown-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:02.965279 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:02.968415 git.c:463               trace: built-in: git clone -q /tmp/repro1329-R3jz/unknown-ref/origin.git /tmp/repro1329-R3jz/unknown-ref/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.969283 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-R3jz/unknown-ref/origin.git'\'''
+02:53:02.971073 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-R3jz/unknown-ref/origin.git
+02:53:02.974448 git.c:463               trace: built-in: git checkout -q main
+02:53:02.976252 git.c:463               trace: built-in: git rev-parse origin/feat
+== unknown-ref: ref=nosuch commit=da07e070b2d81ed7da5c3ebd0dcc5cb6448f81a9 dirty=0
+02:53:02.977619 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:02.979106 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:02.980439 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=e50e5e1 branch=main refs/heads/main=e50e5e1 README.md=base
+02:53:02.983027 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/nosuch
+$ git checkout --force refs/heads/nosuch --
+    | 02:53:02.984751 git.c:463               trace: built-in: git checkout --force refs/heads/nosuch --
+    | fatal: invalid reference: refs/heads/nosuch
+    exit=128
+    => sync failed at checkout (exit 128)
+02:53:02.988232 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:02.989848 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:02.991400 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=e50e5e1 branch=main refs/heads/main=e50e5e1 README.md=base
+
+02:53:02.994943 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-R3jz/dirty-overlap/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:02.997195 git.c:463               trace: built-in: git config receive.autogc false
+02:53:02.998497 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-R3jz/dirty-overlap/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.000921 git.c:463               trace: built-in: git add README.md
+02:53:03.002604 git.c:463               trace: built-in: git commit -qm A
+02:53:03.003806 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.004734 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.006323 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:03.008200 git.c:463               trace: built-in: git add -A
+02:53:03.009769 git.c:463               trace: built-in: git commit -qm B
+02:53:03.010579 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.011654 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.012957 git.c:463               trace: built-in: git push -q /tmp/repro1329-R3jz/dirty-overlap/origin.git main feat
+02:53:03.013150 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-R3jz/dirty-overlap/origin.git'\'''
+02:53:03.014733 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-R3jz/dirty-overlap/origin.git
+02:53:03.015058 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.016246 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.017817 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-dlSXPh GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-dlSXPh git unpack-objects --pack_header=2,7 -q
+02:53:03.017833 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.018805 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.019944 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-dlSXPh GIT_QUARANTINE_PATH=/tmp/repro1329-R3jz/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-dlSXPh git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.019964 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.020967 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.021309 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-R3jz/dirty-overlap/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.022608 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.025994 git.c:463               trace: built-in: git clone -q /tmp/repro1329-R3jz/dirty-overlap/origin.git /tmp/repro1329-R3jz/dirty-overlap/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.026778 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-R3jz/dirty-overlap/origin.git'\'''
+02:53:03.028536 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-R3jz/dirty-overlap/origin.git
+02:53:03.032045 git.c:463               trace: built-in: git checkout -q main
+02:53:03.033865 git.c:463               trace: built-in: git rev-parse origin/feat
+== dirty-overlap: ref=feat commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=1
+02:53:03.035320 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.036982 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.038658 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=dirty
+02:53:03.041473 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:03.043195 git.c:463               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at 55ce9f3 B
+    exit=0
+$ git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | 02:53:03.047353 git.c:463               trace: built-in: git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | fatal: option '--end-of-options' must come before non-option arguments
+    exit=128
+    => sync failed at reset (exit 128); checkout exit was 0
+02:53:03.050125 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.051741 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.053190 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=55ce9f3 branch=(detached) refs/heads/main=0f9e7b6 README.md=feat
+
+### after, reset in the PR #1330 oid form on top of the fixed checkout (full sync path on 2.43)
+mode=new reset_form=oid
+02:53:03.059530 git.c:463               trace: built-in: git version
+git on PATH: /tmp/git243/bin/git -> git version 2.43.0
+02:53:03.060911 git.c:479               trace: built-in: git version
+/usr/bin/git: git version 2.47.3
+
+02:53:03.063248 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-tqai/reuse-existing-ref/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.065141 git.c:463               trace: built-in: git config receive.autogc false
+02:53:03.066337 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-tqai/reuse-existing-ref/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.068718 git.c:463               trace: built-in: git add README.md
+02:53:03.070544 git.c:463               trace: built-in: git commit -qm A
+02:53:03.071629 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.072545 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.074225 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:03.076229 git.c:463               trace: built-in: git add -A
+02:53:03.077775 git.c:463               trace: built-in: git commit -qm B
+02:53:03.078645 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.079517 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.081051 git.c:463               trace: built-in: git push -q /tmp/repro1329-tqai/reuse-existing-ref/origin.git main feat
+02:53:03.081306 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-tqai/reuse-existing-ref/origin.git'\'''
+02:53:03.083003 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-tqai/reuse-existing-ref/origin.git
+02:53:03.083415 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.084337 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.086128 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-2xlV2a GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-2xlV2a git unpack-objects --pack_header=2,7 -q
+02:53:03.086145 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.087558 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.088783 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-2xlV2a GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-2xlV2a git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.088803 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.089929 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.090369 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-tqai/reuse-existing-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.091332 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.094265 git.c:463               trace: built-in: git clone -q /tmp/repro1329-tqai/reuse-existing-ref/origin.git /tmp/repro1329-tqai/reuse-existing-ref/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.095263 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-tqai/reuse-existing-ref/origin.git'\'''
+02:53:03.096896 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-tqai/reuse-existing-ref/origin.git
+02:53:03.100867 git.c:463               trace: built-in: git checkout -q main
+02:53:03.102985 git.c:463               trace: built-in: git rev-parse origin/feat
+== reuse-existing-ref: ref=feat commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=0
+02:53:03.104453 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.105957 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.107257 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+02:53:03.109649 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:03.111436 git.c:463               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at 55ce9f3 B
+    exit=0
+$ git rev-parse --verify --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2^{commit}
+    | 02:53:03.114978 git.c:463               trace: built-in: git rev-parse --verify --end-of-options '55ce9f39350fe07b52e64b1676aa7a0b8fa285b2^{commit}'
+    | 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    exit=0
+$ git reset --hard 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | 02:53:03.120319 git.c:463               trace: built-in: git reset --hard 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | HEAD is now at 55ce9f3 B
+    exit=0
+    => sync reports synced; checkout exit was 0
+02:53:03.123629 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.125143 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.126621 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=55ce9f3 branch=(detached) refs/heads/main=0f9e7b6 README.md=feat
+
+02:53:03.129811 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-tqai/unknown-ref/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.132214 git.c:463               trace: built-in: git config receive.autogc false
+02:53:03.133417 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-tqai/unknown-ref/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.135655 git.c:463               trace: built-in: git add README.md
+02:53:03.137354 git.c:463               trace: built-in: git commit -qm A
+02:53:03.138328 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.139192 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.140661 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:03.142552 git.c:463               trace: built-in: git add -A
+02:53:03.144297 git.c:463               trace: built-in: git commit -qm B
+02:53:03.145160 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.146243 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.147489 git.c:463               trace: built-in: git push -q /tmp/repro1329-tqai/unknown-ref/origin.git main feat
+02:53:03.147673 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-tqai/unknown-ref/origin.git'\'''
+02:53:03.149333 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-tqai/unknown-ref/origin.git
+02:53:03.149637 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.150590 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.151876 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects/tmp_objdir-incoming-F0yYZB GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects/tmp_objdir-incoming-F0yYZB git unpack-objects --pack_header=2,7 -q
+02:53:03.151890 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.153037 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.154183 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects/tmp_objdir-incoming-F0yYZB GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/unknown-ref/origin.git/./objects/tmp_objdir-incoming-F0yYZB git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.154208 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.155243 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.155556 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-tqai/unknown-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.156654 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.159308 git.c:463               trace: built-in: git clone -q /tmp/repro1329-tqai/unknown-ref/origin.git /tmp/repro1329-tqai/unknown-ref/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.160018 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-tqai/unknown-ref/origin.git'\'''
+02:53:03.161520 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-tqai/unknown-ref/origin.git
+02:53:03.165100 git.c:463               trace: built-in: git checkout -q main
+02:53:03.166935 git.c:463               trace: built-in: git rev-parse origin/feat
+== unknown-ref: ref=nosuch commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=0
+02:53:03.168495 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.170210 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.171564 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+02:53:03.173824 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/nosuch
+$ git checkout --force refs/heads/nosuch --
+    | 02:53:03.175431 git.c:463               trace: built-in: git checkout --force refs/heads/nosuch --
+    | fatal: invalid reference: refs/heads/nosuch
+    exit=128
+    => sync failed at checkout (exit 128)
+02:53:03.179564 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.181159 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.182902 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+
+02:53:03.186893 git.c:463               trace: built-in: git init -q --bare -b main /tmp/repro1329-tqai/dirty-overlap/origin.git
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.189054 git.c:463               trace: built-in: git config receive.autogc false
+02:53:03.190115 git.c:463               trace: built-in: git init -q -b main /tmp/repro1329-tqai/dirty-overlap/seed
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.192108 git.c:463               trace: built-in: git add README.md
+02:53:03.193633 git.c:463               trace: built-in: git commit -qm A
+02:53:03.194526 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.195647 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.197412 git.c:463               trace: built-in: git checkout -q -b feat
+02:53:03.199189 git.c:463               trace: built-in: git add -A
+02:53:03.200730 git.c:463               trace: built-in: git commit -qm B
+02:53:03.201558 run-command.c:659       trace: run_command: git maintenance run --auto --quiet
+02:53:03.202604 git.c:463               trace: built-in: git maintenance run --auto --quiet
+02:53:03.204019 git.c:463               trace: built-in: git push -q /tmp/repro1329-tqai/dirty-overlap/origin.git main feat
+02:53:03.204284 run-command.c:659       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-tqai/dirty-overlap/origin.git'\'''
+02:53:03.206088 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-tqai/dirty-overlap/origin.git
+02:53:03.206409 run-command.c:659       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.207304 git.c:463               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.208565 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-ZsrPFx GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-ZsrPFx git unpack-objects --pack_header=2,7 -q
+02:53:03.208581 run-command.c:758       trace: start_command: /tmp/git243/bin/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.209620 git.c:463               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.210763 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-ZsrPFx GIT_QUARANTINE_PATH=/tmp/repro1329-tqai/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-ZsrPFx git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.210789 run-command.c:758       trace: start_command: /tmp/git243/bin/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.211718 git.c:463               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.212027 run-command.c:659       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-tqai/dirty-overlap/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.213168 git.c:463               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.216305 git.c:463               trace: built-in: git clone -q /tmp/repro1329-tqai/dirty-overlap/origin.git /tmp/repro1329-tqai/dirty-overlap/work
+warning: templates not found in /home/box/share/git-core/templates
+02:53:03.217377 run-command.c:659       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-tqai/dirty-overlap/origin.git'\'''
+02:53:03.219006 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-tqai/dirty-overlap/origin.git
+02:53:03.223416 git.c:463               trace: built-in: git checkout -q main
+02:53:03.225139 git.c:463               trace: built-in: git rev-parse origin/feat
+== dirty-overlap: ref=feat commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=1
+02:53:03.226659 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.228233 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.229574 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=dirty
+02:53:03.231989 git.c:463               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:03.233522 git.c:463               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at 55ce9f3 B
+    exit=0
+$ git rev-parse --verify --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2^{commit}
+    | 02:53:03.237324 git.c:463               trace: built-in: git rev-parse --verify --end-of-options '55ce9f39350fe07b52e64b1676aa7a0b8fa285b2^{commit}'
+    | 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    exit=0
+$ git reset --hard 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | 02:53:03.242435 git.c:463               trace: built-in: git reset --hard 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | HEAD is now at 55ce9f3 B
+    exit=0
+    => sync reports synced; checkout exit was 0
+02:53:03.245807 git.c:463               trace: built-in: git rev-parse --short HEAD
+02:53:03.247290 git.c:463               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.248785 git.c:463               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=55ce9f3 branch=(detached) refs/heads/main=0f9e7b6 README.md=feat
+
+### after, control: fixed argv on the box default git (/usr/bin/git 2.47.3)
+mode=new reset_form=argv
+02:53:03.255230 git.c:479               trace: built-in: git version
+git on PATH: /usr/bin/git -> git version 2.47.3
+02:53:03.256277 git.c:479               trace: built-in: git version
+/usr/bin/git: git version 2.47.3
+
+02:53:03.258631 git.c:479               trace: built-in: git init -q --bare -b main /tmp/repro1329-TW1H/reuse-existing-ref/origin.git
+02:53:03.261036 git.c:479               trace: built-in: git config receive.autogc false
+02:53:03.262297 git.c:479               trace: built-in: git init -q -b main /tmp/repro1329-TW1H/reuse-existing-ref/seed
+02:53:03.265183 git.c:479               trace: built-in: git add README.md
+02:53:03.267004 git.c:479               trace: built-in: git commit -qm A
+02:53:03.268022 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.268040 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.269437 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.271598 git.c:479               trace: built-in: git checkout -q -b feat
+02:53:03.273980 git.c:479               trace: built-in: git add -A
+02:53:03.275683 git.c:479               trace: built-in: git commit -qm B
+02:53:03.276589 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.276598 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.277938 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.279312 git.c:479               trace: built-in: git push -q /tmp/repro1329-TW1H/reuse-existing-ref/origin.git main feat
+02:53:03.279497 run-command.c:666       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\'''
+02:53:03.279503 run-command.c:758       trace: start_command: /bin/sh -c 'git-receive-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\''' 'git-receive-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\'''
+02:53:03.281373 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-TW1H/reuse-existing-ref/origin.git
+02:53:03.281753 run-command.c:666       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.281768 run-command.c:758       trace: start_command: /usr/lib/git-core/git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.282885 git.c:479               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.284556 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-FaHcBs GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-FaHcBs git unpack-objects --pack_header=2,7 -q
+02:53:03.284575 run-command.c:758       trace: start_command: /usr/lib/git-core/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.285630 git.c:479               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.287128 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-FaHcBs GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git/./objects/tmp_objdir-incoming-FaHcBs git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.287153 run-command.c:758       trace: start_command: /usr/lib/git-core/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.288194 git.c:479               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.288581 run-command.c:666       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.288589 run-command.c:758       trace: start_command: /usr/lib/git-core/git --git-dir=/tmp/repro1329-TW1H/reuse-existing-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.289645 git.c:479               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.292720 git.c:479               trace: built-in: git clone -q /tmp/repro1329-TW1H/reuse-existing-ref/origin.git /tmp/repro1329-TW1H/reuse-existing-ref/work
+02:53:03.293932 run-command.c:666       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\'''
+02:53:03.293940 run-command.c:758       trace: start_command: /bin/sh -c 'git-upload-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\''' 'git-upload-pack '\''/tmp/repro1329-TW1H/reuse-existing-ref/origin.git'\'''
+02:53:03.295681 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-TW1H/reuse-existing-ref/origin.git
+02:53:03.299259 git.c:479               trace: built-in: git checkout -q main
+02:53:03.301515 git.c:479               trace: built-in: git rev-parse origin/feat
+== reuse-existing-ref: ref=feat commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=0
+02:53:03.303341 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.304974 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.306888 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+02:53:03.309426 git.c:479               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:03.311041 git.c:479               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at 55ce9f3 B
+    exit=0
+$ git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | 02:53:03.314904 git.c:479               trace: built-in: git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | HEAD is now at 55ce9f3 B
+    exit=0
+    => sync reports synced; checkout exit was 0
+02:53:03.318654 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.321077 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.322831 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=55ce9f3 branch=(detached) refs/heads/main=0f9e7b6 README.md=feat
+
+02:53:03.326505 git.c:479               trace: built-in: git init -q --bare -b main /tmp/repro1329-TW1H/unknown-ref/origin.git
+02:53:03.329187 git.c:479               trace: built-in: git config receive.autogc false
+02:53:03.330436 git.c:479               trace: built-in: git init -q -b main /tmp/repro1329-TW1H/unknown-ref/seed
+02:53:03.333342 git.c:479               trace: built-in: git add README.md
+02:53:03.334991 git.c:479               trace: built-in: git commit -qm A
+02:53:03.335997 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.336006 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.337212 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.339223 git.c:479               trace: built-in: git checkout -q -b feat
+02:53:03.341059 git.c:479               trace: built-in: git add -A
+02:53:03.342817 git.c:479               trace: built-in: git commit -qm B
+02:53:03.343782 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.343791 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.344871 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.346287 git.c:479               trace: built-in: git push -q /tmp/repro1329-TW1H/unknown-ref/origin.git main feat
+02:53:03.346478 run-command.c:666       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\'''
+02:53:03.346486 run-command.c:758       trace: start_command: /bin/sh -c 'git-receive-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\''' 'git-receive-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\'''
+02:53:03.347964 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-TW1H/unknown-ref/origin.git
+02:53:03.348248 run-command.c:666       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.348258 run-command.c:758       trace: start_command: /usr/lib/git-core/git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.349458 git.c:479               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.350909 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects/tmp_objdir-incoming-VmPzLF GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects/tmp_objdir-incoming-VmPzLF git unpack-objects --pack_header=2,7 -q
+02:53:03.350925 run-command.c:758       trace: start_command: /usr/lib/git-core/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.351999 git.c:479               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.353185 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects/tmp_objdir-incoming-VmPzLF GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/unknown-ref/origin.git/./objects/tmp_objdir-incoming-VmPzLF git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.353199 run-command.c:758       trace: start_command: /usr/lib/git-core/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.354331 git.c:479               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.354785 run-command.c:666       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-TW1H/unknown-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.354796 run-command.c:758       trace: start_command: /usr/lib/git-core/git --git-dir=/tmp/repro1329-TW1H/unknown-ref/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.355817 git.c:479               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.359065 git.c:479               trace: built-in: git clone -q /tmp/repro1329-TW1H/unknown-ref/origin.git /tmp/repro1329-TW1H/unknown-ref/work
+02:53:03.360760 run-command.c:666       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\'''
+02:53:03.360768 run-command.c:758       trace: start_command: /bin/sh -c 'git-upload-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\''' 'git-upload-pack '\''/tmp/repro1329-TW1H/unknown-ref/origin.git'\'''
+02:53:03.362545 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-TW1H/unknown-ref/origin.git
+02:53:03.366651 git.c:479               trace: built-in: git checkout -q main
+02:53:03.368673 git.c:479               trace: built-in: git rev-parse origin/feat
+== unknown-ref: ref=nosuch commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=0
+02:53:03.370124 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.371728 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.373255 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+02:53:03.375707 git.c:479               trace: built-in: git rev-parse --verify -q refs/remotes/origin/nosuch
+$ git checkout --force refs/heads/nosuch --
+    | 02:53:03.377332 git.c:479               trace: built-in: git checkout --force refs/heads/nosuch --
+    | fatal: invalid reference: refs/heads/nosuch
+    exit=128
+    => sync failed at checkout (exit 128)
+02:53:03.380596 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.382549 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.384324 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=base
+
+02:53:03.388390 git.c:479               trace: built-in: git init -q --bare -b main /tmp/repro1329-TW1H/dirty-overlap/origin.git
+02:53:03.391055 git.c:479               trace: built-in: git config receive.autogc false
+02:53:03.392914 git.c:479               trace: built-in: git init -q -b main /tmp/repro1329-TW1H/dirty-overlap/seed
+02:53:03.396493 git.c:479               trace: built-in: git add README.md
+02:53:03.398801 git.c:479               trace: built-in: git commit -qm A
+02:53:03.399846 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.399857 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.400922 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.402669 git.c:479               trace: built-in: git checkout -q -b feat
+02:53:03.404632 git.c:479               trace: built-in: git add -A
+02:53:03.406439 git.c:479               trace: built-in: git commit -qm B
+02:53:03.407374 run-command.c:666       trace: run_command: git maintenance run --auto --quiet --detach
+02:53:03.407385 run-command.c:758       trace: start_command: /usr/lib/git-core/git maintenance run --auto --quiet --detach
+02:53:03.408467 git.c:479               trace: built-in: git maintenance run --auto --quiet --detach
+02:53:03.409871 git.c:479               trace: built-in: git push -q /tmp/repro1329-TW1H/dirty-overlap/origin.git main feat
+02:53:03.410038 run-command.c:666       trace: run_command: unset GIT_PREFIX; 'git-receive-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\'''
+02:53:03.410045 run-command.c:758       trace: start_command: /bin/sh -c 'git-receive-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\''' 'git-receive-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\'''
+02:53:03.411659 git.c:479               trace: built-in: git receive-pack /tmp/repro1329-TW1H/dirty-overlap/origin.git
+02:53:03.411949 run-command.c:666       trace: run_command: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.411956 run-command.c:758       trace: start_command: /usr/lib/git-core/git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.413001 git.c:479               trace: built-in: git pack-objects --all-progress-implied --revs --stdout --thin --delta-base-offset -q
+02:53:03.414256 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-CVGLJP GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-CVGLJP git unpack-objects --pack_header=2,7 -q
+02:53:03.414268 run-command.c:758       trace: start_command: /usr/lib/git-core/git unpack-objects --pack_header=2,7 -q
+remote: 02:53:03.415555 git.c:479               trace: built-in: git unpack-objects --pack_header=2,7 -q        
+02:53:03.416864 run-command.c:666       trace: run_command: GIT_ALTERNATE_OBJECT_DIRECTORIES=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects GIT_OBJECT_DIRECTORY=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-CVGLJP GIT_QUARANTINE_PATH=/tmp/repro1329-TW1H/dirty-overlap/origin.git/./objects/tmp_objdir-incoming-CVGLJP git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+02:53:03.416879 run-command.c:758       trace: start_command: /usr/lib/git-core/git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs
+remote: 02:53:03.418244 git.c:479               trace: built-in: git rev-list --objects --stdin --not --exclude-hidden=receive --all --quiet --alternate-refs        
+remote: 02:53:03.418750 run-command.c:666       trace: run_command: unset GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_DIR GIT_OBJECT_DIRECTORY GIT_PREFIX; git --git-dir=/tmp/repro1329-TW1H/dirty-overlap/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.418762 run-command.c:758       trace: start_command: /usr/lib/git-core/git --git-dir=/tmp/repro1329-TW1H/dirty-overlap/origin.git for-each-ref '--format=%(objectname)'        
+remote: 02:53:03.419934 git.c:479               trace: built-in: git for-each-ref '--format=%(objectname)'        
+02:53:03.422974 git.c:479               trace: built-in: git clone -q /tmp/repro1329-TW1H/dirty-overlap/origin.git /tmp/repro1329-TW1H/dirty-overlap/work
+02:53:03.424248 run-command.c:666       trace: run_command: unset GIT_DIR; GIT_PROTOCOL=version=2 'git-upload-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\'''
+02:53:03.424256 run-command.c:758       trace: start_command: /bin/sh -c 'git-upload-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\''' 'git-upload-pack '\''/tmp/repro1329-TW1H/dirty-overlap/origin.git'\'''
+02:53:03.426041 git.c:479               trace: built-in: git upload-pack /tmp/repro1329-TW1H/dirty-overlap/origin.git
+02:53:03.430470 git.c:479               trace: built-in: git checkout -q main
+02:53:03.432783 git.c:479               trace: built-in: git rev-parse origin/feat
+== dirty-overlap: ref=feat commit=55ce9f39350fe07b52e64b1676aa7a0b8fa285b2 dirty=1
+02:53:03.434341 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.436385 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.438071 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=0f9e7b6 branch=main refs/heads/main=0f9e7b6 README.md=dirty
+02:53:03.441045 git.c:479               trace: built-in: git rev-parse --verify -q refs/remotes/origin/feat
+$ git checkout --force refs/remotes/origin/feat --
+    | 02:53:03.443149 git.c:479               trace: built-in: git checkout --force refs/remotes/origin/feat --
+    | Note: switching to 'refs/remotes/origin/feat'.
+    | 
+    | You are in 'detached HEAD' state. You can look around, make experimental
+    | changes and commit them, and you can discard any commits you make in this
+    | state without impacting any branches by switching back to a branch.
+    | 
+    | If you want to create a new branch to retain commits you create, you may
+    | do so (now or later) by using -c with the switch command. Example:
+    | 
+    |   git switch -c <new-branch-name>
+    | 
+    | Or undo this operation with:
+    | 
+    |   git switch -
+    | 
+    | Turn off this advice by setting config variable advice.detachedHead to false
+    | 
+    | HEAD is now at 55ce9f3 B
+    exit=0
+$ git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | 02:53:03.447040 git.c:479               trace: built-in: git reset --hard --end-of-options 55ce9f39350fe07b52e64b1676aa7a0b8fa285b2
+    | HEAD is now at 55ce9f3 B
+    exit=0
+    => sync reports synced; checkout exit was 0
+02:53:03.450546 git.c:479               trace: built-in: git rev-parse --short HEAD
+02:53:03.452355 git.c:479               trace: built-in: git symbolic-ref --short -q HEAD
+02:53:03.454082 git.c:479               trace: built-in: git rev-parse --short refs/heads/main
+    state: HEAD=55ce9f3 branch=(detached) refs/heads/main=0f9e7b6 README.md=feat
+
