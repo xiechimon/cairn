@@ -441,11 +441,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         }
         // journal 快照续跑：sessionId 在 → continue session（同 conv pi 会话
         // 复用，02 §4.2/§5.7）；不在 → new session 重发任务文本。
+        // priorMachineId 留在原 claim 上：重拼 session 时丢掉它，换机
+        // continue 的降级注记会写成「本机找不到会话」。
+        const priorMachineId = entry.claimed.session.priorMachineId;
         const claimed: ClaimedStep = {
           ...entry.claimed,
           session: {
             action: entry.sessionId ? 'continue' : 'new',
             sessionId: entry.sessionId,
+            ...(priorMachineId !== undefined ? { priorMachineId } : {}),
           },
         };
         await runStep(stepDeps(), claimed, {
