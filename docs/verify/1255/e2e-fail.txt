@@ -1,0 +1,31 @@
+Running 1 test using 1 worker
+
+(node:4828) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1/1] e2e/board-scroll-restore.spec.ts:12:1 › detail round trip keeps the column scroll position
+  1) e2e/board-scroll-restore.spec.ts:12:1 › detail round trip keeps the column scroll position ────
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 601
+    Received: 0
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      28 |   await page.keyboard.press('Escape');
+      29 |   await page.waitForSelector('[data-route="board"]');
+    > 30 |   await expect.poll(async () => column.evaluate((el) => el.scrollTop)).toBe(before);
+         |                                                                        ^
+      31 |   expect(await cardInList(page, id)).toBe(true);
+      32 |
+      33 |   await page.goBack();
+        at /workspace/apps/web/e2e/board-scroll-restore.spec.ts:30:72
+
+    Error Context: test-results/board-scroll-restore-detai-d4b01--the-column-scroll-position/error-context.md
+
+
+  1 failed
+    e2e/board-scroll-restore.spec.ts:12:1 › detail round trip keeps the column scroll position ─────
