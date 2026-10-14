@@ -1,0 +1,10 @@
+pr-evidence: sections: 2/2 answered
+pr-evidence: scanned 10 image link(s)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-web-dark.png (bare URL, line 73)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-web-light.png (bare URL, line 73)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-web-dark.png (bare URL, line 73)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-cursor-dark.png (bare URL, line 73)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-cursor-light.png (bare URL, line 73)
+FAIL not-embedded: https://cursor.com/assets/images/open-in-cursor-dark.png (bare URL, line 73)
+pr-evidence: RED (6 problem(s))
+exit=1
