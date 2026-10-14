@@ -1,0 +1,55 @@
+{
+  "probe": "drive-1277-artifact-drift",
+  "expect": "new",
+  "server": "http://127.0.0.1:8791",
+  "web": "http://127.0.0.1:5273",
+  "passed": 9,
+  "total": 9,
+  "checks": [
+    {
+      "name": "control zero-changes → failed 构建零改动",
+      "ok": true,
+      "detail": "phase=failed msg=构建零改动"
+    },
+    {
+      "name": "control drift+hasChanges=false → failed naming both branches",
+      "ok": true,
+      "detail": "phase=failed msg=agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」"
+    },
+    {
+      "name": "control hasChanges=true no drift → review",
+      "ok": true,
+      "detail": "phase=review msg=null"
+    },
+    {
+      "name": "AFTER: hasChanges=true + drift → failed",
+      "ok": true,
+      "detail": "phase=failed sqlite=failed"
+    },
+    {
+      "name": "AFTER: error names both branches",
+      "ok": true,
+      "detail": "msg=agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」"
+    },
+    {
+      "name": "AFTER: message is not the no-commit wording",
+      "ok": true,
+      "detail": "msg=agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「dogfood/tracer-1153-verification-note」，契约工作分支是「pacman/conv-0198f6c0-0000-7000-8000-000000000000」"
+    },
+    {
+      "name": "AFTER: no PR backfill kept",
+      "ok": true,
+      "detail": "prUrl=null prNumber=null sqlPr=null"
+    },
+    {
+      "name": "AFTER: step failed, review unreachable",
+      "ok": true,
+      "detail": "[{\"id\":\"1ijdqHKcBSGrZN9E7PYY-\",\"kind\":\"build\",\"status\":\"failed\"}]"
+    },
+    {
+      "name": "ui: detail page rendered the drifted todo title",
+      "ok": true,
+      "detail": "title missing"
+    }
+  ]
+}

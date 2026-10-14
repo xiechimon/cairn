@@ -1,0 +1,11 @@
+expect=old
+phase=review
+errorMessage=null
+prUrl=https://github.com/example/repo/pull/1277
+prNumber=1277
+stepStatus=[{"id":"S4XniPTuef1H0UHYmbv-S","kind":"build","status":"done"}]
+sqlitePhase=review
+sqliteHasChanges=1
+server=http://127.0.0.1:8791
+web=http://127.0.0.1:5273
+head=2ced623fcf0f390f4cbeda417a4974bc0c455fc9
