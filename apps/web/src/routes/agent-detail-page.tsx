@@ -132,9 +132,9 @@ const AGENT_NAME_CLS = 'agent-name h-auto justify-start p-0 text-left font-norma
 const AGENT_ICON_EDIT_CLS = 'text-muted-foreground';
 
 /** 名称/职责编辑器：Input/Textarea 件默认形态（手写 border/card 皮肤、15px
- *  档与 13px 墨退役，focus 环归件默认 ring-3 #855 收敛律；field-sizing-content
- *  自增长即件正典）。别名类 agent-name-input / agent-role-input 零引用，随
- *  #1036 终摘——e2e 锚走两编辑器的 id。 */
+ *  档与 13px 墨退役。#1244：focus 环是全局 2px --focus-ring outline；
+ *  field-sizing-content 自增长即件正典）。别名类 agent-name-input /
+ *  agent-role-input 零引用，随 #1036 终摘——e2e 锚走两编辑器的 id。 */
 
 /** 进行中任务行：ghost 件默认形态（hover 涂底归件）+ 整块行钮布局位
  *  （h-auto 行高由内容定）。 */

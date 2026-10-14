@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "248e7a64463eea86b79d167b0c3fb9618e5d6624",
-    "date": "2026-10-12"
+    "sha": "2f8a5416318158446a76ce68ae6bd2a8fa644374",
+    "date": "2026-10-14"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -19,8 +19,9 @@
     "attachment.tsx": {
       "kind": "registry",
       "upstreamItem": "attachment",
-      "status": "pristine",
-      "hash": "33d34435ad9af4e1a078d200fea6ffbbd96673c9c269a01b38ea5597295af64f"
+      "status": "deviated",
+      "reason": "#1244: removed focus-within ring-1 of --ring at 50%. Keyboard focus on the inner control uses the global 2px --focus-ring outline.",
+      "hash": "10be4729dffee6688b77a5852d454c7d0bee3e8691d6d7af5da168c71511c8ea"
     },
     "avatar.tsx": {
       "kind": "registry",
@@ -31,22 +32,23 @@
     "badge.tsx": {
       "kind": "registry",
       "upstreamItem": "badge",
-      "status": "pristine",
-      "hash": "d0e5e9a1757981cf46abe24a29cad025af2fb931a621cc4fa0bf2a69e1958703"
+      "status": "deviated",
+      "reason": "#1244: badge is a span, outside the base focus selector. Replaced the gray focus ring and border-ring with an explicit 2px --focus-ring outline. aria-invalid destructive ring kept. Destructive variant no longer paints its own focus ring.",
+      "hash": "628afb58177e3a13240a5bd3500b086310a7daefff9612d9748b6cce8869f700"
     },
     "bubble.tsx": {
       "kind": "registry",
       "upstreamItem": "bubble",
       "status": "deviated",
-      "hash": "a1b3b6633543a769b62ba2f931ed5c60bf2d2ed328c91818ed9826c2b034dd0e",
-      "reason": "#851 G5 / map #980 oklch-fold contract: upstream tinted variant uses relative-color oklch(from var(--primary) L C h) — runtime-dependent, not foldable to a static token value, raw [oklch red under G5. Rewritten as two-token color-mix(in oklch) washes on the file's own bracket idiom (upstream secondary/muted hovers); per-theme ratios derived from the upstream L targets (base 0.93 light / 0.30 dark, hover 0.88 / 0.35) against measured #988 token L values (card 0.9426/0.2553, primary 0.1706/0.9346): 2%/8% light, 7%/14% dark, |dL| <= 0.005 all four faces. No new token slot minted; zero consumers at registration (#1009 A1 consumes secondary/ghost only)."
+      "hash": "02e98832835606eeee25d5ac8a829d31ebe7fa08ee8259aa1d356674fdf741d1",
+      "reason": "#851 G5 / map #980 oklch-fold contract: upstream tinted variant uses relative-color oklch(from var(--primary) L C h) — runtime-dependent, not foldable to a static token value, raw [oklch red under G5. Rewritten as two-token color-mix(in oklch) washes on the file's own bracket idiom (upstream secondary/muted hovers); per-theme ratios derived from the upstream L targets (base 0.93 light / 0.30 dark, hover 0.88 / 0.35) against measured #988 token L values (card 0.9426/0.2553, primary 0.1706/0.9346): 2%/8% light, 7%/14% dark, |dL| <= 0.005 all four faces. No new token slot minted; zero consumers at registration (#1009 A1 consumes secondary/ghost only). #1244: removed the descendant button/a outline-none and gray focus ring so those controls use the global outline."
     },
     "button.tsx": {
       "kind": "registry",
       "upstreamItem": "button",
       "status": "deviated",
-      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). Focus-ring, transition-list and brand-variant deviations retired per #982/#991: official ring form restored, brand semantics live in the token layer.",
-      "hash": "1df2d8037bd82fe26d910b9d83c1f477fed6926f8138938614c5b5ba8204ef4a"
+      "reason": "#411/#425 semantic mapping, zero skin: type=button default (implicit-submit guard, repo-wide ui/button law) + data-variant/data-size pass-through (the observable contract e2e material pins assert). #1244: removed outline-none and the gray focus ring, including the destructive variant focus ring, so the global 2px --focus-ring outline is the only keyboard focus skin. aria-invalid destructive ring kept. Brand semantics live in the token layer.",
+      "hash": "23934c4e3b6e576fce0938e469e2727560ccbc268fc7dbdc6d198b308fa91bbb"
     },
     "card.tsx": {
       "kind": "registry",
@@ -58,8 +60,8 @@
       "kind": "registry",
       "upstreamItem": "checkbox",
       "status": "deviated",
-      "reason": "#952 tri-state semantic mapping, zero skin: Indicator renders MinusIcon when indeterminate — the upstream mixed state reuses the check glyph, losing the partial-vs-full selection distinction the board filter select-all row relies on (#982: real functional gaps stay, skin goes). Hand-built V2 skin and motion retired per #982/#991; geometry/color = upstream verbatim.",
-      "hash": "61fd728ca5f894124652f299e7d3545bd3c902835383985cde025b1a87b7d14d"
+      "reason": "#952 tri-state semantic mapping, zero skin: Indicator renders MinusIcon when indeterminate — the upstream mixed state reuses the check glyph, losing the partial-vs-full selection distinction the board filter select-all row relies on (#982: real functional gaps stay, skin goes). Hand-built V2 skin and motion retired per #982/#991; geometry/color otherwise upstream. #1244: removed outline-none and the gray focus ring. group-has field-label ring-0 kept so the label proxy does not stack a box-shadow. Keyboard focus uses the global outline. aria-invalid destructive ring kept.",
+      "hash": "819930ba430ee0dfb74522923206632e60089a12e3759d6bf3dc6e3e8443153e"
     },
     "dialog-shell.tsx": {
       "kind": "adapter",
@@ -88,20 +90,23 @@
     "field.tsx": {
       "kind": "registry",
       "upstreamItem": "field",
-      "status": "pristine",
-      "hash": "1d0df9a94372f632929cd3d46e846d15a4d8963c378a6085970a029db6641adc"
+      "status": "deviated",
+      "reason": "#1244: removed the card-label has-focus border-ring and gray ring. The focused control carries the global 2px --focus-ring outline.",
+      "hash": "9f1759469ad00cedce3c54590d5da598635e5a0661975e3d1f862453dab4a4a5"
     },
     "input-group.tsx": {
       "kind": "registry",
       "upstreamItem": "input-group",
-      "status": "pristine",
-      "hash": "b1b9a9930e82825c1408f94e2c74b81d093d0d543203c461f5d0eca8b42cd0cb"
+      "status": "deviated",
+      "reason": "#1244: the shell is a div, outside the base focus selector. While a control inside is focus-visible the shell paints the global 2px --focus-ring outline and the control suppresses its own outline. Removed the gray ring. aria-invalid shell ring kept.",
+      "hash": "f004927940cc59fb82a9ee4871c2551e6db652da72d2f1c324b73300638b8ee9"
     },
     "input.tsx": {
       "kind": "registry",
       "upstreamItem": "input",
-      "status": "pristine",
-      "hash": "616200252ff6fd0667c427176016d55928d56f73b5e5830706820cf9828418bf"
+      "status": "deviated",
+      "reason": "#1244: removed outline-none, focus-visible:border-ring, and the gray focus ring so the #388 global 2px --focus-ring outline is the only keyboard focus skin. aria-invalid destructive ring kept.",
+      "hash": "b031c7775dd71403cd53ad3dc2ea105c0425a0c0190776ccdd6fdf1fabfb15f5"
     },
     "kbd.tsx": {
       "kind": "registry",
@@ -153,8 +158,9 @@
     "select.tsx": {
       "kind": "registry",
       "upstreamItem": "select",
-      "status": "pristine",
-      "hash": "ab19e7f4d786d003373d4b1750be5efda931d18d388cbb163b83e2d29e7a93de"
+      "status": "deviated",
+      "reason": "#1244: removed outline-none, focus-visible:border-ring, and the gray focus ring on the trigger so the global 2px --focus-ring outline is the only keyboard focus skin. aria-invalid destructive ring kept. Menu rows stay outline-hidden.",
+      "hash": "0e38bdda265e2dfd6961a486f1b0351d1969fdeec5a4d702e39088d2aea570b7"
     },
     "separator.tsx": {
       "kind": "registry",
@@ -170,15 +176,16 @@
     "switch.tsx": {
       "kind": "registry",
       "upstreamItem": "switch",
-      "status": "pristine",
-      "hash": "0ce7ad8559ee303391e9c1eb5c7d03d6903878e136ff3da2f45d1d6dec43178e"
+      "status": "deviated",
+      "reason": "#1244: removed outline-none, focus-visible:border-ring, and the gray focus ring. group-has field-label ring-0 and border-transparent kept. The switch is a span; the base selector includes role=switch so keyboard focus uses the global outline. aria-invalid destructive ring kept.",
+      "hash": "e5a48cb43d6dce0b4de014b4b75a18c31bf17b3333c45855fb8eca312c84666e"
     },
     "tabs.tsx": {
       "kind": "registry",
       "upstreamItem": "tabs",
       "status": "deviated",
-      "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism.",
-      "hash": "779b8d6eb7967e69f92aab3771ac37073849e3ca328b91a1a80beaffeecd09e5"
+      "reason": "#644 TabsIndicator zero-chrome pass-through (Base UI writes active-tab geometry into inline custom properties; pill shape carried by consumer CSS) — retention deferred to #1009 chief-face construction (#982 verdict). Segmented/bare handwritten skin variants retired per #991; default/line = the upstream native data-[variant] mechanism. #1244: removed the trigger gray focus ring and 1px outline-ring so role=tab uses the global 2px outline. TabsContent outline-none kept.",
+      "hash": "c98619998d7ec0cf1e6f6b108928078bb08ec6017df9cee0441d98ebb7071a6c"
     },
     "tag-chip.tsx": {
       "kind": "adapter",
@@ -188,8 +195,9 @@
     "textarea.tsx": {
       "kind": "registry",
       "upstreamItem": "textarea",
-      "status": "pristine",
-      "hash": "d73dfa9b4ac27a69ac2cc4bd11715da868275ca134e6841879486174c37cd81e"
+      "status": "deviated",
+      "reason": "#1244: removed outline-none, focus-visible:border-ring, and the gray focus ring so the #388 global 2px --focus-ring outline is the only keyboard focus skin. aria-invalid destructive ring kept. Editors that must stay ringless opt out at the call site.",
+      "hash": "23aa17135dee024385a464b94e319779430e4beab693060ca22cf5e545c62207"
     },
     "toaster.tsx": {
       "kind": "adapter",

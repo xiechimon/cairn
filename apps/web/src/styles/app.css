@@ -68,22 +68,41 @@
     display: block;
   }
 
-  /* #388 全局 focus 环收编：UA 默认蓝框（outline auto）清零，键盘可达面
-     （:focus-visible）统一 indigo ring——配方沿仓内既有 focus-visible 先例
-     （.rerun-switch：2px --focus-ring, offset 2），不是删
-     outline 而是换皮。纯兜底语义靠级联层而非特异性：本规则落 tailwind
-     base 层，unlayered 的面规则（.input / .prj-new-input / .new-task-input
-     等自有 focus 皮肤）无论特异性恒压过 layered 规则，各自配方不动；
-     :where() 只归零元素列表自身的特异性，避免兜底压过同层工具类。
-     role=switch 的 span 面（.rerun-switch）不在本选择器族内，其自有
-     focus-visible 规则仍是唯一环源，勿删。 */
-  :where(button, a, [role="button"], summary, input, select, textarea):focus-visible {
+  /* #388 全局 focus 环。键盘可达面（:focus-visible）统一 2px solid
+     var(--focus-ring)、offset 2。规则在 tailwind base 层，:where() 把
+     元素列表的特异性归零。#1244：registry 原语不再自带 outline-none，
+     也不再自带退役灰环，utilities 层不再压掉本规则。checkbox / switch
+     是 span，tab 走 role，三者补进选择器。
+     鼠标点击（:focus 但非 :focus-visible）清零，避免 UA 环。 */
+  :where(
+    button,
+    a,
+    [role="button"],
+    summary,
+    input,
+    select,
+    textarea,
+    [role="checkbox"],
+    [role="switch"],
+    [role="tab"]
+  ):focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
   }
   /* Safari 等 UA 对纯鼠标点击（:focus 但非 :focus-visible）也画默认环——
      清零；键盘路径由上面的 :focus-visible 规则承载，可达性不减。 */
-  :where(button, a, [role="button"], summary, input, select, textarea):focus:not(:focus-visible) {
+  :where(
+    button,
+    a,
+    [role="button"],
+    summary,
+    input,
+    select,
+    textarea,
+    [role="checkbox"],
+    [role="switch"],
+    [role="tab"]
+  ):focus:not(:focus-visible) {
     outline: none;
   }
 }
