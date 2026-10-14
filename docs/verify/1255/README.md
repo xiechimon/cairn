@@ -23,3 +23,7 @@ Numbers: `offsets.json`.
 ## Fixture e2e
 
 `apps/web/e2e/board-scroll-restore.spec.ts` on `?scenario=board-overflow` (12 cards). Before the fix the poll expected scrollTop 601 and received 0 (`e2e-fail.txt`). After the fix that spec plus `board-overflow.spec.ts` passed 7/7 (`e2e-pass.txt`). `board-dnd.spec.ts` passed 25/25 (`e2e-dnd.txt`). The droppable ref on the list is the same node as before.
+
+The click that opens the card can clamp `scrollTop` by a pixel when `scrollHeight` shrinks in the same turn (local fixture: 601 before the click, 600 at the click). The spec asserts the offset read after that click. Esc, back, and forward restore that leave offset, and the opened card stays inside the list.
+
+A bare `sessionStorage` read throws `SecurityError` in an opaque-origin iframe and the router error page replaces the board (`storage-unavailable.spec.ts`). Column scroll now goes through `safeSessionStorage()`, the same acquisition point as `safeLocalStorage()`. After that change, both storage-unavailable tests and the scroll-restore spec passed.

@@ -60,6 +60,7 @@ import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 // #72: the 总管 FAB moved to the route (board-page.tsx) so the chief
 // drawer/settings overlays sit beside it in one place.
 import { useI18n } from '../i18n/provider.js';
+import { safeSessionStorage } from '../safe-storage.js';
 import {
   COLUMNS,
   canDropOnColumn,
@@ -413,9 +414,10 @@ export function BoardSurface({
 const COLUMN_SCROLL_KEY = 'pacman.board.column-scroll';
 
 function readColumnScroll(): Record<string, number> {
-  if (typeof sessionStorage === 'undefined') return {};
+  const storage = safeSessionStorage();
+  if (storage == null) return {};
   try {
-    const raw = sessionStorage.getItem(COLUMN_SCROLL_KEY);
+    const raw = storage.getItem(COLUMN_SCROLL_KEY);
     if (raw == null) return {};
     const parsed: unknown = JSON.parse(raw);
     if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
@@ -430,11 +432,12 @@ function readColumnScroll(): Record<string, number> {
 }
 
 function writeColumnScroll(columnId: string, top: number): void {
-  if (typeof sessionStorage === 'undefined') return;
+  const storage = safeSessionStorage();
+  if (storage == null) return;
   try {
     const all = readColumnScroll();
     all[columnId] = top;
-    sessionStorage.setItem(COLUMN_SCROLL_KEY, JSON.stringify(all));
+    storage.setItem(COLUMN_SCROLL_KEY, JSON.stringify(all));
   } catch {
     // Quota or private mode. The list still scrolls; the next visit starts at the top.
   }
