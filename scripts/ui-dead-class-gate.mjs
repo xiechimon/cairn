@@ -136,21 +136,6 @@ const EXEMPTIONS = [
     reason:
       'CODE_SKIN map key in detail/segments.tsx: codeClassName selects the chip skin (CODE_SKIN[codeClassName]) and seeds the <key>--link variant; the rendered class is the chip identity hook, the skin lives on the map value utilities.',
   },
-  {
-    name: 'group-data-[state=processing]/attachment:shimmer',
-    reason:
-      '#1244 moved attachment.tsx from pristine to deviated, so the dead-class scan sees it. The shimmer name is the upstream attachment hook. This repo has no .shimmer rule. Adding one would be new per-face CSS, which #950 retired.',
-  },
-  {
-    name: 'group-data-[state=uploading]/attachment:shimmer',
-    reason:
-      '#1244 moved attachment.tsx from pristine to deviated, so the dead-class scan sees it. The shimmer name is the upstream attachment hook. This repo has no .shimmer rule. Adding one would be new per-face CSS, which #950 retired.',
-  },
-  {
-    name: 'scroll-fade-x',
-    reason:
-      '#1244 moved attachment.tsx from pristine to deviated, so the dead-class scan sees it. scroll-fade-x is the upstream attachment-group hook. This repo has no rule for it. Adding one would be new per-face CSS, which #950 retired.',
-  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -143,9 +143,11 @@ export interface ModelRowSkin {
 
 /** #1095 内描焦点环配方单源（行钮与 listbox 容器共用）：2px outline
  *  offset -2px——环墨落进元素盒内缘，滚动容器裁不到；环色走 #388 全局律
- *  --focus-ring。utilities 层压过 app.css base 的外描 2px offset 2。
- *  outline-solid 显式钉 --tw-outline-style，避免祖先 outline-none 把
- *  outline-2 算成 none。行上另配 ring-0，不叠 box-shadow 环。 */
+ *  --focus-ring。outline-solid 不可省：Button 底座 outline-none 把
+ *  --tw-outline-style 钉成 none，outline-2 的 outline-style:
+ *  var(--tw-outline-style) 会算出 none——computed 宽度/偏移全对、像素零墨
+ *  的静默失败（实测踩过）；focus-visible 前缀的 outline-solid 以 0-2-0
+ *  特异性压回 solid。Button 底座消费方另配 ring-0 摘底座外环。 */
 export const FOCUS_INSET_CLS =
   'focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-(--focus-ring)';
 
@@ -155,11 +157,14 @@ export const FOCUS_INSET_CLS =
  *  hover 底 = 旧行皮 --surface-secondary 等值；选中态载体 = aria-selected
  *  （#910 裁定 3 状态类归行为）：行底 --pick-selected-bg、名/勾墨
  *  --pick-selected-fg（#751 单源律随基底走，skin 只做各面几何）。
- *  #1095 焦点配方（票面候选 a）：外描环会被 listbox 滚动容器裁掉——#872
- *  整行铺满律下行盒四缘与裁剪盒齐平，贴边环段无墨（#883 原报、
- *  docs/verify/1011 归因实测）。环改内描走 FOCUS_INSET_CLS（墨落行盒内，
- *  滚动容器裁不到）。#1244 后底座不再自带灰环，行上 ring-0 仍挡住
- *  box-shadow。transition 收窄到底座七通道里真会变的 background-color/color。 */
+ *  #1095 焦点配方（票面候选 a）：Button 底座的外环（focus-visible:ring-3，
+ *  3px box-shadow 画在行盒外）会被 listbox 滚动容器裁掉——#872 整行铺满律下
+ *  行盒四缘与裁剪盒齐平，贴边环段无墨（#883 原报、docs/verify/1011 归因实
+ *  测）。环改内描走 FOCUS_INSET_CLS（墨落行盒内，滚动容器裁不到；环色收敛
+ *  到 #388 全局律 --focus-ring，行灰环 --ring/50 双源就此退役），ring-0 摘
+ *  底座外环。transition 收窄到底座七通道里真会变的 background-color/color
+ *  ——底座 transition-all 违反「只过渡变化的属性」，但 components/ui 已冻结
+ *  （#1003），修在行级不动底座。 */
 export const PICK_ROW_BTN_CLS = `w-full cursor-pointer justify-start border-none bg-transparent text-left font-normal whitespace-nowrap transition-[background-color,color] hover:bg-(--secondary) hover:text-(--foreground) dark:hover:bg-(--secondary) aria-expanded:bg-transparent aria-expanded:text-(--foreground) aria-selected:bg-(--spot-soft) active:not-aria-[haspopup]:translate-y-0 focus-visible:ring-0 ${FOCUS_INSET_CLS} [&_svg:not([class*='size-'])]:size-auto`;
 
 interface ModelPickRowProps {
