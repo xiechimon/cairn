@@ -183,6 +183,7 @@ describe('workspace hook 原语（#1149）', () => {
 
   test('失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入', async () => {
     const root = tmpRoot();
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
     const withCreds = await runWorkspaceHook({
       cwd: root,
@@ -193,6 +194,7 @@ describe('workspace hook 原语（#1149）', () => {
     });
     expect(withCreds!.output).toContain('cred=2');
     // 换脚本重跑（同一 cwd，凭证 null → env 无 GIT_CONFIG 注入）。
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
     const without = await runWorkspaceHook({
       cwd: root,

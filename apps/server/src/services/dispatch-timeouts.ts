@@ -42,6 +42,7 @@ export const QUOTA_HOLD_BACKOFF_MS: readonly [number, number, number] = [60_000,
 /** 第 n 次（1 起）额度挂起的退避时长（末档封顶）。 */
 export function quotaHoldBackoffMs(holdCount: number): number {
   const idx = Math.min(Math.max(holdCount, 1), QUOTA_HOLD_BACKOFF_MS.length) - 1;
+  // biome-ignore lint/style/noNonNullAssertion: idx is clamped to [0, length-1] by Math.min/max above
   return QUOTA_HOLD_BACKOFF_MS[idx]!;
 }
 

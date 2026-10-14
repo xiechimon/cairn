@@ -855,6 +855,7 @@ export async function runStep(
       const matched: string[] = [];
       let m = slashPattern.exec(deliveryPrompt);
       while (m !== null) {
+        // biome-ignore lint/style/noNonNullAssertion: regex /\/([a-z][a-z0-9-]*)/ guarantees capture group 1 when exec returned non-null
         const name = m[1]!;
         if (visibleNames.has(name)) {
           matched.push(name);

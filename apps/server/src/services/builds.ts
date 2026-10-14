@@ -1261,6 +1261,7 @@ export async function requestMerge(
   // 未交付 → 409 点名原因）。之后的合并关口判定与正常 review 一致。
   restoreFailedReview(deps, row);
   if (todoRow.phase === 'failed') {
+    // biome-ignore lint/style/noNonNullAssertion: restoreFailedReview transitions phase in place, never deletes the row; second get() must match the first
     todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get()!;
   }
   // 合并关口 = review（「将改动合并到默认分支」确认弹层，r3 §3.6）。
