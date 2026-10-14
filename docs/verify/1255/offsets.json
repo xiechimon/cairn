@@ -1,0 +1,42 @@
+{
+  "surface": "live verify stack http://127.0.0.1:5273/app viewport 1440x732",
+  "column": "todo (\u5f85\u5f00\u59cb). New cards land here. Same ColumnList as \u5f85\u5904\u7406.",
+  "cards": 30,
+  "beforeFix": {
+    "scrollTopBeforeLeave": 2445,
+    "scrollHeight": 3069,
+    "clientHeight": 624,
+    "afterEsc": 0,
+    "afterBack": 0,
+    "afterForward": 0,
+    "cardVisibleAfterEsc": false,
+    "cardTopAfterEsc": 3068,
+    "sessionStorageOnDetail": {},
+    "boardScroller": {
+      "scrollTop": 0,
+      "scrollLeft": 0,
+      "scrollHeight": 688,
+      "clientHeight": 688,
+      "scrollWidth": 1200,
+      "clientWidth": 1200,
+      "overflowX": "auto",
+      "overflowY": "hidden"
+    }
+  },
+  "afterFix": {
+    "scrollTopBeforeLeave": 2445,
+    "afterEsc": 2445,
+    "afterBack": 2445,
+    "afterForward": 2445,
+    "cardVisibleAfterEsc": true,
+    "cardBoxAfterEsc": {
+      "cardTop": 623,
+      "cardBottom": 717,
+      "listTop": 94,
+      "listBottom": 718
+    },
+    "sessionStorageOnDetail": {
+      "pacman.board.column-scroll": "{\"todo\":2445,\"building\":0,\"pending\":0,\"done\":0}"
+    }
+  }
+}

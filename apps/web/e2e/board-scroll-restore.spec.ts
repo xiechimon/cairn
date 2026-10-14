@@ -22,7 +22,11 @@ test('detail round trip keeps the column scroll position', async ({ page }) => {
   const card = page.locator('[data-column-list="todo"] [data-todo-id]').last();
   const id = await card.getAttribute('data-todo-id');
   if (id == null) throw new Error('overflow card missing');
-  await card.locator('a.todo-card-link').click();
+  // DOM click, not locator.click(): Playwright scrolls the target into view
+  // and that nudge is not the offset the user left.
+  await card.locator('a.todo-card-link').evaluate((el: HTMLAnchorElement) => {
+    el.click();
+  });
   await page.waitForSelector('[data-route="todo-detail"]');
 
   await page.keyboard.press('Escape');

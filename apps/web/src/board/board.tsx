@@ -53,7 +53,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
-import { type ReactNode, useCallback, useState } from 'react';
+import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -410,6 +410,36 @@ export function BoardSurface({
   );
 }
 
+const COLUMN_SCROLL_KEY = 'pacman.board.column-scroll';
+
+function readColumnScroll(): Record<string, number> {
+  if (typeof sessionStorage === 'undefined') return {};
+  try {
+    const raw = sessionStorage.getItem(COLUMN_SCROLL_KEY);
+    if (raw == null) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    const out: Record<string, number> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === 'number' && Number.isFinite(value) && value >= 0) out[key] = value;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeColumnScroll(columnId: string, top: number): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    const all = readColumnScroll();
+    all[columnId] = top;
+    sessionStorage.setItem(COLUMN_SCROLL_KEY, JSON.stringify(all));
+  } catch {
+    // Quota or private mode. The list still scrolls; the next visit starts at the top.
+  }
+}
+
 /** The list area doubles as the column's drop target so empty columns
  *  accept drops (useDroppable id = column id). #504: the list is the
  *  column's scroll surface — the 37px header stays fixed while cards
@@ -418,7 +448,9 @@ export function BoardSurface({
  *  bearing — a scroll container clips at its padding box while the card's
  *  ring is a box-shadow drawn outside the border box, so with a zero block
  *  inset the topmost card (and, scrolled to the end, the bottommost one)
- *  loses that edge; the inline axis already carries 7.25px of inset. */
+ *  loses that edge; the inline axis already carries 7.25px of inset.
+ *  #1255: this list unmounts with the board route. The offset lives here,
+ *  not on .board-scroller (that node is overflow-y hidden). */
 function ColumnList({
   columnId,
   empty,
@@ -430,11 +462,47 @@ function ColumnList({
   count: number;
   children: ReactNode;
 }) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  // Stays false until the saved offset is applied or there is nothing to
+  // apply. A cleanup in that window must not write 0 over the saved value
+  // (live todos often arrive on a later paint, when the list is still short).
+  const restored = useRef(false);
   const { setNodeRef } = useDroppable({ id: columnId });
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      listRef.current = node;
+      setNodeRef(node);
+    },
+    [setNodeRef],
+  );
+
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (el == null) return;
+    if (!restored.current) {
+      const saved = readColumnScroll()[columnId];
+      if (saved == null || saved === 0) {
+        restored.current = true;
+      } else if (el.scrollHeight - el.clientHeight > 0) {
+        el.scrollTop = saved;
+        restored.current = true;
+      }
+    }
+    if (!restored.current) return;
+    const onScroll = () => {
+      writeColumnScroll(columnId, el.scrollTop);
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      writeColumnScroll(columnId, el.scrollTop);
+    };
+  }, [columnId, count]);
+
   return (
     <div
       className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-px"
-      ref={setNodeRef}
+      ref={setRefs}
       data-column-list={columnId}
     >
       {children}
