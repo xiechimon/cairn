@@ -8,7 +8,9 @@
 // 下一次成功导入/refresh 会整文件重写。
 // 并发：读-改-写无事务——用模块级 promise 链串行化写（导入/refresh 是
 // 罕见的人工动作，串行等待零感知）；崩溃窗口由 tmp+rename 原子落位兜底
-// （最坏 = 旧文件保持，丢一条来源记录 = 该技能 refresh 409，可重导入自愈）。
+// （最坏 = 旧文件保持）。缺失或损坏按空登记读，每次返回新对象——写路径
+// 只把新记录铺进副本再落盘，失败的写不会留在下一次读取里。导入登记失败
+// 时 importSkill 删掉刚建的目录，同名可以再导入。
 // 调用方 await 返回值：写完才算动作成功（201/200 即来源已登记）。
 
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -36,7 +38,10 @@ interface SkillSourcesFile {
   sources: Record<string, SkillSourceRecord>;
 }
 
-const EMPTY_FILE: SkillSourcesFile = { version: 1, sources: {} };
+/** 空登记。每次新对象：调用方可以改 sources，不能改到下一次读取。 */
+function emptyFile(): SkillSourcesFile {
+  return { version: 1, sources: {} };
+}
 
 /** 读全文（缺失/损坏 = 空登记——见头注容错律）。 */
 function readFile(path: string): SkillSourcesFile {
@@ -44,16 +49,16 @@ function readFile(path: string): SkillSourcesFile {
   try {
     raw = readFileSync(path, 'utf8');
   } catch {
-    return EMPTY_FILE;
+    return emptyFile();
   }
   try {
     const parsed = JSON.parse(raw) as SkillSourcesFile;
     if (parsed.version !== 1 || typeof parsed.sources !== 'object' || parsed.sources === null) {
-      return EMPTY_FILE;
+      return emptyFile();
     }
-    return parsed;
+    return { version: 1, sources: { ...parsed.sources } };
   } catch {
-    return EMPTY_FILE;
+    return emptyFile();
   }
 }
 
@@ -79,8 +84,10 @@ export function readSkillSource(path: string, skillId: string): SkillSourceRecor
 export function writeSkillSource(path: string, record: SkillSourceRecord): Promise<void> {
   const task = writeChain.then(() => {
     const file = readFile(path);
-    file.sources[record.skillId] = record;
-    writeFileAtomic(path, file);
+    writeFileAtomic(path, {
+      version: 1,
+      sources: { ...file.sources, [record.skillId]: record },
+    });
   });
   // 链本身串行传递：本条失败不阻断后续写（下次写仍落盘）；失败向上冒给
   // 本条调用方（导入/refresh 显式 500，来源未登记不静默）。

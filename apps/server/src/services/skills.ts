@@ -25,6 +25,7 @@ import {
   readdirSync,
   readFileSync,
   realpathSync,
+  rmSync,
   type Stats,
   statSync,
   writeFileSync,
@@ -41,6 +42,7 @@ import {
   type SkillRecord,
   skillRecordSchema,
 } from '@pacman/shared';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { skillAudit } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -423,6 +425,25 @@ export function createLocalSkill(
     name: truth.name,
     description: truth.description,
   });
+}
+
+/** 撤回一次刚成功的 create（#1185）。导入在来源登记失败时调用：目录是
+ * 这次 create 新建的，create 审计行取该 skillId 最新一条。 */
+export function rollbackLocalSkillCreate(
+  opts: { db: Db; skillsDir: string },
+  skillId: string,
+): void {
+  rmSync(join(opts.skillsDir, skillId), { recursive: true, force: true });
+  const rows = opts.db
+    .select()
+    .from(skillAudit)
+    .where(and(eq(skillAudit.skillId, skillId), eq(skillAudit.action, 'create')))
+    .all();
+  const latest = rows.reduce<(typeof rows)[number] | undefined>(
+    (best, row) => (best === undefined || row.createdAt >= best.createdAt ? row : best),
+    undefined,
+  );
+  if (latest) opts.db.delete(skillAudit).where(eq(skillAudit.id, latest.id)).run();
 }
 
 /** 更新技能（PUT /api/teams/{id}/skills/{sid} + relay update_skill 同源）：
