@@ -155,11 +155,11 @@ function MachineConcurrencySelect({
             ) : (
               <>
                 {recommended !== undefined && <span>{t('推荐 {n}', { n: recommended })}</span>}
-                {hardware !== undefined && (
+                {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
                   <span>
-                    {t('依据：核 {cores} · 可用内存 {gib} GiB · 负载 {load}', {
+                    {t('依据：核 {cores} · 总内存 {gib} GiB · 负载 {load}', {
                       cores: hardware.cpuCores,
-                      gib: (hardware.memoryAvailableMb / 1024).toFixed(1),
+                      gib: (hardware.memoryTotalMb / 1024).toFixed(1),
                       load: hardware.loadAvg1.toFixed(2),
                     })}
                   </span>

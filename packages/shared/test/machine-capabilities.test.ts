@@ -282,7 +282,13 @@ describe('agentMachineFitResponseSchema（agent 面「哪些机器可跑它」�
 });
 
 describe('#1241 parseReportedCapabilities（字段级收严）', () => {
-  const hardware = { cpuCores: 8, memoryAvailableMb: 4096, loadAvg1: 0.5, diskFreeMb: 20480 };
+  const hardware = {
+    cpuCores: 8,
+    memoryTotalMb: 16384,
+    memoryAvailableMb: 4096,
+    loadAvg1: 0.5,
+    diskFreeMb: 20480,
+  };
 
   it('7 合法指纹随包原样保留', () => {
     expect(
@@ -298,6 +304,15 @@ describe('#1241 parseReportedCapabilities（字段级收严）', () => {
         hardware: { ...hardware, cpuCores: 0 },
       }),
     ).toEqual({ mcpServers: ['figma'], skills: [] });
+  });
+
+  it('7 升级前落库的指纹无 memoryTotalMb：整块照收（读侧不因新字段整行解析失败）', () => {
+    const { memoryTotalMb: _dropped, ...legacy } = hardware;
+    expect(parseReportedCapabilities({ mcpServers: [], skills: [], hardware: legacy })).toEqual({
+      mcpServers: [],
+      skills: [],
+      hardware: legacy,
+    });
   });
 
   it('7 老 daemon 无 hardware：照收清单，hardware 缺席', () => {
@@ -322,6 +337,7 @@ describe('#1241 parseReportedCapabilities（字段级收严）', () => {
     expect(machineHardwareSchema.safeParse({ ...hardware, memoryAvailableMb: -1 }).success).toBe(
       false,
     );
+    expect(machineHardwareSchema.safeParse({ ...hardware, memoryTotalMb: -1 }).success).toBe(false);
     expect(machineHardwareSchema.safeParse({ ...hardware, cpuCores: 2.5 }).success).toBe(false);
   });
 });

@@ -13,7 +13,7 @@
 // 6. 确定性输出：两集各自排序（wire 断言稳定）。
 
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { cpus, tmpdir } from 'node:os';
+import { cpus, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { machineHardwareSchema } from '@pacman/shared';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -189,6 +189,12 @@ describe('probeMachineHardware（#1241 能力指纹）', () => {
 
   test('H3 核数 = 本机 os.cpus().length', () => {
     expect(probeMachineHardware(tmpRoot())!.cpuCores).toBe(cpus().length);
+  });
+
+  test('H3 内存总量 = 本机 os.totalmem()（推荐公式的内存输入，不随运行中的步变化）', () => {
+    expect(probeMachineHardware(tmpRoot())!.memoryTotalMb).toBe(
+      Math.floor(totalmem() / (1024 * 1024)),
+    );
   });
 
   test('H4 能力包并入指纹；一次性探测与节拍探测同形', () => {

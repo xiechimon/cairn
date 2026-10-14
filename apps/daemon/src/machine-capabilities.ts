@@ -23,7 +23,7 @@
 // 补齐（能力上报是增强信号，分钟级滞后无害）。
 
 import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
-import { cpus, freemem, loadavg } from 'node:os';
+import { cpus, freemem, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
 import {
   type MachineCapabilities,
@@ -84,7 +84,7 @@ function diskFreeMb(path: string): number | undefined {
   return read(path) ?? read('/');
 }
 
-/** #1241 能力指纹。核数 / 可用内存 / 1 分钟负载 / 磁盘余量。任何失败 =
+/** #1241 能力指纹。核数 / 内存总量 / 可用内存 / 1 分钟负载 / 磁盘余量。任何失败 =
  *  undefined（调用方省略 hardware，不 throw）。不缓存：负载和可用内存
  *  每拍都变，mtime 缓存只覆盖 MCP/技能两维。 */
 export function probeMachineHardware(diskPath: string): MachineHardware | undefined {
@@ -97,6 +97,7 @@ export function probeMachineHardware(diskPath: string): MachineHardware | undefi
     if (load === undefined || !Number.isFinite(load) || load < 0) return undefined;
     return {
       cpuCores,
+      memoryTotalMb: Math.max(0, Math.floor(totalmem() / (1024 * 1024))),
       memoryAvailableMb: Math.max(0, Math.floor(freemem() / (1024 * 1024))),
       loadAvg1: load,
       diskFreeMb: free,

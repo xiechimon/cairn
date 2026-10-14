@@ -310,18 +310,20 @@ export function homeMachineRejectReason(
 
 // —— #1241 机器推荐并发（写点算推荐值；公式单源在本叶子）————————————————
 // 问题：maxConcurrent 曾是固定默认 3，与机器承载无关。
-// 例子：32 核 / 64GiB 可用 → min(32, floor(64/2)) = 32，再夹到写域 16；
-//       2 核 / 2GiB 可用 → min(2, floor(2/2)) = 1；没有指纹 → 3，并标估算。
-// 方案：recommended = clamp(min(核数, floor(可用MiB / (1024 * 每槽GiB))), 1, 16)。
-// 16 是既有 PATCH 写域（#1108，1..16）的上沿，不是覆盖用户之后再加的第二道闸。
-// 用户写过的数心跳不再改（maxConcurrentOverridden）。server 不在推荐值之上
-// 再加封顶或暂停：负载/内存的动态降载是后续票，需要 owner 另行确认。
+// 例子：32 核 / 64GiB 总内存 → min(32, floor(64/2)) = 32，再夹到写域 16；
+//       2 核 / 2GiB 总内存 → min(2, floor(2/2)) = 1；没有指纹 → 3，并标估算。
+// 方案：recommended = clamp(min(核数, floor(总内存MiB / (1024 * 每槽GiB))), 1, 16)。
+// 内存用总量而不用可用量：运行中的步占掉可用内存不应缩小推荐值（推荐是机器
+// 承载的静态上界，动态降载是后续票）。16 是既有 PATCH 写域（#1108，1..16）的
+// 上沿，不是覆盖用户之后再加的第二道闸。用户写过的数心跳不再改
+// （maxConcurrentOverridden）。server 不在推荐值之上再加封顶或暂停：负载/内存
+// 的动态降载是后续票，需要 owner 另行确认。
 
 /** 推荐值下沿（写域与 #1108 PATCH 相同）。 */
 export const CONCURRENCY_FLOOR = 1;
 /** 推荐值上沿（写域与 #1108 PATCH 相同：1..16）。 */
 export const CONCURRENCY_CEILING = 16;
-/** 每个并发槽占用的可用内存，GiB。 */
+/** 每个并发槽占用的内存，GiB（按总内存计）。 */
 export const MEMORY_GB_PER_SLOT = 2;
 /** 没有可用指纹时的保守默认（与 machine.maxConcurrent 列默认相同）。 */
 export const CONSERVATIVE_CONCURRENCY = 3;
@@ -330,7 +332,7 @@ export interface ConcurrencyRecommendation {
   source: 'measured' | 'estimate';
 }
 
-/** 推荐并发。无指纹、核数非法、内存非法 → 保守默认，source = estimate。 */
+/** 推荐并发。无指纹、核数非法、内存总量缺席或非法 → 保守默认，source = estimate。 */
 export function recommendMachineConcurrency(
   hardware: MachineHardware | null | undefined,
 ): ConcurrencyRecommendation {
@@ -338,12 +340,13 @@ export function recommendMachineConcurrency(
     hardware == null ||
     !Number.isInteger(hardware.cpuCores) ||
     hardware.cpuCores < 1 ||
-    !Number.isInteger(hardware.memoryAvailableMb) ||
-    hardware.memoryAvailableMb < 0
+    hardware.memoryTotalMb === undefined ||
+    !Number.isInteger(hardware.memoryTotalMb) ||
+    hardware.memoryTotalMb < 0
   ) {
     return { value: CONSERVATIVE_CONCURRENCY, source: 'estimate' };
   }
-  const byMemory = Math.floor(hardware.memoryAvailableMb / (1024 * MEMORY_GB_PER_SLOT));
+  const byMemory = Math.floor(hardware.memoryTotalMb / (1024 * MEMORY_GB_PER_SLOT));
   const raw = Math.min(hardware.cpuCores, byMemory);
   const value = Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, raw));
   return { value, source: 'measured' };

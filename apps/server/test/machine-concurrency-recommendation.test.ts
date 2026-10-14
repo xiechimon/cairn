@@ -25,22 +25,30 @@ afterAll(() => {
 const MIB_PER_GIB = 1024;
 const roomy = {
   cpuCores: 32,
-  memoryAvailableMb: 64 * MIB_PER_GIB,
+  memoryTotalMb: 64 * MIB_PER_GIB,
+  memoryAvailableMb: 60 * MIB_PER_GIB,
   loadAvg1: 1,
   diskFreeMb: 100_000,
 };
 const modest = {
   cpuCores: 8,
-  memoryAvailableMb: 6 * MIB_PER_GIB,
+  memoryTotalMb: 6 * MIB_PER_GIB,
+  memoryAvailableMb: 4 * MIB_PER_GIB,
   loadAvg1: 0.5,
   diskFreeMb: 100_000,
 };
-const weak = { cpuCores: 2, memoryAvailableMb: 2 * MIB_PER_GIB, loadAvg1: 0.2, diskFreeMb: 50_000 };
+const weak = {
+  cpuCores: 2,
+  memoryTotalMb: 2 * MIB_PER_GIB,
+  memoryAvailableMb: 1 * MIB_PER_GIB,
+  loadAvg1: 0.2,
+  diskFreeMb: 50_000,
+};
 
-describe('#1241 公式（推荐并发 = clamp(min(核, floor(可用内存 / 2GiB)), 1, 16)）', () => {
+describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)), 1, 16)）', () => {
   test('F1 核数与内存各自作上界：核少取核，内存少取 floor(GiB/2)', () => {
     expect(
-      recommendMachineConcurrency({ ...modest, cpuCores: 4, memoryAvailableMb: 32 * MIB_PER_GIB }),
+      recommendMachineConcurrency({ ...modest, cpuCores: 4, memoryTotalMb: 32 * MIB_PER_GIB }),
     ).toEqual({
       value: 4,
       source: 'measured',
@@ -53,21 +61,30 @@ describe('#1241 公式（推荐并发 = clamp(min(核, floor(可用内存 / 2GiB
     expect(CONCURRENCY_CEILING).toBe(16);
   });
 
-  test('F1 下沿 1：可用内存不足 2 GiB 仍给 1 槽', () => {
-    expect(recommendMachineConcurrency({ ...weak, memoryAvailableMb: 1500 })).toEqual({
+  test('F1 下沿 1：总内存不足 2 GiB 仍给 1 槽', () => {
+    expect(recommendMachineConcurrency({ ...weak, memoryTotalMb: 1500 })).toEqual({
       value: 1,
       source: 'measured',
     });
     expect(CONCURRENCY_FLOOR).toBe(1);
   });
 
-  test('F2 无指纹 / 坏指纹 → 保守默认 3，标 estimate', () => {
+  test('F1 内存只看总量：运行中的步吃掉可用内存，推荐值不缩', () => {
+    expect(recommendMachineConcurrency({ ...roomy, memoryAvailableMb: 512 })).toEqual({
+      value: 16,
+      source: 'measured',
+    });
+  });
+
+  test('F2 无指纹 / 坏指纹 / 缺 memoryTotalMb → 保守默认 3，标 estimate', () => {
     expect(recommendMachineConcurrency(undefined)).toEqual({ value: 3, source: 'estimate' });
     expect(recommendMachineConcurrency(null)).toEqual({ value: 3, source: 'estimate' });
     expect(recommendMachineConcurrency({ ...weak, cpuCores: 0 })).toEqual({
       value: 3,
       source: 'estimate',
     });
+    const { memoryTotalMb: _legacy, ...legacyRow } = modest;
+    expect(recommendMachineConcurrency(legacyRow)).toEqual({ value: 3, source: 'estimate' });
     expect(CONSERVATIVE_CONCURRENCY).toBe(3);
   });
 });

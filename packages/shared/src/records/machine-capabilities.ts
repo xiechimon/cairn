@@ -18,11 +18,15 @@ import { z } from 'zod';
 import { recordId } from './common.js';
 
 /** #1241 机器能力指纹（daemon 启动 + 每个 presence 节拍现探，不缓存）。
- *  推荐并发只消费核数与可用内存；load 与磁盘余量进依据显示和自动路径的
- *  负载暂停。缺席 = 这拍没探到（server 沿用上一拍硬件，没有上一拍则估算）。 */
+ *  推荐并发只消费核数与内存总量（静态量，不随运行中的步抖动）；可用内存、
+ *  load 与磁盘余量进依据显示。缺席 = 这拍没探到（server 沿用上一拍硬件，没有
+ *  上一拍则估算）。 */
 export const machineHardwareSchema = z.object({
   /** os.cpus().length。 */
   cpuCores: z.number().int().positive(),
+  /** os.totalmem()，MiB。可选：升级前落库的指纹没有此字段，读侧不得因此整行
+   *  解析失败；推荐公式对缺席者回落估算。 */
+  memoryTotalMb: z.number().int().nonnegative().optional(),
   /** os.freemem()，MiB。 */
   memoryAvailableMb: z.number().int().nonnegative(),
   /** os.loadavg()[0]，1 分钟负载。 */
