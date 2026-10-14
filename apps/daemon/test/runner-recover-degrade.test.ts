@@ -4,7 +4,10 @@
 // （#1260 语义保留）。失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug）
 //   2. recover + .jsonl 在 → 正常 continue，不触发降级
-//   3. 非 recover 执行期 continue 失败 → 步 failed 直传（#1260 语义保留）
+//   3. 非 recover 执行期 continue 失败 → 降级 new session，步成功，
+//      卡片注记「本机找不到会话」，投递文本含原任务（#1312）
+//   6. 执行期 continue 失败且 priorMachineId 不是本机 → 同样降级，
+//      注记改为「在另一台机器上」（#1312）
 //   4. journal.prompt 为 null + .jsonl 缺失 → 降级 new session，prompt 走
 //      buildTaskPrompt 单源（不静默空重发——写实现时有 prompt 即投递）
 //   5. chief 步 recover 同律（journal 面相同）
@@ -303,19 +306,21 @@ describe('#1286 recover 面会话降级', () => {
     expect(client.doneBodies[0]?.body.status).toBe('success');
   });
 
-  test('3. 非 recover（无 opts.resume）→ continue 失败直传步 failed（#1260 语义保留）', async () => {
+  test('3. 非 recover（无 opts.resume）→ continue 失败降级 new session，步成功（#1312）', async () => {
     const claimed = execStep(SESSION_ID);
-    const { backend, calls } = recoveringBackend(true);
-    const { client } = await runExec(claimed, backend);
+    const { backend, calls, prompts } = recoveringBackend(true);
+    const { client, lines } = await runExec(claimed, backend);
 
-    // continueSession 被调用并抛错，createSession 不被调用（执行面不降级）
-    expect(calls).toEqual(['continue']);
-    // 步失败
+    expect(calls).toEqual(['continue', 'create']);
+    expect(prompts).toEqual([expect.stringContaining(TASK.spec)]);
     expect(client.doneBodies).toHaveLength(1);
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    // 失败消息包含 SessionNotResumableError 文本
-    expect(client.doneBodies[0]?.body.errorMessage).toContain(SESSION_ID);
-    expect(client.doneBodies[0]?.body.errorMessage).toContain('not found');
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
+    const note = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'system' && String(message.content).includes(SESSION_ID));
+    expect(String(note?.content)).toContain('本机找不到会话');
+    expect(lines.join('\n')).toContain('falling back to new session');
   });
 
   test('4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发）', async () => {
@@ -350,5 +355,20 @@ describe('#1286 recover 面会话降级', () => {
     expect(calls.indexOf('create')).toBeGreaterThan(calls.indexOf('continue'));
     expect(client.doneBodies).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('success');
+  });
+
+  test('6. 执行期会话在另一台机器 → 降级，注记点名异机（#1312）', async () => {
+    const claimed = execStep(SESSION_ID);
+    (claimed.session as { priorMachineId?: string }).priorMachineId = 'other-box';
+    const { backend, calls } = recoveringBackend(true);
+    const { client } = await runExec(claimed, backend);
+
+    expect(calls).toEqual(['continue', 'create']);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    const note = client.uploads
+      .flatMap((upload) => upload.messages)
+      .find((message) => message.role === 'system');
+    expect(String(note?.content)).toContain('另一台机器');
+    expect(String(note?.content)).not.toContain('本机找不到会话');
   });
 });
