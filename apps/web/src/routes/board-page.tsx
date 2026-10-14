@@ -536,9 +536,8 @@ export function BoardPage() {
     [live, todos, fixture.now, teamId, mutations.patchTodo, queryClient, t],
   );
 
-  // #901 done 落位闸：闸相位（confirm/review）有变更产物的卡拖向已完成 =
-  // 跳过合并语义，先开确认弹层（判据单源 board.tsx needsDoneGate）。取消 =
-  // 零提交（拖拽路由未写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路
+  // #1247 done 落位闸：待处理卡拖向已完成先开确认弹层（判据单源
+  // columns.needsDoneGate）。取消 = 零提交（拖拽路由未写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路
   // （fixture 本地集 / live 乐观 PATCH + server 审计行 #902）。无 reset 闸的
   // 快照/409 复核位：确认走的是普通改相 PATCH，竞态由乐观回滚 + toast 兜底
   // （#638 同律），不需要 stale 重确认面。

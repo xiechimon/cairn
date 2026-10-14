@@ -3,8 +3,8 @@
 //   · 执行中 只吃 待开始 源（PATCH building 仅 todo/queued 源放行）；
 //   · 待处理（落点正名 review）只吃 已完成 源，且要变更产物（hasChanges 数据
 //     闸在 updateTodo——无变更 done 卡参考站恒素面，raw PATCH 同判 409）；
-//   · 已完成 吃 待开始/执行中/待处理 源，failed 除外（#702：failed→done 保持
-//     非法，done 只能经合并步落地）；failed→review 仍走 #702 动作面专属 409；
+//   · 已完成 吃 待开始/执行中/待处理 源，含 failed（#1247，不要求 hasChanges）；
+//     failed→review 仍走 #702 动作面专属 409；
 //   · 同列 / closed 源 / 非落点相 恒 409（漏斗兜底）。
 // 分层不新设：PATCH 面 = 手动矩阵 ∪ 系统漏斗（矩阵只扩权——漏斗非法的列迁
 // 移边放行；漏斗合法边照旧通过，不因矩阵收窄）。拖拽手势的非法对由客户端

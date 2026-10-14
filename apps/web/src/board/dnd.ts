@@ -14,7 +14,7 @@
 // order remains the persisted truth (02 §6.2). #753（2026-10-03/04 重测，推翻
 // #351「待处理不作落点」）: 合法边 = columns.ts canDropOnColumn 的 per-source
 // 矩阵单源——待处理 吃 已完成(有变更) 的重开落位（写 review），failed→已完成
-// 不收（#702），执行中 只吃 待开始。执行中 does not route through here at
+// 收（#1247，确认闸在 needsDoneGate），执行中 只吃 待开始。执行中 does not route through here at
 // all — its drop hands the todo to the start path (board.tsx onStartIntent,
 // #640 直发编排；2026-10-04 实测参考站该落位开 开始任务 dialog，差异归后续
 // 票，本仓载体不动).
@@ -27,14 +27,12 @@ export const DRAG_THRESHOLD_PX = 5;
 
 /**
  * Commit a cross-column drop: rewrite the phase to the target column's
- * canon (BoardColumnDef.dropPhase) with a fresh phaseAt so the in-column
- * relative time restarts, landing the card at the END of the target
- * column's view (#616: the reference keeps no manual in-column rank —
- * done 列是时间序，改相卡落尾即「最新」). Identity returns: unknown
- * todo/column, and every pair canDropOnColumn rejects (#753 per-source
- * matrix — same-column, 待开始→待处理, →执行中 from 待处理/已完成,
- * 无变更 done→待处理, failed→已完成). Every column's view order is
- * written back as sequential `orderIndex`.
+ * canon (BoardColumnDef.dropPhase) with a fresh phaseAt. The done column
+ * view sorts that timestamp descending (#1247), so the fresh card is the
+ * top row. Identity returns: unknown todo/column, and every pair
+ * canDropOnColumn rejects (#753 per-source matrix — same-column,
+ * 待开始→待处理, →执行中 from 待处理/已完成, 无变更 done→待处理).
+ * Every column's view order is written back as sequential `orderIndex`.
  */
 export function moveTodo(
   todos: TodoRecord[],

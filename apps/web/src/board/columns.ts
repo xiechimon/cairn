@@ -42,10 +42,13 @@ export function isPinnedBuilding(todo: TodoRecord): boolean {
   return todo.phase === 'failed' || (todo.phase === 'review' && todo.awaitingReply === true);
 }
 
-/** Column view order: pinned group first in 待处理, then the committed
- *  manual order (`orderIndex`, 01 §4.1); Array.sort is stable, so the
- *  all-zero fixture indices keep capture order untouched. */
+/** Column view order. 待处理 keeps the pinned group, then `orderIndex`.
+ *  已完成 is completion time (`phaseAt` desc, #1247); `orderIndex` breaks ties.
+ *  Other columns stay on `orderIndex` (01 §4.1). */
 export function sortColumnTodos(column: BoardColumnDef, todos: TodoRecord[]): TodoRecord[] {
+  if (column.id === 'done') {
+    return [...todos].sort((x, y) => y.phaseAt - x.phaseAt || x.orderIndex - y.orderIndex);
+  }
   const pinnedRank = (t: TodoRecord) => (column.id === 'pending' && isPinnedBuilding(t) ? 0 : 1);
   return [...todos].sort((x, y) => pinnedRank(x) - pinnedRank(y) || x.orderIndex - y.orderIndex);
 }
@@ -99,8 +102,8 @@ export const COLUMNS: BoardColumnDef[] = [
  *    待处理/已完成 源对它恒素面（实测）；
  *  - 待处理 只吃 已完成 且 hasChanges（2026-10-04 实测：无变更的 done 卡
  *    拖拽时 待处理 恒素面）；待开始→待处理 恒素面（实测，#351 该对保留）；
- *  - 已完成 吃 待开始/执行中/待处理，failed 卡除外（#702：failed→done 保持
- *    非法——列级染色不许撒谎，客户端同判不收边）；
+ *  - 已完成 吃 待开始/执行中/待处理，含 failed（#1247 手动关边，不看
+ *    hasChanges）。系统漏斗仍拒 failed→done。落位前确认见 needsDoneGate。
  *  - 执行中 源行未测（参考站机器离线）：沿用本仓既有语义 [设计]。 */
 export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
   const src = COLUMNS.find((c) => c.accepts(todo));
@@ -114,7 +117,7 @@ export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
     case 'pending':
       return src.id === 'done' && todo.hasChanges === true;
     case 'done':
-      return todo.phase !== 'failed';
+      return true;
     default:
       return false;
   }
@@ -132,14 +135,11 @@ export function needsResetGate(todo: TodoRecord): boolean {
   return todo.latestBuildId != null || todo.lastRunAt != null || todo.hasChanges || todo.hasPlan;
 }
 
-/** done 落位闸判据（#901，#892 §6 建议 2）：闸相位（confirm/review）且**有
- *  产物在审**（hasChanges）的卡拖向 已完成 = 跳过两道硬闸的全部语义，要显式
- *  确认弹层（复用 #755 reset 闸形态）；取消 = 零提交。无变更产物的闸相位卡
- *  （测试卡/寒暄卡人肉清理，#892 实证 10 张）与其余拖拽保持静默改相——数据
- *  不支持砍掉拖拽捷径本身。server 审计行面更宽（闸相位 done 落地一律落行，
- *  todos.ts updateTodo #902）：弹层是 UI 位，行是审计位，两判据不共用。 */
+/** Done-drop confirm (#1247). Cards in 待处理 (confirm / review / failed)
+ *  ask before the phase write. hasChanges does not decide this. 待开始 and
+ *  执行中 still drop straight through. Cancel writes nothing. */
 export function needsDoneGate(todo: TodoRecord): boolean {
-  return (todo.phase === 'confirm' || todo.phase === 'review') && todo.hasChanges === true;
+  return todo.phase === 'confirm' || todo.phase === 'review' || todo.phase === 'failed';
 }
 
 /** Phase → primary card action, copy from the shared PHASE_UI table.

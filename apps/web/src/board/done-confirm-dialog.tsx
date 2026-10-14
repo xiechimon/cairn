@@ -1,10 +1,9 @@
-// 已完成确认 dialog（#901，#892 §6 建议 2）：闸相位（confirm/review）且有
-// 变更产物的卡拖向 已完成 = 跳过两道硬闸的全部语义（不发起合并、无机器
-// 落地步），要求显式确认——复用 #755 reset 闸形态（DialogShell + 头 + 说明
-// 清单 + footer 取消/确认）。取消 = 零提交（board.tsx 落位路由在 opened 前
-// 不写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路（fixture 本地集 /
-// live 乐观 PATCH），server 侧同落审计行（todos.ts updateTodo #902，raw
-// PATCH 绕弹层同样有痕）。
+// 已完成确认 dialog（#901，#1247）：待处理卡（confirm / review / failed）
+// 拖向已完成先确认，不看 hasChanges。复用 #755 reset 闸形态（DialogShell +
+// 头 + 说明清单 + footer 取消/确认）。取消 = 零提交（board.tsx 落位路由在
+// opened 前不写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路（fixture
+// 本地集 / live 乐观 PATCH）。这条 PATCH 不调用 cancelBuild，也不走
+// AcceptDialog 的合并步。
 
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -43,14 +42,14 @@ export function DoneConfirmDialog({ open, onClose, onConfirm }: DoneConfirmDialo
           清单、12/16 tertiary 尾注。外垫随壳 DialogContent p-4。 */}
       <div className="block">
         <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--text-primary)">
-          {t('这张卡有正在验收的变更产物，直接拖到已完成会跳过合并：')}
+          {t('将中断在飞构建并标记完成。PR 不会自动合并。')}
         </p>
         <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--text-primary)">
-          <li>{t('变更不会合入默认分支；已开出的 PR 保持原状')}</li>
-          <li>{t('任务立即进入已完成列，不再等待验收')}</li>
+          <li>{t('在飞构建会停下，任务进入已完成列')}</li>
+          <li>{t('已开出的 PR 保持原状，不会自动合并')}</li>
         </ul>
         <p className="m-0 text-xs leading-4 text-(--text-tertiary)">
-          {t('本次操作会记入任务时间线。需要合入变更时，请取消并改用卡片上的 完成 按钮走合并。')}
+          {t('取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。')}
         </p>
       </div>
     </DialogShell>

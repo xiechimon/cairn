@@ -139,14 +139,12 @@ export const EN: Record<string, string> = {
     'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
   '把任务标记为已完成？': 'Mark the task as done?',
   确认完成: 'Confirm done',
-  '这张卡有正在验收的变更产物，直接拖到已完成会跳过合并：':
-    'This card has changes awaiting acceptance — dragging it straight to Done skips the merge:',
-  '变更不会合入默认分支；已开出的 PR 保持原状':
-    'The changes will not be merged into the default branch; an open PR stays as is',
-  '任务立即进入已完成列，不再等待验收':
-    'The task moves to Done immediately, no longer awaiting acceptance',
-  '本次操作会记入任务时间线。需要合入变更时，请取消并改用卡片上的 完成 按钮走合并。':
-    'This action is recorded in the task timeline. To merge the changes, cancel and use the card’s Done button instead.',
+  '将中断在飞构建并标记完成。PR 不会自动合并。':
+    'This stops an in-flight build and marks the task done. The PR will not merge on its own.',
+  '在飞构建会停下，任务进入已完成列': 'An in-flight build stops, and the task moves to Done.',
+  '已开出的 PR 保持原状，不会自动合并': 'An open PR stays as it is and will not merge on its own.',
+  '取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
+    'Cancel leaves the card where it is. To merge the changes, use the Done button on the card.',
   发送: 'Send',
   '当前没有运行中的会话，消息未送出': 'No active run — the message was not delivered',
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',

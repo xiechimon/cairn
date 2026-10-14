@@ -43,9 +43,8 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   // 与只重跑审核两出口共用）。合法性数据依赖，静态表不可表达：边表只记
   // 「这条流转在相位机上合法」，数据闸进服务端判定（builds.ts restoreFailedReview
   // = 唯一放行点，REST merge / steps action review / chief merge_builds 三生产者
-  // 同摄）；手动 PATCH 面拒收（todos.ts——review 不在手动落点集，raw 改相无
-  // 数据闸）。恢复 ≠ 审核通过：落 review 关口等人工决策，done 仍只能经合并步
-  // 落地（failed→done 保持非法）。
+  // 同摄）；手动 PATCH 面拒收 failed→review（todos.ts）。恢复 ≠ 审核通过。
+  // 系统漏斗仍拒 failed→done。手动列迁移另走 canBoardDrop（#1247）。
   failed: ['queued', 'closed', 'review'],
   closed: ['todo'], // reopen [推断]（MCP reopen_todos 词表证据，wire 未采）
 };
@@ -57,8 +56,8 @@ export function canTransitionPhase(from: Phase, to: Phase): boolean {
 /** 手动改相面（#160 看板拖拽）：HTTP PATCH phase = 用户手动列迁移
  *  （onboarding P2 r3 §3.10「在桌面端可将卡片直接拖拽至目标列」）。
  *  边级判据单源 = shared canBoardDrop（#753 per-source 矩阵：执行中 只吃
- *  待开始、待处理 只吃 已完成〔review 落点正名〕、failed→done 保持非法
- *  〔#702〕；旧 #351 平面白名单被 2026-10-03/04 参考站重测推翻）。系统流
+ *  待开始、待处理 只吃 已完成〔review 落点正名〕、failed→done 在手动面放行
+ *  〔#1247〕；旧 #351 平面白名单被 2026-10-03/04 参考站重测推翻）。系统流
  *  （setTodoPhase / MCP update_todo）仍走上方漏斗不变。[设计]——官方 PATCH
  *  wire 未抓（2026-10-04 实测参考站落位走 POST complete/uncomplete 语义
  *  端点），手动面语义为复刻裁定。 */

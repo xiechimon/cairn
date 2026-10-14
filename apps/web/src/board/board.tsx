@@ -211,8 +211,8 @@ export function BoardSurface({
       const column = COLUMNS.find((c) => c.id === overColumnId);
       if (column?.startGate === true) onStartIntent?.(dragged);
       else if (overColumnId === 'todo' && needsResetGate(dragged)) onResetIntent?.(dragged);
-      // #901 done 落位闸：闸相位有产物在审的卡要先显式确认（跳过合并语义），
-      // 确认前零提交；其余落位保持静默改相（判据单源 columns.needsDoneGate）。
+      // #1247 done 落位闸：待处理卡（confirm/review/failed）先确认，确认前零提交。
+      // 其余落位保持静默改相（判据单源 columns.needsDoneGate）。
       else if (overColumnId === 'done' && needsDoneGate(dragged)) onDoneIntent?.(dragged);
       else if (overColumnId != null) onPhaseDrop?.(dragged, overColumnId);
     }
