@@ -314,8 +314,8 @@ export function homeMachineRejectReason(
 //       2 核 / 2GiB 可用 → min(2, floor(2/2)) = 1；没有指纹 → 3，并标估算。
 // 方案：recommended = clamp(min(核数, floor(可用MiB / (1024 * 每槽GiB))), 1, 16)。
 // 16 是既有 PATCH 写域（#1108，1..16）的上沿，不是覆盖用户之后再加的第二道闸。
-// 用户写过的数心跳不再改（maxConcurrentOverridden）。负载暂停只作用在自动
-// 路径，不改存储的数，不杀在跑的步；手动覆盖时暂停不生效。
+// 用户写过的数心跳不再改（maxConcurrentOverridden）。server 不在推荐值之上
+// 再加封顶或暂停：负载/内存的动态降载是后续票，需要 owner 另行确认。
 
 /** 推荐值下沿（写域与 #1108 PATCH 相同）。 */
 export const CONCURRENCY_FLOOR = 1;
@@ -325,15 +325,6 @@ export const CONCURRENCY_CEILING = 16;
 export const MEMORY_GB_PER_SLOT = 2;
 /** 没有可用指纹时的保守默认（与 machine.maxConcurrent 列默认相同）。 */
 export const CONSERVATIVE_CONCURRENCY = 3;
-/** 自动路径：1 分钟负载超过核数的这个倍数 → 暂停新 claim。 */
-export const LOAD_PAUSE_PER_CORE = 1.5;
-/** 自动路径：负载降到核数的这个倍数（且内存回升）才恢复。低于暂停线，形成滞回。 */
-export const LOAD_RESUME_PER_CORE = 1;
-/** 自动路径：可用内存低于这个数（MiB）→ 暂停新 claim。 */
-export const MEMORY_PAUSE_AVAILABLE_MB = 512;
-/** 自动路径：可用内存回到这个数（MiB）才允许从暂停恢复。 */
-export const MEMORY_RESUME_AVAILABLE_MB = 1024;
-
 export interface ConcurrencyRecommendation {
   value: number;
   source: 'measured' | 'estimate';
@@ -356,22 +347,4 @@ export function recommendMachineConcurrency(
   const raw = Math.min(hardware.cpuCores, byMemory);
   const value = Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, raw));
   return { value, source: 'measured' };
-}
-
-/** 负载暂停的下一态。无指纹 → 不暂停（没有依据就不造暂停）。
- *  未暂停时越阈才进入；已暂停时必须同时落到两条恢复线以下才离开。 */
-export function nextConcurrencyPaused(
-  wasPaused: boolean,
-  hardware: MachineHardware | null | undefined,
-): boolean {
-  if (hardware == null) return false;
-  const pauseLoad = hardware.cpuCores * LOAD_PAUSE_PER_CORE;
-  const resumeLoad = hardware.cpuCores * LOAD_RESUME_PER_CORE;
-  const over =
-    hardware.loadAvg1 > pauseLoad || hardware.memoryAvailableMb < MEMORY_PAUSE_AVAILABLE_MB;
-  const under =
-    hardware.loadAvg1 <= resumeLoad && hardware.memoryAvailableMb >= MEMORY_RESUME_AVAILABLE_MB;
-  if (!wasPaused) return over;
-  if (under) return false;
-  return true;
 }

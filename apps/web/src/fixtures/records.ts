@@ -422,7 +422,6 @@ export interface MachineRow {
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
   concurrencySource?: 'measured' | 'estimate' | 'manual';
-  concurrencyPaused?: boolean;
 }
 
 /** The six resource surfaces' row sets (issue #69). */

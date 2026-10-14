@@ -587,7 +587,6 @@ export const EN: Record<string, string> = {
   手动: 'Manual',
   推荐: 'Recommended',
   估算: 'Estimate',
-  已暂停领取: 'Claims paused',
   '推荐 {n}': 'Recommended {n}',
   '依据：核 {cores} · 可用内存 {gib} GiB · 负载 {load}':
     'Basis: {cores} cores · {gib} GiB available memory · load {load}',

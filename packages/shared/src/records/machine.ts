@@ -57,9 +57,6 @@ export const machineRecordSchema = z.object({
   /** #1241：manual = 用户覆盖；measured = 推荐值来自硬件；estimate = 没有
    *  可用指纹，maxConcurrent 是保守默认。缺席 = 老 server。 */
   concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
-  /** #1241：自动路径下负载/可用内存越阈，新 claim 暂停（在跑的步不动）。
-   *  manual 时恒 false（用户的数是闸，server 不再加一层暂停）。缺席 = 老 server。 */
-  concurrencyPaused: z.boolean().optional(),
   /** 该机当前 claimed 非 chief 步数（#1108 排队可见的机器面读数，`执行中 n/N`
    * n；#1148 起 chief 在跑不进 n——n 恒 ≤ N）：读侧派生（listSteps/claim
    * 时点计数），不落库。optional 形同 maxConcurrent——老 server 缺席时机器

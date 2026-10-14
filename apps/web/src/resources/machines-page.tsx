@@ -442,14 +442,6 @@ export function MachinesPage() {
                   ml-5 间距：两组控件视觉同档。 */}
               {machine.maxConcurrent !== undefined && (
                 <span className="ml-5 flex flex-none items-center gap-2.5">
-                  {machine.concurrencyPaused === true && (
-                    <span
-                      className="text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
-                      data-concurrency-paused
-                    >
-                      {t('已暂停领取')}
-                    </span>
-                  )}
                   {machine.runningSteps !== undefined && (
                     <span
                       className="text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"

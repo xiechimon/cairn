@@ -1168,7 +1168,6 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
       ? { recommendedConcurrent: m.recommendedConcurrent }
       : {}),
     ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
-    ...(m.concurrencyPaused !== undefined ? { concurrencyPaused: m.concurrencyPaused } : {}),
   }));
 }
 

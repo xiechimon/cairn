@@ -1136,14 +1136,6 @@
           "autoincrement": false,
           "default": false
         },
-        "concurrencyPaused": {
-          "name": "concurrencyPaused",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "lastSeenAt": {
           "name": "lastSeenAt",
           "type": "integer",

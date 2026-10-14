@@ -5,7 +5,6 @@
 // 失败方式（先于实现固化，仓测试纪律）：
 // B1 非默认存量值没转成覆盖 → 升级后首拍心跳把用户的数改成推荐值（用户值不持久）。
 // B2 默认 3 的存量行被标成覆盖 → 存量机器永远吃不到推荐值（功能对存量失效）。
-// B3 concurrencyPaused 新列不是 false → 升级即暂停全部存量机器。
 //
 // 定位律承 agent-skills-split-backfill（#1169）：按内容找含 maxConcurrentOverridden
 // 回填 UPDATE 的那条，迁移序号不写死（撞号纪律：合并期重编号后零改动）。
@@ -80,20 +79,17 @@ function buildPreBackfillDb(rows: { id: string; maxConcurrent: number }[]): stri
   return dbPath;
 }
 
-function readFlags(
-  dbPath: string,
-  id: string,
-): { maxConcurrentOverridden: number; concurrencyPaused: number } {
+function readFlags(dbPath: string, id: string): { maxConcurrentOverridden: number } {
   const sqlite = new Database(dbPath, { readonly: true });
   const row = sqlite
-    .prepare('SELECT maxConcurrentOverridden, concurrencyPaused FROM machine WHERE id = ?')
-    .get(id) as { maxConcurrentOverridden: number; concurrencyPaused: number };
+    .prepare('SELECT maxConcurrentOverridden FROM machine WHERE id = ?')
+    .get(id) as { maxConcurrentOverridden: number };
   sqlite.close();
   return row;
 }
 
 describe('#1241 机器并发覆盖位回填（存量用户值持久 + 默认行吃推荐值）', () => {
-  test('升级前旧库 → 补跑回填：B1 非默认值转覆盖，B2 默认 3 不覆盖，B3 暂停位为 0', () => {
+  test('升级前旧库 → 补跑回填：B1 非默认值转覆盖，B2 默认 3 不覆盖', () => {
     const dbPath = buildPreBackfillDb([
       { id: 'cc-user-5', maxConcurrent: 5 },
       { id: 'cc-user-16', maxConcurrent: 16 },
@@ -103,17 +99,8 @@ describe('#1241 机器并发覆盖位回填（存量用户值持久 + 默认行�
     migrate(drizzle(sqlite, { schema }), { migrationsFolder: MIGRATIONS_FOLDER });
     sqlite.close();
 
-    expect(readFlags(dbPath, 'cc-user-5')).toEqual({
-      maxConcurrentOverridden: 1,
-      concurrencyPaused: 0,
-    });
-    expect(readFlags(dbPath, 'cc-user-16')).toEqual({
-      maxConcurrentOverridden: 1,
-      concurrencyPaused: 0,
-    });
-    expect(readFlags(dbPath, 'cc-default-3')).toEqual({
-      maxConcurrentOverridden: 0,
-      concurrencyPaused: 0,
-    });
+    expect(readFlags(dbPath, 'cc-user-5')).toEqual({ maxConcurrentOverridden: 1 });
+    expect(readFlags(dbPath, 'cc-user-16')).toEqual({ maxConcurrentOverridden: 1 });
+    expect(readFlags(dbPath, 'cc-default-3')).toEqual({ maxConcurrentOverridden: 0 });
   });
 });

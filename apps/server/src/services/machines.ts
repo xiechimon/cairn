@@ -118,7 +118,6 @@ import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
-  nextConcurrencyPaused,
   recommendMachineConcurrency,
   runtimeGatePasses,
   unassignedStepReason,
@@ -316,12 +315,11 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     shellEnabled: row.shellEnabled,
     // #1108：并发上限（DB 真值）+ 在跑计数（读侧派生，调用方传——缺席 =
     // 不渲染并发面的读端（如老调用面），maxConcurrent 恒随行）。
-    // #1241：来源与推荐值随行。覆盖时暂停位对读面关掉（claim 同样不读它）。
+    // #1241：来源与推荐值随行。
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,
     concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
-    concurrencyPaused: row.concurrencyPaused && !row.maxConcurrentOverridden,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     // #1251：能力清单三态随行（清单 / null = 从未上报 / 列缺省不成立——
     // server 恒发全块，nullish 形只留给老 server 响应的解析兼容）。
@@ -350,46 +348,37 @@ function mergeReportedCapabilities(
   return reported;
 }
 
-/** 心跳/注册写点：未覆盖时把推荐值落 maxConcurrent；暂停位按滞回更新。
- *  覆盖中的行不改 maxConcurrent。 */
+/** 心跳/注册写点：未覆盖时把推荐值落 maxConcurrent。覆盖中的行不改 maxConcurrent。 */
 function reportedConcurrencyPatch(
   row: {
     maxConcurrentOverridden: boolean;
-    concurrencyPaused: boolean;
     capabilities: MachineCapabilities | null;
   },
   reported: MachineCapabilities,
 ): {
   capabilities: MachineCapabilities;
-  concurrencyPaused: boolean;
   maxConcurrent?: number;
 } {
   const capabilities = mergeReportedCapabilities(row.capabilities, reported);
   const recommendation = recommendMachineConcurrency(capabilities.hardware);
   return {
     capabilities,
-    concurrencyPaused: nextConcurrencyPaused(row.concurrencyPaused, capabilities.hardware),
     ...(!row.maxConcurrentOverridden ? { maxConcurrent: recommendation.value } : {}),
   };
 }
 
 /** PATCH /api/machines/{id} 的并发半边（#1241）。数字 = 覆盖并持久；
- *  null = 清除覆盖，按当前指纹重算（无指纹 = 保守默认）并重算暂停位。 */
+ *  null = 清除覆盖，按当前指纹重算（无指纹 = 保守默认）。 */
 export function machineConcurrencyPatch(
   row: typeof machine.$inferSelect,
   maxConcurrent: number | null,
 ): {
   maxConcurrent: number;
   maxConcurrentOverridden: boolean;
-  concurrencyPaused?: boolean;
 } {
   if (maxConcurrent === null) {
     const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
-    return {
-      maxConcurrent: recommendation.value,
-      maxConcurrentOverridden: false,
-      concurrencyPaused: nextConcurrencyPaused(row.concurrencyPaused, row.capabilities?.hardware),
-    };
+    return { maxConcurrent: recommendation.value, maxConcurrentOverridden: false };
   }
   return { maxConcurrent, maxConcurrentOverridden: true };
 }
@@ -508,7 +497,7 @@ export function enrollMachine(
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
         ? reportedConcurrencyPatch(
-            { maxConcurrentOverridden: false, concurrencyPaused: false, capabilities: null },
+            { maxConcurrentOverridden: false, capabilities: null },
             capabilities,
           )
         : {}),
@@ -917,9 +906,6 @@ async function tryClaim(
   const { db } = deps;
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
-  // #1241：自动路径的负载暂停。不改在跑的步，不改存储的 maxConcurrent。
-  // 用户覆盖时不读暂停位（用户的数是闸，server 不再加一层封顶）。
-  if (machineRow.concurrencyPaused && !machineRow.maxConcurrentOverridden) return null;
   // #1108 并发门（maxConcurrent）：本机 claimed 步数达上限 = 步不发，留
   // pending 排队（对归属本机的步即该机队列）。机器释放空位（finishStep
   // 终态 wake）后下一轮 claim 即领。老 daemon（串行循环）恒 1 ≤ N，闸对
