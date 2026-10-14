@@ -141,6 +141,10 @@ export const claimedStepSchema = z.object({
   session: z.object({
     action: z.enum(['new', 'continue']),
     sessionId: z.string().nullable(),
+    /** #1312：上一轮会话所在机器。仅当它与本步领取机不同时携带（换绑 /
+     *  迁移后会话文件还在旧机器上）。同机或缺省 = 旧 daemon 形，zod strip
+     *  无版本墙。 */
+    priorMachineId: z.string().optional(),
   }),
   /** 续轮指令（server 合成 [设计]）：驳回 feedback 注入重规划轮（r5 §4
    * 「v2 内容忠实执行反馈」的宿主等价物）、chief 回合任务文本/wake 事实。

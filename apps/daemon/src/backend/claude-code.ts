@@ -514,9 +514,11 @@ export function toImageBlock(img: DeliveredImage): {
   };
 }
 
-/** CLI 会话 store 惯例 [推断]（r4-foundation 调研；Multica claude.go:936-972
- *  同源）：~/.claude/projects/<cwd-slug>/<sessionId>.jsonl。存在性 = resume
- *  资格的本地判据（空 store/换机 → SessionNotResumableError 冷重试一次）。
+/** CLI 会话 store（Claude Code 2.1.278 实测，#1312）：
+ *  ~/.claude/projects/<cwd-slug>/<sessionId>.jsonl。slug 把解析后 cwd 里
+ *  每个非字母数字字符换成 `-`（`/`、`.`、`_` 都算）。只替换 `/` 时
+ *  `~/.pacman` 工作区的预检路径与 CLI 落盘目录不一致，continue 在文件
+ *  还在的情况下被判 miss。
  *  cwd 先过 realpath：CLI 子进程 cwd 由内核解析符号链接（macOS 工作区
  *  /tmp → /private/tmp），slug 按解析后路径计——不解析则 /tmp 起头的工作区
  *  预检恒 miss（#622 verify 实跑：resume 恒回退冷启）。 */
@@ -531,7 +533,7 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
     homedir(),
     '.claude',
     'projects',
-    resolved.replaceAll('/', '-'),
+    resolved.replace(/[^a-zA-Z0-9]/g, '-'),
     `${sessionId}.jsonl`,
   );
 }
