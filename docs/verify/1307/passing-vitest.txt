@@ -1,0 +1,12 @@
+
+ RUN  v5.0.1 /workspace/apps/daemon
+
+ ✓ test/claude-mcp-strict.test.ts > claude-code spawn MCP isolation (#1307) > 空 allowlist：--strict-mcp-config，不带 --mcp-config，setting sources 仍在 17ms
+ ✓ test/claude-mcp-strict.test.ts > claude-code spawn MCP isolation (#1307) > 仅 in-process pacman：严格模式，argv 不序列化 sdk server 7ms
+ ✓ test/claude-mcp-strict.test.ts > claude-code spawn MCP isolation (#1307) > 显式 stdio 端点：--mcp-config 只有该端点，并带严格模式 4ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  13:34:09
+   Duration  714ms (import 80%, transform 15%, tests 5%)
+
