@@ -1,0 +1,21 @@
+PASS  daemon online before dispatch — YK53FoXnOgvoJQ5Tre31x
+PASS  agent created — p8GxIMo7ts-EGb5oVkyNv
+PASS  resume plan done — done 
+PASS  CLI slug file exists — /home/ubuntu/.claude/projects/-home-ubuntu--pacman-1312-after-workspaces-01a13ae0-6601-75dc-80c8-76b2cd30e5a6/e54fb25b-d646-4d6b-9ed8-f7a003545920.jsonl
+PASS  slash-only path still absent — /home/ubuntu/.claude/projects/-home-ubuntu-.pacman-1312-after-workspaces-01a13ae0-6601-75dc-80c8-76b2cd30e5a6/e54fb25b-d646-4d6b-9ed8-f7a003545920.jsonl
+PASS  build resumed — done 
+PASS  build kept the plan session — e54fb25b-d646-4d6b-9ed8-f7a003545920 -> e54fb25b-d646-4d6b-9ed8-f7a003545920
+PASS  daemon logged continue session
+PASS  resume did not degrade
+PASS  marker committed in the resumed worktree — /home/ubuntu/.pacman-1312-after/workspaces/01a13ae0-6601-75dc-80c8-76b2cd30e5a6/session-resume-marker.txt
+PASS  degrade plan done — done
+PASS  degrade plan session file exists before delete — /home/ubuntu/.claude/projects/-home-ubuntu--pacman-1312-after-workspaces-01a13ae0-77e0-71b3-9ac2-5394c72567f7/ed05482f-b9da-409a-b2e9-7952a673c66b.jsonl
+PASS  session file removed
+PASS  degraded build finished — done 
+PASS  degraded build opened a fresh session — 13f473a0-e9b4-43b0-a26f-ca1409bc961d
+PASS  daemon logged the degrade
+PASS  note says the session was lost on this machine
+PASS  card stored the degrade note
+PASS  degraded worktree still wrote the marker — /home/ubuntu/.pacman-1312-after/workspaces/01a13ae0-77e0-71b3-9ac2-5394c72567f7/session-resume-marker.txt
+19/19
+EXIT:0

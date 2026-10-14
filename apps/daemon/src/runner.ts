@@ -33,6 +33,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendConfirmedPlanNote,
   appendPlanLocationNote,
   appendWorkBranchNote,
   BRAND,
@@ -259,6 +260,51 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
     return composeTaskPromptWithInstruction(taskText, buildPlanFirstRoundInstruction());
   }
   return taskText;
+}
+
+/** #1312：continue 预检失败时卡片上的注记。priorMachineId 与领取机不同
+ *  = 会话文件在另一台机器；否则是本机 store 里没有这份会话。 */
+function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
+  const prior = claimed.session.priorMachineId;
+  if (prior !== undefined && prior !== claimed.step.machineId) {
+    return `会话 ${sessionId} 在另一台机器上，本机无法续接。已改开新会话，按原任务继续。`;
+  }
+  return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
+}
+
+/** 本机交接位上的非空 plan.md。plan 步写在 `<plansDir>/<convId>/plan.md`。
+ *  文件不在这台机器上，或内容为空白，返回 null。 */
+function confirmedPlanFile(plansDir: string, convId: string): string | null {
+  const planFile = join(plansDir, convId, PLAN_FILE_NAME);
+  try {
+    if (!existsSync(planFile)) return null;
+    return readFileSync(planFile, 'utf8').trim() !== '' ? planFile : null;
+  } catch {
+    return null;
+  }
+}
+
+/** #1312：执行面降级后的新会话不能只拿续轮占位句（那句假设上一轮上下文
+ *  还在）。任务文本走 buildTaskPrompt。build 步只在本机交接位已有非空
+ *  plan.md 时附位置注记（同一路径 = plan 步落盘位）。换机或文件缺失不编造
+ *  路径。 */
+function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: string): string {
+  let text = buildTaskPrompt(claimed);
+  if (claimed.step.kind === 'build') {
+    const planFile = confirmedPlanFile(plansDir, convId);
+    if (planFile !== null) text = appendConfirmedPlanNote(text, planFile);
+  } else if (claimed.step.kind === 'plan') {
+    text = appendPlanLocationNote(text, join(plansDir, convId, PLAN_FILE_NAME));
+  }
+  if (
+    (claimed.step.kind === 'build' ||
+      claimed.step.kind === 'merge' ||
+      claimed.step.kind === 'verify') &&
+    (claimed.project?.repo ?? null) !== null
+  ) {
+    text = appendWorkBranchNote(text, conversationBranch(convId));
+  }
+  return text;
 }
 
 // continue session 续轮指令 = shared CONTINUE_PROMPTS 单源（#612 起 web
@@ -1269,29 +1315,72 @@ export async function runStep(
   // 律）：第一轮零进展且终局错误命中自适配签名 → backend 翻 compat 旋钮 →
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
   let handle: AgentSessionHandle;
-  // #1286 会话续接失败双面语义：recover 面（opts.resume 在位，journal 持久
-  // 了 prompt）→ SessionNotResumableError 降级 new session 重发 journal.prompt
-  // （pi 懒落盘窗口重启时 .jsonl 缺失的兜底）；执行面（非 recover）→
-  // continue 失败直传步可见 failed（#1260 语义保留，不静默换新会话重跑）。
+  // #1286 / #1312：SessionNotResumableError 两面都降级 new session。
+  // recover 重发 journal.prompt（pi 懒落盘窗口的兜底）；journal.prompt 为
+  // null 仍显式失败。执行面（无 opts.resume）改投原任务，不把「方案已确认」
+  // 占位句发给一个没有上一轮上下文的新会话，并在开会话前把 journal 换成
+  // 这份原文（崩溃 recover 重发的就是它）。附件 token 按首轮同一解析面展开。
+  // 其它错误仍直传，步失败。
   const openSession = (): Promise<AgentSessionHandle> => {
     if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts).catch((err: unknown) => {
+    return backend.continueSession(continueId, sessionOpts).catch(async (err: unknown) => {
       if (!(err instanceof SessionNotResumableError)) throw err;
-      // recover 面降级（#1286）：journal.prompt 已在 sessionOpts 中，new
-      // session 重发。journal.prompt 为 null（无重发素材）→ 显式失败带可读
-      // 文案（不静默空重发占位句）。执行面（无 opts.resume）直传 #1260 语义。
-      if (opts.resume) {
-        if (opts.resume.prompt === null) {
-          throw new Error(
-            `recover step ${stepId}: continue session ${continueId} unavailable and no journal prompt to resend`,
-          );
-        }
-        logger.step(`continue session unavailable (${continueId}) — falling back to new session`);
-        continueId = null;
-        return backend.createSession(sessionOpts);
+      if (opts.resume?.prompt === null) {
+        throw new Error(
+          `recover step ${stepId}: continue session ${continueId} unavailable and no journal prompt to resend`,
+        );
       }
-      // 执行面直传（#1260 语义）
-      throw err;
+      const missed = continueId ?? '';
+      const note = resumeMissNote(missed, claimed);
+      logger.step(
+        `continue session unavailable (${missed}) — falling back to new session — ${note}`,
+      );
+      transcript.upsert({
+        id: `resume-miss-${stepId}`,
+        role: 'system',
+        content: note,
+        createdAt: now(),
+      });
+      if (!opts.resume) {
+        const fresh = degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
+        journal.update(stepId, {
+          prompt: fresh,
+          sessionAction: 'new',
+          sessionId: null,
+        });
+        let delivery = fresh;
+        let images: DeliveredImage[] | undefined;
+        if (!isChief) {
+          try {
+            const resolved = await resolveStepImages({
+              text: fresh,
+              stepId,
+              client,
+              materializeDir: deps.paths.stepAttachmentsDir,
+              log: (line) => logger.step(line),
+            });
+            delivery = resolved.text;
+            if (resolved.images.length > 0) images = [...resolved.images];
+          } catch (resolveErr) {
+            logger.step(
+              `attachment resolve failed (delivering raw text): ${
+                resolveErr instanceof Error ? resolveErr.message : String(resolveErr)
+              }`,
+            );
+          }
+        }
+        sessionOpts.prompt = delivery;
+        if (images !== undefined) sessionOpts.promptImages = images;
+        else delete sessionOpts.promptImages;
+        transcript.upsert({
+          id: transcriptPromptRowId(stepId),
+          role: 'user',
+          content: fresh,
+          createdAt: now(),
+        });
+      }
+      continueId = null;
+      return backend.createSession(sessionOpts);
     });
   };
   for (let pass = 0; ; pass++) {

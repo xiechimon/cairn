@@ -491,8 +491,8 @@ export function ProjectNewPage() {
         <Label className="mt-6 mb-2 leading-tight" htmlFor="prj-new-name">
           {t('项目名称')}
         </Label>
-        {/* Input 件默认形态（40 高手写盒 + 品牌 focus 配方退役——registry
-            几何赢：h-8 rounded-lg + focus ring-3）。 */}
+        {/* Input 件默认形态（h-8 rounded-lg）。#1244：focus 环是全局
+            2px --focus-ring outline。 */}
         <Input
           id="prj-new-name"
           type="text"

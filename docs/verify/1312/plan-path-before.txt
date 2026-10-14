@@ -1,0 +1,189 @@
+
+ RUN  v5.0.1 /workspace
+
+ × |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 任务文本 + 位置行 → task-prompt 6ms
+   → expected 'user' to be 'task-prompt' // Object.is equality
+ × |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 位置行叠工作分支注记 → task-prompt 1ms
+   → expected 'user' to be 'task-prompt' // Object.is equality
+ × |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 续轮占位句 + 位置行 → synthetic 1ms
+   → expected 'user' to be 'synthetic' // Object.is equality
+ ✓ |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 用户话语带位置行尾 → user 0ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 1. recover + .jsonl 缺失 → 降级 new session，步成功（主 bug 修复） 7ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 2. recover + .jsonl 在 → 正常 continue，不触发降级 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 3. 非 recover（无 opts.resume）→ continue 失败降级 new session，步成功（#1312） 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 4. journal.prompt 为 null + .jsonl 缺失 → 显式失败带可读文案（不静默空重发） 1ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 5. chief 步 recover + .jsonl 缺失 → 降级 new session，同律 2ms
+ ✓ |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 6. 执行期会话在另一台机器 → 降级，注记点名异机（#1312） 2ms
+ × |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 7. 本机交接位有非空 plan.md → 降级 prompt 指向该文件，wire 行不是用户气泡 9ms
+   → expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to contain '已确认方案位置：/tmp/pacman-runner-exec-kQB6l…'
+ × |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 8. 换机且本机没有 plan.md → 降级 prompt 不指向交接路径 3ms
+   → expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to be '降级探针\n\nrecover 降级到 new session 时此文本应…' // Object.is equality
+ × |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 9. 空白 plan.md 不当成交接物 3ms
+   → expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to be '降级探针\n\nrecover 降级到 new session 时此文本应…' // Object.is equality
+ × |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 10. 开会话前 journal 换成原任务，不再留续轮占位句 3ms
+   → expected '方案已确认。请按方案执行，完成改动。' to contain 'recover 降级到 new session 时此文本应进入会话。'
+ × |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 11. 降级 prompt 展开附件 token，不沿用续轮图片 3ms
+   → expected '降级探针\n\nrecover 降级到 new session 时此文本应…' not to contain 'attachment:'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 7. 本机交接位有非空 plan.md → 降级 prompt 指向该文件，wire 行不是用户气泡
+AssertionError: expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to contain '已确认方案位置：/tmp/pacman-runner-exec-kQB6l…'
+
+- Expected
++ Received
+
+- 已确认方案位置：/tmp/pacman-runner-exec-kQB6l1/plans/conv-1/plan.md
++ 降级探针
++
++ recover 降级到 new session 时此文本应进入会话。
++ 已确认的方案在 /tmp/pacman-runner-exec-kQB6l1/plans/conv-1/plan.md。请阅读该文件并按它执行。
+
+ ❯ test/runner-recover-degrade.test.ts:426:23
+    424|     expect(existsSync(planFile)).toBe(true);
+    425|     const delivered = prompts[0] ?? '';
+    426|     expect(delivered).toContain(`已确认方案位置：${planFile}`);
+       |                       ^
+    427|     expect(delivered).not.toContain('已确认的方案在');
+    428|     const user = client.uploads
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 8. 换机且本机没有 plan.md → 降级 prompt 不指向交接路径
+AssertionError: expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to be '降级探针\n\nrecover 降级到 new session 时此文本应…' // Object.is equality
+
+- Expected
++ Received
+
+  降级探针
+
+  recover 降级到 new session 时此文本应进入会话。
++ 已确认的方案在 /tmp/pacman-runner-exec-vVgYdV/plans/conv-1/plan.md。请阅读该文件并按它执行。
+
+ ❯ test/runner-recover-degrade.test.ts:441:24
+    439|     const absent = join(paths.plansDir, 'conv-1', PLAN_FILE_NAME);
+    440|     expect(existsSync(absent)).toBe(false);
+    441|     expect(prompts[0]).toBe(buildTaskPromptText(TASK.title, TASK.spec)…
+       |                        ^
+    442|     expect(prompts[0]).not.toContain(absent);
+    443|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 9. 空白 plan.md 不当成交接物
+AssertionError: expected '降级探针\n\nrecover 降级到 new session 时此文本应…' to be '降级探针\n\nrecover 降级到 new session 时此文本应…' // Object.is equality
+
+- Expected
++ Received
+
+  降级探针
+
+  recover 降级到 new session 时此文本应进入会话。
++ 已确认的方案在 /tmp/pacman-runner-exec-s5s9e7/plans/conv-1/plan.md。请阅读该文件并按它执行。
+
+ ❯ test/runner-recover-degrade.test.ts:455:24
+    453|       },
+    454|     });
+    455|     expect(prompts[0]).toBe(buildTaskPromptText(TASK.title, TASK.spec)…
+       |                        ^
+    456|   });
+    457|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 10. 开会话前 journal 换成原任务，不再留续轮占位句
+AssertionError: expected '方案已确认。请按方案执行，完成改动。' to contain 'recover 降级到 new session 时此文本应进入会话。'
+
+Expected: "recover 降级到 new session 时此文本应进入会话。"
+Received: "方案已确认。请按方案执行，完成改动。"
+
+ ❯ test/runner-recover-degrade.test.ts:472:26
+    470|     });
+    471|     expect(snap).not.toBeNull();
+    472|     expect(snap?.prompt).toContain(TASK.spec);
+       |                          ^
+    473|     expect(snap?.prompt).not.toContain(CONTINUE_PROMPTS.build);
+    474|     expect(snap?.sessionAction).toBe('new');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-recover-degrade.test.ts > #1286 recover 面会话降级 > 11. 降级 prompt 展开附件 token，不沿用续轮图片
+AssertionError: expected '降级探针\n\nrecover 降级到 new session 时此文本应…' not to contain 'attachment:'
+
+- Expected
++ Received
+
+- attachment:
++ 降级探针
++
++ recover 降级到 new session 时此文本应进入会话。
++
++ ![spec.png](attachment:t1/spec.png)
++
++ ![instr.png](attachment:t1/instr.png)
++ 已确认的方案在 /tmp/pacman-runner-exec-PtqVJs/plans/conv-1/plan.md。请阅读该文件并按它执行。
+
+ ❯ test/runner-recover-degrade.test.ts:504:27
+    502|     });
+    503|     const delivered = prompts[0] ?? '';
+    504|     expect(delivered).not.toContain('attachment:');
+       |                           ^
+    505|     expect(delivered).toContain('[image attached: spec.png]');
+    506|     expect(delivered).toContain('[image attached: instr.png]');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 任务文本 + 位置行 → task-prompt
+AssertionError: expected 'user' to be 'task-prompt' // Object.is equality
+
+Expected: "task-prompt"
+Received: "user"
+
+ ❯ test/confirmed-plan-note.test.ts:28:68
+     26|
+     27|   test('任务文本 + 位置行 → task-prompt', () => {
+     28|     expect(classifyUserText(`${TASK_TEXT}\n${NOTE}`.trim(), task)).toB…
+       |                                                                    ^
+     29|   });
+     30|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 位置行叠工作分支注记 → task-prompt
+AssertionError: expected 'user' to be 'task-prompt' // Object.is equality
+
+Expected: "task-prompt"
+Received: "user"
+
+ ❯ test/confirmed-plan-note.test.ts:33:53
+     31|   test('位置行叠工作分支注记 → task-prompt', () => {
+     32|     const composed = appendWorkBranchNote(`${TASK_TEXT}\n${NOTE}`, BRA…
+     33|     expect(classifyUserText(composed.trim(), task)).toBe('task-prompt'…
+       |                                                     ^
+     34|   });
+     35|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  |@pacman/shared| test/confirmed-plan-note.test.ts > classifyUserText 已确认方案位置行 > 续轮占位句 + 位置行 → synthetic
+AssertionError: expected 'user' to be 'synthetic' // Object.is equality
+
+Expected: "synthetic"
+Received: "user"
+
+ ❯ test/confirmed-plan-note.test.ts:37:81
+     35|
+     36|   test('续轮占位句 + 位置行 → synthetic', () => {
+     37|     expect(classifyUserText(`${CONTINUE_PROMPTS.build}\n${NOTE}`.trim(…
+       |                                                                                 ^
+     38|   });
+     39|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  8 failed | 7 passed (15)
+   Start at  17:14:58
+   Duration  2.37s (import 65%, transform 33%, tests 2%)
+

@@ -48,7 +48,7 @@ resolve+realpath 归一后落在技能根内 = 400（已被 pacman 现扫管理�
 1. `launch.mjs` 起栈（**命令行带 `NODE_USE_ENV_PROXY=1`**——见 gotcha 1）。
 2. `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node
    .claude/skills/verify-pacman/scripts/drive-1170-skill-import.mjs`。
-3. 判读 = `docs/verify/1170/README.md`（A/B/C/D 六面 30 checks）。
+3. 判读 = `docs/verify/1170/README.md`（A/B/C/D 六面 31 checks，每条 `ok` 是布尔）。
 
 ## Gotchas
 
@@ -68,9 +68,9 @@ resolve+realpath 归一后落在技能根内 = 400（已被 pacman 现扫管理�
 
 ## 验证账
 
-- live：`drive-1170-skill-import.mjs` 30/30 PASS，证据 `docs/verify/1170/`
-  （2026-10-10）。
-- server 单元：`apps/server/test/skill-import.test.ts` 33 用例（失败方式
-  先行枚举——LP0-LP10 / U1-U11 / R1-R8 / M1 / W1）。
+- live：`drive-1170-skill-import.mjs` 31/31 PASS，证据 `docs/verify/1170/`
+  （2026-10-10）。来源登记失败时导入删掉刚建的目录（#1185），同名可以再导入。
+- server 单元：`apps/server/test/skill-import.test.ts` 35 用例（失败方式
+  先行枚举——LP0-LP11 / U1-U11 / R1-R8 / M1 / W1，外加来源空登记不被失败写污染）。
 - web e2e：`apps/web/e2e/skill-import.spec.ts` 4 用例（fixture 字段集 +
   xor 闸 + accept 律；live 201/400/409 打桩）。
