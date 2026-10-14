@@ -385,6 +385,112 @@ async function stubLiveBoot(page: Page) {
   );
 }
 
+const PI_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+const CC_THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+async function stubThinkingAgent(page: Page, initial: typeof LIVE_AGENT, withSources = false) {
+  await stubLiveBoot(page);
+  const patches: Record<string, unknown>[] = [];
+  let agent: typeof LIVE_AGENT = { ...initial };
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({ json: { thinkingLevels: PI_THINKING_LEVELS } }),
+  );
+  if (withSources) {
+    await page.route('**/api/teams/team-1/model-sources', (route) =>
+      route.fulfill({
+        json: {
+          sources: [
+            {
+              runtime: 'claude-code',
+              installed: true,
+              hostname: 'repro-host',
+              machineId: 'machine-1',
+              models: [{ id: 'claude-haiku-4-5', name: 'claude-haiku-4-5' }],
+            },
+          ],
+        },
+      }),
+    );
+  }
+  await page.route('**/api/teams/team-1/agents/agent-1', (route) => {
+    const req = route.request();
+    if (req.method() === 'PATCH') {
+      const body = req.postDataJSON() as Record<string, unknown>;
+      patches.push(body);
+      agent = { ...agent, ...body } as typeof LIVE_AGENT;
+      return route.fulfill({ json: agent });
+    }
+    return route.fulfill({ json: agent });
+  });
+  return patches;
+}
+
+test('思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLevel，刷新后仍是该档', async ({
+  page,
+}) => {
+  const patches = await stubThinkingAgent(page, {
+    ...LIVE_AGENT,
+    provider: null,
+    thinkingLevel: null,
+  });
+  await page.goto('/app/resources/agents/agent-1');
+  const select = page.locator('.agent-thinking-select');
+  await expect(select).toContainText('未设置');
+  await select.click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText([
+    '未设置',
+    ...PI_THINKING_LEVELS,
+  ]);
+  await page.getByRole('option', { name: 'high', exact: true }).click();
+  expect(patches.at(-1)).toEqual({ thinkingLevel: 'high' });
+  await expect(select).toContainText('high');
+  await page.reload();
+  await expect(page.locator('.agent-thinking-select')).toContainText('high');
+  await page.locator('.agent-thinking-select').click();
+  await page.getByRole('option', { name: '未设置', exact: true }).click();
+  expect(patches.at(-1)).toEqual({ thinkingLevel: null });
+});
+
+test('思考强度：claude-code 菜单含 off，不含 minimal', async ({ page }) => {
+  await stubThinkingAgent(page, {
+    ...LIVE_AGENT,
+    provider: 'claude-code',
+    thinkingLevel: null,
+  });
+  await page.goto('/app/resources/agents/agent-1');
+  await page.locator('.agent-thinking-select').click();
+  await expect(page.getByRole('listbox').getByRole('option')).toHaveText([
+    '未设置',
+    ...CC_THINKING_LEVELS,
+  ]);
+});
+
+test('思考强度：切到 claude-code 时非法档随模型清空，合法档保留', async ({ page }) => {
+  const illegal = await stubThinkingAgent(
+    page,
+    { ...LIVE_AGENT, provider: null, thinkingLevel: 'minimal' },
+    true,
+  );
+  await page.goto('/app/resources/agents/agent-1');
+  await page.locator('.agent-runtime-select').click();
+  await page.locator('.agent-runtime-row', { hasText: 'Claude Code' }).click();
+  expect(illegal.at(-1)).toEqual({
+    provider: 'claude-code',
+    modelId: null,
+    thinkingLevel: null,
+  });
+
+  const legal = await stubThinkingAgent(
+    page,
+    { ...LIVE_AGENT, provider: null, thinkingLevel: 'high' },
+    true,
+  );
+  await page.goto('/app/resources/agents/agent-1');
+  await page.locator('.agent-runtime-select').click();
+  await page.locator('.agent-runtime-row', { hasText: 'Claude Code' }).click();
+  expect(legal.at(-1)).toEqual({ provider: 'claude-code', modelId: null });
+});
+
 test('权限 tab：保存失败出可见错误反馈，开关不回弹', async ({ page }) => {
   await stubLiveBoot(page);
   let patches = 0;
