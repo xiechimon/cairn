@@ -783,18 +783,22 @@ export function useApiMutations(teamId: string | undefined) {
             if (m.id !== input.id) return m;
             const { maxConcurrent, ...rest } = input.body;
             if (maxConcurrent === null) {
+              // 清除覆盖的来源按行内指纹复判（与 server 同律：带 memoryTotalMb 的
+              // 指纹 = 推荐，否则估算）；成功后 invalidate 用服务端回执收口。
               return {
                 ...m,
                 ...rest,
                 maxConcurrentOverridden: false,
                 maxConcurrent: m.recommendedConcurrent ?? m.maxConcurrent,
+                concurrencySource:
+                  m.capabilities?.hardware?.memoryTotalMb !== undefined ? 'measured' : 'estimate',
               };
             }
             return {
               ...m,
               ...rest,
               ...(maxConcurrent !== undefined
-                ? { maxConcurrent, maxConcurrentOverridden: true }
+                ? { maxConcurrent, maxConcurrentOverridden: true, concurrencySource: 'manual' }
                 : {}),
             };
           }),
