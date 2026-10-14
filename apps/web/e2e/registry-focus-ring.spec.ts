@@ -32,6 +32,7 @@ interface FocusInfo {
   borderTopColor: string;
   focusRing: string;
   inputColor: string;
+  primaryColor: string;
   ringColor: string;
 }
 
@@ -56,6 +57,7 @@ async function readFocus(locator: Locator): Promise<FocusInfo> {
       borderTopColor: cs.borderTopColor,
       focusRing: root.getPropertyValue('--focus-ring').trim(),
       inputColor: root.getPropertyValue('--input').trim(),
+      primaryColor: root.getPropertyValue('--primary').trim(),
       ringColor: root.getPropertyValue('--ring').trim(),
     };
   });
@@ -167,7 +169,15 @@ test.describe('#1244 registry focus outline', () => {
     const checkbox = page.getByRole('dialog', { name: '完成任务' }).locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();
     await focusKeyboard(checkbox);
-    expectGlobalOutline(await readFocus(checkbox));
+    const checked = await readFocus(checkbox);
+    expectGlobalOutline(checked);
+    expect(checked.borderTopColor).toBe(hexToRgb(checked.primaryColor));
+
+    await checkbox.click();
+    await focusKeyboard(checkbox);
+    const unchecked = await readFocus(checkbox);
+    expectGlobalOutline(unchecked);
+    expect(unchecked.borderTopColor).toBe(hexToRgb(unchecked.inputColor));
 
     await themed(page, 'dark', MACHINES);
     const sw = page.locator('[data-slot="switch"]').first();

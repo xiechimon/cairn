@@ -151,6 +151,10 @@
     border-color: var(--border);
   }
 
+  [role="checkbox"]:not([data-checked]):focus-visible:not([aria-invalid="true"]) {
+    border-color: var(--input);
+  }
+
   [role="checkbox"][data-checked]:focus-visible:not([aria-invalid="true"]) {
     border-color: var(--primary);
   }
