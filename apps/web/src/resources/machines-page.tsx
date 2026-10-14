@@ -81,6 +81,12 @@ const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执
  * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
 const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+export const CONCURRENCY_SOURCE_LABEL = {
+  manual: '手动',
+  measured: '推荐',
+  estimate: '估算',
+} as const;
+
 /** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
@@ -89,10 +95,12 @@ function MachineConcurrencySelect({
   machine,
   value,
   onPick,
+  onReset,
 }: {
   machine: MachineRow;
   value: number;
   onPick: (n: number) => void;
+  onReset: () => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -100,6 +108,10 @@ function MachineConcurrencySelect({
   const options = CONCURRENCY_OPTIONS.includes(value)
     ? CONCURRENCY_OPTIONS
     : [...CONCURRENCY_OPTIONS, value].sort((a, b) => a - b);
+  const recommended = machine.recommendedConcurrent;
+  const hardware = machine.capabilities?.hardware;
+  const estimate = machine.concurrencySource === 'estimate';
+  const overridden = machine.maxConcurrentOverridden === true;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -116,6 +128,14 @@ function MachineConcurrencySelect({
       >
         <span className="text-(--text-tertiary)">{t('并发')}</span>
         <span className="tabular-nums">{value}</span>
+        {machine.concurrencySource !== undefined && (
+          <span
+            className="text-(--text-tertiary)"
+            data-concurrency-source={machine.concurrencySource}
+          >
+            {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
+          </span>
+        )}
         <ChevronDown width={11} height={11} className="flex-none text-(--text-tertiary)" />
       </PopoverTrigger>
       <PopoverContent
@@ -125,6 +145,42 @@ function MachineConcurrencySelect({
         aria-label={t('并发上限')}
         className="min-w-[120px] rounded-lg bg-(--popover) p-1 shadow-(--chief-shadow)"
       >
+        {(estimate || recommended !== undefined || overridden) && (
+          <div
+            className="flex flex-col gap-1 px-2 pt-1 pb-2 text-xs leading-4 text-(--text-tertiary)"
+            data-testid="machine-concurrency-basis"
+          >
+            {estimate ? (
+              <span>{t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}</span>
+            ) : (
+              <>
+                {recommended !== undefined && <span>{t('推荐 {n}', { n: recommended })}</span>}
+                {hardware !== undefined && (
+                  <span>
+                    {t('依据：核 {cores} · 可用内存 {gib} GiB · 负载 {load}', {
+                      cores: hardware.cpuCores,
+                      gib: (hardware.memoryAvailableMb / 1024).toFixed(1),
+                      load: hardware.loadAvg1.toFixed(2),
+                    })}
+                  </span>
+                )}
+              </>
+            )}
+            {overridden && (
+              <Button
+                variant="ghost"
+                data-testid="machine-concurrency-reset"
+                className="h-6 w-fit cursor-pointer justify-start rounded-md px-0 text-xs font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--text-primary) active:not-aria-[haspopup]:translate-y-0"
+                onClick={() => {
+                  setOpen(false);
+                  onReset();
+                }}
+              >
+                {t('恢复推荐')}
+              </Button>
+            )}
+          </div>
+        )}
         <div role="listbox" aria-label={t('并发上限')} data-testid="machine-concurrency-options">
           {options.map((n) => (
             <Button
@@ -217,6 +273,16 @@ export function MachinesPage() {
       return;
     }
     mutations.patchMachine.mutate({ id: machine.id, body: { maxConcurrent: n } });
+  };
+  const resetCap = (machine: MachineRow): void => {
+    if (!live || machine.id == null) {
+      setCapDraft((prev) => ({
+        ...prev,
+        [rowKey(machine)]: machine.recommendedConcurrent ?? machine.maxConcurrent ?? 1,
+      }));
+      return;
+    }
+    mutations.patchMachine.mutate({ id: machine.id, body: { maxConcurrent: null } });
   };
   // 保存失败的显式反馈（XMON-80/P2 同律）：本面无 toast，失败只可能来自
   // shell 开关 / 并发选择这两条写（页面仅有的 mutation），文案是固定句、
@@ -376,6 +442,14 @@ export function MachinesPage() {
                   ml-5 间距：两组控件视觉同档。 */}
               {machine.maxConcurrent !== undefined && (
                 <span className="ml-5 flex flex-none items-center gap-2.5">
+                  {machine.concurrencyPaused === true && (
+                    <span
+                      className="text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
+                      data-concurrency-paused
+                    >
+                      {t('已暂停领取')}
+                    </span>
+                  )}
                   {machine.runningSteps !== undefined && (
                     <span
                       className="text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"
@@ -391,6 +465,7 @@ export function MachinesPage() {
                     machine={machine}
                     value={capOn(machine)}
                     onPick={(n) => pickCap(machine, n)}
+                    onReset={() => resetCap(machine)}
                   />
                 </span>
               )}

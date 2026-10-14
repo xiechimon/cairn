@@ -584,6 +584,16 @@ export const EN: Record<string, string> = {
   // #1251 machines page capability annotation (daemon-reported inventory).
   '能力清单未上报（旧版 daemon）': 'Capabilities not reported (old daemon)',
   'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
+  手动: 'Manual',
+  推荐: 'Recommended',
+  估算: 'Estimate',
+  已暂停领取: 'Claims paused',
+  '推荐 {n}': 'Recommended {n}',
+  '依据：核 {cores} · 可用内存 {gib} GiB · 负载 {load}':
+    'Basis: {cores} cores · {gib} GiB available memory · load {load}',
+  '未收到能力指纹，按保守默认 {n} 估算':
+    'No capability fingerprint received; estimated at the conservative default of {n}',
+  恢复推荐: 'Reset to recommended',
   并发: 'Concurrency',
   并发上限: 'Concurrency limit',
   // #905 activity phases (live row labels) + the freshness disclosure line.
