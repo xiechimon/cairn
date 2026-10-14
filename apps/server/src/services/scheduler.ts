@@ -30,6 +30,7 @@ import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
 import { sweepStaleMachines } from './machines.js';
+import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
 // #1261 配额挂起探测 sweep（tick 驱动）。
 import { sweepQuotaWaitSteps } from './quota-wait.js';
@@ -127,6 +128,9 @@ export function createScheduler(
         updateNextRunAt(deps, row.id, computeNextRunAt(row.kind, row.at, row.tz, now));
       }
     }
+    // #1303：闲置超过 7 天的 chief 未读在本 tick 置读。先于 fireDueChiefWakes——
+    // 到期 wake 入队会把 thread.updatedAt 刷成现在，后扫会把本该过期的旧未读留住。
+    sweepIdleChiefUnread(deps, now);
     // chief set_wake 到期触发（r5 §2 关注与提醒「约定到点回头核实」；BuildDeps
     // 与 ChiefDeps 同形，直接复用）。
     fireDueChiefWakes(deps, now);

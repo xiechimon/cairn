@@ -1779,7 +1779,7 @@ export async function finishStep(
       '回合已结束',
     );
     finishChiefTurn(deps, stepRow.buildId, outcome);
-    if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId);
+    if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
     // #631 失败闭环：build 路径的失败原因有 build.errorMessage 承接，chief
     // 路径此前零承接——daemon 上报的 errorMessage 落一条 system 行进线程
     // （machine_selected 同族 content 形态 = JSON 串），会话流 message 事件

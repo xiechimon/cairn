@@ -40,6 +40,7 @@ export const EN: Record<string, string> = {
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
+  '{n} 个总管会话有未读': '{n} chief sessions have unread',
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
