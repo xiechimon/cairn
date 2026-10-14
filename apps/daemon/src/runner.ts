@@ -33,6 +33,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendConfirmedPlanNote,
   appendPlanLocationNote,
   appendWorkBranchNote,
   BRAND,
@@ -271,14 +272,27 @@ function resumeMissNote(sessionId: string, claimed: ClaimedStep): string {
   return `本机找不到会话 ${sessionId}，无法续接。已改开新会话，按原任务继续。`;
 }
 
+/** 本机交接位上的非空 plan.md。plan 步写在 `<plansDir>/<convId>/plan.md`。
+ *  文件不在这台机器上，或内容为空白，返回 null。 */
+function confirmedPlanFile(plansDir: string, convId: string): string | null {
+  const planFile = join(plansDir, convId, PLAN_FILE_NAME);
+  try {
+    if (!existsSync(planFile)) return null;
+    return readFileSync(planFile, 'utf8').trim() !== '' ? planFile : null;
+  } catch {
+    return null;
+  }
+}
+
 /** #1312：执行面降级后的新会话不能只拿续轮占位句（那句假设上一轮上下文
- *  还在）。任务文本走 buildTaskPrompt；build 步再指出已确认方案的本地
- *  路径，agent 读它而不是改写它。 */
+ *  还在）。任务文本走 buildTaskPrompt。build 步只在本机交接位已有非空
+ *  plan.md 时附位置注记（同一路径 = plan 步落盘位）。换机或文件缺失不编造
+ *  路径。 */
 function degradedFreshPrompt(claimed: ClaimedStep, plansDir: string, convId: string): string {
   let text = buildTaskPrompt(claimed);
   if (claimed.step.kind === 'build') {
-    const planFile = join(plansDir, convId, PLAN_FILE_NAME);
-    text = `${text}\n已确认的方案在 ${planFile}。请阅读该文件并按它执行。`;
+    const planFile = confirmedPlanFile(plansDir, convId);
+    if (planFile !== null) text = appendConfirmedPlanNote(text, planFile);
   } else if (claimed.step.kind === 'plan') {
     text = appendPlanLocationNote(text, join(plansDir, convId, PLAN_FILE_NAME));
   }
@@ -1304,10 +1318,12 @@ export async function runStep(
   // #1286 / #1312：SessionNotResumableError 两面都降级 new session。
   // recover 重发 journal.prompt（pi 懒落盘窗口的兜底）；journal.prompt 为
   // null 仍显式失败。执行面（无 opts.resume）改投原任务，不把「方案已确认」
-  // 占位句发给一个没有上一轮上下文的新会话。其它错误仍直传，步失败。
+  // 占位句发给一个没有上一轮上下文的新会话，并在开会话前把 journal 换成
+  // 这份原文（崩溃 recover 重发的就是它）。附件 token 按首轮同一解析面展开。
+  // 其它错误仍直传，步失败。
   const openSession = (): Promise<AgentSessionHandle> => {
     if (continueId === null) return backend.createSession(sessionOpts);
-    return backend.continueSession(continueId, sessionOpts).catch((err: unknown) => {
+    return backend.continueSession(continueId, sessionOpts).catch(async (err: unknown) => {
       if (!(err instanceof SessionNotResumableError)) throw err;
       if (opts.resume?.prompt === null) {
         throw new Error(
@@ -1327,7 +1343,35 @@ export async function runStep(
       });
       if (!opts.resume) {
         const fresh = degradedFreshPrompt(claimed, deps.paths.plansDir, convId);
-        sessionOpts.prompt = fresh;
+        journal.update(stepId, {
+          prompt: fresh,
+          sessionAction: 'new',
+          sessionId: null,
+        });
+        let delivery = fresh;
+        let images: DeliveredImage[] | undefined;
+        if (!isChief) {
+          try {
+            const resolved = await resolveStepImages({
+              text: fresh,
+              stepId,
+              client,
+              materializeDir: deps.paths.stepAttachmentsDir,
+              log: (line) => logger.step(line),
+            });
+            delivery = resolved.text;
+            if (resolved.images.length > 0) images = [...resolved.images];
+          } catch (resolveErr) {
+            logger.step(
+              `attachment resolve failed (delivering raw text): ${
+                resolveErr instanceof Error ? resolveErr.message : String(resolveErr)
+              }`,
+            );
+          }
+        }
+        sessionOpts.prompt = delivery;
+        if (images !== undefined) sessionOpts.promptImages = images;
+        else delete sessionOpts.promptImages;
         transcript.upsert({
           id: transcriptPromptRowId(stepId),
           role: 'user',
