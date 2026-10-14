@@ -1,14 +1,3 @@
-// 机器页并发来源乐观更新 e2e（#1241 review fix 3）：PATCH 在途期间，行内来源
-// 标签必须先于服务端回执切换。选数 = 手动；清除覆盖 = 按行内指纹复判（有
-// memoryTotalMb 的指纹 = 推荐，否则 = 估算）。成功后 invalidate 用服务端回执收口。
-//
-// PATCH 桩挂起直到测试放行，故「在途」态可观测：乐观态与回执态分开断言。
-//
-// 钉住的失败方式（先列后写）：
-//   1. 选数不标手动 —— PATCH 在途时来源仍是旧值（推荐/估算），用户看不出已覆盖。
-//   2. 恢复推荐不复判 —— 清除覆盖后来源停在「手动」，直到回执才变。
-//   3. 无指纹行恢复后标推荐 —— 估算说成实测。
-
 import { expect, type Page, test } from '@playwright/test';
 
 type Source = 'measured' | 'estimate' | 'manual';
@@ -67,8 +56,6 @@ function machine(over: Partial<StubMachine> & { id: string }): StubMachine {
   };
 }
 
-/** live 启动打桩；PATCH 挂起到 `release()` 才回执（`pending` 即在途请求的放行器）。
- *  回执按服务端语义算：数字 = 覆盖 + manual；null = 清除覆盖，来源按指纹复判。 */
 async function stubStack(page: Page, rows: StubMachine[]) {
   const pending: (() => void)[] = [];
   const state = { rows: rows.map((r) => ({ ...r })) };
