@@ -950,7 +950,7 @@ export const EN: Record<string, string> = {
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
   '远程 shell': 'Remote shell',
   合并分支: 'Merge branches',
-  创建标签: 'Create labels',
+  创建标签: 'Create tags',
   推送分支: 'Push branches',
   创建技能: 'Create skills',
   更新技能: 'Update skills',
