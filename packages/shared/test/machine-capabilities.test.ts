@@ -23,8 +23,10 @@ import {
   createAgentBodySchema,
   machineCapabilitiesSchema,
   machineEnrollBodySchema,
+  machineHardwareSchema,
   machinePresenceBodySchema,
   machineRecordSchema,
+  parseReportedCapabilities,
   requiredCapabilitiesSchema,
   stepJournalRowSchema,
 } from '../src/index.js';
@@ -276,5 +278,50 @@ describe('agentMachineFitResponseSchema（agent 面「哪些机器可跑它」�
     expect(
       agentMachineFitResponseSchema.safeParse({ machines: [{ machineId: 'm1' }] }).success,
     ).toBe(false);
+  });
+});
+
+describe('#1241 parseReportedCapabilities（字段级收严）', () => {
+  const hardware = { cpuCores: 8, memoryAvailableMb: 4096, loadAvg1: 0.5, diskFreeMb: 20480 };
+
+  it('7 合法指纹随包原样保留', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: ['figma'], skills: ['deploy'], hardware }),
+    ).toEqual({ mcpServers: ['figma'], skills: ['deploy'], hardware });
+  });
+
+  it('7 指纹形状坏（核数 0）：只丢 hardware，mcp/skills 照收', () => {
+    expect(
+      parseReportedCapabilities({
+        mcpServers: ['figma'],
+        skills: [],
+        hardware: { ...hardware, cpuCores: 0 },
+      }),
+    ).toEqual({ mcpServers: ['figma'], skills: [] });
+  });
+
+  it('7 老 daemon 无 hardware：照收清单，hardware 缺席', () => {
+    expect(parseReportedCapabilities({ mcpServers: [], skills: ['a'] })).toEqual({
+      mcpServers: [],
+      skills: ['a'],
+    });
+  });
+
+  it('7 清单本身坏（mcpServers 非数组）→ 整包 undefined，不论 hardware 是否合法', () => {
+    expect(
+      parseReportedCapabilities({ mcpServers: 'figma', skills: [], hardware }),
+    ).toBeUndefined();
+  });
+
+  it('7 非对象 / 数组 → undefined', () => {
+    expect(parseReportedCapabilities(null)).toBeUndefined();
+    expect(parseReportedCapabilities(['figma'])).toBeUndefined();
+  });
+
+  it('7 machineHardwareSchema 拒负数内存与非整数核数', () => {
+    expect(machineHardwareSchema.safeParse({ ...hardware, memoryAvailableMb: -1 }).success).toBe(
+      false,
+    );
+    expect(machineHardwareSchema.safeParse({ ...hardware, cpuCores: 2.5 }).success).toBe(false);
   });
 });
