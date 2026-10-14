@@ -462,7 +462,7 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
   return { state: 'stopping' };
 }
 
-export function sweepZombieQueuedTodos(deps: BuildDeps, now: number = nowMs()): number {
+export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()): number {
   const rows = deps.db.select().from(todo).where(eq(todo.phase, 'queued')).all();
   let released = 0;
   for (const todoRow of rows) {
@@ -1218,7 +1218,7 @@ export async function applyBuildStepAction(
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
   const { db } = deps;
   const todoRow = db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  if (!todoRow || todoRow.phase !== 'failed') return; // 非失败相位 = 无可恢复
+  if (todoRow?.phase !== 'failed') return; // 非失败相位 = 无可恢复
   // build 腿：本 build 的执行步（序贯取最新）已 done。
   const buildStep = db
     .select()

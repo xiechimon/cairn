@@ -9,7 +9,7 @@ import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { step as stepTable, todo as todoTable } from '../src/db/schema.js';
+import { todo as todoTable } from '../src/db/schema.js';
 import { bootServer, postProject, type TestServer } from './helpers.js';
 
 interface JsonRpcResponse {

@@ -9,7 +9,7 @@
 // 接线实录的重复清单收口，agentDir/skills 种入的原生技能不得出现在 LLM 输入
 // 面）；`[skills] catalog:/deny:/denied-read:` 观测行落盘。
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';

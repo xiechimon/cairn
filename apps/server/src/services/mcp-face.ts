@@ -33,7 +33,6 @@ import {
   message,
   project,
   schedule,
-  step,
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';

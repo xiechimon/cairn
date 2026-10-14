@@ -36,7 +36,6 @@ import {
   chief as chiefTable,
   machine as machineTable,
   step as stepTable,
-  todo as todoTable,
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
