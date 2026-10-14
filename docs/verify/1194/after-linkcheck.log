@@ -1,0 +1,36 @@
+# 1194 after link check
+# working tree hrefs, resolved the way GitHub resolves relative links
+# targets already exist on origin/main a2285aa1; this change only rewrites the href
+
+## source lines
+129: ### 关联
+130: 
+131: - [docs/a3/diff-audit.md](../a3/diff-audit.md)——A3 当年裁决 #1 被本 ADR 覆盖
+132: - [docs/a3/report-detail.md](../a3/report-detail.md)——detail 域收编报告，A6 接续
+133: - wiki [[DESIGN.md 驱动的 UI 原语收编]]——方法论来源
+134: - wiki [[Taste Skill]]——反 slop 设计纪律
+
+remaining bad hrefs ](a3/diff-audit.md) or ](a3/report-detail.md): none
+
+## github blob
+line 131 href: ../a3/diff-audit.md
+GET https://github.com/xiechimon/pacman/blob/a2285aa1/docs/a3/diff-audit.md
+HTTP 200
+title: pacman/docs/a3/diff-audit.md at a2285aa1392486588fabdc24aaf6240c850ac638 · xiechimon/pacman · GitHub
+
+line 132 href: ../a3/report-detail.md
+GET https://github.com/xiechimon/pacman/blob/a2285aa1/docs/a3/report-detail.md
+HTTP 200
+title: pacman/docs/a3/report-detail.md at a2285aa1392486588fabdc24aaf6240c850ac638 · xiechimon/pacman · GitHub
+
+## raw.githubusercontent.com
+line 131 href: ../a3/diff-audit.md
+GET https://raw.githubusercontent.com/xiechimon/pacman/a2285aa1/docs/a3/diff-audit.md
+HTTP 200
+body: # A3 散写差异裁决清单
+
+line 132 href: ../a3/report-detail.md
+GET https://raw.githubusercontent.com/xiechimon/pacman/a2285aa1/docs/a3/report-detail.md
+HTTP 200
+body: # A3-detail 收编报告（detail 域 → ui/ 原语）
+
