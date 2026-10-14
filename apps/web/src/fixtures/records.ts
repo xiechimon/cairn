@@ -13,6 +13,7 @@ import {
   type AgentTask,
   type DocumentDiffFile,
   type GithubRepoSummary,
+  type MachineHardware,
   type MemoryRecord,
   type ModelSource,
   PHASE_VALUES,
@@ -417,7 +418,11 @@ export interface MachineRow {
    *  契约单源 = shared machineRecordSchema.capabilities）。null = 从未上报
    *  （行显「能力清单未上报」）；absent = 老服务器/存量 fixture——读标注
    *  退场，呈现零漂移。 */
-  capabilities?: { mcpServers: string[]; skills: string[] } | null;
+  capabilities?: { mcpServers: string[]; skills: string[]; hardware?: MachineHardware } | null;
+  maxConcurrentOverridden?: boolean;
+  recommendedConcurrent?: number;
+  concurrencySource?: 'measured' | 'estimate' | 'manual';
+  concurrencyPaused?: boolean;
 }
 
 /** The six resource surfaces' row sets (issue #69). */
