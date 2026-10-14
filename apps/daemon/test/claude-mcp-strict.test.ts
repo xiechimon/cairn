@@ -63,9 +63,10 @@ function fakeProcess(): SpawnedProcess {
   return proc;
 }
 
-async function spawnArgs(
-  parts: Parameters<typeof buildClaudeSdkOptions>[0],
-): Promise<{ args: string[] }> {
+async function spawnArgs(parts: Parameters<typeof buildClaudeSdkOptions>[0]): Promise<{
+  options: ReturnType<typeof buildClaudeSdkOptions>;
+  args: string[];
+}> {
   const options = buildClaudeSdkOptions(parts);
   let args: string[] | null = null;
   const q = query({
@@ -82,7 +83,7 @@ async function spawnArgs(
     void _message;
   }
   if (args === null) throw new Error('claude was not spawned');
-  return { args };
+  return { options, args };
 }
 
 function mcpConfig(args: string[]): string | null {
@@ -93,7 +94,8 @@ function mcpConfig(args: string[]): string | null {
 
 describe('claude-code spawn MCP isolation (#1307)', () => {
   test('空 allowlist：--strict-mcp-config，不带 --mcp-config，setting sources 仍在', async () => {
-    const { args } = await spawnArgs(baseParts());
+    const { options, args } = await spawnArgs(baseParts());
+    expect(options.strictMcpConfig).toBe(true);
     expect(args).toContain('--strict-mcp-config');
     expect(mcpConfig(args)).toBe(null);
     expect(args).toContain('--setting-sources=user,project,local');
@@ -101,25 +103,26 @@ describe('claude-code spawn MCP isolation (#1307)', () => {
 
   test('仅 in-process pacman：严格模式，argv 不序列化 sdk server', async () => {
     const pacman = createSdkMcpServer({ name: 'pacman', alwaysLoad: true, tools: [] });
-    const { args } = await spawnArgs({ ...baseParts(), mcpServers: { pacman } });
+    const { options, args } = await spawnArgs({ ...baseParts(), mcpServers: { pacman } });
+    expect(options.mcpServers?.pacman).toBe(pacman);
     expect(args).toContain('--strict-mcp-config');
     expect(mcpConfig(args)).toBe(null);
   });
 
   test('显式 stdio 端点：--mcp-config 只有该端点，并带严格模式', async () => {
     const pacman = createSdkMcpServer({ name: 'pacman', alwaysLoad: true, tools: [] });
-    const { args } = await spawnArgs({
-      ...baseParts(),
-      mcpServers: {
-        pacman,
-        figma: mapMcpEndpoint({
-          slug: 'figma',
-          transport: 'stdio',
-          command: 'figma-mcp',
-          args: ['--stdio'],
-        }),
-      },
+    const figma = mapMcpEndpoint({
+      slug: 'figma',
+      transport: 'stdio',
+      command: 'figma-mcp',
+      args: ['--stdio'],
     });
+    const { options, args } = await spawnArgs({
+      ...baseParts(),
+      mcpServers: { pacman, figma },
+    });
+    expect(options.mcpServers?.pacman).toBe(pacman);
+    expect(options.mcpServers?.figma).toBe(figma);
     expect(args).toContain('--strict-mcp-config');
     expect(mcpConfig(args)).toBe(
       '{"mcpServers":{"figma":{"type":"stdio","command":"figma-mcp","args":["--stdio"],"alwaysLoad":true}}}',

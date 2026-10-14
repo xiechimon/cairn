@@ -896,6 +896,10 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     disallowedTools: parts.disallowedTools,
     includePartialMessages: true, // text_delta/thinking_delta 增量面
     settingSources: [...CLAUDE_SETTING_SOURCES],
+    // #1307：空集和仅 in-process sdk server 都不会变成 --mcp-config（SDK 在组 argv
+    // 前丢掉它们）。没有 --strict-mcp-config 时，CLI 仍按 settingSources 把
+    // ~/.claude.json 的 MCP 并进来。显式端点继续走 mcpServers，严格模式只留那些。
+    strictMcpConfig: true,
     ...(Object.keys(parts.mcpServers).length > 0 ? { mcpServers: parts.mcpServers } : {}),
     ...(parts.effort !== undefined ? { effort: parts.effort } : {}),
     ...(parts.append !== undefined
