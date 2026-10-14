@@ -228,7 +228,8 @@ export const usePlans = (buildId: string | null | undefined, enabled: boolean) =
 export const useBuildChanges = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['changes', buildId],
-    queryFn: () => api.get<{ files: DocumentDiffFile[] }>(`/api/builds/${buildId}/changes`),
+    queryFn: () =>
+      api.get<{ files: DocumentDiffFile[]; reported?: boolean }>(`/api/builds/${buildId}/changes`),
     enabled: enabled && buildId != null,
   });
 

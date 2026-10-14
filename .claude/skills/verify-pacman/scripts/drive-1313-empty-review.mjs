@@ -216,6 +216,10 @@ await saveJson('files-changes.json', files.changes);
 check('empty hasChanges', empty.face.hasChanges === true, String(empty.face.hasChanges));
 check('empty changes files 为空', Array.isArray(empty.changes.files) && empty.changes.files.length === 0, JSON.stringify(empty.changes));
 check('files changes 有文件', Array.isArray(files.changes.files) && files.changes.files.length === 1, JSON.stringify(files.changes.files?.map((f) => f.path)));
+if (EXPECT === 'after') {
+  check('after empty changes reported', empty.changes.reported === true, JSON.stringify(empty.changes));
+  check('after files changes reported', files.changes.reported === true, JSON.stringify({ reported: files.changes.reported }));
+}
 
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 732 } });
@@ -231,9 +235,21 @@ async function openAccept(todoId) {
   return dialog;
 }
 
+// 弹层先开、changes 查询后到。查询未完成时判据是未知，合并行会先闪一下。
+// 截图和断言都等合并行计数落到期望值（最多 8s），避免拍到查询在飞的中间态。
+async function settleMerge(dialog, expectedCount) {
+  const deadline = Date.now() + 8000;
+  let count = await dialog.getByText(MERGE_LABEL).count();
+  while (count !== expectedCount && Date.now() < deadline) {
+    await page.waitForTimeout(200);
+    count = await dialog.getByText(MERGE_LABEL).count();
+  }
+  return count;
+}
+
 const emptyDialog = await openAccept(empty.todoId);
+const emptyMergeVisible = await settleMerge(emptyDialog, EXPECT === 'before' ? 1 : 0);
 await shot(page, EXPECT + '-empty-dialog.png');
-const emptyMergeVisible = await emptyDialog.getByText(MERGE_LABEL).count();
 const emptyDone = emptyDialog.getByRole('button', { name: '完成', exact: true });
 const emptyDoneDisabled = await emptyDone.isDisabled();
 const emptyBlock = await emptyDialog.getByText(/授权，无法合并/).count();
@@ -262,8 +278,8 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(300);
 
 const filesDialog = await openAccept(files.todoId);
+const filesMerge = await settleMerge(filesDialog, 1);
 await shot(page, EXPECT + '-files-dialog.png');
-const filesMerge = await filesDialog.getByText(MERGE_LABEL).count();
 const filesDisabled = await filesDialog.getByRole('button', { name: '完成', exact: true }).isDisabled();
 check(EXPECT + ' files 仍展示合并行', filesMerge === 1, 'count=' + filesMerge);
 check(EXPECT + ' files 缺授权时完成禁用', filesDisabled === true, 'disabled=' + filesDisabled);
