@@ -1412,16 +1412,18 @@ function stepArtifactGate(
     if (priorPlanStep === undefined) return null;
     return '规划未产出方案';
   }
-  if (stepRow.kind === 'build' && outcome.hasChanges === false) {
-    // #1195 偏离点名：daemon 收尾检测到 HEAD 停在契约分支之外的具名分支、
-    // 且产物并集面（含步窗口分支扫描）处处无提交——「构建零改动」把失败
-    // 原因说反（看起来像 agent 没干活，实际可能已在自建分支交付）。失败
-    // 原因点名两分支，读者能直接对上 transcript 的偏离行。
+  if (stepRow.kind === 'build') {
+    // #1277：HEAD 停在契约分支之外即硬失败，不论 hasChanges。#1195 只在
+    // hasChanges=false 时点名，有提交的偏离被并集面放进 review。Multica
+    // verifyDeliveryPoint 拒绝记录 off-branch 交付，留给人工。
     const drift = outcome.workBranchDrift;
     if (drift !== undefined) {
-      return `agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
+      if (outcome.hasChanges === false) {
+        return `agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
+      }
+      return `agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
     }
-    return '构建零改动';
+    if (outcome.hasChanges === false) return '构建零改动';
   }
   return null;
 }
@@ -1437,8 +1439,9 @@ export function completeStep(
   stepId: string,
   outcome: {
     hasChanges?: boolean;
-    /** #1195 工作分支偏离（daemon 收尾检测）：闸 2 在 hasChanges=false 时
-     *  据此点名分支偏离而非误导性「构建零改动」。 */
+    /** #1195/#1277 工作分支偏离（daemon 收尾检测）：build 步携带即硬失败。
+     *  hasChanges=false 时原因说明步窗口内无提交；有提交时拒绝自动收工。
+     *  两态都点名两分支。 */
     workBranchDrift?: { expected: string; actual: string };
     findings?: ReviewVerdict;
     findingsError?: string;
@@ -1464,7 +1467,25 @@ export function completeStep(
   // 结束——B-C10 空方案 / B-C11 零改动 / B-C14 假完成同病族）。
   const gateFailure = stepArtifactGate(deps, stepRow, outcome);
   if (gateFailure !== null) {
+    // #1277：有提交的偏离拒绝记录。finishStep 在闸前已把 daemon 上报的 PR
+    // 写入 build 行；硬失败不保留这次回填。无提交偏离（hasChanges=false）
+    // 的既有失败文案与回填面不动。
+    const refuseDriftRecord =
+      stepRow.kind === 'build' &&
+      outcome.workBranchDrift !== undefined &&
+      outcome.hasChanges !== false;
+    if (refuseDriftRecord) {
+      deps.db
+        .update(build)
+        .set({ prUrl: null, prNumber: null })
+        .where(eq(build.id, stepRow.buildId))
+        .run();
+    }
     applyStepFailure(deps, stepRow, gateFailure);
+    if (refuseDriftRecord) {
+      const cleared = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+      if (cleared) publishBuild(deps, cleared);
+    }
     return;
   }
   deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
