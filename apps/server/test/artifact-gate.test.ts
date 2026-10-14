@@ -387,12 +387,13 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
 
 // #1195 闸 2 的偏离点名面：agent 在自建分支交付（PR 已开）而收尾计数按会话
 // 分支判零时，「构建零改动」把失败原因彻底说反（看起来像 agent 没干活）。
-// daemon 收尾上报 workBranchDrift（expected=契约分支 / actual=实际 HEAD 分支），
-// 闸在 hasChanges=false 时据此点名分支偏离。失败方式枚举先于实现固化：
-//  6. hasChanges=false + drift → errorMessage 点名两分支名（不再是「构建零改动」），
-//     step/todo failed、review 不可达（闸语义不变，只换诚实的原因）
-//  7. hasChanges=true + drift → 照常过闸进 review（有物不因偏离而失败——
-//     产物真值面已认领交付，偏离可见性归 transcript/PR 面板）
+// daemon 收尾上报 workBranchDrift（expected=契约分支 / actual=实际 HEAD 分支）。
+// #1277：偏离即硬失败，不再只在 hasChanges=false 时拒绝。失败方式：
+//  6. hasChanges=false + drift → errorMessage 点名两分支且说明步窗口内无提交，
+//     step/todo failed、review 不可达
+//  7. hasChanges=true + drift → 同样硬失败（#1275 并集面：过闸进 review +
+//     保留 PR 回填，在此反转）。原因点名两分支，不套用「未见任何提交」，
+//     review 不可达，done 携带的 PR 不留在 build 行
 //  8. hasChanges=false 无 drift → 「构建零改动」逐字不变（现状钉扎）
 //  9. 版本墙：老 daemon 载荷（无 drift 字段）→ 行为与现状逐字一致
 describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」', () => {
@@ -423,19 +424,28 @@ describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改�
     }
   });
 
-  test('失败方式 7：hasChanges=true + workBranchDrift → 照常过闸进 review', async () => {
+  test('失败方式 7：hasChanges=true + workBranchDrift → 硬失败，点名两分支，不保留 PR', async () => {
     const w = await setupWorld();
     try {
-      await w.startBuild(false);
+      const buildId = await w.startBuild(false);
       const buildStep = await w.claim();
       await w.done(buildStep.step.id, {
         status: 'success',
         hasChanges: true,
         workBranchDrift: DRIFT,
+        prUrl: 'https://github.com/example/repo/pull/1277',
+        prNumber: 1277,
         sessionId: 'pi-d2',
       });
-      expect(w.todoRow().phase).toBe('review');
-      expect(w.buildRow(buildStep.step.buildId).errorMessage).toBeNull();
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.stepRow(buildStep.step.id).status).toBe('failed');
+      const msg = w.buildRow(buildId).errorMessage ?? '';
+      expect(msg).toContain(DRIFT.actual);
+      expect(msg).toContain(DRIFT.expected);
+      expect(msg).not.toBe('构建零改动');
+      expect(msg).not.toContain('未见任何提交');
+      expect(w.buildRow(buildId).prUrl).toBeNull();
+      expect(w.buildRow(buildId).prNumber).toBeNull();
     } finally {
       w.s.dispose();
     }
