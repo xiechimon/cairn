@@ -1,0 +1,68 @@
+[
+  {
+    "id": "KrtWCnBqj1CIXAO-rCSJA",
+    "name": "grok-bot-vm-481311088",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "online": false,
+    "latestCliVersion": null,
+    "kind": "local",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "maxConcurrentOverridden": false,
+    "recommendedConcurrent": 3,
+    "concurrencySource": "estimate",
+    "runningSteps": 0,
+    "capabilities": null
+  },
+  {
+    "id": "xB0HQo6g2SO3uJ0sRX0Zx",
+    "name": "verify-1241-real",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "online": true,
+    "latestCliVersion": "0.2.0",
+    "kind": "remote",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 7,
+    "maxConcurrentOverridden": false,
+    "recommendedConcurrent": 7,
+    "concurrencySource": "measured",
+    "runningSteps": 0,
+    "capabilities": {
+      "mcpServers": [
+        "rea"
+      ],
+      "skills": [],
+      "hardware": {
+        "cpuCores": 8,
+        "memoryTotalMb": 16002,
+        "memoryAvailableMb": 4931,
+        "loadAvg1": 1.01,
+        "diskFreeMb": 113419
+      }
+    }
+  },
+  {
+    "id": "r7DKKlj1C2BZgLFwj18F6",
+    "name": "verify-1241-estimate",
+    "teamId": "I5QLzc32BokHQeGKofH9Z",
+    "online": true,
+    "latestCliVersion": "0.1.0",
+    "kind": "remote",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "maxConcurrentOverridden": false,
+    "recommendedConcurrent": 3,
+    "concurrencySource": "estimate",
+    "runningSteps": 0,
+    "capabilities": null
+  }
+]

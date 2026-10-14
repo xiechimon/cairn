@@ -1,0 +1,148 @@
+# #1241 机器推荐并发：测试输出汇总
+
+执行时间：2026-10-15（worktree `/workspace/wt-1241`，branch `concurrency-1241`）。
+
+## 1. biome lint
+
+```sh
+cd /workspace/wt-1241
+export PATH=/tmp/1241-bin:$PATH
+pnpm lint
+```
+
+```text
+Checked 766 files in 569ms. No fixes applied.
+Found 53 warnings.
+Found 1 info.
+[exited with code 0]
+```
+
+53 个 warning 与 1 个 info 均为 pre-existing（main 上即存在，本分支未引入）：
+- `scripts/generate-feature-map.mjs:171` —— `lint/complexity/useOptionalChain`；
+- `apps/server/src/services/machines.ts` —— `GATE_ANNOUNCEMENTS` 等未用导入与 `claimCandidates` 的 `machineId`；
+- `apps/web/src/resources/machine-detail-page.tsx` —— 未用导入与两处非空断言。
+本次提交未触及这些机器，无需修。
+
+## 2. typecheck
+
+```sh
+cd /workspace/wt-1241
+export PATH=/tmp/1241-bin:$PATH
+pnpm typecheck
+```
+
+```text
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+[exited with code 0]
+```
+
+四个包全部 `Done`，无 `error TS` 输出。
+
+## 3. vitest affected
+
+`pnpm exec vitest related --changed` 在本工作树干净（`git status` 仅未跟踪
+`docs/verify/1241/` 与 `drive-1241-recommended-concurrency.mjs`）的条件下，
+`--changed` 未命中任何源文件（vitest 5 native，无 `--changed` 时返回 "No test
+files found"，exit 0）。按 #1241 实际改动面**直接点名受影响测试文件**：
+
+### 3.1 server
+
+```sh
+cd /workspace/wt-1241/apps/server
+corepack pnpm exec vitest run \
+  machine-concurrency-backfill.test.ts \
+  machine-concurrency-recommendation.test.ts
+```
+
+```text
+ Test Files  2 passed (2)
+      Tests  11 passed (11)
+   Duration  2.01s (transform 47%, import 39%, tests 13%)
+```
+
+### 3.2 daemon
+
+```sh
+cd /workspace/wt-1241/apps/daemon
+corepack pnpm exec vitest run machine-capabilities.test.ts
+```
+
+```text
+ Test Files  1 passed (1)
+      Tests  12 passed (12)
+   Duration  708ms (transform 72%, import 24%, tests 4%, worker 1%)
+```
+
+### 3.3 shared
+
+```sh
+cd /workspace/wt-1241/packages/shared
+corepack pnpm exec vitest run machine-capabilities.test.ts
+```
+
+```text
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Duration  700ms (transform 75%, import 21%, tests 4%, worker 1%)
+```
+
+### 3.4 web i18n
+
+`apps/web/src/i18n/en.ts` 新增 8 个 key（zh 为源串），按仓规跑 i18n 三件套：
+
+```sh
+cd /workspace/wt-1241/apps/web
+corepack pnpm exec vitest run \
+  i18n-coverage.test.ts \
+  i18n-scan.test.ts \
+  i18n.test.ts
+```
+
+```text
+ Test Files  3 passed (3)
+      Tests  28 passed (28)
+   Duration  1.23s (transform 54%, import 32%, tests 12%, worker 1%)
+```
+
+合计：**4 个测试文件 / 75 passed / 0 failed**。
+
+## 4. machines e2e
+
+`apps/web/e2e/machines-concurrency-source.spec.ts` —— 3 用例覆盖并发来源
+乐观更新（选数即标手动 / 有指纹恢复推荐 / 无指纹恢复推荐）。
+
+```sh
+cd /workspace/wt-1241/apps/web
+E2E_PORT=8398 \
+  corepack pnpm exec playwright test machines-concurrency-source.spec.ts \
+  --reporter=line
+```
+
+```text
+Running 3 tests using 1 worker
+
+[1/3] e2e/machines-concurrency-source.spec.ts:121:1 › 选数即标手动：PATCH 在途时来源已是手动，回执后仍是手动
+[2/3] e2e/machines-concurrency-source.spec.ts:137:1 › 恢复推荐（有指纹）：PATCH 在途时来源先复判为推荐
+[3/3] e2e/machines-concurrency-source.spec.ts:152:1 › 恢复推荐（无指纹）：PATCH 在途时来源先复判为估算，不说成推荐
+  3 passed (6.2s)
+[exited with code 0]
+```
+
+## 汇总
+
+| 项 | 命令 | 结果 |
+|---|---|---|
+| biome ci | `pnpm lint` | exit 0，0 error（53 warning + 1 info 均为 pre-existing） |
+| typecheck | `pnpm typecheck` | exit 0，4/4 包 Done |
+| vitest server | machine-concurrency-{backfill,recommendation} | 11 passed |
+| vitest daemon | machine-capabilities | 12 passed |
+| vitest shared | machine-capabilities | 24 passed |
+| vitest web | i18n-{coverage,scan,test} | 28 passed |
+| e2e web | machines-concurrency-source.spec.ts | 3 passed |

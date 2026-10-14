@@ -1,0 +1,52 @@
+[
+  {
+    "id": "CpytCzJtDyNfQUCefCqa4",
+    "name": "grok-bot-vm-481311088",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "online": false,
+    "latestCliVersion": null,
+    "kind": "local",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "runningSteps": 0,
+    "capabilities": null
+  },
+  {
+    "id": "49KiLpQ2AwbX0XqR3edOL",
+    "name": "verify-1241-real",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "online": true,
+    "latestCliVersion": "0.2.0",
+    "kind": "remote",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "runningSteps": 0,
+    "capabilities": {
+      "mcpServers": [
+        "rea"
+      ],
+      "skills": []
+    }
+  },
+  {
+    "id": "ThhV9Fs8bDqZBnWMKvTtJ",
+    "name": "verify-1241-estimate",
+    "teamId": "JhaGSxspTwCjiECPKGQwV",
+    "online": true,
+    "latestCliVersion": "0.1.0",
+    "kind": "remote",
+    "enabledRuntimes": [
+      "pi"
+    ],
+    "shellEnabled": false,
+    "maxConcurrent": 3,
+    "runningSteps": 0,
+    "capabilities": null
+  }
+]
