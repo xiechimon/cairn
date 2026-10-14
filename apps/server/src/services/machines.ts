@@ -34,6 +34,7 @@ import {
   AGENT_TOOL_SHELL,
   AGENT_TOOL_TAG,
   appendMergedPrGuard,
+  assertSkillInjection,
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildSecondPrWarningNote,
@@ -53,9 +54,12 @@ import {
   machineCapabilitiesSchema,
   machineRecordSchema,
   mergedPrGuardNoteRowId,
+  SKILL_INJECTION_CHECK_KIND,
+  type SkillInjectionFacts,
   type SkillInjectionRecord,
   secondPrWarningNoteRowId,
   selectSkillsForTask,
+  skillFactsFromContents,
   suggestSkillsForMessage,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
@@ -68,6 +72,7 @@ import {
   apiKey,
   build,
   chief,
+  chiefMessage,
   chiefThread,
   machine,
   message,
@@ -118,7 +123,7 @@ import {
 } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
+import { diffTextNamesAFile, parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { markModelDead } from './model-liveness.js';
@@ -1602,6 +1607,78 @@ function chiefStepToken(
   };
 }
 
+/** #1186 技能注入断言：done 携带的实际注入名集 × 步上的选择 hits × agent
+ * 授权面 × 已落库 toolcall 事实。副作用只有一条 system 行（deterministic
+ * id，recover 重放 upsert 幂等）。不改步结果、相位、合并闸。quota 挂起
+ * 不进这里（那次运行还没结束）。facts 缺席（旧 daemon）由调用方跳过。
+ * worker 步找不到 agent 行 = 不写、不抛（收尾照常）。chief 步按不限制、
+ * 无选择收窄计（daemon 不对 chief 套 allowlist）。 */
+function recordSkillInjectionCheck(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  facts: SkillInjectionFacts,
+): void {
+  const chiefStep = stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId);
+  let skillsAllowlist: readonly string[] | null = null;
+  let defaultSkill: string | null = null;
+  let requested: string[] | undefined;
+  if (!chiefStep) {
+    const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    const todoRow = buildRow
+      ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+      : undefined;
+    const agentRow = todoRow ? agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) : null;
+    if (agentRow == null) return;
+    skillsAllowlist = agentRow.skillsAllowlist ?? null;
+    defaultSkill = agentRow.defaultSkill;
+    if (stepRow.skillInjection == null) {
+      requested = undefined;
+    } else {
+      const ids = stepRow.skillInjection.hits.map((h) => h.id);
+      requested =
+        defaultSkill == null || defaultSkill === ''
+          ? ids
+          : [defaultSkill, ...ids.filter((id) => id !== defaultSkill)];
+    }
+  }
+  const contents = (
+    chiefStep
+      ? deps.db
+          .select({ content: chiefMessage.content })
+          .from(chiefMessage)
+          .where(eq(chiefMessage.threadId, stepRow.buildId))
+          .all()
+      : deps.db
+          .select({ content: message.content })
+          .from(message)
+          .where(eq(message.conversationId, stepRow.buildId))
+          .all()
+  ).map((row) => row.content);
+  const verdict = assertSkillInjection({
+    skillsAllowlist,
+    defaultSkill,
+    requested,
+    names: facts,
+    facts: skillFactsFromContents(contents),
+  });
+  const row = {
+    id: `skill-injection-${stepRow.id}`,
+    role: 'system' as const,
+    content: JSON.stringify({
+      kind: SKILL_INJECTION_CHECK_KIND,
+      level: verdict.level,
+      reds: verdict.reds,
+      yellows: verdict.yellows,
+      injected: facts.injected,
+      omitted: facts.omitted,
+      unrendered: facts.unrendered,
+    }),
+    createdAt: nowMs(),
+  };
+  if (chiefStep) upsertChiefRow(deps, { ...row, threadId: stepRow.buildId });
+  else upsertMessage(deps, { ...row, conversationId: stepRow.buildId });
+}
+
 // —— done（步骤收尾 + phase 推进 + token 记账，02 §5.4/§4.2）——————————————————
 
 export async function finishStep(
@@ -1644,7 +1721,11 @@ export async function finishStep(
       sets.prNumber = body.prNumber;
     }
     if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
-      sets.changes = parseUnifiedDiff(body.changesDiff);
+      const files = parseUnifiedDiff(body.changesDiff);
+      sets.changes =
+        files.length === 0 && diffTextNamesAFile(body.changesDiff)
+          ? { files, changed: true }
+          : files;
     }
     if (Object.keys(sets).length > 0) {
       const updated = db.update(build).set(sets).where(eq(build.id, stepRow.buildId)).run();
@@ -1770,6 +1851,11 @@ export async function finishStep(
       }
     }
   }
+  // #1186：配额挂起已经 return（那次运行还没结束）。断言是旁路写，
+  // 写在 chief / success / stopped / failed 分叉之前，三支收尾都带上。
+  if (outcome.skillInjectionFacts !== undefined) {
+    recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
+  }
   // chief 步收尾（无 build/phase/merge；thread 面 + chief_message 通知，r5 §3.6/
   // §7.2）。token 记账已按 buildId=chief conv id 落位（context.tokens 数据源）。
   if (stepRow.kind === 'chief' && isChiefConversation(stepRow.buildId)) {
@@ -1792,7 +1878,7 @@ export async function finishStep(
       '回合已结束',
     );
     finishChiefTurn(deps, stepRow.buildId, outcome);
-    if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId);
+    if (outcome.status === 'success') notifyChiefTurn(deps, stepRow.buildId, stepRow.prompt);
     // #631 失败闭环：build 路径的失败原因有 build.errorMessage 承接，chief
     // 路径此前零承接——daemon 上报的 errorMessage 落一条 system 行进线程
     // （machine_selected 同族 content 形态 = JSON 串），会话流 message 事件

@@ -120,7 +120,7 @@ export function ChiefRoot() {
                 <ChiefFabIcon chief={surface.chiefData} />
                 {surface.chiefUnread > 0 && (
                   <span className="fab-badge absolute -top-1 right-0 h-4 min-w-4 rounded-[8px] bg-(--card-button) px-[3px] text-center text-[10px] leading-4 text-(--text-on-accent)">
-                    {surface.chiefUnread}
+                    {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
                   </span>
                 )}
               </Button>
@@ -130,6 +130,9 @@ export function ChiefRoot() {
               kbd-hint 退役回 registry Tooltip + Kbd——该消费点原在
               board-page 内联钮，#1009 A0 把 FAB 迁到根 host，形态随迁。 */}
           <TooltipContent side="top" sideOffset={8}>
+            {surface.chiefUnread > 0 && (
+              <span>{t('{n} 个总管会话有未读', { n: surface.chiefUnread })}</span>
+            )}
             <Kbd>⌘J</Kbd>
           </TooltipContent>
         </Tooltip>

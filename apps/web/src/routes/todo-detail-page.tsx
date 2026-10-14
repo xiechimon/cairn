@@ -69,6 +69,7 @@ import { AcceptDialog } from '../detail/accept-dialog.js';
 import { Composer } from '../detail/composer.js';
 import { DetailHead } from '../detail/dhead.js';
 import { DocPane } from '../detail/docpane.js';
+import { substantiveChangesOf } from '../detail/empty-commit.js';
 import { FreshBlock } from '../detail/fresh-block.js';
 import { mergeRejectCopy, useMergeGate } from '../detail/merge-gate.js';
 import { RerunDialog, ReusePanel } from '../detail/overlays.js';
@@ -1087,6 +1088,7 @@ export function TodoDetailPage() {
         onClose={closeOverlay}
         missingTools={mergeMissing}
         rejectReason={mergeReject}
+        substantiveChanges={live ? substantiveChangesOf(changesQ.data, changesQ.isSuccess) : null}
         mergeLocked={phase === 'failed'}
         confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={

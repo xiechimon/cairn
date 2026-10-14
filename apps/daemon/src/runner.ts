@@ -26,6 +26,7 @@ import type {
   ProviderConfig,
   QuotaBlock,
   SessionOpts,
+  SkillInjectionFacts,
   TranscriptUpload,
   WorktreeOps,
 } from '@pacman/shared';
@@ -865,6 +866,10 @@ export async function runStep(
       clearInterval(keepAlive);
     }
   };
+  // #1186：简报目录构造（composeBody）把 scan + 预算之后的名字交回来。
+  // 回调在 doneBody 落 journal 之前触发，recover 重放 done 时名字跟着走。
+  // 没走到简报（更早失败）保持 null，done 不带本字段。
+  let skillInjectionFacts: SkillInjectionFacts | null = null;
   // 工具面按步全量透传（#647/T4）：claude-code 后端把 host 注入工具
   // （remoteTools relay + localTools 本地执行）包成 in-process MCP server、
   // McpEndpoint 映射 SDK 原生 config——T1 期的 runtimeDrop 降级（worker/review
@@ -920,6 +925,9 @@ export async function runStep(
     // 未携带 injectedSkills = 不造集（目录注入回落 allowlist 全量，零回归）。
     // deny 面（#917）不受重排影响——授权上限只看 skillsAllowlist。
     ...(isChief || injectedForSession === undefined ? {} : { injectedSkills: injectedForSession }),
+    onSkillsResolved: (names) => {
+      skillInjectionFacts = names;
+    },
     // 团队技能物化目录（XMON-112 S2）：backend 把它排在本机 skillsDir 之前
     // 扫描（同名冲突团队条目胜，pi first-wins）；null = 纯本机（零回归）。
     ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
@@ -2055,6 +2063,7 @@ export async function runStep(
     // #1261 配额熔断信号（server 侧挂起等额度的判据；旧 server zod strip =
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
+    ...(skillInjectionFacts !== null ? { skillInjectionFacts } : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {
