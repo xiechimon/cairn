@@ -1,0 +1,22 @@
+main tools-summary mtime: 2026-10-14 13:57:13Z
+branch tools-summary mtime: 2026-10-14 13:57:49Z
+dummy server logs mtime: 2026-10-14 13:57:11Z (unchanged after the branch session)
+
+== dummy_alpha last lines ==
+2026-10-14T13:59:04.773Z raw 342 "{\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"roots\":{\"listChanged\":true},\"elicitation\":{\"form\":{},\"url\":{}}},\"clientInfo\":{\"name\":\"claude-code\",\"title\":\"Claude Code\",\"version\":\"2.1.299\",\"description\":\"Ant"
+2026-10-14T13:59:04.773Z recv initialize id=0
+2026-10-14T13:59:04.778Z recv notifications/initialized id=
+2026-10-14T13:59:04.778Z recv tools/list id=1
+
+== dummy_beta last lines ==
+2026-10-14T13:59:04.773Z raw 342 "{\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"roots\":{\"listChanged\":true},\"elicitation\":{\"form\":{},\"url\":{}}},\"clientInfo\":{\"name\":\"claude-code\",\"title\":\"Claude Code\",\"version\":\"2.1.299\",\"description\":\"Ant"
+2026-10-14T13:59:04.773Z recv initialize id=0
+2026-10-14T13:59:04.776Z recv notifications/initialized id=
+2026-10-14T13:59:04.777Z recv tools/list id=1
+
+== dummy_gamma last lines ==
+2026-10-14T13:59:04.773Z raw 342 "{\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-11-25\",\"capabilities\":{\"roots\":{\"listChanged\":true},\"elicitation\":{\"form\":{},\"url\":{}}},\"clientInfo\":{\"name\":\"claude-code\",\"title\":\"Claude Code\",\"version\":\"2.1.299\",\"description\":\"Ant"
+2026-10-14T13:59:04.773Z recv initialize id=0
+2026-10-14T13:59:04.779Z recv notifications/initialized id=
+2026-10-14T13:59:04.779Z recv tools/list id=1
+

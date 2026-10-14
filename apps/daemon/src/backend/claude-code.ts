@@ -870,10 +870,12 @@ export interface ClaudeSdkOptionParts {
   disallowedTools: string[];
   mcpServers: Record<string, McpServerConfig>;
   /** #1307 三态受管（对齐 Multica mcp_config.go）：true = 受管集合（含空）
-   * → mcpServers 键恒发（{} 也发）+ strictMcpConfig 锁——SDK 翻译成 CLI
-   * `--mcp-config <空表或受管表> --strict-mcp-config`，用户全局（~/.claude.json）/
-   * 项目 .mcp.json / 插件 MCP 全部忽略（sdk.d.ts:2200 实测在位）。缺省 =
-   * 继承态（旧 server 形 / 版本墙机器）：非空才发键、无 strict 旗。 */
+   * → mcpServers 键恒发（{} 也发）+ strictMcpConfig。SDK 把旗翻成 CLI
+   * `--strict-mcp-config`（sdk.d.ts 实测在位），用户全局（~/.claude.json）/
+   * 项目 .mcp.json / 插件 MCP 全部忽略。空表和仅 in-process sdk server 在组
+   * argv 前被 SDK 丢掉，不产生 `--mcp-config`（#1314 探针）；显式端点仍进
+   * `--mcp-config`。缺省 = 继承态（旧 server 形 / 版本墙机器）：非空才发键、
+   * 无 strict 旗。无条件 strict 会把字段缺省塌成受管空锁。 */
   strictMcpConfig?: boolean;
   effort?: EffortLevel;
   /** systemPrompt preset append（#958 后仅无简报通道的调用面非空）。 */
@@ -895,10 +897,12 @@ export interface ClaudeSdkOptionParts {
 }
 
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
-  // #1307：受管态（strictMcpConfig）mcpServers 键恒发——空 record 也翻译成
-  // 空 --mcp-config 表 + --strict-mcp-config，把用户全局 MCP 锁出会话（继承面
-  // 实测 320 工具 / ~960KB schema 吃光小窗口模型，autocompact thrash 必现）。
-  // 继承态维持旧条件（非空才发键、无 strict 旗——逃生门零回归）。
+  // #1307 三态。受管（strictMcpConfig === true）mcpServers 键恒发，{} 也发。
+  // SDK 在组 argv 前丢掉空表和仅 in-process sdk server（#1314 探针），这两种
+  // 形状没有 --mcp-config；锁是 strictMcpConfig → --strict-mcp-config。没有
+  // 这面旗时，CLI 仍按 settingSources 把 ~/.claude.json 并进来。继承态（旗
+  // 缺省）维持旧条件：非空才发键、不上 strict。#1314 的无条件 strict 不采：
+  // claim 字段缺省（旧 daemon / 版本墙）必须留住机器自己的 MCP 配置。
   const managedMcp = parts.strictMcpConfig === true;
   const mcpSection: Pick<Options, 'mcpServers' | 'strictMcpConfig'> = managedMcp
     ? { mcpServers: parts.mcpServers, strictMcpConfig: true }

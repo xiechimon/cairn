@@ -1,0 +1,1 @@
+19138 /home/ubuntu/.local/bin/claude --output-format stream-json --verbose --input-format stream-json --model stub-1307 --disallowedTools AskUserQuestion --setting-sources=user,project,local --strict-mcp-config --permission-mode bypassPermissions --include-partial-messages --session-id=4722dcba-c86b-4871-b5c1-4e469874fe86
