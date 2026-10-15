@@ -40,6 +40,7 @@ export const EN: Record<string, string> = {
   '收起{label}': 'Collapse {label}',
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
+  '{n} 个总管会话有未读': '{n} chief sessions have unread',
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
@@ -636,6 +637,9 @@ export const EN: Record<string, string> = {
   复制链接: 'Copy link',
   完成任务: 'Complete todo',
   将改动合并到默认分支: 'Merge the changes into the default branch',
+  // #1313：已上报且文件集为空时完成弹层不提供合并勾选。
+  '本轮没有文件改动，完成不会合并分支。':
+    'This round has no file changes. Completing will not merge the branch.',
   // XMON-89 合并被拒的可见化：前置缺项行（{tools} = 1~2 个开关名的顿号串；
   // 开关名本身是 shared AGENT_TOOL_SWITCHES 的 zh 值域词，locate 后仍按 zh
   // 出现——与权限 tab 的开关行一致，不另开一份 en 词表）＋ 5xx/网络失败的
@@ -945,7 +949,7 @@ export const EN: Record<string, string> = {
   // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
   '远程 shell': 'Remote shell',
   合并分支: 'Merge branches',
-  创建标签: 'Create labels',
+  创建标签: 'Create tags',
   推送分支: 'Push branches',
   创建技能: 'Create skills',
   更新技能: 'Update skills',

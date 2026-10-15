@@ -654,8 +654,8 @@ function TasksPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex flex-none items-center gap-3 px-4 py-3">
-        {/* 搜索框 = registry InputGroup（手写 28 高带框盒 + 无环 focus 配方
-            退役——focus ring 归件默认 ring-3，#980 裁决④）。 */}
+        {/* 搜索框 = registry InputGroup。#1244：focus 环画在壳上，
+            2px --focus-ring outline，控件面自身不出环。 */}
         <InputGroup className="flex-1">
           <InputGroupAddon>
             <Search />

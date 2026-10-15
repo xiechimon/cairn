@@ -884,8 +884,15 @@ export function upsertChiefMessage(
 }
 
 /** chief_message 通知（r5 §7.2：type chief_message、snippet = 消息全文、
- * agent = 绑定 Agent）：回合收尾取最后一条 assistant 文本发事件。 */
-export function notifyChiefTurn(deps: ChiefDeps, threadId: string): void {
+ * agent = 绑定 Agent）：回合收尾取最后一条 assistant 文本发事件。
+ * stepPrompt 是这一步自己的 prompt（#1303）。机器触发（parseChiefTrigger
+ * 不是 user）落库即已读；不在这里回查「最新一步」——用户回合收尾前可能已经
+ * 入队了更新的 wake 步，按最新步会把用户回复误判成机器回合。 */
+export function notifyChiefTurn(
+  deps: ChiefDeps,
+  threadId: string,
+  stepPrompt?: string | null,
+): void {
   const threadRow = getChiefThread(deps, threadId);
   if (!threadRow) return;
   const last = deps.db
@@ -901,12 +908,14 @@ export function notifyChiefTurn(deps: ChiefDeps, threadId: string): void {
   const agentRow = chiefRow?.agentId
     ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
     : undefined;
+  const machineTurn = parseChiefTrigger(stepPrompt ?? null) !== 'user';
   notifyChiefMessage(deps, {
     threadId,
     message: text,
     agent: agentRow
       ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    ...(machineTurn ? { readAt: nowMs() } : {}),
   });
 }
 

@@ -24,6 +24,31 @@ A URL is an image link under two parallel rules (#940):
    whose last path segment carries no file extension -- the shape
    drag-and-drop uploads produce.
 
+A URL counts as embedded under any of three forms (#1335):
+
+1. Markdown image: the target of `![label](url)`.
+2. HTML image: the value of an `<img src="...">` attribute (the
+   fallback an HTML `<picture>` falls back to).
+3. HTML source: any comma-separated URL in a `<source srcset="...">`
+   attribute (the variants a `<picture>` picks between). Whitespace
+   around each comma is allowed and a width/height descriptor after
+   each URL (`2x`, `100w`) is stripped -- neither is part of the URL.
+
+URLs inside an HTML comment (`<!-- ... -->`) are not embedded and are
+not scanned at all: GitHub does not render them, so the comment text
+is treated as not present for the link check. Section checks
+(`section_verdicts`) have always stripped comments from section
+content and are unaffected.
+
+Form 2 and form 3 cover the Cursor badge footer the agent injects
+after `<!-- CURSOR_AGENT_PR_BODY_END -->` when it opens a PR: a
+`<picture>` with two `<source>` variants and an `<img>` fallback per
+link. Without them the gate red-flags every badge URL as a bare
+external image link, even though GitHub renders the badge. Stripping
+the footer at the lane that opens the PR is out of bounds (#1335),
+so the gate has to recognize the form. Bare URLs that are not wrapped
+in any of the three forms still fail.
+
 raw.githubusercontent.com is judged by rule 1 alone: it serves every
 committed file type, so an extensionless raw path (LICENSE, a directory
 permalink) is a reference, and non-image evidence files (.json, .md,
@@ -78,6 +103,76 @@ def is_media_host_image(url):
     return bool(last) and not TAIL_EXT.search(last)
 
 
+# HTML embedding (#1335): `<img src="...">` and `<source srcset="...">`
+# render the URL as an image, the same as markdown `![label](url)`. The
+# Cursor badge footer the agent injects after `<!-- CURSOR_AGENT_PR_BODY_END -->`
+# is a `<picture>` with two `<source>` variants and an `<img>` fallback per
+# link. The opening `<picture>` and the closing `</picture>` are not
+# matched here -- only the attribute values that actually carry the URL.
+# Quotes must balance (single or double) so an attribute containing a stray
+# quote cannot leak into the next attribute.
+HTML_EMBED = re.compile(
+    r'<(?P<tag>img|source)\b[^>]*?\s(?P<attr>src|srcset)'
+    r'=(?P<quote>["\'])(?P<value>[^"\']*?)(?P=quote)',
+    re.IGNORECASE | re.DOTALL)
+
+
+def html_embed_spans(body):
+    """Byte spans of URLs embedded via `<img src>` or `<source srcset>`.
+
+    Returns a set of (start, end) offsets into `body`, one per URL
+    fragment inside an attribute value. `srcset` may carry
+    comma-separated URLs (whitespace around each comma is allowed;
+    a width/height descriptor like `2x` or `100w` after each URL is
+    stripped); each URL is its own span, registered at the offset
+    IMG_URL would find it so the lookup in `find_links` matches.
+    """
+    spans = set()
+    for m in HTML_EMBED.finditer(body):
+        value = m.group('value')
+        base = m.start('value')
+        pos = 0
+        for part in value.split(','):
+            # Skip leading whitespace inside the original fragment so
+            # the second URL's span lands where IMG_URL actually
+            # finds it (`srcset="a.svg, b.svg"` -- the cursor after
+            # the comma and the space is +2, not +1).
+            ws_lead = 0
+            while ws_lead < len(part) and part[ws_lead].isspace():
+                ws_lead += 1
+            url_part = part[ws_lead:]
+            # First whitespace-separated token is the URL; any
+            # trailing descriptor like `2x` or `100w` is not part of
+            # it. The token is also absent when the fragment is just
+            # whitespace (an empty srcset cell), in which case no
+            # span is registered.
+            url = url_part.split()[0] if url_part else ''
+            url_start = base + pos + ws_lead
+            url_end = url_start + len(url)
+            if url:
+                spans.add((url_start, url_end))
+            pos += len(part) + 1  # +1 for the comma separator
+    return spans
+
+
+def in_html_embed(ms, me, html_embed):
+    """True when the URL span [ms, me) is contained in any embed span.
+
+    IMG_URL terminates its match at the file extension, so a
+    `<source srcset="...svg?v=1#x">` and a bare equivalent stop at
+    different offsets. Equality misses the embedded case and the
+    gate red-flags a URL GitHub does render; containment keeps the
+    form recognised (#1335). Containment is one-directional: the
+    embedded span is always at least as wide as the IMAGE span
+    (image extension is a suffix of the embed value), so a simple
+    `[hs, he)` superset test is enough.
+    """
+    for hs, he in html_embed:
+        if hs <= ms and me <= he:
+            return True
+    return False
+
+
 REQUIRED_SECTIONS = ('Upstream', 'Verified')
 # The full body contract a lane must satisfy (#1110). The gate only
 # *requires* the two sections above; the rest are named here so a failing
@@ -103,6 +198,20 @@ def without_fences(body):
             continue
         out.append('' if inside else line)
     return '\n'.join(out)
+
+
+def without_html_comments(body):
+    """Blank out `<!-- ... -->` spans with same-length whitespace.
+
+    Newlines are preserved so the line numbers reported by the gate
+    still match the source body. URLs inside HTML comments are not
+    rendered by GitHub, so they are not links (#1335). Section checks
+    `section_verdicts` already strip comments from section content and
+    are unaffected -- this helper runs only on the link path.
+    """
+    return HTML_COMMENT.sub(
+        lambda m: re.sub(r'[^\n]', ' ', m.group(0)),
+        body)
 
 
 def section_verdicts(body):
@@ -141,13 +250,21 @@ def http_code(url):
 def find_links(body):
     """Every image URL in the body, tagged with its rendering form.
 
-    A URL is embedded only as the target of `![label](url)`. As the
-    target of `[label](url)` it renders as a link, and standing on its
-    own it renders as an autolink or as text; none of those show the
-    image.
+    A URL is embedded as the target of `![label](url)`, as the value
+    of an `<img src="...">` attribute, or as a URL inside a
+    `<source srcset="...">` attribute (#1335). As the target of
+    `[label](url)` it renders as a link, and standing on its own it
+    renders as an autolink or as text; none of those show the image.
+
+    A URL inside an `<!-- ... -->` comment is not rendered and is not
+    scanned: the comment text is replaced by same-length whitespace
+    before matching, so line numbers in `FAIL not-embedded` still
+    point at the source line.
     """
+    clean = without_html_comments(body)
+
     targets = {}
-    for m in MD_LINK.finditer(body):
+    for m in MD_LINK.finditer(clean):
         start, end = m.span('url')
         targets[(start, end)] = m
 
@@ -157,19 +274,27 @@ def find_links(body):
                 return m
         return None
 
-    matches = list(IMG_URL.finditer(body))
-    matches += [m for m in MEDIA_HOST_URL.finditer(body)
+    html_embed = html_embed_spans(clean)
+
+    matches = list(IMG_URL.finditer(clean))
+    matches += [m for m in MEDIA_HOST_URL.finditer(clean)
                 if is_media_host_image(m.group(0))]
     matches.sort(key=lambda m: m.start())
 
     links = []
     seen = set()
     for m in matches:
-        md = markdown_target(m.start(), m.end())
+        ms, me = m.start(), m.end()
+        if in_html_embed(ms, me, html_embed):
+            links.append({'form': 'html', 'embedded': True, 'label': None,
+                          'url': m.group(0),
+                          'line': clean.count('\n', 0, ms) + 1})
+            continue
+        md = markdown_target(ms, me)
         if md is None:
             links.append({'form': 'bare', 'embedded': False, 'label': None,
                           'url': m.group(0),
-                          'line': body.count('\n', 0, m.start()) + 1})
+                          'line': clean.count('\n', 0, ms) + 1})
             continue
         span = md.span('url')
         if span in seen:
@@ -178,14 +303,16 @@ def find_links(body):
         links.append({'form': 'image' if md.group('bang') == '!' else 'link',
                       'embedded': md.group('bang') == '!',
                       'label': md.group('label'),
-                      'url': body[span[0]:span[1]],
-                      'line': body.count('\n', 0, md.start()) + 1})
+                      'url': clean[span[0]:span[1]],
+                      'line': clean.count('\n', 0, md.start()) + 1})
     return links
 
 
 def describe(link):
     if link['form'] == 'bare':
         return f"{link['url']} (bare URL, line {link['line']})"
+    if link['form'] == 'html':
+        return f"{link['url']} (HTML <img>/<source>, line {link['line']})"
     return f"[{link['label']}]({link['url']})"
 
 

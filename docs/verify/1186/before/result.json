@@ -1,0 +1,32 @@
+{
+  "probe": "1186-before",
+  "passed": 5,
+  "total": 5,
+  "checks": [
+    {
+      "name": "closed agent persisted skillsAllowlist []",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "catalog log is a count (no name set)",
+      "ok": true,
+      "detail": "2026-10-14 16:13:39 [skills] catalog: entries=1 chars=641 bytes=641 | 2026-10-14 16:13:40 [skills] catalog: entries=0 chars=0 bytes=0"
+    },
+    {
+      "name": "open step row keeps requested hits, not an injected name set",
+      "ok": true,
+      "detail": "{\"hits\":[{\"id\":\"demo-skill\",\"rule\":\"explicit-mention\",\"reason\":\"任务文本显式点名「demo-skill」\"}]}"
+    },
+    {
+      "name": "closed step row has no injected name set",
+      "ok": true,
+      "detail": "{\"hits\":[]}"
+    },
+    {
+      "name": "no skill_injection_check record joins the three sources",
+      "ok": true,
+      "detail": "message dump has no check kind"
+    }
+  ]
+}

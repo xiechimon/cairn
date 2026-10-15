@@ -1,0 +1,55 @@
+# 1194 before link check
+# base: a2285aa1 (origin/main)
+# source: docs/spec/09-前端风格统一-A6.md
+# GitHub resolves a relative link from the file directory.
+# href a3/<file>.md therefore requests docs/spec/a3/<file>.md
+
+## source lines
+129: ### 关联
+130: 
+131: - [docs/a3/diff-audit.md](a3/diff-audit.md)——A3 当年裁决 #1 被本 ADR 覆盖
+132: - [docs/a3/report-detail.md](a3/report-detail.md)——detail 域收编报告，A6 接续
+133: - wiki [[DESIGN.md 驱动的 UI 原语收编]]——方法论来源
+134: - wiki [[Taste Skill]]——反 slop 设计纪律
+
+## github blob (rendered click target)
+href: a3/diff-audit.md
+GET https://github.com/xiechimon/pacman/blob/a2285aa1/docs/spec/a3/diff-audit.md
+HTTP 404
+title: File not found · GitHub
+
+href: a3/report-detail.md
+GET https://github.com/xiechimon/pacman/blob/a2285aa1/docs/spec/a3/report-detail.md
+HTTP 404
+title: File not found · GitHub
+
+## raw.githubusercontent.com
+href: a3/diff-audit.md
+GET https://raw.githubusercontent.com/xiechimon/pacman/a2285aa1/docs/spec/a3/diff-audit.md
+HTTP 404
+body: 404: Not Found
+
+href: a3/report-detail.md
+GET https://raw.githubusercontent.com/xiechimon/pacman/a2285aa1/docs/spec/a3/report-detail.md
+HTTP 404
+body: 404: Not Found
+
+## local filesystem at a2285aa1
+missing docs/spec/a3/diff-audit.md
+missing docs/spec/a3/report-detail.md
+exists docs/a3/diff-audit.md
+exists docs/a3/report-detail.md
+
+## rendered page on origin/main
+GET https://github.com/xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/09-前端风格统一-A6.md
+HTTP 200
+
+anchor text: docs/a3/diff-audit.md
+href: /xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/a3/diff-audit.md
+follow: HTTP 404
+title: File not found · GitHub
+
+anchor text: docs/a3/report-detail.md
+href: /xiechimon/pacman/blob/a2285aa1392486588fabdc24aaf6240c850ac638/docs/spec/a3/report-detail.md
+follow: HTTP 404
+title: File not found · GitHub

@@ -9,6 +9,7 @@
 // 重渲染重挂的丢失机理见 escape-wiring.spec.ts 的失败面记录）。
 
 import { useEffect, useRef } from 'react';
+import { dropEscLayer, ensureGestureKeys, pushEscLayer } from '../overlays/gesture-machine.js';
 
 export function useEscClose(onClose: () => void, enabled = true): void {
   const onCloseRef = useRef(onClose);
@@ -17,10 +18,10 @@ export function useEscClose(onClose: () => void, enabled = true): void {
   });
   useEffect(() => {
     if (!enabled) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    // One window listener, owned by the gesture machine. This effect only
+    // pushes a layer id for the open period (#466: do not rebind per render).
+    ensureGestureKeys();
+    const id = pushEscLayer(() => onCloseRef.current());
+    return () => dropEscLayer(id);
   }, [enabled]);
 }

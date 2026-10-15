@@ -1,6 +1,6 @@
 # #939/#940/#1079 evidence: PR body gate widening
 
-One gate (`scripts/pr-evidence-gate.py`, CI job `pr-evidence`), three
+One gate (`scripts/pr-evidence-gate.py`, CI job `pr-evidence`), four
 tickets:
 
 - **#939** — the PR template gains two answer-checked sections (the
@@ -29,6 +29,21 @@ tickets:
   fixtures and recordings in this directory were re-shaped and
   re-recorded against that gate; the verdict columns below read the
   same as before because the collapse preserves every failure mode.
+- **#1335** — the gate learns a third embedded form: a URL inside an
+  HTML `<img src="...">` attribute or a `<source srcset="...">`
+  attribute. The Cursor badge footer the agent injects after
+  `<!-- CURSOR_AGENT_PR_BODY_END -->` is two `<picture>` blocks, each
+  with two `<source>` variants and an `<img>` fallback; without #1335
+  the gate red-flags every badge URL as a bare external image link
+  even though GitHub renders the badge. The footer is injected by the
+  agent, so a lane cannot strip it; the gate has to recognize the
+  form. Bare URLs that are not wrapped in any of the three forms still
+  fail -- the fix is not a free pass for forgotten image links
+  (`fixture-html-control-bare.md`). The previously-recorded
+  `fixture-img-tag-dragdrop.md` output was re-recorded against the
+  fixed gate: the `<img src>` URL is now embedded (one fewer
+  not-embedded line) but still fails on reachability (the asset UUID
+  returns 404).
 
 Everything below was recorded before the PR was opened: fixtures and
 expected verdicts first, then the implementation, then re-runs
@@ -84,7 +99,11 @@ answers neither required section.
 | `ext-anyhost-embedded` | rule 1 green path (shields.io svg, 200) | GREEN, scanned 0 | GREEN, scanned 1 |
 | `user-attachments-bare` | rule 2, extensionless upload URL | GREEN, scanned 0 | RED: not-embedded + unreachable 404 |
 | `user-images-link` | rule 1 catches `[label](url)` on any host | GREEN, scanned 0 | RED: not-embedded + unreachable 403 |
-| `img-tag-dragdrop` | `<img src>` form + code span; no `"`/backtick leakage in named URLs | GREEN, scanned 0 | RED (4), URLs clean |
+| `img-tag-dragdrop` | `<img src>` form + code span; no `"`/backtick leakage in named URLs | GREEN, scanned 0 | RED (3), URLs clean — `<img src>` embedded (#1335), one not-embedded line dropped |
+| `html-img-embedded` | `<img src="...">` alone is embedded (#1335) | GREEN, scanned 0 | GREEN, scanned 1 |
+| `html-source-srcset-embedded` | `<source srcset="...">` URLs are embedded (#1335) | GREEN, scanned 0 | GREEN, scanned 3 |
+| `html-cursor-badge` | the Cursor badge footer is all embedded (#1335) | GREEN, scanned 0 | GREEN, scanned 6 |
+| `html-control-bare` | bare URL outside the three forms still RED (#1335) | GREEN, scanned 0 | RED: not-embedded + unreachable 404 |
 | `raw-refs-green` | mode 8: references stay ignored | GREEN, scanned 0 | GREEN, scanned 0 |
 | `codeblock-bare` | mode 9: fences do not exempt | RED (1) | RED (1), byte-identical link verdict |
 | `sections-both` | mode 15 | GREEN | GREEN |
@@ -136,11 +155,14 @@ close, and repo policy wants evidence committed to the branch anyway):
   the unchanged HTTP-200 probe;
 - GitHub's current editor inserts drag-and-dropped images as
   `<img src="...user-attachments...">` HTML, which renders — the gate
-  still judges that form not-embedded (`fixture-img-tag-dragdrop`).
+  recognizes the form as embedded after #1335, but the 302 above still
+  red-flags the body on reachability (`fixture-img-tag-dragdrop`
+  re-recorded with one fewer FAIL line).
 
-So a drag-and-drop attachment can never pass this gate by construction;
-the passing form is a committed file under `docs/verify/<ticket>/` with
-a raw permalink, embedded as `![label](url)`.
+So a drag-and-drop attachment can still never pass this gate by
+construction; the passing form is a committed file under
+`docs/verify/<ticket>/` with a raw permalink, embedded as
+`![label](url)`.
 
 ## #750 fixtures under the new gate
 
