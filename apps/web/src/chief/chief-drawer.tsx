@@ -844,7 +844,7 @@ function ChiefDrawerInner({
                 chief-composer 以零规则钩子存活：#948 把外域规则内联进本 div
                 后，余下消费者 = spec 容器 scope（chief-panel.spec 的
                 composer bar 定位）；摘除归 #952 终账。 */}
-      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-[17px] my-2.5 rounded-(--radius-composer) bg-(--secondary) px-3 pt-3 pb-2.5 shadow-[var(--edge-ring),var(--card-shadow)] transition-shadow duration-(--dur-fast) ease-(--ease-out)">
+      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-[17px] my-2.5 rounded-(--radius-composer) border-0 bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
         {/* #624：占位双态随回合态（r5 §3.6，截图 113）——活动线程 activeRun
               在位（chief.running，mapChief 单点投影）= steer canon「执行过程中
               即可送达」，空闲 / 新主题 / 回合收尾 = 空闲 canon。两值经 t() 消费
