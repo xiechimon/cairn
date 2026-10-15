@@ -5705,6 +5705,26 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > 
         },
       ],
     },
+    "concurrencyRange": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "min": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "min",
+        "max",
+      ],
+      "type": "object",
+    },
     "concurrencySource": {
       "enum": [
         "measured",

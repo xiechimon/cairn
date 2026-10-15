@@ -25,7 +25,7 @@
 
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
@@ -33,6 +33,7 @@ import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, PiMark } from '../components/brand-marks.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Switch } from '../components/ui/switch.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -40,7 +41,7 @@ import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, Monitor, Restore, ServerThin } from '../icons/index.js';
+import { ChevronDown, Minus, Monitor, Plus, Restore, ServerThin } from '../icons/index.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
 import {
   GroupCard,
@@ -79,7 +80,8 @@ const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执
 
 /** #1108 并发档位候选（UI 面 1..8——单机同刻 8 个 agent 会话已是重负载；
  * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
-const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+/** 老 server（无 concurrencyRange）的退场档位。 */
+const FALLBACK_RANGE = { min: 1, max: 8 };
 
 export const CONCURRENCY_SOURCE_LABEL = {
   manual: '手动',
@@ -116,10 +118,28 @@ function MachineConcurrencySelect({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  // 现值超出 UI 档位（API 设的 9..16）→ 并入选项行，不谎报。
-  const options = CONCURRENCY_OPTIONS.includes(value)
-    ? CONCURRENCY_OPTIONS
-    : [...CONCURRENCY_OPTIONS, value].sort((a, b) => a - b);
+  // #1241 弹性区间：server 按总内存给 1..max（单源公式在 dispatch-eligibility）。
+  // 现值超出区间（API 设的 / 换机后内存变小）→ 照实显示并标「超出」，不谎报；
+  // 新输入一律夹进区间（失焦 / Enter / 步进时提交，Esc 还原不提交）。
+  const range = machine.concurrencyRange ?? FALLBACK_RANGE;
+  const outOfRange = value < range.min || value > range.max;
+  const [draft, setDraft] = useState(String(value));
+  const skipCommit = useRef(false);
+  const clampTo = (n: number) => Math.min(range.max, Math.max(range.min, n));
+  const commit = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    if (Number.isNaN(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const next = clampTo(parsed);
+    setDraft(String(next));
+    if (next !== value) onPick(next);
+  };
+  const step = (delta: number) => {
+    const base = Number.parseInt(draft, 10);
+    commit(String((Number.isNaN(base) ? value : clampTo(base)) + delta));
+  };
   const recommended = machine.recommendedConcurrent;
   const hardware = machine.capabilities?.hardware;
   const source = machine.concurrencySource;
@@ -132,7 +152,16 @@ function MachineConcurrencySelect({
       ? t('并发上限 {n}，{source}', { n: value, source: t(CONCURRENCY_SOURCE_LABEL[source]) })
       : t('并发上限 {n}', { n: value });
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          setDraft(String(value));
+          skipCommit.current = false;
+        }
+        setOpen(next);
+      }}
+    >
       <PopoverTrigger
         render={
           <Button
@@ -172,35 +201,76 @@ function MachineConcurrencySelect({
             {t(CONCURRENCY_SOURCE_LABEL[source])}
           </div>
         )}
-        <div
-          role="listbox"
-          aria-label={t('并发上限')}
-          data-testid="machine-concurrency-options"
-          className="grid grid-cols-4 gap-1"
-        >
-          {options.map((n) => (
-            <Button
-              key={n}
-              variant="ghost"
-              role="option"
-              aria-selected={n === value}
-              data-testid="machine-concurrency-option"
-              className={cn(
-                'h-7 cursor-pointer gap-1 rounded-md px-0 text-[13px] font-normal tabular-nums text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0',
-                n === value &&
-                  'bg-(--secondary) font-medium text-(--foreground) hover:bg-(--secondary)',
-              )}
-              onClick={() => {
-                setOpen(false);
-                onPick(n);
-              }}
-            >
-              {n}
-              {n === value && <Check width={12} height={12} className="flex-none" />}
-            </Button>
-          ))}
+        <div className="flex items-center gap-1 px-1 py-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('减少并发上限')}
+            data-testid="machine-concurrency-dec"
+            disabled={value <= range.min && Number.parseInt(draft, 10) <= range.min}
+            className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            onClick={() => step(-1)}
+          >
+            <Minus width={12} height={12} />
+          </Button>
+          <Input
+            type="number"
+            inputMode="numeric"
+            role="spinbutton"
+            aria-label={t('并发上限')}
+            aria-valuemin={range.min}
+            aria-valuemax={range.max}
+            aria-valuenow={value}
+            aria-describedby={`concurrency-hint-${machine.id}`}
+            min={range.min}
+            max={range.max}
+            data-testid="machine-concurrency-input"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit(draft);
+              } else if (e.key === 'Escape') {
+                skipCommit.current = true;
+                setDraft(String(value));
+              }
+            }}
+            onBlur={() => {
+              if (skipCommit.current) {
+                skipCommit.current = false;
+                return;
+              }
+              commit(draft);
+            }}
+            className="h-7 flex-1 [appearance:textfield] rounded-md px-1 text-center text-sm tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('增加并发上限')}
+            data-testid="machine-concurrency-inc"
+            disabled={value >= range.max && Number.parseInt(draft, 10) >= range.max}
+            className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            onClick={() => step(1)}
+          >
+            <Plus width={12} height={12} />
+          </Button>
         </div>
-        {(estimate || recommended !== undefined || overridden) && (
+        <div
+          id={`concurrency-hint-${machine.id}`}
+          data-testid="machine-concurrency-hint"
+          className="px-1 pb-1 text-xs leading-4 text-(--text-tertiary)"
+        >
+          {t(estimate ? '可选 {min}–{max}（默认档位）' : '可选 {min}–{max}（按内存）', range)}
+          {recommended !== undefined && ` · ${t('推荐 {n}', { n: recommended })}`}
+          {outOfRange && (
+            <span data-testid="machine-concurrency-out-of-range" className="block">
+              {t('当前值 {n} 超出可选范围', { n: value })}
+            </span>
+          )}
+        </div>
+        {(estimate || hardware?.memoryTotalMb !== undefined) && (
           <div
             className="flex flex-col gap-1 px-1 text-xs leading-4"
             data-testid="machine-concurrency-basis"
@@ -209,11 +279,9 @@ function MachineConcurrencySelect({
               <span className="text-(--text-tertiary)">
                 {t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}
               </span>
-            ) : (
+            ) : null}
+            {estimate ? null : (
               <>
-                {recommended !== undefined && (
-                  <BasisRow label={t('推荐')} value={String(recommended)} />
-                )}
                 {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
                   <>
                     <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />

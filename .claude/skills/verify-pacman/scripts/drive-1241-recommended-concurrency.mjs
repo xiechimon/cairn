@@ -57,6 +57,11 @@ function formula(cores, memoryTotalMb) {
 const OS_CORES = cpus().length;
 const OS_MEM_MB = Math.floor(totalmem() / (1024 * 1024));
 const EXPECTED_RECOMMENDED = formula(OS_CORES, OS_MEM_MB);
+// #1241 vA3 弹性区间：1..clamp(floor(总内存 / 2GiB), 1, 16)。
+const rangeMax = (memoryTotalMb) => Math.min(16, Math.max(1, Math.floor(memoryTotalMb / 2048)));
+const EXPECTED_RANGE_MAX = rangeMax(OS_MEM_MB);
+const BIG_NAME = 'verify-1241-36gb';
+const BIG_HW = { cpuCores: 12, memoryTotalMb: 36864, memoryAvailableMb: 20480, loadAvg1: 0.5, diskFreeMb: 102400 };
 
 const checks = [];
 function check(name, ok, detail) {
@@ -138,15 +143,15 @@ async function newApiKey(teamId, name) {
 // 假机器：能力清单只有 MCP / 技能计数、无 hardware 指纹——「缺指纹 → 估算」态的
 // wire 形（行内能力列照常有计数，#1241 vA2：验证环境全行同为当前形）。
 const EST_CAPS = { mcpServers: [], skills: [] };
-async function enrollBlankMachine(teamId, name) {
+async function enrollBlankMachine(teamId, name, caps = EST_CAPS) {
   const key = await newApiKey(teamId, `enroll-${name}`);
   const res = await jfetch('POST', '/api/machine/enroll', {
     token: key,
-    body: { teamId, name, cliVersion: '0.1.0', capabilities: EST_CAPS },
+    body: { teamId, name, cliVersion: '0.1.0', capabilities: caps },
   });
   const token = res.body?.token ?? res.body?.machine?.token;
   if (res.status !== 200 || !token) throw new Error(`enroll ${name} → ${res.status}`);
-  const beat = await jfetch('POST', '/api/machine/presence', { token, body: { cliVersion: '0.1.0', capabilities: EST_CAPS } });
+  const beat = await jfetch('POST', '/api/machine/presence', { token, body: { cliVersion: '0.1.0', capabilities: caps } });
   if (beat.status !== 200) throw new Error(`presence ${name} → ${beat.status}`);
   return token;
 }
@@ -221,6 +226,10 @@ try {
     return byName(rows, EST_NAME) ?? null;
   });
   const estId = estRow.id;
+  // 大内存假机器（12 核 / 36 GiB）：区间 1..16、推荐 12（#1241 vA3）。
+  await enrollBlankMachine(teamId, BIG_NAME, { mcpServers: [], skills: [], hardware: BIG_HW });
+  const bigRow = await waitFor('big machine row', async () => byName(await readMachines(teamId), BIG_NAME) ?? null);
+  const bigId = bigRow.id;
 
   const t0 = await snapshot('t0', teamId);
 
@@ -300,10 +309,22 @@ try {
     await settle(page);
     const basisText = ((await basis.textContent()) ?? '').replace(/\s+/g, ' ').trim();
     const gib = (OS_MEM_MB / 1024).toFixed(1);
+    const hintText = ((await page.getByTestId('machine-concurrency-hint').textContent()) ?? '').trim();
     check(
-      'B1 依据弹层：推荐值与核数/总内存/负载行与 os 一致（总内存口径，非可用内存）',
-      basisText.includes(`推荐${EXPECTED_RECOMMENDED}`) &&
-        basisText.includes(`核数${OS_CORES}`) &&
+      'B0 提示：可选区间按内存 + 推荐值',
+      hintText === `可选 1–${EXPECTED_RANGE_MAX}（按内存） · 推荐 ${EXPECTED_RECOMMENDED}`,
+      `hint=${hintText}`,
+    );
+    const input = page.getByTestId('machine-concurrency-input');
+    check(
+      'B0b 数字输入 aria-valuemin/max = 区间',
+      (await input.getAttribute('aria-valuemin')) === '1' &&
+        (await input.getAttribute('aria-valuemax')) === String(EXPECTED_RANGE_MAX),
+      `min=${await input.getAttribute('aria-valuemin')} max=${await input.getAttribute('aria-valuemax')}`,
+    );
+    check(
+      'B1 依据弹层：核数/总内存/负载行与 os 一致（总内存口径，非可用内存）',
+      basisText.includes(`核数${OS_CORES}`) &&
         basisText.includes(`总内存${gib} GiB`) &&
         /负载\d+\.\d{2}/.test(basisText),
       `text=${basisText}`,
@@ -314,7 +335,9 @@ try {
 
     // —— C 手动覆盖 ——
     await triggerFor(page, realId).click();
-    await page.getByTestId('machine-concurrency-option').filter({ hasText: /^4$/ }).click();
+    await page.getByTestId('machine-concurrency-input').fill('4');
+    await page.getByTestId('machine-concurrency-input').press('Enter');
+    await page.keyboard.press('Escape');
     await expectAttr(page, realId, 'manual', 'C0');
     const c1Label = await labelOf(page, realId);
     check(
@@ -406,6 +429,36 @@ try {
     await triggerFor(page, realId).scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(EVIDENCE, '04-after-reset.png') });
 
+    // —— G 夹值：输入 99 → Enter 夹到区间上沿，+ 钮禁用 ——
+    await triggerFor(page, realId).click();
+    const gInput = page.getByTestId('machine-concurrency-input');
+    // 先用 − 步进提交一次（转手动），再输入超区间值。
+    await page.getByTestId('machine-concurrency-dec').click();
+    await expectAttr(page, realId, 'manual', 'G0');
+    check('G0b − 步进提交 上沿-1', (await gInput.inputValue()) === String(EXPECTED_RANGE_MAX - 1), `input=${await gInput.inputValue()}`);
+    await gInput.fill('99');
+    await gInput.press('Enter');
+    await settle(page);
+    check(
+      'G1 超区间输入夹到上沿（输入框与 aria-label）',
+      (await gInput.inputValue()) === String(EXPECTED_RANGE_MAX) &&
+        (await labelOf(page, realId)).includes(String(EXPECTED_RANGE_MAX)),
+      `input=${await gInput.inputValue()} label=${await labelOf(page, realId)}`,
+    );
+    check('G2 上沿时 + 钮禁用', await page.getByTestId('machine-concurrency-inc').isDisabled(), '');
+    await page.screenshot({ path: join(EVIDENCE, '06-clamp-popover.png') });
+    await page.getByTestId('machine-concurrency-reset').click();
+    await expectAttr(page, realId, 'measured', 'G3');
+
+    // —— H 大内存机：1..16、推荐 12 ——
+    await triggerFor(page, bigId).click();
+    const bigHint = ((await page.getByTestId('machine-concurrency-hint').textContent()) ?? '').trim();
+    check('H1 36 GiB / 12 核：可选 1–16 · 推荐 12', bigHint === '可选 1–16（按内存） · 推荐 12', `hint=${bigHint}`);
+    await settle(page);
+    await page.screenshot({ path: join(EVIDENCE, '07-large-memory-popover.png') });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('machine-concurrency-hint').waitFor({ state: 'hidden', timeout: 10_000 });
+
     // —— E 估算（无指纹机）——
     await triggerFor(page, estId).waitFor({ timeout: 10_000 });
     await expectAttr(page, estId, 'estimate', 'E0');
@@ -431,6 +484,8 @@ try {
       estBasisText.includes('未收到能力指纹，按保守默认 3 估算'),
       `text=${estBasisText}`,
     );
+    const estHint = ((await page.getByTestId('machine-concurrency-hint').textContent()) ?? '').trim();
+    check('E5 估算机：可选 1–8（默认档位） · 推荐 3', estHint === '可选 1–8（默认档位） · 推荐 3', `hint=${estHint}`);
     await page.screenshot({ path: join(EVIDENCE, '05-estimate-basis.png') });
     await page.keyboard.press('Escape');
   }

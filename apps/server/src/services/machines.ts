@@ -319,6 +319,7 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     maxConcurrent: row.maxConcurrent,
     maxConcurrentOverridden: row.maxConcurrentOverridden,
     recommendedConcurrent: recommendation.value,
+    concurrencyRange: recommendation.range,
     concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     // #1251：能力清单三态随行（清单 / null = 从未上报 / 列缺省不成立——

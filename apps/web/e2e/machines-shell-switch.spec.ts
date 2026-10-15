@@ -224,7 +224,8 @@ test('C1+C2+C4：并发选择器——读标注真值、PATCH 单字段、刷新
   await expect(trigger).toHaveAccessibleName('并发上限 2');
   await expect(trigger).toContainText('2');
   await trigger.click();
-  await page.getByRole('option', { name: '4' }).click();
+  await page.getByRole('spinbutton', { name: '并发上限' }).fill('4');
+  await page.getByRole('spinbutton', { name: '并发上限' }).press('Enter');
   // C1：PATCH 只带 maxConcurrent 单字段。
   await expect.poll(() => state.patches.length).toBe(1);
   expect(state.patches[0]).toEqual({ maxConcurrent: 4 });

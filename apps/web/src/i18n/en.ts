@@ -595,6 +595,12 @@ export const EN: Record<string, string> = {
     'No capability fingerprint received; estimated at the conservative default of {n}',
   恢复推荐: 'Reset to recommended',
   并发上限: 'Concurrency limit',
+  '可选 {min}–{max}（按内存）': 'Range {min}–{max} (by memory)',
+  '可选 {min}–{max}（默认档位）': 'Range {min}–{max} (default)',
+  '推荐 {n}': 'Recommended {n}',
+  '当前值 {n} 超出可选范围': 'Current value {n} is outside the range',
+  减少并发上限: 'Decrease concurrency limit',
+  增加并发上限: 'Increase concurrency limit',
   '并发上限 {n}': 'Concurrency limit {n}',
   '并发上限 {n}，{source}': 'Concurrency limit {n}, {source}',
   // #905 activity phases (live row labels) + the freshness disclosure line.

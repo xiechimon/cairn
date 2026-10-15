@@ -54,6 +54,9 @@ export const machineRecordSchema = z.object({
   /** #1241：按当前硬件算出的推荐值（覆盖时也发，恢复自动回到这个数）。
    *  无硬件 = 保守默认。缺席 = 老 server。 */
   recommendedConcurrent: z.number().int().optional(),
+  /** #1241：选择器可选区间（按总内存；无指纹 = 1..8）。PATCH 写域仍是 1..16。
+   *  缺席 = 老 server（web 退回 1..8）。 */
+  concurrencyRange: z.object({ min: z.number().int(), max: z.number().int() }).optional(),
   /** #1241：manual = 用户覆盖；measured = 推荐值来自硬件；estimate = 没有
    *  可用指纹，maxConcurrent 是保守默认。缺席 = 老 server。 */
   concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),

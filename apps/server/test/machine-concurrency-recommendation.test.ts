@@ -49,20 +49,20 @@ describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)),
   test('F1 核数与内存各自作上界：核少取核，内存少取 floor(GiB/2)', () => {
     expect(
       recommendMachineConcurrency({ ...modest, cpuCores: 4, memoryTotalMb: 32 * MIB_PER_GIB }),
-    ).toEqual({
+    ).toMatchObject({
       value: 4,
       source: 'measured',
     });
-    expect(recommendMachineConcurrency(modest)).toEqual({ value: 3, source: 'measured' });
+    expect(recommendMachineConcurrency(modest)).toMatchObject({ value: 3, source: 'measured' });
   });
 
   test('F1 上沿 16：64 GiB 32 核不超写域', () => {
-    expect(recommendMachineConcurrency(roomy)).toEqual({ value: 16, source: 'measured' });
+    expect(recommendMachineConcurrency(roomy)).toMatchObject({ value: 16, source: 'measured' });
     expect(CONCURRENCY_CEILING).toBe(16);
   });
 
   test('F1 下沿 1：总内存不足 2 GiB 仍给 1 槽', () => {
-    expect(recommendMachineConcurrency({ ...weak, memoryTotalMb: 1500 })).toEqual({
+    expect(recommendMachineConcurrency({ ...weak, memoryTotalMb: 1500 })).toMatchObject({
       value: 1,
       source: 'measured',
     });
@@ -70,22 +70,48 @@ describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)),
   });
 
   test('F1 内存只看总量：运行中的步吃掉可用内存，推荐值不缩', () => {
-    expect(recommendMachineConcurrency({ ...roomy, memoryAvailableMb: 512 })).toEqual({
+    expect(recommendMachineConcurrency({ ...roomy, memoryAvailableMb: 512 })).toMatchObject({
       value: 16,
       source: 'measured',
     });
   });
 
   test('F2 无指纹 / 坏指纹 / 缺 memoryTotalMb → 保守默认 3，标 estimate', () => {
-    expect(recommendMachineConcurrency(undefined)).toEqual({ value: 3, source: 'estimate' });
-    expect(recommendMachineConcurrency(null)).toEqual({ value: 3, source: 'estimate' });
-    expect(recommendMachineConcurrency({ ...weak, cpuCores: 0 })).toEqual({
+    expect(recommendMachineConcurrency(undefined)).toMatchObject({ value: 3, source: 'estimate' });
+    expect(recommendMachineConcurrency(null)).toMatchObject({ value: 3, source: 'estimate' });
+    expect(recommendMachineConcurrency({ ...weak, cpuCores: 0 })).toMatchObject({
       value: 3,
       source: 'estimate',
     });
     const { memoryTotalMb: _legacy, ...legacyRow } = modest;
-    expect(recommendMachineConcurrency(legacyRow)).toEqual({ value: 3, source: 'estimate' });
+    expect(recommendMachineConcurrency(legacyRow)).toMatchObject({ value: 3, source: 'estimate' });
     expect(CONSERVATIVE_CONCURRENCY).toBe(3);
+  });
+
+  test('F3 可选区间 = 1..clamp(floor(总内存 / 2GiB), 1, 16)；无指纹 = 1..8', () => {
+    const hw = (cpuCores: number, memoryTotalMb: number) => ({
+      cpuCores,
+      memoryTotalMb,
+      memoryAvailableMb: 0,
+      loadAvg1: 0,
+      diskFreeMb: 0,
+    });
+    expect(recommendMachineConcurrency(hw(8, 16002))).toMatchObject({
+      value: 7,
+      range: { min: 1, max: 7 },
+    });
+    expect(recommendMachineConcurrency(hw(12, 36864))).toMatchObject({
+      value: 12,
+      range: { min: 1, max: 16 },
+    });
+    expect(recommendMachineConcurrency(hw(4, 1500))).toMatchObject({
+      value: 1,
+      range: { min: 1, max: 1 },
+    });
+    expect(recommendMachineConcurrency(undefined)).toMatchObject({
+      value: 3,
+      range: { min: 1, max: 8 },
+    });
   });
 });
 

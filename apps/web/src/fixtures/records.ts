@@ -421,6 +421,7 @@ export interface MachineRow {
   capabilities?: { mcpServers: string[]; skills: string[]; hardware?: MachineHardware } | null;
   maxConcurrentOverridden?: boolean;
   recommendedConcurrent?: number;
+  concurrencyRange?: { min: number; max: number };
   concurrencySource?: 'measured' | 'estimate' | 'manual';
 }
 

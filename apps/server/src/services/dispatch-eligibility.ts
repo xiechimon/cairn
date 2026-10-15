@@ -327,9 +327,17 @@ export const CONCURRENCY_CEILING = 16;
 export const MEMORY_GB_PER_SLOT = 2;
 /** 没有可用指纹时的保守默认（与 machine.maxConcurrent 列默认相同）。 */
 export const CONSERVATIVE_CONCURRENCY = 3;
+/** 无指纹机的可选区间上沿（与 #1108 原固定档位 1..8 同值）。 */
+export const FALLBACK_CONCURRENCY_MAX = 8;
+export interface ConcurrencyRange {
+  min: number;
+  max: number;
+}
 export interface ConcurrencyRecommendation {
   value: number;
   source: 'measured' | 'estimate';
+  /** 选择器可选区间：1..clamp(floor(总内存 / 每槽内存), 1, 16)；无指纹 = 1..8。 */
+  range: ConcurrencyRange;
 }
 
 /** 推荐并发。无指纹、核数非法、内存总量缺席或非法 → 保守默认，source = estimate。 */
@@ -344,10 +352,14 @@ export function recommendMachineConcurrency(
     !Number.isInteger(hardware.memoryTotalMb) ||
     hardware.memoryTotalMb < 0
   ) {
-    return { value: CONSERVATIVE_CONCURRENCY, source: 'estimate' };
+    return {
+      value: CONSERVATIVE_CONCURRENCY,
+      source: 'estimate',
+      range: { min: CONCURRENCY_FLOOR, max: FALLBACK_CONCURRENCY_MAX },
+    };
   }
   const byMemory = Math.floor(hardware.memoryTotalMb / (1024 * MEMORY_GB_PER_SLOT));
-  const raw = Math.min(hardware.cpuCores, byMemory);
-  const value = Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, raw));
-  return { value, source: 'measured' };
+  const clamp = (n: number) => Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, n));
+  const value = clamp(Math.min(hardware.cpuCores, byMemory));
+  return { value, source: 'measured', range: { min: CONCURRENCY_FLOOR, max: clamp(byMemory) } };
 }

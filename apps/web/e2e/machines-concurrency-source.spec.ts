@@ -111,7 +111,8 @@ test('选数即标手动：PATCH 在途时来源已是手动，回执后仍是�
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
 
   await trigger(page, 'm-1').click();
-  await page.locator('[data-testid="machine-concurrency-option"]', { hasText: /^5$/ }).click();
+  await page.getByTestId('machine-concurrency-input').fill('5');
+  await page.getByTestId('machine-concurrency-input').press('Enter');
 
   await expect.poll(() => pending.length).toBe(1);
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
