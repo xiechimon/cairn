@@ -6,7 +6,7 @@ Claude Desktop redesign PR-4: board bare lanes + panel cards.
 - Columns: no border/radius/shadow (tier-0 bare lanes on `--background`)
 - Cards: `--radius-panel` **10px**, `--panel-shadow`, hover lift −1.5px + `--panel-shadow-hover` (200ms `--ease-out-expo`)
 - Header control height **32px**
-- Enter: `anim-message-fade-up`
+- Enter animation deferred (fights #1255 column scroll restore on remount)
 - Colors frozen
 
 ## Evidence
