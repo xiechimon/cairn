@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "6e4fc9fdbc293c85981bafca600b1806bc661eda",
+    "sha": "b376a061d5ba999b7662a82afb000e98c2a66520",
     "date": "2026-10-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -8,13 +8,14 @@
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide.",
-      "hash": "26be5620f2e9385d26b992c20a78e0d5c0a423ae1904c5d5f11225f82b72a79c"
+      "hash": "29959fe4f3aec39b171b8082b822e147dd50b7734980dd33585730a5afefd348"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
       "upstreamItem": "alert-dialog",
-      "status": "pristine",
-      "hash": "5e533e471a0c22035b300d2f615756a57153c366da71626d10e4f5d7283dcd2e"
+      "status": "deviated",
+      "hash": "c53e9b15a75d47415a2c33d37f89f4c4a9188680b5b8ef8e20a045e22e1e404c",
+      "reason": "CDS PR-5: modal consumes --edge-radius (16px) + --dialog-shadow; scrim backdrop-blur-md (12px). Footer radius follows edge-radius."
     },
     "attachment.tsx": {
       "kind": "registry",
@@ -64,20 +65,21 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#983 verdict / map #980 (ruling 2/4): zero-skin adapter over the registry dialog item — regular faces compose Dialog/DialogContent/DialogHeader/DialogTitle/DialogFooter (registry defaults win: panel/overlay skin, motion, close button all come from dialog.tsx), keeping only the repo behavior contracts as semantic mapping (#193 three-segment cap via layout classes + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law via native dismiss, width as a layout position). The viewportRoot and bare modes stay on the legacy direct-primitive mechanism unchanged — they are the #983 adapter-boundary pressure points whose surfaces belong to the L5 lane (#1008) and whose fate is ruled at that lane's prototype review; zIndex/onBackdropClick/backdropClassName serve only those two modes (#1006).",
-      "hash": "69aeaab98062d5223ad3c9c1cc80b4bc6f3fadc04f5db699b228c24926cb4b2c"
+      "hash": "30d99da6f4d2f6b0c7a7483e0c4f91d3e14e8d6e601f2b01bcde6cf99623213b"
     },
     "dialog.tsx": {
       "kind": "registry",
       "upstreamItem": "dialog",
-      "status": "pristine",
-      "hash": "286d2087b0194b82446d417b94d7038648084447dd6ac68e85238ffecdf51fe4"
+      "status": "deviated",
+      "hash": "5ef1302ab5c70dce4169de3d2f1ec8a9ba5021e23f2f5a34e2651f686da521c7",
+      "reason": "CDS PR-5: modal consumes --edge-radius (16px) + --dialog-shadow; scrim backdrop-blur-md (12px). Footer radius follows edge-radius."
     },
     "dropdown-menu.tsx": {
       "kind": "registry",
       "upstreamItem": "dropdown-menu",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form).",
-      "hash": "2f68fd9c04017df9d454605033627e1197b0f9d33235a1cf347c45153811ab72"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). CDS PR-5: popup --radius-popover + --shadow-popover; items --cds-radius-sm h-8 pills.",
+      "hash": "33b559d9d5c343629436bdaddcca2b7ecb03f9c89a0a9e53ef42fa3d984a0c7b"
     },
     "empty.tsx": {
       "kind": "registry",
@@ -142,8 +144,8 @@
       "kind": "registry",
       "upstreamItem": "popover",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form).",
-      "hash": "8f9f2df050de80fee34c7778c531ee3410c8c2020ef4e40c090ab577fc364e7b"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). CDS PR-5: popup consumes --radius-popover (12px) + --shadow-popover (dark inset highlight).",
+      "hash": "053fcd994ec1179e2313d28910a919efe4cffe78eeb996f0d1fa54d1a141712c"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",
@@ -153,8 +155,9 @@
     "select.tsx": {
       "kind": "registry",
       "upstreamItem": "select",
-      "status": "pristine",
-      "hash": "ab19e7f4d786d003373d4b1750be5efda931d18d388cbb163b83e2d29e7a93de"
+      "status": "deviated",
+      "hash": "aacd87c594b8951d1078647e97a418710846645cb4a9b1b37ef195de48668879",
+      "reason": "CDS PR-5: popup consumes --radius-popover (12px) + --shadow-popover; items use --cds-radius-sm (4px) row pills at h-8."
     },
     "separator.tsx": {
       "kind": "registry",

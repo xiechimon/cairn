@@ -1,0 +1,8 @@
+{
+  "edgeRadius": "16px",
+  "radiusPopover": "12px",
+  "userMenuRadius": "12px",
+  "userMenuBorder": "0px",
+  "userMenuShadowRing": true,
+  "searchInputDeBoxed": true
+}

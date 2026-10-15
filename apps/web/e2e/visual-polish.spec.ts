@@ -138,23 +138,13 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
 
     const menu = await edgeContract(page, '.user-menu');
-    // V2 弹层壳（#790 P3）: 1px 实框墨线,框色走 --border-default。
-    // 半径：#1054 消费点清点——直角随 ADR 0012 D1 退役，接 registry
-    // popover 依据 rounded-lg（=10px，plan-dropdown #1006 同词汇）；
-    // 墨线/投影的 registry 化归 user-menu 弹层重建（协调者归属票）。
-    expect(menu.border).toBe('1px');
-    expect(menu.radius).toBe('10px');
-    expect(menu.borderColorOwn).toBe(menu.borderColor);
-    // #161: the popover opens over content and needs visible separation — NOT
-    // --card-shadow. #854 换档：盘面投影正本从 --edge-shadow 的柔和档迁到
-    // --plate-shadow。亮侧 = 硬偏移档（Base UI 官方 menu hero 实测值，直角 +
-    // 1px 实线 + 硬投影三件套）；暗侧按 spec §2.7 + 用户 2026-10-05 裁定归
-    // none，1px 墨线独承（即 hero 自己的暗色分支）——故逐主题断言。
-    if (theme === 'dark') {
-      expect(menu.shadow).toBe('none');
-    } else {
-      expect(menu.shadow).toContain(menu.plateShadow);
-    }
+    // CDS PR-5: popover shell — --radius-popover 12px + --shadow-popover
+    // (light: outer hairline ring + soft pool; dark: inset highlight, no
+    // solid border). Border width collapses to 0; separation rides shadow.
+    expect(menu.border).toBe('0px');
+    expect(menu.radius).toBe('12px');
+    expect(menu.shadow).not.toBe('none');
+    expect(menu.shadow).toContain('0px 0px 0px');
   });
 
   test(`sidebar shares the main-area surface, seam drawn in the divider token (${theme})`, async ({ page }) => {
