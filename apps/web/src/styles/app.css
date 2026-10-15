@@ -234,6 +234,12 @@
   }
 }
 
+/* CDS PR-8: settings/resources forms — 8px input radius (registry input
+ * stays pristine / S5). Height already h-8 = --h-control 32px. */
+[data-slot="input"] {
+  border-radius: var(--cds-radius-lg);
+}
+
 /* CDS PR-5: select popup shell (select.tsx stays pristine under S5).
  * Radius/shadow match popover; ring-0 clears registry ring-1 so dark does
  * not keep an outer ring beside --shadow-popover. */

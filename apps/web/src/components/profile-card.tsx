@@ -45,7 +45,7 @@ import { Input } from './ui/input.js';
  *  单行卡的首末是同一个元素，简写会互相覆盖。gap-0/py-0 中和 Card 内距
  *  节奏——行盒自持几何。 */
 const PROFILE_CARD_CLS =
-  'profile-card gap-0 overflow-visible py-0 [&>:first-child]:rounded-ss-xl [&>:first-child]:rounded-se-xl [&>:last-child]:rounded-es-xl [&>:last-child]:rounded-ee-xl';
+  'profile-card gap-0 overflow-visible rounded-(--cds-radius-2xl) py-0 shadow-none [&>:first-child]:rounded-ss-(--cds-radius-2xl) [&>:first-child]:rounded-se-(--cds-radius-2xl) [&>:last-child]:rounded-es-(--cds-radius-2xl) [&>:last-child]:rounded-ee-(--cds-radius-2xl)';
 
 /** 行盒基底（原 .profile-row）：41 = 40 内高 + 1px 分隔线（r7 13 行界）。
  *  行自带的 border-top 是行间分隔线；做首件时上方没有行可分，那条线只会与卡
@@ -93,7 +93,7 @@ export function ProfileHead({ className, children }: { className?: string; child
   return (
     <div
       className={cn(
-        'profile-head flex h-[120px] flex-col items-center rounded-t-xl pt-4',
+        'profile-head flex h-[120px] flex-col items-center rounded-t-(--cds-radius-2xl) pt-4',
         className,
       )}
     >
