@@ -3,8 +3,8 @@
 //   · 执行中 只吃 待开始 源（PATCH building 仅 todo/queued 源放行）；
 //   · 待处理（落点正名 review）只吃 已完成 源，且要变更产物（hasChanges 数据
 //     闸在 updateTodo——无变更 done 卡参考站恒素面，raw PATCH 同判 409）；
-//   · 已完成 吃 待开始/执行中/待处理 源，failed 除外（#702：failed→done 保持
-//     非法，done 只能经合并步落地）；failed→review 仍走 #702 动作面专属 409；
+//   · 已完成 吃 待开始/执行中/待处理 源，含 failed（#1247，不要求 hasChanges）；
+//     failed→review 仍走 #702 动作面专属 409；
 //   · 同列 / closed 源 / 非落点相 恒 409（漏斗兜底）。
 // 分层不新设：PATCH 面 = 手动矩阵 ∪ 系统漏斗（矩阵只扩权——漏斗非法的列迁
 // 移边放行；漏斗合法边照旧通过，不因矩阵收窄）。拖拽手势的非法对由客户端
@@ -79,6 +79,15 @@ describe('手动落位矩阵（#753）：待处理 源', () => {
     }
   });
 
+  test('confirm/review/failed→closed = 200（#1247 canceled 结局）', async () => {
+    for (const phase of ['confirm', 'review', 'failed'] as const) {
+      const { s, id } = await setup(phase);
+      const res = await patchPhase(s, id, 'closed');
+      expect(res.status, phase).toBe(200);
+      expect(todoRecordSchema.parse(await res.json()).phase).toBe('closed');
+    }
+  });
+
   test('confirm/review→todo = 200（参考站：已开始的卡拖回待开始；重置语义另票）', async () => {
     for (const phase of ['confirm', 'review'] as const) {
       const { s, id } = await setup(phase);
@@ -99,11 +108,11 @@ describe('手动落位矩阵（#753）：待处理 源', () => {
     expect((await patchPhase(confirm.s, confirm.id, 'building')).status).toBe(200);
   });
 
-  test('failed→done = 409（#702：done 只能经合并步落地）', async () => {
-    const { s, id } = await setup('failed', true);
+  test('failed→done = 200 without hasChanges (#1247 manual close)', async () => {
+    const { s, id } = await setup('failed', false);
     const res = await patchPhase(s, id, 'done');
-    expect(res.status).toBe(409);
-    expect(await res.json()).toHaveProperty('error');
+    expect(res.status).toBe(200);
+    expect(todoRecordSchema.parse(await res.json()).phase).toBe('done');
   });
 
   test('failed→review = 409 且仍走 #702 动作面专属文案（漏斗合法边被手动面拒收）', async () => {

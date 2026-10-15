@@ -52,11 +52,14 @@ describe('canDropOnColumn（#753 per-source 矩阵）', () => {
     }
   });
 
-  test('failed 源：待开始 ✓；已完成 ✗（#702 failed→done 保持非法）', () => {
-    const t = todo(1, 'failed');
-    expect(canDropOnColumn(t, 'todo')).toBe(true);
-    expect(canDropOnColumn(t, 'done')).toBe(false);
-    expect(canDropOnColumn(t, 'building')).toBe(false);
+  test('failed 源：待开始 ✓ 已完成 ✓（#1247 手动关边，不看 hasChanges）', () => {
+    const plain = todo(1, 'failed');
+    const rich = { ...plain, hasChanges: true };
+    for (const t of [plain, rich]) {
+      expect(canDropOnColumn(t, 'todo')).toBe(true);
+      expect(canDropOnColumn(t, 'done')).toBe(true);
+      expect(canDropOnColumn(t, 'building')).toBe(false);
+    }
   });
 
   test('已完成 源：有变更 → 待处理 ✓（重开）；无变更 → 待处理 ✗（2026-10-04 实测）', () => {
@@ -79,11 +82,13 @@ describe('canDropOnColumn（#753 per-source 矩阵）', () => {
     }
   });
 
-  test('closed 不占列 = 无源无落；未知列 = 恒等假', () => {
+  test('closed 在已完成列：可拖回待开始；无变更不进待处理；未知列假', () => {
     const t = todo(1, 'closed');
-    for (const id of ['todo', 'building', 'pending', 'done']) {
-      expect(canDropOnColumn(t, id), id).toBe(false);
-    }
+    expect(canDropOnColumn(t, 'todo')).toBe(true);
+    expect(canDropOnColumn(t, 'pending')).toBe(false);
+    expect(canDropOnColumn(t, 'building')).toBe(false);
+    expect(canDropOnColumn(t, 'done')).toBe(false);
+    expect(canDropOnColumn({ ...t, hasChanges: true }, 'pending')).toBe(true);
     expect(canDropOnColumn(todo(2, 'todo'), 'nope')).toBe(false);
   });
 });
@@ -108,7 +113,7 @@ describe('待处理列收纳（confirm ∪ review ∪ failed，#351）', () => {
     }
   });
 
-  test('accepts：todo/queued/planning/building/done/closed 不入列', () => {
+  test('accepts：todo/queued/planning/building/done/closed 不入待处理', () => {
     for (const t of [
       todo(1, 'todo'),
       todo(2, 'queued'),
@@ -119,6 +124,13 @@ describe('待处理列收纳（confirm ∪ review ∪ failed，#351）', () => {
     ]) {
       expect(pending.accepts(t), t.phase).toBe(false);
     }
+  });
+
+  test('已完成列收 done 与 closed（#1247 canceled）', () => {
+    const done = col('done');
+    expect(done.accepts(todo(1, 'done'))).toBe(true);
+    expect(done.accepts(todo(2, 'closed'))).toBe(true);
+    expect(done.accepts(todo(3, 'failed'))).toBe(false);
   });
 
   test('侧栏 badge = 待处理列计数（同一 accepts 谓词单源）', () => {
@@ -177,6 +189,18 @@ describe('sortColumnTodos（orderIndex = 手动序，01 §4.1）', () => {
     const sorted = sortColumnTodos(pending, [review, failed]);
     expect(sorted.map((t) => t.id)).toEqual([failed.id, review.id]);
   });
+
+  test('已完成：phaseAt 倒序，同刻再按 orderIndex（#1247）', () => {
+    const done = col('done');
+    const older = { ...todo(1, 'done'), phaseAt: 100, orderIndex: 0 };
+    const newer = { ...todo(2, 'done'), phaseAt: 200, orderIndex: 9 };
+    const tie = { ...todo(3, 'done'), phaseAt: 200, orderIndex: 1 };
+    expect(sortColumnTodos(done, [older, newer, tie]).map((t) => t.id)).toEqual([
+      tie.id,
+      newer.id,
+      older.id,
+    ]);
+  });
 });
 
 // #755 重置闸 started 判据（与 server isStartedTodoRow 同表：进行中相位或
@@ -215,24 +239,27 @@ describe('needsResetGate（#755 拖回待开始确认闸）', () => {
   });
 });
 
-// #901 done 落位闸（#892 §6 建议 2）：闸相位 ∧ 有产物在审才咬——无码可审的
-// 测试卡人肉清理（confirm 拖 done）保持静默，其余相位拖 done 不变。
-describe('needsDoneGate（#901 拖向已完成确认闸）', () => {
-  test('confirm/review ∧ hasChanges = 需闸', () => {
-    for (const phase of ['confirm', 'review'] as const) {
+describe('needsDoneGate（#1247 待处理/在飞拖向已完成）', () => {
+  test('confirm/review/failed 要确认，与 hasChanges 无关', () => {
+    for (const phase of ['confirm', 'review', 'failed'] as const) {
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), `${phase} rich`).toBe(true);
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), `${phase} plain`).toBe(
+        true,
+      );
+    }
+  });
+
+  test('执行中（queued/planning/building）要确认（stop-then-done）', () => {
+    for (const phase of ['queued', 'planning', 'building'] as const) {
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), phase).toBe(true);
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(true);
     }
   });
 
-  test('confirm/review 无变更产物 = 静默（#892：无码可审的测试卡清理是合理人肉路径）', () => {
-    for (const phase of ['confirm', 'review'] as const) {
-      expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(false);
-    }
-  });
-
-  test('其余相位（含 hasChanges 在位）= 静默（闸只咬 confirm/review 源）', () => {
-    for (const phase of ['todo', 'queued', 'planning', 'building', 'failed', 'done'] as const) {
+  test('待开始与已完成拖向已完成仍静默', () => {
+    for (const phase of ['todo', 'done'] as const) {
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), phase).toBe(false);
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(false);
     }
   });
 });

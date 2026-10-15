@@ -56,6 +56,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/answer', // #1049 问答卡答题面（threads/{tid}/… REST 同族规则；wire 自设）
   'POST /api/teams/{id}/chief/threads/{tid}/questions/{requestId}/cancel', // #1049 问答卡取消面（同上）
   'POST /api/todos/{id}/orchestrate', // #640 开始任务单出口：直发总管编排回合（r14 §5.7 前置裁决落地；todos/{id}/… REST 同族规则，wire 未采）
+  'POST /api/todos/{id}/stop-and-done', // #1247 stop-then-done：在飞卡拖入已完成先停再标 done
   'POST /api/todos/{id}/reset', // #755 任务重置闸：已开始卡拖回待开始的确认落位（中断构建 + 清空对话/方案/改动 + 相位回 todo；todos/{id}/… REST 同族规则，wire 未采）
   // —— #1259 机器生命周期出口（machines/{id}/… REST 同族规则，wire 未采）——
   'DELETE /api/machines/{id}', // 删机保护：无绑定 agent 才删得掉（409 点名占用清单）

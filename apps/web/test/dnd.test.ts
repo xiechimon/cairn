@@ -100,9 +100,11 @@ describe('moveTodo（#753：per-source 矩阵的新合法对与恒等对）', ()
     expect(moveTodo(input, donePlain.id, 'pending', NOW)).toBe(input);
   });
 
-  test('failed→已完成 = 恒等（#702：done 只能经合并步落地）', () => {
-    const input = [failed, confirm];
-    expect(moveTodo(input, failed.id, 'done', NOW)).toBe(input);
+  test('failed→已完成 writes done and refreshes phaseAt (#1247)', () => {
+    const next = moveTodo([failed, confirm], failed.id, 'done', NOW);
+    const moved = next.find((t) => t.id === failed.id);
+    expect(moved?.phase).toBe('done');
+    expect(moved?.phaseAt).toBe(NOW);
   });
 
   test('待处理(confirm)→已完成 / →待开始 = 改相提交', () => {

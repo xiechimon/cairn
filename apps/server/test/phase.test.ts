@@ -84,6 +84,6 @@ describe('4 列折叠映射（#351 单键）', () => {
     expect(boardColumnFor('review')).toBe('待处理');
     expect(boardColumnFor('failed')).toBe('待处理');
     expect(boardColumnFor('done')).toBe('已完成');
-    expect(boardColumnFor('closed')).toBeNull();
+    expect(boardColumnFor('closed')).toBe('已完成');
   });
 });
