@@ -587,9 +587,9 @@ export const EN: Record<string, string> = {
   手动: 'Manual',
   推荐: 'Recommended',
   估算: 'Estimate',
-  '推荐 {n}': 'Recommended {n}',
-  '依据：核 {cores} · 总内存 {gib} GiB · 负载 {load}':
-    'Basis: {cores} cores · {gib} GiB total memory · load {load}',
+  核数: 'Cores',
+  总内存: 'Total memory',
+  负载: 'Load',
   '未收到能力指纹，按保守默认 {n} 估算':
     'No capability fingerprint received; estimated at the conservative default of {n}',
   恢复推荐: 'Reset to recommended',

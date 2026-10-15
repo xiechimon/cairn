@@ -40,7 +40,7 @@ import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, Monitor, ServerThin } from '../icons/index.js';
+import { Check, ChevronDown, Monitor, Restore, ServerThin } from '../icons/index.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
 import {
   GroupCard,
@@ -87,6 +87,15 @@ export const CONCURRENCY_SOURCE_LABEL = {
   estimate: '估算',
 } as const;
 
+function BasisRow({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-baseline justify-between gap-3">
+      <span className="text-(--text-tertiary)">{label}</span>
+      <span className="tabular-nums text-(--text-secondary)">{value}</span>
+    </span>
+  );
+}
+
 /** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
@@ -122,66 +131,38 @@ function MachineConcurrencySelect({
             aria-label={t('并发上限')}
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
-            className="h-7 cursor-pointer gap-1.5 rounded-md border border-input bg-transparent px-2 text-xs leading-4 font-normal text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0 dark:bg-input/30"
+            className="h-6 cursor-pointer gap-1 rounded-md px-1.5 text-xs leading-4 font-normal text-(--text-tertiary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
           />
         }
       >
-        <span className="text-(--text-tertiary)">{t('并发')}</span>
-        <span className="tabular-nums">{value}</span>
+        <span>{t('并发')}</span>
+        <span className="font-medium tabular-nums text-(--foreground)">{value}</span>
         {machine.concurrencySource !== undefined && (
-          <span
-            className="text-(--text-tertiary)"
-            data-concurrency-source={machine.concurrencySource}
-          >
+          <span data-concurrency-source={machine.concurrencySource}>
             {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
           </span>
         )}
-        <ChevronDown width={11} height={11} className="flex-none text-(--text-tertiary)" />
+        <ChevronDown width={11} height={11} className="flex-none" />
       </PopoverTrigger>
       <PopoverContent
         align="end"
         side="bottom"
         sideOffset={8}
         aria-label={t('并发上限')}
-        className="min-w-[120px] rounded-lg bg-(--popover) p-1 shadow-(--chief-shadow)"
+        className="w-52 rounded-lg bg-(--popover) p-1.5 shadow-(--chief-shadow)"
       >
-        {(estimate || recommended !== undefined || overridden) && (
-          <div
-            className="flex flex-col gap-1 px-2 pt-1 pb-2 text-xs leading-4 text-(--text-tertiary)"
-            data-testid="machine-concurrency-basis"
-          >
-            {estimate ? (
-              <span>{t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}</span>
-            ) : (
-              <>
-                {recommended !== undefined && <span>{t('推荐 {n}', { n: recommended })}</span>}
-                {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
-                  <span>
-                    {t('依据：核 {cores} · 总内存 {gib} GiB · 负载 {load}', {
-                      cores: hardware.cpuCores,
-                      gib: (hardware.memoryTotalMb / 1024).toFixed(1),
-                      load: hardware.loadAvg1.toFixed(2),
-                    })}
-                  </span>
-                )}
-              </>
-            )}
-            {overridden && (
-              <Button
-                variant="ghost"
-                data-testid="machine-concurrency-reset"
-                className="h-6 w-fit cursor-pointer justify-start rounded-md px-0 text-xs font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--text-primary) active:not-aria-[haspopup]:translate-y-0"
-                onClick={() => {
-                  setOpen(false);
-                  onReset();
-                }}
-              >
-                {t('恢复推荐')}
-              </Button>
-            )}
-          </div>
-        )}
-        <div role="listbox" aria-label={t('并发上限')} data-testid="machine-concurrency-options">
+        <div className="flex items-baseline justify-between px-1">
+          <span className="text-xs leading-4 text-(--text-tertiary)">{t('并发上限')}</span>
+          <span className="text-sm leading-5 font-medium tabular-nums text-(--foreground)">
+            {value}
+          </span>
+        </div>
+        <div
+          role="listbox"
+          aria-label={t('并发上限')}
+          data-testid="machine-concurrency-options"
+          className="grid grid-cols-4 gap-1"
+        >
           {options.map((n) => (
             <Button
               key={n}
@@ -189,21 +170,63 @@ function MachineConcurrencySelect({
               role="option"
               aria-selected={n === value}
               data-testid="machine-concurrency-option"
-              className="h-[30px] w-full cursor-pointer justify-start gap-2 rounded-none border-none bg-transparent px-2 text-left text-[13px] font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 aria-[current=true]:bg-(--secondary) aria-[selected=true]:bg-(--secondary)"
+              className={cn(
+                'h-7 cursor-pointer gap-1 rounded-md px-0 text-[13px] font-normal tabular-nums text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0',
+                n === value &&
+                  'bg-(--secondary) font-medium text-(--foreground) hover:bg-(--secondary)',
+              )}
               onClick={() => {
                 setOpen(false);
                 onPick(n);
               }}
             >
-              <span className="tabular-nums">{n}</span>
-              {n === value && (
-                <span className="ml-auto inline-flex flex-none text-(--text-tertiary)">
-                  <Check width={14} height={14} />
-                </span>
-              )}
+              {n}
+              {n === value && <Check width={12} height={12} className="flex-none" />}
             </Button>
           ))}
         </div>
+        {(estimate || recommended !== undefined || overridden) && (
+          <div
+            className="flex flex-col gap-1 px-1 text-xs leading-4"
+            data-testid="machine-concurrency-basis"
+          >
+            {estimate ? (
+              <span className="text-(--text-tertiary)">
+                {t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}
+              </span>
+            ) : (
+              <>
+                {recommended !== undefined && (
+                  <BasisRow label={t('推荐')} value={String(recommended)} />
+                )}
+                {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+                  <>
+                    <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+                    <BasisRow
+                      label={t('总内存')}
+                      value={`${(hardware.memoryTotalMb / 1024).toFixed(1)} GiB`}
+                    />
+                    <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {overridden && (
+          <Button
+            variant="ghost"
+            data-testid="machine-concurrency-reset"
+            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-xs font-normal text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            onClick={() => {
+              setOpen(false);
+              onReset();
+            }}
+          >
+            <Restore width={12} height={12} className="flex-none text-(--text-tertiary)" />
+            {t('恢复推荐')}
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );
