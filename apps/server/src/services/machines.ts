@@ -44,7 +44,6 @@ import {
   CHIEF_TURN_ERROR_KIND,
   classifyStepFailure,
   formatSkillRouteSection,
-  GATE_ANNOUNCEMENTS,
   GITHUB_ACCESS_TOKEN_USERNAME,
   isBackendRuntimeId,
   isChiefConversationId,
@@ -64,7 +63,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@pacman/shared';
-import { and, asc, desc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -694,7 +693,7 @@ interface ClaimCandidate {
   todoRow: typeof todo.$inferSelect;
 }
 
-function claimCandidates(deps: MachineDeps, machineId: string, teamId: string): ClaimCandidate[] {
+function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string): ClaimCandidate[] {
   const rows = deps.db
     .select({ stepRow: step, buildRow: build, todoRow: todo })
     .from(step)

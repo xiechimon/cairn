@@ -284,7 +284,10 @@ function isPrivateOrLoopbackHost(host: string): boolean {
       if ((first & 0xfe00) === 0xfc00) return true; // unique-local
     }
     const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(h);
-    if (mapped) return isPrivateOrLoopbackHost(mapped[1]!);
+    if (mapped) {
+      // biome-ignore lint/style/noNonNullAssertion: regex has one capture group, matched truthy above guarantees [1] defined
+      return isPrivateOrLoopbackHost(mapped[1]!);
+    }
   }
   return false;
 }
@@ -332,6 +335,7 @@ function parseGithubUrl(raw: string): GithubTarget {
       `unsupported GitHub URL shape: expected https://github.com/<owner>/<repo>[/tree/<ref>/<subdir>], got ${raw}`,
     );
   }
+  // biome-ignore lint/style/noNonNullAssertion: segments.length < 2 throws above; [0] and [1] are defined here
   const [owner, repo] = [segments[0]!, segments[1]!];
   if (!GH_SEGMENT_RE.test(owner) || !GH_SEGMENT_RE.test(repo)) {
     throw new HttpError(400, `invalid GitHub owner/repo in url: ${raw}`);
@@ -345,6 +349,7 @@ function parseGithubUrl(raw: string): GithubTarget {
         `unsupported GitHub URL shape: tree form requires a ref (…/tree/<ref>/<subdir>), got ${raw}`,
       );
     }
+    // biome-ignore lint/style/noNonNullAssertion: segments.length < 4 throws above; [3] is defined
     ref = segments[3]!;
     if (!GH_REF_RE.test(ref) || ref.split('/').some((seg) => seg === '.' || seg === '..')) {
       throw new HttpError(400, `invalid GitHub ref in url: ${raw}`);
@@ -542,6 +547,7 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
       }
       throw new HttpError(502, `GitHub raw fetch failed (status ${res.status}): ${entry.path}`);
     }
+    // biome-ignore lint/style/noNonNullAssertion: res.ok guard above; fetchBytes returns bytes on the ok path
     files.push({ path: entry.path, content: decodeUtf8Strict(res.bytes!, entry.path) });
   }
   return { sourceRef: target.canonicalUrl, files };
@@ -571,6 +577,7 @@ export async function importSkill(
   }
   const create = assembleCreateBody(
     collected.files,
+    // biome-ignore lint/style/noNonNullAssertion: schema xor guarantees exactly one of localPath/url is set, mirrored by the if/else if above
     kind === 'localPath' ? body.localPath! : body.url!,
   );
   const record = createLocalSkill(

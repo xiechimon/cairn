@@ -362,7 +362,8 @@ export function recommendMachineConcurrency(
     };
   }
   // round 而非 floor：15.6GiB 读作 16GiB（os 报的总内存总比标称少一点）。
-  const slots = (gbPerSlot: number) => Math.round(hardware.memoryTotalMb! / (1024 * gbPerSlot));
+  const memoryTotalMb = hardware.memoryTotalMb;
+  const slots = (gbPerSlot: number) => Math.round(memoryTotalMb / (1024 * gbPerSlot));
   const clamp = (n: number) => Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, n));
   const value = clamp(Math.min(hardware.cpuCores, slots(MEMORY_GB_PER_SLOT)));
   const max = clamp(slots(RANGE_MEMORY_GB_PER_SLOT));

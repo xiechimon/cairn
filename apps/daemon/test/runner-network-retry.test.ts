@@ -19,13 +19,11 @@ import type {
   AgentBackend,
   AgentSessionHandle,
   ClaimedStep,
-  MachineAttachmentResponse,
   MachineDoneBody,
   ProviderConfig,
   SessionOpts,
   StepEvent,
   ToolCallRecord,
-  TranscriptRow,
   TranscriptUpload,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -95,8 +93,6 @@ function claimedStep(): ClaimedStep {
 
 class FakeClient implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
-
-  constructor() {}
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -175,7 +171,7 @@ function scriptedNetworkBackend(scripts: Script[]): {
 } {
   const opened: { kind: 'new' | 'continue'; sessionId: string | null }[] = [];
   let idx = 0;
-  const nextHandle = (sessionId: string, kind: 'new' | 'continue'): AgentSessionHandle => {
+  const nextHandle = (sessionId: string, _kind: 'new' | 'continue'): AgentSessionHandle => {
     const script = scripts[idx++] ?? [{ type: 'done', usage: [] }];
     return {
       sessionId,

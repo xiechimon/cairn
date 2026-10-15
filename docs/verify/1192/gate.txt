@@ -1,0 +1,47 @@
+scripts/lint-warning-cap.mjs — 2026-10-15
+========================================
+
+=== POSITIVE EVIDENCE (branch tip, lint-clean tree) ===
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165a...).
+
+
+=== NEGATIVE EVIDENCE (scratch warning added, then reverted) ===
+
+Wrote scripts/_scratch_warning_test.mjs with an unused import — the
+file appeared under biome's scripts/** include and tripped one
+noUnusedImports warning.
+
+$ node scripts/lint-warning-cap.mjs
+$ biome ci .
+Checked 768 files in ~600ms. No fixes applied.
+Found 1 warning.
+
+[lint-warning-cap] cap: biome ci . reports 1 warning(s), over the cap of 0 (baseline in-tree only)
+[lint-warning-cap] FAIL: 1 violation(s). Clear warnings, then re-freeze: node scripts/lint-warning-cap.mjs --write
+
+(exit code 1; the check job would mark this PR red)
+
+Removed scripts/_scratch_warning_test.mjs:
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165a...).
+
+
+=== BASELINE FILE ===
+
+$ cat scripts/lint-warning-baseline.json
+{
+  "maxWarnings": 0,
+  "frozenFrom": {
+    "sha": "da2f165ac9566c6fcc2425102316bb2c9d51e3d3",
+    "date": "2026-10-14"
+  },
+  "scope": "biome ci . warning count from summary line \"Found N warnings\"; info diagnostics are excluded"
+}
+
+Cap = 0 because the three clearing commits landed first; the gate's
+only path from here is down. To lower the cap after a future clearing
+PR: `node scripts/lint-warning-cap.mjs --write` (re-freeze from a
+clean tree).

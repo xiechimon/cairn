@@ -1,7 +1,7 @@
 // stop 投递（M7 #308：事件 → 拉取-确认 → handle.stop → done(stopped)）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
 // = ./machine-loop-harness.ts，每个测试自 boot 自停）。
 
-import type { AgentBackend, AgentSessionHandle, StepEvent } from '@pacman/shared';
+import type { AgentBackend, StepEvent } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';

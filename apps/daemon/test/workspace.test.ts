@@ -454,6 +454,7 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
   }, 30_000);
 
   test('钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env', async () => {
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     seedHook('setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
     await runGit(['add', '-A'], { cwd: seedDir });
     await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });

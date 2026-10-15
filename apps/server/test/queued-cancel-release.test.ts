@@ -35,7 +35,6 @@ import {
 } from '../src/db/schema.js';
 import {
   cancelBuild,
-  startBuilds,
   sweepAbandonedBuildSteps,
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';

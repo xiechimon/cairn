@@ -69,7 +69,8 @@ export function TeamAgentGrid({
                     指名警示（不可领步）。 */}
                 {machines !== undefined &&
                   (machineName(agent.machineId) !== null
-                    ? t(' · 归属机 {machine}', { machine: machineName(agent.machineId)! })
+                    ? // biome-ignore lint/style/noNonNullAssertion: outer !== null guard above; ternary is the non-null branch
+                      t(' · 归属机 {machine}', { machine: machineName(agent.machineId)! })
                     : t(' · 未设归属机'))}
               </span>
               <span

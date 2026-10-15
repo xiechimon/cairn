@@ -260,6 +260,7 @@
    又只在退场动画播完那一刻命中——进场/退场动效零剪裁。 */
 @layer base {
   .chief-drawer[hidden] {
+    /* biome-ignore lint/complexity/noImportantStyles: tailwind preflight `[hidden] { display: none !important }` 反转层序，必须用 !important 反压；详见规则上方注释 */
     display: flex !important;
     visibility: hidden;
     opacity: 0;

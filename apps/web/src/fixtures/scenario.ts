@@ -156,6 +156,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // providerSources 空——pi 创建照跑，claude-code 无候选才见告警。
       'team-no-sources': {
         ...resourcesDefault,
+        // biome-ignore lint/style/noNonNullAssertion: resourcesDefault.resources is wired to the RESOURCES literal in fixtures/resources.ts and is non-nullable in FixtureSet shape
         resources: { ...resourcesDefault.resources!, providerSources: [] },
       },
       // #176 new-task dialog 项目选择器:命名场景(无 capture)——boardDefault

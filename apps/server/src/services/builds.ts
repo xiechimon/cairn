@@ -462,7 +462,7 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
   return { state: 'stopping' };
 }
 
-export function sweepZombieQueuedTodos(deps: BuildDeps, now: number = nowMs()): number {
+export function sweepZombieQueuedTodos(deps: BuildDeps, _now: number = nowMs()): number {
   const rows = deps.db.select().from(todo).where(eq(todo.phase, 'queued')).all();
   let released = 0;
   for (const todoRow of rows) {
@@ -1218,7 +1218,7 @@ export async function applyBuildStepAction(
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
   const { db } = deps;
   const todoRow = db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-  if (!todoRow || todoRow.phase !== 'failed') return; // 非失败相位 = 无可恢复
+  if (todoRow?.phase !== 'failed') return; // 非失败相位 = 无可恢复
   // build 腿：本 build 的执行步（序贯取最新）已 done。
   const buildStep = db
     .select()
@@ -1261,6 +1261,7 @@ export async function requestMerge(
   // 未交付 → 409 点名原因）。之后的合并关口判定与正常 review 一致。
   restoreFailedReview(deps, row);
   if (todoRow.phase === 'failed') {
+    // biome-ignore lint/style/noNonNullAssertion: restoreFailedReview transitions phase in place, never deletes the row; second get() must match the first
     todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get()!;
   }
   // 合并关口 = review（「将改动合并到默认分支」确认弹层，r3 §3.6）。

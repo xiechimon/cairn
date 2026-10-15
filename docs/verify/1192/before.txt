@@ -1,0 +1,15 @@
+biome ci . summary on origin/main (a6124e6f) — 2026-10-15
+
+Checked 765 files in 579ms. No fixes applied.
+Found 53 warnings.
+Found 1 info.
+
+Rule breakdown (count of diagnostics by rule):
+  25 lint/correctness/noUnusedImports
+  15 lint/style/noNonNullAssertion
+   3 lint/suspicious/noTemplateCurlyInString
+   3 lint/correctness/noUnusedVariables
+   3 lint/correctness/noUnusedFunctionParameters
+   3 lint/complexity/useOptionalChain
+   1 lint/complexity/noImportantStyles
+   1 lint/complexity/noUselessConstructor (info)

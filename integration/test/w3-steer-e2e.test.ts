@@ -9,7 +9,7 @@
 //   3. 门：确认后（无在跑步）POST → 409 不静默
 //   4. 步收尾不受扰：延迟窗过后 done → phase confirm
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';

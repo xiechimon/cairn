@@ -12,8 +12,6 @@ import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attach
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
-import type { ModelSource } from './model-source.js';
-import { modelSourceRuntimeSchema } from './model-source.js';
 
 /** chief 实例 id 形 `chief-<userId>-<teamId>`（r5 §3.6/r2 §1.5 实测）。 */
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
