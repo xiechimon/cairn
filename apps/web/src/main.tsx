@@ -28,3 +28,8 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.getElementById('boot')?.remove();
+  });
+});

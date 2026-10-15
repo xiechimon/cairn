@@ -53,7 +53,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
-import { type ReactNode, useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -168,6 +168,16 @@ export function BoardSurface({
     [filters.active, filters.matches],
   );
   const visibleTodos = narrow(fixture.todos);
+  useEffect(() => {
+    const cols = COLUMNS.map(
+      (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
+    );
+    if (cols.every((n) => n === 0)) return;
+    try {
+      localStorage.setItem('pacman-boot-shape', JSON.stringify({ cols }));
+    } catch {}
+  }, [visibleTodos]);
+
   // 空结果态 = 任一轴收窄生效且收窄后无卡占任何列（closed 不占列，不计入）。
   const showFilterEmpty =
     filters.active && COLUMNS.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
