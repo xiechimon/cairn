@@ -65,19 +65,19 @@ test('存量零漂移：无标注数据（06 canon 面）不长任何标注节�
   await expect(page.locator(`${SHELL} [data-orchestration]`)).toHaveCount(0);
 });
 
-test('行高契约保持：标注行不破行高（首行 60 / 分隔行 59+1px）', async ({ page }) => {
+test('行高契约保持：标注行不破行高（首行 40 / 分隔行 39+1px）', async ({ page }) => {
   await page.goto(CHIEF_STATE);
   const rows = page.locator(ROW);
   await expect(rows).toHaveCount(3);
   const first = await rows.first().evaluate((el) => el.getBoundingClientRect().height);
-  expect(first).toBe(60);
+  expect(first).toBe(40); // CDS PR-8 --row-h
   for (const row of await rows.locator('~ [data-divided]').all()) {
     const geo = await row.evaluate((el) => {
       const r = el.getBoundingClientRect();
       return { height: r.height, borderTop: parseFloat(getComputedStyle(el).borderTopWidth) };
     });
-    // 分隔行契约：59 + 1px 顶线 = 60 总高（标注不顶破）。
-    expect(geo.height).toBe(59);
+    // 分隔行契约：39 + 1px 顶线 = 40 总高 (CDS PR-8)（标注不顶破）。
+    expect(geo.height).toBe(39);
     expect(geo.borderTop).toBe(1);
   }
 });

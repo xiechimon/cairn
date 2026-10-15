@@ -235,8 +235,11 @@
 }
 
 /* CDS PR-8: settings/resources forms — 8px input radius (registry input
- * stays pristine / S5). Height already h-8 = --h-control 32px. */
-[data-slot="input"] {
+ * stays pristine / S5). Height already h-8 = --h-control 32px.
+ * Scoped so search-panel de-boxed rounded-none still wins (PR-5). */
+[data-testid="resource-col"] [data-slot="input"],
+.profile-card [data-slot="input"],
+.account-card [data-slot="input"] {
   border-radius: var(--cds-radius-lg);
 }
 
