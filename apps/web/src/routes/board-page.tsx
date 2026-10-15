@@ -74,6 +74,12 @@ interface ReorderPatch {
   orderIndex?: number;
 }
 
+/** stop-and-done 委托结果（#1247）。泛型不写在 api 调用点：`get` 被 TS 词法
+ *  成 GetKeyword（不在 i18n 扫描器的 NO_JSX_AFTER 集），`api.get<T>` 的 `<T>`
+ *  会被 i18n-coverage 误判成 JSX 起点、把后文 CJK 注释扫成 jsx-text——本文件
+ *  的 api 泛型一律 type alias + `as` 断言。 */
+type StopAndDoneResult = { state: 'done' | 'stopping'; todo: WireTodo };
+
 export function BoardPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
@@ -605,10 +611,10 @@ export function BoardPage() {
     }
     setDoneConfirming(true);
     try {
-      const result = await api.post<{ state: 'done' | 'stopping'; todo: WireTodo }>(
+      const result = (await api.post(
         `/api/todos/${doneTarget.id}/stop-and-done`,
         {},
-      );
+      )) as StopAndDoneResult;
       if (result.state === 'done') {
         queryClient.setQueryData<WireTodo[]>(['todos', teamId], (old) =>
           old?.map((w) => (w.id === result.todo.id ? result.todo : w)),
@@ -621,7 +627,7 @@ export function BoardPage() {
       const deadline = Date.now() + 60_000;
       while (Date.now() < deadline) {
         await new Promise((r) => setTimeout(r, 400));
-        const fresh = await api.get<WireTodo>(`/api/todos/${doneTarget.id}`);
+        const fresh = (await api.get(`/api/todos/${doneTarget.id}`)) as WireTodo;
         if (fresh.phase === 'done') {
           queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
           setDoneTarget(null);

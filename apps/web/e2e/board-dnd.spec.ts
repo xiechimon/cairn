@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 /** #951/#910 载体：重置确认弹层 = role=dialog + 可及名一级（原 .dlg-reset
  *  类名钩随 detail/overlays.css 清零退役）。 */
@@ -6,6 +6,12 @@ const resetDialog = (page: Page) => page.getByRole('dialog', { name: '把任务�
 
 /** #901 done 落位闸弹层：同载体律（role=dialog + 可及名一级）。 */
 const doneDialog = (page: Page) => page.getByRole('dialog', { name: '把任务标记为已完成？' });
+
+/** done/inflight 闸的 footer dismiss（关闭）。先锚 dialog-foot 再按名取钮：
+ *  DialogShell 右上角 X 钮的 aria-label 同为「关闭」，dialog 级按名会双命中
+ *  （Playwright strict mode）。 */
+const dismissButton = (dialog: Locator) =>
+  dialog.getByTestId('dialog-foot').getByRole('button', { name: '关闭' });
 
 // Issue #616 → #753 acceptance: the board drag is the reference product's
 // drag (todos.dev, 2026-10-03/04 live 重测——推翻 2026-10-02 旧测的两条:
@@ -559,7 +565,7 @@ test('done 闸·取消：review(有变更) 拖已完成开弹层，取消零提�
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
   ).toBeVisible();
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('2');
-  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
+  await dismissButton(doneDialog(page)).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
@@ -604,7 +610,7 @@ test('done 闸：无变更 confirm 取消留在待处理；building 源开 stop-
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
+  await dismissButton(doneDialog(page)).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-confirm"]'),
@@ -616,7 +622,7 @@ test('done 闸：无变更 confirm 取消留在待处理；building 源开 stop-
   const inflightDialog = page.getByRole('dialog', { name: '先停止构建再标记完成？' });
   await expect(inflightDialog).toBeVisible();
   await expect(inflightDialog.getByRole('button', { name: '停止并完成' })).toBeVisible();
-  await inflightDialog.getByRole('button', { name: '取消', exact: true }).click();
+  await dismissButton(inflightDialog).click();
   await expect(inflightDialog).toBeHidden();
   await expect(
     page.locator('[data-column="building"] [data-todo-id="dm-building"]'),
@@ -635,7 +641,7 @@ test('failed → 已完成 can mark canceled (#1247)', async ({ page }) => {
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await doneDialog(page).getByRole('button', { name: '标记为已取消' }).click();
+  await doneDialog(page).getByRole('button', { name: '已取消' }).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(page.locator('[data-column="done"] [data-todo-id="dm-failed"]')).toBeVisible();
   await expect(page.locator('[data-todo-id="dm-failed"] [data-todo-canceled]')).toBeVisible();
@@ -663,7 +669,7 @@ test('failed → 已完成 opens the dialog; cancel leaves the card (#1247)', as
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
+  await dismissButton(doneDialog(page)).click();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-failed"]'),
   ).toBeVisible();

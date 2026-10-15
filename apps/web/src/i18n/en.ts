@@ -143,7 +143,6 @@ export const EN: Record<string, string> = {
   确认完成: 'Confirm done',
   停止并完成: 'Stop and mark done',
   '正在停止…': 'Stopping…',
-  标记为已取消: 'Mark as canceled',
   已取消: 'Canceled',
   '必须先停止正在跑的构建，再标记完成。完成后 PR 不会自动合并。':
     'The running build must stop first, then the task is marked done. The PR will not merge on its own.',
@@ -151,11 +150,11 @@ export const EN: Record<string, string> = {
   '选择结局。标记完成不算合并；已取消不算成功交付。':
     'Choose an outcome. Done does not merge. Canceled does not count as success.',
   '确认完成：进入已完成列，计为成功': 'Confirm done: moves to Done and counts as success.',
-  '标记为已取消：进入已完成列并标「已取消」，不计为成功':
-    'Mark as canceled: moves to Done with a Canceled mark and does not count as success.',
+  '已取消：进入已完成列并标「已取消」，不计为成功':
+    'Canceled: moves to Done with a Canceled mark and does not count as success.',
   '已开出的 PR 保持原状，不会自动合并': 'An open PR stays as it is and will not merge on its own.',
-  '取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
-    'Cancel leaves the card where it is. To merge the changes, use the Done button on the card.',
+  '关闭则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
+    'Closing leaves the card where it is. To merge the changes, use the Done button on the card.',
   '停止并完成失败，请重试。': 'Could not stop and mark done. Try again.',
   发送: 'Send',
   '当前没有运行中的会话，消息未送出': 'No active run — the message was not delivered',
