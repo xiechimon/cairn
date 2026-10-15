@@ -4,8 +4,8 @@ import { expect, test } from '@playwright/test';
 // thread | 488 right pane) had no narrow-viewport strategy at all — at 320px
 // the sidebar kept 288px, the right pane kept 488px off-screen behind the
 // shell's overflow:hidden, and the thread column swallowed 133px of content
-// in a 35px box (#885 recorded it). Below 816px — raised from 768 with the 288 sidebar so chrome
-// (288+488) still leaves ~40px center (same as old 768/240)
+// in a 35px box (#885 recorded it). Below 816px — max-[816px] media (width < 816): 815 folds, 816 restores;
+// 288+488 leaves ~40px center (same as old 768/240)
 // 2026-10-05) — the shell now degrades: both side panes drop, the thread
 // owns the full width, and the head's back chevron stays the way out. Each
 // test pins one failure way:
