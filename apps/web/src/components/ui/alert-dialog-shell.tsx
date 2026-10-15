@@ -58,6 +58,7 @@ export function AlertDialogShell({
     >
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Backdrop
+          data-slot="alert-dialog-overlay"
           className="overlay-backdrop fixed inset-0 bg-black/60 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
           // 接管外点（AlertDialog 默认不关）：背板点击 = 关
           onClick={onClose}

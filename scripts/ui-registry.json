@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "ac4c2269e69216187ee336200fabe3b54063901e",
+    "sha": "8604941f2b4fcde83cc8ceeed83ac76298b84bd4",
     "date": "2026-10-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -8,7 +8,7 @@
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide.",
-      "hash": "29959fe4f3aec39b171b8082b822e147dd50b7734980dd33585730a5afefd348"
+      "hash": "eaeca4202d131e6442e0c816628f4b76c09dfd696b7608b01e078cf576551ccf"
     },
     "alert-dialog.tsx": {
       "kind": "registry",

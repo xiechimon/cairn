@@ -234,6 +234,15 @@
   }
 }
 
+/* CDS PR-5: select popup shell (select.tsx stays pristine under S5).
+ * Radius/shadow match popover; ring-0 clears registry ring-1 so dark does
+ * not keep an outer ring beside --shadow-popover. */
+[data-slot="select-content"] {
+  border-radius: var(--radius-popover);
+  /* Replace registry ring-1 + shadow-md entirely (unlayered beats @layer). */
+  box-shadow: var(--shadow-popover);
+}
+
 /* CDS PR-5: select/dropdown row pills at 4px / 32px. Dropdown-menu.tsx is
  * already deviated and carries the classes; select.tsx stays pristine (S5). */
 [data-slot="select-item"] {
@@ -245,7 +254,8 @@
 /* CDS PR-5: modal scrim blur 12px. Lives outside components/ui so dialog.tsx /
  * alert-dialog.tsx stay pristine under the S5 ratchet (map #980). */
 [data-slot="dialog-overlay"],
-[data-slot="alert-dialog-overlay"] {
+[data-slot="alert-dialog-overlay"],
+.overlay-backdrop {
   backdrop-filter: blur(12px);
 }
 
