@@ -15,6 +15,7 @@ import {
   agentDelete,
   agentDetail,
   agentDetailActive,
+  agentDetailLongModels,
   agentDetailMemory,
   agentDetailSecrets,
   agentLongRole,
@@ -363,6 +364,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // 团队卡/机器卡 clamp（agent-detail-long-role 或 team-long-role 同 roster）。
       'agent-detail-long-role': agentLongRole,
       'team-long-role': agentLongRoleTeam,
+      // #1301 长模型 id：概览 tab 二级模型弹层宽度压测。
+      'agent-detail-long-models': agentDetailLongModels,
       '13': boardDefault,
       // account 语言 dropdown open state (issue #74; shape [设计], r2 §11 Q19)
       '13-lang': { ...boardDefault, ui: { langDropdownOpen: true } },

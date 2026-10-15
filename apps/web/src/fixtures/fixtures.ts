@@ -13,6 +13,7 @@ export {
   agentDelete,
   agentDetail,
   agentDetailActive,
+  agentDetailLongModels,
   agentDetailMemory,
   agentDetailSecrets,
   agentLongRole,

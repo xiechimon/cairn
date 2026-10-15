@@ -1,0 +1,17 @@
+Running 1 test using 1 worker
+[1/1] e2e/agent-model-width.spec.ts:23:1 › 长模型 id：概览 tab 模型弹层不横向裁切，最长 id 全名可见（#1301）
+  1) e2e/agent-model-width.spec.ts:23:1 › 长模型 id：概览 tab 模型弹层不横向裁切，最长 id 全名可见（#1301） ────────────────
+    Error: expect(received).toBeLessThanOrEqual(expected)
+    Expected: <= 1213.5
+    Received:    1409
+      46 |       };
+      47 |     });
+    > 48 |     expect(fit.textRight).toBeLessThanOrEqual(fit.rowRight + 0.5);
+         |                           ^
+      49 |     expect(fit.textSw).toBeLessThanOrEqual(fit.textCw);
+      50 |   }
+      51 |
+        at /workspace/wt-1301/apps/web/e2e/agent-model-width.spec.ts:48:27
+    Error Context: test-results/agent-model-width-长模型-id：概览-tab-模型弹层不横向裁切，最长-id-全名可见（-1301）/error-context.md
+  1 failed
+    e2e/agent-model-width.spec.ts:23:1 › 长模型 id：概览 tab 模型弹层不横向裁切，最长 id 全名可见（#1301） ─────────────────

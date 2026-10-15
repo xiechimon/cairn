@@ -285,3 +285,27 @@ export const agentLongRole: FixtureSet = {
   agents: [{ ...AGENT_R3_BUILDER, description: AGENT_LONG_ROLE }],
   team: { members: 1, agents: [AGENT_LONG_ROLE_CARD] },
 };
+
+/** #1301 长模型 id 压测：claude-code 段换成网关上真实出现过的长 id
+ *  （`deepseek-v4-pro[1M]` / `qwen3.8-max-0902[1M]`），agent 绑在
+ *  claude-code 上——概览 tab 的二级模型弹层要能读全名，不被右侧裁掉。
+ *  供 ./e2e/agent-model-width.spec.ts。 */
+export const AGENT_LONG_MODEL_IDS = [
+  'claude-opus-4-5',
+  'deepseek-v4-pro[1M]',
+  'qwen3.8-max-0902[1M]',
+  'vendor/very-long-model-id-for-clipping-check-2026-10[1M]',
+];
+
+export const agentDetailLongModels: FixtureSet = {
+  ...agentDetail,
+  agents: [{ ...AGENT_R3_BUILDER, provider: 'claude-code', modelId: 'qwen3.8-max-0902[1M]' }],
+  resources: {
+    ...AGENT_DETAIL_RESOURCES,
+    providerSources: AGENT_DETAIL_RESOURCES.providerSources.map((source) =>
+      source.runtime === 'claude-code'
+        ? { ...source, models: AGENT_LONG_MODEL_IDS.map((id) => ({ id, name: id })) }
+        : source,
+    ),
+  },
+};
