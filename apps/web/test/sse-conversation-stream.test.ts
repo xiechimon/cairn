@@ -300,6 +300,17 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.get(CONV)).toBe('补发思考');
   });
 
+  it('activity phase starting 清掉在飞思考（回落轮）', () => {
+    const es = startStream(freshClient());
+    es.push({ type: 'thinking_delta', text: '旧轮思考' });
+    expect(liveThinkingStore.get(CONV)).toBe('旧轮思考');
+    es.push({
+      type: 'activity',
+      activity: { stepId: 's1', phase: 'starting', at: 1 },
+    });
+    expect(liveThinkingStore.get(CONV)).toBe('');
+  });
+
   it('重连 resync 作废旧思考缓冲，补发快照不叠加', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '断线前' });

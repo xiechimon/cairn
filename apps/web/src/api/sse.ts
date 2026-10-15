@@ -220,10 +220,17 @@ export function startConversationStream(
         case 'thinking_delta':
           liveThinkingStore.append(conversationId, ev.text as string);
           break;
-        case 'activity':
+        case 'activity': {
           // #905：步活动相位（瞬态单槽；stepId 对在跑步的过滤在消费侧）。
-          activityStore.set(conversationId, (ev as ConversationActivityEvent).activity);
+          const activity = (ev as ConversationActivityEvent).activity;
+          // 与 hub 同律：starting = 新一轮，丢掉上轮在飞思考/正文（#1308 Bugbot）。
+          if (activity.phase === 'starting') {
+            liveTextStore.clear(conversationId);
+            liveThinkingStore.clear(conversationId);
+          }
+          activityStore.set(conversationId, activity);
           break;
+        }
         case 'message': {
           const row = ev.message as TranscriptRow;
           // #857 收敛交接：终稿行到达只记 handoff，不清缓冲——messages 重取在

@@ -192,4 +192,29 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
     }
     s.dispose();
   });
+
+  test('activity phase starting clears a thinking snapshot (retry pass)', async () => {
+    const { s, token, buildId, stepId } = await world();
+    const posted = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: { kind: 'thinking_delta', text: MARKER },
+    });
+    expect(posted.status).toBe(200);
+    const start = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: {
+        kind: 'activity',
+        activity: { phase: 'starting' },
+      },
+    });
+    expect(start.status).toBe(200);
+    const late = await openConvStream(s.app, buildId);
+    try {
+      const first = await late.next(() => true);
+      expect(first.type).not.toBe('thinking_delta');
+    } finally {
+      await late.close();
+    }
+    s.dispose();
+  });
 });

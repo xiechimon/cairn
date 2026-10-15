@@ -1410,8 +1410,10 @@ export async function runStep(
   };
   for (let pass = 0; ; pass++) {
     if (pass > 0) {
-      // 回落轮状态复位（零进展护栏保证 messageSeq/sawChangeTool/增量缓冲在
-      // 第一轮本就未动）。duration cap 不在此复位——它是步级预算（#699）。
+      // 回落轮状态复位。duration cap 不在此复位——它是步级预算（#699）。
+      // 增量缓冲显式丢弃（不 flush）：网络重试可在有进展后 continue，旧轮
+      // 残留若再拼进新轮会让思考/正文翻倍；hub / 客户端由下面 starting
+      // 相位清快照（#1308 Bugbot）。
       lastError = null;
       lastModelError = null;
       sawDone = false;
@@ -1421,6 +1423,16 @@ export async function runStep(
       zeroProgressRetries = 0;
       retryStorm = false;
       usage = [];
+      if (thinkingTimer !== null) {
+        clearTimeout(thinkingTimer);
+        thinkingTimer = null;
+      }
+      thinkingBuf = '';
+      if (deltaTimer !== null) {
+        clearTimeout(deltaTimer);
+        deltaTimer = null;
+      }
+      deltaBuf = '';
     }
     activity.setPhase('starting');
     try {
@@ -1468,6 +1480,10 @@ export async function runStep(
           case 'thinking_delta': {
             // 相位面仍走 activity（无增量时的兜底标签）。正文另按 text_delta
             // 的节流窗进会话流（#1308）；段落库路径不变。
+            // 与 text_delta 同记 sawProgress——否则零进展回落闸会在已流过的
+            // 思考上重开一轮，thinkingBuf / hub / 客户端会把两轮拼成一段。
+            sawProgress = true;
+            zeroProgressRetries = 0;
             activity.setPhase('thinking');
             thinkingBuf += ev.text;
             if (thinkingTimer === null) {

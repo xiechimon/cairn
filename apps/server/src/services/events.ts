@@ -221,6 +221,12 @@ export class ConversationStreamHub {
   /** 步活动相位（#905）：daemon 上报经 reportActivity 盖章后瞬态转发；
    *  单槽留最后一份供订阅补发。 */
   publishActivity(conversationId: string, activity: StepActivity): void {
+    // 新一轮会话起步（daemon pass>0 与首轮同发 starting）——丢掉上轮在飞的
+    // 思考/正文快照，避免协议回落 / 网络重试把两轮拼在一起（#1308 Bugbot）。
+    if (activity.phase === 'starting') {
+      this.textBuffers.delete(conversationId);
+      this.thinkingBuffers.delete(conversationId);
+    }
     this.lastActivity.delete(conversationId);
     this.lastActivity.set(conversationId, activity);
     if (this.lastActivity.size > CONV_TEXT_BUFFER_MAX_CONVS) {
