@@ -856,7 +856,8 @@ async function assertTopCorner(rows: Locator) {
     // #1007 重钉（协调裁决：本重钉归 L4；#1057 的 13px 用「−1px ring」复算，
     // 该复算属 border 时代遗留——ring-1 是 box-shadow 环、不占布局位，首行
     // 逻辑角 = 卡角原值；半径基 10px（#988）下 rounded-xl = 14px，实测同）。
-    expect(topLeft).toEqual(['14px', '14px']);
+    // CDS PR-8: ProfileCard corners --cds-radius-2xl = 16px (was rounded-xl 14px)
+    expect(topLeft).toEqual(['16px', '16px']);
     expect(topBorder).toBe('0px');
   }
 }

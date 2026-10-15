@@ -90,7 +90,7 @@ export function RowCard({
       data-testid="resource-row"
       {...(mcp ? { 'data-mcp': '' } : {})}
       className={cn(
-        'mt-4 h-16 flex-row items-center gap-3 px-4 py-0',
+        'mt-4 h-16 flex-row items-center gap-3 rounded-(--cds-radius-2xl) px-4 py-0 shadow-none',
         mcp && 'h-[62px]',
         onOpen !== undefined && 'cursor-pointer',
         className,
@@ -120,7 +120,10 @@ export function RowCard({
  *  #910 二级结构载体（分组卡无 role，几何/计数断言的锚）。 */
 export function GroupCard({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <Card data-testid="resource-group" className={cn('gap-0 py-0', className)}>
+    <Card
+      data-testid="resource-group"
+      className={cn('gap-0 rounded-(--cds-radius-2xl) py-0 shadow-none', className)}
+    >
       {children}
     </Card>
   );
@@ -144,7 +147,7 @@ export function RowGrow({
       {...(divided ? { 'data-divided': '' } : {})}
       className={cn(
         'flex items-center gap-3 px-4',
-        divided ? 'h-[59px] border-t border-(--border)' : 'h-[60px]',
+        divided ? 'h-[calc(var(--row-h)-1px)] border-t border-(--border)' : 'h-(--row-h)',
         className,
       )}
       {...rest}
@@ -296,7 +299,7 @@ export function EmptyState({
         <EmptyMedia>
           <Tile Icon={Icon} size="hero" tone="orange" />
         </EmptyMedia>
-        <h2 className="text-sm font-medium tracking-tight text-balance text-foreground">
+        <h2 className="text-[15px] font-semibold tracking-tight text-balance text-foreground">
           {t(title)}
         </h2>
         <p className="text-sm/relaxed text-muted-foreground text-balance">
