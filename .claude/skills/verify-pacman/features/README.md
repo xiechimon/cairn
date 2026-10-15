@@ -2,6 +2,8 @@
 
 本目录是 pacman 用户可见行为的验证正源。驱动前先读本索引,再按 feature 文件当配方执行。map 漏掉的入口 = 验证不完整:顺手的入口验过 ≠ 整个 feature 验过。
 
+Control Glass 五条旅程(新建任务 / 派发 / 看 diff / 请求修改 / 合并)的入口、动作、终态在 [glass-journeys.md](./glass-journeys.md)。点击脚本在 `.cursor/skills/verify-pacman/scripts/glass.mjs`,流程与判断在 `.cursor/skills/verify-pacman/SKILL.md`。cursor 侧 `features/` 链到本目录,不另存一份。
+
 变更历史:`../changelog/` 每票一文件(`<日期>-<票号>.md`,skill 面与 feature map 面同文件;车道记新条目 = 新建文件,不改本行)。原「Last updated:」单行链已按 #1039 退役,历史逐条迁入 changelog。
 
 - #1030：local 项目 Files tab 开闸（推翻 spec 12 out-of-scope）。新增条目 project-files-local.md + 定制 probe `scripts/drive-1030-local-files.mjs`：三相位（local 真仓五读面 + 浏览器 tab 开闸/chip=HEAD/查看器/历史、hosted 对照零回归、删仓后不可达降级 + API 404+reason）。**live 验 20/20 PASS，证据 docs/verify/1030/**。fixture 面回归 = e2e project-files-local.spec（4 条；旧 disabled 钉子退役）。
@@ -57,6 +59,7 @@ map 不写实现细节,只写用户路径、稳定句柄、必要状态、命令
 
 ## Features
 
+- [Control Glass 五条旅程](./glass-journeys.md) 新建任务、派发给总管、审核 diff、请求修改、合并。一键脚本 `node .cursor/skills/verify-pacman/scripts/glass.mjs`。
 - [新建任务(工作台)](./board-new-task.md) 工作台 shell 渲染(#351 起 4 列)、新建任务 dialog、无项目自动建默认项目、持久化三重真值。
 - [API 密钥](./api-keys.md) 空态建密钥、一次性明文、掩码行、DB 存哈希不存明文。
 - [搜索](./search.md) 侧栏入口 → 面板输入 → 命中任务行。
