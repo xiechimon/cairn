@@ -1,0 +1,26 @@
+# Recheck after rebasing onto origin/main e5491c0a (2026-10-15 19:40 SGT)
+
+## origin/main: biome ci . summary
+Checked 769 files in 552ms. No fixes applied.
+Found 53 warnings.
+Found 2 infos.
+
+## branch tip e4b67512: biome ci . summary
+Checked 771 files in 523ms. No fixes applied.
+Found 1 info.
+
+## gate on branch tip
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+## negative: scratch unused import under scripts/
+Checked 772 files in 551ms. No fixes applied.
+Found 1 warning.
+Found 1 info.
+[lint-warning-cap] cap: biome ci . reports 1 warning(s), over the cap of 0 (baseline in-tree only)
+[lint-warning-cap] FAIL: 1 violation(s). Clear warnings, then re-freeze: node scripts/lint-warning-cap.mjs --write
+exit=1
+
+## pnpm test on branch tip
+Test Files  288 passed (288)
+Tests  2981 passed (2981)
