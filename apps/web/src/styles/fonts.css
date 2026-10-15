@@ -53,3 +53,20 @@
   --font-jetbrains-mono: "jetbrainsMono", "jetbrainsMono Fallback";
   --font-source-serif: "sourceSerif4", Georgia, "Songti SC", "Noto Serif CJK SC", serif;
 }
+
+:root:not(.light) .optical-medium {
+  font-variation-settings: "wght" 465;
+}
+:root:not(.light) .optical-semibold {
+  font-variation-settings: "wght" 560;
+}
+:root:not(.light) .optical-bold {
+  font-variation-settings: "wght" 660;
+}
+
+.icon-baseline {
+  vertical-align: -0.125em;
+}
+.icon-baseline-sm {
+  vertical-align: -0.075em;
+}

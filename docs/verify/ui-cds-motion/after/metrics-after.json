@@ -1,0 +1,9 @@
+{
+  "springBouncy": "linear(0 0%, .0253 3.57%",
+  "springSnappyDur": ".38s",
+  "springGentleDur": ".58s",
+  "springHeavyDur": ".3s",
+  "scrollFadeSize": "28px",
+  "background": "#f6f1ec",
+  "card": "#f0ebe6"
+}

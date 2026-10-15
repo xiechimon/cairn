@@ -218,3 +218,146 @@ body[data-board-dragging] {
     transform: scale(0.92);
   }
 }
+
+@keyframes message-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes saved-check-decay {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes grapheme-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.anim-message-fade-up {
+  animation: message-fade-up var(--spring-snappy-dur) var(--spring-snappy) both;
+}
+
+.anim-saved-check {
+  animation: saved-check-decay 2.5s var(--ease-out-expo) both;
+}
+
+.anim-grapheme-reveal {
+  animation: grapheme-reveal 350ms var(--ease-out-expo) both;
+}
+
+.scroll-fade {
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: 0px;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-top),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-top),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+    transparent
+  );
+}
+
+.scroll-fade-h {
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: 0px;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-left),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+    rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+    rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+    rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+    rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+    rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+    rgb(0 0 0) var(--scroll-fade-left),
+    rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+    rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+    rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+    rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+    rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+    rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+    rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-message-fade-up,
+  .anim-saved-check,
+  .anim-grapheme-reveal {
+    animation: none;
+  }
+}
