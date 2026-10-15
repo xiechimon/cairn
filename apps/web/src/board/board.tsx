@@ -339,30 +339,26 @@ export function BoardSurface({
                      （2026-10-12 用户派 dsh 对齐：rounded-2xl = 18px，卡件同
                      档）；drop 染色是列盒的状态层，随列几何。 */
                   className={cn(
-                    'board-column relative flex h-full flex-col rounded-2xl border border-border bg-background',
-                    isValidDropTarget(column.id) &&
-                      'border-(--drop-tint-border) bg-(--drop-tint-base)',
-                    dropColumnId === column.id &&
-                      'border-(--drop-tint-border) bg-(--drop-tint-hover)',
+                    'board-column relative flex h-full flex-col bg-background',
+                    isValidDropTarget(column.id) && 'bg-(--drop-tint-base)',
+                    dropColumnId === column.id && 'bg-(--drop-tint-hover)',
                   )}
                   aria-label={t(column.name)}
                   data-column={column.id}
                   data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
                   data-drop={dropColumnId === column.id ? 'true' : undefined}
                 >
-                  <header className="flex h-[37px] flex-none items-center px-[13px] pt-[3px]">
+                  <header className="flex h-8 flex-none items-center px-[13px]">
                     <span
                       className="size-[7px] flex-none rounded-full"
                       style={{ background: column.dot }}
                     />
-                    <span className="board-column-name ml-2 text-xs leading-4 text-muted-foreground">
+                    <span className="board-column-name ml-2 text-sm leading-5 text-muted-foreground">
                       {t(column.name)}
                     </span>
-                    {/* count always renders, `0` included (r2 §4.1 计数 0/1;
-                  r7 02/01b: digit present on empty columns, x = name+9) */}
                     <span
                       data-testid="column-count"
-                      className="ml-[9px] text-xs leading-4 text-muted-foreground/70"
+                      className="ml-[9px] text-xs leading-4 tabular-nums text-muted-foreground/70"
                     >
                       {todos.length}
                     </span>
@@ -514,7 +510,7 @@ function ColumnList({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-px"
+      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-1"
       ref={setRefs}
       data-column-list={columnId}
     >

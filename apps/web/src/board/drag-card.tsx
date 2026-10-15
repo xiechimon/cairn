@@ -30,7 +30,7 @@ export function DragCard({ todo, projectName }: DragCardProps) {
     <div
       /* #1054 清点：拖拽克隆镜像 todo-card 的卡族几何（rounded-2xl = 18px，
          2026-10-12 dsh 对齐随卡面同升）。 */
-      className="board-drag-card flex flex-col gap-1.5 rounded-2xl border border-(--border) bg-(--card) py-2.5 px-3 opacity-[0.92] rotate-2 [box-shadow:var(--drag-shadow)]"
+      className="board-drag-card flex flex-col gap-1.5 rounded-(--radius-panel) border border-(--border) bg-(--card) py-2.5 px-3 opacity-[0.92] rotate-2 [box-shadow:var(--drag-shadow)]"
       data-todo-id={todo.id}
     >
       <div className="flex items-center gap-1.5">

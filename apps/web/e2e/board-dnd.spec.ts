@@ -795,9 +795,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(card).toBeVisible();
     const expected = await resolveStyle(page, {
       'box-shadow': 'var(--drag-shadow)',
-      // 克隆镜像 todo-card 的卡族几何（rounded-2xl = 18px，2026-10-12
-      // 用户派 dsh 对齐随卡面同升，半径基 10px/#988）。
-      'border-radius': '18px',
+      // CDS PR-4: drag clone mirrors todo-card --radius-panel (10px).
+      'border-radius': 'var(--radius-panel)',
     });
     const actual = await card.evaluate((el) => {
       const cs = getComputedStyle(el);
@@ -857,7 +856,6 @@ for (const theme of ['light', 'dark'] as const) {
 
     const expected = await resolveStyle(page, {
       'background-color': 'var(--drop-tint-hover)',
-      'border-color': 'var(--drop-tint-border)',
     });
     const expectedBase = await resolveStyle(page, {
       'background-color': 'var(--drop-tint-base)',
@@ -870,7 +868,6 @@ for (const theme of ['light', 'dark'] as const) {
           valid: section?.getAttribute('data-drop-valid'),
           drop: section?.getAttribute('data-drop'),
           section: section == null ? null : getComputedStyle(section).backgroundColor,
-          border: section == null ? null : getComputedStyle(section).borderTopColor,
           list: listEl == null ? null : getComputedStyle(listEl).backgroundColor,
         };
       };
@@ -880,13 +877,11 @@ for (const theme of ['light', 'dark'] as const) {
     // hovered valid target: hot tier on the whole cell, list carries no patch
     expect(paints.done.drop).toBe('true');
     expect(paints.done.section).toBe(expected['background-color']);
-    expect(paints.done.border).toBe(expected['border-color']);
     expect(paints.done.list).toBe('rgba(0, 0, 0, 0)');
     // the other valid target rides the base tier
     expect(paints.building.valid).toBe('true');
     expect(paints.building.drop).toBeNull();
     expect(paints.building.section).toBe(expectedBase['background-color']);
-    expect(paints.building.border).toBe(expected['border-color']);
     // source column stays neutral, and 待处理 is neutral for a 待开始 source
     // (#753 per-source matrix: 待开始→待处理 invalid — the column itself is
     // a valid target for done(有变更) sources, pinned by the matrix spec)

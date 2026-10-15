@@ -37,6 +37,8 @@ async function edgeContract(page: Page, selector: string) {
     plateShadowProbe.style.boxShadow = 'var(--plate-shadow)';
     const cardLiftProbe = document.createElement('div');
     cardLiftProbe.style.boxShadow = 'var(--card-lift)';
+    const panelShadowProbe = document.createElement('div');
+    panelShadowProbe.style.boxShadow = 'var(--panel-shadow)';
     const borderTokenProbe = document.createElement('div');
     borderTokenProbe.style.backgroundColor = 'var(--border)';
     document.body.append(
@@ -46,6 +48,7 @@ async function edgeContract(page: Page, selector: string) {
       edgeShadowProbe,
       plateShadowProbe,
       cardLiftProbe,
+      panelShadowProbe,
       borderTokenProbe,
     );
     const cs = getComputedStyle(el);
@@ -59,6 +62,7 @@ async function edgeContract(page: Page, selector: string) {
       edgeShadow: getComputedStyle(edgeShadowProbe).boxShadow,
       plateShadow: getComputedStyle(plateShadowProbe).boxShadow,
       cardLift: getComputedStyle(cardLiftProbe).boxShadow,
+      panelShadow: getComputedStyle(panelShadowProbe).boxShadow,
       radius: cs.borderTopLeftRadius,
       border: cs.borderTopWidth,
     };
@@ -68,6 +72,7 @@ async function edgeContract(page: Page, selector: string) {
     edgeShadowProbe.remove();
     plateShadowProbe.remove();
     cardLiftProbe.remove();
+    panelShadowProbe.remove();
     borderTokenProbe.remove();
     return out;
   });
@@ -85,14 +90,13 @@ for (const theme of ['light', 'dark'] as const) {
     // 1px ring 外环（`ring-1 ring-foreground/10`）替代 #414 的 1px 实描边 +
     // shadow-sm。**保留的原意图**：不得回到 #139 的 inset 环（分数缩放下发丝
     // 不匀）——那条断言是本测试的真回归守卫。半径与投影：2026-10-12 用户派
-    // 「看板卡对齐 deepseek-harness 对话框观感」——圆角升卡族档 rounded-2xl
-    // （=18px，dsh 卡件 16-20 区间），静止吃 --card-lift 微抬升柔光
-    // （dsh elevation 律：描边承担分离、柔光只暗示贴地）。
+    // CDS PR-4: panel cards — --radius-panel 10px + --panel-shadow
+    // (hairline ring + cds-shadow-sm); hover lift is separate.
     expect(card.border).toBe('0px');
-    expect(card.radius).toBe('18px');
+    expect(card.radius).toBe('10px');
     expect(card.shadow).toContain('0px 0px 0px 1px');
     expect(card.shadow).not.toContain('inset');
-    expect(card.shadow).toContain(card.cardLift);
+    expect(card.shadow).toContain(card.panelShadow);
   });
 
   test(`board column container rides the same edge ring + card-tier shadow (${theme})`, async ({
@@ -103,12 +107,10 @@ for (const theme of ['light', 'dark'] as const) {
 
     const column = await edgeContract(page, '.board-column');
     // #414（B 面）：列容器与卡片同行——1px 实描边 + card-tier 投影。
-    // 半径随卡族档（2026-10-12 用户派 dsh 对齐：rounded-2xl = 18px，
-    // 卡/列/通知条同档）。
-    expect(column.border).toBe('1px');
-    expect(column.radius).toBe('18px');
-    expect(column.borderColorOwn).toBe(column.borderToken);
-    expect(column.shadow).not.toContain('inset');
+    // CDS PR-4: bare lanes on tier 0 — no border, no radius, no shadow.
+    expect(column.border).toBe('0px');
+    expect(column.radius).toBe('0px');
+    expect(column.shadow).toBe('none');
   });
 
   test(`notify banner rides the same edge ring + card-tier shadow (${theme})`, async ({
