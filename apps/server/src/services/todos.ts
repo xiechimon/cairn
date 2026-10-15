@@ -589,7 +589,7 @@ export function splitBlockersSatisfied(db: Db, row: TodoRow): boolean {
  *  审计行（actor = Chief——收口是编排面动作，不是人手）。已 done / 子未齐
  *  / 父行缺失 = 零副作用。嵌套拆卡自然递归：子父收口落 done 又触发对更上
  *  层父的同一检查。 */
-function settleSplitOnDone(deps: TodoDeps, childId: string): void {
+export function settleSplitOnDone(deps: TodoDeps, childId: string): void {
   const { db } = deps;
   const child = getRow(deps, childId);
   if (child === undefined || child.sourceTodo === null) return;

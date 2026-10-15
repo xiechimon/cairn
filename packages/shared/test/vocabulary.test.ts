@@ -83,7 +83,7 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(boardColumnFor('review')).toBe('待处理'); // awaitingReply 同列（钉顶为渲染行为）
     expect(boardColumnFor('failed')).toBe('待处理');
     expect(boardColumnFor('done')).toBe('已完成');
-    expect(boardColumnFor('closed')).toBeNull(); // 不占列不变
+    expect(boardColumnFor('closed')).toBe('已完成'); // #1247 canceled 同列
   });
 
   it('manual drop targets are the four writable columns (#753)', () => {
@@ -120,7 +120,7 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(canBoardDrop('todo', 'todo')).toBe(false);
     expect(canBoardDrop('confirm', 'review')).toBe(false);
     expect(canBoardDrop('planning', 'building')).toBe(false);
-    expect(canBoardDrop('closed', 'todo')).toBe(false);
+    expect(canBoardDrop('closed', 'todo')).toBe(true); // #1247 reopen from canceled
     expect(canBoardDrop('done', 'failed')).toBe(false);
     expect(canBoardDrop('done', 'confirm')).toBe(false);
   });

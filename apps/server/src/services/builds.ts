@@ -72,7 +72,13 @@ import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
 import { toQuotaWait } from './quota-wait.js';
 import { stepQueueProjector } from './step-queue.js';
-import { childrenOfTodo, getTodo, setTodoPhase, splitBlockersSatisfied } from './todos.js';
+import {
+  childrenOfTodo,
+  getTodo,
+  setTodoPhase,
+  settleSplitOnDone,
+  splitBlockersSatisfied,
+} from './todos.js';
 // #902：transcript 行写入单源提出（todos 面同用，避免 todos→builds 依赖环）。
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
@@ -177,6 +183,10 @@ export function readSteerPending(db: Db, conversationId: string): string[] {
   return pending ? [pending.content] : [];
 }
 
+/** #1247 stop-then-done：delegated stop 完成后的目标相位（进程内）。
+ *  重启后丢失 = 回落 gate（与普通 stop 同面），不另开 migration。 */
+const afterStopPhaseByBuild = new Map<string, Phase>();
+
 /** 停止写面（M7 #308，r9 §3.3 停止钮 / 08 册附录 A composer 停止钮行）：
  * POST /api/builds/{id}/stop body {discard}——中断当前活动步。
  * - claimed 步 = 机器信号面（stop_pending 单槽 upsert + machine stream stop
@@ -273,6 +283,26 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (cancelledRow) publishBuild(deps, cancelledRow);
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) return;
+  // #1247：stop-then-done 预定相位优先；否则 gate 回落（普通停止钮）。
+  const desired = afterStopPhaseByBuild.get(buildRow.id);
+  afterStopPhaseByBuild.delete(buildRow.id);
+  if (desired != null) {
+    if (todoRow.phase !== desired) {
+      // 直写预定相（queued/planning→done 不在前进漏斗；与 gate 回落同形）。
+      // done 额外挂 settle + 波次（成功交付；failed 源不会走 stop-then-done）。
+      db.update(todo)
+        .set({ phase: desired, phaseAt: nowMs(), v: todoRow.v + 1 })
+        .where(eq(todo.id, todoRow.id))
+        .run();
+      const record = getTodo(deps, todoRow.id);
+      if (record) deps.hub.publishTodoDoc(record.teamId, record);
+    }
+    if (desired === 'done') {
+      settleSplitOnDone(deps, todoRow.id);
+      advanceSplitWaves(deps, todoRow.id);
+    }
+    return;
+  }
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
@@ -367,6 +397,71 @@ export function cancelBuild(
  * 回落释放；活步控制组（有 pending/claimed 步）不动。无龄判据：僵尸不是
  * 过渡态——startBuilds 的建 build/入队/置 queued 与 claim 的置 claimed/推
  * 相位都是同步块，合法流转不会产出「queued 无活步」的中间窗。 */
+
+/** #1247：停止活动步但不改相位（pending/waiting_quota 即时；claimed 不走这里）。 */
+function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
+  const { db } = deps;
+  const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (!stepRow) throw new NotFoundError(`step ${stepId}`);
+  db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
+  db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (stoppedRow) {
+    deps.convHub?.publishStep(stepRow.buildId, {
+      id: stoppedRow.id,
+      buildId: stoppedRow.buildId,
+      kind: stoppedRow.kind,
+      machineId: stoppedRow.machineId,
+      createdAt: stoppedRow.createdAt,
+      status: stoppedRow.status,
+      checkpointCommit: stoppedRow.checkpointCommit,
+      skillInjection: stoppedRow.skillInjection ?? null,
+    });
+  }
+  const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow) return;
+  db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
+  const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
+  if (cancelledRow) publishBuild(deps, cancelledRow);
+}
+
+export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
+
+/** #1247 stop-then-done 的停半边：pending 即时停且保相位；claimed 委托停并
+ *  预定 afterStop=done。调用方在 ready 时再写 phase=done。无活动步 = ready。 */
+export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMarkDoneResult {
+  const { db } = deps;
+  const todoRow = db.select().from(todo).where(eq(todo.id, todoId)).get();
+  if (!todoRow) throw new NotFoundError(`todo ${todoId}`);
+  if (todoRow.latestBuildId == null) return { state: 'ready' };
+  const buildId = todoRow.latestBuildId;
+  const active = db
+    .select()
+    .from(step)
+    .where(
+      and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed', 'waiting_quota'])),
+    )
+    .orderBy(asc(step.createdAt))
+    .all()
+    .at(-1);
+  if (!active) return { state: 'ready' };
+  if (active.status === 'pending' || active.status === 'waiting_quota') {
+    stopStepKeepPhase(deps, active.id);
+    return { state: 'ready' };
+  }
+  const now = nowMs();
+  afterStopPhaseByBuild.set(buildId, 'done');
+  db.insert(stopPending)
+    .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
+    .onConflictDoUpdate({
+      target: stopPending.conversationId,
+      set: { stepId: active.id, discard: true, createdAt: now },
+    })
+    .run();
+  deps.machineHub?.stopSignal(todoRow.teamId, active.id);
+  return { state: 'stopping' };
+}
+
 export function sweepZombieQueuedTodos(deps: BuildDeps, now: number = nowMs()): number {
   const rows = deps.db.select().from(todo).where(eq(todo.phase, 'queued')).all();
   let released = 0;

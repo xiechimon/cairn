@@ -79,6 +79,15 @@ describe('手动落位矩阵（#753）：待处理 源', () => {
     }
   });
 
+  test('confirm/review/failed→closed = 200（#1247 canceled 结局）', async () => {
+    for (const phase of ['confirm', 'review', 'failed'] as const) {
+      const { s, id } = await setup(phase);
+      const res = await patchPhase(s, id, 'closed');
+      expect(res.status, phase).toBe(200);
+      expect(todoRecordSchema.parse(await res.json()).phase).toBe('closed');
+    }
+  });
+
   test('confirm/review→todo = 200（参考站：已开始的卡拖回待开始；重置语义另票）', async () => {
     for (const phase of ['confirm', 'review'] as const) {
       const { s, id } = await setup(phase);
