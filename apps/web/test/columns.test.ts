@@ -82,11 +82,13 @@ describe('canDropOnColumn（#753 per-source 矩阵）', () => {
     }
   });
 
-  test('closed 不占列 = 无源无落；未知列 = 恒等假', () => {
+  test('closed 在已完成列：可拖回待开始；无变更不进待处理；未知列假', () => {
     const t = todo(1, 'closed');
-    for (const id of ['todo', 'building', 'pending', 'done']) {
-      expect(canDropOnColumn(t, id), id).toBe(false);
-    }
+    expect(canDropOnColumn(t, 'todo')).toBe(true);
+    expect(canDropOnColumn(t, 'pending')).toBe(false);
+    expect(canDropOnColumn(t, 'building')).toBe(false);
+    expect(canDropOnColumn(t, 'done')).toBe(false);
+    expect(canDropOnColumn({ ...t, hasChanges: true }, 'pending')).toBe(true);
     expect(canDropOnColumn(todo(2, 'todo'), 'nope')).toBe(false);
   });
 });
@@ -111,7 +113,7 @@ describe('待处理列收纳（confirm ∪ review ∪ failed，#351）', () => {
     }
   });
 
-  test('accepts：todo/queued/planning/building/done/closed 不入列', () => {
+  test('accepts：todo/queued/planning/building/done/closed 不入待处理', () => {
     for (const t of [
       todo(1, 'todo'),
       todo(2, 'queued'),
@@ -122,6 +124,13 @@ describe('待处理列收纳（confirm ∪ review ∪ failed，#351）', () => {
     ]) {
       expect(pending.accepts(t), t.phase).toBe(false);
     }
+  });
+
+  test('已完成列收 done 与 closed（#1247 canceled）', () => {
+    const done = col('done');
+    expect(done.accepts(todo(1, 'done'))).toBe(true);
+    expect(done.accepts(todo(2, 'closed'))).toBe(true);
+    expect(done.accepts(todo(3, 'failed'))).toBe(false);
   });
 
   test('侧栏 badge = 待处理列计数（同一 accepts 谓词单源）', () => {
@@ -230,7 +239,7 @@ describe('needsResetGate（#755 拖回待开始确认闸）', () => {
   });
 });
 
-describe('needsDoneGate（#1247 待处理拖向已完成）', () => {
+describe('needsDoneGate（#1247 待处理/在飞拖向已完成）', () => {
   test('confirm/review/failed 要确认，与 hasChanges 无关', () => {
     for (const phase of ['confirm', 'review', 'failed'] as const) {
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), `${phase} rich`).toBe(true);
@@ -240,8 +249,15 @@ describe('needsDoneGate（#1247 待处理拖向已完成）', () => {
     }
   });
 
-  test('待开始与执行中拖向已完成仍静默', () => {
-    for (const phase of ['todo', 'queued', 'planning', 'building', 'done'] as const) {
+  test('执行中（queued/planning/building）要确认（stop-then-done）', () => {
+    for (const phase of ['queued', 'planning', 'building'] as const) {
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), phase).toBe(true);
+      expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(true);
+    }
+  });
+
+  test('待开始与已完成拖向已完成仍静默', () => {
+    for (const phase of ['todo', 'done'] as const) {
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: true }), phase).toBe(false);
       expect(needsDoneGate({ ...todo(1, phase), hasChanges: false }), phase).toBe(false);
     }

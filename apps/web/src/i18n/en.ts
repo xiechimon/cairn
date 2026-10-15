@@ -139,14 +139,24 @@ export const EN: Record<string, string> = {
   '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。':
     'Kept: title, spec, tags and assignment. Run history stays for audit. Executor workspace files are untouched.',
   '把任务标记为已完成？': 'Mark the task as done?',
+  '先停止构建再标记完成？': 'Stop the build, then mark done?',
   确认完成: 'Confirm done',
-  '标记完成。正在跑的构建会继续，PR 不会自动合并。':
-    'This marks the task done. A running build keeps going, and the PR will not merge on its own.',
-  '任务进入已完成列，这次操作不停构建':
-    'The task moves to Done. This action does not stop the build.',
+  停止并完成: 'Stop and mark done',
+  '正在停止…': 'Stopping…',
+  标记为已取消: 'Mark as canceled',
+  已取消: 'Canceled',
+  '必须先停止正在跑的构建，再标记完成。完成后 PR 不会自动合并。':
+    'The running build must stop first, then the task is marked done. The PR will not merge on its own.',
+  '确认后会停止构建，再把任务标为已完成': 'Confirm stops the build, then marks the task done.',
+  '选择结局。标记完成不算合并；已取消不算成功交付。':
+    'Choose an outcome. Done does not merge. Canceled does not count as success.',
+  '确认完成：进入已完成列，计为成功': 'Confirm done: moves to Done and counts as success.',
+  '标记为已取消：进入已完成列并标「已取消」，不计为成功':
+    'Mark as canceled: moves to Done with a Canceled mark and does not count as success.',
   '已开出的 PR 保持原状，不会自动合并': 'An open PR stays as it is and will not merge on its own.',
   '取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。':
     'Cancel leaves the card where it is. To merge the changes, use the Done button on the card.',
+  '停止并完成失败，请重试。': 'Could not stop and mark done. Try again.',
   发送: 'Send',
   '当前没有运行中的会话，消息未送出': 'No active run — the message was not delivered',
   '任务状态已变化，消息未送出': 'The task state changed — the message was not delivered',
@@ -565,7 +575,6 @@ export const EN: Record<string, string> = {
   '准备工作区...': 'Preparing workspace...',
   '处理中...': 'Working on it...',
   '执行中...': 'Running...',
-  '正在停止…': 'Stopping…',
   // #1108 queue rows (pending steps waiting for a machine) + machines page
   // concurrency face.
   '排队中：等 {machine}（{running}/{cap} 在跑，前面 {ahead} 个）':
@@ -603,7 +612,6 @@ export const EN: Record<string, string> = {
   // server data, not t() keys — same law as note #634).
   '注入技能：': 'Injected skills: ',
   '未注入技能（任务文本未命中任何技能）': 'No skills injected (task text matched none)',
-  已取消: 'Cancelled',
   // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
   '{name}（已下架）': '{name} (Delisted)',

@@ -378,8 +378,8 @@ test('待处理(confirm) → 已完成 opens the confirm dialog, then lands firs
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await expect(doneDialog(page).getByText('标记完成。正在跑的构建会继续，PR 不会自动合并。')).toBeVisible();
-  await expect(doneDialog(page).getByText('任务进入已完成列，这次操作不停构建')).toBeVisible();
+  await expect(doneDialog(page).getByText('选择结局。标记完成不算合并；已取消不算成功交付。')).toBeVisible();
+  await expect(doneDialog(page).getByText('确认完成：进入已完成列，计为成功')).toBeVisible();
   await doneDialog(page).getByRole('button', { name: '确认完成' }).click();
   await expect(doneDialog(page)).toBeHidden();
   const inDone = page.locator('[data-column="done"] [data-todo-id="dm-confirm"]');
@@ -552,14 +552,14 @@ test('done 闸·取消：review(有变更) 拖已完成开弹层，取消零提�
   // dm-review = review ∧ hasChanges（probeTodo 相位默认位）：落位开 done 闸，
   // 卡片停在源列，计数不动。
   await expect(doneDialog(page)).toBeVisible();
-  await expect(doneDialog(page).getByText('标记完成。正在跑的构建会继续，PR 不会自动合并。')).toBeVisible();
-  await expect(doneDialog(page).getByText('任务进入已完成列，这次操作不停构建')).toBeVisible();
+  await expect(doneDialog(page).getByText('选择结局。标记完成不算合并；已取消不算成功交付。')).toBeVisible();
+  await expect(doneDialog(page).getByText('确认完成：进入已完成列，计为成功')).toBeVisible();
   await expect(doneDialog(page).getByText('已开出的 PR 保持原状，不会自动合并')).toBeVisible();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
   ).toBeVisible();
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('2');
-  await doneDialog(page).getByRole('button', { name: '取消' }).click();
+  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-review"]'),
@@ -592,7 +592,9 @@ test('done 闸·确认：review(有变更) 确认后落已完成（fixture 本�
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('3');
 });
 
-test('done 闸：无变更 confirm 取消留在待处理；building 源仍静默 (#1247)', async ({ page }) => {
+test('done 闸：无变更 confirm 取消留在待处理；building 源开 stop-then-done (#1247)', async ({
+  page,
+}) => {
   await page.goto('/app?scenario=board-drag-matrix');
   const list = await page.locator('[data-column-list="done"]').boundingBox();
   if (list == null) throw new Error('done list missing');
@@ -602,7 +604,7 @@ test('done 闸：无变更 confirm 取消留在待处理；building 源仍静默
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await doneDialog(page).getByRole('button', { name: '取消' }).click();
+  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
   await expect(doneDialog(page)).toBeHidden();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-confirm"]'),
@@ -611,11 +613,32 @@ test('done 闸：无变更 confirm 取消留在待处理；building 源仍静默
   await settleDrag(page);
   await page.mouse.up();
   await settleDrop(page);
-  await expect(doneDialog(page)).toBeHidden();
+  const inflightDialog = page.getByRole('dialog', { name: '先停止构建再标记完成？' });
+  await expect(inflightDialog).toBeVisible();
+  await expect(inflightDialog.getByRole('button', { name: '停止并完成' })).toBeVisible();
+  await inflightDialog.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(inflightDialog).toBeHidden();
   await expect(
-    page.locator('[data-column="done"] [data-todo-id="dm-building"]'),
+    page.locator('[data-column="building"] [data-todo-id="dm-building"]'),
   ).toBeVisible();
-  await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('3');
+});
+
+test('failed → 已完成 can mark canceled (#1247)', async ({ page }) => {
+  await page.goto('/app?scenario=board-drag-matrix');
+  const list = await page.locator('[data-column-list="done"]').boundingBox();
+  if (list == null) throw new Error('done list missing');
+  await dragTo(page, '[data-todo-id="dm-failed"]', {
+    x: list.x + list.width / 2,
+    y: list.y + list.height - 24,
+  });
+  await settleDrag(page);
+  await page.mouse.up();
+  await settleDrop(page);
+  await expect(doneDialog(page)).toBeVisible();
+  await doneDialog(page).getByRole('button', { name: '标记为已取消' }).click();
+  await expect(doneDialog(page)).toBeHidden();
+  await expect(page.locator('[data-column="done"] [data-todo-id="dm-failed"]')).toBeVisible();
+  await expect(page.locator('[data-todo-id="dm-failed"] [data-todo-canceled]')).toBeVisible();
 });
 
 test('已完成列首卡完成时间不早于末卡 (#1247)', async ({ page }) => {
@@ -640,7 +663,7 @@ test('failed → 已完成 opens the dialog; cancel leaves the card (#1247)', as
   await page.mouse.up();
   await settleDrop(page);
   await expect(doneDialog(page)).toBeVisible();
-  await doneDialog(page).getByRole('button', { name: '取消' }).click();
+  await doneDialog(page).getByRole('button', { name: '取消', exact: true }).click();
   await expect(
     page.locator('[data-column="pending"] [data-todo-id="dm-failed"]'),
   ).toBeVisible();

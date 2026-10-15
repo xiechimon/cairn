@@ -91,7 +91,7 @@ export const COLUMNS: BoardColumnDef[] = [
     dot: 'var(--col-dot-done)',
     empty: '最近 7 天没有完成的任务',
     label: '最近 7 天',
-    accepts: (t) => t.phase === 'done',
+    accepts: (t) => t.phase === 'done' || t.phase === 'closed',
   },
 ];
 
@@ -135,11 +135,21 @@ export function needsResetGate(todo: TodoRecord): boolean {
   return todo.latestBuildId != null || todo.lastRunAt != null || todo.hasChanges || todo.hasPlan;
 }
 
-/** Done-drop confirm (#1247). Cards in 待处理 (confirm / review / failed)
- *  ask before the phase write. hasChanges does not decide this. 待开始 and
- *  执行中 still drop straight through. Cancel writes nothing. */
+/** Done-drop confirm (#1247). 待处理 (confirm / review / failed) 与执行中
+ *  （queued / planning / building）拖向已完成都要确认。hasChanges 不参与。
+ *  待开始（todo）仍静默直落。Cancel writes nothing. */
 export function needsDoneGate(todo: TodoRecord): boolean {
-  return todo.phase === 'confirm' || todo.phase === 'review' || todo.phase === 'failed';
+  return (
+    todo.phase === 'confirm' ||
+    todo.phase === 'review' ||
+    todo.phase === 'failed' ||
+    (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase)
+  );
+}
+
+/** In-flight done gate (#1247)：只给「先停构建再标完成 / 取消」两钮。 */
+export function isInflightDoneGate(todo: TodoRecord): boolean {
+  return (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase);
 }
 
 /** Phase → primary card action, copy from the shared PHASE_UI table.

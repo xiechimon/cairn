@@ -35,6 +35,7 @@ import { mapBranchInfo, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { type BoardFilters, BoardSurface } from '../board/board.js';
+import { isInflightDoneGate } from '../board/columns.js';
 import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
@@ -545,19 +546,96 @@ export function BoardPage() {
     [live, todos, fixture.now, teamId, mutations.patchTodo, queryClient, t],
   );
 
-  // #1247 done 落位闸：待处理卡拖向已完成先开确认弹层（判据单源
-  // columns.needsDoneGate）。取消 = 零提交（拖拽路由未写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路
-  // （fixture 本地集 / live 乐观 PATCH + server 审计行 #902）。无 reset 闸的
-  // 快照/409 复核位：确认走的是普通改相 PATCH，竞态由乐观回滚 + toast 兜底
-  // （#638 同律），不需要 stale 重确认面。
+  // #1247 done 落位闸：待处理 / 在飞卡拖向已完成先开确认弹层（判据单源
+  // columns.needsDoneGate）。取消 = 零提交；outcome = done|closed；inflight =
+  // POST stop-and-done。竞态由乐观回滚 + toast 兜底（#638 同律）。
   const [doneTarget, setDoneTarget] = useState<TodoRecord | null>(null);
+  const [doneConfirming, setDoneConfirming] = useState(false);
   const openDoneGate = useCallback((todo: TodoRecord) => setDoneTarget(todo), []);
-  const closeDoneGate = useCallback(() => setDoneTarget(null), []);
+  const closeDoneGate = useCallback(() => {
+    if (doneConfirming) return;
+    setDoneTarget(null);
+  }, [doneConfirming]);
+  const commitDonePhase = useCallback(
+    (todo: TodoRecord, phase: 'done' | 'closed') => {
+      const next = moveTodo(todos, todo.id, 'done', live ? Date.now() : fixture.now, phase);
+      if (next === todos) return;
+      if (!live) {
+        setFixtureTodos(next);
+        return;
+      }
+      const after = next.find((t) => t.id === todo.id);
+      if (after == null) return;
+      const body: ReorderPatch = { phase: after.phase, orderIndex: after.orderIndex };
+      queryClient.setQueryData<WireTodo[]>(['todos', teamId], (old) =>
+        old?.map((w) =>
+          w.id === todo.id
+            ? { ...w, phase: after.phase, phaseAt: Date.now(), orderIndex: after.orderIndex }
+            : w,
+        ),
+      );
+      mutations.patchTodo.mutate(
+        { id: todo.id, body },
+        {
+          onError: (error) => {
+            queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+            toastError(t('移动任务失败，请重试。'), error);
+          },
+        },
+      );
+    },
+    [live, todos, fixture.now, teamId, mutations.patchTodo, queryClient, t],
+  );
   const confirmDone = useCallback(() => {
     if (doneTarget == null) return;
-    handlePhaseDrop(doneTarget, 'done');
+    commitDonePhase(doneTarget, 'done');
     setDoneTarget(null);
-  }, [doneTarget, handlePhaseDrop]);
+  }, [doneTarget, commitDonePhase]);
+  const confirmCanceled = useCallback(() => {
+    if (doneTarget == null) return;
+    commitDonePhase(doneTarget, 'closed');
+    setDoneTarget(null);
+  }, [doneTarget, commitDonePhase]);
+  const confirmStopThenDone = useCallback(async () => {
+    if (doneTarget == null) return;
+    if (!live) {
+      commitDonePhase(doneTarget, 'done');
+      setDoneTarget(null);
+      return;
+    }
+    setDoneConfirming(true);
+    try {
+      const result = await api.post<{ state: 'done' | 'stopping'; todo: WireTodo }>(
+        `/api/todos/${doneTarget.id}/stop-and-done`,
+        {},
+      );
+      if (result.state === 'done') {
+        queryClient.setQueryData<WireTodo[]>(['todos', teamId], (old) =>
+          old?.map((w) => (w.id === result.todo.id ? result.todo : w)),
+        );
+        queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+        setDoneTarget(null);
+        return;
+      }
+      // claimed：等相位到 done（SSE / 轮询）
+      const deadline = Date.now() + 60_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 400));
+        const fresh = await api.get<WireTodo>(`/api/todos/${doneTarget.id}`);
+        if (fresh.phase === 'done') {
+          queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+          setDoneTarget(null);
+          return;
+        }
+      }
+      throw new Error('stop-and-done timed out');
+    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['todos', teamId] });
+      toastError(t('停止并完成失败，请重试。'), error);
+    } finally {
+      setDoneConfirming(false);
+    }
+  }, [doneTarget, live, commitDonePhase, queryClient, teamId, t]);
 
   // #828: 看板 branch 弹层的数据面——fixture 面走 overlayContent 冻结值；
   // live 面按 overlayTodo.latestBuildId 经 mapBranchInfo 现算（与详情页右
@@ -745,8 +823,12 @@ export function BoardPage() {
           零提交，确认走 handlePhaseDrop（server 同落审计行 #902）。 */}
       <DoneConfirmDialog
         open={doneTarget != null}
+        mode={doneTarget != null && isInflightDoneGate(doneTarget) ? 'inflight' : 'outcome'}
+        confirming={doneConfirming}
         onClose={closeDoneGate}
-        onConfirm={confirmDone}
+        onConfirmDone={confirmDone}
+        onConfirmCanceled={confirmCanceled}
+        onConfirmStopThenDone={() => void confirmStopThenDone()}
       />
     </div>
   );

@@ -39,6 +39,8 @@ export function moveTodo(
   todoId: string,
   columnId: string,
   now: number,
+  /** #1247：已完成列可落 done 或 closed（canceled）。缺省 = 列 dropPhase。 */
+  phaseOverride?: 'done' | 'closed',
 ): TodoRecord[] {
   const moved = todos.find((t) => t.id === todoId);
   if (moved == null) return todos;
@@ -46,7 +48,8 @@ export function moveTodo(
   if (column == null) return todos;
   // #753：合法边单源 canDropOnColumn（同列/非法对 = 恒等，不写相位不动序）
   if (!canDropOnColumn(moved, columnId)) return todos;
-  const dropPhase = column.dropPhase;
+  if (phaseOverride != null && columnId !== 'done') return todos;
+  const dropPhase = phaseOverride ?? column.dropPhase;
   const placed = { ...moved, phase: dropPhase, phaseAt: now };
   const rest = todos.filter((t) => t.id !== todoId);
   const view = rest.filter((t) => column.accepts(t));

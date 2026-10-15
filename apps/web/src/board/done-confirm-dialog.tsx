@@ -1,54 +1,93 @@
-// 已完成确认 dialog（#901，#1247）：待处理卡（confirm / review / failed）
-// 拖向已完成先确认，不看 hasChanges。复用 #755 reset 闸形态（DialogShell +
-// 头 + 说明清单 + footer 取消/确认）。取消 = 零提交（board.tsx 落位路由在
-// opened 前不写任何乐观值）；确认 = 既有 handlePhaseDrop 提交路（fixture
-// 本地集 / live 乐观 PATCH）。这条 PATCH 不调用 cancelBuild：停止落账
-// （applyStoppedStep）会把相位写回上一关口，和「标完成」对着干。在飞构建
-// 继续跑。也不走 AcceptDialog 的合并步。
+// 已完成确认 dialog（#901，#1247）：
+// - 待处理卡（confirm / review / failed）→ Done / Canceled / 取消
+// - 在飞卡（queued / planning / building）→ 先停构建再标完成 / 取消
+// 取消 = 零提交。确认完成不走 AcceptDialog 合并步。
 
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
+export type DoneConfirmMode = 'outcome' | 'inflight';
+
 interface DoneConfirmDialogProps {
   /** #73 retained-mount open flag. */
   open?: boolean;
+  /** outcome = Done/Canceled；inflight = stop-then-done only. */
+  mode?: DoneConfirmMode;
+  /** 确认进行中（stop-and-done 委托态）。 */
+  confirming?: boolean;
   onClose: () => void;
-  /** 确认 = 既有 handlePhaseDrop 乐观提交路（同步落位 + 后台 PATCH），无
-   *  在飞态可禁——与 reset 闸的异步确认面不同，不设 confirming 位。 */
-  onConfirm: () => void;
+  /** 标记为已完成（成功结局）。 */
+  onConfirmDone: () => void;
+  /** 标记为已取消 / 不做了（closed）。inflight 模式不展示。 */
+  onConfirmCanceled?: () => void;
+  /** 先停构建再标完成。仅 inflight 模式。 */
+  onConfirmStopThenDone?: () => void;
 }
 
-export function DoneConfirmDialog({ open, onClose, onConfirm }: DoneConfirmDialogProps) {
+export function DoneConfirmDialog({
+  open,
+  mode = 'outcome',
+  confirming = false,
+  onClose,
+  onConfirmDone,
+  onConfirmCanceled,
+  onConfirmStopThenDone,
+}: DoneConfirmDialogProps) {
   const { t } = useI18n();
+  const inflight = mode === 'inflight';
   return (
     <DialogShell
-      title={t('把任务标记为已完成？')}
+      title={inflight ? t('先停止构建再标记完成？') : t('把任务标记为已完成？')}
       open={open}
-      onClose={onClose}
-      // 挂账已清（#1004 → #1006 段 2）：registry dialog-shell 已进本分支，
-      // 消费点自携垫剥除、裸内容进 DialogFooter，ACCEPT_* import 撤除；
-      // 钮走家族律 registry 档（取消 outline / 确认 default）。
+      onClose={confirming ? () => {} : onClose}
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={confirming}>
             {t('取消')}
           </Button>
-          <Button onClick={onConfirm}>{t('确认完成')}</Button>
+          {inflight ? (
+            <Button onClick={onConfirmStopThenDone} disabled={confirming}>
+              {confirming ? t('正在停止…') : t('停止并完成')}
+            </Button>
+          ) : (
+            <>
+              {onConfirmCanceled != null && (
+                <Button variant="outline" onClick={onConfirmCanceled} disabled={confirming}>
+                  {t('标记为已取消')}
+                </Button>
+              )}
+              <Button onClick={onConfirmDone} disabled={confirming}>
+                {t('确认完成')}
+              </Button>
+            </>
+          )}
         </>
       }
     >
-      {/* 几何/字档 = reset-confirm-dialog 同族（#951 overlays.css 清零后的
-          utility 形态）：内容纵 stacked，13/18 primary 主句、13/20 disc
-          清单、12/16 tertiary 尾注。外垫随壳 DialogContent p-4。 */}
       <div className="block">
-        <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--text-primary)">
-          {t('标记完成。正在跑的构建会继续，PR 不会自动合并。')}
-        </p>
-        <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--text-primary)">
-          <li>{t('任务进入已完成列，这次操作不停构建')}</li>
-          <li>{t('已开出的 PR 保持原状，不会自动合并')}</li>
-        </ul>
+        {inflight ? (
+          <>
+            <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--text-primary)">
+              {t('必须先停止正在跑的构建，再标记完成。完成后 PR 不会自动合并。')}
+            </p>
+            <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--text-primary)">
+              <li>{t('确认后会停止构建，再把任务标为已完成')}</li>
+              <li>{t('已开出的 PR 保持原状，不会自动合并')}</li>
+            </ul>
+          </>
+        ) : (
+          <>
+            <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--text-primary)">
+              {t('选择结局。标记完成不算合并；已取消不算成功交付。')}
+            </p>
+            <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--text-primary)">
+              <li>{t('确认完成：进入已完成列，计为成功')}</li>
+              <li>{t('标记为已取消：进入已完成列并标「已取消」，不计为成功')}</li>
+              <li>{t('已开出的 PR 保持原状，不会自动合并')}</li>
+            </ul>
+          </>
+        )}
         <p className="m-0 text-xs leading-4 text-(--text-tertiary)">
           {t('取消则卡片留在原列。需要合入变更时，请改用卡片上的完成按钮。')}
         </p>

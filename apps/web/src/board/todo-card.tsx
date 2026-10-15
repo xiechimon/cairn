@@ -62,6 +62,8 @@ interface TodoCardProps {
  *  one at gray #9ea3ae). */
 function badgeFor(todo: TodoRecord): 'idle' | 'attention' | 'done' | 'failed' | null {
   if (todo.phase === 'done') return 'done';
+  // #1247 canceled shares the done column; no green check — chip below marks it.
+  if (todo.phase === 'closed') return null;
   // r8 55: the failed card's avatar carries the red `!` badge
   if (todo.phase === 'failed') return 'failed';
   if (todo.phase === 'confirm' || todo.phase === 'review' || todo.awaitingReply === true) {
@@ -216,6 +218,15 @@ export function TodoCard({
             className="ml-[10.5px] h-4 flex-none rounded-4xl border-border px-1.5 py-0 text-[10px] leading-none font-normal text-muted-foreground"
           >
             {t('由总管创建')}
+          </Badge>
+        )}
+        {todo.phase === 'closed' && (
+          <Badge
+            data-todo-canceled=""
+            variant="outline"
+            className="ml-[10.5px] h-4 flex-none rounded-4xl border-border px-1.5 py-0 text-[10px] leading-none font-normal text-muted-foreground"
+          >
+            {t('已取消')}
           </Badge>
         )}
         {/* #1261 等额度芯片（waiting_quota 挂起）：attention 底（todo-card 徽标
