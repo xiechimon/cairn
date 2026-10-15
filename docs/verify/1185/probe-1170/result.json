@@ -1,0 +1,166 @@
+{
+  "probe": "1170-skill-import",
+  "checks": [
+    {
+      "ok": true,
+      "label": "A2 导入弹窗开（topbar 钮，空态同样可达）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "A3 提交后弹窗关",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "A4 列表含导入技能（REST 读面）",
+      "detail": "id=my-live-skill desc=live 栈导入的本地技能 v1"
+    },
+    {
+      "ok": true,
+      "label": "A5 record 对拍（description）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "A6 文件清单对拍（SKILL.md + helper.md + scripts/run.sh）",
+      "detail": "SKILL.md,helper.md,scripts/run.sh"
+    },
+    {
+      "ok": true,
+      "label": "A7 文件内容对拍（helper.md 经 /file 读面）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "A8 盘上文件集对拍",
+      "detail": "SKILL.md,helper.md,scripts,scripts/run.sh"
+    },
+    {
+      "ok": true,
+      "label": "A9 来源记录（kind=localPath + realpath ref + importedAt）",
+      "detail": "{\"skillId\":\"my-live-skill\",\"kind\":\"localPath\",\"ref\":\"/workspace/.claude/verify-run/import-src/my-live-skill\",\"importedAt\":1791998300189,\"refreshedAt\":null}"
+    },
+    {
+      "ok": true,
+      "label": "A10 截图：导入后列表行",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "B1 弹窗再开（url 字段在位）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "B2 提交后弹窗关（真实拉取：repo meta + tree + 12 文件 raw）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "B3 列表含 GitHub 导入技能（id=pdf）",
+      "detail": "desc=Use this skill whenever the user wants t…"
+    },
+    {
+      "ok": true,
+      "label": "B4 文件清单 12 件对拍",
+      "detail": "12 files"
+    },
+    {
+      "ok": true,
+      "label": "B5 SKILL.md 内容对拍（frontmatter name: pdf）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "B6 来源记录（kind=github + canonical URL 含 ref）",
+      "detail": "{\"skillId\":\"pdf\",\"kind\":\"github\",\"ref\":\"https://github.com/anthropics/skills/tree/main/skills/pdf\",\"importedAt\":1791998300957,\"refreshedAt\":null}"
+    },
+    {
+      "ok": true,
+      "label": "B7 截图：两行导入技能",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "C1 手建技能（无来源记录）refresh → 409 说明",
+      "detail": "409: skill \"hand-made-skill\" has no recorded import source — only imported skills can be refreshed; import it again as a new skill instead"
+    },
+    {
+      "ok": true,
+      "label": "C2 refresh → 200 且 id 不变",
+      "detail": "200"
+    },
+    {
+      "ok": true,
+      "label": "C3 盘上内容更新（SKILL.md v2）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "C4 覆写语义（列出者覆写——helper.md v2）",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "C5 物化清单含导入技能（agent 白名单 ∩ 现扫）",
+      "detail": "selection=whitelist files=3"
+    },
+    {
+      "ok": true,
+      "label": "C6 源再改 + refresh → 200",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "label": "C7 refresh 后物化清单同 id 新 sha256（#920 新 digest 视图的根因）",
+      "detail": "id=my-live-skill sha 9dfa1e23→fb01a52d"
+    },
+    {
+      "ok": true,
+      "label": "C8 审计行（create×2 导入 + update×2 refresh，actor=member）",
+      "detail": "create:my-live-skill create:pdf update:my-live-skill update:my-live-skill"
+    },
+    {
+      "ok": true,
+      "label": "D1 SSRF 拒：http://127.0.0.1/skills/x",
+      "detail": "400: invalid url: only https URLs are supported, got http://127.0.0.1/skills/x"
+    },
+    {
+      "ok": true,
+      "label": "D1 SSRF 拒：https://192.168.1.5/acme/repo",
+      "detail": "400: refusing to import from a private or loopback host: 192.168.1.5 (https://192.168.1.5/acme/repo)"
+    },
+    {
+      "ok": true,
+      "label": "D1 SSRF 拒：https://internal.corp.example/acme/repo",
+      "detail": "400: unsupported host: only GitHub URLs are supported (https://github.com/<owner>/<repo>[/tree/<ref>/<subdir>]), got https://internal.corp.example/acme/repo"
+    },
+    {
+      "ok": true,
+      "label": "D2 localPath 落技能根内 → 400（已由 pacman 管理）",
+      "detail": "400: localPath /workspace/.claude/verify-run/home/skills/hand-made-skill resolves inside the pacman skills directory (/workspace/.claude/verify-run/home/skills) — it is already visible to pacman; import from a directory outside it"
+    },
+    {
+      "ok": true,
+      "label": "D3 二进制文件 → 400 点名（文本通道边界）",
+      "detail": "400: skill file is not valid UTF-8 text (binary files are not importable through this channel): logo.png"
+    },
+    {
+      "ok": true,
+      "label": "D4 超单文件上限 → 400 点名上限",
+      "detail": "400: skill file too large: big.txt is 512001 bytes (limit 512000)"
+    },
+    {
+      "ok": true,
+      "label": "D5 UI 错误行（headline + server 原文 detail）",
+      "detail": "来源未通过校验。 | invalid url: only https URLs are supported, got http://127.0.0.1:8787/skills/leak"
+    }
+  ],
+  "stack": {
+    "API": "http://127.0.0.1:8791",
+    "WEB": "http://127.0.0.1:5273",
+    "HOME": "/workspace/.claude/verify-run/home"
+  },
+  "stamp": "20261014-171818"
+}

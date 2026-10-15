@@ -149,8 +149,6 @@ async function setupWorld() {
   };
 }
 
-type World = Awaited<ReturnType<typeof setupWorld>>;
-
 describe('#1257 quota 挂起（done 面分类 + 挂起/续跑闭环）', () => {
   test('失败方式 1：quota 失败 → 挂起（pending + 机位清 + sessionId 续接面 + holdUntil 首档；零失败痕迹 + step pending 事件 + 等额度行）', async () => {
     const w = await setupWorld();

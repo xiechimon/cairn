@@ -329,13 +329,6 @@
     },
     {
       "file": "tags.md",
-      "kind": "data-attr",
-      "symbol": "[data-slot=\"badge\"]",
-      "line": 25,
-      "note": "badge.tsx 存在但未暴露 data-slot（registry 件里少数没有 slot 句柄的）；tags.md 的 e2e 面已改走 role/文案。"
-    },
-    {
-      "file": "tags.md",
       "kind": "class",
       "symbol": ".new-task-input",
       "line": 25

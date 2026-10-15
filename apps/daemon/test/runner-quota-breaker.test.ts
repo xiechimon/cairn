@@ -25,7 +25,6 @@ import type {
   ClaimedStep,
   MachineDoneBody,
   MachineStreamEvent,
-  ProviderConfig,
   SessionOpts,
   StepEvent,
   ToolCallRecord,

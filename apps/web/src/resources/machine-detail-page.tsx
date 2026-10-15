@@ -5,7 +5,7 @@
 // 原因）。
 
 import { useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { useApiMutations, useMachines, useMembers, useModelSources } from '../api/hooks.js';
 import { mapMachines, mapTeam, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
@@ -22,7 +22,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
-import { MACHINES_HREF } from './machines-page.js';
+import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
 import { ResourceShell } from './shell.js';
 
 export function MachineDetailPage() {
@@ -72,8 +72,8 @@ export function MachineDetailPage() {
       // 逐项处置回详情页/agent 编辑面）。
       if ((body.rejected?.length ?? 0) > 0) {
         toastError(
-          t('{n} 个 agent 未过校验留在原机', { n: body.rejected!.length }),
-          new Error(body.rejected!.map((r) => r.reason).join('；')),
+          t('{n} 个 agent 未过校验留在原机', { n: body.rejected?.length ?? 0 }),
+          new Error(body.rejected?.map((r) => r.reason).join('；')),
         );
       }
       navigate({ pathname: MACHINES_HREF, search });
@@ -139,6 +139,11 @@ export function MachineDetailPage() {
                   cap: machine.maxConcurrent,
                 })}
               </span>
+              {machine.concurrencySource !== undefined && (
+                <span data-concurrency-source={machine.concurrencySource}>
+                  {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
+                </span>
+              )}
             </>
           )}
         </div>

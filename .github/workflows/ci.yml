@@ -161,6 +161,25 @@ jobs:
       - name: Lint (biome ci)
         run: pnpm lint
 
+      # Lint warning cap ratchet (#1192): biome ci surfaces warnings in its
+      # summary but only exits non-zero on errors, so the warning count grows
+      # silently with each new code drop (#1180 alone shipped 7). This gate
+      # parses the "Found N warnings" summary line and compares to a frozen
+      # cap; over the cap is red, and the in-tree baseline cannot sit higher
+      # than the base's baseline (so a PR can't lift its own ceiling — same
+      # D3 mechanism as ui-debt-gate.mjs). Cap is pinned in
+      # scripts/lint-warning-baseline.json and may only move down; re-freeze
+      # with `node scripts/lint-warning-cap.mjs --write` after clearing debt
+      # in a PR. Needs npx + node_modules for biome itself.
+      - name: Lint warning cap gate (#1192)
+        env:
+          LINT_WARNING_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$LINT_WARNING_BASE_SHA" ]; then
+            git fetch --depth=1 origin "$LINT_WARNING_BASE_SHA"
+          fi
+          node scripts/lint-warning-cap.mjs
+
       # UI 漂移闸（#851；#1012 封版裁决：保留为永久闸）：单一样式只许一种
       # 实现——活 `.btn` 选择子、token 源之外的 hex 字面量、chip 变体异地
       # 重定义、无 deliberate-native 标记的裸 `<input>`、components/ui 内

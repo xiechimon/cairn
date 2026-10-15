@@ -214,7 +214,12 @@ test('live: review(有变更)→已完成 开 done 闸，取消 = 零 PATCH、�
     page.locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`),
   ).toBeVisible();
 
-  await doneDialog(page).getByRole('button', { name: '取消' }).click();
+  // footer 锚定 dismiss（关闭）：DialogShell 右上角 X 钮 aria-label 同为
+  // 「关闭」，dialog 级按名取钮会双命中（strict mode）。
+  await doneDialog(page)
+    .getByTestId('dialog-foot')
+    .getByRole('button', { name: '关闭' })
+    .click();
   await expect(doneDialog(page)).toBeHidden();
   expect(stub.patches, '取消路径不得发任何 PATCH').toEqual([]);
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('1');

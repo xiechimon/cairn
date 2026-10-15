@@ -1,0 +1,14 @@
+[
+  {
+    "url": "/api/machines/-_VSwYIVSsaF4vCDNXvZh",
+    "body": {
+      "maxConcurrent": null
+    }
+  },
+  {
+    "url": "/api/machines/-_VSwYIVSsaF4vCDNXvZh",
+    "body": {
+      "maxConcurrent": 8
+    }
+  }
+]

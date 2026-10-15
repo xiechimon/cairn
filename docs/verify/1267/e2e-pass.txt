@@ -1,0 +1,41 @@
+E2E_PORT=8398 pnpm exec playwright test e2e/chief-toggle-flash.spec.ts e2e/escape-wiring.spec.ts e2e/hotkeys.spec.ts --reporter=line
+
+Running 36 tests using 2 workers
+
+[1/36] e2e/chief-toggle-flash.spec.ts:100:3 › chief ⌘J toggle does not flash (#1266) › second ⌘J minimizes without an opacity repaint or remount
+[2/36] e2e/escape-wiring.spec.ts:76:1 › 开着的层不被重渲染重挂 Escape 接线：URL 写回后单次 Escape 仍收层
+[3/36] e2e/escape-wiring.spec.ts:135:1 › 确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层
+[4/36] e2e/hotkeys.spec.ts:229:1 › C on the board opens the new-task dialog; ⌘C and the retired N do not
+[5/36] e2e/chief-toggle-flash.spec.ts:126:3 › chief ⌘J toggle does not flash (#1266) › summon-then-minimize cycle twice: node identity holds, zero opacity transitions
+[6/36] e2e/hotkeys.spec.ts:249:1 › sidebar 新任务 row carries the C badge and click-opens the dialog
+[7/36] e2e/hotkeys.spec.ts:260:1 › C on a non-board route opens the dialog in place
+[8/36] e2e/hotkeys.spec.ts:270:1 › C on the project page opens the page’s own dialog (route project chip)
+[9/36] e2e/hotkeys.spec.ts:285:1 › Space no longer opens the drawer; ⌘J does, composer focused, default consumed
+[10/36] e2e/hotkeys.spec.ts:325:1 › ⌘J wakes the chief drawer on a non-board route
+[11/36] e2e/hotkeys.spec.ts:335:1 › editable focus swallows C and ⌘J — the c lands IN the input
+[12/36] e2e/hotkeys.spec.ts:353:1 › textarea focus (chief composer) swallows C
+[13/36] e2e/hotkeys.spec.ts:367:1 › Space on a focused button activates it natively; ⌘J fires past button focus
+[14/36] e2e/hotkeys.spec.ts:402:1 › ⌘J toggles: the second press closes the drawer from its own composer focus
+[15/36] e2e/hotkeys.spec.ts:422:1 › ⌘J toggle rides the non-board singleton hook too (schedules)
+[16/36] e2e/hotkeys.spec.ts:431:1 › FAB click stays open-only; ⌘J closes what the click opened
+[17/36] e2e/hotkeys.spec.ts:446:1 › the robot FAB surfaces the ⌘J hint on hover; at rest it stays hidden
+[18/36] e2e/hotkeys.spec.ts:462:1 › a wake-family route carries the same ⌘J hint (single root FAB)
+[19/36] e2e/hotkeys.spec.ts:477:1 › the collapsed rail search icon hovers the ⌘K hint
+[20/36] e2e/hotkeys.spec.ts:490:1 › the drawer new-thread + hovers the N hint and advertises aria-keyshortcuts
+[21/36] e2e/hotkeys.spec.ts:507:1 › with the drawer closed, N stays retired — neither drawer nor dialog opens
+[22/36] e2e/hotkeys.spec.ts:552:1 › ⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, dialog closes)
+[23/36] e2e/hotkeys.spec.ts:571:1 › with the dialog closed, ⌘↵ on the board lands nothing
+[24/36] e2e/hotkeys.spec.ts:587:1 › ⌘↵ with an empty spec creates nothing (the button gate holds on the chord)
+[25/36] e2e/hotkeys.spec.ts:602:1 › ⌘↵ under the 未保存闸 confirm layer saves nothing (the layer owns the screen)
+[26/36] e2e/hotkeys.spec.ts:626:1 › plain ↵ in the spec textarea stays the newline key — no hijack
+[27/36] e2e/hotkeys.spec.ts:638:1 › the 保存并开始 button carries a visible ⌘↵ badge at rest
+[28/36] e2e/hotkeys.spec.ts:649:1 › Tab cycles the dialog’s project chip from the composer focus
+[29/36] e2e/hotkeys.spec.ts:676:1 › the chip cycles on Tab while the list is open; Shift+Tab keeps native movement
+[30/36] e2e/hotkeys.spec.ts:707:1 › Tab off the driving seats stays native (mention button keeps its own walk)
+[31/36] e2e/hotkeys.spec.ts:726:1 › the project chip hovers its Tab hint (hidden at rest)
+[32/36] e2e/hotkeys.spec.ts:741:1 › Tab cycles nothing while the 未保存闸 confirm layer is up (that layer owns the keyboard)
+[33/36] e2e/hotkeys.spec.ts:769:1 › with the dialog closed Tab stays native
+[34/36] e2e/hotkeys.spec.ts:791:3 › #1141 suppression retired › agent detail renders the FAB; ⌘J wakes the drawer in place
+[35/36] e2e/hotkeys.spec.ts:802:3 › #1141 suppression retired › machine authorize renders the FAB; ⌘J wakes the drawer in place
+[36/36] e2e/hotkeys.spec.ts:813:3 › #1141 suppression retired › the window opened on the authorize page survives the route back
+  36 passed (28.4s)

@@ -1,0 +1,27 @@
+[
+  {
+    "name": "A1 编辑后点 恢复推荐：只发 1 次 PATCH，body = {maxConcurrent:null}",
+    "ok": true,
+    "detail": "[{\"url\":\"/api/machines/-_VSwYIVSsaF4vCDNXvZh\",\"body\":{\"maxConcurrent\":null}}]"
+  },
+  {
+    "name": "A2 API：overridden=false、maxConcurrent=推荐 12、source=measured",
+    "ok": true,
+    "detail": "{\"name\":\"fix-manual\",\"maxConcurrent\":12,\"maxConcurrentOverridden\":false,\"concurrencySource\":\"measured\",\"concurrencyRange\":{\"min\":1,\"max\":16}}"
+  },
+  {
+    "name": "C1 编辑 7 后点 +：只发 1 次 PATCH，body = {maxConcurrent:8}",
+    "ok": true,
+    "detail": "[{\"url\":\"/api/machines/-_VSwYIVSsaF4vCDNXvZh\",\"body\":{\"maxConcurrent\":8}}]"
+  },
+  {
+    "name": "B1 未编辑的超区间值 12：聚焦+失焦+Esc 不发 PATCH",
+    "ok": true,
+    "detail": "[]"
+  },
+  {
+    "name": "B2 API 仍为 12 手动（未被夹到 8）",
+    "ok": true,
+    "detail": "{\"name\":\"fix-out-of-range\",\"maxConcurrent\":12,\"maxConcurrentOverridden\":true,\"concurrencySource\":\"manual\",\"concurrencyRange\":{\"min\":1,\"max\":8}}"
+  }
+]

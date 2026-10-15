@@ -1,18 +1,19 @@
 // Chief surface wiring (issue #129): the view state + live-data block the
 // board route carried inline, lifted into one hook so every shell family
 // (board / pages / resources / secondary / detail) drives the same drawer
-// from its FAB. The hook owns the three-state view (`none | drawer |
-// settings` — the settings swap stays a board-route render decision), the
+// from its FAB. The three-state view (`none | drawer | settings`) lives in
+// the gesture machine. The settings swap stays a board-route render
+// decision. The hook still owns the
 // live envelope/threads/messages queries, the conversation SSE while the
 // drawer is open, the unread badge count and the send/thread callbacks.
 // #631 失败反馈也归它：发送/恢复/PATCH 被拒 + 回合异步失败 → toast（sonner）。
 // Fixture mode stays fully inert (queries enabled = live), so fixture
 // captures keep their zero-request guarantee.
-// #389/#442/#468: the ⌘J hotkey joins the wake path as the FAB's keyboard
-// cousin — a toggle (open ↔ close) while the FAB click stays open-only;
-// the editable-outside-drawer guard lives in overlays/hotkeys. Every page
-// runs exactly one instance of this hook, so the listener stays a
-// singleton per route.
+// #389/#442/#468: ⌘J joins the wake path as the FAB's keyboard cousin.
+// The toggle, the FAB open, and Minimize are events on the gesture machine
+// (#1267). The editable-outside-drawer guard still lives in overlays/hotkeys.
+// This hook is the one chief instance for the app, so it installs the
+// machine's key listener.
 
 import type { AskUserAnswer, TranscriptRow } from '@pacman/shared';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
@@ -34,11 +35,17 @@ import { toastError } from '../components/ui/toaster.js';
 import { chiefDefault } from '../fixtures/fixtures.js';
 import type { ChiefContent, FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { useChiefToggleHotkey } from '../overlays/hotkeys.js';
+import {
+  type ChiefView,
+  ensureGestureKeys,
+  type GestureEvent,
+  getGestureStore,
+} from '../overlays/gesture-machine.js';
 
 /** One three-state view: drawer and settings are mutually exclusive by
- *  construction (r5: the gear swaps the drawer for the full-content view). */
-export type ChiefView = 'none' | 'drawer' | 'settings';
+ *  construction (r5: the gear swaps the drawer for the full-content view).
+ *  The value lives in the gesture machine (#1267). */
+export type { ChiefView };
 
 export interface ChiefSurface {
   chiefView: ChiefView;
@@ -107,9 +114,23 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   const chief = fixture.chief;
   // 初始视图（ADR 0013 D5）：fixture 捕获形（scenario 的 chief.view）优先
   // ——dev/capture 面零存储读取；live 面回落持久化开态（默认关）。
-  const [chiefView, setChiefView] = useState<ChiefView>(
-    () => chief?.view ?? (live && readStoredChiefOpen() ? 'drawer' : 'none'),
+  // 之后的开合只经 gesture machine，本 hook 不再持有一份 useState。
+  const initialChief: ChiefView =
+    chief?.view ?? (live && readStoredChiefOpen() ? 'drawer' : 'none');
+  getGestureStore(initialChief);
+  const chiefView = useSyncExternalStore(
+    (listener) => getGestureStore().subscribe(listener),
+    () => getGestureStore().getState().chief,
+    () => getGestureStore().getState().chief,
   );
+  const setChiefView = useCallback((view: ChiefView) => {
+    const type: GestureEvent['type'] =
+      view === 'none' ? 'chief/minimize' : view === 'settings' ? 'chief/settings' : 'chief/open';
+    getGestureStore().dispatch({ type });
+  }, []);
+  useEffect(() => {
+    ensureGestureKeys();
+  }, []);
   const chiefViewOpen = chiefView === 'drawer';
   // 开态持久化写入（live 面专属；幂等，StrictMode 双跑无害）。settings
   // 视图落 '0'——它是 board 路由的内容交换态，不是窗的开态。
@@ -121,17 +142,8 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
       // Storage 不可用（隐私模式）——持久化静默降级，会话内行为不变
     }
   }, [live, chiefView]);
-  // #389/#442/#468: ⌘J = toggle，再按一次收起（根 layout 单实例常驻，
-  //  ADR 0013 D6——监听随实例全局唯一；守卫归 hotkeys 模块——drawer 外
-  //  输入态不误触，drawer 内豁免，否则和弦关不上自己打开的面）。开后焦点
-  //  落草稿框（drawer 的 autofocus 律，首开限 closed→open 迁移——
-  //  MUL-5522 同律，持久化开态的加载不抢焦点）。settings 面按 ⌘J 同样换到
-  //  drawer（三态单值，drawer 与 settings 本就互斥）。
-  const toggleDrawer = useCallback(
-    () => setChiefView((prev) => (prev === 'drawer' ? 'none' : 'drawer')),
-    [],
-  );
-  useChiefToggleHotkey(toggleDrawer);
+  // ⌘J 的开关在 gesture machine。开后焦点落草稿框（drawer 的 autofocus
+  // 律，首开限 closed→open 迁移。持久化开态的加载不抢焦点）。
 
   // —— chief live 面（r5 §2/§3.6）：envelope + threads + 活动线程消息 +
   // 会话流订阅；发送 = POST threads / conversations messages。——
@@ -160,7 +172,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
       setChiefView('drawer');
     }
     onDeepLinkConsumed?.();
-  }, [live, deepLinkId, chiefThreadsQ.isSuccess, liveThreads, onDeepLinkConsumed]);
+  }, [live, deepLinkId, chiefThreadsQ.isSuccess, liveThreads, onDeepLinkConsumed, setChiefView]);
   const chiefMessagesQ = useMessages(live ? (activeThread?.id ?? null) : null, live);
   // #631 失败闭环（异步半）：chief_turn_error 行经会话流 message 事件到达
   // → 即时 toast；持久行由该事件的 messages 失效重取渲染（mapChiefStream

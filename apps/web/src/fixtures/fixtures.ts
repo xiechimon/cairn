@@ -13,6 +13,7 @@ export {
   agentDelete,
   agentDetail,
   agentDetailActive,
+  agentDetailLongModels,
   agentDetailMemory,
   agentDetailSecrets,
   agentLongRole,
@@ -143,4 +144,11 @@ export {
   schedulesFormOnce,
   schedulesList,
 } from './schedules.js';
-export { TEAM_R7, teamGrid, teamOrgChart, teamOrgChartEmpty } from './team.js';
+export {
+  TEAM_R7,
+  teamGrid,
+  teamOrgChart,
+  teamOrgChartEmpty,
+  teamOrgChartPair,
+  teamOrgChartSingle,
+} from './team.js';

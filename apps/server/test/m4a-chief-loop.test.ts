@@ -6,7 +6,6 @@
 // 判定：协议环逐字段对拍（02 §4.3/§5.4 + r5 §3.1/§3.2/§3.5）；策略层文本由
 // LLM 侧产，此处以 relay params 直投模拟（黑盒逼近，04 §1 A4）。
 
-import { rmSync } from 'node:fs';
 import type { ClaimedStep } from '@pacman/shared';
 import { CHIEF_TOOL_COUNT, claimedStepSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';

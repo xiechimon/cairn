@@ -40,7 +40,7 @@ import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/servic
 import { sweepAbandonedChiefSteps } from '../src/services/chief.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { toTodoRecord } from '../src/services/todos.js';
-import { bootServer, postProject, type TestServer } from './helpers.js';
+import { bootServer, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {

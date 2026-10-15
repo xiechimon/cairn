@@ -1,14 +1,19 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 // #1255: opening a card and coming back drops the column list to the top.
 // The scrolling element is [data-column-list] (overflow-y: auto). The
 // board scroller is overflow-y: hidden and does not carry this offset.
 // Leaving the board unmounts it, so the offset has to be restored on the
-// way back. Esc, back, and forward must all land on the scrollTop the
-// click left behind, and the card that was open stays inside the list
-// viewport. The click itself can clamp scrollTop by a pixel when the
-// list's scrollHeight shrinks, so the expected offset is read after the
-// click, not before it.
+// way back. Esc, back, and forward must all land on the scroll position
+// the click left behind, and the card that was open stays inside the list
+// viewport.
+// #1331: twelve cards at 94.5px, eleven 8px gaps, and 2px of padding sum
+// to 1224, so the settled max scrollTop is 600 when clientHeight is 624.
+// Chromium sometimes reports scrollHeight 1225 in the click turn, and the
+// integer read there is 601. The connected list then clamps to 600 before
+// unmount, and restore writes 600 back. The expected value is that clamped
+// max, min(leftAt, scrollHeight - clientHeight). Equality is exact: a
+// restore to any other offset still fails.
 const OVERFLOW = '/app?scenario=board-overflow';
 const list = (page: Page) => page.locator('[data-column-list="todo"]');
 
@@ -38,22 +43,37 @@ test('detail round trip keeps the column scroll position', async ({ page }) => {
 
   await page.keyboard.press('Escape');
   await page.waitForSelector('[data-route="board"]');
-  await expect.poll(async () => column.evaluate((el) => el.scrollTop)).toBe(leftAt);
+  await expectRestoredScroll(column, leftAt);
   expect(await cardInList(page, id)).toBe(true);
 
   await page.goBack();
   await page.waitForSelector('[data-route="todo-detail"]');
   await page.goBack();
   await page.waitForSelector('[data-route="board"]');
-  await expect.poll(async () => column.evaluate((el) => el.scrollTop)).toBe(leftAt);
+  await expectRestoredScroll(column, leftAt);
 
   await page.goForward();
   await page.waitForSelector('[data-route="todo-detail"]');
   await page.goForward();
   await page.waitForSelector('[data-route="board"]');
-  await expect.poll(async () => column.evaluate((el) => el.scrollTop)).toBe(leftAt);
+  await expectRestoredScroll(column, leftAt);
   expect(await cardInList(page, id)).toBe(true);
 });
+
+async function expectRestoredScroll(column: Locator, leftAt: number): Promise<void> {
+  await expect
+    .poll(async () => {
+      const reading = await column.evaluate((el, want) => {
+        const max = Math.max(0, el.scrollHeight - el.clientHeight);
+        const stable = Math.min(want, max);
+        return [el.scrollTop, stable];
+      }, leftAt);
+      expect(reading, 'column scrollTop, settled max').toEqual([reading[1], reading[1]]);
+      expect(reading[0]).toBeGreaterThan(200);
+      return reading[0];
+    })
+    .toBeGreaterThan(200);
+}
 
 async function cardInList(page: Page, todoId: string): Promise<boolean> {
   return page.evaluate((id) => {

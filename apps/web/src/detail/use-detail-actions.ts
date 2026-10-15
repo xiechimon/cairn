@@ -48,7 +48,6 @@ export function useDetailActions(input: DetailActionsInput) {
     buildId,
     steps,
     members,
-    machines,
     mutations,
     navigate,
     setOverlay,

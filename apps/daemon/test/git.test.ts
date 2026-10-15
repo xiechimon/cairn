@@ -10,15 +10,18 @@
 //   5. auth 失败 = 确定性失败：withGitNetRetries 不再对它烧 6s 重试预算
 
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 import {
   type GitFallbackReason,
   gitCredentialEnv,
+  gitPrim,
   isGitAuthFailure,
   machineGitEnv,
+  runGit,
+  runGitOk,
   withGitCredentialFallback,
   withGitNetRetries,
 } from '../src/git.js';
@@ -256,5 +259,77 @@ describe('withGitCredentialFallback — 凭据序 integration 先行、machine �
     });
     expect(source).toBe('machine');
     expect(calls).toEqual([null]);
+  });
+});
+
+describe('runGit — 信号终止不当作成功（#1329）', () => {
+  // hash-object --stdin 要等 stdin 关闭才返回；超时后被 SIGTERM 杀掉，退出码为 null。
+  const STDIN_BLOCKED = { timeoutMs: 200 };
+
+  test('runGit 保留 null 退出码（信号终止），不映射为 0', async () => {
+    const r = await runGit(['hash-object', '--stdin'], STDIN_BLOCKED);
+    expect(r.code).toBeNull();
+  });
+
+  test('runGitOk 对信号终止抛错，错误文案点名信号', async () => {
+    await expect(runGitOk(['hash-object', '--stdin'], STDIN_BLOCKED)).rejects.toThrow(
+      'failed (signal SIGTERM)',
+    );
+  });
+});
+
+// #1316：git 2.43 的 reset 把 `--end-of-options` 留在 argv 里（PARSE_OPT_KEEP_DASHDASH），
+// verify_filename 对 `-` 开头直接退出 128，checkpoint 恢复到不了目标提交。
+// 选项形 revision（`--soft`）也不能被当成 reset 的模式旗标吃掉。
+
+function gitOk(dir: string, args: string[]): string {
+  const res = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+  if (res.status !== 0) {
+    throw new Error(res.stderr || res.stdout || `git ${args[0]} failed`);
+  }
+  return (res.stdout ?? '').trim();
+}
+
+function dirtyRepo(objectFormat?: 'sha256'): { dir: string; sha: string } {
+  const dir = mkdtempSync(join(tmpdir(), 'pacman-reset-hard-'));
+  const init = ['init', '-b', 'main'];
+  if (objectFormat) init.push('--object-format=sha256');
+  gitOk(dir, init);
+  gitOk(dir, ['config', 'user.email', 't@example.com']);
+  gitOk(dir, ['config', 'user.name', 't']);
+  writeFileSync(join(dir, 'README.md'), 'seed\n');
+  gitOk(dir, ['add', 'README.md']);
+  gitOk(dir, ['commit', '-m', 'seed']);
+  const sha = gitOk(dir, ['rev-parse', 'HEAD']);
+  writeFileSync(join(dir, 'README.md'), 'corrupted\n');
+  return { dir, sha };
+}
+
+describe('resetHard — git 2.43 拒绝 reset --end-of-options（#1316）', () => {
+  test('跟踪文件恢复到目标提交', async () => {
+    const { dir, sha } = dirtyRepo();
+    await gitPrim.resetHard(dir, sha);
+    expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('seed\n');
+    expect(gitOk(dir, ['rev-parse', 'HEAD'])).toBe(sha);
+  });
+
+  test('sha256 对象 id 同样恢复', async () => {
+    const { dir, sha } = dirtyRepo('sha256');
+    expect(sha).toMatch(/^[0-9a-f]{64}$/);
+    await gitPrim.resetHard(dir, sha);
+    expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('seed\n');
+    expect(gitOk(dir, ['rev-parse', 'HEAD'])).toBe(sha);
+  });
+
+  test('选项形 revision 不改工作区', async () => {
+    const { dir } = dirtyRepo();
+    await expect(gitPrim.resetHard(dir, '--soft')).rejects.toThrow();
+    expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('corrupted\n');
+  });
+
+  test('不存在的 revision 不改工作区', async () => {
+    const { dir } = dirtyRepo();
+    await expect(gitPrim.resetHard(dir, 'does-not-exist')).rejects.toThrow();
+    expect(readFileSync(join(dir, 'README.md'), 'utf8')).toBe('corrupted\n');
   });
 });

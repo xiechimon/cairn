@@ -42,7 +42,11 @@ import {
   openGithubToken,
   readGithubConnectionStatus,
 } from './services/github-connection.js';
-import { machineRunningCount, toMachineRecord } from './services/machines.js';
+import {
+  machineConcurrencyPatch,
+  machineRunningCount,
+  toMachineRecord,
+} from './services/machines.js';
 import { listMcpServers } from './services/mcp-servers.js';
 import { mergedCatalogModels, refreshAllRelayCatalogs } from './services/model-liveness.js';
 import {
@@ -162,7 +166,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const patch = {
       ...(body.enabledRuntimes !== undefined ? { enabledRuntimes: body.enabledRuntimes } : {}),
       ...(body.shellEnabled !== undefined ? { shellEnabled: body.shellEnabled } : {}),
-      ...(body.maxConcurrent !== undefined ? { maxConcurrent: body.maxConcurrent } : {}),
+      ...(body.maxConcurrent !== undefined ? machineConcurrencyPatch(row, body.maxConcurrent) : {}),
     };
     // 全字段缺省 = no-op PATCH（空 set 是非法 SQL，且无变更可写）。
     if (Object.keys(patch).length > 0) {

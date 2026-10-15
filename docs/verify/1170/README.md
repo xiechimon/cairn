@@ -4,7 +4,7 @@
 - 运行日：2026-10-10（栈 = worktree live 栈，server 8795 / vite 5277 / 独立
   `PACMAN_HOME` scratch；server 以 `NODE_USE_ENV_PROXY=1` 启动——出站 GitHub
   走本机代理，`lib/github.ts` 头注记录的部署形态）
-- 判读：`result.json` checks 30/30 全 PASS；红态面（D 组）为真拒绝，非模拟。
+- 判读：`result.json` checks 31/31 全 PASS，每条 `ok` 是布尔；红态面（D 组）为真拒绝，非模拟。
 
 | 组 | 覆盖 | 关键真值 |
 |---|---|---|

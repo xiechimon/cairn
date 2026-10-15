@@ -677,6 +677,112 @@ describe('#1250 split_todo（层 2）', () => {
       true,
     );
   });
+
+  test('failed child manual done does not start the next wave (#1247)', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    await call(w.s.app, 'POST', `/api/builds/${result.parentBuildId}/steps`, {
+      body: { action: 'confirm' },
+    });
+    const childA = result.children[0]!.id;
+    const childB = result.children[1]!.id;
+    w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, childA)).run();
+    const res = await call(w.s.app, 'PATCH', `/api/todos/${childA}`, { body: { phase: 'done' } });
+    expect(res.status).toBe(200);
+    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, childA)).get()!.phase).toBe(
+      'done',
+    );
+    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, childB)).get()!.phase).toBe(
+      'todo',
+    );
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.todoId, childB)).all(),
+    ).toHaveLength(0);
+    expect(w.todoRow().phase).toBe('building');
+  });
+
+  test('failed child manual done still closes the parent when every sibling is done (#1247)', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    await call(w.s.app, 'POST', `/api/builds/${result.parentBuildId}/steps`, {
+      body: { action: 'confirm' },
+    });
+    const childA = result.children[0]!.id;
+    const childB = result.children[1]!.id;
+    w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, childB)).run();
+    w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, childA)).run();
+    const res = await call(w.s.app, 'PATCH', `/api/todos/${childA}`, { body: { phase: 'done' } });
+    expect(res.status).toBe(200);
+    expect(w.todoRow().phase).toBe('done');
+  });
+
+  test('review child manual done still starts the next wave (#1247)', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    await call(w.s.app, 'POST', `/api/builds/${result.parentBuildId}/steps`, {
+      body: { action: 'confirm' },
+    });
+    const childA = result.children[0]!.id;
+    const childB = result.children[1]!.id;
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, childA)).run();
+    const res = await call(w.s.app, 'PATCH', `/api/todos/${childA}`, { body: { phase: 'done' } });
+    expect(res.status).toBe(200);
+    expect(w.s.db.select().from(todoTable).where(eq(todoTable.id, childB)).get()!.phase).toBe(
+      'queued',
+    );
+  });
+
+  test('manual done leaves the pending step running (#1247)', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    const buildId = await w.startBuild({ plan: null, build: { agentId: implementerId } });
+    const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'done' } });
+    expect(res.status).toBe(200);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.stepsOf(buildId).some((s) => s.kind === 'build' && s.status === 'pending')).toBe(true);
+  });
 });
 
 describe('#1259 persona 归属机（seeding × 绑定模型桥接）', () => {

@@ -41,13 +41,25 @@ export const machineRecordSchema = z.object({
    * migration 回填）——「机器 shell 权限改动秒级热加载」由每调用预检兑现
    * （POST /api/machine/shell/{stepId} 复读本列，非 claim 期一次闸）。 */
   shellEnabled: z.boolean(),
-  /** 机器并发上限（#1108）：该机同时执行的 worker 步数 N——server claim 闸 +
-   * daemon 本地闸双侧消费；超过 N 的 worker 步留 pending（排队）。#1148 起
-   * chief 步不受本值约束（不占槽：满载 worker 时 chief 照领、runningSteps
-   * 不计 chief）。DB NOT NULL 默认 3（历史值 0000 migration 同数）。optional
-   * 形 = 加法契约：老 server 响应缺该字段，消费方回退（daemon 的本地闸按
-   * 1 串行，web 不渲染并发面）；server 恒发全块。 */
+  /** 机器并发上限（#1108）：该机同时执行的步数 N——server claim 闸 +
+   * daemon 本地闸双侧消费；超过 N 的步留 pending（排队）。#1241 起未覆盖时
+   * 本值是 server 按能力指纹算的推荐值（见 concurrencySource）；用户改过
+   * 则以用户值为准。DB NOT NULL 默认 3。optional 形 = 加法契约：老 server
+   * 响应缺该字段，消费方回退（daemon 的本地闸按 1 串行，web 不渲染并发面）；
+   * server 恒发全块。 */
   maxConcurrent: z.number().int().optional(),
+  /** #1241：true = 用户写过 maxConcurrent，心跳不再用推荐值覆盖。缺席 =
+   *  老 server（web 不标手动/自动）。 */
+  maxConcurrentOverridden: z.boolean().optional(),
+  /** #1241：按当前硬件算出的推荐值（覆盖时也发，恢复自动回到这个数）。
+   *  无硬件 = 保守默认。缺席 = 老 server。 */
+  recommendedConcurrent: z.number().int().optional(),
+  /** #1241：选择器可选区间（按总内存；无指纹 = 1..8）。PATCH 写域仍是 1..16。
+   *  缺席 = 老 server（web 退回 1..8）。 */
+  concurrencyRange: z.object({ min: z.number().int(), max: z.number().int() }).optional(),
+  /** #1241：manual = 用户覆盖；measured = 推荐值来自硬件；estimate = 没有
+   *  可用指纹，maxConcurrent 是保守默认。缺席 = 老 server。 */
+  concurrencySource: z.enum(['measured', 'estimate', 'manual']).optional(),
   /** 该机当前 claimed 非 chief 步数（#1108 排队可见的机器面读数，`执行中 n/N`
    * n；#1148 起 chief 在跑不进 n——n 恒 ≤ N）：读侧派生（listSteps/claim
    * 时点计数），不落库。optional 形同 maxConcurrent——老 server 缺席时机器
@@ -66,11 +78,12 @@ export type MachineRecord = z.infer<typeof machineRecordSchema>;
  * XMON-108 R1 起两字段各自可选、缺省 = 不动（undefined ≠ 清空/重置）——
  * 单字段 PATCH（如 R3 机器页只翻 shellEnabled）不再被迫读改写另一字段。
  * #1108 maxConcurrent：并发上限写位（值域 1..16，越界 400；下调不抢占在
- * 飞步——两侧闸只挡新认领），缺省 = 不动。 */
+ * 飞步——两侧闸只挡新认领），缺省 = 不动。#1241：数字 = 手动覆盖并持久；
+ * null = 清除覆盖，回到推荐值（无指纹则保守默认）。 */
 export const patchMachineBodySchema = z.object({
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   shellEnabled: z.boolean().optional(),
-  maxConcurrent: z.number().int().min(1).max(16).optional(),
+  maxConcurrent: z.number().int().min(1).max(16).nullable().optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
 

@@ -128,9 +128,9 @@ const AGENT_NAME_CLS = 'agent-name h-auto justify-start p-0 text-left font-norma
 const AGENT_ICON_EDIT_CLS = 'text-muted-foreground';
 
 /** 名称/职责编辑器：Input/Textarea 件默认形态（手写 border/card 皮肤、15px
- *  档与 13px 墨退役，focus 环归件默认 ring-3 #855 收敛律；field-sizing-content
- *  自增长即件正典）。别名类 agent-name-input / agent-role-input 零引用，随
- *  #1036 终摘——e2e 锚走两编辑器的 id。 */
+ *  档与 13px 墨退役。#1244：focus 环是全局 2px --focus-ring outline；
+ *  field-sizing-content 自增长即件正典）。别名类 agent-name-input /
+ *  agent-role-input 零引用，随 #1036 终摘——e2e 锚走两编辑器的 id。 */
 
 /** 进行中任务行：ghost 件默认形态（hover 涂底归件）+ 整块行钮布局位
  *  （h-auto 行高由内容定）。 */
@@ -147,7 +147,7 @@ function machineFitHint(m: AgentMachineFitRow, t: TFunc): string {
   if (m.missing !== null && m.missing.length > 0) {
     return t('缺 {missing}（在该机装齐即解锁）', { missing: m.missing.join('、') });
   }
-  if (m.missing === null) return t('能力快照未上报（旧版 daemon）——按可跑放行');
+  if (m.missing === null) return t('能力快照未上报——按可跑放行');
   if (m.mcpGaps !== null && m.mcpGaps.length > 0) {
     return t('可跑；声明的 MCP 缺 {gaps}（执行时跳过）', { gaps: m.mcpGaps.join('、') });
   }
@@ -883,7 +883,7 @@ export function AgentDetailPage() {
               <h3 className="m-0 text-sm font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={PROFILE_HINT_CLS}>
                 {t(
-                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。',
+                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。',
                 )}
               </p>
               {mcpOptions.length === 0 ? (

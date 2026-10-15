@@ -1,0 +1,115 @@
+{
+  "probe": "drive-1241-recommended-concurrency",
+  "expect": "new",
+  "server": "http://127.0.0.1:8796",
+  "web": "http://127.0.0.1:5278",
+  "host": {
+    "cpuCores": 8,
+    "memoryTotalMb": 16002,
+    "expectedRecommended": 7
+  },
+  "passed": 20,
+  "total": 20,
+  "checks": [
+    {
+      "name": "A0 data-concurrency-source = measured",
+      "ok": true,
+      "detail": "got measured"
+    },
+    {
+      "name": "A1 真 daemon 指纹上报后控件标「推荐」（measured）",
+      "ok": true,
+      "detail": "text=并发7推荐"
+    },
+    {
+      "name": "A2 API recommendedConcurrent = 公式(os 核数, os 总内存)",
+      "ok": true,
+      "detail": "api=7 formula=min(8, floor(16002/2048))→7"
+    },
+    {
+      "name": "A3 daemon 上报核数 = os.cpus().length",
+      "ok": true,
+      "detail": "daemon=8 os=8"
+    },
+    {
+      "name": "A4 daemon 上报总内存 = floor(os.totalmem()/MiB)",
+      "ok": true,
+      "detail": "daemon=16002 os=16002"
+    },
+    {
+      "name": "A5 初始态未覆盖：overridden=false，maxConcurrent 跟随推荐值",
+      "ok": true,
+      "detail": "overridden=false maxConcurrent=7"
+    },
+    {
+      "name": "B1 依据弹层：核数与总内存 GiB 与 os 一致（总内存口径，非可用内存）",
+      "ok": true,
+      "detail": "text=推荐 7依据：核 8 · 总内存 15.6 GiB · 负载 1.01"
+    },
+    {
+      "name": "C0 data-concurrency-source = manual",
+      "ok": true,
+      "detail": "got manual"
+    },
+    {
+      "name": "C1 选数即标「手动」（UI）",
+      "ok": true,
+      "detail": "text=并发4手动"
+    },
+    {
+      "name": "C2 API：maxConcurrent=4、overridden=true、推荐值仍为公式值",
+      "ok": true,
+      "detail": "maxConcurrent=4 overridden=true recommended=7"
+    },
+    {
+      "name": "C3 SQLite 行：maxConcurrent=4、maxConcurrentOverridden=1",
+      "ok": true,
+      "detail": "maxConcurrent=4 overridden=1"
+    },
+    {
+      "name": "C4 心跳后覆盖值保持：maxConcurrent 仍为 4（心跳已到达：lastSeenAt 前进）",
+      "ok": true,
+      "detail": "maxConcurrent=4 lastSeenAt 1792009547866→1792009577894"
+    },
+    {
+      "name": "D0 data-concurrency-source = measured",
+      "ok": true,
+      "detail": "got measured"
+    },
+    {
+      "name": "D1 恢复推荐后标「推荐」，值回到公式值（UI）",
+      "ok": true,
+      "detail": "text=并发7推荐"
+    },
+    {
+      "name": "D2 API：overridden=false、maxConcurrent 回到公式值",
+      "ok": true,
+      "detail": "overridden=false maxConcurrent=7"
+    },
+    {
+      "name": "D3 SQLite 行：maxConcurrentOverridden=0、maxConcurrent 回到公式值",
+      "ok": true,
+      "detail": "overridden=0 maxConcurrent=7"
+    },
+    {
+      "name": "E0 data-concurrency-source = estimate",
+      "ok": true,
+      "detail": "got estimate"
+    },
+    {
+      "name": "E2 无指纹机：API 无 capabilities、recommendedConcurrent=3、maxConcurrent=3",
+      "ok": true,
+      "detail": "capabilities=null recommended=3 maxConcurrent=3"
+    },
+    {
+      "name": "E3 SQLite 行：capabilities 为 NULL，未覆盖",
+      "ok": true,
+      "detail": "capabilities=null overridden=0"
+    },
+    {
+      "name": "E4 估算依据：「未收到能力指纹，按保守默认 3 估算」",
+      "ok": true,
+      "detail": "text=未收到能力指纹，按保守默认 3 估算"
+    }
+  ]
+}

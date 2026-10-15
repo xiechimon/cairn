@@ -121,6 +121,17 @@ export function AgentRuntimeSelect({
   );
 }
 
+/** #1301：二级弹层宽度随内容走——registry 默认 `w-(--anchor-width)` 把弹层
+ *  钉在触发钮宽，概览 tab 的触发钮只有回显值那么宽，长 id（`deepseek-v4-pro[1M]`
+ *  一类）右侧被裁。改为 max-content 宽：下限仍是触发钮宽，上限是 Positioner
+ *  给的视口可用宽。 */
+const MODEL_MENU_FIT = 'w-max min-w-(--anchor-width) max-w-(--available-width)';
+
+/** #1301：撞到上限的超长 id 折行而不是被裁（ItemText 默认 nowrap + shrink-0），
+ *  行 title 再兜一层全名。 */
+const MODEL_ROW_WRAP =
+  '[&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:break-all [&>:first-child]:whitespace-normal';
+
 interface AgentModelSelectProps {
   /** 一级当前值：候选按它过滤；null = 内置 (pi)，名下无可选模型，本级禁用。 */
   provider: string | null;
@@ -163,7 +174,7 @@ export function AgentModelSelect({
       <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
-      <SelectContent aria-label={t('模型')} className={`${prefix}-menu`}>
+      <SelectContent aria-label={t('模型')} className={cn(`${prefix}-menu`, MODEL_MENU_FIT)}>
         <SelectItem className={`${prefix}-row`} value={null}>
           {unset}
         </SelectItem>
@@ -174,7 +185,8 @@ export function AgentModelSelect({
           // 不可选）。
           <SelectItem
             key={`${row.machineId ?? ''}/${row.modelId}`}
-            className={`${prefix}-row`}
+            className={cn(`${prefix}-row`, MODEL_ROW_WRAP)}
+            title={row.modelName}
             value={row.modelId}
             disabled={row.liveness === 'dead'}
           >

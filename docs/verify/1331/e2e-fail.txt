@@ -1,0 +1,27 @@
+expect(received).toBe(expected) // Object.is equality
+
+Expected: 601
+Received: 600
+{
+  "i": 4,
+  "id": "overflow-12",
+  "scrolled": {
+    "scrollTop": 601,
+    "scrollHeight": 1225,
+    "clientHeight": 624
+  },
+  "leftAt": {
+    "scrollTop": 601,
+    "scrollHeight": 1225,
+    "clientHeight": 624
+  },
+  "stored": "{\"todo\":600,\"building\":0,\"pending\":0,\"done\":0}",
+  "restored": {
+    "scrollTop": 600,
+    "scrollHeight": 1224,
+    "clientHeight": 624,
+    "cardInList": null
+  },
+  "cardInList": true,
+  "error": "expect(received).toBe(expected) // Object.is equality\n\nExpected: 601\nReceived: 600"
+}
