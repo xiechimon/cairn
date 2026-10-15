@@ -17,11 +17,15 @@ import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
+import { applyDensity, type Density, readStoredDensity } from '../density.js';
 import { useI18n } from '../i18n/provider.js';
+import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, type Theme } from '../theme.js';
 
 interface UserMenuProps {
   theme: Theme;
+  /** CDS PR-9: comfortable | compact. Defaults to stored preference. */
+  density?: Density;
   /** #127 sidebar-trigger render: the fixed variant escapes the 40px
    *  rail's overflow:hidden and stacks above the family click-catcher
    *  (detail.css `.user-menu--floating`); same anchoring law as the
@@ -71,7 +75,12 @@ const SEG_OFF =
 const SEG_ON =
   'border-transparent bg-(--seg-active) text-(--text-secondary) hover:bg-(--seg-active) hover:text-(--text-secondary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-secondary)';
 
-export function UserMenu({ theme: initialTheme, floating = false, className }: UserMenuProps) {
+export function UserMenu({
+  theme: initialTheme,
+  density: initialDensity,
+  floating = false,
+  className,
+}: UserMenuProps) {
   const { t } = useI18n();
   const { user } = useLiveData();
   // Links carry the live query string across hops so the fixture scenario
@@ -84,6 +93,13 @@ export function UserMenu({ theme: initialTheme, floating = false, className }: U
   const select = (next: Theme) => {
     applyTheme(next);
     setTheme(next);
+  };
+  const [density, setDensity] = useState<Density>(
+    () => initialDensity ?? readStoredDensity(safeLocalStorage()),
+  );
+  const selectDensity = (next: Density) => {
+    applyDensity(next);
+    setDensity(next);
   };
   return (
     <div
@@ -124,6 +140,32 @@ export function UserMenu({ theme: initialTheme, floating = false, className }: U
               onClick={() => select('dark')}
             >
               {t('深色')}
+            </Button>
+          </span>
+        </div>
+        <div
+          className="user-menu-row flex h-4 items-center text-xs leading-4 text-(--text-secondary)"
+          data-testid="density-row"
+        >
+          {t('密度')}
+          <span className="user-menu-seg ml-auto flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              className={`${SEG_BASE} ${density === 'comfortable' ? SEG_ON : SEG_OFF}`}
+              data-active={density === 'comfortable'}
+              data-testid="density-comfortable"
+              onClick={() => selectDensity('comfortable')}
+            >
+              {t('舒适')}
+            </Button>
+            <Button
+              variant="ghost"
+              className={`${SEG_BASE} ${density === 'compact' ? SEG_ON : SEG_OFF}`}
+              data-active={density === 'compact'}
+              data-testid="density-compact"
+              onClick={() => selectDensity('compact')}
+            >
+              {t('紧凑')}
             </Button>
           </span>
         </div>

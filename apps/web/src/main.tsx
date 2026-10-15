@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
+import { applyDensity, readStoredDensity } from './density.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
 import { safeLocalStorage } from './safe-storage.js';
 import { applyTheme, readStoredTheme } from './theme.js';
@@ -15,6 +16,7 @@ import './styles/app.css';
 // 的既有默认值回落。
 const bootStorage = safeLocalStorage();
 applyTheme(readStoredTheme(bootStorage), bootStorage);
+applyDensity(readStoredDensity(bootStorage), bootStorage);
 // <html lang> before first paint, exactly like the theme (issue #74)
 applyLocaleLang(readStoredLocale(bootStorage));
 

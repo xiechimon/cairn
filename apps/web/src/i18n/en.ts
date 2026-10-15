@@ -184,6 +184,9 @@ export const EN: Record<string, string> = {
   外观: 'Appearance',
   浅色: 'Light',
   深色: 'Dark',
+  密度: 'Density',
+  舒适: 'Comfortable',
+  紧凑: 'Compact',
 
   // —— chip popover / plan dropdown (r7 19/20/29) ——
   任务分配: 'Task assignment',
