@@ -168,3 +168,33 @@ test('连续两次写：后一次等前一次回执再发（按序，最终 = �
   await expect.poll(() => state.rows[0]?.maxConcurrentOverridden).toBe(false);
   await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
 });
+
+// #1346 Bugbot 回归：PATCH 在途（串行队列里排着、乐观写尚未发生）时连点 +，
+// 每一下都必须以最后一次请求的值为基数，草稿不回弹。第一下立即发出（乐观写生效），
+// 第二、三下排队——旧代码第三下以旧 value 4 为基数，两次都发 5。
+test('PATCH 在途时连点 + 三下：3 → 6，草稿不回弹，最终落库 6', async ({ page }) => {
+  const { bodies, pending, state } = await stubStack(
+    page,
+    [machine({ id: 'm-1', maxConcurrent: 3, maxConcurrentOverridden: true, concurrencySource: 'manual' })],
+    { hold: true },
+  );
+  await page.goto('/app/resources/machines');
+  await trigger(page, 'm-1').click();
+  const inc = page.getByTestId('machine-concurrency-inc');
+  await inc.click();
+  await expect.poll(() => bodies.length).toBe(1);
+  await inc.click();
+  await inc.click();
+  await expect(input(page)).toHaveValue('6');
+  await page.waitForTimeout(300);
+  await expect(input(page)).toHaveValue('6');
+  for (let i = 2; i <= 3; i++) {
+    pending.shift()!();
+    await expect.poll(() => bodies.length).toBe(i);
+  }
+  pending.shift()!();
+  expect(bodies).toEqual([{ maxConcurrent: 4 }, { maxConcurrent: 5 }, { maxConcurrent: 6 }]);
+  await expect.poll(() => state.rows[0]?.maxConcurrent).toBe(6);
+  await expect(input(page)).toHaveValue('6');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('aria-label', '并发上限 6，手动');
+});

@@ -113,8 +113,8 @@ function MachineConcurrencySelect({
 }: {
   machine: MachineRow;
   value: number;
-  onPick: (n: number) => void;
-  onReset: () => void;
+  onPick: (n: number) => Promise<unknown> | undefined;
+  onReset: () => Promise<unknown> | undefined;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
@@ -125,12 +125,27 @@ function MachineConcurrencySelect({
   const outOfRange = value < range.min || value > range.max;
   // #1342 Bugbot：只有用户真改过草稿（dirty）才在 Enter / 失焦时提交——未编辑的
   // 超区间现值不许被夹值存成手动；未改时草稿跟随现值（弹层开着时心跳改值也同步）。
-  const [draft, setDraft] = useState(String(value));
+  // #1346 Bugbot：写在途时（PATCH 串行排队、缓存尚未更新）下一次 ± / Enter 的
+  // 基数取「最后一次请求的值」而非旧 value，草稿也不回弹到旧值；队列清空后回到 value。
+  const [pendingTarget, setPendingTarget] = useState<number | null>(null);
+  const inFlight = useRef(0);
+  const current = pendingTarget ?? value;
+  const track = (target: number | null, req: Promise<unknown> | undefined) => {
+    if (!req) return;
+    inFlight.current += 1;
+    setPendingTarget(target);
+    void req.finally(() => {
+      inFlight.current -= 1;
+      if (inFlight.current === 0) setPendingTarget(null);
+    });
+  };
+  const send = (n: number) => track(n, onPick(n));
+  const [draft, setDraft] = useState(String(current));
   const [dirty, setDirty] = useState(false);
   const skipCommit = useRef(false);
   useEffect(() => {
-    if (!dirty) setDraft(String(value));
-  }, [value, dirty]);
+    if (!dirty) setDraft(String(current));
+  }, [current, dirty]);
   const clampTo = (n: number) => Math.min(range.max, Math.max(range.min, n));
   const settle = (n: number) => {
     setDraft(String(n));
@@ -140,20 +155,20 @@ function MachineConcurrencySelect({
     if (!dirty) return;
     const parsed = Number.parseInt(draft, 10);
     if (Number.isNaN(parsed)) {
-      settle(value);
+      settle(current);
       return;
     }
     const next = clampTo(parsed);
     settle(next);
-    if (next !== value) onPick(next);
+    if (next !== current) send(next);
   };
   // ± = 单次写：基数取草稿（改过）或现值，步进后夹值，直接一发 PATCH。
   const step = (delta: number) => {
     const parsed = Number.parseInt(draft, 10);
-    const base = dirty && !Number.isNaN(parsed) ? parsed : value;
+    const base = dirty && !Number.isNaN(parsed) ? parsed : current;
     const next = clampTo(clampTo(base) + delta);
     settle(next);
-    if (next !== value) onPick(next);
+    if (next !== current) send(next);
   };
   // ± / 恢复推荐 按下时不让输入框失焦（失焦提交会先发一笔手动值，与本次动作竞态）。
   const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
@@ -173,7 +188,7 @@ function MachineConcurrencySelect({
       open={open}
       onOpenChange={(next) => {
         if (next) {
-          settle(value);
+          settle(current);
           skipCommit.current = false;
         }
         setOpen(next);
@@ -224,7 +239,7 @@ function MachineConcurrencySelect({
             size="icon"
             aria-label={t('减少并发上限')}
             data-testid="machine-concurrency-dec"
-            disabled={value <= range.min && Number.parseInt(draft, 10) <= range.min}
+            disabled={current <= range.min && Number.parseInt(draft, 10) <= range.min}
             className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
             data-concurrency-action="step"
             onMouseDown={keepFocus}
@@ -255,7 +270,7 @@ function MachineConcurrencySelect({
                 commit();
               } else if (e.key === 'Escape') {
                 skipCommit.current = true;
-                settle(value);
+                settle(current);
               }
             }}
             onBlur={(e) => {
@@ -274,7 +289,7 @@ function MachineConcurrencySelect({
             size="icon"
             aria-label={t('增加并发上限')}
             data-testid="machine-concurrency-inc"
-            disabled={value >= range.max && Number.parseInt(draft, 10) >= range.max}
+            disabled={current >= range.max && Number.parseInt(draft, 10) >= range.max}
             className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
             data-concurrency-action="step"
             onMouseDown={keepFocus}
@@ -332,7 +347,7 @@ function MachineConcurrencySelect({
             onClick={() => {
               setDirty(false);
               setOpen(false);
-              onReset();
+              track(recommended ?? null, onReset());
             }}
           >
             <Restore width={12} height={12} className="flex-none text-(--text-tertiary)" />
@@ -415,20 +430,22 @@ export function MachinesPage() {
   // #1342 Bugbot：同一台机器的并发写按序发——后一笔等前一笔回执再发，服务端
   // 落库顺序 = 用户意图顺序（最后一次意图胜出），不会乱序留下覆盖位。
   const capChain = useRef<Record<string, Promise<unknown>>>({});
-  const patchCap = (id: string, maxConcurrent: number | null): void => {
+  const patchCap = (id: string, maxConcurrent: number | null): Promise<unknown> => {
     const prev = capChain.current[id] ?? Promise.resolve();
-    capChain.current[id] = prev.then(() =>
+    const next = prev.then(() =>
       mutations.patchMachine.mutateAsync({ id, body: { maxConcurrent } }).catch(() => undefined),
     );
+    capChain.current[id] = next;
+    return next;
   };
-  const pickCap = (machine: MachineRow, n: number): void => {
+  const pickCap = (machine: MachineRow, n: number): Promise<unknown> | undefined => {
     if (!live || machine.id == null) {
       setCapDraft((prev) => ({ ...prev, [rowKey(machine)]: n }));
       return;
     }
-    patchCap(machine.id, n);
+    return patchCap(machine.id, n);
   };
-  const resetCap = (machine: MachineRow): void => {
+  const resetCap = (machine: MachineRow): Promise<unknown> | undefined => {
     if (!live || machine.id == null) {
       setCapDraft((prev) => ({
         ...prev,
@@ -436,7 +453,7 @@ export function MachinesPage() {
       }));
       return;
     }
-    patchCap(machine.id, null);
+    return patchCap(machine.id, null);
   };
   // 保存失败的显式反馈（XMON-80/P2 同律）：本面无 toast，失败只可能来自
   // shell 开关 / 并发选择这两条写（页面仅有的 mutation），文案是固定句、

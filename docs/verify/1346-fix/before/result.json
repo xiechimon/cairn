@@ -1,0 +1,22 @@
+[
+  {
+    "name": "1 PATCH 在途时输入框显示 6（不停在旧值）",
+    "ok": false,
+    "detail": "draft=5"
+  },
+  {
+    "name": "2 PATCH 序列 = 4,5,6",
+    "ok": false,
+    "detail": "[{\"maxConcurrent\":4},{\"maxConcurrent\":5},{\"maxConcurrent\":5}]"
+  },
+  {
+    "name": "3 API 最终 maxConcurrent=6 手动",
+    "ok": false,
+    "detail": "{\"maxConcurrent\":5,\"maxConcurrentOverridden\":true,\"concurrencySource\":\"manual\",\"concurrencyRange\":{\"min\":1,\"max\":16}}"
+  },
+  {
+    "name": "4 落定后输入框 = 6",
+    "ok": false,
+    "detail": "draft=5"
+  }
+]
