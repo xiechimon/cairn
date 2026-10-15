@@ -103,8 +103,15 @@ test('tag-chip 落点：落在 registry Badge 上，别名类保留、几何单�
   await expect(chip).toHaveAttribute('data-slot', 'badge');
   await expect(chip).toHaveClass(/tag-chip/);
   // 卡面 = registry Badge h-5 默认档 20px（#980 前提④几何 registry 默认赢）
-  const h = await chip.evaluate((el) => el.getBoundingClientRect().height);
-  expect(h).toBe(20);
+  // #1324: CI read 19.99999237060547 here once (float noise from layout,
+  // not a different size tier). Let the card-enter animation settle, then
+  // compare to 20 within 0.005px: still tells the 20px tier from 16px.
+  const h = await chip.evaluate(async (el) => {
+    const card = el.closest('.todo-card') ?? el;
+    await Promise.all(card.getAnimations({ subtree: true }).map((a) => a.finished));
+    return el.getBoundingClientRect().height;
+  });
+  expect(h).toBeCloseTo(20, 2);
 
   // 类型筛选弹层的选中行是第二个消费面（board/tag-filter.tsx）——同走
   // 20px 正本（components/ui/tag-chip.tsx 的 Badge h-5 档），单档无例外
@@ -115,5 +122,5 @@ test('tag-chip 落点：落在 registry Badge 上，别名类保留、几何单�
   await expect(picked).toBeVisible();
   await expect(picked).toHaveAttribute('data-slot', 'badge');
   const ph = await picked.evaluate((el) => el.getBoundingClientRect().height);
-  expect(ph).toBe(20);
+  expect(ph).toBeCloseTo(20, 2);
 });
