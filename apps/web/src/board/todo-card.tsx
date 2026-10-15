@@ -103,7 +103,7 @@ export function TodoCard({
     >
       <div className="flex min-h-4 items-center">
         <ProjectAvatar char={chipInitial} />
-        <span className="ml-1 truncate text-[11px] leading-4 text-muted-foreground">
+        <span className="todo-card-meta ml-1 truncate text-[11px] leading-4 text-muted-foreground">
           {chipName}
         </span>
         {/* #445 卡片标签 chip：首行项目名之后（身份行语义位）。#1006 R5
@@ -113,7 +113,7 @@ export function TodoCard({
             保持 16px 节奏，有 chip 卡随行内容长到 20（回流由本域探针
             重钉）。todo-card-tag = e2e 别名。 */}
         {tag != null && <TagChip tag={tag} className="todo-card-tag ml-1 flex-none" />}
-        <span className="todo-card-seq mr-[13px] ml-auto flex-none text-[11px] leading-4 text-muted-foreground/70">
+        <span className="todo-card-meta todo-card-seq mr-[13px] ml-auto flex-none text-[11px] leading-4 text-muted-foreground/70">
           #{todo.seqNum}
         </span>
         {onBranch != null && hasBranch && (
@@ -183,7 +183,7 @@ export function TodoCard({
             </span>
           )}
         </span>
-        <span className="relative top-[1.5px] ml-[7px] text-[11px] leading-4 text-muted-foreground">
+        <span className="todo-card-meta relative top-[1.5px] ml-[7px] text-[11px] leading-4 text-muted-foreground">
           {relativeTime(todo.phaseAt, now, t)}
         </span>
         {/* #1257 挂起态 chip（等机器 / 等额度）：infra 事件不判死步——卡面

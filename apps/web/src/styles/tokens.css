@@ -480,6 +480,32 @@
   }
 }
 
+/* CDS PR-9 density: compact squeezes rem-scale + card/meta rhythm.
+   Comfortable = :root defaults (no data-density). Colors frozen. */
+[data-density="compact"] {
+  --rem-scale: 0.9375;
+  --pad-card: 8px;
+  --font-size-caption: calc(0.6875rem * var(--rem-scale));
+  --font-size-code: calc(0.75rem * var(--rem-scale));
+  --font-size-body: calc(0.8125rem * var(--rem-scale));
+  --font-size-heading: calc(0.875rem * var(--rem-scale));
+  --font-size-title: calc(1.25rem * var(--rem-scale));
+}
+/* Compact card rhythm: 8px pad; identity/time meta → 12/16. */
+[data-density="compact"] [data-slot="card"] {
+  --card-spacing: 0.5rem;
+}
+[data-density="compact"] .todo-card {
+  padding: 8px;
+}
+[data-density="compact"] .todo-card-title {
+  margin-top: 0.25rem;
+}
+[data-density="compact"] .todo-card-meta {
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .light {
   /* 并流别名 light 镜像已随 :root 别名层退役（#1002，#987 §3.3-A）。
      .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像。 */

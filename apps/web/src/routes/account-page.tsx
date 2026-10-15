@@ -41,7 +41,7 @@
 // option set was never observed (r2 §11 Q19), so the shape follows the
 // plan-dropdown family and lists the two locales as endonyms.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useSession } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -60,6 +60,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
+import {
+  applyDensity,
+  DENSITY_EVENT,
+  type Density,
+  readDomDensity,
+  readStoredDensity,
+} from '../density.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
@@ -124,6 +131,21 @@ export function AccountPage() {
   const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
     readNotifyPref(safeLocalStorage()),
   );
+  const [density, setDensity] = useState<Density>(() => readStoredDensity(safeLocalStorage()));
+  const selectDensity = (next: Density) => {
+    applyDensity(next);
+    setDensity(next);
+  };
+  // Keep segment face in sync with user-menu (Bugbot #1366 desync).
+  useEffect(() => {
+    const onDensity = (e: Event) => {
+      const detail = (e as CustomEvent<Density>).detail;
+      if (detail === 'comfortable' || detail === 'compact') setDensity(detail);
+    };
+    window.addEventListener(DENSITY_EVENT, onDensity);
+    setDensity(readDomDensity());
+    return () => window.removeEventListener(DENSITY_EVENT, onDensity);
+  }, []);
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
@@ -204,6 +226,43 @@ export function AccountPage() {
               </div>
             </PopoverContent>
           </Popover>
+        </ProfileRow>
+
+        <ProfileRow label={t('密度')} className="account-density-row">
+          <span className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              className={`h-7 cursor-pointer rounded-[6px] px-2.5 text-[12px] leading-4 font-normal ${
+                density === 'comfortable'
+                  ? 'bg-(--seg-active) text-(--text-secondary)'
+                  : 'text-(--text-tertiary) hover:bg-(--seg-hover)'
+              }`}
+              data-active={density === 'comfortable'}
+              data-testid="account-density-comfortable"
+              onClick={(e) => {
+                e.currentTarget.dataset.clicked = String(Date.now());
+                selectDensity('comfortable');
+              }}
+            >
+              {t('舒适')}
+            </Button>
+            <Button
+              variant="ghost"
+              className={`h-7 cursor-pointer rounded-[6px] px-2.5 text-[12px] leading-4 font-normal ${
+                density === 'compact'
+                  ? 'bg-(--seg-active) text-(--text-secondary)'
+                  : 'text-(--text-tertiary) hover:bg-(--seg-hover)'
+              }`}
+              data-active={density === 'compact'}
+              data-testid="account-density-compact"
+              onClick={(e) => {
+                e.currentTarget.dataset.clicked = String(Date.now());
+                selectDensity('compact');
+              }}
+            >
+              {t('紧凑')}
+            </Button>
+          </span>
         </ProfileRow>
         <ProfileRow
           label={t('推送通知')}
