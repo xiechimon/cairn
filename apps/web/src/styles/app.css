@@ -312,7 +312,9 @@
   .todo-card,
   .board-column,
   .board-notify-banner,
-  .board-drag-card {
+  .board-drag-card,
+  .composer,
+  .chat-bubble {
     corner-shape: superellipse(1.5);
   }
 }
