@@ -22,6 +22,12 @@ function clearFadeVars(el: HTMLElement): void {
   el.style.removeProperty('--scroll-fade-right');
 }
 
+export function scrollFadeClassName(orientation: ScrollFadeOrientation = 'vertical'): string {
+  if (orientation === 'horizontal') return 'scroll-fade-h';
+  if (orientation === 'both') return 'scroll-fade-both';
+  return 'scroll-fade';
+}
+
 export function useScrollFade(
   ref: RefObject<HTMLElement | null>,
   options: UseScrollFadeOptions = {},

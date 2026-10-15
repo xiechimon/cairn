@@ -269,8 +269,6 @@ body[data-board-dragging] {
 .scroll-fade {
   --scroll-fade-top: 0px;
   --scroll-fade-bottom: 0px;
-  --scroll-fade-left: 0px;
-  --scroll-fade-right: 0px;
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent,
@@ -352,6 +350,93 @@ body[data-board-dragging] {
     rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
     transparent
   );
+}
+
+.scroll-fade-both {
+  --scroll-fade-top: 0px;
+  --scroll-fade-bottom: 0px;
+  --scroll-fade-left: 0px;
+  --scroll-fade-right: 0px;
+  -webkit-mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-top),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+      transparent
+    ),
+    linear-gradient(
+      to right,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-left),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+      transparent
+    );
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-top) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-top) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-top) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-top) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-top) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-top) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-top),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-bottom)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-bottom) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-bottom) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-bottom) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-bottom) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-bottom) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-bottom) * 0.15),
+      transparent
+    ),
+    linear-gradient(
+      to right,
+      transparent,
+      rgb(0 0 0 / 0.05) calc(var(--scroll-fade-left) * 0.15),
+      rgb(0 0 0 / 0.15) calc(var(--scroll-fade-left) * 0.3),
+      rgb(0 0 0 / 0.3) calc(var(--scroll-fade-left) * 0.45),
+      rgb(0 0 0 / 0.5) calc(var(--scroll-fade-left) * 0.6),
+      rgb(0 0 0 / 0.7) calc(var(--scroll-fade-left) * 0.75),
+      rgb(0 0 0 / 0.85) calc(var(--scroll-fade-left) * 0.87),
+      rgb(0 0 0) var(--scroll-fade-left),
+      rgb(0 0 0) calc(100% - var(--scroll-fade-right)),
+      rgb(0 0 0 / 0.85) calc(100% - var(--scroll-fade-right) * 0.87),
+      rgb(0 0 0 / 0.7) calc(100% - var(--scroll-fade-right) * 0.75),
+      rgb(0 0 0 / 0.5) calc(100% - var(--scroll-fade-right) * 0.6),
+      rgb(0 0 0 / 0.3) calc(100% - var(--scroll-fade-right) * 0.45),
+      rgb(0 0 0 / 0.15) calc(100% - var(--scroll-fade-right) * 0.3),
+      rgb(0 0 0 / 0.05) calc(100% - var(--scroll-fade-right) * 0.15),
+      transparent
+    );
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
 }
 
 @media (prefers-reduced-motion: reduce) {

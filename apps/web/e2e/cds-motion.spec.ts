@@ -8,7 +8,7 @@ test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
   const vals = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
     const probe = document.createElement('div');
-    probe.className = 'scroll-fade scroll-fade-h';
+    probe.className = 'scroll-fade';
     probe.style.cssText = 'position:fixed;inset:0;overflow:auto;height:120px';
     probe.innerHTML =
       '<div style="height:400px"></div><span class="icon-baseline"></span><span class="icon-baseline-sm"></span>';
@@ -45,6 +45,23 @@ test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
   expect(Number.parseFloat(vals.heavyDur)).toBeGreaterThan(0);
   expect(vals.fadeSize).toBe('28px');
   expect(vals.maskStarts).toBe(true);
+  const axis = await page.evaluate(() => {
+    const a = document.createElement('div');
+    a.className = 'scroll-fade-h';
+    const b = document.createElement('div');
+    b.className = 'scroll-fade-both';
+    document.body.append(a, b);
+    const ha = getComputedStyle(a).maskImage || '';
+    const hb = getComputedStyle(b).maskImage || '';
+    a.remove();
+    b.remove();
+    return {
+      h: String(ha).startsWith('linear-gradient'),
+      both: String(hb).includes('linear-gradient') && String(hb).includes(','),
+    };
+  });
+  expect(axis.h).toBe(true);
+  expect(axis.both).toBe(true);
   expect(vals.animNames['anim-message-fade-up']).toContain('message-fade-up');
   expect(vals.animNames['anim-saved-check']).toContain('saved-check-decay');
   expect(vals.animNames['anim-grapheme-reveal']).toContain('grapheme-reveal');
