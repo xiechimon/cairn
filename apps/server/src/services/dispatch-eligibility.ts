@@ -310,9 +310,10 @@ export function homeMachineRejectReason(
 
 // —— #1241 机器推荐并发（写点算推荐值；公式单源在本叶子）————————————————
 // 问题：maxConcurrent 曾是固定默认 3，与机器承载无关。
-// 例子：32 核 / 64GiB 总内存 → min(32, floor(64/2)) = 32，再夹到写域 16；
-//       2 核 / 2GiB 总内存 → min(2, floor(2/2)) = 1；没有指纹 → 3，并标估算。
-// 方案：recommended = clamp(min(核数, floor(总内存MiB / (1024 * 每槽GiB))), 1, 16)。
+// 例子：32 核 / 64GiB 总内存 → min(32, round(64/2)) = 32，再夹到写域 16；
+//       8 核 / 15.6GiB 总内存 → min(8, round(7.8)) = 8；没有指纹 → 3，并标估算。
+// 方案：recommended = clamp(min(核数, round(总内存MiB / (1024 * 每槽GiB))), 1, 16)；
+// 可选区间 = 1..clamp(round(总内存MiB / (1024 * 区间每槽GiB)), 1, 16)。
 // 内存用总量而不用可用量：运行中的步占掉可用内存不应缩小推荐值（推荐是机器
 // 承载的静态上界，动态降载是后续票）。16 是既有 PATCH 写域（#1108，1..16）的
 // 上沿，不是覆盖用户之后再加的第二道闸。用户写过的数心跳不再改
@@ -323,8 +324,10 @@ export function homeMachineRejectReason(
 export const CONCURRENCY_FLOOR = 1;
 /** 推荐值上沿（写域与 #1108 PATCH 相同：1..16）。 */
 export const CONCURRENCY_CEILING = 16;
-/** 每个并发槽占用的内存，GiB（按总内存计）。 */
+/** 推荐值：每个并发槽占用的内存，GiB（按总内存计，偏保守）。 */
 export const MEMORY_GB_PER_SLOT = 2;
+/** 可选区间：每槽 1 GiB（用户手动上调的上沿；16GiB 机可选到 16）。 */
+export const RANGE_MEMORY_GB_PER_SLOT = 1;
 /** 没有可用指纹时的保守默认（与 machine.maxConcurrent 列默认相同）。 */
 export const CONSERVATIVE_CONCURRENCY = 3;
 /** 无指纹机的可选区间上沿（与 #1108 原固定档位 1..8 同值）。 */
@@ -336,7 +339,7 @@ export interface ConcurrencyRange {
 export interface ConcurrencyRecommendation {
   value: number;
   source: 'measured' | 'estimate';
-  /** 选择器可选区间：1..clamp(floor(总内存 / 每槽内存), 1, 16)；无指纹 = 1..8。 */
+  /** 选择器可选区间：1..clamp(round(总内存 / 1GiB), 1, 16)；无指纹 = 1..8。 */
   range: ConcurrencyRange;
 }
 
@@ -358,8 +361,10 @@ export function recommendMachineConcurrency(
       range: { min: CONCURRENCY_FLOOR, max: FALLBACK_CONCURRENCY_MAX },
     };
   }
-  const byMemory = Math.floor(hardware.memoryTotalMb / (1024 * MEMORY_GB_PER_SLOT));
+  // round 而非 floor：15.6GiB 读作 16GiB（os 报的总内存总比标称少一点）。
+  const slots = (gbPerSlot: number) => Math.round(hardware.memoryTotalMb! / (1024 * gbPerSlot));
   const clamp = (n: number) => Math.min(CONCURRENCY_CEILING, Math.max(CONCURRENCY_FLOOR, n));
-  const value = clamp(Math.min(hardware.cpuCores, byMemory));
-  return { value, source: 'measured', range: { min: CONCURRENCY_FLOOR, max: clamp(byMemory) } };
+  const value = clamp(Math.min(hardware.cpuCores, slots(MEMORY_GB_PER_SLOT)));
+  const max = clamp(slots(RANGE_MEMORY_GB_PER_SLOT));
+  return { value, source: 'measured', range: { min: CONCURRENCY_FLOOR, max } };
 }

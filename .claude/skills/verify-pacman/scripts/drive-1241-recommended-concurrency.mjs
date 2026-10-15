@@ -51,14 +51,14 @@ mkdirSync(EVIDENCE, { recursive: true });
 
 // 公式与服务端同源口径：每槽 2 GiB 总内存，夹到 1..16（ADR 0020）。
 function formula(cores, memoryTotalMb) {
-  const byMemory = Math.floor(memoryTotalMb / (1024 * 2));
+  const byMemory = Math.round(memoryTotalMb / (1024 * 2));
   return Math.min(16, Math.max(1, Math.min(cores, byMemory)));
 }
 const OS_CORES = cpus().length;
 const OS_MEM_MB = Math.floor(totalmem() / (1024 * 1024));
 const EXPECTED_RECOMMENDED = formula(OS_CORES, OS_MEM_MB);
-// #1241 vA3 弹性区间：1..clamp(floor(总内存 / 2GiB), 1, 16)。
-const rangeMax = (memoryTotalMb) => Math.min(16, Math.max(1, Math.floor(memoryTotalMb / 2048)));
+// #1241 vA4 弹性区间：1..clamp(round(总内存 / 1GiB), 1, 16)。
+const rangeMax = (memoryTotalMb) => Math.min(16, Math.max(1, Math.round(memoryTotalMb / 1024)));
 const EXPECTED_RANGE_MAX = rangeMax(OS_MEM_MB);
 const BIG_NAME = 'verify-1241-36gb';
 const BIG_HW = { cpuCores: 12, memoryTotalMb: 36864, memoryAvailableMb: 20480, loadAvg1: 0.5, diskFreeMb: 102400 };
@@ -282,7 +282,7 @@ try {
     check(
       'A2 API recommendedConcurrent = 公式(os 核数, os 总内存)',
       realApi0.recommendedConcurrent === EXPECTED_RECOMMENDED,
-      `api=${realApi0.recommendedConcurrent} formula=min(${OS_CORES}, floor(${OS_MEM_MB}/2048))→${EXPECTED_RECOMMENDED}`,
+      `api=${realApi0.recommendedConcurrent} formula=min(${OS_CORES}, round(${OS_MEM_MB}/2048))→${EXPECTED_RECOMMENDED}`,
     );
     check(
       'A3 daemon 上报核数 = os.cpus().length',
@@ -435,7 +435,7 @@ try {
     // 先用 − 步进提交一次（转手动），再输入超区间值。
     await page.getByTestId('machine-concurrency-dec').click();
     await expectAttr(page, realId, 'manual', 'G0');
-    check('G0b − 步进提交 上沿-1', (await gInput.inputValue()) === String(EXPECTED_RANGE_MAX - 1), `input=${await gInput.inputValue()}`);
+    check('G0b − 步进提交 推荐-1', (await gInput.inputValue()) === String(EXPECTED_RECOMMENDED - 1), `input=${await gInput.inputValue()}`);
     await gInput.fill('99');
     await gInput.press('Enter');
     await settle(page);

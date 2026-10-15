@@ -45,8 +45,8 @@ const weak = {
   diskFreeMb: 50_000,
 };
 
-describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)), 1, 16)）', () => {
-  test('F1 核数与内存各自作上界：核少取核，内存少取 floor(GiB/2)', () => {
+describe('#1241 公式（推荐并发 = clamp(min(核, round(总内存 / 2GiB)), 1, 16)）', () => {
+  test('F1 核数与内存各自作上界：核少取核，内存少取 round(GiB/2)', () => {
     expect(
       recommendMachineConcurrency({ ...modest, cpuCores: 4, memoryTotalMb: 32 * MIB_PER_GIB }),
     ).toMatchObject({
@@ -88,7 +88,7 @@ describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)),
     expect(CONSERVATIVE_CONCURRENCY).toBe(3);
   });
 
-  test('F3 可选区间 = 1..clamp(floor(总内存 / 2GiB), 1, 16)；无指纹 = 1..8', () => {
+  test('F3 可选区间 = 1..clamp(round(总内存 / 1GiB), 1, 16)；无指纹 = 1..8', () => {
     const hw = (cpuCores: number, memoryTotalMb: number) => ({
       cpuCores,
       memoryTotalMb,
@@ -97,8 +97,8 @@ describe('#1241 公式（推荐并发 = clamp(min(核, floor(总内存 / 2GiB)),
       diskFreeMb: 0,
     });
     expect(recommendMachineConcurrency(hw(8, 16002))).toMatchObject({
-      value: 7,
-      range: { min: 1, max: 7 },
+      value: 8,
+      range: { min: 1, max: 16 },
     });
     expect(recommendMachineConcurrency(hw(12, 36864))).toMatchObject({
       value: 12,
