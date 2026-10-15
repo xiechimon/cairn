@@ -223,7 +223,10 @@ export function AccountPage() {
               }`}
               data-active={density === 'comfortable'}
               data-testid="account-density-comfortable"
-              onClick={() => selectDensity('comfortable')}
+              onClick={(e) => {
+                e.currentTarget.dataset.clicked = String(Date.now());
+                selectDensity('comfortable');
+              }}
             >
               {t('舒适')}
             </Button>
@@ -236,7 +239,10 @@ export function AccountPage() {
               }`}
               data-active={density === 'compact'}
               data-testid="account-density-compact"
-              onClick={() => selectDensity('compact')}
+              onClick={(e) => {
+                e.currentTarget.dataset.clicked = String(Date.now());
+                selectDensity('compact');
+              }}
             >
               {t('紧凑')}
             </Button>
