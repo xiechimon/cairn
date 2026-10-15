@@ -147,7 +147,7 @@ function machineFitHint(m: AgentMachineFitRow, t: TFunc): string {
   if (m.missing !== null && m.missing.length > 0) {
     return t('缺 {missing}（在该机装齐即解锁）', { missing: m.missing.join('、') });
   }
-  if (m.missing === null) return t('能力快照未上报（旧版 daemon）——按可跑放行');
+  if (m.missing === null) return t('能力快照未上报——按可跑放行');
   if (m.mcpGaps !== null && m.mcpGaps.length > 0) {
     return t('可跑；声明的 MCP 缺 {gaps}（执行时跳过）', { gaps: m.mcpGaps.join('、') });
   }
@@ -883,7 +883,7 @@ export function AgentDetailPage() {
               <h3 className="m-0 text-sm font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={PROFILE_HINT_CLS}>
                 {t(
-                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。',
+                  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。',
                 )}
               </p>
               {mcpOptions.length === 0 ? (

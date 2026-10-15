@@ -937,15 +937,14 @@ export const EN: Record<string, string> = {
   '保存失败，请重试。': 'Save failed. Try again.',
   // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   机器匹配: 'Machine fit',
-  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的旧版 daemon 机器按可跑放行。':
-    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); old daemons that never reported a snapshot are let through.',
+  '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。':
+    'Execution requirements are a hard dispatch gate: machines whose capability snapshot does not satisfy them never claim this agent’s steps (the queue shows a visible reason); machines that never reported a snapshot are let through.',
   '要求执行机已安装该 MCP 服务器': 'Require this MCP server installed on the executing machine',
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
   '未开启该 Agent 所需的 runtime': 'Required runtime not enabled for this agent',
   '缺 {missing}（在该机装齐即解锁）': 'Missing {missing} (install on that machine to unlock)',
-  '能力快照未上报（旧版 daemon）——按可跑放行':
-    'Capability snapshot not reported (old daemon) — treated as runnable',
+  '能力快照未上报——按可跑放行': 'Capability snapshot not reported — treated as runnable',
   '可跑；声明的 MCP 缺 {gaps}（执行时跳过）':
     'Runnable; declared MCP missing {gaps} (skipped at runtime)',
   可跑: 'Runnable',
