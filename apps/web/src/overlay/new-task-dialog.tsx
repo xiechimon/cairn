@@ -93,7 +93,8 @@ const OPTION_ROW_CLS =
  *  底色投影 / --z-confirm 档全退役——registry AlertDialogContent 默认承载
  *  居中与皮肤，z-50 = --z-dialog 值，数值上仍压 DialogShell 低档面板）：
  *  448 宽是捕获设计的内容 layout。别名 new-task-discard 原样（e2e）。 */
-const DISCARD_PANEL_CLS = 'new-task-discard w-[448px] max-w-[448px] sm:max-w-[448px]';
+const DISCARD_PANEL_CLS =
+  'new-task-discard w-[448px] max-w-[448px] rounded-(--edge-radius) shadow-(--dialog-shadow) sm:max-w-[448px]';
 
 /** Spec textarea template lines, verbatim r2 §5.2 / r7 04 placeholder
  *  block — dict keys so the en fallback carries them too. */

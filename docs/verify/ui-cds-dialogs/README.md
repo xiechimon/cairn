@@ -8,7 +8,7 @@ Claude Desktop redesign PR-5: dialogs / popovers / menus.
 - Menu rows: `--cds-radius-sm` **4px**, height **32px**
 - User menu: same popover shell (no solid border)
 - Search panel: 16px shell; input de-boxed (border/radius 0, transparent)
-- Registry ledger re-frozen (pristine dialog/alert/select → deviated)
+- Registry: dialog/alert/select stay pristine (S5 ratchet); CDS skin on dialog-shell / alert-dialog-shell adapters + call-site classNames / app.css overlay+select-item rules. popover/dropdown already-deviated entries re-frozen.
 - Colors frozen
 
 ## Evidence

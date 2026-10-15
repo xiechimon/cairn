@@ -107,7 +107,10 @@ export function AgentRuntimeSelect({
       <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
-      <SelectContent aria-label={t('运行时')} className={`${prefix}-menu`}>
+      <SelectContent
+        aria-label={t('运行时')}
+        className={`${prefix}-menu rounded-(--radius-popover) shadow-(--shadow-popover)`}
+      >
         <SelectItem className={`${prefix}-row`} value={null}>
           {unset}
         </SelectItem>
@@ -174,7 +177,13 @@ export function AgentModelSelect({
       <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
-      <SelectContent aria-label={t('模型')} className={cn(`${prefix}-menu`, MODEL_MENU_FIT)}>
+      <SelectContent
+        aria-label={t('模型')}
+        className={cn(
+          `${prefix}-menu rounded-(--radius-popover) shadow-(--shadow-popover)`,
+          MODEL_MENU_FIT,
+        )}
+      >
         <SelectItem className={`${prefix}-row`} value={null}>
           {unset}
         </SelectItem>

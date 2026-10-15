@@ -238,7 +238,8 @@ export function DialogShell({
         className={cn(
           // layout 位：#193 封顶 + 三段 grid（body 是真滚动容器）；宽度经
           // style min() 收口，故解除 registry 的 max-w 两档。
-          'max-h-[calc(100vh-48px)] max-w-none sm:max-w-none',
+          // CDS PR-5 (adapter): skin lives here so dialog.tsx stays pristine (S5).
+          'max-h-[calc(100vh-48px)] max-w-none sm:max-w-none rounded-(--edge-radius) shadow-(--dialog-shadow)',
           footer != null ? 'grid-rows-[auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_minmax(0,1fr)]',
           className,
         )}
@@ -261,7 +262,11 @@ export function DialogShell({
         <div data-testid="dialog-body" className="-mx-4 min-h-0 overflow-y-auto px-4">
           {children}
         </div>
-        {footer != null && <DialogFooter data-testid="dialog-foot">{footer}</DialogFooter>}
+        {footer != null && (
+          <DialogFooter data-testid="dialog-foot" className="rounded-b-(--edge-radius)">
+            {footer}
+          </DialogFooter>
+        )}
         <DialogClose
           render={<Button variant="ghost" size="icon-sm" className="absolute top-2 right-2" />}
           aria-label={t('关闭')}
