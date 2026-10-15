@@ -300,13 +300,19 @@ describe('思考增量（#1308）', () => {
     expect(liveThinkingStore.get(CONV)).toBe('补发思考');
   });
 
-  it('activity phase starting 清掉在飞思考（回落轮）', () => {
+  it('activity resetLive 清掉在飞思考（回落轮）', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '旧轮思考' });
     expect(liveThinkingStore.get(CONV)).toBe('旧轮思考');
+    // 普通 starting 不得清（首轮 / 节流重发）。
     es.push({
       type: 'activity',
       activity: { stepId: 's1', phase: 'starting', at: 1 },
+    });
+    expect(liveThinkingStore.get(CONV)).toBe('旧轮思考');
+    es.push({
+      type: 'activity',
+      activity: { stepId: 's1', phase: 'starting', at: 2, resetLive: true },
     });
     expect(liveThinkingStore.get(CONV)).toBe('');
   });

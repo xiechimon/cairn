@@ -221,9 +221,9 @@ export class ConversationStreamHub {
   /** 步活动相位（#905）：daemon 上报经 reportActivity 盖章后瞬态转发；
    *  单槽留最后一份供订阅补发。 */
   publishActivity(conversationId: string, activity: StepActivity): void {
-    // 新一轮会话起步（daemon pass>0 与首轮同发 starting）——丢掉上轮在飞的
-    // 思考/正文快照，避免协议回落 / 网络重试把两轮拼在一起（#1308 Bugbot）。
-    if (activity.phase === 'starting') {
+    // 仅 resetLive（回落轮显式位）清在飞快照——普通 starting / 节流重发
+    // 不得误清已流过的思考与正文（#1308 Bugbot）。
+    if (activity.resetLive === true) {
       this.textBuffers.delete(conversationId);
       this.thinkingBuffers.delete(conversationId);
     }

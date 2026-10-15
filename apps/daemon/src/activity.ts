@@ -27,7 +27,10 @@ export interface ActivityTrackerDeps {
 
 export interface ActivityTracker {
   /** 相位变更：report 与上次已发不同即同步发送（F3）；相同即跳过（F2）。 */
-  setPhase: (phase: StepActivityPhase, extra?: { tool?: string; attempt?: number }) => void;
+  setPhase: (
+    phase: StepActivityPhase,
+    extra?: { tool?: string; attempt?: number; resetLive?: boolean },
+  ) => void;
   /** 任何流事件到达（runner 事件循环顶部，与看门狗重置同点）：驱动节流
    *  重发（F1）——只有真事件能把「最近信号」推新。 */
   noteEvent: () => void;
@@ -81,6 +84,7 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
         phase,
         ...(extra?.tool !== undefined ? { tool: extra.tool } : {}),
         ...(extra?.attempt !== undefined ? { attempt: extra.attempt } : {}),
+        ...(extra?.resetLive === true ? { resetLive: true } : {}),
       };
       emit(withSkills(base));
     },
@@ -142,6 +146,7 @@ function sameReport(a: StepActivityReport | null, b: StepActivityReport | null):
     a.phase === b.phase &&
     a.tool === b.tool &&
     a.attempt === b.attempt &&
+    a.resetLive === b.resetLive &&
     sameSkills(a.skills, b.skills)
   );
 }

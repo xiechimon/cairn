@@ -223,8 +223,8 @@ export function startConversationStream(
         case 'activity': {
           // #905：步活动相位（瞬态单槽；stepId 对在跑步的过滤在消费侧）。
           const activity = (ev as ConversationActivityEvent).activity;
-          // 与 hub 同律：starting = 新一轮，丢掉上轮在飞思考/正文（#1308 Bugbot）。
-          if (activity.phase === 'starting') {
+          // 与 hub 同律：仅 resetLive 清在飞思考/正文（#1308 Bugbot）。
+          if (activity.resetLive === true) {
             liveTextStore.clear(conversationId);
             liveThinkingStore.clear(conversationId);
           }

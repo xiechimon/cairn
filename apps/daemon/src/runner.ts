@@ -1434,7 +1434,8 @@ export async function runStep(
       }
       deltaBuf = '';
     }
-    activity.setPhase('starting');
+    // 回落轮带 resetLive：hub / 客户端清掉上轮在飞思考与正文；首轮不带。
+    activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
       handle = await openSession();
     } catch (err) {

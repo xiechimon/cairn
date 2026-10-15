@@ -193,7 +193,7 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
     s.dispose();
   });
 
-  test('activity phase starting clears a thinking snapshot (retry pass)', async () => {
+  test('activity resetLive clears a thinking snapshot (retry pass)', async () => {
     const { s, token, buildId, stepId } = await world();
     const posted = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
       cred: token,
@@ -204,7 +204,7 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
       cred: token,
       body: {
         kind: 'activity',
-        activity: { phase: 'starting' },
+        activity: { phase: 'starting', resetLive: true },
       },
     });
     expect(start.status).toBe(200);

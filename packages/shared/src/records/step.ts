@@ -216,6 +216,9 @@ export const stepActivityReportSchema = z.object({
   tool: z.string().optional(),
   /** phase='retrying' 时在位：auto_retry 轮次（1 起）。 */
   attempt: z.number().int().optional(),
+  /** #1308：协议回落 / 网络重试开新一轮时在位。server hub 与 web 在飞
+   *  text/thinking 快照按此位清掉；普通 starting / 节流重发不得带此位。 */
+  resetLive: z.boolean().optional(),
   /** #918 技能事实（本步累计，首见序，去重按 name、denied 粘滞）：daemon 从
    *  工具调用流识别的「读了哪些技能」，被 deny 挡下的同样在列（判定源 =
    *  工具事实，分类单源 skill-facts.ts）。每份上报都携带当前累计集——hub
