@@ -172,6 +172,7 @@ export function BoardSurface({
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
+    if (cols.every((n) => n === 0)) return;
     try {
       localStorage.setItem('pacman-boot-shape', JSON.stringify({ cols }));
     } catch {}
