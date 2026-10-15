@@ -108,8 +108,7 @@ body[data-board-dragging] .todo-card:hover {
   }
 }
 
-.todo-card,
-.card-enter {
+.todo-card {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
 @media (hover: hover) and (pointer: fine) {

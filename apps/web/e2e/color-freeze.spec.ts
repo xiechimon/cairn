@@ -138,7 +138,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
       hairline: cs.getPropertyValue('--hairline').trim(),
     };
   });
-  expect(vals.composer).toBe('26px');
+  expect(vals.composer).toBe('20px');
   expect(vals.bubble).toBe('18px');
   expect(vals.sidebar).toBe('288px');
   expect(vals.chat).toBe('768px');

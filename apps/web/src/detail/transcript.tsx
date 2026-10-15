@@ -415,7 +415,7 @@ function Row({
                 min-height 保单行药丸 24px、多行随文长；12px 位圆角与
                 composer 同层（页面上两个用户说话的面同材质）。 */}
             <span
-              className={`chat-bubble card-enter ml-[11px] mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-(--radius-bubble) bg-(--secondary) px-[13px] text-[15px] leading-6 break-words text-(--foreground) ${
+              className={`chat-bubble anim-message-fade-up ml-[11px] mt-1 min-h-6 min-w-0 max-w-[68ch] rounded-(--radius-bubble) bg-(--secondary) px-[13px] text-[15px] leading-6 break-words text-(--foreground) ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
                   : 'whitespace-pre-wrap'

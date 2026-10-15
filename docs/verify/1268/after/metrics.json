@@ -1,9 +1,9 @@
 {
-  "radiusComposer": "26px",
+  "radiusComposer": "20px",
   "radiusBubble": "18px",
-  "composerRadius": "26px",
-  "sendRadius": "3.35544e+07px",
+  "composerRadius": "20px",
+  "sendRadius": "8px",
   "bubbleRadius": "18px",
-  "composerShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(28, 25, 23, 0.05) 0",
-  "bubbleAnim": "card-enter"
+  "bubbleAnim": "message-fade-up",
+  "composerShadowHead": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba"
 }
