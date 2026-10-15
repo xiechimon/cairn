@@ -26,7 +26,7 @@ import { PHASE_UI } from '../phase.js';
  *  触发面 .detail-chip 类名保留（detail-b 的 reject-chain/review-reject 与
  *  integration m5/web-plans 按它定位；重钉归各自批次），皮肤迁 utilities。 */
 
-// 头带 44px（43 + 1px 缝线，r7 §3.1）是 layout 位。#1006 原型（#980
+// 头带 --titlebar-h 48px（CDS PR-6；原 r7 §3.1 44px）是 layout 位。#1006 原型（#980
 // 前提④ registry 默认赢）：r7 §3.3 冻结几何（主钮 50.5×28 @12px、icon 钮
 // 28×28 透明底）与 ghost 七通道中和串退役——icon 钮 = registry ghost
 // icon-sm 档（28×28 + hover:bg-muted 反馈），主钮 = default 档默认几何，
@@ -92,7 +92,7 @@ export function DetailHead({
   const [popover, setPopover] = useState(chipPopoverOpen === true);
   return (
     <header
-      className="detail-head relative flex h-11 flex-none items-center border-b border-(--border) pl-3"
+      className="detail-head relative flex h-(--titlebar-h) flex-none items-center border-b border-(--border) pl-3"
       data-testid="detail-head"
     >
       {/* #1006 原型：返回钮 = registry ghost icon-sm 档经 render prop 落

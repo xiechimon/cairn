@@ -331,7 +331,7 @@ export function ChatMarkdown({ text }: { text: string }) {
               // 缝线，短行折行不横滚、长块 320px 封顶内滚。
               <pre
                 key={i}
-                className="chat-md-code my-2 max-h-80 overflow-auto rounded-[4px] border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-[11px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-[11.5px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
                 data-lang={block.lang ?? ''}
                 data-testid="md-code"
               >

@@ -1,0 +1,19 @@
+{
+  "metrics": {
+    "chatMaxW": "768px",
+    "chatExtra": "35vh",
+    "titlebarH": "48px",
+    "hasScrollFade": false,
+    "hasScrollFadeB": true,
+    "colPadBottom": "16px",
+    "headH": "44px",
+    "jumpActive": "false",
+    "jumpTestId": "message-scroller-button"
+  },
+  "jumpState": {
+    "dist": 220,
+    "jumpActive": "true",
+    "fadeBottom": "",
+    "fadeTop": ""
+  }
+}
