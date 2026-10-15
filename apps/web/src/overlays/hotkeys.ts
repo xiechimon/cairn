@@ -182,21 +182,3 @@ export function useProjectCycleHotkey(active: boolean, onCycle: () => void): voi
     return () => window.removeEventListener('keydown', onKey);
   }, [active, onCycle]);
 }
-
-export function useQuickEntryHotkey(onOpen: () => void): void {
-  const onOpenRef = useRef(onOpen);
-  useEffect(() => {
-    onOpenRef.current = onOpen;
-  });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.isComposing || event.repeat) return;
-      if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'k') return;
-      event.preventDefault();
-      onOpenRef.current();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
-}
