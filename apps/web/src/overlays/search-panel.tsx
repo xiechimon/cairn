@@ -533,7 +533,7 @@ export function useSearchState(initialOpen: boolean, initialQuery: string) {
   const [query, setQuery] = useState(initialQuery);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setOpen((value) => !value);
       } else if (event.key === 'Escape') {
