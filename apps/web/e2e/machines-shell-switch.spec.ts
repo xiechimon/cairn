@@ -218,9 +218,10 @@ test('C1+C2+C4：并发选择器——读标注真值、PATCH 单字段、刷新
   // C2：读标注 = 记录真值（running 1 / cap 2）。
   const readout = page.locator('[data-machine-running="1"]');
   await expect(readout).toHaveText('执行中 1/2');
-  // 触发钮显示当前上限；打开选 4。
-  const trigger = page.locator('button[aria-label="并发上限"]');
-  await expect(trigger).toContainText('并发');
+  // 触发钮显示当前上限；打开选 4。（#1241 设计 A：行内可见面 = 数值 +
+  // chevron，语义词全走 aria-label——无来源字段的老 server 形退短标签。）
+  const trigger = page.locator('button[aria-label^="并发上限"]');
+  await expect(trigger).toHaveAccessibleName('并发上限 2');
   await expect(trigger).toContainText('2');
   await trigger.click();
   await page.getByRole('option', { name: '4' }).click();
@@ -229,13 +230,13 @@ test('C1+C2+C4：并发选择器——读标注真值、PATCH 单字段、刷新
   expect(state.patches[0]).toEqual({ maxConcurrent: 4 });
   // C4：刷新后读侧真值一致。
   await page.reload();
-  await expect(page.locator('button[aria-label="并发上限"]')).toContainText('4');
+  await expect(page.locator('button[aria-label^="并发上限"]')).toContainText('4');
 });
 
 test('C3：老 server 形（无 maxConcurrent 字段）→ 控件与读标注整组退场', async ({ page }) => {
   await stubStack(page, [LOCAL]);
   await page.goto('/app/resources/machines');
-  await expect(page.locator('button[aria-label="并发上限"]')).toHaveCount(0);
+  await expect(page.locator('button[aria-label^="并发上限"]')).toHaveCount(0);
   await expect(page.locator('[data-machine-running]')).toHaveCount(0);
   // shell 开关不受影响（行回到单控件面）。
   await expect(page.locator(`${SWITCH}[data-machine-id="m-local"]`)).toHaveCount(1);

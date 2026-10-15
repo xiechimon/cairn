@@ -99,7 +99,10 @@ function BasisRow({ label, value }: { label: string; value: string }) {
 /** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
- * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。 */
+ * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。
+ * #1241 设计 A：行内触发面只剩 数值 + chevron（与邻座行文本同视觉档），
+ * 语义词（「并发上限」+ 来源）整体搬进 aria-label / title 与弹层——行内
+ * 不再出现 并发 标签词与 推荐/手动/估算 来源词。 */
 function MachineConcurrencySelect({
   machine,
   value,
@@ -119,29 +122,34 @@ function MachineConcurrencySelect({
     : [...CONCURRENCY_OPTIONS, value].sort((a, b) => a - b);
   const recommended = machine.recommendedConcurrent;
   const hardware = machine.capabilities?.hardware;
-  const estimate = machine.concurrencySource === 'estimate';
+  const source = machine.concurrencySource;
+  const estimate = source === 'estimate';
   const overridden = machine.maxConcurrentOverridden === true;
+  // aria-label / title 单源：来源缺席（老 server / 存量 fixture）退无来源段
+  // 的短形——退场判据与行内呈现同律，不谎报不存在的来源。
+  const label =
+    source !== undefined
+      ? t('并发上限 {n}，{source}', { n: value, source: t(CONCURRENCY_SOURCE_LABEL[source]) })
+      : t('并发上限 {n}', { n: value });
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
         render={
           <Button
             variant="ghost"
-            // aria-label = e2e 一级载体（shell 开关同律，strict-mode 独立命名）。
-            aria-label={t('并发上限')}
+            // aria-label = e2e 一级载体（shell 开关同律，strict-mode 独立命名）；
+            // data-concurrency-source = 来源状态载体——原行内来源词 span 的
+            // 载体随可见词迁入触发钮（#1241 设计 A）。
+            aria-label={label}
+            title={label}
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
+            data-concurrency-source={source}
             className="h-6 cursor-pointer gap-1 rounded-md px-1.5 text-xs leading-4 font-normal text-(--text-tertiary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
           />
         }
       >
-        <span>{t('并发')}</span>
-        <span className="font-medium tabular-nums text-(--foreground)">{value}</span>
-        {machine.concurrencySource !== undefined && (
-          <span data-concurrency-source={machine.concurrencySource}>
-            {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
-          </span>
-        )}
+        <span className="tabular-nums">{value}</span>
         <ChevronDown width={11} height={11} className="flex-none" />
       </PopoverTrigger>
       <PopoverContent
@@ -157,6 +165,13 @@ function MachineConcurrencySelect({
             {value}
           </span>
         </div>
+        {/* #1241 设计 A：来源词（推荐/手动/估算）只在弹层上屏——行内触发面
+            不再携带，读法随 aria-label / title 可达。 */}
+        {source !== undefined && (
+          <div className="px-1 text-xs leading-4 text-(--text-tertiary)">
+            {t(CONCURRENCY_SOURCE_LABEL[source])}
+          </div>
+        )}
         <div
           role="listbox"
           aria-label={t('并发上限')}

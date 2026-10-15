@@ -100,25 +100,27 @@ async function stubStack(page: Page, rows: StubMachine[]) {
   return { pending, state };
 }
 
-const source = (page: Page, id: string) =>
-  page.locator(`[data-testid="machine-concurrency"][data-machine-id="${id}"] [data-concurrency-source]`);
+// #1241 设计 A：触发面 = aria-label 定位（行内不再有可见来源词）；来源状态
+// 载体 = 触发钮自身的 data-concurrency-source（原内嵌 span 的载体迁移）。
 const trigger = (page: Page, id: string) =>
-  page.locator(`[data-testid="machine-concurrency"][data-machine-id="${id}"]`);
+  page.locator(`button[aria-label^="并发上限"][data-machine-id="${id}"]`);
 
 test('选数即标手动：PATCH 在途时来源已是手动，回执后仍是手动', async ({ page }) => {
   const { pending, state } = await stubStack(page, [machine({ id: 'm-1' })]);
   await page.goto('/app/resources/machines');
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
 
   await trigger(page, 'm-1').click();
   await page.locator('[data-testid="machine-concurrency-option"]', { hasText: /^5$/ }).click();
 
   await expect.poll(() => pending.length).toBe(1);
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
+  // aria-label 携带现值与来源（可见词已撤，语义走可及名 + title）。
+  await expect(trigger(page, 'm-1')).toHaveAttribute('aria-label', '并发上限 5，手动');
 
   pending.shift()!();
   await expect.poll(() => state.rows[0]?.maxConcurrentOverridden).toBe(true);
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
 });
 
 test('恢复推荐（有指纹）：PATCH 在途时来源先复判为推荐', async ({ page }) => {
@@ -126,13 +128,13 @@ test('恢复推荐（有指纹）：PATCH 在途时来源先复判为推荐', as
     machine({ id: 'm-1', maxConcurrent: 5, maxConcurrentOverridden: true, concurrencySource: 'manual' }),
   ]);
   await page.goto('/app/resources/machines');
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'manual');
 
   await trigger(page, 'm-1').click();
   await page.getByTestId('machine-concurrency-reset').click();
 
   await expect.poll(() => pending.length).toBe(1);
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'measured');
   pending.shift()!();
 });
 
@@ -153,6 +155,6 @@ test('恢复推荐（无指纹）：PATCH 在途时来源先复判为估算，�
   await page.getByTestId('machine-concurrency-reset').click();
 
   await expect.poll(() => pending.length).toBe(1);
-  await expect(source(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'estimate');
+  await expect(trigger(page, 'm-1')).toHaveAttribute('data-concurrency-source', 'estimate');
   pending.shift()!();
 });

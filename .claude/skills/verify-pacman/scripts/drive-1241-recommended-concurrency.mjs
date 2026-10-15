@@ -2,13 +2,16 @@
 // 服务端算推荐值落机器行，机器页并发控件呈现「推荐 / 手动 / 估算」三态与依据弹层。
 // 同一脚本两相位：--expect=new 打本分支栈（五断言族）；--expect=old 打 origin/main
 // 基线栈（只取 before 读数：固定默认 3、无来源标注、API 无推荐字段）。
-// 断言面（new）：
-//   A 推荐态：真 daemon 指纹上报后，控件 data-concurrency-source=measured、文案「推荐」，
-//     API recommendedConcurrent = 公式(os 实测核数/内存)，硬件字段与 os 值逐项相等。
+// 断言面（new）：#1241 设计 A 起行内触发面只有 数值 + chevron，来源词不上屏
+// ——来源语义的判别面 = 触发钮 aria-label（「并发上限 N，来源」）+ 钮自身的
+// data-concurrency-source 载体 + 弹层来源行。
+//   A 推荐态：真 daemon 指纹上报后，触发钮 data-concurrency-source=measured、
+//     aria-label 带「推荐」，API recommendedConcurrent = 公式(os 实测核数/内存)，
+//     硬件字段与 os 值逐项相等。
 //   B 依据：弹层「推荐 R」行 + 核数/总内存/负载 标签行，N/X 与 os 一致（总内存，非可用内存）。
-//   C 手动：UI 选 4 → 「手动」、API/SQLite maxConcurrent=4 overridden=1 source=manual，
+//   C 手动：UI 选 4 → aria-label 带「手动」、API/SQLite maxConcurrent=4 overridden=1 source=manual，
 //     推荐值仍为公式值；等一个心跳周期（30s）后仍为 4（心跳不覆盖用户值）。
-//   D 恢复推荐：UI 点「恢复推荐」→「推荐」、回到公式值、overridden=0（API+SQLite）。
+//   D 恢复推荐：UI 点「恢复推荐」→ aria-label 带「推荐」、回到公式值、overridden=0（API+SQLite）。
 //   E 估算：无指纹假机器（enroll + 只带 cliVersion 的心跳）→「估算」、值 3、依据「保守默认 3」，
 //     API capabilities 缺失、recommendedConcurrent=3。
 // 失败方式清单（先固化判别面）：
@@ -177,9 +180,8 @@ const byName = (rows, name) => rows.find((r) => r.name === name);
 
 // —— 浏览器面 ————————————————————————————————————————————————
 
-const triggerFor = (page, id) => page.locator(`[data-testid="machine-concurrency"][data-machine-id="${id}"]`);
-const sourceOf = (page, id) =>
-  page.locator(`[data-testid="machine-concurrency"][data-machine-id="${id}"] [data-concurrency-source]`);
+const triggerFor = (page, id) => page.locator(`button[aria-label^="并发上限"][data-machine-id="${id}"]`);
+const labelOf = async (page, id) => (await triggerFor(page, id).getAttribute('aria-label')) ?? '';
 
 // ============ 主流程 ============================================================
 
@@ -246,10 +248,17 @@ try {
 
     // —— A 推荐态 ——
     await expectAttr(page, realId, 'measured', 'A0');
+    const a1Label = await labelOf(page, realId);
     check(
-      'A1 真 daemon 指纹上报后控件标「推荐」（measured）',
-      (await triggerFor(page, realId).textContent())?.includes('推荐'),
-      `text=${((await triggerFor(page, realId).textContent()) ?? '').replace(/\s+/g, ' ').trim()}`,
+      'A1 真 daemon 指纹上报后触发钮 aria-label 标「推荐」（measured）',
+      a1Label.includes('推荐') && a1Label.includes(String(EXPECTED_RECOMMENDED)),
+      `aria-label=${a1Label}`,
+    );
+    const realTextNew = ((await triggerFor(page, realId).textContent()) ?? '').replace(/\s+/g, ' ').trim();
+    check(
+      'A1b 行内可见面 = 仅数值（#1241 设计 A：无「并发」标签词、无来源词，语义走 aria-label）',
+      realTextNew === String(EXPECTED_RECOMMENDED) && !/并发|推荐|手动|估算/.test(realTextNew),
+      `text=${realTextNew}`,
     );
     check(
       'A2 API recommendedConcurrent = 公式(os 核数, os 总内存)',
@@ -297,10 +306,11 @@ try {
     await triggerFor(page, realId).click();
     await page.getByTestId('machine-concurrency-option').filter({ hasText: /^4$/ }).click();
     await expectAttr(page, realId, 'manual', 'C0');
+    const c1Label = await labelOf(page, realId);
     check(
-      'C1 选数即标「手动」（UI）',
-      ((await triggerFor(page, realId).textContent()) ?? '').includes('手动'),
-      `text=${((await triggerFor(page, realId).textContent()) ?? '').replace(/\s+/g, ' ').trim()}`,
+      'C1 选数即 aria-label 标「手动」（UI）',
+      c1Label.includes('手动') && c1Label.includes('4'),
+      `aria-label=${c1Label}`,
     );
     const t1 = await snapshot('after-manual', teamId);
     const apiC = byName(t1.api, REAL_NAME);
@@ -332,13 +342,16 @@ try {
 
     // —— D 恢复推荐 ——
     await triggerFor(page, realId).click();
+    await page.getByTestId('machine-concurrency-reset').waitFor({ timeout: 10_000 });
+    await settle(page);
+    await page.screenshot({ path: join(EVIDENCE, '03b-manual-popover-reset.png') });
     await page.getByTestId('machine-concurrency-reset').click();
     await expectAttr(page, realId, 'measured', 'D0');
+    const d1Label = await labelOf(page, realId);
     check(
-      'D1 恢复推荐后标「推荐」，值回到公式值（UI）',
-      ((await triggerFor(page, realId).textContent()) ?? '').includes('推荐') &&
-        ((await triggerFor(page, realId).textContent()) ?? '').includes(String(EXPECTED_RECOMMENDED)),
-      `text=${((await triggerFor(page, realId).textContent()) ?? '').replace(/\s+/g, ' ').trim()}`,
+      'D1 恢复推荐后 aria-label 标「推荐」，值回到公式值（UI）',
+      d1Label.includes('推荐') && d1Label.includes(String(EXPECTED_RECOMMENDED)),
+      `aria-label=${d1Label}`,
     );
     const t3 = await snapshot('after-reset', teamId);
     const apiD = byName(t3.api, REAL_NAME);
@@ -357,7 +370,7 @@ try {
     await page.screenshot({ path: join(EVIDENCE, '04-after-reset.png') });
 
     // —— E 估算（无指纹机）——
-    await sourceOf(page, estId).waitFor({ timeout: 10_000 });
+    await triggerFor(page, estId).waitFor({ timeout: 10_000 });
     await expectAttr(page, estId, 'estimate', 'E0');
     const estApi = byName(t3.api, EST_NAME);
     const estDb = byName(t3.db, EST_NAME);
@@ -409,7 +422,7 @@ async function expectAttr(page, id, want, label) {
   const deadline = Date.now() + 15_000;
   let got = null;
   while (Date.now() < deadline) {
-    got = await sourceOf(page, id).getAttribute('data-concurrency-source').catch(() => null);
+    got = await triggerFor(page, id).getAttribute('data-concurrency-source').catch(() => null);
     if (got === want) break;
     await sleep(250);
   }
