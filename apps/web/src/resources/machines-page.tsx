@@ -25,7 +25,7 @@
 
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
@@ -123,23 +123,40 @@ function MachineConcurrencySelect({
   // 新输入一律夹进区间（失焦 / Enter / 步进时提交，Esc 还原不提交）。
   const range = machine.concurrencyRange ?? FALLBACK_RANGE;
   const outOfRange = value < range.min || value > range.max;
+  // #1342 Bugbot：只有用户真改过草稿（dirty）才在 Enter / 失焦时提交——未编辑的
+  // 超区间现值不许被夹值存成手动；未改时草稿跟随现值（弹层开着时心跳改值也同步）。
   const [draft, setDraft] = useState(String(value));
+  const [dirty, setDirty] = useState(false);
   const skipCommit = useRef(false);
+  useEffect(() => {
+    if (!dirty) setDraft(String(value));
+  }, [value, dirty]);
   const clampTo = (n: number) => Math.min(range.max, Math.max(range.min, n));
-  const commit = (raw: string) => {
-    const parsed = Number.parseInt(raw, 10);
+  const settle = (n: number) => {
+    setDraft(String(n));
+    setDirty(false);
+  };
+  const commit = () => {
+    if (!dirty) return;
+    const parsed = Number.parseInt(draft, 10);
     if (Number.isNaN(parsed)) {
-      setDraft(String(value));
+      settle(value);
       return;
     }
     const next = clampTo(parsed);
-    setDraft(String(next));
+    settle(next);
     if (next !== value) onPick(next);
   };
+  // ± = 单次写：基数取草稿（改过）或现值，步进后夹值，直接一发 PATCH。
   const step = (delta: number) => {
-    const base = Number.parseInt(draft, 10);
-    commit(String((Number.isNaN(base) ? value : clampTo(base)) + delta));
+    const parsed = Number.parseInt(draft, 10);
+    const base = dirty && !Number.isNaN(parsed) ? parsed : value;
+    const next = clampTo(clampTo(base) + delta);
+    settle(next);
+    if (next !== value) onPick(next);
   };
+  // ± / 恢复推荐 按下时不让输入框失焦（失焦提交会先发一笔手动值，与本次动作竞态）。
+  const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
   const recommended = machine.recommendedConcurrent;
   const hardware = machine.capabilities?.hardware;
   const source = machine.concurrencySource;
@@ -156,7 +173,7 @@ function MachineConcurrencySelect({
       open={open}
       onOpenChange={(next) => {
         if (next) {
-          setDraft(String(value));
+          settle(value);
           skipCommit.current = false;
         }
         setOpen(next);
@@ -209,6 +226,8 @@ function MachineConcurrencySelect({
             data-testid="machine-concurrency-dec"
             disabled={value <= range.min && Number.parseInt(draft, 10) <= range.min}
             className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            data-concurrency-action="step"
+            onMouseDown={keepFocus}
             onClick={() => step(-1)}
           >
             <Minus width={12} height={12} />
@@ -226,22 +245,27 @@ function MachineConcurrencySelect({
             max={range.max}
             data-testid="machine-concurrency-input"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setDirty(true);
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                commit(draft);
+                commit();
               } else if (e.key === 'Escape') {
                 skipCommit.current = true;
-                setDraft(String(value));
+                settle(value);
               }
             }}
-            onBlur={() => {
-              if (skipCommit.current) {
+            onBlur={(e) => {
+              // 焦点去往 ± / 恢复推荐（键盘 Tab 也算）：由该动作单发 PATCH，失焦不提交。
+              const to = e.relatedTarget as HTMLElement | null;
+              if (skipCommit.current || to?.dataset.concurrencyAction !== undefined) {
                 skipCommit.current = false;
                 return;
               }
-              commit(draft);
+              commit();
             }}
             className="h-7 flex-1 [appearance:textfield] rounded-md px-1 text-center text-sm tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
@@ -252,6 +276,8 @@ function MachineConcurrencySelect({
             data-testid="machine-concurrency-inc"
             disabled={value >= range.max && Number.parseInt(draft, 10) >= range.max}
             className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            data-concurrency-action="step"
+            onMouseDown={keepFocus}
             onClick={() => step(1)}
           >
             <Plus width={12} height={12} />
@@ -300,8 +326,11 @@ function MachineConcurrencySelect({
           <Button
             variant="ghost"
             data-testid="machine-concurrency-reset"
+            data-concurrency-action="reset"
+            onMouseDown={keepFocus}
             className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-xs font-normal text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
             onClick={() => {
+              setDirty(false);
               setOpen(false);
               onReset();
             }}
@@ -383,12 +412,21 @@ export function MachinesPage() {
   const [capDraft, setCapDraft] = useState<Record<string, number>>({});
   const capOn = (machine: MachineRow): number =>
     capDraft[rowKey(machine)] ?? machine.maxConcurrent ?? 1;
+  // #1342 Bugbot：同一台机器的并发写按序发——后一笔等前一笔回执再发，服务端
+  // 落库顺序 = 用户意图顺序（最后一次意图胜出），不会乱序留下覆盖位。
+  const capChain = useRef<Record<string, Promise<unknown>>>({});
+  const patchCap = (id: string, maxConcurrent: number | null): void => {
+    const prev = capChain.current[id] ?? Promise.resolve();
+    capChain.current[id] = prev.then(() =>
+      mutations.patchMachine.mutateAsync({ id, body: { maxConcurrent } }).catch(() => undefined),
+    );
+  };
   const pickCap = (machine: MachineRow, n: number): void => {
     if (!live || machine.id == null) {
       setCapDraft((prev) => ({ ...prev, [rowKey(machine)]: n }));
       return;
     }
-    mutations.patchMachine.mutate({ id: machine.id, body: { maxConcurrent: n } });
+    patchCap(machine.id, n);
   };
   const resetCap = (machine: MachineRow): void => {
     if (!live || machine.id == null) {
@@ -398,7 +436,7 @@ export function MachinesPage() {
       }));
       return;
     }
-    mutations.patchMachine.mutate({ id: machine.id, body: { maxConcurrent: null } });
+    patchCap(machine.id, null);
   };
   // 保存失败的显式反馈（XMON-80/P2 同律）：本面无 toast，失败只可能来自
   // shell 开关 / 并发选择这两条写（页面仅有的 mutation），文案是固定句、
