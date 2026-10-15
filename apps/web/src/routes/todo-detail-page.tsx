@@ -817,11 +817,11 @@ export function TodoDetailPage() {
     // 是覆盖层，右栏格位不再被面板顶掉，--detail-pane-right 收敛回单态
     // 488px（composer-reject 锚照它 calc() 跳过右格位）。#945（detail.css
     // 清零）：三栏壳（240 | fluid | 488，todos.dev 网格）迁 utilities；
-    // #932 窄屏折叠走 max-md 变体（<768px 双定宽栏退场、线程列独占视口，
+    // #932 窄屏折叠走 max-[815px]（288 sidebar 后保留与旧 768/240 同款 ~40px 中栏余量；双定宽栏退场、线程列独占视口，
     // pane 变量归零让锚位停止跳格）。board-sidebar 是 #943 保留的运行时
     // 钩子类，子选择器规则随壳迁移（跨域消费面不断）。
     <div
-      className="detail-shell flex h-full overflow-hidden [--detail-pane-right:488px] max-md:[--detail-pane-right:0px] [&>.board-sidebar]:max-md:hidden"
+      className="detail-shell flex h-full overflow-hidden [--detail-pane-right:488px] max-[815px]:[--detail-pane-right:0px] [&>.board-sidebar]:max-[815px]:hidden"
       data-route="todo-detail"
       data-todo-id={id}
     >

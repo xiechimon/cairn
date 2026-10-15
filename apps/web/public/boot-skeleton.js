@@ -21,7 +21,7 @@
 
     const ink = theme === 'light' ? '#eae4e0' : '#2d2926';
     const page = theme === 'light' ? '#f6f1ec' : '#1f1b18';
-    boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:240px 1fr;background:${page};z-index:0`;
+    boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:288px 1fr;background:${page};z-index:0`;
 
     const rail = document.createElement('div');
     rail.style.cssText = 'padding:16px 12px';
