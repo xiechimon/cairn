@@ -15,7 +15,7 @@ import { expect, test } from '@playwright/test';
 // 4. 深链 ?runtime=claude-code 直落 + 刷新回定位
 // 5. header 卡：runtime 名/说明/「已安装在 <hostname>」（两 runtime 同构）
 // 5b. settings.json 缺失分支：header 转「未安装」指引态 + 模型行零渲染
-// 6. 几何：tablist/header/模型行卡同贴内容列左缘（x456 @1440，r7 探针
+// 6. 几何：tablist/header/模型行卡同贴内容列左缘（x480 @1440，r7 探针
 //    canon），tab 序 pi 左 claude-code 右
 // #944/#910 载体：.res-model-row → [data-model-id][data-runtime] 契约句柄；
 // .res-runtime-head → runtime-head testid；.res-col → resource-col testid；
@@ -225,8 +225,8 @@ test('几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左
   const headBox = await head.boundingBox();
   const cardBox = await card.boundingBox();
   expect(colBox).not.toBeNull();
-  // 内容列左缘 canon x=456 @1440（r7 06–10 探针，shell.tsx 头注）。
-  expect(colBox?.x).toBe(456);
+  // 内容列左缘 canon x=504 @1440（r7 06–10 探针，shell.tsx 头注）。
+  expect(colBox?.x).toBe(480);
   for (const box of [tabsBox, headBox, cardBox]) {
     expect(box?.x).toBe(colBox?.x);
   }

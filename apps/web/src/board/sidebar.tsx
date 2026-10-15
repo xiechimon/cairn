@@ -306,6 +306,7 @@ function UserMenuPopover({
         alignOffset={8}
         sideOffset={4}
         collisionPadding={8}
+        collisionAvoidance={{ align: 'none' }}
         aria-label={t('用户菜单')}
         className="block w-auto rounded-none border-none bg-transparent p-0 shadow-none ring-0"
       >
