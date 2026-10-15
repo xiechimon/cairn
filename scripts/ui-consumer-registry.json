@@ -12,24 +12,6 @@
       "reason": "Selected-row tint of the sidebar team row (neutral alpha ladder --sidebar-active). L1 #1058 radius ruling 2 (f8595334) keeps row-highlight layers on their own geometry: 'the ::before hover/selected pill keeps its own radius; it is the tint, not the button box' — the team-row active pill is the same tint family (V2 skeleton lineage #792 P6, sidebar-visual.spec pins the pill geometry law plain==selected). No e2e radius pin on this row; re-shaping it is a sidebar visual ruling, registered here instead of taken unilaterally."
     },
     {
-      "file": "apps/web/src/detail/composer.tsx",
-      "anchor": "composer relative",
-      "kind": "deviation",
-      "reason": "#991 Q7 (user ruling): the composer input area is carved out of the registry map — the registry has no composer primitive (#984 search: zero hits), the face stays hand-written and untouched; componentization is a new effort at its own destination. Wave-1 L3 declared it residue on the same clause (#1059: 'transcript/composer untouched (#1009 A2 / #991 Q7)'). Geometry = r7 3.4 card recipe / V2 skeleton square (#792 P6), pinned by detail-3pane.spec (radius 0px + 1px border)."
-    },
-    {
-      "file": "apps/web/src/detail/transcript.tsx",
-      "anchor": "chat-bubble",
-      "kind": "deviation",
-      "reason": "Deferred to #1009 A2 (open, in-flight): the detail transcript column migrates to the registry MessageScroller/Bubble primitives in that segment; the A1 chief precedent lands the user bubble on Bubble secondary with --radius-popover 12px. Wave-1 disposition ② forbids two-sided changes on an in-flight lane's file; the bubble is registered here so A2 lands it on a registry basis and deletes this entry."
-    },
-    {
-      "file": "apps/web/src/chief/chief-drawer.tsx",
-      "anchor": "chief-composer",
-      "kind": "deviation",
-      "reason": "Chief face of the #991 Q7 composer clause: the registry has no composer primitive, the input area stays hand-written ('the composer stays hand-written because the registry has no primitive for it', #1066 A1); the A1 probe ledger re-attested every geometry/skin row KEPT. Same disposition as detail/composer.tsx."
-    },
-    {
       "file": "apps/web/src/chief/recipes.ts",
       "anchor": "w-auto flex-col gap-0 border",
       "kind": "rides-primitive",
