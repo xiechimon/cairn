@@ -48,7 +48,7 @@ import { ComposerChips } from './composer-chips.js';
 // --surface-secondary 底 + --card-shadow 卡级抬升（#775 阴影管层次），
 // 16px 侧/底 margin = 列 inset 律（#472 in-flow）。
 const COMPOSER_CARD =
-  'composer relative mx-4 mb-4 flex-none rounded-none border border-(--border) bg-(--secondary) shadow-(--card-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-out)';
+  'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border border-(--border) bg-(--secondary) shadow-(--card-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-out) focus-within:shadow-[var(--edge-ring),var(--edge-shadow)]';
 // 占位行/输入行共用几何：13px/15px 内衬 + 14px/16px 墨（#470：一档压正文
 // 15px）。min-h-[84px] 走卡片本体。
 const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-4';
@@ -69,7 +69,7 @@ const COMPOSER_TOOL =
 // 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
 // （#860），停止的红只住 10px glyph。
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-none border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[10px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;
