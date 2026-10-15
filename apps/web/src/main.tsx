@@ -28,3 +28,4 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+document.getElementById('boot')?.remove();
