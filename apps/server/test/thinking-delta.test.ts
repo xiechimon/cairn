@@ -217,4 +217,29 @@ describe('thinking_delta on the conversation stream (#1308)', () => {
     }
     s.dispose();
   });
+
+  test('resetLive is one-shot: catch-up after later thinking still replays it', async () => {
+    const { s, token, buildId, stepId } = await world();
+    await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: { kind: 'activity', activity: { phase: 'starting', resetLive: true } },
+    });
+    await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: { kind: 'thinking_delta', text: MARKER },
+    });
+    // A plain starting resend (no resetLive) must not wipe the snapshot.
+    await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+      cred: token,
+      body: { kind: 'activity', activity: { phase: 'starting' } },
+    });
+    const late = await openConvStream(s.app, buildId);
+    try {
+      const replay = await late.next((frame) => frame.type === 'thinking_delta');
+      expect(replay).toEqual({ type: 'thinking_delta', text: MARKER });
+    } finally {
+      await late.close();
+    }
+    s.dispose();
+  });
 });

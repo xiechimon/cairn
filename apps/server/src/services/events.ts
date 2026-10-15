@@ -227,8 +227,12 @@ export class ConversationStreamHub {
       this.textBuffers.delete(conversationId);
       this.thinkingBuffers.delete(conversationId);
     }
+    // 进场补发的 lastActivity 不带 resetLive——否则补发顺序是思考快照
+    // 后跟 starting+resetLive，客户端会把刚补上的思考清掉。
+    const { resetLive: _drop, ...rest } = activity;
+    const stored: StepActivity = activity.resetLive === true ? rest : activity;
     this.lastActivity.delete(conversationId);
-    this.lastActivity.set(conversationId, activity);
+    this.lastActivity.set(conversationId, stored);
     if (this.lastActivity.size > CONV_TEXT_BUFFER_MAX_CONVS) {
       const oldest = this.lastActivity.keys().next().value;
       if (oldest !== undefined) this.lastActivity.delete(oldest);

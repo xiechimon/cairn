@@ -87,6 +87,13 @@ export function createActivityTracker(deps: ActivityTrackerDeps): ActivityTracke
         ...(extra?.resetLive === true ? { resetLive: true } : {}),
       };
       emit(withSkills(base));
+      // resetLive 一次性：发出后立刻从 base/current 撕掉，节流重发与后续
+      // 相位不得再带清快照位（#1308 Bugbot sticky resetLive）。
+      if (extra?.resetLive === true && base !== null) {
+        const { resetLive: _drop, ...rest } = base;
+        base = rest;
+        current = withSkills(base);
+      }
     },
     noteEvent() {
       lastEventAt = now();
