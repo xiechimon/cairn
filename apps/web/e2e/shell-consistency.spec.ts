@@ -161,7 +161,7 @@ test.describe('sidebar form is route-invariant', () => {
     await page.getByRole('link', { name: 'Pacman' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
     // the active pill repaints the row's background only. The r7 12 pill box
-    // (x8 y6 w223 h32) is pinned in sidebar-seam.spec.ts; this is the content
+    // (x8 y6 w272 h32) is pinned in sidebar-seam.spec.ts; this is the content
     // *inside* it — the icon and the name must not drift as the pill lights.
     await expect(page.locator(ROUTE_ANCHOR['/app/team'])).toBeVisible();
     await expect.poll(() => headContentX(page)).toEqual(board);

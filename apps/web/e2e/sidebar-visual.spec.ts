@@ -115,16 +115,15 @@ for (const theme of ['light', 'dark'] as const) {
     // one face geometry for both states — selected is a deepen, not a shape
     expect(geo.plain).toEqual(geo.selected);
     // the official 32px inset face (r7 01/02 probe: 2px vertical inset),
-    // V2 骨架方角 (#792 P6)
+    // CDS PR-3: 8px pill radius (--cds-radius-lg)
     expect(geo.selected.top).toBe('2px');
     expect(geo.selected.bottom).toBe('2px');
-    expect(geo.selected.radius).toBe('0px');
+    expect(geo.selected.radius).toBe('8px');
     // no margin hack on the selected row → no right-edge clip; the row
-    // fills the sidebar's content box (the #135 seam takes its 1px of the
-    // 240px border-box, so clientWidth — not the outer rect — is the law)
+    // fills the sidebar's content box (no solid seam; width == clientWidth)
     expect(geo.rowMargin).toBe('0px');
     expect(geo.rowWidth).toBe(geo.sidebarClientWidth);
-    expect(geo.sidebarWidth).toBe(240);
+    expect(geo.sidebarWidth).toBe(288);
   });
 
   test(`selected pill deepens the hover step (${theme})`, async ({ page }) => {
@@ -150,10 +149,11 @@ for (const theme of ['light', 'dark'] as const) {
     const bg = parse(sidebarBg);
     const hover = over(hoverBg, sidebarBg);
     const selected = over(selectedBg, sidebarBg);
-    // hover reads off the sidebar layer (the #128 "invisible/muddy" fix)
-    expect(dist(hover, bg)).toBeGreaterThan(6);
+    // hover reads off the sidebar layer (tier-1 surface; 5% fg step is
+    // softer on the mid tone than on canvas, so the bar is >3)
+    expect(dist(hover, bg)).toBeGreaterThan(3);
     // selected = the deeper step of the same ladder, not a twin
-    expect(dist(selected, bg)).toBeGreaterThan(dist(hover, bg) + 6);
+    expect(dist(selected, bg)).toBeGreaterThan(dist(hover, bg) + 3);
 
     // hovering the selected row must not wash it back to the hover step
     await page.getByRole('link', { name: '工作台' }).hover();

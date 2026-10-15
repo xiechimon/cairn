@@ -99,7 +99,7 @@ test('N3: the degradation stops at 768px — the 3-pane shell survives above it'
       document.querySelector('[data-testid="detail-right"]')!.getBoundingClientRect().width,
     ),
   }));
-  expect(widths.sidebar).toBe(240);
+  expect(widths.sidebar).toBe(288);
   expect(widths.right).toBe(488);
 });
 

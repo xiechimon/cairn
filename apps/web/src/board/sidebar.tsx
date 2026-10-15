@@ -1,4 +1,4 @@
-// Board sidebar (issue #54): 240px expanded rail, structure and copy from
+// Board sidebar (issue #54): 288px expanded rail (--sidebar-w), structure and copy from
 // r6 §3.1 / r2 §1.1, geometry from r7 01 pixel probes (row pitch 36, level-1
 // icons at x16, group chevrons at x20, sub-rows at x36, user chip at the
 // bottom). #55 adds the collapsed rail: 40px wide, icon-only rows, 32px row
@@ -31,6 +31,7 @@ import {
   type SVGProps,
   useCallback,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -43,6 +44,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { UserMenu } from '../detail/user-menu.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/fixtures.js';
+import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import {
@@ -171,7 +173,7 @@ const groupAria = (t: TFunc, label: string, collapsed: boolean) =>
  *  B 面 hover/selected = --sidebar-hover/--sidebar-active（neutral alpha 梯）。
  *  focus 环走 B 的 ring（全局 indigo outline 在 app.css，本族显式覆盖）。 */
 const ROW_BASE =
-  'relative flex w-full flex-none items-center text-left text-[13px] leading-4 text-muted-foreground no-underline outline-none before:absolute before:inset-x-2 before:inset-y-[2px] before:rounded-none before:content-[""] focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>span:not(.sidebar-kbd):not(.sidebar-online-dot)]:relative';
+  'relative flex w-full flex-none items-center text-left text-[13px] leading-4 text-muted-foreground no-underline outline-none before:absolute before:inset-x-2.5 before:inset-y-[2px] before:rounded-[length:var(--cds-radius-lg)] before:content-[""] before:transition-[background-color] before:duration-150 before:ease-(--ease-out-expo) focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>span:not(.sidebar-kbd):not(.sidebar-online-dot)]:relative';
 /** hover 与 selected 互斥挂在行上（旧 css 的 :not(--selected):hover 闸）：
    选中行悬停保持深 pill，不被 hover 梯洗浅。 */
 const ROW_HOVER = 'hover:before:bg-sidebar-hover';
@@ -225,7 +227,7 @@ function GroupHeader({
       <span className="sidebar-group-chevron flex-none text-muted-foreground transition-transform duration-150 group-[.sidebar-group--collapsed]:[transform:rotate(-90deg)]">
         <ChevronDown />
       </span>
-      <span className="ml-[11px] text-[13px] leading-4 text-muted-foreground">{t(label)}</span>
+      <span className="ml-[11px] text-[14px] leading-[17px] text-muted-foreground">{t(label)}</span>
     </Button>
   );
 }
@@ -262,7 +264,7 @@ function RailGroupChevron({
 
 /** Rail 行公共件：32px 轨道行 + 方角 hover 面（inset 8/4，V2 骨架）。 */
 const RAIL_ROW =
-  'rail-row relative flex h-8 w-10 flex-none items-center justify-center text-muted-foreground no-underline outline-none before:absolute before:inset-x-2 before:inset-y-1 before:rounded-none before:content-[""] hover:before:bg-sidebar-hover focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>svg]:relative [&>.project-avatar]:relative';
+  'rail-row relative flex h-8 w-10 flex-none items-center justify-center text-muted-foreground no-underline outline-none before:absolute before:inset-x-2 before:inset-y-1 before:rounded-[length:var(--cds-radius-lg)] before:content-[""] before:transition-[background-color] before:duration-150 before:ease-(--ease-out-expo) hover:before:bg-sidebar-hover focus-visible:[outline:2px_solid_var(--focus-ring)] focus-visible:outline-offset-2 [&>svg]:relative [&>.project-avatar]:relative';
 const RAIL_SELECTED = `rail-row--selected text-foreground before:bg-sidebar-active ${SEARCH_OPEN_DIM}`;
 /** Rail 行钮中和件（#943）：与 ROW_BTN 同理——rail 钮的视觉盒同样是
  *  before: pill，件配方的涂底/圆角/边框/press 位移归零。 */
@@ -356,9 +358,11 @@ export function BoardSidebar({
   }, []);
   const toggleProjectGroup = useCallback(() => toggleGroup('project'), [toggleGroup]);
   const toggleResourceGroup = useCallback(() => toggleGroup('resource'), [toggleGroup]);
+  const navRef = useRef<HTMLElement | null>(null);
+  useScrollFade(navRef, { enabled: !collapsed });
   if (collapsed) {
     return (
-      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col border-r border-[var(--border)] bg-background">
+      <aside className="board-sidebar board-sidebar--collapsed relative z-(--z-docked) flex w-10 flex-none flex-col bg-(--surface-1) shadow-[1px_0_0_0_var(--border-soft)]">
         {/* 展开钮的 hover 面是它骑 seam 行的本分（见展开态注释）；按压面与
             展开态折叠钮同律禁掉——同一个控件折叠前后的两张脸，按下去都只
             该是图标本身（XMON-69，律在 motion.css 的 sidebar toggles 段）。 */}
@@ -471,7 +475,7 @@ export function BoardSidebar({
   }
 
   return (
-    <aside className="board-sidebar relative z-(--z-docked) flex w-60 flex-none flex-col overflow-hidden border-r border-[var(--border)] bg-background">
+    <aside className="board-sidebar relative z-(--z-docked) flex w-(--sidebar-w) flex-none flex-col overflow-hidden bg-(--surface-1) shadow-[1px_0_0_0_var(--border-soft)]">
       {/* 头部几何与选中态无关（dogfood 2026-09-30）：--active 只换底色，不搬
           内容。pill 的 mx-2 内缩 8px，pl 补 11 让图标仍落在 x19——与非选中态
           pl-[19px] 同一条线；名字间距恒 11px。r7 12 探针钉的是 pill 盒子
@@ -485,7 +489,7 @@ export function BoardSidebar({
         data-testid="team-row"
         className={`sidebar-team-row flex flex-none items-center text-foreground ${
           selected === 'team'
-            ? 'sidebar-team-row--active mx-2 mt-1.5 mb-[5px] h-8 rounded-none bg-sidebar-active pl-[11px]'
+            ? 'sidebar-team-row--active mx-2 mt-1.5 mb-[5px] h-8 rounded-[length:var(--cds-radius-lg)] bg-sidebar-active pl-[11px]'
             : 'h-[43px] pl-[19px]'
         }`}
       >
@@ -536,7 +540,10 @@ export function BoardSidebar({
         </Button>
       </div>
 
-      <nav className="flex min-h-0 flex-[0_1_auto] flex-col overflow-y-auto border-t border-[var(--border)] pt-[9.5px]">
+      <nav
+        ref={navRef}
+        className={`flex min-h-0 flex-[0_1_auto] flex-col gap-0.5 overflow-y-auto border-t border-(--border) pt-[9.5px] ${scrollFadeClassName()}`}
+      >
         <Button
           variant="ghost"
           className={`sidebar-row ${ROW_BASE} ${ROW_HOVER} ${ROW_BTN} h-9 cursor-pointer pl-[18px]`}

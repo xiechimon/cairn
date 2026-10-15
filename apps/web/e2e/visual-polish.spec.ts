@@ -175,13 +175,11 @@ for (const theme of ['light', 'dark'] as const) {
         shadow: cs.boxShadow,
       };
     });
-    // #390 同底律: the sidebar rides the same surface token as the main
-    // area — the #135 裁决 v2 seam (1px in the topbar-divider token, the
-    // floating soft shadow gone) alone carries the layer separation
-    expect(probe.sidebarBg).toBe(probe.mainBg);
-    expect(probe.borderRight).toBe('1px');
-    expect(probe.seamColor).toBe(probe.topbarBorderColor);
-    expect(probe.shadow).toBe('none');
+    // CDS PR-3: sidebar is tier-1 (--surface-1), distinct from main canvas;
+    // soft hairline shadow replaces the solid divider-token seam
+    expect(probe.sidebarBg).not.toBe(probe.mainBg);
+    expect(probe.borderRight).toBe('0px');
+    expect(probe.shadow).not.toBe('none');
   });
 
   test(`board grid lays out four even columns with no horizontal scroll (${theme})`, async ({
@@ -234,6 +232,6 @@ test('collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2)', asyn
     const cs = getComputedStyle(el);
     return { borderRight: cs.borderRightWidth, shadow: cs.boxShadow };
   });
-  expect(rail.borderRight).toBe('1px');
-  expect(rail.shadow).toBe('none');
+  expect(rail.borderRight).toBe('0px');
+  expect(rail.shadow).not.toBe('none');
 });
