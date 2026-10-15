@@ -133,3 +133,18 @@ VERIFY_RUN_DIR=/workspace/wt-1241/.claude/verify-run \
 3. **同跑需重 launch**：`vite` 的 `**/.claude/**` watch 忽略不会罩住 `apps/web/src`，
    但 worktree 自带的 `.claude/verify-pacman/scripts/` 不在 watch 范围，栈运行中改
    probe 脚本不会热生效——重 launch 即可（launch 走 detached 重读 `launch.mjs`）。
+## 终版（option A + 弹性区间 + 步进输入，`39e2da21`）
+
+证据目录 `final/`（探针 32/32 PASS，server 8799 / web 5279，node22）。
+
+```
+range.max   = clamp(round(memoryTotalMb / 1024), 1, 16)      # 每槽 1 GiB
+recommended = clamp(min(cpuCores, round(memoryTotalMb / 2048)), 1, 16)  # 每槽 2 GiB
+无指纹      = range 1..8，recommended 3（估算）
+```
+
+| 机器 | 硬件 | 可选 | 推荐 |
+|---|---|---|---|
+| grok-bot-vm / verify-1241-real | 8 核 / 15.6 GiB | 1–16 | 8 |
+| verify-1241-36gb（假机器） | 12 核 / 36 GiB | 1–16 | 12 |
+| verify-1241-estimate（无指纹） | — | 1–8 | 3 |
