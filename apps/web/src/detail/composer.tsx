@@ -48,18 +48,18 @@ import { ComposerChips } from './composer-chips.js';
 // --surface-secondary 底 + --card-shadow 卡级抬升（#775 阴影管层次），
 // 16px 侧/底 margin = 列 inset 律（#472 in-flow）。
 const COMPOSER_CARD =
-  'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border border-(--border) bg-(--secondary) shadow-(--card-shadow) transition-shadow duration-(--dur-fast) ease-(--ease-out) focus-within:shadow-[var(--edge-ring),var(--edge-shadow)]';
+  'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border-0 bg-(--secondary) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 // 占位行/输入行共用几何：13px/15px 内衬 + 14px/16px 墨（#470：一档压正文
 // 15px）。min-h-[84px] 走卡片本体。
-const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-4';
-// 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 96px wire cap 自增
+const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-5';
+// 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 --composer-max-h 384px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老
 // textarea.composer-input 的自定义字体栈（--font-inter + Inter/system-ui/
 // PingFang SC 后备列）逐项保留——caret/镜像几何依赖它。Textarea 件底座
 // 差额逐条中和：方角已同形，field-sizing 回 fixed（JS grow 律），边框/
 // focus 环/暗底/过渡清零到老 UA 裸面形。
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-24 overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-4 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 // 工具钮（30px 盒，XMON-55 P5 光学左缘 10px 由 toolbar 锚承载）：ghost
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
@@ -189,7 +189,7 @@ export function Composer({
     },
     // #860: textarea follows the content up to 6 lines (16px), scrolling
     // internally beyond it; the card rides min-height (detail.css).
-    growCap: 96,
+    growCap: 384,
   });
 
   return (

@@ -113,7 +113,8 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
   });
   // rounded composer card (--radius-composer = 20px)
   expect(geo.radius).toBe('20px');
-  expect(geo.border).toBe('1px');
+  // CDS PR-7: 1px hairline retired; --shadow-composer carries the ring
+  expect(geo.border).toBe('0px');
   // #472 in-flow law: a layout participant, never an overlay again —
   // relative (not static) because the in-card toolbar/send/stop absolutes
   // anchor to it
