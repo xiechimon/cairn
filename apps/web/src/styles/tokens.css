@@ -150,23 +150,23 @@
   --hairline: 1px;
   --edge-ring: inset 0 0 0 var(--hairline) var(--border);
   --edge-radius: 16px;
-  --radius-xs: 2px;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --cds-radius-xs: 2px;
+  --cds-radius-sm: 4px;
+  --cds-radius-md: 6px;
+  --cds-radius-lg: 8px;
   --radius-panel: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
+  --cds-radius-xl: 12px;
+  --cds-radius-2xl: 16px;
   --radius-popover: 12px;
   --radius-composer: 20px;
   --radius-bubble: 18px;
   --radius-control: 5px;
   --radius-window: 12px;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px 0 rgb(0 0 0 / 0.4);
-  --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.4), 0 6px 16px 0 rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.5), 0 16px 36px -2px rgb(0 0 0 / 0.4);
-  --edge-shadow: var(--shadow-md);
-  --card-shadow: var(--shadow-sm);
+  --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px 0 rgb(0 0 0 / 0.4);
+  --cds-shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.4), 0 6px 16px 0 rgb(0 0 0 / 0.4);
+  --cds-shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.5), 0 16px 36px -2px rgb(0 0 0 / 0.4);
+  --edge-shadow: var(--cds-shadow-md);
+  --card-shadow: var(--cds-shadow-sm);
   --card-lift: 0 4px 16px rgb(0 0 0 / 0.14), 0 1px 4px rgb(0 0 0 / 0.08);
   --shadow-popover:
     inset 0 0 0 var(--hairline) var(--ring-inset-highlight), 0 8px 28px rgb(0 0 0 / 0.65),
@@ -177,7 +177,7 @@
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.65), inset 0 0 0 var(--hairline) var(--ring-inset-highlight),
     0 0 0 var(--hairline) var(--ring-inset-highlight);
-  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--shadow-sm);
+  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--cds-shadow-sm);
   --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
   /* drag-tier shadow (#616): the lifted drag clone floats on the reference
      product's live recipe (todos.dev 2026-10-02 capture: inline
@@ -201,7 +201,7 @@
      裁定不变）；亮侧走定版软 blur 档（分层软投影语言同上）。 */
   --plate-shadow: none;
   /* overlay batch A (#66): dialog 模态投影，定版最深档（spec/22 §2.4） */
-  --dialog-shadow: var(--shadow-lg);
+  --dialog-shadow: var(--cds-shadow-lg);
   /* chief 面（r5 100–104, #72）drawer 投影，r5 100 edge gradient 采样。
      ADR 0013 后本槽只剩抽屉头主题切换器 popover 一个消费点；悬浮窗本体
      走 --floating-shadow（下方），本槽随 #983 手写壳退役面一并处置。 */
@@ -297,12 +297,12 @@
      :root --edge-ring recipe. 投影四档定版 spec/22 §2.4 */
   --radius-popover: 12px;
   --radius-window: 12px;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 2px 8px 0 rgb(0 0 0 / 0.08);
-  --shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.05), 0 6px 16px 0 rgb(0 0 0 / 0.08);
-  --shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.06), 0 12px 28px -2px rgb(0 0 0 / 0.08);
-  --edge-shadow: var(--shadow-md);
+  --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 2px 8px 0 rgb(0 0 0 / 0.08);
+  --cds-shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.05), 0 6px 16px 0 rgb(0 0 0 / 0.08);
+  --cds-shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.06), 0 12px 28px -2px rgb(0 0 0 / 0.08);
+  --edge-shadow: var(--cds-shadow-md);
   --plate-shadow: 0 6px 16px rgb(0 0 0 / 0.12);
-  --card-shadow: var(--shadow-sm);
+  --card-shadow: var(--cds-shadow-sm);
   --card-lift: 0 3px 10px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.04);
   --shadow-popover:
     0 0 0 var(--hairline) var(--border), 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
@@ -312,7 +312,7 @@
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.08), inset 0 0 0 var(--hairline) var(--border-soft),
     0 0 0 var(--hairline) var(--border-soft);
-  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--shadow-sm);
+  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--cds-shadow-sm);
   --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
   /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
      (#915 spot), mirrored explicitly so .light stays the full
@@ -323,7 +323,7 @@
   --drop-tint-hover: rgb(151 34 126 / 0.1);
   /* overlay batch A (#66), light: dialog 模态投影定版档（spec/22 §2.4）
      — mirrored explicitly so .light stays the full semantic-token mirror */
-  --dialog-shadow: var(--shadow-lg);
+  --dialog-shadow: var(--cds-shadow-lg);
   /* chief surfaces (r5 100–104, #72): shadow from the r5 100 edge
      gradient */
   --chief-shadow: 0 4px 24px rgb(28 25 23 / 0.16);

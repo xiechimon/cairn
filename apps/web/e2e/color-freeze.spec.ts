@@ -132,6 +132,8 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
       chat: cs.getPropertyValue('--chat-max-w').trim(),
       edge: cs.getPropertyValue('--edge-radius').trim(),
       panel: cs.getPropertyValue('--radius-panel').trim(),
+      cdsMd: cs.getPropertyValue('--cds-radius-md').trim(),
+      shadcnMd: cs.getPropertyValue('--radius-md').trim(),
       expo: cs.getPropertyValue('--ease-out-expo').trim(),
       hairline: cs.getPropertyValue('--hairline').trim(),
     };
@@ -142,6 +144,9 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
   expect(vals.chat).toBe('768px');
   expect(vals.edge).toBe('16px');
   expect(vals.panel).toBe('10px');
+  expect(vals.cdsMd).toBe('6px');
+  expect(vals.shadcnMd).not.toBe('6px');
+  expect(vals.shadcnMd.length).toBeGreaterThan(0);
   expect(vals.expo.replace(/0\./g, '.')).toBe('cubic-bezier(.16, 1, .3, 1)');
   expect(vals.hairline.length).toBeGreaterThan(0);
   expect(vals.hairline === '1px' || vals.hairline.startsWith('0.') || vals.hairline.startsWith('calc(')).toBe(true);
