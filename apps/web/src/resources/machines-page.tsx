@@ -145,7 +145,7 @@ function MachineConcurrencySelect({
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
             data-concurrency-source={source}
-            className="h-6 cursor-pointer gap-1 rounded-md px-1.5 text-xs leading-4 font-normal text-(--text-tertiary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            className="h-6 w-10 cursor-pointer justify-between gap-1 rounded-md px-1.5 text-xs leading-4 font-normal text-(--text-tertiary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
           />
         }
       >
@@ -245,6 +245,16 @@ function MachineConcurrencySelect({
       </PopoverContent>
     </Popover>
   );
+}
+
+/** #1241 能力读标注全文（title / aria-label）：行内只露紧凑短标。 */
+function capabilityFull(
+  t: ReturnType<typeof useI18n>['t'],
+  caps: { mcpServers: unknown[]; skills: unknown[] } | null,
+): string {
+  return caps === null
+    ? t('能力清单未上报')
+    : t('MCP {n} · 本机技能 {m}', { n: caps.mcpServers.length, m: caps.skills.length });
 }
 
 export function MachinesPage() {
@@ -452,6 +462,7 @@ export function MachinesPage() {
                 <TooltipTrigger
                   render={
                     <span
+                      data-machine-col="shell"
                       className={cn(
                         'flex flex-none items-center gap-2',
                         machine.kind === 'local' || machine.pill != null ? 'ml-5' : 'ml-auto',
@@ -479,10 +490,13 @@ export function MachinesPage() {
                   / step SSE 失效重取刷新（machines 查询联动）。与 shell 簇同
                   ml-5 间距：两组控件视觉同档。 */}
               {machine.maxConcurrent !== undefined && (
-                <span className="ml-5 flex flex-none items-center gap-2.5">
+                <span
+                  className="ml-5 flex flex-none items-center gap-2.5"
+                  data-machine-col="concurrency"
+                >
                   {machine.runningSteps !== undefined && (
                     <span
-                      className="text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"
+                      className="w-16 text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"
                       data-machine-running={machine.runningSteps}
                     >
                       {t('执行中 {n}/{cap}', {
@@ -505,17 +519,21 @@ export function MachinesPage() {
                   整组退场，呈现零漂移（maxConcurrent 同律）。 */}
               {machine.capabilities !== undefined && (
                 <span
-                  className="ml-5 flex-none text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
+                  className="ml-5 w-24 flex-none truncate text-right text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
                   data-machine-capabilities={
                     machine.capabilities === null ? 'unreported' : 'reported'
                   }
+                  title={capabilityFull(t, machine.capabilities)}
                 >
-                  {machine.capabilities === null
-                    ? t('能力清单未上报（旧版 daemon）')
-                    : t('MCP {n} · 本机技能 {m}', {
-                        n: machine.capabilities.mcpServers.length,
-                        m: machine.capabilities.skills.length,
-                      })}
+                  <span className="sr-only">{capabilityFull(t, machine.capabilities)}</span>
+                  <span aria-hidden="true">
+                    {machine.capabilities === null
+                      ? '—'
+                      : t('MCP {n} · 技能 {m}', {
+                          n: machine.capabilities.mcpServers.length,
+                          m: machine.capabilities.skills.length,
+                        })}
+                  </span>
                 </span>
               )}
             </RowGrow>

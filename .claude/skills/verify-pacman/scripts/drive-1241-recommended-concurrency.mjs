@@ -27,7 +27,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { cpus, totalmem } from 'node:os';
+import { cpus, hostname, totalmem } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -103,16 +103,16 @@ async function waitFor(label, fn, timeoutMs = 60_000) {
 
 // —— daemon / 假机器 ——————————————————————————————————————————
 
-function spawnDaemon(apiKey, teamId) {
+function spawnDaemon(apiKey, teamId, name = REAL_NAME, home = DAEMON_HOME, log = 'daemon-console.log') {
   const env = { ...process.env };
   for (const k of ['http_proxy', 'https_proxy', 'all_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']) delete env[k];
   env.NO_PROXY = '*';
-  env.PACMAN_HOME = DAEMON_HOME;
-  const out = join(EVIDENCE, 'daemon-console.log');
+  env.PACMAN_HOME = home;
+  const out = join(EVIDENCE, log);
   writeFileSync(out, '');
   const child = spawn(
     'pnpm',
-    ['exec', 'tsx', 'src/cli.ts', 'start', '--foreground', '--server', SERVER, '--api-key', apiKey, '--team', teamId, '--name', REAL_NAME],
+    ['exec', 'tsx', 'src/cli.ts', 'start', '--foreground', '--server', SERVER, '--api-key', apiKey, '--team', teamId, '--name', name],
     { cwd: join(REPO, 'apps/daemon'), env, stdio: ['ignore', 'pipe', 'pipe'] },
   );
   child.stdout.on('data', (d) => appendFileSync(out, d));
@@ -135,13 +135,18 @@ async function newApiKey(teamId, name) {
   return plain;
 }
 
-// 假机器：enroll 不带能力清单，随后一拍只带 cliVersion 的心跳——「缺指纹」态的真 wire 形。
+// 假机器：能力清单只有 MCP / 技能计数、无 hardware 指纹——「缺指纹 → 估算」态的
+// wire 形（行内能力列照常有计数，#1241 vA2：验证环境全行同为当前形）。
+const EST_CAPS = { mcpServers: [], skills: [] };
 async function enrollBlankMachine(teamId, name) {
   const key = await newApiKey(teamId, `enroll-${name}`);
-  const res = await jfetch('POST', '/api/machine/enroll', { token: key, body: { teamId, name, cliVersion: '0.1.0' } });
+  const res = await jfetch('POST', '/api/machine/enroll', {
+    token: key,
+    body: { teamId, name, cliVersion: '0.1.0', capabilities: EST_CAPS },
+  });
   const token = res.body?.token ?? res.body?.machine?.token;
   if (res.status !== 200 || !token) throw new Error(`enroll ${name} → ${res.status}`);
-  const beat = await jfetch('POST', '/api/machine/presence', { token, body: { cliVersion: '0.1.0' } });
+  const beat = await jfetch('POST', '/api/machine/presence', { token, body: { cliVersion: '0.1.0', capabilities: EST_CAPS } });
   if (beat.status !== 200) throw new Error(`presence ${name} → ${beat.status}`);
   return token;
 }
@@ -192,6 +197,11 @@ if (!teamId) throw new Error(`no team: ${JSON.stringify(teams.body).slice(0, 200
 rmSync(DAEMON_HOME, { recursive: true, force: true });
 const daemonKey = await newApiKey(teamId, `daemon-1241-${EXPECT}`);
 const daemon = spawnDaemon(daemonKey, teamId);
+// 本机行（server seed 的 hostname 占位行）也接一只当前 daemon——否则该行从未上报
+// 能力清单，验证环境里出现一行「未上报」（#1241 vA2）。
+const LOCAL_HOME = `${DAEMON_HOME}-local`;
+rmSync(LOCAL_HOME, { recursive: true, force: true });
+const localDaemon = spawnDaemon(await newApiKey(teamId, `daemon-1241-local-${EXPECT}`), teamId, hostname(), LOCAL_HOME, 'daemon-local-console.log');
 
 let browser;
 try {
@@ -328,6 +338,33 @@ try {
     await triggerFor(page, realId).scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(EVIDENCE, '03-manual-override.png') });
 
+    // —— F 列对齐（#1241 vA2）：shell 簇 / 执行中 / 并发钮 / 能力短标左缘逐行一致 ——
+    const cols = await page.locator('div[data-kind]').evaluateAll((rows) =>
+      rows.map((r) => {
+        const x = (sel) => {
+          const el = r.querySelector(sel);
+          return el ? Math.round(el.getBoundingClientRect().left) : null;
+        };
+        return [
+          x('[data-machine-col="shell"]'),
+          x('[data-machine-running]'),
+          x('button[aria-label^="并发上限"]'),
+          x('[data-machine-capabilities]'),
+        ];
+      }),
+    );
+    const colsAligned =
+      cols.length >= 2 && [0, 1, 2, 3].every((i) => cols.every((c) => c[i] !== null && Math.abs(c[i] - cols[0][i]) <= 1));
+    check('F1 各行控件列 x 坐标一致（shell / 执行中 / 并发 / 能力）', colsAligned, `x=${JSON.stringify(cols)}`);
+    const capStates = await page.locator('[data-machine-capabilities]').evaluateAll((els) =>
+      els.map((e) => e.getAttribute('data-machine-capabilities')),
+    );
+    check(
+      'F2 验证环境全行上报能力清单（当前 daemon / 计数形）',
+      capStates.length === cols.length && capStates.every((v) => v === 'reported'),
+      `states=${JSON.stringify(capStates)}`,
+    );
+
     // 等一个心跳周期（30s）+ 余量：心跳带着指纹回来，覆盖值不得被改回推荐值。
     const seenBefore = dbC.lastSeenAt;
     await sleep(HEARTBEAT_WAIT_MS);
@@ -375,13 +412,13 @@ try {
     const estApi = byName(t3.api, EST_NAME);
     const estDb = byName(t3.db, EST_NAME);
     check(
-      'E2 无指纹机：API 无 capabilities、recommendedConcurrent=3、maxConcurrent=3',
-      estApi.capabilities == null && estApi.recommendedConcurrent === 3 && estApi.maxConcurrent === 3,
+      'E2 无指纹机：API capabilities 无 hardware、recommendedConcurrent=3、maxConcurrent=3',
+      estApi.capabilities != null && estApi.capabilities.hardware == null && estApi.recommendedConcurrent === 3 && estApi.maxConcurrent === 3,
       `capabilities=${JSON.stringify(estApi.capabilities)} recommended=${estApi.recommendedConcurrent} maxConcurrent=${estApi.maxConcurrent}`,
     );
     check(
-      'E3 SQLite 行：capabilities 为 NULL，未覆盖',
-      estDb.capabilities === null && estDb.maxConcurrentOverridden === 0,
+      'E3 SQLite 行：capabilities 无 hardware，未覆盖',
+      !String(estDb.capabilities ?? '').includes('hardware') && estDb.maxConcurrentOverridden === 0,
       `capabilities=${JSON.stringify(estDb.capabilities)} overridden=${estDb.maxConcurrentOverridden}`,
     );
     await triggerFor(page, estId).click();
@@ -402,6 +439,7 @@ try {
 } finally {
   await browser?.close();
   daemon.kill('SIGTERM');
+  localDaemon.kill('SIGTERM');
   await sleep(1500);
   const passed = checks.filter((c) => c.ok).length;
   save('result.json', {

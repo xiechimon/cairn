@@ -582,8 +582,9 @@ export const EN: Record<string, string> = {
     'Queued: waiting for a machine to come online ({ahead} ahead)',
   '执行中 {n}/{cap}': 'Running {n}/{cap}',
   // #1251 machines page capability annotation (daemon-reported inventory).
-  '能力清单未上报（旧版 daemon）': 'Capabilities not reported (old daemon)',
+  能力清单未上报: 'Capabilities not reported',
   'MCP {n} · 本机技能 {m}': 'MCP {n} · local skills {m}',
+  'MCP {n} · 技能 {m}': 'MCP {n} · skills {m}',
   手动: 'Manual',
   推荐: 'Recommended',
   估算: 'Estimate',
