@@ -193,7 +193,6 @@ export function useQuickEntryHotkey(onOpen: () => void): void {
       if (event.defaultPrevented || event.isComposing || event.repeat) return;
       if (!(event.metaKey || event.ctrlKey) || !event.shiftKey) return;
       if (event.key.toLowerCase() !== 'k') return;
-      if (isEditableTarget(event.target)) return;
       event.preventDefault();
       onOpenRef.current();
     };

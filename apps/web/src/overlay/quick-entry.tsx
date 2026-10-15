@@ -61,7 +61,7 @@ export function QuickEntry({ open, onClose, onOpen, onSubmit, busy = false }: Qu
             rows={4}
             className="min-h-[96px] resize-none rounded-(--edge-radius) border-(--border) bg-(--secondary) px-3 py-3 text-[15px] leading-6 text-(--foreground) placeholder:text-(--text-tertiary) focus-visible:ring-0"
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 submit();
               }
