@@ -8,7 +8,7 @@
 // 触控 / 方向键立刻 unpin（原语 userScrollIntent）；流式增长只在仍 pinned
 // 时跟随（behavior:'auto'）。原语 ~180ms autoscrolling 旗位（scrollbar 隐藏）
 // 覆盖 plan 的 150ms no-pull-back——unpin 后直到读者回到边缘才再钉，比 150ms
-// 防回拉更强。jump-to-latest 独立阈值 JUMP_THRESHOLD 120px（MessageScrollerJumpButton）；
+// 防回拉更强。jump-to-latest 独立阈值 JUMP_THRESHOLD 120px（JumpToLatestButton）；
 // 开列落最新 = defaultScrollPosition "end"；读者自己发出去的那条永远跳到
 // 最新 = `scrollToEnd()`（旧 requestFollow 等价）。
 //
@@ -17,13 +17,12 @@
 // Content 中和为 block + gap-0，并 `max-w-(--chat-max-w)` 768 居中。
 
 import { forwardRef, useImperativeHandle } from 'react';
+import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import {
-  FOLLOW_THRESHOLD,
   MessageScroller,
   MessageScrollerContent,
-  MessageScrollerJumpButton,
   MessageScrollerProvider,
-  MessageScrollerViewport,
   useMessageScroller,
 } from '../components/ui/message-scroller.js';
 import type { TranscriptItem } from '../fixtures/records.js';
@@ -91,7 +90,7 @@ function TranscriptColumnInner({
     <MessageScroller className={ROOT_CLS}>
       {/* 旧 `.chat-col` 的滚动端口：testid 与内垫随迁（detail-3pane 的
           colPadBottom / detail-narrow 的横滚断言读这里）。 */}
-      <MessageScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
+      <FadeScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
         <MessageScrollerContent className={CONTENT_CLS}>
           {/* #827：简报卡住线程列首（随流滚动，不钉住）。fixture 面无 spec
               数据，捕获字节不动。 */}
@@ -103,12 +102,12 @@ function TranscriptColumnInner({
             onOpenPlan={onOpenPlan}
           />
         </MessageScrollerContent>
-      </MessageScrollerViewport>
+      </FadeScrollerViewport>
       {/* CDS PR-6：jump past 120px（独立于 40px follow 阈值）。 */}
-      <MessageScrollerJumpButton>
+      <JumpToLatestButton>
         <ArrowDown width={16} height={16} />
         <span className="sr-only">{t('滚动到最新')}</span>
-      </MessageScrollerJumpButton>
+      </JumpToLatestButton>
     </MessageScroller>
   );
 }

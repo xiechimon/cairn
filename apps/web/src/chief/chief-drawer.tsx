@@ -57,16 +57,15 @@ import {
 } from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Kbd } from '../components/ui/kbd.js';
 import {
-  FOLLOW_THRESHOLD,
   MessageScroller,
   MessageScrollerContent,
-  MessageScrollerJumpButton,
   MessageScrollerProvider,
-  MessageScrollerViewport,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
@@ -801,7 +800,7 @@ function ChiefDrawerInner({
                 block + gap-0（行距留在行 margin 上，注记见常量）。
                 chief-body / chief-stream 两 testid 载体随迁。 */}
       <MessageScroller className={SCROLLER_ROOT_CLS}>
-        <MessageScrollerViewport data-testid="chief-body">
+        <FadeScrollerViewport data-testid="chief-body">
           <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
             {chief.stream?.map((item, i) => (
               // 行渲染器住 ./chief-message-rows.js（#1126 提取）——DOM/testid
@@ -825,13 +824,13 @@ function ChiefDrawerInner({
               />
             ))}
           </MessageScrollerContent>
-        </MessageScrollerViewport>
-        {/* CDS PR-6：jump-to-latest 独立 120px 阈值（MessageScrollerJumpButton；
+        </FadeScrollerViewport>
+        {/* CDS PR-6：jump-to-latest 独立 120px 阈值（JumpToLatestButton；
                 follow 仍 40px）。落位/显隐动效沿原语 Button 配方。 */}
-        <MessageScrollerJumpButton>
+        <JumpToLatestButton>
           <ArrowDown width={16} height={16} />
           <span className="sr-only">{t('滚动到最新')}</span>
-        </MessageScrollerJumpButton>
+        </JumpToLatestButton>
       </MessageScroller>
 
       {/* #948：strip 的流内垫规则自 attachment-strip.css 迁入（该文件
