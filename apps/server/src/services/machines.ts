@@ -368,6 +368,30 @@ function reportedConcurrencyPatch(
   };
 }
 
+/** #1241 启动回填（mon 裁定）：未覆盖行（含 0043 回填里恰为旧默认 3 的存量行）
+ *  一律跟当前推荐值——有硬件指纹按公式重算，无指纹保持保守默认 3（估算）。
+ *  手动覆盖行一概不动。幂等：值已等于推荐值的行不写；返回改动行数。
+ *  也兜住公式调整（如 floor→round）后离线机的旧值，不必等下一拍心跳。 */
+export function backfillMachineConcurrency(db: Db): number {
+  const rows = db
+    .select({
+      id: machine.id,
+      maxConcurrent: machine.maxConcurrent,
+      capabilities: machine.capabilities,
+    })
+    .from(machine)
+    .where(eq(machine.maxConcurrentOverridden, false))
+    .all();
+  let changed = 0;
+  for (const row of rows) {
+    const { value } = recommendMachineConcurrency(row.capabilities?.hardware);
+    if (row.maxConcurrent === value) continue;
+    db.update(machine).set({ maxConcurrent: value }).where(eq(machine.id, row.id)).run();
+    changed += 1;
+  }
+  return changed;
+}
+
 /** PATCH /api/machines/{id} 的并发半边（#1241）。数字 = 覆盖并持久；
  *  null = 清除覆盖，按当前指纹重算（无指纹 = 保守默认）。 */
 export function machineConcurrencyPatch(

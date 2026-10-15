@@ -15,7 +15,7 @@ import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import { killInFlightPick } from './services/fs-pick.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
-import { seedLocalMachine } from './services/machines.js';
+import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
 import { createScheduler } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
@@ -47,6 +47,15 @@ backfillFixedTags(db);
 // 的编辑保留），二次启动零动作。测试世界同 backfillFixedTags 律——直调
 // services/personas。
 backfillPersonas(db);
+// 机器并发回填（#1241，mon 裁定）：未覆盖行跟推荐值（旧默认 3 → 推荐；
+// 无指纹仍 3），手动覆盖不动；幂等，二次启动零动作。
+const concurrencyBackfilled = backfillMachineConcurrency(db);
+if (concurrencyBackfilled > 0) {
+  logger.info(
+    { machines: concurrencyBackfilled },
+    'machine concurrency backfilled to recommendation',
+  );
+}
 const hub = new TeamStreamHub();
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
