@@ -93,7 +93,13 @@ function walk(dir, rel, out) {
     if (e.isSymbolicLink()) continue;
     if (e.isDirectory()) {
       if (SKIP_DIRS.has(e.name)) continue;
-      if (e.name.startsWith('.') && e.name !== '.claude' && e.name !== '.github') continue;
+      if (
+        e.name.startsWith('.') &&
+        e.name !== '.claude' &&
+        e.name !== '.github' &&
+        e.name !== '.cursor'
+      )
+        continue;
       walk(join(dir, e.name), `${rel}${e.name}/`, out);
     } else {
       out.push(`${rel}${e.name}`);
