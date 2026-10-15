@@ -12,12 +12,18 @@
 // XMON-107 (用户裁决): the capture's head mail line is removed — pacman
 // 无邮箱账位面（单用户 seed 自动登录），live 态曾渲染 fixture 常量地址。
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { applyDensity, type Density, readStoredDensity } from '../density.js';
+import {
+  applyDensity,
+  DENSITY_EVENT,
+  type Density,
+  readDomDensity,
+  readStoredDensity,
+} from '../density.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, type Theme } from '../theme.js';
@@ -101,6 +107,16 @@ export function UserMenu({
     applyDensity(next);
     setDensity(next);
   };
+  // Keep segment face in sync with account page (Bugbot #1366 desync).
+  useEffect(() => {
+    const onDensity = (e: Event) => {
+      const detail = (e as CustomEvent<Density>).detail;
+      if (detail === 'comfortable' || detail === 'compact') setDensity(detail);
+    };
+    window.addEventListener(DENSITY_EVENT, onDensity);
+    setDensity(readDomDensity());
+    return () => window.removeEventListener(DENSITY_EVENT, onDensity);
+  }, []);
   return (
     <div
       className={`${PANEL}${floating ? ` ${PANEL_FLOATING}` : ''}${

@@ -41,7 +41,7 @@
 // option set was never observed (r2 §11 Q19), so the shape follows the
 // plan-dropdown family and lists the two locales as endonyms.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useSession } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -60,7 +60,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
-import { applyDensity, type Density, readStoredDensity } from '../density.js';
+import {
+  applyDensity,
+  DENSITY_EVENT,
+  type Density,
+  readDomDensity,
+  readStoredDensity,
+} from '../density.js';
 import { USER_NAME } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
@@ -130,6 +136,16 @@ export function AccountPage() {
     applyDensity(next);
     setDensity(next);
   };
+  // Keep segment face in sync with user-menu (Bugbot #1366 desync).
+  useEffect(() => {
+    const onDensity = (e: Event) => {
+      const detail = (e as CustomEvent<Density>).detail;
+      if (detail === 'comfortable' || detail === 'compact') setDensity(detail);
+    };
+    window.addEventListener(DENSITY_EVENT, onDensity);
+    setDensity(readDomDensity());
+    return () => window.removeEventListener(DENSITY_EVENT, onDensity);
+  }, []);
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
