@@ -111,8 +111,8 @@ test('composer stays in-flow inside the center column: card form, 16px insets, s
       colPadBottom: Number.parseFloat(colCs.paddingBottom),
     };
   });
-  // rounded composer card (--radius-composer = 14px)
-  expect(geo.radius).toBe('14px');
+  // rounded composer card (--radius-composer = 20px)
+  expect(geo.radius).toBe('20px');
   expect(geo.border).toBe('1px');
   // #472 in-flow law: a layout participant, never an overlay again —
   // relative (not static) because the in-card toolbar/send/stop absolutes
