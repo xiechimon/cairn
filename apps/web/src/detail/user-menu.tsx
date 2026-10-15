@@ -52,7 +52,10 @@ const ROWS = [
 // Arrow = before/after 双三角（描边 12×6 下指触发行左上，锚位 20px 避开
 // 10px 圆角），伪元经 before:/after: 变体承载。
 const PANEL =
-  "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-px before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-0.5 after:left-[21px] after:h-[5px] after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-['']";
+  // CDS PR-5: border-0 + --shadow-popover hairline. Caret outline tracks the
+  // ring token (light --border outer ring / dark --ring-inset-highlight inset)
+  // and seats on the shadow edge (no 1px border offset).
+  "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-0 before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-px after:left-[21px] after:h-[5px] after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-[''] dark:before:bg-(--ring-inset-highlight)";
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
 
 // 外观 seg（r7 37 probe #138）：~20px 描边格 + 8px 侧内边距 + 发丝缝。

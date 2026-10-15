@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "cdd0ba23bfae2dbb9d8378637c0d642ac33a8770",
+    "sha": "ac4c2269e69216187ee336200fabe3b54063901e",
     "date": "2026-10-15"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -64,7 +64,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#983 verdict / map #980 (ruling 2/4): zero-skin adapter over the registry dialog item — regular faces compose Dialog/DialogContent/DialogHeader/DialogTitle/DialogFooter (registry defaults win: panel/overlay skin, motion, close button all come from dialog.tsx), keeping only the repo behavior contracts as semantic mapping (#193 three-segment cap via layout classes + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law via native dismiss, width as a layout position). The viewportRoot and bare modes stay on the legacy direct-primitive mechanism unchanged — they are the #983 adapter-boundary pressure points whose surfaces belong to the L5 lane (#1008) and whose fate is ruled at that lane's prototype review; zIndex/onBackdropClick/backdropClassName serve only those two modes (#1006).",
-      "hash": "91a522ca2302e8c2944cbe877601bd5e11c9998ab52176d8e6366b889909a12b"
+      "hash": "85a4a2928204c77737936316eb4224336d6c242562b3b8169ccfd35b1cb996b6"
     },
     "dialog.tsx": {
       "kind": "registry",
