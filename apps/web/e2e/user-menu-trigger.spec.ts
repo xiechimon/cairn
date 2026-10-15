@@ -260,7 +260,8 @@ test('#1245 floating menu is a single skin and stays inside the viewport', async
   expect(sample!.shellBg).toBe('rgba(0, 0, 0, 0)');
   expect(sample!.panelBg).not.toBe('rgba(0, 0, 0, 0)');
   expect(sample!.arrowContent).not.toBe('none');
-  expect(sample!.arrowBottom).toBe('1px');
+  // CDS PR-5: border-0 + shadow ring — caret seats at bottom:0 (was 1px on solid border)
+  expect(sample!.arrowBottom).toBe('0px');
   expect(sample!.arrowHeight).toBe('6px');
   expect(sample!.side).toBe('top');
   expect(sample!.panelTop).toBeGreaterThanOrEqual(0);
