@@ -238,6 +238,9 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
           ],
           "type": "string",
         },
+        "priorMachineId": {
+          "type": "string",
+        },
         "sessionId": {
           "type": [
             "string",
@@ -613,6 +616,9 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                     "new",
                     "continue",
                   ],
+                  "type": "string",
+                },
+                "priorMachineId": {
                   "type": "string",
                 },
                 "sessionId": {
@@ -5639,6 +5645,42 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > 
         {
           "additionalProperties": false,
           "properties": {
+            "hardware": {
+              "additionalProperties": false,
+              "properties": {
+                "cpuCores": {
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991,
+                  "type": "integer",
+                },
+                "diskFreeMb": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "loadAvg1": {
+                  "minimum": 0,
+                  "type": "number",
+                },
+                "memoryAvailableMb": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "memoryTotalMb": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+              },
+              "required": [
+                "cpuCores",
+                "memoryAvailableMb",
+                "loadAvg1",
+                "diskFreeMb",
+              ],
+              "type": "object",
+            },
             "mcpServers": {
               "items": {
                 "type": "string",
@@ -5662,6 +5704,34 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > 
           "type": "null",
         },
       ],
+    },
+    "concurrencyRange": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+        "min": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
+      },
+      "required": [
+        "min",
+        "max",
+      ],
+      "type": "object",
+    },
+    "concurrencySource": {
+      "enum": [
+        "measured",
+        "estimate",
+        "manual",
+      ],
+      "type": "string",
     },
     "enabledRuntimes": {
       "items": {
@@ -5690,11 +5760,19 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > machine > 
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "maxConcurrentOverridden": {
+      "type": "boolean",
+    },
     "name": {
       "type": "string",
     },
     "online": {
       "type": "boolean",
+    },
+    "recommendedConcurrent": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
     },
     "runningSteps": {
       "maximum": 9007199254740991,

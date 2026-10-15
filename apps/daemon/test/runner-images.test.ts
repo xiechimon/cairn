@@ -18,7 +18,6 @@ import type {
   ClaimedStep,
   MachineAttachmentResponse,
   SessionOpts,
-  ToolCallRecord,
   TranscriptUpload,
 } from '@pacman/shared';
 import { formatAttachmentToken } from '@pacman/shared';

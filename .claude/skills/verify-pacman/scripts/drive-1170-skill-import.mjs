@@ -62,6 +62,10 @@ mkdirSync(EVIDENCE, { recursive: true });
 const checks = [];
 let failures = 0;
 const check = (ok, label, detail) => {
+  if (typeof ok !== 'boolean') {
+    const kind = ok instanceof Promise ? 'Promise' : ok === null ? 'null' : typeof ok;
+    throw new TypeError(`check ok must be boolean, got ${kind} (${label})`);
+  }
   checks.push({ ok, label, detail: detail ?? null });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}${detail != null ? `  — ${detail}` : ''}`);
   if (!ok) failures += 1;
@@ -233,15 +237,23 @@ try {
     name: 'import-probe',
     cliVersion: '0.1.0',
   }, 'POST', key);
-  const { token } = await enroll.json();
+  const enrolled = await enroll.json();
+  const { token, machineId } = enrolled;
+  if (!token || !machineId) {
+    throw new Error(`enroll failed: ${enroll.status} ${JSON.stringify(enrolled).slice(0, 300)}`);
+  }
   const agentRes = await j(`/api/teams/${TEAM}/agents`, {
     displayName: '物化验证 Agent',
     provider: 'p',
     modelId: 'm',
+    machineId,
     skillsAllowlist: ['my-live-skill'],
   });
   const agentRec = await agentRes.json();
   const agentId = agentRec.id ?? agentRec.agent?.id;
+  if (!agentId) {
+    throw new Error(`agent create failed: ${agentRes.status} ${JSON.stringify(agentRec).slice(0, 300)}`);
+  }
   const project = await (await j('/api/projects', { name: 'import-probe' })).json();
   const todo = await (
     await j(`/api/projects/${project.id}/todos`, { title: '', spec: '导技能\n\n现在的情况：没技能' })
@@ -252,7 +264,11 @@ try {
     withPlan: false,
   });
   const claim = await j('/api/machine/tasks/claim', {}, 'POST', token);
-  const claimed = (await claim.json()).step;
+  const claimBody = await claim.json();
+  const claimed = claimBody.step;
+  if (!claimed?.step?.id) {
+    throw new Error(`claim empty: ${claim.status} ${JSON.stringify(claimBody).slice(0, 300)}`);
+  }
   const manifestGet = () =>
     j(`/api/machine/skills/${claimed.step.id}`, undefined, 'GET', token).then((r) => r.json());
   const manifest1 = await manifestGet();
@@ -364,6 +380,12 @@ try {
   await browser.close();
 }
 
+const nonBoolean = checks.filter((c) => typeof c.ok !== 'boolean');
+if (nonBoolean.length > 0) {
+  throw new TypeError(
+    `result checks with non-boolean ok: ${nonBoolean.map((c) => c.label).join('; ')}`,
+  );
+}
 writeFileSync(
   join(EVIDENCE, 'result.json'),
   `${JSON.stringify({ probe: '1170-skill-import', checks, stack: { API, WEB, HOME }, stamp }, null, 2)}\n`,

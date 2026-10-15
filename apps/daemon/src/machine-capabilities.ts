@@ -22,9 +22,14 @@
 // SKILL.md 只改子目录 mtime，不改扫描根 mtime——下一拍根目录任何变更即
 // 补齐（能力上报是增强信号，分钟级滞后无害）。
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
+import { cpus, freemem, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
-import { type MachineCapabilities, parseClaudeMcpEntries } from '@pacman/shared';
+import {
+  type MachineCapabilities,
+  type MachineHardware,
+  parseClaudeMcpEntries,
+} from '@pacman/shared';
 
 /** 探测源两位（daemon config 直取：mcpConfigPath / skillsDir）。 */
 export interface MachineCapabilitySources {
@@ -65,11 +70,50 @@ function scanSkillNames(skillsDir: string): string[] {
   return names.sort();
 }
 
+/** 卷可用空间（MiB）。路径不存在时回落 `/`；两处都失败 = undefined（整份
+ *  指纹缺席，server 走估算，不把 presence 打挂）。 */
+function diskFreeMb(path: string): number | undefined {
+  const read = (target: string): number | undefined => {
+    try {
+      const st = statfsSync(target);
+      return Math.max(0, Math.floor((st.bavail * st.bsize) / (1024 * 1024)));
+    } catch {
+      return undefined;
+    }
+  };
+  return read(path) ?? read('/');
+}
+
+/** #1241 能力指纹。核数 / 内存总量 / 可用内存 / 1 分钟负载 / 磁盘余量。任何失败 =
+ *  undefined（调用方省略 hardware，不 throw）。不缓存：负载和可用内存
+ *  每拍都变，mtime 缓存只覆盖 MCP/技能两维。 */
+export function probeMachineHardware(diskPath: string): MachineHardware | undefined {
+  try {
+    const cpuCores = cpus().length;
+    if (!Number.isInteger(cpuCores) || cpuCores < 1) return undefined;
+    const free = diskFreeMb(diskPath);
+    if (free === undefined) return undefined;
+    const load = loadavg()[0];
+    if (load === undefined || !Number.isFinite(load) || load < 0) return undefined;
+    return {
+      cpuCores,
+      memoryTotalMb: Math.max(0, Math.floor(totalmem() / (1024 * 1024))),
+      memoryAvailableMb: Math.max(0, Math.floor(freemem() / (1024 * 1024))),
+      loadAvg1: load,
+      diskFreeMb: free,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** 一次性探测（enroll 前 / 测试直用）：全函数，永不 throw。 */
 export function probeMachineCapabilities(sources: MachineCapabilitySources): MachineCapabilities {
+  const hardware = probeMachineHardware(sources.skillsDir);
   return {
     mcpServers: scanMcpSlugs(sources.mcpConfigPath),
     skills: scanSkillNames(sources.skillsDir),
+    ...(hardware !== undefined ? { hardware } : {}),
   };
 }
 
@@ -106,6 +150,11 @@ export function createMachineCapabilitiesProbe(
     if (skillsCache === null) {
       skillsCache = { mtimeMs: Number.NaN, value: scanSkillNames(sources.skillsDir) };
     }
-    return { mcpServers: mcpCache.value, skills: skillsCache.value };
+    const hardware = probeMachineHardware(sources.skillsDir);
+    return {
+      mcpServers: mcpCache.value,
+      skills: skillsCache.value,
+      ...(hardware !== undefined ? { hardware } : {}),
+    };
   };
 }

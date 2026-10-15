@@ -25,7 +25,7 @@
 
 import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
 import { cn } from 'cn';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, useChief, useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
@@ -33,6 +33,7 @@ import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, PiMark } from '../components/brand-marks.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Switch } from '../components/ui/switch.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
@@ -40,7 +41,7 @@ import { TEAM_NAME } from '../fixtures/fixtures.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChevronDown, Monitor, ServerThin } from '../icons/index.js';
+import { ChevronDown, Minus, Monitor, Plus, Restore, ServerThin } from '../icons/index.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
 import {
   GroupCard,
@@ -79,78 +80,293 @@ const MACHINE_SHELL_HINT = '已授权「{tool}」的 Agent 可在该机器上执
 
 /** #1108 并发档位候选（UI 面 1..8——单机同刻 8 个 agent 会话已是重负载；
  * PATCH 值域 1..16 更宽，API 设的 9..16 动态并入选项，控件不谎报现值）。 */
-const CONCURRENCY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8];
+/** 老 server（无 concurrencyRange）的退场档位。 */
+const FALLBACK_RANGE = { min: 1, max: 8 };
+
+export const CONCURRENCY_SOURCE_LABEL = {
+  manual: '手动',
+  measured: '推荐',
+  estimate: '估算',
+} as const;
+
+function BasisRow({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="flex items-baseline justify-between gap-3">
+      <span className="text-(--text-tertiary)">{label}</span>
+      <span className="tabular-nums text-(--text-secondary)">{value}</span>
+    </span>
+  );
+}
 
 /** #1108 并发上限选择器（机器行第二个活控件，listbox 族形态
  * 的 popover listbox 正典：Button ghost 触发 + Check 选中行）。值 =
  * machine.maxConcurrent；live 选定 = PATCH /api/machines/{id}；fixture 面
- * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。 */
+ * 本地草稿（shell 开关同律——scenario 无 API，开关也是活的）。
+ * #1241 设计 A：行内触发面只剩 数值 + chevron（与邻座行文本同视觉档），
+ * 语义词（「并发上限」+ 来源）整体搬进 aria-label / title 与弹层——行内
+ * 不再出现 并发 标签词与 推荐/手动/估算 来源词。 */
 function MachineConcurrencySelect({
   machine,
   value,
   onPick,
+  onReset,
 }: {
   machine: MachineRow;
   value: number;
-  onPick: (n: number) => void;
+  onPick: (n: number) => Promise<unknown> | undefined;
+  onReset: () => Promise<unknown> | undefined;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  // 现值超出 UI 档位（API 设的 9..16）→ 并入选项行，不谎报。
-  const options = CONCURRENCY_OPTIONS.includes(value)
-    ? CONCURRENCY_OPTIONS
-    : [...CONCURRENCY_OPTIONS, value].sort((a, b) => a - b);
+  // #1241 弹性区间：server 按总内存给 1..max（单源公式在 dispatch-eligibility）。
+  // 现值超出区间（API 设的 / 换机后内存变小）→ 照实显示并标「超出」，不谎报；
+  // 新输入一律夹进区间（失焦 / Enter / 步进时提交，Esc 还原不提交）。
+  const range = machine.concurrencyRange ?? FALLBACK_RANGE;
+  const outOfRange = value < range.min || value > range.max;
+  // #1342 Bugbot：只有用户真改过草稿（dirty）才在 Enter / 失焦时提交——未编辑的
+  // 超区间现值不许被夹值存成手动；未改时草稿跟随现值（弹层开着时心跳改值也同步）。
+  // #1346 Bugbot：写在途时（PATCH 串行排队、缓存尚未更新）下一次 ± / Enter 的
+  // 基数取「最后一次请求的值」而非旧 value，草稿也不回弹到旧值；队列清空后回到 value。
+  const [pendingTarget, setPendingTarget] = useState<number | null>(null);
+  const inFlight = useRef(0);
+  const current = pendingTarget ?? value;
+  const track = (target: number | null, req: Promise<unknown> | undefined) => {
+    if (!req) return;
+    inFlight.current += 1;
+    setPendingTarget(target);
+    void req.finally(() => {
+      inFlight.current -= 1;
+      if (inFlight.current === 0) setPendingTarget(null);
+    });
+  };
+  const send = (n: number) => track(n, onPick(n));
+  const [draft, setDraft] = useState(String(current));
+  const [dirty, setDirty] = useState(false);
+  const skipCommit = useRef(false);
+  useEffect(() => {
+    if (!dirty) setDraft(String(current));
+  }, [current, dirty]);
+  const clampTo = (n: number) => Math.min(range.max, Math.max(range.min, n));
+  const settle = (n: number) => {
+    setDraft(String(n));
+    setDirty(false);
+  };
+  const commit = () => {
+    if (!dirty) return;
+    const parsed = Number.parseInt(draft, 10);
+    if (Number.isNaN(parsed)) {
+      settle(current);
+      return;
+    }
+    const next = clampTo(parsed);
+    settle(next);
+    if (next !== current) send(next);
+  };
+  // ± = 单次写：基数取草稿（改过）或现值，步进后夹值，直接一发 PATCH。
+  const step = (delta: number) => {
+    const parsed = Number.parseInt(draft, 10);
+    const base = dirty && !Number.isNaN(parsed) ? parsed : current;
+    const next = clampTo(clampTo(base) + delta);
+    settle(next);
+    if (next !== current) send(next);
+  };
+  // ± / 恢复推荐 按下时不让输入框失焦（失焦提交会先发一笔手动值，与本次动作竞态）。
+  const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
+  const recommended = machine.recommendedConcurrent;
+  const hardware = machine.capabilities?.hardware;
+  const source = machine.concurrencySource;
+  const estimate = source === 'estimate';
+  const overridden = machine.maxConcurrentOverridden === true;
+  // aria-label / title 单源：来源缺席（老 server / 存量 fixture）退无来源段
+  // 的短形——退场判据与行内呈现同律，不谎报不存在的来源。
+  const label =
+    source !== undefined
+      ? t('并发上限 {n}，{source}', { n: value, source: t(CONCURRENCY_SOURCE_LABEL[source]) })
+      : t('并发上限 {n}', { n: value });
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (next) {
+          settle(current);
+          skipCommit.current = false;
+        }
+        setOpen(next);
+      }}
+    >
       <PopoverTrigger
         render={
           <Button
             variant="ghost"
-            // aria-label = e2e 一级载体（shell 开关同律，strict-mode 独立命名）。
-            aria-label={t('并发上限')}
+            // aria-label = e2e 一级载体（shell 开关同律，strict-mode 独立命名）；
+            // data-concurrency-source = 来源状态载体——原行内来源词 span 的
+            // 载体随可见词迁入触发钮（#1241 设计 A）。
+            aria-label={label}
+            title={label}
             data-machine-id={machine.id}
             data-testid="machine-concurrency"
-            className="h-7 cursor-pointer gap-1.5 rounded-md border border-input bg-transparent px-2 text-xs leading-4 font-normal text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0 dark:bg-input/30"
+            data-concurrency-source={source}
+            className="h-6 w-10 cursor-pointer justify-between gap-1 rounded-md px-1.5 text-xs leading-4 font-normal text-(--text-tertiary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
           />
         }
       >
-        <span className="text-(--text-tertiary)">{t('并发')}</span>
         <span className="tabular-nums">{value}</span>
-        <ChevronDown width={11} height={11} className="flex-none text-(--text-tertiary)" />
+        <ChevronDown width={11} height={11} className="flex-none" />
       </PopoverTrigger>
       <PopoverContent
         align="end"
         side="bottom"
         sideOffset={8}
         aria-label={t('并发上限')}
-        className="min-w-[120px] rounded-lg bg-(--popover) p-1 shadow-(--chief-shadow)"
+        className="w-52 rounded-lg bg-(--popover) p-1.5 shadow-(--chief-shadow)"
       >
-        <div role="listbox" aria-label={t('并发上限')} data-testid="machine-concurrency-options">
-          {options.map((n) => (
-            <Button
-              key={n}
-              variant="ghost"
-              role="option"
-              aria-selected={n === value}
-              data-testid="machine-concurrency-option"
-              className="h-[30px] w-full cursor-pointer justify-start gap-2 rounded-none border-none bg-transparent px-2 text-left text-[13px] font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 aria-[current=true]:bg-(--secondary) aria-[selected=true]:bg-(--secondary)"
-              onClick={() => {
-                setOpen(false);
-                onPick(n);
-              }}
-            >
-              <span className="tabular-nums">{n}</span>
-              {n === value && (
-                <span className="ml-auto inline-flex flex-none text-(--text-tertiary)">
-                  <Check width={14} height={14} />
-                </span>
-              )}
-            </Button>
-          ))}
+        <div className="flex items-baseline justify-between px-1">
+          <span className="text-xs leading-4 text-(--text-tertiary)">{t('并发上限')}</span>
+          <span className="text-sm leading-5 font-medium tabular-nums text-(--foreground)">
+            {value}
+          </span>
         </div>
+        {/* #1241 设计 A：来源词（推荐/手动/估算）只在弹层上屏——行内触发面
+            不再携带，读法随 aria-label / title 可达。 */}
+        {source !== undefined && (
+          <div className="px-1 text-xs leading-4 text-(--text-tertiary)">
+            {t(CONCURRENCY_SOURCE_LABEL[source])}
+          </div>
+        )}
+        <div className="flex items-center gap-1 px-1 py-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('减少并发上限')}
+            data-testid="machine-concurrency-dec"
+            disabled={current <= range.min && Number.parseInt(draft, 10) <= range.min}
+            className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            data-concurrency-action="step"
+            onMouseDown={keepFocus}
+            onClick={() => step(-1)}
+          >
+            <Minus width={12} height={12} />
+          </Button>
+          <Input
+            type="number"
+            inputMode="numeric"
+            role="spinbutton"
+            aria-label={t('并发上限')}
+            aria-valuemin={range.min}
+            aria-valuemax={range.max}
+            aria-valuenow={value}
+            aria-describedby={`concurrency-hint-${machine.id}`}
+            min={range.min}
+            max={range.max}
+            data-testid="machine-concurrency-input"
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setDirty(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+              } else if (e.key === 'Escape') {
+                skipCommit.current = true;
+                settle(current);
+              }
+            }}
+            onBlur={(e) => {
+              // 焦点去往 ± / 恢复推荐（键盘 Tab 也算）：由该动作单发 PATCH，失焦不提交。
+              const to = e.relatedTarget as HTMLElement | null;
+              if (skipCommit.current || to?.dataset.concurrencyAction !== undefined) {
+                skipCommit.current = false;
+                return;
+              }
+              commit();
+            }}
+            className="h-7 flex-1 [appearance:textfield] rounded-md px-1 text-center text-sm tabular-nums [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('增加并发上限')}
+            data-testid="machine-concurrency-inc"
+            disabled={current >= range.max && Number.parseInt(draft, 10) >= range.max}
+            className="size-7 cursor-pointer rounded-md text-(--text-secondary) hover:bg-(--surface-hover)"
+            data-concurrency-action="step"
+            onMouseDown={keepFocus}
+            onClick={() => step(1)}
+          >
+            <Plus width={12} height={12} />
+          </Button>
+        </div>
+        <div
+          id={`concurrency-hint-${machine.id}`}
+          data-testid="machine-concurrency-hint"
+          className="px-1 pb-1 text-xs leading-4 text-(--text-tertiary)"
+        >
+          {t(estimate ? '可选 {min}–{max}（默认档位）' : '可选 {min}–{max}（按内存）', range)}
+          {recommended !== undefined && ` · ${t('推荐 {n}', { n: recommended })}`}
+          {outOfRange && (
+            <span data-testid="machine-concurrency-out-of-range" className="block">
+              {t('当前值 {n} 超出可选范围', { n: value })}
+            </span>
+          )}
+        </div>
+        {(estimate || hardware?.memoryTotalMb !== undefined) && (
+          <div
+            className="flex flex-col gap-1 px-1 text-xs leading-4"
+            data-testid="machine-concurrency-basis"
+          >
+            {estimate ? (
+              <span className="text-(--text-tertiary)">
+                {t('未收到能力指纹，按保守默认 {n} 估算', { n: recommended ?? value })}
+              </span>
+            ) : null}
+            {estimate ? null : (
+              <>
+                {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+                  <>
+                    <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+                    <BasisRow
+                      label={t('总内存')}
+                      value={`${(hardware.memoryTotalMb / 1024).toFixed(1)} GiB`}
+                    />
+                    <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {overridden && (
+          <Button
+            variant="ghost"
+            data-testid="machine-concurrency-reset"
+            data-concurrency-action="reset"
+            onMouseDown={keepFocus}
+            className="h-7 cursor-pointer justify-start gap-1.5 rounded-md px-1 text-xs font-normal text-(--text-secondary) hover:bg-(--surface-hover) active:not-aria-[haspopup]:translate-y-0"
+            onClick={() => {
+              setDirty(false);
+              setOpen(false);
+              track(recommended ?? null, onReset());
+            }}
+          >
+            <Restore width={12} height={12} className="flex-none text-(--text-tertiary)" />
+            {t('恢复推荐')}
+          </Button>
+        )}
       </PopoverContent>
     </Popover>
   );
+}
+
+/** #1241 能力读标注全文（title / aria-label）：行内只露紧凑短标。 */
+function capabilityFull(
+  t: ReturnType<typeof useI18n>['t'],
+  caps: { mcpServers: unknown[]; skills: unknown[] } | null,
+): string {
+  return caps === null
+    ? t('能力清单未上报')
+    : t('MCP {n} · 本机技能 {m}', { n: caps.mcpServers.length, m: caps.skills.length });
 }
 
 export function MachinesPage() {
@@ -211,12 +427,33 @@ export function MachinesPage() {
   const [capDraft, setCapDraft] = useState<Record<string, number>>({});
   const capOn = (machine: MachineRow): number =>
     capDraft[rowKey(machine)] ?? machine.maxConcurrent ?? 1;
-  const pickCap = (machine: MachineRow, n: number): void => {
+  // #1342 Bugbot：同一台机器的并发写按序发——后一笔等前一笔回执再发，服务端
+  // 落库顺序 = 用户意图顺序（最后一次意图胜出），不会乱序留下覆盖位。
+  const capChain = useRef<Record<string, Promise<unknown>>>({});
+  const patchCap = (id: string, maxConcurrent: number | null): Promise<unknown> => {
+    const prev = capChain.current[id] ?? Promise.resolve();
+    const next = prev.then(() =>
+      mutations.patchMachine.mutateAsync({ id, body: { maxConcurrent } }).catch(() => undefined),
+    );
+    capChain.current[id] = next;
+    return next;
+  };
+  const pickCap = (machine: MachineRow, n: number): Promise<unknown> | undefined => {
     if (!live || machine.id == null) {
       setCapDraft((prev) => ({ ...prev, [rowKey(machine)]: n }));
       return;
     }
-    mutations.patchMachine.mutate({ id: machine.id, body: { maxConcurrent: n } });
+    return patchCap(machine.id, n);
+  };
+  const resetCap = (machine: MachineRow): Promise<unknown> | undefined => {
+    if (!live || machine.id == null) {
+      setCapDraft((prev) => ({
+        ...prev,
+        [rowKey(machine)]: machine.recommendedConcurrent ?? machine.maxConcurrent ?? 1,
+      }));
+      return;
+    }
+    return patchCap(machine.id, null);
   };
   // 保存失败的显式反馈（XMON-80/P2 同律）：本面无 toast，失败只可能来自
   // shell 开关 / 并发选择这两条写（页面仅有的 mutation），文案是固定句、
@@ -348,6 +585,7 @@ export function MachinesPage() {
                 <TooltipTrigger
                   render={
                     <span
+                      data-machine-col="shell"
                       className={cn(
                         'flex flex-none items-center gap-2',
                         machine.kind === 'local' || machine.pill != null ? 'ml-5' : 'ml-auto',
@@ -375,10 +613,13 @@ export function MachinesPage() {
                   / step SSE 失效重取刷新（machines 查询联动）。与 shell 簇同
                   ml-5 间距：两组控件视觉同档。 */}
               {machine.maxConcurrent !== undefined && (
-                <span className="ml-5 flex flex-none items-center gap-2.5">
+                <span
+                  className="ml-5 flex flex-none items-center gap-2.5"
+                  data-machine-col="concurrency"
+                >
                   {machine.runningSteps !== undefined && (
                     <span
-                      className="text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"
+                      className="w-16 text-xs leading-4 whitespace-nowrap tabular-nums text-(--text-tertiary)"
                       data-machine-running={machine.runningSteps}
                     >
                       {t('执行中 {n}/{cap}', {
@@ -391,6 +632,7 @@ export function MachinesPage() {
                     machine={machine}
                     value={capOn(machine)}
                     onPick={(n) => pickCap(machine, n)}
+                    onReset={() => resetCap(machine)}
                   />
                 </span>
               )}
@@ -400,17 +642,21 @@ export function MachinesPage() {
                   整组退场，呈现零漂移（maxConcurrent 同律）。 */}
               {machine.capabilities !== undefined && (
                 <span
-                  className="ml-5 flex-none text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
+                  className="ml-5 w-24 flex-none truncate text-right text-xs leading-4 whitespace-nowrap text-(--text-tertiary)"
                   data-machine-capabilities={
                     machine.capabilities === null ? 'unreported' : 'reported'
                   }
+                  title={capabilityFull(t, machine.capabilities)}
                 >
-                  {machine.capabilities === null
-                    ? t('能力清单未上报（旧版 daemon）')
-                    : t('MCP {n} · 本机技能 {m}', {
-                        n: machine.capabilities.mcpServers.length,
-                        m: machine.capabilities.skills.length,
-                      })}
+                  <span className="sr-only">{capabilityFull(t, machine.capabilities)}</span>
+                  <span aria-hidden="true">
+                    {machine.capabilities === null
+                      ? '—'
+                      : t('MCP {n} · 技能 {m}', {
+                          n: machine.capabilities.mcpServers.length,
+                          m: machine.capabilities.skills.length,
+                        })}
+                  </span>
                 </span>
               )}
             </RowGrow>

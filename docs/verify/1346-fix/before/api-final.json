@@ -1,0 +1,9 @@
+{
+  "maxConcurrent": 5,
+  "maxConcurrentOverridden": true,
+  "concurrencySource": "manual",
+  "concurrencyRange": {
+    "min": 1,
+    "max": 16
+  }
+}

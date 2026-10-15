@@ -236,23 +236,25 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
 
 // ——— focus ring (fixture) ———
 
-// #1007（wave 1 L4）重钉：名称输入框的 focus 环从 #360 品牌环配方（border
-// + 1px shadow 钉 --focus-ring 槽）迁 registry Input 件默认（focus-visible:
-// border-ring + ring-3 ring-ring/50，#982 判决回官方形）——断言改配方无关
-// 正向形（overlay-focus 同律）：有可见环、非 UA 蓝框、outline 退场。
-test('the name input focus ring is the registry ring, not the UA default', async ({
-  page,
-}) => {
+// #1244：名称输入框的 focus 环是 #388 全局 2px outline，不是 UA 蓝框，
+// 也不是退役的 3px 灰 box-shadow。
+test('the name input focus ring is the global outline, not the UA default', async ({ page }) => {
   await page.goto(NEW_PROJECT);
   const name = page.locator('#prj-new-name');
   await name.click();
   const cs = await name.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { outline: s.outlineStyle, shadow: s.boxShadow, visible: el.matches(':focus-visible') };
+    return {
+      outline: s.outlineStyle,
+      width: s.outlineWidth,
+      shadow: s.boxShadow,
+      visible: el.matches(':focus-visible'),
+    };
   });
   expect(cs.visible).toBe(true);
-  expect(cs.outline).toBe('none');
-  expect(cs.shadow).not.toBe('none');
+  expect(cs.outline).toBe('solid');
+  expect(cs.width).toBe('2px');
+  expect(cs.shadow).not.toContain('0px 0px 0px 3px');
   expect(cs.shadow).not.toContain('rgb(0, 95, 204)');
 });
 

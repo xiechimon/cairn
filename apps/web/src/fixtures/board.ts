@@ -145,9 +145,14 @@ export const boardDragMatrix: FixtureSet = {
       awaitingReply: true,
     }),
     dragMatrixProbe('dm-confirm', 55, 'dragmatrix 探针（待确认）', 'confirm'),
-    dragMatrixProbe('dm-done-changes', 56, 'dragmatrix 探针（已完成·有变更）', 'done'),
+    dragMatrixProbe('dm-done-changes', 56, 'dragmatrix 探针（已完成·有变更）', 'done', {
+      phaseAt: r7(13, 20),
+      orderIndex: 0,
+    }),
     dragMatrixProbe('dm-done-plain', 57, 'dragmatrix 探针（已完成·无变更）', 'done', {
       hasChanges: false,
+      phaseAt: r7(13, 50),
+      orderIndex: 10,
     }),
   ],
   now: r7(13, 55),

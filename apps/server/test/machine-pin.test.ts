@@ -18,7 +18,12 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema } from '@pacman/shared';
+import {
+  claimedStepSchema,
+  machineOkResponseSchema,
+  machineUploadUrlsResponseSchema,
+  PLAN_FILE_NAME,
+} from '@pacman/shared';
 import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -31,7 +36,6 @@ import {
   chief as chiefTable,
   machine as machineTable,
   step as stepTable,
-  todo as todoTable,
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
@@ -195,6 +199,81 @@ describe('#1259 worker 归属机闸', () => {
     expect(res.status).toBe(201);
     expect(await claim(w.s.app, w.tokenA)).toBeNull();
     expect(await claim(w.s.app, w.tokenB)).toBeNull();
+  });
+});
+
+describe('#1312 续接会话的异机标记', () => {
+  async function finishPlan(w: World, stepId: string, sessionId: string): Promise<void> {
+    const urlsRes = await call(w.s.app, 'POST', `/api/machine/upload-urls/${stepId}`, {
+      cred: w.tokenA,
+      body: { files: [{ name: PLAN_FILE_NAME }] },
+    });
+    expect(urlsRes.status).toBe(200);
+    const planUpload = machineUploadUrlsResponseSchema.parse(await urlsRes.json()).uploads[0]!;
+    const planPath = planUpload.url.replace(/^https?:\/\/[^/]+/, '');
+    const planPut = await w.s.app.request(planPath, {
+      method: 'PUT',
+      headers: {
+        authorization: `Bearer ${w.tokenA}`,
+        'content-type': 'text/markdown',
+      },
+      body: '# 方案\nContext: 1312\n',
+    });
+    expect(machineOkResponseSchema.parse(await planPut.json())).toEqual({ ok: true });
+    const doneRes = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: w.tokenA,
+      body: { status: 'success', sessionId, hasChanges: false },
+    });
+    expect(doneRes.status).toBe(200);
+  }
+
+  test('同机续接不带 priorMachineId；换绑后领取带上一轮机器', async () => {
+    const w = await setupWorld();
+    const todoId = await createTodo(w.s, w.projectId);
+    const buildRes = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+      withPlan: true,
+    });
+    expect(buildRes.status).toBe(201);
+    const plan = await claim(w.s.app, w.tokenA);
+    expect(plan?.step.kind).toBe('plan');
+    await finishPlan(w, plan!.step.id, 'sess-home');
+
+    const confirmRes = await req(w.s.app, 'POST', `/api/builds/${plan!.step.buildId}/steps`, {
+      action: 'confirm',
+    });
+    expect(confirmRes.status).toBe(202);
+    const sameMachine = await claim(w.s.app, w.tokenA);
+    expect(sameMachine?.step.kind).toBe('build');
+    expect(sameMachine?.session).toEqual({ action: 'continue', sessionId: 'sess-home' });
+
+    const todoId2 = await createTodo(w.s, w.projectId);
+    const buildRes2 = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId2],
+      assignment: { plan: { agentId: AGENT_ID }, build: { agentId: AGENT_ID } },
+      withPlan: true,
+    });
+    expect(buildRes2.status).toBe(201);
+    const plan2 = await claim(w.s.app, w.tokenA);
+    expect(plan2?.step.kind).toBe('plan');
+    await finishPlan(w, plan2!.step.id, 'sess-moved');
+    const rebind = await req(w.s.app, 'PATCH', `/api/teams/${w.s.team.id}/agents/${AGENT_ID}`, {
+      machineId: w.machineBId,
+    });
+    expect(rebind.status).toBe(200);
+    const confirm2 = await req(w.s.app, 'POST', `/api/builds/${plan2!.step.buildId}/steps`, {
+      action: 'confirm',
+    });
+    expect(confirm2.status).toBe(202);
+    expect(await claim(w.s.app, w.tokenA)).toBeNull();
+    const moved = await claim(w.s.app, w.tokenB);
+    expect(moved).not.toBeNull();
+    expect(moved!.step.kind).toBe('build');
+    expect(moved!.session.action).toBe('continue');
+    expect(moved!.session.sessionId).toBe('sess-moved');
+    const priorMachineId = (moved!.session as { priorMachineId?: string }).priorMachineId;
+    expect(priorMachineId).toBe(w.machineAId);
   });
 });
 

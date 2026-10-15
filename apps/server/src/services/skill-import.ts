@@ -53,6 +53,7 @@ import { readSkillSource, writeSkillSource } from './skill-source-store.js';
 import {
   createLocalSkill,
   resolveLocalSkill,
+  rollbackLocalSkillCreate,
   type SkillAuditActor,
   updateLocalSkill,
 } from './skills.js';
@@ -283,7 +284,10 @@ function isPrivateOrLoopbackHost(host: string): boolean {
       if ((first & 0xfe00) === 0xfc00) return true; // unique-local
     }
     const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(h);
-    if (mapped) return isPrivateOrLoopbackHost(mapped[1]!);
+    if (mapped) {
+      // biome-ignore lint/style/noNonNullAssertion: regex has one capture group, matched truthy above guarantees [1] defined
+      return isPrivateOrLoopbackHost(mapped[1]!);
+    }
   }
   return false;
 }
@@ -331,6 +335,7 @@ function parseGithubUrl(raw: string): GithubTarget {
       `unsupported GitHub URL shape: expected https://github.com/<owner>/<repo>[/tree/<ref>/<subdir>], got ${raw}`,
     );
   }
+  // biome-ignore lint/style/noNonNullAssertion: segments.length < 2 throws above; [0] and [1] are defined here
   const [owner, repo] = [segments[0]!, segments[1]!];
   if (!GH_SEGMENT_RE.test(owner) || !GH_SEGMENT_RE.test(repo)) {
     throw new HttpError(400, `invalid GitHub owner/repo in url: ${raw}`);
@@ -344,6 +349,7 @@ function parseGithubUrl(raw: string): GithubTarget {
         `unsupported GitHub URL shape: tree form requires a ref (…/tree/<ref>/<subdir>), got ${raw}`,
       );
     }
+    // biome-ignore lint/style/noNonNullAssertion: segments.length < 4 throws above; [3] is defined
     ref = segments[3]!;
     if (!GH_REF_RE.test(ref) || ref.split('/').some((seg) => seg === '.' || seg === '..')) {
       throw new HttpError(400, `invalid GitHub ref in url: ${raw}`);
@@ -541,6 +547,7 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
       }
       throw new HttpError(502, `GitHub raw fetch failed (status ${res.status}): ${entry.path}`);
     }
+    // biome-ignore lint/style/noNonNullAssertion: res.ok guard above; fetchBytes returns bytes on the ok path
     files.push({ path: entry.path, content: decodeUtf8Strict(res.bytes!, entry.path) });
   }
   return { sourceRef: target.canonicalUrl, files };
@@ -549,7 +556,9 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
 // —— 编排（import / refresh）——————————————————————————————————————————
 
 /** 导入：收集 → createLocalSkill（全部既有校验/审计）→ 来源登记。
- * 201 的 record 即 createLocalSkill 产物（id = frontmatter name = 目录名）。 */
+ * 201 的 record 即 createLocalSkill 产物（id = frontmatter name = 目录名）。
+ * 登记失败则删掉刚建的目录和对应 create 审计行，调用方看到的仍是登记
+ * 错误；同名可以再导入。 */
 export async function importSkill(
   opts: SkillImportOpts,
   body: ImportSkillBody,
@@ -568,25 +577,43 @@ export async function importSkill(
   }
   const create = assembleCreateBody(
     collected.files,
+    // biome-ignore lint/style/noNonNullAssertion: schema xor guarantees exactly one of localPath/url is set, mirrored by the if/else if above
     kind === 'localPath' ? body.localPath! : body.url!,
   );
   const record = createLocalSkill(
     { db: opts.db, skillsDir: opts.skillsDir, teamId: opts.teamId, actor: opts.actor },
     create,
   );
-  await writeSkillSource(opts.skillSourcesPath, {
-    skillId: record.id,
-    kind,
-    ref: collected.sourceRef,
-    importedAt: nowMs(),
-    refreshedAt: null,
-  });
+  try {
+    await writeSkillSource(opts.skillSourcesPath, {
+      skillId: record.id,
+      kind,
+      ref: collected.sourceRef,
+      importedAt: nowMs(),
+      refreshedAt: null,
+    });
+  } catch (err) {
+    try {
+      rollbackLocalSkillCreate({ db: opts.db, skillsDir: opts.skillsDir }, record.id);
+    } catch (rollbackErr) {
+      const cause = err instanceof Error ? err.message : String(err);
+      const rollbackMessage =
+        rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+      throw new HttpError(
+        500,
+        `skill source registration failed (${cause}) and removing the new skill directory failed (${rollbackMessage})`,
+      );
+    }
+    throw err;
+  }
   return record;
 }
 
 /** refresh：按登记来源重拉 → 身份不变闸（frontmatter name 必须仍等于 sid）
  * → updateLocalSkill 覆写语义（列出者覆写、未列者保留——源删的文件本地
- * 保留，与手动 PUT 同律，票面指定复用）。无来源 = 409；未知 sid = 404。 */
+ * 保留，与手动 PUT 同律，票面指定复用）。无来源 = 409；未知 sid = 404。
+ * refreshedAt 落盘失败时内容已经覆写，来源文件仍是上一次成功的记录，
+ * 再 refresh 一次即可补上时间戳。 */
 export async function refreshSkill(opts: SkillImportOpts, sid: string): Promise<SkillRecord> {
   const resolved = resolveLocalSkill(opts.skillsDir, sid);
   if (!resolved) throw new NotFoundError(`skill ${sid}`);

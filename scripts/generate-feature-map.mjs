@@ -168,7 +168,7 @@ function gh(args) {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (err) {
-    const detail = err && err.stderr ? String(err.stderr).trim() : String(err && err.message);
+    const detail = err?.stderr ? String(err.stderr).trim() : String(err?.message);
     fail(
       `\`gh ${args[0]} ${args[1] ?? ''}…\` failed: ${detail}\n` +
         'prereq: gh on PATH, authenticated (gh auth status), api.github.com reachable.',

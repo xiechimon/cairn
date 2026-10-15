@@ -10,8 +10,10 @@
 //   → 400 点名（文本通道边界，不静默丢弃）/ LP7 符号链接文件不入包
 //   （listSkillFiles 同律：不追链接，无链接走私）/ LP8 只读复制——源目录
 //   内容与文件集写后逐字节不变 / LP9 frontmatter 缺 name → 400（唯一真值
-//   律）/ LP10 同名目录占用 → 409（复用 createLocalSkill C2 闸）/ LP0
-//   body 二选一约束（双缺/双给 → 400）。
+//   律）/ LP10 同名目录占用 → 409（复用 createLocalSkill C2 闸）/ LP11
+//   来源登记失败 → 500，刚建的目录与 create 审计行回滚，同进程手建同名
+//   技能 refresh 仍 409（失败的写不得留在进程内空登记上）/ LP0 body
+//   二选一约束（双缺/双给 → 400）。
 // U URL 导入：U1 happy（mock GitHub API + raw，子目录形）→ 201 + 落盘 +
 //   来源记录（canonical URL 含 ref）/ U1b 根目录仓（默认分支）/
 //   U2 SSRF 拒绝面逐形：非 https、127.0.0.1、localhost、私网段、
@@ -36,6 +38,7 @@
 //   /api/teams/{id}/skills/{sid}/refresh），词表 = shared WEB_REST_ENDPOINTS。
 
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -57,6 +60,7 @@ import {
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
+import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
 import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
 
 // —— 脚手架（隔离技能根 + 隔离来源目录 + GitHub mock）———————————————————
@@ -1036,5 +1040,62 @@ describe('wire：导入/refresh 端点在册', () => {
     const routes = new Set(app.routes.map((r) => `${r.method} ${r.path}`));
     expect(routes.has('POST /api/teams/:id/skills/import')).toBe(true);
     expect(routes.has('POST /api/teams/:id/skills/:sid/refresh')).toBe(true);
+  });
+});
+
+describe('来源登记失败（#1185）', () => {
+  test('LP11：登记失败 → 500，目录与 create 审计行回滚，手建同名技能 refresh 仍 409', async () => {
+    const skillsDir = makeRoot();
+    const blocker = join(makeRoot(), 'not-a-directory');
+    writeFileSync(blocker, 'x');
+    const skillSourcesPath = join(blocker, 'skill-sources.json');
+    const source = makeSourceDir({ 'SKILL.md': skillMd('orphan-skill', '导入正文') });
+    const s = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: source,
+      });
+      expect(res.status).toBe(500);
+      expect(existsSync(join(skillsDir, 'orphan-skill'))).toBe(false);
+      expect(
+        s.db
+          .select()
+          .from(skillAudit)
+          .all()
+          .filter((row) => row.skillId === 'orphan-skill'),
+      ).toEqual([]);
+      const created = await req(s.app, 'POST', '/api/skills', {
+        name: 'orphan-skill',
+        description: '手建',
+        files: [{ path: 'SKILL.md', content: skillMd('orphan-skill', '手建') }],
+      });
+      expect(created.status).toBe(201);
+      const refresh = await req(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/skills/orphan-skill/refresh`,
+        {},
+      );
+      expect(refresh.status).toBe(409);
+      expect(await errorText(refresh)).toContain('no recorded import source');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('空登记是新对象：失败的写不会让下一次读取看见那条来源', async () => {
+    const blocker = join(makeRoot(), 'not-a-directory');
+    writeFileSync(blocker, 'x');
+    const path = join(blocker, 'skill-sources.json');
+    await expect(
+      writeSkillSource(path, {
+        skillId: 'phantom-skill',
+        kind: 'localPath',
+        ref: '/tmp/phantom-src',
+        importedAt: 1,
+        refreshedAt: null,
+      }),
+    ).rejects.toThrow();
+    expect(readSkillSource(path, 'phantom-skill')).toBeNull();
   });
 });

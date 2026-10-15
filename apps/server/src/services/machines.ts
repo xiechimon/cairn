@@ -44,16 +44,15 @@ import {
   CHIEF_TURN_ERROR_KIND,
   classifyStepFailure,
   formatSkillRouteSection,
-  GATE_ANNOUNCEMENTS,
   GITHUB_ACCESS_TOKEN_USERNAME,
   isBackendRuntimeId,
   isChiefConversationId,
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
   MCP_MIN_CLI_VERSION,
-  machineCapabilitiesSchema,
   machineRecordSchema,
   mergedPrGuardNoteRowId,
+  parseReportedCapabilities,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
   type SkillInjectionRecord,
@@ -64,7 +63,7 @@ import {
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
 } from '@pacman/shared';
-import { and, asc, desc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -118,6 +117,7 @@ import {
   agentRunningCount,
   capabilityGatePasses,
   machineRunningCount,
+  recommendMachineConcurrency,
   runtimeGatePasses,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -302,6 +302,7 @@ export function findApiKeyByPlain(db: Db, plain: string) {
 export { machineRunningCount } from './dispatch-eligibility.js';
 
 export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?: number) {
+  const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
   return machineRecordSchema.parse({
     id: row.id,
     name: row.name,
@@ -313,7 +314,12 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     shellEnabled: row.shellEnabled,
     // #1108：并发上限（DB 真值）+ 在跑计数（读侧派生，调用方传——缺席 =
     // 不渲染并发面的读端（如老调用面），maxConcurrent 恒随行）。
+    // #1241：来源与推荐值随行。
     maxConcurrent: row.maxConcurrent,
+    maxConcurrentOverridden: row.maxConcurrentOverridden,
+    recommendedConcurrent: recommendation.value,
+    concurrencyRange: recommendation.range,
+    concurrencySource: row.maxConcurrentOverridden ? 'manual' : recommendation.source,
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     // #1251：能力清单三态随行（清单 / null = 从未上报 / 列缺省不成立——
     // server 恒发全块，nullish 形只留给老 server 响应的解析兼容）。
@@ -322,13 +328,83 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
 }
 
 /** #1251 capabilities 字段的 server 侧收严（心跳红线 02 §5.4 的服务端半边）：
- *  wire 位是 z.unknown（坏形状不 400 心跳），落库前单独 safeParse——合法 =
- *  覆写；坏形状 = 丢弃该字段（保留旧值）；缺席 = 不动。任何一支都不影响
- *  presence/enroll 的成功响应。 */
+ *  wire 位是 z.unknown（坏形状不 400 心跳）。parseReportedCapabilities：
+ *  整包不合法 = 丢弃该字段保留旧值；hardware 单独坏 = 收下 mcp/skills。
+ *  缺席 = 不动。任何一支都不影响 presence/enroll 的成功响应。 */
 function parseCapabilitiesField(raw: unknown): MachineCapabilities | undefined {
   if (raw === undefined) return undefined;
-  const parsed = machineCapabilitiesSchema.safeParse(raw);
-  return parsed.success ? parsed.data : undefined;
+  return parseReportedCapabilities(raw);
+}
+
+/** 这拍上报并上旧指纹：本拍没带 hardware 时留着上一拍的，避免一次探测失败
+ *  把已测到的推荐值打回估算。 */
+function mergeReportedCapabilities(
+  previous: MachineCapabilities | null,
+  reported: MachineCapabilities,
+): MachineCapabilities {
+  if (reported.hardware === undefined && previous?.hardware !== undefined) {
+    return { ...reported, hardware: previous.hardware };
+  }
+  return reported;
+}
+
+/** 心跳/注册写点：未覆盖时把推荐值落 maxConcurrent。覆盖中的行不改 maxConcurrent。 */
+function reportedConcurrencyPatch(
+  row: {
+    maxConcurrentOverridden: boolean;
+    capabilities: MachineCapabilities | null;
+  },
+  reported: MachineCapabilities,
+): {
+  capabilities: MachineCapabilities;
+  maxConcurrent?: number;
+} {
+  const capabilities = mergeReportedCapabilities(row.capabilities, reported);
+  const recommendation = recommendMachineConcurrency(capabilities.hardware);
+  return {
+    capabilities,
+    ...(!row.maxConcurrentOverridden ? { maxConcurrent: recommendation.value } : {}),
+  };
+}
+
+/** #1241 启动回填（mon 裁定）：未覆盖行（含 0043 回填里恰为旧默认 3 的存量行）
+ *  一律跟当前推荐值——有硬件指纹按公式重算，无指纹保持保守默认 3（估算）。
+ *  手动覆盖行一概不动。幂等：值已等于推荐值的行不写；返回改动行数。
+ *  也兜住公式调整（如 floor→round）后离线机的旧值，不必等下一拍心跳。 */
+export function backfillMachineConcurrency(db: Db): number {
+  const rows = db
+    .select({
+      id: machine.id,
+      maxConcurrent: machine.maxConcurrent,
+      capabilities: machine.capabilities,
+    })
+    .from(machine)
+    .where(eq(machine.maxConcurrentOverridden, false))
+    .all();
+  let changed = 0;
+  for (const row of rows) {
+    const { value } = recommendMachineConcurrency(row.capabilities?.hardware);
+    if (row.maxConcurrent === value) continue;
+    db.update(machine).set({ maxConcurrent: value }).where(eq(machine.id, row.id)).run();
+    changed += 1;
+  }
+  return changed;
+}
+
+/** PATCH /api/machines/{id} 的并发半边（#1241）。数字 = 覆盖并持久；
+ *  null = 清除覆盖，按当前指纹重算（无指纹 = 保守默认）。 */
+export function machineConcurrencyPatch(
+  row: typeof machine.$inferSelect,
+  maxConcurrent: number | null,
+): {
+  maxConcurrent: number;
+  maxConcurrentOverridden: boolean;
+} {
+  if (maxConcurrent === null) {
+    const recommendation = recommendMachineConcurrency(row.capabilities?.hardware);
+    return { maxConcurrent: recommendation.value, maxConcurrentOverridden: false };
+  }
+  return { maxConcurrent, maxConcurrentOverridden: true };
 }
 
 /** 本机匹配键（spec 11 A8/A9，#357）：daemon `--name` 默认 hostname（r3
@@ -419,7 +495,7 @@ export function enrollMachine(
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(isLocal ? { kind: 'local' as const } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined ? { capabilities } : {}),
+        ...(capabilities !== undefined ? reportedConcurrencyPatch(existing, capabilities) : {}),
       })
       .where(eq(machine.id, existing.id))
       .run();
@@ -443,7 +519,12 @@ export function enrollMachine(
       kind: isLocal ? 'local' : 'remote',
       enabledRuntimes: ['pi'],
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-      ...(capabilities !== undefined ? { capabilities } : {}),
+      ...(capabilities !== undefined
+        ? reportedConcurrencyPatch(
+            { maxConcurrentOverridden: false, capabilities: null },
+            capabilities,
+          )
+        : {}),
     })
     .run();
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
@@ -501,8 +582,8 @@ export function markPresence(
   const row = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!row) throw new NotFoundError(`machine ${machineId}`);
   const becameOnline = !row.online;
-  // #1251：capabilities 单独 safeParse（心跳红线——坏字段丢弃保留旧值，
-  // 永不打出本函数之外的失败）。
+  // #1251：capabilities 字段级收严（心跳红线——坏字段丢弃保留旧值，
+  // 永不打出本函数之外的失败）。#1241：同一拍把推荐并发写上未覆盖的行。
   const capabilities = parseCapabilitiesField(body.capabilities);
   db.update(machine)
     .set({
@@ -511,7 +592,7 @@ export function markPresence(
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
-      ...(capabilities !== undefined ? { capabilities } : {}),
+      ...(capabilities !== undefined ? reportedConcurrencyPatch(row, capabilities) : {}),
     })
     .where(eq(machine.id, machineId))
     .run();
@@ -612,7 +693,7 @@ interface ClaimCandidate {
   todoRow: typeof todo.$inferSelect;
 }
 
-function claimCandidates(deps: MachineDeps, machineId: string, teamId: string): ClaimCandidate[] {
+function claimCandidates(deps: MachineDeps, _machineId: string, teamId: string): ClaimCandidate[] {
   const rows = deps.db
     .select({ stepRow: step, buildRow: build, todoRow: todo })
     .from(step)
@@ -957,6 +1038,11 @@ async function tryClaim(
       .all();
     const priorRow = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
     const priorSessionId = priorRow?.sessionId ?? null;
+    // #1312：上一轮会话的机器与本步领取机不同（归属机换绑 / 迁移）时告诉
+    // daemon。同机不带该字段，claim 形与旧 daemon 逐字段一致。
+    const priorMachineId = priorRow?.machineId ?? null;
+    const sessionOnOtherMachine =
+      priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
     // plan.md 交接缺失的 build 步强制 new session（#113 裁定候选2 兜底）：plan 关
     // 未产交接物时续轮会话里无可指方案（confirm 措辞空转 → agent 反问「哪个方案」，
     // 05 §5 实跑）；new session 令 daemon 以 todo 原始 title+spec 开工（runner
@@ -1031,6 +1117,7 @@ async function tryClaim(
         : {
             action: priorSessionId ? ('continue' as const) : ('new' as const),
             sessionId: priorSessionId,
+            ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
     const projectRow = db
       .select()

@@ -304,7 +304,7 @@ describe('#1065 路由接线（claim 路由透传请求 signal）', () => {
       expect(res.status).toBe(200);
       return machineEnrollResponseSchema.parse(await res.json());
     };
-    const machineA = await enroll('dead-daemon');
+    const _machineA = await enroll('dead-daemon');
     const machineB = await enroll('live-daemon');
     // #1259：agent 绑 B（合格机）——abort 语义打在 B 自己的死请求上；A 在
     // 归属机闸下恒不可见，留作「别机空手」附证。

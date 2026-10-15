@@ -83,7 +83,7 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(boardColumnFor('review')).toBe('待处理'); // awaitingReply 同列（钉顶为渲染行为）
     expect(boardColumnFor('failed')).toBe('待处理');
     expect(boardColumnFor('done')).toBe('已完成');
-    expect(boardColumnFor('closed')).toBeNull(); // 不占列不变
+    expect(boardColumnFor('closed')).toBe('已完成'); // #1247 canceled 同列
   });
 
   it('manual drop targets are the four writable columns (#753)', () => {
@@ -104,9 +104,9 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(canBoardDrop('review', 'done')).toBe(true);
     expect(canBoardDrop('confirm', 'building')).toBe(false);
     expect(canBoardDrop('review', 'building')).toBe(false);
-    // failed 源：待开始 ✓；已完成 ✗（#702：failed→done 保持非法）
+    // failed 源：待开始 ✓；已完成 ✓（#1247 手动关边。系统漏斗仍拒这条边）
     expect(canBoardDrop('failed', 'todo')).toBe(true);
-    expect(canBoardDrop('failed', 'done')).toBe(false);
+    expect(canBoardDrop('failed', 'done')).toBe(true);
     // 已完成 源：待开始 + 待处理（重开回 review；hasChanges 数据闸在 server
     // updateTodo / web canDropOnColumn，相位级此处放行）；执行中 恒非法（实测）
     expect(canBoardDrop('done', 'todo')).toBe(true);
@@ -120,7 +120,7 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(canBoardDrop('todo', 'todo')).toBe(false);
     expect(canBoardDrop('confirm', 'review')).toBe(false);
     expect(canBoardDrop('planning', 'building')).toBe(false);
-    expect(canBoardDrop('closed', 'todo')).toBe(false);
+    expect(canBoardDrop('closed', 'todo')).toBe(true); // #1247 reopen from canceled
     expect(canBoardDrop('done', 'failed')).toBe(false);
     expect(canBoardDrop('done', 'confirm')).toBe(false);
   });

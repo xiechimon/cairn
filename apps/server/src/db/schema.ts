@@ -569,6 +569,9 @@ export const machine = sqliteTable('machine', {
    * tryClaim 数本机 claimed 步）+ daemon 本地闸（GET me 读数）+ 机器页
    * `执行中 n/N` 读标注与 PATCH 写位。 */
   maxConcurrent: integer('maxConcurrent').notNull().default(3),
+  /** #1241：用户是否写过并发数。true = 心跳不再用推荐值覆盖 maxConcurrent。
+   *  存量行回填 false（继续吃推荐值，缺指纹时推荐值就是本列默认 3）。 */
+  maxConcurrentOverridden: bool('maxConcurrentOverridden').notNull().default(false),
   /** 最近一次 presence 心跳时刻（#1136）：markPresence 每拍覆写，陈旧判定
    * （sweepStaleMachines）的第二真值源——online 的第一翻转源 SSE abort
    * 抓不住静默死机（无 FIN）。NULL = 从未走过新 markPresence（升级前

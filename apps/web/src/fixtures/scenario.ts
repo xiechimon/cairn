@@ -15,6 +15,7 @@ import {
   agentDelete,
   agentDetail,
   agentDetailActive,
+  agentDetailLongModels,
   agentDetailMemory,
   agentDetailSecrets,
   agentLongRole,
@@ -103,6 +104,8 @@ import {
   teamGrid,
   teamOrgChart,
   teamOrgChartEmpty,
+  teamOrgChartPair,
+  teamOrgChartSingle,
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
@@ -153,6 +156,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // providerSources 空——pi 创建照跑，claude-code 无候选才见告警。
       'team-no-sources': {
         ...resourcesDefault,
+        // biome-ignore lint/style/noNonNullAssertion: resourcesDefault.resources is wired to the RESOURCES literal in fixtures/resources.ts and is non-nullable in FixtureSet shape
         resources: { ...resourcesDefault.resources!, providerSources: [] },
       },
       // #176 new-task dialog 项目选择器:命名场景(无 capture)——boardDefault
@@ -341,6 +345,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // team chart 组织图（命名场景，无 capture）：3 成员树 + 零成员空态
       'team-org-chart': teamOrgChart,
       'team-org-chart-empty': teamOrgChartEmpty,
+      'team-org-chart-single': teamOrgChartSingle,
+      'team-org-chart-pair': teamOrgChartPair,
       // Agent 详情编辑面（r3 §4）：团队 roster + 该 agent 的全记录 + providers
       // 行集，一套内容同时供 /app/team 与 /app/resources/agents/:id 两个路由。
       'agent-detail': agentDetail,
@@ -359,6 +365,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // 团队卡/机器卡 clamp（agent-detail-long-role 或 team-long-role 同 roster）。
       'agent-detail-long-role': agentLongRole,
       'team-long-role': agentLongRoleTeam,
+      // #1301 长模型 id：概览 tab 二级模型弹层宽度压测。
+      'agent-detail-long-models': agentDetailLongModels,
       '13': boardDefault,
       // account 语言 dropdown open state (issue #74; shape [设计], r2 §11 Q19)
       '13-lang': { ...boardDefault, ui: { langDropdownOpen: true } },

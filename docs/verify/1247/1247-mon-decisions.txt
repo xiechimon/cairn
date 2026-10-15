@@ -1,0 +1,20 @@
+#1247 mon decisions (2026-10-15)
+
+A) In-flight drag-to-done: dialog offers only "Stop and mark done" / Cancel.
+   Server POST /api/todos/:id/stop-and-done stops active step then sets done.
+   Pending steps: sync stop without gate fallback, then done.
+   Claimed steps: delegated stop with afterStopPhase=done (process-local map).
+
+B) Canceled / Won't do: reuses phase=closed, shown in Done column with
+   data-todo-canceled chip 「已取消」. Does not count as success for
+   settleSplitOnDone / splitBlockersSatisfied / advanceSplitWaves.
+
+Evidence (fixture board-drag-matrix on verify web :5281; server :8795 —
+8791 occupied by sand-egress-tun):
+- 1247-after-outcome-dialog.png
+- 1247-after-canceled-in-done.png
+- 1247-after-inflight-stop-dialog.png
+- 1247-after-done-column-mixed.png
+
+Unit: stop-and-done-1247.test.ts, columns.test, vocabulary, manual-drop-matrix
+E2E: board-dnd.spec.ts 28 passed (E2E_PORT=8417)

@@ -61,6 +61,7 @@ function pickPersonaModel(db: Db, teamId: string): { provider: string; modelId: 
     .all()) {
     const report = row.report;
     if (report === null || report.models.length === 0) continue;
+    // biome-ignore lint/style/noNonNullAssertion: guard above ensures models is non-empty, so [0] is defined
     const model = report.models.find((m) => m.slot === 'default') ?? report.models[0]!;
     return { provider: 'claude-code', modelId: model.id };
   }

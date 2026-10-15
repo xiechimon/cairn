@@ -1161,6 +1161,14 @@ export function mapMachines(rows: MachineRecord[]): MachineRow[] {
     // #1251 能力清单：三态原样透传（清单 / null = 未上报 / absent = 老
     // server——读标注退场，maxConcurrent 同律）。
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
+    ...(m.maxConcurrentOverridden !== undefined
+      ? { maxConcurrentOverridden: m.maxConcurrentOverridden }
+      : {}),
+    ...(m.recommendedConcurrent !== undefined
+      ? { recommendedConcurrent: m.recommendedConcurrent }
+      : {}),
+    ...(m.concurrencySource !== undefined ? { concurrencySource: m.concurrencySource } : {}),
+    ...(m.concurrencyRange !== undefined ? { concurrencyRange: m.concurrencyRange } : {}),
   }));
 }
 

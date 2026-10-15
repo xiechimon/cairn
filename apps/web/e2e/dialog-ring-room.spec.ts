@@ -1,9 +1,9 @@
 // dialog-body 环房回归闸（2026-10-12 实踩）：body 是滚动容器（overflow-y
-// auto ⇒ 两轴都裁），w-full 控件贴齐裁切缘时，其 focus 环（ring-3 外沿
-// 3px）被左右各裁一刀。修复 = 壳层负边距外扩到 DialogContent 的 p-4 垫层
-//（内容零漂移）。本用例钉不变量：聚焦的 w-full 输入框，环的两缘都落在
-// 滚动容器裁切缘之内。所有 registry 弹窗共用一个壳（dialog-shell.tsx），
-// 取创建 agent 弹窗（最密 w-full 控件面）作正典场景。
+// auto ⇒ 两轴都裁），w-full 控件贴齐裁切缘时，其 focus 环被左右各裁一刀。
+// 修复 = 壳层负边距外扩到 DialogContent 的 p-4 垫层（内容零漂移）。
+// #1244 起环是 2px outline + offset 2。本用例钉不变量：聚焦的 w-full
+// 输入框，环的两缘都落在滚动容器裁切缘之内。所有 registry 弹窗共用一个壳
+//（dialog-shell.tsx），取创建 agent 弹窗（最密 w-full 控件面）作正典场景。
 
 import { expect, test } from '@playwright/test';
 
@@ -21,8 +21,16 @@ test('聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量�
     if (!el || !body) return null;
     const ir = el.getBoundingClientRect();
     const br = body.getBoundingClientRect();
-    // ring-3 的外扩 = 3px（registry Input 的 focus-visible 环）。
-    return { inputL: ir.left, inputR: ir.right, bodyL: br.left, bodyR: br.right, spread: 3 };
+    const cs = getComputedStyle(el);
+    const width = Number.parseFloat(cs.outlineWidth);
+    const offset = Number.parseFloat(cs.outlineOffset);
+    return {
+      inputL: ir.left,
+      inputR: ir.right,
+      bodyL: br.left,
+      bodyR: br.right,
+      spread: width + offset,
+    };
   });
   expect(m).not.toBeNull();
   // 环的左右外沿都在滚动容器的裁切盒内。

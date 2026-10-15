@@ -1,0 +1,22 @@
+[
+  {
+    "name": "fix-manual",
+    "maxConcurrent": 12,
+    "maxConcurrentOverridden": false,
+    "concurrencySource": "measured",
+    "concurrencyRange": {
+      "min": 1,
+      "max": 16
+    }
+  },
+  {
+    "name": "fix-out-of-range",
+    "maxConcurrent": 12,
+    "maxConcurrentOverridden": true,
+    "concurrencySource": "manual",
+    "concurrencyRange": {
+      "min": 1,
+      "max": 8
+    }
+  }
+]

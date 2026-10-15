@@ -1,0 +1,21 @@
+Running 1 test using 1 worker
+
+[1/1] e2e/user-menu-trigger.spec.ts:221:1 › #1245 floating menu is a single skin and stays inside the viewport
+  1) e2e/user-menu-trigger.spec.ts:221:1 › #1245 floating menu is a single skin and stays inside the viewport
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 1
+    Received:    64
+
+      255 |
+      256 |   expect(sample).not.toBeNull();
+    > 257 |   expect(Math.abs(sample!.shellW - sample!.panelW)).toBeLessThanOrEqual(1);
+          |                                                     ^
+      258 |   expect(sample!.hitSlot).not.toBe('popover-content');
+      259 |   expect(sample!.shellRing).not.toContain('1px');
+      260 |   expect(sample!.shellBg).toBe('rgba(0, 0, 0, 0)');
+        at /workspace/apps/web/e2e/user-menu-trigger.spec.ts:257:53
+
+  1 failed
+    e2e/user-menu-trigger.spec.ts:221:1 › #1245 floating menu is a single skin and stays inside the viewport

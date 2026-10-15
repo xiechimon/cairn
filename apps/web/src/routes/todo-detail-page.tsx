@@ -85,7 +85,7 @@ import { TranscriptColumn, type TranscriptColumnHandle } from '../detail/transcr
 import { useDetailActions } from '../detail/use-detail-actions.js';
 import { type ChainState, useDetailComposer } from '../detail/use-detail-composer.js';
 import { UserMenu } from '../detail/user-menu.js';
-import { markClosed, markDeleted, withoutDeleted } from '../fixtures/deletions.js';
+import { markDeleted, withoutDeleted } from '../fixtures/deletions.js';
 import { overlayContent } from '../fixtures/fixtures.js';
 import type {
   DetailContent,

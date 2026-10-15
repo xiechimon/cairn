@@ -10,7 +10,6 @@ import {
   phaseSchema,
   type TodoRecord,
 } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -22,7 +21,7 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
-import { advanceSplitWaves } from './services/builds.js';
+import { advanceSplitWaves, prepareStopForDone } from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
@@ -93,6 +92,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
   app.patch('/api/todos/:id', async (c) => {
     const id = c.req.param('id');
     const body = parseWith(patchTodoBodySchema, await jsonBody(c), 'body');
+    const prior = getTodo(svc, id);
     let record: TodoRecord | null;
     try {
       // #160：HTTP PATCH phase = 看板拖拽手动改相面（六列 dropPhase 目标
@@ -106,8 +106,42 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     // #1250（ADR 0018 层 2）：手动 done 落地（拖拽/更多菜单）同触发拆卡
     // 波次推进（completeStep 的 merge 半边与 transitionTodos 的工具半边
     // 同律——子卡 done 解锁后续波次自动派发；非子卡零动作）。
-    if (body.phase === 'done') advanceSplitWaves(svc, id);
+    // #1247：failed 源是关卡，不是成功交付。跳过波次，避免把「失败子卡标
+    // 完成」当成阻塞解除去派发下一张。父卡收口仍走 updateTodo 里的
+    // settleSplitOnDone（兄弟都 done 时父收，不在这里派发新构建）。
+    if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
     return c.json(record);
+  });
+
+  // #1247 stop-then-done：在飞卡拖入已完成——先停活动步再标 done。
+  // pending = 同步停+done；claimed = 委托停并预定 afterStop=done，等 daemon
+  // 回报后落 done（卡停在执行中直到停成功，不会出现「done 仍在跑」）。
+  app.post('/api/todos/:id/stop-and-done', async (c) => {
+    const id = c.req.param('id');
+    const prior = getTodo(svc, id);
+    if (!prior) throw notFound(`todo ${id}`);
+    let prep: ReturnType<typeof prepareStopForDone>;
+    try {
+      prep = prepareStopForDone(svc, id);
+    } catch (err) {
+      if (err instanceof PhaseTransitionError) throw conflict(err.message);
+      throw err;
+    }
+    if (prep.state === 'stopping') {
+      const record = getTodo(svc, id);
+      if (!record) throw notFound(`todo ${id}`);
+      return c.json({ state: 'stopping' as const, todo: record });
+    }
+    let record: TodoRecord | null;
+    try {
+      record = updateTodo(svc, id, { phase: 'done' }, { manualPhase: true });
+    } catch (err) {
+      if (err instanceof PhaseTransitionError) throw conflict(err.message);
+      throw err;
+    }
+    if (!record) throw notFound(`todo ${id}`);
+    if (prior.phase !== 'failed') advanceSplitWaves(svc, id);
+    return c.json({ state: 'done' as const, todo: record });
   });
 
   // 任务重置（#755）：已开始卡拖回待开始的确认落位——中断在飞构建 + 清空

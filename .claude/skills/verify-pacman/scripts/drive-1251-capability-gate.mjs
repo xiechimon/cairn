@@ -523,12 +523,14 @@ await shot(page, 'g8-agent-machine-fit-clear.png');
 
 await page.goto(WEB + '/app/resources/machines');
 await page.locator('[data-machine-capabilities]').first().waitFor({ timeout: 10_000 });
-const annotations = await page.locator('[data-machine-capabilities]').allTextContents();
+const annotations = await page.locator('[data-machine-capabilities]').evaluateAll((els) =>
+  els.map((e) => `${e.textContent ?? ''} ${e.getAttribute('title') ?? ''}`),
+);
 const states = await page.locator('[data-machine-capabilities]').evaluateAll((els) =>
   els.map((e) => e.getAttribute('data-machine-capabilities')),
 );
 check(
-  'G9 机器页能力读标注：上报机 = 「MCP 2 · 本机技能 0」计数形，未上报机 = 「能力清单未上报（旧版 daemon）」（两态不塌缩）',
+  'G9 机器页能力读标注：上报机 = 「MCP 2 · 本机技能 0」计数形，未上报机 = 「—」（title/读屏「能力清单未上报」）（两态不塌缩）',
   states.includes('reported') &&
     states.includes('unreported') &&
     annotations.some((t) => t.includes('MCP 2')) &&
