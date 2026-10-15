@@ -99,7 +99,7 @@ export function TodoCard({
        （标题链接 -webkit-user-drag）在下方 Link。 */
     <Card
       data-todo-id={todo.id}
-      className="todo-card relative w-full gap-0 rounded-2xl px-[13.5px] pt-[9.5px] pb-[11.5px] shadow-(--card-lift) select-none"
+      className="todo-card relative w-full gap-0 rounded-(--radius-panel) bg-card px-[13.5px] pt-[9.5px] pb-[11.5px] shadow-(--panel-shadow) ring-0 transition-[box-shadow,translate] duration-200 ease-(--ease-out-expo) hover:-translate-y-[1.5px] hover:shadow-(--panel-shadow-hover) select-none anim-message-fade-up"
     >
       <div className="flex min-h-4 items-center">
         <ProjectAvatar char={chipInitial} />
