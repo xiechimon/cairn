@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // Issue #366: the detail route drops the 文档|聊天 tab group and re-lays
-// out as three abutting panes — 240 sidebar | fluid thread | 488 right
+// out as three abutting panes — 288 sidebar | fluid thread | 488 right
 // pane (docs/design/todos.dev.md grid). The right pane owns the doc
 // surface (plan/changes/diff) plus the three former head-icon overlays
 // (分支与 PR / Token 用量 / 运行历史) as static pane sections picked from
@@ -31,7 +31,7 @@ import { expect, test } from '@playwright/test';
 const DETAIL_ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc';
 const FRESH = '/app/todo/fresh-probe?scenario=23';
 
-test('three abutting panes: 240 sidebar | fluid center | 488 right', async ({ page }) => {
+test('three abutting panes: 288 sidebar | fluid center | 488 right', async ({ page }) => {
   await page.goto(`${DETAIL_ROUTE}?scenario=17b`);
   const geo = await page.evaluate(() => {
     const rect = (sel: string) => {
@@ -44,13 +44,13 @@ test('three abutting panes: 240 sidebar | fluid center | 488 right', async ({ pa
       right: rect('[data-testid="detail-right"]'),
     };
   });
-  expect(geo.sidebar.width).toBe(240);
+  expect(geo.sidebar.width).toBe(288);
   expect(geo.right.width).toBe(488);
   // panes abut — no gap, no overlap (hairline borders ride inside the boxes)
   expect(Math.round(geo.center.left)).toBe(Math.round(geo.sidebar.right));
   expect(Math.round(geo.right.left)).toBe(Math.round(geo.center.right));
   // center takes the fluid remainder (712 at the 1440 e2e viewport)
-  expect(geo.center.width).toBe(1440 - 240 - 488);
+  expect(geo.center.width).toBe(1440 - 288 - 488);
   // the seam between center and right is a 1px hairline, not a shadow
   const seam = await page.evaluate(() => {
     const cs = getComputedStyle(document.querySelector('[data-testid="detail-right"]')!);
@@ -195,7 +195,7 @@ test('composer width tracks the center column; the floating window overlays with
       return { center: c.width, comp: r.width };
     });
   const pane = await measure();
-  expect(pane.center).toBe(1440 - 240 - 488);
+  expect(pane.center).toBe(1440 - 288 - 488);
   expect(pane.comp).toBeCloseTo(pane.center - 32, 0);
   // A0（ADR 0013 D7 反转）：窗是覆盖层——开窗后右栏在位、中心列与
   // composer 宽度与关态逐值相同（418 互斥态退役，无 pane-var 重同步）
@@ -287,7 +287,7 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
   const center = await page
     .getByTestId('detail-center')
     .evaluate((el) => Math.round(el.getBoundingClientRect().width));
-  expect(center).toBe(1440 - 240);
+  expect(center).toBe(1440 - 288);
 
   // the task title now names the page twice: in the 44px head (XMON-55 P1, so
   // the reader knows which task they are on while scrolled into the thread)

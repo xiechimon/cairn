@@ -258,7 +258,7 @@ export function RightPane({ view, docLabel, onView, content, buildId, children }
   });
   return (
     <aside
-      className="detail-right flex w-(--detail-pane-right) min-h-0 flex-none flex-col border-l border-(--border) max-md:hidden"
+      className="detail-right flex w-(--detail-pane-right) min-h-0 flex-none flex-col border-l border-(--border) max-[816px]:hidden"
       data-testid="detail-right"
     >
       {content == null || view === 'doc' ? (

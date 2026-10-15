@@ -1,8 +1,8 @@
 import { expect, test } from '@playwright/test';
 
 // Issue #135 acceptance (dogfood 裁决 v2, revising #123's 柔边不画缝):
-// the sidebar rides a real 1px seam in the topbar-divider token — not the
-// floating soft shadow — and the top divider runs the FULL viewport width:
+// CDS PR-3: vertical seam retires to surface-1 + soft hairline shadow; the
+// top divider still runs the FULL viewport width:
 // the sidebar's team-row divider sits on the same pixel row (y43..44) as
 // every shell's topbar border-bottom, crossing at the seam. Geometry law:
 // expanded team-row 43px + .sidebar-nav border-top 1px; the r7 12 active
@@ -46,12 +46,10 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
         };
       });
 
-      // the seam: 1px solid, same token law as the board divider, no float
-      expect(m.borderRightW).toBe('1px');
-      expect(m.borderRightStyle).toBe('solid');
-      expect(m.shadow).toBe('none');
-      expect(m.borderRightColor).toBe(m.topbarBorderBColor);
-      expect(m.sidebarW).toBe(240); // border-box: outer width holds
+      // CDS PR-3: no solid right border — tier-1 surface + soft hairline shadow
+      expect(m.borderRightW).toBe('0px');
+      expect(m.shadow).not.toBe('none');
+      expect(m.sidebarW).toBe(288);
 
       // the full-width horizontal: nav border-top on the topbar border row
       expect(m.teamH).toBe(43);
@@ -73,7 +71,7 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
       });
 
       // r7 12 probe: pill x8..231 y6..38 — the divider row must not drag it
-      expect(m).toMatchObject({ x: 8, y: 6, w: 223, h: 32 });
+      expect(m).toMatchObject({ x: 8, y: 6, w: 272, h: 32 });
       expect(m.navTop).toBe(43);
     });
 
@@ -100,10 +98,9 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
         };
       });
 
-      expect(m.borderRightW).toBe('1px');
-      expect(m.shadow).toBe('none');
-      expect(m.borderRightColor).toBe(m.topbarBorderBColor);
-      expect(m.railW).toBe(40); // border-box: the 40px box holds
+      expect(m.borderRightW).toBe('0px');
+      expect(m.shadow).not.toBe('none');
+      expect(m.railW).toBe(40);
       // toggle 44px total = content 43 + 1px border on the y43..44 row
       expect(m.toggleBottom).toBe(44);
       expect(m.toggleBorderB).toBe('1px');
@@ -125,7 +122,6 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
         };
       });
 
-      expect(m.seamColor).toBe(m.topbarColor);
       expect(m.navTop).toBe(43);
       expect(m.topbarH).toBe(44);
     });
@@ -148,8 +144,7 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
         };
       });
 
-      // one token law across the crossing: seam == nav divider == topbar
-      expect(m.seamColor).toBe(m.topbarColor);
+      // horizontal divider still shares the topbar token; vertical seam retired
       expect(m.navColor).toBe(m.topbarColor);
       expect(m.navTop).toBe(43);
     });

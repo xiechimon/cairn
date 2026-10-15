@@ -2,16 +2,16 @@ import { expect, test } from '@playwright/test';
 
 // Issue #932: the detail route's fixed 3-pane shell (240 sidebar | fluid
 // thread | 488 right pane) had no narrow-viewport strategy at all — at 320px
-// the sidebar kept 240px, the right pane kept 488px off-screen behind the
+// the sidebar kept 288px, the right pane kept 488px off-screen behind the
 // shell's overflow:hidden, and the thread column swallowed 133px of content
-// in a 35px box (#885 recorded it). Below 768px — the reference's own
-// breakpoint (todos.dev ships `not all and (width >= 768px)`, measured live
+// in a 35px box (#885 recorded it). Below 816px — max-[816px] media (width < 816): 815 folds, 816 restores;
+// 288+488 leaves ~40px center (same as old 768/240)
 // 2026-10-05) — the shell now degrades: both side panes drop, the thread
 // owns the full width, and the head's back chevron stays the way out. Each
 // test pins one failure way:
 //   N1 320px: nothing clips, nothing swallows a horizontal scroll
 //   N2 360/390: same law at the common phone widths
-//   N3 the degradation is bounded — 768px keeps the full 3-pane shell
+//   N3 the degradation is bounded — 816px keeps the full 3-pane shell
 //   N4 the chief dock cannot re-introduce the clip at 320px
 //   N5 head and composer stay inside the viewport at 320px
 //
@@ -78,15 +78,15 @@ test('N2: 360 and 390 keep the same law', async ({ page }) => {
   }
 });
 
-test('N3: the degradation stops at 768px — the 3-pane shell survives above it', async ({
+test('N3: the degradation stops at 816px — the 3-pane shell survives above it', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 767, height: 732 });
+  await page.setViewportSize({ width: 815, height: 732 });
   await page.goto(DETAIL);
   await page.waitForSelector('[data-testid="transcript-col"]');
   expect((await overflowProbe(page)).sidebarVisible).toBe(false);
 
-  await page.setViewportSize({ width: 768, height: 732 });
+  await page.setViewportSize({ width: 816, height: 732 });
   await page.waitForSelector('[data-route="todo-detail"] > aside');
   const probe = await overflowProbe(page);
   expect(probe.sidebarVisible).toBe(true);
@@ -99,7 +99,7 @@ test('N3: the degradation stops at 768px — the 3-pane shell survives above it'
       document.querySelector('[data-testid="detail-right"]')!.getBoundingClientRect().width,
     ),
   }));
-  expect(widths.sidebar).toBe(240);
+  expect(widths.sidebar).toBe(288);
   expect(widths.right).toBe(488);
 });
 

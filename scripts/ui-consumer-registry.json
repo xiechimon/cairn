@@ -6,12 +6,6 @@
   "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph (#987: brand ink is spot emphasis only, never body/label/link/button-text ink). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-消费点形状与品牌墨台账.md.",
   "squareBoxes": [
     {
-      "file": "apps/web/src/board/sidebar.tsx",
-      "anchor": "sidebar-team-row--active",
-      "kind": "deviation",
-      "reason": "Selected-row tint of the sidebar team row (neutral alpha ladder --sidebar-active). L1 #1058 radius ruling 2 (f8595334) keeps row-highlight layers on their own geometry: 'the ::before hover/selected pill keeps its own radius; it is the tint, not the button box' — the team-row active pill is the same tint family (V2 skeleton lineage #792 P6, sidebar-visual.spec pins the pill geometry law plain==selected). No e2e radius pin on this row; re-shaping it is a sidebar visual ruling, registered here instead of taken unilaterally."
-    },
-    {
       "file": "apps/web/src/chief/recipes.ts",
       "anchor": "w-auto flex-col gap-0 border",
       "kind": "rides-primitive",
