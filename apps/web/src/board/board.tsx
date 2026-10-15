@@ -510,7 +510,7 @@ function ColumnList({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-px"
+      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-1"
       ref={setRefs}
       data-column-list={columnId}
     >

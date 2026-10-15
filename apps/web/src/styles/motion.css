@@ -71,7 +71,13 @@
    之前：hover 与 active 同特异性，按压面靠规则序赢。 */
 @media (hover: hover) and (pointer: fine) {
   .todo-card {
-    transition: background-color var(--dur-fast) var(--ease-standard);
+    /* CDS PR-4: include box-shadow + translate so utility hover lift
+       (--panel-shadow-hover / -1.5px) eases; unlayered rule would otherwise
+       win over transition-[box-shadow,translate] utilities. */
+    transition:
+      background-color var(--dur-fast) var(--ease-standard),
+      box-shadow 200ms var(--ease-out-expo),
+      translate 200ms var(--ease-out-expo);
   }
 
   .todo-card:hover {
@@ -79,10 +85,12 @@
   }
 }
 
-/* 拖拽在飞时源卡不读 hover：指针按住在拖，hover 染色会跟在飞的克隆
-   打架。特异性（0,2,1）压上面的裸 hover 规则。 */
+/* 拖拽在飞时源卡不读 hover：指针按住在拖，hover 染色 / 抬升会跟在飞的
+   克隆打架。特异性（0,2,1）压上面的裸 hover 规则。 */
 body[data-board-dragging] .todo-card:hover {
   background-color: var(--card);
+  box-shadow: var(--panel-shadow);
+  translate: none;
 }
 
 /* 卡面入场（dsh 对话框的消息入场同族：快、小幅、只动 opacity/transform）：
