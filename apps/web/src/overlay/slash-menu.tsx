@@ -152,7 +152,7 @@ export function SlashHelp({ open, onClose, commands, skillCount }: SlashHelpProp
       {/* layout 槽：400 宽（窄视口回件默认 calc 律）、70vh 封顶滚动；皮肤/
           居中/动效/z 归 DialogContent 默认。registry 关闭钮（X）是官网
           confirm 形态一部分，缺省开启。别名 slash-help 随行（e2e 句柄）。 */}
-      <DialogContent className="slash-help max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] gap-0 overflow-auto p-3 sm:max-w-[400px]">
+      <DialogContent className="slash-help max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] gap-0 overflow-auto rounded-(--edge-radius) p-3 shadow-(--dialog-shadow) sm:max-w-[400px]">
         <DialogTitle className="mb-2">{t('命令说明')}</DialogTitle>
         <div className="flex max-h-[320px] flex-col gap-0.5 overflow-auto">
           {commands.map((row) => (

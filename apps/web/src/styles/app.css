@@ -234,6 +234,31 @@
   }
 }
 
+/* CDS PR-5: select popup shell (select.tsx stays pristine under S5).
+ * Radius/shadow match popover; ring-0 clears registry ring-1 so dark does
+ * not keep an outer ring beside --shadow-popover. */
+[data-slot="select-content"] {
+  border-radius: var(--radius-popover);
+  /* Replace registry ring-1 + shadow-md entirely (unlayered beats @layer). */
+  box-shadow: var(--shadow-popover);
+}
+
+/* CDS PR-5: select/dropdown row pills at 4px / 32px. Dropdown-menu.tsx is
+ * already deviated and carries the classes; select.tsx stays pristine (S5). */
+[data-slot="select-item"] {
+  height: 2rem;
+  border-radius: var(--cds-radius-sm);
+  padding-block: 0;
+}
+
+/* CDS PR-5: modal scrim blur 12px. Lives outside components/ui so dialog.tsx /
+ * alert-dialog.tsx stay pristine under the S5 ratchet (map #980). */
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"],
+.overlay-backdrop {
+  backdrop-filter: blur(12px);
+}
+
 /* #948（overlay/ per-face 清零）：确认面（AlertDialogShell 族）背板的 z 档。
    .overlay-backdrop 类由 components/ui/alert-dialog-shell.tsx（冻结共享件）
    输出，其皮肤 utility（fixed inset-0 bg-black/60 ≡ --overlay-scrim 值）已在

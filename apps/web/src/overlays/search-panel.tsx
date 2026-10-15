@@ -77,7 +77,7 @@ const NAV_ROWS = [
  *  归零（border-none，r7 行盒）、font-medium 归 normal、justify/gap 随档位。
  *  focus 环 = 件基类 #388 canon，与旧全局环同值，不重复写。 */
 const ROW_BASE =
-  'mx-2 flex h-10 w-[calc(100%-16px)] cursor-pointer items-center justify-start gap-[15px] whitespace-normal rounded-[8px] border-none bg-transparent pl-4 pr-2 text-left text-[13px] leading-4 font-normal text-(--text-secondary) hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg]:text-(--text-tertiary)';
+  'mx-2 flex h-10 w-[calc(100%-16px)] cursor-pointer items-center justify-start gap-[15px] whitespace-normal rounded-(--cds-radius-sm) border-none bg-transparent pl-4 pr-2 text-left text-[13px] leading-4 font-normal text-(--text-secondary) hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg]:text-(--text-tertiary)';
 
 /** 结果行（任务/项目/agent）差额：icon tile 列距 10px、左垫 8px。 */
 const ROW_RESULT = 'gap-2.5 pl-2';
@@ -96,7 +96,7 @@ function rowLitClasses(selected: boolean, kbd: boolean): string {
 /** 28px icon tile（结果行首列）：--row-icon-bg 底 + 8px 圆角；项目/agent
  *  档在消费点 cn 覆写。 */
 const ROW_ICON =
-  'flex size-7 flex-none items-center justify-center rounded-[8px] bg-(--row-icon-bg) text-(--text-tertiary)';
+  'flex size-7 flex-none items-center justify-center rounded-(--cds-radius-sm) bg-(--row-icon-bg) text-(--text-tertiary)';
 
 interface SearchPanelProps {
   fixture: FixtureSet;
@@ -370,7 +370,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             // 透明 + 13px 字；行容器几何（40px/垫距/分隔线）已随 #949 迁
             // 上方行 utility。
             ref={attachInput}
-            className="flex-1 h-auto border-none p-0 text-[13px] md:text-[13px] leading-4 rounded-none bg-transparent dark:bg-transparent text-(--foreground) placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:!ring-0"
+            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-[13px] md:text-[13px] leading-4 rounded-none bg-transparent dark:bg-transparent text-(--foreground) placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:!ring-0"
             value={query}
             placeholder={t('搜索任务、项目、成员…')}
             onChange={(event) => onQuery(event.target.value)}

@@ -214,7 +214,10 @@ export function CreateAgentDialog({
                     {machineCandidates.find((m) => m.id === machineId)?.name ?? t('选择机器')}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent aria-label={t('归属机')}>
+                <SelectContent
+                  aria-label={t('归属机')}
+                  className="rounded-(--radius-popover) shadow-(--shadow-popover)"
+                >
                   {machineCandidates.map((m) => (
                     <SelectItem key={m.id} className="dlg-agent-machine-row" value={m.id ?? ''}>
                       {m.name}

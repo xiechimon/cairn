@@ -153,9 +153,15 @@ test('确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后�
   // 钉成零会在「重渲染触发器恰好是另一个弹层」时变成假红。它另有一套律，
   // 单列一条断言：**开过又关掉的层不留残线**（收支平衡，只断 parity 不断条数
   // ——条数是实现指纹，parity 才是「没泄漏」）。
+  // Poll: Base UI search teardown can lag the hidden wait by a frame; CDS
+  // shadow/radius class churn made the race flaky (docAdds=docRems+1).
+  await expect
+    .poll(async () => {
+      const t = await readEscapeTap(page);
+      return { win: { winAdds: t.winAdds, winRems: t.winRems }, balanced: t.docAdds === t.docRems };
+    })
+    .toEqual({ win: { winAdds: 0, winRems: 0 }, balanced: true });
   const tap = await readEscapeTap(page);
-  expect({ winAdds: tap.winAdds, winRems: tap.winRems }).toEqual({ winAdds: 0, winRems: 0 });
-  expect(tap.docAdds).toBe(tap.docRems);
   await page.keyboard.press('Escape');
   await expect(confirmDialog(page)).not.toBeVisible();
 });

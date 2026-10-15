@@ -218,7 +218,7 @@ function DimensionSection({
                 registry 同源，皮肤 = 上游默认；整行可点 = 消费点 label 包裹，
                 点文案即 toggle。 */}
             {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
+            <label className="inline-flex h-7 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-(--cds-radius-sm) px-2 text-xs text-foreground transition-colors hover:bg-accent-soft">
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected && !allSelected}
@@ -258,7 +258,7 @@ function DimensionSection({
                       : { 'data-tag': choice.value })}
                     role="option"
                     aria-selected={active}
-                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-md border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
+                    className={`${alias} h-7 min-w-0 flex-1 justify-start gap-2 rounded-(--cds-radius-sm) border-none px-2 text-xs font-normal text-foreground hover:bg-accent-soft dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0 ${
                       active ? 'bg-accent' : ''
                     }`}
                     onClick={() => dimension.onToggle(choice.value)}
@@ -379,7 +379,7 @@ export function FilterPanel({ dimensions, totalSelected, onClearAll }: FilterPan
         {totalSelected > 0 && (
           <Button
             variant="ghost"
-            className="mt-0.5 h-7 w-full rounded-md border-none text-xs font-normal text-muted-foreground hover:bg-accent-soft hover:text-foreground dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0"
+            className="mt-0.5 h-7 w-full rounded-(--cds-radius-sm) border-none text-xs font-normal text-muted-foreground hover:bg-accent-soft hover:text-foreground dark:hover:bg-accent-soft active:not-aria-[haspopup]:translate-y-0"
             onClick={onClearAll}
           >
             {t('清除全部')}

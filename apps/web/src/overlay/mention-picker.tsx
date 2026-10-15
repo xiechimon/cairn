@@ -95,7 +95,7 @@ const CATEGORIES: { kind: MentionKind; Icon: typeof FileCheck }[] = [
  *  （head/list/foot 各自的 border 全出血，故 p-0 gap-0）。别名 mention-picker
  *  原样（e2e 句柄）。 */
 const PANEL_CLS =
-  'mention-picker flex max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[400px]';
+  'mention-picker flex max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-(--edge-radius) p-0 shadow-(--dialog-shadow) sm:max-w-[400px]';
 
 /** 类目/实体行基底（原 .mention-row，Button ghost 七通道中和）。 */
 const ROW_CLS =
