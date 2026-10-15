@@ -591,6 +591,8 @@ export interface TranscriptInput {
   userName: string;
   /** conversation stream text_delta 累积（live 打字面；'' = 无进行中文本）。 */
   liveText: string;
+  /** conversation stream thinking_delta 累积（#1308；'' = 无在飞思考）。 */
+  liveThinking?: string;
   /** 停止钮确认后的过渡态（M7 #308，r9 §3.3「正在停止…」）：stop 已被
    * 受理、步终态未回（live 面本地旗标；缺省 false = 捕获面不受扰）。 */
   stopping?: boolean;
@@ -610,6 +612,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     machineName,
     userName,
     liveText,
+    liveThinking = '',
     stopping = false,
     activity = null,
   } = input;
@@ -824,6 +827,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     (s) => s.status === 'claimed' || s.status === 'pending' || s.status === 'waiting_quota',
   );
   if (running && build) {
+    if (liveThinking.trim() !== '') {
+      items.push({ kind: 'thinking', text: liveThinking });
+    }
     if (liveText.trim() !== '') {
       items.push({
         kind: 'robot',
@@ -1512,6 +1518,8 @@ export function mapChief(
      *  use-chief-surface 注入）：回合进行中且非空 → stream 尾挂 typing
      *  robot 行；缺省 = fixture 面 / 未订阅，stream 与现状一致。 */
     liveText?: string;
+    /** #1308 思考增量。非空时在打字行之前挂一条 thinking 行。 */
+    liveThinking?: string;
     /** #905 步活动相位（activityStore 读侧，use-chief-surface 注入）：在飞
      *  存在行的标签/工具名/最近信号数据源。chief 封套不带 step id，陈旧防
      *  线 = hub 单槽 + 步终态清（server/web 镜像律）+ activeRun 门（回合已
@@ -1534,6 +1542,9 @@ export function mapChief(
   // 回合已收即不渲染）。收敛律 = 详情页同款：终稿 message 事件 clear 缓冲 +
   // messages 重取接管，尾行随之退场，不重复不残留。
   if (running) {
+    if ((opts.liveThinking ?? '').trim() !== '') {
+      chiefStream.push({ kind: 'thinking', text: opts.liveThinking ?? '' });
+    }
     if ((opts.liveText ?? '').trim() !== '') {
       // 增量文本已到 → 打字面尾行（#651）。
       chiefStream.push({

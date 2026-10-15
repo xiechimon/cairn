@@ -122,6 +122,11 @@ export class ConversationStreamHub {
   private readonly byConv = new Map<string, Set<TeamStreamConnection>>();
   /** 在飞段文本缓冲（conversationId → 自上一条落库行以来的增量拼接）。 */
   private readonly textBuffers = new Map<string, string>();
+  /** 在飞思考段（#1308）。与 textBuffers 分开：思考行只清自己；assistant
+   *  文本行只清正文与活动相位——封段时 runner 先推进新的思考增量，再上报被
+   *  封的正文行，一起清会抹掉晚订阅要补的思考快照。用户行、步终态、rewind
+   *  仍全文清。 */
+  private readonly thinkingBuffers = new Map<string, string>();
   /** 每会话最后一份步活动相位（#905，瞬态单槽）：订阅进场补发用，步终态
    *  即清。LRU 上限与 textBuffers 同值（delete+set 触碰序）。 */
   private readonly lastActivity = new Map<string, StepActivity>();
@@ -138,6 +143,10 @@ export class ConversationStreamHub {
     const buffered = this.textBuffers.get(conversationId);
     if (buffered !== undefined && buffered !== '') {
       void conn.send({ type: 'text_delta', text: buffered });
+    }
+    const thinking = this.thinkingBuffers.get(conversationId);
+    if (thinking !== undefined && thinking !== '') {
+      void conn.send({ type: 'thinking_delta', text: thinking });
     }
     // 活动相位同律补发（#905）：断线重连 / 换页进场立即拿到在跑步的当前
     // 相位，不用等下一次相位变化。
@@ -161,7 +170,17 @@ export class ConversationStreamHub {
     // 旧律「任何落库行都清」在工具行上会出事——工具行的上报带 500ms/2000ms
     // 重试链，可能迟到，一次迟到就把正在流的下一段抹掉；且 web 侧 #857 起已
     // 是只认 assistant 文本行的 handoff，两侧改到同律镜像才重新成立。
-    if (endsLiveTextBuffer(message)) this.clearConversationBuffer(conversationId);
+    // 思考缓冲不跟这次全文清（#1308）：thinking_delta 把上一段正文封掉时，
+    // runner 先 flush 新思考增量，再上报那条正文行。全文清会丢掉刚写入的
+    // 快照，晚订阅只剩相位标签。思考段行自己清思考缓冲；用户行 / system 行
+    // 仍清（回合边界）；步终态与 rewind 走 clearConversationBuffer。
+    if (endsLiveTextBuffer(message)) {
+      this.textBuffers.delete(conversationId);
+      this.lastActivity.delete(conversationId);
+      if (message.role !== 'assistant') this.thinkingBuffers.delete(conversationId);
+    } else if (isThinkingOnlyRow(message.content)) {
+      this.thinkingBuffers.delete(conversationId);
+    }
     this.publish(conversationId, { type: 'message', message });
   }
 
@@ -182,11 +201,38 @@ export class ConversationStreamHub {
     this.publish(conversationId, { type: 'text_delta', text });
   }
 
+  /** thinking_delta 节流批量转发（#1308）。瞬态，不落库；累积进思考段缓冲
+   *  供晚订阅补发。空文本不发。 */
+  publishThinkingDelta(conversationId: string, text: string): void {
+    if (text === '') return;
+    const next = tailWithinBytes(
+      (this.thinkingBuffers.get(conversationId) ?? '') + text,
+      CONV_TEXT_BUFFER_MAX_BYTES,
+    );
+    this.thinkingBuffers.delete(conversationId);
+    this.thinkingBuffers.set(conversationId, next);
+    if (this.thinkingBuffers.size > CONV_TEXT_BUFFER_MAX_CONVS) {
+      const oldest = this.thinkingBuffers.keys().next().value;
+      if (oldest !== undefined) this.thinkingBuffers.delete(oldest);
+    }
+    this.publish(conversationId, { type: 'thinking_delta', text });
+  }
+
   /** 步活动相位（#905）：daemon 上报经 reportActivity 盖章后瞬态转发；
    *  单槽留最后一份供订阅补发。 */
   publishActivity(conversationId: string, activity: StepActivity): void {
+    // 仅 resetLive（回落轮显式位）清在飞快照——普通 starting / 节流重发
+    // 不得误清已流过的思考与正文（#1308 Bugbot）。
+    if (activity.resetLive === true) {
+      this.textBuffers.delete(conversationId);
+      this.thinkingBuffers.delete(conversationId);
+    }
+    // 进场补发的 lastActivity 不带 resetLive——否则补发顺序是思考快照
+    // 后跟 starting+resetLive，客户端会把刚补上的思考清掉。
+    const { resetLive: _drop, ...rest } = activity;
+    const stored: StepActivity = activity.resetLive === true ? rest : activity;
     this.lastActivity.delete(conversationId);
-    this.lastActivity.set(conversationId, activity);
+    this.lastActivity.set(conversationId, stored);
     if (this.lastActivity.size > CONV_TEXT_BUFFER_MAX_CONVS) {
       const oldest = this.lastActivity.keys().next().value;
       if (oldest !== undefined) this.lastActivity.delete(oldest);
@@ -208,6 +254,7 @@ export class ConversationStreamHub {
    *  同清（#905）：终局/重置后不得再向进场订阅补发死相位。 */
   clearConversationBuffer(conversationId: string): void {
     this.textBuffers.delete(conversationId);
+    this.thinkingBuffers.delete(conversationId);
     this.lastActivity.delete(conversationId);
   }
 

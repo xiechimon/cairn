@@ -1327,6 +1327,19 @@ export function reportTranscriptDelta(
   deps.convHub?.publishTextDelta(row.buildId, text);
 }
 
+/** 思考增量（#1308）：与 reportTranscriptDelta 同纪律，进 thinking_delta，
+ *  不落库。 */
+export function reportThinkingDelta(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  text: string,
+): void {
+  const row = ownedStep(deps, machineId, stepId);
+  if (text === '') return;
+  deps.convHub?.publishThinkingDelta(row.buildId, text);
+}
+
 /** 段行实时落库（machineToolBodySchema 第五形 [设计]，#955 / ADR 0011 D2）：
  *  daemon 在写入端封段后上报，本层与 live 工具行同律——ownedStep 校验后
  *  **先落库再广播**（`upsertMessage`/`upsertChiefRow` 内含 publishMessage），

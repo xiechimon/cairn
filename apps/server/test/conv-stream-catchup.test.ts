@@ -187,6 +187,55 @@ describe('hub 缓冲：清空点（#740 失败方式 ②）', () => {
   });
 });
 
+describe('hub 思考缓冲（#1308）：正文封段不得抹掉刚写入的思考快照', () => {
+  function thinkingFrames(conn: FakeConn): string[] {
+    return conn.frames
+      .filter(
+        (f): f is { type: string; text: string } =>
+          (f as { type: string }).type === 'thinking_delta',
+      )
+      .map((f) => f.text);
+  }
+
+  test('assistant 文本行保留思考快照，同时清正文缓冲与活动相位', () => {
+    const hub = new ConversationStreamHub();
+    hub.publishThinkingDelta('c1', 'REASONING-MARKER-1308');
+    hub.publishTextDelta('c1', '草稿');
+    hub.publishActivity('c1', {
+      stepId: 'step-1',
+      at: 100,
+      phase: 'thinking',
+    });
+    hub.publishMessage('c1', {
+      id: 'm-text',
+      role: 'assistant',
+      content: [{ type: 'text', text: '终稿' }],
+      createdAt: 1,
+    } as unknown as TranscriptRow);
+    const conn = subscribeFresh(hub, 'c1');
+    expect(thinkingFrames(conn)).toEqual(['REASONING-MARKER-1308']);
+    expect(textFrames(conn)).toEqual([]);
+    expect(conn.frames.filter((f) => (f as { type: string }).type === 'activity')).toEqual([]);
+  });
+
+  test('用户行与步终态仍清思考快照', () => {
+    const userHub = new ConversationStreamHub();
+    userHub.publishThinkingDelta('c1', 'REASONING-MARKER-1308');
+    userHub.publishMessage('c1', {
+      id: 'm-user',
+      role: 'user',
+      content: '新回合',
+      createdAt: 2,
+    } as TranscriptRow);
+    expect(thinkingFrames(subscribeFresh(userHub, 'c1'))).toEqual([]);
+
+    const stepHub = new ConversationStreamHub();
+    stepHub.publishThinkingDelta('c1', 'REASONING-MARKER-1308');
+    stepHub.publishStep('c1', stepRow('c1', 'done'));
+    expect(thinkingFrames(subscribeFresh(stepHub, 'c1'))).toEqual([]);
+  });
+});
+
 describe('hub 缓冲：边界（#740 失败方式 ③④⑤）', () => {
   test('字节上限保尾弃头：超限段补发 = 上限内的最长尾部后缀', () => {
     const hub = new ConversationStreamHub();

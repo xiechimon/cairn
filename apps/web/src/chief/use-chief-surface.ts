@@ -27,6 +27,7 @@ import {
   useNotifications,
 } from '../api/hooks.js';
 import { liveTextStore } from '../api/live-text.js';
+import { liveThinkingStore } from '../api/live-thinking.js';
 import { chiefTurnErrorOfContent, mapChief } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useConversationStream } from '../api/sse.js';
@@ -206,8 +207,14 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
   const liveText = useSyncExternalStore(liveTextStore.subscribe, () =>
     activeThreadId !== null ? liveTextStore.getVisible(activeThreadId, knownChiefIds) : '',
   );
+  const liveThinking = useSyncExternalStore(liveThinkingStore.subscribe, () =>
+    activeThreadId !== null ? liveThinkingStore.getVisible(activeThreadId, knownChiefIds) : '',
+  );
   useEffect(() => {
-    if (activeThreadId !== null) liveTextStore.prune(activeThreadId, knownChiefIds);
+    if (activeThreadId !== null) {
+      liveTextStore.prune(activeThreadId, knownChiefIds);
+      liveThinkingStore.prune(activeThreadId, knownChiefIds);
+    }
   }, [activeThreadId, knownChiefIds]);
   // #905 活动相位读侧（键 = 线程 id，liveText 同律）：单槽快照引用稳定，
   // useSyncExternalStore 直读安全。
@@ -221,9 +228,19 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
       activeThreadId: activeThread?.id ?? null,
       messages: chiefMessagesQ.data?.messages ?? [],
       liveText,
+      liveThinking,
       activity,
     });
-  }, [live, chiefQ.data, liveThreads, activeThread, chiefMessagesQ.data, liveText, activity]);
+  }, [
+    live,
+    chiefQ.data,
+    liveThreads,
+    activeThread,
+    chiefMessagesQ.data,
+    liveText,
+    liveThinking,
+    activity,
+  ]);
 
   const chiefData = live ? (liveChief ?? chiefDefault) : (chief ?? chiefDefault);
   const liveUnread = live

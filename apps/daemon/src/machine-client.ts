@@ -104,6 +104,10 @@ export interface MachineApi {
    * streaming）：pi text_delta 节流批量转发，server 侧瞬态进 conversation
    * stream；失败不重试（终稿经 transcript 上传兜底）。 */
   transcriptDelta(stepId: string, text: string): Promise<void>;
+  /** 思考增量（#1308，machineThinkingDeltaBodySchema）：与 transcriptDelta
+   *  同节流同纪律，server 侧进会话流 thinking_delta，不落库。可选成员 =
+   *  单测桩缺省不实现。 */
+  thinkingDelta?(stepId: string, text: string): Promise<void>;
   /** 段行实时上报（machineToolBodySchema 第五形 [设计]，#955 / ADR 0011）：
    *  写入端封段后即时上报该行，server 先落库再广播；与终稿 upload-urls 按同
    *  id 幂等去重。可选成员 = 单测桩缺省不实现（与 activity 缺省同律）。 */
@@ -336,6 +340,13 @@ export class MachineClient implements MachineApi {
   async transcriptDelta(stepId: string, text: string): Promise<void> {
     await this.request('POST', `/api/machine/tool/${stepId}`, {
       body: { kind: 'transcript_delta' as const, text },
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async thinkingDelta(stepId: string, text: string): Promise<void> {
+    await this.request('POST', `/api/machine/tool/${stepId}`, {
+      body: { kind: 'thinking_delta' as const, text },
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

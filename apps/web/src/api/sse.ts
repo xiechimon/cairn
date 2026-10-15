@@ -28,7 +28,8 @@ import { activityStore } from './activity.js';
 import { readStoredToken, useAuth } from './auth.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
-import { textOfContent } from './mappers.js';
+import { liveThinkingStore } from './live-thinking.js';
+import { textOfContent, thinkingOfContent } from './mappers.js';
 import { connect } from './sse-connection.js';
 import { streamGuards } from './sse-guards.js';
 import { teamEventInvalidations } from './sse-team-events.js';
@@ -195,6 +196,7 @@ export function startConversationStream(
   const onMessage = handlers.onMessage;
   const onStep = handlers.onStep;
   liveTextStore.clear(conversationId);
+  liveThinkingStore.clear(conversationId);
   activityStore.clear(conversationId);
   // resync（#462）：重连/看门狗重建即全量失效重取，补断线窗口内丢失的
   // message/step 事件（plan 卡/进度行停更的根治面）；#740 另加清缓冲——
@@ -204,6 +206,7 @@ export function startConversationStream(
   // 的进场补发（hub lastActivity）接管，陈旧相位不跨连接残留。
   const resync = () => {
     liveTextStore.clear(conversationId);
+    liveThinkingStore.clear(conversationId);
     activityStore.clear(conversationId);
     void invalidateConverged(qc);
   };
@@ -214,10 +217,20 @@ export function startConversationStream(
         case 'text_delta':
           liveTextStore.append(conversationId, ev.text as string);
           break;
-        case 'activity':
-          // #905：步活动相位（瞬态单槽；stepId 对在跑步的过滤在消费侧）。
-          activityStore.set(conversationId, (ev as ConversationActivityEvent).activity);
+        case 'thinking_delta':
+          liveThinkingStore.append(conversationId, ev.text as string);
           break;
+        case 'activity': {
+          // #905：步活动相位（瞬态单槽；stepId 对在跑步的过滤在消费侧）。
+          const activity = (ev as ConversationActivityEvent).activity;
+          // 与 hub 同律：仅 resetLive 清在飞思考/正文（#1308 Bugbot）。
+          if (activity.resetLive === true) {
+            liveTextStore.clear(conversationId);
+            liveThinkingStore.clear(conversationId);
+          }
+          activityStore.set(conversationId, activity);
+          break;
+        }
         case 'message': {
           const row = ev.message as TranscriptRow;
           // #857 收敛交接：终稿行到达只记 handoff，不清缓冲——messages 重取在
@@ -225,6 +238,9 @@ export function startConversationStream(
           // assistant 文本行：工具行/用户行到达时缓冲前缀尚无落库行覆盖。
           if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
             liveTextStore.noteSettled(conversationId, row.id);
+          }
+          if (row.role === 'assistant' && thinkingOfContent(row.content) !== null) {
+            liveThinkingStore.noteSettled(conversationId, row.id);
           }
           void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
           void invalidateConverged(qc, { queryKey: ['plans'] });
@@ -238,6 +254,7 @@ export function startConversationStream(
           const step = (ev as ConversationStepEvent).step;
           if (step.status === 'done' || step.status === 'failed' || step.status === 'stopped') {
             liveTextStore.clear(conversationId);
+            liveThinkingStore.clear(conversationId);
             activityStore.clear(conversationId);
           }
           void invalidateConverged(qc, { queryKey: ['steps', conversationId] });

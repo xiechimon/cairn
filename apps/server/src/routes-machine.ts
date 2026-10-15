@@ -22,6 +22,7 @@ import {
   machineShellPrecheckBodySchema,
   machineShellResultBodySchema,
   machineSyncResultBodySchema,
+  machineThinkingDeltaBodySchema,
   machineToolBodySchema,
   machineToolRelayBodySchema,
   machineTranscriptDeltaBodySchema,
@@ -58,6 +59,7 @@ import {
   markPresence,
   recoverSteps,
   reportActivity,
+  reportThinkingDelta,
   reportTool,
   reportTranscriptDelta,
   reportTranscriptRow,
@@ -80,6 +82,16 @@ function isTranscriptRowBody(raw: unknown): boolean {
     typeof raw === 'object' &&
     'kind' in raw &&
     (raw as { kind: unknown }).kind === 'transcript_row'
+  );
+}
+
+/** 思考增量判别（#1308）：kind 与 transcript_delta 同族，分流必须先于通用 parse。 */
+function isThinkingDeltaBody(raw: unknown): boolean {
+  return (
+    raw !== null &&
+    typeof raw === 'object' &&
+    'kind' in raw &&
+    (raw as { kind: unknown }).kind === 'thinking_delta'
   );
 }
 
@@ -351,6 +363,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     if (isDeltaBody(raw)) {
       const delta = parseWith(machineTranscriptDeltaBodySchema, raw, 'body');
       reportTranscriptDelta(deps, row.id, c.req.param('stepId'), delta.text);
+      return c.json({ ok: true as const });
+    }
+    if (isThinkingDeltaBody(raw)) {
+      const delta = parseWith(machineThinkingDeltaBodySchema, raw, 'body');
+      reportThinkingDelta(deps, row.id, c.req.param('stepId'), delta.text);
       return c.json({ ok: true as const });
     }
     if (isActivityBody(raw)) {
