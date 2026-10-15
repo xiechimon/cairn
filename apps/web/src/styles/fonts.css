@@ -54,13 +54,13 @@
   --font-source-serif: "sourceSerif4", Georgia, "Songti SC", "Noto Serif CJK SC", serif;
 }
 
-:root:not(.light) .font-medium {
+:root:not(.light) .optical-medium {
   font-variation-settings: "wght" 465;
 }
-:root:not(.light) .font-semibold {
+:root:not(.light) .optical-semibold {
   font-variation-settings: "wght" 560;
 }
-:root:not(.light) .font-bold {
+:root:not(.light) .optical-bold {
   font-variation-settings: "wght" 660;
 }
 

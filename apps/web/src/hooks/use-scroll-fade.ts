@@ -15,6 +15,13 @@ function readFadeSize(el: HTMLElement, override?: number): number {
   return Number.isFinite(n) && n > 0 ? n : 28;
 }
 
+function clearFadeVars(el: HTMLElement): void {
+  el.style.removeProperty('--scroll-fade-top');
+  el.style.removeProperty('--scroll-fade-bottom');
+  el.style.removeProperty('--scroll-fade-left');
+  el.style.removeProperty('--scroll-fade-right');
+}
+
 export function useScrollFade(
   ref: RefObject<HTMLElement | null>,
   options: UseScrollFadeOptions = {},
@@ -46,7 +53,11 @@ export function useScrollFade(
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || !enabled) return;
+    if (!el) return;
+    if (!enabled) {
+      clearFadeVars(el);
+      return;
+    }
     el.style.setProperty('--scroll-fade-top', '0px');
     el.style.setProperty('--scroll-fade-bottom', '0px');
     el.style.setProperty('--scroll-fade-left', '0px');
@@ -55,9 +66,13 @@ export function useScrollFade(
     el.addEventListener('scroll', sync, { passive: true });
     const ro = new ResizeObserver(sync);
     ro.observe(el);
+    const mo = new MutationObserver(sync);
+    mo.observe(el, { childList: true, subtree: true, characterData: true });
     return () => {
       el.removeEventListener('scroll', sync);
       ro.disconnect();
+      mo.disconnect();
+      clearFadeVars(el);
     };
   }, [ref, enabled, sync]);
 }

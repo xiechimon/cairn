@@ -8,7 +8,7 @@ test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
   const vals = await page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
     const probe = document.createElement('div');
-    probe.className = 'scroll-fade';
+    probe.className = 'scroll-fade scroll-fade-h';
     probe.style.cssText = 'position:fixed;inset:0;overflow:auto;height:120px';
     probe.innerHTML =
       '<div style="height:400px"></div><span class="icon-baseline"></span><span class="icon-baseline-sm"></span>';
@@ -57,7 +57,7 @@ test('dark optical weight compensation applies outside .light', async ({ page })
   await page.waitForSelector('.board-sidebar');
   const wght = await page.evaluate(() => {
     const el = document.createElement('span');
-    el.className = 'font-medium';
+    el.className = 'optical-medium';
     el.textContent = 'x';
     document.body.append(el);
     const v = getComputedStyle(el).fontVariationSettings;
