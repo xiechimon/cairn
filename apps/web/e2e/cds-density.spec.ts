@@ -15,7 +15,7 @@ test('CDS density: comfortable default; compact rem-scale 0.9375 + data-density'
       padCard: cs.getPropertyValue('--pad-card').trim(),
     };
   });
-  expect(before.density).toBeNull();
+  expect(before.density).toBe('comfortable');
   // comfortable keeps :root calc(16/17)
   expect(before.remScale).toMatch(/calc|0\.94/);
   expect(before.padCard).toBe('16px');
@@ -39,13 +39,13 @@ test('CDS density: comfortable default; compact rem-scale 0.9375 + data-density'
   expect(after.stored).toBe('compact');
 
   await page.getByTestId('account-density-comfortable').click();
-  await page.waitForFunction(() => !document.documentElement.dataset.density);
+  await page.waitForFunction(() => document.documentElement.dataset.density === 'comfortable');
   const back = await page.evaluate(() => ({
     density: document.documentElement.dataset.density ?? null,
     stored: localStorage.getItem('pacman-density'),
     padCard: getComputedStyle(document.documentElement).getPropertyValue('--pad-card').trim(),
   }));
-  expect(back.density).toBeNull();
+  expect(back.density).toBe('comfortable');
   expect(back.stored).toBe('comfortable');
   expect(back.padCard).toBe('16px');
 });

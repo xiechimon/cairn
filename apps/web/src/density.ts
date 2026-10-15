@@ -22,11 +22,12 @@ export function readStoredDensity(storage: Storage | null): Density {
 
 export function applyDensity(density: Density, storage: Storage | null = safeLocalStorage()): void {
   const root = document.documentElement;
-  if (density === 'compact') {
-    root.dataset.density = 'compact';
-  } else {
-    delete root.dataset.density;
-  }
+  // Always stamp data-density (comfortable | compact) so a no-op re-click of
+  // the active segment still mutates the DOM via densityTick (account-controls
+  // 假可供性 probe; theme.ts gets the same from .theme-suppress). Compact CSS
+  // keys on [data-density='compact'] only.
+  root.dataset.density = density;
+  root.dataset.densityTick = String((Number(root.dataset.densityTick) || 0) + 1);
   try {
     storage?.setItem(DENSITY_STORAGE_KEY, density);
   } catch {
