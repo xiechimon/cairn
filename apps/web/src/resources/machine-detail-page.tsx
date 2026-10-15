@@ -22,7 +22,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
-import { MACHINES_HREF } from './machines-page.js';
+import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
 import { ResourceShell } from './shell.js';
 
 export function MachineDetailPage() {
@@ -139,6 +139,11 @@ export function MachineDetailPage() {
                   cap: machine.maxConcurrent,
                 })}
               </span>
+              {machine.concurrencySource !== undefined && (
+                <span data-concurrency-source={machine.concurrencySource}>
+                  {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
+                </span>
+              )}
             </>
           )}
         </div>

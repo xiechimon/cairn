@@ -13,12 +13,14 @@
 // 6. 确定性输出：两集各自排序（wire 断言稳定）。
 
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { cpus, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
+import { machineHardwareSchema } from '@pacman/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   createMachineCapabilitiesProbe,
   probeMachineCapabilities,
+  probeMachineHardware,
 } from '../src/machine-capabilities.js';
 
 const tmpDirs: string[] = [];
@@ -41,7 +43,7 @@ describe('probeMachineCapabilities（一次性探测，全函数）', () => {
       mcpConfigPath: join(root, 'absent.json'),
       skillsDir: join(root, 'absent-skills'),
     });
-    expect(caps).toEqual({ mcpServers: [], skills: [] });
+    expect(caps).toMatchObject({ mcpServers: [], skills: [] });
   });
 
   test('失败方式 1：坏 JSON / 非对象 JSON → mcpServers 空集', () => {
@@ -125,8 +127,8 @@ describe('createMachineCapabilitiesProbe（mtime 缓存的节拍探测）', () =
     mkdirSync(join(skills, 's1'), { recursive: true });
     writeFileSync(join(skills, 's1', 'SKILL.md'), '#');
     const probe = createMachineCapabilitiesProbe({ mcpConfigPath: cfg, skillsDir: skills });
-    expect(probe()).toEqual({ mcpServers: ['a'], skills: ['s1'] });
-    expect(probe()).toEqual({ mcpServers: ['a'], skills: ['s1'] }); // 缓存路径同值
+    expect(probe()).toMatchObject({ mcpServers: ['a'], skills: ['s1'] });
+    expect(probe()).toMatchObject({ mcpServers: ['a'], skills: ['s1'] }); // 缓存路径同值
 
     // MCP 配置变化（mtime 前推）→ 新 slug 上行。
     writeFileSync(
@@ -161,5 +163,55 @@ describe('createMachineCapabilitiesProbe（mtime 缓存的节拍探测）', () =
     expect(probe().mcpServers).toEqual(['a']);
     rmSync(cfg);
     expect(probe().mcpServers).toEqual([]);
+  });
+});
+
+// #1241 机器能力指纹（probeMachineHardware）。失败方式（先于实现固化）：
+// H1 全函数：磁盘路径不存在 → 回落 `/` 的余量，指纹仍整块上报（不 throw、不缺席）。
+// H2 形状：任何一拍的指纹都能过 machineHardwareSchema（server 收严的同一把尺）。
+// H3 核数取真值：cpuCores = os.cpus().length（推荐公式的输入不能是常量）。
+// H4 能力包并入：createMachineCapabilitiesProbe / probeMachineCapabilities 把
+//    指纹随 mcp/skills 同包上报；缺席 hardware 时整包仍合法（老形态零漂移）。
+describe('probeMachineHardware（#1241 能力指纹）', () => {
+  test('H1 磁盘路径不存在 → 回落 `/` 取余量，指纹整块上报', () => {
+    const hw = probeMachineHardware(join(tmpRoot(), 'absent', 'skills'));
+    expect(hw).toBeDefined();
+    expect(machineHardwareSchema.parse(hw)).toEqual(hw);
+    expect(hw!.diskFreeMb).toBeGreaterThanOrEqual(0);
+  });
+
+  test('H2 形状：指纹过 machineHardwareSchema（核 ≥ 1，内存/磁盘非负整数）', () => {
+    const hw = probeMachineHardware(tmpRoot());
+    expect(() => machineHardwareSchema.parse(hw)).not.toThrow();
+    expect(Number.isInteger(hw!.memoryAvailableMb)).toBe(true);
+    expect(hw!.loadAvg1).toBeGreaterThanOrEqual(0);
+  });
+
+  test('H3 核数 = 本机 os.cpus().length', () => {
+    expect(probeMachineHardware(tmpRoot())!.cpuCores).toBe(cpus().length);
+  });
+
+  test('H3 内存总量 = 本机 os.totalmem()（推荐公式的内存输入，不随运行中的步变化）', () => {
+    expect(probeMachineHardware(tmpRoot())!.memoryTotalMb).toBe(
+      Math.floor(totalmem() / (1024 * 1024)),
+    );
+  });
+
+  test('H4 能力包并入指纹；一次性探测与节拍探测同形', () => {
+    const root = tmpRoot();
+    const once = probeMachineCapabilities({
+      mcpConfigPath: join(root, 'absent.json'),
+      skillsDir: join(root, 'absent'),
+    });
+    expect(machineHardwareSchema.parse(once.hardware)).toEqual(once.hardware);
+    const beat = createMachineCapabilitiesProbe({
+      mcpConfigPath: join(root, 'absent.json'),
+      skillsDir: join(root, 'absent'),
+    })();
+    // 可用内存是现读值，两次探测之间会漂移，只比核数这类稳定字段。
+    expect(beat.hardware).toBeDefined();
+    expect(beat.hardware?.cpuCores).toBe(once.hardware?.cpuCores);
+    expect(beat.mcpServers).toEqual([]);
+    expect(beat.skills).toEqual([]);
   });
 });

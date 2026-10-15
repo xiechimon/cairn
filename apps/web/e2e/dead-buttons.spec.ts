@@ -222,7 +222,7 @@ test('machines rows carry only live controls, no dead inline buttons (#222 出�
   // #1259 fixture 双机（canon 本机 + mea-wsl 远端）各带并发位（max 3）
   // ——每行一个并发上限钮，故 = 2。
   await expect(page.locator('div[data-kind] button')).toHaveCount(2);
-  await expect(page.locator('div[data-kind] button[aria-label="并发上限"]')).toHaveCount(2);
+  await expect(page.locator('div[data-kind] button[aria-label^="并发上限"]')).toHaveCount(2);
 });
 
 // —— 8. 语音输入钮（#304 C5）——————————————————————————————————————————

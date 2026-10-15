@@ -81,7 +81,7 @@ test('行内控件面 = shell 开关 + 并发选择器两个（XMON-113 + #1108�
   await page.goto(MACHINES);
   await expect(page.locator(`${LOCAL_ROW} [role="switch"]`)).toHaveCount(1);
   // 并发选择器（Popover 触发钮；aria-label = e2e 一级载体）。
-  await expect(page.locator(`${LOCAL_ROW} button[aria-label="并发上限"]`)).toHaveCount(1);
+  await expect(page.locator(`${LOCAL_ROW} button[aria-label^="并发上限"]`)).toHaveCount(1);
   // 死钮纪律：除并发触发钮外零 button（删除 / chevron / 菜单全无）。
   await expect(page.locator(`${LOCAL_ROW} button`)).toHaveCount(1);
   // per-runtime 位仍是 mark 展示面，不是控件（#503 负向）。

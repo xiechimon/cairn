@@ -779,7 +779,27 @@ export function useApiMutations(teamId: string | undefined) {
       onMutate: (input) => {
         const previous = qc.getQueryData<MachineRecord[]>(['machines', teamId]);
         qc.setQueryData<MachineRecord[]>(['machines', teamId], (rows) =>
-          (rows ?? []).map((m) => (m.id === input.id ? { ...m, ...input.body } : m)),
+          (rows ?? []).map((m) => {
+            if (m.id !== input.id) return m;
+            const { maxConcurrent, ...rest } = input.body;
+            if (maxConcurrent === null) {
+              return {
+                ...m,
+                ...rest,
+                maxConcurrentOverridden: false,
+                maxConcurrent: m.recommendedConcurrent ?? m.maxConcurrent,
+                concurrencySource:
+                  m.capabilities?.hardware?.memoryTotalMb !== undefined ? 'measured' : 'estimate',
+              };
+            }
+            return {
+              ...m,
+              ...rest,
+              ...(maxConcurrent !== undefined
+                ? { maxConcurrent, maxConcurrentOverridden: true, concurrencySource: 'manual' }
+                : {}),
+            };
+          }),
         );
         return { previous };
       },
