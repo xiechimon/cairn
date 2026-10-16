@@ -5,10 +5,12 @@
    apps/web/e2e/palette-e.css（#909 方法正本复刻，流程见 #987 §4；实审裁决
    与 ramp 参数见 issue #988 resolution；生成器 gen-palettes.mjs 随 #988 原型
    脚手架退役，reachable through git history at branch ui/988-palette-reselect）。
+   亮侧 .light 自 Paper 改版起取 apps/web/DESIGN.md frontmatter colors 定稿值
+   （canvas / sheet / card 三层纸面 + ink 阶梯 + 赭红 accent），暗侧仍是 E。
 
-   槽架构（#987 §3 判决，#1002 收敛执行）：本文件持 69 色槽 = 官方 18 +
-   仓内补位 51（品牌/状态/文本三阶/surface 独有档/交互 alpha 梯/恒定杂项）；
-   tokens.css 另持 drop-tint 3，合计留类 72。#987 判死的 7 槽（destructive-
+   槽架构（#987 §3 判决，#1002 收敛执行）：本文件持 81 色槽 = 官方 18 +
+   仓内补位 63（品牌/状态/文本三阶/surface 独有档/交互 alpha 梯/恒定杂项）；
+   tokens.css 另持 drop-tint 3，合计留类 84。#987 判死的 7 槽（destructive-
    foreground / col-bg / col-head-text / dialog-row-bg / tile-indigo-bg /
    tile-indigo-fg / primary-disabled）与判并的 30 槽（surface→card、
    surface-secondary→secondary、border-default→border、border-strong→input、
@@ -61,6 +63,18 @@
   --color-spot-text-on-tint: var(--spot-text-on-tint);
   --color-spot-disabled: var(--spot-disabled);
   --color-spot-disabled-fg: var(--spot-disabled-fg);
+  --color-canvas: var(--canvas);
+  --color-running: var(--running);
+  --color-running-text: var(--running-text);
+  --color-running-bar: var(--running-bar);
+  --color-running-track: var(--running-track);
+  --color-accent-hover: var(--accent-hover);
+  --color-project-tile-1: var(--project-tile-1);
+  --color-project-tile-2: var(--project-tile-2);
+  --color-project-tile-3: var(--project-tile-3);
+  --color-project-tile-4: var(--project-tile-4);
+  --color-project-tile-5: var(--project-tile-5);
+  --color-project-tile-6: var(--project-tile-6);
   /* 半径族对齐官方乘数形态（#412「对齐 shadcn」裁定 + #410 的 Base UI 代数
      接口）：--radius 是半径基，定版 = 官方默认 0.625rem = 10px（#988 实审
      裁决，#980 裁决④ registry 几何赢），翻基值一档带动全族——sm 6 / md 8 /
@@ -241,28 +255,47 @@
   --spot-text-on-tint: #f8a7e1;
   --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
   --spot-disabled-fg: color-mix(in srgb, var(--card-button) 65%, white);
+  /* Paper 语义槽（apps/web/DESIGN.md）。暗侧在暗色定稿前取现有暗阶梯最近档：
+     canvas = 现 --surface-1 配方；running 三档 = col-dot-done / chip-done-fg /
+     diff-add-fg；track = secondary；accent-hover = spot-soft；tile 按色相取
+     现有暗侧高明度档（暗侧首字母配深字，同 --project-avatar-fg 惯例）。 */
+  --canvas: color-mix(in oklab, var(--background), var(--card) 50%);
+  --running: #77d08c;
+  --running-text: #90daa0;
+  --running-bar: #6ac380;
+  --running-track: #2d2926;
+  --accent-hover: var(--spot-soft);
+  --project-tile-1: #ff9c75;
+  --project-tile-2: #77d08c;
+  --project-tile-3: #c4b6ab;
+  --project-tile-4: #eea953;
+  --project-tile-5: #f294d8;
+  --project-tile-6: #63c4ff;
 }
 
 .light {
-  --background: #f6f1ec;
-  --foreground: #120f0b;
-  /* --card light 取定版页面档（卡片与页面底只差一档） */
-  --card: #f0ebe6;
-  --card-foreground: #120f0b;
-  --popover: #f0ebe6;
-  --popover-foreground: #120f0b;
-  --primary: #120f0b;
-  --primary-foreground: #fafafa;
-  --secondary: #eae4e0;
-  --secondary-foreground: #120f0b;
-  --muted: #eae4e0;
-  --muted-foreground: #36322e;
-  --accent: #eae4e0;
-  --accent-foreground: #120f0b;
+  /* Paper 三层纸面按角色落槽：canvas = 侧栏所在应用底（经 --surface-1，
+     见 tokens.css .light）；sheet = 主面板（看板 board-main 走 --background）；
+     card = 白色任务卡与浮层。次级面 secondary/muted/accent 取 hover 档。 */
+  --canvas: #f3eee5;
+  --background: #fbf9f5;
+  --foreground: #2b2620;
+  --card: #ffffff;
+  --card-foreground: #2b2620;
+  --popover: #ffffff;
+  --popover-foreground: #2b2620;
+  --primary: #2b2620;
+  --primary-foreground: #fbf9f5;
+  --secondary: #ebe4d8;
+  --secondary-foreground: #2b2620;
+  --muted: #ebe4d8;
+  --muted-foreground: #5e564d;
+  --accent: #ebe4d8;
+  --accent-foreground: #2b2620;
   /* 亮模 destructive 走深档（solid 保高明度、文字走深档的 Radix 形随定版
      色板入册；实测见 docs/verify/988/） */
   --destructive: #9e2c49;
-  --border: #eae4e0;
+  --border: #ece5da;
   --input: #cbc5c1;
   --ring: #8f8985;
   /* sidebar interaction ladder (#128), light side of the alpha ladder —
@@ -276,14 +309,13 @@
   /* --card-hover 亮侧镜像（dsh interactive-bg-hover 亮侧 = 墨 6%）：卡底向
      文字色压暗 6%，悬停反馈同律。 */
   --card-hover: color-mix(in srgb, var(--card), var(--foreground) 6%);
-  /* XMON-55 P4 亮侧文字族随定版暖灰 ramp 走：secondary / tertiary 过 4.5，
-     dim 过 UI 3 门仍只做装饰：时间戳、非活动图标、占位规则（实测见
-     docs/verify/988/）。 */
-  --text-secondary: #36322e;
-  --text-tertiary: #595450;
+  /* 文字阶梯 = DESIGN.md ink-2 / ink-3（白卡 7.21 / 5.29，canvas 6.24 /
+     4.58）；dim 不动、只做装饰：时间戳、非活动图标、占位规则。 */
+  --text-secondary: #5e564d;
+  --text-tertiary: #746a5f;
   --text-dim: #8f8985;
-  --card-button: #97227e;
-  --focus-ring: #97227e;
+  --card-button: #b4532a;
+  --focus-ring: #b4532a;
   --col-dot-idle: #67594d;
   --col-dot-confirm: #faab3f;
   --col-dot-building: #006390;
@@ -298,8 +330,8 @@
   --project-avatar-bg: #cd6033;
   --project-avatar-fg: #310b00;
   /* detail palette：plan 回 spot 族，其余保留 */
-  --chip-idle-bg: #eae4e0;
-  --chip-idle-fg: #595450;
+  --chip-idle-bg: #ebe4d8;
+  --chip-idle-fg: #5e564d;
   --chip-plan-bg: var(--spot-soft);
   --chip-plan-fg: var(--spot-text-on-tint);
   --chip-confirm-bg: #ffe5c8;
@@ -327,7 +359,7 @@
   --chief-tab-active: #e2dcd7;
   /* notification banner bell disc (#114)：字形走 spot 原色 */
   --notify-icon-bg: var(--spot-soft);
-  --menu-icon: #120f0b;
+  --menu-icon: #2b2620;
   /* 轨 A 家族（on-accent / scrim）：.light 保持完整语义 token 面；on-accent
      亮侧白字压深品牌档（件面实测见 docs/verify/988/）。 */
   --text-on-accent: #ffffff;
@@ -335,12 +367,24 @@
   /* 罩上白字（#854 颜色逃逸收编）：.light 保持完整语义 token 面，同暗侧值 */
   --text-on-veil: #ffffff;
   /* P0 语义槽 light 镜像（#787）：公式与暗侧同形，唯 --spot-text-on-tint 取
-     加深档（spot 原色在亮 tint 上不达标，加深档强制；实测见
-     docs/verify/988/）；失能字沿既有 light 惯例取白（失能态不按 4.5 验收）。 */
+     赭红加深档（spot 原色在 spot-soft 上 4.13 不达标；加深档 6.44，实测见
+     docs/verify/paper-tokens/contrast.txt）；失能字沿既有 light 惯例取白
+     （失能态不按 4.5 验收）。 */
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
   --accent-soft: color-mix(in srgb, var(--card-button) 14%, transparent);
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
-  --spot-text-on-tint: #661955;
+  --spot-text-on-tint: #8a3a1a;
   --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
   --spot-disabled-fg: #ffffff;
+  --running: #5f8f5a;
+  --running-text: #4f7049;
+  --running-bar: #7ea476;
+  --running-track: #ebe5da;
+  --accent-hover: #f6ebe3;
+  --project-tile-1: #c06a43;
+  --project-tile-2: #7d8b5a;
+  --project-tile-3: #6b7a8f;
+  --project-tile-4: #a0784a;
+  --project-tile-5: #8a6a9a;
+  --project-tile-6: #4f8a8b;
 }
