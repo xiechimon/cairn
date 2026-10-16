@@ -184,7 +184,7 @@ try {
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   const cardHasChip = await page
     .locator('[data-column-list="todo"] .todo-card', { hasText: firstLine })
-    .locator('[class*="tag-chip"]')
+    .locator('[class*="tag-chip"], [data-card-tag]')
     .count();
   check('board-card-no-chip', cardHasChip === 0, `无标签卡零占位(命中 ${cardHasChip} 个)`);
 } finally {
