@@ -2,7 +2,8 @@
 // the 6-column 278px fixed-pitch scroller became an even 4-column grid
 // (repeat(4, minmax(0, 1fr)), gap 14); the #147 column-collapse family and
 // the #58 scrollLeft persistence retired with the horizontal scroll they
-// served. Header 37 with dot/name/count, empty-state copy centered (r7).
+// served. Column header = status icon + serif name + count (DESIGN.md 看板列);
+// an empty column shows 暂无 under the header.
 // #692: 列宽单源下限——轨道规则 = scroller 上的 grid-cols 工具类
 // （minmax(var(--board-col-min), 1fr)），窄窗放不下时横滚回归且滚动条
 // 不再隐藏（旧 240px 开态护栏把第四列裁成 ~3px 残边、无可滚线索 =
@@ -33,7 +34,7 @@
 // #414 (shadcn 试点): 视觉层切 shadcn 组件 + B（neutral）token——网格/列/头
 // 部布局走 tailwind 工具类（几何与 #351 的 board.css 规则逐条对齐），按钮走
 // components/ui/button；data-* 钩子、类别名锚点、dnd 逻辑全部原位。阶段点
-// 语义色（column.dot）不随 B 换。
+// 列头状态图标见 ColumnIcon（DESIGN.md 图标）。
 // #445 顶栏重排 / XMON-57 收敛：左侧 = 生效筛选条（一条一维度，点即清该
 // 维度），右侧动作区恰好一钮 = 无底色筛选面板钮（filter-panel.tsx，仓库 +
 // 类型两段）；「+ 任务」撤除（与侧栏「新任务」行 + C 热键同 opener，第三
@@ -53,6 +54,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
+import { Activity, CircleAlert, CircleCheck, CircleDashed, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
@@ -62,6 +64,7 @@ import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeSessionStorage } from '../safe-storage.js';
 import {
+  type BoardColumnDef,
   COLUMNS,
   canDropOnColumn,
   needsDoneGate,
@@ -131,6 +134,20 @@ interface BoardProps {
   /** #445: 卡片标签解析图（tagId → TagChipData；live = 全项目并查，
    *  fixture = scenario.tags）。absent/空图 = 卡不渲染标签。 */
   tagsById?: ReadonlyMap<string, TagChipData>;
+  /** 待开始 column header plus button: the same opener as the sidebar 新任务 row. */
+  onNewTask?: () => void;
+}
+
+const COLUMN_ICON = {
+  queued: { icon: CircleDashed, tone: 'text-content-tertiary' },
+  running: { icon: Activity, tone: 'text-running' },
+  attention: { icon: CircleAlert, tone: 'text-(--card-button)' },
+  done: { icon: CircleCheck, tone: 'text-content-tertiary' },
+} as const;
+
+function ColumnIcon({ status }: { status: BoardColumnDef['status'] }) {
+  const { icon: Icon, tone } = COLUMN_ICON[status];
+  return <Icon aria-hidden strokeWidth={1.75} className={`size-3.75 flex-none ${tone}`} />;
 }
 
 export function BoardSurface({
@@ -146,6 +163,7 @@ export function BoardSurface({
   banner,
   filters,
   tagsById,
+  onNewTask,
 }: BoardProps) {
   const { t } = useI18n();
   const [dragId, setDragId] = useState<string | null>(null);
@@ -339,7 +357,7 @@ export function BoardSurface({
                      （2026-10-12 用户派 dsh 对齐：rounded-2xl = 18px，卡件同
                      档）；drop 染色是列盒的状态层，随列几何。 */
                   className={cn(
-                    'board-column relative flex h-full flex-col bg-background',
+                    'board-column group/column relative flex h-full flex-col bg-background',
                     isValidDropTarget(column.id) && 'bg-(--drop-tint-base)',
                     dropColumnId === column.id && 'bg-(--drop-tint-hover)',
                   )}
@@ -348,27 +366,33 @@ export function BoardSurface({
                   data-drop-valid={isValidDropTarget(column.id) ? 'true' : undefined}
                   data-drop={dropColumnId === column.id ? 'true' : undefined}
                 >
-                  <header className="flex h-8 flex-none items-center px-[13px]">
-                    <span
-                      className="size-[7px] flex-none rounded-full"
-                      style={{ background: column.dot }}
-                    />
-                    <span className="board-column-name ml-2 text-sm leading-5 text-muted-foreground">
+                  <header className="mx-1 mb-1 flex h-9 flex-none items-center gap-2 border-b border-border px-1">
+                    <ColumnIcon status={column.status} />
+                    <h2 className="board-column-name font-heading text-heading font-medium text-foreground">
                       {t(column.name)}
-                    </span>
+                    </h2>
                     <span
                       data-testid="column-count"
-                      className="ml-[9px] text-xs leading-4 tabular-nums text-muted-foreground/70"
+                      className="text-meta tabular-nums text-content-tertiary"
                     >
                       {todos.length}
                     </span>
                     {column.label && (
-                      <span className="ml-2 text-xs leading-4 text-muted-foreground">
-                        {t(column.label)}
-                      </span>
+                      <span className="text-meta text-content-tertiary">{t(column.label)}</span>
+                    )}
+                    {column.id === 'todo' && onNewTask != null && (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="ml-auto text-content-tertiary opacity-0 transition-opacity duration-150 ease-out group-hover/column:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                        aria-label={t('新建任务')}
+                        onClick={onNewTask}
+                      >
+                        <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+                      </Button>
                     )}
                   </header>
-                  <ColumnList columnId={column.id} empty={t(column.empty)} count={todos.length}>
+                  <ColumnList columnId={column.id} empty={t('暂无')} count={todos.length}>
                     {/* #753 可拖面（todos.dev 2026-10-03/04 live 重测）：
                         每列的卡都武装传感器——旧「待处理/已完成不可拖」是
                         2026-10-02 旧测误判，已推翻；点击导航由 PointerSensor
@@ -451,13 +475,13 @@ function writeColumnScroll(columnId: string, top: number): void {
 
 /** The list area doubles as the column's drop target so empty columns
  *  accept drops (useDroppable id = column id). #504: the list is the
- *  column's scroll surface — the 37px header stays fixed while cards
+ *  column's scroll surface — the header stays fixed while cards
  *  overflow (overflow-y rides the same native-scrollbar convention as
  *  .secondary-body / .res-body). XMON-42: the 1px block padding is load
  *  bearing — a scroll container clips at its padding box while the card's
  *  ring is a box-shadow drawn outside the border box, so with a zero block
  *  inset the topmost card (and, scrolled to the end, the bottommost one)
- *  loses that edge; the inline axis already carries 7.25px of inset.
+ *  loses that edge; the inline axis carries 4px of inset.
  *  #1255: this list unmounts with the board route. The offset lives here,
  *  not on .board-scroller (that node is overflow-y hidden). */
 function ColumnList({
@@ -510,13 +534,13 @@ function ColumnList({
 
   return (
     <div
-      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-[7.25px] py-1"
+      className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-1 py-1"
       ref={setRefs}
       data-column-list={columnId}
     >
       {children}
       {count === 0 && (
-        <div className="board-column-empty absolute inset-0 flex -translate-y-3 items-center justify-center text-xs leading-4 text-muted-foreground">
+        <div className="board-column-empty px-0.5 py-2 text-meta text-content-tertiary">
           {empty}
         </div>
       )}

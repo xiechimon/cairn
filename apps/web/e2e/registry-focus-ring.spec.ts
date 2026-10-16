@@ -19,7 +19,9 @@ const SKILLS = '/app/resources/skills?scenario=01';
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks&tab=tasks';
 const MACHINES = '/app/resources/machines?scenario=06';
 const ACCEPT = '/app?scenario=34';
-const BADGES = '/app?scenario=board-tags';
+// The board card no longer renders a Badge (Paper card, PR 3); the detail
+// header phase chip is a Badge face that stays.
+const BADGES = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19';
 const SCHEDULES = '/app/schedules?scenario=r3-92';
 
 interface FocusInfo {

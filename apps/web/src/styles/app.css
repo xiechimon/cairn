@@ -57,6 +57,8 @@
   --text-meta--line-height: calc(16 / 12);
   --text-caption: var(--type-caption);
   --text-caption--line-height: calc(16 / 11.5);
+  /* DESIGN.md 动效: the running icon's 2.4s opacity breath is the one loop. */
+  --animate-breath: card-breath 2.4s ease-in-out infinite;
 }
 
 @layer base {

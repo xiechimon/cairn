@@ -507,19 +507,12 @@
   --type-meta: calc(0.75rem * var(--type-scale));
   --type-caption: calc(0.71875rem * var(--type-scale));
 }
-/* Compact card rhythm: 8px pad; identity/time meta → 12/16. */
+/* Compact card rhythm: 8px pad; the type keys already rescale with density. */
 [data-density="compact"] [data-slot="card"] {
   --card-spacing: 0.5rem;
 }
 [data-density="compact"] .todo-card {
-  padding: 8px;
-}
-[data-density="compact"] .todo-card-title {
-  margin-top: 0.25rem;
-}
-[data-density="compact"] .todo-card-meta {
-  font-size: 12px;
-  line-height: 16px;
+  padding: 8px 10px;
 }
 
 .light {
