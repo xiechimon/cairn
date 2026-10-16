@@ -32,6 +32,7 @@
 // agnostic — the caller (todo-detail-page) feeds in MentionGroups
 // derived from either live REST hooks or the fixture set.
 
+import { useLayoutEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -192,8 +193,37 @@ export function Composer({
     growCap: 384,
   });
 
+  const [multiLine, setMultiLine] = useState(false);
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (ta == null) {
+      setMultiLine(false);
+      return;
+    }
+    const trailingBlank = draft.length - draft.replace(/\n+$/, '').length;
+    const measure = () => {
+      const cs = getComputedStyle(ta);
+      const visualLines = Math.floor(
+        (ta.scrollHeight - Number.parseFloat(cs.paddingTop)) / Number.parseFloat(cs.lineHeight),
+      );
+      setMultiLine(visualLines - trailingBlank >= 2);
+    };
+    measure();
+    let width = ta.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (ta.clientWidth === width) return;
+      width = ta.clientWidth;
+      measure();
+    });
+    observer.observe(ta);
+    return () => observer.disconnect();
+  }, [draft, textareaRef]);
+
   return (
-    <div className={`${COMPOSER_CARD} min-h-[84px]`} data-testid="composer-card">
+    <div
+      className={`${COMPOSER_CARD} min-h-[84px] ${multiLine ? 'pb-[48px]' : ''}`}
+      data-testid="composer-card"
+    >
       {editable ? (
         <div>
           {/* #728 combobox wiring: while the inline listbox is open the
