@@ -69,7 +69,7 @@ const COMPOSER_TOOL =
 // 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
 // （#860），停止的红只住 10px glyph。
 const COMPOSER_SQUARE =
-  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[10px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
+  'absolute bottom-3 flex size-8 cursor-pointer items-center justify-center rounded-[8px] border-none p-0 active:not-aria-[haspopup]:translate-y-0';
 
 interface ComposerProps {
   placeholder: string;

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS composer: 20px radius, shadow-composer ladder, 384 max-h token', async ({ page }) => {
+test('CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="composer-card"]');
 
@@ -12,6 +12,10 @@ test('CDS composer: 20px radius, shadow-composer ladder, 384 max-h token', async
     const composerShadow = getComputedStyle(probe).boxShadow;
     probe.remove();
     const root = getComputedStyle(document.documentElement);
+    const send = el.querySelector('.composer-send');
+    const sendCs = send ? getComputedStyle(send) : null;
+    const bubble = document.querySelector('[data-testid="user-bubble"]');
+    const bubbleCs = bubble ? getComputedStyle(bubble) : null;
     return {
       radius: cs.borderTopLeftRadius,
       border: cs.borderTopWidth,
@@ -19,6 +23,8 @@ test('CDS composer: 20px radius, shadow-composer ladder, 384 max-h token', async
       composerShadow,
       radiusComposer: root.getPropertyValue('--radius-composer').trim(),
       composerMaxH: root.getPropertyValue('--composer-max-h').trim(),
+      sendRadius: sendCs?.borderTopLeftRadius ?? '',
+      bubbleAnim: bubbleCs?.animationName ?? '',
     };
   });
 
@@ -28,4 +34,7 @@ test('CDS composer: 20px radius, shadow-composer ladder, 384 max-h token', async
   expect(m.composerMaxH).toBe('384px');
   expect(m.shadow).not.toBe('none');
   expect(m.shadow).toContain('0px 0px 0px 1px');
+  expect(m.composerShadow).toContain('0px 0px 0px 1px');
+  expect(m.sendRadius).toBe('8px');
+  expect(m.bubbleAnim).toContain('message-fade-up');
 });
