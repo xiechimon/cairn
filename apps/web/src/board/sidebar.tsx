@@ -503,8 +503,8 @@ export function BoardSidebar({
             aria-hidden="true"
             style={{
               backgroundColor: 'currentColor',
-              WebkitMask: 'url("/logo.svg") center / 125% no-repeat',
-              mask: 'url("/logo.svg") center / 125% no-repeat',
+              WebkitMask: 'url("/logo.svg") center / 100% no-repeat',
+              mask: 'url("/logo.svg") center / 100% no-repeat',
             }}
           />
         </span>
