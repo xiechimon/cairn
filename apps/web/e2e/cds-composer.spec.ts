@@ -192,3 +192,35 @@ test('CDS composer: a wrapped single paragraph also clears the toolbar', async (
   expect(geom.cardHeight).toBeGreaterThan(84);
   expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
 });
+
+test('CDS composer: a width change that wraps the draft re-reserves toolbar clearance', async ({
+  page,
+}) => {
+  await stubLiveDetail(page);
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const card = page.locator('[data-testid="composer-card"]');
+  const input = card.locator('textarea');
+  await expect(input).toBeVisible();
+
+  const wideWidth = await input.evaluate((el) => el.clientWidth);
+  const words = Math.floor((wideWidth - 60) / 36);
+  await input.fill('wrap '.repeat(words).trim());
+  const wide = await card.evaluate((el) => el.getBoundingClientRect().height);
+  expect(Math.round(wide)).toBe(84);
+
+  await page.setViewportSize({ width: 900, height: 732 });
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const cardEl = document.querySelector('[data-testid="composer-card"]')!;
+        const ta = cardEl.querySelector('textarea')!;
+        const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
+        const linesWrapped = ta.scrollHeight > 60;
+        return !linesWrapped || ta.getBoundingClientRect().bottom <= toolbar.getBoundingClientRect().top;
+      }),
+    )
+    .toBe(true);
+  const narrow = await card.evaluate((el) => el.getBoundingClientRect().height);
+  expect(narrow).toBeGreaterThan(84);
+});

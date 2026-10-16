@@ -201,12 +201,22 @@ export function Composer({
       return;
     }
     const trailingBlank = draft.length - draft.replace(/\n+$/, '').length;
-    const cs = getComputedStyle(ta);
-    const lineHeight = Number.parseFloat(cs.lineHeight);
-    const visualLines = Math.floor(
-      (ta.scrollHeight - Number.parseFloat(cs.paddingTop)) / lineHeight,
-    );
-    setMultiLine(visualLines - trailingBlank >= 2);
+    const measure = () => {
+      const cs = getComputedStyle(ta);
+      const visualLines = Math.floor(
+        (ta.scrollHeight - Number.parseFloat(cs.paddingTop)) / Number.parseFloat(cs.lineHeight),
+      );
+      setMultiLine(visualLines - trailingBlank >= 2);
+    };
+    measure();
+    let width = ta.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (ta.clientWidth === width) return;
+      width = ta.clientWidth;
+      measure();
+    });
+    observer.observe(ta);
+    return () => observer.disconnect();
   }, [draft, textareaRef]);
 
   return (
