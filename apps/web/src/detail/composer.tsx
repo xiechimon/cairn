@@ -59,7 +59,7 @@ const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-5';
 // 差额逐条中和：方角已同形，field-sizing 回 fixed（JS grow 律），边框/
 // focus 环/暗底/过渡清零到老 UA 裸面形。
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-[48px] [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 // 工具钮（30px 盒，XMON-55 P5 光学左缘 10px 由 toolbar 锚承载）：ghost
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
@@ -192,8 +192,13 @@ export function Composer({
     growCap: 384,
   });
 
+  const multiLine = draft.replace(/\n+$/, '').split('\n').length >= 2;
+
   return (
-    <div className={`${COMPOSER_CARD} min-h-[84px]`} data-testid="composer-card">
+    <div
+      className={`${COMPOSER_CARD} min-h-[84px] ${multiLine ? 'pb-[48px]' : ''}`}
+      data-testid="composer-card"
+    >
       {editable ? (
         <div>
           {/* #728 combobox wiring: while the inline listbox is open the
