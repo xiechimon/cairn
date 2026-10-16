@@ -57,15 +57,15 @@ import {
 } from 'react';
 import { useMachines, useMembers, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Kbd } from '../components/ui/kbd.js';
 import {
   MessageScroller,
-  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerProvider,
-  MessageScrollerViewport,
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
@@ -157,7 +157,7 @@ const SEND_ON_CLS =
 
 /** #1009 A1：chat 原语换装的消费点中和配方（五件原语文件保持 pristine——
  *  registry 账本 hash 零触碰，中和全走消费点 className/style）。滚动模型 =
- *  MessageScroller 原生 autoScroll（#873 跟随律的原语实现，阈值 80px 同值、
+ *  MessageScroller 原生 autoScroll（#873 跟随律的原语实现，阈值 40px（CDS PR-6）、
  *  发送跳最新 scrollToEnd、开窗关武装——Provider 注记见壳层）。
  *  SCROLLER_ITEM_STYLE 随行渲染器迁 ./chief-message-rows.js（#1126）。 */
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
@@ -275,7 +275,7 @@ export function ChiefDrawer(props: DrawerProps) {
         >
           {/* #1009 A1：MessageScroller Provider 包住整列窗内容——滚动律单源
               从 useChatFollow 换成原语原生 autoScroll，#873 语义逐条保留：
-              贴底阈值 80px = FOLLOW_THRESHOLD 同值（scrollEdgeThreshold）、
+              贴底阈值 40px = FOLLOW_THRESHOLD（scrollEdgeThreshold；CDS PR-6）、
               打开落底 = chat 面通行律（defaultScrollPosition="end"，仅初次
               挂载跑一次）、发送跳最新 = scrollToEnd()（实审裁决 2：不采
               scrollAnchor 逐条锚定）。#1067 起跟随武装位 = 读者贴底
@@ -287,7 +287,7 @@ export function ChiefDrawer(props: DrawerProps) {
               ——拆分点即此。 */}
           <MessageScrollerProvider
             autoScroll={open && atBottom}
-            scrollEdgeThreshold={80}
+            scrollEdgeThreshold={FOLLOW_THRESHOLD}
             defaultScrollPosition="end"
           >
             <ChiefFollowArmed onAtBottom={setAtBottom} />
@@ -800,7 +800,7 @@ function ChiefDrawerInner({
                 block + gap-0（行距留在行 margin 上，注记见常量）。
                 chief-body / chief-stream 两 testid 载体随迁。 */}
       <MessageScroller className={SCROLLER_ROOT_CLS}>
-        <MessageScrollerViewport data-testid="chief-body">
+        <FadeScrollerViewport data-testid="chief-body">
           <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
             {chief.stream?.map((item, i) => (
               // 行渲染器住 ./chief-message-rows.js（#1126 提取）——DOM/testid
@@ -824,17 +824,13 @@ function ChiefDrawerInner({
               />
             ))}
           </MessageScrollerContent>
-        </MessageScrollerViewport>
-        {/* #991 Q6：jump-to-latest 随原语带入（删除才是定制；原型实审
-                过目）——MessageScrollerButton direction=end，render 缺省 =
-                仓 Button secondary/icon-sm 档（档位在位）；children 覆写 =
-                仓 ArrowDown 字形 + t() sr-only 文案（pristine 面的英文
-                字面量不进 i18n 账）。落位/显隐动效 = 原语默认（底缘居中、
-                近底自动退场 data-[active=false]）。 */}
-        <MessageScrollerButton direction="end">
+        </FadeScrollerViewport>
+        {/* CDS PR-6：jump-to-latest 独立 120px 阈值（JumpToLatestButton；
+                follow 仍 40px）。落位/显隐动效沿原语 Button 配方。 */}
+        <JumpToLatestButton>
           <ArrowDown width={16} height={16} />
           <span className="sr-only">{t('滚动到最新')}</span>
-        </MessageScrollerButton>
+        </JumpToLatestButton>
       </MessageScroller>
 
       {/* #948：strip 的流内垫规则自 attachment-strip.css 迁入（该文件

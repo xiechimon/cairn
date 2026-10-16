@@ -1,27 +1,28 @@
-// Detail transcript column (#1009 A2): the center column's chat scroller
-// rides the registry MessageScroller primitive — the same swap the chief
-// drawer took in A1. Retired here: the hand-written `column-reverse`
+// Detail transcript column (#1009 A2 + CDS PR-6): the center column's chat
+// scroller rides the registry MessageScroller primitive — the same swap the
+// chief drawer took in A1. Retired here: the hand-written `column-reverse`
 // layout with its `mb-auto` pin and the shared `useChatFollow` hook.
 //
-// 滚动律映射（#873 逐条 → 原语机制，与 A1 同律）：
-// 贴底阈值 80px = `scrollEdgeThreshold={80}`（FOLLOW_THRESHOLD 同值）；增长
-// 只在读者已贴最新端时拖动 = 原语 autoScroll；开列落最新 = defaultScrollPosition
-// "end"（旧 hook 的 bind→scrollToNewest 等价）；读者自己发出去的那条永远跳到
-// 最新 = `scrollToEnd()`（旧 requestFollow 等价，消费点住本组件的 imperative
-// handle，页面的 onSend 经 ref 调用）。
+// CDS stick-to-bottom (plan SP) on top of #873:
+// 贴底阈值 40px = `scrollEdgeThreshold={FOLLOW_THRESHOLD}`；向上滚 / 滚轮 /
+// 触控 / 方向键立刻 unpin（原语 userScrollIntent）；流式增长只在仍 pinned
+// 时跟随（behavior:'auto'）。原语 ~180ms autoscrolling 旗位（scrollbar 隐藏）
+// 覆盖 plan 的 150ms no-pull-back——unpin 后直到读者回到边缘才再钉，比 150ms
+// 防回拉更强。jump-to-latest 独立阈值 JUMP_THRESHOLD 120px（JumpToLatestButton）；
+// 开列落最新 = defaultScrollPosition "end"；读者自己发出去的那条永远跳到
+// 最新 = `scrollToEnd()`（旧 requestFollow 等价）。
 //
-// 列宽/内垫/行距语义逐字保留：Viewport 承接旧 `.chat-col` 的滚动端口身份
-// （testid transcript-col + 19/16/16/19 内垫——detail-3pane 的 colPadBottom
-// 断言读的就是这里），Content 中和为 block + gap-0（行距留在行自身的 margin
-// 上，原语默认 flex gap-6 会双倍行距）。
+// 列宽/内垫：Viewport 承接旧 `.chat-col` 端口（testid transcript-col）；
+// 底垫改 `--chat-extra-space` 35vh（detail-3pane colPadBottom ≥16 仍满足）；
+// Content 中和为 block + gap-0，并 `max-w-(--chat-max-w)` 768 居中。
 
 import { forwardRef, useImperativeHandle } from 'react';
+import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
+import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import {
   MessageScroller,
-  MessageScrollerButton,
   MessageScrollerContent,
   MessageScrollerProvider,
-  MessageScrollerViewport,
   useMessageScroller,
 } from '../components/ui/message-scroller.js';
 import type { TranscriptItem } from '../fixtures/records.js';
@@ -32,10 +33,10 @@ import { type LiveStep, Transcript } from './transcript.js';
 
 /** Root 中和：原语 size-full 的 h-full 会顶爆 detail-center 的 flex 链。 */
 const ROOT_CLS = 'h-auto min-h-0 flex-1';
-/** Viewport = 旧 `.chat-col` 的滚动端口（testid 与内垫逐字随迁）。 */
-const VIEWPORT_CLS = 'chat-col pt-[19px] pr-4 pb-4 pl-[19px]';
-/** Content 的 block + gap-0：行距语义保持在行自身的 margin 上。 */
-const CONTENT_CLS = 'block gap-0';
+/** Viewport = 旧 `.chat-col` 的滚动端口；底垫走 --chat-extra-space（35vh）。 */
+const VIEWPORT_CLS = 'chat-col pt-[19px] pr-4 pb-(--chat-extra-space) pl-[19px]';
+/** Content：行距在行自身 margin；列宽钉 --chat-max-w 768。 */
+const CONTENT_CLS = 'mx-auto block w-full max-w-(--chat-max-w) gap-0';
 
 /** 页面层持有的列 API：读者的 send 必须看得见自己那条（#873 第二律）。 */
 export interface TranscriptColumnHandle {
@@ -63,7 +64,7 @@ export const TranscriptColumn = forwardRef<TranscriptColumnHandle, TranscriptCol
     return (
       <MessageScrollerProvider
         autoScroll={autoScroll}
-        scrollEdgeThreshold={80}
+        scrollEdgeThreshold={FOLLOW_THRESHOLD}
         defaultScrollPosition="end"
       >
         <TranscriptColumnInner {...rest} handleRef={ref} />
@@ -89,7 +90,7 @@ function TranscriptColumnInner({
     <MessageScroller className={ROOT_CLS}>
       {/* 旧 `.chat-col` 的滚动端口：testid 与内垫随迁（detail-3pane 的
           colPadBottom / detail-narrow 的横滚断言读这里）。 */}
-      <MessageScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
+      <FadeScrollerViewport data-testid="transcript-col" className={VIEWPORT_CLS}>
         <MessageScrollerContent className={CONTENT_CLS}>
           {/* #827：简报卡住线程列首（随流滚动，不钉住）。fixture 面无 spec
               数据，捕获字节不动。 */}
@@ -101,13 +102,12 @@ function TranscriptColumnInner({
             onOpenPlan={onOpenPlan}
           />
         </MessageScrollerContent>
-      </MessageScrollerViewport>
-      {/* #991 Q6：jump-to-latest 随原语带入（删除才是定制；原型实审过目）。
-          落位/显隐动效 = 原语默认（底缘居中、近底自动退场）。 */}
-      <MessageScrollerButton direction="end">
+      </FadeScrollerViewport>
+      {/* CDS PR-6：jump past 120px（独立于 40px follow 阈值）。 */}
+      <JumpToLatestButton>
         <ArrowDown width={16} height={16} />
         <span className="sr-only">{t('滚动到最新')}</span>
-      </MessageScrollerButton>
+      </JumpToLatestButton>
     </MessageScroller>
   );
 }

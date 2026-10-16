@@ -36,7 +36,7 @@ export function ThinkingRow({ text }: { text: string }) {
           chevron 由基类 [&_svg]:shrink-0 保住 10px 不被挤。 */}
       <Button
         variant="ghost"
-        className="h-auto w-fit min-w-0 max-w-full shrink justify-start gap-1.5 rounded-none px-0 font-normal text-[12px] leading-5 text-[var(--text-dim)] active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+        className="h-auto w-fit min-w-0 max-w-full shrink justify-start gap-1.5 rounded-none px-0 font-medium text-[12px] leading-4 text-[var(--text-dim)] active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
         aria-label={t(open ? '收起思考' : '展开思考')}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -45,7 +45,7 @@ export function ThinkingRow({ text }: { text: string }) {
         <span className="min-w-0 flex-auto truncate italic">{open ? t('思考') : preview}</span>
       </Button>
       {open && (
-        <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-5 text-[var(--text-secondary)]">
+        <pre className="m-0 whitespace-pre-wrap break-words font-[inherit] text-[12px] leading-4 text-[var(--text-secondary)]">
           {text}
         </pre>
       )}
@@ -73,7 +73,7 @@ export function ToolActivityRow({
   const tick = useLiveSeconds(running === true ? (startedAt ?? null) : null);
   const shown = tick ?? seconds ?? null;
   return (
-    <span className="flex items-center gap-2 text-[12px] leading-5 text-[var(--text-dim)]">
+    <span className="flex items-center gap-2 text-[12px] leading-4 text-[var(--text-dim)]">
       <span className="font-[var(--font-mono)]">
         {running === true ? t('正在调用 {n}', { n: name }) : name}
       </span>
