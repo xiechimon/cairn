@@ -39,7 +39,14 @@ export default defineConfig({
   // @/* 别名（#425）：shadcn CLI 的 preflight 硬查 import alias——tsconfig
   // paths 与 vite resolve 两处都要有，缺一则 CLI 直接退出。既有相对 import
   // 不受影响。
-  resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
+  // 裸 `cn` 指向 src/lib/cn.ts（带 Paper 字号键的 createCn 实例）：正则只
+  // 匹配裸名，`cn/config` 仍落到包本身。vitest.config.ts 与 tsconfig paths 同值。
+  resolve: {
+    alias: [
+      { find: '@', replacement: new URL('./src', import.meta.url).pathname },
+      { find: /^cn$/, replacement: new URL('./src/lib/cn.ts', import.meta.url).pathname },
+    ],
+  },
   server: {
     port: devWebPort,
     // strictPort：vite 缺省「被占就静默 +1」在多栈并行下有两重害处——界面

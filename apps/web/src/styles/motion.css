@@ -111,6 +111,12 @@ body[data-board-dragging] .todo-card:hover {
 .todo-card {
   animation: card-enter var(--dur-fast) var(--ease-pop);
 }
+
+@keyframes card-breath {
+  50% {
+    opacity: 0.35;
+  }
+}
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
   .new-task-project-row,

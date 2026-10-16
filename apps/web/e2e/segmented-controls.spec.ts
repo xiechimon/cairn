@@ -29,16 +29,16 @@ const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 // (dark); trigger ink rest/hover = muted-foreground → foreground (dark),
 // foreground at 60% → foreground (light).
 const GROUP_DARK = 'rgb(45, 41, 38)'; // --muted dark
-const GROUP_LIGHT = 'rgb(234, 228, 224)'; // --muted light
+const GROUP_LIGHT = 'rgb(235, 228, 216)'; // --muted light
 const TAB_FILL_DARK = 'rgba(64, 60, 57, 0.3)'; // --input/30 dark (active fill)
-const TAB_FILL_LIGHT = 'rgb(246, 241, 236)'; // --background light (active fill)
+const TAB_FILL_LIGHT = 'rgb(251, 249, 245)'; // --background light (active fill)
 // team layout toggle (L2 face, seg skin not yet migrated) still fills its
 // active chip with --card:
-const CHIP_LIGHT = 'rgb(240, 235, 230)'; // --card light
+const CHIP_LIGHT = 'rgb(255, 255, 255)'; // --card light
 const INK_REST_DARK = 'rgb(179, 174, 170)'; // --muted-foreground dark
 const INK_HOVER_DARK = 'rgb(238, 232, 228)'; // --foreground dark
-const INK_REST_LIGHT = 'rgba(18, 15, 11, 0.6)'; // --foreground/60 light
-const INK_HOVER_LIGHT = 'rgb(18, 15, 11)'; // --foreground light
+const INK_REST_LIGHT = 'rgba(43, 38, 32, 0.6)'; // --foreground/60 light
+const INK_HOVER_LIGHT = 'rgb(43, 38, 32)'; // --foreground light
 // Faces OUTSIDE the L4 lane (user-menu 外观, branch-dialog seg, team layout
 // toggle, chief tabs) still ride their domain's hand-rolled seg skins until
 // those lanes migrate — their hover tint stays the #138 --seg-hover value.
@@ -46,10 +46,10 @@ const HOVER_DARK = 'rgba(255, 252, 248, 0.05)'; // --seg-hover dark
 const HOVER_LIGHT = 'rgba(28, 25, 21, 0.05)'; // --seg-hover light
 const CHIP_DARK = 'rgb(38, 34, 31)'; // --card dark (tab-chip-bg merged → card, #1002)
 // #1005 registry 对齐：team 布局钮离 SEG_* 分段族、骑 registry default Tabs——
-// 组盒 bg-muted（light 与 --secondary 同值 #eae4e0）、无发丝环 border、选中片
+// 组盒 bg-muted（light 与 --secondary 同值 #ebe4d8）、无发丝环 border、选中片
 // bg-background、hover 只换墨不上底（无 tint）。
-const TABS_GROUP_LIGHT = 'rgb(234, 228, 224)'; // --muted light (registry TabsList default)
-const TABS_CHIP_ACTIVE_LIGHT = 'rgb(246, 241, 236)'; // --background light (registry data-active chip)
+const TABS_GROUP_LIGHT = 'rgb(235, 228, 216)'; // --muted light (registry TabsList default)
+const TABS_CHIP_ACTIVE_LIGHT = 'rgb(251, 249, 245)'; // --background light (registry data-active chip)
 
 // Tailwind v4 opacity modifiers (bg-input/30, text-foreground/60) compute to
 // oklab color-mix strings; the repo value notation (#411) wants rgb/hex —

@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 // - .res-back: hover 无背景变化 (现状即无 hover 面, 此处把律钉死防回潮);
 //   键盘 focus 环由 app.css 全局 :focus-visible 规则承载 (#388, 2px
 //   --focus-ring + offset 2)——本 spec 断言该环在 res-back 上双主题生效
-//   （E 定版暗 #f294d8 / 亮 #97227e）。
+//   （E 定版暗 #f294d8 / Paper 亮 #b4532a）。
 // - P5 danger：--destructive 两值（E 定版暗 #ffabb7 / 亮 #9e2c49）压 --card
 //   面拼对比度（文本 ≥4.5，§5.1 门）。--destructive-foreground 已判死退役
 //   （#987 §3.1），destructive 改按 base-nova 形 text-destructive 消费。
@@ -202,8 +202,8 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    // the codebase ring recipe rides --focus-ring (E canon dark #f294d8 / light #97227e)
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(242, 148, 216)' : 'rgb(151, 34, 126)');
+    // the codebase ring recipe rides --focus-ring (E canon dark #f294d8 / Paper light #b4532a)
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(242, 148, 216)' : 'rgb(180, 83, 42)');
   });
 }
 
@@ -262,9 +262,10 @@ for (const theme of ['light', 'dark'] as const) {
     const destructive = await resolveToken(page, '--destructive');
     const card = await resolveToken(page, '--card');
     // E · 暖灰玫定版红系（#988 实审定版，docs/verify/988/）：暗侧高明度粉档、
-    // 亮侧深玫红档，均压 card 面过文本 4.5 门（暗 9.06 / 亮 6.06，#1002 实测）
+    // 亮侧深玫红档，均压 card 面过文本 4.5 门（暗 9.06 / 亮压 Paper 白卡 7.22，
+    // docs/verify/paper-tokens/contrast.txt）
     expect(destructive).toBe(theme === 'dark' ? 'rgb(255, 171, 183)' : 'rgb(158, 44, 73)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(38, 34, 31)' : 'rgb(240, 235, 230)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(38, 34, 31)' : 'rgb(255, 255, 255)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -273,7 +274,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?scenario=01');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
-    expect(bg).toBe(theme === 'dark' ? 'rgb(242, 148, 216)' : 'rgb(151, 34, 126)');
+    expect(bg).toBe(theme === 'dark' ? 'rgb(242, 148, 216)' : 'rgb(180, 83, 42)');
     expect(fg).toBe(theme === 'dark' ? 'rgb(31, 27, 24)' : 'rgb(255, 255, 255)');
     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });

@@ -355,11 +355,11 @@ test('已完成(有变更) → 待处理: reopen commits review, lands after the
   await settleDrop(page);
 
   // committed: the done card reopens INTO 待处理 as review（落点正名，#753
-  // [设计]）—— the review-gate action reads 完成 (PHASE_UI[review]；徽标是纯
-  // 图标无文字、done 卡本来就没有动作钮，整卡断 chip 词恒错), counts couple
+  // [设计]）—— the review-gate action link reads 审阅 (Paper card footer;
+  // done cards carry no action), counts couple
   const moved = page.locator('[data-column="pending"] [data-todo-id="r3-legacy-2"]');
   await expect(moved).toBeVisible();
-  await expect(moved.getByRole('button', { name: '完成' })).toBeVisible();
+  await expect(moved.getByRole('button', { name: '审阅' })).toBeVisible();
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('0');
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('2');
   // landing: the pinned review+awaitingReply card keeps the top; the reopened

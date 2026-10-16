@@ -69,8 +69,9 @@ jobs:
           node scripts/lane-file-gate.mjs
 
       # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
-      # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数与裸控件
-      # 总数只许降不许升。封版终态即地板（0 per-face 文件；3 裸控件 = 全部
+      # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数、裸控件
+      # 总数、Tailwind 任意值（text-[Npx] 与间距类 -[Npx] 两个总数，Paper
+      # 改版 PR 2 加的第三本账，D5）只许降不许升。封版终态即地板（0 per-face 文件；3 裸控件 = 全部
       # deliberate-native 豁免的隐藏 file 触发器），棘轮自此纯防回潮——它是
       # 「非 registry 新增为零」的机械载体，且 #989 registry 闸的面到
       # components/ui 为止，消费侧 CSS 文件与裸 button/input/select/textarea

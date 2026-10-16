@@ -23,15 +23,15 @@
 
 ## PR 2 · 字号 token + 任意值棘轮
 
-- `src/styles/app.css` 的 `@theme inline` 加六档字号键：`text-page`(18) / `text-heading`(16) / `text-card`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5)，乘现有 `--rem-scale`（密度切换照常生效）；加 `font-heading` = `var(--font-source-serif)`。
+- `src/styles/app.css` 的 `@theme inline` 加六档字号键：`text-page`(18) / `text-heading`(16) / `text-card-title`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5)，乘现有 `--rem-scale`（密度切换照常生效）；加 `font-heading` = `var(--font-source-serif)`。14px 档不叫 `text-card`：shadcn 的 `--color-card` 已占用这个类名（Tailwind 只输出颜色）。
 - `scripts/ui-debt-gate.mjs` 加第三本账：`text-[Npx]` 与间距类 `-[Npx]` 任意值的出现次数（今天约 179 处字号 + 273 处间距），冻结进 `scripts/ui-debt-baseline.json`，只降不升（复用现有 D3 机制）。
 - 不改任何页面，只是让漂移从此不能再涨。后面每个 PR 顺手把自己那块的任意值换成 token 并重冻基线。
 
 ## PR 3 · 任务卡与看板列
 
 - `src/board/todo-card.tsx`：按 DESIGN.md「任务卡」重写结构——标题 → 单行元信息（图标 + 截断优先级：标签先截、项目名至少 5 字宽）→ 按状态的底栏；去掉卡片上的实心按钮（`Button variant="default"`），待开始的「开始」改为悬停浮现、不占高度。顺带删掉三处重复的 badge className（约 195 / 218 / 227 行）。
-- `src/board/board.tsx` + `src/board/columns.ts`：列标题 = 状态图标 + 衬线列名 + 计数，hover 出加号。
-- 标签：`components/ui/tag-chip.tsx` 在卡片上不再是实心色块，改为标签图标 + 文字，图标着 `tag.color`。`e2e/board-filter.spec.ts` 钉着「tag.color → inline backgroundColor」契约，要同步改成新契约（见文末待定问题 2）。
+- `src/board/board.tsx` + `src/board/columns.ts`：列标题 = 状态图标 + 衬线列名 + 计数，hover 出加号（只在「待开始」列：新任务总是落在这一列，其它列的加号没有对应动作）。
+- 标签：卡片不再渲染 `components/ui/tag-chip.tsx` 的实心色块，改为标签图标 + 文字，图标着 `tag.color`（已定问题 2）；`TagChip` 本身保留给筛选弹层。`e2e/board-filter.spec.ts` 的卡面契约改为「tag.color → 标签图标 color」。
 - 要更新的 spec：`cds-board.spec.ts`、`card-press.spec.ts`、`board-filter.spec.ts`、`visual-polish.spec.ts`。改类名前先 grep `apps/web/e2e` 与 `integration/` 的类名钉扎。
 
 ## PR 4 · 看板顶栏
@@ -40,7 +40,7 @@
 
 ## PR 5 · Grouped 侧栏
 
-- `src/board/sidebar.tsx`（主体，695 行）+ `src/board/app-sidebar.tsx`：按 DESIGN.md「侧栏」五段重排——工作区行（搜索、收起两个图标按钮）→ 新任务按钮 → 工作台 / 需要我处理 / 定时 → 项目 → 底部「资源」折叠行 + 用户行（第二行机器状态）。
+- `src/board/sidebar.tsx`（主体，695 行）+ `src/board/app-sidebar.tsx`：按 DESIGN.md「侧栏」五段重排——工作区行（搜索、收起两个图标按钮）→ 新任务按钮 → 工作台 / 需要我处理 / 定时 → 项目 → 底部「资源」折叠行 + 用户行（第二行机器状态）。「需要我处理」= 打开看板并只显示「待处理」列（已定问题 1），不新建页面。
 - `src/styles/tokens.css`：`--sidebar-w` 288 → 248。
 - `src/board/project-avatar.tsx`：首字母方块按 `--project-tile-1..6` 顺序取色。
 - 资源折叠的展开状态存 `safe-storage`，刷新不丢。
@@ -59,8 +59,8 @@
 
 单独一轮 mockup（同样的 Paper 结构，暖深色纸面），定稿后改 `:root` 块与 `color-freeze` 暗色锁值。
 
-## 待定问题
+## 已定问题
 
-1. **「需要我处理」点进去是什么**：看板加状态筛选（只显示待处理列），还是独立收件箱页？建议先做筛选，改动小。
-2. **标签颜色**：保留用户自定义的标签色（着在标签图标上）还是统一墨色？建议保留，用户数据色有信息量。
-3. **暗色时机**：建议亮色 PR 1–5 合并后再做。
+1. **「需要我处理」点进去是什么**：打开看板并筛到「待处理」一列，不做独立收件箱页。落在 PR 5（侧栏导航项）+ 看板的状态筛选。
+2. **标签颜色**：保留用户自定义的标签色，着在卡片的标签图标上，标签名用正文墨色；卡片上不再是实心色块。`TagChip` 留给筛选弹层等其它面。已在 PR 3 落地。
+3. **暗色时机**：亮色 PR 1–5 合并后单独做一轮暗色 mockup 再改。
