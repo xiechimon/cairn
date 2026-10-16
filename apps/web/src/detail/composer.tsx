@@ -32,6 +32,7 @@
 // agnostic — the caller (todo-detail-page) feeds in MentionGroups
 // derived from either live REST hooks or the fixture set.
 
+import { useLayoutEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -192,7 +193,21 @@ export function Composer({
     growCap: 384,
   });
 
-  const multiLine = draft.replace(/\n+$/, '').split('\n').length >= 2;
+  const [multiLine, setMultiLine] = useState(false);
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (ta == null) {
+      setMultiLine(false);
+      return;
+    }
+    const trailingBlank = draft.length - draft.replace(/\n+$/, '').length;
+    const cs = getComputedStyle(ta);
+    const lineHeight = Number.parseFloat(cs.lineHeight);
+    const visualLines = Math.floor(
+      (ta.scrollHeight - Number.parseFloat(cs.paddingTop)) / lineHeight,
+    );
+    setMultiLine(visualLines - trailingBlank >= 2);
+  }, [draft, textareaRef]);
 
   return (
     <div

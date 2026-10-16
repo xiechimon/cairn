@@ -167,3 +167,28 @@ test('CDS composer: multi-line draft grows the card and text clears the toolbar'
   expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
   await evidencePanelShot(page, 'after.png', card);
 });
+
+test('CDS composer: a wrapped single paragraph also clears the toolbar', async ({ page }) => {
+  await stubLiveDetail(page);
+  await page.goto(`/app/todo/${CARD_ID}`);
+  const card = page.locator('[data-testid="composer-card"]');
+  const input = card.locator('textarea');
+  await expect(input).toBeVisible();
+
+  await input.fill('wrap '.repeat(80).trim());
+
+  const geom = await page.evaluate(() => {
+    const cardEl = document.querySelector('[data-testid="composer-card"]')!;
+    const ta = cardEl.querySelector('textarea')!;
+    const toolbar = cardEl.querySelector('[data-testid="composer-toolbar"]')!;
+    const taRect = ta.getBoundingClientRect();
+    return {
+      cardHeight: cardEl.getBoundingClientRect().height,
+      contentBottom: taRect.bottom - Number.parseFloat(getComputedStyle(ta).paddingBottom),
+      toolbarTop: toolbar.getBoundingClientRect().top,
+    };
+  });
+
+  expect(geom.cardHeight).toBeGreaterThan(84);
+  expect(geom.contentBottom).toBeLessThanOrEqual(geom.toolbarTop);
+});
