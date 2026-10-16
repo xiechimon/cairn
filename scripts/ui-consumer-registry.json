@@ -3,7 +3,7 @@
     "sha": "5d9d91d6",
     "date": "2026-10-09"
   },
-  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph (#987: brand ink is spot emphasis only, never body/label/link/button-text ink). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-消费点形状与品牌墨台账.md.",
+  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, DESIGN.md 按钮). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-消费点形状与品牌墨台账.md.",
   "squareBoxes": [
     {
       "file": "apps/web/src/chief/recipes.ts",
@@ -69,6 +69,27 @@
       "role": "selection-mark",
       "reason": "Project-picker check marks (three call sites, one recipe) = selection indicator, spot role per #987.",
       "contrast": "docs/verify/1055/colors/incremental.md"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "tone: 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "待处理 column header alert-circle glyph. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet/card 4.99, measured in PR #1369)"
+    },
+    {
+      "file": "apps/web/src/board/todo-card.tsx",
+      "anchor": "const ACCENT_INK = 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "Needs-you card footer state flag (icon + 失败/待确认/待审阅/待回复). DESIGN.md 颜色: accent is reserved for needs-you states; every status = icon + color + label.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
+    },
+    {
+      "file": "apps/web/src/board/todo-card.tsx",
+      "anchor": "todo-card-action relative z-10 h-6 flex-none gap-1 px-1.5 text-(--card-button)",
+      "role": "action-link",
+      "reason": "Card action text link (重试/确认计划/审阅/回复/开始). DESIGN.md 按钮: card actions are accent text links, no solid buttons on cards. Hover swaps the ink to --spot-text-on-tint because accent on --accent-hover is 4.25.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99); hover --spot-text-on-tint on --accent-hover 6.63 (PR #1369 hand-over)"
     }
   ]
 }

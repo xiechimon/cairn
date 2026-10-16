@@ -159,13 +159,12 @@ test('live: done(有变更)→待处理 fires PATCH phase=review, optimistic lan
   ).toBeVisible();
   await expect(page.locator('[data-column="pending"]').getByTestId('column-count')).toHaveText('1');
   await expect(page.locator('[data-column="done"]').getByTestId('column-count')).toHaveText('0');
-  // the reopened card reads as the review gate (action button 完成 =
-  // PHASE_UI[review]；徽标纯图标无文字，整卡断 chip 词恒错)
+  // the reopened card reads as the review gate (Paper footer action link 审阅)
   await expect(
     page
       .locator(`[data-column="pending"] [data-todo-id="${CARD_ID}"]`)
-      .getByRole('button', { name: '完成' }),
-  ).toHaveText('完成');
+      .getByRole('button', { name: '审阅' }),
+  ).toHaveText('审阅');
 });
 
 test('live: PATCH 409 = 乐观值作废，卡片弹回源列 + toast 点名失败（#638）', async ({ page }) => {

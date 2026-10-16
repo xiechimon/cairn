@@ -43,9 +43,10 @@ import { expect, type Page, test } from '@playwright/test';
 // 清除 = role+name 一级、触发钮 = button「筛选」、弹层 = dialog「筛选」
 // （Base UI Popup 自带 role）、生效条 = header 内 [data-dimension]、计数
 // 徽章 = data-testid（filter-count/option-count/column-count，二级：裸数字
-// 无 role）、板级空态 = 一级 text。TagChip 无 props 透传（共享件不动），
-// chip 载体 = inline background-color 属性钉（tag-chip.tsx 文档契约：数据
-// 色走 inline style）+ exact text。断言语义与数值不动。
+// 无 role）、板级空态 = 一级 text。弹层选中行的 TagChip 载体 = inline
+// background-color 属性钉（tag-chip.tsx 文档契约）+ exact text；任务卡上
+// 不再渲染 TagChip，卡面标签 = [data-card-tag]，数据色落在标签图标上
+// （Paper 改版 PR 3）。
 
 const TAGS = '/app?scenario=board-tags';
 const EMPTY = '/app?scenario=board-tags-empty';
@@ -485,54 +486,28 @@ test('生效筛选条：只列生效维度、点条清该维度、两轴齐时�
   await expect(page.getByTestId('filter-count')).toHaveCount(0);
 });
 
-test('任务卡渲染标签 chip：词表配色、无标签零占位、卡面 chip 20px 默认档', async ({ page }) => {
+test('任务卡标签 = 着词表色的标签图标 + 名字：无实心 chip、无标签零占位、不改卡高', async ({
+  page,
+}) => {
   await page.goto(TAGS);
-  // tagged 卡：chip 在场、文本 = 词表名、底色 = 词表色（bug #ef4444）
-  const bugChip = card(page, 'tagfilter-bug').locator(CHIP);
-  await expect(bugChip).toBeVisible();
-  await expect(bugChip).toHaveText('bug');
-  await expect(bugChip).toHaveCSS('background-color', 'rgb(239, 68, 68)');
-  await expect(card(page, 'tagfilter-docs').locator(CHIP)).toHaveText('docs');
-  // 无标签卡：零占位（chip 不渲染，不是隐藏空盒）——任何词表名都不成 chip
-  await expect(card(page, 'tagfilter-plain').locator(CHIP)).toHaveCount(0);
+  // Paper card (DESIGN.md 任务卡): the tag color lands on the tag icon, the
+  // name stays ink text, and no solid TagChip pill renders on the card.
+  const bugTag = card(page, 'tagfilter-bug').locator('[data-card-tag]');
+  await expect(bugTag).toBeVisible();
+  await expect(bugTag).toHaveText('bug');
+  await expect(bugTag.locator('svg')).toHaveCSS('color', 'rgb(239, 68, 68)');
+  await expect(card(page, 'tagfilter-bug').locator(CHIP)).toHaveCount(0);
+  await expect(card(page, 'tagfilter-docs').locator('[data-card-tag]')).toHaveText('docs');
+  // 无标签卡：零占位（不是隐藏空盒）——任何词表名都不出现
+  await expect(card(page, 'tagfilter-plain').locator('[data-card-tag]')).toHaveCount(0);
   await expect(
     card(page, 'tagfilter-plain').getByText(/^(bug|feature|improvement|refactor|docs|chore)$/),
   ).toHaveCount(0);
-  // 几何护栏（#1006 R5 实审裁决重钉，用户 2026-10-08，与 L1 裁决①一致）：
-  // row-flush 16px 消费点覆写收编 registry Badge 默认 20px——两尺寸不并存。
-  // 回流契约：tagged 卡 row1 随 chip 长到 20（min-h-4 行盒），卡高比无标签
-  // 卡高 4px；无标签卡 row1 保持 16 节奏；seq 右锚跨卡一致（不挤压既有元素）
-  const geo = await page.evaluate(() => {
-    const probe = (id: string) => {
-      const el = document.querySelector(`[data-todo-id="${id}"]`)!;
-      // 身份行 = 卡根首个子元素；序号 = 「#数字」文本徽标；chip = inline
-      // 数据色件（类名载体退役，#943/#910）
-      const row1 = el.firstElementChild!;
-      const seq = [...el.querySelectorAll('span')].find((sp) =>
-        /^#\d+$/.test(sp.textContent?.trim() ?? ''),
-      )!;
-      const chip = el.querySelector('[style*="background-color"]');
-      return {
-        cardH: el.getBoundingClientRect().height,
-        row1H: row1.getBoundingClientRect().height,
-        seqRight: seq.getBoundingClientRect().right,
-        cardRight: el.getBoundingClientRect().right,
-        chipH: chip?.getBoundingClientRect().height ?? null,
-      };
-    };
-    return { tagged: probe('tagfilter-bug'), plain: probe('tagfilter-plain') };
-  });
-  // 亚像素口径：getBoundingClientRect 返回浮点布局值，CI 量 20px 档会得
-  // 19.99999237060547（#1281 实测）。护栏钉的是像素档位（20 挡 19/16），
-  // 不是 float 末位——对齐 chief-panel.spec 的 toBeCloseTo(…, 0)（±0.5px）。
-  expect(geo.tagged.row1H).toBeCloseTo(20, 0);
-  expect(geo.plain.row1H).toBeCloseTo(16, 0);
-  expect(geo.tagged.chipH).toBeCloseTo(20, 0);
-  // R5 回流：tagged 卡随 20px chip 长高 4px（旧「卡高一致」契约由裁决作废）
-  expect(geo.tagged.cardH - geo.plain.cardH).toBeCloseTo(4, 0);
-  // seq 保持右锚（同一列宽网格下两卡右缘差一致）
-  expect(geo.tagged.cardRight - geo.tagged.seqRight).toBeCloseTo(
-    geo.plain.cardRight - geo.plain.seqRight,
-    0,
-  );
+  // 元信息行单行不换行：有标签与无标签卡的元信息行同为 20px，标签不撑高卡片
+  const metaH = (id: string) =>
+    card(page, id)
+      .locator('.todo-card-meta')
+      .evaluate((el) => el.getBoundingClientRect().height);
+  expect(await metaH('tagfilter-bug')).toBeCloseTo(20, 0);
+  expect(await metaH('tagfilter-plain')).toBeCloseTo(20, 0);
 });

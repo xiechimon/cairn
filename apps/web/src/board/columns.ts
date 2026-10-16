@@ -1,7 +1,7 @@
 // Board column model (issues #54 / #351): the 4 kanban columns are the
 // folded view of the nine-value phase enum (02-架构平价 §4.1; 6→4 收敛 #351).
-// Column names, dot colors and empty-state copy are canon (r2 §4.1, colors
-// re-sampled from r7); 待处理 merges the old 待确认/待验收 gate columns plus
+// Column names are canon (r2 §4.1); header icons follow DESIGN.md 看板列.
+// 待处理 merges the old 待确认/待验收 gate columns plus
 // failed — 方案确认、变更验收、失败重试都是等用户处理的事. `review` +
 // awaitingReply folds into 待处理 too (r5b §3.15 / r7 01 observed), and the
 // pinned group (failed / review-awaiting) rides its top (changelog
@@ -15,10 +15,9 @@ import { isInFlightPhase, PHASE_UI } from '../phase.js';
 export interface BoardColumnDef {
   id: string;
   name: string;
-  /** CSS var for the header dot fill. */
-  dot: string;
-  /** Verbatim empty-state copy (r2 §4.1; 待处理 row = #351). */
-  empty: string;
+  /** Header status icon (DESIGN.md 图标: dashed circle / activity / alert
+   *  circle / circle check); `attention` paints it in the accent. */
+  status: 'queued' | 'running' | 'attention' | 'done';
   /** Extra header label, 已完成 only. */
   label?: string;
   /** Phase a cross-column drop writes (issue #73 manual 改相). Every column
@@ -58,8 +57,7 @@ export const COLUMNS: BoardColumnDef[] = [
     id: 'todo',
     dropPhase: 'todo',
     name: '待开始',
-    dot: 'var(--col-dot-idle)',
-    empty: '没有等待开始的任务',
+    status: 'queued',
     accepts: (t) => t.phase === 'todo' || t.phase === 'queued',
   },
   {
@@ -67,8 +65,7 @@ export const COLUMNS: BoardColumnDef[] = [
     dropPhase: 'building',
     startGate: true,
     name: '执行中',
-    dot: 'var(--col-dot-building)',
-    empty: '没有执行中的任务',
+    status: 'running',
     accepts: (t) => isInFlightPhase(t.phase),
   },
   {
@@ -80,16 +77,14 @@ export const COLUMNS: BoardColumnDef[] = [
     // canDropOnColumn）。唯一合法源列 = 已完成。
     dropPhase: 'review',
     name: '待处理',
-    dot: 'var(--col-dot-confirm)',
-    empty: '没有等你处理的任务',
+    status: 'attention',
     accepts: (t) => t.phase === 'confirm' || t.phase === 'review' || t.phase === 'failed',
   },
   {
     id: 'done',
     dropPhase: 'done',
     name: '已完成',
-    dot: 'var(--col-dot-done)',
-    empty: '最近 7 天没有完成的任务',
+    status: 'done',
     label: '最近 7 天',
     accepts: (t) => t.phase === 'done' || t.phase === 'closed',
   },
@@ -152,22 +147,34 @@ export function isInflightDoneGate(todo: TodoRecord): boolean {
   return (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase);
 }
 
-/** Phase → primary card action, copy from the shared PHASE_UI table.
- *  Waiting-on-user todos get the ghost 回复 button (r3 §3.0 引导 P2 词表 +
- *  r5b §3.15). Done cards carry no button: 重开 lives only in the detail
- *  header (r7 §3.3) — the 01b/05b board captures show zero indigo pixels
- *  in the 已完成 column, so PHASE_UI[done].action must not leak here.
- *  Failed cards read `重试` while the detail header reads `重跑` (r8 §2.2
- *  vs §2.1 — a new instance of the CONTEXT.md two-word-list pattern:
- *  board card copy ≠ detail chip copy). */
-export function cardAction(todo: TodoRecord): { kind: 'primary' | 'ghost'; label: string } | null {
-  if (todo.awaitingReply === true) return { kind: 'ghost', label: '回复' };
-  if (todo.phase === 'done') return null;
-  // r8 §2.2 prose reads the card chip as a ghost button, but the 55
-  // bitmap samples a solid #4e47dd fill with white ink — pixels win (04 A1)
-  if (todo.phase === 'failed') return { kind: 'primary', label: '重试' };
-  const label = PHASE_UI[todo.phase].action;
-  return label == null ? null : { kind: 'primary', label };
+/** Which footer a board card carries (DESIGN.md 任务卡). Action copy:
+ *  failed cards read `重试` while the detail header reads `重跑` (r8 §2.2
+ *  vs §2.1, the CONTEXT.md two-word-list pattern). Done cards carry no
+ *  action: 重开 lives only in the detail header (r7 §3.3). */
+export type CardFace =
+  | { kind: 'queued'; action: string | null }
+  | { kind: 'running' }
+  | { kind: 'attention'; need: 'failed' | 'confirm' | 'review' | 'reply' }
+  | { kind: 'done'; canceled: boolean };
+
+export function cardFace(todo: TodoRecord): CardFace {
+  if (todo.awaitingReply === true) return { kind: 'attention', need: 'reply' };
+  switch (todo.phase) {
+    case 'todo':
+    case 'queued':
+      return { kind: 'queued', action: PHASE_UI[todo.phase].action };
+    case 'planning':
+    case 'building':
+      return { kind: 'running' };
+    case 'failed':
+    case 'confirm':
+    case 'review':
+      return { kind: 'attention', need: todo.phase };
+    case 'done':
+      return { kind: 'done', canceled: false };
+    case 'closed':
+      return { kind: 'done', canceled: true };
+  }
 }
 
 /** Todos waiting on the user — the 工作台 nav badge. #351: the badge IS the

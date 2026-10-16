@@ -15,7 +15,13 @@ export default defineConfig({
   // 单测（如经 agent-detail 链拉进 create-provider-dialog 的
   // chief-identity）都要靠这里解析，缺则报 Cannot find package
   // '@/components/ui/…'（#1008 独立复现于 alert-dialog 首消费者上线）。
-  resolve: { alias: { '@': new URL('./src', import.meta.url).pathname } },
+  // 裸 `cn` → src/lib/cn.ts 同样镜像 vite.config.ts（Paper 字号键）。
+  resolve: {
+    alias: [
+      { find: '@', replacement: new URL('./src', import.meta.url).pathname },
+      { find: /^cn$/, replacement: new URL('./src/lib/cn.ts', import.meta.url).pathname },
+    ],
+  },
   test: {
     include: ['test/**/*.test.ts'],
   },
