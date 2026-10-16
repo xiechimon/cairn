@@ -508,7 +508,10 @@
 
 .light {
   /* 并流别名 light 镜像已随 :root 别名层退役（#1002，#987 §3.3-A）。
-     .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像。 */
+     .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像 + --surface-1
+     改指 canvas（侧栏走 --surface-1，Paper 亮侧侧栏坐在 canvas 上）。 */
+
+  --surface-1: var(--canvas);
 
   /* unified border language (#139), light side: the edge shadow tier dimmed
      to the light surface; the ring rides --border's light value via the
@@ -536,9 +539,9 @@
      (#915 spot), mirrored explicitly so .light stays the full
      semantic-token mirror */
   --drag-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  --drop-tint-border: rgb(151 34 126);
-  --drop-tint-base: rgb(151 34 126 / 0.05);
-  --drop-tint-hover: rgb(151 34 126 / 0.1);
+  --drop-tint-border: rgb(180 83 42);
+  --drop-tint-base: rgb(180 83 42 / 0.05);
+  --drop-tint-hover: rgb(180 83 42 / 0.1);
   /* overlay batch A (#66), light: dialog 模态投影定版档（spec/22 §2.4）
      — mirrored explicitly so .light stays the full semantic-token mirror */
   --dialog-shadow: var(--cds-shadow-lg);
