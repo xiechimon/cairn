@@ -1,154 +1,150 @@
 ---
 name: Pacman
+direction: Paper Dense · Grouped sidebar · Hybrid type
+reference: docs/board-paper-r5.html?v=3
 colors:
-  # 画布层级（dark 默认主题；深 → 浅逐级抬升）
-  canvas: '#09090b'
-  surface: '#18181b'
-  surface-secondary: '#1f1f23'
-  surface-tertiary: '#27272a'
-  # 文字阶梯（标题 → 正文 → 辅助 → 元信息）
-  text-primary: '#fafaf9'
-  text-secondary: '#d4d4d8'
-  text-tertiary: '#71717a'
-  text-dim: '#52525b'
-  # 描边
-  border: '#27272a'
-  border-strong: '#3f3f46'
-  # 品牌主色（board 实测值 #6466e9 优先于 landing 采样 #6366f1）
-  primary: '#6466e9'
-  primary-strong: '#4f46e5'
-  accent-blue: '#3b82f6'
-  # 状态
-  success: '#22c55e'
-  warning: '#f59e0b'
-  danger: '#ca3a32'
-  # 语义 chip 色族（bg/fg 成对使用，禁跨对混用）
-  chip-idle-bg: '#202733'
-  chip-idle-fg: '#9ea3ae'
-  chip-plan-bg: '#1c2740'
-  chip-plan-fg: '#8b93f8'
-  chip-confirm-bg: '#33221b'
-  chip-confirm-fg: '#f2c24b'
-  chip-done-bg: '#14291c'
-  chip-done-fg: '#5ec26a'
-  chip-failed-bg: '#351c1a'
-  chip-failed-fg: '#dd524c'
+  # 亮色为基准主题（定稿值）；暗色见「暗色」一节
+  canvas: '#f3eee5'        # 应用底色：侧栏与主面板之外的纸面
+  sheet: '#fbf9f5'         # 主面板（圆角纸张）
+  card: '#ffffff'          # 任务卡
+  hover: '#ebe4d8'         # 侧栏行 hover
+  line: '#ece5da'          # 卡片发丝环
+  rule: '#e6dfd2'          # 列标题下划线
+  divider: '#eee7dc'       # 顶栏下边线
+  ink: '#2b2620'           # 标题、正文、主按钮底
+  ink-2: '#5e564d'         # 次级文字（导航、按钮、说明）
+  ink-3: '#746a5f'         # 元信息（项目、时间、计数）
+  ink-4: '#b0a597'         # 仅装饰图标，不用于文字
+  accent: '#b4532a'        # 赭红：需要你处理、操作链接、计数徽章、激活图标
+  accent-hover: '#f6ebe3'  # 操作链接 hover 底
+  running: '#5f8f5a'       # 执行中图标、在线点
+  running-text: '#4f7049'  # 执行中说明文字
+  running-bar: '#7ea476'
+  running-track: '#ebe5da'
+  online-ring: '#dfe9da'
+  project-tiles: ['#c06a43', '#7d8b5a', '#6b7a8f', '#a0784a', '#8a6a9a', '#4f8a8b']
 typography:
-  headline-md:
-    fontFamily: Inter
-    fontSize: 20px
-    fontWeight: '600'
-    lineHeight: 28px
-    letterSpacing: -0.02em
-  headline-sm:
-    fontFamily: Inter
-    fontSize: 15px
-    fontWeight: '600'
-    lineHeight: 22px
-    letterSpacing: -0.015em
-  body-lg:
-    fontFamily: Inter
-    fontSize: 14px
-    fontWeight: '400'
-    lineHeight: 22px
-  body-md:
-    fontFamily: Inter
-    fontSize: 13px
-    fontWeight: '400'
-    lineHeight: 20px
-  body-sm:
-    fontFamily: Inter
-    fontSize: 12px
-    fontWeight: '400'
-    lineHeight: 18px
-  code-lg:
-    fontFamily: JetBrains Mono
-    fontSize: 13px
-    fontWeight: '500'
-    lineHeight: 20px
-  label-md:
-    fontFamily: Inter
-    fontSize: 12px
-    fontWeight: '500'
-    lineHeight: 16px
-  label-sm:
-    fontFamily: JetBrains Mono
-    fontSize: 11px
-    fontWeight: '500'
-    lineHeight: 16px
+  page-title:   { fontFamily: serif, fontSize: 18px, fontWeight: '500' }
+  heading:      { fontFamily: serif, fontSize: 16px, fontWeight: '500' }
+  brand:        { fontFamily: serif, fontSize: 16px, fontWeight: '600' }
+  card-title:   { fontFamily: sans, fontSize: 14px, fontWeight: '500', lineHeight: '1.5' }
+  ui:           { fontFamily: sans, fontSize: 13.5px, fontWeight: '400' }
+  meta:         { fontFamily: sans, fontSize: 12px, fontWeight: '400' }
+  caption:      { fontFamily: sans, fontSize: 11.5px, fontWeight: '500' }
+  code:         { fontFamily: mono, fontSize: 12px, fontWeight: '400' }
+fonts:
+  serif: var(--font-source-serif)   # sourceSerif4 → Georgia → Songti SC
+  sans: var(--font-inter) + PingFang SC
+  mono: var(--font-jetbrains-mono)
 rounded:
-  sm: 4px
-  DEFAULT: 8px
-  lg: 12px
+  tile: 5px
+  control: 8px
+  card: 10px
+  sheet: 16px
   full: 9999px
 spacing:
-  space-1: 4px
-  space-2: 8px
-  space-3: 12px
-  space-4: 16px
-  space-6: 24px
+  grid: 4px
+  card-padding: 12px 14px
+  column-gap: 16px
+  board-padding: 18px 24px
+  header-height: 56px
+  sidebar-width: 248px
+  nav-row-height: 32px
 ---
 
-## Brand & Style
+## 方向
 
-pacman 是多 lane coding agent 编排台：看板管理并行 agent 任务，详情页追踪单任务对话流。受众是键盘优先的工程师——设计服务密度与可扫读性，不服务装饰。
+pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，每天打开看板几十次，核心问题是「哪些事等我处理」。
 
-设计哲学：高密度极简 + 触觉层级。暗色画布按灰度分层，边界用发丝线（hairline）而非投影划分，彩色只留给状态与主操作。整体气质接近 Linear / 代码编辑器，而非营销页。
+定稿方向：**纸面、紧凑、一个强调色**。暖白纸面分三层（canvas 底 → sheet 主面板 → 白色卡片），层级靠底色深浅加发丝环，不靠重阴影。彩色只有两个：赭红 `accent` 表示「需要你」与可操作，绿色 `running` 表示「正在跑」。其余一律墨色阶梯。
 
-## Colors
+参考 mockup：[`docs/board-paper-r5.html`](docs/board-paper-r5.html)，浏览器打开后按 `3` 切到定稿的 Hybrid 版（静态 HTML，数字键 1–4 切换对比稿）。mockup 与本文件不一致时以本文件为准。
 
-**暗色优先（dark-first）**：`:root` 即暗色，`.light` 类切换到浅色。本文件 frontmatter 列暗色值；浅色对应值见 `apps/web/src/styles/shadcn.css` 的 `.light` 块（暖白底 #faf7f3 系，非冷灰）。
+## 颜色
 
-- **画布层级**：canvas `#09090b`（页面底色）→ surface `#18181b`（主面板）→ surface-secondary `#1f1f23`（卡片/弹层）→ surface-tertiary `#27272a`（嵌入控件底）。侧栏与主面板同底（同引 surface 令牌，#390 同底律），层分隔由 1px 接缝线（border 色族）承担。
-- **文字四级**：标题/激活态 text-primary；正文/字段值 text-secondary；时间戳/元信息 text-tertiary；禁用/占位 text-dim。禁在正文用 text-dim。
-- **彩色纪律**：indigo 只给主操作与焦点态（按钮、focus ring、激活 tab）；蓝/琥珀/绿/玫红只给状态语义（进行中/待确认/完成/失败），不作装饰。
-- **chip 色族**：idle/plan/confirm/done/failed 五对 bg+fg，表达任务状态机。跨对混用是 bug。
+- **三层纸面**：`canvas`（应用底，侧栏直接坐在上面）→ `sheet`（主面板，16px 圆角 + `line` 发丝环）→ `card`（纯白任务卡）。
+- **墨色四级**：`ink` 标题与正文；`ink-2` 导航、按钮、说明；`ink-3` 元信息；`ink-4` 只给装饰图标。文字最浅用到 `ink-3`。
+- **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。
+- **强调色纪律**：`accent` 只用于：需要你处理的状态与计数、卡片上的操作链接、激活导航项的图标、计数徽章底色。不做装饰、不做大面积底色。
+- **状态不只靠颜色**：每个状态都是「图标 + 颜色 + 文字」三件套（失败 ⊗ 失败 / 待确认 ☰ 待确认 / 待审阅 ⑂ 待审阅），色弱用户靠图标和文字也能分辨。
+- **主按钮是墨色，不是彩色**：`ink` 底 + `sheet` 字，圆角胶囊。赭红不做主按钮底色。
+- 颜色只住在 token 文件（`src/styles/shadcn.css` / `tokens.css`），组件里写 token 名，不写 hex（`scripts/ui-drift-gate.mjs` G2 已经钉住）。
 
-## Typography
+## 字体（Hybrid）
 
-双引擎：**Inter** 承载界面叙事（标题、正文、标签）；**JetBrains Mono** 承载机器读数（任务 ID、token 计数、快捷键、代码）。正文 400、元信息 500、标题 600——禁 700+。15px 以上标题用负字距。
+- **衬线只给标题**：页面标题（顶栏「工作台」）、列标题（待开始 / 执行中…）、侧栏品牌名。字体 `var(--font-source-serif)`，中文落到 Songti SC。
+- **其余全部无衬线**：卡片标题、导航、按钮、元信息。字体 Inter，中文落到 PingFang SC。卡片标题不用衬线：14px 宋体太细、中西混排显乱，这是定稿时否掉 Serif 方案的原因。
+- **六档字号**，不许出现第七档：18 页面标题 / 16 列标题与品牌 / 14 卡片标题 / 13.5 界面文字 / 12 元信息 / 11.5 徽章与分组标签。代码里用 token 或对应 Tailwind 主题键，不写 `text-[13px]` 这类任意值。
+- **字重三档**：400 正文、500 卡片标题与激活项、600 计数徽章与品牌。不用 700。
+- 已完成任务的标题降到 400 + `ink-3`，表示「已经不需要看」。
 
-## Layout & Spacing
+## 布局与间距
 
-4px 基数阶梯（space-1 到 space-6）。卡片内边距 space-3（12px），栏间距 space-4（16px），页面边距 space-6（24px）。顶栏 44px（43 内容 + 1px 发丝缝），侧栏 240px。**复刻面现有像素级实测值不动——A3 拍板保护视觉回归（批量等值化会动像素）；新写代码按上方 4px 基数阶梯取值**（Tailwind spacing 即 4px 基数，直写工具类）。
+- 4px 网格。常用值：4 / 8 / 12 / 16 / 24。卡片内边距 12×14，卡片间距 8，列间距 16，看板内边距 18×24。
+- 顶栏 56px：左侧衬线页面标题 + 「⚠ N 项等你处理」；右侧文字按钮（筛选、定时）+ 墨色胶囊「新任务」。所有顶栏元素 `nowrap`，窄窗口不换行。
+- 侧栏 248px，坐在 `canvas` 上；主面板是右侧一张 `sheet`，四周留 10px。
+- 一屏只有一个主操作（墨色胶囊），其余操作是文字按钮或卡片内的赭红链接。
 
-## Elevation & Depth
+## 图标
 
-不用扩散投影堆层级，用**灰度分层 + 发丝环**：
+- 图标库 lucide（`components.json` 已配置），描边 1.75。
+- 尺寸：元信息 12、卡片操作与状态 13、顶栏按钮 14、列标题 15、侧栏导航 16。
+- 颜色：元信息图标 `ink-4`；默认图标 `ink-3`；激活导航项与「需要你」相关图标 `accent`；执行中相关图标 `running`。
+- 列标题图标固定：待开始 = 虚线圆、执行中 = 脉搏线、待处理 = 感叹圆、已完成 = 勾圆。
 
-- **Level 0 画布**：canvas 纯色。
-- **Level 1 卡片**：surface-secondary + `inset 0 0 0 1px border`（用 inset shadow 画环而非 border——分数缩放（110%/125%）下真 1px border 会光栅化不均，shadow-spread 环在任何缩放级别保持均匀发丝）+ 12px 圆角 + 静态微影 `0 2px 4px rgb(0 0 0 / 0.2)`。
-- **Level 2 弹层/对话**：同级 fill，投影升档 `0 5px 14px rgb(0 0 0 / 0.4)`（浮于内容之上需要可见分离）。
+## 组件
 
-## Shapes
+### 侧栏（Grouped）
+从上到下：
+1. **工作区行**：品牌方块（`accent` 底、白色衬线首字母）+ 衬线品牌名 + 下拉箭头；右侧两个图标按钮：搜索（⌘K）、收起侧栏。
+2. **新任务按钮**：白底（`sheet`）、发丝环、赭红加号、右侧键帽 `C`。它是动作，不是导航项。
+3. **工作导航**：工作台、需要我处理（右侧赭红计数徽章）、定时。激活项 = `sheet` 底 + 发丝环 + 赭红图标。
+4. **项目**：分组标签「项目」+ 右侧加号；每个项目一行 = 彩色首字母方块（`project-tiles` 按序取色）+ 名称 + 未完成数。
+5. **底部**：「资源」一行（技能 / MCP / 密钥 / 机器 / 模型服务折叠在里面，点击展开为缩进子列表）；用户行 = 头像 + 名字 + 第二行「● 2 台机器在线 · 执行中 N」。
 
-- **12px（rounded-lg）**：卡片、弹层、对话框——elevated surface 的统一半径。
-- **10px（rounded-popover）**：浮层下拉、设置弹层、popover 等——与 `--radius-popover` token 绑定。
-- **全圆角（9999px）**：状态徽章、chip、快捷键键帽。
-- **8px（DEFAULT）**：按钮、输入框等基础控件。
+### 看板列
+- 列标题：状态图标 + 衬线列名 + `ink-3` 计数；hover 列时右侧出现加号。下方一条 `rule` 线。
+- 空列显示「暂无」，不画占位框。
 
-## Motion
+### 任务卡
+- 白底、10px 圆角、`line` 发丝环 + 极轻投影；hover 时环加深、投影升一档（150ms ease-out）。
+- 结构：标题（最多两行）→ 单行元信息（📁 项目 · #编号 · 🏷 标签 · 🕒 时间，永不换行；空间不够时先截断标签，项目名至少保留 5 个字宽）→ 按状态的底栏。
+- 底栏：
+  - 待处理三态：虚线分隔 + 「图标 状态名」（赭红）+ 原因（截断）+ 右侧赭红操作链接（↻ 重试 / ✓ 确认计划 / → 审阅）。
+  - 执行中：机器人图标（缓慢呼吸）+ 「agent · 当前步骤」+ 右侧 `3/7`，下面一条 3px 进度条。
+  - 待开始：没有底栏；「▶ 开始」悬停时浮在元信息行右侧，不占高度。
+  - 已完成：没有底栏，标题降级。
+- 卡片上不放实心按钮。
 
-三档时长：150ms 常规过渡 / 200ms 浮层挂载 / 300ms 抽屉滑移。缓动：标准 cubic-bezier(0.4,0,0.2,1)，出场 ease-out，弹性入场 cubic-bezier(0.22,1,0.36,1)。无弹簧物理动画。
+### 按钮
+- 主按钮：墨色胶囊，高 30–34。
+- 次按钮：文字按钮，hover 出浅底。
+- 卡片操作：赭红文字链接 + 图标，hover 出 `accent-hover` 底。
 
-## Components
+## 动效
 
-### Button
-- **Primary**：solid primary indigo 底 + 白字，28px（紧凑）/32px（标准）高，8px 圆角。禁用态不透明度降档而非灰化。
-- **Ghost**：透明底 + 1px border，文字 text-secondary，hover 升 text-primary + 描边增亮。
-- **Icon**：28×28 方，图标 text-tertiary，hover 增亮。
+- 只动 `opacity` / `transform` / 阴影；时长 150ms，`ease-out`。
+- 执行中图标 2.4s 呼吸（opacity），这是唯一的循环动画。
+- `prefers-reduced-motion` 下关掉呼吸与所有入场动画。
 
-### Card（看板任务卡 / 资源行卡）
-surface-secondary 底 + 发丝环 + 12px 圆角 + 12px 内边距 + card 级微影。头部 mono 11px 任务 ID（text-tertiary），标题 Inter 13px medium，尾行元信息 + 状态 chip。
+## 暗色
 
-### Chip / Badge
-全圆角 pill，高 18-20px，语义色族 bg+fg 成对。任务状态用 chip 色族；计数/标签用 surface-tertiary 底 + text-secondary。
+定稿只做了亮色。暗色主题（`:root` 默认）保留现有值，直到单独做一轮暗色 mockup 并定稿。规则：每新增一个语义 token，必须同时在 `.light` 与 `:root` 两处定义；暗色值先取现有暗色阶梯里最接近的那档。
 
-### Input
-canvas 底（比所在面板深一阶）+ 1px border，**36px 高**（dlg-form-input 实测族，2026-09-26 裁决：实测赢文档），14px 字。focus = 1px primary 描边，禁外发光 halo。
+## 给 agent 的美学约束（粘贴进提示词）
 
-### Dialog / Popover
-surface-secondary 底 + 发丝环 + 12px 圆角 + 弹层级投影。footer 按钮右对齐，danger 操作用 danger 色实心。
+```text
+Pacman UI rules (source: apps/web/DESIGN.md):
+- Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow.
+- One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.
+- Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
+- Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
+- Every status = icon + color + label. Lucide icons, stroke 1.75.
+- Primary button = ink pill. Card actions = terracotta text links. No solid buttons on cards.
+- Sidebar = Grouped: workspace row, New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
+- Use components/ui primitives and tokens; no hex in components.
+```
 
-### 状态语义
-任务五态（idle/planning/confirm/building/done/failed）有固定色对，见 chip 色族。新增状态先扩色族，不临时取色。
+## 迁移状态
+
+代码里的现状与本文件不一致的地方，按 `apps/web/docs/paper-redesign-plan.md` 的顺序逐步落地。新写的代码直接按本文件取值。
