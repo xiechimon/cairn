@@ -1,0 +1,3 @@
+$ node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 180 text + 319 spacing in 70 file(s); 5 css + 205 tsx + 242 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from 81bc4d37d3b4.
+exit=0

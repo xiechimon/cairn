@@ -41,6 +41,22 @@
      theme 变量定义，无循环 */
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+  --font-heading: var(--font-source-serif);
+  /* Paper 六档字号（DESIGN.md「字体」）。14px 档叫 card-title 不叫 card：
+     shadcn.css 已注册 --color-card，TW 4.3.3 实测 text-card 只出
+     color: var(--card)，同名字号键被吞。 */
+  --text-page: var(--type-page);
+  --text-page--line-height: calc(24 / 18);
+  --text-heading: var(--type-heading);
+  --text-heading--line-height: calc(22 / 16);
+  --text-card-title: var(--type-card-title);
+  --text-card-title--line-height: 1.5;
+  --text-ui: var(--type-ui);
+  --text-ui--line-height: calc(20 / 13.5);
+  --text-meta: var(--type-meta);
+  --text-meta--line-height: calc(16 / 12);
+  --text-caption: var(--type-caption);
+  --text-caption--line-height: calc(16 / 11.5);
 }
 
 @layer base {

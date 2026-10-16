@@ -1,0 +1,4 @@
+# baseline edited: arbitraryValues.textTotal 180 -> 999 (files still sum to 180)
+$ node scripts/ui-debt-gate.mjs
+[ui-debt-gate] D4 scripts/ui-debt-baseline.json: arbitraryValues.files text sums to 180 but textTotal is 999
+exit=2
