@@ -740,6 +740,7 @@ export function BoardPage() {
           onDoneIntent={openDoneGate}
           filters={filters}
           tagsById={tagIndex.tagById}
+          onNewTask={openNewTask}
         />
       )}
       <SearchPanel

@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "81bc4d37d3b41fcab104ca2e2b3a691caaf8af7e",
+    "sha": "9ced1c1a490ac4d7f8d47eac2ee35f1ea317f823",
     "date": "2026-10-16"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,20 +14,16 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 180,
-    "spacingTotal": 319,
+    "textTotal": 169,
+    "spacingTotal": 291,
     "files": {
       "board/board.tsx": {
         "text": 0,
-        "spacing": 7
+        "spacing": 3
       },
       "board/done-confirm-dialog.tsx": {
         "text": 4,
         "spacing": 2
-      },
-      "board/drag-card.tsx": {
-        "text": 3,
-        "spacing": 0
       },
       "board/filter-panel.tsx": {
         "text": 7,
@@ -52,10 +48,6 @@
       "board/sidebar.tsx": {
         "text": 3,
         "spacing": 27
-      },
-      "board/todo-card.tsx": {
-        "text": 8,
-        "spacing": 25
       },
       "chief/chief-agent-dialog.tsx": {
         "text": 5,
@@ -115,7 +107,7 @@
       },
       "detail/composer.tsx": {
         "text": 2,
-        "spacing": 9
+        "spacing": 10
       },
       "detail/dhead.tsx": {
         "text": 1,
