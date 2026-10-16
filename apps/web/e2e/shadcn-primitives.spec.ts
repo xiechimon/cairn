@@ -25,14 +25,12 @@ async function stubDicebear(page: Page) {
   );
 }
 
-test('avatar 落点：侧栏人像 / 看板执行者面共用同一个 components/ui 落点', async ({ page }) => {
+// Paper card (DESIGN.md 任务卡) dropped the executor avatar; the running
+// footer names the agent instead, so the board face left this list.
+test('avatar 落点：侧栏人像走 components/ui 落点', async ({ page }) => {
   await stubDicebear(page);
   await page.goto('/app?scenario=22d');
-  const faces = [
-    page.locator('.sidebar-user'),
-    // fresh 卡执行者位渲染 UserCircle 占位（不是头像面）——按「含 img 者」取样
-    page.locator('.todo-agent-avatar:has(img)').first(),
-  ];
+  const faces = [page.locator('.sidebar-user')];
   for (const face of faces) {
     await expect(face.locator('[data-slot="avatar"]')).toHaveCount(1);
     await expect(face.locator('[data-slot="avatar-image"]')).toHaveCount(1);
@@ -95,26 +93,12 @@ test('kbd 落点：悬浮提示 = registry Tooltip+Kbd 组合，静息不挂载 
 // #1006 R5 实审裁决（用户 2026-10-08，与 L1 裁决①一致）：row-flush 16px
 // 消费点覆写收编 registry Badge 默认 20px——两尺寸不并存，卡面/面板面
 // 单档 20（旧「卡面 16 / 面板面 20」双保契约由裁决作废，本 spec 重钉）。
-test('tag-chip 落点：落在 registry Badge 上，别名类保留、几何单档 20px 正本', async ({
-  page,
-}) => {
+// The board card no longer renders TagChip (Paper card: tag icon tinted with
+// tag.color + name, pinned in board-filter.spec); the type-filter option is
+// the TagChip face that stays.
+test('tag-chip 落点：落在 registry Badge 上，几何单档 20px 正本', async ({ page }) => {
   await page.goto('/app?scenario=board-tags');
-  const chip = page.locator('.todo-card-tag').first();
-  await expect(chip).toHaveAttribute('data-slot', 'badge');
-  await expect(chip).toHaveClass(/tag-chip/);
-  // 卡面 = registry Badge h-5 默认档 20px（#980 前提④几何 registry 默认赢）
-  // #1324: CI read 19.99999237060547 here once (float noise from layout,
-  // not a different size tier). Let the card-enter animation settle, then
-  // compare to 20 within 0.005px: still tells the 20px tier from 16px.
-  const h = await chip.evaluate(async (el) => {
-    const card = el.closest('.todo-card') ?? el;
-    await Promise.all(card.getAnimations({ subtree: true }).map((a) => a.finished));
-    return el.getBoundingClientRect().height;
-  });
-  expect(h).toBeCloseTo(20, 2);
-
-  // 类型筛选弹层的选中行是第二个消费面（board/tag-filter.tsx）——同走
-  // 20px 正本（components/ui/tag-chip.tsx 的 Badge h-5 档），单档无例外
+  await expect(page.locator('.todo-card-tag')).toHaveCount(0);
   await page.locator('.board-type-filter').click();
   const option = page.locator('.type-filter-option[data-tag="bug"]');
   await option.click();

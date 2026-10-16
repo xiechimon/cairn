@@ -221,7 +221,7 @@ export function Composer({
 
   return (
     <div
-      className={`${COMPOSER_CARD} min-h-[84px] ${multiLine ? 'pb-[48px]' : ''}`}
+      className={`${COMPOSER_CARD} min-h-[84px] ${multiLine ? 'pb-12' : ''}`}
       data-testid="composer-card"
     >
       {editable ? (

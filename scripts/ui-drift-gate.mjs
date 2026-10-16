@@ -37,7 +37,8 @@
 //       property form [color:var(…)], or a CSS `color:` declaration) must
 //       carry an entry in scripts/ui-consumer-registry.json
 //       (brandInkText section: {file, anchor, role, reason, contrast}, role
-//       in selection-mark | indicator | badge-glyph). Body/label/link/button
+//       in selection-mark | indicator | badge-glyph | action-link; the last
+//       is the board card's accent text link, DESIGN.md 按钮). Body/label/link/button
 //       text ink goes through the text tiers, --primary or the registry link
 //       tier (#1006 R4) — a canonical slot used in the wrong role is exactly
 //       the defect class G2-style hex scans cannot see. Solid-fill uses
@@ -205,7 +206,7 @@ const G6_TS_RE = new RegExp(
   `(?:text|fill|stroke)-\\(--(?:${BRAND_SLOTS})\\)|(?:text|fill|stroke)-\\[var\\(--(?:${BRAND_SLOTS})\\)\\]|\\[color:var\\(--(?:${BRAND_SLOTS})\\)\\]`,
 );
 const G6_CSS_RE = new RegExp(`color:\\s*var\\(--(?:${BRAND_SLOTS})\\)`);
-const G6_ROLES = new Set(['selection-mark', 'indicator', 'badge-glyph']);
+const G6_ROLES = new Set(['selection-mark', 'indicator', 'badge-glyph', 'action-link']);
 let brandInkHits = 0;
 let brandInkEntries = [];
 try {

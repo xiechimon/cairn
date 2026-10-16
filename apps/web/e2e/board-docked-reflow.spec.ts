@@ -186,7 +186,7 @@ test.describe('board never reflows under the floating chief window (ADR 0013 D1)
     expect(pending).toBeDefined();
     expect(pending!.width).toBeGreaterThanOrEqual(FLOOR - 1);
     await expect(
-      page.locator('[data-column="pending"]').getByText('没有等你处理的任务'),
+      page.locator('[data-column="pending"]').getByText('暂无', { exact: true }),
     ).toBeVisible();
   });
 

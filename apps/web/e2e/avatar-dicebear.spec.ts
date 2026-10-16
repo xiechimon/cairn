@@ -111,26 +111,6 @@ test('live members projection: two agents → two distinct seeded srcs; avatarUr
   await expect(gamma.locator('img')).toHaveAttribute('src', override);
 });
 
-test('board todo card executor avatar seeds by the bound agent; fresh card keeps the placeholder', async ({
-  page,
-}) => {
-  await stubDicebear(page);
-  // scenario=22d = r7 22/22d board: three r3-builder runs + the #10 fresh
-  // probe (phase todo, agent null)
-  await page.goto('/app?scenario=22d');
-  const avatars = page.locator('.todo-agent-avatar img');
-  await expect(avatars.first()).toHaveAttribute('src', AGENT_SRC);
-  // every rendered executor avatar carries the same agent seed in 22d
-  for (const img of await avatars.all()) {
-    await expect(img).toHaveAttribute('src', AGENT_SRC);
-  }
-  // fresh card: UserCircle placeholder, no img (badge glyphs are svgs too —
-  // pin by todo id, not by svg presence)
-  const fresh = page.locator('[data-todo-id="r7-dark-fresh-probe-10"] .todo-agent-avatar');
-  await expect(fresh.locator(':scope > svg')).toBeVisible();
-  await expect(fresh.locator('img')).toHaveCount(0);
-});
-
 test('detail chip popover: user row + 执行对话 agent row both seeded', async ({ page }) => {
   await stubDicebear(page);
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=19');
@@ -168,10 +148,6 @@ test('dicebear unreachable → img onError falls back to the static asset (不�
   await page.route('**/api.dicebear.com/**', (route) => route.abort());
   await page.goto('/app?scenario=01');
   await expect(page.locator('.sidebar-user img')).toHaveAttribute('src', '/avatar-user.png');
-  await expect(page.locator('.todo-agent-avatar img').first()).toHaveAttribute(
-    'src',
-    '/avatar-robot-1.svg',
-  );
 });
 
 test('search agent rows + project task rows are seeded (Agent 列表 / 任务行头像位)', async ({

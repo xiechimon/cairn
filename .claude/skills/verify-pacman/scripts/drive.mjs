@@ -162,11 +162,11 @@ try {
     check(!scroller.scrollable, '桌面无横向滚动');
     check(scroller.overflowX === 'auto', `窄窗兜底 overflow-x = auto(实测 ${scroller.overflowX})`);
 
-    // 待处理列空态 = #351 新文案(全新库全列空)
+    // 待处理列空态 = Paper 列空态「暂无」(DESIGN.md 看板列;全新库全列空)
     const pendingEmpty = (
       await page.locator('[data-column="pending"] .board-column-empty').textContent()
     )?.trim();
-    check(pendingEmpty === '没有等你处理的任务', `待处理空态文案(实测 ${pendingEmpty})`);
+    check(pendingEmpty === '暂无', `待处理空态文案(实测 ${pendingEmpty})`);
 
     const newBtn = page.locator('.sidebar-new-task');
     check(await newBtn.isVisible(), '侧栏「新任务」行可见');
@@ -189,7 +189,9 @@ try {
 
     const card = page.locator('[data-column-list="todo"] .todo-card', { hasText: title });
     await card.waitFor({ state: 'visible', timeout: 15_000 });
-    const seq = (await card.locator('.todo-card-seq').first().textContent())?.trim();
+    const seq = (
+      await card.locator('.todo-card-meta').getByText(/^#\d+$/).first().textContent()
+    )?.trim();
     check(seq?.startsWith('#') === true, `卡片落「待开始」列,序号 ${seq}`);
     await shot(page, '02-new-task-card.png');
 

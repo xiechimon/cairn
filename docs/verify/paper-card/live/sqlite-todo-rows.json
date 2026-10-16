@@ -1,0 +1,32 @@
+[
+  {
+    "seqNum": 1,
+    "title": "把看板任务卡换成 Paper 结构：标题两行截断、元信息单行不换行、按状态的底栏，并且验证超长标题在…",
+    "phase": "todo"
+  },
+  {
+    "seqNum": 2,
+    "title": "按机器能力推荐并发上限",
+    "phase": "todo"
+  },
+  {
+    "seqNum": 3,
+    "title": "侧栏 288px 一级表面与滚动渐隐",
+    "phase": "building"
+  },
+  {
+    "seqNum": 4,
+    "title": "实现 #1251：机器能力上报 + 派发能力闸",
+    "phase": "done"
+  },
+  {
+    "seqNum": 5,
+    "title": "合并会话分支改动到默认分支",
+    "phase": "closed"
+  },
+  {
+    "seqNum": 6,
+    "title": "实现 issue #1138：claim 闸加 agent 级 maxConcurrentTasks",
+    "phase": "confirm"
+  }
+]
