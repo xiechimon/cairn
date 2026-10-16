@@ -23,7 +23,7 @@
 
 ## PR 2 · 字号 token + 任意值棘轮
 
-- `src/styles/app.css` 的 `@theme inline` 加六档字号键：`text-page`(18) / `text-heading`(16) / `text-card`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5)，乘现有 `--rem-scale`（密度切换照常生效）；加 `font-heading` = `var(--font-source-serif)`。
+- `src/styles/app.css` 的 `@theme inline` 加六档字号键：`text-page`(18) / `text-heading`(16) / `text-card-title`(14) / `text-ui`(13.5) / `text-meta`(12) / `text-caption`(11.5)，乘现有 `--rem-scale`（密度切换照常生效）；加 `font-heading` = `var(--font-source-serif)`。14px 档不叫 `text-card`：shadcn 的 `--color-card` 已占用这个类名（Tailwind 只输出颜色）。
 - `scripts/ui-debt-gate.mjs` 加第三本账：`text-[Npx]` 与间距类 `-[Npx]` 任意值的出现次数（今天约 179 处字号 + 273 处间距），冻结进 `scripts/ui-debt-baseline.json`，只降不升（复用现有 D3 机制）。
 - 不改任何页面，只是让漂移从此不能再涨。后面每个 PR 顺手把自己那块的任意值换成 token 并重冻基线。
 

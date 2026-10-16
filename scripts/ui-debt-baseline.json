@@ -1,9 +1,9 @@
 {
   "frozenFrom": {
-    "sha": "7257cbc709df758bc0647956b9b0033871372572",
-    "date": "2026-10-06"
+    "sha": "81bc4d37d3b41fcab104ca2e2b3a691caaf8af7e",
+    "date": "2026-10-16"
   },
-  "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/",
+  "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
   "rawControls": {
     "total": 3,
@@ -11,6 +11,292 @@
       "chief/chief-drawer.tsx": 1,
       "detail/composer.tsx": 1,
       "overlay/new-task-dialog.tsx": 1
+    }
+  },
+  "arbitraryValues": {
+    "textTotal": 180,
+    "spacingTotal": 319,
+    "files": {
+      "board/board.tsx": {
+        "text": 0,
+        "spacing": 7
+      },
+      "board/done-confirm-dialog.tsx": {
+        "text": 4,
+        "spacing": 2
+      },
+      "board/drag-card.tsx": {
+        "text": 3,
+        "spacing": 0
+      },
+      "board/filter-panel.tsx": {
+        "text": 7,
+        "spacing": 2
+      },
+      "board/notify-banner.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "board/project-avatar.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "board/quota-banner.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "board/reset-confirm-dialog.tsx": {
+        "text": 2,
+        "spacing": 1
+      },
+      "board/sidebar.tsx": {
+        "text": 3,
+        "spacing": 27
+      },
+      "board/todo-card.tsx": {
+        "text": 8,
+        "spacing": 25
+      },
+      "chief/chief-agent-dialog.tsx": {
+        "text": 5,
+        "spacing": 0
+      },
+      "chief/chief-drawer.tsx": {
+        "text": 9,
+        "spacing": 23
+      },
+      "chief/chief-message-rows.tsx": {
+        "text": 1,
+        "spacing": 6
+      },
+      "chief/chief-question-card.tsx": {
+        "text": 12,
+        "spacing": 9
+      },
+      "chief/chief-root.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "chief/chief-settings.tsx": {
+        "text": 8,
+        "spacing": 13
+      },
+      "chief/edit-charter-dialog.tsx": {
+        "text": 3,
+        "spacing": 2
+      },
+      "chief/recipes.ts": {
+        "text": 1,
+        "spacing": 3
+      },
+      "components/chat/agent-rows.tsx": {
+        "text": 3,
+        "spacing": 0
+      },
+      "components/chat/live-row.tsx": {
+        "text": 0,
+        "spacing": 3
+      },
+      "components/model-select-core.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "components/profile-card.tsx": {
+        "text": 0,
+        "spacing": 8
+      },
+      "detail/branch-dialog.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "detail/chat-markdown.tsx": {
+        "text": 8,
+        "spacing": 5
+      },
+      "detail/composer.tsx": {
+        "text": 2,
+        "spacing": 9
+      },
+      "detail/dhead.tsx": {
+        "text": 1,
+        "spacing": 2
+      },
+      "detail/docpane.tsx": {
+        "text": 5,
+        "spacing": 21
+      },
+      "detail/fresh-block.tsx": {
+        "text": 1,
+        "spacing": 3
+      },
+      "detail/overlays.tsx": {
+        "text": 0,
+        "spacing": 4
+      },
+      "detail/review-dialog.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "detail/right-pane.tsx": {
+        "text": 6,
+        "spacing": 6
+      },
+      "detail/segments.tsx": {
+        "text": 2,
+        "spacing": 0
+      },
+      "detail/spec-block.tsx": {
+        "text": 1,
+        "spacing": 3
+      },
+      "detail/task-meta-block.tsx": {
+        "text": 2,
+        "spacing": 3
+      },
+      "detail/transcript-column.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "detail/transcript.tsx": {
+        "text": 16,
+        "spacing": 34
+      },
+      "detail/user-menu.tsx": {
+        "text": 2,
+        "spacing": 5
+      },
+      "overlay/attachment-card.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "overlay/attachment-strip.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "overlay/delete-confirm.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "overlay/delete-project-confirm.tsx": {
+        "text": 3,
+        "spacing": 1
+      },
+      "overlay/mention-picker.tsx": {
+        "text": 7,
+        "spacing": 7
+      },
+      "overlay/more-menu.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "overlay/new-task-dialog.tsx": {
+        "text": 5,
+        "spacing": 12
+      },
+      "overlay/slash-menu.tsx": {
+        "text": 2,
+        "spacing": 4
+      },
+      "overlay/token-gate.tsx": {
+        "text": 2,
+        "spacing": 1
+      },
+      "overlays/chip-popover.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "overlays/plan-dropdown.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "overlays/search-panel.tsx": {
+        "text": 11,
+        "spacing": 10
+      },
+      "pages/parts.ts": {
+        "text": 0,
+        "spacing": 1
+      },
+      "pages/project-new-page.tsx": {
+        "text": 0,
+        "spacing": 3
+      },
+      "pages/project-page.tsx": {
+        "text": 8,
+        "spacing": 7
+      },
+      "pages/project-settings-page.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "pages/schedules-page.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "resources/create-machine-dialog.tsx": {
+        "text": 3,
+        "spacing": 0
+      },
+      "resources/create-provider-dialog.tsx": {
+        "text": 1,
+        "spacing": 0
+      },
+      "resources/parts.tsx": {
+        "text": 3,
+        "spacing": 2
+      },
+      "resources/providers-page.tsx": {
+        "text": 0,
+        "spacing": 1
+      },
+      "resources/shell.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "resources/skill-dialog.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "routes/account-page.tsx": {
+        "text": 4,
+        "spacing": 1
+      },
+      "routes/agent-detail-page.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "routes/api-key-create-dialog.tsx": {
+        "text": 2,
+        "spacing": 4
+      },
+      "routes/api-keys-page.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "routes/machine-authorize-page.tsx": {
+        "text": 1,
+        "spacing": 1
+      },
+      "routes/team-agent-grid.tsx": {
+        "text": 1,
+        "spacing": 6
+      },
+      "routes/team-chart.tsx": {
+        "text": 2,
+        "spacing": 6
+      },
+      "routes/team-page.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "routes/todo-detail-page.tsx": {
+        "text": 0,
+        "spacing": 2
+      },
+      "secondary/shell.tsx": {
+        "text": 0,
+        "spacing": 1
+      }
     }
   }
 }

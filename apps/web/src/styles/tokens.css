@@ -452,6 +452,15 @@
   --font-size-body: calc(0.8125rem * var(--rem-scale));
   --font-size-heading: calc(0.875rem * var(--rem-scale));
   --font-size-title: calc(1.25rem * var(--rem-scale));
+  /* Paper type scale (DESIGN.md 六档). Comfortable renders the exact DESIGN
+     px; density rescales relative to the comfortable rem-scale (16/17). */
+  --type-scale: calc(var(--rem-scale) * 17 / 16);
+  --type-page: calc(1.125rem * var(--type-scale));
+  --type-heading: calc(1rem * var(--type-scale));
+  --type-card-title: calc(0.875rem * var(--type-scale));
+  --type-ui: calc(0.84375rem * var(--type-scale));
+  --type-meta: calc(0.75rem * var(--type-scale));
+  --type-caption: calc(0.71875rem * var(--type-scale));
   --leading-body: 1.428;
   --dur-composer: 220ms;
   --dur-popover-exit: 120ms;
@@ -490,6 +499,13 @@
   --font-size-body: calc(0.8125rem * var(--rem-scale));
   --font-size-heading: calc(0.875rem * var(--rem-scale));
   --font-size-title: calc(1.25rem * var(--rem-scale));
+  --type-scale: calc(var(--rem-scale) * 17 / 16);
+  --type-page: calc(1.125rem * var(--type-scale));
+  --type-heading: calc(1rem * var(--type-scale));
+  --type-card-title: calc(0.875rem * var(--type-scale));
+  --type-ui: calc(0.84375rem * var(--type-scale));
+  --type-meta: calc(0.75rem * var(--type-scale));
+  --type-caption: calc(0.71875rem * var(--type-scale));
 }
 /* Compact card rhythm: 8px pad; identity/time meta → 12/16. */
 [data-density="compact"] [data-slot="card"] {

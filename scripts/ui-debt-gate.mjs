@@ -3,7 +3,7 @@
 // Permanent debt ratchet (#851; born as the construction-period brake for
 // #908, sealed as a standing regression gate by #1012 when map #980 closed —
 // the ledgers sit at their floor, so the ratchet now purely blocks regrowth).
-// Two debt ledgers may only shrink, never grow:
+// Three debt ledgers may only shrink, never grow:
 //
 //   per-face CSS   every *.css under apps/web/src except the five
 //                  carrier-layer files (WHITELIST below). Counted per file in
@@ -18,6 +18,20 @@
 //                  a tag-shaped mention inside a comment counts, which keeps
 //                  the baseline directly comparable to the published ledger
 //                  (76 sites / 30 files @ a831032e).
+//   arbitrary      Tailwind arbitrary-value classes in *.ts/*.tsx under
+//   values         apps/web/src (Paper redesign PR 2, apps/web/DESIGN.md
+//                  「六档字号」「4px 网格」): text sizes `text-[13px]` and
+//                  spacing/size utilities `ml-[10.5px]` (SPACING_UTILITIES),
+//                  each a single px/rem/em length, plus any interpolated
+//                  `text-[${x}]`-shaped class (Tailwind cannot see it, so it
+//                  is broken as well as off-scale). Same exclusions as bare
+//                  controls (components/ui/ primitives belong to the #989
+//                  registry gate) plus test files. Matching follows what the
+//                  Tailwind scanner extracts: variants, `!`, negative
+//                  prefixes and `/modifier` suffixes are seen through, and
+//                  comments/strings are NOT stripped — Tailwind emits CSS for
+//                  a class-shaped comment too, so it is counted.
+//                  Two totals (text, spacing), per-file counts for diagnosis.
 //
 // The baseline is scripts/ui-debt-baseline.json, frozen from a clean main by
 // `--write`. Domain tickets shrink debt, then re-freeze in their own PR (the
@@ -32,16 +46,23 @@
 //       between files without adding any is not new debt.
 //   D3  With a base ref (--base <sha> or UI_DEBT_BASE_SHA; CI passes the PR's
 //       base sha), the baseline carried by the branch must not be higher than
-//       the base's baseline — on any CSS entry or on the control total. This
+//       the base's baseline — on any CSS entry, on the control total, or on
+//       either arbitrary-value total. This
 //       is what makes re-freezing inside a PR unable to legalize new debt:
 //       the comparison for D1/D2 runs against the BASE baseline when one is
 //       available, so raising the in-tree numbers changes nothing. Bootstrap:
-//       a base without the file (the PR that introduces the gate) skips D3.
+//       a base without the file (the PR that introduces the gate) skips D3;
+//       a base whose baseline predates the arbitraryValues ledger skips D3
+//       for that ledger only and D5 falls back to the in-tree numbers.
 //   D4  Fail-closed housekeeping: malformed or structurally inconsistent
-//       baseline (rawControls.files must sum to rawControls.total, values
-//       must be non-negative integers), an empty source scan, or a missing
-//       whitelist carrier file all end red — a broken gate must never pass
+//       baseline (rawControls.files must sum to rawControls.total, the
+//       arbitraryValues files must sum to both totals, values must be
+//       non-negative integers), an empty source scan, a missing whitelist
+//       carrier file, or a matcher that fails its built-in canary
+//       (ARBITRARY_CANARY) all end red — a broken gate must never pass
 //       silently (same stance as the drizzle chain guard in ci.yml).
+//   D5  Either arbitrary-value total exceeds the baseline total. Per-file
+//       deltas are printed; the rule is the total, as in D2.
 //
 // Debt below baseline is not red: the run prints a note asking for a
 // `--write` re-freeze so the ledger follows the tree down (#851: 基线随动递减).
@@ -82,13 +103,120 @@ const CONTROL_TAGS = ['button', 'input', 'select', 'textarea'];
 // baseline of 76 sites / 30 files was cut from).
 const CONTROLS_EXCLUDED_PREFIX = 'components/ui/';
 
+// Tailwind utilities whose value is a spacing/size length. Negative forms
+// (-mt-[3px]) are matched through the optional leading `-`.
+const SPACING_UTILITIES = [
+  'p',
+  'px',
+  'py',
+  'pt',
+  'pr',
+  'pb',
+  'pl',
+  'ps',
+  'pe',
+  'm',
+  'mx',
+  'my',
+  'mt',
+  'mr',
+  'mb',
+  'ml',
+  'ms',
+  'me',
+  'gap',
+  'gap-x',
+  'gap-y',
+  'space-x',
+  'space-y',
+  'w',
+  'h',
+  'size',
+  'min-w',
+  'min-h',
+  'max-w',
+  'max-h',
+  'basis',
+  'inset',
+  'inset-x',
+  'inset-y',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'start',
+  'end',
+  'translate-x',
+  'translate-y',
+  'indent',
+];
+const ARBITRARY_EXTENSIONS = ['.ts', '.tsx'];
+const ARBITRARY_EXCLUDED = (r) =>
+  r.startsWith(CONTROLS_EXCLUDED_PREFIX) ||
+  /(^|\/)__tests__\//.test(r) ||
+  /\.(test|spec)\.tsx?$/.test(r) ||
+  r.endsWith('.d.ts');
+
+const LENGTH = String.raw`(?:length:)?-?(?:\d+(?:\.\d*)?|\.\d+)(?:px|rem|em)`;
+const INTERPOLATED = String.raw`[^\]\s]*\$\{[^\]]*`;
+const utilityAlternation = (names) =>
+  [...names]
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/-/g, '\\-'))
+    .join('|');
+// (?<![\w-]) keeps `max-w-[` from also matching as `w-[`, and `context-[`
+// from matching as `text-[`; variants (`md:`), `!`, `[&>svg]:` and quotes
+// all sit outside that class, so prefixed candidates are still seen.
+const arbitraryPattern = (names) =>
+  new RegExp(
+    String.raw`(?<![\w-])-?(?:${utilityAlternation(names)})-\[(?:${LENGTH}|${INTERPOLATED})\]`,
+    'g',
+  );
+const TEXT_PATTERN = arbitraryPattern(['text']);
+const SPACING_PATTERN = arbitraryPattern(SPACING_UTILITIES);
+
+function countArbitrary(source) {
+  return {
+    text: source.match(TEXT_PATTERN)?.length ?? 0,
+    spacing: source.match(SPACING_PATTERN)?.length ?? 0,
+  };
+}
+
+// Run on every invocation before the scan: if the matcher drifts (a refactor
+// of the patterns above), the gate exits 2 instead of silently counting 0.
+const ARBITRARY_CANARY = [
+  ['className="text-[13px]"', 1, 0],
+  ['md:text-[13.5px] hover:!text-[12px] text-[11px]!', 3, 0],
+  ['text-[0.8rem] text-[.75rem] text-[length:13px] text-[13px]/5', 4, 0],
+  [`\`text-[\${size}px]\` \`ml-[\${gap}px]\``, 1, 1],
+  ['\r\nml-[10.5px]\r\n-mt-[3px] top-[-1px] max-w-[300px]', 0, 4],
+  ['[&>svg]:size-[14px] data-[size=sm]:gap-x-[6px] *:py-[5px]', 0, 3],
+  ['// was text-[12px] and h-[49px]', 1, 1],
+  ['text-[#fff] text-[var(--x)] text-(--x) text-sm text-ui context-[3px]', 0, 0],
+  ['w-[50%] h-[calc(100%-4px)] max-[816px]:flex min-w-[68ch] rounded-[10px]', 0, 0],
+  ['leading-[18px] tracking-[0.02em] stop-[3px] blend-[2px] font-size-[3px]', 0, 0],
+];
+
+function selfCheckMatcher() {
+  const problems = [];
+  for (const [sample, text, spacing] of ARBITRARY_CANARY) {
+    const got = countArbitrary(sample);
+    if (got.text !== text || got.spacing !== spacing) {
+      problems.push(
+        `matcher canary ${JSON.stringify(sample)}: expected text ${text} / spacing ${spacing}, got ${got.text} / ${got.spacing}`,
+      );
+    }
+  }
+  return problems;
+}
+
 const rel = (p) => relative(WEB_SRC, p).split(sep).join('/');
 
-function walk(dir, extension, out = []) {
+function walk(dir, extensions, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) walk(path, extension, out);
-    else if (path.endsWith(extension)) out.push(path);
+    if (entry.isDirectory()) walk(path, extensions, out);
+    else if ([extensions].flat().some((e) => path.endsWith(e))) out.push(path);
   }
   return out;
 }
@@ -132,6 +260,7 @@ function tagsOf(source, tag) {
 function scanTree() {
   const cssFiles = walk(WEB_SRC, '.css');
   const tsxFiles = walk(WEB_SRC, '.tsx');
+  const arbitraryFiles = walk(WEB_SRC, ARBITRARY_EXTENSIONS);
 
   // D4 sanity: an empty scan means the walk broke (moved src? wrong cwd?),
   // and a missing carrier file means the whitelist went stale. Both are
@@ -139,6 +268,7 @@ function scanTree() {
   const problems = [];
   if (cssFiles.length === 0) problems.push('scan found no *.css under apps/web/src');
   if (tsxFiles.length === 0) problems.push('scan found no *.tsx under apps/web/src');
+  problems.push(...selfCheckMatcher());
   for (const w of WHITELIST) {
     if (!cssFiles.some((f) => rel(f) === w)) {
       problems.push(`whitelisted carrier file missing from tree: ${w}`);
@@ -169,12 +299,26 @@ function scanTree() {
     controlTotal += n;
   }
 
+  const arbitrary = { textTotal: 0, spacingTotal: 0, files: {} };
+  let arbitraryScanned = 0;
+  for (const f of arbitraryFiles) {
+    const r = rel(f);
+    if (ARBITRARY_EXCLUDED(r)) continue;
+    arbitraryScanned++;
+    const { text, spacing } = countArbitrary(readFileSync(f, 'utf8'));
+    if (text + spacing > 0) arbitrary.files[r] = { text, spacing };
+    arbitrary.textTotal += text;
+    arbitrary.spacingTotal += spacing;
+  }
+
   return {
     perFaceCss,
     controlFiles,
     controlTotal,
+    arbitrary,
     cssCount: cssFiles.length,
     tsxCount: tsxFiles.length,
+    arbitraryScanned,
   };
 }
 
@@ -188,8 +332,46 @@ function isNonNegativeInt(v) {
   return Number.isInteger(v) && v >= 0;
 }
 
+/** D4: the arbitraryValues ledger. Absent is allowed only where the caller
+ *  says so (a base baseline frozen before this ledger existed). */
+function validateArbitrary(av, label, { optional }) {
+  if (av === undefined && optional) return [];
+  if (av === null || typeof av !== 'object')
+    return [`${label}: arbitraryValues missing or not an object`];
+  const problems = [];
+  for (const key of ['textTotal', 'spacingTotal']) {
+    if (!isNonNegativeInt(av[key]))
+      problems.push(`${label}: arbitraryValues.${key} is not a non-negative integer`);
+  }
+  if (av.files === null || typeof av.files !== 'object') {
+    problems.push(`${label}: arbitraryValues.files missing or not an object`);
+    return problems;
+  }
+  const sum = { text: 0, spacing: 0 };
+  for (const [k, v] of Object.entries(av.files)) {
+    for (const key of ['text', 'spacing']) {
+      if (!isNonNegativeInt(v?.[key]))
+        problems.push(
+          `${label}: arbitraryValues.files["${k}"].${key} is not a non-negative integer`,
+        );
+      else sum[key] += v[key];
+    }
+  }
+  if (problems.length === 0) {
+    if (sum.text !== av.textTotal)
+      problems.push(
+        `${label}: arbitraryValues.files text sums to ${sum.text} but textTotal is ${av.textTotal}`,
+      );
+    if (sum.spacing !== av.spacingTotal)
+      problems.push(
+        `${label}: arbitraryValues.files spacing sums to ${sum.spacing} but spacingTotal is ${av.spacingTotal}`,
+      );
+  }
+  return problems;
+}
+
 /** D4: structural validation of a parsed baseline. Returns problem strings. */
-function validateBaseline(b, label) {
+function validateBaseline(b, label, { arbitraryOptional = false } = {}) {
   const problems = [];
   if (b === null || typeof b !== 'object') return [`${label}: baseline is not an object`];
   if (b.perFaceCss === null || typeof b.perFaceCss !== 'object') {
@@ -222,6 +404,7 @@ function validateBaseline(b, label) {
       `${label}: rawControls.files sums to ${sum} but rawControls.total is ${rc.total}`,
     );
   }
+  problems.push(...validateArbitrary(b.arbitraryValues, label, { optional: arbitraryOptional }));
   return problems;
 }
 
@@ -283,7 +466,9 @@ function loadBaseBaseline(sha) {
     console.error(`[ui-debt-gate] D4 baseline at base ${sha} is not valid JSON: ${err.message}`);
     process.exit(2);
   }
-  const problems = validateBaseline(parsed, `base ${sha.slice(0, 12)}`);
+  const problems = validateBaseline(parsed, `base ${sha.slice(0, 12)}`, {
+    arbitraryOptional: true,
+  });
   if (problems.length > 0) {
     for (const p of problems) console.error(`[ui-debt-gate] D4 ${p}`);
     process.exit(2);
@@ -306,15 +491,20 @@ function writeBaseline(scan) {
   const doc = {
     frozenFrom: { sha: currentSha(), date: new Date().toISOString().slice(0, 10) },
     scope:
-      'apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/',
+      'apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files',
     perFaceCss: sortedObject(scan.perFaceCss),
     rawControls: { total: scan.controlTotal, files: sortedObject(scan.controlFiles) },
+    arbitraryValues: {
+      textTotal: scan.arbitrary.textTotal,
+      spacingTotal: scan.arbitrary.spacingTotal,
+      files: sortedObject(scan.arbitrary.files),
+    },
   };
   writeFileSync(BASELINE_PATH, `${JSON.stringify(doc, null, 2)}\n`);
 
   const cssTotal = Object.values(doc.perFaceCss).reduce((a, b) => a + b, 0);
   console.log(
-    `[ui-debt-gate] baseline frozen: ${Object.keys(doc.perFaceCss).length} per-face css files / ${cssTotal} lines; ${doc.rawControls.total} bare control(s) in ${Object.keys(doc.rawControls.files).length} file(s). Written to ${BASELINE_REL}.`,
+    `[ui-debt-gate] baseline frozen: ${Object.keys(doc.perFaceCss).length} per-face css files / ${cssTotal} lines; ${doc.rawControls.total} bare control(s) in ${Object.keys(doc.rawControls.files).length} file(s); arbitrary values ${doc.arbitraryValues.textTotal} text + ${doc.arbitraryValues.spacingTotal} spacing in ${Object.keys(doc.arbitraryValues.files).length} file(s). Written to ${BASELINE_REL}.`,
   );
   if (previous) {
     const notes = [];
@@ -332,6 +522,13 @@ function writeBaseline(scan) {
       notes.push(
         `  controls ${doc.rawControls.total > totalBefore ? 'UP' : 'down'} total: ${totalBefore} -> ${doc.rawControls.total}`,
       );
+    }
+    for (const key of ['textTotal', 'spacingTotal']) {
+      const before = previous.arbitraryValues?.[key];
+      const now = doc.arbitraryValues[key];
+      if (before === undefined) notes.push(`  arbitrary +new ${key}: ${now}`);
+      else if (before !== now)
+        notes.push(`  arbitrary ${now > before ? 'UP' : 'down'} ${key}: ${before} -> ${now}`);
     }
     if (notes.length > 0) {
       console.log('[ui-debt-gate] delta vs previous baseline:');
@@ -363,11 +560,16 @@ function check(baseSha) {
   // one (so a branch cannot lift its own ceiling), else the in-tree file.
   let effective = inTree;
   let baseMode = 'in-tree only';
+  let arbitraryCeiling = inTree.arbitraryValues;
+  let arbitraryMode = '';
   if (baseSha) {
     const loaded = loadBaseBaseline(baseSha);
     if (loaded.mode === 'base') {
       effective = loaded.baseline;
       baseMode = `base ${baseSha.slice(0, 12)}`;
+      if (effective.arbitraryValues) arbitraryCeiling = effective.arbitraryValues;
+      else
+        arbitraryMode = ' (arbitraryValues: bootstrap, base predates the ledger — in-tree numbers)';
     } else {
       baseMode = `bootstrap (base ${baseSha.slice(0, 12)} has no ${BASELINE_REL})`;
     }
@@ -404,6 +606,27 @@ function check(baseSha) {
     shrunk.push(`bare controls total: ${allowedTotal} -> ${scan.controlTotal}`);
   }
 
+  // D5: arbitrary-value totals, with per-file deltas as diagnosis.
+  for (const [key, label] of [
+    ['text', 'arbitrary text sizes (text-[<len>])'],
+    ['spacing', 'arbitrary spacing/size (SPACING_UTILITIES-[<len>])'],
+  ]) {
+    const now = scan.arbitrary[`${key}Total`];
+    const allowed = arbitraryCeiling[`${key}Total`];
+    if (now > allowed) {
+      const grew = [];
+      for (const [file, counts] of Object.entries(scan.arbitrary.files)) {
+        const before = arbitraryCeiling.files?.[file]?.[key] ?? 0;
+        if (counts[key] > before) grew.push(`${file} ${before}->${counts[key]}`);
+      }
+      failures.push(
+        `D5 ${label}: ${now} total > baseline ${allowed}${grew.length > 0 ? ` (grew at: ${grew.join(', ')})` : ''} — use the DESIGN.md scale (text-page/heading/card-title/ui/meta/caption, 4px-grid spacing) instead of an arbitrary value`,
+      );
+    } else if (now < allowed) {
+      shrunk.push(`arbitrary ${key} total: ${allowed} -> ${now}`);
+    }
+  }
+
   // D3: the branch's own baseline must not sit higher than the base's.
   if (baseSha && effective !== inTree) {
     for (const [file, n] of Object.entries(inTree.perFaceCss)) {
@@ -419,12 +642,23 @@ function check(baseSha) {
         `D3 ${BASELINE_REL} rawControls.total raised vs base: ${totalBefore} -> ${totalNow}`,
       );
     }
+    if (effective.arbitraryValues) {
+      for (const key of ['textTotal', 'spacingTotal']) {
+        const now = inTree.arbitraryValues[key];
+        const before = effective.arbitraryValues[key];
+        if (now > before) {
+          failures.push(
+            `D3 ${BASELINE_REL} arbitraryValues.${key} raised vs base: ${before} -> ${now}`,
+          );
+        }
+      }
+    }
   }
 
   if (failures.length > 0) {
     for (const f of failures) console.log(`[ui-debt-gate] ${f}`);
     console.log(
-      `[ui-debt-gate] FAIL: ${failures.length} violation(s). During the #908 overhaul, build with components/ui/* + Tailwind; per-face css and bare controls may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write`,
+      `[ui-debt-gate] FAIL: ${failures.length} violation(s). Build with components/ui/* + Tailwind theme keys; per-face css, bare controls and arbitrary values may only shrink. After removing debt, re-freeze: node scripts/ui-debt-gate.mjs --write`,
     );
     process.exit(1);
   }
@@ -436,7 +670,7 @@ function check(baseSha) {
   }
   const cssTotal = Object.values(scan.perFaceCss).reduce((a, b) => a + b, 0);
   console.log(
-    `[ui-debt-gate] PASS: ${Object.keys(scan.perFaceCss).length} per-face css files / ${cssTotal} lines; ${scan.controlTotal} bare control(s) in ${Object.keys(scan.controlFiles).length} file(s); ${scan.cssCount} css + ${scan.tsxCount} tsx scanned. Baseline: ${baseMode}, frozen from ${(effective.frozenFrom?.sha ?? 'unknown').slice(0, 12)}.`,
+    `[ui-debt-gate] PASS: ${Object.keys(scan.perFaceCss).length} per-face css files / ${cssTotal} lines; ${scan.controlTotal} bare control(s) in ${Object.keys(scan.controlFiles).length} file(s); arbitrary values ${scan.arbitrary.textTotal} text + ${scan.arbitrary.spacingTotal} spacing in ${Object.keys(scan.arbitrary.files).length} file(s); ${scan.cssCount} css + ${scan.tsxCount} tsx + ${scan.arbitraryScanned} ts/tsx (arbitrary scope) scanned. Baseline: ${baseMode}${arbitraryMode}, frozen from ${(effective.frozenFrom?.sha ?? 'unknown').slice(0, 12)}.`,
   );
   process.exit(0);
 }

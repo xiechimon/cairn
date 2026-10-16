@@ -1,0 +1,4 @@
+# matcher drift simulated: LENGTH unit group (?:px|rem|em) -> (?:px)
+$ node scripts/ui-debt-gate.mjs
+[ui-debt-gate] D4 matcher canary "text-[0.8rem] text-[.75rem] text-[length:13px] text-[13px]/5": expected text 4 / spacing 0, got 2 / 0
+exit=2
