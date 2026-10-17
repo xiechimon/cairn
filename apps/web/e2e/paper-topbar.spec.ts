@@ -112,7 +112,9 @@ test('keyboard: Tab reaches all three controls with a visible focus ring; Enter 
 test('narrow window: the summary truncates, the controls stay on one row inside the bar', async ({
   page,
 }) => {
-  await page.setViewportSize({ width: 720, height: 732 });
+  // 680 = 432px of main beside the 248px Paper sidebar, the width the
+  // summary is meant to clip at
+  await page.setViewportSize({ width: 680, height: 732 });
   await page.goto('/app?scenario=01');
   const bar = await topbar(page).boundingBox();
   if (bar == null) throw new Error('missing bar');
