@@ -18,7 +18,7 @@
 import type { TodoRecord as WireTodo } from '@pacman/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { ApiError, api } from '../api/client.js';
 import {
   useApiMutations,
@@ -35,7 +35,13 @@ import { mapBranchInfo, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import { type BoardFilters, BoardSurface } from '../board/board.js';
-import { isInflightDoneGate } from '../board/columns.js';
+import {
+  COLUMN_PARAM,
+  COLUMNS,
+  isInflightDoneGate,
+  parseColumnParam,
+  withColumnParam,
+} from '../board/columns.js';
 import { moveTodo, resetTodoLocal } from '../board/dnd.js';
 import { DoneConfirmDialog } from '../board/done-confirm-dialog.js';
 import type { FilterChip, FilterDimension } from '../board/filter-panel.js';
@@ -84,6 +90,7 @@ export function BoardPage() {
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { search: rawSearch } = useLocation();
   const queryClient = useQueryClient();
   const { live, teamId } = useLiveData();
   const fixture = resolveScenario(searchParams);
@@ -120,6 +127,7 @@ export function BoardPage() {
   // 此前按 FIXED_TAGS 硬渲染 + 按它做白名单，live github 项目的真实 label
   // 既进不了弹层也活不过一次 URL 往返，类型轴对这些项目等于失效。
   const rawTags = searchParams.get('tags');
+  const onlyColumn = parseColumnParam(searchParams.get(COLUMN_PARAM));
   const rawProjects = searchParams.get('projects');
   const selectedProjects = useMemo(() => parseProjectsParam(rawProjects), [rawProjects]);
   const selectedProjectSet = useMemo(() => new Set(selectedProjects), [selectedProjects]);
@@ -261,9 +269,16 @@ export function BoardPage() {
     );
   }, [repoSource, selectedTags, selectedProjects, writeFilterParams]);
   const clearFilters = useCallback(() => {
-    if (selectedProjects.length === 0 && searchParams.get('tags') == null) return;
-    writeFilterParams([], []);
-  }, [selectedProjects, searchParams, writeFilterParams]);
+    if (selectedProjects.length === 0 && searchParams.get('tags') == null && onlyColumn == null)
+      return;
+    const rest = new URLSearchParams(searchParams);
+    for (const key of ['tags', 'projects', COLUMN_PARAM]) rest.delete(key);
+    navigate(`?${rest.toString()}`, { replace: true });
+  }, [selectedProjects, searchParams, onlyColumn, navigate]);
+  const clearColumn = useCallback(() => {
+    navigate({ search: withColumnParam(rawSearch, null) }, { replace: true });
+  }, [navigate, rawSearch]);
+  const onlyColumnName = COLUMNS.find((c) => c.id === onlyColumn)?.name;
 
   // New-task dialog (#66): fixture phase has no backend, so a saved task
   // lives in this client-side set — the card lands in 待开始 with the
@@ -300,6 +315,9 @@ export function BoardPage() {
   // 「全部」pill——那会把「当前无筛选」表达成一个筛选）。类型轴未就绪时
   // 不当生效项（同 filterActive 的就绪闸）。
   const chips: FilterChip[] = [
+    ...(onlyColumnName != null
+      ? [{ key: 'column', label: t(onlyColumnName), onClear: clearColumn }]
+      : []),
     ...(selectedTags.length > 0 && typeReady
       ? [{ key: 'type', label: `${t('类型')} · ${summarize(selectedTags)}`, onClear: clearTags }]
       : []),
@@ -685,7 +703,9 @@ export function BoardPage() {
       <AppSidebar
         fixture={fixture}
         todos={todos}
-        selected={chiefView === 'settings' ? 'none' : 'board'}
+        selected={
+          chiefView === 'settings' ? 'none' : onlyColumn === 'pending' ? 'attention' : 'board'
+        }
         searchPanel={false}
         onSearch={() => search.setOpen(true)}
         onNewTask={openNewTask}
@@ -739,6 +759,7 @@ export function BoardPage() {
           onResetIntent={openResetGate}
           onDoneIntent={openDoneGate}
           filters={filters}
+          onlyColumn={onlyColumn}
           tagsById={tagIndex.tagById}
           onNewTask={openNewTask}
         />

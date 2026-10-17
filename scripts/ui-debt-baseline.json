@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "16f8248a149fde59e4d0d964e409892e17ca8dca",
+    "sha": "156f86c09f4dba5b46db376e8cc3b8ef8ab387fc",
     "date": "2026-10-17"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 168,
-    "spacingTotal": 288,
+    "textTotal": 164,
+    "spacingTotal": 261,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -33,10 +33,6 @@
         "text": 1,
         "spacing": 0
       },
-      "board/project-avatar.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
       "board/quota-banner.tsx": {
         "text": 1,
         "spacing": 0
@@ -44,10 +40,6 @@
       "board/reset-confirm-dialog.tsx": {
         "text": 2,
         "spacing": 1
-      },
-      "board/sidebar.tsx": {
-        "text": 3,
-        "spacing": 27
       },
       "chief/chief-agent-dialog.tsx": {
         "text": 5,

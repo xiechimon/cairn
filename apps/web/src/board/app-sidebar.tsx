@@ -21,7 +21,7 @@ import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-
 import { useNewTaskHotkey } from '../overlays/hotkeys.js';
 import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { attentionCount } from './columns.js';
+import { attentionCount, countInColumn, openCountByProject } from './columns.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
 export const SIDEBAR_STORAGE_KEY = 'pacman.sidebar-collapsed'; // mirrored in e2e (sidebar-nav / collapse-family specs)
@@ -87,8 +87,19 @@ export function AppSidebar({
       return next;
     });
   }, []);
-  const resolvedTodos = todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos);
-  const machineOnline = live ? (machinesQ.data ?? []).some((m) => m.online) : fixture.chief != null;
+  const resolvedTodos = useMemo(
+    () => todos ?? (live ? (todosQ.data ?? []).map(toDisplayTodo) : fixture.todos),
+    [todos, live, todosQ.data, fixture.todos],
+  );
+  const projectCounts = useMemo(() => openCountByProject(resolvedTodos), [resolvedTodos]);
+  const fixtureMachines = fixture.resources?.machines;
+  const machinesOnline = live
+    ? (machinesQ.data ?? []).filter((m) => m.online).length
+    : fixtureMachines != null
+      ? fixtureMachines.filter((m) => m.online === true).length
+      : fixture.chief != null
+        ? 1
+        : 0;
   // #389: 内部全局新建 dialog —— 只在路由未传 onNewTask 时渲染（board/
   // project 保自有面）；C 热键与侧栏行共用解析后的 opener，单点注册。
   // XMON-93：面体住隔离根叶子（open/正文态不进侧栏渲染），opener 走 ref。
@@ -102,11 +113,13 @@ export function AppSidebar({
         collapsed={collapsed}
         onToggle={toggle}
         attention={attentionCount(resolvedTodos)}
+        running={countInColumn(resolvedTodos, 'building')}
+        machinesOnline={machinesOnline}
+        projectCounts={projectCounts}
         onSearch={onSearch ?? (() => search.setOpen(true))}
         onNewTask={openNewTask}
         usageNav={fixture.usageNav === true}
         selected={selected}
-        machineOnline={machineOnline}
         projects={projects}
       />
       {searchPanel && (

@@ -1,0 +1,193 @@
+{
+  "checks": [
+    {
+      "ok": true,
+      "label": "POST /api/projects pacman",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 侧栏改版验收 A",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 侧栏改版验收 B",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 侧栏改版验收 C",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST /api/projects pacman-gh-probe",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 探针任务 D",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 探针任务 E",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST /api/projects 凭证链路验证-一个很长很长的项目名字用来压测截断",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "POST todo 凭证任务 F",
+      "detail": 201
+    },
+    {
+      "ok": true,
+      "label": "expanded sidebar is 248px",
+      "detail": 248
+    },
+    {
+      "ok": true,
+      "label": "需要我处理 badge = 待处理 column",
+      "detail": "2/2"
+    },
+    {
+      "ok": true,
+      "label": "project rows count unfinished todos (done excluded)",
+      "detail": "[\"3\",\"2\",null]"
+    },
+    {
+      "ok": true,
+      "label": "user row second line carries the running count",
+      "detail": "0 台机器在线 · 执行中 1"
+    },
+    {
+      "ok": true,
+      "label": "资源 open state persisted"
+    },
+    {
+      "ok": true,
+      "label": "资源 stays open after reload"
+    },
+    {
+      "ok": true,
+      "label": "需要我处理 shows only the 待处理 column"
+    },
+    {
+      "ok": true,
+      "label": "需要我处理 row is active"
+    },
+    {
+      "ok": true,
+      "label": "chip clears back to four columns"
+    },
+    {
+      "ok": true,
+      "label": "chip drops the column param",
+      "detail": "http://127.0.0.1:5273/app"
+    },
+    {
+      "ok": true,
+      "label": "collapsed rail is 40px",
+      "detail": 40
+    }
+  ],
+  "created": [
+    {
+      "projectId": "jL4pzagGvgRmdvRO00MK7",
+      "project": "pacman",
+      "todoId": "mab7ghbIKj8VT1ajTFW5A",
+      "title": "侧栏改版验收 A"
+    },
+    {
+      "projectId": "jL4pzagGvgRmdvRO00MK7",
+      "project": "pacman",
+      "todoId": "6wF_Fuz8AFoB7hLZqleUI",
+      "title": "侧栏改版验收 B"
+    },
+    {
+      "projectId": "jL4pzagGvgRmdvRO00MK7",
+      "project": "pacman",
+      "todoId": "P5agH2eFS1lO29XcI-6WP",
+      "title": "侧栏改版验收 C"
+    },
+    {
+      "projectId": "OI5m4o6SFJ9SJYGtQOxW7",
+      "project": "pacman-gh-probe",
+      "todoId": "URdc7SBgwaL5Iuk9aV-iy",
+      "title": "探针任务 D"
+    },
+    {
+      "projectId": "OI5m4o6SFJ9SJYGtQOxW7",
+      "project": "pacman-gh-probe",
+      "todoId": "beztnWbmztRqXR9ztVRMz",
+      "title": "探针任务 E"
+    },
+    {
+      "projectId": "B6L8Acnnk6upvbaOOQp2-",
+      "project": "凭证链路验证-一个很长很长的项目名字用来压测截断",
+      "todoId": "2S2h28fvooJVDHgv94dDl",
+      "title": "凭证任务 F"
+    }
+  ],
+  "dbRows": [
+    {
+      "id": "mab7ghbIKj8VT1ajTFW5A",
+      "title": "侧栏改版验收 A",
+      "phase": "todo",
+      "projectId": "jL4pzagGvgRmdvRO00MK7"
+    },
+    {
+      "id": "6wF_Fuz8AFoB7hLZqleUI",
+      "title": "侧栏改版验收 B",
+      "phase": "confirm",
+      "projectId": "jL4pzagGvgRmdvRO00MK7"
+    },
+    {
+      "id": "P5agH2eFS1lO29XcI-6WP",
+      "title": "侧栏改版验收 C",
+      "phase": "building",
+      "projectId": "jL4pzagGvgRmdvRO00MK7"
+    },
+    {
+      "id": "2S2h28fvooJVDHgv94dDl",
+      "title": "凭证任务 F",
+      "phase": "done",
+      "projectId": "B6L8Acnnk6upvbaOOQp2-"
+    },
+    {
+      "id": "URdc7SBgwaL5Iuk9aV-iy",
+      "title": "探针任务 D",
+      "phase": "failed",
+      "projectId": "OI5m4o6SFJ9SJYGtQOxW7"
+    },
+    {
+      "id": "beztnWbmztRqXR9ztVRMz",
+      "title": "探针任务 E",
+      "phase": "todo",
+      "projectId": "OI5m4o6SFJ9SJYGtQOxW7"
+    }
+  ],
+  "projectRows": [
+    {
+      "name": "pacman",
+      "count": "3",
+      "tile": "rgb(192, 106, 67)"
+    },
+    {
+      "name": "pacman-gh-probe",
+      "count": "2",
+      "tile": "rgb(125, 139, 90)"
+    },
+    {
+      "name": "凭证链路验证-一个很长很长的项目名字用来压测截断",
+      "count": null,
+      "tile": "rgb(107, 122, 143)"
+    }
+  ],
+  "machineStatus": "0 台机器在线 · 执行中 1"
+}

@@ -9,7 +9,8 @@ import { type Locator, expect, type Page, test } from '@playwright/test';
 // #163 replaces the frozen-capture geometry assertion (224×244 @ (8,410),
 // r7 17/16d) with the anchoring law — precedent: #135 re-cut the
 // visual-polish assertions with 裁决 v2. The menu is bottom-anchored above
-// the avatar chip: the horizontal capture geometry (x8, 224 wide) stands,
+// the avatar chip: 224 wide, its left edge on the chip's left edge (Paper
+// Grouped sidebar: the chip sits inside the 12px sidebar padding),
 // the bottom edge rides a viewport-height-invariant distance, and the panel
 // never covers the chip at any viewport height (the dogfood symptom: the
 // frozen top:410px buried the avatar on short windows). Both chip shapes
@@ -90,7 +91,7 @@ async function expectAnchoredAboveChip(page: Page, chip: Locator) {
   expect(box).not.toBeNull();
   expect(row).not.toBeNull();
   expect(img).not.toBeNull();
-  expect(box!.x).toBe(8);
+  expect(box!.x).toBe(row!.x);
   expect(box!.width).toBe(224);
   const gapToRowTop = row!.y - (box!.y + box!.height);
   expect(gapToRowTop).toBeGreaterThanOrEqual(3); // family 4px, subpixel-safe

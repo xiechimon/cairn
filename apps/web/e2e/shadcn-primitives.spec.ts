@@ -73,7 +73,8 @@ test('avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝�
   expect(probe.rootBox.h).toBe(24);
   expect(probe.imgBox.w).toBe(24);
   expect(probe.imgBox.h).toBe(24);
-  expect(probe.chipBox.h).toBe(44);
+  // Paper user row: name line + machine-status line (DESIGN.md 侧栏 item 5)
+  expect(probe.chipBox.h).toBe(52);
 });
 
 test('kbd 落点：悬浮提示 = registry Tooltip+Kbd 组合，静息不挂载 / 悬浮浮出', async ({ page }) => {
