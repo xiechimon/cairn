@@ -26,9 +26,10 @@ const input = (page: Page) => panel(page).getByRole('textbox');
 const litPill = (page: Page) =>
   page.getByRole('complementary', { includeHidden: true }).locator('[aria-current="page"]');
 
-/** Background of the selected row's ::before pill layer. */
+/** Background of the selected row (Paper Grouped sidebar: the row itself
+ *  carries the sheet fill; the ::before pill layer retired). */
 function pillBg(locator: Locator) {
-  return locator.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+  return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
 /** #159: the hovered row lights with the canon pill — its background

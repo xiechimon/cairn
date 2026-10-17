@@ -158,8 +158,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await settled(page);
     const main = await page.locator('.board-main').boundingBox();
     expect(main).not.toBeNull();
-    // 全宽：侧栏 288 之外的整段，窗是覆盖层不让位
-    expect(main!.width).toBeCloseTo(1440 - 288, 0);
+    // 全宽：侧栏 248 之外的整段，窗是覆盖层不让位
+    expect(main!.width).toBeCloseTo(1440 - 248, 0);
 
     const open = await page.locator('.board-scroller').evaluate((el) => ({
       scrollable: el.scrollWidth > el.clientWidth,
@@ -209,7 +209,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       const content = page.locator(col);
       await expect(content).toBeVisible();
       const closed = await content.boundingBox();
-      expect(closed!.width).toBeCloseTo(1152, 0);
+      expect(closed!.width).toBeCloseTo(1440 - 248, 0);
 
       await fab(page).click();
       await settled(page);
@@ -219,12 +219,12 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       expect(floating!.width).toBeCloseTo(WIN_BOX.width, 0);
       expect(floating!.height).toBeCloseTo(WIN_BOX.height, 0);
       const open = await content.boundingBox();
-      expect(open!.width).toBeCloseTo(1152, 0);
+      expect(open!.width).toBeCloseTo(1440 - 248, 0);
 
       await minimize(page).click();
       await expect(drawer(page)).toBeHidden();
       const restored = await content.boundingBox();
-      expect(restored!.width).toBeCloseTo(1152, 0);
+      expect(restored!.width).toBeCloseTo(1440 - 248, 0);
       expect(restored!.x).toBeCloseTo(closed!.x, 0);
     });
   }
@@ -249,13 +249,13 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // the center column stays fluid and unchanged by the overlay
     const center = await page.locator('.detail-center').boundingBox();
     expect(center!.width).toBeCloseTo(restingCenter!.width, 0);
-    expect(center!.width).toBeCloseTo(1440 - 288 - 488, 0);
+    expect(center!.width).toBeCloseTo(1440 - 248 - 488, 0);
 
     await minimize(page).click();
     await expect(drawer(page)).toBeHidden();
     await expect(page.locator('.detail-right')).toBeVisible();
     const restored = await page.locator('.detail-center').boundingBox();
-    expect(restored!.width).toBe(1440 - 288 - 488);
+    expect(restored!.width).toBe(1440 - 248 - 488);
   });
 
   test('hero examples: the four canon prompt cards, inert on the fixture face', async ({

@@ -138,6 +138,8 @@ test('live face: a rejected send keeps the draft in the box and in storage (#631
 test('live face: minimize and SPA route switches keep the draft (D6 zero regression)', async ({
   page,
 }) => {
+  // 资源 folds by default in the Grouped sidebar; open it to reach 技能
+  await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
   const { drawer, input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);

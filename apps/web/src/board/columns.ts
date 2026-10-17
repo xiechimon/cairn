@@ -182,6 +182,41 @@ export function cardFace(todo: TodoRecord): CardFace {
  *  review+awaitingReply cards count too — the old badge skipped them while
  *  the fold parked them in 执行中, r8 55/57). */
 export function attentionCount(todos: TodoRecord[]): number {
-  const pending = COLUMNS.find((c) => c.id === 'pending');
-  return pending == null ? 0 : todos.filter(pending.accepts).length;
+  return countInColumn(todos, 'pending');
+}
+
+export function countInColumn(todos: TodoRecord[], columnId: string): number {
+  const column = COLUMNS.find((c) => c.id === columnId);
+  return column == null ? 0 : todos.filter(column.accepts).length;
+}
+
+/** Unfinished todos per project (sidebar project row counts). */
+export function openCountByProject(todos: TodoRecord[]): Map<string, number> {
+  const done = COLUMNS.find((c) => c.id === 'done');
+  const counts = new Map<string, number>();
+  for (const todo of todos) {
+    if (done?.accepts(todo)) continue;
+    counts.set(todo.projectId, (counts.get(todo.projectId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** `?column=<id>` narrows the board to one column (sidebar 需要我处理 =
+ *  `pending`). */
+export const COLUMN_PARAM = 'column';
+
+export function parseColumnParam(raw: string | null): string | null {
+  return raw != null && COLUMNS.some((c) => c.id === raw) ? raw : null;
+}
+
+/** Sets or drops the column param on a raw search string, leaving every
+ *  other segment byte-identical (the tags/projects params keep literal
+ *  commas, which URLSearchParams would re-encode). */
+export function withColumnParam(search: string, column: string | null): string {
+  const parts = search
+    .replace(/^\?/, '')
+    .split('&')
+    .filter((part) => part !== '' && !part.startsWith(`${COLUMN_PARAM}=`));
+  if (column != null) parts.push(`${COLUMN_PARAM}=${column}`);
+  return parts.length === 0 ? '' : `?${parts.join('&')}`;
 }

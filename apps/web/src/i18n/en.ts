@@ -26,6 +26,9 @@ export const EN: Record<string, string> = {
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
   定时: 'Schedules',
+  需要我处理: 'Needs me',
+  '{n} 台机器在线': '{n} machines online',
+  '执行中 {n}': '{n} running',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   资源: 'Resources',
   新建项目: 'New project',

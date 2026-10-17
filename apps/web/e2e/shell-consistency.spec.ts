@@ -134,6 +134,8 @@ test.describe('sidebar form is route-invariant', () => {
   test('expanded sidebar keeps identical geometry across /app ↔ /app/team ↔ resources hops', async ({
     page,
   }) => {
+    // 资源 folds by default in the Grouped sidebar; open it to reach 技能
+    await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
@@ -160,15 +162,18 @@ test.describe('sidebar form is route-invariant', () => {
 
     await page.getByRole('link', { name: 'Pacman' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
-    // the active pill repaints the row's background only. The r7 12 pill box
-    // (x8 y6 w272 h32) is pinned in sidebar-seam.spec.ts; this is the content
-    // *inside* it — the icon and the name must not drift as the pill lights.
+    // the active face repaints the row's background only (Paper Grouped
+    // sidebar: sheet + hairline); the icon and the name must not drift as it
+    // lights.
     await expect(page.locator(ROUTE_ANCHOR['/app/team'])).toBeVisible();
     await expect.poll(() => headContentX(page)).toEqual(board);
   });
 
   test('collapsed rail survives route hops (storage-backed on every shell)', async ({ page }) => {
-    await page.addInitScript((k) => localStorage.setItem(k, '1'), SIDEBAR_KEY);
+    await page.addInitScript((k) => {
+      localStorage.setItem(k, '1');
+      localStorage.setItem('pacman.sidebarResourcesCollapsed', '0');
+    }, SIDEBAR_KEY);
     await page.goto('/app?scenario=03');
     const rail = page.getByRole('complementary');
     const railBox = await captureSidebarBox(page, rail, '/app');

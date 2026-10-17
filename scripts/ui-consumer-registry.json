@@ -90,6 +90,34 @@
       "role": "action-link",
       "reason": "Card action text link (重试/确认计划/审阅/回复/开始). DESIGN.md 按钮: card actions are accent text links, no solid buttons on cards. Hover swaps the ink to --spot-text-on-tint because accent on --accent-hover is 4.25.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99); hover --spot-text-on-tint on --accent-hover 6.63 (PR #1369 hand-over)"
+    },
+    {
+      "file": "apps/web/src/board/sidebar.tsx",
+      "anchor": "ring-1 ring-border [&>svg:first-child]:text-(--card-button)",
+      "role": "indicator",
+      "reason": "Active sidebar row icon. DESIGN.md 侧栏: active row = sheet + hairline + accent icon.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+    },
+    {
+      "file": "apps/web/src/board/sidebar.tsx",
+      "anchor": "const RAIL_ACTIVE = `bg-background text-(--card-button)",
+      "role": "indicator",
+      "reason": "Collapsed-rail twin of the active row icon (icon-only rows).",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+    },
+    {
+      "file": "apps/web/src/board/sidebar.tsx",
+      "anchor": "${RAIL_BTN} text-(--card-button)",
+      "role": "indicator",
+      "reason": "Rail 新任务 plus glyph. DESIGN.md 侧栏: 新任务 carries a terracotta plus.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+    },
+    {
+      "file": "apps/web/src/board/sidebar.tsx",
+      "anchor": "size-4 flex-none text-(--card-button)",
+      "role": "indicator",
+      "reason": "Expanded 新任务 button plus glyph (DESIGN.md 侧栏 item 2).",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
     }
   ]
 }
