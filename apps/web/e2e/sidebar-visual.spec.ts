@@ -133,7 +133,7 @@ for (const theme of ['light', 'dark'] as const) {
     const sidebarBg = await page.evaluate(
       () => getComputedStyle(document.querySelector('aside')!).backgroundColor,
     );
-    await page.getByRole('link', { name: '定时' }).hover();
+    await page.getByRole('complementary').getByRole('link', { name: '定时' }).hover();
     await page.waitForTimeout(300); // the 150ms color step settles
     const hoverBg = await page.evaluate((rowsSel) => {
       const el = [...document.querySelectorAll(rowsSel)].find((r) => r.matches(':hover'));

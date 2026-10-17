@@ -102,18 +102,22 @@ async function openTypePopover(page: Page) {
   await expect(typePopover(page)).toBeVisible();
 }
 
-test('旧场景（无 projectNames）不渲染仓库面；右动作区恰好一钮 = 无底色类型钮；+任务 不存在', async ({
+test('旧场景（无 projectNames）不渲染仓库面；顶栏两钮 = 无底色筛选钮 + 新任务胶囊', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
   // 旧仓库筛选条的语义负钉：无筛选时顶栏不挂任何维度 chip
   await expect(chipsBar(page)).toHaveCount(0);
   const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button')).toHaveCount(1);
+  await expect(banner.getByRole('button')).toHaveCount(2);
   await expect(typeBtn(page)).toBeVisible();
-  // 「+ 任务」全族非存在（第三入口撤除，防单面复活漏网）——顶栏内不得
-  // 出现任何名含「任务」的钮（侧栏 新任务 行在 banner 外，不受累）
-  await expect(banner.getByRole('button', { name: /任务/ })).toHaveCount(0);
+  // Paper 顶栏的唯一主操作 = 墨色胶囊「新任务」（DESIGN.md 布局与间距），
+  // 不是筛选面的一部分；名含「任务」的钮恰一个
+  await expect(banner.getByRole('button', { name: /任务/ })).toHaveCount(1);
+  await expect(banner.getByRole('button', { name: '新任务' })).toHaveAttribute(
+    'data-variant',
+    'default',
+  );
   // 无底色材质：ghost 变体，rest 态背景透明（与主操作实底材质区分）
   await expect(typeBtn(page)).toHaveAttribute('data-variant', 'ghost');
   const bg = await typeBtn(page).evaluate((el) => getComputedStyle(el).backgroundColor);

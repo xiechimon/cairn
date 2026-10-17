@@ -1,0 +1,42 @@
+[
+  {
+    "name": "N=0: quiet line",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "name": "wire: two todos in failed",
+    "ok": true,
+    "detail": "failed=2"
+  },
+  {
+    "name": "N>0: summary = 待处理 column count",
+    "ok": true,
+    "detail": "2 项等你处理 / column 2"
+  },
+  {
+    "name": "topbar height 56",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "name": "新任务 pill opens the new-task dialog",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "name": "filter to project B: summary follows the column",
+    "ok": true,
+    "detail": "没有等你处理的事"
+  },
+  {
+    "name": "filter badge shows 1",
+    "ok": true,
+    "detail": null
+  },
+  {
+    "name": "定时 navigates to /app/schedules",
+    "ok": true,
+    "detail": null
+  }
+]

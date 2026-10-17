@@ -56,7 +56,10 @@ test.describe('sidebar seam + full-width divider (dogfood 裁决 v2)', () => {
       expect(m.navTop).toBe(43);
       expect(m.navBorderTopW).toBe('1px');
       expect(m.navBorderTopColor).toBe(m.topbarBorderBColor);
-      expect(m.topbarH).toBe(44);
+      // Paper 顶栏（DESIGN.md 布局与间距）：board 顶栏 56px，下边线不再与
+      // 侧栏团队行分隔线同行；侧栏随 Grouped 重排（paper-redesign-plan PR 5）
+      // 再定这条横线的去留，其它页面顶栏仍是 44（PR 6 统一）。
+      expect(m.topbarH).toBe(56);
     });
 
     test(`team page: the r7 12 active pill geometry survives the divider row (${theme})`, async ({ page }) => {
