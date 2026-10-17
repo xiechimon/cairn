@@ -196,7 +196,9 @@ async function seedFailedTodo(
 
 async function openBoard(): Promise<void> {
   await page.goto(`${server.url}/app`);
-  await pexpect(page.getByRole('button', { name: '新任务' })).toBeVisible({ timeout: 30_000 });
+  await pexpect(
+    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 async function openDetailByTitle(title: string): Promise<void> {
@@ -284,7 +286,7 @@ afterAll(async () => {
 describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假机器 wire）', () => {
   test('① 保存并开始：一次点击进派发流，在飞态拒重复编排', async () => {
     await openBoard();
-    await page.getByRole('button', { name: '新任务' }).click();
+    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
     await pexpect(page.locator('.new-task-spec')).toBeVisible();
     await page.locator('.new-task-spec').fill(SPECS.oneClick);
     await page.locator('.new-task-dialog').getByRole('button', { name: '保存并开始' }).click();
@@ -422,7 +424,9 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
     await pexpect(unavailable).toHaveAttribute('data-state', 'not-found');
     await unavailable.getByRole('button', { name: '回看板' }).click();
     await pexpect(page).toHaveURL(/\/app$/);
-    await pexpect(page.getByRole('button', { name: '新任务' })).toBeVisible();
+    await pexpect(
+      page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+    ).toBeVisible();
 
     // 查询失败（网络层拒绝）：改前同为空白壳；改后 = error 态 + 重试钮，
     // 重试放通后页面自愈进正常详情（用②的失败卡——正是生产白屏那张的形态）。
