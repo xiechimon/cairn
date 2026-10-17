@@ -9,8 +9,8 @@ import { expect, type Page, test } from '@playwright/test';
 // 布局几何只由 CSS 像素决定，devicePixelRatio 不参与本链路）。
 // 每条用例钉一个失败方式，全部断言几何，不断言 CSS 数值：
 // 1. 常态窄视口地板仍接管：110%/120%/125% 三档（125% = 200px 地板的
-//    实测极限档；288 sidebar 后 (1152−288−34−42)/4 ≈ 197 < 200 → 125%
-//    改走诚实横滚，见下方专测；120% (1200) 仍 fit）scroller 横溢
+//    实测极限档；248 sidebar 后 (1152−248−34−42)/4 ≈ 207 ≥ 200 → 125%
+//    四列也 fit，见下方专测；120% (1200) 仍 fit）scroller 横溢
 //    或第 4 列不完整落窗（用户报障本体）
 // 2. 页面级漏溢：任一档位 documentElement.scrollWidth > clientWidth
 //    （三层 overflow 必须把一切兜在 .board-scroller 里）
@@ -81,13 +81,15 @@ test.describe('natural-state board fits the zoomed-out-equivalent viewports (#10
     });
   }
 
-  test('125% zoom (1152): 288 sidebar puts flow under floor — honest scroll', async ({ page }) => {
+  test('125% zoom (1152): 248 sidebar keeps the flow above the floor — four columns fit', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1152, height: 732 });
     await page.goto(STRESS);
     await page.waitForSelector('[data-column]');
     const m = await measure(page);
     for (const c of m.columns) expect(c.width).toBeGreaterThanOrEqual(NATURAL_FLOOR - 1);
-    expect(m.scrollWidth).toBeGreaterThan(m.clientWidth);
+    expect(m.scrollWidth).toBeLessThanOrEqual(m.clientWidth);
     expect(await pageSpill(page)).toBeLessThanOrEqual(0);
   });
 
@@ -99,7 +101,7 @@ test.describe('natural-state board fits the zoomed-out-equivalent viewports (#10
     await page.waitForSelector('[data-column]');
 
     // 失败方式 3：把地板整个摘掉的作弊修法。1024 常态可用
-    // 1024−288 = 736，流值 (736−76)/4 = 165 < 200 → 下限必须接管：
+    // 1024−248 = 776，流值 (776−76)/4 = 175 < 200 → 下限必须接管：
     // 列守 200、溢出走 scroller 诚实横滚（#692 语义的常态延伸）。
     const m = await measure(page);
     for (const c of m.columns) expect(c.width).toBeGreaterThanOrEqual(NATURAL_FLOOR - 1);

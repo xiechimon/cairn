@@ -22,9 +22,22 @@ declare global {
   }
 }
 
-/** Computed background of a row's ::before pill layer. */
+/** Computed background of a row (Paper Grouped sidebar: the row carries
+ *  its own fill; the ::before pill layer retired). */
 function pillBg(locator: Locator) {
-  return locator.evaluate((el) => getComputedStyle(el, '::before').backgroundColor);
+  return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+}
+
+/** A token resolved to its computed rgb()/rgba() form. */
+function tokenBg(page: Page, token: string) {
+  return page.evaluate((v) => {
+    const el = document.createElement('div');
+    el.style.backgroundColor = `var(${v})`;
+    document.body.append(el);
+    const out = getComputedStyle(el).backgroundColor;
+    el.remove();
+    return out;
+  }, token);
 }
 
 /** Plant the canary after load; any document navigation wipes it. */
@@ -50,6 +63,8 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
 });
 
 test('subrow and team name hop client-side too', async ({ page }) => {
+  // 资源 folds by default in the Grouped sidebar; open it to reach 技能
+  await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
@@ -100,7 +115,7 @@ test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async 
   await expect(page.getByRole('complementary')).toBeVisible();
 });
 
-test('hover tints the row pill — dark default + light theme', async ({ page }) => {
+test('hover tints the row — dark default + light theme', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
 
@@ -114,11 +129,11 @@ test('hover tints the row pill — dark default + light theme', async ({ page })
   await page.goto('/app?scenario=01');
   const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await lightRow.hover();
-  // --sidebar-hover light = 5% warm ink
-  await expect.poll(() => pillBg(lightRow)).toBe('rgba(28, 25, 21, 0.05)');
+  // --sidebar-hover light = DESIGN.md hover #ebe4d8 (Paper Grouped sidebar)
+  await expect.poll(() => pillBg(lightRow)).toBe('rgb(235, 228, 216)');
 });
 
-test('rail hover tints the 24px pill', async ({ page }) => {
+test('rail hover tints the row', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
@@ -128,16 +143,17 @@ test('rail hover tints the 24px pill', async ({ page }) => {
   await expect.poll(() => pillBg(row)).toBe('rgba(255, 252, 248, 0.05)');
 });
 
-test('selected row keeps its own pill under hover', async ({ page }) => {
+test('selected row keeps its sheet fill under hover', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const board = page.getByRole('link', { name: '工作台' });
   await expect(board).toHaveAttribute('aria-current', 'page');
 
+  const sheet = await tokenBg(page, '--background');
   await board.hover();
-  // past the 150ms step: the ::before layer keeps the deeper selected tint
-  // (--sidebar-active, #128) — hover must not wash it back to the hover
+  // past the 150ms step: the active row keeps the sheet fill (DESIGN.md
+  // 侧栏: active = sheet + hairline) — hover must not wash it to the hover
   // step
   await page.waitForTimeout(250);
-  expect(await pillBg(board)).toBe('rgba(255, 252, 248, 0.1)');
+  expect(await pillBg(board)).toBe(sheet);
   await expect(board).toHaveAttribute('aria-current', 'page');
 });

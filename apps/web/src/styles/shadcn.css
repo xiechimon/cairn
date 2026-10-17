@@ -298,9 +298,9 @@
   --border: #ece5da;
   --input: #cbc5c1;
   --ring: #8f8985;
-  /* sidebar interaction ladder (#128), light side of the alpha ladder —
-     warm-ink steps over the sidebar surface, hover 5% / selected 10% */
-  --sidebar-hover: rgb(28 25 21 / 0.05);
+  /* sidebar row hover = DESIGN.md hover (Paper Grouped sidebar); selected
+     stays on the #128 alpha ladder for surfaces that still read it */
+  --sidebar-hover: var(--secondary);
   --sidebar-active: rgb(28 25 21 / 0.1);
   /* 定版亮侧 surface-tertiary 与 secondary 分档（不再别名压缩）：嵌入控件底
      深一档；press = tertiary 一档深（#629） */

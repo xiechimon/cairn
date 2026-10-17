@@ -9,7 +9,7 @@
 // route); the sidebar is the shared AppSidebar, so its geometry/behavior
 // matches the board's exactly.
 // #946: pages.css 清零——本壳的全部几何/配色迁为 token utility（值 =
-// 原规则等值迁移）；page-shell/page-main-col/page-topbar/
+// 原规则等值迁移）；page-shell/page-main-col/
 // page-tab(s-group) 类名留存 DOM：跨域 spec 的既有定位别名（#910 裁定 1
 // 两级制下 spec 载体已迁语义位；零规则别名的终摘 = #1036 dead-class 闸，
 // 仍被 spec 命中的名字由闸的 selector-exempt 台账钉住）。page-main
@@ -113,7 +113,7 @@ export function PageShell({
           references, final pick under the #1036 dead-class gate. */}
       <div className="relative flex min-w-0 flex-1 bg-(--card)">
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
-          <header className="page-topbar relative flex h-11 flex-none items-center border-b border-(--border) pl-3">
+          <header className="relative flex h-11 flex-none items-center border-b border-(--border) pl-3">
             <Link
               className="flex size-7 flex-none items-center justify-center text-(--text-tertiary) no-underline"
               to={{ pathname: '/app', search }}

@@ -59,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(w).toBe('500');
   });
 
-  test(`sidebar header carries the Pacman brand mark + name (${theme})`, async ({ page }) => {
+  test(`sidebar header carries the Pacman brand tile + name (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app?scenario=01');
 
@@ -70,21 +70,33 @@ for (const theme of ['light', 'dark'] as const) {
       if (!row || !mark || !name) throw new Error('sidebar brand head missing');
       const ms = getComputedStyle(mark);
       const r = mark.getBoundingClientRect();
+      const resolve = (v: string) => {
+        const el = document.createElement('div');
+        el.style.backgroundColor = v;
+        document.body.append(el);
+        const out = getComputedStyle(el).backgroundColor;
+        el.remove();
+        return out;
+      };
       return {
-        maskImage: ms.getPropertyValue('mask-image') || ms.getPropertyValue('-webkit-mask-image'),
-        // the glyph paints in the row ink through the mask
-        markPaint: ms.backgroundColor,
-        rowInk: getComputedStyle(row).color,
+        markText: mark.textContent,
+        markBg: ms.backgroundColor,
+        markInk: ms.color,
+        accent: resolve('var(--card-button)'),
+        onAccent: resolve('var(--text-on-accent)'),
+        markFont: ms.fontFamily,
         markBox: { w: r.width, h: r.height },
         nameText: name.textContent,
         nameHref: name.getAttribute('href'),
       };
     });
-    expect(m.maskImage).toContain('/logo.svg');
-    expect(m.markPaint).toBe(m.rowInk);
-    expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
-    expect(m.markBox).toEqual({ w: 16, h: 16 });
-    expect(m.nameText).toBe('Pacman');
+    // DESIGN.md 侧栏 item 1: accent tile, white (on-accent) serif initial
+    expect(m.markText).toBe('P');
+    expect(m.markBg).toBe(m.accent);
+    expect(m.markInk).toBe(m.onAccent);
+    expect(m.markFont).toContain('sourceSerif4');
+    expect(m.markBox).toEqual({ w: 24, h: 24 });
+    expect(m.nameText).toContain('Pacman');
     // the head row keeps its /app/team navigation law
     expect(m.nameHref).toContain('/app/team');
   });
@@ -105,26 +117,35 @@ for (const theme of ['light', 'dark'] as const) {
     expect(hovered).toEqual(rest);
   });
 
-  test(`the sidebar collapse toggle shows no hover face (${theme})`, async ({ page }) => {
+  test(`the sidebar collapse toggle rests bare and shows the row hover on hover (${theme})`, async ({
+    page,
+  }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const read = () =>
       page.evaluate(() => {
         const cs = getComputedStyle(document.querySelector('.sidebar-team-collapse')!);
-        return { bg: cs.backgroundColor, shadow: cs.boxShadow, color: cs.color };
+        return { bg: cs.backgroundColor, shadow: cs.boxShadow };
       });
     const rest = await read();
-    // the open sidebar's collapse toggle carries no surface of its own: no
-    // background and no shadow at rest — the head row it sits in is the whole
-    // separation. Same law as .res-back above, and the reason the hover tint
-    // is banned here: over the row's own fill it reads as a shadow.
+    // no surface of its own at rest
     expect(rest.bg).toBe('rgba(0, 0, 0, 0)');
     expect(rest.shadow).toBe('none');
 
+    // Paper Grouped sidebar: the workspace row's icon buttons take the
+    // sidebar row hover (mockup .icon-btn:hover); the head no longer carries
+    // a fill of its own for the tint to read as a shadow over.
     await page.hover('.sidebar-team-collapse');
-    await page.waitForTimeout(300); // past any 150ms color step
-    expect(await read()).toEqual(rest);
+    const hoverBg = await page.evaluate(() => {
+      const el = document.createElement('div');
+      el.style.backgroundColor = 'var(--sidebar-hover)';
+      document.body.append(el);
+      const out = getComputedStyle(el).backgroundColor;
+      el.remove();
+      return out;
+    });
+    await expect.poll(async () => (await read()).bg).toBe(hoverBg);
   });
 
   // XMON-69: the toggle is a bare 14px glyph, so whatever the press state does
@@ -154,9 +175,8 @@ for (const theme of ['light', 'dark'] as const) {
         };
       }, sel);
 
-    // the pointer settles on the target first (hover is a face of its own —
-    // banned on the head toggle, kept on the rail's), so the delta read here
-    // is the press state alone.
+    // the pointer settles on the target first (hover is a face of its own on
+    // both toggles), so the delta read here is the press state alone.
     const press = async (sel: string) => {
       const bb = (await page.locator(sel).boundingBox())!;
       await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);

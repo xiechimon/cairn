@@ -225,8 +225,9 @@ test('几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左
   const headBox = await head.boundingBox();
   const cardBox = await card.boundingBox();
   expect(colBox).not.toBeNull();
-  // 内容列左缘 canon x=504 @1440（r7 06–10 探针，shell.tsx 头注）。
-  expect(colBox?.x).toBe(480);
+  // 内容列居中于侧栏右侧：(1440 + 248 − 768) / 2 = 460（Paper 侧栏 288 → 248，
+  // 列心右移前为 480）。
+  expect(colBox?.x).toBe(460);
   for (const box of [tabsBox, headBox, cardBox]) {
     expect(box?.x).toBe(colBox?.x);
   }

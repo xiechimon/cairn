@@ -80,7 +80,8 @@ const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
     'drop-tint-hover': 'rgb(242 148 216 / 0.1)',
   },
   light: {
-    'sidebar-hover': 'rgb(28 25 21 / 0.05)',
+    // Paper Grouped sidebar: light row hover = DESIGN.md hover (#ebe4d8)
+    'sidebar-hover': 'rgb(235 228 216)',
     'sidebar-active': 'rgb(28 25 21 / 0.1)',
     'drop-tint-border': 'rgb(180 83 42)',
     'drop-tint-base': 'rgb(180 83 42 / 0.05)',
@@ -168,7 +169,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
   });
   expect(vals.composer).toBe('20px');
   expect(vals.bubble).toBe('18px');
-  expect(vals.sidebar).toBe('288px');
+  expect(vals.sidebar).toBe('248px');
   expect(vals.chat).toBe('768px');
   expect(vals.edge).toBe('16px');
   expect(vals.panel).toBe('10px');

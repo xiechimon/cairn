@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 // Issue #147 acceptance: the sidebar collapse family is live and persists.
 // The 项目 / 资源 GroupHeaders hide their sub-rows (r2 §1.1) and flip their
@@ -9,58 +9,67 @@ import { expect, test } from '@playwright/test';
 // (#351 裁定：看板列收起全家随 6→4 列收敛删除——列收起钮/窄条/持久键
 // 不复存在，本 spec 只保留侧栏族。)
 
+// Paper Grouped sidebar: 资源 folds by default (absent key = folded, "0" =
+// open); 项目 keeps the #147 shape (absent = open, "1" = folded). Headers
+// carry aria-expanded; the rail chevrons keep their 收起/展开 aria-label.
+
+const projectRows = (page: Page) => page.locator('[data-testid="project-row"]');
+const skills = (page: Page) => page.getByRole('complementary').getByRole('link', { name: '技能' });
+
 test('sidebar group collapse hides sub-rows, flips aria, survives reload', async ({ page }) => {
   await page.goto('/app?scenario=01');
 
   const header = page.locator('.sidebar-group', { hasText: '项目' });
-  const newProject = page.locator('.sidebar-subrow', { hasText: '新建项目' });
-  await expect(header).toHaveAttribute('aria-label', '收起项目');
-  await expect(newProject).toBeVisible();
+  await expect(header).toHaveAttribute('aria-expanded', 'true');
+  await expect(projectRows(page)).toHaveCount(1);
 
   await header.click();
-  await expect(header).toHaveAttribute('aria-label', '展开项目');
   await expect(header).toHaveAttribute('aria-expanded', 'false');
-  await expect(newProject).toHaveCount(0);
+  await expect(projectRows(page)).toHaveCount(0);
   // chevron tracks the collapse: down open, right collapsed
   await expect
     .poll(() =>
       page
         .locator('.sidebar-group--collapsed .sidebar-group-chevron')
-        .evaluate((el) => getComputedStyle(el).transform),
+        .first()
+        .evaluate((el) => getComputedStyle(el).rotate),
     )
-    .toBe('matrix(0, -1, 1, 0, 0, 0)');
-  // the 资源 group stays open — the collapses are per-group
-  await expect(page.locator('.sidebar-subrow', { hasText: '技能' })).toBeVisible();
+    .toBe('-90deg');
+  // the 新建项目 plus stays reachable on the folded header
+  await expect(page.getByRole('link', { name: '新建项目' })).toBeVisible();
+  // the 资源 fold is independent (folded by default)
+  await expect(skills(page)).toHaveCount(0);
 
   await page.reload();
   await expect(page.locator('.sidebar-group', { hasText: '项目' })).toHaveAttribute(
-    'aria-label',
-    '展开项目',
+    'aria-expanded',
+    'false',
   );
-  await expect(page.locator('.sidebar-subrow', { hasText: '新建项目' })).toHaveCount(0);
+  await expect(projectRows(page)).toHaveCount(0);
 
   // expand again and that sticks too
   await page.locator('.sidebar-group', { hasText: '项目' }).click();
   await page.reload();
-  await expect(page.locator('.sidebar-subrow', { hasText: '新建项目' })).toBeVisible();
+  await expect(projectRows(page)).toHaveCount(1);
 });
 
 test('rail group collapse hides member rows and survives reload', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
 
-  const chevron = page.locator('.rail-group[aria-label="收起资源"]');
+  await expect(page.locator('.rail-row .project-avatar')).toBeVisible();
+  await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
+
+  await page.locator('.rail-group[aria-label="展开资源"]').click();
   await expect(page.locator('.rail-row[aria-label="技能"]')).toBeVisible();
 
-  await chevron.click();
-  await expect(page.locator('.rail-group[aria-label="展开资源"]')).toBeVisible();
-  await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
-  // the 项目 member row is untouched
-  await expect(page.locator('.rail-row .project-avatar')).toBeVisible();
+  await page.locator('.rail-group[aria-label="收起项目"]').click();
+  await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator('.rail-group[aria-label="展开资源"]')).toBeVisible();
-  await expect(page.locator('.rail-row[aria-label="技能"]')).toHaveCount(0);
+  await expect(page.locator('.rail-group[aria-label="展开项目"]')).toBeVisible();
+  await expect(page.locator('.rail-row .project-avatar')).toHaveCount(0);
+  await expect(page.locator('.rail-row[aria-label="技能"]')).toBeVisible();
 });
 
 test('both sidebar groups persist side by side', async ({ page }) => {
@@ -69,10 +78,10 @@ test('both sidebar groups persist side by side', async ({ page }) => {
   await page.locator('.sidebar-group', { hasText: '项目' }).click();
 
   await page.reload();
-  await expect(page.locator('.sidebar-subrow', { hasText: '技能' })).toHaveCount(0);
-  await expect(page.locator('.sidebar-subrow', { hasText: '新建项目' })).toHaveCount(0);
+  await expect(skills(page)).toBeVisible();
+  await expect(projectRows(page)).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem('pacman.sidebarResourcesCollapsed'))).toBe(
-    '1',
+    '0',
   );
   expect(await page.evaluate(() => localStorage.getItem('pacman.sidebarProjectsCollapsed'))).toBe(
     '1',

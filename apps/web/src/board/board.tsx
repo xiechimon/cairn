@@ -138,6 +138,8 @@ interface BoardProps {
   banner?: ReactNode;
   /** #445: 双轴筛选面（仓库 chip 组 + 类型 popover 钮）。 */
   filters: BoardFilters;
+  /** `?column=` view (sidebar 需要我处理): only this column renders. */
+  onlyColumn?: string | null;
   /** #445: 卡片标签解析图（tagId → TagChipData；live = 全项目并查，
    *  fixture = scenario.tags）。absent/空图 = 卡不渲染标签。 */
   tagsById?: ReadonlyMap<string, TagChipData>;
@@ -196,6 +198,7 @@ export function BoardSurface({
   onDoneIntent,
   banner,
   filters,
+  onlyColumn = null,
   tagsById,
   onNewTask,
 }: BoardProps) {
@@ -221,7 +224,9 @@ export function BoardSurface({
     [filters.active, filters.matches],
   );
   const visibleTodos = narrow(fixture.todos);
+  const visibleColumns = onlyColumn == null ? COLUMNS : COLUMNS.filter((c) => c.id === onlyColumn);
   useEffect(() => {
+    if (onlyColumn != null) return;
     const cols = COLUMNS.map(
       (column) => sortColumnTodos(column, visibleTodos.filter(column.accepts)).length,
     );
@@ -229,11 +234,11 @@ export function BoardSurface({
     try {
       localStorage.setItem('pacman-boot-shape', JSON.stringify({ cols }));
     } catch {}
-  }, [visibleTodos]);
+  }, [visibleTodos, onlyColumn]);
 
   // 空结果态 = 任一轴收窄生效且收窄后无卡占任何列（closed 不占列，不计入）。
   const showFilterEmpty =
-    filters.active && COLUMNS.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
+    filters.active && visibleColumns.every((c) => !visibleTodos.some((todo) => c.accepts(todo)));
 
   const sweep = useCallback(() => {
     delete document.body.dataset.boardDragging;
@@ -382,7 +387,7 @@ export function BoardSurface({
             </div>
           )}
           {!showFilterEmpty &&
-            COLUMNS.map((column) => {
+            visibleColumns.map((column) => {
               const todos = viewTodos(column.id);
               return (
                 <section

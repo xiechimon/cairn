@@ -2,10 +2,10 @@ import { expect, test } from '@playwright/test';
 
 // Issue #932: the detail route's fixed 3-pane shell (240 sidebar | fluid
 // thread | 488 right pane) had no narrow-viewport strategy at all — at 320px
-// the sidebar kept 288px, the right pane kept 488px off-screen behind the
+// the sidebar kept its full width, the right pane kept 488px off-screen behind the
 // shell's overflow:hidden, and the thread column swallowed 133px of content
 // in a 35px box (#885 recorded it). Below 816px — max-[816px] media (width < 816): 815 folds, 816 restores;
-// 288+488 leaves ~40px center (same as old 768/240)
+// 248+488 leaves ~80px center
 // 2026-10-05) — the shell now degrades: both side panes drop, the thread
 // owns the full width, and the head's back chevron stays the way out. Each
 // test pins one failure way:
@@ -99,7 +99,7 @@ test('N3: the degradation stops at 816px — the 3-pane shell survives above it'
       document.querySelector('[data-testid="detail-right"]')!.getBoundingClientRect().width,
     ),
   }));
-  expect(widths.sidebar).toBe(288);
+  expect(widths.sidebar).toBe(248);
   expect(widths.right).toBe(488);
 });
 
