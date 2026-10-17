@@ -35,11 +35,11 @@
 // 部布局走 tailwind 工具类（几何与 #351 的 board.css 规则逐条对齐），按钮走
 // components/ui/button；data-* 钩子、类别名锚点、dnd 逻辑全部原位。阶段点
 // 列头状态图标见 ColumnIcon（DESIGN.md 图标）。
-// #445 顶栏重排 / XMON-57 收敛：左侧 = 生效筛选条（一条一维度，点即清该
-// 维度），右侧动作区恰好一钮 = 无底色筛选面板钮（filter-panel.tsx，仓库 +
-// 类型两段）；「+ 任务」撤除（与侧栏「新任务」行 + C 热键同 opener，第三
-// 入口退役）。任务卡渲染自己的标签 chip（tagsById 解析图 → cardTag，渲染
-// 上限 1）。
+// Paper 顶栏（DESIGN.md 布局与间距）：56px；左 = 衬线「工作台」+ 等你处理
+// 摘要（N = 待处理列当前可见卡数，与列头计数同源）+ 生效筛选条；右 = 文字钮
+// 筛选（filter-panel.tsx）/ 定时（路由链接）+ 墨色胶囊「新任务」（与侧栏
+// 新任务行、C 热键同一个 opener）。全部 nowrap，窄窗先截断摘要。横幅与
+// scroller 随文档流排在顶栏下方，不再按顶栏高度写死偏移。
 
 import {
   closestCorners,
@@ -54,8 +54,9 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { cn } from 'cn';
-import { Activity, CircleAlert, CircleCheck, CircleDashed, Plus } from 'lucide-react';
+import { Activity, CircleAlert, CircleCheck, CircleDashed, Clock, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router';
 import { Button } from '../components/ui/button.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -74,7 +75,13 @@ import {
 import { DRAG_THRESHOLD_PX } from './dnd.js';
 import { DragCard } from './drag-card.js';
 import { DraggableCard } from './draggable-card.js';
-import { type FilterChip, FilterChips, type FilterDimension, FilterPanel } from './filter-panel.js';
+import {
+  type FilterChip,
+  FilterChips,
+  type FilterDimension,
+  FilterPanel,
+  TOPBAR_TEXT_BUTTON,
+} from './filter-panel.js';
 import { cardTag } from './tag-filter.js';
 
 /** #403 建轴 / #445 双轴化：看板筛选面——board-page 持有 URL 态与数据源，
@@ -150,6 +157,33 @@ function ColumnIcon({ status }: { status: BoardColumnDef['status'] }) {
   return <Icon aria-hidden strokeWidth={1.75} className={`size-3.75 flex-none ${tone}`} />;
 }
 
+function NeedsYouSummary({ count }: { count: number }) {
+  const { t } = useI18n();
+  if (count === 0) {
+    return (
+      <span data-testid="needs-you" className="min-w-0 truncate text-ui text-content-tertiary">
+        {t('没有等你处理的事')}
+      </span>
+    );
+  }
+  return (
+    <span
+      data-testid="needs-you"
+      className="flex min-w-0 items-center gap-1.5 text-ui text-content-tertiary"
+    >
+      <CircleAlert
+        aria-hidden
+        strokeWidth={1.75}
+        className="size-3.25 flex-none text-(--card-button)"
+      />
+      <span className="min-w-0 truncate">
+        <span className="font-semibold tabular-nums text-(--card-button)">{count}</span>{' '}
+        {t('项等你处理')}
+      </span>
+    </span>
+  );
+}
+
 export function BoardSurface({
   fixture,
   onAction,
@@ -166,6 +200,7 @@ export function BoardSurface({
   onNewTask,
 }: BoardProps) {
   const { t } = useI18n();
+  const { search } = useLocation();
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropColumnId, setDropColumnId] = useState<string | null>(null);
   // changelog 2026-09-12: the drag affordance is desktop-web only
@@ -263,31 +298,42 @@ export function BoardSurface({
   };
 
   return (
-    <div
-      className={`board-main relative flex min-w-0 flex-1 flex-col bg-background ${banner == null ? '' : ''}`}
-    >
-      <header className="board-topbar relative flex h-11 flex-none items-center border-b border-[var(--border)]">
-        <div className="board-topbar-title pointer-events-none absolute inset-x-0 text-center text-sm leading-[22px] font-medium text-foreground">
+    <div className="board-main relative flex min-w-0 flex-1 flex-col bg-background">
+      <header className="board-topbar flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap">
+        <h1 className="flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
-        </div>
-        {/* XMON-57 生效筛选条：顶栏左侧独立容器——不进 board-topbar-actions
-            （dead-buttons 钉死右动作区恰好一钮）；标题带 absolute +
-            pointer-events-none，hit-test 不拦截条。 */}
+        </h1>
+        <NeedsYouSummary count={viewTodos('pending').length} />
         <FilterChips chips={filters.chips} onClearAll={filters.onClear} />
-        <div className="board-topbar-actions ml-auto flex items-center pr-3">
-          {/* 恰好一钮 = 无底色筛选钮（board-type-filter 是 e2e 钉死的选择器
-              别名，语义已从「类型轴」扩到「全轴筛选」，名字按 #411 别名
-              优先保留）。「+ 任务」已撤——新建入口 = 侧栏「新任务」行
-              （sidebar-new-task）+ C 热键。 */}
+        <div className="board-topbar-actions ml-auto flex flex-none items-center gap-0.5">
           <FilterPanel
             dimensions={filters.dimensions}
             totalSelected={filters.totalSelected}
             onClearAll={filters.onClear}
           />
+          <Button
+            variant="ghost"
+            size="sm"
+            className={TOPBAR_TEXT_BUTTON}
+            render={<Link to={{ pathname: '/app/schedules', search }} />}
+          >
+            <Clock aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
+            {t('定时')}
+          </Button>
+          {onNewTask != null && (
+            <Button
+              size="sm"
+              className="ml-2 h-7.5 gap-1.5 rounded-full pr-3.5 pl-3 text-ui"
+              onClick={onNewTask}
+            >
+              <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+              {t('新任务')}
+            </Button>
+          )}
         </div>
       </header>
 
-      {banner}
+      {banner != null && <div className="flex-none px-[17px] pt-3">{banner}</div>}
 
       <DndContext
         sensors={desktop ? sensors : []}
@@ -315,9 +361,7 @@ export function BoardSurface({
             #1009 A0 ⑨ / ADR 0013 D11）。 */}
         <div
           data-testid="board-scroller"
-          className={`board-scroller absolute inset-x-0 bottom-0 grid grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px] ${
-            banner == null ? 'top-11' : 'top-[121px]'
-          }`}
+          className="board-scroller grid min-h-0 flex-1 grid-cols-[repeat(4,minmax(var(--board-col-min),1fr))] grid-rows-[minmax(0,1fr)] gap-3.5 overflow-x-auto overflow-y-hidden bg-background px-[17px] pt-3 pb-[13px]"
         >
           {/* #403 空结果态（#445 双轴化）：任一轴收窄且零卡 = 板级明示
               文案 + 清除钮（不是四列各背一条误导性列空文案，更不是空白

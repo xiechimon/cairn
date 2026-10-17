@@ -248,7 +248,7 @@ test('C on the board opens the new-task dialog; ⌘C and the retired N do not', 
 
 test('sidebar 新任务 row carries the C badge and click-opens the dialog', async ({ page }) => {
   await page.goto(BOARD);
-  const row = page.getByRole('button', { name: '新任务' });
+  const row = page.getByRole('complementary').getByRole('button', { name: '新任务' });
   await expect(row).toBeVisible();
   await expect(row.getByText('C', { exact: true })).toHaveText('C');
   await row.click();
@@ -521,7 +521,7 @@ test('with the drawer closed, N stays retired — neither drawer nor dialog open
 /** Open the new-task dialog through the sidebar row (the #445 opener form). */
 async function openNewTask(page: Page) {
   await page.goto(BOARD);
-  await page.getByRole('button', { name: '新任务' }).click();
+  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
   const dialog = page.locator('.new-task-dialog');
   await expect(dialog).toBeVisible();
   return dialog;
@@ -561,7 +561,7 @@ test('⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, di
   await expect(dialog).not.toBeVisible();
 
   // Same registration, non-mac receipt: Ctrl+↵ lands a second card
-  await page.getByRole('button', { name: '新任务' }).click();
+  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
   await expect(dialog).toBeVisible();
   await dialog.locator('.new-task-spec').fill('Ctrl 建的卡');
   await pressUntilCard(page, 'Control+Enter', landedCard(page, 'Ctrl 建的卡'));

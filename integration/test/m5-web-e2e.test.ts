@@ -202,11 +202,13 @@ async function openBoard(): Promise<void> {
   await page.goto(`${server.url}/app`);
   // #445：顶栏「+ 任务」撤除——就绪探针与创建入口改指侧栏「新任务」行。
   // #943/#910：类名钉换一级 role+name 载体（integration 面同律）。
-  await pexpect(page.getByRole('button', { name: '新任务' })).toBeVisible({ timeout: 30_000 });
+  await pexpect(
+    page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 async function createAndStart(title: string): Promise<void> {
-  await page.getByRole('button', { name: '新任务' }).click();
+  await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
   // spec 15 #394：单字段正文——title 参数即正文首行，占位标题 = 首行原文。
   await pexpect(page.locator('.new-task-spec')).toBeVisible();
   await page.locator('.new-task-spec').fill(title);

@@ -52,7 +52,7 @@ export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
   return (
     <section
       data-quota-banner="true"
-      className="board-notify-banner absolute inset-x-[17px] top-14 flex h-16 items-center rounded-2xl border-0 bg-(--secondary) px-4 [box-shadow:var(--edge-ring),var(--card-shadow)]"
+      className="board-notify-banner flex h-16 items-center rounded-2xl border-0 bg-(--secondary) px-4 [box-shadow:var(--edge-ring),var(--card-shadow)]"
       aria-label={t('等额度')}
     >
       <span className="flex size-7 flex-none items-center justify-center rounded-full bg-(--badge-attention) text-[10px] leading-none font-bold text-(--badge-attention-fg)">

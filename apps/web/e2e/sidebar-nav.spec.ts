@@ -38,7 +38,7 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
-  const schedules = page.getByRole('link', { name: '定时' });
+  const schedules = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await schedules.click();
 
   await expect(page).toHaveURL('/app/schedules?scenario=01');
@@ -73,7 +73,7 @@ test('rail rows hop client-side', async ({ page }) => {
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
-  await page.getByRole('link', { name: '定时' }).click();
+  await page.getByRole('complementary').getByRole('link', { name: '定时' }).click();
   await expect(page).toHaveURL('/app/schedules?scenario=03');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 });
@@ -91,7 +91,7 @@ test('collapsed rail carries no install icon', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: '定时' })).toBeVisible();
+  await expect(page.getByRole('complementary').getByRole('link', { name: '定时' })).toBeVisible();
 });
 
 test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async ({ page }) => {
@@ -102,7 +102,7 @@ test('/zh/install redirects to /app (unmatched-path divergence, 01 §8)', async 
 
 test('hover tints the row pill — dark default + light theme', async ({ page }) => {
   await page.goto('/app?scenario=01');
-  const row = page.getByRole('link', { name: '定时' });
+  const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();
@@ -112,7 +112,7 @@ test('hover tints the row pill — dark default + light theme', async ({ page })
 
   await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
   await page.goto('/app?scenario=01');
-  const lightRow = page.getByRole('link', { name: '定时' });
+  const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await lightRow.hover();
   // --sidebar-hover light = 5% warm ink
   await expect.poll(() => pillBg(lightRow)).toBe('rgba(28, 25, 21, 0.05)');
@@ -121,7 +121,7 @@ test('hover tints the row pill — dark default + light theme', async ({ page })
 test('rail hover tints the 24px pill', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
-  const row = page.getByRole('link', { name: '定时' });
+  const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
 
   expect(await pillBg(row)).toBe('rgba(0, 0, 0, 0)');
   await row.hover();

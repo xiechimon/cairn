@@ -38,6 +38,7 @@
 // （批次键不再挂标题行）。「仅此」hover 现形，与计数共右端槽（静息计数、
 // hover 仅此）——两控件位置都稳定，不随选集大小推移。
 
+import { Funnel } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -47,7 +48,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Separator } from '../components/ui/separator.js';
 import { TagChip } from '../components/ui/tag-chip.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Funnel, X } from '../icons/index.js';
+import { Check, X } from '../icons/index.js';
+
+/** 顶栏文字按钮（筛选 / 定时）共用的几何与墨色：30px 高、14px 图标、界面字号。 */
+export const TOPBAR_TEXT_BUTTON = 'h-7.5 gap-1.5 px-2.5 text-ui font-normal text-content-secondary';
 
 /** 选项超过此数才给搜索框——短词表（固定 6 词）搜索框是纯噪音。 */
 const SEARCH_THRESHOLD = 8;
@@ -119,7 +123,7 @@ export function FilterChips({
   const { t } = useI18n();
   if (chips.length === 0) return null;
   return (
-    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto pl-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {chips.map((chip) => (
         <Button
           key={chip.key}
@@ -322,9 +326,9 @@ interface FilterPanelProps {
 }
 
 /** 顶栏右动作区的筛选钮（无底色 ghost——与主操作实底材质区分）+ anchored
- *  popover。图标而非文字：Funnel 是本产品自己的筛选语汇（r2 24b 位图里就
- *  长在 project 任务工具条上），文字钮在此处只占宽不增信息量；可读名走
- *  aria-label，收起态「筛选在生效」由角标读数承担。
+ *  popover。Paper 顶栏文字钮 = Funnel 图标 + 「筛选」（DESIGN.md 布局与间距）；
+ *  可及名固定走 aria-label（角标数字不进名字），收起态「筛选在生效」由角标
+ *  读数承担。
  *  开态由本组件自持（纯 UI 态，真值在 URL）；关闭三路 = Esc / 外点 /
  *  重点触发钮，全由 Base UI 承接。点选**保持开**——点选即关会把多选取缔
  *  成单选。查询串随开合周期复位（下次开层不该带着上次的过滤残留）。 */
@@ -345,16 +349,17 @@ export function FilterPanel({ dimensions, totalSelected, onClearAll }: FilterPan
           <Button
             variant="ghost"
             size="sm"
-            className="board-type-filter h-7 gap-1.5 px-2"
+            className={`board-type-filter ${TOPBAR_TEXT_BUTTON}`}
             aria-label={t('筛选')}
           />
         }
       >
-        <Funnel />
+        <Funnel aria-hidden strokeWidth={1.75} className="size-3.5 text-content-tertiary" />
+        {t('筛选')}
         {totalSelected > 0 && (
           <span
             data-testid="filter-count"
-            className="rounded-full bg-accent px-1.5 text-[11px] leading-4 font-normal text-muted-foreground"
+            className="rounded-full bg-accent px-1.5 text-caption font-normal tabular-nums text-muted-foreground"
           >
             {totalSelected}
           </span>

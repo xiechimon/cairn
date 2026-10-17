@@ -62,7 +62,7 @@ test('user menu drops its dead rows — 反馈 (#149), 新功能/快捷键 (#163
 
 // —— 2. 看板指南钮全族撤除（#363）—————————————————————————————————————————
 
-test('board topbar drops the 看板指南 button — right actions keep exactly one button (#363, #445 改指类型钮)', async ({
+test('board topbar drops the 看板指南 button — right actions = 筛选 / 定时 / 新任务 (#363, Paper 顶栏)', async ({
   page,
 }) => {
   await page.goto('/app');
@@ -71,12 +71,15 @@ test('board topbar drops the 看板指南 button — right actions keep exactly 
   await expect(page.locator('.board-guide-wrap')).toHaveCount(0);
   await expect(page.locator('.board-guide-pop')).toHaveCount(0);
   await expect(page.locator('[aria-label="看板指南"]')).toHaveCount(0);
-  // #445：右动作区恰好一钮 = 类型过滤钮（撤「+ 任务」、上一钮，数量仍 1）
+  // Paper 顶栏（DESIGN.md 布局与间距）：右动作区 = 筛选钮 + 定时链接 + 新任务胶囊，
+  // 指南钮不在其中
   const actions = page.locator('.board-topbar-actions');
   await expect(actions).toBeVisible();
-  await expect(actions.locator('button')).toHaveCount(1);
-  await expect(actions.locator('.board-type-filter')).toBeVisible();
-  await expect(actions.locator('.board-new-task')).toHaveCount(0);
+  await expect(actions.getByRole('button')).toHaveCount(2);
+  await expect(actions.getByRole('link')).toHaveCount(1);
+  await expect(actions.getByRole('button', { name: '筛选', exact: true })).toBeVisible();
+  await expect(actions.getByRole('link', { name: '定时' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: '新任务' })).toBeVisible();
 });
 
 // —— 2b. #351 列收敛钉：恰 4 列 + 退役列名/收起族不再渲染 ————————————————————
@@ -86,7 +89,7 @@ test('board renders exactly the four #351 columns, retired names and collapse fa
 }) => {
   await page.goto('/app?scenario=01');
   // 顶栏标题随更名（看板 → 工作台）
-  await expect(page.locator('.board-topbar-title')).toHaveText('工作台');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('工作台');
   // 恰 4 列，逐列钉 id ↔ 列名
   await expect(page.locator('.board-column')).toHaveCount(4);
   for (const [id, name] of [

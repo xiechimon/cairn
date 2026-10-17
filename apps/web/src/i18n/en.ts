@@ -25,6 +25,9 @@ export const EN: Record<string, string> = {
   搜索: 'Search',
   // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
+  // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
+  项等你处理: 'waiting on you',
+  没有等你处理的事: 'Nothing is waiting on you',
   定时: 'Schedules',
   项目: 'Project', // sidebar group / search group / schedule-form field — one fit
   资源: 'Resources',

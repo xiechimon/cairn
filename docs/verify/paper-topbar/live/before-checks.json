@@ -1,0 +1,7 @@
+[
+  {
+    "name": "wire: two todos in failed",
+    "ok": true,
+    "detail": "failed=2"
+  }
+]

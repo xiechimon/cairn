@@ -90,6 +90,20 @@
       "role": "action-link",
       "reason": "Card action text link (重试/确认计划/审阅/回复/开始). DESIGN.md 按钮: card actions are accent text links, no solid buttons on cards. Hover swaps the ink to --spot-text-on-tint because accent on --accent-hover is 4.25.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99); hover --spot-text-on-tint on --accent-hover 6.63 (PR #1369 hand-over)"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "size-3.25 flex-none text-(--card-button)",
+      "role": "indicator",
+      "reason": "Board top bar needs-you alert-circle glyph before 'N 项等你处理'. DESIGN.md 图标: needs-you icons take the accent; non-text glyph, 3:1 gate.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369)"
+    },
+    {
+      "file": "apps/web/src/board/board.tsx",
+      "anchor": "font-semibold tabular-nums text-(--card-button)",
+      "role": "indicator",
+      "reason": "Board top bar needs-you count N (600 weight). DESIGN.md 颜色: accent is reserved for needs-you states and counts; the rest of the line stays ink-3.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 13.5px text)"
     }
   ]
 }

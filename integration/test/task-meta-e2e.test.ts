@@ -79,10 +79,12 @@ describe('spec 15 #394 无标题面 + 固定词表（live UI → wire → SQLite
     await page.goto(`${server.url}/app`);
     // #445：顶栏「+ 任务」撤除——就绪探针与创建入口改指侧栏「新任务」行。
     // #943/#910：类名钉换一级 role+name 载体（integration 面同律）。
-    await pexpect(page.getByRole('button', { name: '新任务' })).toBeVisible({ timeout: 30_000 });
+    await pexpect(
+      page.getByRole('complementary').getByRole('button', { name: '新任务' }),
+    ).toBeVisible({ timeout: 30_000 });
 
     // —— 负空间钉：标题位与手动标签面不存在 ——
-    await page.getByRole('button', { name: '新任务' }).click();
+    await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
     const dialog = page.locator('.new-task-dialog');
     await pexpect(dialog).toBeVisible();
     await pexpect(dialog.locator('.new-task-input')).toHaveCount(0);
