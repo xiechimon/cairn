@@ -577,7 +577,7 @@ export function BoardSidebar({
                 {machinesOnline > 0 && label === '机器' && (
                   <span
                     data-testid="online-dot"
-                    className="sidebar-online-dot size-1.5 flex-none rounded-full bg-running"
+                    className="size-1.5 flex-none rounded-full bg-running"
                   />
                 )}
               </Link>

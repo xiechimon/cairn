@@ -13,7 +13,7 @@ import { expect, type Page, test } from '@playwright/test';
 // #943/#910 重钉：本域载体换语义钩子——侧栏 = aside（complementary）、
 // nav 段 = aside nav、团队头行 = data-testid="team-row"（二级：无 role 的
 // 结构探针位）、rail 展开钮 = button[aria-label="展开侧边栏"]、board 顶栏 =
-// [data-route="board"] 的首个 header（banner）。.page-topbar/.res-topbar 属
+// [data-route="board"] 的首个 header（banner）。.res-topbar 属
 // pages/resources 域，留待各自批次重钉。探针期望值不动（几何零改动）。
 //
 // Paper Grouped sidebar (DESIGN.md 侧栏) retires the full-width divider law:
