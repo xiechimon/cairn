@@ -23,16 +23,15 @@ import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
-/** 命令块(原 .dlg-enroll-cmd):带描边的 code + 复制钮行。 */
+/** 命令块(原 .dlg-enroll-cmd):白底发丝框 code + 复制钮行。 */
 const CMD_CLS =
-  'flex items-center justify-between gap-2 rounded-lg border border-(--border) bg-(--secondary) px-3 py-2';
+  'flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30';
 
-/** 命令块内 code(原 .dlg-enroll-cmd code):等宽 12px,长命令任意断行。 */
-const CMD_CODE_CLS = 'font-mono text-xs text-(--foreground) [overflow-wrap:anywhere]';
+/** 命令块内 code:等宽 meta 档,长命令任意断行。 */
+const CMD_CODE_CLS = 'font-mono text-meta text-foreground [overflow-wrap:anywhere]';
 
-/** disclosure / 链接行(原 .dlg-enroll-toggle 与 keylink/browserlink 共同
- *  形):贴左 13px/16 secondary 墨。 */
-const INLINE_ACTION_CLS = 'self-start text-[13px] leading-4';
+/** disclosure / 链接行(原 .dlg-enroll-toggle 与 keylink/browserlink 共同形)。 */
+const INLINE_ACTION_CLS = 'self-start text-ui';
 
 interface CreateMachineDialogProps {
   /** #73 retained-mount open flag. */
@@ -59,19 +58,20 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
           body 外垫随壳 DialogContent 的 registry p-4 退役（双层垫会把最高
           内容态撑出 #193 封顶滚动区，dialog-viewport machine 面钉）。 */}
       <div className="flex flex-col gap-3">
-        <p className="m-0 text-[13px] leading-5 text-(--text-secondary)">
+        <p className="m-0 text-ui text-content-secondary">
           {t('有条件时优先使用云主机：笔记本会休眠或断网，云主机常在线，构建更稳定。')}
         </p>
-        <p className="m-0 text-[13px] leading-5 text-(--text-tertiary)">
+        <p className="m-0 text-ui text-content-tertiary">
           {t(
             '在待接入的机器上执行以下命令。浏览器将打开登录页，授权团队 {team} 后机器即可上线。此后它在后台常驻运行，无需保持终端开启。',
             { team: teamName },
           )}
         </p>
-        <span className="text-xs leading-4 text-(--text-tertiary)">{t('安装 CLI')}</span>
+        <span className="text-meta font-medium text-content-secondary">{t('安装 CLI')}</span>
         <div className={CMD_CLS}>
           <code className={CMD_CODE_CLS}>{installCmd}</code>
           <Button
+            variant="outline"
             size="xs"
             className="shrink-0 px-2.5"
             onClick={() => void navigator.clipboard?.writeText(installCmd)}
@@ -79,10 +79,11 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
             {t('复制')}
           </Button>
         </div>
-        <span className="text-xs leading-4 text-(--text-tertiary)">{t('在机器上执行')}</span>
+        <span className="text-meta font-medium text-content-secondary">{t('在机器上执行')}</span>
         <div className={CMD_CLS}>
           <code className={CMD_CODE_CLS}>{startCmd}</code>
           <Button
+            variant="outline"
             size="xs"
             className="shrink-0 px-2.5"
             onClick={() => void navigator.clipboard?.writeText(startCmd)}
@@ -94,7 +95,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
             贴左、无框、secondary 墨）；hover/展开态底色由件承载（D2）。 */}
         <Button
           variant="ghost"
-          className={`${INLINE_ACTION_CLS} px-0 text-(--text-secondary) hover:bg-transparent hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-secondary) dark:hover:bg-transparent font-normal active:not-aria-[haspopup]:translate-y-0`}
+          className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal active:not-aria-[haspopup]:translate-y-0`}
           aria-expanded={apiKeyOpen}
           onClick={() => setApiKeyOpen((value) => !value)}
         >
@@ -105,6 +106,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
             <div className={CMD_CLS}>
               <code className={CMD_CODE_CLS}>{apiKeyCmd}</code>
               <Button
+                variant="outline"
                 size="xs"
                 className="shrink-0 px-2.5"
                 onClick={() => void navigator.clipboard?.writeText(apiKeyCmd)}

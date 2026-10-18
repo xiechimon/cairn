@@ -6,26 +6,17 @@
 // 终闸」同律：400/409/502/504 落内联错误行，headline 按 status 分译，server
 // 原文作 detail 行，消息子串不作契约）。
 // fixture 面 = accept 律（#148：提交即关），不发请求。
-// #1005 registry 对齐：表单行走 Field 官方组合（同 SkillDialog 形）。
+// Paper 表单：FormStack / FormField + footer FormActions（同 SkillDialog 形）。
 
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { Button } from '../components/ui/button.js';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '../components/ui/field.js';
+import { FieldError } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
-
-/** 表单容器垫（DialogShell 体无内垫，容器 layout 归消费点——SkillDialog 同值）。 */
-const FORM_CLS = 'px-4 pt-4 pb-3';
 
 interface Fields {
   localPath: string;
@@ -98,37 +89,41 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       onClose={onClose}
       width={560}
       footer={
-        <Button className="w-full" disabled={!submittable} onClick={submit}>
-          {t('导入')}
-        </Button>
+        <FormActions
+          className="pt-0"
+          primary={{ label: t('导入'), onClick: submit, disabled: !submittable }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
       {fields === null ? null : (
-        <FieldGroup className={FORM_CLS}>
-          <Field>
-            <FieldLabel htmlFor="dlg-skill-import-path">{t('本地路径')}</FieldLabel>
+        <FormStack className="max-w-none py-1">
+          <FormField
+            label={t('本地路径')}
+            htmlFor="dlg-skill-import-path"
+            help={t('server 本机上的技能目录路径，目录里要有 SKILL.md。')}
+          >
             <Input
               id="dlg-skill-import-path"
+              className={FORM_CONTROL_CLS}
               value={fields.localPath}
               onChange={(event) => setFields((f) => f && { ...f, localPath: event.target.value })}
               placeholder="/Users/you/skills/deploy-to-prod"
             />
-            <FieldDescription>
-              {t('server 本机上的技能目录路径，目录里要有 SKILL.md。')}
-            </FieldDescription>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-skill-import-url">{t('GitHub 地址')}</FieldLabel>
+          </FormField>
+          <FormField
+            label={t('GitHub 地址')}
+            htmlFor="dlg-skill-import-url"
+            help={t('GitHub 公共仓库或其中子目录的地址；导入后可用 refresh 重新拉取。')}
+          >
             <Input
               id="dlg-skill-import-url"
+              className={FORM_CONTROL_CLS}
               value={fields.url}
               onChange={(event) => setFields((f) => f && { ...f, url: event.target.value })}
               placeholder="https://github.com/anthropics/skills/tree/main/document-skills/pdf"
             />
-            <FieldDescription>
-              {t('GitHub 公共仓库或其中子目录的地址；导入后可用 refresh 重新拉取。')}
-            </FieldDescription>
-          </Field>
+          </FormField>
           {localFilled && urlFilled ? (
             <FieldError>{t('两字段二选一：填其中一个，另一个留空。')}</FieldError>
           ) : null}
@@ -140,7 +135,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
               )}
             </FieldError>
           )}
-        </FieldGroup>
+        </FormStack>
       )}
     </DialogShell>
   );

@@ -443,8 +443,8 @@ export interface ResourcesContent {
   memories?: MemoryRecord[];
   /** 团队密钥记录（shared SecretRecord 同形；live 面 = GET
    *  /api/teams/{id}/secrets）。消费面 = Agent 详情的密钥区（#510：授权粒度
-   *  是全有全无，该区只要 id 集与「有没有密钥」两件事）。密钥 route 自身
-   *  的 fixture 面保持 r7 10 空态字节不变，不读本字段。 */
+   *  是全有全无，该区只要 id 集与「有没有密钥」两件事）与密钥 route 的
+   *  行列表；缺席 = 密钥 route 空态。 */
   secrets?: SecretRecord[];
 }
 

@@ -5,20 +5,17 @@
 // /api/teams/:id/secrets, 02 §8 值只写不读 — the value never echoes back);
 // fixture follows the accept-dialog 律 (#148: close on submit).
 //
-// #942 正典表抽查实装点：老 ui/ 原语消费清零——Input 换 components/ui 件
-// （36px→h-8 32px，§2.6-1）、裸 textarea → Textarea 件、裸 button
-// .dlg-secret-create → Button default（§2.6-3 迁移位）。
-// #1005 registry 对齐：表单行改 Field 官方组合（FieldGroup/Field/FieldLabel/
-// FieldDescription），LABEL_CLS 手排 rhythm 退役；label 的 htmlFor/id 配对
-// 保留：它是 getByLabel 一级载体依赖的语义资产，不是类名别名。
+// Paper 表单（DESIGN.md 页面模式 · 表单）：FormStack / FormField，32px 带框
+// 控件，footer = FormActions（取消 + 添加密钥，不是整宽提交条）。label 的
+// htmlFor/id 配对是 getByLabel 一级载体依赖的语义资产。
 
 import { useState } from 'react';
-import { Button } from '../components/ui/button.js';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
+import { FORM_TEXTAREA_CLS } from './parts.js';
 
 interface CreateSecretDialogProps {
   /** #73 retained-mount open flag. */
@@ -50,45 +47,51 @@ export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDial
       title={t('添加密钥')}
       open={open}
       onClose={onClose}
-      // #1006 段 2（dialog-shell 零皮化的消费点清理）：footer 进 registry
-      // DialogFooter band（自带 p-4 + flex），旧 px-4 pb-4 包装 div 会把
-      // w-full 钮塌成内容宽——剥包装、裸钮直进（w-full 单子填满 band）。
       footer={
-        <Button className="w-full" disabled={name.trim() === '' || value === ''} onClick={submit}>
-          {t('添加密钥')}
-        </Button>
+        <FormActions
+          className="pt-0"
+          primary={{
+            label: t('添加密钥'),
+            onClick: submit,
+            disabled: name.trim() === '' || value === '',
+          }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
-      <FieldGroup className="px-4 pt-4 pb-3">
-        <Field>
-          <FieldLabel htmlFor="dlg-secret-name">{t('名称（环境变量名）')}</FieldLabel>
+      <FormStack className="py-1">
+        <FormField label={t('名称（环境变量名）')} htmlFor="dlg-secret-name">
           <Input
             id="dlg-secret-name"
+            className={FORM_CONTROL_CLS}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="STRIPE_API_KEY"
           />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="dlg-secret-desc">{t('描述（可选）')}</FieldLabel>
+        </FormField>
+        <FormField label={t('描述（可选）')} htmlFor="dlg-secret-desc">
           <Input
             id="dlg-secret-desc"
+            className={FORM_CONTROL_CLS}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder={t('该密钥的用途')}
           />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="dlg-secret-value">{t('值')}</FieldLabel>
+        </FormField>
+        <FormField
+          label={t('值')}
+          htmlFor="dlg-secret-value"
+          help={t('值将加密存储，保存后无法再次查看。')}
+        >
           <Textarea
             id="dlg-secret-value"
+            className={FORM_TEXTAREA_CLS}
             value={value}
             onChange={(event) => setValue(event.target.value)}
             placeholder={t('粘贴密钥的值')}
           />
-        </Field>
-        <FieldDescription>{t('值将加密存储，保存后无法再次查看。')}</FieldDescription>
-      </FieldGroup>
+        </FormField>
+      </FormStack>
     </DialogShell>
   );
 }
