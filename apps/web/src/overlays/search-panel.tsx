@@ -29,7 +29,12 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAgentAvatarUrlById } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_FACE, DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_FACE,
+  DialogShell,
+  PICKER_ROW_SELECTED,
+  VIEWPORT_POP_ANIM,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { StatusChip } from '../components/ui/status-chip.js';
@@ -70,8 +75,8 @@ const NAV_ROWS = [
 
 /** 行钮皮肤（#949 per-face 清零；Paper：40px 行 / 8px 圆角 / 列表容器 8px
  *  侧距 / 六档字号 / 4px 网格）。Button ghost 件配方按
- *  #908 裁决 3 七通道中和：hover 涂底换成 --row-selected 正典 pill（本族
- *  不吃 motion.css #73 的 accent-soft 淡 tint，键盘 cursor 与 hover 共面）、
+ *  #908 裁决 3 七通道中和：hover 涂底换成选中行白卡（PICKER_ROW_SELECTED，
+ *  键盘 cursor 与 hover 共面）、
  *  hover 墨色钉住行墨、press 位移禁掉（XMON-69 例外律变体链）、1px 透明边
  *  归零（border-none，r7 行盒）、font-medium 归 normal、justify/gap 随档位。
  *  focus 环 = 件基类 #388 canon，与旧全局环同值，不重复写。 */
@@ -81,22 +86,14 @@ const ROW_BASE =
 /** 结果行（任务/项目/agent）差额：icon tile 列距 12px、左垫 8px。 */
 const ROW_RESULT = 'gap-3 pl-2';
 
-/** 亮行图标 = 赭红（侧栏激活项同律：激活项图标走 accent）。行首 svg（前往）
- *  与 tile 内 svg（任务）两种落位。 */
-const LIT_ICON = '[&>svg]:text-(--card-button) [&>span:first-child>svg]:text-(--card-button)';
-const HOVER_LIT_ICON =
-  'hover:[&>svg]:text-(--card-button) hover:[&>span:first-child>svg]:text-(--card-button)';
-
 /** #159 hover 跟随的三态行底（渲染期条件类，旧 data-kbd CSS 覆写的等值
- *  机制）：静息 = 透明；鼠标态 = hover 亮正典 pill；键盘 cursor 活着 =
- *  非选中行的 hover pill 让位（唯一亮面律），选中行静息底 + hover 同值
- *  恒亮。dark: 双写中和 ghost 件的 dark:hover:bg-muted/50（--row-selected
- *  自带主题翻转，值同源）。 */
+ *  机制）：静息 = 透明；鼠标态 = hover 亮白卡 + 发丝环；键盘 cursor 活着 =
+ *  非选中行的 hover 让位（唯一亮面律），选中行静息 + hover 同值恒亮。
+ *  dark: 双写中和 ghost 件的 dark:hover:bg-muted/50。 */
 function rowLitClasses(selected: boolean, kbd: boolean): string {
-  if (selected)
-    return `bg-(--secondary) hover:bg-(--secondary) dark:hover:bg-(--secondary) ${LIT_ICON}`;
+  if (selected) return PICKER_ROW_SELECTED;
   if (kbd) return 'hover:bg-transparent dark:hover:bg-transparent';
-  return `hover:bg-(--secondary) dark:hover:bg-(--secondary) ${HOVER_LIT_ICON}`;
+  return 'hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border dark:hover:bg-card';
 }
 
 /** 28px icon tile（结果行首列）：--row-icon-bg 底 + 8px 圆角；项目/agent

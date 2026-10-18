@@ -73,12 +73,17 @@ export const VIEWPORT_POP_ANIM =
 export const DIALOG_FACE =
   'rounded-(--edge-radius) bg-dialog-surface shadow-(--shadow-popover) ring-0';
 
-/** 对话框主操作：墨色胶囊（Button default 档；危险确认换 destructive 档保危险
- *  token），一个对话框只有一个。 */
-export const DIALOG_PRIMARY_BUTTON = 'h-7.5 gap-1.5 rounded-full px-4 text-ui';
+/** 对话框主操作：Button default 档（墨底、32px）+ 8px 圆角；危险确认换
+ *  destructive 档保危险 token。一个对话框只有一个。 */
+export const DIALOG_PRIMARY_BUTTON = 'rounded-md text-ui';
 
 /** 对话框次操作：文字按钮（Button ghost 档），hover 出浅底。 */
-export const DIALOG_TEXT_BUTTON = 'h-7.5 gap-1.5 px-3 text-ui font-normal text-content-secondary';
+export const DIALOG_TEXT_BUTTON = 'gap-1.5 px-3 text-ui font-normal text-content-secondary';
+
+/** 选择器 / ⌘K 的选中行：白卡 + 发丝环 + 极轻卡片投影，不铺 hover 色、不带
+ *  赭红。 */
+export const PICKER_ROW_SELECTED =
+  'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
 
 interface DialogShellProps {
   /** Left header title; absent when `headerCenter` renders instead. */

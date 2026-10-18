@@ -24,7 +24,7 @@
 import { Fragment, type Ref, useEffect } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
-import { DIALOG_FACE } from '../components/ui/dialog-shell.js';
+import { DIALOG_FACE, PICKER_ROW_SELECTED } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { SlashRow } from './slash-commands.js';
 
@@ -113,7 +113,7 @@ export function SlashMenu({
                     tabIndex={-1}
                     role="option"
                     aria-selected={index === highlight}
-                    className={`${ROW_CLS}${index === highlight ? ' bg-(--secondary)' : ''}`}
+                    className={`${ROW_CLS}${index === highlight ? ` ${PICKER_ROW_SELECTED}` : ''}`}
                     onMouseDown={(event) => event.preventDefault()}
                     onMouseEnter={() => onHover(index)}
                     onClick={() => onPick(row)}

@@ -1,14 +1,15 @@
 // Dialog evidence (paper-redesign-plan, dialogs PR): light and dark captures
 // of every restyled overlay, opened with realistic content on a fixture
 // bundle served by `vite preview`.
-//   node docs/verify/paper-dialogs/capture.mjs <label> <baseUrl>
-// label = before | after; baseUrl = a preview of `vite build --mode fixture`.
+//   node docs/verify/paper-dialogs/capture.mjs <label> <baseUrl> [shot,...]
+// label = before | after; baseUrl = a preview of `vite build --mode fixture`;
+// the optional third argument limits the run to the named shots.
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
-const [label, base] = process.argv.slice(2);
+const [label, base, only] = process.argv.slice(2);
 if (!label || !base) throw new Error('usage: capture.mjs <label> <baseUrl>');
 const out = dirname(fileURLToPath(import.meta.url));
 mkdirSync(out, { recursive: true });
@@ -34,6 +35,11 @@ async function openNewTask(page) {
 }
 
 const shots = {
+  async topbar(page) {
+    await page.goto(`${base}/app?scenario=01`);
+    await page.locator('[data-todo-id]').first().waitFor();
+    return { x: 900, y: 0, width: 540, height: 76 };
+  },
   async newtask(page) {
     await openNewTask(page);
   },
@@ -93,15 +99,19 @@ const shots = {
 const browser = await chromium.launch();
 for (const theme of ['light', 'dark']) {
   for (const [name, open] of Object.entries(shots)) {
-    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    if (only && !only.split(',').includes(name)) continue;
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: name === 'topbar' ? 2 : 1,
+    });
     await context.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await context.route('**/api/attachments/**', (route) =>
       route.fulfill({ status: 200, contentType: 'image/png', body: png }),
     );
     const page = await context.newPage();
-    await open(page);
+    const clip = await open(page);
     await page.waitForTimeout(600);
-    await page.screenshot({ path: join(out, `${label}-${theme}-${name}.png`) });
+    await page.screenshot({ path: join(out, `${label}-${theme}-${name}.png`), clip });
     await context.close();
   }
 }

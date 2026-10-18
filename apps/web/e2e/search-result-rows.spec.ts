@@ -25,17 +25,17 @@ const TRANSPARENT = 'rgba(0, 0, 0, 0)';
 const rowBg = (locator: Locator) =>
   locator.evaluate((el) => getComputedStyle(el).backgroundColor);
 
-/** A lit row paints the canon pill: background === resolved
- *  --row-selected (the look the r7 05 fixed selected row used to carry),
- *  not the generic #73 surface-hover tint. */
+/** A lit row paints the selected-row card (PICKER_ROW_SELECTED): --card
+ *  fill plus the hairline ring box-shadow, not a hover-tone fill. */
 const isLit = (locator: Locator) =>
   locator.evaluate((el) => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--secondary)';
+    probe.style.color = 'var(--card)';
     document.documentElement.append(probe);
     const lit = getComputedStyle(probe).color;
     probe.remove();
-    return getComputedStyle(el).backgroundColor === lit;
+    const cs = getComputedStyle(el);
+    return cs.backgroundColor === lit && cs.boxShadow !== 'none';
   });
 
 /** ⌘K until the panel answers — the hotkey listener registers in a

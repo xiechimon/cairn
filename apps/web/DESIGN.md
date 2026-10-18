@@ -67,7 +67,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。
 - **强调色纪律**：`accent` 只用于：需要你处理的状态与计数、卡片上的操作链接、激活导航项的图标、计数徽章底色。不做装饰、不做大面积底色。
 - **状态不只靠颜色**：每个状态都是「图标 + 颜色 + 文字」三件套（失败 ⊗ 失败 / 待确认 ☰ 待确认 / 待审阅 ⑂ 待审阅），色弱用户靠图标和文字也能分辨。
-- **主按钮是墨色，不是彩色**：`ink` 底 + `sheet` 字，圆角胶囊。赭红不做主按钮底色。
+- **主按钮是墨色，不是彩色**：shadcn Button default 档，`ink` 底 + `sheet` 字，8px 圆角（`control`）。赭红不做主按钮底色。
 - 颜色只住在 token 文件（`src/styles/shadcn.css` / `tokens.css`），组件里写 token 名，不写 hex（`scripts/ui-drift-gate.mjs` G2 已经钉住）。
 
 ## 字体（Hybrid）
@@ -81,9 +81,9 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 ## 布局与间距
 
 - 4px 网格。常用值：4 / 8 / 12 / 16 / 24。卡片内边距 12×14，卡片间距 8，列间距 16，看板内边距 18×24。
-- 顶栏 56px：左侧衬线页面标题 + 「⚠ N 项等你处理」；右侧文字按钮（筛选、定时）+ 墨色胶囊「新任务」。所有顶栏元素 `nowrap`，窄窗口不换行。
+- 顶栏 56px：左侧衬线页面标题 + 「⚠ N 项等你处理」；右侧文字按钮（筛选、定时）+ 墨色主按钮「新任务」。所有顶栏元素 `nowrap`，窄窗口不换行。
 - 侧栏 248px，坐在 `canvas` 上；主面板是右侧一张 `sheet`，四周留 10px。
-- 一屏只有一个主操作（墨色胶囊），其余操作是文字按钮或卡片内的赭红链接。
+- 一屏只有一个主操作（墨色主按钮），其余操作是文字按钮或卡片内的赭红链接。
 
 ## 图标
 
@@ -117,9 +117,12 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - 卡片上不放实心按钮。
 
 ### 按钮
-- 主按钮：墨色胶囊，高 30–34。
+- 主按钮：shadcn Button default 档，墨底，8px 圆角（`rounded-md`，即 `control`），高 32。
 - 次按钮：文字按钮，hover 出浅底。
 - 卡片操作：赭红文字链接 + 图标，hover 出 `accent-hover` 底。
+
+### 选择器与 ⌘K
+- 选中行（键盘光标或鼠标所在行）：白卡（`card`）+ `line` 发丝环 + 最多一档极轻投影（0 1px 2px）。不铺 hover 色、不带赭红。
 
 ## 动效
 
@@ -140,7 +143,7 @@ Pacman UI rules (source: apps/web/DESIGN.md):
 - Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
-- Primary button = ink pill. Card actions = terracotta text links. No solid buttons on cards.
+- Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
 - Sidebar = Grouped: workspace row (16px pixel pac-man mark from logo.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.
 ```

@@ -33,7 +33,11 @@
 import { type Ref, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent } from '../components/ui/dialog.js';
-import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  PICKER_ROW_SELECTED,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -101,7 +105,7 @@ const PANEL_CLS =
 
 /** 类目/实体行基底（原 .mention-row，Button ghost 七通道中和）。 */
 const ROW_CLS =
-  'flex w-full cursor-pointer items-center justify-start gap-3 border-0 bg-transparent px-4 py-0 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto disabled:cursor-default';
+  'flex w-full cursor-pointer items-center justify-start gap-3 rounded-md border-0 bg-transparent px-3 py-0 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto disabled:cursor-default';
 
 /** head 返回/关闭钮（原 .mention-picker-back/-close）：24px 方钮、tertiary
  *  墨，hover = ghost 档浅底 + 正文墨。 */
@@ -289,7 +293,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
           </Button>
         </div>
         {layer === 'top' ? (
-          <div className="flex-1 overflow-auto py-1">
+          <div className="flex-1 overflow-auto p-1">
             {CATEGORIES.map(({ kind, Icon }) => (
               <TopRow
                 key={kind}
@@ -311,7 +315,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="flex-1 overflow-auto py-1">
+            <div className="flex-1 overflow-auto p-1">
               {filteredEntries.length === 0 ? (
                 <div className="px-4 py-6 text-center text-meta text-content-tertiary">
                   {drilledQuery === ''
@@ -327,7 +331,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
                       variant="ghost"
                       type="button"
                       className={`${ROW_CLS} mention-row--entry h-12${
-                        isSelected ? ' bg-(--secondary)' : ''
+                        isSelected ? ` ${PICKER_ROW_SELECTED}` : ''
                       }`}
                       onClick={() => toggle(layer, entry.id)}
                     >
@@ -352,7 +356,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
           <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          {/* #1055 角色分槽：确认动作 = 主操作 → 墨色胶囊（registry Button
+          {/* #1055 角色分槽：确认动作 = 主操作 → 墨底主钮（registry Button
               default 档，禁用态走 registry opacity 降档）。类名锚原位保留
               （e2e 定位面，零规则）。 */}
           <Button
@@ -431,7 +435,7 @@ const INLINE_PANEL_CLS =
  *  JS 驱动的 --active 高亮共面（#728 combobox 律：箭头与 hover 一种视觉
  *  语言，DOM 焦点恒在 textarea）。 */
 const INLINE_ROW_CLS =
-  'mention-inline-row flex h-10 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-0 bg-transparent px-2 text-left text-ui font-normal text-foreground hover:bg-(--secondary) hover:text-foreground focus:bg-(--secondary) dark:hover:bg-(--secondary) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'mention-inline-row flex h-10 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-0 bg-transparent px-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 
 export function MentionInline({
   open,
@@ -476,7 +480,7 @@ export function MentionInline({
             tabIndex={-1}
             role="option"
             aria-selected={index === highlight}
-            className={`${INLINE_ROW_CLS}${index === highlight ? ' mention-inline-row--active bg-(--secondary)' : ''}`}
+            className={`${INLINE_ROW_CLS}${index === highlight ? ` mention-inline-row--active ${PICKER_ROW_SELECTED}` : ''}`}
             // Keep the textarea focused: a row mousedown must not blur it
             // (focus loss = broken continuous typing + IME, failure mode 4).
             onMouseDown={(event) => event.preventDefault()}

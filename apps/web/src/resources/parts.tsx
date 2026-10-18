@@ -34,17 +34,12 @@ import { ChevronRight, Lock } from '../icons/index.js';
    RES_SORT_WRAP）随最后一个消费点迁完删除（#1054 消费点方角清点执行，
    台账见 docs/spec/27）。行容器是纯 layout，留守。 */
 
-/** Top bar `+ 新建` of the resource pages: the ink pill primary.
+/** Top bar `+ 新建` of the resource pages: the ink primary button.
  *  data-testid="resource-new" is the hit-test probe handle (title-band-clicks). */
 export function ResourceNewButton({ onClick }: { onClick: () => void }) {
   const { t } = useI18n();
   return (
-    <Button
-      size="sm"
-      className={TOPBAR_PRIMARY_BUTTON}
-      onClick={onClick}
-      data-testid="resource-new"
-    >
+    <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onClick} data-testid="resource-new">
       <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
       {t('新建')}
     </Button>

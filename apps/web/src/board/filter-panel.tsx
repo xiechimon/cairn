@@ -50,11 +50,13 @@ import { TagChip } from '../components/ui/tag-chip.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, X } from '../icons/index.js';
 
-/** 顶栏文字按钮（筛选 / 定时）共用的几何与墨色：30px 高、14px 图标、界面字号。 */
-export const TOPBAR_TEXT_BUTTON = 'h-7.5 gap-1.5 px-2.5 text-ui font-normal text-content-secondary';
+/** 顶栏文字按钮（筛选 / 定时）共用的几何与墨色：32px 高（与主按钮同排同高）、14px
+ *  图标、界面字号。 */
+export const TOPBAR_TEXT_BUTTON = 'h-8 gap-1.5 px-2.5 text-ui font-normal text-content-secondary';
 
-/** 顶栏主操作（新任务 / 新建）：墨色胶囊，一屏只有一个。 */
-export const TOPBAR_PRIMARY_BUTTON = 'ml-2 h-7.5 gap-1.5 rounded-full pr-3.5 pl-3 text-ui';
+/** 顶栏主操作（新任务 / 新建）：Button default 档（墨底、32px）+ 8px 圆角，
+ *  一屏只有一个。 */
+export const TOPBAR_PRIMARY_BUTTON = 'ml-2 gap-1.5 rounded-md text-ui';
 
 /** 选项超过此数才给搜索框——短词表（固定 6 词）搜索框是纯噪音。 */
 const SEARCH_THRESHOLD = 8;

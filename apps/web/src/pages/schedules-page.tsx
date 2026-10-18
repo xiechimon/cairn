@@ -533,7 +533,6 @@ export function SchedulesPage() {
       actions={
         // page-new-action = overlay-focus / dead-buttons handle.
         <Button
-          size="sm"
           className={`page-new-action ${TOPBAR_PRIMARY_BUTTON}`}
           onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
         >

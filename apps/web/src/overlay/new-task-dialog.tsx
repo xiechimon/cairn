@@ -769,7 +769,7 @@ export function NewTaskDialog({
           <AttachmentStrip draft={spec} pending={pendingAttachments} />
         </div>
         <div className="flex-none border-t border-border p-3">
-          <div className="flex h-7.5 items-center">
+          <div className="flex h-8 items-center">
             {/* A4-deep 收编：icon 变体皮肤；30×30 = size-7.5（原 .new-task-tools
                 button 元素选择器）。 */}
             <div className="flex items-center gap-1" data-testid="new-task-tools">
@@ -818,7 +818,7 @@ export function NewTaskDialog({
                 {/* XMON-95 界面标识：常亮按键角标（kbd-hint 的 hover chip 是
                     另一面，这里要「看得到」，故静息可见）。落在 kbd.tsx 原语
                     上（COMPONENTS.md「文档正文里的按键角标用 kbd.tsx」），只把
-                    registry 的尺寸/配色档改写到本面：本钮是墨色胶囊，角标底与
+                    registry 的尺寸/配色档改写到本面：本钮是墨底主钮，角标底与
                     墨走 primary-foreground 半透明系而非 muted。
                     aria-hidden：角标是视觉提示，按钮的可及名仍是文字本身。 */}
                 <Kbd
@@ -861,7 +861,7 @@ export function NewTaskDialog({
           <div className="font-heading text-heading font-medium text-foreground">
             {t('放弃新建任务？未保存的内容将丢失。')}
           </div>
-          <div className="flex h-7.5 items-center justify-end gap-2">
+          <div className="flex h-8 items-center justify-end gap-2">
             {/* 原 .new-task-discard-keep：文字次操作；放弃 = 唯一主操作，保危险
                 token。 */}
             <Button

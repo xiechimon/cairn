@@ -32,17 +32,18 @@ function pillBg(locator: Locator) {
   return locator.evaluate((el) => getComputedStyle(el).backgroundColor);
 }
 
-/** #159: the hovered row lights with the canon pill — its background
- *  equals the resolved --row-selected token (the look the r7 05 fixed
- *  selected row used to carry), not the generic #73 surface-hover tint. */
+/** #159: the hovered row lights as the selected-row card (Paper dialogs PR,
+ *  PICKER_ROW_SELECTED): --card fill plus the hairline ring box-shadow, not
+ *  a hover-tone fill. */
 function isLit(locator: Locator) {
   return locator.evaluate((el) => {
     const probe = document.createElement('span');
-    probe.style.color = 'var(--secondary)';
+    probe.style.color = 'var(--card)';
     document.documentElement.append(probe);
     const lit = getComputedStyle(probe).color;
     probe.remove();
-    return getComputedStyle(el).backgroundColor === lit;
+    const cs = getComputedStyle(el);
+    return cs.backgroundColor === lit && cs.boxShadow !== 'none';
   });
 }
 

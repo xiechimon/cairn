@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Paper board top bar (apps/web/DESIGN.md 布局与间距, paper-redesign-plan PR 4):
 // 56px bar; serif 工作台 + needs-you summary on the left; 筛选 / 定时 text
-// controls and the ink 新任务 pill on the right; nothing wraps.
+// controls and the ink 新任务 button on the right; nothing wraps.
 
 const topbar = (page: Page) => page.locator('[data-route="board"] header').first();
 const summary = (page: Page) => topbar(page).getByTestId('needs-you');
@@ -10,7 +10,7 @@ const pendingCount = (page: Page) =>
   page.locator('.board-column[data-column="pending"]').getByTestId('column-count');
 const filterBtn = (page: Page) => topbar(page).getByRole('button', { name: '筛选', exact: true });
 const schedulesLink = (page: Page) => topbar(page).getByRole('link', { name: '定时' });
-const newTaskPill = (page: Page) => topbar(page).getByRole('button', { name: '新任务' });
+const newTaskButton = (page: Page) => topbar(page).getByRole('button', { name: '新任务' });
 
 test('bar geometry: 56px, serif page title, summary N = the 待处理 column count', async ({
   page,
@@ -79,18 +79,23 @@ test('定时 is a client-side link to the schedules page, scenario kept', async 
   ).toBe('alive');
 });
 
-test('新任务 pill opens the same new-task dialog as C', async ({ page }) => {
-  await page.goto('/app?scenario=01');
-  await expect(newTaskPill(page)).toHaveAttribute('data-variant', 'default');
-  await newTaskPill(page).click();
-  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
-});
-
-test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on the pill opens the dialog', async ({
+test('新任务 is the shadcn default Button (ink, 32px, 8px corners) and opens the same new-task dialog as C', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
-  const targets = [filterBtn(page), schedulesLink(page), newTaskPill(page)];
+  await expect(newTaskButton(page)).toHaveAttribute('data-variant', 'default');
+  await expect(newTaskButton(page)).toHaveAttribute('data-size', 'default');
+  await expect(newTaskButton(page)).toHaveCSS('height', '32px');
+  await expect(newTaskButton(page)).toHaveCSS('border-top-left-radius', '8px');
+  await newTaskButton(page).click();
+  await expect(page.getByRole('dialog', { name: '新建任务' })).toBeVisible();
+});
+
+test('keyboard: Tab reaches all three controls with a visible focus ring; Enter on 新任务 opens the dialog', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=01');
+  const targets = [filterBtn(page), schedulesLink(page), newTaskButton(page)];
   for (const target of targets) {
     let reached = false;
     for (let i = 0; i < 60 && !reached; i++) {
@@ -120,11 +125,11 @@ test('narrow window: the summary truncates, the controls stay on one row inside 
   if (bar == null) throw new Error('missing bar');
   expect(bar.height).toBe(56);
   const boxes = await Promise.all(
-    [filterBtn(page), schedulesLink(page), newTaskPill(page)].map((l) => l.boundingBox()),
+    [filterBtn(page), schedulesLink(page), newTaskButton(page)].map((l) => l.boundingBox()),
   );
   for (const b of boxes) {
     if (b == null) throw new Error('missing control');
-    expect(b.height).toBe(30);
+    expect(b.height).toBe(32);
     expect(b.y).toBe(boxes[0]?.y);
     expect(b.x + b.width).toBeLessThanOrEqual(bar.x + bar.width);
   }

@@ -139,20 +139,6 @@
       "role": "indicator",
       "reason": "Detail top bar status for the three needs-you phases (icon + 失败/确认/审核, paper-redesign-plan PR 7). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 13.5px text)"
-    },
-    {
-      "file": "apps/web/src/overlays/search-panel.tsx",
-      "anchor": "const LIT_ICON = ",
-      "role": "indicator",
-      "reason": "The keyboard-selected row in the ⌘K panel lights its icon in the accent, the same active-item rule as the sidebar (DESIGN.md 颜色: active nav icons). The row fill stays the neutral hover tone.",
-      "contrast": "Measured (WCAG 2.x, PR paper-dialogs): light accent #b4532a on lit row --secondary 3.95, on icon tile --row-icon-bg 3.67; dark #f294d8 on --secondary 6.87, on tile 5.20; non-text glyph, 3:1 gate"
-    },
-    {
-      "file": "apps/web/src/overlays/search-panel.tsx",
-      "anchor": "hover:[&>svg]:text-(--card-button)",
-      "role": "indicator",
-      "reason": "Mouse twin of LIT_ICON: the hovered row is the one lit row while no keyboard cursor lives (#159), so it carries the same accent icon.",
-      "contrast": "Measured (WCAG 2.x, PR paper-dialogs): light accent #b4532a on lit row --secondary 3.95, on icon tile --row-icon-bg 3.67; dark #f294d8 on --secondary 6.87, on tile 5.20; non-text glyph, 3:1 gate"
     }
   ]
 }
