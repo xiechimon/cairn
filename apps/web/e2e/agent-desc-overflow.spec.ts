@@ -107,7 +107,7 @@ test('account 页：推送通知行（auto 档）值槽改可收缩后无回归'
   await expect(notifSwitch).toBeVisible();
   // 点开 Switch 触发 hint 出现（denied 态 = auto 档激活）
   await notifSwitch.click();
-  const hint = card.locator('.profile-hint');
+  const hint = card.locator('.account-notify-blocked');
   await expect(hint).toBeVisible();
   // 行盒几何无溢出
   const row = card.locator('.profile-row').last();

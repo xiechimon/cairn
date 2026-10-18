@@ -1,0 +1,174 @@
+{
+  "light-account": {
+    "cardRadius": "16px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "cls": "profile-head",
+        "h": 120,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 49,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 57,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      }
+    ]
+  },
+  "light-agent": {
+    "cardRadius": "16px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "cls": "profile-head",
+        "h": 120,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 49,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 75,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 57,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(235, 228, 216)",
+        "borderTop": "1px"
+      }
+    ]
+  },
+  "dark-account": {
+    "cardRadius": "16px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.934561 0.00473785 0.00706124 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "cls": "profile-head",
+        "h": 120,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 49,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 57,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      }
+    ]
+  },
+  "dark-agent": {
+    "cardRadius": "16px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.934561 0.00473785 0.00706124 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "cls": "profile-head",
+        "h": 120,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 49,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 75,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 57,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 41,
+        "bg": "rgb(45, 41, 38)",
+        "borderTop": "1px"
+      }
+    ]
+  }
+}

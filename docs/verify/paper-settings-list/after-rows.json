@@ -1,0 +1,126 @@
+{
+  "light-account": {
+    "cardRadius": "12px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      }
+    ]
+  },
+  "light-agent": {
+    "cardRadius": "12px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "cls": "profile-row",
+        "h": 65,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      }
+    ]
+  },
+  "dark-account": {
+    "cardRadius": "12px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      }
+    ]
+  },
+  "dark-agent": {
+    "cardRadius": "12px",
+    "cardShadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "cardBg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "cls": "profile-row",
+        "h": 65,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      },
+      {
+        "cls": "profile-row",
+        "h": 52,
+        "bg": "rgba(0, 0, 0, 0)",
+        "borderTop": "0px"
+      }
+    ]
+  }
+}

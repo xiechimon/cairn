@@ -39,8 +39,8 @@
 // 旧 `${prefix}-wrap|shell|row-name|row-meta|check` 随手写壳退役——Root 不
 // 落 DOM、退场桥归 Base UI 动效、行内名/勾归 SelectItem 结构。弹层经
 // Portal 挂 body（不再嵌在触发钮 wrap 里），locator 一律页面级取。
-// triggerClassName 只承载布局位（弹窗面的 w-full 撑行宽）；皮肤/几何位按
-// D1 不存在。
+// triggerClassName 承载布局位（弹窗面的 w-full 撑行宽）与设置卡的 Paper
+// 白底框式触发钮配方（PROFILE_SELECT_TRIGGER_CLS）。
 
 import { cn } from 'cn';
 import { modelEchoLabel, providerEchoLabel } from '../components/model-select-core.js';

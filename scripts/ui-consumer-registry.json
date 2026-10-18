@@ -57,13 +57,6 @@
       "contrast": "docs/verify/1055/colors/incremental.md"
     },
     {
-      "file": "apps/web/src/routes/account-page.tsx",
-      "anchor": "ml-auto flex text-(--card-button)",
-      "role": "selection-mark",
-      "reason": "Current-language option check mark — #991 Q10 激活态强调面; kept on the user-approved wave-1 ruling (0bfbdefa).",
-      "contrast": "docs/verify/1055/colors/incremental.md"
-    },
-    {
       "file": "apps/web/src/overlay/new-task-dialog.tsx",
       "anchor": "ml-auto flex text-(--card-button)",
       "role": "selection-mark",
