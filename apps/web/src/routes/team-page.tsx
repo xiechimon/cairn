@@ -135,6 +135,7 @@ export function TeamPage() {
           <Link
             className={buttonVariants({ variant: 'ghost', className: TOPBAR_TEXT_BUTTON })}
             to={{ pathname: '/app/account', search }}
+            aria-label={t('设置')}
           >
             {t('设置')}
           </Link>
