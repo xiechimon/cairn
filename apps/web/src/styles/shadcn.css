@@ -69,6 +69,7 @@
   --color-running-bar: var(--running-bar);
   --color-running-track: var(--running-track);
   --color-accent-hover: var(--accent-hover);
+  --color-dialog-surface: var(--dialog-surface);
   --color-project-tile-1: var(--project-tile-1);
   --color-project-tile-2: var(--project-tile-2);
   --color-project-tile-3: var(--project-tile-3);
@@ -258,7 +259,8 @@
   --spot-disabled-fg: color-mix(in srgb, var(--card-button) 65%, white);
   /* Paper 语义槽（apps/web/DESIGN.md）。暗侧在暗色定稿前取现有暗阶梯最近档：
      canvas = 现 --surface-1 配方；running 三档 = col-dot-done / chip-done-fg /
-     diff-add-fg；track = secondary；accent-hover = spot-soft；tile 按色相取
+     diff-add-fg；track = secondary；accent-hover = spot-soft；dialog-surface =
+     popover（对话框在暗侧保持现有浮层底）；tile 按色相取
      现有暗侧高明度档（暗侧首字母配深字，同 --project-avatar-fg 惯例）。 */
   --canvas: color-mix(in oklab, var(--background), var(--card) 50%);
   --running: #77d08c;
@@ -266,6 +268,7 @@
   --running-bar: #6ac380;
   --running-track: #2d2926;
   --accent-hover: var(--spot-soft);
+  --dialog-surface: var(--popover);
   --project-tile-1: #ff9c75;
   --project-tile-2: #77d08c;
   --project-tile-3: #c4b6ab;
@@ -385,6 +388,7 @@
   --running-bar: #7ea476;
   --running-track: #ebe5da;
   --accent-hover: #f6ebe3;
+  --dialog-surface: var(--background);
   --project-tile-1: #c06a43;
   --project-tile-2: #7d8b5a;
   --project-tile-3: #6b7a8f;

@@ -18,6 +18,7 @@ import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { useEscClose } from '../../overlay/use-esc.js';
 import { Button } from './button.js';
+import { DIALOG_FACE, DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from './dialog-shell.js';
 
 interface AlertDialogShellProps {
   /** Head title — the caller's canon copy (任务: 确定删除该任务…). */
@@ -66,14 +67,16 @@ export function AlertDialogShell({
         <AlertDialogPrimitive.Popup
           role="alertdialog"
           data-slot="alert-dialog-content"
-          className={`delete-confirm [transition:visibility_0s_linear_var(--dur-overlay)] data-[ending-style]:invisible${className != null ? ` ${className}` : ''} fixed top-1/2 left-1/2 z-(--z-dialog) flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-(--edge-radius) bg-popover text-sm text-popover-foreground shadow-(--dialog-shadow) ring-1 ring-foreground/10 outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95`}
+          className={`delete-confirm [transition:visibility_0s_linear_var(--dur-overlay)] data-[ending-style]:invisible${className != null ? ` ${className}` : ''} fixed top-1/2 left-1/2 z-(--z-dialog) flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden ${DIALOG_FACE} text-ui text-popover-foreground outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95`}
           style={{ width }}
           aria-label={ariaLabel}
         >
           <div className="relative flex h-12 flex-none items-center border-b border-border px-4">
-            <div className="delete-confirm-title text-sm font-medium text-foreground">{title}</div>
+            <div className="delete-confirm-title font-heading text-heading font-medium text-foreground">
+              {title}
+            </div>
             <AlertDialogPrimitive.Close
-              className="delete-confirm-close absolute right-3 flex size-6 items-center justify-center rounded-md text-muted-foreground"
+              className="delete-confirm-close absolute right-3 flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label={t('关闭')}
               onClick={onClose}
             >
@@ -105,13 +108,17 @@ export function AlertDialogActions({
 }) {
   return (
     <div className="flex flex-none items-center justify-end gap-2 px-4 py-3">
-      <Button variant="ghost" className="delete-confirm-cancel" onClick={onCancel}>
+      <Button
+        variant="ghost"
+        className={`delete-confirm-cancel ${DIALOG_TEXT_BUTTON}`}
+        onClick={onCancel}
+      >
         {cancelLabel}
       </Button>
       <Button
         variant="destructive"
         size="default"
-        className={confirmClassName ?? 'delete-confirm-delete'}
+        className={`${confirmClassName ?? 'delete-confirm-delete'} ${DIALOG_PRIMARY_BUTTON}`}
         disabled={confirmDisabled}
         onClick={onConfirm}
       >

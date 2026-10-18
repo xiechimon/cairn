@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "8604941f2b4fcde83cc8ceeed83ac76298b84bd4",
-    "date": "2026-10-15"
+    "sha": "b4abfdc2a3c57db4a4131968127468b181405772",
+    "date": "2026-10-18"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide.",
-      "hash": "eaeca4202d131e6442e0c816628f4b76c09dfd696b7608b01e078cf576551ccf"
+      "hash": "01919cde1fb62050aa262f7fb653e797fb798445bcf997fd61e30ae4800320f1"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -64,7 +64,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#983 verdict / map #980 (ruling 2/4): zero-skin adapter over the registry dialog item — regular faces compose Dialog/DialogContent/DialogHeader/DialogTitle/DialogFooter (registry defaults win: panel/overlay skin, motion, close button all come from dialog.tsx), keeping only the repo behavior contracts as semantic mapping (#193 three-segment cap via layout classes + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law via native dismiss, width as a layout position). The viewportRoot and bare modes stay on the legacy direct-primitive mechanism unchanged — they are the #983 adapter-boundary pressure points whose surfaces belong to the L5 lane (#1008) and whose fate is ruled at that lane's prototype review; zIndex/onBackdropClick/backdropClassName serve only those two modes (#1006).",
-      "hash": "85a4a2928204c77737936316eb4224336d6c242562b3b8169ccfd35b1cb996b6"
+      "hash": "b562b70a9e3ac03734b8a531add9b09504ec2ee5d0713d209914e5a5107d62ab"
     },
     "dialog.tsx": {
       "kind": "registry",

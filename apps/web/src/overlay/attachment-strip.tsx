@@ -61,12 +61,12 @@ export function AttachmentPreview({
           随 DialogShell（640），高图滚 dlg-body（100vh−48px 封顶律）。 */}
       <div className="flex items-center justify-center p-3">
         {broken ? (
-          <div className="px-4 py-8 text-[13px] text-(--text-secondary)">{name}</div>
+          <div className="px-4 py-8 text-ui text-content-secondary">{name}</div>
         ) : (
           <img
             src={src}
             alt={name}
-            className="max-h-[60vh] max-w-full rounded-[4px] object-contain"
+            className="max-h-[60vh] max-w-full rounded-(--radius-control) object-contain"
             onError={() => setBroken(true)}
           />
         )}

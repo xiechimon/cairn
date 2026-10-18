@@ -1,6 +1,6 @@
 // The one shell for every non-board route (paper-redesign-plan PR 6):
 // Grouped sidebar on canvas, a sheet panel inset 10px, the Paper top bar
-// (56px, serif page title, text buttons + one ink pill) and one 768px
+// (56px, serif page title, text buttons + one ink primary button) and one 768px
 // reading column. Class aliases page-shell / page-main / page-main-col /
 // page-tabs-group / page-tab are e2e handles.
 import type { ReactNode } from 'react';
@@ -74,7 +74,7 @@ interface PageShellProps {
   tabs?: PageTab[];
   tab?: string;
   onTab?: (id: string) => void;
-  /** Right side of the top bar: text buttons, then at most one ink pill. */
+  /** Right side of the top bar: text buttons, then at most one ink primary button. */
   actions?: ReactNode;
   /** Page-owned 新任务 dialog (project page); absent = the sidebar's own. */
   onNewTask?: () => void;

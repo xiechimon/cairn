@@ -1,6 +1,6 @@
 // Detail top bar (issue #56; Paper top bar, paper-redesign-plan PR 7): back
 // link, serif task title, #seq, the status (icon + color + label) that
-// toggles the assignment popover, then 更多 and the phase's one ink pill.
+// toggles the assignment popover, then 更多 and the phase's one ink primary button.
 // #58: the back link carries the current search string home so the
 // dev/fixture ?scenario= selection survives the round trip. #1255: each
 // column list's scrollTop is restored by BoardSurface from sessionStorage.
@@ -189,7 +189,6 @@ export function DetailHead({
             // #1216: a start/rerun already went out; a second click would
             // spawn another orchestration thread.
             <Button
-              size="sm"
               className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
               data-orchestrating="true"
               disabled
@@ -197,11 +196,7 @@ export function DetailHead({
               {t('编排中')}
             </Button>
           ) : (
-            <Button
-              size="sm"
-              className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
-              onClick={onAction}
-            >
+            <Button className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`} onClick={onAction}>
               {t(action)}
             </Button>
           ))}

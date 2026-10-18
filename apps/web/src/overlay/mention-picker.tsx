@@ -33,6 +33,11 @@
 import { type Ref, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent } from '../components/ui/dialog.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  PICKER_ROW_SELECTED,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -90,21 +95,22 @@ const CATEGORIES: { kind: MentionKind; Icon: typeof FileCheck }[] = [
   { kind: 'machine', Icon: Server },
 ];
 
-/** 面板 layout 槽（#1008：皮肤/定位退役，registry DialogContent 默认赢）：
- *  400 宽（窄视口回 calc(100vw-2rem) 件默认律）、70vh 封顶、列布局内部分段
- *  （head/list/foot 各自的 border 全出血，故 p-0 gap-0）。别名 mention-picker
+/** 面板 layout 槽（#1008：定位归 registry DialogContent 默认）：400 宽（窄
+ *  视口回 calc(100vw-2rem) 件默认律）、70vh 封顶、列布局内部分段（head/list/
+ *  foot 各自的 border 全出血，故 p-0 gap-0）。Paper 选择器面 = 白底 + 10px
+ *  圆角 + 浮层投影（自带发丝环，ring-0 撤 registry 环）。别名 mention-picker
  *  原样（e2e 句柄）。 */
 const PANEL_CLS =
-  'mention-picker flex max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-(--edge-radius) p-0 shadow-(--dialog-shadow) sm:max-w-[400px]';
+  'mention-picker flex max-h-[70vh] w-100 max-w-[calc(100vw-2rem)] flex-col gap-0 overflow-hidden rounded-lg bg-popover p-0 shadow-(--shadow-popover) ring-0 sm:max-w-100';
 
 /** 类目/实体行基底（原 .mention-row，Button ghost 七通道中和）。 */
 const ROW_CLS =
-  'flex w-full cursor-pointer items-center justify-start gap-2.5 border-0 bg-transparent px-3.5 py-0 text-left text-sm font-normal text-(--foreground) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto disabled:cursor-default';
+  'flex w-full cursor-pointer items-center justify-start gap-3 rounded-md border-0 bg-transparent px-3 py-0 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto disabled:cursor-default';
 
-/** head 返回/关闭钮（原 .mention-picker-back/-close：22px 方钮、6px 圆角、
- *  tertiary 墨，hover 吃 #73 家族同值 --accent-soft tint + primary 墨）。 */
+/** head 返回/关闭钮（原 .mention-picker-back/-close）：24px 方钮、tertiary
+ *  墨，hover = ghost 档浅底 + 正文墨。 */
 const HEAD_BTN_CLS =
-  'size-[22px] cursor-pointer rounded-[6px] border-none bg-transparent text-(--text-tertiary) font-normal hover:bg-(--accent-soft) hover:text-(--foreground) dark:hover:bg-(--accent-soft) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0';
+  'size-6 cursor-pointer rounded-md text-content-tertiary active:not-aria-[haspopup]:translate-y-0';
 
 /** r9 §2.2 first layer uses a 28px icon glyph + label + count chip on
  *  the right. Each row is 44 tall, pitch 45 — implemented as 44 + 1
@@ -135,8 +141,10 @@ function TopRow({
       <span className={mentionIconClass(kind)}>
         <Icon width={16} height={16} />
       </span>
-      <span className="mention-row-label flex-1 text-[13px] font-medium">{labelFor(t, kind)}</span>
-      <span className="mention-row-count text-xs text-(--text-tertiary) tabular-nums">{count}</span>
+      <span className="mention-row-label flex-1 font-medium">{labelFor(t, kind)}</span>
+      <span className="mention-row-count text-meta text-content-tertiary tabular-nums">
+        {count}
+      </span>
     </Button>
   );
 }
@@ -259,7 +267,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
       }}
     >
       <DialogContent className={PANEL_CLS} showCloseButton={false} aria-label={t('提及')}>
-        <div className="flex items-center gap-2 border-b border-(--border) px-4 pt-3.5 pb-2.5">
+        <div className="flex h-12 items-center gap-2 border-b border-border px-4">
           {layer !== 'top' ? (
             <Button
               variant="ghost"
@@ -271,7 +279,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
               <ChevronLeft width={14} height={14} />
             </Button>
           ) : null}
-          <div className="flex-1 text-[13px] font-medium text-(--foreground)">
+          <div className="flex-1 font-heading text-heading font-medium text-foreground">
             {layer === 'top' ? t('提及') : `${labelFor(t, layer)} · ${counts[layer]}`}
           </div>
           <Button
@@ -285,7 +293,7 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
           </Button>
         </div>
         {layer === 'top' ? (
-          <div className="flex-1 overflow-auto py-1.5">
+          <div className="flex-1 overflow-auto p-1">
             {CATEGORIES.map(({ kind, Icon }) => (
               <TopRow
                 key={kind}
@@ -298,18 +306,18 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
           </div>
         ) : (
           <>
-            <div className="border-b border-(--border) px-3.5 pt-2.5 pb-1.5">
+            <div className="border-b border-border px-4 py-2">
               <Input
                 type="text"
-                className="h-7 border-(--border) bg-(--background) px-2.5 py-0 text-xs text-(--foreground) dark:bg-(--background) md:text-xs"
+                className="h-8 border-border bg-background px-3 py-0 text-ui text-foreground dark:bg-background md:text-ui"
                 placeholder={t('搜索…')}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
-            <div className="flex-1 overflow-auto py-1.5">
+            <div className="flex-1 overflow-auto p-1">
               {filteredEntries.length === 0 ? (
-                <div className="px-3.5 py-[22px] text-center text-xs text-(--text-tertiary)">
+                <div className="px-4 py-6 text-center text-meta text-content-tertiary">
                   {drilledQuery === ''
                     ? t('没有可引用的对象')
                     : t('没有与"{query}"匹配的结果', { query: drilledQuery })}
@@ -322,17 +330,17 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
                       key={entry.id}
                       variant="ghost"
                       type="button"
-                      className={`${ROW_CLS} mention-row--entry h-[50px]${
-                        isSelected ? ' bg-(--secondary)' : ''
+                      className={`${ROW_CLS} mention-row--entry h-12${
+                        isSelected ? ` ${PICKER_ROW_SELECTED}` : ''
                       }`}
                       onClick={() => toggle(layer, entry.id)}
                     >
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="mention-row-title truncate text-[13px] font-medium">
+                        <span className="mention-row-title truncate font-medium">
                           {entry.label}
                         </span>
                         {entry.subtitle != null && (
-                          <span className="truncate text-[11px] text-(--text-tertiary)">
+                          <span className="truncate text-meta text-content-tertiary">
                             {entry.subtitle}
                           </span>
                         )}
@@ -344,22 +352,15 @@ export function MentionPicker({ open, onClose, onInsert, groups }: MentionPicker
             </div>
           </>
         )}
-        <div className="flex items-center justify-end gap-3.5 border-t border-(--border) bg-(--popover) px-4 py-3">
-          <Button
-            variant="ghost"
-            size="default"
-            className="h-auto cursor-pointer justify-start gap-0 px-1.5 py-1 text-xs font-normal text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 hover:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto"
-            onClick={onClose}
-          >
+        <div className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          {/* #1055 角色分槽：确认动作 = 主操作按钮 → registry Button default
-              档（--primary 中性实底，#987「primary 保 neutral，品牌只走
-              spot 族」）；品牌墨文字档与 brightness hover / disabled 中和
-              退役（禁用态走 registry opacity 降档，source-issue #1006 同款）。
-              类名锚原位保留（e2e 定位面，零规则）。 */}
+          {/* #1055 角色分槽：确认动作 = 主操作 → 墨底主钮（registry Button
+              default 档，禁用态走 registry opacity 降档）。类名锚原位保留
+              （e2e 定位面，零规则）。 */}
           <Button
-            className="mention-picker-insert h-auto px-2 py-1 text-xs"
+            className={`mention-picker-insert ${DIALOG_PRIMARY_BUTTON}`}
             disabled={allSelected.length === 0}
             onClick={insert}
           >
@@ -428,13 +429,13 @@ function InlineKindIcon({ kind }: { kind: InlineCompletionRow['kind'] }) {
  *  z40（#688 阶梯外，绘制收编于宿主面 stacking context）；与 slash-menu
  *  同锚同皮（r9 §2.2/§3.2）。 */
 const INLINE_PANEL_CLS =
-  'mention-inline absolute inset-x-0 bottom-[calc(100%+6px)] z-40 max-h-[220px] overflow-auto rounded-(--radius-popover) border border-(--border) bg-(--popover) p-1 shadow-[0_12px_32px_rgb(0_0_0/0.18)]';
+  'mention-inline absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-lg bg-popover p-1 shadow-(--shadow-popover)';
 
 /** 内联行（原 .mention-inline-row，Button ghost 中和）：hover/focus 与
  *  JS 驱动的 --active 高亮共面（#728 combobox 律：箭头与 hover 一种视觉
  *  语言，DOM 焦点恒在 textarea）。 */
 const INLINE_ROW_CLS =
-  'mention-inline-row flex h-[38px] w-full cursor-pointer items-center justify-start gap-2.5 rounded-[6px] border-0 bg-transparent px-2.5 text-left text-sm font-normal text-(--foreground) hover:bg-(--secondary) hover:text-(--foreground) focus:bg-(--secondary) dark:hover:bg-(--secondary) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
+  'mention-inline-row flex h-10 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-0 bg-transparent px-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground focus:bg-transparent dark:hover:bg-transparent aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0';
 
 export function MentionInline({
   open,
@@ -465,7 +466,7 @@ export function MentionInline({
       data-caret={caret ?? ''}
     >
       {rows.length === 0 ? (
-        <div className="mention-inline-empty px-3 py-2.5 text-xs text-(--text-tertiary)">
+        <div className="mention-inline-empty px-3 py-2 text-meta text-content-tertiary">
           {query === ''
             ? t('没有可引用的对象')
             : t('没有与"{query}"匹配的结果', { query: `@${query}` })}
@@ -479,7 +480,7 @@ export function MentionInline({
             tabIndex={-1}
             role="option"
             aria-selected={index === highlight}
-            className={`${INLINE_ROW_CLS}${index === highlight ? ' mention-inline-row--active bg-(--secondary)' : ''}`}
+            className={`${INLINE_ROW_CLS}${index === highlight ? ` mention-inline-row--active ${PICKER_ROW_SELECTED}` : ''}`}
             // Keep the textarea focused: a row mousedown must not blur it
             // (focus loss = broken continuous typing + IME, failure mode 4).
             onMouseDown={(event) => event.preventDefault()}
@@ -487,18 +488,18 @@ export function MentionInline({
             onClick={() => onPick(row)}
           >
             {row.kind === 'agent' ? (
-              <span className="inline-flex size-6 items-center justify-center rounded-full bg-(--surface-tertiary) text-[11px] font-semibold text-(--foreground)">
+              <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
                 {row.label.charAt(0).toLowerCase()}
               </span>
             ) : (
-              <span className="inline-flex size-6 items-center justify-center rounded-full bg-(--surface-tertiary) text-[11px] font-semibold text-(--foreground)">
+              <span className="inline-flex size-6 flex-none items-center justify-center rounded-full bg-(--surface-tertiary) text-caption font-semibold text-foreground">
                 <InlineKindIcon kind={row.kind} />
               </span>
             )}
             <span className="flex min-w-0 flex-col gap-px">
-              <span className="truncate text-xs font-medium">{row.label}</span>
+              <span className="truncate font-medium">{row.label}</span>
               {row.subtitle != null && (
-                <span className="truncate text-[11px] text-(--text-tertiary)">{row.subtitle}</span>
+                <span className="truncate text-meta text-content-tertiary">{row.subtitle}</span>
               )}
             </span>
           </Button>

@@ -29,7 +29,12 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAgentAvatarUrlById } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell, VIEWPORT_POP_ANIM } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_FACE,
+  DialogShell,
+  PICKER_ROW_SELECTED,
+  VIEWPORT_POP_ANIM,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { StatusChip } from '../components/ui/status-chip.js';
@@ -68,35 +73,33 @@ const NAV_ROWS = [
   { label: '模型服务', Icon: Layers, href: '/app/resources/providers' },
 ];
 
-/** 行钮皮肤（#949 per-face 清零）：旧 .search-row 规则的等值 utility——
- *  r7 实测几何逐值保留（40px 行 / 8px 圆角 = Button 底座 rounded-lg 同值 /
- *  calc(100%-16px) 行宽 + 8px 侧距 / 13px 字）。Button ghost 件配方按
- *  #908 裁决 3 七通道中和：hover 涂底换成 --row-selected 正典 pill（本族
- *  不吃 motion.css #73 的 accent-soft 淡 tint，键盘 cursor 与 hover 共面）、
+/** 行钮皮肤（#949 per-face 清零；Paper：40px 行 / 8px 圆角 / 列表容器 8px
+ *  侧距 / 六档字号 / 4px 网格）。Button ghost 件配方按
+ *  #908 裁决 3 七通道中和：hover 涂底换成选中行白卡（PICKER_ROW_SELECTED，
+ *  键盘 cursor 与 hover 共面）、
  *  hover 墨色钉住行墨、press 位移禁掉（XMON-69 例外律变体链）、1px 透明边
  *  归零（border-none，r7 行盒）、font-medium 归 normal、justify/gap 随档位。
  *  focus 环 = 件基类 #388 canon，与旧全局环同值，不重复写。 */
 const ROW_BASE =
-  'mx-2 flex h-10 w-[calc(100%-16px)] cursor-pointer items-center justify-start gap-[15px] whitespace-normal rounded-(--cds-radius-sm) border-none bg-transparent pl-4 pr-2 text-left text-[13px] leading-4 font-normal text-(--text-secondary) hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg]:text-(--text-tertiary)';
+  'flex h-10 w-full cursor-pointer items-center justify-start gap-4 whitespace-normal rounded-md border-none bg-transparent pl-4 pr-2 text-left text-ui font-normal text-content-secondary hover:text-content-secondary active:not-aria-[haspopup]:translate-y-0 [&>svg]:flex-none [&>svg]:text-content-tertiary';
 
-/** 结果行（任务/项目/agent）差额：icon tile 列距 10px、左垫 8px。 */
-const ROW_RESULT = 'gap-2.5 pl-2';
+/** 结果行（任务/项目/agent）差额：icon tile 列距 12px、左垫 8px。 */
+const ROW_RESULT = 'gap-3 pl-2';
 
 /** #159 hover 跟随的三态行底（渲染期条件类，旧 data-kbd CSS 覆写的等值
- *  机制）：静息 = 透明；鼠标态 = hover 亮正典 pill；键盘 cursor 活着 =
- *  非选中行的 hover pill 让位（唯一亮面律），选中行静息底 + hover 同值
- *  恒亮。dark: 双写中和 ghost 件的 dark:hover:bg-muted/50（--row-selected
- *  自带主题翻转，值同源）。 */
+ *  机制）：静息 = 透明；鼠标态 = hover 亮白卡 + 发丝环；键盘 cursor 活着 =
+ *  非选中行的 hover 让位（唯一亮面律），选中行静息 + hover 同值恒亮。
+ *  dark: 双写中和 ghost 件的 dark:hover:bg-muted/50。 */
 function rowLitClasses(selected: boolean, kbd: boolean): string {
-  if (selected) return 'bg-(--secondary) hover:bg-(--secondary) dark:hover:bg-(--secondary)';
+  if (selected) return PICKER_ROW_SELECTED;
   if (kbd) return 'hover:bg-transparent dark:hover:bg-transparent';
-  return 'hover:bg-(--secondary) dark:hover:bg-(--secondary)';
+  return 'hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border dark:hover:bg-card';
 }
 
 /** 28px icon tile（结果行首列）：--row-icon-bg 底 + 8px 圆角；项目/agent
  *  档在消费点 cn 覆写。 */
 const ROW_ICON =
-  'flex size-7 flex-none items-center justify-center rounded-(--cds-radius-sm) bg-(--row-icon-bg) text-(--text-tertiary)';
+  'flex size-7 flex-none items-center justify-center rounded-md bg-(--row-icon-bg) text-content-tertiary';
 
 interface SearchPanelProps {
   fixture: FixtureSet;
@@ -173,18 +176,18 @@ function TodoRow({
       <span className={ROW_ICON}>
         <FileCheck width={16} height={16} />
       </span>
-      <span className="flex w-[358px] min-w-0 flex-none flex-col">
-        <span className="truncate text-xs leading-4 text-(--foreground)">
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate leading-5 text-foreground">
           #{todo.seqNum} {todo.title}
         </span>
-        <span className="text-[10px] leading-3 text-(--text-tertiary)">
+        <span className="truncate text-meta text-content-tertiary">
           {projectName ?? PROJECT_NAME}
         </span>
       </span>
       {/* 时间列墨 = --text-tertiary（#949 better-colors 实测换槽：
           --text-dim × --popover-bg 亮模 2.89 < 槽地板 3，#908 裁决 2
           换消费面引用，token 值不动） */}
-      <span className="flex-none text-[11px] leading-[15px] text-(--text-tertiary)">
+      <span className="flex-none text-meta text-content-tertiary">
         {relativeTime(todo.phaseAt, now, t)}
       </span>
       {/* #853→#949：行 chip = StatusChip（五态 token 对皮肤在件内）；#983
@@ -341,7 +344,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
       zIndex="var(--z-modal)"
     >
       <div
-        className={`fixed top-[146px] left-1/2 z-(--z-modal) flex h-[440px] w-[520px] -ml-[260px] flex-col overflow-hidden rounded-(--edge-radius) bg-(--popover) shadow-(--fab-shadow) origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
+        className={`fixed top-36.5 left-1/2 z-(--z-modal) flex h-110 w-130 -ml-65 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
         role="dialog"
         aria-label={t('搜索')}
         // entering the panel (incl. a synthetic pointer jump straight onto
@@ -357,8 +360,8 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             setCursor(null);
         }}
       >
-        <div className="flex h-10 flex-none items-center gap-[3px] border-b border-(--border) pl-[17px] pr-4 text-(--text-tertiary)">
-          <Search width={13} height={13} />
+        <div className="flex h-10 flex-none items-center gap-2 border-b border-border px-4 text-content-tertiary">
+          <Search width={14} height={14} />
           {/* A5 收编：palette 裸输入形态（r7 05 canon）；e2e search-focus
               钉面板 scope 的 textbox 语义载体——Input 渲染的 input 元素
               天然满足，ref 经 React 19 ref-as-prop 透传 */}
@@ -367,10 +370,11 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             // the attach callback is the mount-time focus path (#137),
             // the [open] effect the retained-mount refocus.
             // B3: variant="palette" 皮肤换 Tailwind 工具类——flex-1 + 无框
-            // 透明 + 13px 字；行容器几何（40px/垫距/分隔线）已随 #949 迁
-            // 上方行 utility。
+            // 透明 + text-ui；行容器几何（40px/垫距/分隔线）已随 #949 迁
+            // 上方行 utility。无焦点环：面板唯一输入、开即聚焦，插入符即
+            // 焦点指示（新建任务正文 textarea 同律）。
             ref={attachInput}
-            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-[13px] md:text-[13px] leading-4 rounded-none bg-transparent dark:bg-transparent text-(--foreground) placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:!ring-0"
+            className="flex-1 h-auto border-none shadow-none ring-0 p-0 text-ui md:text-ui leading-4 rounded-none bg-transparent dark:bg-transparent text-foreground placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:!ring-0 focus-visible:outline-none"
             value={query}
             placeholder={t('搜索任务、项目、成员…')}
             onChange={(event) => onQuery(event.target.value)}
@@ -398,10 +402,8 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
           />
         </div>
         {q === '' ? (
-          <div className="flex-1 overflow-y-auto pb-2" ref={listRef}>
-            <div className="px-4 pt-3 pb-1 text-[11px] leading-[15px] text-(--text-tertiary)">
-              {t('前往')}
-            </div>
+          <div className="flex-1 overflow-y-auto px-2 pb-2" ref={listRef}>
+            <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('前往')}</div>
             {NAV_ROWS.map(({ label, Icon, href }, index) => (
               <Button
                 variant="ghost"
@@ -418,16 +420,14 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             ))}
           </div>
         ) : hitCount === 0 ? (
-          <div className="px-4 py-6 text-[13px] leading-4 text-(--text-tertiary)">
+          <div className="px-4 py-6 text-ui text-content-tertiary">
             {t('没有与“{q}”匹配的结果', { q: query.trim() })}
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto pb-2" ref={listRef}>
+          <div className="flex-1 overflow-y-auto px-2 pb-2" ref={listRef}>
             {todos.length > 0 && (
               <>
-                <div className="px-4 pt-3 pb-1 text-[11px] leading-[15px] text-(--text-tertiary)">
-                  {t('任务')}
-                </div>
+                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('任务')}</div>
                 {todos.map((todo, index) => (
                   <TodoRow
                     key={todo.id}
@@ -450,9 +450,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             )}
             {projects.length > 0 && (
               <>
-                <div className="px-4 pt-3 pb-1 text-[11px] leading-[15px] text-(--text-tertiary)">
-                  {t('项目')}
-                </div>
+                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary">{t('项目')}</div>
                 {projects.map((project, index) => (
                   <Button
                     variant="ghost"
@@ -467,14 +465,12 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
                     onClick={() => go(`/app/project/${project.id}`)}
                   >
                     <span
-                      className={`${ROW_ICON} bg-(--project-avatar-bg) text-[10px] font-medium text-(--project-avatar-fg)`}
+                      className={`${ROW_ICON} bg-(--project-avatar-bg) text-caption font-medium text-(--project-avatar-fg)`}
                     >
                       {project.name.charAt(0).toLowerCase() || PROJECT_INITIAL}
                     </span>
-                    <span className="flex w-[358px] min-w-0 flex-none flex-col">
-                      <span className="truncate text-xs leading-4 text-(--foreground)">
-                        {project.name}
-                      </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-foreground">{project.name}</span>
                     </span>
                   </Button>
                 ))}
@@ -482,7 +478,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
             )}
             {agents.length > 0 && (
               <>
-                <div className="px-4 pt-3 pb-1 text-[11px] leading-[15px] text-(--text-tertiary) uppercase">
+                <div className="px-2 pt-3 pb-1 text-caption text-content-tertiary uppercase">
                   Agents
                 </div>
                 {agents.map((agent, index) => {
@@ -508,10 +504,8 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
                           fallback="/avatar-robot-1.svg"
                         />
                       </span>
-                      <span className="flex w-[358px] min-w-0 flex-none flex-col">
-                        <span className="truncate text-xs leading-4 text-(--foreground)">
-                          {agent.displayName}
-                        </span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-foreground">{agent.displayName}</span>
                       </span>
                     </Button>
                   );

@@ -119,20 +119,14 @@ body[data-board-dragging] .todo-card:hover {
 }
 @media (hover: hover) and (pointer: fine) {
   .more-menu-item,
-  .new-task-project-row,
   .todo-card-branch,
-  .dlg-close,
-  .new-task-close,
-  .delete-confirm-close {
+  .dlg-close {
     transition: background-color var(--dur-fast) var(--ease-standard);
   }
 
   .more-menu-item:hover,
-  .new-task-project-row:hover,
   .todo-card-branch:hover,
-  .dlg-close:hover,
-  .new-task-close:hover,
-  .delete-confirm-close:hover {
+  .dlg-close:hover {
     background-color: var(--accent-soft);
   }
 

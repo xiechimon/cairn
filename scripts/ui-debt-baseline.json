@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "34d9a35b166ecf5defef245afea77666784a7cff",
+    "sha": "5479883ee175c8a82061e1aa5e9896446890c351",
     "date": "2026-10-18"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,16 +14,12 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 118,
-    "spacingTotal": 153,
+    "textTotal": 83,
+    "spacingTotal": 116,
     "files": {
       "board/board.tsx": {
         "text": 0,
         "spacing": 3
-      },
-      "board/done-confirm-dialog.tsx": {
-        "text": 4,
-        "spacing": 2
       },
       "board/filter-panel.tsx": {
         "text": 6,
@@ -89,37 +85,9 @@
         "text": 0,
         "spacing": 8
       },
-      "overlay/attachment-card.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
-      "overlay/attachment-strip.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
-      "overlay/delete-confirm.tsx": {
-        "text": 1,
-        "spacing": 1
-      },
-      "overlay/delete-project-confirm.tsx": {
-        "text": 3,
-        "spacing": 1
-      },
-      "overlay/mention-picker.tsx": {
-        "text": 7,
-        "spacing": 7
-      },
       "overlay/more-menu.tsx": {
         "text": 0,
         "spacing": 1
-      },
-      "overlay/new-task-dialog.tsx": {
-        "text": 5,
-        "spacing": 12
-      },
-      "overlay/slash-menu.tsx": {
-        "text": 2,
-        "spacing": 4
       },
       "overlay/token-gate.tsx": {
         "text": 2,
@@ -132,10 +100,6 @@
       "overlays/plan-dropdown.tsx": {
         "text": 0,
         "spacing": 1
-      },
-      "overlays/search-panel.tsx": {
-        "text": 11,
-        "spacing": 10
       },
       "pages/project-new-page.tsx": {
         "text": 0,

@@ -37,7 +37,7 @@
 // 列头状态图标见 ColumnIcon（DESIGN.md 图标）。
 // Paper 顶栏（DESIGN.md 布局与间距）：56px；左 = 衬线「工作台」+ 等你处理
 // 摘要（N = 待处理列当前可见卡数，与列头计数同源）+ 生效筛选条；右 = 文字钮
-// 筛选（filter-panel.tsx）/ 定时（路由链接）+ 墨色胶囊「新任务」（与侧栏
+// 筛选（filter-panel.tsx）/ 定时（路由链接）+ 墨底主钮「新任务」（与侧栏
 // 新任务行、C 热键同一个 opener）。全部 nowrap，窄窗先截断摘要。横幅与
 // scroller 随文档流排在顶栏下方，不再按顶栏高度写死偏移。
 
@@ -328,7 +328,7 @@ export function BoardSurface({
             {t('定时')}
           </Button>
           {onNewTask != null && (
-            <Button size="sm" className={TOPBAR_PRIMARY_BUTTON} onClick={onNewTask}>
+            <Button className={TOPBAR_PRIMARY_BUTTON} onClick={onNewTask}>
               <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
               {t('新任务')}
             </Button>

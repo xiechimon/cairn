@@ -23,7 +23,7 @@ import { FileText } from '../icons/index.js';
  *  60% 的模态 scrim，值不同不混用）；墨色 --text-on-veil 正典槽。静止 veil、
  *  无假进度（#757）。 */
 const PENDING_BADGE_CLS =
-  'absolute bottom-1 left-1 rounded-[4px] bg-[rgb(0_0_0/0.55)] px-1.5 py-px text-[11px] leading-4 whitespace-nowrap text-(--text-on-veil)';
+  'absolute bottom-1 left-1 rounded-(--radius-control) bg-[rgb(0_0_0/0.55)] px-1 text-caption whitespace-nowrap text-(--text-on-veil)';
 
 /** 卡片内的媒体 + 标题（两态共用同一份字节，见文件头注）。 */
 function CardBody({
