@@ -18,9 +18,12 @@ import { expect, type Page, test } from '@playwright/test';
 //
 // Paper Grouped sidebar (DESIGN.md 侧栏) retires the full-width divider law:
 // the sidebar sits on canvas with no internal rule (the mockup has none),
-// so nothing inside it aligns to the topbar border any more. What stays is
-// the soft seam (no solid border, hairline shadow) and a route-invariant
-// workspace row: the /app/team active face repaints, it does not move.
+// so nothing inside it aligns to the topbar border any more. Paper board
+// sheet (PR 7): every sheet route (board, pages, resources) draws its edge
+// with the sheet's own ring, so the sidebar carries no seam there; the
+// hairline moves to the detail shell, the one route still full-bleed. What
+// stays everywhere is no solid border and a route-invariant workspace row:
+// the /app/team active face repaints, it does not move.
 
 const SEAM_VARIANTS = ['light', 'dark'] as const;
 
@@ -32,7 +35,7 @@ const teamRowBox = (page: Page) =>
 
 test.describe('sidebar seam (Paper Grouped)', () => {
   for (const theme of SEAM_VARIANTS) {
-    test(`board expanded: soft seam, no internal divider (${theme})`, async ({ page }) => {
+    test(`board expanded: no seam, no internal divider (${theme})`, async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
       await page.goto('/app?scenario=01');
 
@@ -49,7 +52,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       });
 
       expect(m.borderRightW).toBe('0px');
-      expect(m.shadow).not.toBe('none');
+      expect(m.shadow).toBe('none');
       expect(m.sidebarW).toBe(248);
       expect(m.navBorderTopW).toBe('0px');
       // workspace row: 40px tall inside the 12px sidebar padding
@@ -68,7 +71,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 40 });
     });
 
-    test(`rail: the seam inherits (${theme})`, async ({ page }) => {
+    test(`rail: no seam either (${theme})`, async ({ page }) => {
       await page.addInitScript((t) => {
         localStorage.setItem('pacman-theme', t);
         localStorage.setItem('pacman.sidebar-collapsed', '1');
@@ -86,7 +89,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       });
 
       expect(m.borderRightW).toBe('0px');
-      expect(m.shadow).not.toBe('none');
+      expect(m.shadow).toBe('none');
       expect(m.railW).toBe(40);
     });
 
@@ -94,7 +97,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       ['pages', '/app/schedules?scenario=11'],
       ['resources', '/app/resources/skills?scenario=06'],
     ] as const) {
-      test(`${name} shell carries the same seam and workspace row (${theme})`, async ({
+      test(`${name} shell: no seam, same workspace row (${theme})`, async ({
         page,
       }) => {
         await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
@@ -104,9 +107,21 @@ test.describe('sidebar seam (Paper Grouped)', () => {
           return { borderRightW: ss.borderRightWidth, shadow: ss.boxShadow };
         });
         expect(m.borderRightW).toBe('0px');
-        expect(m.shadow).not.toBe('none');
+        expect(m.shadow).toBe('none');
         expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 40 });
       });
     }
+
+    test(`detail: the full-bleed body keeps the soft seam (${theme})`, async ({ page }) => {
+      await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=detail-unread');
+      const m = await page.evaluate(() => {
+        const ss = getComputedStyle(document.querySelector('.board-sidebar')!);
+        return { borderRightW: ss.borderRightWidth, shadow: ss.boxShadow };
+      });
+      expect(m.borderRightW).toBe('0px');
+      expect(m.shadow).toMatch(/ 1px 0px 0px 0px$/);
+      expect(await teamRowBox(page)).toEqual({ x: 12, y: 12, w: 224, h: 40 });
+    });
   }
 });

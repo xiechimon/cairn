@@ -55,6 +55,10 @@ async function settled(page: Page) {
 /** ADR 0013 D2 窗几何单源：380×600 @ right/bottom 8（1440×732 主口径）。 */
 const WIN_BOX = { x: 1440 - 8 - 380, y: 732 - 8 - 600, width: 380, height: 600 };
 
+// Paper sheet (PR 6 pages, PR 7 board): every route's main panel sits 10px
+// off the right viewport edge, so the column is 1440 - 248 - 10.
+const SHEET_W = 1440 - 248 - 10;
+
 test.describe('chief panel floating form (ADR 0013)', () => {
   test('Esc never closes the panel on the board route (D3)', async ({ page }) => {
     await page.goto('/app?scenario=111');
@@ -158,8 +162,8 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     await settled(page);
     const main = await page.locator('.board-main').boundingBox();
     expect(main).not.toBeNull();
-    // 全宽：侧栏 248 之外的整段，窗是覆盖层不让位
-    expect(main!.width).toBeCloseTo(1440 - 248, 0);
+    // 全宽：侧栏 248 与 sheet 右侧 10px 之外的整段，窗是覆盖层不让位
+    expect(main!.width).toBeCloseTo(SHEET_W, 0);
 
     const open = await page.locator('.board-scroller').evaluate((el) => ({
       scrollable: el.scrollWidth > el.clientWidth,
@@ -194,9 +198,6 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     for (const w of rest.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);
   });
 
-  // Paper page shell (PR 6): the three families share one shell; its sheet
-  // sits 10px off the right viewport edge, so the column is 1440 - 248 - 10.
-  const SHEET_W = 1440 - 248 - 10;
   for (const { name, route } of [
     { name: 'pages', route: '/app/schedules?scenario=11' },
     { name: 'resources', route: '/app/resources/skills?scenario=06' },

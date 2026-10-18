@@ -631,7 +631,10 @@ export function TodoDetailPage() {
             ? 'error'
             : 'not-found';
     return (
-      <div className="detail-shell flex h-full overflow-hidden" data-route="todo-detail">
+      <div
+        className="detail-shell flex h-full overflow-hidden [&>.board-sidebar]:shadow-[1px_0_0_0_var(--border-soft)]"
+        data-route="todo-detail"
+      >
         <AppSidebar fixture={fixture} todos={todos} searchPanel={false} />
         <div className="relative flex min-w-0 flex-1 flex-col items-center justify-center bg-(--card)">
           <div
@@ -821,7 +824,7 @@ export function TodoDetailPage() {
     // pane 变量归零让锚位停止跳格）。board-sidebar 是 #943 保留的运行时
     // 钩子类，子选择器规则随壳迁移（跨域消费面不断）。
     <div
-      className="detail-shell flex h-full overflow-hidden [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:max-[816px]:hidden"
+      className="detail-shell flex h-full overflow-hidden [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:shadow-[1px_0_0_0_var(--border-soft)] [&>.board-sidebar]:max-[816px]:hidden"
       data-route="todo-detail"
       data-todo-id={id}
     >

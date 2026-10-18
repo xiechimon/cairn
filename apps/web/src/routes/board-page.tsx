@@ -71,6 +71,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
 import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SHEET_PANEL } from '../pages/shell.js';
 
 /** 拖拽提交逐卡发送的字段（#160）：手动改相 + 列内排序位（server
  *  patchTodoBodySchema 两位；首次落位会把触及列的 orderIndex 一次性
@@ -699,7 +700,7 @@ export function BoardPage() {
     // 单态：--board-col-min 200px（四列全见优先，更窄由地板接管回诚实横滚，
     // board-zoom-fit.spec 语义不变）；--board-col-min-docked 已删（tokens.css），
     // 轨道规则单源不分支（board.tsx scroller 只消费 --board-col-min）。
-    <div className="board-shell flex h-full overflow-hidden" data-route="board">
+    <div className="board-shell flex h-full overflow-hidden bg-(--surface-1)" data-route="board">
       <AppSidebar
         fixture={fixture}
         todos={todos}
@@ -710,60 +711,62 @@ export function BoardPage() {
         onSearch={() => search.setOpen(true)}
         onNewTask={openNewTask}
       />
-      {chiefView === 'settings' ? (
-        <ChiefSettings
-          chief={chiefData}
-          onBack={() => setChiefView('drawer')}
-          // #895 fixture 面机器行集（live 面组件自取 useMachines 不吃它）
-          machines={fixture.resources?.machines}
-        />
-      ) : (
-        <BoardSurface
-          fixture={fixtureWithTodos}
-          banner={
-            quotaInfos != null ? (
-              <QuotaBanner infos={quotaInfos} />
-            ) : notifyBanner.visible ? (
-              <NotificationBanner onEnable={notifyBanner.enable} />
-            ) : undefined
-          }
-          onAction={(todo) => {
-            if (live) {
-              // r7 34: review 完成 = accept dialog（merge 202 delegated，
-              // r3 §3.6）；todo 开始 = 直发总管编排回合（#640，无 dialog）；
-              // 其余关口进详情页操作。
-              if (todo.phase === 'review' && todo.awaitingReply !== true) openFor(todo, 'accept');
-              else if (todo.phase === 'todo') startTask(todo);
-              else navigate(`/app/todo/${todo.id}`);
-              return;
+      <div className={`board-sheet ${SHEET_PANEL}`}>
+        {chiefView === 'settings' ? (
+          <ChiefSettings
+            chief={chiefData}
+            onBack={() => setChiefView('drawer')}
+            // #895 fixture 面机器行集（live 面组件自取 useMachines 不吃它）
+            machines={fixture.resources?.machines}
+          />
+        ) : (
+          <BoardSurface
+            fixture={fixtureWithTodos}
+            banner={
+              quotaInfos != null ? (
+                <QuotaBanner infos={quotaInfos} />
+              ) : notifyBanner.visible ? (
+                <NotificationBanner onEnable={notifyBanner.enable} />
+              ) : undefined
             }
-            // r7 34: review-phase 完成 opens the accept dialog; 回复/确认
-            // stay inert until their own tickets
-            if (todo.phase === 'review' && todo.awaitingReply !== true) openFor(todo, 'accept');
-          }}
-          onBranch={(todo) => openFor(todo, 'branch')}
-          // #828: 无分支的卡隐藏分支钮——fixture 面以 overlayContent 有无
-          // 为准（点开必有弹层），live 面以 latestBuildId 有无为准（分支
-          // 面按该 buildId 现算）。
-          hasBranch={(todo) =>
-            live ? todo.latestBuildId != null : overlayContent(todo.id) != null
-          }
-          isOrchestrating={live ? isOrchestrating : undefined}
-          // #73→#616→#640: 静默改相落位（待处理/已完成 + 待开始的未开始卡）
-          // commit into the same client-side todo set as create/delete — column
-          // counts and folds re-derive from it；执行中落位 = 开始意图 → 直发
-          // 编排回合（无 dialog 确认位，T0 反馈 = toast）；#755：待开始落点的
-          // 已开始卡 = 重置意图 → 确认闸（确认前零提交）。
-          onPhaseDrop={handlePhaseDrop}
-          onStartIntent={startTask}
-          onResetIntent={openResetGate}
-          onDoneIntent={openDoneGate}
-          filters={filters}
-          onlyColumn={onlyColumn}
-          tagsById={tagIndex.tagById}
-          onNewTask={openNewTask}
-        />
-      )}
+            onAction={(todo) => {
+              if (live) {
+                // r7 34: review 完成 = accept dialog（merge 202 delegated，
+                // r3 §3.6）；todo 开始 = 直发总管编排回合（#640，无 dialog）；
+                // 其余关口进详情页操作。
+                if (todo.phase === 'review' && todo.awaitingReply !== true) openFor(todo, 'accept');
+                else if (todo.phase === 'todo') startTask(todo);
+                else navigate(`/app/todo/${todo.id}`);
+                return;
+              }
+              // r7 34: review-phase 完成 opens the accept dialog; 回复/确认
+              // stay inert until their own tickets
+              if (todo.phase === 'review' && todo.awaitingReply !== true) openFor(todo, 'accept');
+            }}
+            onBranch={(todo) => openFor(todo, 'branch')}
+            // #828: 无分支的卡隐藏分支钮——fixture 面以 overlayContent 有无
+            // 为准（点开必有弹层），live 面以 latestBuildId 有无为准（分支
+            // 面按该 buildId 现算）。
+            hasBranch={(todo) =>
+              live ? todo.latestBuildId != null : overlayContent(todo.id) != null
+            }
+            isOrchestrating={live ? isOrchestrating : undefined}
+            // #73→#616→#640: 静默改相落位（待处理/已完成 + 待开始的未开始卡）
+            // commit into the same client-side todo set as create/delete — column
+            // counts and folds re-derive from it；执行中落位 = 开始意图 → 直发
+            // 编排回合（无 dialog 确认位，T0 反馈 = toast）；#755：待开始落点的
+            // 已开始卡 = 重置意图 → 确认闸（确认前零提交）。
+            onPhaseDrop={handlePhaseDrop}
+            onStartIntent={startTask}
+            onResetIntent={openResetGate}
+            onDoneIntent={openDoneGate}
+            filters={filters}
+            onlyColumn={onlyColumn}
+            tagsById={tagIndex.tagById}
+            onNewTask={openNewTask}
+          />
+        )}
+      </div>
       <SearchPanel
         open={search.open}
         fixture={live ? { ...fixture, todos, now: Date.now() } : fixture}

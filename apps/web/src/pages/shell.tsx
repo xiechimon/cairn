@@ -12,6 +12,12 @@ import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
 
+/** The sheet panel inset 10px off the canvas; the board route wears the
+ *  same one so moving between routes keeps the main panel still. A div, not
+ *  <main>: a <header> inside <main> loses role=banner. */
+export const SHEET_PANEL =
+  'relative my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background [box-shadow:var(--edge-ring),var(--card-shadow)]';
+
 export interface PageTab {
   id: string;
   label: string;
@@ -95,7 +101,7 @@ export function PageShell({
   return (
     <div className="page-shell flex h-full overflow-hidden bg-(--surface-1)" data-route={route}>
       <AppSidebar fixture={fixture} selected={selected} onNewTask={onNewTask} />
-      <div className="page-main relative my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background [box-shadow:var(--edge-ring),var(--card-shadow)]">
+      <div className={`page-main ${SHEET_PANEL}`}>
         <div className="page-main-col flex min-w-0 flex-1 flex-col">
           <header
             data-testid="page-topbar"

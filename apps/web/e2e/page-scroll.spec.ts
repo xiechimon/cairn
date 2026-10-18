@@ -50,7 +50,9 @@ async function expectScrollerReachesBottom(page: Page, probe: Locator, last: Loc
   // F2：滚轮真的驱动这个容器（用户报障的原始交互）。
   const box = await probe.boundingBox();
   if (box == null) throw new Error('probe element has no box (not rendered?)');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  // Aim near the probe's top: a tall probe (the 60-line charter) centers
+  // below the viewport, in the 10px canvas gap under the sheet.
+  await page.mouse.move(box.x + box.width / 2, box.y + Math.min(box.height / 2, 10));
   await page.mouse.wheel(0, 240);
   await expect
     .poll(() => scroller.evaluate((el) => el.scrollTop), { timeout: 3_000 })

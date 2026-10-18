@@ -304,7 +304,7 @@ export function BoardSurface({
   };
 
   return (
-    <div className="board-main relative flex min-w-0 flex-1 flex-col bg-background">
+    <div className="board-main relative flex min-w-0 flex-1 flex-col">
       <header className="board-topbar flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap">
         <h1 className="flex-none font-heading text-page font-medium text-foreground">
           {t('工作台')}
