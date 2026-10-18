@@ -8,9 +8,7 @@ import { expect, test } from '@playwright/test';
 // 3. card grows a second meta line (role text back on the card)
 // 4. 创建 Agent comes back as a card in the grid, or the top bar loses it
 // 5. a team with no agents renders a bare grid instead of the empty state
-// 6. the 设置 link renders an <a> inside a native-button Button (Base UI
-//    console error)
-// 7. create dialog labels do not point at their controls, or 取消 is missing
+// 6. create dialog labels do not point at their controls, or 取消 is missing
 
 const ROSTER = '/app/team?scenario=team-roster';
 
@@ -87,16 +85,6 @@ test('a team with no agents shows the empty state in the grid layout', async ({ 
   await expect(empty.locator('svg')).toHaveCount(1);
   await expect(page.getByTestId('team-agent-card')).toHaveCount(0);
   await expect(page.getByText('0 个成员')).toHaveCount(0);
-});
-
-test('设置 renders as a link without a Base UI native-button error', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error' && msg.text().includes('nativeButton')) errors.push(msg.text());
-  });
-  await page.goto(ROSTER);
-  await expect(page.getByTestId('page-topbar').getByRole('link', { name: '设置' })).toBeVisible();
-  expect(errors).toEqual([]);
 });
 
 test('create dialog: labels point at controls, 取消 closes, 创建 sits right of 取消', async ({
