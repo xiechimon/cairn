@@ -35,8 +35,8 @@ test('account: 退出登录 / 删除 / 更换 removed (avatar stays)', async ({ 
   await expect(page.locator('.account-swap')).toHaveCount(0);
   await expect(page.locator('.account-avatar img')).toBeVisible();
   // XMON-107：邮箱字段位面已删（本地单用户无邮箱账位面）——卡片只剩
-  // 名称 / 语言 / 密度 / 推送通知四行，且不再出现「邮箱」文案。
-  await expect(page.locator('.account-card .profile-row')).toHaveCount(4);
+  // 语言 / 密度 / 推送通知三行（名称在卡上方的头部），且不再出现「邮箱」文案。
+  await expect(page.locator('.account-card .profile-row')).toHaveCount(3);
   await expect(page.locator('.account-card')).not.toContainText('邮箱');
 });
 
@@ -74,7 +74,7 @@ test('account switch: denied 态点击落偏好开档 + 拦截解释（#1031 语
   // hint 解释（不能「显示开、实际不弹」裸奔）。
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   expect(await page.evaluate(() => window.__permCalls)).toBe(1);
-  await expect(page.locator('.account-card .profile-hint')).toContainText('重新允许');
+  await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
 });
 
 test('team: 设置 routes to the account surface', async ({ page }) => {

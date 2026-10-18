@@ -14,11 +14,11 @@ import { stubNotification } from './helpers.js';
 //
 // 失败方式枚举（先列后钉，与测试一一对应）：
 //  改名面（R）：
-//   R1 名称行值槽无可点载体（无 button 角色 / 铅笔仍是装饰）      → test 1
-//   R2 点名称/铅笔不进编辑态（无 textbox 出现）                    → test 1
+//   R1 头部无可点的「编辑名称」载体                                → test 1
+//   R2 点「编辑名称」不进编辑态（无 textbox 出现）                  → test 1
 //   R3 编辑框不预填当前名 / 不聚焦                                 → test 1
-//   R4 Enter 不提交（行文本不变 / 编辑态不收）                     → test 1
-//   R5 Esc 不取消（编辑态卡死或误提交）                            → test 2
+//   R4 Enter / 保存 不提交（标题不变 / 编辑态不收）                → test 1
+//   R5 Esc / 取消 不取消（编辑态卡死或误提交）                     → test 2
 //   R6 空串/纯空白名被提交（身份位空白）                           → test 2
 //   R7 live 面提交不发 PATCH /api/user/me（落盘通道没接）          → test 3
 //   R8 刷新后名字回旧值（往返不持久）                              → test 3
@@ -32,7 +32,7 @@ import { stubNotification } from './helpers.js';
 //   S6 fixture 面表达不了 denied（permission 冻死 granted）        → test 7
 //   S7 偏好 off 时 SSE 通知照弹（「关」没落到通知本体）            → notify-click.spec T5
 //  探针面（P）：
-//   P1 帐号卡内任一控件点击无可观察效果（假可供性残留）            → test 8
+//   P1 帐号页（头部 + 卡）任一控件点击无可观察效果（假可供性残留）  → test 8
 
 declare global {
   interface Window {
@@ -44,58 +44,58 @@ const USER_NAME = 'Xmon Dai'; // fixtures.ts USER_NAME 同值（e2e 不 import s
 
 // —— ① 改名 ——————————————————————————————————————————————————————————————
 
-test('改名：名称行有真按钮载体，点进编辑态预填聚焦，Enter 提交落行（R1–R4）', async ({
-  page,
-}) => {
+test('改名：头部「编辑名称」进编辑态预填聚焦，Enter 与保存都提交（R1–R4）', async ({ page }) => {
   await page.goto('/app/account?scenario=13');
-  const card = page.locator('.account-card');
-  await expect(card).toBeVisible();
+  const header = page.locator('.account-header');
+  await expect(header.getByRole('heading', { name: USER_NAME, exact: true })).toBeVisible();
 
-  // R1：值槽有 button 载体——文本钮 + aria-label 编辑的铅笔钮（旧面 = 纯文本
-  // div + 装饰 svg，两个载体都不存在）
-  const nameBtn = card.getByRole('button', { name: USER_NAME, exact: true });
-  await expect(nameBtn).toBeVisible();
-  const editBtn = card.getByRole('button', { name: '编辑' });
-  await expect(editBtn).toBeVisible();
-
-  // R2/R3：点文本进编辑态，预填当前名并聚焦
-  await nameBtn.click();
-  const input = card.getByRole('textbox');
-  await expect(input).toBeVisible();
+  // R1/R2/R3：「编辑名称」换出预填并聚焦的输入框
+  await header.getByRole('button', { name: '编辑名称' }).click();
+  const input = header.getByRole('textbox', { name: '名称' });
   await expect(input).toBeFocused();
   await expect(input).toHaveValue(USER_NAME);
 
-  // R4：Enter 提交，编辑态收起，行面显示新名
+  // R4：Enter 提交，编辑态收起，标题显示新名
   await input.fill('改名之后');
   await input.press('Enter');
-  await expect(card.getByRole('textbox')).toHaveCount(0);
-  await expect(card.getByRole('button', { name: '改名之后', exact: true })).toBeVisible();
+  await expect(header.getByRole('textbox')).toHaveCount(0);
+  await expect(header.getByRole('heading', { name: '改名之后', exact: true })).toBeVisible();
 
-  // 铅笔钮是第二入口：同样进编辑态，且预填的是刚提交的新名
-  await editBtn.click();
-  await expect(card.getByRole('textbox')).toHaveValue('改名之后');
-  await card.getByRole('textbox').press('Escape');
+  // 保存钮是第二条提交路径，预填的是刚提交的新名
+  await header.getByRole('button', { name: '编辑名称' }).click();
+  await expect(header.getByRole('textbox')).toHaveValue('改名之后');
+  await header.getByRole('textbox').fill('再改一次');
+  await header.getByRole('button', { name: '保存' }).click();
+  await expect(header.getByRole('heading', { name: '再改一次', exact: true })).toBeVisible();
 });
 
-test('改名：Esc 取消不误提交；空串与纯空白名不提交（R5/R6）', async ({ page }) => {
+test('改名：Esc 与取消都放弃草稿；空串与纯空白名不提交（R5/R6）', async ({ page }) => {
   await page.goto('/app/account?scenario=13');
-  const card = page.locator('.account-card');
-  const nameBtn = card.getByRole('button', { name: USER_NAME, exact: true });
+  const header = page.locator('.account-header');
+  const heading = header.getByRole('heading', { name: USER_NAME, exact: true });
+  const edit = header.getByRole('button', { name: '编辑名称' });
 
-  // R5：Esc 放弃草稿，行面回原名
-  await nameBtn.click();
-  await card.getByRole('textbox').fill('半路放弃');
-  await card.getByRole('textbox').press('Escape');
-  await expect(card.getByRole('textbox')).toHaveCount(0);
-  await expect(nameBtn).toBeVisible();
+  // R5：Esc 放弃草稿，标题回原名
+  await edit.click();
+  await header.getByRole('textbox').fill('半路放弃');
+  await header.getByRole('textbox').press('Escape');
+  await expect(header.getByRole('textbox')).toHaveCount(0);
+  await expect(heading).toBeVisible();
+
+  // R5：取消钮同样放弃
+  await edit.click();
+  await header.getByRole('textbox').fill('点了取消');
+  await header.getByRole('button', { name: '取消' }).click();
+  await expect(header.getByRole('textbox')).toHaveCount(0);
+  await expect(heading).toBeVisible();
 
   // R6：空白名是提交闸（displayName min(1)，空白视同空）——编辑态收起、
-  // 行面保持原名
-  await nameBtn.click();
-  await card.getByRole('textbox').fill('   ');
-  await card.getByRole('textbox').press('Enter');
-  await expect(card.getByRole('textbox')).toHaveCount(0);
-  await expect(nameBtn).toBeVisible();
+  // 标题保持原名
+  await edit.click();
+  await header.getByRole('textbox').fill('   ');
+  await header.getByRole('textbox').press('Enter');
+  await expect(header.getByRole('textbox')).toHaveCount(0);
+  await expect(heading).toBeVisible();
 });
 
 test('改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失败有 toast 点名（R7–R9）', async ({
@@ -120,32 +120,34 @@ test('改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失�
   });
 
   await page.goto('/app/account');
-  const card = page.locator('.account-card');
-  await card.getByRole('button', { name: USER_NAME, exact: true }).click();
-  await card.getByRole('textbox').fill('落库名字');
-  await card.getByRole('textbox').press('Enter');
+  const header = page.locator('.account-header');
+  const rename = async (next: string) => {
+    await header.getByRole('button', { name: '编辑名称' }).click();
+    await header.getByRole('textbox').fill(next);
+    await header.getByRole('textbox').press('Enter');
+  };
+  await expect(header.getByRole('heading', { name: USER_NAME, exact: true })).toBeVisible();
+  await rename('落库名字');
 
   // R7：PATCH 真发出去，body = 改名单字段
   await expect.poll(() => patchBodies.length).toBe(1);
   expect(patchBodies[0]).toEqual({ displayName: '落库名字' });
-  // 往返收口：invalidate 重取后行面 = 服务端真值
-  await expect(card.getByRole('button', { name: '落库名字', exact: true })).toBeVisible();
+  // 往返收口：invalidate 重取后标题 = 服务端真值
+  await expect(header.getByRole('heading', { name: '落库名字', exact: true })).toBeVisible();
 
   // R8：刷新后仍是新名（持久化经 API 往返，不是组件态残影）
   await page.reload();
-  await expect(card.getByRole('button', { name: '落库名字', exact: true })).toBeVisible();
+  await expect(header.getByRole('heading', { name: '落库名字', exact: true })).toBeVisible();
 
-  // R9：提交失败 toast 点名，行面不误报新名
+  // R9：提交失败 toast 点名，标题不误报新名
   failPatch = true;
-  await card.getByRole('button', { name: '落库名字', exact: true }).click();
-  await card.getByRole('textbox').fill('坏名字');
-  await card.getByRole('textbox').press('Enter');
+  await rename('坏名字');
   await expect.poll(() => patchBodies.length).toBe(2);
   const toast = page.locator('[data-sonner-toast]').first();
   await expect(toast).toBeVisible();
   await expect(toast).toContainText('保存失败，请重试。');
-  await expect(card.getByRole('button', { name: '落库名字', exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: '坏名字', exact: true })).toHaveCount(0);
+  await expect(header.getByRole('heading', { name: '落库名字', exact: true })).toBeVisible();
+  await expect(header.getByRole('heading', { name: '坏名字', exact: true })).toHaveCount(0);
 });
 
 // —— ② 推送通知开关 ————————————————————————————————————————————————————————
@@ -177,7 +179,7 @@ test('开关：denied 态开出偏好档 + 拦截解释、关得掉，两档都�
   await stubNotification(page, 'denied', 'denied');
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
-  const hint = page.locator('.account-card .profile-hint');
+  const hint = page.locator('.account-notify-blocked');
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await expect(hint).toHaveCount(0); // 关档不出解释（无「开着却不弹」的矛盾）
 
@@ -232,7 +234,7 @@ test('开关 fixture 面：scenario 可冻 denied——关态起步、点开出�
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'true');
-  await expect(page.locator('.account-card .profile-hint')).toContainText('重新允许');
+  await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
 
   // r7 13 基线行不漂：无偏好存储时 granted 冻结面仍是开态。先清掉上一步落下
   // 的偏好档，否则基线腿读的是 pref 而不是「无偏好跟随权限」档。
@@ -246,35 +248,36 @@ test('开关 fixture 面：scenario 可冻 denied——关态起步、点开出�
 
 // —— ③ 假可供性探针 ————————————————————————————————————————————————————————
 
-test('探针：帐号卡内每个控件点击都有可观察效果（P1，不只验改名与开关两个）', async ({
+test('探针：帐号页每个控件点击都有可观察效果（P1，不只验改名与开关两个）', async ({
   page,
 }) => {
   await page.goto('/app/account?scenario=13');
-  const card = page.locator('.account-card');
+  const col = page.getByTestId('page-col');
   // 只枚举用户感知的可点控件（button / switch / link）。不枚举裸 input：
   // Base UI Switch 会挂一个 hidden `<input type=checkbox>` 做表单关联，那不是
-  // 独立可点面；名称编辑器 input 是点名称钮后的瞬态（由点名称钮这一步覆盖）。
-  const SELECTOR = 'button, [role="switch"], a[href]';
-  const descriptors = await card
+  // 独立可点面；名称编辑器 input 是点「编辑名称」后的瞬态（由那一步覆盖）。
+  // 已选中的密度选项不枚举：再点已选项本就不该有变化。
+  const SELECTOR = 'button:not([role="radio"][aria-checked="true"]), [role="switch"], a[href]';
+  const descriptors = await col
     .locator(SELECTOR)
     .evaluateAll((els) =>
       els.map((el) => ({
         // 原生 <a href> 的 ARIA 角色是 link（不是标签名 a）；<button> 无 role
-        // 属性时角色是 button。其余取标签名兜底（当前卡内只有 button/switch）。
+        // 属性时角色是 button。
         role:
           el.getAttribute('role') ??
           (el.tagName === 'BUTTON' ? 'button' : el.tagName === 'A' ? 'link' : el.tagName.toLowerCase()),
         name: (el.getAttribute('aria-label') ?? el.textContent ?? '').trim(),
       })),
     );
-  // 探针空转 = 没测：名称钮 / 编辑铅笔 / 语言触发器 / 开关 = 4 个可点控件
-  expect(descriptors.length).toBeGreaterThanOrEqual(4);
+  // 探针空转 = 没测：编辑名称 / 语言触发器 / 紧凑 / 开关 = 4 个可点控件
+  expect(descriptors.map((d) => d.name)).toEqual(['编辑名称', '语言', '紧凑', '推送通知']);
 
   for (const d of descriptors) {
-    // 每个控件拿全新面：点击会改 DOM/控件集（名称钮点开编辑态、语言触发器
+    // 每个控件拿全新面：点击会改 DOM/控件集（编辑名称换出输入框、语言触发器
     // 开菜单），共面串测会互相踩。
     await page.goto('/app/account?scenario=13');
-    await page.locator('.account-card').evaluate((el) => {
+    await col.evaluate((el) => {
       window.__probeMutated = false;
       new MutationObserver(() => {
         window.__probeMutated = true;
@@ -285,13 +288,12 @@ test('探针：帐号卡内每个控件点击都有可观察效果（P1，不只
         characterData: true,
       });
     });
-    const target = card.getByRole(d.role as 'button', { name: d.name, exact: true });
+    const target = col.getByRole(d.role as 'button', { name: d.name, exact: true });
     await expect(target, `控件定位丢失: ${d.role}/${d.name}`).toHaveCount(1);
     await target.click();
-    // 效果判据 = 卡子树内任一 DOM/属性变化（aria-checked、aria-expanded、
-    // 编辑态替换、菜单 Portal 落 langDock 都在卡内）。壳面控件（侧栏/顶栏/
-    // 用户菜单）各有专 spec 钉（title-band-clicks / user-menu-nav /
-    // dead-buttons），本探针钉的是帐号卡这张缺陷面。
+    // 效果判据 = 页面列子树内任一 DOM/属性变化（aria-checked、aria-expanded、
+    // 编辑态替换）。壳面控件（侧栏/顶栏/用户菜单）各有专 spec 钉
+    // （title-band-clicks / user-menu-nav / dead-buttons）。
     await expect
       .poll(() => page.evaluate(() => window.__probeMutated), {
         timeout: 2000,

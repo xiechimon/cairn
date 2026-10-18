@@ -95,7 +95,7 @@ test('三 tab 齐在，概览默认选中，点记忆切内容', async ({ page }
 
 test('概览：名称行内编辑提交后回显新值', async ({ page }) => {
   const detail = await openDetail(page);
-  await detail.locator('.agent-name').click();
+  await detail.locator('.agent-name-edit').click();
   const input = detail.locator('#agent-name-input');
   await expect(input).toBeVisible();
   await input.fill('r3-renamed');
@@ -713,14 +713,18 @@ test('记忆 tab：零记忆时不出搜索行，保留 canon 空态', async ({ 
 
 // —— #499：名称 / 职责两行的编辑图标 ——
 
-test('概览：名称行带编辑图标，点图标同样进编辑态', async ({ page }) => {
+test('概览：头部「编辑名称」进编辑态，取消回到原名', async ({ page }) => {
   const detail = await openDetail(page);
-  const icon = detail.locator('.agent-name-edit');
-  await expect(icon).toBeVisible();
-  await expect(icon).toHaveAttribute('aria-label', '编辑');
-  await expect(icon.locator('svg')).toHaveCount(1);
-  await icon.click();
-  await expect(detail.locator('#agent-name-input')).toBeVisible();
+  const edit = detail.locator('.agent-name-edit');
+  await expect(edit).toHaveText('编辑名称');
+  await edit.click();
+  const input = detail.locator('#agent-name-input');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('r3-builder');
+  await input.fill('不保存');
+  await detail.getByRole('button', { name: '取消' }).click();
+  await expect(input).toHaveCount(0);
+  await expect(detail.locator('.agent-name')).toHaveText('r3-builder');
 });
 
 test('概览：职责的编辑钮是图标钮，带可访问名', async ({ page }) => {
@@ -775,21 +779,22 @@ test('概览：点行进任务详情', async ({ page }) => {
   await expect(page).toHaveURL(/\/app\/todo\/r3-legacy-12$/);
 });
 
-// —— XMON-117：本页按 `/app/account` 的个人页模板复刻 ——
-// 模板 = 一张 profile 卡（头像头 + 行式字段），三 tab 的内容都住在卡里。
+// —— XMON-117：本页按 `/app/account` 的设置列表复刻 ——
+// 模板 = 卡上方的头像与名称头部 + 一张行式字段卡，三 tab 的内容都住在卡里。
 // 钉住的失败方式：概览退回散块字段列（每个字段各自带 label，没有行盒与
-// 分隔线）、头像头掉出卡外、记忆/权限两 tab 回到一张卡一行的散卡布局。
-const OVERVIEW_LABELS = ['名称', '职责', '默认 skill', '运行时', '模型', '思考强度'];
+// 分隔线）、名称又回到卡内成一行、记忆/权限两 tab 回到一张卡一行的散卡布局。
+const OVERVIEW_LABELS = ['职责', '默认 skill', '运行时', '模型', '思考强度'];
 
-test('概览：六个字段行长在同一张模板卡里，头像头在卡内', async ({ page }) => {
+test('概览：五个字段行长在同一张模板卡里，头像与名称在卡上方', async ({ page }) => {
   const detail = await openDetail(page);
   const card = detail.locator('.agent-overview .profile-card');
   await expect(card).toHaveCount(1);
-  const avatarImg = card.locator('.profile-head .profile-avatar img');
+  await expect(card.locator('.profile-avatar')).toHaveCount(0);
+  const avatarImg = detail.locator('.agent-overview .profile-header .profile-avatar img');
   await expect(avatarImg).toHaveCount(1);
   // #1156：存在断言对尺寸缺陷是瞎的——SeededAvatar 漏传 className 时回落
-  // registry 默认 size-8（32px），塞进 ProfileAvatar 的 64px 圆盒被裁。这里
-  // 钉 img 的真实几何：64px 是该面唯一 ProfileAvatar 盒的设计值。度量用
+  // registry 默认 size-8（32px），塞进 56px 头像圆被裁。这里
+  // 钉 img 的真实几何：56px 是头部头像圆的设计值。度量用
   // offsetWidth/offsetHeight（布局整数、transform 不变）；不用
   // getBoundingClientRect——它读被 transform 影响的值，进场动画期间会得
   // 0.95 倍假值（#1113 flake 成因）。
@@ -797,8 +802,8 @@ test('概览：六个字段行长在同一张模板卡里，头像头在卡内',
     w: el.offsetWidth,
     h: el.offsetHeight,
   }));
-  expect(avatarGeom.w).toBe(64);
-  expect(avatarGeom.h).toBe(64);
+  expect(avatarGeom.w).toBe(56);
+  expect(avatarGeom.h).toBe(56);
   await expect(card.locator('.profile-row')).toHaveCount(OVERVIEW_LABELS.length);
   // 行序即字段序。取 `.profile-label-text`（模板自己的 label 类）而非面内
   // 别名：别名在、模板类不在，就是「只挂了句柄没吃模板」——正是要钉的退形。
@@ -824,10 +829,10 @@ test('权限 tab：五组开关各自住在模板卡里（#1251 起新增机器�
   await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(6);
 });
 
-// 无头像头的卡（记忆 / 权限三组）首件直接是行，行是自带底色与 border-top 的
-// 方盒。失败方式：行的方角把底色顶出卡的圆角外（卡片 overflow: visible 裁不
-// 掉，肉眼是圆角处多一块方角），且那条 border-top 与卡的描边叠成 2px 的顶边。
-test('记忆/权限卡：首行不吃卡的上圆角与描边（无方角外溢、无 2px 顶边）', async ({
+// 卡的首件直接是行。失败方式：行自带底色，方角把底色顶出卡的圆角外（卡片
+// overflow: visible 裁不掉，肉眼是圆角处多一块方角）；或行带上边线，与卡的
+// 描边叠成 2px 的顶边。
+test('记忆/权限卡：首行无底色、无上边线（无方角外溢、无 2px 顶边）', async ({
   page,
 }) => {
   const detail = await openMemory(page);
@@ -846,18 +851,11 @@ test('记忆/权限卡：首行不吃卡的上圆角与描边（无方角外溢�
 
 async function assertTopCorner(rows: Locator) {
   for (const row of await rows.all()) {
-    const { topLeft, topBorder } = await row.evaluate((el) => {
+    const { background, topBorder } = await row.evaluate((el) => {
       const cs = getComputedStyle(el);
-      return {
-        topLeft: [cs.borderTopLeftRadius, cs.borderTopRightRadius],
-        topBorder: cs.borderTopWidth,
-      };
+      return { background: cs.backgroundColor, topBorder: cs.borderTopWidth };
     });
-    // #1007 重钉（协调裁决：本重钉归 L4；#1057 的 13px 用「−1px ring」复算，
-    // 该复算属 border 时代遗留——ring-1 是 box-shadow 环、不占布局位，首行
-    // 逻辑角 = 卡角原值；半径基 10px（#988）下 rounded-xl = 14px，实测同）。
-    // CDS PR-8: ProfileCard corners --cds-radius-2xl = 16px (was rounded-xl 14px)
-    expect(topLeft).toEqual(['16px', '16px']);
+    expect(background).toBe('rgba(0, 0, 0, 0)');
     expect(topBorder).toBe('0px');
   }
 }

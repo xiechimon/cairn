@@ -69,12 +69,11 @@ import { toModelOptions, toThinkingLevelDisplay } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import {
   PROFILE_HINT_CLS,
-  PROFILE_ROW_AUTO_CLS,
+  PROFILE_ROW_CLS,
+  PROFILE_SELECT_TRIGGER_CLS,
   PROFILE_VALUE_EDITOR_CLS,
-  ProfileAvatar,
   ProfileCard,
-  ProfileHead,
-  ProfileNameRow,
+  ProfileHeader,
   ProfileRow,
   useEditorFocus,
 } from '../components/profile-card.js';
@@ -120,17 +119,8 @@ export const AGENTS_HREF = '/app/resources/agents';
    退役，件默认形态赢；消费点只留布局位。类名句柄原样输出（agent-detail.spec
    的 e2e 锚，零规则）。 */
 
-/** 名称值钮：ghost 件默认形态 + 左对齐布局位（15px 手写值墨档退役，字号
- *  随件 text-sm；hover 换墨配方退役，hover 涂底 = registry 可供性）。 */
-const AGENT_NAME_CLS = 'agent-name h-auto justify-start p-0 text-left font-normal';
-
 /** 图标编辑钮：ghost 件默认 + muted 静息墨（hover 回件默认提亮）。 */
 const AGENT_ICON_EDIT_CLS = 'text-muted-foreground';
-
-/** 名称/职责编辑器：Input/Textarea 件默认形态（手写 border/card 皮肤、15px
- *  档与 13px 墨退役。#1244：focus 环是全局 2px --focus-ring outline；
- *  field-sizing-content 自增长即件正典）。别名类 agent-name-input /
- *  agent-role-input 零引用，随 #1036 终摘——e2e 锚走两编辑器的 id。 */
 
 /** 进行中任务行：ghost 件默认形态（hover 涂底归件）+ 整块行钮布局位
  *  （h-auto 行高由内容定）。 */
@@ -404,44 +394,34 @@ export function AgentDetailPage() {
 
         {tab === 'overview' && (
           <div className="agent-overview flex flex-col gap-3.5">
-            {/* XMON-117：概览按 `/app/account` 的个人页模板复刻——原来是一列
-                各自带 label 的散块，现在是**一张** profile 卡：居中头像头 +
-                行式字段（label 左、值槽右，行间 1px 分隔线）。
-                字段集合与行序逐条不动，只换承载结构；副文案（默认 skill 与
-                职责的说明）跟着 label 走，值槽仍只放值，免得长句把值挤到贴边。 */}
-            <ProfileCard>
-              <ProfileHead>
-                <ProfileAvatar>
-                  {/* 头像走 SeededAvatar 适配层（种子 / 静态兜底 / 失败换图三律），
-                      profile-avatar 只给 64px 圆盒。#1156：SeededAvatar 的 Root
-                      是定尺盒、尺寸由消费点显式给——漏传 className 会落到
-                      registry 默认 size-8（32px），在 64px 盒里被裁。 */}
+            <div className="flex flex-col gap-6">
+              <ProfileHeader
+                avatar={
                   <SeededAvatar
-                    className="size-16"
+                    className="size-14"
                     name={agent.displayName}
                     src={agent.avatarUrl}
                     fallback="/avatar-robot-1.svg"
                   />
-                </ProfileAvatar>
-              </ProfileHead>
-              <ProfileNameRow
-                value={agent.displayName}
-                onCommit={(displayName) => patch({ displayName })}
-                nameClassName={AGENT_NAME_CLS}
-                editClassName={`agent-name-edit ${AGENT_ICON_EDIT_CLS}`}
+                }
+                name={agent.displayName}
+                sub={t('头像与名称')}
+                onRename={(displayName) => patch({ displayName })}
+                nameClassName="agent-name"
+                editClassName="agent-name-edit"
                 inputId="agent-name-input"
-                labelClassName="agent-field-label"
               />
-              <RoleRow
-                value={agent.description}
-                onCommit={(description) => patch({ description })}
-              />
-              <ProfileRow
-                label={t('默认 skill')}
-                hint={t(AGENT_PERMISSION_COPY.defaultSkill)}
-                labelClassName="agent-field-label"
-              >
-                {/* XMON-75：这一格此前是裸 select 控件，弹的是 macOS 系统菜单——
+              <ProfileCard>
+                <RoleRow
+                  value={agent.description}
+                  onCommit={(description) => patch({ description })}
+                />
+                <ProfileRow
+                  label={t('默认 skill')}
+                  hint={t(AGENT_PERMISSION_COPY.defaultSkill)}
+                  labelClassName="agent-field-label"
+                >
+                  {/* XMON-75：这一格此前是裸 select 控件，弹的是 macOS 系统菜单——
                     与紧邻的模型选择器（自制弹层）并排就是两套弹窗。换成同一个
                     Select 壳后两格同形（#1010：壳 = registry select compound 族，
                     几何归 registry 默认）。值回显同模型面：候选里没有的值（技能
@@ -450,83 +430,88 @@ export function AgentDetailPage() {
                     经数组位——与授权面 skillsAllowlist 互不影响）。
                     prefix 句柄类（agent-skill-select/-menu/-row）零规则，e2e 用；
                     弹层 Portal 落 body，locator 页面级取。 */}
-                <Select
-                  value={defaultSkill}
-                  onValueChange={(next) => patch({ defaultSkill: next })}
-                >
-                  <SelectTrigger className="agent-skill-select">
-                    <SelectValue>
-                      {defaultSkill === null
-                        ? t('未设置')
-                        : (skillOptions.find((skill) => skill.id === defaultSkill)?.name ??
-                          defaultSkill)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent aria-label={t('默认 skill')}>
-                    <SelectItem value={null}>{t('未设置')}</SelectItem>
-                    {skillOptions.map((skill) => (
-                      <SelectItem key={skill.id} value={skill.id}>
-                        {skill.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </ProfileRow>
-              <ProfileRow label={t('运行时')} labelClassName="agent-field-label">
-                {/* 运行时档 = 模型槽两级选择器的一级（t-0024 诉求 2；#499 时期
+                  <Select
+                    value={defaultSkill}
+                    onValueChange={(next) => patch({ defaultSkill: next })}
+                  >
+                    <SelectTrigger className={cn('agent-skill-select', PROFILE_SELECT_TRIGGER_CLS)}>
+                      <SelectValue>
+                        {defaultSkill === null
+                          ? t('未设置')
+                          : (skillOptions.find((skill) => skill.id === defaultSkill)?.name ??
+                            defaultSkill)}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent aria-label={t('默认 skill')}>
+                      <SelectItem value={null}>{t('未设置')}</SelectItem>
+                      {skillOptions.map((skill) => (
+                        <SelectItem key={skill.id} value={skill.id}>
+                          {skill.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </ProfileRow>
+                <ProfileRow label={t('运行时')} labelClassName="agent-field-label">
+                  {/* 运行时档 = 模型槽两级选择器的一级（t-0024 诉求 2；#499 时期
                     裁「保持只读」的理由是「做成选择器要落 provider 槽并与模型
                     选择器耦合」——本票要的正是这个耦合：先选运行时/服务商、再
                     选它名下的模型。wire 仍无独立 runtime 字段，一级就是 provider
                     位：null/pi = 内置 (pi)，claude-code = 本机 Claude Code，其余
                     = custom provider id。换一级清二级（modelId 只在 provider 内
                     有意义）。 */}
-                <AgentRuntimeSelect
-                  value={runtimeValue}
-                  options={modelOptions}
-                  onPick={(next) => {
-                    if (next === runtimeValue) return;
-                    const nextLevels = thinkingLevelsForProvider(next, thinkingCatalog);
-                    const illegal =
-                      agent.thinkingLevel !== null && !nextLevels.includes(agent.thinkingLevel);
-                    patch({
-                      provider: next,
-                      modelId: null,
-                      ...(illegal ? { thinkingLevel: null } : {}),
-                    });
-                  }}
-                  prefix="agent-runtime"
-                />
-              </ProfileRow>
-              <ProfileRow label={t('模型')} labelClassName="agent-field-label">
-                <AgentModelSelect
-                  provider={runtimeValue}
-                  modelId={agent.modelId}
-                  options={modelOptions}
-                  onPick={(next) => patch({ modelId: next })}
-                  prefix="agent-model"
-                />
-              </ProfileRow>
-              <ProfileRow label={t('思考强度')} labelClassName="agent-field-label">
-                <Select
-                  value={thinkingLevel}
-                  onValueChange={(next) => patch({ thinkingLevel: next })}
-                >
-                  <SelectTrigger className="agent-thinking-select">
-                    <SelectValue>
-                      {thinkingLevel === null ? t('未设置') : thinkingLevel}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent aria-label={t('思考强度')}>
-                    <SelectItem value={null}>{t('未设置')}</SelectItem>
-                    {thinkingOptions.map((level) => (
-                      <SelectItem key={level} value={level}>
-                        {level}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </ProfileRow>
-            </ProfileCard>
+                  <AgentRuntimeSelect
+                    value={runtimeValue}
+                    options={modelOptions}
+                    onPick={(next) => {
+                      if (next === runtimeValue) return;
+                      const nextLevels = thinkingLevelsForProvider(next, thinkingCatalog);
+                      const illegal =
+                        agent.thinkingLevel !== null && !nextLevels.includes(agent.thinkingLevel);
+                      patch({
+                        provider: next,
+                        modelId: null,
+                        ...(illegal ? { thinkingLevel: null } : {}),
+                      });
+                    }}
+                    prefix="agent-runtime"
+                    triggerClassName={PROFILE_SELECT_TRIGGER_CLS}
+                  />
+                </ProfileRow>
+                <ProfileRow label={t('模型')} labelClassName="agent-field-label">
+                  <AgentModelSelect
+                    provider={runtimeValue}
+                    modelId={agent.modelId}
+                    options={modelOptions}
+                    onPick={(next) => patch({ modelId: next })}
+                    prefix="agent-model"
+                    triggerClassName={PROFILE_SELECT_TRIGGER_CLS}
+                  />
+                </ProfileRow>
+                <ProfileRow label={t('思考强度')} labelClassName="agent-field-label">
+                  <Select
+                    value={thinkingLevel}
+                    onValueChange={(next) => patch({ thinkingLevel: next })}
+                  >
+                    <SelectTrigger
+                      className={cn('agent-thinking-select', PROFILE_SELECT_TRIGGER_CLS)}
+                    >
+                      <SelectValue>
+                        {thinkingLevel === null ? t('未设置') : thinkingLevel}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent aria-label={t('思考强度')}>
+                      <SelectItem value={null}>{t('未设置')}</SelectItem>
+                      {thinkingOptions.map((level) => (
+                        <SelectItem key={level} value={level}>
+                          {level}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </ProfileRow>
+              </ProfileCard>
+            </div>
             {/* 进行中（原版概览最后一段；r3 53 截图拍到的是空态
                 `暂无进行中的任务`）。卡盒 = registry Card（手写 10px 圆角
                 描边 secondary 卡退役）；段头带计数，但 N=0 时不出「 · 0」
@@ -674,15 +659,13 @@ export function AgentDetailPage() {
                     {visibleMemories.map((memory) => (
                       <div
                         key={memory.id}
-                        className={cn(PROFILE_ROW_AUTO_CLS, 'agent-memory-row items-start gap-3')}
+                        className={cn(PROFILE_ROW_CLS, 'agent-memory-row items-start gap-3')}
                       >
-                        <span className="flex flex-1 flex-col gap-0.5">
-                          <span className="agent-memory-title text-sm text-foreground">
+                        <span className="flex flex-1 flex-col">
+                          <span className="agent-memory-title text-ui text-foreground">
                             {memory.title}
                           </span>
-                          <span className="text-xs leading-[1.5] text-muted-foreground">
-                            {memory.content}
-                          </span>
+                          <span className="text-meta text-content-tertiary">{memory.content}</span>
                         </span>
                         <Button
                           variant="ghost"
@@ -800,12 +783,12 @@ export function AgentDetailPage() {
                 // parts.tsx 同法），生产 build 里 scenario 参数本就被编译期
                 // 折叠、不参与路由。
                 <ProfileCard>
-                  <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
-                    <p className="agent-perm-empty m-0 text-sm text-muted-foreground">
+                  <div className={cn(PROFILE_ROW_CLS, 'items-baseline gap-2')}>
+                    <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无团队密钥。')}
                     </p>
                     <Link
-                      className="agent-secret-add text-xs leading-4 text-primary no-underline hover:underline"
+                      className="agent-secret-add text-meta text-primary no-underline hover:underline"
                       to={{ pathname: SECRETS_HREF, search }}
                     >
                       {t('去添加密钥')}
@@ -842,8 +825,8 @@ export function AgentDetailPage() {
               <p className={PROFILE_HINT_CLS}>{t(AGENT_PERMISSION_COPY.mcpServers)}</p>
               {mcpOptions.length === 0 ? (
                 <ProfileCard>
-                  <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
-                    <p className="agent-perm-empty m-0 text-sm text-muted-foreground">
+                  <div className={cn(PROFILE_ROW_CLS, 'items-baseline gap-2')}>
+                    <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无 MCP 服务器。')}
                     </p>
                   </div>
@@ -876,8 +859,8 @@ export function AgentDetailPage() {
               </p>
               {mcpOptions.length === 0 ? (
                 <ProfileCard>
-                  <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
-                    <p className="agent-perm-empty m-0 text-sm text-muted-foreground">
+                  <div className={cn(PROFILE_ROW_CLS, 'items-baseline gap-2')}>
+                    <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无 MCP 服务器。')}
                     </p>
                   </div>
@@ -905,8 +888,8 @@ export function AgentDetailPage() {
               {live && machineFitQ.data !== undefined && (
                 <ProfileCard>
                   {machineFitQ.data.machines.length === 0 ? (
-                    <div className={cn(PROFILE_ROW_AUTO_CLS, 'items-baseline gap-2')}>
-                      <p className="m-0 text-sm text-muted-foreground">{t('暂无机器。')}</p>
+                    <div className={cn(PROFILE_ROW_CLS, 'items-baseline gap-2')}>
+                      <p className="m-0 text-ui text-content-secondary">{t('暂无机器。')}</p>
                     </div>
                   ) : (
                     machineFitQ.data.machines.map((m) => (
@@ -919,8 +902,8 @@ export function AgentDetailPage() {
                       >
                         <span
                           className={cn(
-                            'text-xs',
-                            m.canRun ? 'text-muted-foreground' : 'text-destructive',
+                            'text-meta',
+                            m.canRun ? 'text-content-secondary' : 'text-destructive',
                           )}
                         >
                           {m.canRun ? t('可跑') : t('不可跑')}
@@ -997,7 +980,7 @@ function RoleRow({
     >
       {draft === null ? (
         <>
-          <span className="agent-role-text min-w-0 flex-[1_1_auto] text-sm whitespace-pre-line break-words text-foreground">
+          <span className="agent-role-text min-w-0 flex-auto text-ui whitespace-pre-line break-words text-foreground">
             {display ?? t('未设置职责')}
           </span>
           <div className="flex justify-end gap-2">

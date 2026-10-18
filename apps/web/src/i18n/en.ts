@@ -197,6 +197,13 @@ export const EN: Record<string, string> = {
   舒适: 'Comfortable',
   紧凑: 'Compact',
 
+  // —— account / agent settings list ——
+  头像与名称: 'Avatar and name',
+  编辑名称: 'Edit name',
+  紧凑会缩小字号与行距: 'Compact uses smaller type and tighter rows',
+  '任务需要你处理时，在系统通知中心提醒':
+    'Notify you in the system notification center when a task needs you',
+
   // —— chip popover / plan dropdown (r7 19/20/29) ——
   任务分配: 'Task assignment',
   执行对话: 'Active run',
