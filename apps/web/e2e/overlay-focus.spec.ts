@@ -156,7 +156,7 @@ test.describe('#10 schedules 新建定时弹层 = registry Dialog 全屏族（fa
 
   test('X and 取消 close the fixture face too (no dead buttons)', async ({ page }) => {
     await page.goto(SCHED);
-    await page.locator('.sched-form-cancel').click();
+    await page.getByRole('dialog').getByRole('button', { name: '取消' }).click();
     await expect(overlay(page)).toBeHidden();
 
     await page.goto(SCHED);

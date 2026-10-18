@@ -7,7 +7,7 @@ import { expect, test } from '@playwright/test';
 //   400/500/600 的锚点; inter-var fvar wght 100–900 default 400 且
 //   @font-face 已声明全档范围, 浏览器按请求档实例化, 无需
 //   font-variation-settings)。500/600 档抽钉 .todo-card-title /
-//   .sched-empty-title, 顺带钉 var 字体真载入 (font-display: optional 下
+//   .sched-empty h2, 顺带钉 var 字体真载入 (font-display: optional 下
 //   fallback 静默接管是本面最隐蔽的回退)。
 // - 侧栏头 = 品牌槽: mark 用真资产 logo.svg 作 alpha mask, 随
 //   currentColor 双主题换色 (mark 图单点替换位 = 该 mask url);
@@ -45,16 +45,15 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.cardTitleWeight).toBe('500');
   });
 
-  // #1007（wave 1 L4）重钉：schedules 空态迁 registry Empty 件族，标题档 =
-  // EmptyTitle 的 font-medium（500）+ tracking-tight——原 600 semibold 是
-  // 手写空态的皮肤档，随件退役；本面 headline 正典改 registry 档。
-  test(`empty-state headline rides the registry EmptyTitle tier (${theme})`, async ({
+  // schedules 空态走 Paper EmptyState（components/empty-state.tsx）：标题
+  // h2 = text-card-title 500。
+  test(`empty-state headline rides the Paper EmptyState title tier (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app/schedules?scenario=11');
     const w = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.sched-empty-title')!).fontWeight,
+      () => getComputedStyle(document.querySelector('.sched-empty h2')!).fontWeight,
     );
     expect(w).toBe('500');
   });

@@ -95,7 +95,7 @@ test('live face: 保存 fires POST /api/schedules with the form state (#1037)', 
 
   await page.goto('/app/schedules');
   await expect(page.locator('.sched-empty')).toBeVisible();
-  await page.locator('.sched-empty-new').click();
+  await page.locator('.sched-empty').getByRole('button', { name: '新建定时' }).click();
   const dialog = page.getByRole('dialog', { name: '新建定时' });
   await expect(dialog).toBeVisible();
 

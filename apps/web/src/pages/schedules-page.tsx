@@ -17,15 +17,19 @@
 //      交互未观测，ChevronRight 可供性暗示随假行一并移除。
 //   c. 对话框收编 DialogShell 家族律容器（封顶 + body 内滚 + footer 钉底），
 //      自组裸 DialogContent 的第三套容器退役。
-import { Plus } from 'lucide-react';
+
+import { cn } from 'cn';
+import { Clock, Lightbulb, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSchedules, useTodos } from '../api/hooks.js';
 import { mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
+import { EmptyState } from '../components/empty-state.js';
+import { FormActions } from '../components/form-layout.js';
+import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import {
   DropdownMenu,
@@ -33,14 +37,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '../components/ui/empty.js';
 import {
   Select,
   SelectContent,
@@ -61,7 +57,7 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Clock, EllipsisVertical, Lock, Trash2 } from '../icons/index.js';
+import { EllipsisVertical, Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
 import { PageShell } from './shell.js';
@@ -126,16 +122,15 @@ const RUN_WORD: Record<ScheduleRecord['kind'], string> = {
   once: '运行一次',
 };
 
-/** 表单行盒（项目/任务/机器 静息展示行）：36 高带框行，registry 几何
- *  （rounded-lg + border-input，input 族同款描边词汇）；布局位自持。
+/** 表单行盒（项目/任务 静息展示行）：表单控件同款 32px 白底发丝框。
  *  sched-form-row 别名 = #1037 e2e 跨域句柄（行结构读数/截断钉）。 */
 const FORM_ROW_CLS =
-  'sched-form-row flex h-9 items-center justify-between rounded-lg border border-input px-3';
+  'sched-form-row flex h-8 items-center justify-between gap-3 rounded-md border border-border bg-card px-3 shadow-xs dark:bg-input/30';
 
-/** 行右值槽：13/20 字改走 registry text-sm。#1037：chevron 与其 muted 墨
- *  退役（假行不再读作 picker），值单行截断——超长不可断词（真用户数据形态）
- *  不得撑爆 488 面板。 */
-const FORM_ROW_VALUE_CLS = 'min-w-0 truncate text-sm text-foreground';
+/** 行右值槽：值单行截断——超长不可断词不得撑爆 488 面板。 */
+const FORM_ROW_VALUE_CLS = 'min-w-0 truncate text-ui text-foreground';
+
+const FORM_LABEL_CLS = 'text-ui font-medium text-foreground';
 
 /** 时/分/日期选择盒（#946 建局部壳；#952 回收进共享 Select 件；#1010 随件
  *  回源 = registry select compound 族，皮肤/几何归 registry 默认——旧
@@ -206,28 +201,20 @@ function ScheduleCard({
   const { t } = useI18n();
   const ui = PHASE_UI[schedule.todo.phase];
   return (
-    <Card className="sched-card h-[92px] flex-row items-start p-4">
-      <span className="flex size-7 flex-none items-center justify-center self-center rounded-lg bg-muted text-muted-foreground">
-        <Clock width={14} height={14} />
-      </span>
-      <div className="ml-6 min-w-0 flex-1">
-        <div className="truncate text-sm leading-5 text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-xs leading-[18px] text-muted-foreground">
-          {`${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} ${t(RUN_WORD[schedule.kind])}`}
-        </div>
-        <div className="mt-0.5 flex items-center gap-1.5 text-xs leading-[18px] text-muted-foreground">
-          {t('下次 {day} {time}', {
-            day: dayWord(schedule.nextRunAt, now, t),
-            time: hourMinute(schedule.nextRunAt),
-          })}
-          <span aria-hidden="true">·</span>
-          {schedule.todo.projectName}
-        </div>
+    <div className={cn('sched-card', SETTINGS_ROW_CLS)}>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-ui text-foreground">{`#${schedule.todo.seqNum} ${schedule.todo.title}`}</span>
+        <span className="truncate text-meta text-content-tertiary">
+          {`${monthDay(schedule.at, t)} ${hourMinute(schedule.at)} ${t(RUN_WORD[schedule.kind])} · ${t(
+            '下次 {day} {time}',
+            {
+              day: dayWord(schedule.nextRunAt, now, t),
+              time: hourMinute(schedule.nextRunAt),
+            },
+          )} · ${schedule.todo.projectName}`}
+        </span>
       </div>
-      {/* chip = StatusChip 适配层（#983 判决：五态 data-tone + 五对 token 槽
-          单源）。旧卡面「plan 共用 idle 槽」的 per-face 折叠退役——五态映射
-          归正典单源，plan 档随全站同色（原型实审点）。 */}
-      <StatusChip tone={ui.tone} className="mr-3 flex-none">
+      <StatusChip tone={ui.tone} className="flex-none">
         {t(ui.chip)}
       </StatusChip>
       {/* kebab 菜单：registry DropdownMenu 默认皮肤（手写盘/行配方退役），
@@ -265,7 +252,7 @@ function ScheduleCard({
           </DropdownMenuContent>
         </DropdownMenu>
       </span>
-    </Card>
+    </div>
   );
 }
 
@@ -322,14 +309,11 @@ function ScheduleForm({
       onClose={onClose}
       width={488}
       footer={
-        // registry DialogFooter 形态（border-t + muted 底、行尾对齐）：
-        // 取消 = outline、保存 = default（官网 dialog footer 词汇）。
-        <>
-          <Button variant="outline" className="sched-form-cancel" onClick={onClose}>
-            {t('取消')}
-          </Button>
-          <Button onClick={onSave}>{t('保存')}</Button>
-        </>
+        <FormActions
+          className="pt-0"
+          primary={{ label: t('保存'), onClick: onSave }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
       <div className="flex flex-col gap-3">
@@ -338,11 +322,11 @@ function ScheduleForm({
             local-first 无选择语义可挂——行显示即将生效的值，ChevronRight
             可供性暗示整族移除，静态行不得读作 picker。 */}
         <div className={FORM_ROW_CLS}>
-          <span className="text-sm leading-5 text-muted-foreground">{t('项目')}</span>
+          <span className="text-ui text-content-secondary">{t('项目')}</span>
           <span className={FORM_ROW_VALUE_CLS}>{repo}</span>
         </div>
         <div className={FORM_ROW_CLS}>
-          <span className="text-sm leading-5 text-muted-foreground">{t('任务')}</span>
+          <span className="text-ui text-content-secondary">{t('任务')}</span>
           <span className={FORM_ROW_VALUE_CLS}>
             {todo == null ? '' : `#${todo.seqNum} ${todo.title}`}
           </span>
@@ -367,7 +351,7 @@ function ScheduleForm({
         </Tabs>
         {kind === 'once' && (
           <>
-            <div className="text-sm leading-5 text-muted-foreground">{t('日期')}</div>
+            <div className={FORM_LABEL_CLS}>{t('日期')}</div>
             <div>
               {/* r3 92b observes 今天; further entries unrecorded——单候选，
                   故缺省值就地取 t()（每渲染现取，locale 切换自然跟上，不带
@@ -386,7 +370,7 @@ function ScheduleForm({
             </div>
           </>
         )}
-        <div className="text-sm leading-5 text-muted-foreground">{t('时间')}</div>
+        <div className={FORM_LABEL_CLS}>{t('时间')}</div>
         {/* hour at column left, minute at column center (r3 92 probe) */}
         <div className="grid grid-cols-2">
           <SchedSelect
@@ -406,7 +390,7 @@ function ScheduleForm({
             onPick={onMinute}
           />
         </div>
-        <div className="text-xs leading-4 text-muted-foreground">
+        <div className="text-meta text-content-tertiary">
           {t('按你的本地时区运行（Asia/Shanghai）')}
         </div>
       </div>
@@ -541,43 +525,27 @@ export function SchedulesPage() {
         </Button>
       }
     >
-      <div className="space-y-3 pt-6">
-        {schedules.length === 0 ? (
-          // 空态 = registry Empty 件族（手写 48px tile + 节奏配方退役）；
-          // sched-empty/-title/-new 别名留存（dead-buttons / accent-typo
-          // 跨域句柄）。
-          <Empty className="sched-empty">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Clock />
-              </EmptyMedia>
-              <EmptyTitle className="sched-empty-title">{t('尚无定时。')}</EmptyTitle>
-              <EmptyDescription>
-                {t(
-                  '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。',
-                )}
-              </EmptyDescription>
-            </EmptyHeader>
-            <EmptyContent>
-              {/* #1037：空态主钮两面接真（fixture 面点开冻结表单）。 */}
-              <Button
-                className="sched-empty-new"
-                onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
-              >
-                {t('新建定时')}
-              </Button>
-              {/* 「查看文档」钮全除（#149 wontfix）：local-first 自托管无
-                  文档站可链（官方链接对象不可观测），README 指向上游代码库
-                  与产品语义无关——隐去，台账 #136 勾兑登记。 */}
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {/* the r7 icon dump names the bulb markup Lock (#49a224ab53) */}
-                <Lock width={12} height={12} />
-                <span>{t('也可以直接告诉总管某个任务要多久重跑一次，它会替你写好规则。')}</span>
-              </div>
-            </EmptyContent>
-          </Empty>
-        ) : (
-          schedules.map((s) => (
+      {schedules.length === 0 ? (
+        // sched-empty = dead-buttons / accent-typo 跨域句柄。
+        <EmptyState
+          className="sched-empty mt-6"
+          icon={Clock}
+          title={t('尚无定时。')}
+          description={t(
+            '按周期或在指定时间自动重新运行任务。每一轮都会依据任务描述从头开始一次全新运行，到达确认或审核关口时暂停，交由负责人接手。',
+          )}
+          action={{
+            label: t('新建定时'),
+            onClick: () => (live ? setFormOpen(true) : setFixtureFormOpen(true)),
+          }}
+          hint={{
+            icon: Lightbulb,
+            text: t('也可以直接告诉总管某个任务要多久重跑一次，它会替你写好规则。'),
+          }}
+        />
+      ) : (
+        <SettingsCard className="mt-4">
+          {schedules.map((s) => (
             <ScheduleCard
               key={s.id}
               schedule={s}
@@ -587,9 +555,9 @@ export function SchedulesPage() {
                 setConfirmOpen(true);
               }}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </SettingsCard>
+      )}
       {/* #1037：fixture 面恒挂载（open=false 时 Base UI 不渲染 DOM）——
           retained-mount 让退场淡出活过关闭，冻结面与用户点开面共用一壳。 */}
       {live ? (
@@ -635,7 +603,7 @@ export function SchedulesPage() {
         summary={
           deleteTarget != null ? (
             <>
-              <span className="text-(--text-tertiary)">#{deleteTarget.todo.seqNum}</span>
+              <span className="text-content-tertiary">#{deleteTarget.todo.seqNum}</span>
               {deleteTarget.todo.title}
             </>
           ) : null
