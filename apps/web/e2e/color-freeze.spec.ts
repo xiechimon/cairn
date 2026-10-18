@@ -133,6 +133,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['canvas', theme === 'light' ? '#f3eee5' : 'color-mix(in oklab, var(--background), var(--card) 50%)'],
       ['surface-1', 'var(--canvas)'],
       ['accent-hover', theme === 'light' ? '#f6ebe3' : 'var(--spot-soft)'],
+      ['dialog-surface', theme === 'light' ? 'var(--background)' : 'var(--popover)'],
       ['surface-2', 'var(--card)'],
       ['surface-3', 'var(--popover)'],
       ['hover-1', 'color-mix(in oklab, var(--foreground) 5%, transparent)'],

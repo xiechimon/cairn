@@ -40,12 +40,9 @@ test('概览页脚有删除入口，点开二次确认（canon 原文逐字）',
   await expect(dialog.locator('.delete-confirm-title')).toHaveText(CANON_TITLE);
   await expect(dialog.locator('.delete-confirm-summary')).toHaveText(CANON_BODY);
   await expect(dialog.locator('.delete-confirm-cancel')).toHaveText('取消');
-  // #948/#910 裁定 3：computed 字排钉整条按新正典重写——`.delete-confirm-cancel`
-  // 的 12px/16px per-face 规则（#574 re-key 的 r7 25 实测值）随 overlay.css
-  // 退役，取消钮回到冻结件几何正本（#909/§2.5：Button ghost default =
-  // text-sm 14px/20px，D2 吸收差值；§5.4 同律「dlg 族钮面归件默认档」）。
+  // Paper 对话框次操作 = 文字按钮（DIALOG_TEXT_BUTTON）：text-ui 13.5px/20px。
   // 载体仍走类名别名（壳级输出的摘除权属 #952，本票不越权改冻结件）。
-  await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('font-size', '14px');
+  await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('font-size', '13.5px');
   await expect(dialog.locator('.delete-confirm-cancel')).toHaveCSS('line-height', '20px');
   await expect(dialog.locator('.delete-confirm-delete')).toHaveText('删除');
 });

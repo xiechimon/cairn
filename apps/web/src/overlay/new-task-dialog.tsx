@@ -43,7 +43,12 @@ import type { ClipboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertDialog, AlertDialogContent } from '../components/ui/alert-dialog.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_FACE,
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -67,11 +72,10 @@ import { applyOrderedListEnter } from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 
 // ---- #948 per-face 清零：overlay.css 的本面规则 1:1 迁以下 utility 常量 ----
-// 几何全部保 r7 04/14 实测值（672×439 壳经 DialogShell width/height 入参；
-// head 44 / 行 32 / chip 30 / 工具钮 30 / 钮组 gap 13 等阶梯外一次性尺寸走
-// arbitrary，§3.1(a)）。行钮 hover 底不写 utility：.new-task-project-row 与
-// .new-task-close 在 motion.css 的 #73 家族名单里（accent-soft tint，
-// unlayered 恒压 layered 工具类与件配方），家族律即本面 hover 正本。
+// Paper 改版（apps/web/DESIGN.md）：壳 672×439 经 DialogShell width/height
+// 入参不变；head 44 / 行 32 / 工具钮 30 落 4px 网格，字号走六档键。行钮与
+// 关闭钮的 hover 底 = Button ghost 档浅底（已退出 motion.css #73 accent-soft
+// 家族：赭红只给「需要你」与操作链接）。
 
 /** head 项目 chip（原 .new-task-project）：透明无框触发钮，Button ghost
  *  七通道中和（#908 裁决 3）；svg 墨 tertiary（chevron 12px 属性原值）。 */
@@ -82,19 +86,18 @@ const PROJECT_CHIP_CLS =
  *  absolute 定位 / z 档全退役——皮肤与动效归 PopoverContent 默认，定位归
  *  Positioner 参数，z 归件内 --z-dialog 单梯）：220 宽是内容 layout（行 =
  *  avatar+名+勾 的捕获节奏），行距归零（旧面行带紧贴）。别名类原样（e2e）。 */
-const PROJECT_MENU_CLS = 'new-task-project-menu w-[220px] gap-0';
+const PROJECT_MENU_CLS = 'new-task-project-menu w-55 gap-0 rounded-lg p-1';
 
-/** popover 选项行（原 .new-task-project-row）：32px 行、8px 圆角；hover
- *  tint 归 motion.css #73 家族律（此处不写 hover bg，件配方被家族压掉）。 */
+/** popover 选项行（原 .new-task-project-row）：32px 行、8px 圆角；hover 底
+ *  = ghost 档浅底。 */
 const OPTION_ROW_CLS =
-  'new-task-project-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-[8px] border-none bg-transparent pr-1 pl-0 text-left text-xs leading-4 font-normal text-(--foreground) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto';
+  'new-task-project-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-none bg-transparent px-2 text-left text-ui font-normal text-foreground aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto';
 
 /** 未保存闸确认层（#318 r9 §3.4）layout 槽（#1008：居中 fixed / 圆角 /
  *  底色投影 / --z-confirm 档全退役——registry AlertDialogContent 默认承载
  *  居中与皮肤，z-50 = --z-dialog 值，数值上仍压 DialogShell 低档面板）：
  *  448 宽是捕获设计的内容 layout。别名 new-task-discard 原样（e2e）。 */
-const DISCARD_PANEL_CLS =
-  'new-task-discard w-[448px] max-w-[448px] rounded-(--edge-radius) shadow-(--dialog-shadow) sm:max-w-[448px]';
+const DISCARD_PANEL_CLS = `new-task-discard w-112 max-w-112 sm:max-w-112 ${DIALOG_FACE}`;
 
 /** Spec textarea template lines, verbatim r2 §5.2 / r7 04 placeholder
  *  block — dict keys so the en fallback carries them too. */
@@ -613,7 +616,7 @@ export function NewTaskDialog({
             计数、newtask 组的面板锚都吃这些 testid（#943 的 online-dot /
             column-count 同律）。 */}
         <div
-          className="relative flex h-11 flex-none items-center border-b border-(--border) bg-(--popover) pr-1 pl-3"
+          className="relative flex h-11 flex-none items-center border-b border-border pr-1 pl-3"
           data-testid="new-task-head"
         >
           {/* #682 第三轮（用户三审）：标题行回归抓拍形态——项目 chip + 居中
@@ -657,10 +660,10 @@ export function NewTaskDialog({
                     />
                   }
                 >
-                  <span className="size-5 rounded-[6px] bg-(--project-avatar-bg) text-[11px] leading-5 text-center uppercase text-(--project-avatar-fg)">
+                  <span className="size-5 rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-5 uppercase text-(--project-avatar-fg)">
                     {projectName.charAt(0).toLowerCase()}
                   </span>
-                  <span className="new-task-project-name min-w-0 max-w-[220px] truncate text-[13px] leading-4 text-(--foreground)">
+                  <span className="new-task-project-name min-w-0 max-w-55 truncate text-ui leading-4 text-foreground">
                     {projectName}
                   </span>
                   <ChevronDown width={12} height={12} />
@@ -695,12 +698,10 @@ export function NewTaskDialog({
                       setProjectOpen(false);
                     }}
                   >
-                    <span className="size-4 flex-none rounded-[5px] bg-(--project-avatar-bg) text-[9px] leading-4 text-center uppercase text-(--project-avatar-fg)">
+                    <span className="size-4 flex-none rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-4 uppercase text-(--project-avatar-fg)">
                       {row.name.charAt(0).toLowerCase()}
                     </span>
-                    <span className="new-task-project-row-name text-xs leading-4 text-(--foreground)">
-                      {row.name}
-                    </span>
+                    <span className="new-task-project-row-name min-w-0 truncate">{row.name}</span>
                     {row.id === selected?.id && (
                       <span className="ml-auto flex text-(--card-button)">
                         <Check width={14} height={14} />
@@ -711,25 +712,24 @@ export function NewTaskDialog({
               </PopoverContent>
             </Popover>
           </span>
-          <div className="pointer-events-none absolute inset-x-0 text-center text-[13px] leading-4 font-medium text-(--foreground)">
+          <div className="pointer-events-none absolute inset-x-0 text-center font-heading text-heading font-medium text-foreground">
             {t('新建任务')}
           </div>
           {/* A4-deep 收编：icon 变体皮肤；#948：28×28 + margin-left:auto 几何
               迁 utility（size-7 压件 icon 档 size-8——dead-buttons #574 回归
-              钉 28×28 + 贴 head 右缘 4px）；hover 底走 motion.css #73 家族律
-              （.new-task-close 在名单内，unlayered 恒压件配方）。#318 未保存
-              闸:dialog 关闭走 requestClose(dirty 时先弹确认层)。 */}
+              钉 28×28 + 贴 head 右缘 4px）。#318 未保存闸:dialog 关闭走
+              requestClose(dirty 时先弹确认层)。 */}
           <Button
             variant="ghost"
             size="icon"
-            className="new-task-close ml-auto size-7"
+            className="new-task-close ml-auto size-7 text-content-tertiary"
             aria-label={t('关闭')}
             onClick={requestClose}
           >
             <X />
           </Button>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col bg-(--card) px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2">
+        <div className="flex min-h-0 flex-1 flex-col px-4 pt-4 [&>.attachment-strip]:flex-none [&>.attachment-strip]:pb-2 [&_[data-slot=attachment]]:bg-transparent">
           {/* spec 15 #394：单字段正文——标题输入位移除,占位提示 = 五行模板族
               （首行即任务一句话,占位标题派生取它）。
               #948：裸 textarea 收编 Textarea 件（§5.3），件配方逐位中和回
@@ -741,7 +741,7 @@ export function NewTaskDialog({
           <Textarea
             ref={focusSpecRef}
             data-testid="new-task-spec"
-            className="new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-5 tabular-nums text-(--foreground) field-sizing-fixed placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-sm"
+            className="new-task-spec min-h-0 flex-1 resize-none border-0 bg-transparent p-0 text-ui leading-5 tabular-nums text-foreground field-sizing-fixed placeholder:text-content-tertiary focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent md:text-ui"
             placeholder={SPEC_TEMPLATE_LINES.map((line) => t(line)).join('\n')}
             value={spec}
             onChange={(e) => setSpec(e.target.value)}
@@ -768,17 +768,17 @@ export function NewTaskDialog({
               列，strip 挂正文与 footer 之间、空时零节点。 */}
           <AttachmentStrip draft={spec} pending={pendingAttachments} />
         </div>
-        <div className="flex-none border-t border-(--border) bg-(--secondary) pt-[11px] pr-3 pb-3 pl-4">
-          <div className="flex h-[30px] items-center">
-            {/* A4-deep 收编：icon 变体皮肤；#948：30×30 几何迁 size-[30px]
-                （原 .new-task-tools button 元素选择器，阶梯外一次性尺寸）。 */}
-            <div className="flex items-center gap-1.5" data-testid="new-task-tools">
+        <div className="flex-none border-t border-border p-3">
+          <div className="flex h-7.5 items-center">
+            {/* A4-deep 收编：icon 变体皮肤；30×30 = size-7.5（原 .new-task-tools
+                button 元素选择器）。 */}
+            <div className="flex items-center gap-1" data-testid="new-task-tools">
               {/* #304 C5 裁决:语音输入功能不做(local-first 无语音面)——
                   语音钮移除不渲染,不留死钮;添加附件/提及走 A4 Button 原语。 */}
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-[30px]"
+                className="size-7.5 text-content-tertiary"
                 aria-label={t('添加附件')}
                 disabled={attaching || !onAttachment}
                 onClick={() => fileInputRef.current?.click()}
@@ -788,21 +788,21 @@ export function NewTaskDialog({
               <Button
                 variant="ghost"
                 size="icon"
-                className="size-[30px]"
+                className="size-7.5 text-content-tertiary"
                 aria-label={t('提及')}
                 onClick={() => setPickerOpen((value) => !value)}
               >
                 <Grid2x2 />
               </Button>
             </div>
-            <div>
+            <div className="ml-auto flex items-center gap-2">
               {/* e2e 别名叠加：integration/test/m5-web-e2e.test.ts 钉
                   .new-task-start（overlays lane 误删致 CI 红，此处恢复；
                   类名与规则无关，纯选择器锚点） */}
               <Button
                 variant="ghost"
                 size="default"
-                className="new-task-save"
+                className={`new-task-save ${DIALOG_TEXT_BUTTON}`}
                 disabled={spec.trim() === ''}
                 onClick={save}
               >
@@ -810,7 +810,7 @@ export function NewTaskDialog({
               </Button>
               <Button
                 size="default"
-                className="new-task-start"
+                className={`new-task-start ${DIALOG_PRIMARY_BUTTON}`}
                 disabled={spec.trim() === ''}
                 onClick={saveAndStart}
               >
@@ -818,12 +818,12 @@ export function NewTaskDialog({
                 {/* XMON-95 界面标识：常亮按键角标（kbd-hint 的 hover chip 是
                     另一面，这里要「看得到」，故静息可见）。落在 kbd.tsx 原语
                     上（COMPONENTS.md「文档正文里的按键角标用 kbd.tsx」），只把
-                    registry 的尺寸/配色档逐项改写到本面：本钮是 default 档（实底 + 主题字），故边界/墨走
-currentColor 系而非 border-border/muted-foreground。
+                    registry 的尺寸/配色档改写到本面：本钮是墨色胶囊，角标底与
+                    墨走 primary-foreground 半透明系而非 muted。
                     aria-hidden：角标是视觉提示，按钮的可及名仍是文字本身。 */}
                 <Kbd
                   aria-hidden="true"
-                  className="ml-1.5 h-auto min-w-0 rounded-[3px] border border-current/35 bg-transparent px-[3px] py-px text-[11px] leading-4 font-normal text-current/90"
+                  className="h-4 min-w-0 rounded-sm bg-primary-foreground/15 px-1 text-caption font-normal text-primary-foreground/80"
                 >
                   {START_SHORTCUT_LABEL}
                 </Kbd>
@@ -858,25 +858,25 @@ currentColor 系而非 border-border/muted-foreground。
           className={DISCARD_PANEL_CLS}
           aria-label={t('放弃新建任务？未保存的内容将丢失。')}
         >
-          <div className="text-sm leading-5 font-medium text-(--foreground)">
+          <div className="font-heading text-heading font-medium text-foreground">
             {t('放弃新建任务？未保存的内容将丢失。')}
           </div>
-          <div className="flex h-[30px] items-center justify-end gap-2.5">
-            {/* 原 .new-task-discard-keep：透明无框 12px 钮（ghost 七通道中和）。
-                墨色换 muted-foreground：旧 --text-dim 亮模 on --dialog-bg 实测
-                2.89:1，连正典给 dim 槽自留的 3:1 地板都不过（#943
-                notify-banner 同病同治），按 #908 裁决 2 换消费面槽引用，
-                token 值不动（contrast-948.md）。 */}
+          <div className="flex h-7.5 items-center justify-end gap-2">
+            {/* 原 .new-task-discard-keep：文字次操作；放弃 = 唯一主操作，保危险
+                token。 */}
             <Button
               variant="ghost"
-              size="default"
-              className="new-task-discard-keep h-auto cursor-pointer justify-start gap-0 border-none bg-transparent p-0 text-xs leading-4 font-normal text-muted-foreground active:not-aria-[haspopup]:translate-y-0 hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-muted-foreground [&_svg:not([class*='size-'])]:size-auto"
+              className={`new-task-discard-keep ${DIALOG_TEXT_BUTTON}`}
               ref={keepBtnRef}
               onClick={closeDiscard}
             >
               {t('继续编辑')}
             </Button>
-            <Button variant="destructive" size="default" onClick={discardAndClose}>
+            <Button
+              variant="destructive"
+              className={DIALOG_PRIMARY_BUTTON}
+              onClick={discardAndClose}
+            >
               {t('放弃并关闭')}
             </Button>
           </div>

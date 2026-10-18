@@ -67,6 +67,19 @@ const VIEWPORT_MECHANISM_CLS =
 export const VIEWPORT_POP_ANIM =
   'duration-100 ease-out group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
 
+/** Paper 对话框面（apps/web/DESIGN.md）：dialog-surface 纸面（亮 = sheet）+
+ *  一档浮层投影（--shadow-popover 自带发丝环，故 ring-0 撤掉 registry 的
+ *  foreground/10 环）。浮层浮在 sheet 之上，所以有投影；sheet 本身只有环。 */
+export const DIALOG_FACE =
+  'rounded-(--edge-radius) bg-dialog-surface shadow-(--shadow-popover) ring-0';
+
+/** 对话框主操作：墨色胶囊（Button default 档；危险确认换 destructive 档保危险
+ *  token），一个对话框只有一个。 */
+export const DIALOG_PRIMARY_BUTTON = 'h-7.5 gap-1.5 rounded-full px-4 text-ui';
+
+/** 对话框次操作：文字按钮（Button ghost 档），hover 出浅底。 */
+export const DIALOG_TEXT_BUTTON = 'h-7.5 gap-1.5 px-3 text-ui font-normal text-content-secondary';
+
 interface DialogShellProps {
   /** Left header title; absent when `headerCenter` renders instead. */
   title?: string;
@@ -206,7 +219,7 @@ export function DialogShell({
                 ? // 具名 group：视口根面板经 group-data-open/closed/dlgvp 读本 Popup
                   // 的开闭态（VIEWPORT_POP_ANIM）；transform 不上包装层（#656）。
                   `${VIEWPORT_MECHANISM_CLS} group/dlgvp${className != null ? ` ${className}` : ''}`
-                : `${SHELL_EXIT_BRIDGE_CLS}${className != null ? ` ${className}` : ''} fixed top-1/2 left-1/2 flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-(--edge-radius) bg-popover text-sm text-popover-foreground shadow-(--dialog-shadow) ring-1 ring-foreground/10 outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95`
+                : `${SHELL_EXIT_BRIDGE_CLS}${className != null ? ` ${className}` : ''} fixed top-1/2 left-1/2 flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden ${DIALOG_FACE} text-ui text-popover-foreground outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95`
             }
             style={
               viewportRoot ? { zIndex } : { width, zIndex, ...(height == null ? {} : { height }) }
@@ -239,7 +252,8 @@ export function DialogShell({
           // layout 位：#193 封顶 + 三段 grid（body 是真滚动容器）；宽度经
           // style min() 收口，故解除 registry 的 max-w 两档。
           // CDS PR-5 (adapter): skin lives here so dialog.tsx stays pristine (S5).
-          'max-h-[calc(100vh-48px)] max-w-none sm:max-w-none rounded-(--edge-radius) shadow-(--dialog-shadow)',
+          'max-h-[calc(100vh-48px)] max-w-none sm:max-w-none',
+          DIALOG_FACE,
           footer != null ? 'grid-rows-[auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_minmax(0,1fr)]',
           className,
         )}
@@ -251,7 +265,7 @@ export function DialogShell({
           {headerCenter != null ? (
             headerCenter
           ) : title != null ? (
-            <DialogTitle>{title}</DialogTitle>
+            <DialogTitle className="font-heading text-heading leading-none">{title}</DialogTitle>
           ) : null}
         </DialogHeader>
         {/* ring 房：body 是滚动容器（overflow-y-auto ⇒ 两轴都裁），w-full
@@ -263,7 +277,10 @@ export function DialogShell({
           {children}
         </div>
         {footer != null && (
-          <DialogFooter data-testid="dialog-foot" className="rounded-b-(--edge-radius)">
+          <DialogFooter
+            data-testid="dialog-foot"
+            className="rounded-b-(--edge-radius) bg-transparent"
+          >
             {footer}
           </DialogFooter>
         )}

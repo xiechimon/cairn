@@ -24,6 +24,7 @@
 import { Fragment, type Ref, useEffect } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
+import { DIALOG_FACE } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { SlashRow } from './slash-commands.js';
 
@@ -49,17 +50,17 @@ export interface SlashMenuProps {
 
 /** 面板壳（原 .slash-menu）：与 .mention-inline 同锚同皮（r9 §2.2/§3.2）。 */
 const MENU_CLS =
-  'slash-menu absolute inset-x-0 bottom-[calc(100%+6px)] z-40 max-h-[220px] overflow-auto rounded-(--radius-popover) border border-(--border) bg-(--popover) p-1 shadow-[0_12px_32px_rgb(0_0_0/0.18)]';
+  'slash-menu absolute inset-x-0 bottom-[calc(100%+8px)] z-40 max-h-55 overflow-auto rounded-lg bg-popover p-1 shadow-(--shadow-popover)';
 
 /** 行钮基底（原 .slash-menu-row，Button ghost 七通道中和 + h-auto——旧行
  *  高随内容，不吃件 size 档的 32px）。 */
 const ROW_CLS =
-  'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-[6px] border-0 px-2 py-1.5 text-left text-sm font-normal text-(--foreground) hover:bg-transparent hover:text-(--foreground) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--foreground) active:not-aria-[haspopup]:translate-y-0';
+  'slash-menu-row flex h-auto w-full cursor-pointer items-baseline justify-start gap-2 rounded-md border-0 px-2 py-2 text-left text-ui font-normal text-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-foreground active:not-aria-[haspopup]:translate-y-0';
 
-/** 命令行名（mono 13px）与描述（12px tertiary 截断）——menu 行与 /help 行
- *  共用（原 .slash-menu-name / .slash-menu-desc）。 */
-const NAME_CLS = 'flex-none font-mono text-[13px]';
-const DESC_CLS = 'truncate text-xs text-(--text-tertiary)';
+/** 命令行名（mono 12px，DESIGN 代码档）与描述（12px tertiary 截断）——menu
+ *  行与 /help 行共用（原 .slash-menu-name / .slash-menu-desc）。 */
+const NAME_CLS = 'flex-none font-mono text-meta';
+const DESC_CLS = 'truncate text-meta text-content-tertiary';
 
 export function SlashMenu({
   open,
@@ -90,7 +91,7 @@ export function SlashMenu({
       data-caret={caret ?? ''}
     >
       {total === 0 ? (
-        <div className="slash-menu-empty px-2 py-2.5 text-[13px] text-(--text-tertiary)">
+        <div className="slash-menu-empty px-2 py-2 text-ui text-content-tertiary">
           {t('没有匹配"/{query}"的命令', { query })}
         </div>
       ) : (
@@ -99,7 +100,7 @@ export function SlashMenu({
           offset += section.rows.length;
           return (
             <Fragment key={section.title}>
-              <div className="px-2 pt-1.5 pb-0.5 text-xs text-(--text-tertiary)" aria-hidden="true">
+              <div className="px-2 pt-2 pb-1 text-caption text-content-tertiary" aria-hidden="true">
                 {section.title}
               </div>
               {section.rows.map((row, i) => {
@@ -152,11 +153,15 @@ export function SlashHelp({ open, onClose, commands, skillCount }: SlashHelpProp
       {/* layout 槽：400 宽（窄视口回件默认 calc 律）、70vh 封顶滚动；皮肤/
           居中/动效/z 归 DialogContent 默认。registry 关闭钮（X）是官网
           confirm 形态一部分，缺省开启。别名 slash-help 随行（e2e 句柄）。 */}
-      <DialogContent className="slash-help max-h-[70vh] w-[400px] max-w-[calc(100vw-2rem)] gap-0 overflow-auto rounded-(--edge-radius) p-3 shadow-(--dialog-shadow) sm:max-w-[400px]">
-        <DialogTitle className="mb-2">{t('命令说明')}</DialogTitle>
-        <div className="flex max-h-[320px] flex-col gap-0.5 overflow-auto">
+      <DialogContent
+        className={`slash-help max-h-[70vh] w-100 max-w-[calc(100vw-2rem)] gap-0 overflow-auto p-4 sm:max-w-100 ${DIALOG_FACE}`}
+      >
+        <DialogTitle className="mb-2 font-heading text-heading leading-none">
+          {t('命令说明')}
+        </DialogTitle>
+        <div className="flex max-h-80 flex-col overflow-auto">
           {commands.map((row) => (
-            <div key={row.name} className="slash-help-row flex items-baseline gap-2 px-2 py-1.5">
+            <div key={row.name} className="slash-help-row flex items-baseline gap-2 px-2 py-2">
               <span className={NAME_CLS}>/{row.name}</span>
               <span className={DESC_CLS}>
                 {row.descKey != null ? t(row.descKey) : (row.description ?? '')}
@@ -164,7 +169,7 @@ export function SlashHelp({ open, onClose, commands, skillCount }: SlashHelpProp
             </div>
           ))}
         </div>
-        <div className="mt-2 border-t border-(--border) pt-2 text-xs text-(--text-tertiary)">
+        <div className="mt-2 border-t border-border pt-2 text-meta text-content-tertiary">
           {t('团队技能来自技能页面（共 {count} 个）', { count: skillCount })}
         </div>
       </DialogContent>
