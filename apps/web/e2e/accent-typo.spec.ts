@@ -59,7 +59,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(w).toBe('500');
   });
 
-  test(`sidebar header carries the Pacman brand tile + name (${theme})`, async ({ page }) => {
+  test(`sidebar header carries the Pacman pixel mark + name (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app?scenario=01');
 
@@ -70,32 +70,25 @@ for (const theme of ['light', 'dark'] as const) {
       if (!row || !mark || !name) throw new Error('sidebar brand head missing');
       const ms = getComputedStyle(mark);
       const r = mark.getBoundingClientRect();
-      const resolve = (v: string) => {
-        const el = document.createElement('div');
-        el.style.backgroundColor = v;
-        document.body.append(el);
-        const out = getComputedStyle(el).backgroundColor;
-        el.remove();
-        return out;
-      };
       return {
+        maskImage: ms.getPropertyValue('mask-image') || ms.getPropertyValue('-webkit-mask-image'),
+        maskSize: ms.getPropertyValue('mask-size') || ms.getPropertyValue('-webkit-mask-size'),
+        markPaint: ms.backgroundColor,
+        rowInk: getComputedStyle(row).color,
         markText: mark.textContent,
-        markBg: ms.backgroundColor,
-        markInk: ms.color,
-        accent: resolve('var(--card-button)'),
-        onAccent: resolve('var(--text-on-accent)'),
-        markFont: ms.fontFamily,
         markBox: { w: r.width, h: r.height },
         nameText: name.textContent,
         nameHref: name.getAttribute('href'),
       };
     });
-    // DESIGN.md 侧栏 item 1: accent tile, white (on-accent) serif initial
-    expect(m.markText).toBe('P');
-    expect(m.markBg).toBe(m.accent);
-    expect(m.markInk).toBe(m.onAccent);
-    expect(m.markFont).toContain('sourceSerif4');
-    expect(m.markBox).toEqual({ w: 24, h: 24 });
+    // DESIGN.md 侧栏 item 1: logo.svg pixel mark at 16px, one grid cell per
+    // CSS pixel, painted in the row ink through the mask
+    expect(m.maskImage).toContain('/logo.svg');
+    expect(m.maskSize).toBe('100% auto');
+    expect(m.markPaint).toBe(m.rowInk);
+    expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
+    expect(m.markText).toBe('');
+    expect(m.markBox).toEqual({ w: 16, h: 16 });
     expect(m.nameText).toContain('Pacman');
     // the head row keeps its /app/team navigation law
     expect(m.nameHref).toContain('/app/team');
