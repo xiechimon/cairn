@@ -16,7 +16,7 @@ import { ChevronLeft } from '../icons/index.js';
  *  same one so moving between routes keeps the main panel still. A div, not
  *  <main>: a <header> inside <main> loses role=banner. */
 export const SHEET_PANEL =
-  'relative my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background [box-shadow:var(--edge-ring),var(--card-shadow)]';
+  'relative my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background [box-shadow:var(--edge-ring)]';
 
 export interface PageTab {
   id: string;

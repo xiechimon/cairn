@@ -1,0 +1,6 @@
+{
+  "before-light": "rgb(236, 229, 218) 0px 0px 0px 0.333333px inset, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px, rgba(0, 0, 0, 0.08) 0px 2px 8px 0px",
+  "before-dark": "rgb(45, 41, 38) 0px 0px 0px 0.333333px inset, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+  "after-light": "rgb(236, 229, 218) 0px 0px 0px 0.333333px inset",
+  "after-dark": "rgb(45, 41, 38) 0px 0px 0px 0.333333px inset"
+}
