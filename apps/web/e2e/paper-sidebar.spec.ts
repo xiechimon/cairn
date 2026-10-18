@@ -21,7 +21,14 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(248);
 
   const team = page.getByTestId('team-row');
-  await expect(team.getByTestId('brand-mark')).toHaveText('P');
+  const mark = team.getByTestId('brand-mark');
+  await expect(mark).toHaveText('');
+  expect(
+    await mark.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
+    }),
+  ).toContain('/logo.svg');
   await expect(team.getByRole('link', { name: 'Pacman' })).toBeVisible();
   await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
   await expect(team.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
