@@ -12,18 +12,17 @@ import {
   ChevronRight,
   CircleAlert,
   Clock,
+  Columns3,
   EllipsisVertical,
   KeyRound,
   Layers,
   type LucideIcon,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeft,
   Plug,
   Plus,
   Puzzle,
   Search,
   Server,
-  SquareKanban,
 } from 'lucide-react';
 import { type ReactElement, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
@@ -135,8 +134,7 @@ const SEARCH_OPEN_DIM =
   '[html[data-search-open]_&]:bg-transparent [html[data-search-open]_&]:shadow-none [html[data-search-open]_&]:ring-0 [html[data-search-open]_&]:text-content-secondary';
 
 const ROW = `flex h-8 w-full flex-none items-center gap-2.5 rounded-(--cds-radius-lg) px-2.5 text-left text-ui text-content-secondary no-underline transition-[background-color,box-shadow,color] duration-150 ease-out ${FOCUS}`;
-const ROW_IDLE =
-  'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-content-tertiary';
+const ROW_IDLE = 'hover:bg-sidebar-hover hover:text-foreground [&>svg:first-child]:text-icon';
 const ROW_ACTIVE = `bg-background font-medium text-foreground shadow-xs ring-1 ring-border [&>svg:first-child]:text-(--card-button) ${SEARCH_OPEN_DIM}`;
 
 /** Ghost Button neutralizer for rows: the row recipe owns fill, radius and
@@ -265,7 +263,7 @@ export function BoardSidebar({
           aria-label={t('展开侧边栏')}
           onClick={onToggle}
         >
-          <PanelLeftOpen className={ICON} strokeWidth={STROKE} />
+          <PanelLeft className={ICON} strokeWidth={STROKE} />
         </Button>
         <Tooltip>
           <TooltipTrigger
@@ -305,7 +303,7 @@ export function BoardSidebar({
           <Link
             {...railLink({ pathname: '/app', search: plain }, selected === 'board', t('工作台'))}
           >
-            <SquareKanban className={ICON} strokeWidth={STROKE} />
+            <Columns3 className={ICON} strokeWidth={STROKE} />
           </Link>
           <Link
             {...railLink(
@@ -458,7 +456,7 @@ export function BoardSidebar({
           aria-label={t('收起侧边栏')}
           onClick={onToggle}
         >
-          <PanelLeftClose className="size-3.5" strokeWidth={STROKE} />
+          <PanelLeft className="size-3.5" strokeWidth={STROKE} />
         </Button>
       </div>
 
@@ -477,7 +475,7 @@ export function BoardSidebar({
         className={`flex min-h-0 flex-1 flex-col gap-px overflow-y-auto ${scrollFadeClassName()}`}
       >
         <Link {...navLink({ pathname: '/app', search: plain }, selected === 'board')}>
-          <SquareKanban className={ICON} strokeWidth={STROKE} />
+          <Columns3 className={ICON} strokeWidth={STROKE} />
           <span className="truncate">{t('工作台')}</span>
         </Link>
         <Link {...navLink({ pathname: '/app', search: attentionSearch }, selected === 'attention')}>

@@ -541,8 +541,8 @@
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.08), inset 0 0 0 var(--hairline) var(--border-soft),
     0 0 0 var(--hairline) var(--border-soft);
-  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--cds-shadow-sm);
-  --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
+  --panel-shadow: 0 0 0 var(--hairline) var(--border), 0 1px 2px rgb(80 60 30 / 0.04);
+  --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
   /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
      (#915 spot), mirrored explicitly so .light stays the full
      semantic-token mirror */

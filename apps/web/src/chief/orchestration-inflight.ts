@@ -32,3 +32,38 @@ export function inflightOrchestrationFor(
   }
   return best;
 }
+
+/** 卡面在飞编排的等待成因（turnQueue.blocked 同源，api/mappers queueLabel
+ *  同一口径的短形）：null = 回合已认领在跑，或排队无阻塞事实之外的态。 */
+export interface OrchestrationWait {
+  label: string;
+  vars: Record<string, string>;
+}
+
+export function orchestrationWait(thread: ChiefThread): OrchestrationWait | null {
+  const queue = thread.turnQueue;
+  if (queue == null) return null;
+  if (queue.blocked?.kind === 'machine-offline') {
+    return queue.waitingFor != null
+      ? { label: '等 {machine} 上线', vars: { machine: queue.waitingFor.name } }
+      : { label: '等机器上线', vars: {} };
+  }
+  if (queue.blocked?.kind === 'capability-missing') {
+    return { label: '缺 {missing}', vars: { missing: queue.blocked.missing.join('、') } };
+  }
+  return { label: '排队中', vars: {} };
+}
+
+/** 卡面读的在飞编排：线程 id（「查看会话」深链 ?chief=<id>）+ 等待成因。 */
+export interface CardOrchestration {
+  threadId: string;
+  wait: OrchestrationWait | null;
+}
+
+export function cardOrchestration(
+  threads: readonly ChiefThread[] | undefined,
+  seqNum: number,
+): CardOrchestration | null {
+  const thread = inflightOrchestrationFor(threads, seqNum);
+  return thread === null ? null : { threadId: thread.id, wait: orchestrationWait(thread) };
+}

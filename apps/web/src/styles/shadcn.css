@@ -158,6 +158,7 @@
   --text-secondary: #d3ceca;
   --text-tertiary: #b3aeaa;
   --text-dim: #797571;
+  --icon: var(--text-tertiary);
   /* 品牌槽（品牌只走 spot 族，rosewood 玫瑰木定版，#988）：
      --card-button = 卡片按钮实心底色；--focus-ring = 全局 :focus-visible
      环色（#388 家族律：2px 实线 + offset 2，app.css 兜底 + 各面先例）。
@@ -310,10 +311,13 @@
      文字色压暗 6%，悬停反馈同律。 */
   --card-hover: color-mix(in srgb, var(--card), var(--foreground) 6%);
   /* 文字阶梯 = DESIGN.md ink-2 / ink-3（白卡 7.21 / 5.29，canvas 6.24 /
-     4.58）；dim 不动、只做装饰：时间戳、非活动图标、占位规则。 */
+     4.58）；dim = ink-4，只做装饰（元信息图标、折叠箭头），不当文字色。
+     --icon = 带文字标签的图标（侧栏导航、列标题）；纯图标按钮仍用 tertiary，
+     保住 3:1 非文本对比。 */
   --text-secondary: #5e564d;
   --text-tertiary: #746a5f;
-  --text-dim: #8f8985;
+  --text-dim: #b0a597;
+  --icon: #9a9086;
   --card-button: #b4532a;
   --focus-ring: #b4532a;
   --col-dot-idle: #67594d;
