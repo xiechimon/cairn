@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "4c976cfdbe4bf2c84ef7534aef1b34e81b1fb09b",
+    "sha": "435c2dfd2d5462658284586aec96b88ba5a05af4",
     "date": "2026-10-18"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 79,
-    "spacingTotal": 107,
+    "textTotal": 76,
+    "spacingTotal": 92,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -129,10 +129,6 @@
         "text": 0,
         "spacing": 2
       },
-      "routes/agent-detail-page.tsx": {
-        "text": 0,
-        "spacing": 2
-      },
       "routes/api-key-create-dialog.tsx": {
         "text": 2,
         "spacing": 4
@@ -143,18 +139,6 @@
       },
       "routes/machine-authorize-page.tsx": {
         "text": 1,
-        "spacing": 1
-      },
-      "routes/team-agent-grid.tsx": {
-        "text": 1,
-        "spacing": 6
-      },
-      "routes/team-chart.tsx": {
-        "text": 2,
-        "spacing": 6
-      },
-      "routes/team-page.tsx": {
-        "text": 0,
         "spacing": 1
       }
     }

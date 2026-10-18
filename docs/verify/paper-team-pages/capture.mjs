@@ -54,6 +54,7 @@ for (const theme of ['light', 'dark']) {
     if (shot.tab) await page.getByRole('tab', { name: shot.tab }).click();
     if (shot.dialog) await page.getByRole('button', { name: '创建 Agent' }).click();
     await page.locator(shot.ready).first().waitFor();
+    await page.waitForFunction(() => [...document.images].every((img) => img.complete));
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(out, `${label}-${theme}-${shot.name}.png`) });
     if (shot.name === 'team-grid') {

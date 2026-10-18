@@ -6,7 +6,7 @@ import { stubNotification } from './helpers.js';
 // e2e 断言 + account 回归各钉一条）。
 //
 // 失败方式（先于实现固化）：
-// 1. 团队卡 76px 固定高下 610 字多行职责文字画在卡外 → 卡 scrollHeight > clientHeight
+// 1. 团队卡上 610 字多行职责文字画在卡外 → 卡 scrollHeight > clientHeight
 // 2. 详情页单行长文撑破行宽出屏 → 值槽 scrollWidth > clientWidth
 // 3. 详情页左 label 列被挤成单字宽竖排 → label 列宽度 < 双字符宽
 // 4. whitespace-pre-line 把编辑态草稿的多余空行带进显示态 → 3+ 换行折成 2 个
@@ -15,7 +15,7 @@ import { stubNotification } from './helpers.js';
 const TEAM_LONG = '/app/team?scenario=team-long-role';
 const DETAIL_LONG = '/app/resources/agents/r3-builder?scenario=agent-detail-long-role';
 
-test('团队卡：line-clamp-2生效，卡 scrollHeight = clientHeight（无溢出）', async ({ page }) => {
+test('团队卡：卡 scrollHeight = clientHeight（无溢出）', async ({ page }) => {
   await page.goto(TEAM_LONG);
   const card = page.getByTestId('team-agent-card');
   await expect(card).toBeVisible();
@@ -29,16 +29,17 @@ test('团队卡：line-clamp-2生效，卡 scrollHeight = clientHeight（无溢�
   expect(geom.scrollW).toBeLessThanOrEqual(geom.clientW);
 });
 
-// 职责行的文本在卡上有 title 属性（全文 tooltip）。
-test('团队卡：长职责 span 有 title 属性带全文', async ({ page }) => {
+// Paper 团队卡只有名字 + 一行元信息：长职责不上卡（详情页才展示），卡高不随
+// 职责长度变化。
+test('团队卡：长职责不上卡，卡内只有名字与一行元信息', async ({ page }) => {
   await page.goto(TEAM_LONG);
   const card = page.getByTestId('team-agent-card');
-  // team-agent-card 下的第三个 span = 职责行（名 → 模型行 → 职责行）
-  const roleSpan = card.locator('span.line-clamp-2');
-  await expect(roleSpan).toBeVisible();
-  const title = await roleSpan.getAttribute('title');
-  expect(title).not.toBeNull();
-  expect(title!.length).toBeGreaterThan(100); // 长文 title
+  await expect(card).toBeVisible();
+  await expect(card.getByTestId('team-agent-meta')).toBeVisible();
+  const text = (await card.textContent()) ?? '';
+  expect(text.length).toBeLessThan(100);
+  const h = await card.evaluate((el) => el.getBoundingClientRect().height);
+  expect(h).toBeLessThanOrEqual(64);
 });
 
 // 详情页：值槽不破行宽（scrollWidth <= clientWidth）、label 列不竖排

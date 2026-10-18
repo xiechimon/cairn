@@ -213,14 +213,15 @@ test('概览：不摆「状态」行', async ({ page }) => {
   await expect(detail.locator('.agent-status')).toHaveCount(0);
 });
 
-// 文案逐字 = shared `MEMORY_EMPTY_COPY`（records/memory.ts:18；e2e 不跨包取
-// 常量，与仓内其它 spec 硬写 canon 文案同律）。
-test('记忆 tab：空态文案与 shared canon 同文', async ({ page }) => {
+// Paper 空态（EmptyState）：canon 句拆成标题「尚无记忆」+ 说明（shared
+// MEMORY_EMPTY_COPY 的后半句），图标 + 标题 h2 + 说明。
+test('记忆 tab：空态 = 图标 + 标题 + 说明', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(1).click();
-  await expect(detail.locator('.agent-memory-empty')).toHaveText(
-    '尚无记忆。Agent 会在工作中将值得沉淀的经验存入此处。',
-  );
+  const empty = detail.locator('.agent-memory-empty');
+  await expect(empty.locator('svg')).toHaveCount(1);
+  await expect(empty.getByRole('heading', { name: '尚无记忆' })).toBeVisible();
+  await expect(empty).toContainText('Agent 会在工作中将值得沉淀的经验存入此处。');
 });
 
 // XMON-84 用户拍板 B：六开关全保留（四无本体档照常摆出，本体另立规划票）；
@@ -657,7 +658,9 @@ test('记忆 tab：零命中出「没有匹配的记忆。」，不回落 canon 
   const detail = await openMemory(page);
   await detail.locator('.agent-memory-search input').fill('不存在的词');
   await expect(detail.locator('.agent-memory-row')).toHaveCount(0);
-  await expect(detail.locator('.agent-memory-no-match')).toHaveText('没有匹配的记忆。');
+  await expect(
+    detail.locator('.agent-memory-no-match').getByRole('heading', { name: '没有匹配的记忆' }),
+  ).toBeVisible();
   await expect(detail.locator('.agent-memory-empty')).toHaveCount(0);
   // 配额头仍报存量 3（不是 0）。
   await expect(detail.locator('.agent-memory-head')).toHaveText('记忆 · 3 / 100');

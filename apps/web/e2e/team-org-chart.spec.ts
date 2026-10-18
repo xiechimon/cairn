@@ -4,26 +4,12 @@ import { expect, type Page, test } from '@playwright/test';
 // 与同一份数据下的 grid 自相矛盾 —— grid 顶栏 `3 个成员` 并画出卡片，
 // chart 却说没有成员）。
 //
-// 本文件是冻结的验收面：每条断言对应一条对 todos.dev/app/team chart 布局的
-// DOM 实测（2026-09-30），几何数值照抄实测值，不是推测；场景清单在循环
-// iteration 0 定稿后不再改动（改断言 = 改尺子 = 作弊，由 Guard 校验文件哈希）。
-//
-// #947/#910 载体重钉：类名 locator（.team-chart-*）退役——chart 内部全是
-// 无 role 的结构 div，换 data-testid 二级载体（节点/名字/模型行/皇冠/服务商
-// 徽标/连接线/括号/子列/节点栈）；根节点身份由皇冠徽标承载（crown 只渲染在
-// 总管绑定 agent 上 = 原 --root 修饰类的语义载体，#910 裁定 3 状态类归
-// 行为）；创建位 = getByRole('button', {name:'创建 Agent'})。**几何数值零
-// 改动**——220×56 / 44×1 / 28 / 圆角 8 / dashed 全部等值迁移（token
-// utility 承载），尺子没动，只换了握尺子的地方。
-//
-// 参考实测（chat 布局，团队 2 agent + 1 绑定总管）：
-//   node 卡 220×56 / radius 8 / 1px --border-default / bg --surface
-//   头像 32 圆；名字 12px/500；模型行 10px mono --text-dim
-//   根节点带皇冠徽标（/api/teams/{id}/chief 的 agent.agentId 指向它）
-//   每节点第二行 = 服务商徽标胶囊(18×18, p3, bg --surface-secondary) + 模型行
-//   根→子列之间横向 1px 连接线 44 宽（--border-strong）
-//   子列左缘 28 宽括号连接件（上/左/下三边，左圆角 7），跨首→末子节点中心
-//   `创建 Agent` 在 chart 里是虚线节点卡，位于子列末位
+// 结构与连接件几何沿用 todos.dev/app/team chart 布局的 DOM 实测（2026-09-30）：
+// 节点 220×56、根→子列 44×1 连接线、子列左缘 28 宽括号跨首→末子节点中心。
+// Paper 卡改造（docs/verify/paper-team-pages）：节点换成 Paper 卡（白底、
+// --radius-card 10px、1px 环 + 轻投影）；创建 Agent 只在页面顶栏，组织图里
+// 不再画虚线创建节点。载体：data-testid 二级（节点/名字/模型行/皇冠/服务商
+// 徽标/连接线/括号/子列/节点栈），根节点身份由皇冠徽标承载。
 
 const NODE_H = 56;
 const LINK_W = 44;
@@ -83,27 +69,32 @@ test('chart 组织图：每个节点带服务商徽标与模型行', async ({ pa
   expect(names.map((n) => n.trim())).toEqual(['r3-builder', 'r5-scribe', 'r9-scout']);
 });
 
-test('chart 组织图：创建 Agent 是子列末位的虚线节点卡', async ({ page }) => {
+test('chart 组织图：节点是 Paper 卡，创建 Agent 只在顶栏', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
   await openChart(page, 'team-org-chart');
-  const create = page.getByRole('button', { name: '创建 Agent' });
-  await expect(create).toHaveCount(1);
-  await expect(create).toContainText('创建 Agent');
-  const shape = await create.evaluate((el) => {
-    const cs = getComputedStyle(el);
-    return {
-      border: cs.borderTopStyle,
-      radius: cs.borderTopLeftRadius,
-      height: el.getBoundingClientRect().height,
-    };
-  });
-  expect(shape.border).toBe('dashed');
-  expect(shape.radius).toBe('8px');
+  const shape = await page
+    .getByTestId('team-chart-node')
+    .first()
+    .evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return {
+        radius: cs.borderTopLeftRadius,
+        bg: cs.backgroundColor,
+        shadow: cs.boxShadow,
+        height: el.getBoundingClientRect().height,
+        width: el.getBoundingClientRect().width,
+      };
+    });
+  expect(shape.radius).toBe('10px');
+  expect(shape.bg).toBe('rgb(255, 255, 255)');
+  expect(shape.shadow).toContain('0px 0px 0px 1px');
   expect(shape.height).toBe(NODE_H);
-  // 子列末位 = 节点栈的最后一个（`.team-chart-children > *` 枚举的是括号列
-  // 与节点栈两列本身，恒取不到卡片）
-  await expect(page.getByTestId('team-chart-nodes').locator('> *').last()).toContainText(
-    '创建 Agent',
-  );
+  expect(shape.width).toBe(220);
+  await expect(page.getByRole('button', { name: '创建 Agent' })).toHaveCount(1);
+  await expect(
+    page.getByTestId('page-topbar').getByRole('button', { name: '创建 Agent' }),
+  ).toBeVisible();
+  await expect(page.getByTestId('team-chart-nodes').getByRole('button')).toHaveCount(0);
 });
 
 test('chart 组织图：根与子列之间有 44×1 横向连接线', async ({ page }) => {
@@ -122,7 +113,11 @@ test('chart 组织图：子列左缘括号连接件跨首末子节点中心', as
     .getByTestId('team-chart-node')
     .first()
     .boundingBox();
-  const last = await page.getByRole('button', { name: '创建 Agent' }).boundingBox();
+  const last = await page
+    .getByTestId('team-chart-children')
+    .getByTestId('team-chart-node')
+    .last()
+    .boundingBox();
   expect(bracket).not.toBeNull();
   expect(bracket?.width).toBe(BRACKET_W);
   expect(Math.round(bracket!.y)).toBe(Math.round(first!.y + first!.height / 2));
@@ -131,11 +126,11 @@ test('chart 组织图：子列左缘括号连接件跨首末子节点中心', as
   );
 });
 
-test('chart 组织图：零成员团队显示 暂无成员 且不渲染节点', async ({ page }) => {
+test('chart 组织图：零成员团队显示 暂无成员 空态且不渲染节点', async ({ page }) => {
   await openChart(page, 'team-org-chart-empty');
-  await expect(page.getByText('暂无成员')).toHaveText('暂无成员');
+  await expect(page.getByTestId('team-agents-empty')).toContainText('暂无成员');
   await expect(page.getByTestId('team-chart-node')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '创建 Agent' })).toHaveCount(0);
+  await expect(page.getByTestId('team-agents-empty').getByRole('button')).toHaveCount(0);
   await expect(page.getByTestId('team-chart-link')).toHaveCount(0);
 });
 

@@ -256,8 +256,9 @@ export const EN: Record<string, string> = {
   // —— team route (r7 12) ——
   设置: 'Settings',
   '{n} 个成员': '{n} members',
-  // #148 chart layout empty state (r2 §8.1 17c verbatim)
+  // team empty state, grid and chart (r2 §8.1 17c title)
   暂无成员: 'No members yet',
+  '创建 Agent 后，它会出现在这里。': 'Create an agent and it shows up here.',
   ' · 默认': ' · Default',
   未设置职责: 'No role set',
   '创建 Agent': 'Create Agent',
@@ -1028,8 +1029,12 @@ export const EN: Record<string, string> = {
   '搜索记忆…': 'Search memories…',
   // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
   添加时间: 'Added',
-  // 零命中态：与「尚无记忆」canon 空态分开——搜不到不等于没存过。
-  '没有匹配的记忆。': 'No memories match.',
+  // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
+  尚无记忆: 'No memories yet',
+  'Agent 会在工作中将值得沉淀的经验存入此处。':
+    'The Agent stores experience worth keeping here as it works.',
+  没有匹配的记忆: 'No memories match',
+  '换个关键词再试。': 'Try another search term.',
   // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   总管本轮执行失败: 'The chief turn failed',
   '发送失败，请重试。': 'Send failed. Try again.',
