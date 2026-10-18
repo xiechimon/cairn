@@ -7,7 +7,9 @@ import { expect, type Page, test } from '@playwright/test';
 //   2. the two sheets look different (radius, fill, ring);
 //   3. the 10px gaps are not canvas (root left at the sheet color);
 //   4. the sheet becomes <main> and the board header loses role=banner;
-//   5. the 总管设置 swap renders outside the sheet, on bare canvas.
+//   5. the 总管设置 swap renders outside the sheet, on bare canvas;
+//   6. the sheet casts an outer shadow, which reads as a grey halo in the
+//      10px canvas gaps (DESIGN.md: the sheet is the hairline ring only).
 
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=11';
@@ -17,11 +19,17 @@ const sheetOf = (page: Page, selector: string) =>
     const r = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const root = el.parentElement!;
+    const probe = document.createElement('div');
+    probe.style.boxShadow = 'var(--edge-ring)';
+    root.append(probe);
+    const ring = getComputedStyle(probe).boxShadow;
+    probe.remove();
     return {
       box: { x: r.x, y: r.y, w: r.width, h: r.height },
       radius: cs.borderRadius,
       bg: cs.backgroundColor,
       shadow: cs.boxShadow,
+      ring,
       canvas: getComputedStyle(root).backgroundColor,
       sidebarBg: getComputedStyle(root.querySelector('.board-sidebar')!).backgroundColor,
     };
@@ -49,7 +57,8 @@ for (const theme of ['light', 'dark'] as const) {
       expect(board.box).toEqual({ x: left, y: 10, w: 1440 - left - 10, h: 900 - 20 });
       expect(board).toEqual(pages);
       expect(board.radius).toBe('16px');
-      expect(board.shadow).not.toBe('none');
+      expect(board.ring).toContain('inset');
+      expect(board.shadow).toBe(board.ring);
       expect(board.canvas).toBe(board.sidebarBg);
       expect(board.canvas).not.toBe(board.bg);
     });
