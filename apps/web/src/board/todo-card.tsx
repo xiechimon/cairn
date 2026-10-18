@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
@@ -51,9 +52,10 @@ interface TodoCardProps {
   projectName?: string;
   /** #445: the card's tag (cardTag result, at most one); null = no tag item. */
   tag?: TagChipData | null;
-  /** #1216: an orchestration round is in flight for this card; the 开始/重试
-   *  link renders disabled「编排中」so it cannot be clicked twice. */
-  orchestrating?: boolean;
+  /** #1216: an orchestration round is in flight for this card. A 待开始 card
+   *  swaps its 开始 for a 编排中 footer naming what the round waits on; a
+   *  失败 card swaps 重试 for an inert 编排中, so neither can fire twice. */
+  orchestration?: CardOrchestration | null;
 }
 
 type AttentionNeed = Extract<CardFace, { kind: 'attention' }>['need'];
@@ -100,7 +102,7 @@ export function TodoCard({
   hasBranch = true,
   projectName,
   tag,
-  orchestrating = false,
+  orchestration = null,
 }: TodoCardProps) {
   const { t } = useI18n();
   const { search } = useLocation();
@@ -117,19 +119,22 @@ export function TodoCard({
           }),
         })
       : undefined;
-  const lockedByOrchestration = orchestrating && (todo.phase === 'todo' || todo.phase === 'failed');
+  const lockedByOrchestration =
+    orchestration != null && (todo.phase === 'todo' || todo.phase === 'failed');
+  const chiefSearch = (threadId: string) => {
+    const params = new URLSearchParams(search);
+    params.set('chief', threadId);
+    return `?${params}`;
+  };
 
   const actionLink = (label: string, icon: LucideIcon, className?: string): ReactNode =>
     lockedByOrchestration ? (
-      <Button
-        variant="ghost"
-        size="xs"
-        className={`${ACTION_LINK} ${className ?? ''}`}
+      <span
         data-orchestrating="true"
-        disabled
+        className={`todo-card-action flex h-6 flex-none items-center px-1.5 text-meta font-medium text-content-tertiary ${className ?? ''}`}
       >
-        <span className="text-meta font-medium">{t('编排中')}</span>
-      </Button>
+        {t('编排中')}
+      </span>
     ) : (
       <Button
         variant="ghost"
@@ -214,14 +219,11 @@ export function TodoCard({
           </div>
           {face.kind === 'queued' &&
             face.action != null &&
+            !lockedByOrchestration &&
             actionLink(
               face.action,
               Play,
-              `absolute inset-y-0 right-0 my-auto bg-inherit ${
-                lockedByOrchestration
-                  ? ''
-                  : 'opacity-0 transition-opacity duration-150 ease-out group-hover/card:opacity-100 group-focus-within/card:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100'
-              }`,
+              'absolute inset-y-0 right-0 my-auto bg-inherit opacity-0 transition-opacity duration-150 ease-out group-hover/card:opacity-100 group-focus-within/card:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100',
             )}
         </div>
         <div className="flex flex-none items-center gap-1 text-content-dim empty:hidden">
@@ -253,6 +255,27 @@ export function TodoCard({
           )}
         </div>
       </div>
+
+      {face.kind === 'queued' && lockedByOrchestration && orchestration != null && (
+        <div
+          data-orchestrating="true"
+          className="todo-card-orchestration mt-2.5 flex items-center gap-1.5 border-t border-dashed border-border pt-2 text-meta whitespace-nowrap text-content-secondary"
+        >
+          <Glyph icon={Hourglass} className="size-3.25 flex-none text-content-tertiary" />
+          <span className="min-w-0 truncate">
+            {t('编排中')}
+            {orchestration.wait != null &&
+              ` · ${t(orchestration.wait.label, orchestration.wait.vars)}`}
+          </span>
+          <Link
+            className="relative z-10 -mr-1.5 ml-auto flex h-6 flex-none items-center gap-1 rounded-(--radius-control) px-1.5 text-content-secondary no-underline hover:bg-secondary"
+            to={{ search: chiefSearch(orchestration.threadId) }}
+          >
+            {t('查看会话')}
+            <Glyph icon={ArrowRight} className="size-3.25" />
+          </Link>
+        </div>
+      )}
 
       {face.kind === 'running' && (
         <div className="mt-2 flex items-center gap-1.5 text-meta whitespace-nowrap text-running-text">

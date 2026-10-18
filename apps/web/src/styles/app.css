@@ -35,6 +35,7 @@
   --color-content-secondary: var(--text-secondary);
   --color-content-tertiary: var(--text-tertiary);
   --color-content-dim: var(--text-dim);
+  --color-icon: var(--icon);
   --color-surface-tertiary: var(--surface-tertiary);
   /* 自指是有意的：theme key 名即 utility 名（font-sans/font-mono），值直引
      tokens.css 的同名消费栈变量（--font-sans/--font-mono），inline 不下发

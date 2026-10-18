@@ -1049,6 +1049,10 @@ export const EN: Record<string, string> = {
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   编排中: 'Orchestrating',
+  '等 {machine} 上线': 'waiting for {machine} to come online',
+  等机器上线: 'waiting for a machine to come online',
+  '缺 {missing}': 'missing {missing}',
+  排队中: 'queued',
   '总管正在编排这张任务，等这一轮结束再发起。':
     'The chief is already orchestrating this task — wait for this round to finish.',
   '重复发起只会多排一轮编排，不会更快开始。':

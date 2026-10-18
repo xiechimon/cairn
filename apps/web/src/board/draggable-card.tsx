@@ -10,6 +10,7 @@
 // 直通链接，dnd-kit 抑制完成拖拽后的 click），#629 的原生链接拖抑制
 // （draggable=false + -webkit-user-drag:none）在 todo-card.tsx 原位不动。
 import { useDraggable } from '@dnd-kit/core';
+import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { TodoCard } from './todo-card.js';
@@ -26,7 +27,7 @@ interface DraggableCardProps {
   /** #445：卡片标签行（cardTag 解析结果；null = 不渲染占位）。 */
   tag?: TagChipData | null;
   /** #1216：透传 TodoCard 的在飞编排态。 */
-  orchestrating?: boolean;
+  orchestration?: CardOrchestration | null;
 }
 
 export function DraggableCard({
@@ -37,7 +38,7 @@ export function DraggableCard({
   hasBranch,
   projectName,
   tag,
-  orchestrating,
+  orchestration,
 }: DraggableCardProps) {
   const { listeners, setNodeRef, isDragging } = useDraggable({ id: todo.id });
   const style = { opacity: isDragging ? 0.4 : undefined };
@@ -51,7 +52,7 @@ export function DraggableCard({
         hasBranch={hasBranch}
         projectName={projectName}
         tag={tag}
-        orchestrating={orchestrating}
+        orchestration={orchestration}
       />
     </div>
   );
