@@ -103,7 +103,7 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
   await page.goto('/app?scenario=01');
   const m = await page.evaluate(() => {
     const row = document.querySelector('aside a[aria-current="page"]');
-    const main = document.querySelector('.board-main');
+    const main = document.querySelector('.board-sheet');
     if (!row || !main) throw new Error('active row missing');
     const cs = getComputedStyle(row);
     return {

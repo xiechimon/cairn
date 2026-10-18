@@ -147,13 +147,13 @@ for (const theme of ['light', 'dark'] as const) {
     expect(menu.shadow).toContain('0px 0px 0px');
   });
 
-  test(`sidebar shares the main-area surface, seam drawn in the divider token (${theme})`, async ({ page }) => {
+  test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const probe = await page.evaluate(() => {
       const sidebar = document.querySelector('.board-sidebar');
-      const main = document.querySelector('.board-main');
+      const main = document.querySelector('.board-sheet');
       if (!sidebar || !main) throw new Error('board layout missing');
       const cs = getComputedStyle(sidebar);
       return {
@@ -167,11 +167,11 @@ for (const theme of ['light', 'dark'] as const) {
         shadow: cs.boxShadow,
       };
     });
-    // CDS PR-3: sidebar is tier-1 (--surface-1), distinct from main canvas;
-    // soft hairline shadow replaces the solid divider-token seam
+    // CDS PR-3: sidebar is tier-1 (--surface-1), distinct from the sheet;
+    // Paper PR 7: the sheet's ring is the edge, the sidebar draws no seam
     expect(probe.sidebarBg).not.toBe(probe.mainBg);
     expect(probe.borderRight).toBe('0px');
-    expect(probe.shadow).not.toBe('none');
+    expect(probe.shadow).toBe('none');
   });
 
   test(`board grid lays out four even columns with no horizontal scroll (${theme})`, async ({
@@ -213,7 +213,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2)', async ({ page }) => {
+test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('pacman-theme', 'dark');
     localStorage.setItem('pacman.sidebar-collapsed', '1');
@@ -225,5 +225,5 @@ test('collapsed rail keeps the same drawn-seam treatment (#135 裁决 v2)', asyn
     return { borderRight: cs.borderRightWidth, shadow: cs.boxShadow };
   });
   expect(rail.borderRight).toBe('0px');
-  expect(rail.shadow).not.toBe('none');
+  expect(rail.shadow).toBe('none');
 });

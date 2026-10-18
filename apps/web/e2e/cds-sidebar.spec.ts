@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS sidebar: 248px tier-1 surface, soft hairline, rounded rows, scroll-fade', async ({
+test('CDS sidebar: 248px tier-1 surface, no seam, rounded rows, scroll-fade', async ({
   page,
 }) => {
   await page.goto('/app?scenario=01');
@@ -26,7 +26,9 @@ test('CDS sidebar: 248px tier-1 surface, soft hairline, rounded rows, scroll-fad
   // Paper Grouped sidebar (DESIGN.md 布局: 侧栏 248px)
   expect(m.width).toBe(248);
   expect(m.borderRightW).toBe('0px');
-  expect(m.shadow).not.toBe('none');
+  // Paper board sheet (PR 7): the sheet's own ring is the edge; a sidebar
+  // hairline would only show as a stub in the 10px canvas gaps
+  expect(m.shadow).toBe('none');
   expect(m.navHasScrollFade).toBe(true);
   expect(m.rowRadius).toBe('8px');
   expect(m.cdsRadiusLg).toBe('8px');
