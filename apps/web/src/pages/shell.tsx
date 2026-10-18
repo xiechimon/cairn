@@ -14,9 +14,11 @@ import { ChevronLeft } from '../icons/index.js';
 
 /** The sheet panel inset 10px off the canvas; the board route wears the
  *  same one so moving between routes keeps the main panel still. A div, not
- *  <main>: a <header> inside <main> loses role=banner. */
+ *  <main>: a <header> inside <main> loses role=banner. The ring is an
+ *  ::after layer above the content: an inset box-shadow on the sheet itself
+ *  paints under its children, so any child with a background hides it. */
 export const SHEET_PANEL =
-  'relative my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background [box-shadow:var(--sheet-ring)]';
+  "relative isolate my-2.5 mr-2.5 flex min-w-0 flex-1 overflow-hidden rounded-(--cds-radius-2xl) bg-background after:pointer-events-none after:absolute after:inset-0 after:z-10 after:rounded-[inherit] after:[box-shadow:var(--sheet-ring)] after:content-['']";
 
 export interface PageTab {
   id: string;

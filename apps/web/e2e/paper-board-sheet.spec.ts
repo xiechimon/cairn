@@ -11,7 +11,9 @@ import { expect, type Page, test } from '@playwright/test';
 //   6. the sheet casts an outer shadow, which reads as a grey halo in the
 //      10px canvas gaps (DESIGN.md: the sheet is the hairline ring only);
 //   7. on a 2x screen the sheet or card outline thins to 0.5px (--hairline)
-//      instead of one CSS pixel.
+//      instead of one CSS pixel;
+//   8. a child with a background covers the sheet ring (the board scroller
+//      did, below the top bar), so the ring is an ::after layer above them.
 
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=11';
@@ -30,7 +32,8 @@ const sheetOf = (page: Page, selector: string) =>
       box: { x: r.x, y: r.y, w: r.width, h: r.height },
       radius: cs.borderRadius,
       bg: cs.backgroundColor,
-      shadow: cs.boxShadow,
+      shadow: getComputedStyle(el, '::after').boxShadow,
+      selfShadow: cs.boxShadow,
       ring,
       canvas: getComputedStyle(root).backgroundColor,
       sidebarBg: getComputedStyle(root.querySelector('.board-sidebar')!).backgroundColor,
@@ -61,6 +64,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(board.radius).toBe('16px');
       expect(board.ring).toContain('inset');
       expect(board.shadow).toBe(board.ring);
+      expect(board.selfShadow).toBe('none');
       expect(board.canvas).toBe(board.sidebarBg);
       expect(board.canvas).not.toBe(board.bg);
     });
@@ -91,7 +95,9 @@ test.describe('on a 2x screen', () => {
   test('sheet and card outlines stay one CSS pixel', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
     await page.goto(BOARD);
-    const sheet = await page.locator('.board-sheet').evaluate((el) => getComputedStyle(el).boxShadow);
+    const sheet = await page
+      .locator('.board-sheet')
+      .evaluate((el) => getComputedStyle(el, '::after').boxShadow);
     const card = await page
       .locator('.todo-card')
       .first()
@@ -99,5 +105,26 @@ test.describe('on a 2x screen', () => {
     expect(sheet).toContain('0px 0px 0px 1px inset');
     expect(card).toContain('0px 0px 0px 1px');
     expect(card).not.toContain('0.5px');
+  });
+});
+
+test('the sheet ring sits above every child of the sheet', async ({ page }) => {
+  await page.goto(BOARD);
+  const ring = await page.locator('.board-sheet').evaluate((el) => {
+    const after = getComputedStyle(el, '::after');
+    return {
+      isolated: getComputedStyle(el).isolation,
+      position: after.position,
+      zIndex: after.zIndex,
+      pointerEvents: after.pointerEvents,
+      inset: [after.top, after.right, after.bottom, after.left],
+    };
+  });
+  expect(ring).toEqual({
+    isolated: 'isolate',
+    position: 'absolute',
+    zIndex: '10',
+    pointerEvents: 'none',
+    inset: ['0px', '0px', '0px', '0px'],
   });
 });
