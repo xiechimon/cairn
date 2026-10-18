@@ -34,15 +34,13 @@ export interface TaskMetaFields {
 
 // #945（detail.css 清零）：meta 面皮肤迁 token utilities。行距 = 中列
 // chat-row 的 18px 律——老 `.task-meta-row + .task-meta-row` 相邻选择器改由
-// 渲染序派生（首行不挂 mt，其后逐行 mt-[18px]，与 DOM 相邻语义等价：行集
+// 渲染序派生（首行不挂 mt，其后逐行 mt-4，与 DOM 相邻语义等价：行集
 // 顺序渲染、中间无其它兄弟）。label 列定宽对齐；墨色比 dlg-token-row 安静
 // 半档（label tertiary，value secondary——meta 是衬底信息，#476 决策记录）。
 function Row({ label, first, children }: { label: string; first?: boolean; children: ReactNode }) {
   return (
-    <div
-      className={`flex items-baseline text-xs leading-[18px]${first === true ? '' : ' mt-[18px]'}`}
-    >
-      <span className="w-[68px] flex-none text-(--text-tertiary)">{label}</span>
+    <div className={`flex items-baseline text-meta leading-5${first === true ? '' : ' mt-4'}`}>
+      <span className="w-17 flex-none text-(--text-tertiary)">{label}</span>
       <span className="min-w-0 flex-1 text-(--text-secondary) [overflow-wrap:anywhere]">
         {children}
       </span>
@@ -75,7 +73,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
       label: t('分支 / PR'),
       content: (
         <>
-          {meta.branch != null && <code className="font-mono text-[11px]">{meta.branch}</code>}
+          {meta.branch != null && <code className="font-mono text-caption">{meta.branch}</code>}
           {meta.pr != null && (
             <a
               // 老 `.task-meta-code + .task-meta-link` 相邻律：branch code 在
@@ -110,7 +108,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
   if (meta.model != null) {
     rows.push({
       label: t('模型'),
-      content: <code className="font-mono text-[11px]">{meta.model}</code>,
+      content: <code className="font-mono text-caption">{meta.model}</code>,
     });
   }
   if (meta.createdAt != null) {
@@ -123,7 +121,7 @@ export function TaskMetaBlock({ meta, now }: { meta: TaskMetaFields; now: number
           {row.content}
         </Row>
       ))}
-      <div className="mt-6 text-xs leading-4 text-(--text-tertiary)">{t('方案产出后显示于此')}</div>
+      <div className="mt-6 text-meta text-(--text-tertiary)">{t('方案产出后显示于此')}</div>
     </div>
   );
 }

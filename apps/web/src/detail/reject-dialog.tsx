@@ -70,7 +70,7 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
         />
       </div>
       {rejectReason != null && (
-        <p className="text-xs leading-4 text-(--destructive)" role="alert">
+        <p className="text-meta text-(--destructive)" role="alert">
           {rejectReason}
         </p>
       )}

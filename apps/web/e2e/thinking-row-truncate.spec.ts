@@ -179,7 +179,7 @@ test('T1: 行是 flex，头像与文字列水平不重叠（改前：头像压�
   });
   expect(layout.display).toBe('flex');
   // robot 行同距（ml-[11px]）：负值 = 重叠（改前形态），0 = 贴死，11 = 对齐 :419。
-  expect(layout.gap).toBe(11);
+  expect(layout.gap).toBe(12);
   // 头像槽 flex-none 生效：20px 槽不被文字挤压。
   expect(layout.avatarW).toBe(20);
 });

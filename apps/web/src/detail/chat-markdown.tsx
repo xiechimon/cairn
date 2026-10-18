@@ -152,17 +152,16 @@ export function parseChatMarkdown(text: string): ChatBlock[] {
   return blocks;
 }
 
-// #945（detail.css 清零）：md 块族皮肤迁 token utilities。ATX 标题 = 真
-// <h2>/<h3>/… 元素，一档压过 13px 正文、不抢 doc pane 的 16px 方案标题；
-// 尺寸阶梯 --1..--6 = 18/16/14/13/13/13px（老 chat-md-head--N 规则同值，
-// arbitrary 字号不带 text-* 档的随行高——行高单源 leading-[1.35]）。
+// ATX headings are real <h1>…<h6> elements on the six type keys
+// (DESIGN.md 六档字号): 18 / 16 / 14, then 13.5 for 4–6. Each key carries its
+// own line height.
 const HEAD_SIZE: Record<number, string> = {
-  1: 'text-[18px]',
-  2: 'text-[16px]',
-  3: 'text-[14px]',
-  4: 'text-[13px]',
-  5: 'text-[13px]',
-  6: 'text-[13px]',
+  1: 'text-page',
+  2: 'text-heading',
+  3: 'text-card-title',
+  4: 'text-ui',
+  5: 'text-ui',
+  6: 'text-ui',
 };
 
 function HeadingTag({ level, segments }: { level: number; segments: DocSegment[] }) {
@@ -170,7 +169,7 @@ function HeadingTag({ level, segments }: { level: number; segments: DocSegment[]
   const Tag = `h${clamped}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   return (
     <Tag
-      className={`chat-md-head chat-md-head--${clamped} mt-3 mb-1 leading-[1.35] font-semibold text-(--foreground) first:mt-0 ${HEAD_SIZE[clamped] ?? 'text-[13px]'}`}
+      className={`chat-md-head chat-md-head--${clamped} mt-3 mb-1 font-semibold text-(--foreground) first:mt-0 ${HEAD_SIZE[clamped] ?? 'text-ui'}`}
     >
       <Segments segments={segments} codeClassName="chat-code" />
     </Tag>
@@ -202,7 +201,7 @@ export function isImageAttachmentKey(key: string): boolean {
 // SPEC_CHIP utility 常量（attachment-strip.css 已随 #948 退役；
 // spec-chip--preview 别名零引用，同批终摘）。
 export const SPEC_CHIP =
-  'inline-flex max-w-full items-center rounded-[6px] border border-(--border) bg-(--muted) px-2 py-[3px] text-xs leading-4 text-(--text-secondary) no-underline transition-[color,border-color] duration-(--dur-fast) ease-(--ease-standard) hover:border-(--input) hover:text-(--foreground)';
+  'inline-flex max-w-full items-center rounded-[6px] border border-(--border) bg-(--muted) px-2 py-1 text-meta text-(--text-secondary) no-underline transition-[color,border-color] duration-(--dur-fast) ease-(--ease-standard) hover:border-(--input) hover:text-(--foreground)';
 export const SPEC_CHIP_IMAGE = 'border-none bg-transparent p-0.5 hover:bg-transparent';
 export const SPEC_CHIP_IMG = 'block max-h-40 max-w-full rounded-[4px]';
 
@@ -213,7 +212,7 @@ export const SPEC_CHIP_IMG = 'block max-h-40 max-w-full rounded-[4px]';
  *  点开预览浮层而非新标签；#945 裸钮收编——ghost 底座 + 七通道中和钉回
  *  老 chip 形）；不传 = transcript 旧链形，字节不变。 */
 /** 长路径截断（composer/附件两 strip 共用）：label 收进内 span，省略号不断 chip 框。 */
-export const COMPOSER_CHIP_LABEL = 'block min-w-0 max-w-[260px] truncate';
+export const COMPOSER_CHIP_LABEL = 'block min-w-0 max-w-65 truncate';
 
 export function AttachmentChip({
   name,
@@ -288,7 +287,7 @@ export function ChatMarkdown({ text }: { text: string }) {
               // 2px、首块归零（老 :first-child 规则的渲染序等价形）。
               <div
                 key={i}
-                className={`chat-md-item chat-md-item--ordered flex items-baseline gap-[7px] ${
+                className={`chat-md-item chat-md-item--ordered flex items-baseline gap-2 ${
                   i === 0 ? 'mt-0' : 'mt-0.5'
                 }`}
                 data-testid="md-item-ordered"
@@ -310,14 +309,14 @@ export function ChatMarkdown({ text }: { text: string }) {
             return (
               <div
                 key={i}
-                className={`chat-md-item chat-md-item--bullet flex items-baseline gap-[7px] ${
+                className={`chat-md-item chat-md-item--bullet flex items-baseline gap-2 ${
                   i === 0 ? 'mt-0' : 'mt-0.5'
                 }`}
                 data-testid="md-item-bullet"
                 data-depth={block.depth}
                 style={{ marginLeft: block.depth * DEPTH_PX }}
               >
-                <span className="min-w-[14px] flex-none text-left text-(--text-tertiary) tabular-nums">
+                <span className="min-w-3.5 flex-none text-left text-(--text-tertiary) tabular-nums">
                   •
                 </span>
                 <span className="chat-md-content min-w-0">
@@ -331,7 +330,7 @@ export function ChatMarkdown({ text }: { text: string }) {
               // 缝线，短行折行不横滚、长块 320px 封顶内滚。
               <pre
                 key={i}
-                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-[11.5px] leading-4 break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
+                className="chat-md-code my-2 max-h-80 overflow-auto rounded-(--cds-radius-xl) border border-(--border) bg-(--muted) px-2.5 py-2 font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
                 data-lang={block.lang ?? ''}
                 data-testid="md-code"
               >

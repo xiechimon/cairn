@@ -1,36 +1,49 @@
-// Detail header (issue #56, r7 §3.3): back button, #seq, status chip, the
-// 更多 icon and the 50.5×28 primary button. #366 stripped the centered
-// 文档|聊天 tab group (the route is a 3-pane layout now) and the
-// 分支与 PR/Token 用量/运行历史 icon trio (static right-pane sections).
-// #58: the back button carries the current search string home so the
+// Detail top bar (issue #56; Paper top bar, paper-redesign-plan PR 7): back
+// link, serif task title, #seq, the status (icon + color + label) that
+// toggles the assignment popover, then 更多 and the phase's one ink pill.
+// #58: the back link carries the current search string home so the
 // dev/fixture ?scenario= selection survives the round trip. #1255: each
 // column list's scrollTop is restored by BoardSurface from sessionStorage.
-// #67: the chip is a real button — it toggles the status popover (r7
-// 19/29), and the chevron rides outside the pill (r7 17 measure).
 
+import type { LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  Ban,
+  CircleCheck,
+  CircleDashed,
+  CircleX,
+  GitPullRequest,
+  Hourglass,
+  ListChecks,
+} from 'lucide-react';
 import { type Ref, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import { StatusChip } from '../components/ui/status-chip.js';
-import type { TodoRecord } from '../fixtures/records.js';
+import type { Phase, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
 import { ChipPopover } from '../overlays/chip-popover.js';
 import { PHASE_UI } from '../phase.js';
 
-/** #945（#942 正典表 §5.2 C1）：头 chip 从老 ui/chip 原语迁 StatusChip
- *  适配件（Badge 骨架 + 五对 --chip-* token utility 皮肤；default 档 h-5，
- *  替旧 md 18px——D2 授权几何）。状态载体 = data-tone（件自带）；
- *  detail-chip--<tone> 别名退役（全库零 spec 消费，grep 复核 @ 034bf7d5）。
- *  触发面 .detail-chip 类名保留（detail-b 的 reject-chain/review-reject 与
- *  integration m5/web-plans 按它定位；重钉归各自批次），皮肤迁 utilities。 */
+const ACCENT_INK = 'text-(--card-button)';
+const RUNNING_INK = 'text-running-text';
+const QUIET_INK = 'text-content-tertiary';
 
-// 头带 --titlebar-h 48px（CDS PR-6；原 r7 §3.1 44px）是 layout 位。#1006 原型（#980
-// 前提④ registry 默认赢）：r7 §3.3 冻结几何（主钮 50.5×28 @12px、icon 钮
-// 28×28 透明底）与 ghost 七通道中和串退役——icon 钮 = registry ghost
-// icon-sm 档（28×28 + hover:bg-muted 反馈），主钮 = default 档默认几何，
-// chevron/图标吃底座 [&_svg]:size-4 律。
+/** Status glyph + ink per phase: terracotta for the three needs-you phases,
+ *  green while an agent runs, ink greys otherwise (DESIGN.md 强调色纪律). */
+const PHASE_STATUS: Record<Phase, { icon: LucideIcon; ink: string }> = {
+  todo: { icon: CircleDashed, ink: QUIET_INK },
+  queued: { icon: CircleDashed, ink: QUIET_INK },
+  planning: { icon: Activity, ink: RUNNING_INK },
+  building: { icon: Activity, ink: RUNNING_INK },
+  confirm: { icon: ListChecks, ink: ACCENT_INK },
+  review: { icon: GitPullRequest, ink: ACCENT_INK },
+  failed: { icon: CircleX, ink: ACCENT_INK },
+  done: { icon: CircleCheck, ink: QUIET_INK },
+  closed: { icon: Ban, ink: QUIET_INK },
+};
 
 interface DetailHeadProps {
   todo: TodoRecord;
@@ -76,150 +89,120 @@ export function DetailHead({
   moreButtonRef,
 }: DetailHeadProps) {
   const { t } = useI18n();
-  // AI 审核中态（M7 #312，r8 §3.1）：chip 文案与 phase 解耦——「审核中」字面
-  // 反映活动步 kind 而非 phase（review 步是额外 agent 步，phase 留 confirm/
-  // review）。tone 用 confirm（同色与待确认期一致，不引入新色）。#1250
-  // 验证中态同位覆盖（verify 优先）。#1261 等额度态同律：waiting_quota 挂起时
-  // chip 直说「等额度」——票面「卡态」半，用户不再从「执行中」猜断粮。
-  const ui = verifyActive
-    ? { ...PHASE_UI[phase ?? todo.phase], chip: '验证中' }
+  const shown = phase ?? todo.phase;
+  // The review/verify steps are extra agent steps (phase stays confirm/review),
+  // so their words and the green ink come from the active step, not the phase.
+  // #1261: a quota hold says 等额度 instead of a misleading 执行中.
+  const status = verifyActive
+    ? { chip: '验证中', icon: Activity, ink: RUNNING_INK }
     : reviewActive
-      ? { ...PHASE_UI[phase ?? todo.phase], chip: '审核中' }
+      ? { chip: '审核中', icon: Activity, ink: RUNNING_INK }
       : todo.quotaWait != null
-        ? { ...PHASE_UI[phase ?? todo.phase], chip: '等额度' }
-        : PHASE_UI[phase ?? todo.phase];
+        ? { chip: '等额度', icon: Hourglass, ink: 'text-content-secondary' }
+        : { chip: PHASE_UI[shown].chip, ...PHASE_STATUS[shown] };
+  const action = PHASE_UI[shown].action;
   const { search } = useLocation();
   const [popover, setPopover] = useState(chipPopoverOpen === true);
+  const StatusIcon = status.icon;
   return (
     <header
-      className="detail-head relative flex h-(--titlebar-h) flex-none items-center border-b border-(--border) pl-3"
+      className="detail-head flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
       data-testid="detail-head"
     >
-      {/* #1006 原型：返回钮 = registry ghost icon-sm 档经 render prop 落
-          router Link（Base UI useRender 组合，锚语义/中键/新标签行为保留；
-          .detail-back 别名透传）。 */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="flex-none"
-        render={<Link to={{ pathname: '/app', search }} />}
+      <Link
+        className="-mr-1 -ml-2 flex size-7 flex-none items-center justify-center rounded-md text-content-tertiary hover:bg-muted"
+        to={{ pathname: '/app', search }}
         aria-label={t('返回')}
       >
-        <ChevronLeft />
-      </Button>
-      <span className="ml-1 flex-none text-xs leading-4 text-(--text-tertiary)">
-        #{todo.seqNum}
-      </span>
-      {/* #949：chipwrap 定位类随 overlays.css 清零退役（relative flex
-          items-center 等值 utility）。 */}
-      <span className="relative flex items-center">
-        {/* #1006 原型（#980 前提④）：触发钮皮肤——七通道中和串退役，
-            ghost 底座的 hover:bg-muted / aria-expanded:bg-muted 反馈生效
-            （registry 默认赢），只留 layout 位（h-auto 随 chip 内容、gap-0
-            保 chevron 5px 左距为唯一间距、p-0.5 给 hover 盒留呼吸）。
-            #951：detail-b 两 spec 重钉到 phase-chip testid；detail-chip
-            基类保留至执行域退役（chip-assign/chip-hotzone/integration m5
-            按它定位）。 */}
-        {/* #1008（#983 判决：floating-shell 族拆退役，锚定 absolute 族 →
-            registry Popover）：chip 钮 = PopoverTrigger（toggle/aria-expanded
-            归原语，#666 双写 state 竞态的根因随之消失）；定位归 Positioner
-            参数（side=bottom align=start alignOffset=-18 sideOffset=8 =
-            原「chip 左缘 −18、底缘 +8」捕获几何）。initialFocus=false 保
-            #666 键盘契约（焦点留触发钮，同一个键再按一次关面）；外点关走
-            原生 outside-press（实审裁决 1：接受穿透）。#634: chevron 在
-            触发钮内——整只 chip 一个热区。 */}
-        <Popover open={popover} onOpenChange={setPopover}>
-          <PopoverTrigger
-            render={
-              <Button
-                variant="ghost"
-                data-testid="phase-chip"
-                className="detail-chip ml-2 h-auto flex-none gap-0 p-0.5"
-              />
-            }
-          >
-            <StatusChip tone={ui.tone} className="shrink-0 whitespace-nowrap">
-              {t(ui.chip)}
-            </StatusChip>
-            {/* #949: chevron 皮肤等值迁 utility。testid = 二级载体
-                （chip-hotzone 的 H1 热区钉扎位，#910 裁定 1）。 */}
-            <span
-              className="ml-[5px] flex flex-none text-(--text-tertiary)"
-              data-testid="chip-chevron"
-            >
-              <ChevronDown width={12} height={12} />
-            </span>
-          </PopoverTrigger>
-          {/* 298 宽 = 捕获设计的内容 layout 槽（#983 宽度归消费点判例）；
-              皮肤/圆角/描边/投影/Arrow 归 PopoverContent 默认（#991 Q9）。 */}
-          <PopoverContent
-            side="bottom"
-            align="start"
-            alignOffset={-18}
-            sideOffset={8}
-            initialFocus={false}
-            aria-label={t('任务分配')}
-            className="w-[298px]"
-          >
-            <ChipPopover
-              todo={todo}
-              onEditAssign={
-                onEditAssign == null
-                  ? undefined
-                  : () => {
-                      // 先关 popover 再开弹层:两 overlay 不叠(家族律单实例)。
-                      setPopover(false);
-                      onEditAssign();
-                    }
-              }
-            />
-          </PopoverContent>
-        </Popover>
-      </span>
-
-      {/* XMON-55 P1: the head carries the task subject. Without it the only
-          way to tell which task the page belongs to was to read the thread's
-          taskline — the head showed an id and a status word and nothing to
-          attach them to. Ellipsised, never wrapped: the head is a fixed 44px
-          band. */}
-      <span
-        className="ml-3.5 min-w-0 flex-1 truncate text-[15px] leading-5 font-semibold text-(--foreground)"
+        <ChevronLeft width={16} height={16} />
+      </Link>
+      <h1
+        className="min-w-0 truncate font-heading text-page font-medium text-foreground"
         title={todo.title}
         data-testid="detail-title"
       >
         {todo.title}
-      </span>
+      </h1>
+      <span className="flex-none text-meta tabular-nums text-content-tertiary">#{todo.seqNum}</span>
+      {/* #1008: Base UI Popover; initialFocus=false keeps focus on the trigger
+          so the same key closes it again (#666). #634: the chevron sits inside
+          the trigger, one hit area. */}
+      <Popover open={popover} onOpenChange={setPopover}>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="phase-chip"
+              data-tone={PHASE_UI[shown].tone}
+              className={`detail-chip -ml-1.5 h-7 flex-none gap-1.5 px-1.5 text-ui font-normal ${status.ink}`}
+            />
+          }
+        >
+          <StatusIcon aria-hidden strokeWidth={1.75} className="size-3.5" />
+          {t(status.chip)}
+          <span className="flex flex-none text-content-tertiary" data-testid="chip-chevron">
+            <ChevronDown width={12} height={12} />
+          </span>
+        </PopoverTrigger>
+        <PopoverContent
+          side="bottom"
+          align="start"
+          alignOffset={-6}
+          sideOffset={8}
+          initialFocus={false}
+          aria-label={t('任务分配')}
+          className="w-74.5"
+        >
+          <ChipPopover
+            todo={todo}
+            onEditAssign={
+              onEditAssign == null
+                ? undefined
+                : () => {
+                    // Close first: the dialog lives on the page and the two
+                    // overlays never stack.
+                    setPopover(false);
+                    onEditAssign();
+                  }
+            }
+          />
+        </PopoverContent>
+      </Popover>
 
       <div
-        className="ml-3 flex flex-none items-center gap-1.5 pr-3"
+        className="ml-auto flex flex-none items-center gap-0.5"
         data-testid="detail-head-actions"
       >
-        {/* XMON-24 更多钮 shadcn ghost 底座；#1006 原型：registry ghost
-            icon-sm 档默认形态（hover 反馈生效、svg 吃底座 size-4 律）。
-            --more 别名保留（8 处 spec 钉）。 */}
         <Button
           variant="ghost"
           ref={moreButtonRef}
           size="icon-sm"
-          className="detail-head-icon--more flex-none"
+          className="detail-head-icon--more flex-none text-content-secondary"
           aria-label={t('更多')}
           onClick={onMore}
         >
           <EllipsisVertical />
         </Button>
-        {ui.action != null &&
+        {action != null &&
           (actionInFlight === true ? (
-            // #1216 在飞编排态：主钮禁用 +「编排中」——重入点击此前会静默
-            // 多发一轮编排线程（生产实测同卡 3–5 条），拒绝反馈住
-            // use-orchestrate-start 的 toast 位。
-            <Button className="detail-head-action flex-none" data-orchestrating="true" disabled>
+            // #1216: a start/rerun already went out; a second click would
+            // spawn another orchestration thread.
+            <Button
+              size="sm"
+              className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
+              data-orchestrating="true"
+              disabled
+            >
               {t('编排中')}
             </Button>
           ) : (
-            // #1006 原型（#980 前提④）：主钮 50.5×28 @12px 冻结几何退役——
-            // registry Button default 档默认几何（h-8 text-sm font-medium）。
-            <Button className="detail-head-action flex-none" onClick={onAction}>
-              {t(ui.action)}
+            <Button
+              size="sm"
+              className={`detail-head-action ${TOPBAR_PRIMARY_BUTTON}`}
+              onClick={onAction}
+            >
+              {t(action)}
             </Button>
           ))}
       </div>

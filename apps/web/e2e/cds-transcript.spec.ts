@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS transcript: tokens, fade, follow 40 / jump 120, header 48', async ({ page }) => {
+test('CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top bar)', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=16');
   await page.waitForSelector('[data-testid="transcript-col"]');
 
@@ -15,7 +15,6 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, header 48', async ({ p
     return {
       chatMaxW: root.getPropertyValue('--chat-max-w').trim(),
       chatExtra: root.getPropertyValue('--chat-extra-space').trim(),
-      titlebarH: root.getPropertyValue('--titlebar-h').trim(),
       fadeSize: root.getPropertyValue('--scroll-fade-size').trim(),
       radiusBubble: root.getPropertyValue('--radius-bubble').trim(),
       cdsRadiusXl: root.getPropertyValue('--cds-radius-xl').trim(),
@@ -29,12 +28,11 @@ test('CDS transcript: tokens, fade, follow 40 / jump 120, header 48', async ({ p
 
   expect(m.chatMaxW).toBe('768px');
   expect(m.chatExtra).toBe('35vh');
-  expect(m.titlebarH).toBe('48px');
   expect(m.fadeSize).toBe('28px');
   expect(m.radiusBubble).toBe('18px');
   expect(m.cdsRadiusXl).toBe('12px');
   expect(m.hasScrollFade).toBe(true);
-  expect(m.headH).toBe('48px');
+  expect(m.headH).toBe('56px');
   expect(m.contentMaxW).toBe('768px');
   // 35vh bottom buffer — numeric px depends on viewport; just ensure >> 16
   expect(Number.parseFloat(m.colPadBottom)).toBeGreaterThanOrEqual(16);

@@ -96,7 +96,7 @@ export function AcceptDialog({
           行盒由消费点 label 承载——整行可点走 label 激活转发）。行垫随
           DialogContent p-4，行内 8 gap 是 layout 位。 */}
       {skipMerge ? (
-        <p className="text-xs leading-4 text-(--text-tertiary)">
+        <p className="text-meta text-(--text-tertiary)">
           {t('本轮没有文件改动，完成不会合并分支。')}
         </p>
       ) : (
@@ -118,13 +118,13 @@ export function AcceptDialog({
       {locked && (
         // failed 卡锁定行：与缺项行同档 tertiary 说明位（「禁掉它并把原因写
         // 在旁边是同一件事的两半」，XMON-89 律）。
-        <p className="mt-2 text-xs leading-4 text-(--text-tertiary)">
+        <p className="mt-2 text-meta text-(--text-tertiary)">
           {t('失败任务只能经合并完成，不能跳过合并。')}
         </p>
       )}
       {blocked && (
         // XMON-89 缺项行：禁用态由 default disabled 档承载，本行只说「缺什么」。
-        <p className="mt-2 text-xs leading-4 text-(--text-tertiary)">
+        <p className="mt-2 text-meta text-(--text-tertiary)">
           {t('缺少「{tools}」授权，无法合并。请在该 Agent 的权限里开启。', {
             tools: (missingTools ?? []).join('、'),
           })}
@@ -133,7 +133,7 @@ export function AcceptDialog({
       {rejectReason != null && (
         // XMON-89 server 拒绝行：destructive 与其余面级错误文案同色；
         // role=alert 是 e2e/读屏一级载体（#910 裁定 1）。
-        <p className="mt-2 text-xs leading-4 text-(--destructive)" role="alert">
+        <p className="mt-2 text-meta text-(--destructive)" role="alert">
           {rejectReason}
         </p>
       )}

@@ -152,7 +152,7 @@ test('4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-s
   // --secondary 暗色侧 #2d2926；--border #2d2926（shadcn.css 正本；surface-secondary/border-default 已并，#1002）
   expect(cs.bg).toBe('rgb(45, 41, 38)');
   expect(cs.borderColor).toBe('rgb(45, 41, 38)');
-  expect(cs.fontSize).toBe('15px');
+  expect(cs.fontSize).toBe('14px');
 });
 
 test('4b. 宽屏下行宽吃 68ch cap（#470 的 60–75 字符带同律）', async ({ page }) => {

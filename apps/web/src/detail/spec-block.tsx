@@ -14,7 +14,7 @@
 //
 // #945（detail.css 清零）：简报卡皮肤迁 token utilities——配方 = composer
 // 卡同族（1px --border-default 缝线 + --surface-secondary 底，线程列里用户
-// 说话的两个面读作同一材质）；15px/1.6 阅读档 + 68ch cap = #470 线程正文
+// 说话的两个面读作同一材质）；text-card-title/1.6 阅读档 + 68ch cap = #470 线程正文
 // 纪律。fresh 态（任务简报独占中心列）经 `fresh` 入参并入 720px 居中轴
 // （老 `.detail-fresh .spec-block` 上下文覆写规则的组件侧等价形）。
 
@@ -34,8 +34,8 @@ export function SpecBlock({ spec, fresh = false }: SpecBlockProps) {
       className={cn(
         // #1054 清点：带框内容盒接 registry 圆角词汇 rounded-lg（#1072 同域
         // 先例：review-dialog notice box / BranchBox / READONLY_BOX 同档）。
-        'spec-block mt-4 mx-4 rounded-lg border border-(--border) bg-(--secondary) px-[15px] py-[13px] text-[15px] leading-[1.6] break-words text-(--foreground) [&>*]:max-w-[68ch]',
-        fresh && 'mx-auto max-w-[720px]',
+        'spec-block mt-4 mx-4 rounded-lg border border-(--border) bg-(--secondary) px-4 py-3 text-card-title leading-[1.6] break-words text-(--foreground) [&>*]:max-w-[68ch]',
+        fresh && 'mx-auto max-w-180',
       )}
     >
       <ChatMarkdown text={spec} />

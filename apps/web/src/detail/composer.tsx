@@ -50,9 +50,9 @@ import { ComposerChips } from './composer-chips.js';
 // 16px 侧/底 margin = 列 inset 律（#472 in-flow）。
 const COMPOSER_CARD =
   'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border-0 bg-(--secondary) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
-// 占位行/输入行共用几何：13px/15px 内衬 + 14px/16px 墨（#470：一档压正文
-// 15px）。min-h-[84px] 走卡片本体。
-const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-5';
+// 占位行/输入行共用几何：12px/16px 内衬 + text-ui 墨（#470：一档压正文
+// text-card-title）。84px 最小高走卡片本体。
+const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 // 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 --composer-max-h 384px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老
 // textarea.composer-input 的自定义字体栈（--font-inter + Inter/system-ui/
@@ -60,11 +60,11 @@ const COMPOSER_PLACEHOLDER = 'px-[15px] pt-[13px] text-[14px] leading-5';
 // 差额逐条中和：方角已同形，field-sizing 回 fixed（JS grow 律），边框/
 // focus 环/暗底/过渡清零到老 UA 裸面形。
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-[15px] pt-[13px] pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-[14px] leading-5 text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 // 工具钮（30px 盒，XMON-55 P5 光学左缘 10px 由 toolbar 锚承载）：ghost
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
-  'flex size-[30px] cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
+  'flex size-7.5 cursor-pointer items-center justify-center border-none bg-transparent p-0 text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0';
 // 发送/停止（XMON-55 P5 同胞对：32×32、同底、同轴、8px 间隔）共享的定位/
 // 盒形串——漆面（bg/text/hover）不进本串：tailwind-merge 后写者胜，共享串
 // 排消费端漆面之后会压掉 --ready 态的品牌实底。idle 底 --seg-active
@@ -221,7 +221,7 @@ export function Composer({
 
   return (
     <div
-      className={`${COMPOSER_CARD} min-h-[84px] ${multiLine ? 'pb-12' : ''}`}
+      className={`${COMPOSER_CARD} min-h-21 ${multiLine ? 'pb-12' : ''}`}
       data-testid="composer-card"
     >
       {editable ? (
@@ -386,7 +386,7 @@ export function Composer({
         // P5 同胞律）；红只住 10px glyph（--stop 墨）。
         <Button
           variant="ghost"
-          className={`composer-stop ${COMPOSER_SQUARE} right-[53px] bg-(--seg-active) text-(--destructive) hover:bg-(--seg-active) hover:text-(--destructive) dark:hover:bg-(--seg-active) dark:hover:text-(--destructive) [&_svg:not([class*='size-'])]:size-auto`}
+          className={`composer-stop ${COMPOSER_SQUARE} right-13 bg-(--seg-active) text-(--destructive) hover:bg-(--seg-active) hover:text-(--destructive) dark:hover:bg-(--seg-active) dark:hover:text-(--destructive) [&_svg:not([class*='size-'])]:size-auto`}
           aria-label={t('停止')}
           onClick={onStop}
         >
@@ -400,7 +400,7 @@ export function Composer({
           ArrowUp 属性 14px，svg 免底座强制 16px。 */}
       <Button
         variant="ghost"
-        className={`composer-send ${COMPOSER_SQUARE} right-[13px] transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
+        className={`composer-send ${COMPOSER_SQUARE} right-3 transition-[background-color,color] duration-(--dur-fast) ease-[cubic-bezier(0.2,0,0,1)] ${
           draft.trim() === ''
             ? 'bg-(--seg-active) text-(--text-tertiary) hover:bg-(--seg-active) hover:text-(--text-tertiary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-tertiary)'
             : 'bg-(--card-button) text-(--text-on-accent) hover:bg-(--card-button) hover:text-(--text-on-accent) dark:hover:bg-(--card-button) dark:hover:text-(--text-on-accent)'

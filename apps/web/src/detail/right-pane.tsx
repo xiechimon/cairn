@@ -83,22 +83,19 @@ function TokenSection({
             律等值迁 utility——total 行 61 高（60 内容 + 1 缝线，border-box 会
             吃掉缝线故钉 61）baseline 两端；model 行 39 高 mono 12；stat 行
             27 高 12px。 */}
-        <div className="flex h-[61px] items-baseline justify-between border-b border-b-(--border) px-4">
-          <span className="text-[length:24px] font-semibold tracking-[-0.3px] text-(--foreground)">
+        <div className="flex h-15 items-baseline justify-between border-b border-b-(--border) px-4">
+          <span className="text-page font-semibold tabular-nums text-(--foreground)">
             {stats.total}
           </span>
-          <span className="text-[length:12px] text-(--text-tertiary)">tokens</span>
+          <span className="text-meta text-(--text-tertiary)">tokens</span>
         </div>
-        <div className="flex h-[39px] items-center justify-between border-b border-b-(--border) px-4 font-mono text-[length:12px]">
+        <div className="flex h-10 items-center justify-between border-b border-b-(--border) px-4 font-mono text-meta">
           <span className="text-(--text-secondary)">{stats.model}</span>
           <span className="text-(--text-tertiary)">{stats.modelTotal}</span>
         </div>
         <div>
           {rows.map(([label, value]) => (
-            <div
-              key={label}
-              className="flex h-[27px] items-center justify-between px-4 text-[length:12px]"
-            >
+            <div key={label} className="flex h-7 items-center justify-between px-4 text-meta">
               <span className="text-(--text-tertiary)">{t(label)}</span>
               <span className="text-(--foreground)">{value}</span>
             </div>
@@ -130,20 +127,20 @@ function HistorySection({
             18 高 code-bg 底（同名不同族，非五态原语，§5.2 划界）。行 testid =
             二级载体（无 role 的计数结构钩，detail-3pane 的 toHaveCount 钉，
             #910 裁定 1）。 */}
-        <div className="px-4 pt-6 pb-[26px]">
+        <div className="px-4 pt-6 pb-6">
           {content.runs.map((run, index) => (
             <div
               key={run.label}
               data-testid="history-row"
               className={cn(
-                'flex items-center gap-[11px]',
+                'flex items-center gap-3',
                 index > 0 && 'mt-2 border-t border-t-(--border) pt-2',
               )}
             >
               <RunGlyph status={run.status} />
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] text-(--foreground)">{t(run.label)}</span>
+                  <span className="text-ui text-(--foreground)">{t(run.label)}</span>
                   {(run.status === 'current' || run.status === 'failed-current') && (
                     // #1006 原型（#980 前提④）：手搓 18px/4px 圆角小 chip →
                     // registry Badge secondary 档（h-5 rounded-4xl 默认几何；
@@ -153,9 +150,7 @@ function HistorySection({
                     </Badge>
                   )}
                 </div>
-                <div className="h-[17px] text-[length:12px] text-(--text-tertiary)">
-                  {t(run.meta)}
-                </div>
+                <div className="h-4 text-meta text-(--text-tertiary)">{t(run.meta)}</div>
               </div>
             </div>
           ))}

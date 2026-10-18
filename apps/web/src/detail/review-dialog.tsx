@@ -177,7 +177,7 @@ export function ReviewDialog({
               aria-label={t('搜索 Agent…')}
             />
             <div
-              className="flex max-h-[200px] flex-col gap-1 overflow-y-auto"
+              className="flex max-h-50 flex-col gap-1 overflow-y-auto"
               role="listbox"
               aria-label={t('选择审核 Agent')}
             >

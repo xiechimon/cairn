@@ -100,21 +100,19 @@ interface DocPaneProps {
 
 // #945（detail.css 清零）：右栏文档面皮肤迁 token utilities。族律 = r7
 // 27/27b/36 捕获：head 36px 发丝缝、文件行 32px surface-secondary、diff
-// mono 11px（hunk 头 22px 行盒 / 行 17px）、gutter 老新双列右对齐
-// （old 18px / new 19px，r7 27b x255/x274 实测）。ghost 七通道中和随各钮。
+// mono caption（hunk 头 20px 行盒 / 行 16px）、gutter 老新双列右对齐
+// （各 20px，4px 网格）。ghost 七通道中和随各钮。
 /** pane 头带（36px + 发丝缝，#366）——docpane 与 right-pane 三 section 头
  *  共用单源（#945：老 .doc-pane-head 规则族的两消费面防漂移律不变）。 */
 export const PANE_HEAD =
-  'flex h-9 flex-none items-center border-b border-(--border) pl-[17px] text-xs leading-4 text-(--text-secondary) [&>svg]:text-(--text-tertiary)';
+  'flex h-9 flex-none items-center border-b border-(--border) pl-4 text-meta text-(--text-secondary) [&>svg]:text-(--text-tertiary)';
 // #1006 原型（#980 前提④）：PANE_SELECT 七通道中和串退役——头带文字钮
 // 走 registry ghost xs 档默认形态（hover:bg-muted 反馈生效），只留 layout
 // 位（ml-0：wrap 内贴左）。plan-dropdown 的同名配方同步退役（两消费面
 // 防漂移律不变）。
 const PANE_SELECT = 'doc-pane-select ml-0';
-const DIFF_LINE = 'flex items-center font-mono text-[11px] leading-[17px] text-(--text-secondary)';
-// gutter 老/新行号格右对齐；宽度差 1px 是 r7 27b 捕获原值（old 列尾 x255、
-// new 列尾 x274）。
-const DIFF_NO = 'flex-none pr-[3px] text-right text-(--text-tertiary)';
+const DIFF_LINE = 'flex items-center font-mono text-caption leading-4 text-(--text-secondary)';
+const DIFF_NO = 'flex-none pr-1 text-right text-(--text-tertiary)';
 const DIFF_KIND_SKIN: Record<string, string> = {
   add: 'bg-(--diff-add-bg)',
   del: 'bg-(--diff-del-bg)',
@@ -196,7 +194,7 @@ export function DiffFileBlock({
     <div>
       {/* 文件行骑 surface-secondary（r7 27 双模）：chevron + 路径 + 👁 +
           右对齐 +N（mono，−N 走 danger 墨）。 */}
-      <div className="doc-file-row flex h-8 flex-none items-center gap-1.5 bg-(--secondary) pl-[13px] text-[13px] leading-4 text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
+      <div className="doc-file-row flex h-8 flex-none items-center gap-1.5 bg-(--secondary) pl-3 text-ui text-(--text-secondary) [&_svg]:text-(--text-tertiary)">
         {expanded ? (
           <ChevronDown width={10} height={10} />
         ) : (
@@ -207,7 +205,7 @@ export function DiffFileBlock({
         <span className="flex text-(--text-tertiary)">
           <Eye width={14} height={14} />
         </span>
-        <span className="ml-auto pr-[17px] font-mono text-xs leading-4 text-(--diff-add-fg)">
+        <span className="ml-auto pr-4 font-mono text-meta text-(--diff-add-fg)">
           +{file.added}
           {file.removed != null && file.removed > 0 && (
             <span className="text-(--destructive)"> −{file.removed}</span>
@@ -221,7 +219,7 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
-                  <div className="diff-hunk-head border-y border-(--border) bg-(--secondary) pl-[53px] font-mono text-[11px] leading-[22px] text-(--text-tertiary)">
+                  <div className="diff-hunk-head border-y border-(--border) bg-(--secondary) pl-14 font-mono text-caption leading-5 text-(--text-tertiary)">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {
@@ -240,16 +238,16 @@ export function DiffFileBlock({
                         data-word={isCapped ? 'capped' : undefined}
                         title={isCapped ? t('行过长，已退回整行高亮') : undefined}
                       >
-                        <span data-no="old" className={`${DIFF_NO} w-[18px]`}>
+                        <span data-no="old" className={`${DIFF_NO} w-5`}>
                           {line.oldNo ?? ''}
                         </span>
-                        <span data-no="new" className={`${DIFF_NO} w-[19px]`}>
+                        <span data-no="new" className={`${DIFF_NO} w-5`}>
                           {line.newNo ?? ''}
                         </span>
-                        <span className="w-[11px] flex-none text-center text-(--diff-add-fg)">
+                        <span className="w-3 flex-none text-center text-(--diff-add-fg)">
                           {line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : ''}
                         </span>
-                        <span className="pl-1.5 whitespace-pre">
+                        <span className="pl-2 whitespace-pre">
                           {segs == null
                             ? line.text
                             : segs.map((seg, si) =>
@@ -281,20 +279,20 @@ export function DiffFileBlock({
                 .map((text, i) => (
                   // file order is stable; lines carry no ids
                   <div key={i} className={`${DIFF_LINE}`} data-kind="context">
-                    <span data-no="old" className={`${DIFF_NO} w-[18px]`} />
-                    <span data-no="new" className={`${DIFF_NO} w-[19px]`}>
+                    <span data-no="old" className={`${DIFF_NO} w-5`} />
+                    <span data-no="new" className={`${DIFF_NO} w-5`}>
                       {i + 1}
                     </span>
-                    <span className="w-[11px] flex-none text-center text-(--diff-add-fg)" />
-                    <span className="pl-1.5 whitespace-pre">{text}</span>
+                    <span className="w-3 flex-none text-center text-(--diff-add-fg)" />
+                    <span className="pl-2 whitespace-pre">{text}</span>
                   </div>
                 ))}
             </div>
           )}
           {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
             // #225 全文态占位：loading/error/binary 在 hunk 区同槽，左对齐
-            // hunk 头文本位（53px），tertiary mono 同 hunk 头族。
-            <div className="py-2 pr-[13px] pl-[53px] font-mono text-[11px] leading-[17px] text-(--text-tertiary)">
+            // hunk 头文本位（56px），tertiary mono 同 hunk 头族。
+            <div className="py-2 pr-3 pl-14 font-mono text-caption leading-4 text-(--text-tertiary)">
               {full.kind === 'loading'
                 ? t('加载中…')
                 : full.kind === 'error'
@@ -364,7 +362,7 @@ function VersionMenu({
         align="end"
         side="bottom"
         sideOffset={8}
-        className="version-menu--sub w-auto min-w-[69px]"
+        className="version-menu--sub w-auto min-w-17"
       >
         <DropdownMenuItem className="version-menu-row" onClick={onCompare}>
           {t('上一版本')}
@@ -427,7 +425,7 @@ function VersionControl({
   onBase?: () => void;
 }) {
   return (
-    <span className="doc-range-wrap relative ml-[18px] inline-flex">
+    <span className="doc-range-wrap relative ml-4 inline-flex">
       {/* #1006 原型（#980 前提④）：两 chip 钮收敛 registry Button 档——
           range chip = outline xs 档（描边 pill 的 registry 对应），select 面
           = ghost xs 档（plan-dropdown 同配方，防两消费面漂移律不变）；
@@ -473,10 +471,10 @@ function VersionControl({
  *  归零）；bullet 悬挂 17/−12；节标签 = 12px/500 tertiary 上 22px 下 6px
  *  （是 label 不是 title——它引导的散文是 15px，节边界由更宽的上带标出）。 */
 function docBlockClass(kind: string, first: boolean): string {
-  const base = 'text-[15px] leading-6 break-words text-(--foreground)';
+  const base = 'text-card-title leading-6 break-words text-(--foreground)';
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
-  if (kind === 'bullet') return `${base} pl-[17px] [text-indent:-12px]`;
-  return `${base} ${first ? 'mt-0' : 'mt-[22px]'} mb-1.5 text-xs leading-4 font-medium tracking-[0.02em] text-(--text-tertiary)`;
+  if (kind === 'bullet') return `${base} pl-4 [text-indent:-12px]`;
+  return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium tracking-[0.02em] text-(--text-tertiary)`;
 }
 
 export function DocPane({
@@ -549,7 +547,7 @@ export function DocPane({
           {hasData && (
             <>
               {/* changes mode（r7 27/36）：stat 簇 + 右对齐展开切换。 */}
-              <span className="ml-[18px] text-(--text-tertiary)">
+              <span className="ml-4 text-(--text-tertiary)">
                 {t('· {n} 个文件改动', { n: fileCount })}{' '}
                 <span className="text-(--diff-add-fg)">+{added}</span>
                 {removed > 0 && <span className="text-(--destructive)"> −{removed}</span>}
@@ -559,7 +557,7 @@ export function DocPane({
               <Button
                 variant="ghost"
                 size="xs"
-                className="ml-auto mr-[17px] text-(--text-tertiary)"
+                className="ml-auto mr-4 text-(--text-tertiary)"
                 onClick={onToggleExpand}
               >
                 {expanded ? t('全部收起') : t('全部展开')}
@@ -591,7 +589,7 @@ export function DocPane({
         ) : (
           // changes-empty 占位（r7 38）：整 pane 居中、头上无 band——
           // --full 变体把 .doc-empty 的绝对居中改回 static flex 项。
-          <div className="doc-empty static flex flex-1 items-center justify-center text-xs leading-4 text-(--text-tertiary)">
+          <div className="doc-empty static flex flex-1 items-center justify-center text-meta text-(--text-tertiary)">
             {t('暂无可显示的变更')}
           </div>
         )}
@@ -617,14 +615,14 @@ export function DocPane({
         )}
       </header>
       <div
-        className="relative min-h-0 flex-1 overflow-y-auto pt-4 pr-[18px] pb-6 pl-[17px]"
+        className="relative min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6"
         data-testid="doc-body"
       >
         {doc == null
           ? // #476：live 空态由任务元信息块承接（顶对齐、随 doc-pane-body
             // 既有滚动）；fixture 面 emptyMeta 缺省 → 居中占位原样。
             (emptyMeta ?? (
-              <div className="doc-empty absolute inset-0 flex items-center justify-center text-xs leading-4 text-(--text-tertiary)">
+              <div className="doc-empty absolute inset-0 flex items-center justify-center text-meta text-(--text-tertiary)">
                 {t('暂无方案')}
               </div>
             ))
