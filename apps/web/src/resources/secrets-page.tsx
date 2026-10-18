@@ -11,9 +11,18 @@ import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { KeyThin } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import { CreateSecretDialog } from './create-secret-dialog.js';
-import { EmptyState, RowCard, RowChevron, RowDesc, RowText, RowTitle, Tile } from './parts.js';
-import { ResourceShell } from './shell.js';
+import {
+  EmptyState,
+  ResourceNewButton,
+  RowCard,
+  RowChevron,
+  RowDesc,
+  RowText,
+  RowTitle,
+  Tile,
+} from './parts.js';
 
 export const SECRETS_HREF = '/app/resources/secrets';
 
@@ -34,12 +43,11 @@ export function SecretsPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
-    <ResourceShell
-      title="密钥"
-      href={SECRETS_HREF}
-      backHref="/app"
+    <PageShell
+      route={SECRETS_HREF}
+      title={t('密钥')}
       selected={SECRETS_HREF}
-      onNew={() => setCreateOpen(true)}
+      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
       {secrets.length === 0 ? (
@@ -77,6 +85,6 @@ export function SecretsPage() {
             : undefined
         }
       />
-    </ResourceShell>
+    </PageShell>
   );
 }

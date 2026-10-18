@@ -35,7 +35,8 @@ import {
 } from '../api/hooks.js';
 import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
-import { buttonVariants } from '../components/ui/button.js';
+import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { Button } from '../components/ui/button.js';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { isDeleted } from '../fixtures/deletions.js';
@@ -43,8 +44,8 @@ import { TEAM_NAME, TEAM_R7 } from '../fixtures/fixtures.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChartNetwork, ChevronDown, Grid2x2 } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
-import { SecondaryShell } from '../secondary/shell.js';
 import { CreateAgentDialog } from './create-agent-dialog.js';
 import { TeamAgentGrid } from './team-agent-grid.js';
 import { TeamChart } from './team-chart.js';
@@ -107,30 +108,29 @@ export function TeamPage() {
   const machinesQ = useMachines(teamId, live);
   const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
   return (
-    <SecondaryShell
+    <PageShell
       route="team"
       fixture={live ? { ...fixture, todos: (todosQ.data ?? []).map(toDisplayTodo) } : fixture}
-      sidebarSelected="team"
+      selected="team"
       title={
-        <>
+        <span className="inline-flex items-center gap-1.5">
           {teamName}
-          <ChevronDown width={12} height={12} />
-        </>
+          <ChevronDown width={12} height={12} className="text-content-tertiary" />
+        </span>
       }
-      right={
-        /* 头右「设置」文本链：品牌墨当文字色按 2026-10-08 实审裁决收敛到
-           registry link 档（--primary 保 neutral、品牌墨只做 spot 强调，
-           同 shell.tsx + 新建 / #1006 R4 / #1055 口径）。 */
-        <Link
-          className={buttonVariants({ variant: 'link' })}
-          to={{ pathname: '/app/account', search }}
+      actions={
+        <Button
+          variant="ghost"
+          size="sm"
+          className={TOPBAR_TEXT_BUTTON}
+          render={<Link to={{ pathname: '/app/account', search }} />}
           aria-label={t('设置')}
         >
           {t('设置')}
-        </Link>
+        </Button>
       }
     >
-      <div className="mt-[18px] flex h-7 items-center justify-between">
+      <div className="flex h-7 items-center justify-between">
         {layout === 'grid' && (
           <div className="flex items-center">
             <span className="mr-1.5 text-xs text-(--text-secondary)">
@@ -191,6 +191,6 @@ export function TeamPage() {
             : undefined
         }
       />
-    </SecondaryShell>
+    </PageShell>
   );
 }

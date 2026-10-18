@@ -1008,11 +1008,13 @@ export function ProjectPage() {
   );
   return (
     <PageShell
+      route="project"
+      bleed
       fixture={
         live ? { ...fixture, todos } : { ...fixture, todos: [...fixture.todos, ...fixtureAdded] }
       }
       selected="none"
-      leftTitle={project?.name ?? ''}
+      title={project?.name ?? ''}
       // #389: C 热键/侧栏行走本页 dialog（保存锚路由项目，#305 律）
       onNewTask={openNewTask}
       tabs={[
@@ -1021,7 +1023,7 @@ export function ProjectPage() {
       ]}
       tab={tab}
       onTab={(next) => setTab(next === 'tasks' ? 'tasks' : 'files')}
-      action={
+      actions={
         id === undefined ? undefined : (
           // #1174 设置入口：/app/project/:id/settings 自 #207 起带全套删除流，
           // 但全站没有任何导航指向它——孤儿路由，删项目只能猜 API（票面实撞

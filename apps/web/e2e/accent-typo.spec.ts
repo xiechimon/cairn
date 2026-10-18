@@ -94,9 +94,9 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.nameHref).toContain('/app/team');
   });
 
-  test(`resources back chevron hover shows no background change (${theme})`, async ({ page }) => {
+  test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
-    await page.goto('/app/resources/skills?scenario=06');
+    await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
 
     const read = () =>
       page.evaluate(() => {
@@ -196,9 +196,9 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`resources back chevron keeps a keyboard focus ring (${theme})`, async ({ page }) => {
+  test(`page shell back chevron keeps a keyboard focus ring (${theme})`, async ({ page }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
-    await page.goto('/app/resources/skills?scenario=06');
+    await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
     // keyboard modality: tab until the back chevron owns focus
     for (let i = 0; i < 40; i++) {
       const onBack = await page.evaluate(

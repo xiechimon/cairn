@@ -215,7 +215,7 @@ try {
 
   // 1) A5 负向：页面列表不投喂 preset 目录（preset 仅在 dialog 内出现）。
   //    样本取三个辨识名；非空守卫：读不到正文时负向不可判真。
-  const pageText = await softText(page, `${SHELL} .res-main`);
+  const pageText = await softText(page, `${SHELL} .page-main`);
   const leaked = ['DeepSeek', 'OpenRouter', 'Cloudflare AI Gateway'].filter((n) =>
     pageText.includes(n),
   );
@@ -223,7 +223,7 @@ try {
     'page-no-presets',
     pageText !== '' && leaked.length === 0,
     pageText === ''
-      ? '页面正文不可读（.res-main 缺失？）——负向断言不可空判'
+      ? '页面正文不可读（.page-main 缺失？）——负向断言不可空判'
       : leaked.length === 0
         ? '页面无 preset 名投喂（preset 仅在 dialog 内出现）'
         : `spec 11 A5：preset 仅在 dialog 内出现——页面泄漏 ${leaked.join(', ')}`,

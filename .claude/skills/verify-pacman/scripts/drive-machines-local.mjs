@@ -30,7 +30,7 @@
 // [data-runtime] 容器 + svg + aria-label 可读名、.mach-runtime--on →
 // data-enabled、.mach-shell-switch → role=switch、.res-row-desc → 文案一级、
 // .res-add → button:text-is(文案)、.res-row-chev/-more 负向 → 可点语义/menu
-// 触发计数 0；.res-main = chief docking 跨域句柄，不动（#950 面）。
+// 触发计数 0；.page-main = 页面壳 sheet（PR 6 三壳合一）。
 // 用法：node drive-machines-local.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -187,13 +187,13 @@ try {
   );
 
   // 1) A8 负向：「Pacman 托管机器」facade 行已除（非空守卫：读不到正文时负向不可判真）
-  const bodyText = await softText(page, `${SHELL} .res-main`);
+  const bodyText = await softText(page, `${SHELL} .page-main`);
   const facadeGone = bodyText !== '' && !bodyText.includes('Pacman 托管机器');
   check(
     'no-hosted-facade',
     facadeGone,
     bodyText === ''
-      ? '页面正文不可读（.res-main 缺失？）——负向断言不可空判'
+      ? '页面正文不可读（.page-main 缺失？）——负向断言不可空判'
       : facadeGone
         ? '页面无「Pacman 托管机器」facade 行'
         : 'spec 11 A8：「Pacman 托管机器」facade 行仍在（前端静态装饰行未除）',

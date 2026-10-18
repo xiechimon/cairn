@@ -13,8 +13,10 @@
 // Content）；消费点只保留 layout（行高/间距/外边距）与 token 层墨色。
 
 import { cn } from 'cn';
+import { Plus } from 'lucide-react';
 import type { ComponentProps, ComponentType, ReactNode, SVGProps } from 'react';
 import { Link, useLocation } from 'react-router';
+import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -31,6 +33,23 @@ import { ChevronRight, Lock } from '../icons/index.js';
    RES_SEARCH_INPUT / RES_SORT_TRIGGER / RES_SORT_MENU / RES_SORT_ROW /
    RES_SORT_WRAP）随最后一个消费点迁完删除（#1054 消费点方角清点执行，
    台账见 docs/spec/27）。行容器是纯 layout，留守。 */
+
+/** Top bar `+ 新建` of the resource pages: the ink pill primary.
+ *  data-testid="resource-new" is the hit-test probe handle (title-band-clicks). */
+export function ResourceNewButton({ onClick }: { onClick: () => void }) {
+  const { t } = useI18n();
+  return (
+    <Button
+      size="sm"
+      className={TOPBAR_PRIMARY_BUTTON}
+      onClick={onClick}
+      data-testid="resource-new"
+    >
+      <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
+      {t('新建')}
+    </Button>
+  );
+}
 
 /** 搜索 + 排序的工具行容器（纯 layout，两域共用）。 */
 export const RES_SEARCH_ROW_CLS = 'flex gap-2';

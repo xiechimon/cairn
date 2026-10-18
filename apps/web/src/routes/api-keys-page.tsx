@@ -25,7 +25,7 @@ import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronRight, Key } from '../icons/index.js';
-import { SecondaryShell } from '../secondary/shell.js';
+import { PageShell } from '../pages/shell.js';
 import { ApiKeyCreateDialog } from './api-key-create-dialog.js';
 
 export function ApiKeysPage() {
@@ -51,13 +51,14 @@ export function ApiKeysPage() {
       ]
     : (fixture.apiKeys?.keys ?? []);
   return (
-    <SecondaryShell
+    <PageShell
       route="api-keys"
       fixture={live ? { ...fixture, todos: (todosQ.data ?? []).map(toDisplayTodo) } : fixture}
+      selected="none"
       title={t('API 密钥')}
     >
       {keys.length === 0 ? (
-        <Empty data-testid="keys-empty" className="mt-10">
+        <Empty data-testid="keys-empty" className="mt-6">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <Key />
@@ -141,6 +142,6 @@ export function ApiKeysPage() {
           })
         }
       />
-    </SecondaryShell>
+    </PageShell>
   );
 }

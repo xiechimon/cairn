@@ -42,6 +42,7 @@ import type { MachineRow } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, Minus, Monitor, Plus, Restore, ServerThin } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
 import {
   GroupCard,
@@ -53,7 +54,6 @@ import {
   StatusPill,
   Tile,
 } from './parts.js';
-import { ResourceShell } from './shell.js';
 
 export const MACHINES_HREF = '/app/resources/machines';
 
@@ -468,14 +468,7 @@ export function MachinesPage() {
   return (
     // r7 06: the machines topbar carries no `+ 新建` — the dashed 添加机器
     // button is the page's only add action
-    <ResourceShell
-      title="机器"
-      href={MACHINES_HREF}
-      backHref="/app"
-      selected={MACHINES_HREF}
-      hideNew
-      fixture={fixture}
-    >
+    <PageShell route={MACHINES_HREF} title={t('机器')} selected={MACHINES_HREF} fixture={fixture}>
       {(shellSaveFailed || capSaveFailed) && (
         <p className="mt-0 mb-2 text-xs leading-4 text-(--destructive)" role="alert">
           {t('保存失败，请重试。')}
@@ -680,6 +673,6 @@ export function MachinesPage() {
         teamName={teamName}
         teamId={teamId}
       />
-    </ResourceShell>
+    </PageShell>
   );
 }

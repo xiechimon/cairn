@@ -194,22 +194,21 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     for (const w of rest.columns) expect(Math.abs(w - first)).toBeLessThanOrEqual(1);
   });
 
-  for (const { name, route, col } of [
-    { name: 'pages', route: '/app/schedules?scenario=11', col: '.page-main-col' },
-    { name: 'resources', route: '/app/resources/skills?scenario=06', col: '.res-main-col' },
-    {
-      name: 'secondary',
-      route: '/app/team?scenario=12',
-      col: '.secondary-main-col', // 零规则跨域钩（chief 域消费，spec/22 §5.0 残留律）
-    },
+  // Paper page shell (PR 6): the three families share one shell; its sheet
+  // sits 10px off the right viewport edge, so the column is 1440 - 248 - 10.
+  const SHEET_W = 1440 - 248 - 10;
+  for (const { name, route } of [
+    { name: 'pages', route: '/app/schedules?scenario=11' },
+    { name: 'resources', route: '/app/resources/skills?scenario=06' },
+    { name: 'secondary', route: '/app/team?scenario=12' },
   ] as const) {
     test(`${name}: the main column never narrows while the window is open`, async ({ page }) => {
       await page.goto(route);
       // *-main 不再是 docking row（ADR 0013 D1）；内容列宽与窗开合无关
-      const content = page.locator(col);
+      const content = page.locator('.page-main-col');
       await expect(content).toBeVisible();
       const closed = await content.boundingBox();
-      expect(closed!.width).toBeCloseTo(1440 - 248, 0);
+      expect(closed!.width).toBeCloseTo(SHEET_W, 0);
 
       await fab(page).click();
       await settled(page);
@@ -219,12 +218,12 @@ test.describe('chief panel floating form (ADR 0013)', () => {
       expect(floating!.width).toBeCloseTo(WIN_BOX.width, 0);
       expect(floating!.height).toBeCloseTo(WIN_BOX.height, 0);
       const open = await content.boundingBox();
-      expect(open!.width).toBeCloseTo(1440 - 248, 0);
+      expect(open!.width).toBeCloseTo(SHEET_W, 0);
 
       await minimize(page).click();
       await expect(drawer(page)).toBeHidden();
       const restored = await content.boundingBox();
-      expect(restored!.width).toBeCloseTo(1440 - 248, 0);
+      expect(restored!.width).toBeCloseTo(SHEET_W, 0);
       expect(restored!.x).toBeCloseTo(closed!.x, 0);
     });
   }

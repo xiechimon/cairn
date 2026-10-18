@@ -2,11 +2,11 @@ import { expect, test } from '@playwright/test';
 
 test('CDS settings: reading col 768, cards 16px no shadow, input 8px/32px', async ({ page }) => {
   await page.goto('/app/account?scenario=01');
-  await page.waitForSelector('[data-testid="resource-col"], .profile-card, .account-card');
+  await page.waitForSelector('[data-testid="page-col"], .profile-card, .account-card');
 
   const m = await page.evaluate(() => {
     const col =
-      document.querySelector('[data-testid="resource-col"]') ??
+      document.querySelector('[data-testid="page-col"]') ??
       document.querySelector('main .mx-auto');
     const card = document.querySelector('.profile-card, .account-card, [data-testid="resource-group"]');
     const input = document.querySelector('[data-slot="input"]');

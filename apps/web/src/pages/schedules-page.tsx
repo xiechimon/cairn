@@ -17,11 +17,13 @@
 //      交互未观测，ChevronRight 可供性暗示随假行一并移除。
 //   c. 对话框收编 DialogShell 家族律容器（封顶 + body 内滚 + footer 钉底），
 //      自组裸 DialogContent 的第三套容器退役。
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSchedules, useTodos } from '../api/hooks.js';
 import { mapSchedules, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -59,10 +61,9 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Clock, EllipsisVertical, Lock, PlusSmall, Trash2 } from '../icons/index.js';
+import { Clock, EllipsisVertical, Lock, Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PHASE_UI } from '../phase.js';
-import { PAGE_COL_CLS } from './parts.js';
 import { PageShell } from './shell.js';
 
 /** Capture-timezone offset (+08:00) — same convention as board/rel-time.ts:
@@ -525,26 +526,23 @@ export function SchedulesPage() {
   };
   return (
     <PageShell
+      route="schedules"
       fixture={live ? { ...fixture, todos: liveTodos } : fixture}
       selected="schedules"
-      title="定时"
-      action={
-        // 顶栏动作钮：ghost 件默认形态 + primary 墨（品牌语义走 token 层，
-        // #991 Q10）；手写七通道中和配方退役，hover 涂底 = registry 可供性。
-        // page-new-action 类名留存 = overlay-focus 跨域别名。#1037：两面都
-        // 有真 handler——fixture 面点开冻结表单，不再渲染 onClick=undefined
-        // 的假可供性。
+      title={t('定时')}
+      actions={
+        // page-new-action = overlay-focus / dead-buttons handle.
         <Button
-          variant="ghost"
-          className="page-new-action text-primary hover:text-primary dark:hover:text-primary"
+          size="sm"
+          className={`page-new-action ${TOPBAR_PRIMARY_BUTTON}`}
           onClick={() => (live ? setFormOpen(true) : setFixtureFormOpen(true))}
         >
-          <PlusSmall data-icon="inline-start" />
+          <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
           {t('新建')}
         </Button>
       }
     >
-      <div className={`${PAGE_COL_CLS} space-y-3 pt-10`}>
+      <div className="space-y-3 pt-6">
         {schedules.length === 0 ? (
           // 空态 = registry Empty 件族（手写 48px tile + 节奏配方退役）；
           // sched-empty/-title/-new 别名留存（dead-buttons / accent-typo

@@ -15,6 +15,7 @@ import { useSearchParams } from 'react-router';
 import { useSkills } from '../api/hooks.js';
 import { mapSkills } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -27,9 +28,11 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/i
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowUpDown, ChevronDown, Download, Puzzle, Search } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import {
   EmptyState,
   RES_SEARCH_ROW_CLS,
+  ResourceNewButton,
   RowCard,
   RowChevron,
   RowDesc,
@@ -37,7 +40,6 @@ import {
   RowTitle,
   Tile,
 } from './parts.js';
-import { ResourceShell } from './shell.js';
 import { SkillDialog, type SkillEditTarget } from './skill-dialog.js';
 import { SkillImportDialog } from './skill-import-dialog.js';
 
@@ -65,17 +67,24 @@ export function SkillsPage() {
   const [importOpen, setImportOpen] = useState(false);
 
   return (
-    <ResourceShell
-      title="技能"
-      href={SKILLS_HREF}
-      backHref="/app"
+    <PageShell
+      route={SKILLS_HREF}
+      title={t('技能')}
       selected={SKILLS_HREF}
-      onNew={openCreate}
-      headerExtra={
-        <Button variant="link" onClick={() => setImportOpen(true)} data-testid="resource-import">
-          <Download width={13} height={13} />
-          {t('导入')}
-        </Button>
+      actions={
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={TOPBAR_TEXT_BUTTON}
+            onClick={() => setImportOpen(true)}
+            data-testid="resource-import"
+          >
+            <Download aria-hidden className="size-3.5 text-content-tertiary" />
+            {t('导入')}
+          </Button>
+          <ResourceNewButton onClick={openCreate} />
+        </>
       }
       fixture={fixture}
     >
@@ -156,6 +165,6 @@ export function SkillsPage() {
       )}
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />
       <SkillImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
-    </ResourceShell>
+    </PageShell>
   );
 }

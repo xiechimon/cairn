@@ -94,8 +94,14 @@ export function ProjectSettingsPage() {
       : undefined
     : fixture.project;
   return (
-    <PageShell fixture={fixture} selected="none" title="设置">
-      <div className="mx-auto w-[760px] pt-5">
+    <PageShell
+      route="project-settings"
+      fixture={fixture}
+      selected="none"
+      title={t('设置')}
+      back={{ pathname: `/app/project/${id ?? ''}`, search: searchParams.toString() }}
+    >
+      <div className="pt-1">
         {/* r2 24c: the tab group sits in the content column, not the topbar */}
         <div className="flex">
           <TabGroup tabs={TABS} tab={tab} onTab={setTab} />

@@ -20,7 +20,8 @@ const SETTINGS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX/settings?scenario=r2-24c';
 const PROJECT_PAGE = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=r2-24c';
 const PROJECT_NAME = 'r3-lifecycle';
 // 侧栏项目行 = board 域跨域别名（#943 面），href 语义位已足——类名段摘除。
-const PROJECT_ROW = 'a[href*="/app/project/ZAQczKCu0MOAzC1ZqcFlX"]';
+// 限定在 aside：页面壳（PR 6）的返回键同样指向本项目。
+const PROJECT_ROW = 'aside a[href*="/app/project/ZAQczKCu0MOAzC1ZqcFlX"]';
 
 // #946/#910 载体：确认层 = role=alertdialog（AlertDialogShell 自带），
 // 面内控件全部 role+文案 / 唯一 textbox；危险区文案 = 一级 text。

@@ -13,8 +13,8 @@ import { expect, type Page, test } from '@playwright/test';
 //    （history.pushState）不发 document 请求；无竞态：若真整页重载，
 //    document 请求必先于目标面渲染发出，而计数断言在目标面渲染后才读。
 // 3. Link 断掉（不导航 / 目标错）→ URL 与目标面标记必须到位。
-// 4. 另一个 ResourceShell 面同族回归——agent-detail（票报的面）与
-//    skills（验收要求至少再核一面）各跑一遍同一机制。
+// 4. 另一个带返回键的面同族回归——agent-detail（票报的面）与
+//    machine detail（验收要求至少再核一面）各跑一遍同一机制。
 
 /** 带内存哨兵的 window 形态（哨兵只活在本 spec 的一次导航周期里）。 */
 type SentinelWindow = Window & { __spaSentinel?: string };
@@ -59,6 +59,13 @@ test('agent detail back is an in-SPA navigation, not a document reload', async (
   );
 });
 
-test('skills back is an in-SPA navigation, not a document reload', async ({ page }) => {
-  await expectBackIsSpaNavigation(page, '/app/resources/skills?scenario=06', '/app', '[data-route="board"]');
+// Paper page shell (PR 6): sidebar destinations (skills) carry no back arrow
+// any more; the second detail face is machine detail → the machines list.
+test('machine detail back is an in-SPA navigation, not a document reload', async ({ page }) => {
+  await expectBackIsSpaNavigation(
+    page,
+    '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
+    '/app/resources/machines',
+    '[data-route="/app/resources/machines"] h1:text-is("机器")',
+  );
 });
