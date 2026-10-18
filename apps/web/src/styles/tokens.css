@@ -341,6 +341,9 @@
      hairline at every zoom */
   --hairline: 1px;
   --edge-ring: inset 0 0 0 var(--hairline) var(--border);
+  /* Paper sheet edge: one CSS pixel at every density, not --hairline, which
+     drops to 0.5px on 2x screens and reads too faint for the paper look. */
+  --sheet-ring: inset 0 0 0 1px var(--border);
   --edge-radius: 16px;
   --cds-radius-xs: 2px;
   --cds-radius-sm: 4px;
@@ -541,8 +544,8 @@
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.08), inset 0 0 0 var(--hairline) var(--border-soft),
     0 0 0 var(--hairline) var(--border-soft);
-  --panel-shadow: 0 0 0 var(--hairline) var(--border), 0 1px 2px rgb(80 60 30 / 0.04);
-  --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
+  --panel-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(80 60 30 / 0.04);
+  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
   /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
      (#915 spot), mirrored explicitly so .light stays the full
      semantic-token mirror */

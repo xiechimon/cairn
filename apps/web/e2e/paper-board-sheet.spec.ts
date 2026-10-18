@@ -9,7 +9,9 @@ import { expect, type Page, test } from '@playwright/test';
 //   4. the sheet becomes <main> and the board header loses role=banner;
 //   5. the 总管设置 swap renders outside the sheet, on bare canvas;
 //   6. the sheet casts an outer shadow, which reads as a grey halo in the
-//      10px canvas gaps (DESIGN.md: the sheet is the hairline ring only).
+//      10px canvas gaps (DESIGN.md: the sheet is the hairline ring only);
+//   7. on a 2x screen the sheet or card outline thins to 0.5px (--hairline)
+//      instead of one CSS pixel.
 
 const BOARD = '/app?scenario=01';
 const SCHEDULES = '/app/schedules?scenario=11';
@@ -20,7 +22,7 @@ const sheetOf = (page: Page, selector: string) =>
     const cs = getComputedStyle(el);
     const root = el.parentElement!;
     const probe = document.createElement('div');
-    probe.style.boxShadow = 'var(--edge-ring)';
+    probe.style.boxShadow = 'var(--sheet-ring)';
     root.append(probe);
     const ring = getComputedStyle(probe).boxShadow;
     probe.remove();
@@ -81,4 +83,21 @@ test('总管设置 swaps in inside the same sheet', async ({ page }) => {
   await expect(page.locator('.board-main')).toHaveCount(0);
   const sheet = await sheetOf(page, '.board-sheet');
   expect(sheet.box).toEqual({ x: 248, y: 10, w: 1182, h: 880 });
+});
+
+test.describe('on a 2x screen', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  test('sheet and card outlines stay one CSS pixel', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+    await page.goto(BOARD);
+    const sheet = await page.locator('.board-sheet').evaluate((el) => getComputedStyle(el).boxShadow);
+    const card = await page
+      .locator('.todo-card')
+      .first()
+      .evaluate((el) => getComputedStyle(el).boxShadow);
+    expect(sheet).toContain('0px 0px 0px 1px inset');
+    expect(card).toContain('0px 0px 0px 1px');
+    expect(card).not.toContain('0.5px');
+  });
 });
