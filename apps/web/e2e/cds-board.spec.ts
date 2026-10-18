@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS board: bare columns, panel cards 10px + panel-shadow', async ({ page }) => {
+test('CDS board: bare columns, cards at --radius-card 10px + panel-shadow', async ({ page }) => {
   await page.goto('/app?scenario=01');
   await page.waitForSelector('.board-column');
   await page.waitForSelector('.todo-card');
@@ -24,8 +24,8 @@ test('CDS board: bare columns, panel cards 10px + panel-shadow', async ({ page }
       cardShadow: csCard.boxShadow,
       panelShadow,
       headerH: Math.round(header.getBoundingClientRect().height),
-      radiusPanel: getComputedStyle(document.documentElement)
-        .getPropertyValue('--radius-panel')
+      radiusCard: getComputedStyle(document.documentElement)
+        .getPropertyValue('--radius-card')
         .trim(),
     };
   });
@@ -34,7 +34,7 @@ test('CDS board: bare columns, panel cards 10px + panel-shadow', async ({ page }
   expect(m.colRadius).toBe('0px');
   expect(m.colShadow).toBe('none');
   expect(m.cardRadius).toBe('10px');
-  expect(m.radiusPanel).toBe('10px');
+  expect(m.radiusCard).toBe('10px');
   expect(m.cardShadow).toContain(m.panelShadow);
   // Paper column header (DESIGN.md 看板列): 36px incl. the rule line.
   expect(m.headerH).toBe(36);

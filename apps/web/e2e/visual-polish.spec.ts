@@ -90,7 +90,7 @@ for (const theme of ['light', 'dark'] as const) {
     // 1px ring 外环（`ring-1 ring-foreground/10`）替代 #414 的 1px 实描边 +
     // shadow-sm。**保留的原意图**：不得回到 #139 的 inset 环（分数缩放下发丝
     // 不匀）——那条断言是本测试的真回归守卫。半径与投影：2026-10-12 用户派
-    // CDS PR-4: panel cards — --radius-panel 10px + --panel-shadow
+    // CDS PR-4: panel cards — --radius-card 10px + --panel-shadow
     // (hairline ring + cds-shadow-sm); hover lift is separate.
     expect(card.border).toBe('0px');
     expect(card.radius).toBe('10px');

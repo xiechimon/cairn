@@ -16,7 +16,7 @@ interface DragCardProps {
 export function DragCard({ todo, projectName }: DragCardProps) {
   return (
     <div
-      className="board-drag-card flex flex-col gap-1.5 rounded-(--radius-panel) border border-border bg-card px-3.5 py-3 opacity-[0.92] rotate-2 [box-shadow:var(--drag-shadow)]"
+      className="board-drag-card flex flex-col gap-1.5 rounded-(--radius-card) border border-border bg-card px-3.5 py-3 opacity-[0.92] rotate-2 [box-shadow:var(--drag-shadow)]"
       data-todo-id={todo.id}
     >
       <div className="line-clamp-2 text-card-title font-medium text-card-foreground">

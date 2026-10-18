@@ -795,8 +795,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(card).toBeVisible();
     const expected = await resolveStyle(page, {
       'box-shadow': 'var(--drag-shadow)',
-      // CDS PR-4: drag clone mirrors todo-card --radius-panel (10px).
-      'border-radius': 'var(--radius-panel)',
+      // CDS PR-4: drag clone mirrors todo-card --radius-card (10px).
+      'border-radius': 'var(--radius-card)',
     });
     const actual = await card.evaluate((el) => {
       const cs = getComputedStyle(el);

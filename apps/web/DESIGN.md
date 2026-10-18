@@ -40,7 +40,7 @@ fonts:
 rounded:
   tile: 5px
   control: 8px
-  card: 10px
+  card: 10px         # --radius-card：所有卡片类表面同一个角
   sheet: 16px
   full: 9999px
 spacing:
@@ -110,7 +110,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - 空列显示「暂无」，不画占位框。
 
 ### 任务卡
-- 白底、10px 圆角、`line` 1px 发丝环 + 一层极轻的暖色投影（`0 1px 2px`，4%），边缘清楚、不发虚；hover 时环加深、投影升到 `0 4px 14px` 7%（150ms ease-out）。不叠第二层大模糊阴影。
+- 白底、10px 圆角（`--radius-card`）、`line` 1px 发丝环 + 一层极轻的暖色投影（`0 1px 2px`，4%），边缘清楚、不发虚；hover 时环加深、投影升到 `0 4px 14px` 7%（150ms ease-out）。不叠第二层大模糊阴影。
 - 在飞编排（点了开始、总管还没派发）：待开始卡把「开始」换成一行底栏「⏳ 编排中 · 等待原因」（等 X 上线 / 缺能力 / 排队中）+ 右侧「查看会话」；失败卡把「重试」换成不可点的「编排中」。不在元信息行上叠层。
 - 结构：标题（最多两行）→ 单行元信息（📁 项目 · #编号 · 🏷 标签 · 🕒 时间，永不换行；空间不够时先截断标签，项目名至少保留 5 个字宽）→ 按状态的底栏。标签图标着用户自定义的标签色，标签名用元信息墨色。
 - 底栏：
@@ -129,12 +129,46 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - 选中行（键盘光标或鼠标所在行）：白卡（`card`）+ `line` 发丝环 + 最多一档极轻投影（0 1px 2px）。不铺 hover 色、不带赭红。
 
 ### 设置列表（帐号页、Agent 概览）
-件在 `src/components/profile-card.tsx`。
-- **头部在卡上方**：56px 白底头像（`line` 1px 环）+ 衬线名字（`text-page`）+ 下方 `text-meta` `ink-3` 说明；右侧文字按钮「编辑名称」，点开换成输入框 + 墨色「保存」+ 文字「取消」。名字不在卡里重复成一行。
-- **一张卡**：白底、`line` 1px 外环、12px 圆角，行不带底色（不做双色卡）。
-- **行**：最小高 52px、左右 16px；左侧 `text-ui` `ink` 标签（可带一行 `text-meta` `ink-3` 说明），右侧控件。内容两行时行自然长高。
+见下节「页面模式 · 设置列表」。
+
+## 页面模式
+
+设置、资源、团队、项目这类页面共用下面几件。新页面先拼这几件，不在页面里另做一套卡片、空态或表单。件都在 `src/components/`，取值全部走 token 与六档字号。
+
+### 卡片圆角：一个角
+- **token**：`--radius-card` = 10px（`rounded.card`），类名 `rounded-(--radius-card)`，或 `settings-list.tsx` 导出的 `CARD_RADIUS_CLS`。
+- **用在**：所有卡片类表面——任务卡、拖拽中的卡、设置卡、团队 / Agent 卡、成组的资源行卡、一次性提示卡。
+- **不在此列**：弹窗与 ⌘K 面板是 sheet 档 16px（`--edge-radius`）；下拉与选择器弹层保持各自的弹层圆角；控件 8px（`rounded-md`）；项目方块 5px。
+- registry `Card` 自带 `rounded-xl`（14px），用作卡片时必须换成 `--radius-card`。
+- 要：一页里所有卡同一个角。不要：页面里写 12px / 14px 的卡，或一页混两种卡角。
+
+### 空态
+件：`src/components/empty-state.tsx` 的 `EmptyState`（底座是 registry `Empty`）。
+- **图标**：lucide 线条图标，24px，描边 1.75，`ink-3`（`text-content-tertiary`），不垫底块。
+- **标题**：`h2`，`text-card-title` 500 `ink`。
+- **说明**：`text-meta` `ink-3`，最宽 320px（约 44ch），居中，`text-balance`。
+- **主操作**（可选）：shadcn Button default 档，墨底 32px 8px 角（`DIALOG_PRIMARY_BUTTON`）。一个空态最多一个主操作。
+- **提示行**（可选）：主操作下方一行 `text-meta` `ink-3`，前面可带 12px 图标（`ink-4`），用来说明只读或权限原因。
+- **用在**：列表页没有数据时（API 密钥、定时、技能、MCP、密钥……）。文案由调用方先翻译再传入。
+- 要：裸图标 + 标题 + 一句说明。不要：带色块底的图标方块（橙色、米色都不要）、`size="sm"` 小按钮、两个并排主按钮、「查看文档」外链。
+
+### 设置列表
+件：`src/components/settings-list.tsx`。帐号页的「编辑名称」头部在 `src/components/profile-card.tsx`（`ProfileHeader`，组合 `SettingsHeader`）。
+- **头部在卡上方**（`SettingsHeader`）：56px 白底圆形头像（`line` 1px 环）+ 衬线标题（`text-page` 500）+ 下方 `text-meta` `ink-3` 说明；右侧一个可选操作（通常是文字按钮）。名字不在卡里重复成一行。行内改名时 `editor` 替换标题、说明与操作。
+- **一张卡**（`SettingsCard`）：白底、`line` 1px 外环、`--radius-card`，行不带底色（不做双色卡）。
+- **行**（`SettingsRow`）：最小高 52px、左右 16px；左侧 `text-ui` `ink` 标签（可带一行 `text-meta` `ink-3` 说明），右侧控件。内容两行时行自然长高。不走 `SettingsRow` 的自定义行用 `SETTINGS_ROW_CLS`。
 - **分隔线只画在已渲染的行之间**：卡上 `divide-y`，行按条件渲染，不用 CSS 隐藏。被隐藏的行仍是兄弟节点，会在卡顶画出第二条边。
-- **控件带框，一类一种**：下拉 = 白底 + `line` 1px 环 + 8px 圆角 + 高 32；单选分段 = `canvas` 浅纸轨道、选中项是白底 + 1px 环的白签（不用冷灰底）；开关 = shadcn Switch，开态墨色。
+- **控件带框，一类一种**：下拉 = 白底 + `line` 1px 环 + 8px 圆角 + 高 32（`SETTINGS_SELECT_TRIGGER_CLS`，与表单 `FORM_CONTROL_CLS` 同一串）；单选分段 = `SettingsSegmented`，`canvas` 浅纸轨道、选中项是白底 + 1px 环的白签（不用冷灰底）；开关 = shadcn Switch，开态墨色。
+- **危险操作**（`SettingsDangerZone`）：页面最后单独一张卡，一行：左侧标签 + 说明，右侧 Button `variant="destructive"`，32px 8px 角（标准按钮形）。点了先弹确认层，不直接删除。
+- 要：头部 + 一张卡 + 等高行。不要：头像大块占一行、行铺底色、圆角药丸形删除按钮、危险操作混在普通设置卡里。
+
+### 表单
+件：`src/components/form-layout.tsx`（底座是 registry `Field` 家族）。
+- **栈**（`FormStack`）：字段竖排，字段间 16px，最宽 520px，靠左。
+- **字段**（`FormField`）：标签在上（`text-ui` 500 `ink`，`htmlFor` 指向控件），控件，可选帮助文字（`text-meta` `ink-3`）在下。
+- **控件**：Input / SelectTrigger 加 `FORM_CONTROL_CLS`：高 32、白底、`line` 1px 环、8px 圆角、`text-ui`。
+- **操作行**（`FormActions`）：表单最后一行，靠右；可选文字按钮（如「取消」）在左，shadcn Button default 主按钮在右。不能提交时用按钮自身的 `disabled`（半透明），不另画灰条。
+- 要：窄栏、标签在上、主按钮靠右。不要：撑满整列的输入框、整宽的灰色提交条、标签和输入框左右并排的双栏表单。
 
 ## 动效
 
@@ -156,6 +190,7 @@ Pacman UI rules (source: apps/web/DESIGN.md):
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
+- One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px pixel pac-man mark from logo.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.
 ```

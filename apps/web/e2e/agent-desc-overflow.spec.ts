@@ -110,7 +110,7 @@ test('account 页：推送通知行（auto 档）值槽改可收缩后无回归'
   const hint = card.locator('.account-notify-blocked');
   await expect(hint).toBeVisible();
   // 行盒几何无溢出
-  const row = card.locator('.profile-row').last();
+  const row = card.locator('.settings-row').last();
   const geom = await row.evaluate((el) => ({
     scrollH: el.scrollHeight,
     clientH: el.clientHeight,

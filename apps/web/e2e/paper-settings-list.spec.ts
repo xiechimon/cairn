@@ -45,7 +45,7 @@ async function probe(card: Locator): Promise<CardProbe> {
           top: cs.borderTopWidth,
           bottom: `${cs.borderBottomWidth} ${cs.borderBottomColor}`,
           bg: cs.backgroundColor,
-          label: row.querySelector('.profile-label-text')?.textContent ?? '',
+          label: row.querySelector('.settings-label-text')?.textContent ?? '',
         };
       }),
       cardBg: getComputedStyle(el).backgroundColor,
@@ -74,7 +74,7 @@ function expectOneCardShape(p: CardProbe) {
 }
 
 function headerName(page: Page, scope: string) {
-  return page.locator(`${scope} .profile-header h2`);
+  return page.locator(`${scope} .settings-header h2`);
 }
 
 test('account: three equal 52px rows, dividers between rows only, name above the card', async ({
@@ -139,7 +139,7 @@ test('agent overview: same card shape; one-line rows are 52px, two-line rows gro
   page,
 }) => {
   await page.goto('/app/resources/agents/r3-builder?scenario=agent-detail');
-  const card = page.locator('.agent-overview .profile-card');
+  const card = page.locator('.agent-overview .settings-card');
   await expect(card).toBeVisible();
   const p = await probe(card);
   expect(p.rows.map((r) => r.label)).toEqual(['职责', '默认 skill', '运行时', '模型', '思考强度']);

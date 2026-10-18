@@ -24,7 +24,7 @@ import { stubNotification } from './helpers.js';
 // .team-layout-tab → getByRole('tab')；.team-agent-card/.team-chart-node →
 // data-testid 二级；.team-members → 文案一级；.team-create-agent（grid 槽）
 // → team-agent-grid 容器（chart 布局整格退场）。.account-card/.account-avatar/
-// .profile-row = profile-card 共享模板家族锚，规则不住 secondary.css，保留。
+// .settings-row = settings-list 共享模板家族锚，规则不住 secondary.css，保留。
 // 行为断言语义一字不动。
 
 test('account: 退出登录 / 删除 / 更换 removed (avatar stays)', async ({ page }) => {
@@ -36,7 +36,7 @@ test('account: 退出登录 / 删除 / 更换 removed (avatar stays)', async ({ 
   await expect(page.locator('.account-avatar img')).toBeVisible();
   // XMON-107：邮箱字段位面已删（本地单用户无邮箱账位面）——卡片只剩
   // 语言 / 密度 / 推送通知三行（名称在卡上方的头部），且不再出现「邮箱」文案。
-  await expect(page.locator('.account-card .profile-row')).toHaveCount(3);
+  await expect(page.locator('.account-card .settings-row')).toHaveCount(3);
   await expect(page.locator('.account-card')).not.toContainText('邮箱');
 });
 

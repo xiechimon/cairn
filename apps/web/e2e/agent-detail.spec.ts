@@ -787,10 +787,10 @@ const OVERVIEW_LABELS = ['职责', '默认 skill', '运行时', '模型', '思�
 
 test('概览：五个字段行长在同一张模板卡里，头像与名称在卡上方', async ({ page }) => {
   const detail = await openDetail(page);
-  const card = detail.locator('.agent-overview .profile-card');
+  const card = detail.locator('.agent-overview .settings-card');
   await expect(card).toHaveCount(1);
-  await expect(card.locator('.profile-avatar')).toHaveCount(0);
-  const avatarImg = detail.locator('.agent-overview .profile-header .profile-avatar img');
+  await expect(card.locator('.settings-avatar')).toHaveCount(0);
+  const avatarImg = detail.locator('.agent-overview .settings-header .settings-avatar img');
   await expect(avatarImg).toHaveCount(1);
   // #1156：存在断言对尺寸缺陷是瞎的——SeededAvatar 漏传 className 时回落
   // registry 默认 size-8（32px），塞进 56px 头像圆被裁。这里
@@ -804,28 +804,28 @@ test('概览：五个字段行长在同一张模板卡里，头像与名称在�
   }));
   expect(avatarGeom.w).toBe(56);
   expect(avatarGeom.h).toBe(56);
-  await expect(card.locator('.profile-row')).toHaveCount(OVERVIEW_LABELS.length);
-  // 行序即字段序。取 `.profile-label-text`（模板自己的 label 类）而非面内
+  await expect(card.locator('.settings-row')).toHaveCount(OVERVIEW_LABELS.length);
+  // 行序即字段序。取 `.settings-label-text`（模板自己的 label 类）而非面内
   // 别名：别名在、模板类不在，就是「只挂了句柄没吃模板」——正是要钉的退形。
-  expect(await card.locator('.profile-label-text').allTextContents()).toEqual(OVERVIEW_LABELS);
+  expect(await card.locator('.settings-label-text').allTextContents()).toEqual(OVERVIEW_LABELS);
 });
 
 test('记忆 tab：记忆行住在模板卡里', async ({ page }) => {
   const detail = await openMemory(page);
-  const card = detail.locator('.agent-memories .profile-card');
+  const card = detail.locator('.agent-memories .settings-card');
   await expect(card).toHaveCount(1);
-  await expect(card.locator('.profile-row.agent-memory-row')).toHaveCount(3);
+  await expect(card.locator('.settings-row.agent-memory-row')).toHaveCount(3);
 });
 
 test('权限 tab：五组开关各自住在模板卡里（#1251 起新增机器匹配段）', async ({ page }) => {
   const detail = await openDetail(page);
   await detail.locator('.agent-tab').nth(2).click();
-  const cards = detail.locator('.agent-perms .profile-card');
+  const cards = detail.locator('.agent-perms .settings-card');
   // 工具 / 授权技能(#1169) / 密钥 / MCP 服务器 / 机器匹配(#1251——执行要求
   // 写面卡；机器匹配读面卡是 live 专属读面，fixture 面缺席)。
   await expect(cards).toHaveCount(5);
   // 六档工具开关全在工具组的卡里（不靠散行的 .agent-perm-row 撑）
-  await expect(cards.first().locator('.profile-row')).toHaveCount(6);
+  await expect(cards.first().locator('.settings-row')).toHaveCount(6);
   await expect(cards.first().locator('.agent-tool-switch')).toHaveCount(6);
 });
 
@@ -837,14 +837,14 @@ test('记忆/权限卡：首行无底色、无上边线（无方角外溢、无 
 }) => {
   const detail = await openMemory(page);
   // tab 是条件渲染，两面的首行要各读一次（切走就没了）
-  const memoryFirst = detail.locator('.agent-memories .profile-card > .profile-row:first-child');
+  const memoryFirst = detail.locator('.agent-memories .settings-card > .settings-row:first-child');
   await expect(memoryFirst).toHaveCount(1);
   await assertTopCorner(memoryFirst);
 
   await detail.locator('.agent-tab').nth(2).click();
   // 5 张权限卡：工具 / 授权技能(#1169) / 密钥（零密钥时空态也是模板行）/
   // MCP 服务器 / 机器匹配(#1251，fixture 面 = 执行要求写面卡)。
-  const permFirst = detail.locator('.agent-perms .profile-card > .profile-row:first-child');
+  const permFirst = detail.locator('.agent-perms .settings-card > .settings-row:first-child');
   await expect(permFirst).toHaveCount(5);
   await assertTopCorner(permFirst);
 });

@@ -152,7 +152,7 @@ export function TodoCard({
        link cannot be dragged natively (draggable=false + -webkit-user-drag). */
     <Card
       data-todo-id={todo.id}
-      className="todo-card relative w-full gap-0 rounded-(--radius-panel) bg-card px-3.5 py-3 shadow-(--panel-shadow) ring-0 transition-[box-shadow] duration-150 ease-out hover:shadow-(--panel-shadow-hover) select-none"
+      className="todo-card relative w-full gap-0 rounded-(--radius-card) bg-card px-3.5 py-3 shadow-(--panel-shadow) ring-0 transition-[box-shadow] duration-150 ease-out hover:shadow-(--panel-shadow-hover) select-none"
     >
       <h3
         className={`todo-card-title line-clamp-2 wrap-break-word text-card-title ${

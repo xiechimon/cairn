@@ -349,7 +349,8 @@
   --cds-radius-sm: 4px;
   --cds-radius-md: 6px;
   --cds-radius-lg: 8px;
-  --radius-panel: 10px;
+  /* DESIGN.md rounded.card: the one corner for every card-like surface. */
+  --radius-card: 10px;
   --cds-radius-xl: 12px;
   --cds-radius-2xl: 16px;
   --radius-popover: 12px;
