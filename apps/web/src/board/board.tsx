@@ -80,6 +80,7 @@ import {
   FilterChips,
   type FilterDimension,
   FilterPanel,
+  TOPBAR_PRIMARY_BUTTON,
   TOPBAR_TEXT_BUTTON,
 } from './filter-panel.js';
 import { cardTag } from './tag-filter.js';
@@ -326,11 +327,7 @@ export function BoardSurface({
             {t('定时')}
           </Button>
           {onNewTask != null && (
-            <Button
-              size="sm"
-              className="ml-2 h-7.5 gap-1.5 rounded-full pr-3.5 pl-3 text-ui"
-              onClick={onNewTask}
-            >
+            <Button size="sm" className={TOPBAR_PRIMARY_BUTTON} onClick={onNewTask}>
               <Plus aria-hidden strokeWidth={1.75} className="size-3.5" />
               {t('新任务')}
             </Button>

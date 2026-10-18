@@ -59,7 +59,6 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronRight, ImageFrame } from '../icons/index.js';
 import { DirBrowser } from './dir-browser.js';
-import { PAGE_COL_CLS } from './parts.js';
 import { PageShell } from './shell.js';
 
 /* #980 registry 对齐：手写配方（40 高带框族 / V2 弹层板 / 七通道中和）退役，
@@ -478,8 +477,8 @@ export function ProjectNewPage() {
   };
 
   return (
-    <PageShell fixture={fixture} selected="none" title="新建项目">
-      <div className={`${PAGE_COL_CLS} flex flex-col pt-4`}>
+    <PageShell route="project-new" fixture={fixture} selected="none" title={t('新建项目')}>
+      <div className="flex flex-col">
         <div className="mx-auto flex size-[72px] items-center justify-center rounded-xl bg-muted text-muted-foreground">
           <ImageFrame />
         </div>

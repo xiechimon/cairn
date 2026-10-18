@@ -23,7 +23,7 @@
 // [data-testid="runtime-empty"]、.res-model-row → [data-model-id][data-runtime]、
 // .res-runtime-head → [data-testid="runtime-head"]、.dlg-picker-search →
 // input[aria-label="搜索服务商..."]、.res-row-chev/-more 负向 → 行内 svg/button
-// 计数 0；.res-main = chief docking 跨域句柄，不动（#950 面）。
+// 计数 0；.page-main = 页面壳 sheet（PR 6 三壳合一）。
 // 用法：node drive-providers-tabs.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -239,13 +239,13 @@ try {
   );
 
   // 2) A1 负向：「Pacman（内置）」facade 行已除（非空守卫：读不到正文时负向不可判真）
-  const bodyText = await softText(page, `${SHELL} .res-main`);
+  const bodyText = await softText(page, `${SHELL} .page-main`);
   const facadeGone = bodyText !== '' && !bodyText.includes('Pacman（内置）');
   check(
     'no-builtin-facade',
     facadeGone,
     bodyText === ''
-      ? '页面正文不可读（.res-main 缺失？）——负向断言不可空判'
+      ? '页面正文不可读（.page-main 缺失？）——负向断言不可空判'
       : facadeGone
         ? '页面无「Pacman（内置）」facade 行'
         : 'spec 11 A1：「Pacman（内置）」facade 行仍在（前端静态装饰行未除）',

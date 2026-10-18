@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "156f86c09f4dba5b46db376e8cc3b8ef8ab387fc",
-    "date": "2026-10-17"
+    "sha": "52d2cdca5ab286021d3514e4a6c6d91d95ccb03f",
+    "date": "2026-10-18"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
@@ -15,7 +15,7 @@
   },
   "arbitraryValues": {
     "textTotal": 164,
-    "spacingTotal": 261,
+    "spacingTotal": 255,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -197,10 +197,6 @@
         "text": 11,
         "spacing": 10
       },
-      "pages/parts.ts": {
-        "text": 0,
-        "spacing": 1
-      },
       "pages/project-new-page.tsx": {
         "text": 0,
         "spacing": 3
@@ -208,10 +204,6 @@
       "pages/project-page.tsx": {
         "text": 8,
         "spacing": 7
-      },
-      "pages/project-settings-page.tsx": {
-        "text": 0,
-        "spacing": 1
       },
       "pages/schedules-page.tsx": {
         "text": 0,
@@ -232,10 +224,6 @@
       "resources/providers-page.tsx": {
         "text": 0,
         "spacing": 1
-      },
-      "resources/shell.tsx": {
-        "text": 0,
-        "spacing": 2
       },
       "resources/skill-dialog.tsx": {
         "text": 0,
@@ -271,15 +259,11 @@
       },
       "routes/team-page.tsx": {
         "text": 0,
-        "spacing": 2
+        "spacing": 1
       },
       "routes/todo-detail-page.tsx": {
         "text": 0,
         "spacing": 2
-      },
-      "secondary/shell.tsx": {
-        "text": 0,
-        "spacing": 1
       }
     }
   }

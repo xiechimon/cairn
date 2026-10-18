@@ -32,9 +32,9 @@ import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
+import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
-import { GroupCard, RowDesc, RowLine, RowText, RowTitle } from './parts.js';
-import { ResourceShell } from './shell.js';
+import { GroupCard, ResourceNewButton, RowDesc, RowLine, RowText, RowTitle } from './parts.js';
 
 export const PROVIDERS_HREF = '/app/resources/providers';
 
@@ -186,12 +186,11 @@ export function ProvidersPage() {
   };
 
   return (
-    <ResourceShell
-      title="模型服务"
-      href={PROVIDERS_HREF}
-      backHref="/app"
+    <PageShell
+      route={PROVIDERS_HREF}
+      title={t('模型服务')}
       selected={PROVIDERS_HREF}
-      onNew={() => setCreateOpen(true)}
+      actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
       {/* #423 Tabs 收编（#422 裁决：runtime tab 由 ?runtime= 驱动）：受控
@@ -328,6 +327,6 @@ export function ProvidersPage() {
         connectPending={mutations.startProviderOAuth.isPending}
         connectError={connectError}
       />
-    </ResourceShell>
+    </PageShell>
   );
 }

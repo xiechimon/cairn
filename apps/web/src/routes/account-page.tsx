@@ -72,8 +72,8 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChevronDown } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import { safeLocalStorage } from '../safe-storage.js';
-import { SecondaryShell } from '../secondary/shell.js';
 
 /* —— #1031 名称行内编辑面配方（account 面几何，与 agent 详情同构）——
    ProfileNameRow 是共享模板件，本面只注入自己的几何/皮肤 utility。值钮 =
@@ -153,13 +153,12 @@ export function AccountPage() {
   // 开着但权限被拒 = 显示开而实际不弹，必须给出解释（不能裸奔成新的假可供性）。
   const notifyBlocked = notifyOn && permission === 'denied';
   return (
-    <SecondaryShell route="account" fixture={fixture} sidebarSelected="team" title={t('帐号')}>
+    <PageShell route="account" fixture={fixture} selected="team" title={t('帐号')}>
       {/* XMON-117：卡盒 / 头像头 / 行 / label / 值槽落 components/profile-card
           的模板件（本页正是模板的来源面）；`account-*` 类名原样留作 e2e
           定位锚（profile-card 家族契约），几何正本住件上 PROFILE_* 常量。
-          卡的上边距是页面节奏（card top y60 = 头 44 + 16），归消费点，
-          #947 起以 mt-4 utility 承载（原 secondary.css .account-card 规则）。 */}
-      <ProfileCard className="account-card mt-4">
+          卡的上边距 = 页面壳内容列的 pt-4。 */}
+      <ProfileCard className="account-card">
         <ProfileHead>
           <ProfileAvatar className="account-avatar">
             {/* XMON-105: the account head is the same identity avatar as the
@@ -288,6 +287,6 @@ export function AccountPage() {
           />
         </ProfileRow>
       </ProfileCard>
-    </SecondaryShell>
+    </PageShell>
   );
 }

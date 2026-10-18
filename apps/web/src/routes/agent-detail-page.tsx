@@ -107,9 +107,9 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ArrowUpDown, ChevronDown, ChevronRight, Search, SquarePen } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { PageShell } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
-import { ResourceShell } from '../resources/shell.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
 /** 资源族根路径（非侧栏行——原版命令面板「前往」清单里没有 Agents 行，
@@ -326,19 +326,13 @@ export function AgentDetailPage() {
 
   if (agent === undefined) {
     return (
-      <ResourceShell
-        title={t('Agent')}
-        href={AGENTS_HREF}
-        backHref="/app/team"
-        hideNew
-        fixture={fixture}
-      >
+      <PageShell route={AGENTS_HREF} title={t('Agent')} back="/app/team" fixture={fixture}>
         <div className="agent-detail flex flex-col gap-4">
           <p className="agent-missing text-sm text-muted-foreground">
             {t('找不到该 Agent。它可能已被删除。')}
           </p>
         </div>
-      </ResourceShell>
+      </PageShell>
     );
   }
 
@@ -393,13 +387,7 @@ export function AgentDetailPage() {
   const thinkingLevel = toThinkingLevelDisplay(agent.thinkingLevel, thinkingOptions);
 
   return (
-    <ResourceShell
-      title={agent.displayName}
-      href={AGENTS_HREF}
-      backHref="/app/team"
-      hideNew
-      fixture={fixture}
-    >
+    <PageShell route={AGENTS_HREF} title={agent.displayName} back="/app/team" fixture={fixture}>
       <div className="agent-detail flex flex-col gap-4">
         {/* tabs = registry Tabs default 档原形（手写 SEG_* 发丝环皮肤退役，
             #982 tabs 判决）；agent-tabs/agent-tab 别名留存（e2e 句柄），
@@ -977,7 +965,7 @@ export function AgentDetailPage() {
           navigate({ pathname: '/app/team', search });
         }}
       />
-    </ResourceShell>
+    </PageShell>
   );
 }
 

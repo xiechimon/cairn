@@ -30,7 +30,7 @@ const rootTheme = (page: Page) =>
 const ROUTE_ANCHOR: Record<string, string> = {
   '/app': '[data-route="board"]',
   '/app/team': '[data-route="team"]',
-  '/app/schedules': '.page-shell',
+  '/app/schedules': '[data-route="schedules"]',
   '/app/resources/skills': '[data-route="/app/resources/skills"]',
 };
 

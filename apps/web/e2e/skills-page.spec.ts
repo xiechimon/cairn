@@ -95,7 +95,7 @@ test('live 列表消费 GET /api/skills（server 换源后 wire 形状不变）'
  *  ① 面板无滚动容器（overflow:hidden 裁掉溢出）→ 滚轮后末行仍在视口外（#486）；
  *  ② 滚动容器是窄列而非面板体 → 滚动条悬在版心右缘、不在面板右缘（#494）；
  *  ③ 滚动被上移到 document/外壳 → window.scrollY 非 0 或 topbar 被推走；
- *  ④ 修法破几何 → 768 列宽 / topbar 44 高漂移；
+ *  ④ 修法破几何 → 768 列宽 / topbar 56 高漂移；
  *  ⑤ 前置守卫：若内容本就不高于容器，本测会假绿——先断言确有溢出。
  *
  *  手势用真滚轮而非 scrollTop 赋值：overflow:hidden 下 scrollTop 赋值照样
@@ -116,13 +116,13 @@ test('回归 #486/#494：技能列表可由滚轮到达，且滚动条贴面板�
   await expect(page.getByTestId('resource-row')).toHaveCount(rows.length);
 
   const shellSel = '[data-route="/app/resources/skills"]';
-  // #944/#910 载体：.res-col/.res-topbar → 结构 testid（无 role 容器）；
-  // .res-main-col 类名 = chief docking 跨域句柄，随壳存活（#950 面）。
-  const col = page.getByTestId('resource-col');
+  // Paper page shell (PR 6): page-col / page-topbar testids, .page-main-col
+  // = the sheet's column (one shell for every non-board route).
+  const col = page.getByTestId('page-col');
   const readScrollLayer = () =>
     page.evaluate((sel) => {
-      const colEl = document.querySelector(`${sel} [data-testid="resource-col"]`);
-      const pane = document.querySelector(`${sel} .res-main-col`);
+      const colEl = document.querySelector(`${sel} [data-testid="page-col"]`);
+      const pane = document.querySelector(`${sel} .page-main-col`);
       let host = null;
       for (let n = colEl; n != null; n = n.parentElement) {
         const cs = getComputedStyle(n);
@@ -163,8 +163,9 @@ test('回归 #486/#494：技能列表可由滚轮到达，且滚动条贴面板�
 
   // 几何未漂移 + 滚动没跑到外层
   expect((await col.boundingBox())?.width).toBe(widthBefore);
-  const topbar = await page.getByTestId('resource-topbar').boundingBox();
-  expect(topbar?.y).toBe(0);
-  expect(topbar?.height).toBe(44);
+  // the sheet sits 10px below the viewport top; the Paper top bar is 56px
+  const topbar = await page.getByTestId('page-topbar').boundingBox();
+  expect(topbar?.y).toBe(10);
+  expect(topbar?.height).toBe(56);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
 });

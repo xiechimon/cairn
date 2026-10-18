@@ -17,7 +17,7 @@
 // data-enabled 属性（裁定 3：状态断言载体走 data-*）；.mach-shell-switch →
 // role=switch；.res-row-title/-desc → 文案一级；.res-row-more/-chev 负向 →
 // 行内 menu 触发计数 0 + 行无 button 语义；行内唯一链接 = 机器名。
-// .res-main = chief docking 跨域句柄（#950）。
+// .page-main = the page shell's sheet (PR 6 merged the resources shell into it).
 
 import { expect, test } from '@playwright/test';
 
@@ -42,7 +42,7 @@ test('本机行钉列表首：data-kind=local + id 句柄 + hostname canon', asy
 test('托管 facade 行已除（spec 11 A8 负向）', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(LOCAL_ROW)).toBeVisible();
-  await expect(page.locator(`${SHELL} .res-main`)).not.toContainText('Pacman 托管机器');
+  await expect(page.locator(`${SHELL} .page-main`)).not.toContainText('Pacman 托管机器');
 });
 
 // #887 图标独形：文字名撤下，可辨识性走容器 role="img" + aria-label（读屏）

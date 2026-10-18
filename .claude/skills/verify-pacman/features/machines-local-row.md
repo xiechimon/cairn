@@ -48,7 +48,7 @@ Preconditions:
 - runtime 词表 `'pi'|'claude-code'` 单源在 shared（与 model-sources runtime、providers tab data-runtime 同词表）；品牌 mark 原件来源记在 `apps/web/src/components/brand-marks.tsx` 头部。
 - 本机行 name 断言 = `os.hostname()` **精确匹配**（A8 seed 以 hostname 键）；机器改名后旧行按 hostname 匹配补 kind，不重复建行（idempotent 语义归 T2 实现钉）。
 - 「不可删」的 probe 口径 = 行内无 `aria-label` 含「删除」的按钮且无 menu 触发（`[aria-haspopup="menu"]` 计数 0）——若实现给出删除以外的行内菜单，先改 map 再改断言。
-- **#944 载体迁移**：类名钩 → 语义/data-* 载体（断言语义不变）——原 `.res-grow` → `div[data-machine-id]`、`.mach-runtime` / `.mach-mark` / `.mach-runtime-label` → `[data-runtime]` 容器 + 内 `svg` + `aria-label` 可读名（文字名 #887 起不上屏，负向 = 容器文本空）、`.mach-runtime--on` 状态类 → `data-enabled` 属性、`.mach-shell-switch` → `[role="switch"]`、`.res-row-desc` → 文案一级、`.res-add` → role=button「添加机器」、`.res-row-chev` / `.res-row-more` 负向 → 行级可点语义/menu 触发计数 0；`.res-main` / `.res-main-col` = chief docking 跨域句柄，存活不动（#950 面）。
+- **#944 载体迁移**：类名钩 → 语义/data-* 载体（断言语义不变）——原 `.res-grow` → `div[data-machine-id]`、`.mach-runtime` / `.mach-mark` / `.mach-runtime-label` → `[data-runtime]` 容器 + 内 `svg` + `aria-label` 可读名（文字名 #887 起不上屏，负向 = 容器文本空）、`.mach-runtime--on` 状态类 → `data-enabled` 属性、`.mach-shell-switch` → `[role="switch"]`、`.res-row-desc` → 文案一级、`.res-add` → role=button「添加机器」、`.res-row-chev` / `.res-row-more` 负向 → 行级可点语义/menu 触发计数 0；原 res-main / res-main-col 句柄随 PR 6 三壳合一改名 `.page-main` / `.page-main-col`。
 - **两个 API 前缀别写混**：读是 team 作用域 `GET /api/teams/{tid}/machines`，写是不带 team 的 `PATCH /api/machines/{id}`（apps/web e2e 打桩同坑，踩过一次）。打桩路由注册序 = 匹配逆序，catch-all 先注册。
 - **开关写入是单字段 body**：`{shellEnabled}`。带上 `enabledRuntimes` 会把该列全量替换（R1 起两字段各自可选、缺省 = 不动），probe/e2e 都断言 body 恰一个键。
 - 添加机器 dialog 只轻断言（开窗 + 含 `pacman` 命令文本）——CLI 命令细节面归 fixture e2e，本 probe 钉「流程不变」不钉内容。

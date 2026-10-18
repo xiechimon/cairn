@@ -12,6 +12,7 @@ import { useLiveData } from '../api/provider.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { Network } from '../icons/index.js';
+import { PageShell } from '../pages/shell.js';
 import {
   EmptyState,
   RowAgo,
@@ -23,7 +24,6 @@ import {
   RowTitle,
   Tile,
 } from './parts.js';
-import { ResourceShell } from './shell.js';
 
 export const MCP_HREF = '/app/resources/mcp-servers';
 
@@ -39,14 +39,7 @@ export function McpServersPage() {
     : (fixture.resources?.mcpServers ?? []);
 
   return (
-    <ResourceShell
-      title="MCP 服务器"
-      href={MCP_HREF}
-      backHref="/app"
-      selected={MCP_HREF}
-      hideNew
-      fixture={fixture}
-    >
+    <PageShell route={MCP_HREF} title={t('MCP 服务器')} selected={MCP_HREF} fixture={fixture}>
       {servers.length === 0 ? (
         <EmptyState
           Icon={Network}
@@ -68,6 +61,6 @@ export function McpServersPage() {
           </RowCard>
         ))
       )}
-    </ResourceShell>
+    </PageShell>
   );
 }

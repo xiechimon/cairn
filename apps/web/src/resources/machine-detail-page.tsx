@@ -20,10 +20,10 @@ import {
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { PageShell } from '../pages/shell.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
-import { ResourceShell } from './shell.js';
 
 export function MachineDetailPage() {
   const { t } = useI18n();
@@ -102,23 +102,23 @@ export function MachineDetailPage() {
 
   if (machine === null) {
     return (
-      <ResourceShell
+      <PageShell
+        route={MACHINES_HREF}
         title={t('机器')}
-        href={MACHINES_HREF}
-        backHref={MACHINES_HREF}
+        back={MACHINES_HREF}
         selected={MACHINES_HREF}
         fixture={fixture}
       >
         <div className="p-4 text-sm text-muted-foreground">{t('机器不存在或已移除')}</div>
-      </ResourceShell>
+      </PageShell>
     );
   }
 
   return (
-    <ResourceShell
+    <PageShell
+      route={MACHINES_HREF}
       title={machine.name}
-      href={MACHINES_HREF}
-      backHref={MACHINES_HREF}
+      back={MACHINES_HREF}
       selected={MACHINES_HREF}
       fixture={fixture}
     >
@@ -209,6 +209,6 @@ export function MachineDetailPage() {
             : undefined
         }
       />
-    </ResourceShell>
+    </PageShell>
   );
 }

@@ -18,10 +18,10 @@ import { expect, test } from '@playwright/test';
 // 6. 几何：tablist/header/模型行卡同贴内容列左缘（x480 @1440，r7 探针
 //    canon），tab 序 pi 左 claude-code 右
 // #944/#910 载体：.res-model-row → [data-model-id][data-runtime] 契约句柄；
-// .res-runtime-head → runtime-head testid；.res-col → resource-col testid；
+// .res-runtime-head → runtime-head testid；.res-col → page-col testid；
 // .res-tabs → role=tablist；.res-card → resource-group testid；.res-row-chev/
 // -more 负向 → 行内 svg/button 计数 0（A7 语义：纯展示行无可点感装饰）。
-// .res-main = chief docking 跨域句柄，随壳存活（#950 面）。
+// .page-main = the page shell's sheet (PR 6 merged the resources shell into it).
 
 const PAGE = '/app/resources/providers?scenario=10';
 const SHELL = '[data-route="/app/resources/providers"]';
@@ -50,7 +50,7 @@ test('pi tab：fixture 模型行 + facade/38 项负向 + 无可点感装饰', as
   await expect(rows.nth(0)).toContainText('Claude Sonnet 5（R3 网关）');
   await expect(rows.nth(0)).toContainText('claude-sonnet-5');
   // A1/A5 负向：facade 行与 38 项 preset 名单不出现在页面正文
-  const main = page.locator(`${SHELL} .res-main`);
+  const main = page.locator(`${SHELL} .page-main`);
   await expect(main).not.toContainText('Pacman（内置）');
   await expect(main).not.toContainText('DeepSeek');
   await expect(main).not.toContainText('OpenRouter');
@@ -216,7 +216,7 @@ test('几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左
   page,
 }) => {
   await page.goto(PAGE);
-  const col = page.locator(`${SHELL} [data-testid="resource-col"]`);
+  const col = page.locator(`${SHELL} [data-testid="page-col"]`);
   const tabs = page.locator(`${SHELL} [role="tablist"]`);
   const head = page.locator(`${SHELL} [data-testid="runtime-head"]`).first();
   const card = page.locator(`${SHELL} [data-testid="resource-group"]`).first();
@@ -225,9 +225,9 @@ test('几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左
   const headBox = await head.boundingBox();
   const cardBox = await card.boundingBox();
   expect(colBox).not.toBeNull();
-  // 内容列居中于侧栏右侧：(1440 + 248 − 768) / 2 = 460（Paper 侧栏 288 → 248，
-  // 列心右移前为 480）。
-  expect(colBox?.x).toBe(460);
+  // 内容列居中于 sheet：sheet 占 248..1430（右缘留 10px），
+  // (248 + 1430 − 768) / 2 = 455。
+  expect(colBox?.x).toBe(455);
   for (const box of [tabsBox, headBox, cardBox]) {
     expect(box?.x).toBe(colBox?.x);
   }
