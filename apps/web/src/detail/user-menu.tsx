@@ -65,7 +65,7 @@ const PANEL =
   // CDS PR-5: border-0 + --shadow-popover hairline. Caret outline tracks the
   // ring token (light --border outer ring / dark --ring-inset-highlight inset)
   // and seats on the shadow edge (no 1px border offset).
-  "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-0 before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-px after:left-[21px] after:h-[5px] after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-[''] dark:before:bg-(--ring-inset-highlight)";
+  "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-0 before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-px after:left-5.25 after:h-1.25 after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-[''] dark:before:bg-(--ring-inset-highlight)";
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
 
 // 外观 seg（r7 37 probe #138）：~20px 描边格 + 8px 侧内边距 + 发丝缝。
@@ -75,7 +75,7 @@ const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
 // 透明缝 + secondary 墨（data-active 载体不动——segmented-controls/
 // theme-toggle spec 按它断言）。
 const SEG_BASE =
-  'h-5 cursor-pointer rounded-[6px] px-2 text-[11px] leading-[18px] font-normal transition-[background-color] duration-(--dur-fast) ease-(--ease-standard) active:not-aria-[haspopup]:translate-y-0';
+  'h-5 cursor-pointer rounded-[6px] px-2 text-caption font-normal transition-[background-color] duration-(--dur-fast) ease-(--ease-standard) active:not-aria-[haspopup]:translate-y-0';
 const SEG_OFF =
   'border-(--border) bg-transparent text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-tertiary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-tertiary)';
 const SEG_ON =
@@ -123,19 +123,19 @@ export function UserMenu({
         className != null && className !== '' ? ` ${className}` : ''
       }`}
     >
-      <div className="user-menu-head flex flex-none items-center gap-[11px] border-b border-(--border) py-3.5 [&_img]:size-[30px] [&_img]:rounded-full">
+      <div className="user-menu-head flex flex-none items-center gap-3 border-b border-(--border) py-3.5 [&_img]:size-7.5 [&_img]:rounded-full">
         <SeededAvatar
-          className="size-[30px]"
+          className="size-7.5"
           name={user.displayName}
           src={user.avatarUrl}
           fallback="/avatar-user.png"
         />
         <div>
-          <div className="text-[13px] leading-4 text-(--foreground)">{user.displayName}</div>
+          <div className="text-ui leading-4 text-(--foreground)">{user.displayName}</div>
         </div>
       </div>
       <div className="flex flex-col gap-3 py-3">
-        <div className="user-menu-row flex h-4 items-center text-xs leading-4 text-(--text-secondary)">
+        <div className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)">
           {t('外观')}
           <span className="user-menu-seg ml-auto flex items-center gap-0.5">
             {/* XMON-24 分段钮 shadcn ghost 底座不变；#945 皮肤从 detail.css
@@ -160,7 +160,7 @@ export function UserMenu({
           </span>
         </div>
         <div
-          className="user-menu-row flex h-4 items-center text-xs leading-4 text-(--text-secondary)"
+          className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)"
           data-testid="density-row"
         >
           {t('密度')}
@@ -188,7 +188,7 @@ export function UserMenu({
         {ROWS.map(({ label, href }) => (
           <Link
             key={label}
-            className="user-menu-row flex h-4 items-center text-xs leading-4 text-(--text-secondary)"
+            className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)"
             to={{ pathname: href, search }}
           >
             {t(label)}

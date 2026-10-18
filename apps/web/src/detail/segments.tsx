@@ -20,8 +20,8 @@ import { AGENTS_HREF } from '../routes/agent-detail-page.js';
  *  --link 变体 = plan 蓝墨 + 同色底（r8 56 文件/提交引用 chip）。类名保留
  *  作惰性别名（chief-stream-markdown 等它域 spec 与单测按它定位）。 */
 const CODE_SKIN: Record<string, string> = {
-  'chat-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-[11px] leading-[13px]',
-  'doc-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-[11px]',
+  'chat-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-caption leading-3',
+  'doc-code': 'mx-0.5 rounded-[4px] bg-(--muted) px-1 py-px font-mono text-caption',
 };
 const CODE_LINK_SKIN = 'bg-(--chip-plan-bg) text-(--chip-plan-fg)';
 

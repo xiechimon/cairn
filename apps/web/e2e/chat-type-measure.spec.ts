@@ -6,6 +6,8 @@ import { expect, test } from '@playwright/test';
 // does not drift), and a 68ch measure cap keeps wide-screen paragraphs and
 // centered notes inside the 60–75 character comfort band. The composer
 // placeholder steps 13 → 14px: one notch under the body, hierarchy intact.
+// Paper PR 7 moves the body onto the six type keys: 14px (text-card-title) on
+// the same unitless 1.6, placeholder 13.5px (text-ui), still one notch apart.
 // Each test pins one failure way of the rework:
 //   1. body ink/pitch falls back to the old 13px fixed-pitch recipe
 //   2. line-height declared in px again (stops scaling with the size)
@@ -27,7 +29,7 @@ import { expect, test } from '@playwright/test';
 const DONE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=36';
 const CONFIRM = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b';
 
-test('chat body reads at 15px on a unitless 1.6 — the 24px pitch survives', async ({ page }) => {
+test('chat body reads at 14px (text-card-title) on a unitless 1.6', async ({ page }) => {
   await page.goto(DONE);
   const text = page.getByTestId('agent-text').first();
   await expect(text).toBeVisible();
@@ -35,9 +37,10 @@ test('chat body reads at 15px on a unitless 1.6 — the 24px pitch survives', as
     const s = getComputedStyle(el);
     return { fontSize: s.fontSize, lineHeight: s.lineHeight };
   });
-  expect(cs.fontSize).toBe('15px');
-  // 15 × 1.6 lands on the same 24px line box the fixed pitch carried
-  expect(cs.lineHeight).toBe('24px');
+  // Paper PR 7: the six type keys have no 15px step; reading text takes
+  // text-card-title (14px) and keeps the unitless 1.6 (22.4px line box)
+  expect(cs.fontSize).toBe('14px');
+  expect(cs.lineHeight).toBe('22.4px');
   // the declaration itself must stay unitless so the pitch tracks the size:
   // scan the stylesheets for a rule that matches THIS element and declares
   // line-height: 1.6 (the leading-[1.6] utility is that rule)
@@ -122,7 +125,7 @@ test('68ch measure cap binds the body text and the centered note', async ({ page
   expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
 });
 
-test('composer placeholder steps to 14px — one notch under the 15px body', async ({ page }) => {
+test('composer placeholder sits at 13.5px (text-ui) — one notch under the 14px body', async ({ page }) => {
   await page.goto(CONFIRM);
   const sizes = await page.evaluate(() => {
     const ph = document.querySelector('[data-testid="composer-placeholder"]')!;
@@ -132,8 +135,8 @@ test('composer placeholder steps to 14px — one notch under the 15px body', asy
       body: getComputedStyle(text).fontSize,
     };
   });
-  expect(sizes.placeholder).toBe('14px');
-  expect(sizes.body).toBe('15px');
+  expect(sizes.placeholder).toBe('13.5px');
+  expect(sizes.body).toBe('14px');
 });
 
 test('bubble / avatar / footer keep their own geometry (#470 scope fence)', async ({ page }) => {
@@ -152,9 +155,9 @@ test('bubble / avatar / footer keep their own geometry (#470 scope fence)', asyn
     };
   });
   expect(geo.bubbleH).toBe(24);
-  expect(geo.bubbleFont).toBe('15px');
+  expect(geo.bubbleFont).toBe('14px');
   expect(geo.avatarBox).toEqual({ w: 20, h: 20 });
-  expect(geo.footerPad).toBe('31px');
+  expect(geo.footerPad).toBe('32px');
 });
 
 test('turn boundary is air, not a rule: no divider between a user turn and the agent row', async ({

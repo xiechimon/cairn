@@ -238,7 +238,7 @@ test('5. 单段短消息气泡保持 24px 药丸高度（几何不漂移）', as
     return { h: Math.round(r.height), font: getComputedStyle(el).fontSize };
   });
   expect(box.h).toBe(24);
-  expect(box.font).toBe('15px');
+  expect(box.font).toBe('14px');
 });
 
 test('6. taskline 不错挂：任务文本行退场后没有 #seq 行残留', async ({ page }) => {

@@ -45,7 +45,7 @@ export function SourceIssueLine({
     const parsed = todo.sourceRef !== null ? parseOrchestrationSourceRef(todo.sourceRef) : null;
     return (
       <div
-        className="flex min-w-0 items-center gap-2 px-4 pt-2 text-xs leading-4 text-(--text-tertiary)"
+        className="flex min-w-0 items-center gap-2 px-4 pt-2 text-meta text-(--text-tertiary)"
         data-testid="source-orchestration"
       >
         <span className="flex-none text-(--text-tertiary)">{t('来源')}</span>
@@ -71,7 +71,7 @@ export function SourceIssueLine({
   if (todo.sourceRef === null) {
     return (
       <div
-        className="flex min-w-0 items-center gap-2 px-4 pt-2 text-xs leading-4 text-(--text-tertiary)"
+        className="flex min-w-0 items-center gap-2 px-4 pt-2 text-meta text-(--text-tertiary)"
         data-testid="source-issue-pending"
       >
         <span className="flex-none text-(--text-tertiary)">{t('GitHub issue 未建成')}</span>
@@ -95,7 +95,7 @@ export function SourceIssueLine({
   const mismatch = echo.title !== todo.title;
   return (
     <div
-      className="flex min-w-0 items-center gap-2 px-4 pt-2 text-xs leading-4 text-(--text-tertiary)"
+      className="flex min-w-0 items-center gap-2 px-4 pt-2 text-meta text-(--text-tertiary)"
       data-testid="source-issue-echo"
     >
       <span className="flex-none text-(--text-tertiary)">{t('来源 issue')}</span>

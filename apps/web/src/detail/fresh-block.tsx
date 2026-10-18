@@ -1,7 +1,7 @@
 // Fresh-state block (issue #56, r7 23): title h2, tag chips row, 「尚无描述」
 // and the creation-time meta row. XMON-55 P0 turned it into the page's task
 // brief: the block now owns the whole center column (the right pane no longer
-// renders in fresh phases), so the title steps up to 22px, the brief sits on
+// renders in fresh phases), so the title takes text-page, the brief sits on
 // a centred 720px measure instead of hugging the left edge of a 1200px
 // column, and the phase's primary action sits with it. The r7 23 meta row's
 // three glyphs (edit + two identical copies) are gone — unlabelled duplicate
@@ -78,25 +78,23 @@ export function FreshBlock({
 }: FreshBlockProps) {
   const { t } = useI18n();
   return (
-    <div className="fresh-block mx-auto max-w-[720px] px-4 pt-[72px]" data-testid="fresh-block">
-      <h2 className="fresh-title m-0 text-[22px] leading-[30px] font-semibold break-words text-(--foreground)">
+    <div className="fresh-block mx-auto max-w-180 px-4 pt-18" data-testid="fresh-block">
+      <h2 className="fresh-title m-0 text-page font-medium break-words text-(--foreground)">
         {todo.title}
       </h2>
       {/* #394：chips 只读，无标签时整行不渲染（原静态添加 affordance 移除） */}
       {(tags ?? []).length > 0 && (
-        <div className="fresh-tags mt-4 flex items-center gap-[15px] text-(--text-tertiary)">
+        <div className="fresh-tags mt-4 flex items-center gap-4 text-(--text-tertiary)">
           {(tags ?? []).map((tag) => (
             <TagChip key={tag.id} tag={tag} className="fresh-tag-chip" />
           ))}
         </div>
       )}
       {hasSpec !== true && (
-        <div className="fresh-nodesc mt-4 text-sm leading-[22px] text-(--text-tertiary)">
-          {t('尚无描述')}
-        </div>
+        <div className="fresh-nodesc mt-4 text-ui text-(--text-tertiary)">{t('尚无描述')}</div>
       )}
       <div className="mt-5 flex items-center text-(--text-tertiary)">
-        <span className="text-xs leading-4">{formatCreatedAt(todo.phaseAt, t)}</span>
+        <span className="text-meta">{formatCreatedAt(todo.phaseAt, t)}</span>
       </div>
       {action != null && onAction != null && (
         <div className="mt-8 flex items-center gap-3">
@@ -112,7 +110,7 @@ export function FreshBlock({
               {t(action)}
             </Button>
           )}
-          <span className="text-xs leading-4 text-(--text-tertiary)">
+          <span className="text-meta text-(--text-tertiary)">
             {t('点开始后由总管编排派发，Agent 在你的机器上跑')}
           </span>
         </div>

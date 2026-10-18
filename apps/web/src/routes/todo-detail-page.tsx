@@ -103,6 +103,7 @@ import type { MentionGroups } from '../overlay/mention-picker.js';
 import type { FileMentionEntry } from '../overlay/mention-token.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { SearchPanel, useSearchState } from '../overlays/search-panel.js';
+import { SHEET_PANEL } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { readStoredTheme } from '../theme.js';
@@ -632,33 +633,31 @@ export function TodoDetailPage() {
             : 'not-found';
     return (
       <div
-        className="detail-shell flex h-full overflow-hidden [&>.board-sidebar]:shadow-[1px_0_0_0_var(--border-soft)]"
+        className="detail-shell flex h-full overflow-hidden bg-(--surface-1)"
         data-route="todo-detail"
       >
         <AppSidebar fixture={fixture} todos={todos} searchPanel={false} />
-        <div className="relative flex min-w-0 flex-1 flex-col items-center justify-center bg-(--card)">
+        <div className={`${SHEET_PANEL} flex-col items-center justify-center`}>
           <div
-            className="max-w-[420px] px-6 text-center"
+            className="max-w-105 px-6 text-center"
             data-testid="detail-unavailable"
             data-state={state}
           >
             {state === 'loading' && (
-              <p className="m-0 text-sm text-(--text-tertiary)">{t('加载中…')}</p>
+              <p className="m-0 text-ui text-content-tertiary">{t('加载中…')}</p>
             )}
             {state === 'error' && (
               <>
-                <h2 className="m-0 text-base font-semibold text-(--foreground)">
+                <h2 className="m-0 text-card-title font-medium text-foreground">
                   {t('任务加载失败')}
                 </h2>
                 {err instanceof Error && err.message !== '' && (
-                  <p className="mt-2 text-xs leading-5 break-words text-(--text-tertiary)">
-                    {err.message}
-                  </p>
+                  <p className="mt-2 text-meta break-words text-content-tertiary">{err.message}</p>
                 )}
               </>
             )}
             {state === 'not-found' && (
-              <h2 className="m-0 text-base font-semibold text-(--foreground)">
+              <h2 className="m-0 text-card-title font-medium text-foreground">
                 {t('任务不存在或已被删除')}
               </h2>
             )}
@@ -822,9 +821,10 @@ export function TodoDetailPage() {
     // 清零）：三栏壳（240 | fluid | 488，todos.dev 网格）迁 utilities；
     // #932 窄屏折叠走 max-[816px]（288 sidebar 后保留与旧 768/240 同款 ~40px 中栏余量；双定宽栏退场、线程列独占视口，
     // pane 变量归零让锚位停止跳格）。board-sidebar 是 #943 保留的运行时
-    // 钩子类，子选择器规则随壳迁移（跨域消费面不断）。
+    // 钩子类，子选择器规则随壳迁移（跨域消费面不断）。Paper PR 7：主栏
+    // 坐进与其它路由同一张 SHEET_PANEL；窄屏侧栏隐藏时纸张贴边铺满。
     <div
-      className="detail-shell flex h-full overflow-hidden [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:shadow-[1px_0_0_0_var(--border-soft)] [&>.board-sidebar]:max-[816px]:hidden"
+      className="detail-shell flex h-full overflow-hidden bg-(--surface-1) [--detail-pane-right:488px] max-[816px]:[--detail-pane-right:0px] [&>.board-sidebar]:max-[816px]:hidden"
       data-route="todo-detail"
       data-todo-id={id}
     >
@@ -835,7 +835,7 @@ export function TodoDetailPage() {
         onSearch={() => search.setOpen(true)}
       />
       <div
-        className="group/detail-main relative flex min-w-0 flex-1 flex-col bg-(--card)"
+        className={`group/detail-main ${SHEET_PANEL} flex-col max-[816px]:m-0 max-[816px]:rounded-none max-[816px]:[box-shadow:none]`}
         data-testid="detail-main"
       >
         <DetailHead
@@ -1014,7 +1014,7 @@ export function TodoDetailPage() {
           )}
         </div>
         {ui.placeholder != null && composerReject != null && (
-          <div className="composer-reject absolute bottom-[104px] left-4 right-[calc(var(--detail-pane-right)+16px)] text-center text-xs leading-4 text-(--destructive)">
+          <div className="composer-reject absolute bottom-26 left-4 right-[calc(var(--detail-pane-right)+16px)] text-center text-meta text-destructive">
             {composerReject}
           </div>
         )}

@@ -30,7 +30,7 @@ import { ChevronLeft, X } from '../icons/index.js';
 
 /** 家族面板 layout 位（#983 判决：宽度归消费点布局类）：448 = dialog
  *  家族律 #68；移动收口与 registry max-w 配方等值。 */
-const PANEL_LAYOUT = 'overlay overlay-panel w-[448px] max-w-[calc(100%-2rem)] sm:max-w-[448px]';
+const PANEL_LAYOUT = 'overlay overlay-panel w-112 max-w-[calc(100%-2rem)] sm:max-w-112';
 
 /** #168: the rerun/reuse pair joins the dialog family close law — Esc,
  *  backdrop click, and the X head button all carry the same `onClose`
@@ -131,7 +131,7 @@ export function RerunDialog({
         </>
       }
     >
-      <div className="pt-[18px] pb-0.5 text-center text-sm leading-[18px] text-(--text-secondary)">
+      <div className="pt-4 pb-0.5 text-center text-ui text-(--text-secondary)">
         {t('这张任务将交给总管重新编排。')}
       </div>
     </OverlayDialog>
@@ -169,7 +169,7 @@ export function ReusePanel({
         </>
       }
     >
-      <div className="px-4 pt-[30px] pb-1 text-center text-sm leading-5 text-(--text-secondary)">
+      <div className="px-4 pt-8 pb-1 text-center text-ui text-(--text-secondary)">
         {t('选择接下来如何使用这个方案')}
       </div>
     </OverlayDialog>

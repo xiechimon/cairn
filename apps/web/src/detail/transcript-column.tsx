@@ -34,7 +34,7 @@ import { type LiveStep, Transcript } from './transcript.js';
 /** Root 中和：原语 size-full 的 h-full 会顶爆 detail-center 的 flex 链。 */
 const ROOT_CLS = 'h-auto min-h-0 flex-1';
 /** Viewport = 旧 `.chat-col` 的滚动端口；底垫走 --chat-extra-space（35vh）。 */
-const VIEWPORT_CLS = 'chat-col pt-[19px] pr-4 pb-(--chat-extra-space) pl-[19px]';
+const VIEWPORT_CLS = 'chat-col pt-5 pr-4 pb-(--chat-extra-space) pl-5';
 /** Content：行距在行自身 margin；列宽钉 --chat-max-w 768。 */
 const CONTENT_CLS = 'mx-auto block w-full max-w-(--chat-max-w) gap-0';
 

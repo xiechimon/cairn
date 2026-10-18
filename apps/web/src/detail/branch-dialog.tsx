@@ -93,8 +93,8 @@ function CopyButton({ value }: { value: string }) {
  *  registry 控件语言（rounded-lg border-input），行律是 layout 位。 */
 export function BranchBox({ info }: { info: BranchInfoContent }) {
   const { t } = useI18n();
-  const row = 'flex h-[42px] items-center gap-1 pr-2 pl-3';
-  const label = 'w-[76px] flex-none text-xs text-(--text-tertiary)';
+  const row = 'flex h-10 items-center gap-1 pr-2 pl-3';
+  const label = 'w-19 flex-none text-xs text-(--text-tertiary)';
   const value = 'min-w-0 flex-1 truncate font-mono text-xs text-(--foreground)';
   return (
     <div className="overflow-hidden rounded-lg border border-input">
@@ -190,7 +190,7 @@ export function BranchSyncFields({
       <div className="flex items-start gap-3">
         <div className="flex flex-1 flex-col gap-1">
           <Label className="text-sm leading-tight">{t('强制同步')}</Label>
-          <div className="text-xs leading-[18px] text-(--text-tertiary)">
+          <div className="text-meta text-(--text-tertiary)">
             {t('丢弃代码修改并删除非忽略的未跟踪文件；保留忽略内容。仅本次生效。')}
           </div>
         </div>

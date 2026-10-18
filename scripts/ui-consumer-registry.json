@@ -132,6 +132,13 @@
       "role": "indicator",
       "reason": "Expanded 新任务 button plus glyph (DESIGN.md 侧栏 item 2).",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
+    },
+    {
+      "file": "apps/web/src/detail/dhead.tsx",
+      "anchor": "const ACCENT_INK = 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "Detail top bar status for the three needs-you phases (icon + 失败/确认/审核, paper-redesign-plan PR 7). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 13.5px text)"
     }
   ]
 }

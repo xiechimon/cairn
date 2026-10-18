@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "52d2cdca5ab286021d3514e4a6c6d91d95ccb03f",
+    "sha": "34d9a35b166ecf5defef245afea77666784a7cff",
     "date": "2026-10-18"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 164,
-    "spacingTotal": 255,
+    "textTotal": 118,
+    "spacingTotal": 153,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -88,66 +88,6 @@
       "components/profile-card.tsx": {
         "text": 0,
         "spacing": 8
-      },
-      "detail/branch-dialog.tsx": {
-        "text": 0,
-        "spacing": 2
-      },
-      "detail/chat-markdown.tsx": {
-        "text": 8,
-        "spacing": 5
-      },
-      "detail/composer.tsx": {
-        "text": 2,
-        "spacing": 9
-      },
-      "detail/dhead.tsx": {
-        "text": 1,
-        "spacing": 2
-      },
-      "detail/docpane.tsx": {
-        "text": 5,
-        "spacing": 21
-      },
-      "detail/fresh-block.tsx": {
-        "text": 1,
-        "spacing": 3
-      },
-      "detail/overlays.tsx": {
-        "text": 0,
-        "spacing": 4
-      },
-      "detail/review-dialog.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
-      "detail/right-pane.tsx": {
-        "text": 6,
-        "spacing": 6
-      },
-      "detail/segments.tsx": {
-        "text": 2,
-        "spacing": 0
-      },
-      "detail/spec-block.tsx": {
-        "text": 1,
-        "spacing": 3
-      },
-      "detail/task-meta-block.tsx": {
-        "text": 2,
-        "spacing": 3
-      },
-      "detail/transcript-column.tsx": {
-        "text": 0,
-        "spacing": 2
-      },
-      "detail/transcript.tsx": {
-        "text": 16,
-        "spacing": 34
-      },
-      "detail/user-menu.tsx": {
-        "text": 2,
-        "spacing": 5
       },
       "overlay/attachment-card.tsx": {
         "text": 1,
@@ -260,10 +200,6 @@
       "routes/team-page.tsx": {
         "text": 0,
         "spacing": 1
-      },
-      "routes/todo-detail-page.tsx": {
-        "text": 0,
-        "spacing": 2
       }
     }
   }

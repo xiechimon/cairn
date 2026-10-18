@@ -92,7 +92,7 @@ test('I4: expand/collapse interaction and the #470 row geometry are untouched', 
   await expect(expander).toHaveAttribute('aria-expanded', 'false');
   await expander.click();
   await expect(page.getByTestId('tool-pill')).toHaveCount(2);
-  // #470 fence: the row keeps its 31px inset under the agent text column and
+  // #470 fence: the row keeps its 32px inset under the agent text column and
   // the 16px pitch — the identity glyph must not grow the row
   const geo = await page.evaluate(() => {
     const el = document.querySelector(
@@ -101,7 +101,7 @@ test('I4: expand/collapse interaction and the #470 row geometry are untouched', 
     const cs = getComputedStyle(el);
     return { padLeft: cs.paddingLeft, height: Math.round(el.getBoundingClientRect().height) };
   });
-  expect(geo.padLeft).toBe('31px');
+  expect(geo.padLeft).toBe('32px');
   expect(geo.height).toBeLessThanOrEqual(16);
 });
 

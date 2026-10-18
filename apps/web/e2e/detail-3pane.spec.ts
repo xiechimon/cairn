@@ -49,8 +49,9 @@ test('three abutting panes: 248 sidebar | fluid center | 488 right', async ({ pa
   // panes abut — no gap, no overlap (hairline borders ride inside the boxes)
   expect(Math.round(geo.center.left)).toBe(Math.round(geo.sidebar.right));
   expect(Math.round(geo.right.left)).toBe(Math.round(geo.center.right));
-  // center takes the fluid remainder (712 at the 1440 e2e viewport)
-  expect(geo.center.width).toBe(1440 - 248 - 488);
+  // center takes the fluid remainder of the sheet, which stops 10px short of
+  // the right viewport edge (694 at the 1440 e2e viewport; Paper PR 7)
+  expect(geo.center.width).toBe(1440 - 248 - 10 - 488);
   // the seam between center and right is a 1px hairline, not a shadow
   const seam = await page.evaluate(() => {
     const cs = getComputedStyle(document.querySelector('[data-testid="detail-right"]')!);
@@ -196,7 +197,7 @@ test('composer width tracks the center column; the floating window overlays with
       return { center: c.width, comp: r.width };
     });
   const pane = await measure();
-  expect(pane.center).toBe(1440 - 248 - 488);
+  expect(pane.center).toBe(1440 - 248 - 10 - 488);
   expect(pane.comp).toBeCloseTo(pane.center - 32, 0);
   // A0（ADR 0013 D7 反转）：窗是覆盖层——开窗后右栏在位、中心列与
   // composer 宽度与关态逐值相同（418 互斥态退役，无 pane-var 重同步）
@@ -288,14 +289,16 @@ test('fresh phase: the brief owns the whole center column, right pane collapses'
   const center = await page
     .getByTestId('detail-center')
     .evaluate((el) => Math.round(el.getBoundingClientRect().width));
-  expect(center).toBe(1440 - 248);
+  expect(center).toBe(1440 - 248 - 10);
 
-  // the task title now names the page twice: in the 44px head (XMON-55 P1, so
-  // the reader knows which task they are on while scrolled into the thread)
-  // and on the brief itself
+  // the task title names the page twice: as the top bar's h1 (XMON-55 P1;
+  // Paper PR 7 makes it the serif page title) and as the brief's own heading
   const title = '在 README.md 末尾追加一行「r7 rebaseline probe」';
-  await expect(page.getByRole('heading', { name: title })).toHaveText(title);
+  await expect(page.getByRole('heading', { level: 1, name: title })).toHaveText(title);
   await expect(page.getByTestId('detail-title')).toHaveText(title);
+  await expect(page.getByTestId('fresh-block').getByRole('heading', { name: title })).toHaveText(
+    title,
+  );
   const start = page
     .getByTestId('detail-center')
     .getByRole('button', { name: '开始', exact: true });

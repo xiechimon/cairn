@@ -249,13 +249,13 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // the center column stays fluid and unchanged by the overlay
     const center = await page.locator('.detail-center').boundingBox();
     expect(center!.width).toBeCloseTo(restingCenter!.width, 0);
-    expect(center!.width).toBeCloseTo(1440 - 248 - 488, 0);
+    expect(center!.width).toBeCloseTo(SHEET_W - 488, 0);
 
     await minimize(page).click();
     await expect(drawer(page)).toBeHidden();
     await expect(page.locator('.detail-right')).toBeVisible();
     const restored = await page.locator('.detail-center').boundingBox();
-    expect(restored!.width).toBe(1440 - 248 - 488);
+    expect(restored!.width).toBe(SHEET_W - 488);
   });
 
   test('hero examples: the four canon prompt cards, inert on the fixture face', async ({
