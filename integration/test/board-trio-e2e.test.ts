@@ -307,15 +307,14 @@ describe('#1216 板面 UI 可靠性三缺陷（真 web dist + 真 server + 假�
     }, 15_000);
     await waitFor(() => orchestrateThreads(seqNum).length === 1, 15_000);
 
-    // 修复面：在飞编排期间卡面钮位翻禁用「编排中」——改前此处是照亮的
-    // 「开始」（连点即重复线程，生产库 #30 五连实证）。
+    // 修复面：在飞编排期间卡面「开始」让位给「编排中」底栏——改前此处是
+    // 照亮的「开始」（连点即重复线程，生产库 #30 五连实证）。
     const card = page.locator(`[data-todo-id="${todoId}"]`);
-    await pexpect(card.locator('.todo-card-action[data-orchestrating="true"]')).toHaveText(
-      '编排中',
-      { timeout: 15_000 },
-    );
-    await pexpect(card.locator('.todo-card-action[data-orchestrating="true"]')).toBeDisabled();
-    // 重复点击不可能：钮已禁用；线程数保持 1（无重复编排回合）。
+    await pexpect(card.locator('.todo-card-orchestration')).toContainText('编排中', {
+      timeout: 15_000,
+    });
+    await pexpect(card.locator('.todo-card-action')).toHaveCount(0);
+    // 重复点击不可能：卡上没有可点的「开始」；线程数保持 1（无重复编排回合）。
     expect(orchestrateThreads(seqNum).length).toBe(1);
 
     // chief 派发（假机器认领编排回合 → relay run_builds → done）：一次点击

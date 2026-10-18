@@ -57,7 +57,7 @@ import { ResetConfirmDialog } from '../board/reset-confirm-dialog.js';
 import { buildTagOptions, matchesTagFilter, parseTagParam } from '../board/tag-filter.js';
 import { useChiefRoot } from '../chief/chief-root.js';
 import { ChiefSettings } from '../chief/chief-settings.js';
-import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
+import { cardOrchestration } from '../chief/orchestration-inflight.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { AcceptDialog } from '../detail/accept-dialog.js';
@@ -508,9 +508,9 @@ export function BoardPage() {
     },
     [live, orchestrateStart.orchestrate],
   );
-  // #1216：逐卡在飞编排判定（开始/重试 钮位翻「编排中」禁用态的数据源）。
-  const isOrchestrating = useCallback(
-    (todo: TodoRecord) => inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null,
+  // #1216：逐卡在飞编排（卡面「编排中」底栏 + 等待成因的数据源）。
+  const orchestrationOf = useCallback(
+    (todo: TodoRecord) => cardOrchestration(chiefThreadsQ.data, todo.seqNum),
     [chiefThreadsQ.data],
   );
 
@@ -750,7 +750,7 @@ export function BoardPage() {
             hasBranch={(todo) =>
               live ? todo.latestBuildId != null : overlayContent(todo.id) != null
             }
-            isOrchestrating={live ? isOrchestrating : undefined}
+            orchestrationOf={live ? orchestrationOf : undefined}
             // #73→#616→#640: 静默改相落位（待处理/已完成 + 待开始的未开始卡）
             // commit into the same client-side todo set as create/delete — column
             // counts and folds re-derive from it；执行中落位 = 开始意图 → 直发

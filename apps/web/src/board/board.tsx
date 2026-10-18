@@ -57,6 +57,7 @@ import { cn } from 'cn';
 import { Activity, CircleAlert, CircleCheck, CircleDashed, Clock, Plus } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
+import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import type { TagChipData } from '../components/ui/tag-chip.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
@@ -115,10 +116,10 @@ interface BoardProps {
   /** #828：逐卡分支钮可见性（调用方按数据源判定——fixture 面走
    *  overlayContent 有无、live 面走 latestBuildId 有无；缺省 = 全显旧行）。 */
   hasBranch?: (todo: TodoRecord) => boolean;
-  /** #1216：逐卡在飞编排态（live 面由 chiefThreads 读面派生，判定单源
-   *  chief/orchestration-inflight.ts；缺省 = fixture 面恒 false，卡片 DOM
+  /** #1216：逐卡在飞编排（live 面由 chiefThreads 读面派生，判定单源
+   *  chief/orchestration-inflight.ts；缺省 = fixture 面恒无，卡片 DOM
    *  零变化）。 */
-  isOrchestrating?: (todo: TodoRecord) => boolean;
+  orchestrationOf?: (todo: TodoRecord) => CardOrchestration | null;
   /** #616: silent phase-commit drop (待开始/已完成 targets) — the page owns
    *  the write path (fixture 本地集 / live 乐观 PATCH)。 */
   onPhaseDrop?: (todo: TodoRecord, columnId: string) => void;
@@ -149,10 +150,10 @@ interface BoardProps {
 }
 
 const COLUMN_ICON = {
-  queued: { icon: CircleDashed, tone: 'text-content-tertiary' },
+  queued: { icon: CircleDashed, tone: 'text-icon' },
   running: { icon: Activity, tone: 'text-running' },
   attention: { icon: CircleAlert, tone: 'text-(--card-button)' },
-  done: { icon: CircleCheck, tone: 'text-content-tertiary' },
+  done: { icon: CircleCheck, tone: 'text-icon' },
 } as const;
 
 function ColumnIcon({ status }: { status: BoardColumnDef['status'] }) {
@@ -192,7 +193,7 @@ export function BoardSurface({
   onAction,
   onBranch,
   hasBranch,
-  isOrchestrating,
+  orchestrationOf,
   onPhaseDrop,
   onStartIntent,
   onResetIntent,
@@ -451,7 +452,7 @@ export function BoardSurface({
                         onAction={onAction}
                         onBranch={onBranch}
                         hasBranch={hasBranch == null ? undefined : hasBranch(todo)}
-                        orchestrating={isOrchestrating?.(todo) === true}
+                        orchestration={orchestrationOf?.(todo) ?? null}
                         projectName={fixture.projectNames?.[todo.projectId]}
                         tag={tagsById == null ? null : cardTag(todo, tagsById)}
                       />
