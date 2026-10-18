@@ -129,7 +129,20 @@ const FILE_RULES = new Map([
     'apps/web/src/components/model-select-core.tsx',
     [...AGENT, 'chief-drawer-model', 'chief-settings'],
   ],
-  ['apps/web/src/components/profile-card.tsx', ['avatar-', 'user-menu-']],
+  [
+    'apps/web/src/components/profile-card.tsx',
+    ['avatar-', 'user-menu-', 'paper-', 'account-', ...AGENT],
+  ],
+  // Paper page patterns: every page that composes them, plus their own pins.
+  [
+    'apps/web/src/components/settings-list.tsx',
+    ['paper-', 'account-', 'cds-settings', 'user-menu-', ...AGENT, ...PAGES],
+  ],
+  [
+    'apps/web/src/components/empty-state.tsx',
+    ['paper-', 'dead-buttons', 'title-band-clicks', 'user-menu-', ...RESOURCES, ...PAGES],
+  ],
+  ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
 ]);
 

@@ -1,0 +1,192 @@
+{
+  "light-account": {
+    "radius": "10px",
+    "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "bg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "light-agent": {
+    "radius": "10px",
+    "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "bg": "rgb(255, 255, 255)",
+    "rows": [
+      {
+        "h": 65,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "light-api-keys": {
+    "icon": {
+      "color": "rgb(116, 106, 95)",
+      "size": 24
+    },
+    "media": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "width": "24px",
+      "height": "24px"
+    },
+    "title": {
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "color": "rgb(43, 38, 32)"
+    },
+    "desc": {
+      "fontSize": "12px",
+      "color": "rgb(116, 106, 95)",
+      "maxWidth": "320px",
+      "width": 320
+    },
+    "button": {
+      "variant": "default",
+      "size": "default",
+      "height": "32px",
+      "backgroundColor": "rgb(43, 38, 32)",
+      "borderTopLeftRadius": "8px",
+      "fontSize": "13.5px"
+    }
+  },
+  "light-board": {
+    "radius": "10px"
+  },
+  "dark-account": {
+    "radius": "10px",
+    "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "bg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "dark-agent": {
+    "radius": "10px",
+    "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, 41, 38) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+    "bg": "rgb(38, 34, 31)",
+    "rows": [
+      {
+        "h": 65,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "1px",
+        "bg": "rgba(0, 0, 0, 0)"
+      },
+      {
+        "h": 52,
+        "top": "0px",
+        "bottom": "0px",
+        "bg": "rgba(0, 0, 0, 0)"
+      }
+    ]
+  },
+  "dark-api-keys": {
+    "icon": {
+      "color": "rgb(179, 174, 170)",
+      "size": 24
+    },
+    "media": {
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "width": "24px",
+      "height": "24px"
+    },
+    "title": {
+      "fontSize": "14px",
+      "fontWeight": "500",
+      "color": "rgb(238, 232, 228)"
+    },
+    "desc": {
+      "fontSize": "12px",
+      "color": "rgb(179, 174, 170)",
+      "maxWidth": "320px",
+      "width": 320
+    },
+    "button": {
+      "variant": "default",
+      "size": "default",
+      "height": "32px",
+      "backgroundColor": "rgb(238, 232, 228)",
+      "borderTopLeftRadius": "8px",
+      "fontSize": "13.5px"
+    }
+  },
+  "dark-board": {
+    "radius": "10px"
+  }
+}

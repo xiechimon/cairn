@@ -1,4 +1,4 @@
-// API-keys route (issue #70): the empty state per r2 19 (icon tile +
+// API-keys route (issue #70): the empty state per r2 19 (icon +
 // canon copy + 新建密钥; the captured 查看文档 link is gone — #307
 // wontfix, local-first 无文档站, #149 schedules 同律), and with a created key in the
 // fixture the r3 §6 display rules — list row masked `pacman_afe07565…`
@@ -7,9 +7,8 @@
 // 「请立即复制密钥，它仅显示一次。」. Row and one-time block shapes are
 // [推断] (no capture: r2 §9-12, r3 §6 图失); mask and copy are observed.
 // #947 per-face 清零：secondary.css 退役。
-// #1005 registry 对齐：空态走 Empty 官方 compound（EmptyHeader/Media icon 档
-// + EmptyContent，居中列即件默认形；标题/描述保留 h2/p 语义标签——heading 是
-// a11y 资产，与 resources EmptyState 同律）；一次性明文块与列表行走 Card 件
+// Paper 页面模式：空态走 components/empty-state.tsx（裸图标 ink-3、无色块
+// 底；标题/描述仍是 h2/p）。#1005 registry 对齐：一次性明文块与列表行走 Card 件
 // 默认皮肤（rounded-xl / ring-1 / bg-card，--radius-popover 手写壳槽的消费在
 // 本面退役），行高 62 等 layout 留消费点；按钮走 Button 默认档（border-0/px/
 // 字重覆写退役）。data-testid="keys-empty" 二级载体保留。
@@ -18,9 +17,9 @@ import { useSearchParams } from 'react-router';
 import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
 import { mapApiKeys, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia } from '../components/ui/empty.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -58,28 +57,14 @@ export function ApiKeysPage() {
       title={t('API 密钥')}
     >
       {keys.length === 0 ? (
-        <Empty data-testid="keys-empty" className="mt-6">
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <Key />
-            </EmptyMedia>
-            {/* h2/p 语义标签保留（heading 是 a11y 资产，与 resources EmptyState
-                同律），只挂 registry 件的文字档取齐观感。 */}
-            <h2 className="text-sm font-medium tracking-tight text-balance text-foreground">
-              {t('尚无 API 密钥。')}
-            </h2>
-            <p className="text-sm/relaxed text-muted-foreground text-balance">
-              {t('API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。')}
-            </p>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button size="sm" onClick={live ? () => setCreateOpen(true) : undefined}>
-              {t('新建密钥')}
-            </Button>
-            {/* 「查看文档」钮全除（#307 wontfix）：local-first 自托管无文档站
-                可链（#149 schedules 同律）——隐去，spec 08 档 4 出账。 */}
-          </EmptyContent>
-        </Empty>
+        <EmptyState
+          testId="keys-empty"
+          className="mt-6"
+          icon={Key}
+          title={t('尚无 API 密钥。')}
+          description={t('API 密钥用于从命令行接入机器，也让 MCP 客户端能访问你的工作台。')}
+          action={{ label: t('新建密钥'), onClick: live ? () => setCreateOpen(true) : undefined }}
+        />
       ) : (
         <>
           {keys

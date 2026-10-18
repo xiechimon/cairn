@@ -16,13 +16,13 @@ import { useApiMutations, useSession } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
 import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
+import { ProfileHeader } from '../components/profile-card.js';
 import {
-  PROFILE_SELECT_TRIGGER_CLS,
-  ProfileCard,
-  ProfileHeader,
-  ProfileRow,
-  ProfileSegmented,
-} from '../components/profile-card.js';
+  SETTINGS_SELECT_TRIGGER_CLS,
+  SettingsCard,
+  SettingsRow,
+  SettingsSegmented,
+} from '../components/settings-list.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   Select,
@@ -121,8 +121,8 @@ export function AccountPage() {
           sub={t('头像与名称')}
           onRename={commitName}
         />
-        <ProfileCard className="account-card">
-          <ProfileRow label={t('语言')}>
+        <SettingsCard className="account-card">
+          <SettingsRow label={t('语言')}>
             <Select
               value={locale}
               defaultOpen={fixture.ui?.langDropdownOpen === true}
@@ -130,7 +130,7 @@ export function AccountPage() {
                 if (next !== null) setLocale(next);
               }}
             >
-              <SelectTrigger aria-label={t('语言')} className={PROFILE_SELECT_TRIGGER_CLS}>
+              <SelectTrigger aria-label={t('语言')} className={SETTINGS_SELECT_TRIGGER_CLS}>
                 <SelectValue>{LOCALE_NAMES[locale]}</SelectValue>
               </SelectTrigger>
               <SelectContent aria-label={t('语言')} align="end" alignItemWithTrigger={false}>
@@ -141,13 +141,13 @@ export function AccountPage() {
                 ))}
               </SelectContent>
             </Select>
-          </ProfileRow>
-          <ProfileRow
+          </SettingsRow>
+          <SettingsRow
             label={t('密度')}
             hint={t('紧凑会缩小字号与行距')}
             className="account-density-row"
           >
-            <ProfileSegmented
+            <SettingsSegmented
               label={t('密度')}
               value={density}
               onChange={selectDensity}
@@ -160,8 +160,8 @@ export function AccountPage() {
                 { value: 'compact', label: t('紧凑'), testId: 'account-density-compact' },
               ]}
             />
-          </ProfileRow>
-          <ProfileRow
+          </SettingsRow>
+          <SettingsRow
             label={t('推送通知')}
             hint={
               notifyBlocked
@@ -180,8 +180,8 @@ export function AccountPage() {
                 if (checked && permission !== 'granted') request();
               }}
             />
-          </ProfileRow>
-        </ProfileCard>
+          </SettingsRow>
+        </SettingsCard>
       </div>
     </PageShell>
   );

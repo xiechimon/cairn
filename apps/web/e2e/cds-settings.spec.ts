@@ -1,14 +1,14 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS settings: reading col 768, cards 12px no shadow, input 8px/32px', async ({ page }) => {
+test('CDS settings: reading col 768, cards at --radius-card 10px no shadow, input 8px/32px', async ({ page }) => {
   await page.goto('/app/account?scenario=01');
-  await page.waitForSelector('[data-testid="page-col"], .profile-card, .account-card');
+  await page.waitForSelector('[data-testid="page-col"], .settings-card, .account-card');
 
   const m = await page.evaluate(() => {
     const col =
       document.querySelector('[data-testid="page-col"]') ??
       document.querySelector('main .mx-auto');
-    const card = document.querySelector('.profile-card, .account-card, [data-testid="resource-group"]');
+    const card = document.querySelector('.settings-card, .account-card, [data-testid="resource-group"]');
     const input = document.querySelector('[data-slot="input"]');
     const root = getComputedStyle(document.documentElement);
     const colCs = col ? getComputedStyle(col) : null;
@@ -33,7 +33,7 @@ test('CDS settings: reading col 768, cards 12px no shadow, input 8px/32px', asyn
     expect(m.colWidth).toBeGreaterThanOrEqual(640);
     expect(m.colWidth).toBeLessThanOrEqual(800);
   }
-  if (m.cardRadius != null) expect(m.cardRadius).toBe('12px');
+  if (m.cardRadius != null) expect(m.cardRadius).toBe('10px');
   if (m.cardShadow != null) {
     // no soft drop shadow — hairline ring alone is OK
     expect(m.cardShadow.includes('8px') || m.cardShadow.includes('16px') || m.cardShadow.includes('24px')).toBeFalsy();

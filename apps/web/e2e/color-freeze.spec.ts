@@ -161,7 +161,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
       sidebar: cs.getPropertyValue('--sidebar-w').trim(),
       chat: cs.getPropertyValue('--chat-max-w').trim(),
       edge: cs.getPropertyValue('--edge-radius').trim(),
-      panel: cs.getPropertyValue('--radius-panel').trim(),
+      card: cs.getPropertyValue('--radius-card').trim(),
       cdsMd: cs.getPropertyValue('--cds-radius-md').trim(),
       shadcnMd: cs.getPropertyValue('--radius-md').trim(),
       expo: cs.getPropertyValue('--ease-out-expo').trim(),
@@ -173,7 +173,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
   expect(vals.sidebar).toBe('248px');
   expect(vals.chat).toBe('768px');
   expect(vals.edge).toBe('16px');
-  expect(vals.panel).toBe('10px');
+  expect(vals.card).toBe('10px');
   expect(vals.cdsMd).toBe('6px');
   expect(vals.shadcnMd).not.toBe('6px');
   expect(vals.shadcnMd.length).toBeGreaterThan(0);
