@@ -309,7 +309,8 @@ test('项目设置页能滚到底 (#1032)', async ({ page }) => {
 });
 
 test('新建项目页能滚到底 (#1032)', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 360 });
+  // Paper 表单（窄栏、操作行靠右）比旧整宽版矮，360 不再溢出；300 仍逼出溢出。
+  await page.setViewportSize({ width: 1440, height: 300 });
   await page.goto('/app/project/new?scenario=01');
   const heading = page.getByRole('button', { name: '创建项目' });
   await expect(heading).toBeAttached();
