@@ -835,7 +835,7 @@ export function TodoDetailPage() {
         onSearch={() => search.setOpen(true)}
       />
       <div
-        className={`group/detail-main ${SHEET_PANEL} flex-col max-[816px]:m-0 max-[816px]:rounded-none max-[816px]:[box-shadow:none]`}
+        className={`group/detail-main ${SHEET_PANEL} flex-col max-[816px]:m-0 max-[816px]:rounded-none max-[816px]:after:hidden`}
         data-testid="detail-main"
       >
         <DetailHead
