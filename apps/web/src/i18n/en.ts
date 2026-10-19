@@ -389,7 +389,6 @@ export const EN: Record<string, string> = {
   '跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。':
     "Follows the bound Agent's own configuration; adjust it in the Agent's settings.",
 
-  ' · 未设归属机': ' · no home machine',
   未设归属机: 'no home machine',
   还没有接入机器: 'No machines connected yet',
   接入机器: 'Connect a machine',
