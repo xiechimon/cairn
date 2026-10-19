@@ -146,7 +146,7 @@ test('schedules empty state drops the 查看文档 button; 新建定时 really o
   await page.goto('/app/schedules?scenario=11');
   await expect(page.locator('.sched-empty')).toBeVisible();
   await expect(page.locator('.sched-empty-docs')).toHaveCount(0);
-  const emptyNew = page.locator('.sched-empty-new');
+  const emptyNew = page.locator('.sched-empty').getByRole('button', { name: '新建定时' });
   await expect(emptyNew).toBeVisible();
   // #1037: 可见不是判据——点下去才算。旧守卫只断言 visible，一个
   // onClick=undefined 的哑钮照样绿。fixture 面禁止哑按钮：点 = 冻结表单

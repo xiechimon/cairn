@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "9bc56c83d492fc272b36151ba330e254468779ca",
-    "date": "2026-10-18"
+    "sha": "8a17dccf27f8a7f4fb87ef886ed7c5731334e322",
+    "date": "2026-10-19"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 72,
-    "spacingTotal": 101,
+    "textTotal": 69,
+    "spacingTotal": 95,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -105,21 +105,9 @@
         "text": 8,
         "spacing": 7
       },
-      "pages/schedules-page.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
       "routes/agent-detail-page.tsx": {
         "text": 0,
         "spacing": 2
-      },
-      "routes/api-key-create-dialog.tsx": {
-        "text": 2,
-        "spacing": 4
-      },
-      "routes/api-keys-page.tsx": {
-        "text": 1,
-        "spacing": 1
       },
       "routes/machine-authorize-page.tsx": {
         "text": 1,
