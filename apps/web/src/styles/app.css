@@ -158,7 +158,7 @@
     border-color: transparent;
   }
 
-  button.border-border:focus-visible:not([aria-invalid="true"]) {
+  :is(input, textarea, button).border-border:focus-visible:not([aria-invalid="true"]) {
     border-color: var(--border);
   }
 

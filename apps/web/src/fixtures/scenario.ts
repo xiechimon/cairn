@@ -106,6 +106,7 @@ import {
   teamOrgChartEmpty,
   teamOrgChartPair,
   teamOrgChartSingle,
+  teamRoster,
   versionMenuV2,
   versionMenuV3,
 } from './fixtures.js';
@@ -347,6 +348,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       'team-org-chart-empty': teamOrgChartEmpty,
       'team-org-chart-single': teamOrgChartSingle,
       'team-org-chart-pair': teamOrgChartPair,
+      // Paper team page: 4 agents, online / offline / unassigned home machines.
+      'team-roster': teamRoster,
       // Agent 详情编辑面（r3 §4）：团队 roster + 该 agent 的全记录 + providers
       // 行集，一套内容同时供 /app/team 与 /app/resources/agents/:id 两个路由。
       'agent-detail': agentDetail,

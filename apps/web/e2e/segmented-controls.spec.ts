@@ -32,9 +32,10 @@ const GROUP_DARK = 'rgb(45, 41, 38)'; // --muted dark
 const GROUP_LIGHT = 'rgb(235, 228, 216)'; // --muted light
 const TAB_FILL_DARK = 'rgba(64, 60, 57, 0.3)'; // --input/30 dark (active fill)
 const TAB_FILL_LIGHT = 'rgb(251, 249, 245)'; // --background light (active fill)
-// team layout toggle (L2 face, seg skin not yet migrated) still fills its
-// active chip with --card:
+// team layout toggle (Paper SettingsSegmented look) fills its active chip
+// with --card on a --canvas track:
 const CHIP_LIGHT = 'rgb(255, 255, 255)'; // --card light
+const TEAM_TRACK_LIGHT = 'rgb(243, 238, 229)'; // --canvas light
 const INK_REST_DARK = 'rgb(179, 174, 170)'; // --muted-foreground dark
 const INK_HOVER_DARK = 'rgb(238, 232, 228)'; // --foreground dark
 const INK_REST_LIGHT = 'rgba(43, 38, 32, 0.6)'; // --foreground/60 light
@@ -45,11 +46,6 @@ const INK_HOVER_LIGHT = 'rgb(43, 38, 32)'; // --foreground light
 const HOVER_DARK = 'rgba(255, 252, 248, 0.05)'; // --seg-hover dark
 const HOVER_LIGHT = 'rgba(28, 25, 21, 0.05)'; // --seg-hover light
 const CHIP_DARK = 'rgb(38, 34, 31)'; // --card dark (tab-chip-bg merged → card, #1002)
-// #1005 registry 对齐：team 布局钮离 SEG_* 分段族、骑 registry default Tabs——
-// 组盒 bg-muted（light 与 --secondary 同值 #ebe4d8）、无发丝环 border、选中片
-// bg-background、hover 只换墨不上底（无 tint）。
-const TABS_GROUP_LIGHT = 'rgb(235, 228, 216)'; // --muted light (registry TabsList default)
-const TABS_CHIP_ACTIVE_LIGHT = 'rgb(251, 249, 245)'; // --background light (registry data-active chip)
 
 // Tailwind v4 opacity modifiers (bg-input/30, text-foreground/60) compute to
 // oklab color-mix strings; the repo value notation (#411) wants rgb/hex —
@@ -254,29 +250,25 @@ test('branch-dialog seg: hover tints Git, click swaps the tab body', async ({ pa
   await expect(page.getByRole('tab', { name: '同步到机器', selected: false })).toBeVisible();
 });
 
-test('team layout toggle: registry default Tabs form (muted group, background chip, no ring)', async ({
+test('team layout toggle: SettingsSegmented look (paper track, white ringed chip)', async ({
   page,
 }) => {
   await themed(page, 'light', '/app/team?scenario=12');
-  // #1005 registry 对齐（重钉）：team 布局钮离 SEG_* 分段族（发丝环 / --secondary
-  // 组底 / --card 选中片 / --seg-hover tint 全退役），骑 registry default Tabs：
-  // 组盒 bg-muted 无 border、选中片 bg-background、未选中片零底（hover 只换墨）。
-  // 载体仍 = role=tablist/tab 一级（#947/#910）。
-  const group = await page.evaluate(() => {
-    const g = document.querySelector('[role="tablist"]')!;
-    return {
-      border: getComputedStyle(g).borderTopWidth,
-      groupBg: getComputedStyle(g).backgroundColor,
-    };
-  });
+  // Paper 页面模式：团队 grid|chart 切换住在顶栏，外观同 SettingsSegmented——
+  // canvas 浅纸轨道、选中片白底 + 1px 环、未选中片零底（hover 只换墨）。
+  // 载体仍 = role=tablist/tab（#947/#910）。
+  const bar = page.getByTestId('page-topbar');
+  const group = await bar.getByRole('tablist').evaluate((g) => ({
+    border: getComputedStyle(g).borderTopWidth,
+    groupBg: getComputedStyle(g).backgroundColor,
+  }));
   expect(group.border).toBe('0px');
-  expect(group.groupBg).toBe(TABS_GROUP_LIGHT);
-  expect(await bg(page.locator('[role="tab"][aria-selected="true"]'))).toBe(
-    TABS_CHIP_ACTIVE_LIGHT,
-  );
+  expect(group.groupBg).toBe(TEAM_TRACK_LIGHT);
+  const active = bar.getByRole('tab', { selected: true });
+  expect(await bg(active)).toBe(CHIP_LIGHT);
+  expect(await active.evaluate((el) => getComputedStyle(el).boxShadow)).toContain('0px 0px 0px 1px');
 
-  // 未选中片零底：registry hover 是 ink-only，不上 tint 底。
-  const chart = page.getByRole('tab', { name: 'chart' });
+  const chart = bar.getByRole('tab', { name: 'chart' });
   expect(await bg(chart)).toBe('rgba(0, 0, 0, 0)');
   await chart.hover();
   await expect.poll(() => bg(chart)).toBe('rgba(0, 0, 0, 0)');

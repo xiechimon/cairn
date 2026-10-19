@@ -75,6 +75,8 @@ export function providerGroups(
 }
 
 interface AgentRuntimeSelectProps {
+  /** Trigger id, so a form label can point at it. */
+  id?: string;
   /** 当前值 = provider 位；null = 内置 (pi)（清空行）。 */
   value: string | null;
   options: ModelOption[];
@@ -89,6 +91,7 @@ interface AgentRuntimeSelectProps {
 /** 一级：运行时/服务商。行 = provider 分组名（custom provider 的 label /
  *  runtime 段品牌名 `Claude Code`），首行恒是「内置 (pi)」清空档。 */
 export function AgentRuntimeSelect({
+  id,
   value,
   options,
   onPick,
@@ -104,7 +107,7 @@ export function AgentRuntimeSelect({
 
   return (
     <Select value={value} onValueChange={(next) => onPick?.(next as string | null)}>
-      <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
+      <SelectTrigger id={id} className={cn(`${prefix}-select`, triggerClassName)}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectContent aria-label={t('运行时')} className={`${prefix}-menu`}>
@@ -133,6 +136,8 @@ const MODEL_ROW_WRAP =
   '[&>:first-child]:min-w-0 [&>:first-child]:shrink [&>:first-child]:break-all [&>:first-child]:whitespace-normal';
 
 interface AgentModelSelectProps {
+  /** Trigger id, so a form label can point at it. */
+  id?: string;
   /** 一级当前值：候选按它过滤；null = 内置 (pi)，名下无可选模型，本级禁用。 */
   provider: string | null;
   modelId: string | null;
@@ -150,6 +155,7 @@ interface AgentModelSelectProps {
 
 /** 二级：当前运行时/服务商名下的具体模型。 */
 export function AgentModelSelect({
+  id,
   provider,
   modelId,
   options,
@@ -171,7 +177,7 @@ export function AgentModelSelect({
       disabled={disabled || provider === null}
       onValueChange={(next) => onPick?.(next as string | null)}
     >
-      <SelectTrigger className={cn(`${prefix}-select`, triggerClassName)}>
+      <SelectTrigger id={id} className={cn(`${prefix}-select`, triggerClassName)}>
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectContent

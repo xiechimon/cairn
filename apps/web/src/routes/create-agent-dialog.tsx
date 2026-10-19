@@ -9,11 +9,9 @@
 // re-adjudicated 移除 (the account-swap twin stays with 档 3, out of this
 // ticket).
 //
-// B2 · secondary 面（XMON-20）：弹窗内两件控件（提交钮、名称输入）全走
-// components/ui 件。#952（正典表 §5.3/§5.4，ui/dialog.css 退役）：.dlg-form*
-// 族类 → utility 等值迁移（单源同 #944 的 LABEL_CLS 律）、.dlg-form-input 摘类
-// （几何即件正典 h-8，36px 不存续）、.dlg-agent-create → Button default + w-full
-// （§2.6-3 迁移位；散写形差额并项——字重 400、无按下位移——原样承接）。
+// Paper form (DESIGN.md「页面模式 · 表单」): FormStack of label-above
+// fields, boxed 32px controls, and a FormActions row in the dialog footer
+// (取消 text button, 创建 ink primary on the right).
 //
 // #485 模型槽两态（原版两处实测：r2 §8.1 capture 20 = 尚未配置服务商时的
 // 告警行 + `配置服务商` 外链；r3 §2 = 服务商配好后同一弹窗的「模型」下拉）：
@@ -24,12 +22,13 @@
 // 只出模型名——原版的 `· 128k` 是原版内置模型目录的上下文窗口，pacman 是本
 // 地 BYOK，没有这个数据源。
 
+import { cn } from 'cn';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { Button } from '../components/ui/button.js';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { CARD_RADIUS_CLS } from '../components/settings-list.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
-import { Label } from '../components/ui/label.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   Select,
@@ -44,9 +43,15 @@ import { MACHINES_HREF } from '../resources/machines-page.js';
 import { PROVIDERS_HREF } from '../resources/providers-page.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
-/** 槽位标签（运行时/模型 span，无控件配对不走 label 元素）：registry Label
- *  同款排印（text-sm leading-none font-medium）；12px/0.01em 手写档退役。 */
-const SLOT_LABEL_CLS = 'text-sm leading-none font-medium';
+/** Paper form control stretched to the dialog column. */
+const CONTROL_CLS = cn('w-full', FORM_CONTROL_CLS);
+
+/** One-off notice card (no machine / no model source) with its fix-it link. */
+const NOTICE_CLS = cn(
+  'flex items-center gap-2 bg-card px-3 py-2 text-ui text-content-secondary ring-1 ring-border',
+  CARD_RADIUS_CLS,
+);
+const NOTICE_LINK_CLS = 'ml-auto text-(--card-button) no-underline hover:underline';
 
 /** POST agents body 的创建面字段（reason = 词表最小形 + #485 的模型槽）。 */
 export interface CreateAgentInput {
@@ -127,66 +132,48 @@ export function CreateAgentDialog({
       title={t('创建 agent')}
       open={open}
       onClose={onClose}
-      // 裸内容进 DialogFooter（壳组合 registry dialog 件后 band 自带 p-4，
-      // 自携 padding 包装会双垫）；Button default 档 + w-full 钉底独占。
-      // （#1006 段 2 与 #1007 各自独立修到同一形态，merge 取 L4 全清理版：
-      // 旧包装 div 会把 w-full 钮塌成内容宽，drive-952-finale B3 实测 30px。）
       footer={
-        <Button
-          className="w-full"
-          disabled={name.trim() === '' || machineId === null}
-          onClick={submit}
-        >
-          {t('创建')}
-        </Button>
+        <FormActions
+          className="w-full pt-0"
+          secondary={{ label: t('取消'), onClick: onClose }}
+          primary={{
+            label: t('创建'),
+            disabled: name.trim() === '' || machineId === null,
+            onClick: submit,
+          }}
+        />
       }
     >
-      <div className="flex flex-col gap-3">
-        {/* #951（detail/overlays.css 清零）：.dlg-agent-avatar 律等值迁
-            utility——行 12 gap；img 40×40 圆（per-face 容器是 img 几何正本，
-            SeededAvatar 契约）。testid = 二级载体（img 在 loaded 前被 registry
-            keepMounted 置 aria-hidden，role 钉不到；dead-buttons /
-            avatar-dicebear 的定位面，#910 裁定 1）。 */}
-        <div className="flex items-center gap-3" data-testid="agent-avatar">
-          {/* #387: 头像行 = 名称种子的 dicebear 预览——随输入即所得（创建后
-              同名恒同像）；空名退回静态机器人资产。「更换」钮全除（#307
-              wontfix）：栈内无上传面。 */}
+      <FormStack>
+        {/* testid = 二级载体（img 在 loaded 前被 registry keepMounted 置
+            aria-hidden，role 钉不到；dead-buttons / avatar-dicebear 的定位面）。
+            #387: 头像 = 名称种子的 dicebear 预览，空名退回静态机器人资产。 */}
+        <div className="flex items-center" data-testid="agent-avatar">
           <SeededAvatar name={name.trim()} fallback="/avatar-robot-1.svg" className="size-10" />
         </div>
-        {/* CJK 墨盒满 em 见方：registry Label 默认 leading-none 让标签贴行底、
-            被邻位 Input focus 环压住（本行实踩）——leading-tight（1.25）就地
-            修正，件保持 pristine（#980 S5 棘轮：偏差只进 adapter/调用位）。 */}
-        <Label htmlFor="dlg-agent-name" className="leading-tight">
-          {t('名称')}
-        </Label>
-        <Input
-          id="dlg-agent-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder={t('输入 Agent 名称')}
-        />
-        {/* #485 两态：有服务商 → 弹窗内两级选（运行时/服务商 → 它名下的模型，
-            不跳页）；无服务商 → 告警行 + 配置外链（capture 20 原样）。 */}
+        <FormField label={t('名称')} htmlFor="dlg-agent-name">
+          <Input
+            id="dlg-agent-name"
+            className={FORM_CONTROL_CLS}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={t('输入 Agent 名称')}
+          />
+        </FormField>
         {machines.length === 0 ? (
           // #1259：无机器 = 创建不可能（归属机必填），机器告警行优先于
           // 服务商告警行。
-          <div className="flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm leading-4 text-muted-foreground">
+          <div className={NOTICE_CLS}>
             <span>{t('还没有接入机器')}</span>
-            <Link className="ml-auto text-primary" to={{ pathname: MACHINES_HREF, search }}>
+            <Link className={NOTICE_LINK_CLS} to={{ pathname: MACHINES_HREF, search }}>
               {t('接入机器')}
             </Link>
           </div>
         ) : (
           <>
-            {/* #951：.dlg-agent-slot-row 律等值迁 utility（标签与选择器纵向
-                排布，6 gap）。#1010：选择器皮肤/几何归 registry select 默认
-                （DLG_AGENT_SELECT_* 常量退役，ADR 0012 D1）；本面只留 w-full
-                布局位（撑满行宽，#983 宽度归消费点判例）。菜单锚位/封顶归
-                Base UI Positioner（碰撞翻转 + --available-height），旧
-                bottom 锚 + max-h-192 覆写随 absolute 壳退役。 */}
-            <div className="flex flex-col gap-1.5">
-              <span className={SLOT_LABEL_CLS}>{t('运行时')}</span>
+            <FormField label={t('运行时')} htmlFor="dlg-agent-runtime">
               <AgentRuntimeSelect
+                id="dlg-agent-runtime"
                 value={provider}
                 options={modelOptions}
                 onPick={(next) => {
@@ -197,11 +184,10 @@ export function CreateAgentDialog({
                   setProvider(next);
                 }}
                 prefix="dlg-agent-runtime"
-                triggerClassName="w-full"
+                triggerClassName={CONTROL_CLS}
               />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className={SLOT_LABEL_CLS}>{t('归属机')}</span>
+            </FormField>
+            <FormField label={t('归属机')} htmlFor="dlg-agent-machine">
               <Select
                 value={machineId}
                 onValueChange={(next) => {
@@ -209,7 +195,10 @@ export function CreateAgentDialog({
                   setMachineId(next as string | null);
                 }}
               >
-                <SelectTrigger className="dlg-agent-machine-select w-full">
+                <SelectTrigger
+                  id="dlg-agent-machine"
+                  className={cn('dlg-agent-machine-select', CONTROL_CLS)}
+                >
                   <SelectValue>
                     {machineCandidates.find((m) => m.id === machineId)?.name ?? t('选择机器')}
                   </SelectValue>
@@ -226,33 +215,33 @@ export function CreateAgentDialog({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
             {modelOptions.length > 0 ? (
-              <div className="flex flex-col gap-1.5">
-                <span className={SLOT_LABEL_CLS}>{t('模型')}</span>
+              <FormField label={t('模型')} htmlFor="dlg-agent-model">
                 <AgentModelSelect
+                  id="dlg-agent-model"
                   provider={provider}
                   modelId={modelId}
                   options={machineModelOptions}
                   disabled={provider === 'claude-code' && machineId === null}
                   onPick={setModelId}
                   prefix="dlg-agent-model"
-                  triggerClassName="w-full"
+                  triggerClassName={CONTROL_CLS}
                 />
-              </div>
+              </FormField>
             ) : (
               // modelOptions 空 = 没有任何 claude-code 候选（pi 创建不受阻——
               // 运行时/归属机两槽已够）；告警行退成信息性，不再顶掉整个表单。
-              <div className="flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm leading-4 text-muted-foreground">
+              <div className={NOTICE_CLS}>
                 <span>{t('尚未配置模型服务商')}</span>
-                <Link className="ml-auto text-primary" to={{ pathname: PROVIDERS_HREF, search }}>
+                <Link className={NOTICE_LINK_CLS} to={{ pathname: PROVIDERS_HREF, search }}>
                   {t('配置服务商')}
                 </Link>
               </div>
             )}
           </>
         )}
-      </div>
+      </FormStack>
     </DialogShell>
   );
 }

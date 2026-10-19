@@ -44,13 +44,13 @@ import {
   AGENT_TOOL_SWITCHES,
   type AgentMachineFitRow,
   type AgentRecord,
-  MEMORY_EMPTY_COPY,
   MEMORY_QUOTA_PER_AGENT,
   MEMORY_UI_COPY,
   type PatchAgentBody,
   THINKING_LEVELS,
 } from '@pacman/shared';
 import { cn } from 'cn';
+import { Brain, SearchX } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import {
@@ -67,6 +67,7 @@ import {
 } from '../api/hooks.js';
 import { toModelOptions, toThinkingLevelDisplay } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { EmptyState } from '../components/empty-state.js';
 import { ProfileHeader, useEditorFocus } from '../components/profile-card.js';
 import {
   SETTINGS_HINT_CLS,
@@ -583,19 +584,19 @@ export function AgentDetailPage() {
             {/* 配额头（r5 §6 原文 `记忆 · 1 / 100`）。n = 存量条数——配额记的
                 是 Agent 上存了多少，不随搜索收窄；上限取 shared 单源常量，
                 不在这写死 100（server 的超限 409 走同一个常量）。 */}
-            <p className="agent-memory-head m-0 text-xs text-muted-foreground">
+            <p className="agent-memory-head m-0 text-meta text-content-tertiary">
               {t('记忆 · {n} / {max}', {
                 n: memories.length,
                 max: MEMORY_QUOTA_PER_AGENT,
               })}
             </p>
             {memories.length === 0 ? (
-              /* 空态文案 = shared MEMORY_EMPTY_COPY（02 §4.4/r5 §6 canon，总管
-                 设置记忆 tab 同文），经 t() 消费、不作字面量出现。空列表不摆
-                 搜索/排序控件（skills-page 先例：空态顶掉工具行）。 */
-              <p className="agent-memory-empty m-0 text-sm text-muted-foreground">
-                {t(MEMORY_EMPTY_COPY)}
-              </p>
+              <EmptyState
+                icon={Brain}
+                title={t('尚无记忆')}
+                description={t('Agent 会在工作中将值得沉淀的经验存入此处。')}
+                className="agent-memory-empty"
+              />
             ) : (
               <>
                 {/* 搜索框 + 排序钮行：registry 形态（搜索 = InputGroup 件，
@@ -630,7 +631,7 @@ export function AgentDetailPage() {
                         side="bottom"
                         sideOffset={8}
                         aria-label={t(MEMORY_UI_COPY.sort)}
-                        className="agent-memory-sort-menu w-auto min-w-[148px]"
+                        className="agent-memory-sort-menu w-auto min-w-37"
                       >
                         <DropdownMenuRadioGroup
                           value={memorySort}
@@ -647,11 +648,13 @@ export function AgentDetailPage() {
                   </span>
                 </div>
                 {visibleMemories.length === 0 ? (
-                  /* 搜不到 ≠ 没有记忆：canon 空态说的是「一条都没存过」，
-                     [设计] 另起一行，不改用 MEMORY_EMPTY_COPY。 */
-                  <p className="agent-memory-no-match m-0 text-sm text-muted-foreground">
-                    {t('没有匹配的记忆。')}
-                  </p>
+                  /* 搜不到 ≠ 没有记忆：零命中另起一个空态，不回落「尚无记忆」。 */
+                  <EmptyState
+                    icon={SearchX}
+                    title={t('没有匹配的记忆')}
+                    description={t('换个关键词再试。')}
+                    className="agent-memory-no-match"
+                  />
                 ) : (
                   /* XMON-117：记忆行落进同一张模板卡（一卡多行、行间分隔线），
                      不再一条一张描边卡。行不是 label/值对（没有左侧字段名），
@@ -697,14 +700,14 @@ export function AgentDetailPage() {
         )}
 
         {tab === 'permissions' && (
-          <div className="agent-perms flex flex-col gap-[18px]">
+          <div className="agent-perms flex flex-col gap-6">
             {/* XMON-80/P2：保存失败的显式反馈。本面无乐观更新——开关由服务端
                 值驱动，失败时控件压根没动过，所以「什么都不说」在用户侧 = 点了
                 没反应（XMON-78 实测）。文案是固定句，不透传 server / statusText
                 原文：500 的 body 对用户不可操作，且网络级失败的原文是英文串，
                 混进中文面反而更糊（todo-detail 的被拒提示行同律）。 */}
             {permSaveFailed && (
-              <p className="agent-perm-error m-0 text-xs leading-4 text-destructive" role="alert">
+              <p className="agent-perm-error m-0 text-meta text-destructive" role="alert">
                 {t('保存失败，请重试。')}
               </p>
             )}
@@ -712,7 +715,7 @@ export function AgentDetailPage() {
                 留作段头，行 = label（+ 说明副文案）左、开关右，与个人页的
                 推送通知行同形。 */}
             <section className="agent-perm-group flex flex-col gap-2">
-              <h3 className="m-0 text-sm font-medium text-foreground">{t('工具')}</h3>
+              <h3 className="m-0 text-card-title font-medium text-foreground">{t('工具')}</h3>
               <SettingsCard>
                 {AGENT_TOOL_SWITCHES.map((label) => (
                   <SettingsRow
@@ -739,7 +742,7 @@ export function AgentDetailPage() {
                   = 全量可读）与「限制后全不勾」（[] = 显式全拒）是两种状态，
                   由顶部开关互转；限制态逐技能勾选（MCP 段同形），默认携带面
                   （defaultSkill，概览）与本段互不影响。 */}
-              <h3 className="m-0 text-sm font-medium text-foreground">{t('授权技能')}</h3>
+              <h3 className="m-0 text-card-title font-medium text-foreground">{t('授权技能')}</h3>
               <p className={SETTINGS_HINT_CLS}>{t(AGENT_PERMISSION_COPY.skillsAllowlist)}</p>
               <SettingsCard>
                 <SettingsRow label={t('不限制')}>
@@ -770,7 +773,7 @@ export function AgentDetailPage() {
             </section>
 
             <section className="agent-perm-group flex flex-col gap-2">
-              <h3 className="m-0 text-sm font-medium text-foreground">{t('密钥')}</h3>
+              <h3 className="m-0 text-card-title font-medium text-foreground">{t('密钥')}</h3>
               {/* 授权粒度 = 原版的「全有全无」（#510）：一行「团队密钥 + 总
                   说明 + 单个 switch」。原版 Agent 权限 tab 不展开逐个密钥行
                   （2026-09-30 直读参考产品确认），密钥页的行菜单也只有编辑/
@@ -784,7 +787,7 @@ export function AgentDetailPage() {
                 // parts.tsx 同法），生产 build 里 scenario 参数本就被编译期
                 // 折叠、不参与路由。
                 <SettingsCard>
-                  <div className={cn(SETTINGS_ROW_CLS, 'items-baseline gap-2')}>
+                  <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>
                     <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无团队密钥。')}
                     </p>
@@ -822,11 +825,11 @@ export function AgentDetailPage() {
             <section className="agent-perm-group flex flex-col gap-2">
               {/* 段级说明（整组共用一句，不挂在单行上——挂哪一行都是任选），
                   形随模板的副文案档（12px 三级色）。 */}
-              <h3 className="m-0 text-sm font-medium text-foreground">{t('MCP 服务器')}</h3>
+              <h3 className="m-0 text-card-title font-medium text-foreground">{t('MCP 服务器')}</h3>
               <p className={SETTINGS_HINT_CLS}>{t(AGENT_PERMISSION_COPY.mcpServers)}</p>
               {mcpOptions.length === 0 ? (
                 <SettingsCard>
-                  <div className={cn(SETTINGS_ROW_CLS, 'items-baseline gap-2')}>
+                  <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>
                     <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无 MCP 服务器。')}
                     </p>
@@ -852,7 +855,7 @@ export function AgentDetailPage() {
                   声明位）+「哪些机器可跑它」读面（判定单源在 server——claim/
                   sweep 同一份 dispatch-eligibility 原语，本面只呈现）。读面
                   live 专属：fixture 场景无机器上报快照，缺席 = 只渲染写面。 */}
-              <h3 className="m-0 text-sm font-medium text-foreground">{t('机器匹配')}</h3>
+              <h3 className="m-0 text-card-title font-medium text-foreground">{t('机器匹配')}</h3>
               <p className={SETTINGS_HINT_CLS}>
                 {t(
                   '执行要求 = 派发硬闸：能力快照不满足的机器不领该 Agent 的步（排队面会给可见成因）；从未上报快照的机器按可跑放行。',
@@ -860,7 +863,7 @@ export function AgentDetailPage() {
               </p>
               {mcpOptions.length === 0 ? (
                 <SettingsCard>
-                  <div className={cn(SETTINGS_ROW_CLS, 'items-baseline gap-2')}>
+                  <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>
                     <p className="agent-perm-empty m-0 text-ui text-content-secondary">
                       {t('暂无 MCP 服务器。')}
                     </p>
@@ -889,7 +892,7 @@ export function AgentDetailPage() {
               {live && machineFitQ.data !== undefined && (
                 <SettingsCard>
                   {machineFitQ.data.machines.length === 0 ? (
-                    <div className={cn(SETTINGS_ROW_CLS, 'items-baseline gap-2')}>
+                    <div className={cn(SETTINGS_ROW_CLS, 'gap-2')}>
                       <p className="m-0 text-ui text-content-secondary">{t('暂无机器。')}</p>
                     </div>
                   ) : (

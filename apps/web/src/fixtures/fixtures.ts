@@ -151,4 +151,5 @@ export {
   teamOrgChartEmpty,
   teamOrgChartPair,
   teamOrgChartSingle,
+  teamRoster,
 } from './team.js';

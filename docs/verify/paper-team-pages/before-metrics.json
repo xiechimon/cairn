@@ -1,0 +1,50 @@
+{
+  "light-team-grid": {
+    "card": {
+      "w": 378,
+      "h": 76,
+      "radius": "14px",
+      "bg": "rgb(255, 255, 255)",
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+    },
+    "cardCount": 4,
+    "switchTrack": {
+      "w": 66,
+      "h": 28,
+      "radius": "10px",
+      "bg": "rgb(235, 228, 216)",
+      "shadow": "none"
+    },
+    "switchSelected": {
+      "w": 30,
+      "h": 21,
+      "radius": "8px",
+      "bg": "rgb(251, 249, 245)",
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+    }
+  },
+  "dark-team-grid": {
+    "card": {
+      "w": 378,
+      "h": 76,
+      "radius": "14px",
+      "bg": "rgb(38, 34, 31)",
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.934561 0.00473785 0.00706124 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+    },
+    "cardCount": 4,
+    "switchTrack": {
+      "w": 66,
+      "h": 28,
+      "radius": "10px",
+      "bg": "rgb(45, 41, 38)",
+      "shadow": "none"
+    },
+    "switchSelected": {
+      "w": 30,
+      "h": 21,
+      "radius": "8px",
+      "bg": "oklab(0.359166 0.00385408 0.00650811 / 0.3)",
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px"
+    }
+  }
+}

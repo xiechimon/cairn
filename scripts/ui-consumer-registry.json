@@ -51,7 +51,7 @@
     },
     {
       "file": "apps/web/src/routes/team-chart.tsx",
-      "anchor": "size-[18px]",
+      "anchor": "bg-spot-soft text-(--card-button)",
       "role": "badge-glyph",
       "reason": "Crown glyph on a bg-(--spot-soft) disc — kept as spot emphasis on the user-approved wave-1 ruling (0bfbdefa: 'Spot-emphasis usages kept (account lang check, team-chart crown on bg-(--spot-soft))').",
       "contrast": "docs/verify/1055/colors/incremental.md"
@@ -132,6 +132,20 @@
       "role": "indicator",
       "reason": "Detail top bar status for the three needs-you phases (icon + 失败/确认/审核, paper-redesign-plan PR 7). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 13.5px text)"
+    },
+    {
+      "file": "apps/web/src/routes/team-agent-grid.tsx",
+      "anchor": "unassigned: { icon: CircleAlert, label: '未设归属机', cls: 'text-(--card-button)' }",
+      "role": "indicator",
+      "reason": "Team agent card status for an agent with no home machine (icon + 未设归属机). It cannot take steps until the user assigns a machine, a needs-you state; DESIGN.md 颜色: accent is reserved for needs-you states, every status = icon + color + label.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 12px text)"
+    },
+    {
+      "file": "apps/web/src/routes/create-agent-dialog.tsx",
+      "anchor": "const NOTICE_LINK_CLS = 'ml-auto text-(--card-button) no-underline hover:underline'",
+      "role": "action-link",
+      "reason": "Fix-it link on the create-agent notice card (接入机器 / 配置服务商). DESIGN.md 颜色: accent marks operable links on cards.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 13.5px text)"
     },
     {
       "file": "apps/web/src/resources/providers-page.tsx",
