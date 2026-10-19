@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Issue #122 acceptance: the 外观 segmented row in the user-menu popover
 // drives applyTheme — instant repaint via the root .light class, persisted
-// under `pacman-theme`, segment data-active following the stored value.
+// under `pacman-theme`, segment aria-checked following the stored value.
 // The popover open state is a fixture flag (its open/close trigger lands
 // with the overlay ticket), so the row rides scenario 16d, which freezes
 // the capture with the menu open. The scheme-aware icon links are asserted
@@ -28,14 +28,14 @@ test('default dark: 深色 active; 浅色 click repaints instantly + persists', 
   await page.goto(ROUTE);
 
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
-  await expect(darkSeg(page)).toHaveAttribute('data-active', 'true');
-  await expect(lightSeg(page)).toHaveAttribute('data-active', 'false');
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
+  await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'false');
 
   await lightSeg(page).click();
 
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
-  await expect(lightSeg(page)).toHaveAttribute('data-active', 'true');
-  await expect(darkSeg(page)).toHaveAttribute('data-active', 'false');
+  await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'true');
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'false');
   expect(await page.evaluate((k) => localStorage.getItem(k), THEME_KEY)).toBe('light');
 });
 
@@ -47,13 +47,13 @@ test('selection survives reload', async ({ page }) => {
   await page.reload();
 
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
-  await expect(lightSeg(page)).toHaveAttribute('data-active', 'true');
+  await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'true');
   expect(await page.evaluate((k) => localStorage.getItem(k), THEME_KEY)).toBe('light');
 
   await darkSeg(page).click();
   await page.reload();
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
-  await expect(darkSeg(page)).toHaveAttribute('data-active', 'true');
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
 });
 
 test('injected storage pins the initial segment (storage injection path)', async ({ page }) => {
@@ -62,7 +62,7 @@ test('injected storage pins the initial segment (storage injection path)', async
   await page.goto(ROUTE);
 
   expect(await rootTheme(page)).toEqual({ theme: 'light', light: true });
-  await expect(lightSeg(page)).toHaveAttribute('data-active', 'true');
+  await expect(lightSeg(page)).toHaveAttribute('aria-checked', 'true');
 });
 
 test('clicking the active segment is a stable no-op', async ({ page }) => {
@@ -71,7 +71,7 @@ test('clicking the active segment is a stable no-op', async ({ page }) => {
 
   expect(await rootTheme(page)).toEqual({ theme: 'dark', light: false });
   expect(await page.evaluate((k) => localStorage.getItem(k), THEME_KEY)).toBe('dark');
-  await expect(darkSeg(page)).toHaveAttribute('data-active', 'true');
+  await expect(darkSeg(page)).toHaveAttribute('aria-checked', 'true');
 });
 
 // #787 (base-ui-theme F8): the .light flip repaints every token at once —

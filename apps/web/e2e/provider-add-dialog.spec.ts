@@ -21,8 +21,8 @@ import { expect, type Page, test } from '@playwright/test';
 // #944/#910 载体:.res-new → role+文案;.dlg-provider-search → getByLabel;
 // .dlg-provider-preset → [data-preset-id] 二级载体;.dlg-provider-custom/
 // -create/-back/-model-add → getByRole(button)+文案(exact 防「添加模型」
-// 前缀吞「添加模型服务」);.dlg-provider-seg-tab → role=tab(aria-selected
-// 断言语义不动,正典表 §5.4);.dlg-provider-badge/-note → 文案一级;
+// 前缀吞「添加模型服务」);.dlg-provider-seg-tab → 表单 Select
+// (combobox「API 协议」,三个协议名放不进分段);.dlg-provider-badge/-note → 文案一级;
 // #dlg-provider-* id 原样保留(§5.6)。#952/#910 重钉：壳级 .dlg/.dlg-title/
 // .dlg-close → getByRole(dialog) 可及名 / getByRole(button 关闭)（§5.5）。
 
@@ -105,10 +105,10 @@ test('自定义端点 opens the existing form (fields and defaults unchanged); �
   await expect(dialog.locator('#dlg-provider-baseurl')).toBeVisible();
   await expect(dialog.locator('#dlg-provider-apikey')).toBeVisible();
   // r3 §2 defaults: OpenAI Completions protocol active, Bearer checkbox on
-  // (协议段 = Tabs 件,选中态载体 role=tab + aria-selected,正典表 §5.4)
-  await expect(
-    dialog.getByRole('tab', { name: 'OpenAI Completions' }),
-  ).toHaveAttribute('aria-selected', 'true');
+  // (协议 = 表单 Select,选中值在 combobox 文案上)
+  await expect(dialog.getByRole('combobox', { name: 'API 协议' })).toContainText(
+    'OpenAI Completions',
+  );
   await expect(dialog.locator('#dlg-provider-authheader')).toBeChecked();
   await expect(dialog.getByRole('button', { name: '添加模型服务' })).toBeDisabled();
   // 返回列表
@@ -150,7 +150,7 @@ test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
 });
 
-test('providerId/label/baseUrl gate the submit; protocol segment swaps', async ({ page }) => {
+test('providerId/label/baseUrl gate the submit; protocol select swaps', async ({ page }) => {
   const dialog = await openCustomForm(page);
   const submit = dialog.getByRole('button', { name: '添加模型服务' });
   await expect(submit).toBeDisabled();
@@ -160,14 +160,11 @@ test('providerId/label/baseUrl gate the submit; protocol segment swaps', async (
   await expect(submit).toBeDisabled();
   await dialog.locator('#dlg-provider-baseurl').fill('https://relay-355.example.com/v1');
   await expect(submit).toBeEnabled();
-  // protocol segment swaps the selection
-  await dialog.getByRole('tab', { name: 'Anthropic Messages' }).click();
-  await expect(
-    dialog.getByRole('tab', { name: 'Anthropic Messages' }),
-  ).toHaveAttribute('aria-selected', 'true');
-  await expect(
-    dialog.getByRole('tab', { name: 'OpenAI Completions' }),
-  ).toHaveAttribute('aria-selected', 'false');
+  // protocol select swaps the value
+  const api = dialog.getByRole('combobox', { name: 'API 协议' });
+  await api.click();
+  await page.getByRole('option', { name: 'Anthropic Messages' }).click();
+  await expect(api).toContainText('Anthropic Messages');
 });
 
 test('fixture submit closes the dialog (accept 律) and reopens a clean picker', async ({

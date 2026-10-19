@@ -169,8 +169,8 @@ test('schedules fixture face: topbar 新建 opens the dialog, freq tabs respond,
   await expect(dialog).toBeVisible();
   // 频率 tabs 在冻结面同样是真 tabs：点 每周 选中即跟（旧态 = 受控 value
   // 无 onValueChange，点击不动的死面）。
-  await dialog.getByRole('tab', { name: '每周' }).click();
-  await expect(dialog.locator('.sched-form-freq-tab[aria-selected="true"]')).toHaveText('每周');
+  await dialog.getByRole('radio', { name: '每周' }).click();
+  await expect(dialog.locator('.sched-form-freq-tab[aria-checked="true"]')).toHaveText('每周');
   await dialog.getByRole('button', { name: '保存' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.locator('.sched-card')).toHaveCount(1);

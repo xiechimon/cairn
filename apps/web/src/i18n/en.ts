@@ -218,6 +218,7 @@ export const EN: Record<string, string> = {
   '没有与“{q}”匹配的结果': 'No results matching “{q}”',
 
   // —— schedules route (r3 §9, 02 §9.2) ——
+  频率: 'Frequency',
   每小时: 'Hourly',
   每天: 'Daily',
   每周: 'Weekly',

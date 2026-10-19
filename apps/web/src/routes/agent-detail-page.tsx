@@ -69,6 +69,7 @@ import { toModelOptions, toThinkingLevelDisplay } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
 import { ProfileHeader, useEditorFocus } from '../components/profile-card.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import {
   SETTINGS_HINT_CLS,
   SETTINGS_ROW_CLS,
@@ -97,7 +98,6 @@ import {
 } from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
 import { Switch } from '../components/ui/switch.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { toastError } from '../components/ui/toaster.js';
 import { isDeleted, markDeleted } from '../fixtures/deletions.js';
@@ -379,18 +379,14 @@ export function AgentDetailPage() {
   return (
     <PageShell route={AGENTS_HREF} title={agent.displayName} back="/app/team" fixture={fixture}>
       <div className="agent-detail flex flex-col gap-4">
-        {/* tabs = registry Tabs default 档原形（手写 SEG_* 发丝环皮肤退役，
-            #982 tabs 判决）；agent-tabs/agent-tab 别名留存（e2e 句柄），
-            选中载体 = data-active/aria-selected。 */}
-        <Tabs value={tab} onValueChange={(value) => setTab(value as AgentTab)}>
-          <TabsList className="agent-tabs" aria-label={t('Agent')}>
-            {TAB_LABELS.map((item) => (
-              <TabsTrigger key={item.id} value={item.id} className="agent-tab px-3">
-                {t(item.label)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <SegmentedTabs
+          className="agent-tabs"
+          optionHandle="agent-tab"
+          label={t('Agent')}
+          value={tab}
+          onChange={setTab}
+          options={TAB_LABELS.map((item) => ({ value: item.id, label: t(item.label) }))}
+        />
 
         {tab === 'overview' && (
           <div className="agent-overview flex flex-col gap-3.5">

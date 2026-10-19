@@ -4,11 +4,11 @@
 // with CSS would still draw a divider against the card edge.
 
 import { cn } from 'cn';
-import { type KeyboardEvent, type ReactNode, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { FORM_CONTROL_CLS } from './form-layout.js';
 import { Button } from './ui/button.js';
 import { Card } from './ui/card.js';
-import { DIALOG_PRIMARY_BUTTON, PICKER_ROW_SELECTED } from './ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON } from './ui/dialog-shell.js';
 
 /** The one card corner (DESIGN.md rounded.card, `--radius-card`). */
 export const CARD_RADIUS_CLS = 'rounded-(--radius-card)';
@@ -166,72 +166,5 @@ export function SettingsDangerZone({
   );
 }
 
-interface SegmentOption<T extends string> {
-  value: T;
-  label: string;
-  testId?: string;
-}
-
-/** Single-choice segmented control: paper track, the chosen option a white tab
- *  with a 1px ring. Radio-group semantics with arrow-key movement. */
-export function SettingsSegmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: SegmentOption<T>[];
-  onChange: (next: T) => void;
-}) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const onKeyDown = (event: KeyboardEvent, index: number) => {
-    const step =
-      event.key === 'ArrowRight' || event.key === 'ArrowDown'
-        ? 1
-        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
-          ? -1
-          : 0;
-    if (step === 0) return;
-    event.preventDefault();
-    const next = (index + step + options.length) % options.length;
-    const option = options[next];
-    if (option === undefined) return;
-    onChange(option.value);
-    refs.current[next]?.focus();
-  };
-  return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className="inline-flex h-8 items-center gap-0.5 rounded-md bg-canvas p-0.5"
-    >
-      {options.map((option, index) => {
-        const checked = option.value === value;
-        return (
-          <Button
-            key={option.value}
-            ref={(el) => {
-              refs.current[index] = el;
-            }}
-            variant="ghost"
-            role="radio"
-            aria-checked={checked}
-            tabIndex={checked ? 0 : -1}
-            data-active={checked}
-            data-testid={option.testId}
-            className={cn(
-              'h-7 rounded-(--cds-radius-md) px-3 text-ui font-normal text-content-secondary hover:bg-transparent hover:text-foreground dark:hover:bg-transparent',
-              checked && cn(PICKER_ROW_SELECTED, 'font-medium text-foreground'),
-            )}
-            onClick={() => onChange(option.value)}
-            onKeyDown={(event) => onKeyDown(event, index)}
-          >
-            {option.label}
-          </Button>
-        );
-      })}
-    </div>
-  );
-}
+/** Single-choice control inside a settings row: the shared segmented radio. */
+export { SegmentedRadio as SettingsSegmented } from './segmented.js';

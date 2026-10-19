@@ -15,9 +15,9 @@ import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@pacman/shared';
 import { useState } from 'react';
 import { useApiMutations, useChief, useMachines, useMembers, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { Tabs, TabsIndicator, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight, ChiefFaceDashed } from '../icons/index.js';
@@ -51,33 +51,6 @@ const EMPTY_CARD_CLS =
 /** 列表卡（旧 .chief-memory-card/.chief-watch-card 等值，XMON-117 一卡多行
  *  律；8px 一次性档收敛回 registry Card rounded-xl，#1054，ADR 0012 D1）。 */
 const LIST_CARD_CLS = 'mt-[17px] rounded-xl bg-(--secondary) text-[13px]';
-
-/** tab chip（#950 清零，旧 .chief-tab 等值：26 高 / 11 横垫 / 13px 次级墨 /
- *  透明底，圆角骑件默认 trigger 档 rounded-md（#1054）；z-[1] 压在滑动
- *  指示条之上）。选中态载体 = aria-selected
- *  （Base UI 自带，#910 裁定 3——旧 .is-active 类退役）：primary 墨 + 600。
- *  hover tint 只给未选中 chip、只吃精细指针（#73/#138 律）；过渡只动
- *  background-color（旧律：选中墨切换瞬切不过渡）。
- *  尾段 = 上游基类中和层（#1003，bare 档退役后 chip 骑 registry default 档
- *  trigger）：font-medium → 400；hover 墨提亮钉回次级墨（只打未选中，选中
- *  chip 的墨由 aria-selected 段承载）；data-active 漆面/阴影中和为透明——
- *  选中底色由滑动指示条（TAB_INDICATOR_CLS，z-0）承载，chip 本体恒透明。 */
-const TAB_CLS =
-  'relative z-[1] h-[26px] cursor-pointer border-none bg-transparent px-[11px] text-[13px] text-(--text-secondary) transition-[background-color] duration-(--dur-fast) ease-(--ease-standard) pointer-fine:hover:aria-[selected=false]:bg-(--seg-hover) aria-selected:font-semibold aria-selected:text-(--foreground) font-normal hover:aria-[selected=false]:text-(--text-secondary) dark:hover:aria-[selected=false]:text-(--text-secondary) data-active:bg-transparent data-active:shadow-none dark:data-active:bg-transparent';
-
-/** 滑动指示条（#644，旧 .chief-tab-indicator 等值）：Base UI 把激活 chip 的
- *  几何写进内联 --active-tab-* 自定义属性，pill 垫在 chip 下层（z-0）按
- *  参考站实测过渡滑动——left/top/width/height 各 150ms ease（todos.dev 真
- *  浏览器实测，ease 即 cubic-bezier(0.25,0.1,0.25,1)，非 --ease-standard）。
- *  transition 走任意值 shorthand 而非 transition-[…] + duration 拆件：四条
- *  逐属性声明的 computed 读回是 4 元列表（'0.15s, 0.15s, 0.15s, 0.15s' /
- *  'ease, ease, ease, ease'），segmented-controls 探针按旧 CSS 逐字钉该形。
- *  减弱动效瞬切（r1 §4.3 全站降级律，motion-reduce 承旧 reduce 块）。
- *  pill 圆角接 registry Tabs trigger 档 rounded-md（#1054 清点：#644 判决
- *  「pill shape carried by consumer CSS」的 shape 归件默认词汇；与 lg 列表
- *  p-0.5 内衬成同心圆角 10−2=8px）。 */
-const TAB_INDICATOR_CLS =
-  'pointer-events-none absolute left-(--active-tab-left) top-(--active-tab-top) z-0 h-(--active-tab-height) w-(--active-tab-width) rounded-md bg-(--chief-tab-active) shadow-[0_1px_2px_0_rgb(0_0_0/0.05)] [transition:left_var(--dur-fast)_ease,top_var(--dur-fast)_ease,width_var(--dur-fast)_ease,height_var(--dur-fast)_ease] motion-reduce:[transition:none]';
 
 /** 已绑定 Agent 行头像（旧 .chief-agent-row-avatar 等值：首字母 chip =
  *  24 圆盘 surface 底 + 墨线框；--img 律去 chip 底边，图即圆盘）。 */
@@ -188,28 +161,12 @@ export function ChiefSettings({
           overflow-x 保持裁切：窄列内容不该横向溢出（页面壳仍是唯一裁切者）。 */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
         <div className="mx-auto w-[766px]">
-          {/* XMON-23 收编：Tabs 件——原语只出语义（role=tablist/tab、
-            aria-selected、roving tabindex），几何/配色/选中态由
-            TAB_CLS/TAB_INDICATOR_CLS utility 承载；选中态载体 =
-            aria-selected（旧 is-active 类退役，e2e 钉 role=tab+selected）。
-            #1003 起 bare 档退役：骑 registry default 档，上游基类穿透由
-            TAB_CLS 尾段中和。根 contents 出树，不产生布局盒。 */}
-          <Tabs
+          <SegmentedTabs
+            slide
             value={tab}
-            onValueChange={(value) => setTab(value as ChiefSettingsTab)}
-            className="contents"
-          >
-            <TabsList className="relative inline-flex bg-(--secondary) p-0.5 group-data-horizontal/tabs:h-auto">
-              {/* #644 滑动指示条：选中 chip 的底色不再画在 chip 上，改由这根
-                pill 承载——切 tab 时它按参考站实测的过渡滑到新位并变宽。 */}
-              <TabsIndicator data-testid="chief-tab-indicator" className={TAB_INDICATOR_CLS} />
-              {TABS.map((item) => (
-                <TabsTrigger key={item.id} value={item.id} className={TAB_CLS}>
-                  {t(item.label)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+            onChange={setTab}
+            options={TABS.map((item) => ({ value: item.id, label: t(item.label) }))}
+          />
 
           {tab === 'agent' && (
             <>

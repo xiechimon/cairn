@@ -192,7 +192,7 @@ test('外观 row works from the click-opened menu and the choice survives reopen
   await userChip(page).click();
 
   const light = page.locator('.user-menu-seg button', { hasText: '浅色' });
-  await expect(light).toHaveAttribute('data-active', 'false'); // scenario 01 rides dark
+  await expect(light).toHaveAttribute('aria-checked', 'false'); // scenario 01 rides dark
   await light.click();
 
   expect(
@@ -204,7 +204,7 @@ test('外观 row works from the click-opened menu and the choice survives reopen
   await page.keyboard.press('Escape');
   await expect(menu(page)).toBeHidden();
   await userChip(page).click();
-  await expect(light).toHaveAttribute('data-active', 'true');
+  await expect(light).toHaveAttribute('aria-checked', 'true');
 });
 
 test('detail route: the trigger opens the menu over the confirm surface', async ({ page }) => {

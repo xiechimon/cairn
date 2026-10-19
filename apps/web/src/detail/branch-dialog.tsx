@@ -26,13 +26,13 @@ import { useState } from 'react';
 import { api } from '../api/client.js';
 import { useBuild, useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Switch } from '../components/ui/switch.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { BranchInfoContent } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -259,32 +259,15 @@ export function BranchDialog({ info, buildId: buildIdProp, open, onClose }: Bran
   return (
     <DialogShell
       headerCenter={
-        // #945（正典表 §5.4）：seg 走 Tabs 件 default 档（registry 几何）。
-        // #138 家族 hover tint 保留在消费端 utility（--seg-hover token 承载，
-        // 未选中档专属）——前提④「用户自行决定只经 token 层生效」的合法
-        // 通道，非手写皮肤；registry TabsTrigger 自带的 hover:text 反馈
-        // 同时生效。选中态载体 = role=tab + aria-selected + data-active
-        // （Base UI 自带）不动。
-        <Tabs value={tab} onValueChange={(value) => setTab(value as 'sync' | 'git')}>
-          <TabsList aria-label={t('分支与 PR')}>
-            <TabsTrigger
-              value="sync"
-              className={
-                tab === 'sync' ? undefined : 'hover:bg-(--seg-hover) dark:hover:bg-(--seg-hover)'
-              }
-            >
-              {t('同步到机器')}
-            </TabsTrigger>
-            <TabsTrigger
-              value="git"
-              className={
-                tab === 'git' ? undefined : 'hover:bg-(--seg-hover) dark:hover:bg-(--seg-hover)'
-              }
-            >
-              Git
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <SegmentedTabs
+          label={t('分支与 PR')}
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'sync', label: t('同步到机器') },
+            { value: 'git', label: 'Git' },
+          ]}
+        />
       }
       open={open}
       onClose={onClose}
