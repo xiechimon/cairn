@@ -5,9 +5,9 @@
 // models[] 投影；claude-code 段 = 各执行机 daemon 读本机
 // ~/.claude/settings.json 经 presence/enroll 上报、server 按机器聚合
 // （#707；缺失/解析失败 → header 转「未安装」指引态，不空报不崩）。
-// 每 tab = header 卡（runtime 名 + 一行说明 +
-// 安装态）+ 模型行（显示名 → 模型 id）；claude-code tab 按机器分段
-// （每台机器一张 header 卡 + 模型行）；「Pacman（内置）」facade 行与
+// 每 tab = header（runtime 名 + 一行说明 +
+// 安装态，卡上方的头部）+ 一张模型行卡（显示名 + 模型 id，槽位在右）；
+// claude-code tab 按机器分段（每台机器一个头部 + 模型行卡）；「Pacman（内置）」facade 行与
 // 38 项 preset 列表行已除（数据层全留，preset 仅在添加服务商 picker
 // dialog 内出现，A5/A6）。A7 行可点感收编：模型行纯展示无 handler，
 // 不渲染 chevron/三点装饰。
@@ -17,16 +17,14 @@
 // （state 缺或过期——原裸 400 JSON 面退役，同律 302 着陆）。
 import { MODEL_SOURCE_RUNTIMES, type ModelSource, type ModelSourceRuntime } from '@pacman/shared';
 import { cn } from 'cn';
+import { CircleAlert, CircleCheck, Cpu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useModelSources } from '../api/hooks.js';
 import { RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, PiMark } from '../components/brand-marks.js';
-import { Badge } from '../components/ui/badge.js';
-import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
-import { Empty, EmptyContent, EmptyDescription } from '../components/ui/empty.js';
+import { EmptyState } from '../components/empty-state.js';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -34,7 +32,15 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateProviderDialog } from './create-provider-dialog.js';
-import { GroupCard, ResourceNewButton, RowDesc, RowLine, RowText, RowTitle } from './parts.js';
+import {
+  ResourceList,
+  ResourceNewButton,
+  ResourceRow,
+  RowDesc,
+  RowMeta,
+  RowText,
+  RowTitle,
+} from './parts.js';
 
 export const PROVIDERS_HREF = '/app/resources/providers';
 
@@ -55,6 +61,16 @@ const RUNTIME_MARKS: Record<ModelSourceRuntime, typeof PiMark> = {
   'claude-code': ClaudeMark,
 };
 
+/** Paper segmented face on the registry Tabs (tab semantics kept: each runtime
+ *  is its own view): paper track, the chosen runtime a white tab with a 1px
+ *  ring, the same face as SettingsSegmented. */
+/** Needs-you ink (未安装 / 未登录): the accent, DESIGN.md 颜色. */
+const NEEDS_YOU_INK = 'text-(--card-button)';
+
+const RUNTIME_TABS_LIST_CLS = 'h-8 gap-0.5 rounded-md bg-canvas p-0.5';
+const RUNTIME_TAB_CLS =
+  'h-7 flex-none rounded-(--cds-radius-md) border-0 px-3 text-ui font-normal text-content-secondary hover:text-foreground dark:text-content-secondary data-active:bg-card data-active:font-medium data-active:text-foreground data-active:shadow-xs data-active:ring-1 data-active:ring-border dark:data-active:bg-card dark:data-active:text-foreground';
+
 const isRuntime = (value: string | null): value is ModelSourceRuntime =>
   value !== null && (MODEL_SOURCE_RUNTIMES as readonly string[]).includes(value);
 
@@ -70,9 +86,9 @@ function parseRuntime(searchParams: URLSearchParams): ModelSourceRuntime {
  *  说「未安装」；二进制在而没写配置说「已安装，未配置模型槽」（补法也不同）。
  *  二进制三态（别压平）：对象 = 探到了；`null` = 探过了没有；缺席 = 没探过
  *  （老 daemon）——那一路退回「只看 installed」的旧行为，且不写「未知」。
- *  #1005 registry 对齐：皮肤 = Card 件默认（rounded-xl / ring-1 / bg-card），
- *  横垫是 layout；行间节奏走件默认 gap。
- *  data-testid="runtime-head" = #910 二级结构载体（卡片无 role，几何与
+ *  Paper 设置列表：头部在模型行卡上方，不是卡；需要你处理的状态（未安装 /
+ *  未登录）走赭红 + 图标。
+ *  data-testid="runtime-head" = #910 二级结构载体（头部无 role，几何与
  *  安装态断言的锚；data-runtime 继续做 runtime 维度筛选）；data-auth 承载
  *  凭据态供 e2e 断言。 */
 type HeadState = 'installed' | 'no-config' | 'bin-missing' | 'unknown';
@@ -99,43 +115,45 @@ function RuntimeHead({ source }: { source: ModelSource }) {
       : state === 'bin-missing' || state === 'unknown'
         ? t('安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。')
         : null;
+  const needsYou = state === 'bin-missing' || state === 'unknown';
+  const StateIcon = needsYou ? CircleAlert : CircleCheck;
   return (
-    <Card
+    <div
       data-testid="runtime-head"
       data-runtime={source.runtime}
       data-auth={source.auth?.state}
       data-state={state}
-      className="mt-4 gap-1 px-4 py-3.5"
+      className="mt-6 flex flex-col gap-0.5 px-1"
     >
       <div className="flex items-center gap-2">
-        <span className="text-sm leading-5 font-semibold text-(--foreground)">
+        <span className="text-ui font-medium text-foreground">
           {RUNTIME_LABELS[source.runtime]}
         </span>
-        {state === 'installed' ? (
-          <span className="text-xs leading-4 text-(--text-tertiary)">
-            {t('已安装在 {hostname}', { hostname: source.hostname })}
-          </span>
-        ) : state === 'no-config' ? (
-          <span className="text-xs leading-4 text-(--text-tertiary)">
-            {t('已安装，未配置模型槽')}
-          </span>
-        ) : (
-          <span className="text-xs leading-4 text-(--tile-orange-fg)">{t('未安装')}</span>
-        )}
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 text-meta',
+            needsYou ? NEEDS_YOU_INK : 'text-content-tertiary',
+          )}
+        >
+          <StateIcon aria-hidden strokeWidth={1.75} className="size-3.5" />
+          {state === 'installed'
+            ? t('已安装在 {hostname}', { hostname: source.hostname })
+            : state === 'no-config'
+              ? t('已安装，未配置模型槽')
+              : t('未安装')}
+        </span>
       </div>
       {binFound && (
-        <p data-testid="runtime-bin" className="m-0 text-xs leading-4 text-(--text-tertiary)">
+        <p data-testid="runtime-bin" className="m-0 text-meta text-content-tertiary">
           {`claude${bin.version !== null ? ` ${bin.version}` : ''} · ${bin.path}`}
-          {notLoggedIn && <span className="text-(--tile-orange-fg)">{` · ${t('未登录')}`}</span>}
+          {notLoggedIn && <span className={NEEDS_YOU_INK}>{` · ${t('未登录')}`}</span>}
         </p>
       )}
-      <p className="m-0 text-xs leading-4 text-(--text-tertiary)">
+      <p className="m-0 text-meta text-content-tertiary">
         {t(RUNTIME_DESCRIPTIONS[source.runtime])}
       </p>
-      {guidance !== null && (
-        <p className="m-0 text-xs leading-4 text-(--text-tertiary)">{guidance}</p>
-      )}
-    </Card>
+      {guidance !== null && <p className="m-0 text-meta text-content-tertiary">{guidance}</p>}
+    </div>
   );
 }
 
@@ -197,19 +215,18 @@ export function ProvidersPage() {
           value/onValueChange 落回原 selectRuntime（写 ?runtime=、历史入栈、
           回退键可用），role=tablist/tab 与 aria-selected 由 Base UI 承载，
           data-runtime 句柄原样透出——spec 载体 = role/文案/data-runtime。
-          #1005 registry 对齐：分段皮肤（SEG_* 配方）退役，Tabs 走 registry
-          default 档原生形态（bg-muted 圆角组盒 + data-active bg-background
-          选中片，#982 tabs 判决的终态）。两 tab 前置各自品牌 mark
+          Paper 分段面（RUNTIME_TABS_LIST_CLS / RUNTIME_TAB_CLS）。两 tab
+          前置各自品牌 mark
           （components/brand-marks.tsx，机器行 #503 同源消费；间距走件默认
           gap-1.5）。mark aria-hidden，文案照常渲染——可访问名 =
           RUNTIME_LABELS，读屏与 e2e 的 toHaveText('pi'/'Claude Code') 都不
           受影响。 */}
       <Tabs value={runtime} onValueChange={(value) => selectRuntime(value as ModelSourceRuntime)}>
-        <TabsList aria-label={t('模型服务')}>
+        <TabsList className={RUNTIME_TABS_LIST_CLS} aria-label={t('模型服务')}>
           {MODEL_SOURCE_RUNTIMES.map((rt) => {
             const Mark = RUNTIME_MARKS[rt];
             return (
-              <TabsTrigger key={rt} value={rt} data-runtime={rt}>
+              <TabsTrigger key={rt} value={rt} data-runtime={rt} className={RUNTIME_TAB_CLS}>
                 <Mark className="block flex-none" />
                 {RUNTIME_LABELS[rt]}
               </TabsTrigger>
@@ -222,77 +239,59 @@ export function ProvidersPage() {
         <div key={`${source.hostname}:${si}`}>
           <RuntimeHead source={source} />
           {source.models.length > 0 ? (
-            /* 卡间垂直间距 = 16px（--card-spacing，上游 Card 内节奏同值）——
-               用户复核 #1057：头卡与模型卡贴零间距；只补几何不动结构。 */
-            <GroupCard className="mt-4">
+            <ResourceList className="mt-3">
               {source.models.map((model, i) => (
-                <div
+                <ResourceRow
                   // pi 段跨 provider 平铺，模型 id 偶发撞名——索引兜底保唯一。
                   key={`${model.id}:${i}`}
-                  className={cn(
-                    // 行节奏：py-3（12px）让 52px _floor 行有呼吸（内容 36px
-                    // + 上下 24px = 60px），分隔线两侧不再贴字。
-                    'flex min-h-[52px] items-center px-4 py-3',
-                    i > 0 && 'border-t border-(--border)',
-                    // #1288：dead 模型置灰（不隐藏）——透明度降低而非整行退场。
-                    model.liveness === 'dead' && 'opacity-50',
-                  )}
+                  // #1288：dead 模型置灰（不隐藏）。
+                  className={cn(model.liveness === 'dead' && 'opacity-50')}
                   data-runtime={source.runtime}
                   data-model-id={model.id}
                   data-liveness={model.liveness ?? 'unknown'}
                 >
                   <RowText>
-                    <RowLine>
-                      <RowTitle>{model.name}</RowTitle>
-                      {/* #423 Badge 收编（#422 裁决）；#1005 registry 对齐：
-                          outline 档默认形（描边 pill / h-5 / text-xs），橙墨
-                          保留 --tile-orange-fg 槽（token 层）。 */}
-                      {model.slot != null && (
-                        <Badge variant="outline" className="text-(--tile-orange-fg)">
-                          {model.slot}
-                        </Badge>
-                      )}
-                      {/* #1288：死模型标注「已下架」（不隐藏，保可见性）。 */}
-                      {model.liveness === 'dead' && (
-                        <Badge variant="outline" className="text-(--text-tertiary)">
-                          {t('已下架')}
-                        </Badge>
-                      )}
-                    </RowLine>
+                    <RowTitle>{model.name}</RowTitle>
                     <RowDesc>{model.id}</RowDesc>
                   </RowText>
-                </div>
+                  {(model.slot != null || model.liveness === 'dead') && (
+                    <span className="flex items-center gap-3">
+                      {model.liveness === 'dead' && <RowMeta>{t('已下架')}</RowMeta>}
+                      {model.slot != null && <RowMeta className="font-mono">{model.slot}</RowMeta>}
+                    </span>
+                  )}
+                </ResourceRow>
               ))}
-            </GroupCard>
+            </ResourceList>
           ) : source.runtime === 'pi' ? (
-            // A3 空态：引导开添加服务商 picker（picker 面见
-            // verify features/provider-picker.md）。data-testid =
-            // #910 二级结构载体（原 .res-runtime-empty）。#1005 registry
-            // 对齐：Empty 件默认档（居中列），主钮 sm 默认形。
-            <Empty data-testid="runtime-empty" className="mt-4">
-              <EmptyDescription>
-                {t('尚未添加服务商。添加后，服务商的模型会出现在这里。')}
-              </EmptyDescription>
-              <EmptyContent>
-                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                  {t('添加模型服务')}
-                </Button>
-              </EmptyContent>
-            </Empty>
+            <EmptyState
+              testId="runtime-empty"
+              className="mt-3"
+              icon={Cpu}
+              title={t('尚未添加服务商。')}
+              description={t('添加后，服务商的模型会出现在这里。')}
+              action={{ label: t('添加模型服务'), onClick: () => setCreateOpen(true) }}
+            />
           ) : (
             source.installed && (
-              <Empty data-testid="runtime-empty" className="mt-4">
-                <EmptyDescription>{t('settings.json 未配置模型槽。')}</EmptyDescription>
-              </Empty>
+              <EmptyState
+                testId="runtime-empty"
+                className="mt-3"
+                icon={Cpu}
+                title={t('settings.json 未配置模型槽。')}
+              />
             )
           )}
         </div>
       ))}
       {matching.length === 0 && (
         // #707：尚无执行机上报过（旧 daemon / 未注册）——缺席不断言未安装。
-        <Empty data-testid="runtime-empty" className="mt-4">
-          <EmptyDescription>{t('尚无执行机上报模型信息。')}</EmptyDescription>
-        </Empty>
+        <EmptyState
+          testId="runtime-empty"
+          className="mt-6"
+          icon={Cpu}
+          title={t('尚无执行机上报模型信息。')}
+        />
       )}
       <CreateProviderDialog
         open={createOpen}

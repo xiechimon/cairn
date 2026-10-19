@@ -20,13 +20,13 @@
 // 表单往返不带残值）。
 // #944 正典表执行（spec/22 §5.1/§5.3/§5.4）：老 ui/input 六处 →
 // components/ui Input（36px→h-8 32px，§2.6-1，getByLabel/placeholder 载体
-// 不动）；.dlg-provider-create → Button default w-full；
+// 不动）；
 // .dlg-form-seg/.dlg-provider-seg-tab → Tabs 件 default 档（block 形态 =
 // TabsList w-full + TabsTrigger flex-1，选中态载体 = role=tab +
 // aria-selected，data-active 断言退役）；行钮收编 Button（#851 裸控件账）。
 // data-preset-id 保留 = 行级二级载体。
-// #1005 registry 对齐：密钥表单改 Field 官方组合（FieldGroup/Field/
-// FieldLabel/FieldTitle/FieldDescription），LABEL_CLS/NOTE_CLS 手排配方退役；
+// Paper 表单（DESIGN.md 页面模式 · 表单）：密钥表单 = FormStack / FormField，
+// footer = FormActions（取消 + 添加模型服务，不是整宽提交条）；
 // picker 行钮走 Button outline 默认档、行右 chip 走 Badge 默认档（PICKER_ROW/
 // ROW_CHIP 皮肤配方退役）；ghost 文字钮的七通道中和退役（件默认 hover/按下
 // 态回归）。
@@ -39,25 +39,18 @@ import {
   type ProviderApi,
 } from '@pacman/shared';
 import { useEffect, useState } from 'react';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from '../components/ui/field.js';
+import { Field, FieldDescription, FieldError, FieldTitle } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, PlusSmall } from '../icons/index.js';
 
-/** 弹窗体容器垫（DialogShell 体无内垫，容器 layout 归消费点）。 */
-const FORM_CLS = 'px-4 pt-4 pb-3';
+const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
 /** picker 行钮（preset 38 行 + 自定义端点入口）：Button outline 默认档 +
  *  左对齐 layout（#1005：皮肤/状态全走件默认）。 */
@@ -246,18 +239,22 @@ export function CreateProviderDialog({
       title={t('添加模型服务')}
       open={open}
       onClose={onClose}
-      // #1006 段 2（dialog-shell 零皮化的消费点清理）：剥 footer 包装 div
-      // （band 自带 p-4；包装会把 w-full 钮塌成内容宽），裸钮直进。
       footer={
         view === 'form' ? (
-          <Button className="w-full" disabled={!ready || pending === true} onClick={submit}>
-            {t('添加模型服务')}
-          </Button>
+          <FormActions
+            className="pt-0"
+            primary={{
+              label: t('添加模型服务'),
+              onClick: submit,
+              disabled: !ready || pending === true,
+            }}
+            secondary={{ label: t('取消'), onClick: onClose }}
+          />
         ) : undefined
       }
     >
       {view === 'picker' ? (
-        <div className={`flex flex-col gap-3 ${FORM_CLS}`}>
+        <div className="flex flex-col gap-3 py-1">
           <Input
             // spec/verify 载体 = aria-label 一级（getByLabel('搜索服务商...')，
             // #910/#944——原 .dlg-provider-search/.dlg-picker-search 类名钩
@@ -322,13 +319,13 @@ export function CreateProviderDialog({
           </Button>
         </div>
       ) : (
-        <FieldGroup className={FORM_CLS}>
+        <FormStack className="max-w-none py-1">
           {/* 返回钮 = Button ghost 默认档（#1005：七通道中和退役，hover/
               按下态由件承载）；贴左 px-0 与 secondary 墨（token 槽）是
               layout/ink。 */}
           <Button
             variant="ghost"
-            className="self-start px-0 text-(--text-secondary)"
+            className="self-start px-0 text-content-secondary"
             onClick={() => setView('picker')}
           >
             <ChevronLeft />
@@ -339,34 +336,34 @@ export function CreateProviderDialog({
           {preset?.id === PROVIDER_XAI_PRESET.id && (
             <FieldDescription>{PROVIDER_XAI_PRESET.oauthLabel}</FieldDescription>
           )}
-          <Field>
-            <FieldLabel htmlFor="dlg-provider-id">{t('服务商 ID')}</FieldLabel>
+          <FormField label={t('服务商 ID')} htmlFor="dlg-provider-id">
             <Input
               id="dlg-provider-id"
+              className={FORM_CONTROL_CLS}
               value={providerId}
               onChange={(event) => setProviderId(event.target.value)}
               placeholder={t('例如 my-relay')}
             />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-provider-label">{t('名称')}</FieldLabel>
+          </FormField>
+          <FormField label={t('名称')} htmlFor="dlg-provider-label">
             <Input
               id="dlg-provider-label"
+              className={FORM_CONTROL_CLS}
               value={label}
               onChange={(event) => setLabel(event.target.value)}
             />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-provider-baseurl">Base URL</FieldLabel>
+          </FormField>
+          <FormField label="Base URL" htmlFor="dlg-provider-baseurl">
             <Input
               id="dlg-provider-baseurl"
+              className={FORM_CONTROL_CLS}
               value={baseUrl}
               onChange={(event) => setBaseUrl(event.target.value)}
               placeholder="https://api.example.com/v1"
             />
-          </Field>
+          </FormField>
           <Field>
-            <FieldTitle>{t('API 协议')}</FieldTitle>
+            <FieldTitle className={FIELD_TITLE_CLS}>{t('API 协议')}</FieldTitle>
             {/* API 协议段 → Tabs 件 default 档（正典表 §5.4）：block 形态 =
                 TabsList w-full + TabsTrigger flex-1（default 档基类自带）。
                 选中态载体 = role=tab + aria-selected（Base UI 自带），
@@ -381,10 +378,10 @@ export function CreateProviderDialog({
               </TabsList>
             </Tabs>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-provider-apikey">{t('API 密钥')}</FieldLabel>
+          <FormField label={t('API 密钥')} htmlFor="dlg-provider-apikey">
             <Input
               id="dlg-provider-apikey"
+              className={FORM_CONTROL_CLS}
               type="password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
@@ -404,18 +401,21 @@ export function CreateProviderDialog({
                   onCheckedChange={setAuthHeader}
                   aria-label={t('以 Authorization: Bearer 请求头发送 API 密钥')}
                 />
-                <span className="text-[13px] text-(--foreground)">
+                <span className="text-ui text-foreground">
                   {t('以 Authorization: Bearer 请求头发送 API 密钥')}
                 </span>
               </label>
             </div>
-            <FieldDescription>{t('密钥将加密存储，保存后无法再次查看。')}</FieldDescription>
-          </Field>
+            <FieldDescription className="text-meta text-content-tertiary">
+              {t('密钥将加密存储，保存后无法再次查看。')}
+            </FieldDescription>
+          </FormField>
           <Field>
-            <FieldTitle>{t('模型（可选）')}</FieldTitle>
+            <FieldTitle className={FIELD_TITLE_CLS}>{t('模型（可选）')}</FieldTitle>
             {modelIds.map((id, i) => (
               <Input
                 key={i}
+                className={FORM_CONTROL_CLS}
                 aria-label={t('模型 ID')}
                 value={id}
                 placeholder="claude-sonnet-5"
@@ -427,7 +427,7 @@ export function CreateProviderDialog({
             <div>
               <Button
                 variant="ghost"
-                className="px-0 text-(--text-secondary)"
+                className="px-0 text-content-secondary"
                 onClick={() => setModelIds((rows) => [...rows, ''])}
               >
                 <PlusSmall />
@@ -435,7 +435,7 @@ export function CreateProviderDialog({
               </Button>
             </div>
           </Field>
-        </FieldGroup>
+        </FormStack>
       )}
     </DialogShell>
   );

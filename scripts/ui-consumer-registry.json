@@ -146,6 +146,13 @@
       "role": "action-link",
       "reason": "Fix-it link on the create-agent notice card (接入机器 / 配置服务商). DESIGN.md 颜色: accent marks operable links on cards.",
       "contrast": "apps/web/DESIGN.md 颜色 (accent on card 4.99, AA for 13.5px text)"
+    },
+    {
+      "file": "apps/web/src/resources/providers-page.tsx",
+      "anchor": "const NEEDS_YOU_INK = 'text-(--card-button)'",
+      "role": "indicator",
+      "reason": "Runtime head 未安装 / 未登录 state = needs you (DESIGN.md: accent only for needs-you); carried with a CircleAlert icon and the label, so the state does not rely on color.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 12px text)"
     }
   ]
 }
