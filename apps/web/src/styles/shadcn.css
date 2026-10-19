@@ -70,6 +70,8 @@
   --color-running-track: var(--running-track);
   --color-accent-hover: var(--accent-hover);
   --color-dialog-surface: var(--dialog-surface);
+  --color-dialog-backdrop: var(--dialog-backdrop);
+  --color-menu-hover: var(--menu-hover);
   --color-project-tile-1: var(--project-tile-1);
   --color-project-tile-2: var(--project-tile-2);
   --color-project-tile-3: var(--project-tile-3);
@@ -266,6 +268,11 @@
   --running-track: #2d2926;
   --accent-hover: var(--spot-soft);
   --dialog-surface: var(--popover);
+  /* Paper overlays (DESIGN.md 弹窗与菜单): the dim behind every dialog and
+     the menu row hover. Dark keeps a deeper dim so the popover-tone dialog
+     still separates from the page. */
+  --dialog-backdrop: rgb(0 0 0 / 0.32);
+  --menu-hover: var(--accent);
   --project-tile-1: #ff9c75;
   --project-tile-2: #77d08c;
   --project-tile-3: #c4b6ab;
@@ -385,6 +392,8 @@
   --running-track: #ebe5da;
   --accent-hover: #f6ebe3;
   --dialog-surface: var(--background);
+  --dialog-backdrop: rgb(43 38 32 / 0.14);
+  --menu-hover: #f6f2ec;
   --project-tile-1: #c06a43;
   --project-tile-2: #7d8b5a;
   --project-tile-3: #6b7a8f;

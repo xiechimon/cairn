@@ -78,6 +78,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
       title={t('新建密钥')}
       open={open}
       onClose={onClose}
+      size="s"
       footer={
         <FormActions
           className="pt-0"
@@ -86,7 +87,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
         />
       }
     >
-      <FormStack className="max-w-none py-1">
+      <FormStack className="max-w-none">
         <FormField label={t('名称（可选）')} htmlFor="apikey-name-input">
           <Input
             id="apikey-name-input"

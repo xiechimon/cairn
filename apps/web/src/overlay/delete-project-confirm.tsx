@@ -1,5 +1,5 @@
 // Delete project confirm (#207 删除区复活, r2 24d): DeleteConfirm 家族同形
-// — 448 居中弹层、head + divider、项目名摘要、右对齐 取消/删除(danger) —
+// — Paper S 档确认面、项目名摘要、右对齐 取消/删除(danger) —
 // 加键入项目名确认行:输入与项目名精确匹配才解禁删除钮(误删闸门,票面
 // 「确认输入不匹配禁用」)。级联语义不在本层——server services/projects.ts
 // 单源(#189);本层只管确认形状与闸门。
@@ -7,6 +7,7 @@
 // 两面共享 .delete-confirm-* css 面，收编同构）。
 
 import { useEffect, useState } from 'react';
+import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
@@ -40,32 +41,31 @@ export function DeleteProjectConfirm({
       ariaLabel={t('删除项目')}
       open={open}
       onClose={onClose}
-      // #948 per-face 清零：旧 .delete-confirm--project 的 height:auto 在壳
-      // utility 面（无固定高）上是 no-op，只余 16px 底垫 → pb-4。
-      className="pb-4"
+      footer={
+        <AlertDialogActions
+          cancelLabel={t('取消')}
+          confirmLabel={t('删除')}
+          onCancel={onClose}
+          onConfirm={onConfirm}
+          confirmDisabled={typed !== projectName}
+        />
+      }
     >
-      <div className="delete-confirm-summary mx-4 mt-4 flex h-4 items-center gap-2 overflow-hidden text-ui leading-4 whitespace-nowrap text-foreground">
-        {projectName}
-      </div>
-      <div className="mx-4 mt-3 text-meta text-content-secondary">{prompt}</div>
-      {/* #948：确认输入 = components/ui Input 件默认几何（h-8 32px 正本控件
-          高，spec/22 §2.6-1；旧 per-face 30px 死值不留），描边/底色 1:1 迁
-          --border-default / transparent。 */}
-      <Input
-        className="mx-4 mt-2 w-[calc(100%-32px)] border-(--border) text-ui text-foreground md:text-ui"
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        aria-label={prompt}
-        autoComplete="off"
-        spellCheck={false}
-      />
-      <AlertDialogActions
-        cancelLabel={t('取消')}
-        confirmLabel={t('删除')}
-        onCancel={onClose}
-        onConfirm={onConfirm}
-        confirmDisabled={typed !== projectName}
-      />
+      <FormStack className="max-w-none">
+        <div className="delete-confirm-summary flex items-center gap-2 overflow-hidden text-ui whitespace-nowrap text-foreground">
+          {projectName}
+        </div>
+        <FormField label={prompt} htmlFor="delete-project-confirm-input">
+          <Input
+            id="delete-project-confirm-input"
+            className={FORM_CONTROL_CLS}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </FormField>
+      </FormStack>
     </AlertDialogShell>
   );
 }

@@ -353,7 +353,13 @@
   --radius-card: 10px;
   --cds-radius-xl: 12px;
   --cds-radius-2xl: 16px;
-  --radius-popover: 12px;
+  /* DESIGN.md 弹窗与菜单: menus, popovers and select popups share the card
+     corner. */
+  --radius-popover: 10px;
+  /* DESIGN.md 弹窗与菜单: the three dialog widths (S / M / L). */
+  --dialog-w-s: 400px;
+  --dialog-w-m: 480px;
+  --dialog-w-l: 640px;
   --radius-composer: 20px;
   --radius-bubble: 18px;
   --radius-control: 5px;
@@ -396,8 +402,10 @@
      （sheet/菜单/popup）暗侧无投影、线框承重（1px 墨线独承，用户 2026-10-05
      裁定不变）；亮侧走定版软 blur 档（分层软投影语言同上）。 */
   --plate-shadow: none;
-  /* overlay batch A (#66): dialog 模态投影，定版最深档（spec/22 §2.4） */
-  --dialog-shadow: var(--cds-shadow-lg);
+  /* Paper dialog face (DESIGN.md 弹窗与菜单): a one-pixel ring plus a soft
+     two-layer pool. */
+  --dialog-shadow:
+    0 0 0 1px var(--ring-inset-highlight), 0 16px 40px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
   /* chief 面（r5 100–104, #72）drawer 投影，r5 100 edge gradient 采样。
      ADR 0013 后本槽只剩抽屉头主题切换器 popover 一个消费点；悬浮窗本体
      走 --floating-shadow（下方），本槽随 #983 手写壳退役面一并处置。 */
@@ -528,7 +536,7 @@
   /* unified border language (#139), light side: the edge shadow tier dimmed
      to the light surface; the ring rides --border's light value via the
      :root --edge-ring recipe. 投影四档定版 spec/22 §2.4 */
-  --radius-popover: 12px;
+  --radius-popover: 10px;
   --radius-window: 12px;
   --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 2px 8px 0 rgb(0 0 0 / 0.08);
   --cds-shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.05), 0 6px 16px 0 rgb(0 0 0 / 0.08);
@@ -537,8 +545,10 @@
   --plate-shadow: 0 6px 16px rgb(0 0 0 / 0.12);
   --card-shadow: var(--cds-shadow-sm);
   --card-lift: 0 3px 10px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.04);
+  /* Paper menu face (DESIGN.md 弹窗与菜单): one CSS pixel ring plus a warm
+     soft pool. */
   --shadow-popover:
-    0 0 0 var(--hairline) var(--border), 0 8px 24px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.08);
+    0 0 0 1px var(--border), 0 8px 24px rgb(31 27 24 / 0.1), 0 2px 6px rgb(31 27 24 / 0.05);
   --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) var(--border);
   --shadow-composer-hover:
     0 4px 24px rgb(0 0 0 / 0.06), inset 0 0 0 var(--hairline) var(--border-soft);
@@ -554,9 +564,8 @@
   --drop-tint-border: rgb(180 83 42);
   --drop-tint-base: rgb(180 83 42 / 0.05);
   --drop-tint-hover: rgb(180 83 42 / 0.1);
-  /* overlay batch A (#66), light: dialog 模态投影定版档（spec/22 §2.4）
-     — mirrored explicitly so .light stays the full semantic-token mirror */
-  --dialog-shadow: var(--cds-shadow-lg);
+  --dialog-shadow:
+    0 0 0 1px var(--border), 0 16px 40px rgb(31 27 24 / 0.16), 0 2px 6px rgb(31 27 24 / 0.06);
   /* chief surfaces (r5 100–104, #72): shadow from the r5 100 edge
      gradient */
   --chief-shadow: 0 4px 24px rgb(28 25 23 / 0.16);

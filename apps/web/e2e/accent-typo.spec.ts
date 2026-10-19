@@ -291,7 +291,7 @@ for (const theme of ['light', 'dark'] as const) {
     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
 
-  test(`P4 row hover rides accent-soft, delete row rides danger-soft (${theme})`, async ({
+  test(`Paper menu row hover rides menu-hover, delete row rides danger-soft (${theme})`, async ({
     page,
   }) => {
     await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
@@ -300,7 +300,7 @@ for (const theme of ['light', 'dark'] as const) {
     const menu = page.locator('.more-menu');
     await expect(menu).toBeVisible();
 
-    const soft = await resolveToken(page, '--accent-soft');
+    const soft = await resolveToken(page, '--menu-hover');
     const danger = await resolveToken(page, '--danger-soft');
     const normal = menu.locator('.more-menu-item', { hasText: '复制链接' });
     await normal.hover();

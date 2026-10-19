@@ -60,7 +60,11 @@ import { useLiveData } from '../api/provider.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Kbd } from '../components/ui/kbd.js';
 import {
   MessageScroller,
@@ -1024,40 +1028,37 @@ function ChiefDrawerInner({
           skillCount={helpSkillCount}
         />
       </div>
-      {/* #615 返工：恢复钮确认层（破坏性：截断锚后消息并以锚重发）。壳与
-            按钮档复用 chief-agent-dialog 同族配方（#950 后 = §5.4 容器
-            utility + outline/default 件正典 + px-3/text-[13px] 内联档）。
+      {/* #615 返工：恢复钮确认层（破坏性：截断锚后消息并以锚重发）。
             fixture 面 id 缺省 = accept 律关窗零请求。 */}
       <DialogShell
         title={t('恢复到此处')}
         open={rewindConfirm !== null}
         onClose={() => setRewindConfirm(null)}
+        size="s"
         footer={
-          <div className="flex flex-col px-4 pb-4">
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                className="px-3 text-[13px]"
-                onClick={() => setRewindConfirm(null)}
-              >
-                {t('取消')}
-              </Button>
-              <Button
-                className="px-3 text-[13px]"
-                onClick={() => {
-                  const anchor = rewindConfirm;
-                  setRewindConfirm(null);
-                  if (anchor?.id != null) onRewind?.(anchor.id);
-                }}
-              >
-                {t('恢复到此处')}
-              </Button>
-            </div>
-          </div>
+          <>
+            <Button
+              variant="ghost"
+              className={DIALOG_TEXT_BUTTON}
+              onClick={() => setRewindConfirm(null)}
+            >
+              {t('取消')}
+            </Button>
+            <Button
+              className={DIALOG_PRIMARY_BUTTON}
+              onClick={() => {
+                const anchor = rewindConfirm;
+                setRewindConfirm(null);
+                if (anchor?.id != null) onRewind?.(anchor.id);
+              }}
+            >
+              {t('恢复到此处')}
+            </Button>
+          </>
         }
       >
-        <div className="flex flex-col gap-4 p-4">
-          <p className="text-[13px] leading-5 text-(--foreground)">
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-ui text-foreground">
             {t('恢复到此处？该条之后的 {n} 条消息会移除，总管从这条重发开新回合。', {
               n: Math.max(0, (chief.stream?.length ?? 0) - (rewindConfirm?.index ?? 0) - 1),
             })}

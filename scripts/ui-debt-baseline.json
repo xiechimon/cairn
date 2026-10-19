@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "2ebfda8a5e0d9d0248aab3825c5b92726bd66a7c",
+    "sha": "unknown",
     "date": "2026-10-19"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 65,
-    "spacingTotal": 78,
+    "textTotal": 51,
+    "spacingTotal": 76,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -33,16 +33,8 @@
         "text": 1,
         "spacing": 0
       },
-      "board/reset-confirm-dialog.tsx": {
-        "text": 2,
-        "spacing": 1
-      },
-      "chief/chief-agent-dialog.tsx": {
-        "text": 5,
-        "spacing": 0
-      },
       "chief/chief-drawer.tsx": {
-        "text": 9,
+        "text": 5,
         "spacing": 23
       },
       "chief/chief-message-rows.tsx": {
@@ -62,8 +54,8 @@
         "spacing": 11
       },
       "chief/edit-charter-dialog.tsx": {
-        "text": 3,
-        "spacing": 2
+        "text": 0,
+        "spacing": 1
       },
       "chief/recipes.ts": {
         "text": 1,

@@ -1,36 +1,28 @@
-// DialogShell 零皮肤适配层（#983 判决：改写为零皮肤适配层；地图 #980
-// 前提②④）：对外 API 与旧壳逐参数兼容，常规面（17 挂载点）内部组合
-// registry dialog.tsx 件——面板/背板/头/脚皮肤一律 registry 默认
-// （DialogContent rounded-xl p-4 grid gap-4 ring-1 duration-100、
-// DialogOverlay bg-black/10 + backdrop-blur-xs、DialogHeader/DialogTitle、
-// DialogFooter border-t bg-muted/50 band），本层不再持任何皮肤串。
+// DialogShell：Paper 对话框适配层（apps/web/DESIGN.md「弹窗与菜单」），组合
+// registry dialog.tsx 件（DialogContent / DialogTitle / DialogDescription /
+// DialogClose），皮肤住本层与 token，dialog.tsx 保持 pristine（S5）。
 //
-// 保住的行为契约（直通 Base UI props / layout 类承载）：
-// - #193 三段律：DialogContent 吃 layout 类——封顶 max-h = 100vh - 48px +
-//   grid-rows auto/minmax(0,1fr)/auto；dialog-head / dialog-body /
-//   dialog-foot 三个结构 testid 原位在（几何断言需要结构盒，role-scope
-//   隔离不出滚动容器，spec/22 §5.5 二级载体）。高表单挤不出提交钮；
-// - #389 焦点回陷：finalFocus 直通 Popup（不经 Base UI 的 trigger 推定，
-//   仓内触发钮多在 dialog 树外）；
-// - #73 retained-mount：open flag 直通 Root，退场淡出活得过 close；
-// - #318 dismiss 分层：onOpenChange reason 闸原样（escape-key 转交
+// Paper 面：sheet 纸面（--dialog-surface）、16px 角、1px 环 + 软投影
+// （--dialog-shadow）；背板是 styles/app.css 的 [data-slot=dialog-overlay]
+// 浅墨 dim（--dialog-backdrop，无 blur）。三档宽 S 400 / M 480 / L 640
+// （--dialog-w-*，min(100% - 2rem, …) 收口移动端）。头 = 16px 衬线标题 +
+// 可选 12px 副行 + 28px ghost 关闭钮；体是唯一滚动盒（min-h-0）；脚 =
+// 左侧 12px 提示（hint，可缺省）+ 右侧操作，无底色带。
+//
+// 保住的行为契约：
+// - #193 三段律：grid-rows auto / minmax(0,1fr) / auto，max-h = 100vh - 64px，
+//   高表单滚字段不挤按钮；dialog-head / dialog-body / dialog-foot 结构
+//   testid 原位（几何断言载体，spec/22 §5.5 二级）；
+// - #1244 环房：体自带左右 20px 内边距，w-full 控件的 4px 焦点环落在滚动
+//   盒内，不被裁；
+// - #389 焦点回陷：finalFocus 直通 Popup；
+// - #73 retained-mount：open flag 直通 Root；
+// - #318 dismiss 分层：onOpenChange reason 闸（escape-key 转交
 //   onEscapeWhileNested、嵌套期 outside-press 不关）；
-// - #68 家族关闭律：Esc / 背板外点 / X 三路同归 onClose（外点与 Esc 走
-//   Base UI 原生 dismiss，X 走 DialogClose）；
-// - width 入参 = layout 位（#983 判决：448/560/640 宽度归消费点布局）——
-//   style width = min(100% - 2rem, Npx)，移动端收口与 registry
-//   max-w-[calc(100%-2rem)] 配方等值；z 档 registry z-50 与 --z-dialog
-//   同值（tokens.css #688 阶梯 50），常规面不再传 zIndex。
+// - #68 家族关闭律：Esc / 背板外点 / X 三路同归 onClose。
 //
-// viewportRoot / bare 两模式保留旧直连机制**原样不动**：它们是 #983 判决
-// 点名的「适配层只语义映射」判据压力点（search-panel / new-task-dialog，
-// 面归 L5 车道），去留（留在适配层 vs 降级为消费点自组合 registry
-// Dialog）在 L5 原型实审裁决；本层不预判。zIndex / backdropClassName /
-// onBackdropClick 入参仅这两模式消费。
-//
-// i18n：关闭钮 aria-label 走 t('关闭')（registry 内建 close 的 sr-only
-// 文案是英文硬编码，语义映射归适配层）；形态与内建钮逐类同形
-// （ghost icon-sm，absolute top-2 right-2）。
+// viewportRoot / bare 两模式保留旧直连机制（search-panel / new-task-dialog
+// 自带几何）；zIndex / onBackdropClick / width / height 只这两模式消费。
 
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { cn } from 'cn';
@@ -38,14 +30,7 @@ import { type ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { Button } from './button.js';
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './dialog.js';
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from './dialog.js';
 
 /** 退场 visibility 桥（§5.4 机制内联，原 .dlg-shell 配方）：零视觉的
  *  visibility 延迟过渡撑住 Base UI 的卸载窗，让面板 animate-out 播完再卸。
@@ -67,11 +52,53 @@ const VIEWPORT_MECHANISM_CLS =
 export const VIEWPORT_POP_ANIM =
   'duration-100 ease-out group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98';
 
-/** Paper 对话框面（apps/web/DESIGN.md）：dialog-surface 纸面（亮 = sheet）+
- *  一档浮层投影（--shadow-popover 自带发丝环，故 ring-0 撤掉 registry 的
- *  foreground/10 环）。浮层浮在 sheet 之上，所以有投影；sheet 本身只有环。 */
+/** Paper 对话框面：sheet 纸面 + 16px 角 + --dialog-shadow（1px 环 + 软投影，
+ *  ring-0 撤掉 registry 的 foreground/10 环）。 */
 export const DIALOG_FACE =
-  'rounded-(--edge-radius) bg-dialog-surface shadow-(--shadow-popover) ring-0';
+  'rounded-(--edge-radius) bg-dialog-surface shadow-(--dialog-shadow) ring-0';
+
+/** 三档宽（DESIGN.md 弹窗与菜单）：S = 密钥 / 删除确认 / 短表单，M = 技能与
+ *  多数新建表单，L = 多步流程（添加机器、模型服务选择器）。 */
+export type DialogSize = 's' | 'm' | 'l';
+
+export function dialogWidth(size: DialogSize): string {
+  return `min(100% - 2rem, var(--dialog-w-${size}))`;
+}
+
+/** 面板：Paper 面 + 三段 grid + 视口封顶。 */
+export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 overflow-hidden p-0 text-ui text-popover-foreground sm:max-w-none ${DIALOG_FACE}`;
+
+/** 头：标题列，顶 18 / 左 20 / 底 4；右侧 52 让给角上的关闭钮。 */
+export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4.5 pr-13 pb-1 pl-5';
+
+export const DIALOG_TITLE_CLS =
+  'font-heading text-heading leading-[1.4] font-medium text-foreground';
+
+export const DIALOG_SUBTITLE_CLS = 'mt-0.5 text-meta text-content-tertiary';
+
+/** 28px ghost 关闭钮，钉在面板右上角，ink-3 图标、hover 出浅底。DOM 里排在
+ *  最后：Base UI 的初始焦点取第一个可聚焦元素，表单弹窗要落在首个字段上。 */
+export const DIALOG_CLOSE_CLS =
+  'absolute top-4 right-4 text-content-tertiary hover:text-foreground';
+
+/** 体：唯一滚动盒。左右 20 内边距同时是焦点环的房间。 */
+export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-5 pt-3 pb-4';
+
+/** 脚：提示靠左、操作靠右，无底色带。 */
+export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-5 pt-3 pb-4';
+
+export const DIALOG_HINT_CLS =
+  'flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary [&_svg]:size-3 [&_svg]:flex-none';
+
+/** 分栏脚：左提示（可缺省）+ 右操作组。AlertDialogShell 与 DialogShell 共用。 */
+export function DialogFootRow({ hint, children }: { hint?: ReactNode; children?: ReactNode }) {
+  return (
+    <div data-testid="dialog-foot" className={DIALOG_FOOT_CLS}>
+      {hint != null && <div className={DIALOG_HINT_CLS}>{hint}</div>}
+      <div className="ml-auto flex items-center gap-2">{children}</div>
+    </div>
+  );
+}
 
 /** 对话框主操作：Button default 档（墨底、32px）+ 8px 圆角；危险确认换
  *  destructive 档保危险 token。一个对话框只有一个。 */
@@ -86,47 +113,42 @@ export const PICKER_ROW_SELECTED =
   'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
 
 interface DialogShellProps {
-  /** Left header title; absent when `headerCenter` renders instead. */
+  /** Header title; absent when `headerCenter` renders instead. */
   title?: string;
+  /** Optional 12px sub-line under the title. */
+  subtitle?: ReactNode;
   /** Centered header content (segmented tabs, r7 31). */
   headerCenter?: ReactNode;
   /** #73 retained-mount open flag; the exit fade outlives the close. */
   open?: boolean;
   onClose: () => void;
   children: ReactNode;
-  /** #193: pinned below the body scroll region — submit/cancel rides here so
-   *  a tall form scrolls the fields, never the buttons. 常规面渲染进
-   *  registry DialogFooter（band 皮肤件自带）——消费点给裸内容即可，
-   *  自携 padding 包装会与 band 的 p-4 叠垫。 */
+  /** Footer actions, right-aligned under the body scroll region (#193). */
   footer?: ReactNode;
-  /** #309: face class on the panel — per-face utility recipes and the e2e
-   *  handle discipline without touching the family base. */
+  /** Muted 12px hint or status left of the actions (docs link, ⌘↵ hint,
+   *  waiting status). Renders the footer row even without actions. */
+  hint?: ReactNode;
+  /** Per-face class on the panel. */
   className?: string;
-  /** Panel width in px (defaults to 448 = family law #68); M7 #312 review
-   *  dialog uses 560. 常规面 = layout 位（min() 收口，见头注）。 */
-  width?: number;
-  /** bare：面板内容由消费者全权渲染（自带头/体/底），适配层只出壳机制与
-   *  皮肤——new-task-dialog 的面板几何（672×439 + 自定义头）自成一体。
-   *  L5 实审压力点，旧机制原样（见头注）。 */
+  /** S 400 / M 480 / L 640 (bare panels too, unless `width` is set). */
+  size?: DialogSize;
+  /** bare: the consumer renders the whole panel (own head / body / foot). */
   bare?: boolean;
-  /** 面板高度 in px（bare 面用；家族缺省按内容自适应）。 */
+  /** Panel width in px — bare only. */
+  width?: number;
+  /** Panel height in px — bare only. */
   height?: number;
-  /** 面板 z-index——仅 viewportRoot/bare 旧机制路径消费（常规面 =
-   *  registry z-50 ≡ --z-dialog 档，#688 阶梯）。 */
+  /** Panel z-index — viewportRoot / bare only. */
   zIndex?: number | string;
-  /** 背板点击的自定义处置——仅 viewportRoot/bare 旧机制路径消费（常规面
-   *  外点走 Base UI 原生 dismiss → onClose）。 */
+  /** Custom backdrop click — viewportRoot / bare only. */
   onBackdropClick?: () => void;
-  /** 内层浮层开着时的 Esc 处置（等价旧壳手写的分层 Esc）。**必须由壳代收**：
-   *  Base UI 处理 Esc 时会拦下事件，仓内内层的 window 监听收不到。传了本
-   *  回调即表示「现在有内层开着」——壳不关自己，转交本回调（由消费者决定
-   *  关哪层）。 */
+  /** Esc while an inner layer is open: the shell does not close itself and
+   *  hands the key to this callback. Base UI stops the Escape event, so an
+   *  inner window listener never sees it. */
   onEscapeWhileNested?: () => void;
-  /** #453 视口根变体：壳不出面板几何，children 自带 fixed 几何。**开它是
-   *  内容全权**：`width` / `height` / `footer` / `headerCenter` / `bare`
-   *  一并失效。L5 实审压力点，旧机制原样（见头注）。 */
+  /** #453 viewport-root variant: children carry their own fixed geometry. */
   viewportRoot?: boolean;
-  /** Backdrop 位类名入参（只作用于视口根态）。 */
+  /** Backdrop class (viewportRoot only). */
   backdropClassName?: string;
 }
 
@@ -165,13 +187,16 @@ function useReturnFocus(open: boolean) {
 
 export function DialogShell({
   title,
+  subtitle,
   headerCenter,
   open = true,
   onClose,
   children,
   footer,
+  hint,
   className,
-  width = 448,
+  size = 'm',
+  width,
   height,
   bare = false,
   zIndex = 'var(--z-dialog)',
@@ -205,7 +230,7 @@ export function DialogShell({
     // 只视口根态吃 backdropClassName：bare 态的类串保持逐字不动。
     const backdropClass = viewportRoot
       ? `fixed inset-0${backdropClassName == null ? '' : ` ${backdropClassName}`}`
-      : 'fixed inset-0 flex items-center justify-center bg-black/60 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0';
+      : 'fixed inset-0 flex items-center justify-center duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0';
     return (
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange} modal>
         <DialogPrimitive.Portal>
@@ -227,7 +252,13 @@ export function DialogShell({
                 : `${SHELL_EXIT_BRIDGE_CLS}${className != null ? ` ${className}` : ''} fixed top-1/2 left-1/2 flex max-h-[calc(100vh-48px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden ${DIALOG_FACE} text-ui text-popover-foreground outline-none duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95`
             }
             style={
-              viewportRoot ? { zIndex } : { width, zIndex, ...(height == null ? {} : { height }) }
+              viewportRoot
+                ? { zIndex }
+                : {
+                    width: width ?? dialogWidth(size),
+                    zIndex,
+                    ...(height == null ? {} : { height }),
+                  }
             }
             // 视口根态：容器是纯管道，dialog 语义由面内自己的 role 承载——
             // 容器不抢名，面内的 role/aria-label 就是这一层的 a11y 身份。
@@ -244,53 +275,43 @@ export function DialogShell({
     );
   }
 
-  // ── 常规面：组合 registry dialog.tsx（零皮肤，#983 判决）──
   return (
     <Dialog open={open} onOpenChange={handleOpenChange} modal>
       <DialogContent
-        // #389：关闭后归还触发位（finalFocus 经 DialogContent 直通 Popup）。
         finalFocus={restore}
         showCloseButton={false}
         aria-label={title}
-        style={{ width: `min(100% - 2rem, ${width}px)` }}
+        data-size={size}
+        style={{ width: dialogWidth(size) }}
         className={cn(
-          // layout 位：#193 封顶 + 三段 grid（body 是真滚动容器）；宽度经
-          // style min() 收口，故解除 registry 的 max-w 两档。
-          // CDS PR-5 (adapter): skin lives here so dialog.tsx stays pristine (S5).
-          'max-h-[calc(100vh-48px)] max-w-none sm:max-w-none',
-          DIALOG_FACE,
-          footer != null ? 'grid-rows-[auto_minmax(0,1fr)_auto]' : 'grid-rows-[auto_minmax(0,1fr)]',
+          DIALOG_PANEL_CLS,
+          footer != null || hint != null
+            ? 'grid-rows-[auto_minmax(0,1fr)_auto]'
+            : 'grid-rows-[auto_minmax(0,1fr)]',
           className,
         )}
       >
-        <DialogHeader
+        <div
           data-testid="dialog-head"
-          className={headerCenter != null ? 'items-center' : undefined}
+          className={cn(DIALOG_HEAD_CLS, headerCenter != null && 'items-center pl-13')}
         >
           {headerCenter != null ? (
-            headerCenter
-          ) : title != null ? (
-            <DialogTitle className="font-heading text-heading leading-none">{title}</DialogTitle>
-          ) : null}
-        </DialogHeader>
-        {/* ring 房：body 是滚动容器（overflow-y-auto ⇒ 两轴都裁），w-full
-            控件的 focus 环（#1244：2px outline + offset 2 = 外沿 4px）会贴到
-            裁切缘被左右各切一刀。负边距把滚动区外扩到 DialogContent 的 p-4
-            垫层（裁切缘 = 对话框内缘），px-4 把内容顶回原位：内容几何零漂移，
-            环不再被裁。 */}
-        <div data-testid="dialog-body" className="-mx-4 min-h-0 overflow-y-auto px-4">
+            <div className="flex min-w-0 flex-1 justify-center">{headerCenter}</div>
+          ) : (
+            <div className="min-w-0 flex-1">
+              {title != null && <DialogTitle className={DIALOG_TITLE_CLS}>{title}</DialogTitle>}
+              {subtitle != null && (
+                <DialogDescription className={DIALOG_SUBTITLE_CLS}>{subtitle}</DialogDescription>
+              )}
+            </div>
+          )}
+        </div>
+        <div data-testid="dialog-body" className={DIALOG_BODY_CLS}>
           {children}
         </div>
-        {footer != null && (
-          <DialogFooter
-            data-testid="dialog-foot"
-            className="rounded-b-(--edge-radius) bg-transparent"
-          >
-            {footer}
-          </DialogFooter>
-        )}
+        {(footer != null || hint != null) && <DialogFootRow hint={hint}>{footer}</DialogFootRow>}
         <DialogClose
-          render={<Button variant="ghost" size="icon-sm" className="absolute top-2 right-2" />}
+          render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
           aria-label={t('关闭')}
         >
           <X width={16} height={16} />

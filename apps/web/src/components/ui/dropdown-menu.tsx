@@ -1,6 +1,9 @@
-// 仓内语义映射（零皮肤；其余与上游 base-nova 逐字同源）：
+// 仓内语义映射（其余与上游 base-nova 逐字同源）：
 // ① z-50 → z-(--z-dialog)——#733 全仓单一 z 梯（overlay 架构槽位，非皮肤）；
-// ② Content 透出 anchor——#454 调用点定位（project-new-page 1 处消费）。
+// ② Content 透出 anchor——#454 调用点定位（project-new-page 1 处消费）；
+// ③ Paper menu（apps/web/DESIGN.md 弹窗与菜单）：32px 行、13.5px 字、15px
+//    ink-3 图标、menu-hover 底、danger-soft 危险行、内缩 6px 分隔线、
+//    caption 分组标签与快捷键提示。
 // 图标走 lucide 契约（components.json iconLibrary=lucide，#982 判决：生成件缝
 // 属皮肤）；动效 = 上游默认（#991 Q9：动效是 base-nova 形态一部分）。
 import { Menu as MenuPrimitive } from '@base-ui/react/menu';
@@ -72,7 +75,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        'px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7',
+        'px-2.5 pt-2 pb-1 text-caption font-medium text-content-tertiary data-inset:pl-8.75',
         className,
       )}
       {...props}
@@ -95,7 +98,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-(--cds-radius-sm) h-8 px-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        "group/dropdown-menu-item relative flex cursor-default items-center gap-2.5 rounded-(--cds-radius-md) h-8 px-2.5 text-ui text-foreground outline-hidden select-none focus:bg-menu-hover data-inset:pl-8.75 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-danger-soft data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-content-tertiary [&_svg:not([class*='size-'])]:size-3.75 data-[variant=destructive]:*:[svg]:text-destructive",
         className,
       )}
       {...props}
@@ -120,7 +123,7 @@ function DropdownMenuSubTrigger({
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
       className={cn(
-        "flex cursor-default items-center gap-1.5 rounded-(--cds-radius-sm) h-8 px-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "flex cursor-default items-center gap-2.5 rounded-(--cds-radius-md) h-8 px-2.5 text-ui text-foreground outline-hidden select-none focus:bg-menu-hover data-inset:pl-8.75 data-popup-open:bg-menu-hover data-open:bg-menu-hover [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-content-tertiary [&_svg:not([class*='size-'])]:size-3.75",
         className,
       )}
       {...props}
@@ -169,7 +172,7 @@ function DropdownMenuCheckboxItem({
       data-slot="dropdown-menu-checkbox-item"
       data-inset={inset}
       className={cn(
-        "relative flex cursor-default items-center gap-1.5 rounded-(--cds-radius-sm) h-8 py-0 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default items-center gap-2.5 rounded-(--cds-radius-md) h-8 py-0 pr-8 pl-2.5 text-ui text-foreground outline-hidden select-none focus:bg-menu-hover data-inset:pl-8.75 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-content-tertiary [&_svg:not([class*='size-'])]:size-3.75",
         className,
       )}
       checked={checked}
@@ -205,7 +208,7 @@ function DropdownMenuRadioItem({
       data-slot="dropdown-menu-radio-item"
       data-inset={inset}
       className={cn(
-        "relative flex cursor-default items-center gap-1.5 rounded-(--cds-radius-sm) h-8 py-0 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex cursor-default items-center gap-2.5 rounded-(--cds-radius-md) h-8 py-0 pr-8 pl-2.5 text-ui text-foreground outline-hidden select-none focus:bg-menu-hover data-inset:pl-8.75 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-content-tertiary [&_svg:not([class*='size-'])]:size-3.75",
         className,
       )}
       {...props}
@@ -227,7 +230,7 @@ function DropdownMenuSeparator({ className, ...props }: MenuPrimitive.Separator.
   return (
     <MenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn('-mx-1 my-1 h-px bg-border', className)}
+      className={cn('mx-1.5 my-1 h-px bg-border', className)}
       {...props}
     />
   );
@@ -237,10 +240,7 @@ function DropdownMenuShortcut({ className, ...props }: React.ComponentProps<'spa
   return (
     <span
       data-slot="dropdown-menu-shortcut"
-      className={cn(
-        'ml-auto text-xs tracking-widest text-muted-foreground group-focus/dropdown-menu-item:text-accent-foreground',
-        className,
-      )}
+      className={cn('ml-auto text-caption text-content-tertiary', className)}
       {...props}
     />
   );

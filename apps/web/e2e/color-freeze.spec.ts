@@ -62,6 +62,7 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     'running-bar': '#7ea476',
     'running-track': '#ebe5da',
     'accent-hover': '#f6ebe3',
+    'menu-hover': '#f6f2ec',
     'project-tile-1': '#c06a43',
     'project-tile-2': '#7d8b5a',
     'project-tile-3': '#6b7a8f',
@@ -78,6 +79,7 @@ const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
     'drop-tint-border': 'rgb(242 148 216)',
     'drop-tint-base': 'rgb(242 148 216 / 0.05)',
     'drop-tint-hover': 'rgb(242 148 216 / 0.1)',
+    'dialog-backdrop': 'rgb(0 0 0 / 0.32)',
   },
   light: {
     // Paper Grouped sidebar: light row hover = DESIGN.md hover (#ebe4d8)
@@ -86,6 +88,7 @@ const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
     'drop-tint-border': 'rgb(180 83 42)',
     'drop-tint-base': 'rgb(180 83 42 / 0.05)',
     'drop-tint-hover': 'rgb(180 83 42 / 0.1)',
+    'dialog-backdrop': 'rgb(43 38 32 / 0.14)',
   },
 };
 
@@ -134,6 +137,7 @@ for (const theme of ['light', 'dark'] as const) {
       ['surface-1', 'var(--canvas)'],
       ['accent-hover', theme === 'light' ? '#f6ebe3' : 'var(--spot-soft)'],
       ['dialog-surface', theme === 'light' ? 'var(--background)' : 'var(--popover)'],
+      ['menu-hover', theme === 'light' ? '#f6f2ec' : 'var(--accent)'],
       ['surface-2', 'var(--card)'],
       ['surface-3', 'var(--popover)'],
       ['hover-1', 'color-mix(in oklab, var(--foreground) 5%, transparent)'],

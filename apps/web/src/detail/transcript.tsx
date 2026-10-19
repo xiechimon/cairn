@@ -801,12 +801,7 @@ function FailRow({
       {/* 原始错误全文弹窗：dialog 族常规面（#68 三路关闭、#389 焦点回陷触发
           钮、#193 封顶滚动）；正文 = tool-output 同款 mono 块，无自身 max-h
           ——长文由 dialog 体滚动承载。 */}
-      <DialogShell
-        title={t('原始错误')}
-        open={rawOpen}
-        onClose={() => setRawOpen(false)}
-        width={560}
-      >
+      <DialogShell title={t('原始错误')} open={rawOpen} onClose={() => setRawOpen(false)} size="l">
         <pre
           className="m-0 rounded-[3px] border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-caption break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
           data-testid="fail-raw-error"

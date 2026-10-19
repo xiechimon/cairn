@@ -337,10 +337,10 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
       open={open}
       onClose={onClose}
       viewportRoot
-      // 背板是 Base UI Backdrop（自带 data-open/data-closed）→ 自变体淡入淡出，
-      // 与 .dlg 默认背板同档（duration-200 fade）。壳已给 fixed inset-0，
-      // 这里只带 scrim 皮肤 + z 兜底（--overlay-scrim = 60% 黑，r7 canon）。
-      backdropClassName="z-(--z-modal-scrim) bg-(--overlay-scrim) duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+      // 背板是 Base UI Backdrop（自带 data-open/data-closed）→ 自变体淡入淡出。
+      // 壳已给 fixed inset-0，底色是全站弹窗同一层浅墨 dim（styles/app.css
+      // [data-slot=dialog-overlay]），这里只带动效 + z 兜底。
+      backdropClassName="z-(--z-modal-scrim) duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       zIndex="var(--z-modal)"
     >
       <div

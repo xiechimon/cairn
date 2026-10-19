@@ -54,8 +54,8 @@
 /* ---- hover / press states (#73, base-ui-theme P4 #791) ----
    Row and menu surfaces tint with the theme accent-soft token
    (color-mix spot 14%, shadcn.css 值正本） over the standard 150ms color
-   step; danger rows (the more-menu 删除行） ride the parallel danger-soft
-   tint instead. Hover is gated to fine pointers like the official sheet's
+   step. Menu rows (DropdownMenuItem) carry the Paper menu hover and the
+   danger-soft delete row in the primitive itself. Hover is gated to fine pointers like the official sheet's
    @media (hover:hover) and (pointer:fine) block, and coarse pointers zero
    the transition on press (same sheet, pointer:coarse block).
    不跟本 tint 的行 hover（有意为例外，见各自注释）：侧栏行（§2.2 [保留]
@@ -118,22 +118,12 @@ body[data-board-dragging] .todo-card:hover {
   }
 }
 @media (hover: hover) and (pointer: fine) {
-  .more-menu-item,
-  .todo-card-branch,
-  .dlg-close {
+  .todo-card-branch {
     transition: background-color var(--dur-fast) var(--ease-standard);
   }
 
-  .more-menu-item:hover,
-  .todo-card-branch:hover,
-  .dlg-close:hover {
+  .todo-card-branch:hover {
     background-color: var(--accent-soft);
-  }
-
-  /* 删除行（§1.1：删除行吃 danger 淡 tint）——more-menu 的 danger 行由
-     data-action 锚定（nth-child 锚行序，#701 证明行序会动）。 */
-  .more-menu-item[data-action="delete"]:hover {
-    background-color: var(--danger-soft);
   }
 }
 

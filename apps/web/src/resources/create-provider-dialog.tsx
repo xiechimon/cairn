@@ -40,12 +40,12 @@ import {
 } from '@pacman/shared';
 import { useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
-import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Field, FieldDescription, FieldError, FieldTitle } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import {
   Select,
   SelectContent,
@@ -54,13 +54,69 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, PlusSmall } from '../icons/index.js';
+import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
 
 const FIELD_TITLE_CLS = 'text-ui font-medium text-foreground';
 
-/** picker 行钮（preset 38 行 + 自定义端点入口）：Button outline 默认档 +
- *  左对齐 layout（#1005：皮肤/状态全走件默认）。 */
-const PICKER_ROW_CLS = 'justify-start px-3 text-left';
+/** Paper 分组选择器行（DESIGN.md 弹窗与菜单 · 分组选择器）：40px、首字母
+ *  方块 + 名称 + 右侧 ink-3 标签；hover / 键盘焦点 = 选择器选中行（白卡 +
+ *  发丝环）；禁用行降到 ink-3、不出 hover。 */
+const PICKER_ROW_CLS =
+  'h-10 w-full justify-start gap-2.5 rounded-md px-2.5 text-left text-ui font-normal text-foreground hover:bg-card hover:shadow-xs hover:ring-1 hover:ring-border focus-visible:bg-card dark:hover:bg-card disabled:text-content-tertiary disabled:opacity-100';
+
+const PICKER_TILE_CLS =
+  'flex size-5.5 flex-none items-center justify-center rounded-(--radius-control) bg-card text-caption font-semibold text-content-secondary ring-1 ring-border';
+
+const PICKER_TAG_CLS = 'ml-auto text-caption font-normal text-content-tertiary';
+
+const PICKER_GROUP_CLS = 'm-0 flex min-w-0 flex-col border-0 p-0';
+
+const PICKER_GROUP_HEAD_CLS = 'px-2.5 pt-3 pb-1 text-caption font-medium text-content-tertiary';
+
+/** 选择器分组（显示序）。键 = 中文文案（t() 键）。 */
+const PRESET_GROUPS = ['订阅登录', '模型厂商', '云平台', '推理平台', '网关与聚合'] as const;
+
+/** preset → 分组。键型 = 目录 id 联合，漏归组即 typecheck 红。 */
+const PRESET_GROUP: Record<(typeof PROVIDER_PRESET_IDS)[number], (typeof PRESET_GROUPS)[number]> = {
+  'github-copilot': '订阅登录',
+  'openai-codex': '订阅登录',
+  anthropic: '模型厂商',
+  openai: '模型厂商',
+  google: '模型厂商',
+  xai: '模型厂商',
+  deepseek: '模型厂商',
+  mistral: '模型厂商',
+  moonshotai: '模型厂商',
+  'moonshotai-cn': '模型厂商',
+  'kimi-coding': '模型厂商',
+  minimax: '模型厂商',
+  'minimax-cn': '模型厂商',
+  'ant-ling': '模型厂商',
+  'qwen-token-plan': '模型厂商',
+  'qwen-token-plan-cn': '模型厂商',
+  'qwen-token-plan-individual': '模型厂商',
+  xiaomi: '模型厂商',
+  'xiaomi-token-plan-ams': '模型厂商',
+  'xiaomi-token-plan-cn': '模型厂商',
+  'xiaomi-token-plan-sgp': '模型厂商',
+  'z-ai': '模型厂商',
+  'z-ai-coding-cn': '模型厂商',
+  'amazon-bedrock': '云平台',
+  'google-vertex': '云平台',
+  'cloudflare-workers-ai': '云平台',
+  groq: '推理平台',
+  cerebras: '推理平台',
+  fireworks: '推理平台',
+  baseten: '推理平台',
+  huggingface: '推理平台',
+  nvidia: '推理平台',
+  together: '推理平台',
+  'cloudflare-ai-gateway': '网关与聚合',
+  'vercel-ai-gateway': '网关与聚合',
+  openrouter: '网关与聚合',
+  opencode: '网关与聚合',
+  'opencode-go': '网关与聚合',
+};
 
 /** API 协议段（r3 §2 实测文案与顺序；wire 值 = providerApiSchema）。 */
 const API_OPTIONS: readonly { value: ProviderApi; label: string }[] = [
@@ -123,11 +179,12 @@ const PRESET_ROWS = PROVIDER_PRESET_IDS.map((id) => {
   return {
     id,
     label: PRESET_LABELS[id],
+    group: PRESET_GROUP[id],
     oauth,
     /** #385：oauth && !wired = 未接线行——禁用 + 「暂未开通」注记，点击零动作。 */
     wired: oauth && WIRED_OAUTH_IDS.has(id),
   };
-});
+}).sort((a, b) => a.label.localeCompare(b.label, 'en'));
 
 interface CreateProviderDialogProps {
   /** #73 retained-mount open flag. */
@@ -245,6 +302,7 @@ export function CreateProviderDialog({
       title={t('添加模型服务')}
       open={open}
       onClose={onClose}
+      size="l"
       footer={
         view === 'form' ? (
           <FormActions
@@ -260,72 +318,76 @@ export function CreateProviderDialog({
       }
     >
       {view === 'picker' ? (
-        <div className="flex flex-col gap-3 py-1">
-          <Input
-            // spec/verify 载体 = aria-label 一级（getByLabel('搜索服务商...')，
-            // #910/#944——原 .dlg-provider-search/.dlg-picker-search 类名钩
-            // 随 per-face 清零退役，feature map 同步改锚）。
-            aria-label={t('搜索服务商...')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t('搜索服务商...')}
-          />
+        <div className="flex flex-col gap-3">
+          <InputGroup className="h-8.5 rounded-md border-border bg-card shadow-xs dark:bg-input/30">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              // spec/verify 载体 = aria-label 一级（getByLabel('搜索服务商...')）。
+              aria-label={t('搜索服务商...')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('搜索服务商...')}
+              className="text-ui md:text-ui"
+            />
+          </InputGroup>
           {/* #231 错误行：authorize 失败原文 / callback 落地 reason 三译
-              （providers-page 喂入）。列表前渲染——着陆重开即可见。
-              #1005：FieldError 承载（role=alert 内建 = 错误行一级载体，
-              件默认 destructive 墨；原 .dlg-provider-oauth-error 类名钩已随
-              #944 退役）。 */}
+              （providers-page 喂入），列表前渲染——着陆重开即可见。 */}
           {connectError != null && connectError !== '' && <FieldError>{connectError}</FieldError>}
-          <div className="flex flex-col gap-1">
-            {rows.map((row) => (
-              <Button
-                key={row.id}
-                variant="outline"
-                // data-preset-id = 行级二级载体（#910：38 行的计数/定位锚，
-                // verify feature map 同锚）。
-                data-preset-id={row.id}
-                className={PICKER_ROW_CLS}
-                // #385：族表外 OAuth 行恒禁用（无后端面，点击零动作——disabled
-                // 钮不发 click，onClick 无需防御分支）；已接线行在 authorize
-                // 进行中禁用防重发。
-                disabled={row.oauth && (!row.wired || connectPending === true)}
-                onClick={() =>
-                  row.oauth
-                    ? onConnect != null
-                      ? onConnect(row.id)
-                      : onClose()
-                    : enterForm({ id: row.id, label: row.label })
-                }
-              >
-                {row.label}
-                {/* T0 map：'(OAuth)' 后缀进名称文本（行 textContent 等值
-                    断言，JSX 折叠换行空白故显式 {' '}），只骑族表已接线行
-                    （#385）；xai 行不带后缀（负向钉）。#1005：chip 走 Badge
-                    secondary 默认档，margin-left:auto 行末 layout。 */}
-                {row.wired && (
-                  <Badge variant="secondary" className="ml-auto">
-                    {' (OAuth)'}
-                  </Badge>
-                )}
-                {/* #385 未接线注记：占徽标同槽位（行右 chip，Badge outline
-                    默认档 = 描边不上底；行整体 :disabled 已降不透明度）；
-                    显式 {' '} 保行 textContent 空格分隔（probe 名称节点等值
-                    断言的行文本形）。 */}
-                {row.oauth && !row.wired && (
-                  <Badge variant="outline" className="ml-auto">
-                    {' '}
-                    {t('暂未开通')}
-                  </Badge>
-                )}
+          <div className="flex flex-col">
+            {PRESET_GROUPS.map((group) => {
+              const groupRows = rows.filter((row) => row.group === group);
+              if (groupRows.length === 0) return null;
+              return (
+                <fieldset key={group} className={PICKER_GROUP_CLS}>
+                  <legend className={PICKER_GROUP_HEAD_CLS}>{t(group)}</legend>
+                  {groupRows.map((row) => (
+                    <Button
+                      key={row.id}
+                      variant="ghost"
+                      // data-preset-id = 行级二级载体（38 行的计数/定位锚）。
+                      data-preset-id={row.id}
+                      className={PICKER_ROW_CLS}
+                      // #385：族表外 OAuth 行恒禁用（无后端面）；已接线行在
+                      // authorize 进行中禁用防重发。
+                      disabled={row.oauth && (!row.wired || connectPending === true)}
+                      onClick={() =>
+                        row.oauth
+                          ? onConnect != null
+                            ? onConnect(row.id)
+                            : onClose()
+                          : enterForm({ id: row.id, label: row.label })
+                      }
+                    >
+                      <span aria-hidden className={PICKER_TILE_CLS}>
+                        {row.label.charAt(0)}
+                      </span>
+                      {row.label}
+                      {/* 已接线 OAuth 行带「OAuth」标签（xai 不带，负向钉）；
+                          族表外 OAuth 行带「暂未开通」（#385）。 */}
+                      {row.wired && <span className={PICKER_TAG_CLS}>OAuth</span>}
+                      {row.oauth && !row.wired && (
+                        <span className={PICKER_TAG_CLS}>{t('暂未开通')}</span>
+                      )}
+                    </Button>
+                  ))}
+                </fieldset>
+              );
+            })}
+            <fieldset className={PICKER_GROUP_CLS}>
+              <legend className={PICKER_GROUP_HEAD_CLS}>{t('其他')}</legend>
+              <Button variant="ghost" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
+                <span aria-hidden className={PICKER_TILE_CLS}>
+                  <PlusSmall />
+                </span>
+                {t('自定义端点')}
               </Button>
-            ))}
+            </fieldset>
           </div>
-          <Button variant="outline" className={PICKER_ROW_CLS} onClick={() => enterForm(null)}>
-            {t('自定义端点')}
-          </Button>
         </div>
       ) : (
-        <FormStack className="max-w-none py-1">
+        <FormStack className="max-w-none">
           {/* 返回钮 = Button ghost 默认档（#1005：七通道中和退役，hover/
               按下态由件承载）；贴左 px-0 与 secondary 墨（token 槽）是
               layout/ink。 */}
@@ -380,10 +442,7 @@ export function CreateProviderDialog({
                   {API_OPTIONS.find((option) => option.value === api)?.label}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent
-                aria-label={t('API 协议')}
-                className="rounded-(--radius-popover) shadow-(--shadow-popover)"
-              >
+              <SelectContent aria-label={t('API 协议')}>
                 {API_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}

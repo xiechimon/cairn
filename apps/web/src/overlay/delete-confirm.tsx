@@ -25,19 +25,23 @@ export function DeleteConfirm({
 }: DeleteConfirmProps) {
   const { t } = useI18n();
   return (
-    <AlertDialogShell title={title} ariaLabel={ariaLabel} open={open} onClose={onClose}>
-      {/* #948 per-face 清零：summary 行规则迁 utility（16px 侧距/8px gap/单行
-          截断，Paper 4px 网格）；.delete-confirm-seq 的 tertiary 墨随消费点
-          （schedules-page / todo-detail-page）各自的 utility 走。 */}
-      <div className="delete-confirm-summary mx-4 mt-4 flex h-4 items-center gap-2 overflow-hidden text-ui leading-4 whitespace-nowrap text-foreground">
+    <AlertDialogShell
+      title={title}
+      ariaLabel={ariaLabel}
+      open={open}
+      onClose={onClose}
+      footer={
+        <AlertDialogActions
+          cancelLabel={t('取消')}
+          confirmLabel={t('删除')}
+          onCancel={onClose}
+          onConfirm={onConfirm}
+        />
+      }
+    >
+      <div className="delete-confirm-summary flex items-center gap-2 overflow-hidden text-ui whitespace-nowrap text-foreground">
         {summary}
       </div>
-      <AlertDialogActions
-        cancelLabel={t('取消')}
-        confirmLabel={t('删除')}
-        onCancel={onClose}
-        onConfirm={onConfirm}
-      />
     </AlertDialogShell>
   );
 }

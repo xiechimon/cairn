@@ -87,7 +87,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       title={t('导入技能')}
       open={open}
       onClose={onClose}
-      width={560}
+      size="m"
       footer={
         <FormActions
           className="pt-0"
@@ -97,7 +97,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       }
     >
       {fields === null ? null : (
-        <FormStack className="max-w-none py-1">
+        <FormStack className="max-w-none">
           <FormField
             label={t('本地路径')}
             htmlFor="dlg-skill-import-path"

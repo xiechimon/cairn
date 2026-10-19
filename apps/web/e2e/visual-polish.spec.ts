@@ -138,11 +138,11 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
 
     const menu = await edgeContract(page, '.user-menu');
-    // CDS PR-5: popover shell — --radius-popover 12px + --shadow-popover
+    // Paper menu face: --radius-popover 10px + --shadow-popover
     // (light: outer hairline ring + soft pool; dark: inset highlight, no
     // solid border). Border width collapses to 0; separation rides shadow.
     expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('12px');
+    expect(menu.radius).toBe('10px');
     expect(menu.shadow).not.toBe('none');
     expect(menu.shadow).toContain('0px 0px 0px');
   });

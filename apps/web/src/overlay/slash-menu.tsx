@@ -11,20 +11,15 @@
 // currently available builtins with their descriptions — the only builtin
 // that needs its own surface (proposal §2).
 //
-// #1008（#983 判决：floating-shell 族拆退役）：/help 面板 = 居中 fixed 模态
-// 族 → registry Dialog。旧冻结坐标（top-228 / 400 宽 / 负 margin 居中）与
-// 手写皮肤/ClickCatcher 退役，居中与动效归 DialogContent 默认（#991 Q9
-// registry 默认赢）；400 宽与 70vh 封顶留 layout 槽。标题走 DialogTitle
-// 语义映射（slash-help-title 别名零引用，已随 #1036 终摘）。listbox 面（SlashMenu 本体）
-// 仍是 composer 相对锚的内联面板（无壳，非本票射程）。
+// /help 面板 = DialogShell S 档（Paper 弹窗），技能数行走脚左提示位。
+// listbox 面（SlashMenu 本体）仍是 composer 相对锚的内联面板（无壳）。
 // 行钮收编 components/ui Button（ghost 档七通道中和，#908
 // comment-6001887439 裁决 3；行不在 motion.css hover 家族名单，hover 底
 // 中和为透明、高亮只走 --active 类）。
 
 import { Fragment, type Ref, useEffect } from 'react';
 import { Button } from '../components/ui/button.js';
-import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
-import { DIALOG_FACE, PICKER_ROW_SELECTED } from '../components/ui/dialog-shell.js';
+import { DialogShell, PICKER_ROW_SELECTED } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { SlashRow } from './slash-commands.js';
 
@@ -144,35 +139,24 @@ export interface SlashHelpProps {
 export function SlashHelp({ open, onClose, commands, skillCount }: SlashHelpProps) {
   const { t } = useI18n();
   return (
-    <Dialog
+    <DialogShell
+      title={t('命令说明')}
       open={open}
-      onOpenChange={(next: boolean) => {
-        if (!next) onClose();
-      }}
+      onClose={onClose}
+      size="s"
+      className="slash-help"
+      hint={t('团队技能来自技能页面（共 {count} 个）', { count: skillCount })}
     >
-      {/* layout 槽：400 宽（窄视口回件默认 calc 律）、70vh 封顶滚动；皮肤/
-          居中/动效/z 归 DialogContent 默认。registry 关闭钮（X）是官网
-          confirm 形态一部分，缺省开启。别名 slash-help 随行（e2e 句柄）。 */}
-      <DialogContent
-        className={`slash-help max-h-[70vh] w-100 max-w-[calc(100vw-2rem)] gap-0 overflow-auto p-4 sm:max-w-100 ${DIALOG_FACE}`}
-      >
-        <DialogTitle className="mb-2 font-heading text-heading leading-none">
-          {t('命令说明')}
-        </DialogTitle>
-        <div className="flex max-h-80 flex-col overflow-auto">
-          {commands.map((row) => (
-            <div key={row.name} className="slash-help-row flex items-baseline gap-2 px-2 py-2">
-              <span className={NAME_CLS}>/{row.name}</span>
-              <span className={DESC_CLS}>
-                {row.descKey != null ? t(row.descKey) : (row.description ?? '')}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 border-t border-border pt-2 text-meta text-content-tertiary">
-          {t('团队技能来自技能页面（共 {count} 个）', { count: skillCount })}
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex flex-col">
+        {commands.map((row) => (
+          <div key={row.name} className="slash-help-row flex items-baseline gap-2 py-2">
+            <span className={NAME_CLS}>/{row.name}</span>
+            <span className={DESC_CLS}>
+              {row.descKey != null ? t(row.descKey) : (row.description ?? '')}
+            </span>
+          </div>
+        ))}
+      </div>
+    </DialogShell>
   );
 }
