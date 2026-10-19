@@ -47,6 +47,7 @@ export function DoneConfirmDialog({
       title={inflight ? t('先停止构建再标记完成？') : t('把任务标记为已完成？')}
       open={open}
       onClose={confirming ? () => {} : onClose}
+      size="m"
       footer={
         <>
           <Button

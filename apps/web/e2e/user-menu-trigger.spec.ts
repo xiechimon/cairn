@@ -244,8 +244,6 @@ test('#1245 floating menu is a single skin and stays inside the viewport', async
       panelBg: panelStyle.backgroundColor,
       shellBg: shellStyle.backgroundColor,
       shellRing: shellStyle.getPropertyValue('--tw-ring-shadow'),
-      arrowBottom: before.bottom,
-      arrowHeight: before.height,
       arrowContent: before.content,
       panelTop: panelBox.top,
       panelBottom: panelBox.bottom,
@@ -260,10 +258,8 @@ test('#1245 floating menu is a single skin and stays inside the viewport', async
   expect(sample!.shellRing).not.toContain('1px');
   expect(sample!.shellBg).toBe('rgba(0, 0, 0, 0)');
   expect(sample!.panelBg).not.toBe('rgba(0, 0, 0, 0)');
-  expect(sample!.arrowContent).not.toBe('none');
-  // CDS PR-5: border-0 + shadow ring — caret seats at bottom:0 (was 1px on solid border)
-  expect(sample!.arrowBottom).toBe('0px');
-  expect(sample!.arrowHeight).toBe('6px');
+  // Paper menu face (DESIGN.md 弹窗与菜单): no caret on the panel.
+  expect(sample!.arrowContent).toBe('none');
   expect(sample!.side).toBe('top');
   expect(sample!.panelTop).toBeGreaterThanOrEqual(0);
   expect(sample!.panelBottom).toBeLessThanOrEqual(sample!.vh);

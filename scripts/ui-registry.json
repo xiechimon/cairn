@@ -1,14 +1,14 @@
 {
   "frozenFrom": {
-    "sha": "b4abfdc2a3c57db4a4131968127468b181405772",
-    "date": "2026-10-18"
+    "sha": "bda527168d47d22bcaf57f1995eca29e4413117a",
+    "date": "2026-10-19"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide.",
-      "hash": "01919cde1fb62050aa262f7fb653e797fb798445bcf997fd61e30ae4800320f1"
+      "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer).",
+      "hash": "b01730a88d4682386eff68128290fb076d57a7d6d8a8bb9d52fcc6dcdfdecf28"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -63,8 +63,8 @@
     },
     "dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "#983 verdict / map #980 (ruling 2/4): zero-skin adapter over the registry dialog item — regular faces compose Dialog/DialogContent/DialogHeader/DialogTitle/DialogFooter (registry defaults win: panel/overlay skin, motion, close button all come from dialog.tsx), keeping only the repo behavior contracts as semantic mapping (#193 three-segment cap via layout classes + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law via native dismiss, width as a layout position). The viewportRoot and bare modes stay on the legacy direct-primitive mechanism unchanged — they are the #983 adapter-boundary pressure points whose surfaces belong to the L5 lane (#1008) and whose fate is ruled at that lane's prototype review; zIndex/onBackdropClick/backdropClassName serve only those two modes (#1006).",
-      "hash": "b562b70a9e3ac03734b8a531add9b09504ec2ee5d0713d209914e5a5107d62ab"
+      "reason": "Paper dialog adapter (apps/web/DESIGN.md 弹窗与菜单) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers.",
+      "hash": "31a6f07111e531acc43ad3e2368ee06f6ae843e32d347b7d7f2e6d2c1a3b2eef"
     },
     "dialog.tsx": {
       "kind": "registry",
@@ -76,8 +76,8 @@
       "kind": "registry",
       "upstreamItem": "dropdown-menu",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). CDS PR-5: popup --radius-popover + --shadow-popover; items --cds-radius-sm h-8 pills.",
-      "hash": "33b559d9d5c343629436bdaddcca2b7ecb03f9c89a0a9e53ef42fa3d984a0c7b"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #454 anchor prop exposed for call-site positioning (project-new-page, 1 consumer). Icon seam retired to lucide per the components.json iconLibrary contract (#982); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu (apps/web/DESIGN.md 弹窗与菜单): popup --radius-popover (10px) + --shadow-popover; items h-8, 6px corners, text-ui, 15px ink-3 icons, menu-hover focus fill, danger-soft destructive fill; separators inset 6px; caption labels and shortcut hints.",
+      "hash": "318456d3472a8bb5f48b6328e11375fa6225a9b9fe42877202246d0e57a77978"
     },
     "empty.tsx": {
       "kind": "registry",
@@ -142,8 +142,8 @@
       "kind": "registry",
       "upstreamItem": "popover",
       "status": "deviated",
-      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). CDS PR-5: popup consumes --radius-popover (12px) + --shadow-popover (dark inset highlight).",
-      "hash": "053fcd994ec1179e2313d28910a919efe4cffe78eeb996f0d1fa54d1a141712c"
+      "reason": "#733 single z ladder (z-50 → z-(--z-dialog), a repo overlay-architecture slot, not skin); #805 scale-fade motion retired to the upstream default (#991 Q9: motion is part of the base-nova form). Paper menu face: popup consumes --radius-popover (10px) + --shadow-popover (light 1px ring + soft pool, dark inset highlight); text-sm -> text-ui (DESIGN.md type scale).",
+      "hash": "5447fa40ccd7d24345f7f507649df4f40271315db8befafb637216bcb75270f1"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",

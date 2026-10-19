@@ -7,7 +7,11 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -37,29 +41,26 @@ export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharte
       title={t('编辑章程')}
       open={open}
       onClose={onClose}
+      size="m"
       footer={
-        // #950 per-face 清零：.dlg-form-foot/.dlg-form-actions 容器 utility
-        // 等值迁移（spec/22 §5.4）；钮 = outline/default 件正典 + chief 内联档
-        // 保留消费点既有 px-3/text-[13px]。e2e 载体 = getByRole('button')。
-        <div className="flex flex-col px-4 pb-4">
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" className="px-3 text-[13px]" onClick={onClose}>
-              {t('取消')}
-            </Button>
-            <Button className="px-3 text-[13px]" onClick={save}>
-              {t('保存章程')}
-            </Button>
-          </div>
-        </div>
+        // e2e 载体 = getByRole('button')。
+        <>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
+            {t('取消')}
+          </Button>
+          <Button className={DIALOG_PRIMARY_BUTTON} onClick={save}>
+            {t('保存章程')}
+          </Button>
+        </>
       }
     >
-      <div className="flex flex-col gap-3 px-4 pt-4 pb-3">
+      <div className="flex flex-col gap-3">
         {/* §5.3：裸 textarea → Textarea 件；charter 高字段显式 override
             min-h-[120px]（行为理由：章程全文多行编辑空间）。旧
             resize:vertical 退役——field-sizing 自增长替代手动拖拽。
             e2e 载体 = dialog scope getByRole('textbox')（唯一 textbox）。 */}
         <Textarea
-          className="min-h-[120px]"
+          className="min-h-30 text-ui md:text-ui"
           value={text}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('长期指令：模型路由规则（何种任务使用何种模型）、优先级、偏好…')}

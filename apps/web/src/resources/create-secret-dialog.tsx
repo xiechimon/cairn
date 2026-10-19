@@ -47,6 +47,7 @@ export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDial
       title={t('添加密钥')}
       open={open}
       onClose={onClose}
+      size="s"
       footer={
         <FormActions
           className="pt-0"
@@ -59,7 +60,7 @@ export function CreateSecretDialog({ open, onClose, onCreate }: CreateSecretDial
         />
       }
     >
-      <FormStack className="py-1">
+      <FormStack className="max-w-none">
         <FormField label={t('名称（环境变量名）')} htmlFor="dlg-secret-name">
           <Input
             id="dlg-secret-name"

@@ -307,7 +307,7 @@ function ScheduleForm({
       title={t('新建定时')}
       open={open}
       onClose={onClose}
-      width={488}
+      size="m"
       footer={
         <FormActions
           className="pt-0"

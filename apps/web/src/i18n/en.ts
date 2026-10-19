@@ -835,6 +835,13 @@ export const EN: Record<string, string> = {
   自定义端点: 'Custom endpoint',
   // #385 族表未接线的 OAuth preset 行注记(如 openai-codex)
   暂未开通: 'Not yet available',
+  // Paper grouped provider picker: group headings
+  订阅登录: 'Subscription sign-in',
+  模型厂商: 'Model vendors',
+  云平台: 'Cloud platforms',
+  推理平台: 'Inference platforms',
+  网关与聚合: 'Gateways and routers',
+  其他: 'Other',
   // #356 runtime tabs(spec 11 §A1-A4;tab 名 pi/Claude Code 不译,槽位名
   // default/opus/… 为配置标识符不译;{hostname} = 上报机器名插值)
   'pacman 自有运行时。模型来自你添加的服务商。':

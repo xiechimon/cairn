@@ -12,9 +12,10 @@
 // + SQLite provider 表行（models JSON 含所填模型）。创建链是既有行为，重构
 // （A6）不得击穿——本段在 disclosure 未落地时（表单现状外露）同样可达，
 // 红态运行也产出创建链回归证据。
-// 负向（A6 + #385）：xai 行不带 '(OAuth)' 后缀（其 oauthLabel 在密钥表单内
-// 展示）；openai-codex 族表未接线——行不带后缀、行禁用、带「暂未开通」注记，
-// 徽标仅 github-copilot 一项。
+// 负向（A6 + #385）：xai 行不带「OAuth」标签（其 oauthLabel 在密钥表单内
+// 展示）；openai-codex 族表未接线——行不带标签、行禁用、带「暂未开通」注记，
+// 标签仅 github-copilot 一项。Paper 分组选择器：行 = 首字母方块 + 名称 span +
+// 右侧标签 span，名称节点等值仍是显示名 canon 的判据。
 //
 // OAuth 点击链（authorize → 外网重定向 → 302 着陆）不在本 probe 验证：需真
 // 外网 + 真订阅，属 #231/#243 e2e 面；probe 内不发外部请求。
@@ -28,7 +29,7 @@
 // [data-testid="resource-new"]、.dlg-picker-search → input[aria-label=
 // "搜索服务商..."]、.dlg-picker-row → [data-preset-id]、.dlg-picker-custom /
 // .dlg-provider-create / -model-add → button:text-is(文案)；#dlg-provider-*
-// id 载体与 .dlg / .dlg-close 壳句柄不变（#952 面）。
+// id 载体不变；壳句柄 = role=dialog，关窗钮 = aria-label「关闭」（#952 面）。
 // 用法：node drive-provider-picker.mjs
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -60,9 +61,9 @@ const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 // 38 项 preset 显示名 canon = spec 11「上游 38 项 preset 显示名（2026-09-28
 // 实测，picker 文案源）」名单逐字转录。文案变更先改 spec 11 再改这里。
 const PRESET_NAMES = {
-  'github-copilot': 'GitHub Copilot (OAuth)',
-  // #385：codex 族未接线——行文本 = 名 + 「暂未开通」注记（无 (OAuth) 后缀）
-  'openai-codex': 'OpenAI Codex 暂未开通',
+  // 名称节点只含显示名；OAuth / 暂未开通 是行右的独立标签节点（下方 5) 钉）。
+  'github-copilot': 'GitHub Copilot',
+  'openai-codex': 'OpenAI Codex',
   xai: 'xAI',
   'amazon-bedrock': 'Amazon Bedrock',
   'ant-ling': 'Ant Ling',
@@ -295,22 +296,23 @@ try {
           .join(', ')}${missingNames.length > 4 ? ` 等 ${missingNames.length} 项` : ''}`,
   );
 
-  // 5) A6 + #385：'(OAuth)' 后缀仅族表已接线的 github-copilot；openai-codex
-  //    未接线——无后缀、带「暂未开通」注记、行禁用；xai 行不带（其
+  // 5) A6 + #385：「OAuth」标签节点仅族表已接线的 github-copilot；openai-codex
+  //    未接线——无标签、带「暂未开通」注记、行禁用；xai 行不带（其
   //    oauthLabel 在密钥表单内）
-  const ghOk = (rowTexts['github-copilot'] ?? '').includes('(OAuth)');
+  const hasOauthTag = (id) => (rowData[id]?.nodes ?? []).includes('OAuth');
+  const ghOk = hasOauthTag('github-copilot');
   const codexText = rowTexts['openai-codex'] ?? '';
-  const codexClean = codexText !== '' && !codexText.includes('(OAuth)');
+  const codexClean = codexText !== '' && !hasOauthTag('openai-codex');
   const codexNote = codexText.includes('暂未开通');
   const codexDisabled = await page
     .locator(`${ROW}[data-preset-id="openai-codex"]`)
     .isDisabled()
     .catch(() => false);
-  const xaiClean = rowTexts['xai'] != null && !rowTexts['xai'].includes('(OAuth)');
+  const xaiClean = rowTexts['xai'] != null && !hasOauthTag('xai');
   check(
     'oauth-badge-wired-only',
     ghOk && codexClean && codexNote && codexDisabled && xaiClean,
-    `spec 11 A6 + #385：'(OAuth)' 徽标仅 github-copilot=${ghOk}；openai-codex 未接线——无后缀=${codexClean} 「暂未开通」注记=${codexNote} 行禁用=${codexDisabled}；xai 行不带后缀=${xaiClean}`,
+    `spec 11 A6 + #385：「OAuth」标签仅 github-copilot=${ghOk}；openai-codex 未接线——无标签=${codexClean} 「暂未开通」注记=${codexNote} 行禁用=${codexDisabled}；xai 行不带标签=${xaiClean}`,
   );
   await shot(page, '02-preset-rows.png');
 
@@ -381,7 +383,7 @@ try {
   check('keyform-closes', closedOk === true, closedOk ? '关闭钮关窗（#68 family law，aria-label 载体）' : '关窗失败/dialog 未开');
 
   // 8b) A6 正向：xai 的 oauthLabel 在其密钥表单内展示（spec 11 名单注；行不带
-  //     '(OAuth)' 后缀的负向已在 oauth-badge-wired-only 钉）。无外网请求。
+  //     「OAuth」标签的负向已在 oauth-badge-wired-only 钉）。无外网请求。
   await page.click(`${SHELL} [data-testid="resource-new"]`).catch(() => {});
   const xaiReopen = await softVisible(page, DLG);
   const xaiRowSel = `${ROW}[data-preset-id="xai"]`;

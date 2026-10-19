@@ -56,7 +56,7 @@ export function AttachmentPreview({
 }) {
   const [broken, setBroken] = useState(false);
   return (
-    <DialogShell title={name} onClose={onClose} onBackdropClick={onClose} width={640}>
+    <DialogShell title={name} onClose={onClose} size="l">
       {/* 原 .attachment-preview-body：图片 contain 进面板、永不撑爆——面板宽
           随 DialogShell（640），高图滚 dlg-body（100vh−48px 封顶律）。 */}
       <div className="flex items-center justify-center p-3">

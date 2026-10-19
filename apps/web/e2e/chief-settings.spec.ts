@@ -52,25 +52,22 @@ test('agent row opens the 选择总管 Agent dialog with search + canon default 
   await expect(dialog.getByRole('option')).toHaveText('r3-builder');
 });
 
-// #872 反向钉：搜索盒是共享配方（SEARCH_BOX_CLS），agent 对话框那一份骑在
-// 自己的 16px 容器垫上。模型 picker 的壳垫移交（盒自带 mx-3）不许漏进这一
-// 面（第一次实现就是全局加 margin-inline: 12px —— 这一面会变 28px）。
-test('agent dialog search keeps its own 16px inset (#872 blast radius)', async ({ page }) => {
+// #872 反向钉：搜索盒是共享配方（SEARCH_BOX_CLS），不自带外边距——agent
+// 对话框里它贴着弹窗体的 20px 内边距（DESIGN.md 弹窗与菜单）。模型 picker 的
+// 壳垫移交（盒自带 mx-3）不许漏进这一面（第一次实现就是全局加
+// margin-inline: 12px —— 这一面会变 32px）。
+test('agent dialog search sits on the dialog body inset (#872 blast radius)', async ({ page }) => {
   const dialog = await openAgentDialog(page);
-  // #950 载体：壳 = 搜索盒的父容器（.chief-pick/.chief-pick-search 类退役；
-  // 盒 = placeholder input 的父）。
-  const shell = dialog.getByPlaceholder('搜索 Agent…').locator('xpath=../..');
   // .dlg 的进场是 zoom-in-95 缩放（100ms）——缩放着量到的不是落定几何。
   await dialog.evaluate((el) =>
     Promise.all(el.getAnimations().map((a) => a.finished)).then(() => undefined),
   );
   const inset = await dialog.getByPlaceholder('搜索 Agent…').evaluate((el) => {
     const box = el.parentElement as HTMLElement;
-    const shell = box.parentElement as HTMLElement;
-    return box.getBoundingClientRect().left - shell.getBoundingClientRect().left;
+    const body = box.closest('[data-testid="dialog-body"]') as HTMLElement;
+    return box.getBoundingClientRect().left - body.getBoundingClientRect().left;
   });
-  await expect(shell).toBeVisible();
-  expect(inset).toBeCloseTo(16, 1);
+  expect(inset).toBeCloseTo(20, 1);
 });
 
 test('agent dialog family law: X, Escape and backdrop dismiss; panel clicks do not', async ({

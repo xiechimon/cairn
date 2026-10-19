@@ -8,7 +8,11 @@
 
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Label } from '../components/ui/label.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -40,14 +44,17 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
       title={t('请求修改')}
       open={open}
       onClose={onClose}
+      size="m"
       footer={
-        // #1006 原型（#980 前提④）：registry DialogFooter band + Button
-        // 默认档（取消 outline / 请求修改 default），13px/h-7 冻结几何退役。
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button disabled={trimmed === ''} onClick={() => onConfirm?.(trimmed)}>
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            disabled={trimmed === ''}
+            onClick={() => onConfirm?.(trimmed)}
+          >
             {t('请求修改')}
           </Button>
         </>
@@ -58,7 +65,7 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
             手写标签律退役（前提④：排版收敛 registry 默认 text-sm/500）。 */}
         {/* CJK 标签行高修正（leading-none → 1.25，墨盒不贴行底被邻位
             focus 环压住）：就地 className，件保持 pristine（#980 S5）。 */}
-        <Label className="leading-tight">{label}</Label>
+        <Label className="text-ui leading-tight font-medium text-foreground">{label}</Label>
         {/* #945（#851 裸控件账）：裸 textarea 收编 components/ui Textarea；
             #1006 原型：FOCUS_TEXTAREA 中和皮退役，件默认形态生效
             （field-sizing-content 自增高 + rounded-lg border-input）。 */}
@@ -66,6 +73,7 @@ export function RejectDialog({ open, onClose, onConfirm, rejectReason }: RejectD
           value={feedback}
           onChange={(event) => setFeedback(event.target.value)}
           rows={3}
+          className="text-ui md:text-ui"
           placeholder={label}
         />
       </div>

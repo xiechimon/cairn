@@ -18,6 +18,8 @@ colors:
   icon: '#9a9086'          # 带文字标签的图标（侧栏导航、列标题）
   accent: '#b4532a'        # 赭红：需要你处理、操作链接、计数徽章、激活图标
   accent-hover: '#f6ebe3'  # 操作链接 hover 底
+  menu-hover: '#f6f2ec'    # 菜单行 hover 底
+  backdrop: 'rgba(43, 38, 32, 0.14)'  # 弹窗背板（浅墨 dim，无 blur）
   running: '#5f8f5a'       # 执行中图标、在线点
   running-text: '#4f7049'  # 执行中说明文字
   running-bar: '#7ea476'
@@ -41,6 +43,7 @@ rounded:
   tile: 5px
   control: 8px
   card: 10px         # --radius-card：所有卡片类表面同一个角
+  menu: 10px         # --radius-popover：菜单、弹层、下拉
   sheet: 16px
   full: 9999px
 spacing:
@@ -51,6 +54,10 @@ spacing:
   header-height: 56px
   sidebar-width: 248px
   nav-row-height: 32px
+  dialog-s: 400px    # --dialog-w-s
+  dialog-m: 480px    # --dialog-w-m
+  dialog-l: 640px    # --dialog-w-l
+  menu-row-height: 32px
 ---
 
 ## 方向
@@ -138,7 +145,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 ### 卡片圆角：一个角
 - **token**：`--radius-card` = 10px（`rounded.card`），类名 `rounded-(--radius-card)`，或 `settings-list.tsx` 导出的 `CARD_RADIUS_CLS`。
 - **用在**：所有卡片类表面——任务卡、拖拽中的卡、设置卡、团队 / Agent 卡、成组的资源行卡、一次性提示卡。
-- **不在此列**：弹窗与 ⌘K 面板是 sheet 档 16px（`--edge-radius`）；下拉与选择器弹层保持各自的弹层圆角；控件 8px（`rounded-md`）；项目方块 5px。
+- **不在此列**：弹窗与 ⌘K 面板是 sheet 档 16px（`--edge-radius`）；菜单与弹层用 `--radius-popover`（也是 10px，见下节「弹窗与菜单」）；控件 8px（`rounded-md`）；项目方块 5px。
 - registry `Card` 自带 `rounded-xl`（14px），用作卡片时必须换成 `--radius-card`。
 - 要：一页里所有卡同一个角。不要：页面里写 12px / 14px 的卡，或一页混两种卡角。
 
@@ -180,6 +187,22 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **滑动**：`slide` 让白签以一条 150ms 的底层 pill 在选项间滑动（只有总管设置用，#644）。
 - 要：所有分段都从这两件拼；e2e 句柄用 `className`（轨道）和 `optionHandle`（选项）挂。不要：手写 `role="radiogroup"` / `role="tab"`，或在页面里直接用 `TabsList` / `TabsTrigger` 另调一套皮肤——`scripts/ui-drift-gate.mjs` G7 会拦下。
 
+### 弹窗与菜单
+件：`src/components/ui/dialog-shell.tsx`（`DialogShell` + 导出的 `DIALOG_*` 件、`DialogFootRow`、`dialogWidth`）、`alert-dialog-shell.tsx`（确认面）、`dropdown-menu.tsx` / `popover.tsx`（菜单与弹层）。`dialog.tsx` / `alert-dialog.tsx` / `select.tsx` 是 pristine registry 件，它们的 Paper 皮肤住在 `styles/app.css` 的 `[data-slot=…]` 规则与 token 上。
+- **背板**：一层浅墨 dim `--dialog-backdrop`（亮 `rgba(43,38,32,.14)`），不加 blur。所有弹窗、确认面、⌘K 同一层，不做深色幕布。
+- **面**：`sheet` 底（`--dialog-surface`）、16px 角（`--edge-radius`）、`--dialog-shadow`（1px `line` 环 + 两层软投影）。
+- **三档宽**（`size`，`--dialog-w-*`，窄屏 `min(100% - 2rem, …)` 收口）：
+  - S 400：密钥、API 密钥、删除与其它确认、短表单。
+  - M 480：技能、多数新建表单（Agent、定时、章程、审核、请求修改）。
+  - L 640：多步流程与长列表（添加机器、模型服务选择器、GitHub issue、原始错误、附件预览、新建任务）。
+- **头**：16px 衬线标题（`text-heading`）+ 可选一行 12px `ink-3` 副行（`subtitle`）；右上角 28px ghost 关闭钮。关闭钮在 DOM 里排最后，初始焦点落在第一个字段上。
+- **体**：唯一的滚动盒（`min-h-0`），左右 20px 内边距同时是焦点环的房间。面板封顶 `100vh - 64px`，矮视口里滚的是体，脚永远在屏内。
+- **脚（分栏）**：左边一条 12px `ink-3` 提示或状态（`hint`：文档链接、快捷键、等待状态、页码），右边操作组。主操作是 shadcn Button default（墨底 32px 8px 角，`DIALOG_PRIMARY_BUTTON`），次操作是 ghost 文字按钮（`DIALOG_TEXT_BUTTON`），危险确认换 `destructive`。没有提示时操作照样靠右。不画底色带、不画分隔线。
+- **分组选择器**（模型服务）：顶部搜索框，下面按小标题分组（`text-caption` 500 `ink-3`），每行 40px = 22px 首字母方块（白底 + `line` 环）+ 名称 + 右侧 `ink-3` 标签（OAuth / 暂未开通）。hover 与键盘焦点 = 选择器选中行（白卡 + 发丝环）。禁用行字降到 `ink-3`、不出 hover。搜索跨组过滤，空组整组隐藏；「其他 · 自定义端点」始终在。
+- **菜单**（Paper menu，`DropdownMenu` / `Popover` / Select 弹层同一张面）：白底、10px 角（`--radius-popover`）、4px 内衬、`--shadow-popover`（1px 环 + 软投影）。行高 32、6px 角、13.5px 字、15px `ink-3` 图标、hover `menu-hover`；快捷键提示靠右 `text-caption` `ink-3`；分隔线 1px、左右内缩 6px；分组标签 `text-caption` 500 `ink-3`。危险行字与图标走 `destructive`，hover `danger-soft`。菜单里的分段控件用 `SegmentedRadio` / `SegmentedTabs`，不手搓。
+- 要：一个弹窗选一档宽、提示靠左操作靠右、菜单行等高。不要：深色或模糊背板、整宽提交条、灰色底色带脚、outline 次按钮、12px 字的小灰菜单。
+- `e2e/paper-overlays.spec.ts` 钉背板颜色、三档宽、分栏脚、菜单行高与分组选择器；`e2e/color-freeze.spec.ts` 钉 `dialog-backdrop` / `menu-hover`。
+
 ## 动效
 
 - 只动 `opacity` / `transform` / 阴影；时长 150ms，`ease-out`。
@@ -200,6 +223,7 @@ Pacman UI rules (source: apps/web/DESIGN.md):
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
+- Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px serif title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px pixel pac-man mark from logo.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.

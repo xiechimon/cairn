@@ -19,7 +19,11 @@ import { CHIEF_REBIND_CONFIRM_COPY, type TeamMember } from '@pacman/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { SEARCH_BOX_CLS, SEARCH_INPUT_CLASS } from '../components/model-select-core.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
@@ -158,36 +162,33 @@ export function ChiefAgentDialog({
       title={dlgTitle}
       open={open}
       onClose={onClose}
+      size="m"
       footer={
         confirming != null ? (
-          // #950 per-face 清零：.dlg-form-foot/.dlg-form-actions 容器 utility
-          // 等值迁移（spec/22 §5.4）；钮 = outline/default 件正典 + chief 内联档
-          // 保留 px-3/text-[13px]。e2e 载体 = getByRole('button')。
-          <div className="flex flex-col px-4 pb-4">
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                className="px-3 text-[13px]"
-                onClick={() => setConfirming(null)}
-              >
-                {t('取消')}
-              </Button>
-              <Button className="px-3 text-[13px]" onClick={() => onBind?.(confirming.id)}>
-                {t('更换')}
-              </Button>
-            </div>
-          </div>
+          // e2e 载体 = getByRole('button')。
+          <>
+            <Button
+              variant="ghost"
+              className={DIALOG_TEXT_BUTTON}
+              onClick={() => setConfirming(null)}
+            >
+              {t('取消')}
+            </Button>
+            <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => onBind?.(confirming.id)}>
+              {t('更换')}
+            </Button>
+          </>
         ) : undefined
       }
     >
       {confirming != null ? (
-        <div className="flex flex-col gap-4 p-4">
-          <p className="text-[13px] leading-5 text-(--foreground)">
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-ui text-foreground">
             {t(confirmCopy ?? CHIEF_REBIND_CONFIRM_COPY).replaceAll('<agent>', confirming.name)}
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-3">
           <div className={SEARCH_BOX_CLS}>
             <Search width={14} height={14} />
             {/* #855→#950：Input 原语 + SEARCH_INPUT_CLASS 中和件单源
@@ -206,7 +207,7 @@ export function ChiefAgentDialog({
             aria-label={dlgTitle}
           >
             {rows.length === 0 ? (
-              <div className="px-2 py-4 text-center text-[13px] text-(--text-tertiary)">
+              <div className="px-2 py-4 text-center text-ui text-content-tertiary">
                 {t('没有匹配的 Agent')}
               </div>
             ) : (

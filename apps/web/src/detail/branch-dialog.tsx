@@ -28,7 +28,7 @@ import { useBuild, useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -271,10 +271,10 @@ export function BranchDialog({ info, buildId: buildIdProp, open, onClose }: Bran
       }
       open={open}
       onClose={onClose}
+      size="m"
       footer={
-        // #193: the sync tab's 同步 button rides the pinned shell footer
-        // （registry DialogFooter band）; the git tab carries no action and
-        // no footer.
+        // #193: the sync tab's 同步 button rides the pinned shell footer; the
+        // git tab carries no action and no footer.
         tab === 'sync' ? (
           <SyncButton
             buildId={buildId}
@@ -434,7 +434,7 @@ export function SyncButton({
   const live = canSync && buildId !== null && machineId !== null;
   return (
     <Button
-      className="w-full"
+      className={DIALOG_PRIMARY_BUTTON}
       disabled={!live || disabled || mut.isPending}
       onClick={() => {
         if (!live || buildId === null || machineId === null) return;

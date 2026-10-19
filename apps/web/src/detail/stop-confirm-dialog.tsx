@@ -7,7 +7,11 @@
 import { useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface StopConfirmDialogProps {
@@ -27,15 +31,18 @@ export function StopConfirmDialog({ open, onClose, onConfirm }: StopConfirmDialo
       title={t('停止当前这一轮？')}
       open={open}
       onClose={onClose}
+      size="s"
       footer={
-        // #1006 原型（#980 前提④）：registry DialogFooter band + Button
-        // 默认档；「停止」是销毁本轮修改的破坏性动作 → destructive 档
-        // （registry 语义皮肤 = 语义映射，非自定义皮肤）。
+        // 「停止」是销毁本轮修改的破坏性动作 → destructive 档。
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button variant="destructive" onClick={() => onConfirm(discard)}>
+          <Button
+            variant="destructive"
+            className={DIALOG_PRIMARY_BUTTON}
+            onClick={() => onConfirm(discard)}
+          >
             {t('停止')}
           </Button>
         </>
@@ -51,7 +58,9 @@ export function StopConfirmDialog({ open, onClose, onConfirm }: StopConfirmDialo
             onCheckedChange={setDiscard}
             aria-label={t('丢弃本轮修改——方案和代码回到上一个版本')}
           />
-          <span>{t('丢弃本轮修改——方案和代码回到上一个版本')}</span>
+          <span className="text-ui text-foreground">
+            {t('丢弃本轮修改——方案和代码回到上一个版本')}
+          </span>
         </label>
       </div>
     </DialogShell>

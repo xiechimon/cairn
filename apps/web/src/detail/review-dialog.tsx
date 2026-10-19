@@ -14,7 +14,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
 import { Textarea } from '../components/ui/textarea.js';
@@ -128,22 +132,22 @@ export function ReviewDialog({
       title={t('AI 审核')}
       open={open}
       onClose={onClose}
-      width={560}
+      size="m"
       footer={
-        // #1006 原型（#980 前提④）：registry DialogFooter band + Button
-        // 默认档（取消 outline / 开始审核 default），h-7/13px 冻结几何退役。
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button onClick={submit} disabled={!fanout && selected === ''}>
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            onClick={submit}
+            disabled={!fanout && selected === ''}
+          >
             {t(fanout ? '开始三视角审核' : '开始审核')}
           </Button>
         </>
       }
     >
-      {/* #1006 原型：body 纵向栈只留 layout 位（间距走 DialogContent 的
-          registry gap-4 与本栈 gap-3），16 垫随壳 p-4 退役。 */}
       <div className="flex flex-col gap-3">
         {/* #1250 fan-out 行（ADR 0018 层 1）：勾选 = 不选人，server 按 persona
             三员（CodeReviewer / SecurityAuditor / TestEngineer）各入队一条

@@ -184,7 +184,7 @@ export function SkillDialog({
       title={editing ? t('编辑技能') : t('新建技能')}
       open={open}
       onClose={onClose}
-      width={560}
+      size="m"
       footer={
         <FormActions
           className="pt-0"
@@ -200,7 +200,7 @@ export function SkillDialog({
       {/* 编辑面（live）预填读失败 = 表单整体让位错误块——拿不到原 SKILL.md
           时绝不让用户盲写覆写（PUT 覆写语义，空表单提交会抹掉正文）。 */}
       {error !== null && fields === null ? (
-        <FormStack className="max-w-none py-1">
+        <FormStack className="max-w-none">
           <FieldError>
             {error.headline}
             {error.detail !== '' && (
@@ -209,11 +209,11 @@ export function SkillDialog({
           </FieldError>
         </FormStack>
       ) : fields === null ? (
-        <FormStack className="max-w-none py-1">
+        <FormStack className="max-w-none">
           <FieldDescription>{t('正在读取 SKILL.md…')}</FieldDescription>
         </FormStack>
       ) : (
-        <FormStack className="max-w-none py-1">
+        <FormStack className="max-w-none">
           <FormField label={t('名称')} htmlFor="dlg-skill-name">
             <Input
               id="dlg-skill-name"

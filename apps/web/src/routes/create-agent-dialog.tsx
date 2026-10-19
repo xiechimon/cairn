@@ -132,9 +132,10 @@ export function CreateAgentDialog({
       title={t('创建 agent')}
       open={open}
       onClose={onClose}
+      size="m"
       footer={
         <FormActions
-          className="w-full pt-0"
+          className="pt-0"
           secondary={{ label: t('取消'), onClick: onClose }}
           primary={{
             label: t('创建'),
@@ -203,10 +204,7 @@ export function CreateAgentDialog({
                     {machineCandidates.find((m) => m.id === machineId)?.name ?? t('选择机器')}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent
-                  aria-label={t('归属机')}
-                  className="rounded-(--radius-popover) shadow-(--shadow-popover)"
-                >
+                <SelectContent aria-label={t('归属机')}>
                   {machineCandidates.map((m) => (
                     <SelectItem key={m.id} className="dlg-agent-machine-row" value={m.id ?? ''}>
                       {m.name}

@@ -26,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
 import { Ban, Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
@@ -131,7 +132,8 @@ export function MoreMenu({
         aria-label={t('更多')}
         className={PANEL_CLS}
       >
-        {rows.map((row) => (
+        {rows.map((row) => [
+          row.danger === true && <DropdownMenuSeparator key={`${row.key}-sep`} />,
           <DropdownMenuItem
             key={row.key}
             variant={row.danger === true ? 'destructive' : 'default'}
@@ -142,8 +144,8 @@ export function MoreMenu({
           >
             <row.Icon />
             {row.label}
-          </DropdownMenuItem>
-        ))}
+          </DropdownMenuItem>,
+        ])}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -13,7 +13,11 @@
 import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface AcceptDialogProps {
@@ -71,16 +75,14 @@ export function AcceptDialog({
       title={t('完成任务')}
       open={open}
       onClose={onClose}
+      size="s"
       footer={
-        // #1006 原型（#980 前提④）：footer = registry DialogFooter band
-        // （件自带 border-t bg-muted/50 右对齐 gap-2），钮走 Button 默认档
-        // ——取消 outline / 完成 default（家族律 #945 §5.4 的 registry 形态），
-        // 冻结几何（50×28）与 ghost 中和皮肤退役。
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
           <Button
+            className={DIALOG_PRIMARY_BUTTON}
             disabled={blocked || confirming === true}
             onClick={() => {
               if (onConfirm) onConfirm(skipMerge ? false : mergeChecked);
@@ -93,8 +95,7 @@ export function AcceptDialog({
       }
     >
       {/* XMON-72：复选行收口 components/ui/checkbox 原语（registry 同源件，
-          行盒由消费点 label 承载——整行可点走 label 激活转发）。行垫随
-          DialogContent p-4，行内 8 gap 是 layout 位。 */}
+          行盒由消费点 label 承载——整行可点走 label 激活转发）。 */}
       {skipMerge ? (
         <p className="text-meta text-(--text-tertiary)">
           {t('本轮没有文件改动，完成不会合并分支。')}
@@ -111,7 +112,7 @@ export function AcceptDialog({
               disabled={locked}
               aria-label={t('将改动合并到默认分支')}
             />
-            <span>{t('将改动合并到默认分支')}</span>
+            <span className="text-ui text-foreground">{t('将改动合并到默认分支')}</span>
           </label>
         </div>
       )}

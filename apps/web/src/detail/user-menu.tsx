@@ -12,6 +12,7 @@
 // XMON-107 (用户裁决): the capture's head mail line is removed — pacman
 // 无邮箱账位面（单用户 seed 自动登录），live 态曾渲染 fixture 常量地址。
 
+import { KeyRound, Plug, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
@@ -45,28 +46,29 @@ interface UserMenuProps {
 // 菜单行接真导航（#163）：有真实路由的行渲染为 SPA Link，载当前 search
 // 过跳（#121 Link 全族纪律）。href 用字面量——路由常量散在各页面模块，
 // import 会经 shell 家族成环（resources/shell → app-sidebar → sidebar →
-// 本文件）；App.tsx 路由表为单源对照。新功能/快捷键 隐去：local-first
-// 无 whats-new 页、无快捷键面，死钮无对象即除（反馈 行 #149 同款裁决）。
+// 本文件）；App.tsx 路由表为单源对照。
 const ROWS = [
-  { label: '帐号', href: '/app/account' },
-  { label: 'API 密钥', href: '/app/api-keys' },
-  { label: 'MCP', href: '/app/resources/mcp-servers' },
+  { label: '帐号', href: '/app/account', Icon: User },
+  { label: 'API 密钥', href: '/app/api-keys', Icon: KeyRound },
+  { label: 'MCP', href: '/app/resources/mcp-servers', Icon: Plug },
 ];
 
-// #945（detail.css 清零）：面板皮肤迁 token utilities。V2 弹层壳（#790
-// P3）：12px 内边距 / 1px 墨线框 / --plate-shadow 盘投影（#854 三件套）；
-// 圆角接 registry popover 依据 rounded-lg（#1054 消费点清点，ADR 0012 D1
-// ——直角随 V2 骨架退役，plan-dropdown #1006 迁移同词汇；墨线/投影的
-// registry 化归弹层重建票）。#163/#388/#610 锚定律的底边 48px 不动
-// （floating 变体交给 Popover Positioner，本壳只留触发形态标记）。
-// Arrow = before/after 双三角（描边 12×6 下指触发行左上，锚位 20px 避开
-// 10px 圆角），伪元经 before:/after: 变体承载。
+// Paper menu（DESIGN.md 弹窗与菜单）：白底、10px 角、4px 内衬、1px 环 + 软
+// 投影（--shadow-popover），与 DropdownMenu 同一张面。#163/#388/#610 锚定律
+// 的底边 48px 不动（floating 变体交给 Popover Positioner，本壳只留触发形态
+// 标记）。
 const PANEL =
-  // CDS PR-5: border-0 + --shadow-popover hairline. Caret outline tracks the
-  // ring token (light --border outer ring / dark --ring-inset-highlight inset)
-  // and seats on the shadow edge (no 1px border offset).
-  "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-0 before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-px after:left-5.25 after:h-1.25 after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-[''] dark:before:bg-(--ring-inset-highlight)";
+  'user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) bg-popover p-1 shadow-(--shadow-popover)';
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
+
+/** 分段行（外观 / 密度）：36px，左标签右分段。 */
+const SEG_ROW_CLS = 'user-menu-row flex h-9 items-center pr-1.5 pl-2.5 text-ui text-foreground';
+
+/** 导航行 = DropdownMenuItem 同形：32px、6px 角、15px ink-3 图标、menu-hover。 */
+const NAV_ROW_CLS =
+  'user-menu-row flex h-8 items-center gap-2.5 rounded-(--cds-radius-md) px-2.5 text-ui text-foreground no-underline outline-none hover:bg-menu-hover focus-visible:bg-menu-hover [&_svg]:size-3.75 [&_svg]:flex-none [&_svg]:text-content-tertiary';
+
+const SEPARATOR_CLS = 'mx-1.5 my-1 h-px bg-border';
 
 export function UserMenu({
   theme: initialTheme,
@@ -110,57 +112,50 @@ export function UserMenu({
         className != null && className !== '' ? ` ${className}` : ''
       }`}
     >
-      <div className="user-menu-head flex flex-none items-center gap-3 border-b border-(--border) py-3.5 [&_img]:size-7.5 [&_img]:rounded-full">
+      <div className="user-menu-head flex items-center gap-2 px-2.5 pt-2 pb-1 [&_img]:size-5 [&_img]:rounded-full">
         <SeededAvatar
-          className="size-7.5"
+          className="size-5"
           name={user.displayName}
           src={user.avatarUrl}
           fallback="/avatar-user.png"
         />
-        <div>
-          <div className="text-ui leading-4 text-(--foreground)">{user.displayName}</div>
-        </div>
+        <span className="min-w-0 truncate text-caption font-medium text-content-tertiary">
+          {user.displayName}
+        </span>
       </div>
-      <div className="flex flex-col gap-3 py-3">
-        <div className="user-menu-row flex h-8 items-center text-meta text-(--text-secondary)">
-          {t('外观')}
-          <SegmentedRadio
-            className="user-menu-seg ml-auto"
-            label={t('外观')}
-            value={theme}
-            onChange={select}
-            options={[
-              { value: 'light', label: t('浅色') },
-              { value: 'dark', label: t('深色') },
-            ]}
-          />
-        </div>
-        <div
-          className="user-menu-row flex h-8 items-center text-meta text-(--text-secondary)"
-          data-testid="density-row"
-        >
-          {t('密度')}
-          <SegmentedRadio
-            className="user-menu-seg ml-auto"
-            label={t('密度')}
-            value={density}
-            onChange={selectDensity}
-            options={[
-              { value: 'comfortable', label: t('舒适'), testId: 'density-comfortable' },
-              { value: 'compact', label: t('紧凑'), testId: 'density-compact' },
-            ]}
-          />
-        </div>
-        {ROWS.map(({ label, href }) => (
-          <Link
-            key={label}
-            className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)"
-            to={{ pathname: href, search }}
-          >
-            {t(label)}
-          </Link>
-        ))}
+      <div className={SEG_ROW_CLS}>
+        {t('外观')}
+        <SegmentedRadio
+          className="user-menu-seg ml-auto"
+          label={t('外观')}
+          value={theme}
+          onChange={select}
+          options={[
+            { value: 'light', label: t('浅色') },
+            { value: 'dark', label: t('深色') },
+          ]}
+        />
       </div>
+      <div className={SEG_ROW_CLS} data-testid="density-row">
+        {t('密度')}
+        <SegmentedRadio
+          className="user-menu-seg ml-auto"
+          label={t('密度')}
+          value={density}
+          onChange={selectDensity}
+          options={[
+            { value: 'comfortable', label: t('舒适'), testId: 'density-comfortable' },
+            { value: 'compact', label: t('紧凑'), testId: 'density-compact' },
+          ]}
+        />
+      </div>
+      <div className={SEPARATOR_CLS} aria-hidden />
+      {ROWS.map(({ label, href, Icon }) => (
+        <Link key={label} className={NAV_ROW_CLS} to={{ pathname: href, search }}>
+          <Icon aria-hidden />
+          {t(label)}
+        </Link>
+      ))}
     </div>
   );
 }

@@ -95,12 +95,9 @@ test('accept: 整行可点（文字也是点击目标）', async ({ page }) => {
   await expect(input).toBeChecked();
 });
 
-// #1006 段 2 重钉（#986 步骤 3，DRIFT-预期）：accept 面文字 13px → 14px——
-// ACCEPT_LABEL 手写标签档随 dialog-shell 零皮化退役，行文吃 registry
-// DialogContent 的 text-sm 默认（#980 前提④排版 registry 默认赢；原型
-// 实审 R1/R2 同波过目）。checkbox 盒几何（16×16 / 4px）与 gap 8 是
-// registry 件自身契约，不动。
-test('accept: 盒几何 = 16×16 / 圆角 4px / 与文字 gap 8 / 文字 14px', async ({
+// accept 面文字 = DESIGN.md 界面字 text-ui 13.5px（Paper 弹窗）。checkbox 盒
+// 几何（16×16 / 4px）与 gap 8 是 registry 件自身契约，不动。
+test('accept: 盒几何 = 16×16 / 圆角 4px / 与文字 gap 8 / 文字 13.5px', async ({
   page,
 }) => {
   const dialog = await openAccept(page);
@@ -114,7 +111,7 @@ test('accept: 盒几何 = 16×16 / 圆角 4px / 与文字 gap 8 / 文字 14px', 
   expect(box.height).toBeLessThan(16.5);
   await expect(tile).toHaveCSS('border-radius', '4px');
   const label = dialog.getByText('将改动合并到默认分支');
-  await expect(label).toHaveCSS('font-size', '14px');
+  await expect(label).toHaveCSS('font-size', '13.5px');
   const lb = await label.boundingBox();
   expect(lb).not.toBeNull();
   if (lb == null) return;

@@ -11,7 +11,7 @@ import type { GithubIssueState, TodoRecord } from '@pacman/shared';
 import { useEffect, useState } from 'react';
 import { useApiMutations, useGithubIssues } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import { DIALOG_TEXT_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { TagChip } from '../components/ui/tag-chip.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -23,11 +23,6 @@ const STATE_FILTERS: { id: GithubIssueState; label: string }[] = [
 
 /** 过滤 chip：registry Button 形态（outline 底座 / secondary 选中档，几何
  *  皮肤全归件默认 h-8），选中载体 aria-pressed（#910 裁定 3 状态断言归行为）。 */
-
-/** 翻页钮：ghost 件默认形态 + muted 墨；禁用降档归件默认（opacity-50 +
- *  pointer-events-none，registry 语义——「禁用仍画 pointer」的旧 quiet 行为
- *  随件配方退役）。 */
-const PAGER_BTN_CLS = 'h-auto cursor-pointer p-0 text-muted-foreground hover:text-foreground';
 
 interface GithubIssuesDialogProps {
   /** #73 retained-mount open flag（DialogShell 家族律）。 */
@@ -76,28 +71,27 @@ export function GithubIssuesDialog({
       open={open}
       onClose={onClose}
       title={t('从 GitHub issue 建任务')}
+      size="l"
+      hint={<span className="tabular-nums">{t('第 {page} 页', { page })}</span>}
       footer={
-        <div className="flex w-full items-center justify-between gap-3">
+        <>
           <Button
             variant="ghost"
-            className={PAGER_BTN_CLS}
+            className={DIALOG_TEXT_BUTTON}
             disabled={page <= 1 || pending}
             onClick={() => setPage((p) => p - 1)}
           >
             {t('上一页')}
           </Button>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {t('第 {page} 页', { page })}
-          </span>
           <Button
             variant="ghost"
-            className={PAGER_BTN_CLS}
+            className={DIALOG_TEXT_BUTTON}
             disabled={data?.hasMore !== true || pending}
             onClick={() => setPage((p) => p + 1)}
           >
             {t('下一页')}
           </Button>
-        </div>
+        </>
       }
     >
       <div className="flex gap-2">
@@ -116,15 +110,13 @@ export function GithubIssuesDialog({
         ))}
       </div>
       {issuesQ.isError ? (
-        <div className="py-6 text-center text-sm leading-4 text-muted-foreground">
+        <div className="py-6 text-center text-ui text-content-tertiary">
           {t('issue 列表加载失败')}
         </div>
       ) : data === undefined ? (
-        <div className="py-6 text-center text-sm leading-4 text-muted-foreground">
-          {t('加载中…')}
-        </div>
+        <div className="py-6 text-center text-ui text-content-tertiary">{t('加载中…')}</div>
       ) : data.issues.length === 0 ? (
-        <div className="py-6 text-center text-sm leading-4 text-muted-foreground">
+        <div className="py-6 text-center text-ui text-content-tertiary">
           {t('这个状态下没有 issue')}
         </div>
       ) : (
@@ -142,10 +134,10 @@ export function GithubIssuesDialog({
               disabled={pending}
               onClick={() => importIssue(issue.number)}
             >
-              <span className="flex-none text-xs text-muted-foreground tabular-nums">
+              <span className="flex-none text-meta text-content-tertiary tabular-nums">
                 #{issue.number}
               </span>
-              <span className="min-w-0 text-sm leading-[18px] text-foreground [overflow-wrap:anywhere]">
+              <span className="min-w-0 text-ui text-foreground [overflow-wrap:anywhere]">
                 {issue.title}
               </span>
               {issue.labels.length > 0 && (
@@ -162,7 +154,7 @@ export function GithubIssuesDialog({
           ))}
         </div>
       )}
-      {error !== null && <div className="text-xs leading-4 text-destructive">{error}</div>}
+      {error !== null && <div className="text-meta text-destructive">{error}</div>}
     </DialogShell>
   );
 }

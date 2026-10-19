@@ -5,7 +5,11 @@
 // 打开后推进了，弹层不关、清单按现记录刷新、顶部显变化提示重新确认。
 
 import { Button } from '../components/ui/button.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
+import {
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 
 interface ResetConfirmDialogProps {
@@ -32,16 +36,22 @@ export function ResetConfirmDialog({
       title={t('把任务重置回待开始？')}
       open={open}
       onClose={onClose}
+      size="s"
       // 挂账已清（#1004 → #1006 段 2）：registry dialog-shell 已进本分支，
       // 消费点自携垫剥除、裸内容进 DialogFooter，ACCEPT_* import 撤除。
       // 确认重置 = 销毁性动作（中断构建 + 清空对话/方案/改动，不可恢复）
       // → destructive 档（R3 停止钮同判：registry 语义皮肤 = 语义映射）。
       footer={
         <>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
             {t('取消')}
           </Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={confirming === true}>
+          <Button
+            variant="destructive"
+            className={DIALOG_PRIMARY_BUTTON}
+            onClick={onConfirm}
+            disabled={confirming === true}
+          >
             {t('确认重置')}
           </Button>
         </>
@@ -55,20 +65,18 @@ export function ResetConfirmDialog({
           同 PR 重钉；confirm 钩全仓零规则零 pin）。 */}
       <div className="block">
         {stale === true && (
-          <p className="m-0 mb-2 text-xs leading-4 text-(--text-tertiary)">
+          <p className="m-0 mb-2 text-meta text-content-tertiary">
             {t('任务在你打开确认框后发生了变化，下面是最新状态，请重新确认。')}
           </p>
         )}
-        <p className="m-0 mb-1.5 text-[13px] leading-[18px] text-(--foreground)">
-          {t('以下内容将被清空，无法恢复：')}
-        </p>
-        <ul className="m-0 mb-1.5 list-disc pl-[18px] text-[13px] leading-5 text-(--foreground)">
+        <p className="m-0 mb-1.5 text-ui text-foreground">{t('以下内容将被清空，无法恢复：')}</p>
+        <ul className="m-0 mb-2 list-disc pl-5 text-ui text-foreground">
           <li>{t('中断运行中的构建（在线的执行机即时中断；离线机器的残留进程够不着）')}</li>
           <li>{t('清空对话记录')}</li>
           <li>{t('清空方案版本')}</li>
           <li>{t('清空改动记录')}</li>
         </ul>
-        <p className="m-0 text-xs leading-4 text-(--text-tertiary)">
+        <p className="m-0 text-meta text-content-tertiary">
           {t(
             '保留：标题、需求说明、标签与人员指派。运行历史保留，可供审计。执行机工作区文件不受影响。',
           )}

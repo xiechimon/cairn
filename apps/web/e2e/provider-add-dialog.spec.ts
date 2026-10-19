@@ -79,18 +79,18 @@ test('OAuth badge rides wired family rows only (github-copilot); codex unwired c
   page,
 }) => {
   const dialog = await openPicker(page);
-  await expect(dialog.getByText('(OAuth)')).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(1);
   await expect(
-    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('(OAuth)'),
+    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
   // #385:openai-codex 族表未接线——徽标摘除,行禁用 + 「暂未开通」注记
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('(OAuth)')).toHaveCount(0);
+  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
   await expect(codex).toBeDisabled();
   await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
   const xai = dialog.locator('[data-preset-id]', { hasText: 'xAI' });
   await expect(xai).toHaveCount(1);
-  await expect(xai.getByText('(OAuth)')).toHaveCount(0);
+  await expect(xai.getByText('OAuth', { exact: true })).toHaveCount(0);
   // xai oauthLabel 的展示位 = 其密钥表单,picker 面不出现
   await expect(dialog.getByText('SuperGrok')).toHaveCount(0);
 });

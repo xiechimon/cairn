@@ -33,13 +33,13 @@ test('OAuth 徽标只骑已接线族(GitHub Copilot),codex 未接线行无徽标
   page,
 }) => {
   const dialog = await openDialog(page);
-  await expect(dialog.getByText('(OAuth)')).toHaveCount(1);
+  await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(1);
   await expect(
-    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('(OAuth)'),
+    dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).getByText('OAuth', { exact: true }),
   ).toHaveCount(1);
   // #385:openai-codex 族表未接线——徽标摘除,行禁用 + 右端「暂未开通」注记
   const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
-  await expect(codex.getByText('(OAuth)')).toHaveCount(0);
+  await expect(codex.getByText('OAuth', { exact: true })).toHaveCount(0);
   await expect(codex).toBeDisabled();
   await expect(codex.getByText('暂未开通')).toHaveText('暂未开通');
   // xai = api_key 行:picker 面不渲染其 oauthLabel(展示位在密钥表单内)
@@ -65,7 +65,7 @@ test('fixture 面点已接线徽标行 = accept 律(关窗),重开列表仍在',
   await dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' }).click();
   await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
   const again = await openDialog(page);
-  await expect(again.getByText('(OAuth)')).toHaveCount(1);
+  await expect(again.getByText('OAuth', { exact: true })).toHaveCount(1);
   await expect(again.getByRole('alert')).toHaveCount(0);
 });
 

@@ -202,12 +202,6 @@
       "line": 41
     },
     {
-      "file": "provider-picker.md",
-      "kind": "class",
-      "symbol": ".dlg-title",
-      "line": 41
-    },
-    {
       "file": "providers-tabs.md",
       "kind": "class",
       "symbol": ".res-runtime-head",

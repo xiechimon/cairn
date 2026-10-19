@@ -44,10 +44,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertDialog, AlertDialogContent } from '../components/ui/alert-dialog.js';
 import { Button } from '../components/ui/button.js';
 import {
-  DIALOG_FACE,
+  DIALOG_HEAD_CLS,
+  DIALOG_PANEL_CLS,
   DIALOG_PRIMARY_BUTTON,
   DIALOG_TEXT_BUTTON,
+  DIALOG_TITLE_CLS,
+  DialogFootRow,
   DialogShell,
+  dialogWidth,
 } from '../components/ui/dialog-shell.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -93,11 +97,11 @@ const PROJECT_MENU_CLS = 'new-task-project-menu w-55 gap-0 rounded-lg p-1';
 const OPTION_ROW_CLS =
   'new-task-project-row flex h-8 w-full cursor-pointer items-center justify-start gap-2 rounded-md border-none bg-transparent px-2 text-left text-ui font-normal text-foreground aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 disabled:pointer-events-auto';
 
-/** 未保存闸确认层（#318 r9 §3.4）layout 槽（#1008：居中 fixed / 圆角 /
- *  底色投影 / --z-confirm 档全退役——registry AlertDialogContent 默认承载
- *  居中与皮肤，z-50 = --z-dialog 值，数值上仍压 DialogShell 低档面板）：
- *  448 宽是捕获设计的内容 layout。别名 new-task-discard 原样（e2e）。 */
-const DISCARD_PANEL_CLS = `new-task-discard w-112 max-w-112 sm:max-w-112 ${DIALOG_FACE}`;
+/** 未保存闸确认层（#318 r9 §3.4）：registry AlertDialogContent 承载居中与
+ *  z-50（= --z-dialog，数值上仍压 DialogShell 低档面板），面 = Paper S 档
+ *  （registry 的 data-size 宽档撤掉，宽走 style）。别名 new-task-discard
+ *  原样（e2e）。 */
+const DISCARD_PANEL_CLS = `new-task-discard grid-rows-[auto_auto] data-[size=default]:max-w-none data-[size=default]:sm:max-w-none ${DIALOG_PANEL_CLS}`;
 
 /** Spec textarea template lines, verbatim r2 §5.2 / r7 04 placeholder
  *  block — dict keys so the en fallback carries them too. */
@@ -607,7 +611,7 @@ export function NewTaskDialog({
         // #910 一级载体：bare 面缺省无可及名，title 只进 aria-label（不可见）——
         // getByRole('dialog', { name: '新建任务' }) 即本 dialog 的语义锚。
         title={t('新建任务')}
-        width={672}
+        size="l"
         height={439}
       >
         {/* #910 二级载体（结构钩子，无 role 可表达）：new-task-head /
@@ -856,12 +860,13 @@ export function NewTaskDialog({
       >
         <AlertDialogContent
           className={DISCARD_PANEL_CLS}
+          style={{ width: dialogWidth('s') }}
           aria-label={t('放弃新建任务？未保存的内容将丢失。')}
         >
-          <div className="font-heading text-heading font-medium text-foreground">
-            {t('放弃新建任务？未保存的内容将丢失。')}
+          <div data-testid="dialog-head" className={DIALOG_HEAD_CLS}>
+            <div className={DIALOG_TITLE_CLS}>{t('放弃新建任务？未保存的内容将丢失。')}</div>
           </div>
-          <div className="flex h-8 items-center justify-end gap-2">
+          <DialogFootRow>
             {/* 原 .new-task-discard-keep：文字次操作；放弃 = 唯一主操作，保危险
                 token。 */}
             <Button
@@ -879,7 +884,7 @@ export function NewTaskDialog({
             >
               {t('放弃并关闭')}
             </Button>
-          </div>
+          </DialogFootRow>
         </AlertDialogContent>
       </AlertDialog>
       {/* #311 mention picker(sibling layer)。Esc/backdrop 顺序见上分层注记。 */}

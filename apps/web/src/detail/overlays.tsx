@@ -6,37 +6,32 @@
 // 文档（r8 §3.4）— 复用方案 第三钮。fixture 面保持静态：无 onRerun/onReuse
 // 时钮无 wire。
 //
-// #1006 原型（#980 前提②④；#983「居中 fixed 模态族 → Dialog」同族判例）：
-// #75 自建的 Overlay/PanelHead 手写壳（裸 div scrim + window Esc 监听，无
-// 焦点圈定/滚动锁/退场动效）退役，组合 registry dialog.tsx 件——
-// Dialog/DialogContent/DialogHeader/DialogTitle/DialogFooter 默认形态，
-// 三路可关（X / Esc / 背板外点，#168 家族关闭律）归 Base UI 原生 dismiss。
-// .overlay* 别名类随形透传（e2e 句柄，spec/22 §5.0 残留律——
-// rerun-close-family / todo-detail-page ESC 布线按它定位；重钉归施工段）。
-// OVERLAY_BTN/OVERLAY_GHOST 冻结几何（30 高/13px）退役，钮走 registry
-// Button variant 档。
+// 组合 registry dialog.tsx 件 + Paper 面（dialog-shell 的 DIALOG_* 件，
+// S 档），三路可关（X / Esc / 背板外点，#168 家族关闭律）归 Base UI 原生
+// dismiss。.overlay* 别名类随形透传（e2e 句柄）。
 
 import { Button } from '../components/ui/button.js';
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog.js';
+  DIALOG_BODY_CLS,
+  DIALOG_CLOSE_CLS,
+  DIALOG_HEAD_CLS,
+  DIALOG_PANEL_CLS,
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DIALOG_TITLE_CLS,
+  DialogFootRow,
+  dialogWidth,
+} from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, X } from '../icons/index.js';
-
-/** 家族面板 layout 位（#983 判决：宽度归消费点布局类）：448 = dialog
- *  家族律 #68；移动收口与 registry max-w 配方等值。 */
-const PANEL_LAYOUT = 'overlay overlay-panel w-112 max-w-[calc(100%-2rem)] sm:max-w-112';
 
 /** #168: the rerun/reuse pair joins the dialog family close law — Esc,
  *  backdrop click, and the X head button all carry the same `onClose`
  *  (dismiss the whole overlay); `back` stays the explicit step-back
- *  affordance. Mount/unmount is conditional at the call site. Base UI 原生
- *  dismiss 三路同归 onOpenChange(false)。 */
+ *  affordance. Mount/unmount is conditional at the call site. Paper S 档
+ *  面（dialog-shell 的 DIALOG_* 件）；back 钮住头里，走 onBack 而非
+ *  DialogClose。.overlay* 别名透传（e2e 句柄）。 */
 function OverlayDialog({
   onClose,
   title,
@@ -61,33 +56,42 @@ function OverlayDialog({
         if (!next) onClose();
       }}
     >
-      <DialogContent showCloseButton={false} className={PANEL_LAYOUT}>
-        <DialogHeader className="flex-row items-center gap-1">
-          {/* back/close = registry ghost icon-sm 默认档（老 20×20/24×24 冻结
-              几何与七通道中和退役）；.overlay-back/.overlay-close 别名透传。
-              back 不是 close：#168 语义 = 显式回退到 rerun 面（弹层仍在），
-              走 onBack 而非 DialogClose。 */}
+      <DialogContent
+        showCloseButton={false}
+        style={{ width: dialogWidth('s') }}
+        data-size="s"
+        className={`overlay overlay-panel grid-rows-[auto_minmax(0,1fr)_auto] ${DIALOG_PANEL_CLS}`}
+      >
+        <div data-testid="dialog-head" className={`${DIALOG_HEAD_CLS} items-center`}>
           {back === true && (
             <Button
               variant="ghost"
               size="icon-sm"
-              className="overlay-back -ml-1"
+              className="overlay-back -ml-1.5 flex-none text-content-tertiary"
               aria-label={t('返回')}
               onClick={onBack}
             >
               <ChevronLeft width={16} height={16} />
             </Button>
           )}
-          <DialogTitle className="overlay-title">{title}</DialogTitle>
-        </DialogHeader>
-        <div className="min-h-0">{children}</div>
-        {footer != null && <DialogFooter className="overlay-actions">{footer}</DialogFooter>}
+          <DialogTitle className={`overlay-title min-w-0 flex-1 ${DIALOG_TITLE_CLS}`}>
+            {title}
+          </DialogTitle>
+        </div>
+        <div data-testid="dialog-body" className={DIALOG_BODY_CLS}>
+          {children}
+        </div>
+        {footer != null && (
+          <div className="overlay-actions">
+            <DialogFootRow>{footer}</DialogFootRow>
+          </div>
+        )}
         <DialogClose
           render={
             <Button
               variant="ghost"
               size="icon-sm"
-              className="overlay-close absolute top-2 right-2"
+              className={`overlay-close ${DIALOG_CLOSE_CLS}`}
               aria-label={t('关闭')}
             />
           }
@@ -124,16 +128,22 @@ export function RerunDialog({
       title={t('开始任务')}
       footer={
         <>
-          <Button variant={reuse ? 'outline' : 'default'} onClick={onRerun}>
+          <Button
+            variant={reuse ? 'ghost' : 'default'}
+            className={reuse ? DIALOG_TEXT_BUTTON : DIALOG_PRIMARY_BUTTON}
+            onClick={onRerun}
+          >
             {t('重跑')}
           </Button>
-          {reuse && <Button onClick={onReuse}>{t('复用方案')}</Button>}
+          {reuse && (
+            <Button className={DIALOG_PRIMARY_BUTTON} onClick={onReuse}>
+              {t('复用方案')}
+            </Button>
+          )}
         </>
       }
     >
-      <div className="pt-4 pb-0.5 text-center text-ui text-(--text-secondary)">
-        {t('这张任务将交给总管重新编排。')}
-      </div>
+      <div className="text-ui text-content-secondary">{t('这张任务将交给总管重新编排。')}</div>
     </OverlayDialog>
   );
 }
@@ -162,16 +172,16 @@ export function ReusePanel({
       onBack={onBack}
       footer={
         <>
-          <Button variant="outline" onClick={onView}>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onView}>
             {t('查看方案')}
           </Button>
-          <Button onClick={onDirect}>{t('直接执行')}</Button>
+          <Button className={DIALOG_PRIMARY_BUTTON} onClick={onDirect}>
+            {t('直接执行')}
+          </Button>
         </>
       }
     >
-      <div className="px-4 pt-8 pb-1 text-center text-ui text-(--text-secondary)">
-        {t('选择接下来如何使用这个方案')}
-      </div>
+      <div className="text-ui text-content-secondary">{t('选择接下来如何使用这个方案')}</div>
     </OverlayDialog>
   );
 }
