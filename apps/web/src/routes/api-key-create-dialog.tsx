@@ -7,18 +7,15 @@
 // 提交走页面注入的 onCreate（POST /api/teams/{id}/api-keys——server 全表单
 // 在位，body schema = createApiKeyBodySchema）。live-only（fixture 面按钮
 // 保持无操作）。
-// #947 per-face 清零：secondary.css 退役，表单族几何改挂 token utility
-// （min-w 320 / 工具盘 max-h 264 是 [推断] 面的既有实测值，§3.1(a)）。
-// #1005 registry 对齐：名称行走 Field 官方组合；底部双钮与两枚快捷钮走
-// Button default/ghost 默认档（七通道中和与 border-0/px 覆写退役，hover/
-// 按下态由件承载）；工具盘盒圆角随 registry 基（rounded-lg）。
+// Paper 表单：名称行 = FormField，footer = FormActions（取消 + 创建）；
+// 工具盘是 8px 角白底发丝框，最高 264px 内滚。
 
 import { CHIEF_REMOTE_TOOLS } from '@pacman/shared';
 import { useState } from 'react';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import { Field, FieldGroup, FieldLabel } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -82,34 +79,30 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
       open={open}
       onClose={onClose}
       footer={
-        <div className="flex gap-2 px-4 py-3">
-          <Button onClick={submit}>{t('创建')}</Button>
-          <Button variant="ghost" onClick={onClose}>
-            {t('取消')}
-          </Button>
-        </div>
+        <FormActions
+          className="pt-0"
+          primary={{ label: t('创建'), onClick: submit }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
-      <FieldGroup className="min-w-[320px] gap-2.5">
-        <Field>
-          <FieldLabel htmlFor="apikey-name-input">{t('名称（可选）')}</FieldLabel>
-          {/* id/htmlFor 配对是语义资产（getByLabel 一级载体），保留不动；
-              Input 走件默认档（#1003 起 rounded-lg / border-input / 官方
-              focus 环）。 */}
+      <FormStack className="max-w-none py-1">
+        <FormField label={t('名称（可选）')} htmlFor="apikey-name-input">
           <Input
             id="apikey-name-input"
+            className={FORM_CONTROL_CLS}
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder={t('如：笔记本、CI 机器')}
           />
-        </Field>
+        </FormField>
         {/* XMON-75：这两行与下面的读写位此前是裸 checkbox 原生控件，画出来
             是浏览器自带的方框，跟仓内 .dlg-accept-check 那一族的复选 tile
             不同形。改用 components/ui/checkbox.tsx 统一形态（#1003 起件为
             registry 同源；行盒布局由消费点 label 承载，此处只并字体档）。 */}
         <div className="flex flex-col gap-1.5">
           {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-          <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-(--text-secondary)">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
             <Checkbox
               checked={gitAccess}
               onCheckedChange={setGitAccess}
@@ -118,7 +111,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             {t('Git 读写（托管仓库 push/pull）')}
           </label>
           {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}
-          <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-(--text-secondary)">
+          <label className="inline-flex cursor-pointer items-center gap-2 text-ui text-content-secondary">
             <Checkbox
               checked={mcpAccess}
               onCheckedChange={setMcpAccess}
@@ -128,7 +121,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
           </label>
         </div>
         <div className="flex items-baseline justify-between">
-          <span className="text-xs text-(--text-tertiary)">{t('工具权限位')}</span>
+          <span className="text-ui font-medium text-foreground">{t('工具权限位')}</span>
           <span className="flex gap-2">
             <Button variant="ghost" size="xs" onClick={grantAll}>
               {t('授予全部')}
@@ -138,23 +131,23 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             </Button>
           </span>
         </div>
-        <div className="max-h-[264px] overflow-y-auto rounded-lg border border-(--border) px-2 py-1">
-          <div className="flex items-center gap-2 py-[3px] text-xs text-(--text-tertiary)">
+        <div className="max-h-66 overflow-y-auto rounded-md border border-border bg-card px-2 py-1 dark:bg-input/30">
+          <div className="flex items-center gap-2 py-1 text-meta text-content-tertiary">
             <span className="flex-1" />
             <span className="w-8 text-center">{t('读')}</span>
             <span className="w-8 text-center">{t('写')}</span>
           </div>
           {TOOL_NAMES.map((tool) => (
-            <div key={tool} className="flex items-center gap-2 py-[3px] text-xs">
-              <span className="flex-1 text-(--text-secondary)">{tool}</span>
-              <span className="w-8 text-center text-(--text-tertiary)">
+            <div key={tool} className="flex items-center gap-2 py-1 text-meta">
+              <span className="flex-1 text-content-secondary">{tool}</span>
+              <span className="w-8 text-center text-content-tertiary">
                 <Checkbox
                   checked={read.has(tool)}
                   onCheckedChange={() => setRead((set) => toggle(set, tool))}
                   aria-label={`${t('读')} ${tool}`}
                 />
               </span>
-              <span className="w-8 text-center text-(--text-tertiary)">
+              <span className="w-8 text-center text-content-tertiary">
                 <Checkbox
                   checked={write.has(tool)}
                   onCheckedChange={() => setWrite((set) => toggle(set, tool))}
@@ -164,7 +157,7 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
             </div>
           ))}
         </div>
-      </FieldGroup>
+      </FormStack>
     </DialogShell>
   );
 }

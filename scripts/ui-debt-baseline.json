@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "6161f47a5cf36333100a8062b69ae35600885f14",
+    "sha": "0b264825343b19d8712b2a1dcc2b307a0132fceb",
     "date": "2026-10-19"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 69,
-    "spacingTotal": 86,
+    "textTotal": 66,
+    "spacingTotal": 80,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -104,18 +104,6 @@
       "pages/project-page.tsx": {
         "text": 8,
         "spacing": 7
-      },
-      "pages/schedules-page.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
-      "routes/api-key-create-dialog.tsx": {
-        "text": 2,
-        "spacing": 4
-      },
-      "routes/api-keys-page.tsx": {
-        "text": 1,
-        "spacing": 1
       },
       "routes/machine-authorize-page.tsx": {
         "text": 1,
