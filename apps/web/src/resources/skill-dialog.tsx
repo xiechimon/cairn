@@ -10,12 +10,9 @@
 // #944 正典表执行（spec/22 §5.3/§5.4）：裸 button/textarea → Button
 // default / Textarea 件、Input 摘 .dlg-form-input 老类（I3——件已是
 // components/ui，几何即正典 h-8）。
-// #1005 registry 对齐：表单行改 Field 官方组合（FieldGroup/Field/FieldLabel/
-// FieldDescription），错误行改 FieldError（role=alert 内建，件默认
-// destructive 墨）；LABEL_CLS/FORM_CLS/ERROR_CLS 手排配方退役。
-// SKILL.md 正文编辑框的 font-mono + min-h-[160px] 是消费面显式 override
-// （textarea.tsx 头注口径）：markdown/YAML 源码编辑要等宽，正文要多行空间
-// ——原 .dlg-skill-body 的行为理由原样承接。
+// Paper 表单（DESIGN.md 页面模式 · 表单）：FormStack / FormField，错误行
+// 走 FieldError（role=alert 内建），footer = FormActions。SKILL.md 正文框
+// 等宽 + min-h-40：markdown/YAML 源码编辑要等宽，正文要多行空间。
 
 import {
   buildSkillEntry,
@@ -30,21 +27,13 @@ import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations, useSkillFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { Button } from '../components/ui/button.js';
+import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from '../components/ui/field.js';
+import { FieldDescription, FieldError } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
-
-/** 表单容器垫（DialogShell 体无内垫，容器 layout 归消费点）。 */
-const FORM_CLS = 'px-4 pt-4 pb-3';
+import { FORM_TEXTAREA_CLS } from './parts.js';
 
 /** 编辑目标（行数据投影）；undefined = 新建。 */
 export interface SkillEditTarget {
@@ -196,35 +185,39 @@ export function SkillDialog({
       open={open}
       onClose={onClose}
       width={560}
-      // #1006 段 2（dialog-shell 零皮化的消费点清理）：剥 footer 包装 div
-      // （band 自带 p-4；包装会把 w-full 钮塌成内容宽），裸钮直进。
       footer={
-        <Button className="w-full" disabled={!submittable} onClick={submit}>
-          {editing ? t('保存') : t('新建技能')}
-        </Button>
+        <FormActions
+          className="pt-0"
+          primary={{
+            label: editing ? t('保存') : t('新建技能'),
+            onClick: submit,
+            disabled: !submittable,
+          }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
       {/* 编辑面（live）预填读失败 = 表单整体让位错误块——拿不到原 SKILL.md
           时绝不让用户盲写覆写（PUT 覆写语义，空表单提交会抹掉正文）。 */}
       {error !== null && fields === null ? (
-        <FieldGroup className={FORM_CLS}>
+        <FormStack className="max-w-none py-1">
           <FieldError>
             {error.headline}
             {error.detail !== '' && (
               <span className="mt-0.5 block text-muted-foreground">{error.detail}</span>
             )}
           </FieldError>
-        </FieldGroup>
+        </FormStack>
       ) : fields === null ? (
-        <FieldGroup className={FORM_CLS}>
+        <FormStack className="max-w-none py-1">
           <FieldDescription>{t('正在读取 SKILL.md…')}</FieldDescription>
-        </FieldGroup>
+        </FormStack>
       ) : (
-        <FieldGroup className={FORM_CLS}>
-          <Field>
-            <FieldLabel htmlFor="dlg-skill-name">{t('名称')}</FieldLabel>
+        <FormStack className="max-w-none py-1">
+          <FormField label={t('名称')} htmlFor="dlg-skill-name">
             <Input
               id="dlg-skill-name"
+              className={FORM_CONTROL_CLS}
               value={fields?.name ?? ''}
               onChange={(event) => setFields((f) => f && { ...f, name: event.target.value })}
               placeholder="deploy-to-prod"
@@ -234,11 +227,11 @@ export function SkillDialog({
                 {t('名称须以字母或数字开头，只能含字母、数字、点、横杠、下划线，最长 64 字符。')}
               </FieldError>
             )}
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-skill-desc">{t('描述')}</FieldLabel>
+          </FormField>
+          <FormField label={t('描述')} htmlFor="dlg-skill-desc">
             <Input
               id="dlg-skill-desc"
+              className={FORM_CONTROL_CLS}
               value={fields?.description ?? ''}
               onChange={(event) => setFields((f) => f && { ...f, description: event.target.value })}
               placeholder={t('这个技能做什么、什么时候用它。')}
@@ -248,16 +241,15 @@ export function SkillDialog({
                 {t('描述不要用引号整体包裹——写进 frontmatter 后引号会被剥去，与表单值不一致。')}
               </FieldError>
             )}
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dlg-skill-body">{t('SKILL.md 正文')}</FieldLabel>
+          </FormField>
+          <FormField label={t('SKILL.md 正文')} htmlFor="dlg-skill-body">
             <Textarea
               id="dlg-skill-body"
-              className="min-h-[160px] font-mono"
+              className={`min-h-40 font-mono ${FORM_TEXTAREA_CLS}`}
               value={fields?.body ?? ''}
               onChange={(event) => setFields((f) => f && { ...f, body: event.target.value })}
             />
-            <FieldDescription>
+            <FieldDescription className="text-meta text-content-tertiary">
               {editing
                 ? t('frontmatter（name/description）由上方表单生成；未在此编辑的文件保持原样。')
                 : t('frontmatter（name/description）由上方表单生成，这里只写正文。')}
@@ -269,7 +261,7 @@ export function SkillDialog({
                 })}
               </FieldError>
             )}
-          </Field>
+          </FormField>
           {error !== null && (
             <FieldError>
               {error.headline}
@@ -278,7 +270,7 @@ export function SkillDialog({
               )}
             </FieldError>
           )}
-        </FieldGroup>
+        </FormStack>
       )}
     </DialogShell>
   );
