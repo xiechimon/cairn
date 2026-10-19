@@ -363,7 +363,7 @@ export function CreateProviderDialog({
                       <span aria-hidden className={PICKER_TILE_CLS}>
                         {row.label.charAt(0)}
                       </span>
-                      {row.label}
+                      <span className="min-w-0 truncate">{row.label}</span>
                       {/* 已接线 OAuth 行带「OAuth」标签（xai 不带，负向钉）；
                           族表外 OAuth 行带「暂未开通」（#385）。 */}
                       {row.wired && <span className={PICKER_TAG_CLS}>OAuth</span>}
