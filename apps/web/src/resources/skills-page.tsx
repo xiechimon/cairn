@@ -1,6 +1,5 @@
-// 技能 route (issue #69, r7 08): search input + 排序 button row, then one
-// card row per skill (20px orange puzzle tile, name + description, row
-// chevron). Row content comes from the scenario fixture.
+// 技能 route (issue #69): search input + 排序 button row, then one card of
+// skill rows (name + description, row chevron).
 // #306 接真：排序钮开单选 listbox（默认/名称，当前项 ✓，行点击 = 选中即关
 // — lang-dropdown 家族律）。原站排序下拉内容未观测，选项集 [设计]：SkillRow
 // 数据面只有 name/description（无时间戳），可诚实承载的排序键 = 名称。
@@ -10,12 +9,14 @@
 // 界面新建双入口（canon = shared SKILL_PAGE_COPY 单源消费，{dir} =
 // SKILLS_DIR_DEFAULT；env 覆写在 server 侧，i18n 键经 COMPUTED_KEYS 登记）。
 import { SKILL_PAGE_COPY, SKILLS_DIR_DEFAULT } from '@pacman/shared';
+import { Puzzle } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useSkills } from '../api/hooks.js';
 import { mapSkills } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { EmptyState } from '../components/empty-state.js';
 import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
@@ -27,18 +28,17 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUpDown, ChevronDown, Download, Puzzle, Search } from '../icons/index.js';
+import { ArrowUpDown, ChevronDown, Download, Search } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import {
-  EmptyState,
   RES_SEARCH_ROW_CLS,
+  ResourceList,
   ResourceNewButton,
-  RowCard,
+  ResourceRow,
   RowChevron,
   RowDesc,
   RowText,
   RowTitle,
-  Tile,
 } from './parts.js';
 import { SkillDialog, type SkillEditTarget } from './skill-dialog.js';
 import { SkillImportDialog } from './skill-import-dialog.js';
@@ -89,25 +89,17 @@ export function SkillsPage() {
       fixture={fixture}
     >
       {skills.length === 0 ? (
-        // r2 08: the empty state replaces the search row entirely；spec 13
-        // 回摆（XMON-114）：双入口口径——主钮开新建弹窗，文案指路目录 +
-        // 界面新建（canon = SKILL_PAGE_COPY，{dir} 插值；en 翻译键 = 同串，
-        // i18n-coverage COMPUTED_KEYS 登记）。
         <EmptyState
-          Icon={Puzzle}
-          title={SKILL_PAGE_COPY.empty}
-          description={SKILL_PAGE_COPY.directoryHint}
-          descriptionVars={{ dir: SKILLS_DIR_DEFAULT }}
-          actionLabel="新建技能"
-          onAction={openCreate}
+          testId="resource-empty"
+          className="mt-6"
+          icon={Puzzle}
+          title={t(SKILL_PAGE_COPY.empty)}
+          description={t(SKILL_PAGE_COPY.directoryHint, { dir: SKILLS_DIR_DEFAULT })}
+          action={{ label: t('新建技能'), onClick: openCreate }}
         />
       ) : (
         <>
           <div className={RES_SEARCH_ROW_CLS}>
-            {/* #1005 registry 对齐：搜索盒走 InputGroup 官方组合（前置图标
-                addon + 零装饰 input，件自带 focus 环与 rounded-lg 盒形）——
-                手搓盒形配方（RES_SEARCH_BOX/INPUT_CLS）在本面退役。过滤行为
-                无行为票，本面 = 真输入框，占位文案同键单源。 */}
             <InputGroup className="flex-1">
               <InputGroupAddon>
                 <Search />
@@ -118,12 +110,6 @@ export function SkillsPage() {
                 aria-label={t('搜索技能...')}
               />
             </InputGroup>
-            {/* #854 收编 dropdown-menu（Base UI Menu RadioGroup，#714
-                playbook）：单选即关走显式 closeOnClick；勾形改由
-                RadioItemIndicator 原生槽承载；定位正本迁 Positioner 参数
-                （side=bottom align=end sideOffset=8）。#1005 registry 对齐：
-                触发钮 = Button outline 默认档，盘/行皮肤走件默认（V2 弹层壳
-                配方在本面退役；盘宽随锚 = 件默认 w-(--anchor-width)）。 */}
             <DropdownMenu>
               <DropdownMenuTrigger render={<Button variant="outline" />}>
                 <ArrowUpDown />
@@ -144,23 +130,24 @@ export function SkillsPage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          {skills.map((skill) => (
-            <RowCard
-              key={skill.name}
-              onOpen={() =>
-                setDialog({
-                  skill: { id: skill.name, name: skill.name, description: skill.description },
-                })
-              }
-            >
-              <Tile Icon={Puzzle} size="sm" tone="orange" />
-              <RowText>
-                <RowTitle>{skill.name}</RowTitle>
-                <RowDesc strong>{skill.description}</RowDesc>
-              </RowText>
-              <RowChevron />
-            </RowCard>
-          ))}
+          <ResourceList>
+            {skills.map((skill) => (
+              <ResourceRow
+                key={skill.name}
+                onOpen={() =>
+                  setDialog({
+                    skill: { id: skill.name, name: skill.name, description: skill.description },
+                  })
+                }
+              >
+                <RowText>
+                  <RowTitle>{skill.name}</RowTitle>
+                  <RowDesc>{skill.description}</RowDesc>
+                </RowText>
+                <RowChevron />
+              </ResourceRow>
+            ))}
+          </ResourceList>
         </>
       )}
       <SkillDialog open={dialog !== null} onClose={() => setDialog(null)} skill={dialog?.skill} />

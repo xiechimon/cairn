@@ -398,7 +398,18 @@ export const EN: Record<string, string> = {
   '迁移到…': 'Migrate to…',
   迁移到: 'Migrate to',
   整机迁移: 'Migrate all agents',
-  '删除（先迁走 {n} 个 agent）': 'Delete (move {n} agents first)',
+  状态: 'Status',
+  '把归属这台机器的 agent 一起迁到另一台机器。':
+    'Move every agent homed on this machine to another one.',
+  删除机器: 'Delete machine',
+  '先迁走归属这台机器的 {n} 个 agent 才能删除。':
+    'Move the {n} agents homed on this machine first, then delete it.',
+  '删除后，这台机器要重新注册才能再接任务。':
+    'Once deleted, the machine has to enroll again before it takes work.',
+  '确定删除这台机器？此操作不可撤销。': 'Delete this machine? This cannot be undone.',
+  '尚无机器。': 'No machines yet.',
+  '在要执行任务的机器上运行注册命令，它就会出现在这里。':
+    'Run the enroll command on the machine that should run tasks and it appears here.',
   机器不存在或已移除: 'Machine missing or removed',
   '整机迁移失败，请重试。': 'Migration failed. Try again.',
   '删除机器失败，请重试。': 'Could not delete the machine. Try again.',
@@ -837,8 +848,8 @@ export const EN: Record<string, string> = {
     'Add ANTHROPIC_*_MODEL slots to env in ~/.claude/settings.json on that machine and its model slots show up here.',
   '安装 Claude Code 并完成一次登录后，此处自动展示其模型槽。':
     'Install Claude Code and sign in once; its model slots appear here automatically.',
-  '尚未添加服务商。添加后，服务商的模型会出现在这里。':
-    'No providers yet. Once you add one, its models appear here.',
+  '尚未添加服务商。': 'No providers yet.',
+  '添加后，服务商的模型会出现在这里。': 'Once you add one, its models appear here.',
   'settings.json 未配置模型槽。': 'No model slots configured in settings.json.',
   '尚无执行机上报模型信息。': 'No executor has reported model info yet.',
   // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)

@@ -1,15 +1,23 @@
-// #1259 机器详情页（/app/resources/machines/:id）：机器的完整面——事实条
-// （runtime/版本/并发/在线）+ 归属该机（归属机 = 它）的 agent 网格（复用
-// team 页卡网格）+ 「在这台机器新建 agent」（预选归属机）+ 生命周期出口
-// （整机迁移 / 删除——有绑定 agent 时删除被 server 409 拒，按钮先禁并写明
-// 原因）。
+// #1259 机器详情页（/app/resources/machines/:id）：设置列表一张卡（在线态 /
+// runtime / 并发 / 整机迁移）+ 归属该机的 agent 网格（复用 team 页卡网格，
+// 「在这台机器新建 agent」预选归属机）+ 末尾危险区删除（先确认；有绑定
+// agent 时 server 409 拒，按钮先禁并写明原因）。
 
+import { Monitor } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { useApiMutations, useMachines, useMembers, useModelSources } from '../api/hooks.js';
-import { mapMachines, mapTeam, toModelOptions } from '../api/mappers.js';
+import { mapMachines, mapTeam, RUNTIME_LABELS, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { EmptyState } from '../components/empty-state.js';
+import {
+  SETTINGS_SELECT_TRIGGER_CLS,
+  SettingsCard,
+  SettingsDangerZone,
+  SettingsRow,
+} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import {
   Select,
   SelectContent,
@@ -20,10 +28,12 @@ import {
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateAgentDialog } from '../routes/create-agent-dialog.js';
 import { TeamAgentGrid } from '../routes/team-agent-grid.js';
 import { CONCURRENCY_SOURCE_LABEL, MACHINES_HREF } from './machines-page.js';
+import { OnlineStatus } from './parts.js';
 
 export function MachineDetailPage() {
   const { t } = useI18n();
@@ -50,6 +60,7 @@ export function MachineDetailPage() {
   const [evacuateTarget, setEvacuateTarget] = useState<string | null>(null);
   const [evacuating, setEvacuating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const others = machines.filter((m) => m.id !== machineId);
 
@@ -85,6 +96,7 @@ export function MachineDetailPage() {
   };
 
   const remove = async () => {
+    setConfirmOpen(false);
     setDeleting(true);
     try {
       const res = await fetch(`/api/machines/${machineId}`, { method: 'DELETE' });
@@ -109,7 +121,7 @@ export function MachineDetailPage() {
         selected={MACHINES_HREF}
         fixture={fixture}
       >
-        <div className="p-4 text-sm text-muted-foreground">{t('机器不存在或已移除')}</div>
+        <EmptyState className="mt-6" icon={Monitor} title={t('机器不存在或已移除')} />
       </PageShell>
     );
   }
@@ -122,69 +134,70 @@ export function MachineDetailPage() {
       selected={MACHINES_HREF}
       fixture={fixture}
     >
-      <div className="flex flex-col gap-4 p-4">
-        {/* 事实条：runtime 开关 / 版本 / 并发 / 在线态。 */}
-        <div className="flex flex-wrap items-center gap-3 text-sm text-(--text-secondary)">
-          <span data-testid="machine-detail-online">
-            {machine.online !== false ? t('在线') : t('离线')}
-          </span>
-          <span aria-hidden="true">·</span>
-          <span>{(machine.enabledRuntimes ?? []).join(' / ') || t('无 runtime 开启')}</span>
+      <div className="flex flex-col gap-6 pt-4">
+        <SettingsCard>
+          <SettingsRow label={t('状态')}>
+            <span data-testid="machine-detail-online">
+              <OnlineStatus on={machine.online !== false} />
+            </span>
+          </SettingsRow>
+          <SettingsRow label={t('运行时')}>
+            <span className="text-content-secondary">
+              {(machine.enabledRuntimes ?? [])
+                .map((r) =>
+                  r in RUNTIME_LABELS ? RUNTIME_LABELS[r as keyof typeof RUNTIME_LABELS] : r,
+                )
+                .join(' / ') || t('无 runtime 开启')}
+            </span>
+          </SettingsRow>
           {machine.maxConcurrent !== undefined && (
-            <>
-              <span aria-hidden="true">·</span>
-              <span>
+            <SettingsRow label={t('并发上限')}>
+              <span className="tabular-nums text-content-secondary">
                 {t('并发 {running}/{cap}', {
                   running: machine.runningSteps ?? 0,
                   cap: machine.maxConcurrent,
                 })}
               </span>
               {machine.concurrencySource !== undefined && (
-                <span data-concurrency-source={machine.concurrencySource}>
+                <span
+                  className="text-meta text-content-tertiary"
+                  data-concurrency-source={machine.concurrencySource}
+                >
                   {t(CONCURRENCY_SOURCE_LABEL[machine.concurrencySource])}
                 </span>
               )}
-            </>
+            </SettingsRow>
           )}
-        </div>
-
-        {/* 生命周期出口：整机迁移 + 删除（有绑定 agent 时删除禁用，server
-            同律 409）。 */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
-            <SelectTrigger className="machine-evacuate-select">
-              <SelectValue>
-                {others.find((m) => m.id === evacuateTarget)?.name ?? t('迁移到…')}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent aria-label={t('迁移到')}>
-              {others.map((m) => (
-                <SelectItem key={m.id} className="machine-evacuate-row" value={m.id ?? ''}>
-                  {m.name}
-                  {m.online === false ? `（${t('离线')}）` : ''}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            disabled={evacuateTarget === null || evacuating || homeAgents.length === 0}
-            onClick={evacuate}
-            data-testid="machine-evacuate-btn"
+          <SettingsRow
+            label={t('整机迁移')}
+            hint={t('把归属这台机器的 agent 一起迁到另一台机器。')}
           >
-            {t('整机迁移')}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={deleting || homeAgents.length > 0}
-            onClick={remove}
-            data-testid="machine-delete-btn"
-          >
-            {homeAgents.length > 0
-              ? t('删除（先迁走 {n} 个 agent）', { n: homeAgents.length })
-              : t('删除')}
-          </Button>
-        </div>
+            <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
+              <SelectTrigger className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}>
+                <SelectValue>
+                  {others.find((m) => m.id === evacuateTarget)?.name ?? t('迁移到…')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent aria-label={t('迁移到')}>
+                {others.map((m) => (
+                  <SelectItem key={m.id} className="machine-evacuate-row" value={m.id ?? ''}>
+                    {m.name}
+                    {m.online === false ? `（${t('离线')}）` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              className={DIALOG_PRIMARY_BUTTON}
+              disabled={evacuateTarget === null || evacuating || homeAgents.length === 0}
+              onClick={evacuate}
+              data-testid="machine-evacuate-btn"
+            >
+              {t('整机迁移')}
+            </Button>
+          </SettingsRow>
+        </SettingsCard>
 
         <TeamAgentGrid
           agents={homeAgents}
@@ -192,7 +205,27 @@ export function MachineDetailPage() {
           onCreate={() => setCreateOpen(true)}
           search={search}
         />
+
+        <SettingsDangerZone
+          label={t('删除机器')}
+          description={
+            homeAgents.length > 0
+              ? t('先迁走归属这台机器的 {n} 个 agent 才能删除。', { n: homeAgents.length })
+              : t('删除后，这台机器要重新注册才能再接任务。')
+          }
+          actionLabel={t('删除')}
+          disabled={deleting || homeAgents.length > 0}
+          onAction={() => setConfirmOpen(true)}
+        />
       </div>
+      <DeleteConfirm
+        open={confirmOpen}
+        title={t('确定删除这台机器？此操作不可撤销。')}
+        summary={machine.name}
+        ariaLabel={t('删除机器')}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void remove()}
+      />
       <CreateAgentDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}

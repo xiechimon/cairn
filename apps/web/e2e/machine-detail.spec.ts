@@ -4,7 +4,8 @@
 // 1. 列表行机器名是链接 → 详情页（行内开关控件不串导航）。
 // 2. 详情页 fact 条 = 在线态 + runtimes + 并发；agent 网格只列归属本机的。
 // 3. 归属机预选：创建槽开弹窗，机器槽回显本机（预选）。
-// 4. 删除闸：有绑定 agent 时删除钮禁用并指名数量（server 409 同律）。
+// 4. 删除闸：有绑定 agent 时删除钮禁用并指名数量（server 409 同律）；删除在
+//    末尾危险区，点了先弹确认层，不直接删。
 // 5. 整机迁移：未选目标机时迁移钮禁用；fixture 静态面（无后端）。
 
 import { expect, test } from '@playwright/test';
@@ -42,10 +43,28 @@ test('创建槽预选本机为归属机', async ({ page }) => {
 test('删除闸：无绑定 agent 时可删；整机迁移未选目标机时禁用', async ({ page }) => {
   await page.goto(DETAIL);
   // fixture 机均无绑定 agent → 删除可用；迁移未选目标 = 禁用。
-  await expect(page.getByTestId('machine-delete-btn')).toBeEnabled();
+  await expect(page.getByRole('button', { name: '删除', exact: true })).toBeEnabled();
   await expect(page.getByTestId('machine-evacuate-btn')).toBeDisabled();
   // 迁移目标选择器列出「别的机器」（本机不在其列）。
   await page.locator('.machine-evacuate-select').click();
   await expect(page.locator('.machine-evacuate-row', { hasText: 'xmonsMac-3574.local' })).toBeVisible();
   await expect(page.locator('.machine-evacuate-row', { hasText: 'mea-wsl' })).toHaveCount(0);
+});
+
+test('危险区删除先弹确认层，取消不删', async ({ page }) => {
+  await page.goto(DETAIL);
+  const danger = page.locator('.settings-card').last();
+  await expect(danger).toContainText('删除机器');
+  let deletes = 0;
+  page.on('request', (req) => {
+    if (req.method() === 'DELETE') deletes += 1;
+  });
+  await danger.getByRole('button', { name: '删除', exact: true }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除机器' });
+  await expect(confirm).toBeVisible();
+  await expect(confirm).toContainText('mea-wsl');
+  await confirm.getByRole('button', { name: '取消' }).click();
+  await expect(confirm).toBeHidden();
+  expect(deletes).toBe(0);
+  await expect(page).toHaveURL(DETAIL);
 });

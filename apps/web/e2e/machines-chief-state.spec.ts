@@ -9,12 +9,12 @@
 //    shell 闸恰一个 → 标注容器内必须零 button 零 role=menu。
 // 4. 存量漂移：无标注数据的行（06 canon 面）不得长出任何标注节点
 //    （capture 零漂移）。
-// 5. 行高契约破坏：标注把 60px 行高顶破 → res-grow 行高契约必须保持。
+// 5. 行高契约破坏：标注把 52px 设置行顶破 → 行高契约必须保持。
 // live 全链真值（PATCH 设主力机 → 徽标 → 离线 → 等待 → 宽限失败）归
 // verify 证据（docs/verify/865/，PR body raw 永久链）。
 // #944/#910 载体：.res-grow → div[data-kind]；.mach-orchestration* →
 // [data-orchestration] 状态属性（host/running/waiting，容器类退役）；
-// .res-dot → [data-on]；.res-grow--divided → [data-divided]。
+// .res-dot → [data-on]；行间分隔线由设置卡 divide-y 承载（无 data-divided）。
 
 import { expect, test } from '@playwright/test';
 
@@ -65,19 +65,12 @@ test('存量零漂移：无标注数据（06 canon 面）不长任何标注节�
   await expect(page.locator(`${SHELL} [data-orchestration]`)).toHaveCount(0);
 });
 
-test('行高契约保持：标注行不破行高（首行 40 / 分隔行 39+1px）', async ({ page }) => {
+test('行高契约保持：标注行不破 Paper 设置行高（每行 52，含分隔线）', async ({ page }) => {
   await page.goto(CHIEF_STATE);
   const rows = page.locator(ROW);
   await expect(rows).toHaveCount(3);
-  const first = await rows.first().evaluate((el) => el.getBoundingClientRect().height);
-  expect(first).toBe(40); // CDS PR-8 --row-h
-  for (const row of await rows.locator('~ [data-divided]').all()) {
-    const geo = await row.evaluate((el) => {
-      const r = el.getBoundingClientRect();
-      return { height: r.height, borderTop: parseFloat(getComputedStyle(el).borderTopWidth) };
-    });
-    // 分隔行契约：39 + 1px 顶线 = 40 总高 (CDS PR-8)（标注不顶破）。
-    expect(geo.height).toBe(39);
-    expect(geo.borderTop).toBe(1);
-  }
+  const heights = await rows.evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().height),
+  );
+  expect(heights).toEqual([52, 52, 52]);
 });

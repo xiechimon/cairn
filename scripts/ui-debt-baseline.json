@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "d6488b01adad09103973c6120fbca99d548dd1e5",
-    "date": "2026-10-18"
+    "sha": "8a17dccf27f8a7f4fb87ef886ed7c5731334e322",
+    "date": "2026-10-19"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
   "perFaceCss": {},
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 76,
-    "spacingTotal": 100,
+    "textTotal": 69,
+    "spacingTotal": 95,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -104,26 +104,6 @@
       "pages/project-page.tsx": {
         "text": 8,
         "spacing": 7
-      },
-      "resources/create-machine-dialog.tsx": {
-        "text": 3,
-        "spacing": 0
-      },
-      "resources/create-provider-dialog.tsx": {
-        "text": 1,
-        "spacing": 0
-      },
-      "resources/parts.tsx": {
-        "text": 3,
-        "spacing": 2
-      },
-      "resources/providers-page.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
-      "resources/skill-dialog.tsx": {
-        "text": 0,
-        "spacing": 2
       },
       "routes/agent-detail-page.tsx": {
         "text": 0,

@@ -166,5 +166,5 @@ test('mark 几何：16×16 mark，on/off 透明度分离，行高契约不破', 
   expect(m.on.opacity).toBe('1'); // on：品牌原色
   expect(m.off.opacity).toBe('0.35'); // off：35% 透明
   expect(m.off.wrapLeft - m.on.wrapRight).toBe(16); // 同屏两图标间距不塌
-  expect(m.rowHeight).toBe(40); // CDS PR-8 --row-h
+  expect(m.rowHeight).toBe(52); // Paper settings row (SETTINGS_ROW_CLS min-h-13)
 });
