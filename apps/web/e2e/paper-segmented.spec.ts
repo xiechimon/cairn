@@ -56,6 +56,12 @@ const CONTROLS: Control[] = [
     open: (page) => page.click('.sidebar-user'),
     track: (page) => page.getByRole('radiogroup', { name: '外观' }),
   },
+  {
+    name: 'user menu density',
+    url: '/app?scenario=01',
+    open: (page) => page.click('.sidebar-user'),
+    track: (page) => page.getByRole('radiogroup', { name: '密度' }),
+  },
 ];
 
 async function themed(page: Page, theme: 'light' | 'dark', url: string) {
