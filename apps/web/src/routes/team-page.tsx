@@ -29,8 +29,8 @@ import {
 import { mapMachines, mapTeam, toDisplayTodo, toModelOptions } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { Button, buttonVariants } from '../components/ui/button.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { isDeleted } from '../fixtures/deletions.js';
 import { TEAM_NAME, TEAM_R7 } from '../fixtures/fixtures.js';
@@ -48,12 +48,6 @@ import { TeamChart } from './team-chart.js';
 export const TEAM_LAYOUT_STORAGE_KEY = 'pacman.teamMembersLayout';
 
 type TeamLayout = 'grid' | 'chart';
-
-/** grid|chart switch in the SettingsSegmented look (paper track, the chosen
- *  tab white with a 1px ring), kept on Tabs so it stays a tablist. */
-const LAYOUT_TRACK_CLS = 'mr-1 h-8 gap-0.5 rounded-md bg-canvas p-0.5';
-const LAYOUT_TAB_CLS =
-  'h-7 flex-none rounded-(--cds-radius-md) border-0 px-2 text-content-secondary hover:text-foreground data-active:bg-card data-active:text-foreground data-active:shadow-xs data-active:ring-1 data-active:ring-border dark:text-content-secondary dark:data-active:bg-card group-data-[variant=default]/tabs-list:data-active:shadow-xs';
 
 function readStoredLayout(storage: Storage | null): TeamLayout {
   // #1091：null / getItem 抛 = 无记忆，回落 grid（本页首渲染路径）。
@@ -122,16 +116,23 @@ export function TeamPage() {
       }
       actions={
         <>
-          <Tabs value={layout} onValueChange={(value) => switchLayout(value as TeamLayout)}>
-            <TabsList className={LAYOUT_TRACK_CLS}>
-              <TabsTrigger value="grid" aria-label="grid" className={LAYOUT_TAB_CLS}>
-                <Grid2x2 aria-hidden strokeWidth={1.75} className="size-3.5" />
-              </TabsTrigger>
-              <TabsTrigger value="chart" aria-label="chart" className={LAYOUT_TAB_CLS}>
-                <Network aria-hidden strokeWidth={1.75} className="size-3.5" />
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <SegmentedTabs
+            className="mr-1"
+            value={layout}
+            onChange={switchLayout}
+            options={[
+              {
+                value: 'grid',
+                ariaLabel: 'grid',
+                icon: <Grid2x2 aria-hidden strokeWidth={1.75} />,
+              },
+              {
+                value: 'chart',
+                ariaLabel: 'chart',
+                icon: <Network aria-hidden strokeWidth={1.75} />,
+              },
+            ]}
+          />
           <Link
             className={buttonVariants({ variant: 'ghost', className: TOPBAR_TEXT_BUTTON })}
             to={{ pathname: '/app/account', search }}

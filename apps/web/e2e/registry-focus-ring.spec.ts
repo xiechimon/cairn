@@ -215,12 +215,20 @@ test.describe('#1244 registry focus outline', () => {
     expect(shellInfo.boxShadow).not.toContain('0px 0px 0px 3px');
   });
 
-  test('a tab trigger uses the global outline', async ({ page }) => {
+  // Segmented options sit 2px apart, so their keyboard ring is drawn inside
+  // the option box (offset -2) instead of the global outset outline.
+  test('a segmented option draws the focus ring inset', async ({ page }) => {
     await themed(page, 'dark', SCHEDULES);
-    const tab = page.locator('.sched-form-freq-tab[aria-selected="true"]');
-    await expect(tab).toBeVisible();
-    await focusKeyboard(tab);
-    expectGlobalOutline(await readFocus(tab));
+    const option = page.locator('.sched-form-freq-tab[aria-checked="true"]');
+    await expect(option).toBeVisible();
+    await focusKeyboard(option);
+    const info = await readFocus(option);
+    expect(info.focusVisible).toBe(true);
+    expect(info.outlineStyle).toBe('solid');
+    expect(info.outlineWidth).toBe('2px');
+    expect(info.outlineOffset).toBe('-2px');
+    expect(info.outlineColor).toBe(hexToRgb(info.focusRing));
+    expect(info.boxShadow).not.toContain('0px 0px 0px 3px');
   });
 
   test('the sidebar user button uses the global outline', async ({ page }) => {

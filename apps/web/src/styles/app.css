@@ -188,6 +188,14 @@
     border-color: var(--input);
   }
 
+  /* 分段控件（components/segmented.tsx）：选项之间只隔 2px，外描 offset 2
+     会压到相邻选项——键盘环收进选项盒内。同特异性 (0,3,0)，写在 tab 规则
+     之后取胜。 */
+  [data-segmented="option"]:focus-visible:not([aria-invalid="true"]) {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: -2px;
+  }
+
   [data-slot="badge"]:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;

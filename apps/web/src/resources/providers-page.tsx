@@ -25,7 +25,7 @@ import { RUNTIME_LABELS } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { ClaudeMark, PiMark } from '../components/brand-marks.js';
 import { EmptyState } from '../components/empty-state.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
@@ -61,15 +61,8 @@ const RUNTIME_MARKS: Record<ModelSourceRuntime, typeof PiMark> = {
   'claude-code': ClaudeMark,
 };
 
-/** Paper segmented face on the registry Tabs (tab semantics kept: each runtime
- *  is its own view): paper track, the chosen runtime a white tab with a 1px
- *  ring, the same face as SettingsSegmented. */
 /** Needs-you ink (未安装 / 未登录): the accent, DESIGN.md 颜色. */
 const NEEDS_YOU_INK = 'text-(--card-button)';
-
-const RUNTIME_TABS_LIST_CLS = 'h-8 gap-0.5 rounded-md bg-canvas p-0.5';
-const RUNTIME_TAB_CLS =
-  'h-7 flex-none rounded-(--cds-radius-md) border-0 px-3 text-ui font-normal text-content-secondary hover:text-foreground dark:text-content-secondary data-active:bg-card data-active:font-medium data-active:text-foreground data-active:shadow-xs data-active:ring-1 data-active:ring-border dark:data-active:bg-card dark:data-active:text-foreground';
 
 const isRuntime = (value: string | null): value is ModelSourceRuntime =>
   value !== null && (MODEL_SOURCE_RUNTIMES as readonly string[]).includes(value);
@@ -211,29 +204,24 @@ export function ProvidersPage() {
       actions={<ResourceNewButton onClick={() => setCreateOpen(true)} />}
       fixture={fixture}
     >
-      {/* #423 Tabs 收编（#422 裁决：runtime tab 由 ?runtime= 驱动）：受控
-          value/onValueChange 落回原 selectRuntime（写 ?runtime=、历史入栈、
-          回退键可用），role=tablist/tab 与 aria-selected 由 Base UI 承载，
-          data-runtime 句柄原样透出——spec 载体 = role/文案/data-runtime。
-          Paper 分段面（RUNTIME_TABS_LIST_CLS / RUNTIME_TAB_CLS）。两 tab
-          前置各自品牌 mark
-          （components/brand-marks.tsx，机器行 #503 同源消费；间距走件默认
-          gap-1.5）。mark aria-hidden，文案照常渲染——可访问名 =
-          RUNTIME_LABELS，读屏与 e2e 的 toHaveText('pi'/'Claude Code') 都不
-          受影响。 */}
-      <Tabs value={runtime} onValueChange={(value) => selectRuntime(value as ModelSourceRuntime)}>
-        <TabsList className={RUNTIME_TABS_LIST_CLS} aria-label={t('模型服务')}>
-          {MODEL_SOURCE_RUNTIMES.map((rt) => {
-            const Mark = RUNTIME_MARKS[rt];
-            return (
-              <TabsTrigger key={rt} value={rt} data-runtime={rt} className={RUNTIME_TAB_CLS}>
-                <Mark className="block flex-none" />
-                {RUNTIME_LABELS[rt]}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
-      </Tabs>
+      {/* #423：runtime tab 由 ?runtime= 驱动（#422 裁决），selectRuntime 写
+          ?runtime=、历史入栈、回退键可用；每个 runtime 是独立视图，故走
+          SegmentedTabs（tablist/tab）。data-runtime 句柄原样透出；品牌 mark
+          aria-hidden，可访问名 = RUNTIME_LABELS。 */}
+      <SegmentedTabs
+        label={t('模型服务')}
+        value={runtime}
+        onChange={selectRuntime}
+        options={MODEL_SOURCE_RUNTIMES.map((rt) => {
+          const Mark = RUNTIME_MARKS[rt];
+          return {
+            value: rt,
+            label: RUNTIME_LABELS[rt],
+            icon: <Mark className="block flex-none" />,
+            data: { 'data-runtime': rt },
+          };
+        })}
+      />
       {matching.map((source, si) => (
         // 多机同 hostname 时 header 文案可撞——key 用索引兜底保唯一。
         <div key={`${source.hostname}:${si}`}>

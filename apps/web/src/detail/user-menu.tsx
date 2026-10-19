@@ -15,7 +15,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { Button } from '../components/ui/button.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   applyDensity,
@@ -67,19 +67,6 @@ const PANEL =
   // and seats on the shadow edge (no 1px border offset).
   "user-menu absolute bottom-12 left-2 z-10 flex w-56 flex-col rounded-(--radius-popover) border-0 bg-(--popover) p-3 shadow-(--shadow-popover) before:absolute before:bottom-0 before:left-5 before:h-1.5 before:w-3 before:bg-(--border) before:[clip-path:polygon(0_0,50%_100%,100%_0)] before:content-[''] after:absolute after:bottom-px after:left-5.25 after:h-1.25 after:w-2.5 after:bg-(--popover) after:[clip-path:polygon(0_0,50%_100%,100%_0)] after:content-[''] dark:before:bg-(--ring-inset-highlight)";
 const PANEL_FLOATING = 'relative bottom-auto left-auto z-auto';
-
-// 外观 seg（r7 37 probe #138）：~20px 描边格 + 8px 侧内边距 + 发丝缝。
-// ghost 七通道中和（#908 裁决 3）+ --seg-hover 自立 token 的 hover tint
-// （#138 家族律；fine-pointer 门收敛进 TW v4 hover 变体的 @media
-// (hover:hover)，#943 sidebar 行同判例）。选中格 = --seg-active 实底 +
-// 透明缝 + secondary 墨（data-active 载体不动——segmented-controls/
-// theme-toggle spec 按它断言）。
-const SEG_BASE =
-  'h-5 cursor-pointer rounded-[6px] px-2 text-caption font-normal transition-[background-color] duration-(--dur-fast) ease-(--ease-standard) active:not-aria-[haspopup]:translate-y-0';
-const SEG_OFF =
-  'border-(--border) bg-transparent text-(--text-tertiary) hover:bg-(--seg-hover) hover:text-(--text-tertiary) dark:hover:bg-(--seg-hover) dark:hover:text-(--text-tertiary)';
-const SEG_ON =
-  'border-transparent bg-(--seg-active) text-(--text-secondary) hover:bg-(--seg-active) hover:text-(--text-secondary) dark:hover:bg-(--seg-active) dark:hover:text-(--text-secondary)';
 
 export function UserMenu({
   theme: initialTheme,
@@ -135,55 +122,34 @@ export function UserMenu({
         </div>
       </div>
       <div className="flex flex-col gap-3 py-3">
-        <div className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)">
+        <div className="user-menu-row flex h-8 items-center text-meta text-(--text-secondary)">
           {t('外观')}
-          <span className="user-menu-seg ml-auto flex items-center gap-0.5">
-            {/* XMON-24 分段钮 shadcn ghost 底座不变；#945 皮肤从 detail.css
-                后代选择器迁到消费端 utilities（SEG_BASE + 选中/未选两态），
-                data-active 载体直通（族 spec 断言面不动）。 */}
-            <Button
-              variant="ghost"
-              className={`${SEG_BASE} ${theme === 'light' ? SEG_ON : SEG_OFF}`}
-              data-active={theme === 'light'}
-              onClick={() => select('light')}
-            >
-              {t('浅色')}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`${SEG_BASE} ${theme === 'dark' ? SEG_ON : SEG_OFF}`}
-              data-active={theme === 'dark'}
-              onClick={() => select('dark')}
-            >
-              {t('深色')}
-            </Button>
-          </span>
+          <SegmentedRadio
+            className="user-menu-seg ml-auto"
+            label={t('外观')}
+            value={theme}
+            onChange={select}
+            options={[
+              { value: 'light', label: t('浅色') },
+              { value: 'dark', label: t('深色') },
+            ]}
+          />
         </div>
         <div
-          className="user-menu-row flex h-4 items-center text-meta text-(--text-secondary)"
+          className="user-menu-row flex h-8 items-center text-meta text-(--text-secondary)"
           data-testid="density-row"
         >
           {t('密度')}
-          <span className="user-menu-seg ml-auto flex items-center gap-0.5">
-            <Button
-              variant="ghost"
-              className={`${SEG_BASE} ${density === 'comfortable' ? SEG_ON : SEG_OFF}`}
-              data-active={density === 'comfortable'}
-              data-testid="density-comfortable"
-              onClick={() => selectDensity('comfortable')}
-            >
-              {t('舒适')}
-            </Button>
-            <Button
-              variant="ghost"
-              className={`${SEG_BASE} ${density === 'compact' ? SEG_ON : SEG_OFF}`}
-              data-active={density === 'compact'}
-              data-testid="density-compact"
-              onClick={() => selectDensity('compact')}
-            >
-              {t('紧凑')}
-            </Button>
-          </span>
+          <SegmentedRadio
+            className="user-menu-seg ml-auto"
+            label={t('密度')}
+            value={density}
+            onChange={selectDensity}
+            options={[
+              { value: 'comfortable', label: t('舒适'), testId: 'density-comfortable' },
+              { value: 'compact', label: t('紧凑'), testId: 'density-compact' },
+            ]}
+          />
         </div>
         {ROWS.map(({ label, href }) => (
           <Link

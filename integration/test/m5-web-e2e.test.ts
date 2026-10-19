@@ -518,9 +518,9 @@ describe('M5 web E2E：主时序全链（01 §7.4 脊柱，UI 零 reload）', ()
     await page.goto(`${server.url}/app/schedules`);
     await page.getByRole('button', { name: '新建', exact: true }).click();
     await pexpect(page.getByRole('dialog', { name: '新建定时' })).toBeVisible();
-    // #1007（wave 1 L4）：频率分段迁 registry Tabs——载体 role=button →
-    // role=tab（集成层同 PR 迁移，#735 教训）。
-    await page.getByRole('tab', { name: '单次' }).click();
+    // 频率分段 = SegmentedRadio（选一个存下来的值）：载体 role=radio（集成层
+    // 同 PR 迁移，#735 教训）。
+    await page.getByRole('radio', { name: '单次' }).click();
     const next = new Date(Date.now() + 60_000);
     let minute = Math.ceil(next.getMinutes() / 15) * 15;
     let hour = next.getHours();

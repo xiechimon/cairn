@@ -21,9 +21,9 @@
 // #944 正典表执行（spec/22 §5.1/§5.3/§5.4）：老 ui/input 六处 →
 // components/ui Input（36px→h-8 32px，§2.6-1，getByLabel/placeholder 载体
 // 不动）；
-// .dlg-form-seg/.dlg-provider-seg-tab → Tabs 件 default 档（block 形态 =
-// TabsList w-full + TabsTrigger flex-1，选中态载体 = role=tab +
-// aria-selected，data-active 断言退役）；行钮收编 Button（#851 裸控件账）。
+// .dlg-form-seg/.dlg-provider-seg-tab → 表单 Select（三个协议名共需约 460px，
+// 弹窗栏宽 416，分段放不下，DESIGN.md 表单：取值控件 = SelectTrigger +
+// FORM_CONTROL_CLS）；行钮收编 Button（#851 裸控件账）。
 // data-preset-id 保留 = 行级二级载体。
 // Paper 表单（DESIGN.md 页面模式 · 表单）：密钥表单 = FormStack / FormField，
 // footer = FormActions（取消 + 添加模型服务，不是整宽提交条）；
@@ -46,7 +46,13 @@ import { Checkbox } from '../components/ui/checkbox.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Field, FieldDescription, FieldError, FieldTitle } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, PlusSmall } from '../icons/index.js';
 
@@ -362,22 +368,30 @@ export function CreateProviderDialog({
               placeholder="https://api.example.com/v1"
             />
           </FormField>
-          <Field>
-            <FieldTitle className={FIELD_TITLE_CLS}>{t('API 协议')}</FieldTitle>
-            {/* API 协议段 → Tabs 件 default 档（正典表 §5.4）：block 形态 =
-                TabsList w-full + TabsTrigger flex-1（default 档基类自带）。
-                选中态载体 = role=tab + aria-selected（Base UI 自带），
-                data-active 断言退役。 */}
-            <Tabs value={api} onValueChange={(value) => setApi(value as ProviderApi)}>
-              <TabsList className="w-full" aria-label={t('API 协议')}>
+          <FormField label={t('API 协议')} htmlFor="dlg-provider-api">
+            <Select
+              value={api}
+              onValueChange={(next) => {
+                if (next !== null) setApi(next as ProviderApi);
+              }}
+            >
+              <SelectTrigger id="dlg-provider-api" className={FORM_CONTROL_CLS}>
+                <SelectValue>
+                  {API_OPTIONS.find((option) => option.value === api)?.label}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                aria-label={t('API 协议')}
+                className="rounded-(--radius-popover) shadow-(--shadow-popover)"
+              >
                 {API_OPTIONS.map((option) => (
-                  <TabsTrigger key={option.value} value={option.value}>
+                  <SelectItem key={option.value} value={option.value}>
                     {option.label}
-                  </TabsTrigger>
+                  </SelectItem>
                 ))}
-              </TabsList>
-            </Tabs>
-          </Field>
+              </SelectContent>
+            </Select>
+          </FormField>
           <FormField label={t('API 密钥')} htmlFor="dlg-provider-apikey">
             <Input
               id="dlg-provider-apikey"

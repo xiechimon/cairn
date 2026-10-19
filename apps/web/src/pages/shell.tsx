@@ -7,7 +7,7 @@ import type { ReactNode } from 'react';
 import { Link, type To } from 'react-router';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { SidebarSelected } from '../board/sidebar.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft } from '../icons/index.js';
@@ -27,8 +27,9 @@ export interface PageTab {
   disabled?: boolean;
 }
 
-/** Text-tab pill group: 任务|文件 in the top bar, 基本信息|仓库|标签 in the
- *  project settings column. The tab value drives page state; no panels. */
+/** Text tabs on the shared segmented face: 任务|文件 in the top bar,
+ *  基本信息|仓库|标签 in the project settings column. The tab value drives
+ *  page state; no panels. */
 export function TabGroup({
   tabs,
   tab,
@@ -40,24 +41,17 @@ export function TabGroup({
 }) {
   const { t } = useI18n();
   return (
-    <Tabs
-      className="page-tabs-group gap-0"
+    <SegmentedTabs
+      className="page-tabs-group"
+      optionHandle="page-tab"
       value={tab}
-      onValueChange={(next) => onTab?.(String(next))}
-    >
-      <TabsList>
-        {tabs.map((item) => (
-          <TabsTrigger
-            key={item.id}
-            value={item.id}
-            className="page-tab px-3"
-            disabled={item.disabled === true}
-          >
-            {t(item.label)}
-          </TabsTrigger>
-        ))}
-      </TabsList>
-    </Tabs>
+      onChange={(next) => onTab?.(next)}
+      options={tabs.map((item) => ({
+        value: item.id,
+        label: t(item.label),
+        disabled: item.disabled === true,
+      }))}
+    />
   );
 }
 

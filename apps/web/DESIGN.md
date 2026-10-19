@@ -158,7 +158,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **一张卡**（`SettingsCard`）：白底、`line` 1px 外环、`--radius-card`，行不带底色（不做双色卡）。
 - **行**（`SettingsRow`）：最小高 52px、左右 16px；左侧 `text-ui` `ink` 标签（可带一行 `text-meta` `ink-3` 说明），右侧控件。内容两行时行自然长高。不走 `SettingsRow` 的自定义行用 `SETTINGS_ROW_CLS`。
 - **分隔线只画在已渲染的行之间**：卡上 `divide-y`，行按条件渲染，不用 CSS 隐藏。被隐藏的行仍是兄弟节点，会在卡顶画出第二条边。
-- **控件带框，一类一种**：下拉 = 白底 + `line` 1px 环 + 8px 圆角 + 高 32（`SETTINGS_SELECT_TRIGGER_CLS`，与表单 `FORM_CONTROL_CLS` 同一串）；单选分段 = `SettingsSegmented`，`canvas` 浅纸轨道、选中项是白底 + 1px 环的白签（不用冷灰底）；开关 = shadcn Switch，开态墨色。
+- **控件带框，一类一种**：下拉 = 白底 + `line` 1px 环 + 8px 圆角 + 高 32（`SETTINGS_SELECT_TRIGGER_CLS`，与表单 `FORM_CONTROL_CLS` 同一串）；单选分段 = `SettingsSegmented`（即 `SegmentedRadio`，见下节「分段控件」）；开关 = shadcn Switch，开态墨色。
 - **危险操作**（`SettingsDangerZone`）：页面最后单独一张卡，一行：左侧标签 + 说明，右侧 Button `variant="destructive"`，32px 8px 角（标准按钮形）。点了先弹确认层，不直接删除。
 - 要：头部 + 一张卡 + 等高行。不要：头像大块占一行、行铺底色、圆角药丸形删除按钮、危险操作混在普通设置卡里。
 
@@ -169,6 +169,16 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **控件**：Input / SelectTrigger 加 `FORM_CONTROL_CLS`：高 32、白底、`line` 1px 环、8px 圆角、`text-ui`。
 - **操作行**（`FormActions`）：表单最后一行，靠右；可选文字按钮（如「取消」）在左，shadcn Button default 主按钮在右。不能提交时用按钮自身的 `disabled`（半透明），不另画灰条。
 - 要：窄栏、标签在上、主按钮靠右。不要：撑满整列的输入框、整宽的灰色提交条、标签和输入框左右并排的双栏表单。
+
+### 分段控件
+件：`src/components/segmented.tsx`。一种外观，两种语义：
+- **`SegmentedTabs`**：切换视图——每个选项控制一块面板或一条路由（Agent 概览 / 记忆 / 权限、项目 任务 | 文件、文件 | 历史、列表 | 网格、团队 网格 | 组织图、模型服务 runtime、分支弹窗、总管设置）。底座是 registry `Tabs`，保留 `tablist` / `tab` 语义。
+- **`SegmentedRadio`**：在表单或设置里选一个值（帐号页的密度、用户菜单的外观 / 密度、定时频率）。`radiogroup` / `radio` 语义，方向键移动并选中，roving tabindex。选「改了会存下来的值」用它；选「看哪块内容」用 tabs。
+- **放不下就换下拉**：选项文字按 12px 内边距排不进所在栏宽时，不缩字、不截断，改用表单 Select（`SelectTrigger` + `FORM_CONTROL_CLS`）。例：新建模型服务的 API 协议（三个协议名约需 460px，弹窗栏宽 416）。
+- **外观**：轨道高 32、内衬 2、8px 角，底色 `canvas` 一个纸色 token；选项高 28、6px 角，文字选项左右 12，纯图标选项是 28 的正方形（必须带 `ariaLabel`）。未选中 `ink-2` 字、hover 变 `ink`、不铺底；选中 = 白底（`card`）+ `line` 1px 环 + 一层极轻投影，字 500 `ink`。不用赭红。禁用项用原语自带的半透明。
+- **焦点**：鼠标点击不出环。键盘 `:focus-visible` 是 2px `--focus-ring` 环，**内描**在选项盒里（`outline-offset: -2px`，`styles/app.css` 的 `[data-segmented="option"]` 规则）：选项之间只隔 2px，外描会压到邻居。
+- **滑动**：`slide` 让白签以一条 150ms 的底层 pill 在选项间滑动（只有总管设置用，#644）。
+- 要：所有分段都从这两件拼；e2e 句柄用 `className`（轨道）和 `optionHandle`（选项）挂。不要：手写 `role="radiogroup"` / `role="tab"`，或在页面里直接用 `TabsList` / `TabsTrigger` 另调一套皮肤——`scripts/ui-drift-gate.mjs` G7 会拦下。
 
 ## 动效
 
@@ -190,6 +200,7 @@ Pacman UI rules (source: apps/web/DESIGN.md):
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
 - Every status = icon + color + label. Lucide icons, stroke 1.75.
 - Primary button = shadcn default Button in ink, 8px corners, 32px tall. Card actions = terracotta text links. No solid buttons on cards.
+- Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
 - Sidebar = Grouped: workspace row (16px pixel pac-man mark from logo.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.

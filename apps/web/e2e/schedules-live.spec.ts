@@ -129,7 +129,7 @@ test('live face: 保存 fires POST /api/schedules with the form state (#1037)', 
   // inside the dialog; the open popup is the only listbox in the a11y tree
   // (closed popups stay display:none), so page-level getByRole('listbox')
   // is unambiguous.
-  await dialog.getByRole('tab', { name: '单次' }).click();
+  await dialog.getByRole('radio', { name: '单次' }).click();
   await dialog.locator('button[aria-label="时"]').click();
   await page.getByRole('listbox').getByRole('option', { name: '10', exact: true }).click();
   await dialog.getByRole('button', { name: '保存' }).click();

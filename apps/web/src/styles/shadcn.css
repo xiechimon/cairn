@@ -223,9 +223,6 @@
   /* overlay batch B (issue #67)：result icon tile（row-selected / overlay-
      select-indigo / pick-selected-* 已并入 secondary / spot 族，§3.3-B/C） */
   --row-icon-bg: #403c39;
-  /* chief surfaces (r5 100–104, #72)：active pill（chief-tab-bg 已并入
-     secondary；pill 深于 strip 关系由 chief-tab-active 自持档保持） */
-  --chief-tab-active: #403c39;
   /* notification banner bell disc (#114)：其上字形走 spot
      （--card-button，非文本 3:1 门实测见 docs/verify/988/） */
   --notify-icon-bg: #403c39;
@@ -363,7 +360,6 @@
   --tile-orange-fg: #825100;
   --tile-hero-bg: #ffd099;
   --row-icon-bg: #e2dcd7;
-  --chief-tab-active: #e2dcd7;
   /* notification banner bell disc (#114)：字形走 spot 原色 */
   --notify-icon-bg: var(--spot-soft);
   --menu-icon: #2b2620;

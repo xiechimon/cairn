@@ -30,6 +30,7 @@ import {
 import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
+import { SegmentedTabs } from '../components/segmented.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -50,7 +51,6 @@ import {
 } from '../components/ui/empty.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { DiffFileBlock } from '../detail/docpane.js';
 import { localTodo } from '../fixtures/fixtures.js';
 import type {
@@ -171,23 +171,16 @@ function FilesPane({
         {/* 「导出」钮全除（#149 wontfix）：无导出后端面，local-first 裁决
             （#129 先例），台账 #136 勾兑登记。 */}
       </div>
-      {/* 文件|历史 分段 = registry Tabs default 档（手写 SEG_* 发丝环壳退役，
-          #982 tabs 判决）；prj-files-seg-tab 别名留存（dead-buttons /
-          segmented-controls 跨域句柄），选中载体 = data-active/aria-selected。 */}
-      <Tabs
-        className="mt-2 w-fit gap-0"
+      <SegmentedTabs
+        className="mt-2"
+        optionHandle="prj-files-seg-tab"
         value={seg}
-        onValueChange={(next) => onSeg(next as 'files' | 'history')}
-      >
-        <TabsList>
-          <TabsTrigger value="files" className="prj-files-seg-tab px-3">
-            {t('文件')}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="prj-files-seg-tab px-3">
-            {t('历史')}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+        onChange={onSeg}
+        options={[
+          { value: 'files', label: t('文件') },
+          { value: 'history', label: t('历史') },
+        ]}
+      />
       {seg === 'files' ? (
         <div className="mt-3">
           {/* 面包屑（#1097）：仅子目录内渲染——顶层零视觉漂移（既有捕获面
@@ -687,32 +680,15 @@ function TasksPane({
             {t('从 GitHub issue 建任务')}
           </Button>
         )}
-        {/* 视图切换 = registry Tabs default 档（图标 trigger；手写 28×24 发丝
-            环段退役）。role=tab/aria-selected 归 Base UI 原语；
-            prj-tasks-view-btn 别名留存（segmented-controls/dead-buttons
-            跨域句柄）。 */}
-        <Tabs
-          className="gap-0"
+        <SegmentedTabs
+          optionHandle="prj-tasks-view-btn"
           value={layout}
-          onValueChange={(next) => switchLayout(next as TasksLayout)}
-        >
-          <TabsList>
-            <TabsTrigger
-              value="list"
-              className="prj-tasks-view-btn px-1.5"
-              aria-label={t('列表视图')}
-            >
-              <ListLines data-icon="inline-start" />
-            </TabsTrigger>
-            <TabsTrigger
-              value="grid"
-              className="prj-tasks-view-btn px-1.5"
-              aria-label={t('网格视图')}
-            >
-              <Grid2x2 width={14} height={14} data-icon="inline-start" />
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+          onChange={switchLayout}
+          options={[
+            { value: 'list', ariaLabel: t('列表视图'), icon: <ListLines /> },
+            { value: 'grid', ariaLabel: t('网格视图'), icon: <Grid2x2 /> },
+          ]}
+        />
       </div>
       {todos.length === 0 ? (
         // 空态 = registry Empty 件族（手写 48px tile + 节奏配方退役）。

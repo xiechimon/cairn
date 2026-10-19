@@ -44,6 +44,12 @@
 //       the defect class G2-style hex scans cannot see. Solid-fill uses
 //       (bg-(--card-button), the slot's canonical role) are not policed.
 //       Entries with no matching line are red too (stale ledger).
+//   G7  One segmented control (DESIGN.md 页面模式 · 分段控件): the registry
+//       Tabs (components/ui/tabs) is imported only by
+//       components/segmented.tsx, and no other file writes a tab / tablist /
+//       radio / radiogroup role by hand. View switches use SegmentedTabs,
+//       value pickers SegmentedRadio; a second segmented face cannot come
+//       back through either door. SEGMENTED_ALLOWLIST names the owner.
 //
 // The former single-site exception is closed: #854 minted `--text-on-veil`
 // (styles/shadcn.css, both theme mirrors) for the white text over the
@@ -54,7 +60,7 @@
 // Usage: node scripts/ui-drift-gate.mjs
 // Exit 0 when all gates hold; exit 1 otherwise, listing the offending sites.
 
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 // G4/G5 comment stripping lives in ui-normalize.mjs — one implementation,
 // shared with the registry gate's hash pipeline (#989). It used to be a local
@@ -279,10 +285,46 @@ for (const entry of brandInkEntries) {
   }
 }
 
+// --- G7: one segmented control ----------------------------------------------
+// file (web-src-relative) -> reason. Only the owner of the face may touch the
+// registry Tabs or write the roles.
+const SEGMENTED_ALLOWLIST = new Map([
+  [
+    'components/segmented.tsx',
+    'owns the one segmented face: SegmentedTabs wraps the registry Tabs, SegmentedRadio writes the radiogroup/radio roles',
+  ],
+]);
+const TABS_IMPORT_RE = /from\s+['"][^'"]*\/ui\/tabs(?:\.js)?['"]/;
+const SEGMENT_ROLE_RE = /\brole=\{?\s*['"](tab|tablist|radio|radiogroup)['"]/;
+let segmentedFiles = 0;
+for (const file of [...walk(WEB_SRC, '.tsx'), ...walk(WEB_SRC, '.ts')]) {
+  const relPath = rel(file);
+  if (relPath === 'components/ui/tabs.tsx') continue;
+  const clean = stripJsxComments(readFileSync(file, 'utf8')).split('\n');
+  let hit = false;
+  clean.forEach((line, i) => {
+    const imp = TABS_IMPORT_RE.test(line);
+    const role = line.match(SEGMENT_ROLE_RE);
+    if (!imp && role === null) return;
+    hit = true;
+    if (SEGMENTED_ALLOWLIST.has(relPath)) return;
+    failures.push(
+      imp
+        ? `G7 ${relPath}:${i + 1}: registry Tabs imported outside components/segmented.tsx — use SegmentedTabs (view switch) or SegmentedRadio (value picker) (${line.trim()})`
+        : `G7 ${relPath}:${i + 1}: hand-written role="${role[1]}" — segmented controls come from components/segmented.tsx (SegmentedTabs / SegmentedRadio) (${line.trim()})`,
+    );
+  });
+  if (hit) segmentedFiles++;
+}
+for (const owner of SEGMENTED_ALLOWLIST.keys()) {
+  if (!existsSync(join(WEB_SRC, owner)))
+    failures.push(`G7 STALE allowlist entry ${owner}: file is gone — drop or re-point it.`);
+}
+
 // --- verdict -----------------------------------------------------------------
 if (failures.length === 0) {
   console.log(
-    `[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (${cssFiles.length} css files scanned); ${inputSites} bare <input> site(s), ${deliberateInputs} deliberate-native; no raw color in ${uiFilesScanned} components/ui file(s); ${brandInkHits} brand-ink text-role line(s), all registered (${brandInkEntries.length} ledger entries).`,
+    `[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (${cssFiles.length} css files scanned); ${inputSites} bare <input> site(s), ${deliberateInputs} deliberate-native; no raw color in ${uiFilesScanned} components/ui file(s); ${brandInkHits} brand-ink text-role line(s), all registered (${brandInkEntries.length} ledger entries); segmented roles and registry Tabs only in ${[...SEGMENTED_ALLOWLIST.keys()].join(', ')} (${segmentedFiles} file(s) touch them).`,
   );
   process.exit(0);
 }

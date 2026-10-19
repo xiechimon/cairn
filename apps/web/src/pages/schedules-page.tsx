@@ -28,6 +28,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FormActions } from '../components/form-layout.js';
+import { SegmentedRadio } from '../components/segmented.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
@@ -45,7 +46,6 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { StatusChip } from '../components/ui/status-chip.js';
-import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs.js';
 import { toastError } from '../components/ui/toaster.js';
 import {
   markDeleted,
@@ -331,24 +331,16 @@ function ScheduleForm({
             {todo == null ? '' : `#${todo.seqNum} ${todo.title}`}
           </span>
         </div>
-        {/* 频率分段 = registry Tabs default 档（手写 SEG_* 发丝环壳退役，
-            #982 tabs 判决）；sched-form-freq(-tab) 别名留存
-            （segmented-controls 跨域句柄），选中载体 = data-active。
-            #1037：fixture 面同样传 onValueChange——冻结面不是死面，点 tab
-            选中即跟（时/分/日期的局部态回显同律）。 */}
-        <Tabs
-          className="sched-form-freq w-fit gap-0"
+        <SegmentedRadio
+          optionHandle="sched-form-freq-tab"
+          label={t('频率')}
           value={kind}
-          onValueChange={(next: unknown) => onKind(next as ScheduleKind)}
-        >
-          <TabsList>
-            {(['hourly', 'daily', 'weekly', 'once'] as const).map((k) => (
-              <TabsTrigger key={k} value={k} className="sched-form-freq-tab px-3">
-                {t(FREQ_LABEL[k])}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+          onChange={onKind}
+          options={(['hourly', 'daily', 'weekly', 'once'] as const).map((k) => ({
+            value: k,
+            label: t(FREQ_LABEL[k]),
+          }))}
+        />
         {kind === 'once' && (
           <>
             <div className={FORM_LABEL_CLS}>{t('日期')}</div>
