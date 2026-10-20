@@ -1,0 +1,11 @@
+# P2a round 3 (after pr-gate run 2 on #1414, head d906440, go with suggestions): new tests on d906440 with only pr-reconcile.test.ts changed
+$ pnpm exec vitest run test/pr-reconcile.test.ts
+     × ⑭a merged, but the branch has a later commit the merge does not contain → stays in review with a hint 46ms
+     × ⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint 33ms
+     × ⑮a a merge step waiting for quota counts as in flight 34ms
+     × ⑮b an unclaimed verify step does not hold the reconcile 32ms
+     × ⑮b an unclaimed review step does not hold the reconcile 36ms
+     × ⑯ the todo gets a new current build during the network window → no write 38ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  6 failed | 20 passed (26)

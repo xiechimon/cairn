@@ -39,14 +39,15 @@
 // open → 不动。读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, step, todo } from '../db/schema.js';
+import { build, message, project, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubCheckRun,
   type GithubPull,
   githubCommitCheckRuns,
+  githubCompareStatus,
   githubPull,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -196,12 +197,14 @@ interface CiPollTally {
   unreadable: number;
   /** 单候选意外异常（不杀整轮）。 */
   errors: number;
-  /** #1403 review 关口候选数（todo 最新 PR build）。 */
+  /** #1403 review 关口候选数（todo 当前 build 带 PR）。 */
   reviewCandidates: number;
   /** PR 已在 GitHub 合并 → done。 */
   merged: number;
   /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
+  /** 已合并但分支上有合并没带走的提交：提示一次，不收尾。 */
+  hinted: number;
 }
 
 /** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
@@ -219,15 +222,55 @@ export function createCiPoller(
   /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
 
-  /** 本 build 有在飞的步（pending / claimed）。 */
+  /** 本 build 有在飞的步：已被领取或在等额度的任意步，以及排队中的非审核
+   * 类步。没人领的 verify / review 步不算（Verifier 的机器离线时，卡不能
+   * 因此永远停在 review）。 */
   function hasActiveStep(buildId: string): boolean {
     return (
       deps.db
         .select({ id: step.id })
         .from(step)
-        .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+        .where(
+          and(
+            eq(step.buildId, buildId),
+            or(
+              inArray(step.status, ['claimed', 'waiting_quota']),
+              and(eq(step.status, 'pending'), notInArray(step.kind, ['verify', 'review'])),
+            ),
+          ),
+        )
         .get() !== undefined
     );
+  }
+
+  /** 本 build 最近一个完成的执行步收尾时的分支 HEAD。 */
+  function lastCheckpoint(buildId: string): string | null {
+    return (
+      deps.db
+        .select({ commit: step.checkpointCommit })
+        .from(step)
+        .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), eq(step.status, 'done')))
+        .orderBy(desc(step.createdAt))
+        .get()?.commit ?? null
+    );
+  }
+
+  /** 同一条提示只落一次（内容带提交 SHA）。 */
+  function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
+    const seen = deps.db
+      .select({ content: message.content })
+      .from(message)
+      .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
+      .all()
+      .some((r) => r.content === content);
+    if (seen) return;
+    insertMessageRow(deps, buildId, {
+      id: newRecordId(),
+      role: 'system',
+      content,
+      createdAt: nowMs(),
+    });
+    tally.hinted += 1;
   }
 
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
@@ -236,9 +279,12 @@ export function createCiPoller(
     return row !== undefined && row.phase === 'building' ? row : null;
   }
 
-  function freshReviewRow(todoId: string) {
+  /** 读当前 phase 与当前 build：仍在 review 且 build 仍是 todo 的当前 build。 */
+  function freshReviewRow(todoId: string, buildId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.phase === 'review' ? row : null;
+    return row !== undefined && row.phase === 'review' && row.latestBuildId === buildId
+      ? row
+      : null;
   }
 
   /** github 形态目标（owner/repo）；非 github 或缺仓名 → null。 */
@@ -272,7 +318,7 @@ export function createCiPoller(
     now: number,
     tally: CiPollTally,
   ): Promise<void> {
-    const todoRow = freshReviewRow(cand.todoId);
+    const todoRow = freshReviewRow(cand.todoId, cand.buildId);
     const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     const target = todoRow === null ? null : githubTarget(todoRow.projectId);
     if (
@@ -313,12 +359,45 @@ export function createCiPoller(
       tally.pending += 1;
       return;
     }
-    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
-    if (freshReviewRow(cand.todoId) === null) {
+    // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
       tally.skipped += 1;
       return;
     }
     if (pull.merged) {
+      // 合并之后同分支又推了提交（修复轮）：那个提交不在这次合并里，不收尾。
+      // head 包含 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
+      const checkpoint = lastCheckpoint(cand.buildId);
+      if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
+        const status = await githubCompareStatus(
+          run.githubFetch,
+          token,
+          target.owner,
+          target.repo,
+          checkpoint,
+          pull.headSha,
+        );
+        if (status === null) {
+          tally.unreadable += 1;
+          return;
+        }
+        if (status !== 'ahead' && status !== 'identical') {
+          if (freshReviewRow(cand.todoId, cand.buildId) === null) {
+            tally.skipped += 1;
+            return;
+          }
+          hintOnce(
+            cand.buildId,
+            `PR #${prNumber} 已在 GitHub 合并（合并时 head ${pull.headSha.slice(0, 7)}），但分支上的提交 ${checkpoint.slice(0, 7)} 不在这次合并里，这部分改动还没进 main。需要的话重启任务，会新开分支与 PR。`,
+            tally,
+          );
+          return;
+        }
+        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+          tally.skipped += 1;
+          return;
+        }
+      }
       const detail = [
         pull.mergeCommitSha === null ? null : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
         pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
@@ -336,7 +415,7 @@ export function createCiPoller(
     deps.db
       .update(build)
       .set({
-        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并。需要继续时重启任务，会新开分支与 PR。`,
+        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`,
       })
       .where(eq(build.id, cand.buildId))
       .run();
@@ -481,6 +560,7 @@ export function createCiPoller(
       reviewCandidates: reviewCandidates.length,
       merged: 0,
       closedUnmerged: 0,
+      hinted: 0,
     };
     for (const cand of candidates) {
       try {
