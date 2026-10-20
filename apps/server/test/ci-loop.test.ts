@@ -154,6 +154,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       phase: opts.phase ?? 'building',
       phaseAt: base,
       seqNum: 1,
+      latestBuildId: buildId,
       assignment: { plan: null, build: { agentId: `agent-ci-${rnd}` } },
     })
     .run();
@@ -287,6 +288,7 @@ function addCandidate(
       phase: opts.phase ?? 'building',
       phaseAt: base,
       seqNum: 1,
+      latestBuildId: buildId,
     })
     .run();
   s.db
@@ -432,6 +434,27 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
     );
     await w.poller.sweep();
     expect(w.mock.requests[0]?.headers.authorization).toBe('Bearer token-plain');
+  });
+
+  test('#1403 重跑开出的新 build 是 todo 的当前 build 时，旧 PR build 不再被磨（不读 checks、不派修复步）', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    const newer = `${w.buildId}-rerun`;
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: newer,
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: w.base,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ latestBuildId: newer }).where(eq(todoTable.id, w.todoId)).run();
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps()).toHaveLength(0);
   });
 
   test('扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不读 checks', async () => {

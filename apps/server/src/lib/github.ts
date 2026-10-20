@@ -136,6 +136,8 @@ export async function githubPullState(
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
+  /** merged 时合并者的 login；未合并或响应缺失 = null。 */
+  mergedBy: string | null;
 }
 
 export interface GithubPullPage {
@@ -179,7 +181,12 @@ export async function githubPull(
     return null;
   }
   if (typeof data !== 'object' || data === null) return null;
-  const raw = data as { state?: unknown; merged?: unknown; merge_commit_sha?: unknown };
+  const raw = data as {
+    state?: unknown;
+    merged?: unknown;
+    merge_commit_sha?: unknown;
+    merged_by?: { login?: unknown } | null;
+  };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
   return {
@@ -190,6 +197,7 @@ export async function githubPull(
       merged,
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
+      mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
     },
   };
 }

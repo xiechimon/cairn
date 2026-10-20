@@ -1,0 +1,8 @@
+# P2a round 2 green leg
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  40 passed (40)
+
+$ pnpm exec vitest run   (apps/server, whole project)
+ Test Files  110 passed (110)
+      Tests  1150 passed | 1 skipped (1151)
