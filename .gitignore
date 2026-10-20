@@ -76,11 +76,12 @@ credentials.enc
 # OS
 .DS_Store
 
-# Claude — 本地 agent 状态全忽略。四处例外是项目级产物，随仓走：
+# Claude — 本地 agent 状态全忽略。以下例外是项目级产物，随仓走：
 # verify-pacman（验证 harness）、pr-pacman（本仓 PR body 契约；名字刻意
 # 不叫 pr——个人级 skill 同名优先级压过项目级，叫 pr 会被全局 /pr 盖掉）、
 # hillclimb（评测数据：输入集、判分口径、跑分）与云端会话启动 hook
-# （settings.json 注册 + hooks/session-start.sh 装依赖）。
+# （settings.json 注册 + hooks/session-start.sh 装依赖）、workflows（命名
+# workflow 脚本，如 docs/spec/28 §7.5 的 pr-gate.js）。
 # 个人覆写仍走 settings.local.json（上方已忽略）。
 # hillclimb 的 trace、report.html、trajectory、progress 是派生/体量面，仍忽略。
 .claude/*
