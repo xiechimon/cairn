@@ -138,6 +138,7 @@ export {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesSkillsList,
 } from './resources.js';
 export {
   schedulesEmpty,
