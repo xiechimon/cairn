@@ -24,33 +24,36 @@ const MAX_SKEPTICS = 4
 
 // ADR 0021 D4, decided here so routing to the user does not depend on a
 // reviewer remembering it: protected paths, deleted test files, and patches
-// over 800 lines or 40 files. The merge readiness gate source joins PROTECTED
-// when P3 (#1404) adds it.
+// over 800 lines or 40 files. scripts/** is whole because CI gates import
+// helpers and read data there under names no glob predicts (pr-gate run 3).
+// The merge readiness gate source joins PROTECTED when P3 (#1404) adds it.
 const PROTECTED = [
   '.github/**',
   'biome.json',
-  'scripts/*gate*',
-  'scripts/*baseline*.json',
-  'scripts/check-*',
-  'scripts/lint-warning-cap.mjs',
-  'scripts/pack-smoke.sh',
-  'scripts/ui-consumer-registry.json',
+  'scripts/**',
   '.husky/**',
   'CLAUDE.md',
   'AGENTS.md',
   'docs/adr/**',
   '.claude/workflows/**',
   'apps/server/drizzle/**',
-  'package.json',
   '**/package.json',
   'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  '.npmrc',
+  '**/vitest.config.*',
+  '**/playwright.config.*',
+  '**/tsconfig*.json',
 ]
 
 function globToRegExp(glob) {
   let re = ''
   for (let i = 0; i < glob.length; i += 1) {
     const ch = glob[i]
-    if (ch === '*' && glob[i + 1] === '*') {
+    if (ch === '*' && glob[i + 1] === '*' && glob[i + 2] === '/') {
+      re += '(?:.*/)?' // **/ also matches the repo root
+      i += 2
+    } else if (ch === '*' && glob[i + 1] === '*') {
       re += '.*'
       i += 1
     } else if (ch === '*') {
@@ -63,8 +66,6 @@ function globToRegExp(glob) {
 }
 const PROTECTED_RE = PROTECTED.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
-const isTestFile = (f) =>
-  /(^|\/)(e2e|test|tests|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f)
 const MAX_LINES = 800
 const MAX_FILES = 40
 
@@ -74,6 +75,8 @@ const MAX_FILES = 40
 const FILES_CMD = 'git -c core.quotePath=false diff --no-renames --name-only'
 const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: number, the sum of both columns of \`git diff --no-renames --numstat origin/main...<headSha>\`}`
 const isPathList = (xs) => Array.isArray(xs) && xs.every((f) => typeof f === 'string' && f.length > 0)
+// File names reach agents that build git commands from them.
+const UNSAFE_PATH = /[\u0000-\u001f\u007f`$;|&<>\\]/
 if (
   !args ||
   typeof args.pr !== 'number' ||
@@ -84,13 +87,18 @@ if (
   args.changedFiles.length === 0 ||
   !isPathList(args.deletedFiles) ||
   !args.deletedFiles.every((f) => args.changedFiles.includes(f)) ||
-  typeof args.linesChanged !== 'number'
+  !Number.isInteger(args.linesChanged) ||
+  args.linesChanged < 0
 ) {
   throw new Error(ARGS_HELP)
 }
 const quoted = [...args.changedFiles, ...args.deletedFiles].filter((f) => f.startsWith('"'))
 if (quoted.length > 0) {
   throw new Error(`pr-gate: C-quoted paths (${quoted[0]}); build the lists with core.quotePath=false. ${ARGS_HELP}`)
+}
+const unsafe = args.changedFiles.filter((f) => UNSAFE_PATH.test(f))
+if (unsafe.length > 0) {
+  throw new Error(`pr-gate: path with a control or shell character (${JSON.stringify(unsafe[0])}); review this PR by hand.`)
 }
 const { pr, headSha, ticket, changedFiles, deletedFiles, linesChanged } = args
 const matchedProtected = changedFiles.filter(isProtected)
@@ -113,7 +121,7 @@ const DIMENSIONS = [
   },
   {
     key: 'rules',
-    prompt: `Dimension: repository rules. Check the diff and the commit messages (\`git log --format=%B <your base ref>..${headSha}\`) against CLAUDE.md and AGENTS.md: seam discipline (biome.json noRestrictedImports, apps/daemon/src/backend), no inline import, no unexplained any, one-line single-use helpers inlined, the ticket's closing keyword in a commit message and no closing keyword followed by an issue number anywhere else (negations count), commit subject format <scope>(<ticket>): <subject>, .husky/banned.txt vocabulary, no emoji in commits, PR or code, ADRs overturned by a new ADR instead of edited, and documents that must change with the behavior (docs/spec, .claude/skills/verify-pacman/features, apps/web/COMPONENTS.md).`,
+    prompt: `Dimension: repository rules. Check the diff and the commit messages (\`git log --format=%B <your base ref>..${headSha}\`) against CLAUDE.md and AGENTS.md: seam discipline (biome.json noRestrictedImports, apps/daemon/src/backend), no inline import, no unexplained any, one-line single-use helpers inlined, the ticket's closing keyword in a commit message and no closing keyword followed by an issue number anywhere else (negations count), commit subject format <scope>(<ticket>): <subject> and the attribution trailers, .husky/banned.txt vocabulary, no emoji in commits, PR or code, ADRs overturned by a new ADR instead of edited, documents that must change with the behavior (docs/spec, .claude/skills/verify-pacman/features, apps/web/COMPONENTS.md), and the review checklist in docs/pr-review.md.`,
   },
   {
     key: 'tests',
@@ -121,7 +129,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; the script compares them with the caller's list. These changed files fall under ADR 0021 D4 and route the merge to the user: ${matchedProtected.length > 0 ? JSON.stringify(matchedProtected) : 'none'}. Add any other D4 path you find to protectedPaths; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`git diff --no-renames --numstat <your base ref>...${headSha}\` in linesChanged. The script compares these with the caller's values. These changed files fall under ADR 0021 D4 and route the merge to the user: ${matchedProtected.length > 0 ? JSON.stringify(matchedProtected) : 'none'}. Add any other D4 path you find to protectedPaths; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -157,8 +165,13 @@ const FINDINGS_SCHEMA = {
 
 const SAFETY_SCHEMA = {
   ...FINDINGS_SCHEMA,
-  properties: { ...FINDINGS_SCHEMA.properties, changedFiles: { type: 'array', items: { type: 'string' } } },
-  required: [...FINDINGS_SCHEMA.required, 'changedFiles'],
+  properties: {
+    ...FINDINGS_SCHEMA.properties,
+    changedFiles: { type: 'array', items: { type: 'string' } },
+    deletedFiles: { type: 'array', items: { type: 'string' } },
+    linesChanged: { type: 'integer' },
+  },
+  required: [...FINDINGS_SCHEMA.required, 'changedFiles', 'deletedFiles', 'linesChanged'],
 }
 
 const SKEPTIC_SCHEMA = {
@@ -235,7 +248,9 @@ ${d.prompt}`,
 if (unrefuted.length > 0) {
   log(`${unrefuted.length} blocking finding(s) kept without skeptics (cap ${MAX_SKEPTICS})`)
 }
-if (skepticsMissing > 0) log(`${skepticsMissing} skeptic(s) returned nothing; their findings were kept`)
+if (skepticsMissing > 0) {
+  log(`${skepticsMissing} skeptic(s) returned nothing or read another head; their findings were kept`)
+}
 
 const done = results.filter(Boolean)
 const missing = DIMENSIONS.map((d) => d.key).filter(
@@ -268,12 +283,18 @@ const protectedPaths = [
     ...done.flatMap((r) => (r.review === null ? [] : (r.review.protectedPaths ?? []))),
   ]),
 ]
-const deletedTests = deletedFiles.filter(isTestFile)
+// The caller is the session that wrote the PR, so its deletion list and line
+// count are checked against the safety reviewer's: the union and the larger.
+const allDeleted = [...new Set([...deletedFiles, ...(safety ? (safety.review.deletedFiles ?? []) : [])])]
+const deletedTests = allDeleted.filter(
+  (f) => /(^|\/)(e2e|test|tests|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f),
+)
+const lines = Math.max(linesChanged, safety && Number.isInteger(safety.review.linesChanged) ? safety.review.linesChanged : 0)
 const fileCount = new Set([...changedFiles, ...unlistedFiles]).size
 const humanReasons = [
   ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
-  ...(linesChanged > MAX_LINES ? [`${linesChanged} lines changed (over ${MAX_LINES})`] : []),
+  ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
   ...(fileCount > MAX_FILES ? [`${fileCount} files changed (over ${MAX_FILES})`] : []),
 ]
 const checked = Object.fromEntries(

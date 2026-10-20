@@ -1,0 +1,53 @@
+# pr-gate run 3 (head 3b0da7b) follow-up: the harness now lives at scripts/pr-gate-harness.mjs (under D4).
+# red leg: the 3b0da7b copy of pr-gate.js
+$ git show 3b0da7b:.claude/workflows/pr-gate.js > pr-gate-3b0da7b.js
+$ node scripts/pr-gate-harness.mjs pr-gate-3b0da7b.js
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+FAIL  linesChanged must be a non-negative integer
+FAIL  a path with a shell character is rejected
+FAIL  CI gate helpers and data anywhere under scripts/ route to the user
+FAIL  configs CI runs under route to the user, at the root too
+FAIL  a deletion only the safety reviewer reports routes to the user
+FAIL  a larger line count from the safety reviewer routes to the user
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a missing safety file list blocks go
+16/22 passed (pr-gate-3b0da7b.js)
+
+# green leg
+$ node scripts/pr-gate-harness.mjs
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a missing safety file list blocks go
+22/22 passed (.claude/workflows/pr-gate.js)
