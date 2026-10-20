@@ -1,7 +1,8 @@
 // 总管设置 view (issue #72, r5 101–104): the gear swaps the whole content
-// area to this surface — back button + centered title over a 766-wide
-// centered column with the 4 tabs (Agent / 章程 / 记忆 / 关注与提醒). The
-// tab row is real state; fixture captures take the fixture's tab.
+// area to this surface — the Paper top bar (back + serif page title, #1398)
+// over the 768px reading column with the 4 tabs (Agent / 章程 / 记忆 /
+// 关注与提醒), each tab one settings card (DESIGN.md 页面模式 · 设置列表).
+// The tab row is real state; fixture captures take the fixture's tab.
 // #182 三钮接线:agent 行 = 选择总管 Agent dialog(清单 = members 读面
 // memberType:"agent" 行,r5 §1;选定 → PATCH chief agent 槽,换绑带二次
 // 确认 canon);章程编辑 = DialogShell 编辑弹窗(#180 裁决;保存 → PATCH
@@ -12,11 +13,14 @@
 // settings 无「派发方式」行。
 
 import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@pacman/shared';
+import { cn } from 'cn';
 import { useState } from 'react';
 import { useApiMutations, useChief, useMachines, useMembers, useMemories } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { SegmentedTabs } from '../components/segmented.js';
+import { SETTINGS_HINT_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import type { ChiefContent, ChiefSettingsTab, MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -31,31 +35,20 @@ const TABS: { id: ChiefSettingsTab; label: string }[] = [
   { id: 'watches', label: '关注与提醒' },
 ];
 
-/** 设置面卡片族公共皮肤（#950 清零，旧 .chief-compress/.chief-host 等值：
- *  surface-secondary 块 / 16 横垫 8 纵垫 / min-height 62——#772 律英文描述
- *  换行时长高 / 17 上距）。圆角接 registry Card 依据 rounded-xl（#1054
- *  消费点清点，ADR 0012 D1；卡族三成员 CARD/EMPTY_CARD/LIST_CARD 与章程块
- *  同档，8px 一次性档随「几何自由」授权废止收敛回 registry 默认）。 */
-const CARD_CLS =
-  'mt-[17px] flex min-h-[62px] items-center gap-4 rounded-xl bg-(--secondary) px-4 py-2';
+/** 卡内空态行（#772 律：居中 + 随文案长高；#1398 起住进设置卡，
+ *  DESIGN.md 设置列表的 raw-div 行）。 */
+const EMPTY_ROW_CLS = cn(
+  SETTINGS_ROW_CLS,
+  'justify-center text-center text-meta text-content-tertiary',
+);
 
-/** 卡片文字组（旧 .chief-compress-text h3/p 等值）。 */
-const CARD_TITLE_CLS = 'text-sm font-semibold text-(--foreground)';
-const CARD_DESC_CLS = 'mt-0.5 text-xs text-(--text-tertiary)';
-
-/** 空态卡（旧 .chief-memo/.chief-watches 等值，#772 min-height + 居中 +
- *  tertiary 统一律；圆角随卡族 = registry Card rounded-xl，#1054）。 */
-const EMPTY_CARD_CLS =
-  'mt-[17px] flex min-h-11 items-center justify-center rounded-xl bg-(--secondary) px-4 py-2 text-[13px] text-(--text-tertiary)';
-
-/** 列表卡（旧 .chief-memory-card/.chief-watch-card 等值，XMON-117 一卡多行
- *  律；8px 一次性档收敛回 registry Card rounded-xl，#1054，ADR 0012 D1）。 */
-const LIST_CARD_CLS = 'mt-[17px] rounded-xl bg-(--secondary) text-[13px]';
+/** 卡内两行条目（记忆 / 关注 / 提醒）：标题 + 一行说明。 */
+const ENTRY_ROW_CLS = cn(SETTINGS_ROW_CLS, 'flex-col items-start justify-center gap-0.5 py-2');
 
 /** 已绑定 Agent 行头像（旧 .chief-agent-row-avatar 等值：首字母 chip =
  *  24 圆盘 surface 底 + 墨线框；--img 律去 chip 底边，图即圆盘）。 */
 const ROW_AVATAR_CLS =
-  'grid size-6 flex-none place-items-center rounded-full border border-(--border) bg-(--card) text-xs text-(--foreground)';
+  'grid size-6 flex-none place-items-center rounded-full border border-(--border) bg-(--card) text-meta text-(--foreground)';
 const ROW_AVATAR_IMG_CLS =
   'grid size-6 flex-none place-items-center rounded-full border-none bg-none [&_img]:block [&_img]:size-6 [&_img]:rounded-full';
 
@@ -135,32 +128,29 @@ export function ChiefSettings({
       : null;
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <header className="relative flex h-[57px] flex-none items-center">
-        {/* XMON-23→#950：ghost/icon 原语；28×28 + 方角 + tertiary 墨（含
-            hover 增亮承旧 btn--icon 皮肤）改挂 utility 等值；ghost 的灰底
-            hover / expanded 涂底逐通道钉回透明（旧 per-face 无底色）。 */}
+      {/* Paper 顶栏（#1398，PageShell 同形：56 高、发丝下边、返回 + 衬线页
+          标题靠左）。返回 = 回总管窗（不是路由返回，故用按钮不用 Link）。 */}
+      <header
+        data-testid="chief-settings-topbar"
+        className="flex h-14 flex-none items-center gap-3 border-b border-border px-6 whitespace-nowrap"
+      >
         <Button
           variant="ghost"
           size="icon"
-          className="ml-3.5 size-7 cursor-pointer rounded-none border-none text-(--text-tertiary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent dark:hover:text-(--text-secondary) aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0"
+          className="-mr-1 -ml-2 size-7 flex-none cursor-pointer text-content-tertiary"
           aria-label={t('返回')}
           onClick={onBack}
         >
           <ChevronLeft width={16} height={16} />
         </Button>
-        {/* 标题 = 全宽绝对定位覆盖层；pointer-events-none 放行到底层返回钮
-            （#811：纯文本标题不需要命中测试，布局/绘制零变化）。 */}
-        <h1 className="pointer-events-none absolute inset-x-0 text-center text-[15px] font-semibold text-(--foreground)">
+        <h1 className="min-w-0 truncate font-heading text-page font-medium text-foreground">
           {t('总管设置')}
         </h1>
       </header>
-      {/* #1032：面板体自持滚动（secondary/shell.tsx:92、resources/shell.tsx:121
-          同律）——根与内容列此前全链 overflow visible，长内容（记忆列表/长
-          章程/关注清单）被外壳 overflow-hidden 裁掉且滚轮不动。全宽滚动层
-          承接 overflow（滚动条贴面板右缘），766px 窄列只在里面居中、不自滚；
-          overflow-x 保持裁切：窄列内容不该横向溢出（页面壳仍是唯一裁切者）。 */}
+      {/* #1032：面板体自持滚动——全宽滚动层承接 overflow（滚动条贴面板
+          右缘），768px 阅读栏只在里面居中、不自滚；overflow-x 保持裁切。 */}
       <div className="flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto w-[766px]">
+        <div data-testid="chief-settings-col" className="mx-auto w-192 pt-4 pb-6">
           <SegmentedTabs
             slide
             value={tab}
@@ -169,19 +159,17 @@ export function ChiefSettings({
           />
 
           {tab === 'agent' && (
-            <>
-              {/* XMON-23→#950：ghost 原语 + 行卡皮肤 utility（旧
-                .chief-agent-row 等值：44 行 / 12 gap / 16 横垫 /
-                surface-secondary 底 / 14px 次级墨）。中和件沿旧：
-                justify-start（原语居中会破左对齐行）、font-normal、
-                leading-normal（原语 text-sm 的 20px 定值行高会替掉继承的
-                1.5=21px，行内名字垂直挪 0.5px——像素对拍实测出在名字 AA
-                上）、active 位移、hover/expanded 涂底钉回卡片底（旧
-                per-face 恒压件层无反馈）、svg size-auto（ChiefFaceDashed
-                24 / ChevronRight 14 属性尺寸）+ 行首 svg tertiary 墨。 */}
+            <SettingsCard className="mt-4">
+              {/* 绑定行 = 整行可点（资源列表行同形）：头像 + 名字 + 右缘
+                  chevron；可及名 = 绑定态文案（未设置 / Agent 名）。Button 件
+                  自带四边 1px 透明边，会盖掉卡片 divide-y 的分隔线（divide
+                  规则零特异度）——本行恒在信息行之前，故显式只留底边。 */}
               <Button
                 variant="ghost"
-                className="mt-[17px] h-11 w-full cursor-pointer justify-start gap-3 border-none bg-(--secondary) px-4 text-sm leading-normal font-normal text-(--text-secondary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) dark:hover:text-(--text-secondary) aria-expanded:bg-(--secondary) aria-expanded:text-(--text-secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:first-child]:text-(--text-tertiary) [&_svg:not([class*='size-'])]:size-auto"
+                className={cn(
+                  SETTINGS_ROW_CLS,
+                  "h-auto w-full cursor-pointer justify-start gap-3 rounded-none border-0 border-b border-border text-left text-ui font-normal text-foreground hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent [&_svg:first-child]:text-content-tertiary [&_svg:not([class*='size-'])]:size-auto",
+                )}
                 onClick={() => setAgentOpen(true)}
               >
                 {boundAgent != null ? (
@@ -203,53 +191,43 @@ export function ChiefSettings({
                   <ChiefFaceDashed width={24} height={24} />
                 )}
                 <span>{boundAgent != null ? boundAgent.name : t('未设置')}</span>
-                <ChevronRight width={14} height={14} className="ml-auto text-(--text-tertiary)" />
+                <ChevronRight width={14} height={14} className="ml-auto text-content-tertiary" />
               </Button>
               {/* #1260：模型与归属机是绑定 Agent 的自身配置（chief 无覆盖
                 槽）——只读回显 + 指路，写位在 Agent 设置面/机器详情页。 */}
-              <div className={CARD_CLS} data-testid="chief-follows-agent">
-                <div>
-                  <h3 className={CARD_TITLE_CLS}>{t('模型与归属机')}</h3>
-                  <p className={CARD_DESC_CLS}>
+              <div className={SETTINGS_ROW_CLS} data-testid="chief-follows-agent">
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-ui text-foreground">{t('模型与归属机')}</span>
+                  <span className={SETTINGS_HINT_CLS}>
                     {boundAgent != null && boundModelId !== null
                       ? t('跟随绑定 Agent：模型 {model} · 归属机 {machine}', {
                           model: boundModelId,
                           machine: boundMachineName ?? t('未设归属机'),
                         })
                       : t('跟随绑定 Agent 的自身配置，在 Agent 的设置里调整。')}
-                  </p>
-                </div>
+                  </span>
+                </span>
               </div>
-            </>
+            </SettingsCard>
           )}
 
           {tab === 'charter' && (
             <>
-              {charter !== '' ? (
-                // live 既有章程呈现位(r5 未拍非空章程 tab,[设计]:同空态块
-                // 语言换实文)。旧 .chief-charter-text 等值迁移。
-                <div className="mt-[17px] rounded-xl bg-(--secondary) px-4 py-3 text-[13px] leading-5 whitespace-pre-wrap text-(--foreground)">
-                  {charter}
-                </div>
-              ) : (
-                /* 空态虚线框 = registry Empty 件词汇（rounded-xl +
-                   border-dashed，#1054 清点接依据）。 */
-                <div className="mt-[17px] grid min-h-[78px] place-items-center rounded-xl border border-dashed border-(--input) bg-(--secondary) text-[13px] text-(--text-tertiary)">
-                  {t('尚无章程。点击编辑，为总管添加常设指示。')}
-                </div>
-              )}
-              <div className="mt-5 flex justify-end">
-                {/* XMON-23→#950：旧 .chief-edit-btn 三点 per-face 偏差（描边
-                  token、surface 底、primary 字）正是 outline 档配方——收编
-                  variant="outline"（spec/22 §5.4 chief-dlg-ghost 同律，件
-                  几何正典承接、差额 D2 吸收）；sm 档 28 高沿旧；px-3/
-                  text-[13px] 补齐 compact 档的 12 内边距/13 字。 */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="px-3 text-[13px]"
-                  onClick={() => setCharterOpen(true)}
-                >
+              <SettingsCard className="mt-4">
+                {charter !== '' ? (
+                  // live 既有章程呈现位（r5 未拍非空章程 tab，[设计]）。
+                  <div className="px-4 py-3 text-ui whitespace-pre-wrap text-foreground">
+                    {charter}
+                  </div>
+                ) : (
+                  <div className={EMPTY_ROW_CLS}>
+                    {t('尚无章程。点击编辑，为总管添加常设指示。')}
+                  </div>
+                )}
+              </SettingsCard>
+              <div className="mt-4 flex justify-end">
+                {/* 本 tab 唯一主操作 = 墨色主按钮（32 高 8 圆角）。 */}
+                <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCharterOpen(true)}>
                   {t('编辑')}
                 </Button>
               </div>
@@ -262,69 +240,62 @@ export function ChiefSettings({
                 <div>
                   {/* 配额头与 agent-detail 同文（`记忆 · n / 100`，上限取 shared
                     单源常量）；行只读，管理落 Agent 详情记忆 tab。 */}
-                  <p className="mt-[17px] text-xs text-(--text-tertiary)">
+                  <p className="mt-4 text-meta text-content-tertiary">
                     {t('记忆 · {n} / {max}', { n: memories.length, max: MEMORY_QUOTA_PER_AGENT })}
                   </p>
-                  {memories.length === 0 ? (
-                    <p className={EMPTY_CARD_CLS}>{t(MEMORY_EMPTY_COPY)}</p>
-                  ) : (
-                    <div className={`${LIST_CARD_CLS} px-4 py-1`}>
-                      {memories.map((memory, index) => (
-                        <div
-                          key={memory.id}
-                          className={
-                            // XMON-117 一卡多行律：行间分隔线（旧
-                            // .chief-memory-row + 兄弟选择器等值，随改落
-                            // 条件类）。
-                            index > 0 ? 'block border-t border-(--border) py-2' : 'block py-2'
-                          }
-                        >
-                          <span className="block text-(--foreground)">{memory.title}</span>
-                          <span className="block text-(--text-secondary)">{memory.content}</span>
+                  <SettingsCard className="mt-2">
+                    {memories.length === 0 ? (
+                      <p className={EMPTY_ROW_CLS}>{t(MEMORY_EMPTY_COPY)}</p>
+                    ) : (
+                      memories.map((memory) => (
+                        <div key={memory.id} className={ENTRY_ROW_CLS}>
+                          <span className="text-ui text-foreground">{memory.title}</span>
+                          <span className="text-meta text-content-secondary">{memory.content}</span>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      ))
+                    )}
+                  </SettingsCard>
                 </div>
               ) : null
             ) : (
-              <div className={EMPTY_CARD_CLS}>
-                {t('尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。')}
-              </div>
+              <SettingsCard className="mt-4">
+                <div className={EMPTY_ROW_CLS}>
+                  {t('尚未选择 Agent。请先在「Agent」页选定 Agent，记忆将保存在该 Agent 上。')}
+                </div>
+              </SettingsCard>
             ))}
 
-          {tab === 'watches' &&
-            (live && (watches.length > 0 || wakes.length > 0) ? (
-              <div className="flex flex-col">
-                {watches.map((watch) => (
-                  <div key={watch.threadId} className={`${LIST_CARD_CLS} px-4 py-2`}>
-                    <span className="block text-(--foreground)">{watch.title}</span>
-                    <span className="block text-xs text-(--text-tertiary)">
-                      {watch.threadTitle}
-                    </span>
-                  </div>
-                ))}
-                {wakes.map((wake) => {
-                  const note = typeof wake.note === 'string' ? wake.note : null;
-                  const at = typeof wake.at === 'number' ? wake.at : null;
-                  const id = typeof wake.id === 'string' ? wake.id : null;
-                  return (
-                    <div key={id ?? `${at}`} className={`${LIST_CARD_CLS} px-4 py-2`}>
-                      <span className="block text-(--foreground)">{note ?? t('到点提醒')}</span>
-                      {at != null && (
-                        <span className="block text-xs text-(--text-tertiary)">
-                          {new Date(at).toLocaleString()}
-                        </span>
-                      )}
+          {tab === 'watches' && (
+            <SettingsCard className="mt-4">
+              {live && (watches.length > 0 || wakes.length > 0) ? (
+                <>
+                  {watches.map((watch) => (
+                    <div key={watch.threadId} className={ENTRY_ROW_CLS}>
+                      <span className="text-ui text-foreground">{watch.title}</span>
+                      <span className={SETTINGS_HINT_CLS}>{watch.threadTitle}</span>
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className={EMPTY_CARD_CLS}>
-                {t('暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。')}
-              </div>
-            ))}
+                  ))}
+                  {wakes.map((wake) => {
+                    const note = typeof wake.note === 'string' ? wake.note : null;
+                    const at = typeof wake.at === 'number' ? wake.at : null;
+                    const id = typeof wake.id === 'string' ? wake.id : null;
+                    return (
+                      <div key={id ?? `${at}`} className={ENTRY_ROW_CLS}>
+                        <span className="text-ui text-foreground">{note ?? t('到点提醒')}</span>
+                        {at != null && (
+                          <span className={SETTINGS_HINT_CLS}>{new Date(at).toLocaleString()}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              ) : (
+                <div className={EMPTY_ROW_CLS}>
+                  {t('暂无跟进事项。总管关注某个任务，或约定到点回头核实时，会按主题列在这里。')}
+                </div>
+              )}
+            </SettingsCard>
+          )}
         </div>
       </div>
       {/* 弹窗挂在 tab 条件块外:切换 tab 不带走开态(dialog 遮罩层级高于
