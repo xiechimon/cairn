@@ -1,0 +1,24 @@
+{
+  "probe": "search",
+  "ok": false,
+  "at": "2026-10-20T22:44:15.809Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home",
+    "root": "/home/user/pacman/.claude/worktrees/p1/"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "搜索面板打开(⌘K)"
+    },
+    {
+      "ok": false,
+      "label": "probe 异常:locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: '搜索' }).locator('[data-row-kind=\"todo\"]').filter({ hasText: '搜索目标 55933' }).first() to be visible\u001b[22m\n"
+    }
+  ],
+  "artifacts": [
+    "99-error.png"
+  ]
+}

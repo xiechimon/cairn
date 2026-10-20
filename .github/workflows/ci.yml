@@ -107,6 +107,12 @@ jobs:
       - name: UI consumer shape gate (#1054)
         run: node scripts/ui-consumer-shape-gate.mjs
 
+      # verify-pacman 入口自测（#1402）：vp.mjs 的分派与归档规则（-- 参数替换默认、
+      # 相对证据路径转绝对、需 --force 的 needs、archive 不取最新一次、不覆盖），
+      # drive 走 --dry-run、archive 在自建的空仓根里跑，不起栈。零依赖，排在 install 之前。
+      - name: verify-pacman CLI self-test (#1402)
+        run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+
       # e2e 迁去独立分片 job（#693）后 ffmpeg 随迁；chromium 留在本 job——
       # integration vitest 的四个 e2e 套件（m5-web-e2e 等）在场内起真
       # Chromium（2026-10-03 实测摘掉即红：browserType.launch executable
