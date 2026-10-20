@@ -7,4 +7,4 @@
 
 Running 55 tests using 2 workers
 
-  55 passed (31.7s)
+  55 passed (29.6s)

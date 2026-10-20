@@ -7,14 +7,14 @@
     "webPort": 5273,
     "homeDir": "/home/user/pacman/.claude/verify-run/home",
     "skillsDir": "/home/user/pacman/.claude/verify-run/home/skills",
-    "serverPid": 8620,
-    "webPid": 8621,
-    "startedAt": "2026-10-20T20:43:15.407Z"
+    "serverPid": 16884,
+    "webPid": 16885,
+    "startedAt": "2026-10-20T22:43:57.931Z"
   },
   "checks": [
     {
       "ok": true,
-      "label": "seed: project (id=C0dYIg1LLxZHsq6LKl2wi)"
+      "label": "seed: project (id=uFsIZxjpcPc8HV5OZlO5p)"
     },
     {
       "ok": true,
@@ -22,11 +22,11 @@
     },
     {
       "ok": true,
-      "label": "seed: daily schedule on the fresh todo (status 201)"
+      "label": "seed: once schedule on the fresh todo (status 201)"
     },
     {
       "ok": true,
-      "label": "SQLite: phases todo / queued / confirm ([{\"id\":\"_NKbeoM-0UnH8g0uIT56K\",\"title\":\"verify 1400 confirm\",\"phase\":\"confirm\"},{\"id\":\"p-hVuiOm03Gi3RMfqRVHF\",\"title\":\"verify 1400 fresh\",\"phase\":\"todo\"},{\"id\":\"XbPA9j-fqqtZcF1yTchsY\",\"title\":\"verify 1400 queued\",\"phase\":\"queued\"}])"
+      "label": "SQLite: phases todo / queued / confirm ([{\"id\":\"Zss8B0j7zj-a5OZOUIsfw\",\"title\":\"verify 1400 confirm\",\"phase\":\"confirm\"},{\"id\":\"i24ZqTcDi2BI-Cw5fastE\",\"title\":\"verify 1400 fresh\",\"phase\":\"todo\"},{\"id\":\"m64GsY98VZAEN8iA8tG_r\",\"title\":\"verify 1400 queued\",\"phase\":\"queued\"}])"
     },
     {
       "ok": true,
@@ -46,7 +46,7 @@
     },
     {
       "ok": true,
-      "label": "detail header (queued): chip reads 待开始 (got 待开始)"
+      "label": "detail header (queued): chip reads 排队中 (got 排队中)"
     },
     {
       "ok": true,
@@ -54,7 +54,7 @@
     },
     {
       "ok": true,
-      "label": "search: fresh / queued rows read 待开始 ({\"fresh\":\"待开始\",\"queued\":\"待开始\",\"confirm\":\"确认\"})"
+      "label": "search: fresh reads 待开始, queued 排队中 ({\"fresh\":\"待开始\",\"queued\":\"排队中\",\"confirm\":\"确认\"})"
     },
     {
       "ok": true,
@@ -66,7 +66,7 @@
     },
     {
       "ok": true,
-      "label": "project rows: fresh / queued read 待开始 ({\"fresh\":\"待开始\",\"queued\":\"待开始\",\"confirm\":\"确认\"})"
+      "label": "project rows: fresh reads 待开始, queued 排队中 ({\"fresh\":\"待开始\",\"queued\":\"排队中\",\"confirm\":\"确认\"})"
     },
     {
       "ok": true,
@@ -80,46 +80,46 @@
   "payloads": {
     "todoRows": [
       {
-        "id": "_NKbeoM-0UnH8g0uIT56K",
+        "id": "Zss8B0j7zj-a5OZOUIsfw",
         "title": "verify 1400 confirm",
         "phase": "confirm"
       },
       {
-        "id": "p-hVuiOm03Gi3RMfqRVHF",
+        "id": "i24ZqTcDi2BI-Cw5fastE",
         "title": "verify 1400 fresh",
         "phase": "todo"
       },
       {
-        "id": "XbPA9j-fqqtZcF1yTchsY",
+        "id": "m64GsY98VZAEN8iA8tG_r",
         "title": "verify 1400 queued",
         "phase": "queued"
       }
     ],
     "apiTodos": [
       {
-        "id": "p-hVuiOm03Gi3RMfqRVHF",
+        "id": "i24ZqTcDi2BI-Cw5fastE",
         "title": "verify 1400 fresh",
         "phase": "todo"
       },
       {
-        "id": "XbPA9j-fqqtZcF1yTchsY",
+        "id": "m64GsY98VZAEN8iA8tG_r",
         "title": "verify 1400 queued",
         "phase": "queued"
       },
       {
-        "id": "_NKbeoM-0UnH8g0uIT56K",
+        "id": "Zss8B0j7zj-a5OZOUIsfw",
         "title": "verify 1400 confirm",
         "phase": "confirm"
       }
     ],
     "searchChips": {
       "fresh": "待开始",
-      "queued": "待开始",
+      "queued": "排队中",
       "confirm": "确认"
     },
     "projectStatus": {
       "fresh": "待开始",
-      "queued": "待开始",
+      "queued": "排队中",
       "confirm": "确认"
     }
   }
