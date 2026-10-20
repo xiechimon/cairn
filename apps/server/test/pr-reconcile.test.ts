@@ -8,6 +8,14 @@
 //   ⑥ 同一 todo 更旧的 PR build 已关闭（spec 23 被取代分支）而最新 PR 仍 open
 //      → 不得把 todo 打成 failed
 //   ⑦ 已 done 之后再扫 → 不再是候选，不重复收尾
+// pr-gate 第一轮（#1414）补的失败方式：
+//   ⑧ todo 的当前 build 没有 PR（#1217 守卫下不开新 PR / 探针失败），更旧
+//      build 的 PR 已合并或已关闭 → 不得替当前 build 收尾或打回
+//   ⑨ 两个 build 指向同一个 PR（#1217）→ 只按当前 build 读一次、写在它上面
+//   ⑩ merge 步在飞（agent 正在合并）→ 对账不插手；先后两次收尾只落一条完成行
+//   ⑪ 未连接 GitHub（匿名 60 次/小时）→ 每个候选 5 分钟内最多读一次
+//   ⑫ 条件读 304 → 复用上轮状态；网络抛错 → 不动，下轮重读
+//   ⑬ 合并行写明是谁合并的
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（🎉 行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -17,9 +25,12 @@ import {
   build as buildTable,
   message as messageTable,
   project as projectTable,
+  step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { finishTodoDone } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -41,20 +52,32 @@ interface PullSpec {
   state: 'open' | 'closed';
   merged: boolean;
   mergeCommitSha?: string | null;
+  mergedBy?: string;
 }
 
 /** pulls/{n} 端点 mock：按 PR 号回应；其它 URL（check-runs）一律 404，
  * 证明 review 候选不走磨绿面。 */
 class PullsMock {
   requests: string[] = [];
+  headers: Record<string, string>[] = [];
+  /** 下一次请求抛网络错（undici 的 TypeError 形）。 */
+  throwNext = false;
   constructor(
-    private readonly pulls: Record<number, PullSpec>,
+    readonly pulls: Record<number, PullSpec>,
     private readonly status = 200,
   ) {}
 
-  readonly fetch = (input: string | URL) => {
+  readonly fetch = (input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
     this.requests.push(url);
+    this.headers.push({ ...(init?.headers ?? {}) });
+    if (this.throwNext) {
+      this.throwNext = false;
+      return Promise.reject(new TypeError('fetch failed'));
+    }
+    if ((init?.headers?.['if-none-match'] ?? '') === '"x"') {
+      return Promise.resolve(res(304, '"x"', {}));
+    }
     const m = url.match(/\/pulls\/(\d+)$/);
     if (m === null) return Promise.resolve(res(404, '"x"', {}));
     if (this.status !== 200) return Promise.resolve(res(this.status, '"x"', {}));
@@ -66,6 +89,7 @@ class PullsMock {
         state: spec.state,
         merged: spec.merged,
         merge_commit_sha: spec.mergeCommitSha ?? null,
+        merged_by: spec.mergedBy === undefined ? null : { login: spec.mergedBy },
         head: { sha: 'f'.repeat(40) },
       }),
     );
@@ -82,7 +106,19 @@ interface World {
   systemRows(): string[];
 }
 
-function makeWorld(opts: { phase?: Phase; prNumber?: number; olderClosedPr?: number } = {}): World {
+function makeWorld(
+  opts: {
+    phase?: Phase;
+    prNumber?: number;
+    olderClosedPr?: number;
+    /** a newer build of the same todo becomes todo.latestBuildId (null = no PR). */
+    newerBuildPr?: number | null;
+    /** a step of the PR build still in flight (the merge step). */
+    inflight?: 'pending' | 'claimed';
+    /** GitHub connected (token present); default anonymous. */
+    connected?: boolean;
+  } = {},
+): World {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const rnd = Math.random().toString(36).slice(2, 8);
@@ -141,6 +177,44 @@ function makeWorld(opts: { phase?: Phase; prNumber?: number; olderClosedPr?: num
       prNumber,
     })
     .run();
+  let latestBuildId = buildId;
+  if (opts.newerBuildPr !== undefined) {
+    latestBuildId = `build-new-${rnd}`;
+    s.db
+      .insert(buildTable)
+      .values({
+        id: latestBuildId,
+        todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: base - 1_000,
+        prUrl:
+          opts.newerBuildPr === null
+            ? null
+            : `https://github.com/octo/demo/pull/${opts.newerBuildPr}`,
+        prNumber: opts.newerBuildPr,
+      })
+      .run();
+  }
+  s.db.update(todoTable).set({ latestBuildId }).where(eq(todoTable.id, todoId)).run();
+  if (opts.inflight !== undefined) {
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `step-merge-${rnd}`,
+        buildId,
+        kind: 'merge',
+        status: opts.inflight,
+        createdAt: base,
+      })
+      .run();
+  }
+  if (opts.connected === true) {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'octo', accessToken: 'gho_test', scope: 'read:user repo' },
+    );
+  }
   return {
     s,
     todoId,
@@ -242,6 +316,99 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
     expect(mock.requests.length).toBe(requestsAfterFirst);
     expect(w.systemRows().length).toBe(rowsAfterFirst);
+  });
+
+  test("⑧a the todo's current build has no PR; an older build's PR merged → nothing changes", async () => {
+    const w = makeWorld({ newerBuildPr: null });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(mock.requests).toEqual([]);
+  });
+
+  test("⑧b the todo's current build has no PR; an older build's PR closed → not failed", async () => {
+    const w = makeWorld({ newerBuildPr: null });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow().errorMessage).toBeNull();
+  });
+
+  test('⑨ two builds point at the same PR (#1217) → one read, written on the current build', async () => {
+    const w = makeWorld({ newerBuildPr: 201 });
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/201'))).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.systemRows()).toEqual([]); // the older build's conversation is untouched
+  });
+
+  test('⑩a a merge step in flight → reconcile does not step in', async () => {
+    const w = makeWorld({ inflight: 'claimed' });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(mock.requests).toEqual([]);
+  });
+
+  test('⑩b finishing twice leaves one completion row', () => {
+    const w = makeWorld();
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    expect(w.systemRows().filter((c) => c.includes('任务已完成'))).toHaveLength(1);
+  });
+
+  test('⑪ anonymous: a candidate is read at most once per five minutes', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    expect(mock.requests).toHaveLength(1);
+    await poller.sweep(t0 + 300_001);
+    expect(mock.requests).toHaveLength(2);
+  });
+
+  test('⑫a connected: the second read is conditional and a 304 changes nothing', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    await poller.sweep();
+    expect(mock.requests).toHaveLength(2);
+    expect(mock.headers[1]?.['if-none-match']).toBe('"x"');
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('⑫b a thrown network error → nothing changes; the next sweep reads again', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    mock.throwNext = true;
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('done');
+  });
+
+  test('⑬ the merge row names who merged', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({
+      [w.prNumber]: {
+        state: 'closed',
+        merged: true,
+        mergeCommitSha: 'abc1234',
+        mergedBy: 'octocat',
+      },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.systemRows().some((c) => c.includes('abc1234') && c.includes('octocat'))).toBe(true);
   });
 
   test('building-phase builds are reconciled on the CI grind path too (#1403 segment 3)', async () => {

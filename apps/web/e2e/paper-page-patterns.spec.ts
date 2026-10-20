@@ -17,6 +17,8 @@ import { expect, type Page, test } from '@playwright/test';
 //  S1 settings rows drift to per-row heights
 //  S2 a divider lands on the card top or under the last row, doubling the
 //     card outline there
+//  S3 clickable rows (a Button per row) lose the divider: the button's own
+//     transparent border outranks the card's zero-specificity divide rule
 
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
@@ -128,5 +130,45 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.title, 'E4').toEqual(['14px', '500']);
     expect(m.desc, 'E4').toEqual(['12px', m.ink3]);
     expect(m.descWidth, 'E4: description capped near 44ch').toBeLessThanOrEqual(320);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`clickable resource rows keep the card divider between rows only (${theme}) (S3)`, async ({
+    page,
+  }) => {
+    await setTheme(page, theme);
+    await page.goto('/app/resources/skills?scenario=skills-list');
+    const rows = page.getByTestId('resource-row');
+    await expect(rows).toHaveCount(3);
+    await expect(rows.first(), 'S3: rows are buttons').toHaveJSProperty('tagName', 'BUTTON');
+    const border = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--border)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    const faces = await rows.evaluateAll((els) =>
+      els.map((el) => {
+        const cs = getComputedStyle(el);
+        return {
+          top: cs.borderTopWidth,
+          bottom: cs.borderBottomWidth,
+          color: cs.borderBottomColor,
+        };
+      }),
+    );
+    expect(
+      faces.map((f) => f.top),
+      'S3: no top edge',
+    ).toEqual(['0px', '0px', '0px']);
+    expect(
+      faces.map((f) => f.bottom),
+      'S3: divider between rows, none under the last',
+    ).toEqual(['1px', '1px', '0px']);
+    expect(faces[0]?.color, 'S3: divider in --border').toBe(border);
+    expect(faces[1]?.color, 'S3: divider in --border').toBe(border);
   });
 }

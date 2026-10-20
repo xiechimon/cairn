@@ -31,9 +31,11 @@
 // 还没注册 check（竞态）」不可分——宽限内按 pending 等，超宽限按绿交人
 // （不把无 CI 仓永远锁在 building）。
 //
-// #1403 第二候选集（review 关口的 PR 对账）：相位 review、todo 最新的 PR
-// build（spec 23 latestPrBuild——更旧的被取代 PR 关了不算数）。每候选一次
-// 条件 GET pulls/{n}：已合并（不论谁合的）→ system 行写合并 SHA + done 收尾
+// #1403 第二候选集（review 关口的 PR 对账）：相位 review、build 是 todo 的
+// 当前 build（todo.latestBuildId；更旧的被取代 PR 关了或合了都不算数，当前
+// build 没 PR 时也不拿旧 PR 替它收尾）、没有在飞的步（merge 步正在合并时不
+// 插手）。未连接 GitHub（匿名 60 次/小时）时每候选 5 分钟最多读一次。每候选
+// 一次条件 GET pulls/{n}：已合并（不论谁合的）→ system 行写合并 SHA + done 收尾
 // 漏斗（与 merge 步成同一条）；关闭未合并 → build.errorMessage + failed；
 // open 且 BEHIND / DIRTY → 每个 head 提示一次（人工合并策略下不动手：
 // update-branch 归 P4 执行器；自动解冲突要 review→building 边，phase.ts 现
@@ -61,7 +63,6 @@ import {
   type BuildDeps,
   enqueueStep,
   finishTodoDone,
-  latestPrBuild,
   maybeEnqueueVerifyStep,
   toBuildRecord,
 } from './builds.js';
@@ -84,6 +85,10 @@ export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
 
 /** 必需检查算「过」的结论（GitHub 分支保护同口径）。 */
 const PASSING_CONCLUSIONS = ['success', 'neutral', 'skipped'];
+
+/** 未连接 GitHub 时每个 PR 的最短重读间隔（匿名主限流 60 次/小时，#931 /
+ * #1217 守卫同用这份额度）。 */
+export const CI_ANON_READ_INTERVAL_MS = 300_000;
 
 /** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
  * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
@@ -250,6 +255,19 @@ export function createCiPoller(
   const cache = new Map<string, PrChecksCacheEntry>();
   const pullCache = new Map<string, PullCacheEntry>();
   const requiredCache = new Map<string, { at: number; names: string[] }>();
+  /** 匿名读的上次时刻（按 PR）。 */
+  const anonReadAt = new Map<string, number>();
+
+  /** 本 build 有在飞的步（pending / claimed）。 */
+  function hasActiveStep(buildId: string): boolean {
+    return (
+      deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+        .get() !== undefined
+    );
+  }
 
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
   function freshGrindRow(todoId: string) {
@@ -286,6 +304,16 @@ export function createCiPoller(
     } catch {
       return null;
     }
+  }
+
+  /** 未连接 GitHub 时，同一 PR 在 CI_ANON_READ_INTERVAL_MS 内只读一次；
+   * true = 本轮不读。读的一方记下时刻。 */
+  function anonThrottled(key: string, token: string | null, now: number): boolean {
+    if (token !== null) return false;
+    const last = anonReadAt.get(key);
+    if (last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) return true;
+    anonReadAt.set(key, now);
+    return false;
   }
 
   /** PR 条件读（两个候选集共用一份缓存）。null = 读不到。 */
@@ -340,12 +368,14 @@ export function createCiPoller(
     tally: CiPollTally,
   ): void {
     if (pull.merged) {
-      const sha =
-        pull.mergeCommitSha === null ? '' : `（合并提交 ${pull.mergeCommitSha.slice(0, 7)}）`;
+      const detail = [
+        pull.mergeCommitSha === null ? null : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
+        pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
+      ].filter((x) => x !== null);
       insertMessageRow(deps, cand.buildId, {
         id: newRecordId(),
         role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并${sha}`,
+        content: `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
         createdAt: nowMs(),
       });
       finishTodoDone(deps, cand.todoId, cand.buildId);
@@ -385,6 +415,7 @@ export function createCiPoller(
 
   async function reconcileOne(
     cand: { buildId: string; todoId: string },
+    now: number,
     tally: CiPollTally,
   ): Promise<void> {
     const todoRow = freshReviewRow(cand.todoId);
@@ -399,7 +430,15 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
+    if (hasActiveStep(cand.buildId)) {
+      tally.skipped += 1; // merge 步在飞：合并结果由它收尾
+      return;
+    }
     const prNumber = buildRow.prNumber;
+    if (anonThrottled(`${target.fullName}#${prNumber}`, tokenFor(target.teamId), now)) {
+      tally.skipped += 1;
+      return;
+    }
     const pull = await readPull(target, prNumber);
     if (pull === null) {
       tally.unreadable += 1;
@@ -441,12 +480,7 @@ export function createCiPoller(
       return;
     }
     // 修复步在飞不叠派（幂等）：pending/claimed 在跑 = 读到的 checks 是旧 head 的。
-    const active = deps.db
-      .select({ id: step.id })
-      .from(step)
-      .where(and(eq(step.buildId, cand.buildId), inArray(step.status, ['pending', 'claimed'])))
-      .get();
-    if (active !== undefined) {
+    if (hasActiveStep(cand.buildId)) {
       tally.skipped += 1;
       return;
     }
@@ -458,6 +492,10 @@ export function createCiPoller(
       return;
     }
     const prNumber = buildRow.prNumber;
+    if (anonThrottled(`${target.fullName}#${prNumber}`, tokenFor(target.teamId), now)) {
+      tally.pending += 1; // 未连接 GitHub：本 PR 五分钟内已读过
+      return;
+    }
     const pull = await readPull(target, prNumber);
     if (pull === null) {
       tally.unreadable += 1; // 限流/私仓匿名/网络 = 读不到 ≠ 红：不动，下轮重试
@@ -556,21 +594,21 @@ export function createCiPoller(
 
   async function sweep(now: number = nowMs()): Promise<void> {
     // 批量扫描：一条查询取全候选——prNumber 在位 × 相位 building（磨绿中；
-    // review/failed/closed/done 都已退出磨绿集，天然满足「已推进不回写」）。
+    // review/failed/closed/done 都已退出磨绿集，天然满足「已推进不回写」）×
+    // todo 的当前 build（#1403：重跑开出的新 build 在跑时，旧 PR 不再被磨）。
     const candidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)
-      .innerJoin(todo, eq(todo.id, build.todoId))
+      .innerJoin(todo, and(eq(todo.id, build.todoId), eq(todo.latestBuildId, build.id)))
       .where(and(isNotNull(build.prNumber), eq(todo.phase, 'building')))
       .all();
-    // #1403 review 关口候选：todo 最新的 PR build 才算（更旧的被取代 PR 不算）。
+    // #1403 review 关口候选：同为 todo 的当前 build。
     const reviewCandidates = deps.db
       .select({ buildId: build.id, todoId: todo.id })
       .from(build)
-      .innerJoin(todo, eq(todo.id, build.todoId))
+      .innerJoin(todo, and(eq(todo.id, build.todoId), eq(todo.latestBuildId, build.id)))
       .where(and(isNotNull(build.prNumber), eq(todo.phase, 'review')))
-      .all()
-      .filter((c) => latestPrBuild(deps.db, c.todoId)?.id === c.buildId);
+      .all();
     const tally: CiPollTally = {
       candidates: candidates.length,
       pending: 0,
@@ -599,7 +637,7 @@ export function createCiPoller(
     }
     for (const cand of reviewCandidates) {
       try {
-        await reconcileOne(cand, tally);
+        await reconcileOne(cand, now, tally);
       } catch (err) {
         tally.errors += 1;
         run.logger?.info(

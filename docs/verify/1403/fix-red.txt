@@ -1,0 +1,19 @@
+# P2a round 2 (after pr-gate run 1 on #1414, head 373d42e): new tests on 373d42e with only the two test files changed
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+     × ⑧a the todo's current build has no PR; an older build's PR merged → nothing changes 41ms
+     × ⑧b the todo's current build has no PR; an older build's PR closed → not failed 38ms
+     × ⑩a a merge step in flight → reconcile does not step in 36ms
+     × ⑩b finishing twice leaves one completion row 38ms
+     × ⑪ anonymous: a candidate is read at most once per five minutes 37ms
+     × ⑬ the merge row names who merged 43ms
+     × #1403 重跑开出的新 build 是 todo 的当前 build 时，旧 PR build 不再被磨（不读 checks、不派修复步） 42ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > #1403 重跑开出的新 build 是 todo 的当前 build 时，旧 PR build 不再被磨（不读 checks、不派修复步）
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑧a the todo's current build has no PR; an older build's PR merged → nothing changes
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑧b the todo's current build has no PR; an older build's PR closed → not failed
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑩a a merge step in flight → reconcile does not step in
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑩b finishing twice leaves one completion row
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑪ anonymous: a candidate is read at most once per five minutes
+ FAIL  test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ⑬ the merge row names who merged
+ Test Files  2 failed (2)
+      Tests  7 failed | 33 passed (40)

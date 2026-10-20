@@ -146,6 +146,8 @@ export interface GithubPull extends GithubPullState {
   /** GitHub 的 mergeable_state（clean / behind / dirty / blocked / unstable /
    * unknown …，文档未列全集，原样透传）；后台未算完时为 unknown。 */
   mergeableState: string | null;
+  /** merged 时合并者的 login；未合并或响应缺失 = null。 */
+  mergedBy: string | null;
 }
 
 export interface GithubPullPage {
@@ -197,6 +199,7 @@ export async function githubPull(
     mergeable_state?: unknown;
     head?: { sha?: unknown } | null;
     base?: { ref?: unknown } | null;
+    merged_by?: { login?: unknown } | null;
   };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
@@ -212,6 +215,7 @@ export async function githubPull(
       title: typeof raw.title === 'string' ? raw.title : null,
       baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : null,
       mergeableState: typeof raw.mergeable_state === 'string' ? raw.mergeable_state : null,
+      mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
     },
   };
 }

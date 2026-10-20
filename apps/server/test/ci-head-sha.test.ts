@@ -15,6 +15,8 @@
 //      phase edge; resolving conflicts automatically waits for that decision)
 //   ⑪ review: clean / unknown mergeability writes nothing
 //   ⑫ the required list is read on every sweep instead of cached
+//   ⑬ without a GitHub connection the grind's two reads a minute per PR eat
+//      the anonymous 60-an-hour budget (read each PR once per five minutes)
 
 import type { Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -27,6 +29,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { CI_EMPTY_CHECKS_GRACE_MS, createCiPoller } from '../src/services/ci-loop.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -150,7 +153,7 @@ interface World {
   steps(): { kind: string; prompt: string | null }[];
 }
 
-function makeWorld(state: GithubState, opts: { phase?: Phase } = {}): World {
+function makeWorld(state: GithubState, opts: { phase?: Phase; anonymous?: boolean } = {}): World {
   const s = bootServer();
   disposables.push(() => s.dispose());
   const rnd = Math.random().toString(36).slice(2, 8);
@@ -178,6 +181,7 @@ function makeWorld(state: GithubState, opts: { phase?: Phase } = {}): World {
       phase: opts.phase ?? 'building',
       phaseAt: Date.now(),
       seqNum: 1,
+      latestBuildId: buildId,
       assignment: { plan: null, build: { agentId: `agent-hs-${rnd}` } },
     })
     .run();
@@ -193,6 +197,13 @@ function makeWorld(state: GithubState, opts: { phase?: Phase } = {}): World {
       prNumber: 301,
     })
     .run();
+  // connected: the anonymous five-minute throttle would hide the second sweep
+  if (opts.anonymous !== true) {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'octo', accessToken: 'gho_test', scope: 'read:user repo' },
+    );
+  }
   const mock = new GithubMock(state);
   return {
     s,
@@ -314,6 +325,20 @@ describe('#1403 CI grind at the PR head SHA with required checks', () => {
     const w = makeWorld({ pull: { state: 'closed', merged: false } });
     await w.poller.sweep();
     expect(w.phase()).toBe('failed');
+  });
+
+  test('⑬ anonymous: the grind reads a PR at most once per five minutes', async () => {
+    const w = makeWorld(
+      { checks: [{ name: 'check', status: 'in_progress', conclusion: null }] },
+      { anonymous: true },
+    );
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    await w.poller.sweep(t0 + 60_000);
+    expect(w.mock.urls.filter((u) => /\/pulls\/\d+$/.test(u))).toHaveLength(1);
+    expect(w.mock.urls.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
+    await w.poller.sweep(t0 + 300_001);
+    expect(w.mock.urls.filter((u) => u.includes('/check-runs'))).toHaveLength(2);
   });
 
   test('⑫ the required list is read once across sweeps', async () => {
