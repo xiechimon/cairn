@@ -10,6 +10,12 @@
       "anchor": "rounded-none border-0 border-b border-border",
       "kind": "deviation",
       "reason": "总管设置 agent row (#1398): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule, and a divider on a rounded box would curl up at both ends, so the box stays square. Its paint is that one bottom rule; the card's --radius-card corners stay the visible shape."
+    },
+    {
+      "file": "apps/web/src/resources/parts.tsx",
+      "anchor": "rounded-none border-0 border-b border-border",
+      "kind": "deviation",
+      "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
     }
   ],
   "brandInkText": [

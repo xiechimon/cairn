@@ -1,0 +1,25 @@
+Container: Claude Code cloud session, Chromium from the session-start hook
+(PR #1395). CI runs the pinned browser.
+
+New pin S3 in e2e/paper-page-patterns.spec.ts, before the ResourceRow fix
+(fixture scenario skills-list already present):
+
+$ pnpm exec playwright test e2e/paper-page-patterns.spec.ts -g "S3"
+    Error: S3: no top edge
+    - Expected  - 3
+    + Received  + 3
+    Error: S3: no top edge
+    - Expected  - 3
+    + Received  + 3
+  2 failed
+
+After the fix:
+
+$ pnpm exec playwright test e2e/paper-page-patterns.spec.ts
+  6 passed (8.6s)
+
+Every spec that touches resource rows, the skills page or the shells they
+sit in:
+
+$ pnpm exec playwright test e2e/cds-settings.spec.ts e2e/dead-buttons.spec.ts e2e/paper-overlays.spec.ts e2e/paper-page-patterns.spec.ts e2e/paper-resource-pages.spec.ts e2e/providers-tabs.spec.ts e2e/registry-focus-ring.spec.ts e2e/shell-consistency.spec.ts e2e/skill-import.spec.ts e2e/skills-page.spec.ts e2e/skills-write.spec.ts e2e/title-band-clicks.spec.ts
+  130 passed (1.1m)
