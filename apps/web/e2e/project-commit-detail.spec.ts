@@ -164,7 +164,7 @@ test('C1+C2 点历史行 → 发详情请求，出 diff，元信息与行一致'
 
   // C2 元信息与列表行一致：头面 message/meta 与行面同文本
   await expect(page.locator('[data-commit-detail="message"]')).toHaveText('feat: alpha');
-  const rowMeta = await row.locator('span.font-mono').innerText();
+  const rowMeta = await row.getByTestId('history-meta').innerText();
   await expect(page.locator('[data-commit-detail="meta"]')).toHaveText(rowMeta.trim());
 });
 

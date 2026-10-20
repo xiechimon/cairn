@@ -5,45 +5,17 @@
 // dev/fixture ?scenario= selection survives the round trip. #1255: each
 // column list's scrollTop is restored by BoardSurface from sessionStorage.
 
-import type { LucideIcon } from 'lucide-react';
-import {
-  Activity,
-  Ban,
-  CircleCheck,
-  CircleDashed,
-  CircleX,
-  GitPullRequest,
-  Hourglass,
-  ListChecks,
-} from 'lucide-react';
+import { Activity, Hourglass } from 'lucide-react';
 import { type Ref, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
-import type { Phase, TodoRecord } from '../fixtures/records.js';
+import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
 import { ChipPopover } from '../overlays/chip-popover.js';
-import { PHASE_UI } from '../phase.js';
-
-const ACCENT_INK = 'text-(--card-button)';
-const RUNNING_INK = 'text-running-text';
-const QUIET_INK = 'text-content-tertiary';
-
-/** Status glyph + ink per phase: terracotta for the three needs-you phases,
- *  green while an agent runs, ink greys otherwise (DESIGN.md 强调色纪律). */
-const PHASE_STATUS: Record<Phase, { icon: LucideIcon; ink: string }> = {
-  todo: { icon: CircleDashed, ink: QUIET_INK },
-  queued: { icon: CircleDashed, ink: QUIET_INK },
-  planning: { icon: Activity, ink: RUNNING_INK },
-  building: { icon: Activity, ink: RUNNING_INK },
-  confirm: { icon: ListChecks, ink: ACCENT_INK },
-  review: { icon: GitPullRequest, ink: ACCENT_INK },
-  failed: { icon: CircleX, ink: ACCENT_INK },
-  done: { icon: CircleCheck, ink: QUIET_INK },
-  closed: { icon: Ban, ink: QUIET_INK },
-};
+import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
