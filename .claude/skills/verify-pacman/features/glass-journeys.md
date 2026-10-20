@@ -4,6 +4,22 @@
 
 A review journey's seed is a precondition, not the user path: one plain project (no repo), one enrolled machine, one agent holding `合并分支` and `推送分支`, then a plan step and a build step whose `changesDiff` is a unified diff. Create task and dispatch are clicks on a board that may already contain that project. Dispatch also binds that agent onto the chief (`PATCH /api/teams/:id/chief` body `{agent:{agentId}}`) before the click. A fresh chief has `agentId` null; 保存并开始 then returns 409 「请先为总管选择一个 Agent」. That bind is seed, not the user path.
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive glass-journeys all`
+- `vp.mjs drive glass-journeys board`
+- `vp.mjs drive glass-journeys create-task`
+- `vp.mjs drive glass-journeys dispatch`
+- `vp.mjs drive glass-journeys merge`
+- `vp.mjs drive glass-journeys request-changes`
+- `vp.mjs drive glass-journeys view-diff`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list glass-journeys`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
+## How to get to it (user POV)
+
+- 各旅程从看板（`/app`）起步，每节的 Enter 行写明入口。旅程种子（项目、机器、Agent、plan/build 步）是前置，不是用户路径。
+
 ## Create task
 
 Enter: the board. Sidebar row 新任务 (`.sidebar-new-task`), or the C key.

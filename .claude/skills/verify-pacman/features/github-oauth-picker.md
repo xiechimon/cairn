@@ -11,6 +11,12 @@
 - `manual-fallback` — 手动链接 → owner/repo input(现状面);合法 ref + 名称 → 创建钮放开 → 提交建 repoKind=github 项目(公开仓免认证全链)。
 - `callback-landing` — callback 302 回 `/app/project/new?oauth=connected|error&reason=…&github=connection`:connected 自动开 picker;error reason 三译落内联行;读后清参不重放。(真 OAuth 回环需真 App 凭证 + 人环,见 Gotchas。)
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive github-oauth-picker oauth-and-manual-repo`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list github-oauth-picker`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - web:侧栏/项目页「新建项目」→ `/app/project/new` → 仓库行 → 「GitHub 仓库」。

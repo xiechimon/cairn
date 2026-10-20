@@ -12,6 +12,14 @@
 - `review-submitted` 点击「开始审核」→ POST `/api/builds/{id}/steps {action:'review', agentId, focus?}` → 模态关闭 → composer placeholder 替为「AI 审核进行中…」→ transcript 顶部出现 `REVIEW_ANNOUNCEMENT` 行 + step 表入队 `kind:'review'` 步 + phase 不动。
 - `phase-guard-409` 非 confirm/review phase 调该端点 → 409(`todo/queued/planning/building/done/failed/closed` 一律拒)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive review-modal empty-review`
+- `vp.mjs drive review-modal failed-review-restore`
+- `vp.mjs drive review-modal review-launch`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list review-modal`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 任务详情页(`/app/todo/:id`)在 confirm 或 review phase → composer 右下「AI 审核」钮(唯一入口;其他 phase 不渲染)。

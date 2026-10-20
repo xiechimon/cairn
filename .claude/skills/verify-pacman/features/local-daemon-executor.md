@@ -11,6 +11,13 @@ local 仓库项目的任务执行链(spec 12 G2-T2,#362):daemon 对用户本机 
 - `local-unreachable-fail-loud` — local 形态仓路径在执行机不可达(#1210 C 兜底):prepare 在 clone/fetch 之前抛 `LocalRepoUnreachableError`(reason=not_found/not_git),runner 合成点名机器/路径/原因/补法的步 errorMessage;clone 零尝试(无 `Cloning` 日志行、不烧 withGitNetRetries 退避)、workspace 零材料化。跨机开发的产品答案 = GitHub 形态(ADR 0017 加速位),文案里给两条补法。
 - ~~`files-tab-disabled`~~ — #1030 已推翻:local 项目 Files tab 开闸,读面/降级配方迁 [project-files-local.md](./project-files-local.md)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive local-daemon-executor local-unreachable`
+- `vp.mjs drive local-daemon-executor mea-live-claude-code`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list local-daemon-executor`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 执行面:新建 local 项目(见 [local-repo-api.md](./local-repo-api.md))→ 建任务 → 开始构建(withPlan)→ 确认 → 执行 → 发起合并;观察用户仓库分支/HEAD/工作树。

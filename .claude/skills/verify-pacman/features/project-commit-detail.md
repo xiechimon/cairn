@@ -28,6 +28,12 @@
   web 按 LOCAL_ERROR_REASON_COPY 分译「提交详情加载失败」+ 分译行,不 500 不空树;
   local 整仓不可达时 FilesPane 同闸不渲染(历史行无假面)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive project-commit-detail commit-detail`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list project-commit-detail`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - hosted 项目(有提交)或 local 项目(localPath 可达)→ 项目页 文件 tab → 历史 seg →

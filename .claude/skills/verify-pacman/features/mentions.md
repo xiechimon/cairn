@@ -11,6 +11,12 @@
 - `mention-serialization` 选中提及序列化:agent → `[名](agent:{id})`、任务 → `#seq`;落进 draft/spec 文本。
 - `mention-render-back` 提交后执行面/详情 spec 渲染把 token 解析回 chip(Segments 组件)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive mentions mention-picker`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list mentions`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - composer(详情页运行/确认面)工具条「提及」钮 → picker;或 textarea 键入 `@`。

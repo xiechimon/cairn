@@ -14,6 +14,12 @@
 - `pick-custom-disclosure` 底部「自定义端点」入口（契约句柄 role=button 文案「自定义端点」）→ 展开**现有**自定义网关表单——既有句柄保全：`#dlg-provider-id` / `#dlg-provider-label` / `#dlg-provider-baseurl` / API 协议段（`[role="tab"]` + `aria-selected`）/ `#dlg-provider-apikey` / 「添加模型」钮（role=button，exact——「添加模型服务」含它作子串）/ 「添加模型服务」submit 钮（role=button，dialog 内 scoped）。
 - `pick-create-e2e` 创建链回归护栏（既有行为，A6 重构不得击穿）：填表 + 模型行 → 保存 → `POST /api/teams/:id/providers` → dialog 关 → 封套 providers 段字段全对 + SQLite `provider` 表行（models JSON 含所填模型）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive provider-picker picker-dialog`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list provider-picker`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 模型服务页（`/app/resources/providers`）topbar「+ 新建」。

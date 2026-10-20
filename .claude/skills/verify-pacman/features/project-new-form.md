@@ -12,6 +12,12 @@
 - `focus-ring` — 项目名/GitHub/路径输入框 focus-visible = outline none + spot 系边框(吃 --focus-ring,暗 #cba6f7)+ 1px ring(共享 input 原语配方)+ `-webkit-autofill` 覆盖,非 UA 默认蓝。
 - `create-chains` — 三条提交链落库:local(repoKind/localPath)、github(repoKind/githubRepo)、未选(repoKind NULL 无 repo 项目),成功导航 `/app/project/<id>`。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive project-new-form new-form`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list project-new-form`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 侧栏「新建项目」→ `/app/project/new`(live 面,URL 不带 `?scenario=`)。

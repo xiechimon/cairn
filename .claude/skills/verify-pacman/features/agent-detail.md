@@ -12,6 +12,14 @@
 - `create-model-slot` — 创建弹窗模型槽两态；选中后 `POST /api/teams/{id}/agents` body 带 `provider` 与 `modelId`。
 - `delete-agent` — 概览页脚 `删除 Agent` 入口 → DeleteConfirm 家族二次确认（标题/正文 = 原版语料原文，`agent_modal.remove_title` / `remove_confirm`）→ 确认后 `DELETE /api/teams/{id}/agents/{aid}` → 落团队页。取消路径（取消 / X / Esc / backdrop）不删不跳。删除语义三件（memories 不级联 / `todo.assignment` 摘槽 / `chief.agentId` 摘绑定）见 `apps/server/src/services/agents.ts`。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive agent-detail edit-and-create`
+- `vp.mjs drive agent-detail identity-chip-link`
+- `vp.mjs drive agent-detail ui-cleanup-finale`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list agent-detail`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 团队页（`/app/team`）→ 点任意 Agent 卡 → 详情页。

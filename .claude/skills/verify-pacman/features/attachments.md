@@ -11,6 +11,13 @@
 - `attachment-executable` 执行面 agent 可读取附件(daemon 侧 attachment 工具进 worker 词表,remoteTools)。
 - `attachment-dirty-gate` 附件 token 注入 spec 后由 spec 非空承载未保存闸 dirty 位(#318 闸,#310 接线)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive attachments clipboard-paste`
+- `vp.mjs drive attachments new-task-and-composer-upload`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list attachments`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 详情页 composer 工具条「添加附件」钮(运行/确认面)。

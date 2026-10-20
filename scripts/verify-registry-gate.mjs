@@ -8,15 +8,21 @@
 // new ticket-numbered drivers.
 //
 // Violations:
-//   Leg 1 (always)  a .mjs file under scripts/ that the registry does not
-//                   list (neither as a case script nor under "support"), a
-//                   registered script path that does not exist, or a
-//                   registry that does not parse.
+//   Leg 1 (always)  a file under scripts/ (.mjs, .mts or any other) that
+//                   the registry does not list (neither as a case script nor
+//                   under "support"), a registered script path that does not
+//                   exist, a registry that does not parse, or a case that
+//                   vp.mjs cannot run: needs not an array, status outside
+//                   current / stale / host-bound, or runner tsx without a
+//                   cwd holding a package.json (tsx is not installed at the
+//                   repo root), or a feature whose recipe file is missing or
+//                   does not name its `vp.mjs drive <feature>` command.
 //   Leg 2 (PR runs) with a base sha (--base or VERIFY_REGISTRY_BASE_SHA,
 //                   fetched in ci.yml the way lane-file-gate takes its
 //                   base): a script ADDED under scripts/ whose name starts
-//                   with drive-<digits>. Existing ones are not touched;
-//                   register a new case under its feature instead.
+//                   with drive-<digits>, renames included. Existing ones are
+//                   not touched; register a new case under its feature
+//                   instead.
 //
 // Usage:
 //   node scripts/verify-registry-gate.mjs
@@ -34,6 +40,7 @@ const SKILL = '.claude/skills/verify-pacman';
 const SCRIPTS = `${SKILL}/scripts`;
 const REGISTRY = `${SKILL}/vp-registry.json`;
 const TICKET_NAMED = /^drive-\d/;
+const STATUSES = ['current', 'stale', 'host-bound'];
 
 function git(args) {
   return execFileSync('git', ['-C', REPO_ROOT, ...args], {
@@ -68,6 +75,13 @@ try {
 if (registry !== undefined) {
   const registered = new Set(Object.keys(registry.support ?? {}));
   for (const [feature, entry] of Object.entries(registry.features ?? {})) {
+    if (entry.recipe) {
+      const recipe = join(REPO_ROOT, SKILL, entry.recipe);
+      if (!existsSync(recipe)) violations.push(`${feature}: recipe ${entry.recipe} does not exist`);
+      else if (!readFileSync(recipe, 'utf8').includes(`vp.mjs drive ${feature}`)) {
+        violations.push(`${feature}: ${entry.recipe} does not name \`vp.mjs drive ${feature}\``);
+      }
+    }
     for (const [name, c] of Object.entries(entry.cases ?? {})) {
       if (typeof c.script !== 'string') {
         violations.push(`${feature}/${name}: no script`);
@@ -77,9 +91,25 @@ if (registry !== undefined) {
         violations.push(`${feature}/${name}: registered script is missing: ${c.script}`);
       }
       if (posix.dirname(c.script) === SCRIPTS) registered.add(posix.basename(c.script));
+      if (!Array.isArray(c.needs)) violations.push(`${feature}/${name}: needs is not an array`);
+      if (!STATUSES.includes(c.status)) {
+        violations.push(
+          `${feature}/${name}: status ${JSON.stringify(c.status)} is not one of ${STATUSES.join(', ')}`,
+        );
+      }
+      if (
+        c.runner === 'tsx' &&
+        (typeof c.cwd !== 'string' || !existsSync(join(REPO_ROOT, c.cwd, 'package.json')))
+      ) {
+        violations.push(
+          `${feature}/${name}: runner tsx needs a cwd with a package.json (got ${JSON.stringify(c.cwd)})`,
+        );
+      }
     }
   }
-  const onDisk = readdirSync(join(REPO_ROOT, SCRIPTS)).filter((f) => f.endsWith('.mjs'));
+  const onDisk = readdirSync(join(REPO_ROOT, SCRIPTS), { withFileTypes: true })
+    .filter((d) => d.isFile())
+    .map((d) => d.name);
   const unregistered = onDisk.filter((f) => !registered.has(f));
   for (const f of unregistered) {
     violations.push(`${SCRIPTS}/${f} is not in ${REGISTRY}`);
@@ -93,7 +123,17 @@ if (registry !== undefined) {
 if (baseSha) {
   let added;
   try {
-    added = git(['diff', '--name-only', '--diff-filter=A', baseSha, 'HEAD', '--', SCRIPTS]);
+    // --no-renames: a rename into a drive-<digits> name shows as an addition.
+    added = git([
+      'diff',
+      '--no-renames',
+      '--name-only',
+      '--diff-filter=A',
+      baseSha,
+      'HEAD',
+      '--',
+      SCRIPTS,
+    ]);
   } catch (e) {
     console.error(`verify-registry-gate: git plumbing failure: ${String(e.message).slice(0, 300)}`);
     process.exit(2);

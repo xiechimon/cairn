@@ -11,6 +11,13 @@
 - `restart-phase-gate` restart 门只收 failed 相位(confirm 走 revision、building/review 走 steer——两写面相位隔离,不共享入口)。
 - `restart-empty-rejected` 空消息不成发送(`feedback: z.string().min(1)`);异步 onSend 失败(409)时 draft 保留不丢字。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive failed-send restart-with-feedback`
+- `vp.mjs drive failed-send restart-combo`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list failed-send`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 失败任务详情页(`/app/todo/:id`,phase=failed)→ composer 输入反馈 → 发送钮。

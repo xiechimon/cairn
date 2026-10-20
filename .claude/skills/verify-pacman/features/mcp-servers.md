@@ -9,6 +9,13 @@ spec 13/#368 起 MCP 页 = server 本机 `~/.claude.json` mcpServers 段的只�
 - `mcp-empty`: config 文件缺失/无 mcpServers 段 = 空态,文案指向 `~/.claude.json`(fixture e2e dead-buttons #368 钉)。
 - `mcp-exec`: agent.mcpServers[] 勾选后,daemon 本机解析连接;未知 slug 降级行 `[mcp] <slug>: not in local config — …`,每回合 `[mcp] loaded from <path>: …` 打出实际加载集。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive mcp-servers command-gate-mcp-bridge`
+- `vp.mjs drive mcp-servers readonly-config`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list mcp-servers`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 侧栏 资源 ▾ → MCP;用户菜单 → MCP;搜索面板导航行 MCP。

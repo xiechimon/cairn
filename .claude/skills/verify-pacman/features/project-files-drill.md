@@ -28,6 +28,12 @@ Folder 字形 + 点击下钻、面包屑回上层、选中键用完整路径。�
   在途且无缓存数据 → 「加载中…」(空态不抢跑)。live 面造不出真空目录(git 不
   跟踪),这两态归 e2e W5/W6 + server P5,不在 live probe 演。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive project-files-drill folder-drill`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list project-files-drill`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - hosted 项目(有提交)或 local 项目(行上 localPath 可达)→ 项目页 文件 tab →

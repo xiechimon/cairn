@@ -8,6 +8,12 @@
 - `branch-chip-echo` — 分支 chip 显示 tree 载荷的 ref 回显:hosted='main'、local='HEAD'(live);fixture 面 = `project.branch`(prj-local-files 钉 `trunk`,证 local 默认分支任意)。
 - `unreachable-degradation` — localPath 失格(多机部署 server 看不见 / 目录已删 / 已非 git 仓)→ 404 + reason code(`not_found`/`not_git`,词表复用 #386 `PROJECT_LOCAL_ERROR_REASONS`);web 渲染「本地仓库当前无法读取。」主行 + reason 分译行,FilesPane 不渲染(不空树、无历史假面)。`repoKind='local'` 而 localPath 列空(行完整性破)→ 404 显式红无 reason。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive project-files-local local-files`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list project-files-local`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 建 local 项目(见 [local-repo-api.md](./local-repo-api.md))→ 项目页 文件 tab(默认落)→ 分支 chip + 文件行 + 查看器 + 历史 seg。

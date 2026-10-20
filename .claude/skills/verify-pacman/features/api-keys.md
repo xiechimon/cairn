@@ -10,6 +10,12 @@
 - `keys-masked` 列表行 `.keys-row` 显示掩码(`pacman_afe07565…` 形态)。
 - `keys-hash` SQLite `api_key` 表存 `keyHash`,明文不入库。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive api-keys create`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list api-keys`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 侧栏进「API 密钥」页(`/app/api-keys`,secondary shell)。

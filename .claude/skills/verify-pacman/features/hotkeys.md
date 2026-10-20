@@ -10,6 +10,14 @@
 - `hotkeys-chief-new-thread`（#645）抽屉开态裸 `N` = 头部 + 新主题（与钮同 handler：触发 + 收切换器 popover）。作用域门 = `useHotkey` 的 enabled 参（抽屉关态监听器不在 window 上）；守卫 = _plain_ 输入态律（**不带** ⌘J 的 drawer 内豁免：开抽屉的 autofocus 落 composer，聚焦时 n 归打字员）。钮载 `KbdHint` 的 N 悬浮提示（below）+ `aria-keyshortcuts="N"`。
 - `hotkeys-guards` 输入态/交互态负向：搜索面板输入框持焦时 C/Space 不误触且字符照常入框；按钮持焦时 Space 原生激活按钮（不劫持）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive hotkeys chief-new-thread-key`
+- `vp.mjs drive hotkeys hotkeys-chain`
+- `vp.mjs drive hotkeys newtask-key-c`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list hotkeys`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 展开态侧栏「新任务」行（`button.sidebar-row` 含「新任务」文案 + `.sidebar-kbd` C 角标）。

@@ -9,6 +9,10 @@
 - `write-entries` 新建入口在位(XMON-114 恢复,skills-page.spec.ts 钉计数 1):topbar「新建」= role=button 文案「新建」exact(CSS 载体 `[data-testid="resource-new"]`)、空态主钮「新建技能」开 SkillDialog;无导入路由(`/app/resources/skills/import` 重定向回 `/app`);空态文案指路技能目录(`~/.agents/skills` 缺省显示)+ 界面新建双入口。
 - `agent-grant` Agent 行 `skills[]` 只认现扫已知 id:携带已删目录的旧 id 静默滤除,不报错。
 
+## Drive (vp.mjs)
+
+- 尚无登记的 drive case，跑法见下文。截图可用 `vp.mjs capture /app/resources/skills --name skills`。新 case 先登记进 `../vp-registry.json`。
+
 ## How to get to it (user POV)
 
 - 侧栏「资源 → 技能」→ `/app/resources/skills`。

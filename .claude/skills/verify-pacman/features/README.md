@@ -38,7 +38,7 @@ Control Glass 五条旅程(新建任务 / 派发 / 看 diff / 请求修改 / 合
 
 ## Driving conventions
 
-- 驱动一律走单一入口 `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> [case]`(#1402);`vp.mjs list [feature]` 列出已登记的 case 及其前置。各 feature 文件里写的脚本命令仍可直跑,但新 case 先登记进 `../vp-registry.json`,不新建按票号命名的脚本。
+- 驱动一律走单一入口 `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> [case]`(#1402);`vp.mjs list [feature]` 列出已登记的 case 及其前置。各 feature 文件的「Drive (vp.mjs)」段列出它的 case(`scripts/verify-registry-gate.mjs` 核对每个登记 feature 的 recipe 文件写了 `vp.mjs drive <feature>`);文件里写的脚本命令仍可直跑,但新 case 先登记进 `../vp-registry.json`,不新建按票号命名的脚本。
 - 一律 live 面:URL 不带 `?scenario=`(那是 fixture 面)。
 - 选择器优先稳定句柄:`data-route`、`data-column-list`、`data-todo-id`、aria-label、类名;不用坐标/tab 序。
 - UI 证据 = 截图(1440×732,与 e2e 同口径)+ `result.json` 的逐条 checks。

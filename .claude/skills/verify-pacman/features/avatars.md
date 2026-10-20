@@ -10,6 +10,12 @@
 - `avatar-fallback` dicebear 不可达 → onError 一次性换静态资产(按失败 URL 记账,换名重试,fallback 自身失败不死循环)。
 - 种子编码走 `encodeURIComponent`(fixture 用户名含空格;中文名实测 `%E9%AA%8C…`)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive avatars dicebear-avatars`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list avatars`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 侧栏底部头像 chip(展开/收起两态);点开 = user-menu 头部。

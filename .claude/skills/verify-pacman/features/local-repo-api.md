@@ -9,6 +9,12 @@
 - `repos-proxy` — `GET /api/github/repos?q=`:token 取自 github_connection(SecretBox 密文),未连接 404;连接后代理 GitHub `/user/repos`(连接写入面见 github-oauth-picker.md)。
 - `connection-table` — github_connection 表形:teamId 单行、accessToken 只有 cipher 列位、无 plaintext token 列。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive local-repo-api local-repo-api`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list local-repo-api`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - API 直入:`curl -X POST http://127.0.0.1:<VERIFY_PORT>/api/projects -H 'content-type: application/json' -d '{"name":"x","kind":"local","localPath":"/abs/path/to/repo"}'`。

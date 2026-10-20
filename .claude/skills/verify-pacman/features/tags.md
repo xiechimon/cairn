@@ -11,6 +11,12 @@
 - `tag-render-detail-meta` 任务详情 fresh meta 区按 todo.tagIds 渲染 TagChip(每标签一 chip,只读);看板卡自 #445 起也渲染:载体 `[data-card-tag]`(值 = tag id),标签图标 svg 的 color = tag.color,文本 = 标签名;首个可解析标签,无标签零占位(e2e 钉 = board-filter.spec)。
 - `tag-no-manual-ui` 新建对话框无标签行/面板;详情页无添加 affordance;`POST /api/projects/{id}/tags` HTTP API 保留(播种复用 + 将来筛选面落点)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive tags fixed-vocab-untitled`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list tags`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 用户不操作标签。派发任务后,执行 agent 自动归类;详情页 meta 区看已回填的 chip(只读)。

@@ -11,6 +11,12 @@
 - `gate-fallback` todo phase 回落:本 build 无 done 步 → prevPhase(fresh 任务 = todo,开始钮回位);有 done 步 → 其 gate(plan done → confirm,build done → review)。chip/主按钮随 phase 面自动迁移。
 - `discard-rewind` 勾选丢弃 = daemon 侧 worktree rewind 到步起点 checkpoint(退化形/无 repo 任务跳过;真 repo 面证据 = daemon 单测 runner-stop + workspace 原语,本 probe 不含 git 面)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive stop-button stop-chain`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list stop-button`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 任务详情页(`/app/todo/:id`)运行中 → composer 右下停止钮(唯一入口;看板/总管无停止面)。

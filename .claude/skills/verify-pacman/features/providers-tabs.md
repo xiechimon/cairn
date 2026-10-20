@@ -13,6 +13,13 @@
 - `prov-no-affordance` 模型行纯展示无 handler → 不渲染 chevron/三点装饰（负向句柄 = 行内 `[data-model-id] svg` / `[data-model-id] button` 计数 0——装饰类已随 #944 退役，A7 语义改钉「纯展示行无可点感」）。
 - `prov-model-sources-api` `GET /api/teams/:id/model-sources` → pi 首段 + 每台上报过的机器一段 claude-code（序固定：pi 首 + 按机器名），与 UI 双真值一致（数据契约单源在 shared）；封套元素形状 `{runtime, installed, hostname, models[{id, name, slot?}]}` 逐段钉死（机器无关面）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive providers-tabs claude-bin-detection`
+- `vp.mjs drive providers-tabs runtime-tabs`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list providers-tabs`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 看板侧栏 资源 → 模型服务（`/app/resources/providers`），落地默认 pi tab。

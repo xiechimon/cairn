@@ -44,6 +44,15 @@ claimed ≥ cap 即不发步）+ daemon 本地闸（GET me 读 cap，混版本�
 - `mconc-finish-wake` 空位交接：`finishStep` 终态发 team wake——满载机器
   挂起的 claim 即时重试认领（enqueue wake 只覆盖新步路径）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive machine-concurrency agent-concurrency-cap`
+- `vp.mjs drive machine-concurrency cap-and-queue`
+- `vp.mjs drive machine-concurrency recommended-concurrency`
+- `vp.mjs drive machine-concurrency zombie-claim`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list machine-concurrency`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 机器页（`/app/resources/machines`）：每行右段「执行中 n/N」+「并发 N」

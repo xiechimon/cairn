@@ -12,6 +12,12 @@
 - `sync-result-card` 结果卡随 branch_sync 事件迁移:pending → running → synced/failed。
 - `sync-any-member` 任意团队成员可用(非仅 owner)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive branch-sync sync-ui`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list branch-sync`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 详情页:右 pane 头部型选钮(方案▾/变更▾)→ listbox「分支与 PR」行 → 静止 section(无弹层)。

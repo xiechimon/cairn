@@ -10,6 +10,13 @@ review 静息态(步已收尾、无活跃会话)下人说「不」:任务回 pla
 - `reject-steer-boundary` 运行中(claimed/pending 步在场)review 保持 steer 补话面——打回只在静息关口,两不抢道。
 - `reject-landing` 打回落地:phase→planning(chip 经 SSE 失效键即时翻,不 reload)+ 重规划步入队(pending plan 步,prompt 单源 shared `buildReviewRejectPrompt`,交代「改动仍在会话分支、不丢弃既有产物」)+ feedback 行落 transcript(role user)+ plan/分支/latestBuildId 全保留(不删产物、不孤儿化)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive review-reject blocking-revision`
+- `vp.mjs drive review-reject human-reject`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list review-reject`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 任务跑到 review(执行步收尾)后:详情页头部「更多」→「请求修改」→ 弹层填反馈 → 确认。

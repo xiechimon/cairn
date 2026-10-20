@@ -24,6 +24,17 @@ resolve+realpath 归一后落在技能根内 = 400（已被 pacman 现扫管理�
 二进制文件显式 400（写面 body 是 utf8 文本；Multica 因 PG TEXT 列选择跳过
 ——pacman 写面纪律是显式拒绝，见 `skill-import.ts` 头注）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive skill-import import-rollback`
+- `vp.mjs drive skill-import local-and-github-import`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list skill-import`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
+## How to get to it (user POV)
+
+- 技能页（`/app/resources/skills`）topbar「导入」钮（`data-testid=resource-import`）开导入对话框，填 localPath 或 GitHub URL 二选一。
+
 ## Sub-features
 
 - `skill-import-local` localPath 导入：收集器只读 walk + 逐文件字节闸 +

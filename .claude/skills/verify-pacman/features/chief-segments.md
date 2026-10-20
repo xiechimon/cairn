@@ -21,6 +21,16 @@ transcript 行——封出即落 journal + 实时上报（第五形 `transcript_
 - `hub-clear-law` — 在飞文本缓冲只由「工具行 / 仅思考行」以外的落库行终结。工具行
   的上报带 500ms/2000ms 重试链、可能迟到，旧律（任何行都清）会把正在流的下一段抹掉。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive chief-segments avatar-geometry`
+- `vp.mjs drive chief-segments compress-model-select`
+- `vp.mjs drive chief-segments segment-sealing`
+- `vp.mjs drive chief-segments stream-catchup`
+- `vp.mjs drive chief-segments threads-scroll`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list chief-segments`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 开 chief 抽屉（⌘J）发一句话，看它逐段出现：思考一行、正文一行、工具一行（进行中带秒）。

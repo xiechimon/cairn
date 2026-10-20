@@ -17,6 +17,15 @@
 - `composer-sole-card` composer 16px 内衬锚中心列、12px 圆角 + recessed fill,是中心列唯一卡片;总管 FAB 贴中心列右下角、composer 在场时让位上移(#347 律保留)。
 - `meta-machine-pin-note` 方案空态 meta 块机器行改派尾注(#1208):任务钉了机器(todo.machineId)而机器行值不同名(唯一现实来源 = run_builds 显式 machineId 改派;派发面 pin 是硬约束,别机领不到)→ 行尾 `（任务钉选 {machine}）` tertiary 尾注,换机在看板层不再静默。遵守(同名)与未钉 = 零噪声;钉机离线的等待标注「（等待机器上线）」是相邻独立尾注(#682)。驱动:drive-1208-machine-pin.mjs。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive detail-right-pane detail-css-live`
+- `vp.mjs drive detail-right-pane detail-live-migration`
+- `vp.mjs drive detail-right-pane machine-pin`
+- `vp.mjs drive detail-right-pane three-pane`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list detail-right-pane`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 任意任务详情路由 `/app/todo/:id`(看板卡标题点击 / 搜索结果行 / 直接 URL)。

@@ -8,6 +8,13 @@
 - `theme-persist` `pacman-theme` 键落 localStorage,重载后仍生效(apps/web/src/theme.ts `THEME_STORAGE_KEY`)。
 - `theme-segments` 用户菜单 popover 的「外观」分段行(浅色/深色,`data-active` 跟随)——**live 面暂无 popover 触发器**(见 Gotchas)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive theme persist`
+- `vp.mjs drive theme sealed-tokens-audit`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list theme`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 用户菜单 popover「外观」行(浅色/深色分段)。

@@ -8,6 +8,12 @@
 - `search-match` 输入即过滤 live todos,命中行 `.search-row--todo`(标题 `.search-row-title` + 项目子行 `.search-row-sub`)。
 - `search-nav` 结果行点击进任务详情(`/app/todo/:id`)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive search search`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list search`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - ⌘K 快捷键(任意 shell 页;输入即焦点)。

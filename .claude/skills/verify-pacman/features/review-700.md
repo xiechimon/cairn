@@ -2,6 +2,16 @@
 
 票：#700（B-C13，#519 实测：审核步 verdict JSON 之后又调 set_task_meta，「审核结论」静默丢弃）。probe 走**真 daemon 全链**（区别于 drive-review-blocking 的 server 直投 done：那条不进 daemon 提取面），stub 回放 #519 形状——verdict JSON 文本与 set_task_meta 工具调用同轮发出，daemon transcript 落行序 = 文本行在前、工具行在后（正是击穿旧提取器的形状）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive review-700 verdict-extraction`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list review-700`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
+## How to get to it (user POV)
+
+- 用户不直接触发提取：审核步在任务详情页（`/app/todo/:id`）跑完后，审核面显示结论或「判定提取失败」行。本 probe 走真 daemon 全链复现这一面。
+
 ## 覆盖
 
 - 场景 B（提取失败面）：stub 纯散文 → daemon `findingsError` → server verdict 消息 conclusion「判定提取失败」+ `extractionError` 原因上浮 → web 审核面 danger 色 tag 行（区别于旧兜底「审核未返回结论」）→ 不触发修订（phase 留 confirm、无新 plan 步）。

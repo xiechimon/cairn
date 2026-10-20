@@ -64,6 +64,12 @@ fan-out 行零渲染负向钉）。live 真值面 = `docs/verify/1250/`（drive-
 - `split-todo` — 拆解三件（子卡+边/父方案文档/父停 confirm）+ 派发波次 +
   父自动收 + 校验族。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive persona-verify persona-verify`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list persona-verify`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 全新库首开 → 设置页成员区多出六员角色 agent（模型位需配置后才可领步）。

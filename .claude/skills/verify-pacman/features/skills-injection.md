@@ -16,6 +16,18 @@ daemon 每次创建 agent 会话前扫描 `PACMAN_SKILLS_DIR`(缺省 `~/.agents/
 - `skills-allowlist-split`(#1169) agent 技能两字段分家——`defaultSkill`(携带,单值,详情页概览 Select)+ `skillsAllowlist`(授权,null=不限制、[]=显式全拒,详情页权限 tab 勾选清单+两态互转开关);存量 `[]` 行迁移为 null(解除「新建 agent 出生即全拒」);deny 机制(#917)原样。验证 = `drive-1169-skills-split.mjs` live 探针(api 相位零 daemon 钉 REST 读写面/claim 载荷/清单 selection 三面 + behavior 相位真模型腿钉不限制 agent 读 SKILL.md 零 deny)+ 迁移回填 unit(agent-skills-split-backfill.test.ts)+ 详情页 e2e(agent-detail.spec.ts 两控件互不影响)。
 - `skills-native-plugin`(#1171) claude 后端团队技能经 SDK `plugins` 选项(→ `--plugin-dir`)进 CLI 原生 Skill 发现面:落点 = daemon 缓存第三分区 `<teamSkillsCacheDir>/plugins/<key>/`(`.claude-plugin/plugin.json` name=`pacman-team-skills` + `skills/<dirName>` hardlink 装配,key = sha256(view digest + 排序 allowed dirNames));**任务 worktree 零写入**;allowed 集 = `collectTeamSkillEntries`(与 catalog/deny 同扫描源,只滤 `skillsAllowlist`,**不受 `injectedSkills` 收窄**——选择不越授权,#917 同律);版本闸 `MIN_CLAUDE_PLUGIN_VERSION=2.1.74`(#1050 探测单源,低于闸 = skipped 行 + catalog 兜底);deny 三条规则形不改(`Skill(name)` 经 alias 命中插件限定名);catalog XML 通道照常并存。技能名 = `pacman-team-skills:<name>` 限定形 + 非限定 alias;与 project/user 技能撞名 = 共存,非限定名归既有侧。验证 = `drive-1171-native-plugin.mjs`(wire 相位假 CLI 捕获 argv 零 LLM 32 checks + behavior 相位真模型腿 10 checks:transcript `Skill` 工具调用段行点名插件限定名)+ unit `skills-native-plugin.test.ts`(34 checks,失败方式 P1-P15)。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive skills-injection claim-injection`
+- `vp.mjs drive skills-injection injection-check`
+- `vp.mjs drive skills-injection native-plugin`
+- `vp.mjs drive skills-injection skill-read-facts`
+- `vp.mjs drive skills-injection skills-manifest`
+- `vp.mjs drive skills-injection skills-routing`
+- `vp.mjs drive skills-injection skills-split`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list skills-injection`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 用户把 skills 放 `~/.agents/skills/<name>/SKILL.md`(frontmatter `name` + `description`;缺 name 回落目录名)→ daemon 起来后派任何任务 → agent 会话自动带 catalog,按需 read。

@@ -22,6 +22,12 @@
 - `mach-add-intact` 「添加机器」钮（role=button 文案「添加机器」）→ CLI 命令 dialog 流程不变（dialog 结构不动）。
 - `mach-no-affordance` 行无 chevron 装饰（负向句柄 = 行级可点语义计数 0：`[data-kind][role="button"]` / `[data-kind] a`——装饰类已随 #944 退役，A7 语义改钉「行不可点」）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive machines-local-row local-row`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list machines-local-row`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 看板侧栏 资源 → 机器（`/app/resources/machines`）。

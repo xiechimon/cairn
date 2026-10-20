@@ -33,6 +33,12 @@ chief，无团队设置槽；沿革见 ADR 0014「旧裁决翻转记录」）。
   （先规划 = plan 步停 confirm 闸；直修 = build 步）。响应回显 `withPlan` +
   `dispatchReason`（缺省腿 reason = null）。
 
+## Drive (vp.mjs)
+
+- `vp.mjs drive chief-dispatch-judgment dispatch-judgment`
+
+前置（stack / daemon / stub-llm …）、状态与脚本参数：`vp.mjs list chief-dispatch-judgment`。`vp.mjs` = `node .claude/skills/verify-pacman/scripts/vp.mjs`。
+
 ## How to get to it (user POV)
 
 - 看板「开始」→ 编排回合 → chief 逐次判定派发模式，回执写明判定与理由。
