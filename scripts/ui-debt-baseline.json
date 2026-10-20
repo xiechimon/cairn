@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "3f3ea2d378ea9a953ca5a9bef8c739e63500e4cd",
+    "sha": "f2cdf40fc6d8f760ca572fcb872709ac056f9c35",
     "date": "2026-10-20"
   },
   "scope": "apps/web/src; per-face css = *.css minus the ui-debt-gate.mjs WHITELIST (carrier layer); bare controls = <button|<input|<select|<textarea occurrences in *.tsx minus components/ui/; arbitrary values = text-[<len>] and SPACING_UTILITIES-[<len>] (px|rem|em, or interpolated) in *.ts/*.tsx minus components/ui/ and test files",
@@ -14,8 +14,8 @@
     }
   },
   "arbitraryValues": {
-    "textTotal": 43,
-    "spacingTotal": 69,
+    "textTotal": 16,
+    "spacingTotal": 15,
     "files": {
       "board/board.tsx": {
         "text": 0,
@@ -32,34 +32,6 @@
       "board/quota-banner.tsx": {
         "text": 1,
         "spacing": 0
-      },
-      "chief/chief-drawer.tsx": {
-        "text": 5,
-        "spacing": 23
-      },
-      "chief/chief-message-rows.tsx": {
-        "text": 1,
-        "spacing": 6
-      },
-      "chief/chief-question-card.tsx": {
-        "text": 12,
-        "spacing": 9
-      },
-      "chief/chief-root.tsx": {
-        "text": 1,
-        "spacing": 1
-      },
-      "chief/chief-settings.tsx": {
-        "text": 7,
-        "spacing": 11
-      },
-      "chief/edit-charter-dialog.tsx": {
-        "text": 0,
-        "spacing": 1
-      },
-      "chief/recipes.ts": {
-        "text": 1,
-        "spacing": 3
       },
       "components/chat/agent-rows.tsx": {
         "text": 3,

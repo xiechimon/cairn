@@ -1848,8 +1848,10 @@ export function completeStep(
 }
 
 /** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：相位 → done、
- * 🎉 行、拆卡波次推进。 */
+ * 完成行、拆卡波次推进。已 done 则不动（两个落点先后到达只收一次尾）。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
+  const current = deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, todoId)).get();
+  if (current?.phase === 'done') return;
   setTodoPhase(deps, todoId, 'done');
   insertMessageRow(deps, buildId, {
     id: newRecordId(),

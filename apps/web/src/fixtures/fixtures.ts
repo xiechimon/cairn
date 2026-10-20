@@ -45,6 +45,7 @@ export {
   chiefDefault,
   chiefGated,
   chiefMarkdown,
+  chiefQuestion,
   chiefReady,
   chiefScrollLong,
   chiefSettings,
@@ -137,6 +138,7 @@ export {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesSkillsList,
 } from './resources.js';
 export {
   schedulesEmpty,

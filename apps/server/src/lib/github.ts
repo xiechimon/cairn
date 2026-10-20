@@ -139,6 +139,8 @@ export interface GithubPull extends GithubPullState {
   mergeCommitSha: string | null;
   /** PR head 分支当前的提交（合并请求的 sha 参数取它）；响应缺失 = null。 */
   headSha: string | null;
+  /** merged 时合并者的 login；未合并或响应缺失 = null。 */
+  mergedBy: string | null;
 }
 
 export interface GithubPullPage {
@@ -187,6 +189,7 @@ export async function githubPull(
     merged?: unknown;
     merge_commit_sha?: unknown;
     head?: { sha?: unknown } | null;
+    merged_by?: { login?: unknown } | null;
   };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
@@ -199,6 +202,7 @@ export async function githubPull(
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
     },
   };
 }

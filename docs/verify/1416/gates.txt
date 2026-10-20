@@ -1,0 +1,27 @@
+$ pnpm lint
+Checked 781 files in 1561ms. No fixes applied.
+Found 1 info.
+exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed
+ Test Files  22 passed (22)
+      Tests  239 passed (239)
+
+$ node scripts/ui-consumer-shape-gate.mjs
+[ui-consumer-shape-gate] PASS: 2 flagged line(s) across 244 consumer file(s), all registered (2 entries = 2 deviation).
+$ node scripts/ui-drift-gate.mjs
+[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (5 css files scanned); 3 bare <input> site(s), 3 deliberate-native; no raw color in 33 components/ui file(s); 20 brand-ink text-role line(s), all registered (20 ledger entries); segmented roles and registry Tabs only in components/segmented.tsx (1 file(s) touch them).
+$ node scripts/ui-debt-gate.mjs
+[ui-debt-gate] PASS: 0 per-face css files / 0 lines; 3 bare control(s) in 3 file(s); arbitrary values 16 text + 15 spacing in 13 file(s); 5 css + 207 tsx + 244 ts/tsx (arbitrary scope) scanned. Baseline: in-tree only, frozen from f2cdf40fc6d8.
