@@ -1,47 +1,47 @@
-# red leg: harness against the gate at c41da70 (segment 2 before pr-gate run 1 on #1411)
+# red leg: the self-check against the gate at c41da70 (segment 2 before pr-gate run 1 on #1411)
 $ git show c41da70:scripts/verify-registry-gate.mjs > verify-registry-gate-c41da70.mjs
-$ node docs/verify/1402/registry-gate-harness.mjs verify-registry-gate-c41da70.mjs
+$ node scripts/verify-registry-gate-selfcheck.mjs verify-registry-gate-c41da70.mjs
 PASS  unchanged registry and scripts pass  (exit 0, want 0)
 FAIL  an unregistered .mts file fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 7a0e5b1f6a91): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 56e4fd43c0be): 0 hit(s)
       verify-registry-gate: OK
 PASS  an unregistered .mjs file fails  (exit 1, want 1)
 PASS  a registered script that is missing fails  (exit 1, want 1)
 FAIL  a case without needs fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 5d17cc567916): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 019a33b8bef0): 0 hit(s)
       verify-registry-gate: OK
 FAIL  a case with an unknown status fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 92980d2861dd): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 674f403283fe): 0 hit(s)
       verify-registry-gate: OK
 FAIL  a tsx case without cwd fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 92980d2861dd): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 674f403283fe): 0 hit(s)
       verify-registry-gate: OK
 FAIL  a tsx case whose cwd has no package.json fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 92980d2861dd): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 674f403283fe): 0 hit(s)
       verify-registry-gate: OK
 FAIL  a recipe file that does not name its drive command fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 485f8dc18a84): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 37e50253f5e7): 0 hit(s)
       verify-registry-gate: OK
 FAIL  a recipe path that does not exist fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 485f8dc18a84): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base 37e50253f5e7): 0 hit(s)
       verify-registry-gate: OK
 PASS  a new drive-<number> script fails even when registered  (exit 1, want 1)
 FAIL  renaming an existing script to drive-<number> fails  (exit 0, want 1)
-      verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
-      verify-registry-gate leg 2 (added vs base 611daa49a6b9): 0 hit(s)
+      verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+      verify-registry-gate leg 2 (added vs base d268f4a200a5): 0 hit(s)
       verify-registry-gate: OK
 PASS  editing an existing drive-<number> script passes  (exit 0, want 0)
 5/13 passed (verify-registry-gate-c41da70.mjs)
 
 # green leg
-$ node docs/verify/1402/registry-gate-harness.mjs
+$ node scripts/verify-registry-gate-selfcheck.mjs
 PASS  unchanged registry and scripts pass  (exit 0, want 0)
 PASS  an unregistered .mts file fails  (exit 1, want 1)
 PASS  an unregistered .mjs file fails  (exit 1, want 1)
@@ -57,9 +57,9 @@ PASS  renaming an existing script to drive-<number> fails  (exit 1, want 1)
 PASS  editing an existing drive-<number> script passes  (exit 0, want 0)
 13/13 passed (scripts/verify-registry-gate.mjs)
 
-# the gate on this branch, both legs (base = origin/main a1e7254)
-$ node scripts/verify-registry-gate.mjs --base a1e7254
-verify-registry-gate leg 1: 102 script(s) on disk, 0 unregistered
-verify-registry-gate leg 2 (added vs base a1e7254296d0): 0 hit(s)
+# the gate on this branch, both legs (base = origin/main f436dd2)
+$ node scripts/verify-registry-gate.mjs --base f436dd2
+verify-registry-gate leg 1: 103 script(s) on disk, 0 unregistered
+verify-registry-gate leg 2 (added vs base f436dd2): 0 hit(s)
 verify-registry-gate: OK
 exit=0

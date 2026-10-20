@@ -15,11 +15,22 @@ import { chromium } from '@playwright/test';
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPTS_DIR = join(SKILL_DIR, 'scripts');
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
-const ROOT = process.env.VERIFY_REPO_ROOT ? resolve(process.env.VERIFY_REPO_ROOT) : SCRIPT_ROOT;
+// Paths from the environment are made absolute against the caller's cwd before
+// anything runs: tsx cases run from a package directory, where a relative path
+// would point somewhere else than it does for doctor and archive. Empty = unset.
+for (const key of ['VERIFY_REPO_ROOT', 'VERIFY_RUN_DIR', 'VERIFY_EVIDENCE_DIR']) {
+  if (process.env[key]) process.env[key] = resolve(process.env[key]);
+  else delete process.env[key];
+}
+const ROOT = process.env.VERIFY_REPO_ROOT ?? SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
 const EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence');
-// Cases that spend model tokens or call GitHub run only when asked with --force.
-const COSTLY_NEEDS = ['real-llm', 'github'];
+// Needs that make a case run only when asked with --force, and why.
+const FORCE_NEEDS = {
+  'real-llm': 'spends model tokens',
+  github: 'calls GitHub',
+  'rewrites-evidence': 'rewrites committed docs/verify evidence in place',
+};
 const REGISTRY_FILE = join(SKILL_DIR, 'vp-registry.json');
 const TICKET_RE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -29,16 +40,19 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
   launch                         start the isolated stack (scripts/launch.mjs)
   doctor                         read-only health check of the stack (scripts/doctor.mjs)
   list [feature]                 registered features and their cases
-  drive <feature> [case] [--force] [-- <args>]
+  drive <feature> [case] [--force] [--dry-run] [-- <args>]
                                  run a registered case; cases that need the stack run doctor first;
-                                 stale and host-bound cases, and cases that need real-llm or github,
-                                 need --force; script arguments go after --
+                                 stale and host-bound cases, and cases that need real-llm, github or
+                                 rewrites-evidence, need --force; arguments after -- replace the
+                                 case's default args; --dry-run prints what would run
   capture <path> [--name <label>] [--wait <ms>]
                                  screenshot a live route, record console errors and failed requests
-                                 (exit 0 when the page loaded; errors are recorded, not judged)
+                                 (exit 0 when the page loaded; errors are recorded, not judged;
+                                 with VERIFY_EVIDENCE_DIR set it writes into its capture-<label>/)
   archive <ticket> [--from <dir>]... [--latest <n>]
                                  copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
-                                 without --from: VERIFY_EVIDENCE_DIR if set, else the newest run
+                                 the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
+                                 (newest runs in the shared evidence root, other lanes' included)
   links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
   cleanup                        stop the stack (scripts/cleanup.mjs)
 
@@ -98,6 +112,7 @@ function driveCommand(argv) {
   const dashDash = argv.indexOf('--');
   const extra = dashDash === -1 ? [] : argv.splice(dashDash).slice(1);
   const force = takeFlag(argv, '--force');
+  const dryRun = takeFlag(argv, '--dry-run');
   const [feature, caseName, ...stray] = argv;
   if (stray.length > 0) fail(`unexpected argument(s) ${stray.join(' ')}: script arguments go after --`);
   const { features } = loadRegistry();
@@ -116,11 +131,22 @@ function driveCommand(argv) {
     const note = c.note ? `: ${c.note.replace(/\.+$/, '')}` : '';
     fail(`${feature}/${name} is ${c.status}${note}. Re-run with --force to drive it anyway.`);
   }
-  const costly = c.needs.filter((n) => COSTLY_NEEDS.includes(n));
-  if (costly.length > 0 && !force) {
-    fail(`${feature}/${name} needs ${costly.join(' and ')} (model tokens or GitHub calls). Re-run with --force to drive it.`);
+  const forced = c.needs.filter((n) => n in FORCE_NEEDS);
+  if (forced.length > 0 && !force) {
+    const why = forced.map((n) => FORCE_NEEDS[n]).join('; ');
+    fail(`${feature}/${name} needs ${forced.join(' and ')} (${why}). Re-run with --force to drive it.`);
   }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
+  const args = extra.length > 0 ? extra : c.args;
+  const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
+  if (dryRun) {
+    console.log(`vp: dry-run ${feature}/${name}`);
+    console.log(`    runner ${c.runner ?? 'node'}  cwd ${cwd}`);
+    console.log(`    script ${c.script}  args ${args.join(' ')}`.trimEnd());
+    console.log(`    VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR ?? ''}`);
+    console.log(`    VERIFY_RUN_DIR=${process.env.VERIFY_RUN_DIR ?? ''}`);
+    return 0;
+  }
   if (c.needs.includes('stack')) {
     console.log(`vp: ${feature}/${name} needs the stack, running doctor first`);
     if (runNode(join(SCRIPTS_DIR, 'doctor.mjs'), []) !== 0) {
@@ -131,12 +157,11 @@ function driveCommand(argv) {
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   // tsx is a dependency of apps/server, apps/daemon and integration, not of the
   // repo root, so a tsx case runs from the package its registry entry names.
-  const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
   const runner = c.runner === 'tsx' ? `(cd ${c.cwd ?? '.'} && pnpm exec tsx)` : 'node';
-  console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${[...c.args, ...extra].join(' ')}`.trimEnd());
-  if (c.runner !== 'tsx') return runNode(script, [...c.args, ...extra]);
+  console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${args.join(' ')}`.trimEnd());
+  if (c.runner !== 'tsx') return runNode(script, args);
   if (c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
-  const result = spawnSync('pnpm', ['exec', 'tsx', script, ...c.args, ...extra], {
+  const result = spawnSync('pnpm', ['exec', 'tsx', script, ...args], {
     cwd,
     stdio: 'inherit',
     env: process.env,
@@ -156,7 +181,9 @@ async function captureCommand(argv) {
   const { webPort } = JSON.parse(readFileSync(portsFile, 'utf8'));
   const url = `http://127.0.0.1:${webPort}${path}`;
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const dir = process.env.VERIFY_EVIDENCE_DIR ?? join(EVIDENCE_ROOT, `${stamp}-capture-${label}`);
+  // Inside a drive's VERIFY_EVIDENCE_DIR, a subdirectory: the drive's result.json stays.
+  const envDir = process.env.VERIFY_EVIDENCE_DIR;
+  const dir = envDir ? join(envDir, `capture-${label}`) : join(EVIDENCE_ROOT, `${stamp}-capture-${label}`);
   mkdirSync(dir, { recursive: true });
 
   const browser = await chromium.launch();
@@ -201,11 +228,18 @@ function newestEvidenceDirs(count) {
 
 function archiveCommand(argv) {
   const from = takeOption(argv, '--from').map((p) => resolve(p));
-  const latest = Number(takeOption(argv, '--latest')[0] ?? 1);
+  const latestOption = takeOption(argv, '--latest')[0];
   const ticket = argv[0];
-  if (ticket === undefined || !TICKET_RE.test(ticket)) fail('usage: vp.mjs archive <ticket> [--from <dir>]... [--latest <n>]');
+  const usage = 'usage: vp.mjs archive <ticket> [--from <dir>]... | VERIFY_EVIDENCE_DIR=<dir> | --latest <n>';
+  if (ticket === undefined || !TICKET_RE.test(ticket)) fail(usage);
   const envDir = process.env.VERIFY_EVIDENCE_DIR;
-  const sources = from.length > 0 ? from : envDir ? [resolve(envDir)] : newestEvidenceDirs(latest);
+  // No implicit "newest run": the evidence root is shared by every lane on this
+  // machine, so the newest directory can be someone else's.
+  if (from.length === 0 && !envDir && latestOption === undefined) {
+    fail(`${usage}\nname the source: --from <dir>, VERIFY_EVIDENCE_DIR, or --latest <n> (other lanes' runs included)`);
+  }
+  const sources =
+    from.length > 0 ? from : envDir ? [envDir] : newestEvidenceDirs(Number(latestOption));
   if (sources.length === 0) fail('nothing to archive', 1);
   const target = join(ROOT, 'docs', 'verify', ticket);
   const plans = sources.map((src) => {

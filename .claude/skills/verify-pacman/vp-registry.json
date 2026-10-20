@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm and github mean the case spends model tokens or calls GitHub, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -40,6 +40,10 @@
     "vp.mjs": {
       "kind": "infra",
       "purpose": "Single entry point: launch, doctor, list, drive, capture, archive, links, cleanup."
+    },
+    "vp-selftest.mjs": {
+      "kind": "test",
+      "purpose": "Self-test for vp.mjs: drive argument and path rules through --dry-run, archive refusals and copies in a throwaway VERIFY_REPO_ROOT. No stack needed."
     }
   },
   "features": {
@@ -894,7 +898,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-926-convergence.mts",
           "args": [],
           "needs": [
-            "stub-llm"
+            "stub-llm",
+            "rewrites-evidence"
           ],
           "status": "current",
           "purpose": "Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done. Writes docs/verify/926/convergence-evidence.json in place.",

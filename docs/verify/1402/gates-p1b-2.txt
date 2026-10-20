@@ -1,0 +1,28 @@
+# Gates on claude/bootstrap-p1b after merging claude/bootstrap-p1 at af23dd3, with the
+# registry gate self-check moved to scripts/ and run in CI.
+
+$ pnpm lint
+Checked 783 files in 1320ms. No fixes applied.
+Found 1 info.
+lint=0
+
+$ pnpm typecheck
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+typecheck=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+spec=0
+
+$ pnpm --filter @pacman/web e2e:affected
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+e2e=0
+
+$ node scripts/verify-registry-gate-selfcheck.mjs
+13/13 passed (scripts/verify-registry-gate.mjs)
+
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+8/8 passed
+
+lint info: apps/web/src/resources/machines-page.tsx:317 noUselessFragments, present on main, outside this diff.

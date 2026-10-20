@@ -82,6 +82,12 @@ jobs:
           fi
           node scripts/verify-registry-gate.mjs
 
+      # The gate's own failure modes (unregistered .mts, missing needs, tsx
+      # without cwd, a rename into drive-<digits>, ...), each in a throwaway
+      # git repo. Zero-dependency, same stance as the pr-gate self-check.
+      - name: Verify registry gate self-check (#1402)
+        run: node scripts/verify-registry-gate-selfcheck.mjs
+
       # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
       # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数、裸控件
       # 总数、Tailwind 任意值（text-[Npx] 与间距类 -[Npx] 两个总数，Paper
@@ -127,6 +133,14 @@ jobs:
       # doesn't exist）。「check 不再需要浏览器面」是误判，浏览器面有两层。
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # verify-pacman 入口自测（#1402）：vp.mjs 的分派与归档规则（-- 参数替换默认、
+      # 相对证据路径转绝对、需 --force 的 needs、archive 不取最新一次、不覆盖），
+      # drive 走 --dry-run、archive 在自建的空仓根里跑，不起栈、不起浏览器。
+      # 排在 install 之后：vp.mjs 顶层引 @playwright/test（capture 用），装依赖
+      # 之前跑整个脚本在 import 处崩（#1411 首轮 CI 实测 1/8）。
+      - name: verify-pacman CLI self-test (#1402)
+        run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 
       # Spec 解析闸（#1052）：e2e spec 少一个 `  });` 不进任何本地快速闸——
       # biome 只警告、apps/web 的 tsconfig 不含 e2e/，第一道红是 CI e2e 分片
