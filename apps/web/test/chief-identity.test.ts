@@ -52,8 +52,8 @@ describe('chief robot 行身份 chip（#741）', () => {
 
   test('F-U8: chip 渲染名字（头像 + 名字并排的参考站形态）', () => {
     const markup = render(WITH_ID);
-    // #950: 名字 span 载体从 .chief-identity-name 迁到 text utility。
-    expect(markup).toMatch(/<span class="[^"]*text-xs leading-4[^"]*">r3-builder<\/span>/);
+    // #950: 名字 span 载体从 .chief-identity-name 迁到 text utility；#1398 起走字号键 text-meta。
+    expect(markup).toMatch(/<span class="[^"]*text-meta leading-4[^"]*">r3-builder<\/span>/);
     expect(markup).toMatch(/<span[^>]*>r3-builder<\/span>/);
   });
 

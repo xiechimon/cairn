@@ -322,6 +322,62 @@ export const chiefMarkdown: FixtureSet = {
   },
 };
 
+/** #1398 问答卡命名场景（无 capture，chief-md 先例）：一张已回答的卡 + 一张
+ *  待回答的两题卡（选项题 + 自由文本题），钉问答卡三态的 Paper 面。fixture
+ *  面没有 onAnswer，待回答卡按惰性律渲染（控件 disabled，状态行照常）。 */
+export const chiefQuestion: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(13, 14),
+  chief: {
+    view: 'drawer',
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '给贪吃蛇小游戏定难度…',
+    stream: [
+      { kind: 'note', text: '17:26' },
+      { kind: 'user', text: '给贪吃蛇小游戏定一下难度曲线，拆好任务再开工。' },
+      {
+        kind: 'question',
+        id: 'q-answered',
+        requestId: 'q-answered',
+        status: 'answered',
+        questions: [
+          {
+            header: '目标平台',
+            question: '先做哪一端？',
+            options: [{ label: '桌面浏览器' }, { label: '手机浏览器' }],
+          },
+        ],
+        answers: [{ header: '目标平台', choices: ['桌面浏览器'] }],
+      },
+      {
+        kind: 'robot',
+        paragraphs: [[{ text: '好，先做桌面端。难度还需要你定两件事：' }]],
+        seconds: '12s',
+      },
+      {
+        kind: 'question',
+        id: 'q-pending',
+        requestId: 'q-pending',
+        status: 'pending',
+        questions: [
+          {
+            header: '难度曲线',
+            question: '蛇速随分数怎么涨？',
+            options: [
+              { label: '每 50 分加速一档' },
+              { label: '每吃 5 个果子加速一档' },
+              { label: '保持匀速，只加障碍' },
+            ],
+          },
+          { header: '上限', question: '最高速度给多少格每秒？', options: [] },
+        ],
+        answers: null,
+      },
+    ],
+  },
+};
+
 /** r5 101–104: the 总管设置 view, one set per tab (unbound agent). */
 export function chiefSettings(tab: ChiefSettingsTab): FixtureSet {
   return {

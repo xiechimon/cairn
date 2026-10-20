@@ -4,15 +4,22 @@
 // 2026-10-09 形态裁决（用户亲选原型 scratch/qcard-proto v3「Steps」）：
 // pending = 一题一屏向导——进度条 / 整行选项块 + 序号方块 / 末行「其他…」
 // + 自由文本 / 数字键 1–N 直达 / 上一步-下一步-提交 / 选项 >6 卡内滚动 /
-// 多选计数提示；几何逐值照抄原型 .v3 段。answered = 只读高亮（整行块 +
+// 多选计数提示（结构取自原型 v3，取值见下方 #1398 段）。answered = 只读高亮（整行块 +
 // 序号填充，自定义答案以选项串回显）；cancelled = 整卡暗淡。拼装只用
 // registry 零件 Button/Input（shadcn 无「提问卡」原语，26 件快照已核）；
-// 徽章/序号方块/进度条是卡内局部 span，不进 components/ui。组件对缺省
-// 回调惰性（与恢复钮 accept 律同族纪律）。
+// 序号方块/进度条是卡内局部 span，不进 components/ui。组件对缺省回调
+// 惰性（与恢复钮 accept 律同族纪律）。
+// #1398 Paper 面：向导结构不动，取值换 DESIGN.md——卡 = --radius-card 白卡
+// + line 1px 边；状态 = 图标 + 颜色 + 文字（等你回答 = 赭红，已回答 /
+// 已取消 = ink-3），不再是药丸徽章；字号走六档键；自由文本 =
+// FORM_CONTROL_CLS；底部 = 文字按钮 + 一个墨色主按钮。
 
 import type { AskUserAnswer } from '@pacman/shared';
+import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
+import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -35,29 +42,51 @@ type Draft =
   | { kind: 'choices'; picked: string[]; other: boolean; otherText: string }
   | { kind: 'text'; value: string };
 
-/** 原型 v3 几何（scratch/qcard-proto index.html 逐值）：卡框 / 进度条 /
- * 徽章 / 序号方块 / 整行选项块 / 自由文本输入。 */
+/** 卡框 / 进度条 / 序号方块 / 整行选项块（向导结构取自原型 v3，取值走
+ *  DESIGN.md：卡 12×14 内衬、--radius-card、控件 8px 角、字号六档键）。 */
 const CARD_CLS =
-  'flex flex-col gap-2.5 rounded-[var(--radius)] border border-border bg-background p-3';
-const PIP_CLS = 'h-[3px] flex-1 rounded-full bg-border transition-colors duration-200 ease-out';
+  'flex flex-col gap-3 rounded-(--radius-card) border border-border bg-card px-3.5 py-3';
+const PIP_CLS = 'h-0.75 flex-1 rounded-full bg-border transition-colors duration-200 ease-out';
 const PIP_ON_CLS = 'bg-primary';
-const BADGE_CLS =
-  'rounded-full border border-border bg-secondary px-[7px] py-px text-[11px] text-muted-foreground';
-const BADGE_LIVE_CLS = 'border-transparent bg-primary text-primary-foreground';
-const HINT_CLS = 'flex-1 text-[11px] text-muted-foreground';
-const BIG_CLS = 'text-[15px] leading-[1.35] font-semibold text-foreground';
+const HINT_CLS = 'flex-1 text-caption text-content-tertiary';
+const BIG_CLS = 'text-card-title font-medium text-foreground';
 const NUM_CLS =
-  'grid size-5 shrink-0 place-items-center rounded-[5px] border text-[11px] leading-none font-semibold';
-const NUM_OFF_CLS = 'bg-secondary text-muted-foreground';
+  'grid size-5 shrink-0 place-items-center rounded-[5px] border text-caption leading-none font-semibold';
+const NUM_OFF_CLS = 'bg-card text-content-tertiary';
 const NUM_ON_CLS = 'border-transparent bg-primary text-primary-foreground';
 const OPT_CLS =
-  'h-auto w-full justify-start gap-[9px] whitespace-normal rounded-[calc(var(--radius)-2px)] border-border bg-transparent px-3 py-[11px] text-left text-[13px] leading-normal font-normal';
-const OPT_SEL_CLS = 'border-ring bg-secondary';
+  'h-auto w-full justify-start gap-2 whitespace-normal rounded-md border-border bg-transparent px-3 py-2.5 text-left text-ui leading-normal font-normal';
+const OPT_SEL_CLS = 'border-ring bg-(--menu-hover)';
 const OPT_TXT_CLS = 'min-w-0 flex-1';
-const FREE_INPUT_CLS = 'h-auto rounded-[calc(var(--radius)-3px)] px-3 py-[11px] text-[13px]';
 /** answered/cancelled 态的只读整行块（非交互：无焦点无手型）。 */
 const ROW_STATIC_CLS =
-  'flex w-full items-center gap-[9px] rounded-[calc(var(--radius)-2px)] border border-border px-3 py-[11px] text-[13px] leading-normal text-foreground';
+  'flex w-full items-center gap-2 rounded-md border border-border px-3 py-2.5 text-ui leading-normal text-foreground';
+
+/** 卡头状态：图标 + 颜色 + 文字（DESIGN.md 状态三件套）。等你回答是「需要
+ *  你」态，走赭红；已回答 / 已取消降到 ink-3。 */
+const STATUS_WAITING_INK = 'text-(--card-button)';
+const QUESTION_STATUS: Record<
+  ChiefQuestionItem['status'],
+  { icon: LucideIcon; ink: string; label: string }
+> = {
+  pending: { icon: CircleHelp, ink: STATUS_WAITING_INK, label: '等你回答' },
+  answered: { icon: CircleCheck, ink: 'text-content-tertiary', label: '已回答' },
+  cancelled: { icon: Ban, ink: 'text-content-tertiary', label: '已取消' },
+};
+
+function QuestionStatus({ status }: { status: ChiefQuestionItem['status'] }) {
+  const { t } = useI18n();
+  const { icon: Icon, ink, label } = QUESTION_STATUS[status];
+  return (
+    <span
+      data-testid="chief-question-status"
+      className={`flex flex-none items-center gap-1 text-meta whitespace-nowrap ${ink}`}
+    >
+      <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
+      {t(label)}
+    </span>
+  );
+}
 
 export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCardProps) {
   const { t } = useI18n();
@@ -125,22 +154,18 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         className={`${CARD_CLS}${item.status === 'cancelled' ? ' opacity-70' : ''}`}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[13px] font-semibold text-foreground">{t('总管提问')}</span>
-          {item.status === 'answered' ? (
-            <span className={BADGE_CLS}>{t('已回答')}</span>
-          ) : (
-            <span className={`${BADGE_CLS} bg-transparent`}>{t('已取消')}</span>
-          )}
+          <span className="text-ui font-medium text-foreground">{t('总管提问')}</span>
+          <QuestionStatus status={item.status} />
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-3">
           {item.questions.map((q, qi) => (
             <div key={qi} className="flex flex-col gap-1.5">
-              <div className="text-[11px] text-muted-foreground">{q.header}</div>
-              <div className="text-[13px] text-foreground">{q.question}</div>
+              <div className="text-caption text-content-tertiary">{q.header}</div>
+              <div className="text-ui text-foreground">{q.question}</div>
               {q.options.length === 0 ? (
                 <div
                   data-testid={`chief-question-answer-${qi}`}
-                  className="rounded-[calc(var(--radius)-3px)] border border-input px-3 py-[11px] text-[13px] text-foreground"
+                  className="rounded-md border border-input px-3 py-2.5 text-ui text-foreground"
                 >
                   {item.answers?.[qi]?.text ?? ''}
                 </div>
@@ -175,18 +200,18 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         ))}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] tracking-[0.02em] text-muted-foreground">
+        <span data-testid="chief-question-step" className="text-caption text-content-tertiary">
           {question.header} · {step + 1}/{total}
         </span>
-        <span className={`${BADGE_CLS}${pending ? ` ${BADGE_LIVE_CLS}` : ''}`}>
-          {t('等你回答')}
-        </span>
+        <QuestionStatus status={item.status} />
       </div>
-      <div className={BIG_CLS}>{question.question}</div>
+      <div data-testid="chief-question-text" className={BIG_CLS}>
+        {question.question}
+      </div>
       {question.options.length === 0 ? (
         <Input
           data-testid={`chief-question-input-${step}`}
-          className={FREE_INPUT_CLS}
+          className={FORM_CONTROL_CLS}
           placeholder={t('输入你的回答')}
           value={draft?.kind === 'text' ? draft.value : ''}
           disabled={!pending}
@@ -196,9 +221,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
           }}
         />
       ) : (
-        <div
-          className={`flex flex-col gap-1.5${scroll ? ' max-h-[216px] overflow-y-auto pr-0.5' : ''}`}
-        >
+        <div className={`flex flex-col gap-1.5${scroll ? ' max-h-54 overflow-y-auto pr-0.5' : ''}`}>
           {question.options.map((option, oi) => {
             const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);
             return (
@@ -240,7 +263,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
           {otherSelected && (
             <Input
               data-testid={`chief-question-input-${step}`}
-              className={FREE_INPUT_CLS}
+              className={FORM_CONTROL_CLS}
               placeholder={t('输入你的回答')}
               value={draft?.kind === 'choices' ? draft.otherText : ''}
               disabled={!pending}
@@ -259,8 +282,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
       <div className="flex items-center gap-2">
         <Button
           variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
+          className={DIALOG_TEXT_BUTTON}
           disabled={!pending || onCancel === undefined}
           onClick={() => onCancel?.(item.requestId)}
         >
@@ -269,8 +291,8 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
         <span className={HINT_CLS}>{hintText}</span>
         {step > 0 && (
           <Button
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            className={DIALOG_TEXT_BUTTON}
             disabled={!pending}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
           >
@@ -278,7 +300,7 @@ export function ChiefQuestionCard({ item, onAnswer, onCancel }: ChiefQuestionCar
           </Button>
         )}
         <Button
-          size="sm"
+          className={DIALOG_PRIMARY_BUTTON}
           disabled={!pending || !(last ? allComplete : stepComplete)}
           onClick={() => {
             if (last) submit();
@@ -311,7 +333,7 @@ function answeredRows(
           <div
             key={oi}
             data-testid={`chief-question-option-${qi}-${oi}`}
-            className={`${ROW_STATIC_CLS}${picked ? ' border-ring bg-secondary' : ''}`}
+            className={`${ROW_STATIC_CLS}${picked ? ` ${OPT_SEL_CLS}` : ''}`}
           >
             <span className={`${NUM_CLS} ${picked ? NUM_ON_CLS : NUM_OFF_CLS}`}>{oi + 1}</span>
             <span className={OPT_TXT_CLS}>{option.label}</span>
@@ -319,7 +341,7 @@ function answeredRows(
         );
       })}
       {otherAnswers.length > 0 && (
-        <div className={`${ROW_STATIC_CLS} border-ring bg-secondary`}>
+        <div className={`${ROW_STATIC_CLS} ${OPT_SEL_CLS}`}>
           <span className={`${NUM_CLS} ${NUM_ON_CLS}`}>{question.options.length + 1}</span>
           <span data-testid={`chief-question-answer-${qi}`} className={OPT_TXT_CLS}>
             {otherAnswers.join('；')}

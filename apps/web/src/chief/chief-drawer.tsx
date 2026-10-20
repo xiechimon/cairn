@@ -115,7 +115,7 @@ import { ChiefStreamRow, chiefStreamRowKey } from './chief-message-rows.js';
  *  overlays/hotkeys.ts 的 ⌘J 守卫走 closest('.chief-drawer')，e2e 以它做
  *  面板 scope 锚（更名随施工面载体重钉批，D13）。 */
 const WINDOW_CLS =
-  'chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-[600px] max-h-[calc(100dvh-1rem)] w-[380px] max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-(--radius-window) bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)]';
+  'chief-drawer fixed right-2 bottom-2 z-(--z-floating) flex h-150 max-h-[calc(100dvh-1rem)] w-95 max-w-[calc(100dvw-1rem)] flex-col overflow-hidden rounded-(--radius-window) bg-(--card) shadow-[var(--edge-ring),var(--floating-shadow)]';
 
 /** 进出场腿（ADR 0013 D7：fade + scale 0.95→1、transformOrigin bottom
  *  right——窗从 FAB 角长出；shadcn/Base UI 默认动效家族（dropdown/popover
@@ -167,7 +167,7 @@ const SEND_ON_CLS =
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 flex-1';
 /** Content 的 block + gap-0：行距语义保持在行自身的 margin 上（现状
  *  mt-3.5 / my-2.5 的块级折叠律逐字存活），原语默认 flex gap-6 会双倍行距。 */
-const SCROLLER_CONTENT_CLS = 'block gap-0 px-[17px] pt-3.5';
+const SCROLLER_CONTENT_CLS = 'block gap-0 px-4 pt-3.5';
 
 const EXAMPLE_ICONS = {
   'user-plus': ChiefUserPlus,
@@ -586,16 +586,15 @@ function ChiefDrawerInner({
   // composer/弹层），hook 面得以消费 useMessageScroller。
   return (
     <>
-      <header className="relative px-[17px] pt-[5px] pb-3">
+      <header className="relative px-4 pt-1 pb-3">
         <div className="flex items-center">
-          {/* XMON-23→#950：ghost 原语 + 头部 chip 皮肤 utility（旧
-                .chief-chip 等值：零装饰 / tertiary 墨 / gap 6 / 可点）。
-                中和件沿旧：h-auto（原语 h-8 会撑高 22.5 的行）、
-                leading-[inherit]（原语 text-sm 的定值 20px 行高会压掉 15px
-                标题继承的 22.5，像素对拍实测塌 1px）、shrink（chip 须收缩
-                让 title 省略号生效）、hover/expanded 涂底钉回透明（旧
-                unlayered 恒压件配方无反馈）、svg size-auto（ChiefHash 13px
-                属性尺寸）。 */}
+          {/* XMON-23→#950：ghost 原语 + 头部 chip 皮肤 utility（零装饰 /
+                tertiary 墨 / gap 6 / 可点）。标题 = 弹窗标题同档（#1398：
+                16px 衬线 500，DESIGN.md「弹窗与菜单」）。中和件：h-auto（原语
+                h-8 会撑高标题行）、leading-[inherit]（原语 text-sm 的定值
+                20px 行高会压掉标题继承的行高）、shrink（chip 须收缩让 title
+                省略号生效）、hover/expanded 涂底钉回透明、svg size-auto
+                （ChiefHash 13px 属性尺寸）。 */}
           <Button
             variant="ghost"
             className="h-auto min-w-0 shrink cursor-pointer gap-1.5 rounded-none border-none bg-transparent p-0 leading-[inherit] text-(--text-tertiary) hover:bg-transparent hover:text-(--text-tertiary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
@@ -603,7 +602,7 @@ function ChiefDrawerInner({
             onClick={() => setThreadsOpen((v) => !v)}
           >
             <ChiefHash />
-            <span className="max-w-[210px] truncate text-[15px] font-semibold text-(--foreground)">
+            <span className="max-w-52 truncate font-heading text-heading font-medium text-(--foreground)">
               {t(chief.threadTitle)}
             </span>
             <ChevronDown width={12} height={12} />
@@ -665,11 +664,11 @@ function ChiefDrawerInner({
                   模型的只读展示（行首运行时标记同前：pi 块状 π / claude-code
                   品牌星标）；改模型去 Agent 设置面。 */}
         <div
-          className="mt-[3px] flex items-center gap-[5px] text-xs text-(--text-tertiary)"
+          className="mt-1 flex items-center gap-1 text-meta text-(--text-tertiary)"
           data-testid="chief-model-row"
         >
           {chief.bound ? (
-            <span className="flex min-w-0 items-center gap-[5px] px-1">
+            <span className="flex min-w-0 items-center gap-1 px-1">
               <span className="inline-flex flex-none items-center">
                 {(chief.modelProvider ?? 'pi') === 'claude-code' ? (
                   <RuntimeClaudeCode width={12} height={12} />
@@ -684,18 +683,17 @@ function ChiefDrawerInner({
           )}
         </div>
         {threadsOpen && (
-          // 主题切换器（r5 116，旧 .chief-switcher 等值：头部锚定绝对
-          // 位、262 宽、popover 底、drawer-local z 5——#688 阶梯外，
-          // 收编于抽屉 stacking context 只压内部内容）。圆角接 registry
-          // popover 依据 rounded-lg（#1054 清点，ADR 0012 D1）。
+          // 主题切换器（r5 116）：头部锚定绝对位、264 宽、drawer-local
+          // z 5——#688 阶梯外，收编于抽屉 stacking context 只压内部内容。
+          // 面 = Paper 菜单（#1398，DESIGN.md「弹窗与菜单」）：白底、
+          // --radius-popover、4px 内衬、--shadow-popover；行 32 高、13.5px。
           // #1094：长列表封顶 + 纵向滚动——无上限的子元素撞上窗体
-          // WINDOW_CLS 的 overflow-hidden 时尾部行不可达（旧
-          // .chief-switcher 同缺口，非换代回归）。上限照 slash-menu 的
-          // 绝对定位列表先例取 max-h-[220px]；registry 侧的
+          // WINDOW_CLS 的 overflow-hidden 时尾部行不可达。上限照 slash-menu
+          // 的绝对定位列表先例取 220px（max-h-55）；registry 侧的
           // max-h-(--available-height) 不适用——该变量由 Base UI
           // Positioner 注入，本容器不在 Positioner 里，变量恒未定义。
           <div
-            className="absolute top-8 left-3 z-[5] max-h-[220px] w-[262px] overflow-y-auto rounded-lg bg-(--popover) p-1 shadow-(--chief-shadow)"
+            className="absolute top-8 left-3 z-[5] max-h-55 w-66 overflow-y-auto rounded-(--radius-popover) bg-(--popover) p-1 shadow-(--shadow-popover)"
             role="menu"
           >
             {(chief.threads ?? []).map((thread, index) => (
@@ -708,7 +706,7 @@ function ChiefDrawerInner({
                 role="menuitem"
                 key={thread.title}
                 aria-current={thread.active ? 'true' : undefined}
-                className="h-[30px] w-full cursor-pointer justify-start gap-2 rounded-none border-none bg-transparent px-2 text-left text-[13px] font-normal text-(--text-secondary) hover:bg-transparent hover:text-(--text-secondary) dark:hover:bg-transparent aria-expanded:bg-transparent aria-[current=true]:bg-(--secondary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                className="h-8 w-full cursor-pointer justify-start gap-2 rounded-sm border-none bg-transparent px-2 text-left text-ui font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent aria-[current=true]:bg-(--menu-hover) aria-[current=true]:font-medium aria-[current=true]:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
                 onClick={
                   onThread != null
                     ? () => {
@@ -728,19 +726,20 @@ function ChiefDrawerInner({
 
       {/* gate / hero 移出滚动区（#1009 A1）：两面只在无流状态出场
                 （未绑定 gate / 空线程 hero），移出后视觉等价；滚动区自此
-                纯消息流。gate 在位（= 未绑定）时 hero 上距 62，否则 54
+                纯消息流。gate 在位（= 未绑定）时 hero 上距 64，否则 56
                 ——条件类随 JSX 状态切换（旧 .chief-hero 兄弟选择器等值）。 */}
       {!chief.bound && (
-        /* gate 横幅 = 卡族面，圆角接 registry Card 依据 rounded-xl
-           （#1054 清点，ADR 0012 D1）。 */
-        <div className="mx-[17px] flex h-[54px] flex-none items-center rounded-xl bg-(--secondary) pr-3 pl-5 text-[13px] text-(--text-secondary)">
+        /* gate 横幅 = Paper 卡（#1398）：--radius-card + 1px line 环，
+           不铺底色；右侧一个墨色主按钮。 */
+        <div
+          data-testid="chief-gate"
+          className="mx-4 flex h-14 flex-none items-center gap-3 rounded-(--radius-card) bg-(--card) pr-3 pl-4 text-ui text-(--text-secondary) ring-1 ring-(--border)"
+        >
           <span>{t('请先为总管选择一个 Agent。')}</span>
-          {/* XMON-23 收编：default 档 = A3 primary 等价位。中和件对齐 A6 实测形（50×26、12px 字、
-                  8px 内边距、8 圆角、400 字重）：h-[26px]/px-2/rounded-md/
-                  border-0/font-normal + 既有 inline style；active 位移中和。 */}
+          {/* 主按钮 = shadcn Button default 档（墨底 32 高 8 圆角，
+              DIALOG_PRIMARY_BUTTON），靠右。 */}
           <Button
-            className="h-[26px] cursor-pointer rounded-md border-0 px-2 font-normal active:not-aria-[haspopup]:translate-y-0"
-            style={{ width: 50, fontSize: 12 }}
+            className={`ml-auto cursor-pointer ${DIALOG_PRIMARY_BUTTON}`}
             onClick={onSettings}
           >
             {t('设置')}
@@ -750,13 +749,13 @@ function ChiefDrawerInner({
       {chief.examples && (
         <div className="flex-none">
           <h2
-            className={`text-center text-[15px] font-semibold text-(--foreground) ${
-              chief.bound ? 'mt-[54px]' : 'mt-[62px]'
+            className={`text-center font-heading text-heading font-medium text-(--foreground) ${
+              chief.bound ? 'mt-14' : 'mt-16'
             }`}
           >
             {t('选择一个主题开始')}
           </h2>
-          <div className="mx-[33px] mt-3 grid grid-cols-2 gap-2.5" data-testid="chief-examples">
+          <div className="mx-8 mt-3 grid grid-cols-2 gap-2.5" data-testid="chief-examples">
             {chief.examples.map((ex) => {
               const Icon = EXAMPLE_ICONS[ex.icon];
               return (
@@ -765,32 +764,25 @@ function ChiefDrawerInner({
                 // #631：onSend 异步化（被拒保留 draft）后 hero 面消费
                 // fire-and-forget——失败 toast 归 surface，此处无 draft
                 // 可保，不悬挂未处理 promise。
-                // XMON-23→#950：ghost 原语 + 示例卡皮肤 utility（旧
-                // .chief-example 等值：64 卡 / 12 gap / surface-secondary
-                // 底）。中和件沿旧：justify-start/whitespace-normal/
-                // font-normal（原语居中+nowrap+medium 会破 170 卡内
-                // 左对齐换行文案）、hover 涂底钉回卡底（旧 unlayered
-                // 恒压件配方）、active 位移、svg size-auto（瓦片字形
-                // 14px 属性尺寸）。
+                // 示例卡 = Paper 卡（#1398，DESIGN.md「卡片圆角：一个角」）：
+                // 64 高、--radius-card、白底 + 1px line 环、hover menu-hover；
+                // 行首图标裸放 ink-3（不垫色块）。中和件：justify-start/
+                // whitespace-normal/font-normal（原语居中+nowrap+medium 会破
+                // 卡内左对齐换行文案）、active 位移、svg size-auto（字形
+                // 16px 属性尺寸）。
                 <Button
                   variant="ghost"
-                  /* #1054 清点：示例卡是 Button 承载 → 圆角骑件默认
-                     rounded-lg（L5 #1008 同款摘除覆写）；行首 icon tile
-                     接 tile 词汇 rounded-lg（schedules-page size-7 tile
-                     L4 先例同档）。 */
-                  className="h-16 w-full cursor-pointer justify-start gap-3 border-none bg-(--secondary) px-3 text-left whitespace-normal font-normal hover:bg-(--secondary) dark:hover:bg-(--secondary) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
+                  className="h-16 w-full cursor-pointer justify-start gap-3 rounded-(--radius-card) border-none bg-(--card) px-3 text-left whitespace-normal font-normal ring-1 ring-(--border) hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto"
                   key={ex.text}
                   onClick={onSend != null ? () => void onSend(ex.text) : undefined}
                 >
-                  <span className="flex size-6 flex-none items-center justify-center rounded-lg bg-(--seg-active) text-(--text-tertiary)">
-                    <Icon width={14} height={14} />
+                  <span className="flex size-6 flex-none items-center justify-center text-(--text-tertiary)">
+                    <Icon width={16} height={16} />
                   </span>
                   {/* 12px: r5 100 wraps 帮我组建 Agent 团/队 but keeps
                               帮我创建一个新项目 on one line inside the
                               170-wide card */}
-                  <span className="text-xs leading-[21px] text-(--text-secondary)">
-                    {t(ex.text)}
-                  </span>
+                  <span className="text-meta leading-5 text-(--text-secondary)">{t(ex.text)}</span>
                 </Button>
               );
             })}
@@ -844,7 +836,7 @@ function ChiefDrawerInner({
                 chief-composer 以零规则钩子存活：#948 把外域规则内联进本 div
                 后，余下消费者 = spec 容器 scope（chief-panel.spec 的
                 composer bar 定位）；摘除归 #952 终账。 */}
-      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-[17px] my-2.5 rounded-(--radius-composer) border-0 bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
+      <div className="chief-composer [&>.attachment-strip]:mt-2 mx-4 my-2.5 rounded-(--radius-composer) border-0 bg-(--secondary) px-3 pt-3 pb-2.5 shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)">
         {/* #624：占位双态随回合态（r5 §3.6，截图 113）——活动线程 activeRun
               在位（chief.running，mapChief 单点投影）= steer canon「执行过程中
               即可送达」，空闲 / 新主题 / 回合收尾 = 空闲 canon。两值经 t() 消费
@@ -869,7 +861,7 @@ function ChiefDrawerInner({
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className="h-[60px] max-h-[120px] min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-[13px] leading-5 text-(--foreground) tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+            className="h-15 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}

@@ -820,8 +820,8 @@ export type ChiefStreamItem =
    *  mapChiefStream；fixture 面无此行——失败场景走 live 验证）。 */
   | { kind: 'error'; text: string }
   /** #1049 问答卡行：chief ask_user 提问的投影（live 面单源 = api/mappers
-   *  collectChiefStream 的 askUserQuestionContentOf 分支；fixture 面无此行
-   *  ——问答是 live 交互场景，捕获面不构造）。pending 期可答可取消；答毕/
+   *  collectChiefStream 的 askUserQuestionContentOf 分支；fixture 面只有
+   *  chief-question 命名场景构造它，#1398）。pending 期可答可取消；答毕/
    *  取消后只读翻面。`id` = 源 chief_message id（= requestId，答题端点位）。 */
   | {
       kind: 'question';
