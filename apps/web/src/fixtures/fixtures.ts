@@ -45,6 +45,7 @@ export {
   chiefDefault,
   chiefGated,
   chiefMarkdown,
+  chiefQuestion,
   chiefReady,
   chiefScrollLong,
   chiefSettings,

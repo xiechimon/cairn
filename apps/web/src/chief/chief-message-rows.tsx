@@ -44,23 +44,24 @@ const MSG_TOOL_BTN_CLS =
   "size-5 cursor-pointer rounded-none border-none bg-transparent text-(--text-tertiary) hover:bg-(--secondary) hover:text-(--text-secondary) dark:hover:bg-(--secondary) aria-expanded:bg-muted aria-expanded:text-(--text-tertiary) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
 
 /** 回合过程折叠面（旧 .chief-turn-tools 等值：foot 下挂工具行表，
- *  surface-secondary 底 6/8 内垫，mono 名 + 秒数 + 失败徽标 dim 墨压底）。
+ *  surface-secondary 底 6/8 内垫，mono 名 + 秒数 + 失败徽标 dim 墨压底；
+ *  行字 = text-caption 11.5px，#1398）。
  *  圆角随流面家族 = --radius-popover 12px（BUBBLE_USER_CLS 同档，A1 几何
  *  钉回原值；#1054 清点接依据，直角退役）。 */
 const TURN_TOOLS_CLS =
-  'mt-1.5 flex flex-col gap-[3px] rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5';
-const TURN_TOOL_ROW_CLS = 'flex items-center gap-2 font-mono text-[11px] text-(--text-tertiary)';
+  'mt-1.5 flex flex-col gap-1 rounded-(--radius-popover) bg-(--secondary) px-2 py-1.5';
+const TURN_TOOL_ROW_CLS = 'flex items-center gap-2 font-mono text-caption text-(--text-tertiary)';
 const TURN_TOOL_NAME_CLS = 'min-w-0 flex-auto truncate';
 
 /** 消息列（旧 .chief-msg-col 等值 + #650 抽屉节奏 scoped 覆盖）：正文
- *  14px/24px、primary 墨由容器 inheritance 承接（chat-markdown 块自身
+ *  text-card-title 14px / 24px 行高（#1398 字号键）、primary 墨由容器 inheritance 承接（chat-markdown 块自身
  *  不带字号规则，detail.css 正本只管块距）；段距 2px 与气泡首尾块 margin
  *  归零两条覆盖的对象是 detail.css 的 unlayered 块距正典（.chat-para +
  *  .chat-para 7px、.chat-md-code 8px 上下）——CSS 级联律：unlayered 恒压
  *  layered utility，important 修饰是 utility 层赢过 unlayered 正典的唯一
  *  出口（important 声明的层序优先于一切 normal 声明）。 */
 const MSG_COL_CLS =
-  'min-w-0 flex-1 text-sm leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
+  'min-w-0 flex-1 text-card-title leading-6 text-(--foreground) [&_.chat-para+.chat-para]:mt-0.5!';
 const BUBBLE_MD_CLS = '[&>:first-child]:mt-0! [&>:last-child]:mb-0!';
 
 /** Item 的 [content-visibility:auto] 用 inline style 钉回 visible：离屏行不跳
@@ -90,14 +91,15 @@ const BUBBLE_ROBOT_CLS = 'w-full border-0 leading-6';
 /** note/error 的居中 annotation 行 = Marker 原语（上游用途本义）；字号/
  *  墨色钉回现状（text-xs + tertiary/destructive，原语 text-sm/muted 中和），
  *  error 二段面走 flex-col。 */
-const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-xs text-(--text-tertiary)';
-const MARKER_ERROR_CLS = 'my-2.5 flex-col justify-center text-center text-xs text-(--destructive)';
+const MARKER_NOTE_CLS = 'my-2.5 justify-center text-center text-meta text-(--text-tertiary)';
+const MARKER_ERROR_CLS =
+  'my-2.5 flex-col justify-center text-center text-meta text-(--destructive)';
 
 /** 行内 mention chip 皮肤（#950 清零，旧 .chief-chip-todo/.chief-chip-agent
  *  等值：1px/6px 内垫、4px 圆角（一次性尺寸 §3.1(a)）、2px 边距、1px 光学
  *  上抬；todo = chip-plan 令牌对，agent = seg-active 底 + 次级墨）。 */
 const CHIP_INLINE_CLS =
-  'mx-0.5 inline-flex items-center gap-1 rounded-[4px] px-1.5 py-px align-[1px] text-xs';
+  'mx-0.5 inline-flex items-center gap-1 rounded-[4px] px-1.5 py-px align-[1px] text-meta';
 
 /** Inline runs → plain text（#615 复制钮的 clipboard 载荷：chip 取其label，
  *  代码段取原文——复制的是读者可见文本）。 */
@@ -151,7 +153,7 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
           );
         if (s.code)
           return (
-            <code key={i} className="rounded-[4px] bg-(--muted) px-[5px] py-px font-mono text-xs">
+            <code key={i} className="rounded-[4px] bg-(--muted) px-1 py-px font-mono text-meta">
               {s.text}
             </code>
           );
@@ -287,10 +289,7 @@ export function ChiefStreamRow({
                 {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
               </BubbleContent>
             </Bubble>
-            <div
-              className="mt-[7px] flex gap-2.5 text-(--text-tertiary)"
-              data-testid="chief-msg-tools"
-            >
+            <div className="mt-2 flex gap-2.5 text-(--text-tertiary)" data-testid="chief-msg-tools">
               {/* #615 C：复制翻真 clipboard 钮（local-first 面存在）。 */}
               <Button
                 variant="ghost"
@@ -519,12 +518,17 @@ export function ChiefStreamRow({
               ) : (
                 <>
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? 'mt-0.5 text-sm leading-6' : 'text-sm leading-6'}>
+                    <p
+                      key={j}
+                      className={
+                        j > 0 ? 'mt-0.5 text-card-title leading-6' : 'text-card-title leading-6'
+                      }
+                    >
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets?.map((b, j) => (
-                    <p key={`b${j}`} className="mt-0.5 flex gap-[7px] text-sm leading-6">
+                    <p key={`b${j}`} className="mt-0.5 flex gap-2 text-card-title leading-6">
                       <span className="flex-none">•</span>
                       <span>
                         <Segments segments={b} />
@@ -539,7 +543,7 @@ export function ChiefStreamRow({
               折叠）只属定稿行，打字行不渲染。 */}
           {item.typing !== true && (
             <div
-              className="mt-[9px] flex items-center gap-[7px] text-xs text-(--text-tertiary)"
+              className="mt-2 flex items-center gap-2 text-meta text-(--text-tertiary)"
               data-testid="chief-msg-foot"
             >
               <Button
