@@ -132,12 +132,14 @@ export async function githubPullState(
   return { state, merged: merged === true };
 }
 
-/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA。 */
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head SHA。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
   /** merged 时合并者的 login；未合并或响应缺失 = null。 */
   mergedBy: string | null;
+  /** PR head 分支当前的提交（合并后 = 合并时的 head）；响应缺失 = null。 */
+  headSha: string | null;
 }
 
 export interface GithubPullPage {
@@ -186,6 +188,7 @@ export async function githubPull(
     merged?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
+    head?: { sha?: unknown } | null;
   };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
@@ -198,8 +201,38 @@ export async function githubPull(
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
+      headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
     },
   };
+}
+
+/** head 是否包含 base（`GET /repos/{o}/{r}/compare/{base}...{head}` 的 status：
+ * ahead / identical = 包含，behind / diverged = 不包含）。'missing' = 404
+ * （base 提交不在 GitHub 上，例如从没推送过）；null = 读不到。 */
+export async function githubCompareStatus(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  base: string,
+  head: string,
+): Promise<string | 'missing' | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}`;
+  try {
+    const res = await fetchImpl(url, {
+      headers: {
+        ...API_HEADERS,
+        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (res.status === 404) return 'missing';
+    if (!res.ok) return null;
+    const data = (await res.json()) as { status?: unknown } | null;
+    return typeof data?.status === 'string' ? data.status : null;
+  } catch {
+    return null;
+  }
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；

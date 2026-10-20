@@ -16,7 +16,14 @@
 //   ⑪ 未连接 GitHub（匿名 60 次/小时）→ 每个候选 5 分钟内最多读一次
 //   ⑫ 条件读 304 → 复用上轮状态；网络抛错 → 不动，下轮重读
 //   ⑬ 合并行写明是谁合并的
-// 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（🎉 行 + 拆卡波次）。
+// pr-gate 第二轮（#1414）补的：
+//   ⑭ PR 合并之后同分支又推了提交（修复轮）→ 那个提交没进 main，不得收尾；
+//      GitHub 的 update-branch 合并提交盖在 checkpoint 之上 → 仍算已合并
+//   ⑮ 在飞步口径：waiting_quota 的 merge 步算在飞；没人领的 verify / review
+//      步不挡对账（离线的 Verifier 不能让卡永远停在 review）
+//   ⑯ 网络窗口里 todo 换了当前 build → 不写
+//   ⑰ 错误状态码带着 PR 形的响应体 → 仍按读不到处理
+// 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -53,10 +60,13 @@ interface PullSpec {
   merged: boolean;
   mergeCommitSha?: string | null;
   mergedBy?: string;
+  headSha?: string;
+  /** compare/{checkpoint}...{head} 的 status（缺省 identical）；数字 = HTTP 错误码。 */
+  compare?: string | number;
 }
 
-/** pulls/{n} 端点 mock：按 PR 号回应；其它 URL（check-runs）一律 404，
- * 证明 review 候选不走磨绿面。 */
+/** pulls/{n} 端点 mock：按 PR 号回应；compare 按 spec 回应；其它 URL
+ * （check-runs）一律 404，证明 review 候选不走磨绿面。 */
 class PullsMock {
   requests: string[] = [];
   headers: Record<string, string>[] = [];
@@ -78,19 +88,26 @@ class PullsMock {
     if ((init?.headers?.['if-none-match'] ?? '') === '"x"') {
       return Promise.resolve(res(304, '"x"', {}));
     }
+    const cmp = url.match(/\/compare\/([0-9a-f]+)\.\.\.([0-9a-f]+)$/);
+    if (cmp !== null) {
+      const spec = Object.values(this.pulls).find((p) => (p.headSha ?? 'f'.repeat(40)) === cmp[2]);
+      const status = spec?.compare ?? 'identical';
+      if (typeof status === 'number') return Promise.resolve(res(status, '"c"', {}));
+      return Promise.resolve(res(200, '"c"', { status }));
+    }
     const m = url.match(/\/pulls\/(\d+)$/);
     if (m === null) return Promise.resolve(res(404, '"x"', {}));
-    if (this.status !== 200) return Promise.resolve(res(this.status, '"x"', {}));
     const spec = this.pulls[Number(m[1])];
     if (spec === undefined) return Promise.resolve(res(404, '"x"', {}));
+    // error statuses still carry a PR-shaped body: the status code alone must decide
     return Promise.resolve(
-      res(200, '"x"', {
+      res(this.status, '"x"', {
         number: Number(m[1]),
         state: spec.state,
         merged: spec.merged,
         merge_commit_sha: spec.mergeCommitSha ?? null,
         merged_by: spec.mergedBy === undefined ? null : { login: spec.mergedBy },
-        head: { sha: 'f'.repeat(40) },
+        head: { sha: spec.headSha ?? 'f'.repeat(40) },
       }),
     );
   };
@@ -113,8 +130,11 @@ function makeWorld(
     olderClosedPr?: number;
     /** a newer build of the same todo becomes todo.latestBuildId (null = no PR). */
     newerBuildPr?: number | null;
-    /** a step of the PR build still in flight (the merge step). */
-    inflight?: 'pending' | 'claimed';
+    /** a step of the PR build still in flight (the merge step by default). */
+    inflight?: 'pending' | 'claimed' | 'waiting_quota';
+    inflightKind?: 'merge' | 'verify' | 'review';
+    /** the build step's checkpointCommit (branch HEAD at step end). */
+    checkpoint?: string;
     /** GitHub connected (token present); default anonymous. */
     connected?: boolean;
   } = {},
@@ -203,9 +223,22 @@ function makeWorld(
       .values({
         id: `step-merge-${rnd}`,
         buildId,
-        kind: 'merge',
+        kind: opts.inflightKind ?? 'merge',
         status: opts.inflight,
         createdAt: base,
+      })
+      .run();
+  }
+  if (opts.checkpoint !== undefined) {
+    s.db
+      .insert(stepTable)
+      .values({
+        id: `step-build-${rnd}`,
+        buildId,
+        kind: 'build',
+        status: 'done',
+        checkpointCommit: opts.checkpoint,
+        createdAt: base - 30_000,
       })
       .run();
   }
@@ -409,6 +442,76 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     await pollerFor(w, mock).sweep();
     expect(w.systemRows().some((c) => c.includes('abc1234') && c.includes('octocat'))).toBe(true);
+  });
+
+  test('⑭a merged, but the branch has a later commit the merge does not contain → stays in review with a hint', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    const mock = new PullsMock({
+      [w.prNumber]: {
+        state: 'closed',
+        merged: true,
+        mergeCommitSha: 'abc1234',
+        compare: 'diverged',
+      },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().some((c) => c.includes('aaaaaaa') && c.includes(`#${w.prNumber}`))).toBe(
+      true,
+    );
+  });
+
+  test('⑭b merged at a head built on top of the checkpoint (update-branch) → done', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, mergeCommitSha: 'abc1234', compare: 'ahead' },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('done');
+  });
+
+  test('⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, compare: 404 },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test('⑮a a merge step waiting for quota counts as in flight', async () => {
+    const w = makeWorld({ inflight: 'waiting_quota' });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test.each(['verify', 'review'] as const)(
+    '⑮b an unclaimed %s step does not hold the reconcile',
+    async (inflightKind) => {
+      const w = makeWorld({ inflight: 'pending', inflightKind });
+      const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+      await pollerFor(w, mock).sweep();
+      expect(w.todoRow().phase).toBe('done');
+    },
+  );
+
+  test('⑯ the todo gets a new current build during the network window → no write', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    const racing = (input: string | URL, init?: { headers?: Record<string, string> }) => {
+      w.s.db
+        .update(todoTable)
+        .set({ latestBuildId: 'build-elsewhere' })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+      return mock.fetch(input, init);
+    };
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing }).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
   });
 
   test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {

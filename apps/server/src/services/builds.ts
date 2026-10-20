@@ -755,7 +755,7 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
 /** todo 最新的「产过 PR 的 build」（prUrl/prNumber 任一非空 = daemon 步收尾
  * 探测回填在位，github 形态独有）。更旧的 PR build 属被取代分支（存量收敛
  * 规则 = spec 23）；无 → null（返工走现行新 build 路）。 */
-export function latestPrBuild(db: Db, todoId: string): BuildRow | null {
+function latestPrBuild(db: Db, todoId: string): BuildRow | null {
   return (
     db
       .select()
