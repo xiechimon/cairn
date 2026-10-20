@@ -99,6 +99,20 @@ export const resourcesDefault: FixtureSet = {
   resources: RESOURCES,
 };
 
+/** #1416 技能多行命名场景（无 capture，chief-md 先例）：三行可点的技能行，
+ *  钉住按钮行之间的分隔线（单行的默认集画不出「行间」）。 */
+export const resourcesSkillsList: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    skills: [
+      { name: 'r3-probe-skill', description: 'R3 盘点测试技能' },
+      { name: 'release-notes', description: '按提交历史起草发布说明' },
+      { name: 'repo-audit', description: '盘点仓库依赖与许可证' },
+    ],
+  },
+};
+
 /** #356 未安装分支 canon（spec 11 §A4）：机器上既没有 settings.json 也没有
  *  claude 二进制 → header 转「未安装」指引态、模型行零渲染。#1050 起
  *  「没装」在 wire 上是 `bin: null`（探过了没有），不是键缺席。 */

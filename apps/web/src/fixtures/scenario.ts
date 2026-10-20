@@ -91,6 +91,7 @@ import {
   resourcesCcMissing,
   resourcesCcNoConfig,
   resourcesDefault,
+  resourcesSkillsList,
   reusedBuilding,
   reusePanel15,
   revisionChain,
@@ -386,6 +387,8 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       '08': resourcesDefault,
       '09': resourcesDefault,
       '10': resourcesDefault,
+      // #1416 技能多行（无 capture）：三行可点技能行，钉行间分隔线。
+      'skills-list': resourcesSkillsList,
       // #356 未安装分支（spec 11 §A4）：claude-code settings.json 缺失 →
       // header 未安装指引态的 fixture 钉
       '10-cc-missing': resourcesCcMissing,
