@@ -1,6 +1,6 @@
 # 停止钮(详情页 composer,#308)
 
-用户在运行中的任务详情页中断失控的一轮:streaming 时 composer 出现停止钮 → 确认弹层「停止当前这一轮？」(默认勾选「丢弃本轮修改——方案和代码回到上一个版本」)→ 停止 → transcript 运行行「正在停止…」过渡 → 终态「已取消」,todo 回落上一完成 turn 的 gate(首轮规划被停 = 回「待处理」,开始钮回位)。这是详情页第一个入图的 live 面;需要全栈(server + web + 真 daemon + pi),stub LLM 门控延迟轮提供停止窗口。
+用户在运行中的任务详情页中断失控的一轮:streaming 时 composer 出现停止钮 → 确认弹层「停止当前这一轮？」(默认勾选「丢弃本轮修改——方案和代码回到上一个版本」)→ 停止 → transcript 运行行「正在停止…」过渡 → 终态「已取消」,todo 回落上一完成 turn 的 gate(首轮规划被停 = 回「待开始」,开始钮回位)。这是详情页第一个入图的 live 面;需要全栈(server + web + 真 daemon + pi),stub LLM 门控延迟轮提供停止窗口。
 
 ## Sub-features
 

@@ -891,6 +891,23 @@
         }
       }
     },
+    "phase-chip-words": {
+      "recipe": null,
+      "cases": {
+        "chip-word": {
+          "script": ".claude/skills/verify-pacman/scripts/drive-1400-chip-word.mjs",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "#1400: the phase chip word on every surface (board columns, detail header for todo / queued / confirm, Cmd-K search rows, schedule card, project task row). --expect=new wants 待开始 for todo and 排队中 for queued, and 待处理 only for the needs-you column; --expect=old records the base build. Seeds over REST and a direct UPDATE on the scratch SQLite; rerun needs a fresh stack.",
+          "usage": "[--expect=new|--expect=old]"
+        }
+      }
+    },
     "pi-convergence": {
       "recipe": null,
       "cases": {

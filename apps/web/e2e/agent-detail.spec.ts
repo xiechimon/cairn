@@ -767,9 +767,9 @@ test('概览：有在跑任务时列出行，段头带计数', async ({ page }) 
   await expect(rows.nth(0).locator('.agent-task-title')).toHaveText(
     'README 文档目录 + 新建 CHANGELOG.md + scripts/',
   );
-  // 等机器的一行 chip = `queued` 档的文案（待处理）。载体 = StatusChip 的
+  // 等机器的一行 chip = `queued` 档的文案（排队中，#1400）。载体 = StatusChip 的
   // data-tone 状态属性（spec/22 §5.2，#910 裁定 3 状态类归行为的 data-* 载体）
-  await expect(rows.nth(0).locator('[data-tone="idle"]')).toHaveText('待处理');
+  await expect(rows.nth(0).locator('[data-tone="idle"]')).toHaveText('排队中');
   // 跑起来的一行 chip 吃 todo.phase（building → 执行中）
   await expect(rows.nth(1).locator('.agent-task-seq')).toHaveText('#13');
   await expect(rows.nth(1).locator('[data-tone="plan"]')).toHaveText('执行中');
