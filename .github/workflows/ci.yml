@@ -68,6 +68,20 @@ jobs:
           fi
           node scripts/lane-file-gate.mjs
 
+      # verify-pacman registry gate (#1402): every script under the skill's
+      # scripts/ is listed in vp-registry.json and run through vp.mjs, and no
+      # new drive-<ticket>.mjs lands (99 scripts, 51 of them unreferenced,
+      # before the registry). Zero-dependency, pre-install; the added-only
+      # leg takes the PR base sha the same way the lane file gate does.
+      - name: Verify registry gate (#1402)
+        env:
+          VERIFY_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$VERIFY_REGISTRY_BASE_SHA" ]; then
+            git fetch --depth=1 origin "$VERIFY_REGISTRY_BASE_SHA"
+          fi
+          node scripts/verify-registry-gate.mjs
+
       # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
       # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数、裸控件
       # 总数、Tailwind 任意值（text-[Npx] 与间距类 -[Npx] 两个总数，Paper

@@ -1,0 +1,38 @@
+## (a) new ticket-numbered driver, registered
+verify-registry-gate leg 1: 101 script(s) on disk, 0 unregistered
+verify-registry-gate leg 2 (added vs base 4ab0d89d3ca7): 1 hit(s)
+verify-registry-gate: .claude/skills/verify-pacman/scripts/drive-9999-demo.mjs is a new ticket-numbered driver
+
+Fix: register the script under its feature in vp-registry.json (or under "support"
+when it is not a driver), name new drivers by what they verify instead of the ticket,
+and run them through `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> <case>`.
+exit=1
+
+## (b) new driver not in the registry
+verify-registry-gate leg 1: 102 script(s) on disk, 1 unregistered
+verify-registry-gate leg 2: skipped (no base sha; local run or push event)
+verify-registry-gate: .claude/skills/verify-pacman/scripts/drive-unlisted.mjs is not in .claude/skills/verify-pacman/vp-registry.json
+
+Fix: register the script under its feature in vp-registry.json (or under "support"
+when it is not a driver), name new drivers by what they verify instead of the ticket,
+and run them through `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> <case>`.
+exit=1
+
+## (c) registered script missing
+verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
+verify-registry-gate leg 2: skipped (no base sha; local run or push event)
+verify-registry-gate: demo/demo: registered script is missing: .claude/skills/verify-pacman/scripts/drive-9999-demo.mjs
+
+Fix: register the script under its feature in vp-registry.json (or under "support"
+when it is not a driver), name new drivers by what they verify instead of the ticket,
+and run them through `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> <case>`.
+exit=1
+
+## (d) registry does not parse
+verify-registry-gate leg 2: skipped (no base sha; local run or push event)
+verify-registry-gate: .claude/skills/verify-pacman/vp-registry.json does not parse: Expected property name or '}' in JSON at position 2 (line 2 column 1)
+
+Fix: register the script under its feature in vp-registry.json (or under "support"
+when it is not a driver), name new drivers by what they verify instead of the ticket,
+and run them through `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> <case>`.
+exit=1

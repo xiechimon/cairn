@@ -1,0 +1,11 @@
+$ node scripts/verify-registry-gate.mjs
+verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
+verify-registry-gate leg 2: skipped (no base sha; local run or push event)
+verify-registry-gate: OK
+exit=0
+
+$ node scripts/verify-registry-gate.mjs --base origin/main
+verify-registry-gate leg 1: 100 script(s) on disk, 0 unregistered
+verify-registry-gate leg 2 (added vs base origin/main): 0 hit(s)
+verify-registry-gate: OK
+exit=0
