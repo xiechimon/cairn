@@ -1,0 +1,4 @@
+# origin/main f436dd29 fixture build, preview :8418
+{"base":"http://127.0.0.1:8418","chip":"R r3-lifecycle","writes":["POST /api/projects/ZAQczKCu0MOAzC1ZqcFlX/todos"],"toast":"新建任务失败，请重试。\nnot found"}
+# this branch, fixture build, preview :8419
+{"base":"http://127.0.0.1:8419","chip":"(no chip)","writes":[],"toast":"新建任务失败，请重试。"}

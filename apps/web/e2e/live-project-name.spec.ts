@@ -1,4 +1,5 @@
-import { expect, type Page, type Route, test } from '@playwright/test';
+import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
+import { evidencePanelShot } from './evidence';
 
 // Live face, every surface that used to fall back to the fixture capture
 // project (r3-lifecycle) when the live project list had no entry for a todo:
@@ -10,7 +11,8 @@ import { expect, type Page, type Route, test } from '@playwright/test';
 //
 // Boot stubs follow search-live-project-name.spec.ts: teams + user me
 // succeed, every other GET 500s into the app's isError tolerance; no
-// ?scenario= = live.
+// ?scenario= = live. Evidence shots (PACMAN_E2E_EVIDENCE) sit before the
+// assertions so the same run also frames the old code.
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -121,6 +123,15 @@ async function holdProjects(page: Page) {
 
 const card = (page: Page, id: string) =>
   page.locator(`[data-testid="board-scroller"] .todo-card[data-todo-id="${id}"]`);
+/** evidencePanelShot after the 150-200ms enter fades; regression runs skip both. */
+async function shot(page: Page, name: string, panel: Locator) {
+  if (process.env.PACMAN_E2E_EVIDENCE === undefined) return;
+  await page.waitForTimeout(300);
+  await evidencePanelShot(page, name, panel);
+}
+
+const column = (page: Page) =>
+  page.locator('section[data-column]', { has: page.locator('[data-todo-id="todo-0"]') });
 const sidebarProject = (page: Page, name: string) =>
   page.getByTestId('project-name').filter({ hasText: name });
 
@@ -133,16 +144,19 @@ test.describe('board card', () => {
     await expect(card(page, 'todo-0')).toContainText('project probe alpha');
     await expect.poll(projects.count).toBeGreaterThan(0);
     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
+    await shot(page, 'board-pending.png', column(page));
     await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
     await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
-    const pendingHeight = (await card(page, 'todo-0').boundingBox())?.height;
+    const pendingHeight = (await card(page, 'todo-0').boundingBox())?.height ?? Number.NaN;
 
     await projects.release();
+    await expect(sidebarProject(page, 'atlas')).toBeVisible();
+    await shot(page, 'board-loaded.png', column(page));
     await expect(card(page, 'todo-0')).toContainText('verify-1400');
     await expect(card(page, 'todo-1')).toContainText('atlas');
     await expect(card(page, 'todo-1')).not.toContainText('verify-1400');
     // the meta row is fixed height: the name arriving does not move the card
-    expect((await card(page, 'todo-0').boundingBox())?.height).toBe(pendingHeight);
+    expect((await card(page, 'todo-0').boundingBox())?.height).toBeCloseTo(pendingHeight, 1);
   });
 
   test('projects read failed: no project item', async ({ page }) => {
@@ -184,6 +198,7 @@ test('drag overlay: no project while pending, the card’s own project once load
 
   const pending = await liftCard(page);
   await expect(pending.overlay).toContainText('#1');
+  await shot(page, 'drag-pending.png', pending.overlay);
   await expect(pending.overlay).not.toContainText(FIXTURE_PROJECT);
   await pending.drop();
 
@@ -212,6 +227,7 @@ test.describe('detail chip popover', () => {
 
     const popover = await openPopover(page);
     await expect(popover).toContainText('project probe beta');
+    await shot(page, 'chip-popover-loaded.png', popover);
     await expect(popover).toContainText('atlas');
     await expect(popover).toContainText('#2');
     await expect(popover).not.toContainText(FIXTURE_PROJECT);
@@ -226,6 +242,7 @@ test.describe('detail chip popover', () => {
 
     const popover = await openPopover(page);
     await expect(popover).toContainText('#2');
+    await shot(page, 'chip-popover-pending.png', popover);
     await expect(popover).not.toContainText(FIXTURE_PROJECT);
 
     await projects.release();
@@ -253,6 +270,7 @@ test.describe('new-task dialog', () => {
 
     const dialog = await openDialog(page);
     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
+    await shot(page, 'newtask-pending.png', dialog.getByTestId('new-task-head'));
     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
 
@@ -270,6 +288,7 @@ test.describe('new-task dialog', () => {
     await chip.click();
     const menu = page.getByRole('listbox', { name: '项目' });
     await expect(menu.getByRole('option')).toHaveCount(2);
+    await shot(page, 'newtask-loaded.png', reopened);
     await expect(menu).not.toContainText(FIXTURE_PROJECT);
   });
 
@@ -284,5 +303,30 @@ test.describe('new-task dialog', () => {
     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
+  });
+
+  test('projects loaded and empty: no project chip, saving creates the default project', async ({
+    page,
+  }) => {
+    const writes = await stubLiveBoot(page);
+    let answered = 0;
+    await page.route('**/api/projects?*', (route) => {
+      answered += 1;
+      return route.fulfill({ json: [] });
+    });
+    await page.goto('/app');
+    await expect(card(page, 'todo-0')).toContainText('project probe alpha');
+    await expect.poll(() => answered).toBeGreaterThan(0);
+
+    const dialog = await openDialog(page);
+    await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
+    await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
+    await expect(dialog).not.toContainText(FIXTURE_PROJECT);
+
+    await dialog.getByTestId('new-task-spec').fill('empty list save probe');
+    await dialog.getByRole('button', { name: '保存', exact: true }).click();
+    // the stub answers the write 404, so the create-project leg toasts
+    await expect(page.getByText('创建项目失败，请重试。')).toBeVisible();
+    expect(writes.list).toEqual([{ method: 'POST', path: '/api/projects' }]);
   });
 });

@@ -1,14 +1,8 @@
-[WebServer] [plugin builtin:vite-reporter] 
-[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
-[WebServer] - Using dynamic import() to code-split the application
-[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
-[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 
+Running 8 tests using 1 worker
 
-Running 7 tests using 1 worker
-
-[1/7] e2e/live-project-name.spec.ts:128:3 › board card › projects pending: no project item, then each card’s own project
-  1) e2e/live-project-name.spec.ts:128:3 › board card › projects pending: no project item, then each card’s own project 
+[1/8] e2e/live-project-name.spec.ts:139:3 › board card › projects pending: no project item, then each card’s own project
+  1) e2e/live-project-name.spec.ts:139:3 › board card › projects pending: no project item, then each card’s own project 
 
     Error: expect(locator).not.toContainText(expected) failed
 
@@ -24,20 +18,20 @@ Running 7 tests using 1 worker
            - unexpected value "project probe alphar3-lifecycle#120747 天前开始"
 
 
-      134 |     await expect.poll(projects.count).toBeGreaterThan(0);
-      135 |     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
-    > 136 |     await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
+      146 |     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
+      147 |     await shot(page, 'board-pending.png', column(page));
+    > 148 |     await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
           |                                            ^
-      137 |     await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
-      138 |     const pendingHeight = (await card(page, 'todo-0').boundingBox())?.height;
-      139 |
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:136:44
+      149 |     await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
+      150 |     const pendingHeight = (await card(page, 'todo-0').boundingBox())?.height ?? Number.NaN;
+      151 |
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:148:44
 
     Error Context: test-results/live-project-name-board-ca-5b16b-hen-each-card’s-own-project/error-context.md
 
 
-[2/7] e2e/live-project-name.spec.ts:148:3 › board card › projects read failed: no project item
-  2) e2e/live-project-name.spec.ts:148:3 › board card › projects read failed: no project item ──────
+[2/8] e2e/live-project-name.spec.ts:162:3 › board card › projects read failed: no project item
+  2) e2e/live-project-name.spec.ts:162:3 › board card › projects read failed: no project item ──────
 
     Error: expect(locator).not.toContainText(expected) failed
 
@@ -53,20 +47,20 @@ Running 7 tests using 1 worker
            - unexpected value "project probe alphar3-lifecycle#120747 天前开始"
 
 
-      153 |     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
-      154 |     await projects.settled();
-    > 155 |     await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
+      167 |     await expect(card(page, 'todo-0').locator('.todo-card-meta')).toContainText('#1');
+      168 |     await projects.settled();
+    > 169 |     await expect(card(page, 'todo-0')).not.toContainText(FIXTURE_PROJECT);
           |                                            ^
-      156 |     await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
-      157 |   });
-      158 | });
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:155:44
+      170 |     await expect(card(page, 'todo-1')).not.toContainText(FIXTURE_PROJECT);
+      171 |   });
+      172 | });
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:169:44
 
     Error Context: test-results/live-project-name-board-ca-d4983-read-failed-no-project-item/error-context.md
 
 
-[3/7] e2e/live-project-name.spec.ts:176:1 › drag overlay: no project while pending, the card’s own project once loaded
-  3) e2e/live-project-name.spec.ts:176:1 › drag overlay: no project while pending, the card’s own project once loaded 
+[3/8] e2e/live-project-name.spec.ts:190:1 › drag overlay: no project while pending, the card’s own project once loaded
+  3) e2e/live-project-name.spec.ts:190:1 › drag overlay: no project while pending, the card’s own project once loaded 
 
     Error: expect(locator).not.toContainText(expected) failed
 
@@ -82,20 +76,20 @@ Running 7 tests using 1 worker
            - unexpected value "project probe alphar3-lifecycle#1"
 
 
-      185 |   const pending = await liftCard(page);
-      186 |   await expect(pending.overlay).toContainText('#1');
-    > 187 |   await expect(pending.overlay).not.toContainText(FIXTURE_PROJECT);
+      200 |   await expect(pending.overlay).toContainText('#1');
+      201 |   await shot(page, 'drag-pending.png', pending.overlay);
+    > 202 |   await expect(pending.overlay).not.toContainText(FIXTURE_PROJECT);
           |                                     ^
-      188 |   await pending.drop();
-      189 |
-      190 |   await projects.release();
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:187:37
+      203 |   await pending.drop();
+      204 |
+      205 |   await projects.release();
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:202:37
 
     Error Context: test-results/live-project-name-drag-ove-cc397-d’s-own-project-once-loaded/error-context.md
 
 
-[4/7] e2e/live-project-name.spec.ts:207:3 › detail chip popover › projects loaded: the head names the todo’s own project
-  4) e2e/live-project-name.spec.ts:207:3 › detail chip popover › projects loaded: the head names the todo’s own project 
+[4/8] e2e/live-project-name.spec.ts:222:3 › detail chip popover › projects loaded: the head names the todo’s own project
+  4) e2e/live-project-name.spec.ts:222:3 › detail chip popover › projects loaded: the head names the todo’s own project 
 
     Error: expect(locator).toContainText(expected) failed
 
@@ -111,20 +105,20 @@ Running 7 tests using 1 worker
            - unexpected value "rr3-lifecycle#2project probe beta任务我执行对话未指派 · claude-sonnet-5 · 默认编辑分配"
 
 
-      213 |     const popover = await openPopover(page);
-      214 |     await expect(popover).toContainText('project probe beta');
-    > 215 |     await expect(popover).toContainText('atlas');
+      229 |     await expect(popover).toContainText('project probe beta');
+      230 |     await shot(page, 'chip-popover-loaded.png', popover);
+    > 231 |     await expect(popover).toContainText('atlas');
           |                           ^
-      216 |     await expect(popover).toContainText('#2');
-      217 |     await expect(popover).not.toContainText(FIXTURE_PROJECT);
-      218 |     await expect(popover).not.toContainText('verify-1400');
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:215:27
+      232 |     await expect(popover).toContainText('#2');
+      233 |     await expect(popover).not.toContainText(FIXTURE_PROJECT);
+      234 |     await expect(popover).not.toContainText('verify-1400');
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:231:27
 
     Error Context: test-results/live-project-name-detail-c-a5c62-ames-the-todo’s-own-project/error-context.md
 
 
-[5/7] e2e/live-project-name.spec.ts:221:3 › detail chip popover › projects pending: the head has no project, then fills in
-  5) e2e/live-project-name.spec.ts:221:3 › detail chip popover › projects pending: the head has no project, then fills in 
+[5/8] e2e/live-project-name.spec.ts:237:3 › detail chip popover › projects pending: the head has no project, then fills in
+  5) e2e/live-project-name.spec.ts:237:3 › detail chip popover › projects pending: the head has no project, then fills in 
 
     Error: expect(locator).not.toContainText(expected) failed
 
@@ -140,20 +134,20 @@ Running 7 tests using 1 worker
            - unexpected value "rr3-lifecycle#2project probe beta任务我执行对话未指派 · claude-sonnet-5 · 默认编辑分配"
 
 
-      227 |     const popover = await openPopover(page);
-      228 |     await expect(popover).toContainText('#2');
-    > 229 |     await expect(popover).not.toContainText(FIXTURE_PROJECT);
+      244 |     await expect(popover).toContainText('#2');
+      245 |     await shot(page, 'chip-popover-pending.png', popover);
+    > 246 |     await expect(popover).not.toContainText(FIXTURE_PROJECT);
           |                               ^
-      230 |
-      231 |     await projects.release();
-      232 |     await expect(popover).toContainText('atlas');
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:229:31
+      247 |
+      248 |     await projects.release();
+      249 |     await expect(popover).toContainText('atlas');
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:246:31
 
     Error Context: test-results/live-project-name-detail-c-edf93-as-no-project-then-fills-in/error-context.md
 
 
-[6/7] e2e/live-project-name.spec.ts:245:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project
-  6) e2e/live-project-name.spec.ts:245:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project 
+[6/8] e2e/live-project-name.spec.ts:262:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project
+  6) e2e/live-project-name.spec.ts:262:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project 
 
     Error: expect(locator).toHaveCount(expected) failed
 
@@ -169,20 +163,20 @@ Running 7 tests using 1 worker
            - unexpected value "1"
 
 
-      254 |     const dialog = await openDialog(page);
-      255 |     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
-    > 256 |     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
+      272 |     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
+      273 |     await shot(page, 'newtask-pending.png', dialog.getByTestId('new-task-head'));
+    > 274 |     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
           |                                                               ^
-      257 |     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
-      258 |
-      259 |     await dialog.getByTestId('new-task-spec').fill('pending save probe');
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:256:63
+      275 |     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
+      276 |
+      277 |     await dialog.getByTestId('new-task-spec').fill('pending save probe');
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:274:63
 
     Error Context: test-results/live-project-name-new-task-64e62-othing-to-a-fixture-project/error-context.md
 
 
-[7/7] e2e/live-project-name.spec.ts:276:3 › new-task dialog › projects read failed: no project chip
-  7) e2e/live-project-name.spec.ts:276:3 › new-task dialog › projects read failed: no project chip ─
+[7/8] e2e/live-project-name.spec.ts:295:3 › new-task dialog › projects read failed: no project chip
+  7) e2e/live-project-name.spec.ts:295:3 › new-task dialog › projects read failed: no project chip ─
 
     Error: expect(locator).toHaveCount(expected) failed
 
@@ -198,23 +192,53 @@ Running 7 tests using 1 worker
            - unexpected value "1"
 
 
-      283 |     const dialog = await openDialog(page);
-      284 |     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
-    > 285 |     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
+      302 |     const dialog = await openDialog(page);
+      303 |     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
+    > 304 |     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
           |                                                               ^
-      286 |     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
-      287 |   });
-      288 | });
-        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:285:63
+      305 |     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
+      306 |   });
+      307 |
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:304:63
 
     Error Context: test-results/live-project-name-new-task-434e9-read-failed-no-project-chip/error-context.md
 
 
-  7 failed
-    e2e/live-project-name.spec.ts:128:3 › board card › projects pending: no project item, then each card’s own project 
-    e2e/live-project-name.spec.ts:148:3 › board card › projects read failed: no project item ───────
-    e2e/live-project-name.spec.ts:176:1 › drag overlay: no project while pending, the card’s own project once loaded 
-    e2e/live-project-name.spec.ts:207:3 › detail chip popover › projects loaded: the head names the todo’s own project 
-    e2e/live-project-name.spec.ts:221:3 › detail chip popover › projects pending: the head has no project, then fills in 
-    e2e/live-project-name.spec.ts:245:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project 
-    e2e/live-project-name.spec.ts:276:3 › new-task dialog › projects read failed: no project chip ──
+[8/8] e2e/live-project-name.spec.ts:308:3 › new-task dialog › projects loaded and empty: no project chip, saving creates the default project
+  8) e2e/live-project-name.spec.ts:308:3 › new-task dialog › projects loaded and empty: no project chip, saving creates the default project 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByRole('dialog', { name: '新建任务' }).getByTestId('new-task-project-chip')
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByRole('dialog', { name: '新建任务' }).getByTestId('new-task-project-chip') with timeout 5000ms
+      - waiting for getByRole('dialog', { name: '新建任务' }).getByTestId('new-task-project-chip')
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      321 |     const dialog = await openDialog(page);
+      322 |     await expect(dialog.getByTestId('new-task-head')).toContainText('新建任务');
+    > 323 |     await expect(dialog.getByTestId('new-task-project-chip')).toHaveCount(0);
+          |                                                               ^
+      324 |     await expect(dialog).not.toContainText(FIXTURE_PROJECT);
+      325 |
+      326 |     await dialog.getByTestId('new-task-spec').fill('empty list save probe');
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/recursing-poitras-2ef407/apps/web/e2e/live-project-name.spec.ts:323:63
+
+    Error Context: test-results/live-project-name-new-task-26f75-creates-the-default-project/error-context.md
+
+
+  8 failed
+    e2e/live-project-name.spec.ts:139:3 › board card › projects pending: no project item, then each card’s own project 
+    e2e/live-project-name.spec.ts:162:3 › board card › projects read failed: no project item ───────
+    e2e/live-project-name.spec.ts:190:1 › drag overlay: no project while pending, the card’s own project once loaded 
+    e2e/live-project-name.spec.ts:222:3 › detail chip popover › projects loaded: the head names the todo’s own project 
+    e2e/live-project-name.spec.ts:237:3 › detail chip popover › projects pending: the head has no project, then fills in 
+    e2e/live-project-name.spec.ts:262:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project 
+    e2e/live-project-name.spec.ts:295:3 › new-task dialog › projects read failed: no project chip ──
+    e2e/live-project-name.spec.ts:308:3 › new-task dialog › projects loaded and empty: no project chip, saving creates the default project 
