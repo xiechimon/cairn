@@ -1,0 +1,19 @@
+# P2c red leg: the new tests on the P2b head 8fcdb0f with only the two test files changed
+$ pnpm exec vitest run test/ci-head-sha.test.ts test/github-human-merge.test.ts
+     × ⑨ commit_title is the PR title with the PR number 46ms
+     × ⑩ source issue github:octo/demo#55 → commit_message closes #55 45ms
+     × ⑩ source issue github:other/repo#7 → commit_message closes other/repo#7 54ms
+     × ① check-runs are read at the PR head SHA, not the branch 74ms
+     × ② a failing check that is not required does not start a fix round 46ms
+     × ③ a cancelled required check is red 41ms
+     × ⑤ a required check that has not reported waits for the grace, then hands over 42ms
+     × ⑦ ruleset required checks count 41ms
+     × ⑧a PR merged on GitHub while building → done with the merge sha 35ms
+     × ⑧b PR closed without merge while building → failed 34ms
+     × ⑬ anonymous: the grind reads a PR at most once per five minutes 35ms
+     × ⑫ the required list is read once across sweeps 35ms
+     × ⑨ BEHIND → one hint naming update-branch, not repeated on the next sweep 35ms
+     × ⑩ DIRTY → one hint naming the conflict; no step, phase stays review 35ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 14 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  2 failed (2)
+      Tests  14 failed | 15 passed (29)

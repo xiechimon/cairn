@@ -1,0 +1,12 @@
+# P2c green leg
+$ pnpm exec vitest run test/ci-head-sha.test.ts test/github-human-merge.test.ts
+ Test Files  2 passed (2)
+      Tests  29 passed (29)
+
+$ pnpm exec vitest run   (apps/server, whole project)
+ Test Files  112 passed (112)
+      Tests  1182 passed | 1 skipped (1183)
+
+$ pnpm exec vitest run --changed origin/main   (AGENTS.md unit affected set, #1415)
+ Test Files  133 passed (133)
+      Tests  1213 passed | 1 skipped (1214)
