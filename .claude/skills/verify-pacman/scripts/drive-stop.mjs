@@ -1,7 +1,7 @@
 // verify-pacman 定制 probe（M7 #308 停止钮全链）：live 栈（server + vite +
 // 真 daemon + pi + stub LLM 门控轮）走真用户路径——详情页 开始 → streaming
 // 停止钮 → 确认弹层（默认勾选丢弃）→ 停止 → 「正在停止…」过渡 → 运行行
-// 「已取消」→ gate 回落（chip 待处理 + 开始钮回位）。
+// 「已取消」→ gate 回落（chip 待开始 + 开始钮回位）。
 // 真值三面：HTTP API JSON + SQLite 行 + daemon.log 行；证据 = 截图 + result.json。
 //
 // 前置（配方见 features/stop-button.md）：launch.mjs 起栈 + stub-llm-verify.mjs
@@ -101,10 +101,11 @@ try {
   }
   check('stopping-transition', sawStopping, sawStopping ? '「正在停止…」上屏' : '窗口过窄未截获');
 
-  // —— 运行行「已取消」+ gate 回落（chip 待处理 / 开始钮回位）——
+  // —— 运行行「已取消」+ gate 回落（chip 待开始 / 开始钮回位）——
   await page.waitForSelector('.chat-stamp-cancelled', { timeout: 60_000 });
   const cancelledText = await page.$eval('.chat-stamp-cancelled', (el) => el.textContent);
-  await page.waitForSelector('button:has-text("开始")', { timeout: 30_000 });
+  // 头部主钮专属类：phase chip 也是 <button>，回落后读「待开始」，含「开始」子串
+  await page.waitForSelector('.detail-head-action:has-text("开始")', { timeout: 30_000 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(EVIDENCE, '04-cancelled-run-row.png'), fullPage: true });
   check('cancelled-run-row', cancelledText === '已取消', `stamp=${cancelledText}`);
