@@ -8,10 +8,10 @@
 //   board columns (待开始 holds todo + queued, 待处理 holds confirm),
 //   detail header chip (fresh / queued / confirm), ⌘K search row chips,
 //   schedule card chip, project task row status.
-// --expect=new (default): todo / queued chips read 待开始 and no chip reads
-// 待处理. --expect=old: the same reads on the pre-#1400 build, where those
-// chips read 待处理 (the before half; run it from a worktree of the base
-// commit with VERIFY_REPO_ROOT + its own ports and VERIFY_RUN_DIR).
+// --expect=new (default): the todo chip reads 待开始, the queued chip 排队中,
+// and no chip reads 待处理. --expect=old: the same reads on the pre-#1400
+// build, where both chips read 待处理 (the before half: launch the base
+// worktree's stack and point VERIFY_REPO_ROOT + VERIFY_RUN_DIR at it).
 // Stack must already run (launch.mjs; coordinates from VERIFY_RUN_DIR/
 // ports.json). Evidence (screenshots + result.json + SQLite rows) lands in
 // VERIFY_EVIDENCE_DIR; delivery per SKILL.md 证据归档纪律. Exit 1 on any FAIL.
@@ -30,6 +30,7 @@ if (!['old', 'new'].includes(EXPECT)) {
   process.exit(2);
 }
 const FRESH_WORD = EXPECT === 'old' ? '待处理' : '待开始';
+const QUEUED_WORD = EXPECT === 'old' ? '待处理' : '排队中';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const ROOT = process.env.VERIFY_REPO_ROOT ? resolve(process.env.VERIFY_REPO_ROOT) : SCRIPT_ROOT;
@@ -160,7 +161,7 @@ try {
   const detailChips = {};
   for (const [id, label, want] of [
     [fresh, 'fresh', FRESH_WORD],
-    [queued, 'queued', FRESH_WORD],
+    [queued, 'queued', QUEUED_WORD],
     [confirm, 'confirm', '确认'],
   ]) {
     await card(id).locator('a').first().click();
@@ -204,8 +205,8 @@ try {
   };
   payloads.searchChips = searchChips;
   check(
-    searchChips.fresh === FRESH_WORD && searchChips.queued === FRESH_WORD,
-    `search: fresh / queued rows read ${FRESH_WORD} (${JSON.stringify(searchChips)})`,
+    searchChips.fresh === FRESH_WORD && searchChips.queued === QUEUED_WORD,
+    `search: fresh reads ${FRESH_WORD}, queued ${QUEUED_WORD} (${JSON.stringify(searchChips)})`,
   );
   check(searchChips.confirm === '确认', 'search: confirm row reads 确认');
   await shot('03-search.png');
@@ -238,8 +239,8 @@ try {
   };
   payloads.projectStatus = projectStatus;
   check(
-    projectStatus.fresh === FRESH_WORD && projectStatus.queued === FRESH_WORD,
-    `project rows: fresh / queued read ${FRESH_WORD} (${JSON.stringify(projectStatus)})`,
+    projectStatus.fresh === FRESH_WORD && projectStatus.queued === QUEUED_WORD,
+    `project rows: fresh reads ${FRESH_WORD}, queued ${QUEUED_WORD} (${JSON.stringify(projectStatus)})`,
   );
   check(projectStatus.confirm === '确认', 'project rows: confirm reads 确认');
   await shot('05-project.png');

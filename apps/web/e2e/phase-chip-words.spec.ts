@@ -2,8 +2,9 @@ import { expect, type Page, test } from '@playwright/test';
 
 // #1400: 待处理 has one meaning. It names the board column of tasks that need
 // the user (confirm / review / failed; the sidebar 需要我处理 opens it).
-// Not-started tasks (todo / queued) sit in 待开始, and every chip for those
-// two phases reads 待开始 too, so a fresh task never shows 待处理.
+// Not-started tasks (todo / queued) sit in 待开始. The todo chip reads 待开始
+// and the queued chip (started, waiting for a machine) reads 排队中, so
+// neither shows 待处理.
 // Pinned surfaces: board columns, search rows and project task rows
 // (scenario 22: fresh probe #9 beside the review / done legacy pair), detail
 // header (scenario 23), schedule cards (live stub: todo / queued / confirm
@@ -92,7 +93,7 @@ function wireSchedule(seqNum: number, phase: string) {
   };
 }
 
-test('schedule cards: todo and queued read 待开始, confirm reads 确认', async ({ page }) => {
+test('schedule cards: todo reads 待开始, queued 排队中, confirm 确认', async ({ page }) => {
   await page.route('**/api/**', (route, request) => {
     if (request.method() !== 'GET') return route.fallback();
     return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
@@ -111,7 +112,7 @@ test('schedule cards: todo and queued read 待开始, confirm reads 确认', asy
   const chip = (phase: string) =>
     cards.filter({ hasText: `定时探针 ${phase}` }).locator('[data-tone]');
   await expect(chip('todo')).toHaveText('待开始');
-  await expect(chip('queued')).toHaveText('待开始');
+  await expect(chip('queued')).toHaveText('排队中');
   await expect(chip('confirm')).toHaveText('确认');
   await expect(page.getByText('待处理', { exact: true })).toHaveCount(0);
 });
