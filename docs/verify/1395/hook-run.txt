@@ -1,0 +1,16 @@
+$ CLAUDE_CODE_REMOTE=true CLAUDE_ENV_FILE=<scratch> .claude/hooks/session-start.sh
+Packages are hard linked from the content-addressable store to the virtual store.
+  Content-addressable store is at: /root/.local/share/pnpm/store/v11
+  Virtual store is at:             node_modules/.pnpm
+.../node_modules/better-sqlite3 install: 
+.../node_modules/better-sqlite3 install: Done
+. prepare$ husky
+. prepare: Done
+Done in 980ms using pnpm v12.5.1
+exit=0 elapsed=1s
+
+$ cat $CLAUDE_ENV_FILE
+export PLAYWRIGHT_BROWSERS_PATH="/root/.cache/pacman-pw-browsers"
+
+$ git status --short pnpm-lock.yaml
+(empty = lockfile unchanged)
