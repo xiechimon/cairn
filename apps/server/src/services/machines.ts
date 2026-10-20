@@ -2019,8 +2019,9 @@ export async function finishStep(
 /** 合并落地（M3b [设计]，02 §4.2 merge 202 delegated 的 server 半）：机器合并
  * 步 push 后，bare repo 默认分支 fast-forward 到 done 回传的 conv 分支 HEAD。
  * 护栏：现 tip 必须是该 commit 祖先（非快进 = main 在合并窗口被推进 → 步按
- * failed 收尾，人工重跑，02/A6）。GitHub 形态不落地本地 ref（PR 面归后票，
- * 02 §3 接入形态）。返回 null = 落地成功/不适用；string = 失败原因。 */
+ * failed 收尾，人工重跑，02/A6）。GitHub 形态不落地本地 ref：有 PR 的
+ * build 由 requestMerge 经 REST 合 PR（#1403，不入队 merge 步），无 PR 的才走到
+ * 这里。返回 null = 落地成功/不适用；string = 失败原因。 */
 async function applyMergeLanding(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
@@ -2034,7 +2035,7 @@ async function applyMergeLanding(
     ? deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get()
     : undefined;
   if (!todoRow || projectRow?.repoKind !== 'hosted' || projectRow.repoName === null) {
-    return null; // 未绑托管 repo：无可落地 ref（github 形态 PR 面归后票）。
+    return null; // 未绑托管 repo：无可落地 ref（github 形态的 PR 由 requestMerge 合，#1403）。
   }
   if (commit === null) return 'merge step reported no commit';
   const dir = repoDirFor(deps.reposDir, todoRow.teamId, projectRow.repoName);

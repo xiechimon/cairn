@@ -51,6 +51,7 @@ import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { type BuildDeps, requestMerge } from '../src/services/builds.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -230,13 +231,30 @@ function prFetchMock(
         return {
           ok: true,
           status: 200,
-          json: async () => ({ state: st.state, merged: st.merged }),
+          json: async () => ({ state: st.state, merged: st.merged, head: { sha: 'c'.repeat(40) } }),
+          headers: { get: () => null },
+        };
+      }
+      // #1403：GitHub 形态有 PR 的人工合并经 REST 合 PR（PUT …/merge）。
+      if (String(url).endsWith(`/pulls/${num}/merge`)) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ merged: true, sha: 'd'.repeat(40) }),
           headers: { get: () => null },
         };
       }
     }
     return { ok: false, status: 404, json: async () => ({}), headers: { get: () => null } };
   }) as unknown as FetchLike;
+}
+
+/** #1403：人工合并经 REST 合 PR 需要团队 GitHub 连接。 */
+function connectGithub(w: World): void {
+  upsertGithubConnection(
+    { db: w.s.db, box: w.s.secretBox },
+    { teamId: w.teamId, login: 'octo', accessToken: 'gho_test', scope: 'read:user repo' },
+  );
 }
 
 function messagesOf(w: World, conversationId: string) {
@@ -335,16 +353,25 @@ describe('#1217 同 todo 第二张 PR 守卫（claim 面 + 合并面 + 回填面
       b2PrFields: true,
       githubFetch: prFetchMock({ [PR2_NUMBER]: { state: 'closed', merged: true } }),
     });
-    // B2 自身 PR 已合并（人在 GitHub 合的）→ pacman merge 照走（排除自身）。
+    // B2 自身 PR 已合并（人在 GitHub 合的）→ 守卫不拦（排除自身）。#1403 起
+    // GitHub 形态有 PR 的合并经 REST：PR 已合并 = 直接收尾，不入队 merge 步。
+    connectGithub(w);
     const result = await requestMerge(w.deps, w.b2Id, 'tester');
     expect(result).toEqual({ delegated: true });
-    expect(messagesOf(w, w.b2Id).some((m) => m.content === '发起了合并')).toBe(true);
-    expect(stepsOf(w, w.b2Id).some((st) => st.kind === 'merge')).toBe(true);
+    expect(stepsOf(w, w.b2Id).some((st) => st.kind === 'merge')).toBe(false);
+    expect(
+      messagesOf(w, w.b2Id).some((m) =>
+        String(m.content).includes(`PR #${PR2_NUMBER} 已在 GitHub 合并`),
+      ),
+    ).toBe(true);
   });
 
   test('失败方式 5：首 PR closed-unmerged → claim 无守卫、requestMerge 202（合法返工重投）', async () => {
     const w = makeWorld({
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: false } }),
+      githubFetch: prFetchMock({
+        [PR1_NUMBER]: { state: 'closed', merged: false },
+        [PR2_NUMBER]: { state: 'open', merged: false },
+      }),
     });
     const got = (await claimStep(
       w.machineDeps,
@@ -368,6 +395,7 @@ describe('#1217 同 todo 第二张 PR 守卫（claim 面 + 合并面 + 回填面
       .set({ prUrl: PR2_URL, prNumber: PR2_NUMBER })
       .where(eq(buildTable.id, w.b2Id))
       .run();
+    connectGithub(w);
     expect(await requestMerge(w.deps, w.b2Id, 'tester')).toEqual({ delegated: true });
   });
 

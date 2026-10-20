@@ -1,0 +1,66 @@
+# P2b red leg: G9 tests before the implementation (P2a head 39990ab + the two test edits only)
+$ pnpm exec vitest run test/chief-auto-confirm.test.ts test/gate-actor.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p2/apps/server
+
+ ❯ test/chief-auto-confirm.test.ts (7 tests | 1 failed) 17ms
+   ❯ wakeFacts — #1403 G9 review 关口不套 confirm 规则 (2)
+     × review gate → 合并只由人触发，不给自动确认三档规则 9ms
+ ❯ test/gate-actor.test.ts (13 tests | 1 failed) 827ms
+   ❯ #1403 G9 review 关口误调 confirm (1)
+     × steps confirm at review → 409，transcript 不落确认行 55ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/chief-auto-confirm.test.ts > wakeFacts — #1403 G9 review 关口不套 confirm 规则 > review gate → 合并只由人触发，不给自动确认三档规则
+AssertionError: expected '任务 #3「写一个登录页」 停驻在 review 关口。自动确认规则：先读…' not to contain '自动确认规则'
+
+Expected: "自动确认规则"
+Received: "任务 #3「写一个登录页」 停驻在 review 关口。自动确认规则：先读方案全文（用 conversation 工具读本 build 的 plan 步产出），判以下三档——1. 用户驳回后的重新规划（revision）→ 汇报新方案内容，不调 confirm_builds，等用户表态；2. 方案含真决策点（技术分叉、不可逆操作、票面含糊无法自判）→ 用 ask_user 结构化提问，逐项列决策点，不自动过闸；3. 方案与票面一致、无分叉 → 直接调 confirm_builds 过闸进 building（闸宣告行自动落审计记录），然后向用户汇报「已自动确认，进入施工」。"
+
+ ❯ test/chief-auto-confirm.test.ts:77:22
+     75|   test('review gate → 合并只由人触发，不给自动确认三档规则', () => {
+     76|     const text = wakeFacts('gate', todo({ phase: 'review' }), null);
+     77|     expect(text).not.toContain('自动确认规则');
+       |                      ^
+     78|     expect(text).not.toContain('直接调 confirm_builds');
+     79|     expect(text).toContain('只由人触发');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/gate-actor.test.ts > #1403 G9 review 关口误调 confirm > steps confirm at review → 409，transcript 不落确认行
+AssertionError: 相位不对时不得留下确认行: expected { id: '92721RkYBjKHjwmudW1ph', …(5) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+{
+  "actor": "Owner",
+  "content": "通过了确认",
+  "conversationId": "01a15b20-54cc-7f9b-86f4-d4c57e9621fc",
+  "createdAt": 1792530207953,
+  "id": "92721RkYBjKHjwmudW1ph",
+  "role": "user",
+}
+
+ ❯ test/gate-actor.test.ts:332:35
+    330|       expect(res.status).toBe(409);
+    331|       const row = rowsOf(s, s.buildId).find((m) => m.content === CONFI…
+    332|       expect(row, '相位不对时不得留下确认行').toBeUndefined();
+       |                                   ^
+    333|       const todoRow = s.db.select().from(todoTable).where(eq(todoTable…
+    334|       expect(todoRow.phase).toBe('review');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 18 passed (20)
+   Start at  21:03:24
+   Duration  3.75s (transform 55%, import 29%, tests 16%)
+
+  Transform  transforming modules took 2.97s · 55% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

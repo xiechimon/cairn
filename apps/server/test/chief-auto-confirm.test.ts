@@ -70,3 +70,17 @@ describe('wakeFacts — #1254 auto-confirm gate 文本', () => {
     expect(text).not.toContain('confirm_builds');
   });
 });
+
+describe('wakeFacts — #1403 G9 review 关口不套 confirm 规则', () => {
+  test('review gate → 合并只由人触发，不给自动确认三档规则', () => {
+    const text = wakeFacts('gate', todo({ phase: 'review' }), null);
+    expect(text).not.toContain('自动确认规则');
+    expect(text).not.toContain('直接调 confirm_builds');
+    expect(text).toContain('只由人触发');
+  });
+
+  test('confirm gate 不受影响', () => {
+    const text = wakeFacts('gate', todo({ phase: 'confirm' }), null);
+    expect(text).toContain('自动确认规则');
+  });
+});

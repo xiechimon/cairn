@@ -60,7 +60,13 @@ import {
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { type FetchLike, githubPullState } from '../lib/github.js';
+import {
+  type FetchLike,
+  githubMergePull,
+  githubPreferredMergeMethod,
+  githubPull,
+  githubPullState,
+} from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
@@ -1049,6 +1055,9 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
+    // #1403 G9：先判边再落宣告行——相位不在 confirm 时 409 且零痕迹（此前先落
+    // 「通过了确认」行，setTodoPhase 再抛 409，审计里留一行没发生的确认）。
+    assertPhaseTransition(todoRecord.phase, 'building');
     // #902 确认闸通过宣告行（MERGE/REVIEW 同族行形）：actor 位答「在场的
     // 是谁」——此前 confirm 闸被按过在库里零痕迹（#892 §6 建议 3）。
     insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);
@@ -1281,9 +1290,24 @@ export async function requestMerge(
       );
     }
   }
-  // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
-  // 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、
-  // github done 语义即已推），assignment.build 槽 Agent 必须同时持有两开关；
+  // #1403：GitHub 形态且本 build 开了 PR → server 经 REST 合 PR（带 head sha），
+  // 不入队 merge 步。执行合并的是 server，不是 build 槽 Agent，下面的 Agent
+  // 开关闸不适用于这条路。无 PR 的 github build 仍走既有 merge 步。
+  const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+  if (projRow?.repoKind === 'github' && projRow.githubRepo !== null && row.prNumber !== null) {
+    await mergeGithubPull(deps, {
+      buildId,
+      todoId: todoRow.id,
+      teamId: todoRow.teamId,
+      githubRepo: projRow.githubRepo,
+      prNumber: row.prNumber,
+      actor: actor ?? deps.user.displayName,
+    });
+    return { delegated: true };
+  }
+  // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（hosted /
+  // local / 无 PR 的 github 形态都以推送为前置——local ff 落地、hosted
+  // applyMergeLanding 读推送态），assignment.build 槽 Agent 必须同时持有两开关；
   // 缺 = 403 并点名缺失项（chief merge_builds 与 REST /builds/{id}/merge 两
   // 生产者同摄于此）。build 槽未指派 = 无权限主体可判，不拦（未指派步不可
   // 领是既有语义）。
@@ -1308,6 +1332,81 @@ export async function requestMerge(
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
+}
+
+/** 人工合并的 GitHub 半边（#1403）：读 PR → 已合并则直接收尾 → 否则按仓库
+ * 允许的方式合并，sha = PR 当前 head。GitHub 的拒绝原话以 409 转给人，todo
+ * 留在 review、不落宣告行；成功 = 宣告行 + 合并 SHA 行 + done 收尾漏斗。 */
+async function mergeGithubPull(
+  deps: BuildDeps,
+  input: {
+    buildId: string;
+    todoId: string;
+    teamId: string;
+    githubRepo: string;
+    prNumber: number;
+    actor: string;
+  },
+): Promise<void> {
+  const { prNumber } = input;
+  let token: string | null = null;
+  if (deps.box) {
+    try {
+      token = openGithubToken({ db: deps.db, box: deps.box }, input.teamId);
+    } catch {
+      token = null;
+    }
+  }
+  if (token === null) {
+    throw new HttpError(
+      409,
+      `未连接 GitHub，无法经 API 合并 PR #${prNumber}。请先在设置里连接 GitHub，或直接在 GitHub 上合并（合并后 pacman 会自动把任务收尾）。`,
+    );
+  }
+  const slash = input.githubRepo.indexOf('/');
+  const owner = input.githubRepo.slice(0, slash);
+  const repo = input.githubRepo.slice(slash + 1);
+  const fetchImpl = deps.githubFetch ?? fetch;
+  const page = await githubPull(fetchImpl, token, owner, repo, prNumber);
+  const pull = page?.pull ?? null;
+  if (pull === null) {
+    throw new HttpError(502, `读不到 PR #${prNumber} 的状态，稍后再试`);
+  }
+  if (pull.merged) {
+    const sha =
+      pull.mergeCommitSha === null ? '' : `（合并提交 ${pull.mergeCommitSha.slice(0, 7)}）`;
+    insertMessageRow(deps, input.buildId, {
+      id: newRecordId(),
+      role: 'system',
+      content: `PR #${prNumber} 已在 GitHub 合并${sha}`,
+      createdAt: nowMs(),
+    });
+    finishTodoDone(deps, input.todoId, input.buildId);
+    return;
+  }
+  if (pull.state === 'closed') {
+    throw new HttpError(409, `PR #${prNumber} 已关闭且未合并，无法合并`);
+  }
+  if (pull.headSha === null) {
+    throw new HttpError(502, `读不到 PR #${prNumber} 的 head 提交，稍后再试`);
+  }
+  const mergeMethod = await githubPreferredMergeMethod(fetchImpl, token, owner, repo);
+  const result = await githubMergePull(fetchImpl, token, owner, repo, prNumber, {
+    sha: pull.headSha,
+    mergeMethod,
+  });
+  if (!result.merged) {
+    throw new HttpError(409, `GitHub 拒绝合并 PR #${prNumber}：${result.message}`);
+  }
+  insertGateAnnouncement(deps, input.buildId, MERGE_ANNOUNCEMENT, input.actor);
+  const sha = result.sha === null ? '' : `（合并提交 ${result.sha.slice(0, 7)}）`;
+  insertMessageRow(deps, input.buildId, {
+    id: newRecordId(),
+    role: 'system',
+    content: `PR #${prNumber} 已合并${sha}`,
+    createdAt: nowMs(),
+  });
+  finishTodoDone(deps, input.todoId, input.buildId);
 }
 
 /** plan 步未产 plan.md 的自动补写指令（#113 裁定候选1，02 §4.2「plan 即文件」

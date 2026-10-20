@@ -10,10 +10,11 @@
 //   读向，token 纪律同上位）
 // - GET repos/{o}/{r} → #1242 local→github 转换面可达性判定（token 纪律
 //   同上位；匿名梯 = 无连接时公开仓可达）
-// 写面（#452 / ADR 0006——server 唯二的 api.github.com 写入点，穷举律：
-// grep `api.github.com` 的 POST/PATCH 只此两处；不改 scope、不新增凭证面）：
+// 写面（#452 / ADR 0006 + #1403——穷举律：grep `api.github.com` 的
+// POST/PATCH/PUT 只此三处；不改 scope、不新增凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
 // - PATCH repos/{o}/{r}/issues/{n} → agent 回填标题写进 issue
+// - PUT repos/{o}/{r}/pulls/{n}/merge → 人工「完成 + 合并」合 PR（带 head sha）
 // OAuth 面（#231 握手）：
 // - POST github.com/login/oauth/access_token（form-encoded：client_id/
 //   client_secret/code/redirect_uri，Accept: json）→ access_token
@@ -132,10 +133,12 @@ export async function githubPullState(
   return { state, merged: merged === true };
 }
 
-/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA。 */
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA + head SHA。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
+  /** PR head 分支当前的提交（合并请求的 sha 参数取它）；响应缺失 = null。 */
+  headSha: string | null;
 }
 
 export interface GithubPullPage {
@@ -179,7 +182,12 @@ export async function githubPull(
     return null;
   }
   if (typeof data !== 'object' || data === null) return null;
-  const raw = data as { state?: unknown; merged?: unknown; merge_commit_sha?: unknown };
+  const raw = data as {
+    state?: unknown;
+    merged?: unknown;
+    merge_commit_sha?: unknown;
+    head?: { sha?: unknown } | null;
+  };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
   return {
@@ -190,8 +198,86 @@ export async function githubPull(
       merged,
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
+      headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
     },
   };
+}
+
+export type GithubMergeMethod = 'squash' | 'merge' | 'rebase';
+
+/** 仓库允许的合并方式（`GET /repos/{o}/{r}` 的 allow_* 三位），按 squash →
+ * merge → rebase 取第一个允许的。读不到 / 三位全缺 → squash（GitHub 拒绝时
+ * 合并请求会带回原因，调用方原样转给人）。 */
+export async function githubPreferredMergeMethod(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+): Promise<GithubMergeMethod> {
+  let data: unknown;
+  try {
+    data = await readJson(
+      fetchImpl,
+      `https://api.github.com/${repoPath(owner, repo)}`,
+      authHeaders(token),
+    );
+  } catch {
+    return 'squash';
+  }
+  const raw = (data ?? {}) as Record<string, unknown>;
+  if (raw.allow_squash_merge !== false) return 'squash';
+  if (raw.allow_merge_commit !== false) return 'merge';
+  if (raw.allow_rebase_merge !== false) return 'rebase';
+  return 'squash';
+}
+
+export type GithubMergeResult =
+  | { merged: true; sha: string | null }
+  /** GitHub 拒绝（405 不可合 / 409 head 已变 / 422 参数不合）：message = 上游原话。 */
+  | { merged: false; status: number; message: string };
+
+/** 合 PR（#1403：`PUT /repos/{o}/{r}/pulls/{n}/merge`，body 带 sha——PR head
+ * 不等于该值时 GitHub 拒绝，确认对象就是被合并的那份代码）。405/409/422 返回
+ * 拒绝原话（人要看见为什么没合）；超时/网络与其它上游状态经既有映射抛
+ * HttpError。token 只进 Authorization 头。 */
+export async function githubMergePull(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  input: { sha: string; mergeMethod: GithubMergeMethod },
+): Promise<GithubMergeResult> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: 'PUT',
+      headers: { ...authHeaders(token), 'content-type': 'application/json' },
+      body: JSON.stringify({ sha: input.sha, merge_method: input.mergeMethod }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    throw mapFetchThrow(url, err);
+  }
+  if (res.status === 405 || res.status === 409 || res.status === 422) {
+    let message = `github merge refused (${res.status})`;
+    try {
+      const body = (await res.json()) as { message?: unknown };
+      if (typeof body?.message === 'string' && body.message !== '') message = body.message;
+    } catch {
+      // 拒绝体不是 JSON：保留状态码文案。
+    }
+    return { merged: false, status: res.status, message };
+  }
+  if (!res.ok) throw mapUpstreamStatus(url, res);
+  let body: { merged?: unknown; sha?: unknown } = {};
+  try {
+    body = (await res.json()) as typeof body;
+  } catch {
+    // 200 体坏：合并已发生（状态码为准），sha 未知。
+  }
+  return { merged: true, sha: typeof body.sha === 'string' ? body.sha : null };
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；

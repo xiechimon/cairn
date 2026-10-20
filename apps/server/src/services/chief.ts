@@ -644,6 +644,15 @@ export function wakeFacts(
   const ref = `#${todo.seqNum}「${todo.title}」`;
   switch (kind) {
     case 'gate': {
+      // #1403 G9：review 关口的过闸动作是合并，不是 confirm——套用 confirm 的
+      // 自动确认规则会让 chief 调 confirm_builds（review→building 非法边 → 409）。
+      if (todo.phase === 'review') {
+        return [
+          `任务 ${ref} 停驻在 review（待验收）关口。合并动作只由人触发（#1256）：`,
+          '向用户汇报交付内容（PR 链接、CI 结果、审核与验证结论），请用户在任务详情页审阅后合并。',
+          '不要调 confirm_builds 或 merge_builds。',
+        ].join('');
+      }
       const isSplit = context?.isSplitParent === true;
       if (isSplit) {
         return [

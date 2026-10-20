@@ -1,0 +1,154 @@
+# P2b red leg: human GitHub merge tests before the implementation (P2a head 39990ab + test file only)
+# ⑧ (no PR -> existing merge step) passes on the base by design; it guards the old path.
+$ pnpm exec vitest run test/github-human-merge.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p2/apps/server
+
+ ❯ test/github-human-merge.test.ts (8 tests | 7 failed) 535ms
+   ❯ #1403 human merge on a GitHub-form project merges the PR (8)
+     × ① mergeable → PUT merge with the head sha and squash; todo done; no merge step 159ms
+     × ② GitHub 405 → 409 with the GitHub message; todo stays in review; no announcement 61ms
+     × ③ GitHub 409 (head moved) → 409; todo stays in review 61ms
+     × ④ no GitHub connection → 409 naming the connection; no write request 64ms
+     × ⑤ already merged on GitHub → todo done without calling merge 59ms
+     × ⑥ repository does not allow squash → merge_method merge 38ms
+     × ⑦ build agent without the merge switch → still merges (the server merges, not the agent) 42ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ① mergeable → PUT merge with the head sha and squash; todo done; no merge step
+AssertionError: expected 403 to be 202 // Object.is equality
+
+- Expected
++ Received
+
+- 202
++ 403
+
+ ❯ test/github-human-merge.test.ts:200:22
+    198|     const w = makeWorld({});
+    199|     const r = await merge(w);
+    200|     expect(r.status).toBe(202);
+       |                      ^
+    201|     expect(w.puts()).toHaveLength(1);
+    202|     expect(w.puts()[0].body).toMatchObject({ sha: HEAD, merge_method: …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ② GitHub 405 → 409 with the GitHub message; todo stays in review; no announcement
+AssertionError: expected 403 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 403
+
+ ❯ test/github-human-merge.test.ts:212:22
+    210|     const w = makeWorld({ mergeStatus: 405, mergeMessage: 'Required st…
+    211|     const r = await merge(w);
+    212|     expect(r.status).toBe(409);
+       |                      ^
+    213|     expect(r.text).toContain('Required status check');
+    214|     expect(w.phase()).toBe('review');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ③ GitHub 409 (head moved) → 409; todo stays in review
+AssertionError: expected 403 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 403
+
+ ❯ test/github-human-merge.test.ts:222:22
+    220|     const w = makeWorld({ mergeStatus: 409, mergeMessage: 'Head branch…
+    221|     const r = await merge(w);
+    222|     expect(r.status).toBe(409);
+       |                      ^
+    223|     expect(r.text).toContain('Head branch was modified');
+    224|     expect(w.phase()).toBe('review');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ④ no GitHub connection → 409 naming the connection; no write request
+AssertionError: expected 403 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 403
+
+ ❯ test/github-human-merge.test.ts:230:22
+    228|     const w = makeWorld({}, { connected: false });
+    229|     const r = await merge(w);
+    230|     expect(r.status).toBe(409);
+       |                      ^
+    231|     expect(r.text).toContain('GitHub');
+    232|     expect(w.puts()).toHaveLength(0);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ⑤ already merged on GitHub → todo done without calling merge
+AssertionError: expected 403 to be 202 // Object.is equality
+
+- Expected
++ Received
+
+- 202
++ 403
+
+ ❯ test/github-human-merge.test.ts:239:22
+    237|     const w = makeWorld({ pull: { state: 'closed', merged: true, merge…
+    238|     const r = await merge(w);
+    239|     expect(r.status).toBe(202);
+       |                      ^
+    240|     expect(w.puts()).toHaveLength(0);
+    241|     expect(w.phase()).toBe('done');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ⑥ repository does not allow squash → merge_method merge
+TypeError: Cannot read properties of undefined (reading 'body')
+ ❯ test/github-human-merge.test.ts:247:23
+    245|     const w = makeWorld({ allowSquash: false });
+    246|     await merge(w);
+    247|     expect(w.puts()[0].body).toMatchObject({ sha: HEAD, merge_method: …
+       |                       ^
+    248|   });
+    249|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  test/github-human-merge.test.ts > #1403 human merge on a GitHub-form project merges the PR > ⑦ build agent without the merge switch → still merges (the server merges, not the agent)
+AssertionError: expected 403 to be 202 // Object.is equality
+
+- Expected
++ Received
+
+- 202
++ 403
+
+ ❯ test/github-human-merge.test.ts:253:22
+    251|     const w = makeWorld({}, { agentTools: [] });
+    252|     const r = await merge(w);
+    253|     expect(r.status).toBe(202);
+       |                      ^
+    254|     expect(w.phase()).toBe('done');
+    255|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  7 failed | 1 passed (8)
+   Start at  21:05:03
+   Duration  3.56s (transform 61%, import 23%, tests 16%)
+
+  Transform  transforming modules took 2.07s · 61% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

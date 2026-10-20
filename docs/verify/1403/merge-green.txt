@@ -1,0 +1,26 @@
+# P2b green leg
+$ pnpm exec vitest run test/github-human-merge.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p2/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  21:06:17
+   Duration  3.28s (transform 62%, import 24%, tests 13%)
+
+
+$ pnpm exec vitest run --project @xiechimon/pacman   (whole server project)
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p2
+
+
+ Test Files  111 passed (111)
+      Tests  1151 passed | 1 skipped (1152)
+   Start at  21:09:52
+   Duration  64.71s (import 49%, tests 46%, transform 4%)
+
+    Isolate  111 workers spawned · ~145ms startup each (spawn + environment, per file)
+             at least ~5.23s faster with isolate: false — reuses workers across files instead of one per file
+
+server tests exit=0

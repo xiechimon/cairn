@@ -1,0 +1,15 @@
+# P2b green leg: same tests with chief.ts wake text and the confirm phase check
+$ pnpm exec vitest run test/chief-auto-confirm.test.ts test/gate-actor.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p2/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  20 passed (20)
+   Start at  21:03:41
+   Duration  3.68s (transform 57%, import 28%, tests 15%)
+
+  Transform  transforming modules took 3.02s · 57% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

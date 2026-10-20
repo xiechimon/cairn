@@ -319,3 +319,21 @@ describe('#901 手动改相 confirm/review→done 审计行（server 面）', ()
     }
   });
 });
+
+describe('#1403 G9 review 关口误调 confirm', () => {
+  test('steps confirm at review → 409，transcript 不落确认行', async () => {
+    const s = await withReviewTodo();
+    try {
+      const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+        action: 'confirm',
+      });
+      expect(res.status).toBe(409);
+      const row = rowsOf(s, s.buildId).find((m) => m.content === CONFIRM_ANNOUNCEMENT);
+      expect(row, '相位不对时不得留下确认行').toBeUndefined();
+      const todoRow = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()!;
+      expect(todoRow.phase).toBe('review');
+    } finally {
+      s.dispose();
+    }
+  });
+});
