@@ -133,12 +133,12 @@ export async function githubPullState(
   return { state, merged: merged === true };
 }
 
-/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA + head SHA
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head SHA
  * + 标题、base 分支与可合并态。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
-  /** PR head 分支当前的提交（合并请求的 sha 参数、check-runs 的读点）；响应缺失 = null。 */
+  /** PR head 分支当前的提交（合并请求的 sha 参数、check-runs 的读点；合并后 = 合并时的 head）；响应缺失 = null。 */
   headSha: string | null;
   title: string | null;
   /** base 分支名（必需检查名单按它读）。 */
@@ -364,6 +364,35 @@ export async function githubMergePull(
     // 200 体坏：合并已发生（状态码为准），sha 未知。
   }
   return { merged: true, sha: typeof body.sha === 'string' ? body.sha : null };
+}
+
+/** head 是否包含 base（`GET /repos/{o}/{r}/compare/{base}...{head}` 的 status：
+ * ahead / identical = 包含，behind / diverged = 不包含）。'missing' = 404
+ * （base 提交不在 GitHub 上，例如从没推送过）；null = 读不到。 */
+export async function githubCompareStatus(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  base: string,
+  head: string,
+): Promise<string | 'missing' | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}`;
+  try {
+    const res = await fetchImpl(url, {
+      headers: {
+        ...API_HEADERS,
+        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (res.status === 404) return 'missing';
+    if (!res.ok) return null;
+    const data = (await res.json()) as { status?: unknown } | null;
+    return typeof data?.status === 'string' ? data.status : null;
+  } catch {
+    return null;
+  }
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；

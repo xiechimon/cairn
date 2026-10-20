@@ -47,7 +47,7 @@
 // cancelled / failure / timed_out / action_required 等算红；名单里的检查还没
 // 出现 → 同空 checks 的宽限；名单读不到或为空 → 看全部检查。
 
-import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, message, project, step, todo } from '../db/schema.js';
 import {
@@ -55,6 +55,7 @@ import {
   type GithubCheckRun,
   type GithubPull,
   githubCommitCheckRuns,
+  githubCompareStatus,
   githubPull,
   githubRequiredChecks,
 } from '../lib/github.js';
@@ -258,26 +259,53 @@ export function createCiPoller(
   /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
 
-  /** 本 build 有在飞的步（pending / claimed）。 */
+  /** 本 build 有在飞的步：已被领取或在等额度的任意步，以及排队中的非审核
+   * 类步。没人领的 verify / review 步不算（Verifier 的机器离线时，卡不能
+   * 因此永远停在 review）。 */
   function hasActiveStep(buildId: string): boolean {
     return (
       deps.db
         .select({ id: step.id })
         .from(step)
-        .where(and(eq(step.buildId, buildId), inArray(step.status, ['pending', 'claimed'])))
+        .where(
+          and(
+            eq(step.buildId, buildId),
+            or(
+              inArray(step.status, ['claimed', 'waiting_quota']),
+              and(eq(step.status, 'pending'), notInArray(step.kind, ['verify', 'review'])),
+            ),
+          ),
+        )
         .get() !== undefined
     );
   }
 
-  /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
-  function freshGrindRow(todoId: string) {
-    const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.phase === 'building' ? row : null;
+  /** 本 build 最近一个完成的执行步收尾时的分支 HEAD。 */
+  function lastCheckpoint(buildId: string): string | null {
+    return (
+      deps.db
+        .select({ commit: step.checkpointCommit })
+        .from(step)
+        .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), eq(step.status, 'done')))
+        .orderBy(desc(step.createdAt))
+        .get()?.commit ?? null
+    );
   }
 
-  function freshReviewRow(todoId: string) {
+  /** 读当前 phase 与当前 build：仍在磨绿且 build 仍是 todo 的当前 build（④：
+   * 已被人工推进/关闭/终态，或重跑换了 build = 不动）。 */
+  function freshGrindRow(todoId: string, buildId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    return row !== undefined && row.phase === 'review' ? row : null;
+    return row !== undefined && row.phase === 'building' && row.latestBuildId === buildId
+      ? row
+      : null;
+  }
+
+  function freshReviewRow(todoId: string, buildId: string) {
+    const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    return row !== undefined && row.phase === 'review' && row.latestBuildId === buildId
+      ? row
+      : null;
   }
 
   /** github 形态目标（owner/repo）；非 github 或缺仓名 → null。 */
@@ -359,15 +387,49 @@ export function createCiPoller(
   }
 
   /** PR 已合并 → system 行 + done 收尾；关闭未合并 → errorMessage + failed。
-   * 调用方已在写面前重读过相位。 */
-  function closeOut(
+   * stillFresh 在每次写之前重核相位、当前 build 与在飞步。 */
+  async function closeOut(
     cand: { buildId: string; todoId: string },
-    teamId: string,
+    target: { teamId: string; owner: string; repo: string },
     prNumber: number,
     pull: GithubPull,
+    stillFresh: () => boolean,
     tally: CiPollTally,
-  ): void {
+  ): Promise<void> {
+    if (!stillFresh()) {
+      tally.skipped += 1;
+      return;
+    }
     if (pull.merged) {
+      // 合并之后同分支又推了提交（修复轮）：那个提交不在这次合并里，不收尾。
+      // head 包含 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
+      const checkpoint = lastCheckpoint(cand.buildId);
+      if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
+        const status = await githubCompareStatus(
+          run.githubFetch,
+          tokenFor(target.teamId),
+          target.owner,
+          target.repo,
+          checkpoint,
+          pull.headSha,
+        );
+        if (status === null) {
+          tally.unreadable += 1;
+          return;
+        }
+        if (!stillFresh()) {
+          tally.skipped += 1;
+          return;
+        }
+        if (status !== 'ahead' && status !== 'identical') {
+          hintOnce(
+            cand.buildId,
+            `PR #${prNumber} 已在 GitHub 合并（合并时 head ${pull.headSha.slice(0, 7)}），但分支上的提交 ${checkpoint.slice(0, 7)} 不在这次合并里，这部分改动还没进 main。需要的话重启任务，会新开分支与 PR。`,
+            tally,
+          );
+          return;
+        }
+      }
       const detail = [
         pull.mergeCommitSha === null ? null : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
         pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
@@ -385,12 +447,12 @@ export function createCiPoller(
     deps.db
       .update(build)
       .set({
-        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并。需要继续时重启任务，会新开分支与 PR。`,
+        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`,
       })
       .where(eq(build.id, cand.buildId))
       .run();
     const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
+    if (row) deps.hub.publishBuildDoc(target.teamId, toBuildRecord(row));
     setTodoPhase(deps, cand.todoId, 'failed');
     tally.closedUnmerged += 1;
   }
@@ -418,7 +480,7 @@ export function createCiPoller(
     now: number,
     tally: CiPollTally,
   ): Promise<void> {
-    const todoRow = freshReviewRow(cand.todoId);
+    const todoRow = freshReviewRow(cand.todoId, cand.buildId);
     const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     const target = todoRow === null ? null : githubTarget(todoRow.projectId);
     if (
@@ -456,16 +518,15 @@ export function createCiPoller(
       tally.pending += 1;
       return;
     }
-    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
-    if (freshReviewRow(cand.todoId) === null) {
-      tally.skipped += 1;
-      return;
-    }
+    // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
+    const stillFresh = () =>
+      freshReviewRow(cand.todoId, cand.buildId) !== null && !hasActiveStep(cand.buildId);
     if (hint !== null) {
-      hintOnce(cand.buildId, hint, tally);
+      if (stillFresh()) hintOnce(cand.buildId, hint, tally);
+      else tally.skipped += 1;
       return;
     }
-    closeOut(cand, todoRow.teamId, prNumber, pull, tally);
+    await closeOut(cand, target, prNumber, pull, stillFresh, tally);
   }
 
   async function pollOne(
@@ -474,7 +535,7 @@ export function createCiPoller(
     tally: CiPollTally,
   ): Promise<void> {
     // 读当前 phase 再动（④）：候选是扫描快照。
-    const todoRow = freshGrindRow(cand.todoId);
+    const todoRow = freshGrindRow(cand.todoId, cand.buildId);
     if (todoRow === null) {
       tally.skipped += 1;
       return;
@@ -502,12 +563,10 @@ export function createCiPoller(
       return;
     }
     if (pull.state !== 'open') {
-      // 磨绿期间 PR 已在 GitHub 合并 / 关闭：同 review 关口收尾（写面前重读相位）。
-      if (freshGrindRow(cand.todoId) === null) {
-        tally.skipped += 1;
-        return;
-      }
-      closeOut(cand, todoRow.teamId, prNumber, pull, tally);
+      // 磨绿期间 PR 已在 GitHub 合并 / 关闭：同 review 关口收尾（写面前重核）。
+      const stillFresh = () =>
+        freshGrindRow(cand.todoId, cand.buildId) !== null && !hasActiveStep(cand.buildId);
+      await closeOut(cand, target, prNumber, pull, stillFresh, tally);
       return;
     }
     if (pull.headSha === null) {
@@ -548,7 +607,7 @@ export function createCiPoller(
       // 超宽限 = 仓无 CI / 必需检查不在 check-runs 上报：无可磨，按绿交人。
     }
     // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
-    if (freshGrindRow(cand.todoId) === null) {
+    if (freshGrindRow(cand.todoId, cand.buildId) === null) {
       tally.skipped += 1;
       return;
     }
