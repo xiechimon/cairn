@@ -1,0 +1,127 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 5 tests using 1 worker
+
+  1) e2e/phase-chip-words.spec.ts:41:1 › detail header: the fresh task chip reads the column word 待开始 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  getByTestId('phase-chip')
+    Expected: "待开始"
+    Received: "待处理"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" getByTestId('phase-chip') with timeout 5000ms
+      - waiting for getByTestId('phase-chip')
+        14 × locator resolved to <button tabindex="0" type="button" data-size="sm" data-tone="idle" id="base-ui-_r_a_" data-variant="ghost" aria-expanded="false" aria-haspopup="dialog" data-testid="phase-chip" data-slot="popover-trigger" data-base-ui-click-trigger="" class="group/button inline-flex items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 active:not-aria-[haspopup]:translate-…>…</button>
+           - unexpected value "待处理"
+
+
+      41 | test('detail header: the fresh task chip reads the column word 待开始', async ({ page }) => {
+      42 |   await page.goto('/app/todo/fresh-probe?scenario=23');
+    > 43 |   await expect(page.getByTestId('phase-chip')).toHaveText('待开始');
+         |                                                ^
+      44 | });
+      45 |
+      46 | test('search rows: fresh reads 待开始, review 审核, done 已完成', async ({ page }) => {
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/phase-chip-words.spec.ts:43:48
+
+    Error Context: test-results/phase-chip-words-detail-he-5334c-p-reads-the-column-word-待开始/error-context.md
+
+
+  2) e2e/phase-chip-words.spec.ts:46:1 › search rows: fresh reads 待开始, review 审核, done 已完成 ─────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'r7 rebaseline probe' }).locator('[data-tone]')
+    Expected: "待开始"
+    Received: "待处理"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'r7 rebaseline probe' }).locator('[data-tone]') with timeout 5000ms
+      - waiting for getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'r7 rebaseline probe' }).locator('[data-tone]')
+        14 × locator resolved to <span data-tone="idle" data-slot="badge" data-variant="default" class="group/badge inline-flex h-5 w-fit items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructiv…>待处理</span>
+           - unexpected value "待处理"
+
+
+      51 |   await expect(rows).toHaveCount(3);
+      52 |   const chip = (title: string) => rows.filter({ hasText: title }).locator('[data-tone]');
+    > 53 |   await expect(chip(FRESH_TITLE)).toHaveText('待开始');
+         |                                   ^
+      54 |   await expect(chip('r3 lifecycle probe」')).toHaveText('审核');
+      55 |   await expect(chip('r3 lifecycle probe2')).toHaveText('已完成');
+      56 |   await expect(panel(page).getByText('待处理', { exact: true })).toHaveCount(0);
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/phase-chip-words.spec.ts:53:35
+
+    Error Context: test-results/phase-chip-words-search-ro-e69e6-eads-待开始-review-审核-done-已完成/error-context.md
+
+
+  3) e2e/phase-chip-words.spec.ts:59:1 › project task rows: fresh reads 待开始, review 审核 ─────────────
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  getByTestId('task-row').filter({ hasText: 'r7 rebaseline probe' }).getByTestId('task-status')
+    Expected: "待开始"
+    Received: "待处理"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" getByTestId('task-row').filter({ hasText: 'r7 rebaseline probe' }).getByTestId('task-status') with timeout 5000ms
+      - waiting for getByTestId('task-row').filter({ hasText: 'r7 rebaseline probe' }).getByTestId('task-status')
+        14 × locator resolved to <span data-testid="task-status" class="flex flex-none items-center gap-1 text-meta whitespace-nowrap text-content-tertiary">…</span>
+           - unexpected value "待处理"
+
+
+      61 |   const status = (title: string) =>
+      62 |     page.getByTestId('task-row').filter({ hasText: title }).getByTestId('task-status');
+    > 63 |   await expect(status(FRESH_TITLE)).toHaveText('待开始');
+         |                                     ^
+      64 |   await expect(status('r3 lifecycle probe」')).toHaveText('审核');
+      65 |   await expect(page.getByText('待处理', { exact: true })).toHaveCount(0);
+      66 | });
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/phase-chip-words.spec.ts:63:37
+
+    Error Context: test-results/phase-chip-words-project-task-rows-fresh-reads-待开始-review-审核/error-context.md
+
+
+  4) e2e/phase-chip-words.spec.ts:95:1 › schedule cards: todo and queued read 待开始, confirm reads 确认 
+
+    Error: expect(locator).toHaveText(expected) failed
+
+    Locator:  locator('.sched-card').filter({ hasText: '定时探针 todo' }).locator('[data-tone]')
+    Expected: "待开始"
+    Received: "待处理"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveText" locator('.sched-card').filter({ hasText: '定时探针 todo' }).locator('[data-tone]') with timeout 5000ms
+      - waiting for locator('.sched-card').filter({ hasText: '定时探针 todo' }).locator('[data-tone]')
+        14 × locator resolved to <span data-tone="idle" data-slot="badge" data-variant="default" class="group/badge inline-flex h-5 w-fit items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructiv…>待处理</span>
+           - unexpected value "待处理"
+
+
+      111 |   const chip = (phase: string) =>
+      112 |     cards.filter({ hasText: `定时探针 ${phase}` }).locator('[data-tone]');
+    > 113 |   await expect(chip('todo')).toHaveText('待开始');
+          |                              ^
+      114 |   await expect(chip('queued')).toHaveText('待开始');
+      115 |   await expect(chip('confirm')).toHaveText('确认');
+      116 |   await expect(page.getByText('待处理', { exact: true })).toHaveCount(0);
+        at /home/user/pacman/.claude/worktrees/base-1400/apps/web/e2e/phase-chip-words.spec.ts:113:30
+
+    Error Context: test-results/phase-chip-words-schedule--cb5f1-d-read-待开始-confirm-reads-确认/error-context.md
+
+
+  4 failed
+    e2e/phase-chip-words.spec.ts:41:1 › detail header: the fresh task chip reads the column word 待开始 
+    e2e/phase-chip-words.spec.ts:46:1 › search rows: fresh reads 待开始, review 审核, done 已完成 ──────────
+    e2e/phase-chip-words.spec.ts:59:1 › project task rows: fresh reads 待开始, review 审核 ──────────────
+    e2e/phase-chip-words.spec.ts:95:1 › schedule cards: todo and queued read 待开始, confirm reads 确认 ─
+  1 passed (28.4s)
