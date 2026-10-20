@@ -41,7 +41,10 @@ export function ResourceList({ className, children }: { className?: string; chil
 }
 
 /** A list row. With `onOpen` the whole row opens the item (role=button,
- *  Enter / Space); without it the row is static. */
+ *  Enter / Space); without it the row is static. The button form draws its
+ *  own divider: the Button base's transparent border outranks the card's
+ *  zero-specificity divide-y rule, so it keeps only a bottom border in the
+ *  --border color and drops it on the last row (#1416). */
 export function ResourceRow({
   mcp = false,
   className,
@@ -74,7 +77,7 @@ export function ResourceRow({
       {...mark}
       className={cn(
         SETTINGS_ROW_CLS,
-        'h-auto w-full rounded-none text-left font-normal hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
+        'h-auto w-full rounded-none border-0 border-b border-border text-left font-normal last:border-b-0 hover:bg-transparent active:not-aria-[haspopup]:translate-y-0 dark:hover:bg-transparent',
         className,
       )}
       onClick={onOpen}
