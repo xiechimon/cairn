@@ -15,6 +15,8 @@ import {
   type ProjectCommitDetailResponse,
   type ProjectFileResponse,
 } from '@pacman/shared';
+import { cn } from 'cn';
+import { ListTodo } from 'lucide-react';
 import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
@@ -30,7 +32,9 @@ import {
 import { mapCommits, mapDiffFiles, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
+import { EmptyState } from '../components/empty-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
+import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -41,14 +45,6 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from '../components/ui/empty.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { DiffFileBlock } from '../detail/docpane.js';
@@ -72,12 +68,12 @@ import {
   GitCommit,
   Grid2x2,
   ListLines,
-  PlusSmall,
   Search,
   Settings,
   X,
 } from '../icons/index.js';
 import { type NewTaskSurfaceApi, NewTaskSurfaceRoot } from '../overlay/new-task-surface-root.js';
+import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { GithubIssuesDialog } from './github-issues-dialog.js';
 import { PageShell } from './shell.js';
@@ -90,17 +86,17 @@ import { PageShell } from './shell.js';
    = aria-selected / aria-current / data-active（#910 裁定 3，--active 状态类
    退役）。 */
 
-/** 文件树行钮：ghost 件默认形态 + 布局位；选中 = bg-muted 填充（载体
+/** 文件树行钮：ghost 件默认形态 + 布局位；选中 = Paper 选择器选中行（白卡
+ *  + 1px line 环 + 一层极轻投影，DESIGN.md「选择器与 ⌘K」；载体
  *  aria-current）。 */
 const FILE_ROW_CLS = 'w-full cursor-pointer justify-start gap-2 px-1.5 font-normal';
-const FILE_ROW_ACTIVE_CLS = 'bg-muted hover:bg-muted dark:hover:bg-muted';
+const FILE_ROW_ACTIVE_CLS = 'bg-card shadow-xs ring-1 ring-border hover:bg-card dark:hover:bg-card';
 
 /** 历史行钮（#1102 点行开提交详情）：文件行同款 ghost 件默认形态，双行文本
- *  所以 h-auto + 原 li 行的 py-[5px] 节奏；prj-history-row 别名留存
- *  （dead-buttons / #980 跨域定位句柄），选中态载体 = aria-current（#910
- *  裁定 3，文件行同律）。 */
+ *  所以 h-auto + py-1.5；prj-history-row 别名留存（dead-buttons / #980 跨域
+ *  定位句柄），选中态载体 = aria-current（#910 裁定 3，文件行同律）。 */
 const HISTORY_ROW_CLS =
-  'h-auto w-full cursor-pointer justify-start gap-2 px-1.5 py-[5px] font-normal [&_svg]:flex-none [&_svg]:text-muted-foreground';
+  'h-auto w-full cursor-pointer justify-start gap-2 px-1.5 py-1.5 font-normal [&_svg]:flex-none [&_svg]:text-icon';
 
 /** #1097 Files 面行数据 = wire entry（name/path/type）原样投影。fixture 面
  *  string 文件退化为顶层 blob 行（path=name，形态零漂移）；live 面直接吃
@@ -114,7 +110,10 @@ export interface FileTreeRow {
 
 /** 面包屑钮（#1097 导航）：ghost 小钮 + mono 段名；当前段不可点，载体
  *  aria-current=location（路径回显 = 载荷 path 同源值，见 ProjectPage）。 */
-const CRUMB_BTN_CLS = 'h-6 cursor-pointer px-1 font-mono text-xs font-normal';
+const CRUMB_BTN_CLS = 'h-6 cursor-pointer px-1 font-mono text-meta font-normal';
+
+/** 文件栏的加载 / 读失败 / 空目录 / 无提交 / 空改动集占位行。 */
+const PANE_NOTE_CLS = 'px-1 py-6 text-center text-meta text-content-tertiary';
 
 function FilesPane({
   branch,
@@ -155,7 +154,7 @@ function FilesPane({
 }) {
   const { t } = useI18n();
   return (
-    <div className="flex w-[276px] flex-none flex-col border-r border-border py-2 pr-2 pl-4">
+    <div className="flex w-69 flex-none flex-col border-r border-border py-2 pr-2 pl-4">
       <div className="flex items-center justify-between pr-2">
         {/* 分支 chip = 静态展示（#149 裁决，[设计]）：托管 repo 读面固定
             defaultBranch（tree?ref=main），无切分支行为预期；chevron 保
@@ -211,7 +210,7 @@ function FilesPane({
                       {isCurrent ? (
                         <span
                           aria-current="location"
-                          className="px-1 font-mono text-xs text-foreground"
+                          className="px-1 font-mono text-meta text-foreground"
                         >
                           {name}
                         </span>
@@ -230,19 +229,13 @@ function FilesPane({
             </nav>
           ) : null}
           {treeLoading ? (
-            <div className="px-1 py-6 text-center text-xs text-muted-foreground">
-              {t('加载中…')}
-            </div>
+            <div className={PANE_NOTE_CLS}>{t('加载中…')}</div>
           ) : treeError ? (
-            <div className="px-1 py-6 text-center text-xs text-muted-foreground">
-              {t('文件树读取失败。')}
-            </div>
+            <div className={PANE_NOTE_CLS}>{t('文件树读取失败。')}</div>
           ) : entries.length === 0 ? (
             // 空目录定义态（#1097 验收）：git 不跟踪空目录，服务端对空/不存在
             // 目录同回 entries=[]（server vitest P5）——web 一律演空态文案。
-            <div className="px-1 py-6 text-center text-xs text-muted-foreground">
-              {t('此目录为空。')}
-            </div>
+            <div className={PANE_NOTE_CLS}>{t('此目录为空。')}</div>
           ) : (
             entries.map((e) =>
               e.type === 'tree' ? (
@@ -255,8 +248,8 @@ function FilesPane({
                   className={`prj-file-row ${FILE_ROW_CLS}`}
                   onClick={() => onNavigateDir(e.path)}
                 >
-                  <Folder className="size-3.5 text-muted-foreground" />
-                  <span className="font-mono text-xs text-muted-foreground">{e.name}</span>
+                  <Folder className="size-3.5 text-icon" />
+                  <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
                 </Button>
               ) : (
                 // 文件行 = 既有形态零回归；键与选中比较都用完整 path（#1097：
@@ -269,17 +262,15 @@ function FilesPane({
                   className={`prj-file-row ${FILE_ROW_CLS}${selectedFile === e.path ? ` ${FILE_ROW_ACTIVE_CLS}` : ''}`}
                   onClick={() => onSelectFile(e.path)}
                 >
-                  <FileTab className="size-3.5 text-muted-foreground" />
-                  <span className="font-mono text-xs text-muted-foreground">{e.name}</span>
+                  <FileTab className="size-3.5 text-icon" />
+                  <span className="font-mono text-meta text-muted-foreground">{e.name}</span>
                 </Button>
               ),
             )
           )}
         </div>
       ) : commits.length === 0 ? (
-        <div className="mt-3 px-1 py-6 text-center text-xs text-muted-foreground">
-          {t('尚无提交历史。')}
-        </div>
+        <div className={`mt-3 ${PANE_NOTE_CLS}`}>{t('尚无提交历史。')}</div>
       ) : (
         // 历史行形 [设计]（官方历史面无捕获）：git log 最小投影，新→旧。
         // #1102 起可点：行 = ghost 钮（文件行同族），点击开右侧提交详情面；
@@ -295,12 +286,21 @@ function FilesPane({
                 onClick={() => onSelectCommit(c.id)}
               >
                 <GitCommit width={14} height={14} />
-                <span className="flex min-w-0 flex-1 flex-col items-start gap-px">
-                  <span className="max-w-full truncate text-xs leading-4 text-foreground">
+                <span className="flex min-w-0 flex-1 flex-col items-start">
+                  <span
+                    data-testid="history-message"
+                    className="max-w-full truncate text-ui text-foreground"
+                  >
                     {c.message}
                   </span>
-                  <span className="font-mono text-[11px] leading-[14px] text-muted-foreground">
-                    {c.authorName} · {relativeTime(c.at, now, t)} · {c.shortSha}
+                  {/* 元信息走无衬线，只有 sha 是 mono（DESIGN.md code 档）：
+                      276px 栏里整行 mono 会把 sha 截掉。 */}
+                  <span
+                    data-testid="history-meta"
+                    className="max-w-full truncate text-meta text-content-tertiary"
+                  >
+                    {c.authorName} · {relativeTime(c.at, now, t)} ·{' '}
+                    <span className="font-mono">{c.shortSha}</span>
                   </span>
                 </span>
               </Button>
@@ -323,9 +323,41 @@ type TaskSort = 'default' | 'recent' | 'title';
 
 interface TaskRow {
   id: string;
+  seqNum: number;
   title: string;
   phase: Phase;
   phaseAt: number;
+}
+
+/** 已完成 / 已取消的标题降到 ink-3（DESIGN.md「已经不需要看」）。 */
+function isSettled(phase: Phase): boolean {
+  return phase === 'done' || phase === 'closed';
+}
+
+/** 行 / 卡的状态 = 图标 + 颜色 + 文字三件套（DESIGN.md 状态不只靠颜色）；
+ *  词与图标同详情页顶栏（PHASE_UI chip + PHASE_STATUS）。 */
+function TaskStatus({ phase }: { phase: Phase }) {
+  const { t } = useI18n();
+  const { icon: Icon, ink } = PHASE_STATUS[phase];
+  return (
+    <span
+      data-testid="task-status"
+      className={cn('flex flex-none items-center gap-1 text-meta whitespace-nowrap', ink)}
+    >
+      <Icon aria-hidden strokeWidth={1.75} className="size-3.25" />
+      {t(PHASE_UI[phase].chip)}
+    </span>
+  );
+}
+
+/** XMON-105 owner avatar（登录用户身份单源）+ 右下 idle 点；列表与网格共用
+ *  .prj-task-avatar 句柄（avatar-dicebear spec）。 */
+function TaskAvatar({ name, src }: { name?: string | null; src?: string | null }) {
+  return (
+    <span className="prj-task-avatar relative size-5 flex-none after:absolute after:-right-px after:-bottom-px after:size-1.75 after:rounded-full after:border-[1.5px] after:border-card after:bg-(--badge-idle) after:content-['']">
+      <SeededAvatar className="size-5" name={name} src={src} fallback="/avatar-user.png" />
+    </span>
+  );
 }
 
 /** 文件查看器状态(#202):idle = 占位;loading/error 仅 live 可达;
@@ -430,7 +462,7 @@ function CommitDetailView({
   const { t } = useI18n();
   if (view.kind !== 'detail') {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-[13px] text-muted-foreground">
+      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-ui text-content-tertiary">
         <span>
           {view.kind === 'loading'
             ? t('加载中…')
@@ -443,7 +475,7 @@ function CommitDetailView({
         {view.kind === 'error' &&
         view.reason !== undefined &&
         view.reason in LOCAL_ERROR_REASON_COPY ? (
-          <span className="text-xs">
+          <span className="text-meta">
             {t(LOCAL_ERROR_REASON_COPY[view.reason as LocalErrorReason])}
           </span>
         ) : null}
@@ -452,21 +484,20 @@ function CommitDetailView({
   }
   return (
     <div className="flex min-w-0 flex-1 flex-col" data-commit-detail="pane">
-      <div className="flex flex-none items-start gap-2 border-b border-border px-4 py-2.5">
-        <GitCommit width={14} height={14} className="mt-[3px] flex-none text-muted-foreground" />
-        <div className="flex min-w-0 flex-1 flex-col items-start gap-px">
+      <div className="flex flex-none items-start gap-2 border-b border-border px-4 py-3">
+        {/* mt-0.75 = 把 14px 图标落在 20px 首行的正中。 */}
+        <GitCommit width={14} height={14} className="mt-0.75 flex-none text-icon" />
+        <div className="flex min-w-0 flex-1 flex-col items-start">
           {/* data-commit-detail 载体 = 跨域定位句柄（data-tree-entry #1097 同律）。 */}
           <span
-            className="max-w-full truncate text-[13px] leading-5 text-foreground"
+            className="max-w-full truncate text-ui text-foreground"
             data-commit-detail="message"
           >
             {view.message}
           </span>
-          <span
-            className="font-mono text-[11px] leading-4 text-muted-foreground"
-            data-commit-detail="meta"
-          >
-            {view.authorName} · {relativeTime(view.at, now, t)} · {view.shortSha}
+          <span className="text-meta text-content-tertiary" data-commit-detail="meta">
+            {view.authorName} · {relativeTime(view.at, now, t)} ·{' '}
+            <span className="font-mono">{view.shortSha}</span>
           </span>
         </div>
         <Button
@@ -483,9 +514,7 @@ function CommitDetailView({
         {files.length === 0 ? (
           // 空改动集定义态（空提交 / 纯二进制 / 种子提交——server S6 口径）：
           // 诚实文案，不白屏不「加载失败」。
-          <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-            {t('该提交没有可显示的改动。')}
-          </div>
+          <div className={PANE_NOTE_CLS}>{t('该提交没有可显示的改动。')}</div>
         ) : (
           <div className="w-max min-w-full">
             {files.map((file) => (
@@ -598,7 +627,7 @@ function TasksMenuButton<T extends string>({
           <ChevronDown width={12} height={12} />
         </DropdownMenuTrigger>
       </span>
-      <DropdownMenuContent sideOffset={6} aria-label={t(label)} className="w-auto min-w-[148px]">
+      <DropdownMenuContent sideOffset={6} aria-label={t(label)} className="w-auto min-w-37">
         <TasksMenu options={options} value={value} onSelect={onSelect} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -645,8 +674,8 @@ function TasksPane({
     return sortTodos(rows, sort);
   }, [todos, query, filter, sort]);
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-none items-center gap-3 px-4 py-3">
+    <div className="pb-6">
+      <div className="flex items-center gap-2">
         {/* 搜索框 = registry InputGroup。#1244：focus 环画在壳上，
             2px --focus-ring outline，控件面自身不出环。 */}
         <InputGroup className="flex-1">
@@ -691,100 +720,83 @@ function TasksPane({
         />
       </div>
       {todos.length === 0 ? (
-        // 空态 = registry Empty 件族（手写 48px tile + 节奏配方退役）。
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <ListLines />
-            </EmptyMedia>
-            <EmptyTitle>{t('暂无内容')}</EmptyTitle>
-            <EmptyDescription>{t('创建第一个任务以开始使用。')}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Button aria-label={t('新建任务')} onClick={onNewTask}>
-              <PlusSmall data-icon="inline-start" />
-              {t('任务')}
-            </Button>
-          </EmptyContent>
-        </Empty>
+        // 空态 = 共享 EmptyState（裸 ink-3 图标 + 标题 + 一句说明 + 一个墨色
+        // 主按钮，DESIGN.md「页面模式 · 空态」）；按钮名即 #305 的 新建任务。
+        <EmptyState
+          className="mt-6"
+          icon={ListTodo}
+          title={t('暂无内容')}
+          description={t('创建第一个任务以开始使用。')}
+          action={{ label: t('新建任务'), onClick: onNewTask }}
+        />
       ) : visible.length === 0 ? (
         // 筛选/搜索清空 ≠ 项目无任务：给匹配空态一行，不误用 r2 24b 的
         // 「创建第一个任务」空态（那是无 todo 项目的 canon）
-        <div className="px-4 py-6 text-sm leading-4 text-muted-foreground">
-          {t('没有匹配的任务')}
-        </div>
+        <p className="m-0 mt-6 text-center text-ui text-content-tertiary">{t('没有匹配的任务')}</p>
       ) : layout === 'list' ? (
-        <div className="space-y-2 px-4">
+        // 列表 = 一张设置卡的 52px 行（DESIGN.md「页面模式 · 设置列表」，
+        // 定时 / 资源列表同形）：左标题 + 元信息，右状态三件套 + 头像。
+        <SettingsCard className="prj-task-list mt-4">
           {visible.map((todo) => (
-            // 行盒：registry 词汇 rounded-lg + bg-muted/50（方角 secondary
-            // tile 退役——几何 registry 赢，#980 裁决④）。
             <div
               key={todo.id}
               data-testid="task-row"
-              className="prj-task-row relative flex h-9 items-center gap-3 rounded-lg bg-muted/50 px-3"
+              className={cn('prj-task-row relative', SETTINGS_ROW_CLS)}
             >
-              <span
-                className="size-4 flex-none rounded-[4px] border border-input"
-                aria-hidden="true"
-              />
-              {/* #318: 标题是真 <a>,after: 拉伸盖满整行 = 点行开详情
-                  (todo-card-link #58 同款,行内无其它交互件无需抬 z) */}
-              <Link
-                className="prj-task-link min-w-0 flex-1 truncate text-sm leading-5 text-foreground no-underline after:absolute after:inset-0 after:content-['']"
-                to={{ pathname: `/app/todo/${todo.id}`, search }}
-              >
-                {todo.title}
-              </Link>
-              <span className="flex-none text-xs text-muted-foreground">
-                {relativeTime(todo.phaseAt, now, t)}
+              <span className="flex min-w-0 flex-1 flex-col">
+                {/* #318: 标题是真 <a>,after: 拉伸盖满整行 = 点行开详情
+                    (todo-card-link #58 同款,行内无其它交互件无需抬 z) */}
+                <Link
+                  className={cn(
+                    "prj-task-link truncate text-ui no-underline after:absolute after:inset-0 after:content-['']",
+                    isSettled(todo.phase) ? 'text-content-tertiary' : 'text-foreground',
+                  )}
+                  to={{ pathname: `/app/todo/${todo.id}`, search }}
+                >
+                  {todo.title}
+                </Link>
+                <span data-testid="task-meta" className="truncate text-meta text-content-tertiary">
+                  #{todo.seqNum} · {relativeTime(todo.phaseAt, now, t)}
+                </span>
               </span>
-              <span className="prj-task-avatar relative size-5 flex-none after:absolute after:-right-px after:-bottom-px after:size-[7px] after:rounded-full after:border-[1.5px] after:border-card after:bg-(--badge-idle) after:content-['']">
-                <SeededAvatar
-                  className="size-5"
-                  name={user.displayName}
-                  src={user.avatarUrl}
-                  fallback="/avatar-user.png"
-                />
-              </span>
+              <TaskStatus phase={todo.phase} />
+              <TaskAvatar name={user.displayName} src={user.avatarUrl} />
             </div>
           ))}
-        </div>
+        </SettingsCard>
       ) : (
-        // 网格形 [设计]（票面注记：官方无捕获）——卡语言 = registry Card 件
-        // （bg-card + ring + rounded-xl，sm 档间距）＋本行原子（勾选圈/相对
-        // 时间/头像）。
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(224px,1fr))] gap-2 px-4">
+        // 网格形 [设计]（票面注记：官方无捕获）——卡 = registry Card 换
+        // --radius-card + line 环（DESIGN.md「卡片圆角：一个角」）；卡内
+        // 状态三件套 + 头像、两行标题（任务卡同档 14px 500）、元信息。
+        <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(224px,1fr))] gap-2">
           {visible.map((todo) => (
             <Card
               key={todo.id}
               size="sm"
               data-testid="task-card"
-              className="prj-task-card relative items-start gap-2 p-3"
+              className={cn(
+                'prj-task-card relative items-start gap-2 px-3.5 py-3 ring-border',
+                CARD_RADIUS_CLS,
+              )}
             >
               <div className="flex items-center justify-between self-stretch">
-                <span
-                  className="size-4 flex-none rounded-[4px] border border-input"
-                  aria-hidden="true"
-                />
-                <span className="prj-task-avatar relative size-5 flex-none after:absolute after:-right-px after:-bottom-px after:size-[7px] after:rounded-full after:border-[1.5px] after:border-card after:bg-(--badge-idle) after:content-['']">
-                  <SeededAvatar
-                    className="size-5"
-                    name={user.displayName}
-                    src={user.avatarUrl}
-                    fallback="/avatar-user.png"
-                  />
-                </span>
+                <TaskStatus phase={todo.phase} />
+                <TaskAvatar name={user.displayName} src={user.avatarUrl} />
               </div>
-              {/* #318: 同列表行——标题 <a> 的 after: 拉伸盖满整卡；两行截断 =
-                  max-height 40 idiom（detail.css chat-preview 注同源）。 */}
+              {/* #318: 同列表行——标题 <a> 的 after: 拉伸盖满整卡。 */}
               <Link
-                className="prj-task-link max-h-10 overflow-hidden text-sm leading-5 text-foreground no-underline after:absolute after:inset-0 after:content-['']"
+                className={cn(
+                  "prj-task-link line-clamp-2 text-card-title no-underline after:absolute after:inset-0 after:content-['']",
+                  isSettled(todo.phase)
+                    ? 'font-normal text-content-tertiary'
+                    : 'font-medium text-foreground',
+                )}
                 to={{ pathname: `/app/todo/${todo.id}`, search }}
               >
                 {todo.title}
               </Link>
-              <span className="text-xs text-muted-foreground">
-                {relativeTime(todo.phaseAt, now, t)}
+              <span data-testid="task-meta" className="text-meta text-content-tertiary">
+                #{todo.seqNum} · {relativeTime(todo.phaseAt, now, t)}
               </span>
             </Card>
           ))}
@@ -985,7 +997,8 @@ export function ProjectPage() {
   return (
     <PageShell
       route="project"
-      bleed
+      // 文件 = 树 + 查看器铺满纸面；任务 = 列表页同款 768px 阅读栏。
+      bleed={tab === 'files'}
       fixture={
         live ? { ...fixture, todos } : { ...fixture, todos: [...fixture.todos, ...fixtureAdded] }
       }
@@ -1024,18 +1037,18 @@ export function ProjectPage() {
         // （多机部署不同机 / 目录已删 / 已非 git 仓）。不渲染 FilesPane——
         // 空树会被误读成「仓库是空的」，历史面同闸也不再发。分类 reason 走
         // #386 单源分译；未分类失败（网络/5xx）只出主行。
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-[13px] text-muted-foreground">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 text-ui text-content-tertiary">
           <span>{t('本地仓库当前无法读取。')}</span>
           {treeQ.error instanceof ApiError &&
           treeQ.error.reason !== undefined &&
           treeQ.error.reason in LOCAL_ERROR_REASON_COPY ? (
-            <span className="text-xs">
+            <span className="text-meta">
               {t(LOCAL_ERROR_REASON_COPY[treeQ.error.reason as LocalErrorReason])}
             </span>
           ) : null}
         </div>
       ) : tab === 'files' && isGithubRepoEntry ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center gap-3 text-[13px] text-muted-foreground">
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-3 text-ui text-content-tertiary">
           <span>{t('GitHub 仓库项目的文件在 GitHub 上查看')}</span>
           {githubFilesUrl != null && (
             /* #946 better-colors 实测换槽：原规则引 --accent（软分隔线族，
@@ -1081,13 +1094,13 @@ export function ProjectPage() {
               onClose={() => setCommitSel(null)}
             />
           ) : fileView.kind === 'text' ? (
-            <div className="block min-w-0 flex-1 overflow-auto px-4 py-3 text-[13px] text-muted-foreground">
-              <pre className="m-0 font-mono text-xs leading-[18px] whitespace-pre text-foreground">
+            <div className="block min-w-0 flex-1 overflow-auto px-4 py-3">
+              <pre className="m-0 font-mono text-meta leading-4.5 whitespace-pre text-foreground">
                 {fileView.content}
               </pre>
             </div>
           ) : (
-            <div className="flex flex-1 items-center justify-center text-[13px] text-muted-foreground">
+            <div className="flex flex-1 items-center justify-center text-ui text-content-tertiary">
               {fileView.kind === 'loading'
                 ? t('加载中…')
                 : fileView.kind === 'error'

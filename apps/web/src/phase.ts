@@ -7,6 +7,16 @@
 // light, 17 light/dark) and r5b §3.3/§3.6 + r6 §4.4 (main-button copy
 // table incl. `重开`). Rows no capture exercises carry [推断].
 
+import type { LucideIcon } from 'lucide-react';
+import {
+  Activity,
+  Ban,
+  CircleCheck,
+  CircleDashed,
+  CircleX,
+  GitPullRequest,
+  ListChecks,
+} from 'lucide-react';
 import type { Phase } from './fixtures/records.js';
 
 export interface PhaseUi {
@@ -61,4 +71,24 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
     placeholder: '请求修改…',
   },
   closed: { chip: '已取消', tone: 'idle', action: null, placeholder: null },
+};
+
+const ACCENT_INK = 'text-(--card-button)';
+export const RUNNING_INK = 'text-running-text';
+const QUIET_INK = 'text-content-tertiary';
+
+/** Status glyph + ink per phase, shown next to the PHASE_UI chip word (the
+ *  detail head, project task rows): terracotta for the three needs-you
+ *  phases, green while an agent runs, ink greys otherwise (DESIGN.md
+ *  强调色纪律). */
+export const PHASE_STATUS: Record<Phase, { icon: LucideIcon; ink: string }> = {
+  todo: { icon: CircleDashed, ink: QUIET_INK },
+  queued: { icon: CircleDashed, ink: QUIET_INK },
+  planning: { icon: Activity, ink: RUNNING_INK },
+  building: { icon: Activity, ink: RUNNING_INK },
+  confirm: { icon: ListChecks, ink: ACCENT_INK },
+  review: { icon: GitPullRequest, ink: ACCENT_INK },
+  failed: { icon: CircleX, ink: ACCENT_INK },
+  done: { icon: CircleCheck, ink: QUIET_INK },
+  closed: { icon: Ban, ink: QUIET_INK },
 };
