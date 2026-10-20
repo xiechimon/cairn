@@ -132,6 +132,68 @@ export async function githubPullState(
   return { state, merged: merged === true };
 }
 
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA。 */
+export interface GithubPull extends GithubPullState {
+  /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
+  mergeCommitSha: string | null;
+}
+
+export interface GithubPullPage {
+  /** true = 304 Not Modified（调用方复用缓存判据，同 check-runs 条件 GET）。 */
+  notModified: boolean;
+  etag: string | null;
+  pull: GithubPull | null;
+}
+
+/** 单条 PR 条件读（#1403 review 关口对账：`GET /repos/{o}/{r}/pulls/{n}`，
+ * If-None-Match 携带上轮 etag → 304 不计主限流）。null = 读不到（网络/404/
+ * 限流/响应形坏不区分，fail-open 归调用方，同 githubCommitCheckRuns）。 */
+export async function githubPull(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  opts: { etag?: string | null } = {},
+): Promise<GithubPullPage | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      headers: {
+        ...API_HEADERS,
+        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+        ...(opts.etag != null ? { 'if-none-match': opts.etag } : {}),
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch {
+    return null;
+  }
+  if (res.status === 304) return { notModified: true, etag: opts.etag ?? null, pull: null };
+  if (!res.ok) return null;
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null) return null;
+  const raw = data as { state?: unknown; merged?: unknown; merge_commit_sha?: unknown };
+  if (raw.state !== 'open' && raw.state !== 'closed') return null;
+  const merged = raw.merged === true;
+  return {
+    notModified: false,
+    etag: res.headers.get('etag'),
+    pull: {
+      state: raw.state,
+      merged,
+      mergeCommitSha:
+        merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
+    },
+  };
+}
+
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；
  *  404 = 不可达（含「私仓无 auth 与不存在同形」的 GitHub 防探测语义——
  *  mapUpstreamStatus 404 分支同文）；限流/网络/5xx 沿 readJson 的 HttpError

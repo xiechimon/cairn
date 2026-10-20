@@ -755,7 +755,7 @@ export function dispatchSplitChildren(deps: BuildDeps, parentId: string): number
 /** todo 最新的「产过 PR 的 build」（prUrl/prNumber 任一非空 = daemon 步收尾
  * 探测回填在位，github 形态独有）。更旧的 PR build 属被取代分支（存量收敛
  * 规则 = spec 23）；无 → null（返工走现行新 build 路）。 */
-function latestPrBuild(db: Db, todoId: string): BuildRow | null {
+export function latestPrBuild(db: Db, todoId: string): BuildRow | null {
   return (
     db
       .select()
@@ -1745,8 +1745,14 @@ export function completeStep(
   }
   // merge 步成 → done + 🎉（时间线「发起了合并」+ 结果行 + `🎉 任务已完成`，
   // r3 §3.6；celebration 行 [设计] = role system 纯文本）。
-  setTodoPhase(deps, todoRow.id, 'done');
-  insertMessageRow(deps, buildRow.id, {
+  finishTodoDone(deps, todoRow.id, buildRow.id);
+}
+
+/** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：相位 → done、
+ * 🎉 行、拆卡波次推进。 */
+export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
+  setTodoPhase(deps, todoId, 'done');
+  insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',
     content: '🎉 任务已完成',
@@ -1754,7 +1760,7 @@ export function completeStep(
   });
   // #1250（ADR 0018 层 2）：done 落地即查拆卡波次——本卡是子项时推进其父的
   // 下一波（父自动收口在 setTodoPhase 的 settleSplitOnDone 半边，Todos 层）。
-  advanceSplitWaves(deps, todoRow.id);
+  advanceSplitWaves(deps, todoId);
 }
 
 export class NotFoundError extends Error {

@@ -29,16 +29,36 @@
 // 不变。空 checks 宽限：PR head 上一条 check 都没有 = 「仓没配 CI」与「CI
 // 还没注册 check（竞态）」不可分——宽限内按 pending 等，超宽限按绿交人
 // （不把无 CI 仓永远锁在 building）。
+//
+// #1403 第二候选集（review 关口的 PR 对账）：相位 review、todo 最新的 PR
+// build（spec 23 latestPrBuild——更旧的被取代 PR 关了不算数）。每候选一次
+// 条件 GET pulls/{n}：已合并（不论谁合的）→ system 行写合并 SHA + done 收尾
+// 漏斗（与 merge 步成同一条）；关闭未合并 → build.errorMessage + failed；
+// open → 不动。读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 
 import { conversationBranch } from '@pacman/shared';
 import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
-import { type FetchLike, type GithubCheckRun, githubCommitCheckRuns } from '../lib/github.js';
-import { nowMs } from '../lib/ids.js';
-import { type BuildDeps, enqueueStep, maybeEnqueueVerifyStep, toBuildRecord } from './builds.js';
+import {
+  type FetchLike,
+  type GithubCheckRun,
+  type GithubPull,
+  githubCommitCheckRuns,
+  githubPull,
+} from '../lib/github.js';
+import { newRecordId, nowMs } from '../lib/ids.js';
+import {
+  type BuildDeps,
+  enqueueStep,
+  finishTodoDone,
+  latestPrBuild,
+  maybeEnqueueVerifyStep,
+  toBuildRecord,
+} from './builds.js';
 import { openGithubToken } from './github-connection.js';
 import { setTodoPhase } from './todos.js';
+import { insertMessageRow } from './transcript.js';
 
 /** 轮询节奏（票面：60s 扫）。 */
 export const CI_POLL_INTERVAL_MS = 60_000;
@@ -171,6 +191,18 @@ interface CiPollTally {
   unreadable: number;
   /** 单候选意外异常（不杀整轮）。 */
   errors: number;
+  /** #1403 review 关口候选数（todo 最新 PR build）。 */
+  reviewCandidates: number;
+  /** PR 已在 GitHub 合并 → done。 */
+  merged: number;
+  /** PR 关闭未合并 → failed。 */
+  closedUnmerged: number;
+}
+
+/** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
+interface PullCacheEntry {
+  etag: string | null;
+  pull: GithubPull | null;
 }
 
 export function createCiPoller(
@@ -178,11 +210,111 @@ export function createCiPoller(
   run: { githubFetch: FetchLike; logger?: CiPollLogger },
 ): CiPoller {
   const cache = new Map<string, PrChecksCacheEntry>();
+  const pullCache = new Map<string, PullCacheEntry>();
 
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
   function freshGrindRow(todoId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
     return row !== undefined && row.phase === 'building' ? row : null;
+  }
+
+  function freshReviewRow(todoId: string) {
+    const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
+    return row !== undefined && row.phase === 'review' ? row : null;
+  }
+
+  /** github 形态目标（owner/repo）；非 github 或缺仓名 → null。 */
+  function githubTarget(projectId: string) {
+    const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+    if (projRow === undefined || projRow.repoKind !== 'github' || projRow.githubRepo === null) {
+      return null;
+    }
+    const slash = projRow.githubRepo.indexOf('/');
+    return {
+      teamId: projRow.teamId,
+      fullName: projRow.githubRepo,
+      owner: projRow.githubRepo.slice(0, slash),
+      repo: projRow.githubRepo.slice(slash + 1),
+    };
+  }
+
+  /** token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
+   * 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。 */
+  function tokenFor(teamId: string): string | null {
+    if (deps.box === undefined) return null;
+    try {
+      return openGithubToken({ db: deps.db, box: deps.box }, teamId);
+    } catch {
+      return null;
+    }
+  }
+
+  async function reconcileOne(
+    cand: { buildId: string; todoId: string },
+    tally: CiPollTally,
+  ): Promise<void> {
+    const todoRow = freshReviewRow(cand.todoId);
+    const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    const target = todoRow === null ? null : githubTarget(todoRow.projectId);
+    if (
+      todoRow === null ||
+      buildRow === undefined ||
+      buildRow.prNumber === null ||
+      target === null
+    ) {
+      tally.skipped += 1;
+      return;
+    }
+    const prNumber = buildRow.prNumber;
+    const key = `${target.fullName}#${prNumber}`;
+    const entry = pullCache.get(key) ?? null;
+    const page = await githubPull(
+      run.githubFetch,
+      tokenFor(target.teamId),
+      target.owner,
+      target.repo,
+      prNumber,
+      { etag: entry?.etag ?? null },
+    );
+    if (page === null) {
+      tally.unreadable += 1;
+      return;
+    }
+    const pull = page.notModified ? (entry?.pull ?? null) : page.pull;
+    pullCache.set(key, { etag: page.etag, pull });
+    if (pull === null || pull.state === 'open') {
+      tally.pending += 1;
+      return;
+    }
+    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
+    if (freshReviewRow(cand.todoId) === null) {
+      tally.skipped += 1;
+      return;
+    }
+    if (pull.merged) {
+      const sha =
+        pull.mergeCommitSha === null ? '' : `（合并提交 ${pull.mergeCommitSha.slice(0, 7)}）`;
+      insertMessageRow(deps, cand.buildId, {
+        id: newRecordId(),
+        role: 'system',
+        content: `PR #${prNumber} 已在 GitHub 合并${sha}`,
+        createdAt: nowMs(),
+      });
+      finishTodoDone(deps, cand.todoId, cand.buildId);
+      tally.merged += 1;
+      return;
+    }
+    deps.db
+      .update(build)
+      .set({
+        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并。需要继续时重启任务，会新开分支与 PR。`,
+      })
+      .where(eq(build.id, cand.buildId))
+      .run();
+    const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    if (row) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
+    setTodoPhase(deps, cand.todoId, 'failed');
+    tally.closedUnmerged += 1;
   }
 
   async function pollOne(
@@ -207,39 +339,20 @@ export function createCiPoller(
       return;
     }
     const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
-    if (
-      buildRow === undefined ||
-      buildRow.prNumber === null ||
-      projRow === undefined ||
-      projRow.repoKind !== 'github' ||
-      projRow.githubRepo === null
-    ) {
+    const target = githubTarget(todoRow.projectId);
+    if (buildRow === undefined || buildRow.prNumber === null || target === null) {
       // 形态不齐（PR 号缺失/项目非 github——生产不可达，防御位）：不出站、不写。
       tally.skipped += 1;
       return;
     }
-    const slash = projRow.githubRepo.indexOf('/');
-    const owner = projRow.githubRepo.slice(0, slash);
-    const repo = projRow.githubRepo.slice(slash + 1);
-    // token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
-    // 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。
-    let token: string | null = null;
-    if (deps.box !== undefined) {
-      try {
-        token = openGithubToken({ db: deps.db, box: deps.box }, projRow.teamId);
-      } catch {
-        token = null;
-      }
-    }
-    const key = `${projRow.githubRepo}#${buildRow.prNumber}`;
+    const key = `${target.fullName}#${buildRow.prNumber}`;
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
     const page = await githubCommitCheckRuns(
       run.githubFetch,
-      token,
-      owner,
-      repo,
+      tokenFor(target.teamId),
+      target.owner,
+      target.repo,
       conversationBranch(cand.buildId),
       {
         etag: entry?.etag ?? null,
@@ -324,6 +437,14 @@ export function createCiPoller(
       .innerJoin(todo, eq(todo.id, build.todoId))
       .where(and(isNotNull(build.prNumber), eq(todo.phase, 'building')))
       .all();
+    // #1403 review 关口候选：todo 最新的 PR build 才算（更旧的被取代 PR 不算）。
+    const reviewCandidates = deps.db
+      .select({ buildId: build.id, todoId: todo.id })
+      .from(build)
+      .innerJoin(todo, eq(todo.id, build.todoId))
+      .where(and(isNotNull(build.prNumber), eq(todo.phase, 'review')))
+      .all()
+      .filter((c) => latestPrBuild(deps.db, c.todoId)?.id === c.buildId);
     const tally: CiPollTally = {
       candidates: candidates.length,
       pending: 0,
@@ -333,6 +454,9 @@ export function createCiPoller(
       skipped: 0,
       unreadable: 0,
       errors: 0,
+      reviewCandidates: reviewCandidates.length,
+      merged: 0,
+      closedUnmerged: 0,
     };
     for (const cand of candidates) {
       try {
@@ -343,6 +467,17 @@ export function createCiPoller(
         run.logger?.info(
           { err: err instanceof Error ? err.message : String(err) },
           'ci pr-checks poll candidate failed (sweep continues)',
+        );
+      }
+    }
+    for (const cand of reviewCandidates) {
+      try {
+        await reconcileOne(cand, tally);
+      } catch (err) {
+        tally.errors += 1;
+        run.logger?.info(
+          { err: err instanceof Error ? err.message : String(err) },
+          'pr reconcile candidate failed (sweep continues)',
         );
       }
     }

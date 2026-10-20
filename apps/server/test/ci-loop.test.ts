@@ -434,7 +434,7 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
     expect(w.mock.requests[0]?.headers.authorization).toBe('Bearer token-plain');
   });
 
-  test('扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不出站', async () => {
+  test('扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不读 checks', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const noPr = addCandidate(s, []);
@@ -452,18 +452,20 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
         ),
       )
       .run();
-    let requests = 0;
+    const urls: string[] = [];
     const poller = createCiPoller(
       { ...s.svc },
       {
         githubFetch: (url) => {
-          requests += 1;
-          throw new Error(`unexpected outbound ${url}`);
+          urls.push(String(url));
+          return Promise.resolve(res(404, '"x"', {}));
         },
       },
     );
     await poller.sweep();
-    expect(requests).toBe(0);
+    // #1403：review 相位的 PR build 进对账面（只读 pulls/{n}），不进磨绿面。
+    expect(urls.filter((u) => u.includes('/check-runs'))).toEqual([]);
+    expect(urls).toEqual([expect.stringMatching(/\/pulls\/\d+$/)]);
   });
 });
 
@@ -633,14 +635,15 @@ describe('#1150 绿推闸 / completeStep 持 building / scheduler 接线', () =>
     expect(w.todoRow().hasChanges).toBe(true);
   });
 
-  test('green 后候选拿出扫描集：再 sweep 零请求（终态退出，不空转）', async () => {
+  test('green 后候选拿出磨绿集：再 sweep 不再读 checks（转 #1403 对账面）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
     await w.poller.sweep();
-    const before = w.mock.requests.length;
+    const checksReads = () => w.mock.requests.filter((r) => r.url.includes('/check-runs')).length;
+    const before = checksReads();
     await w.poller.sweep();
-    expect(w.mock.requests.length).toBe(before);
+    expect(checksReads()).toBe(before);
   });
 
   test('completeStep：执行步成 + PR 交付（prNumber 在）→ 停在 building；无 PR → review（既有行为）', () => {

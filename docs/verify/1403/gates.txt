@@ -1,0 +1,23 @@
+$ pnpm lint
+apps/web/src/resources/machines-page.tsx:317:15 ]8;;https://biomejs.dev/linter/rules/no-useless-fragments\lint/complexity/noUselessFragments]8;;\  FIXABLE  ━━━━━━━━━━
+Checked 782 files in 1454ms. No fixes applied.
+Found 1 info.
+lint exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+typecheck exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+spec:parse exit=0
+
+$ pnpm --filter @pacman/web e2e:affected
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 1/156 specs on the standard fixture-build config, E2E_PORT=8398
+  6 passed (12.4s)
+e2e:affected exit=0
