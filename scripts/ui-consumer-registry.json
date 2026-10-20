@@ -127,11 +127,11 @@
       "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, measured in PR #1369); non-text glyph, 3:1 gate"
     },
     {
-      "file": "apps/web/src/detail/dhead.tsx",
+      "file": "apps/web/src/phase.ts",
       "anchor": "const ACCENT_INK = 'text-(--card-button)'",
       "role": "indicator",
-      "reason": "Detail top bar status for the three needs-you phases (icon + 失败/确认/审核, paper-redesign-plan PR 7). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet 4.99, AA for 13.5px text)"
+      "reason": "PHASE_STATUS ink for the three needs-you phases (icon + 失败/确认/审核), read by the detail top bar (paper-redesign-plan PR 7) and the project page task rows and cards (#1397). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
+      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet and on card 4.99, AA for 12px and 13.5px text)"
     },
     {
       "file": "apps/web/src/routes/team-agent-grid.tsx",
