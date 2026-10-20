@@ -1,0 +1,1346 @@
+[
+ {
+  "script": "cleanup.mjs",
+  "kind": "infra",
+  "feature": "infra",
+  "newFeature": false,
+  "case": "cleanup",
+  "purpose": "Tears down the launch.mjs stack using its pid files (SIGTERM, then SIGKILL), reaps leftover daemons tied to this stack's server port, and deletes VERIFY_RUN_DIR. Evidence is kept.",
+  "needs": [
+   "none"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_PORT, VERIFY_EVIDENCE_DIR (all optional)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1034-thinking-truncate.mjs",
+  "kind": "probe",
+  "feature": "thinking-truncate",
+  "newFeature": true,
+  "case": "thinking-truncate",
+  "purpose": "Proves long thinking-preview rows are cut off by CSS truncation, not by overflowing width, in both the chief drawer and the detail transcript. Data is seeded through REST and a fake machine.",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1136-stale-sweep.mjs",
+  "kind": "probe",
+  "feature": "machine-stale-sweep",
+  "newFeature": true,
+  "case": "stale-sweep",
+  "purpose": "Freezes a real daemon with SIGSTOP and proves the machine row turns offline once the 150s stale threshold passes, then returns online after SIGCONT.",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "--expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1213-dual-source.mjs",
+  "kind": "probe",
+  "feature": "dual-source",
+  "newFeature": true,
+  "case": "dual-source",
+  "purpose": "Proves that for a github project with a localPath set, the daemon uses the local clone as its base and still fetches to the remote tip. With a bad path it falls back to a GitHub clone. The settings page edits the localPath field.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm",
+   "github"
+  ],
+  "args": "env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1262-ansi-error.mjs",
+  "kind": "probe",
+  "feature": "ansi-error-display",
+  "newFeature": true,
+  "case": "ansi-error",
+  "purpose": "Seeds a failed build whose errorMessage is a real ANSI-polluted row, then proves the failure row and run history show it with no ESC or OSC8 sequences.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env SERVER, WEB, POLLUTED_ROW_FILE, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-925-pi-policy.mjs",
+  "kind": "probe",
+  "feature": "pi-policy",
+  "newFeature": true,
+  "case": "pi-policy",
+  "purpose": "Proves the pi session policy end to end: the trust layer denies .pi/SYSTEM.md, the policy announcement line appears, the cache-retention setting reaches the request, and per-build usage records cost and the four token counts.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env SERVER, VERIFY_RUN_DIR, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-agent-detail.mjs",
+  "kind": "probe",
+  "feature": "agent-detail",
+  "newFeature": false,
+  "case": "edit-and-create",
+  "purpose": "Edits an agent's overview, permission and secret toggles in the detail page, then creates an agent with a chosen model. Each change is checked against the server's saved values.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-detail-pane.mjs",
+  "kind": "probe",
+  "feature": "detail-right-pane",
+  "newFeature": false,
+  "case": "three-pane",
+  "purpose": "Checks the detail page's 3-pane geometry in the fresh and thread states, and switching between the right pane's four views without any modal.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "stale",
+  "staleReason": "Its branch-section check looks for the .dlg-machine-picker, .dlg-dir--input and .dlg-machine classes. These no longer exist in apps/web: branch-dialog.tsx only mentions .dlg-machine-dot in a comment as an old class name (#951)."
+ },
+ {
+  "script": "drive-project-new-form.mjs",
+  "kind": "probe",
+  "feature": "project-new-form",
+  "newFeature": false,
+  "case": "new-form",
+  "purpose": "Covers the new-project form: repo menu rows, name auto-fill, focus ring, local path errors, the submit gate, and three create flows checked in both the API and SQLite.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env must be unset",
+  "status": "current"
+ },
+ {
+  "script": "launch.mjs",
+  "kind": "infra",
+  "feature": "infra",
+  "newFeature": false,
+  "case": "launch",
+  "purpose": "Starts an isolated verify stack: the server on 8791 and vite on 5273, with a scratch PACMAN_HOME and skills dir. It writes pid files and ports.json.",
+  "needs": [
+   "none"
+  ],
+  "args": "env VERIFY_PORT, VERIFY_WEB_PORT, VERIFY_REPO_ROOT, VERIFY_RUN_DIR",
+  "status": "current"
+ },
+ {
+  "script": "doctor.mjs",
+  "kind": "infra",
+  "feature": "infra",
+  "newFeature": false,
+  "case": "doctor",
+  "purpose": "Read-only health check: it confirms the process group is alive, the ports answer, and the auth session, teams and projects endpoints return 200.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1035-zoom-fit.mjs",
+  "kind": "probe",
+  "feature": "board-zoom-fit",
+  "newFeature": true,
+  "case": "zoom-fit",
+  "purpose": "At each simulated zoom width the board columns fit without horizontal overflow, the column floor is 200px normally and 280px with chief docked (Cmd+J), and Escape returns it to normal.",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1137-webhook-tracer.mjs",
+  "kind": "probe",
+  "feature": "github-webhook",
+  "newFeature": true,
+  "case": "webhook-tracer",
+  "purpose": "A GitHub issues labeled webhook creates a todo and orchestrates a chief thread. It also covers the failure paths: bad token (401), duplicate delivery, replay, ping, an ignored label and an unmapped repo.",
+  "needs": [
+   "stack",
+   "github"
+  ],
+  "args": "run via pnpm exec tsx; env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1241-recommended-concurrency.mjs",
+  "kind": "probe",
+  "feature": "machine-concurrency",
+  "newFeature": false,
+  "case": "recommended-concurrency",
+  "purpose": "The daemon's hardware fingerprint yields a recommended concurrency value. It checks the recommended, manual and estimated states, the basis popover, that a heartbeat does not overwrite a manual value, and that 'restore recommended' works.",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-1303-chief-unread.mjs",
+  "kind": "probe",
+  "feature": "chief-unread",
+  "newFeature": true,
+  "case": "unread-badge",
+  "purpose": "The chief unread badge counts unread threads. Wake turns are excluded, threads idle for 8 days become read after a tick, and the badge shows 99+ with a tooltip giving the true count.",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=old|new; fresh DB required; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-929-930.mjs",
+  "kind": "probe",
+  "feature": "mcp-servers",
+  "newFeature": false,
+  "case": "command-gate-mcp-bridge",
+  "purpose": "The bash command gate blocks rm -rf with a refusal the model can see and lets legal bash run. It also checks the MCP native bridge: echo and resources work, a dead endpoint degrades without blocking, and the stdio child is closed on shutdown.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME, MCP_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-agent-identity.mjs",
+  "kind": "probe",
+  "feature": "agent-detail",
+  "newFeature": false,
+  "case": "identity-chip-link",
+  "purpose": "The agent identity chip on the chief drawer's robot row and agent mention chips navigate to the agent settings page by click and by keyboard (Shift+Tab, Enter).",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=old optional; fresh DB required; env VERIFY_REPO_ROOT",
+  "status": "current"
+ },
+ {
+  "script": "drive-failed-review-restore.mjs",
+  "kind": "probe",
+  "feature": "review-modal",
+  "newFeature": false,
+  "case": "failed-review-restore",
+  "purpose": "A todo that failed at AI review recovers two ways: 'complete' from the UI menu merges the branch into bare-repo main and reaches done, or rerunning only the review returns it to the review gate.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-provider-picker.mjs",
+  "kind": "probe",
+  "feature": "provider-picker",
+  "newFeature": false,
+  "case": "picker-dialog",
+  "purpose": "The add-provider picker dialog is checked end to end: search, preset key forms, oauth labels, the disabled codex row and the custom gateway disclosure. Creating a provider is confirmed through the API and SQLite.",
+  "needs": [
+   "stack"
+  ],
+  "args": "run after drive-providers-tabs.mjs; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "probe-error-lifecycle.mjs",
+  "kind": "probe",
+  "feature": "step-error-lifecycle",
+  "newFeature": true,
+  "case": "error-lifecycle",
+  "purpose": "A persistent 400 from a mock gateway fails the step in bounded time with the root cause shown and at most 8 requests. Patching provider compat then takes effect without a daemon restart, and removing it reverts the request fields.",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "env VERIFY_REPO_ROOT, MOCK_PORT (default 8799), VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1007-pages.mjs",
+  "kind": "probe",
+  "feature": "schedules-dialog",
+  "newFeature": true,
+  "case": "schedule-dialog-and-settings-cards",
+  "purpose": "Schedules new-schedule Dialog saves (POST /api/schedules + SQLite row) with Esc/backdrop/X close paths, and project settings page renders registry Card structure",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-1050-claude-bin.mjs",
+  "kind": "probe",
+  "feature": "providers-tabs",
+  "newFeature": false,
+  "case": "claude-bin-detection",
+  "purpose": "Daemon detects the local claude binary version/auth and reports it via enroll; providers page shows version line and login badge, and shows not-installed when the binary is missing",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, SERVER, WEB, DB, VERIFY_EVIDENCE_DIR, STUB_VERSION",
+  "status": "current"
+ },
+ {
+  "script": "drive-1138-agent-concurrency.mjs",
+  "kind": "probe",
+  "feature": "machine-concurrency",
+  "newFeature": false,
+  "case": "agent-concurrency-cap",
+  "purpose": "Per-agent maxConcurrentTasks gate: PATCH validation, claim blocked per agent pool across machines, freed slot handoff, null clears the limit",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1242-project-identity.mjs",
+  "kind": "probe",
+  "feature": "project-identity",
+  "newFeature": true,
+  "case": "identity-patch-and-convert",
+  "purpose": "Project identity PATCH (rename/description), local-to-github conversion with in-flight build 409, board note, and new steps resolve the new repo shape",
+  "needs": [
+   "stack",
+   "github"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+  "status": "current"
+ },
+ {
+  "script": "drive-1308-thinking-delta.mjs",
+  "kind": "probe",
+  "feature": "thinking-delta",
+  "newFeature": true,
+  "case": "live-thinking-text",
+  "purpose": "thinking_delta activity is accepted, reaches the conversation stream, and the detail page shows the reasoning text once",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=old|new (default new); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-943-board-sidebar.mjs",
+  "kind": "probe",
+  "feature": "board-sidebar",
+  "newFeature": true,
+  "case": "board-sidebar-render-contrast",
+  "purpose": "Board/sidebar geometry, button migration, interaction paths, removed board.css rules, and dual-theme WCAG contrast",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; drive.mjs new-task must run first",
+  "status": "current"
+ },
+ {
+  "script": "drive-attachments.mjs",
+  "kind": "probe",
+  "feature": "attachments",
+  "newFeature": false,
+  "case": "new-task-and-composer-upload",
+  "purpose": "Attachment upload via the new-task dialog (and optionally the composer) puts a token in the spec, writes the SQLite row and file on disk, and reads back through GET /api/attachments/:id",
+  "needs": [
+   "stack"
+  ],
+  "args": "[todoId] (optional; adds the composer path, seed via setup-review-seed.mjs)",
+  "status": "current"
+ },
+ {
+  "script": "drive-failed-send.mjs",
+  "kind": "probe",
+  "feature": "failed-send",
+  "newFeature": false,
+  "case": "restart-with-feedback",
+  "purpose": "Sending from the composer in failed phase restarts with feedback: new build, feedback in a new conversation, failed->queued; non-failed restart returns 409",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "<todoId> <failedBuildId>",
+  "status": "current"
+ },
+ {
+  "script": "drive-providers-tabs.mjs",
+  "kind": "probe",
+  "feature": "providers-tabs",
+  "newFeature": false,
+  "case": "runtime-tabs",
+  "purpose": "Providers page pi/Claude Code runtime tabs: empty state, model rows after seeding a provider, ?runtime= sync, header card matches model-sources API and machine report",
+  "needs": [
+   "stack"
+  ],
+  "args": "needs a fresh DB; run before drive-provider-picker",
+  "status": "current"
+ },
+ {
+  "script": "probe-github-oauth.mjs",
+  "kind": "probe",
+  "feature": "github-oauth-picker",
+  "newFeature": false,
+  "case": "oauth-and-manual-repo",
+  "purpose": "GitHub connection status/authorize/disconnect/repos endpoints and the UI manual fallback that creates a github project",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-1008-overlay-registry.mjs",
+  "kind": "probe",
+  "feature": "overlay-registry",
+  "newFeature": true,
+  "case": "overlay-registry",
+  "purpose": "Popover, Dialog, AlertDialog, Tooltip and DropdownMenu overlays across new-task, detail, account, schedules and theme run on the registry components, and saving still writes matching API and SQLite rows.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1065-zombie-claim.mjs",
+  "kind": "probe",
+  "feature": "machine-concurrency",
+  "newFeature": false,
+  "case": "zombie-claim",
+  "purpose": "A killed machine's held claim long-poll never takes a newly queued step; the live machine claims it instead (fake machine wire, no daemon).",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1169-skills-split.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "skills-split",
+  "purpose": "skillsAllowlist and defaultSkill are separate fields across REST, the claim payload and the machine skill selection; the behavior phase checks that an agent with no skills set can read SKILL.md.",
+  "needs": [
+   "stack",
+   "daemon",
+   "real-llm"
+  ],
+  "args": "phase argv api|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1250-persona-verify.mjs",
+  "kind": "probe",
+  "feature": "persona-verify",
+  "newFeature": false,
+  "case": "persona-verify",
+  "purpose": "Persona roster seeding, the verify step with its verdict, three-perspective review fan-out and split_todo child cards all work end to end over the fake machine wire and the browser.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT (needs a fresh DB from relaunch)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1313-empty-review.mjs",
+  "kind": "probe",
+  "feature": "review-modal",
+  "newFeature": false,
+  "case": "empty-review",
+  "purpose": "A review with an empty diff hides the merge row and can be completed without merge permission, while a review with file changes still requires it.",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=before|after [--focus=hunkless]",
+  "status": "current"
+ },
+ {
+  "script": "drive-945-detail.mjs",
+  "kind": "probe",
+  "feature": "detail-right-pane",
+  "newFeature": false,
+  "case": "detail-css-live",
+  "purpose": "After the detail.css removal, the live detail page keeps composer textarea styles, the disclosure button box, task-meta, the status chip tone, the stop button and readable contrast.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "[--skip-build]; env RUNNING_ID, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-avatars.mjs",
+  "kind": "probe",
+  "feature": "avatars",
+  "newFeature": false,
+  "case": "dicebear-avatars",
+  "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite.",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-hotkeys.mjs",
+  "kind": "probe",
+  "feature": "hotkeys",
+  "newFeature": false,
+  "case": "hotkeys-chain",
+  "purpose": "The C new-task hotkey, the ⌘J tooltip and chief drawer focus, ⌘K negative cases and C on schedules each create real todos.",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-review-700.mjs",
+  "kind": "probe",
+  "feature": "review-700",
+  "newFeature": false,
+  "case": "verdict-extraction",
+  "purpose": "A failed verdict extraction shows as a danger tag; a verdict followed by set_task_meta in the same turn is still extracted and sends the task back to replanning.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "<todoA> <todoB>; env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "probe-local-repos.mjs",
+  "kind": "probe",
+  "feature": "local-repo-api",
+  "newFeature": false,
+  "case": "local-repo-api",
+  "purpose": "POST /api/projects with kind=local returns 400 not_found, 400 not_git or 201 as appropriate; hosted projects are not broken; GitHub repos return 404 when not connected; the SQLite shape is correct.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-1009-a0-live.mjs",
+  "kind": "probe",
+  "feature": "chief-floating-window",
+  "newFeature": true,
+  "case": "a0-live",
+  "purpose": "Chief floating-window shell on live data: geometry, minimize, refresh restore, Cmd+J/Esc, cross-route persistence, deep links, suppressed routes",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-1094-threads-scroll.mjs",
+  "kind": "probe",
+  "feature": "chief-segments",
+  "newFeature": false,
+  "case": "threads-scroll",
+  "purpose": "Chief thread switcher with 22 threads stays scrollable and every row is clickable by real mouse coordinates",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=new|old (env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1170-skill-import.mjs",
+  "kind": "probe",
+  "feature": "skill-import",
+  "newFeature": false,
+  "case": "local-and-github-import",
+  "purpose": "Skill import via localPath and GitHub URL, refresh re-pull, machine manifest digest, audit rows, and SSRF/path/binary rejections",
+  "needs": [
+   "stack",
+   "github"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-1251-capability-gate.mjs",
+  "kind": "probe",
+  "feature": "machine-capability-gate",
+  "newFeature": true,
+  "case": "capability-gate",
+  "purpose": "Machine capability reporting, dispatch gate that leaves steps pending with a visible reason, agent machine-fit, and real daemon reporting",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "env VERIFY_REPO_ROOT; server launched with PACMAN_MCP_CONFIG fixture",
+  "status": "current"
+ },
+ {
+  "script": "drive-902-gate-actor.mjs",
+  "kind": "probe",
+  "feature": "gate-actor",
+  "newFeature": true,
+  "case": "gate-actor",
+  "purpose": "Human confirm gate records actor, drag to done shows a confirm dialog with an audit row, and chief cannot pass gates by itself",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=new|old (env VERIFY_RUN_DIR for baseline)",
+  "status": "current"
+ },
+ {
+  "script": "drive-947-secondary.mjs",
+  "kind": "probe",
+  "feature": "secondary-shell",
+  "newFeature": true,
+  "case": "secondary-domain",
+  "purpose": "Team/org chart/api-keys secondary pages: geometry, slots, interaction paths, secondary.css cleared, WCAG contrast in both themes",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-branch-sync.mjs",
+  "kind": "probe",
+  "feature": "branch-sync",
+  "newFeature": false,
+  "case": "sync-ui",
+  "purpose": "Branch sync from the detail right pane resets the dirty target dir to the commit (POST, SQLite row, stream event, git state)",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "<todoId> <buildId>",
+  "status": "current"
+ },
+ {
+  "script": "drive-machines-local.mjs",
+  "kind": "probe",
+  "feature": "machines-local-row",
+  "newFeature": false,
+  "case": "local-row",
+  "purpose": "Machines page pins the local row with runtime brand marks and a shell toggle that persists across reload",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-review-blocking.mjs",
+  "kind": "probe",
+  "feature": "review-reject",
+  "newFeature": false,
+  "case": "blocking-revision",
+  "purpose": "AI review with a blocking verdict moves phase back to planning, writes a summary note, and enqueues a new plan step with review facts",
+  "needs": [
+   "stack"
+  ],
+  "args": "<todoId> <agentId>; env REVIEW_MACHINE_TOKEN (after setup-review-seed.mjs)",
+  "status": "current"
+ },
+ {
+  "script": "setup-branch-sync-seed.mjs",
+  "kind": "seed",
+  "feature": "branch-sync",
+  "newFeature": false,
+  "case": "seed",
+  "purpose": "Creates the todo/build plus a dirty git origin/target in /tmp with the step checkpoint at C2; prints ids and apiKey JSON",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-1010-select.mjs",
+  "kind": "probe",
+  "feature": "registry-select",
+  "newFeature": true,
+  "case": "schedule-time-select",
+  "purpose": "Registry compound select on the schedule dialog's hour/minute pickers: open, pick and echo back on the real user path, ARIA structure, and light/dark contrast.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1097-folder-drill.mjs",
+  "kind": "probe",
+  "feature": "project-files-drill",
+  "newFeature": false,
+  "case": "folder-drill",
+  "purpose": "Project Files folder drill-down for hosted and local repos: tree?path= REST values, breadcrumbs, same-name files kept apart, 3-level nesting, and no file read sent on a folder click.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1171-native-plugin.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "native-plugin",
+  "purpose": "Team skills native plugin channel: wire phase uses a fake claude CLI to check --plugin-dir, the version gate and allowlist legs; behavior phase checks real-model Skill discovery with zero leftover files in the worktree.",
+  "needs": [
+   "stack",
+   "real-llm"
+  ],
+  "args": "phase argument wire|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, VERIFY_EVIDENCE_DIR, MODEL (default glm-5.3); daemon is spawned by the script itself",
+  "status": "current"
+ },
+ {
+  "script": "drive-1257-hang-retry.mjs",
+  "kind": "probe",
+  "feature": "step-hold-retry",
+  "newFeature": true,
+  "case": "hang-retry",
+  "purpose": "Unclaimed steps wait for a machine instead of failing, a quota error triggers a 402 hold and backoff re-claim, and a broken stream resumes the same session; three legs checked via SQLite, REST and board chips.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; embedded stub LLM; starts the daemon itself",
+  "status": "current"
+ },
+ {
+  "script": "drive-903-dispatch-judgment.mjs",
+  "kind": "probe",
+  "feature": "chief-dispatch-judgment",
+  "newFeature": false,
+  "case": "dispatch-judgment",
+  "purpose": "Chief dispatch judgment: the dispatchWithPlan setting is dead (no UI row, PATCH 400), and run_builds withPlan/dispatchReason in three forms is checked against SQLite through a fake machine wire.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+  "status": "current"
+ },
+ {
+  "script": "drive-948-overlay.mjs",
+  "kind": "probe",
+  "feature": "board-new-task",
+  "newFeature": false,
+  "case": "overlay-css-migration",
+  "purpose": "Overlay-domain migration: new-task dialog path, computed geometry of the utility classes, popovers, more-menu and delete-confirm, retired CSS sheets never loaded, light mode.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+  "status": "stale",
+  "staleReason": "The selector data-testid=new-task-machine-chip no longer exists in apps/web/src. new-task-dialog.tsx only lists new-task-machine-dot, though new-task-head and new-task-project-chip are still there."
+ },
+ {
+  "script": "drive-chief-catchup.mjs",
+  "kind": "probe",
+  "feature": "chief-segments",
+  "newFeature": false,
+  "case": "stream-catchup",
+  "purpose": "A chief conversation SSE subscriber that joins mid-turn gets a replayed text_delta snapshot with no duplicate or missing text, on both the API and the drawer.",
+  "needs": [
+   "stack"
+  ],
+  "args": "optional --expect=old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-mcp.mjs",
+  "kind": "probe",
+  "feature": "mcp-servers",
+  "newFeature": false,
+  "case": "readonly-config",
+  "purpose": "The MCP page shows the local config read-only: the API projection hides secrets, write routes return 404, rows have no new or more entry points, and there is no mcp_server table.",
+  "needs": [
+   "stack"
+  ],
+  "args": "launch with PACMAN_MCP_CONFIG=<fixture claude.json>; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-review-reject.mjs",
+  "kind": "probe",
+  "feature": "review-reject",
+  "newFeature": false,
+  "case": "human-reject",
+  "purpose": "Two human-reject paths from review (more-menu request changes and the composer) send the task back to planning with a feedback transcript row and a template prompt, while plan v1 and the build are kept.",
+  "needs": [
+   "stack"
+  ],
+  "args": "<todoId> positional; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR; run setup-review-seed.mjs first",
+  "status": "current"
+ },
+ {
+  "script": "setup-review-700-seed.mjs",
+  "kind": "seed",
+  "feature": "review-700",
+  "newFeature": false,
+  "case": "seed",
+  "purpose": "Seeds a provider pointing at stub-review-700, an agent, a project, and two todos driven to confirm phase for the verdict extraction scenarios A and B; prints the IDs and token as JSON.",
+  "needs": [
+   "stack",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, STUB_LLM_URL (default http://127.0.0.1:8921/v1)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1025-plan-first-round.mjs",
+  "kind": "probe",
+  "feature": "plan-doc-chain",
+  "newFeature": true,
+  "case": "plan-first-round",
+  "purpose": "Plan.md contract is injected into first-round plan prompt (A leg) and missing plan triggers rewrite round then failed close (B leg).",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-1102-commit-detail.mjs",
+  "kind": "probe",
+  "feature": "project-commit-detail",
+  "newFeature": false,
+  "case": "commit-detail",
+  "purpose": "Project history row opens commit diff for hosted, local and unreachable repos with REST and browser checks.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-1185-import-rollback.mjs",
+  "kind": "probe",
+  "feature": "skill-import",
+  "newFeature": false,
+  "case": "import-rollback",
+  "purpose": "When skill-sources.json registration fails, imported skill is rolled back (new) or left behind (old).",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=old | --expect=new; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1258-fail-links.mjs",
+  "kind": "probe",
+  "feature": "failed-run-error",
+  "newFeature": true,
+  "case": "fail-raw-error-dialog",
+  "purpose": "Failed todo row's view raw error opens dialog with full build.errorMessage, no guide link, X closes.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-904-plan-chain.mjs",
+  "kind": "probe",
+  "feature": "plan-doc-chain",
+  "newFeature": true,
+  "case": "plan-chain",
+  "purpose": "withPlan build writes plan.md to plan table, confirm card and right-pane doc show it for hosted and bare dir, negative leg fails.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-949-overlays.mjs",
+  "kind": "probe",
+  "feature": "overlays",
+  "newFeature": true,
+  "case": "overlays-contrast",
+  "purpose": "Cmd-K panel and chip popover overlay styling, overlays.css retirement and contrast in both themes.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; requires drive.mjs new-task run first",
+  "status": "current"
+ },
+ {
+  "script": "drive-chief-drawer.mjs",
+  "kind": "probe",
+  "feature": "chief-drawer",
+  "newFeature": true,
+  "case": "drawer-model-select",
+  "purpose": "Chief drawer model selection persists via PATCH, runtime mark icon, and no dead buttons (gear, copy).",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; fresh DB",
+  "status": "current"
+ },
+ {
+  "script": "drive-mentions.mjs",
+  "kind": "probe",
+  "feature": "mentions",
+  "newFeature": false,
+  "case": "mention-picker",
+  "purpose": "Mention picker inserts agent token into new-task spec and optionally detail composer draft.",
+  "needs": [
+   "stack"
+  ],
+  "args": "[todoId]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-review.mjs",
+  "kind": "probe",
+  "feature": "review-modal",
+  "newFeature": false,
+  "case": "review-launch",
+  "purpose": "AI review modal launch from confirm phase enqueues review step, shows announcement, and simulated done closes loop.",
+  "needs": [
+   "stack"
+  ],
+  "args": "<todoId>; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "setup-review-seed.mjs",
+  "kind": "seed",
+  "feature": "review-modal",
+  "newFeature": false,
+  "case": "review-seed",
+  "purpose": "Seeds provider/agent/project/todo and a machine driving plan to confirm phase; prints ids JSON.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1030-local-files.mjs",
+  "kind": "probe",
+  "feature": "project-files-local",
+  "newFeature": false,
+  "case": "local-files",
+  "purpose": "Local project Files tab opens on a git worktree with a non-main default branch, hosted repos show no regression, and an unreachable local path degrades to a readable message with an API 404 and reason=not_found.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-1104-unassigned-build.mjs",
+  "kind": "probe",
+  "feature": "unassigned-build",
+  "newFeature": true,
+  "case": "unassigned-build",
+  "purpose": "run_builds with no assignment gets a 400 from the chief relay; a step with no owner fails cleanly at claim without blocking the queue (REST and scheduler paths); the board and detail page show the failure.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB",
+  "status": "current"
+ },
+ {
+  "script": "drive-1186-skill-injection.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "injection-check",
+  "purpose": "A completed dispatch saves the injected skill set and a skill_injection_check row: yellow injected-unread with an open allowlist, red allowlist-closed with a closed one.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env EVIDENCE_DIR (default /tmp/1186-after)",
+  "status": "stale",
+  "staleReason": "Repo root is hardcoded to /workspace (reads /workspace/.claude/verify-run/ports.json) and ignores VERIFY_REPO_ROOT/VERIFY_RUN_DIR, so it does not run from a worktree lane as written."
+ },
+ {
+  "script": "drive-1259-1260-binding.mjs",
+  "kind": "probe",
+  "feature": "machine-binding",
+  "newFeature": true,
+  "case": "agent-machine-binding",
+  "purpose": "Agent steps and chief turns go only to the agent's home machine; the chief holds a concurrency slot; rebinding is validated; machine deletion is protected and agents can be migrated; sweep keeps steps pending; UI shows machine details and the chief model as read-only.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB",
+  "status": "current"
+ },
+ {
+  "script": "drive-918-skill-facts.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "skill-read-facts",
+  "purpose": "The live row and detail summary show skills that were read (skill: demo-skill), denied reads are marked as blocked, and a control task with no skills shows no empty entries.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, SKILLS_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-951-detail.mjs",
+  "kind": "probe",
+  "feature": "detail-right-pane",
+  "newFeature": false,
+  "case": "detail-live-migration",
+  "purpose": "Live-only detail surfaces after removing overlays.css: create-agent warning, branch section machine pill/switch/stop confirm, AI review modal and its contrast, and retired selectors have no stylesheet rules.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env SEED951_JSON (seed-951-live.mjs), SEED_REVIEW_JSON (setup-review-seed.mjs), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; STUB_PORT=8919",
+  "status": "current"
+ },
+ {
+  "script": "drive-chief-model-select.mjs",
+  "kind": "probe",
+  "feature": "chief-segments",
+  "newFeature": false,
+  "case": "compress-model-select",
+  "purpose": "The chief settings compression-model picker options match the toModelOptions projection of GET model-sources, with custom providers excluded.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional)",
+  "status": "stale",
+  "staleReason": "#1259/#1260 removed the compression-model selector from the chief settings Agent tab (drive-1259 asserts it is absent); no button aria-label=\"压缩模型\" remains in apps/web/src."
+ },
+ {
+  "script": "drive-newtask-key.mjs",
+  "kind": "probe",
+  "feature": "hotkeys",
+  "newFeature": false,
+  "case": "newtask-key-c",
+  "purpose": "Pressing c opens New Task on the board, project page and global sidebar while the old key n does not; the input-focus guard and sidebar entry are checked; evidence is screenshots, API rows and SQLite rows.",
+  "needs": [
+   "stack"
+  ],
+  "args": "[oldKey default n] [--expect=old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-stop.mjs",
+  "kind": "probe",
+  "feature": "stop-button",
+  "newFeature": false,
+  "case": "stop-chain",
+  "purpose": "Full stop-button chain from the detail page: start, stop during streaming, confirm with discard, stopping transition, cancelled row, then the gate falls back to pending.",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "<todoId>; env VERIFY_REPO_ROOT, STOP_DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+  "status": "stale",
+  "staleReason": "It starts the build with the UI Start button, which now calls POST /orchestrate (409 when no chief is bound, and the chief turn never dispatches through the stub). drive-951 and features/stop-button.md both record this UI start path as stale."
+ },
+ {
+  "script": "stub-llm-verify.mjs",
+  "kind": "stub",
+  "feature": "stop-button",
+  "newFeature": false,
+  "case": "gated-stub-llm",
+  "purpose": "OpenAI-compatible SSE stub that delays a single turn so the stop path has a window; the delay is cleared when the client aborts.",
+  "needs": [
+   "none"
+  ],
+  "args": "env STUB_PORT (default 8919), STUB_DELAY_MS (default 30000)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1031-account-controls.mjs",
+  "kind": "probe",
+  "feature": "account-controls",
+  "newFeature": true,
+  "case": "rename-and-notify-toggle",
+  "purpose": "Account page rename round-trips through PATCH /api/user/me to SQLite and persists; the push-notification switch works both ways under granted and denied permission states.",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "drive-1106-skill-inject.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "claim-injection",
+  "purpose": "The dispatch claim payload injects only the domain-relevant skills (explicit mention, zero hits, step-row rules) and the detail pane renders the injected-skills row.",
+  "needs": [
+   "stack"
+  ],
+  "args": "--phase=claim; env SERVER, WEB_URL, SKILLS_DIR, DB, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1208-machine-pin.mjs",
+  "kind": "probe",
+  "feature": "detail-right-pane",
+  "newFeature": false,
+  "case": "machine-pin",
+  "purpose": "Dispatch honors a todo's machine pin, and the detail machine row shows a pinned-machine footnote when a build is reassigned to another machine.",
+  "needs": [
+   "stack"
+  ],
+  "args": "optional --expect=old (origin/main baseline stack 8793/5275); env VERIFY_REPO_ROOT",
+  "status": "current"
+ },
+ {
+  "script": "drive-1259-mea-live.mjs",
+  "kind": "probe",
+  "feature": "local-daemon-executor",
+  "newFeature": false,
+  "case": "mea-live-claude-code",
+  "purpose": "On the mea host, creates an agent through the three-level cascade in the browser, then a real claude-code task edits the README.",
+  "needs": [
+   "remote-host",
+   "daemon",
+   "real-llm"
+  ],
+  "args": "env MEA_WEB (default 127.0.0.1:5274), MEA_SERVER (default 127.0.0.1:8792)",
+  "status": "host-bound"
+ },
+ {
+  "script": "drive-919-skills-routing.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "skills-routing",
+  "purpose": "behavior: a real model picks up a skill without being told (marker in output, transcript Read row, detail skills summary). deny-ui: a denied read shows as a blocked row and in the block count.",
+  "needs": [
+   "stack",
+   "daemon",
+   "real-llm",
+   "stub-llm"
+  ],
+  "args": "--phase=behavior|deny-ui; env SERVER, WEB, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, STUB_PORT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-952-finale.mjs",
+  "kind": "probe",
+  "feature": "agent-detail",
+  "newFeature": false,
+  "case": "ui-cleanup-finale",
+  "purpose": "Runtime checks for the #952 cleanup: dialog shell, create-agent form, agent detail, account page, team org chart, retired-class audit and token contrast.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "stale",
+  "staleReason": "The header says C6/C7 selectors moved to the registry (#1010) and that later waves (#1002/#1003/#1007/#1008) changed the geometry and token values it asserts. The .agent-runtime-menu handle class is not found anywhere in apps/web/src. drive-1010-select.mjs and drive-agent-detail.mjs replace it."
+ },
+ {
+  "script": "drive-chief-new-thread-key.mjs",
+  "kind": "probe",
+  "feature": "hotkeys",
+  "newFeature": false,
+  "case": "chief-new-thread-key",
+  "purpose": "The N key in the chief drawer returns to the new-thread view only while the drawer is open and the composer is not focused; also checks the KbdHint and aria-keyshortcuts.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT",
+  "status": "current"
+ },
+ {
+  "script": "drive-paper-sidebar.mjs",
+  "kind": "probe",
+  "feature": "paper-sidebar",
+  "newFeature": true,
+  "case": "grouped-sidebar",
+  "purpose": "Paper Grouped sidebar counts match the board columns, and the expanded, resources, needs-me filter and collapsed-rail states are correct in the URL and aria attributes.",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; run with the proxy env unset",
+  "status": "current"
+ },
+ {
+  "script": "drive-tags.mjs",
+  "kind": "probe",
+  "feature": "tags",
+  "newFeature": false,
+  "case": "fixed-vocab-untitled",
+  "purpose": "A new task has no title or tag inputs, its title comes from the first line of the body, the project has the 6 seeded fixed tags (API and SQLite), and detail renders no chips row when a task has no tags.",
+  "needs": [
+   "stack"
+  ],
+  "args": "",
+  "status": "current"
+ },
+ {
+  "script": "stub-review-700.mjs",
+  "kind": "stub",
+  "feature": "review-700",
+  "newFeature": false,
+  "case": "review-verdict-stub",
+  "purpose": "OpenAI-compatible SSE stub that replays the review verdict JSON together with a set_task_meta tool call, plus extract-fail and delayed-replan modes.",
+  "needs": [
+   "none"
+  ],
+  "args": "env STUB_PORT (default 8921)",
+  "status": "current"
+ },
+ {
+  "script": "drive-1033-avatar.mjs",
+  "kind": "probe",
+  "feature": "chief-segments",
+  "newFeature": false,
+  "case": "avatar-geometry",
+  "purpose": "Chief drawer thinking/tool rows render a 24x24 avatar to the left of a flex text column (not a full-width Lorelei SVG); --expect=old reproduces the bug",
+  "needs": [
+   "stack"
+  ],
+  "args": "[--expect=new|old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-1108-concurrency.mjs",
+  "kind": "probe",
+  "feature": "machine-concurrency",
+  "newFeature": false,
+  "case": "cap-and-queue",
+  "purpose": "With machine maxConcurrent=2, two turns run in parallel, the third queues visibly (turnQueue, drawer and machines page), takes over a freed slot, and PATCH validates bounds",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-1210-local-unreachable.mjs",
+  "kind": "probe",
+  "feature": "local-daemon-executor",
+  "newFeature": false,
+  "case": "local-unreachable",
+  "purpose": "A local-form project whose repo path is unreachable fails the build step before clone with a named machine/path/remedy message, and works normally once the path is restored",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "[--expect=new|old]; env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, VERIFY_REPO_ROOT",
+  "status": "current"
+ },
+ {
+  "script": "drive-1261-quota-wait.mjs",
+  "kind": "probe",
+  "feature": "quota-wait",
+  "newFeature": true,
+  "case": "quota-wait-resume",
+  "purpose": "A relay 429 trips the quota circuit breaker, the todo parks as waiting_quota with board banner, chip and notification, and it resumes on its own once the relay recovers",
+  "needs": [
+   "stack",
+   "daemon",
+   "stub-llm"
+  ],
+  "args": "env VERIFY_PORT=8802 VERIFY_WEB_PORT=5282 at launch; VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+  "status": "current"
+ },
+ {
+  "script": "drive-920-skills-manifest.mjs",
+  "kind": "probe",
+  "feature": "skills-injection",
+  "newFeature": false,
+  "case": "skills-manifest",
+  "purpose": "The machine skills manifest and per-file endpoints serve oversized skills with sha256 checks and negative 404s; the daemon materializes skills incrementally and fails loudly against an old server",
+  "needs": [
+   "stack",
+   "daemon"
+  ],
+  "args": "--phase=wire|daemon-success|daemon-incremental|daemon-fail [--expect=new|old]; env SERVER, VERIFY_RUN_DIR, SKILLS_DIR, DB, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-953-sealed.mjs",
+  "kind": "probe",
+  "feature": "theme",
+  "newFeature": false,
+  "case": "sealed-tokens-audit",
+  "purpose": "In dark and light mode, retired CSS rules are absent, selected-row colors and contrast match the tokens, screenshots cover four surfaces, and cross-surface token contrast passes WCAG",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_RUN_DIR, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-chief-segments.mjs",
+  "kind": "probe",
+  "feature": "chief-segments",
+  "newFeature": false,
+  "case": "segment-sealing",
+  "purpose": "Chief turn text segments are sealed when a tool arrives (DB order, single-type content, SSE order, in-flight buffer kept, idempotent upload), and the drawer shows segments and live tool rows flat",
+  "needs": [
+   "stack"
+  ],
+  "args": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ },
+ {
+  "script": "drive-paste.mjs",
+  "kind": "probe",
+  "feature": "attachments",
+  "newFeature": false,
+  "case": "clipboard-paste",
+  "purpose": "Pasting an image into the detail composer or the new-task spec runs the grant, upload and token chain, renders an attachment chip, and stores a SQLite row with disk bytes matching the sample",
+  "needs": [
+   "stack"
+  ],
+  "args": "<todoId> in confirm phase (from setup-review-seed.mjs); env VERIFY_REPO_ROOT",
+  "status": "current"
+ },
+ {
+  "script": "drive.mjs",
+  "kind": "infra",
+  "feature": "infra",
+  "newFeature": false,
+  "case": "board,new-task,api-key,search,theme",
+  "purpose": "Multi-probe dispatcher that walks real user paths (board, new task, API key, search, theme) on the live stack and records checks plus screenshots",
+  "needs": [
+   "stack"
+  ],
+  "args": "<probe> where probe is one of board|new-task|api-key|search|theme; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+  "status": "current"
+ }
+]

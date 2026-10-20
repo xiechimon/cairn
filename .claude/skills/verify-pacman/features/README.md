@@ -31,12 +31,14 @@ Control Glass 五条旅程(新建任务 / 派发 / 看 diff / 请求修改 / 合
 - 先跑 `launch.mjs`:隔离栈就绪(默认 web `http://127.0.0.1:5273/app`、api `http://127.0.0.1:8791`、全新 scratch 库、seed 单用户 Owner,无 auth)。
 - 全新库是每个 launch 的保证(probe `api-key` 依赖空态);重验 = 重 launch,不是复用旧库。
 - 端口被占(8791/5273)→ 别的 lane,换 `VERIFY_PORT`/`VERIFY_WEB_PORT`,不杀。
+- **worktree 在 `.claude/worktrees/` 下时,launch 之后的改动不会被 vite 送出**:`apps/web/vite.config.ts` 的 `watch.ignored: ['**/.claude/**']` 命中这类 worktree 的每个文件。改代码后先 `vp.mjs cleanup` 再 `vp.mjs launch`,否则驱动的是 launch 时刻的代码(#1402 负对照实测:植入回归后不重 launch,drive 照样 PASS)。
 - `doctor.mjs` 全 PASS 才开 drive。
 - 永不驱动非本验证起的实例(用户 dev 栈 8787/5173 在跑也不碰)。
 - spec 11 三先行 probe 跑序:`drive-providers-tabs`(pi 空态断言要求库内无 custom provider)→ `drive-provider-picker`(e2e 会建 provider)→ `drive-machines-local`(幂等,次序任意)。跑反 = tabs 空态假红。
 
 ## Driving conventions
 
+- 驱动一律走单一入口 `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> [case]`(#1402);`vp.mjs list [feature]` 列出已登记的 case 及其前置。各 feature 文件里写的脚本命令仍可直跑,但新 case 先登记进 `../vp-registry.json`,不新建按票号命名的脚本。
 - 一律 live 面:URL 不带 `?scenario=`(那是 fixture 面)。
 - 选择器优先稳定句柄:`data-route`、`data-column-list`、`data-todo-id`、aria-label、类名;不用坐标/tab 序。
 - UI 证据 = 截图(1440×732,与 e2e 同口径)+ `result.json` 的逐条 checks。
