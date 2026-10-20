@@ -1,0 +1,50 @@
+# vp-selftest.mjs in CI (#1411, head 3b13142). The CI step ran before 'Install dependencies'
+# and failed 1/8: vp.mjs imports @playwright/test at the top (capture uses it), so every
+# vp.mjs call died at import. The one PASS was 'two sources with one name', which only
+# checked exit 1 and nothing copied, both true for a crash. The step now runs after install,
+# and the two refusal cases also check the refusal text.
+# Reproduced in a git archive of the branch (no node_modules), then with node_modules linked.
+
+== CI log, check job, run 39510839351 (step before install) ==
+FAIL  arguments after -- replace the case default args
+FAIL  without arguments a case runs with its default args
+FAIL  relative evidence and run paths reach a tsx case as absolute paths
+FAIL  a case that rewrites committed evidence needs --force
+FAIL  archive with no source named refuses instead of taking the newest run
+FAIL  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+FAIL  archive copies a named source
+1/8 passed
+
+== tightened self-test, archive of the branch, no node_modules ==
+FAIL  arguments after -- replace the case default args
+FAIL  without arguments a case runs with its default args
+FAIL  relative evidence and run paths reach a tsx case as absolute paths
+FAIL  a case that rewrites committed evidence needs --force
+FAIL  archive with no source named refuses instead of taking the newest run
+FAIL  archive refuses to overwrite an archived directory
+FAIL  archive refuses two sources with one name and copies nothing
+FAIL  archive copies a named source
+0/8 passed
+
+== tightened self-test, same archive, node_modules linked ==
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive copies a named source
+8/8 passed
+
+== tightened self-test against vp.mjs and vp-registry.json at 6f527a1, node_modules linked (red) ==
+FAIL  arguments after -- replace the case default args
+FAIL  without arguments a case runs with its default args
+FAIL  relative evidence and run paths reach a tsx case as absolute paths
+FAIL  a case that rewrites committed evidence needs --force
+FAIL  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive copies a named source
+3/8 passed

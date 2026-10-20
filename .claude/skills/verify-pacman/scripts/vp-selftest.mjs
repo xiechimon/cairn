@@ -74,7 +74,7 @@ const cases = [
       const r = vp(['archive', 'T2'], { VERIFY_REPO_ROOT: root });
       const copied = existsSync(join(root, 'docs', 'verify', 'T2'));
       rmSync(root, { recursive: true, force: true });
-      return r.code === 2 && !copied;
+      return r.code === 2 && /name the source/.test(r.out) && !copied;
     },
   ],
   [
@@ -95,7 +95,7 @@ const cases = [
       });
       const copied = existsSync(join(root, 'docs', 'verify', 'T3'));
       rmSync(root, { recursive: true, force: true });
-      return r.code === 1 && !copied;
+      return r.code === 1 && /share the directory name/.test(r.out) && !copied;
     },
   ],
   [

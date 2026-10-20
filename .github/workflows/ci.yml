@@ -107,18 +107,20 @@ jobs:
       - name: UI consumer shape gate (#1054)
         run: node scripts/ui-consumer-shape-gate.mjs
 
-      # verify-pacman 入口自测（#1402）：vp.mjs 的分派与归档规则（-- 参数替换默认、
-      # 相对证据路径转绝对、需 --force 的 needs、archive 不取最新一次、不覆盖），
-      # drive 走 --dry-run、archive 在自建的空仓根里跑，不起栈。零依赖，排在 install 之前。
-      - name: verify-pacman CLI self-test (#1402)
-        run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
-
       # e2e 迁去独立分片 job（#693）后 ffmpeg 随迁；chromium 留在本 job——
       # integration vitest 的四个 e2e 套件（m5-web-e2e 等）在场内起真
       # Chromium（2026-10-03 实测摘掉即红：browserType.launch executable
       # doesn't exist）。「check 不再需要浏览器面」是误判，浏览器面有两层。
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # verify-pacman 入口自测（#1402）：vp.mjs 的分派与归档规则（-- 参数替换默认、
+      # 相对证据路径转绝对、需 --force 的 needs、archive 不取最新一次、不覆盖），
+      # drive 走 --dry-run、archive 在自建的空仓根里跑，不起栈、不起浏览器。
+      # 排在 install 之后：vp.mjs 顶层引 @playwright/test（capture 用），装依赖
+      # 之前跑整个脚本在 import 处崩（#1411 首轮 CI 实测 1/8）。
+      - name: verify-pacman CLI self-test (#1402)
+        run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 
       # Spec 解析闸（#1052）：e2e spec 少一个 `  });` 不进任何本地快速闸——
       # biome 只警告、apps/web 的 tsconfig 不含 e2e/，第一道红是 CI e2e 分片
