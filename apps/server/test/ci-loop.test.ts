@@ -8,7 +8,8 @@
 // 行为面（验收）：绿直接进 review 不派修复步；completeStep 对 PR 交付持
 // building（磨绿前不进人工闸）；scheduler 接线（自循环，不进同步 tick 契约）。
 
-import { conversationBranch, type Phase } from '@pacman/shared';
+import { createHash } from 'node:crypto';
+import type { Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -56,10 +57,18 @@ function res(status: number, etag: string, body: unknown) {
   };
 }
 
-/** GitHub check-runs 端点 mock：记录全部请求（URL + 头），按状态回应。
- * if-none-match 命中 etag 且状态 200 → 304（真实 GitHub 的条件 GET 语义）。 */
+/** 由 build id 派生的 40 位 head SHA（多候选按它分派 check-runs 请求）。 */
+function headShaFor(buildId: string): string {
+  return createHash('sha1').update(buildId).digest('hex');
+}
+
+/** GitHub mock：check-runs 请求记进 requests（URL + 头），按状态回应；
+ * if-none-match 命中 etag 且状态 200 → 304（真实 GitHub 的条件 GET 语义）。
+ * #1403 起 ci-loop 先读 pulls/{n}（open PR，head = headSha）与 base 的必需
+ * 检查名单（无分支保护、无规则集），这些请求记进 otherRequests。 */
 class CheckRunsMock {
   requests: { url: string; headers: Record<string, string> }[] = [];
+  otherRequests: string[] = [];
 
   constructor(
     private readonly state: {
@@ -68,10 +77,42 @@ class CheckRunsMock {
       /** 覆盖状态码（429 限流面 / 404 读不到面）。 */
       status?: number;
     },
+    readonly headSha: string = 'a'.repeat(40),
+    readonly prNumber: number | null = null,
   ) {}
+
+  /** 多候选分派：本 PR 的 pulls 读与本 head 的 check-runs 读。 */
+  owns(url: string): boolean {
+    return (
+      (this.prNumber !== null && url.endsWith(`/pulls/${this.prNumber}`)) ||
+      url.includes(`/commits/${this.headSha}/`)
+    );
+  }
 
   readonly fetch = (input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
+    if (/\/pulls\/\d+$/.test(url)) {
+      this.otherRequests.push(url);
+      if ((init?.headers?.['if-none-match'] ?? '') === '"pull-etag"') {
+        return Promise.resolve(res(304, '"pull-etag"', {}));
+      }
+      return Promise.resolve(
+        res(200, '"pull-etag"', {
+          state: 'open',
+          merged: false,
+          head: { sha: this.headSha },
+          base: { ref: 'main' },
+        }),
+      );
+    }
+    if (url.endsWith('/rules/branches/main')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"r"', []));
+    }
+    if (url.endsWith('/branches/main')) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"b"', { name: 'main', protected: false }));
+    }
     this.requests.push({ url, headers: { ...(init?.headers ?? {}) } });
     const etag = this.state.etag ?? '"etag-1"';
     const status = this.state.status ?? 200;
@@ -225,11 +266,14 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       })
       .run();
   }
-  const mock = new CheckRunsMock({
-    checks: opts.checks ?? [],
-    etag: opts.etag,
-    status: opts.status,
-  });
+  const mock = new CheckRunsMock(
+    {
+      checks: opts.checks ?? [],
+      etag: opts.etag,
+      status: opts.status,
+    },
+    headShaFor(buildId),
+  );
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
   return {
     s,
@@ -305,24 +349,29 @@ function addCandidate(
     todoId,
     buildId,
     prNumber,
-    mock: new CheckRunsMock({ checks }),
+    mock: new CheckRunsMock({ checks }, headShaFor(buildId), prNumber),
   };
 }
 
 // ——— ① 扫描面纪律（批量 + ETag 条件请求 + 429 fail-open）———————————————————
 
 describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', () => {
-  test('一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET（无其它端点、无逐 PR 全量拉）', async () => {
+  test('一轮 sweep = 一条 DB 扫描取全候选，每候选 1 个 pulls 条件 GET + 1 个 head SHA 的 check-runs GET（#1403；必需名单按仓缓存）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
     await w.poller.sweep();
 
     expect(w.mock.requests).toHaveLength(1);
+    expect(w.mock.otherRequests).toEqual([
+      `https://api.github.com/repos/octo/demo/pulls/${w.prNumber}`,
+      'https://api.github.com/repos/octo/demo/branches/main',
+      'https://api.github.com/repos/octo/demo/rules/branches/main',
+    ]);
     const req = w.mock.requests[0];
     if (req === undefined) throw new Error('no request made');
     expect(req.url).toContain('https://api.github.com/repos/octo/demo/commits/');
-    expect(req.url).toContain(`${encodeURIComponent(conversationBranch(w.buildId))}/check-runs`);
+    expect(req.url).toContain(`/commits/${w.mock.headSha}/check-runs`);
     expect(req.url).toContain('per_page=');
     // 未暖缓存的轮不带 if-none-match（首轮读一次，此后条件读）。
     expect(req.headers['if-none-match']).toBeUndefined();
@@ -363,12 +412,12 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
       {
         githubFetch: (input, init) => {
           const url = String(input);
-          // 同仓同端点，按分支名分派到各候选的 mock。
+          // 同仓同端点：pulls 按 PR 号、check-runs 按 head SHA 分派到各候选的
+          // mock；必需名单（分支 / 规则集）是仓级读，交给任一 mock。
           for (const c of all) {
-            if (url.includes(encodeURIComponent(conversationBranch(c.buildId)))) {
-              return c.mock.fetch(url, init);
-            }
+            if (c.mock.owns(url)) return c.mock.fetch(url, init);
           }
+          if (url.includes('/branches/main')) return red.mock.fetch(url, init);
           throw new Error(`unexpected url ${url}`);
         },
         logger: { info },

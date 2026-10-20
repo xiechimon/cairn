@@ -1,0 +1,82 @@
+# P2c live leg: isolated verify stack (server 8791, scratch PACMAN_HOME) polling the real, public xiechimon/pacman
+# anonymously. Read-only: pulls/{n}, branches/main, rules/branches/main, commits/{sha}/check-runs. No write call.
+# Stack: NODE_USE_ENV_PROXY=1 node .claude/skills/verify-pacman/scripts/launch.mjs (worktree at the P2c change).
+
+# GitHub at seed time (21:41 UTC)
+#1414 state=open head=373d42e mergeable_state=behind   (main had moved to faed603)
+#1413 merged=true merge_commit=a1e7254
+
+$ node seed.mjs <PACMAN_HOME>/server/server.db 1414 1413
+[{"id":"todo-live-grind","phase":"building","prNumber":1414},{"id":"todo-live-merged","phase":"review","prNumber":1413}]
+
+# server.log, ci pr-checks sweep tallies after the seed (one sweep per minute)
+[21:42:36] INFO (2269): ci pr-checks sweep
+    candidates: 1
+    pending: 0
+    advanced: 1
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 1
+    closedUnmerged: 0
+    hinted: 0
+[21:43:34] INFO (2269): ci pr-checks sweep
+    candidates: 0
+    pending: 1
+    advanced: 0
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 0
+    closedUnmerged: 0
+    hinted: 0
+[21:44:34] INFO (2269): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    advanced: 0
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 0
+    closedUnmerged: 0
+    hinted: 1
+[21:45:34] INFO (2269): ci pr-checks sweep
+    candidates: 0
+    pending: 0
+    advanced: 0
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 0
+    closedUnmerged: 0
+    hinted: 0
+[21:46:34] INFO (2269): ci pr-checks sweep
+    candidates: 0
+    pending: 1
+    advanced: 0
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 0
+    closedUnmerged: 0
+    hinted: 0
+[21:47:34] INFO (2269): ci pr-checks sweep
+    candidates: 0
+    pending: 1
+    advanced: 0
+    unreadable: 0
+    errors: 0
+    reviewCandidates: 1
+    merged: 0
+    closedUnmerged: 0
+    hinted: 0
+
+$ node read.mjs <PACMAN_HOME>/server/server.db
+{"todo":"todo-live-grind","phase":"review","pr":1414,"errorMessage":null,"systemRows":["\"PR #1414 落后于 main（head 373d42e）。合并前需要先把 main 合进分支（GitHub 的 Update branch）；人工合并策略下 pacman 不自动更新分支。\""]}
+{"todo":"todo-live-merged","phase":"done","pr":1413,"errorMessage":null,"systemRows":["\"PR #1413 已在 GitHub 合并（合并提交 a1e7254）\"","\"🎉 任务已完成\""]}
+
+# reading: sweep 1 read #1414 at head 373d42e against the required checks on main (check, pack-smoke, e2e-gate;
+# all green) and moved the building todo to review; the merged #1413 closed its review todo with the merge sha.
+# Sweep 2 read #1414 in review without a BEHIND state (GitHub computes mergeable_state lazily); sweep 3 got
+# behind and wrote one hint; the later sweeps wrote nothing more (pending = open, nothing to do).
+# Detail pages: todo-live-grind.png, todo-live-merged.png (latestBuildId pointed at the seeded builds for the shot).

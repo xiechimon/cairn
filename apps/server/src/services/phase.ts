@@ -26,7 +26,8 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   confirm: ['building', 'planning', 'failed', 'queued', 'closed'],
   // #1250（ADR 0018 层 2）：building→done = 拆卡父的自动收口边——子卡全部
   // done 时父卡由本边落地（父卡无自己的合并步，合并闸在子卡各自身上）。
-  // 只被 settleSplitOnDone 消费；普通卡的 done 落地路径不变（review→done）。
+  // 被 settleSplitOnDone 消费；#1403 起 ci-loop 也用它：磨绿期间 PR 已在
+  // GitHub 被人合并，任务直接收尾。其余普通卡的 done 落地路径不变（review→done）。
   building: ['review', 'failed', 'done', 'closed'],
   // 完成+合并落地→done（02 §4.2：merge 202 delegated → 机器合并步 → done）；
   // 定时轮顶替→queued（r5 §8）。

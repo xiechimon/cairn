@@ -133,12 +133,19 @@ export async function githubPullState(
   return { state, merged: merged === true };
 }
 
-/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA + head SHA。 */
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA + head SHA
+ * + 标题、base 分支与可合并态。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
-  /** PR head 分支当前的提交（合并请求的 sha 参数取它）；响应缺失 = null。 */
+  /** PR head 分支当前的提交（合并请求的 sha 参数、check-runs 的读点）；响应缺失 = null。 */
   headSha: string | null;
+  title: string | null;
+  /** base 分支名（必需检查名单按它读）。 */
+  baseRef: string | null;
+  /** GitHub 的 mergeable_state（clean / behind / dirty / blocked / unstable /
+   * unknown …，文档未列全集，原样透传）；后台未算完时为 unknown。 */
+  mergeableState: string | null;
 }
 
 export interface GithubPullPage {
@@ -186,7 +193,10 @@ export async function githubPull(
     state?: unknown;
     merged?: unknown;
     merge_commit_sha?: unknown;
+    title?: unknown;
+    mergeable_state?: unknown;
     head?: { sha?: unknown } | null;
+    base?: { ref?: unknown } | null;
   };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
   const merged = raw.merged === true;
@@ -199,8 +209,68 @@ export async function githubPull(
       mergeCommitSha:
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      title: typeof raw.title === 'string' ? raw.title : null,
+      baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : null,
+      mergeableState: typeof raw.mergeable_state === 'string' ? raw.mergeable_state : null,
     },
   };
+}
+
+/** base 分支的必需检查名单（#1403）：经典分支保护（`GET /repos/{o}/{r}/branches/{b}`
+ * 的 protection.required_status_checks，公开仓匿名可读）并上规则集
+ * （`GET /repos/{o}/{r}/rules/branches/{b}` 的 required_status_checks 规则；404 =
+ * 该实例无规则集端点，按空集）。[] = 没有必需检查；null = 读不到（调用方回落
+ * 到全部检查）。 */
+export async function githubRequiredChecks(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string[] | null> {
+  const headers = {
+    ...API_HEADERS,
+    ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+  };
+  const read = async (path: string): Promise<{ status: number; data: unknown } | null> => {
+    try {
+      const res = await fetchImpl(`https://api.github.com/${repoPath(owner, repo)}/${path}`, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+      if (!res.ok) return { status: res.status, data: null };
+      return { status: res.status, data: await res.json() };
+    } catch {
+      return null;
+    }
+  };
+  const encoded = encodeURIComponent(branch);
+  const branchRes = await read(`branches/${encoded}`);
+  if (branchRes === null || branchRes.data === null) return null;
+  const protection = (branchRes.data as { protection?: unknown }).protection as
+    | { enabled?: unknown; required_status_checks?: { contexts?: unknown } | null }
+    | undefined;
+  const names = new Set<string>();
+  const contexts = protection?.required_status_checks?.contexts;
+  if (protection?.enabled !== false && Array.isArray(contexts)) {
+    for (const c of contexts) if (typeof c === 'string') names.add(c);
+  }
+  const rulesRes = await read(`rules/branches/${encoded}`);
+  if (rulesRes === null) return null;
+  if (rulesRes.data === null) {
+    if (rulesRes.status !== 404) return null;
+  } else if (Array.isArray(rulesRes.data)) {
+    for (const rule of rulesRes.data as Array<Record<string, unknown>>) {
+      if (rule?.type !== 'required_status_checks') continue;
+      const checks = (rule.parameters as { required_status_checks?: unknown } | undefined)
+        ?.required_status_checks;
+      if (!Array.isArray(checks)) continue;
+      for (const c of checks as Array<{ context?: unknown }>) {
+        if (typeof c?.context === 'string') names.add(c.context);
+      }
+    }
+  }
+  return [...names];
 }
 
 export type GithubMergeMethod = 'squash' | 'merge' | 'rebase';
@@ -246,7 +316,14 @@ export async function githubMergePull(
   owner: string,
   repo: string,
   prNumber: number,
-  input: { sha: string; mergeMethod: GithubMergeMethod },
+  input: {
+    sha: string;
+    mergeMethod: GithubMergeMethod;
+    /** 不传 = GitHub 按提交数自选标题（单提交取该提交 message）。 */
+    commitTitle?: string;
+    /** 追加在自动 message 之后（GitHub 文档：Extra detail to append）。 */
+    commitMessage?: string;
+  },
 ): Promise<GithubMergeResult> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
   let res: Awaited<ReturnType<FetchLike>>;
@@ -254,7 +331,12 @@ export async function githubMergePull(
     res = await fetchImpl(url, {
       method: 'PUT',
       headers: { ...authHeaders(token), 'content-type': 'application/json' },
-      body: JSON.stringify({ sha: input.sha, merge_method: input.mergeMethod }),
+      body: JSON.stringify({
+        sha: input.sha,
+        merge_method: input.mergeMethod,
+        ...(input.commitTitle !== undefined ? { commit_title: input.commitTitle } : {}),
+        ...(input.commitMessage !== undefined ? { commit_message: input.commitMessage } : {}),
+      }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch (err) {
@@ -648,9 +730,8 @@ export interface GithubCheckRunsPage {
  * 超出部分丢尾——不在本端点翻页（丢的是常驻非门禁 check，不在「磨绿」面）。 */
 const CHECK_RUNS_PER_PAGE = 100;
 
-/** PR head 的 check-runs 只读（`GET /repos/{o}/{r}/commits/{ref}/check-runs`；
- * ref = conv 分支名，上游解析分支头——PR 的 head 即分支 tip，无需再拉
- * pulls/{n} 取 sha）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
+/** check-runs 只读（`GET /repos/{o}/{r}/commits/{ref}/check-runs`；#1403 起
+ * ci-loop 传 PR 的 head SHA，判定绑在这个提交上）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
  * 复用判据，不出全量体）。token 可空（匿名梯，公开仓可达）。null = 读不到
  * （网络/404 私仓/限流/响应形坏不区分——fail-open 语义归调用方，同
  * githubPullState）。单次尝试、FETCH_TIMEOUT_MS 上界，不重试。 */

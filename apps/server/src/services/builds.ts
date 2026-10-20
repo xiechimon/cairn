@@ -1391,9 +1391,24 @@ async function mergeGithubPull(
     throw new HttpError(502, `读不到 PR #${prNumber} 的 head 提交，稍后再试`);
   }
   const mergeMethod = await githubPreferredMergeMethod(fetchImpl, token, owner, repo);
+  // squash 标题不交给 GitHub 自选（单提交 PR 会把 daemon 的 `<kind>: <title>`
+  // 带进 main）；从 issue 导入的任务带关票行（spec 28 P5 / ADR 0021 D2）。
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, input.todoId)).get();
+  const source = todoRow?.sourceRef != null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
+  const sameRepo =
+    source !== null &&
+    `${source.owner}/${source.repo}`.toLowerCase() === input.githubRepo.toLowerCase();
   const result = await githubMergePull(fetchImpl, token, owner, repo, prNumber, {
     sha: pull.headSha,
     mergeMethod,
+    ...(pull.title !== null ? { commitTitle: `${pull.title} (#${prNumber})` } : {}),
+    ...(source !== null
+      ? {
+          commitMessage: sameRepo
+            ? `closes #${source.issueNumber}`
+            : `closes ${source.owner}/${source.repo}#${source.issueNumber}`,
+        }
+      : {}),
   });
   if (!result.merged) {
     throw new HttpError(409, `GitHub 拒绝合并 PR #${prNumber}：${result.message}`);

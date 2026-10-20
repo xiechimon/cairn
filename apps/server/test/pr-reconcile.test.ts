@@ -244,10 +244,13 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows().length).toBe(rowsAfterFirst);
   });
 
-  test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {
+  test('building-phase builds are reconciled on the CI grind path too (#1403 segment 3)', async () => {
     const w = makeWorld({ phase: 'building' });
-    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
     await pollerFor(w, mock).sweep();
-    expect(mock.requests.some((u) => u.includes('/pulls/'))).toBe(false);
+    expect(w.todoRow().phase).toBe('done');
+    expect(mock.requests.some((u) => u.includes('/check-runs'))).toBe(false);
   });
 });

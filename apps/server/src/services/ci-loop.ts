@@ -15,10 +15,11 @@
 //
 // 纪律（票面）：
 // - 只读 GitHub（checks 读取），不写——本模块零 api.github.com 写面；
-// - 扫描面批量（一条 DB 查询取全候选）+ 条件请求（每轮每候选恰好 1 个
-//   If-None-Match 条件 GET，304 复用缓存判据），禁止逐 PR 全量拉——GitHub
-//   无跨 PR 批量端点，条件 GET 是最小合规形；429/404/网络 = fail-open 不动，
-//   下轮重试（读不到 ≠ 红）；
+// - 扫描面批量（一条 DB 查询取全候选）+ 条件请求（If-None-Match，304 复用
+//   缓存），禁止逐 PR 全量拉——GitHub 无跨 PR 批量端点，条件 GET 是最小合规
+//   形；429/404/网络 = fail-open 不动，下轮重试（读不到 ≠ 红）。#1403 起每轮
+//   每候选两个条件 GET：pulls/{n}（head SHA、base、已合并/已关闭）与该 head
+//   SHA 的 check-runs；base 的必需检查名单按仓 + 分支缓存 10 分钟；
 // - build 已被人手动推进/关闭时不得回写：候选是扫描快照，动作前重读当前
 //   phase（两次：网络读之前、写面之前——网络窗是人工动作最可能落进的缝）；
 // - 修复步在飞（pending/claimed）不叠派：读到的 checks 是推送前旧 head 的，
@@ -34,18 +35,26 @@
 // build（spec 23 latestPrBuild——更旧的被取代 PR 关了不算数）。每候选一次
 // 条件 GET pulls/{n}：已合并（不论谁合的）→ system 行写合并 SHA + done 收尾
 // 漏斗（与 merge 步成同一条）；关闭未合并 → build.errorMessage + failed；
-// open → 不动。读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
+// open 且 BEHIND / DIRTY → 每个 head 提示一次（人工合并策略下不动手：
+// update-branch 归 P4 执行器；自动解冲突要 review→building 边，phase.ts 现
+// 判为非法，待裁决）；其余 → 不动。读不到 / 网络窗内相位被人改 → 不动（同
+// 磨绿面 ④ 纪律）。磨绿面读到 PR 已合并 / 已关闭同样收尾。
+//
+// 判定口径（#1403）：check-runs 按 PR head SHA 读；base 有必需检查名单时只看
+// 名单里的检查，success / neutral / skipped 算过（GitHub 分支保护同口径），
+// cancelled / failure / timed_out / action_required 等算红；名单里的检查还没
+// 出现 → 同空 checks 的宽限；名单读不到或为空 → 看全部检查。
 
-import { conversationBranch } from '@pacman/shared';
 import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, step, todo } from '../db/schema.js';
+import { build, message, project, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubCheckRun,
   type GithubPull,
   githubCommitCheckRuns,
   githubPull,
+  githubRequiredChecks,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -69,6 +78,12 @@ export const CI_FIX_ROUNDS_MAX = 3;
 /** 空 checks 宽限（[设计]：够 GitHub Actions 在新 head 上注册 check；仓真没
  * CI 时延迟到此推闸交人）。 */
 export const CI_EMPTY_CHECKS_GRACE_MS = 300_000;
+
+/** 必需检查名单的缓存时长（[设计]：分支保护很少改，10 分钟内的改动下一窗生效）。 */
+export const CI_REQUIRED_CHECKS_TTL_MS = 600_000;
+
+/** 必需检查算「过」的结论（GitHub 分支保护同口径）。 */
+const PASSING_CONCLUSIONS = ['success', 'neutral', 'skipped'];
 
 /** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
  * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
@@ -101,23 +116,34 @@ export type CheckVerdict =
   | { state: 'pending' }
   /** PR head 零 check run（仓无 CI / CI 未注册竞态——宽限归调用方）。 */
   | { state: 'empty' }
+  /** 必需检查有的还没出现（同 empty 的宽限）。 */
+  | { state: 'missing'; names: string[] }
   | { state: 'red'; failures: CiCheckFailure[] };
 
-/** 三态判定（含 empty 第四形）：有 check 未 completed → pending（先于红绿，
- * 「pending 被误判红」的闸）；completed 里 failure/timed_out → red；
- * 其余（success 全绿 / neutral / skipped / cancelled）→ green——neutral 与
- * skipped 是有意的非门禁，cancelled 是新推送顶替或人工取消，都交人不重磨。 */
-export function verdictOfCheckRuns(runs: GithubCheckRun[]): CheckVerdict {
+/** 判定：required 非空时只看名单里的检查，否则看全部。看的检查里有未
+ * completed → pending（先于红绿，「pending 被误判红」的闸）；completed 的结论
+ * 不在 success / neutral / skipped → red（cancelled 也算：取消的必需检查同样
+ * 挡合并）；名单里有检查没出现 → missing；其余 → green。 */
+export function verdictOfCheckRuns(
+  runs: GithubCheckRun[],
+  required: string[] | null = null,
+): CheckVerdict {
   if (runs.length === 0) return { state: 'empty' };
-  if (runs.some((r) => r.status !== 'completed')) return { state: 'pending' };
-  const failures = runs
-    .filter((r) => r.conclusion === 'failure' || r.conclusion === 'timed_out')
+  const gated = required !== null && required.length > 0;
+  const considered = gated ? runs.filter((r) => required.includes(r.name)) : runs;
+  if (considered.some((r) => r.status !== 'completed')) return { state: 'pending' };
+  const failures = considered
+    .filter((r) => !PASSING_CONCLUSIONS.includes(r.conclusion ?? ''))
     .map((r) => ({
       name: r.name,
       conclusion: r.conclusion ?? '',
       summary: r.outputSummary ?? r.outputTitle,
     }));
   if (failures.length > 0) return { state: 'red', failures };
+  if (gated) {
+    const names = required.filter((n) => !runs.some((r) => r.name === n));
+    if (names.length > 0) return { state: 'missing', names };
+  }
   return { state: 'green' };
 }
 
@@ -167,11 +193,13 @@ function deadLoopMessage(rounds: number): string {
 }
 
 /** ETag 缓存行（进程内存——单进程 server；重启失缓存 = 下轮多一次全量读，
- * 无害）。verdict 缓存仅在 304 时复用（200 恒刷新）。 */
+ * 无害）。按 PR 存一行，head SHA 变了 etag 作废；runs 仅在 304 时复用（200
+ * 恒刷新），判定每轮按当前必需名单重算。 */
 interface PrChecksCacheEntry {
+  sha: string;
   etag: string | null;
-  verdict: CheckVerdict | null;
-  /** 首见「空 checks」的时刻（宽限锚点；非空 verdict 恒 null）。 */
+  runs: GithubCheckRun[];
+  /** 首见「空 checks / 必需检查未出现」的时刻（宽限锚点；其余判定恒 null）。 */
   emptySince: number | null;
 }
 
@@ -197,6 +225,8 @@ interface CiPollTally {
   merged: number;
   /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
+  /** review 关口 BEHIND / DIRTY 提示（每个 head 一次）。 */
+  hinted: number;
 }
 
 /** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
@@ -205,12 +235,21 @@ interface PullCacheEntry {
   pull: GithubPull | null;
 }
 
+function behindHint(prNumber: number, base: string, sha: string): string {
+  return `PR #${prNumber} 落后于 ${base}（head ${sha.slice(0, 7)}）。合并前需要先把 ${base} 合进分支（GitHub 的 Update branch）；人工合并策略下 pacman 不自动更新分支。`;
+}
+
+function dirtyHint(prNumber: number, base: string, sha: string): string {
+  return `PR #${prNumber} 与 ${base} 有冲突（head ${sha.slice(0, 7)}）。需要在分支上解决冲突后才能合并；pacman 目前不自动发起解冲突轮。`;
+}
+
 export function createCiPoller(
   deps: BuildDeps,
   run: { githubFetch: FetchLike; logger?: CiPollLogger },
 ): CiPoller {
   const cache = new Map<string, PrChecksCacheEntry>();
   const pullCache = new Map<string, PullCacheEntry>();
+  const requiredCache = new Map<string, { at: number; names: string[] }>();
 
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
   function freshGrindRow(todoId: string) {
@@ -249,23 +288,11 @@ export function createCiPoller(
     }
   }
 
-  async function reconcileOne(
-    cand: { buildId: string; todoId: string },
-    tally: CiPollTally,
-  ): Promise<void> {
-    const todoRow = freshReviewRow(cand.todoId);
-    const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    const target = todoRow === null ? null : githubTarget(todoRow.projectId);
-    if (
-      todoRow === null ||
-      buildRow === undefined ||
-      buildRow.prNumber === null ||
-      target === null
-    ) {
-      tally.skipped += 1;
-      return;
-    }
-    const prNumber = buildRow.prNumber;
+  /** PR 条件读（两个候选集共用一份缓存）。null = 读不到。 */
+  async function readPull(
+    target: { teamId: string; fullName: string; owner: string; repo: string },
+    prNumber: number,
+  ): Promise<GithubPull | null> {
     const key = `${target.fullName}#${prNumber}`;
     const entry = pullCache.get(key) ?? null;
     const page = await githubPull(
@@ -276,21 +303,42 @@ export function createCiPoller(
       prNumber,
       { etag: entry?.etag ?? null },
     );
-    if (page === null) {
-      tally.unreadable += 1;
-      return;
-    }
+    if (page === null) return null;
     const pull = page.notModified ? (entry?.pull ?? null) : page.pull;
     pullCache.set(key, { etag: page.etag, pull });
-    if (pull === null || pull.state === 'open') {
-      tally.pending += 1;
-      return;
-    }
-    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
-    if (freshReviewRow(cand.todoId) === null) {
-      tally.skipped += 1;
-      return;
-    }
+    return pull;
+  }
+
+  /** base 的必需检查名单（缓存 CI_REQUIRED_CHECKS_TTL_MS；读不到不缓存，下轮重读）。 */
+  async function requiredFor(
+    target: { teamId: string; fullName: string; owner: string; repo: string },
+    base: string | null,
+    now: number,
+  ): Promise<string[] | null> {
+    if (base === null) return null;
+    const key = `${target.fullName}@${base}`;
+    const hit = requiredCache.get(key);
+    if (hit !== undefined && now - hit.at < CI_REQUIRED_CHECKS_TTL_MS) return hit.names;
+    const names = await githubRequiredChecks(
+      run.githubFetch,
+      tokenFor(target.teamId),
+      target.owner,
+      target.repo,
+      base,
+    );
+    if (names !== null) requiredCache.set(key, { at: now, names });
+    return names;
+  }
+
+  /** PR 已合并 → system 行 + done 收尾；关闭未合并 → errorMessage + failed。
+   * 调用方已在写面前重读过相位。 */
+  function closeOut(
+    cand: { buildId: string; todoId: string },
+    teamId: string,
+    prNumber: number,
+    pull: GithubPull,
+    tally: CiPollTally,
+  ): void {
     if (pull.merged) {
       const sha =
         pull.mergeCommitSha === null ? '' : `（合并提交 ${pull.mergeCommitSha.slice(0, 7)}）`;
@@ -312,9 +360,73 @@ export function createCiPoller(
       .where(eq(build.id, cand.buildId))
       .run();
     const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    if (row) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
+    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
     setTodoPhase(deps, cand.todoId, 'failed');
     tally.closedUnmerged += 1;
+  }
+
+  /** 同一条提示只落一次（内容带 head SHA：head 变了会再提示一次）。 */
+  function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
+    const seen = deps.db
+      .select({ content: message.content })
+      .from(message)
+      .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
+      .all()
+      .some((r) => r.content === content);
+    if (seen) return;
+    insertMessageRow(deps, buildId, {
+      id: newRecordId(),
+      role: 'system',
+      content,
+      createdAt: nowMs(),
+    });
+    tally.hinted += 1;
+  }
+
+  async function reconcileOne(
+    cand: { buildId: string; todoId: string },
+    tally: CiPollTally,
+  ): Promise<void> {
+    const todoRow = freshReviewRow(cand.todoId);
+    const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    const target = todoRow === null ? null : githubTarget(todoRow.projectId);
+    if (
+      todoRow === null ||
+      buildRow === undefined ||
+      buildRow.prNumber === null ||
+      target === null
+    ) {
+      tally.skipped += 1;
+      return;
+    }
+    const prNumber = buildRow.prNumber;
+    const pull = await readPull(target, prNumber);
+    if (pull === null) {
+      tally.unreadable += 1;
+      return;
+    }
+    const hint =
+      pull.state !== 'open' || pull.headSha === null
+        ? null
+        : pull.mergeableState === 'behind'
+          ? behindHint(prNumber, pull.baseRef ?? 'base', pull.headSha)
+          : pull.mergeableState === 'dirty'
+            ? dirtyHint(prNumber, pull.baseRef ?? 'base', pull.headSha)
+            : null;
+    if (pull.state === 'open' && hint === null) {
+      tally.pending += 1;
+      return;
+    }
+    // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
+    if (freshReviewRow(cand.todoId) === null) {
+      tally.skipped += 1;
+      return;
+    }
+    if (hint !== null) {
+      hintOnce(cand.buildId, hint, tally);
+      return;
+    }
+    closeOut(cand, todoRow.teamId, prNumber, pull, tally);
   }
 
   async function pollOne(
@@ -345,43 +457,57 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    const key = `${target.fullName}#${buildRow.prNumber}`;
-    const entry = cache.get(key) ?? null;
-    // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
+    const prNumber = buildRow.prNumber;
+    const pull = await readPull(target, prNumber);
+    if (pull === null) {
+      tally.unreadable += 1; // 限流/私仓匿名/网络 = 读不到 ≠ 红：不动，下轮重试
+      return;
+    }
+    if (pull.state !== 'open') {
+      // 磨绿期间 PR 已在 GitHub 合并 / 关闭：同 review 关口收尾（写面前重读相位）。
+      if (freshGrindRow(cand.todoId) === null) {
+        tally.skipped += 1;
+        return;
+      }
+      closeOut(cand, todoRow.teamId, prNumber, pull, tally);
+      return;
+    }
+    if (pull.headSha === null) {
+      tally.unreadable += 1;
+      return;
+    }
+    const required = await requiredFor(target, pull.baseRef, now);
+    const key = `${target.fullName}#${prNumber}`;
+    const prev = cache.get(key);
+    const entry = prev !== undefined && prev.sha === pull.headSha ? prev : null;
     const page = await githubCommitCheckRuns(
       run.githubFetch,
       tokenFor(target.teamId),
       target.owner,
       target.repo,
-      conversationBranch(cand.buildId),
-      {
-        etag: entry?.etag ?? null,
-      },
+      pull.headSha,
+      { etag: entry?.etag ?? null },
     );
     if (page === null) {
-      tally.unreadable += 1; // 限流/私仓匿名/网络 = 读不到 ≠ 红：不动，下轮重试
+      tally.unreadable += 1;
       return;
     }
-    let verdict: CheckVerdict;
-    let emptySince: number | null = null;
-    if (page.notModified) {
-      verdict = entry?.verdict ?? { state: 'empty' }; // etag 只在有缓存行时发送，此处恒有
-      emptySince = entry?.emptySince ?? now;
-    } else {
-      verdict = verdictOfCheckRuns(page.checkRuns);
-      emptySince = verdict.state === 'empty' ? (entry?.emptySince ?? now) : null;
-    }
-    cache.set(key, { etag: page.etag, verdict, emptySince });
+    // etag 只在同 head 有缓存行时发送，304 时 entry 恒在。
+    const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
+    const verdict = verdictOfCheckRuns(runs, required);
+    const waiting = verdict.state === 'empty' || verdict.state === 'missing';
+    const emptySince = waiting ? (entry?.emptySince ?? now) : null;
+    cache.set(key, { sha: pull.headSha, etag: page.etag, runs, emptySince });
     if (verdict.state === 'pending') {
       tally.pending += 1;
       return;
     }
-    if (verdict.state === 'empty') {
+    if (waiting) {
       if (now - (emptySince ?? now) < CI_EMPTY_CHECKS_GRACE_MS) {
         tally.pending += 1; // 竞态窗内（CI 可能还没注册 check）：不动
         return;
       }
-      // 超宽限 = 仓无 CI：无可磨，按绿交人（不把无 CI 仓锁死在 building）。
+      // 超宽限 = 仓无 CI / 必需检查不在 check-runs 上报：无可磨，按绿交人。
     }
     // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
     if (freshGrindRow(cand.todoId) === null) {
@@ -411,7 +537,7 @@ export function createCiPoller(
         'build',
         todoRow.teamId,
         buildCiFixPrompt({
-          prNumber: buildRow.prNumber,
+          prNumber,
           prUrl: buildRow.prUrl,
           round: rounds + 1,
           failures: verdict.failures,
@@ -457,6 +583,7 @@ export function createCiPoller(
       reviewCandidates: reviewCandidates.length,
       merged: 0,
       closedUnmerged: 0,
+      hinted: 0,
     };
     for (const cand of candidates) {
       try {

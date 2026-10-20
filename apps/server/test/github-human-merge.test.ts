@@ -10,6 +10,10 @@
 //   ⑥ 仓库不许 squash → merge_method = merge
 //   ⑦ build 槽 Agent 缺「合并分支」开关 → 仍合并（执行合并的是 server，不是 agent）
 //   ⑧ github 形态但本 build 无 PR → 既有 merge 步路径不变
+//   ⑨ squash 标题是 GitHub 按提交数自选的（单提交取提交 message，daemon 的
+//      `<kind>: <title>` 就此进 main）→ 传 commit_title = PR 标题 + (#n)
+//   ⑩ 从 GitHub issue 导入的任务合并后 issue 仍开着 → commit_message 带
+//      closes（同仓 #N，跨仓 owner/repo#N）；无来源不带
 
 import { MERGE_ANNOUNCEMENT } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -74,6 +78,7 @@ class GithubMock {
       return Promise.resolve(
         res(200, {
           number: 301,
+          title: 'Fix the thing',
           state: p.state,
           merged: p.merged,
           merge_commit_sha: p.mergeCommitSha ?? null,
@@ -108,7 +113,12 @@ interface World {
 
 function makeWorld(
   state: GithubState,
-  opts: { connected?: boolean; prNumber?: number | null; agentTools?: string[] } = {},
+  opts: {
+    connected?: boolean;
+    prNumber?: number | null;
+    agentTools?: string[];
+    sourceRef?: string;
+  } = {},
 ): World {
   const mock = new GithubMock(state);
   const s = bootServer({ githubFetch: mock.fetch });
@@ -152,6 +162,9 @@ function makeWorld(
       hasChanges: true,
       latestBuildId: buildId,
       assignment: { plan: null, build: { agentId } },
+      ...(opts.sourceRef !== undefined
+        ? { sourceKind: 'github-issue' as const, sourceRef: opts.sourceRef }
+        : {}),
     })
     .run();
   const prNumber = opts.prNumber === undefined ? 301 : opts.prNumber;
@@ -269,6 +282,22 @@ describe('#1403 human merge on a GitHub-form project merges the PR', () => {
     const r = await merge(w);
     expect(r.status).toBe(202);
     expect(w.phase()).toBe('done');
+  });
+
+  test('⑨ commit_title is the PR title with the PR number', async () => {
+    const w = makeWorld({});
+    await merge(w);
+    expect(w.puts()[0]?.body).toMatchObject({ commit_title: 'Fix the thing (#301)' });
+    expect(w.puts()[0]?.body).not.toHaveProperty('commit_message');
+  });
+
+  test.each([
+    ['github:octo/demo#55', 'closes #55'],
+    ['github:other/repo#7', 'closes other/repo#7'],
+  ])('⑩ source issue %s → commit_message %s', async (sourceRef, closing) => {
+    const w = makeWorld({}, { sourceRef });
+    await merge(w);
+    expect(w.puts()[0]?.body).toMatchObject({ commit_message: closing });
   });
 
   test('⑧ GitHub-form build without a PR → existing merge-step path', async () => {
