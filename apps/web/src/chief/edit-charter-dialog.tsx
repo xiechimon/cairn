@@ -56,7 +56,7 @@ export function EditCharterDialog({ open, onClose, charter, onSave }: EditCharte
     >
       <div className="flex flex-col gap-3">
         {/* §5.3：裸 textarea → Textarea 件；charter 高字段显式 override
-            min-h-[120px]（行为理由：章程全文多行编辑空间）。旧
+            min-h-30 = 120px（行为理由：章程全文多行编辑空间）。旧
             resize:vertical 退役——field-sizing 自增长替代手动拖拽。
             e2e 载体 = dialog scope getByRole('textbox')（唯一 textbox）。 */}
         <Textarea

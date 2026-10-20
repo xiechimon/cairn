@@ -11,7 +11,7 @@ import { expect, type Page, test } from '@playwright/test';
 //      clientHeight) and the tail row must accept a real click — pre-fix
 //      the click times out on the clipped row.
 //   2. short-list regression: the r5 116 canon face (2 threads) keeps its
-//      natural content height, shows no scrollbar and keeps the 262px
+//      natural content height, shows no scrollbar and keeps the 264px
 //      width — the cap must be inert below the limit.
 //   3. keyboard reachability: Tab from the first row lands on the tail row
 //      and the scroll container carries the focused row into its visible
@@ -83,19 +83,20 @@ test.describe('chief thread switcher long-list scroll (#1094)', () => {
       // #1113: offsetWidth, not getBoundingClientRect().width. The drawer
       // window enters with zoom-in-95 (scale 0.95→1 over --dur-overlay,
       // WINDOW_MOTION_CLS) and the rect is transform-affected: sampled
-      // mid-entry it reads 262×scale(t) — first frame 248.9, and the CI
+      // mid-entry it reads width×scale(t) (262 then: first frame 248.9), and the CI
       // flakes (261.78 on #1105, 260.34 on main) are late-entry frames
       // under load. offsetWidth is the layout integer: transform-invariant,
       // so the exact pin below stays deterministic without a tolerance
       // that would swallow real width regressions.
       offsetWidth: el.offsetWidth,
     }));
-    // 2 rows × 30px + p-1 (4px × 2) = 68 — the cap must not add chrome
-    // (clientHeight/scrollHeight are layout metrics too — same invariance)
-    expect(geom.clientHeight).toBe(68);
+    // 2 rows × 32px (Paper menu row, #1398) + p-1 (4px × 2) = 72 — the cap
+    // must not add chrome (clientHeight/scrollHeight are layout metrics too —
+    // same invariance)
+    expect(geom.clientHeight).toBe(72);
     expect(geom.scrollHeight).toBeLessThanOrEqual(geom.clientHeight);
-    // width untouched (#1054/#1009 pinned geometry, out of scope here)
-    expect(geom.offsetWidth).toBe(262);
+    // width on the 4px grid (w-66, #1398; was 262)
+    expect(geom.offsetWidth).toBe(264);
   });
 
   test('Tab walks the list to the tail row and scrolls it into view', async ({ page }) => {

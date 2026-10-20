@@ -43,6 +43,7 @@ import {
   chiefFabAvatarOverride,
   chiefGated,
   chiefMarkdown,
+  chiefQuestion,
   chiefReady,
   chiefScrollLong,
   chiefSettings,
@@ -430,6 +431,9 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // #650/#651 markdown 面命名场景（无 capture，md-toolout 先例）：定稿
       // robot 行 raw markdown + typing 打字尾行，钉共用解析器进抽屉的渲染形。
       'chief-md': chiefMarkdown,
+      // #1398 问答卡命名场景（无 capture，chief-md 先例）：已回答 + 待回答
+      // 两张卡，钉问答卡的 Paper 面（e2e/paper-chief.spec）。
+      'chief-question': chiefQuestion,
       // #741 agent 身份可点进设置命名场景（无 capture，chief-md 先例）：
       // robot 行身份 chip（头像+名字，带 id 成链）+ 五种提及 scheme 的
       // 成链/惰性对照 + 详情页 transcript 同场景第二消费面。
