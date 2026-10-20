@@ -19,6 +19,8 @@ import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
+  /** Live project name for the chip popover head; see ChipPopover. */
+  projectName?: string;
   /** Rendered phase; the reject chain overrides the record's phase
    *  (replan streaming / building rounds, issue #75). */
   phase?: TodoRecord['phase'];
@@ -50,6 +52,7 @@ interface DetailHeadProps {
 
 export function DetailHead({
   todo,
+  projectName,
   phase,
   onMore,
   onAction,
@@ -128,6 +131,7 @@ export function DetailHead({
         >
           <ChipPopover
             todo={todo}
+            projectName={projectName}
             onEditAssign={
               onEditAssign == null
                 ? undefined

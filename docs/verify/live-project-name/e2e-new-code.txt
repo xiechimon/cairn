@@ -1,0 +1,17 @@
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 7 tests using 1 worker
+
+[1/7] e2e/live-project-name.spec.ts:128:3 › board card › projects pending: no project item, then each card’s own project
+[2/7] e2e/live-project-name.spec.ts:148:3 › board card › projects read failed: no project item
+[3/7] e2e/live-project-name.spec.ts:176:1 › drag overlay: no project while pending, the card’s own project once loaded
+[4/7] e2e/live-project-name.spec.ts:207:3 › detail chip popover › projects loaded: the head names the todo’s own project
+[5/7] e2e/live-project-name.spec.ts:221:3 › detail chip popover › projects pending: the head has no project, then fills in
+[6/7] e2e/live-project-name.spec.ts:245:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project
+[7/7] e2e/live-project-name.spec.ts:276:3 › new-task dialog › projects read failed: no project chip
+  7 passed (9.7s)
