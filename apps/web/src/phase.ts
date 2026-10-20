@@ -1,11 +1,13 @@
 // Phase → UI copy matrix (issue #56): the single table both the detail
 // header and the board card action read (one source for 开始/确认/完成/
-// 重开). Two word lists again (CONTEXT.md
-// ruling): board column names vs the detail chip words — `待验收`≡`审核`,
-// `待确认`≡`确认`, fresh≡`待处理`. Chip pills, main-button copy and
-// composer placeholders measured from the r7 captures (23 light/dark, 16
-// light, 17 light/dark) and r5b §3.3/§3.6 + r6 §4.4 (main-button copy
-// table incl. `重开`). Rows no capture exercises carry [推断].
+// 重开). Chip words may differ from the board column names (the 待处理
+// column shows `确认` / `审核` / `失败` chips), but a chip that uses a
+// column name must sit in that column: todo / queued read `待开始`, and
+// `待处理` names only the needs-you column (#1400, CONTEXT.md). Chip pills,
+// main-button copy and composer placeholders measured from the r7 captures
+// (23 light/dark, 16 light, 17 light/dark) and r5b §3.3/§3.6 + r6 §4.4
+// (main-button copy table incl. `重开`); the todo / queued chip word is
+// [设计] (#1400). Rows no capture exercises carry [推断].
 
 import type { LucideIcon } from 'lucide-react';
 import {
@@ -41,8 +43,8 @@ export const IN_FLIGHT_PHASES: ReadonlySet<Phase> = new Set<Phase>(['planning', 
 export const isInFlightPhase = (phase: string): boolean => IN_FLIGHT_PHASES.has(phase as Phase);
 
 export const PHASE_UI: Record<Phase, PhaseUi> = {
-  todo: { chip: '待处理', tone: 'idle', action: '开始', placeholder: null },
-  queued: { chip: '待处理', tone: 'idle', action: '开始', placeholder: null },
+  todo: { chip: '待开始', tone: 'idle', action: '开始', placeholder: null },
+  queued: { chip: '待开始', tone: 'idle', action: '开始', placeholder: null },
   planning: {
     chip: '规划中',
     tone: 'plan',
