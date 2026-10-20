@@ -1,0 +1,280 @@
+# vp.mjs after pr-gate run 3 on #1411 (head 2e54c01, no-go). Worktree: claude/bootstrap-p1.
+# Run 3 found: probes that default to their pre-fix mode registered with no args (chief-unread,
+# review-modal/empty-review; skill-import/import-rollback refuses with no args); probes whose
+# evidence default is docs/verify/<old ticket>/ or scripts/ (providers-tabs/claude-bin-detection,
+# chief-floating-window/a0-live) driven with no VERIFY_EVIDENCE_DIR. Fix: registry defaults carry
+# the post-fix flag; vp.mjs drive opens .claude/verify-evidence/<time>-<feature>-<case>/ when
+# VERIFY_EVIDENCE_DIR is unset. A live drive of a0-live then showed a third class: probes that create
+# an agent without machineId get 400 since ADR 0019; a scan marked 14 such current cases stale.
+
+== vp-selftest.mjs (this branch's 17 cases) against vp.mjs and vp-registry.json at 2e54c01 (red) ==
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+      missing: chief-unread/unread-badge --expect=new, review-modal/empty-review --expect=after, skill-import/import-rollback --expect=new
+FAIL  probes that default to their pre-fix mode get the post-fix flag from the registry
+      broken: chief-floating-window/a0-live, dual-source/dual-source, local-daemon-executor/local-unreachable, mcp-servers/command-gate-mcp-bridge, pi-policy/pi-policy, quota-wait/quota-wait-resume, secondary-shell/secondary-domain, skills-injection/claim-injection, skills-injection/skill-read-facts, skills-injection/skills-manifest, skills-injection/skills-routing, skills-injection/skills-split, step-error-lifecycle/error-lifecycle, step-hold-retry/hang-retry
+FAIL  no current case creates an agent without machineId (ADR 0019)
+FAIL  a drive without VERIFY_EVIDENCE_DIR gets its own directory under .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+FAIL  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+FAIL  archive --latest takes a positive integer only
+FAIL  archive refuses a source given without --from
+PASS  archive copies a named source
+11/17 passed
+
+== the same self-test on this branch (green) ==
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under .claude/verify-evidence
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+17/17 passed
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive providers-tabs claude-bin-detection --dry-run
+vp: providers-tabs/claude-bin-detection usage: env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, SERVER, WEB, DB, VERIFY_EVIDENCE_DIR, STUB_VERSION
+vp: dry-run providers-tabs/claude-bin-detection (doctor first)
+    runner node  cwd <worktree>
+    script .claude/skills/verify-pacman/scripts/drive-1050-claude-bin.mjs  args
+    VERIFY_EVIDENCE_DIR=<worktree>/.claude/verify-evidence/20261020-233703-providers-tabs-claude-bin-detection
+    VERIFY_RUN_DIR=
+
+== fresh stack, no VERIFY_EVIDENCE_DIR: vp.mjs drive api-keys create ==
+vp: api-keys/create usage: needs a fresh database (re-run vp.mjs launch)
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233153-api-keys-create
+vp: api-keys/create needs the stack, running doctor first
+PASS  server 进程组存活(pid 13703) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 13704) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: api-keys/create -> node .claude/skills/verify-pacman/scripts/drive.mjs api-key
+PASS  API 密钥页空态就绪
+PASS  新建密钥弹窗打开(#287 两步流)
+PASS  一次性明文形态 pacman_…(pacman_1bc74fe…,仅显示一次)
+PASS  密钥列表出现掩码行(1 行)
+PASS  API 掩码行(pacman_1bc74fe2…)
+PASS  SQLite api_key 表存 keyHash 非明文(02 §8 护栏)
+drive api-key:PASS
+evidence:<worktree>/.claude/verify-evidence/20261020-233153-api-keys-create
+
+== fresh stack, no VERIFY_EVIDENCE_DIR: vp.mjs drive chief-unread ==
+vp: chief-unread/unread-badge usage: --expect=old|new; fresh DB required; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233157-chief-unread-unread-badge
+vp: chief-unread/unread-badge needs the stack, running doctor first
+PASS  server 进程组存活(pid 13703) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 13704) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: chief-unread/unread-badge -> node .claude/skills/verify-pacman/scripts/drive-1303-chief-unread.mjs --expect=new
+PASS  A1 同一线程两条 assistant 文本落库  — assistant=2
+PASS  A2 未读集含该线程且只有它（线程粒度，不是消息数）  — ids=chief-01a15ba8-495b-78bc-88c8-3ba685f3fab4
+PASS  A3 通知 readAt 为空，snippet = 最后一条 assistant 文本  — readAt=null snippet=第二条回复，仍是同一会话。
+PASS  A4 徽标裸数字 = 1（两条消息不计 2）  — badge=1
+PASS  A5 tooltip 说明 1 个总管会话有未读  — tip=1 个总管会话有未读⌘J
+PASS  A6 打开线程再最小化，徽标仍是 1，readAt 仍空  — badge=1 readAt=null
+PASS  B0 无 assistant 文本的用户步不新增未读  — ids=chief-01a15ba8-495b-78bc-88c8-3ba685f3fab4
+PASS  B1 tick 后领到的步 prompt 带 [wake:wake]  — prompt=[wake:wake] 回头看任务是否仍在跑。请回头核实相关任务状态并向用户汇报。
+PASS  B2 tick 把 8 天闲置的 A 置读  — readAt=1792539127912
+PASS  B3 wake 收尾落库即已读，B 不进未读  — readAt=1792539127960 snippet=机器回头：任务仍在跑，无需处理。 ids=
+fill  20 unread-probe threads posted
+fill  40 unread-probe threads posted
+fill  60 unread-probe threads posted
+fill  80 unread-probe threads posted
+fill  100 unread-probe threads posted
+PASS  C0 未读 chief 线程数 >= 100  — count=100
+PASS  C1 100+ 未读徽标渲染 99+  — badge=99+
+PASS  C2 tooltip 写出真实未读线程数  — tip=100 个总管会话有未读⌘J
+EVIDENCE <worktree>/.claude/verify-evidence/20261020-233157-chief-unread-unread-badge
+RESULT 13/13 expect=new
+
+== fresh stack, no VERIFY_EVIDENCE_DIR: vp.mjs drive review-modal empty-review ==
+vp: review-modal/empty-review usage: --expect=before|after [--focus=hunkless]
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233213-review-modal-empty-review
+vp: review-modal/empty-review needs the stack, running doctor first
+PASS  server 进程组存活(pid 13703) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 13704) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: review-modal/empty-review -> node .claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs --expect=after
+PASS  session Owner  — Owner
+PASS  agent 缺合并分支  — ["推送分支"]
+PASS  empty hasChanges  — true
+PASS  empty changes files 为空  — {"files":[],"reported":true,"changed":false}
+PASS  files changes 有文件  — ["README.md"]
+PASS  after empty changes reported  — {"files":[],"reported":true,"changed":false}
+PASS  after files changes reported  — {"reported":true}
+PASS  after empty 不展示合并行  — count=0
+PASS  after empty 说明行在
+PASS  after empty 完成可点  — disabled=false
+PASS  after empty 无缺授权文案  — block=0
+PASS  after files 仍展示合并行  — count=1
+PASS  after files 缺授权时完成禁用  — disabled=true
+PASS  after empty 相位 done  — done
+PASS  after empty 零 merge 步  — [{"kind":"build","status":"done"}]
+PASS  after empty 审计行标记为已完成  — {"role":"user","content":"标记为已完成","actor":"Owner"}
+ALL PASS  evidence=<worktree>/.claude/verify-evidence/20261020-233213-review-modal-empty-review
+
+== fresh stack, no VERIFY_EVIDENCE_DIR: vp.mjs drive skill-import import-rollback ==
+vp: skill-import/import-rollback usage: --expect=old | --expect=new; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233218-skill-import-import-rollback
+vp: skill-import/import-rollback needs the stack, running doctor first
+PASS  server 进程组存活(pid 13703) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 13704) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=2(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: skill-import/import-rollback -> node .claude/skills/verify-pacman/scripts/drive-1185-import-rollback.mjs --expect=new
+PASS  import returns 500 when source registration cannot land  — 500
+PASS  skill directory is removed after the failed registration
+PASS  create audit row is removed  — creates=0
+PASS  skill is not listed
+PASS  refresh does not see a source for the rolled-back skill  — 404 skill orphan-1185 not found
+PASS  same-name import succeeds once registration can land  — 201 
+PASS  the successful retry wrote a source record
+
+7/7  evidence: <worktree>/.claude/verify-evidence/20261020-233218-skill-import-import-rollback
+
+== a second fresh stack: the same two probes with the arguments they used to get by default ==
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive chief-unread -- --expect=old
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233246-chief-unread-unread-badge
+vp: chief-unread/unread-badge needs the stack, running doctor first
+PASS  server 进程组存活(pid 14556) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 14557) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: chief-unread/unread-badge -> node .claude/skills/verify-pacman/scripts/drive-1303-chief-unread.mjs --expect=old
+PASS  A1 同一线程两条 assistant 文本落库  — assistant=2
+PASS  A2 未读集含该线程且只有它（线程粒度，不是消息数）  — ids=chief-01a15ba9-093c-7ca2-84b5-1309a8c7d812
+PASS  A3 通知 readAt 为空，snippet = 最后一条 assistant 文本  — readAt=null snippet=第二条回复，仍是同一会话。
+PASS  A4 徽标裸数字 = 1（两条消息不计 2）  — badge=1
+FAIL  A5 计数为 1 时 tooltip 只有快捷键  — tip=1 个总管会话有未读⌘J
+PASS  A6 打开线程再最小化，徽标仍是 1，readAt 仍空  — badge=1 readAt=null
+PASS  B0 无 assistant 文本的用户步不新增未读  — ids=chief-01a15ba9-093c-7ca2-84b5-1309a8c7d812
+PASS  B1 tick 后领到的步 prompt 带 [wake:wake]  — prompt=[wake:wake] 回头看任务是否仍在跑。请回头核实相关任务状态并向用户汇报。
+FAIL  B2 8 天闲置 + tick 之后 A 仍未读（没有过期扫）  — readAt=1792539180557
+FAIL  B3 wake 收尾走同一通知路径：snippet = wake 文本且 readAt 空，B 进入未读  — readAt=1792539180585 snippet=机器回头：任务仍在跑，无需处理。 ids=
+fill  20 unread-probe threads posted
+fill  40 unread-probe threads posted
+fill  60 unread-probe threads posted
+fill  80 unread-probe threads posted
+fill  100 unread-probe threads posted
+PASS  C0 未读 chief 线程数 >= 100  — count=100
+EVIDENCE <worktree>/.claude/verify-evidence/20261020-233246-chief-unread-unread-badge
+RESULT 8/11 expect=old
+exit=1
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive review-modal empty-review -- --expect=before
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233320-review-modal-empty-review
+vp: review-modal/empty-review needs the stack, running doctor first
+PASS  server 进程组存活(pid 14556) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 14557) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: review-modal/empty-review -> node .claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs --expect=before
+PASS  session Owner  — Owner
+PASS  agent 缺合并分支  — ["推送分支"]
+PASS  empty hasChanges  — true
+PASS  empty changes files 为空  — {"files":[],"reported":true,"changed":false}
+PASS  files changes 有文件  — ["README.md"]
+FAIL  before empty 展示合并行  — count=0
+FAIL  before empty 完成禁用  — disabled=false
+FAIL  before empty 缺授权文案  — block=0
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+locator.click: Timeout 30000ms exceeded.
+Call log:
+  - waiting for getByRole('dialog', { name: '完成任务' }).getByRole('checkbox', { name: '将改动合并到默认分支' })
+
+    at <worktree>/.claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs:329:66 {
+  log: [
+    "  - waiting for getByRole('dialog', { name: '完成任务' }).getByRole('checkbox', { name: '将改动合并到默认分支' })"
+  ],
+  name: 'TimeoutError'
+}
+
+Node.js v22.22.0
+exit=1
+
+== the same stack: a0-live (registered current at 2e54c01) and agent-detail (stale, --force) ==
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive chief-floating-window
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233415-chief-floating-window-a0-live
+vp: chief-floating-window/a0-live needs the stack, running doctor first
+PASS  server 进程组存活(pid 14556) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 14557) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=2(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: chief-floating-window/a0-live -> node .claude/skills/verify-pacman/scripts/drive-1009-a0-live.mjs
+Error: POST /api/teams/GzubfwBZPZvDmhs-IoBrT/agents → 400 {"error":"invalid body at machineId: Invalid input: expected string, received undefined"}
+exit=2 (the probe threw)
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive agent-detail edit-and-create --force
+vp: agent-detail/edit-and-create usage: env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR
+vp: evidence <worktree>/.claude/verify-evidence/20261020-233416-agent-detail-edit-and-create
+vp: agent-detail/edit-and-create needs the stack, running doctor first
+PASS  server 进程组存活(pid 14556) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 14557) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=2(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: agent-detail/edit-and-create -> node .claude/skills/verify-pacman/scripts/drive-agent-detail.mjs
+file://<worktree>/.claude/skills/verify-pacman/scripts/drive-agent-detail.mjs:65
+  if (!res.ok) throw new Error(`${method} ${url} → ${res.status}`);
+                     ^
+
+Error: POST http://127.0.0.1:8791/api/teams/GzubfwBZPZvDmhs-IoBrT/agents → 400
+
+Node.js v22.22.0
+exit=1
+
+git status --untracked-files=all .claude/skills/verify-pacman/scripts after both runs: no new files
+(a0-live used to default its evidence into that directory).

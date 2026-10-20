@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -292,8 +292,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "Chief floating-window shell on live data: geometry, minimize, refresh restore, Cmd+J/Esc, cross-route persistence, deep links, suppressed routes"
+          "status": "stale",
+          "purpose": "Chief floating-window shell on live data: geometry, minimize, refresh restore, Cmd+J/Esc, cross-route persistence, deep links, suppressed routes",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -358,7 +359,9 @@
       "cases": {
         "unread-badge": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1303-chief-unread.mjs",
-          "args": [],
+          "args": [
+            "--expect=new"
+          ],
           "needs": [
             "stack"
           ],
@@ -430,9 +433,10 @@
             "stub-llm",
             "github"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Proves that for a github project with a localPath set, the daemon uses the local clone as its base and still fetches to the remote tip. With a bad path it falls back to a GitHub clone. The settings page edits the localPath field.",
-          "usage": "env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -646,9 +650,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A local-form project whose repo path is unreachable fails the build step before clone with a named machine/path/remedy message, and works normally once the path is restored",
-          "usage": "[--expect=new|old]; env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, VERIFY_REPO_ROOT"
+          "usage": "[--expect=new|old]; env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "mea-live-claude-code": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1259-mea-live.mjs",
@@ -656,7 +661,8 @@
           "needs": [
             "remote-host",
             "daemon",
-            "real-llm"
+            "real-llm",
+            "rewrites-evidence"
           ],
           "status": "host-bound",
           "purpose": "On the mea host, creates an agent through the three-level cascade in the browser, then a real claude-code task edits the README.",
@@ -800,9 +806,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The bash command gate blocks rm -rf with a refusal the model can see and lets legal bash run. It also checks the MCP native bridge: echo and resources work, a dead endpoint degrades without blocking, and the stdio child is closed on shutdown.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME, MCP_HOME"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME, MCP_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "readonly-config": {
           "script": ".claude/skills/verify-pacman/scripts/drive-mcp.mjs",
@@ -936,9 +943,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Proves the pi session policy end to end: the trust layer denies .pi/SYSTEM.md, the policy announcement line appears, the cache-retention setting reaches the request, and per-build usage records cost and the four token counts.",
-          "usage": "env SERVER, VERIFY_RUN_DIR, DAEMON_HOME, VERIFY_EVIDENCE_DIR"
+          "usage": "env SERVER, VERIFY_RUN_DIR, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -1099,9 +1107,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A relay 429 trips the quota circuit breaker, the todo parks as waiting_quota with board banner, chip and notification, and it resumes on its own once the relay recovers",
-          "usage": "env VERIFY_PORT=8802 VERIFY_WEB_PORT=5282 at launch; VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+          "usage": "env VERIFY_PORT=8802 VERIFY_WEB_PORT=5282 at launch; VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -1142,7 +1151,9 @@
       "cases": {
         "empty-review": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs",
-          "args": [],
+          "args": [
+            "--expect=after"
+          ],
           "needs": [
             "stack"
           ],
@@ -1237,8 +1248,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "Team/org chart/api-keys secondary pages: geometry, slots, interaction paths, secondary.css cleared, WCAG contrast in both themes"
+          "status": "stale",
+          "purpose": "Team/org chart/api-keys secondary pages: geometry, slots, interaction paths, secondary.css cleared, WCAG contrast in both themes",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -1247,7 +1259,9 @@
       "cases": {
         "import-rollback": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1185-import-rollback.mjs",
-          "args": [],
+          "args": [
+            "--expect=new"
+          ],
           "needs": [
             "stack"
           ],
@@ -1276,9 +1290,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The dispatch claim payload injects only the domain-relevant skills (explicit mention, zero hits, step-row rules) and the detail pane renders the injected-skills row.",
-          "usage": "--phase=claim; env SERVER, WEB_URL, SKILLS_DIR, DB, VERIFY_EVIDENCE_DIR"
+          "usage": "--phase=claim; env SERVER, WEB_URL, SKILLS_DIR, DB, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "injection-check": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1186-skill-injection.mjs",
@@ -1312,9 +1327,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The live row and detail summary show skills that were read (skill: demo-skill), denied reads are marked as blocked, and a control task with no skills shows no empty entries.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, SKILLS_DIR, DAEMON_HOME"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, SKILLS_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-manifest": {
           "script": ".claude/skills/verify-pacman/scripts/drive-920-skills-manifest.mjs",
@@ -1323,9 +1339,10 @@
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The machine skills manifest and per-file endpoints serve oversized skills with sha256 checks and negative 404s; the daemon materializes skills incrementally and fails loudly against an old server",
-          "usage": "--phase=wire|daemon-success|daemon-incremental|daemon-fail [--expect=new|old]; env SERVER, VERIFY_RUN_DIR, SKILLS_DIR, DB, DAEMON_HOME, VERIFY_EVIDENCE_DIR"
+          "usage": "--phase=wire|daemon-success|daemon-incremental|daemon-fail [--expect=new|old]; env SERVER, VERIFY_RUN_DIR, SKILLS_DIR, DB, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-routing": {
           "script": ".claude/skills/verify-pacman/scripts/drive-919-skills-routing.mjs",
@@ -1336,9 +1353,10 @@
             "real-llm",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "behavior: a real model picks up a skill without being told (marker in output, transcript Read row, detail skills summary). deny-ui: a denied read shows as a blocked row and in the block count.",
-          "usage": "--phase=behavior|deny-ui; env SERVER, WEB, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, STUB_PORT, VERIFY_EVIDENCE_DIR"
+          "usage": "--phase=behavior|deny-ui; env SERVER, WEB, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, STUB_PORT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         },
         "skills-split": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1169-skills-split.mjs",
@@ -1348,9 +1366,10 @@
             "daemon",
             "real-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "skillsAllowlist and defaultSkill are separate fields across REST, the claim payload and the machine skill selection; the behavior phase checks that an agent with no skills set can read SKILL.md.",
-          "usage": "phase argv api|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, VERIFY_EVIDENCE_DIR"
+          "usage": "phase argv api|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -1364,9 +1383,10 @@
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A persistent 400 from a mock gateway fails the step in bounded time with the root cause shown and at most 8 requests. Patching provider compat then takes effect without a daemon restart, and removing it reverts the request fields.",
-          "usage": "env VERIFY_REPO_ROOT, MOCK_PORT (default 8799), VERIFY_EVIDENCE_DIR"
+          "usage": "env VERIFY_REPO_ROOT, MOCK_PORT (default 8799), VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },
@@ -1381,9 +1401,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Unclaimed steps wait for a machine instead of failing, a quota error triggers a 402 hold and backoff re-claim, and a broken stream resumes the same session; three legs checked via SQLite, REST and board chips.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; embedded stub LLM; starts the daemon itself"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; embedded stub LLM; starts the daemon itself",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
         }
       }
     },

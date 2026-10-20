@@ -9,7 +9,7 @@ pacman = todos.dev 复刻(React/vite web + Hono REST/SSE/SQLite server)。本 sk
 
 Control Glass 入口(点击在脚本里,本文件不复述那五条旅程): `.cursor/skills/verify-pacman/SKILL.md`。旅程契约在 `features/glass-journeys.md`(本目录 `features/` 仍是正源,cursor 侧是同一目录的链接)。一键复跑: `node .cursor/skills/verify-pacman/scripts/glass.mjs`。
 
-**统一入口 `scripts/vp.mjs`(#1402)**:`launch` / `doctor` / `cleanup` 原样转给下文同名脚本;`list [feature]` 列 case;`drive <feature> [case] [--dry-run] [-- <脚本参数>]` 按 `vp-registry.json` 分发(需栈的 case 先自动跑 doctor;`stale` / `host-bound` 的 case,以及要 `real-llm` / `github` / `rewrites-evidence` 的 case,要 `--force`;`--` 后的参数替换 case 的默认参数;`runner: tsx` 的 case 在注册表 `cwd` 指的包目录里跑 tsx,仓根没有 tsx,环境里的证据与运行目录先转成绝对路径;`--dry-run` 只打印将要执行的命令);`capture </app/路径>` 截图并记控制台错误与失败请求;`archive <票号>` 把点名的证据拷进 `docs/verify/<票号>/`(只增不改);自测 `scripts/vp-selftest.mjs`;`links <票号>` 在提交推送后打印钉 SHA 的 raw 链。新驱动先登记进注册表,不新建 `drive-<票号>.mjs`。下文各脚本的直跑命令仍有效。
+**统一入口 `scripts/vp.mjs`(#1402)**:`launch` / `doctor` / `cleanup` 原样转给下文同名脚本;`list [feature]` 列 case;`drive <feature> [case] [--dry-run] [-- <脚本参数>]` 按 `vp-registry.json` 分发(需栈的 case 先自动跑 doctor;`stale` / `host-bound` 的 case,以及要 `real-llm` / `github` / `rewrites-evidence` 的 case,要 `--force`;`--` 后的参数替换 case 的默认参数;`runner: tsx` 的 case 在注册表 `cwd` 指的包目录里跑 tsx,仓根没有 tsx,环境里的证据与运行目录先转成绝对路径;没设 `VERIFY_EVIDENCE_DIR` 时每次 drive 自开 `.claude/verify-evidence/<时间>-<feature>-<case>/` 并打印 `vp: evidence <目录>`,不让脚本落回它自己的默认处(有的默认写 `docs/verify/<旧票号>/` 或 scripts/,会改写已提交证据);node case 在仓根跑;`--dry-run` 只打印将要执行的命令);`capture </app/路径>` 截图并记控制台错误与失败请求;`archive <票号>` 把点名的证据拷进 `docs/verify/<票号>/`(只增不改);自测 `scripts/vp-selftest.mjs`;`links <票号>` 在提交推送后打印钉 SHA 的 raw 链。新驱动先登记进注册表,不新建 `drive-<票号>.mjs`。下文各脚本的直跑命令仍有效。
 
 变更历史:`changelog/` 每票一文件(`<日期>-<票号>.md`;原「Last updated:」单行链已按 #1039 退役——每条车道往链首挂条目,两条车道必撞同一 hunk)。车道记新条目 = **新建文件并随 PR 提交**,不改本行、不编辑旧条目文件;约定全文见 `changelog/README.md`。顺序以 `git log --oneline -- .claude/skills/verify-pacman/` 为准。
 Last updated: 2026-10-12(#1250 角色名册+verify 步+三视角 fan-out+split_todo 随票新增:定制 probe `scripts/drive-1250-persona-verify.mjs`(纯 live 栈+假机器 wire+chief relay,零 daemon 零 LLM,浏览器腿真点击;四相位 S 播种/V 验证步/F fan-out/P 拆解波次+父自动收;live 27/27 PASS,证据 docs/verify/1250/ 含复跑配方;实测坑六条见 changelog/2026-10-12-1250.md——run_builds 自动 watch 使 chief gate 回合插队须 claimUntil、worker 步材料载体=claim 载荷 instruction 非 step.prompt、review 步 agentId 只在 meta header、message.content 双包 JSON 二次 parse、chief relay 落库映射丢 review/verify 槽的本票修复、DONE_ANNOUNCEMENT 值=「标记为已完成」)。
@@ -145,7 +145,7 @@ node .../scripts/drive-machines-local.mjs    # machines 本机行+switches(machi
 
 ## Evidence
 
-证据目录 = `VERIFY_EVIDENCE_DIR`(默认**主仓** `<主仓>/.claude/verify-evidence/<时间戳>-<probe>/`),含 `result.json`(probe、checks 逐条 ok/label、stack 坐标)+ 截图 PNG。**cleanup 不删证据**;proof 标准 = 截图可见动作前后态 + result.json 的 checks 全 ok + API/DB 真值字段(不是只看终屏)。
+证据目录 = `VERIFY_EVIDENCE_DIR`(经 `vp.mjs drive` 时缺省为本仓 `.claude/verify-evidence/<时间>-<feature>-<case>/`;直跑脚本时按脚本自己的缺省,多为**主仓** `<主仓>/.claude/verify-evidence/<时间戳>-<probe>/`),含 `result.json`(probe、checks 逐条 ok/label、stack 坐标)+ 截图 PNG。**cleanup 不删证据**;proof 标准 = 截图可见动作前后态 + result.json 的 checks 全 ok + API/DB 真值字段(不是只看终屏)。
 
 证据默认落**主仓**而非 `VERIFY_REPO_ROOT`——lane 的栈跑在 worktree,证据若落 worktree 会随 worktree 删除而永久丢失。这个坑 M7 实测踩过:#310/#319 的 PR body 声称跑过 verify-pacman,合并后主仓里证据目录根本不存在,验证声明不可查证(见 #345)。
 
@@ -210,7 +210,7 @@ node .../scripts/cleanup.mjs
 | `scripts/drive.mjs` | Playwright probe(本文 Drive 节用法) |
 | `scripts/cleanup.mjs` | 回收栈,保证据 |
 
-env 契约(脚本一致):`VERIFY_REPO_ROOT` / `VERIFY_RUN_DIR` / `VERIFY_PORT` / `VERIFY_WEB_PORT` / `VERIFY_EVIDENCE_DIR`。无归档脚本:收尾手工 cp 证据目录进 PR 分支 `docs/verify/<票号>/` 并 commit(本文「证据归档纪律」)。
+env 契约(脚本一致):`VERIFY_REPO_ROOT` / `VERIFY_RUN_DIR` / `VERIFY_PORT` / `VERIFY_WEB_PORT` / `VERIFY_EVIDENCE_DIR`。归档走 `vp.mjs archive <票号> --from <drive 打印的证据目录>`,再 commit(本文「证据归档纪律」)。
 
 ## 何时不用本 skill
 

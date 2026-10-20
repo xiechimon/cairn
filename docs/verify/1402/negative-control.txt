@@ -17,3 +17,8 @@ shot  99-error.png
 drive search:FAIL(1 项)
 evidence:<worktree>/.claude/verify-evidence/20261020-203942-search
 rc=1
+
+# Note (later): the seed for this run, recovered from the session log: in apps/web/src/overlays/search-panel.tsx
+# the todo result row attribute data-row-kind="todo" was changed to data-row-kind="todo-seeded-regression".
+# positive-control.txt is the same drive after reverting that line and relaunching. negative-control-2.txt
+# records a second seed with its diff and the empty git diff after the revert.
