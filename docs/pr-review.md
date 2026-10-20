@@ -11,6 +11,10 @@
    - 被 diff 触及的代码文件**整读**（不截断）再对照 diff；diff 没碰但验证行为必须读到的代码路径（调用方、接口另一端、共享面）也一并读。
 5. **检查 docs 是否需要同步**：改了已有行为或加了新机制时，`docs/spec/`（分层职责、验收口径、功能地图）、`apps/web/COMPONENTS.md`、`.claude/skills/verify-pacman/SKILL.md` 这类文档面是否该跟着变。发现缺口记进 `Bad` 或 `Tests`，不当场替作者改。
 
+## 例外：`pr-gate` workflow（ADR 0021、spec 28 §7.5）
+
+`.claude/workflows/pr-gate.js` 是合并前闸，不是人审评分卡，三处与上面不同：子代理对 GitHub 只读，不打 `inprogress` 标签、不发评论，结论是一份带 headSha 的 JSON 判定，由主会话转述；证据维度及其反驳者跑在各自的独立 worktree 里，可以 `git checkout --detach <headSha>`（第 4 步禁的是在共享工作区里切换，独立 worktree 不撞别的车道）；读 PR 改用 fetch 进私有 ref，读完删掉。其余步骤（全文读完、读关联 issue、文档同步）照常。改这里或改 `pr-gate.js` 的评审口径时两处一起改。
+
 ## 六节评分卡（固定输出形态）
 
 对每张被审 PR 输出六节，节名固定：

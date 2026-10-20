@@ -4,8 +4,8 @@
 // spending subagents. CI runs it (ci.yml, check job); run it after every
 // change to the script (spec 28 §7.5).
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
-// The failure modes come from pr-gate runs 2-4 on #1410
-// (docs/verify/1401/pr-gate-run{2,3,4}-*.json).
+// The failure modes come from pr-gate runs 2-5 on #1410
+// (docs/verify/1401/pr-gate-run{2,3,4,5}-*.json).
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -166,7 +166,7 @@ const cases = [
         await gate({ ...base, changedFiles: ['docs/x;rm -rf .md'] });
         return false;
       } catch (e) {
-        return /shell character/.test(String(e));
+        return /review this PR by hand/.test(String(e));
       }
     },
   ],
@@ -225,15 +225,154 @@ const cases = [
     },
   ],
   [
-    'ordinary source, tests and docs do not route to the user',
+    'product source, tests, e2e and evidence do not route to the user',
     async () => {
       const files = [
         'apps/server/src/services/ci-loop.ts',
         'apps/server/test/ci-loop.test.ts',
-        'docs/spec/28.md',
+        'apps/web/e2e/board.spec.ts',
+        'packages/shared/src/records/review.ts',
+        'integration/test/m5.test.ts',
+        'docs/verify/1404/run.txt',
       ];
       const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
       return r.mergedBy === 'auto-merge' && r.go === true;
+    },
+  ],
+  [
+    'paths outside the auto-merge set route to the user (run 5)',
+    async () => {
+      for (const f of [
+        'docs/spec/28-x.md',
+        'README.md',
+        'CONTEXT.md',
+        'apps/web/public/x.svg',
+        'integration/eval/x.ts',
+      ]) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (
+          r.mergedBy !== 'user' ||
+          !r.humanReasons.some((x) => x.includes('outside the auto-merge set') && x.includes(f))
+        )
+          return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'agent-steering files the name list missed route to the user (run 5)',
+    async () => {
+      const files = [
+        'AGENTS.override.md',
+        'AGENTS.MD',
+        'CLAUDE.local.md',
+        '.pi/skills/x/SKILL.md',
+        'apps/web/.claude/skills/x/SKILL.md',
+        'apps/server/src/.claude/settings.json',
+        '.cursor/skills/verify-pacman/SKILL.md',
+        '.mcp.json',
+        '.ckignore',
+      ];
+      for (const f of files) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'case variants of protected paths route to the user (run 5)',
+    async () => {
+      for (const f of [
+        '.Claude/settings.json',
+        '.Husky/pre-commit',
+        'apps/web/src/Claude.md',
+        'apps/server/src/Scripts/x.mjs',
+      ]) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'a protected path only the safety reviewer lists is matched (run 5)',
+    async () => {
+      const r = await gate(base, {
+        reviews: safetyFiles([...base.changedFiles, '.github/workflows/ci.yml']),
+      });
+      return (
+        r.go === false &&
+        r.mergedBy === 'user' &&
+        r.protectedPaths.includes('.github/workflows/ci.yml')
+      );
+    },
+  ],
+  [
+    'a deleted test helper (test directory only) routes to the user (run 5)',
+    async () => {
+      const files = ['integration/test/helpers.ts'];
+      const r = await gate(
+        { ...base, changedFiles: files, deletedFiles: files },
+        { reviews: safetyFiles(files) },
+      );
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some((x) => x.startsWith('deleted test files') && x.includes('helpers.ts'))
+      );
+    },
+  ],
+  [
+    'a deleted colocated test (suffix only) routes to the user (run 5)',
+    async () => {
+      const files = ['apps/web/src/x.test.tsx'];
+      const r = await gate(
+        { ...base, changedFiles: files, deletedFiles: files },
+        { reviews: safetyFiles(files) },
+      );
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some((x) => x.startsWith('deleted test files') && x.includes('x.test.tsx'))
+      );
+    },
+  ],
+  [
+    'a deleted path missing from changedFiles is an args error (run 5)',
+    async () => {
+      try {
+        await gate({ ...base, deletedFiles: ['apps/server/src/gone.ts'] });
+        return false;
+      } catch (e) {
+        return /^Error: pr-gate args/.test(String(e));
+      }
+    },
+  ],
+  [
+    'pr and ticket must be positive integers (run 5)',
+    async () => {
+      for (const bad of [{ pr: 1410.5 }, { pr: 0 }, { ticket: -3 }]) {
+        try {
+          await gate({ ...base, ...bad });
+          return false;
+        } catch (e) {
+          if (!/^Error: pr-gate args/.test(String(e))) return false;
+        }
+      }
+      return true;
+    },
+  ],
+  [
+    'a path with a quote or space is rejected (run 5)',
+    async () => {
+      for (const f of ["x' --output=y 'z", 'docs/a b.md']) {
+        try {
+          await gate({ ...base, changedFiles: [f] });
+          return false;
+        } catch (e) {
+          if (!/review this PR by hand/.test(String(e))) return false;
+        }
+      }
+      return true;
     },
   ],
   [
@@ -308,6 +447,32 @@ const cases = [
         },
       });
       return r.go === true && r.blocking.length === 0;
+    },
+  ],
+  [
+    'two skeptics confirming on the head keep the finding (run 5)',
+    async () => {
+      const confirm = { headSha: HEAD, refuted: false, reason: 'real' };
+      const r = await gate(base, {
+        reviews: { ...safetyFiles(base.changedFiles), correctness: { findings: [blocker] } },
+        votes: { correctness: [confirm, confirm] },
+      });
+      return r.go === false && r.blocking.length === 1;
+    },
+  ],
+  [
+    'a split vote keeps the finding (run 5)',
+    async () => {
+      const r = await gate(base, {
+        reviews: { ...safetyFiles(base.changedFiles), correctness: { findings: [blocker] } },
+        votes: {
+          correctness: [
+            { headSha: HEAD, refuted: true, reason: 'no' },
+            { headSha: HEAD, refuted: false, reason: 'real' },
+          ],
+        },
+      });
+      return r.go === false && r.blocking.length === 1;
     },
   ],
   [
