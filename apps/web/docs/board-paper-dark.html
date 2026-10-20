@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pacman — Paper dark (#1396)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#1a1612}
+body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:inherit;text-decoration:none}
+svg{flex:none}
+#stage{height:100vh}
+@keyframes enter{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.anim{animation:enter 220ms cubic-bezier(0.23,1,0.32,1) both;animation-delay:calc(var(--i,0) * 18ms)}
+.still .anim{animation:none}
+@keyframes breath{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.anim{animation:none}.breath{animation:none!important}}
+
+/* ---------- Paper dark tokens (docs/verify/1396/palette.mjs, OKLCH hue 70) ----------
+   Elevation = lighter: canvas → sheet → card → popover. One accent (terracotta
+   lifted for dark), running green lifted, ink ladder inverted. Every colour
+   below is one of these variables. */
+.app{
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","STSong",serif;
+  --canvas:#1a1612;--sheet:#24201b;--card:#2f2a26;--popover:#37322d;
+  --secondary:#3c3732;--menu-hover:#403b36;--line:#3e3a34;--input:#514c47;--tertiary:#46413c;--ring:#837f7b;
+  --hover:rgb(255 252 248 / .05);--active:rgb(255 252 248 / .1);
+  --ink:#ece7df;--ink2:#c5c0b9;--ink3:#aca7a0;--ink4:#7a756f;--icon:#908b85;
+  --accent:#f0926d;--accent-hover:#46362f;--spot-soft:#4a3930;--spot-text:#fbc3a7;--on-accent:#1a1612;
+  --running:#7fb980;--running-text:#99ce9a;--running-bar:#70a971;--running-track:#3e3a34;--online-ring:#283b29;
+  --destructive:#ffabb7;--danger-soft:color-mix(in srgb,var(--destructive) 14%,transparent);
+  --card-hover:#3e3935;--backdrop:rgb(0 0 0 / .45);
+  --tile-1:#da8f72;--tile-2:#9eac76;--tile-3:#8ba8c6;--tile-4:#cca26e;--tile-5:#b19ac4;--tile-6:#6eb3b2;
+  --card-shadow:0 0 0 1px var(--line),0 1px 2px rgb(0 0 0 / .2);
+  --card-shadow-hover:0 0 0 1px var(--input),0 4px 14px rgb(0 0 0 / .28);
+  --sheet-shadow:0 0 0 1px var(--line);
+  --menu-shadow:0 0 0 1px var(--line),0 8px 24px rgb(0 0 0 / .4),0 2px 6px rgb(0 0 0 / .3);
+  --dialog-shadow:0 0 0 1px var(--line),0 16px 40px rgb(0 0 0 / .5),0 2px 6px rgb(0 0 0 / .3);
+  display:flex;height:100vh;background:var(--canvas);color:var(--ink);font-size:13.5px;position:relative;overflow:hidden}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;margin:10px 10px 10px 0;background:var(--sheet);border-radius:16px;box-shadow:var(--sheet-shadow)}
+.bar{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 24px;border-bottom:1px solid var(--line);white-space:nowrap;min-width:0}
+.bar h1{font-family:var(--serif);font-size:18px;font-weight:500}
+.bar-sub{font-size:12.5px;color:var(--ink3);display:flex;align-items:center;gap:5px;overflow:hidden}
+.bar-sub svg{color:var(--accent)}
+.bar-sub b{color:var(--accent);font-weight:600}
+.bar nav{margin-left:auto;display:flex;gap:2px;align-items:center;flex:none}
+.bar nav button{display:flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:8px;color:var(--ink2);font-size:13px}
+.bar nav button svg{color:var(--ink3)}
+.bar nav button:hover{background:var(--secondary);color:var(--ink)}
+.bar nav .new{margin-left:8px;background:var(--ink);color:var(--sheet);border-radius:8px;padding:0 14px 0 11px;height:32px}
+.bar nav .new svg{color:var(--sheet)}
+.bar nav .new:hover{background:#fff;color:var(--canvas)}
+.cols{flex:1;min-height:0;display:flex;gap:16px;padding:18px 24px 32px;overflow:auto}
+.col{flex:1;min-width:230px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;padding:2px}
+.col-h{display:flex;align-items:center;gap:7px;padding:0 2px 8px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.col-h>svg{color:var(--icon)}
+.col-running .col-h>svg{color:var(--running)}
+.col-attn .col-h>svg{color:var(--accent)}
+.col-h h2{font-family:var(--serif);font-size:16px;font-weight:500}
+.col-h span{color:var(--ink3);font-size:12px;margin-left:2px}
+.col-add{margin-left:auto;color:var(--ink3);display:flex;padding:3px;border-radius:6px;opacity:0;transition:opacity 150ms ease-out}
+.col:hover .col-add,.col-add:focus-visible{opacity:1}
+.col-add:hover{background:var(--secondary);color:var(--ink)}
+.empty{color:var(--ink3);padding:8px 2px}
+.card{background:var(--card);border-radius:10px;padding:12px 14px 11px;box-shadow:var(--card-shadow);transition:box-shadow 150ms ease-out}
+.card:hover{box-shadow:var(--card-shadow-hover)}
+.title{font-size:14px;font-weight:500;line-height:1.5}
+.c-done .title{font-weight:400;color:var(--ink3)}
+.meta{display:flex;gap:3px 10px;margin-top:7px;font-size:12px;color:var(--ink3);flex-wrap:nowrap;white-space:nowrap;overflow:hidden;align-items:center}
+.meta>span{flex:none;display:inline-flex;align-items:center;gap:4px}
+.meta>.m-proj{flex:0 1 auto;min-width:5em}
+.meta>.m-tag{flex:0 100 auto;min-width:0}
+.meta svg{color:var(--ink4)}
+.meta em{font-style:normal}
+.ell{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.foot{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.flag{display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-weight:600}
+.why{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.link{margin-left:auto;display:inline-flex;align-items:center;gap:4px;color:var(--accent);font-weight:600;padding:2px 6px;margin-right:-6px;border-radius:6px}
+.link:hover{background:var(--accent-hover)}
+.link.is-hover{background:var(--accent-hover)}
+.c-todo{position:relative}
+.c-todo .foot{border-top:0;padding-top:0;margin-top:4px}
+.meta-act{position:absolute;right:14px;bottom:9px;font-size:12px;background:var(--card);box-shadow:-10px 0 8px var(--card);opacity:0;transition:opacity 150ms ease-out}
+.card:hover .meta-act,.meta-act:focus-visible,.c-todo.show-act .meta-act{opacity:1}
+.run{margin-top:8px;display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--running-text);white-space:nowrap}
+.run>span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.run .breath{display:flex;animation:breath 2.4s ease-in-out infinite;color:var(--running)}
+.run-n{margin-left:auto;color:var(--ink3);font-size:12px}
+.run-bar{margin-top:7px;height:3px;border-radius:2px;background:var(--running-track);overflow:hidden}
+.run-bar i{display:block;height:100%;background:var(--running-bar);border-radius:2px}
+.orch{margin-top:9px;padding-top:8px;border-top:1px dashed var(--line);display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink3);white-space:nowrap}
+.orch .link{color:var(--ink2);font-weight:500}
+
+/* ---------- Grouped sidebar ---------- */
+.s1{width:248px;flex:none;display:flex;flex-direction:column;padding:12px 12px 10px;gap:1px;min-height:0;overflow-y:auto}
+.ws{display:flex;align-items:center;gap:9px;height:40px;padding:0 8px;border-radius:9px;flex:none}
+.ws:hover{background:var(--hover)}
+.ws-logo{width:16px;height:16px;flex:none;display:grid;grid-template-columns:repeat(8,1fr);gap:0}
+.ws-logo i{background:var(--ink)}
+.ws-name{font-family:var(--serif);font-size:16px;font-weight:600}
+.ws>svg{color:var(--ink3)}
+.grow{flex:1}
+.icon-btn{display:flex;padding:5px;border-radius:7px;color:var(--ink3)}
+.icon-btn:hover{background:var(--hover);color:var(--ink)}
+.nav{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:8px;color:var(--ink2);cursor:default;flex:none}
+.nav>svg{color:var(--icon)}
+.nav:hover{background:var(--hover);color:var(--ink)}
+.nav.on{background:var(--sheet);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line)}
+.nav.on>svg{color:var(--accent)}
+.lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r{font-size:11.5px;color:var(--ink3)}
+.kbd{font:11px ui-monospace,Menlo,monospace;color:var(--ink4)}
+.pill{background:var(--accent);color:var(--on-accent);border-radius:999px;padding:1px 7px;font-size:11px;font-weight:600}
+.sec{display:flex;align-items:center;gap:4px;padding:18px 10px 5px;font-size:11.5px;color:var(--ink3);font-weight:500;flex:none}
+.sec .add{margin-left:auto;display:flex;color:var(--ink4);border-radius:5px;padding:2px}
+.sec .add:hover{color:var(--ink);background:var(--hover)}
+.tile{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:600;color:var(--on-accent);flex:none}
+.foot-s{margin-top:auto;display:flex;flex-direction:column;gap:2px;padding-top:8px;flex:none}
+.gdot{width:7px;height:7px;border-radius:50%;background:var(--running);box-shadow:0 0 0 3px var(--online-ring);flex:none}
+.av{width:24px;height:24px;border-radius:50%;background:var(--tertiary);display:grid;place-items:center;font-size:11px;font-weight:600;color:var(--ink2);flex:none}
+.grp-new{display:flex;align-items:center;gap:8px;height:34px;margin:8px 0 12px;padding:0 12px;border-radius:9px;background:var(--sheet);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line);flex:none}
+.grp-new svg{color:var(--accent)}
+.grp-new kbd{margin-left:auto;font:11px ui-monospace,Menlo,monospace;color:var(--ink4)}
+.grp-new:hover{box-shadow:0 0 0 1px var(--input),0 2px 6px rgb(0 0 0 / .25)}
+.sb-grp [data-res]{cursor:pointer}
+.sb-grp [data-res]>svg:last-child{color:var(--ink4)}
+.grp-res{display:flex;flex-direction:column;gap:1px;border-left:1px solid var(--line);margin:2px 0 6px 17px;padding-left:6px}
+.grp-me{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;margin-top:4px;color:var(--ink);position:relative}
+.grp-me:hover{background:var(--hover)}
+.grp-sub{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink3);margin-top:2px}
+.grp-sub .gdot{width:6px;height:6px;box-shadow:0 0 0 2px var(--online-ring)}
+.grp-me .more{margin-left:auto;color:var(--ink3);display:flex}
+
+/* ---------- detail ---------- */
+.d-bar{height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid var(--line);white-space:nowrap}
+.d-bar .icon-btn{color:var(--ink2)}
+.d-bar h1{font-family:var(--serif);font-size:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis}
+.d-bar .num{color:var(--ink3);font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--running-text);padding:0 6px;height:26px;border-radius:7px}
+.chip svg{color:var(--running)}
+.chip>svg:last-child{color:var(--ink4)}
+.d-body{flex:1;min-height:0;display:flex}
+.thread{flex:1;min-width:0;display:flex;flex-direction:column;padding:14px 16px 12px}
+.thread-scroll{flex:1;min-height:0;overflow:auto;padding:4px 4px 0}
+.msg{display:flex;align-items:flex-start;gap:10px;margin-bottom:6px}
+.bot{width:20px;height:20px;border-radius:50%;background:var(--tertiary);color:var(--ink);display:grid;place-items:center;flex:none}
+.tag-pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;background:var(--secondary);color:var(--ink);font-size:12.5px}
+.step{display:flex;align-items:center;gap:10px;color:var(--ink);font-size:13.5px;margin:8px 0 8px 2px}
+.step .ring-dot{width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px var(--ink4);flex:none}
+.step .ring-dot.live{box-shadow:inset 0 0 0 1.5px var(--running)}
+.sub{display:flex;align-items:center;gap:8px;margin:4px 0 10px 32px;font-size:13.5px}
+.code{font:12px ui-monospace,Menlo,monospace;background:var(--secondary);color:var(--ink2);padding:1px 6px;border-radius:5px}
+.plan{margin:0 0 10px 32px}
+.plan-h{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2)}
+.plan-h svg{color:var(--icon)}
+.plan-h .open{margin-left:auto;color:var(--ink4)}
+.plan p{font-size:12.5px;color:var(--ink3);line-height:1.55;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tool{display:flex;align-items:center;gap:8px;margin:2px 0 6px 32px;font-size:11.5px;color:var(--ink3)}
+.tool svg{color:var(--ink4)}
+.tool .sep{width:1px;height:12px;background:var(--line)}
+.t-time{text-align:center;color:var(--ink3);font-size:12px;margin:14px 0}
+.composer{flex:none;margin:12px 0 0;background:var(--card);border-radius:14px;box-shadow:0 0 0 1px var(--line);padding:12px 14px 10px}
+.composer .ph{color:var(--ink3);font-size:13.5px;margin-bottom:14px}
+.composer-row{display:flex;align-items:center;gap:8px}
+.composer-row .icon-btn{color:var(--ink3)}
+.sq{width:32px;height:32px;border-radius:8px;background:var(--secondary);display:grid;place-items:center;margin-left:auto}
+.sq i{width:10px;height:10px;border-radius:2px;background:var(--destructive)}
+.round{width:32px;height:32px;border-radius:50%;background:var(--secondary);display:grid;place-items:center;color:var(--ink2)}
+.pane{width:488px;flex:none;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.pane-tabs{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;border-bottom:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.pane-tabs span{display:inline-flex;align-items:center;gap:5px}
+.pane-tabs svg{color:var(--icon)}
+.pane-tabs .ver{margin-left:auto}
+.pane-body{flex:1;min-height:0;overflow:auto;padding:14px 16px 20px;font-size:13.5px;line-height:1.6}
+.pane-body h4{font-size:12.5px;font-weight:500;color:var(--ink3);margin:14px 0 4px}
+.pane-body h4:first-child{margin-top:0}
+.pane-body ul{padding-left:18px}
+.pane-body code{font:12px ui-monospace,Menlo,monospace;background:var(--secondary);color:var(--ink2);padding:1px 5px;border-radius:4px}
+
+/* ---------- settings list ---------- */
+.set-bar{height:56px;flex:none;display:flex;align-items:center;padding:0 24px;border-bottom:1px solid var(--line)}
+.set-bar h1{font-family:var(--serif);font-size:18px;font-weight:500}
+.set-wrap{flex:1;min-height:0;overflow:auto;padding:28px 24px}
+.set-col{max-width:768px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.set-head{display:flex;align-items:center;gap:14px;padding:0 4px}
+.set-av{width:56px;height:56px;border-radius:50%;background:var(--card);box-shadow:0 0 0 1px var(--line);display:grid;place-items:center;font-family:var(--serif);font-size:20px;font-weight:600;color:var(--ink)}
+.set-head h2{font-family:var(--serif);font-size:18px;font-weight:500}
+.set-head p{font-size:12px;color:var(--ink3);margin-top:2px}
+.set-head .txt{margin-left:auto;color:var(--ink2);font-size:13.5px;height:32px;padding:0 10px;border-radius:8px}
+.set-head .txt:hover{background:var(--secondary);color:var(--ink)}
+.set-card{background:var(--card);border-radius:10px;box-shadow:0 0 0 1px var(--line);overflow:hidden}
+.set-row{min-height:52px;display:flex;align-items:center;gap:16px;padding:10px 16px}
+.set-row+.set-row{border-top:1px solid var(--line)}
+.set-row .l{flex:1;min-width:0}
+.set-row .l b{font-weight:400;font-size:13.5px;color:var(--ink);display:block}
+.set-row .l small{font-size:12px;color:var(--ink3);display:block;margin-top:2px}
+.select{display:inline-flex;align-items:center;gap:8px;height:32px;padding:0 10px 0 12px;border-radius:8px;background:var(--card);box-shadow:0 0 0 1px var(--line);font-size:13.5px;color:var(--ink)}
+.select svg{color:var(--ink3)}
+.seg{display:inline-flex;height:32px;padding:2px;border-radius:8px;background:var(--canvas);gap:0}
+.seg span{height:28px;min-width:28px;padding:0 12px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;color:var(--ink2)}
+.seg span.on{background:var(--card);color:var(--ink);font-weight:500;box-shadow:0 0 0 1px var(--line),0 1px 2px rgb(0 0 0 / .2)}
+.switch{width:36px;height:20px;border-radius:999px;background:var(--ink);position:relative;flex:none}
+.switch::after{content:"";position:absolute;top:2px;right:2px;width:16px;height:16px;border-radius:50%;background:var(--canvas)}
+.switch.off{background:var(--input)}
+.switch.off::after{right:auto;left:2px;background:var(--ink)}
+.btn-danger{height:32px;padding:0 12px;border-radius:8px;background:var(--danger-soft);color:var(--destructive);font-size:13.5px;font-weight:500}
+.set-sec{font-size:11.5px;font-weight:500;color:var(--ink3);padding:8px 4px 0}
+
+/* ---------- dialog ---------- */
+.backdrop{position:absolute;inset:0;background:var(--backdrop);display:grid;place-items:center}
+.dialog{width:480px;max-width:calc(100% - 2rem);background:var(--popover);border-radius:16px;box-shadow:var(--dialog-shadow);display:flex;flex-direction:column;max-height:calc(100vh - 64px)}
+.dlg-head{display:flex;align-items:flex-start;gap:12px;padding:16px 20px 12px}
+.dlg-head h2{font-family:var(--serif);font-size:16px;font-weight:500}
+.dlg-head p{font-size:12px;color:var(--ink3);margin-top:3px}
+.dlg-head .x{margin-left:auto;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--ink3);margin-top:-4px;margin-right:-6px}
+.dlg-head .x:hover{background:var(--menu-hover);color:var(--ink)}
+.dlg-body{padding:4px 20px 12px;display:flex;flex-direction:column;gap:16px;overflow:auto;min-height:0}
+.field label{display:block;font-size:13.5px;font-weight:500;color:var(--ink);margin-bottom:6px}
+.field .in{height:32px;border-radius:8px;background:var(--card);box-shadow:0 0 0 1px var(--line);display:flex;align-items:center;padding:0 10px;font-size:13.5px;color:var(--ink)}
+.field .in.ph{color:var(--ink3)}
+.field .in.focus{box-shadow:0 0 0 1px var(--line),0 0 0 2px var(--canvas),0 0 0 4px var(--accent)}
+.field small{display:block;font-size:12px;color:var(--ink3);margin-top:6px}
+.dlg-foot{display:flex;align-items:center;gap:8px;padding:12px 20px 16px}
+.dlg-foot .hint{font-size:12px;color:var(--ink3);display:flex;align-items:center;gap:5px}
+.dlg-foot .hint svg{color:var(--ink4)}
+.dlg-foot .acts{margin-left:auto;display:flex;align-items:center;gap:6px}
+.ghost{height:32px;padding:0 10px;border-radius:8px;color:var(--ink2);font-size:13.5px}
+.ghost:hover{background:var(--menu-hover);color:var(--ink)}
+.primary{height:32px;padding:0 12px;border-radius:8px;background:var(--ink);color:var(--sheet);font-size:13.5px;font-weight:500;display:inline-flex;align-items:center;gap:8px}
+.primary kbd{font:11px ui-monospace,Menlo,monospace;opacity:.6}
+
+/* ---------- menu ---------- */
+.menu{position:absolute;left:12px;bottom:66px;width:240px;background:var(--popover);border-radius:10px;padding:4px;box-shadow:var(--menu-shadow);font-size:13.5px}
+.mrow{display:flex;align-items:center;gap:8px;height:32px;padding:0 8px;border-radius:6px;color:var(--ink)}
+.mrow svg{color:var(--ink3)}
+.mrow .k{margin-left:auto;font-size:11.5px;color:var(--ink3)}
+.mrow:hover,.mrow.is-hover{background:var(--menu-hover)}
+.mrow.danger{color:var(--destructive)}
+.mrow.danger svg{color:var(--destructive)}
+.mrow.danger:hover,.mrow.danger.is-hover{background:var(--danger-soft)}
+.msep{height:1px;background:var(--line);margin:4px 6px}
+.mlbl{font-size:11.5px;font-weight:500;color:var(--ink3);padding:6px 8px 4px}
+.mseg{padding:0 8px 6px}
+.mseg .seg{width:100%}
+.mseg .seg span{flex:1;padding:0}
+
+/* ---------- token sheet ---------- */
+.sheet-view{flex:1;overflow:auto;padding:28px 32px;display:flex;flex-direction:column;gap:22px;color:var(--ink)}
+.sheet-view h2{font-family:var(--serif);font-size:18px;font-weight:500}
+.sheet-view h3{font-size:11.5px;font-weight:500;color:var(--ink3);margin-bottom:8px}
+.sw-row{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:150px;border-radius:10px;padding:10px 12px;box-shadow:0 0 0 1px var(--line);font-size:12px;display:flex;flex-direction:column;gap:3px;min-height:76px}
+.sw b{font-weight:500;font-size:13px}
+.sw code{font:11px ui-monospace,Menlo,monospace;opacity:.8}
+.sw .ratio{margin-top:auto;font-size:11.5px}
+.sw .ratio.pass{color:inherit;opacity:.85}
+.sw .ratio.fail{color:var(--destructive);font-weight:600}
+.sw .ratio.note{color:var(--ink3)}
+.ladder{display:flex;gap:0;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
+.ladder div{flex:1;padding:14px 12px;font-size:12px;display:flex;flex-direction:column;gap:3px}
+.ladder code{font:11px ui-monospace,Menlo,monospace;opacity:.8}
+.legend{font-size:12px;color:var(--ink3);line-height:1.6;max-width:720px}
+
+/* ---------- picker (verbatim spec) ---------- */
+.proto-picker{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2147483647;display:flex;align-items:center;gap:2px;padding:4px;border-radius:999px;background:rgba(10,10,10,0.82);-webkit-backdrop-filter:blur(12px) saturate(1.4);backdrop-filter:blur(12px) saturate(1.4);box-shadow:0 0 0 1px rgba(255,255,255,0.08) inset,0 8px 24px rgba(0,0,0,0.24),0 2px 6px rgba(0,0,0,0.12);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;line-height:1;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+.proto-picker-highlight{position:absolute;top:4px;left:0;height:28px;border-radius:999px;background:rgba(255,255,255,0.12);will-change:transform}
+.proto-picker[data-ready] .proto-picker-highlight{transition:transform 250ms cubic-bezier(0.23,1,0.32,1),width 250ms cubic-bezier(0.23,1,0.32,1)}
+@media (prefers-reduced-motion:reduce){.proto-picker[data-ready] .proto-picker-highlight{transition:none}}
+.proto-picker-item{position:relative;display:flex;align-items:center;height:28px;padding:0 12px;border:0;border-radius:999px;background:transparent;color:rgba(255,255,255,0.55);font:inherit;cursor:pointer;transition:color 150ms ease-out}
+.proto-picker-item:hover{color:rgba(255,255,255,0.85)}
+.proto-picker-item:active{transform:scale(0.97)}
+.proto-picker-item:focus-visible{outline:2px solid rgba(255,255,255,0.4);outline-offset:2px}
+.proto-picker-item[data-active]{color:#fff}
+.proto-picker-divider{width:1px;height:16px;margin:0 4px;background:rgba(255,255,255,0.12)}
+.proto-picker-replay{padding:0 10px;font-size:14px}
+.hide-picker .proto-picker{display:none}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<nav class="proto-picker" aria-label="Prototype views">
+  <span class="proto-picker-highlight" aria-hidden="true"></span>
+  <button class="proto-picker-item" data-active aria-current="true">看板</button>
+  <button class="proto-picker-item">详情</button>
+  <button class="proto-picker-item">设置</button>
+  <button class="proto-picker-item">弹窗</button>
+  <button class="proto-picker-item">菜单</button>
+  <button class="proto-picker-item">色板</button>
+  <span class="proto-picker-divider" aria-hidden="true"></span>
+  <button class="proto-picker-item proto-picker-replay" aria-label="Replay animation (R)">↻</button>
+</nav>
+<script>
+const P = {
+  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  board:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  puzzle:'<path d="M5 8h3a2 2 0 1 1 4 0h3v3a2 2 0 1 1 0 4v4H5z"/>',
+  plug:'<path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0zM12 17v5"/>',
+  key:'<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3"/>',
+  server:'<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>',
+  layers:'<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
+  filter:'<path d="M3 5h18l-7 8v6l-4 2v-8z"/>',
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  tag:'<path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  circleDashed:'<path d="M10.1 2.2a10 10 0 0 1 3.8 0M17.6 3.7a10 10 0 0 1 2.7 2.7M21.8 10.1a10 10 0 0 1 0 3.8M20.3 17.6a10 10 0 0 1-2.7 2.7M13.9 21.8a10 10 0 0 1-3.8 0M6.4 20.3a10 10 0 0 1-2.7-2.7M2.2 13.9a10 10 0 0 1 0-3.8M3.7 6.4a10 10 0 0 1 2.7-2.7"/>',
+  activity:'<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/>',
+  checkCircle:'<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+  xCircle:'<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
+  listChecks:'<path d="m3 7 2 2 4-4M3 17l2 2 4-4M13 6h8M13 12h8M13 18h8"/>',
+  pr:'<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M18 15.5V9a3 3 0 0 0-3-3h-4"/>',
+  play:'<path d="M7 5v14l11-7z"/>',
+  rotate:'<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>',
+  check:'<path d="m5 12 5 5L20 7"/>',
+  arrowRight:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  arrowUp:'<path d="M12 19V5M5 12l7-7 7 7"/>',
+  bot:'<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
+  chevronRight:'<path d="m9 6 6 6-6 6"/>',
+  chevronLeft:'<path d="m15 6-6 6 6 6"/>',
+  panelLeft:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
+  box:'<path d="M21 8 12 3 3 8v8l9 5 9-5z"/><path d="m3 8 9 5 9-5M12 13v8"/>',
+  more:'<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  moreV:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
+  file:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/>',
+  copy:'<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+  paperclip:'<path d="m21 11-8.5 8.5a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.5 8.5a2 2 0 0 1-3-3L16 6"/>',
+  grid:'<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
+  hourglass:'<path d="M6 3h12M6 21h12M8 3v4l4 5 4-5V3M8 21v-4l4-5 4 5v4"/>',
+  user:'<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  users:'<circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0"/><circle cx="17" cy="9" r="3"/><path d="M16 15a6 6 0 0 1 6 5"/>',
+  logout:'<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l5-5-5-5M15 12H3"/>',
+  x:'<path d="M18 6 6 18M6 6l12 12"/>',
+  book:'<path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M4 18a2 2 0 0 1 2-2h12"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  external:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M19 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h6"/>',
+};
+const icon = (n, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+
+const SEED = [
+  {id:68, proj:'pacman-gh-probe', title:'实现 #1267：全局手势收单一状态机', state:'todo', ago:'4 天前', orch:'等 mac-mini 上线'},
+  {id:72, proj:'pacman-gh-probe', title:'实现 #1277：分支漂移交付改硬失败', state:'todo', ago:'4 天前'},
+  {id:74, proj:'pacman', title:'侧栏 288px 一级表面与滚动渐隐', state:'running', agent:'glm', step:'运行 e2e:affected', done:3, total:7, ago:'12 分钟'},
+  {id:75, proj:'pacman', title:'按机器能力推荐并发上限', state:'running', agent:'kimi', step:'编辑 machine-capacity.ts', done:2, total:5, ago:'4 分钟'},
+  {id:22, proj:'pacman', tag:'improvement', title:'调慢 spinner 至 1.8s 同步呼吸律：补全 PR1119 证据段', state:'failed', why:'e2e 失败 2 条 · visual-polish.spec', ago:'6 天前', agent:'glm'},
+  {id:26, proj:'pacman', tag:'feature', title:'实现 issue #1138：claim 闸加 agent 级 maxConcurrentTasks', state:'confirm', why:'计划 5 步，等你确认', ago:'4 天前', agent:'claude'},
+  {id:48, proj:'pacman-gh-probe', title:'实现 #1186 skills 注入面三前置条件的机器断言', state:'review', why:'PR #1283 · +214 −37', ago:'4 天前', agent:'kimi'},
+  {id:25, proj:'pacman', tag:'chore', title:'合并会话分支改动到默认分支', state:'failed', why:'合并冲突 · 3 个文件', ago:'5 天前', agent:'glm'},
+  {id:69, proj:'pacman-gh-probe', title:'实现 #1251：机器能力上报 + 派发能力闸', state:'done', ago:'3 天前', agent:'glm'},
+  {id:65, proj:'pacman-gh-probe', title:'实现 #1261：daemon 配额信号熔断 + waiting_quota 挂起', state:'done', ago:'3 天前', agent:'kimi'},
+  {id:62, proj:'pacman-gh-probe', title:'#1257 计划：认领超时不判死 build，挂起等机器', state:'done', ago:'4 天前', agent:'claude'},
+  {id:71, proj:'pacman-gh-probe', title:'实现 #1195：构建产物稀释 conv 分支零改动误报', state:'done', ago:'4 天前', agent:'glm'},
+];
+let tasks = SEED.map(t => ({...t}));
+
+const isAttn = s => s === 'failed' || s === 'confirm' || s === 'review';
+const attn = () => tasks.filter(t => isAttn(t.state)).length;
+const count = s => tasks.filter(t => t.state === s).length;
+const COLS = [
+  {key:'todo', name:'待开始', icon:'circleDashed', match:s => s === 'todo'},
+  {key:'running', name:'执行中', icon:'activity', match:s => s === 'running'},
+  {key:'attn', name:'待处理', icon:'alert', match:isAttn},
+  {key:'done', name:'已完成', icon:'checkCircle', match:s => s === 'done'},
+];
+const ACTION = {todo:'开始', failed:'重试', confirm:'确认计划', review:'审阅'};
+const ACTION_ICON = {todo:'play', failed:'rotate', confirm:'check', review:'arrowRight'};
+const STATE_ICON = {failed:'xCircle', confirm:'listChecks', review:'pr'};
+const LABEL = {todo:'排队中', running:'执行中', failed:'失败', confirm:'待确认', review:'待审阅', done:'已合并'};
+const PROJ = [
+  {n:'pacman', l:'P', c:'var(--tile-1)'},
+  {n:'pacman-gh-probe', l:'G', c:'var(--tile-2)'},
+  {n:'凭证链路验证', l:'凭', c:'var(--tile-3)'},
+];
+const RES = [['puzzle','技能'], ['plug','MCP'], ['key','密钥'], ['server','机器'], ['layers','模型服务']];
+const ofProj = n => tasks.filter(t => t.proj === n);
+const tile = p => `<span class="tile" style="background:${p.c}">${p.l}</span>`;
+const nav = (ic, label, right = '', on = false, lead = '') =>
+  `<a class="nav${on ? ' on' : ''}">${lead || (ic ? icon(ic, 16) : '')}<span class="lbl">${label}</span>${right}</a>`;
+const pill = () => attn() ? `<span class="pill">${attn()}</span>` : '';
+// 8x8 pixel pac-man mark (logo.svg stand-in), one cell = one CSS pixel at 16px.
+const PAC = ['..####..','.######.','###.####','#######.','#####...','#######.','.######.','..####..'];
+const logo = () => `<span class="ws-logo" aria-hidden="true">${PAC.join('').split('').map(c => `<i style="${c === '#' ? '' : 'background:transparent'}"></i>`).join('')}</span>`;
+const avatarImg = () => `<span class="av">X</span>`;
+
+function card(t, i, opts = {}) {
+  let foot = '';
+  if (isAttn(t.state)) foot = `<div class="foot"><span class="flag">${icon(STATE_ICON[t.state], 13)}${LABEL[t.state]}</span><span class="why">${t.why}</span><button class="link${opts.hoverLink === t.id ? ' is-hover' : ''}" data-act="${t.id}">${icon(ACTION_ICON[t.state], 13)}${ACTION[t.state]}</button></div>`;
+  else if (t.state === 'running') foot = `<div class="run"><span class="breath">${icon('bot', 14)}</span><span>${t.agent} · ${t.step}</span><span class="run-n">${t.done}/${t.total}</span></div><div class="run-bar"><i style="width:${Math.max(6, t.done / t.total * 100)}%"></i></div>`;
+  else if (t.state === 'todo' && t.orch) foot = `<div class="orch">${icon('hourglass', 13)}<span class="why">编排中 · ${t.orch}</span><button class="link">${icon('external', 12)}查看会话</button></div>`;
+  return `<article class="card c-${t.state}${opts.showAct === t.id ? ' show-act' : ''} anim" style="--i:${i}">
+    <div class="title">${t.title}</div>
+    <div class="meta"><span class="m-proj">${icon('folder', 12)}<span class="ell">${t.proj}</span></span><span>#${t.id}</span>${t.tag ? `<span class="m-tag">${icon('tag', 12)}<em class="ell">${t.tag}</em></span>` : ''}<span>${icon('clock', 12)}${t.ago}</span>${t.state === 'todo' && !t.orch ? `<button class="link meta-act" data-act="${t.id}">${icon('play', 12)}开始</button>` : ''}</div>
+    ${foot}
+  </article>`;
+}
+
+let resOpen = false;
+const projRows = () => PROJ.map(p => { const a = ofProj(p.n).filter(t => t.state !== 'done').length; return nav(null, p.n, a ? `<span class="r">${a}</span>` : '', false, tile(p)); }).join('');
+
+function sidebar(active = '工作台') {
+  return `<aside class="s1 sb-grp">
+    <div class="ws">${logo()}<span class="ws-name">Pacman</span>${icon('chevronDown', 14)}<span class="grow"></span><span class="icon-btn" title="搜索 ⌘K">${icon('search', 15)}</span><span class="icon-btn">${icon('panelLeft', 15)}</span></div>
+    <button class="grp-new">${icon('plus', 15)}新任务<kbd>C</kbd></button>
+    ${nav('board', '工作台', '', active === '工作台')}${nav('alert', '需要我处理', pill(), active === '需要我处理')}${nav('clock', '定时', '', active === '定时')}
+    <div class="sec">项目<span class="add">${icon('plus', 13)}</span></div>
+    ${projRows()}
+    <div class="foot-s">
+      <a class="nav" data-res>${icon('box', 16)}<span class="lbl">资源</span>${icon(resOpen ? 'chevronDown' : 'chevronRight', 14)}</a>
+      ${resOpen ? `<div class="grp-res">${RES.map(([ic, l]) => nav(ic, l, l === '机器' ? '<span class="gdot"></span>' : '')).join('')}</div>` : ''}
+      <div class="grp-me">${avatarImg()}<div><div>Xmon Dai</div><div class="grp-sub"><span class="gdot"></span>2 台机器在线 · 执行中 ${count('running')}</div></div><span class="more">${icon('moreV', 15)}</span></div>
+    </div>
+  </aside>`;
+}
+
+function boardMain(opts = {}) {
+  let i = 0;
+  const n = attn();
+  return `<main class="main">
+    <header class="bar"><h1>工作台</h1><span class="bar-sub">${n ? `${icon('alert', 13)}<b>${n} 项</b>等你处理` : '没有等你处理的事'}</span>
+      <nav><button>${icon('filter', 14)}筛选</button><button>${icon('clock', 14)}定时</button><button class="new">${icon('plus', 14)}新任务</button></nav></header>
+    <div class="cols">${COLS.map(c => {
+      const list = tasks.filter(t => c.match(t.state));
+      return `<section class="col col-${c.key}"><div class="col-h">${icon(c.icon, 15)}<h2>${c.name}</h2><span>${list.length}</span><button class="col-add" aria-label="在${c.name}新建">${icon('plus', 14)}</button></div>${list.map(t => card(t, i++, opts)).join('') || '<div class="empty">暂无</div>'}</section>`;
+    }).join('')}</div>
+  </main>`;
+}
+
+function board(extra = '', opts = {}) {
+  return `<div class="app">${sidebar()}${boardMain(opts)}${extra}</div>`;
+}
+
+function detail() {
+  return `<div class="app">${sidebar('')}<main class="main">
+    <header class="d-bar"><span class="icon-btn">${icon('chevronLeft', 16)}</span><h1>侧栏 288px 一级表面与滚动渐隐</h1><span class="num">#74</span><span class="chip">${icon('activity', 14)}执行中${icon('chevronDown', 13)}</span><span class="grow"></span><span class="icon-btn">${icon('moreV', 16)}</span></header>
+    <div class="d-body">
+      <section class="thread">
+        <div class="thread-scroll">
+          <div class="msg"><span class="bot">${icon('bot', 12)}</span><span class="tag-pill">开始执行任务</span></div>
+          <div class="sub"><span class="code">#74</span>侧栏 288px 一级表面与滚动渐隐</div>
+          <div class="tool">${icon('copy', 13)}</div>
+          <div class="step"><span class="ring-dot"></span>任务简单明确：侧栏换到 --surface-1，列表底部加 28px 渐隐，滚动时顶部同样处理。</div>
+          <div class="plan"><div class="plan-h">${icon('file', 13)}方案 · v1<span class="open">${icon('external', 12)}</span></div><p>Context: 侧栏目前直接坐在 --background 上，与主面板没有层级差；Multica 的侧栏是一级表面。Changes: sidebar.tsx 底色改 --surface-1，scroll-fade 高度走 --scroll-fade-size…</p></div>
+          <div class="tool">${icon('copy', 13)}<span class="sep"></span>完成 21s</div>
+          <div class="t-time">13:35</div>
+          <div class="msg"><span class="bot">${icon('bot', 12)}</span><span class="tag-pill">确认</span></div>
+          <div class="tool">${icon('copy', 13)}</div>
+          <div class="step"><span class="ring-dot live"></span><span style="color:var(--running-text)">运行 e2e:affected</span><span style="color:var(--ink3);font-size:12px">3/7 · 1m 12s</span></div>
+          <div class="tool">${icon('grid', 13)}pnpm --filter @pacman/web e2e:affected<span class="sep"></span>8398</div>
+        </div>
+        <div class="composer"><div class="ph">向 Agent 补充说明，执行过程中即可送达</div><div class="composer-row"><span class="icon-btn">${icon('paperclip', 15)}</span><span class="icon-btn">${icon('grid', 15)}</span><span class="sq"><i></i></span><span class="round">${icon('arrowUp', 15)}</span></div></div>
+      </section>
+      <aside class="pane">
+        <div class="pane-tabs"><span>${icon('file', 14)}方案${icon('chevronDown', 12)}</span><span class="ver">v1${icon('chevronDown', 12)}</span></div>
+        <div class="pane-body">
+          <h4>Context</h4>
+          <p>侧栏目前直接坐在 <code>--background</code> 上，与主面板没有层级差。Multica 的侧栏是一级表面，滚动列表在顶和底都有渐隐。</p>
+          <h4>Changes</h4>
+          <ul><li><code>sidebar.tsx</code>：底色改 <code>--surface-1</code>，宽度钉 288px，列表加上下渐隐遮罩。</li><li><code>tokens.css</code>：<code>--scroll-fade-size</code> 28px，<code>--sidebar-w</code> 288px。</li></ul>
+          <h4>Edge cases</h4>
+          <p>收起态 40px 轨不做渐隐；窄视口下侧栏仍可整体滚动。</p>
+          <h4>Verification</h4>
+          <ul><li>执行 <code>pnpm --filter @pacman/web e2e:affected</code>，<code>cds-sidebar.spec</code> 的 288 钉扎通过。</li><li>fixture 01 截图：侧栏与主面板两层可辨。</li></ul>
+        </div>
+      </aside>
+    </div>
+  </main></div>`;
+}
+
+function settings() {
+  return `<div class="app">${sidebar('')}<main class="main">
+    <header class="set-bar"><h1>帐号</h1></header>
+    <div class="set-wrap"><div class="set-col">
+      <div class="set-head"><span class="set-av">X</span><div><h2>Xmon Dai</h2><p>头像与名称</p></div><button class="txt">编辑名称</button></div>
+      <div class="set-card">
+        <div class="set-row"><div class="l"><b>语言</b></div><span class="select">简体中文${icon('chevronDown', 13)}</span></div>
+        <div class="set-row"><div class="l"><b>外观</b><small>没有选择时跟随系统</small></div><span class="seg"><span>浅色</span><span class="on">深色</span><span>跟随系统</span></span></div>
+        <div class="set-row"><div class="l"><b>密度</b><small>紧凑会缩小字号与行距</small></div><span class="seg"><span class="on">舒适</span><span>紧凑</span></span></div>
+        <div class="set-row"><div class="l"><b>推送通知</b><small>任务需要你处理时，在系统通知中心提醒</small></div><span class="switch"></span></div>
+        <div class="set-row"><div class="l"><b>声音</b><small>任务完成或失败时播放提示音</small></div><span class="switch off"></span></div>
+      </div>
+      <div class="set-sec">危险操作</div>
+      <div class="set-card">
+        <div class="set-row"><div class="l"><b>删除帐号</b><small>删除后任务、项目与密钥一并清除，不可恢复</small></div><button class="btn-danger">删除帐号</button></div>
+      </div>
+    </div></div>
+  </main></div>`;
+}
+
+function dialog() {
+  const dlg = `<div class="backdrop"><div class="dialog" role="dialog">
+    <div class="dlg-head"><div><h2>新建定时</h2><p>按计划在指定项目里创建任务</p></div><span class="x">${icon('x', 15)}</span></div>
+    <div class="dlg-body">
+      <div class="field"><label>名称</label><div class="in focus">每日依赖审计</div></div>
+      <div class="field"><label>项目</label><div class="in" style="justify-content:space-between"><span style="display:inline-flex;align-items:center;gap:8px">${tile(PROJ[0])}pacman</span>${icon('chevronDown', 13)}</div></div>
+      <div class="field"><label>频率</label><span class="seg"><span class="on">每天</span><span>每周</span><span>一次</span></span></div>
+      <div class="field"><label>时间</label><div class="in" style="width:140px">09:30</div><small>按机器本地时区执行</small></div>
+      <div class="field"><label>任务说明</label><div class="in ph" style="height:72px;align-items:flex-start;padding-top:7px">审计 pnpm-lock 的新增依赖，列出未登记的 postinstall…</div></div>
+    </div>
+    <div class="dlg-foot"><span class="hint">${icon('book', 13)}定时任务文档</span><div class="acts"><button class="ghost">取消</button><button class="primary">创建<kbd>⌘↵</kbd></button></div></div>
+  </div></div>`;
+  return board(dlg);
+}
+
+function menu() {
+  const m = `<div class="menu" role="menu">
+    <div class="mrow">${icon('user', 15)}帐号<span class="k">⌘,</span></div>
+    <div class="mrow is-hover">${icon('key', 15)}API 密钥</div>
+    <div class="mrow">${icon('users', 15)}团队</div>
+    <div class="msep"></div>
+    <div class="mlbl">外观</div>
+    <div class="mseg"><span class="seg"><span>浅色</span><span class="on">深色</span><span>系统</span></span></div>
+    <div class="mlbl">密度</div>
+    <div class="mseg"><span class="seg"><span class="on">舒适</span><span>紧凑</span></span></div>
+    <div class="msep"></div>
+    <div class="mrow danger">${icon('logout', 15)}退出登录</div>
+  </div>`;
+  return board(m, {hoverLink: 26, showAct: 72});
+}
+
+function tokenSheet() {
+  const v = (n) => `var(--${n})`;
+  const sw = (bg, fg, label, hex, pairs) => `<div class="sw" style="background:${v(bg)};color:${v(fg)}"><b>${label}</b><code>${hex}</code>${pairs}</div>`;
+  const R = (fg, bg, gate, text) => `<span class="ratio" data-fg="${fg}" data-bg="${bg}" data-gate="${gate}">${text}</span>`;
+  return `<div class="app"><div class="sheet-view">
+    <h2>Paper dark · 色板与实测对比度（WCAG 2.x，页内从 CSS 变量实时计算）</h2>
+    <div><h3>三层纸面 + 浮层（海拔越高越亮；每格里的字是 ink / ink-2 / ink-3）</h3>
+      <div class="ladder">
+        <div style="background:var(--canvas)"><b>canvas 应用底</b><code>#1a1612</code><span style="color:var(--ink2)">ink-2 ${R('ink2','canvas',4.5,'')}</span><span style="color:var(--ink3)">ink-3 ${R('ink3','canvas',4.5,'')}</span></div>
+        <div style="background:var(--sheet)"><b>sheet 主面板</b><code>#24201b</code><span style="color:var(--ink2)">ink-2 ${R('ink2','sheet',4.5,'')}</span><span style="color:var(--ink3)">ink-3 ${R('ink3','sheet',4.5,'')}</span></div>
+        <div style="background:var(--card)"><b>card 任务卡</b><code>#2f2a26</code><span style="color:var(--ink2)">ink-2 ${R('ink2','card',4.5,'')}</span><span style="color:var(--ink3)">ink-3 ${R('ink3','card',4.5,'')}</span></div>
+        <div style="background:var(--popover)"><b>popover 菜单 / 弹窗</b><code>#37322d</code><span style="color:var(--ink2)">ink-2 ${R('ink2','popover',4.5,'')}</span><span style="color:var(--ink3)">ink-3 ${R('ink3','popover',4.5,'')}</span></div>
+        <div style="background:var(--menu-hover)"><b>menu-hover</b><code>#403b36</code><span style="color:var(--ink2)">ink-2 ${R('ink2','menu-hover',4.5,'')}</span><span style="color:var(--ink3)">ink-3 ${R('ink3','menu-hover',4.5,'')}</span></div>
+      </div></div>
+    <div><h3>墨色阶梯（在 card 上）</h3><div class="sw-row">
+      ${sw('card','ink','ink 标题正文','#ece7df',R('ink','card',4.5,''))}
+      ${sw('card','ink2','ink-2 导航按钮','#c5c0b9',R('ink2','card',4.5,''))}
+      ${sw('card','ink3','ink-3 元信息','#aca7a0',R('ink3','card',4.5,''))}
+      ${sw('card','icon','icon 带标签图标','#908b85',R('icon','card',3,''))}
+      ${sw('card','ink4','ink-4 仅装饰','#7a756f',R('ink4','card',3,''))}
+      <div class="sw" style="background:var(--card);color:var(--ink3);box-shadow:0 0 0 3px var(--line)"><b>line 发丝环</b><code>#3e3a34</code>${R('line','card',1,'')}</div>
+    </div></div>
+    <div><h3>强调色（赭红）与执行中（绿）</h3><div class="sw-row">
+      ${sw('card','accent','accent 操作链接','#f0926d',R('accent','card',4.5,''))}
+      ${sw('accent','on-accent','计数徽章','#f0926d',R('on-accent','accent',4.5,''))}
+      ${sw('accent-hover','accent','链接 hover 底','#46362f',R('accent','accent-hover',4.5,''))}
+      ${sw('spot-soft','spot-text','spot-soft 选中底','#4a3930',R('spot-text','spot-soft',4.5,''))}
+      ${sw('card','running','running 图标','#7fb980',R('running','card',3,''))}
+      ${sw('card','running-text','running-text','#99ce9a',R('running-text','card',4.5,''))}
+      ${sw('running-track','running-bar','进度条 / 轨','#70a971',R('running-bar','running-track',3,''))}
+      ${sw('card','destructive','destructive','#ffabb7',R('destructive','card',4.5,''))}
+    </div></div>
+    <div><h3>项目方块（深字 on-accent）</h3><div class="sw-row">
+      ${[1,2,3,4,5,6].map(n => sw(`tile-${n}`,'on-accent',`tile-${n}`,'',R('on-accent',`tile-${n}`,4.5,''))).join('')}
+    </div></div>
+    <div><h3>主按钮与弹窗背板</h3><div class="sw-row">
+      ${sw('ink','sheet','主按钮 墨底','#ece7df',R('sheet','ink',4.5,''))}
+      <div class="sw" style="background:color-mix(in srgb, black 45%, var(--sheet));color:var(--ink3)"><b>backdrop</b><code>rgb(0 0 0 / .45)</code><span class="ratio note">在 sheet 上的实色</span></div>
+      <div class="sw" style="background:var(--card-hover);color:var(--ink)"><b>card hover</b><code>#3e3935</code>${R('ink','card-hover',4.5,'')}</div>
+      <div class="sw" style="background:var(--secondary);color:var(--ink2)"><b>secondary 控件底</b><code>#3c3732</code>${R('ink2','secondary',4.5,'')}</div>
+    </div></div>
+    <p class="legend">阶梯：canvas 0.205 → sheet 0.245 → card 0.29 → popover 0.32（OKLCH L，色相 70，色度 0.011）。文字门 4.5:1、非文字门 3:1；ink-4 与亮色一样只做装饰，发丝环不设门。每个数字由本页从渲染色实时计算，与 docs/verify/1396/contrast.txt 一致。</p>
+  </div></div>`;
+}
+
+function measureSheet() {
+  const probe = document.createElement('span');
+  document.body.append(probe);
+  const resolve = (n) => { probe.style.color = `var(--${n})`; const c = getComputedStyle(probe).color; return c; };
+  const lum = (s) => {
+    const c = s.replace(/^rgba?\(/, '').replace(/\)$/, '').split(',').slice(0, 3).map(v => { const x = Number(v) / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; });
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  };
+  const app = document.querySelector('.app');
+  app.append(probe);
+  for (const el of document.querySelectorAll('.ratio[data-fg]')) {
+    const [a, b] = [lum(resolve(el.dataset.fg)), lum(resolve(el.dataset.bg))].sort((x, y) => y - x);
+    const r = (a + 0.05) / (b + 0.05);
+    const gate = Number(el.dataset.gate);
+    el.textContent = `${gate > 1 ? (r >= gate ? '✓ ' : '✗ ') : ''}${r.toFixed(2)}:1${gate > 1 ? ` · 门 ${gate}` : ''}`;
+    el.classList.add(gate > 1 ? (r >= gate ? 'pass' : 'fail') : 'note');
+  }
+  probe.remove();
+}
+
+const variants = [board, detail, settings, dialog, menu, tokenSheet];
+const stage = document.getElementById('stage');
+const picker = document.querySelector('.proto-picker');
+const highlight = picker.querySelector('.proto-picker-highlight');
+const items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+const replay = picker.querySelector('.proto-picker-replay');
+let current = 0;
+
+function moveHighlight() {
+  const el = items[current];
+  highlight.style.width = el.offsetWidth + 'px';
+  highlight.style.transform = `translateX(${el.offsetLeft}px)`;
+}
+function paint() {
+  stage.innerHTML = variants[current]();
+  if (current === 5) measureSheet();
+}
+function mount(i) {
+  stage.classList.remove('still');
+  stage.innerHTML = '';
+  requestAnimationFrame(() => { current = i; paint(); });
+}
+function rerender() { stage.classList.add('still'); paint(); }
+
+function act(id) {
+  const t = tasks.find(x => String(x.id) === String(id));
+  if (!t) return;
+  if (t.state === 'review') Object.assign(t, {state:'done', ago:'刚刚'});
+  else Object.assign(t, {state:'running', step:'准备工作区', done:0, total:t.total || 6, ago:'刚刚', agent:t.agent || 'glm'});
+  tasks.splice(tasks.indexOf(t), 1);
+  tasks.unshift(t);
+  rerender();
+}
+
+stage.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]');
+  if (a) { act(a.dataset.act); return; }
+  if (e.target.closest('[data-res]')) { resOpen = !resOpen; rerender(); }
+});
+
+function setActive(i) {
+  if (i < 0 || i >= variants.length) return;
+  current = i;
+  items.forEach((el, j) => {
+    el.toggleAttribute('data-active', j === i);
+    if (j === i) el.setAttribute('aria-current', 'true');
+    else el.removeAttribute('aria-current');
+  });
+  moveHighlight();
+  const url = new URL(location);
+  url.searchParams.set('v', i + 1);
+  history.replaceState(null, '', url);
+  mount(i);
+}
+
+items.forEach((el, i) => el.addEventListener('click', () => setActive(i)));
+replay?.addEventListener('click', () => mount(current));
+window.addEventListener('resize', moveHighlight);
+
+document.addEventListener('keydown', (e) => {
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= variants.length) setActive(num - 1);
+  else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+  else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+  else if (e.key === 'r' || e.key === 'R') mount(current);
+});
+
+if (new URLSearchParams(location.search).get('picker') === '0') document.body.classList.add('hide-picker');
+setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
+requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
+</script>
+</body>
+</html>
