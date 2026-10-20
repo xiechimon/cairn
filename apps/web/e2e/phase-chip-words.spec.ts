@@ -4,10 +4,10 @@ import { expect, type Page, test } from '@playwright/test';
 // the user (confirm / review / failed; the sidebar 需要我处理 opens it).
 // Not-started tasks (todo / queued) sit in 待开始, and every chip for those
 // two phases reads 待开始 too, so a fresh task never shows 待处理.
-// Pinned surfaces: board columns + search rows (scenario 22: fresh probe #9
-// beside the review / done legacy pair), detail header (scenario 23),
-// schedule cards (live stub: todo / queued / confirm rows). The agent
-// detail queued row is pinned in agent-detail.spec.ts.
+// Pinned surfaces: board columns, search rows and project task rows
+// (scenario 22: fresh probe #9 beside the review / done legacy pair), detail
+// header (scenario 23), schedule cards (live stub: todo / queued / confirm
+// rows). The agent detail queued row is pinned in agent-detail.spec.ts.
 
 const FRESH_TITLE = 'r7 rebaseline probe';
 
@@ -54,6 +54,15 @@ test('search rows: fresh reads 待开始, review 审核, done 已完成', async 
   await expect(chip('r3 lifecycle probe」')).toHaveText('审核');
   await expect(chip('r3 lifecycle probe2')).toHaveText('已完成');
   await expect(panel(page).getByText('待处理', { exact: true })).toHaveCount(0);
+});
+
+test('project task rows: fresh reads 待开始, review 审核', async ({ page }) => {
+  await page.goto('/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=22&tab=tasks');
+  const status = (title: string) =>
+    page.getByTestId('task-row').filter({ hasText: title }).getByTestId('task-status');
+  await expect(status(FRESH_TITLE)).toHaveText('待开始');
+  await expect(status('r3 lifecycle probe」')).toHaveText('审核');
+  await expect(page.getByText('待处理', { exact: true })).toHaveCount(0);
 });
 
 // Live face: no ?scenario= in the URL = live data source; page.route answers

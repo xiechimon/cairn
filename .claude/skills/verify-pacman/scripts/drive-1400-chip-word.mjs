@@ -7,7 +7,7 @@
 // word on every surface:
 //   board columns (待开始 holds todo + queued, 待处理 holds confirm),
 //   detail header chip (fresh / queued / confirm), ⌘K search row chips,
-//   schedule card chip, project task rows (no status word).
+//   schedule card chip, project task row status.
 // --expect=new (default): todo / queued chips read 待开始 and no chip reads
 // 待处理. --expect=old: the same reads on the pre-#1400 build, where those
 // chips read 待处理 (the before half; run it from a worktree of the base
@@ -89,7 +89,6 @@ const withDb = (readonly, fn) => {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, colorScheme: 'light' });
 const shot = (name) => page.screenshot({ path: join(EVIDENCE, name) });
-const exactWord = (scope, word) => scope.getByText(word, { exact: true });
 
 try {
   // —— seed ——————————————————————————————————————————————————————————
@@ -217,17 +216,34 @@ try {
   await page.goto(`${WEB}/app/project/${projectId}`, { waitUntil: 'load' });
   await page.locator('.page-tab', { hasText: '任务' }).click();
   await page.getByTestId('task-row').first().waitFor({ state: 'visible', timeout: 10_000 });
+  const rowStatus = async (label) =>
+    (
+      (await page
+        .getByTestId('task-row')
+        .filter({ hasText: `verify 1400 ${label}` })
+        .getByTestId('task-status')
+        .textContent()) ?? ''
+    ).trim();
+  const projectStatus = {
+    fresh: await rowStatus('fresh'),
+    queued: await rowStatus('queued'),
+    confirm: await rowStatus('confirm'),
+  };
+  payloads.projectStatus = projectStatus;
   check(
-    (await exactWord(page, '待处理').count()) === 0 && (await exactWord(page, '待开始').count()) === 0,
-    'project page: task rows carry no status word',
+    projectStatus.fresh === FRESH_WORD && projectStatus.queued === FRESH_WORD,
+    `project rows: fresh / queued read ${FRESH_WORD} (${JSON.stringify(projectStatus)})`,
   );
+  check(projectStatus.confirm === '确认', 'project rows: confirm reads 确认');
   await shot('05-project.png');
 
   // —— one meaning ————————————————————————————————————————————————————————
   if (EXPECT === 'new') {
     check(
-      Object.values(searchChips).every((w) => w !== '待处理') && schedChip !== '待处理',
-      'no chip on detail / search / schedules reads 待处理',
+      [...Object.values(searchChips), ...Object.values(projectStatus), schedChip].every(
+        (w) => w !== '待处理',
+      ),
+      'no chip on detail / search / schedules / project rows reads 待处理',
     );
   }
 } catch (err) {
