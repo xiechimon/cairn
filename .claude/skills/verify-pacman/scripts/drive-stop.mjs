@@ -104,7 +104,8 @@ try {
   // —— 运行行「已取消」+ gate 回落（chip 待开始 / 开始钮回位）——
   await page.waitForSelector('.chat-stamp-cancelled', { timeout: 60_000 });
   const cancelledText = await page.$eval('.chat-stamp-cancelled', (el) => el.textContent);
-  await page.waitForSelector('button:has-text("开始")', { timeout: 30_000 });
+  // 头部主钮专属类：phase chip 也是 <button>，回落后读「待开始」，含「开始」子串
+  await page.waitForSelector('.detail-head-action:has-text("开始")', { timeout: 30_000 });
   await page.waitForTimeout(300);
   await page.screenshot({ path: join(EVIDENCE, '04-cancelled-run-row.png'), fullPage: true });
   check('cancelled-run-row', cancelledText === '已取消', `stamp=${cancelledText}`);

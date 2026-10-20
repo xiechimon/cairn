@@ -3,7 +3,7 @@
 // no LLM. Seeds one project and three todos over REST (fresh `todo`, plus one
 // moved to `queued` and one to `confirm` with a direct UPDATE on the scratch
 // SQLite: manual gate-phase PATCHes answer 409 on the live server), and a
-// daily schedule on the fresh todo. Browser leg with real clicks reads the
+// once schedule (2030) on the fresh todo. Browser leg with real clicks reads the
 // word on every surface:
 //   board columns (待开始 holds todo + queued, 待处理 holds confirm),
 //   detail header chip (fresh / queued / confirm), ⌘K search row chips,
@@ -23,7 +23,12 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
 
-const EXPECT = process.argv.includes('--expect=old') ? 'old' : 'new';
+const expectArg = process.argv.slice(2).find((a) => a.startsWith('--expect')) ?? '--expect=new';
+const EXPECT = expectArg.slice('--expect='.length);
+if (!['old', 'new'].includes(EXPECT)) {
+  console.error(`unknown mode ${expectArg}: use --expect=old or --expect=new`);
+  process.exit(2);
+}
 const FRESH_WORD = EXPECT === 'old' ? '待处理' : '待开始';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
@@ -111,9 +116,11 @@ try {
     set.run('queued', queued);
     set.run('confirm', confirm);
   });
-  const at = Date.UTC(2026, 9, 21, 1, 0); // 09:00 +08
-  const sched = await api('POST', '/api/schedules', { todoId: fresh, kind: 'daily', at });
-  check(sched.status === 201, `seed: daily schedule on the fresh todo (status ${sched.status})`);
+  // A once rule years out: the server scheduler never fires it mid-probe, so
+  // the fresh todo stays in `todo`.
+  const at = Date.UTC(2030, 0, 1, 1, 0); // 2030-01-01 09:00 +08
+  const sched = await api('POST', '/api/schedules', { todoId: fresh, kind: 'once', at });
+  check(sched.status === 201, `seed: once schedule on the fresh todo (status ${sched.status})`);
   const rows = withDb(true, (db) =>
     db
       .prepare('select id, title, phase from todo where id in (?, ?, ?) order by title')
@@ -150,8 +157,7 @@ try {
   await shot('01-board.png');
 
   // —— detail header ————————————————————————————————————————————————————
-  const chipText = async () =>
-    ((await page.getByTestId('phase-chip').textContent()) ?? '').trim();
+  const detailChips = {};
   for (const [id, label, want] of [
     [fresh, 'fresh', FRESH_WORD],
     [queued, 'queued', FRESH_WORD],
@@ -159,7 +165,8 @@ try {
   ]) {
     await card(id).locator('a').first().click();
     await page.getByTestId('phase-chip').waitFor({ state: 'visible', timeout: 10_000 });
-    const got = await chipText();
+    const got = ((await page.getByTestId('phase-chip').textContent()) ?? '').trim();
+    detailChips[label] = got;
     check(got === want, `detail header (${label}): chip reads ${want} (got ${got})`);
     await shot(`02-detail-${label}.png`);
     await page.goto(`${WEB}/app`, { waitUntil: 'load' });
@@ -240,9 +247,12 @@ try {
   // —— one meaning ————————————————————————————————————————————————————————
   if (EXPECT === 'new') {
     check(
-      [...Object.values(searchChips), ...Object.values(projectStatus), schedChip].every(
-        (w) => w !== '待处理',
-      ),
+      [
+        ...Object.values(detailChips),
+        ...Object.values(searchChips),
+        ...Object.values(projectStatus),
+        schedChip,
+      ].every((w) => w !== '待处理'),
       'no chip on detail / search / schedules / project rows reads 待处理',
     );
   }
