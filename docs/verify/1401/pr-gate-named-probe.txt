@@ -10,3 +10,5 @@ $ diff .claude/workflows/pr-gate.js <persisted script>  -> differs (working tree
 
 # reading: the name resolves, and it resolves to the copy scanned when the session (re)started,
 # not to the file on disk at call time. spec 28 §7.5 keeps scriptPath on the origin/main copy for that reason.
+
+# Note (later): the "snapshot at session start" reading above was revised by pr-gate-named-probe-2.txt.

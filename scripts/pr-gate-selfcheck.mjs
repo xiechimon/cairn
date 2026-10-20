@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Runs .claude/workflows/pr-gate.js with stub agents, so its deterministic part
 // (args check, D4 routing, skeptic withdraw rule, go) can be checked without
-// spending subagents. Run it after every change to the script (spec 28 §7.5).
-// Usage: node scripts/pr-gate-harness.mjs [path to pr-gate.js]
-// The failure modes come from pr-gate runs 2 and 3 on #1410
-// (docs/verify/1401/pr-gate-run2-7f0b544.json, pr-gate-run3-3b0da7b.json).
+// spending subagents. CI runs it (ci.yml, check job); run it after every
+// change to the script (spec 28 §7.5).
+// Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
+// The failure modes come from pr-gate runs 2-4 on #1410
+// (docs/verify/1401/pr-gate-run{2,3,4}-*.json).
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -102,15 +103,19 @@ const cases = [
     },
   ],
   [
-    'deletedFiles and linesChanged are required',
+    'deletedFiles and linesChanged are each required',
     async () => {
-      const { deletedFiles: _d, linesChanged: _l, ...rest } = base;
-      try {
-        await gate(rest);
-        return false;
-      } catch {
-        return true;
+      const { deletedFiles: _d, ...noDeleted } = base;
+      const { linesChanged: _l, ...noLines } = base;
+      for (const args of [noDeleted, noLines]) {
+        try {
+          await gate(args);
+          return false;
+        } catch (e) {
+          if (!/^Error: pr-gate args/.test(String(e))) return false;
+        }
       }
+      return true;
     },
   ],
   [
@@ -175,6 +180,60 @@ const cases = [
       ];
       const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
       return r.mergedBy === 'user' && files.every((f) => r.protectedPaths.includes(f));
+    },
+  ],
+  [
+    'gate files outside root scripts/ route to the user (run 4)',
+    async () => {
+      const files = [
+        'apps/web/src/biome.json',
+        'apps/server/biome.jsonc',
+        '.gitignore',
+        'apps/server/src/.gitignore',
+        'apps/server/scripts/db-check.mjs',
+        'apps/server/drizzle.config.ts',
+      ];
+      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      return files.every((f) => r.protectedPaths.includes(f));
+    },
+  ],
+  [
+    'files that steer agents route to the user (run 4)',
+    async () => {
+      const files = [
+        '.claude/settings.json',
+        '.claude/hooks/pre.sh',
+        '.claude/skills/pr-pacman/SKILL.md',
+        'apps/web/CLAUDE.md',
+        'apps/server/AGENTS.md',
+        'docs/pr-review.md',
+      ];
+      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      return files.every((f) => r.protectedPaths.includes(f));
+    },
+  ],
+  [
+    'a path a reviewer adds to protectedPaths routes to the user',
+    async () => {
+      const r = await gate(base, {
+        reviews: {
+          ...safetyFiles(base.changedFiles),
+          correctness: { protectedPaths: ['apps/server/src/x.ts'] },
+        },
+      });
+      return r.mergedBy === 'user' && r.protectedPaths.includes('apps/server/src/x.ts');
+    },
+  ],
+  [
+    'ordinary source, tests and docs do not route to the user',
+    async () => {
+      const files = [
+        'apps/server/src/services/ci-loop.ts',
+        'apps/server/test/ci-loop.test.ts',
+        'docs/spec/28.md',
+      ];
+      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      return r.mergedBy === 'auto-merge' && r.go === true;
     },
   ],
   [

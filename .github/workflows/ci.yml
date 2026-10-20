@@ -162,6 +162,12 @@ jobs:
       - name: Lint (biome ci)
         run: pnpm lint
 
+      # pr-gate self-check (#1401): .claude/workflows/pr-gate.js decides ADR
+      # 0021 D4 routing and go / no-go in plain code; this runs that code with
+      # stub agents. Pure node, no install needed.
+      - name: pr-gate self-check (#1401)
+        run: node scripts/pr-gate-selfcheck.mjs
+
       # Lint warning cap ratchet (#1192): biome ci surfaces warnings in its
       # summary but only exits non-zero on errors, so the warning count grows
       # silently with each new code drop (#1180 alone shipped 7). This gate

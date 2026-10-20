@@ -34,3 +34,5 @@ PASS  skeptics that saw another head do not withdraw the finding
 PASS  a reviewer on another head blocks go
 PASS  a missing safety file list blocks go
 14/14 passed (.claude/workflows/pr-gate.js)
+
+# Note (later): docs/verify/1401/pr-gate-harness.mjs moved to scripts/pr-gate-selfcheck.mjs in this PR; run that path.
