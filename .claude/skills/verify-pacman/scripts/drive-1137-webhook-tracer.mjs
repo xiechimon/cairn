@@ -21,7 +21,8 @@
 //      GH_WEBHOOK_VERIFY_TOKEN（GitHub connection token，真出站拉 issue 用；
 //      不落任何证据文件）、VERIFY_GITHUB_REPO（缺省 xiechimon/pacman）、
 //      VERIFY_GITHUB_ISSUE（缺省 1137）。
-// 前置：launch.mjs 已起栈。运行：pnpm exec tsx <本脚本>（tsx 走仓根；
+// 前置：launch.mjs 已起栈。运行：vp.mjs drive github-webhook webhook-tracer --force，
+//      或 cd apps/server && pnpm exec tsx <本脚本>（仓根没有 tsx，#1402 实测；
 //      服务模块 import 一律 file:// 绝对 URL——bare 依赖从 apps/server 解析，
 //      926 gotcha 同款）。
 

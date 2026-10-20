@@ -1342,5 +1342,33 @@
   ],
   "args": "<probe> where probe is one of board|new-task|api-key|search|theme; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
   "status": "current"
+ },
+ {
+  "script": "drive-926-convergence.mts",
+  "kind": "probe",
+  "feature": "pi-convergence",
+  "newFeature": true,
+  "case": "convergence",
+  "purpose": "Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done.",
+  "needs": [
+   "stub-llm"
+  ],
+  "args": "none; tsx from apps/daemon",
+  "status": "current",
+  "classifiedBy": "hand, after pr-gate run 1 on #1411 found the workflow had listed only .mjs"
+ },
+ {
+  "script": "drive-1279-restart-combo.mts",
+  "kind": "probe",
+  "feature": "failed-send",
+  "newFeature": false,
+  "case": "restart-combo",
+  "purpose": "A failed-restart round stores the feedback and the daemon combo as two user rows; after the task title drifts, the combo row stays out of the user bubbles (#1279).",
+  "needs": [
+   "stack"
+  ],
+  "args": "--expect=new; tsx from apps/server",
+  "status": "current",
+  "classifiedBy": "hand, after pr-gate run 1 on #1411 found the workflow had listed only .mjs"
  }
 ]

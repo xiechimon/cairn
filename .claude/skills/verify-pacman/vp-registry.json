@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these), status (current | stale | host-bound; non-current cases need --force), purpose. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm and github mean the case spends model tokens or calls GitHub, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -460,6 +460,19 @@
           "status": "current",
           "purpose": "Sending from the composer in failed phase restarts with feedback: new build, feedback in a new conversation, failed->queued; non-failed restart returns 409",
           "usage": "<todoId> <failedBuildId>"
+        },
+        "restart-combo": {
+          "script": ".claude/skills/verify-pacman/scripts/drive-1279-restart-combo.mts",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "A failed-restart round stores the feedback and the daemon combo as two user rows; after the task title drifts, the combo row stays out of the user bubbles and the feedback stays in (#1279).",
+          "runner": "tsx",
+          "cwd": "apps/server"
         }
       }
     },
@@ -505,8 +518,9 @@
           ],
           "status": "current",
           "purpose": "A GitHub issues labeled webhook creates a todo and orchestrates a chief thread. It also covers the failure paths: bad token (401), duplicate delivery, replay, ping, an ignored label and an unmapped repo.",
-          "usage": "run via pnpm exec tsx; env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
-          "runner": "tsx"
+          "usage": "env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "runner": "tsx",
+          "cwd": "apps/server"
         }
       }
     },
@@ -870,6 +884,22 @@
           "status": "current",
           "purpose": "Persona roster seeding, the verify step with its verdict, three-perspective review fan-out and split_todo child cards all work end to end over the fake machine wire and the browser.",
           "usage": "env VERIFY_REPO_ROOT (needs a fresh DB from relaunch)"
+        }
+      }
+    },
+    "pi-convergence": {
+      "recipe": null,
+      "cases": {
+        "convergence": {
+          "script": ".claude/skills/verify-pacman/scripts/drive-926-convergence.mts",
+          "args": [],
+          "needs": [
+            "stub-llm"
+          ],
+          "status": "current",
+          "purpose": "Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done. Writes docs/verify/926/convergence-evidence.json in place.",
+          "runner": "tsx",
+          "cwd": "apps/daemon"
         }
       }
     },
