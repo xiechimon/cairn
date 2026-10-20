@@ -91,6 +91,7 @@ credentials.enc
 !.claude/hillclimb/
 !.claude/settings.json
 !.claude/hooks/
+!.claude/workflows/
 .claude/hillclimb/*/baseline/traces/
 .claude/hillclimb/*/report.html
 .claude/hillclimb/*/trajectory/
