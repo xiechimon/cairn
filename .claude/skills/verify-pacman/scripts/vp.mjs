@@ -18,6 +18,8 @@ const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
 const ROOT = process.env.VERIFY_REPO_ROOT ? resolve(process.env.VERIFY_REPO_ROOT) : SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
 const EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence');
+// Cases that spend model tokens or call GitHub run only when asked with --force.
+const COSTLY_NEEDS = ['real-llm', 'github'];
 const REGISTRY_FILE = join(SKILL_DIR, 'vp-registry.json');
 const TICKET_RE = /^[A-Za-z0-9][A-Za-z0-9-]*$/;
 const IMAGE_RE = /\.(png|jpe?g|gif|webp|svg)$/i;
@@ -29,11 +31,14 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
   list [feature]                 registered features and their cases
   drive <feature> [case] [--force] [-- <args>]
                                  run a registered case; cases that need the stack run doctor first;
-                                 stale and host-bound cases need --force
+                                 stale and host-bound cases, and cases that need real-llm or github,
+                                 need --force; script arguments go after --
   capture <path> [--name <label>] [--wait <ms>]
                                  screenshot a live route, record console errors and failed requests
+                                 (exit 0 when the page loaded; errors are recorded, not judged)
   archive <ticket> [--from <dir>]... [--latest <n>]
-                                 copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites)
+                                 copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
+                                 without --from: VERIFY_EVIDENCE_DIR if set, else the newest run
   links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
   cleanup                        stop the stack (scripts/cleanup.mjs)
 
@@ -83,6 +88,7 @@ function listCommand(argv) {
     for (const [name, c] of Object.entries(entry.cases)) {
       const flags = [c.needs.join('+'), c.status === 'current' ? '' : c.status].filter(Boolean).join(', ');
       console.log(`  ${name.padEnd(28)} ${flags.padEnd(28)} ${c.purpose}`);
+      if (c.usage) console.log(`  ${''.padEnd(28)} ${''.padEnd(28)} usage: ${c.usage}`);
     }
   }
   return 0;
@@ -92,7 +98,8 @@ function driveCommand(argv) {
   const dashDash = argv.indexOf('--');
   const extra = dashDash === -1 ? [] : argv.splice(dashDash).slice(1);
   const force = takeFlag(argv, '--force');
-  const [feature, caseName] = argv;
+  const [feature, caseName, ...stray] = argv;
+  if (stray.length > 0) fail(`unexpected argument(s) ${stray.join(' ')}: script arguments go after --`);
   const { features } = loadRegistry();
   if (feature === undefined) fail(`usage: vp.mjs drive <feature> [case]\nfeatures: ${Object.keys(features).join(', ')}`);
   const entry = features[feature];
@@ -109,6 +116,11 @@ function driveCommand(argv) {
     const note = c.note ? `: ${c.note.replace(/\.+$/, '')}` : '';
     fail(`${feature}/${name} is ${c.status}${note}. Re-run with --force to drive it anyway.`);
   }
+  const costly = c.needs.filter((n) => COSTLY_NEEDS.includes(n));
+  if (costly.length > 0 && !force) {
+    fail(`${feature}/${name} needs ${costly.join(' and ')} (model tokens or GitHub calls). Re-run with --force to drive it.`);
+  }
+  if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
   if (c.needs.includes('stack')) {
     console.log(`vp: ${feature}/${name} needs the stack, running doctor first`);
     if (runNode(join(SCRIPTS_DIR, 'doctor.mjs'), []) !== 0) {
@@ -117,11 +129,15 @@ function driveCommand(argv) {
   }
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
-  const runner = c.runner === 'tsx' ? 'pnpm exec tsx' : 'node';
+  // tsx is a dependency of apps/server, apps/daemon and integration, not of the
+  // repo root, so a tsx case runs from the package its registry entry names.
+  const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
+  const runner = c.runner === 'tsx' ? `(cd ${c.cwd ?? '.'} && pnpm exec tsx)` : 'node';
   console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${[...c.args, ...extra].join(' ')}`.trimEnd());
   if (c.runner !== 'tsx') return runNode(script, [...c.args, ...extra]);
+  if (c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
   const result = spawnSync('pnpm', ['exec', 'tsx', script, ...c.args, ...extra], {
-    cwd: SCRIPT_ROOT,
+    cwd,
     stdio: 'inherit',
     env: process.env,
   });
@@ -188,7 +204,8 @@ function archiveCommand(argv) {
   const latest = Number(takeOption(argv, '--latest')[0] ?? 1);
   const ticket = argv[0];
   if (ticket === undefined || !TICKET_RE.test(ticket)) fail('usage: vp.mjs archive <ticket> [--from <dir>]... [--latest <n>]');
-  const sources = from.length > 0 ? from : newestEvidenceDirs(latest);
+  const envDir = process.env.VERIFY_EVIDENCE_DIR;
+  const sources = from.length > 0 ? from : envDir ? [resolve(envDir)] : newestEvidenceDirs(latest);
   if (sources.length === 0) fail('nothing to archive', 1);
   const target = join(ROOT, 'docs', 'verify', ticket);
   const plans = sources.map((src) => {
@@ -197,6 +214,9 @@ function archiveCommand(argv) {
     if (existsSync(dest)) fail(`refusing to overwrite ${dest}: docs/verify is add-only (ADR 0015)`, 1);
     return { src, dest };
   });
+  const names = plans.map((p) => basename(p.dest));
+  const twice = names.find((n, i) => names.indexOf(n) !== i);
+  if (twice !== undefined) fail(`two sources share the directory name ${twice}; archive them in separate runs`, 1);
   for (const { src, dest } of plans) {
     mkdirSync(dest, { recursive: true });
     cpSync(src, dest, { recursive: true, errorOnExist: true, force: false });

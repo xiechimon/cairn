@@ -119,7 +119,7 @@ export function ChiefRoot() {
               >
                 <ChiefFabIcon chief={surface.chiefData} />
                 {surface.chiefUnread > 0 && (
-                  <span className="fab-badge absolute -top-1 right-0 h-4 min-w-4 rounded-[8px] bg-(--card-button) px-[3px] text-center text-[10px] leading-4 text-(--text-on-accent)">
+                  <span className="fab-badge absolute -top-1 right-0 h-4 min-w-4 rounded-full bg-(--card-button) px-1 text-center text-caption leading-4 font-semibold text-(--text-on-accent)">
                     {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
                   </span>
                 )}

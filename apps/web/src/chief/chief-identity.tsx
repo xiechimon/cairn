@@ -47,7 +47,7 @@ export function ChiefIdentity({ agent }: ChiefIdentityProps) {
       </span>
       {/* 名字 12px = 参考站实测值（12px/14px、weight 400、次级墨）；行高抬到
           16px 让 chip 高度由 24px 头像槽主导（XMON-105 canon 不动）。 */}
-      <span className="text-xs leading-4 font-normal text-(--text-secondary)">
+      <span className="text-meta leading-4 font-normal text-(--text-secondary)">
         {agent.displayName}
       </span>
     </>
