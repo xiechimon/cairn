@@ -30,7 +30,6 @@ const MAX_SKEPTICS = 4
 // another agent-steering or gate file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS).
-// The merge readiness gate source joins PROTECTED when P3 (#1404) adds it.
 const AUTO_MERGE = [
   'apps/*/src/**',
   'apps/*/test/**',
@@ -60,12 +59,18 @@ const PROTECTED = [
   '**/biome.jsonc',
   '**/tsconfig*.json',
   '**/.gitignore',
+  // a nested `*.ts -diff` makes numstat print "- -" and hides diffs (run 6)
+  '**/.gitattributes',
   // one-way doors: migrations and the supply chain
   '**/drizzle/**',
   '**/package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   '**/.npmrc',
+  // the merge readiness gate's own source (D4 4, P3 #1404)
+  'apps/server/src/services/merge-gate/**',
+  'packages/shared/src/records/merge-gate.ts',
+  'apps/daemon/src/merge-decision.ts',
 ]
 
 function globToRegExp(glob) {
@@ -89,7 +94,6 @@ function globToRegExp(glob) {
 const PROTECTED_RE = PROTECTED.map(globToRegExp)
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
-const outsideAutoMerge = (f) => !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f))
 const MAX_LINES = 800
 const MAX_FILES = 40
 
@@ -97,7 +101,10 @@ const MAX_FILES = 40
 // moved elsewhere would not match; without core.quotePath=false git C-quotes
 // non-ASCII names (every docs/adr file) and the globs miss them.
 const FILES_CMD = 'git -c core.quotePath=false diff --no-renames --name-only'
-const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`git diff --no-renames --numstat origin/main...<headSha>\` with binary rows (- -) counted as 0}`
+// Attributes come from the empty tree, so a committed .gitattributes cannot
+// turn text into "- -" rows and zero the line count (run 6).
+const LINES_CMD = 'git --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat'
+const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha>\` with binary rows (- -) counted as 0}`
 const isPathList = (xs) => Array.isArray(xs) && xs.every((f) => typeof f === 'string' && f.length > 0)
 // File names reach agents that build git commands from them, so only letters,
 // digits, combining marks and ._/@+%- pass (every tracked path fits).
@@ -156,7 +163,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`git diff --no-renames --numstat <your base ref>...${headSha}\` in linesChanged. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha}\` in linesChanged (binary rows count 0). The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -245,7 +252,7 @@ ${d.prompt}`,
         [0, 1].map(
           (i) => () =>
             agent(
-              `${readRules(`${d.key}-refute-${i}`)}\n\nAnother reviewer (dimension ${d.key}) reported this blocking finding:\n${JSON.stringify(f)}\n\nTry to refute it by tracing the failure path in the code at ${headSha}. Set refuted to false only if you confirmed the failure is real at ${headSha}. If you cannot confirm it, set refuted to true. Set headSha to the SHA you read.`,
+              `${readRules(`${d.key}-refute-${i}`)}\n\nAnother reviewer (dimension ${d.key}) reported this blocking finding:\n${JSON.stringify(f)}\n\nTry to refute it by tracing the failure path in the code at ${headSha}. Set refuted to false only if you confirmed the failure is real at ${headSha}. If you cannot confirm it, set refuted to true. Set headSha to the SHA you read.${d.key === 'evidence' ? ` You run in your own worktree and may \`git checkout --detach ${headSha}\` there. When \`gh api repos/${REPO}/pulls/${pr}\` shows head.repo.full_name other than ${REPO}, install nothing and run nothing from the PR.` : ''}`,
               {
                 label: `refute:${d.key}:${i}`,
                 phase: 'Refute',
@@ -325,7 +332,7 @@ const deletedTests = allDeleted.filter(
 const lines = Math.max(linesChanged, safety && Number.isInteger(safety.review.linesChanged) ? safety.review.linesChanged : 0)
 const fileCount = new Set([...changedFiles, ...unlistedFiles]).size
 const outside = [...new Set([...changedFiles, ...unlistedFiles])].filter(
-  (f) => outsideAutoMerge(f) && !protectedPaths.includes(f),
+  (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
 )
 const humanReasons = [
   ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),

@@ -51,5 +51,3 @@ PASS  skeptics that saw another head do not withdraw the finding
 PASS  a reviewer on another head blocks go
 PASS  a missing safety file list blocks go
 22/22 passed (.claude/workflows/pr-gate.js)
-
-# Note (later): scripts/pr-gate-harness.mjs became scripts/pr-gate-selfcheck.mjs (more cases since). To rerun this round, take the harness of that time: git show 2953b40:scripts/pr-gate-harness.mjs > h.mjs && node h.mjs pr-gate-3b0da7b.js

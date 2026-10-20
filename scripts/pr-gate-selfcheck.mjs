@@ -4,8 +4,8 @@
 // spending subagents. CI runs it (ci.yml, check job); run it after every
 // change to the script (spec 28 §7.5).
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
-// The failure modes come from pr-gate runs 2-5 on #1410
-// (docs/verify/1401/pr-gate-run{2,3,4,5}-*.json).
+// The failure modes come from pr-gate runs 2-6 on #1410
+// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json).
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -16,9 +16,11 @@ const run = new AsyncFunction('args', 'agent', 'parallel', 'pipeline', 'log', 'p
 const HEAD = 'a'.repeat(40);
 const OTHER = 'b'.repeat(40);
 
-// reviews: {key: partial review}; votes: {key: [vote0, vote1]} (null = skeptic died)
-async function gate(args, { reviews = {}, votes = {} } = {}) {
-  const agent = async (_prompt, opts) => {
+// reviews: {key: partial review}; votes: {key: [vote0, vote1]} (null = skeptic died);
+// calls collects {label, prompt, opts} for every agent the gate starts.
+async function gate(args, { reviews = {}, votes = {}, calls = [] } = {}) {
+  const agent = async (prompt, opts) => {
+    calls.push({ label: opts.label, prompt, opts });
     const [kind, key, i] = opts.label.split(':');
     if (kind === 'review') {
       if (reviews[key] === null) return null;
@@ -507,6 +509,165 @@ const cases = [
         reviews: { ...safetyFiles(base.changedFiles), rules: { headSha: OTHER } },
       });
       return r.go === false && r.shaMismatch.some((m) => m.dimension === 'rules');
+    },
+  ],
+  [
+    'a nested .gitattributes routes to the user (run 6)',
+    async () => {
+      for (const f of [
+        'apps/web/src/.gitattributes',
+        'apps/server/test/.gitattributes',
+        '.gitattributes',
+      ]) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'the line count ignores in-tree attributes (run 6)',
+    async () => {
+      try {
+        await gate({ ...base, linesChanged: -1 });
+        return false;
+      } catch (e) {
+        return /--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904/.test(String(e));
+      }
+    },
+  ],
+  [
+    'the merge readiness gate source routes to the user (run 6)',
+    async () => {
+      for (const f of [
+        'apps/server/src/services/merge-gate/digest.ts',
+        'packages/shared/src/records/merge-gate.ts',
+        'apps/daemon/src/merge-decision.ts',
+      ]) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)',
+    async () => {
+      for (const f of ['apps/server/drizzle/0044_x.sql', 'pnpm-lock.yaml', 'apps/web/.npmrc']) {
+        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        if (!r.protectedPaths.includes(f)) return false;
+      }
+      const f = 'packages/shared/notes.ts';
+      const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some((x) => x.includes('outside the auto-merge set') && x.includes(f))
+      );
+    },
+  ],
+  [
+    'a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)',
+    async () => {
+      for (const f of [
+        'apps/web/e2e/helpers.ts',
+        'apps/web/src/tests/util.ts',
+        'apps/web/src/__tests__/util.ts',
+      ]) {
+        const r = await gate(
+          { ...base, changedFiles: [f], deletedFiles: [f] },
+          { reviews: safetyFiles([f]) },
+        );
+        if (
+          r.mergedBy !== 'user' ||
+          !r.humanReasons.some((x) => x.startsWith('deleted test files'))
+        )
+          return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'exactly 800 lines and 40 files still auto-merge (run 6)',
+    async () => {
+      const files = Array.from({ length: 40 }, (_, i) => `apps/web/src/f${i}.ts`);
+      const r = await gate(
+        { ...base, changedFiles: files, linesChanged: 800 },
+        { reviews: safetyFiles(files) },
+      );
+      return r.mergedBy === 'auto-merge' && r.go === true;
+    },
+  ],
+  [
+    'a file only the safety reviewer lists counts toward the auto-merge set (run 6)',
+    async () => {
+      const r = await gate(base, { reviews: safetyFiles([...base.changedFiles, 'README.md']) });
+      return (
+        r.go === false &&
+        r.humanReasons.some(
+          (x) => x.includes('outside the auto-merge set') && x.includes('README.md'),
+        )
+      );
+    },
+  ],
+  [
+    'headSha, an empty file list and non-string paths are args errors (run 6)',
+    async () => {
+      for (const bad of [
+        { headSha: 'abc' },
+        { headSha: 'A'.repeat(40) },
+        { changedFiles: [] },
+        { changedFiles: [1] },
+      ]) {
+        try {
+          await gate({ ...base, ...bad });
+          return false;
+        } catch (e) {
+          if (!/^Error: pr-gate args/.test(String(e))) return false;
+        }
+      }
+      return true;
+    },
+  ],
+  [
+    'the safety reviewer does not see the caller file list (run 6)',
+    async () => {
+      const calls = [];
+      await gate(
+        { ...base, changedFiles: ['apps/server/src/only-the-caller-knows.ts'] },
+        { calls },
+      );
+      const safety = calls.find((c) => c.label === 'review:safety');
+      const rules = calls.find((c) => c.label === 'review:rules');
+      return (
+        safety !== undefined &&
+        !safety.prompt.includes('only-the-caller-knows') &&
+        rules !== undefined &&
+        rules.prompt.includes('only-the-caller-knows')
+      );
+    },
+  ],
+  [
+    'the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)',
+    async () => {
+      const calls = [];
+      await gate(base, {
+        calls,
+        reviews: { ...safetyFiles(base.changedFiles), evidence: { findings: [blocker] } },
+      });
+      const evidence = calls.filter(
+        (c) => c.label === 'review:evidence' || c.label.startsWith('refute:evidence:'),
+      );
+      const others = calls.filter(
+        (c) => c.label.startsWith('review:') && c.label !== 'review:evidence',
+      );
+      return (
+        evidence.length === 3 &&
+        evidence.every(
+          (c) =>
+            c.opts.isolation === 'worktree' && /install nothing and run nothing/.test(c.prompt),
+        ) &&
+        others.every((c) => c.opts.isolation === undefined)
+      );
     },
   ],
   [
