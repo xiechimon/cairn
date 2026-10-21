@@ -72,6 +72,8 @@ export interface GateInputs {
     draft: boolean;
     /** null = GitHub 还没算出来。 */
     mergeableState: string | null;
+    /** 40 位小写 SHA。不是（大写、缩写）= 外壳的毛病：没有可对的 head，PR 按读不到
+     * 处理（pr-unreadable，detail 点明），结果不报 head。 */
     headSha: string;
     baseRef: string;
     baseRepoFullName: string;
@@ -79,17 +81,20 @@ export interface GateInputs {
     body: string;
     changedFiles: number;
   } | null;
-  /** PR head 的检查；null = 读不到。headSha = 外壳读检查时请求的提交：check run 与
-   * commit status 都按这一个 40 位小写 SHA 读（不按分支名）。它不等于 pr.headSha
-   * （比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）= 这份结果说的是别的提交，
-   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。statusSha =
-   * combined status 响应的 sha，runs[].headSha = 每条 check run 响应的 head_sha；这里
-   * 只对 headSha。required 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
-   * 最新的一条（同一 app 同名的旧条目不传）。S4 的外壳按 app 与名字去重，不能只按
-   * 名字：两个 app 报同名的检查时，只按名字会让失败的那条被同名的通过盖掉，GitHub 的
-   * rollup 却照样算它；自家 status 未通过时 unstable 又按自家豁免，闸就看着一条失败
-   * 的检查放行。complete = runs 与 statuses 都读全了（分页读完）；false 时整份按读
-   * 不到处理：缺席的可能只是没读到，未通过的可能在没读的那页。 */
+  /** PR head 的检查；null = 读不到。三处 SHA 说这份结果是在哪个提交上读的：headSha =
+   * 外壳请求的提交（check run 与 commit status 都按这一个 SHA 读，不按分支名）；
+   * runs[].headSha = 每条 check run 响应的 head_sha；statusSha = combined status
+   * （commits/{sha}/status）响应的 sha。后两样出自响应本身：外壳按分支名或从缓存读、
+   * 却照 pr.headSha 填了 headSha，也认得出。三处里有一个不等于 pr.headSha（比 PR 旧
+   * 或比 PR 新都算：缓存的响应、跨推送的两次读）= 这份结果说的是别的提交，整份按读
+   * 不到处理（required-checks-unreadable，可等，下一次巡检再读）。有一个不是 40 位
+   * 小写 SHA = 外壳的毛病，同样整份按读不到处理，detail 点明（词表里检查没有留人的
+   * 码）。required 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，
+   * statuses 每个 context 最新的一条（同一 app 同名的旧条目不传）。S4 的外壳按 app
+   * 与名字去重，不能只按名字：两个 app 报同名的检查时，只按名字会让失败的那条被同名
+   * 的通过盖掉，GitHub 的 rollup 却照样算它；自家 status 未通过时 unstable 又按自家
+   * 豁免，闸就看着一条失败的检查放行。complete = runs 与 statuses 都读全了（分页读
+   * 完）；false 时整份按读不到处理：缺席的可能只是没读到，未通过的可能在没读的那页。 */
   checks: {
     headSha: string;
     statusSha: string;
@@ -99,26 +104,32 @@ export interface GateInputs {
     complete: boolean;
   } | null;
   /** compare {base}...{head} 一次读到的三样：
-   * - headSha：外壳请求时写在 {head} 位置的提交，40 位小写 SHA（按 SHA 请求，不按分支
-   *   名；按分支名读的 compare 不知道读在哪个提交上）。取请求的 SHA，不从响应里认：
-   *   响应没有 head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url
-   *   里是缩写），commits 按时间排、分页，末一个不保证是 head。
+   * - headSha：外壳请求时写在 {head} 位置的提交（按 SHA 请求，不按分支名）。响应没有
+   *   head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url 里是缩写，
+   *   html_url 照抄请求），commits 从旧到新、分页，一页的末一个不保证是 head（实拍见
+   *   docs/verify/1404/s2-r10-github-shapes.txt）。
    * - files：全部文件（compareFilesFromResponse）。
-   * - commits：本 PR 的提交 base..head（响应 commits[] 的 sha 与 parents[].sha，40 位
-   *   小写，读全）。读全时含读到的 head。
-   * headSha 不等于 pr.headSha（比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读），
-   * 或 commits 里没有 pr.headSha（按分支名或从缓存读的 compare，外壳却照 pr.headSha
-   * 填了 headSha：这一条出自响应本身，不只信外壳填的值）= 文件与摘要说的不是 PR head
-   * 的补丁，按读不到处理（patch-unavailable，可等，下一次巡检再读），文件数对不上也
-   * 不报 compare-truncated：那是跨推送的竞态，不是截断。
+   * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），读全。
+   * 读在 PR 的 head 上 = 三条都成立：
+   *   1. headSha 等于 pr.headSha（外壳填的值）；
+   *   2. commits 里有 pr.headSha（读在比 head 旧的提交上的 compare 没有它）；
+   *   3. commits 里没有哪个提交以 pr.headSha 为父（读在 head 的后代上的 compare 一定
+   *      列着 head 的子提交：head 在 commits 里即不在 base 一侧，它的后代也都不在，从
+   *      读到的提交往下到 head 的每一个都列着；在 head 上读的只列 head 与它的祖先，祖先
+   *      不以 head 为父）。
+   * 2 与 3 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得
+   * 出。它们以 commits 读全为前提：少了 head 的子提交，后代上读的 compare 就认不出。
+   * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
+   * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
-   * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 {sha, parents} 列表），
-   * 每次读都一样，留人；headSha 不是 40 位小写 SHA 时外壳同样传 'malformed'，不要让
-   * 它在这里成为永远对不上的可等。commits 少给别的提交只会让证据链少认（拦），不会
-   * 多放。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否已经存在
-   * （raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head 可对：
-   * compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），结果不报 head，也不报
-   * 摘要（没有 head 的摘要绑不到哪个提交上）。 */
+   * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 {sha, parents}
+   * 列表），每次读都一样，留人。headSha、commits 的 sha 或 parents 里有不是 40 位小写
+   * SHA 的，这里同样按 compare-malformed 留人：写错的 SHA 每次读都一样，不该成为永远对
+   * 不上的可等；写错的父提交还会认不出 head 的子提交。commits 少给别的提交，证据链只会
+   * 少认（拦）。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否
+   * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head
+   * 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），结果不报 head，
+   * 也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
   compare:
     | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[] }
     | 'unreadable'
@@ -137,6 +148,7 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
+const isSha = (s: string) => /^[0-9a-f]{40}$/.test(s);
 const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]));
 const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
@@ -194,10 +206,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (i.build.phase !== 'review') block('phase-not-review', i.build.phase);
   if (i.build.stepsInFlight > 0) block('work-in-flight', `${i.build.stepsInFlight} step(s)`);
 
-  // PR
-  const pr = i.pr;
+  // PR。head 不是 40 位小写 SHA：没有可对的 head，按读不到处理。
+  const prHeadMalformed = i.pr !== null && !isSha(i.pr.headSha);
+  const pr = prHeadMalformed ? null : i.pr;
   if (pr === null) {
-    block('pr-unreadable');
+    block('pr-unreadable', ...(prHeadMalformed ? ['head SHA not 40 lowercase hex'] : []));
   } else {
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
@@ -216,11 +229,17 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('base-not-default', `${quoted(pr.baseRef)} → ${quoted(i.repo.defaultBranch)}`);
   }
 
-  // 检查（PR 的 head）。在别的提交上读的、没读全的，都与读不到同等：不拿别的提交
-  // 的结果判，也不拿半张清单判。judged = 下面已按必需检查或 pr-evidence 记过自己码
-  // 的条目。
+  // 检查（PR 的 head）。SHA 写错的、在别的提交上读的（外壳请求的、响应里每条 check
+  // run 的、combined status 的，有一个不是 PR 的 head）、没读全的，都与读不到同等：
+  // 不拿别的提交的结果判，也不拿半张清单判。judged = 下面已按必需检查或 pr-evidence
+  // 记过自己码的条目。
   let checks = i.checks;
-  if (checks !== null && pr !== null && checks.headSha !== pr.headSha) {
+  const checkShas =
+    checks === null ? [] : [checks.headSha, checks.statusSha, ...checks.runs.map((r) => r.headSha)];
+  if (checks !== null && !checkShas.every(isSha)) {
+    block('required-checks-unreadable', 'check SHA not 40 lowercase hex');
+    checks = null;
+  } else if (checks !== null && pr !== null && checkShas.some((s) => s !== pr.headSha)) {
     block('required-checks-unreadable', 'checks not read at the PR head');
     checks = null;
   } else if (checks !== null && !checks.complete) {
@@ -306,17 +325,26 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
-  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。compare 不是在
-  // PR 的 head 上读的（外壳填的 head 对不上，或响应自己的提交里没有这个 head）：说的是
-  // 别的补丁，按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它
-  // 判，结果也不报它的摘要，免得把别的补丁的结论安到 head 上。
+  // 补丁。compare 读不到可等；读到了形状不对（含写错的 SHA），下一次读还是一样，留人。
+  // compare 不是在 PR 的 head 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，
+  // 读在了更早的提交上；或响应的提交里有以它为父的，读在了后代上）：说的是别的补丁，
+  // 按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果也
+  // 不报它的摘要，免得把别的补丁的结论安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
   if (
     compare !== null &&
+    ![compare.headSha, ...compare.commits.flatMap((c) => [c.sha, ...c.parents])].every(isSha)
+  ) {
+    block('compare-malformed', 'compare SHA not 40 lowercase hex');
+    compare = null;
+  } else if (
+    compare !== null &&
     pr !== null &&
-    (compare.headSha !== pr.headSha || !compare.commits.some((c) => c.sha === pr.headSha))
+    (compare.headSha !== pr.headSha ||
+      !compare.commits.some((c) => c.sha === pr.headSha) ||
+      compare.commits.some((c) => c.parents.includes(pr.headSha)))
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
