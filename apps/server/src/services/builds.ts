@@ -1823,13 +1823,14 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   // 相位已是 done 时 setTodoPhase 不动；完成行本轮只落一次（合并步与对账先后
   // 到达、或合并步在人手拖到已完成之后才完成，都只有一行）。
   setTodoPhase(deps, todoId, 'done');
-  if (hasMessageRow(deps, buildId, 'system', DONE_ROW, roundStart(deps, buildId))) return;
-  insertMessageRow(deps, buildId, {
-    id: newRecordId(),
-    role: 'system',
-    content: DONE_ROW,
-    createdAt: nowMs(),
-  });
+  if (!hasMessageRow(deps, buildId, 'system', DONE_ROW, roundStart(deps, buildId))) {
+    insertMessageRow(deps, buildId, {
+      id: newRecordId(),
+      role: 'system',
+      content: DONE_ROW,
+      createdAt: nowMs(),
+    });
+  }
   // #1250（ADR 0018 层 2）：done 落地即查拆卡波次——本卡是子项时推进其父的
   // 下一波（父自动收口在 setTodoPhase 的 settleSplitOnDone 半边，Todos 层）。
   advanceSplitWaves(deps, todoId);
