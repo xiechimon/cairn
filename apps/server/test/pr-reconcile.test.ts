@@ -39,6 +39,14 @@
 //   ㉕ checkpoint 不是 40 位十六进制 SHA → 不拼进请求 URL，留在 review 并提示
 //   ㉖ 合并与审核两个人手动作在 await 窗内被对账收尾抢先 → 不再入队合并步 /
 //      审核步（requestMerge 与 applyBuildStepAction review 在 await 后重读相位）
+// pr-gate 第四轮（#1414）补的：
+//   ⑱ 的时间判据把「CI 一绿就合并」（含 GitHub auto-merge）挡在门外——卡在
+//      合并之后才进 review，就永远停在 review 且没有任何一行说明。改判据：每个
+//      build 每种结局只收一次尾（merged 看本 build 是否已有完成行，closed 看
+//      是否已有对账的关闭行），不看时钟
+//   ㉗ 响应里缺 base 或 default_branch → 不当成合进默认分支
+//   ㉘ pulls 读或 compare 读的网络窗里有步开始在飞（人点了合并）→ 不写
+//   ㉙ 提示行里的分支名按数据引出，执行步回报的 checkpoint 原文不进提示
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -84,9 +92,10 @@ interface PullSpec {
   /** merged_at / closed_at（缺省 = 响应时刻，晚于卡进入 review）。 */
   mergedAt?: string | null;
   closedAt?: string | null;
-  /** base.ref 与 base.repo.default_branch（缺省都是 main）。 */
+  /** base.ref 与 base.repo.default_branch（缺省都是 main）；noBase = 响应里没有 base。 */
   baseRef?: string;
   defaultBranch?: string;
+  noBase?: boolean;
   /** compare 的 status 按 base（checkpoint）区分；缺省回落 compare。 */
   compareByBase?: Record<string, string>;
 }
@@ -143,10 +152,9 @@ class PullsMock {
         merged_at: spec.merged ? (spec.mergedAt === undefined ? at : spec.mergedAt) : null,
         closed_at:
           spec.state === 'closed' ? (spec.closedAt === undefined ? at : spec.closedAt) : null,
-        base: {
-          ref: spec.baseRef ?? 'main',
-          repo: { default_branch: spec.defaultBranch ?? 'main' },
-        },
+        base: spec.noBase
+          ? undefined
+          : { ref: spec.baseRef ?? 'main', repo: { default_branch: spec.defaultBranch ?? 'main' } },
       }),
     );
   };
@@ -356,6 +364,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     await pollerFor(w, mock).sweep();
     expect(w.todoRow().phase).toBe('failed');
     expect(w.buildRow().errorMessage ?? '').toContain(`#${w.prNumber}`);
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
+    ).toHaveLength(1);
   });
 
   test('③ still open → nothing changes', async () => {
@@ -530,6 +541,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows().some((c) => c.includes('aaaaaaa') && c.includes(`#${w.prNumber}`))).toBe(
       true,
     );
+    // restart is refused from review, and #1217 keeps a todo to one merged PR
+    expect(w.systemRows().some((c) => c.includes('重启任务'))).toBe(false);
   });
 
   test('⑭b merged at a head built on top of the checkpoint (update-branch) → done', async () => {
@@ -541,16 +554,22 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint', async () => {
-    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+  test('⑭c the checkpoint commit is unknown to GitHub (never pushed) → stays in review with a hint; once it is there, done', async () => {
+    const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
     const mock = new PullsMock({
       [w.prNumber]: { state: 'closed', merged: true, compare: 404 },
     });
-    await pollerFor(w, mock).sweep();
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
     expect(w.todoRow().phase).toBe('review');
     const hints = w.systemRows().filter((c) => c.includes('aaaaaaa'));
     expect(hints).toHaveLength(1);
     expect(hints[0]).toContain('GitHub 上找不到');
+    const spec = mock.pulls[w.prNumber];
+    if (spec !== undefined) spec.compare = 'ahead'; // the commit became visible: a 404 is not cached
+    await poller.sweep();
+    expect(mock.compareRequests()).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('done');
   });
 
   test('⑮a a merge step waiting for quota counts as in flight', async () => {
@@ -645,32 +664,35 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(rows.filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
   });
 
-  test('⑱b merged before the card entered review → left to the person, nothing written', async () => {
+  test('⑱b merged before the card reached review (auto-merge the moment CI went green) → done', async () => {
     const w = makeWorld({ phaseAt: Date.now() });
     const mock = new PullsMock({
       [w.prNumber]: {
         state: 'closed',
         merged: true,
+        mergeCommitSha: 'abc1234',
         mergedAt: new Date(Date.now() - 120_000).toISOString(),
       },
     });
     await pollerFor(w, mock).sweep();
-    expect(w.todoRow().phase).toBe('review');
-    expect(w.systemRows()).toEqual([]);
+    expect(w.todoRow().phase).toBe('done');
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`)),
+    ).toHaveLength(1);
   });
 
-  test('⑱c merged in the same second the card entered review (timestamps to the second) → done', async () => {
-    const enteredAt = Math.floor(Date.now() / 1000) * 1000 + 900;
-    const w = makeWorld({ phaseAt: enteredAt });
-    const mock = new PullsMock({
-      [w.prNumber]: {
-        state: 'closed',
-        merged: true,
-        mergedAt: new Date(enteredAt - 900).toISOString().replace(/\.\d{3}Z$/, 'Z'),
-      },
-    });
+  test('⑱c reopened done→review after the merge step finished it → not finished again', async () => {
+    const w = makeWorld({ connected: true });
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    finishTodoDone(w.s.svc, w.todoId, w.buildId); // the merge step's finish, no reconcile row
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
     await pollerFor(w, mock).sweep();
-    expect(w.todoRow().phase).toBe('done');
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().some((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`))).toBe(
+      false,
+    );
   });
 
   test('⑱d closed→review drag after the reconcile failed it → stays in review, errorMessage kept', async () => {
@@ -713,6 +735,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('review');
     const hints = w.systemRows().filter((c) => c.includes('feature-x'));
     expect(hints).toHaveLength(1);
+    expect(hints[0]).toContain('「feature-x」');
     expect(hints[0]).toContain('main');
   });
 
@@ -785,6 +808,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(mock.requests.some((u) => u.includes('/compare/'))).toBe(false);
     expect(w.todoRow().phase).toBe('review');
     expect(w.systemRows()).toHaveLength(1);
+    expect(w.systemRows()[0]).not.toContain('../../user');
   });
 
   test('㉖ requestMerge: the reconcile finishes the card during the PR probe → no merge step', async () => {
@@ -797,7 +821,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         res(200, '"p"', { number: Number(url.split('/').at(-1)), state: 'open', merged: false }),
       );
     };
-    await expect(requestMerge({ ...w.s.svc, githubFetch: probe }, w.buildId)).rejects.toThrow();
+    await expect(requestMerge({ ...w.s.svc, githubFetch: probe }, w.buildId)).rejects.toThrow(
+      'illegal phase transition: done -> done',
+    );
     expect(w.stepRows().filter((r) => r.kind === 'merge')).toEqual([]);
   });
 
@@ -809,7 +835,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     // runs inside the first await of the review action (readBuildChanges)
     w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
-    await expect(pending).rejects.toThrow();
+    await expect(pending).rejects.toThrow('读取变更期间任务相位已变为 done');
     expect(w.stepRows().filter((r) => r.kind === 'review')).toEqual([]);
     const announced = w.s.db
       .select()
@@ -818,6 +844,62 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       .all()
       .filter((r) => r.role === 'user');
     expect(announced).toEqual([]);
+  });
+
+  test('㉗ a merged response without base or default_branch is not taken as a merge into the default branch', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, noBase: true } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test.each(['pulls', 'compare'] as const)(
+    '㉘ a merge step starts while the %s read is in flight → no write',
+    async (at) => {
+      // without a checkpoint there is no compare read, so the pulls case stands alone
+      const w = makeWorld(at === 'compare' ? { checkpoint: 'a'.repeat(40) } : {});
+      const mock = new PullsMock({
+        [w.prNumber]: { state: 'closed', merged: true, compare: 'ahead' },
+      });
+      const startMerge = () =>
+        w.s.db
+          .insert(stepTable)
+          .values({
+            id: `step-m-${at}-${w.buildId}`,
+            buildId: w.buildId,
+            kind: 'merge',
+            status: 'pending',
+            createdAt: Date.now(),
+          })
+          .run();
+      const racing = (input: string | URL, init?: { headers?: Record<string, string> }) => {
+        if (at === 'pulls' && String(input).includes('/pulls/')) startMerge();
+        return mock.fetch(input, init);
+      };
+      if (at === 'compare') mock.onCompare = startMerge;
+      await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: racing }).sweep();
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.systemRows()).toEqual([]);
+    },
+  );
+
+  test('㉘c while compare is in flight the merge step finishes the card and a person reopens it → not finished again', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, compare: 'ahead' },
+    });
+    mock.onCompare = () => {
+      finishTodoDone(w.s.svc, w.todoId, w.buildId);
+      updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    };
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().some((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`))).toBe(
+      false,
+    );
   });
 
   test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {

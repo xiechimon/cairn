@@ -41,10 +41,11 @@
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
 // - 关闭未合并 → system 行 + build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
-// 只认卡进入 review 之后发生的合并/关闭（GitHub 的 merged_at / closed_at 到
-// 秒，按秒与 todo.phaseAt 比）：人在那之后把卡拖回 review（done→review 重开、
-// closed→review、failed→review 恢复）是人的决定，对账不再收尾一次。收尾时
-// 停掉没人领的 verify / review 步。
+// 每个 build 每种结局只收一次尾：本 build 已有完成行（合并步或对账收过尾）
+// 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收——人之后把卡
+// 拖回 review（done→review 重开、closed→review、failed→review 恢复）是人的
+// 决定。不看时钟：CI 一绿就合并（含 GitHub auto-merge）时卡在合并之后才进
+// review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
 import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
@@ -61,6 +62,7 @@ import {
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   type BuildDeps,
+  DONE_ROW,
   enqueueStep,
   finishTodoDone,
   maybeEnqueueVerifyStep,
@@ -214,8 +216,8 @@ interface CiPollTally {
   closedUnmerged: number;
   /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示一次，不收尾。 */
   hinted: number;
-  /** PR 的合并/关闭早于卡进入 review（人后来把卡拖回了 review）：交给人。 */
-  beforeReview: number;
+  /** 本 build 已为这个结局收过一次尾（人后来把卡拖回了 review）：交给人。 */
+  settledBefore: number;
 }
 
 /** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
@@ -257,15 +259,23 @@ export function createCiPoller(
     );
   }
 
-  /** 同一条提示只落一次（内容带提交 SHA）。 */
-  function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
-    const seen = deps.db
+  function systemRows(buildId: string): unknown[] {
+    return deps.db
       .select({ content: message.content })
       .from(message)
       .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
       .all()
-      .some((r) => r.content === content);
-    if (seen) return;
+      .map((r) => r.content);
+  }
+
+  /** 本 build 是否已为这个结局收过尾（完成行 / 对账的关闭行）。 */
+  function settled(buildId: string, merged: boolean, closedText: string): boolean {
+    return systemRows(buildId).includes(merged ? DONE_ROW : closedText);
+  }
+
+  /** 同一条提示只落一次（内容带提交 SHA）。 */
+  function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
+    if (systemRows(buildId).includes(content)) return;
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
       role: 'system',
@@ -367,10 +377,9 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    // 只认卡进入 review 之后的合并/关闭（GitHub 时间戳到秒，phaseAt 取整到秒）。
-    const outcomeAt = pull.merged ? pull.mergedAt : pull.closedAt;
-    if (outcomeAt === null || outcomeAt < Math.floor(fresh.phaseAt / 1000) * 1000) {
-      tally.beforeReview += 1;
+    const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
+    if (settled(cand.buildId, pull.merged, closedText)) {
+      tally.settledBefore += 1;
       return;
     }
     if (pull.merged) {
@@ -381,7 +390,7 @@ export function createCiPoller(
       if (pull.baseRef !== pull.defaultBranch) {
         hintOnce(
           cand.buildId,
-          `PR #${prNumber} 合并进了 ${pull.baseRef}，不是默认分支 ${pull.defaultBranch}，改动还没进 ${pull.defaultBranch}。任务留在审核关口，由人决定下一步。`,
+          `PR #${prNumber} 合并进了分支「${pull.baseRef}」，不是默认分支「${pull.defaultBranch}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
           tally,
         );
         return;
@@ -416,7 +425,11 @@ export function createCiPoller(
           // 404 不缓存：那个提交之后可能被推上去；其余结果对两个固定提交不会变。
           if (status !== 'missing') compareCache.set(cmpKey, status);
         }
-        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+        if (
+          freshReviewRow(cand.todoId, cand.buildId) === null ||
+          hasActiveStep(cand.buildId) ||
+          settled(cand.buildId, true, closedText)
+        ) {
           tally.skipped += 1;
           return;
         }
@@ -428,8 +441,8 @@ export function createCiPoller(
             status === 'missing'
               ? `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`
               : status === 'invalid'
-                ? `PR #${prNumber} 已在 GitHub 合并，但执行步回报的分支提交「${checkpoint.slice(0, 40)}」不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
-                : `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支，任务留在审核关口；需要的话重启任务，会新开分支与 PR。`,
+                ? `PR #${prNumber} 已在 GitHub 合并，但执行步回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
+                : `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支；任务留在审核关口，由人把这个提交另行合入默认分支。`,
             tally,
           );
           return;
@@ -450,7 +463,6 @@ export function createCiPoller(
       tally.merged += 1;
       return;
     }
-    const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
     insertMessageRow(deps, cand.buildId, {
       id: newRecordId(),
       role: 'system',
@@ -601,7 +613,7 @@ export function createCiPoller(
       merged: 0,
       closedUnmerged: 0,
       hinted: 0,
-      beforeReview: 0,
+      settledBefore: 0,
     };
     for (const cand of candidates) {
       try {

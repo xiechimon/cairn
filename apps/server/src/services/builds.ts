@@ -1793,6 +1793,9 @@ export function completeStep(
   finishTodoDone(deps, todoRow.id, buildRow.id);
 }
 
+/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本 build 是否已收过尾）。 */
+export const DONE_ROW = '🎉 任务已完成';
+
 /** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：相位 → done、
  * 完成行、拆卡波次推进。已 done 则不动（两个落点先后到达只收一次尾）。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
@@ -1802,7 +1805,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',
-    content: '🎉 任务已完成',
+    content: DONE_ROW,
     createdAt: nowMs(),
   });
   // #1250（ADR 0018 层 2）：done 落地即查拆卡波次——本卡是子项时推进其父的
