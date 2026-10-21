@@ -766,9 +766,9 @@ export const githubConnection = sqliteTable('github_connection', {
 // 里不生效，故此后按 drizzle 形状重建 build（或经 build.todoId 级联的 todo）的迁移，
 // DROP TABLE 的隐式删行会清空四表：那条迁移须先把闸行挪开再写回
 // （merge-gate-tables.test.ts F19 跑本迁移之后的全部迁移查这一点）。
-// 列形取自尚未合入 main 的 S1（packages/shared/src/records/merge-gate.ts、
-// services/merge-gate/digest.ts）与 S2（services/merge-gate/readiness.ts）；这里不
-// import 它们，词表以 $type 字面量照抄，各列注明对应的 S1/S2 类型。值域不设 CHECK：
+// 列形取自 S1（packages/shared/src/records/merge-gate.ts、
+// services/merge-gate/digest.ts）与 S2（services/merge-gate/readiness.ts）；schema
+// 不 import 闸代码，词表以 $type 字面量照抄，各列注明对应的 S1/S2 类型。值域不设 CHECK：
 // 词表随 S5a–S8 增长时不必重建表。内部表，无 wire record（INTERNAL_ONLY_TABLES）。
 
 /** S2 GateVerdictView['kind']。 */
