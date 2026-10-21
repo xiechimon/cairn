@@ -1,0 +1,2 @@
+## uid=0  pnpm exec vitest run test/runner-brief.test.ts (directory-swap injection)
+      Tests  11 passed (11)

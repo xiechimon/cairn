@@ -196,13 +196,23 @@ describe('workspace hook 原语（#1149）', () => {
     // 换脚本重跑（同一 cwd，凭证 null → env 无 GIT_CONFIG 注入）。
     // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
-    const without = await runWorkspaceHook({
-      cwd: root,
-      name: 'setup',
-      credentials: null,
-      timeoutMs: 30_000,
-      log: () => {},
-    });
+    // null 凭证 = 父 env 原样继承。父进程可能自带 GIT_CONFIG_*（云端容器的
+    // 代理配置），先摘掉再断言，测的是 runWorkspaceHook 自己不注入（#1458）。
+    const inherited = Object.keys(process.env).filter((k) => k.startsWith('GIT_CONFIG_'));
+    const saved = inherited.map((k) => [k, process.env[k]] as const);
+    for (const k of inherited) delete process.env[k];
+    let without: Awaited<ReturnType<typeof runWorkspaceHook>>;
+    try {
+      without = await runWorkspaceHook({
+        cwd: root,
+        name: 'setup',
+        credentials: null,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+    } finally {
+      for (const [k, v] of saved) process.env[k] = v;
+    }
     expect(without!.output).toContain('cred=unset');
   });
 
