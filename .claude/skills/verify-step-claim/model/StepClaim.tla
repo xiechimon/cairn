@@ -23,7 +23,7 @@ vars    == <<server, daemon, ex, ghosts, budgets>>
 
 None     == 0
 Statuses == {"pending", "claimed", "done", "failed", "stopped", "waiting_quota"}
-Stages   == {"idle", "preparing", "running", "reporting", "applying", "gone"}
+Stages   == {"idle", "preparing", "running", "reporting", "applying", "orphan", "gone"}
 Working  == {"preparing", "running"}
 Live     == {"preparing", "running", "reporting", "applying"}
 Outcomes == {"success", "failed", "stopped", "quota"}
@@ -77,7 +77,7 @@ Gone == [Idle EXCEPT !.stage = "gone"]
 
 Involved(m) ==
   \/ home = m \/ sm = m \/ journal[m] /= "none"
-  \/ \E e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Live
+  \/ \E e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Live \cup {"orphan"}
 
 KeepsFresh ==
   /\ sm /= NoMachine
@@ -85,7 +85,6 @@ KeepsFresh ==
   /\ \E e \in ExecIds : ex[e].mach = sm /\ ex[e].stage = "running" /\ ex[e].beat
 
 ----------------------------------------------------------------------------
-\* server: tryClaim (machines.ts) + daemon claim loop launching runStep
 
 TryClaim(m) ==
   /\ dm[m] = "up" /\ connected[m]
@@ -111,8 +110,6 @@ TryClaimResponseLost(m) ==
   /\ claims' = claims + 1
   /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
                  daemon, ex, staleApply, stopDelivered, partitions, crashes, rebinds>>
-
-\* daemon runStep: workspace.prepare done -> heartbeat timer + session handle
 
 StartSession(e) ==
   /\ ex[e].stage = "preparing"
@@ -148,11 +145,10 @@ FinishSession(e) ==
   /\ journal' = [journal EXCEPT ![m] = "awaiting"]
   /\ UNCHANGED <<server, connected, dm, handle, stopEvt, stopInHand, ghosts, budgets>>
 
-\* server: finishStep writes for the reported outcome, without re-checking step status
-
 ApplyOutcome(e) ==
-  LET m == ex[e].mach
-      o == ex[e].out IN
+  LET m       == ex[e].mach
+      o       == ex[e].out
+      orphan  == ex[e].stage = "orphan" IN
   /\ st' = CASE o = "quota"   -> "waiting_quota"
              [] o = "success" -> "done"
              [] o = "failed"  -> "failed"
@@ -162,15 +158,11 @@ ApplyOutcome(e) ==
   /\ staleApply' = (staleApply \/ holder /= e)
   /\ holder' = None
   /\ ex' = [ex EXCEPT ![e] = Gone]
-  /\ handle' = [handle EXCEPT ![m] = None]
-  /\ journal' = IF dm[m] = "down" THEN journal ELSE [journal EXCEPT ![m] = "none"]
-  /\ jout' = IF dm[m] = "down" THEN jout ELSE [jout EXCEPT ![m] = "none"]
+  /\ handle' = IF orphan THEN handle ELSE [handle EXCEPT ![m] = None]
+  /\ journal' = IF orphan THEN journal ELSE [journal EXCEPT ![m] = "none"]
+  /\ jout' = IF orphan THEN jout ELSE [jout EXCEPT ![m] = "none"]
   /\ UNCHANGED <<sm, fresh, progressed, phase, online, presenceFresh, home,
                  connected, dm, stopEvt, stopInHand, stopReq, stopDelivered, budgets>>
-
-\* server: finishStep up to its first await. Only a success body can carry prUrl
-\* (mergedPrElsewhere) or be a merge landing (applyMergeLanding); every other
-\* outcome runs ownedStep and the writes in one synchronous block.
 
 FinishStepOwnedCheck(e) ==
   LET m == ex[e].mach IN
@@ -185,14 +177,11 @@ FinishStepOwnedCheck(e) ==
             /\ UNCHANGED <<server, journal, jout, ghosts>>
   /\ UNCHANGED <<connected, dm, stopEvt, stopInHand, stopReq, budgets>>
 
-\* server: finishStep after its awaits
-
 FinishStepApply(e) ==
-  /\ ex[e].stage = "applying"
+  /\ ex[e].stage \in {"applying", "orphan"}
   /\ ApplyOutcome(e)
 
 ----------------------------------------------------------------------------
-\* scheduler tick: sweepStaleMachines; sweepAbandonedBuildSteps; sweepQuotaWaitSteps
 
 SchedulerTick ==
   LET online1  == [m \in Machines |-> online[m] /\ presenceFresh[m]]
@@ -217,7 +206,6 @@ SchedulerTick ==
                  daemon, ex, staleApply, stopDelivered, budgets>>
 
 ----------------------------------------------------------------------------
-\* user: stopActiveStepsAfterExit (close / mark done / back to todo)
 
 CloseCard ==
   /\ phase = "open"
@@ -234,8 +222,6 @@ CloseCard ==
                  connected, dm, handle, stopInHand, stopReq, journal, jout,
                  ex, ghosts, budgets>>
 
-\* daemon deliverStop: client.stop (server fetchStop) ...
-
 DeliverStopFetch(m) ==
   /\ stopEvt[m] /\ dm[m] = "up" /\ connected[m]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
@@ -245,8 +231,6 @@ DeliverStopFetch(m) ==
        ELSE UNCHANGED <<stopPending, stopInHand>>
   /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, online, presenceFresh, home,
                  connected, dm, handle, stopReq, journal, jout, ex, ghosts, budgets>>
-
-\* ... then sessionHandles.get(stepId)
 
 DeliverStopToHandle(m) ==
   /\ stopInHand[m]
@@ -260,7 +244,6 @@ DeliverStopToHandle(m) ==
                  holder, staleApply, budgets>>
 
 ----------------------------------------------------------------------------
-\* environment: time passing, network, daemon process, agent home machine
 
 HeartbeatAges ==
   /\ st = "claimed" /\ fresh /\ ~KeepsFresh
@@ -290,6 +273,14 @@ MarkPresence(m) ==
   /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, home,
                  daemon, ex, ghosts, budgets>>
 
+MachineStreamAbort(m) ==
+  /\ Involved(m)
+  /\ online[m]
+  /\ online' = [online EXCEPT ![m] = FALSE]
+  /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
+  /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, stopPending, presenceFresh, home,
+                 connected, dm, handle, stopInHand, stopReq, journal, jout, ex, ghosts, budgets>>
+
 Partition(m) ==
   /\ Involved(m)
   /\ connected[m] /\ partitions < MaxPartitions
@@ -311,18 +302,16 @@ DaemonCrash(m) ==
   /\ dm[m] /= "down" /\ crashes < MaxCrashes
   /\ dm' = [dm EXCEPT ![m] = "down"]
   /\ ex' = [e \in ExecIds |->
-              IF ex[e].mach = m /\ ex[e].stage \in {"preparing", "running", "reporting"}
-                THEN Gone
-                ELSE ex[e]]
+              IF ex[e].mach /= m THEN ex[e]
+              ELSE IF ex[e].stage \in {"preparing", "running", "reporting"} THEN Gone
+              ELSE IF ex[e].stage = "applying" THEN [ex[e] EXCEPT !.stage = "orphan"]
+              ELSE ex[e]]
   /\ handle' = [handle EXCEPT ![m] = None]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
   /\ stopReq' = [stopReq EXCEPT ![m] = FALSE]
   /\ crashes' = crashes + 1
   /\ UNCHANGED <<server, connected, journal, jout, ghosts, claims, partitions, rebinds>>
-
-\* daemon start: presence, then POST /api/machine/recover, resumed runStep is awaited
-\* before the push stream, the presence timer and the claim loop start
 
 DaemonStartRecover(m) ==
   /\ Involved(m)
@@ -369,7 +358,7 @@ Next ==
   \/ \E m \in Machines :
        \/ TryClaim(m) \/ TryClaimResponseLost(m)
        \/ DeliverStopFetch(m) \/ DeliverStopToHandle(m)
-       \/ PresenceAges(m) \/ MarkPresence(m)
+       \/ PresenceAges(m) \/ MarkPresence(m) \/ MachineStreamAbort(m)
        \/ Partition(m) \/ Reconnect(m)
        \/ DaemonCrash(m) \/ DaemonStartRecover(m) \/ DaemonRecoverDone(m)
        \/ RebindHomeMachine(m)
@@ -390,7 +379,6 @@ StateView ==
     ex, ghosts, budgets>>
 
 ----------------------------------------------------------------------------
-\* properties
 
 SingleExecutorPerMachine ==
   \A m \in Machines :
