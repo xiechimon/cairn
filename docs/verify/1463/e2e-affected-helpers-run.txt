@@ -1,0 +1,10 @@
+$ node ../../scripts/e2e-affected.mjs -- apps/web/e2e/helpers.ts
+[e2e:affected] changed paths (explicit):
+  apps/web/e2e/helpers.ts → imported by 17 specs
+[e2e:affected] 17/169 specs on the standard fixture-build config, E2E_PORT=8398
+  a11y-axe.spec.ts account-controls.spec.ts account-team-cleanse.spec.ts agent-desc-overflow.spec.ts avatar-dicebear.spec.ts cds-dialogs.spec.ts escape-wiring.spec.ts hotkeys.spec.ts notify-banner.spec.ts overlay-focus.spec.ts phase-chip-words.spec.ts registry-focus-ring.spec.ts search-close-flash.spec.ts search-focus.spec.ts search-live-project-name.spec.ts search-result-rows.spec.ts segmented-controls.spec.ts
+
+Running 160 tests using 2 workers
+
+
+  160 passed (1.5m)
