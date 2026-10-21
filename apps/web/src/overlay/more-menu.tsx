@@ -43,7 +43,7 @@ interface MoreMenuProps {
   /** #318: 关闭 = phase closed 落账;可关相位由页面层判定（canClose）。 */
   onCloseTask: () => void;
   canClose: boolean;
-  /** #1446: queued 卡的停止（停掉等机器的 pending 步，卡回待开始）——
+  /** #1446: queued 卡的停止（停掉等机器的 pending 步，卡回排队前的相位）——
    *  它没有 composer，停止钮无处可挂；缺省 = 行不渲染。 */
   onStop?: () => void;
   /** #701: 审核关口人肉打回（请求修改）——live review 静息态在场；缺省 =

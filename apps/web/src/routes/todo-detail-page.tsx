@@ -1051,7 +1051,7 @@ export function TodoDetailPage() {
         onCloseTask={closeTask}
         canClose={canClose}
         // #1446：queued 卡没有 composer，停止钮住更多菜单（停掉等机器的步，
-        // 卡回待开始）；其余相位缺省 = 行不渲染。
+        // 卡回排队前的相位）；其余相位缺省 = 行不渲染。
         onStop={
           live && phase === 'queued' && buildId != null
             ? () => {
@@ -1106,8 +1106,19 @@ export function TodoDetailPage() {
           // 乐观过渡态（r9 §3.3「正在停止…」）：确认即置位；终态由 SSE step
           // 事件重取回显（running 转 false 清旗标）。409 竞态（步已收尾）=
           // 数据面已前进，清旗标 + invalidateAll 重取即收敛。
+          // delegated:false = 服务端已当场停掉（pending / waiting_quota 步，#1261），
+          // 没有在途中断可等；waiting_quota 步不算 running，上面的清旗 effect
+          // 不会触发，不清就带到同 build 的下一步（#1446）。
           setStopping(true);
-          mutations.stopBuild.mutate({ buildId, discard }, { onError: () => setStopping(false) });
+          mutations.stopBuild.mutate(
+            { buildId, discard },
+            {
+              onSuccess: (res) => {
+                if (!res.delegated) setStopping(false);
+              },
+              onError: () => setStopping(false),
+            },
+          );
         }}
       />
       <AcceptDialog

@@ -13,7 +13,12 @@ import { evidencePanelShot } from './evidence';
 //      means nothing for a step that never ran) or sends nothing;
 //   3. 关闭 sends nothing;
 //   4. the change leaks to planning / building: a menu 停止 appears or 关闭
-//      turns on (their stop stays in the composer, 关闭 stays off mid-run).
+//      turns on (their stop stays in the composer, 关闭 stays off mid-run);
+//   5. a synchronous stop ({delegated:false}: the server stopped the step on
+//      the spot) leaves the page's 正在停止… flag set. A waiting_quota step
+//      never counts as running, so nothing clears it, and the next step on the
+//      same build (plan done → 确认 → build step) reads 正在停止… instead of
+//      处理中….
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
@@ -116,6 +121,64 @@ test('queued: 更多 offers 停止, and confirming it stops the build', async ({
   await expect.poll(() => sent.stops.map((s) => s.path)).toEqual([
     `/api/builds/${QUEUED.latestBuildId}/stop`,
   ]);
+});
+
+test('queued: a synchronous stop leaves no 正在停止… behind', async ({ page }) => {
+  const sent = await stubLiveBoot(page);
+  const buildId = QUEUED.latestBuildId;
+  const step = (id: string, kind: string, status: string, createdAt: number) => ({
+    id,
+    buildId,
+    kind,
+    machineId: status === 'claimed' ? 'machine-1' : null,
+    createdAt,
+    status,
+    checkpointCommit: null,
+    skillInjection: null,
+  });
+  const BUILD = {
+    id: buildId,
+    todoId: QUEUED.id,
+    withPlan: true,
+    prevPhase: null,
+    triggerSource: 'user',
+    planDocId: null,
+    errorMessage: null,
+    prUrl: null,
+    prNumber: null,
+    diffHash: null,
+    createdAt: STARTED_AT,
+  };
+  // Before the stop: the plan is done and the build step waits on quota. After
+  // it: that step is stopped and a later build step on the same build runs.
+  const before = [
+    step('step-plan', 'plan', 'done', STARTED_AT),
+    step('step-build', 'build', 'waiting_quota', STARTED_AT + 1),
+  ];
+  const after = [
+    step('step-plan', 'plan', 'done', STARTED_AT),
+    step('step-build', 'build', 'stopped', STARTED_AT + 1),
+    step('step-build-2', 'build', 'claimed', STARTED_AT + 2),
+  ];
+  await page.route(`**/api/builds/${buildId}`, (route) => route.fulfill({ json: BUILD }));
+  await page.route(`**/api/builds/${buildId}/steps`, (route) =>
+    route.fulfill({ json: sent.stops.length === 0 ? before : after }),
+  );
+  await page.route(`**/api/todos/${QUEUED.id}`, (route) =>
+    route.fulfill({
+      json: sent.stops.length === 0 ? QUEUED : { ...QUEUED, phase: 'building', v: QUEUED.v + 1 },
+    }),
+  );
+
+  await openMore(page, QUEUED.id, '排队中');
+  await row(page, '停止').click();
+  await page
+    .getByRole('dialog', { name: '停止排队？' })
+    .getByRole('button', { name: '停止', exact: true })
+    .click();
+  await expect(head(page).getByTestId('phase-chip')).toHaveText('执行中');
+  await expect(page.getByTestId('live-row')).toContainText('处理中');
+  await expect(page.getByTestId('live-row')).not.toContainText('正在停止');
 });
 
 test('queued: 更多 > 关闭 is enabled and closes the task', async ({ page }) => {

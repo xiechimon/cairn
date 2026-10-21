@@ -4,7 +4,8 @@
 // checkpoint）+ footer 取消/停止。仅 live 面接线（fixture 捕获面无后端，
 // 停止钮不挂 handler，DOM 字节不变）。
 // #1446 queued 档：等机器的步还没跑过，没有「本轮修改」可丢——换「停止排队？」
-// 头 + 一句去向说明，不出复选行。
+// 头 + 一句去向说明，不出复选行。去向 = 服务端 stopFallbackPhase（首轮回待开始，
+// 重跑回本轮起点如失败/已完成），故文案只说「排队前」。
 
 import { useState } from 'react';
 import { Button } from '../components/ui/button.js';
@@ -53,7 +54,7 @@ export function StopConfirmDialog({ open, onClose, onConfirm, queued }: StopConf
       }
     >
       {queued === true ? (
-        <p className="m-0 text-ui text-foreground">{t('任务回到待开始，之后可以再开始。')}</p>
+        <p className="m-0 text-ui text-foreground">{t('任务回到排队前的状态。')}</p>
       ) : (
         <div className="flex items-center gap-2">
           {/* XMON-72：与 accept-dialog 同族，收口 components/ui/checkbox 原语

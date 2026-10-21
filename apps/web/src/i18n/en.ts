@@ -134,8 +134,7 @@ export const EN: Record<string, string> = {
   '团队技能来自技能页面（共 {count} 个）': 'Team skills come from the Skills page ({count} total)',
   '停止当前这一轮？': 'Stop this round?',
   '停止排队？': 'Stop queueing?',
-  '任务回到待开始，之后可以再开始。':
-    'The task goes back to the To start column. You can start it again later.',
+  '任务回到排队前的状态。': 'The task goes back to where it was before it was queued.',
   '丢弃本轮修改——方案和代码回到上一个版本':
     'Discard this round’s changes — plan and code revert to the previous version',
   '把任务重置回待开始？': 'Reset the task back to Todo?',
