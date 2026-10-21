@@ -99,8 +99,8 @@ interface WorldOpts {
   prNumber?: number;
   /** 已完成的 CI 修复轮数（marker prompt 的 done 步）。 */
   fixRounds?: number;
-  /** 在飞修复步（pending/claimed；修复步在跑时检查读的是旧 head）。 */
-  activeFix?: 'pending' | 'claimed';
+  /** 在飞修复步（pending/claimed/等额度；修复步在跑时检查读的是旧 head）。 */
+  activeFix?: 'pending' | 'claimed' | 'waiting_quota';
   checks?: CheckSpec[];
   etag?: string;
   status?: number;
@@ -558,6 +558,35 @@ describe('#1150 ③ 修复步死循环闸（连续 N 轮仍红停手）', () => 
     await w.poller.sweep();
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(1);
+  });
+
+  test('#1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      activeFix: 'waiting_quota',
+    });
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps().map((r) => r.status)).toEqual(['waiting_quota']);
+  });
+
+  test('#1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-rework-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'waiting_quota',
+        createdAt: w.base,
+      })
+      .run();
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps()).toHaveLength(0);
   });
 
   test('#1403 没人领的 verify / review 步（排队中或等额度）不挡磨绿；已领取的照挡', async () => {

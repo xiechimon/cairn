@@ -97,9 +97,14 @@
 // 第七遍 /code-review 补的：
 //   [61] 已合并的响应缺合并判据要的字段（base、default_branch，有 checkpoint 时的
 //        head sha）→ 不当终态缓存，之后照常节流重读（不带那次响应的 etag）
+// pr-gate 第六轮补的：
+//   [62] PR 号是 daemon 按分支名查到的（gh pr list --head 只比分支名）：公开仓里
+//        别人 fork 的同名分支开的 PR 也会被读成本 build 的。head 仓（不分大小写）与
+//        head 分支都对上才写；对不上 → 不收尾、不打回，提示一次；缺这两个字段 → 读不到
+//   [63] 合并步经 completeStep 收尾（不是直接调 finishTodoDone）同样停掉没人领的 verify 步
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
-import type { Phase } from '@pacman/shared';
+import { conversationBranch, type Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -112,6 +117,7 @@ import {
 } from '../src/db/schema.js';
 import {
   applyBuildStepAction,
+  completeStep,
   DONE_ROW,
   finishTodoDone,
   requestMerge,
@@ -154,11 +160,19 @@ interface PullSpec {
   noBase?: boolean;
   /** 响应里没有 head（head 仓被删之类）。 */
   noHead?: boolean;
+  /** head.ref（缺省 = 世界里指向这张 PR 的 build 的工作分支，见 headRefs）。 */
+  headRef?: string;
+  /** head.repo.full_name（缺省 octo/demo）；null = head.repo 为 null（fork 被删）。 */
+  headRepo?: string | null;
   /** 响应里没有 merged 字段（被裁掉的响应体）。 */
   noMerged?: boolean;
   /** compare 的 status 按 base（checkpoint）区分；缺省回落 compare。 */
   compareByBase?: Record<string, string>;
 }
+
+/** PR 号 → 它的 head 分支（指向它的当前 build 的工作分支）：makeWorld 与 addReviewCard
+ * 登记，mock 缺省按它回 head.ref（[62] 前的测试读到的都是本 build 自己的 PR）。 */
+const headRefs = new Map<number, string>();
 
 /** pulls/{n} 端点 mock：按 PR 号回应；compare 按 spec 回应；其它 URL
  * （check-runs）一律 404，证明 review 候选不走磨绿面。 */
@@ -231,7 +245,13 @@ class PullsMock {
         ...(spec.noMerged ? {} : { merged: spec.merged }),
         merge_commit_sha: spec.mergeCommitSha ?? null,
         merged_by: spec.mergedBy === undefined ? null : { login: spec.mergedBy },
-        head: spec.noHead ? null : { sha: spec.headSha ?? 'f'.repeat(40) },
+        head: spec.noHead
+          ? null
+          : {
+              sha: spec.headSha ?? 'f'.repeat(40),
+              ref: spec.headRef ?? headRefs.get(Number(m[1])) ?? '',
+              repo: spec.headRepo === null ? null : { full_name: spec.headRepo ?? 'octo/demo' },
+            },
         merged_at: spec.merged ? (spec.mergedAt === undefined ? at : spec.mergedAt) : null,
         closed_at:
           spec.state === 'closed' ? (spec.closedAt === undefined ? at : spec.closedAt) : null,
@@ -285,6 +305,14 @@ function makeWorld(
   const todoId = `todo-rec-${rnd}`;
   const buildId = `build-rec-${rnd}`;
   const prNumber = opts.prNumber ?? 201;
+  headRefs.clear();
+  if (opts.olderClosedPr !== undefined) {
+    headRefs.set(opts.olderClosedPr, conversationBranch(`build-old-${rnd}`));
+  }
+  headRefs.set(prNumber, conversationBranch(buildId));
+  if (typeof opts.newerBuildPr === 'number') {
+    headRefs.set(opts.newerBuildPr, conversationBranch(`build-new-${rnd}`));
+  }
   s.db
     .insert(projectTable)
     .values({
@@ -455,6 +483,7 @@ const QUOTA_BLOCK: QuotaWaitRow = {
 /** Another review-phase todo with its own PR build in the same project. */
 function addReviewCard(w: World, prNumber: number): void {
   const id = `${w.todoId}-${prNumber}`;
+  headRefs.set(prNumber, conversationBranch(`b-${id}`));
   w.s.db
     .insert(todoTable)
     .values({
@@ -1632,6 +1661,87 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       expect(rows).toContain(DONE_ROW);
     },
   );
+
+  test.each([
+    ['closed', false],
+    ['merged', true],
+  ] as const)(
+    '[62a] a fork PR with the same branch name, %s → the card is neither failed nor finished; one hint',
+    async (_label, merged) => {
+      const w = makeWorld({ connected: true, inflight: 'pending', inflightKind: 'verify' });
+      const mock = new PullsMock({
+        [w.prNumber]: {
+          state: 'closed',
+          merged,
+          mergeCommitSha: 'abc1234',
+          headRepo: 'mallory/demo',
+        },
+      });
+      const info = vi.fn();
+      const poller = createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox },
+        { githubFetch: mock.fetch, logger: { info } },
+      );
+      await sweepTwice(poller);
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.buildRow().errorMessage).toBeNull();
+      expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
+      const rows = w.systemRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toContain(`PR #${w.prNumber}`);
+      expect(rows[0]).toContain(conversationBranch(w.buildId));
+      expect(rows[0]).not.toContain('mallory');
+      const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
+      expect(tally.reviewForeign).toBe(1);
+    },
+  );
+
+  test('[62b] a PR from another branch of the target repo → not finished', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, headRef: 'someone-elses-branch' },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toEqual([]);
+  });
+
+  test('[62c] the head repo is compared without case → Octo/Demo is the target repo', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, headRepo: 'Octo/DEMO' },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('done');
+  });
+
+  test('[62d] a merged response whose head repo is null (fork deleted) → not finished, no hint', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, headRepo: null } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[63] a merge step completing through completeStep stops an unclaimed verify step', () => {
+    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    const mergeStepId = `step-merge-done-${w.buildId}`;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: mergeStepId,
+        buildId: w.buildId,
+        kind: 'merge',
+        status: 'claimed',
+        createdAt: Date.now(),
+      })
+      .run();
+    completeStep(w.s.svc, mergeStepId);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('stopped');
+    expect(w.systemRows()).toContain(DONE_ROW);
+  });
 
   test('㊼ compare asks for one page', async () => {
     const w = makeWorld({ checkpoint: 'a'.repeat(40) });

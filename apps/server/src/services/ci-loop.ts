@@ -45,6 +45,10 @@
 // - 关闭未合并、隔一轮再读到仍关闭（为重跑 CI 关掉又重开 PR 不算）→ system
 //   行 + build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
+// - 写之前核对 PR 是本 build 的：PR 号是 daemon 按分支名查到的（gh pr list
+//   --head 只比分支名），公开仓里别人 fork 的同名分支开的 PR 也会被查到。head
+//   仓（owner/repo 不分大小写）是目标仓、head 分支是本 build 的工作分支才写；
+//   对不上 → 不收尾不打回，提示一次；响应缺这两个字段 → 按读不到。
 // 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
 // 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
 // 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收。人在报告之后把
@@ -239,6 +243,8 @@ interface CiPollTally {
   reviewSkipped: number;
   /** 对账：读不到（限流/404/网络/响应缺字段）：fail-open 下轮重试。 */
   reviewUnreadable: number;
+  /** 对账：PR 的 head 仓或分支不是本 build 的（例如 fork 的同名分支）：不写。 */
+  reviewForeign: number;
   /** PR 已在 GitHub 合并 → done。 */
   merged: number;
   /** PR 关闭未合并 → failed。 */
@@ -360,11 +366,6 @@ export function createCiPoller(
       !hasActiveStep(cand.buildId) &&
       !rowKnown(cand.buildId, DONE_ROW, since)
     );
-  }
-
-  /** 本轮（since 起）是否已报告过这个结局（完成行 / 对账的关闭行）。 */
-  function settled(buildId: string, merged: boolean, closedText: string, since: number): boolean {
-    return rowKnown(buildId, merged ? DONE_ROW : closedText, since);
   }
 
   /** 失败收尾：build.errorMessage 落因 + 发 build 文档 + todo → failed。 */
@@ -501,7 +502,25 @@ export function createCiPoller(
     }
     const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
     const since = roundStart(deps, cand.buildId);
-    if (settled(cand.buildId, pull.merged, closedText, since)) {
+    // PR 是本 build 的才写（见文件头）：缺字段的响应不当终态缓存（同下文合并判据）。
+    if (pull.headRepo === null || pull.headRef === null) {
+      pullCache.delete(key);
+      tally.reviewUnreadable += 1;
+      return;
+    }
+    const branch = conversationBranch(cand.buildId);
+    if (pull.headRepo.toLowerCase() !== target.fullName.toLowerCase() || pull.headRef !== branch) {
+      hintOnce(
+        cand.buildId,
+        `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`,
+        since,
+        tally,
+      );
+      tally.reviewForeign += 1;
+      return;
+    }
+    // 本轮（since 起）已报告过这个结局（完成行 / 对账的关闭行）→ 交给人。
+    if (rowKnown(cand.buildId, pull.merged ? DONE_ROW : closedText, since)) {
       tally.settledBefore += 1;
       return;
     }
@@ -785,6 +804,7 @@ export function createCiPoller(
       reviewPending: 0,
       reviewSkipped: 0,
       reviewUnreadable: 0,
+      reviewForeign: 0,
       merged: 0,
       closedUnmerged: 0,
       hinted: 0,

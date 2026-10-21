@@ -1881,7 +1881,7 @@ export function hasMessageRow(
 
 /** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：停掉没人领的
  * verify / review 步、相位 → done（已 done 则相位不动）、完成行、拆卡波次推进。
- * 对账在本轮已有完成行时不进这里（ci-loop settled），两个落点不会叠两行。 */
+ * 对账在本轮已有完成行时不进这里（ci-loop 的本轮已报告判据），两个落点不会叠两行。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
   // 到不了 done（人在合并步跑着时把卡关了）就先抛错，什么都不动（setTodoPhase
   // 同一判据）。
@@ -1901,7 +1901,7 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     if (record) deps.hub.publishTodoDoc(record.teamId, record);
   }
   // 完成行每次收尾都落（与改动前一致）：对账在本轮已有完成行时根本不收尾
-  // （ci-loop settled），同一轮里第二个合并步照旧再落一行。
+  // （ci-loop 的本轮已报告判据），同一轮里第二个合并步照旧再落一行。
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',

@@ -123,7 +123,7 @@ export function isFullSha(value: string): boolean {
 }
 
 /** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head
- * SHA、base 分支与仓库默认分支。 */
+ * SHA、head 分支与所在仓、base 分支与仓库默认分支。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
@@ -131,6 +131,10 @@ export interface GithubPull extends GithubPullState {
   mergedBy: string | null;
   /** PR head 分支当前的提交（合并后 = 合并时的 head）；响应缺失 = null。 */
   headSha: string | null;
+  /** PR head 的分支名（head.ref）与所在仓（head.repo.full_name，owner/repo）；fork 被删
+   * 时 head.repo 为 null，响应缺失同样 = null。 */
+  headRef: string | null;
+  headRepo: string | null;
   /** PR 的目标分支（base.ref）与仓库默认分支（base.repo.default_branch）；缺失 = null。 */
   baseRef: string | null;
   defaultBranch: string | null;
@@ -205,7 +209,7 @@ export async function githubPull(
     merged?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
-    head?: { sha?: unknown } | null;
+    head?: { sha?: unknown; ref?: unknown; repo?: { full_name?: unknown } | null } | null;
     base?: { ref?: unknown; repo?: { default_branch?: unknown } | null } | null;
   };
   // merged 缺失或不是布尔 → 读不到：不能把一次被裁掉的响应读成「关闭未合并」。
@@ -223,6 +227,8 @@ export async function githubPull(
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : null,
+      headRepo: typeof raw.head?.repo?.full_name === 'string' ? raw.head.repo.full_name : null,
       baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : null,
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,

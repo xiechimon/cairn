@@ -58,7 +58,9 @@ fan-out 行零渲染负向钉）。live 真值面 = `docs/verify/1250/`（drive-
 - `verify-step-chain` — review 关口抵达入队 verify 步（幂等）→ claim（new
   session + 材料 + agent 块 = verify 槽）→ done verifyVerdict → 消息行 +
   phase 不动。提取失败兜底「判定提取失败」上浮原因；两字段皆缺 =
-  「验证未返回结论」。
+  「验证未返回结论」。卡收尾时链断在这里：合并步成与 #1403 PR 对账收尾
+  （done / failed）都停掉本 build 没人领（排队中或等额度）的 verify /
+  review 步（`stopUnclaimedGateSteps`，步 → stopped），不在已收尾的卡上跑。
 - `review-fanout` — 无 agentId 的 review 动作按 persona 三员 fan-out；meta
   header agentId + 本视角重点；回落/400 两兜底；blocking 去重闸。
 - `split-todo` — 拆解三件（子卡+边/父方案文档/父停 confirm）+ 派发波次 +
