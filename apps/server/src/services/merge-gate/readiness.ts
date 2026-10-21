@@ -224,6 +224,8 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     block('patch-unbindable', digest.unavailable);
   }
   if (digest !== null && i.compareFiles !== null) {
+    // 上限按整张补丁算：证据也计入，改名记两个文件（口径在 digest.ts）。不要
+    // 换成 digest.kept 去数，那是摘要的口径，不是 D4 上限的口径。
     if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {
       block('size-cap', `${digest.countedLines} lines, ${digest.countedFiles} files`);
     }
@@ -231,6 +233,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     if (paths.protected.length > 0) block('protected-path', ...paths.protected);
     if (paths.outsideAutoMerge.length > 0) block('outside-auto-merge', ...paths.outsideAutoMerge);
     if (paths.deletedTests.length > 0) block('test-deleted', ...paths.deletedTests);
+    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);
     if (paths.otherTicketEvidence.length > 0)
       block('evidence-outside-ticket', ...paths.otherTicketEvidence);
     if (paths.executableEvidence.length > 0)

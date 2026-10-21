@@ -168,6 +168,12 @@ export const MERGE_BLOCKERS = [
   { code: 'protected-path', class: 'human', label: '改动命中 D4 保护路径' },
   { code: 'outside-auto-merge', class: 'human', label: '改动在可自动合并集之外' },
   { code: 'test-deleted', class: 'human', label: '删除了测试' },
+  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。
+  {
+    code: 'opaque-file',
+    class: 'human',
+    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',
+  },
   { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },
   { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },
   // 来源与证据

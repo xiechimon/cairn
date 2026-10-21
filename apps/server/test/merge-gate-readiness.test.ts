@@ -10,6 +10,9 @@
 // GitHub 还报 clean 时放过手上检查清单里别家未通过的检查；unstable 却看不到
 // 任何未通过的检查也放过；同摘要上后来的通过清不掉 evidence_invalid；读不到
 // 默认分支被当成目标分支不对而留人。
+// S1 第三轮（D4 在 #1410 上的修订）之后：证据目录外看不到 diff 的文件（二进制、
+// diff 过大、纯改名）被放过；证据目录里的截图被当成看不到 diff 而留人；800 行 /
+// 40 文件上限只数证据之外的部分。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿）。
 
 import { type CompareFile, MERGE_BLOCKER_CODES, type MergeBlockerCode } from '@pacman/shared';
@@ -265,6 +268,19 @@ const ROWS: Row[] = [
   [
     'test-deleted',
     (i) => setFiles(i, [...FILES, file('apps/server/test/old.test.ts', { status: 'removed' })]),
+  ],
+  [
+    'opaque-file',
+    (i) =>
+      setFiles(i, [
+        ...FILES,
+        file('apps/web/src/assets/logo.png', {
+          status: 'added',
+          additions: 0,
+          deletions: 0,
+          hasPatch: false,
+        }),
+      ]),
   ],
   ['evidence-outside-ticket', (i) => setFiles(i, [...FILES, file('docs/verify/926/x.json')])],
   [
@@ -696,5 +712,84 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
     expect(mergeReadiness(i).blockers.map((b) => [b.code, b.class])).toEqual([
       ['base-not-default', 'human'],
     ]);
+  });
+});
+
+describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后）', () => {
+  const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
+    file(filename, { status: 'added', additions: 0, deletions: 0, hasPatch: false, ...over });
+  const many = (n: number, at: (k: number) => string, over: Partial<CompareFile> = {}) =>
+    Array.from({ length: n }, (_, k) => file(at(k), { additions: 1, deletions: 0, ...over }));
+
+  test('证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）', () => {
+    const i = green();
+    setFiles(i, [
+      ...FILES,
+      opaque('apps/web/src/assets/logo.png'),
+      opaque('apps/server/src/b.ts', {
+        status: 'renamed',
+        previousFilename: 'apps/server/src/a.ts',
+      }),
+    ]);
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.blockers).toEqual([
+      {
+        code: 'opaque-file',
+        class: 'human',
+        label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',
+        detail: ['apps/web/src/assets/logo.png', 'apps/server/src/b.ts', 'apps/server/src/a.ts'],
+      },
+    ]);
+  });
+
+  test('证据目录里的截图（没有 patch）不留人', () => {
+    const i = green();
+    setFiles(i, [...FILES, opaque('docs/verify/1404/shot.png')]);
+    expect(codesOf(i)).toEqual([]);
+  });
+
+  test('opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前', () => {
+    const i = green();
+    setFiles(i, [
+      ...FILES,
+      file('docs/verify/926/x.json'),
+      opaque('apps/web/src/assets/logo.png'),
+      file('apps/server/test/old.test.ts', { status: 'removed' }),
+      file('apps/server/drizzle/0044_x.sql', { status: 'added' }),
+    ]);
+    expect(codesOf(i)).toEqual([
+      'protected-path',
+      'test-deleted',
+      'opaque-file',
+      'evidence-outside-ticket',
+    ]);
+  });
+
+  test('40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦', () => {
+    const withEvidence = (code: number) => {
+      const i = green();
+      setFiles(i, [
+        ...many(code, (k) => `apps/server/src/f${k}.ts`),
+        ...many(10, (k) => `docs/verify/1404/e${k}.txt`, { status: 'added' }),
+      ]);
+      return classesOf(i);
+    };
+    expect(withEvidence(30)).toEqual([]);
+    expect(withEvidence(35)).toEqual([['size-cap', 'human', '45 lines, 45 files']]);
+  });
+
+  test('800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦', () => {
+    const withEvidence = (n: number) => {
+      const i = green();
+      setFiles(i, [
+        file('apps/server/src/a.ts', { additions: 699, deletions: 0 }),
+        file('apps/server/test/a.test.ts', { additions: 1, deletions: 0 }),
+        file('docs/verify/1404/log.txt', { status: 'added', additions: n, deletions: 0 }),
+      ]);
+      return classesOf(i);
+    };
+    expect(withEvidence(100)).toEqual([]);
+    expect(withEvidence(101)).toEqual([['size-cap', 'human', '801 lines, 3 files']]);
   });
 });
