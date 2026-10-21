@@ -1,5 +1,6 @@
 // drive-1137-webhook-tracer.mjs — #1137 GitHub webhook → 建 todo + orchestrate
-// 事件入口 tracer 探针（纯 live 栈 + 真出站一次，零 daemon 零 LLM 零浏览器）。
+// 事件入口 tracer 探针（纯 live 栈 + 真出站读 GitHub：issue 详情、标签、打标人
+// 权限；零 daemon 零 LLM 零浏览器）。
 //
 // 票面（xiechimon/pacman#1137）：POST /api/webhook/github/:token 收 GitHub
 // issues 事件（labeled + 触发 label `pacman`）→ 建 todo（importGithubIssue
@@ -9,6 +10,14 @@
 // （chief_thread/chief_message/step 行）。失败路径：错 token 401、重复投递
 // （60s 窗口）、同 issue 重放（sourceRef 409 → 202 duplicate）、ping noop、
 // 非触发 label ignored、repo 未映射 misconfigured。
+// #1459（ADR 0021 D5）起投递带 sender（打标人），receiver 先核 sender 在
+// VERIFY_GITHUB_REPO 上是 triage 及以上、项目没到在飞上限（3）才导入；拒收一律
+// 202。本探针活体覆盖其中三种：no-sender（载荷不带 sender）、sender-below-
+// triage（sender = ghost，GitHub 认不出人时的占位账号，permission 404）、at-cap
+// （直插两张在飞的 github-issue 卡凑满 3 张）。permission-unreadable（权限读
+// 5xx / 超时 / 形坏）与 rate-limited（429 / 带限流信号的 403）对真 GitHub 造不
+// 出来，由 apps/server/test/webhook.test.ts 的 W4 / W4b 覆盖。打标人权限类拒收
+// 的 202 detail 是同一句（不说哪种），原因码只在 server.log。
 //
 // 铺底走真 REST（POST /api/projects + POST /api/teams/:id/webhook-tokens）+
 // 服务模块直达（github connection / agent / chief 行——REST 面无 connection
@@ -18,9 +27,13 @@
 // env：VERIFY_REPO_ROOT（stack 所在 worktree；缺省 = 本脚本所在仓）、
 //      VERIFY_RUN_DIR（缺省 <REPO>/.claude/verify-run，读 ports.json）、
 //      VERIFY_EVIDENCE_DIR（缺省 <REPO>/.claude/verify-evidence/<ts>-1137）、
-//      GH_WEBHOOK_VERIFY_TOKEN（GitHub connection token，真出站拉 issue 用；
-//      不落任何证据文件）、VERIFY_GITHUB_REPO（缺省 xiechimon/pacman）、
-//      VERIFY_GITHUB_ISSUE（缺省 1137）。
+//      GH_WEBHOOK_VERIFY_TOKEN（GitHub connection token，真出站拉 issue 与读
+//      打标人权限用；不落任何证据文件）、VERIFY_GITHUB_REPO（缺省
+//      xiechimon/pacman）、VERIFY_GITHUB_ISSUE（缺省 1137）、
+//      VERIFY_GITHUB_SENDER（投递的 sender：在 VERIFY_GITHUB_REPO 上有 triage、
+//      write、maintain 或 admin 的 login，且 GH_WEBHOOK_VERIFY_TOKEN 读得到它的
+//      权限；缺省 = VERIFY_GITHUB_REPO 的 owner 段，个人仓的仓主是 admin，组织仓
+//      必须显式给）。
 // 前置：launch.mjs 已起栈。运行：vp.mjs drive github-webhook webhook-tracer --force，
 //      或 cd apps/server && pnpm exec tsx <本脚本>（仓根没有 tsx，#1402 实测；
 //      服务模块 import 一律 file:// 绝对 URL——bare 依赖从 apps/server 解析，
@@ -41,6 +54,8 @@ const KEYFILE = join(stack.homeDir, 'server', 'secretbox.key');
 const GH_TOKEN = process.env.GH_WEBHOOK_VERIFY_TOKEN;
 const REPO_FULL = process.env.VERIFY_GITHUB_REPO ?? 'xiechimon/pacman';
 const ISSUE_NUMBER = Number(process.env.VERIFY_GITHUB_ISSUE ?? 1137);
+// #1459：打标人（webhook sender），须在 REPO_FULL 上 triage 及以上。
+const SENDER = process.env.VERIFY_GITHUB_SENDER ?? REPO_FULL.split('/')[0];
 const SOURCE_REF = `github:${REPO_FULL}#${ISSUE_NUMBER}`;
 
 const ts = new Date().toISOString().replaceAll(/[:.]/g, '-');
@@ -98,6 +113,7 @@ function labeledPayload(overrides = {}) {
     issue: { number: ISSUE_NUMBER },
     label: { name: 'pacman' },
     repository: { full_name: REPO_FULL },
+    sender: { login: SENDER, type: 'User' },
     ...overrides,
   };
 }
@@ -238,10 +254,42 @@ const misconf = await receiver(hookToken, 'issues', dMisconf, labeledPayload({ r
 save('10-misconfigured.json', { deliveryId: dMisconf, ...misconf });
 check('I1 repo 未映射 202 misconfigured（不喂重试风暴）', misconf.status === 202 && misconf.body?.result === 'misconfigured', `status=${misconf.status} result=${misconf.body?.result}`);
 
+// —— #1459 拒收（ADR 0021 D5 + 在飞上限）：一律 202，不导入 ——————————————
+const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
+const todosNow = () => db.select().from(schema.todo).all().filter((r) => r.sourceKind === 'github-issue').length;
+const beforeRefusals = todosNow();
+
+// 投递 8：载荷不带 sender → no-sender（零出站）
+const dNoSender = randomUUID();
+const { sender: _dropped, ...withoutSender } = labeledPayload();
+const noSender = await receiver(hookToken, 'issues', dNoSender, withoutSender);
+save('12-no-sender.json', { deliveryId: dNoSender, ...noSender });
+check('K1 载荷不带 sender 202 ignored「event has no sender」（no-sender）', noSender.status === 202 && noSender.body?.result === 'ignored' && noSender.body?.detail === 'event has no sender', `status=${noSender.status} result=${noSender.body?.result}`);
+
+// 投递 9：sender = ghost（permission 404 = 不到 triage）→ sender-below-triage
+const dGhost = randomUUID();
+const ghost = await receiver(hookToken, 'issues', dGhost, labeledPayload({ sender: { login: 'ghost', type: 'User' } }));
+save('13-sender-below-triage.json', { deliveryId: dGhost, ...ghost });
+check('K2 sender 不到 triage 202 ignored，detail 不说是哪种拒收（sender-below-triage）', ghost.status === 202 && ghost.body?.result === 'ignored' && ghost.body?.detail === SENDER_REFUSED_DETAIL, `status=${ghost.status} detail=${ghost.body?.detail}`);
+
+// 投递 10：项目凑满在飞上限（已导入 1 张 + 直插 2 张在飞卡）→ at-cap（零出站）
+let seq = 900_000;
+for (const n of [990_001, 990_002]) {
+  seq += 1;
+  db.insert(schema.todo)
+    .values({ id: `todo-verify-1459-${n}`, teamId, projectId, title: `verify at-cap ${n}`, spec: '', phase: 'todo', phaseAt: Date.now(), seqNum: seq, sourceKind: 'github-issue', sourceRef: `github:${REPO_FULL}#${n}`, createdBy: userRow.id })
+    .run();
+}
+const dCap = randomUUID();
+const atCap = await receiver(hookToken, 'issues', dCap, labeledPayload());
+save('14-at-cap.json', { deliveryId: dCap, ...atCap });
+check('K3 项目到在飞上限 202 ignored（at-cap）', atCap.status === 202 && atCap.body?.result === 'ignored' && atCap.body?.detail === 'project at the in-flight cap (3 open github-issue tasks)', `status=${atCap.status} detail=${atCap.body?.detail}`);
+check('K4 三种拒收都没建卡', todosNow() === beforeRefusals + 2, `github-issue todos=${todosNow()} (before=${beforeRefusals}, +2 seeded for K3)`);
+
 // —— 请求段日志：pino 每投递一条结构化记录（pretty 多行形态：头行 msg +
 // deliveryId 行 + result 行），按 deliveryId 键落 server.log ————————————
 const serverLog = readFileSync(join(RUN_DIR, 'server.log'), 'utf8');
-const consumed = [dCreated, dReplay, dPing, dLabel, dMisconf];
+const consumed = [dCreated, dReplay, dPing, dLabel, dMisconf, dNoSender, dGhost, dCap];
 const lines = serverLog.split('\n');
 const deliveryLineIdx = lines.map((l, i) => ({ l, i })).filter(({ l }) => consumed.some((d) => l.includes(d)));
 const keep = new Set();
