@@ -1,0 +1,68 @@
+{
+  "status": "ahead",
+  "ahead_by": 1,
+  "behind_by": 0,
+  "total_commits": 1,
+  "base_commit": {
+    "sha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac"
+  },
+  "merge_base_commit": {
+    "sha": "66d5022e374da641ed37ca59ec4fa1c089cb1fac"
+  },
+  "commits": [
+    {
+      "sha": "23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458"
+    }
+  ],
+  "files": [
+    {
+      "filename": "apps/server/src/services/builds.ts",
+      "status": "modified",
+      "additions": 47,
+      "deletions": 19,
+      "changes": 66
+    },
+    {
+      "filename": "apps/server/test/close-stops-active-steps.test.ts",
+      "status": "modified",
+      "additions": 154,
+      "deletions": 3,
+      "changes": 157
+    },
+    {
+      "filename": "docs/verify/1453/README.md",
+      "status": "added",
+      "additions": 39,
+      "deletions": 0,
+      "changes": 39
+    },
+    {
+      "filename": "docs/verify/1453/server-suite.txt",
+      "status": "added",
+      "additions": 12,
+      "deletions": 0,
+      "changes": 12
+    },
+    {
+      "filename": "docs/verify/1453/server-test-new-leg.txt",
+      "status": "added",
+      "additions": 9,
+      "deletions": 0,
+      "changes": 9
+    },
+    {
+      "filename": "docs/verify/1453/server-test-old-leg.txt",
+      "status": "added",
+      "additions": 103,
+      "deletions": 0,
+      "changes": 103
+    },
+    {
+      "filename": "docs/verify/1453/server-test-review-old-leg.txt",
+      "status": "added",
+      "additions": 110,
+      "deletions": 0,
+      "changes": 110
+    }
+  ]
+}
