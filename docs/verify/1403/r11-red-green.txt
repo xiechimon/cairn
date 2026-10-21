@@ -1,0 +1,44 @@
+# #1403 round 11 (fifth /code-review pass on #1414): red against the sources of 5942e4a, green at 9be90a7.
+# The 13 failing cases are the ones this round adds or changes: [49] to [56], plus ② (a close now needs a
+# second read), ㊴ and ㊻ (their budgets now leave room for a compare and name the per-IP total).
+
+== red ==
+# round 11 tests (final) against the sources of 5942e4a: ci-loop.ts, builds.ts and github.ts copied in with git show, run, copied back
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+     × ② closed without merge → todo failed with the cause on the build 37ms
+     × ㊴ anonymous: reads across all PRs stay under a per-hour budget 35ms
+     × ㊻ anonymous: the grind's check-runs reads count against the same budget 36ms
+     × [49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped 33ms
+     × [49] the merge step finishes a card a person already marked done: the done card is published without the quota wait of the verify step it stopped 32ms
+     × [50] anonymous: a pulls read waits until the budget also has room for the compare it may need 32ms
+     × [51] closed, then reopened before the next read (a close and reopen to rerun CI) → not failed 39ms
+     × [52] a closed response without a merged field is unreadable, not a close 30ms
+     × [53] a merge step starts during the second unreadable compare → no hint 32ms
+     × [53] the merge step finishes the card and a person reopens it during the second unreadable compare → no hint 33ms
+     × [54] a second merge step in the same round writes its completion row again, as before this change 34ms
+     × [55] the sweep log counts the reconcile apart from the grind 35ms
+     × [56] anonymous: the grind's reads count toward the per-IP total, not the reconcile's own share 33ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+AssertionError: expected [ …(3) ] to have a length of 2 but got 3
+AssertionError: expected [ Array(1) ] to have a length of +0 but got 1
+AssertionError: expected { kind: 'quota', …(4) } to be null
+AssertionError: expected undefined to be 'done' // Object.is equality
+AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+AssertionError: expected [ Array(1) ] to deeply equal []
+AssertionError: expected [ '🎉 任务已完成' ] to have a length of 2 but got 1
+AssertionError: expected 1 to be +0 // Object.is equality
+AssertionError: expected [] to have a length of 1 but got +0
+ Test Files  1 failed | 1 passed (2)
+      Tests  13 failed | 86 passed (99)
+
+== green at 9be90a7 ==
+$ pnpm exec vitest run test/pr-reconcile.test.ts test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  99 passed (99)
+
+# One run of the two files during this round, on the same tree as the green run, failed one ci-loop case
+# ("批量对账：3 候选一轮 = 3 个条件 GET ... + 对账行落日志"); the output kept only the test name. The next 14
+# runs of both files passed 99 of 99 (10 of them in a loop for this check). Not explained, not reproduced.
