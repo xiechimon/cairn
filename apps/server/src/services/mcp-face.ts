@@ -125,6 +125,15 @@ function requireProjectRow(db: Db, projectId: string, teamId: string) {
   return row;
 }
 
+function requireTeamAgent(db: Db, agentId: string, teamId: string) {
+  const row = db
+    .select({ id: agent.id })
+    .from(agent)
+    .where(and(eq(agent.id, agentId), eq(agent.teamId, teamId)))
+    .get();
+  if (!row) throw new HttpError(404, `agent ${agentId}`);
+}
+
 function requireTeamTodo(db: Db, todoId: string, teamId: string) {
   const row = db
     .select()
@@ -213,8 +222,8 @@ export async function executeMcpTool(
     case 'conversation': {
       // Read progress：最新构建完整对话含流式（02 §7.2 六能力组）；chief 会话
       // 同族可读（r5 §3.6 端点族）。
-      // 团队归属（#1470）：chief thread 行带 teamId；build 对话经 build → todo
-      // 联查（requireTeamBuild 同律）。跨团队与不存在同 404。
+      // 团队归属（#1470）：chief thread 行带 teamId；build 对话 id ≡ buildId，
+      // 走 requireTeamBuild。跨团队与不存在同 404。
       const conversationId = str(args, 'conversationId');
       if (isChiefConversation(conversationId)) {
         const thread = db
@@ -233,13 +242,7 @@ export async function executeMcpTool(
           rows.map((r) => ({ id: r.id, role: r.role, content: r.content, createdAt: r.createdAt })),
         );
       }
-      const owned = db
-        .select({ id: build.id })
-        .from(build)
-        .innerJoin(todo, eq(todo.id, build.todoId))
-        .where(and(eq(build.id, conversationId), eq(todo.teamId, ctx.teamId)))
-        .get();
-      if (!owned) throw new HttpError(404, `conversation ${conversationId}`);
+      requireTeamBuild(db, conversationId, ctx.teamId);
       const rows = db
         .select()
         .from(message)
@@ -356,9 +359,12 @@ export async function executeMcpTool(
         plan: assignmentIn?.plan?.agentId ? { agentId: assignmentIn.plan.agentId } : null,
         build: assignmentIn?.build?.agentId ? { agentId: assignmentIn.build.agentId } : null,
       };
-      // 逐卡校验先于任何派工（#1470，chief run_builds 同律）：本队任务指向他队
-      // 项目在建 build 之前就 404，整批不动——否则 build 建在他队项目上，claim
-      // 载荷带他队仓库与本队 GitHub 凭证。
+      // 逐项校验先于任何派工（#1470，chief run_builds 同律）：指派 Agent 须是
+      // 本队的；本队任务指向他队项目在建 build 之前就 404，整批不动——否则
+      // build 建在他队项目上，claim 载荷带他队仓库与本队 GitHub 凭证。
+      for (const slot of [assignment.plan, assignment.build]) {
+        if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
+      }
       const rows = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
         requireProjectRow(db, row.projectId, ctx.teamId);

@@ -11,11 +11,14 @@
 //  U6 clone URL：存量 githubRepo 不合法（`../user`）时仍拼出
 //     `https://github.com/../user.git`，claim 载荷与项目记录都带它。
 //  U7 同团队路径不变。
+//  U8 MCP run_builds：assignment 指派他队 Agent——他队机器领到本队仓库与凭证。
+//  U9 chief 信封 context.tokens：累加全部 `chief-%` 行（他队 chief 回合也算）。
 
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
   agentMemory,
+  agent as agentTable,
   build as buildTable,
   chiefMessage,
   chiefThread,
@@ -28,6 +31,7 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
+import { getChiefEnvelope } from '../src/services/chief.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { hasRepoBinding, projectRepoRef, toProjectRecord } from '../src/services/git.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
@@ -196,6 +200,23 @@ describe('#1470 MCP run_builds / schedule_todo：任务所指项目也核团队'
     );
   });
 
+  test('U8 run_builds：指派他队 Agent → 404 agent，一个 build 都不建', async () => {
+    H.s.db
+      .insert(agentTable)
+      .values({ id: 'agent-b-1470', teamId: TEAM_B, displayName: 'b', provider: 'p', modelId: 'm' })
+      .run();
+    const before = buildsOf(OWN_TASK);
+    const err = await rejection(
+      mcp('run_builds', {
+        todoIds: [OWN_TASK],
+        assignment: { build: { agentId: 'agent-b-1470' } },
+      }),
+    );
+    expect(err.status).toBe(404);
+    expect(err.message).toBe('agent agent-b-1470');
+    expect(buildsOf(OWN_TASK)).toBe(before);
+  });
+
   test('U2 schedule_todo：本队任务指向他队项目 → 404 project，不建定时', async () => {
     const err = await rejection(
       mcp('schedule_todo', { todoId: CROSS, kind: 'once', at: nextQuarter() }),
@@ -249,6 +270,13 @@ describe('#1470 chief usage：只回本队 build 与本队 chief 回合的行', 
     expect(await relay('usage', { buildId: THREAD_B })).toEqual([]);
     const own = (await relay('usage', { buildId: OWN_BUILD })) as { input: number }[];
     expect(own.map((r) => r.input)).toEqual([1]);
+  });
+});
+
+describe('#1470 chief 信封 context.tokens：只计本 chief 的 thread', () => {
+  test('U9 他队 chief 回合不进读数', () => {
+    const svc = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
+    expect(getChiefEnvelope(svc, H.teamId).context?.tokens).toBe(2);
   });
 });
 

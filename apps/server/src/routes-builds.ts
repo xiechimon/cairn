@@ -181,7 +181,9 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     let projectId: string | null = null;
     if (todoRow.projectId !== null) {
       const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
-      if (projRow) {
+      // 项目须与任务同队（#1470）：他队项目视同无项目，不把他队仓库的 URL
+      // 下发到本队机器。
+      if (projRow && projRow.teamId === todoRow.teamId) {
         projectId = projRow.id;
         // 派生单源 = git.projectRepoRef（#1470：github 存量值不合法 = 无 URL）；
         // local 形态不经 clone 同步，照旧 null。
