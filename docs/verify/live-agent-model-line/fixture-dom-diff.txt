@@ -1,0 +1,6 @@
+fixture-dom-dump.mjs on vite build --mode fixture, 5 chip popovers (innerHTML + agent row text), 10 dumps
+origin/main e6582946:
+  77ed67e1d96b1cec3f9dddb868258cabc77adb77
+this branch d6164d28:
+  77ed67e1d96b1cec3f9dddb868258cabc77adb77
+cmp: identical

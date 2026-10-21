@@ -431,6 +431,7 @@ export function AgentDetailPage() {
                     onValueChange={(next) => patch({ defaultSkill: next })}
                   >
                     <SelectTrigger
+                      aria-label={t('默认 skill')}
                       className={cn('agent-skill-select', SETTINGS_SELECT_TRIGGER_CLS)}
                     >
                       <SelectValue>
@@ -459,6 +460,7 @@ export function AgentDetailPage() {
                     = custom provider id。换一级清二级（modelId 只在 provider 内
                     有意义）。 */}
                   <AgentRuntimeSelect
+                    ariaLabel={t('运行时')}
                     value={runtimeValue}
                     options={modelOptions}
                     onPick={(next) => {
@@ -478,6 +480,7 @@ export function AgentDetailPage() {
                 </SettingsRow>
                 <SettingsRow label={t('模型')} labelClassName="agent-field-label">
                   <AgentModelSelect
+                    ariaLabel={t('模型')}
                     provider={runtimeValue}
                     modelId={agent.modelId}
                     options={modelOptions}
@@ -492,6 +495,7 @@ export function AgentDetailPage() {
                     onValueChange={(next) => patch({ thinkingLevel: next })}
                   >
                     <SelectTrigger
+                      aria-label={t('思考强度')}
                       className={cn('agent-thinking-select', SETTINGS_SELECT_TRIGGER_CLS)}
                     >
                       <SelectValue>

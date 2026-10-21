@@ -7,6 +7,8 @@
 // 契约 = 冻结面只允许素材替换计划 §3.4 的品牌槽 divergence——manifest
 // name/short_name = Pacman + description 自写 + sw.js 通知兜底标题 =
 // Pacman；其余字段/字节仍须与 docs/research/assets/r1/ 原件逐字节一致。
+// #1430 追加 divergence：theme_color / background_color 对齐 Paper 暗色
+// canvas token（manifest 不支持 media，取默认暗档 #1a1612）。
 // #249 素材核账追加两处 divergence（D8 批次收口）：related_applications
 // 原站指针整段移除（产品无关联应用可指）；screenshots 换复刻 UI 实拍
 // （scripts/capture-pwa-screenshots.mjs）+ 自写 label，且文件必须真在
@@ -33,6 +35,9 @@ const MANIFEST_BRAND = {
 /** manifest screenshots 自写 label（#249；capture 脚本再生时同步此处）。 */
 const MANIFEST_SCREENSHOT_LABEL = 'Pacman task board — humans direct, agents execute';
 
+/** manifest theme_color / background_color（#1430：Paper 暗色 --canvas）。 */
+const MANIFEST_DARK_PAPER = '#1a1612';
+
 describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => {
   it('manifest.webmanifest diverges only in the §3.4 brand slots + #249 D8 收口两处', () => {
     const original = JSON.parse(readFileSync(resolve(R1_DIR, 'manifest.webmanifest'), 'utf8'));
@@ -40,6 +45,9 @@ describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => 
     expect(shipped.name).toBe(MANIFEST_BRAND.name);
     expect(shipped.short_name).toBe(MANIFEST_BRAND.shortName);
     expect(shipped.description).toBe(MANIFEST_BRAND.description);
+    // #1430：manifest 无 media，取默认暗档 Paper token
+    expect(shipped.theme_color).toBe(MANIFEST_DARK_PAPER);
+    expect(shipped.background_color).toBe(MANIFEST_DARK_PAPER);
     // #249：原站 related_applications 指针移除，产品面无关联应用可指
     expect(shipped.related_applications).toBeUndefined();
     // #249：screenshots = 复刻 UI 实拍 + 自写 label，文件真在 public/
@@ -69,6 +77,8 @@ describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => 
       description: _d,
       related_applications: _ra,
       screenshots: _sc,
+      theme_color: _tc,
+      background_color: _bc,
       ...restShipped
     } = shipped;
     const {
@@ -77,6 +87,8 @@ describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => 
       description: _od,
       related_applications: _ora,
       screenshots: _osc,
+      theme_color: _otc,
+      background_color: _obc,
       ...restOriginal
     } = original;
     expect(restShipped).toEqual(restOriginal);

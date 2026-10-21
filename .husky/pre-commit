@@ -88,6 +88,9 @@ if [ -n "$HAS_SPEC" ]; then
   pnpm spec:parse
 fi
 
+# 3.6 test spawn gate — test code spawning through a package-manager shim orphans the real process
+node scripts/test-spawn-gate.mjs
+
 # 4. Restage anything biome format --write modified
 for f in $STAGED; do
   [ -f "$f" ] && git add "$f"

@@ -1,0 +1,6 @@
+$ pnpm typecheck   # on the merged tree (66c7985c)
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done

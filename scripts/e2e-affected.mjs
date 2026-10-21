@@ -47,6 +47,10 @@ const BOARD = [
   'dead-',
   'shell-',
   'visual-',
+  // #1423: the queued card has no 开始 (queued-action.spec also pins the detail head).
+  'queued-action',
+  // #1428: one ring per edge — the card and the notify banner are probed there.
+  'elevation-',
 ];
 const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
 const DETAIL = [
@@ -68,9 +72,15 @@ const DETAIL = [
   // #1400: phase chip words (detail head, search rows, schedule cards,
   // project task rows). Each of those surfaces pulls it in.
   'phase-chip-words',
+  // #1423: a queued task's detail head has no primary button.
+  'queued-action',
+  // #1428: one ring per edge — the user menu and the composer are probed there.
+  'elevation-',
 ];
-const CHIEF = ['chief-', 'composer-wire-reject'];
+// #1428: one ring per edge — the chief window and the FAB are probed there.
+const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
 const AGENT = ['agent-', 'team-create-agent'];
+const LIVE_SERVER = ['token-gate', 'live-server-'];
 const OVERLAY = [
   'newtask-',
   'mention-',
@@ -148,6 +158,9 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  ['apps/web/e2e/live-server.ts', LIVE_SERVER],
+  ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
+  ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],
 ]);
 
 const DIR_RULES = [
@@ -234,8 +247,8 @@ function classify(path) {
   if (path.startsWith('apps/web/')) return { specs: null, why: 'unmapped web path' };
   if (path.startsWith('apps/server/')) {
     return {
-      specs: ['token-gate'],
-      why: 'server surface (token-gate spawns a real server; the stack layer is the real coverage)',
+      specs: LIVE_SERVER,
+      why: 'server surface (these specs spawn a real server; the stack layer is the real coverage)',
     };
   }
   return { specs: [], why: 'outside the web e2e surface' };
@@ -295,9 +308,15 @@ const picked = new Set();
 const reasons = [];
 for (const path of paths) {
   const { specs, why } = classify(path);
-  reasons.push(`  ${path} → ${specs === null ? 'FULL' : specs.length === 0 ? 'none' : why}`);
+  // #1442: the axe sweep scans every main page in both themes, so any web
+  // source change runs it — one rule here, not a copy in every family.
+  const axe = specs !== null && path.startsWith('apps/web/src/');
+  reasons.push(
+    `  ${path} → ${specs === null ? 'FULL' : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,
+  );
   if (specs === null) full = true;
   for (const s of specs ?? []) picked.add(s);
+  if (axe) picked.add('a11y-axe');
 }
 
 const selection = full ? allSpecs : expand([...picked], allSpecs);
