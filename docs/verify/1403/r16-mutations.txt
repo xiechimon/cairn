@@ -1,0 +1,87 @@
+# #1403 round 16 mutations (pr-gate run 8 on #1414): each one applied alone to the final sources at bc9c833
+# (M6 to the test helper), then
+#   pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+# (135 tests). The runner kept a copy of the touched file, replaced the old text (it must occur exactly once),
+# ran the tests, wrote the copy back and checked 'git diff --quiet HEAD -- <file>' (exit 0 = restored).
+# 12 of 12 mutations turn at least one test red; every file was restored. NO_COLOR=1; durations dropped.
+#   fix 1 (close confirmation)   M1a-M1d remove each of the four new resets; M1e resets on the anonymous
+#                                interval skip too, which the [67c] guard catches
+#   fix 2 (pushed checkpoints)   M2
+#   fix 3 (no already-done path) M3
+#   fix 4 (sweep tally)          M4a, M4b
+#   item 5 (base guard coverage) M5a is the mutation pr-gate named (delete pullCache.delete(key) in the
+#                                base.ref/default_branch guard); M5b narrows the guard to base.ref
+#   item 6 (helper counter)      M6
+# The last block is M5a applied at deff4b9 (its sources and tests): all 125 tests stay green there, which is
+# the coverage gap pr-gate reported; at bc9c833 the new [61] base.ref / default_branch cases catch it.
+
+M1a fix 1: a sweep that skips the card for a step in flight keeps the earlier close (delete removed)
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+      AssertionError: expected 'failed' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1b fix 1: a read that gets nothing keeps the earlier close
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a network error) between two closed reads: the count starts over
+      AssertionError: expected 'failed' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1c fix 1: a step that starts during the read keeps the earlier close
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+      AssertionError: expected 'failed' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1d fix 1: a response without head or base repo id keeps the earlier close
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67b] a read that gets nothing (a response without head) between two closed reads: the count starts over
+      AssertionError: expected 'failed' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M1e fix 1 (over-eager): the anonymous five-minute skip clears the close too
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [67c] anonymous: the sweeps that skip a PR for the five-minute interval do not reset its close
+      AssertionError: expected 'review' to be 'failed' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M2 fix 2: only build-step checkpoints are checked against the merged head again
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [68] merged at the last build checkpoint, then a verify step pushed a commit → stays in review with a hint
+      AssertionError: expected 'done' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M3 fix 3: the done funnel's already-done exemption is back
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [59] the done funnel on a card a person moved to done throws before it stops anything
+      AssertionError: expected [Function] to throw an error
+    (restored; git diff --quiet HEAD -- apps/server/src/services/builds.ts: exit=0)
+M4a fix 4: a candidate held by the base-branch hint is not counted
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+      AssertionError: expected 3 to be 4 // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M4b fix 4: a foreign candidate counted under hinted as well as reviewForeign (the old double count on the hint sweep)
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+      AssertionError: expected 5 to be 4 // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M5a item 5: pullCache.delete(key) deleted in the base.ref/default_branch guard
+    run 1: exit=1 Tests  2 failed | 133 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without base.ref is read again on a later sweep; the complete one finishes the card
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+      AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M5b item 5: the guard checks base.ref only
+    run 1: exit=1 Tests  2 failed | 133 passed (135)
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > ㉗ a merged response without default_branch is not taken as a merge into the default branch
+    × pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [61] a merged response without default_branch is read again on a later sweep; the complete one finishes the card
+      AssertionError: expected +0 to be 1 // Object.is equality
+      AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+    (restored; git diff --quiet HEAD -- apps/server/src/services/ci-loop.ts: exit=0)
+M6 item 6: addCandidate's counter does not advance (every candidate gets PR 1000)
+    run 1: exit=1 Tests  1 failed | 134 passed (135)
+    × ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+      AssertionError: expected 'building' to be 'review' // Object.is equality
+    (restored; git diff --quiet HEAD -- apps/server/test/ci-loop.test.ts: exit=0)
+
+== M5a at deff4b9 ==
+# every touched file written from 'git show deff4b9:<path>' (builds.ts and both test files unchanged from
+# deff4b9, ci-loop.ts with M5a), then the same vitest command; files written back from HEAD afterwards.
+M5a at deff4b9 (deff4b9's sources and tests; the same pullCache.delete(key) deleted): the mutation the gate found unguarded
+    run 1: exit=0 Tests  125 passed (125)
+    (restored; git diff --quiet HEAD -- apps/server/src/services/builds.ts apps/server/src/services/ci-loop.ts apps/server/test/ci-loop.test.ts apps/server/test/pr-reconcile.test.ts: exit=0)

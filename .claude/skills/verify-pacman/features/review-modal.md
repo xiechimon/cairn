@@ -15,6 +15,9 @@
 ## How to get to it (user POV)
 
 - 任务详情页(`/app/todo/:id`)在 confirm 或 review phase → composer 右下「AI 审核」钮(唯一入口;其他 phase 不渲染)。
+- 驱动(`vp.mjs list review-modal` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive review-modal empty-review`:空改动任务的审核与合并行(默认带修复后开关 `--expect=after`)。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive review-modal failed-review-restore`(建 agent 不带 machineId,ADR 0019 起 400);`vp.mjs drive review-modal review-launch`(依赖的 setup-review-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving it with verify-pacman
 

@@ -46,12 +46,13 @@ import {
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
 } from '@pacman/shared';
-import { and, asc, desc, eq, inArray, isNotNull, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
   machine,
+  message,
   plan as planTable,
   project,
   steerPending,
@@ -65,12 +66,12 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { hasRepoBinding, readBuildChanges } from './git.js';
+import { githubRepoOfProject, hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
-import { toQuotaWait } from './quota-wait.js';
+import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
@@ -295,18 +296,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (stoppedRow) {
-    deps.convHub?.publishStep(stepRow.buildId, {
-      id: stoppedRow.id,
-      buildId: stoppedRow.buildId,
-      kind: stoppedRow.kind,
-      machineId: stoppedRow.machineId,
-      createdAt: stoppedRow.createdAt,
-      status: stoppedRow.status,
-      checkpointCommit: stoppedRow.checkpointCommit,
-      skillInjection: stoppedRow.skillInjection ?? null,
-    });
-  }
+  if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
@@ -428,23 +418,34 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (stoppedRow) {
-    deps.convHub?.publishStep(stepRow.buildId, {
-      id: stoppedRow.id,
-      buildId: stoppedRow.buildId,
-      kind: stoppedRow.kind,
-      machineId: stoppedRow.machineId,
-      createdAt: stoppedRow.createdAt,
-      status: stoppedRow.status,
-      checkpointCommit: stoppedRow.checkpointCommit,
-      skillInjection: stoppedRow.skillInjection ?? null,
-    });
-  }
+  if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (cancelledRow) publishBuild(deps, cancelledRow);
+}
+
+/** #1403：PR 对账收尾（done / failed）时停掉本 build 还没人领的 verify /
+ * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
+ * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
+ * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
+export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
+  const rows = deps.db
+    .select()
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        inArray(step.status, ['pending', 'waiting_quota']),
+        inArray(step.kind, ['verify', 'review']),
+      ),
+    )
+    .all();
+  for (const row of rows) {
+    deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
+    publishStepRow(deps, { ...row, status: 'stopped' });
+  }
 }
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
@@ -730,7 +731,8 @@ export function maybeEnqueueVerifyStep(
     .get();
   const prompt = buildVerifyStepPrompt({
     ticketRef,
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec),
+    // #1406：GitHub issue 导入任务的标题与正文进 issue 原文围栏（ADR 0021 D5）。
+    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
   });
@@ -824,10 +826,10 @@ async function probePullState(
   timeoutMs?: number,
 ): Promise<{ state: 'open' | 'closed'; merged: boolean } | null> {
   const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
-  if (projRow?.repoKind !== 'github' || projRow.githubRepo === null) return null;
-  const slash = projRow.githubRepo.indexOf('/');
-  const owner = projRow.githubRepo.slice(0, slash);
-  const repo = projRow.githubRepo.slice(slash + 1);
+  // 非 github 形态或 githubRepo 不合法（#1466：`.` / `..` 段改写请求路径）→ 不探测。
+  const repoRef = githubRepoOfProject(projRow);
+  if (repoRef === null) return null;
+  const { owner, repo } = repoRef;
   // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
   // box 缺席按未连接处理（探测是辅助面，不把主请求 500 掉）。
   let token: string | null = null;
@@ -1125,9 +1127,6 @@ export async function applyBuildStepAction(
     if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
       throw new HttpError(409, `AI 审核仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
     }
-    // 时间线「发起了 AI 审核」行（r8 §3.1 实测：行形 = role user 纯文本，
-    // 呈现层拼装时间/actor；REVIEW_ANNOUNCEMENT 双端单源）。
-    insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     // 审核步 prompt：meta header（kind+agentId+gate，claim 载荷据此取 Agent
     // ——step 表无 agentId 列）+ JSON 输出契约 + plan.md 全文 +（审核关口）
     // 本轮变更 + 用户 focus。meta 解析与组装单源 =
@@ -1162,6 +1161,18 @@ export async function applyBuildStepAction(
           ? (await readBuildChanges({ db: deps.db, reposDir: deps.reposDir }, buildId)).files
           : []
         : undefined;
+    // 读变更的 await 窗里相位可能已被改（#1403 PR 对账会把 review 收成 done/
+    // failed）：重读再判，不在已收尾的卡上入队审核步、不落宣告行。
+    const after = getTodo(deps, row.todoId);
+    if (after?.phase !== todoRecord.phase) {
+      throw new HttpError(
+        409,
+        `读取变更期间任务相位已变为 ${after?.phase ?? '（任务已删除）'}，未发起 AI 审核`,
+      );
+    }
+    // 时间线「发起了 AI 审核」行（r8 §3.1 实测：行形 = role user 纯文本，
+    // 呈现层拼装时间/actor；REVIEW_ANNOUNCEMENT 双端单源）。
+    insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     const promptArgs = {
       gate,
       planText,
@@ -1325,6 +1336,11 @@ export async function requestMerge(
         `本任务已有已合并的 PR #${priorMerged.prNumber}，本 build 又开了 PR #${row.prNumber}——疑似重复交付，拒绝发起合并（请人工复核后处理）`,
       );
     }
+    // 探测的网络窗里相位可能已被改（#1403 PR 对账会把 review 收成 done/failed）：
+    // 重读再判，不在已收尾的卡上入队合并步。
+    const after = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (!after) throw new NotFoundError(`todo ${row.todoId}`);
+    assertPhaseTransition(after.phase, 'done');
   }
   // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
   // 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、
@@ -1688,10 +1704,10 @@ export function completeStep(
     // 追加修复步续磨，绿 = 轮询器推进 review，services/ci-loop.ts）。磨绿面 =
     // github 项目的 PR checks（轮询器同判据）：hosted/local（无 GitHub checks 可磨）
     // 与 prNumber 缺位的存量形（仅 prUrl，#931 不猜号同律）→ 既有直进 review
-    // 行为逐字节不变。
+    // 行为逐字节不变。githubRepo 存量值不合法（#1466）同按无 GitHub 仓处理：
+    // 轮询器对它不出站，停在 building 就再没有出口。
     const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
-    const deliveredGithubPr =
-      buildRow.prNumber !== null && projRow?.repoKind === 'github' && projRow.githubRepo !== null;
+    const deliveredGithubPr = buildRow.prNumber !== null && githubRepoOfProject(projRow) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
@@ -1820,16 +1836,78 @@ export function completeStep(
   }
   // merge 步成 → done + 🎉（时间线「发起了合并」+ 结果行 + `🎉 任务已完成`，
   // r3 §3.6；celebration 行 [设计] = role system 纯文本）。
-  setTodoPhase(deps, todoRow.id, 'done');
-  insertMessageRow(deps, buildRow.id, {
+  finishTodoDone(deps, todoRow.id, buildRow.id);
+}
+
+/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本轮是否已收过尾）。 */
+export const DONE_ROW = '🎉 任务已完成';
+
+/** 本 build 这一轮的起点：最近一个 build / plan 步的创建时刻（#931 返工复用
+ * 同一个 build 时，新一轮从新的执行步算起）；没有这类步为 0。 */
+export function roundStart(deps: BuildDeps, buildId: string): number {
+  return (
+    deps.db
+      .select({ at: step.createdAt })
+      .from(step)
+      .where(and(eq(step.buildId, buildId), inArray(step.kind, ['build', 'plan'])))
+      .orderBy(desc(step.createdAt))
+      .get()?.at ?? 0
+  );
+}
+
+/** 本 build 的会话里是否有这一行（按值查一条；since = 只看此刻之后落的）。 */
+export function hasMessageRow(
+  deps: BuildDeps,
+  buildId: string,
+  role: 'system' | 'user',
+  content: string,
+  since = 0,
+): boolean {
+  return (
+    deps.db
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, role),
+          eq(message.content, content),
+          gte(message.createdAt, since),
+        ),
+      )
+      .get() !== undefined
+  );
+}
+
+/** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：停掉没人领的
+ * verify / review 步、相位 → done、完成行、拆卡波次推进。两个落点都在卡还没写离
+ * 执行中时才进来（completeStep 对已关闭 / 已完成的卡只记步，#1453；对账先核对卡
+ * 仍在 review）。对账在本轮已有完成行时不进这里（ci-loop 的本轮已报告判据），两个
+ * 落点不会叠两行。 */
+export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
+  // 到不了 done（已关闭、已是 done）就先抛错，什么都不动（setTodoPhase 同一判据）。
+  const current = deps.db
+    .select({ phase: todo.phase })
+    .from(todo)
+    .where(eq(todo.id, todoId))
+    .get()?.phase;
+  if (current !== undefined) assertPhaseTransition(current, 'done');
+  // 卡已收尾：没人领的 verify / review 步之后不再在它上面跑（合并步与对账同一处）。
+  // 先停步再落相位：done 文档发出时不再带着这些步的等额度投影。
+  stopUnclaimedGateSteps(deps, buildId);
+  setTodoPhase(deps, todoId, 'done');
+  // 完成行每次收尾都落：对账在本轮已有完成行时不收尾（ci-loop 的本轮已报告
+  // 判据）；人把卡拖回 review 后同一轮里第二个合并步完成，再落一行（卡还是 done
+  // 时合并步的回报只记步，走不到这里）。
+  insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',
-    content: '🎉 任务已完成',
+    content: DONE_ROW,
     createdAt: nowMs(),
   });
   // #1250（ADR 0018 层 2）：done 落地即查拆卡波次——本卡是子项时推进其父的
   // 下一波（父自动收口在 setTodoPhase 的 settleSplitOnDone 半边，Todos 层）。
-  advanceSplitWaves(deps, todoRow.id);
+  advanceSplitWaves(deps, todoId);
 }
 
 export class NotFoundError extends Error {

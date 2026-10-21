@@ -12,17 +12,18 @@ import { MIGRATIONS_FOLDER, openMemoryDb } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 
-describe('31 表 migration（01 §6 清单）', () => {
+describe('35 表 migration（01 §6 清单）', () => {
   test('drizzle schema 表名集 = DB_TABLES', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(31); // 01 §6 原清单 30（含 skill/mcp_server/document_diff）− skill/mcp_server（spec 13 退役）− document_diff（#1029 死 schema：diff 端点自 plan 行现算，从未写入）+ spec 12 github_connection（内部凭证表）+ skill_audit（XMON-109 写审计）+ XMON-108 shell_command（内部审计表）+ #1137 webhook_token（内部凭证表）
+    expect(names).toHaveLength(35); // 01 §6 原清单 30（含 skill/mcp_server/document_diff）− skill/mcp_server（spec 13 退役）− document_diff（#1029 死 schema：diff 端点自 plan 行现算，从未写入）+ spec 12 github_connection（内部凭证表）+ skill_audit（XMON-109 写审计）+ XMON-108 shell_command（内部审计表）+ #1137 webhook_token（内部凭证表）+ #1404 gate_digest/gate_round/gate_verdict/gate_state（合并就绪闸内部表）
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');
     expect(names).toContain('github_connection');
     expect(names).toContain('shell_command');
+    expect(names).toContain('gate_verdict');
   });
 
   test('migration SQL 进 repo 且全表覆盖（跨 migration 累计）', () => {

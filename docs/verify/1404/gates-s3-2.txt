@@ -1,0 +1,91 @@
+# #1404 S3 round 2 gates. Branch claude/bootstrap-p3c at 34381bd0 (branch point 2294b087; main is not
+# merged in), run in the p3c worktree. Container runs as root (id -u = 0). Machine load average 19-24
+# on 4 CPUs during the runs (other lanes' test suites).
+
+$ pnpm lint
+Checked 786 files in 7s. No fixes applied.
+Found 1 info.
+exit=0
+The one info is apps/web/src/resources/machines-page.tsx:317 noUselessFragments, present on main.
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (11.7s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+# Migration discipline (the CI drizzle steps, ci.yml 'db:check' and 'drizzle drift')
+$ pnpm --filter @xiechimon/pacman db:check
+drizzle 护栏通过：snapshot 链线性、无父子冲突
+exit=0
+$ pnpm --filter @xiechimon/pacman db:generate
+No schema changes, nothing to migrate (drizzle-kit prints an emoji after this, dropped here)
+exit=0
+$ git add -N apps/server/drizzle && git diff --exit-code apps/server/drizzle
+exit=0 (no new migration, no drift; git status clean afterwards)
+
+$ node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 332 refs checked, 59 frozen in baseline)
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+(vitest 5 takes `git diff --name-only origin/main...HEAD` plus staged and unstaged files, so the
+merge-base range: main's commits after 2294b087 do not enter the selection.)
+ FAIL  |@xiechimon/pacman| test/skill-write.test.ts > machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]） > M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单
+Error: Test timed out in 5000ms.
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ Test Files  2 failed | 242 passed (244)
+      Tests  2 failed | 2460 passed | 1 skipped (2463)
+   Duration  927.42s
+exit=1
+- runner-brief.test.ts "擦除失败": the root-only case. The test makes the brief file unremovable
+  through directory permissions (chmodSync, test line 407-410), which root ignores; this container
+  runs as uid 0. apps/daemon is untouched by this branch; CI runs it as a normal user. Same failure
+  as round 1 (gates-s3.txt).
+- skill-write.test.ts M5: a 5000 ms timeout under the machine load above (the case took 9414 ms).
+  Rerun of the file alone at the same head:
+  $ pnpm exec vitest run apps/server/test/skill-write.test.ts
+   Test Files  1 passed (1)
+        Tests  30 passed (30)
+  exit=0
+  The file is selected because it imports the server schema; it does not touch the gate tables.
+
+$ E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected      (8396 free per lsof before and after)
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  apps/server/drizzle/0044_merge_gate_tables.sql → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/drizzle/meta/0044_snapshot.json → server surface (...)
+  apps/server/drizzle/meta/_journal.json → server surface (...)
+  apps/server/src/db/schema.ts → server surface (...)
+  apps/server/test/merge-gate-tables.test.ts → server surface (...)
+  apps/server/test/schema.test.ts → server surface (...)
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8396
+  live-server-reap.spec.ts token-gate.spec.ts
+  8 passed (31.9s)
+exit=0
+
+# The four S3 test files at 34381bd0
+$ pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts apps/server/test/schema.test.ts packages/shared/test/vocabulary.test.ts packages/shared/test/snapshot.test.ts
+ Test Files  4 passed (4)
+      Tests  146 passed (146)
+exit=0
+
+# Commits of this round (each passed the pre-commit hook: lockfile guard, banned vocabulary, biome
+# format + ci, pnpm -r typecheck, test spawn gate)
+f859a18f server(1404): merge gate S3 round 2, tests for verdicts that outlive their step   (red leg)
+2136fea5 server(1404): merge gate S3 round 2, drop the gate_verdict foreign key to step     (green)
+0071bef2 server(1404): merge gate S3 round 2, simplify pass on the gate table tests
+34381bd0 server(1404): merge gate S3 round 2, code-review fix to the gate_digest key comment
+No pnpm-lock.yaml change.

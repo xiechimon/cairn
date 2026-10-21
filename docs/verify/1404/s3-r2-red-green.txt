@@ -1,0 +1,67 @@
+# #1404 S3 round 2 (pr-gate run 1 on #1469 at 3330010, verdict copied as pr-gate-1469-run1-3330010.json).
+# Failure modes written before the tests and the schema change; F1-F16 are in s3-failure-modes.txt.
+# Each line: id, what goes wrong, what it costs, which test pins it.
+
+F5' (revised) A verdict for a build that does not exist is stored. Pin: buildId FK -> build.id,
+    insert throws. stepId deliberately has no FK (F17/F18); the step id is written by the
+    server's gate code (S5a), so a verdict whose stepId has no step row is stored.
+F17 A later migration recreates `step` the way drizzle-kit emits it (create __new_step, copy,
+    DROP TABLE step, rename). drizzle runs every pending migration inside BEGIN/COMMIT and
+    SQLite ignores PRAGMA foreign_keys=OFF inside a transaction, so DROP TABLE step's implicit
+    delete fires the stepId cascade: every gate_verdict row is gone while the step rows are
+    copied back, at server boot, with no error. A lost `tampered` verify verdict lets a later
+    pass clear a gate that S2 treats as permanently blocked for the build.
+    Pin: synthetic drizzle-shaped recreate of step after the real journal keeps every verdict
+    and every step row (and the synthetic migration is shown to have run).
+F18 A step is deleted while its build stays (a retry or a cleanup in a later segment): the
+    cascade removes the recorded verdict, so a `block` or `tampered` stops counting.
+    Pin: DELETE FROM step keeps the verdict; DELETE FROM build still removes it.
+F19 A migration after the gate migration recreates `build` (or `todo`, whose delete cascades into
+    build through build.todoId): the same transaction rule wipes all four gate tables.
+    Pin: a database migrated through the gate migration, with a row in each gate table, keeps
+    every row after the rest of the journal applies. No later migration exists at this head, so
+    the test is green on both legs; s3-r2-mutations.txt shows a drizzle-shaped build or todo
+    recreate turning it red and the same build recreate with the gate rows moved aside and
+    written back staying green. The rule is written next to the gate tables in schema.ts.
+F20 gate_verdict.expectedHeadSha nullable: a verdict without the head the server pinned at
+    dispatch is stored and can never be bound. Pin: insert with null throws NOT NULL.
+F21 gate_round.patchDigest nullable: SQLite UNIQUE treats NULLs as distinct, so a build could open
+    any number of rounds with a null digest. Pin: insert with null throws NOT NULL.
+F1' (test robustness) The upgrade test called the head's seed() on a pre-gate database; a later
+    column added to user or team would break it. Now user and team are seeded with raw SQL
+    (seedTeam), as seedBuild does for the other tables.
+
+Choice for build recreates: the test, in behavioral form (F19), plus a schema comment. A text
+check for DROP TABLE `build` in later migrations would miss a todo recreate, which deletes every
+build through the build.todoId cascade (s3-r2-mutations.txt: it also turns F1 red because the
+upgraded database loses its build row); F19 runs the real later migrations over seeded rows and
+catches both. The schema comment above the gate tables says a later recreate of build or todo
+must move the gate rows aside and write them back, and names F19.
+
+$ pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts apps/server/test/schema.test.ts packages/shared/test/vocabulary.test.ts packages/shared/test/snapshot.test.ts --reporter=verbose
+
+== red: commit f859a18f (tests only; schema and 0044 as in round 1, gate_verdict.stepId FK -> step ON DELETE cascade)
+ FAIL  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F5 不存在的构建：外键拒绝；stepId 不设外键（F17/F18），由派步的 server 写入方给出
+SqliteError: FOREIGN KEY constraint failed
+ FAIL  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F17 后续迁移按 drizzle 形状重建 step（__new_step、拷行、DROP TABLE step、改名）：判定与步一条不少
+AssertionError: expected [] to deeply equal [ { stepId: 's-a', …(8) }, …(2) ]
+ FAIL  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F18 删步（构建还在）：判定留着；删构建才带走
+AssertionError: expected [] to deeply equal [ { stepId: 's-a', outcome: 'block' } ]
+ Test Files  1 failed | 3 passed (4)
+      Tests  3 failed | 143 passed (146)
+
+F17's red is the reported hazard reproduced: the step rows compare equal after the recreate (that
+assertion runs first and passes), and gate_verdict is empty.
+F19, F20, F21 and the F1 change are green on this leg: F19 has no later migration to run yet,
+and the NOT NULL pins hold on round 1's schema; their teeth are shown in s3-r2-mutations.txt.
+
+== green: commit 2136fea5 (gate_verdict.stepId without FK, 0044 regenerated)
+ Test Files  4 passed (4)
+      Tests  146 passed (146)
+
+== final: commit 34381bd0 (after the simplify commit 0071bef2 and the code-review comment fix 34381bd0)
+ Test Files  4 passed (4)
+      Tests  146 passed (146)
+
+merge-gate-tables.test.ts: 25 tests (round 1: 20; added F17, F18, F19, F20, F21; F5 rewritten).
+schema.test.ts, vocabulary.test.ts and snapshot.test.ts are unchanged in this round.

@@ -188,6 +188,9 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     // #1261 等额度投影（板面卡态/横幅判定位）；无挂起 = null（fixture 面
     // 键缺席同形——undefined 折叠进 null）。
     quotaWait: w.quotaWait ?? null,
+    // #1406：transcript 的围栏形任务文本行按来源识别（classifyUserText）。
+    sourceKind: w.sourceKind,
+    sourceRef: w.sourceRef,
   };
 }
 

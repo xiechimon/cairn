@@ -48,6 +48,7 @@ import {
   conversationBranch,
   FIXED_TAGS,
   isBackendRuntimeId,
+  isIssueSourcedTask,
   LOCAL_TOOL_CREATE_TAG,
   LOCAL_TOOL_REMOTE_SHELL,
   LocalRepoUnreachableError,
@@ -250,7 +251,9 @@ export function streamTimeoutMessage(
 export function buildTaskPrompt(claimed: ClaimedStep): string {
   const todo = claimed.todo;
   if (!todo) return claimed.instruction ?? '';
-  const taskText = buildTaskPromptText(todo.title, todo.spec);
+  // #1406：claim 带来源两列；GitHub issue 导入任务的标题与正文进 issue 原文
+  // 围栏（ADR 0021 D5），指令段留在围栏之外。
+  const taskText = buildTaskPromptText(todo.title, todo.spec, todo);
   // 缺席归一（zod optional：无该字段 = undefined ≠ null）。
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
@@ -350,12 +353,13 @@ export function composeTaskMetaInstruction(currentTitle: string, meta?: TaskMeta
 /** todo 语境 → taskMeta 注入位（#446 / ADR 0005 D5）：meta.titleFinal =
  * issue 来源标题已真值、标签已导入 → 整段元信息指令不注入（回填反而覆盖
  * 真值）；否则 currentTitle + 形态 meta 原样透传（meta 缺省 = local 词表
- * 现行为）。chief 步无 todo → undefined。 */
+ * 现行为）。chief 步无 todo → undefined。#1406：GitHub issue 导入任务不靠
+ * meta 也短路——标题是 issue 作者写的，不进 systemPrompt（ADR 0021 D5）。 */
 function taskMetaOpts(
   todo: ClaimedStep['todo'],
 ): { taskMeta: { currentTitle: string; meta?: TaskMetaForm } } | undefined {
   if (!todo) return undefined;
-  if (todo.meta?.titleFinal === true) return undefined;
+  if (todo.meta?.titleFinal === true || isIssueSourcedTask(todo)) return undefined;
   return {
     taskMeta: {
       currentTitle: todo.title,

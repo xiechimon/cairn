@@ -21,6 +21,14 @@ daemon 每次创建 agent 会话前扫描 `PACMAN_SKILLS_DIR`(缺省 `~/.agents/
 - 用户把 skills 放 `~/.agents/skills/<name>/SKILL.md`(frontmatter `name` + `description`;缺 name 回落目录名)→ daemon 起来后派任何任务 → agent 会话自动带 catalog,按需 read。
 - 自托管:`PACMAN_SKILLS_DIR=/path/to/other` 启动 daemon,从那处加载。
 - UI 可配性(account 页输入框)= 后票,当前无入口。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list skills-injection` 列出 usage:
+  - `vp.mjs drive skills-injection claim-injection`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive skills-injection injection-check`:仓根写死 /workspace,不认 VERIFY_REPO_ROOT。
+  - `vp.mjs drive skills-injection native-plugin`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive skills-injection skill-read-facts`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive skills-injection skills-manifest`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive skills-injection skills-routing`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive skills-injection skills-split`:建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Driving it with integration harness
 

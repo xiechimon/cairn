@@ -4,7 +4,8 @@
 //   2. gh 不可用（未安装/非零退出）→ REST 梯接手；token 只进头
 //   3. REST 非数组/非 200/网络错 → null（未知，不抛不重试）
 //   4. 全梯失败 → null（面板分支名在、PR 槽留空）
-//   5. githubRepoRefOf：github cloneUrl → owner/repo；hosted/local/垃圾 → null
+//   5. githubRepoRefOf：github cloneUrl → owner/repo；hosted/local/垃圾 → null；
+//      owner 或 repo 为 `.` / `..`（#1466：拼进 repos/{o}/{r} 会被 URL 归一改写）→ null
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -151,5 +152,14 @@ describe('githubRepoRefOf（失败方式 5：形态前置闸）', () => {
     expect(githubRepoRefOf('/Users/me/repo')).toBeNull();
     expect(githubRepoRefOf('not a url')).toBeNull();
     expect(githubRepoRefOf('https://github.com/only-owner/')).toBeNull();
+  });
+  test('#1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测', () => {
+    expect(githubRepoRefOf('https://github.com/owner/...git')).toBeNull();
+    expect(githubRepoRefOf('https://github.com/owner/..git')).toBeNull();
+    // 三点仓名不是 dot segment，照常探测。
+    expect(githubRepoRefOf('https://github.com/owner/....git')).toEqual({
+      owner: 'owner',
+      repo: '...',
+    });
   });
 });

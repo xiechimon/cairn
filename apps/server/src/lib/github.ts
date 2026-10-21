@@ -111,25 +111,165 @@ export async function githubPullState(
   prNumber: number,
   timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<GithubPullState | null> {
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prNumber}`;
+  const page = await githubPull(fetchImpl, token, owner, repo, prNumber, { timeoutMs });
+  return page?.pull ? { state: page.pull.state, merged: page.pull.merged } : null;
+}
+
+const FULL_SHA = /^[0-9a-f]{40}$/;
+
+/** 40 位小写十六进制的提交 SHA（compare 只拿这种拼 URL）。 */
+export function isFullSha(value: string): boolean {
+  return FULL_SHA.test(value);
+}
+
+/** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head
+ * SHA、head 分支与所在仓的 id、base 分支、base 仓的 id 与默认分支。 */
+export interface GithubPull extends GithubPullState {
+  /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
+  mergeCommitSha: string | null;
+  /** merged 时合并者的 login；未合并或响应缺失 = null。 */
+  mergedBy: string | null;
+  /** PR head 分支当前的提交（合并后 = 合并时的 head）；响应缺失 = null。 */
+  headSha: string | null;
+  /** PR head 的分支名（head.ref）；响应缺失 = null。 */
+  headRef: string | null;
+  /** head 所在仓的仓库 id（head.repo.id）：fork 被删时 GitHub 给 head.repo = null，这里
+   * 同样是 null。仓库 id 不随改名或转移变。 */
+  headRepoId: number | null;
+  /** PR 的目标分支（base.ref）、目标仓的仓库 id（base.repo.id）与默认分支
+   * （base.repo.default_branch）；缺失 = null。 */
+  baseRef: string | null;
+  baseRepoId: number | null;
+  defaultBranch: string | null;
+}
+
+export interface GithubPullPage {
+  /** true = 304 Not Modified（调用方复用缓存判据，同 check-runs 条件 GET）。 */
+  notModified: boolean;
+  etag: string | null;
+  pull: GithubPull | null;
+}
+
+/** 条件 GET（ETag）：304 → notModified；非 2xx、网络错、响应体不是 JSON 对象
+ * → null。githubPull 与 githubCommitCheckRuns 共用。 */
+async function conditionalGetJson(
+  fetchImpl: FetchLike,
+  url: string,
+  token: string | null,
+  etag: string | null | undefined,
+  timeoutMs: number,
+): Promise<
+  { notModified: true } | { notModified: false; etag: string | null; data: object } | null
+> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      headers: {
+        ...API_HEADERS,
+        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+        ...(etag != null ? { 'if-none-match': etag } : {}),
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    return null;
+  }
+  if (res.status === 304) return { notModified: true };
+  if (!res.ok) return null;
   let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null) return null;
+  return { notModified: false, etag: res.headers.get('etag'), data };
+}
+
+/** 单条 PR 条件读（#1403 review 关口对账：`GET /repos/{o}/{r}/pulls/{n}`，
+ * If-None-Match 携带上轮 etag → 304 不计主限流）。null = 读不到（网络/404/
+ * 限流/响应形坏不区分，fail-open 归调用方，同 githubCommitCheckRuns）。 */
+export async function githubPull(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  opts: { etag?: string | null; timeoutMs?: number } = {},
+): Promise<GithubPullPage | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
+  const got = await conditionalGetJson(
+    fetchImpl,
+    url,
+    token,
+    opts.etag,
+    opts.timeoutMs ?? FETCH_TIMEOUT_MS,
+  );
+  if (got === null) return null;
+  if (got.notModified) return { notModified: true, etag: opts.etag ?? null, pull: null };
+  const raw = got.data as {
+    state?: unknown;
+    merged?: unknown;
+    merge_commit_sha?: unknown;
+    merged_by?: { login?: unknown } | null;
+    head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
+    base?: { ref?: unknown; repo?: { id?: unknown; default_branch?: unknown } | null } | null;
+  };
+  // merged 缺失或不是布尔 → 读不到：不能把一次被裁掉的响应读成「关闭未合并」。
+  if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
+    return null;
+  }
+  const merged = raw.merged;
+  return {
+    notModified: false,
+    etag: got.etag,
+    pull: {
+      state: raw.state,
+      merged,
+      mergeCommitSha:
+        merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
+      mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
+      headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      headRef: typeof raw.head?.ref === 'string' ? raw.head.ref : null,
+      headRepoId: typeof raw.head?.repo?.id === 'number' ? raw.head.repo.id : null,
+      baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : null,
+      baseRepoId: typeof raw.base?.repo?.id === 'number' ? raw.base.repo.id : null,
+      defaultBranch:
+        typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
+    },
+  };
+}
+
+/** head 是否包含 base（`GET /repos/{o}/{r}/compare/{base}...{head}` 的 status：
+ * ahead / identical = 包含，behind / diverged = 不包含）。'missing' = 404
+ * （base 提交不在 GitHub 上，例如从没推送过）；'invalid' = 两个参数不都是 40
+ * 位十六进制 SHA（机器回报的值，不拼进请求路径，不发请求）；null = 读不到。 */
+export async function githubCompareStatus(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  base: string,
+  head: string,
+): Promise<string | 'missing' | 'invalid' | null> {
+  if (!isFullSha(base) || !isFullSha(head)) return 'invalid';
+  // per_page=1：只要 status，不拉整页提交。
+  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
     const res = await fetchImpl(url, {
       headers: {
         ...API_HEADERS,
         ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
       },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
+    if (res.status === 404) return 'missing';
     if (!res.ok) return null;
-    data = await res.json();
+    const data = (await res.json()) as { status?: unknown } | null;
+    return typeof data?.status === 'string' ? data.status : null;
   } catch {
     return null;
   }
-  if (typeof data !== 'object' || data === null) return null;
-  const { state, merged } = data as { state?: unknown; merged?: unknown };
-  if (state !== 'open' && state !== 'closed') return null;
-  return { state, merged: merged === true };
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；
@@ -1062,32 +1202,13 @@ export async function githubCommitCheckRuns(
   const url =
     `https://api.github.com/${repoPath(owner, repo)}/commits/${encodeURIComponent(ref)}` +
     `/check-runs?per_page=${CHECK_RUNS_PER_PAGE}`;
-  let res: Awaited<ReturnType<FetchLike>>;
-  try {
-    res = await fetchImpl(url, {
-      headers: {
-        ...API_HEADERS,
-        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
-        ...(opts.etag != null ? { 'if-none-match': opts.etag } : {}),
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-  } catch {
-    return null;
-  }
-  if (res.status === 304) {
+  const got = await conditionalGetJson(fetchImpl, url, token, opts.etag, FETCH_TIMEOUT_MS);
+  if (got === null) return null;
+  if (got.notModified) {
     // 304 无应答体：etag 回传（调用方缓存键不变），checkRuns 空（notModified 位承载语义）。
     return { notModified: true, etag: opts.etag ?? null, checkRuns: [] };
   }
-  if (!res.ok) return null;
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return null;
-  }
-  if (typeof data !== 'object' || data === null) return null;
-  const raw = (data as { check_runs?: unknown }).check_runs;
+  const raw = (got.data as { check_runs?: unknown }).check_runs;
   if (!Array.isArray(raw)) return null;
   const checkRuns: GithubCheckRun[] = [];
   for (const entry of raw as Array<Record<string, unknown>>) {
@@ -1101,7 +1222,7 @@ export async function githubCommitCheckRuns(
       outputSummary: typeof output?.summary === 'string' ? output.summary : null,
     });
   }
-  return { notModified: false, etag: res.headers.get('etag'), checkRuns };
+  return { notModified: false, etag: got.etag, checkRuns };
 }
 
 // —— OAuth token 交换面（#231 握手：callback 收码后唯一一次出站）———————————

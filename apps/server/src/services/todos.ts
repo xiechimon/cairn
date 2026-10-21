@@ -7,6 +7,7 @@
 
 import type {
   Assignment,
+  GithubRepoRef,
   Phase,
   SecretBox,
   TodoRecord,
@@ -49,6 +50,7 @@ import {
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { githubRepoOfProject } from './git.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
@@ -755,31 +757,23 @@ export async function flushSelfIssueWrites(): Promise<void> {
   await Promise.all([...selfIssueInFlight.values()]);
 }
 
-/** githubRepo 列拆 owner/repo（github-issues.ts requireGithubRepo 同律；
- * 建项目时已过 isGithubRepoRef 400 闸，lib 层出站再 encodeURIComponent）。 */
-function splitGithubRepo(githubRepo: string): { owner: string; repo: string } {
-  const slash = githubRepo.indexOf('/');
-  return { owner: githubRepo.slice(0, slash), repo: githubRepo.slice(slash + 1) };
-}
-
 /** 自建 issue 目标判定（createTodo 关键路径，纯本地读零出站）：github 形态
  * + 连接表有行 + deps 带 box（写向开启）→ 目标在；否则 null——local/hosted/
  * 未连接 = 现行为逐字节不变（A1/A8：不建、不报错、不亮失败态）。连接行只判
- * 存在性不解密：密文损坏留给异步 job 出站时降级（停留未建成，可重试）。 */
-function planSelfIssue(
-  deps: TodoDeps,
-  teamId: string,
-  projectId: string,
-): { owner: string; repo: string } | null {
+ * 存在性不解密：密文损坏留给异步 job 出站时降级（停留未建成，可重试）。
+ * owner/repo 经 githubRepoOfProject 拆段：存量值不合法（#1466）同按非 github
+ * 形态，不进自建面。 */
+function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
   if (deps.box === undefined) return null;
   const proj = deps.db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
     .from(project)
     .where(eq(project.id, projectId))
     .get();
-  if (proj?.repoKind !== 'github' || proj.githubRepo === null) return null;
+  const ref = githubRepoOfProject(proj);
+  if (ref === null) return null;
   if (!hasGithubConnection(deps.db, teamId)) return null;
-  return splitGithubRepo(proj.githubRepo);
+  return ref;
 }
 
 /** fire-and-forget 派发（createTodo 落库后调用；返回前零 GitHub await——
@@ -808,12 +802,11 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     .from(project)
     .where(eq(project.id, row.projectId))
     .get();
-  if (proj?.repoKind !== 'github' || proj.githubRepo === null) {
-    throw new HttpError(404, 'project is not github-backed');
-  }
+  const repoRef = githubRepoOfProject(proj);
+  if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
   const token = openGithubToken({ db, box }, row.teamId);
   if (token === null) throw new HttpError(404, 'github connection not found');
-  const { owner, repo } = splitGithubRepo(proj.githubRepo);
+  const { owner, repo } = repoRef;
   const { number } = await githubCreateIssue(deps.githubFetch ?? fetch, token, owner, repo, {
     title: row.title,
     body: row.spec,

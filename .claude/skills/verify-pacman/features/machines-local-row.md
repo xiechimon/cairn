@@ -27,6 +27,8 @@
 - 看板侧栏 资源 → 机器（`/app/resources/machines`）。
 - 本机行 = 列表首行；中段 mark 只读展示本机启用哪些 runtime，行右缘是「远程 shell」标签 + 开关与「执行中 n/N」读标注 +「并发 N」选择器（两个活控件，点击即写库）。
 - 添加 LAN/VPS 机器：「添加机器」钮 → dialog 给可复制 CLI 命令（在目标机器上跑）。
+- 驱动(`vp.mjs list machines-local-row` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive machines-local-row local-row`:本机行、品牌 mark、shell 开关写回。
 
 ## Driving it with verify-pacman
 

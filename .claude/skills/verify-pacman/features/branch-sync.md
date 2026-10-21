@@ -16,6 +16,8 @@
 
 - 详情页:右 pane 头部型选钮(方案▾/变更▾)→ listbox「分支与 PR」行 → 静止 section(无弹层)。
 - 看板:卡片分支图标(`button[aria-label="分支与 PR"]`)→ branch-dialog →「同步到机器」tab。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list branch-sync` 列出 usage:
+  - `vp.mjs drive branch-sync sync-ui`:依赖的 setup-branch-sync-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Driving it with verify-pacman
 

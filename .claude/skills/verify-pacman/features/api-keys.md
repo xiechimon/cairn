@@ -13,6 +13,8 @@
 ## How to get to it (user POV)
 
 - 侧栏进「API 密钥」页(`/app/api-keys`,secondary shell)。
+- 驱动(`vp.mjs list api-keys` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create`:空态点「新建密钥」:一次性明文、掩码行、库里只存哈希;需全新栈(launch 后的第一个 drive,否则拒跑)。
 
 ## Driving it with verify-pacman
 

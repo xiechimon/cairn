@@ -33,6 +33,8 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   // M7 #330：review → planning = blocking finding 自动修订回路（agent 落
   // verdict → emit review_verdict 消息 → enqueue plan 重规划步 → 回待确认；
   // 同 conv continue session；r8 §3.1 实测 62）。
+  // #1403：ci-loop 的 PR 对账也走 review→done（PR 已在 GitHub 合并进默认分支）
+  // 与 review→failed（PR 关闭未合并）。
   review: ['done', 'failed', 'queued', 'planning', 'closed'],
   // 定时重跑→queued（r3 §9 实测：done todo 到点全新重跑回到执行中→待验收）；
   // 其余出边（reopen 类）未观测 [推断]。

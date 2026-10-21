@@ -16,6 +16,8 @@
 
 - 侧栏「新建项目」→ `/app/project/new`(live 面,URL 不带 `?scenario=`)。
 - fixture 面交互链回归(菜单/回填/focus 计算样式/提交 body 桩断言)在 `apps/web/e2e/project-new-repo.spec.ts`,不走本 harness。
+- 驱动(`vp.mjs list project-new-form` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive project-new-form new-form`:新建项目表单菜单、名称回填、三条创建链。
 
 ## Driving it with drive-project-new-form.mjs
 

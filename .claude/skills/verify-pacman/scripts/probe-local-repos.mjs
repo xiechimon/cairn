@@ -12,7 +12,8 @@
 //    (accessToken 只有 cipher 列位,无 plaintext 列)
 // 栈必须已在跑(launch.mjs;坐标取 VERIFY_RUN_DIR/ports.json)。
 // 证据(result.json + responses.json)落 VERIFY_EVIDENCE_DIR;交付见 SKILL.md
-// 「证据归档纪律」(cp 进 PR 分支 docs/verify/<票号>/ 随 PR 提交)。任一断言失败退出码 1。
+// 「证据归档纪律」(在 PR 分支上 vp.mjs archive <票号> --from <证据目录> 拷进
+// docs/verify/<票号>/ 随 PR 提交,不手工 cp)。任一断言失败退出码 1。
 // 运行前置:proxy env 全 unset(回环请求过代理会 502 假阳性)。
 
 import { execFileSync } from 'node:child_process';

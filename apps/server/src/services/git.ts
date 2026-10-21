@@ -18,6 +18,7 @@ import {
   conversationBranch,
   type DiffFileContent,
   type DocumentDiffFile,
+  type GithubRepoRef,
   gitHostedRepoPath,
   type ProjectBranchesResponse,
   type ProjectCommitDetailResponse,
@@ -26,6 +27,7 @@ import {
   type ProjectFilesResponse,
   type ProjectRecord,
   type ProjectTreeResponse,
+  parseGithubRepoRef,
 } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -135,6 +137,17 @@ export function projectRepoRef(
     return { kind: 'local', cloneUrl: row.localPath };
   }
   return null;
+}
+
+/** github 形态项目行 → `{owner, repo}`：server 侧 GitHub API 出站的拆段单口
+ * （issue 读面、#452 自建 issue、CI 轮询、PR 状态探测）。非 github 形态 /
+ * 列空 / 存量值不合法（#1466：`.` / `..` 段会改写 `repos/{o}/{r}` 请求路径）
+ * 一律 null，调用方按「项目不是合法 GitHub 仓」处理、不出站。 */
+export function githubRepoOfProject(
+  row: Pick<ProjectRow, 'repoKind' | 'githubRepo'> | undefined,
+): GithubRepoRef | null {
+  if (row?.repoKind !== 'github' || row.githubRepo === null) return null;
+  return parseGithubRepoRef(row.githubRepo);
 }
 
 /** GitHub 接入 clone URL（https 派生 [设计]；凭证 per-step 注入归 M3，02 §8）。 */

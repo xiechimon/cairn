@@ -18,6 +18,8 @@
 
 - 模型服务页（`/app/resources/providers`）topbar「+ 新建」。
 - pi tab 空态引导钮（providers-tabs.md `prov-pi-empty`）同样开到本 dialog。
+- 驱动(`vp.mjs list provider-picker` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive provider-picker picker-dialog`:「+ 新建」开 picker:搜索、OAuth 徽标、密钥表单;在 `providers-tabs runtime-tabs` 之后跑。
 
 ## Driving it with verify-pacman
 

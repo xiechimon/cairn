@@ -32,6 +32,8 @@ Folder 字形 + 点击下钻、面包屑回上层、选中键用完整路径。�
 
 - hosted 项目(有提交)或 local 项目(行上 localPath 可达)→ 项目页 文件 tab →
   目录行点进去 → 面包屑回上层;文件行点开查看器。
+- 驱动(`vp.mjs list project-files-drill` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive project-files-drill folder-drill`:文件 tab 目录下钻、面包屑回上层、查看器。
 
 ## Driving it with drive-1097-folder-drill.mjs
 

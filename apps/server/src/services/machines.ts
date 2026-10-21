@@ -1181,6 +1181,10 @@ async function tryClaim(
         title: cand.todoRow.title,
         spec: cand.todoRow.spec,
         ...(taskMeta !== undefined ? { meta: taskMeta } : {}),
+        // #1406 来源两列：daemon 据此把 GitHub issue 导入任务的文本包进 issue
+        // 原文围栏、不在 systemPrompt 里写标题（ADR 0021 D5）。
+        sourceKind: cand.todoRow.sourceKind,
+        sourceRef: cand.todoRow.sourceRef,
       },
       project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
       agent: {
