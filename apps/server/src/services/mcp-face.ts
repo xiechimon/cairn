@@ -18,6 +18,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
+  githubReadToolParamsSchemas,
   MCP_TOOL_REGISTRY,
   MERGE_HUMAN_ONLY_COPY,
   type UserRecord,
@@ -41,6 +42,7 @@ import { verifyApiKey } from './api-keys.js';
 import { cancelBuild, startBuilds } from './builds.js';
 import type { ChiefToolDeps, TransitionActor } from './chief-tools.js';
 import { confirmBuild, transitionTodos } from './chief-tools.js';
+import { executeGithubReadTool } from './github-reads.js';
 import { isChiefConversation } from './machines.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { scanLocalSkills } from './skills.js';
@@ -70,9 +72,11 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   attachment: { attachmentId: s },
   skills: {},
   machines: {},
-  issues: { projectId: s.optional() },
-  pull_requests: { projectId: s.optional() },
-  workflow_runs: { projectId: s.optional() },
+  // #1406 P5a-2：与 chief 词表同一套参数（shared 单源）；projectId 必填——
+  // 缺省是错误结果，不替调用方挑项目、不跨项目扇出。
+  issues: githubReadToolParamsSchemas.issues.shape,
+  pull_requests: githubReadToolParamsSchemas.pull_requests.shape,
+  workflow_runs: githubReadToolParamsSchemas.workflow_runs.shape,
   create_todo: { projectId: s, title: s, spec: s },
   update_todo: { todoId: s, title: s.optional(), spec: s.optional(), tagIds: sArr.optional() },
   message_todo: { todoId: s, content: s },
@@ -270,8 +274,9 @@ export async function executeMcpTool(
     case 'issues':
     case 'pull_requests':
     case 'workflow_runs':
-      // GitHub-backed 才有（02 §3/A4，依赖 A4 GitHub 形态）；托管 repo 空集。
-      return json({ items: [], note: 'GitHub-backed only' });
+      // #1406 P5a-2：与 chief 面同一份实现（services/github-reads.ts）；团队 =
+      // key 行的 teamId，只读本团队项目、用本团队的 GitHub 连接。
+      return json(await executeGithubReadTool(deps, ctx.teamId, name, args));
 
     // —— 写 13 项（Organize work / Run work / Manage lifecycle）——
     case 'create_todo': {

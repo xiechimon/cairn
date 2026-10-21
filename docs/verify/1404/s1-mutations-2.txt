@@ -1,0 +1,48 @@
+# #1404 S1 mutations, round 2 (after pr-gate run 1 on #1420): each one applied alone, then the three S1 test files.
+# A first pass left "link: comments scanned" alive; the test for a link after a closed comment was added and this is the rerun.
+# The round 1 file s1-mutations.txt is unchanged; three of its patterns no longer match the formatted source, so every pattern is restated here.
+# Definitions (name, file, text replaced, replacement) below.
+
+digest: rename into evidence excluded         1 failed | 68 passed (69)
+digest: tab-joined tuples                     1 failed | 68 passed (69)
+digest: unsorted                              2 failed | 67 passed (69)
+digest: previous_filename left out            2 failed | 67 passed (69)
+digest: truncation at > cap                   1 failed | 68 passed (69)
+digest: null sha accepted                     1 failed | 68 passed (69)
+digest: evidence not root-anchored            1 failed | 68 passed (69)
+digest: empty patch digested                  2 failed | 67 passed (69)
+digest: previous_filename not parsed          1 failed | 68 passed (69)
+paths: case-sensitive                         2 failed | 67 passed (69)
+paths: previous name ignored                  2 failed | 67 passed (69)
+paths: unsafe names classified                1 failed | 68 passed (69)
+paths: test renamed into a test dir ignored   1 failed | 68 passed (69)
+paths: removed executables counted            1 failed | 68 passed (69)
+paths: other-ticket check off                 4 failed | 65 passed (69)
+paths: evidence prefix case-sensitive         1 failed | 68 passed (69)
+link: uppercase sha accepted                  1 failed | 68 passed (69)
+link: comments scanned                        1 failed | 68 passed (69)
+link: unclosed comment scanned                1 failed | 68 passed (69)
+link: trailing punctuation kept               1 failed | 68 passed (69)
+link: dot segments allowed                    1 failed | 68 passed (69)
+
+["digest: rename into evidence excluded", "apps/server/src/services/merge-gate/digest.ts", "isEvidencePath(f.filename) &&\n    (f.previousFilename === null || isEvidencePath(f.previousFilename))", "isEvidencePath(f.filename)"]
+["digest: tab-joined tuples", "apps/server/src/services/merge-gate/digest.ts", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha])", "[f.status, f.filename, f.previousFilename, f.sha].join('\\t')"]
+["digest: unsorted", "apps/server/src/services/merge-gate/digest.ts", "    .sort();\n", "    ;\n"]
+["digest: previous_filename left out", "apps/server/src/services/merge-gate/digest.ts", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha])", "JSON.stringify([f.status, f.filename, f.sha])"]
+["digest: truncation at > cap", "apps/server/src/services/merge-gate/digest.ts", "files.length >= GATE_LIMITS.compareFileCap", "files.length > GATE_LIMITS.compareFileCap"]
+["digest: null sha accepted", "apps/server/src/services/merge-gate/digest.ts", "  if (kept.some((f) => f.sha === null && f.status !== 'removed')) return result(null, 'null-sha');\n", ""]
+["digest: evidence not root-anchored", "apps/server/src/services/merge-gate/digest.ts", "return path.startsWith(EVIDENCE_PREFIX);", "return path.includes(EVIDENCE_PREFIX);"]
+["digest: empty patch digested", "apps/server/src/services/merge-gate/digest.ts", "  if (kept.length === 0) return result(null, 'empty');\n", ""]
+["digest: previous_filename not parsed", "apps/server/src/services/merge-gate/digest.ts", "previousFilename: typeof prev === 'string' ? prev : null,", "previousFilename: null,"]
+["paths: case-sensitive", "apps/server/src/services/merge-gate/paths.ts", "return new RegExp(`^${re}$`, 'i');", "return new RegExp(`^${re}$`);"]
+["paths: previous name ignored", "apps/server/src/services/merge-gate/paths.ts", "        ? [f.filename, f.previousFilename]", "        ? [f.filename]"]
+["paths: unsafe names classified", "apps/server/src/services/merge-gate/paths.ts", "!SAFE_PATH.test(name) || matches(name, PROTECTED_RE)", "matches(name, PROTECTED_RE)"]
+["paths: test renamed into a test dir ignored", "apps/server/src/services/merge-gate/paths.ts", "if (f.status === 'renamed' && f.previousFilename !== null && isTestPath(f.previousFilename)) {", "if (f.status === 'renamed' && f.previousFilename !== null && isTestPath(f.previousFilename) && !isTestPath(f.filename)) {"]
+["paths: removed executables counted", "apps/server/src/services/merge-gate/paths.ts", "      f.status !== 'removed' &&\n      isEvidence(f.filename)", "      isEvidence(f.filename)"]
+["paths: other-ticket check off", "apps/server/src/services/merge-gate/paths.ts", "      if (isEvidence(name) && !ownEvidence(name)) push(out.otherTicketEvidence, name);\n", ""]
+["paths: evidence prefix case-sensitive", "apps/server/src/services/merge-gate/paths.ts", "name.toLowerCase().startsWith(EVIDENCE_PREFIX)", "name.startsWith(EVIDENCE_PREFIX)"]
+["link: uppercase sha accepted", "apps/server/src/services/merge-gate/evidence-link.ts", "/^[0-9a-f]{40}$/.test(sha)", "/^[0-9a-fA-F]{40}$/.test(sha)"]
+["link: comments scanned", "apps/server/src/services/merge-gate/evidence-link.ts", "const visible = body.replace(HTML_COMMENT_RE, '');", "const visible = body;"]
+["link: unclosed comment scanned", "apps/server/src/services/merge-gate/evidence-link.ts", "const text = open === -1 ? visible : visible.slice(0, open);", "const text = visible;"]
+["link: trailing punctuation kept", "apps/server/src/services/merge-gate/evidence-link.ts", ".map((u) => u.replace(TRAILING_PUNCT_RE, ''))", ""]
+["link: dot segments allowed", "apps/server/src/services/merge-gate/evidence-link.ts", " &&\n      !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === '')", ""]

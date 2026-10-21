@@ -1,0 +1,90 @@
+import { eq } from 'drizzle-orm';
+import { afterAll, expect, test } from 'vitest';
+import {
+  agent as agentTable,
+  build as buildTable,
+  machine as machineTable,
+  project as projectTable,
+  step as stepTable,
+  todo as todoTable,
+} from '../src/db/schema.js';
+import { BUILD_ABANDONED_STEP_MS, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import { claimStep, finishStep, heartbeatStep } from '../src/services/machines.js';
+import { bootServer } from './helpers.js';
+
+const disposables: (() => void)[] = [];
+afterAll(() => {
+  for (const d of disposables) d();
+});
+
+test('P1/P2 server half: same machine reclaims a released step and both runs report done', async () => {
+  const s = bootServer();
+  disposables.push(() => s.dispose());
+  const teamId = s.team.id;
+  const machineId = 'machine-m1';
+  s.db.insert(projectTable).values({ id: 'proj-fv', name: 'fv', teamId }).run();
+  s.db
+    .insert(machineTable)
+    .values({ id: machineId, teamId, name: 'm1', online: true, enabledRuntimes: ['pi'] })
+    .run();
+  s.db
+    .insert(agentTable)
+    .values({ id: 'agent-fv', teamId, displayName: 'fv', modelId: 'stub-model', machineId })
+    .run();
+  s.db
+    .insert(todoTable)
+    .values({
+      id: 'todo-fv',
+      teamId,
+      projectId: 'proj-fv',
+      title: 'fv',
+      phase: 'building',
+      phaseAt: Date.now(),
+      seqNum: 1,
+      assignment: { plan: null, build: { agentId: 'agent-fv' } },
+    })
+    .run();
+  s.db
+    .insert(buildTable)
+    .values({
+      id: 'build-fv',
+      todoId: 'todo-fv',
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: Date.now(),
+    })
+    .run();
+  s.db
+    .insert(stepTable)
+    .values({
+      id: 'step-fv',
+      buildId: 'build-fv',
+      kind: 'build',
+      status: 'pending',
+      machineId: null,
+      createdAt: Date.now(),
+    })
+    .run();
+  const deps = { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir };
+  const row = () => s.db.select().from(stepTable).where(eq(stepTable.id, 'step-fv')).get()!;
+  const phase = () => s.db.select().from(todoTable).where(eq(todoTable.id, 'todo-fv')).get()!.phase;
+
+  const first = await claimStep(deps, machineId, teamId, 10, 'http://localhost');
+  expect(first?.step.id).toBe('step-fv');
+  console.log('after claim #1', row().status, row().machineId);
+
+  sweepAbandonedBuildSteps(s.svc, Date.now() + BUILD_ABANDONED_STEP_MS + 1_000);
+  console.log('after sweep (machine online, no heartbeat yet)', row().status, row().machineId);
+
+  const second = await claimStep(deps, machineId, teamId, 10, 'http://localhost');
+  console.log('claim #2 returned step', second?.step.id, 'status', row().status);
+
+  heartbeatStep(deps, machineId, 'step-fv');
+  console.log('heartbeat from run #1 accepted after reclaim; lastHeartbeatAt > claimedAt:', (row().lastHeartbeatAt ?? 0) > (row().claimedAt ?? 0));
+
+  await finishStep(deps, machineId, 'step-fv', { status: 'success', hasChanges: true });
+  console.log('run #1 done(success) accepted while run #2 holds the claim:', row().status, 'todo phase', phase());
+
+  await finishStep(deps, machineId, 'step-fv', { status: 'failed', errorMessage: 'run #2' });
+  console.log('run #2 done(failed) accepted on a step already done:', row().status, 'todo phase', phase());
+});

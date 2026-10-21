@@ -3,6 +3,7 @@
 // data-todo-id, the stretched title link (#629 drag locks) and the
 // todo-card / todo-card-title / todo-card-action / todo-card-branch aliases.
 
+import { canOrchestrate } from '@pacman/shared';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,
@@ -123,8 +124,7 @@ export function TodoCard({
           }),
         })
       : undefined;
-  const lockedByOrchestration =
-    orchestration != null && (todo.phase === 'todo' || todo.phase === 'failed');
+  const lockedByOrchestration = orchestration != null && canOrchestrate(todo.phase);
   const chiefSearch = (threadId: string) => {
     const params = new URLSearchParams(search);
     params.set('chief', threadId);

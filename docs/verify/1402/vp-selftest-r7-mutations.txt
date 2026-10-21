@@ -1,0 +1,21 @@
+# vp-selftest.mjs mutations, round 7 (#1411): each mutation applied alone to the tree committed as f5e2f5d,
+# then the whole self-test; every one turns at least one case red. Script: the definitions below.
+
+-- arguments drop defaults they do not name      40/41 passed  caught by: arguments after -- replace only the default options they name
+run directory not passed to the probe            40/41 passed  caught by: a probe gets the run directory doctor checked
+options alone satisfy needsArgs                  40/41 passed  caught by: a case that needs arguments is not satisfied by options alone
+a given output path left relative                40/41 passed  caught by: an output path given after -- is made absolute against the caller's directory
+cleanup without the evidence root                40/41 passed  caught by: cleanup reports the evidence root drive writes to
+capture takes any --wait                         40/41 passed  caught by: capture refuses a --wait that is not a number of milliseconds
+a case that needs a broken seed back to current  40/41 passed  caught by: no current case depends on a seed script that creates an agent without machineId
+
+== definitions (file, original, replacement) ==
+M=[
+ ('-- arguments drop defaults they do not name', V, "  const args = [...c.args.filter((a) => !replaced.has(keyOf(a))), ...extra];", "  const args = extra.length > 0 ? [...c.args.filter((a) => !a.startsWith('-') && !extra.includes(a)), ...extra] : [...c.args];"),
+ ('run directory not passed to the probe', V, "  process.env.VERIFY_RUN_DIR = RUN_DIR;\n", "\n"),
+ ('options alone satisfy needsArgs', V, "  if (c.needsArgs && !extra.some((a) => !a.startsWith('-'))) {", "  if (c.needsArgs && extra.length === 0) {"),
+ ('a given output path left relative', V, "  if (flagAt !== -1 && args[flagAt + 1] !== undefined) args[flagAt + 1] = resolve(args[flagAt + 1]);\n", "\n"),
+ ('cleanup without the evidence root', V, "    process.env.VERIFY_EVIDENCE_DIR ??= EVIDENCE_ROOT;\n", "\n"),
+ ('capture takes any --wait', V, "  if (!/^[0-9]+$/.test(waitText)) fail('--wait needs a whole number of milliseconds');\n", "\n"),
+]
+registry: features.review-reject.cases.human-reject.status set back to current

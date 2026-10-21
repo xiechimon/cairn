@@ -1,0 +1,8 @@
+## apps/web: pnpm exec vitest run test/columns.test.ts
+      Tests  30 passed (30)
+
+## packages/shared: pnpm exec vitest run test/vocabulary.test.ts
+      Tests  39 passed (39)
+
+## apps/server: orchestrate tests
+      Tests  27 passed (27)

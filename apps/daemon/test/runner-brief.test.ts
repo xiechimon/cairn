@@ -9,14 +9,7 @@
 // 5. 写失败降级：全搬之后没有回退通道，「带着空简报开会话」比失败更糟。
 // 6. 误伤无通道后端：未来第三后端不读上下文文件，runner 必须保留 inline 通道。
 
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -403,14 +396,20 @@ describe('简报接线：失败闸', () => {
     const { ws, calls } = fakeWorkspace(cwdForWs);
     mkdirSync(cwdForWs, { recursive: true });
     const { backend } = stubBackend({
-      // 会话期把 worktree 目录改成只读：之后的 rmSync/writeFileSync 都会失败。
-      onSessionStart: (cwd) => chmodSync(cwd, 0o500),
+      // 会话期把简报文件换成同名目录：擦除先读文件，读到目录即 EISDIR 抛出。
+      // 不用 chmod 只读：root（云端容器）无视目录权限，那样擦除照常成功、
+      // 本用例在 root 下恒红（#1458）。
+      onSessionStart: (cwd) => {
+        rmSync(join(cwd, 'AGENTS.md'), { force: true });
+        mkdirSync(join(cwd, 'AGENTS.md'));
+      },
     });
     const { client } = await run({ claimed, backend, workspace: ws });
-    chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
     expect(calls).not.toContain('commitAll');
     expect(calls).not.toContain('push');
     expect(client.doneBodies[0]?.body.status).toBe('failed');
+    // 失败确实出在擦除这一口（cleanupBriefOnce 的 transcript 行），不是更早的某步。
+    expect(JSON.stringify(client.uploads)).toContain('运行简报未能从工作区擦除');
   });
 
   test('写失败即 fail-closed：不开会话（失败方式 5）', async () => {

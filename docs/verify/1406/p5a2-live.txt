@@ -1,0 +1,81 @@
+#1406 P5a-2 live run: the real server, the MCP face over HTTP, GitHub through the container proxy
+head: 59bc0e8f (branch claude/bootstrap-p5b)
+date: 2026-10-21T10:28:53Z
+
+Setup (scratch PACMAN_HOME under the session scratchpad, deleted afterwards):
+- seed script (apps/server modules, the server's own keyfile box):
+  upsertGithubConnection(team, login xiechimon, accessToken ghp_live_p5a2_dummy).
+  The proxy authenticates api.github.com requests itself (a bogus Bearer token
+  still gets 200 through it), so the dummy token is enough here; it never
+  appears in any output below.
+- server: PACMAN_HOME=<scratch> PORT=8796 HOST=127.0.0.1 NODE_ENV=production
+  NODE_USE_ENV_PROXY=1 node --import tsx src/index.ts (Node v22.22.0).
+- POST /api/projects {"name":"pacman-live","kind":"github","githubRepo":"xiechimon/pacman"}
+  -> i9JkDzwNEfPunqzreZMYi; POST /api/projects {"name":"plain-live"} -> 4UQxthfxttdk3ldoKZ-e2.
+- POST /api/teams/{team}/api-keys mcpAccess true, read grants Issues, Pull
+  Requests, Workflow Runs, Projects.
+- One todo inserted directly into the scratch DB with sourceRef
+  github:xiechimon/pacman#1460 (createTodo on a connected project would also
+  create an issue upstream, so it was not used).
+- Calls: POST /api/mcp tools/call (JSON-RPC, Bearer key). Server stopped with
+  SIGTERM afterwards; port 8796 free again.
+
+Results (text of result.content[0], entries trimmed to the first few):
+
+== issues
+isError: False
+{"projectId": "i9JkDzwNEfPunqzreZMYi", "repo": "xiechimon/pacman", "state": "open", "page": 1, "perPage": 5, "hasMore": true}
+issues: 3 entries
+  {"number": 1463, "title": "e2e-affected: an e2e helper change selects the specs that use it, not the full suite", "state": "open", "labels": ["enhancement", "ready-for-agent"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:57:37Z", "updatedAt": "2026-10-21T09:57:37Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1463", "taskId": null}
+  {"number": 1462, "title": "docs,chore: ADR 0021 D4 与 pr-gate 的后续收紧（#1410 pr-gate 第 12 轮建议）", "state": "open", "labels": ["enhancement", "ready-for-agent"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:48:37Z", "updatedAt": "2026-10-21T09:48:37Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1462", "taskId": null}
+  {"number": 1460, "title": "daemon: per-step git credentials overwrite GIT_CONFIG_* the machine's environment already sets", "state": "open", "labels": ["bug", "needs-triage"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:12:55Z", "updatedAt": "2026-10-21T09:12:55Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1460", "taskId": "todo-live-p5a2"}
+
+== issues-perpage100
+isError: False
+{"projectId": "i9JkDzwNEfPunqzreZMYi", "repo": "xiechimon/pacman", "state": "open", "page": 1, "perPage": 30, "hasMore": false}
+issues: 19 entries
+  {"number": 1463, "title": "e2e-affected: an e2e helper change selects the specs that use it, not the full suite", "state": "open", "labels": ["enhancement", "ready-for-agent"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:57:37Z", "updatedAt": "2026-10-21T09:57:37Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1463", "taskId": null}
+  {"number": 1462, "title": "docs,chore: ADR 0021 D4 与 pr-gate 的后续收紧（#1410 pr-gate 第 12 轮建议）", "state": "open", "labels": ["enhancement", "ready-for-agent"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:48:37Z", "updatedAt": "2026-10-21T09:48:37Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1462", "taskId": null}
+  {"number": 1460, "title": "daemon: per-step git credentials overwrite GIT_CONFIG_* the machine's environment already sets", "state": "open", "labels": ["bug", "needs-triage"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:12:55Z", "updatedAt": "2026-10-21T09:12:55Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1460", "taskId": "todo-live-p5a2"}
+  {"number": 1459, "title": "server: webhook 的 pacman 触发不核打标人，与 D5 不一致", "state": "open", "labels": ["enhancement", "ready-for-human"], "author": "xiechimon", "authorAssociation": "OWNER", "createdAt": "2026-10-21T09:11:26Z", "updatedAt": "2026-10-21T09:11:26Z", "htmlUrl": "https://github.com/xiechimon/pacman/issues/1459", "taskId": null}
+
+== pulls
+isError: False
+{"projectId": "i9JkDzwNEfPunqzreZMYi", "repo": "xiechimon/pacman", "state": "all", "page": 1, "perPage": 3, "hasMore": true}
+pullRequests: 3 entries
+  {"number": 1465, "title": "e2e(1463): an e2e helper change selects the specs that import it", "state": "open", "draft": false, "mergedAt": null, "headRef": "claude/elegant-ride-0ynxia", "baseRef": "main", "author": "xiechimon", "htmlUrl": "https://github.com/xiechimon/pacman/pull/1465"}
+  {"number": 1464, "title": "chore: add verify-step-claim, a TLA+ model check of the step lifecycle", "state": "closed", "draft": false, "mergedAt": "2026-10-21T10:15:19Z", "headRef": "claude/formal-verification-pilot-97889c", "baseRef": "main", "author": "xiechimon", "htmlUrl": "https://github.com/xiechimon/pacman/pull/1464"}
+  {"number": 1461, "title": "server(1406): issue intake poller for ready-for-agent issues, opt-in", "state": "open", "draft": false, "mergedAt": null, "headRef": "claude/bootstrap-p5", "baseRef": "main", "author": "xiechimon", "htmlUrl": "https://github.com/xiechimon/pacman/pull/1461"}
+
+== runs
+isError: False
+{"projectId": "i9JkDzwNEfPunqzreZMYi", "repo": "xiechimon/pacman", "branch": "main", "status": "success", "page": 1, "perPage": 2, "hasMore": true}
+workflowRuns: 2 entries
+  {"id": 39583233515, "name": "ci", "headBranch": "main", "headSha": "2294b087ed66bd3c0a5324cc59da5f58c7d560a5", "status": "completed", "conclusion": "success", "event": "push", "createdAt": "2026-10-21T10:15:22Z", "htmlUrl": "https://github.com/xiechimon/pacman/actions/runs/39583233515"}
+  {"id": 39580945748, "name": "ci", "headBranch": "main", "headSha": "1f61c793bf7ac675fc898fa8597d13c6e23c0293", "status": "completed", "conclusion": "success", "event": "push", "createdAt": "2026-10-21T09:57:22Z", "htmlUrl": "https://github.com/xiechimon/pacman/actions/runs/39580945748"}
+
+== runs-bad-status
+isError: True
+MCP error -32602: Input validation error: Invalid arguments for tool workflow_runs: Invalid option: expected one of "completed"|"action_required"|"cancelled"|"failure"|"neutral"|"skipped"|"stale"|"success"|"timed_out"|"in_progress"|"queued"|"requested"|"waiting"|"pending" at status
+
+== issues-plain
+isError: True
+error: project 4UQxthfxttdk3ldoKZ-e2 is not GitHub-backed
+
+== issues-noproject
+isError: True
+MCP error -32602: Input validation error: Invalid arguments for tool issues: Invalid input: expected string, received undefined at projectId
+
+Reading:
+- issues perPage 5: GitHub returned 5 open entries, 2 of them pull requests
+  (#1465 and #1461 at capture time), so 3 issues come back and hasMore is true. #1460
+  carries taskId todo-live-p5a2; the others null. No "body" key anywhere in
+  the text.
+- issues perPage 100: lowered to 30 (perPage 30 in the result).
+- pull_requests state all: draft, mergedAt (#1464 merged), head / base refs.
+- workflow_runs branch main + status success: two "ci" push runs on main.
+- status bogus: rejected before any GitHub read (GitHub itself would answer
+  200 with zero runs; see p5a2-api-notes.txt).
+- plain project: "project ... is not GitHub-backed" error result.
+- no projectId: input validation error result on the MCP face (projectId is
+  required on both faces now).

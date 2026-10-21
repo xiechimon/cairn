@@ -1,0 +1,4 @@
+{
+  "error": "Error: POST /api/teams/GzubfwBZPZvDmhs-IoBrT/agents → 400 {\"error\":\"invalid body at machineId: Invalid input: expected string, received undefined\"}",
+  "checks": []
+}
