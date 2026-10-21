@@ -1,0 +1,402 @@
+# #1404 S1 mutations, round 7: each round 7 rule undone or bent alone, applied to the sources at 09c2b13 (122 tests).
+# After each mutation the runner runs the three S1 test files
+#   pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+# and restores the file; it checks that `git diff` is identical before and after the whole run. Every mutation turns
+# at least one test red; no survivors. Runner: mutate6.mjs from round 6 (s1-mutations-6.txt), unchanged.
+# Definitions: [name, file, text replaced, replacement], each text occurring exactly once; each mutation's patch is
+# the runner's `git diff` of the file while mutated.
+#
+#   class 5 (packages/shared/src/records/merge-gate.ts): the whole block removed; one entry dropped; the machine glob
+#     made to cross a slash; an entry unanchored; an entry widened to services/*.ts. The case-rule test is held by
+#     the case-sensitive flags mutation.
+#   direction (apps/server/src/services/merge-gate/paths.ts), one per side: auto-merge folding Unicode too
+#     (apps/web/\u{17F}rc/x.ts goes red), protected folding ASCII only (AGENT\u{17F}.md goes red), the evidence prefix
+#     and the executable extensions built without protect (doc\u{17F}/verify/1405/x.sh, x.\u{17F}h go red).
+#   fold: the evidence prefix and the executable extensions back to toLowerCase; TEST_DIR_RE and TEST_FILE_RE
+#     without 'u'.
+
+$ node mutate6.mjs /home/user/pacman/.claude/worktrees/p3a mutations7.json
+class 5: whole block removed                         3 failed | 119 passed (122)
+class 5: db/client.ts dropped                        2 failed | 120 passed (122)
+class 5: machine glob crosses a slash (**)           1 failed | 121 passed (122)
+class 5: db/client.ts unanchored (**/db/client.ts)   1 failed | 121 passed (122)
+class 5: oauth.ts widened to services/*.ts           3 failed | 119 passed (122)
+globs: case-sensitive (no 'i' either way)            11 failed | 111 passed (122)
+direction: auto-merge folds Unicode too ('iu' always) 3 failed | 119 passed (122)
+direction: protected folds ASCII only ('i' always)   4 failed | 118 passed (122)
+direction: evidence prefix without protect           2 failed | 120 passed (122)
+direction: executable extensions without protect     1 failed | 121 passed (122)
+fold: evidence prefix by toLowerCase again           2 failed | 120 passed (122)
+fold: executable extension by toLowerCase again      1 failed | 121 passed (122)
+fold: TEST_DIR_RE without u                          1 failed | 121 passed (122)
+fold: TEST_FILE_RE without u                         1 failed | 121 passed (122)
+
+git diff identical before and after the run: true
+survivors: 0
+
+per mutation: patch, then the failing tests
+
+== class 5: whole block removed
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3f19c221..7d0096f6 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -88,27 +88,6 @@ export const PROTECTED_PATH_GLOBS = [
+   'pnpm-lock.yaml',
+   'pnpm-workspace.yaml',
+   '**/.npmrc',
+-  // 5 security-sensitive surfaces (the AGENTS.md /security-review list; change both together) and the DB bootstrap that runs migrations
+-  'apps/server/src/lib/secret-box.ts',
+-  'apps/server/src/lib/keys.ts',
+-  'apps/server/src/lib/token-auth.ts',
+-  'apps/server/src/lib/attachments-token.ts',
+-  'apps/server/src/services/secrets.ts',
+-  'apps/server/src/services/credentials.ts',
+-  'apps/server/src/services/api-keys.ts',
+-  'apps/server/src/services/webhook-tokens.ts',
+-  'apps/server/src/services/oauth.ts',
+-  'apps/server/src/routes-machine.ts',
+-  'apps/server/src/services/machine*.ts',
+-  'apps/daemon/src/credentials.ts',
+-  'apps/daemon/src/secret-channel.ts',
+-  'apps/daemon/src/shell-channel.ts',
+-  'apps/daemon/src/machine-client.ts',
+-  'apps/daemon/src/backend/command-gate.ts',
+-  'apps/server/src/services/mcp-face.ts',
+-  'apps/server/src/services/mcp-servers.ts',
+-  'apps/server/src/routes-webhook.ts',
+-  'apps/server/src/db/client.ts',
+ ] as const;
+ 
+ /** D4 ④：合并就绪闸自身的源码（含本文件）。 */
+failing tests:
+    × ⑤ 安全敏感面与跑迁移的 DB 引导：清单里每个文件都算保护，不进 gateSource
+    × ⑤ 与其它保护 glob 同样不分大小写
+    × ⑤ 的 machine*.ts：machines.ts、machine-relay.ts 命中；* 不跨目录，machine/x.ts 不命中
+
+== class 5: db/client.ts dropped
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3f19c221..690715d0 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -108,7 +108,6 @@ export const PROTECTED_PATH_GLOBS = [
+   'apps/server/src/services/mcp-face.ts',
+   'apps/server/src/services/mcp-servers.ts',
+   'apps/server/src/routes-webhook.ts',
+-  'apps/server/src/db/client.ts',
+ ] as const;
+ 
+ /** D4 ④：合并就绪闸自身的源码（含本文件）。 */
+failing tests:
+    × ⑤ 安全敏感面与跑迁移的 DB 引导：清单里每个文件都算保护，不进 gateSource
+    × ⑤ 与其它保护 glob 同样不分大小写
+
+== class 5: machine glob crosses a slash (**)
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3f19c221..d40813f5 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -99,7 +99,7 @@ export const PROTECTED_PATH_GLOBS = [
+   'apps/server/src/services/webhook-tokens.ts',
+   'apps/server/src/services/oauth.ts',
+   'apps/server/src/routes-machine.ts',
+-  'apps/server/src/services/machine*.ts',
++  'apps/server/src/services/machine**.ts',
+   'apps/daemon/src/credentials.ts',
+   'apps/daemon/src/secret-channel.ts',
+   'apps/daemon/src/shell-channel.ts',
+failing tests:
+    × ⑤ 的 machine*.ts：machines.ts、machine-relay.ts 命中；* 不跨目录，machine/x.ts 不命中
+
+== class 5: db/client.ts unanchored (**/db/client.ts)
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3f19c221..be9eefc3 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -108,7 +108,7 @@ export const PROTECTED_PATH_GLOBS = [
+   'apps/server/src/services/mcp-face.ts',
+   'apps/server/src/services/mcp-servers.ts',
+   'apps/server/src/routes-webhook.ts',
+-  'apps/server/src/db/client.ts',
++  '**/db/client.ts',
+ ] as const;
+ 
+ /** D4 ④：合并就绪闸自身的源码（含本文件）。 */
+failing tests:
+    × ⑤ 锚定在原路径：近邻与别处的同名文件仍可自动合并
+
+== class 5: oauth.ts widened to services/*.ts
+diff --git a/packages/shared/src/records/merge-gate.ts b/packages/shared/src/records/merge-gate.ts
+index 3f19c221..833c9a88 100644
+--- a/packages/shared/src/records/merge-gate.ts
++++ b/packages/shared/src/records/merge-gate.ts
+@@ -97,7 +97,7 @@ export const PROTECTED_PATH_GLOBS = [
+   'apps/server/src/services/credentials.ts',
+   'apps/server/src/services/api-keys.ts',
+   'apps/server/src/services/webhook-tokens.ts',
+-  'apps/server/src/services/oauth.ts',
++  'apps/server/src/services/*.ts',
+   'apps/server/src/routes-machine.ts',
+   'apps/server/src/services/machine*.ts',
+   'apps/daemon/src/credentials.ts',
+failing tests:
+    × 闸源码
+    × ⑤ 锚定在原路径：近邻与别处的同名文件仍可自动合并
+    × 产品源码、测试、e2e 与本票证据在集内
+
+== globs: case-sensitive (no 'i' either way)
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..5e3e1129 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -47,7 +47,7 @@ export function globToRegExp(glob: string, { protect = false } = {}): RegExp {
+       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+     }
+   }
+-  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i');
++  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'u' : '');
+ }
+ 
+ const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
+failing tests:
+    × **/ 含仓根，* 不跨目录，不分大小写
+    × protect 按 Unicode 折叠，不带时只折 ASCII
+    × 大小写变体照样命中
+    × 不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k
+    × 保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 protect 一致）
+    × ⑤ 与其它保护 glob 同样不分大小写
+    × 可自动合并集只折 ASCII 大小写：只靠 Unicode 折叠才像集内的名字（ſrc、pacKages）落在集外
+    × 本 PR 新增或改动的可执行证据列出，删除的不算
+    × 证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行
+    × 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外
+    × 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行
+
+== direction: auto-merge folds Unicode too ('iu' always)
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..a223d663 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -47,7 +47,7 @@ export function globToRegExp(glob: string, { protect = false } = {}): RegExp {
+       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+     }
+   }
+-  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i');
++  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'iu');
+ }
+ 
+ const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
+failing tests:
+    × protect 按 Unicode 折叠，不带时只折 ASCII
+    × 可自动合并集只折 ASCII 大小写：只靠 Unicode 折叠才像集内的名字（ſrc、pacKages）落在集外
+    × 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外
+
+== direction: protected folds ASCII only ('i' always)
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..35a00d14 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -47,7 +47,7 @@ export function globToRegExp(glob: string, { protect = false } = {}): RegExp {
+       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+     }
+   }
+-  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i');
++  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'i');
+ }
+ 
+ const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
+failing tests:
+    × protect 按 Unicode 折叠，不带时只折 ASCII
+    × 不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k
+    × 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外
+    × 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行
+
+== direction: evidence prefix without protect
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..677277eb 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -59,7 +59,7 @@ const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
+ /** 判别票与可执行用。折叠只在单码元字符之间（ſ 与 s），命中时前缀长度仍是
+  * EVIDENCE_PREFIX.length；单独的 docs/verify 条目（顶替证据目录的符号链接）也算，
+  * 票号段为空，列进别票。 */
+-const EVIDENCE_RE = protectedRe(`${EVIDENCE_PREFIX}**`);
++const EVIDENCE_RE = globToRegExp(`${EVIDENCE_PREFIX}**`);
+ const EXECUTABLE_RE = EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => protectedRe(`**/*${ext}`));
+ /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
+ const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
+failing tests:
+    × 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外
+    × 单独的 docs/verify 条目（顶替证据目录的符号链接）列进别票：票号段为空
+
+== direction: executable extensions without protect
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..d0b86ed8 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -60,7 +60,7 @@ const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
+  * EVIDENCE_PREFIX.length；单独的 docs/verify 条目（顶替证据目录的符号链接）也算，
+  * 票号段为空，列进别票。 */
+ const EVIDENCE_RE = protectedRe(`${EVIDENCE_PREFIX}**`);
+-const EXECUTABLE_RE = EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => protectedRe(`**/*${ext}`));
++const EXECUTABLE_RE = EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => globToRegExp(`**/*${ext}`));
+ /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
+ const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
+failing tests:
+    × 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行
+
+== fold: evidence prefix by toLowerCase again
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..7b630976 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -101,7 +101,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
+     if (!list.includes(path)) list.push(path);
+   };
+   // 别票与可执行两项的证据前缀用 EVIDENCE_RE（判进来是严的一侧），票号段按原样比。
+-  const isEvidence = (name: string) => EVIDENCE_RE.test(name);
++  const isEvidence = (name: string) => name.toLowerCase().startsWith(EVIDENCE_PREFIX);
+ 
+   for (const f of files) {
+     const names =
+failing tests:
+    × 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外
+    × 单独的 docs/verify 条目（顶替证据目录的符号链接）列进别票：票号段为空
+
+== fold: executable extension by toLowerCase again
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..e1b9bc54 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -126,7 +126,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
+       push(out.deletedTests, f.previousFilename);
+     }
+ 
+-    if (f.status !== 'removed' && isEvidence(f.filename) && matches(f.filename, EXECUTABLE_RE)) {
++    if (f.status !== 'removed' && isEvidence(f.filename) && EVIDENCE_EXECUTABLE_EXTENSIONS.some((ext) => f.filename.toLowerCase().endsWith(ext))) {
+       push(out.executableEvidence, f.filename);
+     }
+   }
+failing tests:
+    × 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行
+
+== fold: TEST_DIR_RE without u
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..9f26edee 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -54,7 +54,7 @@ const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
+ const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
+ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+ const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+-const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//iu;
++const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
+ const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
+ /** 判别票与可执行用。折叠只在单码元字符之间（ſ 与 s），命中时前缀长度仍是
+  * EVIDENCE_PREFIX.length；单独的 docs/verify 条目（顶替证据目录的符号链接）也算，
+failing tests:
+    × 测试目录与后缀按 Unicode 折叠（收紧的一侧）：teſt/ 是测试目录，.teſt.ts 是测试文件
+
+== fold: TEST_FILE_RE without u
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 9195223d..5b334923 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -55,7 +55,7 @@ const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(p
+ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+ const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+ const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//iu;
+-const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
++const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+ /** 判别票与可执行用。折叠只在单码元字符之间（ſ 与 s），命中时前缀长度仍是
+  * EVIDENCE_PREFIX.length；单独的 docs/verify 条目（顶替证据目录的符号链接）也算，
+  * 票号段为空，列进别票。 */
+failing tests:
+    × 测试目录与后缀按 Unicode 折叠（收紧的一侧）：teſt/ 是测试目录，.teſt.ts 是测试文件
+
+mutations7.json:
+  [
+   [
+    "class 5: whole block removed",
+    "packages/shared/src/records/merge-gate.ts",
+    "  // 5 security-sensitive surfaces (the AGENTS.md /security-review list; change both together) and the DB bootstrap that runs migrations\n  'apps/server/src/lib/secret-box.ts',\n  'apps/server/src/lib/keys.ts',\n  'apps/server/src/lib/token-auth.ts',\n  'apps/server/src/lib/attachments-token.ts',\n  'apps/server/src/services/secrets.ts',\n  'apps/server/src/services/credentials.ts',\n  'apps/server/src/services/api-keys.ts',\n  'apps/server/src/services/webhook-tokens.ts',\n  'apps/server/src/services/oauth.ts',\n  'apps/server/src/routes-machine.ts',\n  'apps/server/src/services/machine*.ts',\n  'apps/daemon/src/credentials.ts',\n  'apps/daemon/src/secret-channel.ts',\n  'apps/daemon/src/shell-channel.ts',\n  'apps/daemon/src/machine-client.ts',\n  'apps/daemon/src/backend/command-gate.ts',\n  'apps/server/src/services/mcp-face.ts',\n  'apps/server/src/services/mcp-servers.ts',\n  'apps/server/src/routes-webhook.ts',\n  'apps/server/src/db/client.ts',\n",
+    ""
+   ],
+   [
+    "class 5: db/client.ts dropped",
+    "packages/shared/src/records/merge-gate.ts",
+    "  'apps/server/src/db/client.ts',\n",
+    ""
+   ],
+   [
+    "class 5: machine glob crosses a slash (**)",
+    "packages/shared/src/records/merge-gate.ts",
+    "'apps/server/src/services/machine*.ts'",
+    "'apps/server/src/services/machine**.ts'"
+   ],
+   [
+    "class 5: db/client.ts unanchored (**/db/client.ts)",
+    "packages/shared/src/records/merge-gate.ts",
+    "'apps/server/src/db/client.ts'",
+    "'**/db/client.ts'"
+   ],
+   [
+    "class 5: oauth.ts widened to services/*.ts",
+    "packages/shared/src/records/merge-gate.ts",
+    "'apps/server/src/services/oauth.ts'",
+    "'apps/server/src/services/*.ts'"
+   ],
+   [
+    "globs: case-sensitive (no 'i' either way)",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "protect ? 'iu' : 'i');",
+    "protect ? 'u' : '');"
+   ],
+   [
+    "direction: auto-merge folds Unicode too ('iu' always)",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "protect ? 'iu' : 'i');",
+    "'iu');"
+   ],
+   [
+    "direction: protected folds ASCII only ('i' always)",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "protect ? 'iu' : 'i');",
+    "'i');"
+   ],
+   [
+    "direction: evidence prefix without protect",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const EVIDENCE_RE = protectedRe(`${EVIDENCE_PREFIX}**`);",
+    "const EVIDENCE_RE = globToRegExp(`${EVIDENCE_PREFIX}**`);"
+   ],
+   [
+    "direction: executable extensions without protect",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => protectedRe(`**/*${ext}`))",
+    "EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => globToRegExp(`**/*${ext}`))"
+   ],
+   [
+    "fold: evidence prefix by toLowerCase again",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const isEvidence = (name: string) => EVIDENCE_RE.test(name);",
+    "const isEvidence = (name: string) => name.toLowerCase().startsWith(EVIDENCE_PREFIX);"
+   ],
+   [
+    "fold: executable extension by toLowerCase again",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "matches(f.filename, EXECUTABLE_RE)",
+    "EVIDENCE_EXECUTABLE_EXTENSIONS.some((ext) => f.filename.toLowerCase().endsWith(ext))"
+   ],
+   [
+    "fold: TEST_DIR_RE without u",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const TEST_DIR_RE = /(^|\\/)(e2e|test|tests|__tests__)\\//iu;",
+    "const TEST_DIR_RE = /(^|\\/)(e2e|test|tests|__tests__)\\//i;"
+   ],
+   [
+    "fold: TEST_FILE_RE without u",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const TEST_FILE_RE = /\\.(test|spec)\\.[cm]?[jt]sx?$/iu;",
+    "const TEST_FILE_RE = /\\.(test|spec)\\.[cm]?[jt]sx?$/i;"
+   ]
+  ]

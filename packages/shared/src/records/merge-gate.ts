@@ -59,7 +59,8 @@ export const AUTO_MERGE_PATH_GLOBS = [
   'docs/verify/**',
 ] as const;
 
-/** D4 保护类别 ①–③：任意层级、不分大小写。与 pr-gate.js 的 PROTECTED 同口径。 */
+/** D4 保护类别 ①–③ 与 ⑤：不分大小写；①–③ 多为任意层级，⑤ 锚定在原路径。与
+ * pr-gate.js 的 PROTECTED 同口径（④ 在 MERGE_GATE_SOURCE_GLOBS）。 */
 export const PROTECTED_PATH_GLOBS = [
   // ① CI、钩子与左右 agent 的文件
   '.github/**',
@@ -87,6 +88,27 @@ export const PROTECTED_PATH_GLOBS = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
   '**/.npmrc',
+  // 5 security-sensitive surfaces (the AGENTS.md /security-review list; change both together) and the DB bootstrap that runs migrations
+  'apps/server/src/lib/secret-box.ts',
+  'apps/server/src/lib/keys.ts',
+  'apps/server/src/lib/token-auth.ts',
+  'apps/server/src/lib/attachments-token.ts',
+  'apps/server/src/services/secrets.ts',
+  'apps/server/src/services/credentials.ts',
+  'apps/server/src/services/api-keys.ts',
+  'apps/server/src/services/webhook-tokens.ts',
+  'apps/server/src/services/oauth.ts',
+  'apps/server/src/routes-machine.ts',
+  'apps/server/src/services/machine*.ts',
+  'apps/daemon/src/credentials.ts',
+  'apps/daemon/src/secret-channel.ts',
+  'apps/daemon/src/shell-channel.ts',
+  'apps/daemon/src/machine-client.ts',
+  'apps/daemon/src/backend/command-gate.ts',
+  'apps/server/src/services/mcp-face.ts',
+  'apps/server/src/services/mcp-servers.ts',
+  'apps/server/src/routes-webhook.ts',
+  'apps/server/src/db/client.ts',
 ] as const;
 
 /** D4 ④：合并就绪闸自身的源码（含本文件）。 */

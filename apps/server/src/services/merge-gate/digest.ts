@@ -7,7 +7,8 @@
 // blob 不够：合入 main 解冲突保留本 PR 的版本，head blob 不变，补丁却从「A 改
 // B」变成「C 改回 B」（撤掉 main 的改动），patchSha 变，摘要变（D3 在 #1410 的修订）。
 // D4 的 800 行 / 40 文件上限与摘要口径不同：按整张补丁算，证据也计入。
-// 纯函数，无 I/O：compare 由 lib/github.ts 取，结果在这里算。
+// 纯函数，无 I/O：compare 的读取还没有，随后面分段（S4）的 I/O 外壳落地；
+// 这里只从响应体算结果。
 
 import { createHash } from 'node:crypto';
 import {

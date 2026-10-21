@@ -1,7 +1,8 @@
 // D4 路径判定（#1404，ADR 0021 D4）：默认拒绝。只有可自动合并集里、且不落入
 // 保护类别的路径能不经人；改名两头（新名与原名）都要过一遍，保护文件改名
-// 移走也算动了它。匹配不分大小写（macOS 默认文件系统不分），与
-// .claude/workflows/pr-gate.js 用同一种 glob 写法，两边判同一份清单。名字里
+// 移走也算动了它。匹配不分大小写（macOS 默认文件系统不分），折叠按方向分，见
+// globToRegExp 上的注释；与 .claude/workflows/pr-gate.js 用同一种 glob 写法与同一条
+// 折叠规则，两边判同一份清单。名字里
 // 有白名单外的字符（换行、空格之类）时不判类、一律算保护：glob 的 `.` 跨不过
 // 换行，而 `*` 能，判类会落空；pr-gate 对这类名字同样拒绝自动判定。
 // 证据目录之外的二进制文件留人（D4）：没有行数，也没有可读的 diff。compare
@@ -17,16 +18,27 @@ import {
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
 } from '@pacman/shared';
+import { isEvidencePath } from './digest.js';
 
-// `**/` 含仓根，`**` 跨目录，`*` 不跨目录；其余字符按字面。
-export function globToRegExp(glob: string): RegExp {
+// 大小写折叠按方向分（与 pr-gate.js 同一条规则）：放行的匹配只折 ASCII，收紧的
+// 匹配按 Unicode 折叠。protect 时带 `iu`（ſ U+017F 同 s、K U+212A 同 k），末尾的 `/**`
+// 也认同名的目录项本身（指向别处的符号链接 .claude、scripts）；保护类别、闸源码、
+// 判别票与可执行用的证据前缀与扩展名都按 protect 建，测试目录与后缀两条正则也带
+// `iu`。可自动合并集不带 protect、只带 `i`：只靠 Unicode 折叠或符号链接才像产品
+// 源码、证据的名字（apps/web/ſrc/x.ts）落在集外，按默认拒绝留人。opaque 的证据豁免
+// 另用大小写敏感的 isEvidencePath（豁免是放行的一侧）。
+// `**/` 含仓根，`**` 跨目录，`*` 不跨目录；其余字符按字面，转义的都是语法字符，
+// `u` 下照样合法。
+export function globToRegExp(glob: string, { protect = false } = {}): RegExp {
+  const tail = protect && glob.endsWith('/**');
+  const g = tail ? glob.slice(0, -3) : glob;
   let re = '';
-  for (let i = 0; i < glob.length; i += 1) {
-    const ch = glob[i];
-    if (ch === '*' && glob[i + 1] === '*' && glob[i + 2] === '/') {
+  for (let i = 0; i < g.length; i += 1) {
+    const ch = g[i];
+    if (ch === '*' && g[i + 1] === '*' && g[i + 2] === '/') {
       re += '(?:.*/)?';
       i += 2;
-    } else if (ch === '*' && glob[i + 1] === '*') {
+    } else if (ch === '*' && g[i + 1] === '*') {
       re += '.*';
       i += 1;
     } else if (ch === '*') {
@@ -35,15 +47,20 @@ export function globToRegExp(glob: string): RegExp {
       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
     }
   }
-  return new RegExp(`^${re}$`, 'i');
+  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i');
 }
 
-const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(globToRegExp);
-const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(globToRegExp);
-const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map(globToRegExp);
-// 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
-const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
-const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+const protectedRe = (glob: string) => globToRegExp(glob, { protect: true });
+const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
+const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//iu;
+const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/iu;
+/** 判别票与可执行用。折叠只在单码元字符之间（ſ 与 s），命中时前缀长度仍是
+ * EVIDENCE_PREFIX.length；单独的 docs/verify 条目（顶替证据目录的符号链接）也算，
+ * 票号段为空，列进别票。 */
+const EVIDENCE_RE = protectedRe(`${EVIDENCE_PREFIX}**`);
+const EXECUTABLE_RE = EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => protectedRe(`**/*${ext}`));
 /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
 const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
 
@@ -64,8 +81,9 @@ export interface PathFindings {
   /** 本 PR 新增或改动的、证据目录里的可执行文件。 */
   executableEvidence: string[];
   /** compare 没给 patch 的条目（二进制、diff 过大、纯改名）在证据目录之外的
-   * 名字；改名两头各判，含删除。证据前缀不分大小写，与 pr-gate 的
-   * EVIDENCE_RE 一致。 */
+   * 名字；改名两头各判，含删除。证据豁免与摘要同一条（digest.ts 的
+   * isEvidencePath，前缀大小写敏感）：GitHub 的树分大小写，Docs/Verify/ 不是
+   * 证据目录。pr-gate 的 EVIDENCE_RE 带 /i，这一项上它比本闸宽。 */
   opaque: string[];
 }
 
@@ -82,8 +100,8 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
   const push = (list: string[], path: string) => {
     if (!list.includes(path)) list.push(path);
   };
-  // 证据前缀不分大小写（与集内 glob 一致），票号段按原样比。
-  const isEvidence = (name: string) => name.toLowerCase().startsWith(EVIDENCE_PREFIX);
+  // 别票与可执行两项的证据前缀用 EVIDENCE_RE（判进来是严的一侧），票号段按原样比。
+  const isEvidence = (name: string) => EVIDENCE_RE.test(name);
 
   for (const f of files) {
     const names =
@@ -100,7 +118,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       if (isEvidence(name) && !name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`)) {
         push(out.otherTicketEvidence, name);
       }
-      if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);
+      if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);
     }
 
     if (f.status === 'removed' && isTestPath(f.filename)) push(out.deletedTests, f.filename);
@@ -108,12 +126,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       push(out.deletedTests, f.previousFilename);
     }
 
-    const lower = f.filename.toLowerCase();
-    if (
-      f.status !== 'removed' &&
-      isEvidence(f.filename) &&
-      EVIDENCE_EXECUTABLE_EXTENSIONS.some((ext) => lower.endsWith(ext))
-    ) {
+    if (f.status !== 'removed' && isEvidence(f.filename) && matches(f.filename, EXECUTABLE_RE)) {
       push(out.executableEvidence, f.filename);
     }
   }
