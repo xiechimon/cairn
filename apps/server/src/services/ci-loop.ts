@@ -35,11 +35,11 @@
 // #1403 第二候选集（review 关口的 PR 对账）：相位 review、build 是 todo 的
 // 当前 build（todo.latestBuildId；更旧的被取代 PR 关了或合了都不算数，当前
 // build 没 PR 时也不拿旧 PR 替它收尾）、没有在飞的步（merge 步正在合并时不
-// 插手）。未连接 GitHub（匿名 60 次/小时按 IP 算）时每候选 5 分钟最多读一次，
-// 对账自己每小时至多 20 次、连同磨绿至多 50 次，pulls 读要给它可能跟着的
-// compare 留一次额度。每候选
-// 一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint 不同时再加一次
-// compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
+// 插手）。未连接 GitHub（匿名 60 次/小时按 IP 算）时每候选 5 分钟最多读一次；
+// 最近一小时里对账自己的匿名请求到 20 次、或对账与磨绿合计到 50 次时，对账
+// 停读（磨绿只记数，不受这两个上限拦）；pulls 读要给它可能跟着的 compare 留
+// 一次额度。每候选一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint
+// 不同时再加一次 compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
 // - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后的 checkpoint
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
 // - 关闭未合并、隔一轮再读到仍关闭（为重跑 CI 关掉又重开 PR 不算）→ system
@@ -47,8 +47,12 @@
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 // - 写之前核对 PR 是本 build 的：PR 号是 daemon 按分支名查到的（gh pr list
 //   --head 只比分支名），公开仓里别人 fork 的同名分支开的 PR 也会被查到。head
-//   仓（owner/repo 不分大小写）是目标仓、head 分支是本 build 的工作分支才写；
-//   对不上 → 不收尾不打回，提示一次；响应缺这两个字段 → 按读不到。
+//   仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库改名或转移后照样
+//   对得上，fork 对不上）、head 分支是本 build 的工作分支才写；对不上（含 fork
+//   已删、head 仓为 null）→ 不收尾不打回，每轮提示一次，结果照常按 etag 缓存；
+//   响应缺 head 分支或 base 仓 id → 按读不到。
+// - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符、截到
+//   100 个字符（会话行经 chief / MCP 的会话读工具交给 agent）。
 // 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
 // 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
 // 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收。人在报告之后把
@@ -121,6 +125,18 @@ export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 
 /** fix prompt 里单条失败摘要的截断（prompt 是会话注入位，不给无界长文本）。 */
 const CI_FIX_SUMMARY_MAX = 800;
+
+/** system 行里引用的一段 GitHub 文本的长度上界（字符数）。 */
+const GITHUB_TEXT_MAX = 100;
+
+/** GitHub 给的文本（分支名、合并者、合并提交）进 system 行之前：去掉控制字符，
+ * 超过上界截断并加省略号。 */
+function githubText(text: string): string {
+  const chars = Array.from(text.replace(/\p{Cc}/gu, ''));
+  return chars.length > GITHUB_TEXT_MAX
+    ? `${chars.slice(0, GITHUB_TEXT_MAX).join('')}…`
+    : chars.join('');
+}
 
 /** 对账日志口（scheduler 接线传 pino；每 sweep 一行：候选数 × 三态落位）。 */
 export interface CiPollLogger {
@@ -243,7 +259,7 @@ interface CiPollTally {
   reviewSkipped: number;
   /** 对账：读不到（限流/404/网络/响应缺字段）：fail-open 下轮重试。 */
   reviewUnreadable: number;
-  /** 对账：PR 的 head 仓或分支不是本 build 的（例如 fork 的同名分支）：不写。 */
+  /** 对账：PR 的 head 仓或分支不是本 build 的（fork 的同名分支、已删的 fork）：不写。 */
   reviewForeign: number;
   /** PR 已在 GitHub 合并 → done。 */
   merged: number;
@@ -511,14 +527,17 @@ export function createCiPoller(
     }
     const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
     const since = roundStart(deps, cand.buildId);
-    // PR 是本 build 的才写（见文件头）：缺字段的响应不当终态缓存（同下文合并判据）。
-    if (pull.headRepo === null || pull.headRef === null) {
+    // PR 是本 build 的才写（见文件头）：缺 head 分支或 base 仓 id 的响应不当终态缓存
+    // （同下文合并判据）。
+    if (pull.headRef === null || pull.baseRepoId === null) {
       pullCache.delete(key);
       tally.reviewUnreadable += 1;
       return;
     }
     const branch = conversationBranch(cand.buildId);
-    if (pull.headRepo.toLowerCase() !== target.fullName.toLowerCase() || pull.headRef !== branch) {
+    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时
+    // headRepoId 是 null，同样对不上。对不上的结果留在缓存里（PR 的 head 不会变）。
+    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
       hintOnce(
         cand.buildId,
         `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`,
@@ -543,7 +562,7 @@ export function createCiPoller(
       if (pull.baseRef !== pull.defaultBranch) {
         hintOnce(
           cand.buildId,
-          `PR #${prNumber} 合并进了分支「${pull.baseRef}」，不是默认分支「${pull.defaultBranch}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
+          `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
           since,
           tally,
         );
@@ -636,8 +655,10 @@ export function createCiPoller(
         }
       }
       const detail = [
-        pull.mergeCommitSha === null ? null : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
-        pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
+        pull.mergeCommitSha === null
+          ? null
+          : `合并提交 ${githubText(pull.mergeCommitSha).slice(0, 7)}`,
+        pull.mergedBy === null ? null : `由 ${githubText(pull.mergedBy)} 合并`,
       ].filter((x) => x !== null);
       writeSystemRow(
         cand.buildId,
