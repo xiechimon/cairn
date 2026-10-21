@@ -1900,8 +1900,8 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
     const record = getTodo(deps, todoId);
     if (record) deps.hub.publishTodoDoc(record.teamId, record);
   }
-  // 完成行每次收尾都落（与改动前一致）：对账在本轮已有完成行时根本不收尾
-  // （ci-loop 的本轮已报告判据），同一轮里第二个合并步照旧再落一行。
+  // 完成行每次收尾都落：对账在本轮已有完成行时不收尾（ci-loop 的本轮已报告
+  // 判据），同一轮里第二个合并步再落一行。
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',
