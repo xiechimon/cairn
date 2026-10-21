@@ -58,7 +58,7 @@ export const COLUMNS: BoardColumnDef[] = [
     dropPhase: 'todo',
     name: '待开始',
     status: 'queued',
-    accepts: (t) => t.phase === 'todo' || t.phase === 'queued',
+    accepts: (t) => t.phase === 'todo',
   },
   {
     id: 'building',
@@ -66,7 +66,9 @@ export const COLUMNS: BoardColumnDef[] = [
     startGate: true,
     name: '执行中',
     status: 'running',
-    accepts: (t) => isInFlightPhase(t.phase),
+    // #1447：queued 已开始，停在它将要跑的那一步（参考站 2026-09-12）。
+    // IN_FLIGHT_PHASES（静默对账闸门）仍只含 planning/building。
+    accepts: (t) => t.phase === 'queued' || isInFlightPhase(t.phase),
   },
   {
     id: 'pending',
@@ -93,10 +95,9 @@ export const COLUMNS: BoardColumnDef[] = [
 /** 落位合法矩阵（#753，todos.dev 2026-10-03/04 live 重测；shared canBoardDrop
  *  的卡面镜像——那边是相位级 raw PATCH 判据，这边吃整卡所以带数据位）：
  *  - 每张卡都可拖；源列恒素面（同列落位 = 无操作）；
- *  - 执行中 只吃 待开始 里未开始的 todo 卡（拖入 = 开始意图，board.tsx
- *    startGate 路由；server orchestrate 只收 todo / failed）。queued 同住
- *    待开始但已开始，不进（#1434）——比 canBoardDrop 的 queued→building
- *    更严：执行中落位不发改相 PATCH。待处理/已完成 源对它恒素面（实测）；
+ *  - 执行中 只吃 待开始（只住未开始的 todo 卡；拖入 = 开始意图，board.tsx
+ *    startGate 路由，server orchestrate 只收 todo / failed）。queued 住执行中
+ *    （#1447），对它是源列。待处理/已完成 源对它恒素面（实测）；
  *  - 待处理 只吃 已完成 且 hasChanges（2026-10-04 实测：无变更的 done 卡
  *    拖拽时 待处理 恒素面）；待开始→待处理 恒素面（实测，#351 该对保留）；
  *  - 已完成 吃 待开始/执行中/待处理，含 failed（#1247 手动关边，不看
@@ -110,7 +111,7 @@ export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
     case 'todo':
       return true;
     case 'building':
-      return todo.phase === 'todo';
+      return src.id === 'todo';
     case 'pending':
       return src.id === 'done' && todo.hasChanges === true;
     case 'done':
@@ -152,9 +153,10 @@ export function isInflightDoneGate(todo: TodoRecord): boolean {
 /** Which footer a board card carries (DESIGN.md 任务卡). Action copy:
  *  failed cards read `重试` while the detail header reads `重跑` (r8 §2.2
  *  vs §2.1, the CONTEXT.md two-word-list pattern). Done cards carry no
- *  action: 重开 lives only in the detail header (r7 §3.3). */
+ *  action: 重开 lives only in the detail header (r7 §3.3). A queued card
+ *  takes the running footer in its waiting form (#1447). */
 export type CardFace =
-  | { kind: 'queued'; action: string | null }
+  | { kind: 'todo'; action: string | null }
   | { kind: 'running' }
   | { kind: 'attention'; need: 'failed' | 'confirm' | 'review' | 'reply' }
   | { kind: 'done'; canceled: boolean };
@@ -163,8 +165,8 @@ export function cardFace(todo: TodoRecord): CardFace {
   if (todo.awaitingReply === true) return { kind: 'attention', need: 'reply' };
   switch (todo.phase) {
     case 'todo':
+      return { kind: 'todo', action: PHASE_UI.todo.action };
     case 'queued':
-      return { kind: 'queued', action: PHASE_UI[todo.phase].action };
     case 'planning':
     case 'building':
       return { kind: 'running' };

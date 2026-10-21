@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest';
 import {
   attentionCount,
   canDropOnColumn,
+  cardFace,
   COLUMNS,
   needsDoneGate,
   needsResetGate,
@@ -43,14 +44,26 @@ describe('canDropOnColumn（#753 per-source 矩阵）', () => {
     expect(canDropOnColumn(t, 'todo')).toBe(false);
   });
 
-  // #1434：拖进执行中 = 开始意图，server orchestrate 只收 todo / failed。
-  // queued 同住待开始列但已开始——执行中对它亮起，松手只换来 409 + 报错 toast。
-  test('queued 源（已开始、等机器）：已完成 ✓（在飞关闸）；执行中 ✗；源列 ✗', () => {
+  // #1447：queued 已开始，住执行中（参考站：排队卡停在它将要跑的那一步）。
+  // 拖回待开始 = 重置意图（#755 闸），已完成 = 在飞关闸，执行中是源列。
+  test('queued 源（已开始、等机器）：待开始 ✓（重置闸）已完成 ✓；执行中 ✗（源列）；待处理 ✗', () => {
     const t = todo(1, 'queued');
+    expect(canDropOnColumn(t, 'todo')).toBe(true);
     expect(canDropOnColumn(t, 'done')).toBe(true);
     expect(canDropOnColumn(t, 'building')).toBe(false);
     expect(canDropOnColumn(t, 'pending')).toBe(false);
-    expect(canDropOnColumn(t, 'todo')).toBe(false);
+  });
+
+  test('卡面：queued 走执行中底栏，todo 才浮开始（#1447）', () => {
+    expect(cardFace(todo(1, 'queued'))).toEqual({ kind: 'running' });
+    expect(cardFace(todo(2, 'todo'))).toEqual({ kind: 'todo', action: '开始' });
+  });
+
+  test('queued 住执行中列、不住待开始列（#1447）', () => {
+    const t = todo(1, 'queued');
+    expect(col('building').accepts(t)).toBe(true);
+    expect(col('todo').accepts(t)).toBe(false);
+    expect(needsResetGate(t)).toBe(true);
   });
 
   test('执行中 落点逐相位：只有未开始的 todo 可进（#1434）', () => {
