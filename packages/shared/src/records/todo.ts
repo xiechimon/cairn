@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
+import { parseGithubRepoRef } from './project.js';
 // #1261 quotaWait 投影形态（step.ts 单源——等额度读面 todo/step 同形）。
 import { quotaWaitSchema } from './step.js';
 
@@ -66,13 +67,16 @@ export function githubIssueSourceRef(owner: string, repo: string, issueNumber: n
 
 /** 外部引用反解单源（#452 写向：回写标题 / 只读回显按 ref 出站）。与
  * githubIssueSourceRef 严格互逆；不匹配（含 owner/repo 段带 `/` 或 `#` 的
- * 畸形值）返回 null 由调用面降级。 */
+ * 畸形值）返回 null 由调用面降级。owner/repo 段再过 parseGithubRepoRef
+ * （#1466：`.` / `..` 段的存量引用同样不出站）。 */
 export function parseGithubIssueSourceRef(
   ref: string,
 ): { owner: string; repo: string; issueNumber: number } | null {
-  const m = /^github:([^/#]+)\/([^/#]+)#(\d+)$/.exec(ref);
+  const m = /^github:([^/#]+\/[^/#]+)#(\d+)$/.exec(ref);
   if (m === null) return null;
-  return { owner: m[1] as string, repo: m[2] as string, issueNumber: Number(m[3]) };
+  const repoRef = parseGithubRepoRef(m[1] as string);
+  if (repoRef === null) return null;
+  return { ...repoRef, issueNumber: Number(m[2]) };
 }
 
 /** 编排来源引用格式单源（#640 / r14 §5.3：`chief:<uuid>`——编排会话 id 的
