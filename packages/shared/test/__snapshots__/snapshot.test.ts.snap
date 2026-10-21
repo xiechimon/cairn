@@ -7712,6 +7712,61 @@ exports[`协议词表快照（02 §5/§6 canonical） > worktree 契约（02 §5
 }
 `;
 
+exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码与类别，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 1`] = `
+[
+  "policy-human: policy",
+  "autonomy-paused: policy",
+  "not-applicable: policy",
+  "not-current-build: transient",
+  "phase-not-review: transient",
+  "work-in-flight: transient",
+  "pr-unreadable: transient",
+  "pr-not-open: human",
+  "pr-draft: transient",
+  "pr-from-fork: human",
+  "base-not-default: human",
+  "mergeable-state: transient",
+  "self-required: human",
+  "required-checks-unreadable: transient",
+  "required-checks-none: human",
+  "required-check-missing: transient",
+  "required-check-pending: transient",
+  "required-check-failed: transient",
+  "pr-evidence-not-green: transient",
+  "patch-unavailable: transient",
+  "compare-malformed: human",
+  "compare-truncated: human",
+  "patch-unbindable: human",
+  "size-cap: human",
+  "protected-path: human",
+  "outside-auto-merge: human",
+  "test-deleted: human",
+  "opaque-file: human",
+  "evidence-outside-ticket: human",
+  "evidence-executable: human",
+  "issue-ref-missing: human",
+  "evidence-link-missing: transient",
+  "verify-missing: transient",
+  "verify-failed: transient",
+  "verify-extraction-failed: transient",
+  "verify-evidence-invalid: transient",
+  "verify-tampered: human",
+  "review-missing: transient",
+  "review-blocking: transient",
+  "review-extraction-failed: transient",
+  "perspective-timed-out: human",
+  "decision-missing: transient",
+  "decision-no-go: transient",
+  "decision-extraction-failed: transient",
+  "fix-rounds-exhausted: human",
+  "fix-no-change: human",
+  "gate-rounds-exhausted: human",
+  "no-reviewers: human",
+  "no-verifier: human",
+  "no-decider: human",
+]
+`;
+
 exports[`协议词表快照（02 §5/§6 canonical） > 品牌串命名常量表（02 §5.8 + 素材替换计划 §2） 1`] = `
 {
   "BRAND": {
