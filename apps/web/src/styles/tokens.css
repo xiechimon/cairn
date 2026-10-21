@@ -392,9 +392,9 @@
      while a gesture is in flight (ring + 5% fill) and the hovered one a step
      hotter (10%); invalid targets and the source column stay neutral.
      Hue follows the brand spot slot (--card-button), same 5%/10% steps */
-  --drop-tint-border: rgb(242 148 216);
-  --drop-tint-base: rgb(242 148 216 / 0.05);
-  --drop-tint-hover: rgb(242 148 216 / 0.1);
+  --drop-tint-border: rgb(240 146 109);
+  --drop-tint-base: rgb(240 146 109 / 0.05);
+  --drop-tint-hover: rgb(240 146 109 / 0.1);
   /* alias of the #139 edge shadow tier — every elevated surface (fab,
      popovers, panels) draws one shadow from the single source */
   --fab-shadow: var(--edge-shadow);
@@ -478,7 +478,9 @@
   --dur-modal-exit: 150ms;
   --dur-message-exit: 180ms;
   --surface-0: var(--background);
-  --surface-1: color-mix(in oklab, var(--background), var(--card) 50%);
+  /* Paper: the sidebar sits on canvas in both themes (shadcn.css holds the
+     two canvas values). */
+  --surface-1: var(--canvas);
   --surface-2: var(--card);
   --surface-3: var(--popover);
   --hover-1: color-mix(in oklab, var(--foreground) 5%, transparent);
@@ -528,10 +530,8 @@
 
 .light {
   /* 并流别名 light 镜像已随 :root 别名层退役（#1002，#987 §3.3-A）。
-     .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像 + --surface-1
-     改指 canvas（侧栏走 --surface-1，Paper 亮侧侧栏坐在 canvas 上）。 */
-
-  --surface-1: var(--canvas);
+     .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像；--surface-1
+     在 :root 指 canvas，两侧同形。 */
 
   /* unified border language (#139), light side: the edge shadow tier dimmed
      to the light surface; the ring rides --border's light value via the
