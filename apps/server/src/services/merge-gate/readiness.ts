@@ -76,6 +76,7 @@ export interface GateInputs {
   compareFiles: CompareFile[] | null;
   /** body 里证据链的 SHA → 是否是 head 本身或其祖先；null = 未知。 */
   evidenceLinkAncestry: Record<string, boolean | null>;
+  /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
   verdicts: GateVerdictView[];
   /** 当前摘要的闸轮次；perspectives 在建轮时冻结。human 策略下没有轮次。 */
   round: {
@@ -96,6 +97,8 @@ const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
 
 const runPasses = (r: GateCheckRun) =>
   r.status === 'completed' && r.conclusion !== null && PASSING_CONCLUSIONS.has(r.conclusion);
+const isOwnStatus = (s: GateCommitStatus) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT;
+const checkName = (x: GateCheckRun | GateCommitStatus) => ('name' in x ? x.name : x.context);
 
 export function mergeReadiness(i: GateInputs): MergeReadiness {
   const found = new Map<MergeBlockerCode, string[]>();
@@ -124,16 +127,15 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     ) {
       block('pr-from-fork', pr.headRepoFullName ?? 'head repository deleted');
     }
-    if (i.repo.defaultBranch === null || pr.baseRef !== i.repo.defaultBranch) {
-      block(
-        'base-not-default',
-        `${pr.baseRef} → ${i.repo.defaultBranch ?? 'default branch unknown'}`,
-      );
-    }
+    // 默认分支读不到是输入读不到，可等；不能当成目标分支不对去留人。
+    if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');
+    else if (pr.baseRef !== i.repo.defaultBranch)
+      block('base-not-default', `${pr.baseRef} → ${i.repo.defaultBranch}`);
   }
 
-  // 检查（当前 head）
+  // 检查（当前 head）。judged = 上面已按必需检查或 pr-evidence 记过自己码的条目。
   const checks = i.checks;
+  const judged = new Set<GateCheckRun | GateCommitStatus>();
   if (checks === null || checks.required === null) {
     block('required-checks-unreadable');
   } else {
@@ -145,10 +147,12 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       const run = checks.runs.find((r) => r.name === name);
       const status = checks.statuses.find((s) => s.context.toLowerCase() === name.toLowerCase());
       if (run !== undefined) {
+        judged.add(run);
         if (run.status !== 'completed') block('required-check-pending', name);
         else if (!runPasses(run))
           block('required-check-failed', `${name}: ${run.conclusion ?? 'none'}`);
       } else if (status !== undefined) {
+        judged.add(status);
         if (status.state === 'pending') block('required-check-pending', name);
         else if (status.state !== 'success')
           block('required-check-failed', `${name}: ${status.state}`);
@@ -159,6 +163,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
   if (checks !== null) {
     const evidence = checks.runs.find((r) => r.name === 'pr-evidence');
+    if (evidence !== undefined) judged.add(evidence);
     if (
       evidence === undefined ||
       evidence.status !== 'completed' ||
@@ -171,27 +176,35 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
-  // GitHub 的可合并判定。自家 status 不是必需检查，但非 success 时 GitHub 报
-  // unstable；只因它 unstable 不算拦，否则闸会被自己卡死。
+  // GitHub 的可合并判定。mergeable_state 是 GitHub 异步算的，可能还停在 clean；
+  // 手上的检查清单更新，以它为准：未通过（失败或还在跑）的检查，除了自家
+  // status，一律拦，必需检查之外的也拦。自家 status 不是必需检查，非 success
+  // 时 GitHub 报 unstable；只因它 unstable 不算拦，否则闸会被自己卡死。但看
+  // 不到任何未通过的检查却报 unstable，说不清是谁让它 unstable 的，拦。
+  const notPassing =
+    checks === null
+      ? null
+      : [
+          ...checks.runs.filter((r) => !runPasses(r)),
+          ...checks.statuses.filter((s) => s.state !== 'success' && !isOwnStatus(s)),
+        ];
+  const ownNotPassing =
+    checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s)) ?? false;
   if (pr !== null) {
     const state = pr.mergeableState;
     if (state === null || state === 'unknown') {
       block('mergeable-state', 'GitHub still computing');
     } else if (state === 'unstable') {
-      if (checks === null) {
-        block('mergeable-state', 'unstable, checks unreadable');
-      } else {
-        const foreign = [
-          ...checks.runs.filter((r) => !runPasses(r)).map((r) => r.name),
-          ...checks.statuses
-            .filter(
-              (s) => s.state !== 'success' && s.context.toLowerCase() !== MERGE_GATE_STATUS_CONTEXT,
-            )
-            .map((s) => s.context),
-        ];
-        if (foreign.length > 0) block('mergeable-state', `unstable: ${foreign.join(', ')}`);
-      }
-    } else if (state !== 'clean' && state !== 'has_hooks') {
+      if (notPassing === null) block('mergeable-state', 'unstable, checks unreadable');
+      else if (notPassing.length > 0)
+        block('mergeable-state', `unstable: ${notPassing.map(checkName).join(', ')}`);
+      else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');
+    } else if (state === 'clean' || state === 'has_hooks') {
+      // 必需检查与 pr-evidence 上面已各记自己的码，这里不重复列。
+      const foreign = (notPassing ?? []).filter((x) => !judged.has(x));
+      if (foreign.length > 0)
+        block('mergeable-state', `${state}, not passing: ${foreign.map(checkName).join(', ')}`);
+    } else {
       block('mergeable-state', state);
     }
   }
@@ -207,7 +220,8 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   } else if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {
     block('compare-truncated', digest.unavailable);
   } else if (digest.unavailable !== null) {
-    block('patch-unavailable', digest.unavailable);
+    // 只有证据（empty）或有文件缺 blob sha（null-sha）：等多久都算不出摘要，留人。
+    block('patch-unbindable', digest.unavailable);
   }
   if (digest !== null && i.compareFiles !== null) {
     if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {
@@ -240,6 +254,9 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 判定：只认绑在当前摘要上的。摘要不可得时上面已拦，这里不再重复列出。
+  // 唯一的例外是 verify-tampered，有意不看摘要：本构建任何摘要上的 tampered
+  // 都算。验证者改了代码是这条车道的问题，不是哪份补丁的问题，修出一份新补丁
+  // 清不掉它；只有换新的构建（verdicts 只含本构建的判定）才清掉。
   if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))
     block('verify-tampered');
   const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;
@@ -256,7 +273,8 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
     const verify = at('verify');
     if (has(verify, 'block')) block('verify-failed');
-    if (has(verify, 'evidence_invalid')) block('verify-evidence-invalid');
+    // 证据无效与提取失败一样：同摘要上后来有一次通过就清掉。
+    if (!has(verify, 'pass') && has(verify, 'evidence_invalid')) block('verify-evidence-invalid');
     if (!has(verify, 'pass') && has(verify, 'extraction_failed')) block('verify-extraction-failed');
     if (
       !verify.some((x) =>

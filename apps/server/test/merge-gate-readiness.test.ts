@@ -6,6 +6,10 @@
 // 读不到退回「全部检查」；必需项由 commit status 而不是 check run 提供时
 // 漏判；pr-evidence 为 skipped / neutral 被当绿；pacman/merge-gate 本身被设成
 // 必需检查；blocker 顺序不稳导致 status 描述来回跳。
+// /code-review 之后：只有证据或缺 blob sha 的补丁（等不来摘要）被当成可等；
+// GitHub 还报 clean 时放过手上检查清单里别家未通过的检查；unstable 却看不到
+// 任何未通过的检查也放过；同摘要上后来的通过清不掉 evidence_invalid；读不到
+// 默认分支被当成目标分支不对而留人。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿）。
 
 import { type CompareFile, MERGE_BLOCKER_CODES, type MergeBlockerCode } from '@pacman/shared';
@@ -243,6 +247,7 @@ const ROWS: Row[] = [
       pr(i).changedFiles = FILES.length + 1;
     },
   ],
+  ['patch-unbindable', (i) => setFiles(i, [file('docs/verify/1404/result.json')])],
   [
     'size-cap',
     (i) =>
@@ -293,7 +298,15 @@ const ROWS: Row[] = [
       ];
     },
   ],
-  ['verify-evidence-invalid', (i) => i.verdicts.push(v('verify', 'evidence_invalid'))],
+  [
+    'verify-evidence-invalid',
+    (i) => {
+      i.verdicts = [
+        ...i.verdicts.filter((x) => x.kind !== 'verify'),
+        v('verify', 'evidence_invalid'),
+      ];
+    },
+  ],
   ['verify-tampered', (i) => i.verdicts.push(v('verify', 'tampered', null, 'pd1:old'))],
   [
     'review-missing',
@@ -373,6 +386,8 @@ const ROWS: Row[] = [
 ];
 
 const codesOf = (i: GateInputs) => mergeReadiness(i).blockers.map((b) => b.code);
+const classesOf = (i: GateInputs) =>
+  mergeReadiness(i).blockers.map((b) => [b.code, b.class, ...b.detail]);
 
 describe('mergeReadiness：每个 blocker 一真一假', () => {
   test('基线全绿：ready，没有 blocker（每个 blocker 的假腿）', () => {
@@ -567,5 +582,118 @@ describe('mergeReadiness：设计点名的组合', () => {
     pr(i).changedFiles = 0;
     i.verdicts = [];
     expect(() => mergeReadiness(i)).not.toThrow();
+  });
+});
+
+describe('mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准（/code-review 后）', () => {
+  test('只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable', () => {
+    const a = green();
+    setFiles(a, [file('docs/verify/1404/result.json')]);
+    expect(classesOf(a)).toEqual([['patch-unbindable', 'human', 'empty']]);
+    const b = green();
+    setFiles(b, []);
+    expect(classesOf(b)).toEqual([['patch-unbindable', 'human', 'empty']]);
+  });
+
+  test('有文件缺 blob sha（子模块之类）：摘要等不来，留人', () => {
+    const i = green();
+    setFiles(i, [...FILES, file('apps/server/src/vendored', { sha: null })]);
+    expect(classesOf(i)).toEqual([['patch-unbindable', 'human', 'null-sha']]);
+  });
+
+  test('读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated', () => {
+    const a = green();
+    a.compareFiles = null;
+    expect(classesOf(a)).toEqual([['patch-unavailable', 'transient', 'compare unreadable']]);
+    const b = green();
+    pr(b).changedFiles = FILES.length + 1;
+    expect(classesOf(b)).toEqual([['compare-truncated', 'human', 'count-mismatch']]);
+  });
+
+  test('GitHub 还报 clean，手上的检查里有别家失败：拦，并点名', () => {
+    const i = green();
+    checks(i).runs.push({
+      name: 'Cursor Security Agent',
+      status: 'completed',
+      conclusion: 'failure',
+    });
+    const [b, ...rest] = mergeReadiness(i).blockers;
+    expect(rest).toEqual([]);
+    expect(b).toMatchObject({ code: 'mergeable-state', class: 'transient' });
+    expect(b?.detail.join(' ')).toContain('Cursor Security Agent');
+  });
+
+  test('has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦', () => {
+    const a = green();
+    pr(a).mergeableState = 'has_hooks';
+    checks(a).statuses = [{ context: 'codecov/patch', state: 'failure' }];
+    expect(mergeReadiness(a).blockers.map((b) => [b.code, b.class])).toEqual([
+      ['mergeable-state', 'transient'],
+    ]);
+    const b = green();
+    pr(b).mergeableState = 'has_hooks';
+    checks(b).runs.push({ name: 'lighthouse', status: 'in_progress', conclusion: null });
+    expect(mergeReadiness(b).blockers.map((x) => [x.code, x.class])).toEqual([
+      ['mergeable-state', 'transient'],
+    ]);
+  });
+
+  test('clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码', () => {
+    const a = green();
+    checks(a).statuses = [{ context: 'pacman/merge-gate', state: 'failure' }];
+    expect(codesOf(a)).toEqual([]);
+    const b = green();
+    checks(b).runs[2] = { name: 'pr-evidence', status: 'completed', conclusion: 'failure' };
+    expect(codesOf(b)).toEqual(['pr-evidence-not-green']);
+    const c = green();
+    checks(c).required = ['check', 'legacy-ci'];
+    checks(c).statuses = [{ context: 'Legacy-CI', state: 'failure' }];
+    expect(codesOf(c)).toEqual(['required-check-failed']);
+  });
+
+  test('unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦', () => {
+    const a = green();
+    pr(a).mergeableState = 'unstable';
+    expect(mergeReadiness(a).blockers.map((b) => [b.code, b.class])).toEqual([
+      ['mergeable-state', 'transient'],
+    ]);
+    const b = green();
+    pr(b).mergeableState = 'unstable';
+    checks(b).statuses = [{ context: 'pacman/merge-gate', state: 'success' }];
+    expect(mergeReadiness(b).blockers.map((x) => [x.code, x.class])).toEqual([
+      ['mergeable-state', 'transient'],
+    ]);
+  });
+
+  test('同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理）', () => {
+    const i = green();
+    i.verdicts = [v('verify', 'evidence_invalid'), ...i.verdicts];
+    expect(codesOf(i)).toEqual([]);
+  });
+
+  test('通过在另一份补丁上：清不掉同摘要的 evidence_invalid', () => {
+    const i = green();
+    i.verdicts = [
+      ...i.verdicts.filter((x) => x.kind !== 'verify'),
+      v('verify', 'evidence_invalid'),
+      v('verify', 'pass', null, 'pd1:old'),
+    ];
+    expect(mergeReadiness(i).blockers.map((b) => [b.code, b.class])).toEqual([
+      ['verify-evidence-invalid', 'transient'],
+    ]);
+  });
+
+  test('读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default', () => {
+    const i = green();
+    i.repo.defaultBranch = null;
+    expect(classesOf(i)).toEqual([['pr-unreadable', 'transient', 'default branch unreadable']]);
+  });
+
+  test('读到了默认分支、PR 指向别处：仍是留人的 base-not-default', () => {
+    const i = green();
+    pr(i).baseRef = 'release';
+    expect(mergeReadiness(i).blockers.map((b) => [b.code, b.class])).toEqual([
+      ['base-not-default', 'human'],
+    ]);
   });
 });

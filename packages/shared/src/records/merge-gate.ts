@@ -135,7 +135,7 @@ export const MERGE_BLOCKERS = [
   { code: 'phase-not-review', class: 'transient', label: '任务不在审核关口' },
   { code: 'work-in-flight', class: 'transient', label: '还有步骤在跑' },
   // PR
-  { code: 'pr-unreadable', class: 'transient', label: '读不到 PR' },
+  { code: 'pr-unreadable', class: 'transient', label: '读不到 PR 或仓库默认分支' },
   { code: 'pr-not-open', class: 'human', label: 'PR 已合并或已关闭' },
   { code: 'pr-draft', class: 'transient', label: 'PR 是草稿' },
   { code: 'pr-from-fork', class: 'human', label: 'PR 来自 fork' },
@@ -150,8 +150,15 @@ export const MERGE_BLOCKERS = [
   { code: 'required-check-failed', class: 'transient', label: '必需检查未通过' },
   { code: 'pr-evidence-not-green', class: 'transient', label: 'pr-evidence 未通过' },
   // 补丁
-  { code: 'patch-unavailable', class: 'transient', label: '补丁摘要不可得' },
+  // 摘要不可得分两类：compare 读不到可等（下一次巡检再读）；读到了却算不出
+  // （截断、只有证据、缺 blob sha）等不来，留人。
+  { code: 'patch-unavailable', class: 'transient', label: '读不到 compare，补丁摘要暂不可得' },
   { code: 'compare-truncated', class: 'human', label: 'compare 文件列表被截断' },
+  {
+    code: 'patch-unbindable',
+    class: 'human',
+    label: '补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）',
+  },
   { code: 'size-cap', class: 'human', label: '补丁超过 800 行或 40 个文件' },
   { code: 'protected-path', class: 'human', label: '改动命中 D4 保护路径' },
   { code: 'outside-auto-merge', class: 'human', label: '改动在可自动合并集之外' },
