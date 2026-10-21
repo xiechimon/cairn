@@ -39,7 +39,9 @@
 // 20 （第三轮补：对账范围）关闭对账只碰轮询器领的卡：轮询器导入时 createdBy
 //    记为本队 chief 绑定的 Agent id（chief 自建卡同一律），手工导入与 webhook
 //    导入仍是 seed 用户、不被对账关闭；认卡靠库里的 createdBy，重启后照样
-//    对账；chief 没绑 Agent 的队本轮不对账、每轮记一行。
+//    对账；chief 没绑 Agent 的队本轮不对账、每轮记一行。review 补：没绑的那几轮
+//    不清「见过 open」（换回同一 Agent 后，期间被关的照样关）；绑定的 Agent 没有
+//    模型也照样对账（对账不编排）；读 chief 出错只算本队失败，不算整轮失败。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -1056,7 +1058,7 @@ describe('10 导入后标签被摘', () => {
 describe('11 issue 在 GitHub 被关', () => {
   // 只认本进程亲眼看到的 open → closed（导入时或某次读到 open 记为「见过
   // open」），且关闭人（最新一条 closed 事件的 actor）在仓库上 triage 及以上。
-  // 首见即 closed 的卡（例：从已关闭 issue 手工导入）永不被对账关闭；被关后
+  // 首见即 closed 的卡（例：重启后才读到）永不被对账关闭；被关后
   // 有人把卡重开，也不再关第二次。
   const OPEN_1445 = { ...ISSUE_1445_CLOSED, state: 'open', closed_at: null, state_reason: null };
 
@@ -1106,7 +1108,7 @@ describe('11 issue 在 GitHub 被关', () => {
     expect(w.gh.issueReads(1448)).toHaveLength(0);
   });
 
-  test('从已关闭 issue 手工导入的卡（首见即 closed）→ 永不被对账关闭', async () => {
+  test('轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭', async () => {
     const w = await makeWorld({ list: [] });
     w.gh.state.issues.set(1445, ISSUE_1445_CLOSED);
     w.gh.state.events.set(1445, [closedEvent(OWNER, '2026-10-21T06:28:42Z', 1)]);
@@ -2190,5 +2192,70 @@ describe('20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 
       { teamId: w.s.team.id, reason: 'chief-not-bound' },
       { teamId: w.s.team.id, reason: 'chief-not-bound' },
     ]);
+  });
+
+  test('没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    w.s.db.update(chiefTable).set({ agentId: null }).run();
+    await w.intake.sweep();
+    closeOnGithub(w, 1406, OWNER);
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+    bindChief(w.s);
+    const tally = await w.intake.sweep();
+    expect(tally?.closed).toBe(1);
+    expect(todoOf(w.s, 1406)?.phase).toBe('closed');
+  });
+
+  test('chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    w.s.db.update(agentTable).set({ modelId: null }).run();
+    closeOnGithub(w, 1406, OWNER);
+    const tally = await w.intake.sweep();
+    expect(tally?.closed).toBe(1);
+    expect(todoOf(w.s, 1406)?.phase).toBe('closed');
+  });
+
+  test('读 chief 行出错 → 记本队失败（issue intake team failed），不是整轮失败', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    const db = new Proxy(w.s.db, {
+      get(target, prop, receiver) {
+        if (prop === 'select') {
+          return (fields?: Record<string, unknown>) => {
+            const query =
+              fields === undefined
+                ? target.select()
+                : target.select(fields as Parameters<typeof target.select>[0]);
+            return new Proxy(query, {
+              get(q, p, r) {
+                if (p === 'from') {
+                  return (table: unknown) => {
+                    if (table === chiefTable) throw new Error('SQLITE_BUSY: database is locked');
+                    return q.from(table as Parameters<typeof q.from>[0]);
+                  };
+                }
+                return Reflect.get(q, p, r);
+              },
+            });
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const logs: LogLine[] = [];
+    const intake = createIssueIntake(
+      { ...w.s.svc, db, box: w.s.secretBox },
+      {
+        githubFetch: w.gh.impl,
+        logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
+      },
+    );
+    const tally = await intake.sweep();
+    expect(tally?.errors).toBe(1);
+    expect(logs.some((l) => l.msg === 'issue intake team failed')).toBe(true);
+    expect(logs.some((l) => l.msg === 'issue intake sweep failed')).toBe(false);
   });
 });
