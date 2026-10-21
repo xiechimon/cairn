@@ -33,7 +33,9 @@ export const PATCH_DIGEST_VERSION = 'pd2';
  * 整张补丁），其中的二进制文件不留人。 */
 export const EVIDENCE_PREFIX = 'docs/verify/';
 
-/** 证据目录里会被当成可执行代码的扩展名（不分大小写）。 */
+/** 证据目录里会被当成可执行代码的扩展名（不分大小写）。HTML 在浏览器里打开就会跑
+ * 其中的脚本，一并算。
+ * 没有扩展名、靠 shebang 运行的文件按名判不到：要看 patch 文本，而这里只留它的哈希。 */
 export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.mjs',
   '.cjs',
@@ -45,6 +47,15 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.tsx',
   '.sh',
   '.py',
+  '.bash',
+  '.zsh',
+  '.fish',
+  '.ps1',
+  '.psm1',
+  '.bat',
+  '.cmd',
+  '.html',
+  '.htm',
 ] as const;
 
 /** 可以不经人合并的路径（ADR 0021 D4 默认拒绝）：产品源码、测试与证据。

@@ -27,8 +27,19 @@
 // 的一侧（可自动合并集）只折 ASCII，ſrc 不算 src、落在集外；收紧的一侧（保护类别、
 // 闸源码、测试目录与后缀、判别票与可执行用的证据前缀与扩展名）按 Unicode 折叠。
 // globToRegExp 的 dirAlone 随之改名 protect（同时带 iu 与目录项本身）。
+// 第八轮（#1410 已进 main）补的：读仓里的 .claude/workflows/pr-gate.js，它的 AUTO_MERGE
+// 与 PROTECTED 两个数组须与词表逐项同序（PROTECTED 对 PROTECTED_PATH_GLOBS 加
+// MERGE_GATE_SOURCE_GLOBS），两份清单漂移即红；可执行扩展名补 shell、PowerShell、
+// Windows 批处理与 HTML 四族。
 
-import type { CompareFile } from '@pacman/shared';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  AUTO_MERGE_PATH_GLOBS,
+  type CompareFile,
+  MERGE_GATE_SOURCE_GLOBS,
+  PROTECTED_PATH_GLOBS,
+} from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { classifyPaths, globToRegExp } from '../src/services/merge-gate/paths.js';
 
@@ -459,7 +470,27 @@ describe('证据目录', () => {
   });
 
   // 清单在这里照抄一份，不从 @pacman/shared 引：从词表里删掉一项时这条要红。
-  const EXECUTABLE = ['.mjs', '.cjs', '.js', '.mts', '.cts', '.ts', '.jsx', '.tsx', '.sh', '.py'];
+  const EXECUTABLE = [
+    '.mjs',
+    '.cjs',
+    '.js',
+    '.mts',
+    '.cts',
+    '.ts',
+    '.jsx',
+    '.tsx',
+    '.sh',
+    '.py',
+    '.bash',
+    '.zsh',
+    '.fish',
+    '.ps1',
+    '.psm1',
+    '.bat',
+    '.cmd',
+    '.html',
+    '.htm',
+  ];
   test('每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出', () => {
     for (const ext of EXECUTABLE) {
       const files = [
@@ -577,6 +608,69 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
       'apps/server/src/new.ts',
       'apps/server/src/old.ts',
       'apps/web/public/moved.png',
+    ]);
+  });
+});
+
+describe('可执行扩展名的新四族（第八轮）', () => {
+  const families: [string, string[]][] = [
+    ['shell', ['.bash', '.zsh', '.fish']],
+    ['PowerShell', ['.ps1', '.psm1']],
+    ['Windows 批处理', ['.bat', '.cmd']],
+    ['HTML（浏览器打开即跑脚本）', ['.html', '.htm']],
+  ];
+  for (const [family, exts] of families) {
+    test(`${family}：${exts.join(' ')} 新增即列出，扩展名换大小写也算`, () => {
+      const files = exts.flatMap((ext) => [
+        `docs/verify/1404/run${ext}`,
+        `docs/verify/1404/RUN${ext.toUpperCase()}`,
+      ]);
+      const r = classify(files.map((p) => f(p, { status: 'added' })));
+      expect(r.executableEvidence).toEqual(files);
+    });
+  }
+});
+
+/** pr-gate.js 里 `const NAME = [` 那一行到其后第一行 `]` 之间的字符串字面量，一行一个；
+ * 空行与注释行跳过，别的形状一律报错，找不到数组也报错，免得解析悄悄少读。 */
+function prGateArray(source: string, name: string): string[] {
+  const lines = source.split('\n');
+  const start = lines.indexOf(`const ${name} = [`);
+  if (start === -1) throw new Error(`pr-gate.js: \`const ${name} = [\` not found`);
+  const end = lines.indexOf(']', start + 1);
+  if (end === -1) throw new Error(`pr-gate.js: closing \`]\` of ${name} not found`);
+  return lines.slice(start + 1, end).flatMap((raw) => {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('//')) return [];
+    const m = /^'([^'\\]+)',?$/.exec(line);
+    if (m?.[1] === undefined) throw new Error(`pr-gate.js: unexpected line in ${name}: ${raw}`);
+    return [m[1]];
+  });
+}
+
+describe('与 .claude/workflows/pr-gate.js 同一份清单', () => {
+  const prGate = () =>
+    readFileSync(join(import.meta.dirname, '../../../.claude/workflows/pr-gate.js'), 'utf8');
+
+  test('AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序', () => {
+    expect(prGateArray(prGate(), 'AUTO_MERGE')).toEqual([...AUTO_MERGE_PATH_GLOBS]);
+  });
+
+  test('PROTECTED 与 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS 逐项同序', () => {
+    expect(prGateArray(prGate(), 'PROTECTED')).toEqual([
+      ...PROTECTED_PATH_GLOBS,
+      ...MERGE_GATE_SOURCE_GLOBS,
+    ]);
+  });
+
+  test('解析器找不到数组、找不到收尾的 ]、遇到不认识的行都报错', () => {
+    expect(() => prGateArray("const X = [\n  'a/**',\n]", 'AUTO_MERGE')).toThrow(/not found/);
+    expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**',\n", 'AUTO_MERGE')).toThrow(/closing/);
+    expect(() => prGateArray("const AUTO_MERGE = [\n  'a/**', 'b/**',\n]", 'AUTO_MERGE')).toThrow(
+      /unexpected line/,
+    );
+    expect(prGateArray("const AUTO_MERGE = [\n  // note's\n  'a/**',\n]", 'AUTO_MERGE')).toEqual([
+      'a/**',
     ]);
   });
 });

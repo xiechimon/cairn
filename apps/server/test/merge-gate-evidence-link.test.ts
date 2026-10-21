@@ -12,6 +12,9 @@
 // cmark-gfm 都在这个 `-->` 处结束），不是没闭合；同一文件按解码后的 sha/路径
 // 只记一次（仓主大小写、`%61` 不同的写法不算两份）。另钉住：坏的百分号转义列进
 // others，不抛。
+// 第八轮（#1420 pr-gate 第五轮）补的：没闭合的 `<!--` 只有开 HTML 块时（行首，至多
+// 三个空格缩进；cmark-gfm 第 2 类 HTML 块）才吞后文，行中的（比如反引号里引用它）
+// 只是字面文字。另钉住：路径里有 `.` 段的列进 others。
 
 import { performance } from 'node:perf_hooks';
 import { describe, expect, test } from 'vitest';
@@ -140,9 +143,31 @@ describe('parseRawEvidenceLinks', () => {
     expect(parse(body)).toEqual({ links: [], others: [] });
   });
 
+  test('行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文', () => {
+    const body = `The parser skips \`<!--\` comments.\n\n## Verified\n\n[a](${raw('docs/verify/1404/a.txt')})`;
+    expect(parse(body)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+      others: [],
+    });
+  });
+
+  test('行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞', () => {
+    const a = raw('docs/verify/1404/a.txt');
+    expect(parse(`ok\n   <!-- draft\n${a}`)).toEqual({ links: [], others: [] });
+    expect(parse(`ok\n\n    <!-- draft\n\n${a}`)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+      others: [],
+    });
+  });
+
   test('目录穿越与仓外路径不算', () => {
     const r = parse(raw('docs/verify/1404/../1403/a.json'));
     expect(r.links).toEqual([]);
+  });
+
+  test('路径里有 . 段的不算，列进 others', () => {
+    const url = raw('docs/verify/1404/./a.json');
+    expect(parse(url)).toEqual({ links: [], others: [url] });
   });
 
   test('查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次', () => {
@@ -183,6 +208,8 @@ describe('parseRawEvidenceLinks', () => {
       })(),
     ],
     ['成串没闭合的 <!--', '<!--'.repeat(BODY_LIMIT / 4)],
+    // 行中没闭合的 <!-- 不吞后文，每个都要往后找 `-->`：找不到的不能每次扫到末尾。
+    ['一行里成串没闭合的 <!--', `${'x<!--'.repeat((BODY_LIMIT - 1) / 5)}x`],
   ];
   for (const [label, body] of adversarial) {
     test(`对抗性 body 线性解析：${label}，65,536 个字符在 200 ms 内`, () => {

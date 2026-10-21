@@ -15,6 +15,7 @@
 // 第六轮（#1420 pr-gate 第四轮）补的：码元序与码点序分得开的一组（补充平面的
 // emoji 挨着 U+E000–U+FFFF 的字符），期望值由按 UTF-16 码元排序的 Python 算出。
 // 另钉住：300 个上限按整张列表算（证据条目也计入）；复制条目同改名记两个文件。
+// 第八轮钉住：filename 为空串的条目按形状不对处理（compareFileSchema 要求至少一个字符）。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
 // 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
 // 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
@@ -452,6 +453,10 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ files: [entry({ status: 'Modified' })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ filename: 7 })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ filename: ['apps/a.ts'] })] })).toBeNull();
+  });
+
+  test('filename 为空串：形状不对，返回 null（compareFileSchema 要求至少一个字符）', () => {
+    expect(compareFilesFromResponse({ files: [entry({ filename: '' })] })).toBeNull();
   });
 
   test('additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致）', () => {
