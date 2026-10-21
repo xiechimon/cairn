@@ -39,9 +39,12 @@
 // 20 （第三轮补：对账范围）关闭对账只碰轮询器领的卡：轮询器导入时 createdBy
 //    记为本队 chief 绑定的 Agent id（chief 自建卡同一律），手工导入与 webhook
 //    导入仍是 seed 用户、不被对账关闭；认卡靠库里的 createdBy，重启后照样
-//    对账；chief 没绑 Agent 的队本轮不对账、每轮记一行。review 补：没绑的那几轮
-//    不清「见过 open」（换回同一 Agent 后，期间被关的照样关）；绑定的 Agent 没有
-//    模型也照样对账（对账不编排）；读 chief 出错只算本队失败，不算整轮失败。
+//    对账；chief 没绑 Agent 的队本轮不对账，有可能是轮询器领的卡（createdBy
+//    不是 seed 用户）时每轮记一行，只有手工 / webhook 导入的卡不记。review
+//    补：没绑的那几轮不清「见过 open」（换回同一 Agent 后，期间被关的照样关）；
+//    绑定的 Agent 没有模型也照样对账（对账不编排）；读 chief 出错只算本队失败，
+//    不算整轮失败；chief 换绑别的 Agent 后，换绑前领的卡不再对账，编排重试也
+//    不再替它们开始。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -1958,6 +1961,29 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     expect(third?.orchestrated).toBe(1);
     expect(chiefThreads(w.s)).toHaveLength(2);
   });
+
+  test('编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, logs, flaky } = flakyIntake(w);
+    await intake.sweep();
+    flaky.failing = false;
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-intake-b',
+        teamId: w.s.team.id,
+        displayName: 'agent-intake-b',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+      })
+      .run();
+    w.s.db.update(chiefTable).set({ agentId: 'agent-intake-b' }).run();
+    const second = await intake.sweep();
+    expect(second?.orchestrated).toBe(0);
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    const dropped = logs.filter((l) => l.msg === 'issue intake orchestrate retry dropped');
+    expect(dropped.map((l) => l.obj.reason)).toEqual(['chief-rebound']);
+  });
 });
 
 describe('17 经 app 打的标：投影保留 slug，领取日志带上', () => {
@@ -2257,5 +2283,36 @@ describe('20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 
     expect(tally?.errors).toBe(1);
     expect(logs.some((l) => l.msg === 'issue intake team failed')).toBe(true);
     expect(logs.some((l) => l.msg === 'issue intake sweep failed')).toBe(false);
+  });
+
+  test('chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动）', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    w.s.db
+      .insert(agentTable)
+      .values({
+        id: 'agent-intake-b',
+        teamId: w.s.team.id,
+        displayName: 'agent-intake-b',
+        provider: 'stub-gw',
+        modelId: 'stub-model',
+      })
+      .run();
+    w.s.db.update(chiefTable).set({ agentId: 'agent-intake-b' }).run();
+    closeOnGithub(w, 1406, OWNER);
+    const tally = await w.intake.sweep();
+    expect(tally?.closed).toBe(0);
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+  });
+
+  test('chief 没绑 Agent、队里只有手工导入的卡 → 不记 close reconcile skipped', async () => {
+    const w = await makeWorld({ chief: 'unbound', list: [1406] });
+    const hand = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/github/issues/import`, {
+      number: 1406,
+    });
+    expect(hand.status).toBe(201);
+    await w.intake.sweep();
+    await w.intake.sweep();
+    expect(w.logs.filter((l) => l.msg === 'issue intake close reconcile skipped')).toHaveLength(0);
   });
 });
