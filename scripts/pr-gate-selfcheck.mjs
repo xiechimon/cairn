@@ -60,31 +60,52 @@ const base = {
 };
 const safetyFiles = (files) => ({ safety: { changedFiles: files } });
 const blocker = { title: 'bug', severity: 'blocking', failurePath: 'x' };
+const ARGS_ERROR = /^Error: pr-gate args/;
+
+// The gate on these changed files, with the safety reviewer listing the same files.
+const gateFiles = (files, args = {}) =>
+  gate({ ...base, changedFiles: files, ...args }, { reviews: safetyFiles(files) });
+
+// True when the gate refuses every args object, each with a message matching re
+// when re is given.
+async function refuses(argsList, re, opts) {
+  for (const args of argsList) {
+    try {
+      await gate(args, opts);
+      return false;
+    } catch (e) {
+      if (re && !re.test(String(e))) return false;
+    }
+  }
+  return true;
+}
+
+// True when each file, changed alone, routes to the user as a protected path.
+async function eachProtected(files) {
+  for (const f of files) {
+    const r = await gateFiles([f]);
+    if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
+  }
+  return true;
+}
 
 const cases = [
   [
     'clean change: go, auto-merge',
     async () => {
-      const r = await gate(base, { reviews: safetyFiles(base.changedFiles) });
+      const r = await gateFiles(base.changedFiles);
       return r.go === true && r.mergedBy === 'auto-merge';
     },
   ],
   [
     'C-quoted path (core.quotePath on) is rejected',
-    async () => {
-      try {
-        await gate({ ...base, changedFiles: ['"docs/adr/0021-\\350\\207\\252.md"'] });
-        return false;
-      } catch (e) {
-        return /quotePath/.test(String(e));
-      }
-    },
+    () => refuses([{ ...base, changedFiles: ['"docs/adr/0021-\\350\\207\\252.md"'] }], /quotePath/),
   ],
   [
     'unquoted non-ASCII ADR path routes to the user',
     async () => {
       const files = ['docs/adr/0021-自治合并.md'];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return r.mergedBy === 'user' && r.protectedPaths.includes(files[0]);
     },
   ],
@@ -92,7 +113,7 @@ const cases = [
     'CI-called script outside the *gate* glob routes to the user',
     async () => {
       const files = ['scripts/lint-warning-cap.mjs'];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return r.mergedBy === 'user';
     },
   ],
@@ -111,35 +132,21 @@ const cases = [
     async () => {
       const { deletedFiles: _d, ...noDeleted } = base;
       const { linesChanged: _l, ...noLines } = base;
-      for (const args of [noDeleted, noLines]) {
-        try {
-          await gate(args);
-          return false;
-        } catch (e) {
-          if (!/^Error: pr-gate args/.test(String(e))) return false;
-        }
-      }
-      return true;
+      return refuses([noDeleted, noLines], ARGS_ERROR);
     },
   ],
   [
     'deleted test file routes to the user',
     async () => {
       const files = ['apps/server/test/foo.test.ts'];
-      const r = await gate(
-        { ...base, changedFiles: files, deletedFiles: files },
-        { reviews: safetyFiles(files) },
-      );
+      const r = await gateFiles(files, { deletedFiles: files });
       return r.mergedBy === 'user' && r.humanReasons.some((x) => x.includes('foo.test.ts'));
     },
   ],
   [
     'over 800 lines routes to the user',
     async () => {
-      const r = await gate(
-        { ...base, linesChanged: 801 },
-        { reviews: safetyFiles(base.changedFiles) },
-      );
+      const r = await gateFiles(base.changedFiles, { linesChanged: 801 });
       return r.mergedBy === 'user';
     },
   ],
@@ -147,32 +154,17 @@ const cases = [
     'over 40 files routes to the user',
     async () => {
       const files = Array.from({ length: 41 }, (_, i) => `apps/web/src/f${i}.ts`);
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return r.mergedBy === 'user';
     },
   ],
   [
     'linesChanged must be a non-negative integer',
-    async () => {
-      for (const linesChanged of [Number.NaN, -1, 1.5]) {
-        try {
-          await gate({ ...base, linesChanged });
-          return false;
-        } catch {}
-      }
-      return true;
-    },
+    () => refuses([Number.NaN, -1, 1.5].map((linesChanged) => ({ ...base, linesChanged }))),
   ],
   [
     'a path with a shell character is rejected',
-    async () => {
-      try {
-        await gate({ ...base, changedFiles: ['docs/x;rm -rf .md'] });
-        return false;
-      } catch (e) {
-        return /review this PR by hand/.test(String(e));
-      }
-    },
+    () => refuses([{ ...base, changedFiles: ['docs/x;rm -rf .md'] }], /review this PR by hand/),
   ],
   [
     'CI gate helpers and data anywhere under scripts/ route to the user',
@@ -182,7 +174,7 @@ const cases = [
         'scripts/ui-registry.json',
         'scripts/ui-upstream-snapshots.json',
       ];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return r.mergedBy === 'user' && files.every((f) => r.protectedPaths.includes(f));
     },
   ],
@@ -197,7 +189,7 @@ const cases = [
         'apps/server/scripts/db-check.mjs',
         'apps/server/drizzle.config.ts',
       ];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return files.every((f) => r.protectedPaths.includes(f));
     },
   ],
@@ -212,7 +204,7 @@ const cases = [
         'apps/server/AGENTS.md',
         'docs/pr-review.md',
       ];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return files.every((f) => r.protectedPaths.includes(f));
     },
   ],
@@ -239,7 +231,7 @@ const cases = [
         'integration/test/m5.test.ts',
         'docs/verify/1404/run.txt',
       ];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return r.mergedBy === 'auto-merge' && r.go === true;
     },
   ],
@@ -253,7 +245,7 @@ const cases = [
         'apps/web/public/x.svg',
         'integration/eval/x.ts',
       ]) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        const r = await gateFiles([f]);
         if (
           r.mergedBy !== 'user' ||
           !r.humanReasons.some((x) => x.includes('outside the auto-merge set') && x.includes(f))
@@ -265,8 +257,8 @@ const cases = [
   ],
   [
     'agent-steering files the name list missed route to the user (run 5)',
-    async () => {
-      const files = [
+    () =>
+      eachProtected([
         'AGENTS.override.md',
         'AGENTS.MD',
         'CLAUDE.local.md',
@@ -276,28 +268,17 @@ const cases = [
         '.cursor/skills/verify-pacman/SKILL.md',
         '.mcp.json',
         '.ckignore',
-      ];
-      for (const f of files) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
-        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
-      }
-      return true;
-    },
+      ]),
   ],
   [
     'case variants of protected paths route to the user (run 5)',
-    async () => {
-      for (const f of [
+    () =>
+      eachProtected([
         '.Claude/settings.json',
         '.Husky/pre-commit',
         'apps/web/src/Claude.md',
         'apps/server/src/Scripts/x.mjs',
-      ]) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
-        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
-      }
-      return true;
-    },
+      ]),
   ],
   [
     'a protected path only the safety reviewer lists is matched (run 5)',
@@ -316,10 +297,7 @@ const cases = [
     'a deleted test helper (test directory only) routes to the user (run 5)',
     async () => {
       const files = ['integration/test/helpers.ts'];
-      const r = await gate(
-        { ...base, changedFiles: files, deletedFiles: files },
-        { reviews: safetyFiles(files) },
-      );
+      const r = await gateFiles(files, { deletedFiles: files });
       return (
         r.mergedBy === 'user' &&
         r.humanReasons.some((x) => x.startsWith('deleted test files') && x.includes('helpers.ts'))
@@ -330,10 +308,7 @@ const cases = [
     'a deleted colocated test (suffix only) routes to the user (run 5)',
     async () => {
       const files = ['apps/web/src/x.test.tsx'];
-      const r = await gate(
-        { ...base, changedFiles: files, deletedFiles: files },
-        { reviews: safetyFiles(files) },
-      );
+      const r = await gateFiles(files, { deletedFiles: files });
       return (
         r.mergedBy === 'user' &&
         r.humanReasons.some((x) => x.startsWith('deleted test files') && x.includes('x.test.tsx'))
@@ -342,42 +317,23 @@ const cases = [
   ],
   [
     'a deleted path missing from changedFiles is an args error (run 5)',
-    async () => {
-      try {
-        await gate({ ...base, deletedFiles: ['apps/server/src/gone.ts'] });
-        return false;
-      } catch (e) {
-        return /^Error: pr-gate args/.test(String(e));
-      }
-    },
+    () => refuses([{ ...base, deletedFiles: ['apps/server/src/gone.ts'] }], ARGS_ERROR),
   ],
   [
     'pr and ticket must be positive integers (run 5)',
-    async () => {
-      for (const bad of [{ pr: 1410.5 }, { pr: 0 }, { ticket: -3 }]) {
-        try {
-          await gate({ ...base, ...bad });
-          return false;
-        } catch (e) {
-          if (!/^Error: pr-gate args/.test(String(e))) return false;
-        }
-      }
-      return true;
-    },
+    () =>
+      refuses(
+        [{ pr: 1410.5 }, { pr: 0 }, { ticket: -3 }].map((bad) => ({ ...base, ...bad })),
+        ARGS_ERROR,
+      ),
   ],
   [
     'a path with a quote or space is rejected (run 5)',
-    async () => {
-      for (const f of ["x' --output=y 'z", 'docs/a b.md']) {
-        try {
-          await gate({ ...base, changedFiles: [f] });
-          return false;
-        } catch (e) {
-          if (!/review this PR by hand/.test(String(e))) return false;
-        }
-      }
-      return true;
-    },
+    () =>
+      refuses(
+        ["x' --output=y 'z", 'docs/a b.md'].map((f) => ({ ...base, changedFiles: [f] })),
+        /review this PR by hand/,
+      ),
   ],
   [
     'configs CI runs under route to the user, at the root too',
@@ -389,7 +345,7 @@ const cases = [
         'apps/server/tsconfig.json',
         'pnpm-workspace.yaml',
       ];
-      const r = await gate({ ...base, changedFiles: files }, { reviews: safetyFiles(files) });
+      const r = await gateFiles(files);
       return files.every((f) => r.protectedPaths.includes(f));
     },
   ],
@@ -417,28 +373,21 @@ const cases = [
     'binaryFiles is required and lists changed paths only (code-review on #1410)',
     async () => {
       const { binaryFiles: _b, ...noBinary } = base;
-      for (const bad of [
-        noBinary,
-        { ...base, binaryFiles: ['apps/server/src/other.ts'] },
-        { ...base, binaryFiles: 'x' },
-      ]) {
-        try {
-          await gate(bad, { reviews: safetyFiles(base.changedFiles) });
-          return false;
-        } catch (e) {
-          if (!String(e).includes('binaryFiles')) return false;
-        }
-      }
-      return true;
+      return refuses(
+        [
+          noBinary,
+          { ...base, binaryFiles: ['apps/server/src/other.ts'] },
+          { ...base, binaryFiles: 'x' },
+        ],
+        /binaryFiles/,
+        { reviews: safetyFiles(base.changedFiles) },
+      );
     },
   ],
   [
     'a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)',
     async () => {
-      const r = await gate(
-        { ...base, binaryFiles: base.changedFiles },
-        { reviews: safetyFiles(base.changedFiles) },
-      );
+      const r = await gateFiles(base.changedFiles, { binaryFiles: base.changedFiles });
       return (
         r.mergedBy === 'user' &&
         r.humanReasons.some((x) => x.startsWith('binary files') && x.includes('x.ts'))
@@ -449,10 +398,7 @@ const cases = [
     'a binary file under docs/verify stays mergeable without the user',
     async () => {
       const files = ['apps/server/src/x.ts', 'docs/verify/2/shot.png'];
-      const r = await gate(
-        { ...base, changedFiles: files, binaryFiles: ['docs/verify/2/shot.png'] },
-        { reviews: safetyFiles(files) },
-      );
+      const r = await gateFiles(files, { binaryFiles: ['docs/verify/2/shot.png'] });
       return r.mergedBy === 'auto-merge' && r.humanReasons.length === 0;
     },
   ],
@@ -473,11 +419,7 @@ const cases = [
         'apps/web/src/a.Test.ts',
         'apps/web/E2E/x.ts',
       ]) {
-        const files = [f];
-        const r = await gate(
-          { ...base, changedFiles: files, deletedFiles: files },
-          { reviews: safetyFiles(files) },
-        );
+        const r = await gateFiles([f], { deletedFiles: [f] });
         if (
           !(r.mergedBy === 'user' && r.humanReasons.some((x) => x.startsWith('deleted test files')))
         )
@@ -588,46 +530,36 @@ const cases = [
   ],
   [
     'a nested .gitattributes routes to the user (run 6)',
-    async () => {
-      for (const f of [
+    () =>
+      eachProtected([
         'apps/web/src/.gitattributes',
         'apps/server/test/.gitattributes',
         '.gitattributes',
-      ]) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
-        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
-      }
-      return true;
-    },
+      ]),
   ],
   [
     'the line count ignores in-tree attributes (run 6)',
-    async () => {
-      try {
-        await gate({ ...base, linesChanged: -1 });
-        return false;
-      } catch (e) {
-        return /--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904/.test(String(e));
-      }
-    },
+    () =>
+      refuses(
+        [{ ...base, linesChanged: -1 }],
+        /--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904/,
+      ),
   ],
   [
     'a C-quoted binary path is refused with the quoting hint (run 7)',
     async () => {
       const files = ['apps/server/src/x.ts', 'docs/verify/9/截图.png'];
-      try {
-        await gate(
+      return refuses(
+        [
           {
             ...base,
             changedFiles: files,
             binaryFiles: ['"docs/verify/9/\\346\\210\\252\\345\\233\\276.png"'],
           },
-          { reviews: safetyFiles(files) },
-        );
-        return false;
-      } catch (e) {
-        return String(e).includes('C-quoted paths');
-      }
+        ],
+        /C-quoted paths/,
+        { reviews: safetyFiles(files) },
+      );
     },
   ],
   [
@@ -639,7 +571,7 @@ const cases = [
       const files = 'git -c core.quotePath=false diff --no-renames --name-only';
       const lines =
         'git -c core.quotePath=false --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat';
-      return safety !== undefined && safety.prompt.includes(files) && safety.prompt.includes(lines);
+      return safety?.prompt.includes(files) === true && safety.prompt.includes(lines);
     },
   ],
   [
@@ -655,27 +587,22 @@ const cases = [
   ],
   [
     'the merge readiness gate source routes to the user (run 6)',
-    async () => {
-      for (const f of [
+    () =>
+      eachProtected([
         'apps/server/src/services/merge-gate/digest.ts',
         'packages/shared/src/records/merge-gate.ts',
         'apps/daemon/src/merge-decision.ts',
-      ]) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
-        if (r.mergedBy !== 'user' || !r.protectedPaths.includes(f)) return false;
-      }
-      return true;
-    },
+      ]),
   ],
   [
     'migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)',
     async () => {
       for (const f of ['apps/server/drizzle/0044_x.sql', 'pnpm-lock.yaml', 'apps/web/.npmrc']) {
-        const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+        const r = await gateFiles([f]);
         if (!r.protectedPaths.includes(f)) return false;
       }
       const f = 'packages/shared/notes.ts';
-      const r = await gate({ ...base, changedFiles: [f] }, { reviews: safetyFiles([f]) });
+      const r = await gateFiles([f]);
       return (
         r.mergedBy === 'user' &&
         r.humanReasons.some((x) => x.includes('outside the auto-merge set') && x.includes(f))
@@ -690,10 +617,7 @@ const cases = [
         'apps/web/src/tests/util.ts',
         'apps/web/src/__tests__/util.ts',
       ]) {
-        const r = await gate(
-          { ...base, changedFiles: [f], deletedFiles: [f] },
-          { reviews: safetyFiles([f]) },
-        );
+        const r = await gateFiles([f], { deletedFiles: [f] });
         if (
           r.mergedBy !== 'user' ||
           !r.humanReasons.some((x) => x.startsWith('deleted test files'))
@@ -707,10 +631,7 @@ const cases = [
     'exactly 800 lines and 40 files still auto-merge (run 6)',
     async () => {
       const files = Array.from({ length: 40 }, (_, i) => `apps/web/src/f${i}.ts`);
-      const r = await gate(
-        { ...base, changedFiles: files, linesChanged: 800 },
-        { reviews: safetyFiles(files) },
-      );
+      const r = await gateFiles(files, { linesChanged: 800 });
       return r.mergedBy === 'auto-merge' && r.go === true;
     },
   ],
@@ -728,22 +649,16 @@ const cases = [
   ],
   [
     'headSha, an empty file list and non-string paths are args errors (run 6)',
-    async () => {
-      for (const bad of [
-        { headSha: 'abc' },
-        { headSha: 'A'.repeat(40) },
-        { changedFiles: [] },
-        { changedFiles: [1] },
-      ]) {
-        try {
-          await gate({ ...base, ...bad });
-          return false;
-        } catch (e) {
-          if (!/^Error: pr-gate args/.test(String(e))) return false;
-        }
-      }
-      return true;
-    },
+    () =>
+      refuses(
+        [
+          { headSha: 'abc' },
+          { headSha: 'A'.repeat(40) },
+          { changedFiles: [] },
+          { changedFiles: [1] },
+        ].map((bad) => ({ ...base, ...bad })),
+        ARGS_ERROR,
+      ),
   ],
   [
     'the safety reviewer does not see the caller file list (run 6)',

@@ -27,8 +27,9 @@ const MAX_SKEPTICS = 4
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
 // and tests, docs/verify evidence) may auto-merge, and only when no PROTECTED
 // class matches them; every other path, deleted test files, binary files
-// outside docs/verify, and patches over 800 lines or 40 files route to the user. pr-gate runs 3, 4 and 5 each found
-// another agent-steering or gate file that a list of names missed
+// outside docs/verify, and patches over 800 lines or 40 files route to the
+// user. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
+// file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS).
 const AUTO_MERGE = [
@@ -229,7 +230,7 @@ const SKEPTIC_SCHEMA = {
 
 let skepticsLeft = MAX_SKEPTICS
 let skepticsMissing = 0
-const unrefuted = []
+let skepticsSkipped = 0
 const skepticShaMismatch = []
 
 const results = await pipeline(
@@ -252,7 +253,7 @@ ${d.prompt}`,
     const blocking = []
     for (const f of review.findings.filter((x) => x.severity === 'blocking')) {
       if (skepticsLeft < 2) {
-        unrefuted.push({ dimension: d.key, ...f })
+        skepticsSkipped += 1
         blocking.push({ dimension: d.key, ...f, skeptics: 'skipped: cap reached' })
         continue
       }
@@ -279,74 +280,72 @@ ${d.prompt}`,
       // A missing skeptic, or one that read another head, keeps the finding:
       // the gate fails closed.
       const answered = votes.filter((v) => v && v.headSha === headSha)
-      if (answered.length === 2 && answered.every((v) => v.refuted)) {
+      const unanswered = 2 - answered.length
+      if (unanswered === 0 && answered.every((v) => v.refuted)) {
         log(`refuted (${d.key}): ${f.title}`)
         continue
       }
-      if (answered.length < 2) skepticsMissing += 2 - answered.length
+      skepticsMissing += unanswered
       blocking.push({
         dimension: d.key,
         ...f,
-        skeptics: answered.length < 2 ? `${2 - answered.length} skeptic(s) missing` : answered.map((v) => v.reason),
+        skeptics: unanswered > 0 ? `${unanswered} skeptic(s) missing` : answered.map((v) => v.reason),
       })
     }
     return { key: d.key, review, blocking }
   },
 )
 
-if (unrefuted.length > 0) {
-  log(`${unrefuted.length} blocking finding(s) kept without skeptics (cap ${MAX_SKEPTICS})`)
+if (skepticsSkipped > 0) {
+  log(`${skepticsSkipped} blocking finding(s) kept without skeptics (cap ${MAX_SKEPTICS})`)
 }
 if (skepticsMissing > 0) {
   log(`${skepticsMissing} skeptic(s) returned nothing or read another head; their findings were kept`)
 }
 
-const done = results.filter(Boolean)
-const missing = DIMENSIONS.map((d) => d.key).filter(
-  (k) => !done.some((r) => r.key === k && r.review !== null),
-)
+// A dimension whose reviewer returned nothing has no findings and no blocking.
+const reviewed = results.filter((r) => r && r.review !== null)
+const missing = DIMENSIONS.map((d) => d.key).filter((k) => !reviewed.some((r) => r.key === k))
 const shaMismatch = [
-  ...done
-    .filter((r) => r.review !== null && r.review.headSha !== headSha)
+  ...reviewed
+    .filter((r) => r.review.headSha !== headSha)
     .map((r) => ({ dimension: r.key, saw: r.review.headSha })),
   ...skepticShaMismatch,
 ]
-const blocking = done.flatMap((r) => r.blocking)
-const suggestions = done.flatMap((r) =>
-  r.review === null
-    ? []
-    : r.review.findings
-        .filter((f) => f.severity === 'suggestion')
-        .map((f) => ({ dimension: r.key, ...f })),
+const blocking = reviewed.flatMap((r) => r.blocking)
+const suggestions = reviewed.flatMap((r) =>
+  r.review.findings
+    .filter((f) => f.severity === 'suggestion')
+    .map((f) => ({ dimension: r.key, ...f })),
 )
 // Paths the safety reviewer saw that the caller did not pass (a list built
 // without --no-renames, or a stale one) block go and are matched too.
-const safety = done.find((r) => r.key === 'safety' && r.review !== null)
-const seenFiles = safety ? (safety.review.changedFiles ?? []) : []
+const safety = reviewed.find((r) => r.key === 'safety')?.review
+const seenFiles = safety?.changedFiles ?? []
 const unlistedFiles = seenFiles.filter((f) => !changedFiles.includes(f))
 if (unlistedFiles.length > 0) log(`files the caller did not pass: ${unlistedFiles.join(', ')}`)
 const protectedPaths = [
   ...new Set([
     ...matchedProtected,
     ...unlistedFiles.filter(isProtected),
-    ...done.flatMap((r) => (r.review === null ? [] : (r.review.protectedPaths ?? []))),
+    ...reviewed.flatMap((r) => r.review.protectedPaths ?? []),
   ]),
 ]
 // The caller is the session that wrote the PR, so its deletion list and line
 // count are checked against the safety reviewer's: the union and the larger.
-const allDeleted = [...new Set([...deletedFiles, ...(safety ? (safety.review.deletedFiles ?? []) : [])])]
+const allDeleted = [...new Set([...deletedFiles, ...(safety?.deletedFiles ?? [])])]
 const deletedTests = allDeleted.filter(
   (f) => /(^|\/)(e2e|test|tests|__tests__)\//i.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/i.test(f),
 )
 // A binary row (- -) adds no lines and shows reviewers no diff; one NUL byte
 // makes git treat a source file as binary even with the empty tree's attributes
 // (/code-review on #1410), so only evidence may be binary without the user.
-const opaque = [...new Set([...binaryFiles, ...(safety ? (safety.review.binaryFiles ?? []) : [])])].filter(
+const opaque = [...new Set([...binaryFiles, ...(safety?.binaryFiles ?? [])])].filter(
   (f) => !EVIDENCE_RE.test(f),
 )
-const lines = Math.max(linesChanged, safety && Number.isInteger(safety.review.linesChanged) ? safety.review.linesChanged : 0)
-const fileCount = new Set([...changedFiles, ...unlistedFiles]).size
-const outside = [...new Set([...changedFiles, ...unlistedFiles])].filter(
+const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
+const allFiles = [...new Set([...changedFiles, ...unlistedFiles])]
+const outside = allFiles.filter(
   (f) => !protectedPaths.includes(f) && !isProtected(f) && !AUTO_MERGE_RE.some((re) => re.test(f)),
 )
 const humanReasons = [
@@ -355,11 +354,9 @@ const humanReasons = [
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
   ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
   ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
-  ...(fileCount > MAX_FILES ? [`${fileCount} files changed (over ${MAX_FILES})`] : []),
+  ...(allFiles.length > MAX_FILES ? [`${allFiles.length} files changed (over ${MAX_FILES})`] : []),
 ]
-const checked = Object.fromEntries(
-  done.filter((r) => r.review !== null).map((r) => [r.key, r.review.checked]),
-)
+const checked = Object.fromEntries(reviewed.map((r) => [r.key, r.review.checked]))
 
 return {
   pr,
