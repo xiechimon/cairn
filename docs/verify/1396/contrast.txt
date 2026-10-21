@@ -1,0 +1,102 @@
+dark Paper palette (#1396), OKLCH -> sRGB, WCAG 2.x relative luminance
+  canvas             oklch(0.205 0.011 70)       #1a1612
+  background         oklch(0.245 0.011 70)       #24201b
+  card               oklch(0.29 0.011 70)        #2f2a26
+  popover            oklch(0.32 0.011 70)        #37322d
+  secondary          oklch(0.34 0.011 70)        #3c3732
+  menu-hover         oklch(0.355 0.011 70)       #403b36
+  border             oklch(0.35 0.011 70)        #3e3a34
+  input              oklch(0.42 0.011 70)        #514c47
+  surface-tertiary   oklch(0.38 0.011 70)        #46413c
+  ring               oklch(0.6 0.008 70)         #837f7b
+  foreground         oklch(0.93 0.012 80)        #ece7df
+  text-secondary     oklch(0.81 0.011 78)        #c5c0b9
+  text-tertiary      oklch(0.73 0.011 76)        #aca7a0
+  text-dim           oklch(0.565 0.011 74)       #7a756f
+  icon               oklch(0.64 0.011 75)        #908b85
+  card-button        oklch(0.75 0.125 42)        #f0926d
+  spot-text-on-tint  oklch(0.86 0.075 48)        #fbc3a7
+  running            oklch(0.73 0.1 145)         #7fb980
+  running-text       oklch(0.8 0.09 145)         #99ce9a
+  running-bar        oklch(0.68 0.1 145)         #70a971
+  running-track      oklch(0.35 0.011 70)        #3e3a34
+  online-ring        oklch(0.33 0.04 145)        #283b29
+  project-tile-1     oklch(0.72 0.1 42)          #da8f72
+  project-tile-2     oklch(0.72 0.075 120)       #9eac76
+  project-tile-3     oklch(0.72 0.055 250)       #8ba8c6
+  project-tile-4     oklch(0.74 0.085 72)        #cca26e
+  project-tile-5     oklch(0.72 0.065 310)       #b19ac4
+  project-tile-6     oklch(0.72 0.07 195)        #6eb3b2
+  accent-hover       card-button 12% over card   #46362f
+  spot-soft          card-button 14% over card   #4a3930
+  text-on-accent     = canvas                    #1a1612
+  card-hover         foreground 8% over card     #3e3935
+  sidebar-hover      #fffcf8 5% over canvas      #25221e
+  dialog-backdrop    black 45% over background   #14120f
+
+pair                                                               ratio gate result
+foreground #ece7df on card #2f2a26                                 11.53  4.5 pass
+foreground #ece7df on background #24201b                           13.15  4.5 pass
+foreground #ece7df on canvas #1a1612                               14.62  4.5 pass
+foreground #ece7df on popover #37322d                              10.30  4.5 pass
+text-secondary #c5c0b9 on card #2f2a26                              7.85  4.5 pass
+text-secondary #c5c0b9 on background #24201b                        8.95  4.5 pass
+text-secondary #c5c0b9 on canvas #1a1612                            9.95  4.5 pass
+text-secondary #c5c0b9 on secondary #3c3732                         6.51  4.5 pass
+text-secondary #c5c0b9 on popover #37322d                           7.01  4.5 pass
+text-tertiary #aca7a0 on card #2f2a26                               5.94  4.5 pass
+text-tertiary #aca7a0 on background #24201b                         6.77  4.5 pass
+text-tertiary #aca7a0 on canvas #1a1612                             7.53  4.5 pass
+text-tertiary #aca7a0 on popover #37322d                            5.31  4.5 pass
+text-tertiary #aca7a0 on secondary #3c3732                          4.92  4.5 pass
+text-tertiary #aca7a0 on menu-hover #403b36                         4.63  4.5 pass
+text-dim #7a756f on card #2f2a26                                    3.11    3 pass
+text-dim #7a756f on canvas #1a1612                                  3.94    3 pass
+icon #908b85 on card #2f2a26                                        4.20    3 pass
+icon #908b85 on canvas #1a1612                                      5.33    3 pass
+icon #908b85 on background #24201b                                  4.79    3 pass
+card-button #f0926d on card #2f2a26                                 6.11  4.5 pass
+card-button #f0926d on background #24201b                           6.97  4.5 pass
+card-button #f0926d on canvas #1a1612                               7.74  4.5 pass
+card-button #f0926d on popover #37322d                              5.46  4.5 pass
+text-on-accent #1a1612 on card-button #f0926d                       7.74  4.5 pass
+white #ffffff on card-button #f0926d                                2.32  4.5 FAIL (rejected option)
+spot-text-on-tint #fbc3a7 on spot-soft #4a3930                      7.02  4.5 pass
+spot-text-on-tint #fbc3a7 on accent-soft@background #413026         8.04  4.5 pass
+spot-text-on-tint #fbc3a7 on accent-hover #46362f                   7.36  4.5 pass
+card-button #f0926d on spot-soft #4a3930                            4.71    3 pass
+card-button #f0926d on accent-hover #46362f                         4.94  4.5 pass
+primary-foreground #24201b on primary #ece7df                      13.15  4.5 pass
+running #7fb980 on card #2f2a26                                     6.18    3 pass
+running #7fb980 on canvas #1a1612                                   7.84    3 pass
+running-text #99ce9a on card #2f2a26                                7.87  4.5 pass
+running-text #99ce9a on background #24201b                          8.98  4.5 pass
+running-text #99ce9a on canvas #1a1612                              9.98  4.5 pass
+running-bar #70a971 on running-track #3e3a34                        4.09    3 pass
+text-on-accent #1a1612 on project-tile-1 #da8f72                    6.98  4.5 pass
+text-on-accent #1a1612 on project-tile-2 #9eac76                    7.38  4.5 pass
+text-on-accent #1a1612 on project-tile-3 #8ba8c6                    7.29  4.5 pass
+text-on-accent #1a1612 on project-tile-4 #cca26e                    7.68  4.5 pass
+text-on-accent #1a1612 on project-tile-5 #b19ac4                    7.10  4.5 pass
+text-on-accent #1a1612 on project-tile-6 #6eb3b2                    7.50  4.5 pass
+destructive #ffabb7 on card #2f2a26                                 7.95  4.5 pass
+destructive #ffabb7 on popover #37322d                              7.10  4.5 pass
+foreground #ece7df on card-hover #3e3935                            9.27  4.5 pass
+text-tertiary #aca7a0 on card-hover #3e3935                         4.77  4.5 pass
+foreground #ece7df on sidebar-hover@canvas #25221e                 12.87  4.5 pass
+text-secondary #c5c0b9 on sidebar-hover@canvas #25221e              8.76  4.5 pass
+text-tertiary #aca7a0 on sidebar-active@canvas #312d29              5.71  4.5 pass
+border #3e3a34 on card #2f2a26                                      1.26    1 step (no gate)
+border #3e3a34 on background #24201b                                1.43    1 step (no gate)
+border #3e3a34 on canvas #1a1612                                    1.59    1 step (no gate)
+input #514c47 on card #2f2a26                                       1.67    1 step (no gate)
+canvas #1a1612 on background #24201b                                1.11    1 step (no gate)
+background #24201b on card #2f2a26                                  1.14    1 step (no gate)
+card #2f2a26 on popover #37322d                                     1.12    1 step (no gate)
+popover #37322d on menu-hover #403b36                               1.15    1 step (no gate)
+card #2f2a26 on secondary #3c3732                                   1.21    1 step (no gate)
+card #2f2a26 on accent-hover #46362f                                1.24    1 step (no gate)
+popover #37322d on dialog-backdrop@background #14120f               1.47    1 step (no gate)
+popover #37322d on dialog-backdrop@card #1a1715                     1.41    1 step (no gate)
+
+all gated pairs pass

@@ -1,0 +1,62 @@
+{
+  "base": "http://127.0.0.1:5301",
+  "route": "/app?scenario=01",
+  "appTheme": {
+    "light": {
+      "dataTheme": "light",
+      "rootLightClass": true,
+      "storedTheme": "light"
+    },
+    "dark": {
+      "dataTheme": "dark",
+      "rootLightClass": false,
+      "storedTheme": "dark"
+    }
+  },
+  "liveMetas": {
+    "light": [
+      {
+        "content": "#f3eee5",
+        "media": "(prefers-color-scheme: light)",
+        "outerHTML": "<meta name=\"theme-color\" content=\"#f3eee5\" media=\"(prefers-color-scheme: light)\">"
+      },
+      {
+        "content": "#f3eee5",
+        "media": "(prefers-color-scheme: dark)",
+        "outerHTML": "<meta name=\"theme-color\" content=\"#f3eee5\" media=\"(prefers-color-scheme: dark)\">"
+      }
+    ],
+    "dark": [
+      {
+        "content": "#1a1612",
+        "media": "(prefers-color-scheme: light)",
+        "outerHTML": "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: light)\">"
+      },
+      {
+        "content": "#1a1612",
+        "media": "(prefers-color-scheme: dark)",
+        "outerHTML": "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: dark)\">"
+      }
+    ]
+  },
+  "bootSkeleton": {
+    "light": {
+      "pageBackground": "rgb(243, 238, 229)",
+      "railRowBackground": "rgb(235, 228, 216)",
+      "cardBackground": "rgb(235, 228, 216)"
+    },
+    "dark": {
+      "pageBackground": "rgb(26, 22, 18)",
+      "railRowBackground": "rgb(36, 32, 27)",
+      "cardBackground": "rgb(36, 32, 27)"
+    }
+  },
+  "staticMetaTags": [
+    "<meta name=\"theme-color\" content=\"#f3eee5\" media=\"(prefers-color-scheme: light)\" />",
+    "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: dark)\" />"
+  ],
+  "manifest": {
+    "theme_color": "#1a1612",
+    "background_color": "#1a1612"
+  }
+}
