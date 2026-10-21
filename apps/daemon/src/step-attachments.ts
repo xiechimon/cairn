@@ -13,18 +13,19 @@
 // 3/10）。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
 // 在解析前已落 transcript）——web 渲染面的 chip 形态不因展开而丢。
 // #1406 issue 原文围栏：GitHub issue 导入任务的标题与 spec 逐行带引用前缀进
-// 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行补回同一
-// 前缀，留在围栏里；围栏外的引用 token 行不认（web 不给它渲染 chip）。
+// 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行按围栏同一
+// 引用律（quoteIssueLines）写回，留在围栏里；围栏外的引用 token 行不认（web
+// 不给它渲染 chip）。
 
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { DeliveredImage, MachineAttachmentResponse } from '@pacman/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
-  ISSUE_FENCE_QUOTE,
   isImageAttachmentExt,
   issueFenceQuotedLines,
   parseAttachmentTokenLines,
+  quoteIssueLines,
 } from '@pacman/shared';
 
 /** 素材化文件名的独立安全化（票面失败方式 2 的纵深防御第二道）：server 面
@@ -148,10 +149,9 @@ type Outcome =
   | { kind: 'unavailable'; note: string }
   | { kind: 'untouched' };
 
-/** 整行 token 形态的行：body = token 本身，prefix = 它前面的围栏引用前缀
- * （裸整行 token 为空串）。 */
+/** 整行 token 形态的行：body = token 本身；quoted = 它是围栏里的引用行。 */
 interface TokenLine {
-  prefix: string;
+  quoted: boolean;
   body: string;
 }
 
@@ -160,11 +160,9 @@ interface TokenLine {
 function tokenLinesOf(lines: readonly string[]): (TokenLine | null)[] {
   const quoted = issueFenceQuotedLines(lines);
   return lines.map((line, i) => {
-    if (ATTACHMENT_TOKEN_LINE.test(line)) return { prefix: '', body: line };
+    if (ATTACHMENT_TOKEN_LINE.test(line)) return { quoted: false, body: line };
     const body = quoted[i] ?? null;
-    return body !== null && ATTACHMENT_TOKEN_LINE.test(body)
-      ? { prefix: ISSUE_FENCE_QUOTE, body }
-      : null;
+    return body !== null && ATTACHMENT_TOKEN_LINE.test(body) ? { quoted: true, body } : null;
   });
 }
 
@@ -185,8 +183,8 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
     if (outcome.kind === 'inline') images.push(outcome.image);
   }
   // 重建文本：token 形态行按处置改写（key 语法外 = 不可用注记，零下载——
-  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。改写行与注记行的每一行
-  // 都带上原行的前缀（报错原文可能带换行），围栏里的产物不出围栏。
+  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。围栏里的改写行与注记行
+  // 按围栏引用律写回（文件名与报错原文可能带换行变体），产物不出围栏。
   const outLines: string[] = [];
   for (const [i, line] of lines.entries()) {
     const token = tokens[i] ?? null;
@@ -195,7 +193,7 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
       continue;
     }
     const emit = (text: string): void => {
-      for (const part of text.split('\n')) outLines.push(`${token.prefix}${part}`);
+      outLines.push(token.quoted ? quoteIssueLines(text) : text);
     };
     const outcome = outcomes.get(token.body);
     if (outcome === undefined) {
