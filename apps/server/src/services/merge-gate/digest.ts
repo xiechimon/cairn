@@ -90,8 +90,9 @@ const STATUSES: readonly string[] = COMPARE_FILE_STATUSES;
 const isCount = (n: unknown): boolean => Number.isInteger(n) && (n as number) >= 0;
 
 /** compare 响应体 → 文件条目；形状不对（缺 files、字段缺失或类型不对、行数
- * 为负）返回 null，由调用方按「摘要不可得」处理，不抛进巡检。changes 不取，
- * 但给了就得是非负整数。patch 只记有没有（hasPatch），文本不取。 */
+ * 为负、改名或复制条目缺原名）返回 null，由调用方按「摘要不可得」处理，不抛进
+ * 巡检。changes 不取，但给了就得是非负整数。patch 只记有没有（hasPatch），文本
+ * 不取。 */
 export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
   if (body === null || typeof body !== 'object') return null;
   const raw = (body as { files?: unknown }).files;
@@ -108,6 +109,8 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
     const prev = f.previous_filename;
     if (!(prev === undefined || prev === null || (typeof prev === 'string' && prev !== '')))
       return null;
+    // 改名与复制缺原名时，原名进不了路径判定（放过的一侧），按形状不对处理。
+    if ((f.status === 'renamed' || f.status === 'copied') && typeof prev !== 'string') return null;
     out.push({
       status: f.status as CompareFile['status'],
       filename: f.filename,

@@ -41,8 +41,9 @@ export function globToRegExp(glob: string): RegExp {
 const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(globToRegExp);
 const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(globToRegExp);
 const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map(globToRegExp);
-const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//;
-const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+// 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
+const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
+const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
 /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
 const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
 
@@ -83,8 +84,6 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
   };
   // 证据前缀不分大小写（与集内 glob 一致），票号段按原样比。
   const isEvidence = (name: string) => name.toLowerCase().startsWith(EVIDENCE_PREFIX);
-  const ownEvidence = (name: string) =>
-    name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`);
 
   for (const f of files) {
     const names =
@@ -98,7 +97,9 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       } else if (!matches(name, AUTO_MERGE_RE)) {
         push(out.outsideAutoMerge, name);
       }
-      if (isEvidence(name) && !ownEvidence(name)) push(out.otherTicketEvidence, name);
+      if (isEvidence(name) && !name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`)) {
+        push(out.otherTicketEvidence, name);
+      }
       if (!f.hasPatch && !isEvidence(name)) push(out.opaque, name);
     }
 
