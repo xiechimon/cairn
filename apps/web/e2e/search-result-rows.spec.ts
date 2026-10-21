@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #159: 搜索结果行——点击即跳 + 常亮改 hover 跟随。Every panel row is
 // a live SPA hop carrying the current ?search= along (#121 convention) and
@@ -44,15 +45,7 @@ const isLit = (locator: Locator) =>
  *  guard as search-focus.spec.ts). */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await panel(page)
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error('⌘K never opened the search panel');
+  await pressUntil(page, 'Meta+k', panel(page));
 }
 
 /** Panel open + the probe query typed into the auto-focused input. */

@@ -1,0 +1,14 @@
+
+
+Running 4 tests using 1 worker
+
+e2e/zz-press-until-probe.spec.ts:4:1 › visible: a key that opens nothing throws
+visible -> Error: F9 never made getByRole('dialog', { name: '搜索' }) visible
+
+e2e/zz-press-until-probe.spec.ts:12:1 › hidden: a key that closes nothing throws while the target stays up
+hidden -> Error: F9 never made getByRole('dialog', { name: '搜索' }) hidden
+
+e2e/zz-press-until-probe.spec.ts:28:1 › a non-timeout wait error (strict mode) is rethrown on the first press
+strict -> Error: locator.waitFor: Error: strict mode violation: locator('[data-testid]') resolved to 21 elements: | presses: 1
+
+  4 passed (18.0s)

@@ -170,40 +170,17 @@ async function pressesStayHidden(
   }
 }
 
-/** Escape-until-closed, same retry law as pressUntil: the close listener
- *  registers in a passive effect too, so an Escape fired right after open
- *  can be lost (renderer input processing lags the assertion read under
- *  load — CI evidence: the dialog stayed mounted 5s+). Escape on an
- *  already-closed surface is a no-op, so retries never double-fire. */
+/** The close listener registers in a passive effect too (CI evidence: the
+ *  dialog stayed mounted 5s+ after a single Escape). */
 async function escapeUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Escape');
-    const closed = await surface
-      .waitFor({ state: 'hidden', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (closed) return;
-  }
-  throw new Error(`Escape never closed ${surface}`);
+  await pressUntil(page, 'Escape', surface, 'hidden');
 }
 
-/** toggle close, same retry law as escapeUntilHidden: a delivered toggle
- *  hides the surface and the wait ends the loop; a lost key leaves it open
- *  and the re-press IS the toggle. A pathologically slow close makes the
- *  next press reopen — and the one after closes again — so the loop's end
- *  state is deterministically hidden, never a coin flip. 键固定 ⌘J——本文件里
- *  走这条 toggle 循环的面只有 chief 抽屉；XMON-87 的 Tab 换项目是「循环选择」
- *  语义、不关面，另有用例走 useProjectCycleHotkey。 */
+/** 键固定 ⌘J（toggle，见 pressUntil 的 toggle 注）——本文件里走这条循环的面
+ *  只有 chief 抽屉；XMON-87 的 Tab 换项目是「循环选择」语义、不关面，另有用例
+ *  走 useProjectCycleHotkey。 */
 async function toggleUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+j');
-    const closed = await surface
-      .waitFor({ state: 'hidden', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (closed) return;
-  }
-  throw new Error('Meta+j never closed the surface');
+  await pressUntil(page, 'Meta+j', surface, 'hidden');
 }
 
 test('C on the board opens the new-task dialog; ⌘C and the retired N do not', async ({

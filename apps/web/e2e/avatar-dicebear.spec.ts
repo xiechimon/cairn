@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #387 acceptance: dicebear Lorelei avatar system — name-seeded
 // generative avatars via the dicebear HTTP API (same name → same image, no
@@ -158,15 +159,7 @@ test('search agent rows + project task rows are seeded (Agent 列表 / 任务行
   // 注册(search-result-rows 同款 retry,丢键才重按)
   await page.goto('/app?scenario=01');
   await expect(page.locator('.sidebar-row').first()).toBeVisible();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await page
-      .getByRole('dialog', { name: '搜索' })
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) break;
-  }
+  await pressUntil(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
   await page.keyboard.type('r3-builder');
   // #949：agent 行头像位 = data-row-kind 行族载体（.search-row-icon--agent 类钉退役）
   await expect(

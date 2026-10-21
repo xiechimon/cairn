@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #388 acceptance (弹层与 focus 视觉缺陷组):
 //   #15 — 点击 topbar 钮 / 新建任务钮后键盘交互（Esc/Tab）不再出现 UA 蓝框
@@ -52,16 +53,8 @@ test.describe('#15 focus ring收编', () => {
     // #389: 家族律 = 开时焦点入层、关时回还触发位——Esc 现在的职责是关
     // dialog（焦点回还按钮），读环前必须等关闭落定；重发律同 search-focus
     // （负载下渲染端输入处理可滞后于断言读，关层监听挂被动 effect）。
-    for (let attempt = 0; attempt < 6; attempt += 1) {
-      await page.keyboard.press('Escape');
-      // #948 载体重钉（#910 裁定 1）：dialog 类名锚换 role+name 一级载体。
-      const closed = await page
-        .getByRole('dialog', { name: '新建任务' })
-        .waitFor({ state: 'hidden', timeout: 1000 })
-        .then(() => true)
-        .catch(() => false);
-      if (closed) break;
-    }
+    // #948 载体重钉（#910 裁定 1）：dialog 类名锚换 role+name 一级载体。
+    await pressUntil(page, 'Escape', page.getByRole('dialog', { name: '新建任务' }), 'hidden');
     await page.waitForTimeout(250); // transition-all 过渡落定（见 expectVisibleRing 注）
     const info = await focusedOutline(page);
     expect(info).not.toBeNull();
