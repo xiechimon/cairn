@@ -48,7 +48,6 @@ CREATE TABLE `gate_verdict` (
 	`headSha` text,
 	`expectedHeadSha` text NOT NULL,
 	`createdAt` integer NOT NULL,
-	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint

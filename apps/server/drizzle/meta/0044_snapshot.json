@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4b2c2dc4-0b9f-4ae7-ae44-fef1fe949b6e",
+  "id": "c3fbd25d-523e-495e-9167-460db4d6a78e",
   "prevId": "918a55eb-de16-4752-9b53-f112c918bb14",
   "tables": {
     "agent": {
@@ -1330,19 +1330,6 @@
         }
       },
       "foreignKeys": {
-        "gate_verdict_stepId_step_id_fk": {
-          "name": "gate_verdict_stepId_step_id_fk",
-          "tableFrom": "gate_verdict",
-          "tableTo": "step",
-          "columnsFrom": [
-            "stepId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
         "gate_verdict_buildId_build_id_fk": {
           "name": "gate_verdict_buildId_build_id_fk",
           "tableFrom": "gate_verdict",

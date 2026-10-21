@@ -762,6 +762,10 @@ export const githubConnection = sqliteTable('github_connection', {
 // 自定 id，冲突即覆盖，机器能伪造。四表只由 server 的闸代码写（S5a 起），机器
 // 回传路径（routes-machine.ts、services/machine*.ts）不写。全部挂 build 级联：
 // 删构建（重置、删任务、删项目三条现有路径）带走闸行，不留孤儿也不挡删除。
+// 闸行只该随构建删除。drizzle 在一个事务里跑迁移，PRAGMA foreign_keys=OFF 在事务
+// 里不生效，故此后按 drizzle 形状重建 build（或经 build.todoId 级联的 todo）的迁移，
+// DROP TABLE 的隐式删行会清空四表：那条迁移须先把闸行挪开再写回
+// （merge-gate-tables.test.ts F19 跑本迁移之后的全部迁移查这一点）。
 // 列形取自尚未合入 main 的 S1（packages/shared/src/records/merge-gate.ts、
 // services/merge-gate/digest.ts）与 S2（services/merge-gate/readiness.ts）；这里不
 // import 它们，词表以 $type 字面量照抄，各列注明对应的 S1/S2 类型。值域不设 CHECK：
@@ -860,15 +864,16 @@ export const gateRound = sqliteTable(
   ],
 );
 
-// gate_verdict：一步一条判定（S2 GateVerdictView 的来源）。stepId 外键到 step：只
-// 能为 server 派过的步记判定。chief 小合并步的 step.buildId 是 chief 线程，故被审
-// 构建另记 buildId（外键到 build）。
+// gate_verdict：一步一条判定（S2 GateVerdictView 的来源）。stepId 是主键但不设外键
+// （同 plan / steer_pending / stop_pending 的 stepId）：步 id 由派步的 server 闸代码
+// 写入；外键带级联时，删一步（构建还在）会悄悄抹掉记下的 block / tampered 判定，
+// 此后按 drizzle 形状重建 step 的迁移也会经 DROP TABLE step 清空本表（F17/F18）。
+// chief 小合并步的 step.buildId 是 chief 线程，故被审构建另记 buildId（外键到
+// build，判定随构建删除）。
 export const gateVerdict = sqliteTable(
   'gate_verdict',
   {
-    stepId: text('stepId')
-      .primaryKey()
-      .references(() => step.id, { onDelete: 'cascade' }),
+    stepId: text('stepId').primaryKey(),
     buildId: text('buildId')
       .notNull()
       .references(() => build.id, { onDelete: 'cascade' }),
