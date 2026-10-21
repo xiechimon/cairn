@@ -4,7 +4,7 @@
 // evidence/run paths instead of running anything. archive cases use a
 // throwaway VERIFY_REPO_ROOT. Cases that must really run use a copy of vp.mjs
 // in a throwaway skill directory with its own registry and a stub probe.
-// Failure modes from pr-gate runs 2 to 6 and /code-review on #1411.
+// Failure modes from pr-gate runs 2 to 7 and /code-review on #1411.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -16,6 +16,7 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
+  statSync,
   symlinkSync,
   utimesSync,
   writeFileSync,
@@ -114,10 +115,12 @@ function installSkill(root, cases, scripts = {}) {
   return join(skill, 'scripts', 'vp.mjs');
 }
 
-// installSkill in a throwaway directory outside any git repository, so its
-// evidence root is the throwaway directory itself.
+// installSkill in a throwaway directory that is a git repository of its own, so
+// its evidence root is the throwaway directory itself, also when the temp dir
+// sits inside another checkout (pr-gate run 7 on #1411).
 function fakeSkill(cases, scripts = {}) {
   const root = tempDir('vp-fake-');
+  gitAt(root)('init', '-q');
   const script = installSkill(root, cases, scripts);
   const evidenceRoot = join(root, '.claude', 'verify-evidence');
   return {
@@ -166,6 +169,15 @@ function vp(args, env = {}, cwd = process.cwd(), script = VP) {
     },
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
+}
+
+// Every entry under dir, files with their contents: equal snapshots mean
+// nothing was added, removed or rewritten.
+function snapshot(dir) {
+  return readdirSync(dir, { recursive: true })
+    .sort()
+    .map((p) => (statSync(join(dir, p)).isDirectory() ? `${p}/` : `${p}:${readFileSync(join(dir, p), 'utf8')}`))
+    .join('\n');
 }
 
 function tempRoot() {
@@ -350,7 +362,14 @@ const cases = [
       // --force: every case with needsArgs is stale since pr-gate run 5; the check holds either way.
       const bare = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run']);
       const given = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run', '--', 't1', 'b1']);
-      return bare.code === 2 && /needs arguments/.test(bare.out) && given.code === 0;
+      // The --force list is printed for a run that goes ahead, not before this refusal.
+      return (
+        bare.code === 2 &&
+        /needs arguments/.test(bare.out) &&
+        !/--force drives/.test(bare.out) &&
+        given.code === 0 &&
+        /--force drives/.test(given.out)
+      );
     },
   ],
   [
@@ -503,6 +522,41 @@ const cases = [
     },
   ],
   [
+    'with the temp dir inside a git repository, a fake skill writes nothing outside its own root',
+    () => {
+      // pr-gate run 7 on #1411: with TMPDIR inside a checkout, the fake skill took
+      // that checkout's .claude/verify-evidence as its evidence root and left stub
+      // runs there, in the root another lane's archive --latest reads.
+      const outer = tempDir('vp-selftest-outer-');
+      const saved = process.env.TMPDIR;
+      let fake;
+      let r = { code: null, out: '' };
+      let top = [];
+      let inTmp = [];
+      try {
+        gitAt(outer)('init', '-q');
+        mkdirSync(join(outer, 'tmp'));
+        process.env.TMPDIR = join(outer, 'tmp');
+        fake = fakeSkill({ ok: STUB });
+        r = fake.run(['drive', 't', 'ok']);
+        top = readdirSync(outer).sort();
+        inTmp = readdirSync(join(outer, 'tmp'));
+      } finally {
+        if (saved === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = saved;
+        fake?.done();
+        rmSync(outer, { recursive: true, force: true });
+      }
+      const dir = r.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
+      return (
+        r.code === 0 &&
+        dir.startsWith(`${fake?.evidenceRoot}/`) &&
+        top.join(',') === '.git,tmp' &&
+        inTmp.length === 1
+      );
+    },
+  ],
+  [
     '--help lists every command',
     () => {
       const r = vp(['--help']);
@@ -601,11 +655,41 @@ const cases = [
   [
     'links prints sha-pinned raw links and refuses a ticket with no evidence',
     () => {
-      const r = vp(['links', '1402', '--sha', 'HEAD']);
+      // A throwaway repository with its own committed evidence, not this
+      // repository's docs/verify, which can be renamed or removed (pr-gate run 7).
+      const repo = tempDir('vp-selftest-git-');
+      const g = gitAt(repo);
+      let r = { code: null, out: '' };
+      let none = { code: null, out: '' };
+      let sha = '';
+      try {
+        g('init', '-q');
+        g('remote', 'add', 'origin', 'https://github.com/o/r.git');
+        for (const [ticket, file] of [
+          ['T', 'result.json'],
+          ['T', 'shot.png'],
+          ['U', 'other.json'],
+        ]) {
+          mkdirSync(join(repo, 'docs', 'verify', ticket), { recursive: true });
+          writeFileSync(join(repo, 'docs', 'verify', ticket, file), 'x');
+        }
+        g('add', '.');
+        g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
+        sha = g('rev-parse', 'HEAD').trim();
+        r = vp(['links', 'T', '--sha', 'HEAD'], { VERIFY_REPO_ROOT: repo });
+        none = vp(['links', '999999', '--sha', 'HEAD'], { VERIFY_REPO_ROOT: repo });
+      } finally {
+        rmSync(repo, { recursive: true, force: true });
+      }
+      const base = `https://raw.githubusercontent.com/o/r/${sha}/docs/verify/T`;
       const lines = r.out.split('\n').filter((l) => l.includes('raw.githubusercontent.com'));
-      const pinned = lines.every((l) => /\]\(https:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[0-9a-f]{40}\/docs\/verify\/1402\//.test(l));
-      const none = vp(['links', '999999', '--sha', 'HEAD']);
-      return r.code === 0 && lines.length > 0 && pinned && none.code === 1;
+      return (
+        r.code === 0 &&
+        /^[0-9a-f]{40}$/.test(sha) &&
+        lines.join('\n') === `[result.json](${base}/result.json)\n![shot.png](${base}/shot.png)` &&
+        none.code === 1 &&
+        /no files under docs\/verify\/999999/.test(none.out)
+      );
     },
   ],
   [
@@ -669,6 +753,37 @@ const cases = [
     },
   ],
   [
+    'a stale case that also has a forced need names both in its refusal, and --force names them before running',
+    () => {
+      // pr-gate run 7 on #1411: the refusal named only the status, and --force
+      // then also let real-llm and rewrites-evidence through without naming them.
+      const fake = fakeSkill({
+        x: { ...STUB, status: 'stale', note: 'waits for a removed chip.', needs: ['real-llm', 'rewrites-evidence'] },
+      });
+      const refused = fake.run(['drive', 't', 'x']);
+      const before = fake.evidence().length;
+      const forced = fake.run(['drive', 't', 'x', '--force']);
+      const after = fake.evidence().length;
+      fake.done();
+      const reasons = [
+        'is stale: waits for a removed chip',
+        'needs real-llm (spends model tokens)',
+        'needs rewrites-evidence (rewrites committed docs/verify evidence in place)',
+      ];
+      const ranAt = forced.out.indexOf('vp: t/x -> ');
+      return (
+        refused.code === 2 &&
+        reasons.every((s) => refused.out.includes(s)) &&
+        /--force/.test(refused.out) &&
+        before === 0 &&
+        forced.code === 0 &&
+        ranAt !== -1 &&
+        reasons.every((s) => forced.out.slice(0, ranAt).includes(s)) &&
+        after === 1
+      );
+    },
+  ],
+  [
     'a stray positional argument is refused',
     () => {
       const r = vp(['drive', 'hotkeys', 'newtask-key-c', 'm', '--dry-run']);
@@ -686,12 +801,23 @@ const cases = [
     },
   ],
   [
-    'archive refuses to overwrite an archived directory',
+    'archive refuses to overwrite an archived directory and leaves the archive as it was',
     () => {
+      // The refusal alone passes when the copy happens first and the refusal after
+      // (pr-gate run 7): the archive must also be unchanged, and a run naming one
+      // new and one archived source copies neither.
       const { root, src } = tempRoot();
-      const r = vp(['archive', 'T', '--from', join(src, 'run-a')], { VERIFY_REPO_ROOT: root });
+      const archive = join(root, 'docs', 'verify', 'T');
+      writeFileSync(join(archive, 'run-a', 'result.json'), '{"archived":true}\n');
+      writeFileSync(join(src, 'run-a', 'shot.png'), 'x');
+      const before = snapshot(archive);
+      const one = vp(['archive', 'T', '--from', join(src, 'run-a')], { VERIFY_REPO_ROOT: root });
+      const mixed = vp(['archive', 'T', '--from', join(src, 'run-b'), '--from', join(src, 'run-a')], {
+        VERIFY_REPO_ROOT: root,
+      });
+      const after = snapshot(archive);
       rmSync(root, { recursive: true, force: true });
-      return r.code === 1 && /add-only/.test(r.out);
+      return [one, mixed].every((r) => r.code === 1 && /add-only/.test(r.out)) && after === before;
     },
   ],
   [

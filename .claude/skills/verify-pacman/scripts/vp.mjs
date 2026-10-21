@@ -46,10 +46,11 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
   drive <feature> [case] [--force] [--dry-run] [-- <args>]
                                  run a registered case; cases that need the stack run doctor first;
                                  stale and host-bound cases, and cases that need real-llm, github or
-                                 rewrites-evidence, need --force; a case whose usage names required
-                                 arguments needs one; arguments after -- replace the defaults they
-                                 name (same option before '=', same probe name), the rest stay; a
-                                 case that needs the
+                                 rewrites-evidence, need --force (the refusal lists every reason, and
+                                 --force prints the same list before it runs); a case whose usage
+                                 names required arguments needs one; arguments after -- replace the
+                                 defaults they name (same option before '=', same probe name), the
+                                 rest stay; a case that needs the
                                  stack gets VERIFY_PORT / VERIFY_WEB_PORT from the stack's ports.json;
                                  without VERIFY_EVIDENCE_DIR the case writes to a new
                                  .claude/verify-evidence/<time>-<feature>-<case>/ in the main checkout,
@@ -196,14 +197,15 @@ function driveCommand(argv) {
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   if (c.runner === 'tsx' && c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
-  if (c.status !== 'current' && !force) {
-    const note = c.note ? `: ${c.note.replace(/\.+$/, '')}` : '';
-    fail(`${feature}/${name} is ${c.status}${note}. Re-run with --force to drive it anyway.`);
-  }
-  const forced = c.needs.filter((n) => n in FORCE_NEEDS);
-  if (forced.length > 0 && !force) {
-    const why = forced.map((n) => FORCE_NEEDS[n]).join('; ');
-    fail(`${feature}/${name} needs ${forced.join(' and ')} (${why}). Re-run with --force to drive it.`);
+  // Every reason the case needs --force, in one refusal: a stale case's refusal
+  // used to name only its status, and --force then also let its real-llm,
+  // github or rewrites-evidence need through unnamed (pr-gate run 7 on #1411).
+  const reasons = [];
+  if (c.status !== 'current') reasons.push(`is ${c.status}${c.note ? `: ${c.note.replace(/\.+$/, '')}` : ''}`);
+  for (const need of c.needs) if (need in FORCE_NEEDS) reasons.push(`needs ${need} (${FORCE_NEEDS[need]})`);
+  const forceList = reasons.map((r) => `\n  - ${r}`).join('');
+  if (reasons.length > 0 && !force) {
+    fail(`${feature}/${name} runs only with --force:${forceList}\nRe-run with --force to drive it anyway; --force covers every line above.`);
   }
   // Options alone do not satisfy a case whose usage names a required argument.
   if (c.needsArgs && !extra.some((a) => !a.startsWith('-'))) {
@@ -267,6 +269,8 @@ function driveCommand(argv) {
       : (named ?? join(EVIDENCE_ROOT, `${localStamp()}-${feature}-${name}`));
   // The probe's own output option carries the directory, in a dry run and a real one alike.
   const withEvidence = (dir) => (evidence.flag === undefined || dir === undefined ? args : [...args, evidence.flag, dir]);
+  // After the argument and port refusals above, so a refused run does not print it.
+  if (reasons.length > 0) console.log(`vp: --force drives ${feature}/${name}:${forceList}`);
   if (dryRun) {
     console.log(`vp: dry-run ${feature}/${name}${doctorFirst ? ' (doctor first)' : ''}`);
     console.log(`    runner ${c.runner ?? 'node'}  cwd ${cwd}`);

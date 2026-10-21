@@ -45,7 +45,7 @@ Control Glass 五条旅程(新建任务 / 派发 / 看 diff / 请求修改 / 合
 - 变更类证明必须有第二只眼:`GET /api/...` JSON 真值 + SQLite 只读行(见各 feature 文件)。
 - **机制类声称**(CSS/动效、落盘/wire 格式、schema、shim 流量、判据字段)的第二只眼 = **编译产物 / 运行时实物**,不是源码、配置或依赖清单——声称→实物→实案路径表见 SKILL.md「机制生效验收:实物判据(硬规则)」。
 - 收尾 `cleanup.mjs` 回收栈;证据默认落**主仓** `.claude/verify-evidence/`(不落 worktree),该目录 gitignored。
-- **证据交付必须归档进 PR**:cp 证据目录进 PR 分支 `docs/verify/<票号>/` 并 commit(`result.json` + 截图,多组证据加 README 索引),PR body 以 commit SHA 永久链引用(链接形态见 SKILL.md「证据归档纪律」)。运行期证据落 `.claude/verify-evidence/`(gitignored);**证据未随 PR 进仓引用的 verify 声明视为未验证**。
+- **证据交付必须归档进 PR**:在 PR 分支的检出上跑 `vp.mjs archive <票号> --from <证据目录>`,把证据目录归档进 `docs/verify/<票号>/` 并 commit(只拷贝,目标已存在即拒绝,不手工 `cp`;`result.json` + 截图,多组证据加 README 索引),PR body 以 commit SHA 永久链引用(推送后 `vp.mjs links <票号>` 打印;链接形态见 SKILL.md「证据归档纪律」)。运行期证据落 `.claude/verify-evidence/`(gitignored);**证据未随 PR 进仓引用的 verify 声明视为未验证**。
 - 报告跳过的入口时要带尝试过的命令与未满足的前置;不得把「从别的入口验过」当成「该入口已验」。
 
 ## Feature entry contract
