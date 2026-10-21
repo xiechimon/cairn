@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressUntil } from './helpers.js';
 
 // Issue #389 + #442 + #468 + XMON-37 acceptance, re-pinned for ADR 0013
@@ -172,14 +172,14 @@ async function pressesStayHidden(
 
 /** The close listener registers in a passive effect too (CI evidence: the
  *  dialog stayed mounted 5s+ after a single Escape). */
-async function escapeUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
+async function escapeUntilHidden(page: Page, surface: Locator) {
   await pressUntil(page, 'Escape', surface, 'hidden');
 }
 
 /** 键固定 ⌘J（toggle，见 pressUntil 的 toggle 注）——本文件里走这条循环的面
  *  只有 chief 抽屉；XMON-87 的 Tab 换项目是「循环选择」语义、不关面，另有用例
  *  走 useProjectCycleHotkey。 */
-async function toggleUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
+async function toggleUntilHidden(page: Page, surface: Locator) {
   await pressUntil(page, 'Meta+j', surface, 'hidden');
 }
 
@@ -496,8 +496,9 @@ test('⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, di
   // The autofocused spec textarea is an editable target — the chord must
   // still fire from it (dialog-interior exemption; without it the guard
   // swallows the press and this wait times out).
-  // The retry loop waits on the outcome (the card landing), not on a surface
-  // opening: a lost press lands nothing, so a re-press cannot double-fire.
+  // The retry loop waits on the outcome (the card landing): a lost press
+  // lands nothing and is re-pressed. A save slower than the 1s wait lands a
+  // second card, and the strict card locator then fails the test loudly.
   await pressUntil(page, 'Meta+Enter', landedCard(page, '⌘↵ 建的卡'));
   await expect(dialog).not.toBeVisible();
 

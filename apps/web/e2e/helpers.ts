@@ -68,12 +68,16 @@ export async function settleTransitions(page: Page): Promise<void> {
   if (!settled) throw new Error('CSS transitions still running after 20 rounds');
 }
 
-/** Press `key` until `target` reaches `state`: at most 6 presses, 1s apart.
+/** Press `key` until `target` reaches `state`: at most 6 presses, each
+ *  followed by a wait of up to 1s.
  *  Hotkey listeners register in a passive effect after first paint, so a
  *  press right after load can be lost; a lost press leaves the old state and
  *  the re-press is the fix. A delivered press ends the loop as soon as the
  *  target flips.
- *  - Escape is idempotent, so a re-press never undoes a slow close.
+ *  - The key must be harmless to press again after a slow but delivered
+ *    press. Escape closes one layer per press: on a single layer a re-press
+ *    after a slow close is a no-op, but with stacked layers it closes the
+ *    next one out.
  *  - ⌘K and ⌘J are toggles. A delivered press that takes over 1s to show is
  *    re-pressed and flips back; the loop keeps going until `state` holds, but
  *    a re-press queued behind a slow flip can still land after it returns.
