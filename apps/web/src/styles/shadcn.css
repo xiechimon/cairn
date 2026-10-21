@@ -5,8 +5,11 @@
    apps/web/e2e/palette-e.css（#909 方法正本复刻，流程见 #987 §4；实审裁决
    与 ramp 参数见 issue #988 resolution；生成器 gen-palettes.mjs 随 #988 原型
    脚手架退役，reachable through git history at branch ui/988-palette-reselect）。
-   亮侧 .light 自 Paper 改版起取 apps/web/DESIGN.md frontmatter colors 定稿值
-   （canvas / sheet / card 三层纸面 + ink 阶梯 + 赭红 accent），暗侧仍是 E。
+   两侧都取 apps/web/DESIGN.md 的 Paper 定稿值：亮侧 .light = frontmatter
+   colors（canvas / sheet / card 三层纸面 + ink 阶梯 + 赭红 accent），暗侧
+   :root = frontmatter colors-dark（同一阶梯的暖深纸面，海拔越高越亮，#1396；
+   实测表 docs/verify/1396/contrast.txt）。E 色板只剩非 Paper 槽（状态 chip、
+   diff、列点、badge）仍持其值。
 
    槽架构（#987 §3 判决，#1002 收敛执行）：本文件持 81 色槽 = 官方 18 +
    仓内补位 63（品牌/状态/文本三阶/surface 独有档/交互 alpha 梯/恒定杂项）；
@@ -105,29 +108,36 @@
 :root {
   /* 半径基（#988 实审定版 = 官方默认 10px） */
   --radius: 0.625rem;
-  /* ---- 官方语义槽 18（值取定版暖灰暗档；并流别名已退役，消费直引官方名） ---- */
-  /* canvas/页面底色（DESIGN.md 画布层级第一档） */
-  --background: #1f1b18;
-  /* 主文字色（文字族首位，全仓最高消费面） */
-  --foreground: #eee8e4;
+  /* ---- 官方语义槽 18（Paper 暗色阶梯，OKLCH 色相 70、色度 0.011；并流别名
+     已退役，消费直引官方名） ---- */
+  /* Paper 三层纸面，暗侧海拔越高越亮：canvas = 侧栏所在应用底（经
+     --surface-1）；sheet = 主面板（看板 board-main 走 --background）；
+     card = 任务卡；popover 再亮一档给菜单与弹窗（投影在暗底上弱，靠亮一档
+     加发丝环分层）。 */
+  --canvas: #1a1612;
+  --background: #24201b;
+  /* 主文字色 = ink（文字族首位，全仓最高消费面） */
+  --foreground: #ece7df;
   /* 卡片底（surface 族已并入：surface / surface-elevated / dialog-bg /
      dialog-box-bg / tab-chip-bg 等值档全部直引本槽，#987 §3.3-B） */
-  --card: #26221f;
-  --card-foreground: #eee8e4;
-  /* 浮层底（popover-bg 别名已并入） */
-  --popover: #26221f;
-  --popover-foreground: #eee8e4;
-  --primary: #eee8e4;
-  --primary-foreground: #1f1b18;
-  /* 次级面底（surface-secondary / surface-hover / row-selected / chief-tab-bg
-     / range-chip-bg / pill-idle-bg / agent-avatar-bg 等值档全部并入，§3.3-B） */
-  --secondary: #2d2926;
-  --secondary-foreground: #eee8e4;
+  --card: #2f2a26;
+  --card-foreground: #ece7df;
+  /* 浮层底（popover-bg 别名已并入）：卡片之上一档 */
+  --popover: #37322d;
+  --popover-foreground: #ece7df;
+  /* 主按钮 = 墨底（暗侧墨是亮的）+ sheet 字 */
+  --primary: #ece7df;
+  --primary-foreground: #24201b;
+  /* 次级面底 = hover 档（surface-secondary / surface-hover / row-selected /
+     chief-tab-bg / range-chip-bg / pill-idle-bg / agent-avatar-bg 等值档全部
+     并入，§3.3-B） */
+  --secondary: #3c3732;
+  --secondary-foreground: #ece7df;
   /* 嵌入/代码块底（code-bg 别名已并入） */
-  --muted: #2d2926;
-  --muted-foreground: #b3aeaa;
-  --accent: #2d2926;
-  --accent-foreground: #eee8e4;
+  --muted: #3c3732;
+  --muted-foreground: #c5c0b9;
+  --accent: #3c3732;
+  --accent-foreground: #ece7df;
   /* 破坏性动作色（暗侧走高明度档、深字配对；danger / stop 别名已并入，
      destructive-foreground 判死退役——官方 v4 集无此槽、base-nova 件 0 消费，
      #987 §3.1。实测见 docs/verify/988/） */
@@ -136,9 +146,9 @@
      border-default / card-border / overlay-divider 等值档并入 --border；
      border-strong / dash-border / dialog-ring / range-chip-border 并入 --input，
      1.5 门 hairline 证据随迁，#987 §3.3-B） */
-  --border: #2d2926;
-  --input: #403c39;
-  --ring: #938e8a;
+  --border: #3e3a34;
+  --input: #514c47;
+  --ring: #837f7b;
   /* ---- 仓内补位族（官方词表无对口的域内色，#412 D1–D4） ---- */
   /* 侧栏行 pill 梯（#128）：hover / selected 两档走 alpha 梯 5% / 10%，
      暗侧暖白梯（定版暖调墨）；本文件为唯一正本。
@@ -147,7 +157,7 @@
   --sidebar-active: rgb(255 252 248 / 0.1);
   /* surface 独有档（官方阶梯无对口，#987 §3.4-D）：tertiary 嵌入控件底，
      press 板面卡按压档（#629，= tertiary 深一档关系保持） */
-  --surface-tertiary: #403c39;
+  --surface-tertiary: #46413c;
   --surface-press: var(--surface-tertiary);
   /* 卡面 hover 档（2026-10-12 用户派：看板卡对齐 deepseek-harness 对话框观感
      ——dsh 交互面 hover = 墨 8% 微染，packages/client/ui-theme
@@ -155,20 +165,22 @@
      走一步，双主题各持配比（暗侧提亮、亮侧压暗），品牌/色板翻值自动跟随。
      唯一消费点 = motion.css 的 .todo-card:hover（卡面按压仍走 --surface-press）。 */
   --card-hover: color-mix(in srgb, var(--card), var(--foreground) 8%);
-  /* text 三阶（官方只有 muted-foreground 一阶次级文本，三阶是全仓最大消费面
-     的真扩展，#987 §3.4-C）：secondary / tertiary / dim（dim 仅装饰：
-     时间戳/占位/非活动图标，沿 XMON-55 口径；UI 3 门实测见 docs/verify/988/） */
-  --text-secondary: #d3ceca;
-  --text-tertiary: #b3aeaa;
-  --text-dim: #797571;
-  --icon: var(--text-tertiary);
-  /* 品牌槽（品牌只走 spot 族，rosewood 玫瑰木定版，#988）：
+  /* 文字阶梯 = DESIGN.md 暗色 ink-2 / ink-3（卡上 7.85 / 5.94，canvas 9.95 /
+     7.53）；dim = ink-4，只做装饰（元信息图标、折叠箭头），不当文字色。
+     --icon = 带文字标签的图标（侧栏导航、列标题），非文本 3 门卡上 4.20；
+     纯图标按钮仍用 tertiary。 */
+  --text-secondary: #c5c0b9;
+  --text-tertiary: #aca7a0;
+  --text-dim: #7a756f;
+  --icon: #908b85;
+  /* 品牌槽（品牌只走 spot 族）= 赭红 accent 提亮到暗侧档，卡上 6.11、canvas
+     7.74；其上的字走 --text-on-accent 深墨（白字 2.32 不过门）。
      --card-button = 卡片按钮实心底色；--focus-ring = 全局 :focus-visible
      环色（#388 家族律：2px 实线 + offset 2，app.css 兜底 + 各面先例）。
      官方 --ring 是中性灰 faint 档，与 #388 不等价，故环色自立补位名。
      两名都被 e2e 钉扎：accent-typo.spec.ts / overlay-focus.spec.ts */
-  --card-button: #f294d8;
-  --focus-ring: #f294d8;
+  --card-button: #f0926d;
+  --focus-ring: #f0926d;
   /* column dot family: one token per board column (#351 4-fold — 待开始 idle,
      执行中 building, 待处理 confirm, 已完成 done); planning/review dots retired
      with their columns */
@@ -192,8 +204,8 @@
   /* detail palette (#56)：chip 族五态中的 idle/plan/confirm/done 四对 bg+fg；
      plan 回 spot 族（选中底 + tint 字，命名含角色）。chip 五态皮肤由
      status-chip 适配层持有（#983 判留：现适配层非零皮肤），十槽随判留 */
-  --chip-idle-bg: #2d2926;
-  --chip-idle-fg: #b3aeaa;
+  --chip-idle-bg: #3c3732;
+  --chip-idle-fg: #c5c0b9;
   --chip-plan-bg: var(--spot-soft);
   --chip-plan-fg: var(--spot-text-on-tint);
   --chip-confirm-bg: #422b0d;
@@ -202,7 +214,7 @@
   --chip-done-fg: #90daa0;
   /* 分段控件族（#138）：active chip 自持档；hover 走 alpha 梯第一阶
      （unselected tint，与 --sidebar-hover 同值同形） */
-  --seg-active: #403c39;
+  --seg-active: #46413c;
   --seg-hover: rgb(255 252 248 / 0.05);
   /* diff pane：stat 绿与删除行红随定版色板走 */
   --diff-add-bg: #1a3821;
@@ -224,15 +236,15 @@
   --tile-hero-bg: #422b0d;
   /* overlay batch B (issue #67)：result icon tile（row-selected / overlay-
      select-indigo / pick-selected-* 已并入 secondary / spot 族，§3.3-B/C） */
-  --row-icon-bg: #403c39;
-  /* notification banner bell disc (#114)：其上字形走 spot
-     （--card-button，非文本 3:1 门实测见 docs/verify/988/） */
-  --notify-icon-bg: #403c39;
-  /* 更多 menu row 图标色（UI 3 门实测见 docs/verify/988/） */
-  --menu-icon: #797571;
-  /* on-accent 文字（DESIGN.md 轨 A #A2）：暗侧深字——定版 spot 是高明度档，
-     深字配对（件面实测见 docs/verify/988/）；散写 #ffffff 全部收此单源 */
-  --text-on-accent: #1f1b18;
+  --row-icon-bg: #46413c;
+  /* notification banner bell disc (#114)：其上字形走 spot（--card-button） */
+  --notify-icon-bg: #46413c;
+  /* 更多 menu row 图标色 = ink，同 .light */
+  --menu-icon: #ece7df;
+  /* on-accent 文字（DESIGN.md 轨 A #A2）：暗侧深字 = canvas——赭红暗档与
+     项目方块都是高明度底，深字配对（徽章 7.74、方块 6.98 起，
+     docs/verify/1396/contrast.txt）；散写 #ffffff 全部收此单源 */
+  --text-on-accent: #1a1612;
   /* 浮层遮罩（轨 A #A2）: modal / search / token-gate 全屏黑幕统一值，
      主题恒定 */
   --overlay-scrim: rgb(0 0 0 / 0.6);
@@ -253,32 +265,32 @@
   /* danger 行 hover 淡 tint（base-ui-theme §1.1：删除行吃 danger 淡 tint，
      与 accent-soft 同 14% 配方，源换 --destructive） */
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
-  --spot-text-on-tint: #f8a7e1;
+  /* tint 底上的字：淡赭红档，spot-soft 上 7.02、accent-hover 上 7.36 */
+  --spot-text-on-tint: #fbc3a7;
   --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
   --spot-disabled-fg: color-mix(in srgb, var(--card-button) 65%, white);
-  /* Paper 语义槽（apps/web/DESIGN.md）。暗侧在暗色定稿前取现有暗阶梯最近档：
-     canvas = 现 --surface-1 配方；running 三档 = col-dot-done / chip-done-fg /
-     diff-add-fg；track = secondary；accent-hover = spot-soft；dialog-surface =
-     popover（对话框在暗侧保持现有浮层底）；tile 按色相取
-     现有暗侧高明度档（暗侧首字母配深字，同 --project-avatar-fg 惯例）。 */
-  --canvas: color-mix(in oklab, var(--background), var(--card) 50%);
-  --running: #77d08c;
-  --running-text: #90daa0;
-  --running-bar: #6ac380;
-  --running-track: #2d2926;
-  --accent-hover: var(--spot-soft);
+  /* Paper 语义槽（apps/web/DESIGN.md 暗色）：running 绿提亮到暗侧档（图标
+     卡上 6.18、文字 7.87、进度条压轨 4.09），轨 = 发丝线；accent-hover 是
+     赭红 12% 染进卡底的深色 hover 底，链接在上面 4.94；dialog-surface =
+     popover（弹窗与菜单同一档）。 */
+  --running: #7fb980;
+  --running-text: #99ce9a;
+  --running-bar: #70a971;
+  --running-track: #3e3a34;
+  --accent-hover: #46362f;
   --dialog-surface: var(--popover);
   /* Paper overlays (DESIGN.md 弹窗与菜单): the dim behind every dialog and
-     the menu row hover. Dark keeps a deeper dim so the popover-tone dialog
-     still separates from the page. */
-  --dialog-backdrop: rgb(0 0 0 / 0.32);
-  --menu-hover: var(--accent);
-  --project-tile-1: #ff9c75;
-  --project-tile-2: #77d08c;
-  --project-tile-3: #c4b6ab;
-  --project-tile-4: #eea953;
-  --project-tile-5: #f294d8;
-  --project-tile-6: #63c4ff;
+     the menu row hover. Dark dims 45% so the popover-tone dialog still
+     separates from the page; the menu row hover is one step above popover. */
+  --dialog-backdrop: rgb(0 0 0 / 0.45);
+  --menu-hover: #403b36;
+  /* 项目方块：亮侧六个色相同序提亮到 L .72，上面是 --text-on-accent 深字 */
+  --project-tile-1: #da8f72;
+  --project-tile-2: #9eac76;
+  --project-tile-3: #8ba8c6;
+  --project-tile-4: #cca26e;
+  --project-tile-5: #b19ac4;
+  --project-tile-6: #6eb3b2;
 }
 
 .light {

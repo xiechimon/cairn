@@ -15,7 +15,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 
-const CARD_DARK = 'rgb(38, 34, 31)'; // --card dark
+const CARD_DARK = 'rgb(47, 42, 38)'; // --card dark
 const CARD_LIGHT = 'rgb(255, 255, 255)'; // --card light
 const CANVAS_LIGHT = 'rgb(243, 238, 229)'; // --canvas light
 const CLEAR = 'rgba(0, 0, 0, 0)';
