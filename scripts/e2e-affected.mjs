@@ -202,6 +202,12 @@ const FULL_PATH_PREFIXES = [
   'pnpm-workspace.yaml',
 ];
 
+// #1455: the web unit-test layer. vitest-only (vitest.config.ts includes
+// test/**/*.test.ts), never in the fixture build playwright serves, and no
+// e2e file imports from it — so no spec is affected. The unit run
+// (`pnpm exec vitest run --changed`) is the coverage for these paths.
+const UNIT_TEST_PREFIXES = ['apps/web/test/', 'apps/web/vitest.config.ts'];
+
 // --- changed-path collection -------------------------------------------------
 
 function git(args) {
@@ -245,6 +251,9 @@ function classify(path) {
   }
   if (FULL_PATH_PREFIXES.some((p) => path === p || path.startsWith(p))) {
     return { specs: null, why: 'shared surface' };
+  }
+  if (UNIT_TEST_PREFIXES.some((p) => path === p || path.startsWith(p))) {
+    return { specs: [], why: 'web unit-test layer (vitest only, not in the e2e build)' };
   }
   if (path.startsWith('apps/web/')) return { specs: null, why: 'unmapped web path' };
   if (path.startsWith('apps/server/')) {
@@ -326,7 +335,7 @@ if (selection.length === 0) {
   console.log(`[e2e:affected] changed paths (${source}):`);
   console.log(reasons.join('\n'));
   console.log(
-    '[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.',
+    '[e2e:affected] no web e2e surface touched — the vitest layers (unit / stack integration) are the coverage for this change.',
   );
   process.exit(0);
 }
