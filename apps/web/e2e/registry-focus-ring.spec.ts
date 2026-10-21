@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { settleTransitions } from './helpers.js';
 
 // #1244: registry focus skins (outline-none + focus-visible:ring-3
 // ring-ring/50) sit in the utilities layer and override the #388 base
@@ -71,13 +72,15 @@ async function focusKeyboard(locator: Locator) {
   // Tab away and back so Chromium treats the focus as keyboard focus.
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
-  await page.waitForTimeout(350);
+  // Focus starts 150ms outline / box-shadow transitions; read only after
+  // they settle (#1427).
+  await settleTransitions(page);
   const hit = await locator.evaluate(
     (el) => document.activeElement === el && el.matches(':focus-visible'),
   );
   if (!hit) {
     await locator.focus();
-    await page.waitForTimeout(350);
+    await settleTransitions(page);
   }
 }
 
@@ -148,7 +151,7 @@ test.describe('#1244 registry focus outline', () => {
     await page.getByRole('button', { name: '创建 Agent' }).click();
     const input = page.locator('#dlg-agent-name');
     await input.click();
-    await page.waitForTimeout(350);
+    await settleTransitions(page);
     expectGlobalOutline(await readFocus(input));
   });
 
@@ -158,7 +161,7 @@ test.describe('#1244 registry focus outline', () => {
     const input = page.locator('#dlg-agent-name');
     await focusKeyboard(input);
     await input.evaluate((el) => el.setAttribute('aria-invalid', 'true'));
-    await page.waitForTimeout(350);
+    await settleTransitions(page);
     const info = await readFocus(input);
     expect(info.outlineStyle).toBe('solid');
     expect(info.outlineWidth).toBe('2px');

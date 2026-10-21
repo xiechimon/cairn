@@ -1,0 +1,142 @@
+{
+  "light@1x": {
+    "slots": {
+      "cds-shadow-sm": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "cds-shadow-md": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px",
+      "cds-shadow-lg": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "edge-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "card-shadow": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "card-lift": "oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px, rgba(80, 60, 30, 0.07) 0px 4px 14px 0px",
+      "shadow-popover": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "shadow-composer": "rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(236, 229, 218) 0px 0px 0px 1px inset",
+      "shadow-composer-hover": "rgba(0, 0, 0, 0.06) 0px 4px 24px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px inset",
+      "shadow-composer-focus": "rgba(0, 0, 0, 0.08) 0px 4px 24px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px inset, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px",
+      "panel-shadow": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "panel-shadow-hover": "oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px, rgba(80, 60, 30, 0.07) 0px 4px 14px 0px",
+      "drag-shadow": "rgba(0, 0, 0, 0.18) 0px 8px 24px 0px",
+      "fab-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "plate-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "dialog-shadow": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "chief-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "floating-shadow": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "e1": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "e2": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "e3": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "top": "rgba(255, 255, 255, 0) 0px 1px 0px 0px inset",
+      "edge-ring": "rgb(236, 229, 218) 0px 0px 0px 1px inset"
+    },
+    "surfaces": {
+      "todo-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 0px, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "notify-banner": "rgb(236, 229, 218) 0px 0px 0px 1px inset, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "user-menu": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "composer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(236, 229, 218) 0px 0px 0px 1px inset",
+      "chief-drawer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 1px inset, rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "team-agent-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px"
+    }
+  },
+  "dark@1x": {
+    "slots": {
+      "cds-shadow-sm": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "cds-shadow-md": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "cds-shadow-lg": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "edge-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "card-shadow": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "card-lift": "oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 1px, rgba(0, 0, 0, 0.09) 0px 4px 16px -2px",
+      "shadow-popover": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "shadow-composer": "rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(62, 58, 52) 0px 0px 0px 1px inset",
+      "shadow-composer-hover": "rgba(0, 0, 0, 0.55) 0px 4px 24px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 1px inset",
+      "shadow-composer-focus": "rgba(0, 0, 0, 0.65) 0px 4px 24px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "panel-shadow": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "panel-shadow-hover": "oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 1px, rgba(0, 0, 0, 0.09) 0px 4px 16px -2px",
+      "drag-shadow": "rgba(0, 0, 0, 0.18) 0px 8px 24px 0px",
+      "fab-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "plate-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "dialog-shadow": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "chief-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "floating-shadow": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "e1": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "e2": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "e3": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "top": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "edge-ring": "rgb(62, 58, 52) 0px 0px 0px 1px inset"
+    },
+    "surfaces": {
+      "todo-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "notify-banner": "rgb(62, 58, 52) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "user-menu": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "composer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(62, 58, 52) 0px 0px 0px 1px inset",
+      "chief-drawer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(62, 58, 52) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "team-agent-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px"
+    }
+  },
+  "light@2x": {
+    "slots": {
+      "cds-shadow-sm": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "cds-shadow-md": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px",
+      "cds-shadow-lg": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "edge-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "card-shadow": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "card-lift": "oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px, rgba(80, 60, 30, 0.07) 0px 4px 14px 0px",
+      "shadow-popover": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "shadow-composer": "rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(236, 229, 218) 0px 0px 0px 0.5px inset",
+      "shadow-composer-hover": "rgba(0, 0, 0, 0.06) 0px 4px 24px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 0.5px inset",
+      "shadow-composer-focus": "rgba(0, 0, 0, 0.08) 0px 4px 24px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 0.5px inset, oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 0.5px",
+      "panel-shadow": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "panel-shadow-hover": "oklab(0.272041 0.00400013 0.0124831 / 0.09) 0px 0px 0px 1px, rgba(80, 60, 30, 0.07) 0px 4px 14px 0px",
+      "drag-shadow": "rgba(0, 0, 0, 0.18) 0px 8px 24px 0px",
+      "fab-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "plate-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "dialog-shadow": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "chief-shadow": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "floating-shadow": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "e1": "rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "e2": "rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "e3": "rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "top": "rgba(255, 255, 255, 0) 0px 1px 0px 0px inset",
+      "edge-ring": "rgb(236, 229, 218) 0px 0px 0px 0.5px inset"
+    },
+    "surfaces": {
+      "todo-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.272041 0.00400013 0.0124831 / 0.1) 0px 0px 0px 0px, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "notify-banner": "rgb(236, 229, 218) 0px 0px 0px 0.5px inset, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px",
+      "user-menu": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(31, 27, 24, 0.1) 0px 8px 24px 0px, rgba(31, 27, 24, 0.05) 0px 2px 6px 0px, rgb(236, 229, 218) 0px 0px 0px 1px",
+      "composer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.035) 0px 4px 20px 0px, rgb(236, 229, 218) 0px 0px 0px 0.5px inset",
+      "chief-drawer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236, 229, 218) 0px 0px 0px 0.5px inset, rgba(31, 27, 24, 0.16) 0px 16px 40px 0px, rgba(31, 27, 24, 0.06) 0px 2px 6px 0px",
+      "team-agent-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px"
+    }
+  },
+  "dark@2x": {
+    "slots": {
+      "cds-shadow-sm": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "cds-shadow-md": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "cds-shadow-lg": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "edge-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "card-shadow": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "card-lift": "oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 1px, rgba(0, 0, 0, 0.09) 0px 4px 16px -2px",
+      "shadow-popover": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "shadow-composer": "rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(62, 58, 52) 0px 0px 0px 0.5px inset",
+      "shadow-composer-hover": "rgba(0, 0, 0, 0.55) 0px 4px 24px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 0.5px inset",
+      "shadow-composer-focus": "rgba(0, 0, 0, 0.65) 0px 4px 24px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 0.5px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 0.5px",
+      "panel-shadow": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "panel-shadow-hover": "oklab(0.929657 0.00217339 0.0118415 / 0.09) 0px 0px 0px 1px, rgba(0, 0, 0, 0.09) 0px 4px 16px -2px",
+      "drag-shadow": "rgba(0, 0, 0, 0.18) 0px 8px 24px 0px",
+      "fab-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "plate-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "dialog-shadow": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "chief-shadow": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "floating-shadow": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "e1": "rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "e2": "rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "e3": "rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "top": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "edge-ring": "rgb(62, 58, 52) 0px 0px 0px 0.5px inset"
+    },
+    "surfaces": {
+      "todo-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px",
+      "notify-banner": "rgb(62, 58, 52) 0px 0px 0px 0.5px inset, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px",
+      "user-menu": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.65) 0px 8px 28px 0px, rgba(0, 0, 0, 0.45) 0px 2px 8px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, oklab(0.929657 0.00217339 0.0118415 / 0.1) 0px 0px 0px 1px",
+      "composer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(62, 58, 52) 0px 0px 0px 0.5px inset",
+      "chief-drawer": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(62, 58, 52) 0px 0px 0px 0.5px inset, rgba(0, 0, 0, 0.5) 0px 16px 40px 0px, rgba(0, 0, 0, 0.3) 0px 2px 6px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset",
+      "team-agent-card": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px"
+    }
+  }
+}

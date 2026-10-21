@@ -31,11 +31,14 @@ const POPOVER_ROW =
 /** 节标签 = DropdownMenuLabel 节奏（text-xs medium muted）。 */
 const SECTION_LABEL = 'px-1.5 text-xs leading-4 font-medium text-muted-foreground';
 
-export function ChipPopover({ todo, onEditAssign }: ChipPopoverProps) {
+export function ChipPopover({ todo, agentModel, onEditAssign }: ChipPopoverProps) {
   const { t } = useI18n();
   // XMON-105: the 任务 (owner) row shows the logged-in user's own identity
   // avatar — single source, same face as the sidebar chip / account head.
-  const { user } = useLiveData();
+  const { user, live } = useLiveData();
+  const modelLine = live
+    ? agentModel && `${agentModel.modelId} · ${agentModel.thinkingLevel ?? t('默认')}`
+    : AGENT_MODEL_LINE;
   const agentAvatarUrl = useAgentAvatarUrlById();
   return (
     <div className="chip-popover flex flex-col gap-1.5 text-left">
@@ -78,7 +81,8 @@ export function ChipPopover({ todo, onEditAssign }: ChipPopoverProps) {
             fallback="/avatar-robot-1.svg"
           />
           {/* 未指派 fallback is [推断]: every capture shows an assigned agent */}
-          {todo.agent?.displayName ?? t('未指派')} · {AGENT_MODEL_LINE}
+          {todo.agent?.displayName ?? t('未指派')}
+          {modelLine !== undefined && ` · ${modelLine}`}
           <span className="ml-auto flex text-(--card-button)">
             <Check width={14} height={14} />
           </span>
@@ -101,8 +105,17 @@ export function ChipPopover({ todo, onEditAssign }: ChipPopoverProps) {
   );
 }
 
+export interface ChipAgentModel {
+  modelId: string;
+  thinkingLevel: string | null;
+}
+
 interface ChipPopoverProps {
   todo: TodoRecord;
+  /** Live: the model of `todo.agent` from the page's members read; absent =
+   *  no model segment (unassigned, read pending/failed, or no model set).
+   *  Fixture: ignored, the row shows the capture canon. */
+  agentModel?: ChipAgentModel;
   /** #209「编辑分配」接线:点击开 agent 选择弹层(#182 家族形态);弹层挂
    *  在页层(popover 关即卸载,挂内层会被带走)。 */
   onEditAssign?: () => void;
