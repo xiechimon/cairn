@@ -24,6 +24,7 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   filterAgentTools,
+  IN_PROGRESS_PHASES,
   isChiefConversationId,
   MEMORY_QUOTA_PER_AGENT,
   MERGE_HUMAN_ONLY_COPY,
@@ -1048,7 +1049,12 @@ export function transitionTodos(
       if (record) {
         transitioned.push(id);
         // #1445：关闭即停活动步——只写相位的话 pending 步仍会被机器领走。
-        if (to === 'closed' && owned.phase !== 'closed') stopActiveStepsAfterExit(svc, id);
+        // #1451：complete_todos 把卡标完成、离开执行中（漏斗的 building→done
+        // 边）同停——claimed 步零通知会继续跑。
+        const doneFromInProgress =
+          to === 'done' && (IN_PROGRESS_PHASES as readonly string[]).includes(owned.phase);
+        if ((to === 'closed' && owned.phase !== 'closed') || doneFromInProgress)
+          stopActiveStepsAfterExit(svc, id);
         // #902 done 落地审计行（不经合并步的 done 一律留痕，actor 答「谁」）。
         // 同相位重放（XMON-59 幂等语义：MCP 批量流转重入）不重复落行——
         // 审计记发生的流转，不记重放。
