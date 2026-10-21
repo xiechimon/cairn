@@ -1,0 +1,12 @@
+Scope: all 6 workspace projects
+✓ Lockfile at ../../pnpm-lock.yaml passes supply-chain policies (verified 1h ago)
+../.. prepare$ husky
+../.. prepare: Done
+Done in 208ms using pnpm v12.5.1
+
+
+Running 2 tests using 1 worker
+
+[1/2] e2e/board-queued-drop.spec.ts:114:1 › a queued card does not light 执行中, and a drop there sends no start
+[2/2] e2e/board-queued-drop.spec.ts:142:1 › a todo card still lights 执行中, and a drop there sends the start
+  2 passed (6.4s)
