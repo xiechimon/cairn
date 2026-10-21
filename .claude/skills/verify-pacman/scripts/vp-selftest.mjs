@@ -1137,10 +1137,11 @@ const cases = [
     'drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository',
     () => {
       // vp.mjs sits in the main checkout; the caller works in worktree p2, and p3
-      // is a third worktree. p2 and p3 each hold archived evidence.
+      // is a third worktree. other is a repository of its own (a second clone).
+      // p2, p3 and other each hold archived evidence.
       const root = tempDir('vp-selftest-wts-');
       const main = join(root, 'main');
-      const [p2, p3] = [join(root, 'p2'), join(root, 'p3')];
+      const [p2, p3, other] = [join(root, 'p2'), join(root, 'p3'), join(root, 'other')];
       let runs = [];
       let beside = { code: null, out: '' };
       let unchanged = false;
@@ -1154,12 +1155,14 @@ const cases = [
         g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
         g('worktree', 'add', '-q', '--detach', p2);
         g('worktree', 'add', '-q', '--detach', p3);
+        mkdirSync(other);
+        gitAt(other)('init', '-q');
         const script = installSkill(main, { x: STUB, out: { ...STUB, evidence: { flag: '--out' } } });
-        for (const wt of [p2, p3]) committedEvidence(wt);
+        for (const wt of [p2, p3, other]) committedEvidence(wt);
         const run = join(root, 'run');
         mkdirSync(run);
         writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
-        const before = [p2, p3].map((wt) => snapshot(join(wt, 'docs', 'verify')));
+        const before = [p2, p3, other].map((wt) => snapshot(join(wt, 'docs', 'verify')));
         const at = (cwd, args, env = {}) => vp(args, env, cwd, script);
         const inP2 = 'docs/verify/T/run-a';
         runs = [
@@ -1170,9 +1173,11 @@ const cases = [
           at(p2, ['drive', 't', 'out', '--', '--out', join(p3, 'docs', 'verify', 'T', 'run-a')]),
           at(p2, ['drive', 't', 'out', '--', '--out', 'docs/verify/T/run-b']),
           at(p2, ['capture', '/app', '--wait', '0'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: inP2 }),
+          // The caller's own repository, which is not vp.mjs's.
+          at(other, ['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: inP2 }),
         ];
         beside = at(p2, ['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: 'docs/verify-notes/run' });
-        unchanged = [p2, p3].every((wt, i) => snapshot(join(wt, 'docs', 'verify')) === before[i]);
+        unchanged = [p2, p3, other].every((wt, i) => snapshot(join(wt, 'docs', 'verify')) === before[i]);
         const evidenceRoot = join(main, '.claude', 'verify-evidence');
         made = existsSync(evidenceRoot) ? readdirSync(evidenceRoot) : [];
       } finally {
