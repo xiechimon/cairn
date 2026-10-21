@@ -23,7 +23,15 @@ import type {
   TriggerSource,
 } from '@pacman/shared';
 import { sql } from 'drizzle-orm';
-import { integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  primaryKey,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
 /** epoch 毫秒（records/common.ts epochMs 同族）。 */
 const epochMs = (name: string) => integer(name);
@@ -747,4 +755,160 @@ export const githubConnection = sqliteTable('github_connection', {
   /** 授权 scope 串（空格分隔，`repo` 位 = spec 12 GitHub 执行面前提）。 */
   scope: text('scope').notNull(),
   createdAt: epochMs('createdAt').notNull(),
+});
+
+// —— 合并就绪闸（#1404 P3，ADR 0021 D1–D4，spec 28 P3）的 server 独占四表 ——————
+// 判定不再从 message 行读：机器的 transcript 上传接受任意 role 与内容、调用方
+// 自定 id，冲突即覆盖，机器能伪造。四表只由 server 的闸代码写（S5a 起），机器
+// 回传路径（routes-machine.ts、services/machine*.ts）不写。全部挂 build 级联：
+// 删构建（重置、删任务、删项目三条现有路径）带走闸行，不留孤儿也不挡删除。
+// 闸行只该随构建删除。drizzle 在一个事务里跑迁移，PRAGMA foreign_keys=OFF 在事务
+// 里不生效，故此后按 drizzle 形状重建 build（或经 build.todoId 级联的 todo）的迁移，
+// DROP TABLE 的隐式删行会清空四表：那条迁移须先把闸行挪开再写回
+// （merge-gate-tables.test.ts F19 跑本迁移之后的全部迁移查这一点）。
+// 列形取自 S1（packages/shared/src/records/merge-gate.ts、
+// services/merge-gate/digest.ts）与 S2（services/merge-gate/readiness.ts）；schema
+// 不 import 闸代码，词表以 $type 字面量照抄，各列注明对应的 S1/S2 类型。值域不设 CHECK：
+// 词表随 S5a–S8 增长时不必重建表。内部表，无 wire record（INTERNAL_ONLY_TABLES）。
+
+/** S2 GateVerdictView['kind']。 */
+type GateVerdictKind = 'review' | 'verify' | 'decision';
+/** S2 GateVerdictView['outcome']。 */
+type GateVerdictOutcome =
+  | 'pass'
+  | 'block'
+  | 'extraction_failed'
+  | 'step_failed'
+  | 'tampered'
+  | 'unbound'
+  | 'evidence_invalid';
+/** S1 MergePolicy（MERGE_POLICIES）。 */
+type GatePolicy = 'human' | 'shadow' | 'autonomous';
+/** S2 MergeBlocker（mergeBlockerSchema）：code 取 MERGE_BLOCKERS 的码，class 取
+ * BLOCKER_CLASSES；detail 是 readiness 写好的名单（名字已转义、有长度与条数上限）。 */
+interface GateBlockerRow {
+  code: string;
+  class: 'policy' | 'transient' | 'human';
+  label: string;
+  detail: string[];
+}
+/** gate_round.state（S7 的轮次协调持有）：open = 在收判定或等 chief；fixing =
+ * 本补丁的 [review-fix] 步已派；fix_no_change = 该修复步收尾而摘要没变（S2
+ * round.fixNoChange）；closed = 已决、已被新补丁取代或已交给人。 */
+type GateRoundState = 'open' | 'fixing' | 'fix_no_change' | 'closed';
+/** gate_round.dispatches 的值：某 (kind, 视角) 在本摘要上派过几次、最近一次的
+ * 时刻（GATE_LIMITS.perspectiveRetries 与 perspectiveDeadlineMs 按它判）。 */
+interface GateRoundDispatch {
+  count: number;
+  lastAt: number;
+}
+
+// gate_digest：构建的 PR 在某个 head 上的补丁摘要（S1 computePatchDigest 的结果，
+// 只在摘要可得时落行；不可得时 gate_state 的快照带 patchDigest null 与对应 blocker）。
+// 每 (buildId, headSha) 一行；update-branch 后新 head 同摘要另落一行。摘要按三点
+// compare {base}...{head} 算，merge-base 一变（PR 改了 base 分支）同一 head 也会得出
+// 新摘要，故写入方按主键覆盖本行，不把旧行当成新 compare 的结果。
+export const gateDigest = sqliteTable(
+  'gate_digest',
+  {
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    /** compare {base}...{headSha} 的 head，40 位小写 hex。 */
+    headSha: text('headSha').notNull(),
+    /** S1 PatchDigestResult.patchDigest（非 null）：`<版本>:<sha256 hex>`，前缀 =
+     * PATCH_DIGEST_VERSION（S1 现为 pd2），算法一改前缀即变。 */
+    patchDigest: text('patchDigest').notNull(),
+    /** S1 PatchDigestResult.countedFiles：整张补丁的文件数，含证据，改名记两个
+     * （D4 的 40 文件上限）。 */
+    countedFiles: integer('countedFiles').notNull(),
+    /** S1 PatchDigestResult.countedLines：整张补丁的增删行数，含证据（D4 的 800 行上限）。 */
+    countedLines: integer('countedLines').notNull(),
+    /** S1 PatchDigestResult.kept.length：进摘要的条目数（docs/verify/ 之外）。 */
+    keptFiles: integer('keptFiles').notNull(),
+    /** S1 PatchDigestResult.kept 的 additions + deletions 之和。 */
+    keptLines: integer('keptLines').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.buildId, t.headSha] })],
+);
+
+// gate_round：每 (buildId, patchDigest) 一轮（S7）。补丁改回旧摘要时沿用旧轮，判定
+// 仍绑在那份补丁上。round 是轮在构建内的序号，(buildId, round) 唯一，GATE_LIMITS.
+// roundsMax 按它数；fixRound 记本补丁出自第几个 [review-fix] 轮，fixRoundsMax 按它数。
+export const gateRound = sqliteTable(
+  'gate_round',
+  {
+    id: text('id').primaryKey(),
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    /** 同 gate_digest.patchDigest（S1 PatchDigestResult.patchDigest，非 null）。 */
+    patchDigest: text('patchDigest').notNull(),
+    /** 构建内第几轮，从 1 起（S2 round.gateRoundsExhausted 的计数）。 */
+    round: integer('round').notNull(),
+    /** 本补丁出自第几个 [review-fix] 轮；0 = 不是修复轮的产物（S2
+     * round.fixRoundsExhausted 的计数）。 */
+    fixRound: integer('fixRound').notNull().default(0),
+    state: text('state').$type<GateRoundState>().notNull().default('open'),
+    /** S2 round.perspectives：建轮时冻结的审核视角。 */
+    perspectives: json<string[]>('perspectives').notNull(),
+    /** S2 round.timedOut：超时且重试用完的视角。 */
+    timedOut: json<string[]>('timedOut').notNull().default(sql`'[]'`),
+    /** 派步计数，键 = `<kind>` 或 `<kind>:<视角>`（按 (kind, 视角, 摘要) 封顶，摘要即本行）。 */
+    dispatches: json<Record<string, GateRoundDispatch>>('dispatches').notNull().default(sql`'{}'`),
+    startedAt: epochMs('startedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('gate_round_build_digest_unique').on(t.buildId, t.patchDigest),
+    uniqueIndex('gate_round_build_round_unique').on(t.buildId, t.round),
+  ],
+);
+
+// gate_verdict：一步一条判定（S2 GateVerdictView 的来源）。stepId 是主键但不设外键
+// （同 plan / steer_pending / stop_pending 的 stepId）：步 id 由派步的 server 闸代码
+// 写入；外键带级联时，删一步（构建还在）会悄悄抹掉记下的 block / tampered 判定，
+// 此后按 drizzle 形状重建 step 的迁移也会经 DROP TABLE step 清空本表（F17/F18）。
+// chief 小合并步的 step.buildId 是 chief 线程，故被审构建另记 buildId（外键到
+// build，判定随构建删除）。
+export const gateVerdict = sqliteTable(
+  'gate_verdict',
+  {
+    stepId: text('stepId').primaryKey(),
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<GateVerdictKind>().notNull(),
+    /** S2 GateVerdictView['perspective']：审核视角；verify 为 null，chief 为 'chief'。 */
+    perspective: text('perspective'),
+    outcome: text('outcome').$type<GateVerdictOutcome>().notNull(),
+    /** S2 GateVerdictView['patchDigest']：本判定计入的摘要；null = 判定的 head
+     * 与 expectedHeadSha 对不上，不计入任何摘要。 */
+    patchDigest: text('patchDigest'),
+    /** 判定自报的 head（spec 28 P3：判定带 headSha，摘要按它现算）；null = 没报
+     * （提取失败、步失败）。 */
+    headSha: text('headSha'),
+    /** server 派步时写下的 head；判定只在两者一致时绑定摘要。 */
+    expectedHeadSha: text('expectedHeadSha').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('gate_verdict_buildId_idx').on(t.buildId)],
+);
+
+// gate_state：每构建最新一份 readiness 快照（S2 MergeReadiness，S6a 起写），任务
+// 详情页、chief 工具与 status 同源读它。
+export const gateState = sqliteTable('gate_state', {
+  buildId: text('buildId')
+    .primaryKey()
+    .references(() => build.id, { onDelete: 'cascade' }),
+  /** MergeReadiness.ready（⇔ blockers 为空）。 */
+  ready: bool('ready').notNull(),
+  /** MergeReadiness.headSha；null = 读不到 PR。 */
+  headSha: text('headSha'),
+  /** MergeReadiness.patchDigest；null = 摘要不可得。 */
+  patchDigest: text('patchDigest'),
+  policy: text('policy').$type<GatePolicy>().notNull(),
+  /** MergeReadiness.blockers，按 MERGE_BLOCKERS 的固定顺序。 */
+  blockers: json<GateBlockerRow[]>('blockers').notNull(),
+  evaluatedAt: epochMs('evaluatedAt').notNull(),
 });

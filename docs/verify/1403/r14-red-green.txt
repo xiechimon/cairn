@@ -1,0 +1,48 @@
+# #1403 round 14 (pr-gate run 6 on #1414): red against the sources of 4237afa, green after the fix.
+# The 4 failing cases are the ownership checks this round adds ([62a] closed and merged, [62b], [62d]).
+# [62c] (head repo compared without case) and the pins [63] and the two ci-loop waiting_quota tests
+# pass on the old sources by design: they guard behavior that already holds.
+
+== red ==
+# ran against the sources of 4237afa with only the test files changed
+# (apps/server/test/pr-reconcile.test.ts, apps/server/test/ci-loop.test.ts)
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ ✓ test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > #1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]
+ ✓ test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > #1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62b] a PR from another branch of the target repo → not finished
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the head repo is compared without case → Octo/Demo is the target repo
+ × test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a merged response whose head repo is null (fork deleted) → not finished, no hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [63] a merge step completing through completeStep stops an unclaimed verify step
+AssertionError: expected 'failed' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1681:33
+AssertionError: expected 'done' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1681:33
+AssertionError: expected 'done' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1699:31
+AssertionError: expected 'done' to be 'review' // Object.is equality
+ ❯ test/pr-reconcile.test.ts:1716:31
+ Test Files  1 failed | 1 passed (2)
+      Tests  4 failed | 109 passed (113)
+exit=1
+
+== green at 37fc851 (the fix commit) ==
+$ pnpm exec vitest run --reporter=verbose apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts apps/server/test/close-stops-active-steps.test.ts
+ ✓ test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > #1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]
+ ✓ test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > #1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, closed → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62a] a fork PR with the same branch name, merged → the card is neither failed nor finished; one hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62b] a PR from another branch of the target repo → not finished
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62c] the head repo is compared without case → Octo/Demo is the target repo
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [62d] a merged response whose head repo is null (fork deleted) → not finished, no hint
+ ✓ test/pr-reconcile.test.ts > #1403 PR reconcile for review-phase builds > [63] a merge step completing through completeStep stops an unclaimed verify step
+ Test Files  3 passed (3)
+      Tests  141 passed (141)
+exit=0
+
+== green again at fb06b51 (after the /simplify commit) ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts apps/server/test/close-stops-active-steps.test.ts
+ Test Files  3 passed (3)
+      Tests  141 passed (141)
+exit=0

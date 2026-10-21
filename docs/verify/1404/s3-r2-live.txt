@@ -1,0 +1,155 @@
+# #1404 S3 round 2 live evidence: upgrade of a main-created database with the regenerated 0044.
+# One fresh scratch PACMAN_HOME under the session scratchpad (s3r2-home-upgrade), deleted afterwards.
+# Main's server = origin/main at dabef481 (the tip when this ran; 49af6f28, e1b051a8, 9eefe881, 290f3c14
+# and dabef481 landed after the branch point 2294b087 and change no package.json, lockfile or
+# apps/server/drizzle file), extracted with `git archive origin/main apps/server packages/shared
+# package.json` into the scratchpad and run with the p3c worktree's installed node_modules linked in
+# (@pacman/shared pointed at main's extracted packages/shared). Nothing in the p3c worktree was
+# swapped. This branch's server = the p3c worktree at 34381bd0. Both: `tsx src/index.ts` from
+# apps/server, HOST=127.0.0.1. SQLite read with node better-sqlite3 (no sqlite3 CLI here):
+# s3r2-dump.mjs and s3r2-probe.mjs, reproduced at the end (probe opens its own connection with
+# foreign_keys = ON, the per-connection pragma db/client.ts sets).
+
+== 1. main's server (dabef481) on the fresh home, port 8797
+$ PACMAN_HOME=<scratch>/s3r2-home-upgrade PORT=8797 HOST=127.0.0.1 tsx src/index.ts
+GET /api/teams -> 200
+POST /api/projects -> project -lgqBdcJEEuh-h9zudkPO
+POST /api/projects/:id/todos -> todo cz8ZSZBf4TA64zdFM1Is4
+POST /api/projects/:id/builds {todoIds, assignment {plan:null, build:null}, withPlan:true} -> 201,
+     build 01a15e95-bfc2-7eb6-bb94-59232a9aec66
+server stopped with SIGTERM (port 8797 free afterwards per lsof)
+$ node s3r2-dump.mjs server.db
+__drizzle_migrations rows: 44; newest created_at: 1792002303068
+tables (31); gate tables: none
+tables with a foreign key to step: none
+
+== 2. this branch's server (34381bd0) on the same home, port 8798
+$ PACMAN_HOME=<same home> PORT=8798 HOST=127.0.0.1 tsx src/index.ts
+GET /api/teams -> 200; startup log "errors: 0", no WARN or ERROR lines
+$ node s3r2-dump.mjs server.db    (after this branch's server migrated it)
+__drizzle_migrations rows: 45; newest created_at: 1792586626268
+tables (35); gate tables: gate_digest gate_round gate_state gate_verdict
+-- gate_verdict DDL:
+CREATE TABLE `gate_verdict` (
+	`stepId` text PRIMARY KEY NOT NULL,
+	`buildId` text NOT NULL,
+	`kind` text NOT NULL,
+	`perspective` text,
+	`outcome` text NOT NULL,
+	`patchDigest` text,
+	`headSha` text,
+	`expectedHeadSha` text NOT NULL,
+	`createdAt` integer NOT NULL,
+	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
+);
+-- gate_digest foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+-- gate_round foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+-- gate_verdict foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+-- gate_state foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+tables with a foreign key to step: none
+build row from main: [{"id":"01a15e95-bfc2-7eb6-bb94-59232a9aec66","todoId":"cz8ZSZBf4TA64zdFM1Is4","createdAt":1792588234690}]
+step rows from main: [{"id":"tbXvuuhcIav0P9bnUZEKn","buildId":"01a15e95-bfc2-7eb6-bb94-59232a9aec66","kind":"plan","status":"pending"}]
+
+The newest created_at, 1792586626268, is the regenerated 0044's journal `when` (round 1's was
+1792583973494); it is above 0043's 1792002303068, so the main-created database applied it.
+gate_verdict has one foreign key, buildId -> build ON DELETE CASCADE; no table references step.
+
+$ node s3r2-probe.mjs seed server.db 01a15e95-bfc2-7eb6-bb94-59232a9aec66
+build 01a15e95-bfc2-7eb6-bb94-59232a9aec66, step tbXvuuhcIav0P9bnUZEKn
+INSERT gate_digest: ok (changes=1)
+INSERT gate_round: ok (changes=1)
+INSERT gate_verdict on the build's step (outcome block): ok (changes=1)
+INSERT gate_verdict whose stepId has no step row: ok (changes=1)
+INSERT gate_verdict for a build that does not exist: SQLITE_CONSTRAINT_FOREIGNKEY FOREIGN KEY constraint failed
+INSERT gate_verdict with expectedHeadSha null: SQLITE_CONSTRAINT_NOTNULL NOT NULL constraint failed: gate_verdict.expectedHeadSha
+INSERT gate_round with patchDigest null: SQLITE_CONSTRAINT_NOTNULL NOT NULL constraint failed: gate_round.patchDigest
+INSERT gate_state: ok (changes=1)
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":2,"gate_state":1,"build":1,"step":1}
+
+$ node s3r2-probe.mjs stepdel server.db 01a15e95-bfc2-7eb6-bb94-59232a9aec66    (F18 on the live database)
+DELETE FROM step WHERE id = tbXvuuhcIav0P9bnUZEKn (the build stays): ok (changes=1)
+verdicts left: [{"stepId":"no-such-step","outcome":"pass"},{"stepId":"tbXvuuhcIav0P9bnUZEKn","outcome":"block"}]
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":2,"gate_state":1,"build":1,"step":0}
+
+$ curl -X DELETE http://127.0.0.1:8798/api/todos/cz8ZSZBf4TA64zdFM1Is4    (live branch server; todo -> build cascade)
+DELETE /api/todos/cz8ZSZBf4TA64zdFM1Is4 http=204
+$ node s3r2-probe.mjs counts server.db 01a15e95-bfc2-7eb6-bb94-59232a9aec66
+counts: {"gate_digest":0,"gate_round":0,"gate_verdict":0,"gate_state":0,"build":0,"step":0}
+whole tables after the delete: gate_digest 0, gate_round 0, gate_verdict 0, gate_state 0 rows
+(both verdicts, including the one whose step was already gone, left with their build)
+
+== 3. Cleanup
+The branch server stopped with SIGTERM to its tsx parent (port 8798 free afterwards per lsof; 8797
+also free); a scan of /proc environments found no process with the scratch home. The scratch home
+and the extracted main source were deleted.
+
+== s3r2-dump.mjs
+// Usage: node s3r2-dump.mjs <server.db> — migrations, table list, gate_verdict DDL, foreign keys of the gate tables.
+import { createRequire } from 'node:module';
+const require = createRequire('/home/user/pacman/.claude/worktrees/p3c/apps/server/package.json');
+const Database = require('better-sqlite3');
+const db = new Database(process.argv[2], { readonly: true });
+const mig = db.prepare('SELECT created_at FROM __drizzle_migrations ORDER BY created_at').all();
+console.log(`__drizzle_migrations rows: ${mig.length}; newest created_at: ${mig.at(-1)?.created_at}`);
+const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> '__drizzle_migrations' ORDER BY name").all().map((r) => r.name);
+console.log(`tables (${tables.length}); gate tables: ${tables.filter((t) => t.startsWith('gate_')).join(' ') || 'none'}`);
+const v = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='gate_verdict'").get();
+if (v) console.log(`-- gate_verdict DDL:\n${v.sql};`);
+for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
+  if (!tables.includes(t)) continue;
+  console.log(`-- ${t} foreign_key_list: ${JSON.stringify(db.prepare(`PRAGMA foreign_key_list(${t})`).all().map((f) => ({ from: f.from, table: f.table, to: f.to, on_delete: f.on_delete })))}`);
+}
+const refs = tables.filter((t) => db.prepare(`PRAGMA foreign_key_list(${t})`).all().some((f) => f.table === 'step'));
+console.log(`tables with a foreign key to step: ${refs.length ? refs.join(' ') : 'none'}`);
+db.close();
+
+== s3r2-probe.mjs
+// Usage: node s3r2-probe.mjs <seed|stepdel|counts> <server.db> <buildId>
+// Own connection with foreign_keys = ON (per-connection pragma, as db/client.ts sets it).
+import { createRequire } from 'node:module';
+const require = createRequire('/home/user/pacman/.claude/worktrees/p3c/apps/server/package.json');
+const Database = require('better-sqlite3');
+const [cmd, dbPath, buildId] = process.argv.slice(2);
+const db = new Database(dbPath);
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
+const D1 = `pd2:${'a'.repeat(64)}`;
+const H1 = '1'.repeat(40);
+const run = (label, sql, ...args) => {
+  try {
+    console.log(`${label}: ok (changes=${db.prepare(sql).run(...args).changes})`);
+  } catch (e) {
+    console.log(`${label}: ${e.code} ${e.message}`);
+  }
+};
+const counts = () => {
+  const out = {};
+  for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
+    out[t] = db.prepare(`SELECT count(*) AS n FROM ${t} WHERE buildId = ?`).get(buildId).n;
+  }
+  out.build = db.prepare('SELECT count(*) AS n FROM build WHERE id = ?').get(buildId).n;
+  out.step = db.prepare('SELECT count(*) AS n FROM step WHERE buildId = ?').get(buildId).n;
+  return out;
+};
+const firstStep = () => db.prepare('SELECT id FROM step WHERE buildId = ? ORDER BY createdAt LIMIT 1').get(buildId)?.id;
+if (cmd === 'seed') {
+  const s = firstStep();
+  console.log(`build ${buildId}, step ${s}`);
+  run('INSERT gate_digest', 'INSERT INTO gate_digest (buildId, headSha, patchDigest, countedFiles, countedLines, keptFiles, keptLines, createdAt) VALUES (?, ?, ?, 3, 42, 2, 40, ?)', buildId, H1, D1, Date.now());
+  run('INSERT gate_round', 'INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES (?, ?, ?, 1, ?, ?)', `r1-${buildId}`, buildId, D1, '["code","security","tests"]', Date.now());
+  run("INSERT gate_verdict on the build's step (outcome block)", "INSERT INTO gate_verdict (stepId, buildId, kind, perspective, outcome, patchDigest, headSha, expectedHeadSha, createdAt) VALUES (?, ?, 'review', 'security', 'block', ?, ?, ?, ?)", s, buildId, D1, H1, H1, Date.now());
+  run('INSERT gate_verdict whose stepId has no step row', "INSERT INTO gate_verdict (stepId, buildId, kind, outcome, expectedHeadSha, createdAt) VALUES ('no-such-step', ?, 'verify', 'pass', ?, ?)", buildId, H1, Date.now());
+  run('INSERT gate_verdict for a build that does not exist', "INSERT INTO gate_verdict (stepId, buildId, kind, outcome, expectedHeadSha, createdAt) VALUES ('s-x', 'no-such-build', 'review', 'pass', ?, ?)", H1, Date.now());
+  run('INSERT gate_verdict with expectedHeadSha null', "INSERT INTO gate_verdict (stepId, buildId, kind, outcome, expectedHeadSha, createdAt) VALUES ('s-y', ?, 'review', 'pass', NULL, ?)", buildId, Date.now());
+  run('INSERT gate_round with patchDigest null', "INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES ('r-null', ?, NULL, 2, '[]', ?)", buildId, Date.now());
+  run('INSERT gate_state', "INSERT INTO gate_state (buildId, ready, headSha, patchDigest, policy, blockers, evaluatedAt) VALUES (?, 0, ?, ?, 'human', '[]', ?)", buildId, H1, D1, Date.now());
+  console.log('counts:', JSON.stringify(counts()));
+} else if (cmd === 'stepdel') {
+  const s = firstStep();
+  run(`DELETE FROM step WHERE id = ${s} (the build stays)`, 'DELETE FROM step WHERE id = ?', s);
+  console.log('verdicts left:', JSON.stringify(db.prepare('SELECT stepId, outcome FROM gate_verdict WHERE buildId = ? ORDER BY stepId').all(buildId)));
+  console.log('counts:', JSON.stringify(counts()));
+} else if (cmd === 'counts') {
+  console.log('counts:', JSON.stringify(counts()));
+}
+db.close();

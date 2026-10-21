@@ -13,6 +13,8 @@
 
 - API 直入:`curl -X POST http://127.0.0.1:<VERIFY_PORT>/api/projects -H 'content-type: application/json' -d '{"name":"x","kind":"local","localPath":"/abs/path/to/repo"}'`。
 - web 新建项目表单「本地文件夹」条目:已落地(G2-T3/#360),驱动配方见 [project-new-form.md](./project-new-form.md)。
+- 驱动(`vp.mjs list local-repo-api` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive local-repo-api local-repo-api`:local 项目 API 三态校验 + GitHub 未连接 404。
 
 ## Driving it with probe-local-repos.mjs
 

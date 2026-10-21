@@ -468,6 +468,7 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
       customModelReasoning,
       piCacheRetention,
       hookTimeoutMs,
+      issueIntake,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -493,6 +494,8 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(piCacheRetention).toBe('PACMAN_PI_CACHE_RETENTION');
     // 自有面 [设计]（#1149）：环境钩子超时 ms 覆写（缺省 20min，票面钉死）
     expect(hookTimeoutMs).toBe('PACMAN_HOOK_TIMEOUT_MS');
+    // 自有面 [设计]（#1406）：issue 进料轮询 opt-in（1 / true / yes 才开，默认关）
+    expect(issueIntake).toBe('PACMAN_ISSUE_INTAKE');
   });
 
   it('credential formats match the observed shapes (key prefix 随 BRAND 槽)', () => {
@@ -521,9 +524,9 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
   });
 });
 
-describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token)', () => {
-  it('DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command + webhook_token (31 incl. the todo_tag join)', () => {
-    expect(DB_TABLES).toHaveLength(31);
+describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; #310 +attachment; #319 +branch_sync; spec 12 +github_connection; spec 13 −skill −mcp_server; XMON-109 +skill_audit; XMON-108 +shell_command; #1029 −document_diff; #1137 +webhook_token; #1404 +gate_*)', () => {
+  it('DB table registry is the 01 §6 list + chief + steer/stop_pending + attachment + branch_sync + github_connection − skill − mcp_server − document_diff + skill_audit + shell_command + webhook_token + the four gate tables (35 incl. the todo_tag join)', () => {
+    expect(DB_TABLES).toHaveLength(35);
     expect(DB_TABLES).toContain('todo_tag');
     expect(DB_TABLES).toContain('chief');
     expect(DB_TABLES).toContain('attachment');
@@ -538,6 +541,11 @@ describe('record projection (01 §6 / 03 M1; M4a +chief; M7 #308 +stop_pending; 
     expect(DB_TABLES).toContain('skill_audit');
     // #1137：GitHub webhook 入口路径 token（内部凭证表，无 record 投影）
     expect(DB_TABLES).toContain('webhook_token');
+    // #1404：合并就绪闸四表（内部表，readiness 经构建记录展示，无 record 投影）
+    for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
+      expect(DB_TABLES).toContain(t);
+      expect(INTERNAL_ONLY_TABLES).toContain(t);
+    }
   });
 
   it('record shapes cover exactly the 22 wire tables (todo_tag join + steer/stop_pending internal + attachment binary + github_connection credential + webhook_token credential have none; skill = 磁盘投影无表位 #367, mcp_server = config 投影无表位 #368, document_diff = 死 schema 退役 #1029 但 wire 形状仍在 document-diff.js)', () => {

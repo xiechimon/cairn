@@ -65,7 +65,7 @@ function probeWindowMs(base: number, attempts: number): number {
 
 /** 会话流 step 事件行（挂起/释放两态共用；形状 = stepJournalRowSchema 的
  * journal 位投影，quotaWait 挂起态携带）。 */
-function publishStepRow(deps: QuotaWaitDeps, row: StepRow): void {
+export function publishStepRow(deps: Pick<QuotaWaitDeps, 'convHub'>, row: StepRow): void {
   deps.convHub?.publishStep(row.buildId, {
     id: row.id,
     buildId: row.buildId,

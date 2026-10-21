@@ -16,9 +16,17 @@ import {
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { agent as agentTable, tag as tagTable, todoTag } from '../src/db/schema.js';
+import {
+  agent as agentTable,
+  project as projectTable,
+  tag as tagTable,
+  todo as todoTable,
+  todoTag,
+} from '../src/db/schema.js';
+import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { importGithubIssue } from '../src/services/github-issues.js';
 import {
   bindAllAgents,
   bootServer,
@@ -716,6 +724,105 @@ describe('出站纪律', () => {
     const res = await req(s.app, 'GET', `/api/projects/${projectId}/github/issues`);
     expect(res.status).toBe(404); // 上游 404 经 lib 映射直透
     expect(mock.calls).toHaveLength(1);
+    s.dispose();
+  });
+});
+
+// —— #1406 并发导入占位（webhook 与轮询器同时导入同一 issue）——————————————
+// claimedSourceRefs 是应用层检查、todo.sourceRef 无唯一约束；导入在检查与
+// createTodo 之间要等两次 GitHub 读。进程内 sourceRef 占位在第一次 await 之前
+// 落下、finally 里释放：同时进来的第二个导入拿到 409，一条 issue 一张卡。
+
+describe('#1406 并发导入占位', () => {
+  /** 每次读都让出事件循环（像真实网络），两路导入在读之间交错。 */
+  function yielding(mock: ReturnType<typeof ghMock>): FetchLike {
+    return async (input, init) => {
+      await new Promise((r) => setTimeout(r, 0));
+      return mock.impl(input, init);
+    };
+  }
+
+  async function importWorld(fetchImpl: FetchLike) {
+    const s = bootServer({ githubFetch: fetchImpl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const row = s.db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
+    if (row === undefined) throw new Error('project missing');
+    const deps = { ...s.svc, box: s.secretBox, githubFetch: fetchImpl };
+    const issueTodos = () =>
+      s.db
+        .select()
+        .from(todoTable)
+        .where(eq(todoTable.sourceRef, `github:${REPO}#7`))
+        .all();
+    return { s, row, deps, issueTodos };
+  }
+
+  test('同一 issue 两路并发导入：一路建卡，另一路 409', async () => {
+    const mock = ghMock(defaultRoutes());
+    const { s, row, deps, issueTodos } = await importWorld(yielding(mock));
+    const results = await Promise.allSettled([
+      importGithubIssue(deps, row, 7),
+      importGithubIssue(deps, row, 7),
+    ]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const rejected = results.find((r) => r.status === 'rejected');
+    expect(rejected?.status).toBe('rejected');
+    const reason = (rejected as PromiseRejectedResult).reason;
+    expect(reason).toBeInstanceOf(HttpError);
+    expect((reason as HttpError).status).toBe(409);
+    expect(issueTodos()).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('不同 issue 并发导入互不阻塞', async () => {
+    const mock = ghMock(defaultRoutes());
+    const { s, row, deps } = await importWorld(yielding(mock));
+    const [a, b] = await Promise.all([
+      importGithubIssue(deps, row, 7),
+      importGithubIssue(deps, row, 9),
+    ]);
+    expect([a.sourceRef, b.sourceRef].sort()).toEqual([`github:${REPO}#7`, `github:${REPO}#9`]);
+    s.dispose();
+  });
+
+  test('导入失败（上游 5xx）释放占位：随后的导入照常建卡', async () => {
+    const mock = ghMock(defaultRoutes({ [issuePath(7)]: { status: 500, body: {} } }));
+    const { s, row, deps, issueTodos } = await importWorld(yielding(mock));
+    await expect(importGithubIssue(deps, row, 7)).rejects.toMatchObject({ status: 502 });
+    mock.set(issuePath(7), { body: ISSUE_7_DETAIL });
+    const record = await importGithubIssue(deps, row, 7);
+    expect(record.sourceRef).toBe(`github:${REPO}#7`);
+    expect(issueTodos()).toHaveLength(1);
+    s.dispose();
+  });
+
+  test('引用大小写不同也是同一条 issue：已有 github:Octo/Alpha#7 的卡 → 列表滤除 7、直接导入 409', async () => {
+    const mock = ghMock(defaultRoutes());
+    const { s, row, deps } = await importWorld(mock.impl);
+    s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-case-7',
+        teamId: s.team.id,
+        projectId: row.id,
+        title: 'issue 7 under another case',
+        spec: '',
+        phase: 'todo',
+        phaseAt: Date.now(),
+        seqNum: 900,
+        sourceKind: 'github-issue',
+        sourceRef: 'github:Octo/Alpha#7',
+      })
+      .run();
+    const list = await call(s.app, 'GET', `/api/projects/${row.id}/github/issues`);
+    expect(list.status).toBe(200);
+    const face = (await list.json()) as { issues: Array<{ number: number }> };
+    expect(face.issues.map((i) => i.number)).toEqual([9]);
+    await expect(importGithubIssue(deps, row, 7)).rejects.toMatchObject({ status: 409 });
+    expect(
+      s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),
+    ).toHaveLength(1);
     s.dispose();
   });
 });

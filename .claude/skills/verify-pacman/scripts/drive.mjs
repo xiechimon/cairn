@@ -6,8 +6,9 @@
 // 证据(截图 + result.json)落 VERIFY_EVIDENCE_DIR(默认落**主仓**的
 // .claude/verify-evidence/<时间戳>-<probe>/,与 VERIFY_REPO_ROOT 无关——
 // lane 的栈在 worktree,证据落 worktree 会随它删除而丢失)。cleanup.mjs 不
-// 删证据;证据交付见 SKILL.md「证据归档纪律」(cp 进 PR 分支
-// docs/verify/<票号>/ 随 PR 提交)。任一断言失败退出码 1,
+// 删证据;证据交付见 SKILL.md「证据归档纪律」(在 PR 分支上 vp.mjs archive
+// <票号> --from <证据目录> 拷进 docs/verify/<票号>/ 随 PR 提交,不手工 cp)。
+// 任一断言失败退出码 1,
 // result.json 里逐条记 checks。
 // 口径与 apps/web/playwright.config.ts 一致:1440×732、colorScheme dark。
 

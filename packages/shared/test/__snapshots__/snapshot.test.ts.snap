@@ -7125,6 +7125,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > executor CLI 面（02 §
     "githubOauthClientSecret": "PACMAN_GITHUB_OAUTH_CLIENT_SECRET",
     "home": "PACMAN_HOME",
     "hookTimeoutMs": "PACMAN_HOOK_TIMEOUT_MS",
+    "issueIntake": "PACMAN_ISSUE_INTAKE",
     "mcpConfig": "PACMAN_MCP_CONFIG",
     "piCacheRetention": "PACMAN_PI_CACHE_RETENTION",
     "server": "PACMAN_SERVER",
@@ -7828,6 +7829,10 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "skill_audit",
   "shell_command",
   "webhook_token",
+  "gate_digest",
+  "gate_round",
+  "gate_verdict",
+  "gate_state",
 ]
 `;
 
