@@ -18,7 +18,7 @@
 // 不给它渲染 chip）。
 
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import type { DeliveredImage, MachineAttachmentResponse } from '@pacman/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
@@ -36,7 +36,9 @@ const FORMAT_CHAR = /^\p{Cf}$/u;
  * basename 段并剥控制字符，防 `../evil/name.bmp` 类 label 逃逸。#1406：
  * isValidFileName 放过的换行变体（U+0085 / U+2028 / U+2029）与格式字符
  * （Unicode Cf）也剥掉——路径写进提示行，模型侧会在这些字符处断行，围栏
- * 引用律也会改写它们，落盘名与提示里的路径只有同一份才对得上。 */
+ * 引用律也会改写它们，落盘名与提示里的路径只有同一份才对得上。剥完只剩
+ * 空串、. 或 ..（isValidFileName 放过的 `\u200b..\u200b` 一类）同样落
+ * attachment——它们会被 join 解析成步目录本身或素材化根。 */
 function safeFileName(fileName: string): string {
   const base = basename(fileName.replaceAll('\\', '/'));
   let out = '';
@@ -46,7 +48,7 @@ function safeFileName(fileName: string): string {
     if (FORMAT_CHAR.test(ch)) continue;
     out += ch;
   }
-  return out === '' || out === '.' ? 'attachment' : out;
+  return out === '' || out === '.' || out === '..' ? 'attachment' : out;
 }
 
 /** 响应 mime → 素材化文件的规范扩展名（mime 与 fileName 扩展名漂移时以
@@ -76,16 +78,21 @@ function inlineMime(mimeType: string): string | null {
 }
 
 /** 素材化落盘（幂等覆写）：`<materializeDir>/<stepId>/<name>`。
- * 返回绝对路径（提示行与 Read 用）。 */
+ * 返回绝对路径（提示行与 Read 用）。落点不是素材化根下恰好两段（步目录 +
+ * 文件名）就抛错、不建目录不写盘——文件名已由 safeFileName 收成一段，这一
+ * 道管 stepId（server 下发，空串、.. 或带 / 都会把落点带出步目录）。 */
 export function materializeFile(
   materializeDir: string,
   stepId: string,
   fileName: string,
   bytes: Buffer,
 ): string {
-  const dir = join(materializeDir, stepId);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, safeFileName(fileName));
+  const path = join(materializeDir, stepId, safeFileName(fileName));
+  const segments = relative(materializeDir, path).split(sep);
+  if (segments.length !== 2 || segments.includes('..')) {
+    throw new Error(`materialize path outside ${materializeDir}/<stepId>/: ${path}`);
+  }
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, bytes);
   return path;
 }
