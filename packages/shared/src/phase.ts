@@ -127,7 +127,9 @@ export function canBoardDrop(from: Phase, to: Phase): boolean {
     case 'todo':
       return src !== '待开始';
     case 'building':
-      return src === '待开始';
+      // #1457：进执行中 = 开始，与 orchestrate 同一相位集（今天 待开始 只住
+      // todo，这一项是列内容再变时的兜底）。
+      return src === '待开始' && canOrchestrate(from);
     case 'review':
       return src === '已完成';
     case 'done':

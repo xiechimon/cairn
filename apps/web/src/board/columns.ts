@@ -113,7 +113,8 @@ export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
       return true;
     case 'building':
       // #1457：列规则之上再套 shared canOrchestrate——落位走开始门 →
-      // orchestrate，看板不得放行服务端会 409 的相位，无论它住哪一列。
+      // orchestrate。今天 待开始 只住 todo，这一项是兜底：哪天又有
+      // orchestrate 不收的相位住进 待开始（#1434 = queued），看板也不放行。
       return src.id === 'todo' && canOrchestrate(todo.phase);
     case 'pending':
       return src.id === 'done' && todo.hasChanges === true;
