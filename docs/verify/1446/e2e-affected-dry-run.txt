@@ -1,0 +1,11 @@
+## base (HEAD before the family-table line): node scripts/e2e-affected.mjs --dry-run -- apps/web/src/overlay/more-menu.tsx
+[e2e:affected] changed paths (explicit):
+  apps/web/src/overlay/more-menu.tsx → area apps/web/src/overlay/
+[e2e:affected] 14/167 specs on the standard fixture-build config, E2E_PORT=8398
+  composer-wire-reject.spec.ts dead-buttons.spec.ts dialog-ring-room.spec.ts dialog-viewport.spec.ts escape-wiring.spec.ts hotkeys.spec.ts mention-picker-center.spec.ts newtask-dismiss-gesture.spec.ts newtask-project-persist.spec.ts newtask-project-select.spec.ts newtask-single-field.spec.ts overlay-focus.spec.ts project-settings-delete.spec.ts token-gate.spec.ts
+
+## branch
+[e2e:affected] changed paths (explicit):
+  apps/web/src/overlay/more-menu.tsx → area apps/web/src/overlay/
+[e2e:affected] 15/167 specs on the standard fixture-build config, E2E_PORT=8398
+  composer-wire-reject.spec.ts dead-buttons.spec.ts detail-queued-exit.spec.ts dialog-ring-room.spec.ts dialog-viewport.spec.ts escape-wiring.spec.ts hotkeys.spec.ts mention-picker-center.spec.ts newtask-dismiss-gesture.spec.ts newtask-project-persist.spec.ts newtask-project-select.spec.ts newtask-single-field.spec.ts overlay-focus.spec.ts project-settings-delete.spec.ts token-gate.spec.ts

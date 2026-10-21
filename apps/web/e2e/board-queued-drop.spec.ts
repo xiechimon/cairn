@@ -3,8 +3,8 @@ import { evidencePanelShot } from './evidence';
 
 // #1434: a drop into 执行中 is a start intent (POST /api/todos/:id/orchestrate),
 // and the server starts only todo / failed tasks. A queued card (started,
-// waiting for a machine) sits in 待开始 beside the todo cards, so 执行中 must
-// not take it. Live face, no ?scenario=: startTask only fires on the live data
+// waiting for a machine) must not start again; since #1447 it sits in 执行中,
+// so 执行中 is its own column. Live face, no ?scenario=: startTask only fires on the live data
 // path, and page.route answers it (stubWorld discipline from
 // board-dnd-live.spec.ts).
 // Failure modes pinned here:
@@ -114,7 +114,7 @@ const todoColumn = (page: Page) => page.locator('.board-column[data-column="todo
 test('a queued card does not light 执行中, and a drop there sends no start', async ({ page }) => {
   const stub = await stubWorld(page);
   await page.goto('/app');
-  await expect(todoColumn(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
+  await expect(building(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
 
   await dragCardOver(page, QUEUED_ID, 'building');
   // Drag state has settled: 已完成 is a valid target for a queued card (the
@@ -128,7 +128,7 @@ test('a queued card does not light 执行中, and a drop there sends no start', 
   await expect(building(page)).not.toHaveAttribute('data-drop-valid', 'true');
   await expect(building(page)).not.toHaveAttribute('data-drop', 'true');
   await page.mouse.up();
-  await expect(todoColumn(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
+  await expect(building(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
 
   // Sentinel: the todo card's drop goes through the same start path. Once its
   // POST is recorded, a POST from the queued drop would already be in the list

@@ -137,6 +137,17 @@ describe('resetTodoLocal（#755 fixture 面重置投影）', () => {
     expect(next.filter((t) => t.phase === 'todo').map((t) => t.id)).toEqual([a.id, run.id]);
   });
 
+  test('queued 卡（住执行中，#1447）：落待开始列尾 + 产物位清空', () => {
+    const a = todo(1, 'todo');
+    const queued = { ...todo(2, 'queued'), lastRunAt: NOW - 1 };
+    const next = resetTodoLocal([a, queued], queued.id, NOW);
+    const moved = next.find((t) => t.id === queued.id)!;
+    expect(moved.phase).toBe('todo');
+    expect(moved.latestBuildId).toBeNull();
+    expect(moved.lastRunAt).toBeNull();
+    expect(next.filter((t) => t.phase === 'todo').map((t) => t.id)).toEqual([a.id, queued.id]);
+  });
+
   test('非 started 卡 = 恒等（静默改相走 moveTodo，不经此路）', () => {
     const done = {
       ...todo(1, 'done'),
