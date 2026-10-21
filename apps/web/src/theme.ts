@@ -52,6 +52,13 @@ export function applyTheme(theme: Theme, storage: Storage | null = safeLocalStor
   void root.offsetHeight;
   root.classList.toggle('light', theme === 'light');
   root.dataset.theme = theme;
+  // index.html's media-scoped theme-color metas track the system scheme; the
+  // stored choice has to win over it, so the canvas token of the applied theme
+  // is written here.
+  const canvas = getComputedStyle(root).getPropertyValue('--canvas').trim();
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute('content', canvas);
+  });
   try {
     storage?.setItem(THEME_STORAGE_KEY, theme);
   } catch {
