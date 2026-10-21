@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // #1400: 待处理 has one meaning. It names the board column of tasks that need
 // the user (confirm / review / failed; the sidebar 需要我处理 opens it).
@@ -14,19 +15,10 @@ const FRESH_TITLE = 'r7 rebaseline probe';
 
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-/** ⌘K until the panel answers (same retry guard as search-result-rows.spec.ts:
- *  the hotkey listener registers after first paint). */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await panel(page)
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error('⌘K never opened the search panel');
+  await pressUntil(page, 'Meta+k', panel(page));
 }
 
 test('board: the fresh task sits in 待开始, 待处理 holds the review card', async ({ page }) => {

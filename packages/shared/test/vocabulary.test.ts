@@ -76,7 +76,7 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
   it('column mapping is the #351 single-key fold (no hasChanges param)', () => {
     expect(boardColumnFor).toHaveLength(1); // 单键签名钉：无 hasChanges 第二参
     expect(boardColumnFor('todo')).toBe('待开始');
-    expect(boardColumnFor('queued')).toBe('待开始');
+    expect(boardColumnFor('queued')).toBe('执行中'); // #1447：已开始，住它将要跑的那一步（参考站 2026-09-12）
     expect(boardColumnFor('planning')).toBe('执行中');
     expect(boardColumnFor('building')).toBe('执行中');
     expect(boardColumnFor('confirm')).toBe('待处理');
@@ -112,7 +112,10 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     expect(canBoardDrop('done', 'todo')).toBe(true);
     expect(canBoardDrop('done', 'review')).toBe(true);
     expect(canBoardDrop('done', 'building')).toBe(false);
-    // 执行中 源（未测行，沿用既有语义 [设计]）：待开始 + 已完成
+    // 执行中 源（未测行，沿用既有语义 [设计]）：待开始 + 已完成；queued 同列（#1447）
+    expect(canBoardDrop('queued', 'todo')).toBe(true);
+    expect(canBoardDrop('queued', 'done')).toBe(true);
+    expect(canBoardDrop('queued', 'building')).toBe(false);
     expect(canBoardDrop('building', 'todo')).toBe(true);
     expect(canBoardDrop('building', 'done')).toBe(true);
     expect(canBoardDrop('building', 'review')).toBe(false);
