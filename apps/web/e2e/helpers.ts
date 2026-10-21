@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 // e2e 共享测试工具（非断言面）。放这里的判据 = 多个 spec 逐字节复用同一段
 // 桩；单 spec 专用的桩仍留在各自文件（house pattern）。
@@ -66,4 +66,25 @@ export async function settleTransitions(page: Page): Promise<void> {
     return false;
   });
   if (!settled) throw new Error('CSS transitions still running after 20 rounds');
+}
+
+/** Hotkey press with the search-focus.spec retry law: the listener registers
+ *  in a passive effect after first paint, so a too-early press can be lost —
+ *  re-press only while the surface stays closed. ⌘K is open-only and
+ *  re-presses only on a *lost* key (a delivered one flips the panel
+ *  visible, ending the loop), so retries never double-fire; once a surface
+ *  opens, its own input holds focus (editable guard) and a late retry is
+ *  inert. ⌘J is a toggle, but the loop only runs from a closed surface and
+ *  ends the instant one flips visible — a delivered open exits before any
+ *  re-press could toggle it back. */
+export async function pressUntil(page: Page, key: string, visible: Locator): Promise<void> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await page.keyboard.press(key);
+    const opened = await visible
+      .waitFor({ state: 'visible', timeout: 1000 })
+      .then(() => true)
+      .catch(() => false);
+    if (opened) return;
+  }
+  throw new Error(`${key} never opened ${visible}`);
 }

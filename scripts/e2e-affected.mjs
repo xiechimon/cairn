@@ -307,6 +307,9 @@ for (const path of paths) {
   reasons.push(`  ${path} → ${specs === null ? 'FULL' : specs.length === 0 ? 'none' : why}`);
   if (specs === null) full = true;
   for (const s of specs ?? []) picked.add(s);
+  // #1442: the axe sweep scans every main page in both themes, so any web
+  // source change runs it — one rule here, not a copy in every family.
+  if (path.startsWith('apps/web/src/')) picked.add('a11y-axe');
 }
 
 const selection = full ? allSpecs : expand([...picked], allSpecs);

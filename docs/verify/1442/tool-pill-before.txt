@@ -1,0 +1,40 @@
+
+
+Running 2 tests using 1 worker
+
+  1) e2e/a11y-axe.spec.ts:118:5 › axe: detail tool calls (light) ───────────────────────────────────
+
+    Error: axe violations on detail tool calls (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "serious",
+    +     "rule": "color-contrast",
+    +     "targets": Array [
+    +       ".gap-1.flex-col.min-w-0:nth-child(1) > .chat-tool-pill.rounded-\\[3px\\].\\[\\&_svg\\]\\:flex-none > .truncate",
+    +       ".gap-1.flex-col.min-w-0:nth-child(2) > .chat-tool-pill.rounded-\\[3px\\].\\[\\&_svg\\]\\:flex-none > .truncate",
+    +     ],
+    +   },
+    + ]
+
+      131 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      132 |       }));
+    > 133 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      134 |     });
+      135 |   }
+      136 | }
+        at apps/web/e2e/a11y-axe.spec.ts:133:63
+
+    Error Context: test-results/a11y-axe-axe-detail-tool-calls-light-/error-context.md
+
+
+  1 failed
+    e2e/a11y-axe.spec.ts:118:5 › axe: detail tool calls (light) ────────────────────────────────────
+  1 passed (8.4s)

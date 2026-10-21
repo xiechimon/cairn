@@ -51,7 +51,8 @@ import { ComposerChips } from './composer-chips.js';
 const COMPOSER_CARD =
   'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border-0 bg-(--secondary) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 // 占位行/输入行共用几何：12px/16px 内衬 + text-ui 墨（#470：一档压正文
-// text-card-title）。84px 最小高走卡片本体。
+// text-card-title）。84px 最小高走卡片本体。占位字用 ink-2：卡底是
+// --secondary，ink-3 在上面亮模只有 4.19:1，ink-2 为 5.7:1（#1442，axe）。
 const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 // 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 --composer-max-h 384px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老
@@ -60,7 +61,7 @@ const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 // 差额逐条中和：方角已同形，field-sizing 回 fixed（JS grow 律），边框/
 // focus 环/暗底/过渡清零到老 UA 裸面形。
 const COMPOSER_INPUT =
-  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
+  "field-sizing-fixed h-12 min-h-0 max-h-(--composer-max-h) overflow-y-auto resize-none border-none bg-transparent px-4 pt-3 pb-0 [font-family:var(--font-inter),Inter,system-ui,-apple-system,'PingFang_SC','Microsoft_YaHei',sans-serif] text-ui text-(--foreground) tabular-nums transition-none outline-none placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent";
 // 工具钮（30px 盒，XMON-55 P5 光学左缘 10px 由 toolbar 锚承载）：ghost
 // 七通道中和 + #860 hover 增亮律（tertiary → secondary，只动墨色）。
 const COMPOSER_TOOL =
@@ -304,7 +305,7 @@ export function Composer({
         </div>
       ) : (
         <div
-          className={`composer-placeholder ${COMPOSER_PLACEHOLDER} text-(--text-tertiary)`}
+          className={`composer-placeholder ${COMPOSER_PLACEHOLDER} text-(--text-secondary)`}
           data-testid="composer-placeholder"
         >
           {t(placeholder)}

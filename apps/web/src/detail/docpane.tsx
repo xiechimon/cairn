@@ -219,7 +219,8 @@ export function DiffFileBlock({
               const wordDiff = wordDiffs[hi];
               return (
                 <div key={hunk.header}>
-                  <div className="diff-hunk-head border-y border-(--border) bg-(--secondary) pl-14 font-mono text-caption leading-5 text-(--text-tertiary)">
+                  {/* ink-2 on --secondary: ink-3 there reads 4.19:1 in light (#1442) */}
+                  <div className="diff-hunk-head border-y border-(--border) bg-(--secondary) pl-14 font-mono text-caption leading-5 text-(--text-secondary)">
                     {hunk.header}
                   </div>
                   {hunk.lines.map((line, i) => {

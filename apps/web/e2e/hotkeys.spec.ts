@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #389 + #442 + #468 + XMON-37 acceptance, re-pinned for ADR 0013
 // (#1009 A0): the 快捷键组 — C opens the
@@ -139,27 +140,6 @@ const MACHINES = '/app/resources/machines?scenario=06';
 
 const dialog = (page: Page) => page.locator('.new-task-dialog');
 const drawer = (page: Page) => page.locator('.chief-drawer');
-
-/** Hotkey press with the search-focus.spec retry law: the listener registers
- *  in a passive effect after first paint, so a too-early press can be lost —
- *  re-press only while the surface stays closed. ⌘K is open-only and
- *  re-presses only on a *lost* key (a delivered one flips the panel
- *  visible, ending the loop), so retries never double-fire; once a surface
- *  opens, its own input holds focus (editable guard) and a late retry is
- *  inert. ⌘J is a toggle, but the loop only runs from a closed surface and
- *  ends the instant one flips visible — a delivered open exits before any
- *  re-press could toggle it back. */
-async function pressUntil(page: Page, key: string, visible: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press(key);
-    const opened = await visible
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error(`${key} never opened ${visible}`);
-}
 
 /** Retired-binding negative (XMON-37), the retry law inverted: six delivered
  *  presses of the old key could not all be lost if it were still bound, so a
