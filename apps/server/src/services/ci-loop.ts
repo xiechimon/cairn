@@ -498,8 +498,6 @@ export function createCiPoller(
       .set({ prNumber: to.number, prUrl: `https://github.com/${fullName}/pull/${to.number}` })
       .where(eq(build.id, buildId))
       .run();
-    // 改记的那张从头数关闭（两次读的规则不吃之前留下的看到时刻）。
-    closedSeenAt.delete(`${fullName}#${to.number}`);
     const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
     if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
     writeSystemRow(
@@ -657,7 +655,6 @@ export function createCiPoller(
     // 不是本 build 的 PR：结果留在缓存里（PR 的 head 不会变）。
     if (foreign) {
       const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
-      closedSeenAt.delete(key);
       // 先看工作分支上有没有本 build 自己的 PR（每 CI_FOREIGN_RELIST_MS 最多列一次：它可能
       // 之后才开出来或合并）；没有、列不到或额度不够 → 照常提示（每轮一次）。
       const listedAt = foreignListedAt.get(cand.buildId);
