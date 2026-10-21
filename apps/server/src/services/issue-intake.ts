@@ -43,7 +43,6 @@
 
 import {
   githubIssueSourceRef,
-  isGithubRepoRef,
   orchestrateThreadTitle,
   type Phase,
   parseGithubIssueSourceRef,
@@ -82,6 +81,7 @@ import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
+import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
@@ -846,14 +846,16 @@ export function createIssueIntake(
     retryOrchestration(teamId, createdBy, tally);
     const seenRepos = new Set<string>();
     for (const row of projects) {
-      const githubRepo = row.githubRepo ?? '';
-      if (!isGithubRepoRef(githubRepo)) {
+      // 拆段走 server 出站单口（#1466：`.` / `..` 段同按形坏跳过）。
+      const repoRef = githubRepoOfProject(row);
+      if (repoRef === null) {
         tally.skipped += 1;
         log({ projectId: row.id, reason: 'malformed-repo' }, 'issue intake project skipped');
         continue;
       }
       // 同队两个项目指同一仓（GitHub owner / repo 不分大小写）：只取 id 最小
       // 的一个，另一个跳过——同一条 issue 不会以两个大小写不同的引用各领一次。
+      const githubRepo = `${repoRef.owner}/${repoRef.repo}`;
       if (seenRepos.has(githubRepo.toLowerCase())) {
         tally.skipped += 1;
         log({ projectId: row.id, reason: 'duplicate-repo' }, 'issue intake project skipped');
@@ -861,16 +863,8 @@ export function createIssueIntake(
       }
       seenRepos.add(githubRepo.toLowerCase());
       tally.projects += 1;
-      const slash = githubRepo.indexOf('/');
       try {
-        await intakeProject(
-          row,
-          githubRepo.slice(0, slash),
-          githubRepo.slice(slash + 1),
-          { ...got, createdBy },
-          now,
-          tally,
-        );
+        await intakeProject(row, repoRef.owner, repoRef.repo, { ...got, createdBy }, now, tally);
       } catch (err) {
         if (err instanceof GithubRateLimitedError) throw err;
         tally.errors += 1;
