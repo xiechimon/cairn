@@ -65,6 +65,9 @@ const DETAIL = [
   'chief-stream-markdown',
   'composer-wire-reject',
   'user-menu-',
+  // #1400: phase chip words (detail head, search rows, schedule cards,
+  // project task rows). Each of those surfaces pulls it in.
+  'phase-chip-words',
 ];
 const CHIEF = ['chief-', 'composer-wire-reject'];
 const AGENT = ['agent-', 'team-create-agent'];
@@ -80,7 +83,7 @@ const OVERLAY = [
   'project-settings-delete',
   'hotkeys',
 ];
-const OVERLAYS = ['chip-', 'hotkeys', 'search-', 'plan-diff-full-file'];
+const OVERLAYS = ['chip-', 'hotkeys', 'search-', 'plan-diff-full-file', 'phase-chip-words'];
 const PAGES = [
   'project-',
   'file-viewer',
@@ -90,6 +93,7 @@ const PAGES = [
   // #1037: the schedules page family (schedules-live.spec pins the form's
   // live face; src/pages/schedules-page.tsx edits must pull it in).
   'schedules-',
+  'phase-chip-words',
 ];
 const RESOURCES = [
   'machine-',

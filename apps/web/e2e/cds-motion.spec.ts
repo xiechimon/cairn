@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
+test('motion tokens and scroll-fade utility land', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
   await page.goto('/app?scenario=01');
   await page.waitForSelector('.board-sidebar');
@@ -26,11 +26,12 @@ test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
     }
     probe.remove();
     return {
-      bouncy: cs.getPropertyValue('--spring-bouncy').trim(),
+      snappy: cs.getPropertyValue('--spring-snappy').trim(),
       snappyDur: cs.getPropertyValue('--spring-snappy-dur').trim(),
-      gentleDur: cs.getPropertyValue('--spring-gentle-dur').trim(),
-      heavyDur: cs.getPropertyValue('--spring-heavy-dur').trim(),
-      bubble: cs.getPropertyValue('--spring-bubble').trim(),
+      durFast: cs.getPropertyValue('--dur-fast').trim(),
+      durOverlay: cs.getPropertyValue('--dur-overlay').trim(),
+      easePop: cs.getPropertyValue('--ease-pop').trim(),
+      retired: ['--spring-bouncy', '--spring-gentle', '--spring-heavy', '--spring-bubble', '--spring-modal', '--dur-drawer', '--ease-snap', '--ease-overshoot'].filter((name) => cs.getPropertyValue(name).trim() !== ''),
       fadeSize: cs.getPropertyValue('--scroll-fade-size').trim(),
       maskStarts: String(mask).startsWith('linear-gradient'),
       animNames,
@@ -38,11 +39,14 @@ test('CDS spring tokens and scroll-fade utility land', async ({ page }) => {
     };
   });
 
-  expect(vals.bouncy.startsWith('linear(')).toBe(true);
-  expect(vals.bubble.startsWith('linear(')).toBe(true);
-  expect(Number.parseFloat(vals.snappyDur)).toBeGreaterThan(0);
-  expect(Number.parseFloat(vals.gentleDur)).toBeGreaterThan(0);
-  expect(Number.parseFloat(vals.heavyDur)).toBeGreaterThan(0);
+  const toMs = (v: string) => (v.endsWith('ms') ? Number.parseFloat(v) : Number.parseFloat(v) * 1000);
+  const bezier = (v: string) => v.replace(/\s/g, '').replace(/(^|[^\d])0\./g, '$1.');
+  expect(vals.snappy.startsWith('linear(')).toBe(true);
+  expect(toMs(vals.snappyDur)).toBe(380);
+  expect(toMs(vals.durFast)).toBe(150);
+  expect(toMs(vals.durOverlay)).toBe(200);
+  expect(bezier(vals.easePop)).toBe('cubic-bezier(.22,1,.36,1)');
+  expect(vals.retired).toEqual([]);
   expect(vals.fadeSize).toBe('28px');
   expect(vals.maskStarts).toBe(true);
   const axis = await page.evaluate(() => {
