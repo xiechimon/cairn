@@ -2,8 +2,9 @@
 name: Pacman
 direction: Paper Dense · Grouped sidebar · Hybrid type
 reference: docs/board-paper-r5.html?v=3
+reference-dark: docs/board-paper-dark.html
 colors:
-  # 亮色为基准主题（定稿值）；暗色见「暗色」一节
+  # 亮色为基准主题（定稿值）；暗色值在 colors-dark，规则见「暗色」一节
   canvas: '#f3eee5'        # 应用底色：侧栏与主面板之外的纸面
   sheet: '#fbf9f5'         # 主面板（圆角纸张）
   card: '#ffffff'          # 任务卡
@@ -26,6 +27,32 @@ colors:
   running-track: '#ebe5da'
   online-ring: '#dfe9da'
   project-tiles: ['#c06a43', '#7d8b5a', '#6b7a8f', '#a0784a', '#8a6a9a', '#4f8a8b']
+colors-dark:
+  # 暗色（:root 默认）：同一阶梯的暖深纸面，海拔越高越亮；实测表 docs/verify/1396/contrast.txt
+  canvas: '#1a1612'
+  sheet: '#24201b'
+  card: '#2f2a26'
+  popover: '#37322d'       # 菜单与弹窗：卡片之上再亮一档（亮色里 popover 与 card 同为白）
+  hover: 'rgb(255 252 248 / 0.05)'  # 侧栏行 hover：暖白 5% 盖在 canvas 上
+  line: '#3e3a34'          # 发丝环、列标题下划线、顶栏下边线同一条
+  rule: '#3e3a34'
+  divider: '#3e3a34'
+  ink: '#ece7df'
+  ink-2: '#c5c0b9'
+  ink-3: '#aca7a0'
+  ink-4: '#7a756f'         # 仅装饰图标，不用于文字
+  icon: '#908b85'
+  accent: '#f0926d'        # 赭红提亮；其上的字是 on-accent 深墨，不是白
+  on-accent: '#1a1612'
+  accent-hover: '#46362f'  # 赭红 12% 染进卡底
+  menu-hover: '#403b36'
+  backdrop: 'rgba(0, 0, 0, 0.45)'
+  running: '#7fb980'
+  running-text: '#99ce9a'
+  running-bar: '#70a971'
+  running-track: '#3e3a34'
+  online-ring: '#283b29'
+  project-tiles: ['#da8f72', '#9eac76', '#8ba8c6', '#cca26e', '#b19ac4', '#6eb3b2']
 typography:
   page-title:   { fontFamily: serif, fontSize: 18px, fontWeight: '500' }
   heading:      { fontFamily: serif, fontSize: 16px, fontWeight: '500' }
@@ -230,13 +257,25 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 
 ## 暗色
 
-定稿只做了亮色。暗色主题（`:root` 默认）保留现有值，直到单独做一轮暗色 mockup 并定稿。规则：每新增一个语义 token，必须同时在 `.light` 与 `:root` 两处定义；暗色值先取现有暗色阶梯里最接近的那档。
+暗色是 `:root` 默认（`.light` 是亮色）。定稿 mockup：[`docs/board-paper-dark.html`](docs/board-paper-dark.html)，数字键 1–6 切看板 / 详情 / 设置 / 弹窗 / 菜单 / 色板（色板页从渲染色实时算对比度）。值在 frontmatter `colors-dark`，实测表 `docs/verify/1396/contrast.txt`（`docs/verify/1396/palette.mjs` 用 OKLCH 定义、换算 sRGB 再量）。
+
+- **同一阶梯，方向反过来**：暗色里海拔越高越亮——`canvas` #1a1612 → `sheet` #24201b → `card` #2f2a26 → `popover` #37322d。四档同一色相（OKLCH 色相 70、色度 0.011），是奶油纸的深端，不是中性灰。亮色里菜单与弹窗和卡片同色（白）；暗色里投影弱，菜单与弹窗比卡片再亮一档，靠亮度差加发丝环分层。侧栏经 `--surface-1` 坐在 `canvas` 上，两侧同形。
+- **发丝环照画**：`line` #3e3a34 在卡上 1.26、在 sheet 上 1.43，和亮色一样是一个 CSS 像素，不靠投影。
+- **墨色阶梯倒过来**：`ink` #ece7df 标题正文、`ink-2` #c5c0b9 导航按钮、`ink-3` #aca7a0 元信息、`icon` #908b85 带标签图标；`ink-4` #7a756f 只做装饰。
+- **对比度（实测，WCAG 2.x）**：卡上 `ink` 11.53、`ink-2` 7.85、`ink-3` 5.94、`icon` 4.20（非文本门 3）、`accent` 6.11、`running-text` 7.87、`destructive` 7.95；canvas 上 `ink-3` 7.53；菜单 hover 行上 `ink-3` 4.63。`ink-4` 在卡上 3.11，仍只做装饰。
+- **赭红上的字是深墨**：`accent` 提亮到 #f0926d 后白字只有 2.32，所以计数徽章、项目方块上的字走 `--text-on-accent` = canvas 深墨（徽章 7.74，六块方块 6.98 起）。亮色里是白字，这是两侧唯一一处反向。
+- **强调色 hover 底是深染不是浅染**：`accent-hover` #46362f = 赭红 12% 染进卡底，链接在上面 4.94（亮色 4.25）。`spot-soft` 选中底同法，上面的字 `spot-text-on-tint` #fbc3a7 淡赭红 7.02。
+- **执行中绿提亮**：图标 #7fb980（卡上 6.18）、文字 #99ce9a（7.87）、进度条 #70a971 压轨道 4.09；轨道就是发丝线。
+- **弹窗背板**：黑 45%，无 blur；弹窗面 = `popover`，和菜单同一档。
+- **状态色不在本阶梯里**：chip、diff、列点、`badge-attention`、`destructive` #ffabb7 沿用 E 色板暗侧值（亮色那轮同样只换了 Paper 槽），每个文字对都在新卡底上重测过 4.5。
+- **新增语义 token 的规则**：必须同时在 `.light` 与 `:root` 两处定义；暗侧从本阶梯取值并实测，不取「最近的现有档」。
 
 ## 给 agent 的美学约束（粘贴进提示词）
 
 ```text
 Pacman UI rules (source: apps/web/DESIGN.md):
 - Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow.
+- Dark (:root default): the same ladder, lighter with elevation: canvas #1a1612 → sheet #24201b → card #2f2a26 → popover #37322d (menus and dialogs). Ink #ece7df / #c5c0b9 / #aca7a0. Accent #f0926d with dark text on it (badge, project tiles). Running #7fb980. Only token values differ between themes.
 - One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.
 - Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.
 - Spacing on the 4px grid. No arbitrary px values (text-[13px], ml-[10.5px]).
