@@ -2899,6 +2899,133 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(hint.buildRow().prNumber).toBe(hint.prNumber);
   });
 
+  /** 9b 形：较早的 build 开的 PR（号 201，head 是那个 build 的分支）记在当前 build 上。 */
+  function foreignWorld(opts: { connected?: boolean } = {}) {
+    const w = makeWorld({ connected: opts.connected ?? true, newerBuildPr: 201 });
+    headRefs.set(201, conversationBranch(w.buildId));
+    const currentBuildId = String(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    );
+    const own = conversationBranch(currentBuildId);
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    const currentPr = () =>
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, currentBuildId)).get()?.prNumber;
+    const currentRows = () =>
+      w.s.db
+        .select()
+        .from(messageTable)
+        .all()
+        .filter((r) => r.role === 'system' && r.conversationId === currentBuildId)
+        .map((r) => String(r.content));
+    return { w, mock, currentBuildId, own, currentPr, currentRows };
+  }
+
+  test('[s2-A18] a merged PR of the build is not taken when a newer PR of the build was closed without merge (the person rejected the newer work)', async () => {
+    // foreign path: own #150 merged, own #160 closed unmerged → nothing to adopt, the hint
+    const f = foreignWorld();
+    headRefs.set(150, f.own);
+    headRefs.set(160, f.own);
+    f.mock.branchPulls = [
+      { number: 160, state: 'closed' },
+      { number: 150, state: 'closed', merged: true },
+    ];
+    await pollerFor(f.w, f.mock).sweep();
+    expect(f.currentPr()).toBe(201);
+    expect(f.currentRows().some((c) => c.includes('PR #201 的 head'))).toBe(true);
+
+    // closed path: own #205 merged, own #210 closed unmerged, the recorded #201 closed → failed
+    const { w, mock } = closedWithSibling();
+    headRefs.set(205, conversationBranch(w.buildId));
+    headRefs.set(210, conversationBranch(w.buildId));
+    mock.branchPulls = [
+      { number: 210, state: 'closed' },
+      { number: 205, state: 'closed', merged: true },
+    ];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+  });
+
+  test('[s2-A19] the build records another PR while the list read is in flight (the daemon probe) → that value is kept, nothing written', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: 202 }];
+    mock.onList = () => {
+      w.s.db.update(buildTable).set({ prNumber: 555 }).where(eq(buildTable.id, w.buildId)).run();
+    };
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prNumber).toBe(555);
+    expect(w.systemRows()).toEqual([]);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test('[s2-A20] the daemon probe records the foreign PR again and the reconcile adopts again → the adoption row is written once per round', async () => {
+    const f = foreignWorld();
+    headRefs.set(305, f.own);
+    f.mock.pulls[305] = { state: 'open', merged: false };
+    f.mock.branchPulls = [{ number: 305 }];
+    const poller = pollerFor(f.w, f.mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    expect(f.currentPr()).toBe(305);
+    await poller.sweep(t0 + 60_000);
+    f.w.s.db
+      .update(buildTable)
+      .set({ prNumber: 201 })
+      .where(eq(buildTable.id, f.currentBuildId))
+      .run();
+    await poller.sweep(t0 + 600_000);
+    expect(f.currentPr()).toBe(305);
+    expect(f.currentRows().filter((c) => c.includes('改记'))).toHaveLength(1);
+  });
+
+  test('[s2-A21] anonymous: the foreign path lists the branch at most once an hour', async () => {
+    const f = foreignWorld({ connected: false });
+    const poller = pollerFor(f.w, f.mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    expect(f.mock.listRequests()).toHaveLength(1);
+    await poller.sweep(t0 + 600_000);
+    expect(f.mock.listRequests()).toHaveLength(1);
+    await poller.sweep(t0 + 3_600_000);
+    expect(f.mock.listRequests()).toHaveLength(2);
+  });
+
+  test('[s2-A22] the recorded PR changes: the ten-minute wait starts again for the new one', async () => {
+    const f = foreignWorld();
+    const poller = pollerFor(f.w, f.mock);
+    const t0 = Date.now();
+    await poller.sweep(t0); // lists for #201, nothing of its own yet
+    // the daemon probe records another foreign PR; meanwhile the build's own PR was opened
+    headRefs.set(202, conversationBranch(f.w.buildId));
+    f.mock.pulls[202] = { state: 'closed', merged: true, mergeCommitSha: 'def5678' };
+    headRefs.set(305, f.own);
+    f.mock.branchPulls = [{ number: 305 }];
+    f.w.s.db
+      .update(buildTable)
+      .set({ prNumber: 202 })
+      .where(eq(buildTable.id, f.currentBuildId))
+      .run();
+    await poller.sweep(t0 + 120_000);
+    expect(f.mock.listRequests()).toHaveLength(2);
+    expect(f.currentPr()).toBe(305);
+  });
+
+  test('[s2-A5b] the list read fails at two confirming reads in a row → the close is reported as in segment 1', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = 502;
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    expect(w.todoRow().phase).toBe('review');
+    await poller.sweep(t0 + 120_000);
+    expect(mock.listRequests()).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('failed');
+    expect(closedRows(w)).toHaveLength(1);
+  });
+
   test('[s2-A13] the recorded URL is built from the repository and number, not taken from the response', async () => {
     const { w, mock } = closedWithSibling();
     mock.branchPulls = [{ number: 202, htmlUrl: 'https://evil.example/pull/202‮' }];
