@@ -1,0 +1,66 @@
+# P5a-1 gates on 645640fd (server(1406): intake list read returns the issues only; stop counting once full)
+# date: 2026-10-21T08:59:06Z
+
+## pnpm lint
+  
+
+Checked 786 files in 2s. No fixes applied.
+Found 1 info.
+exit=0
+
+## pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+## pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (4.7s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+## node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+## pnpm exec vitest run --changed origin/main
+ Test Files  131 passed (131)
+      Tests  1235 passed | 1 skipped (1236)
+   Duration  301.93s (tests 65%, import 34%, transform 1%)
+exit=0
+runner-brief.test.ts lines in log: 0
+
+## lsof -iTCP:8394 -sTCP:LISTEN (before the run): no listener
+## E2E_AFFECTED_PORT=8394 pnpm --filter @pacman/web e2e:affected
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8394
+  live-server-reap.spec.ts token-gate.spec.ts
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.3s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.0s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (533ms)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (2.9s)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (512ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (613ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (494ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (427ms)
+  8 passed (13.5s)
+exit=0
+
+## notes
+- pnpm lint "Found 1 info": apps/web/src/resources/machines-page.tsx:317 noUselessFragments
+  (info level, a file this branch does not touch; biome ci exits 0).
+- runner-brief.test.ts (apps/daemon) is not in the --changed set for this diff, so the known
+  root-only "擦除失败" case did not run and did not show up.
+- /security-review: not run. No file on the CLAUDE.md security list is touched
+  (routes-webhook.ts, secret-box/keys/token-auth/attachments-token, secrets/credentials/api-keys/
+  webhook-tokens/oauth, routes-machine, machine*, mcp-face/mcp-servers, daemon credential files).
