@@ -27,9 +27,10 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { githubIssueSourceRef, type Phase, type TodoSourceKind } from '@pacman/shared';
+import { ENV_VARS, githubIssueSourceRef, type Phase, type TodoSourceKind } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { loadConfig } from '../src/config.js';
 import {
   agent as agentTable,
   build as buildTable,
@@ -1175,5 +1176,54 @@ describe('scheduler 接线', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// —— opt-in 开关（PACMAN_ISSUE_INTAKE，默认关）—————————————————————————————
+// 进料会自己导入并派发仓里已打 ready-for-agent 的存量 issue（最旧先），本仓
+// 大多数 issue 都打着这个标签：升级不该让实例自己开工（spec 28 P8 分阶段
+// 上线）。只有显式设了才开；接受仓里布尔 env 的既有写法 1 / true / yes。
+
+describe('opt-in：PACMAN_ISSUE_INTAKE', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  test('变量名走品牌槽', () => {
+    expect(ENV_VARS.issueIntake).toBe('PACMAN_ISSUE_INTAKE');
+  });
+
+  test('未设 → 关', () => {
+    vi.stubEnv('PACMAN_ISSUE_INTAKE', undefined);
+    expect(loadConfig().issueIntake).toBe(false);
+  });
+
+  test.each(['1', 'true', 'TRUE', 'yes', 'Yes'])('%s → 开', (value) => {
+    vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    expect(loadConfig().issueIntake).toBe(true);
+  });
+
+  test.each(['0', 'false', 'no', '', 'on', 'enabled', '2', ' 1'])('%j → 关', (value) => {
+    vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    expect(loadConfig().issueIntake).toBe(false);
+  });
+
+  test.each([
+    ['不传进料位', undefined],
+    ['进料位为 null', null],
+  ] as const)('createScheduler %s：start() 不起进料，零 GitHub 读、零建卡', async (_name, slot) => {
+    const w = await makeWorld({ list: [1406] });
+    const scheduler = createScheduler(
+      { ...w.s.svc, box: w.s.secretBox },
+      { tickMs: 3_600_000 },
+      undefined,
+      undefined,
+      slot,
+    );
+    scheduler.start();
+    await new Promise((r) => setTimeout(r, 50));
+    scheduler.stop();
+    expect(w.gh.calls).toHaveLength(0);
+    expect(issueTodos(w.s)).toHaveLength(0);
   });
 });

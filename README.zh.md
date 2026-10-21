@@ -74,6 +74,7 @@ server 环境变量（全部可选）：
 | `PACMAN_GITHUB_OAUTH_CLIENT_ID`<br>`PACMAN_GITHUB_OAUTH_CLIENT_SECRET` | 未设 | 自注册 GitHub OAuth App 的凭证对，开启 provider OAuth 登录。两件同设或同缺——只配一件 server 启动即报错，不静默。 |
 | `PACMAN_WEB_DIR` | `apps/web/dist`（存在即托管） | SPA 静态托管根覆写；未设且无构建产物 = 纯 API 形态。 |
 | `PACMAN_SKILLS_DIR` | `~/.agents/skills` | 技能根目录。每个含 `SKILL.md` 的一级子目录 = 一个技能（id = frontmatter `name`，缺省回落目录名）。每次请求现扫，不入库——加技能 = 往目录放文件夹，删技能 = 删文件夹。 |
+| `PACMAN_ISSUE_INTAKE` | 未设（关） | GitHub issue 进料。`1`、`true` 或 `yes` 开，其余值一律关，默认关。开了之后 server 每 5 分钟从已连接 GitHub、且总管已绑定带模型 Agent 的团队的每个 GitHub 项目里，领带 `ready-for-agent` 标签的 open issue，导入成任务并开始编排。只领该标签最新一条 `labeled` 事件由仓库 triage、write、maintain 或 admin 权限用户打上的 issue（别人打的、或打了又摘的不领）。每个项目同时至多 3 张不在已完成 / 已关闭的导入任务（失败的也算）。开启时已经打着标签的存量 issue 也会被领，按最旧先、受同一上限约束——开之前先看清哪些 issue 打着标签。导入任务对应的 issue 在 GitHub 关闭后任务随之关闭（审核中的任务不动）。启动日志写明进料开没开。 |
 
 daemon 环境变量（上述 CLI flag 的等价覆写）：`PACMAN_SERVER`（默认 `http://127.0.0.1:8787`）、`PACMAN_API_KEY`、`PACMAN_TEAM`、`PACMAN_WORKSPACES_DIR`（默认 `<PACMAN_HOME>/workspaces`）。
 

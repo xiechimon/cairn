@@ -457,6 +457,7 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
       customModelReasoning,
       piCacheRetention,
       hookTimeoutMs,
+      issueIntake,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -482,6 +483,8 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(piCacheRetention).toBe('PACMAN_PI_CACHE_RETENTION');
     // 自有面 [设计]（#1149）：环境钩子超时 ms 覆写（缺省 20min，票面钉死）
     expect(hookTimeoutMs).toBe('PACMAN_HOOK_TIMEOUT_MS');
+    // 自有面 [设计]（#1406）：issue 进料轮询 opt-in（1 / true / yes 才开，默认关）
+    expect(issueIntake).toBe('PACMAN_ISSUE_INTAKE');
   });
 
   it('credential formats match the observed shapes (key prefix 随 BRAND 槽)', () => {
