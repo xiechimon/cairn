@@ -15,6 +15,8 @@
 
 - composer(详情页运行/确认面)工具条「提及」钮 → picker;或 textarea 键入 `@`。
 - 新建任务对话框(看板「新建任务」)工具条「提及」钮 → picker(落 spec textarea)。
+- 驱动(`vp.mjs list mentions` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive mentions mention-picker`:提及钮 picker 与 `@` 内联补全;`--` 后给 todoId 时加 composer 路径。
 
 ## Driving it with verify-pacman
 

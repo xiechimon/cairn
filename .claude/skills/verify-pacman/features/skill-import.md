@@ -43,6 +43,14 @@ resolve+realpath 归一后落在技能根内 = 400（已被 pacman 现扫管理�
   （localPath / GitHub URL 两字段，客户端 xor 预检，400/409/502/504 落内联
   错误行）。
 
+## How to get to it (user POV)
+
+- 侧栏「资源 → 技能」→ `/app/resources/skills` → topbar「导入」钮(data-testid=resource-import)→ 导入对话框,本地路径与 GitHub URL 二选一。
+- API:`POST /api/teams/{id}/skills/import`、`POST /api/teams/{id}/skills/{sid}/refresh`。
+- 驱动(`vp.mjs list skill-import` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive skill-import import-rollback`:导入失败回滚、重试成功写来源记录(默认带修复后开关 `--expect=new`)。
+  - `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node .claude/skills/verify-pacman/scripts/vp.mjs drive skill-import local-and-github-import --force`:本地目录与 GitHub URL 导入、refresh,即下面的驱动步;调 GitHub,要 `--force`;launch 时带 `NODE_USE_ENV_PROXY=1`(Gotchas 1)。
+
 ## 驱动步（drive-1170-skill-import.mjs）
 
 1. `launch.mjs` 起栈（**命令行带 `NODE_USE_ENV_PROXY=1`**——见 gotcha 1）。

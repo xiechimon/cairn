@@ -38,6 +38,8 @@ chief，无团队设置槽；沿革见 ADR 0014「旧裁决翻转记录」）。
 - 看板「开始」→ 编排回合 → chief 逐次判定派发模式，回执写明判定与理由。
 - 用户对判定不满 → 会话里就地一句话推翻（chief cancel_builds 后按相反模式重派）。
 - 总管设置 Agent tab 不再有「派发方式」行（判定不是配置项）。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list chief-dispatch-judgment` 列出 usage:
+  - `vp.mjs drive chief-dispatch-judgment dispatch-judgment`:建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Driving it with drive-903-dispatch-judgment.mjs
 

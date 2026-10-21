@@ -43,6 +43,11 @@ export const DB_TABLES = [
   'skill_audit', // XMON-109 S1：技能写审计行（REST/relay 三入口同表；actor_type member|agent + action create|update + bytes）
   'shell_command', // XMON-108 R1 机器 shell 审计行（预检 denied/running → done/failed 终态一次）；内部审计表无 record 投影
   'webhook_token', // #1137：GitHub webhook 入口路径 token（哈希反查 + 行掩码，api_key 凭证同族）
+  // #1404 合并就绪闸四表（server 独占，机器回传路径不写；判定不再从 message 行读）
+  'gate_digest', // 构建的 PR 在某个 head 上的补丁摘要
+  'gate_round', // 每 (buildId, patchDigest) 一轮：视角、超时、派步计数、修复轮序号
+  'gate_verdict', // 每步一条判定，绑派步时的 head 与摘要
+  'gate_state', // 每构建最新一份 readiness 快照
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -77,4 +82,10 @@ export const INTERNAL_ONLY_TABLES = [
   'shell_command',
   // #1137：webhook_token 读位 = 管理三端点自有封套（masked 列表行）。
   'webhook_token',
+  // #1404：闸四表的读位 = 构建记录上的 readiness 与 chief 工具 merge_readiness，
+  // 不立 record 投影。
+  'gate_digest',
+  'gate_round',
+  'gate_verdict',
+  'gate_state',
 ] as const;

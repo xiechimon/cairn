@@ -1,0 +1,233 @@
+# #1402 segment 2: one mutation per new rule, each in a scratch copy of the skill (.claude/skills/verify-pacman
+# and .cursor/skills/verify-pacman copied, node_modules linked), never in this worktree. The copy's self-test
+# runs only the 13 new cases plus two existing ones that read the same code ("a case that needs the stack
+# gets the ports ...", "no current case depends on a seed script ..."). A mutation is caught when at least
+# one of them turns FAIL. Runner: the appendix below (exact string replacement, must match once).
+# Mutation ids follow seg2-failure-modes.txt.
+
+== run 1: the code at 87480f0 ==
+baseline (no mutation): 15 PASS, 0 FAIL [] [19s]
+RED   G1 gate: no unregistered-file check: 1 FAIL [24s]
+        FAIL  a new drive-<number> script turns the registry gate red, registered or not
+RED   G2 gate: no ticket-named check: 1 FAIL [23s]
+        FAIL  a new drive-<number> script turns the registry gate red, registered or not
+RED   G2b gate: ticket-named pattern weakened to five digits: 1 FAIL [25s]
+        FAIL  a new drive-<number> script turns the registry gate red, registered or not
+RED   G5 gate: empty registry accepted: 1 FAIL [18s]
+        FAIL  the registry gate refuses a registry without cases
+RED   G6a gate: missing case script accepted: 1 FAIL [15s]
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+RED   G6b gate: missing support file accepted: 1 FAIL [18s]
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+RED   G7 gate: missing recipe accepted: 1 FAIL [16s]
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+RED   G8a gate: any status accepted: 1 FAIL [17s]
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+RED   G8b gate: any need accepted: 1 FAIL [21s]
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+RED   G9 gate: reads the registry from the caller cwd: 6 FAIL [19s]
+        FAIL  the registry gate keeps support scripts, seeds and the existing ticket-named probes green
+        FAIL  a new drive-<number> script turns the registry gate red, registered or not
+        FAIL  the registry gate refuses a registry without cases
+        FAIL  the registry gate: a case that writes into docs/verify needs rewrites-evidence
+        FAIL  the registry gate checks script paths, recipes, statuses and needs
+        FAIL  the registry gate: drive lines in feature maps name registered cases, and each mapped feature has one
+RED   E1 gate: docs/verify writer without rewrites-evidence accepted: 1 FAIL [12s]
+        FAIL  the registry gate: a case that writes into docs/verify needs rewrites-evidence
+RED   M1 gate: drive line naming no case accepted: 1 FAIL [14s]
+        FAIL  the registry gate: drive lines in feature maps name registered cases, and each mapped feature has one
+RED   M2 gate: map without its drive line accepted: 1 FAIL [13s]
+        FAIL  the registry gate: drive lines in feature maps name registered cases, and each mapped feature has one
+RED   M2b real tree: api-keys.md loses its drive line: 1 FAIL [13s]
+        FAIL  the registry gate passes on this checkout
+RED   G1b real tree: a stray drive-1500-x.mjs in scripts/: 1 FAIL [12s]
+        FAIL  the registry gate passes on this checkout
+RED   A1 vp: worktree list left out of committed roots: 1 FAIL [12s]
+        FAIL  drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository
+GREEN A1b vp: worktree list read only from vp.mjs own repo, not the caller cwd (same repo here): 0 FAIL [12s]
+RED   E2 vp: VERIFY_WEB_PORT not compared with the stack: 2 FAIL [12s]
+        FAIL  a case that needs the stack gets the ports of the stack doctor checks
+        FAIL  a VERIFY_WEB_PORT other than the stack's web port is refused
+RED   E3 self-test: optional exemption skips the whole case again: 1 FAIL [15s]
+        FAIL  the seed check's optional exemption covers only the seed the usage marks optional
+RED   E3b self-test: any seed the usage names is exempt: 1 FAIL [16s]
+        FAIL  the seed check's optional exemption covers only the seed the usage marks optional
+RED   F1 vp: drives never recorded: 1 FAIL [14s]
+        FAIL  a fresh-stack case runs only on a stack nothing was driven on since launch
+RED   F2 vp: fresh-stack record ignored: 1 FAIL [12s]
+        FAIL  a fresh-stack case runs only on a stack nothing was driven on since launch
+RED   F6 vp: a dry run records a drive: 1 FAIL [12s]
+        FAIL  a fresh-stack case runs only on a stack nothing was driven on since launch
+RED   F3 vp: own-stack not checked: 1 FAIL [14s]
+        FAIL  an own-stack case is refused while a stack is up in the run directory, also with --force
+RED   F8 vp: own-stack refusal lifted by --force: 1 FAIL [12s]
+        FAIL  an own-stack case is refused while a stack is up in the run directory, also with --force
+RED   F-reg registry: api-keys/create loses fresh-stack: 1 FAIL [11s]
+        FAIL  cases whose usage asks for a fresh stack need fresh-stack; cases that start their own stack need own-stack
+RED   F-reg2 registry: glass create-task loses own-stack: 1 FAIL [15s]
+        FAIL  cases whose usage asks for a fresh stack need fresh-stack; cases that start their own stack need own-stack
+caught 26 of 27
+
+# A1b stayed green in run 1: in the worktree case of 87480f0 the caller's cwd (p2) and vp.mjs (main) are
+# in one repository, so reading git worktree list from vp.mjs's checkout alone still covered p2. 668e79c adds
+# a second repository as the caller's cwd to that case. Run 2 repeats A1 and A1b on the code after /simplify
+# (2ddff26), whose committedRoots() dedupes the directories before the git calls; the mutation strings
+# follow that line.
+
+== run 2: A1 and A1b at 2ddff26 ==
+HEAD 2ddff265, worktree clean: 0 changed files under .claude
+baseline (no mutation): 15 PASS, 0 FAIL [] [15s]
+RED   A1 vp: worktree list left out of committed roots: 1 FAIL [18s]
+        FAIL  drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository
+RED   A1b vp: worktree list read only from vp.mjs own repo, not the caller cwd (same repo here): 1 FAIL [15s]
+        FAIL  drive and capture refuse an evidence directory inside docs/verify of any worktree of the repository
+caught 2 of 2
+
+# The A1b label's "(same repo here)" was written for run 1 and is kept as the runner prints it.
+#
+# Total: 27 mutations, 27 caught (A1b caught from 668e79c on).
+
+== appendix: the runner, as run (run 2 strings) ==
+# Mutation runner for #1402 segment 2. Copies the skill (and the .cursor mirror)
+# into a scratch repo root, applies one mutation (exact string replacement,
+# must match once), runs the self-test restricted to the named cases, and
+# prints which cases FAIL. Baseline (no mutation) first.
+import json, os, shutil, subprocess, sys, time
+
+WT = '/home/user/pacman/.claude/worktrees/p1c'
+SP = '<scratch>/p1s2/mut'
+NODE = 'node'
+SK = '.claude/skills/verify-pacman'
+S = SK + '/scripts/'
+
+NEW_CASES = [
+  "the seed check's optional exemption",
+  "a VERIFY_WEB_PORT other than",
+  "drive and capture refuse an evidence directory inside docs/verify of any worktree",
+  "a fresh-stack case runs only",
+  "an own-stack case is refused",
+  "cases whose usage asks for a fresh stack",
+  "the registry gate passes on this checkout",
+  "the registry gate keeps support scripts",
+  "a new drive-<number> script turns",
+  "the registry gate refuses a registry without cases",
+  "the registry gate: a case that writes into docs/verify",
+  "the registry gate checks script paths",
+  "the registry gate: drive lines in feature maps",
+  "a case that needs the stack gets the ports",
+  "no current case depends on a seed script",
+]
+
+M = [
+  ('G1 gate: no unregistered-file check', S+'vp-registry-gate.mjs',
+   "  if (!caseScripts.has(name) && !Object.hasOwn(support, name)) {", "  if (false) {"),
+  ('G2 gate: no ticket-named check', S+'vp-registry-gate.mjs',
+   "  if (/^drive-\\d/.test(name) && !TICKET_NAMED.has(name)) {", "  if (false) {"),
+  ('G2b gate: ticket-named pattern weakened to five digits', S+'vp-registry-gate.mjs',
+   "  if (/^drive-\\d/.test(name) && !TICKET_NAMED.has(name)) {", "  if (/^drive-\\d{5}/.test(name) && !TICKET_NAMED.has(name)) {"),
+  ('G5 gate: empty registry accepted', S+'vp-registry-gate.mjs',
+   "if (cases.length === 0) problems.push('vp-registry.json has no cases');", ""),
+  ('G6a gate: missing case script accepted', S+'vp-registry-gate.mjs',
+   "  if (!c.script || !existsSync(script)) problem(id, `script ${c.script} does not exist`);", ""),
+  ('G6b gate: missing support file accepted', S+'vp-registry-gate.mjs',
+   "  if (!files.includes(name)) problem(`support ${name}`, 'no such file in scripts/');", ""),
+  ('G7 gate: missing recipe accepted', S+'vp-registry-gate.mjs',
+   "  if (!existsSync(join(SKILL_DIR, entry.recipe))) problem(feature, `recipe ${entry.recipe} does not exist`);\n  else if",
+   "  if (false) {}\n  else if"),
+  ('G8a gate: any status accepted', S+'vp-registry-gate.mjs',
+   "  if (!STATUSES.has(c.status)) problem(id, `status ${c.status} is not current, stale or host-bound`);", ""),
+  ('G8b gate: any need accepted', S+'vp-registry-gate.mjs',
+   "  for (const need of needs) if (!NEEDS.has(need)) problem(id, `unknown need ${need}`);", ""),
+  ('G9 gate: reads the registry from the caller cwd', S+'vp-registry-gate.mjs',
+   "const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));", "const SKILL_DIR = join(process.cwd(), '.claude', 'skills', 'verify-pacman') + '/';"),
+  ('E1 gate: docs/verify writer without rewrites-evidence accepted', S+'vp-registry-gate.mjs',
+   "    if (inside && !needs.includes('rewrites-evidence')) {", "    if (false) {"),
+  ('M1 gate: drive line naming no case accepted', S+'vp-registry-gate.mjs',
+   "    if (entry === undefined || (name !== undefined && !Object.hasOwn(entry.cases ?? {}, name))) {", "    if (false) {"),
+  ('M2 gate: map without its drive line accepted', S+'vp-registry-gate.mjs',
+   "  else if (!named.get(file)?.has(feature)) problem(`features/${file}`, `names no vp.mjs drive ${feature} line`);", ""),
+  ('M2b real tree: api-keys.md loses its drive line', SK+'/features/api-keys.md',
+   "  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create`", "  - `node .claude/skills/verify-pacman/scripts/vp.mjs api-keys create`"),
+  ('G1b real tree: a stray drive-1500-x.mjs in scripts/', None, None, None),
+  ('A1 vp: worktree list left out of committed roots', S+'vp.mjs',
+   "      [ROOT, SCRIPT_ROOT, MAIN_ROOT, ...[...new Set([process.cwd(), ROOT, SCRIPT_ROOT])].flatMap(worktrees)].map((r) =>",
+   "      [ROOT, SCRIPT_ROOT, MAIN_ROOT].map((r) =>"),
+  ('A1b vp: worktree list read only from vp.mjs own repo, not the caller cwd (same repo here)', S+'vp.mjs',
+   "...[...new Set([process.cwd(), ROOT, SCRIPT_ROOT])].flatMap(worktrees)", "...[SCRIPT_ROOT].flatMap(worktrees)"),
+  ('E2 vp: VERIFY_WEB_PORT not compared with the stack', S+'vp.mjs',
+   "      ['VERIFY_WEB_PORT', stack.webPort],\n", ""),
+  ('E3 self-test: optional exemption skips the whole case again', S+'vp-selftest.mjs',
+   "      if (c.status !== 'current') continue;\n      const usage", "      if (c.status !== 'current' || /optional/.test(c.usage ?? '')) continue;\n      const usage"),
+  ('E3b self-test: any seed the usage names is exempt', S+'vp-selftest.mjs',
+   "&& !optional.some((clause) => clause.includes(seed)),", "&& !usage.includes(seed),"),
+  ('F1 vp: drives never recorded', S+'vp.mjs',
+   "    appendFileSync(DRIVES_FILE, `${feature}/${name}\\n`);\n", ""),
+  ('F2 vp: fresh-stack record ignored', S+'vp.mjs',
+   "  const driven = c.needs.includes('fresh-stack') && existsSync(DRIVES_FILE)", "  const driven = false && existsSync(DRIVES_FILE)"),
+  ('F6 vp: a dry run records a drive', S+'vp.mjs',
+   "  if (dryRun) {\n    console.log(`vp: dry-run", "  if (dryRun) {\n    if (doctorFirst) appendFileSync(DRIVES_FILE, `${feature}/${name}\\n`);\n    console.log(`vp: dry-run"),
+  ('F3 vp: own-stack not checked', S+'vp.mjs',
+   "  const up = c.needs.includes('own-stack') ? readStack() : undefined;", "  const up = undefined;"),
+  ('F8 vp: own-stack refusal lifted by --force', S+'vp.mjs',
+   "  if (up !== undefined) {\n    fail(", "  if (up !== undefined && !force) {\n    fail("),
+  ('F-reg registry: api-keys/create loses fresh-stack', None, None, None),
+  ('F-reg2 registry: glass create-task loses own-stack', None, None, None),
+]
+
+def build():
+    root = os.path.join(SP, 'repo')
+    shutil.rmtree(root, ignore_errors=True)
+    os.makedirs(os.path.join(root, '.claude', 'skills'))
+    os.makedirs(os.path.join(root, '.cursor', 'skills'))
+    shutil.copytree(os.path.join(WT, SK), os.path.join(root, SK), symlinks=True)
+    shutil.copytree(os.path.join(WT, '.cursor/skills/verify-pacman'), os.path.join(root, '.cursor/skills/verify-pacman'), symlinks=True)
+    os.symlink(os.path.join(WT, 'node_modules'), os.path.join(root, 'node_modules'))
+    st = os.path.join(root, S, 'vp-selftest.mjs')
+    src = open(st).read()
+    old = 'for (const [name, fn] of cases) {'
+    assert src.count(old) == 1
+    keep = json.dumps(NEW_CASES)
+    src = src.replace(old, f'for (const [name, fn] of cases.filter(([n]) => {keep}.some((k) => n.includes(k)))) {{')
+    src = src.replace('console.log(`${cases.length - failed}/${cases.length} passed`);', 'console.log(`ran ${failed} failed`);')
+    open(st, 'w').write(src)
+    return root
+
+def mutate_registry(root, feature, case, need):
+    p = os.path.join(root, SK, 'vp-registry.json')
+    r = json.load(open(p))
+    r['features'][feature]['cases'][case]['needs'].remove(need)
+    open(p, 'w').write(json.dumps(r, indent=2) + '\n')
+
+def run(root):
+    t = time.time()
+    out = subprocess.run([NODE, os.path.join(root, S, 'vp-selftest.mjs')], capture_output=True, text=True, cwd=root)
+    fails = [l[6:] for l in out.stdout.splitlines() if l.startswith('FAIL  ')]
+    passes = sum(1 for l in out.stdout.splitlines() if l.startswith('PASS  '))
+    return fails, passes, round(time.time() - t)
+
+only = sys.argv[1:] 
+root = build()
+fails, passes, secs = run(root)
+print(f'baseline (no mutation): {passes} PASS, {len(fails)} FAIL {fails} [{secs}s]', flush=True)
+caught = 0
+for name, path, old, new in M:
+    if only and not any(name.startswith(o) for o in only):
+        continue
+    root = build()
+    if name.startswith('G1b'):
+        open(os.path.join(root, S, 'drive-1500-x.mjs'), 'w').write('')
+    elif name.startswith('F-reg2'):
+        mutate_registry(root, 'glass-journeys', 'create-task', 'own-stack')
+    elif name.startswith('F-reg'):
+        mutate_registry(root, 'api-keys', 'create', 'fresh-stack')
+    else:
+        p = os.path.join(root, path)
+        s = open(p).read()
+        assert s.count(old) == 1, (name, s.count(old))
+        open(p, 'w').write(s.replace(old, new))
+    fails, passes, secs = run(root)
+    caught += 1 if fails else 0
+    print(f"{'RED  ' if fails else 'GREEN'} {name}: {len(fails)} FAIL [{secs}s]", flush=True)
+    for f in fails:
+        print(f'        FAIL  {f}', flush=True)
+print(f'caught {caught} of {len([m for m in M if not only or any(m[0].startswith(o) for o in only)])}')

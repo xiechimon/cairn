@@ -1,0 +1,143 @@
+# #1404 S2 round 3 (S1 round 3 merged: hasPatch, classifyPaths.opaque, caps over the whole patch): new tests first, red against readiness at the merge commit 5070956, green after the fix.
+# Red leg: source (readiness.ts, merge-gate.ts) at 5070956; only apps/server/test/merge-gate-readiness.test.ts changed.
+# After the red leg biome wrapped one call in the new rename test over four lines; test lines past 729 sit three lower in the committed file than in the red trace.
+# The two size-cap tests (35 code + 10 evidence files; 700 code + 101 evidence lines) are already green in the red leg: readiness reads S1's
+# countedFiles/countedLines, which count the whole patch since S1 round 3. The 'cap counts only non-evidence' mutations in s2-mutations-3.txt show they bite.
+
+== red: round 3 test file, source at 5070956 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (86 tests | 4 failed) 76ms
+   ❯ mergeReadiness：每个 blocker 一真一假 (51)
+     × 每个 blocker 码都有一行真腿（加码不写腿即变红） 18ms
+     × opaque-file：只打开它 2ms
+   ❯ mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） (5)
+     × 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列） 2ms
+     × opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 每个 blocker 码都有一行真腿（加码不写腿即变红）
+AssertionError: expected [ 'autonomy-paused', …(48) ] to deeply equal [ 'autonomy-paused', …(47) ]
+
+- Expected
++ Received
+
+@@ -16,10 +16,11 @@
+    "no-decider",
+    "no-reviewers",
+    "no-verifier",
+    "not-applicable",
+    "not-current-build",
++   "opaque-file",
+    "outside-auto-merge",
+    "patch-unavailable",
+    "patch-unbindable",
+    "perspective-timed-out",
+    "phase-not-review",
+
+ ❯ test/merge-gate-readiness.test.ts:419:41
+    417|
+    418|   test('每个 blocker 码都有一行真腿（加码不写腿即变红）', () => {
+    419|     expect(ROWS.map(([c]) => c).sort()).toEqual([...MERGE_BLOCKER_CODE…
+       |                                         ^
+    420|   });
+    421|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > opaque-file：只打开它
+AssertionError: expected [] to deeply equal [ 'opaque-file' ]
+
+- Expected
++ Received
+
+- [
+-   "opaque-file",
+- ]
++ []
+
+ ❯ test/merge-gate-readiness.test.ts:427:45
+    425|       flip(i);
+    426|       const r = mergeReadiness(i);
+    427|       expect(r.blockers.map((b) => b.code)).toEqual([code]);
+       |                                             ^
+    428|       expect(r.ready).toBe(false);
+    429|     });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:732:21
+    730|     ]);
+    731|     const r = mergeReadiness(i);
+    732|     expect(r.ready).toBe(false);
+       |                     ^
+    733|     expect(r.blockers).toEqual([
+    734|       {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+AssertionError: expected [ 'protected-path', …(2) ] to deeply equal [ 'protected-path', …(3) ]
+
+- Expected
++ Received
+
+  [
+    "protected-path",
+    "test-deleted",
+-   "opaque-file",
+    "evidence-outside-ticket",
+  ]
+
+ ❯ test/merge-gate-readiness.test.ts:758:24
+    756|       file('apps/server/drizzle/0044_x.sql', { status: 'added' }),
+    757|     ]);
+    758|     expect(codesOf(i)).toEqual([
+       |                        ^
+    759|       'protected-path',
+    760|       'test-deleted',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed | 3 passed (4)
+      Tests  4 failed | 159 passed (163)
+   Start at  06:48:14
+   Duration  1.58s (transform 74%, import 21%, tests 4%, worker 1%)
+exit=1
+
+== green: after the fix (readiness.ts: opaque-file from classifyPaths.opaque; merge-gate.ts: opaque-file between test-deleted and evidence-outside-ticket) ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  4 passed (4)
+      Tests  163 passed (163)
+   Start at  06:48:45
+   Duration  1.50s (transform 74%, import 22%, tests 3%, worker 1%)
+exit=0
+
+== new round 3 tests, verbose ==
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > opaque-file：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > 证据目录里的截图（没有 patch）不留人 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后） > 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦 0ms
+
+$ pnpm typecheck
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0

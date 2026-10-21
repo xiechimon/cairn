@@ -8,6 +8,12 @@
 - 场景 A（#519 形状面）：verdict JSON + 尾部 set_task_meta 工具行 → verdict 照常提取（findings 落库）→ blocking → review→planning 回流（revise note + 重规划步入队 + prompt 注入审核事实）→ set_task_meta 真执行（todo 标题改写）。
 - stub 对重规划轮（daemon 下发的 CONTINUE_PROMPTS.plan 文本）**延迟 30s** 响应 = planning 相位窗口恒开，断言无竞态；probe 收尾 cleanup 整栈丢弃，该步不收尾。
 
+## How to get to it (user POV)
+
+- 任务详情页(`/app/todo/:id`)在 confirm 相位 → composer「AI 审核」钮发起审核(入口同 [review-modal.md](./review-modal.md));审核步跑完,结论落进会话:场景 A 是 verdict 行与 findings 并回流 planning,场景 B 是「判定提取失败」danger 色 tag 行。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list review-700` 列出 usage:
+  - `vp.mjs drive review-700 verdict-extraction`:依赖的 setup-review-700-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400。
+
 ## 前置与跑法
 
 ```sh

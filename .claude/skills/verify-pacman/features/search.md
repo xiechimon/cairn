@@ -12,6 +12,9 @@
 
 - ⌘K 快捷键(任意 shell 页;输入即焦点)。
 - 展开态侧栏「搜索」行(`button.sidebar-row`,带 ⌘K 徽标);折叠态为 `.rail-row[aria-label="搜索"]`。
+- 驱动(`vp.mjs list search` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive search search`:⌘K 输入标题,命中行可见。
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive search project-line`:结果行第二行是任务自己的项目;需全新栈(launch 后的第一个 drive,否则拒跑)。
 
 ## Driving it with verify-pacman
 
