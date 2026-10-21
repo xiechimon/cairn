@@ -108,6 +108,8 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
   // 保存缺省解析（#176 + #404 参数位）：dialog 选中项目优先；未选（空集/
   // 查询未决）退锚定页路由项目（project），再退首行真值。锚恒在位 ⇒ 两
   // 保存路径的「无项目建默认项目」分支不可达（board/全局面无锚，原样可达）。
+  // 建默认项目只在项目读面已到且为空时走；读面在途/失败时不知道有没有项目，
+  // 两保存路径都报失败、不发请求。
   const resolveProjectId = useCallback(
     (selectedProjectId?: string) => selectedProjectId ?? anchorProjectId ?? projectsQ.data?.[0]?.id,
     [anchorProjectId, projectsQ.data],
@@ -127,6 +129,10 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
           );
           return;
         }
+        if (projectsQ.data === undefined) {
+          toastError(t('新建任务失败，请重试。'), null);
+          return;
+        }
         // 无项目：先建默认托管项目再落任务（self-host 单用户语义 [设计]，
         // 02 §3 项目创建流两分支的 hosted 侧）。
         mutations.createProject.mutate(
@@ -144,7 +150,15 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
       }
       onFixtureSave?.(spec);
     },
-    [live, resolveProjectId, mutations.createTodo, mutations.createProject, onFixtureSave, t],
+    [
+      live,
+      resolveProjectId,
+      projectsQ.data,
+      mutations.createTodo,
+      mutations.createProject,
+      onFixtureSave,
+      t,
+    ],
   );
 
   // 保存并开始（r2 §4.2 双钮语义；#640 / r14 §5.7 前置裁决落地）：创建 →
@@ -175,6 +189,7 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
         );
       const projectId = resolveProjectId(selectedProjectId);
       if (projectId) start(projectId);
+      else if (projectsQ.data === undefined) toastError(t('新建任务失败，请重试。'), null);
       else
         mutations.createProject.mutate(
           { name: t('默认项目'), repoKind: 'hosted' },
@@ -190,6 +205,7 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
       mutations.createTodo,
       mutations.createProject,
       resolveProjectId,
+      projectsQ.data,
       orchestrate,
       t,
     ],
@@ -218,18 +234,14 @@ export function useNewTaskSurface(fixture: FixtureSet, opts: NewTaskSurfaceOpts 
   );
 
   // #176 新建任务 dialog 项目选择器数据位:live = projectsQ 真值投影
-  // (undefined = 查询未决);fixture = scenario projectNames(缺省 =
-  // undefined → dialog 退 canon 单默认项目)。选择是纯表单 state。
-  // #404 锚定页（project）：live 未决退空集（不退 canon 幻影行），锚行
-  // 置首——dialog 未动选择的默认行 = rows[0] = 本页路由项目（#305 律，
-  // fixture 面同律）。
+  // (在途/失败 = 空集,不退 canon 幻影行);fixture = scenario projectNames
+  // (缺省 = undefined → dialog 退 canon 单默认项目)。选择是纯表单 state。
+  // #404 锚定页（project）：锚行置首——dialog 未动选择的默认行 = rows[0] =
+  // 本页路由项目（#305 律，fixture 面同律）。
   const projectRows = useMemo(() => {
     let rows: { id: string; name: string }[] | undefined;
     if (live) {
-      rows =
-        anchorProjectId === undefined
-          ? projectsQ.data?.map((p) => ({ id: p.id, name: p.name }))
-          : (projectsQ.data ?? []).map((p) => ({ id: p.id, name: p.name }));
+      rows = (projectsQ.data ?? []).map((p) => ({ id: p.id, name: p.name }));
     } else if (fixture.projectNames != null) {
       rows = Object.entries(fixture.projectNames).map(([id, name]) => ({ id, name }));
     }

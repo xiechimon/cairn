@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
+import { useLiveData } from '../api/provider.js';
 import type { CardOrchestration } from '../chief/orchestration-inflight.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
@@ -48,7 +49,8 @@ interface TodoCardProps {
   onBranch?: (todo: TodoRecord) => void;
   /** #828: false = no branch icon (cards without a build have nothing to open). */
   hasBranch?: boolean;
-  /** M5 live project name; absent = capture canon constant. */
+  /** Project name. Absent: fixture = capture canon constant, live = no
+   *  project item (projects read pending/failed, or no row for the todo). */
   projectName?: string;
   /** #445: the card's tag (cardTag result, at most one); null = no tag item. */
   tag?: TagChipData | null;
@@ -106,8 +108,9 @@ export function TodoCard({
 }: TodoCardProps) {
   const { t } = useI18n();
   const { search } = useLocation();
+  const { live } = useLiveData();
   const face = cardFace(todo);
-  const project = projectName ?? PROJECT_NAME;
+  const project = live ? projectName : (projectName ?? PROJECT_NAME);
   const suspended = suspension(todo);
   const retryTitle =
     todo.waitingOn?.on === 'quota' && todo.waitingOn.retryAt != null
@@ -173,23 +176,25 @@ export function TodoCard({
       <div className="todo-card-meta mt-1.5 flex h-5 items-center gap-2 bg-inherit text-meta whitespace-nowrap text-content-tertiary">
         <div className="relative flex min-w-0 flex-1 bg-inherit">
           <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-            <span className="flex items-center gap-1">
-              <Glyph icon={Folder} className="size-3 flex-none text-content-dim" />
-              {/* The ::before ghost holds the first five characters plus the
-                  ellipsis on one line, so the name truncates but never below
-                  five visible characters. The tag's huge shrink factor keeps
-                  the project from losing even a sub-pixel (which would already
-                  draw its ellipsis) until the tag is gone; the tag carries
-                  its leading gap inside, so a fully shrunk tag leaves one gap. */}
-              <span
-                data-floor={
-                  [...project].length > 5 ? `${[...project].slice(0, 5).join('')}…` : project
-                }
-                className="flex flex-col before:invisible before:h-0 before:overflow-hidden before:content-[attr(data-floor)]"
-              >
-                <span className="line-clamp-1 break-all whitespace-normal">{project}</span>
+            {project !== undefined && (
+              <span className="flex items-center gap-1">
+                <Glyph icon={Folder} className="size-3 flex-none text-content-dim" />
+                {/* The ::before ghost holds the first five characters plus the
+                    ellipsis on one line, so the name truncates but never below
+                    five visible characters. The tag's huge shrink factor keeps
+                    the project from losing even a sub-pixel (which would already
+                    draw its ellipsis) until the tag is gone; the tag carries
+                    its leading gap inside, so a fully shrunk tag leaves one gap. */}
+                <span
+                  data-floor={
+                    [...project].length > 5 ? `${[...project].slice(0, 5).join('')}…` : project
+                  }
+                  className="flex flex-col before:invisible before:h-0 before:overflow-hidden before:content-[attr(data-floor)]"
+                >
+                  <span className="line-clamp-1 break-all whitespace-normal">{project}</span>
+                </span>
               </span>
-            </span>
+            )}
             <span className="flex-none tabular-nums">#{todo.seqNum}</span>
             {tag != null && (
               <span
