@@ -99,8 +99,8 @@ interface WorldOpts {
   prNumber?: number;
   /** 已完成的 CI 修复轮数（marker prompt 的 done 步）。 */
   fixRounds?: number;
-  /** 在飞修复步（pending/claimed；修复步在跑时检查读的是旧 head）。 */
-  activeFix?: 'pending' | 'claimed';
+  /** 在飞修复步（pending/claimed/等额度；修复步在跑时检查读的是旧 head）。 */
+  activeFix?: 'pending' | 'claimed' | 'waiting_quota';
   checks?: CheckSpec[];
   etag?: string;
   status?: number;
@@ -154,6 +154,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
       phase: opts.phase ?? 'building',
       phaseAt: base,
       seqNum: 1,
+      latestBuildId: buildId,
       assignment: { plan: null, build: { agentId: `agent-ci-${rnd}` } },
     })
     .run();
@@ -254,6 +255,10 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
   };
 }
 
+/** addCandidate 的 PR 号：逐个递增。磨绿缓存按「仓#PR 号」存，各 mock 的 etag 缺省
+ * 相同；两个候选撞号时后一个会拿前一个的 etag 读到 304、复用前一个的判据。 */
+let nextCandidatePr = 1000;
+
 /** 多候选世界（批量扫描面）：同一 server 上再种一棵 PR 树，各自配 mock。 */
 function addCandidate(
   s: TestServer,
@@ -262,7 +267,7 @@ function addCandidate(
 ) {
   const rnd = Math.random().toString(36).slice(2, 8);
   const base = Date.now();
-  const prNumber = opts.prNumber ?? 100 + Math.floor(Math.random() * 900);
+  const prNumber = opts.prNumber ?? nextCandidatePr++;
   const projectId = `proj-ci-${rnd}`;
   const todoId = `todo-ci-${rnd}`;
   const buildId = `build-ci-${rnd}`;
@@ -287,6 +292,7 @@ function addCandidate(
       phase: opts.phase ?? 'building',
       phaseAt: base,
       seqNum: 1,
+      latestBuildId: buildId,
     })
     .run();
   s.db
@@ -434,7 +440,28 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
     expect(w.mock.requests[0]?.headers.authorization).toBe('Bearer token-plain');
   });
 
-  test('扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不出站', async () => {
+  test('#1403 重跑开出的新 build 是 todo 的当前 build 时，旧 PR build 不再被磨（不读 checks、不派修复步）', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    const newer = `${w.buildId}-rerun`;
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: newer,
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: w.base,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ latestBuildId: newer }).where(eq(todoTable.id, w.todoId)).run();
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps()).toHaveLength(0);
+  });
+
+  test('扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不读 checks', async () => {
     const s = bootServer();
     disposables.push(() => s.dispose());
     const noPr = addCandidate(s, []);
@@ -452,18 +479,20 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
         ),
       )
       .run();
-    let requests = 0;
+    const urls: string[] = [];
     const poller = createCiPoller(
       { ...s.svc },
       {
         githubFetch: (url) => {
-          requests += 1;
-          throw new Error(`unexpected outbound ${url}`);
+          urls.push(String(url));
+          return Promise.resolve(res(404, '"x"', {}));
         },
       },
     );
     await poller.sweep();
-    expect(requests).toBe(0);
+    // #1403：review 相位的 PR build 进对账面（只读 pulls/{n}），不进磨绿面。
+    expect(urls.filter((u) => u.includes('/check-runs'))).toEqual([]);
+    expect(urls).toEqual([expect.stringMatching(/\/pulls\/\d+$/)]);
   });
 });
 
@@ -533,6 +562,77 @@ describe('#1150 ③ 修复步死循环闸（连续 N 轮仍红停手）', () => 
     await w.poller.sweep();
     await w.poller.sweep();
     expect(w.fixRoundSteps()).toHaveLength(1);
+  });
+
+  test('#1403 等额度挂起的修复步算在飞：不读 checks、不追加第二条 [ci-fix]', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+      activeFix: 'waiting_quota',
+    });
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps().map((r) => r.status)).toEqual(['waiting_quota']);
+  });
+
+  test('#1403 等额度挂起的执行步（无 marker，如 #931 返工轮）同样算在飞：不派修复步', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-rework-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'waiting_quota',
+        createdAt: w.base,
+      })
+      .run();
+    await w.poller.sweep();
+    expect(w.mock.requests).toHaveLength(0);
+    expect(w.fixRoundSteps()).toHaveLength(0);
+  });
+
+  test('#1403 没人领的 verify / review 步（排队中或等额度）不挡磨绿；已领取的照挡', async () => {
+    for (const kind of ['verify', 'review'] as const) {
+      for (const status of ['pending', 'waiting_quota'] as const) {
+        const w = makePrWorld({
+          checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+        });
+        w.s.db
+          .insert(stepTable)
+          .values({
+            id: `step-gate-${w.buildId}`,
+            buildId: w.buildId,
+            kind,
+            status,
+            createdAt: w.base,
+          })
+          .run();
+        await w.poller.sweep();
+        expect(w.mock.requests).toHaveLength(1);
+        expect(w.fixRoundSteps()).toHaveLength(1);
+      }
+    }
+    const held = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    held.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-gate-${held.buildId}`,
+        buildId: held.buildId,
+        kind: 'verify',
+        status: 'claimed',
+        machineId: 'machine-gate',
+        claimedAt: held.base,
+        lastHeartbeatAt: held.base,
+        createdAt: held.base,
+      })
+      .run();
+    await held.poller.sweep();
+    expect(held.mock.requests).toHaveLength(0);
+    expect(held.fixRoundSteps()).toHaveLength(0);
   });
 
   test('N-1 轮完成仍红 → 追加第 N 轮；N 轮完成仍红 → 停手标 failed 转人工（不再叠派）', async () => {
@@ -633,14 +733,15 @@ describe('#1150 绿推闸 / completeStep 持 building / scheduler 接线', () =>
     expect(w.todoRow().hasChanges).toBe(true);
   });
 
-  test('green 后候选拿出扫描集：再 sweep 零请求（终态退出，不空转）', async () => {
+  test('green 后候选拿出磨绿集：再 sweep 不再读 checks（转 #1403 对账面）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
     await w.poller.sweep();
-    const before = w.mock.requests.length;
+    const checksReads = () => w.mock.requests.filter((r) => r.url.includes('/check-runs')).length;
+    const before = checksReads();
     await w.poller.sweep();
-    expect(w.mock.requests.length).toBe(before);
+    expect(checksReads()).toBe(before);
   });
 
   test('completeStep：执行步成 + PR 交付（prNumber 在）→ 停在 building；无 PR → review（既有行为）', () => {

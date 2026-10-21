@@ -1,0 +1,34 @@
+# #1403 round 17 /code-review (Skill code-review, forked execution) on the round 17 range 9ef2a0c..81d5ef1.
+
+== attempt 1: args "low 9ef2a0c..HEAD" (wrong range, discarded) ==
+The forked review runs in the main clone /home/user/pacman, not in this worktree. There HEAD was 398950a7, so
+"9ef2a0c..HEAD" named a different, ~990 KB diff (it began with .claude/skills/verify-pacman/features/persona-verify.md
+and .claude/workflows/pr-gate.js). The review returned "(none)" and said it had not read most of the range, i.e.
+nothing was checked. Not counted as a review of this round.
+
+== attempt 2: args "low 9ef2a0c..81d5ef1" ==
+The range is named by sha, which resolves to the same commits in every worktree of the repository:
+$ cd /home/user/pacman && git rev-parse --short HEAD && git diff --shortstat 9ef2a0c..81d5ef1
+398950a7
+ 3 files changed, 250 insertions(+), 31 deletions(-)
+$ cd /home/user/pacman/.claude/worktrees/p2a && git diff --shortstat 9ef2a0c..81d5ef1
+ 3 files changed, 250 insertions(+), 31 deletions(-)
+Files: apps/server/src/services/ci-loop.ts, apps/server/test/pr-reconcile.test.ts, docs/spec/02-架构平价.md.
+The review skips test hunks, so it read the ci-loop.ts change (and the spec line).
+
+Result: (none). The review's notes:
+- the base.ref / default_branch check moved up before the merged / closed split; the merged path's old check was
+  removed with it, so no guard was lost; the merged path now also clears closedSeenAt, which does no harm (a merged
+  PR never reads closedSeenAt);
+- the hint for a closed PR into another branch runs only after the reviewPending return and keeps closedSeenAt, as
+  its comment says;
+- the coalesce(lastHeartbeatAt, claimedAt, createdAt) ordering with createdAt as the tie-break looks right; the
+  review did not check that the three columns share a storage type, which the ordering needs;
+- widening the strip to [\p{Cc}\p{Cf}] is correct.
+
+The open point, checked here: all three are INTEGER columns. apps/server/src/db/schema.ts:29
+'const epochMs = (name: string) => integer(name);' and step.createdAt / claimedAt / lastHeartbeatAt are all epochMs;
+apps/server/drizzle/0004_opposite_chimera.sql declares `claimedAt` integer and `lastHeartbeatAt` integer. ㉔b runs the
+ordering against the server's SQLite database and passes at 81d5ef1; r17-mutations M2 shows it goes red without it.
+
+Confirmed findings: none, so no fix commit follows the review.

@@ -1,0 +1,11 @@
+# Notes on committed evidence in this directory (#1403, PR #1414). docs/verify is add-only (ADR 0015),
+# so corrections go here instead of into the files.
+
+r7-mutations.txt, r8-mutations.txt, r9-mutations.txt: the second header line reads "Run on the tree that
+became the round 6 commit." It was copied from r6-mutations.txt by the script that wrote the files. The
+first line of each file names the tree the run used: 6cf9e76 (round 7), 668dc7c (round 8), 862bd69
+(round 9). Found by pr-gate run 5 on #1414.
+
+r10-mutations.txt: round 10 adds tests only (pr-gate run 5 suggestions). The rules they cover were
+already implemented, so they pass on bea56ba too; the red leg for these two tests is the mutation run,
+where each mutation turns its test red.

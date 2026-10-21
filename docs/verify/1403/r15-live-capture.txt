@@ -1,0 +1,51 @@
+# #1403 round 15: live GitHub REST captures for the fields the reconcile reads (pr-gate run 7 on #1414).
+# Captured 2026-10-21 09:00-09:01 UTC from this container with curl through the agent proxy, with no
+# Authorization header and the same request headers the server sends (lib/github.ts API_HEADERS):
+#   accept: application/vnd.github+json / x-github-api-version: 2022-11-28 / user-agent: pacman-server
+# The proxy answered with X-Ratelimit-Limit: 15000 (an anonymous client gets 60), so it attached its
+# own credentials upstream. These captures therefore show the response shape for a public repo; they
+# do not measure the anonymous rate limit.
+#
+# Trimmed copies (URL-heavy fields, PR body and file patches dropped; every field the reconcile reads
+# kept verbatim) are the test fixtures apps/server/test/fixtures/github/*.json, copied here as
+# live-*.json. Tests [66a]-[66c] in apps/server/test/pr-reconcile.test.ts parse them through
+# githubPull and githubCompareStatus with the existing response stub.
+
+$ curl -sS -D - -H '<API_HEADERS>' https://api.github.com/repos/xiechimon/pacman/pulls/1414
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 09:00:38 GMT
+Etag: "cc00c517c7bf8caac5770b4aed19a0d4cdf1b723b2869ae22ab92d61d5ebf6a9"   raw body 56078 bytes -> live-pull-1414-open.json
+  state=open merged=false merged_by=null merged_at=null
+  merge_commit_sha=08c85b65eb3b6ae47eb69d527f21dd200d30f9b7   (set on an open PR: GitHub's test merge commit)
+  head.ref=claude/bootstrap-p2 head.sha=9fa4ed90fa76bc7d7a82c7ffe20ab3782dc2cddd
+  head.repo.id=1361226985 head.repo.full_name=xiechimon/pacman
+  base.ref=main base.repo.id=1361226985 base.repo.default_branch=main
+
+$ curl -sS -D - -H '<API_HEADERS>' https://api.github.com/repos/xiechimon/pacman/pulls/1454
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 09:00:39 GMT
+Etag: "93b739874fb96fd7564a21c4361d53947d16223340ea2492bf225d7acd9b4c48"   raw body 24309 bytes -> live-pull-1454-merged.json
+  state=closed merged=true merged_at=2026-10-21T07:54:00Z merged_by.login=xiechimon
+  merge_commit_sha=23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458   (the squash commit on main)
+  head.ref=claude/optimistic-albattani-r5pmfn head.sha=815d5b73f70829d44d6895e1a7a51e13bc6a0555 (head at merge time)
+  head.repo.id=1361226985 head.repo.full_name=xiechimon/pacman
+  base.ref=main base.repo.id=1361226985 base.repo.default_branch=main
+
+$ curl -sS -D - -H '<API_HEADERS>' 'https://api.github.com/repos/xiechimon/pacman/compare/66d5022e374da641ed37ca59ec4fa1c089cb1fac...23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458?per_page=1'
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 09:01:02 GMT
+Etag: "b9e56850d7aa44cabdd6a0582562aae3e45440fb415b266839d0da8fc3b37a5e"   raw body 58269 bytes -> live-compare-ahead.json
+  status=ahead ahead_by=1 behind_by=0 total_commits=1, commits: 1 entry
+  files: 7 entries, all 7 with a patch (24650 bytes of patch text) -- per_page=1 limits the commit list only
+
+$ curl -sS -D - -H '<API_HEADERS>' 'https://api.github.com/repos/xiechimon/pacman/compare/23a39da9f7dc929fa8e1e271e2dd73d4bbdb0458...66d5022e374da641ed37ca59ec4fa1c089cb1fac?per_page=1'
+HTTP/1.1 200 OK   Date: Wed, 21 Oct 2026 09:01:03 GMT
+Etag: "b6aaafa60579ed05b5471a348872ba7c4e1cc8bb8d3b08a69c73a762c6bd9cca"   raw body 16657 bytes -> live-compare-behind.json
+  status=behind ahead_by=0 behind_by=1 total_commits=0, commits: 0, files: 0
+  (66d5022 is the parent of 23a39da on main: base newer than head reads 'behind', the shape a fix
+  commit pushed after the merged head produces for compare/{checkpoint}...{merged head})
+
+# Shape notes against the code
+# - merge_commit_sha is a string on an open PR. githubPull keeps it only when merged is true ([66a]).
+# - head.repo.id and base.repo.id are numbers and equal for a PR from a branch of the same repo; the
+#   ownership check compares them ([66a], [66b]).
+# - merged_by is null on an open PR and an object with login on a merged one.
+# - compare status strings seen: 'ahead' and 'behind' ([66c]). The response still carries the changed
+#   files with their patches on page 1 with per_page=1; the reconcile reads only 'status'.
