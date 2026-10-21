@@ -1,0 +1,111 @@
+Scope: all 6 workspace projects
+✓ Lockfile at ../../pnpm-lock.yaml passes supply-chain policies (verified 12d ago)
+../.. prepare$ husky
+../.. prepare: Done
+
+dependencies:
++ @base-ui/react 1.8.0
++ @dnd-kit/core 6.3.1
++ @dnd-kit/sortable 10.0.0
++ @pacman/shared link:../../packages/shared
++ @shadcn/react 0.3.1
++ @tanstack/react-query 5.103.1
++ class-variance-authority 0.7.1
++ cn 0.4.0
++ diff 9.0.0
++ loading-dev 0.3.5
++ lucide-react 1.52.0
++ react 19.3.0
++ react-dom 19.3.0
++ react-router 8.4.0
++ sonner 2.0.8
++ tw-animate-css 1.4.0
+
+devDependencies:
++ @playwright/test 1.63.0
++ @tailwindcss/postcss 4.3.3
++ @types/node 26.6.2
++ @types/react 19.3.0
++ @types/react-dom 19.3.0
++ @vitejs/plugin-react 6.1.1
++ autoprefixer 10.6.1
++ postcss 8.5.28
++ tailwindcss 4.3.3
++ typescript 7.0.2
++ vite 8.3.0
++ vitest 5.0.1
+
+Update available! 12.5.1 → 12.14.0.
+Changelog: https://pnpm.io/v/12.14.0
+To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -
+Done in 1.6s using pnpm v12.5.1
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+
+Running 2 tests using 1 worker
+
+[1/2] e2e/search-live-project-name.spec.ts:123:1 › live, projects loaded: pre-response rows carry each todo’s own project
+  1) e2e/search-live-project-name.spec.ts:123:1 › live, projects loaded: pre-response rows carry each todo’s own project 
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'search probe alpha' })
+    Expected substring: "verify-1400"
+    Received string:    "#1 search probe alphar3-lifecycle20747 天前待处理"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "toContainText" getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'search probe alpha' }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').filter({ hasText: 'search probe alpha' })
+        14 × locator resolved to <button tabindex="0" type="button" data-slot="button" data-row-index="0" data-size="default" data-variant="ghost" data-row-kind="todo" class="group/button shrink-0 border border-transparent bg-clip-padding transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-in…>…</button>
+           - unexpected value "#1 search probe alphar3-lifecycle20747 天前待处理"
+
+
+      138 |   await expect.poll(() => search.queries()).toContain('search probe');
+      139 |   // /api/search is held: this is the client-filtered frame
+    > 140 |   await expect(todoRow(page, 'search probe alpha')).toContainText('verify-1400');
+          |                                                     ^
+      141 |   await expect(todoRow(page, 'search probe beta')).toContainText('atlas');
+      142 |   await expect(todoRow(page, 'search probe beta')).not.toContainText('verify-1400');
+      143 |   await expect(panel(page)).not.toContainText(FIXTURE_PROJECT);
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/focused-boyd-04a7fe/apps/web/e2e/search-live-project-name.spec.ts:140:53
+
+    Error Context: test-results/search-live-project-name-l-c7541-rry-each-todo’s-own-project/error-context.md
+
+
+[2/2] e2e/search-live-project-name.spec.ts:164:1 › live, projects read failed: pre-response rows show no project line
+  2) e2e/search-live-project-name.spec.ts:164:1 › live, projects read failed: pre-response rows show no project line 
+
+    Error: expect(locator).not.toContainText(expected) failed
+
+    Locator: getByRole('dialog', { name: '搜索' })
+    Expected substring: not "r3-lifecycle"
+    Received string: "任务#1 search probe alphar3-lifecycle20747 天前待处理#2 search probe betar3-lifecycle20747 天前待处理"
+    Timeout: 5000ms
+
+    Call log:
+      - Expect "not toContainText" getByRole('dialog', { name: '搜索' }) with timeout 5000ms
+      - waiting for getByRole('dialog', { name: '搜索' })
+        14 × locator resolved to <div role="dialog" aria-label="搜索" class="fixed top-36.5 left-1/2 z-(--z-modal) flex h-110 w-130 -ml-65 flex-col overflow-hidden rounded-(--edge-radius) bg-dialog-surface shadow-(--dialog-shadow) ring-0 origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none duration-100 ease-out group-data-open/dlgvp:animate-in group-data-open/dlgvp:fade-in-0 group-data-open/dlgvp:zoom-in-98">…</div>
+           - unexpected value "任务#1 search probe alphar3-lifecycle20747 天前待处理#2 search probe betar3-lifecycle20747 天前待处理"
+
+
+      174 |   await expect.poll(() => search.queries()).toContain('search probe');
+      175 |   await expect(todoRow(page, 'search probe alpha')).toBeVisible();
+    > 176 |   await expect(panel(page)).not.toContainText(FIXTURE_PROJECT);
+          |                                 ^
+      177 |   await expect(panel(page)).not.toContainText('verify-1400');
+      178 |   await search.release();
+      179 | });
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/focused-boyd-04a7fe/apps/web/e2e/search-live-project-name.spec.ts:176:33
+
+    Error Context: test-results/search-live-project-name-l-068a6-e-rows-show-no-project-line/error-context.md
+
+
+  2 failed
+    e2e/search-live-project-name.spec.ts:123:1 › live, projects loaded: pre-response rows carry each todo’s own project 
+    e2e/search-live-project-name.spec.ts:164:1 › live, projects read failed: pre-response rows show no project line 

@@ -77,6 +77,9 @@ export function providerGroups(
 interface AgentRuntimeSelectProps {
   /** Trigger id, so a form label can point at it. */
   id?: string;
+  /** Trigger name where no <label> points at it (the agent detail row label
+   *  is plain text, #1442). */
+  ariaLabel?: string;
   /** 当前值 = provider 位；null = 内置 (pi)（清空行）。 */
   value: string | null;
   options: ModelOption[];
@@ -92,6 +95,7 @@ interface AgentRuntimeSelectProps {
  *  runtime 段品牌名 `Claude Code`），首行恒是「内置 (pi)」清空档。 */
 export function AgentRuntimeSelect({
   id,
+  ariaLabel,
   value,
   options,
   onPick,
@@ -107,7 +111,11 @@ export function AgentRuntimeSelect({
 
   return (
     <Select value={value} onValueChange={(next) => onPick?.(next as string | null)}>
-      <SelectTrigger id={id} className={cn(`${prefix}-select`, triggerClassName)}>
+      <SelectTrigger
+        id={id}
+        aria-label={ariaLabel}
+        className={cn(`${prefix}-select`, triggerClassName)}
+      >
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectContent aria-label={t('运行时')} className={`${prefix}-menu`}>
@@ -138,6 +146,8 @@ const MODEL_ROW_WRAP =
 interface AgentModelSelectProps {
   /** Trigger id, so a form label can point at it. */
   id?: string;
+  /** Same as AgentRuntimeSelect. */
+  ariaLabel?: string;
   /** 一级当前值：候选按它过滤；null = 内置 (pi)，名下无可选模型，本级禁用。 */
   provider: string | null;
   modelId: string | null;
@@ -156,6 +166,7 @@ interface AgentModelSelectProps {
 /** 二级：当前运行时/服务商名下的具体模型。 */
 export function AgentModelSelect({
   id,
+  ariaLabel,
   provider,
   modelId,
   options,
@@ -177,7 +188,11 @@ export function AgentModelSelect({
       disabled={disabled || provider === null}
       onValueChange={(next) => onPick?.(next as string | null)}
     >
-      <SelectTrigger id={id} className={cn(`${prefix}-select`, triggerClassName)}>
+      <SelectTrigger
+        id={id}
+        aria-label={ariaLabel}
+        className={cn(`${prefix}-select`, triggerClassName)}
+      >
         <SelectValue>{label}</SelectValue>
       </SelectTrigger>
       <SelectContent

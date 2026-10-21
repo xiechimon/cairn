@@ -68,6 +68,19 @@ jobs:
           fi
           node scripts/lane-file-gate.mjs
 
+      # Test spawn gate: corepack's pnpm/npx shim swallows SIGTERM, so a test
+      # that spawns through it leaves the real process tree under PID 1.
+      # Zero-dependency, pre-install.
+      - name: Test spawn gate
+        run: node scripts/test-spawn-gate.mjs
+
+      # pr-evidence is a required status check on main and carries the
+      # needs-decision guard (2026-10-21, after #1435); this pins the shape
+      # that keeps it load-bearing (no job-level if/name, no paths filter,
+      # label and auto-merge triggers present). Zero-dependency, pre-install.
+      - name: PR evidence workflow shape gate
+        run: node scripts/pr-evidence-workflow-gate.mjs
+
       # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
       # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数、裸控件
       # 总数、Tailwind 任意值（text-[Npx] 与间距类 -[Npx] 两个总数，Paper

@@ -1,0 +1,4 @@
+# compiled PHASE_UI rows in the fixture build (vite build --mode fixture, dist/ built 2026-10-21 00:46:00 UTC by the e2e-new-leg run)
+$ grep -o 'queued:{chip:[^}]*}' dist/assets/*.js; grep -o 'todo:{chip:[^}]*}' dist/assets/*.js
+queued:{chip:`排队中`,tone:`idle`,action:null,placeholder:null}
+todo:{chip:`待开始`,tone:`idle`,action:`开始`,placeholder:null}

@@ -149,9 +149,9 @@ test('4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-s
   // rounded-lg（=10px，#1072 同域先例）；composer 卡家族绑定随 #991 Q7
   // 登记偏离解除（composer 保持手写方角是登记在案的偏离，不再拖带本盒）。
   expect(cs.radius).toBe('10px');
-  // --secondary 暗色侧 #2d2926；--border #2d2926（shadcn.css 正本；surface-secondary/border-default 已并，#1002）
-  expect(cs.bg).toBe('rgb(45, 41, 38)');
-  expect(cs.borderColor).toBe('rgb(45, 41, 38)');
+  // --secondary 暗色侧 #3c3732；--border #3e3a34（shadcn.css 正本 Paper 暗色；surface-secondary/border-default 已并，#1002）
+  expect(cs.bg).toBe('rgb(60, 55, 50)');
+  expect(cs.borderColor).toBe('rgb(62, 58, 52)');
   expect(cs.fontSize).toBe('14px');
 });
 

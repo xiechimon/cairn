@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #389 + #442 + #468 + XMON-37 acceptance, re-pinned for ADR 0013
 // (#1009 A0): the 快捷键组 — C opens the
@@ -139,27 +140,6 @@ const MACHINES = '/app/resources/machines?scenario=06';
 
 const dialog = (page: Page) => page.locator('.new-task-dialog');
 const drawer = (page: Page) => page.locator('.chief-drawer');
-
-/** Hotkey press with the search-focus.spec retry law: the listener registers
- *  in a passive effect after first paint, so a too-early press can be lost —
- *  re-press only while the surface stays closed. ⌘K is open-only and
- *  re-presses only on a *lost* key (a delivered one flips the panel
- *  visible, ending the loop), so retries never double-fire; once a surface
- *  opens, its own input holds focus (editable guard) and a late retry is
- *  inert. ⌘J is a toggle, but the loop only runs from a closed surface and
- *  ends the instant one flips visible — a delivered open exits before any
- *  re-press could toggle it back. */
-async function pressUntil(page: Page, key: string, visible: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press(key);
-    const opened = await visible
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error(`${key} never opened ${visible}`);
-}
 
 /** Retired-binding negative (XMON-37), the retry law inverted: six delivered
  *  presses of the old key could not all be lost if it were still bound, so a
@@ -531,24 +511,6 @@ async function openNewTask(page: Page) {
 const landedCard = (page: Page, title: string) =>
   page.locator('[data-column="todo"] [data-todo-id]', { hasText: title });
 
-/** Chord press with the retry law: the listener registers in a passive
- *  effect after the dialog's open commit, so a press fired the instant the
- *  dialog paints can be lost. The loop ends on the *outcome* (the card
- *  landing) rather than on a surface flipping visible — a lost press lands
- *  nothing, so re-presses cannot double-fire, and a delivered one exits
- *  before the next attempt. */
-async function pressUntilCard(page: Page, key: string, card: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press(key);
-    const landed = await card
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (landed) return;
-  }
-  throw new Error(`${key} never landed ${card}`);
-}
-
 test('⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, dialog closes)', async ({
   page,
 }) => {
@@ -557,14 +519,16 @@ test('⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, di
   // The autofocused spec textarea is an editable target — the chord must
   // still fire from it (dialog-interior exemption; without it the guard
   // swallows the press and this wait times out).
-  await pressUntilCard(page, 'Meta+Enter', landedCard(page, '⌘↵ 建的卡'));
+  // The retry loop waits on the outcome (the card landing), not on a surface
+  // opening: a lost press lands nothing, so a re-press cannot double-fire.
+  await pressUntil(page, 'Meta+Enter', landedCard(page, '⌘↵ 建的卡'));
   await expect(dialog).not.toBeVisible();
 
   // Same registration, non-mac receipt: Ctrl+↵ lands a second card
   await page.getByRole('complementary').getByRole('button', { name: '新任务' }).click();
   await expect(dialog).toBeVisible();
   await dialog.locator('.new-task-spec').fill('Ctrl 建的卡');
-  await pressUntilCard(page, 'Control+Enter', landedCard(page, 'Ctrl 建的卡'));
+  await pressUntil(page, 'Control+Enter', landedCard(page, 'Ctrl 建的卡'));
   await expect(dialog).not.toBeVisible();
 });
 
