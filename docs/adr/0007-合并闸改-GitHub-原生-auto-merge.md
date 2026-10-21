@@ -79,6 +79,18 @@ D4 的前提「up-to-date 只能 rebase + force-push」不成立。`gh api -X PU
 | 仓库 update branch | `allow_update_branch: true` | `gh api repos/xiechimon/pacman` |
 | 仓库 auto-merge | `allow_auto_merge: true` | 同上 |
 
+### 修订（2026-10-21，#1435 之后）
+
+#1435 在用户裁决未落时被 auto-merge 合入：车道开 PR 即按 D3 挂了 `--auto`，编排者把 Acceptance 的两个空框勾绿后才去问用户措辞是否可接受，`check` 一绿 GitHub 就合了。当时 `pr-evidence` 不在必需检查里，PR 上也没有任何机器可读的「人工裁决待定」状态。改三处：
+
+| 项 | 改后 | 出处 |
+|---|---|---|
+| main 必需检查 | `["check", "pack-smoke", "e2e-gate", "pr-evidence"]`，四项均钉 GitHub Actions app（`app_id` 15368，防止任何写权限方用 commit status 冒充） | `gh api repos/xiechimon/pacman/branches/main/protection/required_status_checks` |
+| 裁决状态 | 标签 `needs-decision`：`pr-evidence` 见标签即红，标签在身时每次 run 解除 auto-merge（trigger 含 `labeled` / `unlabeled` / `auto_merge_enabled`）；Acceptance 有未勾项时 workflow 自己加标签。摘标签是人的动作 | `.github/workflows/pr-evidence.yml` |
+| D3 的前提 | 向用户提问前先 `gh pr merge <n> --disable-auto`，再加标签，再问；裁决落了再重新 `--auto`。agent 摘标签只能带 `PACMAN_DECIDED=1`，`gh pr merge --admin` 没有出口（本机 PreToolUse hook 拦） | `AGENTS.md`「Issues and PRs」 |
+
+不改 `enforce_admins`：它只拦人在网页上的 bypass 按钮和带 `--admin` 的合并，而 agent 侧已由 hook 拦住；要不要连人的 bypass 也关，另议。
+
 ### Premortem
 
 | 死因 | 护栏 |
