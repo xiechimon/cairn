@@ -222,6 +222,22 @@ describe('GitHub 读三件（#1406 P5a-2）', () => {
     ]);
   });
 
+  // daemon claude-code 后端把 parameters 转 zod 时只认 type / description（+ 对象
+  // 的 properties / required、数组的 items），词表外 fail-closed、整个 chief
+  // 工具面建不起来；已发出去的 daemon 不会随 server 升级，所以 server 发的
+  // 定义只能用这套词。
+  it('参数只用 daemon 转换器认得的词：string / number + description', () => {
+    for (const name of NAMES) {
+      const params = CHIEF_REMOTE_TOOLS.find((t) => t.name === name)?.parameters as {
+        properties: Record<string, Record<string, unknown>>;
+      };
+      for (const [key, schema] of Object.entries(params.properties)) {
+        expect(Object.keys(schema).sort(), `${name}.${key}`).toEqual(['description', 'type']);
+        expect(['string', 'number'], `${name}.${key}`).toContain(schema.type);
+      }
+    }
+  });
+
   it('页大小上限：issues / pull_requests 30、workflow_runs 20', () => {
     expect(GITHUB_READ_PER_PAGE_MAX).toEqual({ issues: 30, pull_requests: 30, workflow_runs: 20 });
   });

@@ -1065,7 +1065,7 @@ describe('chief 面与 MCP 面（13）', () => {
       const mcpTool = listed.result?.tools?.find((t) => t.name === name);
       const chiefDef = CHIEF_REMOTE_TOOLS.find((t) => t.name === name);
       const chiefParams = chiefDef?.parameters as {
-        properties: Record<string, { type?: string; enum?: string[]; minimum?: number }>;
+        properties: Record<string, { type?: string; description?: string }>;
         required?: string[];
       };
       const mcpProps = mcpTool?.inputSchema.properties as Record<
@@ -1080,9 +1080,18 @@ describe('chief 面与 MCP 面（13）', () => {
       );
       expect(chiefParams.required, name).toEqual(['projectId']);
       for (const [prop, schema] of Object.entries(chiefParams.properties)) {
-        expect(mcpProps[prop]?.type, `${name}.${prop}`).toBe(schema.type);
-        expect(mcpProps[prop]?.enum, `${name}.${prop}`).toEqual(schema.enum);
-        expect(mcpProps[prop]?.minimum, `${name}.${prop}`).toEqual(schema.minimum);
+        const where = `${name}.${prop}`;
+        // chief 面只用 daemon claude-code 转换器认得的词（type + description，
+        // 已发出去的 daemon 对 enum / integer / minimum 一律 fail-closed，整个
+        // chief 工具面建不起来）：integer 写成 number，enum 的值写进说明；校验
+        // 由 server 用同一个 zod schema 做（两面同一套）。
+        expect(Object.keys(schema).sort(), where).toEqual(['description', 'type']);
+        expect(schema.type, where).toBe(
+          mcpProps[prop]?.type === 'integer' ? 'number' : mcpProps[prop]?.type,
+        );
+        for (const value of mcpProps[prop]?.enum ?? []) {
+          expect(schema.description, where).toContain(value);
+        }
       }
     }
   });
