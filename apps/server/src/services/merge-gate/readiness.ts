@@ -71,29 +71,43 @@ export interface GateInputs {
     body: string;
     changedFiles: number;
   } | null;
-  /** 当前 head 的检查；null = 读不到。required 为 null = 必需清单读不到。runs 每个
-   * (app, 名字) 最新的一条，statuses 每个 context 最新的一条（同一 app 同名的旧条目
-   * 不传）。S4 的外壳按 app 与名字去重，不能只按名字：两个 app 报同名的检查时，只按
-   * 名字会让失败的那条被同名的通过盖掉，GitHub 的 rollup 却照样算它；自家 status
-   * 未通过时 unstable 又按自家豁免，闸就看着一条失败的检查放行。complete = runs 与
-   * statuses 都读全了（分页读完）；false 时整份按读不到处理：缺席的可能只是没读到，
-   * 未通过的可能在没读的那页。 */
+  /** PR head 的检查；null = 读不到。headSha = 外壳读检查时请求的提交：check run 与
+   * commit status 都按这一个 40 位小写 SHA 读（不按分支名）。它不等于 pr.headSha
+   * （比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）= 这份结果说的是别的提交，
+   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。required
+   * 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
+   * 最新的一条（同一 app 同名的旧条目不传）。S4 的外壳按 app 与名字去重，不能只按
+   * 名字：两个 app 报同名的检查时，只按名字会让失败的那条被同名的通过盖掉，GitHub 的
+   * rollup 却照样算它；自家 status 未通过时 unstable 又按自家豁免，闸就看着一条失败
+   * 的检查放行。complete = runs 与 statuses 都读全了（分页读完）；false 时整份按读
+   * 不到处理：缺席的可能只是没读到，未通过的可能在没读的那页。 */
   checks: {
+    headSha: string;
     required: string[] | null;
     runs: GateCheckRun[];
     statuses: GateCommitStatus[];
     complete: boolean;
   } | null;
-  /** compare {base}...{head} 一次读到的两样：全部文件（compareFilesFromResponse），与
-   * 本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。读全时 commits
-   * 含 PR 的 head；不含 = 不是在 pr.headSha 上读的（缓存的响应、跨推送的两次读），
-   * 文件与摘要说的是旧补丁，按读不到处理（patch-unavailable）。'unreadable' =
-   * 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' = 读到了、形状
-   * 不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），每次读
-   * 都一样，留人。commits 少给只会让证据链少认（拦），不会多放。commits 不带逐提交
-   * 的文件列表，所以证据链指向的文件在那个提交上是否已经存在（raw 是否 404）这里
-   * 判不了，由 I/O 外壳（S4）去查。 */
-  compare: { files: CompareFile[]; commits: string[] } | 'unreadable' | 'malformed';
+  /** compare {base}...{head} 一次读到的三样：
+   * - headSha：外壳请求时写在 {head} 位置的提交，40 位小写 SHA（按 SHA 请求，不按分支
+   *   名；按分支名读的 compare 不知道读在哪个提交上）。取请求的 SHA，不从响应里认：
+   *   响应没有 head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url
+   *   里是缩写），commits 按时间排、分页，末一个不保证是 head。
+   * - files：全部文件（compareFilesFromResponse）。
+   * - commits：本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。
+   * headSha 不等于 pr.headSha（比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）=
+   * 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，下一次
+   * 巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
+   * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
+   * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），
+   * 每次读都一样，留人。commits 少给只会让证据链少认（拦），不会多放。commits 不带
+   * 逐提交的文件列表，所以证据链指向的文件在那个提交上是否已经存在（raw 是否 404）
+   * 这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head 可对，compare 与检查照常
+   * 判（pr-unreadable 已拦，结果不报 head）。 */
+  compare:
+    | { headSha: string; files: CompareFile[]; commits: string[] }
+    | 'unreadable'
+    | 'malformed';
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
   verdicts: GateVerdictView[];
   /** 当前摘要的闸轮次；perspectives 在建轮时冻结。human 策略下没有轮次。 */
@@ -108,10 +122,6 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
-const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]));
-const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
-  MERGE_BLOCKERS.map((b) => [b.code, b]),
-);
 
 // detail 里的名字（文件、检查、分支、仓库）由 PR 作者或第三方起，原样会把换行、
 // 控制字符、指令样的文本与任意长的名单带进 status 描述与 chief 工具。名字一律写成
@@ -187,21 +197,28 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('base-not-default', `${quoted(pr.baseRef)} → ${quoted(i.repo.defaultBranch)}`);
   }
 
-  // 检查（当前 head）。judged = 上面已按必需检查或 pr-evidence 记过自己码的条目。
-  // 没读全的列表与读不到同等：不拿半张清单判。
-  const checks = i.checks?.complete ? i.checks : null;
+  // 检查（PR 的 head）。在别的提交上读的、没读全的，都与读不到同等：不拿别的提交
+  // 的结果判，也不拿半张清单判。judged = 下面已按必需检查或 pr-evidence 记过自己码
+  // 的条目。
+  let checks = i.checks;
+  if (checks !== null && pr !== null && checks.headSha !== pr.headSha) {
+    block('required-checks-unreadable', 'checks not read at the PR head');
+    checks = null;
+  } else if (checks !== null && !checks.complete) {
+    block('required-checks-unreadable', 'check list incomplete');
+    checks = null;
+  }
   const judged = new Set<GateCheckRun | GateCommitStatus>();
   if (checks === null || checks.required === null) {
-    block(
-      'required-checks-unreadable',
-      ...(i.checks?.complete === false ? ['check list incomplete'] : []),
-    );
+    block('required-checks-unreadable');
   } else {
     const required = checks.required;
     if (required.length === 0) block('required-checks-none');
-    if (required.some((n) => n.toLowerCase() === MERGE_GATE_STATUS_CONTEXT)) block('self-required');
     for (const name of required) {
-      if (name.toLowerCase() === MERGE_GATE_STATUS_CONTEXT) continue;
+      if (name.toLowerCase() === MERGE_GATE_STATUS_CONTEXT) {
+        block('self-required');
+        continue;
+      }
       const run = checks.runs.find((r) => r.name === name);
       const status = checks.statuses.find((s) => s.context.toLowerCase() === name.toLowerCase());
       if (run !== undefined) {
@@ -270,22 +287,23 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
-  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。compare 的
-  // 提交里没有 PR 的 head：读的是旧补丁，按读不到处理，下一次巡检再读；摘要、路径、
-  // 证据链与判定都不拿它判，结果也不报它的摘要，免得把旧补丁的结论安到 head 上。
+  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。compare 不是在
+  // PR 的 head 上读的（旧或新）：说的是别的补丁，按读不到处理，下一次巡检再读；摘要、
+  // 文件数、路径、证据链与判定都不拿它判，结果也不报它的摘要，免得把别的补丁的结论
+  // 安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
-  if (compare !== null && pr !== null && !compare.commits.includes(pr.headSha)) {
+  if (compare !== null && pr !== null && compare.headSha !== pr.headSha) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
   }
-  const digest =
-    compare === null
-      ? null
-      : computePatchDigest(compare.files, { expectedFileCount: pr?.changedFiles ?? null });
-  const D = digest?.patchDigest ?? null;
-  if (digest !== null && compare !== null) {
+  let D: string | null = null;
+  if (compare !== null) {
+    const digest = computePatchDigest(compare.files, {
+      expectedFileCount: pr?.changedFiles ?? null,
+    });
+    D = digest.patchDigest;
     if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {
       block('compare-truncated', digest.unavailable);
     } else if (digest.unavailable !== null) {
@@ -406,12 +424,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (!i.availability.verifier) block('no-verifier');
   if (!i.availability.decider) block('no-decider');
 
-  const blockers: MergeBlocker[] = [...found.entries()]
-    .sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))
-    .map(([code, detail]) => {
-      const meta = META.get(code);
-      return { code, class: meta?.class ?? 'human', label: meta?.label ?? code, detail };
-    });
+  // 按词表顺序取出记下的码，类别与文案也从词表来。
+  const blockers: MergeBlocker[] = MERGE_BLOCKERS.flatMap((b) => {
+    const detail = found.get(b.code);
+    return detail === undefined ? [] : [{ code: b.code, class: b.class, label: b.label, detail }];
+  });
   return {
     ready: blockers.length === 0,
     headSha: pr?.headSha ?? null,

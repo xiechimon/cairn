@@ -186,16 +186,20 @@ export const MERGE_BLOCKERS = [
   { code: 'mergeable-state', class: 'transient', label: 'GitHub 判定暂不可合并' },
   // 检查
   { code: 'self-required', class: 'human', label: 'pacman/merge-gate 被设成了必需检查' },
-  { code: 'required-checks-unreadable', class: 'transient', label: '读不到必需检查清单' },
+  {
+    code: 'required-checks-unreadable',
+    class: 'transient',
+    label: '读不到当前 head 的检查或必需检查清单',
+  },
   { code: 'required-checks-none', class: 'human', label: '默认分支没有必需检查' },
   { code: 'required-check-missing', class: 'transient', label: '必需检查在当前 head 上缺席' },
   { code: 'required-check-pending', class: 'transient', label: '必需检查还在跑' },
   { code: 'required-check-failed', class: 'transient', label: '必需检查未通过' },
   { code: 'pr-evidence-not-green', class: 'transient', label: 'pr-evidence 未通过' },
   // 补丁
-  // 摘要不可得分两类：compare 读不到、或不是在 PR 的 head 上读的，可等（下一次巡检
-  // 再读）；读到了却算不出（形状不对、截断、只有证据、缺 blob sha）每次读都一样，
-  // 等不来，留人。
+  // 摘要不可得分两类：compare 读不到、或不是在 PR 的 head 上读的（比 PR 旧或新），
+  // 可等（下一次巡检再读）；读到了却算不出（形状不对、截断、只有证据、缺 blob sha）
+  // 每次读都一样，等不来，留人。
   {
     code: 'patch-unavailable',
     class: 'transient',
