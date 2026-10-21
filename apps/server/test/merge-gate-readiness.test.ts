@@ -10,8 +10,9 @@
 //   或 combined status 的 sha 说的是别的提交也放过；PR 读不到时结果报出一个没有 head
 //   的摘要；SHA 不是 40 位小写十六进制（大写、缩写）时永远对不上，闸以「没在 head 上
 //   读」等下去，看不出是外壳的毛病；PR 的 head 写错时整个 PR 按读不到处理，已合并、
-//   fork 这些留人的码被吞掉；compare 的提交没读全（分页没读完），head 的子提交在没读
-//   的那页上，后代上读的 compare 照样放过。
+//   fork 这些留人的码被吞掉，留下的 PR 又拿没对过 head 的 compare 去对文件数与证据链；
+//   compare 的提交没读全（分页没读完、重复的条目凑数），head 的子提交在没读的那页上，
+//   后代上读的 compare 照样放过。
 // - 检查：必需检查缺席被当绿（ci-loop 的宽限）；必需清单读不到退回「全部检查」；
 //   必需项由 commit status 而不是 check run 提供时漏判；pr-evidence 为 skipped /
 //   neutral 被当绿；pacman/merge-gate 本身被设成必需检查；只因自家 status 造成的
@@ -1262,6 +1263,20 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     ]);
   });
 
+  test('compare 的提交有重复、条数凑够了 total_commits：同样算没读全（重复的不顶替没读到的）', () => {
+    // 故事：外壳跨页读时页面错位，第二页重复了第一页的 HEAD，以 HEAD 为父的 NEWER 掉了。
+    const i = green();
+    compareAtNewer(i);
+    i.compare = readAt(
+      HEAD,
+      withCommits(compare(i), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [EARLIER] }]),
+    );
+    expect(compare(i).totalCommits).toBe(3);
+    expect(classesOf(i)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+  });
+
   test('compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要', () => {
     // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER（改一行，文件数不变），
     // compare 读到的是 NEWER。HEAD 在 NEWER 的 base..head 里，文件数对得上，判定都绑在
@@ -1394,6 +1409,20 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
       ['pr-from-fork', 'human', '"someone/pacman"'],
       ['base-not-default', 'human', '"release" → "main"'],
     ]);
+  });
+
+  test('PR 的 head 写错时 compare 没有 head 可对：文件数与证据链不拿它判（同 PR 读不到），跨推送的竞态不报成留人的 compare-truncated', () => {
+    const malformedHead = [['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex']];
+    // compare 读在推送后的 NEWER 上，推送加了文件：文件数与 PR 报的对不上
+    const a = green();
+    pr(a).headSha = HEAD.toUpperCase();
+    compareAtNewer(a, [file('apps/server/src/services/ci-loop-retry.ts', { status: 'added' })]);
+    expect(classesOf(a)).toEqual(malformedHead);
+    // compare 读在更早的 EARLIER 上，body 的证据链钉在 HEAD：不报 evidence-link-missing
+    const b = green();
+    pr(b).headSha = HEAD.toUpperCase();
+    b.compare = readAt(EARLIER, withCommits(compare(b), chain(EARLIER)));
+    expect(classesOf(b)).toEqual(malformedHead);
   });
 
   test('PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）', () => {
