@@ -6,7 +6,8 @@ name: diagram-text-fit
 # instead of fonts, so it runs identically on fontless CI runners.
 #
 # Advisory for now (#1087): this job is NOT in branch protection. It follows
-# the pr-evidence rollout rule — a check joins the required set only after it
+# the rollout rule pr-evidence followed (promoted 2026-10-21, #1440) — a
+# check joins the required set only after it
 # has been green for a stretch and the in-flight lanes have merged, never
 # before (requiring it early locks out every open lane whose older diagrams
 # predate the gate). Stable job name below so that promotion is a one-line

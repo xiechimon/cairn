@@ -1,0 +1,15 @@
+node ~/.claude/hooks/dangerous-cmd-block.local.cjs with a Bash PreToolUse payload, 2026-10-21
+BLOCK  gh pr edit 1441 --remove-label needs-decision
+BLOCK  gh pr edit 1441 --remove-label "foo,needs-decision"
+BLOCK  gh issue edit 1441 --remove-label=needs-decision
+BLOCK  gh api -X DELETE repos/xiechimon/pacman/issues/1441/labels/needs-decision
+BLOCK  gh label delete needs-decision --yes
+BLOCK  gh pr merge 1441 --squash --admin
+BLOCK  PACMAN_DECIDED=1 gh pr merge 1441 --squash --admin
+BLOCK  gh api -X PUT repos/xiechimon/pacman/pulls/1441/merge -f merge_method=squash
+BLOCK  gh api graphql -f query="mutation { mergePullRequest(input:{pullRequestId:\"x\"}) { clientMutationId } }"
+pass   PACMAN_DECIDED=1 gh pr edit 1441 --remove-label needs-decision
+pass   gh pr edit 1441 --add-label needs-decision
+pass   gh pr merge 1441 --disable-auto
+pass   gh pr merge 1441 --squash --auto
+pass   gh api -X PUT repos/xiechimon/pacman/pulls/1441/update-branch
