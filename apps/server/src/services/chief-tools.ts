@@ -160,8 +160,14 @@ function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
 
-function requireProjectRow(db: Db, projectId: string) {
-  const row = db.select().from(project).where(eq(project.id, projectId)).get();
+/** project 存在性 + 团队归属校验（#1466，requireTeamTodo 同口径：跨团队 id
+ * 与不存在同 404，不泄露存在性）。 */
+function requireProjectRow(db: Db, projectId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
 }
@@ -258,7 +264,8 @@ export async function executeChiefTool(
     case 'todos': {
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
-      let records = listTodos(svc, projectId ? { projectId } : { teamId: ctx.teamId });
+      // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
+      let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
       return json(records);
     }
@@ -363,7 +370,7 @@ export async function executeChiefTool(
       // daemon worktree `git show`，复刻走 server 裸库读，能力对齐、机制不同
       // [设计]。无 path → 回项目 repo 元信息（GitHub 形态无本地存储）。
       const projectId = str(params, 'projectId');
-      const row = requireProjectRow(db, projectId);
+      const row = requireProjectRow(db, projectId, ctx.teamId);
       const paths = strArr(params, 'paths');
       if (paths.length === 0) {
         return json({ projectId, name: row.name, repoKind: row.repoKind, files: [] });
@@ -439,7 +446,7 @@ export async function executeChiefTool(
     case 'create_todo': {
       // 措辞→spec 三段式（r5 §3.2）由 LLM 侧组织 spec 文本；本层落库 + 溯源。
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId); // 存在性校验（404 面）
+      requireProjectRow(db, projectId, ctx.teamId); // 存在性 + 团队归属校验（404 面）
       const record = createTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -581,7 +588,7 @@ export async function executeChiefTool(
     }
     case 'update_project': {
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId);
+      requireProjectRow(db, projectId, ctx.teamId);
       const name = optStr(params, 'name');
       if (name !== undefined)
         db.update(project).set({ name }).where(eq(project.id, projectId)).run();
@@ -589,7 +596,7 @@ export async function executeChiefTool(
     }
     case 'connect_repo': {
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId);
+      requireProjectRow(db, projectId, ctx.teamId);
       const githubRepo = str(params, 'githubRepo');
       if (!isGithubRepoRef(githubRepo))
         throw new HttpError(400, 'invalid params.githubRepo: expected "owner/repo"');
@@ -821,7 +828,7 @@ export async function executeChiefTool(
         );
         started.push(...builds);
         // 派工即自动 watch（r5 §3.5：run_builds → watches[0] reason canon）。
-        const projectName = requireProjectRow(db, row.projectId).name;
+        const projectName = requireProjectRow(db, row.projectId, ctx.teamId).name;
         const todoRecord = getTodo(svc, todoId);
         if (todoRecord) {
           addChiefWatch(deps, {
@@ -949,8 +956,9 @@ export async function executeChiefTool(
       const reason = optStr(params, 'reason');
       for (const todoId of todoIds) {
         const record = getTodo(svc, todoId);
-        if (!record) continue;
-        const projectName = requireProjectRow(db, record.projectId).name;
+        // 他队任务与不存在同样跳过（#1466 团队归属，requireTeamTodo 同口径）。
+        if (!record || record.teamId !== ctx.teamId) continue;
+        const projectName = requireProjectRow(db, record.projectId, ctx.teamId).name;
         addChiefWatch(deps, {
           teamId: ctx.teamId,
           todo: record,

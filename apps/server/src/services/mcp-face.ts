@@ -108,8 +108,14 @@ function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
 
-function requireProjectRow(db: Db, projectId: string) {
-  const row = db.select().from(project).where(eq(project.id, projectId)).get();
+/** project 存在性 + 团队归属校验（#1466，requireTeamTodo 同口径：key 属主
+ * 团队之外的 id 与不存在同 404，不泄露存在性）。 */
+function requireProjectRow(db: Db, projectId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
 }
@@ -181,7 +187,8 @@ export async function executeMcpTool(
     case 'todos': {
       const projectId = optStr(args, 'projectId');
       const phase = optStr(args, 'phase');
-      let records = listTodos(svc, projectId ? { projectId } : { teamId: ctx.teamId });
+      // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
+      let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
       return json(records);
     }
@@ -276,7 +283,7 @@ export async function executeMcpTool(
     // —— 写 13 项（Organize work / Run work / Manage lifecycle）——
     case 'create_todo': {
       const projectId = str(args, 'projectId');
-      requireProjectRow(db, projectId);
+      requireProjectRow(db, projectId, ctx.teamId);
       // key 属主身份：ownerId = 用户、createdBy 无 Agent 位（非 chief 派工，
       // 无 sourceBuildId 溯源——r3 §5.2 身份语义）。
       return json(

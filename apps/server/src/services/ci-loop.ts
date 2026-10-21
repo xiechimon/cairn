@@ -37,6 +37,7 @@ import { build, project, step, todo } from '../db/schema.js';
 import { type FetchLike, type GithubCheckRun, githubCommitCheckRuns } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep, maybeEnqueueVerifyStep, toBuildRecord } from './builds.js';
+import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { setTodoPhase } from './todos.js';
 
@@ -208,20 +209,19 @@ export function createCiPoller(
     }
     const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+    const repoRef = githubRepoOfProject(projRow);
     if (
       buildRow === undefined ||
       buildRow.prNumber === null ||
       projRow === undefined ||
-      projRow.repoKind !== 'github' ||
-      projRow.githubRepo === null
+      repoRef === null
     ) {
-      // 形态不齐（PR 号缺失/项目非 github——生产不可达，防御位）：不出站、不写。
+      // 形态不齐（PR 号缺失/项目非 github/githubRepo 不合法 #1466——生产不可达，
+      // 防御位）：不出站、不写。
       tally.skipped += 1;
       return;
     }
-    const slash = projRow.githubRepo.indexOf('/');
-    const owner = projRow.githubRepo.slice(0, slash);
-    const repo = projRow.githubRepo.slice(slash + 1);
+    const { owner, repo } = repoRef;
     // token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
     // 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。
     let token: string | null = null;

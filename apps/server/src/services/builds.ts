@@ -65,7 +65,7 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { hasRepoBinding, readBuildChanges } from './git.js';
+import { githubRepoOfProject, hasRepoBinding, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
@@ -824,10 +824,10 @@ async function probePullState(
   timeoutMs?: number,
 ): Promise<{ state: 'open' | 'closed'; merged: boolean } | null> {
   const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
-  if (projRow?.repoKind !== 'github' || projRow.githubRepo === null) return null;
-  const slash = projRow.githubRepo.indexOf('/');
-  const owner = projRow.githubRepo.slice(0, slash);
-  const repo = projRow.githubRepo.slice(slash + 1);
+  // 非 github 形态或 githubRepo 不合法（#1466：`.` / `..` 段改写请求路径）→ 不探测。
+  const repoRef = githubRepoOfProject(projRow);
+  if (repoRef === null) return null;
+  const { owner, repo } = repoRef;
   // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
   // box 缺席按未连接处理（探测是辅助面，不把主请求 500 掉）。
   let token: string | null = null;
