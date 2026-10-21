@@ -40,6 +40,12 @@
 // 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；任一 GitHub
 // 读遇限流（429 / 带限流信号的 403）= 本队本轮停读、记一行带重置时刻（同一
 // token 再读只会再被拒）；上一轮没跑完时新触发直接返回（不重叠）。
+//
+// #1459：webhook 的 `pacman` 触发按同一 D5 判据核打标人（事件的 sender）、
+// 计入同一在飞上限。三样在模块级导出、两路共用：团队 token（teamGithubToken）、
+// 打标人权限读与缓存（hasRepoTriage，缓存是进程里唯一一份，轮询器开没开都在；
+// 限流照常抛 GithubRateLimitedError，不进缓存，webhook 自己接住）、在飞现数
+// （projectAtInFlightCap，含还在等 GitHub 读的导入）。
 
 import {
   githubIssueSourceRef,
@@ -62,6 +68,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
+import type { Db } from '../db/client.js';
 import { build, chiefThread, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
@@ -83,7 +90,7 @@ import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
-import { importGithubIssue } from './github-issues.js';
+import { importGithubIssue, importsInFlightFor } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
 
 /** 轮询节奏（spec 28 §4 P5a：5 分钟）。 */
@@ -104,7 +111,7 @@ export const ISSUE_INTAKE_MAX_LIST_PAGES = 3;
 export const ISSUE_INTAKE_MAX_EVENT_PAGES = 5;
 
 /** permission 答案缓存时长（按 团队 × 仓 × login）：3 轮内不重读；权限被收回
- * 最多晚这么久生效。 */
+ * 最多晚这么久生效（webhook 同此）。 */
 export const ISSUE_INTAKE_PERMISSION_TTL_MS = 15 * 60_000;
 
 /** 导入后编排至多试几次（连同导入那一次）：之后记一行放弃，卡留在 todo、
@@ -306,6 +313,77 @@ function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { r
   return { labeler: labeled.actor };
 }
 
+/** 团队的 GitHub 读权：连接 token 与密文 box；拿不到给原因（无 box / 无连接 /
+ * 密文解不开）。轮询器与 webhook 共用：拿不到就不读，零匿名读。 */
+export function teamGithubToken(
+  deps: { db: Db; box?: SecretBox | undefined },
+  teamId: string,
+):
+  | { token: string; box: SecretBox }
+  | { reason: 'no-secret-box' | 'no-github-connection' | 'token-unreadable' } {
+  const box = deps.box;
+  if (box === undefined) return { reason: 'no-secret-box' };
+  try {
+    const token = openGithubToken({ db: deps.db, box }, teamId);
+    return token === null ? { reason: 'no-github-connection' } : { token, box };
+  } catch {
+    return { reason: 'token-unreadable' };
+  }
+}
+
+/** 项目在飞已满：库里不在 done / closed 的 github-issue 卡，加上正在导入、还在
+ * 等 GitHub 读的（importGithubIssue 的占位），到了 ISSUE_INTAKE_IN_FLIGHT_CAP。
+ * 每次导入前现数：现数与 importGithubIssue 落占位之间不隔 await，同时到的几路
+ * 导入（webhook 批量投递、轮询器）合起来不超上限。 */
+export function projectAtInFlightCap(db: Db, projectId: string): boolean {
+  const inFlight =
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(todo)
+      .where(
+        and(
+          eq(todo.projectId, projectId),
+          eq(todo.sourceKind, 'github-issue'),
+          notInArray(todo.phase, NOT_IN_FLIGHT),
+        ),
+      )
+      .get()?.n ?? 0;
+  return inFlight + importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
+}
+
+/** permission 答案缓存（按 团队 × 仓 × login，小写）：模块级，进程里唯一一份，
+ * 轮询器与 webhook 共用（一路读到的答案另一路 TTL 内直接用）。读不到不进缓存
+ * （下次重读）；404 是明确的否定答案，照常缓存。过期项每次读时顺手清。 */
+const permissionCache = new Map<string, { at: number; permission: GithubRepoPermission }>();
+
+/** login 在仓库上是不是 triage 及以上（D5 打标人、关闭人、webhook sender 同一
+ * 判据）；null = 读不到。 */
+export async function hasRepoTriage(
+  githubFetch: FetchLike,
+  teamId: string,
+  token: string,
+  owner: string,
+  repo: string,
+  login: string,
+  now: number,
+): Promise<boolean | null> {
+  for (const [key, hit] of permissionCache) {
+    if (now - hit.at >= ISSUE_INTAKE_PERMISSION_TTL_MS) permissionCache.delete(key);
+  }
+  const key = `${teamId}\u0000${owner}/${repo}\u0000${login}`.toLowerCase();
+  let p: GithubRepoPermission | null = permissionCache.get(key)?.permission ?? null;
+  if (p === null) {
+    p = await githubCollaboratorPermission(githubFetch, token, owner, repo, login);
+    if (p === null) return null;
+    permissionCache.set(key, { at: now, permission: p });
+  }
+  return (
+    LABELER_BASE_PERMISSIONS.has(p.permission) ||
+    (p.roleName !== null && LABELER_ROLES.has(p.roleName)) ||
+    p.triage === true
+  );
+}
+
 export function createIssueIntake(
   deps: BuildDeps,
   run: { githubFetch: FetchLike; logger?: IssueIntakeLogger },
@@ -319,7 +397,6 @@ export function createIssueIntake(
   const stateCache: EtagCache<{ state: 'open' | 'closed' }> = new Map();
   // 关闭人核验的 events 缓存与打标人的分开：后者只留仍在 open 列表里的 issue。
   const closerEventsCache: EtagCache<GithubIssueEventsPage> = new Map();
-  const permissionCache = new Map<string, { at: number; permission: GithubRepoPermission }>();
   // 本进程见过 open 的 issue（团队 × sourceRef，小写）：关闭对账只认这些的
   // open → closed。进程内存，重启即空（重启后首见即 closed 的不关）。
   const seenOpen = new Set<string>();
@@ -358,34 +435,6 @@ export function createIssueIntake(
     );
   }
 
-  function teamToken(teamId: string): { token: string; box: SecretBox } | { reason: string } {
-    const box = deps.box;
-    if (box === undefined) return { reason: 'no-secret-box' };
-    try {
-      const token = openGithubToken({ db: deps.db, box }, teamId);
-      return token === null ? { reason: 'no-github-connection' } : { token, box };
-    } catch {
-      return { reason: 'token-unreadable' };
-    }
-  }
-
-  /** 项目在飞已满（每次导入前现数：sweep 期间 webhook 导入的卡同样占位）。 */
-  function projectFull(projectId: string): boolean {
-    const inFlight =
-      deps.db
-        .select({ n: sql<number>`count(*)` })
-        .from(todo)
-        .where(
-          and(
-            eq(todo.projectId, projectId),
-            eq(todo.sourceKind, 'github-issue'),
-            notInArray(todo.phase, NOT_IN_FLIGHT),
-          ),
-        )
-        .get()?.n ?? 0;
-    return inFlight >= ISSUE_INTAKE_IN_FLIGHT_CAP;
-  }
-
   /** 团队已占用的 issue 引用（小写；导入的与自建的都算）。 */
   function claimedRefs(teamId: string): Set<string> {
     return new Set(
@@ -395,33 +444,6 @@ export function createIssueIntake(
         .where(and(eq(todo.teamId, teamId), like(todo.sourceRef, 'github:%')))
         .all()
         .map((r) => (r.sourceRef ?? '').toLowerCase()),
-    );
-  }
-
-  /** login 在仓库上是不是 triage 及以上（打标人与关闭人同一判据）；null = 读
-   * 不到。答案按 团队 × 仓 × login 缓存 TTL。 */
-  async function hasTriage(
-    teamId: string,
-    token: string,
-    owner: string,
-    repo: string,
-    login: string,
-    now: number,
-  ): Promise<boolean | null> {
-    const key = `${teamId}\u0000${owner}/${repo}\u0000${login}`.toLowerCase();
-    const hit = permissionCache.get(key);
-    let p: GithubRepoPermission | null =
-      hit !== undefined && now - hit.at < ISSUE_INTAKE_PERMISSION_TTL_MS ? hit.permission : null;
-    if (p === null) {
-      p = await githubCollaboratorPermission(run.githubFetch, token, owner, repo, login);
-      // 读不到不进缓存（下轮重读）；404 是明确的否定答案，照常缓存。
-      if (p === null) return null;
-      permissionCache.set(key, { at: now, permission: p });
-    }
-    return (
-      LABELER_BASE_PERMISSIONS.has(p.permission) ||
-      (p.roleName !== null && LABELER_ROLES.has(p.roleName)) ||
-      p.triage === true
     );
   }
 
@@ -469,7 +491,15 @@ export function createIssueIntake(
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
     const found = newestLabeler(history);
     if ('reason' in found) return { notTaken: 'not-eligible', ...found };
-    const trusted = await hasTriage(teamId, token, owner, repo, found.labeler, now);
+    const trusted = await hasRepoTriage(
+      run.githubFetch,
+      teamId,
+      token,
+      owner,
+      repo,
+      found.labeler,
+      now,
+    );
     if (trusted === null) return { notTaken: 'unverifiable', reason: 'permission-unreadable' };
     return trusted ? found : { notTaken: 'not-eligible', reason: 'labeler-below-triage' };
   }
@@ -587,7 +617,7 @@ export function createIssueIntake(
       return 'not-taken';
     }
     // 读窗口里别处可能已占位（webhook 导入）：导入前再数一次。
-    if (projectFull(row.id)) {
+    if (projectAtInFlightCap(deps.db, row.id)) {
       tally.atCap += 1;
       return 'full';
     }
@@ -632,7 +662,7 @@ export function createIssueIntake(
     tally: IssueIntakeTally,
   ): Promise<void> {
     // 满员不读列表（省一次读；下一轮有位再读）。
-    if (projectFull(row.id)) return;
+    if (projectAtInFlightCap(deps.db, row.id)) return;
     const listKey = `${row.teamId}\u0000${owner}/${repo}`.toLowerCase();
     const claimed = claimedRefs(row.teamId);
     const listed = new Set<string>();
@@ -681,7 +711,7 @@ export function createIssueIntake(
           tally.claimed += 1;
           continue;
         }
-        if (!atCap) atCap = projectFull(row.id);
+        if (!atCap) atCap = projectAtInFlightCap(deps.db, row.id);
         if (atCap) {
           tally.atCap += 1;
           continue;
@@ -717,7 +747,15 @@ export function createIssueIntake(
     const closed = newestOf(history.events, (e) => e.event === 'closed');
     if (closed === null) return { reason: 'no-closed-event' };
     if (closed.actor === null) return { reason: 'closer-deleted' };
-    const trusted = await hasTriage(teamId, token, ref.owner, ref.repo, closed.actor, now);
+    const trusted = await hasRepoTriage(
+      run.githubFetch,
+      teamId,
+      token,
+      ref.owner,
+      ref.repo,
+      closed.actor,
+      now,
+    );
     if (trusted === null) return { reason: 'permission-unreadable' };
     return trusted ? 'trusted' : { reason: 'closer-below-triage' };
   }
@@ -812,7 +850,7 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
-    const got = teamToken(teamId);
+    const got = teamGithubToken(deps, teamId);
     if ('reason' in got) {
       tally.skipped += projects.length;
       log({ teamId, reason: got.reason }, 'issue intake team skipped');
@@ -878,9 +916,6 @@ export function createIssueIntake(
     sweeping = true;
     const tally = emptyTally();
     try {
-      for (const [key, hit] of permissionCache) {
-        if (now - hit.at >= ISSUE_INTAKE_PERMISSION_TTL_MS) permissionCache.delete(key);
-      }
       const projects = deps.db
         .select()
         .from(project)

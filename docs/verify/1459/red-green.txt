@@ -1,0 +1,71 @@
+#1459 red / green: apps/server/test/webhook.test.ts + apps/server/test/issue-intake.test.ts
+Command (worktree root): pnpm exec vitest run apps/server/test/webhook.test.ts apps/server/test/issue-intake.test.ts --reporter=verbose
+
+== Red: tests-only commit f8f56f4e on the 69722cc sources
+(git diff 69722cc f8f56f4e -- apps/server/src packages: empty; only the two test files changed)
+Test Files  1 failed | 1 passed (2)
+Tests  22 failed | 141 passed (163)
+exit 1
+Failed (22):
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 triage → 202 created（先读 permission 再导入）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 write → 202 created（先读 permission 再导入）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 maintain → 202 created（先读 permission 再导入）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 admin → 202 created（先读 permission 再导入）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 custom role built on triage → 202 created（先读 permission 再导入）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12a 载荷不带 sender → 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）
+  x test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+  x test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+  x test/webhook.test.ts > #1459 W 并发与重投 > W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入
+New #1459 tests already green on the old sources (regression guards, 3):
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W13 webhook 导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）
+  ok test/webhook.test.ts > #1459 W 计入在飞上限 > W6b done / closed 的卡与自建 issue 卡不计入 → 202 created
+  ok test/webhook.test.ts > #1459 W 并发与重投 > W7 webhook 与轮询器同时导入同一 issue → 一张卡（另一路 409）
+  W13: the webhook already imported with the seed user as creator.
+  W6b: done / closed / self-created tasks do not block (the old code had no cap at all).
+  W7: the #1406 in-process claim already kept one task per issue.
+Existing tests (19 in webhook.test.ts: A-F, the service-direct case, the #1406 race; all 119 issue-intake tests incl. group 20 with the
+payload now carrying sender octo/xiechimon) stay green on the old sources.
+
+== Green: implementation commit 3524b15a
+Test Files  2 passed (2)
+Tests  163 passed (163)
+exit 0
+#1459 tests passing: 25 of 25
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 triage → 202 created（先读 permission 再导入）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 write → 202 created（先读 permission 再导入）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 maintain → 202 created（先读 permission 再导入）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 admin → 202 created（先读 permission 再导入）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W3 打标人 custom role built on triage → 202 created（先读 permission 再导入）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（403）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（429）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（500）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（502）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（network error / timeout）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W4 permission 读失败（malformed 200 body）→ 202 ignored，不导入，记日志，不缓存
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12a 载荷不带 sender → 202 ignored，零出站，记日志
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W13 webhook 导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）
+  ok test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission
+  ok test/webhook.test.ts > #1459 W 计入在飞上限 > W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志
+  ok test/webhook.test.ts > #1459 W 计入在飞上限 > W6b done / closed 的卡与自建 issue 卡不计入 → 202 created
+  ok test/webhook.test.ts > #1459 W 计入在飞上限 > W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限
+  ok test/webhook.test.ts > #1459 W 并发与重投 > W7 webhook 与轮询器同时导入同一 issue → 一张卡（另一路 409）
+  ok test/webhook.test.ts > #1459 W 并发与重投 > W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入
