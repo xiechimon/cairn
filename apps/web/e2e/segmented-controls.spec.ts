@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { settleTransitions } from './helpers.js';
 
 // Issue #138 family law, re-pinned onto the one segmented control
 // (components/segmented.tsx; colours and heights across controls live in
@@ -24,8 +25,13 @@ const bg = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).backgroun
 const ink = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).color);
 
 /** Unselected option: no box at rest or under hover, ink steps to the
- *  selected option's ink. */
+ *  selected option's ink. The pointer moves off first: after `themed()`
+ *  reloads, it still rests where the previous leg hovered, so the option
+ *  would start :hover and read the hover ink as its rest ink (#1427). */
 async function expectInkStep(idle: Locator, selected: Locator) {
+  await idle.page().mouse.move(0, 0);
+  await expect.poll(() => idle.evaluate((el) => el.matches(':hover'))).toBe(false);
+  await settleTransitions(idle.page());
   const rest = await ink(idle);
   const target = await ink(selected);
   expect(rest).not.toBe(target);
