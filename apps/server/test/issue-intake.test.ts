@@ -36,6 +36,10 @@
 //    重试不再进行时记一行带原因。第二遍 review：线程要有 chief 步才算开始了
 //    （自己那次编排中途失败留下的空线程不算）；重试时读库抛错只跳过那张卡，
 //    同一轮照常领别的 issue。「交付过 PR」只看这张卡自己的 build。
+// 20 （第三轮补：对账范围）关闭对账只碰轮询器领的卡：轮询器导入时 createdBy
+//    记为本队 chief 绑定的 Agent id（chief 自建卡同一律），手工导入与 webhook
+//    导入仍是 seed 用户、不被对账关闭；认卡靠库里的 createdBy，重启后照样
+//    对账；chief 没绑 Agent 的队本轮不对账、每轮记一行。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -80,6 +84,8 @@ const OWNER = 'xiechimon';
 const REPO = 'xiechimon/pacman';
 const TOKEN = 'ghp_issue_intake_token';
 const LABEL = 'ready-for-agent';
+/** seedChief 建的、chief 绑定的 Agent（轮询器导入卡的 createdBy）。 */
+const CHIEF_AGENT_ID = 'agent-intake';
 
 // —— 夹具（真实只读抓取）————————————————————————————————————————————————
 
@@ -378,9 +384,9 @@ function seedChief(s: TestServer, mode: ChiefMode): void {
   s.db
     .insert(agentTable)
     .values({
-      id: 'agent-intake',
+      id: CHIEF_AGENT_ID,
       teamId: s.team.id,
-      displayName: 'agent-intake',
+      displayName: CHIEF_AGENT_ID,
       provider: 'stub-gw',
       modelId: mode === 'no-model' ? null : 'stub-model',
     })
@@ -391,7 +397,7 @@ function seedChief(s: TestServer, mode: ChiefMode): void {
       id: `chief-${s.user.id}-${s.team.id}`,
       userId: s.user.id,
       teamId: s.team.id,
-      agentId: mode === 'unbound' ? null : 'agent-intake',
+      agentId: mode === 'unbound' ? null : CHIEF_AGENT_ID,
       charter: '',
       watches: [],
       wakes: [],
@@ -401,13 +407,13 @@ function seedChief(s: TestServer, mode: ChiefMode): void {
 }
 
 function bindChief(s: TestServer): void {
-  const agentRow = s.db.select().from(agentTable).where(eq(agentTable.id, 'agent-intake')).get();
+  const agentRow = s.db.select().from(agentTable).where(eq(agentTable.id, CHIEF_AGENT_ID)).get();
   if (agentRow === undefined) {
     seedChief(s, 'bound');
     return;
   }
   s.db.update(agentTable).set({ modelId: 'stub-model' }).run();
-  s.db.update(chiefTable).set({ agentId: 'agent-intake' }).run();
+  s.db.update(chiefTable).set({ agentId: CHIEF_AGENT_ID }).run();
 }
 
 async function postGithubProject(s: TestServer, name: string, githubRepo: string): Promise<string> {
@@ -483,7 +489,9 @@ function todoOf(s: TestServer, n: number) {
 
 let seq = 500;
 
-/** 直插一张来源卡（已在飞 / 已领 / 自建 issue 等场景）。 */
+/** 直插一张来源卡（已在飞 / 已领 / 自建 issue 等场景）。createdBy 取轮询器
+ * 导入的形状（chief 绑定的 Agent），关闭对账的用例按「轮询器领的卡」跑；
+ * 手工导入与 webhook 导入走真路径（20 组）。 */
 function insertSourceTodo(
   w: World,
   n: number,
@@ -507,6 +515,7 @@ function insertSourceTodo(
       seqNum: seq,
       sourceKind,
       sourceRef,
+      createdBy: CHIEF_AGENT_ID,
     })
     .run();
   return id;
@@ -2089,5 +2098,97 @@ describe('18 既有判据的钉子', () => {
     );
     expect(carrying.map((m) => m.role)).toEqual(['user']);
     expect(composeChiefSystemPrompt(w.s.svc, w.s.team.id)).not.toContain('INTAKE-BODY-MARKER-1406');
+  });
+});
+
+describe('20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent）', () => {
+  /** 同一批带标签的 open issue：1406 经 webhook 导入、1407 手工导入，轮询器
+   * 随后领 1394（1406 / 1407 它也看得到，记 claimed）。 */
+  async function threeWays() {
+    const w = await makeWorld({ list: [1394, 1406, 1407] });
+    const tokenRes = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/webhook-tokens`, {
+      name: 'hook',
+    });
+    expect(tokenRes.status).toBe(201);
+    const token = ((await tokenRes.json()) as { plaintext: string }).plaintext;
+    const hook = await w.s.app.request(`/api/webhook/github/${token}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-github-event': 'issues',
+        'x-github-delivery': `intake-r3b-${w.s.team.id}`,
+      },
+      body: JSON.stringify({
+        action: 'labeled',
+        issue: { number: 1406, title: 'webhook' },
+        label: { name: 'pacman' },
+        repository: { full_name: REPO },
+      }),
+    });
+    expect(hook.status).toBe(202);
+    const hand = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/github/issues/import`, {
+      number: 1407,
+    });
+    expect(hand.status).toBe(201);
+    const tally = await w.intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([1394, 1406, 1407]);
+    return w;
+  }
+
+  test('createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户', async () => {
+    const w = await threeWays();
+    const polled = todoOf(w.s, 1394);
+    expect(polled?.createdBy).toBe(CHIEF_AGENT_ID);
+    const shown = await req(w.s.app, 'GET', `/api/todos/${polled?.id}`);
+    expect(((await shown.json()) as { createdBy: string | null }).createdBy).toBe(CHIEF_AGENT_ID);
+    expect(todoOf(w.s, 1406)?.createdBy).toBe(w.s.user.id);
+    expect(todoOf(w.s, 1407)?.createdBy).toBe(w.s.user.id);
+  });
+
+  test('三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态', async () => {
+    const w = await threeWays();
+    for (const n of [1394, 1406, 1407]) closeOnGithub(w, n, OWNER);
+    const reads1406 = w.gh.issueReads(1406).length;
+    const reads1407 = w.gh.issueReads(1407).length;
+    const tally = await w.intake.sweep();
+    expect(todoOf(w.s, 1394)?.phase).toBe('closed');
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+    expect(todoOf(w.s, 1407)?.phase).toBe('todo');
+    expect(tally?.closed).toBe(1);
+    expect(w.gh.issueReads(1406)).toHaveLength(reads1406);
+    expect(w.gh.issueReads(1407)).toHaveLength(reads1407);
+  });
+
+  test('轮询器在重启前领的卡，重启后照样对账（认卡靠库里的 createdBy，不靠进程内存）', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    const restarted = createIssueIntake(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.gh.impl },
+    );
+    // 重启后先读到 open（见过 open），再被仓主关闭。
+    await restarted.sweep();
+    closeOnGithub(w, 1406, OWNER);
+    const tally = await restarted.sweep();
+    expect(tally?.closed).toBe(1);
+    expect(todoOf(w.s, 1406)?.phase).toBe('closed');
+  });
+
+  test('chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    w.s.db.update(chiefTable).set({ agentId: null }).run();
+    closeOnGithub(w, 1406, OWNER);
+    const reads = w.gh.issueReads(1406).length;
+    await w.intake.sweep();
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+    expect(w.gh.issueReads(1406)).toHaveLength(reads);
+    const skipped = w.logs.filter((l) => l.msg === 'issue intake close reconcile skipped');
+    expect(skipped.map((l) => l.obj)).toEqual([
+      { teamId: w.s.team.id, reason: 'chief-not-bound' },
+      { teamId: w.s.team.id, reason: 'chief-not-bound' },
+    ]);
   });
 });
