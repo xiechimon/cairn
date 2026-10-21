@@ -1896,7 +1896,8 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   stopUnclaimedGateSteps(deps, buildId);
   setTodoPhase(deps, todoId, 'done');
   // 完成行每次收尾都落：对账在本轮已有完成行时不收尾（ci-loop 的本轮已报告
-  // 判据），同一轮里第二个合并步再落一行。
+  // 判据）；人把卡拖回 review 后同一轮里第二个合并步完成，再落一行（卡还是 done
+  // 时合并步的回报只记步，走不到这里）。
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',
