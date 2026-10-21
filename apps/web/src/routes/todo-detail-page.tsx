@@ -851,6 +851,7 @@ export function TodoDetailPage() {
       >
         <DetailHead
           todo={todo}
+          projectName={projectsQ.data?.find((p) => p.id === todo.projectId)?.name}
           agentModel={chipAgentModel}
           phase={live ? phase : (view.phaseOverride ?? todo.phase)}
           onMore={() => setMoreOpen(true)}
