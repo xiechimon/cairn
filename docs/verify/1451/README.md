@@ -10,7 +10,9 @@ A move from an in-progress phase (queued / planning / building) to done now stop
 A pending / waiting_quota step stops at once. A claimed step gets the delegated stop with the `keep` reservation, so the stop report leaves the card done. Two code-review follow-ups:
 
 - If a restart drops the `keep` reservation, `applyStoppedStep` still leaves a card that was closed, marked done or moved back to todo where it is. Before, only closed was guarded, and a done card fell back to its gate (confirm / review).
-- `sweepAbandonedBuildSteps` treats done like closed: it stops leftover pending / waiting_quota steps of done tasks, and stops instead of releasing an abandoned claimed step of a done task. A stop sent to an offline machine therefore cannot turn into a release back to pending. The web does not send either write for an in-progress card (the board's in-flight done gate uses `POST /api/todos/:id/stop-and-done`, and the detail page's 完成 is disabled), so no web file changes.
+- `sweepAbandonedBuildSteps` treats done like closed: it stops leftover pending / waiting_quota steps of done tasks, and stops instead of releasing an abandoned claimed step of a done task. A stop sent to an offline machine therefore cannot turn into a release back to pending.
+
+The web does not send either write for an in-progress card (the board's in-flight done gate uses `POST /api/todos/:id/stop-and-done`, and the detail page's 完成 is disabled), so no web file changes.
 
 ## Server tests
 
