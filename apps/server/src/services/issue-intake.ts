@@ -5,21 +5,21 @@
 // 每轮按团队走：
 // 1. token：团队连接 token（无连接 / 密文坏 / box 缺席 = 整队跳过，零匿名读——
 //    匿名 60/h 的 IP 预算归 ci-loop 与 #931，importGithubIssue 本就要 token）。
-// 2. 关闭对账：本队 github-issue 卡（相位不在 done / closed / review，且最新
-//    build 没交付 PR）逐张条件读 issue state。只认本进程亲眼看到的 open →
+// 2. 关闭对账：本队 github-issue 卡（相位不在 done / closed / review，且没有
+//    哪个 build 交付过 PR）逐张条件读 issue state。只认本进程亲眼看到的 open →
 //    closed：导入时、或某次读到 open，记为「见过 open」；之后读到 closed，且
 //    最新一条 closed 事件的 actor 在仓库上是 triage 及以上（与打标人同一判据、
 //    同一缓存），才 transitionTodos(closed)——chief / MCP close_todos 的关闭
 //    路径（#1445：写相位后停活动步）。首见即 closed 的卡（例：从已关闭 issue
 //    手工导入、或重启后）永不被对账关闭；关过一次即忘掉「见过 open」，有人把
 //    卡重开就不再关。外部作者关自己的 issue、任一读失败 = 本轮不关。review 卡
-//    与最新 build 已交付 PR 的卡（building 磨绿中 / failed）留给 PR 对账：合并
-//    带关闭引用关掉 issue 时，那张卡不以 closed 收尾。写前重读相位与 PR，变了
-//    就不动。
+//    与 build 交付过 PR 的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：
+//    合并带关闭引用关掉 issue 时，那张卡不以 closed 收尾。写前重读相位与 PR，
+//    变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
-//    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或已有编排线程
-//    = 有人接手，不再试）。
+//    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已有编排
+//    线程 = 有人接手，不再试）。
 // 4. 每个 github 项目（githubRepo 形好；同队同仓只取 id 最小的一个）：在飞
 //    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表；按 Link
 //    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
@@ -42,7 +42,7 @@ import {
   parseGithubIssueSourceRef,
   type SecretBox,
 } from '@pacman/shared';
-import { and, asc, eq, isNotNull, isNull, like, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, isNotNull, like, notExists, notInArray, or, sql } from 'drizzle-orm';
 import { build, chiefThread, project, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
@@ -101,8 +101,7 @@ const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin']);
 const NOT_IN_FLIGHT: Phase[] = ['done', 'closed'];
 
 /** 关闭对账不碰的相位：done / closed 已终态；review 归 #1414 的 PR 对账。
- * 相位之外还有一条：最新 build 已交付 PR（prNumber 在）的卡也不碰——合并
- * 带关闭引用会关掉 issue，那张卡由 PR 对账收尾，不该以 closed 收尾。 */
+ * 相位之外还有一条：任一 build 交付过 PR 的卡也不碰（见 noDeliveredPr）。 */
 const CLOSE_RECONCILE_SKIPPED: Phase[] = ['done', 'closed', 'review'];
 
 /** 关闭对账的流转主体（agent 档：不能自过 confirm / review 闸，关闭不受影响）。 */
@@ -152,10 +151,22 @@ export interface IssueIntake {
 
 type ProjectRow = typeof project.$inferSelect;
 
-/** D5 判定：可领时带打标人与经手的 app（领取日志用）。 */
-type Verdict =
-  | { labeler: string; viaApp: string | null }
-  | { notTaken: 'not-eligible' | 'unverifiable'; reason: string };
+/** 该标签最新一条 labeled 的打标人与经手的 app（app 只供领取日志审计）。 */
+interface Labeler {
+  labeler: string;
+  viaApp: string | null;
+}
+
+/** D5 判定：可领时即打标人。 */
+type Verdict = Labeler | { notTaken: 'not-eligible' | 'unverifiable'; reason: string };
+
+/** 导入后编排的一次尝试：团队、导入时刻（认「导入之后建的编排线程」）、
+ * 连同这次已试的次数。 */
+interface OrchestrateAttempt {
+  teamId: string;
+  importedAt: number;
+  attempts: number;
+}
 
 function emptyTally(): IssueIntakeTally {
   return {
@@ -224,9 +235,7 @@ function newestOf(
 /** D5 第一半：该标签最新一条 labeled 的 actor（之后有 unlabeled / 读不全 /
  * 没有 labeled / 账号已删 → 不领的理由）。顺序按 created_at，同刻按 id，不信
  * 数组位置。 */
-function newestLabeler(
-  data: IssueHistory,
-): { login: string; viaApp: string | null } | { reason: string } {
+function newestLabeler(data: IssueHistory): Labeler | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
   const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>
     e.event === kind && e.label?.toLowerCase() === ISSUE_INTAKE_LABEL;
@@ -235,7 +244,7 @@ function newestLabeler(
   if (labeled === null) return { reason: 'no-labeled-event' };
   if (unlabeled !== null && later(unlabeled, labeled)) return { reason: 'label-removed' };
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
-  return { login: labeled.actor, viaApp: labeled.viaApp };
+  return { labeler: labeled.actor, viaApp: labeled.viaApp };
 }
 
 export function createIssueIntake(
@@ -255,11 +264,26 @@ export function createIssueIntake(
   // 本进程见过 open 的 issue（团队 × sourceRef，小写）：关闭对账只认这些的
   // open → closed。进程内存，重启即空（重启后首见即 closed 的不关）。
   const seenOpen = new Set<string>();
-  // 导入后编排失败、待重试的卡（todo id → 团队与已试次数）。进程内存：重启
-  // 即忘（重启后分不出哪张 todo 卡是本轮询器领的，不碰）。
-  const orchestrateRetries = new Map<string, { teamId: string; attempts: number }>();
+  // 导入后编排失败、待重试的卡（todo id → 上一次尝试）。进程内存：重启即忘
+  // （重启后分不出哪张 todo 卡是本轮询器领的，不碰）。
+  const orchestrateRetries = new Map<string, OrchestrateAttempt>();
   let sweeping = false;
   const refKey = (teamId: string, sourceRef: string) => `${teamId}\u0000${sourceRef}`.toLowerCase();
+
+  /** 卡没有任何 build 交付过 PR（prNumber 或 prUrl 在，builds.ts latestPrBuild
+   * 同一判据；只看最新 build 不够：失败卡重跑出的新 build 还没 PR 时，旧 PR
+   * 仍开着、仍可能被合并）。交付过的卡，合并带关闭引用关掉 issue 时由 PR
+   * 对账收尾，关闭对账不碰。用在以 todo 为主表的查询里（相关子查询）。 */
+  function noDeliveredPr() {
+    return notExists(
+      deps.db
+        .select({ id: build.id })
+        .from(build)
+        .where(
+          and(eq(build.todoId, todo.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl))),
+        ),
+    );
+  }
 
   function teamToken(teamId: string): { token: string; box: SecretBox } | { reason: string } {
     const box = deps.box;
@@ -370,20 +394,17 @@ export function createIssueIntake(
     const key = `${teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
-    const labeler = newestLabeler(history);
-    if ('reason' in labeler) return { notTaken: 'not-eligible', reason: labeler.reason };
-    const trusted = await hasTriage(teamId, token, owner, repo, labeler.login, now);
+    const found = newestLabeler(history);
+    if ('reason' in found) return { notTaken: 'not-eligible', reason: found.reason };
+    const trusted = await hasTriage(teamId, token, owner, repo, found.labeler, now);
     if (trusted === null) return { notTaken: 'unverifiable', reason: 'permission-unreadable' };
-    return trusted
-      ? { labeler: labeler.login, viaApp: labeler.viaApp }
-      : { notTaken: 'not-eligible', reason: 'labeler-below-triage' };
+    return trusted ? found : { notTaken: 'not-eligible', reason: 'labeler-below-triage' };
   }
 
   /** 编排一张导入的卡；失败记次，没到上限留给后面几轮重试。 */
   function orchestrateImported(
-    teamId: string,
     todoId: string,
-    attempts: number,
+    entry: OrchestrateAttempt,
     tally: IssueIntakeTally,
   ): void {
     try {
@@ -392,31 +413,39 @@ export function createIssueIntake(
       tally.orchestrated += 1;
     } catch (err) {
       tally.errors += 1;
-      log({ todoId, attempts, err: errText(err) }, 'issue intake orchestrate failed');
-      if (attempts < ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS) {
-        orchestrateRetries.set(todoId, { teamId, attempts });
+      log(
+        { todoId, attempts: entry.attempts, err: errText(err) },
+        'issue intake orchestrate failed',
+      );
+      if (entry.attempts < ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS) {
+        orchestrateRetries.set(todoId, entry);
       } else {
         orchestrateRetries.delete(todoId);
-        log({ todoId, attempts }, 'issue intake orchestrate given up');
+        log({ todoId, attempts: entry.attempts }, 'issue intake orchestrate given up');
       }
     }
   }
 
-  /** 卡已有编排线程（有人手动开始了）：按 orchestrateThreadTitle 认线程，
-   * web 的「在飞编排回合」判定同一判据。 */
-  function hasOrchestrateThread(teamId: string, seqNum: number): boolean {
+  /** 卡导入之后建了编排线程（有人手动开始了）：按 orchestrateThreadTitle 认
+   * 线程（web 的「在飞编排回合」判定同一标题）。只认导入之后建的——seqNum 是
+   * 团队内 max+1，删掉最大号的卡后下一张复用它的号，旧线程不算。 */
+  function startedSince(teamId: string, seqNum: number, importedAt: number): boolean {
     const thread = deps.db
       .select({ id: chiefThread.id })
       .from(chiefThread)
       .where(
-        and(eq(chiefThread.teamId, teamId), eq(chiefThread.title, orchestrateThreadTitle(seqNum))),
+        and(
+          eq(chiefThread.teamId, teamId),
+          eq(chiefThread.title, orchestrateThreadTitle(seqNum)),
+          gte(chiefThread.createdAt, importedAt),
+        ),
       )
       .get();
     return thread !== undefined;
   }
 
-  /** 重试本队导入后编排失败的卡。卡没了、离开了 todo、或已有编排线程 = 有人
-   * 接手，不再试。 */
+  /** 重试本队导入后编排失败的卡。卡没了、离开了 todo、或导入后已有编排线程
+   * = 有人接手，不再试（记一行带原因）。 */
   function retryOrchestration(teamId: string, tally: IssueIntakeTally): void {
     for (const [todoId, entry] of orchestrateRetries) {
       if (entry.teamId !== teamId) continue;
@@ -425,11 +454,20 @@ export function createIssueIntake(
         .from(todo)
         .where(eq(todo.id, todoId))
         .get();
-      if (row === undefined || row.phase !== 'todo' || hasOrchestrateThread(teamId, row.seqNum)) {
+      const dropped =
+        row === undefined
+          ? 'todo-gone'
+          : row.phase !== 'todo'
+            ? 'left-todo'
+            : startedSince(teamId, row.seqNum, entry.importedAt)
+              ? 'thread-exists'
+              : null;
+      if (dropped !== null) {
         orchestrateRetries.delete(todoId);
+        log({ todoId, reason: dropped }, 'issue intake orchestrate retry dropped');
         continue;
       }
-      orchestrateImported(teamId, todoId, entry.attempts + 1, tally);
+      orchestrateImported(todoId, { ...entry, attempts: entry.attempts + 1 }, tally);
     }
   }
 
@@ -479,8 +517,9 @@ export function createIssueIntake(
       return 'not-taken';
     }
     tally.imported += 1;
-    // 打标人与经手的 app（经 GitHub App 打的标 actor 仍是授权的人）：只供
-    // 审计，D5 不看 app。
+    // 打标人与经手的 app：只供审计，D5 不看 app（用户授权的 app 令牌打的标，
+    // actor 是授权的人；app 安装令牌打的标，actor 是 <slug>[bot]，照常按它
+    // 在仓库上的权限判）。
     log(
       {
         projectId: row.id,
@@ -493,7 +532,7 @@ export function createIssueIntake(
     );
     // 列表只给 open 的 issue：导入即「见过 open」（关闭对账的起点）。
     seenOpen.add(refKey(row.teamId, githubIssueSourceRef(owner, repo, issueNumber)));
-    orchestrateImported(row.teamId, todoId, 1, tally);
+    orchestrateImported(todoId, { teamId: row.teamId, importedAt: nowMs(), attempts: 1 }, tally);
     return 'imported';
   }
 
@@ -644,12 +683,11 @@ export function createIssueIntake(
         // 写前重读相位与 PR：读窗口里被人推进（如进 review）/ 关闭 / 完成，或
         // build 交付了 PR（留给 PR 对账）→ 不动。
         const fresh = deps.db
-          .select({ phase: todo.phase, prNumber: build.prNumber })
+          .select({ phase: todo.phase })
           .from(todo)
-          .leftJoin(build, eq(build.id, todo.latestBuildId))
-          .where(eq(todo.id, t.id))
+          .where(and(eq(todo.id, t.id), noDeliveredPr()))
           .get();
-        if (fresh === undefined || fresh.phase !== t.phase || fresh.prNumber !== null) {
+        if (fresh === undefined || fresh.phase !== t.phase) {
           tally.closeSkipped += 1;
           continue;
         }
@@ -751,13 +789,12 @@ export function createIssueIntake(
       const toReconcile = deps.db
         .select({ id: todo.id, teamId: todo.teamId, phase: todo.phase, sourceRef: todo.sourceRef })
         .from(todo)
-        .leftJoin(build, eq(build.id, todo.latestBuildId))
         .where(
           and(
             eq(todo.sourceKind, 'github-issue'),
             isNotNull(todo.sourceRef),
             notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),
-            isNull(build.prNumber),
+            noDeliveredPr(),
           ),
         )
         .all();

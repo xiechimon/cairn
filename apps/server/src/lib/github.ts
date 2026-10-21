@@ -539,8 +539,9 @@ export interface GithubIssueEvent {
   label: string | null;
   /** actor.login；账号已删（actor 为 null）→ null。 */
   actor: string | null;
-  /** performed_via_github_app.slug：经 GitHub App 操作（actor 仍是授权的
-   * 人）→ app 的 slug；不经 app、或缺 slug → null。只供审计，不进判据。 */
+  /** performed_via_github_app.slug：经 GitHub App 操作 → app 的 slug（用户
+   * 授权的 app 令牌下 actor 是授权的人；app 安装令牌下 actor 是
+   * `<slug>[bot]`）；不经 app、或缺 slug → null。只供审计，不进判据。 */
   viaApp: string | null;
   /** created_at 的毫秒值。 */
   at: number;
