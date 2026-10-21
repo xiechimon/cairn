@@ -19,6 +19,18 @@
 // 13 sweep 不重叠；列表 304 复用缓存；permission 按 login 缓存。
 // 14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓 → 跳过或团队级去重。
 //
+// 第三轮（pr-gate run 2 的建议，测试先于修复）：
+// 15 building / failed 卡的最新 build 已交付 PR，合并带关闭引用把 issue 关了
+//    → 不关卡，留给 PR 对账；读期间才交付的，写前重读同样跳过。
+// 16 导入后 orchestrateTodo 抛错 → 卡停在 todo、占着上限位：后续几轮重试
+//    编排，次数有上限，到上限记一行放弃；有人已手动开始（已有编排线程）不再
+//    重试。
+// 17 经 app 打的标：events 投影保留 performed_via_github_app 的 slug，领取
+//    日志带上打标人与 app，D5 判据不变。
+// 18 钉住既有判据：只看最新一条 closed 事件；unlabeled 只认本标签；同刻按
+//    id；人关卡后「见过 open」被剪掉；正文只进 chief 线程的 user 消息、不进
+//    chief 的 system prompt。
+//
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
 // permission 端点被本容器的出站代理拦下（403 非 GitHub 应答），其夹具取自
@@ -34,6 +46,7 @@ import { loadConfig } from '../src/config.js';
 import {
   agent as agentTable,
   build as buildTable,
+  chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
   githubConnection as githubConnectionTable,
@@ -41,7 +54,8 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import type { FetchLike } from '../src/lib/github.js';
+import { type FetchLike, githubIssueEvents } from '../src/lib/github.js';
+import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
 import {
@@ -1630,5 +1644,291 @@ describe('opt-in 接线：index.ts 经 issueIntakeRunOf 取进料运行位', () 
     const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
     const args = call.split('\n').filter((l) => l.trim() !== '');
     expect(args.at(-1)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
+  });
+});
+
+// —— 第三轮：15–18 ————————————————————————————————————————————————————————
+
+const ISSUE_1445_OPEN = {
+  ...ISSUE_1445_CLOSED,
+  state: 'open',
+  closed_at: null,
+  state_reason: null,
+};
+
+/** 卡的最新 build 交付了 GitHub PR（daemon github 形态步收尾回填 prNumber）。 */
+function deliverPr(w: World, todoId: string, prNumber: number): void {
+  seq += 1;
+  const buildId = `build-intake-pr-${seq}`;
+  w.s.db
+    .insert(buildTable)
+    .values({
+      id: buildId,
+      todoId,
+      withPlan: false,
+      triggerSource: 'user',
+      prNumber,
+      prUrl: `https://github.com/${REPO}/pull/${prNumber}`,
+      createdAt: Date.now(),
+    })
+    .run();
+  w.s.db.update(todoTable).set({ latestBuildId: buildId }).where(eq(todoTable.id, todoId)).run();
+}
+
+describe('15 已交付 PR 的卡留给 PR 对账', () => {
+  test.each(['building', 'failed'] as const)(
+    '轮询器领的卡在 %s、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态',
+    async (phase) => {
+      const w = await makeWorld({ list: [1406] });
+      await w.intake.sweep();
+      const row = todoOf(w.s, 1406);
+      if (row === undefined) throw new Error('1406 not imported');
+      setPhase(w, row.id, phase);
+      deliverPr(w, row.id, 1500);
+      // 合并 PR（squash 带关闭引用）由仓主操作：issue 的 closed 事件 actor = 仓主。
+      closeOnGithub(w, 1406, OWNER);
+      const stateReads = w.gh.issueReads(1406).length;
+      const tally = await w.intake.sweep();
+      expect(phaseOf(w, row.id)).toBe(phase);
+      expect(tally?.closed).toBe(0);
+      expect(w.gh.issueReads(1406)).toHaveLength(stateReads);
+    },
+  );
+
+  test('读期间 build 交付了 PR → 写前重读，跳过', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, ISSUE_1445_OPEN);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    w.gh.setOnCall((path) => {
+      if (path === `/repos/${REPO}/issues/1445/events`) {
+        w.gh.setOnCall(null);
+        deliverPr(w, todoId, 1501);
+      }
+    });
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('building');
+    expect(tally?.closed).toBe(0);
+    expect(tally?.closeSkipped).toBe(1);
+  });
+});
+
+describe('16 导入后编排失败：后续几轮重试，有上限', () => {
+  /** 轮询器的 db 在写 chief 线程处可开关地失败（例：SQLITE_BUSY），其余照常。 */
+  function flakyIntake(w: World) {
+    const flaky = { failing: true };
+    const db = new Proxy(w.s.db, {
+      get(target, prop, receiver) {
+        if (prop === 'insert') {
+          return (table: Parameters<typeof target.insert>[0]) => {
+            if (flaky.failing && table === chiefThreadTable) {
+              throw new Error('SQLITE_BUSY: database is locked');
+            }
+            return target.insert(table);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const logs: LogLine[] = [];
+    const intake = createIssueIntake(
+      { ...w.s.svc, db, box: w.s.secretBox },
+      {
+        githubFetch: w.gh.impl,
+        logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
+      },
+    );
+    return { intake, logs, flaky };
+  }
+
+  test('第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, flaky } = flakyIntake(w);
+    const first = await intake.sweep();
+    expect(first?.imported).toBe(1);
+    expect(first?.orchestrated).toBe(0);
+    expect(first?.errors).toBe(1);
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    flaky.failing = false;
+    const second = await intake.sweep();
+    expect(second?.orchestrated).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+    const third = await intake.sweep();
+    expect(third?.orchestrated).toBe(0);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+    expect(issueTodos(w.s)).toHaveLength(1);
+  });
+
+  test('一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, logs, flaky } = flakyIntake(w);
+    for (let i = 0; i < 5; i++) await intake.sweep();
+    expect(logs.filter((l) => l.msg === 'issue intake orchestrate failed')).toHaveLength(3);
+    expect(logs.filter((l) => l.msg === 'issue intake orchestrate given up')).toHaveLength(1);
+    // 放弃后即便恢复也不再自动编排：卡留在 todo 等人。
+    flaky.failing = false;
+    await intake.sweep();
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(todoOf(w.s, 1406)?.phase).toBe('todo');
+  });
+
+  test('重试前有人已手动开始（已有编排线程）→ 不再重试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, flaky } = flakyIntake(w);
+    await intake.sweep();
+    flaky.failing = false;
+    const row = todoOf(w.s, 1406);
+    if (row === undefined) throw new Error('1406 not imported');
+    const res = await req(w.s.app, 'POST', `/api/todos/${row.id}/orchestrate`);
+    expect(res.status).toBe(201);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+    const second = await intake.sweep();
+    expect(second?.orchestrated).toBe(0);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+  });
+});
+
+describe('17 经 app 打的标：投影保留 slug，领取日志带上', () => {
+  test('githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null', async () => {
+    const gh = githubFake(REPO);
+    gh.state.events.set(1450, EVENTS_1450);
+    gh.state.events.set(1451, [
+      { ...LABELED_TEMPLATE, id: 1, performed_via_github_app: { id: 5 } },
+    ]);
+    const read1406 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1406);
+    expect(read1406).toMatchObject({
+      notModified: false,
+      data: {
+        events: [
+          {
+            id: 33782158621,
+            event: 'labeled',
+            label: 'enhancement',
+            actor: OWNER,
+            viaApp: 'claude',
+          },
+          { id: 33782159000, event: 'labeled', label: LABEL, actor: OWNER, viaApp: 'claude' },
+        ],
+      },
+    });
+    const read1450 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1450);
+    expect(read1450).toMatchObject({
+      notModified: false,
+      data: {
+        events: [
+          { event: 'labeled', label: 'needs-decision', viaApp: 'claude' },
+          { event: 'unlabeled', label: 'needs-decision', viaApp: 'claude' },
+          { event: 'closed', label: null, actor: OWNER, viaApp: null },
+        ],
+      },
+    });
+    const read1451 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1451);
+    expect(read1451).toMatchObject({ data: { events: [{ id: 1, viaApp: null }] } });
+  });
+
+  test('领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧', async () => {
+    const w = await makeWorld({ list: [1406, 1407] });
+    w.gh.state.events.set(1407, [
+      {
+        ...labelEvent('labeled', OWNER, '2026-10-20T20:30:00Z', 300),
+        performed_via_github_app: null,
+      },
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406, 1407]);
+    const taken = w.logs.filter((l) => l.msg === 'issue intake candidate taken');
+    expect(taken.map((l) => l.obj)).toEqual([
+      expect.objectContaining({
+        issue: 1406,
+        todoId: todoOf(w.s, 1406)?.id,
+        labeler: OWNER,
+        viaApp: 'claude',
+      }),
+      expect.objectContaining({
+        issue: 1407,
+        todoId: todoOf(w.s, 1407)?.id,
+        labeler: OWNER,
+        viaApp: null,
+      }),
+    ]);
+  });
+});
+
+describe('18 既有判据的钉子', () => {
+  test('关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, ISSUE_1445_OPEN);
+    w.gh.state.events.set(1445, [
+      ...EVENTS_1406,
+      closedEvent(OWNER, '2026-10-21T07:00:00Z', 60_001),
+    ]);
+    w.gh.state.permissions.set('outsider', { body: permissionBody('outsider', 'read', 'read') });
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, 'outsider');
+    const tally = await w.intake.sweep();
+    expect(tally?.closeSkipped).toBe(1);
+    expect(tally?.closed).toBe(0);
+    expect(phaseOf(w, todoId)).toBe('building');
+  });
+
+  test('打上 ready-for-agent 之后摘的是别的标签（needs-decision）→ 照领', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.events.set(1406, [
+      labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 100),
+      labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 101, 'needs-decision'),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+  });
+
+  test('同一秒的 labeled 与 unlabeled 按 id 定先后：unlabeled 的 id 大 → 不领；labeled 的 id 大 → 领', async () => {
+    const w = await makeWorld({ list: [1406, 1407] });
+    w.gh.state.events.set(1406, [
+      labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 201),
+      labelEvent('labeled', OWNER, '2026-10-20T20:30:00Z', 200),
+    ]);
+    w.gh.state.events.set(1407, [
+      labelEvent('labeled', OWNER, '2026-10-20T20:30:00Z', 301),
+      labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 300),
+    ]);
+    const tally = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1407]);
+    expect(tally?.notEligible).toBe(1);
+  });
+
+  test('人在 issue 仍 open 时关了卡、仓主随后关 issue、人再重开卡 → 不再关', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, ISSUE_1445_OPEN);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    setPhase(w, todoId, 'closed');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    setPhase(w, todoId, 'todo');
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('todo');
+    expect(tally?.closed).toBe(0);
+  });
+
+  test('失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const issue = w.gh.state.open.find((i) => i.number === 1406) as RawIssue;
+    w.gh.state.issues.set(1406, { ...issue, body: BODY_WITH_INSTRUCTIONS });
+    await w.intake.sweep();
+    const threads = chiefThreads(w.s);
+    expect(threads).toHaveLength(1);
+    const messages = w.s.db
+      .select()
+      .from(chiefMessageTable)
+      .where(eq(chiefMessageTable.threadId, threads[0]?.id ?? ''))
+      .all();
+    const carrying = messages.filter((m) =>
+      JSON.stringify(m.content).includes('INTAKE-BODY-MARKER-1406'),
+    );
+    expect(carrying.map((m) => m.role)).toEqual(['user']);
+    expect(composeChiefSystemPrompt(w.s.svc, w.s.team.id)).not.toContain('INTAKE-BODY-MARKER-1406');
   });
 });
