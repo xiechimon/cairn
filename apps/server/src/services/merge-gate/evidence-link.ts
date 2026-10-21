@@ -3,8 +3,9 @@
 // 名会动，短 SHA 与大写写法不是 vp.mjs links 产出的形态，别的仓、别的票不算
 // 本票证据。HTML 注释里的链接不渲染，也不算（与 scripts/pr-evidence-gate.py
 // 同一约定）；没闭合的 `<!--` 让 GitHub 吞掉后文，后文也不算。链接后紧跟的
-// 句读与反引号不算进路径。SHA 是否是 head 的祖先由调用方另查（compare），
-// 这里只解析。
+// 句读与反引号不算进路径，查询串与片段（`?raw=true`、`#L3`）也不算：去掉后
+// 路径合格照样认，同一文件只记一次。SHA 是否是 head 的祖先由调用方另查
+// （compare），这里只解析。
 
 import { EVIDENCE_PREFIX } from '@pacman/shared';
 
@@ -17,6 +18,7 @@ export interface RawEvidenceLink {
 const RAW_URL_RE = /https:\/\/raw\.githubusercontent\.com\/[^\s)"'<>\]`]+/g;
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 const TRAILING_PUNCT_RE = /[.,;:!?*_~]+$/;
+const QUERY_OR_FRAGMENT_RE = /[?#].*$/;
 
 export function parseRawEvidenceLinks(
   body: string,
@@ -32,9 +34,10 @@ export function parseRawEvidenceLinks(
   const open = visible.indexOf('<!--');
   const text = open === -1 ? visible : visible.slice(0, open);
   for (const url of (text.match(RAW_URL_RE) ?? []).map((u) => u.replace(TRAILING_PUNCT_RE, ''))) {
-    if (seen.has(url)) continue;
-    seen.add(url);
-    const parts = url.slice('https://raw.githubusercontent.com/'.length).split('/');
+    const bare = url.replace(QUERY_OR_FRAGMENT_RE, '');
+    if (seen.has(bare)) continue;
+    seen.add(bare);
+    const parts = bare.slice('https://raw.githubusercontent.com/'.length).split('/');
     const [owner = '', repo = '', sha = '', ...rest] = parts;
     let path: string;
     try {

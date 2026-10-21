@@ -4,6 +4,9 @@
 // .claude/workflows/pr-gate.js 用同一种 glob 写法，两边判同一份清单。名字里
 // 有白名单外的字符（换行、空格之类）时不判类、一律算保护：glob 的 `.` 跨不过
 // 换行，而 `*` 能，判类会落空；pr-gate 对这类名字同样拒绝自动判定。
+// 证据目录之外的二进制文件留人（D4）：没有行数，也没有可读的 diff。compare
+// 对二进制不给 patch，纯改名也不给，两者分不出来，没有 patch 的一律算（严的
+// 一侧；pr-gate 用 --no-renames 看 numstat 的 `- -` 行，纯文本改名不算）。
 // 纯函数，无 I/O。
 
 import {
@@ -59,6 +62,10 @@ export interface PathFindings {
   otherTicketEvidence: string[];
   /** 本 PR 新增或改动的、证据目录里的可执行文件。 */
   executableEvidence: string[];
+  /** compare 没给 patch 的条目（二进制、diff 过大、纯改名）在证据目录之外的
+   * 名字；改名两头各判，含删除。证据前缀不分大小写，与 pr-gate 的
+   * EVIDENCE_RE 一致。 */
+  opaque: string[];
 }
 
 export function classifyPaths(files: readonly CompareFile[], ticketRef: string): PathFindings {
@@ -69,6 +76,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
     deletedTests: [],
     otherTicketEvidence: [],
     executableEvidence: [],
+    opaque: [],
   };
   const push = (list: string[], path: string) => {
     if (!list.includes(path)) list.push(path);
@@ -91,6 +99,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
         push(out.outsideAutoMerge, name);
       }
       if (isEvidence(name) && !ownEvidence(name)) push(out.otherTicketEvidence, name);
+      if (!f.hasPatch && !isEvidence(name)) push(out.opaque, name);
     }
 
     if (f.status === 'removed' && isTestPath(f.filename)) push(out.deletedTests, f.filename);

@@ -6,6 +6,8 @@
 // pr-gate 第一轮（#1420）补的：名字里带换行或空格时 `.` 跨不过去，保护 glob
 // 落空而集内 glob 命中；测试在测试目录里改名成不被收集的名字；证据目录前缀
 // 换大小写绕开别票 / 可执行检查；票号是另一票号的前缀。
+// 第三轮（ADR 0021 D4 修订）补的：证据目录之外的二进制文件留人。compare 对
+// 二进制不给 patch，纯改名也不给，分不出来，一并留人（严的一侧）。
 
 import type { CompareFile } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -17,6 +19,7 @@ const f = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   sha: 'a'.repeat(40),
   additions: 1,
   deletions: 0,
+  hasPatch: true,
   ...over,
   filename,
 });
@@ -255,5 +258,52 @@ describe('证据目录', () => {
   test('票号段大小写敏感匹配之外不做猜测：XMON-104 与 xmon-104 是两个目录', () => {
     const r = classify([f('docs/verify/xmon-104/a.txt', { status: 'added' })], 'XMON-104');
     expect(r.otherTicketEvidence).toEqual(['docs/verify/xmon-104/a.txt']);
+  });
+});
+
+describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名）', () => {
+  test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写', () => {
+    const r = classify([
+      f('apps/web/public/logo.png', { status: 'added', additions: 0, hasPatch: false }),
+      f('apps/server/src/big.ts', { additions: 4000, hasPatch: false }),
+      f('apps/web/public/old.png', { status: 'removed', additions: 0, hasPatch: false }),
+      f('docs/verify/1404/a.png', { status: 'added', additions: 0, hasPatch: false }),
+      f('Docs/Verify/1404/b.png', { status: 'added', additions: 0, hasPatch: false }),
+      f('apps/server/src/a.ts'),
+    ]);
+    expect(r.opaque).toEqual([
+      'apps/web/public/logo.png',
+      'apps/server/src/big.ts',
+      'apps/web/public/old.png',
+    ]);
+  });
+
+  test('改名没有 patch：两头里落在证据目录之外的名字都列出', () => {
+    const r = classify([
+      f('apps/server/src/new.ts', {
+        status: 'renamed',
+        previousFilename: 'apps/server/src/old.ts',
+        additions: 0,
+        hasPatch: false,
+      }),
+      f('docs/verify/1404/moved.png', {
+        status: 'renamed',
+        previousFilename: 'apps/web/public/moved.png',
+        additions: 0,
+        hasPatch: false,
+      }),
+      f('docs/verify/1404/c.png', {
+        status: 'renamed',
+        previousFilename: 'docs/verify/1404/b.png',
+        additions: 0,
+        hasPatch: false,
+      }),
+      f('apps/server/src/r.ts', { status: 'renamed', previousFilename: 'apps/server/src/q.ts' }),
+    ]);
+    expect(r.opaque).toEqual([
+      'apps/server/src/new.ts',
+      'apps/server/src/old.ts',
+      'apps/web/public/moved.png',
+    ]);
   });
 });
