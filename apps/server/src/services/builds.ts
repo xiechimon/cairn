@@ -425,6 +425,37 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   if (cancelledRow) publishBuild(deps, cancelledRow);
 }
 
+/** #1403：PR 对账收尾（done / failed）时停掉本 build 还没人领的 verify /
+ * review 步——卡已收尾，它们之后再被领走就是在已收尾的卡上跑（blocking 审核
+ * 会把 done 往 planning 推而抛错）。只改步状态，不写 build.errorMessage
+ * （不是用户停止，收尾原因由对账自己的行说明）。 */
+export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
+  const rows = deps.db
+    .select()
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.status, 'pending'),
+        inArray(step.kind, ['verify', 'review']),
+      ),
+    )
+    .all();
+  for (const row of rows) {
+    deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
+    deps.convHub?.publishStep(buildId, {
+      id: row.id,
+      buildId,
+      kind: row.kind,
+      machineId: row.machineId,
+      createdAt: row.createdAt,
+      status: 'stopped',
+      checkpointCommit: row.checkpointCommit,
+      skillInjection: row.skillInjection ?? null,
+    });
+  }
+}
+
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
 
 /** #1247 stop-then-done 的停半边：pending 即时停且保相位；claimed 委托停并
@@ -1080,9 +1111,6 @@ export async function applyBuildStepAction(
     if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
       throw new HttpError(409, `AI 审核仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
     }
-    // 时间线「发起了 AI 审核」行（r8 §3.1 实测：行形 = role user 纯文本，
-    // 呈现层拼装时间/actor；REVIEW_ANNOUNCEMENT 双端单源）。
-    insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     // 审核步 prompt：meta header（kind+agentId+gate，claim 载荷据此取 Agent
     // ——step 表无 agentId 列）+ JSON 输出契约 + plan.md 全文 +（审核关口）
     // 本轮变更 + 用户 focus。meta 解析与组装单源 =
@@ -1117,6 +1145,18 @@ export async function applyBuildStepAction(
           ? (await readBuildChanges({ db: deps.db, reposDir: deps.reposDir }, buildId)).files
           : []
         : undefined;
+    // 读变更的 await 窗里相位可能已被改（#1403 PR 对账会把 review 收成 done/
+    // failed）：重读再判，不在已收尾的卡上入队审核步、不落宣告行。
+    const after = getTodo(deps, row.todoId);
+    if (after?.phase !== todoRecord.phase) {
+      throw new HttpError(
+        409,
+        `读取变更期间任务相位已变为 ${after?.phase ?? '（任务已删除）'}，未发起 AI 审核`,
+      );
+    }
+    // 时间线「发起了 AI 审核」行（r8 §3.1 实测：行形 = role user 纯文本，
+    // 呈现层拼装时间/actor；REVIEW_ANNOUNCEMENT 双端单源）。
+    insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
     const promptArgs = {
       gate,
       planText,
@@ -1280,6 +1320,11 @@ export async function requestMerge(
         `本任务已有已合并的 PR #${priorMerged.prNumber}，本 build 又开了 PR #${row.prNumber}——疑似重复交付，拒绝发起合并（请人工复核后处理）`,
       );
     }
+    // 探测的网络窗里相位可能已被改（#1403 PR 对账会把 review 收成 done/failed）：
+    // 重读再判，不在已收尾的卡上入队合并步。
+    const after = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+    if (!after) throw new NotFoundError(`todo ${row.todoId}`);
+    assertPhaseTransition(after.phase, 'done');
   }
   // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
   // 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、

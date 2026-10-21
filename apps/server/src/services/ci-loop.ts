@@ -15,14 +15,15 @@
 //
 // 纪律（票面）：
 // - 只读 GitHub（checks 读取），不写——本模块零 api.github.com 写面；
-// - 扫描面批量（一条 DB 查询取全候选）+ 条件请求（每轮每候选恰好 1 个
+// - 扫描面批量（一条 DB 查询取全候选）+ 条件请求（磨绿候选每轮恰好 1 个
 //   If-None-Match 条件 GET，304 复用缓存判据），禁止逐 PR 全量拉——GitHub
 //   无跨 PR 批量端点，条件 GET 是最小合规形；429/404/网络 = fail-open 不动，
 //   下轮重试（读不到 ≠ 红）；
 // - build 已被人手动推进/关闭时不得回写：候选是扫描快照，动作前重读当前
 //   phase（两次：网络读之前、写面之前——网络窗是人工动作最可能落进的缝）；
-// - 修复步在飞（pending/claimed）不叠派：读到的 checks 是推送前旧 head 的，
-//   等它跑完重评（幂等：同轮重复 sweep 不追加第二条）。
+// - 有步在飞（hasActiveStep：已领取或等额度的任意步、排队中的非审核类步）
+//   不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
+//   sweep 不追加第二条）。没人领的 verify / review 步不挡磨绿与对账。
 //
 // 磨绿入口（completeStep 的 build 分支，builds.ts）：PR 交付（prNumber 在）
 // 的执行步成 → 停在 building（本模块推进 review）；无 PR → 既有直进 review
@@ -34,9 +35,16 @@
 // 当前 build（todo.latestBuildId；更旧的被取代 PR 关了或合了都不算数，当前
 // build 没 PR 时也不拿旧 PR 替它收尾）、没有在飞的步（merge 步正在合并时不
 // 插手）。未连接 GitHub（匿名 60 次/小时）时每候选 5 分钟最多读一次。每候选
-// 一次条件 GET pulls/{n}：已合并（不论谁合的）→ system 行写合并 SHA + done 收尾
-// 漏斗（与 merge 步成同一条）；关闭未合并 → build.errorMessage + failed；
-// open → 不动。读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
+// 一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint 不同时再加一次
+// compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
+// - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后的 checkpoint
+//   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
+// - 关闭未合并 → system 行 + build.errorMessage + failed；
+// - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
+// 只认卡进入 review 之后发生的合并/关闭（GitHub 的 merged_at / closed_at 到
+// 秒，按秒与 todo.phaseAt 比）：人在那之后把卡拖回 review（done→review 重开、
+// closed→review、failed→review 恢复）是人的决定，对账不再收尾一次。收尾时
+// 停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
 import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
@@ -56,6 +64,7 @@ import {
   enqueueStep,
   finishTodoDone,
   maybeEnqueueVerifyStep,
+  stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
 import { openGithubToken } from './github-connection.js';
@@ -203,8 +212,10 @@ interface CiPollTally {
   merged: number;
   /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
-  /** 已合并但分支上有合并没带走的提交：提示一次，不收尾。 */
+  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示一次，不收尾。 */
   hinted: number;
+  /** PR 的合并/关闭早于卡进入 review（人后来把卡拖回了 review）：交给人。 */
+  beforeReview: number;
 }
 
 /** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
@@ -221,6 +232,9 @@ export function createCiPoller(
   const pullCache = new Map<string, PullCacheEntry>();
   /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
+  /** compare 结果（键 = PR + checkpoint + head；两个固定提交之间的结果不变，
+   * 读到即可复用；404 除外）。 */
+  const compareCache = new Map<string, string>();
 
   /** 本 build 有在飞的步：已被领取或在等额度的任意步，以及排队中的非审核
    * 类步。没人领的 verify / review 步不算（Verifier 的机器离线时，卡不能
@@ -240,18 +254,6 @@ export function createCiPoller(
           ),
         )
         .get() !== undefined
-    );
-  }
-
-  /** 本 build 最近一个完成的执行步收尾时的分支 HEAD。 */
-  function lastCheckpoint(buildId: string): string | null {
-    return (
-      deps.db
-        .select({ commit: step.checkpointCommit })
-        .from(step)
-        .where(and(eq(step.buildId, buildId), eq(step.kind, 'build'), eq(step.status, 'done')))
-        .orderBy(desc(step.createdAt))
-        .get()?.commit ?? null
     );
   }
 
@@ -360,41 +362,76 @@ export function createCiPoller(
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+    const fresh = freshReviewRow(cand.todoId, cand.buildId);
+    if (fresh === null || hasActiveStep(cand.buildId)) {
       tally.skipped += 1;
       return;
     }
+    // 只认卡进入 review 之后的合并/关闭（GitHub 时间戳到秒，phaseAt 取整到秒）。
+    const outcomeAt = pull.merged ? pull.mergedAt : pull.closedAt;
+    if (outcomeAt === null || outcomeAt < Math.floor(fresh.phaseAt / 1000) * 1000) {
+      tally.beforeReview += 1;
+      return;
+    }
     if (pull.merged) {
+      if (pull.baseRef === null || pull.defaultBranch === null) {
+        tally.unreadable += 1;
+        return;
+      }
+      if (pull.baseRef !== pull.defaultBranch) {
+        hintOnce(
+          cand.buildId,
+          `PR #${prNumber} 合并进了 ${pull.baseRef}，不是默认分支 ${pull.defaultBranch}，改动还没进 ${pull.defaultBranch}。任务留在审核关口，由人决定下一步。`,
+          tally,
+        );
+        return;
+      }
       // 合并之后同分支又推了提交（修复轮）：那个提交不在这次合并里，不收尾。
       // head 包含 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
-      const checkpoint = lastCheckpoint(cand.buildId);
+      const checkpoint =
+        deps.db
+          .select({ commit: step.checkpointCommit })
+          .from(step)
+          .where(
+            and(eq(step.buildId, cand.buildId), eq(step.kind, 'build'), eq(step.status, 'done')),
+          )
+          .orderBy(desc(step.createdAt))
+          .get()?.commit ?? null;
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
-        const status = await githubCompareStatus(
-          run.githubFetch,
-          token,
-          target.owner,
-          target.repo,
-          checkpoint,
-          pull.headSha,
-        );
+        const cmpKey = `${key}:${checkpoint}...${pull.headSha}`;
+        let status = compareCache.get(cmpKey) ?? null;
         if (status === null) {
-          tally.unreadable += 1;
-          return;
-        }
-        if (status !== 'ahead' && status !== 'identical') {
-          if (freshReviewRow(cand.todoId, cand.buildId) === null) {
-            tally.skipped += 1;
+          status = await githubCompareStatus(
+            run.githubFetch,
+            token,
+            target.owner,
+            target.repo,
+            checkpoint,
+            pull.headSha,
+          );
+          if (status === null) {
+            tally.unreadable += 1;
             return;
           }
-          hintOnce(
-            cand.buildId,
-            `PR #${prNumber} 已在 GitHub 合并（合并时 head ${pull.headSha.slice(0, 7)}），但分支上的提交 ${checkpoint.slice(0, 7)} 不在这次合并里，这部分改动还没进 main。需要的话重启任务，会新开分支与 PR。`,
-            tally,
-          );
-          return;
+          // 404 不缓存：那个提交之后可能被推上去；其余结果对两个固定提交不会变。
+          if (status !== 'missing') compareCache.set(cmpKey, status);
         }
         if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
           tally.skipped += 1;
+          return;
+        }
+        if (status !== 'ahead' && status !== 'identical') {
+          const head = pull.headSha.slice(0, 7);
+          const cp = checkpoint.slice(0, 7);
+          hintOnce(
+            cand.buildId,
+            status === 'missing'
+              ? `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`
+              : status === 'invalid'
+                ? `PR #${prNumber} 已在 GitHub 合并，但执行步回报的分支提交「${checkpoint.slice(0, 40)}」不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
+                : `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支，任务留在审核关口；需要的话重启任务，会新开分支与 PR。`,
+            tally,
+          );
           return;
         }
       }
@@ -408,19 +445,22 @@ export function createCiPoller(
         content: `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
         createdAt: nowMs(),
       });
+      stopUnclaimedGateSteps(deps, cand.buildId);
       finishTodoDone(deps, cand.todoId, cand.buildId);
       tally.merged += 1;
       return;
     }
-    deps.db
-      .update(build)
-      .set({
-        errorMessage: `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`,
-      })
-      .where(eq(build.id, cand.buildId))
-      .run();
+    const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
+    insertMessageRow(deps, cand.buildId, {
+      id: newRecordId(),
+      role: 'system',
+      content: closedText,
+      createdAt: nowMs(),
+    });
+    deps.db.update(build).set({ errorMessage: closedText }).where(eq(build.id, cand.buildId)).run();
     const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
     if (row) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
+    stopUnclaimedGateSteps(deps, cand.buildId);
     setTodoPhase(deps, cand.todoId, 'failed');
     tally.closedUnmerged += 1;
   }
@@ -436,7 +476,7 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    // 修复步在飞不叠派（幂等）：pending/claimed 在跑 = 读到的 checks 是旧 head 的。
+    // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
     if (hasActiveStep(cand.buildId)) {
       tally.skipped += 1;
       return;
@@ -561,6 +601,7 @@ export function createCiPoller(
       merged: 0,
       closedUnmerged: 0,
       hinted: 0,
+      beforeReview: 0,
     };
     for (const cand of candidates) {
       try {
