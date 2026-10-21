@@ -152,13 +152,12 @@ const GATE_SCRIPTS = [
 ];
 const GATE_MAPS = { 't.md': '# t\n\n- `node .claude/skills/verify-pacman/scripts/vp.mjs drive t legacy`\n' };
 
+// Every script of GATE_SCRIPTS that is no drive case, plus the gate itself.
+const GATE_SUPPORT = [...GATE_SCRIPTS.filter((name) => !name.startsWith('drive-')), 'vp-registry-gate.mjs'];
+
 function gateRegistry(cases = {}, support = {}) {
   const kinds = { 'setup-x-seed.mjs': 'seed', 'stub-x.mjs': 'stub', 'vp-selftest.mjs': 'test' };
-  const base = Object.fromEntries(
-    ['cleanup.mjs', 'doctor.mjs', 'launch.mjs', 'setup-x-seed.mjs', 'stub-x.mjs', 'vp.mjs', 'vp-selftest.mjs', 'vp-registry-gate.mjs'].map(
-      (name) => [name, { kind: kinds[name] ?? 'infra', purpose: name }],
-    ),
-  );
+  const base = Object.fromEntries(GATE_SUPPORT.map((name) => [name, { kind: kinds[name] ?? 'infra', purpose: name }]));
   return {
     support: { ...base, ...support },
     features: {
@@ -240,6 +239,18 @@ function gitAt(repo) {
     execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
       encoding: 'utf8',
     });
+}
+
+// A repository at main with one commit, and a detached worktree at each of
+// worktreePaths.
+function repoWithWorktrees(main, ...worktreePaths) {
+  mkdirSync(main, { recursive: true });
+  const g = gitAt(main);
+  g('init', '-q');
+  writeFileSync(join(main, 'README'), 'x\n');
+  g('add', 'README');
+  g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
+  for (const wt of worktreePaths) g('worktree', 'add', '-q', '--detach', wt);
 }
 
 // A probe that runs its pre-fix mode, or refuses to run, when called with no
@@ -921,13 +932,7 @@ const cases = [
       const wt = join(main, '.claude', 'worktrees', 'wt');
       let r = { code: null, out: '' };
       try {
-        mkdirSync(main);
-        const g = gitAt(main);
-        g('init', '-q');
-        writeFileSync(join(main, 'README'), 'x\n');
-        g('add', 'README');
-        g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
-        g('worktree', 'add', '-q', '--detach', wt);
+        repoWithWorktrees(main, wt);
         const script = installSkill(wt, { ok: STUB });
         r = vp(['drive', 't', 'ok', '--dry-run'], {}, wt, script);
       } finally {
@@ -1147,14 +1152,7 @@ const cases = [
       let unchanged = false;
       let made = ['not run'];
       try {
-        mkdirSync(main);
-        const g = gitAt(main);
-        g('init', '-q');
-        writeFileSync(join(main, 'README'), 'x\n');
-        g('add', 'README');
-        g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
-        g('worktree', 'add', '-q', '--detach', p2);
-        g('worktree', 'add', '-q', '--detach', p3);
+        repoWithWorktrees(main, p2, p3);
         mkdirSync(other);
         gitAt(other)('init', '-q');
         const script = installSkill(main, { x: STUB, out: { ...STUB, evidence: { flag: '--out' } } });
@@ -1307,7 +1305,7 @@ const cases = [
   [
     'the registry gate refuses a registry without cases',
     () => {
-      const scripts = GATE_SCRIPTS.filter((name) => !name.startsWith('drive-'));
+      const scripts = GATE_SUPPORT.filter((name) => name !== 'vp-registry-gate.mjs');
       const none = runGate({ support: gateRegistry().support, features: {} }, scripts, {});
       const empty = runGate({ support: gateRegistry().support, features: { t: { recipe: null, cases: {} } } }, scripts, {});
       return [none, empty].every((r) => r.code === 1 && r.out.includes('vp-registry.json has no cases'));

@@ -166,7 +166,7 @@ let committedEvidence;
 function committedRoots() {
   committedEvidence ??= [
     ...new Set(
-      [ROOT, SCRIPT_ROOT, MAIN_ROOT, ...[process.cwd(), ROOT, SCRIPT_ROOT].flatMap(worktrees)].map((r) =>
+      [ROOT, SCRIPT_ROOT, MAIN_ROOT, ...[...new Set([process.cwd(), ROOT, SCRIPT_ROOT])].flatMap(worktrees)].map((r) =>
         physical(join(r, 'docs', 'verify')),
       ),
     ),
