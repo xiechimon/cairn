@@ -1043,6 +1043,25 @@ const cases = [
       ]),
   ],
   [
+    'auto-merge matching folds ASCII case only, protection folds Unicode: ſrc and docſ/verify route to the user, AGENTſ.md stays protected (run 11)',
+    async () => {
+      const src = 'apps/web/ſrc/x.ts';
+      const shot = 'docſ/verify/x.png';
+      const r = await gateFiles([src, shot], { binaryFiles: [shot] });
+      const agents = 'apps/web/src/AGENTſ.md';
+      const p = await gateFiles([agents]);
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some(
+          (x) => x.startsWith('outside the auto-merge set') && x.includes(src) && x.includes(shot),
+        ) &&
+        r.humanReasons.some((x) => x.startsWith('binary files') && x.includes(shot)) &&
+        p.mergedBy === 'user' &&
+        p.protectedPaths.includes(agents)
+      );
+    },
+  ],
+  [
     'a deleted test is found with U+017F in its directory or suffix (run 11)',
     async () => {
       for (const f of ['apps/server/teſt/helper.ts', 'apps/web/src/a.ſpec.ts']) {

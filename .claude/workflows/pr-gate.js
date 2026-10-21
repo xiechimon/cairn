@@ -31,8 +31,8 @@ const MAX_SKEPTICS = 4
 // user. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
 // file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
-// may merge alone instead of what may not. Matching ignores case (APFS), with
-// Unicode folding, so U+017F and U+212A match s and k (run 11).
+// may merge alone instead of what may not. Matching ignores case (APFS);
+// globToRegExp says which matches fold Unicode.
 const AUTO_MERGE = [
   'apps/*/src/**',
   'apps/*/test/**',
@@ -97,12 +97,16 @@ const PROTECTED = [
   'apps/daemon/src/merge-decision.ts',
 ]
 
-// With dirAlone, a trailing /** also matches the entry named like the
-// directory, so a symlink named .claude or scripts is protected (run 10). Only
-// PROTECTED uses it: in AUTO_MERGE it would let a symlink named apps/x/src
-// merge without the user.
-function globToRegExp(glob, { dirAlone = false } = {}) {
-  const tail = dirAlone && glob.endsWith('/**')
+// Matching that widens protection folds Unicode, matching that grants
+// auto-merge folds ASCII case only. With protect (PROTECTED here, and the
+// deleted-test patterns below use iu too), case folds with Unicode, so U+017F
+// and U+212A match s and k (run 11), and a trailing /** also matches the entry
+// named like the directory, so a symlink named .claude or scripts is protected
+// (run 10). AUTO_MERGE and EVIDENCE_RE get neither: a path that looks like
+// product source or evidence only through Unicode folding or a symlink stays
+// outside the set and goes to the user under default deny.
+function globToRegExp(glob, { protect = false } = {}) {
+  const tail = protect && glob.endsWith('/**')
   const g = tail ? glob.slice(0, -3) : glob
   let re = ''
   for (let i = 0; i < g.length; i += 1) {
@@ -119,9 +123,9 @@ function globToRegExp(glob, { dirAlone = false } = {}) {
       re += ch.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
     }
   }
-  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'iu')
+  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, protect ? 'iu' : 'i')
 }
-const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { dirAlone: true }))
+const PROTECTED_RE = PROTECTED.map((glob) => globToRegExp(glob, { protect: true }))
 const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
 const MAX_LINES = 800
