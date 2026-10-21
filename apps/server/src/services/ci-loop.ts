@@ -875,7 +875,6 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    listFailures.delete(key);
     const found = sibling === 'unreadable' ? null : sibling;
     forgetClose(key);
     // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
