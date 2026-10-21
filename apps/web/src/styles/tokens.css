@@ -1,6 +1,6 @@
 /* 非颜色 token 层 + drop-tint 色槽（#435 落地 #412 P2b；#1002 收敛后定形）：
    颜色值正本在 shadcn.css（官方语义词表 + 仓内补位族）。本文件持——
-   1) 非颜色 token：motion / 字体栈 / 阴影四档 / 圆角（--edge-radius /
+   1) 非颜色 token：motion / 字体栈 / 阴影三档梯（#1428）/ 圆角（--edge-radius /
       --radius-popover，手写壳消费面，不随 --radius 官方化翻，#983 退役面）/
       密度与标签几何 / z 阶梯（几何定版值取 spec/22 §2，#915 翻值）；
    2) drop-tint 3 色槽（拖放目标 tint，#987 §3.4-B 留类，随 #988 色板翻值）。
@@ -202,29 +202,59 @@
   --radius-bubble: 18px;
   --radius-control: 5px;
   --radius-window: 12px;
+  /* ---- elevation ladder (#1428) ----
+     Three resting tiers. A rung is its pool plus one outer ring of one CSS
+     pixel in the --border scale (DESIGN.md 颜色: rings never thin to
+     --hairline). The pool is the rung without the ring: a surface that
+     draws its own --edge-ring (notify banner, chief window, FAB) takes the
+     pool, so one edge never carries two rings.
+       --cds-shadow-sm / --e1   card, row, segmented thumb
+       --cds-shadow-md / --e2   menu, popover, select popup, overlay plate
+       --cds-shadow-lg / --e3   dialog, floating window
+     --top is the dark-only inset top highlight that makes a raised surface
+     read as lit paper. It lives in the e2/e3 pools and nowhere else: a
+     white card has nothing to catch it. .light sets it to a zero-alpha
+     shadow rather than `none` — `none` inside a comma list voids the whole
+     box-shadow, and the Tailwind shadow-(--x) utility always comma-joins.
+     Dark pools keep the pre-ladder darkness verbatim (#1396 retunes dark);
+     light pools are the Paper 定稿 values (DESIGN.md 任务卡 / 弹窗与菜单).
+     The old slot names are aliases, declared once (they resolve against
+     whichever theme block wins); the hover / focus slots and the drag clone
+     stay literal — a state is not a tier. */
+  --top: inset 0 1px 0 rgb(255 255 255 / 0.08);
   --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px 0 rgb(0 0 0 / 0.4);
-  --cds-shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.4), 0 6px 16px 0 rgb(0 0 0 / 0.4);
-  --cds-shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.5), 0 16px 36px -2px rgb(0 0 0 / 0.4);
-  --edge-shadow: var(--cds-shadow-md);
+  --cds-shadow-md: 0 8px 28px rgb(0 0 0 / 0.65), 0 2px 8px rgb(0 0 0 / 0.45), var(--top);
+  --cds-shadow-lg: 0 16px 40px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3), var(--top);
+  --e1: var(--cds-shadow-sm), 0 0 0 1px var(--border);
+  /* dark e2/e3 ring in the dialog's pre-ladder ring colour: --border is
+     invisible on --popover, the 10% foreground tint reads as the lit edge. */
+  --e2: var(--cds-shadow-md), 0 0 0 1px var(--ring-inset-highlight);
+  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--ring-inset-highlight);
+  --panel-shadow: var(--e1);
+  --shadow-popover: var(--e2);
+  --dialog-shadow: var(--e3);
   --card-shadow: var(--cds-shadow-sm);
-  --card-lift: 0 4px 16px rgb(0 0 0 / 0.14), 0 1px 4px rgb(0 0 0 / 0.08);
-  --shadow-popover:
-    inset 0 0 0 var(--hairline) var(--ring-inset-highlight), 0 8px 28px rgb(0 0 0 / 0.65),
-    0 2px 8px rgb(0 0 0 / 0.45);
+  --floating-shadow: var(--cds-shadow-lg);
+  --edge-shadow: var(--e2);
+  --fab-shadow: var(--e2);
+  --plate-shadow: var(--e2);
+  --chief-shadow: var(--e2);
+  --card-lift: var(--panel-shadow-hover);
+  /* e1 hover state (DESIGN.md 任务卡: ring deepens, pool lifts); the ring
+     stays one CSS pixel so hover does not thin the resting e1 ring on 2x. */
+  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
+  /* composer rest / hover / focus: pool plus its own inset hairline ring. */
   --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.4), inset 0 0 0 var(--hairline) var(--border);
   --shadow-composer-hover:
     0 4px 24px rgb(0 0 0 / 0.55), inset 0 0 0 var(--hairline) var(--border-soft);
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.65), inset 0 0 0 var(--hairline) var(--ring-inset-highlight),
     0 0 0 var(--hairline) var(--ring-inset-highlight);
-  --panel-shadow: 0 0 0 var(--hairline) var(--border), var(--cds-shadow-sm);
-  --panel-shadow-hover: 0 0 0 var(--hairline) var(--border-soft), 0 4px 16px -2px rgb(0 0 0 / 0.09);
   /* drag-tier shadow (#616): the lifted drag clone floats on the reference
      product's live recipe (todos.dev 2026-10-02 capture: inline
      `box-shadow: rgba(0,0,0,0.18) 0 8px 24px`, one value in BOTH themes) —
      a wide soft pool 8px below the card instead of #391's four-edge inked
-     tier. Theme-invariant like --dialog-shadow; mirrored in .light to keep
-     the semantic-token mirror complete */
+     tier. The clone draws a real border, so no ring. */
   --drag-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
   /* drop-target tint (#616): the reference tints EVERY valid drop column
      while a gesture is in flight (ring + 5% fill) and the hovered one a step
@@ -233,26 +263,6 @@
   --drop-tint-border: rgb(240 146 109);
   --drop-tint-base: rgb(240 146 109 / 0.05);
   --drop-tint-hover: rgb(240 146 109 / 0.1);
-  /* alias of the #139 edge shadow tier — every elevated surface (fab,
-     popovers, panels) draws one shadow from the single source */
-  --fab-shadow: var(--edge-shadow);
-  /* 盘投影（overlay 盘三件套之一，spec/22 §2.4/§2.6-7）: 手搓 overlay 盘
-     （sheet/菜单/popup）暗侧无投影、线框承重（1px 墨线独承，用户 2026-10-05
-     裁定不变）；亮侧走定版软 blur 档（分层软投影语言同上）。 */
-  --plate-shadow: none;
-  /* Paper dialog face (DESIGN.md 弹窗与菜单): a one-pixel ring plus a soft
-     two-layer pool. */
-  --dialog-shadow:
-    0 0 0 1px var(--ring-inset-highlight), 0 16px 40px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
-  /* chief 面（r5 100–104, #72）drawer 投影，r5 100 edge gradient 采样。
-     ADR 0013 后本槽只剩抽屉头主题切换器 popover 一个消费点；悬浮窗本体
-     走 --floating-shadow（下方），本槽随 #983 手写壳退役面一并处置。 */
-  --chief-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
-  /* 窗级 overlay 投影（ADR 0013 D2：整套采 Multica `--floating-shadow`
-     原值，multica packages/ui/styles/tokens.css:261 暗侧 / :159 亮侧，
-     2026-10-08 raw 复核）：总管悬浮窗与 FAB 共用（Multica 同律——窗与
-     launcher 一个投影档），dialog/sheet 族仍走各自的 --dialog-shadow。 */
-  --floating-shadow: 0 20px 48px rgb(0 0 0 / 0.46), 0 4px 12px rgb(0 0 0 / 0.28);
   /* 右下角预约制度（ADR 0013 D10，Multica clearance 同律 tokens.css:165-172
      + base.css:10-33）：launcher（FAB/悬浮窗）常驻内容区右下角，该角对页面
      内容不可用。几何住在 token 层而非按钮本体，clearance 由 launcher 自身
@@ -367,30 +377,25 @@
      .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像；--surface-1
      在 :root 指 canvas，两侧同形。 */
 
-  /* unified border language (#139), light side: the edge shadow tier dimmed
-     to the light surface; the ring rides --border's light value via the
-     :root --edge-ring recipe. 投影四档定版 spec/22 §2.4 */
   --radius-popover: 10px;
   --radius-window: 12px;
-  --cds-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 2px 8px 0 rgb(0 0 0 / 0.08);
-  --cds-shadow-md: 0 2px 4px 0 rgb(0 0 0 / 0.05), 0 6px 16px 0 rgb(0 0 0 / 0.08);
-  --cds-shadow-lg: 0 4px 8px 0 rgb(0 0 0 / 0.06), 0 12px 28px -2px rgb(0 0 0 / 0.08);
-  --edge-shadow: var(--cds-shadow-md);
-  --plate-shadow: 0 6px 16px rgb(0 0 0 / 0.12);
-  --card-shadow: var(--cds-shadow-sm);
-  --card-lift: 0 3px 10px rgb(28 25 23 / 0.05), 0 1px 3px rgb(28 25 23 / 0.04);
-  /* Paper menu face (DESIGN.md 弹窗与菜单): one CSS pixel ring plus a warm
-     soft pool. */
-  --shadow-popover:
-    0 0 0 1px var(--border), 0 8px 24px rgb(31 27 24 / 0.1), 0 2px 6px rgb(31 27 24 / 0.05);
+
+  /* elevation ladder (#1428), light side: the Paper 定稿 pools (DESIGN.md
+     任务卡 / 弹窗与菜单), ring in --border; the aliases live in :root. */
+  --top: inset 0 1px 0 rgb(255 255 255 / 0);
+  --cds-shadow-sm: 0 1px 2px rgb(80 60 30 / 0.04);
+  --cds-shadow-md: 0 8px 24px rgb(31 27 24 / 0.1), 0 2px 6px rgb(31 27 24 / 0.05);
+  --cds-shadow-lg: 0 16px 40px rgb(31 27 24 / 0.16), 0 2px 6px rgb(31 27 24 / 0.06);
+  --e1: var(--cds-shadow-sm), 0 0 0 1px var(--border);
+  --e2: var(--cds-shadow-md), 0 0 0 1px var(--border);
+  --e3: var(--cds-shadow-lg), 0 0 0 1px var(--border);
+  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
   --shadow-composer: 0 4px 20px rgb(0 0 0 / 0.035), inset 0 0 0 var(--hairline) var(--border);
   --shadow-composer-hover:
     0 4px 24px rgb(0 0 0 / 0.06), inset 0 0 0 var(--hairline) var(--border-soft);
   --shadow-composer-focus:
     0 4px 24px rgb(0 0 0 / 0.08), inset 0 0 0 var(--hairline) var(--border-soft),
     0 0 0 var(--hairline) var(--border-soft);
-  --panel-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(80 60 30 / 0.04);
-  --panel-shadow-hover: 0 0 0 1px var(--border-soft), 0 4px 14px rgb(80 60 30 / 0.07);
   /* drag-tier shadow (#616) + drop-target tint: hue follows the dark side
      (#915 spot), mirrored explicitly so .light stays the full
      semantic-token mirror */
@@ -398,12 +403,4 @@
   --drop-tint-border: rgb(180 83 42);
   --drop-tint-base: rgb(180 83 42 / 0.05);
   --drop-tint-hover: rgb(180 83 42 / 0.1);
-  --dialog-shadow:
-    0 0 0 1px var(--border), 0 16px 40px rgb(31 27 24 / 0.16), 0 2px 6px rgb(31 27 24 / 0.06);
-  /* chief surfaces (r5 100–104, #72): shadow from the r5 100 edge
-     gradient */
-  --chief-shadow: 0 4px 24px rgb(28 25 23 / 0.16);
-  /* 窗级 overlay 投影 light 侧（Multica tokens.css:159 原值，slate 墨
-     14%/8% 双层——ADR 0013 D2 双主题整套采原值） */
-  --floating-shadow: 0 16px 40px rgb(15 23 42 / 0.14), 0 3px 10px rgb(15 23 42 / 0.08);
 }
