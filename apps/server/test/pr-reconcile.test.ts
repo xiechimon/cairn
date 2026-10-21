@@ -12,7 +12,7 @@
 //   ⑧ todo 的当前 build 没有 PR（#1217 守卫下不开新 PR / 探针失败），更旧
 //      build 的 PR 已合并或已关闭 → 不得替当前 build 收尾或打回
 //   ⑨ 两个 build 指向同一个 PR（#1217）→ 只按当前 build 读一次、写在它上面
-//   ⑩ merge 步在飞（agent 正在合并）→ 对账不插手；先后两次收尾只落一条完成行
+//   ⑩ merge 步在飞（agent 正在合并）→ 对账不插手（⑩b 见 [54]）
 //   ⑪ 未连接 GitHub（匿名 60 次/小时）→ 每个候选 5 分钟内最多读一次
 //   ⑫ 条件读 304 → 复用上轮状态；网络抛错 → 不动，下轮重读
 //   ⑬ 合并行写明是谁合并的
@@ -26,8 +26,8 @@
 // pr-gate 第三轮（#1414）补的：
 //   ⑱ 人在对账收尾之后把卡拖回 review（done→review 重开、closed→review、
 //      failed→review 恢复）→ 下一轮不得再收尾一次（重复的合并行与完成行）、
-//      不得覆盖 errorMessage；判据 = PR 的合并/关闭时刻早于卡进入 review 的
-//      时刻（GitHub 时间戳到秒，按秒比较）
+//      不得覆盖 errorMessage；（第三轮的判据按时钟比，第四轮起不再看时钟，
+//      见下）
 //   ⑲ PR 合并进了非默认分支 → 改动不在 main，不收尾，提示一次
 //   ⑳ 收尾时还排着没人领的 verify / review 步 → 停掉，不让它们之后在已收尾
 //      的卡上跑（blocking 审核会把 done 往 planning 推而抛错）
@@ -50,7 +50,7 @@
 // /code-review（#1414，AGENTS.md #1422 起开 PR 前后各跑一次）补的：
 //   ⑱ 人手拖到「已完成」（落「标记为已完成」行）再拖回 review → 不再按已合并
 //      收尾；人手关掉再拖回 review、或 PR 在卡进入 review 之前就关了 → 不打成
-//      failed，提示一行交给人（关闭时刻按秒与 todo.phaseAt 比）
+//      failed，提示一行交给人（这一遍的时钟比较在第二遍之后撤掉，见下）
 //   ⑮ 等额度挂起的 verify / review 步同样不挡对账，收尾时一并停掉
 //   ㉚ 合并响应缺 head sha 而本 build 有 checkpoint → 无法核对，不收尾
 //   ㉛ compare 404 不永久缓存，但同一对提交 10 分钟内只重读一次
@@ -77,15 +77,27 @@
 //   ㊼ compare 只取一页（per_page=1），不拉整份提交与补丁
 // pr-gate 第五轮补的：
 //   ㊽ 第二次读不到 compare 的网络窗内卡离开 review → 不写提示
+// 第五遍 /code-review 补的：
+//   [49] 收尾时停掉的等额度 verify 步，在发出的 done 文档里不再留等额度投影
+//        （卡本来就是 done 时也要补发一次）
+//   [50] 匿名额度：pulls 读要等额度里也留得出它可能需要的那次 compare
+//   [51] 关闭后立刻重开（为重跑 CI）→ 不打成 failed：关闭要两次读都还在才算
+//   [52] 响应里没有 merged 字段 → 读不到，不当成关闭未合并
+//   [53] 第二次读不到 compare 的网络窗里合并步开始 → 不写提示
+//   [54] 同一轮里第二个合并步完成 → 照旧再落一行完成行（⑩b 的直接调用去重撤掉：
+//        对账在本轮已有完成行时根本不收尾，用不着 finishTodoDone 自己去重）
+//   [55] sweep 日志把对账与磨绿分开计数
+//   [56] 磨绿的匿名读算进按 IP 的总额度，不占对账自己的那份
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   message as messageTable,
   project as projectTable,
+  type QuotaWaitRow,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
@@ -133,6 +145,8 @@ interface PullSpec {
   noBase?: boolean;
   /** 响应里没有 head（head 仓被删之类）。 */
   noHead?: boolean;
+  /** 响应里没有 merged 字段（被裁掉的响应体）。 */
+  noMerged?: boolean;
   /** compare 的 status 按 base（checkpoint）区分；缺省回落 compare。 */
   compareByBase?: Record<string, string>;
 }
@@ -205,7 +219,7 @@ class PullsMock {
       res(this.status, '"x"', {
         number: Number(m[1]),
         state: spec.state,
-        merged: spec.merged,
+        ...(spec.noMerged ? {} : { merged: spec.merged }),
         merge_commit_sha: spec.mergeCommitSha ?? null,
         merged_by: spec.mergedBy === undefined ? null : { login: spec.mergedBy },
         head: spec.noHead ? null : { sha: spec.headSha ?? 'f'.repeat(40) },
@@ -402,9 +416,32 @@ function makeWorld(
   };
 }
 
-function pollerFor(w: World, mock: PullsMock, opts: { anonReadsPerHour?: number } = {}) {
+function pollerFor(
+  w: World,
+  mock: PullsMock,
+  opts: { anonReadsPerHour?: number; anonIpReadsPerHour?: number } = {},
+) {
   return createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch: mock.fetch, ...opts });
 }
+
+/** A close counts at the second read that still sees it (a close and reopen to rerun CI is
+ * common), five minutes apart so an anonymous world reads again too. */
+async function sweepTwice(poller: ReturnType<typeof pollerFor>, t0 = Date.now()): Promise<void> {
+  await poller.sweep(t0);
+  await poller.sweep(t0 + 300_000);
+}
+
+const QUOTA_BLOCK: QuotaWaitRow = {
+  kind: 'quota',
+  providerId: 'relay',
+  label: 'Relay',
+  reason: '402: quota exceeded',
+  retryAfterMs: null,
+  firstSeenAt: 0,
+  lastAt: 0,
+  attempts: 1,
+  probeAt: 0,
+};
 
 /** Another review-phase todo with its own PR build in the same project. */
 function addReviewCard(w: World, prNumber: number): void {
@@ -461,7 +498,12 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   test('② closed without merge → todo failed with the cause on the build', async () => {
     const w = makeWorld();
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
-    await pollerFor(w, mock).sweep();
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    expect(w.todoRow().phase).toBe('review'); // one read is not enough ([51])
+    expect(w.systemRows()).toEqual([]);
+    await poller.sweep(t0 + 300_000);
     expect(w.todoRow().phase).toBe('failed');
     expect(w.buildRow().errorMessage ?? '').toContain(`#${w.prNumber}`);
     expect(
@@ -566,13 +608,6 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     await pollerFor(w, mock).sweep();
     expect(w.todoRow().phase).toBe('review');
     expect(mock.requests).toEqual([]);
-  });
-
-  test('⑩b finishing twice leaves one completion row', () => {
-    const w = makeWorld();
-    finishTodoDone(w.s.svc, w.todoId, w.buildId);
-    finishTodoDone(w.s.svc, w.todoId, w.buildId);
-    expect(w.systemRows().filter((c) => c.includes('任务已完成'))).toHaveLength(1);
   });
 
   test('⑪ anonymous: a candidate is read at most once per five minutes', async () => {
@@ -724,7 +759,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
         })
         .run();
       const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged } });
-      await pollerFor(w, mock).sweep();
+      await sweepTwice(pollerFor(w, mock));
       expect(w.todoRow().phase).toBe(merged ? 'done' : 'failed');
       expect(w.stepRows().filter((r) => r.kind === 'review' || r.kind === 'verify')).toEqual([
         { kind: 'review', status: 'stopped' },
@@ -782,6 +817,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   });
 
   test('⑱b merged before the card reached review (auto-merge the moment CI went green) → done', async () => {
+    // The merge time two minutes before the card's phaseAt is what a clock rule would refuse:
+    // this test fails if the reconcile goes back to comparing them.
     const w = makeWorld({ phaseAt: Date.now() });
     const mock = new PullsMock({
       [w.prNumber]: {
@@ -827,7 +864,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       .where(eq(todoTable.id, w.todoId))
       .run();
     const poller = pollerFor(w, mock);
-    await poller.sweep();
+    await sweepTwice(poller);
     expect(w.todoRow().phase).toBe('failed');
     updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
@@ -990,7 +1027,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
     const poller = pollerFor(w, mock);
-    await poller.sweep();
+    await sweepTwice(poller);
     expect(w.todoRow().phase).toBe('failed');
     updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
@@ -1083,7 +1120,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     const w = makeWorld({ connected: true });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
     const poller = pollerFor(w, mock);
-    await poller.sweep();
+    await sweepTwice(poller);
     expect(w.todoRow().phase).toBe('failed');
     // restart reused the build (PR reopened, fix round ran), then the PR closed again
     w.s.db
@@ -1098,7 +1135,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       .run();
     w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
     await new Promise((r) => setTimeout(r, 5));
-    await poller.sweep();
+    await sweepTwice(poller, Date.now() + 600_000);
     expect(w.todoRow().phase).toBe('failed');
     expect(
       w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
@@ -1124,11 +1161,10 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('㉟ the merge step completes after a manual done: completion row written, once', () => {
+  test('㉟ the merge step completes after a manual done: completion row written', () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
-    finishTodoDone(w.s.svc, w.todoId, w.buildId);
     finishTodoDone(w.s.svc, w.todoId, w.buildId);
     expect(w.todoRow().phase).toBe('done');
     expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
@@ -1175,7 +1211,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       301: { state: 'open', merged: false },
       302: { state: 'open', merged: false },
     });
-    const poller = pollerFor(w, mock, { anonReadsPerHour: 2 });
+    // A read starts with room for one compare after it ([50]): of 3, two cards read.
+    const poller = pollerFor(w, mock, { anonReadsPerHour: 3 });
     const t0 = Date.now();
     await poller.sweep(t0);
     expect(mock.requests).toHaveLength(2);
@@ -1283,7 +1320,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       301: { state: 'open', merged: false },
       302: { state: 'open', merged: false },
     });
-    const poller = pollerFor(w, mock, { anonReadsPerHour: 2 });
+    const poller = pollerFor(w, mock, { anonReadsPerHour: 3 });
     const t0 = Date.now();
     await poller.sweep(t0);
     await poller.sweep(t0 + 3_600_001);
@@ -1307,7 +1344,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       401: { state: 'closed', merged: true },
     });
     mock.checkRuns = true;
-    await pollerFor(w, mock, { anonReadsPerHour: 1 }).sweep();
+    await pollerFor(w, mock, { anonIpReadsPerHour: 2 }).sweep();
     expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
     expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(0);
   });
@@ -1325,6 +1362,163 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(mock.compareRequests()).toHaveLength(2);
     expect(w.todoRow().phase).toBe('closed');
     expect(w.systemRows()).toEqual([]);
+  });
+
+  test.each([
+    ['the reconcile finishes the card', false],
+    ['the merge step finishes a card a person already marked done', true],
+  ] as const)(
+    '[49] %s: the done card is published without the quota wait of the verify step it stopped',
+    async (_label, doneFirst) => {
+      const w = makeWorld({ connected: true, inflight: 'waiting_quota', inflightKind: 'verify' });
+      w.s.db
+        .update(stepTable)
+        .set({ quotaBlock: QUOTA_BLOCK })
+        .where(eq(stepTable.buildId, w.buildId))
+        .run();
+      w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+      if (doneFirst) updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
+      const hub = w.s.svc.hub;
+      const docs: Parameters<typeof hub.publishTodoDoc>[1][] = [];
+      const publish = hub.publishTodoDoc.bind(hub);
+      hub.publishTodoDoc = (teamId, doc) => {
+        docs.push(doc);
+        publish(teamId, doc);
+      };
+      if (doneFirst) finishTodoDone(w.s.svc, w.todoId, w.buildId);
+      else {
+        const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+        await pollerFor(w, mock).sweep();
+      }
+      expect(w.todoRow().phase).toBe('done');
+      expect(docs.at(-1)?.phase).toBe('done');
+      expect(docs.at(-1)?.quotaWait).toBeNull();
+    },
+  );
+
+  test('[50] anonymous: a pulls read waits until the budget also has room for the compare it may need', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    addReviewCard(w, 301);
+    const mine: PullSpec = { state: 'open', merged: false, compare: 'ahead' };
+    const mock = new PullsMock({ [w.prNumber]: mine, 301: { state: 'open', merged: false } });
+    const poller = pollerFor(w, mock, { anonReadsPerHour: 3 });
+    const t0 = Date.now();
+    await poller.sweep(t0); // both read: 2 of 3 used
+    mine.state = 'closed';
+    mine.merged = true;
+    mock.status304 = false;
+    await poller.sweep(t0 + 300_001); // 1 left: no pulls read that its compare could not follow
+    expect(mock.requests.filter((u) => u.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(1);
+    await poller.sweep(t0 + 3_600_001);
+    expect(w.todoRow().phase).toBe('done');
+    expect(mock.compareRequests()).toHaveLength(1);
+  });
+
+  test('[51] closed, then reopened before the next read (a close and reopen to rerun CI) → not failed', async () => {
+    const w = makeWorld({ connected: true, inflight: 'pending', inflightKind: 'verify' });
+    const spec: PullSpec = { state: 'closed', merged: false };
+    const mock = new PullsMock({ [w.prNumber]: spec });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+    spec.state = 'open';
+    mock.status304 = false;
+    await poller.sweep(t0 + 60_000);
+    spec.state = 'closed';
+    await poller.sweep(t0 + 120_000); // closed again: the count starts over
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow().errorMessage).toBeNull();
+    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
+  });
+
+  test('[52] a closed response without a merged field is unreadable, not a close', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: false, noMerged: true },
+    });
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test.each([
+    ['a merge step starts', false],
+    ['the merge step finishes the card and a person reopens it', true],
+  ] as const)(
+    '[53] %s during the second unreadable compare → no hint',
+    async (_label, finished) => {
+      const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
+      w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+      const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, compare: 502 } });
+      const poller = pollerFor(w, mock);
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      mock.onCompare = () => {
+        if (finished) {
+          finishTodoDone(w.s.svc, w.todoId, w.buildId);
+          updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+          return;
+        }
+        w.s.db
+          .insert(stepTable)
+          .values({
+            id: `step-merge-late-${w.buildId}`,
+            buildId: w.buildId,
+            kind: 'merge',
+            status: 'pending',
+            createdAt: Date.now(),
+          })
+          .run();
+      };
+      await poller.sweep(t0 + 600_001);
+      expect(mock.compareRequests()).toHaveLength(2);
+      expect(w.systemRows().filter((c) => c.includes('compare'))).toEqual([]);
+    },
+  );
+
+  test('[54] a second merge step in the same round writes its completion row again, as before this change', () => {
+    const w = makeWorld();
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(2);
+  });
+
+  test('[55] the sweep log counts the reconcile apart from the grind', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    const info = vi.fn();
+    await createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: mock.fetch, logger: { info } },
+    ).sweep();
+    const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
+    expect(tally.pending).toBe(0);
+    expect(tally.reviewPending).toBe(1);
+  });
+
+  test("[56] anonymous: the grind's reads count toward the per-IP total, not the reconcile's own share", async () => {
+    const w = makeWorld({ phase: 'building' });
+    addReviewCard(w, 402);
+    w.s.db
+      .update(todoTable)
+      .set({ phase: 'building' })
+      .where(eq(todoTable.id, `${w.todoId}-402`))
+      .run();
+    addReviewCard(w, 401);
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'open', merged: false },
+      401: { state: 'open', merged: false },
+      402: { state: 'open', merged: false },
+    });
+    mock.checkRuns = true;
+    // two grind reads would fill a shared budget of 2; the reconcile's own share is untouched
+    await pollerFor(w, mock, { anonReadsPerHour: 2 }).sweep();
+    expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(2);
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/401'))).toHaveLength(1);
   });
 
   test('㊼ compare asks for one page', async () => {

@@ -138,6 +138,42 @@ export interface GithubPullPage {
   pull: GithubPull | null;
 }
 
+/** 条件 GET（ETag）：304 → notModified；非 2xx、网络错、响应体不是 JSON 对象
+ * → null。githubPull 与 githubCommitCheckRuns 共用。 */
+async function conditionalGetJson(
+  fetchImpl: FetchLike,
+  url: string,
+  token: string | null,
+  etag: string | null | undefined,
+  timeoutMs: number,
+): Promise<
+  { notModified: true } | { notModified: false; etag: string | null; data: object } | null
+> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      headers: {
+        ...API_HEADERS,
+        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+        ...(etag != null ? { 'if-none-match': etag } : {}),
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch {
+    return null;
+  }
+  if (res.status === 304) return { notModified: true };
+  if (!res.ok) return null;
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch {
+    return null;
+  }
+  if (typeof data !== 'object' || data === null) return null;
+  return { notModified: false, etag: res.headers.get('etag'), data };
+}
+
 /** 单条 PR 条件读（#1403 review 关口对账：`GET /repos/{o}/{r}/pulls/{n}`，
  * If-None-Match 携带上轮 etag → 304 不计主限流）。null = 读不到（网络/404/
  * 限流/响应形坏不区分，fail-open 归调用方，同 githubCommitCheckRuns）。 */
@@ -150,29 +186,16 @@ export async function githubPull(
   opts: { etag?: string | null; timeoutMs?: number } = {},
 ): Promise<GithubPullPage | null> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}`;
-  let res: Awaited<ReturnType<FetchLike>>;
-  try {
-    res = await fetchImpl(url, {
-      headers: {
-        ...API_HEADERS,
-        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
-        ...(opts.etag != null ? { 'if-none-match': opts.etag } : {}),
-      },
-      signal: AbortSignal.timeout(opts.timeoutMs ?? FETCH_TIMEOUT_MS),
-    });
-  } catch {
-    return null;
-  }
-  if (res.status === 304) return { notModified: true, etag: opts.etag ?? null, pull: null };
-  if (!res.ok) return null;
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return null;
-  }
-  if (typeof data !== 'object' || data === null) return null;
-  const raw = data as {
+  const got = await conditionalGetJson(
+    fetchImpl,
+    url,
+    token,
+    opts.etag,
+    opts.timeoutMs ?? FETCH_TIMEOUT_MS,
+  );
+  if (got === null) return null;
+  if (got.notModified) return { notModified: true, etag: opts.etag ?? null, pull: null };
+  const raw = got.data as {
     state?: unknown;
     merged?: unknown;
     merge_commit_sha?: unknown;
@@ -180,11 +203,14 @@ export async function githubPull(
     head?: { sha?: unknown } | null;
     base?: { ref?: unknown; repo?: { default_branch?: unknown } | null } | null;
   };
-  if (raw.state !== 'open' && raw.state !== 'closed') return null;
-  const merged = raw.merged === true;
+  // merged 缺失或不是布尔 → 读不到：不能把一次被裁掉的响应读成「关闭未合并」。
+  if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
+    return null;
+  }
+  const merged = raw.merged;
   return {
     notModified: false,
-    etag: res.headers.get('etag'),
+    etag: got.etag,
     pull: {
       state: raw.state,
       merged,
@@ -616,32 +642,13 @@ export async function githubCommitCheckRuns(
   const url =
     `https://api.github.com/${repoPath(owner, repo)}/commits/${encodeURIComponent(ref)}` +
     `/check-runs?per_page=${CHECK_RUNS_PER_PAGE}`;
-  let res: Awaited<ReturnType<FetchLike>>;
-  try {
-    res = await fetchImpl(url, {
-      headers: {
-        ...API_HEADERS,
-        ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
-        ...(opts.etag != null ? { 'if-none-match': opts.etag } : {}),
-      },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-  } catch {
-    return null;
-  }
-  if (res.status === 304) {
+  const got = await conditionalGetJson(fetchImpl, url, token, opts.etag, FETCH_TIMEOUT_MS);
+  if (got === null) return null;
+  if (got.notModified) {
     // 304 无应答体：etag 回传（调用方缓存键不变），checkRuns 空（notModified 位承载语义）。
     return { notModified: true, etag: opts.etag ?? null, checkRuns: [] };
   }
-  if (!res.ok) return null;
-  let data: unknown;
-  try {
-    data = await res.json();
-  } catch {
-    return null;
-  }
-  if (typeof data !== 'object' || data === null) return null;
-  const raw = (data as { check_runs?: unknown }).check_runs;
+  const raw = (got.data as { check_runs?: unknown }).check_runs;
   if (!Array.isArray(raw)) return null;
   const checkRuns: GithubCheckRun[] = [];
   for (const entry of raw as Array<Record<string, unknown>>) {
@@ -655,7 +662,7 @@ export async function githubCommitCheckRuns(
       outputSummary: typeof output?.summary === 'string' ? output.summary : null,
     });
   }
-  return { notModified: false, etag: res.headers.get('etag'), checkRuns };
+  return { notModified: false, etag: got.etag, checkRuns };
 }
 
 // —— OAuth token 交换面（#231 握手：callback 收码后唯一一次出站）———————————

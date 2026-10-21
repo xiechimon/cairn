@@ -35,12 +35,15 @@
 // #1403 第二候选集（review 关口的 PR 对账）：相位 review、build 是 todo 的
 // 当前 build（todo.latestBuildId；更旧的被取代 PR 关了或合了都不算数，当前
 // build 没 PR 时也不拿旧 PR 替它收尾）、没有在飞的步（merge 步正在合并时不
-// 插手）。未连接 GitHub（匿名 60 次/小时）时每候选 5 分钟最多读一次。每候选
+// 插手）。未连接 GitHub（匿名 60 次/小时按 IP 算）时每候选 5 分钟最多读一次，
+// 对账自己每小时至多 20 次、连同磨绿至多 50 次，pulls 读要给它可能跟着的
+// compare 留一次额度。每候选
 // 一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint 不同时再加一次
 // compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
 // - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后的 checkpoint
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
-// - 关闭未合并 → system 行 + build.errorMessage + failed；
+// - 关闭未合并、隔一轮再读到仍关闭（为重跑 CI 关掉又重开 PR 不算）→ system
+//   行 + build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 // 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
 // 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
@@ -94,9 +97,17 @@ export const CI_ANON_READ_INTERVAL_MS = 300_000;
 /** compare 答 404（提交不在 GitHub 上）或读不到之后，同一对提交的最短重读间隔。 */
 export const CI_MISSING_COMPARE_RECHECK_MS = 600_000;
 
-/** 未连接 GitHub 时对账每小时最多发的匿名请求（pulls 与 compare 合计；匿名
- * 主限流 60 次/小时按 IP 算，#931 / #1217 守卫与磨绿的匿名读也用这份额度）。 */
+/** 未连接 GitHub 时对账自己每小时最多发的匿名请求（pulls 与 compare 合计）。 */
 export const CI_ANON_READS_PER_HOUR = 20;
+
+/** 对账与磨绿合计每小时最多发的匿名请求：GitHub 的匿名主限流 60 次/小时按 IP
+ * 算，留 10 次给 #931 / #1217 守卫。磨绿只记数、不受它拦，对账在总数满了时
+ * 不读。 */
+export const CI_ANON_IP_READS_PER_HOUR = 50;
+
+/** PR 读到关闭未合并之后，隔这么久再读到仍关闭才打成 failed：为重跑 CI 关掉又
+ * 重开 PR 很常见，一次 sweep 落在中间不算（略短于一轮 sweep，下一轮即确认）。 */
+export const CI_CLOSED_CONFIRM_MS = 50_000;
 
 /** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
  * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
@@ -221,6 +232,12 @@ interface CiPollTally {
   errors: number;
   /** #1403 review 关口候选数（todo 当前 build 带 PR）。 */
   reviewCandidates: number;
+  /** 对账：PR 仍 open，或关闭了还待下一轮确认。 */
+  reviewPending: number;
+  /** 对账：形态不齐、有步在飞、网络窗里相位变了、匿名额度不够：不动。 */
+  reviewSkipped: number;
+  /** 对账：读不到（限流/404/网络/响应缺字段）：fail-open 下轮重试。 */
+  reviewUnreadable: number;
   /** PR 已在 GitHub 合并 → done。 */
   merged: number;
   /** PR 关闭未合并 → failed。 */
@@ -239,7 +256,12 @@ interface PullCacheEntry {
 
 export function createCiPoller(
   deps: BuildDeps,
-  run: { githubFetch: FetchLike; logger?: CiPollLogger; anonReadsPerHour?: number },
+  run: {
+    githubFetch: FetchLike;
+    logger?: CiPollLogger;
+    anonReadsPerHour?: number;
+    anonIpReadsPerHour?: number;
+  },
 ): CiPoller {
   const cache = new Map<string, PrChecksCacheEntry>();
   const pullCache = new Map<string, PullCacheEntry>();
@@ -253,8 +275,9 @@ export function createCiPoller(
     Map<string, { status: string; at: number; failures: number }>
   >();
   /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
-  const lastReadAt = new Map<string, number>();
   const lastReadByBuild = new Map<string, number>();
+  /** 首次读到关闭未合并的时刻（按 PR）；读到 open 即清。 */
+  const closedSeenAt = new Map<string, number>();
   /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
   const knownRows = new Set<string>();
   /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
@@ -263,19 +286,32 @@ export function createCiPoller(
   const grindKeys = new Set<string>();
   /** 上一轮 sweep 还在跑（网络读慢）时下一轮不进来：缓存与匿名额度按单轮设计。 */
   let sweeping = false;
-  /** 对账最近一小时的匿名请求时刻（进程级额度）。 */
-  const anonReads: number[] = [];
+  /** 最近一小时的匿名请求时刻：对账自己的，与对账加磨绿的（按 IP 的总数）。 */
+  const anonOwn: number[] = [];
+  const anonAll: number[] = [];
 
-  function recordAnonRead(now: number): void {
-    while (anonReads.length > 0 && (anonReads[0] ?? now) <= now - 3_600_000) anonReads.shift();
-    anonReads.push(now);
+  function anonFree(now: number): number {
+    for (const list of [anonOwn, anonAll]) {
+      while (list.length > 0 && (list[0] ?? now) <= now - 3_600_000) list.shift();
+    }
+    return Math.min(
+      (run.anonReadsPerHour ?? CI_ANON_READS_PER_HOUR) - anonOwn.length,
+      (run.anonIpReadsPerHour ?? CI_ANON_IP_READS_PER_HOUR) - anonAll.length,
+    );
   }
 
-  /** 取一次匿名额度：一小时内已用满返回 false。 */
-  function takeAnonRead(now: number): boolean {
-    while (anonReads.length > 0 && (anonReads[0] ?? now) <= now - 3_600_000) anonReads.shift();
-    if (anonReads.length >= (run.anonReadsPerHour ?? CI_ANON_READS_PER_HOUR)) return false;
-    anonReads.push(now);
+  /** 磨绿的匿名读：只记进按 IP 的总数，不受额度拦。 */
+  function recordGrindAnonRead(now: number): void {
+    anonFree(now);
+    anonAll.push(now);
+  }
+
+  /** 取一次对账的匿名额度；need = 这次读之后还要留出的次数（pulls 读要给它
+   * 可能跟着的 compare 留一次）。 */
+  function takeAnonRead(now: number, need = 1): boolean {
+    if (anonFree(now) < need) return false;
+    anonOwn.push(now);
+    anonAll.push(now);
     return true;
   }
 
@@ -396,45 +432,45 @@ export function createCiPoller(
       buildRow.prNumber === null ||
       target === null
     ) {
-      tally.skipped += 1;
+      tally.reviewSkipped += 1;
       return;
     }
     const prNumber = buildRow.prNumber;
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
     if (hasActiveStep(cand.buildId)) {
-      tally.skipped += 1; // merge 步在飞：合并结果由它收尾
+      tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
     const token = tokenFor(target.teamId);
     if (token === null) {
       const last = anonReadAt.get(key);
-      if ((last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) || !takeAnonRead(now)) {
-        tally.skipped += 1;
+      if ((last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) || !takeAnonRead(now, 2)) {
+        tally.reviewSkipped += 1;
         return;
       }
       anonReadAt.set(key, now);
     }
-    lastReadAt.set(key, now);
     lastReadByBuild.set(cand.buildId, now);
     const entry = pullCache.get(key) ?? null;
     const page = await githubPull(run.githubFetch, token, target.owner, target.repo, prNumber, {
       etag: entry?.etag ?? null,
     });
     if (page === null) {
-      tally.unreadable += 1;
+      tally.reviewUnreadable += 1;
       return;
     }
     const pull = page.notModified ? (entry?.pull ?? null) : page.pull;
     pullCache.set(key, { etag: page.etag, pull });
     if (pull === null || pull.state === 'open') {
-      tally.pending += 1;
+      closedSeenAt.delete(key);
+      tally.reviewPending += 1;
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
     const fresh = freshReviewRow(cand.todoId, cand.buildId);
     if (fresh === null || hasActiveStep(cand.buildId)) {
-      tally.skipped += 1;
+      tally.reviewSkipped += 1;
       return;
     }
     const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
@@ -445,7 +481,7 @@ export function createCiPoller(
     }
     if (pull.merged) {
       if (pull.baseRef === null || pull.defaultBranch === null) {
-        tally.unreadable += 1;
+        tally.reviewUnreadable += 1;
         return;
       }
       if (pull.baseRef !== pull.defaultBranch) {
@@ -474,7 +510,7 @@ export function createCiPoller(
           .orderBy(desc(step.createdAt))
           .get()?.commit ?? null;
       if (checkpoint !== null && pull.headSha === null) {
-        tally.unreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
+        tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
         return;
       }
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
@@ -490,7 +526,7 @@ export function createCiPoller(
             : cached.status;
         if (status === null) {
           if (token === null && !takeAnonRead(now)) {
-            tally.skipped += 1;
+            tally.reviewSkipped += 1;
             return;
           }
           status =
@@ -508,9 +544,12 @@ export function createCiPoller(
         if (status === 'unreadable') {
           // 读不到（GitHub 出错、超时、限流）：10 分钟内不重读；连续两次读不到
           // 才提示一次（一次超时之后下一次就读到的常见情形不留陈旧提示）。
+          // 写提示前同样复查（㉘）：网络窗里卡离开 review、有步开始在飞或本轮已报告 → 不写。
           if (
             (pairs.get(cmpKey)?.failures ?? 0) >= 2 &&
-            freshReviewRow(cand.todoId, cand.buildId) !== null
+            freshReviewRow(cand.todoId, cand.buildId) !== null &&
+            !hasActiveStep(cand.buildId) &&
+            !settled(cand.buildId, true, closedText, since)
           ) {
             hintOnce(
               cand.buildId,
@@ -519,7 +558,7 @@ export function createCiPoller(
               tally,
             );
           }
-          tally.unreadable += 1;
+          tally.reviewUnreadable += 1;
           return;
         }
         if (
@@ -527,7 +566,7 @@ export function createCiPoller(
           hasActiveStep(cand.buildId) ||
           settled(cand.buildId, true, closedText, since)
         ) {
-          tally.skipped += 1;
+          tally.reviewSkipped += 1;
           return;
         }
         if (status !== 'ahead' && status !== 'identical') {
@@ -560,6 +599,15 @@ export function createCiPoller(
       tally.merged += 1;
       return;
     }
+    // 关闭要隔一轮再读到才算：为重跑 CI 关掉又重开 PR 很常见，sweep 落在中间时
+    // 不能把卡打成 failed、停掉它的 verify 步。
+    const seen = closedSeenAt.get(key);
+    if (seen === undefined || now - seen < CI_CLOSED_CONFIRM_MS) {
+      if (seen === undefined) closedSeenAt.set(key, now);
+      tally.reviewPending += 1;
+      return;
+    }
+    closedSeenAt.delete(key);
     insertMessageRow(deps, cand.buildId, {
       id: newRecordId(),
       role: 'system',
@@ -600,7 +648,7 @@ export function createCiPoller(
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
     const grindToken = tokenFor(target.teamId);
     // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
-    if (grindToken === null) recordAnonRead(now);
+    if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(
       run.githubFetch,
       grindToken,
@@ -711,6 +759,9 @@ export function createCiPoller(
       unreadable: 0,
       errors: 0,
       reviewCandidates: reviewCandidates.length,
+      reviewPending: 0,
+      reviewSkipped: 0,
+      reviewUnreadable: 0,
       merged: 0,
       closedUnmerged: 0,
       hinted: 0,
@@ -750,7 +801,7 @@ export function createCiPoller(
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
     for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
     for (const k of compareCache.keys()) if (!liveKeys.has(k)) compareCache.delete(k);
-    for (const k of lastReadAt.keys()) if (!liveKeys.has(k)) lastReadAt.delete(k);
+    for (const k of closedSeenAt.keys()) if (!liveKeys.has(k)) closedSeenAt.delete(k);
     const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
     for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);
     for (const k of knownRows)
