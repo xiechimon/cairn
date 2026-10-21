@@ -1,0 +1,58 @@
+#1459 gates at 3524b15a (worktree .claude/worktrees/p5e, branch claude/bootstrap-p5-1459; origin/main = dabef481)
+
+== pnpm lint -> exit 0
+
+Checked 787 files in 3s. No fixes applied.
+Found 1 info.
+(the 1 info is the existing noUselessFragments note in apps/web/src/resources/machines-page.tsx, not in this diff)
+
+== pnpm typecheck -> exit 0
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+
+== pnpm spec:parse -> exit 0
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (8.4s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+== node scripts/test-spawn-gate.mjs -> exit 0
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+
+== pnpm exec vitest run --changed origin/main -> exit 1 (the root-only runner-brief case, below)
+Test Files  1 failed | 247 passed (248)
+Tests  1 failed | 2641 passed | 1 skipped (2643)
+Duration  425.90s (tests 56%, import 43%, transform 1%)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ > test/runner-brief.test.ts:411:23
+    409|     const { client } = await run({ claimed, backend, workspace: ws });
+    410|     chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
+    411|     expect(calls).not.toContain('commitAll');
+       |                       ^
+    412|     expect(calls).not.toContain('push');
+Only failure: apps/daemon/test/runner-brief.test.ts '擦除失败 → 不 commitAll ...'. It makes the workspace
+unwritable with chmodSync(..., 0o500) and expects the erase to fail; this container runs as root (id -u = 0),
+and root ignores the mode bits, so the erase succeeds. Root-only; apps/daemon is untouched by this branch
+(git diff --stat origin/main...HEAD -- apps/daemon: empty).
+No other failure in that run. Separately, apps/server/test/skill-write.test.ts timed out once (5 s) in an
+earlier full server+shared run under load and passes alone (30/30); it is not in this diff.
+
+== E2E_AFFECTED_PORT=8393 pnpm --filter @pacman/web e2e:affected -> exit 0
+(8393 checked free with lsof; the default 8398 was free too; 8393 was picked to stay off the shared default)
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8393
+  ok  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.5s)
+  ok  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.7s)
+  ok  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.1s)
+  ok  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (718ms)
+  ok  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (778ms)
+  ok  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (761ms)
+  ok  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (547ms)
+  ok  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (492ms)
+  8 passed (16.6s)
