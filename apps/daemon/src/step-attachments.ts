@@ -10,8 +10,9 @@
 //   - text/pdf → 零触碰（既有 attachment 工具路径不动）
 // 失败可见律：下载失败（pending/404/网络）、素材化落盘失败与 key 语法复验
 // 不过 → token 原样保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过
-// （票面失败方式 3/10），同一文本里其余图片照常交付。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
-// 在解析前已落 transcript）——web 渲染面的 chip 形态不因展开而丢。
+// （票面失败方式 3/10），同一文本里其余图片照常交付。原文保真律：
+// journal/transcript 侧的原始文本不经本模块（runner 在解析前已落
+// transcript）——web 渲染面的 chip 形态不因展开而丢。
 // #1406 issue 原文围栏：GitHub issue 导入任务的标题与 spec 逐行带引用前缀进
 // 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行按围栏同一
 // 引用律（quoteIssueLines）写回，留在围栏里；围栏外的引用 token 行不认（web
