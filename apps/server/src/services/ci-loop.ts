@@ -63,6 +63,7 @@ import {
   githubCommitCheckRuns,
   githubCompareStatus,
   githubPull,
+  isFullSha,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -286,6 +287,9 @@ export function createCiPoller(
   const grindKeys = new Set<string>();
   /** 上一轮 sweep 还在跑（网络读慢）时下一轮不进来：缓存与匿名额度按单轮设计。 */
   let sweeping = false;
+  /** 本轮 sweep 开始的真实时刻：一次读真正发生的时刻 = now + 已过去的时间
+   * （慢的一轮里，排在后面的读可能比 sweep 开始晚几十秒）。 */
+  let sweepStartedAt = 0;
   /** 最近一小时的匿名请求时刻：对账自己的，与对账加磨绿的（按 IP 的总数）。 */
   const anonOwn: number[] = [];
   const anonAll: number[] = [];
@@ -346,6 +350,16 @@ export function createCiPoller(
     if (!hasMessageRow(deps, buildId, 'system', content, since)) return false;
     knownRows.add(memo);
     return true;
+  }
+
+  /** compare 读回来之后（await 之后）还轮得到对账写：卡仍在 review 且是当前
+   * build、没有步开始在飞、本轮还没有完成行（合并步刚收过尾）。 */
+  function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
+    return (
+      freshReviewRow(cand.todoId, cand.buildId) !== null &&
+      !hasActiveStep(cand.buildId) &&
+      !rowKnown(cand.buildId, DONE_ROW, since)
+    );
   }
 
   /** 本轮（since 起）是否已报告过这个结局（完成行 / 对账的关闭行）。 */
@@ -443,25 +457,36 @@ export function createCiPoller(
       return;
     }
     const token = tokenFor(target.teamId);
-    if (token === null) {
-      const last = anonReadAt.get(key);
-      if ((last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) || !takeAnonRead(now, 2)) {
-        tally.reviewSkipped += 1;
+    const entry = pullCache.get(key) ?? null;
+    let pull: GithubPull | null;
+    let readAt = now;
+    if (entry?.pull?.merged === true) {
+      // 合并是终态：卡留在 review（提示、人拖回）时不再重读，不耗读额度。
+      pull = entry.pull;
+    } else {
+      if (token === null) {
+        const last = anonReadAt.get(key);
+        if (
+          (last !== undefined && now - last < CI_ANON_READ_INTERVAL_MS) ||
+          !takeAnonRead(now, 2)
+        ) {
+          tally.reviewSkipped += 1;
+          return;
+        }
+        anonReadAt.set(key, now);
+      }
+      lastReadByBuild.set(cand.buildId, now);
+      const page = await githubPull(run.githubFetch, token, target.owner, target.repo, prNumber, {
+        etag: entry?.etag ?? null,
+      });
+      readAt = now + (nowMs() - sweepStartedAt);
+      if (page === null) {
+        tally.reviewUnreadable += 1;
         return;
       }
-      anonReadAt.set(key, now);
+      pull = page.notModified ? (entry?.pull ?? null) : page.pull;
+      pullCache.set(key, { etag: page.etag, pull });
     }
-    lastReadByBuild.set(cand.buildId, now);
-    const entry = pullCache.get(key) ?? null;
-    const page = await githubPull(run.githubFetch, token, target.owner, target.repo, prNumber, {
-      etag: entry?.etag ?? null,
-    });
-    if (page === null) {
-      tally.reviewUnreadable += 1;
-      return;
-    }
-    const pull = page.notModified ? (entry?.pull ?? null) : page.pull;
-    pullCache.set(key, { etag: page.etag, pull });
     if (pull === null || pull.state === 'open') {
       closedSeenAt.delete(key);
       tally.reviewPending += 1;
@@ -525,7 +550,9 @@ export function createCiPoller(
             ? null
             : cached.status;
         if (status === null) {
-          if (token === null && !takeAnonRead(now)) {
+          // 不是 40 位 SHA 时 compare 不发请求（答 invalid），不占匿名额度。
+          const sendsRequest = isFullSha(checkpoint) && isFullSha(pull.headSha);
+          if (token === null && sendsRequest && !takeAnonRead(now)) {
             tally.reviewSkipped += 1;
             return;
           }
@@ -545,12 +572,7 @@ export function createCiPoller(
           // 读不到（GitHub 出错、超时、限流）：10 分钟内不重读；连续两次读不到
           // 才提示一次（一次超时之后下一次就读到的常见情形不留陈旧提示）。
           // 写提示前同样复查（㉘）：网络窗里卡离开 review、有步开始在飞或本轮已报告 → 不写。
-          if (
-            (pairs.get(cmpKey)?.failures ?? 0) >= 2 &&
-            freshReviewRow(cand.todoId, cand.buildId) !== null &&
-            !hasActiveStep(cand.buildId) &&
-            !settled(cand.buildId, true, closedText, since)
-          ) {
+          if ((pairs.get(cmpKey)?.failures ?? 0) >= 2 && stillOurs(cand, since)) {
             hintOnce(
               cand.buildId,
               `PR #${prNumber} 已在 GitHub 合并，但暂时读不到 compare（GitHub 出错、超时或限流），无法确认分支提交 ${checkpoint.slice(0, 7)} 在这次合并里；稍后重试。`,
@@ -561,11 +583,7 @@ export function createCiPoller(
           tally.reviewUnreadable += 1;
           return;
         }
-        if (
-          freshReviewRow(cand.todoId, cand.buildId) === null ||
-          hasActiveStep(cand.buildId) ||
-          settled(cand.buildId, true, closedText, since)
-        ) {
+        if (!stillOurs(cand, since)) {
           tally.reviewSkipped += 1;
           return;
         }
@@ -602,8 +620,8 @@ export function createCiPoller(
     // 关闭要隔一轮再读到才算：为重跑 CI 关掉又重开 PR 很常见，sweep 落在中间时
     // 不能把卡打成 failed、停掉它的 verify 步。
     const seen = closedSeenAt.get(key);
-    if (seen === undefined || now - seen < CI_CLOSED_CONFIRM_MS) {
-      if (seen === undefined) closedSeenAt.set(key, now);
+    if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
+      if (seen === undefined) closedSeenAt.set(key, readAt);
       tally.reviewPending += 1;
       return;
     }
@@ -733,6 +751,7 @@ export function createCiPoller(
   }
 
   async function sweepOnce(now: number): Promise<void> {
+    sweepStartedAt = nowMs();
     // 批量扫描：一条查询取全候选——prNumber 在位 × 相位 building（磨绿中；
     // review/failed/closed/done 都已退出磨绿集，天然满足「已推进不回写」）×
     // todo 的当前 build（#1403：重跑开出的新 build 在跑时，旧 PR 不再被磨）。

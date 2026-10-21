@@ -1808,15 +1808,20 @@ export function hasMessageRow(
  * verify / review 步、相位 → done（已 done 则相位不动）、完成行、拆卡波次推进。
  * 对账在本轮已有完成行时不进这里（ci-loop settled），两个落点不会叠两行。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
+  // 到不了 done（人在合并步跑着时把卡关了）就先抛错，什么都不动（setTodoPhase
+  // 同一判据）。
+  const current = deps.db
+    .select({ phase: todo.phase })
+    .from(todo)
+    .where(eq(todo.id, todoId))
+    .get()?.phase;
+  if (current !== undefined && current !== 'done') assertPhaseTransition(current, 'done');
   // 卡已收尾：没人领的 verify / review 步之后不再在它上面跑（合并步与对账同一处）。
   // 先停步再落相位：done 文档发出时不再带着这些步的等额度投影。
   const stopped = stopUnclaimedGateSteps(deps, buildId);
-  const wasDone =
-    deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, todoId)).get()?.phase ===
-    'done';
   setTodoPhase(deps, todoId, 'done');
   // 相位本来就是 done 时 setTodoPhase 不发文档：停了步就补发一次。
-  if (wasDone && stopped > 0) {
+  if (current === 'done' && stopped > 0) {
     const record = getTodo(deps, todoId);
     if (record) deps.hub.publishTodoDoc(record.teamId, record);
   }

@@ -88,6 +88,12 @@
 //        对账在本轮已有完成行时根本不收尾，用不着 finishTodoDone 自己去重）
 //   [55] sweep 日志把对账与磨绿分开计数
 //   [56] 磨绿的匿名读算进按 IP 的总额度，不占对账自己的那份
+// 第六遍 /code-review 补的：
+//   [57] 关闭确认按两次读真正发生的时刻算，不按 sweep 开始的时刻（慢的一轮之后
+//        紧跟快的一轮，两次读可能只隔十几秒）
+//   [58] 已合并的 PR 不会再变：卡留在 review（提示、人拖回）时不再重读
+//   [59] 合并步收尾时相位已被人改成不能到 done 的（closed）→ 先抛错，不停任何步
+//   [60] checkpoint 不是 40 位 SHA 时 compare 不发请求，也不占匿名额度
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -1519,6 +1525,73 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     await pollerFor(w, mock, { anonReadsPerHour: 2 }).sweep();
     expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(2);
     expect(mock.requests.filter((u) => u.endsWith('/pulls/401'))).toHaveLength(1);
+  });
+
+  test('[57] a close counts when the two reads happened 50 s apart, not the two sweep starts', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+    const t0 = Date.now();
+    // a slow first sweep: the pulls read lands 45 s after the sweep started
+    const fetch = mock.fetch;
+    let slow = true;
+    const timed = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      {
+        githubFetch: (input, init) => {
+          if (slow) {
+            slow = false;
+            vi.setSystemTime(Date.now() + 45_000);
+          }
+          return fetch(input, init);
+        },
+      },
+    );
+    try {
+      await timed.sweep(t0);
+      vi.setSystemTime(t0 + 60_000);
+      await timed.sweep(t0 + 60_000); // 15 s after the first read
+      expect(w.todoRow().phase).toBe('review');
+      vi.setSystemTime(t0 + 120_000);
+      await timed.sweep(t0 + 120_000);
+      expect(w.todoRow().phase).toBe('failed');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('[58] a merged PR is not read again while its card stays in review', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, baseRef: 'release-x', defaultBranch: 'main' },
+    });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 300_001);
+    await poller.sweep(t0 + 600_002);
+    expect(mock.requests.filter((u) => u.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().filter((c) => c.includes('release-x'))).toHaveLength(1);
+  });
+
+  test('[59] the merge step finishing a card a person closed meanwhile throws before it stops anything', () => {
+    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
+    updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
+    expect(() => finishTodoDone(w.s.svc, w.todoId, w.buildId)).toThrow();
+    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[60] anonymous: a compare that sends no request (checkpoint not a sha) takes no budget', async () => {
+    const w = makeWorld({ checkpoint: 'not-a-sha' });
+    addReviewCard(w, 301);
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true },
+      301: { state: 'open', merged: false },
+    });
+    await pollerFor(w, mock, { anonReadsPerHour: 3 }).sweep();
+    expect(mock.compareRequests()).toHaveLength(0);
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/301'))).toHaveLength(1);
   });
 
   test('㊼ compare asks for one page', async () => {

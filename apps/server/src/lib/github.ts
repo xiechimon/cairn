@@ -117,6 +117,11 @@ export async function githubPullState(
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
+/** 40 位小写十六进制的提交 SHA（compare 只拿这种拼 URL）。 */
+export function isFullSha(value: string): boolean {
+  return FULL_SHA.test(value);
+}
+
 /** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head
  * SHA、base 分支与仓库默认分支。 */
 export interface GithubPull extends GithubPullState {
@@ -237,7 +242,7 @@ export async function githubCompareStatus(
   base: string,
   head: string,
 ): Promise<string | 'missing' | 'invalid' | null> {
-  if (!FULL_SHA.test(base) || !FULL_SHA.test(head)) return 'invalid';
+  if (!isFullSha(base) || !isFullSha(head)) return 'invalid';
   // per_page=1：只要 status，不拉整页提交。
   const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
