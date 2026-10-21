@@ -8,9 +8,9 @@
 //     step-attachments/<stepId>/）+ token 行下追加绝对路径 + Read 提示——
 //     引擎 Read 工具按需转换（pi photon / CC 内建）后进上下文
 //   - text/pdf → 零触碰（既有 attachment 工具路径不动）
-// 失败可见律：下载失败（pending/404/网络）与 key 语法复验不过 → token 原样
-// 保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过（票面失败方式
-// 3/10）。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
+// 失败可见律：下载失败（pending/404/网络）、素材化落盘失败与 key 语法复验
+// 不过 → token 原样保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过
+// （票面失败方式 3/10），同一文本里其余图片照常交付。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
 // 在解析前已落 transcript）——web 渲染面的 chip 形态不因展开而丢。
 // #1406 issue 原文围栏：GitHub issue 导入任务的标题与 spec 逐行带引用前缀进
 // 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行按围栏同一
@@ -90,7 +90,9 @@ export function materializeFile(
   const path = join(materializeDir, stepId, safeFileName(fileName));
   const segments = relative(materializeDir, path).split(sep);
   if (segments.length !== 2 || segments.includes('..')) {
-    throw new Error(`materialize path outside ${materializeDir}/<stepId>/: ${path}`);
+    throw new Error(
+      `materialize path outside ${materializeDir}/<stepId>/: ${JSON.stringify(path)}`,
+    );
   }
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, bytes);
@@ -230,6 +232,18 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
   return { text: outLines.join('\n'), images };
 }
 
+/** 不可用处置（下载或落盘失败）：日志行 + 注记；token 行原样保留由重建处负责。 */
+function unavailable(
+  key: string,
+  stage: 'download' | 'materialize',
+  err: unknown,
+  log: (line: string) => void,
+): Outcome {
+  const reason = err instanceof Error ? err.message : String(err);
+  log(`attachment ${stage} failed: ${key} — ${reason}`);
+  return { kind: 'unavailable', note: `[图片附件 ${key} 不可用：${reason} — 该图片未交付]` };
+}
+
 /** 单 token 分路处置。 */
 async function resolveOne(
   ref: { line: string; label: string; key: string; attachmentId: string; ext: string },
@@ -240,12 +254,7 @@ async function resolveOne(
   try {
     res = await opts.client.attachment(opts.stepId, ref.attachmentId);
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    opts.log(`attachment download failed: ${ref.key} — ${reason}`);
-    return {
-      kind: 'unavailable',
-      note: `[图片附件 ${ref.key} 不可用：${reason} — 该图片未交付]`,
-    };
+    return unavailable(ref.key, 'download', err, opts.log);
   }
   // 分类以响应 mime 为权威（key ext 只是预筛——漂移时按真值分路）。
   const mime = inlineMime(res.mimeType);
@@ -257,12 +266,18 @@ async function resolveOne(
     };
   }
   const bytes = Buffer.from(res.contentBase64, 'base64');
-  const path = materializeFile(
-    opts.materializeDir,
-    opts.stepId,
-    withMimeExt(res.fileName, res.mimeType),
-    bytes,
-  );
+  let path: string;
+  try {
+    path = materializeFile(
+      opts.materializeDir,
+      opts.stepId,
+      withMimeExt(res.fileName, res.mimeType),
+      bytes,
+    );
+  } catch (err) {
+    // 落盘失败只让这一个 token 不可用（同下载失败）：同一文本里已解析的图片照常交付。
+    return unavailable(ref.key, 'materialize', err, opts.log);
+  }
   opts.log(
     `attachment materialized: ${res.fileName} → ${path} (${res.mimeType} 不支持内联交付，走 Read 路线)`,
   );
