@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// verify-pacman 单一入口(#1402)。每个会话不再各写各的驱动脚本:功能 → case
-// → 脚本的对应关系登记在 ../vp-registry.json,drive 按表分发;launch / doctor /
-// cleanup 原样转给既有脚本,行为不变。证据交付拆两步:archive 只拷贝(docs/verify
-// 只增不改,ADR 0015),links 在提交推送之后打印钉 SHA 的 raw 链。
-// 栈坐标、端口、证据目录沿用既有环境变量:VERIFY_REPO_ROOT / VERIFY_RUN_DIR /
+// verify-pacman 单一入口(#1402)。功能 → case → 脚本的对应关系登记在
+// ../vp-registry.json,drive 按表分发;launch / doctor / cleanup 转给同名脚本。
+// 证据交付分两步:archive 只拷贝(docs/verify 只增不改,ADR 0015),links 在提交
+// 推送之后打印钉 SHA 的 raw 链。drive 与 capture 不往 docs/verify 里写。
+// 栈坐标、端口、证据目录取自环境变量:VERIFY_REPO_ROOT / VERIFY_RUN_DIR /
 // VERIFY_PORT / VERIFY_WEB_PORT / VERIFY_EVIDENCE_DIR。
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
@@ -25,9 +25,14 @@ for (const key of ['VERIFY_REPO_ROOT', 'VERIFY_RUN_DIR', 'VERIFY_EVIDENCE_DIR'])
 for (const key of ['VERIFY_PORT', 'VERIFY_WEB_PORT']) if (!process.env[key]) delete process.env[key];
 const ROOT = process.env.VERIFY_REPO_ROOT ?? SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
+const MAIN_ROOT = mainCheckout(SCRIPT_ROOT);
 // Evidence goes to the main checkout, also when this vp.mjs sits in a worktree:
 // a worktree's evidence is deleted with it (#345, SKILL.md Evidence).
-const EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), '.claude', 'verify-evidence');
+const EVIDENCE_ROOT = join(MAIN_ROOT, '.claude', 'verify-evidence');
+// Committed evidence, add-only (ADR 0015): docs/verify of the repository vp.mjs
+// works on, of vp.mjs's own checkout and of the main checkout. archive adds to
+// it; drive and capture never write into it.
+const COMMITTED_EVIDENCE = [...new Set([ROOT, SCRIPT_ROOT, MAIN_ROOT].map((r) => physical(join(r, 'docs', 'verify'))))];
 // Needs that make a case run only when asked with --force, and why.
 const FORCE_NEEDS = {
   'real-llm': 'spends model tokens',
@@ -56,12 +61,15 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
                                  .claude/verify-evidence/<time>-<feature>-<case>/ in the main checkout,
                                  created once doctor passes (a probe with its own output option gets
                                  the directory through it, or uses the one given after --; a probe
-                                 that writes fixed evidence is named instead);
+                                 that writes fixed evidence is named instead); an evidence directory
+                                 inside docs/verify (VERIFY_EVIDENCE_DIR, or the output option's
+                                 directory) is refused before anything runs, also with --dry-run;
                                  --dry-run prints what would run
   capture <path> [--name <label>] [--wait <ms>]
                                  screenshot a live route, record console errors and failed requests
                                  (exit 0 when the page loaded; errors are recorded, not judged;
-                                 with VERIFY_EVIDENCE_DIR set it writes into a new capture-<label>/)
+                                 with VERIFY_EVIDENCE_DIR set it writes into a new capture-<label>/,
+                                 refused when that directory is inside docs/verify)
   archive <ticket> [--from <dir>]... [--latest <n>]
                                  copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
                                  the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
@@ -103,6 +111,34 @@ function mainCheckout(dir) {
   } catch {
     return dir;
   }
+}
+
+// The path with symlinks resolved as far as it exists, so a link into
+// docs/verify, or a temp dir behind a symlink, compares as the directory itself.
+function physical(path) {
+  const rest = [];
+  let head = resolve(path);
+  while (!existsSync(head) && dirname(head) !== head) {
+    rest.unshift(basename(head));
+    head = dirname(head);
+  }
+  try {
+    head = realpathSync(head);
+  } catch {}
+  return join(head, ...rest);
+}
+
+// An evidence directory inside committed evidence is refused before anything
+// runs: a probe writing there would rewrite archived files in place.
+function refuseCommitted(dir, what) {
+  const path = physical(dir);
+  const root = COMMITTED_EVIDENCE.find((r) => path === r || path.startsWith(`${r}${sep}`));
+  if (root === undefined) return;
+  fail(
+    `${what} is inside ${root}: committed evidence, add-only (ADR 0015).\n` +
+      'Let vp.mjs write to a new directory under .claude/verify-evidence (leave VERIFY_EVIDENCE_DIR unset), ' +
+      'then copy it in with vp.mjs archive <ticket> --from <dir>.',
+  );
 }
 
 function pad(n) {
@@ -181,6 +217,7 @@ function driveCommand(argv) {
   const dryRun = takeFlag(argv, '--dry-run');
   const [feature, caseName, ...stray] = argv;
   if (stray.length > 0) fail(`unexpected argument(s) ${stray.join(' ')}: script arguments go after --`);
+  if (process.env.VERIFY_EVIDENCE_DIR) refuseCommitted(process.env.VERIFY_EVIDENCE_DIR, `VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR}`);
   const { features } = loadRegistry();
   if (feature === undefined) fail(`usage: vp.mjs drive <feature> [case]\nfeatures: ${Object.keys(features).join(', ')}`);
   if (!Object.hasOwn(features, feature)) fail(`unknown feature: ${feature}\nfeatures: ${Object.keys(features).join(', ')}`);
@@ -197,9 +234,8 @@ function driveCommand(argv) {
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   if (c.runner === 'tsx' && c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
-  // Every reason the case needs --force, in one refusal: a stale case's refusal
-  // used to name only its status, and --force then also let its real-llm,
-  // github or rewrites-evidence need through unnamed (pr-gate run 7 on #1411).
+  // Every reason the case needs --force goes into one refusal, and --force
+  // prints the same list, so a --force is given knowing all it authorizes.
   const reasons = [];
   if (c.status !== 'current') reasons.push(`is ${c.status}${c.note ? `: ${c.note.replace(/\.+$/, '')}` : ''}`);
   for (const need of c.needs) if (need in FORCE_NEEDS) reasons.push(`needs ${need} (${FORCE_NEEDS[need]})`);
@@ -224,7 +260,7 @@ function driveCommand(argv) {
   }
   // Arguments after -- replace the default arguments they name (the same option
   // before '=', or the same probe or journey name); the other defaults stay, so a
-  // post-fix --expect flag survives an unrelated option (/code-review on #1411).
+  // post-fix --expect flag survives an unrelated option.
   // The output directory is a value, so a directory named like the journey does
   // not replace the journey.
   const keyOf = (a) => a.split('=')[0];
@@ -252,15 +288,16 @@ function driveCommand(argv) {
   }
   // Every drive writes somewhere new unless told otherwise: several probes
   // default their evidence into docs/verify/<their ticket>/ or into scripts/,
-  // which would rewrite committed evidence (pr-gate run 3 on #1411). A probe
-  // that writes fixed evidence by design gets no directory; one that takes an
-  // output option gets the directory through it, or uses the one given after --;
-  // one that reads another variable gets it there (pr-gate run 4, /code-review).
+  // which would rewrite committed evidence. A probe that writes fixed evidence
+  // by design gets no directory; one that takes an output option gets the
+  // directory through it, or uses the one given after --; one that reads
+  // another variable gets it there.
   const flagAt = args.indexOf(evidence.flag);
   // A path given after -- is the caller's: made absolute against their cwd, not
   // the probe's (node cases run from the repo root, tsx cases from a package).
   if (flagAt !== -1 && args[flagAt + 1] !== undefined) args[flagAt + 1] = resolve(args[flagAt + 1]);
   const given = flagAt === -1 ? undefined : args[flagAt + 1];
+  if (given !== undefined) refuseCommitted(given, `${evidence.flag} ${given}`);
   const envName = evidence.env ?? 'VERIFY_EVIDENCE_DIR';
   const named = process.env.VERIFY_EVIDENCE_DIR;
   const planned =
@@ -325,6 +362,7 @@ async function captureCommand(argv) {
   const path = argv[0];
   if (path === undefined || !path.startsWith('/')) fail('usage: vp.mjs capture </app/route> [--name <label>] [--wait <ms>]');
   if (!/^[A-Za-z0-9-]+$/.test(label)) fail('--name must be letters, digits and dashes');
+  if (process.env.VERIFY_EVIDENCE_DIR) refuseCommitted(process.env.VERIFY_EVIDENCE_DIR, `VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR}`);
   const stack = readStack();
   if (stack === undefined) fail('vp: no stack coordinates, run `vp.mjs launch` first', 1);
   const { webPort } = stack;

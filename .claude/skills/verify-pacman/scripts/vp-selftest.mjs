@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // vp.mjs self-test (#1402): the dispatch and archive rules, checked without a
-// stack. drive cases use --dry-run, which prints the resolved command and the
-// evidence/run paths instead of running anything. archive cases use a
-// throwaway VERIFY_REPO_ROOT. Cases that must really run use a copy of vp.mjs
-// in a throwaway skill directory with its own registry and a stub probe.
-// Failure modes from pr-gate runs 2 to 7 and /code-review on #1411.
+// stack. drive cases run a copy of vp.mjs in a throwaway skill directory with
+// its own registry and a stub probe, and set each case's status, needs and
+// arguments themselves, so no case depends on a real registry entry; most use
+// --dry-run, which prints the resolved command and the evidence/run paths
+// instead of running anything. The whole-registry scans read the real
+// registry. archive cases use a throwaway VERIFY_REPO_ROOT.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -22,23 +23,16 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
 const VP = resolve(import.meta.dirname, 'vp.mjs');
 const ROOT = resolve(import.meta.dirname, '../../../..');
 const REGISTRY = JSON.parse(readFileSync(resolve(import.meta.dirname, '../vp-registry.json'), 'utf8'));
-// Where drive puts evidence by default: the main checkout of this repository,
-// also when vp.mjs runs from a worktree (#345: a worktree's evidence goes with it).
-const COMMON_DIR = execFileSync('git', ['-C', ROOT, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
-  encoding: 'utf8',
-}).trim();
-const MAIN_ROOT = COMMON_DIR.endsWith('/.git') ? dirname(COMMON_DIR) : ROOT;
 
 // A new directory under the system temp dir, as its physical path. vp.mjs
 // derives its paths from import.meta.url and process.cwd(), which Node gives
 // with symlinks resolved; where the temp dir sits behind a symlink (macOS:
-// /var -> /private/var) the link path never equals them as a string
-// (pr-gate run 5 on #1411).
+// /var -> /private/var) the link path never equals them as a string.
 function tempDir(prefix) {
   return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
 }
@@ -117,7 +111,7 @@ function installSkill(root, cases, scripts = {}) {
 
 // installSkill in a throwaway directory that is a git repository of its own, so
 // its evidence root is the throwaway directory itself, also when the temp dir
-// sits inside another checkout (pr-gate run 7 on #1411).
+// sits inside another checkout. run() runs from the root unless given a cwd.
 function fakeSkill(cases, scripts = {}) {
   const root = tempDir('vp-fake-');
   gitAt(root)('init', '-q');
@@ -126,13 +120,28 @@ function fakeSkill(cases, scripts = {}) {
   return {
     root,
     evidenceRoot,
-    run: (args, env = {}) => vp(args, env, root, script),
+    run: (args, env = {}, cwd = root) => vp(args, env, cwd, script),
     evidence: () => (existsSync(evidenceRoot) ? readdirSync(evidenceRoot) : []),
     done: () => rmSync(root, { recursive: true, force: true }),
   };
 }
 
+// fakeSkill for the length of check(fake), removed afterwards whatever happens.
+function withFake(cases, check, scripts = {}) {
+  const fake = fakeSkill(cases, scripts);
+  try {
+    return check(fake);
+  } finally {
+    fake.done();
+  }
+}
+
 const STUB = { script: 'stub.mjs', args: [], needs: [], status: 'current', purpose: 'stub' };
+// A case whose probe takes its evidence directory through an output option,
+// with a journey name as its default argument (glass.mjs <journey> --out <dir>).
+const JOURNEY = { ...STUB, args: ['create-task'], evidence: { flag: '--out' } };
+// A case that refuses to run without a positional argument.
+const NEEDS_ARGS = { ...STUB, needsArgs: true, usage: '<todoId> <branch>' };
 
 // git in a throwaway repository. The caller's git config may sign commits or
 // run hooks; this repository does neither.
@@ -144,9 +153,8 @@ function gitAt(repo) {
 }
 
 // A probe that runs its pre-fix mode, or refuses to run, when called with no
-// arguments needs the post-fix flag as its registry default (pr-gate run 3:
-// chief-unread and empty-review ran their pre-fix mode, import-rollback exited
-// 2, so vp.mjs drive went red on a healthy stack).
+// arguments needs the post-fix flag as its registry default; without it,
+// vp.mjs drive goes red on a healthy stack.
 const PRE_FIX_DEFAULTS = [
   [/=== '--expect=new' \? 'new' : 'old'/, '--expect=new'],
   [/includes\('--expect=new'\) \? 'new' : 'old'/, '--expect=new'],
@@ -191,68 +199,85 @@ function tempRoot() {
   return { root, src };
 }
 
+// <root>/docs/verify/T/run-a holding one committed file, as archive leaves it.
+function committedEvidence(root) {
+  const archived = join(root, 'docs', 'verify', 'T', 'run-a');
+  mkdirSync(archived, { recursive: true });
+  writeFileSync(join(archived, 'result.json'), '{"archived":true}\n');
+  return archived;
+}
+
 const cases = [
   [
     'arguments after -- replace the case default args',
-    () => {
-      const r = vp(['drive', 'failed-send', 'restart-combo', '--dry-run', '--', '--expect=old']);
-      return r.code === 0 && r.out.includes('--expect=old') && !r.out.includes('--expect=new');
-    },
+    () =>
+      withFake({ x: { ...STUB, args: ['--expect=new'] } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--expect=old']);
+        return r.code === 0 && /args --expect=old\n/.test(r.out) && !r.out.includes('--expect=new');
+      }),
   ],
   [
     'without arguments a case runs with its default args',
-    () => {
-      const r = vp(['drive', 'failed-send', 'restart-combo', '--dry-run']);
-      return r.code === 0 && r.out.includes('--expect=new');
-    },
+    () =>
+      withFake({ x: { ...STUB, args: ['--expect=new'] } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        return r.code === 0 && /args --expect=new\n/.test(r.out);
+      }),
   ],
   [
     'relative evidence and run paths reach a tsx case as absolute paths',
-    () => {
-      const r = vp(['drive', 'failed-send', 'restart-combo', '--dry-run'], {
-        VERIFY_EVIDENCE_DIR: 'rel/evidence',
-        VERIFY_RUN_DIR: 'rel/run',
-      });
-      return (
-        r.code === 0 &&
-        r.out.includes(`VERIFY_EVIDENCE_DIR=${resolve('rel/evidence')}`) &&
-        r.out.includes(`VERIFY_RUN_DIR=${resolve('rel/run')}`)
-      );
-    },
+    () =>
+      withFake({ x: { ...STUB, runner: 'tsx', cwd: 'pkg' } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run'], {
+          VERIFY_EVIDENCE_DIR: 'rel/evidence',
+          VERIFY_RUN_DIR: 'rel/run',
+        });
+        return (
+          r.code === 0 &&
+          r.out.includes(`VERIFY_EVIDENCE_DIR=${join(fake.root, 'rel', 'evidence')}\n`) &&
+          r.out.includes(`VERIFY_RUN_DIR=${join(fake.root, 'rel', 'run')}\n`)
+        );
+      }),
   ],
   [
     'a case that rewrites committed evidence needs --force',
-    () => {
-      const r = vp(['drive', 'pi-convergence', '--dry-run']);
-      return r.code === 2 && /needs rewrites-evidence/.test(r.out) && /--force/.test(r.out);
-    },
+    () =>
+      withFake({ x: { ...STUB, needs: ['rewrites-evidence'] } }, (fake) => {
+        const refused = fake.run(['drive', 't', 'x', '--dry-run']);
+        const forced = fake.run(['drive', 't', 'x', '--force', '--dry-run']);
+        return (
+          refused.code === 2 &&
+          /needs rewrites-evidence \(rewrites committed docs\/verify evidence in place\)/.test(refused.out) &&
+          /--force/.test(refused.out) &&
+          forced.code === 0
+        );
+      }),
   ],
   [
     'a case that needs github needs --force',
-    () => {
-      const refused = vp(['drive', 'github-webhook', 'webhook-tracer', '--dry-run']);
-      const forced = vp(['drive', 'github-webhook', 'webhook-tracer', '--force', '--dry-run']);
-      return refused.code === 2 && /needs github \(calls GitHub\)/.test(refused.out) && forced.code === 0;
-    },
+    () =>
+      withFake({ x: { ...STUB, needs: ['github'] } }, (fake) => {
+        const refused = fake.run(['drive', 't', 'x', '--dry-run']);
+        const forced = fake.run(['drive', 't', 'x', '--force', '--dry-run']);
+        return refused.code === 2 && /needs github \(calls GitHub\)/.test(refused.out) && forced.code === 0;
+      }),
   ],
   [
     'a case that needs real-llm needs --force and runs nothing without it',
-    () => {
-      // No current registry case needs real-llm (pr-gate run 5), so a stub does.
-      const fake = fakeSkill({ llm: { ...STUB, needs: ['real-llm'] } });
-      const refused = fake.run(['drive', 't', 'llm']);
-      const before = fake.evidence().length;
-      const forced = fake.run(['drive', 't', 'llm', '--force']);
-      const after = fake.evidence().length;
-      fake.done();
-      return (
-        refused.code === 2 &&
-        /needs real-llm \(spends model tokens\)/.test(refused.out) &&
-        before === 0 &&
-        forced.code === 0 &&
-        after === 1
-      );
-    },
+    () =>
+      withFake({ llm: { ...STUB, needs: ['real-llm'] } }, (fake) => {
+        const refused = fake.run(['drive', 't', 'llm']);
+        const before = fake.evidence().length;
+        const forced = fake.run(['drive', 't', 'llm', '--force']);
+        const after = fake.evidence().length;
+        return (
+          refused.code === 2 &&
+          /needs real-llm \(spends model tokens\)/.test(refused.out) &&
+          before === 0 &&
+          forced.code === 0 &&
+          after === 1
+        );
+      }),
   ],
   [
     'probes that default to their pre-fix mode get the post-fix flag from the registry',
@@ -277,9 +302,9 @@ const cases = [
       for (const [feature, entry] of Object.entries(REGISTRY.features)) {
         for (const [name, c] of Object.entries(entry.cases)) {
           if (c.status !== 'current') continue;
-          // Each call that sends a body to .../agents (the helpers default to POST,
-          // pr-gate run 4), judged by its own body: a probe that names machineId
-          // anywhere else in the file still 400s (/code-review on #1411).
+          // Each call that sends a body to .../agents (the helpers default to
+          // POST), judged by its own body: a probe that names machineId anywhere
+          // else in the file still 400s.
           const lines = agentBodiesWithoutMachineId(readFileSync(resolve(ROOT, c.script), 'utf8'));
           if (lines.length > 0) broken.push(`${feature}/${name} (${c.script.split('/').at(-1)}:${lines.join(',')})`);
         }
@@ -307,136 +332,150 @@ const cases = [
   ],
   [
     'a case whose probe takes an output flag gets the evidence directory through it',
-    () => {
-      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run']);
-      const own = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', 'create-task', '--out', '/tmp/x']);
-      const dir = r.out.match(/VERIFY_EVIDENCE_DIR=(\S+)/)?.[1] ?? 'missing';
-      const ownArgs = own.out.match(/ args (.*)\n/)?.[1] ?? '';
-      return r.code === 0 && r.out.includes(`--out ${dir}`) && own.code === 0 && ownArgs === 'create-task --out /tmp/x';
-    },
+    () =>
+      withFake({ x: JOURNEY }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        const own = fake.run(['drive', 't', 'x', '--dry-run', '--', 'create-task', '--out', '/tmp/x']);
+        const dir = r.out.match(/VERIFY_EVIDENCE_DIR=(\S+)/)?.[1] ?? 'missing';
+        const ownArgs = own.out.match(/ args (.*)\n/)?.[1] ?? '';
+        return (
+          r.code === 0 &&
+          r.out.includes(`args create-task --out ${dir}\n`) &&
+          own.code === 0 &&
+          ownArgs === 'create-task --out /tmp/x'
+        );
+      }),
   ],
   [
-    'arguments after -- keep the case\'s own positional args (the probe or journey name)',
-    () => {
-      // Giving the name again after -- does not run it twice (covered by the output-flag case).
-      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', '/tmp/x']);
-      return r.code === 0 && /args create-task --out \/tmp\/x\n/.test(r.out);
-    },
+    "arguments after -- keep the case's own positional args (the probe or journey name)",
+    () =>
+      withFake({ x: JOURNEY }, (fake) => {
+        // Giving the name again after -- does not run it twice (covered by the output-flag case).
+        const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out', '/tmp/x']);
+        return r.code === 0 && /args create-task --out \/tmp\/x\n/.test(r.out);
+      }),
   ],
   [
     'an output option given after -- is the evidence directory; drive makes none of its own',
-    () => {
-      const dry = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', '/tmp/x']);
-      const fake = fakeSkill({ out: { ...STUB, evidence: { flag: '--out' } } });
-      const mine = join(fake.root, 'mine');
-      const r = fake.run(['drive', 't', 'out', '--', '--out', mine]);
-      const made = fake.evidence();
-      // Without the option after --, the probe gets drive's own directory through it.
-      const auto = fake.run(['drive', 't', 'out']);
-      const autoDir = auto.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
-      const argv = existsSync(join(autoDir, 'result.json'))
-        ? JSON.parse(readFileSync(join(autoDir, 'result.json'), 'utf8')).argv.join(' ')
-        : '';
-      fake.done();
-      return (
-        dry.code === 0 &&
-        !dry.out.includes('VERIFY_EVIDENCE_DIR=') &&
-        r.code === 0 &&
-        r.out.includes(`vp: evidence ${mine}`) &&
-        made.length === 0 &&
-        auto.code === 0 &&
-        argv === `--out ${autoDir}`
-      );
-    },
+    () =>
+      withFake({ x: JOURNEY, out: { ...STUB, evidence: { flag: '--out' } } }, (fake) => {
+        const dry = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out', '/tmp/x']);
+        const mine = join(fake.root, 'mine');
+        const r = fake.run(['drive', 't', 'out', '--', '--out', mine]);
+        const made = fake.evidence();
+        // Without the option after --, the probe gets drive's own directory through it.
+        const auto = fake.run(['drive', 't', 'out']);
+        const autoDir = auto.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
+        const argv = existsSync(join(autoDir, 'result.json'))
+          ? JSON.parse(readFileSync(join(autoDir, 'result.json'), 'utf8')).argv.join(' ')
+          : '';
+        return (
+          dry.code === 0 &&
+          !dry.out.includes('VERIFY_EVIDENCE_DIR=') &&
+          r.code === 0 &&
+          r.out.includes(`vp: evidence ${mine}`) &&
+          made.length === 0 &&
+          auto.code === 0 &&
+          argv === `--out ${autoDir}`
+        );
+      }),
   ],
   [
     'a probe that reads another variable gets the evidence directory through it',
-    () => {
-      const r = vp(['drive', 'skills-injection', 'injection-check', '--force', '--dry-run']);
-      return r.code === 0 && /^ +EVIDENCE_DIR=\/\S+-skills-injection-injection-check$/m.test(r.out);
-    },
+    () =>
+      withFake({ x: { ...STUB, evidence: { env: 'EVIDENCE_DIR' } } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        return (
+          r.code === 0 &&
+          new RegExp(`^ +EVIDENCE_DIR=${fake.evidenceRoot}/\\d{8}-\\d{6}-t-x$`, 'm').test(r.out) &&
+          !r.out.includes('VERIFY_EVIDENCE_DIR=')
+        );
+      }),
   ],
   [
     'a case whose usage names required arguments refuses to run without them',
-    () => {
-      // --force: every case with needsArgs is stale since pr-gate run 5; the check holds either way.
-      const bare = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run']);
-      const given = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run', '--', 't1', 'b1']);
-      // The --force list is printed for a run that goes ahead, not before this refusal.
-      return (
-        bare.code === 2 &&
-        /needs arguments/.test(bare.out) &&
-        !/--force drives/.test(bare.out) &&
-        given.code === 0 &&
-        /--force drives/.test(given.out)
-      );
-    },
+    () =>
+      withFake({ x: { ...NEEDS_ARGS, status: 'stale' } }, (fake) => {
+        const bare = fake.run(['drive', 't', 'x', '--force', '--dry-run']);
+        const given = fake.run(['drive', 't', 'x', '--force', '--dry-run', '--', 't1', 'b1']);
+        // The --force list is printed for a run that goes ahead, not before this refusal.
+        return (
+          bare.code === 2 &&
+          bare.out.includes('needs arguments: <todoId> <branch>') &&
+          !/--force drives/.test(bare.out) &&
+          given.code === 0 &&
+          /--force drives/.test(given.out) &&
+          /args t1 b1\n/.test(given.out)
+        );
+      }),
   ],
   [
     'a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run',
-    () => {
-      const fake = fakeSkill({
-        missing: { ...STUB, script: 'nope.mjs', needs: ['stack'] },
-        nocwd: { ...STUB, runner: 'tsx', needs: ['stack'] },
-      });
-      const run = join(fake.root, 'run');
-      const a = fake.run(['drive', 't', 'missing'], { VERIFY_RUN_DIR: run });
-      const b = fake.run(['drive', 't', 'missing', '--dry-run'], { VERIFY_RUN_DIR: run });
-      const c = fake.run(['drive', 't', 'nocwd', '--dry-run'], { VERIFY_RUN_DIR: run });
-      const made = fake.evidence();
-      fake.done();
-      return (
-        a.code === 1 &&
-        /registered script is missing/.test(a.out) &&
-        !/doctor/.test(a.out) &&
-        b.code === 1 &&
-        c.code === 1 &&
-        /no cwd/.test(c.out) &&
-        made.length === 0
-      );
-    },
+    () =>
+      withFake(
+        {
+          missing: { ...STUB, script: 'nope.mjs', needs: ['stack'] },
+          nocwd: { ...STUB, runner: 'tsx', needs: ['stack'] },
+        },
+        (fake) => {
+          const run = join(fake.root, 'run');
+          const a = fake.run(['drive', 't', 'missing'], { VERIFY_RUN_DIR: run });
+          const b = fake.run(['drive', 't', 'missing', '--dry-run'], { VERIFY_RUN_DIR: run });
+          const c = fake.run(['drive', 't', 'nocwd', '--dry-run'], { VERIFY_RUN_DIR: run });
+          return (
+            a.code === 1 &&
+            /registered script is missing/.test(a.out) &&
+            !/doctor/.test(a.out) &&
+            b.code === 1 &&
+            c.code === 1 &&
+            /no cwd/.test(c.out) &&
+            fake.evidence().length === 0
+          );
+        },
+      ),
   ],
   [
     'feature and case names are looked up as registry keys only',
-    () => {
-      const a = vp(['drive', 'toString', '--dry-run']);
-      const b = vp(['list', 'constructor']);
-      const c = vp(['drive', 'search', 'constructor', '--dry-run']);
-      return a.code === 2 && /unknown feature/.test(a.out) && b.code === 2 && c.code === 2 && /unknown case/.test(c.out);
-    },
+    () =>
+      withFake({ x: STUB }, (fake) => {
+        const a = fake.run(['drive', 'toString', '--dry-run']);
+        const b = fake.run(['list', 'constructor']);
+        const c = fake.run(['drive', 't', 'constructor', '--dry-run']);
+        return a.code === 2 && /unknown feature/.test(a.out) && b.code === 2 && c.code === 2 && /unknown case/.test(c.out);
+      }),
   ],
   [
     'a case that needs the stack gets the ports of the stack doctor checks',
-    () => {
-      const run = tempDir('vp-selftest-run-');
-      writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 8792, webPort: 5274 }));
-      const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run });
-      const clash = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run, VERIFY_PORT: '8791' });
-      rmSync(run, { recursive: true, force: true });
-      return (
-        r.code === 0 &&
-        r.out.includes('VERIFY_PORT=8792') &&
-        r.out.includes('VERIFY_WEB_PORT=5274') &&
-        clash.code === 2 &&
-        /8791/.test(clash.out) &&
-        /8792/.test(clash.out)
-      );
-    },
+    () =>
+      withFake({ x: { ...STUB, needs: ['stack'] } }, (fake) => {
+        const run = join(fake.root, 'run');
+        mkdirSync(run);
+        writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 8792, webPort: 5274 }));
+        const r = fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_RUN_DIR: run });
+        const clash = fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_RUN_DIR: run, VERIFY_PORT: '8791' });
+        return (
+          r.code === 0 &&
+          r.out.includes('VERIFY_PORT=8792') &&
+          r.out.includes('VERIFY_WEB_PORT=5274') &&
+          clash.code === 2 &&
+          /8791/.test(clash.out) &&
+          /8792/.test(clash.out)
+        );
+      }),
   ],
   [
     'a drive never writes into an evidence directory that already exists',
-    () => {
-      const fake = fakeSkill({ ok: STUB });
-      const now = Date.now();
-      const taken = [0, 1, 2, 3].map((s) => join(fake.evidenceRoot, `${localStamp(now + s * 1000)}-t-ok`));
-      for (const dir of taken) mkdirSync(dir, { recursive: true });
-      const r = fake.run(['drive', 't', 'ok']);
-      const printed = r.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
-      const untouched = taken.every((dir) => readdirSync(dir).length === 0);
-      const wrote = printed !== '' && existsSync(join(printed, 'result.json'));
-      fake.done();
-      return r.code === 0 && !taken.includes(printed) && untouched && wrote;
-    },
+    () =>
+      withFake({ ok: STUB }, (fake) => {
+        const now = Date.now();
+        const taken = [0, 1, 2, 3].map((s) => join(fake.evidenceRoot, `${localStamp(now + s * 1000)}-t-ok`));
+        for (const dir of taken) mkdirSync(dir, { recursive: true });
+        const r = fake.run(['drive', 't', 'ok']);
+        const printed = r.out.match(/vp: evidence (\S+)/)?.[1] ?? '';
+        const untouched = taken.every((dir) => readdirSync(dir).length === 0);
+        const wrote = printed !== '' && existsSync(join(printed, 'result.json'));
+        return r.code === 0 && !taken.includes(printed) && untouched && wrote;
+      }),
   ],
   [
     'capture never writes into a capture directory that already exists',
@@ -452,6 +491,54 @@ const cases = [
       rmSync(run, { recursive: true, force: true });
       return first === 0 && second;
     },
+  ],
+  [
+    'drive refuses an evidence directory inside committed docs/verify before anything runs',
+    () =>
+      withFake({ x: STUB, out: { ...STUB, evidence: { flag: '--out' } } }, (fake) => {
+        const archived = committedEvidence(fake.root);
+        const verify = join(fake.root, 'docs', 'verify');
+        symlinkSync(join(verify, 'T'), join(fake.root, 'link'));
+        const before = snapshot(verify);
+        const refused = [
+          ...['docs/verify/T/run-a', archived, 'docs/verify/T/run-new', 'link/run-a'].flatMap((dir) => [
+            fake.run(['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: dir }),
+            fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: dir }),
+          ]),
+          fake.run(['drive', 't', 'out', '--', '--out', 'docs/verify/T/run-a']),
+          fake.run(['drive', 't', 'out', '--dry-run', '--', '--out', archived]),
+        ];
+        // A directory beside docs/verify whose name starts the same is not committed evidence.
+        const beside = fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_EVIDENCE_DIR: 'docs/verify-notes/run' });
+        return (
+          refused.every(
+            (r) => r.code === 2 && r.out.includes('vp.mjs archive <ticket> --from <dir>') && !/ -> |dry-run/.test(r.out),
+          ) &&
+          snapshot(verify) === before &&
+          fake.evidence().length === 0 &&
+          beside.code === 0
+        );
+      }),
+  ],
+  [
+    'capture refuses an evidence directory inside committed docs/verify before anything runs',
+    () =>
+      withFake({}, (fake) => {
+        const archived = committedEvidence(fake.root);
+        const verify = join(fake.root, 'docs', 'verify');
+        const run = join(fake.root, 'run');
+        mkdirSync(run);
+        writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
+        const before = snapshot(verify);
+        const refused = ['docs/verify/T/run-a', archived].map((dir) =>
+          fake.run(['capture', '/app', '--wait', '0'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: dir }),
+        );
+        return (
+          refused.every((r) => r.code === 2 && r.out.includes('vp.mjs archive <ticket> --from <dir>') && !/captured/.test(r.out)) &&
+          snapshot(verify) === before &&
+          fake.evidence().length === 0
+        );
+      }),
   ],
   [
     'links encodes non-ASCII file names instead of quoting them',
@@ -475,22 +562,22 @@ const cases = [
   ],
   [
     'arguments after -- replace only the default options they name',
-    () => {
-      const keep = vp(['drive', 'review-modal', 'empty-review', '--dry-run', '--', '--focus=hunkless']);
-      const swap = vp(['drive', 'review-modal', 'empty-review', '--dry-run', '--', '--expect=before']);
-      return (
-        /args --expect=after --focus=hunkless\n/.test(keep.out) && /args --expect=before\n/.test(swap.out)
-      );
-    },
+    () =>
+      withFake({ x: { ...STUB, args: ['--expect=after'] } }, (fake) => {
+        const keep = fake.run(['drive', 't', 'x', '--dry-run', '--', '--focus=hunkless']);
+        const swap = fake.run(['drive', 't', 'x', '--dry-run', '--', '--expect=before']);
+        return /args --expect=after --focus=hunkless\n/.test(keep.out) && /args --expect=before\n/.test(swap.out);
+      }),
   ],
   [
     'a probe gets the run directory doctor checked',
-    () => {
-      const root = tempDir('vp-selftest-root-');
-      const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_REPO_ROOT: root });
-      rmSync(root, { recursive: true, force: true });
-      return r.code === 0 && r.out.includes(`VERIFY_RUN_DIR=${join(root, '.claude', 'verify-run')}\n`);
-    },
+    () =>
+      withFake({ x: { ...STUB, needs: ['stack'] } }, (fake) => {
+        const other = join(fake.root, 'other');
+        mkdirSync(other);
+        const r = fake.run(['drive', 't', 'x', '--dry-run'], { VERIFY_REPO_ROOT: other });
+        return r.code === 0 && r.out.includes(`VERIFY_RUN_DIR=${join(other, '.claude', 'verify-run')}\n`);
+      }),
   ],
   [
     'no current case depends on a seed script that creates an agent without machineId',
@@ -514,19 +601,17 @@ const cases = [
   ],
   [
     'cleanup reports the evidence root drive writes to',
-    () => {
-      const fake = fakeSkill({}, { 'cleanup.mjs': 'console.log(`evidence-root ${process.env.VERIFY_EVIDENCE_DIR}`);\n' });
-      const r = fake.run(['cleanup']);
-      fake.done();
-      return r.code === 0 && r.out.includes(`evidence-root ${fake.evidenceRoot}\n`);
-    },
+    () =>
+      withFake({}, (fake) => {
+        const r = fake.run(['cleanup']);
+        return r.code === 0 && r.out.includes(`evidence-root ${fake.evidenceRoot}\n`);
+      }, { 'cleanup.mjs': 'console.log(`evidence-root ${process.env.VERIFY_EVIDENCE_DIR}`);\n' }),
   ],
   [
     'with the temp dir inside a git repository, a fake skill writes nothing outside its own root',
     () => {
-      // pr-gate run 7 on #1411: with TMPDIR inside a checkout, the fake skill took
-      // that checkout's .claude/verify-evidence as its evidence root and left stub
-      // runs there, in the root another lane's archive --latest reads.
+      // The outer repository stands for a checkout that holds TMPDIR. Its
+      // .claude/verify-evidence is a shared root that archive --latest reads.
       const outer = tempDir('vp-selftest-outer-');
       const saved = process.env.TMPDIR;
       let fake;
@@ -571,50 +656,58 @@ const cases = [
     () => {
       const stub = (marker, code) =>
         `console.log('${marker}', JSON.stringify(process.argv.slice(2)));\nprocess.exit(${code});\n`;
-      const fake = fakeSkill({}, { 'launch.mjs': stub('launch-stub', 3), 'doctor.mjs': stub('doctor-stub', 4) });
-      const launch = fake.run(['launch', '--keep', 'x']);
-      const doctor = fake.run(['doctor', '--json']);
-      fake.done();
-      return (
-        launch.code === 3 &&
-        launch.out.includes('launch-stub ["--keep","x"]\n') &&
-        doctor.code === 4 &&
-        doctor.out.includes('doctor-stub ["--json"]\n')
+      return withFake(
+        {},
+        (fake) => {
+          const launch = fake.run(['launch', '--keep', 'x']);
+          const doctor = fake.run(['doctor', '--json']);
+          return (
+            launch.code === 3 &&
+            launch.out.includes('launch-stub ["--keep","x"]\n') &&
+            doctor.code === 4 &&
+            doctor.out.includes('doctor-stub ["--json"]\n')
+          );
+        },
+        { 'launch.mjs': stub('launch-stub', 3), 'doctor.mjs': stub('doctor-stub', 4) },
       );
     },
   ],
   [
     'a case that needs arguments is not satisfied by options alone',
-    () => {
-      const r = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run', '--', '--expect=old']);
-      return r.code === 2 && /needs arguments/.test(r.out);
-    },
+    () =>
+      withFake({ x: NEEDS_ARGS }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--expect=old']);
+        return r.code === 2 && /needs arguments/.test(r.out);
+      }),
   ],
   [
-    'an output path given after -- is made absolute against the caller\'s directory',
-    () => {
-      const cwd = tempDir('vp-selftest-cwd-');
-      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'rel/ev'], {}, cwd);
-      rmSync(cwd, { recursive: true, force: true });
-      return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'rel', 'ev')}\n`);
-    },
+    "an output path given after -- is made absolute against the caller's directory",
+    () =>
+      withFake({ x: JOURNEY }, (fake) => {
+        const cwd = join(fake.root, 'caller');
+        mkdirSync(cwd);
+        const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out', 'rel/ev'], {}, cwd);
+        return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'rel', 'ev')}\n`);
+      }),
   ],
   [
     'an output directory named like the journey does not replace the journey',
-    () => {
-      const cwd = tempDir('vp-selftest-cwd-');
-      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'create-task'], {}, cwd);
-      rmSync(cwd, { recursive: true, force: true });
-      return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'create-task')}\n`);
-    },
+    () =>
+      withFake({ x: JOURNEY }, (fake) => {
+        const cwd = join(fake.root, 'caller');
+        mkdirSync(cwd);
+        const r = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out', 'create-task'], {}, cwd);
+        return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'create-task')}\n`);
+      }),
   ],
   [
     'an output option without its directory as the next argument is refused before anything runs',
-    () => {
-      const joined = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out=rel/ev']);
-      const bare = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out']);
-      return [joined, bare].every((r) => r.code === 2 && r.out.includes('--out takes its directory as the next argument'));
-    },
+    () =>
+      withFake({ x: JOURNEY }, (fake) => {
+        const joined = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out=rel/ev']);
+        const bare = fake.run(['drive', 't', 'x', '--dry-run', '--', '--out']);
+        return [joined, bare].every((r) => r.code === 2 && r.out.includes('--out takes its directory as the next argument'));
+      }),
   ],
   [
     'capture refuses a --wait that is not a number of milliseconds',
@@ -629,34 +722,40 @@ const cases = [
   ],
   [
     'a case that writes its evidence itself gets no evidence directory',
-    () => {
-      const r = vp(['drive', 'pi-convergence', '--force', '--dry-run']);
-      return r.code === 0 && /writes its evidence itself: docs\/verify\/926\//.test(r.out) && !r.out.includes('VERIFY_EVIDENCE_DIR=/');
-    },
+    () =>
+      withFake({ x: { ...STUB, evidence: { writes: 'docs/verify/926/' } } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        return (
+          r.code === 0 && /writes its evidence itself: docs\/verify\/926\//.test(r.out) && !r.out.includes('VERIFY_EVIDENCE_DIR=')
+        );
+      }),
   ],
   [
     '--force lets a stale case run',
-    () => {
-      const r = vp(['drive', 'stop-button', '--force', '--dry-run', '--', 't1']);
-      return r.code === 0 && /script \S+drive-/.test(r.out);
-    },
+    () =>
+      withFake({ x: { ...STUB, status: 'stale' } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--force']);
+        return r.code === 0 && fake.evidence().length === 1;
+      }),
   ],
   [
     'a failed doctor leaves no evidence directory behind',
-    () => {
-      const root = tempDir('vp-selftest-');
-      const ev = join(root, 'ev');
-      const r = vp(['drive', 'search', 'search'], { VERIFY_RUN_DIR: join(root, 'run'), VERIFY_EVIDENCE_DIR: ev });
-      const made = existsSync(ev);
-      rmSync(root, { recursive: true, force: true });
-      return r.code === 1 && /doctor failed/.test(r.out) && !made;
-    },
+    () =>
+      withFake(
+        { x: { ...STUB, needs: ['stack'] } },
+        (fake) => {
+          const ev = join(fake.root, 'ev');
+          const r = fake.run(['drive', 't', 'x'], { VERIFY_EVIDENCE_DIR: ev });
+          return r.code === 1 && /doctor failed/.test(r.out) && !existsSync(ev) && fake.evidence().length === 0;
+        },
+        { 'doctor.mjs': 'process.exit(1);\n' },
+      ),
   ],
   [
     'links prints sha-pinned raw links and refuses a ticket with no evidence',
     () => {
-      // A throwaway repository with its own committed evidence, not this
-      // repository's docs/verify, which can be renamed or removed (pr-gate run 7).
+      // A throwaway repository with its own committed evidence, so the case does
+      // not depend on this repository's docs/verify.
       const repo = tempDir('vp-selftest-git-');
       const g = gitAt(repo);
       let r = { code: null, out: '' };
@@ -693,19 +792,17 @@ const cases = [
     },
   ],
   [
-    'a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout\'s .claude/verify-evidence',
-    () => {
-      const r = vp(['drive', 'providers-tabs', 'claude-bin-detection', '--dry-run']);
-      const prefix = `VERIFY_EVIDENCE_DIR=${resolve(MAIN_ROOT, '.claude/verify-evidence')}/`;
-      return r.code === 0 && r.out.includes(prefix) && /-providers-tabs-claude-bin-detection\n/.test(r.out);
-    },
+    "a drive without VERIFY_EVIDENCE_DIR gets its own <time>-<feature>-<case> directory under the checkout's .claude/verify-evidence",
+    () =>
+      withFake({ x: STUB }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        return r.code === 0 && new RegExp(`VERIFY_EVIDENCE_DIR=${fake.evidenceRoot}/\\d{8}-\\d{6}-t-x\\n`).test(r.out);
+      }),
   ],
   [
     'a drive from a worktree puts its evidence under the main checkout, not the worktree',
     () => {
-      // The case above cannot fail in CI: its checkout is no worktree, so the
-      // main checkout and the script's own checkout are one directory there
-      // (pr-gate run 6). Here vp.mjs runs from a real worktree of a throwaway repo.
+      // vp.mjs runs from a real worktree of a throwaway repository.
       const root = tempDir('vp-selftest-wt-');
       const main = join(root, 'main');
       const wt = join(main, '.claude', 'worktrees', 'wt');
@@ -732,63 +829,68 @@ const cases = [
   ],
   [
     'a tsx case runs from its package directory, a node case from the repo root',
-    () => {
-      const tsx = vp(['drive', 'failed-send', 'restart-combo', '--dry-run']);
-      const node = vp(['drive', 'search', 'search', '--dry-run'], {}, resolve(ROOT, 'apps'));
-      return tsx.out.includes(`cwd ${resolve(ROOT, 'apps/server')}`) && node.out.includes(`cwd ${ROOT}\n`);
-    },
+    () =>
+      withFake({ tsx: { ...STUB, runner: 'tsx', cwd: 'pkg' }, node: STUB }, (fake) => {
+        const elsewhere = join(fake.root, 'elsewhere');
+        mkdirSync(elsewhere);
+        const tsx = fake.run(['drive', 't', 'tsx', '--dry-run']);
+        const node = fake.run(['drive', 't', 'node', '--dry-run'], {}, elsewhere);
+        return tsx.out.includes(`runner tsx  cwd ${join(fake.root, 'pkg')}\n`) && node.out.includes(`runner node  cwd ${fake.root}\n`);
+      }),
   ],
   [
     'a case that needs the stack runs doctor first',
-    () => {
-      const r = vp(['drive', 'search', 'search', '--dry-run']);
-      return r.code === 0 && /doctor first/.test(r.out);
-    },
+    () =>
+      withFake({ x: { ...STUB, needs: ['stack'] }, y: STUB }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', '--dry-run']);
+        const plain = fake.run(['drive', 't', 'y', '--dry-run']);
+        return r.code === 0 && /doctor first/.test(r.out) && plain.code === 0 && !/doctor first/.test(plain.out);
+      }),
   ],
   [
     'a stale case needs --force',
-    () => {
-      const r = vp(['drive', 'stop-button', '--dry-run']);
-      return r.code === 2 && /is stale/.test(r.out);
-    },
+    () =>
+      withFake({ x: { ...STUB, status: 'stale' } }, (fake) => {
+        const r = fake.run(['drive', 't', 'x']);
+        return r.code === 2 && /is stale/.test(r.out) && fake.evidence().length === 0;
+      }),
   ],
   [
     'a stale case that also has a forced need names both in its refusal, and --force names them before running',
-    () => {
-      // pr-gate run 7 on #1411: the refusal named only the status, and --force
-      // then also let real-llm and rewrites-evidence through without naming them.
-      const fake = fakeSkill({
-        x: { ...STUB, status: 'stale', note: 'waits for a removed chip.', needs: ['real-llm', 'rewrites-evidence'] },
-      });
-      const refused = fake.run(['drive', 't', 'x']);
-      const before = fake.evidence().length;
-      const forced = fake.run(['drive', 't', 'x', '--force']);
-      const after = fake.evidence().length;
-      fake.done();
-      const reasons = [
-        'is stale: waits for a removed chip',
-        'needs real-llm (spends model tokens)',
-        'needs rewrites-evidence (rewrites committed docs/verify evidence in place)',
-      ];
-      const ranAt = forced.out.indexOf('vp: t/x -> ');
-      return (
-        refused.code === 2 &&
-        reasons.every((s) => refused.out.includes(s)) &&
-        /--force/.test(refused.out) &&
-        before === 0 &&
-        forced.code === 0 &&
-        ranAt !== -1 &&
-        reasons.every((s) => forced.out.slice(0, ranAt).includes(s)) &&
-        after === 1
-      );
-    },
+    () =>
+      withFake(
+        { x: { ...STUB, status: 'stale', note: 'waits for a removed chip.', needs: ['real-llm', 'rewrites-evidence'] } },
+        (fake) => {
+          const refused = fake.run(['drive', 't', 'x']);
+          const before = fake.evidence().length;
+          const forced = fake.run(['drive', 't', 'x', '--force']);
+          const after = fake.evidence().length;
+          const reasons = [
+            'is stale: waits for a removed chip',
+            'needs real-llm (spends model tokens)',
+            'needs rewrites-evidence (rewrites committed docs/verify evidence in place)',
+          ];
+          const ranAt = forced.out.indexOf('vp: t/x -> ');
+          return (
+            refused.code === 2 &&
+            reasons.every((s) => refused.out.includes(s)) &&
+            /--force/.test(refused.out) &&
+            before === 0 &&
+            forced.code === 0 &&
+            ranAt !== -1 &&
+            reasons.every((s) => forced.out.slice(0, ranAt).includes(s)) &&
+            after === 1
+          );
+        },
+      ),
   ],
   [
     'a stray positional argument is refused',
-    () => {
-      const r = vp(['drive', 'hotkeys', 'newtask-key-c', 'm', '--dry-run']);
-      return r.code === 2 && /script arguments go after --/.test(r.out);
-    },
+    () =>
+      withFake({ x: STUB }, (fake) => {
+        const r = fake.run(['drive', 't', 'x', 'm', '--dry-run']);
+        return r.code === 2 && /script arguments go after --/.test(r.out);
+      }),
   ],
   [
     'archive with no source named refuses instead of taking the newest run',
@@ -803,9 +905,9 @@ const cases = [
   [
     'archive refuses to overwrite an archived directory and leaves the archive as it was',
     () => {
-      // The refusal alone passes when the copy happens first and the refusal after
-      // (pr-gate run 7): the archive must also be unchanged, and a run naming one
-      // new and one archived source copies neither.
+      // The archive is unchanged after the refusal, and a run naming one new and
+      // one archived source copies neither: a refusal that comes after the copy
+      // fails here.
       const { root, src } = tempRoot();
       const archive = join(root, 'docs', 'verify', 'T');
       writeFileSync(join(archive, 'run-a', 'result.json'), '{"archived":true}\n');
@@ -879,28 +981,27 @@ const cases = [
   ],
   [
     'archive --latest 1 copies the newest run only',
-    () => {
-      const fake = fakeSkill({});
-      // Name order and mtime order disagree, so only the newest by mtime is run-b.
-      const now = Date.now() / 1000;
-      for (const [name, age] of [
-        ['run-a', 200],
-        ['run-b', 0],
-        ['run-c', 100],
-      ]) {
-        const dir = join(fake.evidenceRoot, name);
-        mkdirSync(dir, { recursive: true });
-        writeFileSync(join(dir, 'result.json'), '{}\n');
-        utimesSync(dir, now - age, now - age);
-      }
-      const repo = join(fake.root, 'repo');
-      const r = fake.run(['archive', 'T8', '--latest', '1'], { VERIFY_REPO_ROOT: repo });
-      const target = join(repo, 'docs', 'verify', 'T8');
-      const copied = existsSync(target) ? readdirSync(target) : [];
-      const files = existsSync(join(target, 'run-b')) ? readdirSync(join(target, 'run-b')) : [];
-      fake.done();
-      return r.code === 0 && copied.join(',') === 'run-b' && files.includes('result.json');
-    },
+    () =>
+      withFake({}, (fake) => {
+        // Name order and mtime order disagree, so only the newest by mtime is run-b.
+        const now = Date.now() / 1000;
+        for (const [name, age] of [
+          ['run-a', 200],
+          ['run-b', 0],
+          ['run-c', 100],
+        ]) {
+          const dir = join(fake.evidenceRoot, name);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, 'result.json'), '{}\n');
+          utimesSync(dir, now - age, now - age);
+        }
+        const repo = join(fake.root, 'repo');
+        const r = fake.run(['archive', 'T8', '--latest', '1'], { VERIFY_REPO_ROOT: repo });
+        const target = join(repo, 'docs', 'verify', 'T8');
+        const copied = existsSync(target) ? readdirSync(target) : [];
+        const files = existsSync(join(target, 'run-b')) ? readdirSync(join(target, 'run-b')) : [];
+        return r.code === 0 && copied.join(',') === 'run-b' && files.includes('result.json');
+      }),
   ],
 ];
 
