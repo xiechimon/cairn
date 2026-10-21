@@ -19,7 +19,7 @@ node .cursor/skills/verify-pacman/scripts/glass.mjs
 Journey ids, optional: `board`, `create-task`, `dispatch`, `view-diff`, `request-changes`, `merge`. No ids runs all of them. `--out <dir>` sets the evidence directory. The default is `.claude/verify-evidence/<stamp>-glass/`. Cleanup does not delete it, and git does not track it.
 
 3. The command starts Hono and Vite against a scratch `PACMAN_HOME` on ports 8791 and 5273, opens the board, walks the journeys, writes `result.json` and PNGs, then stops only the processes it started.
-4. Read `result.json` and the screenshots. Copy the directory to `docs/verify/<ticket>/` on the PR branch and embed the PNGs with a commit-SHA raw URL.
+4. Read `result.json` and the screenshots. For PR evidence, run the journey through the single entry point, `node .claude/skills/verify-pacman/scripts/vp.mjs drive glass-journeys <journey>`, which prints `vp: evidence <dir>`. On the PR branch, archive that directory with `node .claude/skills/verify-pacman/scripts/vp.mjs archive <ticket> --from <dir>`. Archive copies it into `docs/verify/<ticket>/` and refuses to overwrite a directory already there (ADR 0015). Do not copy by hand. After the commit is pushed, `vp.mjs links <ticket>` prints the commit-SHA raw URLs for the PNGs.
 5. If 8791 or 5273 is taken, the command exits and names `VERIFY_PORT` / `VERIFY_WEB_PORT`. Leave the listener alone.
 
 ## Judgment

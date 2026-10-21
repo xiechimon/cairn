@@ -4,7 +4,7 @@
 // evidence/run paths instead of running anything. archive cases use a
 // throwaway VERIFY_REPO_ROOT. Cases that must really run use a copy of vp.mjs
 // in a throwaway skill directory with its own registry and a stub probe.
-// Failure modes from pr-gate runs 2, 3 and 4 and /code-review on #1411.
+// Failure modes from pr-gate runs 2 to 5 and /code-review on #1411.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -14,8 +14,10 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,6 +32,15 @@ const COMMON_DIR = execFileSync('git', ['-C', ROOT, 'rev-parse', '--path-format=
   encoding: 'utf8',
 }).trim();
 const MAIN_ROOT = COMMON_DIR.endsWith('/.git') ? dirname(COMMON_DIR) : ROOT;
+
+// A new directory under the system temp dir, as its physical path. vp.mjs
+// derives its paths from import.meta.url and process.cwd(), which Node gives
+// with symlinks resolved; where the temp dir sits behind a symlink (macOS:
+// /var -> /private/var) the link path never equals them as a string
+// (pr-gate run 5 on #1411).
+function tempDir(prefix) {
+  return realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+}
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -83,7 +94,7 @@ function agentBodiesWithoutMachineId(src) {
 // node_modules (vp.mjs imports @playwright/test). Outside any git repository,
 // so its evidence root is the throwaway directory itself.
 function fakeSkill(cases, scripts = {}) {
-  const root = mkdtempSync(join(tmpdir(), 'vp-fake-'));
+  const root = tempDir('vp-fake-');
   const skill = join(root, '.claude', 'skills', 'verify-pacman');
   mkdirSync(join(skill, 'scripts'), { recursive: true });
   cpSync(VP, join(skill, 'scripts', 'vp.mjs'));
@@ -142,7 +153,7 @@ function vp(args, env = {}, cwd = process.cwd(), script = VP) {
 }
 
 function tempRoot() {
-  const root = mkdtempSync(join(tmpdir(), 'vp-selftest-'));
+  const root = tempDir('vp-selftest-');
   const src = join(root, 'evidence');
   for (const name of ['run-a', 'run-b']) {
     mkdirSync(join(src, name), { recursive: true });
@@ -186,6 +197,33 @@ const cases = [
     () => {
       const r = vp(['drive', 'pi-convergence', '--dry-run']);
       return r.code === 2 && /needs rewrites-evidence/.test(r.out) && /--force/.test(r.out);
+    },
+  ],
+  [
+    'a case that needs github needs --force',
+    () => {
+      const refused = vp(['drive', 'github-webhook', 'webhook-tracer', '--dry-run']);
+      const forced = vp(['drive', 'github-webhook', 'webhook-tracer', '--force', '--dry-run']);
+      return refused.code === 2 && /needs github \(calls GitHub\)/.test(refused.out) && forced.code === 0;
+    },
+  ],
+  [
+    'a case that needs real-llm needs --force and runs nothing without it',
+    () => {
+      // No current registry case needs real-llm (pr-gate run 5), so a stub does.
+      const fake = fakeSkill({ llm: { ...STUB, needs: ['real-llm'] } });
+      const refused = fake.run(['drive', 't', 'llm']);
+      const before = fake.evidence().length;
+      const forced = fake.run(['drive', 't', 'llm', '--force']);
+      const after = fake.evidence().length;
+      fake.done();
+      return (
+        refused.code === 2 &&
+        /needs real-llm \(spends model tokens\)/.test(refused.out) &&
+        before === 0 &&
+        forced.code === 0 &&
+        after === 1
+      );
     },
   ],
   [
@@ -293,8 +331,9 @@ const cases = [
   [
     'a case whose usage names required arguments refuses to run without them',
     () => {
-      const bare = vp(['drive', 'failed-send', 'restart-with-feedback', '--dry-run']);
-      const given = vp(['drive', 'failed-send', 'restart-with-feedback', '--dry-run', '--', 't1', 'b1']);
+      // --force: every case with needsArgs is stale since pr-gate run 5; the check holds either way.
+      const bare = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run']);
+      const given = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run', '--', 't1', 'b1']);
       return bare.code === 2 && /needs arguments/.test(bare.out) && given.code === 0;
     },
   ],
@@ -334,7 +373,7 @@ const cases = [
   [
     'a case that needs the stack gets the ports of the stack doctor checks',
     () => {
-      const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));
+      const run = tempDir('vp-selftest-run-');
       writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 8792, webPort: 5274 }));
       const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run });
       const clash = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run, VERIFY_PORT: '8791' });
@@ -367,7 +406,7 @@ const cases = [
   [
     'capture never writes into a capture directory that already exists',
     () => {
-      const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));
+      const run = tempDir('vp-selftest-run-');
       const ev = join(run, 'ev');
       mkdirSync(join(ev, 'capture-page'), { recursive: true });
       writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
@@ -382,7 +421,7 @@ const cases = [
   [
     'links encodes non-ASCII file names instead of quoting them',
     () => {
-      const repo = mkdtempSync(join(tmpdir(), 'vp-selftest-git-'));
+      const repo = tempDir('vp-selftest-git-');
       // The caller's git config may sign commits or run hooks; this repo does neither.
       const g = (...args) =>
         execFileSync(
@@ -418,7 +457,7 @@ const cases = [
   [
     'a probe gets the run directory doctor checked',
     () => {
-      const root = mkdtempSync(join(tmpdir(), 'vp-selftest-root-'));
+      const root = tempDir('vp-selftest-root-');
       const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_REPO_ROOT: root });
       rmSync(root, { recursive: true, force: true });
       return r.code === 0 && r.out.includes(`VERIFY_RUN_DIR=${join(root, '.claude', 'verify-run')}\n`);
@@ -454,16 +493,43 @@ const cases = [
     },
   ],
   [
+    '--help lists every command',
+    () => {
+      const r = vp(['--help']);
+      const commands = ['launch', 'doctor', 'cleanup', 'list', 'drive', 'capture', 'archive', 'links'];
+      const missing = commands.filter((c) => !new RegExp(`^  ${c}\\b`, 'm').test(r.out));
+      if (missing.length > 0) console.log(`      missing: ${missing.join(', ')}`);
+      return r.code === 0 && missing.length === 0;
+    },
+  ],
+  [
+    'launch and doctor forward their arguments and exit code to their scripts',
+    () => {
+      const stub = (marker, code) =>
+        `console.log('${marker}', JSON.stringify(process.argv.slice(2)));\nprocess.exit(${code});\n`;
+      const fake = fakeSkill({}, { 'launch.mjs': stub('launch-stub', 3), 'doctor.mjs': stub('doctor-stub', 4) });
+      const launch = fake.run(['launch', '--keep', 'x']);
+      const doctor = fake.run(['doctor', '--json']);
+      fake.done();
+      return (
+        launch.code === 3 &&
+        launch.out.includes('launch-stub ["--keep","x"]\n') &&
+        doctor.code === 4 &&
+        doctor.out.includes('doctor-stub ["--json"]\n')
+      );
+    },
+  ],
+  [
     'a case that needs arguments is not satisfied by options alone',
     () => {
-      const r = vp(['drive', 'failed-send', 'restart-with-feedback', '--dry-run', '--', '--expect=old']);
+      const r = vp(['drive', 'failed-send', 'restart-with-feedback', '--force', '--dry-run', '--', '--expect=old']);
       return r.code === 2 && /needs arguments/.test(r.out);
     },
   ],
   [
     'an output path given after -- is made absolute against the caller\'s directory',
     () => {
-      const cwd = mkdtempSync(join(tmpdir(), 'vp-selftest-cwd-'));
+      const cwd = tempDir('vp-selftest-cwd-');
       const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'rel/ev'], {}, cwd);
       rmSync(cwd, { recursive: true, force: true });
       return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'rel', 'ev')}\n`);
@@ -472,7 +538,7 @@ const cases = [
   [
     'an output directory named like the journey does not replace the journey',
     () => {
-      const cwd = mkdtempSync(join(tmpdir(), 'vp-selftest-cwd-'));
+      const cwd = tempDir('vp-selftest-cwd-');
       const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'create-task'], {}, cwd);
       rmSync(cwd, { recursive: true, force: true });
       return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'create-task')}\n`);
@@ -489,7 +555,7 @@ const cases = [
   [
     'capture refuses a --wait that is not a number of milliseconds',
     () => {
-      const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));
+      const run = tempDir('vp-selftest-run-');
       writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
       const r = vp(['capture', '/app', '--wait', '1s'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: join(run, 'ev') });
       const made = existsSync(join(run, 'ev'));
@@ -514,7 +580,7 @@ const cases = [
   [
     'a failed doctor leaves no evidence directory behind',
     () => {
-      const root = mkdtempSync(join(tmpdir(), 'vp-selftest-'));
+      const root = tempDir('vp-selftest-');
       const ev = join(root, 'ev');
       const r = vp(['drive', 'search', 'search'], { VERIFY_RUN_DIR: join(root, 'run'), VERIFY_EVIDENCE_DIR: ev });
       const made = existsSync(ev);
@@ -641,6 +707,31 @@ const cases = [
         : [];
       rmSync(root, { recursive: true, force: true });
       return r.code === 0 && files.includes('result.json');
+    },
+  ],
+  [
+    'archive --latest 1 copies the newest run only',
+    () => {
+      const fake = fakeSkill({});
+      // Name order and mtime order disagree, so only the newest by mtime is run-b.
+      const now = Date.now() / 1000;
+      for (const [name, age] of [
+        ['run-a', 200],
+        ['run-b', 0],
+        ['run-c', 100],
+      ]) {
+        const dir = join(fake.evidenceRoot, name);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(join(dir, 'result.json'), '{}\n');
+        utimesSync(dir, now - age, now - age);
+      }
+      const repo = join(fake.root, 'repo');
+      const r = fake.run(['archive', 'T8', '--latest', '1'], { VERIFY_REPO_ROOT: repo });
+      const target = join(repo, 'docs', 'verify', 'T8');
+      const copied = existsSync(target) ? readdirSync(target) : [];
+      const files = existsSync(join(target, 'run-b')) ? readdirSync(join(target, 'run-b')) : [];
+      fake.done();
+      return r.code === 0 && copied.join(',') === 'run-b' && files.includes('result.json');
     },
   ],
 ];

@@ -482,9 +482,10 @@
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Sending from the composer in failed phase restarts with feedback: new build, feedback in a new conversation, failed->queued; non-failed restart returns 409",
-          "usage": "<todoId> <failedBuildId>"
+          "usage": "<todoId> <failedBuildId> (a failed todo from setup-branch-sync-seed.mjs and a daemon run, features/failed-send.md)",
+          "note": "Needs a todo from setup-branch-sync-seed.mjs (the recipe in features/failed-send.md), which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by pr-gate run 5 on #1411; fix the seed first."
         },
         "restart-combo": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1279-restart-combo.mts",
@@ -1236,9 +1237,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "AI review modal launch from confirm phase enqueues review step, shows announcement, and simulated done closes loop.",
-          "usage": "<todoId>; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+          "usage": "<todoId> in confirm phase (from setup-review-seed.mjs); env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Needs a todo from setup-review-seed.mjs (written for this probe, #312) or the same seed steps in features/review-modal.md, which create the agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by pr-gate run 5 on #1411; fix the seed first."
         }
       }
     },
