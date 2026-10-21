@@ -28,15 +28,22 @@ import {
   quoteIssueLines,
 } from '@pacman/shared';
 
+/** 单个格式字符（Unicode Cf）。 */
+const FORMAT_CHAR = /^\p{Cf}$/u;
+
 /** 素材化文件名的独立安全化（票面失败方式 2 的纵深防御第二道）：server 面
  * isValidFileName 已挡 / 与 \，但 label 是用户可控文本——落盘名恒取
- * basename 段并剥控制字符，防 `../evil/name.bmp` 类 label 逃逸。 */
+ * basename 段并剥控制字符，防 `../evil/name.bmp` 类 label 逃逸。#1406：
+ * isValidFileName 放过的换行变体（U+0085 / U+2028 / U+2029）与格式字符
+ * （Unicode Cf）也剥掉——路径写进提示行，模型侧会在这些字符处断行，围栏
+ * 引用律也会改写它们，落盘名与提示里的路径只有同一份才对得上。 */
 function safeFileName(fileName: string): string {
   const base = basename(fileName.replaceAll('\\', '/'));
   let out = '';
   for (const ch of base) {
-    const cp = ch.codePointAt(0);
-    if (cp !== undefined && cp < 0x20) continue;
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp < 0x20 || cp === 0x85 || cp === 0x2028 || cp === 0x2029) continue;
+    if (FORMAT_CHAR.test(ch)) continue;
     out += ch;
   }
   return out === '' || out === '.' ? 'attachment' : out;

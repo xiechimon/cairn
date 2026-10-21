@@ -400,6 +400,23 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
     expect(existsSync(path)).toBe(true);
   });
 
+  test('A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const response = {
+      fileName: 'dia\u200bgram\u2028x.svg',
+      mimeType: 'image/svg+xml',
+      sizeBytes: svg.byteLength,
+      contentBase64: svg.toString('base64'),
+    };
+    const token = formatAttachmentToken('diagram.svg', 't1/id1.svg');
+    for (const text of [fenced(token), `任务\n\n${token}`]) {
+      const { out } = await resolve(text, { id1: response });
+      const path = /查看图片：(\/[^\s`\]]+)\]/.exec(out.text)?.[1] ?? '';
+      expect(path, out.text).toMatch(/diagramx\.svg$/);
+      expect(existsSync(path)).toBe(true);
+    }
+  });
+
   test('A3：下载失败（报错原文带换行）→ token 行与注记的每一行都带前缀', async () => {
     const { out, requested } = await resolve(fenced(`看图：\n${TOKEN}`), {
       id1: new Error('machine api 502: <html>\n<body>bad gateway</body>\n</html>'),
