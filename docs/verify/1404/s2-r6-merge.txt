@@ -1,0 +1,66 @@
+# #1404 S2 round 6: S1 round 8 (origin/claude/bootstrap-p3a at 92bd34b, which merged main 1f61c79) merged into claude/bootstrap-p3b at 4ae9bb5 without conflicts.
+# readiness.ts and its tests need no change: S1 round 8 touched evidence-link.ts (line-start rule for an unclosed <!--), paths.ts (a doc comment),
+# merge-gate.ts (more EVIDENCE_EXECUTABLE_EXTENSIONS) and S1's tests, plus scripts/pr-gate-selfcheck.mjs; the readiness fixtures do not depend on any of it.
+# All output below is from the clean merge commit 4ae9bb5 (git status was empty while it ran; this file was written after).
+# vitest --changed origin/main: origin/main was 2294b08 after the fetch; the one failure is the known root-only apps/daemon runner-brief.test.ts "擦除失败" case.
+# E2E_AFFECTED_PORT=8393: lsof -iTCP:8393 -sTCP:LISTEN showed nothing listening before the run.
+
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ Test Files  4 passed (4)
+      Tests  228 passed (228)
+exit=0
+
+$ pnpm lint
+Checked 794 files in 3s. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.7s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (8.7s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 19ms
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 242 passed (243)
+      Tests  1 failed | 2653 passed | 1 skipped (2655)
+exit=1
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 516 test sources, no package-manager spawns.
+exit=0
+
+$ E2E_AFFECTED_PORT=8393 pnpm --filter @pacman/web e2e:affected
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8393
+  live-server-reap.spec.ts token-gate.spec.ts
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.5s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.3s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.6s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (885ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (849ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (795ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (652ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (638ms)
+  8 passed (17.4s)
+exit=0

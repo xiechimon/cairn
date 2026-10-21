@@ -1,0 +1,103 @@
+# #1402 segment 2 gates. Two rounds: at 87480f0 (the change) and at 2ddff26 (after /simplify, the code the
+# second /code-review read). Node v22.22.0; the self-test also on v24.22.0 (seg2-selftest.txt).
+# vitest --changed origin/main selects no test file: the diff has no file a vitest project imports. The root-only
+# runner-brief case did not appear. e2e:affected maps every changed path to no web surface.
+
+######## round 1, HEAD 87480f0 ########
+== pnpm lint (HEAD 87480f0e)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 794 files in 6s. No fixes applied.
+Found 1 info.
+exit=0
+
+== pnpm typecheck (HEAD 87480f0e)
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+== pnpm spec:parse (HEAD 87480f0e)
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (12.7s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (13.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+== node scripts/feature-map-staleness-gate.mjs (HEAD 87480f0e)
+feature-map-gate: OK (37 md files, 334 refs checked, 59 frozen in baseline)
+exit=0
+== node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs
+vp-registry-gate: OK (106 scripts, 106 cases, 37 feature maps)
+exit=0
+== pnpm exec vitest run --changed origin/main
+No test files found, exiting with code 0
+exit=0
+
+== lsof -iTCP:8396 -sTCP:LISTEN: (empty = free)
+== E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected (HEAD 87480f0e)
+  (every changed path listed, each -> none)
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+
+== node .claude/skills/verify-pacman/scripts/vp-selftest.mjs (87480f0, Node 22 / Node 24)
+66/66 passed
+exit=0 secs=74 load=9.52 13.93 15.75
+66/66 passed
+exit=0 secs=79 load=10.04 13.11 15.32
+
+######## round 2, HEAD 2ddff26 ########
+== pnpm lint (HEAD 2ddff265)
+
+Checked 794 files in 3s. No fixes applied.
+Found 1 info.
+exit=0
+
+== pnpm typecheck (HEAD 2ddff265)
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+== pnpm spec:parse (HEAD 2ddff265)
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+== node scripts/feature-map-staleness-gate.mjs (HEAD 2ddff265)
+feature-map-gate: OK (37 md files, 334 refs checked, 59 frozen in baseline)
+exit=0
+
+== node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs (HEAD 2ddff265)
+vp-registry-gate: OK (106 scripts, 106 cases, 37 feature maps)
+exit=0
+
+== pnpm exec vitest run --changed origin/main (HEAD 2ddff265)
+ RUN  v5.0.1 <worktree>
+No test files found, exiting with code 0
+exit=0
+
+== lsof -iTCP:8396 -sTCP:LISTEN (no output = free)
+== E2E_AFFECTED_PORT=8396 pnpm --filter @pacman/web e2e:affected (HEAD 2ddff265)
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+
+== node .claude/skills/verify-pacman/scripts/vp-selftest.mjs (2ddff26, Node 22 / Node 24)
+66/66 passed
+exit=0 secs=74 load=8.19 4.94 4.34
+66/66 passed
+exit=0 secs=65 load=7.77 5.54 4.59

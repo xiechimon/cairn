@@ -15,6 +15,8 @@
 - 侧栏底部头像 chip(展开/收起两态);点开 = user-menu 头部。
 - 团队页 `/app/team`:「创建 Agent」dialog 头像行 + 网格卡。
 - 看板任务卡左下执行者头像(fresh 卡无 agent 时是 UserCircle 占位,非头像面)。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list avatars` 列出 usage:
+  - `vp.mjs drive avatars dicebear-avatars`:读的选择子已不在 apps/web/src。
 
 ## Driving it with verify-pacman
 

@@ -15,6 +15,8 @@
 
 - web:侧栏/项目页「新建项目」→ `/app/project/new` → 仓库行 → 「GitHub 仓库」。
 - API:`GET|DELETE /api/teams/{id}/github/connection`、`POST /api/teams/{id}/github/oauth/authorize`、`GET /api/github/repos?q=`(T1 面)。
+- 驱动(`vp.mjs list github-oauth-picker` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive github-oauth-picker oauth-and-manual-repo`:未认证态认证钮 + 手动兜底建 github 项目全链。
 
 ## Driving it with probe-github-oauth.mjs
 

@@ -1,0 +1,89 @@
+# Output of the /security-review skill, run on origin/HEAD...HEAD in the p5c worktree (origin/HEAD = origin/main 2294b087, HEAD = 07ab360a).
+# The skill gathered its context from this worktree; its diff was byte-identical to `git diff origin/HEAD...HEAD` (115094 bytes).
+# reviews.txt (written earlier) records a first attempt whose pre-loaded diff came from another checkout; the report below replaces that hand pass as the skill run.
+
+# /security-review: #1466 (claude/bootstrap-p5c-1466)
+
+## Range reviewed
+
+- origin/HEAD = 2294b087ed66bd3c0a5324cc59da5f58c7d560a5
+- HEAD = 07ab360a4b339f27fa349ed6cedbdc3e07eaca2c (worktree /home/user/pacman/.claude/worktrees/p5c)
+- Commits: 1bf7c28c (shared), 18ca8072 (server), 07ab360a (docs evidence). `git log --oneline origin/HEAD..HEAD` in the worktree listed exactly these three before the skill ran.
+- Whole diff: 19 files, +1404 / -64. Production source: 9 files under apps/server/src and packages/shared/src, +106 / -63. The other 10 files are tests (3) and docs/verify/1466 evidence (6 text files plus the dev-only mutate.mjs).
+
+## Did the skill's pre-loaded diff match the real one?
+
+Yes. This time the skill gathered its context in the p5c worktree: its git status line read "On branch claude/bootstrap-p5c-1466", and its commit list was the three commits above. Files compared:
+- /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/sec1466-skill-diff.txt (the skill's persisted diff output)
+- /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/sec1466-real-diff.txt (`git -C .../p5c diff origin/HEAD...HEAD`)
+
+Both are 115094 bytes, and `cmp` reports them identical.
+
+## Method
+
+- I invoked the skill as-is, and its context was the correct diff.
+- Sub-tasks were not available. This agent has no Agent/Task tool, so the skill's step 1 (find sub-task) and step 2 (one false-positive filter sub-task per candidate) could not be fanned out. I ran both phases myself against the same diff, following the skill's categories, its hard exclusions and precedents, and its confidence threshold of 8. File reads used paths under /home/user/pacman/.claude/worktrees/p5c.
+- I used two read-only node checks. One ran the new regex plus dot-segment rule on edge inputs. The other checked WHATWG URL normalization of `repos/${encodeURIComponent(o)}/${encodeURIComponent(r)}/issues`. Nothing was edited, committed or pushed.
+
+## Findings
+
+None at or above the confidence threshold.
+
+## Attack paths traced and why each is closed
+
+1. **Dot-segment rewrite of api.github.com requests with the team token (the issue this PR fixes).**
+   - Before: `../user` passed `/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/`. `encodeURIComponent('..')` is `..`, and fetch normalizes `https://api.github.com/repos/../user/issues` to `/user/issues`. Node confirmed: `..`/`x` gives `/x/issues`.
+   - Now: `parseGithubRepoRef` (packages/shared/src/records/project.ts:69) rejects `.` and `..` for either segment. `isGithubRepoRef` (:80) is its boolean face.
+   - Bypass variants checked:
+     - `%2e`/`%2E` forms: `%` is outside the character class.
+     - Backslash: outside the class.
+     - Trailing newline: JS `$` without the m flag matches only at end of input. Node: `"a/b\n"` gives null.
+     - Extra slash (`a/b/c`): rejected.
+     - `...`, `.....`, `.git`: allowed, and they stay literal segments. Node: `/repos/.../x/issues`.
+   - Closed.
+
+2. **New writes of a dot-segment githubRepo.** Every writer of project.githubRepo validates through isGithubRepoRef:
+   - POST /api/projects (routes-projects.ts:205-213). The object form `{owner, repo}` is joined and then validated, so `{owner:"..",repo:"x"}` gets a 400.
+   - PATCH local-to-github conversion (services/projects.ts:184). This runs before the `githubRepoReachable` fetch.
+   - chief `connect_repo` (chief-tools.ts:601).
+
+   The only other write sets null (chief-tools.ts:578). Closed.
+
+3. **Stored invalid rows reaching an outbound API call.**
+   - Every server caller that builds a repos/{o}/{r} request from the column now goes through `githubRepoOfProject` (services/git.ts:146):
+     - issue list, import, labels (github-issues.ts `requireGithubRepo`)
+     - #452 self-issue plan and create (todos.ts `planSelfIssue` / `runSelfIssueCreate`)
+     - CI check-runs (ci-loop.ts)
+     - PR state probe (builds.ts `probePullState`)
+   - The callers that build from todo.sourceRef go through `parseGithubIssueSourceRef` (packages/shared/src/records/todo.ts:72): source echo (github-issues.ts:179), title write-back (todos.ts:866), verify ticketRef (builds.ts:723, numeric only). That parser now runs owner/repo through parseGithubRepoRef and is stricter than the old `[^/#]+` class.
+   - sourceRef is built only server-side (createTodo `input.sourceRef` comes from the import path, not from any route, chief or MCP body).
+   - The only remaining hand split (services/projects.ts:223) runs on a value that has just passed isGithubRepoRef.
+   - The daemon PR probe (`githubRepoRefOf`, apps/daemon/src/github-probe.ts:31) uses isGithubRepoRef on the URL-normalized path, so it now rejects `owner/..`/`owner/.` rows.
+   - Closed.
+
+4. **Clone URLs still built from the raw stored column** (services/git.ts:132 and :229, routes-builds.ts:190). These are not changed by this diff, so they are pre-existing.
+   - The host is fixed to github.com, and the stored character class cannot carry `@`, `\`, `%` or a scheme.
+   - `https://github.com/../user.git` normalizes to `github.com/user.git`. That is a git smart-HTTP path on github.com, not an API endpoint, and it gives no access that a valid `owner/repo` would not.
+   - No new rows of this shape can be written (path 2).
+   - Filtered: not introduced by the PR, and no security impact shown. Confidence about 2.
+
+5. **Cross-team project access through chief and MCP tools.**
+   - `requireProjectRow` now filters `and(eq(project.id), eq(project.teamId, ctx.teamId))` at chief-tools.ts:165 and mcp-face.ts:113. The 404 text is the same for a missing id and for another team's id, and it echoes only the caller's own input, so it does not reveal whether the id exists.
+   - Callers covered:
+     - chief: docs (readFile then runs on the same, checked id), create_todo, update_project and connect_repo (the update's `where eq(project.id)` runs after the team check), run_builds, watch_todos (also skips `record.teamId !== ctx.teamId`)
+     - MCP: create_todo
+   - The chief and MCP `todos` tools now always pass teamId. `listTodos` ANDs the teamId and projectId conditions (todos.ts:238-245), so another team's projectId returns [].
+   - No new path weakens an existing check. Closed.
+
+6. **run_builds ordering.** `startBuilds` runs before the new team-scoped `requireProjectRow` (chief-tools.ts:818-831). That matters only for a legacy todo of team A that points at a project of team B. Such a row could have been created only before this fix, and only in a multi-team deployment, which this codebase does not have ("team 恒一行", context.ts:26). The todo itself is already team-checked by requireTeamTodo. The PR does not make this worse. Filtered: pre-existing, theoretical. Confidence about 2.
+
+7. **Stall on invalid stored rows.** builds.ts:1694 (`deliveredGithubPr`) still keys on the raw column, while ci-loop now skips such rows, so the todo can sit in `building`. This is availability within the caller's own team and falls under the DoS hard exclusion. Not a finding.
+
+8. **Non-production files.**
+   - docs/verify/1466/mutate.mjs uses `execFileSync('pnpm', [fixed args])`, takes only argv[2] as its root, and is not wired into CI or package scripts.
+   - The evidence text files and the two new server tests contain no secrets: a grep for ghp_/gho_/github_pat_/sk-/Bearer/private-key patterns found nothing.
+   - These files are excluded from findings by rules 11 and 16 anyway.
+
+## Residuals outside this diff (not findings, already listed in docs/verify/1466/reviews.txt)
+
+The MCP `conversation` tool reads any conversation id without a team check. chief `usage` covers all token_usage rows. chief and worker `save_memory` store an unchecked projectId reference. All of these are pre-existing, untouched by #1466, and unreachable across teams in a single-team deployment.

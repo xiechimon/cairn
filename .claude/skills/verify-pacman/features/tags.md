@@ -14,6 +14,8 @@
 ## How to get to it (user POV)
 
 - 用户不操作标签。派发任务后,执行 agent 自动归类;详情页 meta 区看已回填的 chip(只读)。
+- 驱动(`vp.mjs list tags` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive tags fixed-vocab-untitled`:固定词表回填与无标题任务。
 
 ## Driving it with verify-pacman
 

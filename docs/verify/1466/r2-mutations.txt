@@ -1,0 +1,68 @@
+# #1466 round 2 mutations: one source mutation per rule, run against the round 2 tests, original bytes restored after each (sha256-checked).
+# git: ab18cc3012d25906aa87adc28e565fa3171d8578 (sources = ab18cc30, the round 2 fix commit; the runner script is the only untracked file)
+# runner: node docs/verify/1466/r2-mutate.mjs "$PWD" (from the worktree root; mutation table in the script)
+# all 4 mutations KILLED; chief-tools.ts and builds.ts verified byte-identical afterwards (sha256sum -c: OK OK)
+# R2-M1 moves the project check back after startBuilds, where e87699c had it. R2-M2 puts the e87699c watch loop back (same code).
+# R2-M1b is the half fix (check before startBuilds but one todo at a time);
+# it is killed by the mixed-list half of T9 (the own-team todo, first in the list, was started: { phase: 'queued', builds: 1 }).
+# R2-M3 puts the e87699c deliveredGithubPr expression back exactly.
+
+## R2-M1: run_builds checks the project (team-scoped) before startBuilds
+file: apps/server/src/services/chief-tools.ts
+mutation: project check moved back after startBuilds, as at e87699c
+  edit: "return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };" -> "return { todoId, row };"
+  edit: "for (const { todoId, row, projectName } of targets) {" -> "for (const { todoId, row } of targets) {"
+  edit: "started.push(...builds);" -> "started.push(...builds);\n        const projectName = requireProjectRow(db, row.projectId, ctx.teamId).name;"
+tests: apps/server/test/project-team-guard.test.ts
+vitest exit: 1 (KILLED)
+Test Files  1 failed (1)
+Tests  1 failed | 12 passed (13)
+failing cases:
+  × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch
+first assertion messages:
+  AssertionError: expected { phase: 'queued', builds: 1 } to deeply equal { phase: 'todo', builds: +0 }
+
+## R2-M1b: run_builds checks every todo before the first startBuilds, not one todo at a time
+file: apps/server/src/services/chief-tools.ts
+mutation: project check kept before startBuilds but inside the loop, so an own-team todo earlier in the list is started first
+  edit: "return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };" -> "return { todoId, row };"
+  edit: "for (const { todoId, row, projectName } of targets) {" -> "for (const { todoId, row } of targets) {\n        const projectName = requireProjectRow(db, row.projectId, ctx.teamId).name;"
+tests: apps/server/test/project-team-guard.test.ts
+vitest exit: 1 (KILLED)
+Test Files  1 failed (1)
+Tests  1 failed | 12 passed (13)
+failing cases:
+  × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch
+first assertion messages:
+  AssertionError: expected { phase: 'queued', builds: 1 } to deeply equal { phase: 'todo', builds: +0 }
+
+## R2-M2: watch_todos checks every project before watching any todo
+file: apps/server/src/services/chief-tools.ts
+mutation: project check moved back into the watch loop, so it runs after the first todo is watched (e87699c shape)
+  edit: "const targets = todoIds.flatMap((todoId) => {\n        const record = getTodo(svc, todoId);\n        if (!record || record.teamId !== ctx.teamId) return [];\n        return [{ record, projectName: requireProjectRow(db, record.projectId, ctx.teamId).name }];\n      });\n      for (const { record, projectName } of targets) {" -> "for (const todoId of todoIds) {\n        const record = getTodo(svc, todoId);\n        if (!record || record.teamId !== ctx.teamId) continue;\n        const projectName = requireProjectRow(db, record.projectId, ctx.teamId).name;"
+tests: apps/server/test/project-team-guard.test.ts
+vitest exit: 1 (KILLED)
+Test Files  1 failed (1)
+Tests  1 failed | 12 passed (13)
+failing cases:
+  × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch
+first assertion messages:
+  AssertionError: expected [ '_yvxLEZ7K6e8wej8GxVnd' ] to deeply equal []
+
+## R2-M3: completeStep decides "wait for CI" through githubRepoOfProject
+file: apps/server/src/services/builds.ts
+mutation: raw githubRepo column back in deliveredGithubPr, as at e87699c
+  edit: "const deliveredGithubPr = buildRow.prNumber !== null && githubRepoOfProject(projRow) !== null;" -> "const deliveredGithubPr =\n      buildRow.prNumber !== null && projRow?.repoKind === 'github' && projRow.githubRepo !== null;"
+tests: apps/server/test/github-repo-dot-segments.test.ts
+vitest exit: 1 (KILLED)
+Test Files  1 failed (1)
+Tests  4 failed | 15 passed (19)
+failing cases:
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（../user）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（owner/..）
+first assertion messages:
+  AssertionError: expected 'building' to be 'review' // Object.is equality
+  AssertionError: expected 'building' to be 'review' // Object.is equality
+

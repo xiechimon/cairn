@@ -3,7 +3,8 @@
 // （AGENTS.md 测试规则）：
 //  1 别的团队的项目 id → 404，不用任何一方的 token、不出站。
 //  2 非 GitHub 项目（hosted / local / 无 repo）→ 错误结果，不出站。
-//  3 githubRepo 形坏（无斜杠、多段、非法字符）→ 错误结果，不出站。
+//  3 githubRepo 形坏（无斜杠、多段、非法字符、owner 或 repo 为 `.` / `..`
+//    ——#1466 共享规则）→ 错误结果，不出站。
 //  4 团队无 GitHub 连接 → 404「github connection not found」，无匿名回落。
 //  5 token 密文解不开（keyfile 换了）→ 错误结果，不是 500。只有
 //    SecretBoxError 是这个 409；读连接行的 SQLite 错误等别的错误原样抛出。
@@ -406,7 +407,20 @@ describe('项目闸与连接闸（1-5）', () => {
 
   test('3 githubRepo 形坏 → 错误结果，不出站', async () => {
     const w = world();
-    for (const bad of ['noslash', 'a/b/c', 'own er/repo', '/repo', 'owner/', '', '../x']) {
+    // 末四项 = `.` / `..` 段（#1466 共享规则，githubRepoOfProject）。
+    const badRefs = [
+      'noslash',
+      'a/b/c',
+      'own er/repo',
+      '/repo',
+      'owner/',
+      '',
+      '../x',
+      './x',
+      'x/.',
+      'x/..',
+    ];
+    for (const bad of badRefs) {
       const projectId = insertProject(w.s, { repoKind: 'github', githubRepo: bad });
       for (const name of TOOLS) {
         const err = await chiefError(w, name, { projectId });

@@ -29,6 +29,7 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  quotesIssueFence,
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
@@ -161,8 +162,14 @@ function json(result: unknown): string {
   return JSON.stringify(result ?? null);
 }
 
-function requireProjectRow(db: Db, projectId: string) {
-  const row = db.select().from(project).where(eq(project.id, projectId)).get();
+/** project 存在性 + 团队归属校验（#1466，requireTeamTodo 同口径：跨团队 id
+ * 与不存在同 404，不泄露存在性）。 */
+function requireProjectRow(db: Db, projectId: string, teamId: string) {
+  const row = db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
+    .get();
   if (!row) throw new HttpError(404, `project ${projectId}`);
   return row;
 }
@@ -259,7 +266,8 @@ export async function executeChiefTool(
     case 'todos': {
       const projectId = optStr(params, 'projectId');
       const phase = optStr(params, 'phase');
-      let records = listTodos(svc, projectId ? { projectId } : { teamId: ctx.teamId });
+      // 团队过滤恒在（#1466）：他队 projectId 与不存在的 id 同回 []。
+      let records = listTodos(svc, { teamId: ctx.teamId, ...(projectId ? { projectId } : {}) });
       if (phase) records = records.filter((t) => t.phase === phase);
       return json(records);
     }
@@ -364,7 +372,7 @@ export async function executeChiefTool(
       // daemon worktree `git show`，复刻走 server 裸库读，能力对齐、机制不同
       // [设计]。无 path → 回项目 repo 元信息（GitHub 形态无本地存储）。
       const projectId = str(params, 'projectId');
-      const row = requireProjectRow(db, projectId);
+      const row = requireProjectRow(db, projectId, ctx.teamId);
       const paths = strArr(params, 'paths');
       if (paths.length === 0) {
         return json({ projectId, name: row.name, repoKind: row.repoKind, files: [] });
@@ -439,7 +447,7 @@ export async function executeChiefTool(
     case 'create_todo': {
       // 措辞→spec 三段式（r5 §3.2）由 LLM 侧组织 spec 文本；本层落库 + 溯源。
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId); // 存在性校验（404 面）
+      requireProjectRow(db, projectId, ctx.teamId); // 存在性 + 团队归属校验（404 面）
       const record = createTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -581,7 +589,7 @@ export async function executeChiefTool(
     }
     case 'update_project': {
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId);
+      requireProjectRow(db, projectId, ctx.teamId);
       const name = optStr(params, 'name');
       if (name !== undefined)
         db.update(project).set({ name }).where(eq(project.id, projectId)).run();
@@ -589,7 +597,7 @@ export async function executeChiefTool(
     }
     case 'connect_repo': {
       const projectId = str(params, 'projectId');
-      requireProjectRow(db, projectId);
+      requireProjectRow(db, projectId, ctx.teamId);
       const githubRepo = str(params, 'githubRepo');
       if (!isGithubRepoRef(githubRepo))
         throw new HttpError(400, 'invalid params.githubRepo: expected "owner/repo"');
@@ -806,9 +814,14 @@ export async function executeChiefTool(
       ]) {
         if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
       }
-      const started: unknown[] = [];
-      for (const todoId of todoIds) {
+      // 逐卡校验先于任何派工（#1466）：本队任务指向他队项目（旧 create_todo
+      // 可造）在建 build 之前就 404，整批不动——不留「报错了、build 却在跑」。
+      const targets = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
+        return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };
+      });
+      const started: unknown[] = [];
+      for (const { todoId, row, projectName } of targets) {
         const builds = startBuilds(
           { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
           {
@@ -821,7 +834,6 @@ export async function executeChiefTool(
         );
         started.push(...builds);
         // 派工即自动 watch（r5 §3.5：run_builds → watches[0] reason canon）。
-        const projectName = requireProjectRow(db, row.projectId).name;
         const todoRecord = getTodo(svc, todoId);
         if (todoRecord) {
           addChiefWatch(deps, {
@@ -947,10 +959,14 @@ export async function executeChiefTool(
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
       const reason = optStr(params, 'reason');
-      for (const todoId of todoIds) {
+      // 他队任务与不存在同样跳过（#1466 团队归属，requireTeamTodo 同口径）；项目
+      // 归属先全部校验再 watch——本队任务指向他队项目即整批 404，不半截生效。
+      const targets = todoIds.flatMap((todoId) => {
         const record = getTodo(svc, todoId);
-        if (!record) continue;
-        const projectName = requireProjectRow(db, record.projectId).name;
+        if (!record || record.teamId !== ctx.teamId) return [];
+        return [{ record, projectName: requireProjectRow(db, record.projectId, ctx.teamId).name }];
+      });
+      for (const { record, projectName } of targets) {
         addChiefWatch(deps, {
           teamId: ctx.teamId,
           todo: record,
@@ -1128,6 +1144,15 @@ export function saveMemoryEntry(
     sourceBuildId: string | null;
   },
 ): typeof agentMemory.$inferSelect {
+  // #1406（ADR 0021 D5）：记忆每轮进系统提示层，GitHub issue 原文围栏里是仓外
+  // 作者写的数据，逐字搬进记忆就等于把它升进系统层。只认得出逐字搬运的围栏
+  // 标记；改写过的转述认不出，那一半靠 chief 章程与围栏首行的禁令。
+  if (quotesIssueFence(input.title) || quotesIssueFence(input.content)) {
+    throw new HttpError(
+      400,
+      'invalid params.content: text quoted from a GitHub issue fence is third-party data and is not saved as memory',
+    );
+  }
   const count = db
     .select({ n: sql<number>`count(*)` })
     .from(agentMemory)

@@ -15,6 +15,9 @@
 
 - 详情页 composer 工具条「添加附件」钮(运行/确认面)。
 - 新建任务对话框工具条「添加附件」钮(落 spec textarea)。
+- 驱动(`vp.mjs list attachments` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive attachments new-task-and-composer-upload`:新建任务对话框上传附件;`--` 后给 todoId 时加 composer 路径。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive attachments clipboard-paste`(依赖的 setup-review-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving it with verify-pacman
 

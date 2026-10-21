@@ -1,0 +1,135 @@
+# #1404 S2 round 8: origin/main at 49af6f2 merged into claude/bootstrap-p3b at 04ffa3b by a merge commit, a570f79 (parents 04ffa3b, 49af6f2).
+# origin/main brings S1's squash 9eefe88 (#1420, made from S1's head 92bd34b, whose original commits are already in this branch's history)
+# and 2294b08, 290f3c1, e1b051a, 49af6f2 (#1464, #1465, #1411, #1467), none of which touch merge-gate files.
+#
+# Conflicts: one.
+#   packages/shared/src/records/merge-gate.ts, add/add (both sides added the file relative to the merge base 1f61c79).
+#   main's version is S1's 161 lines; the branch's version is the same 161 lines (diff against main's file empty) plus S2's
+#   blocker vocabulary appended after them (lines 162-268: BLOCKER_CLASSES, MERGE_BLOCKERS, mergeBlockerSchema, mergeReadinessSchema).
+#   Git marked lines 162-268 as the conflict (S2's block against nothing). Resolution: main's S1 content plus S2's appended block, which is
+#   the branch's version byte for byte; S1's part is main's (it is identical), and S2's delta on the file is unchanged (shown below).
+# Every other S1 file (the other 38 of the 39 in 9eefe88) merged without a conflict: the add/add sides were identical, since main's
+#   squash is S1's head 92bd34b, which this branch had merged in round 6. Their diff against main is empty.
+# So `git diff origin/main -- <S1 files>` is empty for 38 files; for merge-gate.ts it is exactly S2's 107 added lines, which S2 needs
+# (readiness.ts imports MERGE_BLOCKERS and the blocker and readiness types from it). `git diff --stat origin/main...a570f79` shows S2's own 24 files,
+# the same 24 files and 3914 insertions as 92bd34b..04ffa3b before the merge.
+# origin/main in the commands below is 49af6f2 (the fetch before the merge). It moved to dabef48 (#1456) while round 8 was under way;
+# that commit touches no merge-gate file and is not merged here; the three-dot diff's merge base stays 49af6f2.
+# The merge commit went through the pre-commit hook (biome ci, pnpm -r typecheck, test spawn gate). All output below is at a570f79
+# with a clean tree; this file was written after.
+
+$ git show --name-only --format= 9eefe88   # S1 files (the #1420 squash)
+apps/server/src/services/merge-gate/digest.ts
+apps/server/src/services/merge-gate/evidence-link.ts
+apps/server/src/services/merge-gate/paths.ts
+apps/server/test/fixtures/merge-gate-compare-sample.json
+apps/server/test/merge-gate-digest.test.ts
+apps/server/test/merge-gate-evidence-link.test.ts
+apps/server/test/merge-gate-paths.test.ts
+docs/verify/1404/compare-sample.json
+docs/verify/1404/digest-crosscheck-2.txt
+docs/verify/1404/digest-crosscheck-3.txt
+docs/verify/1404/digest-crosscheck.txt
+docs/verify/1404/gates-s1-2.txt
+docs/verify/1404/gates-s1-3.txt
+docs/verify/1404/gates-s1-4.txt
+docs/verify/1404/gates-s1-5.txt
+docs/verify/1404/gates-s1-6.txt
+docs/verify/1404/gates-s1-7.txt
+docs/verify/1404/gates-s1-8.txt
+docs/verify/1404/gates-s1.txt
+docs/verify/1404/pr-gate-1420-run4-02780b4.json
+docs/verify/1404/pr-gate-1420-run5-1892662.json
+docs/verify/1404/s1-mutations-2.txt
+docs/verify/1404/s1-mutations-3.txt
+docs/verify/1404/s1-mutations-4.txt
+docs/verify/1404/s1-mutations-5.txt
+docs/verify/1404/s1-mutations-6.txt
+docs/verify/1404/s1-mutations-7.txt
+docs/verify/1404/s1-mutations-8.txt
+docs/verify/1404/s1-mutations.txt
+docs/verify/1404/s1-r2-red-green.txt
+docs/verify/1404/s1-r3-red-green.txt
+docs/verify/1404/s1-r4-red-green.txt
+docs/verify/1404/s1-r5-red-green.txt
+docs/verify/1404/s1-r6-red-green.txt
+docs/verify/1404/s1-r7-red-green.txt
+docs/verify/1404/s1-r8-red-green.txt
+docs/verify/1404/s1-red-green.txt
+packages/shared/src/records/index.ts
+packages/shared/src/records/merge-gate.ts
+
+$ git diff origin/main a570f79 --stat -- <the 38 S1 files other than merge-gate.ts>
+(empty: 0 bytes of diff)
+
+$ git diff origin/main a570f79 --stat -- packages/shared/src/records/merge-gate.ts
+ packages/shared/src/records/merge-gate.ts | 107 ++++++++++++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
+
+$ diff <(git diff origin/main a570f79 -- merge-gate.ts) <(git diff 92bd34b 04ffa3b -- merge-gate.ts)   # hunks only, index lines dropped
+(no difference: the merge keeps exactly S2's delta on merge-gate.ts)
+
+$ diff <(git show 92bd34b:merge-gate.ts) <(git show 9eefe88:merge-gate.ts)
+(identical: S1 head 92bd34b is what was squashed)
+
+$ git diff --stat origin/main...a570f79
+ apps/server/src/services/merge-gate/readiness.ts |  404 +++++++++
+ apps/server/test/merge-gate-readiness.test.ts    | 1056 ++++++++++++++++++++++
+ docs/verify/1404/gates-s2-2.txt                  |   47 +
+ docs/verify/1404/gates-s2-3.txt                  |   51 ++
+ docs/verify/1404/gates-s2-4.txt                  |   54 ++
+ docs/verify/1404/gates-s2-5.txt                  |   58 ++
+ docs/verify/1404/gates-s2-7.txt                  |   58 ++
+ docs/verify/1404/gates-s2.txt                    |   45 +
+ docs/verify/1404/pr-gate-1421-run2-68d499f.json  |  151 ++++
+ docs/verify/1404/s2-mutations-1.txt              |   42 +
+ docs/verify/1404/s2-mutations-2.txt              |   38 +
+ docs/verify/1404/s2-mutations-3.txt              |   40 +
+ docs/verify/1404/s2-mutations-4.txt              |   62 ++
+ docs/verify/1404/s2-mutations-5.txt              |  266 ++++++
+ docs/verify/1404/s2-mutations-7.txt              |  388 ++++++++
+ docs/verify/1404/s2-mutations.txt                |   42 +
+ docs/verify/1404/s2-r2-red-green.txt             |   31 +
+ docs/verify/1404/s2-r3-red-green.txt             |  143 +++
+ docs/verify/1404/s2-r4-red-green.txt             |  283 ++++++
+ docs/verify/1404/s2-r5-red-green.txt             |  182 ++++
+ docs/verify/1404/s2-r6-merge.txt                 |   66 ++
+ docs/verify/1404/s2-r7-red-green.txt             |  271 ++++++
+ docs/verify/1404/s2-red-green.txt                |   29 +
+ packages/shared/src/records/merge-gate.ts        |  107 +++
+ 24 files changed, 3914 insertions(+)
+
+$ git diff --stat 92bd34b 04ffa3b   # S2 before the merge, for comparison
+ 24 files changed, 3914 insertions(+)
+
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts
+ Test Files  4 passed (4)
+      Tests  248 passed (248)
+exit=0
+per file (JSON reporter, same run set):
+  apps/server/test/merge-gate-digest.test.ts 35 of 35
+  apps/server/test/merge-gate-evidence-link.test.ts 24 of 24
+  apps/server/test/merge-gate-paths.test.ts 75 of 75
+  apps/server/test/merge-gate-readiness.test.ts 114 of 114
+  total 248 of 248
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (5.3s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (9.4s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0

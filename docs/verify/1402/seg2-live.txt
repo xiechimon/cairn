@@ -1,0 +1,461 @@
+# #1402 segment 2 live run (ticket acceptance 2): three existing features driven end to end with only
+# vp.mjs --help and the feature maps' vp.mjs drive lines, then archived with vp.mjs archive and linked with
+# vp.mjs links. Stack: vp.mjs launch from this worktree on 8791 / 5273 (lsof found both free; no
+# VERIFY_PORT / VERIFY_WEB_PORT override needed). NO_PROXY=127.0.0.1,localhost for the loopback calls.
+# Part 1 also shows the two stack-state refusals (fresh-stack, own-stack); part 2 drives a glass journey on
+# its own stack and replays pr-gate run 9's add-only finding against a real sibling worktree, --dry-run only.
+# Negative control (ticket acceptance 3) is segment 1's: negative-control.txt, positive-control.txt,
+# negative-control-2.txt, with run directories 20261020-203942-search/ (seeded, FAIL) and
+# 20261020-204008-search/ (reverted, PASS); see README.md.
+
+== part 1 ==
+# worktree <worktree>, HEAD 668e79c6, 2026-10-21T13:52:32Z, node v22.22.0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs --help
+verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <command>
+
+  launch                         start the isolated stack (scripts/launch.mjs)
+  doctor                         read-only health check of the stack (scripts/doctor.mjs)
+  list [feature]                 registered features and their cases
+  drive <feature> [case] [--force] [--dry-run] [-- <args>]
+                                 run a registered case; cases that need the stack run doctor first;
+                                 stale and host-bound cases, and cases that need real-llm, github or
+                                 rewrites-evidence, need --force (the refusal lists every reason, and
+                                 --force prints the same list before it runs); so does a fresh-stack
+                                 case once anything was driven on the stack since launch (start a new
+                                 one: vp.mjs cleanup, then vp.mjs launch); an own-stack case starts
+                                 its own stack and is refused while one is up in VERIFY_RUN_DIR
+                                 (vp.mjs cleanup first); a case whose usage
+                                 names required arguments needs one; arguments after -- replace the
+                                 defaults they name (same option before '=', same probe name), the
+                                 rest stay; a case that needs the
+                                 stack gets VERIFY_PORT / VERIFY_WEB_PORT from the stack's ports.json;
+                                 without VERIFY_EVIDENCE_DIR the case writes to a new
+                                 .claude/verify-evidence/<time>-<feature>-<case>/ in the main checkout,
+                                 created once doctor passes (a probe with its own output option gets
+                                 the directory through it, or uses the one given after --; a probe
+                                 that writes fixed evidence is named instead); an evidence directory
+                                 inside docs/verify (VERIFY_EVIDENCE_DIR, or the output option's
+                                 directory) is refused before anything runs, also with --dry-run;
+                                 --dry-run prints what would run
+  capture <path> [--name <label>] [--wait <ms>]
+                                 screenshot a live route, record console errors and failed requests
+                                 (exit 0 when the page loaded; errors are recorded, not judged;
+                                 with VERIFY_EVIDENCE_DIR set it writes into a new capture-<label>/,
+                                 refused when that directory is inside docs/verify)
+  archive <ticket> [--from <dir>]... [--latest <n>]
+                                 copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
+                                 the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
+                                 (newest runs in the shared evidence root, other lanes' included);
+                                 --latest with either of the others is refused
+  links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
+  cleanup                        stop the stack (scripts/cleanup.mjs)
+
+Feature recipes: .claude/skills/verify-pacman/features/<feature>.md
+Registry: .claude/skills/verify-pacman/vp-registry.json
+exit=0
+
+# the drive lines in the three maps used here (the only source for the commands below)
+
+$ grep -n vp.mjs drive .claude/skills/verify-pacman/features/api-keys.md .claude/skills/verify-pacman/features/search.md .claude/skills/verify-pacman/features/theme.md
+.claude/skills/verify-pacman/features/api-keys.md:17:  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create`:空态点「新建密钥」:一次性明文、掩码行、库里只存哈希;需全新栈(launch 后的第一个 drive,否则拒跑)。
+.claude/skills/verify-pacman/features/search.md:16:  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive search search`:⌘K 输入标题,命中行可见。
+.claude/skills/verify-pacman/features/search.md:17:  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive search project-line`:结果行第二行是任务自己的项目;需全新栈(launch 后的第一个 drive,否则拒跑)。
+.claude/skills/verify-pacman/features/theme.md:16:  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive theme persist`:浅色 / 深色写入 `pacman-theme`,重载保形。
+.claude/skills/verify-pacman/features/theme.md:17:  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive theme sealed-tokens-audit`:双主题下退役规则缺席、选中行颜色与 token 对比度。
+exit=0
+
+# ports before launch (empty = free)
+
+$ lsof -iTCP:8791 -sTCP:LISTEN -P -n
+exit=1
+
+$ lsof -iTCP:5273 -sTCP:LISTEN -P -n
+exit=1
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs launch
+verify stack ready
+  web(驱动入口)  http://127.0.0.1:5273/app
+  api(server)     http://127.0.0.1:8791
+  PACMAN_HOME     <worktree>/.claude/verify-run/home(全新库,seed 用户 Owner)
+  技能目录        <worktree>/.claude/verify-run/home/skills(scratch,空集起步;放技能见 features/skills-page.md)
+  运行态          <worktree>/.claude/verify-run
+next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs list api-keys
+api-keys  (features/api-keys.md)
+  create                       stack+fresh-stack            Create an API key from the empty state: one-time plaintext, masked row, SQLite stores the hash only.
+                                                            usage: needs a fresh database (re-run vp.mjs launch)
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create
+vp: api-keys/create usage: needs a fresh database (re-run vp.mjs launch)
+vp: api-keys/create needs the stack, running doctor first
+PASS  server 进程组存活(pid 6658) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 6659) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-135240-api-keys-create
+vp: api-keys/create -> node .claude/skills/verify-pacman/scripts/drive.mjs api-key
+PASS  API 密钥页空态就绪
+shot  01-keys-empty.png
+PASS  新建密钥弹窗打开(#287 两步流)
+shot  02-keys-create-dialog.png
+PASS  一次性明文形态 pacman_…(pacman_4043b53…,仅显示一次)
+PASS  密钥列表出现掩码行(1 行)
+shot  03-keys-once.png
+PASS  API 掩码行(pacman_4043b53a…)
+PASS  SQLite api_key 表存 keyHash 非明文(02 §8 护栏)
+drive api-key:PASS
+evidence:/home/user/pacman/.claude/verify-evidence/20261021-135240-api-keys-create
+exit=0
+
+# the same fresh-stack case again on the same stack: refused, not a red run
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create
+api-keys/create runs only with --force:
+  - needs fresh-stack, and the stack in <worktree>/.claude/verify-run was driven since launch (api-keys/create); start a new one with vp.mjs cleanup, then vp.mjs launch
+Re-run with --force to drive it anyway; --force covers every line above.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive search search
+vp: search/search needs the stack, running doctor first
+PASS  server 进程组存活(pid 6658) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 6659) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-135246-search-search
+vp: search/search -> node .claude/skills/verify-pacman/scripts/drive.mjs search
+PASS  搜索面板打开(⌘K)
+PASS  结果行命中「搜索目标 67404」
+shot  02-search-results.png
+drive search:PASS
+evidence:/home/user/pacman/.claude/verify-evidence/20261021-135246-search-search
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive theme persist
+vp: theme/persist needs the stack, running doctor first
+PASS  server 进程组存活(pid 6658) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 6659) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=1(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-135250-theme-persist
+vp: theme/persist -> node .claude/skills/verify-pacman/scripts/drive.mjs theme
+shot  01-theme-default-dark.png
+PASS  light 生效({"theme":"light","light":true})
+shot  02-theme-light.png
+PASS  dark 生效({"theme":"dark","light":false})
+shot  03-theme-dark.png
+drive theme:PASS
+evidence:/home/user/pacman/.claude/verify-evidence/20261021-135250-theme-persist
+exit=0
+
+# a glass case while this stack is up: refused before glass.mjs starts its own stack
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive glass-journeys create-task
+glass-journeys/create-task starts and stops its own stack in <worktree>/.claude/verify-run, where a stack is up (server 8791, web 5273); stop it with vp.mjs cleanup first.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive glass-journeys create-task --force
+glass-journeys/create-task starts and stops its own stack in <worktree>/.claude/verify-run, where a stack is up (server 8791, web 5273); stop it with vp.mjs cleanup first.
+exit=2
+
+# the stack's drive record
+
+$ cat .claude/verify-run/vp-drives.txt
+api-keys/create
+search/search
+theme/persist
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs cleanup
+vite dev:已回收(pid 6659)
+server:已回收(pid 6658)
+daemon:无残留(钉选 http://127.0.0.1:8791)
+运行态已删:<worktree>/.claude/verify-run(scratch home,含 SQLite 库)
+证据完好:/home/user/pacman/.claude/verify-evidence(8 组)
+  - 20261021-135240-api-keys-create
+  - 20261021-135246-search-search
+  - 20261021-135250-theme-persist
+exit=0
+
+== part 2 ==
+# part 2, HEAD 668e79c6, 2026-10-21T13:53:19Z
+# no stack in VERIFY_RUN_DIR now: the glass case runs on a stack of its own
+
+$ ls .claude/verify-run
+ls: cannot access '.claude/verify-run': No such file or directory
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive glass-journeys create-task
+vp: glass-journeys/create-task usage: starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-135320-glass-journeys-create-task
+vp: glass-journeys/create-task -> node .cursor/skills/verify-pacman/scripts/glass.mjs create-task --out /home/user/pacman/.claude/verify-evidence/20261021-135320-glass-journeys-create-task
+launch
+shot  02-create-task-dialog.png
+shot  03-create-task-card.png
+PASS  create-task: card is in 待开始
+PASS  create-task: GET /api/todos phase=todo
+PASS  create-task: sqlite phase=todo
+evidence  /home/user/pacman/.claude/verify-evidence/20261021-135320-glass-journeys-create-task
+cleanup
+PASS
+exit=0
+
+# add-only guard against a sibling worktree (p1, another lane of this repository), --dry-run only.
+# git worktree list from this checkout:
+
+$ git worktree list --porcelain
+(40 worktrees listed; the two this run uses:)
+worktree /home/user/pacman/.claude/worktrees/p1
+worktree <worktree>
+exit=0
+# vp.mjs as on origin/main, copied for this run to .claude/skills/verify-pacman/scripts/p1s2-main-vp.mjs and removed after (dry-run, writes nothing):
+
+$ env VERIFY_EVIDENCE_DIR=/home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261020-203718-api-key node .claude/skills/verify-pacman/scripts/p1s2-main-vp.mjs drive api-keys create --dry-run
+vp: api-keys/create usage: needs a fresh database (re-run vp.mjs launch)
+vp: dry-run api-keys/create (doctor first)
+    runner node  cwd <worktree>
+    script .claude/skills/verify-pacman/scripts/drive.mjs  args api-key
+    VERIFY_EVIDENCE_DIR=/home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261020-203718-api-key
+    VERIFY_RUN_DIR=<worktree>/.claude/verify-run
+exit=0
+
+$ git status --short .claude/skills/verify-pacman/scripts
+exit=0
+# vp.mjs on this branch:
+
+$ env VERIFY_EVIDENCE_DIR=/home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261020-203718-api-key node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create --dry-run
+VERIFY_EVIDENCE_DIR=/home/user/pacman/.claude/worktrees/p1/docs/verify/1402/20261020-203718-api-key is inside /home/user/pacman/.claude/worktrees/p1/docs/verify: committed evidence, add-only (ADR 0015).
+Let vp.mjs write to a new directory under .claude/verify-evidence (leave VERIFY_EVIDENCE_DIR unset), then copy it in with vp.mjs archive <ticket> --from <dir>.
+exit=2
+
+$ git -C /home/user/pacman/.claude/worktrees/p1 status --short docs/verify/1402
+exit=0
+
+== archive (in this worktree, before the evidence commit 518ec47) ==
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402 --from <4 run directories>
+vp: /home/user/pacman/.claude/verify-evidence/20261021-135240-api-keys-create -> <worktree>/docs/verify/1402/20261021-135240-api-keys-create
+vp: /home/user/pacman/.claude/verify-evidence/20261021-135246-search-search -> <worktree>/docs/verify/1402/20261021-135246-search-search
+vp: /home/user/pacman/.claude/verify-evidence/20261021-135250-theme-persist -> <worktree>/docs/verify/1402/20261021-135250-theme-persist
+vp: /home/user/pacman/.claude/verify-evidence/20261021-135320-glass-journeys-create-task -> <worktree>/docs/verify/1402/20261021-135320-glass-journeys-create-task
+next: git add docs/verify/1402 && git commit, push, then vp.mjs links 1402
+exit=0
+
+$ (the same archive again: refused, nothing copied)
+refusing to overwrite <worktree>/docs/verify/1402/20261021-135240-api-keys-create: docs/verify is add-only (ADR 0015)
+exit=1
+
+== links, after committing the archived runs as 518ec47 (not pushed; vp.mjs warns, the SHA stays the same when
+== the branch is pushed as is). It lists every file under docs/verify/1402 at that SHA, segment 1's included.
+$ node .claude/skills/verify-pacman/scripts/vp.mjs links 1402
+vp: 518ec47f618b5d4f8faee1697ced6f4e71dbffea is not on any remote branch yet; push before using these links
+![2026-10-20T20-37-51-922Z-capture-board/board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/2026-10-20T20-37-51-922Z-capture-board/board.png)
+[2026-10-20T20-37-51-922Z-capture-board/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/2026-10-20T20-37-51-922Z-capture-board/result.json)
+![20261020-203718-api-key/01-keys-empty.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203718-api-key/01-keys-empty.png)
+![20261020-203718-api-key/02-keys-create-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203718-api-key/02-keys-create-dialog.png)
+![20261020-203718-api-key/03-keys-once.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203718-api-key/03-keys-once.png)
+[20261020-203718-api-key/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203718-api-key/result.json)
+![20261020-203724-new-task/01-board-before.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203724-new-task/01-board-before.png)
+![20261020-203724-new-task/02-new-task-card.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203724-new-task/02-new-task-card.png)
+[20261020-203724-new-task/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203724-new-task/result.json)
+![20261020-203728-search/02-search-results.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203728-search/02-search-results.png)
+[20261020-203728-search/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203728-search/result.json)
+![20261020-203735-theme/01-theme-default-dark.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203735-theme/01-theme-default-dark.png)
+![20261020-203735-theme/02-theme-light.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203735-theme/02-theme-light.png)
+![20261020-203735-theme/03-theme-dark.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203735-theme/03-theme-dark.png)
+[20261020-203735-theme/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203735-theme/result.json)
+![20261020-203942-search/99-error.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203942-search/99-error.png)
+[20261020-203942-search/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-203942-search/result.json)
+![20261020-204008-search/02-search-results.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-204008-search/02-search-results.png)
+[20261020-204008-search/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-204008-search/result.json)
+![20261020-233153-api-keys-create/01-keys-empty.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233153-api-keys-create/01-keys-empty.png)
+![20261020-233153-api-keys-create/02-keys-create-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233153-api-keys-create/02-keys-create-dialog.png)
+![20261020-233153-api-keys-create/03-keys-once.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233153-api-keys-create/03-keys-once.png)
+[20261020-233153-api-keys-create/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233153-api-keys-create/result.json)
+[20261020-233157-chief-unread-unread-badge/00-session.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/00-session.json)
+[20261020-233157-chief-unread-unread-badge/01-after-user-turn.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/01-after-user-turn.json)
+![20261020-233157-chief-unread-unread-badge/02-badge-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/02-badge-1.png)
+![20261020-233157-chief-unread-unread-badge/03-board-badge-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/03-board-badge-1.png)
+![20261020-233157-chief-unread-unread-badge/04-tooltip-count-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/04-tooltip-count-1.png)
+![20261020-233157-chief-unread-unread-badge/05-drawer-open.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/05-drawer-open.png)
+[20261020-233157-chief-unread-unread-badge/06-after-open.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/06-after-open.json)
+![20261020-233157-chief-unread-unread-badge/07-badge-after-open.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/07-badge-after-open.png)
+[20261020-233157-chief-unread-unread-badge/08-wake-step.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/08-wake-step.json)
+[20261020-233157-chief-unread-unread-badge/09-after-tick.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/09-after-tick.json)
+[20261020-233157-chief-unread-unread-badge/10-after-wake-done.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/10-after-wake-done.json)
+[20261020-233157-chief-unread-unread-badge/11-unread-100.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/11-unread-100.json)
+![20261020-233157-chief-unread-unread-badge/12-badge-cap.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/12-badge-cap.png)
+![20261020-233157-chief-unread-unread-badge/13-board-badge-cap.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/13-board-badge-cap.png)
+[20261020-233157-chief-unread-unread-badge/14-tooltip.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/14-tooltip.json)
+![20261020-233157-chief-unread-unread-badge/15-tooltip-cap.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/15-tooltip-cap.png)
+[20261020-233157-chief-unread-unread-badge/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233157-chief-unread-unread-badge/result.json)
+![20261020-233213-review-modal-empty-review/after-empty-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/after-empty-dialog.png)
+![20261020-233213-review-modal-empty-review/after-empty-done-column.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/after-empty-done-column.png)
+![20261020-233213-review-modal-empty-review/after-files-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/after-files-dialog.png)
+[20261020-233213-review-modal-empty-review/agent-tools.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/agent-tools.json)
+[20261020-233213-review-modal-empty-review/empty-changes.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/empty-changes.json)
+[20261020-233213-review-modal-empty-review/empty-messages.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/empty-messages.json)
+[20261020-233213-review-modal-empty-review/empty-steps.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/empty-steps.json)
+[20261020-233213-review-modal-empty-review/empty-todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/empty-todo.json)
+[20261020-233213-review-modal-empty-review/files-changes.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/files-changes.json)
+[20261020-233213-review-modal-empty-review/files-todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/files-todo.json)
+[20261020-233213-review-modal-empty-review/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233213-review-modal-empty-review/result.json)
+[20261020-233218-skill-import-import-rollback/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233218-skill-import-import-rollback/result.json)
+[20261020-233218-skill-import-import-rollback/snapshot.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233218-skill-import-import-rollback/snapshot.json)
+[20261020-233246-chief-unread-unread-badge/00-session.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/00-session.json)
+[20261020-233246-chief-unread-unread-badge/01-after-user-turn.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/01-after-user-turn.json)
+![20261020-233246-chief-unread-unread-badge/02-badge-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/02-badge-1.png)
+![20261020-233246-chief-unread-unread-badge/03-board-badge-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/03-board-badge-1.png)
+![20261020-233246-chief-unread-unread-badge/04-tooltip-count-1.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/04-tooltip-count-1.png)
+![20261020-233246-chief-unread-unread-badge/05-drawer-open.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/05-drawer-open.png)
+[20261020-233246-chief-unread-unread-badge/06-after-open.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/06-after-open.json)
+![20261020-233246-chief-unread-unread-badge/07-badge-after-open.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/07-badge-after-open.png)
+[20261020-233246-chief-unread-unread-badge/08-wake-step.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/08-wake-step.json)
+[20261020-233246-chief-unread-unread-badge/09-after-tick.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/09-after-tick.json)
+[20261020-233246-chief-unread-unread-badge/10-after-wake-done.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/10-after-wake-done.json)
+[20261020-233246-chief-unread-unread-badge/11-unread-100.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/11-unread-100.json)
+[20261020-233246-chief-unread-unread-badge/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233246-chief-unread-unread-badge/result.json)
+[20261020-233320-review-modal-empty-review/agent-tools.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/agent-tools.json)
+![20261020-233320-review-modal-empty-review/before-empty-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/before-empty-dialog.png)
+[20261020-233320-review-modal-empty-review/empty-changes.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/empty-changes.json)
+[20261020-233320-review-modal-empty-review/empty-todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/empty-todo.json)
+[20261020-233320-review-modal-empty-review/files-changes.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/files-changes.json)
+[20261020-233320-review-modal-empty-review/files-todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233320-review-modal-empty-review/files-todo.json)
+[20261020-233415-chief-floating-window-a0-live/result-a0-live.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-233415-chief-floating-window-a0-live/result-a0-live.json)
+![20261020-chip-word/01-board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/01-board.png)
+![20261020-chip-word/02-detail-confirm.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/02-detail-confirm.png)
+![20261020-chip-word/02-detail-fresh.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/02-detail-fresh.png)
+![20261020-chip-word/02-detail-queued.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/02-detail-queued.png)
+![20261020-chip-word/03-search.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/03-search.png)
+![20261020-chip-word/04-schedules.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/04-schedules.png)
+![20261020-chip-word/05-project.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/05-project.png)
+[20261020-chip-word/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-chip-word/result.json)
+![20261020-neg3-search-reverted/02-search-results.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-reverted/02-search-results.png)
+![20261020-neg3-search-reverted/capture-board/board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-reverted/capture-board/board.png)
+[20261020-neg3-search-reverted/capture-board/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-reverted/capture-board/result.json)
+[20261020-neg3-search-reverted/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-reverted/result.json)
+![20261020-neg3-search-seeded/99-error.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-seeded/99-error.png)
+[20261020-neg3-search-seeded/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-neg3-search-seeded/result.json)
+![20261020-restart-combo/after-chat-col.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/after-chat-col.png)
+![20261020-restart-combo/after-combo-hidden.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/after-combo-hidden.png)
+[20261020-restart-combo/bubbles.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/bubbles.json)
+[20261020-restart-combo/classify.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/classify.json)
+[20261020-restart-combo/messages.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/messages.json)
+[20261020-restart-combo/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/result.json)
+[20261020-restart-combo/todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261020-restart-combo/todo.json)
+[20261021-012147-machine-stale-sweep-stale-sweep/daemon-console.log](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/daemon-console.log)
+[20261021-012147-machine-stale-sweep-stale-sweep/daemon.log](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/daemon.log)
+[20261021-012147-machine-stale-sweep-stale-sweep/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/result.json)
+[20261021-012147-machine-stale-sweep-stale-sweep/server.log](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/server.log)
+![20261021-012705-glass-journeys-board/01-board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012705-glass-journeys-board/01-board.png)
+![20261021-012705-glass-journeys-board/fail-board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012705-glass-journeys-board/fail-board.png)
+[20261021-012705-glass-journeys-board/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012705-glass-journeys-board/result.json)
+![20261021-012912-glass-journeys-all/01-board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/01-board.png)
+![20261021-012912-glass-journeys-all/02-create-task-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/02-create-task-dialog.png)
+![20261021-012912-glass-journeys-all/03-create-task-card.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/03-create-task-card.png)
+![20261021-012912-glass-journeys-all/04-dispatch-toast.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/04-dispatch-toast.png)
+![20261021-012912-glass-journeys-all/05-dispatch-chief.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/05-dispatch-chief.png)
+![20261021-012912-glass-journeys-all/06-view-diff.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/06-view-diff.png)
+![20261021-012912-glass-journeys-all/07-request-changes-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/07-request-changes-dialog.png)
+![20261021-012912-glass-journeys-all/08-request-changes-landed.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/08-request-changes-landed.png)
+![20261021-012912-glass-journeys-all/09-merge-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/09-merge-dialog.png)
+![20261021-012912-glass-journeys-all/10-merge-accepted.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/10-merge-accepted.png)
+![20261021-012912-glass-journeys-all/fail-board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/fail-board.png)
+[20261021-012912-glass-journeys-all/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-012912-glass-journeys-all/result.json)
+![20261021-041337-search-search/02-search-results.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/02-search-results.png)
+![20261021-041337-search-search/capture-board-2/board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/capture-board-2/board.png)
+[20261021-041337-search-search/capture-board-2/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/capture-board-2/result.json)
+![20261021-041337-search-search/capture-board/board.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/capture-board/board.png)
+[20261021-041337-search-search/capture-board/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/capture-board/result.json)
+[20261021-041337-search-search/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041337-search-search/result.json)
+![20261021-041352-glass-journeys-create-task/02-create-task-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041352-glass-journeys-create-task/02-create-task-dialog.png)
+![20261021-041352-glass-journeys-create-task/03-create-task-card.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041352-glass-journeys-create-task/03-create-task-card.png)
+[20261021-041352-glass-journeys-create-task/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041352-glass-journeys-create-task/result.json)
+![20261021-041833-search-project-line/00-natural-3000ms.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/00-natural-3000ms.png)
+![20261021-041833-search-project-line/01-pre-response.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/01-pre-response.png)
+![20261021-041833-search-project-line/02-server-frame.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/02-server-frame.png)
+![20261021-041833-search-project-line/03-projects-pending.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/03-projects-pending.png)
+[20261021-041833-search-project-line/projects-api.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/projects-api.json)
+[20261021-041833-search-project-line/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/result.json)
+[20261021-041833-search-project-line/search-api.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/search-api.json)
+[20261021-041833-search-project-line/search-response-browser.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/search-response-browser.json)
+[20261021-041833-search-project-line/sqlite-rows.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-041833-search-project-line/sqlite-rows.json)
+[20261021-060201-review-modal-empty-review/agent-tools.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-060201-review-modal-empty-review/agent-tools.json)
+![20261021-060201-review-modal-empty-review/hunkless-after-rename-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-060201-review-modal-empty-review/hunkless-after-rename-dialog.png)
+[20261021-060201-review-modal-empty-review/rename-changes.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-060201-review-modal-empty-review/rename-changes.json)
+[20261021-060201-review-modal-empty-review/rename-todo.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-060201-review-modal-empty-review/rename-todo.json)
+[20261021-060201-review-modal-empty-review/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-060201-review-modal-empty-review/result.json)
+![20261021-135240-api-keys-create/01-keys-empty.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135240-api-keys-create/01-keys-empty.png)
+![20261021-135240-api-keys-create/02-keys-create-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135240-api-keys-create/02-keys-create-dialog.png)
+![20261021-135240-api-keys-create/03-keys-once.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135240-api-keys-create/03-keys-once.png)
+[20261021-135240-api-keys-create/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135240-api-keys-create/result.json)
+![20261021-135246-search-search/02-search-results.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135246-search-search/02-search-results.png)
+[20261021-135246-search-search/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135246-search-search/result.json)
+![20261021-135250-theme-persist/01-theme-default-dark.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135250-theme-persist/01-theme-default-dark.png)
+![20261021-135250-theme-persist/02-theme-light.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135250-theme-persist/02-theme-light.png)
+![20261021-135250-theme-persist/03-theme-dark.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135250-theme-persist/03-theme-dark.png)
+[20261021-135250-theme-persist/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135250-theme-persist/result.json)
+![20261021-135320-glass-journeys-create-task/02-create-task-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135320-glass-journeys-create-task/02-create-task-dialog.png)
+![20261021-135320-glass-journeys-create-task/03-create-task-card.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135320-glass-journeys-create-task/03-create-task-card.png)
+[20261021-135320-glass-journeys-create-task/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-135320-glass-journeys-create-task/result.json)
+![20261021-glass-create-task-out/02-create-task-dialog.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-glass-create-task-out/02-create-task-dialog.png)
+![20261021-glass-create-task-out/03-create-task-card.png](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-glass-create-task-out/03-create-task-card.png)
+[20261021-glass-create-task-out/result.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/20261021-glass-create-task-out/result.json)
+[evidence-notes.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/evidence-notes.txt)
+[gates-10.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-10.txt)
+[gates-11.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-11.txt)
+[gates-12.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-12.txt)
+[gates-2.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-2.txt)
+[gates-3.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-3.txt)
+[gates-4.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-4.txt)
+[gates-5.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-5.txt)
+[gates-6.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-6.txt)
+[gates-7.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-7.txt)
+[gates-8.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-8.txt)
+[gates-9.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates-9.txt)
+[gates.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/gates.txt)
+[inventory.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/inventory.json)
+[negative-control-2.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/negative-control-2.txt)
+[negative-control.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/negative-control.txt)
+[positive-control.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/positive-control.txt)
+[pr-gate-1411-run7-7e1c42e.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/pr-gate-1411-run7-7e1c42e.json)
+[pr-gate-1411-run8-a72dd46.json](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/pr-gate-1411-run8-a72dd46.json)
+[rerun-notes.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/rerun-notes.txt)
+[seg2-failure-modes.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/seg2-failure-modes.txt)
+[vp-cli-2.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-2.txt)
+[vp-cli-3.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-3.txt)
+[vp-cli-4.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-4.txt)
+[vp-cli-5.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-5.txt)
+[vp-cli-6.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-6.txt)
+[vp-cli-7.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-7.txt)
+[vp-cli-8.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-8.txt)
+[vp-cli-9.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli-9.txt)
+[vp-cli.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-cli.txt)
+[vp-selftest-ci.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-ci.txt)
+[vp-selftest-node24.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-node24.txt)
+[vp-selftest-r10.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r10.txt)
+[vp-selftest-r11.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r11.txt)
+[vp-selftest-r12.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r12.txt)
+[vp-selftest-r5.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r5.txt)
+[vp-selftest-r6-mutations.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r6-mutations.txt)
+[vp-selftest-r6.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r6.txt)
+[vp-selftest-r7-mutations.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r7-mutations.txt)
+[vp-selftest-r7.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r7.txt)
+[vp-selftest-r8.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r8.txt)
+[vp-selftest-r9.txt](https://raw.githubusercontent.com/xiechimon/pacman/518ec47f618b5d4f8faee1697ced6f4e71dbffea/docs/verify/1402/vp-selftest-r9.txt)
+exit=0
