@@ -99,6 +99,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 
 - **三层纸面**：`canvas`（应用底，侧栏直接坐在上面）→ `sheet`（主面板，16px 圆角 + `line` 1px 描边）→ `card`（纯白任务卡）。
 - **描边一律 1 个 CSS 像素**：主面板、任务卡、激活导航项、新任务按钮在高分屏上也是 1px（不跟 `--hairline` 降到 0.5px），描边要看得清。
+- **投影三档梯**（`tokens.css`，#1428）：`--e1` 卡与行、`--e2` 菜单与弹层、`--e3` 对话框与浮窗。每档末尾自带 1px 环（亮色三档都是 `line`；暗色 e2/e3 用 `--ring-inset-highlight`，`line` 在弹层底上看不见），面上不再另画描边；自己画 `--edge-ring` 的面（通知条、总管窗、FAB）取同档的池 `--cds-shadow-sm` / `-md` / `-lg`，一条边只有一个环。`--panel-shadow` / `--shadow-popover` / `--dialog-shadow` 这些旧槽名是别名；hover / focus 槽是状态，不是档。
 - **墨色四级**：`ink` 标题与正文；`ink-2` 导航、按钮、说明；`ink-3` 元信息；`ink-4` 只给装饰图标。文字最浅用到 `ink-3`。
 - **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。
 - **强调色纪律**：`accent` 只用于：需要你处理的状态与计数、卡片上的操作链接、激活导航项的图标、计数徽章底色。不做装饰、不做大面积底色。
@@ -144,7 +145,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - 空列显示「暂无」，不画占位框。
 
 ### 任务卡
-- 白底、10px 圆角（`--radius-card`）、`line` 1px 发丝环 + 一层极轻的暖色投影（`0 1px 2px`，4%），边缘清楚、不发虚；hover 时环加深、投影升到 `0 4px 14px` 7%（150ms ease-out）。不叠第二层大模糊阴影。
+- 白底、10px 圆角（`--radius-card`）、`line` 1px 发丝环 + 一层极轻的暖色投影（`0 1px 2px`，4%；两者合起来就是 `--e1`），边缘清楚、不发虚；hover 时环加深、投影升到 `0 4px 14px` 7%（150ms ease-out）。不叠第二层大模糊阴影。
 - 在飞编排（点了开始、总管还没派发）：待开始卡把「开始」换成一行底栏「⏳ 编排中 · 等待原因」（等 X 上线 / 缺能力 / 排队中）+ 右侧「查看会话」；失败卡把「重试」换成不可点的「编排中」。不在元信息行上叠层。
 - 结构：标题（最多两行）→ 单行元信息（📁 项目 · #编号 · 🏷 标签 · 🕒 时间，永不换行；空间不够时先截断标签，项目名至少保留 5 个字宽）→ 按状态的底栏。标签图标着用户自定义的标签色，标签名用元信息墨色。
 - 底栏：
@@ -217,7 +218,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 ### 弹窗与菜单
 件：`src/components/ui/dialog-shell.tsx`（`DialogShell` + 导出的 `DIALOG_*` 件、`DialogFootRow`、`dialogWidth`）、`alert-dialog-shell.tsx`（确认面）、`dropdown-menu.tsx` / `popover.tsx`（菜单与弹层）。`dialog.tsx` / `alert-dialog.tsx` / `select.tsx` 是 pristine registry 件，它们的 Paper 皮肤住在 `styles/app.css` 的 `[data-slot=…]` 规则与 token 上。
 - **背板**：一层浅墨 dim `--dialog-backdrop`（亮 `rgba(43,38,32,.14)`），不加 blur。所有弹窗、确认面、⌘K 同一层，不做深色幕布。
-- **面**：`sheet` 底（`--dialog-surface`）、16px 角（`--edge-radius`）、`--dialog-shadow`（1px `line` 环 + 两层软投影）。
+- **面**：`sheet` 底（`--dialog-surface`）、16px 角（`--edge-radius`）、`--dialog-shadow`（= `--e3`：两层软投影 + 1px `line` 环）。
 - **三档宽**（`size`，`--dialog-w-*`，窄屏 `min(100% - 2rem, …)` 收口）：
   - S 400：密钥、API 密钥、删除与其它确认、短表单。
   - M 480：技能、多数新建表单（Agent、定时、章程、审核、请求修改）。
@@ -226,7 +227,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **体**：唯一的滚动盒（`min-h-0`），左右 20px 内边距同时是焦点环的房间。面板封顶 `100vh - 64px`，矮视口里滚的是体，脚永远在屏内。
 - **脚（分栏）**：左边一条 12px `ink-3` 提示或状态（`hint`：文档链接、快捷键、等待状态、页码），右边操作组。主操作是 shadcn Button default（墨底 32px 8px 角，`DIALOG_PRIMARY_BUTTON`），次操作是 ghost 文字按钮（`DIALOG_TEXT_BUTTON`），危险确认换 `destructive`。没有提示时操作照样靠右。不画底色带、不画分隔线。
 - **分组选择器**（模型服务）：顶部搜索框，下面按小标题分组（`text-caption` 500 `ink-3`），每行 40px = 22px 首字母方块（白底 + `line` 环）+ 名称 + 右侧 `ink-3` 标签（OAuth / 暂未开通）。hover 与键盘焦点 = 选择器选中行（白卡 + 发丝环）。禁用行字降到 `ink-3`、不出 hover。搜索跨组过滤，空组整组隐藏；「其他 · 自定义端点」始终在。
-- **菜单**（Paper menu，`DropdownMenu` / `Popover` / Select 弹层同一张面）：白底、10px 角（`--radius-popover`）、4px 内衬、`--shadow-popover`（1px 环 + 软投影）。行高 32、6px 角、13.5px 字、15px `ink-3` 图标、hover `menu-hover`；快捷键提示靠右 `text-caption` `ink-3`；分隔线 1px、左右内缩 6px；分组标签 `text-caption` 500 `ink-3`。危险行字与图标走 `destructive`，hover `danger-soft`。菜单里的分段控件用 `SegmentedRadio` / `SegmentedTabs`，不手搓。
+- **菜单**（Paper menu，`DropdownMenu` / `Popover` / Select 弹层同一张面）：白底、10px 角（`--radius-popover`）、4px 内衬、`--shadow-popover`（= `--e2`：软投影 + 1px 环）。行高 32、6px 角、13.5px 字、15px `ink-3` 图标、hover `menu-hover`；快捷键提示靠右 `text-caption` `ink-3`；分隔线 1px、左右内缩 6px；分组标签 `text-caption` 500 `ink-3`。危险行字与图标走 `destructive`，hover `danger-soft`。菜单里的分段控件用 `SegmentedRadio` / `SegmentedTabs`，不手搓。
 - 要：一个弹窗选一档宽、提示靠左操作靠右、菜单行等高。不要：深色或模糊背板、整宽提交条、灰色底色带脚、outline 次按钮、12px 字的小灰菜单。
 - `e2e/paper-overlays.spec.ts` 钉背板颜色、三档宽、分栏脚、菜单行高与分组选择器；`e2e/color-freeze.spec.ts` 钉 `dialog-backdrop` / `menu-hover`。
 
@@ -270,11 +271,13 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **状态色不在本阶梯里**：chip、diff、列点、`badge-attention`、`destructive` #ffabb7 沿用 E 色板暗侧值（亮色那轮同样只换了 Paper 槽），每个文字对都在新卡底上重测过 4.5。
 - **新增语义 token 的规则**：必须同时在 `.light` 与 `:root` 两处定义；暗侧从本阶梯取值并实测，不取「最近的现有档」。
 
+暗色多一条 `--top`（`inset 0 1px 0` 8% 白的顶部高光），只拼进 `--e2` / `--e3` 的池，让抬起的面读成被照亮的纸；亮色是零 alpha 的空操作（白卡上本来就看不见；不写 `none`，`none` 混进逗号列表会让整条 box-shadow 失效）。暗色三档的投影明度是收梯前的旧值（#1396 定稿只翻了颜色槽，没动投影）；环色跟着 `colors-dark` 走：e1 用 `line`，e2 / e3 用 `--ring-inset-highlight`。
+
 ## 给 agent 的美学约束（粘贴进提示词）
 
 ```text
 Pacman UI rules (source: apps/web/DESIGN.md):
-- Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow.
+- Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow; --top (dark-only inset top highlight) rides e2/e3 only.
 - Dark (:root default): the same ladder, lighter with elevation: canvas #1a1612 → sheet #24201b → card #2f2a26 → popover #37322d (menus and dialogs). Ink #ece7df / #c5c0b9 / #aca7a0. Accent #f0926d with dark text on it (badge, project tiles). Running #7fb980. Only token values differ between themes.
 - One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.
 - Type: serif (--font-source-serif) only for page title, column headings, brand. Everything else sans (Inter / PingFang). Sizes only 18/16/14/13.5/12/11.5. Weights 400/500/600.

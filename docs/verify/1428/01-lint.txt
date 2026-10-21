@@ -1,0 +1,5 @@
+$ pnpm lint
+  
+
+Checked 781 files in 4s. No fixes applied.
+Found 1 info.
