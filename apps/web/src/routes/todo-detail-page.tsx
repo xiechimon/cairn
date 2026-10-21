@@ -1260,16 +1260,7 @@ export function TodoDetailPage() {
       />
       <SearchPanel
         open={search.open}
-        fixture={
-          live
-            ? {
-                ...fixture,
-                todos,
-                now: Date.now(),
-                projectNames: Object.fromEntries((projectsQ.data ?? []).map((p) => [p.id, p.name])),
-              }
-            : fixture
-        }
+        fixture={live ? { ...fixture, todos, now: Date.now() } : fixture}
         server={live ? searchResults.data : undefined}
         query={search.query}
         onQuery={search.setQuery}

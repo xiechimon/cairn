@@ -114,6 +114,8 @@ export function canBoardDrop(from: Phase, to: Phase): boolean {
     case 'todo':
       return src !== '待开始';
     case 'building':
+      // 相位级（手动改相 PATCH）放行 待开始 两相。看板拖拽面更严：拖进执行中
+      // = 开始意图，queued 已开始不进（web columns.ts canDropOnColumn，#1434）。
       return src === '待开始';
     case 'review':
       return src === '已完成';
