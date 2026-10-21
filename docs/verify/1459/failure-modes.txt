@@ -1,0 +1,69 @@
+#1459 webhook `pacman` trigger: failure modes, listed before the tests
+Rule (decision, issue comment 6316379513): on `issues` + `labeled` + label
+`pacman`, import only when the event's `sender` has triage, write, maintain
+or admin on the repository, read with the same permission read and cache the
+#1406 poller uses; a failed or impossible read imports nothing and is logged;
+the import counts against the per-project in-flight cap (3 open github-issue
+tasks outside done and closed, the poller's count); createdBy stays the seed
+user. Every refusal answers 202 with a reason (`result` plus `detail`), the
+way the receiver answers every other settled event today.
+
+Response shape used below: 202 {result, deliveryId, detail}. `ignored` is the
+receiver's existing answer for "nothing to do here"; `misconfigured` is its
+existing answer for "the server side is not set up" (no repo mapping, no
+GitHub connection).
+
+ID   failure mode                                    expected                                  test (apps/server/test/webhook.test.ts unless noted)
+F1   outside author opens an issue from a template   no import; 202 ignored "<login> is below   W1 "outside author via template label"
+     that carries `pacman` (labeled, sender = the     triage on octo/alpha"; log reason
+     author, permission read 404 = none)              sender-below-triage; no issue read
+F2   labeler with read only (permission read,         no import; 202 ignored, same detail      W2 "read-only labeler"
+     role_name read, user.permissions.triage false)
+F3   labeler with triage (permission read,            imported; 202 created                     W3 test.each triage / write / maintain /
+     role_name triage); also write, maintain,                                                   admin / custom role with triage
+     admin, custom role built on triage
+F4   permission read fails: 403, 429, 500, 502,       no import; 202 ignored "permission of     W4 test.each (6 cases); a second delivery
+     network error / timeout (fetch throws),          <login> on octo/alpha unreadable"; log    reads again (failures are not cached)
+     malformed 200 body                               reason permission-unreadable
+F5   no team GitHub token: no connection; stored      no import; 202 misconfigured ("github     W5a no connection (was misconfigured
+     token cannot be decrypted (cipher error)         connection not found" / "github token     already; now also logged, zero reads)
+                                                      unreadable"); zero GitHub requests (no    W5b cipher error (was HTTP 500)
+                                                      anonymous read); log reason
+                                                      no-github-connection / token-unreadable
+F6   project at the cap: 3 github-issue tasks in      no import; 202 ignored "project at the   W6 at cap (todo, building, failed);
+     todo / building / failed                         in-flight cap (3 open github-issue        W6b done, closed and self-created issue
+                                                      tasks)"; zero GitHub requests; log        tasks do not count -> created
+                                                      reason at-cap
+F7   webhook and poller import the same issue at      one task; the later path gets 409; the   W7 webhook + createIssueIntake sweep,
+     once                                             webhook answers 202 created or            detail read gated
+                                                      duplicate                                 (#1406 test "webhook 与另一路导入同一
+                                                                                                issue 并发" kept)
+F8   two deliveries for different issues arrive       one imported, the other 202 ignored at    W8 two concurrent deliveries at cap-1
+     together at cap-1 (bulk labeling in the issue    cap; imports still waiting on GitHub
+     list sends one labeled event per issue)          count against the cap
+F9   redelivery of a refused event (GitHub's          inside the 60 s window: 202 duplicate;   W9 same delivery id three times
+     Redeliver keeps X-GitHub-Delivery)               after it: judged again, 202 ignored with
+                                                      the same reason; nothing imported
+F10  `labeled` event for another label                202 ignored as today, no GitHub request  C3 (existing; payload now carries a
+                                                                                                sender)
+F11  URL-path token check (the receiver's             wrong or revoked token -> 401 before     E1 / E2 (existing; payload now carries
+     authentication; there is no HMAC signature,      anything else; no permission read        a sender)
+     packages/shared/src/webhook.ts header) unchanged
+F12  payload without `sender`; `ghost` sender         no sender: 202 ignored "event has no     W12a no sender, W12b ghost
+     (docs: placeholder when GitHub cannot resolve    sender", no GitHub request; ghost:
+     a user)                                          permission 404 -> below triage
+F13  webhook-imported task                            createdBy = seed user, so the poller's   W13; issue-intake.test.ts group 20
+                                                      close reconcile does not act on it       (payload now carries a sender)
+F14  one permission cache for both paths              same sender twice within TTL -> one      W14a webhook twice; W14b webhook then
+                                                      read; a webhook answer is reused by the  poller sweep (no second read)
+                                                      poller within the TTL (15 min)
+F15  token or project gone between checks             import's own 404 -> 202 misconfigured;   D2 / D3 (existing)
+                                                      upstream 5xx on the issue read -> 502
+                                                      (unchanged)
+
+Not changed, recorded as a known limit: the payload's only authentication is
+the URL token; a holder of that token can forge `sender`. Before this change
+such a holder could import any issue with no check; the D5 check guards the
+GitHub-side triggers (issue templates, outside labelers), not a leaked token.
+Revoking the token (DELETE /api/teams/:id/webhook-tokens/:tid) remains the
+remedy.
