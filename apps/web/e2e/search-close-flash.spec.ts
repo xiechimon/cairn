@@ -18,7 +18,7 @@ const BOARD = '/app?scenario=01';
 const PANEL_SEL = '[role="dialog"][aria-label="搜索"]';
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-/** ⌘K 直到面板应答（search-focus.spec 同款：首按可能早于 hydration）。 */
+/** Ctrl+K 直到面板应答（重试律见 helpers.ts 的 pressUntil）。 */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressUntil(page, 'Control+k', panel(page));

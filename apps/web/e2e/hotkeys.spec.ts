@@ -147,7 +147,7 @@ const drawer = (page: Page) => page.locator('.chief-drawer');
 async function pressesStayClosed(
   page: Page,
   key: string,
-  surface: ReturnType<Page['locator']>,
+  surface: Locator,
 ) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.keyboard.press(key);
@@ -161,7 +161,7 @@ async function pressesStayClosed(
 async function pressesStayHidden(
   page: Page,
   key: string,
-  surface: ReturnType<Page['locator']>,
+  surface: Locator,
 ) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.keyboard.press(key);

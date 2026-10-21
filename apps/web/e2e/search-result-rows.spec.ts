@@ -39,10 +39,7 @@ const isLit = (locator: Locator) =>
     return cs.backgroundColor === lit && cs.boxShadow !== 'none';
   });
 
-/** ⌘K until the panel answers — the hotkey listener registers in a
- *  passive effect after first paint, so a loaded-machine first press can
- *  predate hydration. The retry only re-presses a *lost* hotkey (same
- *  guard as search-focus.spec.ts). */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressUntil(page, 'Meta+k', panel(page));

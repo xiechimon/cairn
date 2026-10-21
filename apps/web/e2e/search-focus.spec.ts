@@ -68,11 +68,7 @@ function tallestRun(img: DecodedPng, x0: number, y0: number, x1: number, y1: num
   return best;
 }
 
-/** ⌘K until the panel answers. goto resolves at `load`, but the hotkey
- *  listener registers in a passive effect after first paint — on a loaded
- *  machine the first press can predate hydration. The retry only re-presses
- *  a *lost* hotkey (a delivered one flips the panel visible, ending the
- *  loop); it never double-toggles. */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   // expanded rows OR rail rows — both live inside the complementary landmark
   await expect(page.getByRole('complementary')).toBeVisible();

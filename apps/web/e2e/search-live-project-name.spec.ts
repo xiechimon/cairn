@@ -101,8 +101,7 @@ const todoRow = (page: Page, title: string) =>
   panel(page).locator('[data-row-kind="todo"]', { hasText: title });
 const projectRows = (page: Page) => panel(page).locator('[data-row-kind="project"]');
 
-/** ⌘K until the panel answers (search-result-rows.spec.ts guard: the
- *  hotkey listener registers after first paint). */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   await pressUntil(page, 'Meta+k', panel(page));
 }

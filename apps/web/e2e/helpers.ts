@@ -1,4 +1,4 @@
-import { errors, type Locator, type Page } from '@playwright/test';
+import { errors, expect, type Locator, type Page } from '@playwright/test';
 
 // e2e 共享测试工具（非断言面）。放这里的判据 = 多个 spec 逐字节复用同一段
 // 桩；单 spec 专用的桩仍留在各自文件（house pattern）。
@@ -81,8 +81,9 @@ export async function settleTransitions(page: Page): Promise<void> {
  *  - ⌘K and ⌘J are toggles. A delivered press that takes over 1s to show is
  *    re-pressed and flips back; the loop keeps going until `state` holds, but
  *    a re-press queued behind a slow flip can still land after it returns.
- *  - `state: 'hidden'` only means something while `target` is visible: a
- *    target that never rendered reads hidden at once.
+ *  - It first waits for `target` to be in the opposite state: a target that
+ *    never rendered would read hidden at once, and a toggle pressed on a
+ *    panel already open would close it.
  *  Only a wait timeout counts as "not yet". Any other wait error (strict
  *  mode, a closed page) is rethrown, not retried into a misleading message. */
 export async function pressUntil(
@@ -91,6 +92,9 @@ export async function pressUntil(
   target: Locator,
   state: 'visible' | 'hidden' = 'visible',
 ): Promise<void> {
+  const before = `${target} before ${key}`;
+  if (state === 'hidden') await expect(target, before).toBeVisible();
+  else await expect(target, before).toBeHidden();
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.keyboard.press(key);
     const reached = await target.waitFor({ state, timeout: 1000 }).then(

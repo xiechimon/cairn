@@ -15,8 +15,7 @@ const FRESH_TITLE = 'r7 rebaseline probe';
 
 const panel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-/** ⌘K until the panel answers (same retry guard as search-result-rows.spec.ts:
- *  the hotkey listener registers after first paint). */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
   await pressUntil(page, 'Meta+k', panel(page));
