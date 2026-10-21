@@ -18,13 +18,9 @@
 // systemd 单元 EnvironmentFile 指向的 env 文件；删变量 + 重启服务端 = 关闭
 // 鉴权（envStr 只在进程启动时读一次）。
 
-import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { createServer } from 'node:net';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
 import { ENV_VARS } from '@pacman/shared';
 import { expect, type Page, test } from '@playwright/test';
+import { bootLiveServer, type LiveServer } from './live-server';
 
 declare global {
   interface Window {
@@ -34,70 +30,6 @@ declare global {
 }
 
 const GATE_TOKEN = 'pacman-e2e-gate-token-0123456789abcdef';
-
-interface LiveServer {
-  base: string;
-  dispose: () => void;
-}
-
-/** OS 分配空闲端口（机器级端口纪律：不碰 8390/8399，不杀既有进程）。 */
-function freePort(): Promise<number> {
-  return new Promise((resolvePort, reject) => {
-    const probe = createServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      if (address !== null && typeof address === 'object') {
-        const { port } = address;
-        probe.close(() => resolvePort(port));
-      } else {
-        probe.close(() => reject(new Error('freePort: no address')));
-      }
-    });
-  });
-}
-
-/** 起真 server：隔离数据根（fresh seed）、托管本 worktree 的 dist、
- *  token 设 = 鉴权开。ready = /api/teams 打出期望状态码（开 401 / 关 200）。 */
-async function bootLiveServer(token: string | null): Promise<LiveServer> {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-e2e-home-'));
-  const port = await freePort();
-  const child = spawn('pnpm', ['exec', 'tsx', 'src/index.ts'], {
-    cwd: resolve(import.meta.dirname, '..', '..', 'server'),
-    env: {
-      ...process.env,
-      PORT: String(port),
-      HOST: '127.0.0.1',
-      LOG_LEVEL: 'warn',
-      PACMAN_HOME: home,
-      PACMAN_WEB_DIR: resolve(import.meta.dirname, '..', 'dist'),
-      ...(token !== null ? { PACMAN_TOKEN: token } : {}),
-    },
-    stdio: ['ignore', 'ignore', 'inherit'],
-  });
-  const base = `http://127.0.0.1:${port}`;
-  const deadline = Date.now() + 60_000;
-  for (;;) {
-    try {
-      const res = await fetch(`${base}/api/teams`);
-      if (res.status === (token !== null ? 401 : 200)) break;
-    } catch {
-      // 端口未起——继续轮询
-    }
-    if (Date.now() > deadline) {
-      child.kill('SIGTERM');
-      throw new Error(`live server not ready on ${base}`);
-    }
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  return {
-    base,
-    dispose() {
-      child.kill('SIGTERM');
-      rmSync(home, { recursive: true, force: true });
-    },
-  };
-}
 
 /** 记录每个 EventSource 构造 URL（?token= 面断言）。 */
 async function recordEventSourceUrls(page: Page): Promise<void> {
@@ -125,9 +57,9 @@ test.beforeAll(async () => {
   openServer = await bootLiveServer(null);
 });
 
-test.afterAll(() => {
-  authed.dispose();
-  openServer.dispose();
+test.afterAll(async () => {
+  await authed.dispose();
+  await openServer.dispose();
 });
 
 test('鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token=', async ({
