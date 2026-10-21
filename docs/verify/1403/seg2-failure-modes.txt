@@ -1,0 +1,90 @@
+#1403 segment 2: failure modes, listed before the tests and the code
+Branch claude/bootstrap-p2-seg2, base cefad17 (segment 1 at f8ab21b plus origin/main).
+Scope of this commit set: item 2 (the build's PR identity), item 3 (G9), item 4 (test
+pins), item 6 (the P2 row of docs/spec/28 section 8). Item 1 (merge through the API with
+sha) waits for the user's decision on the design and is not in this set.
+
+Item 2: the build's PR identity
+-------------------------------
+The reconcile reads only build.prNumber, which the daemon probe refreshes when a non-review
+step finishes. Before a confirmed close fails the card, and once per round before a
+foreign PR leaves a hint, it lists the PRs of the build's own conversation branch
+(GET /repos/{o}/{r}/pulls?state=all&head=<owner>:<branch>&base=<default>&per_page=10) and
+adopts the build's own other PR.
+
+A1  PR #N closed and confirmed; an open PR #M from the same repository, the conversation
+    branch and the default base exists -> build.prNumber = M and build.prUrl = M's URL,
+    one row naming #N, #M and the branch; no closed row, no errorMessage, phase stays
+    review, unclaimed gate steps stay queued; the next sweep reads pulls/M.
+A2  As A1 with #M already merged and no open PR on the branch -> #M adopted; the next
+    sweep finishes the card through the merged path (its containment check applies).
+A3  No other PR on the branch -> failed as in segment 1, after exactly one list read.
+A4  The list holds only PRs that are not the build's own (a fork PR with the same branch
+    name, a deleted fork, a PR from another branch, one into another base, one whose base
+    repository is not the recorded PR's, a closed unmerged one) -> none adopted; failed
+    as in segment 1.
+A5  The list read fails (429, 502, thrown network error) -> nothing written, the close
+    stays seen; the next sweep confirms again, reads the list again, then acts.
+A6  No list read on a first closed sighting, on a close and reopen, on a closed PR whose
+    base is not the default branch, or when this round's close was already reported.
+A7  The phase changes, or a step starts, while the list read is in flight -> no write,
+    on the closed path and on the foreign path.
+A8  Anonymous: the list read uses the slot the pulls read reserved and is counted, so the
+    reconcile's own hourly budget is not exceeded.
+A9  The recorded PR is foreign (the #1217 / #1195 shape of pin 9b) and the build has its
+    own PR on its branch -> adopted, no foreign hint. Without one -> the foreign hint as
+    in segment 1, and the list is read once per round, not every sweep.
+A10 After an adoption the old PR number is not read again.
+A11 One branch can carry several PRs into one base (the live capture of a reused branch
+    lists seven merged ones, seg2-live-capture.txt). An open PR is adopted before any
+    merged one (a merged PR from earlier work must not hide the live one); with only
+    merged ones, the highest number.
+A12 The board learns the new number (the build doc is published). The sweep log counts an adoption in `adopted`; every review candidate lands in
+    exactly one bucket.
+A13 The adoption row quotes no text from GitHub other than PR numbers; the branch name
+    in it is the build's own; the recorded URL is built from the repository and number,
+    not taken from the response.
+A14 The list parser reads the live response shape (number, state, merged_at, head ref and
+    repo id, base ref and repo id) and answers null for an error status, a thrown fetch
+    or a body that is not an array; the request URL is state=all, head=<owner>:<branch>,
+    base=<default>, per_page=10.
+A15 The recorded PR shows up open in the list (it was reopened between the confirming
+    read and the list read) -> not failed, nothing written, the close counts from the
+    next read again.
+
+Item 3: G9, the review gate wake text
+-------------------------------------
+G1  wakeFacts for a todo at the review gate carries the confirm gate's auto-confirm rules
+    and tells the chief to call confirm_builds -> it must instead say this is the review
+    gate, that confirm_builds and merge_builds are not for it, and name the human exit.
+G2  The confirm gate texts (normal and split parent) stay as they are.
+G3  A watched todo entering review through the phase funnel enqueues a chief wake whose
+    prompt is the review gate text.
+G4  confirm_builds (chief) on a build whose todo is in review writes the "通过了确认" row,
+    then fails with an illegal phase transition -> it must fail before writing the row.
+G5  confirm at the confirm gate still writes the row and moves the todo to building.
+G6  The new check refuses only what the phase funnel refuses (setTodoPhase lets the same
+    phase through): a confirm on a todo already in building is accepted as before.
+
+Item 4: test pins for rules that had no test at f8ab21b
+-------------------------------------------------------
+Each pin passes on the unchanged sources; its red leg is the named mutation.
+T1  A close reported this round, then the card dragged back to review: a second sweep
+    (50 s or more after the first) must not confirm and report the close again (pins 18d
+    and 18f gain the second sweep). Mutation: the settled check ignores the closed row.
+T2  The round boundary counts only build and plan steps: a verify or review step created
+    after the completion row must not start a new round. Mutation: roundStart without
+    the kind filter.
+T3  The first closed sighting is dropped when the card leaves review: back in review,
+    the next closed read is a first sighting again. Mutation: no closedSeenAt cleanup at
+    the end of the sweep.
+T4  A failed build step's pushed checkpoint does not decide containment. Mutation: the
+    checkpoint query without the status filter.
+T5  The same for a stopped step (one reading of "the stopped-step filter"). Mutation:
+    the status filter also takes stopped.
+T6  stopUnclaimedGateSteps leaves a claimed verify step alone (the other reading).
+    Mutation: the status filter also takes claimed.
+
+Item 6: the ledger
+------------------
+L1  Only the P2 row of docs/spec/28 section 8 changes; no other line of that file.
