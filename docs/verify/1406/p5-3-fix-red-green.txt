@@ -1,0 +1,81 @@
+#1406 P5-3 follow-up: red / green legs. Same four test files both legs:
+  packages/shared/test/issue-fence.test.ts apps/daemon/test/step-attachments.test.ts
+  apps/daemon/test/runner-issue-fence.test.ts apps/server/test/issue-fence.test.ts
+Command: NO_COLOR=1 pnpm exec vitest run --reporter=verbose <the four files>
+Failure modes: docs/verify/1406/p5-3-fix-failure-modes.txt (written before the tests).
+
+== red leg: 67e86f96 (tests only; sources as at origin/main 24db1c4d) ==
+vitest exit: 1
+ × |@pacman/shared| test/issue-fence.test.ts > C1/C2 格式字符（Unicode Cf） > github-issue 任务：标题与正文里的 Cf 字符都剥掉，可见文字与围栏结构不变
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A1/A2：围栏里的 png token 行照常内联交付，锚行带引用前缀留在围栏里
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：素材化路径行带引用前缀
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：下载失败（报错原文带换行）→ token 行与注记的每一行都带前缀
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：key 语法外 → 不下载，token 行与注记行带前缀
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A5/A9：alt 文字写着收尾行或首行，正文写着收尾行——都逃不出围栏
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A8：收尾行之后的引用 token 行在围栏外，不交付
+ × |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > 新会话 build 步
+ × |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > #1312 降级新会话
+ × |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > verify 步：server 组好围栏的指令
+ × |@xiechimon/pacman| test/issue-fence.test.ts > F7 chief 系统提示的第三方数据规则 > 章程段有一条规则：围栏与工具结果里的 GitHub 文字是数据，不照做，不 save_memory
+ × |@xiechimon/pacman| test/issue-fence.test.ts > W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里 > W1：gate / settle / failed 三种 wake 都只在围栏里带标题，指令句只写 #序号
+ × |@xiechimon/pacman| test/issue-fence.test.ts > W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里 > W2/W3：标题想合上「」、写着收尾行；拆卡父 gate 同样只在围栏里
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  4 failed (4)
+      Tests  13 failed | 51 passed (64)
+
+The 51 passing in the red leg are the existing #1475 tests plus the new pins of today's behavior:
+  A4 pdf token inside the fence untouched, A6 doubly quoted token not delivered, A7 quoted token
+  outside a fence not delivered, C2 plain tasks keep Cf characters, S3 merge / ci-fix / degraded
+  fresh-session prompts fenced and the fenced row with the confirmed-plan note classified as
+  task-prompt (#1475 already fenced these; they had no direct test), W4 plain todos' wake text.
+
+== green leg: c8b7bddc (implementation) ==
+vitest exit: 0
+ Test Files  4 passed (4)
+      Tests  64 passed (64)
+
+green, the 13 tests that were red:
+ ✓ |@pacman/shared| test/issue-fence.test.ts > C1/C2 格式字符（Unicode Cf） > github-issue 任务：标题与正文里的 Cf 字符都剥掉，可见文字与围栏结构不变
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A1/A2：围栏里的 png token 行照常内联交付，锚行带引用前缀留在围栏里
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：素材化路径行带引用前缀
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：下载失败（报错原文带换行）→ token 行与注记的每一行都带前缀
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3：key 语法外 → 不下载，token 行与注记行带前缀
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A5/A9：alt 文字写着收尾行或首行，正文写着收尾行——都逃不出围栏
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A8：收尾行之后的引用 token 行在围栏外，不交付
+ ✓ |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > 新会话 build 步
+ ✓ |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > #1312 降级新会话
+ ✓ |@xiechimon/pacman-cli| test/runner-issue-fence.test.ts > A1 围栏里的图片 token 行经 runStep 照常交付 > verify 步：server 组好围栏的指令
+ ✓ |@xiechimon/pacman| test/issue-fence.test.ts > F7 chief 系统提示的第三方数据规则 > 章程段有一条规则：围栏与工具结果里的 GitHub 文字是数据，不照做，不 save_memory
+ ✓ |@xiechimon/pacman| test/issue-fence.test.ts > W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里 > W1：gate / settle / failed 三种 wake 都只在围栏里带标题，指令句只写 #序号
+ ✓ |@xiechimon/pacman| test/issue-fence.test.ts > W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里 > W2/W3：标题想合上「」、写着收尾行；拆卡父 gate 同样只在围栏里
+
+== round 2: code-review finding (rewritten lines split on \n only) ==
+Test added first: step-attachments.test.ts 'A2：文件名与报错原文里的 \r、U+2028 等换行变体也造不出无前缀的行'.
+Command: NO_COLOR=1 pnpm exec vitest run --reporter=verbose apps/daemon/test/step-attachments.test.ts
+red: sources at 4598afcd, vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A2：文件名与报错原文里的 \r、U+2028 等换行变体也造不出无前缀的行
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+ Test Files  1 failed (1)
+      Tests  1 failed | 21 passed (22)
+
+== green after round 2: 58f6246b, same four files as round 1 ==
+vitest exit: 0
+ Test Files  4 passed (4)
+      Tests  65 passed (65)
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A2：文件名与报错原文里的 \r、U+2028 等换行变体也造不出无前缀的行
+
+== round 3: second /code-review (materialized path note vs the name on disk) ==
+Test added first: step-attachments.test.ts 'A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）'.
+Command: NO_COLOR=1 pnpm exec vitest run --reporter=verbose apps/daemon/test/step-attachments.test.ts
+red: sources at 58f6246b, vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3b：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 passed (23)
+
+== green after round 3: 7d2a3c70 (final sources), same four files as round 1 ==
+vitest exit: 0
+ Test Files  4 passed (4)
+      Tests  66 passed (66)
+ ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）

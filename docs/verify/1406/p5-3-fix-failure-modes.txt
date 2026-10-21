@@ -85,3 +85,14 @@ Failure modes:
   S2  docs/spec/02 §4.4 does not mention that save_memory refuses fenced text.
   S3  Prompt variants named in #1475 without a direct test: merge new session, ci-fix composite,
       degraded fresh session (#1312), and classifyUserText for a fenced row with the confirmed-plan note.
+
+== Added after /code-review (round 2) ==
+  A3b A file name (isValidFileName lets U+2028, U+2029 and U+0085 through) or a download error reason
+      ("\r") carries a line-break variant other than "\n"; a per-"\n" prefix still leaves an unprefixed
+      line for a model that splits on it. Rewritten lines inside the fence go through the fence's own
+      quoting (shared quoteIssueLines: Cf strip, line-break fold, per-line prefix).
+  A3c (added after the second /code-review) The materialized path note names the file written to disk.
+      Inside the fence the note is quoted, which strips Cf and breaks lines at U+2028; if the on-disk
+      name keeps those characters, the path the agent is told to Read does not exist. Clean the name where
+      it enters the daemon (safeFileName drops U+0085 / U+2028 / U+2029 and Cf as well), so the on-disk
+      name and the note path are the same string, inside and outside the fence.
