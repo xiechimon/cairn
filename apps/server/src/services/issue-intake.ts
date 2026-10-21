@@ -7,17 +7,17 @@
 //    匿名 60/h 的 IP 预算归 ci-loop 与 #931，importGithubIssue 本就要 token）。
 // 2. 关闭对账：本队轮询器领的 github-issue 卡（createdBy = 本队 chief 绑定的
 //    Agent id，导入时写入；手工导入与 webhook 导入是 seed 用户，不碰；chief
-//    没绑 Agent = 本队本轮不对账，记一行），相位不在 done / closed / review、
-//    且没有哪个 build 交付过 PR 的，逐张条件读 issue state。只认本进程亲眼
-//    看到的 open → closed：导入时、或某次读到 open，记为「见过 open」；之后
-//    读到 closed，且最新一条 closed 事件的 actor 在仓库上是 triage 及以上（与
-//    打标人同一判据、同一缓存），才 transitionTodos(closed)——chief / MCP
-//    close_todos 的关闭路径（#1445：写相位后停活动步）。首见即 closed 的卡（例：从已关闭 issue
-//    手工导入、或重启后）永不被对账关闭；关过一次即忘掉「见过 open」，有人把
-//    卡重开就不再关。外部作者关自己的 issue、任一读失败 = 本轮不关。review 卡
-//    与 build 交付过 PR 的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：
-//    合并带关闭引用关掉 issue 时，那张卡不以 closed 收尾。写前重读相位与 PR，
-//    变了就不动。
+//    没绑 Agent = 本队本轮不对账、不清「见过 open」，记一行），相位不在
+//    done / closed / review、且没有哪个 build 交付过 PR 的，逐张条件读 issue
+//    state。只认本进程亲眼看到的 open → closed：导入时、或某次读到 open，记为
+//    「见过 open」；之后读到 closed，且最新一条 closed 事件的 actor 在仓库上
+//    是 triage 及以上（与打标人同一判据、同一缓存），才 transitionTodos(closed)
+//    ——chief / MCP close_todos 的关闭路径（#1445：写相位后停活动步）。首见即
+//    closed 的卡（例：重启后才读到）永不被对账关闭；关过一次即忘掉「见过
+//    open」，有人把卡重开就不再关。外部作者关自己的 issue、任一读失败 = 本轮
+//    不关。review 卡与 build 交付过 PR 的卡（building 磨绿中 / failed / 重跑
+//    中）留给 PR 对账：合并带关闭引用关掉 issue 时，那张卡不以 closed 收尾。
+//    写前重读相位与 PR，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
 //    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已开始
@@ -73,7 +73,7 @@ import {
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { chiefBoundAgentId, chiefCanOrchestrate } from './chief.js';
+import { chiefBoundAgentId, chiefOrchestrateAgentId } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { openGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
@@ -179,6 +179,11 @@ interface ReconcileRow {
   id: string;
   phase: Phase;
   sourceRef: string;
+}
+
+/** 本队一张可能要对账的 github-issue 卡，带 createdBy（认是不是轮询器领的）。 */
+interface IssueTaskRow extends ReconcileRow {
+  createdBy: string | null;
 }
 
 /** 团队这一轮的读权与导入署名：连接 token、密文 box、导入卡的 createdBy
@@ -293,8 +298,9 @@ export function createIssueIntake(
   // 本进程见过 open 的 issue（团队 × sourceRef，小写）：关闭对账只认这些的
   // open → closed。进程内存，重启即空（重启后首见即 closed 的不关）。
   const seenOpen = new Set<string>();
-  // 导入后编排失败、待重试的卡（todo id → 上一次尝试）。进程内存：重启即忘
-  // （重启后分不出哪张 todo 卡是本轮询器领的，不碰）。
+  // 导入后编排失败、待重试的卡（todo id → 上一次尝试）。进程内存：重启即忘。
+  // 不从库里按 createdBy 重建：todo 行没有导入时刻，只凭标记分不清「编排
+  // 失败」与「有人把卡重开回 todo」，也认不出删卡后复用号留下的旧线程。
   const orchestrateRetries = new Map<string, OrchestrateAttempt>();
   let sweeping = false;
   const refKey = (teamId: string, sourceRef: string) => `${teamId}\u0000${sourceRef}`.toLowerCase();
@@ -765,7 +771,7 @@ export function createIssueIntake(
   async function sweepTeam(
     teamId: string,
     projects: ProjectRow[],
-    toReconcile: ReconcileRow[],
+    issueTasks: IssueTaskRow[],
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
@@ -775,10 +781,24 @@ export function createIssueIntake(
       log({ teamId, reason: got.reason }, 'issue intake team skipped');
       return;
     }
-    await reconcileClosed(teamId, got.token, toReconcile, now, tally);
+    // 关闭对账只碰轮询器领的卡：createdBy = 本队 chief 绑定的 Agent id（导入
+    // 时写入；手工导入与 webhook 导入是 seed 用户）。认卡只看库里的列，重启后
+    // 照样认得；chief 换绑 Agent 后，换绑前领的卡不再对账。
+    const agentId = chiefBoundAgentId(deps, teamId);
+    if (agentId === null) {
+      // chief 没绑 Agent：本轮不对账，也不调 reconcileClosed——它的修剪会忘掉
+      // 「见过 open」，换回同一 Agent 后，期间被关的就关不上了。只在本队有
+      // 可能是轮询器领的卡（createdBy 不是 seed 用户）时记一行。
+      if (issueTasks.some((t) => t.createdBy !== null && t.createdBy !== deps.user.id)) {
+        log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
+      }
+    } else {
+      const taken = issueTasks.filter((t) => t.createdBy === agentId);
+      await reconcileClosed(teamId, got.token, taken, now, tally);
+    }
     if (projects.length === 0) return;
-    // 导入卡的 createdBy = chief 绑定的 Agent（能编排即已绑定）。
-    const createdBy = chiefCanOrchestrate(deps, teamId) ? chiefBoundAgentId(deps, teamId) : null;
+    // 导入卡的 createdBy = chief 绑定的 Agent（能编排才导入）。
+    const createdBy = chiefOrchestrateAgentId(deps, teamId);
     if (createdBy === null) {
       tally.skipped += projects.length;
       log({ teamId, reason: 'chief-not-bound' }, 'issue intake team skipped');
@@ -851,30 +871,19 @@ export function createIssueIntake(
           ),
         )
         .all();
-      // 关闭对账只碰轮询器领的卡：createdBy = 本队 chief 绑定的 Agent id（导入时
-      // 写入；手工导入与 webhook 导入是 seed 用户）。认卡只看库里的列，重启后
-      // 照样认得；chief 换绑 Agent 后，换绑前领的卡不再对账。chief 没绑 Agent
-      // 的队本轮不对账，记一行。
-      const toReconcile = new Map<string, ReconcileRow[]>();
-      for (const teamId of new Set(issueTasks.map((t) => t.teamId))) {
-        const agentId = chiefBoundAgentId(deps, teamId);
-        if (agentId === null) {
-          log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
-          continue;
-        }
-        const taken = issueTasks
-          .filter((t) => t.teamId === teamId && t.createdBy === agentId)
-          .map((t) => ({ id: t.id, phase: t.phase, sourceRef: t.sourceRef ?? '' }));
-        if (taken.length > 0) toReconcile.set(teamId, taken);
-      }
-      const teamIds = new Set([...projects.map((p) => p.teamId), ...toReconcile.keys()]);
+      const teamIds = new Set([
+        ...projects.map((p) => p.teamId),
+        ...issueTasks.map((t) => t.teamId),
+      ]);
       for (const teamId of teamIds) {
         tally.teams += 1;
         try {
           await sweepTeam(
             teamId,
             projects.filter((p) => p.teamId === teamId),
-            toReconcile.get(teamId) ?? [],
+            issueTasks
+              .filter((t) => t.teamId === teamId)
+              .map((t) => ({ ...t, sourceRef: t.sourceRef ?? '' })),
             now,
             tally,
           );

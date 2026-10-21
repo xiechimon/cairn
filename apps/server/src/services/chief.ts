@@ -87,9 +87,9 @@ export const WAKE_PROMPT_PREFIX = '[wake:';
 // —— chief 记录（每「用户×团队」一个，惰性 upsert）———————————————————————
 
 export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
-  const id = chiefIdFormat(deps.user.id, teamId);
-  const existing = deps.db.select().from(chief).where(eq(chief.id, id)).get();
+  const existing = chiefRowOf(deps, teamId);
   if (existing) return existing;
+  const id = chiefIdFormat(deps.user.id, teamId);
   deps.db
     .insert(chief)
     .values({
@@ -378,23 +378,23 @@ function chiefRowOf(deps: ChiefDeps, teamId: string): ChiefRow | undefined {
 }
 
 /** #1406 编排前置的只读探测（不建 chief 行）：与 sendChiefMessage 的
- * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型。issue
- * 轮询器在导入前问它，不建出 orchestrateTodo 会 409 的卡。 */
-export function chiefCanOrchestrate(deps: ChiefDeps, teamId: string): boolean {
+ * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型——成立时
+ * 回绑定的 Agent id，否则 null。issue 轮询器在导入前问它，不建出
+ * orchestrateTodo 会 409 的卡，并把这个 id 写成导入卡的 createdBy。 */
+export function chiefOrchestrateAgentId(deps: ChiefDeps, teamId: string): string | null {
   const row = chiefRowOf(deps, teamId);
-  if (row === undefined) return false;
+  if (row === undefined) return null;
   try {
-    requireBoundAgent(deps, row);
-    return true;
+    return requireBoundAgent(deps, row).id;
   } catch (err) {
-    if (err instanceof HttpError && err.status === 409) return false;
+    if (err instanceof HttpError && err.status === 409) return null;
     throw err;
   }
 }
 
 /** #1406 团队 chief 绑定的 Agent id（只读，不建 chief 行；没有 chief 行或
- * 未绑 = null）。issue 轮询器把它写成导入卡的 createdBy（chief 自建卡的
- * createdBy 同为绑定 Agent id），关闭对账按它认轮询器领的卡。 */
+ * 未绑 = null；不看模型）。issue 轮询器的关闭对账按它认自己领的卡（导入卡
+ * 的 createdBy 即绑定 Agent id，chief 自建卡同一律）。 */
 export function chiefBoundAgentId(deps: ChiefDeps, teamId: string): string | null {
   return chiefRowOf(deps, teamId)?.agentId ?? null;
 }
