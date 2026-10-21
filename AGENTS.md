@@ -86,6 +86,11 @@ Git 拦截（autoresearch / pre-commit 共识）：
 
 **开 PR 前先跑 `/code-review` 自审**（Skill `code-review`，审本分支相对 `origin/main` 的 diff）：确认的发现先修再开 PR；判定不修的，在 PR body 的 Risk 节写一句理由。PR 期间推送代码修复后、合并前再跑一次。新增或重写较多代码（新文件、重构、大段新逻辑）时，接着跑 `/simplify`。仅文档改动不跑。仓库闸和 e2e 全绿不等于没问题：#1412（2026-10-20）闸与全量 e2e 都过了，`code-review` 仍查出三处要修的：新 spec 没进 `e2e-affected` 的家族表、`drive-stop` 的「开始」选择器被新芯片词「待开始」误命中、queued 芯片语义错。
 
+**碰安全敏感面时加跑 `/security-review`**（Skill `security-review`）：diff 改到下列任一处，开 PR 前在 `/code-review` 之外再跑一次。确认的发现先修；判定不修的，在 PR body 的 Risk 节写理由，并在 PR 里点名请用户确认，不能自行放过。
+- 密钥与加密：`apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`、`apps/server/src/services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts`
+- 机器注册与下发协议：`apps/server/src/routes-machine.ts`、`apps/server/src/services/machine*.ts`、`apps/daemon/src/{credentials,secret-channel,shell-channel,machine-client}.ts`、`apps/daemon/src/backend/command-gate.ts`
+- MCP 鉴权与外部入口：`apps/server/src/services/{mcp-face,mcp-servers}.ts`、`apps/server/src/routes-webhook.ts`
+
 **审 PR 走 `docs/pr-review.md`**（#1080）：五步流程 + 固定六节评分卡（What it does / Good / Bad / Ugly / Tests / Open questions）。其中「**不切分支看 diff**」是硬要求——`gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`，绝不 `gh pr checkout`：本仓多车道并行、各占独立 worktree，评审者一 checkout 就撞别的 lane 的现场。
 
 仓库只有 origin（xiechimon/pacman），裸 `gh` 命令解析正确；显式 `-R xiechimon/pacman` 写法仍可用：
