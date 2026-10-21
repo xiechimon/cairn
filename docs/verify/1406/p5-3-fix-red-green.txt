@@ -79,3 +79,33 @@ vitest exit: 0
  Test Files  4 passed (4)
       Tests  66 passed (66)
  ✓ |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+
+== note added 2026-10-21 (#1480 round 2, pr-gate run 1 suggestions 5 and 9) ==
+The text above is unchanged; this note is appended.
+- The round 3 red line above names "A3b：素材化文件名带零宽字符与 U+2028 …". The test was renamed
+  to A3c before it was committed (A3b is a different failure mode in p5-3-fix-failure-modes.txt);
+  no commit has a test called A3b. The red run was made with the test under its earlier name.
+- Rounds 2 and 3 committed each test together with its fix (58f6246b, 7d2a3c70), so git history
+  alone does not show the order. Below, each head test is re-run against the sources before its
+  fix. Tests: apps/daemon/test/step-attachments.test.ts as at ff385a44 (unchanged at 82d91e30, the
+  merge with origin/main; apps/daemon and prompts.ts are identical between the two). For each run
+  the named source files were replaced with git show <rev>:<path>, then copied back from a
+  scratchpad copy and checked with sha256sum -c (OK for each file; git status clean after).
+Command: NO_COLOR=1 FORCE_COLOR=0 pnpm exec vitest run --reporter=verbose apps/daemon/test/step-attachments.test.ts
+
+A2 against 4598afcd (apps/daemon/src/step-attachments.ts and packages/shared/src/records/prompts.ts,
+the two sources 58f6246b changed): vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A2：文件名与报错原文里的 \r、U+2028 等换行变体也造不出无前缀的行
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+ Test Files  1 failed (1)
+      Tests  2 failed | 21 passed (23)
+AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+A2 fails with the same assertion as the round 2 red line above. A3c fails as well, since its
+fix (7d2a3c70) comes later.
+
+A3c against 58f6246b (apps/daemon/src/step-attachments.ts, the only source 7d2a3c70 changed):
+vitest exit 1
+ × |@xiechimon/pacman-cli| test/step-attachments.test.ts > #1406 issue 原文围栏里的 token 行 > A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）
+ Test Files  1 failed (1)
+      Tests  1 failed | 22 passed (23)
+Only A3c fails, matching the round 3 red count (1 failed | 22 passed (23)).
