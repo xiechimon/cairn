@@ -10,14 +10,14 @@
 
 import { IN_PROGRESS_PHASES, type Phase } from '@pacman/shared';
 import type { TodoRecord } from '../fixtures/records.js';
-import { isInFlightPhase, PHASE_UI } from '../phase.js';
+import { PHASE_UI } from '../phase.js';
 
 export interface BoardColumnDef {
   id: string;
   name: string;
   /** Header status icon (DESIGN.md 图标: dashed circle / activity / alert
    *  circle / circle check); `attention` paints it in the accent. */
-  status: 'queued' | 'running' | 'attention' | 'done';
+  status: 'idle' | 'running' | 'attention' | 'done';
   /** Extra header label, 已完成 only. */
   label?: string;
   /** Phase a cross-column drop writes (issue #73 manual 改相). Every column
@@ -57,7 +57,7 @@ export const COLUMNS: BoardColumnDef[] = [
     id: 'todo',
     dropPhase: 'todo',
     name: '待开始',
-    status: 'queued',
+    status: 'idle',
     accepts: (t) => t.phase === 'todo',
   },
   {
@@ -66,9 +66,10 @@ export const COLUMNS: BoardColumnDef[] = [
     startGate: true,
     name: '执行中',
     status: 'running',
-    // #1447：queued 已开始，停在它将要跑的那一步（参考站 2026-09-12）。
-    // IN_FLIGHT_PHASES（静默对账闸门）仍只含 planning/building。
-    accepts: (t) => t.phase === 'queued' || isInFlightPhase(t.phase),
+    // #1447：queued 已开始，停在它将要跑的那一步（参考站 2026-09-12）——本列
+    // = shared IN_PROGRESS_PHASES。IN_FLIGHT_PHASES（静默对账闸门）仍只含
+    // planning/building。
+    accepts: (t) => (IN_PROGRESS_PHASES as readonly string[]).includes(t.phase),
   },
   {
     id: 'pending',

@@ -150,7 +150,7 @@ interface BoardProps {
 }
 
 const COLUMN_ICON = {
-  queued: { icon: CircleDashed, tone: 'text-icon' },
+  idle: { icon: CircleDashed, tone: 'text-icon' },
   running: { icon: Activity, tone: 'text-running' },
   attention: { icon: CircleAlert, tone: 'text-(--card-button)' },
   done: { icon: CircleCheck, tone: 'text-icon' },
