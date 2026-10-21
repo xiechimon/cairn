@@ -32,7 +32,7 @@ const file = (filename: string, over: Partial<CompareFile> = {}): CompareFile =>
   sha: '1'.repeat(40),
   additions: 3,
   deletions: 1,
-  hasPatch: true,
+  patchSha: 'c'.repeat(64),
   ...over,
   filename,
 });
@@ -278,7 +278,7 @@ const ROWS: Row[] = [
           status: 'added',
           additions: 0,
           deletions: 0,
-          hasPatch: false,
+          patchSha: null,
         }),
       ]),
   ],
@@ -717,7 +717,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
 
 describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后）', () => {
   const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
-    file(filename, { status: 'added', additions: 0, deletions: 0, hasPatch: false, ...over });
+    file(filename, { status: 'added', additions: 0, deletions: 0, patchSha: null, ...over });
   const many = (n: number, at: (k: number) => string, over: Partial<CompareFile> = {}) =>
     Array.from({ length: n }, (_, k) => file(at(k), { additions: 1, deletions: 0, ...over }));
 

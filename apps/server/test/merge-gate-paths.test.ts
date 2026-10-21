@@ -11,6 +11,9 @@
 // 第四轮补的：删测试的目录与后缀不分大小写（ADR 0021 D4）；另把已有行为钉住：
 // 每种可执行扩展名、别票证据的改名原名、嵌套的 biome.json / .gitattributes、
 // daemon 的闸源码、e2e/ tests/ __tests__/ 目录。
+// 第五轮：CompareFile 的 hasPatch 换成 patchSha（ADR 0021 D3 修订），没有 patch 即
+// patchSha 为 null。另钉住：名字里只多一个空格就算保护（SAFE_PATH 放宽到空格时
+// 要红）；gateSource 不收普通的保护路径。
 
 import type { CompareFile } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -22,7 +25,7 @@ const f = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   sha: 'a'.repeat(40),
   additions: 1,
   deletions: 0,
-  hasPatch: true,
+  patchSha: 'c'.repeat(64),
   ...over,
   filename,
 });
@@ -110,6 +113,13 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
+  test('只多一个空格就算保护：集内源码路径本身不命中任何保护 glob', () => {
+    expect(classify([f('apps/server/src/ab.ts')]).protected).toEqual([]);
+    const r = classify([f('apps/server/src/a b.ts', { status: 'added' })]);
+    expect(r.protected).toEqual(['apps/server/src/a b.ts']);
+    expect(r.outsideAutoMerge).toEqual([]);
+  });
+
   test('改名把保护文件移走：按原路径命中', () => {
     const r = classify([
       f('apps/web/src/moved.yml', {
@@ -127,6 +137,20 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     expect(classify([f('apps/daemon/src/merge-decision.ts')]).gateSource).toEqual([
       'apps/daemon/src/merge-decision.ts',
     ]);
+  });
+
+  test('普通的保护路径不进 gateSource', () => {
+    const r = classify([
+      f('.github/workflows/ci.yml'),
+      f('apps/server/scripts/db-check.mjs'),
+      f('packages/shared/package.json'),
+    ]);
+    expect(r.protected).toEqual([
+      '.github/workflows/ci.yml',
+      'apps/server/scripts/db-check.mjs',
+      'packages/shared/package.json',
+    ]);
+    expect(r.gateSource).toEqual([]);
   });
 });
 
@@ -324,11 +348,11 @@ describe('证据目录', () => {
 describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名）', () => {
   test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写', () => {
     const r = classify([
-      f('apps/web/public/logo.png', { status: 'added', additions: 0, hasPatch: false }),
-      f('apps/server/src/big.ts', { additions: 4000, hasPatch: false }),
-      f('apps/web/public/old.png', { status: 'removed', additions: 0, hasPatch: false }),
-      f('docs/verify/1404/a.png', { status: 'added', additions: 0, hasPatch: false }),
-      f('Docs/Verify/1404/b.png', { status: 'added', additions: 0, hasPatch: false }),
+      f('apps/web/public/logo.png', { status: 'added', additions: 0, patchSha: null }),
+      f('apps/server/src/big.ts', { additions: 4000, patchSha: null }),
+      f('apps/web/public/old.png', { status: 'removed', additions: 0, patchSha: null }),
+      f('docs/verify/1404/a.png', { status: 'added', additions: 0, patchSha: null }),
+      f('Docs/Verify/1404/b.png', { status: 'added', additions: 0, patchSha: null }),
       f('apps/server/src/a.ts'),
     ]);
     expect(r.opaque).toEqual([
@@ -344,19 +368,19 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
         status: 'renamed',
         previousFilename: 'apps/server/src/old.ts',
         additions: 0,
-        hasPatch: false,
+        patchSha: null,
       }),
       f('docs/verify/1404/moved.png', {
         status: 'renamed',
         previousFilename: 'apps/web/public/moved.png',
         additions: 0,
-        hasPatch: false,
+        patchSha: null,
       }),
       f('docs/verify/1404/c.png', {
         status: 'renamed',
         previousFilename: 'docs/verify/1404/b.png',
         additions: 0,
-        hasPatch: false,
+        patchSha: null,
       }),
       f('apps/server/src/r.ts', { status: 'renamed', previousFilename: 'apps/server/src/q.ts' }),
     ]);

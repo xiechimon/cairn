@@ -1,0 +1,121 @@
+# Round 5 (#1404 S1, pr-gate run 3 on #1420): the expected digests in apps/server/test/merge-gate-digest.test.ts after
+# ADR 0021 D3 was amended on PR #1410 (origin/claude/nice-faraday-o329b3, line 36 of
+# docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md): the tuple is [status, filename, previous_filename, blobSha,
+# patchSha], patchSha = sha256 (hex) of the file's compare `patch` text, null when there is no patch.
+# Computed by the Python below, written from that D3 text and the earlier crosscheck (digest-crosscheck.txt, which this
+# file does not replace), not from the TypeScript output. The fixture is the test copy with patch placeholders
+# (apps/server/test/fixtures/merge-gate-compare-sample.json; docs/verify/1404/compare-sample.json has no patch fields),
+# so the fixture digest binds the placeholder text "(patch trimmed)", not the real patches.
+# The prefix is pd2: PATCH_DIGEST_VERSION's comment says the prefix changes whenever the algorithm changes; pd1 was the
+# 4-tuple and was never stored.
+
+$ python3 -I crosscheck2.py apps/server/test/fixtures/merge-gate-compare-sample.json
+fixture: 58 files, 36 kept, 0 kept without patch
+fixture digest: pd2:b8fc25a097b7a43e1929cee82b6ec03f0821c373e443df65612278baff845e4e
+patchSha('(patch trimmed)'): 561ef97dad90bb106e586b8ff010ced42de1b46b1dad3af30be0d9b370ac83f6
+patchSha('@@ -1 +1 @@\n-a\n+b'): f66a89464b010b341f1aff020e1ce988a94fabf234c1cdf681f812918d8b132d
+patchSha('@@ -1 +1 @@\n-旧\n+新'): d983495a739ed62907bdfdc4861f9446079a23481a4a3bad678d5ee1986b7eff
+code-unit sort test:
+  ["modified","apps/web/src/B.ts",null,"3333333333333333333333333333333333333333","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  ["modified","apps/web/src/a-b.ts",null,"4444444444444444444444444444444444444444","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  ["modified","apps/web/src/a.b.ts",null,"2222222222222222222222222222222222222222","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  ["modified","apps/web/src/a/b.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+pd2:8a58b36d470b028c799fa04cf16468b3b9507d6097e26bf87d2f878fbe124ad0
+null patchSha test:
+  ["added","apps/web/public/logo.png",null,"5555555555555555555555555555555555555555",null]
+  ["modified","apps/server/src/a.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+pd2:ca814f29974582368d2d5afa5202827ed353fde86d5b7737764a539e93bc4987
+scenario before merge (A -> B): pd2:baad71232a1c6dee1e4ccd3f424848c8b40eee36e47f6ec2e223944f1d5a707b
+scenario after merge  (C -> B): pd2:8fbd0cd1a687deb947080913ea2a509bde7ae97783fdeaf158747ebb33160239
+scenario digests differ: True
+
+patchSha values again with coreutils (printf has no trailing newline):
+$ printf '(patch trimmed)' | sha256sum
+561ef97dad90bb106e586b8ff010ced42de1b46b1dad3af30be0d9b370ac83f6  -
+$ printf '@@ -1 +1 @@\n-a\n+b' | sha256sum
+f66a89464b010b341f1aff020e1ce988a94fabf234c1cdf681f812918d8b132d  -
+$ printf '@@ -1 +1 @@\n-旧\n+新' | sha256sum
+d983495a739ed62907bdfdc4861f9446079a23481a4a3bad678d5ee1986b7eff  -
+
+crosscheck2.py:
+  import hashlib
+  import json
+  import sys
+  
+  # Written from ADR 0021 D3 as amended on PR #1410 (origin/claude/nice-faraday-o329b3):
+  # exclude docs/verify/** (a rename only when both names are under it), take the JSON tuple
+  # [status, filename, previous_filename, blobSha, patchSha] per file, sort, sha256.
+  # patchSha = sha256 (hex) of the file's compare `patch` text, null when there is no patch.
+  # Not specified by D3 and taken from the earlier crosscheck (digest-crosscheck.txt): compact
+  # JSON, tuples joined by "\n", UTF-8; the version prefix is "pd2" (PATCH_DIGEST_VERSION).
+  PREFIX = "pd2"
+  
+  
+  def sha256_hex(text):
+      return hashlib.sha256(text.encode("utf-8")).hexdigest()
+  
+  
+  def patch_sha(patch):
+      return sha256_hex(patch) if isinstance(patch, str) and patch != "" else None
+  
+  
+  def is_evidence(path):
+      return path.startswith("docs/verify/")
+  
+  
+  def digest(entries):
+      kept = [e for e in entries
+              if not (is_evidence(e["filename"])
+                      and (e.get("previous_filename") is None or is_evidence(e["previous_filename"])))]
+      tuples = sorted(json.dumps([e["status"], e["filename"], e.get("previous_filename"), e.get("sha"),
+                                  patch_sha(e.get("patch"))],
+                                 separators=(",", ":"), ensure_ascii=False) for e in kept)
+      return kept, PREFIX + ":" + hashlib.sha256("\n".join(tuples).encode("utf-8")).hexdigest()
+  
+  
+  fixture = json.load(open(sys.argv[1], encoding="utf-8"))
+  files = fixture["files"]
+  kept, d = digest(files)
+  print("fixture:", len(files), "files,", len(kept), "kept,",
+        sum(1 for e in kept if patch_sha(e.get("patch")) is None), "kept without patch")
+  print("fixture digest:", d)
+  print("patchSha('(patch trimmed)'):", sha256_hex("(patch trimmed)"))
+  print("patchSha('@@ -1 +1 @@\\n-a\\n+b'):", sha256_hex("@@ -1 +1 @@\n-a\n+b"))
+  print("patchSha('@@ -1 +1 @@\\n-旧\\n+新'):", sha256_hex("@@ -1 +1 @@\n-旧\n+新"))
+  
+  
+  # Synthetic vectors used by the unit tests. They give patchSha directly (a test stand-in of
+  # 64 'c'), so these tuples are built without the patch_sha step.
+  def digest_tuples(rows):
+      tuples = sorted(json.dumps(list(r), separators=(",", ":"), ensure_ascii=False) for r in rows)
+      for t in tuples:
+          print("  " + t)
+      return PREFIX + ":" + hashlib.sha256("\n".join(tuples).encode("utf-8")).hexdigest()
+  
+  
+  C = "c" * 64
+  print("code-unit sort test:")
+  print(digest_tuples([
+      ("modified", "apps/web/src/a/b.ts", None, "1" * 40, C),
+      ("modified", "apps/web/src/a.b.ts", None, "2" * 40, C),
+      ("modified", "apps/web/src/B.ts", None, "3" * 40, C),
+      ("modified", "apps/web/src/a-b.ts", None, "4" * 40, C),
+  ]))
+  print("null patchSha test:")
+  print(digest_tuples([
+      ("modified", "apps/server/src/a.ts", None, "1" * 40, C),
+      ("added", "apps/web/public/logo.png", None, "5" * 40, None),
+  ]))
+  
+  # The review's scenario, as compare entries: base f=A, PR f=B, main f=C. Before the PR merges
+  # main the three-dot compare is A -> B; after merging main and keeping B it is C -> B. Same
+  # status, filename and head blob; only the patch text differs.
+  entry = {"status": "modified", "filename": "apps/server/src/f.ts", "sha": "b" * 40,
+           "additions": 1, "deletions": 1}
+  _, before = digest([dict(entry, patch="@@ -1 +1 @@\n-A\n+B")])
+  _, after = digest([dict(entry, patch="@@ -1 +1 @@\n-C\n+B")])
+  print("scenario before merge (A -> B):", before)
+  print("scenario after merge  (C -> B):", after)
+  print("scenario digests differ:", before != after)
+
+the test asserts these same values; green run (s1-r5-red-green.txt): 99 passed.

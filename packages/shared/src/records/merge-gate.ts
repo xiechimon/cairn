@@ -25,8 +25,9 @@ export const GATE_LIMITS = {
   perspectiveRetries: 1,
 } as const;
 
-/** 补丁摘要版本前缀；算法一改就换前缀，旧判定不会与新摘要撞上。 */
-export const PATCH_DIGEST_VERSION = 'pd1';
+/** 补丁摘要版本前缀；算法一改就换前缀，旧判定不会与新摘要撞上。pd1 是四元组
+ * （不含 patchSha），没有落过库；pd2 起按 ADR 0021 D3 修订后的五元组。 */
+export const PATCH_DIGEST_VERSION = 'pd2';
 
 /** 证据目录（仓根锚定）。其下的改动不进摘要；行数与文件数照算（D4 的上限按
  * 整张补丁），其中的二进制文件不留人。 */
@@ -108,9 +109,10 @@ export const COMPARE_FILE_STATUSES = [
 
 /** compare 文件条目，取摘要与路径判定要用的字段。sha 在文档里是 string 或
  * null；实测删除条目带旧 blob 的 sha（docs/verify/1404/compare-sample.json）。
- * hasPatch：响应里带非空的 patch 文本。REST 文档：带二进制数据的 diff 没有
- * patch（实测 PNG 条目没有，apps/server/test/fixtures/merge-gate-compare-sample.json）；
- * diff 过大、纯改名也不带。没有 patch 就没有可读的 diff。 */
+ * patchSha：响应里非空 patch 文本的 sha256（hex），没有 patch 时为 null（ADR 0021
+ * D3 元组的第五位）。REST 文档：带二进制数据的 diff 没有 patch（实测 PNG 条目没有，
+ * apps/server/test/fixtures/merge-gate-compare-sample.json）；diff 过大、纯改名也
+ * 不带。没有 patch 就没有可读的 diff。 */
 export const compareFileSchema = z.object({
   status: z.enum(COMPARE_FILE_STATUSES),
   filename: z.string().min(1),
@@ -118,7 +120,10 @@ export const compareFileSchema = z.object({
   sha: z.string().nullable(),
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
-  hasPatch: z.boolean(),
+  patchSha: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .nullable(),
 });
 export type CompareFile = z.infer<typeof compareFileSchema>;
 
