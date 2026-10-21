@@ -17,6 +17,9 @@
 
 - 看板侧栏 资源 → 模型服务（`/app/resources/providers`），落地默认 pi tab。
 - tab 点击切换；URL 带 `?runtime=claude-code` 深链直落 Claude Code tab。
+- 驱动(`vp.mjs list providers-tabs` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive providers-tabs claude-bin-detection`:Claude Code tab 的安装态探测;另需真 daemon(见下文前置)。
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive providers-tabs runtime-tabs`:pi / Claude Code tab、`?runtime=` 深链、pi 空态;在 picker 之前跑;需全新栈(launch 后的第一个 drive,否则拒跑)。
 
 ## Driving it with verify-pacman
 

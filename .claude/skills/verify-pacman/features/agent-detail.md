@@ -18,6 +18,10 @@
 - 详情页 tab 行 → 概览 / 记忆 / 权限。
 - 团队页 dashed「创建 Agent」→ 弹窗（有服务商时内含模型下拉）。
 - 无 DP 入口：Agent 不在侧栏资源行里（原版命令面板「前往」清单也无 Agents 行），只能从团队页卡进入。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list agent-detail` 列出 usage:
+  - `vp.mjs drive agent-detail edit-and-create`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive agent-detail identity-chip-link`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive agent-detail ui-cleanup-finale`:断言的选择子与几何已随后续改版变化。
 
 ## Driving it with drive-agent-detail.mjs
 

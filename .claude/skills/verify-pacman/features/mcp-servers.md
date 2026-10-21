@@ -13,6 +13,9 @@ spec 13/#368 起 MCP 页 = server 本机 `~/.claude.json` mcpServers 段的只�
 
 - 侧栏 资源 ▾ → MCP;用户菜单 → MCP;搜索面板导航行 MCP。
 - URL 直达 `/app/resources/mcp-servers`(live 模式,不带 `?scenario=`)。
+- 驱动(`vp.mjs list mcp-servers` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive mcp-servers readonly-config`:MCP 页只读 config 投影;launch 时带 `PACMAN_MCP_CONFIG=<fixture claude.json>`。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive mcp-servers command-gate-mcp-bridge`(建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving it with verify-pacman
 

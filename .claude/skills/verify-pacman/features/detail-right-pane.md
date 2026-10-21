@@ -21,6 +21,9 @@
 
 - 任意任务详情路由 `/app/todo/:id`(看板卡标题点击 / 搜索结果行 / 直接 URL)。
 - 右 pane 视图切换:pane 头部型选钮(文档面显示 方案▾/变更▾,section 面显示 section 名▾)→ listbox 行点击。
+- 驱动(`vp.mjs list detail-right-pane` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive detail-right-pane detail-css-live`:详情页三栏与右 pane 的 live CSS 面;另需真 daemon(见下文前置);另需 stub LLM。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive detail-right-pane detail-live-migration`(读的选择子已不在 apps/web/src);`vp.mjs drive detail-right-pane machine-pin`(建 agent 不带 machineId,ADR 0019 起 400);`vp.mjs drive detail-right-pane three-pane`(读的选择子已不在 apps/web/src)。
 
 ## Driving it with verify-pacman
 

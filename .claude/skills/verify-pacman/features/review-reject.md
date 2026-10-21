@@ -14,6 +14,9 @@ review 静息态(步已收尾、无活跃会话)下人说「不」:任务回 pla
 
 - 任务跑到 review(执行步收尾)后:详情页头部「更多」→「请求修改」→ 弹层填反馈 → 确认。
 - 或直接在 composer 输入修改要求 → Enter/发送钮。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list review-reject` 列出 usage:
+  - `vp.mjs drive review-reject blocking-revision`:依赖的 setup-review-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive review-reject human-reject`:依赖的 setup-review-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Driving it with verify-pacman
 

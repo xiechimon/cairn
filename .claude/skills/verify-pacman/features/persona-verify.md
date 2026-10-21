@@ -73,6 +73,8 @@ fan-out 行零渲染负向钉）。live 真值面 = `docs/verify/1250/`（drive-
 - AI 审核弹层 → 勾「三视角并行审」→ 开始 → 三份结论并行落会话。
 - 总管对话「把这张大票拆了」→ chief 调 split_todo → 父卡停 confirm 展示
   拆解方案 → 确认后子卡按依赖波次推进，全 done 父卡自动收。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list persona-verify` 列出 usage:
+  - `vp.mjs drive persona-verify persona-verify`:建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Gotchas
 

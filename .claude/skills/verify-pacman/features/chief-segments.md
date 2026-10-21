@@ -25,6 +25,12 @@ transcript 行——封出即落 journal + 实时上报（第五形 `transcript_
 
 - 开 chief 抽屉（⌘J）发一句话，看它逐段出现：思考一行、正文一行、工具一行（进行中带秒）。
 - 详情页（worker 步）同形。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list chief-segments` 列出 usage:
+  - `vp.mjs drive chief-segments avatar-geometry`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive chief-segments compress-model-select`:压缩模型选择器已随 #1259/#1260 删除。
+  - `vp.mjs drive chief-segments segment-sealing`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive chief-segments stream-catchup`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive chief-segments threads-scroll`:建 agent 不带 machineId,ADR 0019 起 400。
 
 ## Driving it with drive-chief-segments.mjs
 
