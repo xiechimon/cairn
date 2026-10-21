@@ -17,7 +17,7 @@ import {
   type MergeReadiness,
   type Phase,
 } from '@pacman/shared';
-import { computePatchDigest, isEvidencePath } from './digest.js';
+import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
 
@@ -106,10 +106,6 @@ const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
 );
 
-/** 证据前缀的大小写变体（Docs/Verify/ 之类）：paths.ts 的 opaque 豁免当它是证据，
- * 摘要（isEvidencePath）不当。 */
-const isEvidenceCaseVariant = (name: string) =>
-  !isEvidencePath(name) && name.toLowerCase().startsWith(EVIDENCE_PREFIX);
 const runPasses = (r: GateCheckRun) =>
   r.status === 'completed' && r.conclusion !== null && PASSING_CONCLUSIONS.has(r.conclusion);
 const isOwnStatus = (s: GateCommitStatus) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT;
@@ -253,16 +249,9 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     if (paths.protected.length > 0) block('protected-path', ...paths.protected);
     if (paths.outsideAutoMerge.length > 0) block('outside-auto-merge', ...paths.outsideAutoMerge);
     if (paths.deletedTests.length > 0) block('test-deleted', ...paths.deletedTests);
-    // 证据豁免取严的一侧：paths.ts 不分大小写，Docs/Verify/ 下没有 patch 的名字也
-    // 豁免了；摘要只认原样的 docs/verify/。这些名字补回 opaque。
-    const opaque = new Set(paths.opaque);
-    for (const f of compare.files) {
-      if (f.patchSha !== null) continue;
-      for (const name of [f.filename, f.previousFilename ?? f.filename]) {
-        if (isEvidenceCaseVariant(name)) opaque.add(name);
-      }
-    }
-    if (opaque.size > 0) block('opaque-file', ...opaque);
+    // 证据豁免只认原样的 docs/verify/（paths.ts 用 isEvidencePath，与摘要同一条）：
+    // Docs/Verify/ 下没有 patch 的名字照样列进 opaque。
+    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);
     if (paths.otherTicketEvidence.length > 0)
       block('evidence-outside-ticket', ...paths.otherTicketEvidence);
     if (paths.executableEvidence.length > 0)

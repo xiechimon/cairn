@@ -18,6 +18,8 @@
 // 前一段（已 squash）的证据也算数，本 PR 却没加证据；检查列表没读全（分页没读完）
 // 却被当成全量；证据前缀的大小写变体（Docs/Verify/）下看不到 diff 的文件被当成
 // 证据放过。
+// S2 第五轮：大小写变体的证据豁免交给 S1（classifyPaths 的 opaque 改用大小写敏感的
+// isEvidencePath），readiness 不再自己补名字；钉住它的测试照留，经 S1 照样留人。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿）。
 
 import { type CompareFile, MERGE_BLOCKER_CODES, type MergeBlockerCode } from '@pacman/shared';
