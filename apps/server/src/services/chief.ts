@@ -645,6 +645,16 @@ export function wakeFacts(
   const ref = `#${todo.seqNum}「${todo.title}」`;
   switch (kind) {
     case 'gate': {
+      // #1403 G9：review 关口与 confirm 关口同走 gate 触发，自动确认规则只属于 confirm
+      // 关口（review → building 不是相位机的边，confirm_builds 在这里只会 409）。
+      if (todo.phase === 'review') {
+        return [
+          `任务 ${ref} 停驻在 review 关口：改动已就绪，等人验收。`,
+          '这不是 confirm 关口，不要调 confirm_builds；合并只由人触发，也不要调 merge_builds。',
+          '请用 conversation 工具读本 build 会话里的 CI 结果、验证结论与审核结论，向用户汇报改动是否就绪、还有哪些未决项，并指出人工出口：任务详情页审阅关口的「完成」按钮。',
+          '本轮还没有审核结论时，可以调 run_review 发起一次独立审核。',
+        ].join('');
+      }
       const isSplit = context?.isSplitParent === true;
       if (isSplit) {
         return [

@@ -272,6 +272,61 @@ export async function githubCompareStatus(
   }
 }
 
+/** 工作分支上的一张 PR（#1403 段 2 PR 身份：`GET /repos/{o}/{r}/pulls` 的列表项投影）。
+ * 列表项没有 merged 布尔，merged = merged_at 非空。head.repo 为 null（fork 已删）时
+ * headRepoId 是 null。 */
+export interface GithubBranchPull {
+  number: number;
+  state: 'open' | 'closed';
+  merged: boolean;
+  headRef: string | null;
+  headRepoId: number | null;
+  baseRef: string | null;
+  baseRepoId: number | null;
+}
+
+/** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
+ * <owner>:<branch>&base=<base>&per_page=10`，GitHub 按创建时间倒序给）。同一个分支可以
+ * 先后开过好几张 PR。token 可空（匿名梯，公开仓可达）。null = 读不到（网络、非 2xx、
+ * 响应不是数组）；形状不对的项跳过。 */
+export async function githubBranchPulls(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  opts: { head: string; base: string },
+): Promise<GithubBranchPull[] | null> {
+  const url = listUrl(owner, repo, 'pulls', {
+    state: 'all',
+    head: opts.head,
+    base: opts.base,
+    per_page: 10,
+  });
+  const got = await conditionalGetJson(fetchImpl, url, token, null, FETCH_TIMEOUT_MS);
+  if (got === null || got.notModified || !Array.isArray(got.data)) return null;
+  const pulls: GithubBranchPull[] = [];
+  for (const raw of got.data as unknown[]) {
+    const p = raw as {
+      number?: unknown;
+      state?: unknown;
+      merged_at?: unknown;
+      head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+      base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+    } | null;
+    if (typeof p?.number !== 'number' || (p.state !== 'open' && p.state !== 'closed')) continue;
+    pulls.push({
+      number: p.number,
+      state: p.state,
+      merged: typeof p.merged_at === 'string',
+      headRef: typeof p.head?.ref === 'string' ? p.head.ref : null,
+      headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
+      baseRef: typeof p.base?.ref === 'string' ? p.base.ref : null,
+      baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+    });
+  }
+  return pulls;
+}
+
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；
  *  404 = 不可达（含「私仓无 auth 与不存在同形」的 GitHub 防探测语义——
  *  mapUpstreamStatus 404 分支同文）；限流/网络/5xx 沿 readJson 的 HttpError

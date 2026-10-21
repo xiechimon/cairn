@@ -319,3 +319,49 @@ describe('#901 手动改相 confirm/review→done 审计行（server 面）', ()
     }
   });
 });
+
+// #1403 G9（spec 28 §2.2）：confirm 动作在 review 关口上曾先落「通过了确认」行，再在
+// setTodoPhase（review → building 不是相位机的边）上 409——审计里多出一行没发生的过闸。
+// 拒绝要在落行之前；confirm 关口照常落行并进 building（上文失败方式 1/3）。
+describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
+  test('G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged', async () => {
+    const s = await withReviewTodo();
+    try {
+      const agentId = seedChiefAgent(s);
+      await expect(
+        runChiefTool(s, agentId, 'confirm_builds', { buildIds: [s.buildId] }),
+      ).rejects.toThrow(/review -> building/);
+      expect(rowsOf(s, s.buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+      const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get();
+      expect(row?.phase).toBe('review');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('G6 the check refuses only what the phase funnel refuses: a todo already in building is accepted as before', async () => {
+    const s = await withConfirmTodo();
+    try {
+      s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, s.todoId)).run();
+      const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+        action: 'confirm',
+      });
+      expect(res.status).toBe(202);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('G4 REST steps confirm on a review build → 409, no 通过了确认 row', async () => {
+    const s = await withReviewTodo();
+    try {
+      const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+        action: 'confirm',
+      });
+      expect(res.status).toBe(409);
+      expect(rowsOf(s, s.buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+    } finally {
+      s.dispose();
+    }
+  });
+});

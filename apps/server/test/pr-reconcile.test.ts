@@ -121,7 +121,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { githubCompareStatus, githubPull } from '../src/lib/github.js';
+import { githubBranchPulls, githubCompareStatus, githubPull } from '../src/lib/github.js';
 import {
   applyBuildStepAction,
   completeStep,
@@ -196,8 +196,22 @@ const REPO_ID = 4242;
  * 登记，mock 缺省按它回 head.ref（[62] 前的测试读到的都是本 build 自己的 PR）。 */
 const headRefs = new Map<number, string>();
 
-/** pulls/{n} 端点 mock：按 PR 号回应；compare 按 spec 回应；其它 URL
- * （check-runs）一律 404，证明 review 候选不走磨绿面。 */
+/** 工作分支 PR 列表（`pulls?state=all&head=&base=`，段 2 的 PR 身份收养读）里的一项。
+ * 缺省：本仓（REPO_ID）、head 分支 = 世界里那个 build 的工作分支（headRefs 按号查，
+ * 查不到为空串）、base main、open。 */
+interface BranchPullSpec {
+  number: number;
+  state?: 'open' | 'closed';
+  merged?: boolean;
+  headRef?: string;
+  headRepoId?: number | null;
+  baseRef?: string;
+  baseRepoId?: number;
+  htmlUrl?: string;
+}
+
+/** pulls/{n} 端点 mock：按 PR 号回应；compare 按 spec 回应；工作分支 PR 列表按
+ * branchPulls 回应；其它 URL（check-runs）一律 404，证明 review 候选不走磨绿面。 */
 class PullsMock {
   requests: string[] = [];
   headers: Record<string, string>[] = [];
@@ -205,6 +219,11 @@ class PullsMock {
   throwNext = false;
   /** compare 请求到达时调用（网络窗竞态注入位）。 */
   onCompare: (() => void) | null = null;
+  /** 工作分支 PR 列表的应答：数组 = 200 体；数字 = HTTP 错误码；'throw' = 网络错。 */
+  branchPulls: BranchPullSpec[] | number | 'throw' = [];
+  /** 工作分支 PR 列表请求到达时调用（网络窗竞态注入位）。 */
+  onList: (() => void) | null = null;
+  listRequests = () => this.requests.filter((u) => /\/pulls\?/.test(u));
   /** check-runs 端点答一条在跑的 check（默认 404）。 */
   checkRuns = false;
   /** false = 带 etag 也答全量（模拟 GitHub 上状态变了）。 */
@@ -252,6 +271,30 @@ class PullsMock {
           total_count: 1,
           check_runs: [{ name: 'ci', status: 'in_progress', conclusion: null }],
         }),
+      );
+    }
+    if (/\/pulls\?/.test(url)) {
+      this.onList?.();
+      const list = this.branchPulls;
+      if (list === 'throw') return Promise.reject(new TypeError('fetch failed'));
+      if (typeof list === 'number') return Promise.resolve(res(list, '"l"', []));
+      const listedAt = new Date().toISOString();
+      return Promise.resolve(
+        res(
+          200,
+          '"l"',
+          list.map((p) => ({
+            number: p.number,
+            state: p.state ?? 'open',
+            merged_at: p.merged === true ? listedAt : null,
+            html_url: p.htmlUrl ?? `https://github.com/octo/demo/pull/${p.number}`,
+            head: {
+              ref: p.headRef ?? headRefs.get(p.number) ?? '',
+              repo: p.headRepoId === null ? null : { id: p.headRepoId ?? REPO_ID },
+            },
+            base: { ref: p.baseRef ?? 'main', repo: { id: p.baseRepoId ?? REPO_ID } },
+          })),
+        ),
       );
     }
     const m = url.match(/\/pulls\/(\d+)$/);
@@ -302,7 +345,7 @@ interface World {
   buildId: string;
   prNumber: number;
   todoRow(): { phase: string; phaseAt: number };
-  buildRow(): { errorMessage: string | null };
+  buildRow(): { errorMessage: string | null; prNumber: number | null; prUrl: string | null };
   systemRows(): string[];
   stepRows(): { kind: string; status: string }[];
 }
@@ -986,9 +1029,19 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       .set({ errorMessage: 'person note' })
       .where(eq(buildTable.id, w.buildId))
       .run();
+    const listsBefore = mock.listRequests().length;
     await poller.sweep();
     expect(w.todoRow().phase).toBe('review');
     expect(w.buildRow().errorMessage).toBe('person note');
+    // T1: a second read, 50 s or more later, is where a close would be confirmed; the close
+    // was already reported this round, so it is not confirmed and reported again
+    await poller.sweep(Date.now() + 600_000);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow().errorMessage).toBe('person note');
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
+    ).toHaveLength(1);
+    expect(mock.listRequests()).toHaveLength(listsBefore);
   });
 
   test('⑲ merged into a branch other than the default branch → stays in review, one hint', async () => {
@@ -1195,6 +1248,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
     await poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    // T1: the second read after the reopen does not confirm the close again
+    await poller.sweep(Date.now() + 600_000);
     expect(w.todoRow().phase).toBe('review');
     expect(
       w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
@@ -2128,7 +2184,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(mock.requests).toHaveLength(1);
     expect(w.todoRow().phase).toBe('review');
     await poller.sweep(t0 + 300_000);
-    expect(mock.requests).toHaveLength(2);
+    // the confirming read is followed by the branch PR list read (segment 2, A3)
+    expect(mock.requests.filter((u) => u.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(2);
     expect(w.todoRow().phase).toBe('failed');
   });
 
@@ -2194,6 +2251,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       'closedUnmerged',
       'hinted',
       'settledBefore',
+      'adopted',
     ] as const;
     for (const t of [0, 60_000]) {
       await poller.sweep(Date.now() + t);
@@ -2377,4 +2435,490 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       ]);
     },
   );
+});
+
+// —— #1403 段 2：PR 身份（工作分支上的 PR 收养）与无测试的规则钉 ——————————————
+// 失败方式正本 = docs/verify/1403/seg2-failure-modes.txt（A1-A14 = PR 身份，T1-T6 =
+// 测试钉；T1 写在 ⑱d / ⑱f 里）。build 上记的 PR 号只在非审核步收尾时由 daemon 探测刷新：
+// 人在 review 期间关掉 #N、从同一工作分支开 #M，对账确认关闭时按 #N 打回，之后 #M 合并也
+// 看不到。确认关闭之后（以及每轮第一次读到别人的 PR 时）先列本 build 工作分支上的 PR。
+
+describe('#1403 segment 2: the PR the build tracks', () => {
+  /** 关闭未合并的已记 PR + 同分支上的另一张 PR（号 202，head = 本 build 的工作分支）。 */
+  function closedWithSibling(opts: { connected?: boolean; sibling?: PullSpec } = {}) {
+    const w = makeWorld({
+      connected: opts.connected ?? true,
+      inflight: 'pending',
+      inflightKind: 'verify',
+    });
+    const branch = conversationBranch(w.buildId);
+    headRefs.set(202, branch);
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: false },
+      202: opts.sibling ?? { state: 'open', merged: false },
+    });
+    return { w, branch, mock };
+  }
+
+  const closedRows = (w: World) =>
+    w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`));
+
+  test("[s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails", async () => {
+    const { w, branch, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: 202 }, { number: w.prNumber, state: 'closed' }];
+    const info = vi.fn();
+    const published = vi.spyOn(w.s.hub, 'publishBuildDoc');
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: mock.fetch, logger: { info } },
+    );
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    expect(mock.listRequests()).toEqual([]); // A6: not on the first sighting
+    await poller.sweep(t0 + 60_000);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow()).toMatchObject({
+      prNumber: 202,
+      prUrl: 'https://github.com/octo/demo/pull/202',
+      errorMessage: null,
+    });
+    // the board and the PR panel learn the new number
+    expect(published.mock.calls.some(([, record]) => record.prNumber === 202)).toBe(true);
+    expect(closedRows(w)).toEqual([]);
+    const adopted = w
+      .systemRows()
+      .filter((c) => c.includes(`#${w.prNumber}`) && c.includes('#202'));
+    expect(adopted).toHaveLength(1);
+    expect(adopted[0]).toContain(`「${branch}」`);
+    // the unclaimed verify step stays queued: nothing was settled
+    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
+    expect(mock.listRequests()).toHaveLength(1);
+    const listed = decodeURIComponent(mock.listRequests()[0] ?? '');
+    expect(listed).toContain('https://api.github.com/repos/octo/demo/pulls?');
+    for (const part of ['state=all', `head=octo:${branch}`, 'base=main', 'per_page=10']) {
+      expect(listed).toContain(part);
+    }
+    // A12: counted as adopted, every candidate in exactly one bucket
+    const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
+    expect(tally).toMatchObject({ adopted: 1, closedUnmerged: 0, reviewCandidates: 1 });
+    const buckets = [
+      'reviewPending',
+      'reviewSkipped',
+      'reviewUnreadable',
+      'reviewForeign',
+      'merged',
+      'closedUnmerged',
+      'hinted',
+      'settledBefore',
+      'adopted',
+    ];
+    expect(buckets.reduce((n, k) => n + (tally[k] ?? 0), 0)).toBe(1);
+    // the next sweep reads the adopted PR; A10: the old number is not read again
+    await poller.sweep(t0 + 120_000);
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/202'))).toHaveLength(1);
+    expect(mock.requests.filter((u) => u.endsWith(`/pulls/${w.prNumber}`))).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test('[s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card', async () => {
+    const { w, mock } = closedWithSibling({
+      sibling: { state: 'closed', merged: true, mergeCommitSha: 'abc1234def' },
+    });
+    mock.branchPulls = [{ number: 202, state: 'closed', merged: true }];
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    expect(w.buildRow().prNumber).toBe(202);
+    expect(w.todoRow().phase).toBe('review');
+    await poller.sweep(t0 + 120_000);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.systemRows().some((c) => c.startsWith('PR #202 已在 GitHub 合并'))).toBe(true);
+    expect(closedRows(w)).toEqual([]);
+  });
+
+  test('[s2-A3] no other PR on the branch → failed as before, after one list read', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: w.prNumber, state: 'closed' }];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(closedRows(w)).toHaveLength(1);
+    expect(mock.listRequests()).toHaveLength(1);
+  });
+
+  test.each([
+    ['a fork PR with the same branch name', { number: 202, headRepoId: REPO_ID + 1 }],
+    ['a fork that was deleted (head repo null)', { number: 202, headRepoId: null }],
+    ['a PR from another branch', { number: 202, headRef: 'feature-x' }],
+    ['a PR into another base', { number: 202, baseRef: 'release-x' }],
+    ['a PR whose base is another repository', { number: 202, baseRepoId: REPO_ID + 5 }],
+    ['another closed PR that was not merged', { number: 202, state: 'closed' as const }],
+  ])('[s2-A4] the list holds only %s → not recorded, failed as before', async (_label, entry) => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [entry];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+  });
+
+  test.each([502, 429, 'throw'] as const)(
+    '[s2-A5] the list read fails (%s) → nothing written; the next sweep confirms again and acts',
+    async (failure) => {
+      const { w, mock } = closedWithSibling();
+      mock.branchPulls = failure;
+      const poller = pollerFor(w, mock);
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      await poller.sweep(t0 + 60_000);
+      expect(mock.listRequests()).toHaveLength(1);
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.buildRow()).toMatchObject({ prNumber: w.prNumber, errorMessage: null });
+      expect(w.systemRows()).toEqual([]);
+      mock.branchPulls = [];
+      await poller.sweep(t0 + 120_000);
+      expect(mock.listRequests()).toHaveLength(2);
+      expect(w.todoRow().phase).toBe('failed');
+    },
+  );
+
+  test('[s2-A6] no list read for a close and reopen, or for a closed PR into another base', async () => {
+    const reopened = closedWithSibling();
+    const poller = pollerFor(reopened.w, reopened.mock);
+    const spec = reopened.mock.pulls[reopened.w.prNumber];
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    if (spec !== undefined) spec.state = 'open';
+    reopened.mock.status304 = false;
+    await poller.sweep(t0 + 60_000);
+    expect(reopened.mock.listRequests()).toEqual([]);
+    expect(reopened.w.todoRow().phase).toBe('review');
+
+    const other = makeWorld({ connected: true });
+    const mock = new PullsMock({
+      [other.prNumber]: { state: 'closed', merged: false, baseRef: 'release-x' },
+    });
+    await sweepTwice(pollerFor(other, mock));
+    expect(mock.listRequests()).toEqual([]);
+    expect(other.todoRow().phase).toBe('review');
+  });
+
+  test.each(['the card leaves review', 'a step starts'] as const)(
+    '[s2-A7] %s while the list read is in flight → no write',
+    async (race) => {
+      const { w, mock } = closedWithSibling();
+      mock.branchPulls = [{ number: 202 }];
+      mock.onList = () => {
+        if (race === 'the card leaves review') {
+          w.s.db
+            .update(todoTable)
+            .set({ phase: 'planning' })
+            .where(eq(todoTable.id, w.todoId))
+            .run();
+        } else {
+          w.s.db
+            .insert(stepTable)
+            .values({
+              id: `step-merge-race-${w.buildId}`,
+              buildId: w.buildId,
+              kind: 'merge',
+              status: 'claimed',
+              createdAt: Date.now(),
+            })
+            .run();
+        }
+      };
+      const poller = pollerFor(w, mock);
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      await poller.sweep(t0 + 60_000);
+      expect(mock.listRequests()).toHaveLength(1);
+      expect(w.buildRow().prNumber).toBe(w.prNumber);
+      expect(w.systemRows()).toEqual([]);
+      expect(w.todoRow().phase).toBe(race === 'the card leaves review' ? 'planning' : 'review');
+    },
+  );
+
+  test("[s2-A8] anonymous: the list read takes the slot the pulls read kept for it, within the reconcile's own budget", async () => {
+    const { w, mock } = closedWithSibling({ connected: false });
+    mock.branchPulls = [{ number: 202 }];
+    const poller = pollerFor(w, mock, { anonReadsPerHour: 4 });
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 300_000);
+    expect(mock.requests).toHaveLength(3);
+    expect(mock.listRequests()).toHaveLength(1);
+    expect(w.buildRow().prNumber).toBe(202);
+    // the list read counted: one of four left, and a pulls read needs room for two
+    await poller.sweep(t0 + 360_000);
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/202'))).toEqual([]);
+  });
+
+  test('[s2-A15] the recorded PR shows up open in the list (reopened between the two reads) → not failed, nothing written', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: w.prNumber }];
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    expect(mock.listRequests()).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow()).toMatchObject({ prNumber: w.prNumber, errorMessage: null });
+    expect(w.systemRows()).toEqual([]);
+    // the next closed read is a first sighting again, not a confirmation
+    mock.branchPulls = [];
+    await poller.sweep(t0 + 120_000);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test("[s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint", async () => {
+    const w = makeWorld({ connected: true, newerBuildPr: 201 });
+    headRefs.set(201, conversationBranch(w.buildId)); // the older build opened it from its branch
+    const currentBuildId = String(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    );
+    const own = conversationBranch(currentBuildId);
+    headRefs.set(305, own);
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+      305: { state: 'open', merged: false },
+    });
+    mock.branchPulls = [{ number: 305 }];
+    const info = vi.fn();
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: mock.fetch, logger: { info } },
+    );
+    await poller.sweep();
+    const current = w.s.db.select().from(buildTable).where(eq(buildTable.id, currentBuildId)).get();
+    expect(current?.prNumber).toBe(305);
+    const rows = w.s.db
+      .select()
+      .from(messageTable)
+      .all()
+      .filter((r) => r.role === 'system' && r.conversationId === currentBuildId)
+      .map((r) => String(r.content));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toContain('#201');
+    expect(rows[0]).toContain('#305');
+    expect(rows[0]).toContain(`「${own}」`);
+    expect(w.todoRow().phase).toBe('review');
+    expect(info.mock.calls.at(-1)?.[0]).toMatchObject({ adopted: 1, reviewForeign: 0 });
+    expect(decodeURIComponent(mock.listRequests()[0] ?? '')).toContain(`head=octo:${own}`);
+  });
+
+  test('[s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write', async () => {
+    const w = makeWorld({ connected: true, newerBuildPr: 201 });
+    headRefs.set(201, conversationBranch(w.buildId));
+    const currentBuildId = String(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    );
+    headRefs.set(305, conversationBranch(currentBuildId));
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    mock.branchPulls = [{ number: 305 }];
+    mock.onList = () => {
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-merge-race-${currentBuildId}`,
+          buildId: currentBuildId,
+          kind: 'merge',
+          status: 'claimed',
+          createdAt: Date.now(),
+        })
+        .run();
+    };
+    await pollerFor(w, mock).sweep();
+    expect(mock.listRequests()).toHaveLength(1);
+    const current = w.s.db.select().from(buildTable).where(eq(buildTable.id, currentBuildId)).get();
+    expect(current?.prNumber).toBe(201);
+    const rows = w.s.db
+      .select()
+      .from(messageTable)
+      .all()
+      .filter((r) => r.role === 'system');
+    expect(rows).toEqual([]);
+  });
+
+  test('[s2-A9b] the recorded PR is foreign and the build has no PR of its own → the hint as before; the list is read once per round', async () => {
+    const w = makeWorld({ connected: true, newerBuildPr: 201 });
+    headRefs.set(201, conversationBranch(w.buildId));
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    await poller.sweep(Date.now() + 60_000);
+    await poller.sweep(Date.now() + 120_000);
+    expect(mock.listRequests()).toHaveLength(1);
+    const hints = w.s.db
+      .select()
+      .from(messageTable)
+      .all()
+      .filter((r) => r.role === 'system' && String(r.content).includes('#201'));
+    expect(hints).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
+  test.each([
+    ['an open PR and merged ones → the open one', [205, 204, 203], 204],
+    ['only merged ones → the highest number', [203, 205], 205],
+  ] as const)('[s2-A11] %s', async (_label, numbers, expected) => {
+    const { w, mock } = closedWithSibling();
+    for (const n of numbers) headRefs.set(n, conversationBranch(w.buildId));
+    mock.branchPulls = numbers.map((n) =>
+      n === 204 ? { number: n } : { number: n, state: 'closed' as const, merged: true },
+    );
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prNumber).toBe(expected);
+  });
+
+  test('[s2-A13] the recorded URL is built from the repository and number, not taken from the response', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: 202, htmlUrl: 'https://evil.example/pull/202‮' }];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prUrl).toBe('https://github.com/octo/demo/pull/202');
+    expect(w.systemRows().join('\n')).not.toContain('evil');
+  });
+
+  test('[s2-A14] the branch PR list parser: live captures, and unreadable answers', async () => {
+    const fixture = (name: string): unknown =>
+      JSON.parse(readFileSync(resolve(import.meta.dirname, 'fixtures/github', name), 'utf8'));
+    const urls: string[] = [];
+    const serve = (status: number, body: unknown) => (input: string | URL) => {
+      urls.push(String(input));
+      return Promise.resolve(res(status, '"live"', body));
+    };
+    const open = await githubBranchPulls(
+      serve(200, fixture('branch-pulls-open.json')),
+      null,
+      'xiechimon',
+      'pacman',
+      { head: 'xiechimon:claude/bootstrap-p2', base: 'main' },
+    );
+    expect(urls).toEqual([
+      'https://api.github.com/repos/xiechimon/pacman/pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2&base=main&per_page=10',
+    ]);
+    expect(open).toEqual([
+      {
+        number: 1414,
+        state: 'open',
+        merged: false,
+        headRef: 'claude/bootstrap-p2',
+        headRepoId: 1361226985,
+        baseRef: 'main',
+        baseRepoId: 1361226985,
+      },
+    ]);
+    const merged = await githubBranchPulls(
+      serve(200, fixture('branch-pulls-merged.json')),
+      null,
+      'xiechimon',
+      'pacman',
+      { head: 'xiechimon:claude/optimistic-albattani-r5pmfn', base: 'main' },
+    );
+    expect(merged?.map((p) => [p.number, p.state, p.merged])).toEqual([
+      [1474, 'closed', true],
+      [1456, 'closed', true],
+      [1454, 'closed', true],
+      [1452, 'closed', true],
+      [1449, 'closed', true],
+      [1436, 'closed', true],
+      [1425, 'closed', true],
+    ]);
+    const args = ['o', 'r', { head: 'o:b', base: 'main' }] as const;
+    expect(await githubBranchPulls(serve(200, { message: 'x' }), null, ...args)).toBeNull();
+    expect(await githubBranchPulls(serve(404, []), null, ...args)).toBeNull();
+    const thrown = () => Promise.reject(new TypeError('fetch failed'));
+    expect(await githubBranchPulls(thrown, null, ...args)).toBeNull();
+  });
+
+  // —— T2-T6：pin rules that had no test at f8ab21b（T1 is in ⑱d / ⑱f）————————————
+
+  test('[s2-T2] a verify or review step created after the completion row does not start a new round', async () => {
+    const w = makeWorld({ connected: true });
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('done');
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    const later = Date.now() + 1_000;
+    for (const kind of ['verify', 'review'] as const) {
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-${kind}-late-${w.buildId}`,
+          buildId: w.buildId,
+          kind,
+          status: 'done',
+          createdAt: later,
+        })
+        .run();
+    }
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+  });
+
+  test('[s2-T3] the first closed sighting is dropped when the card leaves review', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0); // first sighting
+    w.s.db.update(todoTable).set({ phase: 'planning' }).where(eq(todoTable.id, w.todoId)).run();
+    await poller.sweep(t0 + 60_000); // not a review candidate this sweep
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
+    await poller.sweep(t0 + 120_000); // a first sighting again, not a confirmation
+    expect(w.todoRow().phase).toBe('review');
+    await poller.sweep(t0 + 180_000);
+    expect(w.todoRow().phase).toBe('failed');
+  });
+
+  test.each([
+    ['T4', 'failed'],
+    ['T5', 'stopped'],
+  ] as const)(
+    '[s2-%s] a %s build step that pushed a commit does not decide containment',
+    async (_id, status) => {
+      const built = 'a'.repeat(40);
+      const other = 'b'.repeat(40);
+      const w = makeWorld({ connected: true, checkpoint: built });
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-${status}-${w.buildId}`,
+          buildId: w.buildId,
+          kind: 'build',
+          status,
+          checkpointCommit: other,
+          createdAt: Date.now(),
+          lastHeartbeatAt: Date.now(),
+        })
+        .run();
+      const mock = new PullsMock({
+        [w.prNumber]: {
+          state: 'closed',
+          merged: true,
+          headSha: built,
+          compareByBase: { [other]: 'diverged' },
+        },
+      });
+      await pollerFor(w, mock).sweep();
+      expect(mock.compareRequests()).toEqual([]);
+      expect(w.todoRow().phase).toBe('done');
+    },
+  );
+
+  test('[s2-T6] finishing the card stops queued gate steps only: a claimed verify step is left alone', () => {
+    const w = makeWorld({ inflight: 'claimed', inflightKind: 'verify' });
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('claimed');
+  });
 });
