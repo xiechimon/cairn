@@ -1,0 +1,236 @@
+# vp-selftest.mjs after pr-gate run 6 on #1411 (round 10, 3ee5842).
+# Run 6 at 8568a96 said go; this round takes its suggestions: the three archive refusal cases match their
+# messages, a new case runs vp.mjs from a git worktree and checks the evidence root is the main checkout's,
+# and the changelog and Cursor flow are corrected. Mutations: each applied alone to vp.mjs at 3ee5842; the
+# right column is the round 9 self-test (8568a96) under the same mutation. m5-ci-clone: mutation M5 in a
+# plain clone (not a worktree), as CI checks out: only the new worktree case fails there.
+
+== p1-r10-selftest-node22.txt ==
+$ node --version
+v22.22.0
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+49/49 passed
+exit 0
+
+== p1-r10-selftest-node24.txt ==
+$ /root/.npm/_npx/387698761821791d/node_modules/node/bin/node --version
+v24.22.0
+$ /root/.npm/_npx/387698761821791d/node_modules/node/bin/node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+49/49 passed
+exit 0
+
+== p1-r10-mutations-node22.txt ==
+node v22.22.0
+baseline (unmutated vp.mjs):
+  round-10 self-test: exit 0, 49/49 passed
+  round-9 self-test (8568a96): exit 0, 48/48 passed
+
+M1: vp.mjs replaced by `process.exit(2);` (every command exits 2, prints nothing)
+  round-10 self-test: exit 1, 4/49 passed; 45 FAIL total
+    FAIL  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+    FAIL  a drive from a worktree puts its evidence under the main checkout, not the worktree
+    FAIL  archive --latest takes a positive integer only
+    FAIL  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+    FAIL  archive refuses a source given without --from
+  round-9 self-test (8568a96): exit 1, 7/48 passed; 41 FAIL total
+    FAIL  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+
+M2: --latest guard message: 'needs a positive integer' -> 'takes a whole number above zero' (exit 2 kept)
+  round-10 self-test: exit 1, 48/49 passed; 1 FAIL total
+    FAIL  archive --latest takes a positive integer only
+  round-9 self-test (8568a96): exit 0, 48/48 passed; 0 FAIL total
+
+M3: --latest + --from/VERIFY_EVIDENCE_DIR guard message: 'cannot be combined with' -> 'excludes' (exit 2 kept)
+  round-10 self-test: exit 1, 48/49 passed; 1 FAIL total
+    FAIL  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+  round-9 self-test (8568a96): exit 0, 48/48 passed; 0 FAIL total
+
+M4: stray-source guard message: 'unexpected argument(s) X: name a source with --from <dir>' -> 'stray argument(s) X' (exit 2 kept)
+  round-10 self-test: exit 1, 48/49 passed; 1 FAIL total
+    FAIL  archive refuses a source given without --from
+  round-9 self-test (8568a96): exit 0, 48/48 passed; 0 FAIL total
+
+M5: EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), ...) -> join(SCRIPT_ROOT, '.claude', 'verify-evidence')
+  round-10 self-test: exit 1, 47/49 passed; 2 FAIL total
+    FAIL  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+    FAIL  a drive from a worktree puts its evidence under the main checkout, not the worktree
+  round-9 self-test (8568a96): exit 1, 47/48 passed; 1 FAIL total
+    FAIL  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+
+vp.mjs restored, identical to HEAD: true
+
+== p1-r10-m5-ci-clone.txt ==
+Non-worktree clone of 8568a96 (as CI checks out), round-10 vp-selftest.mjs copied in: /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/p1-r10-ci-clone
+git rev-parse --git-common-dir -> .git
+
+unmutated vp.mjs:
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+49/49 passed
+
+M5 (EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence')):
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+FAIL  a drive from a worktree puts its evidence under the main checkout, not the worktree
+48/49 passed
+
+vp.mjs restored in clone, identical to 8568a96: true
+
+== mutation runner ==
+// Mutation runner for round 10: each mutation edits vp.mjs, runs the self-test(s), restores vp.mjs.
+import { copyFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync, execFileSync } from 'node:child_process';
+import { join } from 'node:path';
+
+const WT = '/home/user/pacman/.claude/worktrees/p1';
+const SCRIPTS = join(WT, '.claude/skills/verify-pacman/scripts');
+const VP = join(SCRIPTS, 'vp.mjs');
+const BACKUP = process.argv[2];
+const NODE = process.argv[3] ?? process.execPath;
+const HEAD_TEST = join(SCRIPTS, 'vp-selftest-r9.mjs');
+copyFileSync(VP, BACKUP);
+writeFileSync(HEAD_TEST, execFileSync('git', ['-C', WT, 'show', '8568a96:.claude/skills/verify-pacman/scripts/vp-selftest.mjs']));
+
+const original = readFileSync(VP, 'utf8');
+function replaceOnce(src, from, to) {
+  const n = src.split(from).length - 1;
+  if (n !== 1) throw new Error(`expected one occurrence of ${from}, found ${n}`);
+  return src.replace(from, to);
+}
+const mutations = [
+  ['M1', 'vp.mjs replaced by `process.exit(2);` (every command exits 2, prints nothing)', () => 'process.exit(2);\n'],
+  ['M2', "--latest guard message: 'needs a positive integer' -> 'takes a whole number above zero' (exit 2 kept)",
+    () => replaceOnce(original, '`--latest needs a positive integer\\n${usage}`', '`--latest takes a whole number above zero\\n${usage}`')],
+  ['M3', "--latest + --from/VERIFY_EVIDENCE_DIR guard message: 'cannot be combined with' -> 'excludes' (exit 2 kept)",
+    () => replaceOnce(original, '`--latest cannot be combined with --from or VERIFY_EVIDENCE_DIR; name one source\\n${usage}`', '`--latest excludes --from and VERIFY_EVIDENCE_DIR\\n${usage}`')],
+  ['M4', "stray-source guard message: 'unexpected argument(s) X: name a source with --from <dir>' -> 'stray argument(s) X' (exit 2 kept)",
+    () => replaceOnce(original, '`unexpected argument(s) ${stray.join(\' \')}: name a source with --from <dir>\\n${usage}`', '`stray argument(s) ${stray.join(\' \')}\\n${usage}`')],
+  ['M5', "EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), ...) -> join(SCRIPT_ROOT, '.claude', 'verify-evidence')",
+    () => replaceOnce(original, "const EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), '.claude', 'verify-evidence');", "const EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence');")],
+];
+const run = (test) => {
+  const r = spawnSync(NODE, [test], { cwd: WT, encoding: 'utf8' });
+  const out = `${r.stdout}${r.stderr}`;
+  return { code: r.status, fails: out.split('\n').filter((l) => l.startsWith('FAIL')), summary: out.trim().split('\n').at(-1) };
+};
+try {
+  console.log(`node ${spawnSync(NODE, ['--version'], { encoding: 'utf8' }).stdout.trim()}`);
+  console.log('baseline (unmutated vp.mjs):');
+  for (const [label, test] of [['round-10 self-test', join(SCRIPTS, 'vp-selftest.mjs')], ['round-9 self-test (8568a96)', HEAD_TEST]]) {
+    const r = run(test);
+    console.log(`  ${label}: exit ${r.code}, ${r.summary}`);
+  }
+  for (const [id, def, make] of mutations) {
+    writeFileSync(VP, make());
+    console.log(`\n${id}: ${def}`);
+    for (const [label, test] of [['round-10 self-test', join(SCRIPTS, 'vp-selftest.mjs')], ['round-9 self-test (8568a96)', HEAD_TEST]]) {
+      const r = run(test);
+      const watched = r.fails.filter((l) => /archive --latest takes|archive refuses --latest together|archive refuses a source given without|from a worktree|under the main checkout/.test(l));
+      console.log(`  ${label}: exit ${r.code}, ${r.summary}; ${r.fails.length} FAIL total`);
+      for (const l of watched) console.log(`    ${l}`);
+    }
+    writeFileSync(VP, original);
+  }
+} finally {
+  writeFileSync(VP, original);
+  rmSync(HEAD_TEST, { force: true });
+}
+const clean = spawnSync('git', ['-C', WT, 'diff', '--quiet', '--', VP]).status === 0;
+console.log(`\nvp.mjs restored, identical to HEAD: ${clean}`);
