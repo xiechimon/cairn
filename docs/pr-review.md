@@ -13,7 +13,7 @@
 
 ## 例外：`pr-gate` workflow（ADR 0021、spec 28 §7.5）
 
-`.claude/workflows/pr-gate.js` 是合并前闸，不是人审评分卡，四处与上面不同：子代理对 GitHub 只读，不打 `inprogress` 标签、不发评论，结论是一份带 headSha 的 JSON 判定，由主会话转述；证据维度及其反驳者跑在各自的独立 worktree 里，可以 `git checkout --detach <headSha>`（第 4 步禁的是在共享工作区里切换，独立 worktree 不撞别的车道）；读 PR 改用 fetch 进私有 ref（路径里带 head，读完删掉）；PR 评论只读 `author_association` 为 OWNER / MEMBER / COLLABORATOR 的，其余不读（仓库公开，谁都能评论，证据维度有 shell）。其余步骤（全文读完、读关联 issue、文档同步）照常。改这里或改 `pr-gate.js` 的评审口径时两处一起改。
+`.claude/workflows/pr-gate.js` 是合并前闸，不是人审评分卡，四处与上面不同：子代理对 GitHub 只读，不打 `inprogress` 标签、不发评论，结论是一份带 headSha 的 JSON 判定，由主会话转述；证据维度及其反驳者跑在各自的独立 worktree 里，可以 `git checkout --detach <headSha>`（第 4 步禁的是在共享工作区里切换，独立 worktree 不撞别的车道）；读 PR 改用 fetch 进私有 ref（路径里带 head，读完删掉）；PR 评论只读 `author_association` 为 OWNER / MEMBER / COLLABORATOR 的，读评论的命令用 `--jq` 先滤掉其余（仓库公开，谁都能评论，证据维度有 shell）。其余步骤（全文读完、读关联 issue、文档同步）照常。改这里或改 `pr-gate.js` 的评审口径时两处一起改。
 
 ## 六节评分卡（固定输出形态）
 
