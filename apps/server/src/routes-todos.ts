@@ -21,7 +21,11 @@ import {
   requireProject,
   svcOf,
 } from './routes-helpers.js';
-import { advanceSplitWaves, prepareStopForDone } from './services/builds.js';
+import {
+  advanceSplitWaves,
+  prepareStopForDone,
+  stopActiveStepsForClose,
+} from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { orchestrateTodo } from './services/orchestrate.js';
 import { PhaseTransitionError } from './services/phase.js';
@@ -110,6 +114,8 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     // 完成」当成阻塞解除去派发下一张。父卡收口仍走 updateTodo 里的
     // settleSplitOnDone（兄弟都 done 时父收，不在这里派发新构建）。
     if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
+    // #1445：手动关闭（详情 关闭 / 看板 已取消）同停活动步，机器不再领这张卡。
+    if (body.phase === 'closed' && prior?.phase !== 'closed') stopActiveStepsForClose(svc, id);
     return c.json(record);
   });
 

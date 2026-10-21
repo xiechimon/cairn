@@ -48,7 +48,13 @@ import {
 import { HttpError, parseWith } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { advanceSplitWaves, applyBuildStepAction, cancelBuild, startBuilds } from './builds.js';
+import {
+  advanceSplitWaves,
+  applyBuildStepAction,
+  cancelBuild,
+  startBuilds,
+  stopActiveStepsForClose,
+} from './builds.js';
 import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from './chief.js';
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -1041,6 +1047,8 @@ export function transitionTodos(
       const record = setTodoPhase(svc, id, to);
       if (record) {
         transitioned.push(id);
+        // #1445：关闭即停活动步——只写相位的话 pending 步仍会被机器领走。
+        if (to === 'closed' && owned.phase !== 'closed') stopActiveStepsForClose(svc, id);
         // #902 done 落地审计行（不经合并步的 done 一律留痕，actor 答「谁」）。
         // 同相位重放（XMON-59 幂等语义：MCP 批量流转重入）不重复落行——
         // 审计记发生的流转，不记重放。

@@ -303,6 +303,8 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
     }
     return;
   }
+  // #1445：已关闭的卡不因停止回报重开（预定相丢失 = 进程重启的兜底）。
+  if (todoRow.phase === 'closed') return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
@@ -430,6 +432,22 @@ export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
 /** #1247 stop-then-done 的停半边：pending 即时停且保相位；claimed 委托停并
  *  预定 afterStop=done。调用方在 ready 时再写 phase=done。无活动步 = ready。 */
 export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMarkDoneResult {
+  return prepareStopFor(deps, todoId, 'done');
+}
+
+/** #1445 关闭的停半边：卡已写成 closed 后调用，停掉 latest build 的活动步。
+ *  pending / waiting_quota 即时停，不再可领、不占队列位次；claimed 委托停，
+ *  回报 done(stopped) 时 applyStoppedStep 见卡已 closed 即不回落。无 latest
+ *  build / 无活动步 = no-op。 */
+export function stopActiveStepsForClose(deps: BuildDeps, todoId: string): void {
+  prepareStopFor(deps, todoId, 'closed');
+}
+
+function prepareStopFor(
+  deps: BuildDeps,
+  todoId: string,
+  after: 'done' | 'closed',
+): StopAndMarkDoneResult {
   const { db } = deps;
   const todoRow = db.select().from(todo).where(eq(todo.id, todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${todoId}`);
@@ -450,7 +468,9 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
     return { state: 'ready' };
   }
   const now = nowMs();
-  afterStopPhaseByBuild.set(buildId, 'done');
+  // closed 不预定：卡此刻已是 closed，回报时由 applyStoppedStep 的 closed 兜底
+  // 保持；预定了反而会把回报前被重开的卡再关一次。
+  if (after === 'done') afterStopPhaseByBuild.set(buildId, 'done');
   db.insert(stopPending)
     .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
     .onConflictDoUpdate({
@@ -1407,6 +1427,8 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  * runtime、补设归属机后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
  * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
  * chief 步不在本面（chief.ts 扫尾）。
+ * #1445 已关卡例外：closed 卡名下的 pending / waiting_quota 步一律停掉（关闭
+ * 修复前的存量），失联 claimed 步停掉而不释放——释放回 pending 等于又能被领。
  * 释放语义：status → pending + machineId 清空（认领原子位复位，归属机回来
  * 经 claim 循环重领——#1259 起机器可见性由 agent 归属机闸单源判定）；claimedAt/
  * lastHeartbeatAt 保留作死亡时刻审计（重领即覆写）；createdAt 不动（FIFO
@@ -1416,6 +1438,14 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  * 注记）。
  * 幂等：只扫 pending/claimed，终态步天然跳过。 */
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
+  const closedLeftovers = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .innerJoin(build, eq(step.buildId, build.id))
+    .innerJoin(todo, eq(build.todoId, todo.id))
+    .where(and(eq(todo.phase, 'closed'), inArray(step.status, ['pending', 'waiting_quota'])))
+    .all();
+  for (const { id } of closedLeftovers) stopStepKeepPhase(deps, id);
   const candidates = deps.db
     .select()
     .from(step)
@@ -1442,7 +1472,8 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
       const progressed =
         row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
       if (machineRow === undefined || !machineRow.online || !progressed) {
-        releaseClaimedStep(deps, row, todoRow);
+        if (todoRow.phase === 'closed') stopStepKeepPhase(deps, row.id);
+        else releaseClaimedStep(deps, row, todoRow);
       }
     }
   }
