@@ -12,7 +12,7 @@
 //      refs/heads/<conv>，不碰用户工作树）；用户 HEAD 与脏文件内容原样
 //   4. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
 //      clone/fetch/push 全程 token 不出现在 argv；对照 env 面
-//      GIT_CONFIG_VALUE_1 携带 token（凭证确实经 env credential.helper 注入）
+//      GIT_CONFIG_VALUE_* 携带 token（凭证确实经 env credential.helper 注入）
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -205,7 +205,8 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
       [
         '#!/bin/sh',
         `{ printf '%s ' "$@"; printf '\\n'; } >> "${argvLog}"`,
-        `printenv GIT_CONFIG_VALUE_1 >> "${envLog}" 2>/dev/null || true`,
+        // 全部 VALUE 位都记：父环境自带 GIT_CONFIG_* 时 helper 不在 1 号（#1460）。
+        `env | grep '^GIT_CONFIG_VALUE_' >> "${envLog}" || true`,
         `exec "${realGit}" "$@"`,
       ].join('\n'),
     );
@@ -250,7 +251,7 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     expect(argv).not.toContain('x-access-token');
     expect(argv).not.toContain('credential.helper');
     // 正对照：token 确实经 GIT_CONFIG_* env 注入（否则「argv 无 token」空转）
-    // ——VALUE_1 = 内联 credential.helper 函数体（git.ts gitCredentialEnv）。
+    // ——某个 VALUE 位 = 内联 credential.helper 函数体（git.ts gitCredentialEnv）。
     const envDump = readFileSync(envLog, 'utf8');
     expect(envDump).toContain(PROBE_TOKEN);
     expect(envDump).toContain('echo username=x-access-token');
