@@ -7,10 +7,9 @@ Environment: cloud session image, Chromium 141.0.7390.37, fixture build (`vite b
 | `axe-before.txt` | the gate on the code before the fixes (19 pages x 2 themes): 4 failed, 34 passed. `color-contrast` on `.composer-placeholder` (detail confirm, light) and `.composer-placeholder` + `.diff-hunk-head` (detail review, light); `button-name` (critical) on the agent detail selects, both themes |
 | `axe-after.txt` | the same 38 tests after the fixes: 38 passed |
 | `axe-after-x4.txt` | the same, `--repeat-each=4`: 152 passed |
-| `tool-pill-before.txt` | the `detail tool calls` page added after code review, with the tool pill put back to `ink-3`: light fails `color-contrast` on `.chat-tool-pill > .truncate`, dark passes |
-| `machine-detail-before.txt` | the `machine detail` page added after simplify review, with the evacuate select's `aria-label` removed: `button-name` (critical), 2 failed |
-| `final-x3.txt` | the final gate (22 pages x 2 themes, parallel mode) with `agent-detail`, `hotkeys`, `registry-focus-ring` and `segmented-controls` (the specs sharing the changed helpers), `--repeat-each=3`: 423 passed |
-| `e2e-affected-full.txt` | `pnpm e2e:affected` on the final tree, run on main `94fdb4c` plus this PR's two commits (full-suite fallback: `package.json` and the lockfile changed): 1159 passed, 0 failed |
+| `review-pages-before.txt` | the two pages added during review, on the final spec, with their fixes undone (tool pill back on `ink-3`, evacuate select without `aria-label`): `detail tool calls` light fails `color-contrast` on `.chat-tool-pill > .truncate` (dark passes); `machine detail` fails `button-name` (critical) in both themes. 3 failed, 1 passed |
+| `final-x3.txt` | the final gate (22 pages x 2 themes, parallel mode) with the specs sharing the changed helpers or pages (`agent-detail`, `hotkeys`, `registry-focus-ring`, `segmented-controls`, `machine-detail`, `accent-typo`, `dialog-ring-room`), `--repeat-each=3`: 501 passed |
+| `e2e-affected-full.txt` | `pnpm e2e:affected` before the second code-review round, run on main `94fdb4c` plus this PR's first two commits (full-suite fallback: `package.json` and the lockfile changed): 1159 passed, 0 failed. The round after it narrowed the change (`settleTransitions` back to main's body); `final-x3.txt` covers the touched specs |
 
 Contrast, WCAG 2.x relative luminance from the token values in `src/styles/shadcn.css`:
 

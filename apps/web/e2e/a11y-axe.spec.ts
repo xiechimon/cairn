@@ -85,7 +85,7 @@ const PAGES: AuditPage[] = [
   {
     name: 'machine detail',
     url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
-    ready: (p) => p.locator('.machine-evacuate-select'),
+    ready: (p) => p.getByTestId('team-agent-grid'),
   },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {
@@ -107,12 +107,14 @@ for (const theme of ['light', 'dark'] as const) {
   for (const p of PAGES) {
     test(`axe: ${p.name} (${theme})`, async ({ page }) => {
       await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      // Reduced motion ends the dialog fade/zoom keyframes at once (motion.css),
+      // so color-contrast reads final colours; settleTransitions below covers
+      // the transitions it leaves alone.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.goto(p.url);
       if (p.open) await p.open(page);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expect(p.ready(page)).toBeVisible();
-      // Dialog fade/zoom and transitions finish first, or color-contrast
-      // reads half-faded colours.
       await settleTransitions(page);
       const { violations } = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

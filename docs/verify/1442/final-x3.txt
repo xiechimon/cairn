@@ -1,6 +1,6 @@
-# a11y-axe (22 pages x 2 themes), agent-detail, hotkeys, registry-focus-ring, segmented-controls; --repeat-each=3, 2 workers
+# a11y-axe (22 pages x 2 themes) with agent-detail, hotkeys, registry-focus-ring, segmented-controls, machine-detail, accent-typo, dialog-ring-room; --repeat-each=3, 2 workers
 
 
-Running 423 tests using 2 workers
+Running 501 tests using 2 workers
 
-  423 passed (3.5m)
+  501 passed (3.9m)

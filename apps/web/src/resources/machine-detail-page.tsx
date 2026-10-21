@@ -174,7 +174,7 @@ export function MachineDetailPage() {
           >
             <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
               <SelectTrigger
-                aria-label={t('整机迁移')}
+                aria-label={t('迁移到')}
                 className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}
               >
                 <SelectValue>
