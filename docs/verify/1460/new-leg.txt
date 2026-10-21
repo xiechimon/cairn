@@ -1,0 +1,74 @@
+## new leg: this branch. Container: uid 0, GIT_CONFIG_COUNT=3 inherited
+## (cd apps/daemon && pnpm exec vitest run --reporter=verbose test/git.test.ts test/workspace-hooks.test.ts test/workspace.test.ts)
+
+ RUN  v5.0.1 /home/user/pacman/apps/daemon
+
+ ✓ test/git.test.ts > gitCredentialEnv — per-step 凭证 env 注入（02 §8 不落盘） > 前置空值 credential.helper 重置系统/全局 helper 列表 2ms
+ ✓ test/git.test.ts > gitCredentialEnv — per-step 凭证 env 注入（02 §8 不落盘） > 空值重置使内联凭证压过全局 helper（真 git credential fill） 8ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 1：父环境 3 条原样保留，重置与 helper 落在 3、4，COUNT=5 7ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1 1ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 非数字 → 退回从 0 写（COUNT=2） 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 负数 → 退回从 0 写（COUNT=2） 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 尾随字符 → 退回从 0 写（COUNT=2） 7ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 缺 KEY → 退回从 0 写（COUNT=2） 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2） 1ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置 10ms
+ ✓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效 17ms
+ ✓ test/git.test.ts > machineGitEnv — 执行机本机凭据 env（#1225 兜底路） > 只设 TTY 守卫：不重置 credential.helper、不碰代理变量（票失败方式 3/4） 1ms
+ ✓ test/git.test.ts > machineGitEnv — 执行机本机凭据 env（#1225 兜底路） > machine 路下全局 helper 正常应答（真 git credential fill，与重置测试互为反面） 7ms
+ ✓ test/git.test.ts > isGitAuthFailure — 认证失败判定（降级触发器） > 认证失败原文 → true（mea 实测原文 / 无凭据 / 401 族） 1ms
+ ✓ test/git.test.ts > isGitAuthFailure — 认证失败判定（降级触发器） > 非认证失败 → false（不降级：网络/5xx/404/403/冲突/超时） 1ms
+ ✓ test/git.test.ts > withGitNetRetries — auth 失败确定性短路（#1225：401 重试不翻红） > auth 失败不烧重试预算（单次即抛） 3ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 1：钩子文件缺失 → null（静默跳过，零进程零日志） 4ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 2：exit 0 → ok note，stdout 捕获 10ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 3：exit 1 → 抛 WorkspaceHookError，message 带 exit code 与 stderr 尾 5ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 4：超时 → 杀整组进程（挂起孙进程全灭）+ timeout 形错误 204ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 5：非可执行文件 → 清晰错误（不静默跳过） 1ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 5b：.agents/setup 是目录 → 清晰错误 0ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 6：输出超限截断（内存闸） 6ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入 8ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 7b：父环境自带 GIT_CONFIG_* → 凭证条目接在其后，父环境的键在钩子里仍生效（#1460） 7ms
+ ✓ test/workspace-hooks.test.ts > workspace hook 原语（#1149） > resume 名字同样可跑（原语与名字无关） 5ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 pacman/conv-* 209ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 同项目第二 conv：基座 fetch 复用（不重 clone）；同 conv 再来 = Worktree reused 292ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > base 二择：origin/<convBranch> 已 fetch 时优先（异机续跑面） 363ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > commitAll + push：每步结束自动 push 本 conversation 工作分支；干净树 = committed false 373ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > #958 闸 5：带简报标记的文件被剔出提交，无标记的同名文件照常提交 326ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > #958 闸 4：分支历史里带标记时 briefMarkerInRef 点名，干净分支为空 317ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > checkpoint 恢复：reset --hard + clean -fd → Worktree restored（r3 §1.4/§3.5） 231ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > merge --no-edit 两态：Already up to date / 真合并（main 前进时） 357ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 防分叉护栏：origin/<branch> 领先且 worktree 不在该分支 → remote branch diverged 436ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > 孤儿回收：龄超 TTL(7×24h) 的 conv worktree 清理三步；活步/新目录不动 290ms
+ ✓ test/workspace.test.ts > worktree 契约（02 §5.5 / r3 §1.4） > projectLock：同项目并发 prepare 串行化（clone 竞态护栏） 244ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 事故形：自建分支留有窗口内新提交、HEAD 已切回 → 扫出该分支 319ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 窗口外分支不中：tip 提交早于 sinceMs（用户既有分支不误认） 304ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > base 之外无提交的分支不中（同 tip 空分支） 203ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > 邻座 conv 分支照实上报（排除是 runner 侧策略，原语不做归属裁决） 305ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > base 不可解析 → 空集（fail-open，不抛错不阻断收尾） 202ms
+ ✓ test/workspace.test.ts > #1195 branchesWithNewCommits（步窗口分支扫描原语） > WorkspaceManager 透传同语义（WorktreeOps 缝消费面） 342ms
+ ✓ test/git.test.ts > withGitNetRetries — auth 失败确定性短路（#1225：401 重试不翻红） > 网络失败照旧重试（既有语义不变） 6004ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > fresh 检出 → .agents/setup 跑，hooks 槽带 ok note（含 stdout） 334ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > integration 成功 → 单次调用，来源 integration（集成有效时行为不变） 0ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > integration auth 失败 → machine 兜底成功，来源 machine，onFallback 收 git 原文 0ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > 两路都 auth 失败 → 合并错误点名两路（票失败方式 1：不许静默） 1ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > 非 auth 失败 → 原错误直抛，不降级（网络抖动不吃凭据序） 0ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > allowMachineFallback=false（hosted）→ auth 失败也不降级，单次调用（票失败方式 3） 0ms
+ ✓ test/git.test.ts > withGitCredentialFallback — 凭据序 integration 先行、machine 兜底（#1225） > cred null（无 per-step token）→ 直接 machine 路，单次调用 0ms
+ ✓ test/git.test.ts > runGit — 信号终止不当作成功（#1329） > runGit 保留 null 退出码（信号终止），不映射为 0 203ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 无钩子仓：hooks 缺省 []，零钩子日志行（行为与现状一致） 191ms
+ ✓ test/git.test.ts > runGit — 信号终止不当作成功（#1329） > runGitOk 对信号终止抛错，错误文案点名信号 205ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > reused → .agents/resume 跑（setup 不重跑）；失败/超时非致命，步继续 364ms
+ ✓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 跟踪文件恢复到目标提交 135ms
+ ✓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > sha256 对象 id 同样恢复 159ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > setup 失败 → prepare 抛错（步失败面）；worktree 回滚 → 重试重新走 fresh→setup 355ms
+ ✓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 选项形 revision 不改工作区 115ms
+ ✓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 不存在的 revision 不改工作区 125ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 陈旧重建（worktree 目录被手工删）→ 仍走 fresh → setup 重跑 380ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 钩子消费步级凭据：credentials 非空 → GIT_CONFIG_COUNT=2 进钩子 env 320ms
+ ✓ test/workspace.test.ts > #1149 环境生命周期钩子（prepare 两挂点） > 钩子超时 → setup 面致命（步失败），resume 面非致命 633ms
+
+ Test Files  3 passed (3)
+      Tests  63 passed (63)
+   Start at  12:50:59
+   Duration  8.64s (tests 93%, transform 5%, import 2%)
+
