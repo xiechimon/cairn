@@ -30,6 +30,9 @@ export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
     seqNum: record.seqNum,
     spec: record.spec,
     failed: record.phase === 'failed',
+    // #1406：GitHub issue 导入任务的 spec 进 issue 原文围栏（ADR 0021 D5）。
+    sourceKind: record.sourceKind,
+    sourceRef: record.sourceRef,
   });
   const result = sendChiefMessage(deps, record.teamId, {
     threadId: null,
