@@ -7,21 +7,22 @@
 //    匿名 60/h 的 IP 预算归 ci-loop 与 #931，importGithubIssue 本就要 token）。
 // 2. 关闭对账：本队轮询器领的 github-issue 卡（createdBy = 本队 chief 绑定的
 //    Agent id，导入时写入；手工导入与 webhook 导入是 seed 用户，不碰；chief
-//    没绑 Agent = 本队本轮不对账、不清「见过 open」，记一行），相位不在
-//    done / closed / review、且没有哪个 build 交付过 PR 的，逐张条件读 issue
-//    state。只认本进程亲眼看到的 open → closed：导入时、或某次读到 open，记为
-//    「见过 open」；之后读到 closed，且最新一条 closed 事件的 actor 在仓库上
-//    是 triage 及以上（与打标人同一判据、同一缓存），才 transitionTodos(closed)
-//    ——chief / MCP close_todos 的关闭路径（#1445：写相位后停活动步）。首见即
-//    closed 的卡（例：重启后才读到）永不被对账关闭；关过一次即忘掉「见过
-//    open」，有人把卡重开就不再关。外部作者关自己的 issue、任一读失败 = 本轮
-//    不关。review 卡与 build 交付过 PR 的卡（building 磨绿中 / failed / 重跑
-//    中）留给 PR 对账：合并带关闭引用关掉 issue 时，那张卡不以 closed 收尾。
-//    写前重读相位与 PR，变了就不动。
+//    没绑 Agent = 本队本轮不对账、不清「见过 open」，有可能是轮询器领的卡时
+//    记一行），相位不在 done / closed / review、且没有哪个 build 交付过 PR
+//    的，逐张条件读 issue state。只认本进程亲眼看到的 open → closed：导入
+//    时、或某次读到 open，记为「见过 open」；之后读到 closed，且最新一条
+//    closed 事件的 actor 在仓库上是 triage 及以上（与打标人同一判据、同一
+//    缓存），才 transitionTodos(closed)——chief / MCP close_todos 的关闭路径
+//    （#1445：写相位后停活动步）。首见即 closed 的卡（例：重启后才读到）永不
+//    被对账关闭；关过一次即忘掉「见过 open」，有人把卡重开就不再关。外部
+//    作者关自己的 issue、任一读失败 = 本轮不关。review 卡与 build 交付过 PR
+//    的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：合并带关闭引用关掉
+//    issue 时，那张卡不以 closed 收尾。写前重读相位与 PR，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
 //    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已开始
-//    编排（编排线程里有 chief 步）= 有人接手，不再试）。
+//    编排（编排线程里有 chief 步）= 有人接手，chief 换绑了别的 Agent = 卡已出
+//    关闭对账范围，都不再试）。
 // 4. 每个 github 项目（githubRepo 形好；同队同仓只取 id 最小的一个）：在飞
 //    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表；按 Link
 //    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
@@ -73,7 +74,7 @@ import {
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { chiefBoundAgentId, chiefOrchestrateAgentId } from './chief.js';
+import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { openGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
@@ -488,14 +489,16 @@ export function createIssueIntake(
   }
 
   /** 重试本队导入后编排失败的卡。卡没了、离开了 todo、或导入后已开始编排
-   * = 有人接手，不再试（记一行带原因）。读库失败只跳过这张卡，不计次。 */
-  function retryOrchestration(teamId: string, tally: IssueIntakeTally): void {
+   * = 有人接手；chief 换绑了别的 Agent（卡的 createdBy 不是现在的 Agent）=
+   * 卡已出关闭对账范围，issue 被关也没人收尾——都不再试（记一行带原因）。
+   * 读库失败只跳过这张卡，不计次。 */
+  function retryOrchestration(teamId: string, agentId: string, tally: IssueIntakeTally): void {
     for (const [todoId, entry] of orchestrateRetries) {
       if (entry.teamId !== teamId) continue;
-      let dropped: 'todo-gone' | 'left-todo' | 'thread-exists' | null;
+      let dropped: 'todo-gone' | 'left-todo' | 'chief-rebound' | 'thread-exists' | null;
       try {
         const row = deps.db
-          .select({ phase: todo.phase, seqNum: todo.seqNum })
+          .select({ phase: todo.phase, seqNum: todo.seqNum, createdBy: todo.createdBy })
           .from(todo)
           .where(eq(todo.id, todoId))
           .get();
@@ -504,9 +507,11 @@ export function createIssueIntake(
             ? 'todo-gone'
             : row.phase !== 'todo'
               ? 'left-todo'
-              : startedSince(teamId, row.seqNum, entry.importedAt)
-                ? 'thread-exists'
-                : null;
+              : row.createdBy !== agentId
+                ? 'chief-rebound'
+                : startedSince(teamId, row.seqNum, entry.importedAt)
+                  ? 'thread-exists'
+                  : null;
       } catch (err) {
         tally.errors += 1;
         log({ todoId, err: errText(err) }, 'issue intake orchestrate retry failed');
@@ -784,7 +789,7 @@ export function createIssueIntake(
     // 关闭对账只碰轮询器领的卡：createdBy = 本队 chief 绑定的 Agent id（导入
     // 时写入；手工导入与 webhook 导入是 seed 用户）。认卡只看库里的列，重启后
     // 照样认得；chief 换绑 Agent 后，换绑前领的卡不再对账。
-    const agentId = chiefBoundAgentId(deps, teamId);
+    const agentId = chiefBinding(deps, teamId).agentId;
     if (agentId === null) {
       // chief 没绑 Agent：本轮不对账，也不调 reconcileClosed——它的修剪会忘掉
       // 「见过 open」，换回同一 Agent 后，期间被关的就关不上了。只在本队有
@@ -797,14 +802,16 @@ export function createIssueIntake(
       await reconcileClosed(teamId, got.token, taken, now, tally);
     }
     if (projects.length === 0) return;
-    // 导入卡的 createdBy = chief 绑定的 Agent（能编排才导入）。
-    const createdBy = chiefOrchestrateAgentId(deps, teamId);
+    // 导入卡的 createdBy = chief 绑定的 Agent（能编排才导入）。对账的 await
+    // 之后重读：读窗口里换绑了，新卡记新的 Agent。
+    const binding = chiefBinding(deps, teamId);
+    const createdBy = binding.canOrchestrate ? binding.agentId : null;
     if (createdBy === null) {
       tally.skipped += projects.length;
       log({ teamId, reason: 'chief-not-bound' }, 'issue intake team skipped');
       return;
     }
-    retryOrchestration(teamId, tally);
+    retryOrchestration(teamId, createdBy, tally);
     const seenRepos = new Set<string>();
     for (const row of projects) {
       const githubRepo = row.githubRepo ?? '';

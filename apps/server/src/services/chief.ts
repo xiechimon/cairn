@@ -377,26 +377,27 @@ function chiefRowOf(deps: ChiefDeps, teamId: string): ChiefRow | undefined {
     .get();
 }
 
-/** #1406 编排前置的只读探测（不建 chief 行）：与 sendChiefMessage 的
- * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型——成立时
- * 回绑定的 Agent id，否则 null。issue 轮询器在导入前问它，不建出
- * orchestrateTodo 会 409 的卡，并把这个 id 写成导入卡的 createdBy。 */
-export function chiefOrchestrateAgentId(deps: ChiefDeps, teamId: string): string | null {
+/** #1406 团队 chief 的绑定状态（只读探测，不建 chief 行）。agentId = 绑定
+ * 的 Agent id（没有 chief 行或未绑 = null，不看模型）；canOrchestrate = 与
+ * sendChiefMessage 的 requireBoundAgent 同一判据（绑了、Agent 有模型）。issue
+ * 轮询器导入前问 canOrchestrate（不建出 orchestrateTodo 会 409 的卡），把
+ * agentId 写成导入卡的 createdBy（chief 自建卡同一律），关闭对账按 agentId
+ * 认自己领的卡。 */
+export function chiefBinding(
+  deps: ChiefDeps,
+  teamId: string,
+): { agentId: string | null; canOrchestrate: boolean } {
   const row = chiefRowOf(deps, teamId);
-  if (row === undefined) return null;
+  if (row === undefined || row.agentId === null) return { agentId: null, canOrchestrate: false };
   try {
-    return requireBoundAgent(deps, row).id;
+    requireBoundAgent(deps, row);
+    return { agentId: row.agentId, canOrchestrate: true };
   } catch (err) {
-    if (err instanceof HttpError && err.status === 409) return null;
+    if (err instanceof HttpError && err.status === 409) {
+      return { agentId: row.agentId, canOrchestrate: false };
+    }
     throw err;
   }
-}
-
-/** #1406 团队 chief 绑定的 Agent id（只读，不建 chief 行；没有 chief 行或
- * 未绑 = null；不看模型）。issue 轮询器的关闭对账按它认自己领的卡（导入卡
- * 的 createdBy 即绑定 Agent id，chief 自建卡同一律）。 */
-export function chiefBoundAgentId(deps: ChiefDeps, teamId: string): string | null {
-  return chiefRowOf(deps, teamId)?.agentId ?? null;
 }
 
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =
