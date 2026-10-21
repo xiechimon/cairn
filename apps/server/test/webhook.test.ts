@@ -32,6 +32,9 @@
 // W #1459 打标人按 D5 核 + 计入在飞上限（清单 docs/verify/1459/failure-modes.txt，
 //   W 编号对位）：sender 在仓库上 triage 及以上才导入，权限读与缓存复用 #1406
 //   轮询器的；读不到 / 没 token / 到上限 = 不导入、记日志、202 带原因。
+//   W4b（合入 #1406 round 4 后）：permission 读遇限流（429 / 带限流信号的
+//   403）在 lib 里抛 GithubRateLimitedError；webhook 照读不到处理：202 ignored，
+//   原因码 rate-limited（日志带 status 与重置时刻），不缓存，限流过后照判。
 // 出站纪律：githubFetch 注入 mock，测试面零真实出站。
 
 import { readFileSync } from 'node:fs';
@@ -135,10 +138,16 @@ function post(
   );
 }
 
-type MockRoute = { status?: number; body: unknown; throws?: boolean };
+type MockRoute = {
+  status?: number;
+  body: unknown;
+  throws?: boolean;
+  headers?: Record<string, string>;
+};
 
 /** ghMock：按 pathname 分发（github-issues.test.ts 同族，此处收窄为静态路由；
- * routes 按引用持有，用例可在 boot 之后增改。throws = 网络失败 / 超时）。 */
+ * routes 按引用持有，用例可在 boot 之后增改。throws = 网络失败 / 超时；
+ * headers = 应答头（键小写）。 */
 function ghMock(routes: Record<string, MockRoute>): {
   impl: FetchLike;
   calls: string[];
@@ -153,7 +162,7 @@ function ghMock(routes: Record<string, MockRoute>): {
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: { get: () => null },
+      headers: { get: (name: string) => route?.headers?.[name.toLowerCase()] ?? null },
       json: async () => route?.body ?? {},
       text: async () => JSON.stringify(route?.body ?? {}),
     };
@@ -798,7 +807,6 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
 
   test.each([
     ['403', { status: 403, body: { message: 'Forbidden' } }],
-    ['429', { status: 429, body: { message: 'API rate limit exceeded' } }],
     ['500', { status: 500, body: {} }],
     ['502', { status: 502, body: {} }],
     ['network error / timeout', { body: null, throws: true }],
@@ -823,6 +831,77 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       expect(permissionReads()).toHaveLength(2);
       expect(issueReads()).toHaveLength(0);
       expect(issueTasks()).toHaveLength(0);
+    },
+  );
+
+  const RESET_AT = new Date(1_800_000_600_000).toISOString();
+  test.each([
+    ['429 without headers', { status: 429, body: { message: 'API rate limit exceeded' } }, null],
+    [
+      '429 with retry-after 60',
+      {
+        status: 429,
+        headers: { 'retry-after': '60' },
+        body: { message: 'API rate limit exceeded' },
+      },
+      'retry-after',
+    ],
+    [
+      '403 with x-ratelimit-remaining 0 and x-ratelimit-reset',
+      {
+        status: 403,
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000600' },
+        body: { message: 'API rate limit exceeded for user ID 1.' },
+      },
+      RESET_AT,
+    ],
+    [
+      '403 secondary limit, message only',
+      {
+        status: 403,
+        body: {
+          message:
+            'You have exceeded a secondary rate limit. Please wait a few minutes before you try again.',
+        },
+      },
+      null,
+    ],
+  ] satisfies Array<[string, MockRoute, string | null]>)(
+    'W4b permission 读遇限流（%s）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判',
+    async (_case, route, reset) => {
+      routes[permissionPath(SENDER)] = route;
+      const http = await deliverHttp(labeledPayload(), 'w4b-http');
+      expect(http.status).toBe(202);
+      expect(http.body.result).toBe('ignored');
+      expect(http.body.deliveryId).toBe('w4b-http');
+      const prefix = `github rate limited reading the permission of ${SENDER} on ${REPO}`;
+      if (reset === null) expect(http.body.detail).toBe(prefix);
+      else if (reset === 'retry-after') {
+        expect(http.body.detail).toMatch(
+          new RegExp(`^${prefix} \\(resets at \\d{4}-\\d\\d-\\d\\dT[^)]+Z\\)$`),
+        );
+      } else expect(http.body.detail).toBe(`${prefix} (resets at ${reset})`);
+      const direct = await deliverDirect(labeledPayload(), 'w4b-direct');
+      expect(direct.response.result).toBe('ignored');
+      expect(refusals(direct.lines)).toEqual([
+        expect.objectContaining({
+          deliveryId: 'w4b-direct',
+          sender: SENDER,
+          reason: 'rate-limited',
+          status: route.status,
+          resetAt: reset === null ? null : reset === 'retry-after' ? expect.any(String) : reset,
+        }),
+      ]);
+      // 限流不进缓存：第二次投递重读；没读 issue、没建卡。
+      expect(permissionReads()).toHaveLength(2);
+      expect(issueReads()).toHaveLength(0);
+      expect(issueTasks()).toHaveLength(0);
+      // 限流过后（新投递）照判：读到 admin → 导入。
+      routes[permissionPath(SENDER)] = { body: permissionBody(SENDER, 'admin', 'admin') };
+      const after = await deliverHttp(labeledPayload(), 'w4b-after');
+      expect(after.body.result).toBe('created');
+      expect(permissionReads()).toHaveLength(3);
+      expect(issueTasks()).toHaveLength(1);
     },
   );
 
