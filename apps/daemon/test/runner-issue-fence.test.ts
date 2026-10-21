@@ -116,6 +116,11 @@ async function deliver(step: ClaimedStep): Promise<{
   return { prompt: opts.prompt ?? '', systemPrompt: opts.systemPrompt ?? '', home };
 }
 
+/** 真收尾行之后的部分。正文里那行伪造的收尾行带 `> ` 前缀，按行首匹配跳过它。 */
+function afterFence(text: string): string {
+  return text.slice(text.indexOf(`\n${FOOT}`) + 1 + FOOT.length);
+}
+
 function expectFenced(text: string): void {
   const lines = text.split('\n');
   expect(lines[0]?.startsWith(HEAD)).toBe(true);
@@ -140,7 +145,7 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
   test('首轮 plan 步：围栏在前，plan.md 契约与交接位置注记在围栏之外', async () => {
     const { prompt, home } = await deliver(claimed({ kind: 'plan', source: GH }));
     expectFenced(prompt);
-    const after = prompt.slice(prompt.indexOf(FOOT) + FOOT.length);
+    const after = afterFence(prompt);
     expect(after).toBe(
       appendPlanLocationNote(
         `\n\n${buildPlanFirstRoundInstruction()}`,
@@ -153,7 +158,7 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
     const instruction = buildRestartPrompt('补上单测');
     const { prompt } = await deliver(claimed({ kind: 'build', source: GH, instruction }));
     expectFenced(prompt);
-    expect(prompt.slice(prompt.indexOf(FOOT) + FOOT.length)).toBe(`\n\n${instruction}`);
+    expect(afterFence(prompt)).toBe(`\n\n${instruction}`);
   });
 });
 

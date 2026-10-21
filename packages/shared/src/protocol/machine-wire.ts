@@ -171,6 +171,13 @@ export const claimedStepSchema = z.object({
           vocab: z.array(z.object({ name: z.string() })),
         })
         .optional(),
+      /** #1406 任务来源两列（todo 记录同名列的投影）：sourceKind='github-issue'
+       * 时 daemon 把任务文本包进 GitHub issue 原文围栏（ADR 0021 D5），且不在
+       * systemPrompt 里写标题。种类用宽 string 而非枚举：server 新增来源种类时，
+       * 旧 daemon 不因枚举失配拒掉整条 claim。缺省 = 旧 server 形（无围栏，
+       * 现行为）；旧 daemon 按 zod strip 忽略。 */
+      sourceKind: z.string().nullable().optional(),
+      sourceRef: z.string().nullable().optional(),
     })
     .optional(),
   /** worker 步项目面；chief 步 = 探索基座（可缺省 = 裸目录回合）。 */
