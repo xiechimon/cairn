@@ -1,36 +1,30 @@
 // 合并就绪闸 S1（#1404）：ADR 0021 D4 路径判定。
 // 与 .claude/workflows/pr-gate.js 同一套口径：默认拒绝（只有产品源码、测试与
-// docs/verify 可不经人），其中再排除保护类别；按类、任意层级、不分大小写。
-// 失败方式先行：改名把保护文件移出保护路径、大小写变体、嵌套的 scripts/ 与
-// 配置、靠改名删测试、往别的票的证据目录写、证据目录里夹带可执行文件。
-// pr-gate 第一轮（#1420）补的：名字里带换行或空格时 `.` 跨不过去，保护 glob
-// 落空而集内 glob 命中；测试在测试目录里改名成不被收集的名字；证据目录前缀
-// 换大小写绕开别票 / 可执行检查；票号是另一票号的前缀。
-// 第三轮（ADR 0021 D4 修订）补的：证据目录之外的二进制文件留人。compare 对
-// 二进制不给 patch，纯改名也不给，分不出来，一并留人（严的一侧）。
-// 第四轮补的：删测试的目录与后缀不分大小写（ADR 0021 D4）；另把已有行为钉住：
-// 每种可执行扩展名、别票证据的改名原名、嵌套的 biome.json / .gitattributes、
-// daemon 的闸源码、e2e/ tests/ __tests__/ 目录。
-// 第五轮：CompareFile 的 hasPatch 换成 patchSha（ADR 0021 D3 修订），没有 patch 即
-// patchSha 为 null。另钉住：名字里只多一个空格就算保护（SAFE_PATH 放宽到空格时
-// 要红）；gateSource 不收普通的保护路径。
-// 第六轮（#1420 pr-gate 第四轮）补的：opaque 的证据豁免与摘要同一条，前缀大小写
-// 敏感（Docs/Verify/ 在 GitHub 的树里不是证据目录，其中没有 patch 的条目改判
-// opaque；别票与可执行两项仍不分大小写，那是严的一侧）；保护 glob 末尾的 /**
-// 也认同名的目录项本身（pr-gate.js 第 11 轮的 dirAlone：指向别处的符号链接
-// .claude、scripts），可自动合并集不认；不分大小写按 Unicode 折叠（ſ 与 s、
-// K 与 k）。另钉住：复制条目的原名也判类，删 .test.mts 与仓根 test/ 下的文件
-// 算删测试。
-// 第七轮（#1410 pr-gate 第 11 轮：可自动合并集盖住了 AGENTS.md 要 /security-review
-// 的文件与跑迁移的 DB 引导）补的：保护类别 ⑤，锚定的原路径清单，与 pr-gate.js
-// PROTECTED 同一份。大小写折叠按方向分（与 #1410 第 12b 轮的 pr-gate.js 一致）：放行
-// 的一侧（可自动合并集）只折 ASCII，ſrc 不算 src、落在集外；收紧的一侧（保护类别、
-// 闸源码、测试目录与后缀、判别票与可执行用的证据前缀与扩展名）按 Unicode 折叠。
-// globToRegExp 的 dirAlone 随之改名 protect（同时带 iu 与目录项本身）。
-// 第八轮（#1410 已进 main）补的：读仓里的 .claude/workflows/pr-gate.js，它的 AUTO_MERGE
-// 与 PROTECTED 两个数组须与词表逐项同序（PROTECTED 对 PROTECTED_PATH_GLOBS 加
-// MERGE_GATE_SOURCE_GLOBS），两份清单漂移即红；可执行扩展名补 shell、PowerShell、
-// Windows 批处理与 HTML 四族。
+// docs/verify 可不经人），其中再排除保护类别；按类、任意层级。大小写折叠按方向分
+// （与 pr-gate.js 一致）：放行的一侧（可自动合并集）只折 ASCII，ſrc 不算 src、落在
+// 集外；收紧的一侧（保护类别、闸源码、测试目录与后缀、判别票与可执行用的证据前缀与
+// 扩展名）按 Unicode 折叠（ſ 与 s、K 与 k）。globToRegExp 的 protect 同时带 iu 与
+// 末尾 /** 的目录项本身。没有 patch 的条目 patchSha 为 null。
+// 失败方式先行：
+// - 保护：改名把保护文件移出保护路径（复制条目的原名也判类）、大小写变体、嵌套的
+//   scripts/ 与配置（biome.json、.gitattributes）、daemon 的闸源码；名字里带换行或
+//   空格时 `.` 跨不过去，保护 glob 落空而集内 glob 命中（名字里只多一个空格也算保护）；
+//   保护 glob 末尾的 /** 不认同名的目录项本身（指向别处的符号链接 .claude、scripts），
+//   可自动合并集却认了；gateSource 收了普通的保护路径；保护类别 ⑤（AGENTS.md 要
+//   /security-review 的文件与跑迁移的 DB 引导）漏判，它是锚定的原路径清单，与
+//   pr-gate.js 的 PROTECTED 同一份。
+// - 删测试：靠改名删测试（在测试目录里改名成不被收集的名字）；删测试的目录与后缀分
+//   大小写；漏掉 e2e/ tests/ __tests__/ 目录、.test.mts 与仓根 test/ 下的文件。
+// - 证据目录：往别的票的证据目录写（含改名的原名）；证据目录前缀换大小写绕开别票 /
+//   可执行检查；票号是另一票号的前缀；证据目录里夹带可执行文件（每种可执行扩展名，含
+//   shell、PowerShell、Windows 批处理与 HTML 四族）。
+// - 看不到 diff 的条目：证据目录之外的二进制、diff 过大与纯改名（compare 都不给
+//   patch，分不出来，一并留人，严的一侧）被放过。opaque 的证据豁免与摘要同一条
+//   （isEvidencePath），前缀大小写敏感：Docs/Verify/ 在 GitHub 的树里不是证据目录，
+//   其中没有 patch 的条目列进 opaque。
+// - 漂移：仓里 .claude/workflows/pr-gate.js 的 AUTO_MERGE 与 PROTECTED 两个数组须与
+//   词表逐项同序（PROTECTED 对 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS），两份
+//   清单漂移即红。
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -563,8 +557,8 @@ describe('证据目录', () => {
 });
 
 describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名）', () => {
-  // 第六轮翻转：Docs/Verify/1404/b.png 原先按证据豁免，现在列进 opaque（与摘要的
-  // isEvidencePath 同一条；#1421 S2 要的）。
+  // Docs/Verify/1404/b.png 不在证据目录里（前缀大小写敏感，与摘要的 isEvidencePath
+  // 同一条），没有 patch 即列进 opaque。
   test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条）', () => {
     const r = classify([
       f('apps/web/public/logo.png', { status: 'added', additions: 0, patchSha: null }),
@@ -612,7 +606,7 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
   });
 });
 
-describe('可执行扩展名的新四族（第八轮）', () => {
+describe('可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族', () => {
   const families: [string, string[]][] = [
     ['shell', ['.bash', '.zsh', '.fish']],
     ['PowerShell', ['.ps1', '.psm1']],

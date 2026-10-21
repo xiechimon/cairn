@@ -1,21 +1,20 @@
 // 合并就绪闸 S1（#1404）：补丁摘要 patchDigest（ADR 0021 D3）。
-// 失败方式先行：顺序 / 区域设置让同一补丁算出两个摘要；改名移进 docs/verify/
-// 把代码删除藏起来；文件名含制表符或换行时元组撞车；空 blob sha 被当成
-// 字符串 'null' 哈希；compare 截到 300 个文件仍被当成完整列表。
-// 第三轮（ADR 0021 D4 修订）补的：800 行 / 40 文件按整张补丁算，证据也计入，
-// 改名记两个文件；compare 不给 patch 的条目要能认出来（二进制）；增删行数为负
-// 的响应按形状不对处理。
-// 第四轮补的：改名或复制条目缺 previous_filename 按形状不对处理（不然原名不进
-// 路径判定）；固定码元排序（换成 localeCompare 摘要就变）。
-// 第五轮（ADR 0021 D3 在 #1410 的修订）补的：元组第五位 patchSha。只绑 head 上
-// 的 blob 不够：合入 main 解冲突保留本 PR 的版本，blob 不变，补丁却从「A 改 B」
-// 变成「C 改回 B」；没有 patch 时 patchSha 为 null，不是空串的哈希。另钉住：
-// compare 给的条目比 changed_files 多也算对不上；status 不在取值表里、filename
-// 不是字符串都按形状不对处理。
-// 第六轮（#1420 pr-gate 第四轮）补的：码元序与码点序分得开的一组（补充平面的
-// emoji 挨着 U+E000–U+FFFF 的字符），期望值由按 UTF-16 码元排序的 Python 算出。
-// 另钉住：300 个上限按整张列表算（证据条目也计入）；复制条目同改名记两个文件。
-// 第八轮钉住：filename 为空串的条目按形状不对处理（compareFileSchema 要求至少一个字符）。
+// 失败方式先行：
+// - 同一补丁算出两个摘要：顺序 / 区域设置。排序固定按 UTF-16 码元（换成 localeCompare
+//   摘要就变）；码元序与码点序分得开的一组（补充平面的 emoji 挨着 U+E000–U+FFFF 的
+//   字符）的期望值由按 UTF-16 码元排序的 Python 算出。
+// - 元组撞车：文件名含制表符或换行；空 blob sha 被当成字符串 'null' 哈希。
+// - 只绑 head 上的 blob：合入 main 解冲突保留本 PR 的版本，blob 不变，补丁却从「A 改
+//   B」变成「C 改回 B」。元组第五位 patchSha 绑补丁本身；没有 patch 时为 null，不是
+//   空串的哈希。
+// - 改名移进 docs/verify/ 把代码删除藏起来。
+// - compare 截到 300 个文件仍被当成完整列表（300 个上限按整张列表算，证据条目也计入）；
+//   compare 给的条目比 changed_files 少或多都算对不上。
+// - 形状不对的响应被当成能用：增删行数为负；改名或复制条目缺 previous_filename（不然
+//   原名不进路径判定）；status 不在取值表里；filename 不是字符串或为空串
+//   （compareFileSchema 要求至少一个字符）。
+// - 800 行 / 40 文件只数一部分：按整张补丁算，证据也计入，改名与复制记两个文件；
+//   compare 不给 patch 的条目（二进制）要能认出来。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
 // 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
 // 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
@@ -167,7 +166,7 @@ describe('computePatchDigest', () => {
   });
 
   // 期望值由 Python 的 sorted()（按码点；BMP 内与 UTF-16 码元同序）独立算出，
-  // 见 docs/verify/1404/digest-crosscheck-2.txt（第四轮的四元组版见 s1-r4-red-green.txt）。
+  // 见 docs/verify/1404/digest-crosscheck-2.txt。
   // 码元序：B.ts < a-b.ts < a.b.ts < a/b.ts（'B' 0x42 < 'a' 0x61；'-' 0x2D < '.' 0x2E
   // < '/' 0x2F）；localeCompare 把 a 排在 B 前。
   test('排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要', () => {

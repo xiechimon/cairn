@@ -1,0 +1,27 @@
+# #1404 S2 round 8 review: code-review at low effort on the explicit range from the merge commit to the round 8 fix commit.
+
+Range: a570f79bab915069ae5b0e255a4baac2be5d402a..4cd4502c (merge commit a570f79 to HEAD 4cd4502 at review time; the evidence commit came after).
+$ git diff --shortstat a570f79b..4cd4502c
+ 6 files changed, 281 insertions(+), 118 deletions(-)
+$ git diff --shortstat a570f79b..4cd4502c -- . ':!**/test/**'
+ 2 files changed, 35 insertions(+), 12 deletions(-)
+
+Run 1 (the recorded one)
+  Skill: code-review
+  args:  low a570f79bab915069ae5b0e255a4baac2be5d402a..4cd4502c (repo: /home/user/pacman/.claude/worktrees/p3b; cd there in every Bash call)
+  Recipe: low effort, 1 diff pass, no verify, at most 4 findings; test and fixture hunks are skipped at this level.
+  What it read (from its transcript): one Bash call,
+    cd /home/user/pacman/.claude/worktrees/p3b && git diff a570f79bab915069ae5b0e255a4baac2be5d402a..4cd4502c -- . ':!**/test/**' ':!**/spec/**'
+      ':!**/__tests__/**' ':!**/*.test.*' ':!**/*_test.*' ':!**/fixtures/**' ':!**/testdata/**' | head -1500
+    4514 characters, two files: apps/server/src/services/merge-gate/readiness.ts and packages/shared/src/records/merge-gate.ts,
+    i.e. the whole non-test part of the range (2 files, +35/-12).
+  Result: (none). No findings.
+
+Run 2 (a repeat, to check that the empty result was not a missed target)
+  args:  low a570f79b..4cd4502c
+  It ran `git diff a570f79b..4cd4502c -- . ':!*test*' ':!*spec*' ':!*fixtures*'` from /home/user/pacman (the shared object store resolves the
+  range), read the same two files (4514 characters), and returned (none).
+
+The four test files in the range (+246/-106: new readiness tests, the CLASS table, header and describe-title rewording) are outside what
+low effort reviews; they are covered by the red/green legs (s2-r8-red-green.txt) and the mutations (s2-mutations-8.txt).
+Confirmed findings: none, so nothing to fix.

@@ -1,0 +1,62 @@
+# #1404 S2 mutations, round 4 (pr-gate's first run on #1421): each one applied alone to the round 4 source (acdf494), then apps/server/test/merge-gate-readiness.test.ts (94 tests), then the file restored.
+# One or more per new rule: (a) a read-but-malformed compare is the human compare-malformed, not the transient patch-unavailable;
+# (b) an evidence link counts only at a commit of this PR (base..head) and only to a file this PR adds or changes, and is not judged without a compare;
+# (c) an incomplete check list is treated as unreadable (required-checks-unreadable) and the half list is not judged;
+# (d) a name without a patch under a case variant of docs/verify/ is not evidence (opaque-file), both ends of a rename. No mutation survived.
+# Table: name, test summary; then the failing tests per mutation; then definitions (name, file, text replaced, replacement; a mutation with several replacements has one line each).
+
+malformed compare waits like unreadable                        2 failed | 92 passed (94)
+compare-malformed class transient                              1 failed | 93 passed (94)
+compare-malformed dropped from the vocabulary                  1 failed | 93 passed (94)
+evidence link: any sha (ancestor rule), path of this PR        3 failed | 91 passed (94)
+evidence link: commit of this PR, any path                     2 failed | 92 passed (94)
+evidence link: removed files count as this PR's evidence       1 failed | 93 passed (94)
+evidence link judged without compare                           4 failed | 90 passed (94)
+incomplete checks trusted                                      1 failed | 93 passed (94)
+incomplete checks block but the half list is still judged      1 failed | 93 passed (94)
+opaque exemption case-insensitive (paths.opaque only)          1 failed | 93 passed (94)
+case-variant check skips a rename's old name                   1 failed | 93 passed (94)
+
+malformed compare waits like unreadable:
+  x compare-malformed：只打开它
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+compare-malformed class transient:
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+compare-malformed dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+evidence link: any sha (ancestor rule), path of this PR:
+  x evidence-link-missing：只打开它
+  x 证据链指向别的票或钉在旧 SHA（不在 base..head）：不算
+  x 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算
+evidence link: commit of this PR, any path:
+  x 钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算
+  x 指向本 PR 删掉的证据：不算
+evidence link: removed files count as this PR's evidence:
+  x 指向本 PR 删掉的证据：不算
+evidence link judged without compare:
+  x patch-unavailable：只打开它
+  x compare-malformed：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+incomplete checks trusted:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+incomplete checks block but the half list is still judged:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+opaque exemption case-insensitive (paths.opaque only):
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+case-variant check skips a rename's old name:
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+
+["malformed compare waits like unreadable", "apps/server/src/services/merge-gate/readiness.ts", "if (i.compare === 'malformed') block('compare-malformed');", "if (i.compare === 'malformed') block('patch-unavailable', 'compare unreadable');"]
+["compare-malformed class transient", "packages/shared/src/records/merge-gate.ts", "{ code: 'compare-malformed', class: 'human',", "{ code: 'compare-malformed', class: 'transient',"]
+["compare-malformed dropped from the vocabulary", "packages/shared/src/records/merge-gate.ts", "  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },\n", ""]
+["evidence link: any sha (ancestor rule), path of this PR", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "changed.has(l.path)"]
+["evidence link: commit of this PR, any path", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "commits.has(l.sha)"]
+["evidence link: removed files count as this PR's evidence", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename)", "compare.files.map((f) => f.filename)"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "if (pr !== null && compare !== null) {", "if (pr !== null) {"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "new Set(compare.commits)", "new Set(compare?.commits ?? [])"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed')", "(compare?.files ?? []).filter((f) => f.status !== 'removed')"]
+["incomplete checks trusted", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;"]
+["incomplete checks block but the half list is still judged", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;\n  if (i.checks?.complete === false) block('required-checks-unreadable', 'check list incomplete');"]
+["opaque exemption case-insensitive (paths.opaque only)", "apps/server/src/services/merge-gate/readiness.ts", "!isEvidencePath(name) && name.toLowerCase().startsWith(EVIDENCE_PREFIX)", "false"]
+["case-variant check skips a rename's old name", "apps/server/src/services/merge-gate/readiness.ts", "for (const name of [f.filename, f.previousFilename ?? f.filename]) {", "for (const name of [f.filename]) {"]

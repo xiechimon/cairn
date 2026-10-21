@@ -1,0 +1,40 @@
+# #1404 S2 mutations, round 3 (S1 round 3 merged): each one applied alone to the round 3 source, then apps/server/test/merge-gate-readiness.test.ts (86 tests), then the file restored.
+# Covers: the opaque-file blocker (readiness), the D4 caps over the whole patch (readiness reads digest.countedFiles/countedLines; the mutations make it count digest.kept, the non-evidence entries, instead),
+# and the opaque-file entry in the vocabulary (dropped, moved, class). No mutation survived.
+# Table: name, test summary; then the failing tests per mutation; then definitions (name, file, text replaced, replacement).
+
+opaque blocker removed                           3 failed | 83 passed (86)
+file and line caps count only non-evidence       2 failed | 84 passed (86)
+file cap counts only non-evidence                1 failed | 85 passed (86)
+line cap counts only non-evidence                1 failed | 85 passed (86)
+opaque-file dropped from the vocabulary          3 failed | 83 passed (86)
+opaque-file moved to the end of the path group   1 failed | 85 passed (86)
+opaque-file class transient                      1 failed | 85 passed (86)
+
+opaque blocker removed:
+  x opaque-file：只打开它
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+file and line caps count only non-evidence:
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+file cap counts only non-evidence:
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+line cap counts only non-evidence:
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+opaque-file dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+opaque-file moved to the end of the path group:
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+opaque-file class transient:
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+
+["opaque blocker removed","apps/server/src/services/merge-gate/readiness.ts","    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);\n",""]
+["file and line caps count only non-evidence","apps/server/src/services/merge-gate/readiness.ts","if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {","if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines || digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["file cap counts only non-evidence","apps/server/src/services/merge-gate/readiness.ts","digest.countedFiles > GATE_LIMITS.maxFiles) {","digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["line cap counts only non-evidence","apps/server/src/services/merge-gate/readiness.ts","if (digest.countedLines > GATE_LIMITS.maxLines ||","if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines ||"]
+["opaque-file dropped from the vocabulary","packages/shared/src/records/merge-gate.ts","  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n",""]
+["opaque-file moved to the end of the path group","packages/shared/src/records/merge-gate.ts","  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n","  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n"]
+["opaque-file class transient","packages/shared/src/records/merge-gate.ts","    code: 'opaque-file',\n    class: 'human',","    code: 'opaque-file',\n    class: 'transient',"]

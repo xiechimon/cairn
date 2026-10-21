@@ -1,0 +1,31 @@
+# #1404 S2 round 2 (after /code-review on #1421): new tests first, red against the S2 code at 333d4f5, green after the fix.
+# Source (readiness.ts, merge-gate.ts) at 333d4f5; only apps/server/test/merge-gate-readiness.test.ts changed when the red leg ran.
+
+== red: round 2 test file, source at 333d4f5 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts
+     × 每个 blocker 码都有一行真腿（加码不写腿即变红） 9ms
+     × patch-unbindable：只打开它 2ms
+     × 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable 1ms
+     × 有文件缺 blob sha（子模块之类）：摘要等不来，留人 1ms
+     × GitHub 还报 clean，手上的检查里有别家失败：拦，并点名 2ms
+     × has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦 1ms
+     × unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦 1ms
+     × 同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理） 1ms
+     × 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  9 failed | 71 passed (80)
+exit=1
+
+== green: after the fix (readiness.ts, merge-gate.ts) ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts
+ Test Files  1 passed (1)
+      Tests  80 passed (80)
+exit=0
+
+$ pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+ Test Files  3 passed (3)
+      Tests  69 passed (69)
+exit=0
+
+The green source is the one committed as 13c0171 (no change between this run and the commit; the mutation run in s2-mutations-2.txt restored every file).
