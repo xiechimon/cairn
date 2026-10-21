@@ -1,7 +1,11 @@
 // D4 路径判定（#1404，ADR 0021 D4）：默认拒绝。只有可自动合并集里、且不落入
 // 保护类别的路径能不经人；改名两头（新名与原名）都要过一遍，保护文件改名
 // 移走也算动了它。匹配不分大小写（macOS 默认文件系统不分），与
-// .claude/workflows/pr-gate.js 用同一种 glob 写法，两边判同一份清单。名字里
+// .claude/workflows/pr-gate.js 用同一种 glob 写法，两边判同一份清单；保护类别的
+// glob 末尾的 `/**` 也认同名的目录项本身（pr-gate 第 11 轮的 dirAlone：指向别处的
+// 符号链接 .claude、scripts），可自动合并集不认（不然一个叫 apps/x/src 的符号
+// 链接就能不经人合并）。不分大小写按 Unicode 简单折叠（`iu`），ſ（U+017F）与 s、
+// K（U+212A）与 k 同判；pr-gate.js 只带 `i`，这两个字符折不到 ASCII。名字里
 // 有白名单外的字符（换行、空格之类）时不判类、一律算保护：glob 的 `.` 跨不过
 // 换行，而 `*` 能，判类会落空；pr-gate 对这类名字同样拒绝自动判定。
 // 证据目录之外的二进制文件留人（D4）：没有行数，也没有可读的 diff。compare
@@ -17,16 +21,20 @@ import {
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
 } from '@pacman/shared';
+import { isEvidencePath } from './digest.js';
 
-// `**/` 含仓根，`**` 跨目录，`*` 不跨目录；其余字符按字面。
-export function globToRegExp(glob: string): RegExp {
+// `**/` 含仓根，`**` 跨目录，`*` 不跨目录；其余字符按字面。dirAlone 时末尾的
+// `/**` 也认目录项本身（只给保护类别用）。转义的都是语法字符，`u` 下照样合法。
+export function globToRegExp(glob: string, { dirAlone = false } = {}): RegExp {
+  const tail = dirAlone && glob.endsWith('/**');
+  const g = tail ? glob.slice(0, -3) : glob;
   let re = '';
-  for (let i = 0; i < glob.length; i += 1) {
-    const ch = glob[i];
-    if (ch === '*' && glob[i + 1] === '*' && glob[i + 2] === '/') {
+  for (let i = 0; i < g.length; i += 1) {
+    const ch = g[i];
+    if (ch === '*' && g[i + 1] === '*' && g[i + 2] === '/') {
       re += '(?:.*/)?';
       i += 2;
-    } else if (ch === '*' && glob[i + 1] === '*') {
+    } else if (ch === '*' && g[i + 1] === '*') {
       re += '.*';
       i += 1;
     } else if (ch === '*') {
@@ -35,12 +43,13 @@ export function globToRegExp(glob: string): RegExp {
       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
     }
   }
-  return new RegExp(`^${re}$`, 'i');
+  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'iu');
 }
 
-const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(globToRegExp);
-const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(globToRegExp);
-const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map(globToRegExp);
+const protectedRe = (glob: string) => globToRegExp(glob, { dirAlone: true });
+const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
+const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
 // 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
 const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
 const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
@@ -64,8 +73,9 @@ export interface PathFindings {
   /** 本 PR 新增或改动的、证据目录里的可执行文件。 */
   executableEvidence: string[];
   /** compare 没给 patch 的条目（二进制、diff 过大、纯改名）在证据目录之外的
-   * 名字；改名两头各判，含删除。证据前缀不分大小写，与 pr-gate 的
-   * EVIDENCE_RE 一致。 */
+   * 名字；改名两头各判，含删除。证据豁免与摘要同一条（digest.ts 的
+   * isEvidencePath，前缀大小写敏感）：GitHub 的树分大小写，Docs/Verify/ 不是
+   * 证据目录。pr-gate 的 EVIDENCE_RE 带 /i，这一项上它比本闸宽。 */
   opaque: string[];
 }
 
@@ -82,7 +92,8 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
   const push = (list: string[], path: string) => {
     if (!list.includes(path)) list.push(path);
   };
-  // 证据前缀不分大小写（与集内 glob 一致），票号段按原样比。
+  // 别票与可执行两项的证据前缀不分大小写（与集内 glob 一致，判进来是严的一侧），
+  // 票号段按原样比。opaque 的豁免用大小写敏感的 isEvidencePath（豁免是宽的一侧）。
   const isEvidence = (name: string) => name.toLowerCase().startsWith(EVIDENCE_PREFIX);
 
   for (const f of files) {
@@ -100,7 +111,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       if (isEvidence(name) && !name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`)) {
         push(out.otherTicketEvidence, name);
       }
-      if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);
+      if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);
     }
 
     if (f.status === 'removed' && isTestPath(f.filename)) push(out.deletedTests, f.filename);

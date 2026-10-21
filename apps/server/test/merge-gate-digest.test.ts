@@ -12,6 +12,9 @@
 // 变成「C 改回 B」；没有 patch 时 patchSha 为 null，不是空串的哈希。另钉住：
 // compare 给的条目比 changed_files 多也算对不上；status 不在取值表里、filename
 // 不是字符串都按形状不对处理。
+// 第六轮（#1420 pr-gate 第四轮）补的：码元序与码点序分得开的一组（补充平面的
+// emoji 挨着 U+E000–U+FFFF 的字符），期望值由按 UTF-16 码元排序的 Python 算出。
+// 另钉住：300 个上限按整张列表算（证据条目也计入）；复制条目同改名记两个文件。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
 // 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
 // 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
@@ -178,6 +181,21 @@ describe('computePatchDigest', () => {
     expect(computePatchDigest([...files].reverse()).patchDigest).toBe(expected);
   });
 
+  // 期望值由 Python 按 UTF-16 码元排序（key=s.encode('utf-16-be')）独立算出，按码点
+  // 排序的值一并给出（docs/verify/1404/digest-crosscheck-3.txt）。U+1F600 是代理对
+  // D83D DE00：按码元排在 U+FF21 之前，按码点排在之后。
+  test('补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点', () => {
+    const files = [
+      file({ filename: 'apps/web/src/Ａ.ts', sha: '1'.repeat(40) }),
+      file({ filename: 'apps/web/src/\u{1F600}.ts', sha: '2'.repeat(40) }),
+    ];
+    const byCodeUnit = 'pd2:b7719a254dc7af748b4dc6cc116a095045ab4a5953fb71d406dd36686dc04e88';
+    const byCodePoint = 'pd2:79d3027504003c32589de73cd10c65bd7cc00a44b849aaec97dc21025e34f802';
+    expect(computePatchDigest(files).patchDigest).toBe(byCodeUnit);
+    expect(computePatchDigest([...files].reverse()).patchDigest).toBe(byCodeUnit);
+    expect(byCodeUnit).not.toBe(byCodePoint);
+  });
+
   test('非删除条目的 sha 为空：摘要不可得', () => {
     const r = computePatchDigest([...base, file({ filename: 'apps/sub', sha: null })]);
     expect(r.patchDigest).toBeNull();
@@ -198,6 +216,17 @@ describe('computePatchDigest', () => {
     expect(GATE_LIMITS.compareFileCap).toBe(300);
     expect(computePatchDigest(many(299)).patchDigest).toMatch(/^pd2:/);
     const r = computePatchDigest(many(300));
+    expect(r.patchDigest).toBeNull();
+    expect(r.unavailable).toBe('truncated');
+  });
+
+  test('300 的上限按整张列表算，证据条目也计入：299 个代码文件加 1 个 docs/verify 条目即视为截断', () => {
+    const files = [
+      ...Array.from({ length: 299 }, (_, i) => file({ filename: `apps/f${i}.ts` })),
+      file({ filename: 'docs/verify/1404/run.txt', status: 'added' }),
+    ];
+    const r = computePatchDigest(files);
+    expect(r.kept.length).toBe(299);
     expect(r.patchDigest).toBeNull();
     expect(r.unavailable).toBe('truncated');
   });
@@ -259,6 +288,18 @@ describe('computePatchDigest', () => {
     ]);
     expect(r.countedFiles).toBe(1 + 2 + 2);
     expect(r.countedLines).toBe(5);
+  });
+
+  // pr-gate 的 --no-renames 不开复制检测，复制只记新增的一个；这里记两个，严的一侧。
+  test('复制（copied，带 previous_filename）同改名一样记两个文件', () => {
+    const r = computePatchDigest([
+      file({
+        filename: 'apps/server/src/b.ts',
+        previousFilename: 'apps/server/src/a.ts',
+        status: 'copied',
+      }),
+    ]);
+    expect(r.countedFiles).toBe(2);
   });
 });
 

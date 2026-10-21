@@ -8,6 +8,10 @@
 // 解析要线性。注释换成一个空格而不是删掉：被注释切开的 URL 不会拼成一条 GitHub
 // 不渲染的链接（scripts/pr-evidence-gate.py 同样把注释换成空白）。另钉住：两段闭合
 // 注释之间的链接照常算（贪婪匹配注释会把它吞掉）。
+// 第六轮（#1420 pr-gate 第四轮）补的：`<!-->` 与 `<!--->` 是空注释（HTML 与
+// cmark-gfm 都在这个 `-->` 处结束），不是没闭合；同一文件按解码后的 sha/路径
+// 只记一次（仓主大小写、`%61` 不同的写法不算两份）。另钉住：坏的百分号转义列进
+// others，不抛。
 
 import { performance } from 'node:perf_hooks';
 import { describe, expect, test } from 'vitest';
@@ -65,6 +69,32 @@ describe('parseRawEvidenceLinks', () => {
     expect(parse(`${url}\n[a](${url})`).links).toHaveLength(1);
   });
 
+  test('同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份', () => {
+    const body = [
+      raw('docs/verify/1404/a.txt'),
+      raw('docs/verify/1404/%61.txt', SHA, 'XiechiMon/Pacman'),
+    ].join('\n');
+    expect(parse(body)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+      others: [],
+    });
+  });
+
+  test('同一路径钉在两个 SHA 上是两条', () => {
+    const other = 'a'.repeat(40);
+    const body = [raw('docs/verify/1404/a.txt'), raw('docs/verify/1404/a.txt', other)].join('\n');
+    expect(parse(body).links).toEqual([
+      { sha: SHA, path: 'docs/verify/1404/a.txt' },
+      { sha: other, path: 'docs/verify/1404/a.txt' },
+    ]);
+  });
+
+  test('坏的百分号转义（%E0%A4%A）列进 others，不抛', () => {
+    const url = raw('docs/verify/1404/%E0%A4%A');
+    expect(() => parse(url)).not.toThrow();
+    expect(parse(url)).toEqual({ links: [], others: [url] });
+  });
+
   test('链接后面紧跟的标点与反引号不算进路径', () => {
     const url = raw('docs/verify/1404/a.json');
     const body = [`\`${url}\``, `(see ${url}).`, `${url}, ${url};`].join('\n');
@@ -89,6 +119,20 @@ describe('parseRawEvidenceLinks', () => {
     const cut = url.indexOf(SHA) + 6;
     const body = `${url.slice(0, cut)}<!-- x -->${url.slice(cut)}`;
     expect(parse(body)).toEqual({ links: [], others: [url.slice(0, cut)] });
+  });
+
+  test('空注释 <!--> 与 <!---> 在自身的 --> 处结束（HTML 与 cmark-gfm 同样），其后的链接照常算', () => {
+    const a = raw('docs/verify/1404/a.txt');
+    const b = raw('docs/verify/1404/b.txt');
+    expect(parse(`<!--> see ${a}`)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
+      others: [],
+    });
+    expect(parse(`<!---> see ${b}`)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/b.txt' }],
+      others: [],
+    });
+    expect(parse(`<!-- x ${a} -->`)).toEqual({ links: [], others: [] });
   });
 
   test('没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算', () => {

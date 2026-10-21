@@ -14,6 +14,13 @@
 // 第五轮：CompareFile 的 hasPatch 换成 patchSha（ADR 0021 D3 修订），没有 patch 即
 // patchSha 为 null。另钉住：名字里只多一个空格就算保护（SAFE_PATH 放宽到空格时
 // 要红）；gateSource 不收普通的保护路径。
+// 第六轮（#1420 pr-gate 第四轮）补的：opaque 的证据豁免与摘要同一条，前缀大小写
+// 敏感（Docs/Verify/ 在 GitHub 的树里不是证据目录，其中没有 patch 的条目改判
+// opaque；别票与可执行两项仍不分大小写，那是严的一侧）；保护 glob 末尾的 /**
+// 也认同名的目录项本身（pr-gate.js 第 11 轮的 dirAlone：指向别处的符号链接
+// .claude、scripts），可自动合并集不认；不分大小写按 Unicode 折叠（ſ 与 s、
+// K 与 k）。另钉住：复制条目的原名也判类，删 .test.mts 与仓根 test/ 下的文件
+// 算删测试。
 
 import type { CompareFile } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -39,6 +46,15 @@ describe('globToRegExp', () => {
     expect(globToRegExp('apps/*/src/**').test('apps/server/src/a/b.ts')).toBe(true);
     expect(globToRegExp('apps/*/src/**').test('apps/server/x/src/a.ts')).toBe(false);
     expect(globToRegExp('**/CLAUDE*.md').test('apps/web/Claude.md')).toBe(true);
+  });
+
+  test('dirAlone：末尾的 /** 也认目录项本身，不认同名前缀；不带时不认', () => {
+    const dir = globToRegExp('**/scripts/**', { dirAlone: true });
+    expect(dir.test('apps/server/src/scripts')).toBe(true);
+    expect(dir.test('apps/server/src/scripts/a.sh')).toBe(true);
+    expect(dir.test('apps/server/src/scriptsx')).toBe(false);
+    expect(globToRegExp('**/scripts/**').test('apps/server/src/scripts')).toBe(false);
+    expect(globToRegExp('**/*.config.*', { dirAlone: true }).test('vite.config.ts')).toBe(true);
   });
 });
 
@@ -120,6 +136,46 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     expect(r.outsideAutoMerge).toEqual([]);
   });
 
+  test('不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k', () => {
+    for (const p of [
+      'apps/web/src/AGENTſ.md',
+      'packages/x/src/pacKage.json',
+      'apps/server/src/ſcripts/x.sh',
+    ]) {
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 dirAlone 一致）', () => {
+    for (const p of [
+      'apps/web/src/.claude',
+      'apps/server/src/scripts',
+      'apps/web/src/drizzle',
+      'apps/web/src/.Husky',
+      '.github',
+      'docs/adr',
+    ]) {
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+    const gate = classify([f('apps/server/src/services/merge-gate', { status: 'added' })]);
+    expect(gate.protected).toEqual(['apps/server/src/services/merge-gate']);
+    expect(gate.gateSource).toEqual(['apps/server/src/services/merge-gate']);
+    for (const p of ['apps/web/src/.claudex', 'apps/server/src/scripts.ts', 'apps/web/src/adr']) {
+      expect(classify([f(p)]).protected, p).toEqual([]);
+    }
+  });
+
+  test('复制条目的原名也判类：从保护文件复制出来算命中', () => {
+    const r = classify([
+      f('apps/web/src/ci.yml', { status: 'copied', previousFilename: '.github/workflows/ci.yml' }),
+    ]);
+    expect(r.protected).toEqual(['.github/workflows/ci.yml']);
+  });
+
   test('改名把保护文件移走：按原路径命中', () => {
     const r = classify([
       f('apps/web/src/moved.yml', {
@@ -181,6 +237,14 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     expect(classify(files.map((p) => f(p))).outsideAutoMerge).toEqual(files);
   });
 
+  test('可自动合并集的 glob 不认目录项本身：docs/verify、apps/web/src 单独出现算集外', () => {
+    for (const p of ['docs/verify', 'apps/web/src', 'apps/server/test', 'integration/test']) {
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([]);
+      expect(r.outsideAutoMerge, p).toEqual([p]);
+    }
+  });
+
   test('保护路径不重复记进集外', () => {
     const r = classify([f('.github/workflows/ci.yml')]);
     expect(r.outsideAutoMerge).toEqual([]);
@@ -209,6 +273,17 @@ describe('删测试', () => {
       'apps/web/e2e/fixtures/board-helpers.ts',
       'apps/server/tests/helpers.ts',
       'packages/shared/src/__tests__/util.ts',
+    ];
+    const r = classify(removed.map((p) => f(p, { status: 'removed' })));
+    expect(r.deletedTests).toEqual(removed);
+  });
+
+  test('.test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算', () => {
+    const removed = [
+      'apps/server/src/x.test.mts',
+      'packages/shared/src/y.spec.cts',
+      'test/helpers.ts',
+      'e2e/a.ts',
     ];
     const r = classify(removed.map((p) => f(p, { status: 'removed' })));
     expect(r.deletedTests).toEqual(removed);
@@ -346,7 +421,9 @@ describe('证据目录', () => {
 });
 
 describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名）', () => {
-  test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀不分大小写', () => {
+  // 第六轮翻转：Docs/Verify/1404/b.png 原先按证据豁免，现在列进 opaque（与摘要的
+  // isEvidencePath 同一条；#1421 S2 要的）。
+  test('证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条）', () => {
     const r = classify([
       f('apps/web/public/logo.png', { status: 'added', additions: 0, patchSha: null }),
       f('apps/server/src/big.ts', { additions: 4000, patchSha: null }),
@@ -359,6 +436,7 @@ describe('compare 不给 patch 的条目（二进制、diff 过大、纯改名�
       'apps/web/public/logo.png',
       'apps/server/src/big.ts',
       'apps/web/public/old.png',
+      'Docs/Verify/1404/b.png',
     ]);
   });
 
