@@ -122,8 +122,8 @@ export interface GateInputs {
    *      不以 head 为父）。
    * 2 与 3 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得
    * 出。它们以 commits 读全为前提（少了 head 的子提交，后代上读的 compare 就认不出），
-   * 所以 commits 的条数要等于 totalCommits；不等 = 没读全（分页没读完），整份按读不到
-   * 处理（patch-unavailable，可等）。
+   * 所以 commits 的条数与其中不同 SHA 的个数都要等于 totalCommits；不等 = 没读全（分页
+   * 没读完，或重复的条目凑了数），整份按读不到处理（patch-unavailable，可等）。
    * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
    * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
@@ -134,7 +134,8 @@ export interface GateInputs {
    * 少认（拦）。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否
    * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到或它的 head
    * 写错时没有 head 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），
-   * 结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
+   * 只有要 PR 的 head 才判得了的两样不判（PR 报的文件数、body 的证据链）；结果不报
+   * head，也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
   compare:
     | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[]; totalCommits: number }
     | 'unreadable'
@@ -332,11 +333,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 补丁。compare 读不到可等；读到了形状不对（含写错的 SHA），下一次读还是一样，留人。
-  // 提交没读全（条数不等于 total_commits）的，下面的 head 判定靠不住；不是在 PR 的 head
-  // 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，读在了更早的提交上；或响应
-  // 的提交里有以它为父的，读在了后代上）的，说的是别的补丁。这两样都按读不到处理，下一
-  // 次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果也不报它的摘要，免得
-  // 把别的补丁的结论安到 head 上。
+  // 提交没读全（条数或不同 SHA 数不等于 total_commits）的，下面的 head 判定靠不住；
+  // 不是在 PR 的 head 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，读在了
+  // 更早的提交上；或响应的提交里有以它为父的，读在了后代上）的，说的是别的补丁。这两样
+  // 都按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果
+  // 也不报它的摘要，免得把别的补丁的结论安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
@@ -346,7 +347,11 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   ) {
     block('compare-malformed', 'compare SHA not 40 lowercase hex');
     compare = null;
-  } else if (compare !== null && compare.commits.length !== compare.totalCommits) {
+  } else if (
+    compare !== null &&
+    (compare.commits.length !== compare.totalCommits ||
+      new Set(compare.commits.map((c) => c.sha)).size !== compare.totalCommits)
+  ) {
     block('patch-unavailable', 'compare commit list incomplete');
     compare = null;
   } else if (
@@ -361,8 +366,10 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
   let D: string | null = null;
   if (compare !== null) {
+    // PR 报的文件数只拿来对对过 head 的 compare：没有 head 可对时 compare 可能读在别的
+    // 提交上，对不上是跨推送的竞态，不是截断。
     const digest = computePatchDigest(compare.files, {
-      expectedFileCount: pr?.changedFiles ?? null,
+      expectedFileCount: pr !== null && head !== null ? pr.changedFiles : null,
     });
     D = digest.patchDigest;
     if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {
@@ -392,12 +399,13 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
   // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件：
   // 只是 head 的祖先不够，main 历史里同票前一段（已 squash）的证据也是祖先，本 PR
-  // 却一份证据没加。compare 不可得时上面已拦，这里判不了，不再重复列出。
+  // 却一份证据没加。compare 不可得时上面已拦，这里判不了，不再重复列出；没有 PR 的
+  // head 可对时 compare 的提交可能是别的提交的，也不判（pr-unreadable 已拦）。
   // 判不了的另一样：链接钉在本 PR 较早的提交上、文件到后来的提交才加进来时，raw
   // 是 404，可两条都成立。要判须知道每个提交动了哪些文件，compare 不给；文件在该
   // SHA 上是否存在交给 S4 的外壳查（测试「readiness 不判链接的文件……」钉着这一点）。
   if (i.issueNumber === null) block('issue-ref-missing');
-  if (pr !== null && compare !== null) {
+  if (pr !== null && head !== null && compare !== null) {
     const { links } = parseRawEvidenceLinks(pr.body, {
       owner: i.repo.owner,
       repo: i.repo.name,
