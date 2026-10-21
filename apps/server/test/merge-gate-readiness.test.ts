@@ -4,8 +4,12 @@
 //   每次巡检形状都一样，闸永远等下去；compare 或检查不是在 PR 的 head 上读的（比 PR
 //   旧或比 PR 新：缓存的响应、跨推送的两次读），摘要、判定与检查说的是别的提交，
 //   结果却报 PR 的 head；跨推送时文件数也变了，可等的竞态被报成留人的 compare-truncated；
-//   只信外壳填的 headSha，compare 自己的提交里没有 PR 的 head 也放过；PR 读不到时
-//   结果报出一个没有 head 的摘要。
+//   只信外壳填的 headSha，compare 自己的提交里没有 PR 的 head 也放过；compare 读在
+//   PR head 的后代上、外壳却照 pr.headSha 填了 headSha，提交里含 head 就放过（响应里
+//   列着 head 的子提交）；检查同样只信外壳填的 headSha，响应里 check run 的 head_sha
+//   或 combined status 的 sha 说的是别的提交也放过；PR 读不到时结果报出一个没有 head
+//   的摘要；SHA 不是 40 位小写十六进制（大写、缩写）时永远对不上，闸以「没在 head 上
+//   读」等下去，看不出是外壳的毛病。
 // - 检查：必需检查缺席被当绿（ci-loop 的宽限）；必需清单读不到退回「全部检查」；
 //   必需项由 commit status 而不是 check run 提供时漏判；pr-evidence 为 skipped /
 //   neutral 被当绿；pacman/merge-gate 本身被设成必需检查；只因自家 status 造成的
@@ -1195,6 +1199,46 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(classesOf(i)).toEqual(notAtHead);
   });
 
+  test('compare 自报读在 PR 的 head 上、实则读在后代上：响应里列着 head 的子提交，同样按没在 head 上读处理', () => {
+    // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER；外壳按分支名或从缓存读到
+    // NEWER 上的 compare，headSha 却照 pr.headSha 填。HEAD 在它的提交里（只看「有没有
+    // head」放过），可 NEWER 以 HEAD 为父：这份 compare 读过了 head。
+    const a = green();
+    compareAtNewer(a);
+    a.compare = readAt(HEAD, compare(a));
+    const r = mergeReadiness(a);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(a)).toEqual(notAtHead);
+    // 隔了几代也一样：head 的子提交总在列表里
+    const b = green();
+    compareAtNewer(b);
+    b.compare = readAt(HEAD, {
+      ...compare(b),
+      commits: chain(EARLIER, HEAD, NEWER, '9'.repeat(40)),
+    });
+    expect(classesOf(b)).toEqual(notAtHead);
+    // 后代是合并提交：head 是它的第一个父提交（把 main 合进来），或第二个
+    for (const parents of [
+      [HEAD, MAIN],
+      [MAIN, HEAD],
+    ]) {
+      const c = green();
+      compareAtNewer(c);
+      c.compare = readAt(HEAD, {
+        ...compare(c),
+        commits: [...chain(EARLIER, HEAD), { sha: NEWER, parents }],
+      });
+      expect(classesOf(c)).toEqual(notAtHead);
+    }
+  });
+
+  test('compare 在 PR 的 head 上读、head 本身是合并提交：照常 ready（看谁以 head 为父，不看谁有两个父提交）', () => {
+    const i = green();
+    compare(i).commits = [...chain(EARLIER), { sha: HEAD, parents: [EARLIER, MAIN] }];
+    expect(mergeReadiness(i).ready).toBe(true);
+  });
+
   test('compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要', () => {
     // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER（改一行，文件数不变），
     // compare 读到的是 NEWER。HEAD 在 NEWER 的 base..head 里，文件数对得上，判定都绑在
@@ -1242,6 +1286,72 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
         ['mergeable-state', 'transient', 'unstable, checks unreadable'],
         ...elsewhere,
       ]);
+    }
+  });
+
+  test('检查自报读在 PR 的 head 上、响应说的却是别的提交：任何一条 check run 的 head_sha 或 combined status 的 sha 不是 PR 的 head，都按没在 head 上读处理', () => {
+    // 故事：外壳按分支名或从缓存读检查，headSha 却照 pr.headSha 填。上一次推送的检查
+    // 全绿，PR 真正的 head 上的 CI 还在跑或已失败。
+    const elsewhere = [
+      ['required-checks-unreadable', 'transient', 'checks not read at the PR head'],
+    ];
+    for (const sha of [EARLIER, NEWER]) {
+      // 整份响应在别的提交上
+      const a = green();
+      a.checks = { ...checksAt(sha, checks(a)), headSha: HEAD };
+      expect(mergeReadiness(a).ready).toBe(false);
+      expect(classesOf(a)).toEqual(elsewhere);
+      // 只有一条 check run 在别的提交上：那份结果不拿来判，它的失败也不列
+      const b = green();
+      checks(b).runs[0] = { ...run('check', 'completed', 'failure'), headSha: sha };
+      expect(classesOf(b)).toEqual(elsewhere);
+      // 只有 combined status 在别的提交上
+      const c = green();
+      checks(c).statusSha = sha;
+      expect(classesOf(c)).toEqual(elsewhere);
+    }
+  });
+
+  test('SHA 不是 40 位小写十六进制（大写、缩写）：PR 按读不到处理，compare 留人，检查按读不到处理，detail 都点明', () => {
+    for (const bad of [HEAD.toUpperCase(), HEAD.slice(0, 7)]) {
+      // PR 的 head：没有可对的 head，结果不报 head，也不报摘要
+      const a = green();
+      pr(a).headSha = bad;
+      const r = mergeReadiness(a);
+      expect(r.headSha).toBeNull();
+      expect(r.patchDigest).toBeNull();
+      expect(classesOf(a)).toEqual([
+        ['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex'],
+      ]);
+      // compare：请求的 head、提交、父提交里有一个不是 SHA，每次读都一样，留人。父提交尤其要
+      // 管：写错的 head 认不出谁以 head 为父，后代上读的 compare 就放过了
+      const malformed = [['compare-malformed', 'human', 'compare SHA not 40 lowercase hex']];
+      const b = green();
+      b.compare = readAt(bad, compare(b));
+      expect(classesOf(b)).toEqual(malformed);
+      const c = green();
+      compare(c).commits = [...chain(EARLIER), { sha: bad, parents: [EARLIER] }];
+      expect(classesOf(c)).toEqual(malformed);
+      const d = green();
+      compareAtNewer(d);
+      d.compare = readAt(HEAD, {
+        ...compare(d),
+        commits: [...chain(EARLIER, HEAD), { sha: NEWER, parents: [bad] }],
+      });
+      expect(classesOf(d)).toEqual(malformed);
+      // 检查：请求的 head、某条 check run 的 head_sha、combined status 的 sha
+      const unreadable = [
+        ['required-checks-unreadable', 'transient', 'check SHA not 40 lowercase hex'],
+      ];
+      const e = green();
+      checks(e).headSha = bad;
+      expect(classesOf(e)).toEqual(unreadable);
+      const f = green();
+      checks(f).runs[1] = { ...run('pack-smoke'), headSha: bad };
+      expect(classesOf(f)).toEqual(unreadable);
+      const g = green();
+      checks(g).statusSha = bad;
+      expect(classesOf(g)).toEqual(unreadable);
     }
   });
 
