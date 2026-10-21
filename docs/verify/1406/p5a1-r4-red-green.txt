@@ -1,0 +1,94 @@
+# P5a-1 round 4: red and green legs (tests before fixes)
+# command for every leg: pnpm exec vitest run apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts \
+#   apps/server/test/webhook.test.ts   (green leg with --reporter=verbose)
+# Each red leg ran on a clean tree at the named commit (git status empty apart from the leg's own files).
+
+## Red leg 1: 68d6dbca (server(1406): P5a-1 round 4, tests before the fixes), source = 18c6dded's
+Expected red: groups 21 (app labels), 22 (split parents), 23 + github-issues case test (ref case), 24 (rate limits).
+Expected green: 21 '仓主本人打的标' and '经 app 打、摘掉后仓主本人重新打' (behavior already right), 22 '子卡都已
+done / closed 的父卡照常对账关闭' (positive control), 24 '没有限流信号的 403' (control), 25 (coverage pins).
+  FAIL test/github-issues.test.ts > #1406 并发导入占位 > 引用大小写不同也是同一条 issue：已有 github:Octo/Alpha#7 的卡 → 列表滤除 7、直接导入 409
+  FAIL test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > app 安装令牌打的标（actor = claude[bot]）→ 同样不领，记一行
+  FAIL test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主授权的 app（claude）替仓主打的标（#1406 的真实事件）→ 不领、不读 permission，记一行
+  FAIL test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 早先仓主本人打过、最新一条 labeled 经 app → 不领（只看最新一条）
+  FAIL test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 读期间有人重开一张关掉的子卡 → 写前重读看到未收完的子卡，跳过
+  FAIL test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 轮询器领的卡被 chief 拆开、子卡在跑，issue 被仓主关闭 → 父卡不关、不读状态，子卡不动；最后一张子卡 done → 父卡 done
+  FAIL test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue → 一张卡，轮询器记 claimed
+  FAIL test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（x-ratelimit-remaining 0，带 reset）：本队别的项目这一轮也不读
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+  FAIL test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 429（retry-after 60）：本队别的项目这一轮也不读
+first assertion per failing test group (vitest prints one block per distinct error):
+  AssertionError: expected [ 7, 9 ] to deeply equal [ 9 ]
+  AssertionError: expected [ 1406 ] to deeply equal []
+  AssertionError: expected [ 1406 ] to deeply equal []
+  AssertionError: expected [ 1406 ] to deeply equal []
+  AssertionError: expected 'closed' to be 'building' // Object.is equality
+  AssertionError: expected 'closed' to be 'building' // Object.is equality
+  AssertionError: expected 'created' to be 'duplicate' // Object.is equality
+  AssertionError: expected [ Array(2) ] to deeply equal [ 'github:xiechimon/pacman#1406' ]
+  AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+  AssertionError: expected [ …(3) ] to have a length of 1 but got 3
+  AssertionError: expected [ { host: 'api.github.com', …(4) } ] to have a length of +0 but got 1
+  AssertionError: expected [ …(2) ] to have a length of 1 but got 2
+ Test Files  2 failed | 1 passed (3)
+      Tests  20 failed | 168 passed (188)
+exit=1
+Why each fails on the old code: 21 takes the app label (taken = [1406]); 22 closes the split parent (phase closed);
+23 / github-issues compare refs exactly (second task created / 7 still listed); 24 sends one read per candidate
+(3 events reads), reads the other project, or reads the list after a limited state read.
+
+## Red leg 2: fb1f23d5 (server(1406): P5a-1 round 4, tests for an app label without a slug), source = 18c6dded's
+Adds: 17 projection pin changes from null to 'unknown' for an app object without a slug; 21 slugless app not taken.
+  FAIL test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug > githubIssueEvents 投影 performed_via_github_app.slug；不经 app = null，经 app 却缺 slug = unknown
+  FAIL test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+ Test Files  2 failed | 1 passed (3)
+      Tests  22 failed | 167 passed (189)
+exit=1   (the 20 leg-1 failures plus these 2)
+
+## Green leg: 5cf6e92e (server(1406): P5a-1 round 4, app labels, split parents, ref case, rate limits)
+Test change in the fix commit: 24 '关闭对账的 issue 状态读' ran its limited sweep at T0 + interval while its
+retry-after expectation used T0, so the 429 row failed by exactly 300s on the fixed code (the reset was
+computed from the sweep time, as designed). The test now runs the limited sweep at T0 (first sweep at T0 - interval);
+it was red on the old code for the intended reason (a list read after the limited state read), see leg 1.
+round-4 tests at the green leg:
+  ✓ test/github-issues.test.ts > #1406 并发导入占位 > 引用大小写不同也是同一条 issue：已有 github:Octo/Alpha#7 的卡 → 列表滤除 7、直接导入 409
+  ✓ test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug > githubIssueEvents 投影 performed_via_github_app.slug；不经 app = null，经 app 却缺 slug = unknown
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主本人打的标（不经 app）→ 领，领取日志带打标人
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主授权的 app（claude）替仓主打的标（#1406 的真实事件）→ 不领、不读 permission，记一行
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > app 安装令牌打的标（actor = claude[bot]）→ 同样不领，记一行
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 早先仓主本人打过、最新一条 labeled 经 app → 不领（只看最新一条）
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+  ✓ test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、摘掉后仓主本人重新打 → 领
+  ✓ test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 轮询器领的卡被 chief 拆开、子卡在跑，issue 被仓主关闭 → 父卡不关、不读状态，子卡不动；最后一张子卡 done → 父卡 done
+  ✓ test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 子卡都已 done / closed 的父卡照常对账关闭
+  ✓ test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 读期间有人重开一张关掉的子卡 → 写前重读看到未收完的子卡，跳过
+  ✓ test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate
+  ✓ test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue → 一张卡，轮询器记 claimed
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 429（retry-after 60）：本队别的项目这一轮也不读
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（x-ratelimit-remaining 0，带 reset）：本队别的项目这一轮也不读
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+  ✓ test/issue-intake.test.ts > 24 限流：本队本轮停读 > 没有限流信号的 403（token 无权）照旧只跳过本项目
+  ✓ test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 非 409 的导入失败（详情读 502）→ 记一行、本项目这一轮照领下一条，失败的那条不记「见过 open」
+  ✓ test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+ Test Files  3 passed (3)
+      Tests  189 passed (189)
+exit=0
