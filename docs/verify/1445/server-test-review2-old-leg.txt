@@ -1,0 +1,57 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ❯ test/close-stops-active-steps.test.ts (10 tests | 2 failed) 644ms
+   ❯ #1445 卡离开执行中后，停止回报不再改相位 (2)
+     × 关闭后、回报前重开：回报落账不覆盖重开后的相位 49ms
+     × raw PATCH planning → todo：委托停 claimed 步 46ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1445 卡离开执行中后，停止回报不再改相位 > 关闭后、回报前重开：回报落账不覆盖重开后的相位
+AssertionError: expected 'todo' to be 'review' // Object.is equality
+
+Expected: "review"
+Received: "todo"
+
+ ❯ test/close-stops-active-steps.test.ts:272:26
+    270|     applyStoppedStep(w.s.svc, w.stepId);
+    271|     expect(stepStatus(w)).toBe('stopped');
+    272|     expect(todoPhase(w)).toBe('review');
+       |                          ^
+    273|   });
+    274|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1445 卡离开执行中后，停止回报不再改相位 > raw PATCH planning → todo：委托停 claimed 步
+AssertionError: expected [] to deeply equal [ 'step-25l06mvocg3' ]
+
+- Expected
++ Received
+
+- [
+-   "step-25l06mvocg3",
+- ]
++ []
+
+ ❯ test/close-stops-active-steps.test.ts:283:79
+    281|     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, …
+    282|     expect(res.status).toBe(200);
+    283|     expect(w.s.db.select().from(stopPendingTable).all().map((p) => p.s…
+       |                                                                               ^
+    284|     expect(events.some((e) => e.type === 'stop')).toBe(true);
+    285|     applyStoppedStep(w.s.svc, w.stepId);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  05:26:41
+   Duration  4.03s (transform 60%, import 23%, tests 17%)
+
+  Transform  transforming modules took 2.31s · 60% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

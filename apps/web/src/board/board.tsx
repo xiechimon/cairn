@@ -150,7 +150,7 @@ interface BoardProps {
 }
 
 const COLUMN_ICON = {
-  queued: { icon: CircleDashed, tone: 'text-icon' },
+  idle: { icon: CircleDashed, tone: 'text-icon' },
   running: { icon: Activity, tone: 'text-running' },
   attention: { icon: CircleAlert, tone: 'text-(--card-button)' },
   done: { icon: CircleCheck, tone: 'text-icon' },
@@ -270,7 +270,7 @@ export function BoardSurface({
   };
 
   // #616→#753 落位路由（参考站实测）：执行中 = 开始意图（#640 直发编排，
-  // 本地不写相位；唯一合法源 = 待开始的 todo 卡，queued 不进 #1434）；
+  // 本地不写相位；唯一合法源 = 待开始，只住未开始的 todo 卡）；
   // 待开始/待处理/已完成 = 静默改相
   // 提交（待处理 = 已完成有变更卡的重开，写 review）；#755：待开始落点 +
   // 已开始卡 = 重置意图（开确认 dialog，本面零提交——乐观值与 PATCH 都不发，

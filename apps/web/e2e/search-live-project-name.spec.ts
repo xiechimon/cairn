@@ -1,4 +1,5 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // ⌘K live face, the frame before GET /api/search answers. While the server
 // query is in flight (250ms debounce + round trip) the rows come from the
@@ -100,18 +101,9 @@ const todoRow = (page: Page, title: string) =>
   panel(page).locator('[data-row-kind="todo"]', { hasText: title });
 const projectRows = (page: Page) => panel(page).locator('[data-row-kind="project"]');
 
-/** ⌘K until the panel answers (search-result-rows.spec.ts guard: the
- *  hotkey listener registers after first paint). */
+/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await panel(page)
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error('⌘K never opened the search panel');
+  await pressUntil(page, 'Meta+k', panel(page));
 }
 
 async function typeQuery(page: Page, query: string) {

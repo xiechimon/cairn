@@ -77,7 +77,7 @@ describe('4 列折叠映射（#351 单键）', () => {
     // confirm/review（含 awaitingReply）/failed→待处理；done→已完成（近 7 天）；
     // closed→不占列不变。
     expect(boardColumnFor('todo')).toBe('待开始');
-    expect(boardColumnFor('queued')).toBe('待开始');
+    expect(boardColumnFor('queued')).toBe('执行中'); // #1447
     expect(boardColumnFor('planning')).toBe('执行中');
     expect(boardColumnFor('building')).toBe('执行中');
     expect(boardColumnFor('confirm')).toBe('待处理');

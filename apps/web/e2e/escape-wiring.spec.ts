@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // #462 symptom 2 (Escape 关层竞态) 的回归钉：**开着的层，其 Escape 接线必须
 // 在整个开启期保持稳定**——重渲染（URL 写回、数据提交、SSE 失效）不得把它
@@ -118,20 +119,6 @@ const confirmDialog = (page: Page) => page.getByRole('alertdialog');
 // #949: 面板载体 = role dialog + 可及名（.search-panel 类钉退役）
 const searchPanel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
-/** ⌘K toggle 走 search-focus 重试律：送达的一按翻转面板态即出环，丢失的
- *  一按留在原态、重按即是。开/关两向共用（until = 目标态）。 */
-async function toggleSearchPanel(page: Page, until: 'visible' | 'hidden') {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const flipped = await searchPanel(page)
-      .waitFor({ state: until, timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (flipped) return;
-  }
-  throw new Error(`⌘K never flipped the search panel to ${until}`);
-}
-
 test('确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后单次 Escape 仍收层', async ({
   page,
 }) => {
@@ -142,8 +129,8 @@ test('确认弹层不被根组件重渲染重挂 Escape 接线：⌘K 往返后�
   await installEscapeTap(page);
   // 根组件级重渲染往返：⌘K 开搜索面板（commit 1）、⌘K 关（commit 2）——
   // 每次 commit 都重建确认层吃到的内联 onClose 箭头
-  await toggleSearchPanel(page, 'visible');
-  await toggleSearchPanel(page, 'hidden');
+  await pressUntil(page, 'Meta+k', searchPanel(page));
+  await pressUntil(page, 'Meta+k', searchPanel(page), 'hidden');
   // 开层期零重挂（旧实现：⌘K 往返每次 commit 重挂一次，实测 win adds:2/rems:3）
   // ——同 popover 钉，**关层之前读**，只钉律（重挂）不钉实现的 teardown 条数。
   //

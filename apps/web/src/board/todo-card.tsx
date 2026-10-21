@@ -112,6 +112,7 @@ export function TodoCard({
   const face = cardFace(todo);
   const project = live ? projectName : (projectName ?? PROJECT_NAME);
   const suspended = suspension(todo);
+  const queued = todo.phase === 'queued';
   const retryTitle =
     todo.waitingOn?.on === 'quota' && todo.waitingOn.retryAt != null
       ? t('下次尝试 {time}', {
@@ -209,12 +210,6 @@ export function TodoCard({
               <Glyph icon={Clock} className="size-3 text-content-dim" />
               {relativeTime(todo.phaseAt, now, t)}
             </span>
-            {face.kind === 'queued' && suspended != null && (
-              <span className={META_ITEM} title={retryTitle}>
-                <Glyph icon={Hourglass} className="size-3 text-content-dim" />
-                {t(suspended.label)}
-              </span>
-            )}
             {face.kind === 'done' && face.canceled && (
               <span data-todo-canceled="" className={META_ITEM}>
                 <Glyph icon={Ban} className="size-3 text-content-dim" />
@@ -222,7 +217,7 @@ export function TodoCard({
               </span>
             )}
           </div>
-          {face.kind === 'queued' &&
+          {face.kind === 'todo' &&
             face.action != null &&
             !lockedByOrchestration &&
             actionLink(
@@ -261,7 +256,7 @@ export function TodoCard({
         </div>
       </div>
 
-      {face.kind === 'queued' && lockedByOrchestration && orchestration != null && (
+      {face.kind === 'todo' && lockedByOrchestration && orchestration != null && (
         <div
           data-orchestrating="true"
           className="todo-card-orchestration mt-2.5 flex items-center gap-1.5 border-t border-dashed border-border pt-2 text-meta whitespace-nowrap text-content-secondary"
@@ -283,11 +278,20 @@ export function TodoCard({
       )}
 
       {face.kind === 'running' && (
-        <div className="mt-2 flex items-center gap-1.5 text-meta whitespace-nowrap text-running-text">
-          <Glyph
-            icon={Bot}
-            className="size-3.25 flex-none animate-breath text-running motion-reduce:animate-none"
-          />
+        // #1447：queued 住执行中但还没跑——静态沙漏 + 次级墨（排队中 / 等机器 /
+        // 等额度），呼吸机器人留给真在跑的 planning/building。
+        <div
+          data-card-footer={queued ? 'waiting' : 'running'}
+          className={`mt-2 flex items-center gap-1.5 text-meta whitespace-nowrap ${queued ? 'text-content-secondary' : 'text-running-text'}`}
+        >
+          {queued ? (
+            <Glyph icon={Hourglass} className="size-3.25 flex-none text-content-tertiary" />
+          ) : (
+            <Glyph
+              icon={Bot}
+              className="size-3.25 flex-none animate-breath text-running motion-reduce:animate-none"
+            />
+          )}
           <span className="min-w-0 truncate">
             {todo.agent != null && `${todo.agent.displayName} · `}
             {suspended == null ? (
