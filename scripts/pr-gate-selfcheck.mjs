@@ -4,8 +4,8 @@
 // spending subagents. CI runs it (ci.yml, check job); run it after every
 // change to the script (spec 28 §7.5).
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
-// The failure modes come from pr-gate runs 2-6 on #1410
-// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json), its /code-review and run 7.
+// The failure modes come from pr-gate runs 2-10 on #1410
+// (docs/verify/1401/pr-gate-run*-*.json) and its /code-review rounds.
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -84,6 +84,22 @@ async function refuses(argsList, re, opts) {
   }
   return true;
 }
+
+// Every agent call of a run where the evidence reviewer reports a blocking
+// finding, so the evidence skeptics start too.
+async function callsWithEvidenceSkeptics() {
+  const calls = [];
+  await gate(base, {
+    calls,
+    reviews: { ...safetyFiles(base.changedFiles), evidence: { findings: [blocker] } },
+  });
+  return calls;
+}
+const isEvidence = (c) => c.label === 'review:evidence' || c.label.startsWith('refute:evidence:');
+// Backticked git commands in a prompt whose subcommand matches re.
+const gitCommands = (prompt, re) =>
+  (prompt.match(/`git [^`]*`/g) ?? []).filter((cmd) => re.test(cmd));
+const NO_HOOKS = '`git -c core.hooksPath=/dev/null ';
 
 // True when each file, changed alone, routes to the user as a protected path.
 async function eachProtected(files) {
@@ -795,14 +811,8 @@ const cases = [
   [
     'the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)',
     async () => {
-      const calls = [];
-      await gate(base, {
-        calls,
-        reviews: { ...safetyFiles(base.changedFiles), evidence: { findings: [blocker] } },
-      });
-      const evidence = calls.filter(
-        (c) => c.label === 'review:evidence' || c.label.startsWith('refute:evidence:'),
-      );
+      const calls = await callsWithEvidenceSkeptics();
+      const evidence = calls.filter(isEvidence);
       const others = calls.filter(
         (c) => c.label.startsWith('review:') && c.label !== 'review:evidence',
       );
@@ -814,6 +824,169 @@ const cases = [
         ) &&
         others.every((c) => c.opts.isolation === undefined)
       );
+    },
+  ],
+  [
+    'the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)',
+    async () => {
+      const evidence = (await callsWithEvidenceSkeptics()).filter(isEvidence);
+      return (
+        evidence.length === 3 &&
+        evidence.every(({ prompt }) => {
+          const fork = prompt.indexOf('head.repo.full_name');
+          const checkout = prompt.search(/`git [^`]*\bcheckout\b/);
+          return (
+            fork !== -1 &&
+            checkout > fork &&
+            prompt.includes('check out nothing') &&
+            ['`git show`', '`git diff`', '`git ls-tree`'].every((cmd) => prompt.includes(cmd))
+          );
+        })
+      );
+    },
+  ],
+  [
+    'every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)',
+    async () => {
+      const evidence = (await callsWithEvidenceSkeptics()).filter(isEvidence);
+      return (
+        evidence.length === 3 &&
+        evidence.every(({ prompt }) => {
+          const checkouts = gitCommands(prompt, /\bcheckout\b/);
+          return checkouts.length > 0 && checkouts.every((cmd) => cmd.startsWith(NO_HOOKS));
+        })
+      );
+    },
+  ],
+  [
+    'the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)',
+    async () => {
+      const calls = await callsWithEvidenceSkeptics();
+      return (
+        calls.filter(isEvidence).length === 3 &&
+        calls.every(({ prompt }) => {
+          const fetches = gitCommands(prompt, /\bfetch\b/);
+          const cleanups = gitCommands(prompt, /\bupdate-ref -d\b/);
+          return (
+            fetches.length > 0 &&
+            cleanups.length === 2 &&
+            [...fetches, ...cleanups].every((cmd) => cmd.startsWith(NO_HOOKS))
+          );
+        })
+      );
+    },
+  ],
+  [
+    "evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)",
+    async () => {
+      const evidence = (await callsWithEvidenceSkeptics()).filter(isEvidence);
+      return (
+        evidence.length === 3 &&
+        evidence.every(({ prompt }) => {
+          const installs = prompt.match(/`[^`]*pnpm install[^`]*`/g) ?? [];
+          return (
+            installs.length > 0 && installs.every((cmd) => cmd.startsWith('`HUSKY=0 pnpm install'))
+          );
+        })
+      );
+    },
+  ],
+  [
+    'the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)',
+    async () => {
+      const evidence = (await callsWithEvidenceSkeptics()).filter(isEvidence);
+      const ports = evidence.flatMap(({ prompt }) =>
+        ['VERIFY_PORT', 'VERIFY_WEB_PORT', 'E2E_AFFECTED_PORT'].map(
+          (k) => prompt.match(new RegExp(`\\b${k}=(\\d+)`))?.[1],
+        ),
+      );
+      const defaults = ['8787', '5173', '8791', '5273', '8398', '8399'];
+      return (
+        evidence.length === 3 &&
+        ports.every(Boolean) &&
+        new Set(ports).size === ports.length &&
+        !ports.some((p) => defaults.includes(p))
+      );
+    },
+  ],
+  [
+    "a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)",
+    async () => {
+      const r = await gate(base, {
+        reviews: {
+          safety: {
+            changedFiles: base.changedFiles,
+            deletedFiles: ['.husky/pre-commit', 'README.md'],
+            binaryFiles: ['scripts/blob.bin'],
+          },
+        },
+      });
+      return (
+        r.go === false &&
+        r.mergedBy === 'user' &&
+        ['.husky/pre-commit', 'README.md', 'scripts/blob.bin'].every((f) =>
+          r.unlistedFiles.includes(f),
+        ) &&
+        r.protectedPaths.includes('.husky/pre-commit') &&
+        r.protectedPaths.includes('scripts/blob.bin') &&
+        r.humanReasons.some(
+          (x) => x.includes('outside the auto-merge set') && x.includes('README.md'),
+        )
+      );
+    },
+  ],
+  [
+    'an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)',
+    () =>
+      eachProtected([
+        '.claude',
+        'apps/web/src/.claude',
+        'apps/server/src/scripts',
+        'apps/server/src/.husky',
+        'apps/server/src/drizzle',
+        '.github',
+        'docs/adr',
+        'apps/server/src/services/merge-gate',
+      ]),
+  ],
+  [
+    'the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)',
+    async () => {
+      for (const f of ['apps/web/src', 'packages/shared/test', 'docs/verify']) {
+        const r = await gateFiles([f]);
+        if (
+          r.mergedBy !== 'user' ||
+          !r.humanReasons.some((x) => x.includes('outside the auto-merge set') && x.includes(f))
+        )
+          return false;
+      }
+      const r = await gateFiles(['packages/shared/src/records/merge-gate.tsx']);
+      return r.mergedBy === 'auto-merge' && r.protectedPaths.length === 0;
+    },
+  ],
+  [
+    'D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)',
+    async () => {
+      for (const f of ['tools/docs/verify/run.sh', 'vendor/apps/x/src/a.sh']) {
+        const r = await gateFiles([f]);
+        if (r.mergedBy !== 'user') return false;
+      }
+      const files = ['apps/web/src/x.ts', 'apps/web/src/docs/verify/blob.bin'];
+      const r = await gateFiles(files, { binaryFiles: [files[1]] });
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some((x) => x.startsWith('binary files') && x.includes('blob.bin'))
+      );
+    },
+  ],
+  [
+    "a caller line count larger than the safety reviewer's wins (run 10)",
+    async () => {
+      const r = await gate(
+        { ...base, linesChanged: 900 },
+        { reviews: { safety: { changedFiles: base.changedFiles, linesChanged: 10 } } },
+      );
+      return r.mergedBy === 'user' && r.humanReasons.some((x) => x.startsWith('900 lines changed'));
     },
   ],
   [
