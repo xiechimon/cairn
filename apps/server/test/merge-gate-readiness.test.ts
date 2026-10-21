@@ -1281,7 +1281,21 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
       ...withCommits(compare(j), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [EARLIER] }]),
       totalCommits: 2,
     });
+    expect(mergeReadiness(j).patchDigest).toBeNull();
     expect(classesOf(j)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+    // 条数多出来、都不重复（混进了别的提交）：同样不算读全
+    const k = green();
+    k.compare = readAt(HEAD, {
+      ...withCommits(compare(k), [
+        ...chain(EARLIER, HEAD),
+        { sha: '9'.repeat(40), parents: [MAIN] },
+      ]),
+      totalCommits: 2,
+    });
+    expect(mergeReadiness(k).patchDigest).toBeNull();
+    expect(classesOf(k)).toEqual([
       ['patch-unavailable', 'transient', 'compare commit list incomplete'],
     ]);
   });

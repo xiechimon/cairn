@@ -124,6 +124,8 @@ export interface GateInputs {
    * 出。它们以 commits 读全为前提（少了 head 的子提交，后代上读的 compare 就认不出），
    * 所以 commits 的条数要等于 totalCommits，且没有重复的 SHA（重复是分页错位的迹象，
    * 会顶替没读到的提交）；不然 = 没读全，整份按读不到处理（patch-unavailable，可等）。
+   * 外壳照读到的原样传，不去重：同一 SHA 列了两遍（分页错位，或带着两份 parents）都要
+   * 让这里看见，去重会把没读全的一份当成读全了。
    * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
    * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
