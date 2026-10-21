@@ -1,0 +1,111 @@
+#1459 webhook `pacman` trigger follows D5 and the in-flight cap: GitHub facts relied on
+Read 2026-10-21 from docs.github.com (markdown bodies via
+https://docs.github.com/api/article/body?pathname=/en/<page>, fetched with curl
+through this container's proxy; WebFetch on the same pages agreed). The
+permission endpoint facts are the ones #1406 recorded in
+docs/verify/1406/api-notes.txt section 4 and are only re-quoted here.
+
+== 1. `sender` on the `issues` webhook
+URL: https://docs.github.com/en/webhooks/webhook-events-and-payloads#the-sender-property
+- Heading "The `sender` property":
+  "Most webhook payloads include a `sender` property identifying the user who
+  triggered the event. Sometimes GitHub can't resolve a specific user, for
+  example when an event comes from an internal process rather than a person,
+  or when the triggering action has no associated user. For some events,
+  such as `check_run` and `check_suite`, this includes actions with no Git
+  push or authenticated API actor."
+  "In these cases, `sender` is populated with the `ghost` user, a placeholder
+  account whose `login` is `ghost` and whose `id` isn't tied to a real,
+  current user. Don't assume `sender` always identifies the person who caused
+  an event, and account for the `ghost` user in any security or business
+  logic that relies on it."
+- "Common payload parameters" table: `sender` | `object` | "**Required.** A
+  GitHub user." `repository` | "**Required.** The repository on GitHub where
+  the event occurred."
+URL: https://docs.github.com/en/webhooks/webhook-events-and-payloads#issues
+- "This event occurs when there is activity relating to an issue."
+- Action `labeled`: "A label was added to an issue." Its own parameters:
+  `issue` "**Required.** The issue itself.", `label` `object` (no
+  description). The page lists no `labeled`-specific sender text; the
+  common `sender` ("the user who triggered the event") applies.
+-> The receiver reads `sender.login` as the user who applied the label. A
+   `ghost` sender (or a bot such as `<app>[bot]`) gets the same permission
+   read as anyone else; `ghost` is no collaborator, so the read answers 404 =
+   "none" and nothing is imported (fail closed). A payload without `sender`
+   imports nothing.
+
+== 2. Labels applied by an issue template
+URL: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/syntax-for-issue-forms
+- Top-level key `labels`: "Labels that will automatically be added to issues
+  created with this template. If a label does not already exist in the
+  repository, it will not be automatically added to the issue."
+URL: https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
+- "To automatically set a default issue title, assign the issue to people
+  with read access to the repository, or apply labels to issues raised from
+  the template, use the fields under "Optional additional information." You
+  can also add these details in the issue template with `title`, `labels`,
+  `type`, or `assignees` in a YAML frontmatter format."
+- "Contributors with Read or Triage roles will only see the configured
+  templates." (blank_issues_enabled: false)
+Not settled by the docs: neither page says whether the automatic label is
+delivered as an `issues` `labeled` webhook, nor who the sender of that event
+is. Nearest evidence, a capture (not a template issue): issue
+xiechimon/pacman#133 was created 2026-09-24T02:28:28Z by xiechimon with
+labels bug and ready-for-agent set at creation; its issue events
+(GET /repos/xiechimon/pacman/issues/133/events) hold
+  31723799451 labeled bug             actor xiechimon 2026-09-24T02:28:29Z
+  31723799554 labeled ready-for-agent actor xiechimon 2026-09-24T02:28:29Z
+so labels set when an issue is created are recorded as `labeled` events by
+the issue's creator. The body of #133 is an agent brief, not this repo's
+bug_report.md template, so this shows creation-time labels, not template
+labels as such. The rule stays as decided either way: if a template label
+arrives as `labeled` with the author as sender, an outside author is below
+triage and nothing is imported; if it arrives with any other sender, that
+sender's permission is read and the same rule applies; if it never arrives
+as `labeled`, nothing is imported. The webhook never imports on `opened`.
+
+== 3. Redelivery and response codes
+URL: https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks
+- "You can redeliver webhook deliveries that occurred in the past 3 days.
+  GitHub does not automatically redeliver failed deliveries."
+- "Only people with admin access to a repository can redeliver webhooks in
+  that repository."
+URL: https://docs.github.com/en/webhooks/using-webhooks/best-practices-for-using-webhooks
+- "Your server should respond with a 2XX response within 10 seconds of
+  receiving a webhook delivery. If your server takes longer than that to
+  respond, then GitHub terminates the connection and considers the delivery
+  a failure."
+- "If you request a redelivery, the `X-GitHub-Delivery` header will be the
+  same as in the original delivery."
+URL: https://docs.github.com/en/webhooks/webhook-events-and-payloads#delivery-headers
+- "`X-GitHub-Delivery`: A globally unique identifier (GUID) to identify the
+  event."
+-> A refused import answers 202 with a reason, like every other settled
+   outcome of this receiver; a redelivery inside 60 s hits the existing
+   delivery window (202 duplicate), a later one is judged again (202 with the
+   same reason unless the facts changed). The permission read adds one GitHub
+   read (up to the lib's 15 s timeout) before the import; on a slow read the
+   delivery may pass GitHub's 10 s, and the server still finishes and refuses
+   or imports by the rule.
+
+== 4. Repository permission of the sender
+URL: https://docs.github.com/en/rest/collaborators/collaborators#get-repository-permissions-for-a-user
+- GET /repos/{owner}/{repo}/collaborators/{username}/permission: "Checks the
+  repository permission and role of a collaborator. The permission attribute
+  provides the legacy base roles of admin, write, read, and none, where the
+  maintain role is mapped to write and the triage role is mapped to read.
+  The role_name attribute provides the name of the assigned role, including
+  custom roles. ... The calculated permissions are the highest role assigned
+  to the collaborator after considering all sources of grants, including:
+  repo, teams, organization, and enterprise."
+- Reused unchanged from #1406 (apps/server/src/lib/github.ts
+  githubCollaboratorPermission and the poller's rule in
+  apps/server/src/services/issue-intake.ts): qualifies = role_name in
+  {triage, write, maintain, admin}, or permission in {write, admin}, or
+  user.permissions.triage true. 404 = "none" (a definite no, cached 15 min
+  per team, repo and login); any other failure (403, 429, 5xx, network,
+  timeout, malformed body) = unknown, not cached, nothing imported.
+- This container's proxy refuses the collaborators path (403, recorded in
+  docs/verify/1406/api-notes.txt), so the permission answers in the tests
+  are the OpenAPI example shape from
+  apps/server/test/fixtures/issue-intake/permission-admin.docs-example.json.

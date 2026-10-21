@@ -1,0 +1,121 @@
+#1459 merge of #1461 round 4 into claude/bootstrap-p5-1459 (PR #1477, stacked on claude/bootstrap-p5 = PR #1461)
+date: 2026-10-21; user: root (uid 0); worktree /home/user/pacman/.claude/worktrees/p5e
+pre-check: .husky/_/pre-commit present (-rwxr-xr-x, 39 bytes); working tree clean at 29e16537
+
+## Merge
+$ git fetch origin claude/bootstrap-p5      (origin/claude/bootstrap-p5 = 22cf8db1970cc20f438e9b9e19024aca6f958bca)
+$ git merge --no-ff origin/claude/bootstrap-p5
+merge-base: 69722cc9 (PR #1461 head before round 4; this branch was cut there)
+brings in: 18c6dded (merge of origin/main dabef481 into #1461), 68d6dbca / fb1f23d5 (round 4 tests),
+  5cf6e92e (round 4 fixes: app labels, split parents, ref case, rate limits), 22cf8db1 (round 4 evidence);
+  324 files in all, most of them main's side through 18c6dded.
+
+Conflicts (4 files) and how each was resolved:
+
+1. apps/server/src/services/github-issues.ts (comment only)
+   Round 4 lowercased the in-process claim key (`${teamId}\0${ref.toLowerCase()}`) and claimedSourceRefs
+   (compares lower(sourceRef), returns a lower-case set); this branch turned importsInFlight into a
+   Map<claim, projectId> with importsInFlightFor(projectId). The code merged on its own: the claim key is
+   the lower-cased one and importsInFlight.set(claim, row.id) records the project under that same key, so
+   the per-project in-flight record and round 4's case-insensitive claim are one entry. The conflict was the
+   doc comment above importsInFlight; resolved to one comment naming both (team x lower-case sourceRef ->
+   project id).
+
+2. apps/server/src/services/issue-intake.ts (4 hunks)
+   a. header comment: round 4's rate-limit paragraph kept, followed by this branch's #1459 paragraph, which
+      now also says hasRepoTriage lets GithubRateLimitedError through uncached and the webhook catches it.
+   b. imports: both kept (round 4's `alias` from drizzle-orm/sqlite-core for the split-parent subquery,
+      this branch's `type Db` from ../db/client.js).
+   c. inside createIssueIntake: round 4 kept teamToken / projectFull as closures and added noOpenChildren;
+      this branch had moved teamToken / projectFull / hasTriage to module level as teamGithubToken /
+      projectAtInFlightCap (now also counting imports in flight) / hasRepoTriage (module-level permission
+      cache shared with the webhook). Kept round 4's noOpenChildren, dropped the closure copies of
+      teamToken / projectFull (the module-level versions replace them; every call site already used them).
+   d. labelerVerdict: round 4's `{ notTaken: 'not-eligible', ...found }` (carries the app-label fields)
+      with this branch's hasRepoTriage call.
+   Round 4's rate-limit flow is unchanged: githubCollaboratorPermission throws GithubRateLimitedError,
+   hasRepoTriage neither catches nor caches it, and it reaches the team-level catch as before
+   (issue-intake group 24 passes).
+
+3. README.md / README.zh.md (the PACMAN_ISSUE_INTAKE row)
+   Took round 4's row (hand-applied label rule, split-parent skip, rate-limit sentence) and appended this
+   branch's webhook sentence after "The startup log says whether intake is on." Changed "follows the same
+   rule" to "applies the same permission check": round 4's app-label rule is the poller's, the webhook does
+   not apply it (open question below).
+
+Auto-merged without conflict: apps/server/test/issue-intake.test.ts (round 4's groups 21-24 plus this
+branch's sender in group 20), apps/server/src/lib/github.ts (round 4 only).
+
+Pre-commit on the merge commit: the comment-discipline gate matched one line in
+docs/verify/1404/pr-gate-1420-run5-1892662.json, main's file (blob a6f5b55c, identical in origin/main,
+origin/claude/bootstrap-p5 and the merge index; the match is the quoted word in "`todos.ts` does not match
+the case-sensitive ..."). No line this branch or the resolution adds matches. Committed with the gate's
+sanctioned exit PACMAN_ALLOW_BANNED_VOCAB=1, as round 4's own merge did (docs/verify/1406/p5a1-r4-merge.txt);
+the rest of the hook (biome ci, pnpm -r typecheck, test-spawn-gate) ran and passed.
+
+merge commit: a7e970747ec1006b9964d0dbd48e684778b54a15
+parents:      29e16537e6d1e2d537d2bc9b79ad2cf123251a79 (this branch) 22cf8db1970cc20f438e9b9e19024aca6f958bca (#1461 round 4)
+
+## Tests at the merge commit (a7e97074)
+$ pnpm exec vitest run test/webhook.test.ts test/issue-intake.test.ts test/github-issues.test.ts   (apps/server)
+ Test Files  2 failed | 1 passed (3)
+      Tests  3 failed | 211 passed (214)     webhook 44 (1 failed), issue-intake 141 (2 failed), github-issues 29
+ FAIL issue-intake.test.ts > 23 ... 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后 ... → webhook 记 duplicate
+      expected 'ignored' to be 'duplicate'
+ FAIL issue-intake.test.ts > 23 ... webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue ...
+      expected [ 'github:Xiechimon/Pacman#1406' ] to deeply equal [ 'github:xiechimon/pacman#1406' ]
+ FAIL webhook.test.ts > #1459 W ... > W4 permission 读失败（429）→ 202 ignored ...
+      expected 500 to be 202
+
+Causes:
+- group 23 (new in round 4) delivers its webhook without a `sender`; under #1459 that is refused
+  (no-sender, 202 ignored), so the webhook never imports. Same cause and same fix as group 20 on this
+  branch: the payload carries the repo owner (admin in the fake) as sender.
+- W4 (429): round 4 made githubCollaboratorPermission throw GithubRateLimitedError on a 429 or a 403 with a
+  rate-limit signal. The webhook did not catch it, so the receiver answered 500.
+
+## Rule for the rate limit (new failure mode F4b, beside F4 in failure-modes.txt)
+F4b  sender permission read is rate limited     no import; 202 ignored, reason code `rate-limited`
+     (429; 403 with x-ratelimit-remaining 0 or   (a new code, not `permission-unreadable`, so the log tells a
+     retry-after; 403 whose message says rate    rate limit from a broken read); detail "github rate limited
+     limit)                                      reading the permission of <login> on <repo>" plus
+                                                 " (resets at <ISO>)" when GitHub gave x-ratelimit-reset or
+                                                 retry-after; log line adds status and resetAt; not cached
+                                                 (hasRepoTriage throws before the cache write), so the next
+                                                 delivery reads again and imports once the limit is over.
+Picked `rate-limited` over reusing `permission-unreadable`: the poller already logs rate limits on their own
+line with the reset time, and the operator needs the same distinction on the webhook side. The `result`
+stays `ignored` and the status 202, as the task asked; other errors from the read still propagate.
+
+## Fix commits
+2d0a4a2a server(1459): tests for the webhook under round 4's rate limit
+  - webhook.test.ts: ghMock answers response headers; the 429 case leaves W4; new W4b test.each (429 without
+    headers, 429 with retry-after 60, 403 with x-ratelimit-remaining 0 and x-ratelimit-reset, 403 secondary
+    limit with message only): 202 ignored, detail, log reason rate-limited with status and resetAt, second
+    delivery reads again, no issue read, no task; after the limit a delivery imports.
+  - issue-intake.test.ts group 23: webhook payload carries sender { login: OWNER }.
+  red at 2d0a4a2a (webhook + issue-intake):
+   Test Files  1 failed | 1 passed (2)
+        Tests  4 failed | 184 passed (188)       the four W4b cases, each "expected 500 to be 202";
+                                                 group 23 passes with the sender.
+70601915 server(1459): webhook answers a rate-limited permission read with 202
+  - webhook.ts: try/catch around hasRepoTriage; GithubRateLimitedError -> refuse('rate-limited', 'ignored',
+    detail, { status, resetAt }); `refuse` takes optional extra log fields.
+  - packages/shared/src/webhook.ts: response-schema comment lists the rate limit among `ignored` reasons.
+  - README.md / README.zh.md: the webhook sentence names the rate limit among unreadable permission reads.
+
+## Tests after the fix (70601915)
+$ pnpm exec vitest run test/webhook.test.ts test/issue-intake.test.ts test/github-issues.test.ts   (apps/server)
+ Test Files  3 passed (3)
+      Tests  217 passed (217)     webhook 47 (44 - W4 429 + 4 W4b), issue-intake 141, github-issues 29
+Timing-sensitive cases (group 23, W4b, W7, W8) run 5 times in a row: 8 passed each time.
+
+## Open question (not changed here)
+Round 4 does not count a `ready-for-agent` label applied through a GitHub App (performed_via_github_app on
+the labeled event), because under a user-to-server app token the actor is the authorizing user, so an agent
+session holding the owner's authorization could feed intake its own issues. The `pacman` webhook judges the
+event's `sender` only and reads no app field of the payload (githubIssuesEventSchema has none), so if a
+user-to-server app token makes the authorizing user the sender, as it makes them the event actor, the label
+counts. The webhook therefore applies the same permission check
+and in-flight cap as the poller but not the app-label rule. Whether the webhook needs an equivalent (for
+example a read of the issue's events before importing) is a decision for #1459, not part of this merge.

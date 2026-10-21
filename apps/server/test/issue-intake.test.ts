@@ -2346,6 +2346,8 @@ describe('20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 
         issue: { number: 1406, title: 'webhook' },
         label: { name: 'pacman' },
         repository: { full_name: REPO },
+        // #1459：webhook 按 D5 核打标人（仓主 = admin）。
+        sender: { login: OWNER, type: 'User' },
       }),
     });
     expect(hook.status).toBe(202);
@@ -2736,6 +2738,8 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
             issue: { number: 1406, title: 'case' },
             label: { name: 'pacman' },
             repository: { full_name: REPO },
+            // #1459：webhook 按 D5 核打标人（仓主 = admin）。
+            sender: { login: OWNER, type: 'User' },
           },
         },
       );
