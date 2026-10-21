@@ -189,6 +189,35 @@ export function readSteerPending(db: Db, conversationId: string): string[] {
  *  不动相位。 */
 const afterStopPhaseByBuild = new Map<string, Phase | 'keep'>();
 
+/** #1445 / #1451 / #1453：卡已被人写离执行中（关闭 / 标完成 / 挪回待开始）。
+ *  停止回报与迟到的成功回报都不再改写这几个相位。 */
+function hasLeftExecution(phase: Phase): boolean {
+  return phase === 'closed' || phase === 'done' || phase === 'todo';
+}
+
+/** #1247 预定相落地（停止回报 × 停止在途时步先跑完 两面单源）：直写预定相
+ *  （queued/planning→done 不在前进漏斗；与 gate 回落同形）；done 额外挂
+ *  settle + 波次（成功交付；failed 源不会走 stop-then-done）。 */
+function landReservedPhase(
+  deps: BuildDeps,
+  todoRow: typeof todo.$inferSelect,
+  desired: Phase,
+): void {
+  if (todoRow.phase !== desired) {
+    deps.db
+      .update(todo)
+      .set({ phase: desired, phaseAt: nowMs(), v: todoRow.v + 1 })
+      .where(eq(todo.id, todoRow.id))
+      .run();
+    const record = getTodo(deps, todoRow.id);
+    if (record) deps.hub.publishTodoDoc(record.teamId, record);
+  }
+  if (desired === 'done') {
+    settleSplitOnDone(deps, todoRow.id);
+    advanceSplitWaves(deps, todoRow.id);
+  }
+}
+
 /** 停止写面（M7 #308，r9 §3.3 停止钮 / 08 册附录 A composer 停止钮行）：
  * POST /api/builds/{id}/stop body {discard}——中断当前活动步。
  * - claimed 步 = 机器信号面（stop_pending 单槽 upsert + machine stream stop
@@ -291,25 +320,11 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   // #1445：相位归把卡写离执行中的那一手；回报前被重开的卡也不被回落覆盖。
   if (desired === 'keep') return;
   if (desired != null) {
-    if (todoRow.phase !== desired) {
-      // 直写预定相（queued/planning→done 不在前进漏斗；与 gate 回落同形）。
-      // done 额外挂 settle + 波次（成功交付；failed 源不会走 stop-then-done）。
-      db.update(todo)
-        .set({ phase: desired, phaseAt: nowMs(), v: todoRow.v + 1 })
-        .where(eq(todo.id, todoRow.id))
-        .run();
-      const record = getTodo(deps, todoRow.id);
-      if (record) deps.hub.publishTodoDoc(record.teamId, record);
-    }
-    if (desired === 'done') {
-      settleSplitOnDone(deps, todoRow.id);
-      advanceSplitWaves(deps, todoRow.id);
-    }
+    landReservedPhase(deps, todoRow, desired);
     return;
   }
-  // #1445 / #1451：卡已被写离执行中（关闭 / 标完成 / 挪回待开始）——keep 预定
-  // 丢失（进程重启）时的兜底，回报不改写这几个人写的相位。
-  if (todoRow.phase === 'closed' || todoRow.phase === 'done' || todoRow.phase === 'todo') return;
+  // keep 预定丢失（进程重启）时的兜底：已离开执行中的卡不被 gate 回落改写。
+  if (hasLeftExecution(todoRow.phase)) return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
@@ -1606,6 +1621,19 @@ export function completeStep(
     deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
     return;
   }
+  // #1453 / #1247：停止信号在途时步先正常跑完。卡已被写离执行中、步属旧
+  // build（重开重跑后迟到），或这次停止预定了落点——只落步：不走产物闸、不推
+  // 相位、不补排、不落审核 / 验证结论。推相位在 closed / done 上是非法边（回报
+  // 409，daemon journal 每次重启重报），在 todo 上会把卡推进 confirm。预定
+  // done（stop-and-done）照落 done：用户要的是完成，步先跑完不改变这一点。
+  const reserved = afterStopPhaseByBuild.get(buildRow.id);
+  const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
+  if (reserved !== undefined || staleBuild || hasLeftExecution(todoRow.phase)) {
+    afterStopPhaseByBuild.delete(buildRow.id);
+    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
+    return;
+  }
   // 产物闸（#703）：失败收尾不落 done（完成判据 = 契约产物存在，不是会话
   // 结束——B-C10 空方案 / B-C11 零改动 / B-C14 假完成同病族）。
   const gateFailure = stepArtifactGate(deps, stepRow, outcome);
@@ -1632,17 +1660,6 @@ export function completeStep(
     return;
   }
   deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
-  // #1453：卡已被写离执行中（关闭 / 标完成 / 挪回待开始），停止信号还在途时
-  // 步先正常跑完——只落步，不推相位、不补排重写步。推相位在 closed / done 上
-  // 是非法边（回报 409，daemon journal 每次重启重报），在 todo 上会把卡推进
-  // confirm；keep 预定随之作废。
-  if (
-    (stepRow.kind === 'plan' || stepRow.kind === 'build') &&
-    (todoRow.phase === 'closed' || todoRow.phase === 'done' || todoRow.phase === 'todo')
-  ) {
-    afterStopPhaseByBuild.delete(buildRow.id);
-    return;
-  }
 
   if (stepRow.kind === 'plan') {
     // 交接物校验（#113：05 §5 实跑发现规划轮可跳过写 plan.md 直接交付，build 轮
@@ -1684,8 +1701,8 @@ export function completeStep(
       maybeEnqueueVerifyStep(deps, todoRow, stepRow.buildId);
       return;
     }
-    // 相位已被人工推进/关闭（failed/closed——sweep 失联收尾先落、机器复活迟到
-    // done 的竞态窗）→ 不回拽不抛：迟到回报照常收（步 done、PR 在 build 行），
+    // 相位已被推进到 failed（sweep 失联收尾先落、机器复活迟到 done 的竞态窗；
+    // closed / done / todo 已在函数头 #1453 闸收口）→ 不回拽不抛：迟到回报照常收（步 done、PR 在 build 行），
     // 人从当前相位接手——与 #702 恢复闸哲学一致（恢复是显式人工闸，不是迟到
     // 回报的副作用）。正常路相位恒 building（claim 前置置位），走同相位幂等。
     if (todoRow.phase === 'building' || canTransitionPhase(todoRow.phase, 'building')) {

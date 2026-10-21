@@ -31,6 +31,11 @@
 //     closed / done 卡的 confirm、review 边不合法，回报 409、daemon journal
 //     每次重启重报；挪回待开始的卡被推进 confirm；无方案文档的 plan 步给
 //     已离开执行中的卡补排重写步，机器照领。
+// 17. 同一竞态的其余形态：closed 卡的 merge 步成功（closed→done 非法边）、
+//     review 步带 blocking 成功（closed→planning 非法边）均回报 409；
+//     done 卡的 build 步零改动成功被产物闸记成失败、改写 build.errorMessage；
+//     关卡后重开、重跑（新 build）时旧 build 的步迟到成功把卡推进 confirm；
+//     stop-and-done 预定 done 在途时 build 步先跑完，卡进 review 而非 done。
 
 import { type MachineDoneBody, STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -78,7 +83,7 @@ function machineDepsOf(s: TestServer) {
 function makeWorld(opts: {
   phase: 'queued' | 'planning' | 'building' | 'review' | 'closed';
   stepStatus: 'pending' | 'claimed' | 'done';
-  stepKind?: 'plan' | 'build';
+  stepKind?: 'plan' | 'build' | 'merge' | 'review';
   /** claimed 步的心跳 / 领取时刻距今（缺省 = 新鲜，扫尾不碰）。 */
   claimedAgo?: number;
   machineOnline?: boolean;
@@ -495,5 +500,83 @@ describe('#1453 停止在途时步先跑完：不推进、不补排已离开执�
     withPlanDoc(w);
     await expect(report(w, success())).resolves.toBeUndefined();
     expect(todoPhase(w)).toBe('confirm');
+  });
+});
+
+describe('#1453 同一竞态的其余形态', () => {
+  const report = (w: World, body: MachineDoneBody) =>
+    finishStep(machineDepsOf(w.s), w.machineId, w.stepId, body);
+  const move = async (w: World, phase: string) =>
+    expect((await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase })).status).toBe(200);
+  const buildError = (w: World) =>
+    w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()!.errorMessage;
+
+  test('closed 卡的 merge 步成功回报：回报不抛，卡仍 closed', async () => {
+    const w = makeWorld({ phase: 'review', stepStatus: 'claimed', stepKind: 'merge' });
+    await move(w, 'closed');
+    await expect(report(w, { status: 'success' })).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('closed');
+  });
+
+  test('closed 卡的 review 步带 blocking 成功回报：回报不抛，不入队重规划', async () => {
+    const w = makeWorld({ phase: 'review', stepStatus: 'claimed', stepKind: 'review' });
+    await move(w, 'closed');
+    const findings = {
+      conclusion: 'blocking',
+      findings: [{ id: '1', severity: 'blocking' as const, summary: 'x' }],
+    };
+    await expect(report(w, { status: 'success', findings })).resolves.toBeUndefined();
+    expect(todoPhase(w)).toBe('closed');
+    const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all();
+    expect(steps.map((r) => r.status)).toEqual(['done']);
+  });
+
+  test('done 卡的 build 步零改动成功回报：步 done，不被产物闸记成失败', async () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    await move(w, 'done');
+    await expect(report(w, { status: 'success', hasChanges: false })).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(buildError(w)).toBeNull();
+    expect(todoPhase(w)).toBe('done');
+  });
+
+  test('关卡后重开并重跑（新 build）：旧 build 的步迟到成功不推进卡', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    w.s.db
+      .insert(planTable)
+      .values({ id: `plan-${w.buildId}`, buildId: w.buildId, content: '# plan', createdAt: w.base })
+      .run();
+    await move(w, 'closed');
+    // 重开 + 重跑 = 新 build 成为 latest，卡回到 planning。
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: `${w.buildId}-rerun`,
+        todoId: w.todoId,
+        withPlan: true,
+        prevPhase: 'todo',
+        triggerSource: 'user',
+        createdAt: w.base,
+      })
+      .run();
+    w.s.db
+      .update(todoTable)
+      .set({ phase: 'planning', latestBuildId: `${w.buildId}-rerun` })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    await expect(report(w, { status: 'success' })).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('planning');
+  });
+
+  test('stop-and-done 预定 done 在途时 build 步先跑完：卡落 done，不进 review', async () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    const res = await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
+    expect(res.status).toBe(200);
+    expect(todoPhase(w)).toBe('building');
+    await expect(report(w, { status: 'success', hasChanges: true })).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('done');
   });
 });
