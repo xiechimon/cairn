@@ -3,16 +3,17 @@
 //   检查列表没读全（分页没读完）被当成全量；读到了、形状不对的 compare 被当成可等，
 //   每次巡检形状都一样，闸永远等下去；compare 或检查不是在 PR 的 head 上读的（比 PR
 //   旧或比 PR 新：缓存的响应、跨推送的两次读），摘要、判定与检查说的是别的提交，
-//   结果却报 PR 的 head；跨推送时文件数也变了，可等的竞态被报成留人的 compare-truncated。
+//   结果却报 PR 的 head；跨推送时文件数也变了，可等的竞态被报成留人的 compare-truncated；
+//   只信外壳填的 headSha，compare 自己的提交里没有 PR 的 head 也放过；PR 读不到时
+//   结果报出一个没有 head 的摘要。
 // - 检查：必需检查缺席被当绿（ci-loop 的宽限）；必需清单读不到退回「全部检查」；
 //   必需项由 commit status 而不是 check run 提供时漏判；pr-evidence 为 skipped /
 //   neutral 被当绿；pacman/merge-gate 本身被设成必需检查；只因自家 status 造成的
 //   unstable 把闸自己卡死；别家检查造成的 unstable 被放过，unstable 却看不到任何
 //   未通过的检查也放过，unstable 而检查读不到时不列 mergeable-state；GitHub 还报
-//   clean 时放过手上清单里别家未通过的检查；两个
-//   app 的同名检查里失败的那条被同名的通过盖掉；dirty / blocked / draft 等不可合并态
-//   被放过；自家 status 与必需检查名、fork 判定只认小写；merged 标志被忽略；head
-//   仓库已删时抛错。
+//   clean 时放过手上清单里别家未通过的检查；两个 app 的同名检查里失败的那条被同名的
+//   通过盖掉；dirty / blocked / draft 等不可合并态被放过；自家 status 与必需检查名、
+//   fork 判定只认小写；merged 标志被忽略；head 仓库已删时抛错。
 // - 补丁：只有证据或缺 blob sha 的补丁（等不来摘要）被当成可等；恰好 300 个文件的
 //   截断报成 patch-unbindable；证据目录外看不到 diff 的文件（二进制、diff 过大、纯
 //   改名）被放过，证据目录里的截图却被当成看不到 diff 而留人；证据前缀的大小写变体
@@ -25,7 +26,8 @@
 //   未绑定 head 的 tampered 被放过；抽取失败被当成通过；同摘要上后来的通过清不掉
 //   evidence_invalid 与 verify / review / chief 的提取失败；verify-missing 的 detail
 //   把当前补丁上失败的验证步说成别的补丁上的判定。
-// - 词表：blocker 顺序不稳导致 status 描述来回跳；码的类别被改，闸该留人时去等或去修。
+// - 词表：blocker 顺序不稳导致 status 描述来回跳；码的类别被改，闸该留人时去等或去修
+//   （码、类别与文案另由 shared 的快照测试冻结）。
 // - detail：PR 作者起的名字（换行、控制字符、指令样的文本、任意长）原样进 detail，再进
 //   status 描述与 chief 工具。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿），类别逐码写死。
@@ -1175,6 +1177,18 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(classesOf(i)).toEqual(notAtHead);
   });
 
+  test('compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha）', () => {
+    // 故事：外壳按分支名或从缓存读到一份停在 EARLIER 的 compare，headSha 却照 pr.headSha
+    // 填。响应自己的 commits 里没有 HEAD，文件与摘要说的是 EARLIER 的补丁。
+    const i = green();
+    i.compare = readAt(HEAD, { ...compare(i), commits: [EARLIER] });
+    pr(i).body = `evidence: ${link(EARLIER)}`;
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
   test('compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要', () => {
     // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER（改一行，文件数不变），
     // compare 读到的是 NEWER。HEAD 在 NEWER 的 base..head 里，文件数对得上，判定都绑在
@@ -1223,6 +1237,15 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
         ...elsewhere,
       ]);
     }
+  });
+
+  test('PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）', () => {
+    const i = green();
+    i.pr = null;
+    const r = mergeReadiness(i);
+    expect(r.headSha).toBeNull();
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual([['pr-unreadable', 'transient']]);
   });
 
   test('PR、compare 与检查都在同一个提交上读：照常判（都在后代 NEWER 上也 ready，报 NEWER 与它的摘要）', () => {

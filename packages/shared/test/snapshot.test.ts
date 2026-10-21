@@ -249,7 +249,7 @@ describe('协议词表快照（02 §5/§6 canonical）', () => {
     expect(DB_TABLES).toMatchSnapshot();
   });
 
-  it('合并闸 blocker 词表：码与类别，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述）', () => {
-    expect(MERGE_BLOCKERS.map((b) => `${b.code}: ${b.class}`)).toMatchSnapshot();
+  it('合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述）', () => {
+    expect(MERGE_BLOCKERS.map((b) => `${b.code}: ${b.class}, ${b.label}`)).toMatchSnapshot();
   });
 });
