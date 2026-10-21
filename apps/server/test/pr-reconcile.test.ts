@@ -56,6 +56,7 @@
 //   ㊱ 上一轮 sweep 没跑完时下一轮不进来（共享缓存与匿名额度）
 //   ㊲ 离开磨绿的 PR 不留 check-runs 缓存行
 //   ㊳ githubRepo 不是 owner/repo 形 → 不出站
+//   ㊳b githubRepo 有 `.` / `..` 段（#1466）→ 不出站（githubTarget 走 githubRepoOfProject）
 //   ㊴ 未连接 GitHub 时匿名额度按进程算（每小时上限），不只按 PR 算
 //   ㊵ 最新的完成执行步没回报 checkpoint → 用最近一个有 checkpoint 的步核对
 //   ㊶ 磨绿候选因有步在飞被跳过时，check-runs 缓存行留着
@@ -1393,6 +1394,17 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(mock.requests).toEqual([]);
     expect(w.todoRow().phase).toBe('review');
   });
+
+  test.each(['../user', 'octo/..', './demo'])(
+    '㊳b githubRepo %s with a dot segment (#1466) → no request',
+    async (githubRepo) => {
+      const w = makeWorld({ githubRepo });
+      const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+      await pollerFor(w, mock).sweep();
+      expect(mock.requests).toEqual([]);
+      expect(w.todoRow().phase).toBe('review');
+    },
+  );
 
   test('㊴ anonymous: reads across all PRs stay under a per-hour budget', async () => {
     const w = makeWorld();
