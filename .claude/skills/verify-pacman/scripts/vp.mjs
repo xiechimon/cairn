@@ -9,7 +9,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
@@ -266,7 +266,9 @@ function archiveCommand(argv) {
   const twice = names.find((n, i) => names.indexOf(n) !== i);
   if (twice !== undefined) fail(`two sources share the directory name ${twice}; archive them in separate runs`, 1);
   for (const { src, dest } of plans) {
-    mkdirSync(dest, { recursive: true });
+    // Only the parent: Node 24's cpSync with errorOnExist throws EEXIST when the
+    // target directory itself already exists, even empty.
+    mkdirSync(dirname(dest), { recursive: true });
     cpSync(src, dest, { recursive: true, errorOnExist: true, force: false });
     console.log(`vp: ${src} -> ${dest}`);
   }
