@@ -23,14 +23,12 @@ import {
   githubIssueSourceRef,
   githubReadToolParamsSchemas,
   isGithubRepoRef,
-  type SecretBox,
 } from '@pacman/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, todo } from '../db/schema.js';
 import { HttpError, notFound, parseWith } from '../lib/errors.js';
 import {
-  type FetchLike,
   type GithubListFailure,
   type GithubListResult,
   githubListIssues,
@@ -38,6 +36,7 @@ import {
   githubListWorkflowRuns,
 } from '../lib/github.js';
 import { openGithubToken } from './github-connection.js';
+import type { GithubIssueFaceDeps } from './github-issues.js';
 
 /** 单次 GitHub 读的超时。daemon relay 读工具 10s 超时（REMOTE_TOOL_TIMEOUT_MS），
  * 留 4s 给 relay 往返与本地处理。 */
@@ -50,12 +49,8 @@ const TEXT_MAX = 100;
 
 export type GithubReadToolName = keyof typeof githubReadToolParamsSchemas;
 
-export interface GithubReadDeps {
-  db: Db;
-  box: SecretBox;
-  /** 出站注入位（AppContext.githubFetch 同族；缺省 globalThis.fetch）。 */
-  githubFetch?: FetchLike;
-}
+/** 与 issue 读面同形：db + box（解 token）+ 可注入的出站 fetch。 */
+export type GithubReadDeps = GithubIssueFaceDeps;
 
 /** 第三方文本进模型前的处理：删格式字符（bidi 覆写、零宽、tag 字符——不可见，
  * 能颠倒显示或藏一段指令），控制字符、行 / 段分隔符与空白串并成一个空格，
@@ -65,6 +60,8 @@ export function cleanGithubText(value: string, max: number): string {
     .replace(/\p{Cf}/gu, '')
     .replace(/[\p{Cc}\p{Zl}\p{Zp}\s]+/gu, ' ')
     .trim();
+  // UTF-16 长度不小于码点数：没超就不必按码点拆。
+  if (flat.length <= max) return flat;
   const chars = [...flat];
   return chars.length <= max ? flat : `${chars.slice(0, max - 1).join('')}…`;
 }
@@ -173,23 +170,15 @@ function pageOf(params: { page?: number; perPage?: number }, max: number) {
   return { page: params.page ?? 1, perPage: Math.min(params.perPage ?? max, max) };
 }
 
-/** 本团队由这些 issue 建过的任务：sourceRef（小写比较，GitHub 的 owner/repo
- * 不分大小写）→ 序号最早那张任务的 id。别的团队的任务不算。 */
+/** 本团队由这些 issue 建过的任务：小写 sourceRef（GitHub 的 owner/repo 不分
+ * 大小写，refs 由调用方转小写）→ 序号最早那张任务的 id。别的团队的任务不算。 */
 function taskIdsBySourceRef(db: Db, teamId: string, refs: string[]): Map<string, string> {
   const ids = new Map<string, string>();
   if (refs.length === 0) return ids;
   const rows = db
     .select({ id: todo.id, sourceRef: todo.sourceRef })
     .from(todo)
-    .where(
-      and(
-        eq(todo.teamId, teamId),
-        inArray(
-          sql`lower(${todo.sourceRef})`,
-          refs.map((ref) => ref.toLowerCase()),
-        ),
-      ),
-    )
+    .where(and(eq(todo.teamId, teamId), inArray(sql`lower(${todo.sourceRef})`, refs)))
     .orderBy(asc(todo.seqNum))
     .all();
   for (const row of rows) {

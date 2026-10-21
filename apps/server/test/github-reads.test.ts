@@ -109,6 +109,8 @@ const ISSUES = fixture<RawIssue[]>('issues-open-page1.json');
 const PULLS = fixture<RawPull[]>('pulls-all-page1.json');
 /** 不过滤一页 3 条（exclude_pull_requests=true）。 */
 const RUNS = fixture<RawRuns>('runs-page1.json');
+/** branch=main&status=success 一页 2 条（上游按过滤回的真应答）。 */
+const RUNS_MAIN_SUCCESS = fixture<RawRuns>('runs-main-success.json');
 const NEXT_LINK = `<https://api.github.com/repositories/1361226985/issues?page=2>; rel="next"`;
 
 // —— 出站 mock：按 pathname 分发，记录 URL / 头 / signal ————————————————
@@ -597,21 +599,22 @@ describe('pull_requests / workflow_runs 读面', () => {
   });
 
   test('workflow runs 字段齐；branch / status 直透，exclude_pull_requests=true', async () => {
-    const w = world();
+    const w = world({ routes: defaultRoutes({ [RUNS_PATH]: { body: RUNS_MAIN_SUCCESS } }) });
     const result = await chief(w, 'workflow_runs', {
       projectId: w.projectId,
-      branch: 'claude/bootstrap-p3a',
+      branch: 'main',
       status: 'success',
     });
+    expect(RUNS_MAIN_SUCCESS.workflow_runs).toHaveLength(2);
     expect(result).toEqual({
       projectId: w.projectId,
       repo: REPO,
-      branch: 'claude/bootstrap-p3a',
+      branch: 'main',
       status: 'success',
       page: 1,
       perPage: 20,
       hasMore: false,
-      workflowRuns: RUNS.workflow_runs.map((r) => ({
+      workflowRuns: RUNS_MAIN_SUCCESS.workflow_runs.map((r) => ({
         id: r.id,
         name: r.name,
         headBranch: r.head_branch,
@@ -626,7 +629,7 @@ describe('pull_requests / workflow_runs 读面', () => {
     const call = w.mock.calls[0]!;
     expect(call.url.pathname).toBe(RUNS_PATH);
     expect(Object.fromEntries(call.url.searchParams)).toEqual({
-      branch: 'claude/bootstrap-p3a',
+      branch: 'main',
       status: 'success',
       exclude_pull_requests: 'true',
       page: '1',

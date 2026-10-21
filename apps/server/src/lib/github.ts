@@ -506,6 +506,20 @@ function loginOf(user: unknown): string | null {
   return optString((user as { login?: unknown } | null | undefined)?.login);
 }
 
+/** 列表读 URL：值为 undefined 的查询参数不带。 */
+function listUrl(
+  owner: string,
+  repo: string,
+  path: string,
+  params: Record<string, string | number | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  return `https://api.github.com/${repoPath(owner, repo)}/${path}?${query}`;
+}
+
 /** 数组体逐条投影：体不是数组 = 形坏；条目投影为 null 的跳过。 */
 function projectArray<T>(
   page: Awaited<ReturnType<typeof getListPage>>,
@@ -538,12 +552,11 @@ export async function githubListIssues(
   repo: string,
   opts: { state: 'open' | 'closed' | 'all'; page: number; perPage: number; timeoutMs: number },
 ): Promise<GithubListResult<GithubIssueListEntry>> {
-  const query = new URLSearchParams({
+  const url = listUrl(owner, repo, 'issues', {
     state: opts.state,
-    page: String(opts.page),
-    per_page: String(opts.perPage),
+    page: opts.page,
+    per_page: opts.perPage,
   });
-  const url = `https://api.github.com/${repoPath(owner, repo)}/issues?${query}`;
   return projectArray(await getListPage(fetchImpl, url, token, opts.timeoutMs), (raw) => {
     const issue = projectIssue(raw);
     if (issue === null) return null;
@@ -565,12 +578,11 @@ export async function githubListPulls(
   repo: string,
   opts: { state: 'open' | 'closed' | 'all'; page: number; perPage: number; timeoutMs: number },
 ): Promise<GithubListResult<GithubPullListEntry>> {
-  const query = new URLSearchParams({
+  const url = listUrl(owner, repo, 'pulls', {
     state: opts.state,
-    page: String(opts.page),
-    per_page: String(opts.perPage),
+    page: opts.page,
+    per_page: opts.perPage,
   });
-  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls?${query}`;
   return projectArray(await getListPage(fetchImpl, url, token, opts.timeoutMs), (raw) => {
     if (typeof raw.number !== 'number' || typeof raw.title !== 'string') return null;
     if (raw.state !== 'open' && raw.state !== 'closed') return null;
@@ -596,13 +608,13 @@ export async function githubListWorkflowRuns(
   repo: string,
   opts: { branch?: string; status?: string; page: number; perPage: number; timeoutMs: number },
 ): Promise<GithubListResult<GithubWorkflowRunEntry>> {
-  const query = new URLSearchParams();
-  if (opts.branch !== undefined) query.set('branch', opts.branch);
-  if (opts.status !== undefined) query.set('status', opts.status);
-  query.set('exclude_pull_requests', 'true');
-  query.set('page', String(opts.page));
-  query.set('per_page', String(opts.perPage));
-  const url = `https://api.github.com/${repoPath(owner, repo)}/actions/runs?${query}`;
+  const url = listUrl(owner, repo, 'actions/runs', {
+    branch: opts.branch,
+    status: opts.status,
+    exclude_pull_requests: 'true',
+    page: opts.page,
+    per_page: opts.perPage,
+  });
   return projectArray(
     await getListPage(fetchImpl, url, token, opts.timeoutMs),
     (raw) => {
