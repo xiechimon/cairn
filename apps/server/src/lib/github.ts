@@ -420,7 +420,7 @@ export async function githubRepoLabels(
 //   rel="next" 的 URL 读，只跟 api.github.com 上的 URL）
 // - GET repos/{o}/{r}/issues/{n}/events?per_page=100（条件读；上游按时间升序，
 //   最新的在后面的页；下一页同样按 Link rel="next" 读，只跟 api.github.com；
-//   投影 labeled / unlabeled / closed）
+//   投影 labeled / unlabeled / closed，带 performed_via_github_app 的 slug）
 // - GET repos/{o}/{r}/collaborators/{login}/permission（permission = legacy
 //   基础角色：maintain 映射为 write、triage 映射为 read；role_name = 实际角色）
 // - GET repos/{o}/{r}/issues/{n}（条件读，只投影 state；body 不出本模块）
@@ -539,6 +539,9 @@ export interface GithubIssueEvent {
   label: string | null;
   /** actor.login；账号已删（actor 为 null）→ null。 */
   actor: string | null;
+  /** performed_via_github_app.slug：经 GitHub App 操作（actor 仍是授权的
+   * 人）→ app 的 slug；不经 app、或缺 slug → null。只供审计，不进判据。 */
+  viaApp: string | null;
   /** created_at 的毫秒值。 */
   at: number;
 }
@@ -582,6 +585,7 @@ export async function githubIssueEvents(
     if (event !== 'labeled' && event !== 'unlabeled' && event !== 'closed') continue;
     const label = entry.label as { name?: unknown } | null | undefined;
     const actor = entry.actor as { login?: unknown } | null | undefined;
+    const app = entry.performed_via_github_app as { slug?: unknown } | null | undefined;
     const at = typeof entry.created_at === 'string' ? Date.parse(entry.created_at) : Number.NaN;
     const labelName = typeof label?.name === 'string' ? label.name : null;
     if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;
@@ -591,6 +595,7 @@ export async function githubIssueEvents(
       event,
       label: event === 'closed' ? null : labelName,
       actor: typeof actor?.login === 'string' ? actor.login : null,
+      viaApp: typeof app?.slug === 'string' ? app.slug : null,
       at,
     });
   }

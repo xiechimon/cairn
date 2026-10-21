@@ -64,6 +64,7 @@ import {
   ISSUE_INTAKE_INTERVAL_MS,
   ISSUE_INTAKE_LABEL,
   ISSUE_INTAKE_MAX_EVENT_PAGES,
+  ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS,
   ISSUE_INTAKE_PERMISSION_TTL_MS,
 } from '../src/services/issue-intake.js';
 import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
@@ -564,12 +565,13 @@ function chiefThreads(s: TestServer) {
 
 // —— 常量面 ————————————————————————————————————————————————————————————————
 
-test('常量：5 分钟一轮、标签 ready-for-agent、上限 3、permission 缓存有界', () => {
+test('常量：5 分钟一轮、标签 ready-for-agent、上限 3、permission 缓存有界、编排至多试 3 次', () => {
   expect(ISSUE_INTAKE_INTERVAL_MS).toBe(300_000);
   expect(ISSUE_INTAKE_LABEL).toBe('ready-for-agent');
   expect(ISSUE_INTAKE_IN_FLIGHT_CAP).toBe(3);
   expect(ISSUE_INTAKE_PERMISSION_TTL_MS).toBeGreaterThan(0);
   expect(ISSUE_INTAKE_PERMISSION_TTL_MS).toBeLessThanOrEqual(ISSUE_INTAKE_INTERVAL_MS * 12);
+  expect(ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS).toBe(3);
 });
 
 // —— 主路径 ————————————————————————————————————————————————————————————————
@@ -1765,7 +1767,9 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     const w = await makeWorld({ list: [1406] });
     const { intake, logs, flaky } = flakyIntake(w);
     for (let i = 0; i < 5; i++) await intake.sweep();
-    expect(logs.filter((l) => l.msg === 'issue intake orchestrate failed')).toHaveLength(3);
+    expect(logs.filter((l) => l.msg === 'issue intake orchestrate failed')).toHaveLength(
+      ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS,
+    );
     expect(logs.filter((l) => l.msg === 'issue intake orchestrate given up')).toHaveLength(1);
     // 放弃后即便恢复也不再自动编排：卡留在 todo 等人。
     flaky.failing = false;
