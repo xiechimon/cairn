@@ -1,0 +1,73 @@
+# pr-gate self-check after pr-gate run 6 on #1410 (head 2a1ddc1, no-go).
+# Run 6 found that a nested .gitattributes (for example apps/web/src/.gitattributes with
+# '*.ts -diff') is in the auto-merge set and makes numstat print '- -', so a later PR's line
+# count reads 0 and the 800-line limit never fires. .gitattributes is now protected, and the
+# line count takes attributes from the empty tree (git --attr-source=4b825dc...). Run 6's tests
+# reviewer also listed gate mutations the 37 cases did not catch; the self-check now has 47.
+
+== reproduction of the bypass in a scratch repo (git 2.43.0) ==
+main: apps/web/src/.gitattributes = '*.ts -diff'; branch feat adds 900 lines to apps/web/src/a.ts
+$ git diff --no-renames --numstat main...feat
+-	-	apps/web/src/a.ts
+$ git --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat main...feat
+900	0	apps/web/src/a.ts
+
+== the self-check against the gate at 2a1ddc1 (red) ==
+$ git show 2a1ddc1:.claude/workflows/pr-gate.js > pr-gate-2a1ddc1.js
+$ node scripts/pr-gate-selfcheck.mjs pr-gate-2a1ddc1.js
+FAIL  a nested .gitattributes routes to the user (run 6)
+FAIL  the line count ignores in-tree attributes (run 6)
+FAIL  the merge readiness gate source routes to the user (run 6)
+FAIL  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+43/47 passed (pr-gate-2a1ddc1.js)
+
+== the self-check on this branch (green) ==
+$ node scripts/pr-gate-selfcheck.mjs
+47/47 passed (.claude/workflows/pr-gate.js)
+
+== mutations: each one applied alone to this branch's gate, then the self-check ==
+(m1-m5 from run 5, r6a-r6n from run 6's tests reviewer, r6o-r6p for this round's fix)
+     45/47  m1 withdraw on any two answers
+     46/47  m2 unlisted files left out of the D4 match
+     46/47  m3 no deletedFiles subset check
+     45/47  m4 deleted-test directory regex removed
+     46/47  m5 deleted-test suffix regex removed
+     46/47  r6a e2e dropped from the directory regex
+     46/47  r6b tests and __tests__ dropped
+     46/47  r6c safety reviewer shown the caller list
+     46/47  r6d evidence isolation removed
+     46/47  r6e headSha check removed
+     46/47  r6f empty changedFiles allowed
+     46/47  r6g non-string paths allowed
+     46/47  r6h unlisted files left out of the auto-merge set check
+     46/47  r6i line limit off by one
+     46/47  r6j file limit off by one
+     46/47  r6k packages widened
+     46/47  r6l drizzle unprotected
+     46/47  r6m lockfile unprotected
+     46/47  r6n npmrc unprotected
+     46/47  r6o gitattributes unprotected
+     46/47  r6p line count without --attr-source
+
+== the mutations, as (name, text replaced, replacement) on .claude/workflows/pr-gate.js ==
+["m1 withdraw on any two answers", "if (answered.length === 2 && answered.every((v) => v.refuted)) {", "if (answered.length === 2) {"]
+["m2 unlisted files left out of the D4 match", "    ...unlistedFiles.filter(isProtected),\n", ""]
+["m3 no deletedFiles subset check", "  !args.deletedFiles.every((f) => args.changedFiles.includes(f)) ||\n", ""]
+["m4 deleted-test directory regex removed", "/(^|\\/)(e2e|test|tests|__tests__)\\//.test(f) || ", ""]
+["m5 deleted-test suffix regex removed", " || /\\.(test|spec)\\.[cm]?[jt]sx?$/.test(f)", ""]
+["r6a e2e dropped from the directory regex", "(e2e|test|tests|__tests__)", "(test|tests|__tests__)"]
+["r6b tests and __tests__ dropped", "(e2e|test|tests|__tests__)", "(e2e|test)"]
+["r6c safety reviewer shown the caller list", "readRules(d.key, d.key !== 'safety')", "readRules(d.key)"]
+["r6d evidence isolation removed", "    isolation: 'worktree',\n", ""]
+["r6e headSha check removed", "  !/^[0-9a-f]{40}$/.test(args.headSha) ||\n", ""]
+["r6f empty changedFiles allowed", "  args.changedFiles.length === 0 ||\n", ""]
+["r6g non-string paths allowed", "xs.every((f) => typeof f === 'string' && f.length > 0)", "xs.every((f) => f !== '')"]
+["r6h unlisted files left out of the auto-merge set check", "const outside = [...new Set([...changedFiles, ...unlistedFiles])].filter(", "const outside = [...new Set([...changedFiles])].filter("]
+["r6i line limit off by one", "lines > MAX_LINES", "lines >= MAX_LINES"]
+["r6j file limit off by one", "fileCount > MAX_FILES", "fileCount >= MAX_FILES"]
+["r6k packages widened", "  'packages/*/test/**',\n", "  'packages/**',\n"]
+["r6l drizzle unprotected", "  '**/drizzle/**',\n", ""]
+["r6m lockfile unprotected", "  'pnpm-lock.yaml',\n", ""]
+["r6n npmrc unprotected", "  '**/.npmrc',\n", ""]
+["r6o gitattributes unprotected", "  '**/.gitattributes',\n", ""]
+["r6p line count without --attr-source", "git --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff", "git diff"]
