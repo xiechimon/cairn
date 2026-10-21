@@ -1096,9 +1096,10 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
-    // #1403 G9：到不了 building 的相位（review 等）先拒，再落宣告行——否则审计里留下
-    // 一行没发生的「通过了确认」（setTodoPhase 同一判据：同相位放行，其余按边表）。
-    if (todoRecord.phase !== 'building') assertPhaseTransition(todoRecord.phase, 'building');
+    // #1403 G9：到不了 building 的相位先拒，再落宣告行——否则审计里留下一行没发生的
+    // 「通过了确认」。review 关口如此；已在 building 的第二次确认（双击、chief 与人同时
+    // 确认）同样拒，不再多落一行、多排一个执行步。
+    assertPhaseTransition(todoRecord.phase, 'building');
     // #902 确认闸通过宣告行（MERGE/REVIEW 同族行形）：actor 位答「在场的
     // 是谁」——此前 confirm 闸被按过在库里零痕迹（#892 §6 建议 3）。
     insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);

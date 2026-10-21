@@ -141,6 +141,8 @@ export interface GithubPull extends GithubPullState {
   baseRef: string | null;
   baseRepoId: number | null;
   defaultBranch: string | null;
+  /** 目标仓现在的 owner（base.repo.owner.login；仓库改名或转移后是新名字）；缺失 = null。 */
+  baseOwner: string | null;
 }
 
 export interface GithubPullPage {
@@ -213,7 +215,10 @@ export async function githubPull(
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
-    base?: { ref?: unknown; repo?: { id?: unknown; default_branch?: unknown } | null } | null;
+    base?: {
+      ref?: unknown;
+      repo?: { id?: unknown; default_branch?: unknown; owner?: { login?: unknown } | null } | null;
+    } | null;
   };
   // merged 缺失或不是布尔 → 读不到：不能把一次被裁掉的响应读成「关闭未合并」。
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
@@ -236,6 +241,7 @@ export async function githubPull(
       baseRepoId: typeof raw.base?.repo?.id === 'number' ? raw.base.repo.id : null,
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
+      baseOwner: optString(raw.base?.repo?.owner?.login),
     },
   };
 }
@@ -303,28 +309,30 @@ export async function githubBranchPulls(
     per_page: 10,
   });
   const got = await conditionalGetJson(fetchImpl, url, token, null, FETCH_TIMEOUT_MS);
-  if (got === null || got.notModified || !Array.isArray(got.data)) return null;
-  const pulls: GithubBranchPull[] = [];
-  for (const raw of got.data as unknown[]) {
-    const p = raw as {
-      number?: unknown;
-      state?: unknown;
-      merged_at?: unknown;
-      head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
-      base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
-    } | null;
-    if (typeof p?.number !== 'number' || (p.state !== 'open' && p.state !== 'closed')) continue;
-    pulls.push({
-      number: p.number,
-      state: p.state,
-      merged: typeof p.merged_at === 'string',
-      headRef: optString(p.head?.ref),
-      headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
-      baseRef: optString(p.base?.ref),
-      baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
-    });
-  }
-  return pulls;
+  if (got === null || got.notModified) return null;
+  const page = projectArray<GithubBranchPull>(
+    { ok: true, data: got.data, hasMore: false },
+    (raw) => {
+      const p = raw as {
+        number?: unknown;
+        state?: unknown;
+        merged_at?: unknown;
+        head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+        base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+      };
+      if (typeof p.number !== 'number' || (p.state !== 'open' && p.state !== 'closed')) return null;
+      return {
+        number: p.number,
+        state: p.state,
+        merged: typeof p.merged_at === 'string',
+        headRef: optString(p.head?.ref),
+        headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
+        baseRef: optString(p.base?.ref),
+        baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+      };
+    },
+  );
+  return page.ok ? page.items : null;
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；

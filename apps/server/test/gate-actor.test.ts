@@ -30,6 +30,7 @@ import {
   agent as agentTable,
   build as buildTable,
   message as messageTable,
+  step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { startBuilds } from '../src/services/builds.js';
@@ -322,7 +323,8 @@ describe('#901 手动改相 confirm/review→done 审计行（server 面）', ()
 
 // #1403 G9（spec 28 §2.2）：confirm 动作在 review 关口上曾先落「通过了确认」行，再在
 // setTodoPhase（review → building 不是相位机的边）上 409——审计里多出一行没发生的过闸。
-// 拒绝要在落行之前；confirm 关口照常落行并进 building（上文失败方式 1/3）。
+// 拒绝要在落行之前；已在 building 的第二次确认同样拒（不多落行、不多排执行步）；confirm
+// 关口照常落行并进 building（上文失败方式 1/3）。
 describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
   test('G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged', async () => {
     const s = await withReviewTodo();
@@ -339,14 +341,26 @@ describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
     }
   });
 
-  test('G6 the check refuses only what the phase funnel refuses: a todo already in building is accepted as before', async () => {
+  test('G6 a second confirm on a todo already in building → 409, no second row, no second build step', async () => {
     const s = await withConfirmTodo();
     try {
-      s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, s.todoId)).run();
-      const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+      const first = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
         action: 'confirm',
       });
-      expect(res.status).toBe(202);
+      expect(first.status).toBe(202);
+      const second = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+        action: 'confirm',
+      });
+      expect(second.status).toBe(409);
+      const rows = rowsOf(s, s.buildId).filter((m) => m.content === CONFIRM_ANNOUNCEMENT);
+      expect(rows).toHaveLength(1);
+      const buildSteps = s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.buildId, s.buildId))
+        .all()
+        .filter((st) => st.kind === 'build');
+      expect(buildSteps).toHaveLength(1);
     } finally {
       s.dispose();
     }

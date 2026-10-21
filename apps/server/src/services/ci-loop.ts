@@ -59,10 +59,11 @@
 // - build 上记的 PR 号只在非审核步收尾时由 daemon 探测刷新：人在 review 期间关掉
 //   它、从同一工作分支另开一张时，记的号就过时了（#1403 段 2）。确认关闭之后、打回
 //   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
-//   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`）：有本 build 自己的
-//   另一张（同一个仓、本 build 的工作分支、开着或已合并；开着的优先，否则编号最大的
-//   已合并的）→ 改记它（号与链接）、落一行，不打回、不提示，下一轮读它；列不到 →
-//   不写，关闭照样算看到过。
+//   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
+//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
+//   那张新的已合并的）→ 改记它（号与链接）、落一行，不打回、不提示，下一轮读它；记的那
+//   张在列表里又开着 → 按重开，不打回；列不到 → 不写，下一轮再列。记的 PR 开着但不是
+//   本 build 的，同样走这条路。
 // - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
 //   字符（双向覆盖、零宽字符）、截到 100 个字符（会话行经 chief / MCP 的会话读
 //   工具交给 agent，也在 web 时间线上显示）。
@@ -438,19 +439,21 @@ export function createCiPoller(
 
   /** 本 build 工作分支往默认分支的 PR（见文件头）。只认本 build 自己的：head 仓与 base
    * 仓都是记的那张 PR 的目标仓（按仓库 id）、head 分支是本 build 的工作分支、目标是默认
-   * 分支，且开着或已合并。同一个分支可以先后开过好几张 PR：开着的优先（早先合并的那张
-   * 不能盖住正在进行的这张），否则取编号最大的已合并的一张。记的那张在两次读之间被重开
-   * 时，返回的就是它自己。'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
+   * 分支。记的那张在两次读之间被重开（列表里它开着）→ 返回它自己，调用方按重开处理。
+   * 否则开着的那张优先；没有开着的，取比记的那张新（编号大）的已合并的一张里编号最大的：
+   * 同一个分支可以先后开过好几张 PR，比记的那张早的已合并 PR 是旧事，不是它的替身（人
+   * 关掉新的这张，就是不要这次改动）。head 过滤用响应里目标仓现在的 owner（仓库改名或
+   * 转移后存的名字会过时）。'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
   async function ownBranchPull(
     branch: string,
     target: { owner: string; repo: string },
     token: string | null,
-    recorded: { number: number; baseRepoId: number; defaultBranch: string },
+    recorded: { number: number; baseRepoId: number; defaultBranch: string; owner: string },
     now: number,
   ): Promise<GithubBranchPull | null | 'unreadable' | 'skipped'> {
     if (token === null && !takeAnonRead(now)) return 'skipped';
     const list = await githubBranchPulls(run.githubFetch, token, target.owner, target.repo, {
-      head: `${target.owner}:${branch}`,
+      head: `${recorded.owner}:${branch}`,
       base: recorded.defaultBranch,
     });
     if (list === null) return 'unreadable';
@@ -459,11 +462,12 @@ export function createCiPoller(
         p.headRepoId === recorded.baseRepoId &&
         p.baseRepoId === recorded.baseRepoId &&
         p.headRef === branch &&
-        p.baseRef === recorded.defaultBranch &&
-        (p.state === 'open' || p.merged),
+        p.baseRef === recorded.defaultBranch,
     );
+    const reopened = own.find((p) => p.number === recorded.number && p.state === 'open');
+    if (reopened !== undefined) return reopened;
     const open = own.filter((p) => p.state === 'open');
-    const pool = open.length > 0 ? open : own;
+    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > recorded.number);
     return pool.reduce<GithubBranchPull | null>(
       (best, p) => (best === null || p.number > best.number ? p : best),
       null,
@@ -595,7 +599,19 @@ export function createCiPoller(
       pull = page.notModified ? (entry?.pull ?? null) : page.pull;
       pullCache.set(key, { etag: page.etag, pull });
     }
-    if (pull === null || pull.state === 'open') {
+    const branch = conversationBranch(cand.buildId);
+    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时 headRepoId
+    // 是 null，同样对不上。字段不齐时不算（下文按读不到）。
+    const foreign =
+      pull !== null &&
+      pull.headRef !== null &&
+      pull.baseRepoId !== null &&
+      pull.baseRef !== null &&
+      pull.defaultBranch !== null &&
+      (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch);
+    // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
+    // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
+    if (pull === null || (pull.state === 'open' && !foreign)) {
       closedSeenAt.delete(key);
       tally.reviewPending += 1;
       return;
@@ -621,25 +637,29 @@ export function createCiPoller(
       tally.reviewUnreadable += 1;
       return;
     }
-    const branch = conversationBranch(cand.buildId);
-    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时
-    // headRepoId 是 null，同样对不上。对不上的结果留在缓存里（PR 的 head 不会变）。
-    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
+    const recorded = {
+      number: prNumber,
+      baseRepoId: pull.baseRepoId,
+      defaultBranch: pull.defaultBranch,
+      owner: pull.baseOwner ?? target.owner,
+    };
+    // 不是本 build 的 PR：结果留在缓存里（PR 的 head 不会变）。
+    if (foreign) {
       const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
       // 每轮提示之前先看工作分支上有没有本 build 自己的 PR；提示落了之后本轮不再列。
       if (!rowKnown(cand.buildId, foreignText, since)) {
-        const own = await ownBranchPull(
-          branch,
-          target,
-          token,
-          { number: prNumber, baseRepoId: pull.baseRepoId, defaultBranch: pull.defaultBranch },
-          now,
-        );
+        const own = await ownBranchPull(branch, target, token, recorded, now);
+        // 列不到：这次不写（不提示也不改记），下一轮再列。
+        if (own === 'unreadable' || own === 'skipped') {
+          if (own === 'unreadable') tally.reviewUnreadable += 1;
+          else tally.reviewSkipped += 1;
+          return;
+        }
         if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
           tally.reviewSkipped += 1;
           return;
         }
-        if (typeof own === 'object' && own !== null) {
+        if (own !== null) {
           adoptPull(
             cand.buildId,
             todoRow.teamId,
@@ -800,13 +820,7 @@ export function createCiPoller(
       return;
     }
     // 打回之前看工作分支上有没有本 build 的另一张 PR（见文件头）。
-    const sibling = await ownBranchPull(
-      branch,
-      target,
-      token,
-      { number: prNumber, baseRepoId: pull.baseRepoId, defaultBranch: pull.defaultBranch },
-      now,
-    );
+    const sibling = await ownBranchPull(branch, target, token, recorded, now);
     if (sibling === 'unreadable' || sibling === 'skipped') {
       // 不写；关闭照样算看到过，下一次读确认之后再列一次。
       if (sibling === 'unreadable') tally.reviewUnreadable += 1;

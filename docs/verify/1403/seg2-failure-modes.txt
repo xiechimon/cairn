@@ -33,7 +33,10 @@ A8  Anonymous: the list read uses the slot the pulls read reserved and is counte
     reconcile's own hourly budget is not exceeded.
 A9  The recorded PR is foreign (the #1217 / #1195 shape of pin 9b) and the build has its
     own PR on its branch -> adopted, no foreign hint. Without one -> the foreign hint as
-    in segment 1, and the list is read once per round, not every sweep.
+    in segment 1, and the list is read once per round, not every sweep. If the list
+    read fails, nothing is written and the next sweep lists again (A9c).
+A9d The recorded PR is open but not the build's own (another branch, a fork) -> it is
+    not left pending forever: the build's own PR is adopted, or one hint per round.
 A10 After an adoption the old PR number is not read again.
 A11 One branch can carry several PRs into one base (the live capture of a reused branch
     lists seven merged ones, seg2-live-capture.txt). An open PR is adopted before any
@@ -50,7 +53,11 @@ A14 The list parser reads the live response shape (number, state, merged_at, hea
     base=<default>, per_page=10.
 A15 The recorded PR shows up open in the list (it was reopened between the confirming
     read and the list read) -> not failed, nothing written, the close counts from the
-    next read again.
+    next read again; also when the list holds another open PR of the branch (A15b).
+A16 A merged PR older than the recorded one (earlier work on the same branch) is not a
+    replacement: a person who closed the newer PR rejected the change, so the card fails.
+A17 After a rename or transfer the stored owner is stale: the head filter uses the owner
+    the PR response names (base.repo.owner.login), falling back to the stored one.
 
 Item 3: G9, the review gate wake text
 -------------------------------------
@@ -63,8 +70,10 @@ G3  A watched todo entering review through the phase funnel enqueues a chief wak
 G4  confirm_builds (chief) on a build whose todo is in review writes the "通过了确认" row,
     then fails with an illegal phase transition -> it must fail before writing the row.
 G5  confirm at the confirm gate still writes the row and moves the todo to building.
-G6  The new check refuses only what the phase funnel refuses (setTodoPhase lets the same
-    phase through): a confirm on a todo already in building is accepted as before.
+G6  A second confirm on a todo already in building (a double click, the chief and a
+    person at once) wrote a second row and queued a second build step -> refused with
+    409, one row, one build step. (Raised by /code-review; the first version of the
+    check let the same phase through.)
 
 Item 4: test pins for rules that had no test at f8ab21b
 -------------------------------------------------------

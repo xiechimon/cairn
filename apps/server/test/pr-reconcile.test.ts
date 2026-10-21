@@ -181,6 +181,8 @@ interface PullSpec {
   headRepoId?: number;
   /** base.repo.full_name（缺省 octo/demo）。 */
   baseRepo?: string;
+  /** base.repo.owner.login（缺省不带 owner）。 */
+  baseOwner?: string;
   /** base.repo 里没有 id。 */
   noBaseRepoId?: boolean;
   /** 响应里没有 merged 字段（被裁掉的响应体）。 */
@@ -330,6 +332,7 @@ class PullsMock {
               repo: {
                 ...(spec.noBaseRepoId ? {} : { id: REPO_ID }),
                 full_name: spec.baseRepo ?? 'octo/demo',
+                ...(spec.baseOwner === undefined ? {} : { owner: { login: spec.baseOwner } }),
                 ...(spec.noDefaultBranch ? {} : { default_branch: spec.defaultBranch ?? 'main' }),
               },
             },
@@ -2400,6 +2403,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRef: 'main',
       baseRepoId: 1361226985,
       defaultBranch: 'main',
+      baseOwner: 'xiechimon',
     });
   });
 
@@ -2417,6 +2421,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRef: 'main',
       baseRepoId: 1361226985,
       defaultBranch: 'main',
+      baseOwner: 'xiechimon',
     });
   });
 
@@ -2773,6 +2778,92 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     );
     await sweepTwice(pollerFor(w, mock));
     expect(w.buildRow().prNumber).toBe(expected);
+  });
+
+  test('[s2-A15b] the recorded PR is open again and the list also has a higher open PR of the branch → still a reopen, nothing recorded', async () => {
+    const { w, mock } = closedWithSibling();
+    headRefs.set(221, conversationBranch(w.buildId));
+    mock.branchPulls = [{ number: 221 }, { number: w.prNumber }];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[s2-A16] only a merged PR older than the recorded one is on the branch → not recorded; the close of the newer one stands', async () => {
+    const { w, mock } = closedWithSibling();
+    headRefs.set(150, conversationBranch(w.buildId));
+    mock.branchPulls = [{ number: 150, state: 'closed', merged: true }];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.todoRow().phase).toBe('failed');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(closedRows(w)).toHaveLength(1);
+  });
+
+  test('[s2-A17] the list asks for the owner the PR response names, not the stored one (renamed or transferred repository)', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: false, baseOwner: 'octo-moved' },
+    });
+    await sweepTwice(pollerFor(w, mock));
+    const listed = decodeURIComponent(mock.listRequests()[0] ?? '');
+    expect(listed).toContain(`head=octo-moved:${conversationBranch(w.buildId)}`);
+  });
+
+  test.each([502, 'throw'] as const)(
+    '[s2-A9c] the recorded PR is foreign and the list read fails (%s) → nothing written; the next sweep lists again',
+    async (failure) => {
+      const w = makeWorld({ connected: true, newerBuildPr: 201 });
+      headRefs.set(201, conversationBranch(w.buildId));
+      const currentBuildId = String(
+        w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+      );
+      headRefs.set(305, conversationBranch(currentBuildId));
+      const mock = new PullsMock({
+        201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+      });
+      mock.branchPulls = failure;
+      const poller = pollerFor(w, mock);
+      await poller.sweep();
+      const systemRows = () =>
+        w.s.db
+          .select()
+          .from(messageTable)
+          .all()
+          .filter((r) => r.role === 'system');
+      expect(systemRows()).toEqual([]);
+      mock.branchPulls = [{ number: 305 }];
+      await poller.sweep(Date.now() + 60_000);
+      expect(mock.listRequests()).toHaveLength(2);
+      const current = w.s.db
+        .select()
+        .from(buildTable)
+        .where(eq(buildTable.id, currentBuildId))
+        .get();
+      expect(current?.prNumber).toBe(305);
+    },
+  );
+
+  test("[s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round", async () => {
+    const adopt = makeWorld({ connected: true });
+    headRefs.set(adopt.prNumber, 'someone-else/feature'); // the daemon recorded a PR from another branch
+    headRefs.set(202, conversationBranch(adopt.buildId));
+    const mock = new PullsMock({ [adopt.prNumber]: { state: 'open', merged: false } });
+    mock.branchPulls = [{ number: 202 }];
+    await pollerFor(adopt, mock).sweep();
+    expect(adopt.buildRow().prNumber).toBe(202);
+    expect(adopt.todoRow().phase).toBe('review');
+
+    const hint = makeWorld({ connected: true });
+    headRefs.set(hint.prNumber, 'someone-else/feature');
+    const mock2 = new PullsMock({ [hint.prNumber]: { state: 'open', merged: false } });
+    const poller = pollerFor(hint, mock2);
+    await poller.sweep();
+    await poller.sweep(Date.now() + 60_000);
+    expect(mock2.listRequests()).toHaveLength(1);
+    const hints = hint.systemRows().filter((c) => c.includes(`PR #${hint.prNumber} 的 head`));
+    expect(hints).toHaveLength(1);
+    expect(hint.buildRow().prNumber).toBe(hint.prNumber);
   });
 
   test('[s2-A13] the recorded URL is built from the repository and number, not taken from the response', async () => {
