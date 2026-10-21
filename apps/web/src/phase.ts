@@ -48,8 +48,8 @@ export const isInFlightPhase = (phase: string): boolean => IN_FLIGHT_PHASES.has(
 export const PHASE_UI: Record<Phase, PhaseUi> = {
   todo: { chip: '待开始', tone: 'idle', action: '开始', placeholder: null },
   // queued is already started (shared IN_PROGRESS_PHASES): no primary, same
-  // as planning/building. The wait reason is the transcript's 排队中 row and
-  // the card's 等机器 meta (#1423).
+  // as planning/building. The detail transcript's 排队中 row says what it
+  // waits for; a held card (等机器 / 等额度) also says so in its meta (#1423).
   queued: { chip: '排队中', tone: 'idle', action: null, placeholder: null },
   planning: {
     chip: '规划中',
