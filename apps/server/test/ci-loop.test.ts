@@ -255,6 +255,10 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
   };
 }
 
+/** addCandidate 的 PR 号：逐个递增。磨绿缓存按「仓#PR 号」存，各 mock 的 etag 缺省
+ * 相同；两个候选撞号时后一个会拿前一个的 etag 读到 304、复用前一个的判据。 */
+let nextCandidatePr = 1000;
+
 /** 多候选世界（批量扫描面）：同一 server 上再种一棵 PR 树，各自配 mock。 */
 function addCandidate(
   s: TestServer,
@@ -263,7 +267,7 @@ function addCandidate(
 ) {
   const rnd = Math.random().toString(36).slice(2, 8);
   const base = Date.now();
-  const prNumber = opts.prNumber ?? 100 + Math.floor(Math.random() * 900);
+  const prNumber = opts.prNumber ?? nextCandidatePr++;
   const projectId = `proj-ci-${rnd}`;
   const todoId = `todo-ci-${rnd}`;
   const buildId = `build-ci-${rnd}`;

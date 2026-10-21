@@ -40,7 +40,7 @@
 //   ㉕ checkpoint 不是 40 位十六进制 SHA → 不拼进请求 URL，留在 review 并提示
 //   ㉖ 合并与审核两个人手动作在 await 窗内被对账收尾抢先 → 不入队合并步 /
 //      审核步（requestMerge 与 applyBuildStepAction review 在 await 后重读相位）
-//   ㉗ 响应里缺 base 或 default_branch → 不当成合进默认分支
+//   ㉗ 响应里缺 base、base.ref 或 default_branch → 不当成合进默认分支
 //   ㉘ pulls 读或 compare 读的网络窗里有步开始在飞（人点了合并）→ 不写
 //   ㉙ 提示行里的分支名按数据引出，执行步回报的 checkpoint 原文不进提示
 //   ㉚ 合并响应缺 head sha 而本 build 有 checkpoint → 无法核对，不收尾
@@ -48,7 +48,7 @@
 //   ㉜ 离开 review 的 PR 不留缓存行（进程常驻）：回到 review 后第一次读不带 etag
 //   ㉝ #931 返工复用同一个 build：上一轮的标记不挡这一轮
 //   ㉞ 人手「标记为已完成」后又拖回 review，之后 PR 才合并 → 照样收尾
-//   ㉟ 合并步在人手 done 之后完成 → 落完成行
+//   ㉟ 合并步在人手 done 之后才回报完成 → 只记步（#1453），不落完成行
 //   ㊱ 上一轮 sweep 没跑完时下一轮不进来（共享缓存与匿名额度）
 //   ㊲ 离开磨绿的 PR 不留 check-runs 缓存行
 //   ㊳ githubRepo 不是 owner/repo 形 → 不出站
@@ -63,7 +63,6 @@
 //   ㊼ compare 带 per_page=1：提交只取一条（GitHub 在第一页照样给出改动文件列表）
 //   ㊽ 第二次读不到 compare 的网络窗内卡离开 review → 不写提示
 //   [49] 收尾时停掉的等额度 verify 步，在发出的 done 文档里不留等额度投影
-//        （卡本来就是 done 时也要补发一次）
 //   [50] 匿名额度：pulls 读要等额度里也留得出它可能需要的那次 compare
 //   [51] 关闭后立刻重开（为重跑 CI）→ 不打成 failed：关闭要两次读都还在才算
 //   [52] 响应里没有 merged 字段 → 读不到，不当成关闭未合并
@@ -75,11 +74,11 @@
 //   [57] 关闭确认按两次读真正发生的时刻算，不按 sweep 开始的时刻（慢的一轮之后
 //        紧跟快的一轮，两次读可能只隔十几秒）
 //   [58] 已合并的 PR 不会再变：卡留在 review（提示、人拖回）时不重读
-//   [59] 合并步收尾时相位已被人改成不能到 done 的（closed）→ 先抛非法相位转移错，
-//        不停任何步
+//   [59] done 收尾漏斗遇上到不了 done 的相位（人关掉的 closed，或已经是 done）→ 先抛
+//        非法相位转移错，不停任何步
 //   [60] checkpoint 不是 40 位 SHA 时 compare 不发请求，也不占匿名额度
-//   [61] 已合并的响应缺对账要的字段（head、base、base 仓 id，有 checkpoint 时的
-//        head sha）→ 不当终态缓存，之后照常节流重读（不带那次响应的 etag）
+//   [61] 已合并的响应缺对账要的字段（head、base.ref、default_branch、base 仓 id，有
+//        checkpoint 时的 head sha）→ 不当终态缓存，之后照常节流重读（不带那次响应的 etag）
 //   [62] PR 号是 daemon 按分支名查到的（gh pr list --head 只比分支名）：公开仓里
 //        别人 fork 的同名分支开的 PR 也会被读成本 build 的。head 仓与 base 仓是同一个
 //        仓（同一份响应里按仓库 id 比：仓库改名或转移后照样对得上）、head 分支是本
@@ -91,6 +90,12 @@
 //        截到 100 个字符
 //   [66] 真实 GitHub 响应（test/fixtures/github，docs/verify/1403 同存）按对账用到的
 //        字段解析
+//   [67] 关闭要两次紧挨着的读都看到才算：两次读之间有一段没读（有步在飞而跳过，含读的
+//        网络窗里步开始）或有一次读不到 → 之前那次关闭不算数，从下一次读重新数（中间
+//        可能重开又关过）；未连接 GitHub 时每 5 分钟一次的节流不算空档
+//   [68] 合并之后 verify 步又推了提交（daemon 除审核步外每一步收尾都提交并推送）→ 那个
+//        提交不在这次合并里，不收尾，提示一次
+//   [69] sweep 日志里每个对账候选恰好落进一个计数（提示已落之后的各轮同样计数）
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import { readFileSync } from 'node:fs';
@@ -150,6 +155,10 @@ interface PullSpec {
   baseRef?: string;
   defaultBranch?: string;
   noBase?: boolean;
+  /** base 里没有 ref（base.repo 与它的 id 照常）。 */
+  noBaseRef?: boolean;
+  /** base.repo 里没有 default_branch（id 照常）。 */
+  noDefaultBranch?: boolean;
   /** 响应里没有 head。 */
   noHead?: boolean;
   /** head 里没有 sha（ref 与 repo 照常）。 */
@@ -264,11 +273,11 @@ class PullsMock {
         base: spec.noBase
           ? undefined
           : {
-              ref: spec.baseRef ?? 'main',
+              ...(spec.noBaseRef ? {} : { ref: spec.baseRef ?? 'main' }),
               repo: {
                 ...(spec.noBaseRepoId ? {} : { id: REPO_ID }),
                 full_name: spec.baseRepo ?? 'octo/demo',
-                default_branch: spec.defaultBranch ?? 'main',
+                ...(spec.noDefaultBranch ? {} : { default_branch: spec.defaultBranch ?? 'main' }),
               },
             },
       }),
@@ -1105,13 +1114,27 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows()).toEqual([]);
   });
 
-  test('㉗ a merged response without base or default_branch is not taken as a merge into the default branch', async () => {
-    const w = makeWorld();
-    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, noBase: true } });
-    await pollerFor(w, mock).sweep();
-    expect(w.todoRow().phase).toBe('review');
-    expect(w.systemRows()).toEqual([]);
-  });
+  test.each([
+    ['base', { noBase: true }],
+    // base.repo.id is there, so these two pass the ownership check and reach the base-branch guard
+    ['base.ref', { noBaseRef: true }],
+    ['default_branch', { noDefaultBranch: true }],
+  ] as const)(
+    '㉗ a merged response without %s is not taken as a merge into the default branch',
+    async (_label, missing) => {
+      const w = makeWorld();
+      const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, ...missing } });
+      const info = vi.fn();
+      await createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox },
+        { githubFetch: mock.fetch, logger: { info } },
+      ).sweep();
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.systemRows()).toEqual([]);
+      const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
+      expect(tally.reviewUnreadable).toBe(1);
+    },
+  );
 
   test.each(['pulls', 'compare'] as const)(
     '㉘ a merge step starts while the %s read is in flight → no write',
@@ -1219,13 +1242,26 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('㉟ the merge step completes after a manual done: completion row written', () => {
+  test('㉟ the merge step reports done after a person marked the card done: only the step is recorded, no completion row', () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    const mergeStepId = `step-merge-late-${w.buildId}`;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: mergeStepId,
+        buildId: w.buildId,
+        kind: 'merge',
+        status: 'claimed',
+        createdAt: Date.now(),
+      })
+      .run();
     updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
-    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    // the production path: the machine's done report goes through completeStep (#1453)
+    completeStep(w.s.svc, mergeStepId);
     expect(w.todoRow().phase).toBe('done');
-    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+    expect(w.stepRows().find((r) => r.kind === 'merge')?.status).toBe('done');
+    expect(w.systemRows()).toEqual([]);
   });
 
   test('㊱ a sweep that starts while the last one runs does nothing', async () => {
@@ -1422,37 +1458,27 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows()).toEqual([]);
   });
 
-  test.each([
-    ['the reconcile finishes the card', false],
-    ['the merge step finishes a card a person already marked done', true],
-  ] as const)(
-    '[49] %s: the done card is published without the quota wait of the verify step it stopped',
-    async (_label, doneFirst) => {
-      const w = makeWorld({ connected: true, inflight: 'waiting_quota', inflightKind: 'verify' });
-      w.s.db
-        .update(stepTable)
-        .set({ quotaBlock: QUOTA_BLOCK })
-        .where(eq(stepTable.buildId, w.buildId))
-        .run();
-      w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
-      if (doneFirst) updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
-      const hub = w.s.svc.hub;
-      const docs: Parameters<typeof hub.publishTodoDoc>[1][] = [];
-      const publish = hub.publishTodoDoc.bind(hub);
-      hub.publishTodoDoc = (teamId, doc) => {
-        docs.push(doc);
-        publish(teamId, doc);
-      };
-      if (doneFirst) finishTodoDone(w.s.svc, w.todoId, w.buildId);
-      else {
-        const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
-        await pollerFor(w, mock).sweep();
-      }
-      expect(w.todoRow().phase).toBe('done');
-      expect(docs.at(-1)?.phase).toBe('done');
-      expect(docs.at(-1)?.quotaWait).toBeNull();
-    },
-  );
+  test('[49] the reconcile finishes the card: the done card is published without the quota wait of the verify step it stopped', async () => {
+    const w = makeWorld({ connected: true, inflight: 'waiting_quota', inflightKind: 'verify' });
+    w.s.db
+      .update(stepTable)
+      .set({ quotaBlock: QUOTA_BLOCK })
+      .where(eq(stepTable.buildId, w.buildId))
+      .run();
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    const hub = w.s.svc.hub;
+    const docs: Parameters<typeof hub.publishTodoDoc>[1][] = [];
+    const publish = hub.publishTodoDoc.bind(hub);
+    hub.publishTodoDoc = (teamId, doc) => {
+      docs.push(doc);
+      publish(teamId, doc);
+    };
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('done');
+    expect(docs.at(-1)?.phase).toBe('done');
+    expect(docs.at(-1)?.quotaWait).toBeNull();
+  });
 
   test('[50] anonymous: a pulls read waits until the budget also has room for the compare it may need', async () => {
     const w = makeWorld({ checkpoint: 'a'.repeat(40) });
@@ -1626,15 +1652,19 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows().filter((c) => c.includes('release-x'))).toHaveLength(1);
   });
 
-  test('[59] the merge step finishing a card a person closed meanwhile throws before it stops anything', () => {
-    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
-    updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
-    expect(() => finishTodoDone(w.s.svc, w.todoId, w.buildId)).toThrow(
-      'illegal phase transition: closed -> done',
-    );
-    expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
-    expect(w.systemRows()).toEqual([]);
-  });
+  test.each(['closed', 'done'] as const)(
+    '[59] the done funnel on a card a person moved to %s throws before it stops anything',
+    (phase) => {
+      const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
+      w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+      updateTodo(w.s.svc, w.todoId, { phase }, { manualPhase: true });
+      expect(() => finishTodoDone(w.s.svc, w.todoId, w.buildId)).toThrow(
+        `illegal phase transition: ${phase} -> done`,
+      );
+      expect(w.stepRows().find((r) => r.kind === 'verify')?.status).toBe('pending');
+      expect(w.systemRows()).toEqual([]);
+    },
+  );
 
   test('[60] anonymous: a compare that sends no request (checkpoint not a sha) takes no budget', async () => {
     const w = makeWorld({ checkpoint: 'not-a-sha' });
@@ -1649,7 +1679,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   });
 
   test.each([
-    ['base', {}, { noBase: true }],
+    ['base.ref', {}, { noBaseRef: true }],
+    ['default_branch', {}, { noDefaultBranch: true }],
     ['the base repo id', {}, { noBaseRepoId: true }],
     ['head', {}, { noHead: true }],
     ['head sha (the build has a checkpoint)', { checkpoint: 'a'.repeat(40) }, { noHeadSha: true }],
@@ -1669,7 +1700,13 @@ describe('#1403 PR reconcile for review-phase builds', () => {
       const t0 = Date.now();
       await poller.sweep(t0);
       expect(w.todoRow().phase).toBe('review');
-      Object.assign(spec, { noBase: false, noBaseRepoId: false, noHead: false, noHeadSha: false });
+      Object.assign(spec, {
+        noBaseRef: false,
+        noDefaultBranch: false,
+        noBaseRepoId: false,
+        noHead: false,
+        noHeadSha: false,
+      });
       await poller.sweep(t0 + 60_000); // anonymous: five minutes between reads of one PR
       expect(pullReads()).toHaveLength(1);
       await poller.sweep(t0 + 300_000);
@@ -1878,6 +1915,171 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(row).toContain('合并提交 abc1234，');
     expect(row).toContain(`由 ${login.slice(0, 100)}… 合并`);
     expect(row).not.toMatch(/\p{Cc}/u);
+  });
+
+  test.each([
+    ['the sweep skips the read', 'before'],
+    ['it starts during the read, the sweep drops what it read', 'during'],
+  ] as const)(
+    '[67a] a step runs after the first closed read (%s): the first read after it does not confirm the close',
+    async (_label, at) => {
+      const w = makeWorld({ connected: true });
+      const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+      const stepId = `step-verify-run-${w.buildId}`;
+      const claimVerify = () =>
+        w.s.db
+          .insert(stepTable)
+          .values({
+            id: stepId,
+            buildId: w.buildId,
+            kind: 'verify',
+            status: 'claimed',
+            createdAt: Date.now(),
+          })
+          .run();
+      let raceNext = false;
+      const poller = createCiPoller(
+        { ...w.s.svc, box: w.s.secretBox },
+        {
+          githubFetch: (input, init) => {
+            if (raceNext) {
+              raceNext = false;
+              claimVerify();
+            }
+            return mock.fetch(input, init);
+          },
+        },
+      );
+      const t0 = Date.now();
+      await poller.sweep(t0); // the first sighting of the close
+      if (at === 'before') claimVerify();
+      else raceNext = true;
+      // the step runs for a while; the PR may have been reopened and closed again unseen
+      await poller.sweep(t0 + 60_000);
+      w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, stepId)).run();
+      await poller.sweep(t0 + 900_000);
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.buildRow().errorMessage).toBeNull();
+      await poller.sweep(t0 + 960_000); // the read right after still sees it closed
+      expect(w.todoRow().phase).toBe('failed');
+    },
+  );
+
+  test.each([
+    ['a network error', 'throw'],
+    ['a response without head', 'noHead'],
+  ] as const)(
+    '[67b] a read that gets nothing (%s) between two closed reads: the count starts over',
+    async (_label, failure) => {
+      const w = makeWorld({ connected: true });
+      const spec: PullSpec = { state: 'closed', merged: false };
+      const mock = new PullsMock({ [w.prNumber]: spec });
+      mock.status304 = false; // every read gets a full body
+      const poller = pollerFor(w, mock);
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      if (failure === 'throw') mock.throwNext = true;
+      else spec.noHead = true;
+      await poller.sweep(t0 + 60_000);
+      spec.noHead = false;
+      await poller.sweep(t0 + 120_000);
+      expect(w.todoRow().phase).toBe('review');
+      expect(w.buildRow().errorMessage).toBeNull();
+      await poller.sweep(t0 + 180_000);
+      expect(w.todoRow().phase).toBe('failed');
+    },
+  );
+
+  test('[67c] anonymous: the sweeps that skip a PR for the five-minute interval do not reset its close', async () => {
+    const w = makeWorld();
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    for (let k = 0; k < 5; k += 1) await poller.sweep(t0 + k * 60_000);
+    expect(mock.requests).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+    await poller.sweep(t0 + 300_000);
+    expect(mock.requests).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('failed');
+  });
+
+  test('[68] merged at the last build checkpoint, then a verify step pushed a commit → stays in review with a hint', async () => {
+    const built = 'a'.repeat(40);
+    const verified = 'b'.repeat(40);
+    const w = makeWorld({ checkpoint: built });
+    // the daemon commits and pushes at the end of every step but review
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-verify-pushed-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'done',
+        checkpointCommit: verified,
+        createdAt: Date.now(),
+      })
+      .run();
+    const mock = new PullsMock({
+      [w.prNumber]: {
+        state: 'closed',
+        merged: true,
+        mergeCommitSha: 'abc1234',
+        headSha: built,
+        compareByBase: { [verified]: 'behind' },
+      },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    expect(mock.compareRequests()[0]).toContain(`/compare/${verified}...${built}`);
+    expect(w.systemRows().some((c) => c.includes('bbbbbbb') && c.includes(`#${w.prNumber}`))).toBe(
+      true,
+    );
+    expect(w.systemRows()).not.toContain(DONE_ROW);
+  });
+
+  test('[69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written', async () => {
+    const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
+    addReviewCard(w, 301);
+    addReviewCard(w, 302);
+    addReviewCard(w, 303);
+    const mock = new PullsMock({
+      // merged, but the checkpoint is not in the merged head: a hint
+      [w.prNumber]: { state: 'closed', merged: true, compare: 'diverged' },
+      // merged into another branch: a hint
+      301: { state: 'closed', merged: true, baseRef: 'release-x', defaultBranch: 'main' },
+      // a fork PR with the same branch name: foreign, with its own hint
+      302: { state: 'closed', merged: false, headRepo: 'mallory/demo', headRepoId: REPO_ID + 1 },
+      303: { state: 'open', merged: false },
+    });
+    const info = vi.fn();
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: mock.fetch, logger: { info } },
+    );
+    const buckets = [
+      'reviewPending',
+      'reviewSkipped',
+      'reviewUnreadable',
+      'reviewForeign',
+      'merged',
+      'closedUnmerged',
+      'hinted',
+      'settledBefore',
+    ] as const;
+    for (const t of [0, 60_000]) {
+      await poller.sweep(Date.now() + t);
+      const tally = info.mock.calls.at(-1)?.[0] as Record<string, number>;
+      expect(tally.reviewCandidates).toBe(4);
+      expect(buckets.reduce((n, k) => n + (tally[k] ?? 0), 0)).toBe(4);
+      expect(tally).toMatchObject({ hinted: 2, reviewForeign: 1, reviewPending: 1, errors: 0 });
+    }
+    // each hint was written once
+    const all = w.s.db
+      .select()
+      .from(messageTable)
+      .all()
+      .filter((r) => r.role === 'system');
+    expect(all).toHaveLength(3);
   });
 
   test('㊼ compare asks for one page', async () => {
