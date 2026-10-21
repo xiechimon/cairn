@@ -4,7 +4,7 @@
 // evidence/run paths instead of running anything. archive cases use a
 // throwaway VERIFY_REPO_ROOT. Cases that must really run use a copy of vp.mjs
 // in a throwaway skill directory with its own registry and a stub probe.
-// Failure modes from pr-gate runs 2 to 5 and /code-review on #1411.
+// Failure modes from pr-gate runs 2 to 6 and /code-review on #1411.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -89,12 +89,11 @@ function agentBodiesWithoutMachineId(src) {
   return lines;
 }
 
-// A copy of vp.mjs in a throwaway skill directory: its own registry, a stub
-// probe that writes result.json where it is pointed, and the repo's
-// node_modules (vp.mjs imports @playwright/test). Outside any git repository,
-// so its evidence root is the throwaway directory itself.
-function fakeSkill(cases, scripts = {}) {
-  const root = tempDir('vp-fake-');
+// A copy of vp.mjs in <root>/.claude/skills/verify-pacman: its own registry
+// (feature t with the given cases), the given scripts beside vp.mjs, a stub
+// probe <root>/stub.mjs that writes result.json where it is pointed, and the
+// repo's node_modules (vp.mjs imports @playwright/test). Returns the copy's path.
+function installSkill(root, cases, scripts = {}) {
   const skill = join(root, '.claude', 'skills', 'verify-pacman');
   mkdirSync(join(skill, 'scripts'), { recursive: true });
   cpSync(VP, join(skill, 'scripts', 'vp.mjs'));
@@ -112,11 +111,19 @@ function fakeSkill(cases, scripts = {}) {
       '',
     ].join('\n'),
   );
+  return join(skill, 'scripts', 'vp.mjs');
+}
+
+// installSkill in a throwaway directory outside any git repository, so its
+// evidence root is the throwaway directory itself.
+function fakeSkill(cases, scripts = {}) {
+  const root = tempDir('vp-fake-');
+  const script = installSkill(root, cases, scripts);
   const evidenceRoot = join(root, '.claude', 'verify-evidence');
   return {
     root,
     evidenceRoot,
-    run: (args, env = {}) => vp(args, env, root, join(skill, 'scripts', 'vp.mjs')),
+    run: (args, env = {}) => vp(args, env, root, script),
     evidence: () => (existsSync(evidenceRoot) ? readdirSync(evidenceRoot) : []),
     done: () => rmSync(root, { recursive: true, force: true }),
   };
@@ -124,10 +131,19 @@ function fakeSkill(cases, scripts = {}) {
 
 const STUB = { script: 'stub.mjs', args: [], needs: [], status: 'current', purpose: 'stub' };
 
-// A probe that runs its pre-fix mode when called with no arguments needs the
-// post-fix flag as its registry default (pr-gate run 3: chief-unread,
-// empty-review and import-rollback had none, so vp.mjs drive went red on a
-// healthy stack).
+// git in a throwaway repository. The caller's git config may sign commits or
+// run hooks; this repository does neither.
+function gitAt(repo) {
+  return (...args) =>
+    execFileSync('git', ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+      encoding: 'utf8',
+    });
+}
+
+// A probe that runs its pre-fix mode, or refuses to run, when called with no
+// arguments needs the post-fix flag as its registry default (pr-gate run 3:
+// chief-unread and empty-review ran their pre-fix mode, import-rollback exited
+// 2, so vp.mjs drive went red on a healthy stack).
 const PRE_FIX_DEFAULTS = [
   [/=== '--expect=new' \? 'new' : 'old'/, '--expect=new'],
   [/includes\('--expect=new'\) \? 'new' : 'old'/, '--expect=new'],
@@ -422,13 +438,7 @@ const cases = [
     'links encodes non-ASCII file names instead of quoting them',
     () => {
       const repo = tempDir('vp-selftest-git-');
-      // The caller's git config may sign commits or run hooks; this repo does neither.
-      const g = (...args) =>
-        execFileSync(
-          'git',
-          ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
-          { encoding: 'utf8' },
-        );
+      const g = gitAt(repo);
       let r = { code: null, out: '' };
       try {
         g('init', '-q');
@@ -607,6 +617,36 @@ const cases = [
     },
   ],
   [
+    'a drive from a worktree puts its evidence under the main checkout, not the worktree',
+    () => {
+      // The case above cannot fail in CI: its checkout is no worktree, so the
+      // main checkout and the script's own checkout are one directory there
+      // (pr-gate run 6). Here vp.mjs runs from a real worktree of a throwaway repo.
+      const root = tempDir('vp-selftest-wt-');
+      const main = join(root, 'main');
+      const wt = join(main, '.claude', 'worktrees', 'wt');
+      let r = { code: null, out: '' };
+      try {
+        mkdirSync(main);
+        const g = gitAt(main);
+        g('init', '-q');
+        writeFileSync(join(main, 'README'), 'x\n');
+        g('add', 'README');
+        g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
+        g('worktree', 'add', '-q', '--detach', wt);
+        const script = installSkill(wt, { ok: STUB });
+        r = vp(['drive', 't', 'ok', '--dry-run'], {}, wt, script);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+      return (
+        r.code === 0 &&
+        r.out.includes(`VERIFY_EVIDENCE_DIR=${join(main, '.claude', 'verify-evidence')}/`) &&
+        !r.out.includes(join(wt, '.claude', 'verify-evidence'))
+      );
+    },
+  ],
+  [
     'a tsx case runs from its package directory, a node case from the repo root',
     () => {
       const tsx = vp(['drive', 'failed-send', 'restart-combo', '--dry-run']);
@@ -670,10 +710,10 @@ const cases = [
     'archive --latest takes a positive integer only',
     () => {
       const { root } = tempRoot();
-      const codes = ['-1', '0', 'x'].map((n) => vp(['archive', 'T5', '--latest', n], { VERIFY_REPO_ROOT: root }).code);
+      const runs = ['-1', '0', 'x'].map((n) => vp(['archive', 'T5', '--latest', n], { VERIFY_REPO_ROOT: root }));
       const copied = existsSync(join(root, 'docs', 'verify', 'T5'));
       rmSync(root, { recursive: true, force: true });
-      return codes.every((c) => c === 2) && !copied;
+      return runs.every((r) => r.code === 2 && r.out.includes('--latest needs a positive integer\n')) && !copied;
     },
   ],
   [
@@ -684,17 +724,19 @@ const cases = [
       const b = vp(['archive', 'T7', '--latest', '1'], { VERIFY_REPO_ROOT: root, VERIFY_EVIDENCE_DIR: join(src, 'run-b') });
       const copied = existsSync(join(root, 'docs', 'verify', 'T7'));
       rmSync(root, { recursive: true, force: true });
-      return a.code === 2 && b.code === 2 && !copied;
+      const refused = '--latest cannot be combined with --from or VERIFY_EVIDENCE_DIR; name one source\n';
+      return [a, b].every((r) => r.code === 2 && r.out.includes(refused)) && !copied;
     },
   ],
   [
     'archive refuses a source given without --from',
     () => {
       const { root, src } = tempRoot();
-      const r = vp(['archive', 'T6', join(src, 'run-b')], { VERIFY_REPO_ROOT: root, VERIFY_EVIDENCE_DIR: join(src, 'run-a') });
+      const stray = join(src, 'run-b');
+      const r = vp(['archive', 'T6', stray], { VERIFY_REPO_ROOT: root, VERIFY_EVIDENCE_DIR: join(src, 'run-a') });
       const copied = existsSync(join(root, 'docs', 'verify', 'T6'));
       rmSync(root, { recursive: true, force: true });
-      return r.code === 2 && !copied;
+      return r.code === 2 && r.out.includes(`unexpected argument(s) ${stray}: name a source with --from <dir>\n`) && !copied;
     },
   ],
   [
