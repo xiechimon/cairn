@@ -1,0 +1,106 @@
+
+
+Running 4 tests using 2 workers
+
+  1) e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (light) ──────────────────────────────────────
+
+    Error: axe violations on machine detail (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 9
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_a_",
+    +     ],
+    +   },
+    + ]
+
+      125 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      126 |       }));
+    > 127 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      128 |     });
+      129 |   }
+      130 | }
+        at apps/web/e2e/a11y-axe.spec.ts:127:63
+
+    Error Context: test-results/a11y-axe-axe-machine-detail-light-/error-context.md
+
+
+  2) e2e/a11y-axe.spec.ts:108:5 › axe: detail tool calls (light) ───────────────────────────────────
+
+    Error: axe violations on detail tool calls (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  -  1
+    + Received  + 10
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "serious",
+    +     "rule": "color-contrast",
+    +     "targets": Array [
+    +       ".gap-1.flex-col.min-w-0:nth-child(1) > .chat-tool-pill.rounded-\\[3px\\].\\[\\&_svg\\]\\:flex-none > .truncate",
+    +       ".gap-1.flex-col.min-w-0:nth-child(2) > .chat-tool-pill.rounded-\\[3px\\].\\[\\&_svg\\]\\:flex-none > .truncate",
+    +     ],
+    +   },
+    + ]
+
+      125 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      126 |       }));
+    > 127 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      128 |     });
+      129 |   }
+      130 | }
+        at apps/web/e2e/a11y-axe.spec.ts:127:63
+
+    Error Context: test-results/a11y-axe-axe-detail-tool-calls-light-/error-context.md
+
+
+  3) e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (dark) ───────────────────────────────────────
+
+    Error: axe violations on machine detail (dark)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 9
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_a_",
+    +     ],
+    +   },
+    + ]
+
+      125 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      126 |       }));
+    > 127 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      128 |     });
+      129 |   }
+      130 | }
+        at apps/web/e2e/a11y-axe.spec.ts:127:63
+
+    Error Context: test-results/a11y-axe-axe-machine-detail-dark-/error-context.md
+
+
+  3 failed
+    e2e/a11y-axe.spec.ts:108:5 › axe: detail tool calls (light) ────────────────────────────────────
+    e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (light) ───────────────────────────────────────
+    e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (dark) ────────────────────────────────────────
+  1 passed (7.8s)

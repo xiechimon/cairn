@@ -441,13 +441,15 @@ test('思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLe
     ...PI_THINKING_LEVELS,
   ]);
   await page.getByRole('option', { name: 'high', exact: true }).click();
-  expect(patches.at(-1)).toEqual({ thinkingLevel: 'high' });
+  // PATCH 体由 page.route 回调异步落进 patches：click 返回时可能还没到，
+  // 一律轮询读（同步读在 CI 慢机上读到 undefined，#1438 e2e (1) 实测 :570）。
+  await expect.poll(() => patches.at(-1)).toEqual({ thinkingLevel: 'high' });
   await expect(select).toContainText('high');
   await page.reload();
   await expect(page.locator('.agent-thinking-select')).toContainText('high');
   await page.locator('.agent-thinking-select').click();
   await page.getByRole('option', { name: '未设置', exact: true }).click();
-  expect(patches.at(-1)).toEqual({ thinkingLevel: null });
+  await expect.poll(() => patches.at(-1)).toEqual({ thinkingLevel: null });
 });
 
 test('思考强度：claude-code 菜单含 off，不含 minimal', async ({ page }) => {
@@ -473,7 +475,7 @@ test('思考强度：切到 claude-code 时非法档随模型清空，合法档�
   await page.goto('/app/resources/agents/agent-1');
   await page.locator('.agent-runtime-select').click();
   await page.locator('.agent-runtime-row', { hasText: 'Claude Code' }).click();
-  expect(illegal.at(-1)).toEqual({
+  await expect.poll(() => illegal.at(-1)).toEqual({
     provider: 'claude-code',
     modelId: null,
     thinkingLevel: null,
@@ -487,7 +489,7 @@ test('思考强度：切到 claude-code 时非法档随模型清空，合法档�
   await page.goto('/app/resources/agents/agent-1');
   await page.locator('.agent-runtime-select').click();
   await page.locator('.agent-runtime-row', { hasText: 'Claude Code' }).click();
-  expect(legal.at(-1)).toEqual({ provider: 'claude-code', modelId: null });
+  await expect.poll(() => legal.at(-1)).toEqual({ provider: 'claude-code', modelId: null });
 });
 
 test('权限 tab：保存失败出可见错误反馈，开关不回弹', async ({ page }) => {
@@ -567,15 +569,15 @@ test('授权技能：不限制 ↔ 勾空互转发显式 null/[]；勾选只进�
   await expect(page.locator('.agent-allowlist-row')).toHaveCount(0);
   // 关「不限制」= 显式 []（勾空全拒——不是 null 的伪装）。
   await master.click();
-  expect(patches.at(-1)).toEqual({ skillsAllowlist: [] });
+  await expect.poll(() => patches.at(-1)).toEqual({ skillsAllowlist: [] });
   await expect(master).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.agent-allowlist-row')).toHaveCount(2);
   // 逐技能勾选：单值只进数组槽（不重排、不重复）。
   await page.locator('.agent-allowlist-skill-switch').first().click();
-  expect(patches.at(-1)).toEqual({ skillsAllowlist: ['skill-a'] });
+  await expect.poll(() => patches.at(-1)).toEqual({ skillsAllowlist: ['skill-a'] });
   // 重开「不限制」= 显式 null（省键 = 不动，两态不塌缩——序列化坑主钉位）。
   await master.click();
-  expect(patches.at(-1)).toEqual({ skillsAllowlist: null });
+  await expect.poll(() => patches.at(-1)).toEqual({ skillsAllowlist: null });
   await expect(page.locator('.agent-allowlist-row')).toHaveCount(0);
 });
 
@@ -609,12 +611,12 @@ test('默认 skill：单值 Select 只写 defaultSkill 槽，不带授权面键�
   await expect(select).toContainText('未设置');
   await select.click();
   await page.getByRole('option', { name: 'skill-a' }).click();
-  expect(patches.at(-1)).toEqual({ defaultSkill: 'skill-a' });
+  await expect.poll(() => patches.at(-1)).toEqual({ defaultSkill: 'skill-a' });
   await expect(select).toContainText('skill-a');
   // 清空回 null（显式 null——单值槽不是数组位）。
   await select.click();
   await page.getByRole('option', { name: '未设置' }).click();
-  expect(patches.at(-1)).toEqual({ defaultSkill: null });
+  await expect.poll(() => patches.at(-1)).toEqual({ defaultSkill: null });
 });
 
 test('未知 agent id 不白屏，走回退呈现', async ({ page }) => {

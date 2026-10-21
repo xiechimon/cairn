@@ -861,7 +861,7 @@ function ChiefDrawerInner({
           <Textarea
             ref={attachComposer}
             data-testid="chief-composer-input"
-            className="h-15 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
+            className="h-15 max-h-30 min-h-0 resize-none overflow-y-auto rounded-none border-none bg-transparent p-0 font-sans text-ui leading-5 text-(--foreground) md:text-ui tabular-nums shadow-none field-sizing-fixed placeholder:text-(--text-secondary) focus-visible:border-transparent focus-visible:ring-0 focus-visible:outline-none dark:bg-transparent"
             readOnly={onSend == null}
             value={wire.draft}
             onChange={wire.handleChange}
