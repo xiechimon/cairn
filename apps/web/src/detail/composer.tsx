@@ -52,7 +52,7 @@ const COMPOSER_CARD =
   'composer relative mx-4 mb-4 flex-none rounded-(--radius-composer) border-0 bg-(--secondary) shadow-(--shadow-composer) transition-[box-shadow] duration-[220ms] ease-(--ease-out-expo) hover:shadow-(--shadow-composer-hover) focus-within:shadow-(--shadow-composer-focus)';
 // 占位行/输入行共用几何：12px/16px 内衬 + text-ui 墨（#470：一档压正文
 // text-card-title）。84px 最小高走卡片本体。占位字用 ink-2：卡底是
-// --secondary，ink-3 在上面亮模只有 4.19:1，ink-2 为 5.7:1（#1442，axe）。
+// --secondary，ink-3 在上面不够 4.5:1（DESIGN.md 对比度条，#1442）。
 const COMPOSER_PLACEHOLDER = 'px-4 pt-3 text-ui';
 // 真输入面（M5 live）：48px 基高（3×16 行盒，#860）向 --composer-max-h 384px wire cap 自增
 // （grow 由 useComposerWire 的 inline height 承载），内部滚动。老

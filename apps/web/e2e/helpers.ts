@@ -44,13 +44,14 @@ export function stubNotification(
   );
 }
 
-/** 等到某一帧整页没有在跑的 CSS 过渡，再读计算样式。焦点环（outline-offset /
- *  -width / -color、box-shadow）与分段控件的 hover 墨色都走 150ms 过渡，过渡
- *  中读数会读到中间值（CI 实测 outline-offset `1px`，#1427）。过渡可能挂在
- *  被测元素之外（input-group 外壳经 :has() 跟随），聚焦后的重渲染也可能晚一帧
- *  再起新过渡，所以按帧复查整页；被打断的过渡用 allSettled 吞掉。20 轮仍有
- *  过渡在跑即抛错，让超时显形，而不是带着中间值往下读。
- *  registry-focus-ring / segmented-controls 共用。 */
+/** 等到某一帧整页没有在跑的 CSS 过渡与有限次动画，再读计算样式。焦点环
+ *  （outline-offset / -width / -color、box-shadow）与分段控件的 hover 墨色都走
+ *  150ms 过渡，过渡中读数会读到中间值（CI 实测 outline-offset `1px`，#1427）；
+ *  弹窗入场的 fade/zoom 是有限次动画，读色前同样要等完（#1442 axe）；无限动画
+ *  （spinner）永远跑，不等。过渡可能挂在被测元素之外（input-group 外壳经
+ *  :has() 跟随），聚焦后的重渲染也可能晚一帧再起新过渡，所以按帧复查整页；
+ *  被打断的过渡用 allSettled 吞掉。20 轮仍有在跑的即抛错，让超时显形，而不是
+ *  带着中间值往下读。registry-focus-ring / segmented-controls / a11y-axe 共用。 */
 export async function settleTransitions(page: Page): Promise<void> {
   const settled = await page.evaluate(async () => {
     const frame = () =>
@@ -59,13 +60,17 @@ export async function settleTransitions(page: Page): Promise<void> {
       await frame();
       const running = document
         .getAnimations()
-        .filter((a) => a instanceof CSSTransition && a.playState === 'running');
+        .filter(
+          (a) =>
+            a.playState === 'running' &&
+            a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY,
+        );
       if (running.length === 0) return true;
       await Promise.allSettled(running.map((a) => a.finished));
     }
     return false;
   });
-  if (!settled) throw new Error('CSS transitions still running after 20 rounds');
+  if (!settled) throw new Error('CSS transitions or animations still running after 20 rounds');
 }
 
 /** Hotkey press with the search-focus.spec retry law: the listener registers

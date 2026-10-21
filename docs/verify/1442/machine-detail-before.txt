@@ -1,0 +1,71 @@
+
+
+Running 2 tests using 2 workers
+
+  1) e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (light) ──────────────────────────────────────
+
+    Error: axe violations on machine detail (light)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 9
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_a_",
+    +     ],
+    +   },
+    + ]
+
+      123 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      124 |       }));
+    > 125 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      126 |     });
+      127 |   }
+      128 | }
+        at apps/web/e2e/a11y-axe.spec.ts:125:63
+
+    Error Context: test-results/a11y-axe-axe-machine-detail-light-/error-context.md
+
+
+  2) e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (dark) ───────────────────────────────────────
+
+    Error: axe violations on machine detail (dark)
+
+    expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 1
+    + Received  + 9
+
+    - Array []
+    + Array [
+    +   Object {
+    +     "impact": "critical",
+    +     "rule": "button-name",
+    +     "targets": Array [
+    +       "#base-ui-_r_a_",
+    +     ],
+    +   },
+    + ]
+
+      123 |         targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+      124 |       }));
+    > 125 |       expect(found, `axe violations on ${p.name} (${theme})`).toEqual([]);
+          |                                                               ^
+      126 |     });
+      127 |   }
+      128 | }
+        at apps/web/e2e/a11y-axe.spec.ts:125:63
+
+    Error Context: test-results/a11y-axe-axe-machine-detail-dark-/error-context.md
+
+
+  2 failed
+    e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (light) ───────────────────────────────────────
+    e2e/a11y-axe.spec.ts:108:5 › axe: machine detail (dark) ────────────────────────────────────────

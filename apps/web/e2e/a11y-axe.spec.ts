@@ -7,7 +7,8 @@ import { pressUntil, settleTransitions } from './helpers.js';
 //
 // Failure modes this file pins:
 //  1. A control loses its accessible name (button-name, label, link-name):
-//     agent detail's four settings selects had none before #1442.
+//     agent detail's four settings selects and machine detail's evacuate
+//     select had none before #1442.
 //  2. A colour change drops text below 4.5:1 (color-contrast) in either theme.
 //  3. ARIA misuse (aria-allowed-attr, aria-required-children, …) on any of
 //     these pages.
@@ -19,17 +20,22 @@ import { pressUntil, settleTransitions } from './helpers.js';
 // axe does not check `::placeholder` contrast, so native placeholders on
 // --secondary (composer, chief composer) are held by DESIGN.md, not here.
 
+// Every test opens its own page, so the file runs in parallel (the config
+// default is one worker per file).
+test.describe.configure({ mode: 'parallel' });
+
 interface AuditPage {
   name: string;
   url: string;
-  /** Body content that proves the page rendered (the shell <h1> renders
-   *  before it, so it is not proof). */
+  /** Body content that proves the page rendered (failure mode 4). */
   ready: (page: Page) => Locator;
   open?: (page: Page) => Promise<void>;
 }
 
 const row = (page: Page) => page.getByTestId('resource-row').first();
 const card = (page: Page) => page.getByTestId('page-col').locator('.settings-card').first();
+const phaseChip = (page: Page) => page.getByTestId('phase-chip');
+const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 const PAGES: AuditPage[] = [
   { name: 'board', url: '/app?scenario=board-drag-matrix', ready: (p) => p.locator('[data-todo-id]').first() },
@@ -37,22 +43,20 @@ const PAGES: AuditPage[] = [
     name: 'board search',
     url: '/app?scenario=01',
     open: async (page) => {
-      await pressUntil(page, 'Meta+k', page.getByRole('dialog', { name: '搜索' }));
+      await pressUntil(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
     },
-    ready: (p) => p.getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="todo"]').first(),
+    ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),
   },
   {
     name: 'new task dialog',
     url: '/app?scenario=01',
-    open: async (page) => {
-      await page.locator('.sidebar-new-task').click();
-    },
+    open: (page) => page.locator('.sidebar-new-task').click(),
     ready: (p) => p.getByRole('dialog', { name: '新建任务' }),
   },
-  { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: (p) => p.getByTestId('phase-chip') },
-  { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: (p) => p.getByTestId('phase-chip') },
-  { name: 'detail review', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27', ready: (p) => p.getByTestId('phase-chip') },
+  { name: 'detail fresh', url: '/app/todo/fresh-probe?scenario=23', ready: phaseChip },
+  { name: 'detail confirm', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17b', ready: phaseChip },
+  { name: 'detail review', url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27', ready: phaseChip },
   {
     name: 'detail tool calls',
     url: '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=28',
@@ -78,6 +82,11 @@ const PAGES: AuditPage[] = [
     ready: (p) => p.locator('.agent-skill-select'),
   },
   { name: 'machines', url: '/app/resources/machines?scenario=06', ready: row },
+  {
+    name: 'machine detail',
+    url: '/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06',
+    ready: (p) => p.locator('.machine-evacuate-select'),
+  },
   { name: 'skills', url: '/app/resources/skills?scenario=06', ready: row },
   {
     name: 'providers',
@@ -94,25 +103,6 @@ const PAGES: AuditPage[] = [
   { name: 'account', url: '/app/account?scenario=13', ready: card },
 ];
 
-/** Entry animations (dialog fade and zoom) and transitions finish before the
- *  scan, or color-contrast reads half-faded colours. Only running, finite
- *  ones: a paused animation's `finished` never resolves. */
-async function settle(page: Page) {
-  await settleTransitions(page);
-  await page.evaluate(() =>
-    Promise.allSettled(
-      document
-        .getAnimations()
-        .filter(
-          (a) =>
-            a.playState === 'running' &&
-            a.effect?.getTiming().iterations !== Number.POSITIVE_INFINITY,
-        )
-        .map((a) => a.finished),
-    ).then(() => undefined),
-  );
-}
-
 for (const theme of ['light', 'dark'] as const) {
   for (const p of PAGES) {
     test(`axe: ${p.name} (${theme})`, async ({ page }) => {
@@ -121,7 +111,9 @@ for (const theme of ['light', 'dark'] as const) {
       if (p.open) await p.open(page);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
       await expect(p.ready(page)).toBeVisible();
-      await settle(page);
+      // Dialog fade/zoom and transitions finish first, or color-contrast
+      // reads half-faded colours.
+      await settleTransitions(page);
       const { violations } = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
         .analyze();

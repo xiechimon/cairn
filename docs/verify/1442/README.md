@@ -8,7 +8,8 @@ Environment: cloud session image, Chromium 141.0.7390.37, fixture build (`vite b
 | `axe-after.txt` | the same 38 tests after the fixes: 38 passed |
 | `axe-after-x4.txt` | the same, `--repeat-each=4`: 152 passed |
 | `tool-pill-before.txt` | the `detail tool calls` page added after code review, with the tool pill put back to `ink-3`: light fails `color-contrast` on `.chat-tool-pill > .truncate`, dark passes |
-| `final-x3.txt` | the final gate (21 pages x 2 themes), `agent-detail.spec.ts` and `hotkeys.spec.ts`, `--repeat-each=3` |
+| `machine-detail-before.txt` | the `machine detail` page added after simplify review, with the evacuate select's `aria-label` removed: `button-name` (critical), 2 failed |
+| `final-x3.txt` | the final gate (22 pages x 2 themes, parallel mode) with `agent-detail`, `hotkeys`, `registry-focus-ring` and `segmented-controls` (the specs sharing the changed helpers), `--repeat-each=3`: 423 passed |
 | `e2e-affected-full.txt` | `pnpm e2e:affected` on the final tree (full-suite fallback: `package.json` and the lockfile changed) |
 
 Contrast, WCAG 2.x relative luminance from the token values in `src/styles/shadcn.css`:

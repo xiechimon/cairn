@@ -101,7 +101,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 - **描边一律 1 个 CSS 像素**：主面板、任务卡、激活导航项、新任务按钮在高分屏上也是 1px（不跟 `--hairline` 降到 0.5px），描边要看得清。
 - **投影三档梯**（`tokens.css`，#1428）：`--e1` 卡与行、`--e2` 菜单与弹层、`--e3` 对话框与浮窗。每档末尾自带 1px 环（亮色三档都是 `line`；暗色 e2/e3 用 `--ring-inset-highlight`，`line` 在弹层底上看不见），面上不再另画描边；自己画 `--edge-ring` 的面（通知条、总管窗、FAB）取同档的池 `--cds-shadow-sm` / `-md` / `-lg`，一条边只有一个环。`--panel-shadow` / `--shadow-popover` / `--dialog-shadow` 这些旧槽名是别名；hover / focus 槽是状态，不是档。
 - **墨色四级**：`ink` 标题与正文；`ink-2` 导航、按钮、说明；`ink-3` 元信息；`ink-4` 只给装饰图标。文字最浅用到 `ink-3`。
-- **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。`ink-3` 在 `--secondary`（`#ebe4d8`，输入框卡、diff 区块头、工具调用 pill 这类二级底）上只有 4.19，那里的文字最浅用 `ink-2`（5.7）（#1442，`e2e/a11y-axe.spec.ts` 守着；axe 不查原生 `::placeholder`，输入框占位字只靠这条）。
+- **对比度（实测，WCAG 2.x）**：`ink` 在卡片 14.99、`ink-2` 7.21、`ink-3` 5.29、`accent` 4.99、`running-text` 5.61；`ink-3` 在 canvas 4.58。白字在 `accent` 底 4.99。`ink-4` 只有 2.42，所以不许当文字色。`ink-3` 在 `--secondary`（亮模 `#ebe4d8`，与 `--muted`、`--accent` 同值；输入框卡、diff 区块头、工具调用 pill 这类二级底）上只有 4.19，那里的文字最浅用 `ink-2`（5.7）（#1442，`e2e/a11y-axe.spec.ts` 守着；axe 不查原生 `::placeholder`，输入框占位字只靠这条）。
 - **强调色纪律**：`accent` 只用于：需要你处理的状态与计数、卡片上的操作链接、激活导航项的图标、计数徽章底色。不做装饰、不做大面积底色。
 - **状态不只靠颜色**：每个状态都是「图标 + 颜色 + 文字」三件套（失败 ⊗ 失败 / 待确认 ☰ 待确认 / 待审阅 ⑂ 待审阅），色弱用户靠图标和文字也能分辨。
 - **主按钮是墨色，不是彩色**：shadcn Button default 档，`ink` 底 + `sheet` 字，8px 圆角（`control`）。赭红不做主按钮底色。
