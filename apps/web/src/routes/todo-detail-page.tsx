@@ -288,6 +288,9 @@ export function TodoDetailPage() {
   // 停止钮（M7 #308，r9 §3.3）：确认弹层开态 + 「正在停止…」过渡旗标——
   // 确认即乐观置位，步终态经 SSE step 事件重取回显（running 转 false）后清。
   const [stopOpen, setStopOpen] = useState(false);
+  // #1446：dialog 的 queued 档在打开那一刻定下——开着时机器领走步、卡进
+  // planning，标题和丢弃复选行不该在光标下换脸。
+  const [stopQueued, setStopQueued] = useState(false);
   const [stopping, setStopping] = useState(false);
 
   const phase: Phase = todo?.phase ?? 'todo';
@@ -952,7 +955,14 @@ export function TodoDetailPage() {
                 onAttachment={onAttachment}
                 mentionGroups={mentionGroups}
                 mentionFiles={mentionFiles}
-                onStop={live && buildId ? () => setStopOpen(true) : undefined}
+                onStop={
+                  live && buildId
+                    ? () => {
+                        setStopQueued(false);
+                        setStopOpen(true);
+                      }
+                    : undefined
+                }
                 onReview={
                   // AI 审核钮入口（M7 #312，r8 §3.1）：live 确认/审核面可点，fixture
                   // 面不动（DOM 字节不变）。
@@ -1056,6 +1066,7 @@ export function TodoDetailPage() {
           live && phase === 'queued' && buildId != null
             ? () => {
                 setMoreOpen(false);
+                setStopQueued(true);
                 setStopOpen(true);
               }
             : undefined
@@ -1098,7 +1109,7 @@ export function TodoDetailPage() {
       />
       <StopConfirmDialog
         open={stopOpen}
-        queued={phase === 'queued'}
+        queued={stopQueued}
         onClose={() => setStopOpen(false)}
         onConfirm={(discard) => {
           setStopOpen(false);

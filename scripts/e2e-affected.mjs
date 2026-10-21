@@ -91,6 +91,8 @@ const OVERLAY = [
   'dialog-',
   'project-settings-delete',
   'hotkeys',
+  // #1446: the queued 停止 row lives in overlay/more-menu.tsx.
+  'detail-queued-exit',
 ];
 const OVERLAYS = ['chip-', 'hotkeys', 'search-', 'plan-diff-full-file', 'phase-chip-words'];
 const PAGES = [
