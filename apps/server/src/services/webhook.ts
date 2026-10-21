@@ -24,13 +24,18 @@
 // #1459 进料闸（ADR 0021 D5，与 #1406 轮询器同一判据、同一缓存、同一上限）：
 // 打标人 = 事件的 sender，在仓库上 triage / write / maintain / admin 才导入
 // （issue 模板自动打的标，sender 是开票人：外部作者不导入）。读不到权限、团队
-// 没有可用 token、项目在飞已满 = 不导入（读不到即不领），一律 202 + detail
-// 原因 + 一行 'github webhook import refused' 日志——拒收不是投递失败，不喂
-// 重投。权限读遇限流（#1406 round 4：429 / 带限流信号的 403 抛
-// GithubRateLimitedError）同读不到，原因码另记 rate-limited（日志带 status 与
-// 重置时刻），不进缓存，下一条投递照判。导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）。注意：载荷
-// 只由 URL token 认证，sender 是 token 持有人说了算；本闸挡的是 GitHub 侧的
-// 触发（模板、外部打标），token 泄漏的补救仍是吊销。
+// 没有可用 token、项目在飞已满、项目存的 githubRepo 不是 owner/repo（#1466 的
+// `.` / `..` 段，与轮询器、importGithubIssue 同经 githubRepoOfProject）= 不导入
+// （读不到即不领），一律 202 + 一行 'github webhook import refused' 日志（原因码
+// reason + 细节 detail）——拒收不是投递失败，不喂重投。权限读遇限流（#1406
+// round 4：429 / 带限流信号的 403 抛 GithubRateLimitedError）同读不到，原因码另
+// 记 rate-limited（日志带 status 与重置时刻），不进缓存，下一条投递照判。打标
+// 人权限类的三种拒收（不到 triage、读不到、遇限流）对调用方只答同一句
+// SENDER_REFUSED_DETAIL：哪一种、哪个账号只进日志——202 不给 URL token 持有人
+// 当成按 login 查仓库权限的口子（#1477 pr-gate run 1）。导入的卡 createdBy 仍是
+// seed 用户（轮询器的关闭对账不碰）。注意：载荷只由 URL token 认证，sender 是
+// token 持有人说了算；本闸挡的是 GitHub 侧的触发（模板、外部打标），token 泄漏
+// 的补救仍是吊销。
 
 import {
   type GithubIssuesEvent,
@@ -46,6 +51,7 @@ import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, GithubRateLimitedError } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
+import { githubRepoOfProject } from './git.js';
 import { importGithubIssue } from './github-issues.js';
 import {
   hasRepoTriage,
@@ -66,6 +72,10 @@ export interface WebhookDeps extends OrchestrateDeps {
   /** pino 日志（请求段 deliveryId 行；缺省 = 静默，bootServer 形态）。 */
   logger?: Logger;
 }
+
+/** 打标人权限类拒收（sender-below-triage / permission-unreadable /
+ * rate-limited）的 202 detail：三种同一句，细节只进日志行。 */
+export const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
 
 /** 投递去重册（deliveryId → 到达时刻；模块级内存态——重启清零无害，
  * sourceRef 409 是持久闸）。惰性清扫：每次投递顺手清过期项，无定时器。 */
@@ -174,7 +184,8 @@ export async function receiveGithubWebhook(
     });
   }
 
-  // #1459 进料闸：拒收 = 一行日志（原因码）+ 202 带 detail。
+  // #1459 进料闸：拒收 = 一行日志（原因码 + 细节）+ 202 带 detail（answer 缺省
+  // = 细节；打标人权限类的拒收答 SENDER_REFUSED_DETAIL）。
   const fullName = payload.repository.full_name;
   const issueNumber = payload.issue.number;
   const sender = payload.sender?.login ?? '';
@@ -183,6 +194,7 @@ export async function receiveGithubWebhook(
     result: 'ignored' | 'misconfigured',
     detail: string,
     extra: Record<string, unknown> = {},
+    answer: string = detail,
   ): WebhookReceiverResponse => {
     logger?.info(
       {
@@ -192,12 +204,23 @@ export async function receiveGithubWebhook(
         issue: issueNumber,
         sender: sender === '' ? null : sender,
         reason,
+        detail,
         ...extra,
       },
       'github webhook import refused',
     );
-    return respond(logger, { result, deliveryId, detail });
+    return respond(logger, { result, deliveryId, detail: answer });
   };
+  // 存量行的 githubRepo 不合法（#1466：`.` / `..` 段会改写请求路径）：同按配置错
+  // 收，不拆 full_name、不出站（轮询器与 importGithubIssue 同一判据）。
+  const repoRef = githubRepoOfProject(repoRow);
+  if (repoRef === null) {
+    return refuse(
+      'malformed-repo',
+      'misconfigured',
+      `github repo of the project is not owner/repo: ${fullName}`,
+    );
+  }
   const atCapDetail = `project at the in-flight cap (${ISSUE_INTAKE_IN_FLIGHT_CAP} open github-issue tasks)`;
   if (sender === '') return refuse('no-sender', 'ignored', 'event has no sender');
   // 先数上限（只读库）：满了不必读 GitHub。
@@ -213,7 +236,6 @@ export async function receiveGithubWebhook(
     );
   }
   const githubFetch = deps.githubFetch ?? fetch;
-  const slash = fullName.indexOf('/');
   const now = nowMs();
   let trusted: boolean | null;
   try {
@@ -221,8 +243,8 @@ export async function receiveGithubWebhook(
       githubFetch,
       tokenRow.teamId,
       access.token,
-      fullName.slice(0, slash),
-      fullName.slice(slash + 1),
+      repoRef.owner,
+      repoRef.repo,
       sender,
       now,
     );
@@ -238,6 +260,7 @@ export async function receiveGithubWebhook(
         resetAt === null ? '' : ` (resets at ${resetAt})`
       }`,
       { status: err.status, resetAt },
+      SENDER_REFUSED_DETAIL,
     );
   }
   if (trusted === null) {
@@ -245,10 +268,18 @@ export async function receiveGithubWebhook(
       'permission-unreadable',
       'ignored',
       `permission of ${sender} on ${fullName} unreadable`,
+      {},
+      SENDER_REFUSED_DETAIL,
     );
   }
   if (!trusted) {
-    return refuse('sender-below-triage', 'ignored', `${sender} is below triage on ${fullName}`);
+    return refuse(
+      'sender-below-triage',
+      'ignored',
+      `${sender} is below triage on ${fullName}`,
+      {},
+      SENDER_REFUSED_DETAIL,
+    );
   }
   // 权限读的 await 期间别路可能已占位：导入前再数一次。这次现数与
   // importGithubIssue 落占位之间不隔 await，同时到的几条投递合起来不超上限。
@@ -279,11 +310,12 @@ export async function receiveGithubWebhook(
     throw err;
   }
 
+  // 审计：谁的打标导入了这张卡（轮询器 'issue intake candidate taken' 同律）。
+  // 写在编排之前：编排抛错时卡已建成，这一行照样要在。
+  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');
   // 入编排（webhook 建的 todo 恒 phase='todo'，直通；chief 未绑定 Agent 的
   // 409 属部署配置错——透出去即 409，GitHub 不重试 4xx）。
   const orchestration = orchestrateTodo(deps, todoId);
-  // 审计：谁的打标导入了这张卡（轮询器 'issue intake candidate taken' 同律）。
-  logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');
   return respond(logger, {
     result: 'created',
     deliveryId,

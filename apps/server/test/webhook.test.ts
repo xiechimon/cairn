@@ -18,7 +18,8 @@
 //  C4 载荷形坏（缺 issue.number）→ 202 ignored（不 400）。
 // D misconfigured / 上游
 //  D1 repo 无映射项目 → 202 misconfigured；
-//  D2 GitHub 未连接 → 202 misconfigured（importGithubIssue 404 收敛）；
+//  D2 GitHub 未连接 → 202 misconfigured（#1459 起在 teamGithubToken 就拒；
+//     importGithubIssue 自己的 404 收敛由 W16 覆盖：连接在权限读期间被删）；
 //  D3 上游瞬时失败（网络 502）→ 502 直透（唯一喂 GitHub 重试的分支）。
 // E token 面
 //  E1 错 token → 401（{error} 同形），不写 lastUsedAt；
@@ -35,6 +36,10 @@
 //   W4b（合入 #1406 round 4 后）：permission 读遇限流（429 / 带限流信号的
 //   403）在 lib 里抛 GithubRateLimitedError；webhook 照读不到处理：202 ignored，
 //   原因码 rate-limited（日志带 status 与重置时刻），不缓存，限流过后照判。
+//   round 2（#1477 pr-gate run 1）：打标人权限类的三种拒收 202 只答
+//   SENDER_REFUSED_DETAIL，细节进日志行的 detail；W15 轮询器的在飞现数含
+//   webhook 正在导入的那条；W16 导入自己的 404；W17 存量 githubRepo 形坏；
+//   W18 编排抛错时审计行照写。
 // 出站纪律：githubFetch 注入 mock，测试面零真实出站。
 
 import { readFileSync } from 'node:fs';

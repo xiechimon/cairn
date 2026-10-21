@@ -365,10 +365,12 @@ export class GithubRateLimitedError extends Error {
     this.name = 'GithubRateLimitedError';
   }
 
-  /** 限流解除的时刻：reset 头优先，否则 now + retry-after；都没有 = null。 */
+  /** 限流解除的时刻：retry-after 优先（GitHub 文档「Exceeding the rate limit」：
+   * 有 retry-after 就等它；二级限流常同时带主窗口的 x-ratelimit-reset，那个时刻
+   * 可能远在之后），否则 x-ratelimit-reset；都没有 = null。 */
   retryAt(now: number): number | null {
-    if (this.resetAt !== null) return this.resetAt;
-    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;
+    if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;
+    return this.resetAt;
   }
 }
 
