@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the options in args while a positional probe or journey name in args stays; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without arguments after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the default args they name (the same option before '=', or the same probe or journey name) while the other defaults stay; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without a positional argument after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -142,9 +142,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Pasting an image into the detail composer or the new-task spec runs the grant, upload and token chain, renders an attachment chip, and stores a SQLite row with disk bytes matching the sample",
-          "usage": "<todoId> in confirm phase (from setup-review-seed.mjs); env VERIFY_REPO_ROOT"
+          "usage": "<todoId> in confirm phase (from setup-review-seed.mjs); env VERIFY_REPO_ROOT",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
         },
         "new-task-and-composer-upload": {
           "script": ".claude/skills/verify-pacman/scripts/drive-attachments.mjs",
@@ -154,7 +155,7 @@
           ],
           "status": "current",
           "purpose": "Attachment upload via the new-task dialog (and optionally the composer) puts a token in the spec, writes the SQLite row and file on disk, and reads back through GET /api/attachments/:id",
-          "usage": "[todoId] (optional; adds the composer path, seed via setup-review-seed.mjs)"
+          "usage": "[todoId] (optional; adds the composer path, seed via setup-review-seed.mjs); that seed answers 400 without machineId since ADR 0019, so only the new-task path runs today"
         }
       }
     },
@@ -253,9 +254,10 @@
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Branch sync from the detail right pane resets the dirty target dir to the commit (POST, SQLite row, stream event, git state)",
-          "usage": "<todoId> <buildId>"
+          "usage": "<todoId> <buildId>",
+          "note": "Needs a todo from setup-branch-sync-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
         }
       }
     },
@@ -881,7 +883,7 @@
           ],
           "status": "current",
           "purpose": "Mention picker inserts agent token into new-task spec and optionally detail composer draft.",
-          "usage": "[todoId]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "[todoId] (optional; the todoId path needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
         }
       }
     },
@@ -1194,9 +1196,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A failed verdict extraction shows as a danger tag; a verdict followed by set_task_meta in the same turn is still extracted and sends the task back to replanning.",
-          "usage": "<todoA> <todoB>; env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+          "usage": "<todoA> <todoB>; env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Needs a todo from setup-review-700-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
         }
       }
     },
@@ -1249,9 +1252,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "AI review with a blocking verdict moves phase back to planning, writes a summary note, and enqueues a new plan step with review facts",
-          "usage": "<todoId> <agentId>; env REVIEW_MACHINE_TOKEN (after setup-review-seed.mjs)"
+          "usage": "<todoId> <agentId>; env REVIEW_MACHINE_TOKEN (after setup-review-seed.mjs)",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
         },
         "human-reject": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review-reject.mjs",
@@ -1260,9 +1264,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Two human-reject paths from review (more-menu request changes and the composer) send the task back to planning with a feedback transcript row and a template prompt, while plan v1 and the build are kept.",
-          "usage": "<todoId> positional; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR; run setup-review-seed.mjs first"
+          "usage": "<todoId> positional; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR; run setup-review-seed.mjs first",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
         }
       }
     },
@@ -1303,7 +1308,7 @@
           ],
           "status": "current",
           "purpose": "⌘K search rows show their own project as the second line on the live stack: before /api/search answers (client-side rows), after it, and none while /api/projects is still loading; never the fixture project r3-lifecycle.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+          "usage": "fresh stack for each run (it seeds two todos and expects exactly two result rows); env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
         }
       }
     },

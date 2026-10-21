@@ -82,13 +82,14 @@ function agentBodiesWithoutMachineId(src) {
 // probe that writes result.json where it is pointed, and the repo's
 // node_modules (vp.mjs imports @playwright/test). Outside any git repository,
 // so its evidence root is the throwaway directory itself.
-function fakeSkill(cases) {
+function fakeSkill(cases, scripts = {}) {
   const root = mkdtempSync(join(tmpdir(), 'vp-fake-'));
   const skill = join(root, '.claude', 'skills', 'verify-pacman');
   mkdirSync(join(skill, 'scripts'), { recursive: true });
   cpSync(VP, join(skill, 'scripts', 'vp.mjs'));
   symlinkSync(join(ROOT, 'node_modules'), join(root, 'node_modules'));
   writeFileSync(join(skill, 'vp-registry.json'), JSON.stringify({ features: { t: { recipe: null, cases } } }));
+  for (const [name, body] of Object.entries(scripts)) writeFileSync(join(skill, 'scripts', name), body);
   writeFileSync(
     join(root, 'stub.mjs'),
     [
@@ -104,7 +105,7 @@ function fakeSkill(cases) {
   return {
     root,
     evidenceRoot,
-    run: (args, env = {}) => vp(args, { VERIFY_REPO_ROOT: '', ...env }, root, join(skill, 'scripts', 'vp.mjs')),
+    run: (args, env = {}) => vp(args, env, root, join(skill, 'scripts', 'vp.mjs')),
     evidence: () => (existsSync(evidenceRoot) ? readdirSync(evidenceRoot) : []),
     done: () => rmSync(root, { recursive: true, force: true }),
   };
@@ -127,7 +128,15 @@ function vp(args, env = {}, cwd = process.cwd(), script = VP) {
   const r = spawnSync(process.execPath, [script, ...args], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, VERIFY_EVIDENCE_DIR: '', VERIFY_RUN_DIR: '', VERIFY_PORT: '', VERIFY_WEB_PORT: '', ...env },
+    env: {
+      ...process.env,
+      VERIFY_REPO_ROOT: '',
+      VERIFY_EVIDENCE_DIR: '',
+      VERIFY_RUN_DIR: '',
+      VERIFY_PORT: '',
+      VERIFY_WEB_PORT: '',
+      ...env,
+    },
   });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }
@@ -374,16 +383,101 @@ const cases = [
     'links encodes non-ASCII file names instead of quoting them',
     () => {
       const repo = mkdtempSync(join(tmpdir(), 'vp-selftest-git-'));
-      const g = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
-      g('init', '-q');
-      g('remote', 'add', 'origin', 'https://github.com/o/r.git');
-      mkdirSync(join(repo, 'docs', 'verify', 'T'), { recursive: true });
-      writeFileSync(join(repo, 'docs', 'verify', 'T', '截图.png'), 'x');
-      g('add', '.');
-      g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
-      const r = vp(['links', 'T', '--sha', 'HEAD'], { VERIFY_REPO_ROOT: repo });
-      rmSync(repo, { recursive: true, force: true });
+      // The caller's git config may sign commits or run hooks; this repo does neither.
+      const g = (...args) =>
+        execFileSync(
+          'git',
+          ['-C', repo, '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args],
+          { encoding: 'utf8' },
+        );
+      let r = { code: null, out: '' };
+      try {
+        g('init', '-q');
+        g('remote', 'add', 'origin', 'https://github.com/o/r.git');
+        mkdirSync(join(repo, 'docs', 'verify', 'T'), { recursive: true });
+        writeFileSync(join(repo, 'docs', 'verify', 'T', '截图.png'), 'x');
+        g('add', '.');
+        g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 't');
+        r = vp(['links', 'T', '--sha', 'HEAD'], { VERIFY_REPO_ROOT: repo });
+      } finally {
+        rmSync(repo, { recursive: true, force: true });
+      }
       return r.code === 0 && /^!\[截图\.png\]\(https:\/\/raw\.githubusercontent\.com\/o\/r\/[0-9a-f]{40}\/docs\/verify\/T\/%E6%88%AA%E5%9B%BE\.png\)$/m.test(r.out);
+    },
+  ],
+  [
+    'arguments after -- replace only the default options they name',
+    () => {
+      const keep = vp(['drive', 'review-modal', 'empty-review', '--dry-run', '--', '--focus=hunkless']);
+      const swap = vp(['drive', 'review-modal', 'empty-review', '--dry-run', '--', '--expect=before']);
+      return (
+        /args --expect=after --focus=hunkless\n/.test(keep.out) && /args --expect=before\n/.test(swap.out)
+      );
+    },
+  ],
+  [
+    'a probe gets the run directory doctor checked',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'vp-selftest-root-'));
+      const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_REPO_ROOT: root });
+      rmSync(root, { recursive: true, force: true });
+      return r.code === 0 && r.out.includes(`VERIFY_RUN_DIR=${join(root, '.claude', 'verify-run')}\n`);
+    },
+  ],
+  [
+    'no current case depends on a seed script that creates an agent without machineId',
+    () => {
+      const broken = Object.entries(REGISTRY.support)
+        .filter(([, v]) => v.kind === 'seed')
+        .map(([name]) => name)
+        .filter((name) => agentBodiesWithoutMachineId(readFileSync(join(import.meta.dirname, name), 'utf8')).length > 0);
+      const dependent = [];
+      for (const [feature, entry] of Object.entries(REGISTRY.features)) {
+        for (const [name, c] of Object.entries(entry.cases)) {
+          if (c.status !== 'current' || /optional/.test(c.usage ?? '')) continue;
+          const src = readFileSync(resolve(ROOT, c.script), 'utf8');
+          const uses = broken.filter((seed) => src.includes(seed) || (c.usage ?? '').includes(seed));
+          if (uses.length > 0) dependent.push(`${feature}/${name} (${uses.join(', ')})`);
+        }
+      }
+      if (dependent.length > 0) console.log(`      dependent: ${dependent.join(', ')}`);
+      return dependent.length === 0;
+    },
+  ],
+  [
+    'cleanup reports the evidence root drive writes to',
+    () => {
+      const fake = fakeSkill({}, { 'cleanup.mjs': 'console.log(`evidence-root ${process.env.VERIFY_EVIDENCE_DIR}`);\n' });
+      const r = fake.run(['cleanup']);
+      fake.done();
+      return r.code === 0 && r.out.includes(`evidence-root ${fake.evidenceRoot}\n`);
+    },
+  ],
+  [
+    'a case that needs arguments is not satisfied by options alone',
+    () => {
+      const r = vp(['drive', 'failed-send', 'restart-with-feedback', '--dry-run', '--', '--expect=old']);
+      return r.code === 2 && /needs arguments/.test(r.out);
+    },
+  ],
+  [
+    'an output path given after -- is made absolute against the caller\'s directory',
+    () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'vp-selftest-cwd-'));
+      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'rel/ev'], {}, cwd);
+      rmSync(cwd, { recursive: true, force: true });
+      return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'rel', 'ev')}\n`);
+    },
+  ],
+  [
+    'capture refuses a --wait that is not a number of milliseconds',
+    () => {
+      const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));
+      writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 9, webPort: 9 }));
+      const r = vp(['capture', '/app', '--wait', '1s'], { VERIFY_RUN_DIR: run, VERIFY_EVIDENCE_DIR: join(run, 'ev') });
+      const made = existsSync(join(run, 'ev'));
+      rmSync(run, { recursive: true, force: true });
+      return r.code === 2 && /--wait/.test(r.out) && !made;
     },
   ],
   [

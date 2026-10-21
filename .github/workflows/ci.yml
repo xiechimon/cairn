@@ -127,9 +127,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # verify-pacman 入口自测（#1402）：vp.mjs 的分派与归档规则（-- 参数替换默认、
-      # 相对证据路径转绝对、需 --force 的 needs、archive 不取最新一次、不覆盖），
-      # drive 走 --dry-run、archive 在自建的空仓根里跑，不起栈、不起浏览器。
+      # verify-pacman 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
+      # 规则。drive 多走 --dry-run；要真跑的几条在自建的 skill 副本里配桩探针跑，
+      # archive / links 在自建的空仓根里跑，都不起栈。capture 那条连一个关着的
+      # 端口：有浏览器时记下导航失败，没有浏览器（本 job 此时还没装 chromium）时
+      # 记下启动失败，两条路都要写出 result.json。
       # 排在 install 之后：vp.mjs 顶层引 @playwright/test（capture 用），装依赖
       # 之前跑整个脚本在 import 处崩（#1411 首轮 CI 实测 1/8）。
       - name: verify-pacman CLI self-test (#1402)

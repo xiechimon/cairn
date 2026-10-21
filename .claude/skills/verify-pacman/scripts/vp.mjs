@@ -47,8 +47,9 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
                                  run a registered case; cases that need the stack run doctor first;
                                  stale and host-bound cases, and cases that need real-llm, github or
                                  rewrites-evidence, need --force; a case whose usage names required
-                                 arguments needs them; arguments after -- replace the case's default
-                                 options (its probe or journey name stays); a case that needs the
+                                 arguments needs one; arguments after -- replace the defaults they
+                                 name (same option before '=', same probe name), the rest stay; a
+                                 case that needs the
                                  stack gets VERIFY_PORT / VERIFY_WEB_PORT from the stack's ports.json;
                                  without VERIFY_EVIDENCE_DIR the case writes to a new
                                  .claude/verify-evidence/<time>-<feature>-<case>/ in the main checkout,
@@ -204,16 +205,22 @@ function driveCommand(argv) {
     const why = forced.map((n) => FORCE_NEEDS[n]).join('; ');
     fail(`${feature}/${name} needs ${forced.join(' and ')} (${why}). Re-run with --force to drive it.`);
   }
-  if (c.needsArgs && extra.length === 0) {
+  // Options alone do not satisfy a case whose usage names a required argument.
+  if (c.needsArgs && !extra.some((a) => !a.startsWith('-'))) {
     fail(`${feature}/${name} needs arguments: ${c.usage}. Pass them after --.`);
   }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
-  // Arguments after -- replace the default options; the probe or journey name
-  // in the default args stays (drive.mjs and glass.mjs pick what to run by it).
-  const own = c.args.filter((a) => !a.startsWith('-') && !extra.includes(a));
-  const args = extra.length > 0 ? [...own, ...extra] : [...c.args];
+  // Arguments after -- replace the default arguments they name (the same option
+  // before '=', or the same probe or journey name); the other defaults stay, so a
+  // post-fix --expect flag survives an unrelated option (/code-review on #1411).
+  const keyOf = (a) => a.split('=')[0];
+  const replaced = new Set(extra.map(keyOf));
+  const args = [...c.args.filter((a) => !replaced.has(keyOf(a))), ...extra];
   const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
   const doctorFirst = c.needs.includes('stack');
+  // The probe reads the run directory doctor checks, also when its own default
+  // (its script's checkout) differs from VERIFY_REPO_ROOT's.
+  process.env.VERIFY_RUN_DIR = RUN_DIR;
   // The probe drives the stack doctor checks, not the 8791 / 5273 defaults
   // the probes fall back to.
   const stack = doctorFirst ? readStack() : undefined;
@@ -237,6 +244,9 @@ function driveCommand(argv) {
   // one that reads another variable gets it there (pr-gate run 4, /code-review).
   const evidence = c.evidence ?? {};
   const flagAt = args.indexOf(evidence.flag);
+  // A path given after -- is the caller's: made absolute against their cwd, not
+  // the probe's (node cases run from the repo root, tsx cases from a package).
+  if (flagAt !== -1 && args[flagAt + 1] !== undefined) args[flagAt + 1] = resolve(args[flagAt + 1]);
   const given = flagAt === -1 ? undefined : args[flagAt + 1];
   const envName = evidence.env ?? 'VERIFY_EVIDENCE_DIR';
   const named = process.env.VERIFY_EVIDENCE_DIR;
@@ -294,7 +304,9 @@ function driveCommand(argv) {
 
 async function captureCommand(argv) {
   const label = takeOption(argv, '--name')[0] ?? 'page';
-  const waitMs = Number(takeOption(argv, '--wait')[0] ?? 1500);
+  const waitText = takeOption(argv, '--wait')[0] ?? '1500';
+  if (!/^[0-9]+$/.test(waitText)) fail('--wait needs a whole number of milliseconds');
+  const waitMs = Number(waitText);
   const path = argv[0];
   if (path === undefined || !path.startsWith('/')) fail('usage: vp.mjs capture </app/route> [--name <label>] [--wait <ms>]');
   if (!/^[A-Za-z0-9-]+$/.test(label)) fail('--name must be letters, digits and dashes');
@@ -351,11 +363,19 @@ async function captureCommand(argv) {
 
 function newestEvidenceDirs(count) {
   if (!existsSync(EVIDENCE_ROOT)) fail(`no evidence yet: ${EVIDENCE_ROOT} does not exist`, 1);
-  return readdirSync(EVIDENCE_ROOT)
-    .map((name) => join(EVIDENCE_ROOT, name))
-    .filter((p) => statSync(p).isDirectory())
-    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
-    .slice(0, count);
+  // One stat per entry; an entry another lane removes meanwhile is skipped.
+  const runs = [];
+  for (const name of readdirSync(EVIDENCE_ROOT)) {
+    const path = join(EVIDENCE_ROOT, name);
+    try {
+      const st = statSync(path);
+      if (st.isDirectory()) runs.push({ path, mtime: st.mtimeMs });
+    } catch {}
+  }
+  return runs
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(0, count)
+    .map((run) => run.path);
 }
 
 function archiveCommand(argv) {
@@ -439,6 +459,8 @@ switch (command) {
     code = runNode(join(SCRIPTS_DIR, 'doctor.mjs'), argv);
     break;
   case 'cleanup':
+    // cleanup lists the newest runs under the evidence root drive writes to.
+    process.env.VERIFY_EVIDENCE_DIR ??= EVIDENCE_ROOT;
     code = runNode(join(SCRIPTS_DIR, 'cleanup.mjs'), argv);
     break;
   case 'list':
