@@ -332,7 +332,7 @@ describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
       const agentId = seedChiefAgent(s);
       await expect(
         runChiefTool(s, agentId, 'confirm_builds', { buildIds: [s.buildId] }),
-      ).rejects.toThrow(/review -> building/);
+      ).rejects.toThrow(/待确认（confirm）关口，当前相位 review/);
       expect(rowsOf(s, s.buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
       const row = s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get();
       expect(row?.phase).toBe('review');
@@ -361,6 +361,30 @@ describe('#1403 G9 confirm on a build that is not at the confirm gate', () => {
         .all()
         .filter((st) => st.kind === 'build');
       expect(buildSteps).toHaveLength(1);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('G7 confirm on a queued todo (direct execution, no confirm gate) → 409, no row, no build step', async () => {
+    const s = await withConfirmTodo();
+    try {
+      s.db.update(todoTable).set({ phase: 'queued' }).where(eq(todoTable.id, s.todoId)).run();
+      const res = await req(s.app, 'POST', `/api/builds/${s.buildId}/steps`, {
+        action: 'confirm',
+      });
+      expect(res.status).toBe(409);
+      expect(rowsOf(s, s.buildId).some((m) => m.content === CONFIRM_ANNOUNCEMENT)).toBe(false);
+      const buildSteps = s.db
+        .select()
+        .from(stepTable)
+        .where(eq(stepTable.buildId, s.buildId))
+        .all()
+        .filter((st) => st.kind === 'build');
+      expect(buildSteps).toEqual([]);
+      expect(s.db.select().from(todoTable).where(eq(todoTable.id, s.todoId)).get()?.phase).toBe(
+        'queued',
+      );
     } finally {
       s.dispose();
     }

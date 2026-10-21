@@ -33,8 +33,10 @@ A8  Anonymous: the list read uses the slot the pulls read reserved and is counte
     reconcile's own hourly budget is not exceeded.
 A9  The recorded PR is foreign (the #1217 / #1195 shape of pin 9b) and the build has its
     own PR on its branch -> adopted, no foreign hint. Without one -> the foreign hint as
-    in segment 1, and the list is read once per round, not every sweep. If the list
-    read fails, nothing is written and the next sweep lists again (A9c).
+    in segment 1, once per round; the branch is listed at most every ten minutes, so a
+    PR of its own opened or merged later is still found (A9b). A failed list read falls
+    back to the hint and is retried after ten minutes (A9c). The recorded number is
+    someone else's here, so the build's own merged PR is taken whatever its number (A9e).
 A9d The recorded PR is open but not the build's own (another branch, a fork) -> it is
     not left pending forever: the build's own PR is adopted, or one hint per round.
 A10 After an adoption the old PR number is not read again.
@@ -54,8 +56,9 @@ A14 The list parser reads the live response shape (number, state, merged_at, hea
 A15 The recorded PR shows up open in the list (it was reopened between the confirming
     read and the list read) -> not failed, nothing written, the close counts from the
     next read again; also when the list holds another open PR of the branch (A15b).
-A16 A merged PR older than the recorded one (earlier work on the same branch) is not a
-    replacement: a person who closed the newer PR rejected the change, so the card fails.
+A16 On the closed path a merged PR older than the recorded one (earlier work on the same
+    branch) is not a replacement: a person who closed the newer PR rejected the change,
+    so the card fails.
 A17 After a rename or transfer the stored owner is stale: the head filter uses the owner
     the PR response names (base.repo.owner.login), falling back to the stored one.
 
@@ -74,6 +77,9 @@ G6  A second confirm on a todo already in building (a double click, the chief an
     person at once) wrote a second row and queued a second build step -> refused with
     409, one row, one build step. (Raised by /code-review; the first version of the
     check let the same phase through.)
+G7  A confirm on a queued todo (direct execution, queued -> building is the claim edge)
+    wrote the row and queued a build step next to the pending one -> refused with 409.
+    Confirm is accepted only at the confirm gate. (Second /code-review pass.)
 
 Item 4: test pins for rules that had no test at f8ab21b
 -------------------------------------------------------
@@ -93,6 +99,10 @@ T5  The same for a stopped step (one reading of "the stopped-step filter"). Muta
     the status filter also takes stopped.
 T6  stopUnclaimedGateSteps leaves a claimed verify step alone (the other reading).
     Mutation: the status filter also takes claimed.
+T7  Pin 8b (an older build's closed PR does not fail the card whose current build has no
+    PR) swept once; since the two-read close rule one sweep can never fail a card, so the
+    pin held without the current-build rule (pr-gate run 11 on #1414, mutation M2c). It
+    now sweeps twice. Mutation: no current-build rule.
 
 Item 6: the ledger
 ------------------

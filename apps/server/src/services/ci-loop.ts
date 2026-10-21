@@ -61,9 +61,10 @@
 //   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
 //   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
 //   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
-//   那张新的已合并的）→ 改记它（号与链接）、落一行，不打回、不提示，下一轮读它；记的那
-//   张在列表里又开着 → 按重开，不打回；列不到 → 不写，下一轮再列。记的 PR 开着但不是
-//   本 build 的，同样走这条路。
+//   那张新的已合并的；记的那张是别人的时，任一张已合并的）→ 改记它（号与链接）、落一行，
+//   不打回、不提示，下一轮读它；记的那张在列表里又开着 → 按重开，不打回。关闭路径列不到
+//   → 不写，下一轮再列；别人的 PR 那条路每 10 分钟最多列一次，没有或列不到 → 照常提示。
+//   记的 PR 开着但不是本 build 的，同样走别人的 PR 那条路。
 // - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
 //   字符（双向覆盖、零宽字符）、截到 100 个字符（会话行经 chief / MCP 的会话读
 //   工具交给 agent，也在 web 时间线上显示）。
@@ -130,6 +131,10 @@ export const CI_ANON_READS_PER_HOUR = 20;
  * 算，留 10 次给 #931 / #1217 守卫。磨绿只记数、不受它拦，对账在总数满了时
  * 不读。 */
 export const CI_ANON_IP_READS_PER_HOUR = 50;
+
+/** 记的 PR 不是本 build 的时候，隔这么久再列一次工作分支上的 PR（本 build 自己的 PR 可能
+ * 之后才开出来或合并；列表读不到时同样隔这么久再试）。 */
+export const CI_FOREIGN_RELIST_MS = 600_000;
 
 /** PR 读到关闭未合并之后，隔这么久再读到仍关闭才打成 failed：为重跑 CI 关掉又
  * 重开 PR 很常见，一次 sweep 落在中间不算（略短于一轮 sweep，下一轮即确认）。 */
@@ -319,6 +324,8 @@ export function createCiPoller(
     string,
     Map<string, { status: string; at: number; failures: number }>
   >();
+  /** 记的 PR 不是本 build 的候选上次列工作分支 PR 的时刻（按 build）。 */
+  const foreignListedAt = new Map<string, number>();
   /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
   const lastReadByBuild = new Map<string, number>();
   /** 首次读到关闭未合并的时刻（按 PR）。确认读要紧跟在它之后：读到 open、有步在飞
@@ -440,15 +447,17 @@ export function createCiPoller(
   /** 本 build 工作分支往默认分支的 PR（见文件头）。只认本 build 自己的：head 仓与 base
    * 仓都是记的那张 PR 的目标仓（按仓库 id）、head 分支是本 build 的工作分支、目标是默认
    * 分支。记的那张在两次读之间被重开（列表里它开着）→ 返回它自己，调用方按重开处理。
-   * 否则开着的那张优先；没有开着的，取比记的那张新（编号大）的已合并的一张里编号最大的：
-   * 同一个分支可以先后开过好几张 PR，比记的那张早的已合并 PR 是旧事，不是它的替身（人
-   * 关掉新的这张，就是不要这次改动）。head 过滤用响应里目标仓现在的 owner（仓库改名或
-   * 转移后存的名字会过时）。'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
+   * 否则开着的那张优先；没有开着的，取编号大于 mergedAfter 的已合并的一张里编号最大的：
+   * 关闭路径传记的那张的号（同一个分支可以先后开过好几张 PR，比它早的已合并 PR 是旧事，
+   * 不是它的替身；人关掉新的这张，就是不要这次改动），别人的 PR 那条路传 0（记的号是
+   * 别人的，跟本 build 的 PR 新旧无关）。head 过滤用响应里目标仓现在的 owner（仓库改名
+   * 或转移后存的名字会过时）。'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
   async function ownBranchPull(
     branch: string,
     target: { owner: string; repo: string },
     token: string | null,
     recorded: { number: number; baseRepoId: number; defaultBranch: string; owner: string },
+    mergedAfter: number,
     now: number,
   ): Promise<GithubBranchPull | null | 'unreadable' | 'skipped'> {
     if (token === null && !takeAnonRead(now)) return 'skipped';
@@ -467,7 +476,7 @@ export function createCiPoller(
     const reopened = own.find((p) => p.number === recorded.number && p.state === 'open');
     if (reopened !== undefined) return reopened;
     const open = own.filter((p) => p.state === 'open');
-    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > recorded.number);
+    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > mergedAfter);
     return pool.reduce<GithubBranchPull | null>(
       (best, p) => (best === null || p.number > best.number ? p : best),
       null,
@@ -489,6 +498,8 @@ export function createCiPoller(
       .set({ prNumber: to.number, prUrl: `https://github.com/${fullName}/pull/${to.number}` })
       .where(eq(build.id, buildId))
       .run();
+    // 改记的那张从头数关闭（两次读的规则不吃之前留下的看到时刻）。
+    closedSeenAt.delete(`${fullName}#${to.number}`);
     const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
     if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
     writeSystemRow(
@@ -646,20 +657,18 @@ export function createCiPoller(
     // 不是本 build 的 PR：结果留在缓存里（PR 的 head 不会变）。
     if (foreign) {
       const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
-      // 每轮提示之前先看工作分支上有没有本 build 自己的 PR；提示落了之后本轮不再列。
-      if (!rowKnown(cand.buildId, foreignText, since)) {
-        const own = await ownBranchPull(branch, target, token, recorded, now);
-        // 列不到：这次不写（不提示也不改记），下一轮再列。
-        if (own === 'unreadable' || own === 'skipped') {
-          if (own === 'unreadable') tally.reviewUnreadable += 1;
-          else tally.reviewSkipped += 1;
-          return;
-        }
+      closedSeenAt.delete(key);
+      // 先看工作分支上有没有本 build 自己的 PR（每 CI_FOREIGN_RELIST_MS 最多列一次：它可能
+      // 之后才开出来或合并）；没有、列不到或额度不够 → 照常提示（每轮一次）。
+      const listedAt = foreignListedAt.get(cand.buildId);
+      if (listedAt === undefined || now - listedAt >= CI_FOREIGN_RELIST_MS) {
+        const own = await ownBranchPull(branch, target, token, recorded, 0, now);
+        if (own !== 'skipped') foreignListedAt.set(cand.buildId, now);
         if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
           tally.reviewSkipped += 1;
           return;
         }
-        if (own !== null) {
+        if (own !== null && own !== 'unreadable' && own !== 'skipped') {
           adoptPull(
             cand.buildId,
             todoRow.teamId,
@@ -820,7 +829,7 @@ export function createCiPoller(
       return;
     }
     // 打回之前看工作分支上有没有本 build 的另一张 PR（见文件头）。
-    const sibling = await ownBranchPull(branch, target, token, recorded, now);
+    const sibling = await ownBranchPull(branch, target, token, recorded, prNumber, now);
     if (sibling === 'unreadable' || sibling === 'skipped') {
       // 不写；关闭照样算看到过，下一次读确认之后再列一次。
       if (sibling === 'unreadable') tally.reviewUnreadable += 1;
@@ -1050,6 +1059,7 @@ export function createCiPoller(
     for (const k of closedSeenAt.keys()) if (!liveKeys.has(k)) closedSeenAt.delete(k);
     const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
     for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);
+    for (const k of foreignListedAt.keys()) if (!reviewBuilds.has(k)) foreignListedAt.delete(k);
     for (const k of knownRows)
       if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
     run.logger?.info(tally, 'ci pr-checks sweep');

@@ -695,7 +695,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   test("⑧b the todo's current build has no PR; an older build's PR closed → not failed", async () => {
     const w = makeWorld({ newerBuildPr: null });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
-    await pollerFor(w, mock).sweep();
+    // two reads, five minutes apart: a close counts only at the second (pr-gate run 11 on #1414)
+    await sweepTwice(pollerFor(w, mock));
     expect(w.todoRow().phase).toBe('review');
     expect(w.buildRow().errorMessage).toBeNull();
   });
@@ -2747,24 +2748,37 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(rows).toEqual([]);
   });
 
-  test('[s2-A9b] the recorded PR is foreign and the build has no PR of its own → the hint as before; the list is read once per round', async () => {
+  test('[s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded', async () => {
     const w = makeWorld({ connected: true, newerBuildPr: 201 });
     headRefs.set(201, conversationBranch(w.buildId));
+    const currentBuildId = String(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    );
+    headRefs.set(305, conversationBranch(currentBuildId));
     const mock = new PullsMock({
       201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
     });
     const poller = pollerFor(w, mock);
-    await poller.sweep();
-    await poller.sweep(Date.now() + 60_000);
-    await poller.sweep(Date.now() + 120_000);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    await poller.sweep(t0 + 120_000);
     expect(mock.listRequests()).toHaveLength(1);
-    const hints = w.s.db
-      .select()
-      .from(messageTable)
-      .all()
-      .filter((r) => r.role === 'system' && String(r.content).includes('#201'));
-    expect(hints).toHaveLength(1);
+    const hints = () =>
+      w.s.db
+        .select()
+        .from(messageTable)
+        .all()
+        .filter((r) => r.role === 'system' && String(r.content).includes('#201'));
+    expect(hints()).toHaveLength(1);
     expect(w.todoRow().phase).toBe('review');
+    // meanwhile the build's own PR was opened and merged on GitHub
+    mock.branchPulls = [{ number: 305, state: 'closed', merged: true }];
+    await poller.sweep(t0 + 600_000);
+    expect(mock.listRequests()).toHaveLength(2);
+    const current = w.s.db.select().from(buildTable).where(eq(buildTable.id, currentBuildId)).get();
+    expect(current?.prNumber).toBe(305);
+    expect(hints().filter((r) => String(r.content).includes('#305'))).toHaveLength(1);
   });
 
   test.each([
@@ -2811,7 +2825,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
   });
 
   test.each([502, 'throw'] as const)(
-    '[s2-A9c] the recorded PR is foreign and the list read fails (%s) → nothing written; the next sweep lists again',
+    '[s2-A9c] the recorded PR is foreign and the list read fails (%s) → the hint as before; the branch is listed again after ten minutes',
     async (failure) => {
       const w = makeWorld({ connected: true, newerBuildPr: 201 });
       headRefs.set(201, conversationBranch(w.buildId));
@@ -2824,16 +2838,19 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       });
       mock.branchPulls = failure;
       const poller = pollerFor(w, mock);
-      await poller.sweep();
-      const systemRows = () =>
-        w.s.db
-          .select()
-          .from(messageTable)
-          .all()
-          .filter((r) => r.role === 'system');
-      expect(systemRows()).toEqual([]);
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      const hints = w.s.db
+        .select()
+        .from(messageTable)
+        .all()
+        .filter((r) => r.role === 'system' && r.conversationId === currentBuildId);
+      expect(hints).toHaveLength(1);
+      expect(String(hints[0]?.content)).toContain('PR #201 的 head');
       mock.branchPulls = [{ number: 305 }];
-      await poller.sweep(Date.now() + 60_000);
+      await poller.sweep(t0 + 60_000);
+      expect(mock.listRequests()).toHaveLength(1);
+      await poller.sweep(t0 + 600_000);
       expect(mock.listRequests()).toHaveLength(2);
       const current = w.s.db
         .select()
@@ -2843,6 +2860,22 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       expect(current?.prNumber).toBe(305);
     },
   );
+
+  test("[s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)", async () => {
+    const w = makeWorld({ connected: true, newerBuildPr: 201 });
+    headRefs.set(201, conversationBranch(w.buildId));
+    const currentBuildId = String(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()?.latestBuildId,
+    );
+    headRefs.set(150, conversationBranch(currentBuildId));
+    const mock = new PullsMock({
+      201: { state: 'closed', merged: true, mergeCommitSha: 'abc1234' },
+    });
+    mock.branchPulls = [{ number: 150, state: 'closed', merged: true }];
+    await pollerFor(w, mock).sweep();
+    const current = w.s.db.select().from(buildTable).where(eq(buildTable.id, currentBuildId)).get();
+    expect(current?.prNumber).toBe(150);
+  });
 
   test("[s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round", async () => {
     const adopt = makeWorld({ connected: true });
