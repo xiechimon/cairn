@@ -1,0 +1,107 @@
+# P5a-1 round 3 (pr-gate #1461 run 2 at a313966): red / green
+# Every red leg below ran against a tests-only commit on this branch (claude/bootstrap-p5), so each can be checked
+# out from GitHub once the branch is pushed. Each tests-only commit holds the sources of the commit before it.
+# command for every red leg: pnpm exec vitest run apps/server/test/issue-intake.test.ts
+
+## RED 1: round 3 tests (failure modes 15-18) before any fix
+# commit: 80def1d96927b29197f652e0bacc48e8810e22b4 (tests-only; sources identical to a313966, the pr-gate run 2 head)
+     × 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 64ms
+     × 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 75ms
+     × 读期间 build 交付了 PR → 写前重读，跳过 57ms
+     × 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复 72ms
+     × 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试 74ms
+     × githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null 6ms
+     × 领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧 60ms
+ Test Files  1 failed (1)
+      Tests  7 failed | 96 passed (103)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+    AssertionError: expected 'closed' to be 'building' // Object.is equality
+    at test/issue-intake.test.ts:1692:34
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+    AssertionError: expected 'closed' to be 'failed' // Object.is equality
+    at test/issue-intake.test.ts:1692:34
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 读期间 build 交付了 PR → 写前重读，跳过
+    AssertionError: expected 'closed' to be 'building' // Object.is equality
+    at test/issue-intake.test.ts:1711:32
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复
+    AssertionError: expected +0 to be 1 // Object.is equality
+    at test/issue-intake.test.ts:1756:34
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试
+    AssertionError: expected [ { obj: { …(2) }, …(1) } ] to have a length of 3 but got 1
+    at test/issue-intake.test.ts:1768:77
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug，领取日志带上 > githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null
+    AssertionError: expected { notModified: false, …(2) } to match object { notModified: false, data: { …(1) } }
+    at test/issue-intake.test.ts:1801:22
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug，领取日志带上 > 领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧
+    AssertionError: expected [] to deeply equal [ ObjectContaining{…}, …(1) ]
+    at test/issue-intake.test.ts:1842:37
+Six new tests pass here and are kept as pins: a manual start stops the retry (16), newest closed event, unlabeled filter, same-second id tie-break, seenOpen pruning, and failure mode 5 (18). p5a1-r3-mutations.txt shows each one going red under a mutation.
+
+## RED 2: tests for the first /code-review pass (low, a313966..95208e8c)
+# commit: b1569895d36cbb130f5c3cc145a443f7a140c917 (tests-only; sources identical to 95208e8c, the items 1-6 fix)
+     × 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关 68ms
+     × build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关 56ms
+     × 重试前有人已手动开始（已有编排线程）→ 不再重试 96ms
+     × 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试 116ms
+ Test Files  1 failed (1)
+      Tests  4 failed | 102 passed (106)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关
+    AssertionError: expected 'closed' to be 'building' // Object.is equality
+    at test/issue-intake.test.ts:1735:32
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关
+    AssertionError: expected 'closed' to be 'building' // Object.is equality
+    at test/issue-intake.test.ts:1763:32
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前有人已手动开始（已有编排线程）→ 不再重试
+    AssertionError: expected [] to deeply equal [ ObjectContaining{…} ]
+    at test/issue-intake.test.ts:1845:39
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试
+    AssertionError: expected +0 to be 1 // Object.is equality
+    at test/issue-intake.test.ts:1880:34
+Findings pinned: a re-run task whose old PR is still open; a prUrl-only build; a dropped retry with no log line (assertion added to the manual-start test); a reused seqNum matching an older orchestrate thread.
+
+## RED 3: tests for the second /code-review pass (low, a313966..169bb718)
+# commit: 30b82990a2cc0ceeaaec8ffe8c19b9b64df1d658 (tests-only; sources identical to 169bb718)
+     × 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试 62ms
+     × 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试 57ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 106 passed (108)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试
+    AssertionError: expected +0 to be 1 // Object.is equality
+    at test/issue-intake.test.ts:1911:34
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试
+    AssertionError: expected [ 1406 ] to deeply equal [ 1406, 1407 ]
+    at test/issue-intake.test.ts:1925:31
+Findings pinned: an empty orchestrate thread left by the intake's own failed attempt; a read error before a retry ending the team's sweep.
+
+## GREEN at 8eb20fe67312c20ee0949306b1663e5add26c0a8 (branch head before the evidence commit)
+# The pin "只看这张卡自己的 build" was added after the fixes (8eb20fe6): it passes at 0b0eb7a3 and goes red under mutation M1d.
+# command: pnpm exec vitest run --reporter=verbose apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts apps/server/test/webhook.test.ts
+# date: 2026-10-21T11:57:12Z
+# issue-intake.test.ts: 109 tests (90 at a313966, 19 added this round); github-issues.test.ts + webhook.test.ts: 47
+# round 3 tests and the constants test (full verbose list: 156 passing lines):
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 常量：5 分钟一轮、标签 ready-for-agent、上限 3、permission 缓存有界、编排至多试 3 次 2ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 82ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态 54ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 读期间 build 交付了 PR → 写前重读，跳过 65ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关 57ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 只看这张卡自己的 build：同队另一张卡交付过 PR，不影响没交付的卡照常关闭 47ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关 43ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复 69ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试 69ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前有人已手动开始（已有编排线程）→ 不再重试 56ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试 59ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试 52ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试 69ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug，领取日志带上 > githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null 5ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 17 经 app 打的标：投影保留 slug，领取日志带上 > 领取日志一行带打标人与 app（经 app = slug，不经 = null）；D5 照旧 49ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 18 既有判据的钉子 > 关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关 41ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 18 既有判据的钉子 > 打上 ready-for-agent 之后摘的是别的标签（needs-decision）→ 照领 46ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 18 既有判据的钉子 > 同一秒的 labeled 与 unlabeled 按 id 定先后：unlabeled 的 id 大 → 不领；labeled 的 id 大 → 领 47ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 18 既有判据的钉子 > 人在 issue 仍 open 时关了卡、仓主随后关 issue、人再重开卡 → 不再关 42ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 18 既有判据的钉子 > 失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt 47ms
+ Test Files  3 passed (3)
+      Tests  156 passed (156)
+exit=0

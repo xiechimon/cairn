@@ -88,9 +88,9 @@ export const WAKE_PROMPT_PREFIX = '[wake:';
 // —— chief 记录（每「用户×团队」一个，惰性 upsert）———————————————————————
 
 export function ensureChief(deps: ChiefDeps, teamId: string): ChiefRow {
-  const id = chiefIdFormat(deps.user.id, teamId);
-  const existing = deps.db.select().from(chief).where(eq(chief.id, id)).get();
+  const existing = chiefRowOf(deps, teamId);
   if (existing) return existing;
+  const id = chiefIdFormat(deps.user.id, teamId);
   deps.db
     .insert(chief)
     .values({
@@ -368,6 +368,37 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
     throw new HttpError(409, 'chief agent has no model configured');
   }
   return agentRow;
+}
+
+function chiefRowOf(deps: ChiefDeps, teamId: string): ChiefRow | undefined {
+  return deps.db
+    .select()
+    .from(chief)
+    .where(eq(chief.id, chiefIdFormat(deps.user.id, teamId)))
+    .get();
+}
+
+/** #1406 团队 chief 的绑定状态（只读探测，不建 chief 行）。agentId = 绑定
+ * 的 Agent id（没有 chief 行或未绑 = null，不看模型）；canOrchestrate = 与
+ * sendChiefMessage 的 requireBoundAgent 同一判据（绑了、Agent 有模型）。issue
+ * 轮询器导入前问 canOrchestrate（不建出 orchestrateTodo 会 409 的卡），把
+ * agentId 写成导入卡的 createdBy（chief 自建卡同一律），关闭对账按 agentId
+ * 认自己领的卡。 */
+export function chiefBinding(
+  deps: ChiefDeps,
+  teamId: string,
+): { agentId: string | null; canOrchestrate: boolean } {
+  const row = chiefRowOf(deps, teamId);
+  if (row === undefined || row.agentId === null) return { agentId: null, canOrchestrate: false };
+  try {
+    requireBoundAgent(deps, row);
+    return { agentId: row.agentId, canOrchestrate: true };
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 409) {
+      return { agentId: row.agentId, canOrchestrate: false };
+    }
+    throw err;
+  }
 }
 
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =
