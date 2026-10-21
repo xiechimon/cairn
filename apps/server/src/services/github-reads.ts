@@ -7,7 +7,8 @@
 // - 项目闸：项目属调用方团队、repoKind github、githubRepo 是 owner/repo；
 //   任何一关不过都不出站。用的永远是调用方团队自己的 token。
 // - token：openGithubToken（github-issues requireToken 同语义）。无连接 =
-//   404，密文解不开 = 409，都不回落匿名读。
+//   404，密文解不开（SecretBoxError）= 409，都不回落匿名读。读连接行的
+//   SQLite 错误等别的错误原样抛出：重连 GitHub 治不了它们。
 // - GitHub 文本（标题、label、分支名、login、workflow 名）是第三方写的数据：
 //   去格式字符与控制字符、按码点限长，只进结构化字段；列表不带 issue / PR
 //   正文。htmlUrl 由 owner/repo 与数字 id 拼出，不搬上游的 URL 串。
@@ -35,6 +36,7 @@ import {
   githubListPulls,
   githubListWorkflowRuns,
 } from '../lib/github.js';
+import { SecretBoxError } from '../lib/secret-box.js';
 import { openGithubToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
 
@@ -106,7 +108,8 @@ function openTarget(deps: GithubReadDeps, teamId: string, projectId: string): Gi
   let token: string | null;
   try {
     token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-  } catch {
+  } catch (err) {
+    if (!(err instanceof SecretBoxError)) throw err;
     throw new HttpError(
       409,
       'github connection cannot be read (the stored token does not decrypt); reconnect GitHub',

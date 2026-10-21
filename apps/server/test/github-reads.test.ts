@@ -5,7 +5,8 @@
 //  2 非 GitHub 项目（hosted / local / 无 repo）→ 错误结果，不出站。
 //  3 githubRepo 形坏（无斜杠、多段、非法字符）→ 错误结果，不出站。
 //  4 团队无 GitHub 连接 → 404「github connection not found」，无匿名回落。
-//  5 token 密文解不开（keyfile 换了）→ 错误结果，不是 500。
+//  5 token 密文解不开（keyfile 换了）→ 错误结果，不是 500。只有
+//    SecretBoxError 是这个 409；读连接行的 SQLite 错误等别的错误原样抛出。
 //  6 GitHub 各类失败（401 / 403 / 403 限流 / 二级限流 / 429 / 404 / 422 /
 //    5xx / 超时 / 网络 / 形坏）→ 带短原因的 HttpError，不出 token、不出 URL。
 //  7 形坏条目跳过，形坏整体 → 错误结果。
@@ -13,7 +14,8 @@
 //  9 本团队已有任务的 issue 标 taskId（大小写不敏感；别的团队的任务不算）。
 // 10 perPage 上限（issues / PR 30、runs 20）、标题 200 字、其余 100 字。
 // 11 控制字符、格式字符（bidi、零宽、tag 字符）剥掉。
-// 12 超时低于 daemon relay 的 REMOTE_TOOL_TIMEOUT_MS；fetch 拿到 signal。
+// 12 超时低于 daemon relay 的 REMOTE_TOOL_TIMEOUT_MS；fetch 拿到 signal，
+//    它的超时值至多 REMOTE_TOOL_TIMEOUT_MS - 3s；读应答体时超时也算超时。
 // 13 chief 面与 MCP 面同一调用给同一份数据；两面参数同一套。
 //
 // 上游形状取实物：test/fixtures/github-reads/ 是对 xiechimon/pacman 的只读
@@ -24,7 +26,8 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CHIEF_REMOTE_TOOLS, REMOTE_TOOL_TIMEOUT_MS } from '@pacman/shared';
-import { afterEach, describe, expect, test } from 'vitest';
+import { sql } from 'drizzle-orm';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   githubConnection as githubConnectionTable,
   project as projectTable,
@@ -38,9 +41,10 @@ import {
   githubListPulls,
   githubListWorkflowRuns,
 } from '../src/lib/github.js';
-import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
+import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { executeGithubReadTool } from '../src/services/github-reads.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -119,8 +123,8 @@ interface GhRoute {
   status?: number;
   headers?: Record<string, string>;
   body?: unknown;
-  /** 2xx 但 json() 抛错（应答不是 JSON）。 */
-  notJson?: boolean;
+  /** 2xx 但 json() 抛这个值（应答不是 JSON、读应答体时超时）。 */
+  jsonThrows?: unknown;
   /** fetch 本身抛错（超时 / 网络）。 */
   throws?: unknown;
 }
@@ -144,7 +148,7 @@ function ghMock(routes: Record<string, GhRoute>) {
       status,
       headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
       json: async () => {
-        if (route.notJson) throw new SyntaxError('Unexpected token < in JSON at position 0');
+        if (route.jsonThrows !== undefined) throw route.jsonThrows;
         return route.body;
       },
       text: async () => JSON.stringify(route.body ?? null),
@@ -448,6 +452,61 @@ describe('项目闸与连接闸（1-5）', () => {
     expect(w.mock.calls).toHaveLength(0);
   });
 
+  test('5 box.open 抛 SecretBoxError → 409 reconnect GitHub，不出站', async () => {
+    const w = world();
+    const box = {
+      seal: (plaintext: string) => plaintext,
+      open: (): string => {
+        throw new SecretBoxError('envelope authentication failed (tampered or wrong keyfile)');
+      },
+    };
+    for (const name of TOOLS) {
+      const err = await executeGithubReadTool(
+        { db: w.s.db, box, githubFetch: w.mock.impl },
+        w.s.team.id,
+        name,
+        { projectId: w.projectId },
+      ).catch((e: unknown) => e);
+      expect(err, name).toBeInstanceOf(HttpError);
+      expect(err, name).toMatchObject({ status: 409 });
+      expect((err as HttpError).message, name).toContain('reconnect GitHub');
+    }
+    expect(w.mock.calls).toHaveLength(0);
+  });
+
+  test('5 不是 SecretBoxError 的错误（读连接行的 SQLite 错误、box 的别的错误）原样抛出，不变成 409', async () => {
+    // 连接表读不了（schema 错的一种；SQLITE_BUSY 同路）：连接本身没坏，重连
+    // GitHub 也没用。原错误往上走，不报成「reconnect GitHub」的 409。
+    const w = world();
+    w.s.db.run(sql`DROP TABLE github_connection`);
+    for (const name of TOOLS) {
+      const err = await chiefText(w, name, { projectId: w.projectId }).catch((e: unknown) => e);
+      expect(err, name).toBeInstanceOf(Error);
+      expect(err, name).not.toBeInstanceOf(HttpError);
+      expect((err as Error).message, name).toContain('no such table: github_connection');
+    }
+    expect(w.mock.calls).toHaveLength(0);
+
+    const w2 = world();
+    const broken = new TypeError('box is broken');
+    const box = {
+      seal: (plaintext: string) => plaintext,
+      open: (): string => {
+        throw broken;
+      },
+    };
+    for (const name of TOOLS) {
+      const err = await executeGithubReadTool(
+        { db: w2.s.db, box, githubFetch: w2.mock.impl },
+        w2.s.team.id,
+        name,
+        { projectId: w2.projectId },
+      ).catch((e: unknown) => e);
+      expect(err, name).toBe(broken);
+    }
+    expect(w2.mock.calls).toHaveLength(0);
+  });
+
   test('参数形坏 → 400，不出站', async () => {
     const w = world();
     const bad: [Tool, Record<string, unknown>][] = [
@@ -678,7 +737,7 @@ describe('边界（10-11）', () => {
     const longLabel = 'l'.repeat(300);
     const longLogin = 'u'.repeat(150);
     const longBranch = `feature/${'b'.repeat(300)}`;
-    const emojiTitle = '😀'.repeat(250);
+    const emojiTitle = '\u{1F600}'.repeat(250);
     const issue = {
       ...ISSUES[1],
       title: longTitle,
@@ -711,7 +770,7 @@ describe('边界（10-11）', () => {
     expect(first!.author).toBe(`${'u'.repeat(99)}…`);
     // 码点截断：不把代理对切成半个字符。
     expect([...second!.title]).toHaveLength(200);
-    expect(second!.title).toBe(`${'😀'.repeat(199)}…`);
+    expect(second!.title).toBe(`${'\u{1F600}'.repeat(199)}…`);
 
     const pulls = await chief<{
       pullRequests: { title: string; headRef: string; baseRef: string; author: string }[];
@@ -872,7 +931,22 @@ describe('GitHub 失败（6-7）', () => {
       status: 502,
       reason: 'network',
     },
-    { label: 'not json', route: { notJson: true }, status: 502, reason: 'malformed' },
+    {
+      label: 'not json',
+      route: { jsonThrows: new SyntaxError('Unexpected token < in JSON at position 0') },
+      status: 502,
+      reason: 'malformed',
+    },
+    {
+      // 头已到、读应答体时 AbortSignal 到点：undici 让 json() 以 signal.reason
+      // （TimeoutError）拒绝。这是超时，不是形坏。
+      label: 'timeout while reading the body',
+      route: {
+        jsonThrows: new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+      },
+      status: 504,
+      reason: 'no answer within',
+    },
   ];
 
   for (const c of cases) {
@@ -907,6 +981,33 @@ describe('GitHub 失败（6-7）', () => {
     expect(REMOTE_TOOL_TIMEOUT_MS - ms).toBeGreaterThanOrEqual(3_000);
     expect(w.mock.calls[0]!.signal).toBeInstanceOf(AbortSignal);
     expect(w.mock.calls[0]!.signal!.aborted).toBe(false);
+  });
+
+  test('12 fetch 拿到的 signal 的超时值至多 REMOTE_TOOL_TIMEOUT_MS - 3s（三个工具，chief 面）', async () => {
+    // daemon relay 等 server 应答用 AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS)
+    // （apps/daemon/src/machine-client.ts，常量在 shared machine-api.ts，10s）。
+    // 这里记下 server 真正交给 AbortSignal.timeout 的值，并对上 fetch 拿到的
+    // 那个 signal：错误文案里的数字与实际给 fetch 的值分开验。
+    const w = world();
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    try {
+      for (const name of TOOLS) {
+        timeout.mockClear();
+        const before = w.mock.calls.length;
+        await chief(w, name, { projectId: w.projectId });
+        expect(w.mock.calls.length - before, name).toBe(1);
+        const signal = w.mock.calls[before]!.signal;
+        const index = timeout.mock.results.findIndex((r) => r.value === signal);
+        expect(index, `${name}: the fetch signal comes from AbortSignal.timeout`).toBeGreaterThan(
+          -1,
+        );
+        const ms = timeout.mock.calls[index]![0];
+        expect(ms, name).toBeGreaterThan(0);
+        expect(ms, name).toBeLessThanOrEqual(REMOTE_TOOL_TIMEOUT_MS - 3_000);
+      }
+    } finally {
+      timeout.mockRestore();
+    }
   });
 
   test('7 形坏整体 → 502 malformed：issues / PR 非数组，runs 缺 workflow_runs', async () => {
@@ -1032,10 +1133,10 @@ describe('chief 面与 MCP 面（13）', () => {
       expect(parsed.repo, name).toBe(REPO);
     }
     // 两面各打一次上游，查询串相同。
-    const byTool = (path: string) =>
-      w.mock.calls.filter((c) => c.url.pathname === path).map((c) => c.url.search);
     for (const name of TOOLS) {
-      const searches = byTool(PATHS[name]);
+      const searches = w.mock.calls
+        .filter((c) => c.url.pathname === PATHS[name])
+        .map((c) => c.url.search);
       expect(searches, name).toHaveLength(2);
       expect(searches[0], name).toBe(searches[1]);
     }
