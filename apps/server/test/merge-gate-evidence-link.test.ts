@@ -1,6 +1,7 @@
 // 合并就绪闸 S1（#1404）：PR body 里的 raw 证据链（AGENTS.md「验收必核 PR body
 // 的证据 raw 永久链」）。只认钉 40 位小写 SHA、指向本仓 docs/verify/<票号>/ 的
 // 链接；HTML 注释里的不算（与 scripts/pr-evidence-gate.py 同一约定）。
+// 第三轮补的：查询串与片段（?raw=true、#L3）不是路径的一部分。
 
 import { describe, expect, test } from 'vitest';
 import { parseRawEvidenceLinks } from '../src/services/merge-gate/evidence-link.js';
@@ -70,5 +71,31 @@ describe('parseRawEvidenceLinks', () => {
   test('目录穿越与仓外路径不算', () => {
     const r = parse(raw('docs/verify/1404/../1403/a.json'));
     expect(r.links).toEqual([]);
+  });
+
+  test('查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次', () => {
+    const body = [
+      `${raw('docs/verify/1404/a.json')}?raw=true`,
+      `[log](${raw('docs/verify/1404/b.txt')}#L3)`,
+      `${raw('docs/verify/1404/b.txt')}?x=1#L3-L5.`,
+      raw('docs/verify/1404/a.json'),
+    ].join('\n');
+    expect(parse(body)).toEqual({
+      links: [
+        { sha: SHA, path: 'docs/verify/1404/a.json' },
+        { sha: SHA, path: 'docs/verify/1404/b.txt' },
+      ],
+      others: [],
+    });
+  });
+
+  test('去掉查询串与片段后不指向文件的不算：目录本身不是证据', () => {
+    const body = [
+      `${raw('docs/verify/1404/')}?raw=true`,
+      `${raw('docs/verify/1404/sub/')}#top`,
+    ].join('\n');
+    const r = parse(body);
+    expect(r.links).toEqual([]);
+    expect(r.others).toHaveLength(2);
   });
 });

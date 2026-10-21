@@ -1,0 +1,65 @@
+
+
+Running 3 tests using 1 worker
+
+[1/3] e2e/detail-queued-exit.spec.ts:104:1 › queued: 更多 offers 停止, and confirming it stops the build
+  1) e2e/detail-queued-exit.spec.ts:104:1 › queued: 更多 offers 停止, and confirming it stops the build 
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator: getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '停止', exact: true })
+    Expected: enabled
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeEnabled" getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '停止', exact: true }) with timeout 5000ms
+      - waiting for getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '停止', exact: true })
+
+
+      106 |   await openMore(page, QUEUED.id, '排队中');
+      107 |   await evidencePanelShot(page, 'queued-more-menu.png', menu(page));
+    > 108 |   await expect(row(page, '停止')).toBeEnabled();
+          |                                 ^
+      109 |
+      110 |   await row(page, '停止').click();
+      111 |   const dialog = page.getByRole('dialog', { name: '停止排队？' });
+        at /home/user/pacman/apps/web/e2e/detail-queued-exit.spec.ts:108:33
+
+    Error Context: test-results/detail-queued-exit-queued--a2a19-nfirming-it-stops-the-build/error-context.md
+
+
+[2/3] e2e/detail-queued-exit.spec.ts:121:1 › queued: 更多 > 关闭 is enabled and closes the task
+  2) e2e/detail-queued-exit.spec.ts:121:1 › queued: 更多 > 关闭 is enabled and closes the task ─────────
+
+    Error: expect(locator).toBeEnabled() failed
+
+    Locator:  getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '关闭', exact: true })
+    Expected: enabled
+    Received: disabled
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toBeEnabled" getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '关闭', exact: true }) with timeout 5000ms
+      - waiting for getByRole('menu', { name: '更多' }).getByRole('menuitem', { name: '关闭', exact: true })
+        14 × locator resolved to <div tabindex="-1" role="menuitem" data-disabled="" id="base-ui-_r_16_" aria-disabled="true" data-variant="default" data-slot="dropdown-menu-item" class="group/dropdown-menu-item relative flex cursor-default items-center gap-2.5 rounded-(--cds-radius-md) h-8 px-2.5 text-ui text-foreground outline-hidden select-none focus:bg-menu-hover data-inset:pl-8.75 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-danger-soft data-disabled:pointer-events-none data-disabled:opacity…>…</div>
+           - unexpected value "disabled"
+
+
+      122 |   const sent = await stubLiveBoot(page);
+      123 |   await openMore(page, QUEUED.id, '排队中');
+    > 124 |   await expect(row(page, '关闭')).toBeEnabled();
+          |                                 ^
+      125 |   await row(page, '关闭').click();
+      126 |   await expect.poll(() => sent.patches).toEqual([
+      127 |     { path: `/api/todos/${QUEUED.id}`, body: { phase: 'closed' } },
+        at /home/user/pacman/apps/web/e2e/detail-queued-exit.spec.ts:124:33
+
+    Error Context: test-results/detail-queued-exit-queued--4f4db-enabled-and-closes-the-task/error-context.md
+
+
+[3/3] e2e/detail-queued-exit.spec.ts:131:1 › planning: no menu 停止, 关闭 stays disabled
+  2 failed
+    e2e/detail-queued-exit.spec.ts:104:1 › queued: 更多 offers 停止, and confirming it stops the build ─
+    e2e/detail-queued-exit.spec.ts:121:1 › queued: 更多 > 关闭 is enabled and closes the task ──────────
+  1 passed (17.2s)

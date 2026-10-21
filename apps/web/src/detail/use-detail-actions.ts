@@ -147,10 +147,10 @@ export function useDetailActions(input: DetailActionsInput) {
   // confirm-and-merge、相位适配;Close 关闭语义)。完成 = review 开验收弹层
   // (既有 accept→merge 链)/ confirm 关口确认(live wire);关闭 = PATCH phase
   // closed 后回看板(卡片立即隐藏;延迟 Undo 窗口 [设计] wontfix,r1 语义
-  // 归 closed→todo reopen 面)。server 漏斗现有边 todo/failed→closed;
-  // review/confirm/done→closed 边缺,归 W3 server 票(票面授权前端+注记),
-  // 故 canClose 只放行有边的相位,其余 disabled(运行中禁用 = r1 Delete-in-
-  // turn 先例)。fixture 面无 wire:关闭走 deletions.ts 会话覆面同律。——
+  // 归 closed→todo reopen 面)。canClose 放行 todo / failed / queued:queued
+  // 的步还在等机器、没跑过,服务端关闭时先停掉它(#1445/#1446);planning/
+  // building 运行中禁用(r1 Delete-in-turn 先例),confirm/review/done 不在
+  // 此列。fixture 面无 wire:关闭走 deletions.ts 会话覆面同律。——
   // #702(B-C17):failed 且 build 腿已交付 → 「完成」出口重新出现(服务端
   // 恢复闸是权威判定,此处只是钮面可达性:steps 投影里执行步 done)。点开
   // 同一 accept 弹层 → merge API → server 恢复回 review 关口 + 正常合并委派;
@@ -161,7 +161,7 @@ export function useDetailActions(input: DetailActionsInput) {
     phase === 'review' ||
     (live && phase === 'confirm') ||
     (live && phase === 'failed' && buildLegDone);
-  const canClose = phase === 'todo' || phase === 'failed';
+  const canClose = phase === 'todo' || phase === 'failed' || phase === 'queued';
   const completeTask = () => {
     setMoreOpen(false);
     if (phase === 'review' || phase === 'failed') {

@@ -3,6 +3,7 @@
 // 证据）取 (status, filename, previous_filename, blob sha) 元组，排序后哈希。
 // update-branch 只合入 main、main 的新提交不碰本 PR 的文件时，三点 compare
 // 的这些元组不变，摘要不变，判定沿用；改一行代码，blob sha 变，摘要变。
+// D4 的 800 行 / 40 文件上限与摘要口径不同：按整张补丁算，证据也计入。
 // 纯函数，无 I/O：compare 由 lib/github.ts 取，结果在这里算。
 
 import { createHash } from 'node:crypto';
@@ -23,8 +24,12 @@ export interface PatchDigestResult {
   /** `pd1:<sha256 hex>`；不可得时为 null（调用方一律按留人处理）。 */
   patchDigest: string | null;
   unavailable: DigestUnavailable | null;
-  /** 证据之外的文件数与增删行数（D4 的 40 文件 / 800 行上限按它算）。 */
+  /** 整张补丁的文件数，含 docs/verify/ 的证据（D4 的 40 文件上限按它算）。
+   * 带 previous_filename 的条目（改名）记两个文件，与 pr-gate 的 --no-renames
+   * 把改名记成一删一加同数。 */
   countedFiles: number;
+  /** 整张补丁的增删行数，含证据：每个条目 compare 给的 additions + deletions
+   * （D4 的 800 行上限按它算）。纯改名为 0，二进制为 0。 */
   countedLines: number;
   kept: CompareFile[];
   excluded: CompareFile[];
@@ -50,8 +55,8 @@ export function computePatchDigest(
 ): PatchDigestResult {
   const kept = files.filter((f) => !isEvidenceEntry(f));
   const excluded = files.filter(isEvidenceEntry);
-  const countedFiles = kept.length;
-  const countedLines = kept.reduce((n, f) => n + f.additions + f.deletions, 0);
+  const countedFiles = files.reduce((n, f) => n + (f.previousFilename === null ? 1 : 2), 0);
+  const countedLines = files.reduce((n, f) => n + f.additions + f.deletions, 0);
   const result = (
     patchDigest: string | null,
     unavailable: DigestUnavailable | null,
@@ -81,9 +86,12 @@ export function computePatchDigest(
 }
 
 const STATUSES: readonly string[] = COMPARE_FILE_STATUSES;
+/** 与 compareFileSchema 的 int().nonnegative() 同一条。 */
+const isCount = (n: unknown): boolean => Number.isInteger(n) && (n as number) >= 0;
 
-/** compare 响应体 → 文件条目；形状不对（缺 files、字段缺失或类型不对）返回
- * null，由调用方按「摘要不可得」处理，不抛进巡检。 */
+/** compare 响应体 → 文件条目；形状不对（缺 files、字段缺失或类型不对、行数
+ * 为负）返回 null，由调用方按「摘要不可得」处理，不抛进巡检。changes 不取，
+ * 但给了就得是非负整数。patch 只记有没有（hasPatch），文本不取。 */
 export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
   if (body === null || typeof body !== 'object') return null;
   const raw = (body as { files?: unknown }).files;
@@ -95,7 +103,8 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
     if (typeof f.filename !== 'string' || f.filename === '') return null;
     if (typeof f.status !== 'string' || !STATUSES.includes(f.status)) return null;
     if (!(typeof f.sha === 'string' || f.sha === null)) return null;
-    if (!Number.isInteger(f.additions) || !Number.isInteger(f.deletions)) return null;
+    if (!isCount(f.additions) || !isCount(f.deletions)) return null;
+    if (!(f.changes === undefined || isCount(f.changes))) return null;
     const prev = f.previous_filename;
     if (!(prev === undefined || prev === null || (typeof prev === 'string' && prev !== '')))
       return null;
@@ -106,6 +115,7 @@ export function compareFilesFromResponse(body: unknown): CompareFile[] | null {
       sha: f.sha as string | null,
       additions: f.additions as number,
       deletions: f.deletions as number,
+      hasPatch: typeof f.patch === 'string' && f.patch !== '',
     });
   }
   return out;

@@ -2,10 +2,13 @@
 // 失败方式先行：顺序 / 区域设置让同一补丁算出两个摘要；改名移进 docs/verify/
 // 把代码删除藏起来；文件名含制表符或换行时元组撞车；空 blob sha 被当成
 // 字符串 'null' 哈希；compare 截到 300 个文件仍被当成完整列表。
+// 第三轮（ADR 0021 D4 修订）补的：800 行 / 40 文件按整张补丁算，证据也计入，
+// 改名记两个文件；compare 不给 patch 的条目要能认出来（二进制）；增删行数为负
+// 的响应按形状不对处理。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
-// 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1，去掉了 patch 字段）；
-// 与 docs/verify/1404/compare-sample.json 同一份，放在测试目录里是因为摘要
-// 不计 docs/verify/，测试读的夹具不能落在摘要之外。
+// 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
+// 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
+// 测试目录里是因为摘要不计 docs/verify/，测试读的夹具不能落在摘要之外。
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -23,6 +26,7 @@ const file = (over: Partial<CompareFile> & { filename: string }): CompareFile =>
   sha: 'a'.repeat(40),
   additions: 1,
   deletions: 1,
+  hasPatch: true,
   ...over,
 });
 
@@ -167,11 +171,36 @@ describe('computePatchDigest', () => {
     expect(r.unavailable).toBe('empty');
   });
 
-  test('行数与文件数只算证据之外的条目', () => {
+  test('行数与文件数按整张补丁算，docs/verify/ 的证据也计入；摘要照旧不计证据', () => {
     const r = computePatchDigest(base);
-    expect(r.countedFiles).toBe(2);
-    expect(r.countedLines).toBe(2 + 5);
+    expect(r.countedFiles).toBe(3);
+    expect(r.countedLines).toBe(2 + 5 + 20);
+    expect(r.kept.map((f) => f.filename)).toEqual(['apps/server/src/a.ts', 'apps/server/src/b.ts']);
     expect(r.excluded.map((f) => f.filename)).toEqual(['docs/verify/1404/run.txt']);
+  });
+
+  test('改名（带 previous_filename 的条目）记两个文件，纯改名行数为 0，证据里的改名也算', () => {
+    const r = computePatchDigest([
+      file({ filename: 'apps/server/src/c.ts', additions: 3, deletions: 2 }),
+      file({
+        filename: 'apps/server/src/new.ts',
+        previousFilename: 'apps/server/src/old.ts',
+        status: 'renamed',
+        additions: 0,
+        deletions: 0,
+        hasPatch: false,
+      }),
+      file({
+        filename: 'docs/verify/1404/b.txt',
+        previousFilename: 'docs/verify/1404/a.txt',
+        status: 'renamed',
+        additions: 0,
+        deletions: 0,
+        hasPatch: false,
+      }),
+    ]);
+    expect(r.countedFiles).toBe(1 + 2 + 2);
+    expect(r.countedLines).toBe(5);
   });
 });
 
@@ -190,14 +219,27 @@ describe('真实 compare 响应夹具', () => {
     expect(files?.some((f) => f.filename === 'docs/verify/paper-shell-merge/probe.mjs')).toBe(true);
   });
 
+  test('compare 不给 patch 的正是 20 张 PNG（二进制），其余 38 个条目都带 patch', () => {
+    const files = compareFilesFromResponse(sample) ?? [];
+    const noPatch = files.filter((f) => !f.hasPatch).map((f) => f.filename);
+    expect(noPatch.length).toBe(20);
+    expect(noPatch.every((n) => /^docs\/verify\/paper-shell-merge\/[a-z-]+\.png$/.test(n))).toBe(
+      true,
+    );
+    expect(files.filter((f) => f.hasPatch).length).toBe(38);
+  });
+
   // 期望值由一段独立的 Python 按同一算法算出（docs/verify/1404/digest-crosscheck.txt），
   // 不是从本实现回填的。
-  test('摘要与独立实现一致，证据目录的 22 个文件不计', () => {
+  // 文件数与行数按整张补丁：58 个文件（无改名），846 + 证据里两个 .mjs 的 40 + 46 行
+  // （PNG 记 0 行）；独立复算见 docs/verify/1404/s1-r3-red-green.txt。
+  test('摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数', () => {
     const files = compareFilesFromResponse(sample) ?? [];
     const r = computePatchDigest(files);
-    expect(r.countedFiles).toBe(36);
+    expect(r.kept.length).toBe(36);
     expect(r.excluded.length).toBe(22);
-    expect(r.countedLines).toBe(846);
+    expect(r.countedFiles).toBe(58);
+    expect(r.countedLines).toBe(932);
     expect(r.patchDigest).toBe(
       'pd1:ddf04cd2406d952eec621a1d4f0b466d77b5084bb555f2e737e6ea1679b7655f',
     );
@@ -234,5 +276,23 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ files: [noSha] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: '' })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: 7 })] })).toBeNull();
+  });
+
+  test('patch 是非空字符串时 hasPatch 为真；缺省、空串、null 都为假', () => {
+    const hasPatch = (over: Record<string, unknown>) =>
+      compareFilesFromResponse({ files: [entry(over)] })?.[0]?.hasPatch;
+    expect(hasPatch({ patch: '@@ -1 +1 @@\n-a\n+b' })).toBe(true);
+    expect(hasPatch({})).toBe(false);
+    expect(hasPatch({ patch: '' })).toBe(false);
+    expect(hasPatch({ patch: null })).toBe(false);
+  });
+
+  test('additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致）', () => {
+    expect(compareFilesFromResponse({ files: [entry({ additions: -1 })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ deletions: -1 })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ changes: -1 })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ changes: 1.5 })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ changes: '1' })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ changes: 1 })] })).toHaveLength(1);
   });
 });

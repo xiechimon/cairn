@@ -29,6 +29,7 @@ const file = (filename: string, over: Partial<CompareFile> = {}): CompareFile =>
   sha: '1'.repeat(40),
   additions: 3,
   deletions: 1,
+  hasPatch: true,
   ...over,
   filename,
 });

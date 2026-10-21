@@ -1,18 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 const searchPanel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 async function openSearch(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await searchPanel(page)
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) return;
-  }
-  throw new Error('search panel did not open');
+  await pressUntil(page, 'Meta+k', searchPanel(page));
 }
 
 test('CDS search panel: 16px edge-radius + de-boxed input', async ({ page }) => {
