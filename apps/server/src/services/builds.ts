@@ -731,7 +731,8 @@ export function maybeEnqueueVerifyStep(
     .get();
   const prompt = buildVerifyStepPrompt({
     ticketRef,
-    taskText: buildTaskPromptText(todoRow.title, todoRow.spec),
+    // #1406：GitHub issue 导入任务的标题与正文进 issue 原文围栏（ADR 0021 D5）。
+    taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
   });

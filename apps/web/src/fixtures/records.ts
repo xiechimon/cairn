@@ -86,6 +86,11 @@ export interface TodoRecord {
    *  活动步 waiting_quota 时在位——卡面「等额度」芯片 + 看板横幅的判定
    *  位。undefined/null = 无挂起（fixture 基线与 live 无挂起面零漂移）。 */
   quotaWait?: QuotaWait | null;
+  /** #1406 来源两列（wire todoRecordSchema 同名列）：GitHub issue 导入的任务，
+   *  daemon 把会话首轮任务文本包进 issue 原文围栏，classifyUserText 据此认出
+   *  那一行。fixture 缺省 = 无来源。 */
+  sourceKind?: string | null;
+  sourceRef?: string | null;
 }
 
 /** Token 用量 content (issue #68, r7 30): the cumulative-run figures,
