@@ -1,5 +1,5 @@
-## control: runner.ts with `briefCleanupFailed = true;` removed (restored afterwards), new test
-     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 27ms
+## control: runner.ts with `briefCleanupFailed = true;` removed (restored afterwards), new runner-brief test
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 17ms
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
       Tests  1 failed | 10 skipped (11)

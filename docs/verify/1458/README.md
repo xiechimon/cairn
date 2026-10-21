@@ -4,8 +4,8 @@ Base = `00a2cc75` (this branch; both test files are unchanged since origin/main 
 
 Only the two tests change; no daemon source changes.
 
-1. `apps/daemon/test/runner-brief.test.ts` "擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）". The erase failure was injected with `chmodSync(cwd, 0o500)`, which root ignores. The test now replaces the brief file `AGENTS.md` with a directory of the same name during the session. `cleanupBriefFile` reads the file first, and reading a directory throws EISDIR for every user, the same injection "写失败即 fail-closed（失败方式 5）" uses.
-2. `apps/daemon/test/workspace-hooks.test.ts` "失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入". With null credentials `runWorkspaceHook` passes the parent environment through unchanged (the intended "no injection"), so the hook saw the container's own `GIT_CONFIG_COUNT`. The test now removes inherited `GIT_CONFIG_*` keys around that run and restores them afterwards.
+1. `apps/daemon/test/runner-brief.test.ts` "擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）". The erase failure was injected with `chmodSync(cwd, 0o500)`, which root ignores. The test now replaces the brief file `AGENTS.md` with a directory of the same name during the session. `cleanupBriefFile` reads the file first, and reading a directory throws EISDIR for every user, the same injection "写失败即 fail-closed（失败方式 5）" uses. The test also asserts the erase-failure transcript row (`运行简报未能从工作区擦除`), so a failure earlier in the step cannot pass for this one.
+2. `apps/daemon/test/workspace-hooks.test.ts` "失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入". With null credentials `runWorkspaceHook` passes the parent environment through unchanged (the intended "no injection"), so the hook saw the container's own `GIT_CONFIG_COUNT`. The test now removes inherited `GIT_CONFIG_*` keys around that run with `vi.stubEnv(key, undefined)` and restores them with `vi.unstubAllEnvs()`.
 
 ## Runs
 

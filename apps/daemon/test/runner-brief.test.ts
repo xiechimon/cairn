@@ -408,6 +408,8 @@ describe('简报接线：失败闸', () => {
     expect(calls).not.toContain('commitAll');
     expect(calls).not.toContain('push');
     expect(client.doneBodies[0]?.body.status).toBe('failed');
+    // 失败确实出在擦除这一口（cleanupBriefOnce 的 transcript 行），不是更早的某步。
+    expect(JSON.stringify(client.uploads)).toContain('运行简报未能从工作区擦除');
   });
 
   test('写失败即 fail-closed：不开会话（失败方式 5）', async () => {

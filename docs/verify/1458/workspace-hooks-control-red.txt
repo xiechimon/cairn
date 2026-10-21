@@ -1,5 +1,5 @@
-## control: workspace-hooks.ts null branch changed to `{ ...process.env, GIT_CONFIG_COUNT: '1' }` (restored afterwards), new test
-     × 失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入 16ms
+## control: workspace-hooks.ts null branch changed to `{ ...process.env, GIT_CONFIG_COUNT: '1' }` (restored afterwards), new workspace-hooks test
+     × 失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入 18ms
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 AssertionError: expected 'cred=1\n' to contain 'cred=unset'
       Tests  1 failed | 8 skipped (9)

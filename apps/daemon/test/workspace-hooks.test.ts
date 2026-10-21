@@ -17,7 +17,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { GitCredentials } from '@pacman/shared';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
   runWorkspaceHook,
@@ -198,9 +198,9 @@ describe('workspace hook 原语（#1149）', () => {
     writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
     // null 凭证 = 父 env 原样继承。父进程可能自带 GIT_CONFIG_*（云端容器的
     // 代理配置），先摘掉再断言，测的是 runWorkspaceHook 自己不注入（#1458）。
-    const inherited = Object.keys(process.env).filter((k) => k.startsWith('GIT_CONFIG_'));
-    const saved = inherited.map((k) => [k, process.env[k]] as const);
-    for (const k of inherited) delete process.env[k];
+    for (const k of Object.keys(process.env)) {
+      if (k.startsWith('GIT_CONFIG_')) vi.stubEnv(k, undefined);
+    }
     let without: Awaited<ReturnType<typeof runWorkspaceHook>>;
     try {
       without = await runWorkspaceHook({
@@ -211,7 +211,7 @@ describe('workspace hook 原语（#1149）', () => {
         log: () => {},
       });
     } finally {
-      for (const [k, v] of saved) process.env[k] = v;
+      vi.unstubAllEnvs();
     }
     expect(without!.output).toContain('cred=unset');
   });

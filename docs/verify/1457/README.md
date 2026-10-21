@@ -2,7 +2,7 @@
 
 Base = `0d75239b` (this branch after #1455; the files touched here are unchanged since origin/main `23a39da9`). Branch = `claude/optimistic-albattani-r5pmfn`.
 
-`packages/shared/src/phase.ts` exports `ORCHESTRATE_PHASES = ['todo', 'failed']` and `canOrchestrate(phase)`. Every place that hand-wrote the set reads it now:
+`packages/shared/src/phase.ts` exports `ORCHESTRATE_PHASES = ['todo', 'failed']` and `canOrchestrate(phase: Phase)`. Every place that hand-wrote the set reads it now:
 
 - `apps/server/src/services/orchestrate.ts` `orchestrateTodo`: its 409 check.
 - `packages/shared/src/phase.ts` `canBoardDrop`: the building case (raw PATCH into 执行中) requires it on top of the 待开始 column rule.

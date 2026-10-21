@@ -1,2 +1,2 @@
-## same env  (isolated test)
+## GIT_CONFIG_* set in the parent env (this container)  (vi.stubEnv-isolated test)
       Tests  9 passed (9)

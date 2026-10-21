@@ -46,9 +46,10 @@ export const IN_PROGRESS_PHASES = ['queued', 'planning', 'building'] as const;
  *  列规则可以更窄（failed 不可拖进执行中，实测），不能更宽。 */
 export const ORCHESTRATE_PHASES = ['todo', 'failed'] as const;
 
-/** orchestrate 判据；入参收 string（调用面常拿运行时值来问）。 */
-export const canOrchestrate = (phase: string): boolean =>
-  (ORCHESTRATE_PHASES as readonly string[]).includes(phase);
+/** orchestrate 判据。入参收 Phase：调用面都已持有 Phase，相位改名时
+ *  在这里编译失败，而不是静默返回 false。 */
+export const canOrchestrate = (phase: Phase): boolean =>
+  (ORCHESTRATE_PHASES as readonly Phase[]).includes(phase);
 
 /** 工作台 4 列（#351；前身 = r2 §4.1 的 6 列折叠）——列只是 phase 的折叠
  *  视图，非独立实体（CONTEXT.md）。 */
