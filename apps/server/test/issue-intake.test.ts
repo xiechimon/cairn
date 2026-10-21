@@ -736,7 +736,8 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
     ],
     // labeled / unlabeled 缺 id、created_at 或 label，数组里有一项不是对象 = 整读
     // 作废（githubIssueEvents）：只跳过那一条，摘标事件一丢，已摘的标就成了仓主
-    // 最新打的。closed 事件缺字段的后果在关闭人核验上，见 11 组。
+    // 最新打的。closed 事件缺字段同样让整读作废（解析是打标人与关闭人共用的，
+    // 不按调用方挑事件），所以打标人这边也读不成；它真正改判的是关闭人，见 11 组。
     [
       '形坏（仓主打标之后的 unlabeled 缺 created_at）',
       () => ({
@@ -782,6 +783,15 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
     [
       '形坏（仓主打标之后有一项不是对象）',
       () => ({ body: [labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1), null] }),
+    ],
+    [
+      '形坏（closed 缺 created_at）',
+      () => ({
+        body: [
+          labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+          { ...closedEvent(OWNER, '2026-10-20T20:30:00Z', 2), created_at: undefined },
+        ],
+      }),
     ],
   ];
 
@@ -2889,6 +2899,24 @@ describe('24 限流：本队本轮停读', () => {
       expect(rateLimitLines(w).map((l) => l.obj)).toEqual([
         expect.objectContaining({ status: limited.status, resetAt }),
       ]);
+    },
+  );
+
+  // importGithubIssue 自己的读不走进料的读面：遇限流抛 HttpError，按导入失败记，
+  // 不停本队（README 与 spec 28 P5a 写明的口径）。
+  test.each(LIMITED)(
+    '导入时的详情读 %s：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条',
+    async (_name, limited) => {
+      const w = await makeWorld({ list: [1394, 1401] });
+      w.gh.overrides.set(`/repos/${REPO}/issues/1394`, () => limited);
+      const tally = await w.intake.sweep(T0);
+      expect(takenNumbers(w.s)).toEqual([1401]);
+      expect(tally?.errors).toBe(1);
+      expect(tally?.rateLimited).toBe(0);
+      expect(rateLimitLines(w)).toHaveLength(0);
+      expect(
+        w.logs.filter((l) => l.msg === 'issue intake import failed').map((l) => l.obj.issue),
+      ).toEqual([1394]);
     },
   );
 

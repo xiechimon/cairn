@@ -16,9 +16,12 @@
 //    （#1445：写相位后停活动步）。首见即 closed 的卡（例：重启后才读到）永不
 //    被对账关闭；关过一次即忘掉「见过 open」，有人把卡重开就不再关。外部
 //    作者关自己的 issue、任一读失败 = 本轮不关。review 卡与 build 交付过 PR
-//    的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：合并带关闭引用关掉
-//    issue 时，那张卡不以 closed 收尾。拆卡父卡还有子卡不在 done / closed 时
-//    也不碰（关了它，最后一张子卡 done 时的父卡收口会撞 closed → done 非法边）。
+//    的卡（building 磨绿中 / failed / 重跑中）不归这里关：合并带关闭引用关掉
+//    issue 时，那张卡不该以 closed 收尾。眼下 PR 侧只有 ci-loop 的 review 期
+//    对账（#1414，PR 合并 → done、未合并关闭 → failed）；其余相位的这类卡
+//    由 ci-loop 的磨绿推进，或等人处理（spec 28 P2 的后续段）。拆卡父卡还有
+//    子卡不在 done / closed 时也不碰（关了它，最后一张子卡 done 时的父卡收口会
+//    撞 closed → done 非法边）。
 //    写前重读相位、PR 与子卡，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
@@ -126,7 +129,8 @@ const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin']);
 /** 在飞上限不计的相位。failed 计入：失败卡仍挂在项目上等人处理，不再多领。 */
 const NOT_IN_FLIGHT: Phase[] = ['done', 'closed'];
 
-/** 关闭对账不碰的相位：done / closed 已终态；review 归 #1414 的 PR 对账。
+/** 关闭对账不碰的相位：done / closed 已终态；review 是人审关口，进料不关
+ * （交付过 PR 的 review 卡由 #1414 的 PR 对账收尾，没 PR 的等人）。
  * 相位之外还有两条：任一 build 交付过 PR 的卡（见 noDeliveredPr）、还有子卡
  * 没收完的拆卡父卡（见 noOpenChildren）也不碰。 */
 const CLOSE_RECONCILE_SKIPPED: Phase[] = ['done', 'closed', 'review'];
@@ -339,8 +343,9 @@ export function createIssueIntake(
 
   /** 卡没有任何 build 交付过 PR（prNumber 或 prUrl 在，builds.ts latestPrBuild
    * 同一判据；只看最新 build 不够：失败卡重跑出的新 build 还没 PR 时，旧 PR
-   * 仍开着、仍可能被合并）。交付过的卡，合并带关闭引用关掉 issue 时由 PR
-   * 对账收尾，关闭对账不碰。用在以 todo 为主表的查询里（相关子查询）。 */
+   * 仍开着、仍可能被合并）。交付过的卡关闭对账不碰：合并带关闭引用关掉 issue
+   * 时它不该以 closed 收尾（review 期的由 #1414 的 PR 对账收尾，其余相位见头注
+   * 第 2 条）。用在以 todo 为主表的查询里（相关子查询）。 */
   function noDeliveredPr() {
     return notExists(
       deps.db
@@ -775,7 +780,8 @@ export function createIssueIntake(
           continue;
         }
         // 写前重读相位、PR 与子卡：读窗口里被人推进（如进 review）/ 关闭 /
-        // 完成，build 交付了 PR（留给 PR 对账），或有了还在跑的子卡 → 不动。
+        // 完成，build 交付了 PR（不归这里关，见 noDeliveredPr），或有了还在跑
+        // 的子卡 → 不动。
         const fresh = deps.db
           .select({ phase: todo.phase })
           .from(todo)
