@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
@@ -115,6 +116,28 @@ test('queued cards sit in 执行中 with a waiting footer; todo and building sta
   await expect(runningFooter).toHaveText('r3-builder · 执行中');
   await expect(runningFooter.locator('.animate-breath')).toHaveCount(1);
 });
+
+// The fixture board has no queued card, so a11y-axe.spec never sees the
+// waiting footer; scan the 执行中 column here in both themes (WCAG 2.1 AA).
+for (const theme of ['light', 'dark'] as const) {
+  test(`axe: the 执行中 column with waiting footers (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await stubWorld(page);
+    await page.goto('/app');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect(card(page, 'building', HELD.id).locator('[data-card-footer="waiting"]')).toBeVisible();
+    const { violations } = await new AxeBuilder({ page })
+      .include('.board-column[data-column="building"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    const found = violations.map((v) => ({
+      rule: v.id,
+      targets: v.nodes.slice(0, 3).map((n) => n.target.join(' ')),
+    }));
+    expect(found).toEqual([]);
+  });
+}
 
 test('a queued card dropped on 待开始 opens the reset dialog', async ({ page }) => {
   await stubWorld(page);
