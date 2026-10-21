@@ -1,0 +1,69 @@
+# P5a-1 round 3b (item 3, option C: the close reconcile acts only on tasks the poller took, marked by createdBy =
+# the team chief's bound agent id): red / green
+# Every red leg ran against a tests-only commit on this branch; each holds the sources of the commit before it.
+# command for every red leg: pnpm exec vitest run apps/server/test/issue-intake.test.ts
+
+## RED A: reconcile-scope tests before the fix
+# commit: fe3654d84231ac56c4a30d7f95494d3700da3574 (tests-only; sources identical to 8eb20fe6 (b6180631 on top of it only adds docs/verify files))
+     × createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户 84ms
+     × 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态 78ms
+     × chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行 47ms
+ Test Files  1 failed (1)
+      Tests  3 failed | 110 passed (113)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+    AssertionError: expected '1PWUKOB6oEgqg-wqRyjzK' to be 'agent-intake' // Object.is equality
+    at test/issue-intake.test.ts:2142:31
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态
+    AssertionError: expected 'closed' to be 'todo' // Object.is equality
+    at test/issue-intake.test.ts:2156:38
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行
+    AssertionError: expected 'closed' to be 'todo' // Object.is equality
+    at test/issue-intake.test.ts:2186:38
+Passing there and kept as a pin: "轮询器在重启前领的卡，重启后照样对账" (an in-memory marker would fail it; mutation D2 turns it red).
+
+## RED B: tests for the first /code-review pass (low, 8eb20fe6..591acbac)
+# commit: 27a61b0fd7984f6d8021464cde5a92cae3e94220 (tests-only; sources identical to 591acbac)
+     × 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关 65ms
+     × 读 chief 行出错 → 记本队失败（issue intake team failed），不是整轮失败 48ms
+ Test Files  1 failed (1)
+      Tests  2 failed | 114 passed (116)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关
+    AssertionError: expected +0 to be 1 // Object.is equality
+    at test/issue-intake.test.ts:2207:27
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 读 chief 行出错 → 记本队失败（issue intake team failed），不是整轮失败
+    AssertionError: expected false to be true // Object.is equality
+    at test/issue-intake.test.ts:2258:68
+Passing there and kept as a pin: "chief 绑定的 Agent 没有模型 … 照样对账" (mutation F3 turns it red). The group 11 test once named for a hand import was renamed in this commit to what it runs (a poller task first seen closed).
+
+## RED C: tests for the second /code-review pass (low, 8eb20fe6..6c51cd9c)
+# commit: dc60bf07b9145be7b94523ae459a93b6249cf5f3 (tests-only; sources identical to 6c51cd9c)
+     × 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行 60ms
+ Test Files  1 failed (1)
+      Tests  1 failed | 118 passed (119)
+# where each one fails:
+  FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行
+    AssertionError: expected 1 to be +0 // Object.is equality
+    at test/issue-intake.test.ts:1982:34
+Passing there and kept as pins: "chief 换绑别的 Agent → 换绑前领的卡不再对账" (mutations F1, F2) and "chief 没绑 Agent、队里只有手工导入的卡 → 不记 close reconcile skipped" (mutation U2).
+
+## GREEN at 4cb207ee9191e0bce69c37f178876a6c1b1cdd33 (branch head before this evidence commit)
+# command: pnpm exec vitest run --reporter=verbose apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts apps/server/test/webhook.test.ts
+# date: 2026-10-21T12:35:44Z
+# issue-intake.test.ts: 119 tests (109 at 8eb20fe6, 10 added in round 3b); github-issues.test.ts + webhook.test.ts: 47
+# round 3b tests (full verbose list: 166 passing lines):
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭 45ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行 61ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户 66ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态 97ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 轮询器在重启前领的卡，重启后照样对账（认卡靠库里的 createdBy，不靠进程内存） 58ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行 44ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关 57ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账 68ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 读 chief 行出错 → 记本队失败（issue intake team failed），不是整轮失败 66ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动） 60ms
+ ✓ |@xiechimon/pacman| test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent、队里只有手工导入的卡 → 不记 close reconcile skipped 42ms
+ Test Files  3 passed (3)
+      Tests  166 passed (166)
+exit=0

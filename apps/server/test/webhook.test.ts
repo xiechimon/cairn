@@ -38,12 +38,15 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   chiefMessage as chiefMessageTable,
   chiefThread as chiefThreadTable,
+  project as projectTable,
   step as stepTable,
   todo as todoTable,
   webhookToken as webhookTokenTable,
 } from '../src/db/schema.js';
+import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { importGithubIssue } from '../src/services/github-issues.js';
 import { receiveGithubWebhook, resetWebhookDeliveryWindow } from '../src/services/webhook.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
@@ -502,5 +505,58 @@ describe('服务面直达（delivery 头缺省 + logger 静默）', () => {
       { token: token.plaintext, event: 'ping', deliveryId: undefined, body: {} },
     );
     expect(response.result).toBe('ignored');
+  });
+});
+
+// #1406：webhook 与 issue 轮询器同时导入同一 issue。importGithubIssue 在第一次
+// GitHub 读之前占住 sourceRef，第二路拿 409（webhook 面 = 202 duplicate），
+// 只建一张卡、只编排一次。
+describe('#1406 webhook 与另一路导入同一 issue 并发', () => {
+  test('webhook 投递与直接导入同时进来：一张卡，后到的一路 409', async () => {
+    // 详情读卡在闸门上 20ms：先占位的一路握着占位等 GitHub，另一路此时进门。
+    let open: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      open = r;
+    });
+    const gated: FetchLike = async (input, init) => {
+      if (new URL(String(input)).pathname === ISSUE_PATH) await gate;
+      return mock.impl(input, init);
+    };
+    const projectRow = s.db
+      .select()
+      .from(projectTable)
+      .where(eq(projectTable.githubRepo, REPO))
+      .get();
+    if (projectRow === undefined) throw new Error('project missing');
+    const deps = { db: s.db, hub: s.hub, user: s.user, box: s.secretBox, githubFetch: gated };
+    const hook = receiveGithubWebhook(deps, {
+      token: token.plaintext,
+      event: 'issues',
+      deliveryId: 'race-delivery-1',
+      body: labeledPayload(),
+    });
+    const direct = importGithubIssue(deps, projectRow, 7);
+    setTimeout(open, 20);
+    const [hookResult, directResult] = await Promise.allSettled([hook, direct]);
+    const rows = s.db
+      .select()
+      .from(todoTable)
+      .where(eq(todoTable.sourceRef, `github:${REPO}#7`))
+      .all();
+    expect(rows).toHaveLength(1);
+    expect(hookResult.status).toBe('fulfilled');
+    const hookBody = (hookResult as PromiseFulfilledResult<{ result: string }>).value;
+    if (hookBody.result === 'created') {
+      // webhook 先占位：直接导入那一路 409。
+      expect(directResult.status).toBe('rejected');
+      const reason = (directResult as PromiseRejectedResult).reason;
+      expect(reason).toBeInstanceOf(HttpError);
+      expect((reason as HttpError).status).toBe(409);
+      expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(1);
+    } else {
+      expect(hookBody.result).toBe('duplicate');
+      expect(directResult.status).toBe('fulfilled');
+      expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(0);
+    }
   });
 });

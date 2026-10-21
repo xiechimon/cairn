@@ -60,6 +60,11 @@ export const serverConfigSchema = z.object({
    *  ~/.claude.json，PACMAN_MCP_CONFIG 覆盖。UI 展示读 server 本机、任务
    *  执行读 daemon 本机——多机分歧文档化不桥接）。 */
   mcpConfigPath: z.string(),
+  /** GitHub issue 进料轮询（#1406，spec 28 P5a）：env ENV_VARS.issueIntake
+   *  为 1 / true / yes 才开，其余（未设、0、false、乱值）关。默认关：开了会把
+   *  仓里已打 ready-for-agent 的存量 issue 按最旧先导入并派发——升级不该让
+   *  实例自己开工（spec 28 P8 分阶段上线）。 */
+  issueIntake: z.boolean(),
 });
 export type ServerConfig = z.infer<typeof serverConfigSchema>;
 
@@ -74,6 +79,15 @@ function envPort(): number | undefined {
 function envStr(name: string): string | null {
   const raw = process.env[name];
   return raw !== undefined && raw !== '' ? raw : null;
+}
+
+/** 布尔 env 开关：1 / true / yes（后两者不分大小写）= 开，其余 = 关（仓内既有
+ * 写法：daemon pi.ts truthyEnvFlag、pre-commit 的 PACMAN_ALLOW_* 闸）。 */
+function envFlag(name: string): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return false;
+  const lower = raw.toLowerCase();
+  return raw === '1' || lower === 'true' || lower === 'yes';
 }
 
 /** 全网卡绑定主机名族（显式配置命中 + 鉴权关 = 启动 WARN 判定面）。 */
@@ -137,6 +151,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     mcpConfigPath: resolve(
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
+    issueIntake: envFlag(ENV_VARS.issueIntake),
     ...overrides,
   });
 }

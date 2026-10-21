@@ -1,0 +1,84 @@
+# P5a-1 gates, round 2 (opt-in change) on 7b2c1f56 (server(1406): issue intake is opt-in, off by default)
+# date: 2026-10-21T09:33:27Z
+
+## pnpm lint
+
+Checked 786 files in 2s. No fixes applied.
+Found 1 info.
+exit=0
+
+## pnpm typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/daemon typecheck: Done
+apps/web typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+## pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.0s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.5s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+## node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+## pnpm exec vitest run --changed origin/main
+(the shared ENV_VARS change pulls in most of the workspace: 248 files)
+
+### first run, on ae0def97 (before the snapshot update)
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ FAIL  |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > executor CLI 面（02 §5.1）
+ FAIL  |@xiechimon/pacman| test/skill-write.test.ts > machine-wire 技能清单与按需拉取（GET /api/machine/skills/{stepId}[/file]） > M5：超限文件不再让整包失败——超单文件闸的资产真实 size 入清单、字节完整下发；总量超旧包闸照常出清单
+ Test Files  3 failed | 245 passed (248)
+      Tests  3 failed | 2562 passed | 1 skipped (2566)
+exit=1
+- snapshot.test.ts: the protocol vocabulary snapshot pins ENV_VARS; the new issueIntake slot is a real change, so the snapshot was updated (one added line) and folded into the commit (amend, now 7b2c1f56).
+- skill-write.test.ts M5: 'Test timed out in 5000ms' under the full parallel run; alone it passes 30/30 (pnpm exec vitest run apps/server/test/skill-write.test.ts). Not touched by this branch.
+- runner-brief.test.ts: the known root-only case, below.
+
+### second run, on 7b2c1f56
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 18ms
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ Test Files  1 failed | 247 passed (248)
+      Tests  1 failed | 2564 passed | 1 skipped (2566)
+   Duration  459.47s (tests 53%, import 46%, transform 1%)
+exit=1
+
+### runner-brief.test.ts on origin/main 23a39da9 (temporary worktree /home/user/pacman/.claude/worktrees/p5-main-check, pnpm install --frozen-lockfile, removed afterwards with git worktree remove --force)
+user: root
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 8ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+      Tests  1 failed | 10 passed (11)
+-> same test, same assertion, same failure on origin/main: the known root-only case (chmod does not stop root), not caused by this branch.
+
+## E2E_AFFECTED_PORT=8394 pnpm --filter @pacman/web e2e:affected
+lsof -iTCP:8394 -sTCP:LISTEN before the run: no listener
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8394
+  live-server-reap.spec.ts token-gate.spec.ts
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.0s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (2.2s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (821ms)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (395ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (441ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (489ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (471ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (514ms)
+  8 passed (12.1s)
+exit=0
+
+## /code-review low on 645640fd..HEAD
+No findings. Its one unchecked assumption (createScheduler accepts null for the intake slot and then starts no intake) holds: the signature is intake?: IssueIntakeRun | null; the two null-slot tests in issue-intake.test.ts pin it; the live off run (p5a1-optin-live.txt) shows no intake sweep.
+
+## /security-review
+Not run: no file on the CLAUDE.md security list is touched.

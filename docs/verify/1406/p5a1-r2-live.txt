@@ -1,0 +1,17 @@
+# P5a-1 round 2, live startup on 9f58f10f (issueIntakeRunOf now logs the switch line): real server (pnpm exec tsx src/index.ts), PACMAN_HOME in a scratch dir, PORT 8794, NODE_ENV=production, stopped with SIGTERM after startup
+
+## PACMAN_ISSUE_INTAKE unset
+      1 "msg":"attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed"
+      1 "msg":"ci pr-checks sweep"
+      1 "msg":"github issue intake off (set PACMAN_ISSUE_INTAKE=1 to enable)"
+      1 "msg":"pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>"
+{"level":30,"issueIntake":false,"msg":"github issue intake off (set PACMAN_ISSUE_INTAKE=1 to enable)"}
+
+## PACMAN_ISSUE_INTAKE=1
+      1 "msg":"attachment gc: 0 pending, 0 orphan, 0 bytes reclaimed"
+      1 "msg":"ci pr-checks sweep"
+      1 "msg":"github issue intake on (PACMAN_ISSUE_INTAKE)"
+      1 "msg":"issue intake sweep"
+      1 "msg":"pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 pacman start --api-key <key> --team <teamId>"
+{"level":30,"issueIntake":true,"msg":"github issue intake on (PACMAN_ISSUE_INTAKE)"}
+{"level":30,"teams":0,"projects":0,"skipped":0,"listNotModified":0,"listTruncated":0,"candidates":0,"claimed":0,"atCap":0,"notEligible":0,"unverifiable":0,"imported":0,"orchestrated":0,"closed":0,"closeSkipped":0,"errors":0,"msg":"issue intake sweep"}
