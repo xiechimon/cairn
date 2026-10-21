@@ -23,7 +23,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DB_TABLES, INTERNAL_ONLY_TABLES, todoRecordSchema } from '@pacman/shared';
 import Database from 'better-sqlite3';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -172,30 +172,16 @@ function memory(): { db: Db; sqlite: Database.Database; teamId: string } {
   return { db, sqlite, teamId: team.id };
 }
 
-/** 经 drizzle 读本构建在四表的行数（bootServer 只给 drizzle 句柄）。 */
-function gateCounts(db: Db, buildId: string): Record<(typeof GATE_TABLES)[number], number> {
-  return {
-    gate_digest: db
-      .select()
-      .from(schema.gateDigest)
-      .where(eq(schema.gateDigest.buildId, buildId))
-      .all().length,
-    gate_round: db
-      .select()
-      .from(schema.gateRound)
-      .where(eq(schema.gateRound.buildId, buildId))
-      .all().length,
-    gate_verdict: db
-      .select()
-      .from(schema.gateVerdict)
-      .where(eq(schema.gateVerdict.buildId, buildId))
-      .all().length,
-    gate_state: db
-      .select()
-      .from(schema.gateState)
-      .where(eq(schema.gateState.buildId, buildId))
-      .all().length,
-  };
+/** 经 drizzle 句柄读本构建在四表的行数（bootServer 只给 drizzle 句柄）。 */
+function gateCounts(db: Db, buildId: string): Record<string, number> {
+  return Object.fromEntries(
+    GATE_TABLES.map((t) => [
+      t,
+      db.get<{ n: number }>(
+        sql`SELECT count(*) AS n FROM ${sql.identifier(t)} WHERE "buildId" = ${buildId}`,
+      ).n,
+    ]),
+  );
 }
 
 // —— 迁移定位与旧库升级（F1 / F16）——————————————————————————————————————
@@ -260,7 +246,7 @@ describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
 
     const upgraded = new Database(dbPath);
     upgraded.pragma('foreign_keys = ON');
-    migrate(drizzle(upgraded, { schema }), { migrationsFolder: MIGRATIONS_FOLDER });
+    migrate(drizzle(upgraded), { migrationsFolder: MIGRATIONS_FOLDER });
     expect(tableNames(upgraded).sort()).toEqual([...GATE_TABLES].sort());
     expect(upgraded.prepare('SELECT id, todoId FROM build').all()).toEqual([
       { id: ids.build, todoId: ids.todo },
