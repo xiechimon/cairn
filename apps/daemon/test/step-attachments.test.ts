@@ -11,14 +11,17 @@
 // #1406 issue 原文围栏里的 token 行（docs/verify/1406/p5-3-fix-failure-modes.txt
 // A1-A9）：围栏逐行带「> 」前缀，整行 token 去掉这一层前缀后照常交付；改写与
 // 注记行带回同一前缀，留在围栏里。围栏外的引用 token 行不变（#730 整行律）。
+// A3d（#1480 第二轮，失败方式见 docs/verify/1406/p5-3-fix-red-green-2.txt）：
+// 剥掉格式字符与换行变体后只剩空串、. 或 .. 的文件名落 attachment；素材化
+// 路径恒是 <materializeDir>/<stepId>/<一段名>。
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import type { MachineAttachmentResponse } from '@pacman/shared';
 import { buildTaskPromptText, formatAttachmentToken } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
-import { resolveStepImages } from '../src/step-attachments.js';
+import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
 
 function fakeClient(attachments: Record<string, MachineAttachmentResponse | Error>): {
   client: { attachment: (stepId: string, id: string) => Promise<MachineAttachmentResponse> };
@@ -298,13 +301,58 @@ describe('daemon 图片附件解析下载（#730）', () => {
 
 // 直接物化辅助（materialize 步的独立单测）：文件已存在时幂等覆写。
 describe('materializeAttachmentFile', () => {
-  test('同名重复物化 → 覆写不报错', async () => {
+  test('同名重复物化 → 覆写不报错', () => {
     const s = setup();
-    const { materializeFile } = await import('../src/step-attachments.js');
     const p1 = materializeFile(s.materializeDir, 's1', 'pic.png', Buffer.from('abc'));
     const p2 = materializeFile(s.materializeDir, 's1', 'pic.png', Buffer.from('def'));
     expect(p1).toBe(p2);
     expect(readFileSync(p1).toString()).toBe('def');
+  });
+
+  test('A3d：剥字符后为空、. 或 .. 的文件名 → attachment；其余名照落，都在 <materializeDir>/<stepId>/ 下', () => {
+    const s = setup();
+    const stepDir = join(s.materializeDir, 's1');
+    const fallback = [
+      '\u200b..\u200b',
+      '.\u00ad.',
+      '\u2028.',
+      '\x85..',
+      '..',
+      '.',
+      '',
+      '\u200b',
+      '\u2029',
+    ];
+    const kept: Array<[string, string]> = [
+      [' .', ' .'],
+      [' ..', ' ..'],
+      ['...', '...'],
+      ['a\u200b.svg', 'a.svg'],
+    ];
+    for (const [i, name] of fallback.entries()) {
+      const p = materializeFile(s.materializeDir, 's1', name, Buffer.from(`f${i}`));
+      expect(p, JSON.stringify(name)).toBe(join(stepDir, 'attachment'));
+      expect(readFileSync(p).toString()).toBe(`f${i}`);
+    }
+    for (const [name, onDisk] of kept) {
+      const p = materializeFile(s.materializeDir, 's1', name, Buffer.from(name));
+      expect(p, JSON.stringify(name)).toBe(join(stepDir, onDisk));
+      expect(statSync(p).isFile()).toBe(true);
+    }
+  });
+
+  test('A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘', () => {
+    const s = setup();
+    for (const stepId of ['..', '', '.', '../escape', 'a/../..', 'a/b']) {
+      expect(
+        () => materializeFile(s.materializeDir, stepId, 'x.svg', Buffer.from('x')),
+        JSON.stringify(stepId),
+      ).toThrow(/materialize/);
+    }
+    expect(existsSync(join(s.home, 'x.svg'))).toBe(false);
+    expect(existsSync(join(s.home, 'escape'))).toBe(false);
+    expect(existsSync(join(s.materializeDir, 'x.svg'))).toBe(false);
+    expect(existsSync(join(s.materializeDir, 'a'))).toBe(false);
   });
 });
 
@@ -403,7 +451,8 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
   test('A3c：素材化文件名带零宽字符与 U+2028 → 落盘名与提示里的路径一致（围栏内外同律）', async () => {
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
     const response = {
-      fileName: 'dia\u200bgram\u2028x.svg',
+      // 四类都在：Cf（U+200B）与三种换行变体（U+0085 / U+2028 / U+2029）。
+      fileName: 'dia\u200bg\x85ram\u2028x\u2029.svg',
       mimeType: 'image/svg+xml',
       sizeBytes: svg.byteLength,
       contentBase64: svg.toString('base64'),
@@ -414,6 +463,30 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
       const path = /查看图片：(\/[^\s`\]]+)\]/.exec(out.text)?.[1] ?? '';
       expect(path, out.text).toMatch(/diagramx\.svg$/);
       expect(existsSync(path)).toBe(true);
+    }
+  });
+
+  test('A3d：剥字符后只剩 .. 的文件名 → 落盘名回落 attachment，路径不出步目录（围栏内外同律）', async () => {
+    const tiff = Buffer.from('49492a00', 'hex');
+    const response = {
+      fileName: '\u200b..\u200b',
+      mimeType: 'image/tiff',
+      sizeBytes: tiff.byteLength,
+      contentBase64: tiff.toString('base64'),
+    };
+    const token = formatAttachmentToken('x.tiff', 't1/id1.png');
+    for (const text of [fenced(token), `任务\n\n${token}`]) {
+      const s = setup();
+      const out = await resolveStepImages({
+        text,
+        stepId: 's1',
+        client: fakeClient({ id1: response }).client,
+        materializeDir: s.materializeDir,
+        log: s.log,
+      });
+      const path = /查看图片：(\/[^\s`\]]+)\]/.exec(out.text)?.[1] ?? '';
+      expect(path, out.text).toBe(join(s.materializeDir, 's1', 'attachment'));
+      expect(readFileSync(path).equals(tiff)).toBe(true);
     }
   });
 
