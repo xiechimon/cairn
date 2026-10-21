@@ -1263,7 +1263,7 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     ]);
   });
 
-  test('compare 的提交有重复、条数凑够了 total_commits：同样算没读全（重复的不顶替没读到的）', () => {
+  test('compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）', () => {
     // 故事：外壳跨页读时页面错位，第二页重复了第一页的 HEAD，以 HEAD 为父的 NEWER 掉了。
     const i = green();
     compareAtNewer(i);
@@ -1273,6 +1273,15 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     );
     expect(compare(i).totalCommits).toBe(3);
     expect(classesOf(i)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+    // 不同 SHA 数够了、条数多出来：重复是页面错位的迹象，读到的这份不可信，同样不算读全
+    const j = green();
+    j.compare = readAt(HEAD, {
+      ...withCommits(compare(j), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [EARLIER] }]),
+      totalCommits: 2,
+    });
+    expect(classesOf(j)).toEqual([
       ['patch-unavailable', 'transient', 'compare commit list incomplete'],
     ]);
   });
