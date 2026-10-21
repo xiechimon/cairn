@@ -3,7 +3,13 @@
 // 链接；HTML 注释里的不算（与 scripts/pr-evidence-gate.py 同一约定）。
 // 第三轮补的：查询串与片段（?raw=true、#L3）不是路径的一部分。
 // 第四轮钉住的：票号是另一票号的前缀时（14040 与 1404）不算本票证据。
+// 第五轮（#1420 pr-gate 第三轮）补的：body 由作者控制，最长 65,536 个字符；原先的
+// 正则在「一条链接后跟一长串句点再加一个字母」、成串没闭合的 `<!--` 上回溯成平方，
+// 解析要线性。注释换成一个空格而不是删掉：被注释切开的 URL 不会拼成一条 GitHub
+// 不渲染的链接（scripts/pr-evidence-gate.py 同样把注释换成空白）。另钉住：两段闭合
+// 注释之间的链接照常算（贪婪匹配注释会把它吞掉）。
 
+import { performance } from 'node:perf_hooks';
 import { describe, expect, test } from 'vitest';
 import { parseRawEvidenceLinks } from '../src/services/merge-gate/evidence-link.js';
 
@@ -70,6 +76,21 @@ describe('parseRawEvidenceLinks', () => {
     expect(parse(body).links).toHaveLength(1);
   });
 
+  test('两段闭合注释之间的链接照常算', () => {
+    const body = `<!-- a -->\n${raw('docs/verify/1404/a.json')}\n<!-- b -->`;
+    expect(parse(body)).toEqual({
+      links: [{ sha: SHA, path: 'docs/verify/1404/a.json' }],
+      others: [],
+    });
+  });
+
+  test('被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截', () => {
+    const url = raw('docs/verify/1404/a.json');
+    const cut = url.indexOf(SHA) + 6;
+    const body = `${url.slice(0, cut)}<!-- x -->${url.slice(cut)}`;
+    expect(parse(body)).toEqual({ links: [], others: [url.slice(0, cut)] });
+  });
+
   test('没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算', () => {
     const body = `ok\n<!-- draft\n${raw('docs/verify/1404/a.json')}`;
     expect(parse(body)).toEqual({ links: [], others: [] });
@@ -105,4 +126,26 @@ describe('parseRawEvidenceLinks', () => {
     expect(r.links).toEqual([]);
     expect(r.others).toHaveLength(2);
   });
+
+  // GitHub 的 PR body 上限 65,536 个字符。每份构造都按这个长度；200 ms 是宽松的上界
+  // （线性时是个位数毫秒，原先的正则分别要几秒与几百毫秒）。
+  const BODY_LIMIT = 65_536;
+  const adversarial: [string, string][] = [
+    [
+      '一条链接后跟一长串句点再加一个字母',
+      (() => {
+        const head = raw('docs/verify/1404/a.json');
+        return `${head}${'.'.repeat(BODY_LIMIT - head.length - 1)}a`;
+      })(),
+    ],
+    ['成串没闭合的 <!--', '<!--'.repeat(BODY_LIMIT / 4)],
+  ];
+  for (const [label, body] of adversarial) {
+    test(`对抗性 body 线性解析：${label}，65,536 个字符在 200 ms 内`, () => {
+      expect(body.length).toBe(BODY_LIMIT);
+      const t0 = performance.now();
+      parse(body);
+      expect(performance.now() - t0).toBeLessThan(200);
+    });
+  }
 });

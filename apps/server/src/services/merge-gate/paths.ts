@@ -100,7 +100,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
       if (isEvidence(name) && !name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`)) {
         push(out.otherTicketEvidence, name);
       }
-      if (!f.hasPatch && !isEvidence(name)) push(out.opaque, name);
+      if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);
     }
 
     if (f.status === 'removed' && isTestPath(f.filename)) push(out.deletedTests, f.filename);
