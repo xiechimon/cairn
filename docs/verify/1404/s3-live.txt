@@ -1,0 +1,251 @@
+# #1404 S3 live evidence: the gate tables as the real server creates them.
+# Servers: apps/server `tsx src/index.ts` from the p3c worktree, HOST=127.0.0.1, scratch PACMAN_HOME under the
+# session scratchpad (deleted afterwards). Main's server = the worktree at 2294b087 (origin/main, before any S3
+# change); this branch's server = 2662c3b0. SQLite read with node better-sqlite3 (no sqlite3 CLI in this
+# container): scripts dump.mjs (sqlite_master, PRAGMA index_list / foreign_key_list) and probe.mjs (inserts with
+# foreign_keys = ON, the per-connection pragma db/client.ts sets), both reproduced at the end of this file.
+
+== 1. Upgrade path: a database created by main's server, then opened by this branch's server
+
+$ PACMAN_HOME=<scratch>/s3-home-upgrade PORT=8795 tsx src/index.ts    (main, 2294b087)
+GET /api/teams -> 200; POST project, todo, builds -> project/todo/build below; server stopped.
+$ node dump.mjs server.db    (after main's server)
+__drizzle_migrations rows: 44; newest created_at: 1792002303068
+tables (31): agent agent_memory api_key attachment branch_sync build chief chief_message chief_thread github_connection machine message notification plan project provider schedule secret shell_command skill_audit steer_pending step stop_pending tag team todo todo_tag token_usage user webhook_token whats_new
+
+-- gate_digest: ABSENT
+
+-- gate_round: ABSENT
+
+-- gate_verdict: ABSENT
+
+-- gate_state: ABSENT
+
+$ PACMAN_HOME=<same home> PORT=8795 tsx src/index.ts    (this branch, 2662c3b0); startup log: no error lines
+$ node dump.mjs server.db    (after this branch's server migrated it; first 2 lines)
+__drizzle_migrations rows: 45; newest created_at: 1792583973494
+tables (35): agent agent_memory api_key attachment branch_sync build chief chief_message chief_thread gate_digest gate_round gate_state gate_verdict github_connection machine message notification plan project provider schedule secret shell_command skill_audit steer_pending step stop_pending tag team todo todo_tag token_usage user webhook_token whats_new
+(the four CREATE TABLE statements are identical to section 2)
+
+pre-existing (main-created) project=7q_WeChG6X0umU2kMW7XL todo=3k0G5rEuOITn7Ed4n9GIU build=01a15e51-7b31-7e36-ad51-065b91e2379d
+build row from main: [{"id":"01a15e51-7b31-7e36-ad51-065b91e2379d","todoId":"3k0G5rEuOITn7Ed4n9GIU","createdAt":1792583760689}]
+step rows from main: [{"id":"pF13-nnshjrFVZB6Z4VQ4","buildId":"01a15e51-7b31-7e36-ad51-065b91e2379d","kind":"plan","status":"pending"}]
+$ node probe.mjs seed server.db 01a15e51-7b31-7e36-ad51-065b91e2379d
+build 01a15e51-7b31-7e36-ad51-065b91e2379d, step pF13-nnshjrFVZB6Z4VQ4
+INSERT gate_digest (buildId, headSha=H1, pd2:a…): ok (changes=1)
+INSERT gate_round (round 1, pd2:a…): ok (changes=1)
+INSERT gate_verdict (on the build's step): ok (changes=1)
+INSERT gate_state: ok (changes=1)
+row defaults: {"round":1,"fixRound":0,"state":"open","perspectives":"[\"code\",\"security\",\"tests\"]","timedOut":"[]","dispatches":"{}"}
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ node probe.mjs dups server.db 01a15e51-7b31-7e36-ad51-065b91e2379d
+duplicate gate_round (same buildId, same patchDigest, round 2): SQLITE_CONSTRAINT_UNIQUE UNIQUE constraint failed: gate_round.buildId, gate_round.patchDigest
+duplicate gate_round number (same buildId, other digest, round 1): SQLITE_CONSTRAINT_UNIQUE UNIQUE constraint failed: gate_round.buildId, gate_round.round
+second gate_round (same buildId, other digest, round 2): ok (changes=1)
+duplicate gate_verdict (same stepId): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_verdict.stepId
+gate_verdict for a step that does not exist: SQLITE_CONSTRAINT_FOREIGNKEY FOREIGN KEY constraint failed
+duplicate gate_state (same buildId): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_state.buildId
+duplicate gate_digest (same buildId, same headSha): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_digest.buildId, gate_digest.headSha
+counts: {"gate_digest":1,"gate_round":2,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ curl -X DELETE http://127.0.0.1:8795/api/todos/3k0G5rEuOITn7Ed4n9GIU   (live branch server)
+http=204
+$ node probe.mjs counts server.db 01a15e51-7b31-7e36-ad51-065b91e2379d
+counts: {"gate_digest":0,"gate_round":0,"gate_verdict":0,"gate_state":0,"build":0,"step":0}
+
+== 2. Fresh home, this branch's server (2662c3b0) on port 8796
+
+$ node dump.mjs server.db
+__drizzle_migrations rows: 45; newest created_at: 1792583973494
+tables (35): agent agent_memory api_key attachment branch_sync build chief chief_message chief_thread gate_digest gate_round gate_state gate_verdict github_connection machine message notification plan project provider schedule secret shell_command skill_audit steer_pending step stop_pending tag team todo todo_tag token_usage user webhook_token whats_new
+
+-- gate_digest: 
+CREATE TABLE `gate_digest` (
+	`buildId` text NOT NULL,
+	`headSha` text NOT NULL,
+	`patchDigest` text NOT NULL,
+	`countedFiles` integer NOT NULL,
+	`countedLines` integer NOT NULL,
+	`keptFiles` integer NOT NULL,
+	`keptLines` integer NOT NULL,
+	`createdAt` integer NOT NULL,
+	PRIMARY KEY(`buildId`, `headSha`),
+	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
+);
+-- sqlite_autoindex_gate_digest_1 (implicit, from PRIMARY KEY/UNIQUE)
+-- index_list: [{"seq":0,"name":"sqlite_autoindex_gate_digest_1","unique":1,"origin":"pk","partial":0}]
+-- foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+
+-- gate_round: 
+CREATE TABLE `gate_round` (
+	`id` text PRIMARY KEY NOT NULL,
+	`buildId` text NOT NULL,
+	`patchDigest` text NOT NULL,
+	`round` integer NOT NULL,
+	`fixRound` integer DEFAULT 0 NOT NULL,
+	`state` text DEFAULT 'open' NOT NULL,
+	`perspectives` text NOT NULL,
+	`timedOut` text DEFAULT '[]' NOT NULL,
+	`dispatches` text DEFAULT '{}' NOT NULL,
+	`startedAt` integer NOT NULL,
+	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE UNIQUE INDEX `gate_round_build_digest_unique` ON `gate_round` (`buildId`,`patchDigest`);
+CREATE UNIQUE INDEX `gate_round_build_round_unique` ON `gate_round` (`buildId`,`round`);
+-- sqlite_autoindex_gate_round_1 (implicit, from PRIMARY KEY/UNIQUE)
+-- index_list: [{"seq":0,"name":"gate_round_build_round_unique","unique":1,"origin":"c","partial":0},{"seq":1,"name":"gate_round_build_digest_unique","unique":1,"origin":"c","partial":0},{"seq":2,"name":"sqlite_autoindex_gate_round_1","unique":1,"origin":"pk","partial":0}]
+-- foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+
+-- gate_verdict: 
+CREATE TABLE `gate_verdict` (
+	`stepId` text PRIMARY KEY NOT NULL,
+	`buildId` text NOT NULL,
+	`kind` text NOT NULL,
+	`perspective` text,
+	`outcome` text NOT NULL,
+	`patchDigest` text,
+	`headSha` text,
+	`expectedHeadSha` text NOT NULL,
+	`createdAt` integer NOT NULL,
+	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
+);
+CREATE INDEX `gate_verdict_buildId_idx` ON `gate_verdict` (`buildId`);
+-- sqlite_autoindex_gate_verdict_1 (implicit, from PRIMARY KEY/UNIQUE)
+-- index_list: [{"seq":0,"name":"gate_verdict_buildId_idx","unique":0,"origin":"c","partial":0},{"seq":1,"name":"sqlite_autoindex_gate_verdict_1","unique":1,"origin":"pk","partial":0}]
+-- foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"},{"from":"stepId","table":"step","to":"id","on_delete":"CASCADE"}]
+
+-- gate_state: 
+CREATE TABLE `gate_state` (
+	`buildId` text PRIMARY KEY NOT NULL,
+	`ready` integer NOT NULL,
+	`headSha` text,
+	`patchDigest` text,
+	`policy` text NOT NULL,
+	`blockers` text NOT NULL,
+	`evaluatedAt` integer NOT NULL,
+	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
+);
+-- sqlite_autoindex_gate_state_1 (implicit, from PRIMARY KEY/UNIQUE)
+-- index_list: [{"seq":0,"name":"sqlite_autoindex_gate_state_1","unique":1,"origin":"pk","partial":0}]
+-- foreign_key_list: [{"from":"buildId","table":"build","to":"id","on_delete":"CASCADE"}]
+
+project=qAMzd-LRMBgH5W8L-65W0
+todoA=S585VplMZFMWuASyHKadt todoB=1u2KdPuAi2Gdhjk_fZ5oP
+buildA=01a15e59-5e58-7488-a6c4-9c9ec78597b2 buildB=01a15e59-5e5c-7e38-9b89-cc07b89ac382
+$ node probe.mjs seed server.db 01a15e59-5e58-7488-a6c4-9c9ec78597b2
+build 01a15e59-5e58-7488-a6c4-9c9ec78597b2, step MmVH0n2EHZGP8Hg8wb0cO
+INSERT gate_digest (buildId, headSha=H1, pd2:a…): ok (changes=1)
+INSERT gate_round (round 1, pd2:a…): ok (changes=1)
+INSERT gate_verdict (on the build's step): ok (changes=1)
+INSERT gate_state: ok (changes=1)
+row defaults: {"round":1,"fixRound":0,"state":"open","perspectives":"[\"code\",\"security\",\"tests\"]","timedOut":"[]","dispatches":"{}"}
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ node probe.mjs seed server.db 01a15e59-5e5c-7e38-9b89-cc07b89ac382
+build 01a15e59-5e5c-7e38-9b89-cc07b89ac382, step nKuI5oNeWfqZOUGXP9c5J
+INSERT gate_digest (buildId, headSha=H1, pd2:a…): ok (changes=1)
+INSERT gate_round (round 1, pd2:a…): ok (changes=1)
+INSERT gate_verdict (on the build's step): ok (changes=1)
+INSERT gate_state: ok (changes=1)
+row defaults: {"round":1,"fixRound":0,"state":"open","perspectives":"[\"code\",\"security\",\"tests\"]","timedOut":"[]","dispatches":"{}"}
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ node probe.mjs dups server.db 01a15e59-5e58-7488-a6c4-9c9ec78597b2
+duplicate gate_round (same buildId, same patchDigest, round 2): SQLITE_CONSTRAINT_UNIQUE UNIQUE constraint failed: gate_round.buildId, gate_round.patchDigest
+duplicate gate_round number (same buildId, other digest, round 1): SQLITE_CONSTRAINT_UNIQUE UNIQUE constraint failed: gate_round.buildId, gate_round.round
+second gate_round (same buildId, other digest, round 2): ok (changes=1)
+duplicate gate_verdict (same stepId): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_verdict.stepId
+gate_verdict for a step that does not exist: SQLITE_CONSTRAINT_FOREIGNKEY FOREIGN KEY constraint failed
+duplicate gate_state (same buildId): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_state.buildId
+duplicate gate_digest (same buildId, same headSha): SQLITE_CONSTRAINT_PRIMARYKEY UNIQUE constraint failed: gate_digest.buildId, gate_digest.headSha
+counts: {"gate_digest":1,"gate_round":2,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ curl -X POST http://127.0.0.1:8796/api/todos/S585VplMZFMWuASyHKadt/reset   (reset deletes A's steps, then A's build)
+http=200
+A:
+counts: {"gate_digest":0,"gate_round":0,"gate_verdict":0,"gate_state":0,"build":0,"step":0}
+B (untouched):
+counts: {"gate_digest":1,"gate_round":1,"gate_verdict":1,"gate_state":1,"build":1,"step":1}
+$ curl -X DELETE http://127.0.0.1:8796/api/projects/qAMzd-LRMBgH5W8L-65W0
+http=204
+B:
+counts: {"gate_digest":0,"gate_round":0,"gate_verdict":0,"gate_state":0,"build":0,"step":0}
+
+== 3. Cleanup
+Both servers stopped with SIGTERM (ports 8795 and 8796 free afterwards per lsof; no process left with the scratch
+PACMAN_HOME in its environment); both scratch homes deleted.
+
+== dump.mjs
+// Usage: node dump.mjs <server.db> — prints migrations, gate tables' schema and indexes.
+import { createRequire } from 'node:module';
+const require = createRequire('/home/user/pacman/.claude/worktrees/p3c/apps/server/package.json');
+const Database = require('better-sqlite3');
+const db = new Database(process.argv[2], { readonly: true });
+const mig = db.prepare('SELECT id, hash, created_at FROM __drizzle_migrations ORDER BY created_at').all();
+console.log(`__drizzle_migrations rows: ${mig.length}; newest created_at: ${mig.at(-1)?.created_at}`);
+const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> '__drizzle_migrations' ORDER BY name").all().map((r) => r.name);
+console.log(`tables (${tables.length}): ${tables.join(' ')}`);
+for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(t);
+  console.log(`\n-- ${t}: ${row ? '' : 'ABSENT'}`);
+  if (!row) continue;
+  console.log(`${row.sql};`);
+  for (const ix of db.prepare("SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name=? ORDER BY name").all(t)) {
+    console.log(ix.sql ? `${ix.sql};` : `-- ${ix.name} (implicit, from PRIMARY KEY/UNIQUE)`);
+  }
+  console.log(`-- index_list: ${JSON.stringify(db.prepare(`PRAGMA index_list(${t})`).all())}`);
+  console.log(`-- foreign_key_list: ${JSON.stringify(db.prepare(`PRAGMA foreign_key_list(${t})`).all().map((f) => ({ from: f.from, table: f.table, to: f.to, on_delete: f.on_delete })))}`);
+}
+db.close();
+
+== probe.mjs
+// Usage: node probe.mjs <seed|dups|counts> <server.db> <buildId>
+// Opens its own connection with foreign_keys = ON (a per-connection pragma, as db/client.ts sets it).
+import { createRequire } from 'node:module';
+const require = createRequire('/home/user/pacman/.claude/worktrees/p3c/apps/server/package.json');
+const Database = require('better-sqlite3');
+const [cmd, dbPath, buildId] = process.argv.slice(2);
+const db = new Database(dbPath);
+db.pragma('foreign_keys = ON');
+db.pragma('busy_timeout = 5000');
+const D1 = `pd2:${'a'.repeat(64)}`;
+const D2 = `pd2:${'b'.repeat(64)}`;
+const H1 = '1'.repeat(40);
+const run = (label, sql, ...args) => {
+  try {
+    const r = db.prepare(sql).run(...args);
+    console.log(`${label}: ok (changes=${r.changes})`);
+  } catch (e) {
+    console.log(`${label}: ${e.code} ${e.message}`);
+  }
+};
+const counts = () => {
+  const out = {};
+  for (const t of ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state']) {
+    out[t] = db.prepare(`SELECT count(*) AS n FROM ${t} WHERE buildId = ?`).get(buildId).n;
+  }
+  out.build = db.prepare('SELECT count(*) AS n FROM build WHERE id = ?').get(buildId).n;
+  out.step = db.prepare('SELECT count(*) AS n FROM step WHERE buildId = ?').get(buildId).n;
+  return out;
+};
+const stepId = () => db.prepare('SELECT id FROM step WHERE buildId = ? ORDER BY createdAt LIMIT 1').get(buildId)?.id;
+if (cmd === 'seed') {
+  const s = stepId();
+  console.log(`build ${buildId}, step ${s}`);
+  run('INSERT gate_digest (buildId, headSha=H1, pd2:a…)', 'INSERT INTO gate_digest (buildId, headSha, patchDigest, countedFiles, countedLines, keptFiles, keptLines, createdAt) VALUES (?, ?, ?, 3, 42, 2, 40, ?)', buildId, H1, D1, Date.now());
+  run('INSERT gate_round (round 1, pd2:a…)', 'INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES (?, ?, ?, 1, ?, ?)', `r1-${buildId}`, buildId, D1, JSON.stringify(['code', 'security', 'tests']), Date.now());
+  run('INSERT gate_verdict (on the build\'s step)', "INSERT INTO gate_verdict (stepId, buildId, kind, perspective, outcome, patchDigest, headSha, expectedHeadSha, createdAt) VALUES (?, ?, 'review', 'security', 'pass', ?, ?, ?, ?)", s, buildId, D1, H1, H1, Date.now());
+  run('INSERT gate_state', "INSERT INTO gate_state (buildId, ready, headSha, patchDigest, policy, blockers, evaluatedAt) VALUES (?, 0, ?, ?, 'human', ?, ?)", buildId, H1, D1, JSON.stringify([{ code: 'policy-human', class: 'policy', label: '项目策略为人工合并', detail: [] }]), Date.now());
+  console.log('row defaults:', JSON.stringify(db.prepare('SELECT round, fixRound, state, perspectives, timedOut, dispatches FROM gate_round WHERE buildId = ?').get(buildId)));
+  console.log('counts:', JSON.stringify(counts()));
+} else if (cmd === 'dups') {
+  const s = stepId();
+  run('duplicate gate_round (same buildId, same patchDigest, round 2)', 'INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES (?, ?, ?, 2, ?, ?)', `r2-${buildId}`, buildId, D1, '[]', Date.now());
+  run('duplicate gate_round number (same buildId, other digest, round 1)', 'INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES (?, ?, ?, 1, ?, ?)', `r3-${buildId}`, buildId, D2, '[]', Date.now());
+  run('second gate_round (same buildId, other digest, round 2)', 'INSERT INTO gate_round (id, buildId, patchDigest, round, perspectives, startedAt) VALUES (?, ?, ?, 2, ?, ?)', `r4-${buildId}`, buildId, D2, '[]', Date.now());
+  run('duplicate gate_verdict (same stepId)', "INSERT INTO gate_verdict (stepId, buildId, kind, outcome, expectedHeadSha, createdAt) VALUES (?, ?, 'review', 'block', ?, ?)", s, buildId, H1, Date.now());
+  run('gate_verdict for a step that does not exist', "INSERT INTO gate_verdict (stepId, buildId, kind, outcome, expectedHeadSha, createdAt) VALUES ('no-such-step', ?, 'review', 'pass', ?, ?)", buildId, H1, Date.now());
+  run('duplicate gate_state (same buildId)', "INSERT INTO gate_state (buildId, ready, policy, blockers, evaluatedAt) VALUES (?, 1, 'human', '[]', ?)", buildId, Date.now());
+  run('duplicate gate_digest (same buildId, same headSha)', 'INSERT INTO gate_digest (buildId, headSha, patchDigest, countedFiles, countedLines, keptFiles, keptLines, createdAt) VALUES (?, ?, ?, 1, 1, 1, 1, ?)', buildId, H1, D2, Date.now());
+  console.log('counts:', JSON.stringify(counts()));
+} else if (cmd === 'counts') {
+  console.log('counts:', JSON.stringify(counts()));
+}
+db.close();

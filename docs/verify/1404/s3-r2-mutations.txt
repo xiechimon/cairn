@@ -1,0 +1,395 @@
+# #1404 S3 round 2 mutations, on 34381bd0 (driver s3r2-mutate.py, reproduced at the end).
+# Each mutation is applied alone, then `pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts`,
+# then every touched file is restored from HEAD (git show HEAD:<path>) and `git status` is checked clean.
+# Schema mutations regenerate 0044 the way this round did: `drizzle-kit drop` (it preselects the last
+# entry, 0044_merge_gate_tables) then `pnpm --filter @xiechimon/pacman db:generate --name merge_gate_tables`;
+# the "change" shown is the resulting diff of 0044_merge_gate_tables.sql.
+# Later-migration mutations add a drizzle-kit-shaped table recreate as 0045_s3r2_later.sql plus its journal
+# entry (s3r2-recreate-sql.mjs builds it from the migrated database's CREATE statement, the shape of
+# 0004_opposite_chimera.sql). Rows marked "control" are expected to stay green.
+#
+# The two NOT NULL pins (F20, F21) each go red under their mutation. Re-adding the step foreign key in
+# either form turns F5, F17 and F18 red. A later recreate of build or todo turns F19 red (todo also turns
+# F1 red: the todo recreate deletes the upgraded database's build row through build.todoId); the same
+# build recreate with the four gate tables copied aside and written back stays green, so the rule in the
+# schema comment works. Round 1's mutations that still apply are all still caught.
+# "r1: gate_verdict.buildId FK without cascade" now also turns F7 and F18 red: with no step foreign key,
+# nothing but the buildId cascade removes a verdict.
+
+gate_verdict.expectedHeadSha nullable                                        1 failed | 24 passed (25)
+gate_round.patchDigest nullable                                              1 failed | 24 passed (25)
+gate_verdict.stepId FK to step, cascade (round 1 shape)                      3 failed | 22 passed (25)
+gate_verdict.stepId FK to step, no action                                    6 failed | 19 passed (25)
+later migration recreates build (drizzle shape)                              1 failed | 24 passed (25)
+later migration recreates todo (drizzle shape)                               2 failed | 23 passed (25)
+control: later migration recreates build, gate rows moved aside and back     25 passed (25)
+control: later migration recreates step (drizzle shape)                      25 passed (25)
+r1: gate_round UNIQUE (buildId, patchDigest) dropped                         1 failed | 24 passed (25)
+r1: gate_round UNIQUE (buildId, round) dropped                               1 failed | 24 passed (25)
+r1: gate_verdict.patchDigest NOT NULL                                        1 failed | 24 passed (25)
+r1: gate_verdict.buildId FK without cascade                                  6 failed | 19 passed (25)
+r1: gate_state.buildId with no FK                                            4 failed | 21 passed (25)
+r1: journal 0044 when below 0043                                             2 failed | 23 passed (25)
+
+## gate_verdict.expectedHeadSha nullable
+change:
+-	`expectedHeadSha` text NOT NULL,
++	`expectedHeadSha` text,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F20 缺 expectedHeadSha 的判定被 NOT NULL 拒绝（判定只按 server 派步时钉下的 head 绑定）
+
+## gate_round.patchDigest nullable
+change:
+-	`patchDigest` text NOT NULL,
++	`patchDigest` text,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F21 缺 patchDigest 的轮被 NOT NULL 拒绝（UNIQUE 视 NULL 互异，空摘要能开无数轮）
+
+## gate_verdict.stepId FK to step, cascade (round 1 shape)
+change:
++	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE cascade,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F17 后续迁移按 drizzle 形状重建 step（__new_step、拷行、DROP TABLE step、改名）：判定与步一条不少
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F18 删步（构建还在）：判定留着；删构建才带走
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F5 不存在的构建：外键拒绝；stepId 不设外键（F17/F18），由派步的 server 写入方给出
+
+## gate_verdict.stepId FK to step, no action
+change:
++	FOREIGN KEY (`stepId`) REFERENCES `step`(`id`) ON UPDATE no action ON DELETE no action,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F17 后续迁移按 drizzle 形状重建 step（__new_step、拷行、DROP TABLE step、改名）：判定与步一条不少
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F18 删步（构建还在）：判定留着；删构建才带走
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F5 不存在的构建：外键拒绝；stepId 不设外键（F17/F18），由派步的 server 写入方给出
+
+## later migration recreates build (drizzle shape)
+change:
+added apps/server/drizzle/0045_s3r2_later.sql (journal idx 45):
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__new_build` (
+	`id` text PRIMARY KEY NOT NULL,
+	`todoId` text NOT NULL,
+	`withPlan` integer NOT NULL,
+	`prevPhase` text,
+	`triggerSource` text NOT NULL,
+	`planDocId` text,
+	`errorMessage` text,
+	`prUrl` text,
+	`prNumber` integer,
+	`diffHash` text,
+	`createdAt` integer NOT NULL, `changes` text,
+	FOREIGN KEY (`todoId`) REFERENCES `todo`(`id`) ON UPDATE no action ON DELETE cascade
+);--> statement-breakpoint
+INSERT INTO `__new_build`("id", "todoId", "withPlan", "prevPhase", "triggerSource", "planDocId", "errorMessage", "prUrl", "prNumber", "diffHash", "createdAt", "changes") SELECT "id", "todoId", "withPlan", "prevPhase", "triggerSource", "planDocId", "errorMessage", "prUrl", "prNumber", "diffHash", "createdAt", "changes" FROM `build`;--> statement-breakpoint
+DROP TABLE `build`;--> statement-breakpoint
+ALTER TABLE `__new_build` RENAME TO `build`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F19 截到本迁移的库（四表各有行）→ 跑完之后的全部迁移：四表的行一条不少
+
+## later migration recreates todo (drizzle shape)
+change:
+added apps/server/drizzle/0045_s3r2_later.sql (journal idx 45):
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__new_todo` (
+	`id` text PRIMARY KEY NOT NULL,
+	`teamId` text NOT NULL,
+	`projectId` text NOT NULL,
+	`title` text NOT NULL,
+	`spec` text DEFAULT '' NOT NULL,
+	`phase` text DEFAULT 'todo' NOT NULL,
+	`phaseAt` integer NOT NULL,
+	`seqNum` integer NOT NULL,
+	`orderIndex` real DEFAULT 0 NOT NULL,
+	`assignment` text,
+	`latestBuildId` text,
+	`lastRunAt` integer,
+	`hasChanges` integer DEFAULT false NOT NULL,
+	`hasPlan` integer DEFAULT false NOT NULL,
+	`sourceTodo` text,
+	`v` integer DEFAULT 1 NOT NULL,
+	`createdBy` text,
+	`ownerId` text,
+	`sourceBuildId` text, `sourceKind` text, `sourceRef` text, `blockedBy` text,
+	FOREIGN KEY (`teamId`) REFERENCES `team`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`projectId`) REFERENCES `project`(`id`) ON UPDATE no action ON DELETE no action
+);--> statement-breakpoint
+INSERT INTO `__new_todo`("id", "teamId", "projectId", "title", "spec", "phase", "phaseAt", "seqNum", "orderIndex", "assignment", "latestBuildId", "lastRunAt", "hasChanges", "hasPlan", "sourceTodo", "v", "createdBy", "ownerId", "sourceBuildId", "sourceKind", "sourceRef", "blockedBy") SELECT "id", "teamId", "projectId", "title", "spec", "phase", "phaseAt", "seqNum", "orderIndex", "assignment", "latestBuildId", "lastRunAt", "hasChanges", "hasPlan", "sourceTodo", "v", "createdBy", "ownerId", "sourceBuildId", "sourceKind", "sourceRef", "blockedBy" FROM `todo`;--> statement-breakpoint
+DROP TABLE `todo`;--> statement-breakpoint
+ALTER TABLE `__new_todo` RENAME TO `todo`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F19 截到本迁移的库（四表各有行）→ 跑完之后的全部迁移：四表的行一条不少
+
+## control: later migration recreates build, gate rows moved aside and back
+change:
+added apps/server/drizzle/0045_s3r2_later.sql (journal idx 45):
+CREATE TABLE `__keep_gate_digest` AS SELECT * FROM `gate_digest`;--> statement-breakpoint
+CREATE TABLE `__keep_gate_round` AS SELECT * FROM `gate_round`;--> statement-breakpoint
+CREATE TABLE `__keep_gate_verdict` AS SELECT * FROM `gate_verdict`;--> statement-breakpoint
+CREATE TABLE `__keep_gate_state` AS SELECT * FROM `gate_state`;--> statement-breakpoint
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__new_build` (
+	`id` text PRIMARY KEY NOT NULL,
+	`todoId` text NOT NULL,
+	`withPlan` integer NOT NULL,
+	`prevPhase` text,
+	`triggerSource` text NOT NULL,
+	`planDocId` text,
+	`errorMessage` text,
+	`prUrl` text,
+	`prNumber` integer,
+	`diffHash` text,
+	`createdAt` integer NOT NULL, `changes` text,
+	FOREIGN KEY (`todoId`) REFERENCES `todo`(`id`) ON UPDATE no action ON DELETE cascade
+);--> statement-breakpoint
+INSERT INTO `__new_build`("id", "todoId", "withPlan", "prevPhase", "triggerSource", "planDocId", "errorMessage", "prUrl", "prNumber", "diffHash", "createdAt", "changes") SELECT "id", "todoId", "withPlan", "prevPhase", "triggerSource", "planDocId", "errorMessage", "prUrl", "prNumber", "diffHash", "createdAt", "changes" FROM `build`;--> statement-breakpoint
+DROP TABLE `build`;--> statement-breakpoint
+ALTER TABLE `__new_build` RENAME TO `build`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;--> statement-breakpoint
+INSERT INTO `gate_digest` SELECT * FROM `__keep_gate_digest`;--> statement-breakpoint
+DROP TABLE `__keep_gate_digest`;--> statement-breakpoint
+INSERT INTO `gate_round` SELECT * FROM `__keep_gate_round`;--> statement-breakpoint
+DROP TABLE `__keep_gate_round`;--> statement-breakpoint
+INSERT INTO `gate_verdict` SELECT * FROM `__keep_gate_verdict`;--> statement-breakpoint
+DROP TABLE `__keep_gate_verdict`;--> statement-breakpoint
+INSERT INTO `gate_state` SELECT * FROM `__keep_gate_state`;--> statement-breakpoint
+DROP TABLE `__keep_gate_state`;
+red tests: none
+
+## control: later migration recreates step (drizzle shape)
+change:
+added apps/server/drizzle/0045_s3r2_later.sql (journal idx 45):
+PRAGMA foreign_keys=OFF;--> statement-breakpoint
+CREATE TABLE `__new_step` (
+	`id` text PRIMARY KEY NOT NULL,
+	`buildId` text NOT NULL,
+	`kind` text NOT NULL,
+	`machineId` text,
+	`status` text DEFAULT 'pending' NOT NULL,
+	`sessionId` text,
+	`checkpointCommit` text,
+	`claimedAt` integer,
+	`lastHeartbeatAt` integer,
+	`prompt` text,
+	`createdAt` integer NOT NULL
+, `freshSession` integer DEFAULT false NOT NULL, `skillInjection` text, `holdReason` text, `holdUntil` integer, `holdCount` integer DEFAULT 0 NOT NULL, `quotaBlock` text);--> statement-breakpoint
+INSERT INTO `__new_step`("id", "buildId", "kind", "machineId", "status", "sessionId", "checkpointCommit", "claimedAt", "lastHeartbeatAt", "prompt", "createdAt", "freshSession", "skillInjection", "holdReason", "holdUntil", "holdCount", "quotaBlock") SELECT "id", "buildId", "kind", "machineId", "status", "sessionId", "checkpointCommit", "claimedAt", "lastHeartbeatAt", "prompt", "createdAt", "freshSession", "skillInjection", "holdReason", "holdUntil", "holdCount", "quotaBlock" FROM `step`;--> statement-breakpoint
+DROP TABLE `step`;--> statement-breakpoint
+ALTER TABLE `__new_step` RENAME TO `step`;--> statement-breakpoint
+PRAGMA foreign_keys=ON;
+red tests: none
+
+## r1: gate_round UNIQUE (buildId, patchDigest) dropped
+change:
+-CREATE UNIQUE INDEX `gate_round_build_digest_unique` ON `gate_round` (`buildId`,`patchDigest`);--> statement-breakpoint
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F2 同一构建同一摘要的第二轮被 UNIQUE 拒绝；别的构建同摘要、同构建别的摘要照常
+
+## r1: gate_round UNIQUE (buildId, round) dropped
+change:
+-CREATE UNIQUE INDEX `gate_round_build_round_unique` ON `gate_round` (`buildId`,`round`);--> statement-breakpoint
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_round：每 (buildId, patchDigest) 一轮 > F3 同一构建两轮同号被 UNIQUE 拒绝（roundsMax 按轮号数）
+
+## r1: gate_verdict.patchDigest NOT NULL
+change:
+-	`patchDigest` text,
++	`patchDigest` text NOT NULL,
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null
+
+## r1: gate_verdict.buildId FK without cascade
+change:
+-	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
++	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE no action
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F17 / F18 / F19 闸行只随构建删除 > F18 删步（构建还在）：判定留着；删构建才带走
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > gate_verdict：每步一条，只挂真实的构建 > F9 chief 小合并步（step.buildId = chief 线程，无 build 行）的判定挂被审构建；删构建带走判定、不动 chief 步
+
+## r1: gate_state.buildId with no FK
+change:
+-	`evaluatedAt` integer NOT NULL,
+-	FOREIGN KEY (`buildId`) REFERENCES `build`(`id`) ON UPDATE no action ON DELETE cascade
++	`evaluatedAt` integer NOT NULL
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F6 删构建：本构建四表的行随之删除，别的构建不动 > DELETE build 级联
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除任务（todo → build 级联）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 删除项目（事务内删步、删任务）
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F7 现有删除路径带着闸行照常成功 > 重置任务（先删步、再删构建）
+
+## r1: journal 0044 when below 0043
+change:
+apps/server/drizzle/meta/_journal.json: 0044 when -> 1792002303067 (0043 when - 1)
+red tests:
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行
+  |@xiechimon/pacman| test/merge-gate-tables.test.ts > F1 / F16 旧库升级：main 的库补跑本迁移 > 本迁移的 when 大于此前每一条（否则 migrator 对旧库静默跳过）
+
+
+== s3r2-mutate.py
+# #1404 S3 round 2 mutation driver. Each mutation is applied alone, then
+# `pnpm exec vitest run apps/server/test/merge-gate-tables.test.ts`, then every touched file is restored
+# from HEAD (git show HEAD:<path>) and the worktree checked clean.
+# Schema mutations regenerate 0044 the way this round did: `drizzle-kit drop` (selects the last entry,
+# 0044_merge_gate_tables) then `pnpm --filter @xiechimon/pacman db:generate --name merge_gate_tables`.
+# Later-migration mutations add a drizzle-shaped 0045 (s3r2-recreate-sql.mjs) and its journal entry.
+import json, os, re, subprocess, sys
+
+WT = '/home/user/pacman/.claude/worktrees/p3c'
+HERE = os.path.dirname(os.path.abspath(__file__))
+SCHEMA = 'apps/server/src/db/schema.ts'
+JOURNAL = 'apps/server/drizzle/meta/_journal.json'
+SQL = 'apps/server/drizzle/0044_merge_gate_tables.sql'
+SNAP = 'apps/server/drizzle/meta/0044_snapshot.json'
+LATER = 'apps/server/drizzle/0045_s3r2_later.sql'
+TEST = 'apps/server/test/merge-gate-tables.test.ts'
+TRACKED = [SCHEMA, JOURNAL, SQL, SNAP]
+
+S = 'schema'
+L = 'later'
+MUTATIONS = [
+    ('gate_verdict.expectedHeadSha nullable', S,
+     "    expectedHeadSha: text('expectedHeadSha').notNull(),",
+     "    expectedHeadSha: text('expectedHeadSha'),"),
+    ('gate_round.patchDigest nullable', S,
+     "非 null）。 */\n    patchDigest: text('patchDigest').notNull(),\n    /** 构建内第几轮",
+     "非 null）。 */\n    patchDigest: text('patchDigest'),\n    /** 构建内第几轮"),
+    ('gate_verdict.stepId FK to step, cascade (round 1 shape)', S,
+     "    stepId: text('stepId').primaryKey(),",
+     "    stepId: text('stepId')\n      .primaryKey()\n      .references(() => step.id, { onDelete: 'cascade' }),"),
+    ('gate_verdict.stepId FK to step, no action', S,
+     "    stepId: text('stepId').primaryKey(),",
+     "    stepId: text('stepId')\n      .primaryKey()\n      .references(() => step.id),"),
+    ('later migration recreates build (drizzle shape)', L, 'build', None),
+    ('later migration recreates todo (drizzle shape)', L, 'todo', None),
+    ('control: later migration recreates build, gate rows moved aside and back', L, 'build', 'keep'),
+    ('control: later migration recreates step (drizzle shape)', L, 'step', None),
+    # round 1 mutations that still apply
+    ('r1: gate_round UNIQUE (buildId, patchDigest) dropped', S,
+     "    uniqueIndex('gate_round_build_digest_unique').on(t.buildId, t.patchDigest),\n", ''),
+    ('r1: gate_round UNIQUE (buildId, round) dropped', S,
+     "    uniqueIndex('gate_round_build_round_unique').on(t.buildId, t.round),\n", ''),
+    ('r1: gate_verdict.patchDigest NOT NULL', S,
+     "    patchDigest: text('patchDigest'),\n    /** 判定自报的 head",
+     "    patchDigest: text('patchDigest').notNull(),\n    /** 判定自报的 head"),
+    ('r1: gate_verdict.buildId FK without cascade', S,
+     "    buildId: text('buildId')\n      .notNull()\n      .references(() => build.id, { onDelete: 'cascade' }),\n    kind:",
+     "    buildId: text('buildId')\n      .notNull()\n      .references(() => build.id),\n    kind:"),
+    ('r1: gate_state.buildId with no FK', S,
+     "  buildId: text('buildId')\n    .primaryKey()\n    .references(() => build.id, { onDelete: 'cascade' }),\n  /** MergeReadiness.ready",
+     "  buildId: text('buildId').primaryKey(),\n  /** MergeReadiness.ready"),
+    ('r1: journal 0044 when below 0043', 'journal', None, None),
+]
+
+def sh(cmd, check=True, cwd=WT):
+    r = subprocess.run(cmd, cwd=cwd, shell=True, capture_output=True, text=True)
+    if check and r.returncode != 0:
+        sys.exit(f'command failed: {cmd}\n{r.stdout}\n{r.stderr}')
+    return r
+
+def path(p):
+    return os.path.join(WT, p)
+
+def restore():
+    for f in TRACKED:
+        open(path(f), 'w', encoding='utf8').write(sh(f'git show HEAD:{f}').stdout)
+    if os.path.exists(path(LATER)):
+        os.remove(path(LATER))
+    sh('git diff --exit-code HEAD -- apps/server')
+    if sh('git status --porcelain -- apps/server').stdout.strip():
+        sys.exit('worktree not clean after restore')
+
+def regenerate():
+    sh("(sleep 3; printf '\\r') | script -qec './node_modules/.bin/drizzle-kit drop' /dev/null", cwd=path('apps/server'))
+    if os.path.exists(path(SQL)):
+        sys.exit('drizzle-kit drop did not remove 0044')
+    sh('pnpm --filter @xiechimon/pacman db:generate --name merge_gate_tables')
+
+def run_tests():
+    r = sh(f'pnpm exec vitest run {TEST} --reporter=verbose', check=False)
+    out = r.stdout + r.stderr
+    summary = re.search(r'Tests\s+(.*?)\n', out)
+    failed = sorted(set(m.group(1).strip() for m in re.finditer(r'^\s*×\s+(.*?)(?:\s+\d+ms)?$', out, re.M)))
+    return (summary.group(1).strip() if summary else 'no summary'), failed
+
+restore()
+rows = []
+for name, kind, a, b in MUTATIONS:
+    if kind == 'journal':
+        j = json.load(open(path(JOURNAL), encoding='utf8'))
+        prev = next(e for e in j['entries'] if e['tag'].startswith('0043'))
+        mine = next(e for e in j['entries'] if e['tag'].startswith('0044'))
+        mine['when'] = prev['when'] - 1
+        open(path(JOURNAL), 'w', encoding='utf8').write(json.dumps(j, indent=2) + '\n')
+        change = f'{JOURNAL}: 0044 when -> {prev["when"] - 1} (0043 when - 1)'
+    elif kind == L:
+        later_sql = sh(f'node {HERE}/s3r2-recreate-sql.mjs {a} {b or ""}', cwd=HERE).stdout
+        j = json.load(open(path(JOURNAL), encoding='utf8'))
+        last = j['entries'][-1]
+        j['entries'].append({'idx': last['idx'] + 1, 'version': last['version'], 'when': last['when'] + 1,
+                             'tag': '0045_s3r2_later', 'breakpoints': True})
+        open(path(JOURNAL), 'w', encoding='utf8').write(json.dumps(j, indent=2) + '\n')
+        open(path(LATER), 'w', encoding='utf8').write(later_sql)
+        change = f'added {LATER} (journal idx {last["idx"] + 1}):\n' + later_sql
+    else:
+        src = open(path(SCHEMA), encoding='utf8').read()
+        if src.count(a) != 1:
+            sys.exit(f'{name}: anchor found {src.count(a)} times')
+        open(path(SCHEMA), 'w', encoding='utf8').write(src.replace(a, b))
+        regenerate()
+        d = sh(f'git diff --no-color -U0 HEAD -- {SQL}', check=False).stdout
+        change = '\n'.join(l for l in d.splitlines() if l[:1] in '+-' and not l.startswith(('+++', '---')))
+    summary, failed = run_tests()
+    rows.append((name, summary, failed, change))
+    restore()
+    print(f'done: {name}: {summary}', file=sys.stderr)
+
+for name, summary, failed, change in rows:
+    print(f'{name:<76} {summary}')
+print()
+for name, summary, failed, change in rows:
+    print(f'## {name}')
+    print('change:')
+    print(change)
+    print('red tests:' if failed else 'red tests: none')
+    for t in failed:
+        print(f'  {t}')
+    print()
+
+== s3r2-recreate-sql.mjs
+// Usage: node s3r2-recreate-sql.mjs <table> [keep]
+// Prints a drizzle-kit-shaped table recreate for <table> (the shape of 0004_opposite_chimera.sql), built
+// from the CREATE statement and columns of a database migrated with the worktree's drizzle folder.
+// With `keep`, the four gate tables are copied aside before the recreate and written back after it.
+import { createRequire } from 'node:module';
+const WT = '/home/user/pacman/.claude/worktrees/p3c';
+const require = createRequire(`${WT}/apps/server/package.json`);
+const Database = require('better-sqlite3');
+const { drizzle } = require('drizzle-orm/better-sqlite3');
+const { migrate } = require('drizzle-orm/better-sqlite3/migrator');
+const [table, keep] = process.argv.slice(2);
+const s = new Database(':memory:');
+migrate(drizzle(s), { migrationsFolder: `${WT}/apps/server/drizzle` });
+const { sql } = s.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+const cols = s.prepare(`PRAGMA table_info(${table})`).all().map((c) => `"${c.name}"`).join(', ');
+const indexes = s.prepare("SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL").all(table).map((r) => `${r.sql};`);
+const GATE = ['gate_digest', 'gate_round', 'gate_verdict', 'gate_state'];
+const stmts = [
+  ...(keep ? GATE.map((t) => `CREATE TABLE \`__keep_${t}\` AS SELECT * FROM \`${t}\`;`) : []),
+  'PRAGMA foreign_keys=OFF;',
+  `${sql.replace(new RegExp(`^CREATE TABLE [\`"]?${table}[\`"]?`), `CREATE TABLE \`__new_${table}\``)};`,
+  `INSERT INTO \`__new_${table}\`(${cols}) SELECT ${cols} FROM \`${table}\`;`,
+  `DROP TABLE \`${table}\`;`,
+  `ALTER TABLE \`__new_${table}\` RENAME TO \`${table}\`;`,
+  'PRAGMA foreign_keys=ON;',
+  ...indexes,
+  ...(keep ? GATE.flatMap((t) => [`INSERT INTO \`${t}\` SELECT * FROM \`__keep_${t}\`;`, `DROP TABLE \`__keep_${t}\`;`]) : []),
+];
+process.stdout.write(stmts.join('--> statement-breakpoint\n'));
