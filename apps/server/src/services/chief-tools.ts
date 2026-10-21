@@ -32,7 +32,7 @@ import {
   quotesIssueFence,
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -40,6 +40,7 @@ import {
   build,
   chief,
   chiefMessage,
+  chiefThread,
   machine,
   message,
   project,
@@ -398,12 +399,28 @@ export async function executeChiefTool(
       });
     }
     case 'usage': {
-      // token_usage 无 teamId 列；单租户 self-host（02 §2 team 恒一行）下全量
-      // 即本团队。buildId 给定则按其过滤。
+      // token_usage 无 teamId 列（#1470）：记账键 buildId 是 build id 或 chief
+      // thread id（chief 回合），各自经 build → todo / chief_thread 归到团队。
+      // 只回本队行；buildId 给定则再按其过滤（他队 id 与不存在同回 []）。
       const buildId = optStr(params, 'buildId');
-      const rows = buildId
-        ? db.select().from(tokenUsage).where(eq(tokenUsage.buildId, buildId)).all()
-        : db.select().from(tokenUsage).all();
+      const teamBuildIds = db
+        .select({ id: build.id })
+        .from(build)
+        .innerJoin(todo, eq(todo.id, build.todoId))
+        .where(eq(todo.teamId, ctx.teamId));
+      const teamThreadIds = db
+        .select({ id: chiefThread.id })
+        .from(chiefThread)
+        .where(eq(chiefThread.teamId, ctx.teamId));
+      const owned = or(
+        inArray(tokenUsage.buildId, teamBuildIds),
+        inArray(tokenUsage.buildId, teamThreadIds),
+      );
+      const rows = db
+        .select()
+        .from(tokenUsage)
+        .where(buildId ? and(eq(tokenUsage.buildId, buildId), owned) : owned)
+        .all();
       return json(rows);
     }
     case 'issues':
@@ -930,13 +947,18 @@ export async function executeChiefTool(
       // r5 §6：agentId = Chief 绑定 Agent（共用存储）；三级溯源；配额 100。
       if (ctx.chiefAgentId === null)
         throw new HttpError(409, 'chief agent not bound — memory has no store');
+      // 溯源 id 核团队（#1470）：他队与不存在同 404，不落库。
+      const projectId = optStr(params, 'projectId') ?? null;
+      const sourceTodoId = optStr(params, 'sourceTodoId') ?? null;
+      if (projectId !== null) requireProjectRow(db, projectId, ctx.teamId);
+      if (sourceTodoId !== null) requireTeamTodo(db, sourceTodoId, ctx.teamId);
       const row = saveMemoryEntry(db, {
         agentId: ctx.chiefAgentId,
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
-        projectId: optStr(params, 'projectId') ?? null,
-        sourceTodoId: optStr(params, 'sourceTodoId') ?? null,
+        projectId,
+        sourceTodoId,
         sourceBuildId: ctx.conversationId, // chief 来源 = chief 回合 id（r5 §6）
       });
       return json(row);
@@ -1201,14 +1223,19 @@ export async function executeWorkerMemoryTool(
   switch (name) {
     case 'save_memory': {
       // 溯源缺省 = 运行中任务上下文（r5 §6 实测样本 sourceTodoId/sourceBuildId
-      // = 当次 todo/build）；params 显式值优先（跨任务记录经验 [设计]）。
+      // = 当次 todo/build）；params 显式值优先（跨任务记录经验 [设计]），
+      // 显式值核团队（#1470，chief save_memory 同律）。
+      const projectId = optStr(params, 'projectId');
+      const sourceTodoId = optStr(params, 'sourceTodoId');
+      if (projectId !== undefined) requireProjectRow(db, projectId, ctx.teamId);
+      if (sourceTodoId !== undefined) requireTeamTodo(db, sourceTodoId, ctx.teamId);
       const row = saveMemoryEntry(db, {
         agentId: ctx.agentId,
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
-        projectId: optStr(params, 'projectId') ?? ctx.projectId,
-        sourceTodoId: optStr(params, 'sourceTodoId') ?? ctx.todoId,
+        projectId: projectId ?? ctx.projectId,
+        sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
       });
       return json(row);

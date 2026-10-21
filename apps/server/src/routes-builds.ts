@@ -36,7 +36,7 @@ import {
 } from './services/builds.js';
 import { chiefThreadMessages, getChiefThread } from './services/chief.js';
 import { createSerialConnection } from './services/events.js';
-import { readBuildChangeFile, readBuildChanges } from './services/git.js';
+import { projectRepoRef, readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { PhaseTransitionError } from './services/phase.js';
 
@@ -183,12 +183,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
       if (projRow) {
         projectId = projRow.id;
-        const origin = requestOrigin(c);
-        if (projRow.repoKind === 'hosted' && projRow.repoName !== null) {
-          cloneUrl = `${origin}/git/${todoRow.teamId}/${projRow.repoName}`;
-        } else if (projRow.repoKind === 'github' && projRow.githubRepo !== null) {
-          cloneUrl = `https://github.com/${projRow.githubRepo}.git`;
-        }
+        // 派生单源 = git.projectRepoRef（#1470：github 存量值不合法 = 无 URL）；
+        // local 形态不经 clone 同步，照旧 null。
+        const ref = projectRepoRef(projRow, requestOrigin(c));
+        if (ref !== null && ref.kind !== 'local') cloneUrl = ref.cloneUrl;
       }
     }
     const body = parseWith(createBranchSyncBodySchema, await jsonBody(c), 'body');
