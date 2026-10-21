@@ -122,8 +122,8 @@ export interface GateInputs {
    *      不以 head 为父）。
    * 2 与 3 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得
    * 出。它们以 commits 读全为前提（少了 head 的子提交，后代上读的 compare 就认不出），
-   * 所以 commits 里不同 SHA 的个数要等于 totalCommits（按条数数会让重复的条目凑数）；
-   * 不等 = 没读全（分页没读完），整份按读不到处理（patch-unavailable，可等）。
+   * 所以 commits 的条数要等于 totalCommits，且没有重复的 SHA（重复是分页错位的迹象，
+   * 会顶替没读到的提交）；不然 = 没读全，整份按读不到处理（patch-unavailable，可等）。
    * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
    * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
@@ -333,7 +333,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 补丁。compare 读不到可等；读到了形状不对（含写错的 SHA），下一次读还是一样，留人。
-  // 提交没读全（不同 SHA 的个数不等于 total_commits）的，下面的 head 判定靠不住；
+  // 提交没读全（条数不等于 total_commits，或有重复的 SHA）的，下面的 head 判定靠不住；
   // 不是在 PR 的 head 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，读在了
   // 更早的提交上；或响应的提交里有以它为父的，读在了后代上）的，说的是别的补丁。这两样
   // 都按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果
@@ -349,7 +349,8 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     compare = null;
   } else if (
     compare !== null &&
-    new Set(compare.commits.map((c) => c.sha)).size !== compare.totalCommits
+    (compare.commits.length !== compare.totalCommits ||
+      new Set(compare.commits.map((c) => c.sha)).size !== compare.commits.length)
   ) {
     block('patch-unavailable', 'compare commit list incomplete');
     compare = null;
