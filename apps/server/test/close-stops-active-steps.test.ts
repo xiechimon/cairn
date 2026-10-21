@@ -16,6 +16,9 @@
 //    queued 卡挪回待开始不经 /reset，pending 步原样留着，机器照领。（queued→
 //    done 不在此列：#1247 钉了 raw PATCH done 保留 pending 步，见
 //    persona-split-verify「manual done leaves the pending step running」。）
+// 9. 关一张 claimed 步在跑的卡、回报到达前又重开：gate 回落把重开后的相位
+//    覆盖掉。
+// 10. raw PATCH 把 planning / building 卡挪回待开始：claimed 步零通知、继续跑。
 
 import { STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -252,5 +255,40 @@ describe('#1447 raw PATCH 把 queued 卡挪回待开始也停 pending 步', () =
     expect(todoPhase(w)).toBe('queued');
     expect(stepStatus(w)).toBe('pending');
     expect(await claim(w)).not.toBeNull();
+  });
+});
+
+describe('#1445 卡离开执行中后，停止回报不再改相位', () => {
+  test('关闭后、回报前重开：回报落账不覆盖重开后的相位', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    expect(
+      (await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'closed' })).status,
+    ).toBe(200);
+    expect(
+      (await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'review' })).status,
+    ).toBe(200);
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(stepStatus(w)).toBe('stopped');
+    expect(todoPhase(w)).toBe('review');
+  });
+
+  test('raw PATCH planning → todo：委托停 claimed 步', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    const events: { type: string }[] = [];
+    w.s.machineHub.subscribe(w.teamId, (ev) => {
+      if ('type' in ev) events.push(ev as { type: string });
+    });
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'todo' });
+    expect(res.status).toBe(200);
+    expect(
+      w.s.db
+        .select()
+        .from(stopPendingTable)
+        .all()
+        .map((p) => p.stepId),
+    ).toEqual([w.stepId]);
+    expect(events.some((e) => e.type === 'stop')).toBe(true);
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(todoPhase(w)).toBe('todo');
   });
 });

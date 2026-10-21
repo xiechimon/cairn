@@ -184,8 +184,10 @@ export function readSteerPending(db: Db, conversationId: string): string[] {
 }
 
 /** #1247 stop-then-done：delegated stop 完成后的目标相位（进程内）。
- *  重启后丢失 = 回落 gate（与普通 stop 同面），不另开 migration。 */
-const afterStopPhaseByBuild = new Map<string, Phase>();
+ *  重启后丢失 = 回落 gate（与普通 stop 同面），不另开 migration。
+ *  #1445 `keep`：卡已被写离执行中（关闭 / 挪回待开始），回报只落步与 build，
+ *  不动相位。 */
+const afterStopPhaseByBuild = new Map<string, Phase | 'keep'>();
 
 /** 停止写面（M7 #308，r9 §3.3 停止钮 / 08 册附录 A composer 停止钮行）：
  * POST /api/builds/{id}/stop body {discard}——中断当前活动步。
@@ -286,6 +288,8 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   // #1247：stop-then-done 预定相位优先；否则 gate 回落（普通停止钮）。
   const desired = afterStopPhaseByBuild.get(buildRow.id);
   afterStopPhaseByBuild.delete(buildRow.id);
+  // #1445：相位归把卡写离执行中的那一手；回报前被重开的卡也不被回落覆盖。
+  if (desired === 'keep') return;
   if (desired != null) {
     if (todoRow.phase !== desired) {
       // 直写预定相（queued/planning→done 不在前进漏斗；与 gate 回落同形）。
@@ -303,7 +307,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
     }
     return;
   }
-  // #1445：已关闭的卡不因停止回报重开（预定相丢失 = 进程重启的兜底）。
+  // #1445：已关闭的卡不因停止回报重开（keep 预定丢失 = 进程重启的兜底）。
   if (todoRow.phase === 'closed') return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
@@ -435,12 +439,11 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
   return prepareStopFor(deps, todoId, 'done');
 }
 
-/** #1445 卡被写离执行中之后的停半边：关闭（closed），或 queued 卡被 raw PATCH
- *  挪回待开始（#1447；web 走 /reset）。停掉
- *  latest build 的活动步：pending / waiting_quota 即时停，不再可领、不占队列
- *  位次；claimed 委托停（只有关闭会走到——queued 没有 claimed 步），回报
- *  done(stopped) 时 applyStoppedStep 见卡已 closed 即不回落。无 latest build /
- *  无活动步 = no-op。 */
+/** #1445 卡被写离执行中之后的停半边：关闭（closed），或被 raw PATCH 挪回待
+ *  开始（web 走 /reset）。停掉 latest build 的活动步：pending / waiting_quota
+ *  即时停，不再可领、不占队列位次；claimed 委托停并预定 keep，回报
+ *  done(stopped) 时 applyStoppedStep 不动相位。无 latest build / 无活动步 =
+ *  no-op。 */
 export function stopActiveStepsAfterExit(deps: BuildDeps, todoId: string): void {
   prepareStopFor(deps, todoId, 'exit');
 }
@@ -473,9 +476,9 @@ function prepareStopFor(
     return { state: 'ready' };
   }
   const now = nowMs();
-  // exit 不预定：卡此刻已是 closed，回报时由 applyStoppedStep 的 closed 兜底
-  // 保持；预定了反而会把回报前被重开的卡再关一次。
-  if (after === 'done') afterStopPhaseByBuild.set(buildId, 'done');
+  // exit 预定 keep 而非目标相：卡此刻已在调用方写的相位，回报前被重开的卡
+  // 不该被再关一次，也不该被 gate 回落覆盖。
+  afterStopPhaseByBuild.set(buildId, after === 'done' ? 'done' : 'keep');
   db.insert(stopPending)
     .values({ conversationId: buildId, stepId: active.id, discard: true, createdAt: now })
     .onConflictDoUpdate({
