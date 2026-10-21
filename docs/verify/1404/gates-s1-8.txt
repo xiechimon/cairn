@@ -1,0 +1,54 @@
+# #1404 S1 round 8 gates, worktree on claude/bootstrap-p3a at 56573f8 (round 8 code commit, on top of the main merge
+# 3724619; tracked tree clean, only the untracked round 8 evidence files present). origin/main at 1f61c79 (#1410) is
+# now the merge base, so `--changed origin/main` and e2e:affected count only this branch's files.
+
+$ pnpm lint
+Checked 792 files in 2s. No fixes applied.
+Found 1 info.
+exit=0
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.2s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+     × 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4） 29ms
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 241 passed (242)
+      Tests  1 failed | 2559 passed | 1 skipped (2561)
+   Duration  351.57s (tests 54%, import 44%, transform 1%)
+exit=1
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 515 test sources, no package-manager spawns.
+exit=0
+
+$ lsof -iTCP:8393 -sTCP:LISTEN   (no output, exit 1: port free)
+
+$ E2E_AFFECTED_PORT=8393 pnpm --filter @pacman/web e2e:affected
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8393
+  8 passed (14.1s)
+exit=0
+
+lint info: apps/web/src/resources/machines-page.tsx:317 noUselessFragments, present on main (as in gates-s1.txt).
+runner-brief.test.ts "擦除失败" is the sole failure: the root-only case described in gates-s1.txt (chmodSync(cwd, 0o500)
+does nothing for root; this container runs as root, CI runs as a normal user). apps/daemon is not touched by this
+branch; the test is left as is.
+/code-review (low) on the explicit range 3724619..56573f8 (round 8 since 1892662, without the main merge): no
+findings. It ran after the gate chain finished, not during it.

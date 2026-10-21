@@ -1,0 +1,450 @@
+# #1404 S1 mutations, round 6 (pr-gate run 4 on #1420 at 02780b4): each round 6 fix undone alone, and each rule the
+# round pins (item 7 of the round's brief, plus the malformed escape, the sha in the dedupe key and the code-unit
+# sort), applied to the sources at a20a854 (round 6 code head, 112 tests). After each mutation the runner runs the
+# three S1 test files
+#   pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+# and restores the file; it checks that `git diff` is identical before and after the whole run. Every mutation turns
+# at least one test red; no survivors, so no test was added for a survivor. Item 6 of the brief (digest.ts header
+# comment) changes a comment only and has no mutation. Runner: mutate6.mjs (below the results), definitions:
+# [name, file, text replaced, replacement], each text occurring exactly once. Each mutation's patch is the runner's
+# `git diff` of the file while mutated.
+#
+# Fix mutations (undo the round 6 change):
+#   fix 1  evidence-link visibleText: search for `-->` from open + 4 again (empty comments `<!-->`, `<!--->`).
+#   fix 2  evidence-link dedupe: key on the raw URL text again.
+#   fix 3  paths opaque: case-insensitive evidence exemption again.
+#   fix 4  paths dirAlone: three ways (protected globs without it, globToRegExp ignoring it, auto-merge globs taking it).
+#   fix 5  paths glob regex: 'i' without 'u'.
+# Pins (rules the 02780b4 code already had, now held by a test):
+#   300 cap on the whole list, copied entry's old name judged, root test/ dir, .test.mts/.spec.cts, a copy counts two
+#   files, malformed escape caught, sha in the dedupe key, UTF-16 code-unit sort.
+
+$ node mutate6.mjs /home/user/pacman/.claude/worktrees/p3a mutations6.json
+fix 1, link: close searched from open + 4            1 failed | 111 passed (112)
+fix 2, link: dedupe on the raw URL text              1 failed | 111 passed (112)
+fix 3, D4: opaque exemption case-insensitive         1 failed | 111 passed (112)
+fix 4, D4: protected globs without dirAlone          1 failed | 111 passed (112)
+fix 4, D4: dirAlone ignored in globToRegExp          2 failed | 110 passed (112)
+fix 4, D4: auto-merge globs take dirAlone too        1 failed | 111 passed (112)
+fix 5, D4: glob regex without u                      1 failed | 111 passed (112)
+pin, digest: 300 cap counts kept entries only        1 failed | 111 passed (112)
+pin, D4: old name checked only for renamed           1 failed | 111 passed (112)
+pin, D4: test dir not seen at the repo root          1 failed | 111 passed (112)
+pin, D4: .test.mts / .spec.cts not seen              1 failed | 111 passed (112)
+pin, digest: a copy counts one file                  1 failed | 111 passed (112)
+pin, link: malformed escape throws                   1 failed | 111 passed (112)
+pin, link: dedupe on the path alone                  1 failed | 111 passed (112)
+pin, digest: sort by code point (UTF-8 bytes)        1 failed | 111 passed (112)
+
+git diff identical before and after the run: true
+survivors: 0
+
+per mutation: patch, then the failing tests
+
+== fix 1, link: close searched from open + 4
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index 37a7ebbf..a6158c91 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -33,7 +33,7 @@ function visibleText(body: string): string {
+   let pos = 0;
+   for (;;) {
+     const open = body.indexOf('<!--', pos);
+-    const close = open === -1 ? -1 : body.indexOf('-->', open + 2);
++    const close = open === -1 ? -1 : body.indexOf('-->', open + 4);
+     if (close === -1) {
+       parts.push(body.slice(pos, open === -1 ? body.length : open));
+       return parts.join(' ');
+failing tests:
+    × 空注释 <!--> 与 <!---> 在自身的 --> 处结束（HTML 与 cmark-gfm 同样），其后的链接照常算
+
+== fix 2, link: dedupe on the raw URL text
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index 37a7ebbf..5506db06 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -82,7 +82,7 @@ export function parseRawEvidenceLinks(
+       /^[0-9a-f]{40}$/.test(sha) &&
+       path.startsWith(ownDir) &&
+       !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === '');
+-    const key = ok ? `${sha}/${path}` : bare;
++    const key = bare;
+     if (seen.has(key)) continue;
+     seen.add(key);
+     if (ok) links.push({ sha, path });
+failing tests:
+    × 同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份
+
+== fix 3, D4: opaque exemption case-insensitive
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..a4cfb088 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -111,7 +111,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
+       if (isEvidence(name) && !name.slice(EVIDENCE_PREFIX.length).startsWith(`${ticketRef}/`)) {
+         push(out.otherTicketEvidence, name);
+       }
+-      if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);
++      if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);
+     }
+ 
+     if (f.status === 'removed' && isTestPath(f.filename)) push(out.deletedTests, f.filename);
+failing tests:
+    × 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条）
+
+== fix 4, D4: protected globs without dirAlone
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..a9f09e57 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -46,7 +46,7 @@ export function globToRegExp(glob: string, { dirAlone = false } = {}): RegExp {
+   return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'iu');
+ }
+ 
+-const protectedRe = (glob: string) => globToRegExp(glob, { dirAlone: true });
++const protectedRe = (glob: string) => globToRegExp(glob);
+ const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
+ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+ const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+failing tests:
+    × 保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 dirAlone 一致）
+
+== fix 4, D4: dirAlone ignored in globToRegExp
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..e7845240 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -26,7 +26,7 @@ import { isEvidencePath } from './digest.js';
+ // `**/` 含仓根，`**` 跨目录，`*` 不跨目录；其余字符按字面。dirAlone 时末尾的
+ // `/**` 也认目录项本身（只给保护类别用）。转义的都是语法字符，`u` 下照样合法。
+ export function globToRegExp(glob: string, { dirAlone = false } = {}): RegExp {
+-  const tail = dirAlone && glob.endsWith('/**');
++  const tail = false && dirAlone && glob.endsWith('/**');
+   const g = tail ? glob.slice(0, -3) : glob;
+   let re = '';
+   for (let i = 0; i < g.length; i += 1) {
+failing tests:
+    × dirAlone：末尾的 /** 也认目录项本身，不认同名前缀；不带时不认
+    × 保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 dirAlone 一致）
+
+== fix 4, D4: auto-merge globs take dirAlone too
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..db9d27cf 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -49,7 +49,7 @@ export function globToRegExp(glob: string, { dirAlone = false } = {}): RegExp {
+ const protectedRe = (glob: string) => globToRegExp(glob, { dirAlone: true });
+ const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(protectedRe);
+ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+-const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
++const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map(protectedRe);
+ // 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
+ const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
+ const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+failing tests:
+    × 可自动合并集的 glob 不认目录项本身：docs/verify、apps/web/src 单独出现算集外
+
+== fix 5, D4: glob regex without u
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..34d28ad4 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -43,7 +43,7 @@ export function globToRegExp(glob: string, { dirAlone = false } = {}): RegExp {
+       re += (ch ?? '').replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+     }
+   }
+-  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'iu');
++  return new RegExp(`^${re}${tail ? '(?:/.*)?' : ''}$`, 'i');
+ }
+ 
+ const protectedRe = (glob: string) => globToRegExp(glob, { dirAlone: true });
+failing tests:
+    × 不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k
+
+== pin, digest: 300 cap counts kept entries only
+diff --git a/apps/server/src/services/merge-gate/digest.ts b/apps/server/src/services/merge-gate/digest.ts
+index 764ad112..9287f4a6 100644
+--- a/apps/server/src/services/merge-gate/digest.ts
++++ b/apps/server/src/services/merge-gate/digest.ts
+@@ -73,7 +73,7 @@ export function computePatchDigest(
+     excluded,
+   });
+ 
+-  if (files.length >= GATE_LIMITS.compareFileCap) return result(null, 'truncated');
++  if (kept.length >= GATE_LIMITS.compareFileCap) return result(null, 'truncated');
+   if (opts.expectedFileCount != null && opts.expectedFileCount !== files.length) {
+     return result(null, 'count-mismatch');
+   }
+failing tests:
+    × 300 的上限按整张列表算，证据条目也计入：299 个代码文件加 1 个 docs/verify 条目即视为截断
+
+== pin, D4: old name checked only for renamed
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..838bd5ba 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -98,7 +98,7 @@ export function classifyPaths(files: readonly CompareFile[], ticketRef: string):
+ 
+   for (const f of files) {
+     const names =
+-      f.previousFilename !== null && f.previousFilename !== f.filename
++      f.status === 'renamed' && f.previousFilename !== null && f.previousFilename !== f.filename
+         ? [f.filename, f.previousFilename]
+         : [f.filename];
+     for (const name of names) {
+failing tests:
+    × 复制条目的原名也判类：从保护文件复制出来算命中
+
+== pin, D4: test dir not seen at the repo root
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..3ef52d97 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -51,7 +51,7 @@ const PROTECTED_RE = [...PROTECTED_PATH_GLOBS, ...MERGE_GATE_SOURCE_GLOBS].map(p
+ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+ const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+ // 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
+-const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
++const TEST_DIR_RE = /(\/)(e2e|test|tests|__tests__)\//i;
+ const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
+ /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
+ const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
+failing tests:
+    × .test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算
+
+== pin, D4: .test.mts / .spec.cts not seen
+diff --git a/apps/server/src/services/merge-gate/paths.ts b/apps/server/src/services/merge-gate/paths.ts
+index 841496a6..41fc601e 100644
+--- a/apps/server/src/services/merge-gate/paths.ts
++++ b/apps/server/src/services/merge-gate/paths.ts
+@@ -52,7 +52,7 @@ const GATE_SOURCE_RE = MERGE_GATE_SOURCE_GLOBS.map(protectedRe);
+ const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));
+ // 测试的目录与后缀同样不分大小写（ADR 0021 D4；pr-gate 的这两条也带 /i）。
+ const TEST_DIR_RE = /(^|\/)(e2e|test|tests|__tests__)\//i;
+-const TEST_FILE_RE = /\.(test|spec)\.[cm]?[jt]sx?$/i;
++const TEST_FILE_RE = /\.(test|spec)\.[jt]sx?$/i;
+ /** 与 pr-gate.js 的 SAFE_PATH 同一白名单：字母、组合符、数字与 ._/@+%-。 */
+ const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
+failing tests:
+    × .test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算
+
+== pin, digest: a copy counts one file
+diff --git a/apps/server/src/services/merge-gate/digest.ts b/apps/server/src/services/merge-gate/digest.ts
+index 764ad112..ec3fec2b 100644
+--- a/apps/server/src/services/merge-gate/digest.ts
++++ b/apps/server/src/services/merge-gate/digest.ts
+@@ -59,7 +59,7 @@ export function computePatchDigest(
+ ): PatchDigestResult {
+   const kept = files.filter((f) => !isEvidenceEntry(f));
+   const excluded = files.filter(isEvidenceEntry);
+-  const countedFiles = files.reduce((n, f) => n + (f.previousFilename === null ? 1 : 2), 0);
++  const countedFiles = files.reduce((n, f) => n + (f.status === 'renamed' ? 2 : 1), 0);
+   const countedLines = files.reduce((n, f) => n + f.additions + f.deletions, 0);
+   const result = (
+     patchDigest: string | null,
+failing tests:
+    × 复制（copied，带 previous_filename）同改名一样记两个文件
+
+== pin, link: malformed escape throws
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index 37a7ebbf..89a560d3 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -51,11 +51,7 @@ function withoutTrailingPunct(url: string): string {
+ 
+ /** 逐段 URL 解码再用 `/` 连起来；坏的百分号转义（`%E0%A4%A`）返回 null。 */
+ function decodedPath(segments: readonly string[]): string | null {
+-  try {
+-    return segments.map((p) => decodeURIComponent(p)).join('/');
+-  } catch {
+-    return null;
+-  }
++  return segments.map((p) => decodeURIComponent(p)).join('/');
+ }
+ 
+ export function parseRawEvidenceLinks(
+failing tests:
+    × 坏的百分号转义（%E0%A4%A）列进 others，不抛
+
+== pin, link: dedupe on the path alone
+diff --git a/apps/server/src/services/merge-gate/evidence-link.ts b/apps/server/src/services/merge-gate/evidence-link.ts
+index 37a7ebbf..2acfd3d3 100644
+--- a/apps/server/src/services/merge-gate/evidence-link.ts
++++ b/apps/server/src/services/merge-gate/evidence-link.ts
+@@ -82,7 +82,7 @@ export function parseRawEvidenceLinks(
+       /^[0-9a-f]{40}$/.test(sha) &&
+       path.startsWith(ownDir) &&
+       !path.split('/').some((seg) => seg === '..' || seg === '.' || seg === '');
+-    const key = ok ? `${sha}/${path}` : bare;
++    const key = ok ? path : bare;
+     if (seen.has(key)) continue;
+     seen.add(key);
+     if (ok) links.push({ sha, path });
+failing tests:
+    × 同一路径钉在两个 SHA 上是两条
+
+== pin, digest: sort by code point (UTF-8 bytes)
+diff --git a/apps/server/src/services/merge-gate/digest.ts b/apps/server/src/services/merge-gate/digest.ts
+index 764ad112..df3b4bfe 100644
+--- a/apps/server/src/services/merge-gate/digest.ts
++++ b/apps/server/src/services/merge-gate/digest.ts
+@@ -84,7 +84,7 @@ export function computePatchDigest(
+   // 默认排序按 UTF-16 码元比较，与区域设置无关。
+   const tuples = kept
+     .map((f) => JSON.stringify([f.status, f.filename, f.previousFilename, f.sha, f.patchSha]))
+-    .sort();
++    .sort((a, b) => Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8')));
+   const hex = createHash('sha256').update(tuples.join('\n')).digest('hex');
+   return result(`${PATCH_DIGEST_VERSION}:${hex}`, null);
+ }
+failing tests:
+    × 补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点
+
+mutations6.json:
+  [
+   [
+    "fix 1, link: close searched from open + 4",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "body.indexOf('-->', open + 2)",
+    "body.indexOf('-->', open + 4)"
+   ],
+   [
+    "fix 2, link: dedupe on the raw URL text",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "const key = ok ? `${sha}/${path}` : bare;",
+    "const key = bare;"
+   ],
+   [
+    "fix 3, D4: opaque exemption case-insensitive",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);",
+    "if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);"
+   ],
+   [
+    "fix 4, D4: protected globs without dirAlone",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const protectedRe = (glob: string) => globToRegExp(glob, { dirAlone: true });",
+    "const protectedRe = (glob: string) => globToRegExp(glob);"
+   ],
+   [
+    "fix 4, D4: dirAlone ignored in globToRegExp",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const tail = dirAlone && glob.endsWith('/**');",
+    "const tail = false && dirAlone && glob.endsWith('/**');"
+   ],
+   [
+    "fix 4, D4: auto-merge globs take dirAlone too",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map((glob) => globToRegExp(glob));",
+    "const AUTO_MERGE_RE = AUTO_MERGE_PATH_GLOBS.map(protectedRe);"
+   ],
+   [
+    "fix 5, D4: glob regex without u",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "(?:/.*)?' : ''}$`, 'iu');",
+    "(?:/.*)?' : ''}$`, 'i');"
+   ],
+   [
+    "pin, digest: 300 cap counts kept entries only",
+    "apps/server/src/services/merge-gate/digest.ts",
+    "if (files.length >= GATE_LIMITS.compareFileCap)",
+    "if (kept.length >= GATE_LIMITS.compareFileCap)"
+   ],
+   [
+    "pin, D4: old name checked only for renamed",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "      f.previousFilename !== null && f.previousFilename !== f.filename\n",
+    "      f.status === 'renamed' && f.previousFilename !== null && f.previousFilename !== f.filename\n"
+   ],
+   [
+    "pin, D4: test dir not seen at the repo root",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const TEST_DIR_RE = /(^|\\/)(e2e|test|tests|__tests__)\\//i;",
+    "const TEST_DIR_RE = /(\\/)(e2e|test|tests|__tests__)\\//i;"
+   ],
+   [
+    "pin, D4: .test.mts / .spec.cts not seen",
+    "apps/server/src/services/merge-gate/paths.ts",
+    "const TEST_FILE_RE = /\\.(test|spec)\\.[cm]?[jt]sx?$/i;",
+    "const TEST_FILE_RE = /\\.(test|spec)\\.[jt]sx?$/i;"
+   ],
+   [
+    "pin, digest: a copy counts one file",
+    "apps/server/src/services/merge-gate/digest.ts",
+    "n + (f.previousFilename === null ? 1 : 2)",
+    "n + (f.status === 'renamed' ? 2 : 1)"
+   ],
+   [
+    "pin, link: malformed escape throws",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "  try {\n    return segments.map((p) => decodeURIComponent(p)).join('/');\n  } catch {\n    return null;\n  }\n",
+    "  return segments.map((p) => decodeURIComponent(p)).join('/');\n"
+   ],
+   [
+    "pin, link: dedupe on the path alone",
+    "apps/server/src/services/merge-gate/evidence-link.ts",
+    "const key = ok ? `${sha}/${path}` : bare;",
+    "const key = ok ? path : bare;"
+   ],
+   [
+    "pin, digest: sort by code point (UTF-8 bytes)",
+    "apps/server/src/services/merge-gate/digest.ts",
+    "    .sort();\n",
+    "    .sort((a, b) => Buffer.compare(Buffer.from(a, 'utf8'), Buffer.from(b, 'utf8')));\n"
+   ]
+  ]
+mutate6.mjs:
+  // Mutation runner for #1404 S1 round 6. Each mutation replaces text in one source file, records the patch
+  // (git diff of that file while mutated), runs the three S1 test files, restores the file.
+  // Usage: node mutate6.mjs <worktree> <mutations.json>
+  import { execFileSync, spawnSync } from 'node:child_process';
+  import { readFileSync, writeFileSync } from 'node:fs';
+  import { join } from 'node:path';
+  
+  const [root, defsPath] = process.argv.slice(2);
+  const defs = JSON.parse(readFileSync(defsPath, 'utf8'));
+  const tests = [
+    'apps/server/test/merge-gate-digest.test.ts',
+    'apps/server/test/merge-gate-paths.test.ts',
+    'apps/server/test/merge-gate-evidence-link.test.ts',
+  ];
+  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  const before = git('diff');
+  const rows = [];
+  for (const [name, file, oldText, newText] of defs) {
+    const path = join(root, file);
+    const src = readFileSync(path, 'utf8');
+    const count = src.split(oldText).length - 1;
+    if (count !== 1) {
+      rows.push({ name, summary: `NOT APPLIED (${count} matches)`, failed: [], patch: '' });
+      continue;
+    }
+    writeFileSync(path, src.replace(oldText, () => newText));
+    try {
+      const patch = git('diff', '--no-color', '--', file);
+      const r = spawnSync('pnpm', ['exec', 'vitest', 'run', ...tests], { cwd: root, encoding: 'utf8' });
+      const out = `${r.stdout}\n${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
+      const line = out.split('\n').find((l) => /^\s+Tests\s/.test(l)) ?? 'no summary';
+      const failed = out
+        .split('\n')
+        .filter((l) => /^\s+× /.test(l))
+        .map((l) => l.trim().replace(/ \d+ms$/, ''));
+      rows.push({ name, summary: line.replace(/^\s+Tests\s+/, '').trim(), failed, patch });
+    } finally {
+      writeFileSync(path, src);
+    }
+  }
+  const after = git('diff');
+  for (const { name, summary } of rows) console.log(`${name.padEnd(52)} ${summary}`);
+  console.log('');
+  console.log(`git diff identical before and after the run: ${before === after}`);
+  console.log(`survivors: ${rows.filter((r) => r.failed.length === 0).length}`);
+  console.log('');
+  console.log('per mutation: patch, then the failing tests');
+  for (const { name, failed, patch } of rows) {
+    console.log('');
+    console.log(`== ${name}`);
+    console.log(patch.trimEnd());
+    console.log('failing tests:');
+    for (const f of failed) console.log(`    ${f}`);
+  }
