@@ -40,6 +40,8 @@ export interface GateVerdictView {
 
 export interface GateCheckRun {
   name: string;
+  /** 响应里这条 check run 的 head_sha（它报的是哪个提交）。 */
+  headSha: string;
   /** queued / in_progress / completed …；外壳按 app 与名字只传最新的一条。 */
   status: string;
   conclusion: string | null;
@@ -49,6 +51,12 @@ export interface GateCommitStatus {
   context: string;
   /** error / failure / pending / success；外壳只传每个 context 最新的一条。 */
   state: string;
+}
+
+/** compare 响应 commits[] 里的一条：sha 与 parents[].sha。 */
+export interface GateCompareCommit {
+  sha: string;
+  parents: string[];
 }
 
 export interface GateInputs {
@@ -74,10 +82,9 @@ export interface GateInputs {
   /** PR head 的检查；null = 读不到。headSha = 外壳读检查时请求的提交：check run 与
    * commit status 都按这一个 40 位小写 SHA 读（不按分支名）。它不等于 pr.headSha
    * （比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）= 这份结果说的是别的提交，
-   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。GateCheckRun
-   * 与 GateCommitStatus 不带各自的 SHA，这里只能对 headSha；响应里的 SHA（每条 check
-   * run 的 head_sha、combined status 的 sha）由 S4 的外壳对过：有一条不等于请求的
-   * SHA，这次读就不算在这个提交上读的，整份传 null。required 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
+   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。statusSha =
+   * combined status 响应的 sha，runs[].headSha = 每条 check run 响应的 head_sha；这里
+   * 只对 headSha。required 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
    * 最新的一条（同一 app 同名的旧条目不传）。S4 的外壳按 app 与名字去重，不能只按
    * 名字：两个 app 报同名的检查时，只按名字会让失败的那条被同名的通过盖掉，GitHub 的
    * rollup 却照样算它；自家 status 未通过时 unstable 又按自家豁免，闸就看着一条失败
@@ -85,6 +92,7 @@ export interface GateInputs {
    * 不到处理：缺席的可能只是没读到，未通过的可能在没读的那页。 */
   checks: {
     headSha: string;
+    statusSha: string;
     required: string[] | null;
     runs: GateCheckRun[];
     statuses: GateCommitStatus[];
@@ -96,15 +104,15 @@ export interface GateInputs {
    *   响应没有 head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url
    *   里是缩写），commits 按时间排、分页，末一个不保证是 head。
    * - files：全部文件（compareFilesFromResponse）。
-   * - commits：本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。读全时
-   *   含读到的 head。
+   * - commits：本 PR 的提交 base..head（响应 commits[] 的 sha 与 parents[].sha，40 位
+   *   小写，读全）。读全时含读到的 head。
    * headSha 不等于 pr.headSha（比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读），
    * 或 commits 里没有 pr.headSha（按分支名或从缓存读的 compare，外壳却照 pr.headSha
    * 填了 headSha：这一条出自响应本身，不只信外壳填的值）= 文件与摘要说的不是 PR head
    * 的补丁，按读不到处理（patch-unavailable，可等，下一次巡检再读），文件数对不上也
    * 不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
-   * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），
+   * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 {sha, parents} 列表），
    * 每次读都一样，留人；headSha 不是 40 位小写 SHA 时外壳同样传 'malformed'，不要让
    * 它在这里成为永远对不上的可等。commits 少给别的提交只会让证据链少认（拦），不会
    * 多放。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否已经存在
@@ -112,7 +120,7 @@ export interface GateInputs {
    * compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），结果不报 head，也不报
    * 摘要（没有 head 的摘要绑不到哪个提交上）。 */
   compare:
-    | { headSha: string; files: CompareFile[]; commits: string[] }
+    | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[] }
     | 'unreadable'
     | 'malformed';
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
@@ -308,7 +316,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (
     compare !== null &&
     pr !== null &&
-    (compare.headSha !== pr.headSha || !compare.commits.includes(pr.headSha))
+    (compare.headSha !== pr.headSha || !compare.commits.some((c) => c.sha === pr.headSha))
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
@@ -357,7 +365,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       repo: i.repo.name,
       ticketRef: i.ticketRef,
     });
-    const commits = new Set(compare.commits);
+    const commits = new Set(compare.commits.map((c) => c.sha));
     const changed = new Set(
       compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename),
     );
