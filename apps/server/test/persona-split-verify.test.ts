@@ -774,14 +774,17 @@ describe('#1250 split_todo（层 2）', () => {
     );
   });
 
-  test('manual done leaves the pending step running (#1247)', async () => {
+  // #1451：PATCH done 离开执行中同停活动步（#1247 起此处钉的是「步留着」，
+  // 那是 stop-and-done 之外的裸改相；机器照领一张已完成的卡是 bug）。
+  test('manual done stops the pending step (#1247, #1451)', async () => {
     const w = await setupWorld();
     const implementerId = personaAgentId(w.s, 'implementer');
     const buildId = await w.startBuild({ plan: null, build: { agentId: implementerId } });
     const res = await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'done' } });
     expect(res.status).toBe(200);
     expect(w.todoRow().phase).toBe('done');
-    expect(w.stepsOf(buildId).some((s) => s.kind === 'build' && s.status === 'pending')).toBe(true);
+    const build = w.stepsOf(buildId).filter((s) => s.kind === 'build');
+    expect(build.map((s) => s.status)).toEqual(['stopped']);
   });
 });
 

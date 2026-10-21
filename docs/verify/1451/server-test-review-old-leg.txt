@@ -1,0 +1,82 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ❯ test/close-stops-active-steps.test.ts (18 tests | 4 failed) 870ms
+   ❯ #1451 预定丢失与失联扫尾：已完成同已关闭 (4)
+     × keep 预定丢失后回报到达：卡已是 done，不被 gate 回落改写 40ms
+     × keep 预定丢失后回报到达：卡已是 todo，不被 gate 回落改写 37ms
+     × 已完成卡的残留 pending 步：扫尾停掉 33ms
+     × 已完成卡的失联 claimed 步：停掉，不释放回 pending 32ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > keep 预定丢失后回报到达：卡已是 done，不被 gate 回落改写
+AssertionError: expected 'confirm' to be 'done' // Object.is equality
+
+Expected: "done"
+Received: "confirm"
+
+ ❯ test/close-stops-active-steps.test.ts:405:28
+    403|       applyStoppedStep(w.s.svc, w.stepId);
+    404|       expect(stepStatus(w)).toBe('stopped');
+    405|       expect(todoPhase(w)).toBe(phase);
+       |                            ^
+    406|     },
+    407|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > keep 预定丢失后回报到达：卡已是 todo，不被 gate 回落改写
+AssertionError: expected 'confirm' to be 'todo' // Object.is equality
+
+Expected: "todo"
+Received: "confirm"
+
+ ❯ test/close-stops-active-steps.test.ts:405:28
+    403|       applyStoppedStep(w.s.svc, w.stepId);
+    404|       expect(stepStatus(w)).toBe('stopped');
+    405|       expect(todoPhase(w)).toBe(phase);
+       |                            ^
+    406|     },
+    407|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > 已完成卡的残留 pending 步：扫尾停掉
+AssertionError: expected 'pending' to be 'stopped' // Object.is equality
+
+Expected: "stopped"
+Received: "pending"
+
+ ❯ test/close-stops-active-steps.test.ts:413:27
+    411|     w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable…
+    412|     sweepAbandonedBuildSteps(w.s.svc, w.base);
+    413|     expect(stepStatus(w)).toBe('stopped');
+       |                           ^
+    414|     expect(todoPhase(w)).toBe('done');
+    415|     expect(await claim(w)).toBeNull();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > 已完成卡的失联 claimed 步：停掉，不释放回 pending
+AssertionError: expected 'pending' to be 'stopped' // Object.is equality
+
+Expected: "stopped"
+Received: "pending"
+
+ ❯ test/close-stops-active-steps.test.ts:428:27
+    426|     w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable…
+    427|     sweepAbandonedBuildSteps(w.s.svc, w.base);
+    428|     expect(stepStatus(w)).toBe('stopped');
+       |                           ^
+    429|     expect(todoPhase(w)).toBe('done');
+    430|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 14 passed (18)
+   Start at  06:47:13
+   Duration  3.57s (transform 55%, tests 25%, import 20%)
+
