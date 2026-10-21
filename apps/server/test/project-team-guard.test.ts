@@ -84,6 +84,15 @@ async function mcp(name: string, args: Record<string, unknown>): Promise<unknown
   );
 }
 
+async function mcpError(name: string, args: Record<string, unknown>): Promise<HttpError> {
+  const err = await mcp(name, args).then(
+    () => null,
+    (e: unknown) => e,
+  );
+  expect(err, name).toBeInstanceOf(HttpError);
+  return err as HttpError;
+}
+
 function projectB() {
   return H.s.db.select().from(projectTable).where(eq(projectTable.id, PROJ_B)).get();
 }
@@ -216,20 +225,10 @@ describe('#1466 chief 工具面：跨团队项目 id = 404（与不存在同形�
 
 describe('#1466 MCP 工具面：跨团队项目 id = 404（与不存在同形）', () => {
   test('T2/T7 create_todo：他队项目 404，不建任务', async () => {
-    const cross = await mcp('create_todo', { projectId: PROJ_B, title: 't', spec: 's' }).then(
-      () => null,
-      (e: unknown) => e,
-    );
-    const missing = await mcp('create_todo', { projectId: MISSING, title: 't', spec: 's' }).then(
-      () => null,
-      (e: unknown) => e,
-    );
-    expect(cross).toBeInstanceOf(HttpError);
-    expect(missing).toBeInstanceOf(HttpError);
-    expect((cross as HttpError).status).toBe(404);
-    expect((cross as HttpError).message).toBe(
-      (missing as HttpError).message.replace(MISSING, PROJ_B),
-    );
+    const cross = await mcpError('create_todo', { projectId: PROJ_B, title: 't', spec: 's' });
+    const missing = await mcpError('create_todo', { projectId: MISSING, title: 't', spec: 's' });
+    expect(cross.status).toBe(404);
+    expect(cross.message).toBe(missing.message.replace(MISSING, PROJ_B));
     expect(todosInProject(PROJ_B).map((t) => t.id)).toEqual([TASK_B]);
   });
 
