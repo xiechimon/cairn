@@ -33,7 +33,9 @@
 // 19 （code-review 发现）卡的任一 build 交付过 PR（prNumber 或只有 prUrl
 //    的存量形）都算：失败卡重跑出的新 build 还没 PR、旧 PR 仍开着并被合并 →
 //    不关。编排线程只认导入之后建的：删卡后复用的号撞上旧线程不算有人接手。
-//    重试不再进行时记一行带原因。
+//    重试不再进行时记一行带原因。第二遍 review：线程要有 chief 步才算开始了
+//    （自己那次编排中途失败留下的空线程不算）；重试时读库抛错只跳过那张卡，
+//    同一轮照常领别的 issue。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -1662,7 +1664,8 @@ const ISSUE_1445_OPEN = {
   state_reason: null,
 };
 
-/** 卡的最新 build 交付了 GitHub PR（daemon github 形态步收尾回填 prNumber）。 */
+/** 卡的一个 build 交付了 GitHub PR（daemon github 形态步收尾回填 prNumber），
+ * 并成为最新 build（判据看任一 build，latestBuildId 只为贴近真实形状）。 */
 function deliverPr(w: World, todoId: string, prNumber: number): void {
   seq += 1;
   const buildId = `build-intake-pr-${seq}`;
@@ -1767,16 +1770,32 @@ describe('15 已交付 PR 的卡留给 PR 对账', () => {
 
 describe('16 导入后编排失败：后续几轮重试，有上限', () => {
   /** 轮询器的 db 在写 chief 线程处可开关地失败（例：SQLITE_BUSY），其余照常。 */
-  function flakyIntake(w: World) {
-    const flaky = { failing: true };
+  /** failAt = 在写哪张表时失败（缺省 chief 线程：编排一行没落）；
+   * flaky.failingRead = 读 todo.seqNum 的 select 失败（重试前的读）。 */
+  function flakyIntake(w: World, failAt: unknown = chiefThreadTable) {
+    const flaky = { failing: true, failingRead: false };
     const db = new Proxy(w.s.db, {
       get(target, prop, receiver) {
         if (prop === 'insert') {
           return (table: Parameters<typeof target.insert>[0]) => {
-            if (flaky.failing && table === chiefThreadTable) {
+            if (flaky.failing && table === failAt) {
               throw new Error('SQLITE_BUSY: database is locked');
             }
             return target.insert(table);
+          };
+        }
+        if (prop === 'select') {
+          return (fields?: Record<string, unknown>) => {
+            if (
+              flaky.failingRead &&
+              fields !== undefined &&
+              Object.values(fields).includes(todoTable.seqNum)
+            ) {
+              throw new Error('SQLITE_BUSY: database is locked');
+            }
+            return fields === undefined
+              ? target.select()
+              : target.select(fields as Parameters<typeof target.select>[0]);
           };
         }
         return Reflect.get(target, prop, receiver);
@@ -1878,6 +1897,38 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     flaky.failing = false;
     const second = await intake.sweep();
     expect(second?.orchestrated).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(2);
+  });
+
+  test('自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, flaky } = flakyIntake(w, stepTable);
+    const first = await intake.sweep();
+    expect(first?.orchestrated).toBe(0);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+    flaky.failing = false;
+    const second = await intake.sweep();
+    expect(second?.orchestrated).toBe(1);
+    expect(w.s.db.select().from(stepTable).where(eq(stepTable.kind, 'chief')).all()).toHaveLength(
+      1,
+    );
+  });
+
+  test('重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, logs, flaky } = flakyIntake(w);
+    await intake.sweep();
+    flaky.failing = false;
+    flaky.failingRead = true;
+    w.gh.state.open.push({ ...(LISTED.find((i) => i.number === 1407) as RawIssue) });
+    const second = await intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406, 1407]);
+    expect(second?.orchestrated).toBe(1);
+    expect(second?.errors).toBe(1);
+    expect(logs.filter((l) => l.msg === 'issue intake orchestrate retry failed')).toHaveLength(1);
+    flaky.failingRead = false;
+    const third = await intake.sweep();
+    expect(third?.orchestrated).toBe(1);
     expect(chiefThreads(w.s)).toHaveLength(2);
   });
 });
