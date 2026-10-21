@@ -27,12 +27,13 @@
 // set E2E_PORT wins (a lane that picked a port did so deliberately).
 
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
 const E2E_DIR = join(WEB_DIR, 'e2e');
+const E2E_PREFIX = 'apps/web/e2e/';
 const PORT = process.env.E2E_PORT ?? process.env.E2E_AFFECTED_PORT ?? '8398';
 
 // --- spec families -----------------------------------------------------------
@@ -239,8 +240,8 @@ function changedPaths(explicit) {
 // --- selection ----------------------------------------------------------------
 
 function classify(path) {
-  if (path.startsWith('apps/web/e2e/') && path.endsWith('.spec.ts')) {
-    return { specs: [path.slice('apps/web/e2e/'.length)], why: 'the spec itself' };
+  if (path.startsWith(E2E_PREFIX) && path.endsWith('.spec.ts')) {
+    return { specs: [path.slice(E2E_PREFIX.length)], why: 'the spec itself' };
   }
   const fileRule = FILE_RULES.get(path);
   if (fileRule != null) return { specs: fileRule, why: 'file map' };
@@ -252,6 +253,10 @@ function classify(path) {
   if (FULL_PATH_PREFIXES.some((p) => path === p || path.startsWith(p))) {
     return { specs: null, why: 'shared surface' };
   }
+  if (path.startsWith(E2E_PREFIX)) {
+    const { specs, why } = importingSpecs(path);
+    return { specs: specs.length > 0 ? specs : null, why };
+  }
   if (path.startsWith('apps/web/')) return { specs: null, why: 'unmapped web path' };
   if (path.startsWith('apps/server/')) {
     return {
@@ -260,6 +265,68 @@ function classify(path) {
     };
   }
   return { specs: [], why: 'outside the web e2e surface' };
+}
+
+// #1463: a non-spec module under e2e/ (helpers.ts and the like) affects the
+// specs that import it, directly or through other e2e modules (spec →
+// helpers.ts → the file). The scan only narrows, and only where every mention
+// of the file is a static relative import between top-level e2e modules.
+// Anything else runs the full suite (specs: []): a file that is not a
+// top-level module, a mention that is not an import (a spawn path, a read, a
+// template literal), a chain that reaches a full-fallback file or a
+// subdirectory, a name playwright.config.ts mentions, or no spec found.
+let e2eSources = null;
+function importingSpecs(path) {
+  e2eSources ??= {
+    texts: new Map(
+      readdirSync(E2E_DIR, { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile() && /\.(?:[cm]?js|tsx?)$/.test(entry.name))
+        .map((entry) => {
+          const file = join(entry.parentPath, entry.name);
+          return [relative(E2E_DIR, file), readFileSync(file, 'utf8')];
+        }),
+    ),
+    // What runs or configures the suite from outside e2e/.
+    config: ['playwright.config.ts', 'package.json']
+      .map((file) => readFileSync(join(WEB_DIR, file), 'utf8'))
+      .join('\n'),
+  };
+  const { texts, config } = e2eSources;
+  const count = (text, re) => text.match(re)?.length ?? 0;
+  const specs = new Set();
+  const seen = new Set([path.slice(E2E_PREFIX.length)]);
+  const queue = [...seen];
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (!/^[^/]+\.(?:ts|mjs|js)$/.test(file))
+      return { specs: [], why: `${file} is not a top-level e2e module` };
+    if (FULL_PATH_PREFIXES.some((prefix) => (E2E_PREFIX + file).startsWith(prefix)))
+      return { specs: [], why: `reaches ${file}` };
+    for (const mapped of FILE_RULES.get(E2E_PREFIX + file) ?? []) specs.add(mapped);
+    const stem = file.replace(/\.[^.]+$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const mention = new RegExp(`["'\`/}]${stem}(\\.[A-Za-z0-9]+)?([?#][^"'\`]*)?["'\`]`, 'gi');
+    const imported = new RegExp(
+      `(?:from|import)\\s*\\(?\\s*["']\\./${stem}(\\.(?:js|ts|mjs))?["']`,
+      'gi',
+    );
+    if (count(config, mention) > 0)
+      return { specs: [], why: `the playwright config or package.json names ${file}` };
+    for (const [other, text] of texts) {
+      if (other === file) continue;
+      const mentions = count(text, mention);
+      if (mentions === 0) continue;
+      if (count(text, imported) < mentions)
+        return { specs: [], why: `${other} names ${file} outside an import` };
+      if (seen.has(other)) continue;
+      seen.add(other);
+      if (other.endsWith('.spec.ts')) specs.add(other);
+      queue.push(other);
+    }
+  }
+  const n = specs.size;
+  return n > 0
+    ? { specs: [...specs].sort(), why: `imported by ${n} spec${n === 1 ? '' : 's'}` }
+    : { specs: [], why: 'no spec imports it' };
 }
 
 function listSpecs() {
@@ -320,7 +387,7 @@ for (const path of paths) {
   // source change runs it — one rule here, not a copy in every family.
   const axe = specs !== null && path.startsWith('apps/web/src/');
   reasons.push(
-    `  ${path} → ${specs === null ? 'FULL' : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,
+    `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,
   );
   if (specs === null) full = true;
   for (const s of specs ?? []) picked.add(s);

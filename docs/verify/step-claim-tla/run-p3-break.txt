@@ -1,0 +1,42 @@
+# step 1: builds.ts sweepAbandonedBuildSteps releases closed cards too; model not updated yet
+work dir: $TMPDIR/verify-step-claim.XXXXXX
+P3_NoClaimAfterClose: PASS in 104s, 2193222 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P3_NoClaimAfterClose/tlc.log
+covered code changed since sync-commit 23a39da9; re-read these against the model:
+  uncommitted  M apps/server/src/services/builds.ts
+
+# step 2: model SchedulerTick mirrors the break (stopIt == FALSE, release == stale)
+work dir: $TMPDIR/verify-step-claim.XXXXXX
+P3_NoClaimAfterClose: FAIL in 2s, 2239 distinct states - CHANGED (expected PASS)
+  1. Initial
+       st = "pending"
+       sm = NoMachine
+       phase = "open"
+       home = m1
+  2. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 1
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       journal = (m1 :> "active" @@ m2 :> "none")
+  3. MachineStreamAbort
+       online = (m1 :> FALSE @@ m2 :> TRUE)
+  4. CloseCard
+       phase = "closed"
+       stopPending = TRUE
+       stopEvt = (m1 :> TRUE @@ m2 :> FALSE)
+  5. HeartbeatAges
+       fresh = FALSE
+  6. SchedulerTick
+       st = "pending"
+       sm = NoMachine
+       holder = 0
+  7. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 2
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ], [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none" ] >>
+       fresh = TRUE
+  full log: $TMPDIR/verify-step-claim.XXXXXX/P3_NoClaimAfterClose/tlc.log
+covered code changed since sync-commit 23a39da9; re-read these against the model:
+  uncommitted  M apps/server/src/services/builds.ts
