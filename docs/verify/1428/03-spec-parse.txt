@@ -1,5 +1,3 @@
-$ pnpm spec:parse
-$ node scripts/spec-parse-gate.mjs
-[spec-parse-gate] apps/web/e2e: 1103 tests in 160 files collected, disk count matches (6.5s)
-[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (14.4s)
+$ pnpm spec:parse   # on the merged tree (66c7985c)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (2.2s)
 [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.

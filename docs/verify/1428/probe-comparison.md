@@ -1,8 +1,8 @@
 # Probe dump — old baseline → new measured (#921)
 
-Run 2026-10-21T02:28:11.275Z · commit `498517de` · port 8397 · playwright 1.63.0 · workers 4
+Run 2026-10-21T02:39:21.642Z · commit `66c7985c` · port 8397 · playwright 1.63.0 · workers 4
 
-Specs: all (160 files) · tests 1103 passed / 0 failed
+Specs: all (161 files) · tests 1109 passed / 0 failed
 
 ## Coverage
 
@@ -14,21 +14,11 @@ Enumerated = static scan of spec source. Collected = distinct runtime call sites
 | probe-carrying evaluate/waitForFunction call sites | 245 | 247 |
 | .boundingBox() call sites | 163 | 160 |
 | .toHaveCSS() call sites | 117 | 117 |
-| visual-matcher assertion sites | 1440 | 1875 joined |
+| visual-matcher assertion sites | 1443 | 1882 joined |
 
-Comparison rows: 1584 — KEPT 1571, DRIFT 0, NOT-RUN 8, VIOLATION 5, other 0.
+Comparison rows: 1595 — KEPT 1587, DRIFT 0, NOT-RUN 8, VIOLATION 0, other 0.
 
 Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the new canon — re-pin the spec inline value to “new measured”) or a suspected regression (fix the code, keep the baseline). KEPT rows need no action. NOT-RUN rows are assertion sites whose test failed earlier, was skipped, or was filtered out. The `note` column flags values whose source notation is not rgb/hex: `color(srgb …)` is folded to rgba for comparison (re-pin should write the rgb/hex form); oklch/lab/lch and non-sRGB `color()` cannot fold under the #411 contract and are flagged VIOLATION, never converted.
-
-## VIOLATION — #411 notation contract breach (5)
-
-| spec | line | matcher | old baseline | new measured | note | test |
-| --- | --- | --- | --- | --- | --- | --- |
-| paper-board-sheet.spec.ts | 69 | not.toBe | rgb(31, 27, 24) | oklab(0.240466 0.00428543 0.00718913) | notation contract (#411): forbidden color space, expected rgb/hex | board sheet matches the page shell sheet (dark) |
-| paper-board-sheet.spec.ts | 69 | not.toBe | rgb(31, 27, 24) | oklab(0.240466 0.00428543 0.00718913) | notation contract (#411): forbidden color space, expected rgb/hex | board sheet matches the page shell sheet (dark, rail) |
-| paper-segmented.spec.ts | 122 | not.toBe | oklab(0.240466 0.00428543 0.00718913) | rgb(38, 34, 31) | notation contract (#411): forbidden color space, expected rgb/hex | dark: every segmented control wears the same face |
-| segmented-controls.spec.ts | 138 | not.toBe | rgb(38, 34, 31) | oklab(0.240466 0.00428543 0.00718913) | notation contract (#411): forbidden color space, expected rgb/hex | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| visual-polish.spec.ts | 173 | not.toBe | rgb(31, 27, 24) | oklab(0.240466 0.00428543 0.00718913) | notation contract (#411): forbidden color space, expected rgb/hex | sidebar sits on canvas beside the sheet, no seam of its own (dark) |
 
 ## NOT-RUN — no runtime record for this assertion site (8)
 
@@ -43,7 +33,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | cds-transcript.spec.ts | 118 | toBe | 11.5px | — | — |  |
 | cds-transcript.spec.ts | 119 | toBe | 16px | — | — |  |
 
-## KEPT — baseline holds on this build (1571)
+## KEPT — baseline holds on this build (1587)
 
 | spec | line | matcher | old baseline | new measured | note | test |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -53,50 +43,52 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | accent-typo.spec.ts | 45 | toBe | 500 | 500 | — | font baseline: body 400, card title 500, var font really loaded (dark) |
 | accent-typo.spec.ts | 58 | toBe | 500 | 500 | — | empty-state headline rides the Paper EmptyState title tier (light) |
 | accent-typo.spec.ts | 58 | toBe | 500 | 500 | — | empty-state headline rides the Paper EmptyState title tier (dark) |
-| accent-typo.spec.ts | 87 | toBe | rgb(43, 38, 32) | rgb(43, 38, 32) | — | sidebar header carries the Pacman pixel mark + name (light) |
-| accent-typo.spec.ts | 87 | toBe | rgb(238, 232, 228) | rgb(238, 232, 228) | — | sidebar header carries the Pacman pixel mark + name (dark) |
-| accent-typo.spec.ts | 88 | not.toBe | rgba(0, 0, 0, 0) | rgb(43, 38, 32) | — | sidebar header carries the Pacman pixel mark + name (light) |
-| accent-typo.spec.ts | 88 | not.toBe | rgba(0, 0, 0, 0) | rgb(238, 232, 228) | — | sidebar header carries the Pacman pixel mark + name (dark) |
-| accent-typo.spec.ts | 90 | toEqual | {"w":16,"h":16} | {"w":16,"h":16} | — | sidebar header carries the Pacman pixel mark + name (light) |
-| accent-typo.spec.ts | 90 | toEqual | {"w":16,"h":16} | {"w":16,"h":16} | — | sidebar header carries the Pacman pixel mark + name (dark) |
-| accent-typo.spec.ts | 109 | toEqual | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(116, 106, 95)"} | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(116, 106, 95)"} | — | page shell back chevron hover shows no background change (light) |
-| accent-typo.spec.ts | 109 | toEqual | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(179, 174, 170)"} | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(179, 174, 170)"} | — | page shell back chevron hover shows no background change (dark) |
-| accent-typo.spec.ts | 125 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
-| accent-typo.spec.ts | 125 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
-| accent-typo.spec.ts | 126 | toBe | none | none | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
-| accent-typo.spec.ts | 126 | toBe | none | none | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
-| accent-typo.spec.ts | 140 | toBe | rgb(235, 228, 216) | rgb(235, 228, 216) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
-| accent-typo.spec.ts | 140 | toBe | rgba(255, 252, 248, 0.05) | rgba(255, 252, 248, 0.05) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
-| accent-typo.spec.ts | 185 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (light) |
-| accent-typo.spec.ts | 185 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (dark) |
-| accent-typo.spec.ts | 186 | toEqual | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":215,"iconY":25,"ico… | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":215,"iconY":25,"ico… | — | the sidebar toggles hold face and geometry while pressed (light) |
-| accent-typo.spec.ts | 186 | toEqual | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(238, 232, 228)","opacity":"1","iconX":215,"icon… | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(238, 232, 228)","opacity":"1","iconX":215,"icon… | — | the sidebar toggles hold face and geometry while pressed (dark) |
-| accent-typo.spec.ts | 191 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (light) |
-| accent-typo.spec.ts | 191 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (dark) |
-| accent-typo.spec.ts | 192 | toEqual | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":12,"iconY":16,"icon… | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":12,"iconY":16,"icon… | — | the sidebar toggles hold face and geometry while pressed (light) |
-| accent-typo.spec.ts | 192 | toEqual | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(238, 232, 228)","opacity":"1","iconX":12,"iconY… | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(238, 232, 228)","opacity":"1","iconX":12,"iconY… | — | the sidebar toggles hold face and geometry while pressed (dark) |
-| accent-typo.spec.ts | 215 | toBe | solid | solid | — | page shell back chevron keeps a keyboard focus ring (light) |
-| accent-typo.spec.ts | 215 | toBe | solid | solid | — | page shell back chevron keeps a keyboard focus ring (dark) |
-| accent-typo.spec.ts | 216 | toBe | 2px | 2px | — | page shell back chevron keeps a keyboard focus ring (light) |
-| accent-typo.spec.ts | 216 | toBe | 2px | 2px | — | page shell back chevron keeps a keyboard focus ring (dark) |
-| accent-typo.spec.ts | 218 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | page shell back chevron keeps a keyboard focus ring (light) |
-| accent-typo.spec.ts | 218 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | page shell back chevron keeps a keyboard focus ring (dark) |
-| accent-typo.spec.ts | 279 | toBe | rgb(158, 44, 73) | rgb(158, 44, 73) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
-| accent-typo.spec.ts | 279 | toBe | rgb(255, 171, 183) | rgb(255, 171, 183) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
-| accent-typo.spec.ts | 280 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
-| accent-typo.spec.ts | 280 | toBe | rgb(38, 34, 31) | rgb(38, 34, 31) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
-| accent-typo.spec.ts | 281 | toBeGreaterThanOrEqual | ≥ 4.5 | 7.215748895068962 | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
-| accent-typo.spec.ts | 281 | toBeGreaterThanOrEqual | ≥ 4.5 | 8.836100618782584 | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
-| accent-typo.spec.ts | 289 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | P5 main-button pair passes 4.5 in both themes (light) |
-| accent-typo.spec.ts | 289 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | P5 main-button pair passes 4.5 in both themes (dark) |
-| accent-typo.spec.ts | 290 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | P5 main-button pair passes 4.5 in both themes (light) |
-| accent-typo.spec.ts | 290 | toBe | rgb(31, 27, 24) | rgb(31, 27, 24) | — | P5 main-button pair passes 4.5 in both themes (dark) |
-| accent-typo.spec.ts | 291 | toBeGreaterThanOrEqual | ≥ 4.5 | 4.986470352113856 | — | P5 main-button pair passes 4.5 in both themes (light) |
-| accent-typo.spec.ts | 291 | toBeGreaterThanOrEqual | ≥ 4.5 | 8.14426711269384 | — | P5 main-button pair passes 4.5 in both themes (dark) |
-| accent-typo.spec.ts | 308 | toHaveCSS | background-color: rgb(246, 242, 236) | rgb(246, 242, 236) | — | Paper menu row hover rides menu-hover, delete row rides danger-soft (light) |
-| accent-typo.spec.ts | 308 | toHaveCSS | background-color: rgb(45, 41, 38) | rgb(45, 41, 38) | — | Paper menu row hover rides menu-hover, delete row rides danger-soft (dark) |
-| accent-typo.spec.ts | 313 | toHaveCSS | background-color: rgba(158, 44, 73, 0.14) | rgba(158, 44, 73, 0.14) | color(srgb …) folded to rgba(158, 44, 73, 0.14); re-pin the spec to the rgb/hex form (#411) | Paper menu row hover rides menu-hover, delete row rides danger-soft (light) |
-| accent-typo.spec.ts | 313 | toHaveCSS | background-color: rgba(255, 171, 183, 0.14) | rgba(255, 171, 183, 0.14) | color(srgb …) folded to rgba(255, 171, 183, 0.14); re-pin the spec to the rgb/hex form (#411) | Paper menu row hover rides menu-hover, delete row rides danger-soft (dark) |
+| accent-typo.spec.ts | 89 | toEqual | ["100%","auto"] | ["100%","auto"] | — | sidebar header carries the Pacman pixel mark + name (light) |
+| accent-typo.spec.ts | 89 | toEqual | ["100%","auto"] | ["100%","auto"] | — | sidebar header carries the Pacman pixel mark + name (dark) |
+| accent-typo.spec.ts | 90 | toBe | rgb(43, 38, 32) | rgb(43, 38, 32) | — | sidebar header carries the Pacman pixel mark + name (light) |
+| accent-typo.spec.ts | 90 | toBe | rgb(236, 231, 223) | rgb(236, 231, 223) | — | sidebar header carries the Pacman pixel mark + name (dark) |
+| accent-typo.spec.ts | 91 | not.toBe | rgba(0, 0, 0, 0) | rgb(43, 38, 32) | — | sidebar header carries the Pacman pixel mark + name (light) |
+| accent-typo.spec.ts | 91 | not.toBe | rgba(0, 0, 0, 0) | rgb(236, 231, 223) | — | sidebar header carries the Pacman pixel mark + name (dark) |
+| accent-typo.spec.ts | 93 | toEqual | {"w":16,"h":16} | {"w":16,"h":16} | — | sidebar header carries the Pacman pixel mark + name (light) |
+| accent-typo.spec.ts | 93 | toEqual | {"w":16,"h":16} | {"w":16,"h":16} | — | sidebar header carries the Pacman pixel mark + name (dark) |
+| accent-typo.spec.ts | 112 | toEqual | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(116, 106, 95)"} | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(116, 106, 95)"} | — | page shell back chevron hover shows no background change (light) |
+| accent-typo.spec.ts | 112 | toEqual | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(172, 167, 160)"} | {"bg":"rgba(0, 0, 0, 0)","color":"rgb(172, 167, 160)"} | — | page shell back chevron hover shows no background change (dark) |
+| accent-typo.spec.ts | 128 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
+| accent-typo.spec.ts | 128 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
+| accent-typo.spec.ts | 129 | toBe | none | none | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
+| accent-typo.spec.ts | 129 | toBe | none | none | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
+| accent-typo.spec.ts | 143 | toBe | rgb(235, 228, 216) | rgb(235, 228, 216) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (light) |
+| accent-typo.spec.ts | 143 | toBe | rgba(255, 252, 248, 0.05) | rgba(255, 252, 248, 0.05) | — | the sidebar collapse toggle rests bare and shows the row hover on hover (dark) |
+| accent-typo.spec.ts | 188 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (light) |
+| accent-typo.spec.ts | 188 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (dark) |
+| accent-typo.spec.ts | 189 | toEqual | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":215,"iconY":25,"ico… | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":215,"iconY":25,"ico… | — | the sidebar toggles hold face and geometry while pressed (light) |
+| accent-typo.spec.ts | 189 | toEqual | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(236, 231, 223)","opacity":"1","iconX":215,"icon… | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(236, 231, 223)","opacity":"1","iconX":215,"icon… | — | the sidebar toggles hold face and geometry while pressed (dark) |
+| accent-typo.spec.ts | 194 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (light) |
+| accent-typo.spec.ts | 194 | toBe | 1 | 1 | — | the sidebar toggles hold face and geometry while pressed (dark) |
+| accent-typo.spec.ts | 195 | toEqual | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":12,"iconY":16,"icon… | {"bg":"rgb(235, 228, 216)","shadow":"none","color":"rgb(43, 38, 32)","opacity":"1","iconX":12,"iconY":16,"icon… | — | the sidebar toggles hold face and geometry while pressed (light) |
+| accent-typo.spec.ts | 195 | toEqual | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(236, 231, 223)","opacity":"1","iconX":12,"iconY… | {"bg":"rgba(255, 252, 248, 0.05)","shadow":"none","color":"rgb(236, 231, 223)","opacity":"1","iconX":12,"iconY… | — | the sidebar toggles hold face and geometry while pressed (dark) |
+| accent-typo.spec.ts | 218 | toBe | solid | solid | — | page shell back chevron keeps a keyboard focus ring (light) |
+| accent-typo.spec.ts | 218 | toBe | solid | solid | — | page shell back chevron keeps a keyboard focus ring (dark) |
+| accent-typo.spec.ts | 219 | toBe | 2px | 2px | — | page shell back chevron keeps a keyboard focus ring (light) |
+| accent-typo.spec.ts | 219 | toBe | 2px | 2px | — | page shell back chevron keeps a keyboard focus ring (dark) |
+| accent-typo.spec.ts | 221 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | page shell back chevron keeps a keyboard focus ring (light) |
+| accent-typo.spec.ts | 221 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | page shell back chevron keeps a keyboard focus ring (dark) |
+| accent-typo.spec.ts | 282 | toBe | rgb(158, 44, 73) | rgb(158, 44, 73) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
+| accent-typo.spec.ts | 282 | toBe | rgb(255, 171, 183) | rgb(255, 171, 183) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
+| accent-typo.spec.ts | 283 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
+| accent-typo.spec.ts | 283 | toBe | rgb(47, 42, 38) | rgb(47, 42, 38) | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
+| accent-typo.spec.ts | 284 | toBeGreaterThanOrEqual | ≥ 4.5 | 7.215748895068962 | — | P5 danger: destructive resolves and reads on card, passes 4.5 (light) |
+| accent-typo.spec.ts | 284 | toBeGreaterThanOrEqual | ≥ 4.5 | 7.946361148665461 | — | P5 danger: destructive resolves and reads on card, passes 4.5 (dark) |
+| accent-typo.spec.ts | 292 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | P5 main-button pair passes 4.5 in both themes (light) |
+| accent-typo.spec.ts | 292 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | P5 main-button pair passes 4.5 in both themes (dark) |
+| accent-typo.spec.ts | 293 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | P5 main-button pair passes 4.5 in both themes (light) |
+| accent-typo.spec.ts | 293 | toBe | rgb(26, 22, 18) | rgb(26, 22, 18) | — | P5 main-button pair passes 4.5 in both themes (dark) |
+| accent-typo.spec.ts | 294 | toBeGreaterThanOrEqual | ≥ 4.5 | 4.986470352113856 | — | P5 main-button pair passes 4.5 in both themes (light) |
+| accent-typo.spec.ts | 294 | toBeGreaterThanOrEqual | ≥ 4.5 | 7.741367179546055 | — | P5 main-button pair passes 4.5 in both themes (dark) |
+| accent-typo.spec.ts | 311 | toHaveCSS | background-color: rgb(246, 242, 236) | rgb(246, 242, 236) | — | Paper menu row hover rides menu-hover, delete row rides danger-soft (light) |
+| accent-typo.spec.ts | 311 | toHaveCSS | background-color: rgb(64, 59, 54) | rgb(64, 59, 54) | — | Paper menu row hover rides menu-hover, delete row rides danger-soft (dark) |
+| accent-typo.spec.ts | 316 | toHaveCSS | background-color: rgba(158, 44, 73, 0.14) | rgba(158, 44, 73, 0.14) | color(srgb …) folded to rgba(158, 44, 73, 0.14); re-pin the spec to the rgb/hex form (#411) | Paper menu row hover rides menu-hover, delete row rides danger-soft (light) |
+| accent-typo.spec.ts | 316 | toHaveCSS | background-color: rgba(255, 171, 183, 0.14) | rgba(255, 171, 183, 0.14) | color(srgb …) folded to rgba(255, 171, 183, 0.14); re-pin the spec to the rgb/hex form (#411) | Paper menu row hover rides menu-hover, delete row rides danger-soft (dark) |
 | account-controls.spec.ts | 133 | toBe | 1 | {"__fn":"() => patchBodies.length"} | — | 改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失败有 toast 点名（R7–R9） |
 | account-controls.spec.ts | 134 | toEqual | {"displayName":"落库名字"} | {"displayName":"落库名字"} | — | 改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失败有 toast 点名（R7–R9） |
 | account-controls.spec.ts | 145 | toBe | 2 | {"__fn":"() => patchBodies.length"} | — | 改名 live：提交发 PATCH /api/user/me、刷新后仍是新名、失败有 toast 点名（R7–R9） |
@@ -213,15 +205,15 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | board-dnd.spec.ts | 837 | toBe | 0.4 | 0.4 | — | lifted card rides the compact drag-tier recipe (light) |
 | board-dnd.spec.ts | 837 | toBe | 0.4 | 0.4 | — | lifted card rides the compact drag-tier recipe (dark) |
 | board-dnd.spec.ts | 879 | toBe | rgba(180, 83, 42, 0.1) | rgba(180, 83, 42, 0.1) | — | valid targets tint base tier, hovered column tints hot (light) |
-| board-dnd.spec.ts | 879 | toBe | rgba(242, 148, 216, 0.1) | rgba(242, 148, 216, 0.1) | — | valid targets tint base tier, hovered column tints hot (dark) |
+| board-dnd.spec.ts | 879 | toBe | rgba(240, 146, 109, 0.1) | rgba(240, 146, 109, 0.1) | — | valid targets tint base tier, hovered column tints hot (dark) |
 | board-dnd.spec.ts | 880 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | valid targets tint base tier, hovered column tints hot (light) |
 | board-dnd.spec.ts | 880 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | valid targets tint base tier, hovered column tints hot (dark) |
 | board-dnd.spec.ts | 884 | toBe | rgba(180, 83, 42, 0.05) | rgba(180, 83, 42, 0.05) | — | valid targets tint base tier, hovered column tints hot (light) |
-| board-dnd.spec.ts | 884 | toBe | rgba(242, 148, 216, 0.05) | rgba(242, 148, 216, 0.05) | — | valid targets tint base tier, hovered column tints hot (dark) |
+| board-dnd.spec.ts | 884 | toBe | rgba(240, 146, 109, 0.05) | rgba(240, 146, 109, 0.05) | — | valid targets tint base tier, hovered column tints hot (dark) |
 | board-dnd.spec.ts | 890 | not.toBe | rgba(180, 83, 42, 0.05) | rgb(251, 249, 245) | — | valid targets tint base tier, hovered column tints hot (light) |
-| board-dnd.spec.ts | 890 | not.toBe | rgba(242, 148, 216, 0.05) | rgb(31, 27, 24) | — | valid targets tint base tier, hovered column tints hot (dark) |
+| board-dnd.spec.ts | 890 | not.toBe | rgba(240, 146, 109, 0.05) | rgb(36, 32, 27) | — | valid targets tint base tier, hovered column tints hot (dark) |
 | board-dnd.spec.ts | 891 | not.toBe | rgba(180, 83, 42, 0.05) | rgb(251, 249, 245) | — | valid targets tint base tier, hovered column tints hot (light) |
-| board-dnd.spec.ts | 891 | not.toBe | rgba(242, 148, 216, 0.05) | rgb(31, 27, 24) | — | valid targets tint base tier, hovered column tints hot (dark) |
+| board-dnd.spec.ts | 891 | not.toBe | rgba(240, 146, 109, 0.05) | rgb(36, 32, 27) | — | valid targets tint base tier, hovered column tints hot (dark) |
 | board-dnd.spec.ts | 957 | toBeGreaterThanOrEqual | ≥ 0 | 2 | — | committed drop never flashes the card back to the source column |
 | board-dnd.spec.ts | 959 | toEqual | [] | [] | — | committed drop never flashes the card back to the source column |
 | board-docked-reflow.spec.ts | 73 | toBeLessThanOrEqual | ≤ 1182 | 1182 | — | window open leaves the 1440 columns at their closed geometry |
@@ -297,19 +289,19 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | board-zoom-fit.spec.ts | 156 | toBeLessThanOrEqual | ≤ 1 | 0 | — | worst-case card data stays in-column at the 125% boundary width |
 | board-zoom-fit.spec.ts | 157 | toBeLessThanOrEqual | ≤ 1 | 0 | — | worst-case card data stays in-column at the 125% boundary width |
 | card-press.spec.ts | 59 | not.toBe | rgb(226, 220, 215) | rgb(255, 255, 255) | — | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 59 | not.toBe | rgb(64, 60, 57) | rgb(38, 34, 31) | — | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 59 | not.toBe | rgb(70, 65, 60) | rgb(47, 42, 38) | — | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 65 | not.toBe | rgb(242, 242, 242) | rgb(255, 255, 255) | color(srgb …) folded to rgb(242, 242, 242); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 65 | not.toBe | rgb(54, 50, 47) | rgb(38, 34, 31) | color(srgb …) folded to rgb(54, 50, 47); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 65 | not.toBe | rgb(62, 57, 53) | rgb(47, 42, 38) | color(srgb …) folded to rgb(62, 57, 53); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 66 | not.toBe | rgb(226, 220, 215) | rgb(242, 242, 242) | color(srgb …) folded to rgb(242, 242, 242); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 66 | not.toBe | rgb(64, 60, 57) | rgb(54, 50, 47) | color(srgb …) folded to rgb(54, 50, 47); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 66 | not.toBe | rgb(70, 65, 60) | rgb(62, 57, 53) | color(srgb …) folded to rgb(62, 57, 53); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 67 | toHaveCSS | background-color: rgb(242, 242, 242) | rgb(242, 242, 242) | color(srgb …) folded to rgb(242, 242, 242); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 67 | toHaveCSS | background-color: rgb(54, 50, 47) | rgb(54, 50, 47) | color(srgb …) folded to rgb(54, 50, 47); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 67 | toHaveCSS | background-color: rgb(62, 57, 53) | rgb(62, 57, 53) | color(srgb …) folded to rgb(62, 57, 53); re-pin the spec to the rgb/hex form (#411) | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 69 | toHaveCSS | background-color: rgb(226, 220, 215) | rgb(226, 220, 215) | — | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 69 | toHaveCSS | background-color: rgb(64, 60, 57) | rgb(64, 60, 57) | — | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 69 | toHaveCSS | background-color: rgb(70, 65, 60) | rgb(70, 65, 60) | — | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 74 | toBe | 1 | 1 | — | press tints the whole card one surface step (light) |
 | card-press.spec.ts | 74 | toBe | 1 | 1 | — | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 83 | toHaveCSS | background-color: rgb(255, 255, 255) | rgb(255, 255, 255) | — | press tints the whole card one surface step (light) |
-| card-press.spec.ts | 83 | toHaveCSS | background-color: rgb(38, 34, 31) | rgb(38, 34, 31) | — | press tints the whole card one surface step (dark) |
+| card-press.spec.ts | 83 | toHaveCSS | background-color: rgb(47, 42, 38) | rgb(47, 42, 38) | — | press tints the whole card one surface step (dark) |
 | card-press.spec.ts | 90 | toHaveCSS | user-select: none | none | — | card face is selection- and native-drag-locked (「小链接」绝迹) |
 | card-press.spec.ts | 94 | toBe | none | none | — | card face is selection- and native-drag-locked (「小链接」绝迹) |
 | card-press.spec.ts | 123 | toBe | 0 | 0 | — | card face is selection- and native-drag-locked (「小链接」绝迹) |
@@ -318,7 +310,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | cds-board.spec.ts | 35 | toBe | none | none | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
 | cds-board.spec.ts | 36 | toBe | 10px | 10px | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
 | cds-board.spec.ts | 37 | toBe | 10px | 10px | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
-| cds-board.spec.ts | 38 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(45, 41, 38) 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
+| cds-board.spec.ts | 38 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
 | cds-board.spec.ts | 40 | toBe | 36 | 36 | — | CDS board: bare columns, cards at --radius-card 10px + panel-shadow |
 | cds-composer.spec.ts | 32 | toBe | 20px | 20px | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
 | cds-composer.spec.ts | 33 | toBe | 20px | 20px | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
@@ -326,7 +318,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | cds-composer.spec.ts | 35 | toBe | 384px | 384px | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
 | cds-composer.spec.ts | 36 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
 | cds-composer.spec.ts | 37 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
-| cds-composer.spec.ts | 38 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(45, 41, 38) 0px 0px 0px 1px inset | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
+| cds-composer.spec.ts | 38 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0.4) 0px 4px 20px 0px, rgb(62, 58, 52) 0px 0px 0px 1px inset | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
 | cds-composer.spec.ts | 39 | toBe | 8px | 8px | — | CDS composer: 20px radius, shadow-composer ladder, 8px send, 384 max-h |
 | cds-composer.spec.ts | 148 | toBe | 84 | 84 | — | CDS composer: multi-line draft grows the card and text clears the toolbar |
 | cds-composer.spec.ts | 166 | toBeGreaterThan | > 84 | 120 | — | CDS composer: multi-line draft grows the card and text clears the toolbar |
@@ -377,7 +369,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | cds-transcript.spec.ts | 36 | toBe | 768px | 768px | — | CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top bar) |
 | cds-transcript.spec.ts | 38 | toBeGreaterThanOrEqual | ≥ 16 | 256.2 | — | CDS transcript: tokens, fade, follow 40 / jump 120, header 56 (Paper top bar) |
 | cds-transcript.spec.ts | 86 | toBeLessThanOrEqual | ≤ 40 | {"__fn":"async () => page.evaluate(() => {\n    const col = document.querySelector('[data-testid=\"transcript-… | — | CDS transcript: jump-to-latest appears past 120px and restores end |
-| chat-md-toolout.spec.ts | 87 | toBe | rgb(238, 232, 228) | rgb(238, 232, 228) | — | A3: the output block is left aligned, mono, normal contrast — not a chat-note |
+| chat-md-toolout.spec.ts | 87 | toBe | rgb(236, 231, 223) | rgb(236, 231, 223) | — | A3: the output block is left aligned, mono, normal contrast — not a chat-note |
 | chat-md-toolout.spec.ts | 131 | toBeGreaterThan | > 300 | 318 | — | B3: nested list items indent past their parent |
 | chat-tools-identity.spec.ts | 104 | toBe | 32px | 32px | — | I4: expand/collapse interaction and the #470 row geometry are untouched |
 | chat-tools-identity.spec.ts | 105 | toBeLessThanOrEqual | ≤ 16 | 16 | — | I4: expand/collapse interaction and the #470 row geometry are untouched |
@@ -428,12 +420,12 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-draft-persist.spec.ts | 125 | toBe | 帮我看看这个项目的进展 — reload 后逐字还在 (#1056) | {"__fn":"() => storedDraft(page)"} | — | live face: a rejected send keeps the draft in the box and in storage (#631) |
 | chief-draft-persist.spec.ts | 130 | toBe | 帮我看看这个项目的进展 — reload 后逐字还在 (#1056) | {"__fn":"() => storedDraft(page)"} | — | live face: a rejected send keeps the draft in the box and in storage (#631) |
 | chief-draft-persist.spec.ts | 145 | toBe | 帮我看看这个项目的进展 — reload 后逐字还在 (#1056) | {"__fn":"() => storedDraft(page)"} | — | live face: minimize and SPA route switches keep the draft (D6 zero regression) |
-| chief-drawer-model.spec.ts | 74 | toBeGreaterThanOrEqual | ≥ 4.5 | 7.176214755472066 | — | the row is readable in both themes (#751 A 同律) |
+| chief-drawer-model.spec.ts | 74 | toBeGreaterThanOrEqual | ≥ 4.5 | 5.938503404704226 | — | the row is readable in both themes (#751 A 同律) |
 | chief-drawer-slash.spec.ts | 163 | toBe | 0 | 0 | — | `/clear` runs without sending and toasts confirmation (F1) |
 | chief-drawer-slash.spec.ts | 174 | toBe | 0 | 0 | — | Tab completes without running; Enter without highlight sends (F4) |
 | chief-drawer-slash.spec.ts | 179 | toBe | 1 | {"__fn":"() => posts"} | — | Tab completes without running; Enter without highlight sends (F4) |
 | chief-drawer-slash.spec.ts | 191 | toBe | 0 | 0 | — | mid-prompt accept inserts literal text, never runs (F3) |
-| chief-drawer-slash.spec.ts | 211 | toBeGreaterThanOrEqual | ≥ 0 | 246.39620971679688 | — | /help opens the command panel with the drawer builtins |
+| chief-drawer-slash.spec.ts | 211 | toBeGreaterThanOrEqual | ≥ 0 | 245.0120849609375 | — | /help opens the command panel with the drawer builtins |
 | chief-fab.spec.ts | 50 | toEqual | {"width":"40px","height":"40px","right":"8px","bottom":"8px","position":"fixed"} | {"width":"40px","height":"40px","right":"8px","bottom":"8px","position":"fixed"} | — | the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed) |
 | chief-fab.spec.ts | 103 | toBeCloseTo | 40 ±0.5 | 40 | — | bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay |
 | chief-fab.spec.ts | 104 | toBeCloseTo | 40 ±0.5 | 40 | — | bound: the board FAB swaps the glyph for the seeded avatar, badge and geometry stay |
@@ -455,7 +447,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-panel.spec.ts | 145 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
 | chief-panel.spec.ts | 146 | toContain | inset | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
 | chief-panel.spec.ts | 148 | toBe | 15 | 15 | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
-| chief-panel.spec.ts | 150 | toMatch | {"__regex":"/^rgb\\(/"} | rgb(38, 34, 31) | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
+| chief-panel.spec.ts | 150 | toMatch | {"__regex":"/^rgb\\(/"} | rgb(47, 42, 38) | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
 | chief-panel.spec.ts | 153 | toBeGreaterThanOrEqual | ≥ 248 | 1052 | — | the panel floats as a 380x600 window anchored 8px off the corner (board) |
 | chief-panel.spec.ts | 166 | toBeCloseTo | 1182 ±0.5 | 1182 | — | board content never yields to the window (D1 overlay, no yield) |
 | chief-panel.spec.ts | 176 | toBeLessThanOrEqual | ≤ 1 | 0 | — | board content never yields to the window (D1 overlay, no yield) |
@@ -516,7 +508,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-stream-markdown.spec.ts | 1092 | toBeGreaterThan | > 296 | 774 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
 | chief-stream-markdown.spec.ts | 1094 | toBeLessThanOrEqual | ≤ 307 | 307 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
 | chief-stream-markdown.spec.ts | 1100 | toBeLessThanOrEqual | ≤ 0 | 0 | — | F-R22: 长预览由 CSS 截断——钮宽 ≤ 列宽、省略号生效、页面零横溢（#1034） |
-| chief-thread-switcher-scroll.spec.ts | 40 | toBeLessThanOrEqual | ≤ 724 | 389.56768798828125 | — | the 22-thread list caps inside the window and the tail row is clickable |
+| chief-thread-switcher-scroll.spec.ts | 40 | toBeLessThanOrEqual | ≤ 724 | 386.2867126464844 | — | the 22-thread list caps inside the window and the tail row is clickable |
 | chief-thread-switcher-scroll.spec.ts | 47 | toBeGreaterThan | > 220 | 712 | — | the 22-thread list caps inside the window and the tail row is clickable |
 | chief-thread-switcher-scroll.spec.ts | 96 | toBe | 72 | 72 | — | the short canon list (r5 116, 2 threads) keeps its natural height |
 | chief-thread-switcher-scroll.spec.ts | 97 | toBeLessThanOrEqual | ≤ 72 | 72 | — | the short canon list (r5 116, 2 threads) keeps its natural height |
@@ -527,25 +519,25 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | chief-toggle-flash.spec.ts | 143 | toBe | 2 | 2 | — | summon-then-minimize cycle twice: node identity holds, zero opacity transitions |
 | chief-toggle-flash.spec.ts | 144 | toBe | 2 | 2 | — | summon-then-minimize cycle twice: node identity holds, zero opacity transitions |
 | chief-toggle-flash.spec.ts | 145 | toBe | 2 | 2 | — | summon-then-minimize cycle twice: node identity holds, zero opacity transitions |
-| collapse-family.spec.ts | 37 | toBe | -90deg | -2.93974deg | — | sidebar group collapse hides sub-rows, flips aria, survives reload |
+| collapse-family.spec.ts | 37 | toBe | -90deg | -15.7684deg | — | sidebar group collapse hides sub-rows, flips aria, survives reload |
 | collapse-family.spec.ts | 83 | toBe | 0 | 0 | — | both sidebar groups persist side by side |
 | collapse-family.spec.ts | 86 | toBe | 1 | 1 | — | both sidebar groups persist side by side |
-| color-freeze.spec.ts | 119 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | frozen color slots stay put (light) |
-| color-freeze.spec.ts | 119 | toBe | rgb(31, 27, 24) | rgb(31, 27, 24) | — | frozen color slots stay put (dark) |
-| color-freeze.spec.ts | 125 | toBe | rgb(235, 228, 216) | rgb(235, 228, 216) | — | frozen color slots stay put (light) |
-| color-freeze.spec.ts | 125 | toBe | rgba(255, 252, 248, 0.05) | rgba(255, 252, 248, 0.05) | — | frozen color slots stay put (dark) |
-| color-freeze.spec.ts | 151 | toBe | rgb(251, 249, 245) | rgb(251, 249, 245) | — | derived mix tokens resolve from existing slots (light) |
-| color-freeze.spec.ts | 151 | toBe | rgb(31, 27, 24) | rgb(31, 27, 24) | — | derived mix tokens resolve from existing slots (dark) |
-| color-freeze.spec.ts | 175 | toBe | 20px | 20px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 176 | toBe | 18px | 18px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 177 | toBe | 248px | 248px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 178 | toBe | 768px | 768px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 179 | toBe | 16px | 16px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 180 | toBe | 10px | 10px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 181 | toBe | 6px | 6px | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 182 | not.toBe | 6px | calc(.625rem * .8) | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 183 | toBeGreaterThan | > 0 | 18 | — | CDS structural tokens land at locked mon values |
-| color-freeze.spec.ts | 185 | toBeGreaterThan | > 0 | 3 | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 127 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | frozen color slots stay put (light) |
+| color-freeze.spec.ts | 127 | toBe | rgb(26, 22, 18) | rgb(26, 22, 18) | — | frozen color slots stay put (dark) |
+| color-freeze.spec.ts | 133 | toBe | rgb(235, 228, 216) | rgb(235, 228, 216) | — | frozen color slots stay put (light) |
+| color-freeze.spec.ts | 133 | toBe | rgba(255, 252, 248, 0.05) | rgba(255, 252, 248, 0.05) | — | frozen color slots stay put (dark) |
+| color-freeze.spec.ts | 159 | toBe | rgb(251, 249, 245) | rgb(251, 249, 245) | — | derived mix tokens resolve from existing slots (light) |
+| color-freeze.spec.ts | 159 | toBe | rgb(36, 32, 27) | rgb(36, 32, 27) | — | derived mix tokens resolve from existing slots (dark) |
+| color-freeze.spec.ts | 183 | toBe | 20px | 20px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 184 | toBe | 18px | 18px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 185 | toBe | 248px | 248px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 186 | toBe | 768px | 768px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 187 | toBe | 16px | 16px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 188 | toBe | 10px | 10px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 189 | toBe | 6px | 6px | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 190 | not.toBe | 6px | calc(.625rem * .8) | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 191 | toBeGreaterThan | > 0 | 18 | — | CDS structural tokens land at locked mon values |
+| color-freeze.spec.ts | 193 | toBeGreaterThan | > 0 | 3 | — | CDS structural tokens land at locked mon values |
 | composer-inline-mention.spec.ts | 285 | toBe | 1 | {"__fn":"() => sent.length"} | — | Enter with a highlight inserts WITHOUT sending; the second Enter sends (r9 §5 fix) |
 | composer-inline-mention.spec.ts | 298 | toBe | 1 | {"__fn":"() => sent.length"} | — | Enter without a highlight sends as typed (F1: composer-wire-reject law survives) |
 | composer-inline-mention.spec.ts | 360 | toBe | 29 | 29 | — | insert lands a trailing space and the caret after it — typing continues outside the token (F6) |
@@ -605,7 +597,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | detail-3pane.spec.ts | 175 | toBeCloseTo | 678 ±0.5 | 678 | — | composer controls share one bottom row: stop is the send button's sibling |
 | detail-3pane.spec.ts | 176 | toBeLessThanOrEqual | ≤ 1 | 1 | — | composer controls share one bottom row: stop is the send button's sibling |
 | detail-3pane.spec.ts | 178 | toBeCloseTo | 8 ±0.5 | 8 | — | composer controls share one bottom row: stop is the send button's sibling |
-| detail-3pane.spec.ts | 180 | toBe | rgb(64, 60, 57) | rgb(64, 60, 57) | — | composer controls share one bottom row: stop is the send button's sibling |
+| detail-3pane.spec.ts | 180 | toBe | rgb(70, 65, 60) | rgb(70, 65, 60) | — | composer controls share one bottom row: stop is the send button's sibling |
 | detail-3pane.spec.ts | 181 | toBe | 1 | 1 | — | composer controls share one bottom row: stop is the send button's sibling |
 | detail-3pane.spec.ts | 183 | toBeLessThanOrEqual | ≤ 2 | 1 | — | composer controls share one bottom row: stop is the send button's sibling |
 | detail-3pane.spec.ts | 200 | toBe | 694 | 694 | — | composer width tracks the center column; the floating window overlays without moving it (ADR 0013 D1) |
@@ -628,34 +620,34 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | detail-narrow.spec.ts | 146 | toBeLessThanOrEqual | ≤ 320 | 296 | — | N5: head actions and the composer stay inside the 320px viewport |
 | detail-narrow.spec.ts | 147 | toBeGreaterThanOrEqual | ≥ 0 | 16 | — | N5: head actions and the composer stay inside the 320px viewport |
 | detail-narrow.spec.ts | 148 | toBeLessThanOrEqual | ≤ 320 | 304 | — | N5: head actions and the composer stay inside the 320px viewport |
-| dialog-ring-room.spec.ts | 37 | toBeGreaterThanOrEqual | ≥ 489.33856201171875 | 504.5603332519531 | — | 聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量） |
-| dialog-ring-room.spec.ts | 38 | toBeLessThanOrEqual | ≤ 950.6614379882812 | 935.4396362304688 | — | 聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量） |
+| dialog-ring-room.spec.ts | 37 | toBeGreaterThanOrEqual | ≥ 489.3533935546875 | 504.5739440917969 | — | 聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量） |
+| dialog-ring-room.spec.ts | 38 | toBeLessThanOrEqual | ≤ 950.6466064453125 | 935.4260864257812 | — | 聚焦的 w-full 输入框 focus 环不被弹窗裁切（环房不变量） |
 | dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 434.3689498901367 | — | provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移 |
 | dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 391.92406463623047 | — | secret: 静态表单面 submit 在视口 |
 | dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 436 | — | machine: disclosure 展开(最高内容态)底部链接在视口 |
-| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 297.4329376220703 | — | create-agent: submit 在视口 |
-| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 242.5748748779297 | — | charter: 取消/保存章程在视口 |
-| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 153.0789031982422 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
-| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 149.14715576171875 | — | accept(34): 取消/完成在视口 |
+| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 294.02954864501953 | — | create-agent: submit 在视口 |
+| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 247.04601287841797 | — | charter: 取消/保存章程在视口 |
+| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 153.0836181640625 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
+| dialog-viewport.spec.ts | 43 | toBeLessThanOrEqual | ≤ 452.5 | 151.8209686279297 | — | accept(34): 取消/完成在视口 |
 | dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 32.815528869628906 | — | provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移 |
 | dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 54.03797149658203 | — | secret: 静态表单面 submit 在视口 |
 | dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 32 | — | machine: disclosure 展开(最高内容态)底部链接在视口 |
-| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 101.28352355957031 | — | create-agent: submit 在视口 |
-| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 128.7125701904297 | — | charter: 取消/保存章程在视口 |
-| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 173.46055603027344 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
-| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 175.42642211914062 | — | accept(34): 取消/完成在视口 |
+| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 102.98522186279297 | — | create-agent: submit 在视口 |
+| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 126.47699737548828 | — | charter: 取消/保存章程在视口 |
+| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 173.45819091796875 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
+| dialog-viewport.spec.ts | 44 | toBeGreaterThanOrEqual | ≥ 0 | 174.0895233154297 | — | accept(34): 取消/完成在视口 |
 | dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 467.1844787597656 | — | provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移 |
 | dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 445.9620361328125 | — | secret: 静态表单面 submit 在视口 |
 | dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 468 | — | machine: disclosure 展开(最高内容态)底部链接在视口 |
-| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 398.7164611816406 | — | create-agent: submit 在视口 |
-| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 371.2874450683594 | — | charter: 取消/保存章程在视口 |
-| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 326.5394592285156 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
-| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 324.5735778808594 | — | accept(34): 取消/完成在视口 |
+| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 397.0147705078125 | — | create-agent: submit 在视口 |
+| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 373.52301025390625 | — | charter: 取消/保存章程在视口 |
+| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 326.54180908203125 | — | chief-agent 列表态(无按钮读面)面板整体不越视口 |
+| dialog-viewport.spec.ts | 45 | toBeLessThanOrEqual | ≤ 500.5 | 325.9104919433594 | — | accept(34): 取消/完成在视口 |
 | dialog-viewport.spec.ts | 53 | toBeGreaterThan | > 392 | 1826 | — | provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移 |
 | dialog-viewport.spec.ts | 53 | toBeGreaterThan | > 182 | 311 | — | branch sync tab: 视口压过内容高,同步钮钉底,body 溢出;git tab 正常 |
 | dialog-viewport.spec.ts | 53 | toBeGreaterThan | > 252 | 328 | — | schedules 新建定时(900×420): 封顶、body 内滚、取消/保存/X 恒在视口 (#1037) |
 | dialog-viewport.spec.ts | 81 | toEqual | {"x":597,"y":420,"width":103,"height":32} | {"x":597,"y":420,"width":103,"height":32} | — | provider: 3 模型行把 body 撑溢,submit 钉底且滚动不位移 |
-| dialog-viewport.spec.ts | 150 | toBeLessThanOrEqual | ≤ 312.5 | 289.71685791015625 | — | branch sync tab: 视口压过内容高,同步钮钉底,body 溢出;git tab 正常 |
+| dialog-viewport.spec.ts | 150 | toBeLessThanOrEqual | ≤ 312.5 | 295.75403213500977 | — | branch sync tab: 视口压过内容高,同步钮钉底,body 溢出;git tab 正常 |
 | dialog-viewport.spec.ts | 185 | toBeLessThanOrEqual | ≤ 372.5 | 356 | — | schedules 新建定时(900×420): 封顶、body 内滚、取消/保存/X 恒在视口 (#1037) |
 | dialog-viewport.spec.ts | 186 | toBeGreaterThanOrEqual | ≥ 0 | 32 | — | schedules 新建定时(900×420): 封顶、body 内滚、取消/保存/X 恒在视口 (#1037) |
 | dialog-viewport.spec.ts | 187 | toBeLessThanOrEqual | ≤ 420.5 | 388 | — | schedules 新建定时(900×420): 封顶、body 内滚、取消/保存/X 恒在视口 (#1037) |
@@ -708,6 +700,8 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | footer-copy.spec.ts | 27 | toBeGreaterThan | > 20 | 54 | — | C1: robot row copy puts the row text on the clipboard |
 | github-issue-writeback.spec.ts | 169 | toBe | 0 | 0 | — | 4. 未建成：状态行 + 重试入口；重试成功 → 行升级为回显态（AC3） |
 | github-issue-writeback.spec.ts | 174 | toBe | 1 | 1 | — | 4. 未建成：状态行 + 重试入口；重试成功 → 行升级为回显态（AC3） |
+| live-agent-model-line.spec.ts | 167 | toBeGreaterThan | > 0 | {"__fn":"() => held.length"} | — | members pending: the name alone, then the model fills in |
+| live-agent-model-line.spec.ts | 186 | toBeGreaterThanOrEqual | ≥ 2 | {"__fn":"() => answered"} | — | members read failed: the name alone |
 | machine-detail.spec.ts | 68 | toBe | 0 | 0 | — | 危险区删除先弹确认层，取消不删 |
 | machines-chief-state.spec.ts | 75 | toEqual | [52,52,52] | [52,52,52] | — | 行高契约保持：标注行不破 Paper 设置行高（每行 52，含分隔线） |
 | machines-concurrency-blur.spec.ts | 118 | toEqual | [{"maxConcurrent":"null"}] | [{"maxConcurrent":"null"}] | — | 编辑后点 恢复推荐：只发一次 PATCH（null），不先存手动值 |
@@ -759,9 +753,9 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | notify-click.spec.ts | 474 | toEqual | {"href":"/app/todo/todo-y"} | {"href":"/app/todo/todo-y"} | — | T5: 帐号开关关档（偏好覆盖）→ SSE 通知不弹；开回来即恢复（#1031） |
 | notify-click.spec.ts | 477 | toBe | 0 | 0 | — | T5: 帐号开关关档（偏好覆盖）→ SSE 通知不弹；开回来即恢复（#1031） |
 | overlay-focus.spec.ts | 68 | not.toBe | auto | solid | — | click + key on 新建任务/topbar buttons: never the UA blue box |
-| overlay-focus.spec.ts | 69 | not.toBe | rgb(0, 95, 204) | rgb(242, 148, 216) | — | click + key on 新建任务/topbar buttons: never the UA blue box |
+| overlay-focus.spec.ts | 69 | not.toBe | rgb(0, 95, 204) | rgb(240, 146, 109) | — | click + key on 新建任务/topbar buttons: never the UA blue box |
 | overlay-focus.spec.ts | 90 | not.toBe | auto | solid | — | click + key on 新建任务/topbar buttons: never the UA blue box |
-| overlay-focus.spec.ts | 91 | not.toBe | rgb(0, 95, 204) | rgb(242, 148, 216) | — | click + key on 新建任务/topbar buttons: never the UA blue box |
+| overlay-focus.spec.ts | 91 | not.toBe | rgb(0, 95, 204) | rgb(240, 146, 109) | — | click + key on 新建任务/topbar buttons: never the UA blue box |
 | overlay-focus.spec.ts | 151 | toHaveCSS | animation-name: enter | enter | — | backdrop click closes; entry rides the registry fade-in |
 | page-scroll.spec.ts | 59 | toBeGreaterThan | > 0 | {"x":455,"y":130,"width":768,"height":16} | — | 总管设置三个长内容 tab 都能滚到底 (#1032) |
 | page-scroll.spec.ts | 59 | toBeGreaterThan | > 0 | {"x":480,"y":82,"width":468,"height":32} | — | 项目任务列表页能滚到底 (#1032) |
@@ -784,28 +778,32 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-board-sheet.spec.ts | 62 | toEqual | {"x":40,"y":10,"w":1390,"h":880} | {"x":40,"y":10,"w":1390,"h":880} | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(251, 249, 245)","shadow":"rgb(236, 229, 218… | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(251, 249, 245)","shadow":"rgb(236, 229, 218… | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(251, 249, 245)","shadow":"rgb(236, 229, 218)… | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(251, 249, 245)","shadow":"rgb(236, 229, 218)… | — | board sheet matches the page shell sheet (light, rail) |
-| paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(31, 27, 24)","shadow":"rgb(45, 41, 38) 0px … | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(31, 27, 24)","shadow":"rgb(45, 41, 38) 0px … | — | board sheet matches the page shell sheet (dark) |
-| paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(31, 27, 24)","shadow":"rgb(45, 41, 38) 0px 0… | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(31, 27, 24)","shadow":"rgb(45, 41, 38) 0px 0… | — | board sheet matches the page shell sheet (dark, rail) |
+| paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(36, 32, 27)","shadow":"rgb(62, 58, 52) 0px … | {"box":{"x":248,"y":10,"w":1182,"h":880},"radius":"16px","bg":"rgb(36, 32, 27)","shadow":"rgb(62, 58, 52) 0px … | — | board sheet matches the page shell sheet (dark) |
+| paper-board-sheet.spec.ts | 63 | toEqual | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(36, 32, 27)","shadow":"rgb(62, 58, 52) 0px 0… | {"box":{"x":40,"y":10,"w":1390,"h":880},"radius":"16px","bg":"rgb(36, 32, 27)","shadow":"rgb(62, 58, 52) 0px 0… | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 64 | toBe | 16px | 16px | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 64 | toBe | 16px | 16px | — | board sheet matches the page shell sheet (light, rail) |
 | paper-board-sheet.spec.ts | 64 | toBe | 16px | 16px | — | board sheet matches the page shell sheet (dark) |
 | paper-board-sheet.spec.ts | 64 | toBe | 16px | 16px | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(236, 229, 218) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(236, 229, 218) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (light, rail) |
-| paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(45, 41, 38) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark) |
-| paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(45, 41, 38) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark, rail) |
+| paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(62, 58, 52) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark) |
+| paper-board-sheet.spec.ts | 65 | toContain | inset | rgb(62, 58, 52) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 66 | toBe | rgb(236, 229, 218) 0px 0px 0px 1px inset | rgb(236, 229, 218) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 66 | toBe | rgb(236, 229, 218) 0px 0px 0px 1px inset | rgb(236, 229, 218) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (light, rail) |
-| paper-board-sheet.spec.ts | 66 | toBe | rgb(45, 41, 38) 0px 0px 0px 1px inset | rgb(45, 41, 38) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark) |
-| paper-board-sheet.spec.ts | 66 | toBe | rgb(45, 41, 38) 0px 0px 0px 1px inset | rgb(45, 41, 38) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark, rail) |
+| paper-board-sheet.spec.ts | 66 | toBe | rgb(62, 58, 52) 0px 0px 0px 1px inset | rgb(62, 58, 52) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark) |
+| paper-board-sheet.spec.ts | 66 | toBe | rgb(62, 58, 52) 0px 0px 0px 1px inset | rgb(62, 58, 52) 0px 0px 0px 1px inset | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 67 | toBe | none | none | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 67 | toBe | none | none | — | board sheet matches the page shell sheet (light, rail) |
 | paper-board-sheet.spec.ts | 67 | toBe | none | none | — | board sheet matches the page shell sheet (dark) |
 | paper-board-sheet.spec.ts | 67 | toBe | none | none | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 68 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 68 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | board sheet matches the page shell sheet (light, rail) |
+| paper-board-sheet.spec.ts | 68 | toBe | rgb(26, 22, 18) | rgb(26, 22, 18) | — | board sheet matches the page shell sheet (dark) |
+| paper-board-sheet.spec.ts | 68 | toBe | rgb(26, 22, 18) | rgb(26, 22, 18) | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 69 | not.toBe | rgb(251, 249, 245) | rgb(243, 238, 229) | — | board sheet matches the page shell sheet (light) |
 | paper-board-sheet.spec.ts | 69 | not.toBe | rgb(251, 249, 245) | rgb(243, 238, 229) | — | board sheet matches the page shell sheet (light, rail) |
+| paper-board-sheet.spec.ts | 69 | not.toBe | rgb(36, 32, 27) | rgb(26, 22, 18) | — | board sheet matches the page shell sheet (dark) |
+| paper-board-sheet.spec.ts | 69 | not.toBe | rgb(36, 32, 27) | rgb(26, 22, 18) | — | board sheet matches the page shell sheet (dark, rail) |
 | paper-board-sheet.spec.ts | 80 | toEqual | {"x":248,"y":10,"width":1182,"height":56} | {"x":248,"y":10,"width":1182,"height":56} | — | board header stays the banner, at the top of the sheet |
 | paper-board-sheet.spec.ts | 89 | toEqual | {"x":248,"y":10,"w":1182,"h":880} | {"x":248,"y":10,"w":1182,"h":880} | — | 总管设置 swaps in inside the same sheet |
 | paper-board-sheet.spec.ts | 105 | toContain | 0px 0px 0px 1px inset | rgb(236, 229, 218) 0px 0px 0px 1px inset | — | sheet and card outlines stay one CSS pixel |
@@ -819,13 +817,13 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-card.spec.ts | 60 | toHaveCSS | opacity: 0 | 0 | — | queued start link: hidden at rest, shown on hover and keyboard focus, takes no height |
 | paper-card.spec.ts | 65 | toHaveCSS | opacity: 1 | 1 | — | queued start link: hidden at rest, shown on hover and keyboard focus, takes no height |
 | paper-card.spec.ts | 72 | toHaveCSS | font-weight: 400 | 400 | — | done card: title drops to 400 + ink-3, no footer |
-| paper-card.spec.ts | 81 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | done card: title drops to 400 + ink-3, no footer |
+| paper-card.spec.ts | 81 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | done card: title drops to 400 + ink-3, no footer |
 | paper-card.spec.ts | 83 | toHaveCSS | font-weight: 500 | 500 | — | done card: title drops to 400 + ink-3, no footer |
 | paper-card.spec.ts | 95 | toBeGreaterThan | > 0 | 122 | — | meta row never wraps at the 200px column floor |
 | paper-card.spec.ts | 96 | toBe | 20 | 20 | — | meta row never wraps at the 200px column floor |
 | paper-card.spec.ts | 105 | toHaveCSS | animation-name: card-breath | card-breath | — | running footer breathes, and stops under reduced motion |
 | paper-card.spec.ts | 107 | toHaveCSS | animation-name: none | none | — | running footer breathes, and stops under reduced motion |
-| paper-card.spec.ts | 129 | toHaveCSS | color: rgb(242, 148, 216) | rgb(242, 148, 216) | — | column header: serif name, fixed status icon, plus only on 待开始 and it opens new task |
+| paper-card.spec.ts | 129 | toHaveCSS | color: rgb(240, 146, 109) | rgb(240, 146, 109) | — | column header: serif name, fixed status icon, plus only on 待开始 and it opens new task |
 | paper-card.spec.ts | 133 | toHaveCSS | opacity: 0 | 0 | — | column header: serif name, fixed status icon, plus only on 待开始 and it opens new task |
 | paper-card.spec.ts | 135 | toHaveCSS | opacity: 1 | 1 | — | column header: serif name, fixed status icon, plus only on 待开始 and it opens new task |
 | paper-chief.spec.ts | 90 | toHaveCSS | font-family: sourceSerif4, Georgia, "Songti SC", "Noto Serif CJK SC", serif | sourceSerif4, Georgia, "Songti SC", "Noto Serif CJK SC", serif | — | window: heading face, Paper gate banner and hero cards (light) |
@@ -839,9 +837,9 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-chief.spec.ts | 98 | toHaveCSS | border-top-left-radius: 10px | 10px | — | window: heading face, Paper gate banner and hero cards (light) |
 | paper-chief.spec.ts | 98 | toHaveCSS | border-top-left-radius: 10px | 10px | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 99 | not.toBe | rgb(235, 228, 216) | rgb(255, 255, 255) | — | window: heading face, Paper gate banner and hero cards (light) |
-| paper-chief.spec.ts | 99 | not.toBe | rgb(45, 41, 38) | rgb(38, 34, 31) | — | window: heading face, Paper gate banner and hero cards (dark) |
+| paper-chief.spec.ts | 99 | not.toBe | rgb(60, 55, 50) | rgb(47, 42, 38) | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 100 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236,… | — | window: heading face, Paper gate banner and hero cards (light) |
-| paper-chief.spec.ts | 100 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, … | — | window: heading face, Paper gate banner and hero cards (dark) |
+| paper-chief.spec.ts | 100 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(62, … | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 102 | toBe | 32 | 32 | — | window: heading face, Paper gate banner and hero cards (light) |
 | paper-chief.spec.ts | 102 | toBe | 32 | 32 | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 103 | toHaveCSS | border-top-left-radius: 8px | 8px | — | window: heading face, Paper gate banner and hero cards (light) |
@@ -853,7 +851,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-chief.spec.ts | 109 | toHaveCSS | border-top-left-radius: 10px | 10px | — | window: heading face, Paper gate banner and hero cards (light) |
 | paper-chief.spec.ts | 109 | toHaveCSS | border-top-left-radius: 10px | 10px | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 110 | toHaveCSS | background-color: rgb(255, 255, 255) | rgb(255, 255, 255) | — | window: heading face, Paper gate banner and hero cards (light) |
-| paper-chief.spec.ts | 110 | toHaveCSS | background-color: rgb(38, 34, 31) | rgb(38, 34, 31) | — | window: heading face, Paper gate banner and hero cards (dark) |
+| paper-chief.spec.ts | 110 | toHaveCSS | background-color: rgb(47, 42, 38) | rgb(47, 42, 38) | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 112 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | window: heading face, Paper gate banner and hero cards (light) |
 | paper-chief.spec.ts | 112 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | window: heading face, Paper gate banner and hero cards (dark) |
 | paper-chief.spec.ts | 119 | toHaveCSS | font-size: 13.5px | 13.5px | — | window: bound hero, switcher menu and stream type keys (light) |
@@ -893,21 +891,21 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-chief.spec.ts | 180 | toHaveCSS | border-bottom-width: 1px | 1px | — | settings: Paper top bar, one settings card, empty rows in the card (light) |
 | paper-chief.spec.ts | 180 | toHaveCSS | border-bottom-width: 1px | 1px | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
 | paper-chief.spec.ts | 181 | toHaveCSS | border-bottom-color: rgb(236, 229, 218) | rgb(236, 229, 218) | — | settings: Paper top bar, one settings card, empty rows in the card (light) |
-| paper-chief.spec.ts | 181 | toHaveCSS | border-bottom-color: rgb(45, 41, 38) | rgb(45, 41, 38) | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
+| paper-chief.spec.ts | 181 | toHaveCSS | border-bottom-color: rgb(62, 58, 52) | rgb(62, 58, 52) | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
 | paper-chief.spec.ts | 185 | toHaveCSS | border-top-width: 0px | 0px | — | settings: Paper top bar, one settings card, empty rows in the card (light) |
 | paper-chief.spec.ts | 185 | toHaveCSS | border-top-width: 0px | 0px | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
 | paper-chief.spec.ts | 191 | toBe | 32 | 32 | — | settings: Paper top bar, one settings card, empty rows in the card (light) |
 | paper-chief.spec.ts | 191 | toBe | 32 | 32 | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
 | paper-chief.spec.ts | 192 | toHaveCSS | background-color: rgb(43, 38, 32) | rgb(43, 38, 32) | — | settings: Paper top bar, one settings card, empty rows in the card (light) |
-| paper-chief.spec.ts | 192 | toHaveCSS | background-color: rgb(238, 232, 228) | rgb(238, 232, 228) | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
+| paper-chief.spec.ts | 192 | toHaveCSS | background-color: rgb(236, 231, 223) | rgb(236, 231, 223) | — | settings: Paper top bar, one settings card, empty rows in the card (dark) |
 | paper-chief.spec.ts | 215 | toHaveCSS | border-top-left-radius: 10px | 10px | — | question card: card face, status triad, type keys (light) |
 | paper-chief.spec.ts | 215 | toHaveCSS | border-top-left-radius: 10px | 10px | — | question card: card face, status triad, type keys (dark) |
 | paper-chief.spec.ts | 216 | toHaveCSS | background-color: rgb(255, 255, 255) | rgb(255, 255, 255) | — | question card: card face, status triad, type keys (light) |
-| paper-chief.spec.ts | 216 | toHaveCSS | background-color: rgb(38, 34, 31) | rgb(38, 34, 31) | — | question card: card face, status triad, type keys (dark) |
+| paper-chief.spec.ts | 216 | toHaveCSS | background-color: rgb(47, 42, 38) | rgb(47, 42, 38) | — | question card: card face, status triad, type keys (dark) |
 | paper-chief.spec.ts | 220 | toHaveCSS | color: rgb(180, 83, 42) | rgb(180, 83, 42) | — | question card: card face, status triad, type keys (light) |
-| paper-chief.spec.ts | 220 | toHaveCSS | color: rgb(242, 148, 216) | rgb(242, 148, 216) | — | question card: card face, status triad, type keys (dark) |
+| paper-chief.spec.ts | 220 | toHaveCSS | color: rgb(240, 146, 109) | rgb(240, 146, 109) | — | question card: card face, status triad, type keys (dark) |
 | paper-chief.spec.ts | 226 | toHaveCSS | color: rgb(116, 106, 95) | rgb(116, 106, 95) | — | question card: card face, status triad, type keys (light) |
-| paper-chief.spec.ts | 226 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | question card: card face, status triad, type keys (dark) |
+| paper-chief.spec.ts | 226 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | question card: card face, status triad, type keys (dark) |
 | paper-chief.spec.ts | 228 | toHaveCSS | font-size: 14px | 14px | — | question card: card face, status triad, type keys (light) |
 | paper-chief.spec.ts | 228 | toHaveCSS | font-size: 14px | 14px | — | question card: card face, status triad, type keys (dark) |
 | paper-chief.spec.ts | 229 | toHaveCSS | font-weight: 500 | 500 | — | question card: card face, status triad, type keys (light) |
@@ -928,11 +926,11 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-keys-schedules.spec.ts | 63 | toBeLessThanOrEqual | ≤ 891 | 883 | — | 新建定时 footer: text 取消 left of a 32px primary 保存, no outline button |
 | paper-overlays.spec.ts | 64 | toBe | rgba(43, 38, 32, 0.14) | rgba(43, 38, 32, 0.14) | — | backdrop is the light dim, no blur, on dialogs and confirms (light) |
 | paper-overlays.spec.ts | 69 | toHaveCSS | background-color: rgba(43, 38, 32, 0.14) | rgba(43, 38, 32, 0.14) | — | backdrop is the light dim, no blur, on dialogs and confirms (light) |
-| paper-overlays.spec.ts | 69 | toHaveCSS | background-color: rgba(0, 0, 0, 0.32) | rgba(0, 0, 0, 0.32) | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
+| paper-overlays.spec.ts | 69 | toHaveCSS | background-color: rgba(0, 0, 0, 0.45) | rgba(0, 0, 0, 0.45) | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
 | paper-overlays.spec.ts | 70 | toHaveCSS | backdrop-filter: none | none | — | backdrop is the light dim, no blur, on dialogs and confirms (light) |
 | paper-overlays.spec.ts | 70 | toHaveCSS | backdrop-filter: none | none | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
 | paper-overlays.spec.ts | 76 | toHaveCSS | background-color: rgba(43, 38, 32, 0.14) | rgba(43, 38, 32, 0.14) | — | backdrop is the light dim, no blur, on dialogs and confirms (light) |
-| paper-overlays.spec.ts | 76 | toHaveCSS | background-color: rgba(0, 0, 0, 0.32) | rgba(0, 0, 0, 0.32) | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
+| paper-overlays.spec.ts | 76 | toHaveCSS | background-color: rgba(0, 0, 0, 0.45) | rgba(0, 0, 0, 0.45) | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
 | paper-overlays.spec.ts | 77 | toHaveCSS | backdrop-filter: none | none | — | backdrop is the light dim, no blur, on dialogs and confirms (light) |
 | paper-overlays.spec.ts | 77 | toHaveCSS | backdrop-filter: none | none | — | backdrop is the light dim, no blur, on dialogs and confirms (dark) |
 | paper-overlays.spec.ts | 86 | toBe | 400 | 400 | — | dialog widths are S 400 / M 480 / L 640 |
@@ -978,7 +976,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-page-patterns.spec.ts | 122 | toBe | none | none | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
 | paper-page-patterns.spec.ts | 122 | toBe | none | none | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 123 | toBe | rgb(116, 106, 95) | rgb(116, 106, 95) | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
-| paper-page-patterns.spec.ts | 123 | toBe | rgb(179, 174, 170) | rgb(179, 174, 170) | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
+| paper-page-patterns.spec.ts | 123 | toBe | rgb(172, 167, 160) | rgb(172, 167, 160) | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 124 | toBe | 24 | 24 | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
 | paper-page-patterns.spec.ts | 124 | toBe | 24 | 24 | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 125 | toBe | default | default | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
@@ -994,7 +992,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-page-patterns.spec.ts | 130 | toEqual | ["14px","500"] | ["14px","500"] | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
 | paper-page-patterns.spec.ts | 130 | toEqual | ["14px","500"] | ["14px","500"] | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 131 | toEqual | ["12px","rgb(116, 106, 95)"] | ["12px","rgb(116, 106, 95)"] | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
-| paper-page-patterns.spec.ts | 131 | toEqual | ["12px","rgb(179, 174, 170)"] | ["12px","rgb(179, 174, 170)"] | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
+| paper-page-patterns.spec.ts | 131 | toEqual | ["12px","rgb(172, 167, 160)"] | ["12px","rgb(172, 167, 160)"] | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 132 | toBeLessThanOrEqual | ≤ 320 | 320 | — | API keys empty state: bare ink-3 icon, default primary, type keys (light) (E1–E4) |
 | paper-page-patterns.spec.ts | 132 | toBeLessThanOrEqual | ≤ 320 | 320 | — | API keys empty state: bare ink-3 icon, default primary, type keys (dark) (E1–E4) |
 | paper-page-patterns.spec.ts | 166 | toEqual | ["0px","0px","0px"] | ["0px","0px","0px"] | — | clickable resource rows keep the card divider between rows only (light) (S3) |
@@ -1002,9 +1000,9 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-page-patterns.spec.ts | 170 | toEqual | ["1px","1px","0px"] | ["1px","1px","0px"] | — | clickable resource rows keep the card divider between rows only (light) (S3) |
 | paper-page-patterns.spec.ts | 170 | toEqual | ["1px","1px","0px"] | ["1px","1px","0px"] | — | clickable resource rows keep the card divider between rows only (dark) (S3) |
 | paper-page-patterns.spec.ts | 171 | toBe | rgb(236, 229, 218) | rgb(236, 229, 218) | — | clickable resource rows keep the card divider between rows only (light) (S3) |
-| paper-page-patterns.spec.ts | 171 | toBe | rgb(45, 41, 38) | rgb(45, 41, 38) | — | clickable resource rows keep the card divider between rows only (dark) (S3) |
+| paper-page-patterns.spec.ts | 171 | toBe | rgb(62, 58, 52) | rgb(62, 58, 52) | — | clickable resource rows keep the card divider between rows only (dark) (S3) |
 | paper-page-patterns.spec.ts | 172 | toBe | rgb(236, 229, 218) | rgb(236, 229, 218) | — | clickable resource rows keep the card divider between rows only (light) (S3) |
-| paper-page-patterns.spec.ts | 172 | toBe | rgb(45, 41, 38) | rgb(45, 41, 38) | — | clickable resource rows keep the card divider between rows only (dark) (S3) |
+| paper-page-patterns.spec.ts | 172 | toBe | rgb(62, 58, 52) | rgb(62, 58, 52) | — | clickable resource rows keep the card divider between rows only (dark) (S3) |
 | paper-project-page.spec.ts | 79 | toBe | 768 | 768 | — | tasks: reading column, one card of 52px rows with status and meta (light) |
 | paper-project-page.spec.ts | 79 | toBe | 768 | 768 | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 83 | toHaveCSS | border-top-left-radius: 10px | 10px | — | tasks: reading column, one card of 52px rows with status and meta (light) |
@@ -1016,19 +1014,19 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-project-page.spec.ts | 108 | toEqual | [["0px","1px"],["0px","0px"]] | [["0px","1px"],["0px","0px"]] | — | tasks: reading column, one card of 52px rows with status and meta (light) |
 | paper-project-page.spec.ts | 108 | toEqual | [["0px","1px"],["0px","0px"]] | [["0px","1px"],["0px","0px"]] | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 121 | toHaveCSS | color: rgb(180, 83, 42) | rgb(180, 83, 42) | — | tasks: reading column, one card of 52px rows with status and meta (light) |
-| paper-project-page.spec.ts | 121 | toHaveCSS | color: rgb(242, 148, 216) | rgb(242, 148, 216) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
+| paper-project-page.spec.ts | 121 | toHaveCSS | color: rgb(240, 146, 109) | rgb(240, 146, 109) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 125 | toHaveCSS | color: rgb(116, 106, 95) | rgb(116, 106, 95) | — | tasks: reading column, one card of 52px rows with status and meta (light) |
-| paper-project-page.spec.ts | 125 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
+| paper-project-page.spec.ts | 125 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 128 | toHaveCSS | font-size: 13.5px | 13.5px | — | tasks: reading column, one card of 52px rows with status and meta (light) |
 | paper-project-page.spec.ts | 128 | toHaveCSS | font-size: 13.5px | 13.5px | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 129 | toHaveCSS | color: rgb(43, 38, 32) | rgb(43, 38, 32) | — | tasks: reading column, one card of 52px rows with status and meta (light) |
-| paper-project-page.spec.ts | 129 | toHaveCSS | color: rgb(238, 232, 228) | rgb(238, 232, 228) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
+| paper-project-page.spec.ts | 129 | toHaveCSS | color: rgb(236, 231, 223) | rgb(236, 231, 223) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 132 | toHaveCSS | font-size: 12px | 12px | — | tasks: reading column, one card of 52px rows with status and meta (light) |
 | paper-project-page.spec.ts | 132 | toHaveCSS | font-size: 12px | 12px | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 133 | toHaveCSS | color: rgb(116, 106, 95) | rgb(116, 106, 95) | — | tasks: reading column, one card of 52px rows with status and meta (light) |
-| paper-project-page.spec.ts | 133 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
+| paper-project-page.spec.ts | 133 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 135 | toHaveCSS | color: rgb(116, 106, 95) | rgb(116, 106, 95) | — | tasks: reading column, one card of 52px rows with status and meta (light) |
-| paper-project-page.spec.ts | 135 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
+| paper-project-page.spec.ts | 135 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 139 | toHaveCSS | border-top-left-radius: 10px | 10px | — | tasks: reading column, one card of 52px rows with status and meta (light) |
 | paper-project-page.spec.ts | 139 | toHaveCSS | border-top-left-radius: 10px | 10px | — | tasks: reading column, one card of 52px rows with status and meta (dark) |
 | paper-project-page.spec.ts | 151 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | tasks: empty state is the shared EmptyState (light) |
@@ -1040,11 +1038,11 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-project-page.spec.ts | 167 | toHaveCSS | font-size: 13.5px | 13.5px | — | files: bleed body, picker face on the selected file, type scale (light) |
 | paper-project-page.spec.ts | 167 | toHaveCSS | font-size: 13.5px | 13.5px | — | files: bleed body, picker face on the selected file, type scale (dark) |
 | paper-project-page.spec.ts | 168 | toHaveCSS | color: rgb(116, 106, 95) | rgb(116, 106, 95) | — | files: bleed body, picker face on the selected file, type scale (light) |
-| paper-project-page.spec.ts | 168 | toHaveCSS | color: rgb(179, 174, 170) | rgb(179, 174, 170) | — | files: bleed body, picker face on the selected file, type scale (dark) |
+| paper-project-page.spec.ts | 168 | toHaveCSS | color: rgb(172, 167, 160) | rgb(172, 167, 160) | — | files: bleed body, picker face on the selected file, type scale (dark) |
 | paper-project-page.spec.ts | 174 | toHaveCSS | background-color: rgb(255, 255, 255) | rgb(255, 255, 255) | — | files: bleed body, picker face on the selected file, type scale (light) |
-| paper-project-page.spec.ts | 174 | toHaveCSS | background-color: rgb(38, 34, 31) | rgb(38, 34, 31) | — | files: bleed body, picker face on the selected file, type scale (dark) |
+| paper-project-page.spec.ts | 174 | toHaveCSS | background-color: rgb(47, 42, 38) | rgb(47, 42, 38) | — | files: bleed body, picker face on the selected file, type scale (dark) |
 | paper-project-page.spec.ts | 175 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236,… | — | files: bleed body, picker face on the selected file, type scale (light) |
-| paper-project-page.spec.ts | 175 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, … | — | files: bleed body, picker face on the selected file, type scale (dark) |
+| paper-project-page.spec.ts | 175 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(62, … | — | files: bleed body, picker face on the selected file, type scale (dark) |
 | paper-project-page.spec.ts | 179 | toHaveCSS | font-size: 13.5px | 13.5px | — | files: bleed body, picker face on the selected file, type scale (light) |
 | paper-project-page.spec.ts | 179 | toHaveCSS | font-size: 13.5px | 13.5px | — | files: bleed body, picker face on the selected file, type scale (dark) |
 | paper-project-page.spec.ts | 180 | toHaveCSS | font-size: 12px | 12px | — | files: bleed body, picker face on the selected file, type scale (light) |
@@ -1078,7 +1076,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-project-pages.spec.ts | 100 | toBeGreaterThanOrEqual | ≥ 28 | 33554400 | — | new project: ring avatar, 520px form stack, right-aligned create (light) |
 | paper-project-pages.spec.ts | 100 | toBeGreaterThanOrEqual | ≥ 28 | 33554400 | — | new project: ring avatar, 520px form stack, right-aligned create (dark) |
 | paper-project-pages.spec.ts | 110 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | new project: ring avatar, 520px form stack, right-aligned create (light) |
-| paper-project-pages.spec.ts | 110 | toBe | rgb(38, 34, 31) | rgb(38, 34, 31) | — | new project: ring avatar, 520px form stack, right-aligned create (dark) |
+| paper-project-pages.spec.ts | 110 | toBe | rgb(47, 42, 38) | rgb(47, 42, 38) | — | new project: ring avatar, 520px form stack, right-aligned create (dark) |
 | paper-project-pages.spec.ts | 116 | toBeLessThanOrEqual | ≤ 520 | 520 | — | new project: ring avatar, 520px form stack, right-aligned create (light) |
 | paper-project-pages.spec.ts | 116 | toBeLessThanOrEqual | ≤ 520 | 520 | — | new project: ring avatar, 520px form stack, right-aligned create (dark) |
 | paper-project-pages.spec.ts | 117 | toBe | 32 | 32 | — | new project: ring avatar, 520px form stack, right-aligned create (light) |
@@ -1117,9 +1115,9 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-resource-pages.spec.ts | 93 | toHaveCSS | height: 32px | 32px | — | secret dialog: FormActions footer, primary is not a full-width bar |
 | paper-resource-pages.spec.ts | 93 | toHaveCSS | height: 32px | 32px | — | skill dialog: FormActions footer, primary is not a full-width bar |
 | paper-resource-pages.spec.ts | 93 | toHaveCSS | height: 32px | 32px | — | skill import dialog: FormActions footer, primary is not a full-width bar |
-| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 198.0238037109375 | 75.2490234375 | — | secret dialog: FormActions footer, primary is not a full-width bar |
-| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 237.6409912109375 | 75.25299072265625 | — | skill dialog: FormActions footer, primary is not a full-width bar |
-| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 237.62860107421875 | 48.515869140625 | — | skill import dialog: FormActions footer, primary is not a full-width bar |
+| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 195.7708740234375 | 74.3929443359375 | — | secret dialog: FormActions footer, primary is not a full-width bar |
+| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 237.63694763183594 | 75.251708984375 | — | skill dialog: FormActions footer, primary is not a full-width bar |
+| paper-resource-pages.spec.ts | 96 | toBeLessThan | < 239.09771728515625 | 48.8157958984375 | — | skill import dialog: FormActions footer, primary is not a full-width bar |
 | paper-segmented.spec.ts | 113 | toBe | 32 | 32 | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 113 | toBe | 32 | 32 | — | dark: every segmented control wears the same face |
 | paper-segmented.spec.ts | 114 | toBe | 2px | 2px | — | light: every segmented control wears the same face |
@@ -1135,14 +1133,15 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-segmented.spec.ts | 120 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 120 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | dark: every segmented control wears the same face |
 | paper-segmented.spec.ts | 121 | not.toBe | rgb(43, 38, 32) | rgb(94, 86, 77) | — | light: every segmented control wears the same face |
-| paper-segmented.spec.ts | 121 | not.toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | dark: every segmented control wears the same face |
+| paper-segmented.spec.ts | 121 | not.toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | dark: every segmented control wears the same face |
 | paper-segmented.spec.ts | 122 | not.toBe | rgb(243, 238, 229) | rgb(255, 255, 255) | — | light: every segmented control wears the same face |
+| paper-segmented.spec.ts | 122 | not.toBe | rgb(26, 22, 18) | rgb(47, 42, 38) | — | dark: every segmented control wears the same face |
 | paper-segmented.spec.ts | 124 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 125 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 126 | toBe | rgb(43, 38, 32) | rgb(43, 38, 32) | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 127 | toBe | rgb(94, 86, 77) | rgb(94, 86, 77) | — | light: every segmented control wears the same face |
 | paper-segmented.spec.ts | 130 | toEqual | {"name":"agent tabs","trackBg":"rgb(243, 238, 229)","trackHeight":32,"trackPadding":"2px","trackRadius":"8px",… | {"name":"agent tabs","trackBg":"rgb(243, 238, 229)","trackHeight":32,"trackPadding":"2px","trackRadius":"8px",… | — | light: every segmented control wears the same face |
-| paper-segmented.spec.ts | 130 | toEqual | {"name":"agent tabs","trackBg":"oklab(0.240466 0.00428543 0.00718913)","trackHeight":32,"trackPadding":"2px","… | {"name":"agent tabs","trackBg":"oklab(0.240466 0.00428543 0.00718913)","trackHeight":32,"trackPadding":"2px","… | — | dark: every segmented control wears the same face |
+| paper-segmented.spec.ts | 130 | toEqual | {"name":"agent tabs","trackBg":"rgb(26, 22, 18)","trackHeight":32,"trackPadding":"2px","trackRadius":"8px","se… | {"name":"agent tabs","trackBg":"rgb(26, 22, 18)","trackHeight":32,"trackPadding":"2px","trackRadius":"8px","se… | — | dark: every segmented control wears the same face |
 | paper-segmented.spec.ts | 180 | toBe | solid | solid | — | agent tabs: keyboard focus draws the ring inside the option |
 | paper-segmented.spec.ts | 180 | toBe | solid | solid | — | schedules frequency: keyboard focus draws the ring inside the option |
 | paper-segmented.spec.ts | 181 | toBe | 2 | 2 | — | agent tabs: keyboard focus draws the ring inside the option |
@@ -1214,7 +1213,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | paper-topbar.spec.ts | 32 | toBeGreaterThan | > 0 | 1 | — | bar geometry: 56px, serif page title, summary N = the 待处理 column count |
 | paper-topbar.spec.ts | 37 | toBe | 600 | 600 | — | bar geometry: 56px, serif page title, summary N = the 待处理 column count |
 | paper-topbar.spec.ts | 66 | toBeLessThanOrEqual | ≤ 1 | 0.5 | — | active filter: summary follows the narrowed column, badge + chip stay, popover anchors under 筛选 |
-| paper-topbar.spec.ts | 67 | toBeGreaterThan | > 53.5 | 58.35945129394531 | — | active filter: summary follows the narrowed column, badge + chip stay, popover anchors under 筛选 |
+| paper-topbar.spec.ts | 67 | toBeGreaterThan | > 53.5 | 56.48921585083008 | — | active filter: summary follows the narrowed column, badge + chip stay, popover anchors under 筛选 |
 | paper-topbar.spec.ts | 88 | toHaveCSS | height: 32px | 32px | — | 新任务 is the shadcn default Button (ink, 32px, 8px corners) and opens the same new-task dialog as C |
 | paper-topbar.spec.ts | 89 | toHaveCSS | border-top-left-radius: 8px | 8px | — | 新任务 is the shadcn default Button (ink, 32px, 8px corners) and opens the same new-task dialog as C |
 | paper-topbar.spec.ts | 111 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | keyboard: Tab reaches all three controls with a visible focus ring; Enter on 新任务 opens the dialog |
@@ -1255,59 +1254,59 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | providers-tabs.spec.ts | 235 | toBe | 768 | 768 | — | 几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左 claude-code 右 |
 | providers-tabs.spec.ts | 240 | toBeLessThanOrEqual | ≤ 514.75 | 512.75 | — | 几何：tablist/header/模型行卡同贴内容列左缘，tab 序 pi 左 claude-code 右 |
 | queued-action.spec.ts | 157 | toHaveCSS | opacity: 1 | 1 | — | board: the queued card renders no 开始, the todo card shows it on hover |
-| registry-focus-ring.spec.ts | 86 | toBe | solid | solid | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 86 | toBe | solid | solid | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 86 | toBe | solid | solid | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 86 | toBe | solid | solid | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 86 | toBe | solid | solid | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 87 | toBe | 2px | 2px | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 87 | toBe | 2px | 2px | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 87 | toBe | 2px | 2px | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 87 | toBe | 2px | 2px | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 87 | toBe | 2px | 2px | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 88 | toBe | 2px | 2px | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 88 | toBe | 2px | 2px | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 88 | toBe | 2px | 2px | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 88 | toBe | 2px | 2px | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 88 | toBe | 2px | 2px | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 89 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 89 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 89 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 89 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 89 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 90 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 90 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 90 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 90 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 90 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 91 | not.toBe | rgb(147, 142, 138) | rgb(45, 41, 38) | — | input, select, and button use the global outline |
-| registry-focus-ring.spec.ts | 91 | not.toBe | rgb(143, 137, 133) | rgb(236, 229, 218) | — | the same three controls use the global outline in light |
-| registry-focus-ring.spec.ts | 91 | not.toBe | rgb(147, 142, 138) | rgb(45, 41, 38) | — | a default textarea uses the global outline in both themes |
-| registry-focus-ring.spec.ts | 91 | not.toBe | rgb(147, 142, 138) | rgb(45, 41, 38) | — | clicking the name input shows the global outline, not the gray ring |
-| registry-focus-ring.spec.ts | 91 | not.toBe | rgb(147, 142, 138) | rgb(238, 232, 228) | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 163 | toBe | solid | solid | — | aria-invalid keeps a 3px destructive shadow and the global outline |
-| registry-focus-ring.spec.ts | 164 | toBe | 2px | 2px | — | aria-invalid keeps a 3px destructive shadow and the global outline |
-| registry-focus-ring.spec.ts | 165 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | aria-invalid keeps a 3px destructive shadow and the global outline |
-| registry-focus-ring.spec.ts | 166 | toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | aria-invalid keeps a 3px destructive shadow and the global outline |
-| registry-focus-ring.spec.ts | 176 | toBe | rgb(238, 232, 228) | rgb(238, 232, 228) | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 182 | toBe | rgb(64, 60, 57) | rgb(64, 60, 57) | — | checkbox, switch, and badge use the global outline |
-| registry-focus-ring.spec.ts | 207 | toBe | none | none | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 208 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 211 | toBe | solid | solid | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 212 | toBe | 2px | 2px | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 213 | toBe | 2px | 2px | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 214 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 215 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input-group draws the outline on the shell, not the control |
-| registry-focus-ring.spec.ts | 227 | toBe | solid | solid | — | a segmented option draws the focus ring inset |
-| registry-focus-ring.spec.ts | 228 | toBe | 2px | 2px | — | a segmented option draws the focus ring inset |
-| registry-focus-ring.spec.ts | 229 | toBe | -2px | -2px | — | a segmented option draws the focus ring inset |
-| registry-focus-ring.spec.ts | 230 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | a segmented option draws the focus ring inset |
-| registry-focus-ring.spec.ts | 231 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | a segmented option draws the focus ring inset |
-| registry-focus-ring.spec.ts | 241 | toBe | solid | solid | — | the sidebar user button uses the global outline |
-| registry-focus-ring.spec.ts | 242 | toBe | 2px | 2px | — | the sidebar user button uses the global outline |
-| registry-focus-ring.spec.ts | 243 | toBe | 2px | 2px | — | the sidebar user button uses the global outline |
-| registry-focus-ring.spec.ts | 244 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | the sidebar user button uses the global outline |
-| registry-focus-ring.spec.ts | 245 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the sidebar user button uses the global outline |
+| registry-focus-ring.spec.ts | 89 | toBe | solid | solid | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 89 | toBe | solid | solid | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 89 | toBe | solid | solid | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 89 | toBe | solid | solid | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 89 | toBe | solid | solid | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 90 | toBe | 2px | 2px | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 90 | toBe | 2px | 2px | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 90 | toBe | 2px | 2px | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 90 | toBe | 2px | 2px | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 90 | toBe | 2px | 2px | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 91 | toBe | 2px | 2px | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 91 | toBe | 2px | 2px | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 91 | toBe | 2px | 2px | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 91 | toBe | 2px | 2px | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 91 | toBe | 2px | 2px | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 92 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 92 | toBe | rgb(180, 83, 42) | rgb(180, 83, 42) | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 92 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 92 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 92 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 93 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 93 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 93 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 93 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 93 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 94 | not.toBe | rgb(131, 127, 123) | rgb(62, 58, 52) | — | input, select, and button use the global outline |
+| registry-focus-ring.spec.ts | 94 | not.toBe | rgb(143, 137, 133) | rgb(236, 229, 218) | — | the same three controls use the global outline in light |
+| registry-focus-ring.spec.ts | 94 | not.toBe | rgb(131, 127, 123) | rgb(62, 58, 52) | — | a default textarea uses the global outline in both themes |
+| registry-focus-ring.spec.ts | 94 | not.toBe | rgb(131, 127, 123) | rgb(62, 58, 52) | — | clicking the name input shows the global outline, not the gray ring |
+| registry-focus-ring.spec.ts | 94 | not.toBe | rgb(131, 127, 123) | rgb(236, 231, 223) | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 166 | toBe | solid | solid | — | aria-invalid keeps a 3px destructive shadow and the global outline |
+| registry-focus-ring.spec.ts | 167 | toBe | 2px | 2px | — | aria-invalid keeps a 3px destructive shadow and the global outline |
+| registry-focus-ring.spec.ts | 168 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | aria-invalid keeps a 3px destructive shadow and the global outline |
+| registry-focus-ring.spec.ts | 169 | toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | aria-invalid keeps a 3px destructive shadow and the global outline |
+| registry-focus-ring.spec.ts | 179 | toBe | rgb(236, 231, 223) | rgb(236, 231, 223) | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 185 | toBe | rgb(81, 76, 71) | rgb(81, 76, 71) | — | checkbox, switch, and badge use the global outline |
+| registry-focus-ring.spec.ts | 210 | toBe | none | none | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 211 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 214 | toBe | solid | solid | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 215 | toBe | 2px | 2px | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 216 | toBe | 2px | 2px | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 217 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 218 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | input-group draws the outline on the shell, not the control |
+| registry-focus-ring.spec.ts | 230 | toBe | solid | solid | — | a segmented option draws the focus ring inset |
+| registry-focus-ring.spec.ts | 231 | toBe | 2px | 2px | — | a segmented option draws the focus ring inset |
+| registry-focus-ring.spec.ts | 232 | toBe | -2px | -2px | — | a segmented option draws the focus ring inset |
+| registry-focus-ring.spec.ts | 233 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | a segmented option draws the focus ring inset |
+| registry-focus-ring.spec.ts | 234 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | a segmented option draws the focus ring inset |
+| registry-focus-ring.spec.ts | 244 | toBe | solid | solid | — | the sidebar user button uses the global outline |
+| registry-focus-ring.spec.ts | 245 | toBe | 2px | 2px | — | the sidebar user button uses the global outline |
+| registry-focus-ring.spec.ts | 246 | toBe | 2px | 2px | — | the sidebar user button uses the global outline |
+| registry-focus-ring.spec.ts | 247 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | the sidebar user button uses the global outline |
+| registry-focus-ring.spec.ts | 248 | not.toContain | 0px 0px 0px 3px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | the sidebar user button uses the global outline |
 | resource-back-spa.spec.ts | 50 | toBe | 0 | 0 | — | agent detail back is an in-SPA navigation, not a document reload |
 | resource-back-spa.spec.ts | 50 | toBe | 0 | 0 | — | machine detail back is an in-SPA navigation, not a document reload |
 | review-reject.spec.ts | 166 | toBe | 1 | {"__fn":"() => stepPosts"} | — | FM1/FM2: 静息 review 发送 = steps revision 动作面，draft 清空、chip 即时翻规划中 |
@@ -1316,71 +1315,77 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | review-reject.spec.ts | 259 | toBe | 1 | {"__fn":"() => steerPosts"} | — | FM4: 运行中 review（claimed 步在场）发送保持 steer 语义，不抢动作面 |
 | review-reject.spec.ts | 260 | toBe | 0 | 0 | — | FM4: 运行中 review（claimed 步在场）发送保持 steer 语义，不抢动作面 |
 | review-reject.spec.ts | 280 | toBe | 1 | {"__fn":"() => stepPosts"} | — | FM2: 打回被拒（409 竞态）draft 逐字保留 + 提示行显性，不静默吞 |
-| schedules-live.spec.ts | 119 | toBeLessThanOrEqual | ≤ 488.5 | 478.2001037597656 | — | live face: 保存 fires POST /api/schedules with the form state (#1037) |
+| schedules-live.spec.ts | 119 | toBeLessThanOrEqual | ≤ 488.5 | 475.2662353515625 | — | live face: 保存 fires POST /api/schedules with the form state (#1037) |
 | schedules-live.spec.ts | 137 | toBe | 1 | {"__fn":"() => posts.length"} | — | live face: 保存 fires POST /api/schedules with the form state (#1037) |
 | schedules-live.spec.ts | 146 | toBe | 10 | 10 | — | live face: 保存 fires POST /api/schedules with the form state (#1037) |
 | schedules-live.spec.ts | 147 | toBe | 0 | 0 | — | live face: 保存 fires POST /api/schedules with the form state (#1037) |
 | search-close-flash.spec.ts | 36 | toHaveCSS | transform: none | none | — | 第二下 Ctrl+K 关闭不闪：退出透明度单调递减 |
 | search-close-flash.spec.ts | 36 | toHaveCSS | transform: none | none | — | 三连击：关→开落在开态且输入聚焦 |
-| search-close-flash.spec.ts | 82 | toBeLessThanOrEqual | ≤ 0.4346 | 0.3146 | — | 第二下 Ctrl+K 关闭不闪：退出透明度单调递减 |
-| search-focus.spec.ts | 137 | not.toBe | rgba(0, 0, 0, 0) | rgb(31, 27, 24) | — | 常亮互斥: page-layer pill dims while the panel is open, restores on close |
+| search-close-flash.spec.ts | 82 | toBeLessThanOrEqual | ≤ 0.434784 | 0.314784 | — | 第二下 Ctrl+K 关闭不闪：退出透明度单调递减 |
+| search-focus.spec.ts | 137 | not.toBe | rgba(0, 0, 0, 0) | rgb(36, 32, 27) | — | 常亮互斥: page-layer pill dims while the panel is open, restores on close |
 | search-focus.spec.ts | 142 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => pillBg(pill)"} | — | 常亮互斥: page-layer pill dims while the panel is open, restores on close |
 | search-focus.spec.ts | 152 | not.toBe | rgba(0, 0, 0, 0) | {"__fn":"() => pillBg(pill)"} | — | 常亮互斥: page-layer pill dims while the panel is open, restores on close |
-| search-focus.spec.ts | 162 | not.toBe | rgba(0, 0, 0, 0) | rgb(31, 27, 24) | — | 常亮互斥 holds on the collapsed rail form |
+| search-focus.spec.ts | 162 | not.toBe | rgba(0, 0, 0, 0) | rgb(36, 32, 27) | — | 常亮互斥 holds on the collapsed rail form |
 | search-focus.spec.ts | 165 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => pillBg(rail)"} | — | 常亮互斥 holds on the collapsed rail form |
 | search-focus.spec.ts | 169 | not.toBe | rgba(0, 0, 0, 0) | {"__fn":"() => pillBg(rail)"} | — | 常亮互斥 holds on the collapsed rail form |
 | search-focus.spec.ts | 196 | toHaveCSS | transform: none | none | — | the caret is not clipped where it meets the input edge |
 | search-focus.spec.ts | 223 | toBeGreaterThanOrEqual | ≥ 14 | 16 | — | the caret is not clipped where it meets the input edge |
 | search-result-rows.spec.ts | 100 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => rowBg(first)"} | — | 静息无常亮;hover 哪行亮哪行,且只亮一行 |
 | search-result-rows.spec.ts | 138 | toBe | rgba(0, 0, 0, 0) | {"__fn":"() => rowBg(second)"} | — | 鼠标一动让位:键盘光标交还 hover |
-| segmented-controls.spec.ts | 31 | not.toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | page-tab: unselected hover steps the chip ink — dark + light |
-| segmented-controls.spec.ts | 31 | not.toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 31 | not.toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
-| segmented-controls.spec.ts | 31 | not.toBe | rgb(43, 38, 32) | rgb(94, 86, 77) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
-| segmented-controls.spec.ts | 31 | not.toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
-| segmented-controls.spec.ts | 32 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | page-tab: unselected hover steps the chip ink — dark + light |
-| segmented-controls.spec.ts | 32 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 32 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
-| segmented-controls.spec.ts | 32 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
-| segmented-controls.spec.ts | 32 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
-| segmented-controls.spec.ts | 34 | toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | page-tab: unselected hover steps the chip ink — dark + light |
-| segmented-controls.spec.ts | 34 | toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 34 | toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
-| segmented-controls.spec.ts | 34 | toBe | rgb(43, 38, 32) | rgb(94, 86, 77) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
-| segmented-controls.spec.ts | 34 | toBe | rgb(238, 232, 228) | rgb(211, 206, 202) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
-| segmented-controls.spec.ts | 35 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | page-tab: unselected hover steps the chip ink — dark + light |
-| segmented-controls.spec.ts | 35 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 35 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
-| segmented-controls.spec.ts | 35 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
-| segmented-controls.spec.ts | 35 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
-| segmented-controls.spec.ts | 63 | toBe | rgb(38, 34, 31) | rgb(38, 34, 31) | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
-| segmented-controls.spec.ts | 66 | toBe | rgb(38, 34, 31) | rgb(38, 34, 31) | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
-| segmented-controls.spec.ts | 80 | toBe | 6px | 6px | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
-| segmented-controls.spec.ts | 90 | toEqual | {"x":436,"y":24,"width":51,"height":28} | {"x":436,"y":24,"width":51,"height":28} | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
-| segmented-controls.spec.ts | 109 | toBe | 0px | 0px | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
-| segmented-controls.spec.ts | 110 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
-| segmented-controls.spec.ts | 111 | toBe | 32 | 32 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
-| segmented-controls.spec.ts | 112 | toBe | 2 | 2 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
-| segmented-controls.spec.ts | 113 | toBe | 2 | 2 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
-| segmented-controls.spec.ts | 137 | toBe | rgb(38, 34, 31) | rgb(38, 34, 31) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 143 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
-| segmented-controls.spec.ts | 200 | toBe | 0px | 0px | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 201 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 203 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 204 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236,… | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 205 | toBe | 28 | 28 | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 208 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 210 | toBe | rgba(0, 0, 0, 0) | 28 | — | team layout toggle: segmented face (paper track, white ringed chip) |
-| segmented-controls.spec.ts | 220 | not.toBe | rgb(94, 86, 77) | {"__fn":"() => ink(charter)"} | — | chief tabs: hover steps the ink, click swaps the view |
-| segmented-controls.spec.ts | 221 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | chief tabs: hover steps the ink, click swaps the view |
-| segmented-controls.spec.ts | 248 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 249 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 250 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 251 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 255 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 261 | toEqual | {"pillZ":"0","pillPe":"none","tabZ":"1"} | {"pillZ":"0","pillPe":"none","tabZ":"1"} | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 299 | toEqual | ["left","width"] | {"__fn":"() => page.evaluate(() => [...new Set(window.__pillRuns)].sort())"} | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
-| segmented-controls.spec.ts | 312 | toBeLessThanOrEqual | ≤ 1 | {"__fn":"async () => {\n    const [p, c] = await Promise.all([box(pill), box(charter)]);\n    return Math.max(… | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 33 | toBe | false | rgb(197, 192, 185) | — | page-tab: unselected hover steps the chip ink — dark + light |
+| segmented-controls.spec.ts | 33 | toBe | false | rgb(197, 192, 185) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 33 | toBe | false | rgb(197, 192, 185) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
+| segmented-controls.spec.ts | 33 | toBe | false | rgb(94, 86, 77) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
+| segmented-controls.spec.ts | 33 | toBe | false | rgb(197, 192, 185) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
+| segmented-controls.spec.ts | 37 | not.toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | page-tab: unselected hover steps the chip ink — dark + light |
+| segmented-controls.spec.ts | 37 | not.toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 37 | not.toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
+| segmented-controls.spec.ts | 37 | not.toBe | rgb(43, 38, 32) | rgb(94, 86, 77) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
+| segmented-controls.spec.ts | 37 | not.toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
+| segmented-controls.spec.ts | 38 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | page-tab: unselected hover steps the chip ink — dark + light |
+| segmented-controls.spec.ts | 38 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 38 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
+| segmented-controls.spec.ts | 38 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
+| segmented-controls.spec.ts | 38 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
+| segmented-controls.spec.ts | 40 | toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | page-tab: unselected hover steps the chip ink — dark + light |
+| segmented-controls.spec.ts | 40 | toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 40 | toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
+| segmented-controls.spec.ts | 40 | toBe | rgb(43, 38, 32) | rgb(94, 86, 77) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
+| segmented-controls.spec.ts | 40 | toBe | rgb(236, 231, 223) | rgb(197, 192, 185) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
+| segmented-controls.spec.ts | 41 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | page-tab: unselected hover steps the chip ink — dark + light |
+| segmented-controls.spec.ts | 41 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 41 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | files seg + tasks view toggle: hover steps the unselected ink (dark) |
+| segmented-controls.spec.ts | 41 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | user-menu 外观 seg: hover steps the ink, click switches the theme |
+| segmented-controls.spec.ts | 41 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | branch-dialog seg: hover steps the Git ink, click swaps the tab body |
+| segmented-controls.spec.ts | 69 | toBe | rgb(47, 42, 38) | rgb(47, 42, 38) | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
+| segmented-controls.spec.ts | 72 | toBe | rgb(47, 42, 38) | rgb(47, 42, 38) | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
+| segmented-controls.spec.ts | 86 | toBe | 6px | 6px | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
+| segmented-controls.spec.ts | 96 | toEqual | {"x":436,"y":24,"width":51,"height":28} | {"x":436,"y":24,"width":51,"height":28} | — | page-tab: selected chip keeps its fill under hover, same geometry as the rest state |
+| segmented-controls.spec.ts | 115 | toBe | 0px | 0px | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
+| segmented-controls.spec.ts | 116 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
+| segmented-controls.spec.ts | 117 | toBe | 32 | 32 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
+| segmented-controls.spec.ts | 118 | toBe | 2 | 2 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
+| segmented-controls.spec.ts | 119 | toBe | 2 | 2 | — | page-tab group rides the segmented track (canvas, 32px, 2px inset) |
+| segmented-controls.spec.ts | 143 | toBe | rgb(47, 42, 38) | rgb(47, 42, 38) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 144 | not.toBe | rgb(47, 42, 38) | rgb(26, 22, 18) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 149 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | sched freq: the chosen radio reads against the track, hover steps the rest ink |
+| segmented-controls.spec.ts | 206 | toBe | 0px | 0px | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 207 | toBe | rgb(243, 238, 229) | rgb(243, 238, 229) | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 209 | toBe | rgb(255, 255, 255) | rgb(255, 255, 255) | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 210 | toContain | 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236,… | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 211 | toBe | 28 | 28 | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 214 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 216 | toBe | rgba(0, 0, 0, 0) | 28 | — | team layout toggle: segmented face (paper track, white ringed chip) |
+| segmented-controls.spec.ts | 226 | not.toBe | rgb(94, 86, 77) | {"__fn":"() => ink(charter)"} | — | chief tabs: hover steps the ink, click swaps the view |
+| segmented-controls.spec.ts | 227 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | chief tabs: hover steps the ink, click swaps the view |
+| segmented-controls.spec.ts | 254 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 255 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 256 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 257 | toBeLessThanOrEqual | ≤ 1 | 0 | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 261 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 267 | toEqual | {"pillZ":"0","pillPe":"none","tabZ":"1"} | {"pillZ":"0","pillPe":"none","tabZ":"1"} | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 305 | toEqual | ["left","width"] | {"__fn":"() => page.evaluate(() => [...new Set(window.__pillRuns)].sort())"} | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
+| segmented-controls.spec.ts | 318 | toBeLessThanOrEqual | ≤ 1 | {"__fn":"async () => {\n    const [p, c] = await Promise.all([box(pill), box(charter)]);\n    return Math.max(… | — | chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height |
 | shadcn-primitives.spec.ts | 69 | not.toBe | contents | flex | — | avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝环，img 几何不变 |
 | shadcn-primitives.spec.ts | 72 | toBe | 24 | 24 | — | avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝环，img 几何不变 |
 | shadcn-primitives.spec.ts | 73 | toBe | 24 | 24 | — | avatar 落点定尺盒（#983/#1003）：Root 生成真盒承上游发丝环，img 几何不变 |
@@ -1400,7 +1405,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | sidebar-nav.spec.ts | 133 | toBe | rgb(235, 228, 216) | {"__fn":"() => pillBg(lightRow)"} | — | hover tints the row — dark default + light theme |
 | sidebar-nav.spec.ts | 141 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | rail hover tints the row |
 | sidebar-nav.spec.ts | 143 | toBe | rgba(255, 252, 248, 0.05) | {"__fn":"() => pillBg(row)"} | — | rail hover tints the row |
-| sidebar-nav.spec.ts | 157 | toBe | rgb(31, 27, 24) | rgb(31, 27, 24) | — | selected row keeps its sheet fill under hover |
+| sidebar-nav.spec.ts | 157 | toBe | rgb(36, 32, 27) | rgb(36, 32, 27) | — | selected row keeps its sheet fill under hover |
 | sidebar-seam.spec.ts | 54 | toBe | 0px | 0px | — | board expanded: no seam, no internal divider (light) |
 | sidebar-seam.spec.ts | 54 | toBe | 0px | 0px | — | board expanded: no seam, no internal divider (dark) |
 | sidebar-seam.spec.ts | 55 | toBe | none | none | — | board expanded: no seam, no internal divider (light) |
@@ -1444,13 +1449,13 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | sidebar-visual.spec.ts | 104 | toBe | rgb(235, 228, 216) | rgb(235, 228, 216) | — | selected row = sheet fill + hairline, distinct from hover (light) |
 | sidebar-visual.spec.ts | 104 | toBe | rgba(255, 252, 248, 0.05) | rgba(255, 252, 248, 0.05) | — | selected row = sheet fill + hairline, distinct from hover (dark) |
 | sidebar-visual.spec.ts | 106 | toBeGreaterThan | > 3 | 31 | — | selected row = sheet fill + hairline, distinct from hover (light) |
-| sidebar-visual.spec.ts | 106 | toBeGreaterThan | > 3 | 37.737402972000005 | — | selected row = sheet fill + hairline, distinct from hover (dark) |
+| sidebar-visual.spec.ts | 106 | toBeGreaterThan | > 3 | 34.45 | — | selected row = sheet fill + hairline, distinct from hover (dark) |
 | sidebar-visual.spec.ts | 107 | toBe | rgb(251, 249, 245) | rgb(251, 249, 245) | — | selected row = sheet fill + hairline, distinct from hover (light) |
-| sidebar-visual.spec.ts | 107 | toBe | rgb(31, 27, 24) | rgb(31, 27, 24) | — | selected row = sheet fill + hairline, distinct from hover (dark) |
+| sidebar-visual.spec.ts | 107 | toBe | rgb(36, 32, 27) | rgb(36, 32, 27) | — | selected row = sheet fill + hairline, distinct from hover (dark) |
 | sidebar-visual.spec.ts | 108 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(236,… | — | selected row = sheet fill + hairline, distinct from hover (light) |
-| sidebar-visual.spec.ts | 108 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(45, … | — | selected row = sheet fill + hairline, distinct from hover (dark) |
+| sidebar-visual.spec.ts | 108 | not.toBe | none | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgb(62, … | — | selected row = sheet fill + hairline, distinct from hover (dark) |
 | sidebar-visual.spec.ts | 109 | not.toBe | rgb(235, 228, 216) | rgb(251, 249, 245) | — | selected row = sheet fill + hairline, distinct from hover (light) |
-| sidebar-visual.spec.ts | 109 | not.toBe | rgba(255, 252, 248, 0.05) | rgb(31, 27, 24) | — | selected row = sheet fill + hairline, distinct from hover (dark) |
+| sidebar-visual.spec.ts | 109 | not.toBe | rgba(255, 252, 248, 0.05) | rgb(36, 32, 27) | — | selected row = sheet fill + hairline, distinct from hover (dark) |
 | sidebar-visual.spec.ts | 132 | toBeLessThan | < 2 | 0 | — | machine-online dot sits centered on the 机器 row |
 | skill-import.spec.ts | 119 | toEqual | {"localPath":"/Users/you/skills/deploy-to-prod"} | {"localPath":"/Users/you/skills/deploy-to-prod"} | — | live 导入：201 后弹窗关、列表即现，请求体 = 所填单字段逐字 |
 | skills-page.spec.ts | 86 | toBeGreaterThan | > 0 | 1 | — | live 列表消费 GET /api/skills（server 换源后 wire 形状不变） |
@@ -1468,12 +1473,12 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | spec-brief-card.spec.ts | 128 | toBe | 100% | 100% | — | 3. 图片附件受缩略约束——不再以原尺寸裸图撑破页面 |
 | spec-brief-card.spec.ts | 147 | toBe | 1px | 1px | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
 | spec-brief-card.spec.ts | 151 | toBe | 10px | 10px | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
-| spec-brief-card.spec.ts | 153 | toBe | rgb(45, 41, 38) | rgb(45, 41, 38) | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
-| spec-brief-card.spec.ts | 154 | toBe | rgb(45, 41, 38) | rgb(45, 41, 38) | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
+| spec-brief-card.spec.ts | 153 | toBe | rgb(60, 55, 50) | rgb(60, 55, 50) | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
+| spec-brief-card.spec.ts | 154 | toBe | rgb(62, 58, 52) | rgb(62, 58, 52) | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
 | spec-brief-card.spec.ts | 155 | toBe | 14px | 14px | — | 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） |
 | spec-brief-card.spec.ts | 173 | toBeLessThanOrEqual | ≤ 2 | 0.04399999999998272 | — | 4b. 宽屏下行宽吃 68ch cap（#470 的 60–75 字符带同律） |
 | spec-brief-card.spec.ts | 211 | toBe | baseline | baseline | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
-| spec-brief-card.spec.ts | 212 | not.toBe | rgb(238, 232, 228) | rgb(179, 174, 170) | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
+| spec-brief-card.spec.ts | 212 | not.toBe | rgb(236, 231, 223) | rgb(172, 167, 160) | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
 | spec-brief-card.spec.ts | 213 | toBeLessThanOrEqual | ≤ 1 | 0 | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
 | spec-brief-card.spec.ts | 217 | toBeLessThanOrEqual | ≤ 1 | 0 | — | 6. 有序列表序号与正文区分、与首行基线对齐、双位数不 jog 内容列 (#814 rework) |
 | spec-flow.spec.ts | 127 | toBeLessThan | < 66 | -922 | — | 2. 简报卡随流滚走：滚到底出视口，滚到顶回列首 |
@@ -1492,8 +1497,8 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | spinner-live.spec.ts | 128 | toBe | 9999px | 9999px | — | root is a 16px square, shell a 16px circle, row keeps 20px |
 | spinner-live.spec.ts | 131 | toBe | 1px | 1px | — | root is a 16px square, shell a 16px circle, row keeps 20px |
 | spinner-live.spec.ts | 133 | toBe | 20px | 20px | — | root is a 16px square, shell a 16px circle, row keeps 20px |
-| spinner-live.spec.ts | 149 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue |
-| spinner-live.spec.ts | 151 | toBe | rgb(242, 148, 216) | rgb(242, 148, 216) | — | root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue |
+| spinner-live.spec.ts | 149 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue |
+| spinner-live.spec.ts | 151 | toBe | rgb(240, 146, 109) | rgb(240, 146, 109) | — | root is aria-hidden and shell/ring strokes ride currentColor; label stays the cue |
 | spinner-live.spec.ts | 174 | toBe | 0 | 0 | — | prefers-reduced-motion freezes the spins with the static settle transform |
 | spinner-live.spec.ts | 176 | toBe | none | none | — | prefers-reduced-motion freezes the spins with the static settle transform |
 | spinner-live.spec.ts | 177 | not.toBe | none | matrix(0.5, 0.866025, -0.866025, 0.5, 0, 0) | — | prefers-reduced-motion freezes the spins with the static settle transform |
@@ -1565,7 +1570,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | user-menu-trigger.spec.ts | 256 | toBeLessThanOrEqual | ≤ 1 | 0 | — | #1245 floating menu is a single skin and stays inside the viewport |
 | user-menu-trigger.spec.ts | 258 | not.toContain | 1px | 0 0 0 calc(0px + 0px) currentcolor | — | #1245 floating menu is a single skin and stays inside the viewport |
 | user-menu-trigger.spec.ts | 259 | toBe | rgba(0, 0, 0, 0) | rgba(0, 0, 0, 0) | — | #1245 floating menu is a single skin and stays inside the viewport |
-| user-menu-trigger.spec.ts | 260 | not.toBe | rgba(0, 0, 0, 0) | rgb(38, 34, 31) | — | #1245 floating menu is a single skin and stays inside the viewport |
+| user-menu-trigger.spec.ts | 260 | not.toBe | rgba(0, 0, 0, 0) | rgb(55, 50, 45) | — | #1245 floating menu is a single skin and stays inside the viewport |
 | user-menu-trigger.spec.ts | 262 | toBe | none | none | — | #1245 floating menu is a single skin and stays inside the viewport |
 | user-menu-trigger.spec.ts | 263 | toBe | top | top | — | #1245 floating menu is a single skin and stays inside the viewport |
 | user-menu-trigger.spec.ts | 264 | toBeGreaterThanOrEqual | ≥ 0 | 449 | — | #1245 floating menu is a single skin and stays inside the viewport |
@@ -1579,7 +1584,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | visual-polish.spec.ts | 99 | not.toContain | inset | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | board card rides the single-source edge ring + card-tier shadow (light) |
 | visual-polish.spec.ts | 99 | not.toContain | inset | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | board card rides the single-source edge ring + card-tier shadow (dark) |
 | visual-polish.spec.ts | 100 | toContain | rgba(80, 60, 30, 0.04) 0px 1px 2px 0px, rgb(236, 229, 218) 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | board card rides the single-source edge ring + card-tier shadow (light) |
-| visual-polish.spec.ts | 100 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(45, 41, 38) 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | board card rides the single-source edge ring + card-tier shadow (dark) |
+| visual-polish.spec.ts | 100 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px, rgb(62, 58, 52) 0px 0px 0px 1px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.… | — | board card rides the single-source edge ring + card-tier shadow (dark) |
 | visual-polish.spec.ts | 112 | toBe | 0px | 0px | — | board column container rides the same edge ring + card-tier shadow (light) |
 | visual-polish.spec.ts | 112 | toBe | 0px | 0px | — | board column container rides the same edge ring + card-tier shadow (dark) |
 | visual-polish.spec.ts | 113 | toBe | 0px | 0px | — | board column container rides the same edge ring + card-tier shadow (light) |
@@ -1591,7 +1596,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | visual-polish.spec.ts | 129 | toBe | 18px | 18px | — | notify banner rides the same edge ring + card-tier shadow (light) |
 | visual-polish.spec.ts | 129 | toBe | 18px | 18px | — | notify banner rides the same edge ring + card-tier shadow (dark) |
 | visual-polish.spec.ts | 132 | toContain | rgba(80, 60, 30, 0.04) 0px 1px 2px 0px | rgb(236, 229, 218) 0px 0px 0px 1px inset, rgba(80, 60, 30, 0.04) 0px 1px 2px 0px | — | notify banner rides the same edge ring + card-tier shadow (light) |
-| visual-polish.spec.ts | 132 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px | rgb(45, 41, 38) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px | — | notify banner rides the same edge ring + card-tier shadow (dark) |
+| visual-polish.spec.ts | 132 | toContain | rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px | rgb(62, 58, 52) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.4) 0px 1px 2px 0px, rgba(0, 0, 0, 0.4) 0px 2px 8px 0px | — | notify banner rides the same edge ring + card-tier shadow (dark) |
 | visual-polish.spec.ts | 145 | toBe | 0px | 0px | — | account popover rides the V2 shell border, keeps the overlay-plate hard shadow (light) |
 | visual-polish.spec.ts | 145 | toBe | 0px | 0px | — | account popover rides the V2 shell border, keeps the overlay-plate hard shadow (dark) |
 | visual-polish.spec.ts | 146 | toBe | 10px | 10px | — | account popover rides the V2 shell border, keeps the overlay-plate hard shadow (light) |
@@ -1601,6 +1606,7 @@ Review procedure (#910 裁定 5): every DRIFT row is either expected drift (the 
 | visual-polish.spec.ts | 148 | toContain | 0px 0px 0px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | account popover rides the V2 shell border, keeps the overlay-plate hard shadow (light) |
 | visual-polish.spec.ts | 148 | toContain | 0px 0px 0px | rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, … | — | account popover rides the V2 shell border, keeps the overlay-plate hard shadow (dark) |
 | visual-polish.spec.ts | 173 | not.toBe | rgb(251, 249, 245) | rgb(243, 238, 229) | — | sidebar sits on canvas beside the sheet, no seam of its own (light) |
+| visual-polish.spec.ts | 173 | not.toBe | rgb(36, 32, 27) | rgb(26, 22, 18) | — | sidebar sits on canvas beside the sheet, no seam of its own (dark) |
 | visual-polish.spec.ts | 174 | toBe | 0px | 0px | — | sidebar sits on canvas beside the sheet, no seam of its own (light) |
 | visual-polish.spec.ts | 174 | toBe | 0px | 0px | — | sidebar sits on canvas beside the sheet, no seam of its own (dark) |
 | visual-polish.spec.ts | 175 | toBe | none | none | — | sidebar sits on canvas beside the sheet, no seam of its own (light) |

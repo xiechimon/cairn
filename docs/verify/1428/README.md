@@ -34,7 +34,9 @@
 
 ## 实测表
 
-`shadow-slots.md`：18 槽 × 亮暗 改前/改后 computed 值逐行判定；原始 dump 在 `slots-before.json` / `slots-after.json`（含 1x/2x 与 6 个渲染面）。
+`shadow-slots.md`：18 槽 × 亮暗 改前/改后 computed 值逐行判定；原始 dump 在 `slots-before.json` / `slots-after.json`（含 1x/2x 与 6 个渲染面），两份都在分支基点 `498517de` 上量，隔离本票自己的改动。
+
+分支合入 main 后（`66c7985c`，吸收 #1396 暗色定稿）再量一次：`slots-after-merged.json`。与 `slots-after.json` 的差只在暗色环的输入色：`--border` 从 #2d2926 变 #3e3a34（rgb(62, 58, 52)）、`--ring-inset-highlight` / `--border-soft` 随新 `--foreground` 变；三档的投影池逐字节相同，亮色全部相同。#1396 没动任何投影槽，梯的派生不受影响。
 
 有意变化清单（其余相等或只是环移到末尾）：
 
