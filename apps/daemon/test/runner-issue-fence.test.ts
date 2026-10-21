@@ -7,19 +7,29 @@
 //   F6 claim 缺 meta.titleFinal 时（旧 server 或非 github 形态），github-issue
 //      任务的标题也不进 systemPrompt 的任务元信息段
 //   F1 非 GitHub 导入任务的首轮 prompt 逐字节不变
+// 补段（docs/verify/1406/p5-3-fix-failure-modes.txt）：
+//   S3 merge 新会话、ci-fix 组合行、#1312 降级新会话同样进围栏
+//   A1 任务 spec 里的图片 token 行经 runStep 照常交付（build、降级新会话、
+//      server 组好围栏的 verify 指令），锚行留在围栏里
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type AgentBackend,
   appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
   buildRestartPrompt,
+  buildTaskPromptText,
+  buildVerifyStepPrompt,
   type ClaimedStep,
   composeTaskPromptWithInstruction,
+  formatAttachmentToken,
+  type MachineAttachmentResponse,
   PLAN_FILE_NAME,
 } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
+import { SessionNotResumableError } from '../src/backend/errors.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import { buildTaskPrompt, runStep } from '../src/runner.js';
@@ -54,11 +64,13 @@ const silent: DaemonLogger = {
 /** 来源两列另起变量再并入 todo：先于实现的测试提交里 claim 类型还没有这两列，
  *  变量引用不触发对象字面量的多余属性检查。 */
 function claimed(opts: {
-  kind: 'plan' | 'build';
+  kind: 'plan' | 'build' | 'merge' | 'verify';
   source: { sourceKind: string | null; sourceRef: string | null };
   instruction?: string;
   title?: string;
   spec?: string;
+  /** 续接会话 id（缺省 = 新会话）。 */
+  continueId?: string;
 }): ClaimedStep {
   const todo = {
     id: 't1',
@@ -70,7 +82,10 @@ function claimed(opts: {
   return {
     step: { id: 's1', buildId: 'conv-1', kind: opts.kind, machineId: 'm1', createdAt: 1 },
     conversationId: 'conv-1',
-    session: { action: 'new', sessionId: null },
+    session:
+      opts.continueId !== undefined
+        ? { action: 'continue', sessionId: opts.continueId }
+        : { action: 'new', sessionId: null },
     ...(opts.instruction !== undefined ? { instruction: opts.instruction } : {}),
     todo,
     project: { id: 'p1', name: 'demo', repo: null },
@@ -88,19 +103,39 @@ function claimed(opts: {
 
 const GH = { sourceKind: 'github-issue', sourceRef: 'github:octo/alpha#7' };
 
-/** 跑一步，返回 createSession 收到的 prompt 与 systemPrompt。 */
-async function deliver(step: ClaimedStep): Promise<{
+/** 跑一步，返回 createSession 收到的 prompt、systemPrompt 与内联图片。
+ *  missingSession = 续接会话时本机找不到会话（#1312 降级新会话）。 */
+async function deliver(
+  step: ClaimedStep,
+  opts: {
+    attachments?: Record<string, MachineAttachmentResponse>;
+    missingSession?: boolean;
+  } = {},
+): Promise<{
   prompt: string;
   systemPrompt: string;
+  images: readonly unknown[];
   home: string;
 }> {
   const home = mkdtempSync(join(tmpdir(), 'pacman-issue-fence-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
-  const { backend, created } = fakeBackend([{ type: 'done', usage: [] }]);
+  const fake = fakeBackend([{ type: 'done', usage: [] }]);
+  const backend: AgentBackend =
+    opts.missingSession === true
+      ? {
+          ...fake.backend,
+          async continueSession(id) {
+            throw new SessionNotResumableError(id);
+          },
+        }
+      : fake.backend;
+  const created = fake.created;
+  const client = new FakeMachineApi();
+  client.attachments = { ...opts.attachments };
   await runStep(
     {
-      client: new FakeMachineApi(),
+      client,
       journal: new StepJournal(paths.outboxDir),
       backendFor: () => backend,
       logger: silent,
@@ -112,8 +147,17 @@ async function deliver(step: ClaimedStep): Promise<{
     step,
   );
   expect(created).toHaveLength(1);
-  const opts = created[0]?.opts as { prompt?: string; systemPrompt?: string };
-  return { prompt: opts.prompt ?? '', systemPrompt: opts.systemPrompt ?? '', home };
+  const sent = created[0]?.opts as {
+    prompt?: string;
+    systemPrompt?: string;
+    promptImages?: readonly unknown[];
+  };
+  return {
+    prompt: sent.prompt ?? '',
+    systemPrompt: sent.systemPrompt ?? '',
+    images: sent.promptImages ?? [],
+    home,
+  };
 }
 
 /** 真收尾行之后的部分。正文里那行伪造的收尾行带 `> ` 前缀，按行首匹配跳过它。 */
@@ -159,6 +203,85 @@ describe('F2 GitHub issue 任务的首轮 prompt 进围栏', () => {
     const { prompt } = await deliver(claimed({ kind: 'build', source: GH, instruction }));
     expectFenced(prompt);
     expect(afterFence(prompt)).toBe(`\n\n${instruction}`);
+  });
+});
+
+describe('S3 其余 prompt 变体同样进围栏', () => {
+  test('merge 新会话：prompt 就是围栏本身', async () => {
+    const step = claimed({ kind: 'merge', source: GH });
+    const { prompt } = await deliver(step);
+    expectFenced(prompt);
+    expect(prompt.endsWith(FOOT)).toBe(true);
+  });
+
+  test('ci-fix 组合行：围栏在前，修复指令在围栏之外', async () => {
+    const instruction = '[ci-fix] PR #12 的 CI 第 1 轮失败：\n- lint（failure）：biome ci 报错';
+    const { prompt } = await deliver(claimed({ kind: 'build', source: GH, instruction }));
+    expectFenced(prompt);
+    expect(afterFence(prompt)).toBe(`\n\n${instruction}`);
+  });
+
+  test('#1312 降级新会话：本机找不到会话时改投的原任务进围栏', async () => {
+    const step = claimed({ kind: 'build', source: GH, continueId: 'pi-sess-gone' });
+    const { prompt } = await deliver(step, { missingSession: true });
+    expectFenced(prompt);
+    expect(prompt).toBe(buildTaskPrompt(step));
+  });
+});
+
+describe('A1 围栏里的图片 token 行经 runStep 照常交付', () => {
+  const PNG = Buffer.from('89504e470d0a1a0a', 'hex');
+  const attachments = {
+    att1: {
+      fileName: 'shot.png',
+      mimeType: 'image/png',
+      sizeBytes: PNG.byteLength,
+      contentBase64: PNG.toString('base64'),
+    },
+  };
+  const spec = `${ISSUE_BODY}\n\n${formatAttachmentToken('shot.png', 'team1/att1.png')}`;
+
+  function expectImageInFence(prompt: string, images: readonly unknown[]): void {
+    expect(images).toHaveLength(1);
+    expectFenced(prompt);
+    const lines = prompt.split('\n');
+    const anchor = lines.indexOf('> [image attached: shot.png]');
+    expect(anchor).toBeGreaterThan(0);
+    expect(anchor).toBeLessThan(lines.indexOf(FOOT));
+    expect(prompt).not.toContain('attachment:team1/att1.png');
+  }
+
+  test('新会话 build 步', async () => {
+    const { prompt, images } = await deliver(claimed({ kind: 'build', source: GH, spec }), {
+      attachments,
+    });
+    expectImageInFence(prompt, images);
+  });
+
+  test('#1312 降级新会话', async () => {
+    const step = claimed({ kind: 'build', source: GH, spec, continueId: 'pi-sess-gone' });
+    const { prompt, images } = await deliver(step, { attachments, missingSession: true });
+    expectImageInFence(prompt, images);
+  });
+
+  test('verify 步：server 组好围栏的指令', async () => {
+    const instruction = buildVerifyStepPrompt({
+      ticketRef: '7',
+      taskText: buildTaskPromptText(ISSUE_TITLE, spec, GH),
+      planText: '',
+      pr: null,
+    });
+    const { prompt, images } = await deliver(
+      claimed({ kind: 'verify', source: GH, spec, instruction }),
+      { attachments },
+    );
+    expect(images).toHaveLength(1);
+    const lines = prompt.split('\n');
+    const head = lines.findIndex((l) => l.startsWith(HEAD));
+    const foot = lines.indexOf(FOOT);
+    expect(head).toBeGreaterThan(0);
+    for (const line of lines.slice(head + 1, foot)) expect(line, line).toMatch(/^>( |$)/);
+    expect(lines.slice(head + 1, foot)).toContain('> [image attached: shot.png]');
   });
 });
 

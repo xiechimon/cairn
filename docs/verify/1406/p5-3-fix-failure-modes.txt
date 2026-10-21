@@ -1,0 +1,87 @@
+#1406 P5 segment 3 follow-up: the two blocking findings pr-gate reported on #1475 (run 1, head 7f5d250e),
+plus four cheap suggestions from the same verdict.
+Written before the tests and the code (AGENTS.md: list failure modes first).
+Base: origin/main 24db1c4d (contains #1475 as 61e6cb26).
+
+Invariant kept from #1475: inside the 「GitHub issue 原文」 fence, every line written by the issue author
+starts with the quote prefix "> " (an empty line is ">"); only the head and the closing line are bare.
+
+== Blocking 1: image tokens in issue-sourced task text are no longer delivered ==
+
+Paths, read from the code:
+  Q1 plan / build / merge new session, #720 composite (restart, ci-fix, plan contract), #1312 degraded
+     fresh session: daemon runner buildTaskPrompt -> shared buildTaskPromptText fences title + spec
+     -> runner resolveStepImages (runner.ts:537 and :1384).
+  Q2 verify: server builds.ts maybeEnqueueVerifyStep fences the task text inside the verify instruction;
+     the daemon runs resolveStepImages on the instruction.
+  Q3 steer (machine-loop.ts) and review / chief instructions: no fence; steer text goes through
+     resolveStepImages, chief does not.
+  Other users of ATTACHMENT_TOKEN_LINE: shared records/chief.ts (chief thread title) and task-meta.ts
+  (title derivation). They read the raw spec or message, never fenced text; they keep the regex as is.
+
+Failure modes:
+  A1  Inline image (png/jpeg/gif/webp) token line in the spec of an issue-sourced task is not delivered
+      (no image, no "not delivered" note). Must be delivered again on Q1 and Q2.
+  A2  The rewrite of a quoted token line leaves the fence: the anchor line "[image attached: <name>]"
+      replaces the token line without the "> " prefix, so a bare line appears between head and close.
+      Every rewritten or added line must carry the prefix of the line it came from.
+  A3  Same for the materialized path note (svg/bmp/ico/avif) and the two "not delivered" notes
+      (download failure, key grammar). A download error message can hold "\n" (MachineApiError carries
+      the raw response body, e.g. a proxy HTML page); every line of a note inside the fence gets the prefix.
+  A4  Non-image token (pdf, txt) inside the fence: untouched, the quoted line stays byte for byte.
+  A5  Alt text is issue-author text. A token line whose alt text holds the closing line or the head of
+      the fence must not produce a bare closing line; the alt text never leaves the quoted line.
+  A6  A blockquote in the issue body ("> ![x](attachment:...)") arrives as "> > ![x]...". It was not a
+      whole-line token before #1475 either; it stays undelivered (only one quote level is the fence).
+  A7  Quoted token lines outside a fence (a user's own markdown blockquote in a steer, restart feedback,
+      a plain task spec) stay as today: not downloaded, no note. The #730 whole-line contract and the web
+      chip rendering (no chip for a quoted token) stay aligned; only the fence's own prefix is peeled.
+  A8  The fence region ends at the real closing line: a "> " token line after it (for example in
+      restart feedback composed after the fence) is outside the fence (A7 applies).
+  A9  Spoofing the region: issue text cannot open or close a fence region, because every issue line
+      starts with "> ". Only the bare head line (starts with 【GitHub issue 原文, is not the closing
+      line) opens, only the bare closing line closes.
+  A10 Plain tasks (sourceKind null, orchestration, github-issue-self): resolveStepImages output is
+      byte for byte what it was (bare token lines, no fence).
+  A11 Mixed versions: a daemon older than this fix running a verify step for a server at or after
+      #1475 gets the fenced verify instruction and does not deliver the image (no note either). Not
+      fixable on the server without dropping the fence for those lines; reported, fixed by upgrading
+      the daemon. Plan / build on a daemon from before #1475 is unfenced and delivers as before.
+
+== Blocking 2: issue title copied unfenced into chief wake prompts ==
+
+Path: todos.ts phase change -> chief.ts triggerChiefWakes -> wakeFacts builds `#n「<title>」` into the
+gate / settle / failed instruction -> enqueueChiefStep -> chief claim instruction.
+
+Failure modes:
+  W1  Issue-sourced todo (sourceKind 'github-issue'): the title appears in the wake prompt outside a
+      fence, inside the server's own instruction sentence. For gate (confirm and review), settle and
+      failed, the sentence names the task by #seqNum only; the title appears only as a quoted line
+      inside a fence built by the same helper (fenceIssueText), labelled with the issue ref.
+  W2  A title that closes 「」, holds the closing line, or carries an instruction cannot escape: same
+      fence helper, one bare closing line.
+  W3  Split parent gate of an issue-sourced todo: same rendering.
+  W4  Other todos (null, orchestration, github-issue-self): wake text byte for byte as before
+      (settle and failed pinned verbatim; gate pinned on its first sentence, so the pending G9 wording
+      change in the gate text merges without touching these tests).
+  W5  The chief system rule names fenced text and GitHub text in tool results, not wake prompts. It
+      must name wake prompts too.
+  W6  Visible change, accepted: the wake echo row in the chief thread (web mapChiefStream renders the
+      wake prompt after stripping the [wake:...] marker) shows the fence for issue-sourced tasks.
+  Out of scope (filed separately by the orchestrator): split children losing the issue origin; the
+  pre-existing suppression of delivery notes by a quoted line.
+
+== Suggestions folded in ==
+
+  C1  Format characters (Unicode Cf: bidi overrides U+202A-202E / U+2066-2069, zero-width U+200B-200D,
+      U+FEFF, soft hyphen, tag characters U+E0000-E007F) in issue text pass into the fence. Strip them
+      in fenceIssueText (same rule as cleanGithubText for GitHub text in tool results); the fence
+      structure is unaffected.
+  C2  Plain tasks keep Cf characters byte for byte (only issue text is cleaned).
+  C3  Known limit: a transcript row logged by a #1475 daemon for an issue task whose title or spec
+      holds Cf characters no longer equals the new fenced form; web classifyUserText then shows it as a
+      user bubble. Needs Cf characters in an imported issue and a daemon from the #1475 window.
+  S1  quotesIssueFence: one-line helper, one call site; inline it (AGENTS.md).
+  S2  docs/spec/02 §4.4 does not mention that save_memory refuses fenced text.
+  S3  Prompt variants named in #1475 without a direct test: merge new session, ci-fix composite,
+      degraded fresh session (#1312), and classifyUserText for a fenced row with the confirmed-plan note.
