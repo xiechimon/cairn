@@ -439,8 +439,9 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
   return prepareStopFor(deps, todoId, 'done');
 }
 
-/** #1445 卡被写离执行中之后的停半边：关闭（closed），或被 raw PATCH 挪回待
- *  开始（web 走 /reset）。停掉 latest build 的活动步：pending / waiting_quota
+/** #1445 卡被写离执行中之后的停半边：关闭（closed），被 raw PATCH 挪回待开始
+ *  或标完成（web 走 /reset 与 stop-and-done），或经 complete_todos 标完成
+ *  （#1451）。停掉 latest build 的活动步：pending / waiting_quota
  *  即时停，不再可领、不占队列位次；claimed 委托停并预定 keep，回报
  *  done(stopped) 时 applyStoppedStep 不动相位。无 latest build / 无活动步 =
  *  no-op。 */

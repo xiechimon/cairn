@@ -13,12 +13,16 @@
 // 7. stop-and-done（#1247）的预定还在途时关卡：回报落账按预定把卡从 closed
 //    写成 done。
 // 8. #1447 起 queued 住执行中，canBoardDrop 放行 queued→todo；raw PATCH 把
-//    queued 卡挪回待开始不经 /reset，pending 步原样留着，机器照领。（queued→
-//    done 不在此列：#1247 钉了 raw PATCH done 保留 pending 步，见
-//    persona-split-verify「manual done leaves the pending step running」。）
+//    queued 卡挪回待开始不经 /reset，pending 步原样留着，机器照领。
 // 9. 关一张 claimed 步在跑的卡、回报到达前又重开：gate 回落把重开后的相位
 //    覆盖掉。
 // 10. raw PATCH 把 planning / building 卡挪回待开始：claimed 步零通知、继续跑。
+// 11. #1451 raw PATCH 把执行中的卡标完成（看板走 stop-and-done，不经这里）：
+//     queued 的 pending 步照领；planning 的 claimed 步零通知、继续跑。
+// 12. #1451 chief / MCP complete_todos 把 building 卡标完成（漏斗的
+//     building→done 边本为拆卡父收口而设）：claimed 步零通知、继续跑。
+// 13. 修复后的回报落账不得把卡从 done 挪走；无活动步的 done（review 源）
+//     不发任何停止。
 
 import { STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -63,8 +67,9 @@ function machineDepsOf(s: TestServer) {
 /** 一张卡 + 它的 build + 一个 plan 步；agent 绑一台在线 pi 机器，步若 pending
  *  即可被这台机器认领（claimStep 的正向控制见 6）。 */
 function makeWorld(opts: {
-  phase: 'queued' | 'planning' | 'closed';
-  stepStatus: 'pending' | 'claimed';
+  phase: 'queued' | 'planning' | 'building' | 'review' | 'closed';
+  stepStatus: 'pending' | 'claimed' | 'done';
+  stepKind?: 'plan' | 'build';
   /** claimed 步的心跳 / 领取时刻距今（缺省 = 新鲜，扫尾不碰）。 */
   claimedAgo?: number;
   machineOnline?: boolean;
@@ -135,7 +140,7 @@ function makeWorld(opts: {
     .values({
       id: stepId,
       buildId,
-      kind: 'plan',
+      kind: opts.stepKind ?? 'plan',
       status: opts.stepStatus,
       ...(opts.stepStatus === 'claimed'
         ? { machineId, claimedAt, lastHeartbeatAt: claimedAt }
@@ -290,5 +295,85 @@ describe('#1445 卡离开执行中后，停止回报不再改相位', () => {
     expect(events.some((e) => e.type === 'stop')).toBe(true);
     applyStoppedStep(w.s.svc, w.stepId);
     expect(todoPhase(w)).toBe('todo');
+  });
+});
+
+describe('#1451 把执行中的卡标完成也停活动步', () => {
+  const stopEvents = (w: World) => {
+    const events: { type: string }[] = [];
+    w.s.machineHub.subscribe(w.teamId, (ev) => {
+      if ('type' in ev) events.push(ev as { type: string });
+    });
+    return events;
+  };
+
+  test('raw PATCH queued → done：步 stopped，机器领不到', async () => {
+    const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'done' });
+    expect(res.status).toBe(200);
+    expect(todoPhase(w)).toBe('done');
+    expect(await claim(w)).toBeNull();
+    expect(stepStatus(w)).toBe('stopped');
+  });
+
+  test('raw PATCH planning → done：委托停 claimed 步，回报后卡仍是 done', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    const events = stopEvents(w);
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'done' });
+    expect(res.status).toBe(200);
+    expect(
+      w.s.db
+        .select()
+        .from(stopPendingTable)
+        .all()
+        .map((p) => p.stepId),
+    ).toEqual([w.stepId]);
+    expect(events.some((e) => e.type === 'stop')).toBe(true);
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(todoPhase(w)).toBe('done');
+  });
+
+  test('complete_todos 标 building 卡完成：委托停 claimed 步，回报后卡仍是 done', () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    const events = stopEvents(w);
+    const out = transitionTodos(chiefDepsOf(w), w.teamId, [w.todoId], 'done', chiefActor);
+    expect(out.transitioned).toEqual([w.todoId]);
+    expect(
+      w.s.db
+        .select()
+        .from(stopPendingTable)
+        .all()
+        .map((p) => p.stepId),
+    ).toEqual([w.stepId]);
+    expect(events.some((e) => e.type === 'stop')).toBe(true);
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(todoPhase(w)).toBe('done');
+  });
+
+  test('控制组：review → done（无活动步）不发停止', async () => {
+    const patched = makeWorld({ phase: 'review', stepStatus: 'done', stepKind: 'build' });
+    const patchEvents = stopEvents(patched);
+    const res = await req(patched.s.app, 'PATCH', `/api/todos/${patched.todoId}`, {
+      phase: 'done',
+    });
+    expect(res.status).toBe(200);
+    expect(todoPhase(patched)).toBe('done');
+    expect(patchEvents.some((e) => e.type === 'stop')).toBe(false);
+
+    const completed = makeWorld({ phase: 'review', stepStatus: 'done', stepKind: 'build' });
+    const completeEvents = stopEvents(completed);
+    const out = transitionTodos(
+      chiefDepsOf(completed),
+      completed.teamId,
+      [completed.todoId],
+      'done',
+      {
+        kind: 'user',
+        name: '我',
+      },
+    );
+    expect(out.transitioned).toEqual([completed.todoId]);
+    expect(completeEvents.some((e) => e.type === 'stop')).toBe(false);
+    expect(completed.s.db.select().from(stopPendingTable).all()).toEqual([]);
   });
 });
