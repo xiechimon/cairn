@@ -148,8 +148,10 @@ const matchedProtected = changedFiles.filter(isProtected)
 // withFiles false: the safety reviewer lists the files from git itself, so its
 // list is not anchored on the caller's.
 function readRules(tag, withFiles = true) {
-  const base = `refs/pr-gate/${pr}/${tag}/base`
-  const head = `refs/pr-gate/${pr}/${tag}/head`
+  // The head is in the path, so a rerun on a new head does not delete the
+  // refs of a run still going on the old one (run 8).
+  const base = `refs/pr-gate/${pr}/${headSha.slice(0, 12)}/${tag}/base`
+  const head = `refs/pr-gate/${pr}/${headSha.slice(0, 12)}/${tag}/head`
   return `PR #${pr} of ${REPO}, ticket #${ticket}, head ${headSha}.
 - Fetch into refs of your own, without touching the shared working tree: \`git fetch origin +refs/heads/main:${base} +refs/pull/${pr}/head:${head}\`. If git reports a lock on a ref, wait five seconds and fetch again. Then confirm \`git rev-parse ${head}\` prints ${headSha}. If it prints another SHA, report that SHA as headSha and stop.
 - Read the change with \`git diff ${base}...${headSha}\` and files with \`git show ${headSha}:<path>\`. Never checkout, switch, reset, stash, commit or push in the shared clone (docs/pr-review.md step 4). When you are done, delete your refs with \`git update-ref -d ${base}\` and \`git update-ref -d ${head}\`.

@@ -31,11 +31,16 @@ async function gate(args, { reviews = {}, votes = {}, calls = [] } = {}) {
   };
   // parallel and pipeline stand in for the Workflow globals of the same names.
   const parallel = (thunks) => Promise.all(thunks.map((t) => t().catch(() => null)));
+  // As in the Workflow runtime, a stage that throws drops its item to null.
   const pipeline = (items, ...stages) =>
     Promise.all(
       items.map(async (item, idx) => {
         let r = item;
-        for (const s of stages) r = await s(r, item, idx);
+        try {
+          for (const s of stages) r = await s(r, item, idx);
+        } catch {
+          return null;
+        }
         return r;
       }),
     );
@@ -114,7 +119,7 @@ const cases = [
     async () => {
       const files = ['scripts/lint-warning-cap.mjs'];
       const r = await gateFiles(files);
-      return r.mergedBy === 'user';
+      return r.mergedBy === 'user' && r.protectedPaths.includes(files[0]);
     },
   ],
   [
@@ -426,6 +431,55 @@ const cases = [
           return false;
       }
       return true;
+    },
+  ],
+  [
+    'a glob star does not cross a slash: an extra directory before src/ leaves the auto-merge set (run 8)',
+    async () => {
+      for (const f of ['apps/web/public/src/x.js', 'packages/shared/dist/src/x.js']) {
+        const r = await gateFiles([f]);
+        if (r.mergedBy !== 'user') return false;
+      }
+      return true;
+    },
+  ],
+  [
+    'a deleted colocated .spec file outside a test directory routes to the user (run 8)',
+    async () => {
+      const files = ['apps/web/src/foo.spec.ts'];
+      const r = await gate(
+        { ...base, changedFiles: files, deletedFiles: files },
+        { reviews: safetyFiles(files) },
+      );
+      return (
+        r.mergedBy === 'user' && r.humanReasons.some((x) => x.startsWith('deleted test files'))
+      );
+    },
+  ],
+  [
+    'a dimension whose review breaks the second stage counts as missing and keeps go false (run 8)',
+    async () => {
+      const r = await gate(base, {
+        reviews: { ...safetyFiles(base.changedFiles), tests: { findings: null } },
+      });
+      return r.go === false && r.missing.includes('tests');
+    },
+  ],
+  [
+    "private refs carry the head, so two runs on one PR do not delete each other's refs (run 8)",
+    async () => {
+      const calls = [];
+      await gate(base, { reviews: safetyFiles(base.changedFiles), calls });
+      return (
+        calls.length > 0 &&
+        calls.every((c) => {
+          const refs = c.prompt.match(/refs\/pr-gate\/[^\s`]+/g) ?? [];
+          return (
+            refs.length > 0 &&
+            refs.every((ref) => ref.startsWith(`refs/pr-gate/1/${HEAD.slice(0, 12)}/`))
+          );
+        })
+      );
     },
   ],
   [
