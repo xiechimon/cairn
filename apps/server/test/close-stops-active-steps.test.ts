@@ -27,14 +27,19 @@
 //     回落仍把它写回 confirm。
 // 15. 失联扫尾对已完成的卡同样放行：残留 pending 步不停，失联 claimed 步被
 //     释放回 pending、又能被领。
+// 16. #1453 停止在途时步先正常跑完、回报 success：completeStep 照常推相位——
+//     closed / done 卡的 confirm、review 边不合法，回报 409、daemon journal
+//     每次重启重报；挪回待开始的卡被推进 confirm；无方案文档的 plan 步给
+//     已离开执行中的卡补排重写步，机器照领。
 
-import { STOP_MESSAGE } from '@pacman/shared';
+import { type MachineDoneBody, STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
   machine as machineTable,
+  plan as planTable,
   project as projectTable,
   step as stepTable,
   stopPending as stopPendingTable,
@@ -46,7 +51,7 @@ import {
   sweepAbandonedBuildSteps,
 } from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
-import { claimStep } from '../src/services/machines.js';
+import { claimStep, finishStep } from '../src/services/machines.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -427,5 +432,68 @@ describe('#1451 预定丢失与失联扫尾：已完成同已关闭', () => {
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     expect(stepStatus(w)).toBe('stopped');
     expect(todoPhase(w)).toBe('done');
+  });
+});
+
+describe('#1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡', () => {
+  const success = (extra: Partial<MachineDoneBody> = {}): MachineDoneBody => ({
+    status: 'success',
+    ...extra,
+  });
+  const report = (w: World, body: MachineDoneBody) =>
+    finishStep(machineDepsOf(w.s), w.machineId, w.stepId, body);
+  const withPlanDoc = (w: World) =>
+    w.s.db
+      .insert(planTable)
+      .values({
+        id: `plan-${w.buildId}`,
+        buildId: w.buildId,
+        content: '# plan',
+        stepId: null,
+        createdAt: w.base,
+      })
+      .run();
+  const move = async (w: World, phase: string) =>
+    expect((await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase })).status).toBe(200);
+
+  test('closed 卡的 plan 步成功回报（有方案文档）：回报不抛，步 done，卡仍 closed', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    withPlanDoc(w);
+    await move(w, 'closed');
+    await expect(report(w, success())).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('closed');
+  });
+
+  test('done 卡的 build 步成功回报：回报不抛，卡仍 done', async () => {
+    const w = makeWorld({ phase: 'building', stepStatus: 'claimed', stepKind: 'build' });
+    await move(w, 'done');
+    await expect(report(w, success({ hasChanges: true }))).resolves.toBeUndefined();
+    expect(stepStatus(w)).toBe('done');
+    expect(todoPhase(w)).toBe('done');
+  });
+
+  test('挪回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    withPlanDoc(w);
+    await move(w, 'todo');
+    await expect(report(w, success())).resolves.toBeUndefined();
+    expect(todoPhase(w)).toBe('todo');
+  });
+
+  test('closed 卡的 plan 步成功回报（无方案文档）：不补排重写步，机器领不到', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    await move(w, 'closed');
+    await expect(report(w, success())).resolves.toBeUndefined();
+    const steps = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).all();
+    expect(steps.map((r) => r.status)).toEqual(['done']);
+    expect(await claim(w)).toBeNull();
+  });
+
+  test('控制组：planning 卡的 plan 步成功回报照常进 confirm', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    withPlanDoc(w);
+    await expect(report(w, success())).resolves.toBeUndefined();
+    expect(todoPhase(w)).toBe('confirm');
   });
 });

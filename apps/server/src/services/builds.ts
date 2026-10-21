@@ -1632,6 +1632,17 @@ export function completeStep(
     return;
   }
   deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+  // #1453：卡已被写离执行中（关闭 / 标完成 / 挪回待开始），停止信号还在途时
+  // 步先正常跑完——只落步，不推相位、不补排重写步。推相位在 closed / done 上
+  // 是非法边（回报 409，daemon journal 每次重启重报），在 todo 上会把卡推进
+  // confirm；keep 预定随之作废。
+  if (
+    (stepRow.kind === 'plan' || stepRow.kind === 'build') &&
+    (todoRow.phase === 'closed' || todoRow.phase === 'done' || todoRow.phase === 'todo')
+  ) {
+    afterStopPhaseByBuild.delete(buildRow.id);
+    return;
+  }
 
   if (stepRow.kind === 'plan') {
     // 交接物校验（#113：05 §5 实跑发现规划轮可跳过写 plan.md 直接交付，build 轮
