@@ -40,7 +40,7 @@ export interface GateVerdictView {
 
 export interface GateCheckRun {
   name: string;
-  /** queued / in_progress / completed …；外壳只传每个名字最新的一条。 */
+  /** queued / in_progress / completed …；外壳按 app 与名字只传最新的一条。 */
   status: string;
   conclusion: string | null;
 }
@@ -72,9 +72,12 @@ export interface GateInputs {
     changedFiles: number;
   } | null;
   /** 当前 head 的检查；null = 读不到。required 为 null = 必需清单读不到。runs 每个
-   * 名字最新的一条，statuses 每个 context 最新的一条（同名的旧条目不传）。complete =
-   * runs 与 statuses 都读全了（分页读完）；false 时整份按读不到处理：缺席的可能只是
-   * 没读到，未通过的可能在没读的那页。 */
+   * (app, 名字) 最新的一条，statuses 每个 context 最新的一条（同一 app 同名的旧条目
+   * 不传）。S4 的外壳按 app 与名字去重，不能只按名字：两个 app 报同名的检查时，只按
+   * 名字会让失败的那条被同名的通过盖掉，GitHub 的 rollup 却照样算它；自家 status
+   * 未通过时 unstable 又按自家豁免，闸就看着一条失败的检查放行。complete = runs 与
+   * statuses 都读全了（分页读完）；false 时整份按读不到处理：缺席的可能只是没读到，
+   * 未通过的可能在没读的那页。 */
   checks: {
     required: string[] | null;
     runs: GateCheckRun[];
@@ -82,7 +85,9 @@ export interface GateInputs {
     complete: boolean;
   } | null;
   /** compare {base}...{head} 一次读到的两样：全部文件（compareFilesFromResponse），与
-   * 本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。'unreadable' =
+   * 本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。读全时 commits
+   * 含 PR 的 head；不含 = 不是在 pr.headSha 上读的（缓存的响应、跨推送的两次读），
+   * 文件与摘要说的是旧补丁，按读不到处理（patch-unavailable）。'unreadable' =
    * 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' = 读到了、形状
    * 不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），每次读
    * 都一样，留人。commits 少给只会让证据链少认（拦），不会多放。commits 不带逐提交
@@ -265,10 +270,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
-  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。
-  const compare = typeof i.compare === 'string' ? null : i.compare;
+  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。compare 的
+  // 提交里没有 PR 的 head：读的是旧补丁，按读不到处理，下一次巡检再读；摘要、路径、
+  // 证据链与判定都不拿它判，结果也不报它的摘要，免得把旧补丁的结论安到 head 上。
+  let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
+  if (compare !== null && pr !== null && !compare.commits.includes(pr.headSha)) {
+    block('patch-unavailable', 'compare not read at the PR head');
+    compare = null;
+  }
   const digest =
     compare === null
       ? null
@@ -353,10 +364,17 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
         ['pass', 'block', 'evidence_invalid', 'extraction_failed'].includes(x.outcome),
       )
     ) {
-      const others = i.verdicts.filter((x) => x.kind === 'verify').length;
+      // 当前补丁上只有失败的验证步（没有结论）时，单列出来，不算进「别的补丁」。
+      const elsewhere = i.verdicts.filter((x) => x.kind === 'verify' && x.patchDigest !== D);
+      const stepFailed = verify.filter((x) => x.outcome === 'step_failed');
       block(
         'verify-missing',
-        ...(others > 0 ? [`${others} verdict(s) on another patch or unbound`] : []),
+        ...(elsewhere.length > 0
+          ? [`${elsewhere.length} verdict(s) on another patch or unbound`]
+          : []),
+        ...(stepFailed.length > 0
+          ? [`${stepFailed.length} verify step(s) failed on this patch`]
+          : []),
       );
     }
 
