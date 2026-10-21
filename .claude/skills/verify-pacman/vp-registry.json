@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the default args they name (the same option before '=', or the same probe or journey name) while the other defaults stay; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without a positional argument after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; fresh-stack = a stack nothing was driven on since launch, vp.mjs drive refuses otherwise unless --force; own-stack = the probe starts and stops its own stack, vp.mjs drive refuses while a stack is up in VERIFY_RUN_DIR; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the default args they name (the same option before '=', or the same probe or journey name) while the other defaults stay; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without a positional argument after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files: scripts/vp-registry-gate.mjs (run by the self-test in CI) fails on a script in scripts/ that is not registered, on a new script named drive-<number>, and on a feature map that does not name its vp.mjs drive line.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -43,7 +43,11 @@
     },
     "vp-selftest.mjs": {
       "kind": "test",
-      "purpose": "Self-test for vp.mjs: drive argument and path rules through --dry-run, archive refusals and copies in a throwaway VERIFY_REPO_ROOT. No stack needed."
+      "purpose": "Self-test for vp.mjs: drive argument and path rules through --dry-run, archive refusals and copies in a throwaway VERIFY_REPO_ROOT, and the registry gate on this checkout and on fake skill directories. No stack needed."
+    },
+    "vp-registry-gate.mjs": {
+      "kind": "test",
+      "purpose": "Registry gate: every file in scripts/ is registered, no new drive-<number> script, registry paths, statuses and needs are valid, a docs/verify writer needs rewrites-evidence, and every feature map names its vp.mjs drive line. Run by vp-selftest.mjs."
     }
   },
   "features": {
@@ -80,7 +84,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-agent-identity.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "The agent identity chip on the chief drawer's robot row and agent mention chips navigate to the agent settings page by click and by keyboard (Shift+Tab, Enter).",
@@ -124,7 +129,8 @@
             "api-key"
           ],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "current",
           "purpose": "Create an API key from the empty state: one-time plaintext, masked row, SQLite stores the hash only.",
@@ -204,7 +210,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-948-overlay.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "Overlay-domain migration: new-task dialog path, computed geometry of the utility classes, popovers, more-menu and delete-confirm, retired CSS sheets never loaded, light mode.",
@@ -268,7 +275,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-903-dispatch-judgment.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "Chief dispatch judgment: the dispatchWithPlan setting is dead (no UI row, PATCH 400), and run_builds withPlan/dispatchReason in three forms is checked against SQLite through a fake machine wire.",
@@ -284,7 +292,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-chief-drawer.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "Chief drawer model selection persists via PATCH, runtime mark icon, and no dead buttons (gear, copy).",
@@ -377,7 +386,8 @@
             "--expect=new"
           ],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "current",
           "purpose": "The chief unread badge counts unread threads. Wake turns are excluded, threads idle for 8 days become read after a tick, and the badge shows 99+ with a tooltip giving the true count.",
@@ -557,7 +567,9 @@
         "all": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
           "args": [],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "stale",
           "purpose": "All six Control Glass journeys in one run.",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT",
@@ -571,7 +583,9 @@
           "args": [
             "board"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "stale",
           "purpose": "Control Glass journey \"board\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -585,7 +599,9 @@
           "args": [
             "create-task"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "current",
           "purpose": "Control Glass journey \"create-task\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -598,7 +614,9 @@
           "args": [
             "dispatch"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "current",
           "purpose": "Control Glass journey \"dispatch\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -611,7 +629,9 @@
           "args": [
             "merge"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "current",
           "purpose": "Control Glass journey \"merge\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -624,7 +644,9 @@
           "args": [
             "request-changes"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "current",
           "purpose": "Control Glass journey \"request-changes\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -637,7 +659,9 @@
           "args": [
             "view-diff"
           ],
-          "needs": [],
+          "needs": [
+            "own-stack"
+          ],
           "status": "current",
           "purpose": "Control Glass journey \"view-diff\" (features/glass-journeys.md).",
           "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
@@ -739,7 +763,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-1259-1260-binding.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "current",
           "purpose": "Agent steps and chief turns go only to the agent's home machine; the chief holds a concurrency slot; rebinding is validated; machine deletion is protected and agents can be migrated; sweep keeps steps pending; UI shows machine details and the chief model as read-only.",
@@ -823,6 +848,7 @@
           "args": [],
           "needs": [
             "stack",
+            "fresh-stack",
             "daemon"
           ],
           "status": "current",
@@ -940,7 +966,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-1250-persona-verify.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "Persona roster seeding, the verify step with its verdict, three-perspective review fan-out and split_todo child cards all work end to end over the fake machine wire and the browser.",
@@ -1088,6 +1115,7 @@
           "args": [],
           "needs": [
             "stack",
+            "fresh-stack",
             "github"
           ],
           "status": "current",
@@ -1144,7 +1172,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-providers-tabs.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "current",
           "purpose": "Providers page pi/Claude Code runtime tabs: empty state, model rows after seeding a provider, ?runtime= sync, header card matches model-sources API and machine report",
@@ -1306,7 +1335,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-search-project-line.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "current",
           "purpose": "⌘K search rows show their own project as the second line on the live stack: before /api/search answers (client-side rows), after it, and none while /api/projects is still loading; never the fixture project r3-lifecycle.",
@@ -1584,7 +1614,8 @@
           "script": ".claude/skills/verify-pacman/scripts/drive-1104-unassigned-build.mjs",
           "args": [],
           "needs": [
-            "stack"
+            "stack",
+            "fresh-stack"
           ],
           "status": "stale",
           "purpose": "run_builds with no assignment gets a 400 from the chief relay; a step with no owner fails cleanly at claim without blocking the queue (REST and scheduler paths); the board and detail page show the failure.",

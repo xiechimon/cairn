@@ -51,6 +51,9 @@ claimed ≥ cap 即不发步）+ daemon 本地闸（GET me 读 cap，混版本�
 - chief 抽屉：满载时发出的回合显示「排队中：等 <机器>（n/N 在跑，前面 M
   个）」；被领取后回到「处理中...」。
 - 任务详情对话区：pending 步同款排队行。
+- 驱动(`vp.mjs list machine-concurrency` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive machine-concurrency recommended-concurrency`:机器页推荐并发;另需真 daemon(见下文前置)。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive machine-concurrency agent-concurrency-cap`(建 agent 不带 machineId,ADR 0019 起 400);`vp.mjs drive machine-concurrency cap-and-queue`(建 agent 不带 machineId,ADR 0019 起 400);`vp.mjs drive machine-concurrency zombie-claim`(建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving conventions
 

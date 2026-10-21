@@ -12,6 +12,9 @@
 
 - 用户菜单 popover「外观」行(浅色/深色分段)。
 - 直改 `pacman-theme` 存储(开发者路径;live 面当前唯一可驱动路径)。
+- 驱动(`vp.mjs list theme` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive theme persist`:浅色 / 深色写入 `pacman-theme`,重载保形。
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive theme sealed-tokens-audit`:双主题下退役规则缺席、选中行颜色与 token 对比度。
 
 ## Driving it with verify-pacman
 

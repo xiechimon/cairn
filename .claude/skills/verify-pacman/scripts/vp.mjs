@@ -7,7 +7,17 @@
 // VERIFY_PORT / VERIFY_WEB_PORT / VERIFY_EVIDENCE_DIR。
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { basename, dirname, join, resolve, sep } from 'node:path';
 import { chromium } from '@playwright/test';
@@ -29,10 +39,9 @@ const MAIN_ROOT = mainCheckout(SCRIPT_ROOT);
 // Evidence goes to the main checkout, also when this vp.mjs sits in a worktree:
 // a worktree's evidence is deleted with it (#345, SKILL.md Evidence).
 const EVIDENCE_ROOT = join(MAIN_ROOT, '.claude', 'verify-evidence');
-// Committed evidence, add-only (ADR 0015): docs/verify of the repository vp.mjs
-// works on, of vp.mjs's own checkout and of the main checkout. archive adds to
-// it; drive and capture never write into it.
-const COMMITTED_EVIDENCE = [...new Set([ROOT, SCRIPT_ROOT, MAIN_ROOT].map((r) => physical(join(r, 'docs', 'verify'))))];
+// Drives on the stack in RUN_DIR since launch, one feature/case per line;
+// launch empties RUN_DIR, so a new stack starts without it.
+const DRIVES_FILE = join(RUN_DIR, 'vp-drives.txt');
 // Needs that make a case run only when asked with --force, and why.
 const FORCE_NEEDS = {
   'real-llm': 'spends model tokens',
@@ -52,7 +61,11 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
                                  run a registered case; cases that need the stack run doctor first;
                                  stale and host-bound cases, and cases that need real-llm, github or
                                  rewrites-evidence, need --force (the refusal lists every reason, and
-                                 --force prints the same list before it runs); a case whose usage
+                                 --force prints the same list before it runs); so does a fresh-stack
+                                 case once anything was driven on the stack since launch (start a new
+                                 one: vp.mjs cleanup, then vp.mjs launch); an own-stack case starts
+                                 its own stack and is refused while one is up in VERIFY_RUN_DIR
+                                 (vp.mjs cleanup first); a case whose usage
                                  names required arguments needs one; arguments after -- replace the
                                  defaults they name (same option before '=', same probe name), the
                                  rest stay; a case that needs the
@@ -128,11 +141,44 @@ function physical(path) {
   return join(head, ...rest);
 }
 
+// Every worktree git lists for the repository dir is in (its main checkout and
+// dir's own toplevel among them); none when dir is in no repository.
+function worktrees(dir) {
+  try {
+    return execFileSync('git', ['-C', dir, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .split('\n')
+      .filter((line) => line.startsWith('worktree '))
+      .map((line) => line.slice('worktree '.length));
+  } catch {
+    return [];
+  }
+}
+
+// Committed evidence, add-only (ADR 0015): docs/verify of the repository vp.mjs
+// works on, of vp.mjs's own checkout, of the main checkout, and of every
+// worktree of the repositories the caller's cwd, VERIFY_REPO_ROOT and vp.mjs
+// sit in. archive adds to it; drive and capture never write into it. Computed
+// on first use, since it runs git.
+let committedEvidence;
+function committedRoots() {
+  committedEvidence ??= [
+    ...new Set(
+      [ROOT, SCRIPT_ROOT, MAIN_ROOT, ...[process.cwd(), ROOT, SCRIPT_ROOT].flatMap(worktrees)].map((r) =>
+        physical(join(r, 'docs', 'verify')),
+      ),
+    ),
+  ];
+  return committedEvidence;
+}
+
 // An evidence directory inside committed evidence is refused before anything
 // runs: a probe writing there would rewrite archived files in place.
 function refuseCommitted(dir, what) {
   const path = physical(dir);
-  const root = COMMITTED_EVIDENCE.find((r) => path === r || path.startsWith(`${r}${sep}`));
+  const root = committedRoots().find((r) => path === r || path.startsWith(`${r}${sep}`));
   if (root === undefined) return;
   fail(
     `${what} is inside ${root}: committed evidence, add-only (ADR 0015).\n` +
@@ -234,11 +280,27 @@ function driveCommand(argv) {
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   if (c.runner === 'tsx' && c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
+  // A probe that starts its own stack in RUN_DIR fails at its launch while a
+  // stack is up there; --force does not change that.
+  const up = c.needs.includes('own-stack') ? readStack() : undefined;
+  if (up !== undefined) {
+    fail(
+      `${feature}/${name} starts and stops its own stack in ${RUN_DIR}, where a stack is up ` +
+        `(server ${up.serverPort}, web ${up.webPort}); stop it with vp.mjs cleanup first.`,
+    );
+  }
   // Every reason the case needs --force goes into one refusal, and --force
   // prints the same list, so a --force is given knowing all it authorizes.
   const reasons = [];
   if (c.status !== 'current') reasons.push(`is ${c.status}${c.note ? `: ${c.note.replace(/\.+$/, '')}` : ''}`);
   for (const need of c.needs) if (need in FORCE_NEEDS) reasons.push(`needs ${need} (${FORCE_NEEDS[need]})`);
+  const driven = c.needs.includes('fresh-stack') && existsSync(DRIVES_FILE) ? readFileSync(DRIVES_FILE, 'utf8').split('\n').filter(Boolean) : [];
+  if (driven.length > 0) {
+    reasons.push(
+      `needs fresh-stack, and the stack in ${RUN_DIR} was driven since launch (${driven.join(', ')}); ` +
+        'start a new one with vp.mjs cleanup, then vp.mjs launch',
+    );
+  }
   const forceList = reasons.map((r) => `\n  - ${r}`).join('');
   if (reasons.length > 0 && !force) {
     fail(`${feature}/${name} runs only with --force:${forceList}\nRe-run with --force to drive it anyway; --force covers every line above.`);
@@ -326,6 +388,8 @@ function driveCommand(argv) {
     if (runNode(join(SCRIPTS_DIR, 'doctor.mjs'), []) !== 0) {
       fail('vp: doctor failed. Start the stack with `vp.mjs launch` (or fix what doctor reported) and retry.', 1);
     }
+    // Recorded before the probe runs: a probe that fails half way has changed the stack too.
+    appendFileSync(DRIVES_FILE, `${feature}/${name}\n`);
   }
   // After doctor: a failed doctor leaves no empty directory for --latest to pick.
   let run = args;

@@ -15,6 +15,9 @@
 ## How to get to it (user POV)
 
 - 侧栏「新任务」行或 C 热键(XMON-41 起键位由 N 改 C;#445 起顶栏「+ 任务」钮撤除,行点击与热键同一 opener;详情页/总管另立后票)。
+- 驱动(`vp.mjs list board-new-task` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive board-new-task new-task`:侧栏「新任务」行开 dialog、保存:卡片上板 + API + SQLite。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive board-new-task board`(等的看板标题元素已随 #1375 删除);`vp.mjs drive board-new-task overlay-css-migration`(读的选择子已不在 apps/web/src)。
 
 ## Driving it with verify-pacman
 

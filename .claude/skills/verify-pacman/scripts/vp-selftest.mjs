@@ -86,8 +86,11 @@ function agentBodiesWithoutMachineId(src) {
 }
 
 // Current cases that depend on a seed script whose call to .../agents sends no
-// machineId: the probe names the seed, or its usage does. Seeds live in
-// scriptsDir; case script paths are relative to root.
+// machineId: the probe names the seed, or its usage does. A seed the usage
+// names inside a parenthesized clause that says optional ("[todoId] (optional;
+// seed via setup-review-seed.mjs)") feeds an optional path and does not count;
+// every other seed does. Seeds live in scriptsDir; case script paths are
+// relative to root.
 function seedDependents(registry, scriptsDir, root) {
   const broken = Object.entries(registry.support)
     .filter(([, v]) => v.kind === 'seed')
@@ -96,9 +99,13 @@ function seedDependents(registry, scriptsDir, root) {
   const dependent = [];
   for (const [feature, entry] of Object.entries(registry.features)) {
     for (const [name, c] of Object.entries(entry.cases)) {
-      if (c.status !== 'current' || /optional/.test(c.usage ?? '')) continue;
+      if (c.status !== 'current') continue;
+      const usage = c.usage ?? '';
+      const optional = [...usage.matchAll(/\(([^)]*)\)/g)].map((m) => m[1]).filter((clause) => /optional/.test(clause));
       const src = readFileSync(resolve(root, c.script), 'utf8');
-      const uses = broken.filter((seed) => src.includes(seed) || (c.usage ?? '').includes(seed));
+      const uses = broken.filter(
+        (seed) => (src.includes(seed) || usage.includes(seed)) && !optional.some((clause) => clause.includes(seed)),
+      );
       if (uses.length > 0) dependent.push(`${feature}/${name} (${uses.join(', ')})`);
     }
   }
