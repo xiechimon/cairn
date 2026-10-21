@@ -237,13 +237,13 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       ? null
       : computePatchDigest(compare.files, { expectedFileCount: pr?.changedFiles ?? null });
   const D = digest?.patchDigest ?? null;
-  if (digest?.unavailable === 'truncated' || digest?.unavailable === 'count-mismatch') {
-    block('compare-truncated', digest.unavailable);
-  } else if (digest?.unavailable) {
-    // 只有证据（empty）或有文件缺 blob sha（null-sha）：等多久都算不出摘要，留人。
-    block('patch-unbindable', digest.unavailable);
-  }
   if (digest !== null && compare !== null) {
+    if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {
+      block('compare-truncated', digest.unavailable);
+    } else if (digest.unavailable !== null) {
+      // 只有证据（empty）或有文件缺 blob sha（null-sha）：等多久都算不出摘要，留人。
+      block('patch-unbindable', digest.unavailable);
+    }
     // 上限按整张补丁算：证据也计入，改名记两个文件（口径在 digest.ts）。不要
     // 换成 digest.kept 去数，那是摘要的口径，不是 D4 上限的口径。
     if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {
@@ -286,7 +286,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     if (!links.some((l) => commits.has(l.sha) && changed.has(l.path))) {
       block(
         'evidence-link-missing',
-        `${links.length} link(s) to docs/verify/${i.ticketRef}/, none at a commit of this PR to a file it adds or changes`,
+        `${links.length} link(s) to ${EVIDENCE_PREFIX}${i.ticketRef}/, none at a commit of this PR to a file it adds or changes`,
       );
     }
   }
