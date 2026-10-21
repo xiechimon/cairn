@@ -32,6 +32,8 @@
 
 - hosted 项目(有提交)或 local 项目(localPath 可达)→ 项目页 文件 tab → 历史 seg →
   点提交行 → 右栏出元信息头 + 文件级 diff;点别的行切换;X 钮清选中。
+- 驱动(`vp.mjs list project-commit-detail` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive project-commit-detail commit-detail`:历史行点开提交 diff、切换、删仓降级。
 
 ## Driving it with drive-1102-commit-detail.mjs
 

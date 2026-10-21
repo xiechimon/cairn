@@ -47,14 +47,6 @@ export const projectRecordSchema = z.object({
 });
 export type ProjectRecord = z.infer<typeof projectRecordSchema>;
 
-/** GitHub 接入 `owner/repo` 形状校验（[推断] 最小护栏）。server 路由
- * （POST /api/projects 的 400 门）与 web 表单（github 选态的提交闸）同吃
- * 本单源——#305 前该函数住在 apps/server/src/services/git.ts，web 侧需要
- * 同一校验时迁到 shared。 */
-export function isGithubRepoRef(value: string): boolean {
-  return /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(value);
-}
-
 /** GitHub 仓库引用对象面（spec 12 数据契约：picker 单选回填 {owner,repo}；
  * 手动兜底入口仍出 `owner/repo` 字符串面——server 归一为同一列值）。 */
 export const githubRepoRefSchema = z.object({
@@ -62,6 +54,32 @@ export const githubRepoRefSchema = z.object({
   repo: z.string(),
 });
 export type GithubRepoRef = z.infer<typeof githubRepoRefSchema>;
+
+/** `owner/repo` 形状校验 + 拆段单源（[推断] 最小护栏）：字符集 = GitHub 仓名
+ * 规则（ASCII 字母数字与 `.`、`-`、`_`，docs.github.com「Creating a new
+ * repository」）。owner 或 repo 为 `.` / `..` 一律拒（#1466）：两者是 GitHub
+ * 保留名（github.com/dead-claudia/github-limits 实测），也是 URL 的 dot
+ * segment——`repos/${owner}/${repo}/...` 拼出的请求经 fetch 归一会被改写
+ * （`../user` → `/user/...`），团队 token 随之读到 api.github.com 的其它路径。
+ * `...` 等多点名不是 dot segment（WHATWG URL 标准只认 `.` / `..` 及 `%2e`
+ * 变体，`%` 不在字符集内），照过。
+ * 消费面：server 写入闸（POST/PATCH projects、chief connect_repo）与读路径
+ * （存量行再过一遍，不合法 = 按非 GitHub 项目处理，不出站）、web 表单提交闸、
+ * daemon PR 探测。 */
+export function parseGithubRepoRef(value: string): GithubRepoRef | null {
+  const m = /^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/.exec(value);
+  const owner = m?.[1];
+  const repo = m?.[2];
+  if (owner === undefined || repo === undefined) return null;
+  if (owner === '.' || owner === '..' || repo === '.' || repo === '..') return null;
+  return { owner, repo };
+}
+
+/** 布尔面（server 路由 400 门与 web 表单提交闸同吃本单源——#305 前该函数
+ * 住在 apps/server/src/services/git.ts，web 侧需要同一校验时迁到 shared）。 */
+export function isGithubRepoRef(value: string): boolean {
+  return parseGithubRepoRef(value) !== null;
+}
 
 /** `POST /api/projects` body 单源（spec 12 数据契约面 + 既有 wire 兼容面；
  * server 路由与 web 表单 mutation 同吃）。repo 形态双名同义：`kind` = spec 12

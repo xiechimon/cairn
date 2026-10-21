@@ -11,6 +11,8 @@
 ## How to get to it (user POV)
 
 - 建 local 项目(见 [local-repo-api.md](./local-repo-api.md))→ 项目页 文件 tab(默认落)→ 分支 chip + 文件行 + 查看器 + 历史 seg。
+- 驱动(`vp.mjs list project-files-local` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive project-files-local local-files`:local 项目文件 tab、hosted 对照、删仓降级。
 
 ## Driving it with drive-1030-local-files.mjs
 

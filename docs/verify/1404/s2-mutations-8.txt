@@ -1,0 +1,750 @@
+# #1404 S2 mutations, round 8: every S2 mutation re-run in round 7 (rounds 1-5 and round 7; s2-mutations-1.txt repeats s2-mutations.txt and is
+# skipped) re-run against the round 8 source (4cd4502, after the merge of origin/main 49af6f2 in a570f79), plus the round 8 ones.
+# Each one applied alone in the worktree (definitions below: an exact text that must occur once, and its replacement), then
+# apps/server/test/merge-gate-readiness.test.ts (125 tests), then the files restored; git status showed only the untracked evidence files after.
+# Round 8 mutations, one or more per new rule or pin:
+#   compare at the head: the check removed; the check blocks but the stale compare is still judged (its digest reported); the head mismatch
+#     reported as compare-malformed (human) instead of the transient patch-unavailable;
+#   verify-missing detail: every verify verdict counted (the round 7 count); unbound verdicts left out of the count; failed verify steps not named;
+#   earlier-digest blocks (pr-gate run 3's three mutations): review-blocking, verify-failed and decision-no-go read from verdicts on any digest;
+#   unbound verdicts: a null patchDigest counted as current; tampered counted only when bound;
+#   same-named check runs: readiness deduping runs by name, keeping the first, or the last;
+#   class sweep: each of the 50 codes moved to another class in packages/shared/src/records/merge-gate.ts (transient to human, human to
+#     transient, policy to human). Each one turns red both the CLASS table test and that code's own row.
+# The contract comment (S4 dedupes check runs by app and name), the inlined test helper and the test comments are not rules and have no mutation.
+# 'does not apply' = the replaced text is no longer in the source; the same 10 as in round 7, each covered by a later or adapted mutation
+#   (see s2-mutations-5.txt and s2-mutations-7.txt).
+# Result: 137 applied, 137 caught, none survived; 10 do not apply. Earlier rounds: 74 of 74 applied caught. Round 8: 63 of 63 caught
+#   (13 rule and pin mutations plus the 50-code class sweep).
+# Table: [source file] name, test summary; then the failing tests per mutation; then definitions of the applied ones (name, file, text replaced,
+#   replacement; a mutation with several replacements has one line each).
+
+[s2-mutations.txt] chief go silences blocking                                                            3 failed | 122 passed (125)
+[s2-mutations.txt] verdicts on any digest count                                                          9 failed | 116 passed (125)
+[s2-mutations.txt] extraction failure counts as pass                                                     1 failed | 124 passed (125)
+[s2-mutations.txt] own status unstable blocks                                                            does not apply (text no longer in the source)
+[s2-mutations.txt] foreign unstable accepted                                                             does not apply (text no longer in the source)
+[s2-mutations.txt] missing required check is green                                                       does not apply (text no longer in the source)
+[s2-mutations.txt] unreadable required falls back to pass                                                does not apply (text no longer in the source)
+[s2-mutations.txt] status-provided required check missed                                                 2 failed | 123 passed (125)
+[s2-mutations.txt] pr-evidence skipped is green                                                          2 failed | 123 passed (125)
+[s2-mutations.txt] self-required not flagged                                                             3 failed | 122 passed (125)
+[s2-mutations.txt] perspectives from the team, not the round                                             1 failed | 124 passed (125)
+[s2-mutations.txt] unsorted blockers                                                                     1 failed | 124 passed (125)
+[s2-mutations.txt] unknown ancestry counts                                                               does not apply (text no longer in the source)
+[s2-mutations.txt] has_hooks blocks                                                                      does not apply (text no longer in the source)
+[s2-mutations.txt] size cap off by one                                                                   2 failed | 123 passed (125)
+[s2-mutations.txt] fork check off                                                                        3 failed | 122 passed (125)
+[s2-mutations.txt] tampered only at D                                                                    3 failed | 122 passed (125)
+[s2-mutations.txt] mergeable null accepted                                                               1 failed | 124 passed (125)
+[s2-mutations.txt] failed verify step counts as a verdict                                                2 failed | 123 passed (125)
+[s2-mutations-2.txt] unbindable digest reported as transient patch-unavailable                           4 failed | 121 passed (125)
+[s2-mutations-2.txt] patch-unbindable class transient                                                    4 failed | 121 passed (125)
+[s2-mutations-2.txt] unreadable compare goes to a person                                                 3 failed | 122 passed (125)
+[s2-mutations-2.txt] foreign checks ignored when clean                                                   does not apply (text no longer in the source)
+[s2-mutations-2.txt] has_hooks skips the foreign check                                                   1 failed | 124 passed (125)
+[s2-mutations-2.txt] judged checks listed again under clean                                              5 failed | 120 passed (125)
+[s2-mutations-2.txt] required run not marked judged                                                      3 failed | 122 passed (125)
+[s2-mutations-2.txt] required status not marked judged                                                   2 failed | 123 passed (125)
+[s2-mutations-2.txt] pr-evidence not marked judged                                                       1 failed | 124 passed (125)
+[s2-mutations-2.txt] own status counted as foreign                                                       4 failed | 121 passed (125)
+[s2-mutations-2.txt] unstable with nothing visible accepted                                              1 failed | 124 passed (125)
+[s2-mutations-2.txt] own success counts as a visible non-passing check                                   1 failed | 124 passed (125)
+[s2-mutations-2.txt] pass does not clear evidence_invalid                                                1 failed | 124 passed (125)
+[s2-mutations-2.txt] pass on another digest clears evidence_invalid                                      1 failed | 124 passed (125)
+[s2-mutations-2.txt] unreadable default branch goes to a person                                          1 failed | 124 passed (125)
+[s2-mutations-2.txt] unreadable default branch passes                                                    1 failed | 124 passed (125)
+[s2-mutations-3.txt] opaque blocker removed                                                              does not apply (text no longer in the source)
+[s2-mutations-3.txt] file and line caps count only non-evidence                                          3 failed | 122 passed (125)
+[s2-mutations-3.txt] file cap counts only non-evidence                                                   2 failed | 123 passed (125)
+[s2-mutations-3.txt] line cap counts only non-evidence                                                   1 failed | 124 passed (125)
+[s2-mutations-3.txt] opaque-file dropped from the vocabulary                                             4 failed | 121 passed (125)
+[s2-mutations-3.txt] opaque-file moved to the end of the path group                                      1 failed | 124 passed (125)
+[s2-mutations-3.txt] opaque-file class transient                                                         4 failed | 121 passed (125)
+[s2-mutations-4.txt] malformed compare waits like unreadable                                             2 failed | 123 passed (125)
+[s2-mutations-4.txt] compare-malformed class transient                                                   3 failed | 122 passed (125)
+[s2-mutations-4.txt] compare-malformed dropped from the vocabulary                                       2 failed | 123 passed (125)
+[s2-mutations-4.txt] evidence link: any sha (ancestor rule), path of this PR                             3 failed | 122 passed (125)
+[s2-mutations-4.txt] evidence link: commit of this PR, any path                                          2 failed | 123 passed (125)
+[s2-mutations-4.txt] evidence link: removed files count as this PR's evidence                            1 failed | 124 passed (125)
+[s2-mutations-4.txt] evidence link judged without compare                                                5 failed | 120 passed (125)
+[s2-mutations-4.txt] incomplete checks trusted                                                           1 failed | 124 passed (125)
+[s2-mutations-4.txt] incomplete checks block but the half list is still judged                           1 failed | 124 passed (125)
+[s2-mutations-4.txt] opaque exemption case-insensitive (paths.opaque only)                               does not apply (text no longer in the source)
+[s2-mutations-4.txt] case-variant check skips a rename's old name                                        does not apply (text no longer in the source)
+[s2-mutations-5.txt] S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading)       1 failed | 124 passed (125)
+[s2-mutations-5.txt] S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check)  1 failed | 124 passed (125)
+[s2-mutations-5.txt] unreadable required falls back to pass (adapted to the round 4 text)                3 failed | 122 passed (125)
+[s2-mutations-5.txt] foreign unstable accepted (adapted to the round 2 text)                             3 failed | 122 passed (125)
+[s2-mutations-5.txt] has_hooks blocks (adapted to the round 2 text)                                      1 failed | 124 passed (125)
+[new in round 7] names unquoted (quoted returns the raw name)                                            8 failed | 117 passed (125)
+[new in round 7] only JSON.stringify escaping (C1, bidi, line separator left raw)                        1 failed | 124 passed (125)
+[new in round 7] name length unbounded                                                                   1 failed | 124 passed (125)
+[new in round 7] name list unbounded                                                                     2 failed | 123 passed (125)
+[new in round 7] protected-path detail takes the raw file names                                          3 failed | 122 passed (125)
+[new in round 7] foreign check names raw under clean                                                     2 failed | 123 passed (125)
+[new in round 7] foreign check names raw under unstable                                                  2 failed | 123 passed (125)
+[new in round 7] required check name raw                                                                 1 failed | 124 passed (125)
+[new in round 7] branch names raw                                                                        1 failed | 124 passed (125)
+[new in round 7] head repository name raw                                                                1 failed | 124 passed (125)
+[new in round 7] verify: a later pass does not clear extraction_failed                                   1 failed | 124 passed (125)
+[new in round 7] review: a later pass does not clear extraction_failed                                   1 failed | 124 passed (125)
+[new in round 7] decision: a later pass does not clear extraction_failed                                 1 failed | 124 passed (125)
+[new in round 7] non-mergeable states narrowed to behind                                                 3 failed | 122 passed (125)
+[new in round 7] 300-file truncation reported as patch-unbindable                                        1 failed | 124 passed (125)
+[new in round 7] own status matched case-sensitively                                                     1 failed | 124 passed (125)
+[new in round 7] self-required matched case-sensitively                                                  1 failed | 124 passed (125)
+[new in round 7] own required name not skipped                                                           2 failed | 123 passed (125)
+[new in round 7] fork compare case-sensitive                                                             1 failed | 124 passed (125)
+[new in round 7] merged flag ignored                                                                     1 failed | 124 passed (125)
+[new in round 7] deleted head repository treated as the same repository                                  1 failed | 124 passed (125)
+[new in round 7] empty file list short-circuits to ready                                                 1 failed | 124 passed (125)
+[new in round 7] missing required check is green (adapted to the round 7 text)                           2 failed | 123 passed (125)
+[new in round 7] foreign checks ignored when clean (adapted to the round 7 text)                         4 failed | 121 passed (125)
+[new in round 7] opaque blocker removed (adapted to the round 7 text)                                    4 failed | 121 passed (125)
+[new in round 7] evidence link must be at the head                                                       3 failed | 122 passed (125)
+[new in round 8] compare head check removed                                                              1 failed | 124 passed (125)
+[new in round 8] compare not at the head blocks but is still judged (digest reported)                    1 failed | 124 passed (125)
+[new in round 8] compare not at the head goes to a person (compare-malformed)                            1 failed | 124 passed (125)
+[new in round 8] verify-missing detail counts every verify verdict (round 7 count)                       1 failed | 124 passed (125)
+[new in round 8] verify-missing detail leaves unbound verdicts out                                       1 failed | 124 passed (125)
+[new in round 8] failed verify step not named                                                            1 failed | 124 passed (125)
+[new in round 8] review block on any digest counts                                                       1 failed | 124 passed (125)
+[new in round 8] verify block on any digest counts                                                       1 failed | 124 passed (125)
+[new in round 8] decision block on any digest counts                                                     1 failed | 124 passed (125)
+[new in round 8] unbound verdicts count as current                                                       4 failed | 121 passed (125)
+[new in round 8] tampered counted only when bound                                                        1 failed | 124 passed (125)
+[new in round 8] check runs deduped by name, first kept                                                  1 failed | 124 passed (125)
+[new in round 8] check runs deduped by name, last kept                                                   1 failed | 124 passed (125)
+[new in round 8] class sweep: policy-human policy -> human                                               3 failed | 122 passed (125)
+[new in round 8] class sweep: autonomy-paused policy -> human                                            2 failed | 123 passed (125)
+[new in round 8] class sweep: not-applicable policy -> human                                             2 failed | 123 passed (125)
+[new in round 8] class sweep: not-current-build transient -> human                                       2 failed | 123 passed (125)
+[new in round 8] class sweep: phase-not-review transient -> human                                        2 failed | 123 passed (125)
+[new in round 8] class sweep: work-in-flight transient -> human                                          2 failed | 123 passed (125)
+[new in round 8] class sweep: pr-unreadable transient -> human                                           3 failed | 122 passed (125)
+[new in round 8] class sweep: pr-not-open human -> transient                                             3 failed | 122 passed (125)
+[new in round 8] class sweep: pr-draft transient -> human                                                2 failed | 123 passed (125)
+[new in round 8] class sweep: pr-from-fork human -> transient                                            3 failed | 122 passed (125)
+[new in round 8] class sweep: base-not-default human -> transient                                        3 failed | 122 passed (125)
+[new in round 8] class sweep: mergeable-state transient -> human                                         6 failed | 119 passed (125)
+[new in round 8] class sweep: self-required human -> transient                                           2 failed | 123 passed (125)
+[new in round 8] class sweep: required-checks-unreadable transient -> human                              3 failed | 122 passed (125)
+[new in round 8] class sweep: required-checks-none human -> transient                                    2 failed | 123 passed (125)
+[new in round 8] class sweep: required-check-missing transient -> human                                  2 failed | 123 passed (125)
+[new in round 8] class sweep: required-check-pending transient -> human                                  2 failed | 123 passed (125)
+[new in round 8] class sweep: required-check-failed transient -> human                                   3 failed | 122 passed (125)
+[new in round 8] class sweep: pr-evidence-not-green transient -> human                                   2 failed | 123 passed (125)
+[new in round 8] class sweep: patch-unavailable transient -> human                                       5 failed | 120 passed (125)
+[new in round 8] class sweep: compare-malformed human -> transient                                       3 failed | 122 passed (125)
+[new in round 8] class sweep: compare-truncated human -> transient                                       4 failed | 121 passed (125)
+[new in round 8] class sweep: patch-unbindable human -> transient                                        4 failed | 121 passed (125)
+[new in round 8] class sweep: size-cap human -> transient                                                5 failed | 120 passed (125)
+[new in round 8] class sweep: protected-path human -> transient                                          2 failed | 123 passed (125)
+[new in round 8] class sweep: outside-auto-merge human -> transient                                      2 failed | 123 passed (125)
+[new in round 8] class sweep: test-deleted human -> transient                                            2 failed | 123 passed (125)
+[new in round 8] class sweep: opaque-file human -> transient                                             4 failed | 121 passed (125)
+[new in round 8] class sweep: evidence-outside-ticket human -> transient                                 2 failed | 123 passed (125)
+[new in round 8] class sweep: evidence-executable human -> transient                                     2 failed | 123 passed (125)
+[new in round 8] class sweep: issue-ref-missing human -> transient                                       2 failed | 123 passed (125)
+[new in round 8] class sweep: evidence-link-missing transient -> human                                   3 failed | 122 passed (125)
+[new in round 8] class sweep: verify-missing transient -> human                                          2 failed | 123 passed (125)
+[new in round 8] class sweep: verify-failed transient -> human                                           2 failed | 123 passed (125)
+[new in round 8] class sweep: verify-extraction-failed transient -> human                                2 failed | 123 passed (125)
+[new in round 8] class sweep: verify-evidence-invalid transient -> human                                 3 failed | 122 passed (125)
+[new in round 8] class sweep: verify-tampered human -> transient                                         3 failed | 122 passed (125)
+[new in round 8] class sweep: review-missing transient -> human                                          2 failed | 123 passed (125)
+[new in round 8] class sweep: review-blocking transient -> human                                         2 failed | 123 passed (125)
+[new in round 8] class sweep: review-extraction-failed transient -> human                                2 failed | 123 passed (125)
+[new in round 8] class sweep: perspective-timed-out human -> transient                                   2 failed | 123 passed (125)
+[new in round 8] class sweep: decision-missing transient -> human                                        2 failed | 123 passed (125)
+[new in round 8] class sweep: decision-no-go transient -> human                                          2 failed | 123 passed (125)
+[new in round 8] class sweep: decision-extraction-failed transient -> human                              2 failed | 123 passed (125)
+[new in round 8] class sweep: fix-rounds-exhausted human -> transient                                    2 failed | 123 passed (125)
+[new in round 8] class sweep: fix-no-change human -> transient                                           2 failed | 123 passed (125)
+[new in round 8] class sweep: gate-rounds-exhausted human -> transient                                   2 failed | 123 passed (125)
+[new in round 8] class sweep: no-reviewers human -> transient                                            2 failed | 123 passed (125)
+[new in round 8] class sweep: no-verifier human -> transient                                             2 failed | 123 passed (125)
+[new in round 8] class sweep: no-decider human -> transient                                              2 failed | 123 passed (125)
+
+[s2-mutations.txt] chief go silences blocking:
+  x review-blocking：只打开它
+  x chief 的 go 与同一摘要上的 blocking 同在：不 ready
+  x blocking 之后同视角又通过一次：仍拦（不允许重掷）
+[s2-mutations.txt] verdicts on any digest count:
+  x 旧摘要上的通过不算：review-missing / verify-missing / decision-missing
+  x 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+  x 别的摘要上 verify 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+  x 未绑定 head 的 verify 通过（{pass, null}）不算当前补丁的
+  x 别的摘要上 review 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+  x 未绑定 head 的 review 通过（{pass, null}）不算当前补丁的
+  x 别的摘要上 decision 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+  x 未绑定 head 的 decision 通过（{pass, null}）不算当前补丁的
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[s2-mutations.txt] extraction failure counts as pass:
+  x review-extraction-failed：只打开它
+[s2-mutations.txt] status-provided required check missed:
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations.txt] pr-evidence skipped is green:
+  x pr-evidence-not-green：只打开它
+  x 必需检查 neutral / skipped 算通过（与分支保护一致），pr-evidence 只认 success
+[s2-mutations.txt] self-required not flagged:
+  x self-required：只打开它
+  x 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+  x 自家必需检查名跳过：没有它的 status 也只记 self-required，不记 required-check-missing
+[s2-mutations.txt] perspectives from the team, not the round:
+  x 审核视角按轮次冻结的集合算，不按团队当前的
+[s2-mutations.txt] unsorted blockers:
+  x 插入顺序与词表顺序不同时，按词表排
+[s2-mutations.txt] size cap off by one:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations.txt] fork check off:
+  x pr-from-fork：只打开它
+  x 必需检查名、分支名、仓库名也引号
+  x head 仓库已删（headRepoFullName 为 null）：pr-from-fork，不抛
+[s2-mutations.txt] tampered only at D:
+  x verify-tampered：只打开它
+  x 插入顺序与词表顺序不同时，按词表排
+  x 未绑定 head 的 tampered（{tampered, null}）照样算：verify-tampered
+[s2-mutations.txt] mergeable null accepted:
+  x has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算）
+[s2-mutations.txt] failed verify step counts as a verdict:
+  x verify 步失败（没有结论）不算有判定：verify-missing
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[s2-mutations-2.txt] unbindable digest reported as transient patch-unavailable:
+  x patch-unbindable：只打开它
+  x 不抛：空 body、空文件列表、空判定
+  x 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+  x 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+[s2-mutations-2.txt] patch-unbindable class transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x patch-unbindable：只打开它
+  x 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+  x 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+[s2-mutations-2.txt] unreadable compare goes to a person:
+  x patch-unavailable：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-2.txt] has_hooks skips the foreign check:
+  x has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+[s2-mutations-2.txt] judged checks listed again under clean:
+  x required-check-pending：只打开它
+  x required-check-failed：只打开它
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[s2-mutations-2.txt] required run not marked judged:
+  x required-check-pending：只打开它
+  x required-check-failed：只打开它
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[s2-mutations-2.txt] required status not marked judged:
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] pr-evidence not marked judged:
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] own status counted as foreign:
+  x 只因自家 pacman/merge-gate status 而 unstable：不拦
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+  x 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[s2-mutations-2.txt] unstable with nothing visible accepted:
+  x unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+[s2-mutations-2.txt] own success counts as a visible non-passing check:
+  x unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+[s2-mutations-2.txt] pass does not clear evidence_invalid:
+  x 同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理）
+[s2-mutations-2.txt] pass on another digest clears evidence_invalid:
+  x 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+[s2-mutations-2.txt] unreadable default branch goes to a person:
+  x 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+[s2-mutations-2.txt] unreadable default branch passes:
+  x 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+[s2-mutations-3.txt] file and line caps count only non-evidence:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations-3.txt] file cap counts only non-evidence:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+[s2-mutations-3.txt] line cap counts only non-evidence:
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations-3.txt] opaque-file dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+[s2-mutations-3.txt] opaque-file moved to the end of the path group:
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+[s2-mutations-3.txt] opaque-file class transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x opaque-file：只打开它
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[s2-mutations-4.txt] malformed compare waits like unreadable:
+  x compare-malformed：只打开它
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-4.txt] compare-malformed class transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x compare-malformed：只打开它
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-4.txt] compare-malformed dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+  x 词表里每个码的类别与 CLASS 表逐码相同
+[s2-mutations-4.txt] evidence link: any sha (ancestor rule), path of this PR:
+  x evidence-link-missing：只打开它
+  x 证据链指向别的票或钉在旧 SHA（不在 base..head）：不算
+  x 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算
+[s2-mutations-4.txt] evidence link: commit of this PR, any path:
+  x 钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算
+  x 指向本 PR 删掉的证据：不算
+[s2-mutations-4.txt] evidence link: removed files count as this PR's evidence:
+  x 指向本 PR 删掉的证据：不算
+[s2-mutations-4.txt] evidence link judged without compare:
+  x patch-unavailable：只打开它
+  x compare-malformed：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+  x compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判
+[s2-mutations-4.txt] incomplete checks trusted:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[s2-mutations-4.txt] incomplete checks block but the half list is still judged:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[s2-mutations-5.txt] S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading):
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[s2-mutations-5.txt] S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check):
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[s2-mutations-5.txt] unreadable required falls back to pass (adapted to the round 4 text):
+  x required-checks-unreadable：只打开它
+  x 读不到检查：拦，不退回「全部检查」
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[s2-mutations-5.txt] foreign unstable accepted (adapted to the round 2 text):
+  x 别家检查让它 unstable：拦，并在细节里点名
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[s2-mutations-5.txt] has_hooks blocks (adapted to the round 2 text):
+  x has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算）
+[new in round 7] names unquoted (quoted returns the raw name):
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+  x 文件名一律 JSON 引号：换行与指令样的文本落成一行，可原样解回
+  x JSON 不转义的也转：C1 控制符、双向覆盖、行分隔符写成 \uXXXX
+  x 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+  x 必需检查名、分支名、仓库名也引号
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 7] only JSON.stringify escaping (C1, bidi, line separator left raw):
+  x JSON 不转义的也转：C1 控制符、双向覆盖、行分隔符写成 \uXXXX
+[new in round 7] name length unbounded:
+  x 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more
+[new in round 7] name list unbounded:
+  x 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+[new in round 7] protected-path detail takes the raw file names:
+  x 文件名一律 JSON 引号：换行与指令样的文本落成一行，可原样解回
+  x JSON 不转义的也转：C1 控制符、双向覆盖、行分隔符写成 \uXXXX
+  x 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more
+[new in round 7] foreign check names raw under clean:
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 7] foreign check names raw under unstable:
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 7] required check name raw:
+  x 必需检查名、分支名、仓库名也引号
+[new in round 7] branch names raw:
+  x 必需检查名、分支名、仓库名也引号
+[new in round 7] head repository name raw:
+  x 必需检查名、分支名、仓库名也引号
+[new in round 7] verify: a later pass does not clear extraction_failed:
+  x 同摘要上 verify 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+[new in round 7] review: a later pass does not clear extraction_failed:
+  x 同摘要上 review 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+[new in round 7] decision: a later pass does not clear extraction_failed:
+  x 同摘要上 decision 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+[new in round 7] non-mergeable states narrowed to behind:
+  x mergeable_state 为 dirty：只记 mergeable-state
+  x mergeable_state 为 blocked：只记 mergeable-state
+  x mergeable_state 为 draft：只记 mergeable-state
+[new in round 7] 300-file truncation reported as patch-unbindable:
+  x compare 恰好 300 个文件、PR 也报 300：compare-truncated（truncated），不是 patch-unbindable
+[new in round 7] own status matched case-sensitively:
+  x 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+[new in round 7] self-required matched case-sensitively:
+  x 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+[new in round 7] own required name not skipped:
+  x 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+  x 自家必需检查名跳过：没有它的 status 也只记 self-required，不记 required-check-missing
+[new in round 7] fork compare case-sensitive:
+  x fork 判定不分大小写：XieChiMon/Pacman 是同仓
+[new in round 7] merged flag ignored:
+  x merged 标志算数：closed 且 merged 记 merged；state 还是 open 也记
+[new in round 7] deleted head repository treated as the same repository:
+  x head 仓库已删（headRepoFullName 为 null）：pr-from-fork，不抛
+[new in round 7] empty file list short-circuits to ready:
+  x 不抛：空 body、空文件列表、空判定
+[new in round 7] missing required check is green (adapted to the round 7 text):
+  x required-check-missing：只打开它
+  x 必需检查名、分支名、仓库名也引号
+[new in round 7] foreign checks ignored when clean (adapted to the round 7 text):
+  x GitHub 还报 clean，手上的检查里有别家失败：拦，并点名
+  x has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+  x 检查名同样：别家检查的名字引号、转义，名单有界
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 7] opaque blocker removed (adapted to the round 7 text):
+  x opaque-file：只打开它
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[new in round 7] evidence link must be at the head:
+  x 证据链钉在本 PR 的提交上（不必是 head）、指向本 PR 加的证据：算
+  x 多条链接有一条合格即可：钉在 main 历史上的那条不拖累
+  x readiness 不判链接的文件在那个提交上是否已存在（raw 404）：交给 S4 外壳
+[new in round 8] compare head check removed:
+  x compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判
+[new in round 8] compare not at the head blocks but is still judged (digest reported):
+  x compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判
+[new in round 8] compare not at the head goes to a person (compare-malformed):
+  x compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判
+[new in round 8] verify-missing detail counts every verify verdict (round 7 count):
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[new in round 8] verify-missing detail leaves unbound verdicts out:
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[new in round 8] failed verify step not named:
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[new in round 8] review block on any digest counts:
+  x 别的摘要上 review 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+[new in round 8] verify block on any digest counts:
+  x 别的摘要上 verify 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+[new in round 8] decision block on any digest counts:
+  x 别的摘要上 decision 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+[new in round 8] unbound verdicts count as current:
+  x 未绑定 head 的 verify 通过（{pass, null}）不算当前补丁的
+  x 未绑定 head 的 review 通过（{pass, null}）不算当前补丁的
+  x 未绑定 head 的 decision 通过（{pass, null}）不算当前补丁的
+  x verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+[new in round 8] tampered counted only when bound:
+  x 未绑定 head 的 tampered（{tampered, null}）照样算：verify-tampered
+[new in round 8] check runs deduped by name, first kept:
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 8] check runs deduped by name, last kept:
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 8] class sweep: policy-human policy -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x policy-human：只打开它
+  x 每个 blocker 带类别与固定文案
+[new in round 8] class sweep: autonomy-paused policy -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x autonomy-paused：只打开它
+[new in round 8] class sweep: not-applicable policy -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x not-applicable：只打开它
+[new in round 8] class sweep: not-current-build transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x not-current-build：只打开它
+[new in round 8] class sweep: phase-not-review transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x phase-not-review：只打开它
+[new in round 8] class sweep: work-in-flight transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x work-in-flight：只打开它
+[new in round 8] class sweep: pr-unreadable transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x pr-unreadable：只打开它
+  x 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+[new in round 8] class sweep: pr-not-open human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x pr-not-open：只打开它
+  x merged 标志算数：closed 且 merged 记 merged；state 还是 open 也记
+[new in round 8] class sweep: pr-draft transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x pr-draft：只打开它
+[new in round 8] class sweep: pr-from-fork human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x pr-from-fork：只打开它
+  x head 仓库已删（headRepoFullName 为 null）：pr-from-fork，不抛
+[new in round 8] class sweep: base-not-default human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x base-not-default：只打开它
+  x 读到了默认分支、PR 指向别处：仍是留人的 base-not-default
+[new in round 8] class sweep: mergeable-state transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x mergeable-state：只打开它
+  x GitHub 还报 clean，手上的检查里有别家失败：拦，并点名
+  x has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+  x unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 8] class sweep: self-required human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x self-required：只打开它
+[new in round 8] class sweep: required-checks-unreadable transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x required-checks-unreadable：只打开它
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[new in round 8] class sweep: required-checks-none human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x required-checks-none：只打开它
+[new in round 8] class sweep: required-check-missing transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x required-check-missing：只打开它
+[new in round 8] class sweep: required-check-pending transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x required-check-pending：只打开它
+[new in round 8] class sweep: required-check-failed transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x required-check-failed：只打开它
+  x 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+[new in round 8] class sweep: pr-evidence-not-green transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x pr-evidence-not-green：只打开它
+[new in round 8] class sweep: patch-unavailable transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x patch-unavailable：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+  x compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判
+[new in round 8] class sweep: compare-malformed human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x compare-malformed：只打开它
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[new in round 8] class sweep: compare-truncated human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x compare-truncated：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 恰好 300 个文件、PR 也报 300：compare-truncated（truncated），不是 patch-unbindable
+[new in round 8] class sweep: patch-unbindable human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x patch-unbindable：只打开它
+  x 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+  x 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+[new in round 8] class sweep: size-cap human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x size-cap：只打开它
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+  x compare 恰好 300 个文件、PR 也报 300：compare-truncated（truncated），不是 patch-unbindable
+[new in round 8] class sweep: protected-path human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x protected-path：只打开它
+[new in round 8] class sweep: outside-auto-merge human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x outside-auto-merge：只打开它
+[new in round 8] class sweep: test-deleted human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x test-deleted：只打开它
+[new in round 8] class sweep: opaque-file human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x opaque-file：只打开它
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[new in round 8] class sweep: evidence-outside-ticket human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x evidence-outside-ticket：只打开它
+[new in round 8] class sweep: evidence-executable human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x evidence-executable：只打开它
+[new in round 8] class sweep: issue-ref-missing human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x issue-ref-missing：只打开它
+[new in round 8] class sweep: evidence-link-missing transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x evidence-link-missing：只打开它
+  x 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算
+[new in round 8] class sweep: verify-missing transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x verify-missing：只打开它
+[new in round 8] class sweep: verify-failed transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x verify-failed：只打开它
+[new in round 8] class sweep: verify-extraction-failed transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x verify-extraction-failed：只打开它
+[new in round 8] class sweep: verify-evidence-invalid transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x verify-evidence-invalid：只打开它
+  x 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+[new in round 8] class sweep: verify-tampered human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x verify-tampered：只打开它
+  x 未绑定 head 的 tampered（{tampered, null}）照样算：verify-tampered
+[new in round 8] class sweep: review-missing transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x review-missing：只打开它
+[new in round 8] class sweep: review-blocking transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x review-blocking：只打开它
+[new in round 8] class sweep: review-extraction-failed transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x review-extraction-failed：只打开它
+[new in round 8] class sweep: perspective-timed-out human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x perspective-timed-out：只打开它
+[new in round 8] class sweep: decision-missing transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x decision-missing：只打开它
+[new in round 8] class sweep: decision-no-go transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x decision-no-go：只打开它
+[new in round 8] class sweep: decision-extraction-failed transient -> human:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x decision-extraction-failed：只打开它
+[new in round 8] class sweep: fix-rounds-exhausted human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x fix-rounds-exhausted：只打开它
+[new in round 8] class sweep: fix-no-change human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x fix-no-change：只打开它
+[new in round 8] class sweep: gate-rounds-exhausted human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x gate-rounds-exhausted：只打开它
+[new in round 8] class sweep: no-reviewers human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x no-reviewers：只打开它
+[new in round 8] class sweep: no-verifier human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x no-verifier：只打开它
+[new in round 8] class sweep: no-decider human -> transient:
+  x 词表里每个码的类别与 CLASS 表逐码相同
+  x no-decider：只打开它
+
+["chief go silences blocking", "apps/server/src/services/merge-gate/readiness.ts", "if (blocking.length > 0)\n      block('review-blocking'", "if (blocking.length > 0 && !has(at('decision'), 'pass'))\n      block('review-blocking'"]
+["verdicts on any digest count", "apps/server/src/services/merge-gate/readiness.ts", "          x.patchDigest === D &&\n", ""]
+["extraction failure counts as pass", "apps/server/src/services/merge-gate/readiness.ts", "if (has(mine, 'pass') || has(mine, 'block')) continue;", "if (has(mine, 'pass') || has(mine, 'block') || has(mine, 'extraction_failed')) continue;"]
+["status-provided required check missed", "apps/server/src/services/merge-gate/readiness.ts", "      } else if (status !== undefined) {", "      } else if (false) {"]
+["pr-evidence skipped is green", "apps/server/src/services/merge-gate/readiness.ts", "evidence.conclusion !== 'success'", "!runPasses(evidence)"]
+["self-required not flagged", "apps/server/src/services/merge-gate/readiness.ts", "if (required.some((n) => n.toLowerCase() === MERGE_GATE_STATUS_CONTEXT)) block('self-required');", ""]
+["perspectives from the team, not the round", "apps/server/src/services/merge-gate/readiness.ts", "const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;", "const perspectives = i.availability.reviewerPerspectives;"]
+["unsorted blockers", "apps/server/src/services/merge-gate/readiness.ts", ".sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))", ""]
+["size cap off by one", "apps/server/src/services/merge-gate/readiness.ts", "digest.countedLines > GATE_LIMITS.maxLines", "digest.countedLines >= GATE_LIMITS.maxLines + 12"]
+["fork check off", "apps/server/src/services/merge-gate/readiness.ts", "      pr.headRepoFullName === null ||\n      pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()\n", "      false\n"]
+["tampered only at D", "apps/server/src/services/merge-gate/readiness.ts", "  if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))\n    block('verify-tampered');\n", ""]
+["mergeable null accepted", "apps/server/src/services/merge-gate/readiness.ts", "state === null || state === 'unknown'", "state === 'unknown'"]
+["failed verify step counts as a verdict", "apps/server/src/services/merge-gate/readiness.ts", "['pass', 'block', 'evidence_invalid', 'extraction_failed'].includes(x.outcome)", "x.outcome !== 'unbound'"]
+["unbindable digest reported as transient patch-unavailable", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unbindable', digest.unavailable);", "block('patch-unavailable', digest.unavailable);"]
+["patch-unbindable class transient", "packages/shared/src/records/merge-gate.ts", "code: 'patch-unbindable',\n    class: 'human',", "code: 'patch-unbindable',\n    class: 'transient',"]
+["unreadable compare goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unavailable', 'compare unreadable');", "block('patch-unbindable', 'compare unreadable');"]
+["has_hooks skips the foreign check", "apps/server/src/services/merge-gate/readiness.ts", "} else if (state === 'clean' || state === 'has_hooks') {", "} else if (state === 'has_hooks') {\n    } else if (state === 'clean') {"]
+["judged checks listed again under clean", "apps/server/src/services/merge-gate/readiness.ts", "(notPassing ?? []).filter((x) => !judged.has(x))", "(notPassing ?? [])"]
+["required run not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(run);\n", ""]
+["required status not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(status);\n", ""]
+["pr-evidence not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "    if (evidence !== undefined) judged.add(evidence);\n", ""]
+["own status counted as foreign", "apps/server/src/services/merge-gate/readiness.ts", "...checks.statuses.filter((s) => s.state !== 'success' && !isOwnStatus(s)),", "...checks.statuses.filter((s) => s.state !== 'success'),"]
+["unstable with nothing visible accepted", "apps/server/src/services/merge-gate/readiness.ts", "      else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');\n", ""]
+["own success counts as a visible non-passing check", "apps/server/src/services/merge-gate/readiness.ts", "checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s))", "checks?.statuses.some((s) => isOwnStatus(s))"]
+["pass does not clear evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (has(verify, 'evidence_invalid'))"]
+["pass on another digest clears evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (!i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'pass') && has(verify, 'evidence_invalid'))"]
+["unreadable default branch goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) block('base-not-default', 'default branch unknown');"]
+["unreadable default branch passes", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) {\n    }"]
+["file and line caps count only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {", "if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines || digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["file cap counts only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "digest.countedFiles > GATE_LIMITS.maxFiles) {", "digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["line cap counts only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "if (digest.countedLines > GATE_LIMITS.maxLines ||", "if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines ||"]
+["opaque-file dropped from the vocabulary", "packages/shared/src/records/merge-gate.ts", "  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n", ""]
+["opaque-file moved to the end of the path group", "packages/shared/src/records/merge-gate.ts", "  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n", "  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n"]
+["opaque-file class transient", "packages/shared/src/records/merge-gate.ts", "    code: 'opaque-file',\n    class: 'human',", "    code: 'opaque-file',\n    class: 'transient',"]
+["malformed compare waits like unreadable", "apps/server/src/services/merge-gate/readiness.ts", "if (i.compare === 'malformed') block('compare-malformed');", "if (i.compare === 'malformed') block('patch-unavailable', 'compare unreadable');"]
+["compare-malformed class transient", "packages/shared/src/records/merge-gate.ts", "{ code: 'compare-malformed', class: 'human',", "{ code: 'compare-malformed', class: 'transient',"]
+["compare-malformed dropped from the vocabulary", "packages/shared/src/records/merge-gate.ts", "  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },\n", ""]
+["evidence link: any sha (ancestor rule), path of this PR", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "changed.has(l.path)"]
+["evidence link: commit of this PR, any path", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "commits.has(l.sha)"]
+["evidence link: removed files count as this PR's evidence", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename)", "compare.files.map((f) => f.filename)"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "if (pr !== null && compare !== null) {", "if (pr !== null) {"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "new Set(compare.commits)", "new Set(compare?.commits ?? [])"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed')", "(compare?.files ?? []).filter((f) => f.status !== 'removed')"]
+["incomplete checks trusted", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;"]
+["incomplete checks block but the half list is still judged", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;\n  if (i.checks?.complete === false) block('required-checks-unreadable', 'check list incomplete');"]
+["S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading)", "apps/server/src/services/merge-gate/paths.ts", "if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);", "if (f.patchSha === null && !name.toLowerCase().startsWith(EVIDENCE_PREFIX)) push(out.opaque, name);"]
+["S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check)", "apps/server/src/services/merge-gate/paths.ts", "if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);", "if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);"]
+["unreadable required falls back to pass (adapted to the round 4 text)", "apps/server/src/services/merge-gate/readiness.ts", "    block(\n      'required-checks-unreadable',\n      ...(i.checks?.complete === false ? ['check list incomplete'] : []),\n    );\n", ""]
+["foreign unstable accepted (adapted to the round 2 text)", "apps/server/src/services/merge-gate/readiness.ts", "else if (notPassing.length > 0)", "else if (false)"]
+["has_hooks blocks (adapted to the round 2 text)", "apps/server/src/services/merge-gate/readiness.ts", "} else if (state === 'clean' || state === 'has_hooks') {", "} else if (state === 'clean') {"]
+["names unquoted (quoted returns the raw name)", "apps/server/src/services/merge-gate/readiness.ts", "function quoted(name: string): string {\n  let body = '';", "function quoted(name: string): string {\n  return name;\n  let body = '';"]
+["only JSON.stringify escaping (C1, bidi, line separator left raw)", "apps/server/src/services/merge-gate/readiness.ts", "if (json !== ch || !UNSAFE_CHAR.test(ch)) return json;", "return json;"]
+["name length unbounded", "apps/server/src/services/merge-gate/readiness.ts", "    if (body.length + esc.length > DETAIL_NAME_CHARS) return `\"${body}\"…`;\n", ""]
+["name list unbounded", "apps/server/src/services/merge-gate/readiness.ts", "  const shown = list.slice(0, DETAIL_NAMES).map(quoted);\n  return list.length > DETAIL_NAMES ? [...shown, `+${list.length - DETAIL_NAMES} more`] : shown;", "  return list.map(quoted);"]
+["protected-path detail takes the raw file names", "apps/server/src/services/merge-gate/readiness.ts", "block('protected-path', ...names(paths.protected))", "block('protected-path', ...paths.protected)"]
+["foreign check names raw under clean", "apps/server/src/services/merge-gate/readiness.ts", "names(foreign.map(checkName)).join(', ')", "foreign.map(checkName).join(', ')"]
+["foreign check names raw under unstable", "apps/server/src/services/merge-gate/readiness.ts", "names(notPassing.map(checkName)).join(', ')", "notPassing.map(checkName).join(', ')"]
+["required check name raw", "apps/server/src/services/merge-gate/readiness.ts", "block('required-check-missing', quoted(name));", "block('required-check-missing', name);"]
+["branch names raw", "apps/server/src/services/merge-gate/readiness.ts", "`${quoted(pr.baseRef)} → ${quoted(i.repo.defaultBranch)}`", "`${pr.baseRef} → ${i.repo.defaultBranch}`"]
+["head repository name raw", "apps/server/src/services/merge-gate/readiness.ts", "pr.headRepoFullName === null ? 'head repository deleted' : quoted(pr.headRepoFullName),", "pr.headRepoFullName ?? 'head repository deleted',"]
+["verify: a later pass does not clear extraction_failed", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'extraction_failed'))", "if (has(verify, 'extraction_failed'))"]
+["review: a later pass does not clear extraction_failed", "apps/server/src/services/merge-gate/readiness.ts", "if (has(mine, 'pass') || has(mine, 'block')) continue;", "if ((has(mine, 'pass') || has(mine, 'block')) && !has(mine, 'extraction_failed')) continue;"]
+["decision: a later pass does not clear extraction_failed", "apps/server/src/services/merge-gate/readiness.ts", "else if (!has(decision, 'pass')) {", "else if (!has(decision, 'pass') || has(decision, 'extraction_failed')) {"]
+["non-mergeable states narrowed to behind", "apps/server/src/services/merge-gate/readiness.ts", "    } else {\n      block('mergeable-state', state);\n    }", "    } else if (state === 'behind') {\n      block('mergeable-state', state);\n    }"]
+["300-file truncation reported as patch-unbindable", "apps/server/src/services/merge-gate/readiness.ts", "if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {", "if (digest.unavailable === 'count-mismatch') {"]
+["own status matched case-sensitively", "apps/server/src/services/merge-gate/readiness.ts", "const isOwnStatus = (s: GateCommitStatus) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT;", "const isOwnStatus = (s: GateCommitStatus) => s.context === MERGE_GATE_STATUS_CONTEXT;"]
+["self-required matched case-sensitively", "apps/server/src/services/merge-gate/readiness.ts", "required.some((n) => n.toLowerCase() === MERGE_GATE_STATUS_CONTEXT)", "required.some((n) => n === MERGE_GATE_STATUS_CONTEXT)"]
+["own required name not skipped", "apps/server/src/services/merge-gate/readiness.ts", "      if (name.toLowerCase() === MERGE_GATE_STATUS_CONTEXT) continue;\n", ""]
+["fork compare case-sensitive", "apps/server/src/services/merge-gate/readiness.ts", "pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()", "pr.headRepoFullName !== pr.baseRepoFullName"]
+["merged flag ignored", "apps/server/src/services/merge-gate/readiness.ts", "if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);", "if (pr.state !== 'open') block('pr-not-open', pr.state);"]
+["deleted head repository treated as the same repository", "apps/server/src/services/merge-gate/readiness.ts", "      pr.headRepoFullName === null ||\n      pr.headRepoFullName.toLowerCase()", "      (pr.headRepoFullName !== null &&\n      pr.headRepoFullName.toLowerCase()"]
+["deleted head repository treated as the same repository", "apps/server/src/services/merge-gate/readiness.ts", "!== pr.baseRepoFullName.toLowerCase()\n", "!== pr.baseRepoFullName.toLowerCase())\n"]
+["empty file list short-circuits to ready", "apps/server/src/services/merge-gate/readiness.ts", "export function mergeReadiness(i: GateInputs): MergeReadiness {\n", "export function mergeReadiness(i: GateInputs): MergeReadiness {\n  if (typeof i.compare === 'object' && i.compare.files.length === 0)\n    return { ready: true, headSha: i.pr?.headSha ?? null, patchDigest: null, policy: i.policy.mergePolicy, blockers: [] };\n"]
+["missing required check is green (adapted to the round 7 text)", "apps/server/src/services/merge-gate/readiness.ts", "        block('required-check-missing', quoted(name));\n", ""]
+["foreign checks ignored when clean (adapted to the round 7 text)", "apps/server/src/services/merge-gate/readiness.ts", "if (foreign.length > 0)", "if (false)"]
+["opaque blocker removed (adapted to the round 7 text)", "apps/server/src/services/merge-gate/readiness.ts", "    if (paths.opaque.length > 0) block('opaque-file', ...names(paths.opaque));\n", ""]
+["evidence link must be at the head", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "l.sha === pr.headSha && changed.has(l.path)"]
+["compare head check removed", "apps/server/src/services/merge-gate/readiness.ts", "  if (compare !== null && pr !== null && !compare.commits.includes(pr.headSha)) {\n    block('patch-unavailable', 'compare not read at the PR head');\n    compare = null;\n  }\n", ""]
+["compare not at the head blocks but is still judged (digest reported)", "apps/server/src/services/merge-gate/readiness.ts", "    block('patch-unavailable', 'compare not read at the PR head');\n    compare = null;\n", "    block('patch-unavailable', 'compare not read at the PR head');\n"]
+["compare not at the head goes to a person (compare-malformed)", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unavailable', 'compare not read at the PR head');", "block('compare-malformed');"]
+["verify-missing detail counts every verify verdict (round 7 count)", "apps/server/src/services/merge-gate/readiness.ts", "i.verdicts.filter((x) => x.kind === 'verify' && x.patchDigest !== D)", "i.verdicts.filter((x) => x.kind === 'verify')"]
+["verify-missing detail leaves unbound verdicts out", "apps/server/src/services/merge-gate/readiness.ts", "i.verdicts.filter((x) => x.kind === 'verify' && x.patchDigest !== D)", "i.verdicts.filter((x) => x.kind === 'verify' && x.patchDigest !== D && x.patchDigest !== null)"]
+["failed verify step not named", "apps/server/src/services/merge-gate/readiness.ts", "        ...(stepFailed.length > 0\n          ? [`${stepFailed.length} verify step(s) failed on this patch`]\n          : []),\n", ""]
+["review block on any digest counts", "apps/server/src/services/merge-gate/readiness.ts", "const blocking = at('review').filter((x) => x.outcome === 'block');", "const blocking = i.verdicts.filter((x) => x.kind === 'review' && x.outcome === 'block');"]
+["verify block on any digest counts", "apps/server/src/services/merge-gate/readiness.ts", "if (has(verify, 'block')) block('verify-failed');", "if (has(i.verdicts.filter((x) => x.kind === 'verify'), 'block')) block('verify-failed');"]
+["decision block on any digest counts", "apps/server/src/services/merge-gate/readiness.ts", "if (has(decision, 'block')) block('decision-no-go');", "if (has(i.verdicts.filter((x) => x.kind === 'decision'), 'block')) block('decision-no-go');"]
+["unbound verdicts count as current", "apps/server/src/services/merge-gate/readiness.ts", "          x.patchDigest === D &&\n", "          (x.patchDigest === D || x.patchDigest === null) &&\n"]
+["tampered counted only when bound", "apps/server/src/services/merge-gate/readiness.ts", "if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))", "if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered' && x.patchDigest !== null))"]
+["check runs deduped by name, first kept", "apps/server/src/services/merge-gate/readiness.ts", "  const checks = i.checks?.complete ? i.checks : null;", "  const checks = i.checks?.complete ? { ...i.checks, runs: i.checks.runs.filter((r, k, all) => all.findIndex((x) => x.name === r.name) === k) } : null;"]
+["check runs deduped by name, last kept", "apps/server/src/services/merge-gate/readiness.ts", "  const checks = i.checks?.complete ? i.checks : null;", "  const checks = i.checks?.complete ? { ...i.checks, runs: i.checks.runs.filter((r, k, all) => all.findLastIndex((x) => x.name === r.name) === k) } : null;"]
+["class sweep: policy-human policy -> human", "packages/shared/src/records/merge-gate.ts", "code: 'policy-human', class: 'policy',", "code: 'policy-human', class: 'human',"]
+["class sweep: autonomy-paused policy -> human", "packages/shared/src/records/merge-gate.ts", "code: 'autonomy-paused', class: 'policy',", "code: 'autonomy-paused', class: 'human',"]
+["class sweep: not-applicable policy -> human", "packages/shared/src/records/merge-gate.ts", "code: 'not-applicable', class: 'policy',", "code: 'not-applicable', class: 'human',"]
+["class sweep: not-current-build transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'not-current-build', class: 'transient',", "code: 'not-current-build', class: 'human',"]
+["class sweep: phase-not-review transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'phase-not-review', class: 'transient',", "code: 'phase-not-review', class: 'human',"]
+["class sweep: work-in-flight transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'work-in-flight', class: 'transient',", "code: 'work-in-flight', class: 'human',"]
+["class sweep: pr-unreadable transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'pr-unreadable', class: 'transient',", "code: 'pr-unreadable', class: 'human',"]
+["class sweep: pr-not-open human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'pr-not-open', class: 'human',", "code: 'pr-not-open', class: 'transient',"]
+["class sweep: pr-draft transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'pr-draft', class: 'transient',", "code: 'pr-draft', class: 'human',"]
+["class sweep: pr-from-fork human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'pr-from-fork', class: 'human',", "code: 'pr-from-fork', class: 'transient',"]
+["class sweep: base-not-default human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'base-not-default', class: 'human',", "code: 'base-not-default', class: 'transient',"]
+["class sweep: mergeable-state transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'mergeable-state', class: 'transient',", "code: 'mergeable-state', class: 'human',"]
+["class sweep: self-required human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'self-required', class: 'human',", "code: 'self-required', class: 'transient',"]
+["class sweep: required-checks-unreadable transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'required-checks-unreadable', class: 'transient',", "code: 'required-checks-unreadable', class: 'human',"]
+["class sweep: required-checks-none human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'required-checks-none', class: 'human',", "code: 'required-checks-none', class: 'transient',"]
+["class sweep: required-check-missing transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'required-check-missing', class: 'transient',", "code: 'required-check-missing', class: 'human',"]
+["class sweep: required-check-pending transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'required-check-pending', class: 'transient',", "code: 'required-check-pending', class: 'human',"]
+["class sweep: required-check-failed transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'required-check-failed', class: 'transient',", "code: 'required-check-failed', class: 'human',"]
+["class sweep: pr-evidence-not-green transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'pr-evidence-not-green', class: 'transient',", "code: 'pr-evidence-not-green', class: 'human',"]
+["class sweep: patch-unavailable transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'patch-unavailable',\n    class: 'transient',", "code: 'patch-unavailable',\n    class: 'human',"]
+["class sweep: compare-malformed human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'compare-malformed', class: 'human',", "code: 'compare-malformed', class: 'transient',"]
+["class sweep: compare-truncated human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'compare-truncated', class: 'human',", "code: 'compare-truncated', class: 'transient',"]
+["class sweep: patch-unbindable human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'patch-unbindable',\n    class: 'human',", "code: 'patch-unbindable',\n    class: 'transient',"]
+["class sweep: size-cap human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'size-cap', class: 'human',", "code: 'size-cap', class: 'transient',"]
+["class sweep: protected-path human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'protected-path', class: 'human',", "code: 'protected-path', class: 'transient',"]
+["class sweep: outside-auto-merge human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'outside-auto-merge', class: 'human',", "code: 'outside-auto-merge', class: 'transient',"]
+["class sweep: test-deleted human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'test-deleted', class: 'human',", "code: 'test-deleted', class: 'transient',"]
+["class sweep: opaque-file human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'opaque-file',\n    class: 'human',", "code: 'opaque-file',\n    class: 'transient',"]
+["class sweep: evidence-outside-ticket human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'evidence-outside-ticket', class: 'human',", "code: 'evidence-outside-ticket', class: 'transient',"]
+["class sweep: evidence-executable human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'evidence-executable', class: 'human',", "code: 'evidence-executable', class: 'transient',"]
+["class sweep: issue-ref-missing human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'issue-ref-missing', class: 'human',", "code: 'issue-ref-missing', class: 'transient',"]
+["class sweep: evidence-link-missing transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'evidence-link-missing',\n    class: 'transient',", "code: 'evidence-link-missing',\n    class: 'human',"]
+["class sweep: verify-missing transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'verify-missing', class: 'transient',", "code: 'verify-missing', class: 'human',"]
+["class sweep: verify-failed transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'verify-failed', class: 'transient',", "code: 'verify-failed', class: 'human',"]
+["class sweep: verify-extraction-failed transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'verify-extraction-failed', class: 'transient',", "code: 'verify-extraction-failed', class: 'human',"]
+["class sweep: verify-evidence-invalid transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'verify-evidence-invalid', class: 'transient',", "code: 'verify-evidence-invalid', class: 'human',"]
+["class sweep: verify-tampered human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'verify-tampered', class: 'human',", "code: 'verify-tampered', class: 'transient',"]
+["class sweep: review-missing transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'review-missing', class: 'transient',", "code: 'review-missing', class: 'human',"]
+["class sweep: review-blocking transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'review-blocking', class: 'transient',", "code: 'review-blocking', class: 'human',"]
+["class sweep: review-extraction-failed transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'review-extraction-failed', class: 'transient',", "code: 'review-extraction-failed', class: 'human',"]
+["class sweep: perspective-timed-out human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'perspective-timed-out', class: 'human',", "code: 'perspective-timed-out', class: 'transient',"]
+["class sweep: decision-missing transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'decision-missing', class: 'transient',", "code: 'decision-missing', class: 'human',"]
+["class sweep: decision-no-go transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'decision-no-go', class: 'transient',", "code: 'decision-no-go', class: 'human',"]
+["class sweep: decision-extraction-failed transient -> human", "packages/shared/src/records/merge-gate.ts", "code: 'decision-extraction-failed', class: 'transient',", "code: 'decision-extraction-failed', class: 'human',"]
+["class sweep: fix-rounds-exhausted human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'fix-rounds-exhausted', class: 'human',", "code: 'fix-rounds-exhausted', class: 'transient',"]
+["class sweep: fix-no-change human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'fix-no-change', class: 'human',", "code: 'fix-no-change', class: 'transient',"]
+["class sweep: gate-rounds-exhausted human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'gate-rounds-exhausted', class: 'human',", "code: 'gate-rounds-exhausted', class: 'transient',"]
+["class sweep: no-reviewers human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'no-reviewers', class: 'human',", "code: 'no-reviewers', class: 'transient',"]
+["class sweep: no-verifier human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'no-verifier', class: 'human',", "code: 'no-verifier', class: 'transient',"]
+["class sweep: no-decider human -> transient", "packages/shared/src/records/merge-gate.ts", "code: 'no-decider', class: 'human',", "code: 'no-decider', class: 'transient',"]

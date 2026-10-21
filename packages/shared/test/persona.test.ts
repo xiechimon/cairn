@@ -11,6 +11,7 @@
 
 import { describe, expect, test } from 'vitest';
 import {
+  AGENT_DESC_MAX_LENGTH,
   agentRecordSchema,
   createAgentBodySchema,
   PERSONA_ROLES,
@@ -69,6 +70,45 @@ describe('persona 名册（#1250 / ADR 0018 决策 0）', () => {
         expect(p.reviewFocus, p.role).toBeUndefined();
       }
     }
+  });
+});
+
+// #1406 P5-3：Implementer 认仓规（spec 28 §4 P5「仓规内化」）。失败方式见
+// docs/verify/1406/p5-3-failure-modes.txt：
+//   F11 档案超过 agent.description 的长度闸（seeding 写进去的行 PATCH 不回来）
+//   F12 文案点名的技能在本仓不存在（读仓库文件，钉在 apps/server/test/persona-repo-rules.test.ts）
+//   F13 漏掉一条仓规：AGENTS.md / CLAUDE.md 为正本、PR 技能、验证技能、提交
+//       与 PR 标题形、关票关键字的位置、证据目录、提交前的闸、issue 围栏规则
+describe('Implementer 仓规（#1406 P5-3）', () => {
+  const implementer = personaByRole('implementer').description;
+
+  test('F11：每名档案都在 agent.description 长度闸之内', () => {
+    for (const p of PERSONA_PROFILES) {
+      expect(p.description.length, p.role).toBeLessThanOrEqual(AGENT_DESC_MAX_LENGTH);
+    }
+  });
+
+  test('F13：仓规要点齐全，并指向仓库根的 AGENTS.md / CLAUDE.md', () => {
+    for (const needle of [
+      'AGENTS.md',
+      'CLAUDE.md',
+      'pr-pacman',
+      'verify-pacman',
+      '<scope>(<票号>): <subject>',
+      'closes #',
+      'commit message',
+      'docs/verify/<票号>/',
+      'pnpm lint',
+      'pnpm typecheck',
+      'pnpm spec:parse',
+      'vitest run --changed',
+      'e2e:affected',
+      '【GitHub issue 原文',
+    ]) {
+      expect(implementer, needle).toContain(needle);
+    }
+    // 契约四要素与 Composition 块仍在（既有失败方式 2 的同一要求）。
+    expect(implementer).toContain('Composition：入口 = build 步');
   });
 });
 

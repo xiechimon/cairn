@@ -14,6 +14,10 @@
 
 - 展开态侧栏「新任务」行（`button.sidebar-row` 含「新任务」文案 + `.sidebar-kbd` C 角标）。
 - 键盘：任意页 `C`（非输入态）；`⌘J` 呼出总管抽屉。
+- 驱动(`vp.mjs list hotkeys` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive hotkeys hotkeys-chain`:C 开新建任务、Space 呼出总管、输入态守卫。
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive hotkeys newtask-key-c`:新键 C 开 dialog、旧键 N 不开(正负成对)。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive hotkeys chief-new-thread-key`(建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving it with verify-pacman
 

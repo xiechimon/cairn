@@ -64,23 +64,46 @@ export async function runGitOk(
 
 /** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。密码含 shell 元
  * 字符亦安全（credential.helper 值不经 shell——git 直接以 `sh -c` 执行 fn
- * 体，echo 单引号位转义 `'` → `'\''`）。 */
-export function gitCredentialEnv(cred: GitCredentials): NodeJS.ProcessEnv {
+ * 体，echo 单引号位转义 `'` → `'\''`）。`parent` = 调用方要合并进去的环境
+ * （runGit / 钩子都是 `{ ...process.env, ...本函数结果 }`）。 */
+export function gitCredentialEnv(
+  cred: GitCredentials,
+  parent: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
   const sq = (v: string) => v.replace(/'/g, `'\\''`);
   const helper = `!f() { echo username=${sq(cred.username)}; echo password=${sq(cred.password)}; }; f`;
+  // #1460：接在父环境自带的 GIT_CONFIG_* 之后（容器 / CI 的代理、CA 配置），
+  // 从 0 写会盖掉它们，COUNT=2 又把 2 号以后的藏起来。
+  const n = inheritedGitConfigCount(parent);
   return {
-    // 首条空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
-    // helper）。缺此条则系统级/全局 osxkeychain 等 helper 叠加在前：同主机
-    // 命中陈旧凭证（上一步已撤销的 token）致 auth 失败，且成功轮会回写钥匙串
-    // （凭证落盘面，破 02 §8 不落盘纪律）。重置后本步内联 helper 是唯一来源。
-    GIT_CONFIG_COUNT: '2',
-    GIT_CONFIG_KEY_0: 'credential.helper',
-    GIT_CONFIG_VALUE_0: '',
-    GIT_CONFIG_KEY_1: 'credential.helper',
-    GIT_CONFIG_VALUE_1: helper,
+    // 空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
+    // helper，含父环境条目里的）。缺此条则系统级/全局 osxkeychain 等 helper
+    // 叠加在前：同主机命中陈旧凭证（上一步已撤销的 token）致 auth 失败，且
+    // 成功轮会回写钥匙串（凭证落盘面，破 02 §8 不落盘纪律）。重置后本步内联
+    // helper 是唯一来源。
+    GIT_CONFIG_COUNT: String(n + 2),
+    [`GIT_CONFIG_KEY_${n}`]: 'credential.helper',
+    [`GIT_CONFIG_VALUE_${n}`]: '',
+    [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
+    [`GIT_CONFIG_VALUE_${n + 1}`]: helper,
     // 交互提示关闭（无 tty 场景挂起护栏）。
     GIT_TERMINAL_PROMPT: '0',
   };
+}
+
+/** 父环境里 git 会读的 GIT_CONFIG_* 条数（#1460）。COUNT 的写法按 git 的
+ * strtoul 收（前导空白、+ 号、前导 0；尾随字符与负号不收）。git 不收的 COUNT，
+ * 或 0..n-1 缺 KEY / VALUE 时，git 在父环境下本就报错（bogus count / missing
+ * config key）：返回 0，凭证条目从 0 写、COUNT=2，与 #1460 之前相同。 */
+function inheritedGitConfigCount(parent: NodeJS.ProcessEnv): number {
+  const raw = parent.GIT_CONFIG_COUNT;
+  if (raw === undefined || !/^[ \t\n\v\f\r]*\+?\d+$/.test(raw)) return 0;
+  const n = Number(raw);
+  for (let i = 0; i < n; i++) {
+    if (parent[`GIT_CONFIG_KEY_${i}`] === undefined) return 0;
+    if (parent[`GIT_CONFIG_VALUE_${i}`] === undefined) return 0;
+  }
+  return n;
 }
 
 /** #1225 machine 路的 git env：执行机自己的 credential helper（osxkeychain /

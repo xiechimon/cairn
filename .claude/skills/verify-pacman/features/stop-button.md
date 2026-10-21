@@ -14,6 +14,8 @@
 ## How to get to it (user POV)
 
 - 任务详情页(`/app/todo/:id`)运行中 → composer 右下停止钮(唯一入口;看板/总管无停止面)。
+- 驱动:本 feature 没有 current case;已登记的都判 stale,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list stop-button` 列出 usage:
+  - `vp.mjs drive stop-button stop-chain`:开始钮现走 orchestrate,stub 下 chief 回合不派发。
 
 ## Driving it with verify-pacman
 

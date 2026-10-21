@@ -23,7 +23,6 @@ import {
   GITHUB_READ_PER_PAGE_MAX,
   githubIssueSourceRef,
   githubReadToolParamsSchemas,
-  isGithubRepoRef,
 } from '@pacman/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -37,6 +36,7 @@ import {
   githubListWorkflowRuns,
 } from '../lib/github.js';
 import { SecretBoxError } from '../lib/secret-box.js';
+import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
 
@@ -81,9 +81,9 @@ interface GithubTarget {
 }
 
 /** 项目闸 + 连接闸。项目不属本团队与不存在同形 404（不泄露存在性）。
- * githubRepo 除了过 isGithubRepoRef，还不许 `.` / `..` 段：两者都过得了那条
- * 正则，拼进 `repos/{o}/{r}` 后会被 URL 规范化成别的路径（`../user` 会读到
- * `GET /user/issues`）。GitHub 的用户名与仓库名都不能是 `.` 或 `..`。 */
+ * owner/repo 经 githubRepoOfProject 拆段（#1466 server 出站单口）：列空、
+ * 形状不合法、owner 或 repo 为 `.` / `..`（拼进 `repos/{o}/{r}` 后会被 URL
+ * 规范化成别的路径，`../user` 会读到 `GET /user/issues`）一律 409。 */
 function openTarget(deps: GithubReadDeps, teamId: string, projectId: string): GithubTarget {
   const row = deps.db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
@@ -94,17 +94,13 @@ function openTarget(deps: GithubReadDeps, teamId: string, projectId: string): Gi
   if (row.repoKind !== 'github') {
     throw new HttpError(409, `project ${projectId} is not GitHub-backed`);
   }
-  const slug = row.githubRepo;
-  const [owner, repo] = slug?.split('/') ?? [];
-  if (
-    slug === null ||
-    !isGithubRepoRef(slug) ||
-    owner === undefined ||
-    repo === undefined ||
-    [owner, repo].some((segment) => segment === '.' || segment === '..')
-  ) {
+  const ref = githubRepoOfProject(row);
+  if (ref === null) {
     throw new HttpError(409, `project ${projectId} has no valid githubRepo (owner/repo)`);
   }
+  const { owner, repo } = ref;
+  // 正则锚定恰一斜杠：拼回即列值本身。
+  const slug = `${owner}/${repo}`;
   let token: string | null;
   try {
     token = openGithubToken({ db: deps.db, box: deps.box }, teamId);

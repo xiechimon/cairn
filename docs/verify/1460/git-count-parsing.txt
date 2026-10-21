@@ -1,0 +1,10 @@
+## what git 2.43.0 accepts as GIT_CONFIG_COUNT (one entry a.b=c; inherited GIT_CONFIG_* removed)
+1        -> c
+\ 1      -> c
++1       -> c
+$'\t1'   -> c
+1\       -> error: bogus count in GIT_CONFIG_COUNT
+1x       -> error: bogus count in GIT_CONFIG_COUNT
+-1       -> error: too many entries in GIT_CONFIG_COUNT
+abc      -> error: bogus count in GIT_CONFIG_COUNT
+01       -> c

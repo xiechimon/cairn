@@ -14,6 +14,9 @@
 ## How to get to it (user POV)
 
 - 失败任务详情页(`/app/todo/:id`,phase=failed)→ composer 输入反馈 → 发送钮。
+- 驱动(`vp.mjs list failed-send` 列出全部 case 与 usage):
+  - `node .claude/skills/verify-pacman/scripts/vp.mjs drive failed-send restart-combo`:失败任务重启后,漂移的重启组合不显示成用户气泡。
+  - 判 stale、不带 `--force` 拒跑的 case(拒跑时打印原因):`vp.mjs drive failed-send restart-with-feedback`(依赖的 setup-branch-sync-seed.mjs 建 agent 不带 machineId,ADR 0019 起 400)。
 
 ## Driving it with verify-pacman
 

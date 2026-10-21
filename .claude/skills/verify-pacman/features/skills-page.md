@@ -14,6 +14,7 @@
 - 侧栏「资源 → 技能」→ `/app/resources/skills`。
 - 空态:scratch 技能目录为空时列表页即空态(文案含目录路径)。
 - API 直证:`GET <api>/api/skills?teamId=<teamId>`。
+- 驱动:注册表里没有本 feature 的 case,`vp.mjs list` 不列它;按下面的配方手工驱动。
 
 ## Driving it with playwright
 

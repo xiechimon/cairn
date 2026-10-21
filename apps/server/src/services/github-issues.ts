@@ -13,6 +13,7 @@ import {
   type GithubIssueEcho,
   type GithubIssueState,
   type GithubIssuesResponse,
+  type GithubRepoRef,
   githubIssueSourceRef,
   parseGithubIssueSourceRef,
   type SecretBox,
@@ -24,6 +25,7 @@ import { type project as projectTable, todo as todoTable } from '../db/schema.js
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubRepoIssue, githubRepoIssues, githubRepoLabels } from '../lib/github.js';
+import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { normalizeGithubLabelColor, resolveProjectTagIds, syncGithubLabels } from './tags.js';
 import { createTodo, type TodoDeps } from './todos.js';
@@ -39,14 +41,12 @@ export interface GithubIssueFaceDeps {
 }
 
 /** 形态闸：仅 github 形态项目有 issue 读面；其余形态一律 404（不 500、
- * 不出站）。owner/repo 拆自 githubRepo 列（建项目时已过 isGithubRepoRef
- * 400 闸，lib 层出站再 encodeURIComponent 双保险）。 */
-function requireGithubRepo(row: ProjectRow): { owner: string; repo: string } {
-  if (row.repoKind !== 'github' || row.githubRepo === null) {
-    throw notFound('github issues');
-  }
-  const slash = row.githubRepo.indexOf('/');
-  return { owner: row.githubRepo.slice(0, slash), repo: row.githubRepo.slice(slash + 1) };
+ * 不出站）。owner/repo 经 githubRepoOfProject 拆自 githubRepo 列——存量行
+ * 不合法（#1466：`.` / `..` 段会改写请求路径）同按非 github 形态 404。 */
+function requireGithubRepo(row: ProjectRow): GithubRepoRef {
+  const ref = githubRepoOfProject(row);
+  if (ref === null) throw notFound('github issues');
+  return ref;
 }
 
 /** 连接闸：未连接 = 404 `github connection not found`（GET /api/github/repos

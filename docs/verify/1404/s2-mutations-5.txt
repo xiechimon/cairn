@@ -1,0 +1,266 @@
+# #1404 S2 mutations, round 5: every S2 mutation defined in rounds 1-4 (s2-mutations.txt; s2-mutations-1.txt repeats it and is skipped as a duplicate;
+# s2-mutations-2/3/4.txt) re-run against the round 5 source (8240d4b, S1 round 7 merged), plus the new ones below.
+# Each one applied alone, then apps/server/test/merge-gate-readiness.test.ts (94 tests), then the files restored.
+# New in round 5:
+#   two S1 mutations in paths.ts that undo the case-sensitive opaque exemption (the S1 round 5 reading, and the Unicode-folding EVIDENCE_RE);
+#   now that readiness no longer adds case variants itself, either one turns the readiness case-variant test red;
+#   three adaptations of round 1 mutations whose text later rounds reworded (the rule is the same, the replaced text is the current one).
+# 'does not apply' = the replaced text is no longer in the source:
+#   own status unstable blocks, foreign unstable accepted, has_hooks blocks: reworded in round 2 (round 2's own mutations and the adaptations below cover the rules);
+#   unreadable required falls back to pass: reworded in round 4 (adapted below); unknown ancestry counts: evidenceLinkAncestry left the contract in round 4;
+#   the two round 4 case-variant mutations: isEvidenceCaseVariant was removed in this round.
+# Result: 51 applied, 51 caught, none survived; 7 do not apply.
+# Table: [source file] name, test summary; then the failing tests per mutation; then definitions of the applied ones (name, file, text replaced, replacement).
+
+[s2-mutations.txt] chief go silences blocking                                                        3 failed | 91 passed (94)
+[s2-mutations.txt] verdicts on any digest count                                                      2 failed | 92 passed (94)
+[s2-mutations.txt] extraction failure counts as pass                                                 1 failed | 93 passed (94)
+[s2-mutations.txt] own status unstable blocks                                                        does not apply (text no longer in the source)
+[s2-mutations.txt] foreign unstable accepted                                                         does not apply (text no longer in the source)
+[s2-mutations.txt] missing required check is green                                                   1 failed | 93 passed (94)
+[s2-mutations.txt] unreadable required falls back to pass                                            does not apply (text no longer in the source)
+[s2-mutations.txt] status-provided required check missed                                             2 failed | 92 passed (94)
+[s2-mutations.txt] pr-evidence skipped is green                                                      2 failed | 92 passed (94)
+[s2-mutations.txt] self-required not flagged                                                         1 failed | 93 passed (94)
+[s2-mutations.txt] perspectives from the team, not the round                                         1 failed | 93 passed (94)
+[s2-mutations.txt] unsorted blockers                                                                 1 failed | 93 passed (94)
+[s2-mutations.txt] unknown ancestry counts                                                           does not apply (text no longer in the source)
+[s2-mutations.txt] has_hooks blocks                                                                  does not apply (text no longer in the source)
+[s2-mutations.txt] size cap off by one                                                               2 failed | 92 passed (94)
+[s2-mutations.txt] fork check off                                                                    1 failed | 93 passed (94)
+[s2-mutations.txt] tampered only at D                                                                2 failed | 92 passed (94)
+[s2-mutations.txt] mergeable null accepted                                                           1 failed | 93 passed (94)
+[s2-mutations.txt] failed verify step counts as a verdict                                            1 failed | 93 passed (94)
+[s2-mutations-2.txt] unbindable digest reported as transient patch-unavailable                       3 failed | 91 passed (94)
+[s2-mutations-2.txt] patch-unbindable class transient                                                2 failed | 92 passed (94)
+[s2-mutations-2.txt] unreadable compare goes to a person                                             3 failed | 91 passed (94)
+[s2-mutations-2.txt] foreign checks ignored when clean                                               2 failed | 92 passed (94)
+[s2-mutations-2.txt] has_hooks skips the foreign check                                               1 failed | 93 passed (94)
+[s2-mutations-2.txt] judged checks listed again under clean                                          4 failed | 90 passed (94)
+[s2-mutations-2.txt] required run not marked judged                                                  2 failed | 92 passed (94)
+[s2-mutations-2.txt] required status not marked judged                                               2 failed | 92 passed (94)
+[s2-mutations-2.txt] pr-evidence not marked judged                                                   1 failed | 93 passed (94)
+[s2-mutations-2.txt] own status counted as foreign                                                   2 failed | 92 passed (94)
+[s2-mutations-2.txt] unstable with nothing visible accepted                                          1 failed | 93 passed (94)
+[s2-mutations-2.txt] own success counts as a visible non-passing check                               1 failed | 93 passed (94)
+[s2-mutations-2.txt] pass does not clear evidence_invalid                                            1 failed | 93 passed (94)
+[s2-mutations-2.txt] pass on another digest clears evidence_invalid                                  1 failed | 93 passed (94)
+[s2-mutations-2.txt] unreadable default branch goes to a person                                      1 failed | 93 passed (94)
+[s2-mutations-2.txt] unreadable default branch passes                                                1 failed | 93 passed (94)
+[s2-mutations-3.txt] opaque blocker removed                                                          4 failed | 90 passed (94)
+[s2-mutations-3.txt] file and line caps count only non-evidence                                      3 failed | 91 passed (94)
+[s2-mutations-3.txt] file cap counts only non-evidence                                               2 failed | 92 passed (94)
+[s2-mutations-3.txt] line cap counts only non-evidence                                               1 failed | 93 passed (94)
+[s2-mutations-3.txt] opaque-file dropped from the vocabulary                                         3 failed | 91 passed (94)
+[s2-mutations-3.txt] opaque-file moved to the end of the path group                                  1 failed | 93 passed (94)
+[s2-mutations-3.txt] opaque-file class transient                                                     2 failed | 92 passed (94)
+[s2-mutations-4.txt] malformed compare waits like unreadable                                         2 failed | 92 passed (94)
+[s2-mutations-4.txt] compare-malformed class transient                                               1 failed | 93 passed (94)
+[s2-mutations-4.txt] compare-malformed dropped from the vocabulary                                   1 failed | 93 passed (94)
+[s2-mutations-4.txt] evidence link: any sha (ancestor rule), path of this PR                         3 failed | 91 passed (94)
+[s2-mutations-4.txt] evidence link: commit of this PR, any path                                      2 failed | 92 passed (94)
+[s2-mutations-4.txt] evidence link: removed files count as this PR's evidence                        1 failed | 93 passed (94)
+[s2-mutations-4.txt] evidence link judged without compare                                            4 failed | 90 passed (94)
+[s2-mutations-4.txt] incomplete checks trusted                                                       1 failed | 93 passed (94)
+[s2-mutations-4.txt] incomplete checks block but the half list is still judged                       1 failed | 93 passed (94)
+[s2-mutations-4.txt] opaque exemption case-insensitive (paths.opaque only)                           does not apply (text no longer in the source)
+[s2-mutations-4.txt] case-variant check skips a rename's old name                                    does not apply (text no longer in the source)
+[new in round 5] S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading)       1 failed | 93 passed (94)
+[new in round 5] S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check)  1 failed | 93 passed (94)
+[new in round 5] unreadable required falls back to pass (adapted to the round 4 text)                3 failed | 91 passed (94)
+[new in round 5] foreign unstable accepted (adapted to the round 2 text)                             1 failed | 93 passed (94)
+[new in round 5] has_hooks blocks (adapted to the round 2 text)                                      1 failed | 93 passed (94)
+
+[s2-mutations.txt] chief go silences blocking:
+  x review-blocking：只打开它
+  x chief 的 go 与同一摘要上的 blocking 同在：不 ready
+  x blocking 之后同视角又通过一次：仍拦（不允许重掷）
+[s2-mutations.txt] verdicts on any digest count:
+  x 旧摘要上的通过不算：review-missing / verify-missing / decision-missing
+  x 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+[s2-mutations.txt] extraction failure counts as pass:
+  x review-extraction-failed：只打开它
+[s2-mutations.txt] missing required check is green:
+  x required-check-missing：只打开它
+[s2-mutations.txt] status-provided required check missed:
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations.txt] pr-evidence skipped is green:
+  x pr-evidence-not-green：只打开它
+  x 必需检查 neutral / skipped 算通过（与分支保护一致），pr-evidence 只认 success
+[s2-mutations.txt] self-required not flagged:
+  x self-required：只打开它
+[s2-mutations.txt] perspectives from the team, not the round:
+  x 审核视角按轮次冻结的集合算，不按团队当前的
+[s2-mutations.txt] unsorted blockers:
+  x 插入顺序与词表顺序不同时，按词表排
+[s2-mutations.txt] size cap off by one:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations.txt] fork check off:
+  x pr-from-fork：只打开它
+[s2-mutations.txt] tampered only at D:
+  x verify-tampered：只打开它
+  x 插入顺序与词表顺序不同时，按词表排
+[s2-mutations.txt] mergeable null accepted:
+  x has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算）
+[s2-mutations.txt] failed verify step counts as a verdict:
+  x verify 步失败（没有结论）不算有判定：verify-missing
+[s2-mutations-2.txt] unbindable digest reported as transient patch-unavailable:
+  x patch-unbindable：只打开它
+  x 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+  x 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+[s2-mutations-2.txt] patch-unbindable class transient:
+  x 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+  x 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+[s2-mutations-2.txt] unreadable compare goes to a person:
+  x patch-unavailable：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-2.txt] foreign checks ignored when clean:
+  x GitHub 还报 clean，手上的检查里有别家失败：拦，并点名
+  x has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+[s2-mutations-2.txt] has_hooks skips the foreign check:
+  x has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+[s2-mutations-2.txt] judged checks listed again under clean:
+  x required-check-pending：只打开它
+  x required-check-failed：只打开它
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] required run not marked judged:
+  x required-check-pending：只打开它
+  x required-check-failed：只打开它
+[s2-mutations-2.txt] required status not marked judged:
+  x 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] pr-evidence not marked judged:
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] own status counted as foreign:
+  x 只因自家 pacman/merge-gate status 而 unstable：不拦
+  x clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+[s2-mutations-2.txt] unstable with nothing visible accepted:
+  x unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+[s2-mutations-2.txt] own success counts as a visible non-passing check:
+  x unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+[s2-mutations-2.txt] pass does not clear evidence_invalid:
+  x 同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理）
+[s2-mutations-2.txt] pass on another digest clears evidence_invalid:
+  x 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+[s2-mutations-2.txt] unreadable default branch goes to a person:
+  x 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+[s2-mutations-2.txt] unreadable default branch passes:
+  x 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+[s2-mutations-3.txt] opaque blocker removed:
+  x opaque-file：只打开它
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[s2-mutations-3.txt] file and line caps count only non-evidence:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations-3.txt] file cap counts only non-evidence:
+  x 800 行、40 个文件整数边界：恰好不拦，多一即拦
+  x 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+[s2-mutations-3.txt] line cap counts only non-evidence:
+  x 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+[s2-mutations-3.txt] opaque-file dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+[s2-mutations-3.txt] opaque-file moved to the end of the path group:
+  x opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+[s2-mutations-3.txt] opaque-file class transient:
+  x 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[s2-mutations-4.txt] malformed compare waits like unreadable:
+  x compare-malformed：只打开它
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-4.txt] compare-malformed class transient:
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-4.txt] compare-malformed dropped from the vocabulary:
+  x 每个 blocker 码都有一行真腿（加码不写腿即变红）
+[s2-mutations-4.txt] evidence link: any sha (ancestor rule), path of this PR:
+  x evidence-link-missing：只打开它
+  x 证据链指向别的票或钉在旧 SHA（不在 base..head）：不算
+  x 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算
+[s2-mutations-4.txt] evidence link: commit of this PR, any path:
+  x 钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算
+  x 指向本 PR 删掉的证据：不算
+[s2-mutations-4.txt] evidence link: removed files count as this PR's evidence:
+  x 指向本 PR 删掉的证据：不算
+[s2-mutations-4.txt] evidence link judged without compare:
+  x patch-unavailable：只打开它
+  x compare-malformed：只打开它
+  x 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+  x compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+[s2-mutations-4.txt] incomplete checks trusted:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[s2-mutations-4.txt] incomplete checks block but the half list is still judged:
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[new in round 5] S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading):
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[new in round 5] S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check):
+  x 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+[new in round 5] unreadable required falls back to pass (adapted to the round 4 text):
+  x required-checks-unreadable：只打开它
+  x 读不到检查：拦，不退回「全部检查」
+  x 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+[new in round 5] foreign unstable accepted (adapted to the round 2 text):
+  x 别家检查让它 unstable：拦，并在细节里点名
+[new in round 5] has_hooks blocks (adapted to the round 2 text):
+  x has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算）
+
+["chief go silences blocking", "apps/server/src/services/merge-gate/readiness.ts", "if (blocking.length > 0)\n      block('review-blocking'", "if (blocking.length > 0 && !has(at('decision'), 'pass'))\n      block('review-blocking'"]
+["verdicts on any digest count", "apps/server/src/services/merge-gate/readiness.ts", "          x.patchDigest === D &&\n", ""]
+["extraction failure counts as pass", "apps/server/src/services/merge-gate/readiness.ts", "if (has(mine, 'pass') || has(mine, 'block')) continue;", "if (has(mine, 'pass') || has(mine, 'block') || has(mine, 'extraction_failed')) continue;"]
+["missing required check is green", "apps/server/src/services/merge-gate/readiness.ts", "        block('required-check-missing', name);\n", ""]
+["status-provided required check missed", "apps/server/src/services/merge-gate/readiness.ts", "      } else if (status !== undefined) {", "      } else if (false) {"]
+["pr-evidence skipped is green", "apps/server/src/services/merge-gate/readiness.ts", "evidence.conclusion !== 'success'", "!runPasses(evidence)"]
+["self-required not flagged", "apps/server/src/services/merge-gate/readiness.ts", "if (required.some((n) => n.toLowerCase() === MERGE_GATE_STATUS_CONTEXT)) block('self-required');", ""]
+["perspectives from the team, not the round", "apps/server/src/services/merge-gate/readiness.ts", "const perspectives = i.round?.perspectives ?? i.availability.reviewerPerspectives;", "const perspectives = i.availability.reviewerPerspectives;"]
+["unsorted blockers", "apps/server/src/services/merge-gate/readiness.ts", ".sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))", ""]
+["size cap off by one", "apps/server/src/services/merge-gate/readiness.ts", "digest.countedLines > GATE_LIMITS.maxLines", "digest.countedLines >= GATE_LIMITS.maxLines + 12"]
+["fork check off", "apps/server/src/services/merge-gate/readiness.ts", "      pr.headRepoFullName === null ||\n      pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()\n", "      false\n"]
+["tampered only at D", "apps/server/src/services/merge-gate/readiness.ts", "  if (i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'tampered'))\n    block('verify-tampered');\n", ""]
+["mergeable null accepted", "apps/server/src/services/merge-gate/readiness.ts", "state === null || state === 'unknown'", "state === 'unknown'"]
+["failed verify step counts as a verdict", "apps/server/src/services/merge-gate/readiness.ts", "['pass', 'block', 'evidence_invalid', 'extraction_failed'].includes(x.outcome)", "x.outcome !== 'unbound'"]
+["unbindable digest reported as transient patch-unavailable", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unbindable', digest.unavailable);", "block('patch-unavailable', digest.unavailable);"]
+["patch-unbindable class transient", "packages/shared/src/records/merge-gate.ts", "code: 'patch-unbindable',\n    class: 'human',", "code: 'patch-unbindable',\n    class: 'transient',"]
+["unreadable compare goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "block('patch-unavailable', 'compare unreadable');", "block('patch-unbindable', 'compare unreadable');"]
+["foreign checks ignored when clean", "apps/server/src/services/merge-gate/readiness.ts", "if (foreign.length > 0)\n        block('mergeable-state'", "if (false)\n        block('mergeable-state'"]
+["has_hooks skips the foreign check", "apps/server/src/services/merge-gate/readiness.ts", "} else if (state === 'clean' || state === 'has_hooks') {", "} else if (state === 'has_hooks') {\n    } else if (state === 'clean') {"]
+["judged checks listed again under clean", "apps/server/src/services/merge-gate/readiness.ts", "(notPassing ?? []).filter((x) => !judged.has(x))", "(notPassing ?? [])"]
+["required run not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(run);\n", ""]
+["required status not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "        judged.add(status);\n", ""]
+["pr-evidence not marked judged", "apps/server/src/services/merge-gate/readiness.ts", "    if (evidence !== undefined) judged.add(evidence);\n", ""]
+["own status counted as foreign", "apps/server/src/services/merge-gate/readiness.ts", "...checks.statuses.filter((s) => s.state !== 'success' && !isOwnStatus(s)),", "...checks.statuses.filter((s) => s.state !== 'success'),"]
+["unstable with nothing visible accepted", "apps/server/src/services/merge-gate/readiness.ts", "      else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');\n", ""]
+["own success counts as a visible non-passing check", "apps/server/src/services/merge-gate/readiness.ts", "checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s))", "checks?.statuses.some((s) => isOwnStatus(s))"]
+["pass does not clear evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (has(verify, 'evidence_invalid'))"]
+["pass on another digest clears evidence_invalid", "apps/server/src/services/merge-gate/readiness.ts", "if (!has(verify, 'pass') && has(verify, 'evidence_invalid'))", "if (!i.verdicts.some((x) => x.kind === 'verify' && x.outcome === 'pass') && has(verify, 'evidence_invalid'))"]
+["unreadable default branch goes to a person", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) block('base-not-default', 'default branch unknown');"]
+["unreadable default branch passes", "apps/server/src/services/merge-gate/readiness.ts", "if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');", "if (i.repo.defaultBranch === null) {\n    }"]
+["opaque blocker removed", "apps/server/src/services/merge-gate/readiness.ts", "    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);\n", ""]
+["file and line caps count only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {", "if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines || digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["file cap counts only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "digest.countedFiles > GATE_LIMITS.maxFiles) {", "digest.kept.length > GATE_LIMITS.maxFiles) {"]
+["line cap counts only non-evidence", "apps/server/src/services/merge-gate/readiness.ts", "if (digest.countedLines > GATE_LIMITS.maxLines ||", "if (digest.kept.reduce((n, f) => n + f.additions + f.deletions, 0) > GATE_LIMITS.maxLines ||"]
+["opaque-file dropped from the vocabulary", "packages/shared/src/records/merge-gate.ts", "  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n", ""]
+["opaque-file moved to the end of the path group", "packages/shared/src/records/merge-gate.ts", "  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n", "  { code: 'evidence-outside-ticket', class: 'human', label: '改动了别的票的证据目录' },\n  { code: 'evidence-executable', class: 'human', label: '证据目录里新增或改动了可执行文件' },\n  // 没有 patch 就没有可读的 diff、也没有可信的行数；证据目录里的截图不算。\n  {\n    code: 'opaque-file',\n    class: 'human',\n    label: '证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）',\n  },\n"]
+["opaque-file class transient", "packages/shared/src/records/merge-gate.ts", "    code: 'opaque-file',\n    class: 'human',", "    code: 'opaque-file',\n    class: 'transient',"]
+["malformed compare waits like unreadable", "apps/server/src/services/merge-gate/readiness.ts", "if (i.compare === 'malformed') block('compare-malformed');", "if (i.compare === 'malformed') block('patch-unavailable', 'compare unreadable');"]
+["compare-malformed class transient", "packages/shared/src/records/merge-gate.ts", "{ code: 'compare-malformed', class: 'human',", "{ code: 'compare-malformed', class: 'transient',"]
+["compare-malformed dropped from the vocabulary", "packages/shared/src/records/merge-gate.ts", "  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },\n", ""]
+["evidence link: any sha (ancestor rule), path of this PR", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "changed.has(l.path)"]
+["evidence link: commit of this PR, any path", "apps/server/src/services/merge-gate/readiness.ts", "commits.has(l.sha) && changed.has(l.path)", "commits.has(l.sha)"]
+["evidence link: removed files count as this PR's evidence", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename)", "compare.files.map((f) => f.filename)"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "if (pr !== null && compare !== null) {", "if (pr !== null) {"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "new Set(compare.commits)", "new Set(compare?.commits ?? [])"]
+["evidence link judged without compare", "apps/server/src/services/merge-gate/readiness.ts", "compare.files.filter((f) => f.status !== 'removed')", "(compare?.files ?? []).filter((f) => f.status !== 'removed')"]
+["incomplete checks trusted", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;"]
+["incomplete checks block but the half list is still judged", "apps/server/src/services/merge-gate/readiness.ts", "const checks = i.checks?.complete ? i.checks : null;", "const checks = i.checks;\n  if (i.checks?.complete === false) block('required-checks-unreadable', 'check list incomplete');"]
+["S1: opaque exemption back to the case-insensitive prefix (S1 round 5 reading)", "apps/server/src/services/merge-gate/paths.ts", "if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);", "if (f.patchSha === null && !name.toLowerCase().startsWith(EVIDENCE_PREFIX)) push(out.opaque, name);"]
+["S1: opaque exemption through EVIDENCE_RE (Unicode fold, as the other-ticket check)", "apps/server/src/services/merge-gate/paths.ts", "if (f.patchSha === null && !isEvidencePath(name)) push(out.opaque, name);", "if (f.patchSha === null && !isEvidence(name)) push(out.opaque, name);"]
+["unreadable required falls back to pass (adapted to the round 4 text)", "apps/server/src/services/merge-gate/readiness.ts", "    block(\n      'required-checks-unreadable',\n      ...(i.checks?.complete === false ? ['check list incomplete'] : []),\n    );\n", ""]
+["foreign unstable accepted (adapted to the round 2 text)", "apps/server/src/services/merge-gate/readiness.ts", "else if (notPassing.length > 0)", "else if (false)"]
+["has_hooks blocks (adapted to the round 2 text)", "apps/server/src/services/merge-gate/readiness.ts", "} else if (state === 'clean' || state === 'has_hooks') {", "} else if (state === 'clean') {"]

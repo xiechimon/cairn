@@ -15,6 +15,9 @@ local 仓库项目的任务执行链(spec 12 G2-T2,#362):daemon 对用户本机 
 
 - 执行面:新建 local 项目(见 [local-repo-api.md](./local-repo-api.md))→ 建任务 → 开始构建(withPlan)→ 确认 → 执行 → 发起合并;观察用户仓库分支/HEAD/工作树。
 - Files tab 面:进入 local 项目详情页 `/app/project/:id`(默认落 文件 tab)→ 文件浏览,配方见 [project-files-local.md](./project-files-local.md)。
+- 驱动:本 feature 没有 current case;已登记的都判 stale / host-bound,不带 `--force` 拒跑(拒跑时打印原因),`vp.mjs list local-daemon-executor` 列出 usage:
+  - `vp.mjs drive local-daemon-executor local-unreachable`:建 agent 不带 machineId,ADR 0019 起 400。
+  - `vp.mjs drive local-daemon-executor mea-live-claude-code`:只在指定远端主机上跑。
 
 ## Driving it with 集成 E2E + fixture e2e
 
