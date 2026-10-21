@@ -1,0 +1,126 @@
+{
+  "probe": "drive-1400-chip-word",
+  "expect": "new",
+  "stack": {
+    "root": "/home/user/pacman/",
+    "serverPort": 8791,
+    "webPort": 5273,
+    "homeDir": "/home/user/pacman/.claude/verify-run/home",
+    "skillsDir": "/home/user/pacman/.claude/verify-run/home/skills",
+    "serverPid": 16884,
+    "webPid": 16885,
+    "startedAt": "2026-10-20T22:43:57.931Z"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "seed: project (id=uFsIZxjpcPc8HV5OZlO5p)"
+    },
+    {
+      "ok": true,
+      "label": "seed: three todos over REST"
+    },
+    {
+      "ok": true,
+      "label": "seed: once schedule on the fresh todo (status 201)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite: phases todo / queued / confirm ([{\"id\":\"Zss8B0j7zj-a5OZOUIsfw\",\"title\":\"verify 1400 confirm\",\"phase\":\"confirm\"},{\"id\":\"i24ZqTcDi2BI-Cw5fastE\",\"title\":\"verify 1400 fresh\",\"phase\":\"todo\"},{\"id\":\"m64GsY98VZAEN8iA8tG_r\",\"title\":\"verify 1400 queued\",\"phase\":\"queued\"}])"
+    },
+    {
+      "ok": true,
+      "label": "board: column names 待开始 / 待处理"
+    },
+    {
+      "ok": true,
+      "label": "board: fresh + queued cards sit in 待开始"
+    },
+    {
+      "ok": true,
+      "label": "board: confirm card sits in 待处理"
+    },
+    {
+      "ok": true,
+      "label": "detail header (fresh): chip reads 待开始 (got 待开始)"
+    },
+    {
+      "ok": true,
+      "label": "detail header (queued): chip reads 排队中 (got 排队中)"
+    },
+    {
+      "ok": true,
+      "label": "detail header (confirm): chip reads 确认 (got 确认)"
+    },
+    {
+      "ok": true,
+      "label": "search: fresh reads 待开始, queued 排队中 ({\"fresh\":\"待开始\",\"queued\":\"排队中\",\"confirm\":\"确认\"})"
+    },
+    {
+      "ok": true,
+      "label": "search: confirm row reads 确认"
+    },
+    {
+      "ok": true,
+      "label": "schedules: fresh card reads 待开始 (got 待开始)"
+    },
+    {
+      "ok": true,
+      "label": "project rows: fresh reads 待开始, queued 排队中 ({\"fresh\":\"待开始\",\"queued\":\"排队中\",\"confirm\":\"确认\"})"
+    },
+    {
+      "ok": true,
+      "label": "project rows: confirm reads 确认"
+    },
+    {
+      "ok": true,
+      "label": "no chip on detail / search / schedules / project rows reads 待处理"
+    }
+  ],
+  "payloads": {
+    "todoRows": [
+      {
+        "id": "Zss8B0j7zj-a5OZOUIsfw",
+        "title": "verify 1400 confirm",
+        "phase": "confirm"
+      },
+      {
+        "id": "i24ZqTcDi2BI-Cw5fastE",
+        "title": "verify 1400 fresh",
+        "phase": "todo"
+      },
+      {
+        "id": "m64GsY98VZAEN8iA8tG_r",
+        "title": "verify 1400 queued",
+        "phase": "queued"
+      }
+    ],
+    "apiTodos": [
+      {
+        "id": "i24ZqTcDi2BI-Cw5fastE",
+        "title": "verify 1400 fresh",
+        "phase": "todo"
+      },
+      {
+        "id": "m64GsY98VZAEN8iA8tG_r",
+        "title": "verify 1400 queued",
+        "phase": "queued"
+      },
+      {
+        "id": "Zss8B0j7zj-a5OZOUIsfw",
+        "title": "verify 1400 confirm",
+        "phase": "confirm"
+      }
+    ],
+    "searchChips": {
+      "fresh": "待开始",
+      "queued": "排队中",
+      "confirm": "确认"
+    },
+    "projectStatus": {
+      "fresh": "待开始",
+      "queued": "排队中",
+      "confirm": "确认"
+    }
+  }
+}
