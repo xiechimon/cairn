@@ -369,15 +369,19 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
   return agentRow;
 }
 
-/** #1406 编排前置的只读探测（不建 chief 行）：与 sendChiefMessage 的
- * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型。issue
- * 轮询器在导入前问它，不建出 orchestrateTodo 会 409 的卡。 */
-export function chiefCanOrchestrate(deps: ChiefDeps, teamId: string): boolean {
-  const row = deps.db
+function chiefRowOf(deps: ChiefDeps, teamId: string): ChiefRow | undefined {
+  return deps.db
     .select()
     .from(chief)
     .where(eq(chief.id, chiefIdFormat(deps.user.id, teamId)))
     .get();
+}
+
+/** #1406 编排前置的只读探测（不建 chief 行）：与 sendChiefMessage 的
+ * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型。issue
+ * 轮询器在导入前问它，不建出 orchestrateTodo 会 409 的卡。 */
+export function chiefCanOrchestrate(deps: ChiefDeps, teamId: string): boolean {
+  const row = chiefRowOf(deps, teamId);
   if (row === undefined) return false;
   try {
     requireBoundAgent(deps, row);
@@ -386,6 +390,13 @@ export function chiefCanOrchestrate(deps: ChiefDeps, teamId: string): boolean {
     if (err instanceof HttpError && err.status === 409) return false;
     throw err;
   }
+}
+
+/** #1406 团队 chief 绑定的 Agent id（只读，不建 chief 行；没有 chief 行或
+ * 未绑 = null）。issue 轮询器把它写成导入卡的 createdBy（chief 自建卡的
+ * createdBy 同为绑定 Agent id），关闭对账按它认轮询器领的卡。 */
+export function chiefBoundAgentId(deps: ChiefDeps, teamId: string): string | null {
+  return chiefRowOf(deps, teamId)?.agentId ?? null;
 }
 
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =

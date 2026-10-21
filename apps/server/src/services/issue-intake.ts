@@ -5,12 +5,14 @@
 // 每轮按团队走：
 // 1. token：团队连接 token（无连接 / 密文坏 / box 缺席 = 整队跳过，零匿名读——
 //    匿名 60/h 的 IP 预算归 ci-loop 与 #931，importGithubIssue 本就要 token）。
-// 2. 关闭对账：本队 github-issue 卡（相位不在 done / closed / review，且没有
-//    哪个 build 交付过 PR）逐张条件读 issue state。只认本进程亲眼看到的 open →
-//    closed：导入时、或某次读到 open，记为「见过 open」；之后读到 closed，且
-//    最新一条 closed 事件的 actor 在仓库上是 triage 及以上（与打标人同一判据、
-//    同一缓存），才 transitionTodos(closed)——chief / MCP close_todos 的关闭
-//    路径（#1445：写相位后停活动步）。首见即 closed 的卡（例：从已关闭 issue
+// 2. 关闭对账：本队轮询器领的 github-issue 卡（createdBy = 本队 chief 绑定的
+//    Agent id，导入时写入；手工导入与 webhook 导入是 seed 用户，不碰；chief
+//    没绑 Agent = 本队本轮不对账，记一行），相位不在 done / closed / review、
+//    且没有哪个 build 交付过 PR 的，逐张条件读 issue state。只认本进程亲眼
+//    看到的 open → closed：导入时、或某次读到 open，记为「见过 open」；之后
+//    读到 closed，且最新一条 closed 事件的 actor 在仓库上是 triage 及以上（与
+//    打标人同一判据、同一缓存），才 transitionTodos(closed)——chief / MCP
+//    close_todos 的关闭路径（#1445：写相位后停活动步）。首见即 closed 的卡（例：从已关闭 issue
 //    手工导入、或重启后）永不被对账关闭；关过一次即忘掉「见过 open」，有人把
 //    卡重开就不再关。外部作者关自己的 issue、任一读失败 = 本轮不关。review 卡
 //    与 build 交付过 PR 的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：
@@ -27,8 +29,8 @@
 //    labeled 之后没有 unlabeled，且其 actor 在仓库上是 triage 及以上（events
 //    按 Link rel="next" 至多读 ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页
 //    = 读不全；读不全 / 任一读失败 = 本轮不领）；importGithubIssue（409 = 别路
-//    已领）→ orchestrateTodo；领到一条记一行日志（打标人与经手的 app slug，
-//    审计用，不进判据）。
+//    已领；createdBy 记 chief 绑定的 Agent）→ orchestrateTodo；领到一条记一行
+//    日志（打标人与经手的 app slug，审计用，不进判据）。
 //
 // 纪律：issue 正文只经 importGithubIssue 进 todo.spec，不进日志、不进系统行；
 // 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；上一轮
@@ -71,7 +73,7 @@ import {
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { chiefCanOrchestrate } from './chief.js';
+import { chiefBoundAgentId, chiefCanOrchestrate } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { openGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
@@ -171,6 +173,21 @@ interface Labeler {
 
 /** D5 判定：可领时即打标人。 */
 type Verdict = Labeler | { notTaken: 'not-eligible' | 'unverifiable'; reason: string };
+
+/** 关闭对账的一张卡（轮询器领的、相位与 PR 都还在对账范围内）。 */
+interface ReconcileRow {
+  id: string;
+  phase: Phase;
+  sourceRef: string;
+}
+
+/** 团队这一轮的读权与导入署名：连接 token、密文 box、导入卡的 createdBy
+ * （chief 绑定的 Agent id——关闭对账凭它认轮询器领的卡）。 */
+interface TeamAccess {
+  token: string;
+  box: SecretBox;
+  createdBy: string;
+}
 
 /** 导入后编排的一次尝试：团队、导入时刻（认「导入之后建的编排线程」）、
  * 连同这次已试的次数。 */
@@ -503,7 +520,7 @@ export function createIssueIntake(
     row: ProjectRow,
     owner: string,
     repo: string,
-    access: { token: string; box: SecretBox },
+    access: TeamAccess,
     issueNumber: number,
     now: number,
     tally: IssueIntakeTally,
@@ -529,6 +546,7 @@ export function createIssueIntake(
         { ...deps, box: access.box, githubFetch: run.githubFetch },
         row,
         issueNumber,
+        { createdBy: access.createdBy },
       );
       todoId = record.id;
     } catch (err) {
@@ -567,7 +585,7 @@ export function createIssueIntake(
     row: ProjectRow,
     owner: string,
     repo: string,
-    access: { token: string; box: SecretBox },
+    access: TeamAccess,
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
@@ -667,7 +685,7 @@ export function createIssueIntake(
   async function reconcileClosed(
     teamId: string,
     token: string,
-    rows: { id: string; phase: Phase; sourceRef: string }[],
+    rows: ReconcileRow[],
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
@@ -747,7 +765,7 @@ export function createIssueIntake(
   async function sweepTeam(
     teamId: string,
     projects: ProjectRow[],
-    toReconcile: { id: string; phase: Phase; sourceRef: string }[],
+    toReconcile: ReconcileRow[],
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
@@ -759,7 +777,9 @@ export function createIssueIntake(
     }
     await reconcileClosed(teamId, got.token, toReconcile, now, tally);
     if (projects.length === 0) return;
-    if (!chiefCanOrchestrate(deps, teamId)) {
+    // 导入卡的 createdBy = chief 绑定的 Agent（能编排即已绑定）。
+    const createdBy = chiefCanOrchestrate(deps, teamId) ? chiefBoundAgentId(deps, teamId) : null;
+    if (createdBy === null) {
       tally.skipped += projects.length;
       log({ teamId, reason: 'chief-not-bound' }, 'issue intake team skipped');
       return;
@@ -788,7 +808,7 @@ export function createIssueIntake(
           row,
           githubRepo.slice(0, slash),
           githubRepo.slice(slash + 1),
-          got,
+          { ...got, createdBy },
           now,
           tally,
         );
@@ -813,8 +833,14 @@ export function createIssueIntake(
         .where(and(eq(project.repoKind, 'github'), isNotNull(project.githubRepo)))
         .orderBy(asc(project.id))
         .all();
-      const toReconcile = deps.db
-        .select({ id: todo.id, teamId: todo.teamId, phase: todo.phase, sourceRef: todo.sourceRef })
+      const issueTasks = deps.db
+        .select({
+          id: todo.id,
+          teamId: todo.teamId,
+          phase: todo.phase,
+          sourceRef: todo.sourceRef,
+          createdBy: todo.createdBy,
+        })
         .from(todo)
         .where(
           and(
@@ -825,19 +851,30 @@ export function createIssueIntake(
           ),
         )
         .all();
-      const teamIds = new Set([
-        ...projects.map((p) => p.teamId),
-        ...toReconcile.map((t) => t.teamId),
-      ]);
+      // 关闭对账只碰轮询器领的卡：createdBy = 本队 chief 绑定的 Agent id（导入时
+      // 写入；手工导入与 webhook 导入是 seed 用户）。认卡只看库里的列，重启后
+      // 照样认得；chief 换绑 Agent 后，换绑前领的卡不再对账。chief 没绑 Agent
+      // 的队本轮不对账，记一行。
+      const toReconcile = new Map<string, ReconcileRow[]>();
+      for (const teamId of new Set(issueTasks.map((t) => t.teamId))) {
+        const agentId = chiefBoundAgentId(deps, teamId);
+        if (agentId === null) {
+          log({ teamId, reason: 'chief-not-bound' }, 'issue intake close reconcile skipped');
+          continue;
+        }
+        const taken = issueTasks
+          .filter((t) => t.teamId === teamId && t.createdBy === agentId)
+          .map((t) => ({ id: t.id, phase: t.phase, sourceRef: t.sourceRef ?? '' }));
+        if (taken.length > 0) toReconcile.set(teamId, taken);
+      }
+      const teamIds = new Set([...projects.map((p) => p.teamId), ...toReconcile.keys()]);
       for (const teamId of teamIds) {
         tally.teams += 1;
         try {
           await sweepTeam(
             teamId,
             projects.filter((p) => p.teamId === teamId),
-            toReconcile
-              .filter((t) => t.teamId === teamId)
-              .map((t) => ({ id: t.id, phase: t.phase, sourceRef: t.sourceRef ?? '' })),
+            toReconcile.get(teamId) ?? [],
             now,
             tally,
           );

@@ -124,11 +124,14 @@ const importsInFlight = new Set<string>();
  * - 标签 = issue label 全集（「至多 1 个」github 侧作废）：先镜像同步仓库
  *   label 集（缺行建行、色随 GitHub 真值、永不删行），再按 name 解析进
  *   todo_tag——不变式「贴的标签必在本项目标签集内」由同步先行保证；
- * - 来源两列 = 'github-issue' + `github:owner/repo#N`（溯源家族位）。 */
+ * - 来源两列 = 'github-issue' + `github:owner/repo#N`（溯源家族位）；
+ * - createdBy 缺省 = seed 用户（人工触发导入 / webhook）；#1406 issue 轮询器
+ *   传 chief 绑定的 Agent id（chief 自建卡同一律），关闭对账凭它认自己领的卡。 */
 export async function importGithubIssue(
   deps: ImportGithubIssueDeps,
   row: ProjectRow,
   issueNumber: number,
+  opts: { createdBy?: string } = {},
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
   const token = requireToken(deps, row.teamId);
@@ -162,7 +165,7 @@ export async function importGithubIssue(
       title: detail.title,
       spec: detail.body ?? '',
       tagIds,
-      createdBy: deps.user.id, // 人工触发导入 = seed 用户（REST 建任务面同律）
+      createdBy: opts.createdBy ?? deps.user.id, // 缺省 = seed 用户（REST 建任务面同律）
       ownerId: deps.user.id,
       sourceKind: 'github-issue',
       sourceRef: ref,
