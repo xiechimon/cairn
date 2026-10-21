@@ -47,6 +47,8 @@ const BOARD = [
   'dead-',
   'shell-',
   'visual-',
+  // #1423: the queued card has no 开始 (queued-action.spec also pins the detail head).
+  'queued-action',
 ];
 const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
 const DETAIL = [
@@ -68,6 +70,8 @@ const DETAIL = [
   // #1400: phase chip words (detail head, search rows, schedule cards,
   // project task rows). Each of those surfaces pulls it in.
   'phase-chip-words',
+  // #1423: a queued task's detail head has no primary button.
+  'queued-action',
 ];
 const CHIEF = ['chief-', 'composer-wire-reject'];
 const AGENT = ['agent-', 'team-create-agent'];

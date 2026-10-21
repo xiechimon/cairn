@@ -27,7 +27,8 @@ export interface PhaseUi {
   chip: string;
   /** Chip color tone. */
   tone: 'idle' | 'plan' | 'confirm' | 'done' | 'failed';
-  /** Header primary button copy; null = no button (planning/building). */
+  /** Header primary button copy; null = no button (queued/planning/building:
+   *  already started, the server pushes the next phase; closed). */
   action: string | null;
   /** Composer textarea placeholder; null = no composer (fresh). */
   placeholder: string | null;
@@ -36,7 +37,8 @@ export interface PhaseUi {
 /** 在飞相位：这两态 UI 没有主按钮（`action === null`，见下表）——人按不动，
  *  下一态只能由服务端推过来。所以「界面上还有实体停在这两态」是「服务端本该
  *  在推东西」的可观测证据，也是唯一可用的一条（XMON-60 的静默对账闸门读它，
- *  看板「执行中」列收的正是这两态）。 */
+ *  看板「执行中」列收的正是这两态）。queued 同样没有主按钮（#1423），但不进
+ *  本集：等机器上线可以合法地静默很久，停在 queued 不是服务端漏推的证据。 */
 export const IN_FLIGHT_PHASES: ReadonlySet<Phase> = new Set<Phase>(['planning', 'building']);
 
 /** 在飞判据（phase 九值枚举上的纯函数）。入参收 string：调用面常拿运行时
@@ -45,7 +47,10 @@ export const isInFlightPhase = (phase: string): boolean => IN_FLIGHT_PHASES.has(
 
 export const PHASE_UI: Record<Phase, PhaseUi> = {
   todo: { chip: '待开始', tone: 'idle', action: '开始', placeholder: null },
-  queued: { chip: '排队中', tone: 'idle', action: '开始', placeholder: null },
+  // queued is already started (shared IN_PROGRESS_PHASES): no primary, same
+  // as planning/building. The wait reason is the transcript's 排队中 row and
+  // the card's 等机器 meta (#1423).
+  queued: { chip: '排队中', tone: 'idle', action: null, placeholder: null },
   planning: {
     chip: '规划中',
     tone: 'plan',

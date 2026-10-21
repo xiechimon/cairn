@@ -56,7 +56,7 @@ interface FreshBlockProps {
    *  fixture 面缺省 = 无 chip(r7 23 基线原样,视觉零漂移)。 */
   tags?: TagChipData[];
   /** Phase primary-button copy (PHASE_UI.action); null = this phase has no
-   *  primary (closed) → the action row drops out whole. */
+   *  primary (queued, closed) → the action row drops out whole. */
   action?: string | null;
   /** The page's single primary handler — same one the head button calls. */
   onAction?: () => void;
