@@ -1,0 +1,396 @@
+# vp-selftest.mjs and vp.mjs after pr-gate run 8 on #1411 (round 12; base a72dd46).
+# Run 8 at a72dd46 said go with suggestions (verdict: pr-gate-1411-run8-a72dd46.json). This round:
+#   1. origin/main (1f61c79, #1410) merged in with a merge commit (6e97388); the self-test still passes.
+#   2. Every self-test case that drives a registry entry now runs a fake skill whose entry sets its own status,
+#      needs and arguments (stop-button, search/search, glass-journeys/create-task, failed-send/restart-combo,
+#      review-modal/empty-review, providers-tabs/claude-bin-detection, and also pi-convergence, github-webhook,
+#      skills-injection/injection-check, failed-send/restart-with-feedback and hotkeys). The whole-registry scans
+#      still read the real registry.
+#   3. drive and capture refuse an evidence directory inside committed docs/verify (VERIFY_EVIDENCE_DIR, or the
+#      directory given to the probe's output option) with exit 2 before anything runs, --dry-run included, and
+#      point at vp.mjs archive. Two new cases, with relative, absolute and symlinked paths.
+#   4. Comments in vp.mjs and the self-test state the current rule only.
+# Self-test: 51 cases at a72dd46, 53 now.
+
+== 1. After merging origin/main: round 11 self-test at 6e97388 ==
+$ git log --oneline -1
+6e973880 Merge remote-tracking branch 'origin/main' into claude/bootstrap-p1
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs   # after merging origin/main (1f61c79)
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+51/51 passed
+exit 0
+
+== 2. Registry status flip: round 11 self-test red, round 12 self-test green ==
+# A scratch clone $C of the branch at 6e97388 (round 11 self-test, after the main merge), node_modules linked.
+C=/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/r12/flip
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs   # registry as committed
+51/51 passed
+exit 0
+$ # flip two statuses in the clone's registry: stop-button/stop-chain -> current, search/search -> stale
+ .claude/skills/verify-pacman/vp-registry.json | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs   # round 11 self-test, flipped registry
+FAIL  a case that needs the stack gets the ports of the stack doctor checks
+FAIL  a probe gets the run directory doctor checked
+FAIL  a failed doctor leaves no evidence directory behind
+FAIL  a tsx case runs from its package directory, a node case from the repo root
+FAIL  a case that needs the stack runs doctor first
+FAIL  a stale case needs --force
+45/51 passed
+exit 1
+
+# The same scratch clone with this round's vp.mjs and vp-selftest.mjs copied in; round 11's self-test beside them
+# as vp-selftest-r11.mjs (git show 6e97388:...).
+$ git -C $C diff --stat -- .claude/skills/verify-pacman/vp-registry.json   # the flip is still in place
+ .claude/skills/verify-pacman/vp-registry.json | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+-          "status": "current",
++          "status": "stale",
+-          "status": "stale",
++          "status": "current",
+$ node .claude/skills/verify-pacman/scripts/vp-selftest-r11.mjs
+FAIL  a case that needs the stack gets the ports of the stack doctor checks
+FAIL  a probe gets the run directory doctor checked
+FAIL  a failed doctor leaves no evidence directory behind
+FAIL  a tsx case runs from its package directory, a node case from the repo root
+FAIL  a case that needs the stack runs doctor first
+FAIL  a stale case needs --force
+45/51 passed
+exit 1
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+53/53 passed
+exit 0
+$ git -C $C checkout -- .claude/skills/verify-pacman/vp-registry.json   # registry as committed again
+$ node .claude/skills/verify-pacman/scripts/vp-selftest-r11.mjs
+51/51 passed
+exit 0
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+53/53 passed
+exit 0
+
+== 3. Red: this round's self-test against vp.mjs as at a72dd46 ==
+$ git show a72dd46:.claude/skills/verify-pacman/scripts/vp.mjs > .claude/skills/verify-pacman/scripts/vp.mjs   # vp.mjs as at a72dd46, this round's self-test
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+FAIL  drive refuses an evidence directory inside committed docs/verify before anything runs
+FAIL  capture refuses an evidence directory inside committed docs/verify before anything runs
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own <time>-<feature>-<case> directory under the checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+51/53 passed
+exit 1
+
+== 4. The command from the finding, before and after (dry-run; nothing runs) ==
+# In the scratch clone $C (dry-run only; nothing runs).
+# before: vp.mjs as at a72dd46
+$ VERIFY_EVIDENCE_DIR=docs/verify/1402/20261020-203718-api-key node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create --dry-run
+vp: api-keys/create usage: needs a fresh database (re-run vp.mjs launch)
+vp: dry-run api-keys/create (doctor first)
+    runner node  cwd $C
+    script .claude/skills/verify-pacman/scripts/drive.mjs  args api-key
+    VERIFY_EVIDENCE_DIR=$C/docs/verify/1402/20261020-203718-api-key
+    VERIFY_RUN_DIR=$C/.claude/verify-run
+exit 0
+# after: vp.mjs at 0cffbb89
+$ VERIFY_EVIDENCE_DIR=docs/verify/1402/20261020-203718-api-key node .claude/skills/verify-pacman/scripts/vp.mjs drive api-keys create --dry-run
+VERIFY_EVIDENCE_DIR=$C/docs/verify/1402/20261020-203718-api-key is inside $C/docs/verify: committed evidence, add-only (ADR 0015).
+Let vp.mjs write to a new directory under .claude/verify-evidence (leave VERIFY_EVIDENCE_DIR unset), then copy it in with vp.mjs archive <ticket> --from <dir>.
+exit 2
+$ node .claude/skills/verify-pacman/scripts/vp.mjs capture /app   # same VERIFY_EVIDENCE_DIR
+VERIFY_EVIDENCE_DIR=$C/docs/verify/1402/20261020-203718-api-key is inside $C/docs/verify: committed evidence, add-only (ADR 0015).
+Let vp.mjs write to a new directory under .claude/verify-evidence (leave VERIFY_EVIDENCE_DIR unset), then copy it in with vp.mjs archive <ticket> --from <dir>.
+exit 2
+$ git -C $C status --short docs/verify   # nothing written
+
+== 5. Green on Node 22 (0cffbb89) ==
+$ node --version
+v22.22.0
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  drive refuses an evidence directory inside committed docs/verify before anything runs
+PASS  capture refuses an evidence directory inside committed docs/verify before anything runs
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own <time>-<feature>-<case> directory under the checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+53/53 passed
+exit 0
+
+== 6. Green on Node 24 (0cffbb89) ==
+$ npx -y node@24 --version
+v24.22.0
+$ npx -y node@24 .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  drive refuses an evidence directory inside committed docs/verify before anything runs
+PASS  capture refuses an evidence directory inside committed docs/verify before anything runs
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own <time>-<feature>-<case> directory under the checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+53/53 passed
+exit 0
+
+== 7. Mutations, each applied alone to vp.mjs at 0cffbb89 and undone before the next ==
+# Baseline at 0cffbb89
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+53/53 passed
+exit 0
+
+# ma (item 3) drive does not check VERIFY_EVIDENCE_DIR against docs/verify
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  drive refuses an evidence directory inside committed docs/verify before anything runs
+52/53 passed
+exit 1
+
+# mb (item 3) capture does not check VERIFY_EVIDENCE_DIR against docs/verify
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  capture refuses an evidence directory inside committed docs/verify before anything runs
+52/53 passed
+exit 1
+
+# mc (item 3) drive does not check the directory given to the probe's output option
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  drive refuses an evidence directory inside committed docs/verify before anything runs
+52/53 passed
+exit 1
+
+# md (item 3) the docs/verify match is a bare prefix, without the path separator
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  drive refuses an evidence directory inside committed docs/verify before anything runs
+52/53 passed
+exit 1
+
+# me (item 3) paths are compared without resolving symlinks
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  drive refuses an evidence directory inside committed docs/verify before anything runs
+52/53 passed
+exit 1
+
+# mf (item 2) a stale or host-bound status is not a --force reason
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  a case whose usage names required arguments refuses to run without them
+FAIL  a stale case needs --force
+FAIL  a stale case that also has a forced need names both in its refusal, and --force names them before running
+50/53 passed
+exit 1
+
+# mg (item 2) a tsx case runs from the repo root, not its registered cwd
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+FAIL  a tsx case runs from its package directory, a node case from the repo root
+52/53 passed
+exit 1
+
+== 8. Comments that narrate earlier behavior (item 4) ==
+$ grep -nE 'pr-gate|code-review|#1411|used to|no longer|不再|原样|沿用|行为不变' vp.mjs vp-selftest.mjs   # at 0cffbb89, comments and code
+exit 1 (1 = no match)
+$ the same at a72dd46
+vp.mjs:2:// verify-pacman 单一入口(#1402)。每个会话不再各写各的驱动脚本:功能 → case
+vp.mjs:4:// cleanup 原样转给既有脚本,行为不变。证据交付拆两步:archive 只拷贝(docs/verify
+vp.mjs:6:// 栈坐标、端口、证据目录沿用既有环境变量:VERIFY_REPO_ROOT / VERIFY_RUN_DIR /
+vp.mjs:201:  // used to name only its status, and --force then also let its real-llm,
+vp.mjs:202:  // github or rewrites-evidence need through unnamed (pr-gate run 7 on #1411).
+vp.mjs:227:  // post-fix --expect flag survives an unrelated option (/code-review on #1411).
+vp.mjs:255:  // which would rewrite committed evidence (pr-gate run 3 on #1411). A probe
+vp.mjs:258:  // one that reads another variable gets it there (pr-gate run 4, /code-review).
+vp-selftest.mjs:7:// Failure modes from pr-gate runs 2 to 7 and /code-review on #1411.
+vp-selftest.mjs:41:// (pr-gate run 5 on #1411).
+vp-selftest.mjs:120:// sits inside another checkout (pr-gate run 7 on #1411).
+vp-selftest.mjs:147:// arguments needs the post-fix flag as its registry default (pr-gate run 3:
+vp-selftest.mjs:241:      // No current registry case needs real-llm (pr-gate run 5), so a stub does.
+vp-selftest.mjs:281:          // pr-gate run 4), judged by its own body: a probe that names machineId
+vp-selftest.mjs:282:          // anywhere else in the file still 400s (/code-review on #1411).
+vp-selftest.mjs:362:      // --force: every case with needsArgs is stale since pr-gate run 5; the check holds either way.
+vp-selftest.mjs:527:      // pr-gate run 7 on #1411: with TMPDIR inside a checkout, the fake skill took
+vp-selftest.mjs:659:      // repository's docs/verify, which can be renamed or removed (pr-gate run 7).
+vp-selftest.mjs:708:      // (pr-gate run 6). Here vp.mjs runs from a real worktree of a throwaway repo.
+vp-selftest.mjs:758:      // pr-gate run 7 on #1411: the refusal named only the status, and --force
+vp-selftest.mjs:807:      // (pr-gate run 7): the archive must also be unchanged, and a run naming one

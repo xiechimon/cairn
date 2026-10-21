@@ -1,0 +1,43 @@
+# A driver that landed on main while #1411 was open: e658294 (#1412) added
+# scripts/drive-1400-chip-word.mjs. Merging main into claude/bootstrap-p1 left it
+# unregistered; it is now phase-chip-words/chip-word (recipe null: no features/ map).
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs list phase-chip-words
+phase-chip-words
+  chip-word                    stack                        #1400: the phase chip word on every surface (board columns, detail header for todo / queued / confirm, Cmd-K search rows, schedule card, project task row). --expect=new wants 待开始 for todo and 排队中 for queued, and 待处理 only for the needs-you column; --expect=old records the base build. Seeds over REST and a direct UPDATE on the scratch SQLite; rerun needs a fresh stack.
+                                                            usage: [--expect=new|--expect=old]
+
+$ VERIFY_EVIDENCE_DIR=.claude/verify-evidence/20261020-chip-word node .claude/skills/verify-pacman/scripts/vp.mjs drive phase-chip-words
+vp: phase-chip-words/chip-word usage: [--expect=new|--expect=old]
+vp: phase-chip-words/chip-word needs the stack, running doctor first
+PASS  server 进程组存活(pid 18543) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 18544) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+home:<worktree>/.claude/verify-run/home(用户真数据 ~/.pacman 不被本栈触碰)
+doctor:all PASS
+vp: phase-chip-words/chip-word -> node .claude/skills/verify-pacman/scripts/drive-1400-chip-word.mjs --expect=new
+PASS  seed: project (id=EXXwozDn54bTilfpmtpYV)
+PASS  seed: three todos over REST
+PASS  seed: once schedule on the fresh todo (status 201)
+PASS  SQLite: phases todo / queued / confirm ([{"id":"ZC9TC_SWKabtZYQ_b2PtA","title":"verify 1400 confirm","phase":"confirm"},{"id":"fDCAgJsv20H_Q2gvr8O7K","title":"verify 1400 fresh","phase":"todo"},{"id":"OjnQMgCwdrZS1I3CKLW7M","title":"verify 1400 queued","phase":"queued"}])
+PASS  board: column names 待开始 / 待处理
+PASS  board: fresh + queued cards sit in 待开始
+PASS  board: confirm card sits in 待处理
+PASS  detail header (fresh): chip reads 待开始 (got 待开始)
+PASS  detail header (queued): chip reads 排队中 (got 排队中)
+PASS  detail header (confirm): chip reads 确认 (got 确认)
+PASS  search: fresh reads 待开始, queued 排队中 ({"fresh":"待开始","queued":"排队中","confirm":"确认"})
+PASS  search: confirm row reads 确认
+PASS  schedules: fresh card reads 待开始 (got 待开始)
+PASS  project rows: fresh reads 待开始, queued 排队中 ({"fresh":"待开始","queued":"排队中","confirm":"确认"})
+PASS  project rows: confirm reads 确认
+PASS  no chip on detail / search / schedules / project rows reads 待处理
+
+16/16 PASS  evidence=<worktree>/.claude/verify-evidence/20261020-chip-word
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402 --from .claude/verify-evidence/20261020-chip-word
+vp: <worktree>/.claude/verify-evidence/20261020-chip-word -> <worktree>/docs/verify/1402/20261020-chip-word

@@ -1,0 +1,16 @@
+# CI 'check' went red at f44b920 and a6d5571 on 'archive copies a named source' (16/17).
+# CI runs Node 24 (setup-node node-version: 24); this container runs Node 22.22.0, where it passed.
+# Under Node 24 cpSync with errorOnExist throws ERR_FS_CP_EEXIST when the target directory exists,
+# and vp.mjs archive created the target before copying. It now creates only the parent.
+
+== a6d5571, Node v24.22.0 (red) ==
+FAIL  archive copies a named source
+16/17 passed
+
+== the same archive call under Node 24 at a6d5571 ==
+SystemError [ERR_FS_CP_EEXIST]: Target already exists: cp returned EEXIST (<tmp>/docs/verify/T4/run-b already exists)
+    at archiveCommand (vp.mjs:270:5)
+
+== this branch, Node v24.22.0 and Node v22.22.0 (green) ==
+17/17 passed
+17/17 passed

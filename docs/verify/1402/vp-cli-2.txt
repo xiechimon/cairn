@@ -1,0 +1,83 @@
+# vp.mjs after pr-gate run 1 on #1411 (head 4ab0d89). Worktree: claude/bootstrap-p1.
+# tsx cases run from the package named by their registry cwd; both .mts probes are registered.
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs list pi-convergence
+pi-convergence
+  convergence                  stub-llm                     Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done. Writes docs/verify/926/convergence-evidence.json in place.
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs list failed-send
+failed-send  (features/failed-send.md)
+  restart-with-feedback        stack+daemon                 Sending from the composer in failed phase restarts with feedback: new build, feedback in a new conversation, failed->queued; non-failed restart returns 409
+                                                            usage: <todoId> <failedBuildId>
+  restart-combo                stack                        A failed-restart round stores the feedback and the daemon combo as two user rows; after the task title drifts, the combo row stays out of the user bubbles and the feedback stays in (#1279).
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive hotkeys newtask-key-c m
+unexpected argument(s) m: script arguments go after --
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive github-webhook webhook-tracer
+github-webhook/webhook-tracer needs github (model tokens or GitHub calls). Re-run with --force to drive it.
+exit=2
+
+# drive pi-convergence (tsx from apps/daemon; no stack). Full log trimmed to the verdict lines:
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive pi-convergence
+vp: pi-convergence/convergence -> (cd apps/daemon && pnpm exec tsx) .claude/skills/verify-pacman/scripts/drive-926-convergence.mts
+PASS  retry.enabled 显式 = true  true
+PASS  retry.maxRetries 显式 = 3  3
+PASS  retry.baseDelayMs 显式 = 2000  2000
+PASS  retry.maxAgentDelayMs 显式 = 60000  60000
+PASS  retry.provider.maxRetries 显式 = 0  0
+PASS  设置驱动读回：注入 maxRetries=5（≠默认 3）→ pi 读回随之 = 5（证非默认巧合）  5
+PASS  RETRY_STORM_MAX === pi getRetrySettings().maxRetries（护栏与设置不脱钩）  {"RETRY_STORM_MAX":3,"maxRetries":3}
+PASS  真 pi 发出 agent_end  14
+PASS  真 pi 发出 agent_settled  15
+PASS  agent_settled 在 agent_end 之后（settled 是收敛权威信号）  {"agentEndIdx":14,"settledIdx":15}
+PASS  映射产出恰好一个 done  1
+PASS  done 由 agent_settled 触发（done 对应的原始事件索引 == agent_settled 索引）  {"doneAtRawIndex":[15],"settledIdx":15}
+PASS  agent_end 未触发 done（旧路径会在此提前发 done）  {"agentEndIdx":14,"doneAtRawIndex":[15]}
+PASS  agent_end(willRetry=false) → 不发 done（空）  []
+PASS  agent_settled → 发 done  [{"type":"done","usage":[]}]
+ALL PASS
+exit=0
+(the probe rewrote docs/verify/926/convergence-evidence.json in place; that file was restored from HEAD and is not part of this change)
+
+# drive failed-send restart-combo (tsx from apps/server; stack from vp.mjs launch, doctor first):
+$ VERIFY_EVIDENCE_DIR=.claude/verify-evidence/20261020-restart-combo node .claude/skills/verify-pacman/scripts/vp.mjs drive failed-send restart-combo
+vp: failed-send/restart-combo needs the stack, running doctor first
+PASS  server 进程组存活(pid 12157) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 12158) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+doctor:all PASS
+vp: failed-send/restart-combo -> (cd apps/server && pnpm exec tsx) .claude/skills/verify-pacman/scripts/drive-1279-restart-combo.mts --expect=new
+PASS  feedback row stays a user bubble  — bubbles=2
+PASS  bare restart line is not a bubble
+PASS  matching combo (current title) is not a bubble
+PASS  stale task text without an instruction stays a bubble
+PASS  drifted restart combo is not a user bubble
+PASS  assistant row still renders
+evidence .claude/verify-evidence/20261020-restart-combo
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive ../x
+usage: vp.mjs archive <ticket> [--from <dir>]... [--latest <n>]
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive vp-selftest --from .claude/verify-evidence/20261020-restart-combo --from .claude/verify-evidence/20261020-restart-combo
+two sources share the directory name 20261020-restart-combo; archive them in separate runs
+exit=1
+
+# archive without --from takes VERIFY_EVIDENCE_DIR when it is set
+$ VERIFY_EVIDENCE_DIR=.claude/verify-evidence/20261020-restart-combo node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402
+vp: .claude/verify-evidence/20261020-restart-combo -> docs/verify/1402/20261020-restart-combo
+next: git add docs/verify/1402 && git commit, push, then vp.mjs links 1402
+exit=0
+
+$ VERIFY_EVIDENCE_DIR=.claude/verify-evidence/20261020-restart-combo node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402   # second time
+refusing to overwrite docs/verify/1402/20261020-restart-combo: docs/verify is add-only (ADR 0015)
+exit=1
+

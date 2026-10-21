@@ -1,0 +1,83 @@
+{
+  "probe": "drive-1303-chief-unread",
+  "expect": "old",
+  "ok": false,
+  "passed": 8,
+  "failed": 3,
+  "checks": [
+    {
+      "name": "A1 同一线程两条 assistant 文本落库",
+      "ok": true,
+      "detail": "assistant=2"
+    },
+    {
+      "name": "A2 未读集含该线程且只有它（线程粒度，不是消息数）",
+      "ok": true,
+      "detail": "ids=chief-01a15ba9-093c-7ca2-84b5-1309a8c7d812"
+    },
+    {
+      "name": "A3 通知 readAt 为空，snippet = 最后一条 assistant 文本",
+      "ok": true,
+      "detail": "readAt=null snippet=第二条回复，仍是同一会话。"
+    },
+    {
+      "name": "A4 徽标裸数字 = 1（两条消息不计 2）",
+      "ok": true,
+      "detail": "badge=1"
+    },
+    {
+      "name": "A5 计数为 1 时 tooltip 只有快捷键",
+      "ok": false,
+      "detail": "tip=1 个总管会话有未读⌘J"
+    },
+    {
+      "name": "A6 打开线程再最小化，徽标仍是 1，readAt 仍空",
+      "ok": true,
+      "detail": "badge=1 readAt=null"
+    },
+    {
+      "name": "B0 无 assistant 文本的用户步不新增未读",
+      "ok": true,
+      "detail": "ids=chief-01a15ba9-093c-7ca2-84b5-1309a8c7d812"
+    },
+    {
+      "name": "B1 tick 后领到的步 prompt 带 [wake:wake]",
+      "ok": true,
+      "detail": "prompt=[wake:wake] 回头看任务是否仍在跑。请回头核实相关任务状态并向用户汇报。"
+    },
+    {
+      "name": "B2 8 天闲置 + tick 之后 A 仍未读（没有过期扫）",
+      "ok": false,
+      "detail": "readAt=1792539180557"
+    },
+    {
+      "name": "B3 wake 收尾走同一通知路径：snippet = wake 文本且 readAt 空，B 进入未读",
+      "ok": false,
+      "detail": "readAt=1792539180585 snippet=机器回头：任务仍在跑，无需处理。 ids="
+    },
+    {
+      "name": "C0 未读 chief 线程数 >= 100",
+      "ok": true,
+      "detail": "count=100"
+    }
+  ],
+  "artifacts": [
+    "00-session.json",
+    "01-after-user-turn.json",
+    "02-badge-1.png",
+    "03-board-badge-1.png",
+    "04-tooltip-count-1.png",
+    "05-drawer-open.png",
+    "06-after-open.json",
+    "07-badge-after-open.png",
+    "08-wake-step.json",
+    "09-after-tick.json",
+    "10-after-wake-done.json",
+    "11-unread-100.json"
+  ],
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home"
+  }
+}
