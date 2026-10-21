@@ -80,6 +80,7 @@ const DETAIL = [
 // #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
 const AGENT = ['agent-', 'team-create-agent'];
+const LIVE_SERVER = ['token-gate', 'live-server-'];
 const OVERLAY = [
   'newtask-',
   'mention-',
@@ -157,6 +158,9 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  ['apps/web/e2e/live-server.ts', LIVE_SERVER],
+  ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
+  ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],
 ]);
 
 const DIR_RULES = [
@@ -243,8 +247,8 @@ function classify(path) {
   if (path.startsWith('apps/web/')) return { specs: null, why: 'unmapped web path' };
   if (path.startsWith('apps/server/')) {
     return {
-      specs: ['token-gate'],
-      why: 'server surface (token-gate spawns a real server; the stack layer is the real coverage)',
+      specs: LIVE_SERVER,
+      why: 'server surface (these specs spawn a real server; the stack layer is the real coverage)',
     };
   }
   return { specs: [], why: 'outside the web e2e surface' };
