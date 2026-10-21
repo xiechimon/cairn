@@ -2697,11 +2697,11 @@ describe('24 限流：本队本轮停读', () => {
       w.gh.state.issues.set(1446, { ...ISSUE_1445_OPEN, number: 1446 });
       insertSourceTodo(w, 1445, 'building');
       insertSourceTodo(w, 1446, 'building');
-      await w.intake.sweep(T0);
+      await w.intake.sweep(T0 - ISSUE_INTAKE_INTERVAL_MS);
       const lists = w.gh.listReads().length;
       w.gh.overrides.set(`/repos/${REPO}/issues/1445`, () => limited);
       w.gh.overrides.set(`/repos/${REPO}/issues/1446`, () => limited);
-      await w.intake.sweep(T0 + ISSUE_INTAKE_INTERVAL_MS);
+      await w.intake.sweep(T0);
       expect(rejected(w)).toHaveLength(1);
       expect(w.gh.listReads()).toHaveLength(lists);
       expect(rateLimitLines(w).map((l) => l.obj)).toEqual([

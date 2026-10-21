@@ -18,7 +18,7 @@ import {
   type SecretBox,
   type TodoRecord,
 } from '@pacman/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type project as projectTable, todo as todoTable } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
@@ -59,15 +59,28 @@ function requireToken(deps: GithubIssueFaceDeps, teamId: string): string {
 
 /** 已占用来源引用集（ADR 0006 D4 导入护栏，pacman 侧反查）：本团队已落库
  * 的 sourceRef 全集——「一条 issue 至多一个任务」同时盖住自建的 issue 与
- * 导入过的 issue，不在 GitHub 侧打标记 label。 */
+ * 导入过的 issue，不在 GitHub 侧打标记 label。#1406：按小写比、回小写集
+ * （GitHub 的 owner / repo 不分大小写，两个项目把同一仓写成不同大小写时，
+ * github:Acme/App#5 与 github:acme/app#5 是同一条 issue；调用方按
+ * ref.toLowerCase() 查）。 */
 function claimedSourceRefs(db: Db, teamId: string, refs: string[]): Set<string> {
   if (refs.length === 0) return new Set();
   const rows = db
     .select({ sourceRef: todoTable.sourceRef })
     .from(todoTable)
-    .where(and(eq(todoTable.teamId, teamId), inArray(todoTable.sourceRef, refs)))
+    .where(
+      and(
+        eq(todoTable.teamId, teamId),
+        inArray(
+          sql`lower(${todoTable.sourceRef})`,
+          refs.map((r) => r.toLowerCase()),
+        ),
+      ),
+    )
     .all();
-  return new Set(rows.map((r) => r.sourceRef).filter((v): v is string => v !== null));
+  return new Set(
+    rows.map((r) => r.sourceRef?.toLowerCase()).filter((v): v is string => v !== undefined),
+  );
 }
 
 /** issue 列表（项目页选择器数据面）：state/page 直透上游同名参数，
@@ -93,7 +106,9 @@ export async function listProjectGithubIssues(
   // 消费端不再各自补 #。
   return {
     issues: issues
-      .filter((issue) => !claimed.has(githubIssueSourceRef(owner, repo, issue.number)))
+      .filter(
+        (issue) => !claimed.has(githubIssueSourceRef(owner, repo, issue.number).toLowerCase()),
+      )
       .map((issue) => ({
         ...issue,
         labels: issue.labels.map((label) => ({
@@ -110,7 +125,8 @@ export async function listProjectGithubIssues(
  * 必携位同名冲突，Omit 后交集成立）。 */
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;
 
-/** #1406 进程内导入占位（团队 × sourceRef）。claimedSourceRefs 是应用层检查、
+/** #1406 进程内导入占位（团队 × 小写 sourceRef，同 claimedSourceRefs 按小写
+ * 认同一条 issue）。claimedSourceRefs 是应用层检查、
  * todo.sourceRef 无唯一约束，导入在检查与 createTodo 之间要等两次 GitHub 读：
  * webhook 与 issue 轮询器同时导入同一 issue 时两路都能过检查、各建一张卡。
  * 占位在第一次 await 之前落下、finally 里释放（建成后由 DB 行接手去重）。
@@ -139,11 +155,11 @@ export async function importGithubIssue(
   // D4 第二道闸（列表滤除是第一道）：直 POST 已有任务的 issue → 409，
   // 「一条 issue 至多一个任务」不因列表竞态窗口破防。
   const ref = githubIssueSourceRef(owner, repo, issueNumber);
-  if (claimedSourceRefs(deps.db, row.teamId, [ref]).has(ref)) {
+  if (claimedSourceRefs(deps.db, row.teamId, [ref]).has(ref.toLowerCase())) {
     throw new HttpError(409, `issue ${ref} already has a task`);
   }
   // #1406：另一路正在导入同一 issue（还在等 GitHub 读）→ 同 409。
-  const claim = `${row.teamId}\u0000${ref}`;
+  const claim = `${row.teamId}\u0000${ref.toLowerCase()}`;
   if (importsInFlight.has(claim)) {
     throw new HttpError(409, `issue ${ref} is being imported`);
   }

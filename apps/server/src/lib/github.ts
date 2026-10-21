@@ -203,6 +203,35 @@ function isRateLimited(res: { status: number; headers: { get(n: string): string 
   );
 }
 
+/** 限流应答：isRateLimited 的头判据之外，403 没带限流头时再看一眼应答文本——
+ * 二级限流可以不带 retry-after（上游文档「Exceeding the rate limit」：403 或
+ * 429 + 说明超了二级限流的 message）。 */
+async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
+  if (isRateLimited(res)) return true;
+  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));
+}
+
+/** 进料读遇到限流（#1406：429，或带限流信号的 403）：调用方本轮停读——同一
+ * token 再发读只会再被拒。resetAt = x-ratelimit-reset（UTC 秒）换成的毫秒；
+ * retryAfterSeconds = retry-after 头；缺省或不是数 = null。 */
+export class GithubRateLimitedError extends Error {
+  constructor(
+    url: string,
+    readonly status: number,
+    readonly resetAt: number | null,
+    readonly retryAfterSeconds: number | null,
+  ) {
+    super(`github api rate limited (${status}): ${url}`);
+    this.name = 'GithubRateLimitedError';
+  }
+
+  /** 限流解除的时刻：reset 头优先，否则 now + retry-after；都没有 = null。 */
+  retryAt(now: number): number | null {
+    if (this.resetAt !== null) return this.resetAt;
+    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;
+  }
+}
+
 /** 认证面仓库条目（GitHub `GET /user/repos` 元素最小投影；camelCase =
  * lib 内部形，wire 封套（full_name/private snake_case）归 shared
  * githubReposResponseSchema，routes 层映射）。 */
@@ -457,9 +486,8 @@ function isAbort(err: unknown): boolean {
   return name === 'TimeoutError' || name === 'AbortError';
 }
 
-/** 单页 GET：成功给 JSON 体与 hasMore（Link rel="next"）；失败给分类。403 没带
- * 限流头时再看一眼应答文本——二级限流可以不带 retry-after（上游文档
- * 「Exceeding the rate limit」：403 或 429 + 说明超了二级限流的 message）。 */
+/** 单页 GET：成功给 JSON 体与 hasMore（Link rel="next"）；失败给分类（限流按
+ * isRateLimitedResponse 判）。 */
 async function getListPage(
   fetchImpl: FetchLike,
   url: string,
@@ -478,13 +506,9 @@ async function getListPage(
     return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'network' } };
   }
   if (!res.ok) {
-    let limited = isRateLimited(res);
-    if (!limited && res.status === 403) {
-      limited = /rate limit/i.test(await res.text().catch(() => ''));
-    }
     return {
       ok: false,
-      failure: limited
+      failure: (await isRateLimitedResponse(res))
         ? { kind: 'rate-limited', status: res.status }
         : { kind: 'status', status: res.status },
     };
@@ -653,8 +677,9 @@ export async function githubRepoLabels(
 // —— issue 进料读面（#1406 P5a-1：issue 轮询器的出站读，只读）——————————————
 //
 // 四个读，全部 fail-open 返回 null（网络 / 超时 / 非 2xx / 形坏不区分：读不到
-// = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；token 必携、只进
-// Authorization 头（进料面不走匿名梯）：
+// = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；限流例外：429 或带限流
+// 信号的 403 抛 GithubRateLimitedError，进料本队本轮停读（同一 token 再读只会
+// 再被拒）。token 必携、只进 Authorization 头（进料面不走匿名梯）：
 // - GET repos/{o}/{r}/issues?state=open&labels=&sort=created&direction=asc
 //   &per_page=100（条件读；PR 条目经 projectIssue 滤除；下一页按 Link
 //   rel="next" 的 URL 读，只跟 api.github.com 上的 URL）
@@ -677,7 +702,8 @@ export type GithubConditionalRead<T> =
 const INTAKE_PER_PAGE = 100;
 
 /** 单次 GET（token 必携，etag 可选）。null = 网络 / 超时 / 2xx 体不是 JSON；
- * 非 2xx 回 status 不带 data（调用方按状态码定语义）。 */
+ * 限流抛 GithubRateLimitedError；其余非 2xx 回 status 不带 data（调用方按状态码
+ * 定语义）。 */
 async function intakeGet(
   fetchImpl: FetchLike,
   url: string,
@@ -694,7 +720,19 @@ async function intakeGet(
     return null;
   }
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
-  if (!res.ok) return { ...head, data: undefined };
+  if (!res.ok) {
+    if (await isRateLimitedResponse(res)) {
+      const reset = Number(res.headers.get('x-ratelimit-reset') ?? Number.NaN);
+      const retryAfter = Number(res.headers.get('retry-after') ?? Number.NaN);
+      throw new GithubRateLimitedError(
+        url,
+        res.status,
+        Number.isFinite(reset) ? reset * 1000 : null,
+        Number.isFinite(retryAfter) ? retryAfter : null,
+      );
+    }
+    return { ...head, data: undefined };
+  }
   try {
     return { ...head, data: await res.json() };
   } catch {
@@ -781,7 +819,8 @@ export interface GithubIssueEvent {
   actor: string | null;
   /** performed_via_github_app.slug：经 GitHub App 操作 → app 的 slug（用户
    * 授权的 app 令牌下 actor 是授权的人；app 安装令牌下 actor 是
-   * `<slug>[bot]`）；不经 app、或缺 slug → null。只供审计，不进判据。 */
+   * `<slug>[bot]`）；经 app 却缺 slug（上游 integration 形里 slug 非必有）→
+   * 'unknown'；不经 app → null。进料 D5 不认经 app 打的标。 */
   viaApp: string | null;
   /** created_at 的毫秒值。 */
   at: number;
@@ -836,7 +875,12 @@ export async function githubIssueEvents(
       event,
       label: event === 'closed' ? null : labelName,
       actor: typeof actor?.login === 'string' ? actor.login : null,
-      viaApp: typeof app?.slug === 'string' ? app.slug : null,
+      viaApp:
+        typeof app !== 'object' || app === null
+          ? null
+          : typeof app.slug === 'string'
+            ? app.slug
+            : 'unknown',
       at,
     });
   }
@@ -864,8 +908,8 @@ export interface GithubRepoPermission {
 }
 
 /** 用户在仓库上的权限读。404（非协作者，或 token 看不到该仓）投影为
- * permission 'none'——明确的否定答案；其余失败（网络 / 超时 / 限流 / 5xx /
- * 形坏）= null（未知）。 */
+ * permission 'none'——明确的否定答案；限流抛 GithubRateLimitedError；其余失败
+ * （网络 / 超时 / 5xx / 形坏）= null（未知）。 */
 export async function githubCollaboratorPermission(
   fetchImpl: FetchLike,
   token: string,
