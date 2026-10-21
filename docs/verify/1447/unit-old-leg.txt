@@ -1,0 +1,29 @@
+$ (apps/web) pnpm exec vitest run test/columns.test.ts test/dnd.test.ts
+     × queued 源（已开始、等机器）：待开始 ✓（重置闸）已完成 ✓；执行中 ✗（源列）；待处理 ✗ 9ms
+     × 卡面：queued 走执行中底栏，todo 才浮开始（#1447） 3ms
+     × queued 住执行中列、不住待开始列（#1447） 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > queued 源（已开始、等机器）：待开始 ✓（重置闸）已完成 ✓；执行中 ✗（源列）；待处理 ✗
+AssertionError: expected false to be true // Object.is equality
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > 卡面：queued 走执行中底栏，todo 才浮开始（#1447）
+AssertionError: expected { kind: 'queued', action: null } to deeply equal { kind: 'running' }
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > queued 住执行中列、不住待开始列（#1447）
+AssertionError: expected false to be true // Object.is equality
+      Tests  3 failed | 43 passed (46)
+
+$ (packages/shared) pnpm exec vitest run test/vocabulary.test.ts
+     × column mapping is the #351 single-key fold (no hasChanges param) 7ms
+     × canBoardDrop is the per-source manual matrix (#753) 2ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > column mapping is the #351 single-key fold (no hasChanges param)
+AssertionError: expected '待开始' to be '执行中' // Object.is equality
+ FAIL  test/vocabulary.test.ts > phase 九值权威单源 (02 §4.1, 锁定) > canBoardDrop is the per-source manual matrix (#753)
+AssertionError: expected false to be true // Object.is equality
+      Tests  2 failed | 36 passed (38)
+
+$ (apps/server) pnpm exec vitest run test/phase.test.ts
+     × 逐 phase 列位对拍（单键，无 hasChanges） 6ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/phase.test.ts > 4 列折叠映射（#351 单键） > 逐 phase 列位对拍（单键，无 hasChanges）
+AssertionError: expected '待开始' to be '执行中' // Object.is equality
+      Tests  1 failed | 7 passed (8)
