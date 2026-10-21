@@ -470,6 +470,23 @@ const cases = [
     },
   ],
   [
+    'an output directory named like the journey does not replace the journey',
+    () => {
+      const cwd = mkdtempSync(join(tmpdir(), 'vp-selftest-cwd-'));
+      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out', 'create-task'], {}, cwd);
+      rmSync(cwd, { recursive: true, force: true });
+      return r.code === 0 && r.out.includes(`args create-task --out ${join(cwd, 'create-task')}\n`);
+    },
+  ],
+  [
+    'an output option without its directory as the next argument is refused before anything runs',
+    () => {
+      const joined = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out=rel/ev']);
+      const bare = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', '--out']);
+      return [joined, bare].every((r) => r.code === 2 && r.out.includes('--out takes its directory as the next argument'));
+    },
+  ],
+  [
     'capture refuses a --wait that is not a number of milliseconds',
     () => {
       const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));

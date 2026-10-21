@@ -210,11 +210,23 @@ function driveCommand(argv) {
     fail(`${feature}/${name} needs arguments: ${c.usage}. Pass them after --.`);
   }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
+  // The probe's output option takes its directory as the next argument (glass.mjs
+  // reads no '--out=<dir>'); refused here, before doctor or any directory.
+  const evidence = c.evidence ?? {};
+  const outAt = evidence.flag === undefined ? -1 : extra.indexOf(evidence.flag);
+  if (
+    evidence.flag !== undefined &&
+    (extra.some((a) => a.startsWith(`${evidence.flag}=`)) || (outAt !== -1 && extra[outAt + 1] === undefined))
+  ) {
+    fail(`${evidence.flag} takes its directory as the next argument: -- ${evidence.flag} <dir>`);
+  }
   // Arguments after -- replace the default arguments they name (the same option
   // before '=', or the same probe or journey name); the other defaults stay, so a
   // post-fix --expect flag survives an unrelated option (/code-review on #1411).
+  // The output directory is a value, so a directory named like the journey does
+  // not replace the journey.
   const keyOf = (a) => a.split('=')[0];
-  const replaced = new Set(extra.map(keyOf));
+  const replaced = new Set(extra.filter((_, i) => outAt === -1 || i !== outAt + 1).map(keyOf));
   const args = [...c.args.filter((a) => !replaced.has(keyOf(a))), ...extra];
   const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
   const doctorFirst = c.needs.includes('stack');
@@ -242,7 +254,6 @@ function driveCommand(argv) {
   // that writes fixed evidence by design gets no directory; one that takes an
   // output option gets the directory through it, or uses the one given after --;
   // one that reads another variable gets it there (pr-gate run 4, /code-review).
-  const evidence = c.evidence ?? {};
   const flagAt = args.indexOf(evidence.flag);
   // A path given after -- is the caller's: made absolute against their cwd, not
   // the probe's (node cases run from the repo root, tsx cases from a package).
