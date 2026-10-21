@@ -2804,6 +2804,21 @@ describe('24 限流：本队本轮停读', () => {
       },
       new Date(1_800_000_600_000).toISOString(),
     ],
+    // 二级限流同时带 retry-after 与（主窗口的）x-ratelimit-reset：GitHub 的文档要
+    // 先守 retry-after，日志的重置时刻取它，不取 50 分钟后的主窗口重置。
+    [
+      '403（二级限流，retry-after 60 与 x-ratelimit-reset 都在）',
+      {
+        status: 403,
+        headers: {
+          'retry-after': '60',
+          'x-ratelimit-remaining': '4000',
+          'x-ratelimit-reset': '1800003000',
+        },
+        body: { message: 'You have exceeded a secondary rate limit.' },
+      },
+      new Date(T0 + 60_000).toISOString(),
+    ],
     [
       '403（二级限流，只有 message）',
       {
