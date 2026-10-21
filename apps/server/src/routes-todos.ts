@@ -116,17 +116,17 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     // settleSplitOnDone（兄弟都 done 时父收，不在这里派发新构建）。
     if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
     // #1445：手动关闭（详情 关闭 / 看板 已取消）同停活动步，机器不再领这张卡。
-    // raw PATCH 把执行中的卡挪回待开始（web 走 /reset，不经这里；#1447 起含
-    // queued）同理：pending 步留着会被领走，claimed 步零通知继续跑。已完成不
-    // 在此列：#1247 钉了 raw PATCH done 保留 pending 步，带停的入口是
-    // stop-and-done。判 record（写后值）不判 body：同相位 PATCH 在 updateTodo
+    // raw PATCH 把执行中的卡挪回待开始或标完成（web 走 /reset 与
+    // stop-and-done，不经这里）同理（#1447、#1451）：pending 步留着会被领走，
+    // claimed 步零通知继续跑。只认这两个出口：漏斗边（building→review 等）
+    // 不在此列。判 record（写后值）不判 body：同相位 PATCH 在 updateTodo
     // 里静默 no-op。
     const closing = record.phase === 'closed' && prior?.phase !== 'closed';
-    const backToTodo =
+    const exited =
       prior != null &&
       (IN_PROGRESS_PHASES as readonly string[]).includes(prior.phase) &&
-      record.phase === 'todo';
-    if (closing || backToTodo) stopActiveStepsAfterExit(svc, id);
+      (record.phase === 'todo' || record.phase === 'done');
+    if (closing || exited) stopActiveStepsAfterExit(svc, id);
     return c.json(record);
   });
 
