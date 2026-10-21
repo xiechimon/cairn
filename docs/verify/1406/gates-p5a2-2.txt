@@ -1,0 +1,171 @@
+#1406 P5a-2 round 2 gates at the final code head
+head: a5bf7ed3 (branch claude/bootstrap-p5b; round 2 commits 6b6fcc0d, 47eb7a4b, a5bf7ed3 on top of 10898214)
+date: 2026-10-21T11:11:13Z
+
+summary:
+  pnpm lint                                   exit 0 (1 info, pre-existing apps/web/src/resources/machines-page.tsx noUselessFragments)
+  pnpm typecheck                              exit 0
+  pnpm spec:parse                             exit 0
+  node scripts/test-spawn-gate.mjs            exit 0
+  pnpm exec vitest run --changed origin/main  exit 1: 1 failed | 2468 passed | 1 skipped (2470), 240 files; the only failure is
+      apps/daemon/test/runner-brief.test.ts > 擦除失败 → 不 commitAll ... (失败方式 4), the known root-only case
+      (chmod 0o000 does not stop root; this container runs as uid 0), the same sole failure as gates-p5a2.txt.
+      Round 1 had 2464 passed; the 4 more are the round 2 tests in github-reads.test.ts.
+  E2E_AFFECTED_PORT=8390 pnpm --filter @pacman/web e2e:affected  exit 0: 8 passed (live-server-reap, token-gate)
+      lsof -iTCP:8390 -sTCP:LISTEN before the run: nothing listening (rc 1); 8398 and 8399 were also free
+  git merge-tree --write-tree --name-only origin/main HEAD (origin/main 2294b087): clean, exit 0
+
+== lint
+$ biome ci .
+apps/web/src/resources/machines-page.tsx:317:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+
+  ℹ This fragment is unnecessary.
+  
+    315 │             ) : null}
+    316 │             {estimate ? null : (
+  > 317 │               <>
+        │               ^^
+  > 318 │                 {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+         ...
+  > 327 │                 )}
+  > 328 │               </>
+        │               ^^^
+    329 │             )}
+    330 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed fragment.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    315 315 │               ) : null}
+    316 316 │               {estimate ? null : (
+    317     │ - ··············<>
+    318     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        317 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    319 318 │                     <>
+    320 319 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 786 files in 1640ms. No fixes applied.
+Found 1 info.
+exit=0
+
+== typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+== spec
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.1s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.3s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+== spawn
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+== e2e
+$ lsof -iTCP:8390 -sTCP:LISTEN
+rc=1
+2026-10-21T11:17:33Z
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  docs/verify/1406/p5a2-red-2.txt → none
+  apps/server/src/lib/github.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-reads.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/mcp-face.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/issues-open-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/pulls-all-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/runs-main-success.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/runs-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-reads.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/mcp-face.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/02-\346\236\266\346\236\204\345\271\263\344\273\267.md" → none
+  docs/verify/1406/fixtures-p5a2/issues-open-page1.json → none
+  docs/verify/1406/fixtures-p5a2/pulls-all-page1.json → none
+  docs/verify/1406/fixtures-p5a2/runs-main-success.json → none
+  docs/verify/1406/fixtures-p5a2/runs-page1.json → none
+  docs/verify/1406/gates-p5a2.txt → none
+  docs/verify/1406/p5a2-api-notes.txt → none
+  docs/verify/1406/p5a2-green.txt → none
+  docs/verify/1406/p5a2-live.txt → none
+  docs/verify/1406/p5a2-mutations.txt → none
+  docs/verify/1406/p5a2-red.txt → none
+  docs/verify/1406/p5a2-reviews.txt → none
+  packages/shared/src/protocol/chief-tools.ts → none
+  packages/shared/test/chief-tools.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8390
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.2s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (2.4s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (906ms)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (514ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (469ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (561ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (523ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (470ms)
+
+  8 passed (12.7s)
+exit=0
+
+== vitest --changed origin/main: the changed-surface test files it selected (vitest list --changed origin/main --filesOnly, 240 files, exit 0)
+[@xiechimon/pacman-cli] apps/daemon/test/claude-t4-tools.test.ts
+[@pacman/shared] packages/shared/test/chief-tools.test.ts
+[@xiechimon/pacman] apps/server/test/chief-tools.test.ts
+[@xiechimon/pacman] apps/server/test/github-reads.test.ts
+[@xiechimon/pacman] apps/server/test/mcp-face.test.ts
+
+== vitest --changed origin/main (failure and summary)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+ ❯ test/runner-brief.test.ts:411:23
+    409|     const { client } = await run({ claimed, backend, workspace: ws });
+    410|     chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
+    411|     expect(calls).not.toContain('commitAll');
+       |                       ^
+    412|     expect(calls).not.toContain('push');
+    413|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 239 passed (240)
+      Tests  1 failed | 2468 passed | 1 skipped (2470)
+   Start at  11:11:44
+   Duration  339.60s (tests 58%, import 41%, transform 1%)
+
+    Isolate  240 workers spawned · ~154ms startup each (spawn + environment, per file)
+             at least ~12.19s faster with isolate: false — reuses workers across files instead of one per file
+
+exit=1

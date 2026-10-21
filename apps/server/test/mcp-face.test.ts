@@ -306,8 +306,17 @@ describe('/api/mcp 工具执行 = key 属主身份（02 §7.2）', () => {
     s.dispose();
   });
 
-  test('GitHub-backed 专属读组 = 空集保形（issues/pull_requests/workflow_runs，02 §3/A4）', async () => {
-    const s = bootServer();
+  // #1406 P5a-2：三件读真 GitHub（读面细节与两面同数据见 github-reads.test.ts）。
+  // MCP 面 projectId 由可选改必填（与 chief 词表同一套参数）：缺省 = 错误结果，
+  // 不挑「团队唯一的 GitHub 项目」、不跨项目扇出，也不出站。
+  test('GitHub 读组（issues/pull_requests/workflow_runs）缺 projectId = 错误结果，不出站', async () => {
+    const outbound: string[] = [];
+    const s = bootServer({
+      githubFetch: async (input) => {
+        outbound.push(String(input));
+        throw new Error('no outbound expected');
+      },
+    });
     const key = await issueMcpKey(s, {
       read: ['Issues', 'Pull Requests', 'Workflow Runs'],
       write: [],
@@ -315,10 +324,11 @@ describe('/api/mcp 工具执行 = key 属主身份（02 §7.2）', () => {
     for (const name of ['issues', 'pull_requests', 'workflow_runs']) {
       const res = (await rpc(s.app, key, 'tools/call', { name, arguments: {} }))
         .body as JsonRpcResponse;
-      expect(res.error).toBeUndefined();
-      const parsed = JSON.parse(res.result?.content?.[0]?.text ?? '{}') as { items: unknown[] };
-      expect(parsed.items).toEqual([]);
+      expect(res.error, name).toBeUndefined();
+      expect(res.result?.isError, name).toBe(true);
+      expect(res.result?.content?.[0]?.text ?? '', name).toContain('projectId');
     }
+    expect(outbound).toEqual([]);
     s.dispose();
   });
 });

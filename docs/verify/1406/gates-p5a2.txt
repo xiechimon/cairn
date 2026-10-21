@@ -1,0 +1,156 @@
+#1406 P5a-2 gates at the final code head
+head: 59bc0e8f (branch claude/bootstrap-p5b; code commits 37077116, e92b20d0, 59bc0e8f)
+date: 2026-10-21T10:30:33Z
+
+summary:
+  pnpm lint                                   exit 0 (1 info, pre-existing apps/web/src/resources/machines-page.tsx noUselessFragments)
+  pnpm typecheck                              exit 0
+  pnpm spec:parse                             exit 0
+  node scripts/test-spawn-gate.mjs            exit 0
+  pnpm exec vitest run --changed origin/main  exit 1: 1 failed | 2464 passed | 1 skipped (2466); the only failure is
+      apps/daemon/test/runner-brief.test.ts > 擦除失败 → 不 commitAll ... (失败方式 4), the known root-only case
+      (chmod 0o000 does not stop root in this container), accepted as the sole failure
+  E2E_AFFECTED_PORT=8390 pnpm --filter @pacman/web e2e:affected  exit 0: 8 passed (live-server-reap, token-gate)
+      lsof -iTCP:8390 -sTCP:LISTEN before the run: nothing listening (rc 1)
+
+earlier gate run (head e92b20d0, before 59bc0e8f) for the record: vitest --changed had 3 failures:
+  runner-brief (the same root-only case); apps/daemon/test/claude-t4-tools.test.ts 'chief 词表全量转换零抛'
+  (real: enum in the new chief parameters, fixed by 59bc0e8f); apps/server/test/ci-loop.test.ts
+  '批量对账：3 候选一轮 …' (load flake: 3 of 3 isolated reruns passed, and it passed in the final run).
+
+merge-tree (git merge-tree --write-tree --name-only, fetched 2026-10-21):
+  HEAD vs origin/claude/bootstrap-p5 (f9114471): clean, exit 0
+  HEAD vs origin/claude/bootstrap-p2 (deff4b9e): clean, exit 0
+  HEAD vs origin/main (2294b087): clean, exit 0
+  HEAD vs (p5 merged with p2, unreferenced commit-tree object): clean, exit 0
+  that three-way result checked out in a temporary detached worktree (removed afterwards):
+    pnpm typecheck exit 0; vitest github-reads, mcp-face, shared chief-tools, daemon claude-t4-tools,
+    github-issues, issue-intake, ci-loop, pr-reconcile: 8 files, 299 tests passed
+
+== lint
+$ biome ci .
+apps/web/src/resources/machines-page.tsx:317:15 ]8;;https://biomejs.dev/linter/rules/no-useless-fragments\lint/complexity/noUselessFragments]8;;\  FIXABLE  ━━━━━━━━━━
+
+  ℹ This fragment is unnecessary.
+  
+    315 │             ) : null}
+    316 │             {estimate ? null : (
+  > 317 │               <>
+        │               ^^
+  > 318 │                 {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+         ...
+  > 327 │                 )}
+  > 328 │               </>
+        │               ^^^
+    329 │             )}
+    330 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed ]8;;https://legacy.reactjs.org/docs/fragments.html#keyed-fragments\fragment]8;;\.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    315 315 │               ) : null}
+    316 316 │               {estimate ? null : (
+    317     │ - ··············<>
+    318     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        317 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    319 318 │                     <>
+    320 319 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 786 files in 1913ms. No fixes applied.
+Found 1 info.
+exit=0
+
+== typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+== spec
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.2s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.0s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+== spawn
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+== e2e
+lsof-8390 rc=1
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  docs/verify/1406/ → none
+  apps/server/src/lib/github.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/chief-tools.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/github-reads.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/src/services/mcp-face.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/issues-open-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/pulls-all-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/runs-main-success.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/fixtures/github-reads/runs-page1.json → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/github-reads.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/mcp-face.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  packages/shared/src/protocol/chief-tools.ts → none
+  packages/shared/test/chief-tools.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8390
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (3.8s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (4.2s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.2s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (845ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (721ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (697ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (583ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (566ms)
+
+  8 passed (19.6s)
+exit=0
+
+== vitest --changed origin/main (failures and summary)
+474:[step] shell done step=hwLTggc3CVjXx_oaS1YZV run=qzlzCokgQVSHcQIHyBYzA exit=0 chars=21 ms=23
+510:⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+512: FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+525: Test Files  1 failed | 239 passed (240)
+526:      Tests  1 failed | 2464 passed | 1 skipped (2466)
+533:exit=1
+512: FAIL  |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+513-AssertionError: expected [ 'commitAll', 'push', …(1) ] to not include 'commitAll'
+514- ❯ test/runner-brief.test.ts:411:23
+515-    409|     const { client } = await run({ claimed, backend, workspace: ws });
+516-    410|     chmodSync(cwdForWs, 0o700); // 还原，免得影响后续用例
+517-    411|     expect(calls).not.toContain('commitAll');
+518-       |                       ^
+519-    412|     expect(calls).not.toContain('push');
+520-    413|     expect(client.doneBodies[0]?.body.status).toBe('failed');
+521-
+522-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+523-
+524-
