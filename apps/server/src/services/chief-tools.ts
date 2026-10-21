@@ -813,9 +813,14 @@ export async function executeChiefTool(
       ]) {
         if (slot !== null) requireTeamAgent(db, slot.agentId, ctx.teamId);
       }
-      const started: unknown[] = [];
-      for (const todoId of todoIds) {
+      // 逐卡校验先于任何派工（#1466）：本队任务指向他队项目（旧 create_todo
+      // 可造）在建 build 之前就 404，整批不动——不留「报错了、build 却在跑」。
+      const targets = todoIds.map((todoId) => {
         const row = requireTeamTodo(db, todoId, ctx.teamId);
+        return { todoId, row, projectName: requireProjectRow(db, row.projectId, ctx.teamId).name };
+      });
+      const started: unknown[] = [];
+      for (const { todoId, row, projectName } of targets) {
         const builds = startBuilds(
           { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
           {
@@ -828,7 +833,6 @@ export async function executeChiefTool(
         );
         started.push(...builds);
         // 派工即自动 watch（r5 §3.5：run_builds → watches[0] reason canon）。
-        const projectName = requireProjectRow(db, row.projectId, ctx.teamId).name;
         const todoRecord = getTodo(svc, todoId);
         if (todoRecord) {
           addChiefWatch(deps, {
@@ -954,11 +958,14 @@ export async function executeChiefTool(
     case 'watch_todos': {
       const todoIds = strArr(params, 'todoIds');
       const reason = optStr(params, 'reason');
-      for (const todoId of todoIds) {
+      // 他队任务与不存在同样跳过（#1466 团队归属，requireTeamTodo 同口径）；项目
+      // 归属先全部校验再 watch——本队任务指向他队项目即整批 404，不半截生效。
+      const targets = todoIds.flatMap((todoId) => {
         const record = getTodo(svc, todoId);
-        // 他队任务与不存在同样跳过（#1466 团队归属，requireTeamTodo 同口径）。
-        if (!record || record.teamId !== ctx.teamId) continue;
-        const projectName = requireProjectRow(db, record.projectId, ctx.teamId).name;
+        if (!record || record.teamId !== ctx.teamId) return [];
+        return [{ record, projectName: requireProjectRow(db, record.projectId, ctx.teamId).name }];
+      });
+      for (const { record, projectName } of targets) {
         addChiefWatch(deps, {
           teamId: ctx.teamId,
           todo: record,

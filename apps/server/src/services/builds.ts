@@ -1688,10 +1688,10 @@ export function completeStep(
     // 追加修复步续磨，绿 = 轮询器推进 review，services/ci-loop.ts）。磨绿面 =
     // github 项目的 PR checks（轮询器同判据）：hosted/local（无 GitHub checks 可磨）
     // 与 prNumber 缺位的存量形（仅 prUrl，#931 不猜号同律）→ 既有直进 review
-    // 行为逐字节不变。
+    // 行为逐字节不变。githubRepo 存量值不合法（#1466）同按无 GitHub 仓处理：
+    // 轮询器对它不出站，停在 building 就再没有出口。
     const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
-    const deliveredGithubPr =
-      buildRow.prNumber !== null && projRow?.repoKind === 'github' && projRow.githubRepo !== null;
+    const deliveredGithubPr = buildRow.prNumber !== null && githubRepoOfProject(projRow) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
