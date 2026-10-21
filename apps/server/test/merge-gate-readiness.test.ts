@@ -1249,6 +1249,24 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
       { sha: HEAD, parents: [EARLIER, MAIN] },
     ]);
     expect(mergeReadiness(i).ready).toBe(true);
+    // PR 里合进了一条旁支 SIDE（以 MAIN 为父），SIDE 的日期晚、排在 head 之后：head 不是
+    // 列表的末一个，也不是第一父提交链上的唯一一端。看所有父提交，没被认作父提交的
+    // 仍只有 HEAD。
+    const SIDE = '7'.repeat(40);
+    const j = green();
+    j.compare = withCommits(compare(j), [
+      ...chain(EARLIER),
+      { sha: HEAD, parents: [EARLIER, SIDE] },
+      { sha: SIDE, parents: [MAIN] },
+    ]);
+    expect(mergeReadiness(j).ready).toBe(true);
+  });
+
+  test('外壳填的 head 与响应自己的 head 两样各对一半：外壳说读在 NEWER、提交说读在 HEAD，也按没在 head 上读处理', () => {
+    // 故事：外壳按 NEWER 请求，拿到的却是缓存里 HEAD 那次的提交列表（文件也说不清是哪次的）。
+    const i = green();
+    i.compare = readAt(NEWER, compare(i));
+    expect(classesOf(i)).toEqual(notAtHead);
   });
 
   test('compare 的提交没读全（条数不等于响应的 total_commits，分页没读完）：可等的 patch-unavailable；head 的子提交在没读的那页上也不放过', () => {
@@ -1434,6 +1452,9 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
       expect(classesOf(e)).toEqual(unreadable);
       const f = green();
       checks(f).runs[1] = { ...run('pack-smoke'), headSha: bad };
+      expect(classesOf(f)).toEqual(unreadable);
+      // 写错 SHA 的那份结果不拿来判：里面的失败也不列
+      checks(f).runs[0] = run('check', 'completed', 'failure');
       expect(classesOf(f)).toEqual(unreadable);
       const g = green();
       checks(g).statusSha = bad;

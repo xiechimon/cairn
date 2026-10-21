@@ -132,12 +132,12 @@ export interface GateInputs {
    * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 {sha, parents}
    * 列表），每次读都一样，留人。headSha、commits 的 sha 或 parents 里有不是 40 位小写
    * SHA 的，这里同样按 compare-malformed 留人：写错的 SHA 每次读都一样，不该成为永远对
-   * 不上的可等；写错的父提交还会让响应自己的 head 认错。commits 少给别的提交，证据链只会
-   * 少认（拦）。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否
-   * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到或它的 head
-   * 写错时没有 head 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），
-   * 只有要 PR 的 head 才判得了的两样不判（PR 报的文件数、body 的证据链）；结果不报
-   * head，也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
+   * 不上的可等；写错的父提交还会让响应自己的 head 认错。commits 不带逐提交的文件
+   * 列表，所以证据链指向的文件在那个提交上是否已经存在（raw 是否 404）这里判不了，由
+   * I/O 外壳（S4）去查。PR 读不到或它的 head 写错时没有 head 可对：compare 与检查照常
+   * 判、blocker 照常列（pr-unreadable 已拦），只有要 PR 的 head 才判得了的两样不判（PR
+   * 报的文件数、body 的证据链）；结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个
+   * 提交上）。 */
   compare:
     | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[]; totalCommits: number }
     | 'unreadable'
