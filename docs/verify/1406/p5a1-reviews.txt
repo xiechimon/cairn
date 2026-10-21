@@ -1,0 +1,57 @@
+#1406 P5a-1 (PR #1461): what /simplify and /code-review found, and what was done
+
+Both skills ran inline, as one pass each. The Agent tool was not available, so
+/simplify did not run its usual four-agent fan-out. /code-review ran in a forked
+context and read the branch from the worktree. /security-review was not needed:
+no file on the AGENTS.md security list is touched.
+
+== Round 1 (commits 06333f86, 645640fd, 7b2c1f56)
+
+/simplify on origin/main...645640fd (intake service, lib reads, import claim,
+chief check, scheduler and index wiring, tests):
+- Fixed in 645640fd: githubOpenIssuesWithLabel returned a hasMore flag nothing
+  read, so it now returns the issues only. The intake counted in-flight tasks
+  again for every remaining candidate even once the project was full; it now
+  sets an at-cap flag and stops counting.
+- Kept: intakeGet overlaps #1414's conditionalGetJson. They stay separate (and
+  differently named) so the two PRs merge without a textual or identifier
+  conflict; fold them together after #1414 lands. claimedRefs stays apart from
+  claimedSourceRefs because it compares case-insensitively across the team on
+  purpose. The per-team filter over projects costs nothing that matters.
+
+/code-review low on origin/main...645640fd: no findings.
+/code-review low on 645640fd..7b2c1f56 (the opt-in switch): no findings. It
+named one unchecked assumption: createScheduler accepts null for the intake
+slot and then starts no intake. That holds (signature intake?: IssueIntakeRun |
+null; the null-slot tests; the live off run in p5a1-optin-live.txt).
+
+== Round 2 (after pr-gate run 1 at f9114471, NO-GO): fad94c62..HEAD
+
+/simplify on fad94c62..4b301189:
+- Fixed (folded into the server commit, now 6fe338a1):
+  - One newestOf helper serves the labeled, unlabeled and closed lookups,
+    instead of three hand-written loops.
+  - The per-candidate body (D5 check, recount, import, orchestrate) moved out
+    of intakeProject into take(), which removes a nesting level the paging loop
+    had added.
+  - The in-flight check is one projectFull() used by both places.
+  - The file header comment was rewrapped.
+  - The single-use detailOf helper in the test fake was inlined (pr-gate
+    suggestion).
+- Kept: closerEventsCache stays separate from eventsCache, because the labeler
+  cache keeps only issues still in the open list and the closer needs closed
+  ones. The three per-team prune loops are already clear.
+
+/code-review low on fad94c62..4b301189, first pass, one finding, fixed:
+- closerVerdict read only the first events page. On an issue with more than
+  100 events, the newest closed event sits past page 1, so the task was never
+  closed. The labeler check had the same one-page limit, and in this
+  repository it bites long tickets: every commit that mentions one adds a
+  referenced event.
+- Fix (in 6fe338a1): readHistory follows Link rel="next" on api.github.com
+  for up to ISSUE_INTAKE_MAX_EVENT_PAGES = 5 pages, for both checks. A next
+  link that cannot be followed, or more pages than the cap, still counts as
+  incomplete. Red: three new tests failing on 4b301189 (p5a1-r2-red-green.txt,
+  RED 2). Pinned by mutation S4 (and S5 for the foreign-host link).
+
+/code-review low on fad94c62..6fe338a1, second pass: no findings.
