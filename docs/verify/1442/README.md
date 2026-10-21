@@ -10,7 +10,7 @@ Environment: cloud session image, Chromium 141.0.7390.37, fixture build (`vite b
 | `tool-pill-before.txt` | the `detail tool calls` page added after code review, with the tool pill put back to `ink-3`: light fails `color-contrast` on `.chat-tool-pill > .truncate`, dark passes |
 | `machine-detail-before.txt` | the `machine detail` page added after simplify review, with the evacuate select's `aria-label` removed: `button-name` (critical), 2 failed |
 | `final-x3.txt` | the final gate (22 pages x 2 themes, parallel mode) with `agent-detail`, `hotkeys`, `registry-focus-ring` and `segmented-controls` (the specs sharing the changed helpers), `--repeat-each=3`: 423 passed |
-| `e2e-affected-full.txt` | `pnpm e2e:affected` on the final tree (full-suite fallback: `package.json` and the lockfile changed) |
+| `e2e-affected-full.txt` | `pnpm e2e:affected` on the final tree, run on main `94fdb4c` plus this PR's two commits (full-suite fallback: `package.json` and the lockfile changed): 1159 passed, 0 failed |
 
 Contrast, WCAG 2.x relative luminance from the token values in `src/styles/shadcn.css`:
 
