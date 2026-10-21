@@ -261,6 +261,8 @@ function githubFake(repo: string) {
     eventsHasNext: new Set<number>(),
     /** events 的 Link rel="next" 指到 api.github.com 之外。 */
     eventsForeignNext: new Set<number>(),
+    /** issue 号 → 读不到的 events 页号（502）；别的页照常。 */
+    eventsFailPages: new Map<number, Set<number>>(),
     /** login（小写）→ permission 应答；缺省 = 404。 */
     permissions: new Map<string, GhResponse>([
       [OWNER, { body: permissionBody(OWNER, 'admin', 'admin') }],
@@ -309,6 +311,9 @@ function githubFake(repo: string) {
       // 分页同上游：per_page 缺省 30、page 从 1 起；还有下一页就给 Link rel="next"。
       const perPage = Number(url.searchParams.get('per_page') ?? '30');
       const pageNo = Number(url.searchParams.get('page') ?? '1');
+      if (state.eventsFailPages.get(n)?.has(pageNo) === true) {
+        return { status: 502, body: { message: 'Bad Gateway' } };
+      }
       const slice = state.eventsHasNext.has(n)
         ? events
         : events.slice((pageNo - 1) * perPage, pageNo * perPage);
@@ -610,6 +615,14 @@ function chiefThreads(s: TestServer) {
   return s.db.select().from(chiefThreadTable).all();
 }
 
+/** 「issue intake candidate not taken」日志行的理由（按出现顺序）：不领的用例
+ * 拿它证明候选确实判过，不是因为没被读到才「不领」。 */
+function notTakenReasons(w: World): unknown[] {
+  return w.logs
+    .filter((l) => l.msg === 'issue intake candidate not taken')
+    .map((l) => l.obj.reason);
+}
+
 // —— 常量面 ————————————————————————————————————————————————————————————————
 
 test('常量：5 分钟一轮、标签 ready-for-agent、上限 3、permission 缓存有界、编排至多试 3 次', () => {
@@ -680,16 +693,25 @@ describe('1 打标人权限（D5）', () => {
   test('issue 作者是仓主也不算数：只看打标人', async () => {
     const w = await makeWorld({ list: [1455] });
     w.gh.state.events.set(1455, [labelEvent('labeled', 'outsider', '2026-10-21T08:26:51Z', 9010)]);
-    await w.intake.sweep();
+    const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
+    // 候选确实判过：读了 events、问了打标人的权限，判为不够 triage。
+    expect(tally?.candidates).toBe(1);
+    expect(tally?.notEligible).toBe(1);
+    expect(w.gh.eventReads(1455)).toHaveLength(1);
+    expect(w.gh.permissionReads('outsider')).toHaveLength(1);
+    expect(notTakenReasons(w)).toEqual(['labeler-below-triage']);
   });
 
   test('打标账号已删除（actor null）→ 不领，不读 permission', async () => {
     const w = await makeWorld({ list: [1455] });
     w.gh.state.events.set(1455, [labelEvent('labeled', null, '2026-10-21T08:26:51Z', 9011)]);
-    await w.intake.sweep();
+    const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
     expect(w.gh.permissionReads()).toHaveLength(0);
+    expect(tally?.notEligible).toBe(1);
+    expect(w.gh.eventReads(1455)).toHaveLength(1);
+    expect(notTakenReasons(w)).toEqual(['labeler-deleted']);
   });
 });
 
@@ -712,6 +734,50 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
       '形坏（labeled 缺 label）',
       () => ({ body: [{ ...LABELED_TEMPLATE, label: undefined, id: 1 }] }),
     ],
+    // labeled / unlabeled / closed 缺 id 或 created_at = 整读作废（githubIssueEvents）：
+    // 只跳过那一条，摘标事件一丢，已摘的标就成了仓主最新打的。
+    [
+      '形坏（仓主打标之后的 unlabeled 缺 created_at）',
+      () => ({
+        body: [
+          labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+          { ...labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 2), created_at: undefined },
+        ],
+      }),
+    ],
+    [
+      '形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）',
+      () => ({
+        body: [
+          labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+          { ...labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 2), created_at: 'yesterday' },
+        ],
+      }),
+    ],
+    [
+      '形坏（仓主打标之后的 unlabeled 缺 id）',
+      () => ({
+        body: [
+          labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+          { ...labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 2), id: undefined },
+        ],
+      }),
+    ],
+    [
+      '形坏（labeled 缺 id）',
+      () => ({
+        body: [{ ...labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1), id: undefined }],
+      }),
+    ],
+    [
+      '形坏（closed 缺 created_at）',
+      () => ({
+        body: [
+          labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+          { ...closedEvent(OWNER, '2026-10-20T20:30:00Z', 2), created_at: undefined },
+        ],
+      }),
+    ],
   ];
 
   test.each(eventFailures)('events 读 %s → 不领；恢复后下一轮领', async (_name, failure) => {
@@ -726,6 +792,49 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
     await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([1406]);
   });
+
+  // 多页历史：第 1 页是仓主打的标，后来的事件在第 2 页，第 2 页读不到。只凭
+  // 第 1 页判，就会领一条标已被摘、或已被外人重打的 issue：整读作废，本轮不领。
+  const laterOnPage2: [string, RawEvent, string][] = [
+    [
+      '仓主后来摘了标',
+      labelEvent('unlabeled', OWNER, '2026-10-21T09:00:00Z', 600),
+      'label-removed',
+    ],
+    [
+      '外人后来重打',
+      labelEvent('labeled', 'outsider', '2026-10-21T09:00:00Z', 600),
+      'labeler-below-triage',
+    ],
+  ];
+
+  test.each(laterOnPage2)(
+    'events 第 2 页读不到（第 2 页里%s）→ 不领、不读 permission；恢复后读全两页，照样不领',
+    async (_name, later, reasonAfter) => {
+      const w = await makeWorld({ list: [1406] });
+      w.gh.state.events.set(1406, [
+        labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
+        ...fillerEvents(10, 120, '2026-10-20T21:00:00Z'),
+        later,
+      ]);
+      w.gh.state.eventsFailPages.set(1406, new Set([2]));
+      const first = await w.intake.sweep();
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(first?.unverifiable).toBe(1);
+      expect(w.gh.permissionReads()).toHaveLength(0);
+      // 第 1 页读到了，第 2 页试读失败：不是只读一页就停。
+      expect(w.gh.eventReads(1406).map((c) => [c.search.get('page'), c.status])).toEqual([
+        [null, 200],
+        ['2', 502],
+      ]);
+      expect(notTakenReasons(w)).toEqual(['events-unreadable']);
+      w.gh.state.eventsFailPages.delete(1406);
+      const second = await w.intake.sweep();
+      expect(takenNumbers(w.s)).toEqual([]);
+      expect(second?.notEligible).toBe(1);
+      expect(notTakenReasons(w)).toEqual(['events-unreadable', reasonAfter]);
+    },
+  );
 
   const permissionFailures: [string, GhOverride][] = [
     ['5xx', () => ({ status: 500, body: {} })],
@@ -777,8 +886,13 @@ describe('3 只认最新一条 labeled；events 读不全不领', () => {
       labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 101),
       labelEvent('labeled', 'outsider', '2026-10-20T20:31:00Z', 102),
     ]);
-    await w.intake.sweep();
+    const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
+    // 判的是外人那一条：问了外人的权限，没问仓主的。
+    expect(tally?.notEligible).toBe(1);
+    expect(w.gh.permissionReads('outsider')).toHaveLength(1);
+    expect(w.gh.permissionReads(OWNER)).toHaveLength(0);
+    expect(notTakenReasons(w)).toEqual(['labeler-below-triage']);
   });
 
   test('顺序不靠数组位置：按 created_at 取最新', async () => {
@@ -814,8 +928,12 @@ describe('3 只认最新一条 labeled；events 读不全不领', () => {
       1406,
       HUMAN_EVENTS_1406.filter((e) => e.label?.name !== LABEL),
     );
-    await w.intake.sweep();
+    const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
+    expect(tally?.notEligible).toBe(1);
+    expect(w.gh.eventReads(1406)).toHaveLength(1);
+    expect(w.gh.permissionReads()).toHaveLength(0);
+    expect(notTakenReasons(w)).toEqual(['no-labeled-event']);
   });
 
   test('events 超过 ISSUE_INTAKE_MAX_EVENT_PAGES 页仍有下一页 → 读不全，不领、不读 permission', async () => {
@@ -1146,6 +1264,10 @@ describe('11 issue 在 GitHub 被关', () => {
     expect(phaseOf(w, todoId)).toBe('building');
     expect(first?.closed).toBe(0);
     expect(second?.closed).toBe(0);
+    // 卡在对账集里、两轮都读了 issue 状态（读到 closed）；没见过 open，不去读关闭人。
+    expect(w.gh.issueReads(1445).map((c) => c.status)).toEqual([200, 304]);
+    expect(w.gh.eventReads(1445)).toHaveLength(0);
+    expect(first?.closeSkipped).toBe(0);
   });
 
   test('被对账关掉后有人把卡重开（issue 仍 closed）→ 卡保持开着', async () => {
@@ -1232,9 +1354,16 @@ describe('11 issue 在 GitHub 被关', () => {
       { ...w.s.svc, box: w.s.secretBox },
       { githubFetch: w.gh.impl },
     );
+    const readsBefore = w.gh.calls.length;
     const tally = await restarted.sweep();
     expect(tally?.closed).toBe(0);
     expect(phaseOf(w, todoId)).toBe('building');
+    // 新轮询器确实读了这张卡的 issue（读到 closed）；首见即 closed，不去读关闭人。
+    const restartedReads = w.gh.calls.slice(readsBefore);
+    expect(
+      restartedReads.filter((c) => c.path === `/repos/${REPO}/issues/1445`).map((c) => c.status),
+    ).toEqual([200]);
+    expect(restartedReads.filter((c) => c.path.endsWith('/issues/1445/events'))).toHaveLength(0);
   });
 
   test('读期间卡被人推进 review → 写前重读相位，跳过', async () => {
