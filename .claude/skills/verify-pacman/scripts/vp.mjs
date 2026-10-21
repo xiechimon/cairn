@@ -22,9 +22,12 @@ for (const key of ['VERIFY_REPO_ROOT', 'VERIFY_RUN_DIR', 'VERIFY_EVIDENCE_DIR'])
   if (process.env[key]) process.env[key] = resolve(process.env[key]);
   else delete process.env[key];
 }
+for (const key of ['VERIFY_PORT', 'VERIFY_WEB_PORT']) if (!process.env[key]) delete process.env[key];
 const ROOT = process.env.VERIFY_REPO_ROOT ?? SCRIPT_ROOT;
 const RUN_DIR = process.env.VERIFY_RUN_DIR ?? join(ROOT, '.claude', 'verify-run');
-const EVIDENCE_ROOT = join(SCRIPT_ROOT, '.claude', 'verify-evidence');
+// Evidence goes to the main checkout, also when this vp.mjs sits in a worktree:
+// a worktree's evidence is deleted with it (#345, SKILL.md Evidence).
+const EVIDENCE_ROOT = join(mainCheckout(SCRIPT_ROOT), '.claude', 'verify-evidence');
 // Needs that make a case run only when asked with --force, and why.
 const FORCE_NEEDS = {
   'real-llm': 'spends model tokens',
@@ -43,16 +46,20 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
   drive <feature> [case] [--force] [--dry-run] [-- <args>]
                                  run a registered case; cases that need the stack run doctor first;
                                  stale and host-bound cases, and cases that need real-llm, github or
-                                 rewrites-evidence, need --force; arguments after -- replace the
-                                 case's default args; without VERIFY_EVIDENCE_DIR the case writes to
-                                 a new .claude/verify-evidence/<time>-<feature>-<case>/, created once
-                                 doctor passes (a probe with its own output option gets the directory
-                                 through it; a probe that writes fixed evidence is named instead);
+                                 rewrites-evidence, need --force; a case whose usage names required
+                                 arguments needs them; arguments after -- replace the case's default
+                                 options (its probe or journey name stays); a case that needs the
+                                 stack gets VERIFY_PORT / VERIFY_WEB_PORT from the stack's ports.json;
+                                 without VERIFY_EVIDENCE_DIR the case writes to a new
+                                 .claude/verify-evidence/<time>-<feature>-<case>/ in the main checkout,
+                                 created once doctor passes (a probe with its own output option gets
+                                 the directory through it, or uses the one given after --; a probe
+                                 that writes fixed evidence is named instead);
                                  --dry-run prints what would run
   capture <path> [--name <label>] [--wait <ms>]
                                  screenshot a live route, record console errors and failed requests
                                  (exit 0 when the page loaded; errors are recorded, not judged;
-                                 with VERIFY_EVIDENCE_DIR set it writes into its capture-<label>/)
+                                 with VERIFY_EVIDENCE_DIR set it writes into a new capture-<label>/)
   archive <ticket> [--from <dir>]... [--latest <n>]
                                  copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
                                  the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
@@ -67,6 +74,58 @@ Registry: .claude/skills/verify-pacman/vp-registry.json`;
 function fail(message, code = 2) {
   console.error(message);
   process.exit(code);
+}
+
+function firstLine(err) {
+  return String(err.message ?? err).split('\n')[0];
+}
+
+// The stack doctor checks: ports.json in VERIFY_RUN_DIR; undefined before launch.
+function readStack() {
+  const file = join(RUN_DIR, 'ports.json');
+  if (!existsSync(file)) return undefined;
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    return fail(`vp: ${file} is not valid JSON; run vp.mjs cleanup, then vp.mjs launch`, 1);
+  }
+}
+
+function mainCheckout(dir) {
+  try {
+    const common = execFileSync('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return common.endsWith('/.git') ? dirname(common) : dir;
+  } catch {
+    return dir;
+  }
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+// Local time, the stamp drive.mjs and the other probes use for their directories.
+function localStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
+// A directory nobody wrote to yet: base, else base-2, base-3, ... Two runs in
+// one second (or two lanes in the shared root) never share one.
+function freshDir(base) {
+  mkdirSync(dirname(base), { recursive: true });
+  for (let n = 1; ; n += 1) {
+    const dir = n === 1 ? base : `${base}-${n}`;
+    try {
+      mkdirSync(dir);
+      return dir;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+    }
+  }
 }
 
 function takeFlag(argv, name) {
@@ -100,7 +159,7 @@ function loadRegistry() {
 function listCommand(argv) {
   const { features } = loadRegistry();
   const wanted = argv[0];
-  if (wanted !== undefined && !(wanted in features)) fail(`unknown feature: ${wanted}\nfeatures: ${Object.keys(features).join(', ')}`);
+  if (wanted !== undefined && !Object.hasOwn(features, wanted)) fail(`unknown feature: ${wanted}\nfeatures: ${Object.keys(features).join(', ')}`);
   for (const [feature, entry] of Object.entries(features)) {
     if (wanted !== undefined && feature !== wanted) continue;
     console.log(`${feature}${entry.recipe ? `  (${entry.recipe})` : ''}`);
@@ -122,16 +181,20 @@ function driveCommand(argv) {
   if (stray.length > 0) fail(`unexpected argument(s) ${stray.join(' ')}: script arguments go after --`);
   const { features } = loadRegistry();
   if (feature === undefined) fail(`usage: vp.mjs drive <feature> [case]\nfeatures: ${Object.keys(features).join(', ')}`);
+  if (!Object.hasOwn(features, feature)) fail(`unknown feature: ${feature}\nfeatures: ${Object.keys(features).join(', ')}`);
   const entry = features[feature];
-  if (entry === undefined) fail(`unknown feature: ${feature}\nfeatures: ${Object.keys(features).join(', ')}`);
   const names = Object.keys(entry.cases);
   let name = caseName;
   if (name === undefined) {
     if (names.length !== 1) fail(`feature ${feature} has ${names.length} cases, name one: ${names.join(', ')}`);
     name = names[0];
   }
+  if (!Object.hasOwn(entry.cases, name)) fail(`unknown case ${feature}/${name}; cases: ${names.join(', ')}`);
   const c = entry.cases[name];
-  if (c === undefined) fail(`unknown case ${feature}/${name}; cases: ${names.join(', ')}`);
+  // Registry mistakes fail before doctor and before any directory exists.
+  const script = resolve(SCRIPT_ROOT, c.script);
+  if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
+  if (c.runner === 'tsx' && c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
   if (c.status !== 'current' && !force) {
     const note = c.note ? `: ${c.note.replace(/\.+$/, '')}` : '';
     fail(`${feature}/${name} is ${c.status}${note}. Re-run with --force to drive it anyway.`);
@@ -141,30 +204,58 @@ function driveCommand(argv) {
     const why = forced.map((n) => FORCE_NEEDS[n]).join('; ');
     fail(`${feature}/${name} needs ${forced.join(' and ')} (${why}). Re-run with --force to drive it.`);
   }
+  if (c.needsArgs && extra.length === 0) {
+    fail(`${feature}/${name} needs arguments: ${c.usage}. Pass them after --.`);
+  }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
-  const args = [...(extra.length > 0 ? extra : c.args)];
+  // Arguments after -- replace the default options; the probe or journey name
+  // in the default args stays (drive.mjs and glass.mjs pick what to run by it).
+  const own = c.args.filter((a) => !a.startsWith('-') && !extra.includes(a));
+  const args = extra.length > 0 ? [...own, ...extra] : [...c.args];
   const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
+  const doctorFirst = c.needs.includes('stack');
+  // The probe drives the stack doctor checks, not the 8791 / 5273 defaults
+  // the probes fall back to.
+  const stack = doctorFirst ? readStack() : undefined;
+  if (stack !== undefined) {
+    for (const [key, port] of [
+      ['VERIFY_PORT', stack.serverPort],
+      ['VERIFY_WEB_PORT', stack.webPort],
+    ]) {
+      if (port === undefined) continue;
+      if (process.env[key] !== undefined && process.env[key] !== String(port)) {
+        fail(`${key}=${process.env[key]}, but the stack in ${RUN_DIR} runs on ${port}; unset ${key} or point VERIFY_RUN_DIR at that stack.`);
+      }
+      process.env[key] = String(port);
+    }
+  }
   // Every drive writes somewhere new unless told otherwise: several probes
   // default their evidence into docs/verify/<their ticket>/ or into scripts/,
   // which would rewrite committed evidence (pr-gate run 3 on #1411). A probe
-  // that writes fixed evidence by design gets no directory, and one that takes
-  // an output option gets the directory through it (pr-gate run 4).
-  const writes = c.evidence?.writes;
-  if (!process.env.VERIFY_EVIDENCE_DIR && writes === undefined) {
-    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-    process.env.VERIFY_EVIDENCE_DIR = join(EVIDENCE_ROOT, `${stamp}-${feature}-${name}`);
-  }
-  const flag = c.evidence?.flag;
-  if (flag !== undefined && process.env.VERIFY_EVIDENCE_DIR && !args.includes(flag)) {
-    args.push(flag, process.env.VERIFY_EVIDENCE_DIR);
-  }
-  const doctorFirst = c.needs.includes('stack');
+  // that writes fixed evidence by design gets no directory; one that takes an
+  // output option gets the directory through it, or uses the one given after --;
+  // one that reads another variable gets it there (pr-gate run 4, /code-review).
+  const evidence = c.evidence ?? {};
+  const flagAt = args.indexOf(evidence.flag);
+  const given = flagAt === -1 ? undefined : args[flagAt + 1];
+  const envName = evidence.env ?? 'VERIFY_EVIDENCE_DIR';
+  const named = process.env.VERIFY_EVIDENCE_DIR;
+  const planned =
+    given !== undefined || evidence.writes !== undefined
+      ? undefined
+      : (named ?? join(EVIDENCE_ROOT, `${localStamp()}-${feature}-${name}`));
+  // The probe's own output option carries the directory, in a dry run and a real one alike.
+  const withEvidence = (dir) => (evidence.flag === undefined || dir === undefined ? args : [...args, evidence.flag, dir]);
   if (dryRun) {
     console.log(`vp: dry-run ${feature}/${name}${doctorFirst ? ' (doctor first)' : ''}`);
     console.log(`    runner ${c.runner ?? 'node'}  cwd ${cwd}`);
-    console.log(`    script ${c.script}  args ${args.join(' ')}`.trimEnd());
-    if (writes !== undefined) console.log(`    writes its evidence itself: ${writes}`);
-    if (process.env.VERIFY_EVIDENCE_DIR) console.log(`    VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR}`);
+    console.log(`    script ${c.script}  args ${withEvidence(planned).join(' ')}`.trimEnd());
+    if (evidence.writes !== undefined) console.log(`    writes its evidence itself: ${evidence.writes}`);
+    if (given !== undefined) console.log(`    evidence ${given} (given with ${evidence.flag})`);
+    if (planned !== undefined) console.log(`    ${envName}=${planned}`);
+    for (const key of ['VERIFY_PORT', 'VERIFY_WEB_PORT']) {
+      if (stack !== undefined && process.env[key]) console.log(`    ${key}=${process.env[key]}`);
+    }
     console.log(`    VERIFY_RUN_DIR=${process.env.VERIFY_RUN_DIR ?? ''}`);
     return 0;
   }
@@ -175,21 +266,24 @@ function driveCommand(argv) {
     }
   }
   // After doctor: a failed doctor leaves no empty directory for --latest to pick.
-  if (writes !== undefined) {
-    console.log(`vp: ${feature}/${name} writes its evidence itself: ${writes}`);
+  let run = args;
+  if (evidence.writes !== undefined) {
+    console.log(`vp: ${feature}/${name} writes its evidence itself: ${evidence.writes}`);
+  } else if (given !== undefined) {
+    console.log(`vp: evidence ${given}`);
   } else {
-    mkdirSync(process.env.VERIFY_EVIDENCE_DIR, { recursive: true });
-    console.log(`vp: evidence ${process.env.VERIFY_EVIDENCE_DIR}`);
+    if (named !== undefined) mkdirSync(named, { recursive: true });
+    const dir = named ?? freshDir(planned);
+    process.env[envName] = dir;
+    run = withEvidence(dir);
+    console.log(`vp: evidence ${dir}`);
   }
-  const script = resolve(SCRIPT_ROOT, c.script);
-  if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
   // tsx is a dependency of apps/server, apps/daemon and integration, not of the
   // repo root, so a tsx case runs from the package its registry entry names.
-  const runner = c.runner === 'tsx' ? `(cd ${c.cwd ?? '.'} && pnpm exec tsx)` : 'node';
-  console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${args.join(' ')}`.trimEnd());
-  if (c.runner !== 'tsx') return runNode(script, args, cwd);
-  if (c.cwd === undefined) fail(`${feature}/${name} has runner tsx but no cwd in the registry`, 1);
-  const result = spawnSync('pnpm', ['exec', 'tsx', script, ...args], {
+  const runner = c.runner === 'tsx' ? `(cd ${c.cwd} && pnpm exec tsx)` : 'node';
+  console.log(`vp: ${feature}/${name} -> ${runner} ${c.script} ${run.join(' ')}`.trimEnd());
+  if (c.runner !== 'tsx') return runNode(script, run, cwd);
+  const result = spawnSync('pnpm', ['exec', 'tsx', script, ...run], {
     cwd,
     stdio: 'inherit',
     env: process.env,
@@ -204,38 +298,48 @@ async function captureCommand(argv) {
   const path = argv[0];
   if (path === undefined || !path.startsWith('/')) fail('usage: vp.mjs capture </app/route> [--name <label>] [--wait <ms>]');
   if (!/^[A-Za-z0-9-]+$/.test(label)) fail('--name must be letters, digits and dashes');
-  const portsFile = join(RUN_DIR, 'ports.json');
-  if (!existsSync(portsFile)) fail('vp: no stack coordinates, run `vp.mjs launch` first', 1);
-  const { webPort } = JSON.parse(readFileSync(portsFile, 'utf8'));
+  const stack = readStack();
+  if (stack === undefined) fail('vp: no stack coordinates, run `vp.mjs launch` first', 1);
+  const { webPort } = stack;
   const url = `http://127.0.0.1:${webPort}${path}`;
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  // Inside a drive's VERIFY_EVIDENCE_DIR, a subdirectory: the drive's result.json stays.
+  // Inside a drive's VERIFY_EVIDENCE_DIR, a subdirectory: the drive's result.json
+  // stays, and a second capture with the same label gets capture-<label>-2.
   const envDir = process.env.VERIFY_EVIDENCE_DIR;
-  const dir = envDir ? join(envDir, `capture-${label}`) : join(EVIDENCE_ROOT, `${stamp}-capture-${label}`);
-  mkdirSync(dir, { recursive: true });
+  const dir = freshDir(envDir ? join(envDir, `capture-${label}`) : join(EVIDENCE_ROOT, `${localStamp()}-capture-${label}`));
 
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, colorScheme: 'dark' });
   const consoleErrors = [];
   const failedRequests = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  page.on('requestfailed', (req) => failedRequests.push({ url: req.url(), error: req.failure()?.errorText ?? 'failed' }));
-  page.on('response', (res) => {
-    if (res.status() >= 400) failedRequests.push({ url: res.url(), status: res.status() });
-  });
   let navigation = 'ok';
+  let screenshot = `${label}.png`;
+  let title = '';
+  // Whatever fails (no browser, no page, no screenshot of an error page) is
+  // recorded in result.json, not thrown past it.
+  let browser;
   try {
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
-    await page.waitForTimeout(waitMs);
+    browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1440, height: 732 }, colorScheme: 'dark' });
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+    page.on('requestfailed', (req) => failedRequests.push({ url: req.url(), error: req.failure()?.errorText ?? 'failed' }));
+    page.on('response', (res) => {
+      if (res.status() >= 400) failedRequests.push({ url: res.url(), status: res.status() });
+    });
+    try {
+      await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
+      await page.waitForTimeout(waitMs);
+    } catch (err) {
+      navigation = firstLine(err);
+    }
+    await page.screenshot({ path: join(dir, screenshot) });
+    title = await page.title().catch(() => '');
   } catch (err) {
-    navigation = String(err.message ?? err).split('\n')[0];
+    // The first failure is the one to read: a navigation error stays as it was.
+    if (navigation === 'ok') navigation = firstLine(err);
+    screenshot = null;
+  } finally {
+    await browser?.close();
   }
-  const screenshot = `${label}.png`;
-  await page.screenshot({ path: join(dir, screenshot) });
-  const title = await page.title().catch(() => '');
-  await browser.close();
 
   const result = { url, title, navigation, screenshot, consoleErrors, failedRequests };
   writeFileSync(join(dir, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
@@ -312,7 +416,8 @@ function linksCommand(argv) {
   const sha = git(['rev-parse', shaOption ?? 'HEAD']);
   const onRemote = git(['branch', '-r', '--contains', sha]);
   if (onRemote === '') console.warn(`vp: ${sha} is not on any remote branch yet; push before using these links`);
-  const files = git(['ls-tree', '-r', '--name-only', sha, '--', `docs/verify/${ticket}`]).split('\n').filter(Boolean);
+  // -z: names come back verbatim (without it git quotes and escapes non-ASCII names).
+  const files = git(['ls-tree', '-r', '-z', '--name-only', sha, '--', `docs/verify/${ticket}`]).split('\0').filter(Boolean);
   if (files.length === 0) fail(`no files under docs/verify/${ticket} at ${sha}; archive, commit and push first`, 1);
   const slug = repoSlug();
   for (const file of files) {

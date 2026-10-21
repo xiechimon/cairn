@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option, {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the options in args while a positional probe or journey name in args stays; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without arguments after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -56,8 +56,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "Account page rename round-trips through PATCH /api/user/me to SQLite and persists; the push-notification switch works both ways under granted and denied permission states."
+          "status": "stale",
+          "purpose": "Account page rename round-trips through PATCH /api/user/me to SQLite and persists; the push-notification switch works both ways under granted and denied permission states.",
+          "note": "static check by /code-review on #1411: waits for .profile-hint, which apps/web/src no longer has (the profile-* classes were renamed)."
         }
       }
     },
@@ -137,6 +138,7 @@
         "clipboard-paste": {
           "script": ".claude/skills/verify-pacman/scripts/drive-paste.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack"
           ],
@@ -165,8 +167,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite."
+          "status": "stale",
+          "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite.",
+          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has."
         }
       }
     },
@@ -181,8 +184,9 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
-          "purpose": "Workbench shell layout screenshot (four columns since #351)."
+          "status": "stale",
+          "purpose": "Workbench shell layout screenshot (four columns since #351).",
+          "note": "static check by /code-review on #1411: waits for .board-topbar-title, which #1375 (Paper board top bar) removed; the same wait fails glass-journeys/board live."
         },
         "new-task": {
           "script": ".claude/skills/verify-pacman/scripts/drive.mjs",
@@ -244,6 +248,7 @@
         "sync-ui": {
           "script": ".claude/skills/verify-pacman/scripts/drive-branch-sync.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack",
             "daemon"
@@ -401,9 +406,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Live-only detail surfaces after removing overlays.css: create-agent warning, branch section machine pill/switch/stop confirm, AI review modal and its contrast, and retired selectors have no stylesheet rules.",
-          "usage": "env SEED951_JSON (seed-951-live.mjs), SEED_REVIEW_JSON (setup-review-seed.mjs), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; STUB_PORT=8919"
+          "usage": "env SEED951_JSON (seed-951-live.mjs), SEED_REVIEW_JSON (setup-review-seed.mjs), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; STUB_PORT=8919",
+          "note": "static check by /code-review on #1411: reads .ui-checkbox input, a class apps/web/src no longer has."
         },
         "machine-pin": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1208-machine-pin.mjs",
@@ -411,9 +417,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Dispatch honors a todo's machine pin, and the detail machine row shows a pinned-machine footnote when a build is reassigned to another machine.",
-          "usage": "optional --expect=old (origin/main baseline stack 8793/5275); env VERIFY_REPO_ROOT"
+          "usage": "optional --expect=old (origin/main baseline stack 8793/5275); env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "three-pane": {
           "script": ".claude/skills/verify-pacman/scripts/drive-detail-pane.mjs",
@@ -468,6 +475,7 @@
         "restart-with-feedback": {
           "script": ".claude/skills/verify-pacman/scripts/drive-failed-send.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack",
             "daemon"
@@ -699,6 +707,9 @@
           "status": "host-bound",
           "purpose": "On the mea host, creates an agent through the three-level cascade in the browser, then a real claude-code task edits the README.",
           "usage": "env MEA_WEB (default 127.0.0.1:5274), MEA_SERVER (default 127.0.0.1:8792)",
+          "evidence": {
+            "writes": "docs/verify/1259/"
+          },
           "note": "static spot-check by the #1402 inventory, not executed: runs only against a named remote host"
         }
       }
@@ -743,9 +754,10 @@
             "stack",
             "daemon"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Machine capability reporting, dispatch gate that leaves steps pending with a visible reason, agent machine-fit, and real daemon reporting",
-          "usage": "env VERIFY_REPO_ROOT; server launched with PACMAN_MCP_CONFIG fixture"
+          "usage": "env VERIFY_REPO_ROOT; server launched with PACMAN_MCP_CONFIG fixture",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         }
       }
     },
@@ -758,9 +770,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Per-agent maxConcurrentTasks gate: PATCH validation, claim blocked per agent pool across machines, freed slot handoff, null clears the limit",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "cap-and-queue": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1108-concurrency.mjs",
@@ -770,9 +783,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "With machine maxConcurrent=2, two turns run in parallel, the third queues visibly (turnQueue, drawer and machines page), takes over a freed slot, and PATCH validates bounds",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "recommended-concurrency": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1241-recommended-concurrency.mjs",
@@ -791,9 +805,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A killed machine's held claim long-poll never takes a newly queued step; the live machine claims it instead (fake machine wire, no daemon).",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         }
       }
     },
@@ -997,9 +1012,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "withPlan build writes plan.md to plan table, confirm card and right-pane doc show it for hosted and bare dir, negative leg fails.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "plan-first-round": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1025-plan-first-round.mjs",
@@ -1009,9 +1025,10 @@
             "daemon",
             "stub-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Plan.md contract is injected into first-round plan prompt (A leg) and missing plan triggers rewrite round then failed close (B leg).",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         }
       }
     },
@@ -1171,6 +1188,7 @@
         "verdict-extraction": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review-700.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack",
             "daemon",
@@ -1211,6 +1229,7 @@
         "review-launch": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack"
           ],
@@ -1226,6 +1245,7 @@
         "blocking-revision": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review-blocking.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack"
           ],
@@ -1236,6 +1256,7 @@
         "human-reject": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review-reject.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack"
           ],
@@ -1343,6 +1364,9 @@
           "status": "stale",
           "purpose": "A completed dispatch saves the injected skill set and a skill_injection_check row: yellow injected-unread with an open allowlist, red allowlist-closed with a closed one.",
           "usage": "env EVIDENCE_DIR (default /tmp/1186-after)",
+          "evidence": {
+            "env": "EVIDENCE_DIR"
+          },
           "note": "static spot-check by the #1402 inventory, not executed: Repo root is hardcoded to /workspace (reads /workspace/.claude/verify-run/ports.json) and ignores VERIFY_REPO_ROOT/VERIFY_RUN_DIR, so it does not run from a worktree lane as written."
         },
         "native-plugin": {
@@ -1352,9 +1376,10 @@
             "stack",
             "real-llm"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Team skills native plugin channel: wire phase uses a fake claude CLI to check --plugin-dir, the version gate and allowlist legs; behavior phase checks real-model Skill discovery with zero leftover files in the worktree.",
-          "usage": "phase argument wire|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, VERIFY_EVIDENCE_DIR, MODEL (default glm-5.3); daemon is spawned by the script itself"
+          "usage": "phase argument wire|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, VERIFY_EVIDENCE_DIR, MODEL (default glm-5.3); daemon is spawned by the script itself",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
         },
         "skill-read-facts": {
           "script": ".claude/skills/verify-pacman/scripts/drive-918-skill-facts.mjs",
@@ -1451,6 +1476,7 @@
         "stop-chain": {
           "script": ".claude/skills/verify-pacman/scripts/drive-stop.mjs",
           "args": [],
+          "needsArgs": true,
           "needs": [
             "stack",
             "daemon",
