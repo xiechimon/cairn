@@ -212,7 +212,8 @@ export async function githubCompareStatus(
   head: string,
 ): Promise<string | 'missing' | 'invalid' | null> {
   if (!FULL_SHA.test(base) || !FULL_SHA.test(head)) return 'invalid';
-  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}`;
+  // per_page=1：只要 status，不拉整页提交。
+  const url = `https://api.github.com/${repoPath(owner, repo)}/compare/${base}...${head}?per_page=1`;
   try {
     const res = await fetchImpl(url, {
       headers: {

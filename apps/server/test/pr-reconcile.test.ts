@@ -69,7 +69,12 @@
 //   ㊵ 最新的完成执行步没回报 checkpoint → 用最近一个有 checkpoint 的步核对
 //   ㊶ 磨绿候选因有步在飞被跳过时，check-runs 缓存行留着
 //   ㊷ 提示按轮去重：#931 返工复用同一 build 时，新一轮同样的情况再提示一次
-//   ㊸ compare 读不到 → 10 分钟内不重读，并提示一次
+//   ㊸ compare 读不到 → 10 分钟内不重读；连续两次读不到才提示一次
+// 第四遍 /code-review 补的：
+//   ㊹ 匿名额度轮着用：最久没读的 PR 先读，后面的卡不会永远轮不到
+//   ㊺ 合并步收尾（不经对账）也停掉没人领的 verify / review 步
+//   ㊻ 磨绿的匿名 check-runs 读同样记进进程级额度
+//   ㊼ compare 只取一页（per_page=1），不拉整份提交与补丁
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -165,7 +170,7 @@ class PullsMock {
     if (this.status304 && (init?.headers?.['if-none-match'] ?? '') === '"x"') {
       return Promise.resolve(res(304, '"x"', {}));
     }
-    const cmp = url.match(/\/compare\/([0-9a-f]+)\.\.\.([0-9a-f]+)$/);
+    const cmp = url.match(/\/compare\/([0-9a-f]+)\.\.\.([0-9a-f]+)(?:\?.*)?$/);
     if (cmp !== null) {
       this.onCompare?.();
       const spec = Object.values(this.pulls).find((p) => (p.headSha ?? 'f'.repeat(40)) === cmp[2]);
@@ -1231,6 +1236,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     });
     const poller = pollerFor(w, mock);
     await poller.sweep();
+    await poller.sweep(); // the hint is known now
     w.s.db
       .insert(stepTable)
       .values({
@@ -1246,18 +1252,67 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.systemRows().filter((c) => c.includes('「release-x」'))).toHaveLength(2);
   });
 
-  test('㊸ compare unreadable: not read again within ten minutes, one hint', async () => {
+  test('㊸ compare unreadable: not read again within ten minutes; a hint after the second failure', async () => {
     const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, compare: 502 } });
     const poller = pollerFor(w, mock);
     const t0 = Date.now();
     await poller.sweep(t0);
+    expect(w.systemRows().filter((c) => c.includes('compare'))).toHaveLength(0);
     await poller.sweep(t0 + 60_000);
     expect(mock.compareRequests()).toHaveLength(1);
     await poller.sweep(t0 + 600_001);
     expect(mock.compareRequests()).toHaveLength(2);
     expect(w.todoRow().phase).toBe('review');
     expect(w.systemRows().filter((c) => c.includes('compare'))).toHaveLength(1);
+  });
+
+  test('㊹ anonymous: the budget goes to the PR read longest ago, so every card gets its turn', async () => {
+    const w = makeWorld();
+    addReviewCard(w, 301);
+    addReviewCard(w, 302);
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'open', merged: false },
+      301: { state: 'open', merged: false },
+      302: { state: 'open', merged: false },
+    });
+    const poller = pollerFor(w, mock, { anonReadsPerHour: 2 });
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 3_600_001);
+    const read = new Set(mock.requests.map((u) => u.split('/').at(-1)));
+    expect(read).toEqual(new Set([String(w.prNumber), '301', '302']));
+  });
+
+  test('㊺ the merge step finishing the card stops unclaimed verify / review steps too', () => {
+    const w = makeWorld({ inflight: 'pending', inflightKind: 'review' });
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    expect(w.stepRows().filter((r) => r.kind === 'review')).toEqual([
+      { kind: 'review', status: 'stopped' },
+    ]);
+  });
+
+  test("㊻ anonymous: the grind's check-runs reads count against the same budget", async () => {
+    const w = makeWorld({ phase: 'building' });
+    addReviewCard(w, 401);
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'open', merged: false },
+      401: { state: 'closed', merged: true },
+    });
+    mock.checkRuns = true;
+    await pollerFor(w, mock, { anonReadsPerHour: 1 }).sweep();
+    expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
+    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(0);
+  });
+
+  test('㊼ compare asks for one page', async () => {
+    const w = makeWorld({ checkpoint: 'a'.repeat(40) });
+    const mock = new PullsMock({
+      [w.prNumber]: { state: 'closed', merged: true, compare: 'ahead' },
+    });
+    await pollerFor(w, mock).sweep();
+    expect(mock.compareRequests()[0]).toMatch(/\?per_page=1$/);
+    expect(w.todoRow().phase).toBe('done');
   });
 
   test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {

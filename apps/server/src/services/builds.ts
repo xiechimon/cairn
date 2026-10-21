@@ -71,7 +71,7 @@ import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
-import { toQuotaWait } from './quota-wait.js';
+import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
@@ -402,20 +402,6 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (cancelledRow) publishBuild(deps, cancelledRow);
-}
-
-/** 会话流 step 事件（步状态变了之后发给详情页）。 */
-function publishStepRow(deps: BuildDeps, row: typeof step.$inferSelect): void {
-  deps.convHub?.publishStep(row.buildId, {
-    id: row.id,
-    buildId: row.buildId,
-    kind: row.kind,
-    machineId: row.machineId,
-    createdAt: row.createdAt,
-    status: row.status,
-    checkpointCommit: row.checkpointCommit,
-    skillInjection: row.skillInjection ?? null,
-  });
 }
 
 /** #1403：PR 对账收尾（done / failed）时停掉本 build 还没人领的 verify /
@@ -1823,6 +1809,8 @@ export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string)
   // 相位已是 done 时 setTodoPhase 不动；完成行本轮只落一次（合并步与对账先后
   // 到达、或合并步在人手拖到已完成之后才完成，都只有一行）。
   setTodoPhase(deps, todoId, 'done');
+  // 卡已收尾：没人领的 verify / review 步之后不再在它上面跑（合并步与对账同一处）。
+  stopUnclaimedGateSteps(deps, buildId);
   if (!hasMessageRow(deps, buildId, 'system', DONE_ROW, roundStart(deps, buildId))) {
     insertMessageRow(deps, buildId, {
       id: newRecordId(),

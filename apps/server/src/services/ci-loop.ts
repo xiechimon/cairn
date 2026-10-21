@@ -248,7 +248,15 @@ export function createCiPoller(
   /** compare 结果（键 = PR + checkpoint + head；两个固定提交之间的结果不变，
    * 读到即可复用；404 例外：那个提交之后可能被推上去，过 CI_MISSING_COMPARE_
    * RECHECK_MS 再读）。 */
-  const compareCache = new Map<string, { status: string; at: number }>();
+  const compareCache = new Map<
+    string,
+    Map<string, { status: string; at: number; failures: number }>
+  >();
+  /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
+  const lastReadAt = new Map<string, number>();
+  const lastReadByBuild = new Map<string, number>();
+  /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
+  const knownRows = new Set<string>();
   /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
    * 别的缓存行。 */
   const liveKeys = new Set<string>();
@@ -257,6 +265,11 @@ export function createCiPoller(
   let sweeping = false;
   /** 对账最近一小时的匿名请求时刻（进程级额度）。 */
   const anonReads: number[] = [];
+
+  function recordAnonRead(now: number): void {
+    while (anonReads.length > 0 && (anonReads[0] ?? now) <= now - 3_600_000) anonReads.shift();
+    anonReads.push(now);
+  }
 
   /** 取一次匿名额度：一小时内已用满返回 false。 */
   function takeAnonRead(now: number): boolean {
@@ -290,9 +303,18 @@ export function createCiPoller(
     );
   }
 
+  /** 本轮（since 起）是否已有这一行；肯定结果记进 knownRows，之后不再查表。 */
+  function rowKnown(buildId: string, content: string, since: number): boolean {
+    const memo = `${buildId}\u0000${since}\u0000${content}`;
+    if (knownRows.has(memo)) return true;
+    if (!hasMessageRow(deps, buildId, 'system', content, since)) return false;
+    knownRows.add(memo);
+    return true;
+  }
+
   /** 本轮（since 起）是否已报告过这个结局（完成行 / 对账的关闭行）。 */
   function settled(buildId: string, merged: boolean, closedText: string, since: number): boolean {
-    return hasMessageRow(deps, buildId, 'system', merged ? DONE_ROW : closedText, since);
+    return rowKnown(buildId, merged ? DONE_ROW : closedText, since);
   }
 
   /** 失败收尾：build.errorMessage 落因 + 发 build 文档 + todo → failed。 */
@@ -309,7 +331,7 @@ export function createCiPoller(
 
   /** 同一条提示只落一次（内容带提交 SHA）。 */
   function hintOnce(buildId: string, content: string, since: number, tally: CiPollTally): void {
-    if (hasMessageRow(deps, buildId, 'system', content, since)) return;
+    if (rowKnown(buildId, content, since)) return;
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
       role: 'system',
@@ -393,6 +415,8 @@ export function createCiPoller(
       }
       anonReadAt.set(key, now);
     }
+    lastReadAt.set(key, now);
+    lastReadByBuild.set(cand.buildId, now);
     const entry = pullCache.get(key) ?? null;
     const page = await githubPull(run.githubFetch, token, target.owner, target.repo, prNumber, {
       etag: entry?.etag ?? null,
@@ -454,8 +478,10 @@ export function createCiPoller(
         return;
       }
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
-        const cmpKey = `${key}:${checkpoint}...${pull.headSha}`;
-        const cached = compareCache.get(cmpKey);
+        const pairs = compareCache.get(key) ?? new Map();
+        compareCache.set(key, pairs);
+        const cmpKey = `${checkpoint}...${pull.headSha}`;
+        const cached = pairs.get(cmpKey);
         let status =
           cached === undefined ||
           ((cached.status === 'missing' || cached.status === 'unreadable') &&
@@ -476,11 +502,16 @@ export function createCiPoller(
               checkpoint,
               pull.headSha,
             )) ?? 'unreadable';
-          compareCache.set(cmpKey, { status, at: now });
+          const failures = status === 'unreadable' ? (cached?.failures ?? 0) + 1 : 0;
+          pairs.set(cmpKey, { status, at: now, failures });
         }
         if (status === 'unreadable') {
-          // 读不到（GitHub 出错、超时、限流）：10 分钟内不重读，提示一次。
-          if (freshReviewRow(cand.todoId, cand.buildId) !== null) {
+          // 读不到（GitHub 出错、超时、限流）：10 分钟内不重读；连续两次读不到
+          // 才提示一次（一次超时之后下一次就读到的常见情形不留陈旧提示）。
+          if (
+            (pairs.get(cmpKey)?.failures ?? 0) >= 2 &&
+            freshReviewRow(cand.todoId, cand.buildId) !== null
+          ) {
             hintOnce(
               cand.buildId,
               `PR #${prNumber} 已在 GitHub 合并，但暂时读不到 compare（GitHub 出错、超时或限流），无法确认分支提交 ${checkpoint.slice(0, 7)} 在这次合并里；稍后重试。`,
@@ -525,7 +556,6 @@ export function createCiPoller(
         content: `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
         createdAt: nowMs(),
       });
-      stopUnclaimedGateSteps(deps, cand.buildId);
       finishTodoDone(deps, cand.todoId, cand.buildId);
       tally.merged += 1;
       return;
@@ -568,9 +598,12 @@ export function createCiPoller(
     }
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
+    const grindToken = tokenFor(target.teamId);
+    // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
+    if (grindToken === null) recordAnonRead(now);
     const page = await githubCommitCheckRuns(
       run.githubFetch,
-      tokenFor(target.teamId),
+      grindToken,
       target.owner,
       target.repo,
       conversationBranch(cand.buildId),
@@ -697,6 +730,10 @@ export function createCiPoller(
       }
     }
     liveKeys.clear();
+    // 最久没读的先读：匿名额度不够全读时，后面的卡也轮得到。
+    reviewCandidates.sort(
+      (a, b) => (lastReadByBuild.get(a.buildId) ?? 0) - (lastReadByBuild.get(b.buildId) ?? 0),
+    );
     for (const cand of reviewCandidates) {
       try {
         await reconcileOne(cand, now, tally);
@@ -712,9 +749,12 @@ export function createCiPoller(
     for (const k of cache.keys()) if (!grindKeys.has(k)) cache.delete(k);
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
     for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
-    for (const k of compareCache.keys()) {
-      if (!liveKeys.has(k.slice(0, k.indexOf(':')))) compareCache.delete(k);
-    }
+    for (const k of compareCache.keys()) if (!liveKeys.has(k)) compareCache.delete(k);
+    for (const k of lastReadAt.keys()) if (!liveKeys.has(k)) lastReadAt.delete(k);
+    const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
+    for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);
+    for (const k of knownRows)
+      if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
     run.logger?.info(tally, 'ci pr-checks sweep');
   }
 
