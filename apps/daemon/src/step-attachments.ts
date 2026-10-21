@@ -12,13 +12,18 @@
 // 保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过（票面失败方式
 // 3/10）。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
 // 在解析前已落 transcript）——web 渲染面的 chip 形态不因展开而丢。
+// #1406 issue 原文围栏：GitHub issue 导入任务的标题与 spec 逐行带引用前缀进
+// 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行补回同一
+// 前缀，留在围栏里；围栏外的引用 token 行不认（web 不给它渲染 chip）。
 
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import type { DeliveredImage, MachineAttachmentResponse } from '@pacman/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
+  ISSUE_FENCE_QUOTE,
   isImageAttachmentExt,
+  issueFenceQuotedLines,
   parseAttachmentTokenLines,
 } from '@pacman/shared';
 
@@ -143,17 +148,34 @@ type Outcome =
   | { kind: 'unavailable'; note: string }
   | { kind: 'untouched' };
 
+/** 整行 token 形态的行：body = token 本身，prefix = 它前面的围栏引用前缀
+ * （裸整行 token 为空串）。 */
+interface TokenLine {
+  prefix: string;
+  body: string;
+}
+
+/** 逐行认 token 形态（整行形状命中，含 key 语法复验不过的行——它们也要可见地
+ * 失败，而不是无声当普通文本）；非 token 行为 null。 */
+function tokenLinesOf(lines: readonly string[]): (TokenLine | null)[] {
+  const quoted = issueFenceQuotedLines(lines);
+  return lines.map((line, i) => {
+    if (ATTACHMENT_TOKEN_LINE.test(line)) return { prefix: '', body: line };
+    const body = quoted[i] ?? null;
+    return body !== null && ATTACHMENT_TOKEN_LINE.test(body)
+      ? { prefix: ISSUE_FENCE_QUOTE, body }
+      : null;
+  });
+}
+
 /** 解析 + 下载 + 分路（纯文本管线——逐 token 求结果后按行重建文本）。 */
 export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<ResolvedStepImages> {
-  // token 形态行全集（整行形状命中）：含 key 语法复验不过的行——它们也要
-  // 可见地失败（注记），而不是无声当普通文本。
-  const tokenLines = new Set<string>();
-  for (const line of opts.text.split('\n')) {
-    if (ATTACHMENT_TOKEN_LINE.test(line)) tokenLines.add(line);
-  }
-  const refs = parseAttachmentTokenLines(opts.text);
+  const lines = opts.text.split('\n');
+  const tokens = tokenLinesOf(lines);
+  const bodies = tokens.flatMap((t) => (t === null ? [] : [t.body]));
   const images: DeliveredImage[] = [];
-  if (tokenLines.size === 0) return { text: opts.text, images };
+  if (bodies.length === 0) return { text: opts.text, images };
+  const refs = parseAttachmentTokenLines(bodies.join('\n'));
   // 逐 token 处置（串行：同步下载窗口不放大并发；10MiB cap = 单件内存上界，
   // 串行即同刻至多一件在途——票面失败方式 8 的内存预算答案）。
   const outcomes = new Map<string, Outcome>();
@@ -163,29 +185,34 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
     if (outcome.kind === 'inline') images.push(outcome.image);
   }
   // 重建文本：token 形态行按处置改写（key 语法外 = 不可用注记，零下载——
-  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。
+  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。改写行与注记行的每一行
+  // 都带上原行的前缀（报错原文可能带换行），围栏里的产物不出围栏。
   const outLines: string[] = [];
-  for (const line of opts.text.split('\n')) {
-    if (!tokenLines.has(line)) {
+  for (const [i, line] of lines.entries()) {
+    const token = tokens[i] ?? null;
+    if (token === null) {
       outLines.push(line);
       continue;
     }
-    const outcome = outcomes.get(line);
+    const emit = (text: string): void => {
+      for (const part of text.split('\n')) outLines.push(`${token.prefix}${part}`);
+    };
+    const outcome = outcomes.get(token.body);
     if (outcome === undefined) {
       outLines.push(line);
-      outLines.push('[图片附件形态不合法（key 语法外）——该图片未交付]');
+      emit('[图片附件形态不合法（key 语法外）——该图片未交付]');
       opts.log(`attachment token rejected (key grammar): ${line}`);
       continue;
     }
     if (outcome.kind === 'inline') {
-      outLines.push(outcome.anchor);
+      emit(outcome.anchor);
     } else if (outcome.kind === 'untouched') {
       outLines.push(line);
     } else if (outcome.kind === 'materialized') {
-      outLines.push(outcome.note); // token 行替换为路径提示行（路径即锚）
+      emit(outcome.note); // token 行替换为路径提示行（路径即锚）
     } else {
       outLines.push(line); // 不可用：token 原样保留（票面失败方式 3 裁定）
-      outLines.push(outcome.note);
+      emit(outcome.note);
     }
   }
   return { text: outLines.join('\n'), images };
