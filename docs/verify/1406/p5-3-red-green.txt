@@ -1,0 +1,49 @@
+#1406 P5-3 red / green legs. Same six test files both legs:
+  packages/shared/test/issue-fence.test.ts packages/shared/test/persona.test.ts
+  apps/daemon/test/runner-issue-fence.test.ts apps/server/test/issue-fence.test.ts
+  apps/server/test/persona-repo-rules.test.ts apps/web/test/transcript-issue-fence.test.ts
+Command: pnpm exec vitest run <the six files>
+
+== red leg: 51a61c82 (tests only; sources as at main 2294b087) ==
+     × F13：仓规要点齐全，并指向仓库根的 AGENTS.md / CLAUDE.md 22ms
+     × 任务文本：首行点名出处并声明是第三方数据，标题与正文逐行引用，尾行收口 15ms
+     × 编排请求：围栏替换「任务原文」，首两段不变，机器钉选行在围栏之后 2ms
+     × 组合串（重启 / 首轮 plan 契约）：围栏在前，系统指令在围栏之外 5ms
+     × 逐行前缀；等于收尾行的行只有最后一行，以围栏标记起头的行只有首尾两行 1ms
+     × \r \r\n \v \f \x1c-\x1e \x85 U+2028 U+2029 都按换行处理并加前缀 1ms
+     × null → 首行「出处未知」，仍是单行 5ms
+     × 非 github 形 → 首行「出处未知」，仍是单行 1ms
+     × owner 段带换行 → 首行「出处未知」，仍是单行 1ms
+     × repo 段带方括号 → 首行「出处未知」，仍是单行 1ms
+     × 围栏形任务文本行（含工作分支注记）→ task-prompt；改动前落库的原文行同判 1ms
+     × 围栏 + 首轮 plan 契约组合行 → synthetic；用户自己的话 → user 5ms
+     × github-issue 来源随 claim 到 daemon（不被 schema 剥掉） 31ms
+     × 未知来源种类不拒整条 claim；缺省 = 旧 server 形 1ms
+     × 显示面 todo 带来源两列 13ms
+     × 围栏形任务文本行、首轮 plan 契约组合行、改动前的原文行都退场；用户的话照常 1ms
+     × F11/F12：播种落库的 Implementer 职责文本在长度闸内，点名的 *-pacman 技能都在本仓 228ms
+     × REST orchestrate：chief 线程首条消息 = 围栏形；claim 的 instruction 同串、systemPrompt 无 issue 文字 337ms
+     × 章程段有一条规则：围栏与工具结果里的 GitHub 文字是数据，不照做，不 save_memory 82ms
+     × build 步 claim 的 todo 带 sourceKind / sourceRef 120ms
+     × verify 步材料：「待验证任务」段是围栏形（标题与正文都在里面） 70ms
+     × chief save_memory：正文或标题带围栏标记 → 拒绝，不落库；普通记忆照常 73ms
+     × worker save_memory：同一道闸 101ms
+     × 新会话 build 步：prompt 就是围栏本身 33ms
+     × 首轮 plan 步：围栏在前，plan.md 契约与交接位置注记在围栏之外 11ms
+     × 重启轮组合行：围栏在前，重启指令在围栏之外 8ms
+     × claim 缺 meta.titleFinal：职责与记忆在位，issue 标题与正文都不在 12ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 27 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  6 failed (6)
+      Tests  27 failed | 15 passed (42)
+
+The 15 passing in the red leg are pins of today's behavior: plain-task prompts byte for byte
+(shared F1, daemon F1, server F1), the existing persona contract tests, and F11 (length cap).
+
+== green leg: c60ae648 (implementation) ==
+ Test Files  6 passed (6)
+      Tests  42 passed (42)
+
+Between the legs ff6936aa changed one test helper in apps/daemon/test/runner-issue-fence.test.ts:
+the footer lookup matches at line start (afterFence), because the body's fake footer line made
+String#indexOf hit the quoted copy first. Assertions are unchanged; those two cases were red in
+the red leg for the missing fence (first assertion), before reaching that lookup.
