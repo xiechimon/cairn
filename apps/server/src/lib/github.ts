@@ -180,13 +180,7 @@ function mapUpstreamStatus(
     // 私仓无 auth 与不存在同形（GitHub 防探测语义），不区分。
     return new HttpError(404, `github repo not found (or private without auth): ${url}`);
   }
-  if (
-    res.status === 429 ||
-    (res.status === 403 &&
-      (res.headers.get('x-ratelimit-remaining') === '0' ||
-        // 二级限流（abuse/secondary）：403 无 remaining 头、带 retry-after。
-        res.headers.get('retry-after') !== null))
-  ) {
+  if (isRateLimited(res)) {
     return new HttpError(
       429,
       'github api rate limit exceeded (unauthenticated 60 req/h per IP); retry later',
@@ -196,6 +190,46 @@ function mapUpstreamStatus(
     return new HttpError(502, `github repo is empty (no commits): ${url}`);
   }
   return new HttpError(502, `github api ${res.status}: ${url}`);
+}
+
+/** 限流判定（按响应头）：429，或 403 带 remaining=0 / retry-after。 */
+function isRateLimited(res: { status: number; headers: { get(n: string): string | null } }) {
+  return (
+    res.status === 429 ||
+    (res.status === 403 &&
+      (res.headers.get('x-ratelimit-remaining') === '0' ||
+        // 二级限流（abuse/secondary）：403 无 remaining 头、带 retry-after。
+        res.headers.get('retry-after') !== null))
+  );
+}
+
+/** 限流应答：isRateLimited 的头判据之外，403 没带限流头时再看一眼应答文本——
+ * 二级限流可以不带 retry-after（上游文档「Exceeding the rate limit」：403 或
+ * 429 + 说明超了二级限流的 message）。 */
+async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
+  if (isRateLimited(res)) return true;
+  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));
+}
+
+/** 进料读遇到限流（#1406：429，或带限流信号的 403）：调用方本轮停读——同一
+ * token 再发读只会再被拒。resetAt = x-ratelimit-reset（UTC 秒）换成的毫秒；
+ * retryAfterSeconds = retry-after 头；缺省或不是数 = null。 */
+export class GithubRateLimitedError extends Error {
+  constructor(
+    url: string,
+    readonly status: number,
+    readonly resetAt: number | null,
+    readonly retryAfterSeconds: number | null,
+  ) {
+    super(`github api rate limited (${status}): ${url}`);
+    this.name = 'GithubRateLimitedError';
+  }
+
+  /** 限流解除的时刻：reset 头优先，否则 now + retry-after；都没有 = null。 */
+  retryAt(now: number): number | null {
+    if (this.resetAt !== null) return this.resetAt;
+    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;
+  }
 }
 
 /** 认证面仓库条目（GitHub `GET /user/repos` 元素最小投影；camelCase =
@@ -394,6 +428,236 @@ export async function githubRepoIssue(
   };
 }
 
+// —— 工具读面（#1406 P5a-2：chief / MCP 的 issues / pull_requests /
+// workflow_runs，只读）——————————————————————————————————————————————————
+//
+// - GET repos/{o}/{r}/issues?state=&page=&per_page=（PR 条目经 projectIssue 滤除）
+// - GET repos/{o}/{r}/pulls?state=&page=&per_page=
+// - GET repos/{o}/{r}/actions/runs?branch=&status=&exclude_pull_requests=true
+//   &page=&per_page=
+// 失败不抛：返回分类（超时 / 网络 / 限流 / 状态码 / 形坏），由调用方
+// （services/github-reads.ts）写成给模型看的短原因——不带 URL、不带 token。
+// 超时由调用方给（低于 daemon relay 的工具超时）。原始字符串在这里只做投影，
+// 去控制字符与限长归调用方（那是模型面的规矩）。
+
+export type GithubListFailure =
+  | { kind: 'timeout' }
+  | { kind: 'network' }
+  | { kind: 'rate-limited'; status: number }
+  | { kind: 'status'; status: number }
+  | { kind: 'malformed' };
+
+export type GithubListResult<T> =
+  | { ok: true; items: T[]; hasMore: boolean }
+  | { ok: false; failure: GithubListFailure };
+
+export interface GithubIssueListEntry extends GithubIssueSummary {
+  /** user.login；账号已删（user 为 null）→ null。 */
+  author: string | null;
+  authorAssociation: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface GithubPullListEntry {
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  draft: boolean;
+  mergedAt: string | null;
+  headRef: string | null;
+  baseRef: string | null;
+  author: string | null;
+}
+
+export interface GithubWorkflowRunEntry {
+  id: number;
+  name: string | null;
+  headBranch: string | null;
+  headSha: string | null;
+  status: string | null;
+  conclusion: string | null;
+  event: string | null;
+  createdAt: string | null;
+}
+
+function isAbort(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null)?.name;
+  return name === 'TimeoutError' || name === 'AbortError';
+}
+
+/** 单页 GET：成功给 JSON 体与 hasMore（Link rel="next"）；失败给分类（限流按
+ * isRateLimitedResponse 判）。 */
+async function getListPage(
+  fetchImpl: FetchLike,
+  url: string,
+  token: string,
+  timeoutMs: number,
+): Promise<
+  { ok: true; data: unknown; hasMore: boolean } | { ok: false; failure: GithubListFailure }
+> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      headers: authHeaders(token),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'network' } };
+  }
+  if (!res.ok) {
+    return {
+      ok: false,
+      failure: (await isRateLimitedResponse(res))
+        ? { kind: 'rate-limited', status: res.status }
+        : { kind: 'status', status: res.status },
+    };
+  }
+  let data: unknown;
+  try {
+    data = await res.json();
+  } catch (err) {
+    return { ok: false, failure: { kind: isAbort(err) ? 'timeout' : 'malformed' } };
+  }
+  return { ok: true, data, hasMore: (res.headers.get('link') ?? '').includes('rel="next"') };
+}
+
+function optString(value: unknown): string | null {
+  return typeof value === 'string' ? value : null;
+}
+
+function loginOf(user: unknown): string | null {
+  return optString((user as { login?: unknown } | null | undefined)?.login);
+}
+
+/** 列表读 URL：值为 undefined 的查询参数不带。 */
+function listUrl(
+  owner: string,
+  repo: string,
+  path: string,
+  params: Record<string, string | number | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) query.set(key, String(value));
+  }
+  return `https://api.github.com/${repoPath(owner, repo)}/${path}?${query}`;
+}
+
+/** 数组体逐条投影：体不是数组 = 形坏；条目投影为 null 的跳过。 */
+function projectArray<T>(
+  page: Awaited<ReturnType<typeof getListPage>>,
+  project: (raw: Record<string, unknown>) => T | null,
+  container?: string,
+): GithubListResult<T> {
+  if (!page.ok) return page;
+  let entries: unknown = page.data;
+  if (container !== undefined) {
+    entries =
+      typeof entries === 'object' && entries !== null && !Array.isArray(entries)
+        ? (entries as Record<string, unknown>)[container]
+        : undefined;
+  }
+  if (!Array.isArray(entries)) return { ok: false, failure: { kind: 'malformed' } };
+  const items: T[] = [];
+  for (const raw of entries as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const projected = project(raw as Record<string, unknown>);
+    if (projected !== null) items.push(projected);
+  }
+  return { ok: true, items, hasMore: page.hasMore };
+}
+
+/** 仓库 issue 列表一页（工具读面）。 */
+export async function githubListIssues(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { state: 'open' | 'closed' | 'all'; page: number; perPage: number; timeoutMs: number },
+): Promise<GithubListResult<GithubIssueListEntry>> {
+  const url = listUrl(owner, repo, 'issues', {
+    state: opts.state,
+    page: opts.page,
+    per_page: opts.perPage,
+  });
+  return projectArray(await getListPage(fetchImpl, url, token, opts.timeoutMs), (raw) => {
+    const issue = projectIssue(raw);
+    if (issue === null) return null;
+    return {
+      ...issue,
+      author: loginOf(raw.user),
+      authorAssociation: optString(raw.author_association),
+      createdAt: optString(raw.created_at),
+      updatedAt: optString(raw.updated_at),
+    };
+  });
+}
+
+/** 仓库 PR 列表一页（工具读面）。 */
+export async function githubListPulls(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { state: 'open' | 'closed' | 'all'; page: number; perPage: number; timeoutMs: number },
+): Promise<GithubListResult<GithubPullListEntry>> {
+  const url = listUrl(owner, repo, 'pulls', {
+    state: opts.state,
+    page: opts.page,
+    per_page: opts.perPage,
+  });
+  return projectArray(await getListPage(fetchImpl, url, token, opts.timeoutMs), (raw) => {
+    if (typeof raw.number !== 'number' || typeof raw.title !== 'string') return null;
+    if (raw.state !== 'open' && raw.state !== 'closed') return null;
+    return {
+      number: raw.number,
+      title: raw.title,
+      state: raw.state,
+      draft: raw.draft === true,
+      mergedAt: optString(raw.merged_at),
+      headRef: optString((raw.head as { ref?: unknown } | null | undefined)?.ref),
+      baseRef: optString((raw.base as { ref?: unknown } | null | undefined)?.ref),
+      author: loginOf(raw.user),
+    };
+  });
+}
+
+/** 仓库 workflow runs 一页（工具读面）。exclude_pull_requests=true：每条 run
+ * 的 pull_requests 数组置空，本面不用它，应答小一截。 */
+export async function githubListWorkflowRuns(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { branch?: string; status?: string; page: number; perPage: number; timeoutMs: number },
+): Promise<GithubListResult<GithubWorkflowRunEntry>> {
+  const url = listUrl(owner, repo, 'actions/runs', {
+    branch: opts.branch,
+    status: opts.status,
+    exclude_pull_requests: 'true',
+    page: opts.page,
+    per_page: opts.perPage,
+  });
+  return projectArray(
+    await getListPage(fetchImpl, url, token, opts.timeoutMs),
+    (raw) => {
+      if (typeof raw.id !== 'number') return null;
+      return {
+        id: raw.id,
+        name: optString(raw.name),
+        headBranch: optString(raw.head_branch),
+        headSha: optString(raw.head_sha),
+        status: optString(raw.status),
+        conclusion: optString(raw.conclusion),
+        event: optString(raw.event),
+        createdAt: optString(raw.created_at),
+      };
+    },
+    'workflow_runs',
+  );
+}
+
 /** 仓库 label 集（`GET /repos/{o}/{r}/labels`，单页 LABELS_PER_PAGE
  * [设计]）。应答非数组 → 502；畸形条目跳过。 */
 export async function githubRepoLabels(
@@ -413,8 +677,9 @@ export async function githubRepoLabels(
 // —— issue 进料读面（#1406 P5a-1：issue 轮询器的出站读，只读）——————————————
 //
 // 四个读，全部 fail-open 返回 null（网络 / 超时 / 非 2xx / 形坏不区分：读不到
-// = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；token 必携、只进
-// Authorization 头（进料面不走匿名梯）：
+// = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；限流例外：429 或带限流
+// 信号的 403 抛 GithubRateLimitedError，进料本队本轮停读（同一 token 再读只会
+// 再被拒）。token 必携、只进 Authorization 头（进料面不走匿名梯）：
 // - GET repos/{o}/{r}/issues?state=open&labels=&sort=created&direction=asc
 //   &per_page=100（条件读；PR 条目经 projectIssue 滤除；下一页按 Link
 //   rel="next" 的 URL 读，只跟 api.github.com 上的 URL）
@@ -437,7 +702,8 @@ export type GithubConditionalRead<T> =
 const INTAKE_PER_PAGE = 100;
 
 /** 单次 GET（token 必携，etag 可选）。null = 网络 / 超时 / 2xx 体不是 JSON；
- * 非 2xx 回 status 不带 data（调用方按状态码定语义）。 */
+ * 限流抛 GithubRateLimitedError；其余非 2xx 回 status 不带 data（调用方按状态码
+ * 定语义）。 */
 async function intakeGet(
   fetchImpl: FetchLike,
   url: string,
@@ -454,7 +720,19 @@ async function intakeGet(
     return null;
   }
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
-  if (!res.ok) return { ...head, data: undefined };
+  if (!res.ok) {
+    if (await isRateLimitedResponse(res)) {
+      const reset = Number(res.headers.get('x-ratelimit-reset') ?? Number.NaN);
+      const retryAfter = Number(res.headers.get('retry-after') ?? Number.NaN);
+      throw new GithubRateLimitedError(
+        url,
+        res.status,
+        Number.isFinite(reset) ? reset * 1000 : null,
+        Number.isFinite(retryAfter) ? retryAfter : null,
+      );
+    }
+    return { ...head, data: undefined };
+  }
   try {
     return { ...head, data: await res.json() };
   } catch {
@@ -541,7 +819,8 @@ export interface GithubIssueEvent {
   actor: string | null;
   /** performed_via_github_app.slug：经 GitHub App 操作 → app 的 slug（用户
    * 授权的 app 令牌下 actor 是授权的人；app 安装令牌下 actor 是
-   * `<slug>[bot]`）；不经 app、或缺 slug → null。只供审计，不进判据。 */
+   * `<slug>[bot]`）；经 app 却缺 slug（上游 integration 形里 slug 非必有）→
+   * 'unknown'；不经 app → null。进料 D5 不认经 app 打的标。 */
   viaApp: string | null;
   /** created_at 的毫秒值。 */
   at: number;
@@ -596,7 +875,12 @@ export async function githubIssueEvents(
       event,
       label: event === 'closed' ? null : labelName,
       actor: typeof actor?.login === 'string' ? actor.login : null,
-      viaApp: typeof app?.slug === 'string' ? app.slug : null,
+      viaApp:
+        typeof app !== 'object' || app === null
+          ? null
+          : typeof app.slug === 'string'
+            ? app.slug
+            : 'unknown',
       at,
     });
   }
@@ -624,8 +908,8 @@ export interface GithubRepoPermission {
 }
 
 /** 用户在仓库上的权限读。404（非协作者，或 token 看不到该仓）投影为
- * permission 'none'——明确的否定答案；其余失败（网络 / 超时 / 限流 / 5xx /
- * 形坏）= null（未知）。 */
+ * permission 'none'——明确的否定答案；限流抛 GithubRateLimitedError；其余失败
+ * （网络 / 超时 / 5xx / 形坏）= null（未知）。 */
 export async function githubCollaboratorPermission(
   fetchImpl: FetchLike,
   token: string,

@@ -796,4 +796,33 @@ describe('#1406 并发导入占位', () => {
     expect(issueTodos()).toHaveLength(1);
     s.dispose();
   });
+
+  test('引用大小写不同也是同一条 issue：已有 github:Octo/Alpha#7 的卡 → 列表滤除 7、直接导入 409', async () => {
+    const mock = ghMock(defaultRoutes());
+    const { s, row, deps } = await importWorld(mock.impl);
+    s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-case-7',
+        teamId: s.team.id,
+        projectId: row.id,
+        title: 'issue 7 under another case',
+        spec: '',
+        phase: 'todo',
+        phaseAt: Date.now(),
+        seqNum: 900,
+        sourceKind: 'github-issue',
+        sourceRef: 'github:Octo/Alpha#7',
+      })
+      .run();
+    const list = await call(s.app, 'GET', `/api/projects/${row.id}/github/issues`);
+    expect(list.status).toBe(200);
+    const face = (await list.json()) as { issues: Array<{ number: number }> };
+    expect(face.issues.map((i) => i.number)).toEqual([9]);
+    await expect(importGithubIssue(deps, row, 7)).rejects.toMatchObject({ status: 409 });
+    expect(
+      s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all(),
+    ).toHaveLength(1);
+    s.dispose();
+  });
 });

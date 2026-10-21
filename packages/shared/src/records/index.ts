@@ -40,6 +40,8 @@ export * from './machine.js';
 export * from './machine-capabilities.js';
 export * from './mcp-server.js';
 export * from './memory.js';
+// #1404：合并就绪闸词表（摘要、D4 路径类别、策略、status context）。
+export * from './merge-gate.js';
 export * from './message.js';
 export * from './model-source.js';
 export * from './notification.js';

@@ -1,0 +1,131 @@
+# #1404 S1 mutations, round 5 (pr-gate run 3 on #1420): the patchSha rule, the null-for-no-patch rule, the comment
+# blanking, the linear parser and each pin, undone alone; then the three S1 test files
+# (pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts), source restored after each
+# (git diff identical before and after the whole run, checked by the runner). Sources: round 5 code, 99 tests.
+# Every mutation turns at least one test red. Definitions ([name, file, text replaced, replacement, replace-all]) and
+# the failing tests per mutation are below the table.
+
+digest: tuple without patchSha                   5 failed | 94 passed (99)
+parse: no patch hashed as empty text             2 failed | 97 passed (99)
+digest: null patchSha as empty string            1 failed | 98 passed (99)
+digest: prefix back to pd1                       8 failed | 91 passed (99)
+shared: schema keeps hasPatch                    1 failed | 98 passed (99)
+link: comment deleted, not blanked               1 failed | 98 passed (99)
+link: greedy comment (last -->)                  1 failed | 98 passed (99)
+link: old trailing-punct regex                   1 failed | 98 passed (99)
+link: old lazy comment regex                     1 failed | 98 passed (99)
+D4: SAFE_PATH allows a space                     1 failed | 98 passed (99)
+D4: gateSource takes every protected path        1 failed | 98 passed (99)
+digest: count-mismatch only when fewer           1 failed | 98 passed (99)
+parse: any status string                         1 failed | 98 passed (99)
+parse: filename not checked as string            1 failed | 98 passed (99)
+
+git diff identical before and after the run: true
+
+definitions:
+["digest: tuple without patchSha", "apps/server/src/services/merge-gate/digest.ts", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha, f.patchSha])", "JSON.stringify([f.status, f.filename, f.previousFilename, f.sha])"]
+["parse: no patch hashed as empty text", "apps/server/src/services/merge-gate/digest.ts", "        typeof f.patch === 'string' && f.patch !== ''\n          ? createHash('sha256').update(f.patch, 'utf8').digest('hex')\n          : null,", "        typeof f.patch === 'string' && f.patch !== ''\n          ? createHash('sha256').update(f.patch, 'utf8').digest('hex')\n          : createHash('sha256').update('', 'utf8').digest('hex'),"]
+["digest: null patchSha as empty string", "apps/server/src/services/merge-gate/digest.ts", "f.sha, f.patchSha])", "f.sha, f.patchSha ?? ''])"]
+["digest: prefix back to pd1", "packages/shared/src/records/merge-gate.ts", "export const PATCH_DIGEST_VERSION = 'pd2';", "export const PATCH_DIGEST_VERSION = 'pd1';"]
+["shared: schema keeps hasPatch", "packages/shared/src/records/merge-gate.ts", "  patchSha: z\n    .string()\n    .regex(/^[0-9a-f]{64}$/)\n    .nullable(),", "  hasPatch: z.boolean(),"]
+["link: comment deleted, not blanked", "apps/server/src/services/merge-gate/evidence-link.ts", "parts.join(' ')", "parts.join('')", true]
+["link: greedy comment (last -->)", "apps/server/src/services/merge-gate/evidence-link.ts", "body.indexOf('-->', open + 4)", "body.lastIndexOf('-->')"]
+["link: old trailing-punct regex", "apps/server/src/services/merge-gate/evidence-link.ts", "  let end = url.length;\n  while (end > 0 && TRAILING_PUNCT.includes(url.charAt(end - 1))) end -= 1;\n  return url.slice(0, end);", "  return url.replace(/[.,;:!?*_~]+$/, '');"]
+["link: old lazy comment regex", "apps/server/src/services/merge-gate/evidence-link.ts", "  const parts: string[] = [];\n  let pos = 0;\n  for (;;) {\n    const open = body.indexOf('<!--', pos);\n    const close = open === -1 ? -1 : body.indexOf('-->', open + 4);\n    if (close === -1) {\n      parts.push(body.slice(pos, open === -1 ? body.length : open));\n      return parts.join(' ');\n    }\n    parts.push(body.slice(pos, open));\n    pos = close + 3;\n  }\n}", "  const visible = body.replace(/<!--[\\s\\S]*?-->/g, ' ');\n  const open = visible.indexOf('<!--');\n  return open === -1 ? visible : visible.slice(0, open);\n}"]
+["D4: SAFE_PATH allows a space", "apps/server/src/services/merge-gate/paths.ts", "const SAFE_PATH = /^[\\p{L}\\p{M}\\p{N}._/@+%-]+$/u;", "const SAFE_PATH = /^[\\p{L}\\p{M}\\p{N}._/@+% -]+$/u;"]
+["D4: gateSource takes every protected path", "apps/server/src/services/merge-gate/paths.ts", "if (matches(name, GATE_SOURCE_RE)) push(out.gateSource, name);", "push(out.gateSource, name);"]
+["digest: count-mismatch only when fewer", "apps/server/src/services/merge-gate/digest.ts", "opts.expectedFileCount !== files.length", "opts.expectedFileCount > files.length"]
+["parse: any status string", "apps/server/src/services/merge-gate/digest.ts", "if (typeof f.status !== 'string' || !STATUSES.includes(f.status)) return null;", "if (typeof f.status !== 'string') return null;"]
+["parse: filename not checked as string", "apps/server/src/services/merge-gate/digest.ts", "if (typeof f.filename !== 'string' || f.filename === '') return null;", "if (f.filename === '') return null;"]
+
+failing tests per mutation:
+- digest: tuple without patchSha
+    × status、filename、blob sha 都不变、只有 patchSha 变：摘要就变
+    × 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要
+    × 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要
+    × 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数
+    × 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同
+- parse: no patch hashed as empty text
+    × compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256
+    × patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null
+- digest: null patchSha as empty string
+    × 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要
+- digest: prefix back to pd1
+    × 带版本前缀，同一组文件任意顺序算出同一个摘要
+    × 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要
+    × 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要
+    × 删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha）
+    × 299 个文件照常；300 个即视为截断，摘要不可得
+    × 与 PR 的 changed_files 对不上即视为截断
+    × 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数
+    × 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同
+- shared: schema keeps hasPatch
+    × 解析出的每个条目都合 @pacman/shared 的 compareFileSchema，且没有词表之外的字段
+- link: comment deleted, not blanked
+    × 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截
+- link: greedy comment (last -->)
+    × 两段闭合注释之间的链接照常算
+- link: old trailing-punct regex
+    × 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内
+- link: old lazy comment regex
+    × 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内
+- D4: SAFE_PATH allows a space
+    × 只多一个空格就算保护：集内源码路径本身不命中任何保护 glob
+- D4: gateSource takes every protected path
+    × 普通的保护路径不进 gateSource
+- digest: count-mismatch only when fewer
+    × compare 给的条目比 changed_files 多：同样对不上，摘要不可得
+- parse: any status string
+    × status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null
+- parse: filename not checked as string
+    × status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null
+
+runner (node, in the session scratchpad; not part of the repo):
+  // Mutation runner for #1404 S1 round 5. Each mutation replaces text in one source file, runs the three S1 test
+  // files, restores the file. Usage: node mutate.mjs <worktree> <mutations.json>
+  import { execFileSync, spawnSync } from 'node:child_process';
+  import { readFileSync, writeFileSync } from 'node:fs';
+  import { join } from 'node:path';
+  
+  const [root, defsPath] = process.argv.slice(2);
+  const defs = JSON.parse(readFileSync(defsPath, 'utf8'));
+  const tests = [
+    'apps/server/test/merge-gate-digest.test.ts',
+    'apps/server/test/merge-gate-paths.test.ts',
+    'apps/server/test/merge-gate-evidence-link.test.ts',
+  ];
+  const diff = () => execFileSync('git', ['diff'], { cwd: root, encoding: 'utf8' });
+  const before = diff();
+  const rows = [];
+  for (const [name, file, oldText, newText, all] of defs) {
+    const path = join(root, file);
+    const src = readFileSync(path, 'utf8');
+    const count = src.split(oldText).length - 1;
+    if (count === 0 || (!all && count !== 1)) {
+      rows.push([name, `NOT APPLIED (${count} matches)`]);
+      continue;
+    }
+    writeFileSync(path, all ? src.split(oldText).join(newText) : src.replace(oldText, () => newText));
+    try {
+      const r = spawnSync('pnpm', ['exec', 'vitest', 'run', ...tests], { cwd: root, encoding: 'utf8' });
+      const out = `${r.stdout}\n${r.stderr}`.replace(/\x1b\[[0-9;]*m/g, '');
+      const line = out.split('\n').find((l) => /^\s+Tests\s/.test(l)) ?? 'no summary';
+      const failed = out
+        .split('\n')
+        .filter((l) => /^\s+× /.test(l))
+        .map((l) => l.trim().replace(/ \d+ms$/, ''));
+      rows.push([name, line.replace(/^\s+Tests\s+/, '').trim(), failed]);
+    } finally {
+      writeFileSync(path, src);
+    }
+  }
+  const after = diff();
+  for (const [name, summary] of rows) console.log(`${name.padEnd(48)} ${summary}`);
+  console.log('');
+  console.log(`git diff identical before and after the run: ${before === after}`);
+  console.log('');
+  console.log('failing tests per mutation:');
+  for (const [name, , failed] of rows) {
+    console.log(`- ${name}`);
+    for (const f of failed ?? []) console.log(`    ${f}`);
+  }

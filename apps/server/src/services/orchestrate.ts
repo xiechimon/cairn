@@ -5,7 +5,7 @@
 // buildOrchestratePrompt → sendChiefMessage（新 chief 线程 + 编排请求首条
 // 用户消息 + chief 步入队）→ convHub 推送。
 
-import { buildOrchestratePrompt } from '@pacman/shared';
+import { buildOrchestratePrompt, canOrchestrate } from '@pacman/shared';
 import { conflict, notFound } from '../lib/errors.js';
 import { sendChiefMessage } from './chief.js';
 import type { ConversationStreamHub } from './events.js';
@@ -22,7 +22,7 @@ export interface OrchestrateDeps extends TodoDeps {
 export function orchestrateTodo(deps: OrchestrateDeps, todoId: string) {
   const record = getTodo(deps, todoId);
   if (!record) throw notFound(`todo ${todoId}`);
-  if (record.phase !== 'todo' && record.phase !== 'failed') {
+  if (!canOrchestrate(record.phase)) {
     throw conflict(`orchestrate 仅适用于 待开始/失败 相位（当前 ${record.phase}）`);
   }
   const content = buildOrchestratePrompt({

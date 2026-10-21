@@ -1,0 +1,354 @@
+# Gates at 4c931210 (round 11 code of #1411; changed paths besides the untracked round 11 evidence: 0).
+
+$ pnpm lint
+$ biome ci .
+apps/web/src/resources/machines-page.tsx:317:15 lint/complexity/noUselessFragments  FIXABLE  ━━━━━━━━━━
+
+  ℹ This fragment is unnecessary.
+  
+    315 │             ) : null}
+    316 │             {estimate ? null : (
+  > 317 │               <>
+        │               ^^
+  > 318 │                 {hardware !== undefined && hardware.memoryTotalMb !== undefined && (
+         ...
+  > 327 │                 )}
+  > 328 │               </>
+        │               ^^^
+    329 │             )}
+    330 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed fragment.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    315 315 │               ) : null}
+    316 316 │               {estimate ? null : (
+    317     │ - ··············<>
+    318     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        317 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    319 318 │                     <>
+    320 319 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 784 files in 3s. No fixes applied.
+Found 1 info.
+exit=0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.5s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (5.6s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p1
+
+No test files found, exiting with code 0
+
+
+|@pacman/web| 
+
+include: test/**/*.test.ts
+exclude:  **/node_modules/**, **/.git/**
+
+|@pacman/integration| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/pacman| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@xiechimon/pacman-cli| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+|@pacman/shared| 
+
+include: **/*.{test,spec}.?(c|m)[jt]s?(x)
+exclude:  **/node_modules/**, **/.git/**
+
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 512 test sources, no package-manager spawns.
+exit=0
+
+$ lsof -iTCP:8392 -sTCP:LISTEN
+exit=1 (1 = nothing listening)
+
+$ E2E_AFFECTED_PORT=8392 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  docs/verify/1402/pr-gate-1411-run7-7e1c42e.json → none
+  docs/verify/1402/vp-selftest-r11.txt → none
+  .claude/skills/verify-pacman/SKILL.md → none
+  .claude/skills/verify-pacman/changelog/2026-10-20-1402.md → none
+  .claude/skills/verify-pacman/features/README.md → none
+  .claude/skills/verify-pacman/scripts/drive-1136-stale-sweep.mjs → none
+  .claude/skills/verify-pacman/scripts/drive-1137-webhook-tracer.mjs → none
+  .claude/skills/verify-pacman/scripts/vp-selftest.mjs → none
+  .claude/skills/verify-pacman/scripts/vp.mjs → none
+  .claude/skills/verify-pacman/vp-registry.json → none
+  .cursor/skills/verify-pacman/SKILL.md → none
+  .github/workflows/ci.yml → none
+  docs/verify/1402/2026-10-20T20-37-51-922Z-capture-board/board.png → none
+  docs/verify/1402/2026-10-20T20-37-51-922Z-capture-board/result.json → none
+  docs/verify/1402/20261020-203718-api-key/01-keys-empty.png → none
+  docs/verify/1402/20261020-203718-api-key/02-keys-create-dialog.png → none
+  docs/verify/1402/20261020-203718-api-key/03-keys-once.png → none
+  docs/verify/1402/20261020-203718-api-key/result.json → none
+  docs/verify/1402/20261020-203724-new-task/01-board-before.png → none
+  docs/verify/1402/20261020-203724-new-task/02-new-task-card.png → none
+  docs/verify/1402/20261020-203724-new-task/result.json → none
+  docs/verify/1402/20261020-203728-search/02-search-results.png → none
+  docs/verify/1402/20261020-203728-search/result.json → none
+  docs/verify/1402/20261020-203735-theme/01-theme-default-dark.png → none
+  docs/verify/1402/20261020-203735-theme/02-theme-light.png → none
+  docs/verify/1402/20261020-203735-theme/03-theme-dark.png → none
+  docs/verify/1402/20261020-203735-theme/result.json → none
+  docs/verify/1402/20261020-203942-search/99-error.png → none
+  docs/verify/1402/20261020-203942-search/result.json → none
+  docs/verify/1402/20261020-204008-search/02-search-results.png → none
+  docs/verify/1402/20261020-204008-search/result.json → none
+  docs/verify/1402/20261020-233153-api-keys-create/01-keys-empty.png → none
+  docs/verify/1402/20261020-233153-api-keys-create/02-keys-create-dialog.png → none
+  docs/verify/1402/20261020-233153-api-keys-create/03-keys-once.png → none
+  docs/verify/1402/20261020-233153-api-keys-create/result.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/00-session.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/01-after-user-turn.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/02-badge-1.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/03-board-badge-1.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/04-tooltip-count-1.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/05-drawer-open.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/06-after-open.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/07-badge-after-open.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/08-wake-step.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/09-after-tick.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/10-after-wake-done.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/11-unread-100.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/12-badge-cap.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/13-board-badge-cap.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/14-tooltip.json → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/15-tooltip-cap.png → none
+  docs/verify/1402/20261020-233157-chief-unread-unread-badge/result.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/after-empty-dialog.png → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/after-empty-done-column.png → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/after-files-dialog.png → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/agent-tools.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/empty-changes.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/empty-messages.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/empty-steps.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/empty-todo.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/files-changes.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/files-todo.json → none
+  docs/verify/1402/20261020-233213-review-modal-empty-review/result.json → none
+  docs/verify/1402/20261020-233218-skill-import-import-rollback/result.json → none
+  docs/verify/1402/20261020-233218-skill-import-import-rollback/snapshot.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/00-session.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/01-after-user-turn.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/02-badge-1.png → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/03-board-badge-1.png → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/04-tooltip-count-1.png → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/05-drawer-open.png → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/06-after-open.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/07-badge-after-open.png → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/08-wake-step.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/09-after-tick.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/10-after-wake-done.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/11-unread-100.json → none
+  docs/verify/1402/20261020-233246-chief-unread-unread-badge/result.json → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/agent-tools.json → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/before-empty-dialog.png → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/empty-changes.json → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/empty-todo.json → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/files-changes.json → none
+  docs/verify/1402/20261020-233320-review-modal-empty-review/files-todo.json → none
+  docs/verify/1402/20261020-233415-chief-floating-window-a0-live/result-a0-live.json → none
+  docs/verify/1402/20261020-chip-word/01-board.png → none
+  docs/verify/1402/20261020-chip-word/02-detail-confirm.png → none
+  docs/verify/1402/20261020-chip-word/02-detail-fresh.png → none
+  docs/verify/1402/20261020-chip-word/02-detail-queued.png → none
+  docs/verify/1402/20261020-chip-word/03-search.png → none
+  docs/verify/1402/20261020-chip-word/04-schedules.png → none
+  docs/verify/1402/20261020-chip-word/05-project.png → none
+  docs/verify/1402/20261020-chip-word/result.json → none
+  docs/verify/1402/20261020-neg3-search-reverted/02-search-results.png → none
+  docs/verify/1402/20261020-neg3-search-reverted/capture-board/board.png → none
+  docs/verify/1402/20261020-neg3-search-reverted/capture-board/result.json → none
+  docs/verify/1402/20261020-neg3-search-reverted/result.json → none
+  docs/verify/1402/20261020-neg3-search-seeded/99-error.png → none
+  docs/verify/1402/20261020-neg3-search-seeded/result.json → none
+  docs/verify/1402/20261020-restart-combo/after-chat-col.png → none
+  docs/verify/1402/20261020-restart-combo/after-combo-hidden.png → none
+  docs/verify/1402/20261020-restart-combo/bubbles.json → none
+  docs/verify/1402/20261020-restart-combo/classify.json → none
+  docs/verify/1402/20261020-restart-combo/messages.json → none
+  docs/verify/1402/20261020-restart-combo/result.json → none
+  docs/verify/1402/20261020-restart-combo/todo.json → none
+  docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/daemon-console.log → none
+  docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/daemon.log → none
+  docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/result.json → none
+  docs/verify/1402/20261021-012147-machine-stale-sweep-stale-sweep/server.log → none
+  docs/verify/1402/20261021-012705-glass-journeys-board/01-board.png → none
+  docs/verify/1402/20261021-012705-glass-journeys-board/fail-board.png → none
+  docs/verify/1402/20261021-012705-glass-journeys-board/result.json → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/01-board.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/02-create-task-dialog.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/03-create-task-card.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/04-dispatch-toast.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/05-dispatch-chief.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/06-view-diff.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/07-request-changes-dialog.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/08-request-changes-landed.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/09-merge-dialog.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/10-merge-accepted.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/fail-board.png → none
+  docs/verify/1402/20261021-012912-glass-journeys-all/result.json → none
+  docs/verify/1402/20261021-041337-search-search/02-search-results.png → none
+  docs/verify/1402/20261021-041337-search-search/capture-board-2/board.png → none
+  docs/verify/1402/20261021-041337-search-search/capture-board-2/result.json → none
+  docs/verify/1402/20261021-041337-search-search/capture-board/board.png → none
+  docs/verify/1402/20261021-041337-search-search/capture-board/result.json → none
+  docs/verify/1402/20261021-041337-search-search/result.json → none
+  docs/verify/1402/20261021-041352-glass-journeys-create-task/02-create-task-dialog.png → none
+  docs/verify/1402/20261021-041352-glass-journeys-create-task/03-create-task-card.png → none
+  docs/verify/1402/20261021-041352-glass-journeys-create-task/result.json → none
+  docs/verify/1402/20261021-041833-search-project-line/00-natural-3000ms.png → none
+  docs/verify/1402/20261021-041833-search-project-line/01-pre-response.png → none
+  docs/verify/1402/20261021-041833-search-project-line/02-server-frame.png → none
+  docs/verify/1402/20261021-041833-search-project-line/03-projects-pending.png → none
+  docs/verify/1402/20261021-041833-search-project-line/projects-api.json → none
+  docs/verify/1402/20261021-041833-search-project-line/result.json → none
+  docs/verify/1402/20261021-041833-search-project-line/search-api.json → none
+  docs/verify/1402/20261021-041833-search-project-line/search-response-browser.json → none
+  docs/verify/1402/20261021-041833-search-project-line/sqlite-rows.json → none
+  docs/verify/1402/20261021-060201-review-modal-empty-review/agent-tools.json → none
+  docs/verify/1402/20261021-060201-review-modal-empty-review/hunkless-after-rename-dialog.png → none
+  docs/verify/1402/20261021-060201-review-modal-empty-review/rename-changes.json → none
+  docs/verify/1402/20261021-060201-review-modal-empty-review/rename-todo.json → none
+  docs/verify/1402/20261021-060201-review-modal-empty-review/result.json → none
+  docs/verify/1402/20261021-glass-create-task-out/02-create-task-dialog.png → none
+  docs/verify/1402/20261021-glass-create-task-out/03-create-task-card.png → none
+  docs/verify/1402/20261021-glass-create-task-out/result.json → none
+  docs/verify/1402/evidence-notes.txt → none
+  docs/verify/1402/gates-10.txt → none
+  docs/verify/1402/gates-2.txt → none
+  docs/verify/1402/gates-3.txt → none
+  docs/verify/1402/gates-4.txt → none
+  docs/verify/1402/gates-5.txt → none
+  docs/verify/1402/gates-6.txt → none
+  docs/verify/1402/gates-7.txt → none
+  docs/verify/1402/gates-8.txt → none
+  docs/verify/1402/gates-9.txt → none
+  docs/verify/1402/gates.txt → none
+  docs/verify/1402/inventory.json → none
+  docs/verify/1402/negative-control-2.txt → none
+  docs/verify/1402/negative-control.txt → none
+  docs/verify/1402/positive-control.txt → none
+  docs/verify/1402/rerun-notes.txt → none
+  docs/verify/1402/vp-cli-2.txt → none
+  docs/verify/1402/vp-cli-3.txt → none
+  docs/verify/1402/vp-cli-4.txt → none
+  docs/verify/1402/vp-cli-5.txt → none
+  docs/verify/1402/vp-cli-6.txt → none
+  docs/verify/1402/vp-cli-7.txt → none
+  docs/verify/1402/vp-cli-8.txt → none
+  docs/verify/1402/vp-cli-9.txt → none
+  docs/verify/1402/vp-cli.txt → none
+  docs/verify/1402/vp-selftest-ci.txt → none
+  docs/verify/1402/vp-selftest-node24.txt → none
+  docs/verify/1402/vp-selftest-r10.txt → none
+  docs/verify/1402/vp-selftest-r5.txt → none
+  docs/verify/1402/vp-selftest-r6-mutations.txt → none
+  docs/verify/1402/vp-selftest-r6.txt → none
+  docs/verify/1402/vp-selftest-r7-mutations.txt → none
+  docs/verify/1402/vp-selftest-r7.txt → none
+  docs/verify/1402/vp-selftest-r8.txt → none
+  docs/verify/1402/vp-selftest-r9.txt → none
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  a case that needs github needs --force
+PASS  a case that needs real-llm needs --force and runs nothing without it
+PASS  probes that default to their pre-fix mode get the post-fix flag from the registry
+PASS  no current case creates an agent without machineId (ADR 0019)
+PASS  every case writes where drive points it, or the registry says where it writes
+PASS  a case whose probe takes an output flag gets the evidence directory through it
+PASS  arguments after -- keep the case's own positional args (the probe or journey name)
+PASS  an output option given after -- is the evidence directory; drive makes none of its own
+PASS  a probe that reads another variable gets the evidence directory through it
+PASS  a case whose usage names required arguments refuses to run without them
+PASS  a registry entry with a missing script or a tsx case without cwd fails before doctor, also in --dry-run
+PASS  feature and case names are looked up as registry keys only
+PASS  a case that needs the stack gets the ports of the stack doctor checks
+PASS  a drive never writes into an evidence directory that already exists
+PASS  capture never writes into a capture directory that already exists
+PASS  links encodes non-ASCII file names instead of quoting them
+PASS  arguments after -- replace only the default options they name
+PASS  a probe gets the run directory doctor checked
+PASS  no current case depends on a seed script that creates an agent without machineId
+PASS  cleanup reports the evidence root drive writes to
+PASS  with the temp dir inside a git repository, a fake skill writes nothing outside its own root
+PASS  --help lists every command
+PASS  launch and doctor forward their arguments and exit code to their scripts
+PASS  a case that needs arguments is not satisfied by options alone
+PASS  an output path given after -- is made absolute against the caller's directory
+PASS  an output directory named like the journey does not replace the journey
+PASS  an output option without its directory as the next argument is refused before anything runs
+PASS  capture refuses a --wait that is not a number of milliseconds
+PASS  a case that writes its evidence itself gets no evidence directory
+PASS  --force lets a stale case run
+PASS  a failed doctor leaves no evidence directory behind
+PASS  links prints sha-pinned raw links and refuses a ticket with no evidence
+PASS  a drive without VERIFY_EVIDENCE_DIR gets its own directory under the main checkout's .claude/verify-evidence
+PASS  a drive from a worktree puts its evidence under the main checkout, not the worktree
+PASS  a tsx case runs from its package directory, a node case from the repo root
+PASS  a case that needs the stack runs doctor first
+PASS  a stale case needs --force
+PASS  a stale case that also has a forced need names both in its refusal, and --force names them before running
+PASS  a stray positional argument is refused
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory and leaves the archive as it was
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive --latest takes a positive integer only
+PASS  archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR
+PASS  archive refuses a source given without --from
+PASS  archive copies a named source
+PASS  archive --latest 1 copies the newest run only
+51/51 passed
+exit=0
+

@@ -1,0 +1,30 @@
+$ pnpm lint
+apps/web/src/resources/machines-page.tsx:317:15 ]8;;https://biomejs.dev/linter/rules/no-useless-fragments\lint/complexity/noUselessFragments]8;;\  FIXABLE  ━━━━━━━━━━
+Checked 781 files in 1564ms. No fixes applied.
+Found 1 info.
+lint exit=0
+
+$ pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+typecheck exit=0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1077 tests in 156 files collected, disk count matches (4.4s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.7s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+spec:parse exit=0
+
+$ pnpm --filter @pacman/web e2e:affected
+  .claude/skills/verify-pacman/SKILL.md → none
+  .claude/skills/verify-pacman/features/README.md → none
+  .claude/skills/verify-pacman/changelog/2026-10-20-1402.md → none
+  .claude/skills/verify-pacman/scripts/vp.mjs → none
+  .claude/skills/verify-pacman/vp-registry.json → none
+  docs/verify/1402/ → none
+[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.
+e2e:affected exit=0

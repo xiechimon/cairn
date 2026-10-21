@@ -1,0 +1,21 @@
+# #1404 S1 round 2 (after pr-gate run 1 on #1420): new tests first, red against the S1 code at 9c640f5, green after the fix.
+# The round 1 red leg (s1-red-green.txt) ran on the branch before the modules existed, on the tree that became 9c640f5.
+
+== red: round 2 test files, source at 9c640f5 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+     × 名字里有换行、回车、空格或其它白名单外字符：一律算保护（与 pr-gate SAFE_PATH 同一白名单）
+     × 测试的任何改名都算删了原测试（与 pr-gate 的 --no-renames 一致），含测试目录里改成不被收集的名字
+     × 证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行
+     × 空文件列表：摘要不可得（没有可绑定的补丁）
+     × 只有证据的补丁：证据之外没有文件，摘要不可得
+     × 链接后面紧跟的标点与反引号不算进路径
+     × 没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  7 failed | 61 passed (68)
+
+(one more test, a link after a closed comment, was added after the mutation run; it passes on both sides)
+
+== green, this commit ==
+$ pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts
+ Test Files  3 passed (3)
+      Tests  69 passed (69)

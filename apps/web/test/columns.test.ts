@@ -1,7 +1,7 @@
 // Column view ordering (issue #73): failed / review-awaiting cards pin to
 // the TOP of 待处理 (#351: the pinned group moved from 执行中 to the merged
 // gate column); everything else keeps manual/fixture order.
-import { BOARD_DROP_PHASES, PHASE_VALUES } from '@pacman/shared';
+import { BOARD_DROP_PHASES, canOrchestrate, PHASE_VALUES } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import {
   attentionCount,
@@ -69,6 +69,18 @@ describe('canDropOnColumn（#753 per-source 矩阵）', () => {
   test('执行中 落点逐相位：只有未开始的 todo 可进（#1434）', () => {
     for (const phase of PHASE_VALUES) {
       expect(canDropOnColumn(todo(1, phase), 'building'), phase).toBe(phase === 'todo');
+    }
+  });
+
+  // #1457：落进执行中 = 开始门 → POST /api/todos/:id/orchestrate。看板放行的
+  // 相位必须是服务端 orchestrate 收的相位，否则拖得进去、服务端 409（#1434）。
+  test('执行中 落点 ⊆ shared canOrchestrate（#1457）', () => {
+    for (const phase of PHASE_VALUES) {
+      for (const hasChanges of [false, true]) {
+        if (canDropOnColumn({ ...todo(1, phase), hasChanges }, 'building')) {
+          expect(canOrchestrate(phase), phase).toBe(true);
+        }
+      }
     }
   });
 

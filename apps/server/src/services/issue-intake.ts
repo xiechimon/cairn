@@ -17,7 +17,9 @@
 //    被对账关闭；关过一次即忘掉「见过 open」，有人把卡重开就不再关。外部
 //    作者关自己的 issue、任一读失败 = 本轮不关。review 卡与 build 交付过 PR
 //    的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：合并带关闭引用关掉
-//    issue 时，那张卡不以 closed 收尾。写前重读相位与 PR，变了就不动。
+//    issue 时，那张卡不以 closed 收尾。拆卡父卡还有子卡不在 done / closed 时
+//    也不碰（关了它，最后一张子卡 done 时的父卡收口会撞 closed → done 非法边）。
+//    写前重读相位、PR 与子卡，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
 //    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已开始
@@ -27,20 +29,23 @@
 //    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表；按 Link
 //    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
 //    先）；团队级已占用的号跳过（大小写不敏感）；D5 核打标人：该标签最新一条
-//    labeled 之后没有 unlabeled，且其 actor 在仓库上是 triage 及以上（events
-//    按 Link rel="next" 至多读 ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页
-//    = 读不全；读不全 / 任一读失败 = 本轮不领）；importGithubIssue（409 = 别路
-//    已领；createdBy 记 chief 绑定的 Agent）→ orchestrateTodo；领到一条记一行
-//    日志（打标人与经手的 app slug，审计用，不进判据）。
+//    labeled 之后没有 unlabeled、不是经 GitHub App 打的（performed_via_github_app
+//    在位 = 不领，记一行带 app：持有仓主授权的 agent 会话不能给进料喂它自己开
+//    的 issue），且其 actor 在仓库上是 triage 及以上（events 按 Link rel="next"
+//    至多读 ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页 = 读不全；读不全 /
+//    任一读失败 = 本轮不领）；importGithubIssue（409 = 别路已领；createdBy 记
+//    chief 绑定的 Agent）→ orchestrateTodo；领到一条记一行日志（打标人）。
 //
 // 纪律：issue 正文只经 importGithubIssue 进 todo.spec，不进日志、不进系统行；
-// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；上一轮
-// 没跑完时新触发直接返回（不重叠）。
+// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；任一 GitHub
+// 读遇限流（429 / 带限流信号的 403）= 本队本轮停读、记一行带重置时刻（同一
+// token 再读只会再被拒）；上一轮没跑完时新触发直接返回（不重叠）。
 //
 // #1459：webhook 的 `pacman` 触发按同一 D5 判据核打标人（事件的 sender）、
 // 计入同一在飞上限。三样在模块级导出、两路共用：团队 token（teamGithubToken）、
-// 打标人权限读与缓存（hasRepoTriage，缓存是进程里唯一一份，轮询器开没开都在）、
-// 在飞现数（projectAtInFlightCap，含还在等 GitHub 读的导入）。
+// 打标人权限读与缓存（hasRepoTriage，缓存是进程里唯一一份，轮询器开没开都在；
+// 限流照常抛 GithubRateLimitedError，不进缓存，webhook 自己接住）、在飞现数
+// （projectAtInFlightCap，含还在等 GitHub 读的导入）。
 
 import {
   githubIssueSourceRef,
@@ -63,6 +68,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -72,6 +78,7 @@ import {
   type GithubIssueEvent,
   type GithubIssueEventsPage,
   type GithubLabeledIssuesPage,
+  GithubRateLimitedError,
   type GithubRepoPermission,
   githubCollaboratorPermission,
   githubIssueEvents,
@@ -122,8 +129,15 @@ const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin']);
 const NOT_IN_FLIGHT: Phase[] = ['done', 'closed'];
 
 /** 关闭对账不碰的相位：done / closed 已终态；review 归 #1414 的 PR 对账。
- * 相位之外还有一条：任一 build 交付过 PR 的卡也不碰（见 noDeliveredPr）。 */
+ * 相位之外还有两条：任一 build 交付过 PR 的卡（见 noDeliveredPr）、还有子卡
+ * 没收完的拆卡父卡（见 noOpenChildren）也不碰。 */
 const CLOSE_RECONCILE_SKIPPED: Phase[] = ['done', 'closed', 'review'];
+
+/** 拆卡子卡收完的相位（父卡在这之外有子卡 = 子卡还在跑）。 */
+const CHILD_SETTLED: Phase[] = ['done', 'closed'];
+
+/** 子卡表别名（父卡查询里的相关子查询：子卡 sourceTodo = 父卡 id）。 */
+const childTodo = alias(todo, 'child_todo');
 
 /** 关闭对账的流转主体（agent 档：不能自过 confirm / review 闸，关闭不受影响）。 */
 const ISSUE_INTAKE_ACTOR: TransitionActor = { kind: 'agent', name: 'GitHub issue intake' };
@@ -160,8 +174,10 @@ export interface IssueIntakeTally {
   closed: number;
   /** 对账本轮不动：issue 状态读不到；或见过 open 的 issue 读到 closed，但
    * events / permission 读不到、events 读不全、关闭人不到 triage 或账号已删、
-   * 写前相位变了或 build 交付了 PR。 */
+   * 写前相位变了、build 交付了 PR 或有了没收完的子卡。 */
   closeSkipped: number;
+  /** 本轮遇限流停读的团队。 */
+  rateLimited: number;
   errors: number;
 }
 
@@ -172,14 +188,18 @@ export interface IssueIntake {
 
 type ProjectRow = typeof project.$inferSelect;
 
-/** 该标签最新一条 labeled 的打标人与经手的 app（app 只供领取日志审计）。 */
-interface Labeler {
-  labeler: string;
-  viaApp: string | null;
+/** 该标签最新一条 labeled 经 GitHub App 打的：不领，打标人与 app 记进日志。 */
+interface AppLabel {
+  reason: 'label-via-app';
+  labeler: string | null;
+  viaApp: string;
 }
 
-/** D5 判定：可领时即打标人。 */
-type Verdict = Labeler | { notTaken: 'not-eligible' | 'unverifiable'; reason: string };
+/** D5 判定：可领时即打标人；不领时带理由。 */
+type Verdict =
+  | { labeler: string }
+  | ({ notTaken: 'not-eligible' } & AppLabel)
+  | { notTaken: 'not-eligible' | 'unverifiable'; reason: string };
 
 /** 关闭对账的一张卡（轮询器领的、相位与 PR 都还在对账范围内）。 */
 interface ReconcileRow {
@@ -225,6 +245,7 @@ function emptyTally(): IssueIntakeTally {
     orchestrated: 0,
     closed: 0,
     closeSkipped: 0,
+    rateLimited: 0,
     errors: 0,
   };
 }
@@ -274,9 +295,10 @@ function newestOf(
 }
 
 /** D5 第一半：该标签最新一条 labeled 的 actor（之后有 unlabeled / 读不全 /
- * 没有 labeled / 账号已删 → 不领的理由）。顺序按 created_at，同刻按 id，不信
- * 数组位置。 */
-function newestLabeler(data: IssueHistory): Labeler | { reason: string } {
+ * 没有 labeled / 经 app 打的 / 账号已删 → 不领的理由）。经 app 打的标不算人
+ * 打的：用户授权的 app 令牌下 actor 是授权的人，持有仓主授权的 agent 会话打
+ * 的标与仓主本人打的分不开。顺序按 created_at，同刻按 id，不信数组位置。 */
+function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
   const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>
     e.event === kind && e.label?.toLowerCase() === ISSUE_INTAKE_LABEL;
@@ -284,8 +306,11 @@ function newestLabeler(data: IssueHistory): Labeler | { reason: string } {
   const unlabeled = newestOf(data.events, forLabel('unlabeled'));
   if (labeled === null) return { reason: 'no-labeled-event' };
   if (unlabeled !== null && later(unlabeled, labeled)) return { reason: 'label-removed' };
+  if (labeled.viaApp !== null) {
+    return { reason: 'label-via-app', labeler: labeled.actor, viaApp: labeled.viaApp };
+  }
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
-  return { labeler: labeled.actor, viaApp: labeled.viaApp };
+  return { labeler: labeled.actor };
 }
 
 /** 团队的 GitHub 读权：连接 token 与密文 box；拿不到给原因（无 box / 无连接 /
@@ -397,6 +422,19 @@ export function createIssueIntake(
     );
   }
 
+  /** 卡没有还在跑的拆卡子卡（子卡全在 done / closed，或根本没拆）。父卡被关
+   * 后，最后一张子卡 done 时 settleSplitOnDone 要把父卡推到 done，closed →
+   * done 是非法边，会在子卡相位已落库之后抛错。同 noDeliveredPr，用在以 todo
+   * 为主表的查询里。 */
+  function noOpenChildren() {
+    return notExists(
+      deps.db
+        .select({ id: childTodo.id })
+        .from(childTodo)
+        .where(and(eq(childTodo.sourceTodo, todo.id), notInArray(childTodo.phase, CHILD_SETTLED))),
+    );
+  }
+
   /** 团队已占用的 issue 引用（小写；导入的与自建的都算）。 */
   function claimedRefs(teamId: string): Set<string> {
     return new Set(
@@ -452,7 +490,7 @@ export function createIssueIntake(
     const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
     if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
     const found = newestLabeler(history);
-    if ('reason' in found) return { notTaken: 'not-eligible', reason: found.reason };
+    if ('reason' in found) return { notTaken: 'not-eligible', ...found };
     const trusted = await hasRepoTriage(
       run.githubFetch,
       teamId,
@@ -569,10 +607,13 @@ export function createIssueIntake(
     if ('notTaken' in verdict) {
       if (verdict.notTaken === 'unverifiable') tally.unverifiable += 1;
       else tally.notEligible += 1;
-      log(
-        { projectId: row.id, issue: issueNumber, reason: verdict.reason },
-        'issue intake candidate not taken',
-      );
+      const at = { projectId: row.id, issue: issueNumber, reason: verdict.reason };
+      if ('viaApp' in verdict) {
+        log(
+          { ...at, labeler: verdict.labeler, viaApp: verdict.viaApp },
+          `issue intake label applied through app ${verdict.viaApp}, not taken`,
+        );
+      } else log(at, 'issue intake candidate not taken');
       return 'not-taken';
     }
     // 读窗口里别处可能已占位（webhook 导入）：导入前再数一次。
@@ -602,17 +643,8 @@ export function createIssueIntake(
       return 'not-taken';
     }
     tally.imported += 1;
-    // 打标人与经手的 app：只供审计，D5 不看 app（用户授权的 app 令牌打的标，
-    // actor 是授权的人；app 安装令牌打的标，actor 是 <slug>[bot]，照常按它
-    // 在仓库上的权限判）。
     log(
-      {
-        projectId: row.id,
-        issue: issueNumber,
-        todoId,
-        labeler: verdict.labeler,
-        viaApp: verdict.viaApp,
-      },
+      { projectId: row.id, issue: issueNumber, todoId, labeler: verdict.labeler },
       'issue intake candidate taken',
     );
     // 列表只给 open 的 issue：导入即「见过 open」（关闭对账的起点）。
@@ -773,12 +805,12 @@ export function createIssueIntake(
           );
           continue;
         }
-        // 写前重读相位与 PR：读窗口里被人推进（如进 review）/ 关闭 / 完成，或
-        // build 交付了 PR（留给 PR 对账）→ 不动。
+        // 写前重读相位、PR 与子卡：读窗口里被人推进（如进 review）/ 关闭 /
+        // 完成，build 交付了 PR（留给 PR 对账），或有了还在跑的子卡 → 不动。
         const fresh = deps.db
           .select({ phase: todo.phase })
           .from(todo)
-          .where(and(eq(todo.id, t.id), noDeliveredPr()))
+          .where(and(eq(todo.id, t.id), noDeliveredPr(), noOpenChildren()))
           .get();
         if (fresh === undefined || fresh.phase !== t.phase) {
           tally.closeSkipped += 1;
@@ -791,6 +823,7 @@ export function createIssueIntake(
           seenOpen.delete(key);
         } else tally.closeSkipped += 1;
       } catch (err) {
+        if (err instanceof GithubRateLimitedError) throw err;
         tally.errors += 1;
         log({ todoId: t.id, err: errText(err) }, 'issue intake close failed');
       }
@@ -877,6 +910,7 @@ export function createIssueIntake(
           tally,
         );
       } catch (err) {
+        if (err instanceof GithubRateLimitedError) throw err;
         tally.errors += 1;
         log({ projectId: row.id, err: errText(err) }, 'issue intake project failed');
       }
@@ -909,6 +943,7 @@ export function createIssueIntake(
             isNotNull(todo.sourceRef),
             notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),
             noDeliveredPr(),
+            noOpenChildren(),
           ),
         )
         .all();
@@ -929,8 +964,22 @@ export function createIssueIntake(
             tally,
           );
         } catch (err) {
-          tally.errors += 1;
-          log({ teamId, err: errText(err) }, 'issue intake team failed');
+          if (err instanceof GithubRateLimitedError) {
+            // 限流：本队本轮停读（读到一半的对账与列表留到下一轮），记一行。
+            tally.rateLimited += 1;
+            const retryAt = err.retryAt(now);
+            log(
+              {
+                teamId,
+                status: err.status,
+                resetAt: retryAt === null ? null : new Date(retryAt).toISOString(),
+              },
+              'issue intake team rate limited',
+            );
+          } else {
+            tally.errors += 1;
+            log({ teamId, err: errText(err) }, 'issue intake team failed');
+          }
         }
       }
     } catch (err) {

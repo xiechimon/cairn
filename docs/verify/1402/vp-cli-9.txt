@@ -1,0 +1,36 @@
+# #1402 round 7: review-modal/empty-review driven through vp.mjs on a fresh stack at f5e2f5d, with an extra
+# option after --. Before this round the extra option dropped the case's post-fix --expect=after, so the probe
+# ran in its pre-fix mode. Now both reach the probe. cleanup lists the main checkout's evidence root, the one
+# drive writes to. Archived run: 20261021-060201-review-modal-empty-review/.
+
+$ vp.mjs launch
+verify stack ready
+exit=0
+$ vp.mjs drive review-modal empty-review -- --focus=hunkless
+vp: review-modal/empty-review needs the stack, running doctor first
+PASS  server 进程组存活(pid 30871) — 挂了 → cleanup.mjs 后重 launch
+PASS  vite dev 进程组存活(pid 30872) — 挂了 → cleanup.mjs 后重 launch
+PASS  GET /api/auth/session = seed 用户 Owner — status=200 displayName=Owner
+PASS  GET /api/teams 200 且非空 — status=200 n=1
+PASS  GET /api/projects 200 — status=200 n=0(全新库为 0,正常)
+PASS  GET /app 200 html(vite SPA fallback) — status=200
+doctor:all PASS
+vp: evidence /home/user/pacman/.claude/verify-evidence/20261021-060201-review-modal-empty-review
+vp: review-modal/empty-review -> node .claude/skills/verify-pacman/scripts/drive-1313-empty-review.mjs --expect=after --focus=hunkless
+PASS  session Owner  — Owner
+PASS  agent 缺合并分支  — ["推送分支"]
+PASS  rename hasChanges  — true
+PASS  rename parsed files 为空  — {"files":[],"reported":true,"changed":true}
+PASS  after rename changes.changed  — {"files":[],"reported":true,"changed":true}
+PASS  after rename 展示合并行  — count=1
+PASS  after rename 无空提交说明  — note=0
+PASS  after rename 缺授权时完成禁用  — disabled=true
+ALL PASS  evidence=/home/user/pacman/.claude/verify-evidence/20261021-060201-review-modal-empty-review
+exit=0
+$ vp.mjs cleanup
+运行态已删:/home/user/pacman/.claude/worktrees/p1/.claude/verify-run(scratch home,含 SQLite 库)
+证据完好:/home/user/pacman/.claude/verify-evidence(5 组)
+  - 20261021-041352-glass-journeys-create-task
+  - 20261021-041833-search-project-line
+  - 20261021-060201-review-modal-empty-review
+exit=0

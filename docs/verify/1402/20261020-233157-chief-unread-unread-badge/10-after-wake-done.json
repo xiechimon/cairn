@@ -1,0 +1,13 @@
+{
+  "row": {
+    "id": "UQkxsT-gvHIa4n9N9ZxXZ:chief-01a15ba8-53dc-75cb-84c4-2bc79585ce8e",
+    "type": "chief_message",
+    "entityId": "chief-01a15ba8-53dc-75cb-84c4-2bc79585ce8e",
+    "snippet": "机器回头：任务仍在跑，无需处理。",
+    "readAt": 1792539127960,
+    "createdAt": 1792539127960
+  },
+  "unread": {
+    "unreadThreadIds": []
+  }
+}

@@ -60,6 +60,7 @@ import { addChiefWatch, clearChiefWake, removeChiefWatches, setChiefWake } from 
 import { askUserQuestionsOfParams, createOrGetQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { isGithubRepoRef, readFile } from './git.js';
+import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
 import { notifyChiefMessage } from './notifications.js';
@@ -399,10 +400,9 @@ export async function executeChiefTool(
     }
     case 'issues':
     case 'pull_requests':
-    case 'workflow_runs': {
-      // GitHub-backed 才有（02 §3/A4）；托管 repo 返回空集 [推断]。
-      return json({ items: [], note: 'GitHub-backed only' });
-    }
+    case 'workflow_runs':
+      // #1406 P5a-2：读项目所连 GitHub 仓库的真数据（MCP 面同一份实现）。
+      return json(await executeGithubReadTool(deps, ctx.teamId, name, params));
     case 'attachment': {
       // #310 / r9 §3.1：工具返回 {fileName, mimeType, sizeBytes, encoding,
       // content}；text/* → utf8；其他 → base64。attach 实体查 attachments 服
