@@ -442,14 +442,13 @@ export function createCiPoller(
    * 不能盖住正在进行的这张），否则取编号最大的已合并的一张。记的那张在两次读之间被重开
    * 时，返回的就是它自己。'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
   async function ownBranchPull(
-    buildId: string,
+    branch: string,
     target: { owner: string; repo: string },
     token: string | null,
     recorded: { number: number; baseRepoId: number; defaultBranch: string },
     now: number,
   ): Promise<GithubBranchPull | null | 'unreadable' | 'skipped'> {
     if (token === null && !takeAnonRead(now)) return 'skipped';
-    const branch = conversationBranch(buildId);
     const list = await githubBranchPulls(run.githubFetch, token, target.owner, target.repo, {
       head: `${target.owner}:${branch}`,
       base: recorded.defaultBranch,
@@ -630,7 +629,7 @@ export function createCiPoller(
       // 每轮提示之前先看工作分支上有没有本 build 自己的 PR；提示落了之后本轮不再列。
       if (!rowKnown(cand.buildId, foreignText, since)) {
         const own = await ownBranchPull(
-          cand.buildId,
+          branch,
           target,
           token,
           { number: prNumber, baseRepoId: pull.baseRepoId, defaultBranch: pull.defaultBranch },
@@ -802,7 +801,7 @@ export function createCiPoller(
     }
     // 打回之前看工作分支上有没有本 build 的另一张 PR（见文件头）。
     const sibling = await ownBranchPull(
-      cand.buildId,
+      branch,
       target,
       token,
       { number: prNumber, baseRepoId: pull.baseRepoId, defaultBranch: pull.defaultBranch },

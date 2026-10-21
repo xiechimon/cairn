@@ -318,9 +318,9 @@ export async function githubBranchPulls(
       number: p.number,
       state: p.state,
       merged: typeof p.merged_at === 'string',
-      headRef: typeof p.head?.ref === 'string' ? p.head.ref : null,
+      headRef: optString(p.head?.ref),
       headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
-      baseRef: typeof p.base?.ref === 'string' ? p.base.ref : null,
+      baseRef: optString(p.base?.ref),
       baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
     });
   }
