@@ -50,8 +50,9 @@
 // 21 经 GitHub App 打的标（events 的 performed_via_github_app 在位）不算人打
 //    的：不领、不读 permission，记一行 label applied through app <slug>, not
 //    taken。持有仓主授权的 agent 会话不能给进料喂它自己开的 issue。17 组的
-//    「D5 不看 app」由本组取代；夹具缺省改为仓主本人打的标（#1406 的真实
-//    事件去掉 app 字段），经 app 的真实形状只在 17 组投影与本组用。
+//    「D5 不看 app」由本组取代；app 对象缺 slug 也算经 app（投影为 unknown）。
+//    夹具缺省改为仓主本人打的标（#1406 的真实事件去掉 app 字段），经 app 的
+//    真实形状只在 17 组投影与本组用。
 // 22 拆卡父卡：还有子卡不在 done / closed 时关闭对账不碰它（对账查询与写前
 //    重读都排除）；子卡照常推进，最后一张 done 时父卡经收口边落 done。
 // 23 引用大小写：webhook 与轮询器经两个大小写不同的项目导入同一 issue，先后
@@ -2014,7 +2015,7 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
 });
 
 describe('17 经 app 打的标：投影保留 slug', () => {
-  test('githubIssueEvents 投影 performed_via_github_app.slug；不经 app 或缺 slug = null', async () => {
+  test('githubIssueEvents 投影 performed_via_github_app.slug；不经 app = null，经 app 却缺 slug = unknown', async () => {
     const gh = githubFake(REPO);
     gh.state.events.set(1406, EVENTS_1406);
     gh.state.events.set(1450, EVENTS_1450);
@@ -2049,7 +2050,8 @@ describe('17 经 app 打的标：投影保留 slug', () => {
       },
     });
     const read1451 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1451);
-    expect(read1451).toMatchObject({ data: { events: [{ id: 1, viaApp: null }] } });
+    // 上游 integration 形里 slug 不是必有字段：经 app 却缺 slug 仍是经 app。
+    expect(read1451).toMatchObject({ data: { events: [{ id: 1, viaApp: 'unknown' }] } });
   });
 });
 
@@ -2377,6 +2379,22 @@ describe('21 经 GitHub App 打的标不算人打的', () => {
     ]);
     await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
+  });
+
+  test('经 app 打、app 对象缺 slug → 同样不领', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.events.set(1406, [
+      {
+        ...labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 100),
+        performed_via_github_app: { id: 5 },
+      },
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.gh.permissionReads()).toHaveLength(0);
+    expect(
+      w.logs.filter((l) => l.msg.includes('label applied through app unknown, not taken')),
+    ).toHaveLength(1);
   });
 
   test('经 app 打、摘掉后仓主本人重新打 → 领', async () => {
