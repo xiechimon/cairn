@@ -1,0 +1,145 @@
+# P5a-1 opt-in red: new config / vocabulary / null-slot tests against 637f6868 (no issueIntake config field, no ENV_VARS.issueIntake)
+# command: pnpm exec vitest run apps/server/test/issue-intake.test.ts packages/shared/test/vocabulary.test.ts -t 'PACMAN_ISSUE_INTAKE|env vars are the PACMAN_'
+# date: 2026-10-21T09:12:06Z
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p5
+
+ ❯ |@pacman/shared| test/vocabulary.test.ts (38 tests | 1 failed | 37 skipped) 15ms
+   ❯ brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) (7)
+     × env vars are the PACMAN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*) 13ms
+ ❯ |@xiechimon/pacman| test/issue-intake.test.ts (67 tests | 15 failed | 50 skipped) 378ms
+   ❯ opt-in：PACMAN_ISSUE_INTAKE (17)
+     × 变量名走品牌槽 20ms
+     × 未设 → 关 8ms
+     × 1 → 开 1ms
+     × true → 开 1ms
+     × TRUE → 开 1ms
+     × yes → 开 1ms
+     × Yes → 开 1ms
+     × "0" → 关 1ms
+     × "false" → 关 1ms
+     × "no" → 关 1ms
+     × "" → 关 1ms
+     × "on" → 关 1ms
+     × "enabled" → 关 1ms
+     × "2" → 关 0ms
+     × " 1" → 关 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@pacman/shared| test/vocabulary.test.ts > brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典) > env vars are the PACMAN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*)
+AssertionError: expected undefined to be 'PACMAN_ISSUE_INTAKE' // Object.is equality
+
+- Expected:
+"PACMAN_ISSUE_INTAKE"
+
++ Received:
+undefined
+
+ ❯ test/vocabulary.test.ts:487:25
+    485|     expect(hookTimeoutMs).toBe('PACMAN_HOOK_TIMEOUT_MS');
+    486|     // 自有面 [设计]（#1406）：issue 进料轮询 opt-in（1 / true / yes 才开，默认关）
+    487|     expect(issueIntake).toBe('PACMAN_ISSUE_INTAKE');
+       |                         ^
+    488|   });
+    489|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > 变量名走品牌槽
+AssertionError: expected undefined to be 'PACMAN_ISSUE_INTAKE' // Object.is equality
+
+- Expected:
+"PACMAN_ISSUE_INTAKE"
+
++ Received:
+undefined
+
+ ❯ test/issue-intake.test.ts:1193:34
+    1191|
+    1192|   test('变量名走品牌槽', () => {
+    1193|     expect(ENV_VARS.issueIntake).toBe('PACMAN_ISSUE_INTAKE');
+       |                                  ^
+    1194|   });
+    1195|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > 未设 → 关
+AssertionError: expected undefined to be false // Object.is equality
+
+- Expected:
+false
+
++ Received:
+undefined
+
+ ❯ test/issue-intake.test.ts:1198:38
+    1196|   test('未设 → 关', () => {
+    1197|     vi.stubEnv('PACMAN_ISSUE_INTAKE', undefined);
+    1198|     expect(loadConfig().issueIntake).toBe(false);
+       |                                      ^
+    1199|   });
+    1200|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > 1 → 开
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > true → 开
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > TRUE → 开
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > yes → 开
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > Yes → 开
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ test/issue-intake.test.ts:1203:38
+    1201|   test.each(['1', 'true', 'TRUE', 'yes', 'Yes'])('%s → 开', (value) => {
+    1202|     vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    1203|     expect(loadConfig().issueIntake).toBe(true);
+       |                                      ^
+    1204|   });
+    1205|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "0" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "false" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "no" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "on" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "enabled" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > "2" → 关
+ FAIL  |@xiechimon/pacman| test/issue-intake.test.ts > opt-in：PACMAN_ISSUE_INTAKE > " 1" → 关
+AssertionError: expected undefined to be false // Object.is equality
+
+- Expected:
+false
+
++ Received:
+undefined
+
+ ❯ test/issue-intake.test.ts:1208:38
+    1206|   test.each(['0', 'false', 'no', '', 'on', 'enabled', '2', ' 1'])('%j …
+    1207|     vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    1208|     expect(loadConfig().issueIntake).toBe(false);
+       |                                      ^
+    1209|   });
+    1210|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  16 failed | 2 passed | 87 skipped (105)
+   Start at  09:12:07
+   Duration  5.17s (transform 72%, import 22%, tests 6%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 3.37s · 68% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
