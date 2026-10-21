@@ -1,0 +1,8 @@
+
+
+Running 1 test using 1 worker
+
+e2e/zz-press-until-main.spec.ts:16:1 › main: a strict-mode wait error is retried six times into a misleading message
+main strict -> Error: F9 never brought up locator('[data-testid]') | presses: 6
+
+  1 passed (4.6s)
