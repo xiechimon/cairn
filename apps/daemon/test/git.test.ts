@@ -25,6 +25,7 @@ import {
   withGitCredentialFallback,
   withGitNetRetries,
 } from '../src/git.js';
+import { stubOutInheritedGitConfig } from './git-config-env.js';
 
 const CRED = { username: 'git', password: 'pacman_fresh_token_123' };
 
@@ -35,7 +36,9 @@ const MEA_AUTH_FAILURE =
 
 describe('gitCredentialEnv — per-step 凭证 env 注入（02 §8 不落盘）', () => {
   test('前置空值 credential.helper 重置系统/全局 helper 列表', () => {
-    const env = gitCredentialEnv(CRED);
+    // 父环境显式为空：断言的是无继承 GIT_CONFIG_* 时的形状（#1460 起父环境
+    // 自带条目时整体后移，见下一 describe）。
+    const env = gitCredentialEnv(CRED, {});
     // 重置条目须在首位：空值清空此前系统级/全局累积的全部 helper（如
     // osxkeychain），否则同主机陈旧（已撤销）token 被优先命中 → auth 失败，
     // 且成功轮会回写钥匙串（凭证落盘面，破 02 §8 不落盘纪律）。
@@ -72,6 +75,128 @@ describe('gitCredentialEnv — per-step 凭证 env 注入（02 §8 不落盘）'
     // 内联 fresh 凭证胜出；陈旧全局 helper 被空值重置清除，不参与填充。
     expect(out).toContain(`password=${CRED.password}`);
     expect(out).not.toContain('STALE_REVOKED');
+  });
+});
+
+// —— #1460 父环境自带 GIT_CONFIG_*（容器 / CI 的代理、CA 配置）——————
+//   1. 父环境 n 条合法条目 → 原样保留，重置与 helper 落在 n、n+1，COUNT=n+2
+//   2. 父环境无 GIT_CONFIG_* → 形状不变（COUNT=2，helper 在 1）
+//   3. 父环境 COUNT 非十进制整数，或 0..n-1 缺 KEY / VALUE → git 在父环境下
+//      本就报错，退回从 0 写（与修复前相同），凭证调用照常
+//   4. 父环境条目里的 credential.helper 被其后的空值重置清掉：内联 helper
+//      仍是唯一凭证来源
+//   5. 生产组合（runGit 合并 process.env）走默认父环境 = process.env
+
+/** process.env 去掉继承的 GIT_CONFIG_*（云端容器自带三条代理配置）。 */
+const envWithoutGitConfig = (): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_CONFIG_')));
+
+describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460）', () => {
+  const PARENT: NodeJS.ProcessEnv = {
+    GIT_CONFIG_COUNT: '3',
+    GIT_CONFIG_KEY_0: 'http.proxy',
+    GIT_CONFIG_VALUE_0: 'http://127.0.0.1:3128',
+    GIT_CONFIG_KEY_1: 'http.sslCAInfo',
+    GIT_CONFIG_VALUE_1: '/etc/ssl/proxy-ca.crt',
+    GIT_CONFIG_KEY_2: 'credential.helper',
+    GIT_CONFIG_VALUE_2: 'store',
+  };
+
+  test('失败方式 1：父环境 3 条原样保留，重置与 helper 落在 3、4，COUNT=5', () => {
+    // 调用方的合并形：{ ...父环境, ...gitCredentialEnv(cred) }。
+    const env = { ...PARENT, ...gitCredentialEnv(CRED, PARENT) };
+    expect(env.GIT_CONFIG_COUNT).toBe('5');
+    for (const i of [0, 1, 2]) {
+      expect(env[`GIT_CONFIG_KEY_${i}`]).toBe(PARENT[`GIT_CONFIG_KEY_${i}`]);
+      expect(env[`GIT_CONFIG_VALUE_${i}`]).toBe(PARENT[`GIT_CONFIG_VALUE_${i}`]);
+    }
+    expect(env.GIT_CONFIG_KEY_3).toBe('credential.helper');
+    expect(env.GIT_CONFIG_VALUE_3).toBe('');
+    expect(env.GIT_CONFIG_KEY_4).toBe('credential.helper');
+    expect(env.GIT_CONFIG_VALUE_4).toContain(`password=${CRED.password}`);
+  });
+
+  test.each([' 2', '+2'])('失败方式 1：git 也认的 COUNT 写法 %j → 同样接在后面', (count) => {
+    // git 用 strtoul 解析 COUNT：前导空白与 + 号都收。
+    const parent: NodeJS.ProcessEnv = {
+      GIT_CONFIG_COUNT: count,
+      GIT_CONFIG_KEY_0: 'http.proxy',
+      GIT_CONFIG_VALUE_0: 'http://127.0.0.1:3128',
+      GIT_CONFIG_KEY_1: 'http.sslCAInfo',
+      GIT_CONFIG_VALUE_1: '/etc/ssl/proxy-ca.crt',
+    };
+    const env = { ...parent, ...gitCredentialEnv(CRED, parent) };
+    expect(env.GIT_CONFIG_COUNT).toBe('4');
+    expect(env.GIT_CONFIG_KEY_0).toBe('http.proxy');
+    expect(env.GIT_CONFIG_KEY_1).toBe('http.sslCAInfo');
+    expect(env.GIT_CONFIG_VALUE_2).toBe('');
+    expect(env.GIT_CONFIG_VALUE_3).toContain(`password=${CRED.password}`);
+  });
+
+  test('失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1', () => {
+    const env = gitCredentialEnv(CRED, { PATH: '/usr/bin', HOME: '/home/x' });
+    expect(env.GIT_CONFIG_COUNT).toBe('2');
+    expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    expect(env.GIT_CONFIG_VALUE_1).toContain(`password=${CRED.password}`);
+    expect(Object.keys(env).filter((k) => k.startsWith('GIT_CONFIG_'))).toHaveLength(5);
+  });
+
+  test.each<[string, NodeJS.ProcessEnv]>([
+    ['非数字', { GIT_CONFIG_COUNT: 'abc' }],
+    ['负数', { GIT_CONFIG_COUNT: '-1' }],
+    ['尾随字符', { GIT_CONFIG_COUNT: '1x', GIT_CONFIG_KEY_0: 'a.b', GIT_CONFIG_VALUE_0: 'c' }],
+    ['缺 KEY', { GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'a.b', GIT_CONFIG_VALUE_0: 'c' }],
+    ['缺 VALUE', { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'a.b' }],
+  ])('失败方式 3：父环境 COUNT %s → 退回从 0 写（COUNT=2）', (_label, parent) => {
+    const env = { ...parent, ...gitCredentialEnv(CRED, parent) };
+    expect(env.GIT_CONFIG_COUNT).toBe('2');
+    expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    expect(env.GIT_CONFIG_VALUE_1).toContain(`password=${CRED.password}`);
+  });
+
+  test('失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-cred-parent-'));
+    const staleHelper = join(home, 'stale-helper.sh');
+    writeFileSync(staleHelper, '#!/bin/sh\necho username=git\necho password=STALE_REVOKED\n');
+    chmodSync(staleHelper, 0o755);
+    const parent: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_CONFIG_COUNT: '2',
+      GIT_CONFIG_KEY_0: 'pacman.probe',
+      GIT_CONFIG_VALUE_0: 'kept',
+      GIT_CONFIG_KEY_1: 'credential.helper',
+      GIT_CONFIG_VALUE_1: staleHelper,
+    };
+    const env = { ...parent, ...gitCredentialEnv(CRED, parent) };
+
+    const probe = spawnSync('git', ['config', '--get', 'pacman.probe'], { encoding: 'utf8', env });
+    expect(probe.stdout.trim()).toBe('kept');
+
+    const fill = spawnSync('git', ['credential', 'fill'], {
+      input: 'protocol=http\nhost=127.0.0.1:1\n\n',
+      encoding: 'utf8',
+      env,
+    });
+    expect(fill.stdout).toContain(`password=${CRED.password}`);
+    expect(fill.stdout).not.toContain('STALE_REVOKED');
+  });
+
+  test('失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效', async () => {
+    stubOutInheritedGitConfig();
+    vi.stubEnv('GIT_CONFIG_COUNT', '1');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'pacman.probe');
+    vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');
+    try {
+      const env = gitCredentialEnv(CRED);
+      expect(env.GIT_CONFIG_COUNT).toBe('3');
+      const out = await runGitOk(['config', '--get', 'pacman.probe'], { env });
+      expect(out).toBe('kept');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
