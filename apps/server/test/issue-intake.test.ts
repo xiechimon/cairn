@@ -35,7 +35,7 @@
 //    不关。编排线程只认导入之后建的：删卡后复用的号撞上旧线程不算有人接手。
 //    重试不再进行时记一行带原因。第二遍 review：线程要有 chief 步才算开始了
 //    （自己那次编排中途失败留下的空线程不算）；重试时读库抛错只跳过那张卡，
-//    同一轮照常领别的 issue。
+//    同一轮照常领别的 issue。「交付过 PR」只看这张卡自己的 build。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -1737,6 +1737,22 @@ describe('15 已交付 PR 的卡留给 PR 对账', () => {
     const tally = await w.intake.sweep();
     expect(phaseOf(w, row.id)).toBe('building');
     expect(tally?.closed).toBe(0);
+  });
+
+  test('只看这张卡自己的 build：同队另一张卡交付过 PR，不影响没交付的卡照常关闭', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, ISSUE_1445_OPEN);
+    w.gh.state.issues.set(1446, { ...ISSUE_1445_OPEN, number: 1446 });
+    const withPr = insertSourceTodo(w, 1445, 'building');
+    const withoutPr = insertSourceTodo(w, 1446, 'building');
+    deliverPr(w, withPr, 1503);
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    closeOnGithub(w, 1446, OWNER);
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, withPr)).toBe('building');
+    expect(phaseOf(w, withoutPr)).toBe('closed');
+    expect(tally?.closed).toBe(1);
   });
 
   test('build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关', async () => {
