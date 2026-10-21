@@ -430,7 +430,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
  * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
  * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
  * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
-export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): number {
+export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
   const rows = deps.db
     .select()
     .from(step)
@@ -446,7 +446,6 @@ export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): number
     deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
     publishStepRow(deps, { ...row, status: 'stopped' });
   }
-  return rows.length;
 }
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
@@ -1880,26 +1879,22 @@ export function hasMessageRow(
 }
 
 /** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：停掉没人领的
- * verify / review 步、相位 → done（已 done 则相位不动）、完成行、拆卡波次推进。
- * 对账在本轮已有完成行时不进这里（ci-loop 的本轮已报告判据），两个落点不会叠两行。 */
+ * verify / review 步、相位 → done、完成行、拆卡波次推进。两个落点都在卡还没写离
+ * 执行中时才进来（completeStep 对已关闭 / 已完成的卡只记步，#1453；对账先核对卡
+ * 仍在 review）。对账在本轮已有完成行时不进这里（ci-loop 的本轮已报告判据），两个
+ * 落点不会叠两行。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
-  // 到不了 done（人在合并步跑着时把卡关了）就先抛错，什么都不动（setTodoPhase
-  // 同一判据）。
+  // 到不了 done（已关闭、已是 done）就先抛错，什么都不动（setTodoPhase 同一判据）。
   const current = deps.db
     .select({ phase: todo.phase })
     .from(todo)
     .where(eq(todo.id, todoId))
     .get()?.phase;
-  if (current !== undefined && current !== 'done') assertPhaseTransition(current, 'done');
+  if (current !== undefined) assertPhaseTransition(current, 'done');
   // 卡已收尾：没人领的 verify / review 步之后不再在它上面跑（合并步与对账同一处）。
   // 先停步再落相位：done 文档发出时不再带着这些步的等额度投影。
-  const stopped = stopUnclaimedGateSteps(deps, buildId);
+  stopUnclaimedGateSteps(deps, buildId);
   setTodoPhase(deps, todoId, 'done');
-  // 相位本来就是 done 时 setTodoPhase 不发文档：停了步就补发一次。
-  if (current === 'done' && stopped > 0) {
-    const record = getTodo(deps, todoId);
-    if (record) deps.hub.publishTodoDoc(record.teamId, record);
-  }
   // 完成行每次收尾都落：对账在本轮已有完成行时不收尾（ci-loop 的本轮已报告
   // 判据），同一轮里第二个合并步再落一行。
   insertMessageRow(deps, buildId, {

@@ -41,9 +41,11 @@
 // 一次额度。每候选一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint
 // 不同时再加一次 compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
 // - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后的 checkpoint
+//   （daemon 除审核步外每一步收尾都提交并推送，verify 步推的提交同样算）
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
-// - 关闭未合并、隔一轮再读到仍关闭（为重跑 CI 关掉又重开 PR 不算）→ system
-//   行 + build.errorMessage + failed；
+// - 关闭未合并、紧接着的下一次读（隔一轮）仍关闭（为重跑 CI 关掉又重开 PR 不
+//   算；中间有步在飞没读、或有一次读不到，就从下一次读重新数）→ system 行 +
+//   build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 // - 写之前核对 PR 是本 build 的：PR 号是 daemon 按分支名查到的（gh pr list
 //   --head 只比分支名），公开仓里别人 fork 的同名分支开的 PR 也会被查到。head
@@ -61,7 +63,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import {
@@ -265,7 +267,9 @@ interface CiPollTally {
   merged: number;
   /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
-  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示一次，不收尾。 */
+  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示（每轮一次）后留在
+   * review；之后每次 sweep 照样计在这里。review 各项之和 = reviewCandidates（单候选
+   * 异常记进 errors）。 */
   hinted: number;
   /** 本轮已报告过这个结局（人后来把卡拖回了 review）：交给人。 */
   settledBefore: number;
@@ -299,7 +303,9 @@ export function createCiPoller(
   >();
   /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
   const lastReadByBuild = new Map<string, number>();
-  /** 首次读到关闭未合并的时刻（按 PR）；读到 open 即清。 */
+  /** 首次读到关闭未合并的时刻（按 PR）。确认读要紧跟在它之后：读到 open、有步在飞
+   * 而没读（或读的网络窗里步开始）、读不到，都清掉。未连接 GitHub 时的 5 分钟节流与
+   * 额度不够的跳过不清：两次读之间本来就隔着它们，清了就永远确认不了。 */
   const closedSeenAt = new Map<string, number>();
   /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
   const knownRows = new Set<string>();
@@ -406,11 +412,11 @@ export function createCiPoller(
     });
   }
 
-  /** 同一条提示每轮（since 起）只落一次（按内容去重）。 */
-  function hintOnce(buildId: string, content: string, since: number, tally: CiPollTally): void {
+  /** 同一条提示每轮（since 起）只落一次（按内容去重）。不计数：每次 sweep 由调用方
+   * 按卡留在 review 的原因计一次。 */
+  function hintOnce(buildId: string, content: string, since: number): void {
     if (rowKnown(buildId, content, since)) return;
     writeSystemRow(buildId, content);
-    tally.hinted += 1;
   }
 
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
@@ -480,6 +486,7 @@ export function createCiPoller(
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
     if (hasActiveStep(cand.buildId)) {
+      closedSeenAt.delete(key); // 这段没读：之前读到的关闭不再算数
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
@@ -509,6 +516,7 @@ export function createCiPoller(
       });
       readAt = now + (nowMs() - sweepStartedAt);
       if (page === null) {
+        closedSeenAt.delete(key);
         tally.reviewUnreadable += 1;
         return;
       }
@@ -522,6 +530,7 @@ export function createCiPoller(
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+      closedSeenAt.delete(key);
       tally.reviewSkipped += 1;
       return;
     }
@@ -531,6 +540,7 @@ export function createCiPoller(
     // （同下文合并判据）。
     if (pull.headRef === null || pull.baseRepoId === null) {
       pullCache.delete(key);
+      closedSeenAt.delete(key);
       tally.reviewUnreadable += 1;
       return;
     }
@@ -542,7 +552,6 @@ export function createCiPoller(
         cand.buildId,
         `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`,
         since,
-        tally,
       );
       tally.reviewForeign += 1;
       return;
@@ -564,12 +573,13 @@ export function createCiPoller(
           cand.buildId,
           `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
           since,
-          tally,
         );
+        tally.hinted += 1;
         return;
       }
-      // 合并之后同分支又推了提交（修复轮）：那个提交不在这次合并里，不收尾。
-      // head 包含 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
+      // 合并之后同分支又推了提交（修复轮，或 verify 步推的提交：daemon 除审核步外
+      // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
+      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
       const checkpoint =
         deps.db
           .select({ commit: step.checkpointCommit })
@@ -577,7 +587,7 @@ export function createCiPoller(
           .where(
             and(
               eq(step.buildId, cand.buildId),
-              eq(step.kind, 'build'),
+              ne(step.kind, 'review'),
               eq(step.status, 'done'),
               isNotNull(step.checkpointCommit),
             ),
@@ -628,7 +638,6 @@ export function createCiPoller(
               cand.buildId,
               `PR #${prNumber} 已在 GitHub 合并，但暂时读不到 compare（GitHub 出错、超时或限流），无法确认分支提交 ${checkpoint.slice(0, 7)} 在这次合并里；稍后重试。`,
               since,
-              tally,
             );
           }
           tally.reviewUnreadable += 1;
@@ -646,11 +655,11 @@ export function createCiPoller(
             status === 'missing'
               ? `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但 GitHub 上找不到分支提交 ${cp}（可能从没推送过），无法确认它在这次合并里。任务留在审核关口。`
               : status === 'invalid'
-                ? `PR #${prNumber} 已在 GitHub 合并，但执行步回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
+                ? `PR #${prNumber} 已在 GitHub 合并，但机器回报的分支提交不是有效的提交 SHA，无法核对它是否在这次合并里。任务留在审核关口。`
                 : `PR #${prNumber} 已在 GitHub 合并（合并时 head ${head}），但分支提交 ${cp} 不是那个 head 的祖先：合并之后又推了提交，或分支被改写过。这部分改动可能还没进默认分支；任务留在审核关口，由人把这个提交另行合入默认分支。`,
             since,
-            tally,
           );
+          tally.hinted += 1;
           return;
         }
       }
@@ -668,8 +677,9 @@ export function createCiPoller(
       tally.merged += 1;
       return;
     }
-    // 关闭要隔一轮再读到才算：为重跑 CI 关掉又重开 PR 很常见，sweep 落在中间时
-    // 不能把卡打成 failed、停掉它的 verify 步。
+    // 关闭要紧接着的下一次读（隔一轮）还读到才算：为重跑 CI 关掉又重开 PR 很常见，
+    // sweep 落在中间时不能把卡打成 failed、停掉它的 verify 步。两次读之间有一段没读
+    // 或读不到时（见 closedSeenAt），这次读重新当作第一次。
     const seen = closedSeenAt.get(key);
     if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
       if (seen === undefined) closedSeenAt.set(key, readAt);
