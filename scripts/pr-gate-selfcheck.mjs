@@ -641,8 +641,7 @@ const cases = [
       return (
         safety !== undefined &&
         !safety.prompt.includes('only-the-caller-knows') &&
-        rules !== undefined &&
-        rules.prompt.includes('only-the-caller-knows')
+        rules?.prompt.includes('only-the-caller-knows') === true
       );
     },
   ],
