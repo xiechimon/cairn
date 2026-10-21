@@ -461,7 +461,8 @@ export function createCiPoller(
     let pull: GithubPull | null;
     let readAt = now;
     if (entry?.pull?.merged === true) {
-      // 合并是终态：卡留在 review（提示、人拖回）时不再重读，不耗读额度。
+      // 合并是终态：卡留在 review（提示、人拖回）时不再重读，不耗读额度。缺合并
+      // 判据字段的响应不留在缓存里（见下），之后照常节流重读。
       pull = entry.pull;
     } else {
       if (token === null) {
@@ -505,7 +506,9 @@ export function createCiPoller(
       return;
     }
     if (pull.merged) {
+      // 缺字段的已合并响应不当终态缓存：下次读不带它的 etag（304 会交回同一份）。
       if (pull.baseRef === null || pull.defaultBranch === null) {
+        pullCache.delete(key);
         tally.reviewUnreadable += 1;
         return;
       }
@@ -535,6 +538,7 @@ export function createCiPoller(
           .orderBy(desc(step.createdAt))
           .get()?.commit ?? null;
       if (checkpoint !== null && pull.headSha === null) {
+        pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
         tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
         return;
       }

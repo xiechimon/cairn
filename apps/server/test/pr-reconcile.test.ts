@@ -94,6 +94,9 @@
 //   [58] 已合并的 PR 不会再变：卡留在 review（提示、人拖回）时不再重读
 //   [59] 合并步收尾时相位已被人改成不能到 done 的（closed）→ 先抛错，不停任何步
 //   [60] checkpoint 不是 40 位 SHA 时 compare 不发请求，也不占匿名额度
+// 第七遍 /code-review 补的：
+//   [61] 已合并的响应缺合并判据要的字段（base、default_branch，有 checkpoint 时的
+//        head sha）→ 不当终态缓存，之后照常节流重读（不带那次响应的 etag）
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -1593,6 +1596,42 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(mock.compareRequests()).toHaveLength(0);
     expect(mock.requests.filter((u) => u.endsWith('/pulls/301'))).toHaveLength(1);
   });
+
+  test.each([
+    ['base', {}, { noBase: true }],
+    ['head sha (the build has a checkpoint)', { checkpoint: 'a'.repeat(40) }, { noHead: true }],
+  ] as const)(
+    '[61] a merged response without %s is read again on a later sweep; the complete one finishes the card',
+    async (_label, world, missing) => {
+      const w = makeWorld(world);
+      const spec: PullSpec = {
+        state: 'closed',
+        merged: true,
+        mergeCommitSha: 'abc1234def5678',
+        ...missing,
+      };
+      const mock = new PullsMock({ [w.prNumber]: spec });
+      const poller = pollerFor(w, mock);
+      const pullReads = () => mock.requests.filter((u) => u.endsWith(`/pulls/${w.prNumber}`));
+      const t0 = Date.now();
+      await poller.sweep(t0);
+      expect(w.todoRow().phase).toBe('review');
+      spec.noBase = false;
+      spec.noHead = false;
+      await poller.sweep(t0 + 60_000); // anonymous: five minutes between reads of one PR
+      expect(pullReads()).toHaveLength(1);
+      await poller.sweep(t0 + 300_000);
+      expect(pullReads()).toHaveLength(2);
+      // no etag of the incomplete response: a 304 would hand the same body back
+      expect(mock.headers.at(-1)?.['if-none-match']).toBeUndefined();
+      expect(w.todoRow().phase).toBe('done');
+      const rows = w.systemRows();
+      expect(
+        rows.some((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并（合并提交 abc1234`)),
+      ).toBe(true);
+      expect(rows).toContain(DONE_ROW);
+    },
+  );
 
   test('㊼ compare asks for one page', async () => {
     const w = makeWorld({ checkpoint: 'a'.repeat(40) });
