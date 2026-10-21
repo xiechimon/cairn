@@ -115,6 +115,8 @@ not carry the closing keyword for the parent ticket.
 - Image links must be the embedded `![label](url)` form and must not sit
   inside fenced code blocks — a link in a fence renders nowhere.
 - Bodies are in English.
+- Asking the user anything about an open PR: first `gh pr merge <n> --disable-auto`, then `gh pr edit <n> --add-label needs-decision`, then ask. The gate is red while the label is on and disarms auto-merge on every run until a person removes the label (an agent may remove it only after the user decided in chat, with the `PACMAN_DECIDED=1` prefix). Editing the body green does not clear the label.
+- Arm auto-merge (`gh pr merge <n> --squash --auto`) only on a PR whose Acceptance is fully checked and that carries no `needs-decision` label; an unchecked item adds the label and disarms auto-merge on its own.
 
 ## Gate facts — what is actually enforced
 
@@ -122,4 +124,5 @@ not carry the closing keyword for the parent ticket.
 |---|---|
 | `## Verified`, `## Upstream` answered (non-empty after stripping comments) | pr-evidence (required check) |
 | image links embedded + HTTP 200 | pr-evidence (required check) |
-| Acceptance carries >=1 task-list item, all checked | pr-evidence job (pr-tasks step) |
+| Acceptance carries >=1 task-list item, all checked | pr-evidence (required check, pr-tasks step) |
+| no `needs-decision` label on the PR (a person's decision is pending) | pr-evidence (required check); while the label is on, each run also disarms auto-merge, and an unchecked Acceptance item adds the label |

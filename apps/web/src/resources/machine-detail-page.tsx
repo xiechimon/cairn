@@ -173,7 +173,10 @@ export function MachineDetailPage() {
             hint={t('把归属这台机器的 agent 一起迁到另一台机器。')}
           >
             <Select value={evacuateTarget} onValueChange={(v) => setEvacuateTarget(v as string)}>
-              <SelectTrigger className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}>
+              <SelectTrigger
+                aria-label={t('迁移到')}
+                className={`machine-evacuate-select ${SETTINGS_SELECT_TRIGGER_CLS}`}
+              >
                 <SelectValue>
                   {others.find((m) => m.id === evacuateTarget)?.name ?? t('迁移到…')}
                 </SelectValue>
