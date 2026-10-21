@@ -1,12 +1,17 @@
 ## node scripts/e2e-affected.mjs --dry-run -- apps/web/test/columns.test.ts
 [e2e:affected] changed paths (explicit):
   apps/web/test/columns.test.ts → none
-[e2e:affected] no web e2e surface touched — the vitest layers (unit / stack integration) are the coverage for this change.
+[e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.
 
 ## node scripts/e2e-affected.mjs --dry-run -- apps/web/vitest.config.ts
 [e2e:affected] changed paths (explicit):
   apps/web/vitest.config.ts → none
-[e2e:affected] no web e2e surface touched — the vitest layers (unit / stack integration) are the coverage for this change.
+[e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.
+
+## node scripts/e2e-affected.mjs --dry-run -- apps/web/vitest.config.ts.bak
+[e2e:affected] changed paths (explicit):
+  apps/web/vitest.config.ts.bak → FULL
+[e2e:affected] 169/169 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
 
 ## node scripts/e2e-affected.mjs --dry-run -- apps/web/src/board/columns.ts
 [e2e:affected] changed paths (explicit):

@@ -160,6 +160,8 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  // #1455: vitest-only config (includes test/**/*.test.ts); not in the e2e build.
+  ['apps/web/vitest.config.ts', []],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
   ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
   ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],
@@ -175,6 +177,10 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-'] },
+  // #1455: the web unit-test layer. vitest-only, never in the fixture build
+  // playwright serves, and nothing under e2e/ imports from it: no spec is
+  // affected. `pnpm exec vitest run --changed origin/main` covers it.
+  { prefix: 'apps/web/test/', specs: [] },
 ];
 
 // Cross-cutting paths: consumed (or rendered) everywhere, so the honest
@@ -201,12 +207,6 @@ const FULL_PATH_PREFIXES = [
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',
 ];
-
-// #1455: the web unit-test layer. vitest-only (vitest.config.ts includes
-// test/**/*.test.ts), never in the fixture build playwright serves, and no
-// e2e file imports from it — so no spec is affected. The unit run
-// (`pnpm exec vitest run --changed`) is the coverage for these paths.
-const UNIT_TEST_PREFIXES = ['apps/web/test/', 'apps/web/vitest.config.ts'];
 
 // --- changed-path collection -------------------------------------------------
 
@@ -251,9 +251,6 @@ function classify(path) {
   }
   if (FULL_PATH_PREFIXES.some((p) => path === p || path.startsWith(p))) {
     return { specs: null, why: 'shared surface' };
-  }
-  if (UNIT_TEST_PREFIXES.some((p) => path === p || path.startsWith(p))) {
-    return { specs: [], why: 'web unit-test layer (vitest only, not in the e2e build)' };
   }
   if (path.startsWith('apps/web/')) return { specs: null, why: 'unmapped web path' };
   if (path.startsWith('apps/server/')) {
@@ -335,7 +332,7 @@ if (selection.length === 0) {
   console.log(`[e2e:affected] changed paths (${source}):`);
   console.log(reasons.join('\n'));
   console.log(
-    '[e2e:affected] no web e2e surface touched — the vitest layers (unit / stack integration) are the coverage for this change.',
+    '[e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.',
   );
   process.exit(0);
 }
