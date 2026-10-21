@@ -113,26 +113,26 @@ export interface GateInputs {
    * - files：全部文件（compareFilesFromResponse）。
    * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），读全；
    *   totalCommits = 响应的 total_commits（各页合起来的条数）。
-   * 读在 PR 的 head 上 = 三条都成立：
+   * 读在 PR 的 head 上 = 两条都成立：
    *   1. headSha 等于 pr.headSha（外壳填的值）；
-   *   2. commits 里有 pr.headSha（读在比 head 旧的提交上的 compare 没有它）；
-   *   3. commits 里没有哪个提交以 pr.headSha 为父（读在 head 的后代上的 compare 一定
-   *      列着 head 的子提交：head 在 commits 里即不在 base 一侧，它的后代也都不在，从
-   *      读到的提交往下到 head 的每一个都列着；在 head 上读的只列 head 与它的祖先，祖先
-   *      不以 head 为父）。
-   * 2 与 3 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得
-   * 出。它们以 commits 读全为前提（少了 head 的子提交，后代上读的 compare 就认不出），
-   * 所以 commits 的条数要等于 totalCommits，且没有重复的 SHA（重复是分页错位的迹象，
-   * 会顶替没读到的提交）；不然 = 没读全，整份按读不到处理（patch-unavailable，可等）。
-   * 外壳照读到的原样传，不去重：同一 SHA 列了两遍（分页错位，或带着两份 parents）都要
-   * 让这里看见，去重会把没读全的一份当成读全了。
+   *   2. 响应自己的 head 是 pr.headSha。读全的 base...head 里，head 以外的每个提交都有
+   *      一个子提交也列着（从 head 往下的路上的下一个，它也不在 base 一侧），head 没有：
+   *      没被别的列着的提交认作父提交的恰好一个，就是 compare 读到的 head。读在比 head
+   *      旧的提交上，这一个是那个旧提交；读在后代上，是那个后代（head 的子提交列着）；
+   *      列表里混进了别的提交，就不止一个；空列表一个也没有。
+   * 2 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得出。
+   * 它以 commits 读全为前提（少了 head 的子提交，head 就成了没被认作父提交的那个），所以
+   * commits 的条数要等于 totalCommits，且没有重复的 SHA；不然 = 没读全，整份按读不到
+   * 处理（patch-unavailable，可等）。外壳照读到的原样传，不去重：同一 SHA 列了两遍是
+   * 读得不一致（分页错位，或同一提交带着两份 parents），去重会挑掉其中一份、把不一致
+   * 藏起来。
    * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
    * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
    * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 {sha, parents}
    * 列表），每次读都一样，留人。headSha、commits 的 sha 或 parents 里有不是 40 位小写
    * SHA 的，这里同样按 compare-malformed 留人：写错的 SHA 每次读都一样，不该成为永远对
-   * 不上的可等；写错的父提交还会认不出 head 的子提交。commits 少给别的提交，证据链只会
+   * 不上的可等；写错的父提交还会让响应自己的 head 认错。commits 少给别的提交，证据链只会
    * 少认（拦）。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否
    * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到或它的 head
    * 写错时没有 head 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），
@@ -156,6 +156,14 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
+
+/** compare 响应自己的 head：commits 里没被别的列着的提交认作父提交的那一个（读全的
+ * base...head 恰好一个，见 GateInputs.compare）。没有或不止一个 = 说不清读在哪，null。 */
+function compareHead(commits: GateCompareCommit[]): string | null {
+  const parents = new Set(commits.flatMap((c) => c.parents));
+  const tips = commits.filter((c) => !parents.has(c.sha));
+  return tips.length === 1 ? (tips[0]?.sha ?? null) : null;
+}
 const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]));
 const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
@@ -336,10 +344,10 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
 
   // 补丁。compare 读不到可等；读到了形状不对（含写错的 SHA），下一次读还是一样，留人。
   // 提交没读全（条数不等于 total_commits，或有重复的 SHA）的，下面的 head 判定靠不住；
-  // 不是在 PR 的 head 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，读在了
-  // 更早的提交上；或响应的提交里有以它为父的，读在了后代上）的，说的是别的补丁。这两样
-  // 都按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果
-  // 也不报它的摘要，免得把别的补丁的结论安到 head 上。
+  // 不是在 PR 的 head 上读的（外壳填的 head 对不上，或响应自己的 head 不是它：读在了
+  // 更早的提交或后代上，或列表里混进了别的提交）的，说的是别的补丁。这两样都按读不到
+  // 处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果也不报它的
+  // 摘要，免得把别的补丁的结论安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
@@ -359,9 +367,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   } else if (
     compare !== null &&
     head !== null &&
-    (compare.headSha !== head ||
-      !compare.commits.some((c) => c.sha === head) ||
-      compare.commits.some((c) => c.parents.includes(head)))
+    (compare.headSha !== head || compareHead(compare.commits) !== head)
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
