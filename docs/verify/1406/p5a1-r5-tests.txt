@@ -1,0 +1,461 @@
+# P5a-1 round 5: new and changed intake tests, red/green and mutations
+# Test file: apps/server/test/issue-intake.test.ts (141 tests at 22cf8db1, 155 at the round 5 head).
+# Driver: docs/verify/1406/p5a1-r5-mutate.mjs with docs/verify/1406/p5a1-r5-mutations.json. Each mutation replaces one
+# exact string (must occur once) in one source file, runs
+#   pnpm exec vitest run --reporter=verbose apps/server/test/issue-intake.test.ts
+# and writes the saved file content back; `git status --short` is printed after the set. For the "before" legs the
+# test file itself was swapped for its 22cf8db1 copy saved in the scratchpad and written back afterwards (cmp-checked).
+
+## What the tests pin (pr-gate run 4 suggestions 6, 7, 8 and the two /code-review passes)
+A. Multi-page history, a later events page unreadable (group 2, 2 cases): page 1 holds the owner's labeled event,
+   page 2 (502 through the fake's new per-issue eventsFailPages) holds a later unlabeled, or an outsider's re-label.
+   First sweep: not taken, unverifiable 1, no permission read, reads [page 1 200, page 2 502], reason
+   events-unreadable. After page 2 reads again: still not taken (label-removed / labeler-below-triage).
+B. Malformed events void the whole read (group 2, 7 cases): after the owner's label, an unlabeled event missing
+   created_at, with created_at 'yesterday', missing id, missing label.name; a labeled event missing id; an entry that
+   is not an object; a closed event missing created_at (the parser is shared with the closer check and voids the read
+   for the labeler too). Each: not taken, unverifiable 1, no permission read; taken once the read is whole.
+C. Closer check (group 11, 2 cases): the issue was seen open; events are [owner closed, reopened, outsider closed]
+   with the newest closed missing created_at or id. The read is void: task stays, closeSkipped 1, no permission read,
+   reason events-unreadable. With whole events the outsider is the closer: task stays, reason closer-below-triage.
+D. Rate limit on an import read (group 24, 3 cases, the LIMITED set): the detail read /issues/1394 answers 429, 403
+   with x-ratelimit-remaining 0, or a secondary-limit 403. The import fails (errors 1, 'issue intake import failed'
+   for 1394), the team is not stopped (rateLimited 0, no rate-limit line) and 1401 is taken in the same sweep.
+E. Six negative-only tests now also assert the candidate or task was evaluated:
+   '1 issue 作者是仓主也不算数' (candidates 1, notEligible 1, one events read, outsider's permission read, reason
+   labeler-below-triage); '打标账号已删除' (notEligible 1, one events read, reason labeler-deleted);
+   '3 仓主打 → 摘 → 外人再打' (outsider's permission read, none for the owner, reason labeler-below-triage);
+   '别的标签的 labeled 不算数' (one events read, reason no-labeled-event); '11 首见即 closed' (issue reads [200, 304],
+   no events read, closeSkipped 0); '重启首见即 closed' (the restarted poller reads the issue once, 200, and no events).
+The restart test counts reads through the fake's issueReads / eventReads helpers.
+
+## Green, at the round 5 code head 0567408901710e03f57f68e82ab8950ea1f8b265
+$ pnpm exec vitest run --reporter=verbose apps/server/test/issue-intake.test.ts   -> exit 0, Tests 155 passed (155)
+new and changed tests:
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 1 打标人权限（D5） > issue 作者是仓主也不算数：只看打标人
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 1 打标人权限（D5） > 打标账号已删除（actor null）→ 不领，不读 permission
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 created_at） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 的 created_at 不是时间） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 id） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 id） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 label） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后有一项不是对象） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（closed 缺 created_at） → 不领；恢复后下一轮领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里仓主后来摘了标）→ 不领、不读 permission；恢复后读全两页，照样不领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里外人后来重打）→ 不领、不读 permission；恢复后读全两页，照样不领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 created_at → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 id → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 重启（新的轮询器）首见即 closed → 不关
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 429（retry-after 60）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（x-ratelimit-remaining 0，带 reset）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+✓ |@xiechimon/pacman| test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（二级限流，只有 message）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+
+## Before: the rules undone against the 22cf8db1 tests (mutations survive)
+# source: 22cf8db1 behavior (round 5 had changed comments only); test file: 22cf8db1 copy
+## MA: readHistory: a later events page that cannot be read ends the read as complete (page 1 alone decides)
+file: apps/server/src/services/issue-intake.ts
+replace: "      if (data === null) return null;\n"
+   with: "      if (data === null) return pageNo === 1 ? null : { events, complete: true };\n"
+result: exit 0, Test Files  1 passed (1) ; Tests  141 passed (141)  -> GREEN (mutation survived)
+## MB: githubIssueEvents: a labeled / unlabeled / closed event missing id or created_at is skipped instead of voiding the read
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n"
+   with: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) continue;\n"
+result: exit 0, Test Files  1 passed (1) ; Tests  141 passed (141)  -> GREEN (mutation survived)
+## MC: githubIssueEvents: an unlabeled event missing label.name is skipped (labeled still voids)
+file: apps/server/src/lib/github.ts
+replace: "    if (event !== 'closed' && labelName === null) return null;\n"
+   with: "    if (event === 'labeled' && labelName === null) return null;\n    if (event === 'unlabeled' && labelName === null) continue;\n"
+result: exit 0, Test Files  1 passed (1) ; Tests  141 passed (141)  -> GREEN (mutation survived)
+## MD: githubIssueEvents: an array entry that is not an object is skipped instead of voiding the read
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof raw !== 'object' || raw === null) return null;\n"
+   with: "    if (typeof raw !== 'object' || raw === null) continue;\n"
+result: exit 0, Test Files  1 passed (1) ; Tests  141 passed (141)  -> GREEN (mutation survived)
+
+## Before: the six negative-only tests under a no-op sweep and two setup slips, 22cf8db1 tests (they pass vacuously)
+# the runs are red overall; the "watched" lines show the six tests passing anyway
+## N0: no-op sweep: every sweep returns the empty tally and logs it, reading and writing nothing
+file: apps/server/src/services/issue-intake.ts
+replace: "    if (sweeping) return null;\n    sweeping = true;\n    const tally = emptyTally();\n    try {\n"
+   with: "    if (sweeping) return null;\n    const tally = emptyTally();\n    log(tally, 'issue intake sweep');\n    if (tally.teams === 0) return tally;\n    sweeping = true;\n    try {\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  106 failed | 35 passed (141)  -> RED
+  watched: pass  issue 作者是仓主也不算数：只看打标人
+  watched: pass  打标账号已删除（actor null）→ 不领，不读 permission
+  watched: pass  仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  watched: pass  别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+  watched: pass  轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  watched: pass  重启（新的轮询器）首见即 closed → 不关
+## N1: setup slip on the intake side: the candidate loop visits no candidate (list read, nothing evaluated)
+file: apps/server/src/services/issue-intake.ts
+replace: "      for (const issue of candidates) {\n"
+   with: "      for (const issue of candidates.slice(candidates.length)) {\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  75 failed | 66 passed (141)  -> RED
+  watched: pass  issue 作者是仓主也不算数：只看打标人
+  watched: pass  打标账号已删除（actor null）→ 不领，不读 permission
+  watched: pass  仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  watched: pass  别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+## N2: setup slip on the reconcile side: building tasks drop out of the close-reconcile set
+file: apps/server/src/services/issue-intake.ts
+replace: "            notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),\n"
+   with: "            notInArray(todo.phase, [...CLOSE_RECONCILE_SKIPPED, 'building']),\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  18 failed | 123 passed (141)  -> RED
+  watched: pass  轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  watched: pass  重启（新的轮询器）首见即 closed → 不关
+
+## After: every mutation against the round 5 tests, at 0567408901710e03f57f68e82ab8950ea1f8b265 (all red)
+## MA: readHistory: a later events page that cannot be read ends the read as complete (page 1 alone decides)
+file: apps/server/src/services/issue-intake.ts
+replace: "      if (data === null) return null;\n"
+   with: "      if (data === null) return pageNo === 1 ? null : { events, complete: true };\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  2 failed | 153 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里仓主后来摘了标）→ 不领、不读 permission；恢复后读全两页，照样不领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里外人后来重打）→ 不领、不读 permission；恢复后读全两页，照样不领
+  watched: FAIL  第 2 页里仓主后来摘了标
+  watched: FAIL  第 2 页里外人后来重打
+## MB: githubIssueEvents: a labeled / unlabeled / closed event missing id or created_at is skipped instead of voiding the read
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n"
+   with: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) continue;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  7 failed | 148 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 的 created_at 不是时间） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（closed 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 created_at → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 id → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 缺 created_at）
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 缺 id）
+  watched: FAIL  形坏（labeled 缺 id）
+  watched: FAIL  形坏（closed 缺 created_at）
+  watched: FAIL  最新一条 closed（外人关的）缺 created_at
+  watched: FAIL  最新一条 closed（外人关的）缺 id
+## MB-id: githubIssueEvents: only the missing-id half is skipped (created_at still voids)
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n"
+   with: "    if (typeof entry.id !== 'number') continue;\n    if (!Number.isFinite(at)) return null;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  3 failed | 152 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 id → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  watched: pass  形坏（仓主打标之后的 unlabeled 缺 created_at）
+  watched: pass  形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 缺 id）
+  watched: FAIL  形坏（labeled 缺 id）
+  watched: pass  形坏（closed 缺 created_at）
+  watched: pass  最新一条 closed（外人关的）缺 created_at
+  watched: FAIL  最新一条 closed（外人关的）缺 id
+## MB-at: githubIssueEvents: only the missing or unparsable created_at half is skipped (id still voids)
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;\n"
+   with: "    if (typeof entry.id !== 'number') return null;\n    if (!Number.isFinite(at)) continue;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  4 failed | 151 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 的 created_at 不是时间） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（closed 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 created_at → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 缺 created_at）
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 的 created_at 不是时间）
+  watched: pass  形坏（仓主打标之后的 unlabeled 缺 id）
+  watched: pass  形坏（labeled 缺 id）
+  watched: FAIL  形坏（closed 缺 created_at）
+  watched: FAIL  最新一条 closed（外人关的）缺 created_at
+  watched: pass  最新一条 closed（外人关的）缺 id
+## MC: githubIssueEvents: an unlabeled event missing label.name is skipped (labeled still voids)
+file: apps/server/src/lib/github.ts
+replace: "    if (event !== 'closed' && labelName === null) return null;\n"
+   with: "    if (event === 'labeled' && labelName === null) return null;\n    if (event === 'unlabeled' && labelName === null) continue;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  1 failed | 154 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 label） → 不领；恢复后下一轮领
+  watched: FAIL  形坏（仓主打标之后的 unlabeled 缺 label）
+  watched: pass  形坏（labeled 缺 label）
+## MD: githubIssueEvents: an array entry that is not an object is skipped instead of voiding the read
+file: apps/server/src/lib/github.ts
+replace: "    if (typeof raw !== 'object' || raw === null) return null;\n"
+   with: "    if (typeof raw !== 'object' || raw === null) continue;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  1 failed | 154 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后有一项不是对象） → 不领；恢复后下一轮领
+  watched: FAIL  形坏（仓主打标之后有一项不是对象）
+## ME: take(): a rate-limited import read (HttpError 429 from importGithubIssue) stops the team like an intake read
+file: apps/server/src/services/issue-intake.ts
+replace: "      if (err instanceof HttpError && err.status === 409) {\n        tally.claimed += 1;\n        return 'not-taken';\n      }\n      tally.errors += 1;\n"
+   with: "      if (err instanceof HttpError && err.status === 409) {\n        tally.claimed += 1;\n        return 'not-taken';\n      }\n      if (err instanceof HttpError && err.status === 429) {\n        throw new GithubRateLimitedError('import', 429, null, null);\n      }\n      tally.errors += 1;\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  2 failed | 153 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 429（retry-after 60）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（x-ratelimit-remaining 0，带 reset）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  watched: FAIL  导入时的详情读 429（retry-after 60）
+  watched: FAIL  导入时的详情读 403（x-ratelimit-remaining 0，带 reset）
+  watched: pass  导入时的详情读 403（二级限流，只有 message）
+## N0: no-op sweep: every sweep returns the empty tally and logs it, reading and writing nothing
+file: apps/server/src/services/issue-intake.ts
+replace: "    if (sweeping) return null;\n    sweeping = true;\n    const tally = emptyTally();\n    try {\n"
+   with: "    if (sweeping) return null;\n    const tally = emptyTally();\n    log(tally, 'issue intake sweep');\n    if (tally.teams === 0) return tally;\n    sweeping = true;\n    try {\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  126 failed | 29 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 主路径：领、导入、编排 > 仓主打标的 open issue 被导入并编排；读面带 token、条件读、标签过滤
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > read 权限 / 非协作者（404）不领；role_name triage（legacy permission=read）与 maintain（permission=write）领
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > issue 作者是仓主也不算数：只看打标人
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > 打标账号已删除（actor null）→ 不领，不读 permission
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 5xx → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 404 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 410 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 超时 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（不是数组） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 label） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 的 created_at 不是时间） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 label） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后有一项不是对象） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（closed 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里仓主后来摘了标）→ 不领、不读 permission；恢复后读全两页，照样不领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里外人后来重打）→ 不领、不读 permission；恢复后读全两页，照样不领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 5xx → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 超时 → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 形坏（permission 缺失） → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 外人打 → 摘 → 仓主再打：最新一条是仓主的 → 领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 顺序不靠数组位置：按 created_at 取最新
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 最新 labeled 之后有 unlabeled（列表陈旧）→ 不领、不读 permission
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 超过 ISSUE_INTAKE_MAX_EVENT_PAGES 页仍有下一页 → 读不全，不领、不读 permission
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 跨页：第 1 页外人打标又被摘、第 2 页仓主重新打标 → 读第 2 页、领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 的 Link rel="next" 指到别的主机 → 读不全，不领、不出站
+  FAIL  test/issue-intake.test.ts > 4 列表里的 PR > 带 ready-for-agent 的 PR 条目跳过：不读 events、不建卡
+  FAIL  test/issue-intake.test.ts > 5 已被导入 / 自建 issue > 已有 github-issue 卡与自建 issue 卡的号：记 claimed，不读 events、不再编排
+  FAIL  test/issue-intake.test.ts > 6 并发导入同一 issue > 另一路导入在飞时轮询到同号：一张卡，轮询这边记 claimed、不编排
+  FAIL  test/issue-intake.test.ts > 7 项目在飞上限 > 余量 2：只领最旧的两条，其余等下一轮；腾出位后按最旧续领
+  FAIL  test/issue-intake.test.ts > 7 项目在飞上限 > 在飞数每次导入前现数：sweep 期间别处导入的卡也占位
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > chief 行不存在 → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > chief 未绑 Agent → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > 绑定的 Agent 没有模型 → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 9 无 token / 密文坏 / token 无权 > 团队未连接 GitHub → 零出站、零建卡、记日志
+  FAIL  test/issue-intake.test.ts > 9 无 token / 密文坏 / token 无权 > 密文坏（keyfile 换过）→ sweep 不抛、零出站
+  FAIL  test/issue-intake.test.ts > 9 无 token / 密文坏 / token 无权 > 列表读 403（token 无权）→ 项目跳过、不读 events、不建卡
+  FAIL  test/issue-intake.test.ts > 9 无 token / 密文坏 / token 无权 > 列表读 404（token 无权）→ 项目跳过、不读 events、不建卡
+  FAIL  test/issue-intake.test.ts > 10 导入后标签被摘 > 列表里没了、issue 仍 open → 卡原样留着
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 先读到 open、再被协作者关闭 → 经关闭路径落 closed，并停掉 pending 活动步
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器自己导入的卡：导入即记为见过 open，随后被协作者关闭 → 关闭
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > todo / failed 卡同样关闭；review 与 done 卡不读不动
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 被对账关掉后有人把卡重开（issue 仍 closed）→ 卡保持开着
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 外部作者自己关（read 权限） → 不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭账号已删除（actor null） → 不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：events 5xx → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：events 读不全（Link rel="next"） → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：permission 5xx → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 created_at → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 id → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > issue 事件过百、closed 事件在第 2 页 → 读到第 2 页并关闭
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 重启（新的轮询器）首见即 closed → 不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 读期间卡被人推进 review → 写前重读相位，跳过
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > open issue 不动；第二轮条件读（If-None-Match）304 复用；读失败不动
+  FAIL  test/issue-intake.test.ts > 12 issue 正文当数据 > 正文原样进 todo.spec，不进任何日志行
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 上一轮未完时再触发 → 立即返回 null，不重复读
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 列表 304：发 If-None-Match，复用上轮列表（304 ≠ 空）
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > permission 按 (仓, login) 缓存：TTL 内不重读（含 404 的否定答案），过期重读
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 未领的 issue 第二轮 events 走条件读
+  FAIL  test/issue-intake.test.ts > 14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓 > 形坏 githubRepo 与非 GitHub 项目不出站；同仓两项目只读一次列表、每条 issue 一张卡
+  FAIL  test/issue-intake.test.ts > scheduler 接线 > start() 启动即补扫 + 5 分钟自循环；tick() 不出站；stop() 停
+  FAIL  test/issue-intake.test.ts > 1b 打标人权限：自定义角色的另外两条判据 > legacy permission=write（role_name 是自定义角色）领；user.permissions.triage=true 领；两者都不满足不领
+  FAIL  test/issue-intake.test.ts > 5b 已占用：引用大小写不同也算同一条 issue > 团队里已有 github:Xiechimon/Pacman#1406 的卡 → 1406 记 claimed，不再导入
+  FAIL  test/issue-intake.test.ts > 13b permission 否定答案（404）同样缓存 > 非协作者打标：TTL 内第二轮仍是候选，但不再读 permission
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > 最旧 100 条都已占用或不认，第 101 条照样被领（跟 Link rel="next" 读第 2 页）
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > 至多读 3 页（300 条）：更后面的不读，记 listTruncated
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > 满页之后长出第 2 页：第 1 页内容不变，下一轮不带 If-None-Match 重读，读到新页
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > Link rel="next" 指向 api.github.com 之外 → 不跟（token 不出站到别的主机）
+  FAIL  test/issue-intake.test.ts > sweep 自身出错 > 查库抛错（例：SQLITE_BUSY）→ 记一行带原因的错误、仍落对账行、不抛给调度器
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 读期间 build 交付了 PR → 写前重读，跳过
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 只看这张卡自己的 build：同队另一张卡交付过 PR，不影响没交付的卡照常关闭
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前有人已手动开始（已有编排线程）→ 不再重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 打上 ready-for-agent 之后摘的是别的标签（needs-decision）→ 照领
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 同一秒的 labeled 与 unlabeled 按 id 定先后：unlabeled 的 id 大 → 不领；labeled 的 id 大 → 领
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 轮询器在重启前领的卡，重启后照样对账（认卡靠库里的 createdBy，不靠进程内存）
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 读 chief 行出错 → 记本队失败（issue intake team failed），不是整轮失败
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动）
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主本人打的标（不经 app）→ 领，领取日志带打标人
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主授权的 app（claude）替仓主打的标（#1406 的真实事件）→ 不领、不读 permission，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > app 安装令牌打的标（actor = claude[bot]）→ 同样不领，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、摘掉后仓主本人重新打 → 领
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 轮询器领的卡被 chief 拆开、子卡在跑，issue 被仓主关闭 → 父卡不关、不读状态，子卡不动；最后一张子卡 done → 父卡 done
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 子卡都已 done / closed 的父卡照常对账关闭
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 读期间有人重开一张关掉的子卡 → 写前重读看到未收完的子卡，跳过
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue → 一张卡，轮询器记 claimed
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 429（retry-after 60）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（x-ratelimit-remaining 0，带 reset）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 列表读 403（二级限流，只有 message）：本队别的项目这一轮也不读
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 429（retry-after 60）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（x-ratelimit-remaining 0，带 reset）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（二级限流，只有 message）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 没有限流信号的 403（token 无权）照旧只跳过本项目
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 非 409 的导入失败（详情读 502）→ 记一行、本项目这一轮照领下一条，失败的那条不记「见过 open」
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+  watched: FAIL  issue 作者是仓主也不算数：只看打标人
+  watched: FAIL  打标账号已删除（actor null）→ 不领，不读 permission
+  watched: FAIL  仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  watched: FAIL  别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+  watched: FAIL  轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  watched: FAIL  重启（新的轮询器）首见即 closed → 不关
+## N1: setup slip on the intake side: the candidate loop visits no candidate (list read, nothing evaluated)
+file: apps/server/src/services/issue-intake.ts
+replace: "      for (const issue of candidates) {\n"
+   with: "      for (const issue of candidates.slice(candidates.length)) {\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  91 failed | 64 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 主路径：领、导入、编排 > 仓主打标的 open issue 被导入并编排；读面带 token、条件读、标签过滤
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > read 权限 / 非协作者（404）不领；role_name triage（legacy permission=read）与 maintain（permission=write）领
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > issue 作者是仓主也不算数：只看打标人
+  FAIL  test/issue-intake.test.ts > 1 打标人权限（D5） > 打标账号已删除（actor null）→ 不领，不读 permission
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 5xx → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 404 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 410 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 超时 → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（不是数组） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 label） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 的 created_at 不是时间） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（labeled 缺 id） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后的 unlabeled 缺 label） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（仓主打标之后有一项不是对象） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 读 形坏（closed 缺 created_at） → 不领；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里仓主后来摘了标）→ 不领、不读 permission；恢复后读全两页，照样不领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > events 第 2 页读不到（第 2 页里外人后来重打）→ 不领、不读 permission；恢复后读全两页，照样不领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 5xx → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 超时 → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 2 events / permission 读失败：本轮不领，下轮重读 > permission 读 形坏（permission 缺失） → 不领，失败不进缓存；恢复后下一轮领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 外人打 → 摘 → 仓主再打：最新一条是仓主的 → 领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 顺序不靠数组位置：按 created_at 取最新
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 最新 labeled 之后有 unlabeled（列表陈旧）→ 不领、不读 permission
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > 别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 超过 ISSUE_INTAKE_MAX_EVENT_PAGES 页仍有下一页 → 读不全，不领、不读 permission
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 跨页：第 1 页外人打标又被摘、第 2 页仓主重新打标 → 读第 2 页、领
+  FAIL  test/issue-intake.test.ts > 3 只认最新一条 labeled；events 读不全不领 > events 的 Link rel="next" 指到别的主机 → 读不全，不领、不出站
+  FAIL  test/issue-intake.test.ts > 4 列表里的 PR > 带 ready-for-agent 的 PR 条目跳过：不读 events、不建卡
+  FAIL  test/issue-intake.test.ts > 5 已被导入 / 自建 issue > 已有 github-issue 卡与自建 issue 卡的号：记 claimed，不读 events、不再编排
+  FAIL  test/issue-intake.test.ts > 6 并发导入同一 issue > 另一路导入在飞时轮询到同号：一张卡，轮询这边记 claimed、不编排
+  FAIL  test/issue-intake.test.ts > 7 项目在飞上限 > 余量 2：只领最旧的两条，其余等下一轮；腾出位后按最旧续领
+  FAIL  test/issue-intake.test.ts > 7 项目在飞上限 > 在飞数每次导入前现数：sweep 期间别处导入的卡也占位
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > chief 行不存在 → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > chief 未绑 Agent → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 8 chief 未绑定：导入前跳过 > 绑定的 Agent 没有模型 → 不读列表、不建卡；绑好后下一轮导入并编排
+  FAIL  test/issue-intake.test.ts > 10 导入后标签被摘 > 列表里没了、issue 仍 open → 卡原样留着
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器自己导入的卡：导入即记为见过 open，随后被协作者关闭 → 关闭
+  FAIL  test/issue-intake.test.ts > 12 issue 正文当数据 > 正文原样进 todo.spec，不进任何日志行
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 上一轮未完时再触发 → 立即返回 null，不重复读
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 列表 304：发 If-None-Match，复用上轮列表（304 ≠ 空）
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > permission 按 (仓, login) 缓存：TTL 内不重读（含 404 的否定答案），过期重读
+  FAIL  test/issue-intake.test.ts > 13 sweep 不重叠、304 复用、permission 缓存 > 未领的 issue 第二轮 events 走条件读
+  FAIL  test/issue-intake.test.ts > 14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓 > 形坏 githubRepo 与非 GitHub 项目不出站；同仓两项目只读一次列表、每条 issue 一张卡
+  FAIL  test/issue-intake.test.ts > scheduler 接线 > start() 启动即补扫 + 5 分钟自循环；tick() 不出站；stop() 停
+  FAIL  test/issue-intake.test.ts > 1b 打标人权限：自定义角色的另外两条判据 > legacy permission=write（role_name 是自定义角色）领；user.permissions.triage=true 领；两者都不满足不领
+  FAIL  test/issue-intake.test.ts > 5b 已占用：引用大小写不同也算同一条 issue > 团队里已有 github:Xiechimon/Pacman#1406 的卡 → 1406 记 claimed，不再导入
+  FAIL  test/issue-intake.test.ts > 13b permission 否定答案（404）同样缓存 > 非协作者打标：TTL 内第二轮仍是候选，但不再读 permission
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > 最旧 100 条都已占用或不认，第 101 条照样被领（跟 Link rel="next" 读第 2 页）
+  FAIL  test/issue-intake.test.ts > 13c 候选列表翻页 > 满页之后长出第 2 页：第 1 页内容不变，下一轮不带 If-None-Match 重读，读到新页
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 building、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 轮询器领的卡在 failed、最新 build 已开 PR，合并的人关了 issue → 卡不关、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 第一次编排抛错 → 卡留在 todo；下一轮重试编排一次，之后不再重复
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前有人已手动开始（已有编排线程）→ 不再重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 自己那次编排中途失败（线程建了、chief 步没入队）→ 不算有人接手，照常重试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 重试前的读库抛错 → 只跳过这张卡（不计次），同一轮照常领别的 issue；下一轮再试
+  FAIL  test/issue-intake.test.ts > 16 导入后编排失败：后续几轮重试，有上限 > 编排失败后 chief 换绑别的 Agent → 不再重试（这张卡已不在关闭对账范围内），记一行
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 打上 ready-for-agent 之后摘的是别的标签（needs-decision）→ 照领
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 同一秒的 labeled 与 unlabeled 按 id 定先后：unlabeled 的 id 大 → 不领；labeled 的 id 大 → 领
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 失败方式 5：正文只进 chief 线程的 user 消息，不进 system 消息与 chief system prompt
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > createdBy：轮询器领的卡记 chief 绑定的 Agent（REST 读回同值）；手工导入与 webhook 导入仍是 seed 用户
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 三张卡的 issue 都被仓主关掉 → 只关轮询器领的那张；webhook 与手工导入的卡不动、不读 issue 状态
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 轮询器在重启前领的卡，重启后照样对账（认卡靠库里的 createdBy，不靠进程内存）
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 没绑 Agent → 本队本轮不对账（不读 issue 状态），每轮记一行
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > 没绑的那几轮不清「见过 open」：期间 issue 被关，换回同一 Agent 后照样关
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 绑定的 Agent 没有模型（不能编排）→ 不领新票，但轮询器领过的卡照样对账
+  FAIL  test/issue-intake.test.ts > 20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 Agent） > chief 换绑别的 Agent → 换绑前领的卡不再对账（issue 被仓主关了也不动）
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主本人打的标（不经 app）→ 领，领取日志带打标人
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 仓主授权的 app（claude）替仓主打的标（#1406 的真实事件）→ 不领、不读 permission，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > app 安装令牌打的标（actor = claude[bot]）→ 同样不领，记一行
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、app 对象缺 slug → 同样不领
+  FAIL  test/issue-intake.test.ts > 21 经 GitHub App 打的标不算人打的 > 经 app 打、摘掉后仓主本人重新打 → 领
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 轮询器领的卡被 chief 拆开、子卡在跑，issue 被仓主关闭 → 父卡不关、不读状态，子卡不动；最后一张子卡 done → 父卡 done
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > 轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate
+  FAIL  test/issue-intake.test.ts > 23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡 > webhook 导入在飞（握着占位等 GitHub）时轮询器以另一种大小写导入同一 issue → 一张卡，轮询器记 claimed
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 429（retry-after 60）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（x-ratelimit-remaining 0，带 reset）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > events 读 403（二级限流，只有 message）：几条候选只发出一个被拒的 events 读，本队停读、记一行；限流过后照领
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 429（retry-after 60）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（x-ratelimit-remaining 0，带 reset）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > permission 读 403（二级限流，只有 message）：只发出一个被拒的 permission 读，后面的候选不再读 events
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 429（retry-after 60）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（x-ratelimit-remaining 0，带 reset）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 导入时的详情读 403（二级限流，只有 message）：只算这一次导入失败，不停本队、不记限流行，本轮接着领下一条
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 非 409 的导入失败（详情读 502）→ 记一行、本项目这一轮照领下一条，失败的那条不记「见过 open」
+  FAIL  test/issue-intake.test.ts > 25 覆盖钉：导入失败与读不到的后续列表页 > 3 页列表的第 2 页读不到 → 只领第 1 页里的，不读第 3 页，记一行
+  watched: FAIL  issue 作者是仓主也不算数：只看打标人
+  watched: FAIL  打标账号已删除（actor null）→ 不领，不读 permission
+  watched: FAIL  仓主打 → 摘 → 外人再打：最新一条是外人的 → 不领
+  watched: FAIL  别的标签的 labeled 不算数：events 里没有 ready-for-agent 的 labeled → 不领
+## N2: setup slip on the reconcile side: building tasks drop out of the close-reconcile set
+file: apps/server/src/services/issue-intake.ts
+replace: "            notInArray(todo.phase, CLOSE_RECONCILE_SKIPPED),\n"
+   with: "            notInArray(todo.phase, [...CLOSE_RECONCILE_SKIPPED, 'building']),\n"
+result: exit 1, Test Files  1 failed (1) ; Tests  22 failed | 133 passed (155)  -> RED
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 先读到 open、再被协作者关闭 → 经关闭路径落 closed，并停掉 pending 活动步
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 被对账关掉后有人把卡重开（issue 仍 closed）→ 卡保持开着
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 外部作者自己关（read 权限） → 不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭账号已删除（actor null） → 不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：events 5xx → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：events 读不全（Link rel="next"） → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：permission 5xx → 本轮不关，计 closeSkipped
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 created_at → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 关闭人核验：最新一条 closed（外人关的）缺 id → 整读作废，不关；读到完整的事件后按外人关处理，仍不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > issue 事件过百、closed 事件在第 2 页 → 读到第 2 页并关闭
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 重启（新的轮询器）首见即 closed → 不关
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > 读期间卡被人推进 review → 写前重读相位，跳过
+  FAIL  test/issue-intake.test.ts > 11 issue 在 GitHub 被关 > open issue 不动；第二轮条件读（If-None-Match）304 复用；读失败不动
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 读期间 build 交付了 PR → 写前重读，跳过
+  FAIL  test/issue-intake.test.ts > 15 已交付 PR 的卡留给 PR 对账 > 只看这张卡自己的 build：同队另一张卡交付过 PR，不影响没交付的卡照常关闭
+  FAIL  test/issue-intake.test.ts > 18 既有判据的钉子 > 关闭人只看最新一条 closed：早先仓主关过又重开，这次外人关 → 不关
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 子卡都已 done / closed 的父卡照常对账关闭
+  FAIL  test/issue-intake.test.ts > 22 拆卡父卡：子卡没收完不对账关闭 > 读期间有人重开一张关掉的子卡 → 写前重读看到未收完的子卡，跳过
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 429（retry-after 60）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（x-ratelimit-remaining 0，带 reset）：本队这一轮不再读列表
+  FAIL  test/issue-intake.test.ts > 24 限流：本队本轮停读 > 关闭对账的 issue 状态读 403（二级限流，只有 message）：本队这一轮不再读列表
+  watched: FAIL  轮询器领的卡首见即 closed（例：issue 在重启期间被关）→ 永不被对账关闭
+  watched: FAIL  重启（新的轮询器）首见即 closed → 不关
+git status --short after the last mutation (source files restored):
+  (clean)
