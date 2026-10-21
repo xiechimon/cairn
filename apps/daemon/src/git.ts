@@ -91,12 +91,13 @@ export function gitCredentialEnv(
   };
 }
 
-/** 父环境里 git 会读的 GIT_CONFIG_* 条数（#1460）。COUNT 不是十进制整数，或
- * 0..n-1 缺 KEY / VALUE 时，git 在父环境下本就报错（bogus count / missing
+/** 父环境里 git 会读的 GIT_CONFIG_* 条数（#1460）。COUNT 的写法按 git 的
+ * strtoul 收（前导空白、+ 号、前导 0；尾随字符与负号不收）。git 不收的 COUNT，
+ * 或 0..n-1 缺 KEY / VALUE 时，git 在父环境下本就报错（bogus count / missing
  * config key）：返回 0，凭证条目从 0 写、COUNT=2，与 #1460 之前相同。 */
 function inheritedGitConfigCount(parent: NodeJS.ProcessEnv): number {
   const raw = parent.GIT_CONFIG_COUNT;
-  if (raw === undefined || !/^\d+$/.test(raw)) return 0;
+  if (raw === undefined || !/^[ \t\n\v\f\r]*\+?\d+$/.test(raw)) return 0;
   const n = Number(raw);
   for (let i = 0; i < n; i++) {
     if (parent[`GIT_CONFIG_KEY_${i}`] === undefined) return 0;

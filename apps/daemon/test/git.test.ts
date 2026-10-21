@@ -25,6 +25,7 @@ import {
   withGitCredentialFallback,
   withGitNetRetries,
 } from '../src/git.js';
+import { stubOutInheritedGitConfig } from './git-config-env.js';
 
 const CRED = { username: 'git', password: 'pacman_fresh_token_123' };
 
@@ -115,6 +116,23 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
     expect(env.GIT_CONFIG_VALUE_4).toContain(`password=${CRED.password}`);
   });
 
+  test.each([' 2', '+2'])('失败方式 1：git 也认的 COUNT 写法 %j → 同样接在后面', (count) => {
+    // git 用 strtoul 解析 COUNT：前导空白与 + 号都收。
+    const parent: NodeJS.ProcessEnv = {
+      GIT_CONFIG_COUNT: count,
+      GIT_CONFIG_KEY_0: 'http.proxy',
+      GIT_CONFIG_VALUE_0: 'http://127.0.0.1:3128',
+      GIT_CONFIG_KEY_1: 'http.sslCAInfo',
+      GIT_CONFIG_VALUE_1: '/etc/ssl/proxy-ca.crt',
+    };
+    const env = { ...parent, ...gitCredentialEnv(CRED, parent) };
+    expect(env.GIT_CONFIG_COUNT).toBe('4');
+    expect(env.GIT_CONFIG_KEY_0).toBe('http.proxy');
+    expect(env.GIT_CONFIG_KEY_1).toBe('http.sslCAInfo');
+    expect(env.GIT_CONFIG_VALUE_2).toBe('');
+    expect(env.GIT_CONFIG_VALUE_3).toContain(`password=${CRED.password}`);
+  });
+
   test('失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1', () => {
     const env = gitCredentialEnv(CRED, { PATH: '/usr/bin', HOME: '/home/x' });
     expect(env.GIT_CONFIG_COUNT).toBe('2');
@@ -167,9 +185,7 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
   });
 
   test('失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效', async () => {
-    for (const k of Object.keys(process.env)) {
-      if (k.startsWith('GIT_CONFIG_')) vi.stubEnv(k, undefined);
-    }
+    stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'pacman.probe');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');

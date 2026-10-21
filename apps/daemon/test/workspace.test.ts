@@ -27,6 +27,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
+import { stubOutInheritedGitConfig } from './git-config-env.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
 
@@ -461,9 +462,7 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
     // 父进程自带的 GIT_CONFIG_*（云端容器的代理配置）会把凭证条目往后推
     // （#1460），先摘掉，断言无继承条目时的 COUNT=2。
-    for (const k of Object.keys(process.env)) {
-      if (k.startsWith('GIT_CONFIG_')) vi.stubEnv(k, undefined);
-    }
+    stubOutInheritedGitConfig();
     let prepared: Awaited<ReturnType<typeof ws.prepare>>;
     try {
       prepared = await ws.prepare({

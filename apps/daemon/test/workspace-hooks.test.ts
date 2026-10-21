@@ -23,6 +23,7 @@ import {
   runWorkspaceHook,
   WorkspaceHookError,
 } from '../src/workspace-hooks.js';
+import { stubOutInheritedGitConfig } from './git-config-env.js';
 
 const CREDS: GitCredentials = { username: 'x-access-token', password: 'step-token-secret' };
 
@@ -201,9 +202,7 @@ describe('workspace hook 原语（#1149）', () => {
     // 父进程可能自带 GIT_CONFIG_*（云端容器的代理配置）：两次运行都先摘掉，
     // 测的是 runWorkspaceHook 自己注入什么（#1458；带凭证时条目接在父环境
     // 之后，父环境无条目才是 COUNT=2，#1460）。
-    for (const k of Object.keys(process.env)) {
-      if (k.startsWith('GIT_CONFIG_')) vi.stubEnv(k, undefined);
-    }
+    stubOutInheritedGitConfig();
     let withCreds: Awaited<ReturnType<typeof runWorkspaceHook>>;
     let without: Awaited<ReturnType<typeof runWorkspaceHook>>;
     try {
@@ -239,9 +238,7 @@ describe('workspace hook 原语（#1149）', () => {
       // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
       '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\necho "probe=$(git config --get pacman.probe)"\n',
     );
-    for (const k of Object.keys(process.env)) {
-      if (k.startsWith('GIT_CONFIG_')) vi.stubEnv(k, undefined);
-    }
+    stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'pacman.probe');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');

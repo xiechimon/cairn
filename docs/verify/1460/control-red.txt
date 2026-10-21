@@ -1,7 +1,7 @@
-## control A: inheritedGitConfigCount trusts any decimal COUNT (presence loop removed)
-@@ -98,10 +98,6 @@
+## control A: inheritedGitConfigCount trusts any count git accepts (KEY / VALUE presence loop removed)
+@@ -99,10 +99,6 @@
    const raw = parent.GIT_CONFIG_COUNT;
-   if (raw === undefined || !/^\d+$/.test(raw)) return 0;
+   if (raw === undefined || !/^[ \t\n\v\f\r]*\+?\d+$/.test(raw)) return 0;
    const n = Number(raw);
 -  for (let i = 0; i < n; i++) {
 -    if (parent[`GIT_CONFIG_KEY_${i}`] === undefined) return 0;
@@ -11,11 +11,11 @@
  }
  
      × 失败方式 3：父环境 COUNT 缺 KEY → 退回从 0 写（COUNT=2） 9ms
-     × 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2） 1ms
+     × 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2） 3ms
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
 AssertionError: expected '4' to be '2' // Object.is equality
 AssertionError: expected '3' to be '2' // Object.is equality
-      Tests  2 failed | 27 passed (29)
+      Tests  2 failed | 29 passed (31)
 
 ## control B: no empty credential.helper reset after the inherited entries (helper alone at n)
 @@ -81,11 +81,9 @@
@@ -32,26 +32,45 @@ AssertionError: expected '3' to be '2' // Object.is equality
      // 交互提示关闭（无 tty 场景挂起护栏）。
      GIT_TERMINAL_PROMPT: '0',
    };
-     × 前置空值 credential.helper 重置系统/全局 helper 列表 9ms
-     × 空值重置使内联凭证压过全局 helper（真 git credential fill） 11ms
+     × 前置空值 credential.helper 重置系统/全局 helper 列表 13ms
+     × 空值重置使内联凭证压过全局 helper（真 git credential fill） 13ms
      × 失败方式 1：父环境 3 条原样保留，重置与 helper 落在 3、4，COUNT=5 1ms
-     × 失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1 2ms
+     × 失败方式 1：git 也认的 COUNT 写法 " 2" → 同样接在后面 1ms
+     × 失败方式 1：git 也认的 COUNT 写法 "+2" → 同样接在后面 1ms
+     × 失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1 3ms
      × 失败方式 3：父环境 COUNT 非数字 → 退回从 0 写（COUNT=2） 1ms
      × 失败方式 3：父环境 COUNT 负数 → 退回从 0 写（COUNT=2） 1ms
      × 失败方式 3：父环境 COUNT 尾随字符 → 退回从 0 写（COUNT=2） 1ms
-     × 失败方式 3：父环境 COUNT 缺 KEY → 退回从 0 写（COUNT=2） 0ms
+     × 失败方式 3：父环境 COUNT 缺 KEY → 退回从 0 写（COUNT=2） 1ms
      × 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2） 1ms
-     × 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置 11ms
+     × 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置 13ms
      × 失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效 1ms
-⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯ Failed Tests 13 ⎯⎯⎯⎯⎯⎯⎯
 AssertionError: expected '1' to be '2' // Object.is equality
 AssertionError: expected 'protocol=http\nhost=127.0.0.1:1\nuser…' to contain 'password=pacman_fresh_token_123'
 AssertionError: expected '4' to be '5' // Object.is equality
+AssertionError: expected '3' to be '4' // Object.is equality
 AssertionError: expected '1' to be '2' // Object.is equality
 AssertionError: expected '1' to be '2' // Object.is equality
 AssertionError: expected 'protocol=http\nhost=127.0.0.1:1\nuser…' to contain 'password=pacman_fresh_token_123'
 AssertionError: expected '2' to be '3' // Object.is equality
-      Tests  11 failed | 18 passed (29)
+      Tests  13 failed | 18 passed (31)
+
+## control C: the first fix's count check, /^\d+$/ (code-review finding: stricter than git)
+@@ -97,7 +97,7 @@
+  * config key）：返回 0，凭证条目从 0 写、COUNT=2，与 #1460 之前相同。 */
+ function inheritedGitConfigCount(parent: NodeJS.ProcessEnv): number {
+   const raw = parent.GIT_CONFIG_COUNT;
+-  if (raw === undefined || !/^[ \t\n\v\f\r]*\+?\d+$/.test(raw)) return 0;
++  if (raw === undefined || !/^\d+$/.test(raw)) return 0;
+   const n = Number(raw);
+   for (let i = 0; i < n; i++) {
+     if (parent[`GIT_CONFIG_KEY_${i}`] === undefined) return 0;
+     × 失败方式 1：git 也认的 COUNT 写法 " 2" → 同样接在后面 8ms
+     × 失败方式 1：git 也认的 COUNT 写法 "+2" → 同样接在后面 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected '2' to be '4' // Object.is equality
+      Tests  2 failed | 29 passed (31)
 
 ## restored: git.ts matches the fixed file
 identical
