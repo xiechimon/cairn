@@ -2,8 +2,10 @@
 // 失败方式先行：顺序 / 区域设置让同一补丁算出两个摘要；改名移进 docs/verify/
 // 把代码删除藏起来；文件名含制表符或换行时元组撞车；空 blob sha 被当成
 // 字符串 'null' 哈希；compare 截到 300 个文件仍被当成完整列表。
-// 夹具 docs/verify/1404/compare-sample.json 是一次真实的只读 compare 响应
-// （xiechimon/pacman 52d2cdc...b4b1f96，per_page=1，去掉了 patch 字段）。
+// 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
+// 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1，去掉了 patch 字段）；
+// 与 docs/verify/1404/compare-sample.json 同一份，放在测试目录里是因为摘要
+// 不计 docs/verify/，测试读的夹具不能落在摘要之外。
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -153,6 +155,18 @@ describe('computePatchDigest', () => {
     );
   });
 
+  test('空文件列表：摘要不可得（没有可绑定的补丁）', () => {
+    const r = computePatchDigest([]);
+    expect(r.patchDigest).toBeNull();
+    expect(r.unavailable).toBe('empty');
+  });
+
+  test('只有证据的补丁：证据之外没有文件，摘要不可得', () => {
+    const r = computePatchDigest([file({ filename: 'docs/verify/1404/a.txt', status: 'added' })]);
+    expect(r.patchDigest).toBeNull();
+    expect(r.unavailable).toBe('empty');
+  });
+
   test('行数与文件数只算证据之外的条目', () => {
     const r = computePatchDigest(base);
     expect(r.countedFiles).toBe(2);
@@ -163,10 +177,7 @@ describe('computePatchDigest', () => {
 
 describe('真实 compare 响应夹具', () => {
   const sample = JSON.parse(
-    readFileSync(
-      join(import.meta.dirname, '../../../docs/verify/1404/compare-sample.json'),
-      'utf8',
-    ),
+    readFileSync(join(import.meta.dirname, 'fixtures/merge-gate-compare-sample.json'), 'utf8'),
   ) as unknown;
 
   test('解析出 58 个文件，删除条目带旧 blob sha，证据目录里有可执行文件', () => {
@@ -198,5 +209,30 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ status: 'ahead' })).toBeNull();
     expect(compareFilesFromResponse({ files: 'x' })).toBeNull();
     expect(compareFilesFromResponse({ files: [{ filename: 'a' }] })).toBeNull();
+  });
+
+  const entry = (over: Record<string, unknown> = {}) => ({
+    filename: 'apps/server/src/a.ts',
+    status: 'renamed',
+    sha: 'a'.repeat(40),
+    additions: 1,
+    deletions: 0,
+    previous_filename: 'apps/server/src/b.ts',
+    ...over,
+  });
+
+  test('previous_filename 映射到 previousFilename；缺省为 null', () => {
+    expect(compareFilesFromResponse({ files: [entry()] })?.[0]?.previousFilename).toBe(
+      'apps/server/src/b.ts',
+    );
+    const { previous_filename: _, ...plain } = entry({ status: 'modified' });
+    expect(compareFilesFromResponse({ files: [plain] })?.[0]?.previousFilename).toBeNull();
+  });
+
+  test('sha 缺失、previous_filename 为空串或非字符串：形状不对，返回 null', () => {
+    const { sha: _, ...noSha } = entry();
+    expect(compareFilesFromResponse({ files: [noSha] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ previous_filename: '' })] })).toBeNull();
+    expect(compareFilesFromResponse({ files: [entry({ previous_filename: 7 })] })).toBeNull();
   });
 });
