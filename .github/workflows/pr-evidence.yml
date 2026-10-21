@@ -43,6 +43,13 @@ permissions:
   contents: read
   pull-requests: write
 
+# One run per PR at a time, newest wins: a label added seconds after a body
+# edit must not be outlived by the edit's run finishing green. A cancelled
+# run is not a passing check.
+concurrency:
+  group: pr-evidence-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   # Stable job name: it is in the branch-protection required checks.
   pr-evidence:
@@ -89,14 +96,18 @@ jobs:
       # A pending decision must not be racing an armed auto-merge. An
       # unchecked Acceptance item is a pending decision (verify it or waive
       # it), so it adds the label; then, whenever the label is on, auto-merge
-      # is disarmed. Both calls are idempotent (re-adding a present label and
+      # is disarmed. A draft is still being written, cannot be auto-merged,
+      # and its template boxes are not yet anyone's decision, so it is not
+      # labelled; the red check alone holds it. Both calls are idempotent (re-adding a present label and
       # disabling an unarmed auto-merge are no-ops) and both use the workflow
       # token, so neither triggers another workflow run; the first step
       # re-reads the label from the API on the next user-triggered event.
       - name: Mark the decision pending and disarm auto-merge
         if: ${{ failure() }}
+        env:
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
-          if grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
+          if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
             gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f 'labels[]=needs-decision' --silent
             touch needs-decision.flag
             echo "pr-decision: needs-decision label added (unchecked Acceptance item)"

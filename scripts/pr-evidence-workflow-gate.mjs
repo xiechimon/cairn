@@ -36,9 +36,16 @@ const prEvent = indexOf(/^ {2}pull_request:\s*$/);
 if (prEvent === -1) failures.push('on.pull_request trigger missing');
 else {
   const body = block(prEvent, 2);
-  const types = body.find((line) => /^ {4}types:/.test(line)) ?? '';
+  const typesAt = body.findIndex((line) => /^ {4}types:/.test(line));
+  const types =
+    typesAt === -1
+      ? []
+      : [
+          ...(body[typesAt].match(/\[(.*)\]/)?.[1] ?? '').split(','),
+          ...body.slice(typesAt + 1).map((line) => line.match(/^ {6}- (\S+)/)?.[1] ?? ''),
+        ].map((t) => t.trim());
   for (const type of ['edited', 'labeled', 'unlabeled', 'auto_merge_enabled']) {
-    if (!new RegExp(`[\\[,]\\s*${type}\\s*[,\\]]`).test(types))
+    if (!types.includes(type))
       failures.push(
         `on.pull_request.types lacks ${type}: a labelled PR would stay green until the next push`,
       );
