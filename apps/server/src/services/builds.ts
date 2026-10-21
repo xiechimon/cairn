@@ -46,12 +46,13 @@ import {
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
 } from '@pacman/shared';
-import { and, asc, desc, eq, inArray, isNotNull, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
   build,
   machine,
+  message,
   plan as planTable,
   project,
   steerPending,
@@ -1776,15 +1777,53 @@ export function completeStep(
   finishTodoDone(deps, todoRow.id, buildRow.id);
 }
 
-/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本 build 是否已收过尾）。 */
+/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本轮是否已收过尾）。 */
 export const DONE_ROW = '🎉 任务已完成';
+
+/** 本 build 这一轮的起点：最近一个 build / plan 步的创建时刻（#931 返工复用
+ * 同一个 build 时，新一轮从新的执行步算起）；没有这类步为 0。 */
+export function roundStart(deps: BuildDeps, buildId: string): number {
+  return (
+    deps.db
+      .select({ at: step.createdAt })
+      .from(step)
+      .where(and(eq(step.buildId, buildId), inArray(step.kind, ['build', 'plan'])))
+      .orderBy(desc(step.createdAt))
+      .get()?.at ?? 0
+  );
+}
+
+/** 本 build 的会话里是否有这一行（按值查一条；since = 只看此刻之后落的）。 */
+export function hasMessageRow(
+  deps: BuildDeps,
+  buildId: string,
+  role: 'system' | 'user',
+  content: string,
+  since = 0,
+): boolean {
+  return (
+    deps.db
+      .select({ id: message.id })
+      .from(message)
+      .where(
+        and(
+          eq(message.conversationId, buildId),
+          eq(message.role, role),
+          eq(message.content, content),
+          gte(message.createdAt, since),
+        ),
+      )
+      .get() !== undefined
+  );
+}
 
 /** done 收尾漏斗（merge 步成与 #1403 PR 对账两个落点共用）：相位 → done、
  * 完成行、拆卡波次推进。已 done 则不动（两个落点先后到达只收一次尾）。 */
 export function finishTodoDone(deps: BuildDeps, todoId: string, buildId: string): void {
-  const current = deps.db.select({ phase: todo.phase }).from(todo).where(eq(todo.id, todoId)).get();
-  if (current?.phase === 'done') return;
+  // 相位已是 done 时 setTodoPhase 不动；完成行本轮只落一次（合并步与对账先后
+  // 到达、或合并步在人手拖到已完成之后才完成，都只有一行）。
   setTodoPhase(deps, todoId, 'done');
+  if (hasMessageRow(deps, buildId, 'system', DONE_ROW, roundStart(deps, buildId))) return;
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
     role: 'system',

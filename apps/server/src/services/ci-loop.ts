@@ -41,18 +41,17 @@
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
 // - 关闭未合并 → system 行 + build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
-// 每个 build 每种结局只收一次尾。已合并：本 build 已有完成行（合并步或对账
-// 收过尾）或「标记为已完成」行（人手拖到已完成）就不再收；不看时钟——CI 一绿
-// 就合并（含 GitHub auto-merge）时卡在合并之后才进 review，照样收尾。已关闭：
-// 已有对账的关闭行就不再收；PR 在卡这次进入 review 之前就关了（人手关掉再
-// 拖回、或关在 review 之前）则提示一行交给人，不打成 failed（GitHub 的
-// closed_at 到秒，按秒与 todo.phaseAt 比）。收尾时停掉没人领的 verify /
-// review 步。
+// 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
+// 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
+// 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收。人在报告之后把
+// 卡拖回 review 是人的决定；报告之前人手拖到已完成或已关闭再拖回，报告照样
+// 来一次。不看时钟：CI 一绿就合并（含 GitHub auto-merge）时卡在合并之后才进
+// review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
-import { conversationBranch, DONE_ANNOUNCEMENT } from '@pacman/shared';
+import { conversationBranch } from '@pacman/shared';
 import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, message, project, step, todo } from '../db/schema.js';
+import { build, project, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubCheckRun,
@@ -67,7 +66,9 @@ import {
   DONE_ROW,
   enqueueStep,
   finishTodoDone,
+  hasMessageRow,
   maybeEnqueueVerifyStep,
+  roundStart,
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
@@ -221,7 +222,7 @@ interface CiPollTally {
   closedUnmerged: number;
   /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示一次，不收尾。 */
   hinted: number;
-  /** 本 build 已为这个结局收过一次尾，或 PR 在卡这次进入 review 之前就关了：交给人。 */
+  /** 本轮已报告过这个结局（人后来把卡拖回了 review）：交给人。 */
   settledBefore: number;
 }
 
@@ -243,8 +244,12 @@ export function createCiPoller(
    * 读到即可复用；404 例外：那个提交之后可能被推上去，过 CI_MISSING_COMPARE_
    * RECHECK_MS 再读）。 */
   const compareCache = new Map<string, { status: string; at: number }>();
-  /** 本轮 sweep 见到的 review 候选的缓存键；sweep 末尾据此清掉别的缓存行。 */
+  /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
+   * 别的缓存行。 */
   const liveKeys = new Set<string>();
+  const grindKeys = new Set<string>();
+  /** 上一轮 sweep 还在跑（网络读慢）时下一轮不进来：缓存与匿名额度按单轮设计。 */
+  let sweeping = false;
 
   /** 本 build 有在飞的步：已被领取或在等额度的任意步，以及排队中的非审核
    * 类步。没人领的 verify / review 步不算（Verifier 的机器离线时，卡不能
@@ -270,27 +275,15 @@ export function createCiPoller(
     );
   }
 
-  function hasRow(buildId: string, role: 'system' | 'user', content: string): boolean {
-    return (
-      deps.db
-        .select({ id: message.id })
-        .from(message)
-        .where(
-          and(
-            eq(message.conversationId, buildId),
-            eq(message.role, role),
-            eq(message.content, content),
-          ),
-        )
-        .get() !== undefined
-    );
-  }
-
-  /** 本 build 是否已为这个结局收过尾（完成行或人手「标记为已完成」/ 对账的关闭行）。 */
+  /** 本轮是否已报告过这个结局（完成行 / 对账的关闭行）。 */
   function settled(buildId: string, merged: boolean, closedText: string): boolean {
-    return merged
-      ? hasRow(buildId, 'system', DONE_ROW) || hasRow(buildId, 'user', DONE_ANNOUNCEMENT)
-      : hasRow(buildId, 'system', closedText);
+    return hasMessageRow(
+      deps,
+      buildId,
+      'system',
+      merged ? DONE_ROW : closedText,
+      roundStart(deps, buildId),
+    );
   }
 
   /** 失败收尾：build.errorMessage 落因 + 发 build 文档 + todo → failed。 */
@@ -307,7 +300,7 @@ export function createCiPoller(
 
   /** 同一条提示只落一次（内容带提交 SHA）。 */
   function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
-    if (hasRow(buildId, 'system', content)) return;
+    if (hasMessageRow(deps, buildId, 'system', content)) return;
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
       role: 'system',
@@ -338,6 +331,7 @@ export function createCiPoller(
       return null;
     }
     const slash = projRow.githubRepo.indexOf('/');
+    if (slash < 1 || slash === projRow.githubRepo.length - 1) return null;
     return {
       teamId: projRow.teamId,
       fullName: projRow.githubRepo,
@@ -412,18 +406,6 @@ export function createCiPoller(
     }
     const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
     if (settled(cand.buildId, pull.merged, closedText)) {
-      tally.settledBefore += 1;
-      return;
-    }
-    if (
-      !pull.merged &&
-      (pull.closedAt === null || pull.closedAt < Math.floor(fresh.phaseAt / 1000) * 1000)
-    ) {
-      hintOnce(
-        cand.buildId,
-        `PR #${prNumber} 在任务这次进入审核关口之前已在 GitHub 关闭（未合并）。任务留在审核关口，由人决定。`,
-        tally,
-      );
       tally.settledBefore += 1;
       return;
     }
@@ -551,6 +533,7 @@ export function createCiPoller(
       return;
     }
     const key = `${target.fullName}#${buildRow.prNumber}`;
+    grindKeys.add(key);
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
     const page = await githubCommitCheckRuns(
@@ -627,6 +610,16 @@ export function createCiPoller(
   }
 
   async function sweep(now: number = nowMs()): Promise<void> {
+    if (sweeping) return;
+    sweeping = true;
+    try {
+      await sweepOnce(now);
+    } finally {
+      sweeping = false;
+    }
+  }
+
+  async function sweepOnce(now: number): Promise<void> {
     // 批量扫描：一条查询取全候选——prNumber 在位 × 相位 building（磨绿中；
     // review/failed/closed/done 都已退出磨绿集，天然满足「已推进不回写」）×
     // todo 的当前 build（#1403：重跑开出的新 build 在跑时，旧 PR 不再被磨）。
@@ -658,6 +651,7 @@ export function createCiPoller(
       hinted: 0,
       settledBefore: 0,
     };
+    grindKeys.clear();
     for (const cand of candidates) {
       try {
         await pollOne(cand, now, tally);
@@ -682,7 +676,8 @@ export function createCiPoller(
         );
       }
     }
-    // 离开 review 的 PR 不再留缓存行（进程常驻，否则只增不减）。
+    // 离开 review / 磨绿的 PR 不再留缓存行（进程常驻，否则只增不减）。
+    for (const k of cache.keys()) if (!grindKeys.has(k)) cache.delete(k);
     for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
     for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
     for (const k of compareCache.keys()) {

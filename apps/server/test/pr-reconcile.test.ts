@@ -55,6 +55,15 @@
 //   ㉚ 合并响应缺 head sha 而本 build 有 checkpoint → 无法核对，不收尾
 //   ㉛ compare 404 不永久缓存，但同一对提交 10 分钟内只重读一次
 //   ㉜ 离开 review 的 PR 不再留缓存行（进程常驻）：回到 review 后第一次读不带 etag
+// 第二遍 /code-review 之后改判据：对账对每个结局每一轮只报告一次（轮界 = 本
+// build 最近一个 build / plan 步）。标记只认本轮里的完成行（合并步或对账写
+// 的）和对账自己的关闭行；人手完成不算标记，关闭不比时钟。
+//   ㉝ #931 返工复用同一个 build：上一轮的标记不挡这一轮
+//   ㉞ 人手「标记为已完成」后又拖回 review，之后 PR 才合并 → 照样收尾
+//   ㉟ 合并步在人手 done 之后完成 → 补完成行、推进拆卡波次（与改动前一致）
+//   ㊱ 上一轮 sweep 没跑完时下一轮不进来（共享缓存与匿名额度）
+//   ㊲ 离开磨绿的 PR 不再留 check-runs 缓存行
+//   ㊳ githubRepo 不是 owner/repo 形 → 不出站
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -119,13 +128,27 @@ class PullsMock {
   throwNext = false;
   /** compare 请求到达时调用（网络窗竞态注入位）。 */
   onCompare: (() => void) | null = null;
+  /** check-runs 端点答一条在跑的 check（默认 404）。 */
+  checkRuns = false;
+  /** false = 带 etag 也答全量（模拟 GitHub 上状态变了）。 */
+  status304 = true;
+  /** 每个请求在应答前等这么久（毫秒）。 */
+  delayMs = 0;
   compareRequests = () => this.requests.filter((u) => u.includes('/compare/'));
   constructor(
     readonly pulls: Record<number, PullSpec>,
     private readonly status = 200,
   ) {}
 
-  readonly fetch = (input: string | URL, init?: { headers?: Record<string, string> }) => {
+  readonly fetch = (
+    input: string | URL,
+    init?: { headers?: Record<string, string> },
+  ): Promise<ReturnType<typeof res>> => {
+    if (this.delayMs > 0) {
+      const wait = this.delayMs;
+      this.delayMs = 0;
+      return new Promise<void>((r) => setTimeout(r, wait)).then(() => this.fetch(input, init));
+    }
     const url = String(input);
     this.requests.push(url);
     this.headers.push({ ...(init?.headers ?? {}) });
@@ -133,7 +156,7 @@ class PullsMock {
       this.throwNext = false;
       return Promise.reject(new TypeError('fetch failed'));
     }
-    if ((init?.headers?.['if-none-match'] ?? '') === '"x"') {
+    if (this.status304 && (init?.headers?.['if-none-match'] ?? '') === '"x"') {
       return Promise.resolve(res(304, '"x"', {}));
     }
     const cmp = url.match(/\/compare\/([0-9a-f]+)\.\.\.([0-9a-f]+)$/);
@@ -144,6 +167,15 @@ class PullsMock {
       if (status === 'throw') return Promise.reject(new TypeError('fetch failed'));
       if (typeof status === 'number') return Promise.resolve(res(status, '"c"', {}));
       return Promise.resolve(res(200, '"c"', { status }));
+    }
+    if (url.includes('/check-runs')) {
+      if (!this.checkRuns) return Promise.resolve(res(404, '"x"', {}));
+      return Promise.resolve(
+        res(200, '"x"', {
+          total_count: 1,
+          check_runs: [{ name: 'ci', status: 'in_progress', conclusion: null }],
+        }),
+      );
     }
     const m = url.match(/\/pulls\/(\d+)$/);
     if (m === null) return Promise.resolve(res(404, '"x"', {}));
@@ -199,6 +231,8 @@ function makeWorld(
     phaseAt?: number;
     /** GitHub connected (token present); default anonymous. */
     connected?: boolean;
+    /** project.githubRepo（默认 octo/demo）。 */
+    githubRepo?: string;
   } = {},
 ): World {
   const s = bootServer();
@@ -216,7 +250,7 @@ function makeWorld(
       name: `demo-${rnd}`,
       teamId: s.team.id,
       repoKind: 'github',
-      githubRepo: 'octo/demo',
+      githubRepo: opts.githubRepo ?? 'octo/demo',
     })
     .run();
   s.db
@@ -873,41 +907,39 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(announced).toEqual([]);
   });
 
-  test('⑱e dragged to done by hand, then back to review → not finished again', async () => {
+  test('⑱e dragged to done by hand before the reconcile saw the merge, then back to review → the merge is reported once', async () => {
     const w = makeWorld({ connected: true });
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
-    await pollerFor(w, mock).sweep();
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('done');
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    await poller.sweep();
     expect(w.todoRow().phase).toBe('review');
-    expect(w.systemRows()).toEqual([]);
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`)),
+    ).toHaveLength(1);
+    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
   });
 
-  test('⑱f closed by hand, then back to review, or closed before the card reached review → one hint, not failed', async () => {
+  test('⑱f closed by hand, then back to review → the close is reported once', async () => {
     const w = makeWorld({ connected: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
     updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
-    w.s.db
-      .update(buildTable)
-      .set({ errorMessage: 'person note' })
-      .where(eq(buildTable.id, w.buildId))
-      .run();
-    const mock = new PullsMock({
-      [w.prNumber]: {
-        state: 'closed',
-        merged: false,
-        closedAt: new Date(Date.now() - 120_000).toISOString(),
-      },
-    });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
     const poller = pollerFor(w, mock);
     await poller.sweep();
+    expect(w.todoRow().phase).toBe('failed');
+    updateTodo(w.s.svc, w.todoId, { phase: 'closed' }, { manualPhase: true });
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
     await poller.sweep();
     expect(w.todoRow().phase).toBe('review');
-    expect(w.buildRow().errorMessage).toBe('person note');
-    const hints = w.systemRows().filter((c) => c.includes(`PR #${w.prNumber}`));
-    expect(hints).toHaveLength(1);
-    expect(hints[0]).toContain('关闭');
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
+    ).toHaveLength(1);
   });
 
   test('㉚ merged, the response has no head sha, the build has a checkpoint → not finished', async () => {
@@ -986,6 +1018,93 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     await poller.sweep();
     expect(mock.requests).toHaveLength(2);
     expect(mock.headers[1]?.['if-none-match']).toBeUndefined();
+  });
+
+  test("㉝ a #931 rework round on the same build: the last round's close does not hide this round's", async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: false } });
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('failed');
+    // restart reused the build (PR reopened, fix round ran), then the PR closed again
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-rework-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'done',
+        createdAt: Date.now() + 1,
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'review' }).where(eq(todoTable.id, w.todoId)).run();
+    await new Promise((r) => setTimeout(r, 5));
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('failed');
+    expect(
+      w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 关闭且未合并`)),
+    ).toHaveLength(2);
+  });
+
+  test('㉞ marked done by hand while the PR was open, reopened, then merged → finished', async () => {
+    const w = makeWorld({ connected: true });
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
+    updateTodo(w.s.svc, w.todoId, { phase: 'review' }, { manualPhase: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('review');
+    const spec = mock.pulls[w.prNumber];
+    if (spec !== undefined) {
+      spec.state = 'closed';
+      spec.merged = true;
+    }
+    mock.status304 = false;
+    await poller.sweep();
+    expect(w.todoRow().phase).toBe('done');
+  });
+
+  test('㉟ the merge step completes after a manual done: completion row written, once', () => {
+    const w = makeWorld();
+    w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
+    updateTodo(w.s.svc, w.todoId, { phase: 'done' }, { manualPhase: true });
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    finishTodoDone(w.s.svc, w.todoId, w.buildId);
+    expect(w.todoRow().phase).toBe('done');
+    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+  });
+
+  test('㊱ a sweep that starts while the last one runs does nothing', async () => {
+    const w = makeWorld({ connected: true });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    mock.delayMs = 30;
+    const poller = pollerFor(w, mock);
+    await Promise.all([poller.sweep(), poller.sweep()]);
+    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(1);
+  });
+
+  test('㊲ a PR that leaves the grind drops its check-runs cache row', async () => {
+    const w = makeWorld({ connected: true, phase: 'building' });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'open', merged: false } });
+    mock.checkRuns = true;
+    const poller = pollerFor(w, mock);
+    await poller.sweep();
+    w.s.db.update(todoTable).set({ phase: 'confirm' }).where(eq(todoTable.id, w.todoId)).run();
+    await poller.sweep();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+    await poller.sweep();
+    const reads = mock.headers.filter((_, i) => mock.requests[i]?.includes('/check-runs'));
+    expect(reads).toHaveLength(2);
+    expect(reads[1]?.['if-none-match']).toBeUndefined();
+  });
+
+  test('㊳ a githubRepo that is not owner/repo → no request', async () => {
+    const w = makeWorld({ githubRepo: 'nodash' });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
+    await pollerFor(w, mock).sweep();
+    expect(mock.requests).toEqual([]);
+    expect(w.todoRow().phase).toBe('review');
   });
 
   test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {
