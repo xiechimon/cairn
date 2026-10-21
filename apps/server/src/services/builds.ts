@@ -435,24 +435,29 @@ export function prepareStopForDone(deps: BuildDeps, todoId: string): StopAndMark
   return prepareStopFor(deps, todoId, 'done');
 }
 
-/** #1445 关闭的停半边：卡已写成 closed 后调用，停掉 latest build 的活动步。
- *  pending / waiting_quota 即时停，不再可领、不占队列位次；claimed 委托停，
- *  回报 done(stopped) 时 applyStoppedStep 见卡已 closed 即不回落。无 latest
- *  build / 无活动步 = no-op。 */
-export function stopActiveStepsForClose(deps: BuildDeps, todoId: string): void {
-  prepareStopFor(deps, todoId, 'closed');
+/** #1445 卡被写离执行中之后的停半边：关闭（closed），或 queued 卡被 raw PATCH
+ *  挪回待开始（#1447；web 走 /reset）。停掉
+ *  latest build 的活动步：pending / waiting_quota 即时停，不再可领、不占队列
+ *  位次；claimed 委托停（只有关闭会走到——queued 没有 claimed 步），回报
+ *  done(stopped) 时 applyStoppedStep 见卡已 closed 即不回落。无 latest build /
+ *  无活动步 = no-op。 */
+export function stopActiveStepsAfterExit(deps: BuildDeps, todoId: string): void {
+  prepareStopFor(deps, todoId, 'exit');
 }
 
 function prepareStopFor(
   deps: BuildDeps,
   todoId: string,
-  after: 'done' | 'closed',
+  after: 'done' | 'exit',
 ): StopAndMarkDoneResult {
   const { db } = deps;
   const todoRow = db.select().from(todo).where(eq(todo.id, todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${todoId}`);
   if (todoRow.latestBuildId == null) return { state: 'ready' };
   const buildId = todoRow.latestBuildId;
+  // 卡已离开执行中：先前 stop-and-done 留下的 done 预定作废，否则回报落账
+  // 会把刚关掉的卡写成 done。
+  if (after === 'exit') afterStopPhaseByBuild.delete(buildId);
   const active = db
     .select()
     .from(step)
@@ -468,7 +473,7 @@ function prepareStopFor(
     return { state: 'ready' };
   }
   const now = nowMs();
-  // closed 不预定：卡此刻已是 closed，回报时由 applyStoppedStep 的 closed 兜底
+  // exit 不预定：卡此刻已是 closed，回报时由 applyStoppedStep 的 closed 兜底
   // 保持；预定了反而会把回报前被重开的卡再关一次。
   if (after === 'done') afterStopPhaseByBuild.set(buildId, 'done');
   db.insert(stopPending)

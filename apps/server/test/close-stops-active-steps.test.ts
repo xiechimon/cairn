@@ -10,6 +10,12 @@
 // 4. 存量僵尸（修复前已关的卡还挂着 pending 步）：没有任何扫尾去停它。
 // 5. 失联扫尾把已关卡的 claimed 步释放回 pending——又变回可领。
 // 6. 控制组：未关闭的 queued 卡的 pending 步，扫尾照旧不动。
+// 7. stop-and-done（#1247）的预定还在途时关卡：回报落账按预定把卡从 closed
+//    写成 done。
+// 8. #1447 起 queued 住执行中，canBoardDrop 放行 queued→todo；raw PATCH 把
+//    queued 卡挪回待开始不经 /reset，pending 步原样留着，机器照领。（queued→
+//    done 不在此列：#1247 钉了 raw PATCH done 保留 pending 步，见
+//    persona-split-verify「manual done leaves the pending step running」。）
 
 import { STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -23,7 +29,11 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { applyStoppedStep, sweepAbandonedBuildSteps } from '../src/services/builds.js';
+import {
+  applyStoppedStep,
+  prepareStopForDone,
+  sweepAbandonedBuildSteps,
+} from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machines.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -209,5 +219,38 @@ describe('#1445 失联扫尾不放过已关卡的步', () => {
     sweepAbandonedBuildSteps(w.s.svc, w.base);
     expect(stepStatus(w)).toBe('stopped');
     expect(todoPhase(w)).toBe('closed');
+  });
+});
+
+describe('#1445 关卡清掉在途的 stop-and-done 预定', () => {
+  test('预定 done 在途时关卡：回报落账后卡仍是 closed', async () => {
+    const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+    expect(prepareStopForDone(w.s.svc, w.todoId)).toEqual({ state: 'stopping' });
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'closed' });
+    expect(res.status).toBe(200);
+    applyStoppedStep(w.s.svc, w.stepId);
+    expect(todoPhase(w)).toBe('closed');
+  });
+});
+
+describe('#1447 raw PATCH 把 queued 卡挪回待开始也停 pending 步', () => {
+  test('queued → todo：步 stopped，机器领不到', async () => {
+    const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
+    const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'todo' });
+    expect(res.status).toBe(200);
+    expect(todoPhase(w)).toBe('todo');
+    expect(await claim(w)).toBeNull();
+    expect(stepStatus(w)).toBe('stopped');
+  });
+
+  test('控制组：不改相位的 PATCH（含同相位 queued）不碰 pending 步', async () => {
+    const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
+    for (const body of [{ title: 'renamed' }, { phase: 'queued' }]) {
+      const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, body);
+      expect(res.status).toBe(200);
+    }
+    expect(todoPhase(w)).toBe('queued');
+    expect(stepStatus(w)).toBe('pending');
+    expect(await claim(w)).not.toBeNull();
   });
 });

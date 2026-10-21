@@ -24,7 +24,7 @@ import {
 import {
   advanceSplitWaves,
   prepareStopForDone,
-  stopActiveStepsForClose,
+  stopActiveStepsAfterExit,
 } from './services/builds.js';
 import { readSourceIssueEcho } from './services/github-issues.js';
 import { orchestrateTodo } from './services/orchestrate.js';
@@ -115,7 +115,13 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     // settleSplitOnDone（兄弟都 done 时父收，不在这里派发新构建）。
     if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
     // #1445：手动关闭（详情 关闭 / 看板 已取消）同停活动步，机器不再领这张卡。
-    if (body.phase === 'closed' && prior?.phase !== 'closed') stopActiveStepsForClose(svc, id);
+    // #1447：queued 住执行中后 raw PATCH 能把它挪回待开始（web 走 /reset，不经
+    // 这里）——它的步还在等机器，留着就会被领走，同停。已完成不在此列：#1247
+    // 钉了 raw PATCH done 保留 pending 步，带停的入口是 stop-and-done。
+    // 判 record（写后值）不判 body：同相位 PATCH 在 updateTodo 里静默 no-op。
+    const closing = record.phase === 'closed' && prior?.phase !== 'closed';
+    const unqueued = prior?.phase === 'queued' && record.phase === 'todo';
+    if (closing || unqueued) stopActiveStepsAfterExit(svc, id);
     return c.json(record);
   });
 
