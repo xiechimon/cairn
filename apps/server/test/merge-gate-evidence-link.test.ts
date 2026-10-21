@@ -51,6 +51,22 @@ describe('parseRawEvidenceLinks', () => {
     expect(parse(`${url}\n[a](${url})`).links).toHaveLength(1);
   });
 
+  test('链接后面紧跟的标点与反引号不算进路径', () => {
+    const url = raw('docs/verify/1404/a.json');
+    const body = [`\`${url}\``, `(see ${url}).`, `${url}, ${url};`].join('\n');
+    expect(parse(body).links).toEqual([{ sha: SHA, path: 'docs/verify/1404/a.json' }]);
+  });
+
+  test('闭合的注释之后的链接照常算', () => {
+    const body = `<!-- template note -->\n${raw('docs/verify/1404/a.json')}`;
+    expect(parse(body).links).toHaveLength(1);
+  });
+
+  test('没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算', () => {
+    const body = `ok\n<!-- draft\n${raw('docs/verify/1404/a.json')}`;
+    expect(parse(body)).toEqual({ links: [], others: [] });
+  });
+
   test('目录穿越与仓外路径不算', () => {
     const r = parse(raw('docs/verify/1404/../1403/a.json'));
     expect(r.links).toEqual([]);

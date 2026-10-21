@@ -3,6 +3,9 @@
 // docs/verify 可不经人），其中再排除保护类别；按类、任意层级、不分大小写。
 // 失败方式先行：改名把保护文件移出保护路径、大小写变体、嵌套的 scripts/ 与
 // 配置、靠改名删测试、往别的票的证据目录写、证据目录里夹带可执行文件。
+// pr-gate 第一轮（#1420）补的：名字里带换行或空格时 `.` 跨不过去，保护 glob
+// 落空而集内 glob 命中；测试在测试目录里改名成不被收集的名字；证据目录前缀
+// 换大小写绕开别票 / 可执行检查；票号是另一票号的前缀。
 
 import type { CompareFile } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -84,6 +87,20 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
+  test('名字里有换行、回车、空格或其它白名单外字符：一律算保护（与 pr-gate SAFE_PATH 同一白名单）', () => {
+    for (const p of [
+      'apps/x\ny/src/CLAUDE.md',
+      'apps/x\ny/src/.claude/skills/foo/SKILL.md',
+      'apps/x\ry/src/package.json',
+      'apps/x y/src/AGENTS.md',
+      'apps/server/src/a\u2028b.ts',
+    ]) {
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, JSON.stringify(p)).toEqual([p]);
+      expect(r.outsideAutoMerge, JSON.stringify(p)).toEqual([]);
+    }
+  });
+
   test('改名把保护文件移走：按原路径命中', () => {
     const r = classify([
       f('apps/web/src/moved.yml', {
@@ -161,16 +178,34 @@ describe('删测试', () => {
     expect(r.deletedTests).toEqual(['apps/server/test/foo.test.ts']);
   });
 
-  test('改测试、加测试、测试之间改名都不算', () => {
+  test('改测试、加测试都不算', () => {
     const r = classify([
       f('apps/server/test/a.test.ts'),
       f('apps/server/test/b.test.ts', { status: 'added' }),
+    ]);
+    expect(r.deletedTests).toEqual([]);
+  });
+
+  test('测试的任何改名都算删了原测试（与 pr-gate 的 --no-renames 一致），含测试目录里改成不被收集的名字', () => {
+    const r = classify([
+      f('apps/server/test/foo.ts', {
+        status: 'renamed',
+        previousFilename: 'apps/server/test/foo.test.ts',
+      }),
+      f('apps/web/e2e/board.spec.ts.skip', {
+        status: 'renamed',
+        previousFilename: 'apps/web/e2e/board.spec.ts',
+      }),
       f('apps/server/test/c.test.ts', {
         status: 'renamed',
         previousFilename: 'apps/server/test/d.test.ts',
       }),
     ]);
-    expect(r.deletedTests).toEqual([]);
+    expect(r.deletedTests).toEqual([
+      'apps/server/test/foo.test.ts',
+      'apps/web/e2e/board.spec.ts',
+      'apps/server/test/d.test.ts',
+    ]);
   });
 });
 
@@ -195,6 +230,26 @@ describe('证据目录', () => {
       f('docs/verify/1404/data.json', { status: 'added' }),
     ]);
     expect(r.executableEvidence).toEqual(['docs/verify/1404/probe.mjs', 'docs/verify/1404/run.SH']);
+  });
+
+  test('证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行', () => {
+    const r = classify([
+      f('Docs/Verify/926/x.json'),
+      f('DOCS/verify/1404/probe.MJS', { status: 'added' }),
+      f('docs/verify/1404/view.tsx', { status: 'added' }),
+      f('docs/verify/1404/view.jsx', { status: 'added' }),
+    ]);
+    expect(r.otherTicketEvidence).toEqual(['Docs/Verify/926/x.json']);
+    expect(r.executableEvidence).toEqual([
+      'DOCS/verify/1404/probe.MJS',
+      'docs/verify/1404/view.tsx',
+      'docs/verify/1404/view.jsx',
+    ]);
+  });
+
+  test('票号是另一票号的前缀：14040 不是 1404 的目录', () => {
+    const r = classify([f('docs/verify/14040/a.txt', { status: 'added' })]);
+    expect(r.otherTicketEvidence).toEqual(['docs/verify/14040/a.txt']);
   });
 
   test('票号段大小写敏感匹配之外不做猜测：XMON-104 与 xmon-104 是两个目录', () => {

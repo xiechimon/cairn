@@ -15,8 +15,9 @@ import {
 } from '@pacman/shared';
 
 /** 摘要不可得的原因：截断（≥ 上限，或与 PR 的 changed_files 对不上）、
- * 非删除条目缺 blob sha（子模块之类，无法绑定内容）。 */
-export type DigestUnavailable = 'truncated' | 'count-mismatch' | 'null-sha';
+ * 非删除条目缺 blob sha（子模块之类，无法绑定内容）、证据之外没有文件
+ * （没有可绑定的补丁）。 */
+export type DigestUnavailable = 'truncated' | 'count-mismatch' | 'null-sha' | 'empty';
 
 export interface PatchDigestResult {
   /** `pd1:<sha256 hex>`；不可得时为 null（调用方一律按留人处理）。 */
@@ -67,6 +68,7 @@ export function computePatchDigest(
   if (opts.expectedFileCount != null && opts.expectedFileCount !== files.length) {
     return result(null, 'count-mismatch');
   }
+  if (kept.length === 0) return result(null, 'empty');
   if (kept.some((f) => f.sha === null && f.status !== 'removed')) return result(null, 'null-sha');
 
   // JSON 元组：文件名里的制表符、换行不会让两组不同的条目拼出同一串。

@@ -39,6 +39,8 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.mts',
   '.cts',
   '.ts',
+  '.jsx',
+  '.tsx',
   '.sh',
   '.py',
 ] as const;
