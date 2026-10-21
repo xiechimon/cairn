@@ -20,6 +20,8 @@ Stubbed live board (no `?scenario=`): a healthy queued card, a held queued card 
 - `e2e-new-leg.txt`: branch. 2 passed. Columns hold 待开始 1 / 执行中 3; the footers read `r3-builder · 排队中`, `r3-builder · 等机器` (no breathing class) and `r3-builder · 执行中` (breathing); the drop on 待开始 opens 把任务重置回待开始？.
 - `queued-action.spec.ts` and `board-queued-drop.spec.ts` (the #1423 / #1434 pins) now look for the queued card in 执行中, and pass with `board-dnd`, `board-dnd-live`, `quota-wait-board`, `paper-card` and `detail-queued-exit`: 50 passed.
 
+- `e2e-full.txt`: `pnpm --filter @pacman/web e2e:affected` on the branch after the first code-review round (shared `phase.ts` and `i18n/` changed, so it ran the full suite): 1133 passed, 0 failed.
+
 | shot | `old/` (base) | `new/` (branch) |
 |---|---|---|
 | `board-columns.png` | both queued cards in 待开始; the healthy one shows nothing, the held one's 等机器 is clipped to 等 | both in 执行中 with an hourglass footer; the building card keeps the green robot |

@@ -12,6 +12,8 @@ Stubbed live boot (no `?scenario=`): one queued task and one planning task, each
 - `e2e-sync-stop-old-leg.txt`: the code-review follow-up, before its fix. The 4th test fails: after a synchronous stop (`{delegated:false}`) of a waiting_quota step, the next step on the same build reads `正在停止…` instead of 处理中. A waiting_quota step never counts as running on the detail page, so nothing cleared the optimistic flag. The fix clears it when the server answers `delegated:false`.
 - `e2e-new-leg.txt`: after. 4 passed. 停止 → dialog 停止排队？ with no checkbox → `POST /api/builds/build-todo-queued/stop`; a synchronous stop leaves 处理中, not 正在停止…; 关闭 → `PATCH /api/todos/todo-queued {phase:'closed'}`; planning shows no menu 停止 and keeps 关闭 disabled.
 
+`e2e-affected-r2.txt`: after the second review round, `e2e-affected.mjs` on its web delta (`routes/todo-detail-page.tsx`, `overlay/more-menu.tsx`): 36 specs, 257 passed. The full suite before that round is in `docs/verify/1447/e2e-full.txt`.
+
 `e2e-affected-dry-run.txt`: `scripts/e2e-affected.mjs --dry-run` for an edit to `overlay/more-menu.tsx`, where the 停止 row lives. Before the family-table line it selected 14 specs without `detail-queued-exit`; after, 15 with it.
 
 | shot | `old/` | `new/` |
