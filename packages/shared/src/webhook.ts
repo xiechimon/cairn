@@ -51,7 +51,8 @@ export type GithubIssuesEvent = z.infer<typeof githubIssuesEventSchema>;
 export const webhookReceiverResponseSchema = z.object({
   /** created = 建 todo + 入编排；duplicate = 重复投递或 issue 已有任务；
    * ignored = 非 issues 事件 / 非 labeled / 非触发 label / 载荷形坏 / 不导入
-   * （#1459：没有 sender、sender 不到 triage、权限读不到、项目在飞已满）；
+   * （#1459：没有 sender、sender 不到 triage、权限读不到或遇限流、项目在飞
+   * 已满）；
    * misconfigured = repo 未映射项目 / GitHub 未连接或 token 解不开（重试无意
    * 义，收 202）。detail = 原因。 */
   result: z.enum(['created', 'duplicate', 'ignored', 'misconfigured']),

@@ -26,7 +26,9 @@
 // （issue 模板自动打的标，sender 是开票人：外部作者不导入）。读不到权限、团队
 // 没有可用 token、项目在飞已满 = 不导入（读不到即不领），一律 202 + detail
 // 原因 + 一行 'github webhook import refused' 日志——拒收不是投递失败，不喂
-// 重投。导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）。注意：载荷
+// 重投。权限读遇限流（#1406 round 4：429 / 带限流信号的 403 抛
+// GithubRateLimitedError）同读不到，原因码另记 rate-limited（日志带 status 与
+// 重置时刻），不进缓存，下一条投递照判。导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）。注意：载荷
 // 只由 URL token 认证，sender 是 token 持有人说了算；本闸挡的是 GitHub 侧的
 // 触发（模板、外部打标），token 泄漏的补救仍是吊销。
 
@@ -42,7 +44,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import type { FetchLike } from '../lib/github.js';
+import { type FetchLike, GithubRateLimitedError } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import { importGithubIssue } from './github-issues.js';
 import {
@@ -180,6 +182,7 @@ export async function receiveGithubWebhook(
     reason: string,
     result: 'ignored' | 'misconfigured',
     detail: string,
+    extra: Record<string, unknown> = {},
   ): WebhookReceiverResponse => {
     logger?.info(
       {
@@ -189,6 +192,7 @@ export async function receiveGithubWebhook(
         issue: issueNumber,
         sender: sender === '' ? null : sender,
         reason,
+        ...extra,
       },
       'github webhook import refused',
     );
@@ -210,15 +214,32 @@ export async function receiveGithubWebhook(
   }
   const githubFetch = deps.githubFetch ?? fetch;
   const slash = fullName.indexOf('/');
-  const trusted = await hasRepoTriage(
-    githubFetch,
-    tokenRow.teamId,
-    access.token,
-    fullName.slice(0, slash),
-    fullName.slice(slash + 1),
-    sender,
-    nowMs(),
-  );
+  const now = nowMs();
+  let trusted: boolean | null;
+  try {
+    trusted = await hasRepoTriage(
+      githubFetch,
+      tokenRow.teamId,
+      access.token,
+      fullName.slice(0, slash),
+      fullName.slice(slash + 1),
+      sender,
+      now,
+    );
+  } catch (err) {
+    // 限流 = 读不到（不进缓存）；其余异常照旧上抛。
+    if (!(err instanceof GithubRateLimitedError)) throw err;
+    const retryAt = err.retryAt(now);
+    const resetAt = retryAt === null ? null : new Date(retryAt).toISOString();
+    return refuse(
+      'rate-limited',
+      'ignored',
+      `github rate limited reading the permission of ${sender} on ${fullName}${
+        resetAt === null ? '' : ` (resets at ${resetAt})`
+      }`,
+      { status: err.status, resetAt },
+    );
+  }
   if (trusted === null) {
     return refuse(
       'permission-unreadable',
