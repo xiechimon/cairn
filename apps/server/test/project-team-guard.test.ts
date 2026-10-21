@@ -13,10 +13,16 @@
 //     的 watch 列表；缺失 id 静默跳过，跨团队 id 同样跳过）。
 //  T7 跨团队与不存在的错误文案同形（不泄露存在性）。
 //  T8 同团队路径不变：上述工具对本队项目照常工作。
+//  T9 chief run_builds：本队任务指向他队项目（旧 create_todo 不核团队时能
+//     造出这种行）——先建 build、派步、推相位，再报 404：调用方以为失败，
+//     build 其实在跑，重试撞 409。混合列表里排在前面的本队任务同样先被派出。
+//  T10 chief watch_todos 混合列表：前面的本队任务先进 watch，轮到这种行才
+//     404，半截生效。
 
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {
+  build as buildTable,
   chief as chiefTable,
   project as projectTable,
   team as teamTable,
@@ -24,8 +30,8 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
-import { executeMcpTool, type McpCallerCtx } from '../src/services/mcp-face.js';
-import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
+import { executeMcpTool } from '../src/services/mcp-face.js';
+import { AGENT_ID, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
 registerChiefHarness();
 
@@ -33,6 +39,8 @@ const TEAM_B = 'team-b-1466';
 const PROJ_B = 'proj-b-1466';
 const TASK_B = 'todo-b-1466';
 const MISSING = 'proj-missing-1466';
+/** 本队任务、他队项目（T9/T10 的存量异常行）。 */
+const CROSS = 'todo-cross-1466';
 
 beforeEach(() => {
   const now = nowMs();
@@ -65,12 +73,15 @@ async function chiefError(name: string, params: Record<string, unknown>): Promis
   return err as HttpError;
 }
 
-function mcpCtx(): McpCallerCtx {
-  return { teamId: H.teamId, user: H.s.user, grants: new Set(['Todos', 'Create Todo']) };
-}
-
 async function mcp(name: string, args: Record<string, unknown>): Promise<unknown> {
-  return JSON.parse(await executeMcpTool(toolDeps(), mcpCtx(), name, args));
+  return JSON.parse(
+    await executeMcpTool(
+      toolDeps(),
+      { teamId: H.teamId, user: H.s.user, grants: new Set(['Todos', 'Create Todo']) },
+      name,
+      args,
+    ),
+  );
 }
 
 function projectB() {
@@ -84,6 +95,38 @@ function todosInProject(projectId: string) {
 function chiefWatchIds(): string[] {
   const row = H.s.db.select().from(chiefTable).where(eq(chiefTable.id, H.chiefId)).get();
   return (row?.watches ?? []).map((w) => w.todoId);
+}
+
+/** 存量异常行：teamId = 本队，projectId = 他队项目（#1466 前 create_todo 可造）。 */
+function insertCrossTodo(): void {
+  H.s.db
+    .insert(todoTable)
+    .values({
+      id: CROSS,
+      teamId: H.teamId,
+      projectId: PROJ_B,
+      title: '本队任务、他队项目',
+      spec: '',
+      phase: 'todo',
+      phaseAt: nowMs(),
+      seqNum: 900,
+    })
+    .run();
+}
+
+async function createOwnTodo(): Promise<string> {
+  const created = (await relay('create_todo', {
+    projectId: H.projectId,
+    title: '本队任务',
+    spec: 's',
+  })) as { id: string };
+  return created.id;
+}
+
+function todoState(todoId: string) {
+  const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+  const builds = H.s.db.select().from(buildTable).where(eq(buildTable.todoId, todoId)).all();
+  return { phase: row?.phase, builds: builds.length };
 }
 
 describe('#1466 chief 工具面：跨团队项目 id = 404（与不存在同形）', () => {
@@ -119,6 +162,32 @@ describe('#1466 chief 工具面：跨团队项目 id = 404（与不存在同形�
 
   test('T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch', async () => {
     await relay('watch_todos', { todoIds: [TASK_B, 'todo-missing-1466'] });
+    expect(chiefWatchIds()).toEqual([]);
+  });
+
+  test('T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch', async () => {
+    insertCrossTodo();
+    const own = await createOwnTodo();
+    const runBuilds = (todoIds: string[]) =>
+      chiefError('run_builds', { todoIds, assignment: { build: { agentId: AGENT_ID } } });
+    const single = await runBuilds([CROSS]);
+    expect(single.status).toBe(404);
+    expect(single.message).toBe(`project ${PROJ_B}`);
+    expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
+    // 混合列表：排在前面的本队任务也不先派出。
+    const mixed = await runBuilds([own, CROSS]);
+    expect(mixed.status).toBe(404);
+    expect(todoState(own)).toEqual({ phase: 'todo', builds: 0 });
+    expect(todoState(CROSS)).toEqual({ phase: 'todo', builds: 0 });
+    expect(chiefWatchIds()).toEqual([]);
+  });
+
+  test('T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch', async () => {
+    insertCrossTodo();
+    const own = await createOwnTodo();
+    const err = await chiefError('watch_todos', { todoIds: [own, CROSS] });
+    expect(err.status).toBe(404);
+    expect(err.message).toBe(`project ${PROJ_B}`);
     expect(chiefWatchIds()).toEqual([]);
   });
 

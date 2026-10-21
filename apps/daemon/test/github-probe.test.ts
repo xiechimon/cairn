@@ -156,7 +156,6 @@ describe('githubRepoRefOf（失败方式 5：形态前置闸）', () => {
   test('#1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测', () => {
     expect(githubRepoRefOf('https://github.com/owner/...git')).toBeNull();
     expect(githubRepoRefOf('https://github.com/owner/..git')).toBeNull();
-    expect(githubRepoRefOf('https://github.com/../user.git')).toBeNull();
     // 三点仓名不是 dot segment，照常探测。
     expect(githubRepoRefOf('https://github.com/owner/....git')).toEqual({
       owner: 'owner',

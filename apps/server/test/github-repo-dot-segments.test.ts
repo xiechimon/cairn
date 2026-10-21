@@ -13,7 +13,11 @@
 //   R1 issue 列表 / R2 issue 导入；
 //   R3 建任务时 #452 自建 issue（planSelfIssue）/ R4 未建成重试；
 //   R5 来源 issue 回显 / R6 #452 标题回写（todo.sourceRef 带 `..` 段）；
-//   R7 CI 磨绿轮询 check-runs；R8 PR 状态探测（requestMerge 第二张 PR 守卫）。
+//   R7 PR 交付：执行步成后停在 building 等 CI，而轮询器对这种行不出站——
+//      任务永远卡在 building；应与无 GitHub 仓的项目同样直进 review。
+//   R8 PR 状态探测（requestMerge 第二张 PR 守卫）。
+//   R9 builds.ts 交付闸本身（completeStep）：非法存量值走「无 GitHub 仓」
+//      分支（进 review、verify 槽在位即入队验证步）；合法值照旧停 building。
 // 出站断言 = 注入 githubFetch 的调用记录为空（mock 对任何路径都回 404——
 // 只断 HTTP 状态分不出「没发请求」与「发了、上游 404」）。
 
@@ -29,7 +33,7 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
-import { requestMerge } from '../src/services/builds.js';
+import { completeStep, requestMerge } from '../src/services/builds.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -112,6 +116,54 @@ function insertTodo(
     })
     .run();
   return id;
+}
+
+/** 已产 PR 的 build + 一条在跑的执行步（claimed）：completeStep 即「PR 交付」。 */
+function insertDeliveringBuild(
+  s: TestServer,
+  projectId: string,
+  over: Partial<typeof todoTable.$inferInsert> = {},
+): { todoId: string; buildId: string; stepId: string } {
+  const todoId = insertTodo(s, projectId, { phase: 'building', ...over });
+  const buildId = newUuidv7();
+  s.db
+    .insert(buildTable)
+    .values({
+      id: buildId,
+      todoId,
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: nowMs(),
+      prUrl: 'https://github.com/octo/alpha/pull/101',
+      prNumber: 101,
+    })
+    .run();
+  const stepId = `step-${buildId}`;
+  s.db
+    .insert(stepTable)
+    .values({
+      id: stepId,
+      buildId,
+      kind: 'build',
+      status: 'claimed',
+      machineId: 'machine-1466',
+      createdAt: nowMs(),
+    })
+    .run();
+  return { todoId, buildId, stepId };
+}
+
+function phaseOf(s: TestServer, todoId: string): string | undefined {
+  return s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.phase;
+}
+
+function stepsOf(s: TestServer, buildId: string): { kind: string; status: string }[] {
+  return s.db
+    .select({ kind: stepTable.kind, status: stepTable.status })
+    .from(stepTable)
+    .where(eq(stepTable.buildId, buildId))
+    .all()
+    .sort((x, y) => x.kind.localeCompare(y.kind));
 }
 
 function chiefDeps(s: TestServer) {
@@ -285,34 +337,24 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
     },
   );
 
-  test.each(STORED_BAD_REFS)('R7 CI 磨绿轮询：跳过该候选，零出站（%s）', async (bad) => {
-    const rec = recorder();
-    const s = boot(rec);
-    const projectId = insertGithubProject(s, bad);
-    const todoId = insertTodo(s, projectId, { phase: 'building' });
-    const buildId = newUuidv7();
-    s.db
-      .insert(buildTable)
-      .values({
-        id: buildId,
-        todoId,
-        withPlan: false,
-        triggerSource: 'user',
-        createdAt: nowMs(),
-        prUrl: 'https://github.com/octo/alpha/pull/101',
-        prNumber: 101,
-      })
-      .run();
-    const poller = createCiPoller(
-      { ...s.svc, box: s.secretBox, reposDir: s.reposDir },
-      { githubFetch: rec.impl },
-    );
-    await poller.sweep();
-    expect(rec.calls).toEqual([]);
-    const todoRow = s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
-    expect(todoRow?.phase).toBe('building');
-    expect(s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all()).toEqual([]);
-  });
+  test.each(STORED_BAD_REFS)(
+    'R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（%s）',
+    async (bad) => {
+      const rec = recorder();
+      const s = boot(rec);
+      const projectId = insertGithubProject(s, bad);
+      const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId);
+      completeStep(s.svc, stepId, { hasChanges: true });
+      const poller = createCiPoller(
+        { ...s.svc, box: s.secretBox, reposDir: s.reposDir },
+        { githubFetch: rec.impl },
+      );
+      await poller.sweep();
+      expect(rec.calls).toEqual([]);
+      expect(phaseOf(s, todoId)).toBe('review');
+      expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
+    },
+  );
 
   test.each(STORED_BAD_REFS)(
     'R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（%s）',
@@ -350,4 +392,33 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
       expect(rec.calls).toEqual([]);
     },
   );
+});
+
+describe('#1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9）', () => {
+  const assignment = {
+    plan: null,
+    build: { agentId: 'agent-build-1466' },
+    verify: { agentId: 'agent-verify-1466' },
+  };
+
+  test.each(STORED_BAD_REFS)('R9 completeStep 执行步交付 PR → review + 验证步入队（%s）', (bad) => {
+    const s = boot(recorder());
+    const projectId = insertGithubProject(s, bad);
+    const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
+    completeStep(s.svc, stepId, { hasChanges: true });
+    expect(phaseOf(s, todoId)).toBe('review');
+    expect(stepsOf(s, buildId)).toEqual([
+      { kind: 'build', status: 'done' },
+      { kind: 'verify', status: 'pending' },
+    ]);
+  });
+
+  test('R9 对照：合法 githubRepo 的 PR 交付照旧停 building 等 CI，不入队验证步', () => {
+    const s = boot(recorder());
+    const projectId = insertGithubProject(s, VALID_REPO);
+    const { todoId, buildId, stepId } = insertDeliveringBuild(s, projectId, { assignment });
+    completeStep(s.svc, stepId, { hasChanges: true });
+    expect(phaseOf(s, todoId)).toBe('building');
+    expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
+  });
 });
