@@ -1,0 +1,126 @@
+# Mutations of pr-gate.js at 126f4c1, each applied alone to a copy in a scratch directory (<scratch>), then
+# the self-check of 126f4c1 run against that copy. Each undoes one fix of this round, or breaks a rule a
+# guard case of this round pins. A mutation is caught when at least one case fails (exit 1).
+# Each was applied as an exact, single-occurrence string replacement of the text shown.
+
+== M1a: fork branch allows a checkout again (drop "check out nothing")
+   replace: check out nothing, install nothing and run nothing
+   with:    install nothing and run nothing
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M1a.js
+FAIL  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+72/73 passed (<scratch>/pr-gate-M1a.js)
+exit=1 -> caught
+
+== M1b: checkout instruction moved before the fork check, as at 9460e04
+   replace: You run in your own git worktree. Before any checkout, run
+   with:    You run in your own git worktree; after the fetch, \`${NO_HOOKS} checkout --detach ${headSha}\`. Then run
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M1b.js
+FAIL  the evidence reviewer and skeptics check for a fork before any checkout, and read a fork head with git show, diff and ls-tree only (run 10)
+72/73 passed (<scratch>/pr-gate-M1b.js)
+exit=1 -> caught
+
+== M2: evidence checkout without hooks off
+   replace: \`${NO_HOOKS} checkout --detach ${headSha}\`
+   with:    \`git checkout --detach ${headSha}\`
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M2.js
+FAIL  every checkout the evidence prompts ask for runs with core.hooksPath=/dev/null (run 10)
+72/73 passed (<scratch>/pr-gate-M2.js)
+exit=1 -> caught
+
+== M3a: readRules fetch without hooks off
+   replace: \`${NO_HOOKS} fetch origin
+   with:    \`git fetch origin
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M3a.js
+FAIL  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+72/73 passed (<scratch>/pr-gate-M3a.js)
+exit=1 -> caught
+
+== M3b: readRules ref cleanup without hooks off
+   replace: \`${NO_HOOKS} update-ref -d ${base}\` and \`${NO_HOOKS} update-ref -d ${head}\`
+   with:    \`git update-ref -d ${base}\` and \`git update-ref -d ${head}\`
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M3b.js
+FAIL  the fetch and the ref cleanup run with core.hooksPath=/dev/null in every prompt, the evidence worktrees included (run 10)
+72/73 passed (<scratch>/pr-gate-M3b.js)
+exit=1 -> caught
+
+== M4: evidence install without HUSKY=0
+   replace: \`HUSKY=0 pnpm install
+   with:    \`pnpm install
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M4.js
+FAIL  evidence installs skip husky's prepare, which would set the shared clone's core.hooksPath to the relative .husky/_ (run 10)
+72/73 passed (<scratch>/pr-gate-M4.js)
+exit=1 -> caught
+
+== M5a: evidence skeptics get no ports (as at 9460e04)
+   replace:  If you start a server or e2e, use VERIFY_PORT=${8805 + i} VERIFY_WEB_PORT=${5285 + i} E2E_AFFECTED_PORT=${8385 + i} and stop what you started.
+   with:    (nothing)
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M5a.js
+FAIL  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+72/73 passed (<scratch>/pr-gate-M5a.js)
+exit=1 -> caught
+
+== M5b: both skeptics get the same ports
+   replace: VERIFY_PORT=${8805 + i} VERIFY_WEB_PORT=${5285 + i} E2E_AFFECTED_PORT=${8385 + i}
+   with:    VERIFY_PORT=8805 VERIFY_WEB_PORT=5285 E2E_AFFECTED_PORT=8385
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M5b.js
+FAIL  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+72/73 passed (<scratch>/pr-gate-M5b.js)
+exit=1 -> caught
+
+== M5c: skeptic 0 shares the reviewer ports
+   replace: VERIFY_PORT=${8805 + i} VERIFY_WEB_PORT=${5285 + i} E2E_AFFECTED_PORT=${8385 + i}
+   with:    VERIFY_PORT=${8793 + i} VERIFY_WEB_PORT=${5275 + i} E2E_AFFECTED_PORT=${8397 + i}
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M5c.js
+FAIL  the two evidence skeptics get ports of their own, apart from the reviewer and the repo defaults (run 10)
+72/73 passed (<scratch>/pr-gate-M5c.js)
+exit=1 -> caught
+
+== M6: seenFiles from the safety changedFiles only (as at 9460e04)
+   replace: ...new Set([...safetyListed, ...(safety?.deletedFiles ?? []), ...(safety?.binaryFiles ?? [])]),
+   with:    ...safetyListed,
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M6.js
+FAIL  a path only in the safety reviewer's deleted or binary list is matched against D4 and blocks go (run 10)
+72/73 passed (<scratch>/pr-gate-M6.js)
+exit=1 -> caught
+
+== M7: PROTECTED without the bare-directory match
+   replace: globToRegExp(glob, { dirAlone: true })
+   with:    globToRegExp(glob)
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M7.js
+FAIL  an entry named exactly like a protected directory (a symlink .claude, scripts, drizzle) routes to the user (run 10)
+72/73 passed (<scratch>/pr-gate-M7.js)
+exit=1 -> caught
+
+== M8: bare-directory match for every glob, AUTO_MERGE and EVIDENCE_RE included
+   replace: const tail = dirAlone && glob.endsWith('/**')
+   with:    const tail = glob.endsWith('/**')
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M8.js
+FAIL  the bare-directory match is for protected classes only: src and docs/verify named alone stay outside the auto-merge set, file globs stay exact (run 10)
+72/73 passed (<scratch>/pr-gate-M8.js)
+exit=1 -> caught
+
+== M9a: globs not anchored at the path start
+   replace: return new RegExp(`^${re}
+   with:    return new RegExp(`${re}
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M9a.js
+FAIL  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+72/73 passed (<scratch>/pr-gate-M9a.js)
+exit=1 -> caught
+
+== M9b: EVIDENCE_RE unanchored
+   replace: const EVIDENCE_RE = globToRegExp('docs/verify/**')
+   with:    const EVIDENCE_RE = /docs\/verify\//i
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M9b.js
+FAIL  D4 globs are anchored at the path start: an auto-merge or evidence path inside a longer one routes to the user (run 10)
+72/73 passed (<scratch>/pr-gate-M9b.js)
+exit=1 -> caught
+
+== M10: safety reviewer's line count preferred over the caller's
+   replace: const lines = Math.max(linesChanged, Number.isInteger(safety?.linesChanged) ? safety.linesChanged : 0)
+   with:    const lines = Number.isInteger(safety?.linesChanged) ? safety.linesChanged : linesChanged
+$ node scripts/pr-gate-selfcheck.mjs <scratch>/pr-gate-M10.js
+FAIL  a caller line count larger than the safety reviewer's wins (run 10)
+72/73 passed (<scratch>/pr-gate-M10.js)
+exit=1 -> caught
+
+all caught

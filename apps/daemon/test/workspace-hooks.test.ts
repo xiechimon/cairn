@@ -17,12 +17,13 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from '
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { GitCredentials } from '@pacman/shared';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
   runWorkspaceHook,
   WorkspaceHookError,
 } from '../src/workspace-hooks.js';
+import { stubOutInheritedGitConfig } from './git-config-env.js';
 
 const CREDS: GitCredentials = { username: 'x-access-token', password: 'step-token-secret' };
 
@@ -44,16 +45,29 @@ function writeHookNonExec(dir: string, name: string, body: string): string {
   return writeHook(dir, name, body, { exec: false });
 }
 
-/** 等待 pid 死透（SIGKILL 后到 launchd reaping 有小延迟）。 */
+/** 已死即算：ESRCH（已收尸），或 Linux 上 /proc 状态为 Z（僵尸——进程已
+ *  终止，只等 init 收尸）。kill(pid, 0) 对僵尸照样成功；云端容器的 PID 1
+ *  （firecracker init）收尸要 1–2 秒，负载下超过下方 2 秒期限（#1458）。
+ *  无 /proc 的平台（macOS）退回只认 ESRCH。 */
+function isGone(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return true; // ESRCH = 死透
+  }
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+    return stat.slice(stat.lastIndexOf(') ') + 2).startsWith('Z');
+  } catch {
+    return false;
+  }
+}
+
+/** 等待 pid 死透（SIGKILL 后到 reaping 有延迟）。 */
 async function assertDead(pid: number): Promise<void> {
   const deadline = Date.now() + 2_000;
   while (Date.now() < deadline) {
-    try {
-      process.kill(pid, 0);
-      await new Promise((r) => setTimeout(r, 50));
-    } catch {
-      return; // ESRCH = 死透
-    }
+    if (isGone(pid)) return;
     await new Promise((r) => setTimeout(r, 50));
   }
   throw new Error(`pid ${pid} still alive after group kill`);
@@ -185,25 +199,63 @@ describe('workspace hook 原语（#1149）', () => {
     const root = tmpRoot();
     // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
     writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
-    const withCreds = await runWorkspaceHook({
-      cwd: root,
-      name: 'setup',
-      credentials: CREDS,
-      timeoutMs: 30_000,
-      log: () => {},
-    });
+    // 父进程可能自带 GIT_CONFIG_*（云端容器的代理配置）：两次运行都先摘掉，
+    // 测的是 runWorkspaceHook 自己注入什么（#1458；带凭证时条目接在父环境
+    // 之后，父环境无条目才是 COUNT=2，#1460）。
+    stubOutInheritedGitConfig();
+    let withCreds: Awaited<ReturnType<typeof runWorkspaceHook>>;
+    let without: Awaited<ReturnType<typeof runWorkspaceHook>>;
+    try {
+      withCreds = await runWorkspaceHook({
+        cwd: root,
+        name: 'setup',
+        credentials: CREDS,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+      // 换脚本重跑（同一 cwd，凭证 null → 父 env 原样继承，无 GIT_CONFIG 注入）。
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
+      writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
+      without = await runWorkspaceHook({
+        cwd: root,
+        name: 'setup',
+        credentials: null,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
     expect(withCreds!.output).toContain('cred=2');
-    // 换脚本重跑（同一 cwd，凭证 null → env 无 GIT_CONFIG 注入）。
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
-    writeHook(root, 'setup', '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\n');
-    const without = await runWorkspaceHook({
-      cwd: root,
-      name: 'setup',
-      credentials: null,
-      timeoutMs: 30_000,
-      log: () => {},
-    });
     expect(without!.output).toContain('cred=unset');
+  });
+
+  test('失败方式 7b：父环境自带 GIT_CONFIG_* → 凭证条目接在其后，父环境的键在钩子里仍生效（#1460）', async () => {
+    const root = tmpRoot();
+    writeHook(
+      root,
+      'setup',
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
+      '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\necho "probe=$(git config --get pacman.probe)"\n',
+    );
+    stubOutInheritedGitConfig();
+    vi.stubEnv('GIT_CONFIG_COUNT', '1');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'pacman.probe');
+    vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');
+    let note: Awaited<ReturnType<typeof runWorkspaceHook>>;
+    try {
+      note = await runWorkspaceHook({
+        cwd: root,
+        name: 'setup',
+        credentials: CREDS,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    expect(note!.output).toContain('cred=3');
+    expect(note!.output).toContain('probe=kept');
   });
 
   test('resume 名字同样可跑（原语与名字无关）', async () => {

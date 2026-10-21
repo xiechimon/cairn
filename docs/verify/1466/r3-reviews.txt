@@ -1,0 +1,118 @@
+# #1466 round 3 reviews: /simplify on the branch diff, the round 2 /code-review (reconstructed), and /code-review low on the round 3 range.
+
+## 1. /simplify on origin/main..claude/bootstrap-p5c-1466
+
+What ran: the `simplify` skill, invoked with
+  args: "Review the branch diff origin/main..claude/bootstrap-p5c-1466 in the worktree
+         /home/user/pacman/.claude/worktrees/p5c (cd into it in the same Bash call as every git
+         command; the primary checkout /home/user/pacman is a different branch and must not be
+         reviewed). Scope: code files only (apps/, packages/), not docs/verify/. Do not touch
+         apps/server/src/services/mcp-face.ts. Apply only behavior-preserving changes."
+The Agent tool was not available in this context, so the skill ran as a single inline pass over
+its four angles (reuse, simplification, efficiency, altitude), not as its usual 4-agent fan-out.
+
+Diff it reviewed (checked, not assumed): every git command ran as
+`cd /home/user/pacman/.claude/worktrees/p5c && git ...`; `git rev-parse --show-toplevel` printed
+/home/user/pacman/.claude/worktrees/p5c, branch claude/bootstrap-p5c-1466, HEAD e91074d0 (round 3
+R7b test commit). Range: git diff origin/main...claude/bootstrap-p5c-1466 -- apps packages
+  13 files changed, 926 insertions(+), 70 deletions(-)
+  (merge base 2294b087 = origin/main; whole range incl. docs/verify: 26 files, 2871+/70-)
+Files: apps/server/src/services/{builds,chief-tools,ci-loop,git,github-issues,mcp-face,todos}.ts,
+packages/shared/src/records/{project,todo}.ts and the tests apps/server/test/{github-repo-dot-segments,
+project-team-guard}.test.ts, apps/daemon/test/github-probe.test.ts, packages/shared/test/github-repo-ref.test.ts.
+Not the #1401 diff of the primary checkout.
+
+Findings and what was done:
+
+Reuse
+ S1 apps/server/test/project-team-guard.test.ts, MCP "T2/T7 create_todo": the
+    `.then(() => null, (e) => e)` capture plus four `as HttpError` casts were written out twice,
+    while the chief side of the same file already has `chiefError`. APPLIED: added `mcpError`
+    (mirrors chiefError: same toBeInstanceOf(HttpError) check, labelled with the tool name) and
+    used it for both calls; the test asserts the same three things (instance, 404, message shape).
+    Commit e6291e93 (13+/14-, test file only). Behavior check: the file passes 13/13, and the
+    round 1 mutation M5 (MCP requireProjectRow without the team filter, mcp-face.ts mutated in
+    place and restored byte-identical, sha256sum -c OK) still fails this case:
+      vitest exit: 1 (KILLED)
+      x project-team-guard.test.ts > #1466 MCP 工具面 > T2/T7 create_todo：他队项目 404，不建任务
+      Tests 1 failed | 12 passed (13)
+      AssertionError: create_todo: expected null to be an instance of HttpError
+ S2 apps/server/test/github-repo-dot-segments.test.ts `chiefDeps(s)` / `chiefCtx(s)` repeat the
+    shape of chief-harness.ts `toolDeps()` / `ctx()`. SKIPPED: the harness binds its own server
+    (bootServer() without githubFetch) through registerChiefHarness, and these tests need the
+    recording githubFetch for the zero-outbound assertions; reusing the harness would mean
+    changing it for every chief test file.
+ S3 Hand-split `owner/repo` (isGithubRepoRef then indexOf('/') / slice) that parseGithubRepoRef
+    now replaces: apps/server/src/services/projects.ts:222-225 (local->github conversion
+    reachability probe), apps/daemon/src/github-probe.ts:42-44 (githubRepoRefOf),
+    apps/web/src/pages/project-new-page.tsx:243 (name backfill); apps/server/src/lib/github.ts:114
+    and :147 inline the `repos/${enc(owner)}/${enc(repo)}` builder that repoPath() already holds.
+    SKIPPED: all outside this diff (none of those files is changed by the branch), each is
+    already guarded by isGithubRepoRef, which now rejects `.` / `..`, so the cleanup is
+    behavior-neutral and belongs in a follow-up rather than widening the PR's file set after
+    pr-gate run 2.
+
+Simplification
+ S4 apps/server/src/services/ci-loop.ts:212-218 keeps `projRow === undefined` next to
+    `repoRef === null` although githubRepoOfProject(undefined) is null. SKIPPED (false
+    positive): the explicit check is what narrows projRow for the later projRow.teamId /
+    projRow.githubRepo reads; dropping it needs a non-null assertion instead.
+ S5 apps/server/src/services/todos.ts planSelfIssue: two consecutive `return null` guards
+    (invalid repo, no connection) could be one `||`. SKIPPED: no gain worth a source change
+    after the gate run; the two guards carry different reasons in the doc comment.
+ No other derivable state, copy-paste or dead code in the source hunks: the old per-file split
+ helpers (todos.ts splitGithubRepo, the inline slices in builds.ts / ci-loop.ts /
+ github-issues.ts) were removed in favour of githubRepoOfProject, and isGithubRepoRef is now a
+ one-line wrapper over parseGithubRepoRef.
+
+Efficiency
+ Nothing found. The added work is one anchored regex per GitHub-bound read (githubRepoOfProject)
+ and, in chief run_builds / watch_todos, the same number of project lookups as before, moved
+ ahead of the writes. No new I/O, no sequential independent awaits, no long-lived closures.
+
+Altitude
+ S6 A deeper guard would be in apps/server/src/lib/github.ts repoPath() (refuse `.` / `..`
+    where the URL is built). SKIPPED: it would turn "project is not a GitHub repo" into a throw
+    at request time, which changes caller behavior (completeStep must route such a project to
+    review, the poller must count it skipped, issue routes answer 404); the shared parser
+    (parseGithubRepoRef) plus the single server accessor (githubRepoOfProject) is the level that
+    can express that. The lib layer keeps its encodeURIComponent second line of defence.
+
+Summary: one behavior-preserving test cleanup applied (S1, commit e6291e93); source code was
+already clean on the four angles; five findings skipped with reasons (S2-S6). This was a
+single-pass review done without the Agent tool, not the full 4-agent fan-out.
+Tests rerun after the change: project-team-guard.test.ts 13/13; the wider set in r3-green.txt
+(126/126) and gates-3.txt ran at e6291e93.
+
+## 2. Round 2 /code-review (reconstructed)
+
+Not run in this round; reconstructed from the round 2 record handed over by the orchestrator
+and recomputed from git, since the round 2 transcript is not in this worktree.
+  args: low e87699c3..0a4b0039
+  range: e87699c3 (round 1 head, pr-gate run 1) .. 0a4b0039 (round 2 evidence commit)
+         commits ddb06ca4 (tests first), ab18cc30 (fix), 0a4b0039 (evidence)
+  shortstat (recomputed now with git diff --shortstat e87699c3..0a4b0039; the figure the
+  reviewer printed at the time is not preserved):
+         10 files changed, 902 insertions(+), 48 deletions(-)
+         of which code (apps/, packages/): 5 files changed, 194 insertions(+), 48 deletions(-)
+         apps/server/src/services/{builds,chief-tools}.ts, apps/server/test/{github-repo-dot-segments,
+         project-team-guard}.test.ts, apps/daemon/test/github-probe.test.ts
+  result: (none), no findings.
+
+## 3. /code-review low on the round 3 range
+
+Invoked after both round 3 commits, with SHAs so the range resolves the same in every worktree
+of the repository (the round 1 run resolved HEAD in the primary checkout; see reviews.txt):
+  args: low 0a4b0039..e6291e93
+  range: 0a4b0039 (round 2 head, pr-gate run 2 "go") .. e6291e93 (round 3 code head)
+  diff it resolved: git diff --shortstat 0a4b0039..e6291e93
+         2 files changed, 59 insertions(+), 18 deletions(-)
+         apps/server/test/github-repo-dot-segments.test.ts (46+/4-, R7b + insertPrBuild helper)
+         apps/server/test/project-team-guard.test.ts (13+/14-, mcpError)
+         non-test part: empty (git diff --shortstat 0a4b0039..e6291e93 -- . ':!**/test/**' prints nothing)
+  result: (none)
+  reviewer note: "The diff 0a4b0039..e6291e93 is empty once test, spec, fixture and __tests__
+  paths are left out, so there were no non-test hunks to review."
+  So at low effort this review covered no lines: the round 3 range is test-only, and low effort
+  leaves test paths out. The test changes are covered by the R7b mutation (r3-mutations.txt),
+  the M5 recheck in section 1 and the runs in r3-green.txt / gates-3.txt, not by this review.

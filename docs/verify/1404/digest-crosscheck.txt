@@ -1,0 +1,19 @@
+# The fixture digest in apps/server/test/merge-gate-digest.test.ts was computed by this Python,
+# written from ADR 0021 D3 and the algorithm notes in digest.ts, not copied from the TypeScript
+# output. Run with python3 from the repo root; it printed the line at the end.
+#
+#   import json, hashlib
+#   d = json.load(open('docs/verify/1404/compare-sample.json'))
+#   kept = [f for f in d['files']
+#           if not (f['filename'].startswith('docs/verify/')
+#                   and (f.get('previous_filename') is None or f['previous_filename'].startswith('docs/verify/')))]
+#   tuples = sorted(json.dumps([f['status'], f['filename'], f.get('previous_filename'), f.get('sha')],
+#                              separators=(',', ':'), ensure_ascii=False) for f in kept)
+#   print(len(kept), 'pd1:' + hashlib.sha256('\n'.join(tuples).encode()).hexdigest(),
+#         sum(f['additions'] + f['deletions'] for f in kept))
+#
+36 pd1:ddf04cd2406d952eec621a1d4f0b466d77b5084bb555f2e737e6ea1679b7655f 846
+#
+# The real response also showed: removed entries carry the old blob sha (not null), files under
+# docs/verify/ include .mjs scripts (capture.mjs, probe.mjs), and per_page=1 returns a Link header
+# (pagination mode, file list on the first page only, at most 300 files per the REST docs).

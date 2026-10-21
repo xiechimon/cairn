@@ -1,0 +1,176 @@
+[
+  {
+    "id": 5958036990,
+    "number": 1461,
+    "title": "server(1406): issue intake poller for ready-for-agent issues, opt-in",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T09:36:35Z",
+    "updated_at": "2026-10-21T09:37:20Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/pull/1461",
+    "body": "(body removed from fixture)",
+    "pull_request": {
+      "merged_at": null,
+      "html_url": "https://github.com/xiechimon/pacman/pull/1461"
+    }
+  },
+  {
+    "id": 5957696958,
+    "number": 1460,
+    "title": "daemon: per-step git credentials overwrite GIT_CONFIG_* the machine's environment already sets",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509896,
+        "name": "bug",
+        "color": "d73a4a",
+        "default": true
+      },
+      {
+        "id": 12337349785,
+        "name": "needs-triage",
+        "color": "fbca04",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T09:12:55Z",
+    "updated_at": "2026-10-21T09:12:55Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/issues/1460",
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957676202,
+    "number": 1459,
+    "title": "server: webhook 的 pacman 触发不核打标人，与 D5 不一致",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12449502350,
+        "name": "ready-for-human",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T09:11:26Z",
+    "updated_at": "2026-10-21T09:11:26Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/issues/1459",
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957496128,
+    "number": 1458,
+    "title": "daemon tests: three cases fail in cloud containers (root, inherited GIT_CONFIG_*, slow init reaping)",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509896,
+        "name": "bug",
+        "color": "d73a4a",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:58:56Z",
+    "updated_at": "2026-10-21T09:12:15Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/issues/1458",
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957120218,
+    "number": 1457,
+    "title": "shared: one rule for which phases can start, so the board cannot offer a drop the server rejects",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [
+      {
+        "id": 12104509942,
+        "name": "enhancement",
+        "color": "a2eeef",
+        "default": true
+      },
+      {
+        "id": 12232114920,
+        "name": "ready-for-agent",
+        "color": "0E8A16",
+        "default": false
+      }
+    ],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:31:53Z",
+    "updated_at": "2026-10-21T08:31:53Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/issues/1457",
+    "body": "(body removed from fixture)"
+  },
+  {
+    "id": 5957109366,
+    "number": 1456,
+    "title": "Local test loop and a shared start rule: e2e-affected, canOrchestrate, container-safe daemon tests (#1455, #1457, #1458)",
+    "user": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "type": "User"
+    },
+    "labels": [],
+    "state": "open",
+    "state_reason": null,
+    "author_association": "OWNER",
+    "created_at": "2026-10-21T08:31:11Z",
+    "updated_at": "2026-10-21T09:14:51Z",
+    "closed_at": null,
+    "html_url": "https://github.com/xiechimon/pacman/pull/1456",
+    "body": "(body removed from fixture)",
+    "pull_request": {
+      "merged_at": null,
+      "html_url": "https://github.com/xiechimon/pacman/pull/1456"
+    }
+  }
+]

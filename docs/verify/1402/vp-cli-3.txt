@@ -1,0 +1,90 @@
+# vp.mjs after pr-gate run 2 on #1411 (head 6f527a1). Worktree: claude/bootstrap-p1.
+# Failure modes from that run, as vp-selftest.mjs cases; red is the self-test against
+# vp.mjs at 6f527a1, green is the same self-test after the fix.
+
+== vp-selftest.mjs against vp.mjs at 6f527a1 (red) ==
+FAIL  arguments after -- replace the case default args
+FAIL  without arguments a case runs with its default args
+FAIL  relative evidence and run paths reach a tsx case as absolute paths
+FAIL  a case that rewrites committed evidence needs --force
+FAIL  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive copies a named source
+3/8 passed
+
+== vp-selftest.mjs after the fix (green) ==
+PASS  arguments after -- replace the case default args
+PASS  without arguments a case runs with its default args
+PASS  relative evidence and run paths reach a tsx case as absolute paths
+PASS  a case that rewrites committed evidence needs --force
+PASS  archive with no source named refuses instead of taking the newest run
+PASS  archive refuses to overwrite an archived directory
+PASS  archive refuses two sources with one name and copies nothing
+PASS  archive copies a named source
+8/8 passed
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs --help
+verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <command>
+
+  launch                         start the isolated stack (scripts/launch.mjs)
+  doctor                         read-only health check of the stack (scripts/doctor.mjs)
+  list [feature]                 registered features and their cases
+  drive <feature> [case] [--force] [--dry-run] [-- <args>]
+                                 run a registered case; cases that need the stack run doctor first;
+                                 stale and host-bound cases, and cases that need real-llm, github or
+                                 rewrites-evidence, need --force; arguments after -- replace the
+                                 case's default args; --dry-run prints what would run
+  capture <path> [--name <label>] [--wait <ms>]
+                                 screenshot a live route, record console errors and failed requests
+                                 (exit 0 when the page loaded; errors are recorded, not judged;
+                                 with VERIFY_EVIDENCE_DIR set it writes into its capture-<label>/)
+  archive <ticket> [--from <dir>]... [--latest <n>]
+                                 copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
+                                 the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
+                                 (newest runs in the shared evidence root, other lanes' included)
+  links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
+  cleanup                        stop the stack (scripts/cleanup.mjs)
+
+Feature recipes: .claude/skills/verify-pacman/features/<feature>.md
+Registry: .claude/skills/verify-pacman/vp-registry.json
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive failed-send restart-combo --dry-run
+vp: dry-run failed-send/restart-combo
+    runner tsx  cwd <worktree>/apps/server
+    script .claude/skills/verify-pacman/scripts/drive-1279-restart-combo.mts  args --expect=new
+    VERIFY_EVIDENCE_DIR=
+    VERIFY_RUN_DIR=
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive failed-send restart-combo --dry-run -- --expect=old
+vp: dry-run failed-send/restart-combo
+    runner tsx  cwd <worktree>/apps/server
+    script .claude/skills/verify-pacman/scripts/drive-1279-restart-combo.mts  args --expect=old
+    VERIFY_EVIDENCE_DIR=
+    VERIFY_RUN_DIR=
+exit=0
+
+# with VERIFY_EVIDENCE_DIR=rel/evidence VERIFY_RUN_DIR=rel/run in the environment:
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive pi-convergence convergence --dry-run --force
+vp: dry-run pi-convergence/convergence
+    runner tsx  cwd <worktree>/apps/daemon
+    script .claude/skills/verify-pacman/scripts/drive-926-convergence.mts  args
+    VERIFY_EVIDENCE_DIR=<worktree>/rel/evidence
+    VERIFY_RUN_DIR=<worktree>/rel/run
+exit=0
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive pi-convergence
+pi-convergence/convergence needs rewrites-evidence (rewrites committed docs/verify evidence in place). Re-run with --force to drive it.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs drive github-webhook webhook-tracer
+github-webhook/webhook-tracer needs github (calls GitHub). Re-run with --force to drive it.
+exit=2
+
+$ node .claude/skills/verify-pacman/scripts/vp.mjs archive 1402
+usage: vp.mjs archive <ticket> [--from <dir>]... | VERIFY_EVIDENCE_DIR=<dir> | --latest <n>
+name the source: --from <dir>, VERIFY_EVIDENCE_DIR, or --latest <n> (other lanes' runs included)
+exit=2
+

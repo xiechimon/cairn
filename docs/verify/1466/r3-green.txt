@@ -1,0 +1,149 @@
+# #1466 round 3: wider suite at the round 3 code head.
+# git: e6291e936950814bf724d29d8b6f83f7390c1e06 (e6291e93 = 0a4b003 + e91074d0 R7b test + e6291e93 simplify; both round 3 commits touch test files only)
+# working tree: only untracked docs/verify/1466 files
+# set: the #1466 test files (apps/server/test/github-repo-dot-segments.test.ts, apps/server/test/project-team-guard.test.ts,
+#      apps/daemon/test/github-probe.test.ts, and the shared parser test packages/shared/test/github-repo-ref.test.ts)
+#      plus the chief / CI neighbours chief-dispatch, chief-watch, chief-tools, ci-loop and m4a-chief-loop.
+# cmd: pnpm exec vitest run --reporter=verbose apps/server/test/github-repo-dot-segments.test.ts apps/server/test/project-team-guard.test.ts apps/daemon/test/github-probe.test.ts packages/shared/test/github-repo-ref.test.ts apps/server/test/chief-dispatch.test.ts apps/server/test/chief-watch.test.ts apps/server/test/chief-tools.test.ts apps/server/test/ci-loop.test.ts apps/server/test/m4a-chief-loop.test.ts
+# exit: 0
+# summary: Test Files 9 passed (9); Tests 126 passed (126); 0 failed, 0 skipped
+# per file (passed):
+#        9 test/chief-dispatch.test.ts
+#       11 test/chief-tools.test.ts
+#        6 test/chief-watch.test.ts
+#       20 test/ci-loop.test.ts
+#        9 test/github-probe.test.ts
+#       21 test/github-repo-dot-segments.test.ts
+#       33 test/github-repo-ref.test.ts
+#        4 test/m4a-chief-loop.test.ts
+#       13 test/project-team-guard.test.ts
+
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../user
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：./x
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：owner/..
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：owner/.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../..
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：./.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：octo/alpha
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：my.org/repo.js
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：.../x
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：owner/...
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：owner/.github
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：.x/y
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：x./y.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：a_b-c/d.e_f-g
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 既有形状闸不变：空段、多斜杠、字符集外仍拒
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../user
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：./x
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：owner/..
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：owner/.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../..
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：./.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../.
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > 合法值拆成 {owner, repo}
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > 形状不合法 → null
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../user#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:./x#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:owner/..#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:owner/.#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../..#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:./.#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../.#3
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > 合法引用照常互逆
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET（无其它端点、无逐 PR 全量拉）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > ETag 往返：首轮 200 存 etag，次轮携 if-none-match → 304 → 判据复用（不解析体）
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 docs：他队项目 404，文案与不存在 id 同形
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 create_todo：他队项目 404，文案与不存在 id 同形
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W1 POST /api/projects kind=github：字符串面与对象面都 400
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W2 PATCH local→github 转换：400，且不出站探可达
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 限流/读不到 = fail-open：不动任何行，下轮重试（无崩溃）
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 update_project：他队项目 404，文案与不存在 id 同形
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 connect_repo：他队项目 404，文案与不存在 id 同形
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T2-T4 越权调用无副作用：他队项目名 / 仓 / 任务集不变
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W3 chief connect_repo：400，项目行不改
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W4 带点的合法名照过（POST 201 / connect_repo 落值）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（../user）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > token 阶梯：连接行在 → 条件 GET 带 Authorization 头（经既有 GitHub 连接读 checks）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不出站
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 在跑/排队 → 不动：无修复步、相位不动、无 errorMessage
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 []
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T9 run_builds：本队任务指向他队项目 → 404，且一个 build 都不建、相位不动、不加 watch
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（owner/..）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（owner/..）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 混合（1 个 failure 已完成 + 1 个 queued）→ 仍 pending：全部完成前不判红
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 空 checks（仓无 CI / 竞态）→ 宽限内 pending 不动；超宽限按绿推闸
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 红 → 追加修复步：prompt 带失败 check 名与日志摘要 + PR 号；修复步排队 pending
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T10 watch_todos 混合列表：含本队任务指向他队项目 → 404，一个都不 watch
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（owner/..）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（../user）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 修复步在飞 → 不叠派（幂等）：同轮再 sweep 不追加第二条
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > N-1 轮完成仍红 → 追加第 N 轮；N 轮完成仍红 → 停手标 failed 转人工（不再叠派）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 计数判据 = marker prompt 的修复轮步（原执行步不计入）
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：docs / create_todo / update_project / connect_repo / todos / watch_todos
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T2/T7 create_todo：他队项目 404，不建任务
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 []
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：create_todo + todos
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（owner/..）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 相位已 review（人工接管）→ 红也不派步不写
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 相位已 closed / failed → 同样不动
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（owner/..）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 动作前重读相位：扫描快照与写面之间被人工推进 → 不写（网络窗内的竞态）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > 绿 → 相位推进 review 闸（不派修复步）；hasChanges 承接不丢
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（owner/..）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > green 后候选拿出扫描集：再 sweep 零请求（终态退出，不空转）
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > completeStep：执行步成 + PR 交付（prNumber 在）→ 停在 building；无 PR → review（既有行为）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（../user）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 completeStep 执行步交付 PR → review + 验证步入队（owner/..）
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 builds.ts 交付闸：存量非法 githubRepo 按「无 GitHub 仓」处理（R9） > R9 对照：合法 githubRepo 的 PR 交付照旧停 building 等 CI，不入队验证步
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > scheduler 接线：start() 启动即补扫 + 60s 自循环；stop() 停；tick() 不出站（同步契约）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 措辞→spec 三段变换 + 溯源（r5 §3.2） > create_todo 落三段式 spec 原文 + 溯源 createdBy/sourceBuildId/ownerId
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > agents 读工具返回职责文本（分派权重输入）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > agents 投影携带授权集 tools/skillsAllowlist/mcpServers（XMON-77 分派面权限可见）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > create_agent 落创建默认集 [推送分支]（XMON-84 B4）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > run_builds 缺省 withPlan 走先规划：响应 withPlan=true + 首步=plan + triggerSource:chief + assignment 落槽（#903）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > run_builds withPlan=false → chief 判定直接修：首步=build + dispatchReason 回显（#903）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > run_builds withPlan=true 显式先规划 + 首步=plan（#903）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 词表外工具名 → 400（白名单纪律，不执行）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > set_remote_shell 授予：REST 先写邻档 → chief 增「远程 shell」→ REST GET 回读一致（验收 #2）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > 分派 + 单 todo 直派 + 双 Agent assignment（r5 §3.3/§3.4/§5） > 双 Agent 分派：assignment.plan ≠ assignment.build 两槽独立落库（r5 §5）
+ ✓ |@xiechimon/pacman| test/chief-dispatch.test.ts > merge_builds 机器入口硬拒（#1256） > chief 调 merge_builds → 拒绝 JSON，文案指认人工出口，不落任何合并步
+ ✓ |@xiechimon/pacman| test/m4a-chief-loop.test.ts > M4a Chief 机器协议全环（02 §4.3/§5.4 + r5 §3.1/§3.2/§3.5） > claim → relay(create_todo/run_builds) → transcript → done → gate wake
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 撤销只摘「远程 shell」：邻档与顺序不动；重复授予幂等
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 写路径同过 filterAgentTools：存量残值随写清退（与 REST PATCH 同律）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > enabled 缺省/非布尔 → 400 且行未写（fail-closed；不沿用 #573 前缺省 true）
+ ✓ |@xiechimon/pacman| test/m4a-chief-loop.test.ts > M4a Chief 机器协议全环（02 §4.3/§5.4 + r5 §3.1/§3.2/§3.5） > models 取候选 → create_agent 用合法值 → agents 读回（#627）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 未知 agentId → 404（requireTeamAgent 同律，不误写）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > models：无 custom provider + claude-code 未装 → 空清单不报错
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > models：providers 写面照常，候选只出 claude-code 段（去重 + 行卫生）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > models：custom provider 取名 claude-code 不再遮蔽上报行（#770/#707）
+ ✓ |@xiechimon/pacman| test/m4a-chief-loop.test.ts > M4a Chief 机器协议全环（02 §4.3/§5.4 + r5 §3.1/§3.2/§3.5） > done(failed) → 失败原因落 chief_message system 行，无通知
+ ✓ |@xiechimon/pacman| test/m4a-chief-loop.test.ts > M4a Chief 机器协议全环（02 §4.3/§5.4 + r5 §3.1/§3.2/§3.5） > chief 步 token 下发（绑定 Agent 模型凭证解析，无 build/todo 行）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 读工具 replaySafe 标记与执行一致（抽样 projects/todos/machines/models）
+ ✓ |@xiechimon/pacman| test/chief-tools.test.ts > 51 词表 relay 执行面（02 §4.3） > 词表键集 = r5 raw toolDefHashes 全键 − 除名登记（一手来源防漂移，node fs 面）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 命中 → open 优先、多 open 取 number 最大
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > gh 梯（失败方式 1/2） > gh 非零退出 → REST 梯接手（无 token = 匿名形态）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > gh 缺席 + token 在位 → Authorization 头携带 token，只取头不进 URL
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 404（私仓匿名）→ null 不抛
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 网络错 → null（全梯失败 = 未知）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > REST 梯（失败方式 2/3/4） > REST 非数组载荷 → null（不假阳）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > github cloneUrl → owner/repo（.git 剥离）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > hosted / local / 垃圾形状 → null（探测跳过）
+ ✓ |@xiechimon/pacman-cli| test/github-probe.test.ts > githubRepoRefOf（失败方式 5：形态前置闸） > #1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > run_builds 派工即自动 watch（reason canon）
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > gate 触发（停 review）→ chief wake 步入队，watch 保留
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > settle 触发（done）→ wake + watch 自动解除（r5 §3.5）
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > failed 触发 → wake（法证式汇报指引）+ watch 自动解除
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > #1254 拆卡父 gate → wake 文本含 split_todo 父卡停驻指引
+ ✓ |@xiechimon/pacman| test/chief-watch.test.ts > watch/wake 主动回路三触发（r5 §3.5） > #1254 普通卡（非拆卡父）gate → wake 文本含自动确认规则
+ Test Files  9 passed (9)
+      Tests  126 passed (126)
+   Duration  6.58s (import 40%, tests 32%, transform 27%)

@@ -1,0 +1,43 @@
+# #1466 round 3: the CI poller's own guard for an invalid stored githubRepo (R7b), pass at 0a4b003 sources, red under the mutation.
+# git: e91074d079d753b41a9e3aa4944662d3750caa79 (e91074d0 adds only the R7b test; `git diff 0a4b0039 HEAD -- apps packages` touches only apps/server/test/github-repo-dot-segments.test.ts, so every source file is the 0a4b003 version)
+# runner: node docs/verify/1466/r3-mutate.mjs "$PWD" (from the worktree root; mutation table in the script)
+# why: R7 (rewritten in round 2) goes through completeStep, so the todo reaches review before the poller sweeps and
+#   the guard at apps/server/src/services/ci-loop.ts (githubRepoOfProject(projRow) === null -> skipped) was no longer reached.
+#   R7b inserts a todo already in 'building' with a build carrying prNumber 101 and no pending/claimed step (an in-flight
+#   step would be skipped earlier for another reason), in a project whose stored githubRepo is '../user' or 'owner/..',
+#   runs poller.sweep() once and asserts: zero outbound calls, the sweep tally line is exactly
+#   { candidates: 1, skipped: 1, every other count 0 }, phase stays 'building', no step appended.
+# result: baseline 21/21 pass; R3-M1 KILLED (exactly the two R7b cases fail, on the zero-outbound assertion; R7 stays green
+#   under the mutation, which is the gap this test closes); ci-loop.ts verified byte-identical afterwards (sha256sum -c: OK).
+
+## baseline (no mutation): apps/server/test/github-repo-dot-segments.test.ts
+vitest exit: 0
+Test Files  1 passed (1)
+Tests  21 passed (21)
+R7 / R7b cases:
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user）
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..）
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（../user）
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（owner/..）
+
+## R3-M1: the CI poller skips a building candidate whose stored githubRepo is not a valid GitHub repo ref
+file: apps/server/src/services/ci-loop.ts
+mutation: ci-loop.ts guard reverted to the origin/main form (repoKind/githubRepo null check, then slice at '/')
+  edit: "const repoRef = githubRepoOfProject(projRow);\n    if (\n      buildRow === undefined ||\n      buildRow.prNumber === null ||\n      projRow === undefined ||\n      repoRef === null\n    ) {" -> "if (\n      buildRow === undefined ||\n      buildRow.prNumber === null ||\n      projRow === undefined ||\n      projRow.repoKind !== 'github' ||\n      projRow.githubRepo === null\n    ) {"
+  edit: "const { owner, repo } = repoRef;" -> "const slash = projRow.githubRepo.indexOf('/');\n    const owner = projRow.githubRepo.slice(0, slash);\n    const repo = projRow.githubRepo.slice(slash + 1);"
+tests: apps/server/test/github-repo-dot-segments.test.ts
+vitest exit: 1 (KILLED)
+Test Files  1 failed (1)
+Tests  2 failed | 19 passed (21)
+failing cases:
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（../user）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（owner/..）
+R7 / R7b cases under the mutation:
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（../user）
+  ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 PR 交付：直进 review（不卡 building），CI 磨绿轮询零出站、不派修复步（owner/..）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（../user）
+  × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（owner/..）
+first assertion messages:
+  AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
+  AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
+

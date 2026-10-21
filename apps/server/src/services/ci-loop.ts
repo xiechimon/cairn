@@ -91,6 +91,7 @@ import {
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
+import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -438,19 +439,17 @@ export function createCiPoller(
       : null;
   }
 
-  /** github 形态目标（owner/repo）；非 github 或缺仓名 → null。 */
+  /** github 形态目标（owner/repo）；非 github、缺仓名或仓名不合法（含 `.` / `..`
+   * 段，#1466 githubRepoOfProject 同一道闸）→ null。 */
   function githubTarget(projectId: string) {
     const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
-    if (projRow === undefined || projRow.repoKind !== 'github' || projRow.githubRepo === null) {
-      return null;
-    }
-    const slash = projRow.githubRepo.indexOf('/');
-    if (slash < 1 || slash === projRow.githubRepo.length - 1) return null;
+    const ref = githubRepoOfProject(projRow);
+    if (projRow === undefined || ref === null) return null;
     return {
       teamId: projRow.teamId,
-      fullName: projRow.githubRepo,
-      owner: projRow.githubRepo.slice(0, slash),
-      repo: projRow.githubRepo.slice(slash + 1),
+      fullName: `${ref.owner}/${ref.repo}`,
+      owner: ref.owner,
+      repo: ref.repo,
     };
   }
 
@@ -734,7 +733,8 @@ export function createCiPoller(
       .get();
     const target = githubTarget(todoRow.projectId);
     if (buildRow === undefined || buildRow.prNumber === null || target === null) {
-      // 形态不齐（PR 号缺失/项目非 github——生产不可达，防御位）：不出站、不写。
+      // 形态不齐（PR 号缺失/项目非 github/githubRepo 不合法 #1466——生产不可达，
+      // 防御位）：不出站、不写。
       tally.skipped += 1;
       return;
     }

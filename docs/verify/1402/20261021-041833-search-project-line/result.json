@@ -1,0 +1,147 @@
+{
+  "probe": "search-project-line",
+  "ok": true,
+  "passed": 12,
+  "total": 12,
+  "checks": [
+    {
+      "ok": true,
+      "label": "N +72ms 帧在 /api/search 回包前(回包于 +321ms)"
+    },
+    {
+      "ok": true,
+      "label": "N +72ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle"
+    },
+    {
+      "ok": true,
+      "label": "N +506ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle"
+    },
+    {
+      "ok": true,
+      "label": "N +3009ms 每行副行 = 自己的项目(#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas),面板无 r3-lifecycle"
+    },
+    {
+      "ok": true,
+      "label": "H /api/search 请求已发出并被扣住(1 条)"
+    },
+    {
+      "ok": true,
+      "label": "H 回包前帧:#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas,面板无 r3-lifecycle"
+    },
+    {
+      "ok": true,
+      "label": "H 服务端帧:#1 副行探针 alpha→verify-1400 | #2 副行探针 beta→atlas"
+    },
+    {
+      "ok": true,
+      "label": "H 回包前帧与服务端帧逐行相同(副行不跳变)"
+    },
+    {
+      "ok": true,
+      "label": "P /api/projects(1)与 /api/search(1)均在途"
+    },
+    {
+      "ok": true,
+      "label": "P 项目读面在途帧:#1 副行探针 alpha→null | #2 副行探针 beta→null(无副行,无 r3-lifecycle)"
+    },
+    {
+      "ok": true,
+      "label": "API /api/search 每行 projectName = 自己的项目(副行探针 alpha→verify-1400 | 副行探针 beta→atlas)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite todo.projectId → project.name 与期望一致(副行探针 alpha→verify-1400 | 副行探针 beta→atlas)"
+    }
+  ],
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273"
+  },
+  "expected": {
+    "副行探针 alpha": "verify-1400",
+    "副行探针 beta": "atlas"
+  },
+  "naturalTiming": {
+    "searchAnsweredAtMs": 321,
+    "samples": [
+      {
+        "targetMs": 0,
+        "actualMs": 72,
+        "searchAnswered": false,
+        "rows": [
+          {
+            "title": "#1 副行探针 alpha",
+            "project": "verify-1400"
+          },
+          {
+            "title": "#2 副行探针 beta",
+            "project": "atlas"
+          }
+        ],
+        "fixtureNameInPanel": false
+      },
+      {
+        "targetMs": 500,
+        "actualMs": 506,
+        "searchAnswered": true,
+        "rows": [
+          {
+            "title": "#1 副行探针 alpha",
+            "project": "verify-1400"
+          },
+          {
+            "title": "#2 副行探针 beta",
+            "project": "atlas"
+          }
+        ],
+        "fixtureNameInPanel": false
+      },
+      {
+        "targetMs": 3000,
+        "actualMs": 3009,
+        "searchAnswered": true,
+        "rows": [
+          {
+            "title": "#1 副行探针 alpha",
+            "project": "verify-1400"
+          },
+          {
+            "title": "#2 副行探针 beta",
+            "project": "atlas"
+          }
+        ],
+        "fixtureNameInPanel": false
+      }
+    ]
+  },
+  "heldPreResponse": [
+    {
+      "title": "#1 副行探针 alpha",
+      "project": "verify-1400"
+    },
+    {
+      "title": "#2 副行探针 beta",
+      "project": "atlas"
+    }
+  ],
+  "serverFrame": [
+    {
+      "title": "#1 副行探针 alpha",
+      "project": "verify-1400"
+    },
+    {
+      "title": "#2 副行探针 beta",
+      "project": "atlas"
+    }
+  ],
+  "projectsPending": [
+    {
+      "title": "#1 副行探针 alpha",
+      "project": null
+    },
+    {
+      "title": "#2 副行探针 beta",
+      "project": null
+    }
+  ]
+}

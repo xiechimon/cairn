@@ -1,0 +1,52 @@
+# #1404 S1 mutations, round 4 (pr-gate run 2 suggestions): each fixed rule and each pinned behavior undone alone, then the
+# three S1 test files (pnpm exec vitest run apps/server/test/merge-gate-{digest,paths,evidence-link}.test.ts), source restored
+# after each (git diff identical before and after the whole run). Sources: round 4 code before /simplify, 87 tests.
+# Every mutation turns at least one test red. Definitions (name, file, text replaced, replacement) below the table.
+
+tests: dir regex case-sensitive              1 failed | 86 passed (87)
+tests: file regex case-sensitive             1 failed | 86 passed (87)
+parse: renamed without previous_filename     1 failed | 86 passed (87)
+parse: copied without previous_filename      1 failed | 86 passed (87)
+exec: drop '.mjs'                            3 failed | 84 passed (87)
+exec: drop '.cjs'                            1 failed | 86 passed (87)
+exec: drop '.js'                             1 failed | 86 passed (87)
+exec: drop '.mts'                            1 failed | 86 passed (87)
+exec: drop '.cts'                            1 failed | 86 passed (87)
+exec: drop '.ts'                             1 failed | 86 passed (87)
+exec: drop '.jsx'                            2 failed | 85 passed (87)
+exec: drop '.tsx'                            2 failed | 85 passed (87)
+exec: drop '.sh'                             2 failed | 85 passed (87)
+exec: drop '.py'                             1 failed | 86 passed (87)
+other ticket: new name only                  1 failed | 86 passed (87)
+digest: sort with localeCompare              1 failed | 86 passed (87)
+D4: drop '**/biome.json'                     1 failed | 86 passed (87)
+D4: drop '**/.gitattributes'                 1 failed | 86 passed (87)
+D4: drop daemon gate source                  2 failed | 85 passed (87)
+tests: drop 'e2e' from dir regex             2 failed | 85 passed (87)
+tests: drop 'tests' from dir regex           2 failed | 85 passed (87)
+tests: drop '__tests__' from dir regex       1 failed | 86 passed (87)
+link: no slash after ticket                  1 failed | 86 passed (87)
+
+["tests: dir regex case-sensitive","apps/server/src/services/merge-gate/paths.ts","const TEST_DIR_RE = /(^|\\/)(e2e|test|tests|__tests__)\\//i;","const TEST_DIR_RE = /(^|\\/)(e2e|test|tests|__tests__)\\//;"]
+["tests: file regex case-sensitive","apps/server/src/services/merge-gate/paths.ts","const TEST_FILE_RE = /\\.(test|spec)\\.[cm]?[jt]sx?$/i;","const TEST_FILE_RE = /\\.(test|spec)\\.[cm]?[jt]sx?$/;"]
+["parse: renamed without previous_filename","apps/server/src/services/merge-gate/digest.ts","(f.status === 'renamed' || f.status === 'copied')","f.status === 'copied'"]
+["parse: copied without previous_filename","apps/server/src/services/merge-gate/digest.ts","(f.status === 'renamed' || f.status === 'copied')","f.status === 'renamed'"]
+["exec: drop '.mjs'","packages/shared/src/records/merge-gate.ts","  '.mjs',\n",""]
+["exec: drop '.cjs'","packages/shared/src/records/merge-gate.ts","  '.cjs',\n",""]
+["exec: drop '.js'","packages/shared/src/records/merge-gate.ts","  '.js',\n",""]
+["exec: drop '.mts'","packages/shared/src/records/merge-gate.ts","  '.mts',\n",""]
+["exec: drop '.cts'","packages/shared/src/records/merge-gate.ts","  '.cts',\n",""]
+["exec: drop '.ts'","packages/shared/src/records/merge-gate.ts","  '.ts',\n",""]
+["exec: drop '.jsx'","packages/shared/src/records/merge-gate.ts","  '.jsx',\n",""]
+["exec: drop '.tsx'","packages/shared/src/records/merge-gate.ts","  '.tsx',\n",""]
+["exec: drop '.sh'","packages/shared/src/records/merge-gate.ts","  '.sh',\n",""]
+["exec: drop '.py'","packages/shared/src/records/merge-gate.ts","  '.py',\n",""]
+["other ticket: new name only","apps/server/src/services/merge-gate/paths.ts","if (isEvidence(name) && !name.slice(","if (name === f.filename && isEvidence(name) && !name.slice("]
+["digest: sort with localeCompare","apps/server/src/services/merge-gate/digest.ts",".sort();",".sort((a, b) => a.localeCompare(b));"]
+["D4: drop '**/biome.json'","packages/shared/src/records/merge-gate.ts","  '**/biome.json',\n",""]
+["D4: drop '**/.gitattributes'","packages/shared/src/records/merge-gate.ts","  '**/.gitattributes',\n",""]
+["D4: drop daemon gate source","packages/shared/src/records/merge-gate.ts","  'apps/daemon/src/merge-decision.ts',\n",""]
+["tests: drop 'e2e' from dir regex","apps/server/src/services/merge-gate/paths.ts","(e2e|test|tests|__tests__)","(test|tests|__tests__)"]
+["tests: drop 'tests' from dir regex","apps/server/src/services/merge-gate/paths.ts","(e2e|test|tests|__tests__)","(e2e|test|__tests__)"]
+["tests: drop '__tests__' from dir regex","apps/server/src/services/merge-gate/paths.ts","(e2e|test|tests|__tests__)","(e2e|test|tests)"]
+["link: no slash after ticket","apps/server/src/services/merge-gate/evidence-link.ts","`${EVIDENCE_PREFIX}${args.ticketRef}/`","`${EVIDENCE_PREFIX}${args.ticketRef}`"]

@@ -1,0 +1,11 @@
+## widened locally: canDropOnColumn building -> `return src.id !== 'building';` (guard removed)
+     × 执行中 落点 ⊆ shared canOrchestrate（#1457） 10ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: confirm: expected false to be true // Object.is equality
+      Tests  1 failed | 29 skipped (30)
+
+## widened locally: canBoardDrop building -> `return src !== '执行中';`
+     × canBoardDrop → building only for phases orchestrate accepts (#1457) 12ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: confirm: expected false to be true // Object.is equality
+      Tests  1 failed | 38 skipped (39)

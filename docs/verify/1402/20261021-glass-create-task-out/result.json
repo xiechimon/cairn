@@ -1,0 +1,48 @@
+{
+  "ok": true,
+  "journeys": [
+    {
+      "id": "create-task",
+      "ok": true,
+      "checks": [
+        {
+          "ok": true,
+          "label": "card is in 待开始"
+        },
+        {
+          "ok": true,
+          "label": "GET /api/todos phase=todo"
+        },
+        {
+          "ok": true,
+          "label": "sqlite phase=todo"
+        }
+      ],
+      "screenshots": [
+        "02-create-task-dialog.png",
+        "03-create-task-card.png"
+      ]
+    }
+  ],
+  "consoleErrors": [
+    {
+      "text": "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at BoardSurface (http://127.0.0.1:5273/src/board/board.tsx:263:24)\n    at BoardPage (http://127.0.0.1:5273/src/routes/board-page.tsx:686"
+    }
+  ],
+  "failedRequests": [],
+  "observations": {
+    "doctor": {
+      "displayName": "Owner"
+    },
+    "createTask": {
+      "title": "Glass created 20261021-035216",
+      "id": "BUfn7bWC6_0xNo32xASZR"
+    }
+  },
+  "stack": {
+    "serverPort": 8791,
+    "webPort": 5273,
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home"
+  },
+  "fatal": null
+}

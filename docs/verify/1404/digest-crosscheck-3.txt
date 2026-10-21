@@ -1,0 +1,201 @@
+# Round 6 (#1404 S1, pr-gate run 4 on #1420 at 02780b4): the Python reference redone with a UTF-16 code-unit sort.
+# crosscheck2.py (digest-crosscheck-2.txt) sorted with Python's default str order, which is by code point; digest.ts
+# uses JS's default Array.prototype.sort, which is by UTF-16 code unit. The two orders differ only when a
+# supplementary-plane character (a surrogate pair, lead unit 0xD800-0xDBFF) meets a BMP character in U+E000-U+FFFF,
+# and every earlier vector was ASCII. crosscheck3.py sorts with key=lambda s: s.encode('utf-16-be') (big-endian
+# bytes compare like the code units) and adds a vector that tells the orders apart: U+1F600 (D83D DE00) next to
+# U+FF21. It prints the code-point digest too, to show that the vector separates them. Tuple lines below are printed
+# with backslash escapes so the file stays ASCII; the hashed text is the raw characters in UTF-8.
+# The digest.ts side is printed by a tsx script over the worktree sources at a20a854 (round 6 code head;
+# digest.ts there is the same as at 49f97d1).
+#
+# Result: every digest.ts value equals the UTF-16-key value. The fixture digest is unchanged by round 6 (items 3-5
+# touch paths.ts only): pd2:b8fc25a0...5e4e under both sort keys, the value the test has asserted since round 5.
+# The non-BMP vector gives pd2:b7719a25... by code unit and pd2:79d30275... by code point; digest.ts gives the
+# code-unit value, and the new test in merge-gate-digest.test.ts asserts it (a code-point sort mutation turns it red,
+# s1-mutations-6.txt).
+
+$ python3 -I crosscheck3.py apps/server/test/fixtures/merge-gate-compare-sample.json
+fixture: 58 files, 36 kept
+fixture digest, UTF-16 code-unit sort: pd2:b8fc25a097b7a43e1929cee82b6ec03f0821c373e443df65612278baff845e4e
+fixture digest, code-point sort:       pd2:b8fc25a097b7a43e1929cee82b6ec03f0821c373e443df65612278baff845e4e
+
+non-BMP test (emoji U+1F600 next to U+FF21):
+  UTF-16 code-unit order:
+    ["modified","apps/web/src/\U0001f600.ts",null,"2222222222222222222222222222222222222222","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/\uff21.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:b7719a254dc7af748b4dc6cc116a095045ab4a5953fb71d406dd36686dc04e88
+  code-point order:
+    ["modified","apps/web/src/\uff21.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/\U0001f600.ts",null,"2222222222222222222222222222222222222222","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:79d3027504003c32589de73cd10c65bd7cc00a44b849aaec97dc21025e34f802
+  orders differ: True
+code-unit sort test (round 5 vector, ASCII):
+  UTF-16 code-unit order:
+    ["modified","apps/web/src/B.ts",null,"3333333333333333333333333333333333333333","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a-b.ts",null,"4444444444444444444444444444444444444444","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a.b.ts",null,"2222222222222222222222222222222222222222","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a/b.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:8a58b36d470b028c799fa04cf16468b3b9507d6097e26bf87d2f878fbe124ad0
+  code-point order:
+    ["modified","apps/web/src/B.ts",null,"3333333333333333333333333333333333333333","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a-b.ts",null,"4444444444444444444444444444444444444444","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a.b.ts",null,"2222222222222222222222222222222222222222","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+    ["modified","apps/web/src/a/b.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:8a58b36d470b028c799fa04cf16468b3b9507d6097e26bf87d2f878fbe124ad0
+  orders differ: False
+null patchSha test (round 5 vector):
+  UTF-16 code-unit order:
+    ["added","apps/web/public/logo.png",null,"5555555555555555555555555555555555555555",null]
+    ["modified","apps/server/src/a.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:ca814f29974582368d2d5afa5202827ed353fde86d5b7737764a539e93bc4987
+  code-point order:
+    ["added","apps/web/public/logo.png",null,"5555555555555555555555555555555555555555",null]
+    ["modified","apps/server/src/a.ts",null,"1111111111111111111111111111111111111111","cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"]
+  pd2:ca814f29974582368d2d5afa5202827ed353fde86d5b7737764a539e93bc4987
+  orders differ: False
+
+$ (cd apps/server && ./node_modules/.bin/tsx digest-side.ts test/fixtures/merge-gate-compare-sample.json)
+fixture digest: pd2:b8fc25a097b7a43e1929cee82b6ec03f0821c373e443df65612278baff845e4e
+non-BMP test: pd2:b7719a254dc7af748b4dc6cc116a095045ab4a5953fb71d406dd36686dc04e88
+non-BMP test, input reversed: pd2:b7719a254dc7af748b4dc6cc116a095045ab4a5953fb71d406dd36686dc04e88
+code-unit sort test: pd2:8a58b36d470b028c799fa04cf16468b3b9507d6097e26bf87d2f878fbe124ad0
+null patchSha test: pd2:ca814f29974582368d2d5afa5202827ed353fde86d5b7737764a539e93bc4987
+
+crosscheck3.py:
+  import hashlib
+  import json
+  import sys
+  
+  # Round 6 reference for the #1404 S1 patch digest (ADR 0021 D3 as amended on PR #1410): exclude
+  # docs/verify/** (a rename only when both names are under it), take the JSON tuple
+  # [status, filename, previous_filename, blobSha, patchSha] per file, sort, sha256 over the tuples
+  # joined by "\n" in UTF-8, prefix "pd2:". patchSha = sha256 (hex) of the compare `patch` text, null
+  # when there is no patch.
+  #
+  # Change from crosscheck2.py: the sort key. digest.ts uses JS's default Array.prototype.sort, which
+  # compares UTF-16 code units; Python's sorted() on str compares code points. The two differ only when
+  # a supplementary-plane character (a surrogate pair, 0xD800-0xDBFF lead unit) meets a BMP character in
+  # U+E000-U+FFFF. Encoding to UTF-16BE turns each code unit into two big-endian bytes, so comparing
+  # the bytes compares the code units.
+  PREFIX = "pd2"
+  
+  
+  def utf16_key(s):
+      return s.encode("utf-16-be")
+  
+  
+  def sha256_hex(text):
+      return hashlib.sha256(text.encode("utf-8")).hexdigest()
+  
+  
+  def patch_sha(patch):
+      return sha256_hex(patch) if isinstance(patch, str) and patch != "" else None
+  
+  
+  def is_evidence(path):
+      return path.startswith("docs/verify/")
+  
+  
+  def tuple_json(row):
+      return json.dumps(list(row), separators=(",", ":"), ensure_ascii=False)
+  
+  
+  def digest_of(tuples, key):
+      ordered = sorted(tuples, key=key)
+      return ordered, PREFIX + ":" + hashlib.sha256("\n".join(ordered).encode("utf-8")).hexdigest()
+  
+  
+  def fixture_digest(entries, key):
+      kept = [e for e in entries
+              if not (is_evidence(e["filename"])
+                      and (e.get("previous_filename") is None or is_evidence(e["previous_filename"])))]
+      tuples = [tuple_json([e["status"], e["filename"], e.get("previous_filename"), e.get("sha"),
+                            patch_sha(e.get("patch"))]) for e in kept]
+      return kept, digest_of(tuples, key)[1]
+  
+  
+  def show(label, rows):
+      tuples = [tuple_json(r) for r in rows]
+      by_unit, d_unit = digest_of(tuples, utf16_key)
+      by_point, d_point = digest_of(tuples, None)
+      print(label)
+      print("  UTF-16 code-unit order:")
+      for t in by_unit:
+          print("    " + t.encode("ascii", "backslashreplace").decode("ascii"))
+      print("  " + d_unit)
+      print("  code-point order:")
+      for t in by_point:
+          print("    " + t.encode("ascii", "backslashreplace").decode("ascii"))
+      print("  " + d_point)
+      print("  orders differ:", by_unit != by_point)
+      return d_unit
+  
+  
+  fixture = json.load(open(sys.argv[1], encoding="utf-8"))
+  files = fixture["files"]
+  kept, d_unit = fixture_digest(files, utf16_key)
+  _, d_point = fixture_digest(files, None)
+  print("fixture:", len(files), "files,", len(kept), "kept")
+  print("fixture digest, UTF-16 code-unit sort:", d_unit)
+  print("fixture digest, code-point sort:      ", d_point)
+  print()
+  
+  C = "c" * 64
+  # U+1F600 is the surrogate pair D83D DE00; U+FF21 (fullwidth A) is one unit, 0xFF21. By code unit
+  # 0xD83D < 0xFF21, so the emoji name sorts first; by code point 0x1F600 > 0xFF21, so it sorts last.
+  show("non-BMP test (emoji U+1F600 next to U+FF21):", [
+      ("modified", "apps/web/src/\uFF21.ts", None, "1" * 40, C),
+      ("modified", "apps/web/src/\U0001F600.ts", None, "2" * 40, C),
+  ])
+  show("code-unit sort test (round 5 vector, ASCII):", [
+      ("modified", "apps/web/src/a/b.ts", None, "1" * 40, C),
+      ("modified", "apps/web/src/a.b.ts", None, "2" * 40, C),
+      ("modified", "apps/web/src/B.ts", None, "3" * 40, C),
+      ("modified", "apps/web/src/a-b.ts", None, "4" * 40, C),
+  ])
+  show("null patchSha test (round 5 vector):", [
+      ("modified", "apps/server/src/a.ts", None, "1" * 40, C),
+      ("added", "apps/web/public/logo.png", None, "5" * 40, None),
+  ])
+
+digest-side.ts (imports the worktree digest.ts by absolute path):
+  // Prints computePatchDigest for the round 6 cross-check vectors, from the worktree sources.
+  import { readFileSync } from 'node:fs';
+  import {
+    compareFilesFromResponse,
+    computePatchDigest,
+  } from '/home/user/pacman/.claude/worktrees/p3a/apps/server/src/services/merge-gate/digest.ts';
+  
+  const C = 'c'.repeat(64);
+  const f = (filename: string, sha: string, status = 'modified', patchSha: string | null = C) => ({
+    status: status as 'modified',
+    filename,
+    previousFilename: null,
+    sha,
+    additions: 1,
+    deletions: 1,
+    patchSha,
+  });
+  const fixture = JSON.parse(readFileSync(process.argv[2] ?? '', 'utf8'));
+  const files = compareFilesFromResponse(fixture) ?? [];
+  console.log('fixture digest:', computePatchDigest(files).patchDigest);
+  const nonBmp = [f('apps/web/src/\u{FF21}.ts', '1'.repeat(40)), f('apps/web/src/\u{1F600}.ts', '2'.repeat(40))];
+  console.log('non-BMP test:', computePatchDigest(nonBmp).patchDigest);
+  console.log('non-BMP test, input reversed:', computePatchDigest([...nonBmp].reverse()).patchDigest);
+  console.log(
+    'code-unit sort test:',
+    computePatchDigest([
+      f('apps/web/src/a/b.ts', '1'.repeat(40)),
+      f('apps/web/src/a.b.ts', '2'.repeat(40)),
+      f('apps/web/src/B.ts', '3'.repeat(40)),
+      f('apps/web/src/a-b.ts', '4'.repeat(40)),
+    ]).patchDigest,
+  );
+  console.log(
+    'null patchSha test:',
+    computePatchDigest([
+      f('apps/server/src/a.ts', '1'.repeat(40)),
+      f('apps/web/public/logo.png', '5'.repeat(40), 'added', null),
+    ]).patchDigest,
+  );

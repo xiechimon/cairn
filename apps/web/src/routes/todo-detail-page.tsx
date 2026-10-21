@@ -14,6 +14,7 @@
 // （transcript 实时流/步进度/plan 版本/变更 diff/overlay 三件），关口动作
 // 接真端点（开始/确认/驳回/合并/重跑/删除）；fixture 分支（含 chain 脚本）
 // 保持 #56–#75 行为字节不变。
+import { canOrchestrate } from '@pacman/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
@@ -627,7 +628,7 @@ export function TodoDetailPage() {
   // chief/orchestration-inflight.ts；其余相位恒 false（confirm/review 等主钮
   // 行为不变，#1216 回归面）。
   const actionInFlight =
-    live && todo != null && (todo.phase === 'todo' || todo.phase === 'failed')
+    live && todo != null && canOrchestrate(todo.phase)
       ? inflightOrchestrationFor(chiefThreadsQ.data, todo.seqNum) !== null
       : false;
 

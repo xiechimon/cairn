@@ -31,19 +31,21 @@ Control Glass 五条旅程(新建任务 / 派发 / 看 diff / 请求修改 / 合
 - 先跑 `launch.mjs`:隔离栈就绪(默认 web `http://127.0.0.1:5273/app`、api `http://127.0.0.1:8791`、全新 scratch 库、seed 单用户 Owner,无 auth)。
 - 全新库是每个 launch 的保证(probe `api-key` 依赖空态);重验 = 重 launch,不是复用旧库。
 - 端口被占(8791/5273)→ 别的 lane,换 `VERIFY_PORT`/`VERIFY_WEB_PORT`,不杀。
+- **worktree 在 `.claude/worktrees/` 下时,launch 之后的改动不会被 vite 送出**:`apps/web/vite.config.ts` 的 `watch.ignored: ['**/.claude/**']` 命中这类 worktree 的每个文件。改代码后先 `vp.mjs cleanup` 再 `vp.mjs launch`,否则驱动的是 launch 时刻的代码(#1402 负对照实测:植入回归后不重 launch,drive 照样 PASS)。
 - `doctor.mjs` 全 PASS 才开 drive。
 - 永不驱动非本验证起的实例(用户 dev 栈 8787/5173 在跑也不碰)。
 - spec 11 三先行 probe 跑序:`drive-providers-tabs`(pi 空态断言要求库内无 custom provider)→ `drive-provider-picker`(e2e 会建 provider)→ `drive-machines-local`(幂等,次序任意)。跑反 = tabs 空态假红。
 
 ## Driving conventions
 
+- 驱动一律走单一入口 `node .claude/skills/verify-pacman/scripts/vp.mjs drive <feature> [case]`(#1402);`vp.mjs list [feature]` 列出已登记的 case 及其前置。各 feature 文件里写的脚本命令仍可直跑,但新 case 先登记进 `../vp-registry.json`,不新建按票号命名的脚本。
 - 一律 live 面:URL 不带 `?scenario=`(那是 fixture 面)。
 - 选择器优先稳定句柄:`data-route`、`data-column-list`、`data-todo-id`、aria-label、类名;不用坐标/tab 序。
 - UI 证据 = 截图(1440×732,与 e2e 同口径)+ `result.json` 的逐条 checks。
 - 变更类证明必须有第二只眼:`GET /api/...` JSON 真值 + SQLite 只读行(见各 feature 文件)。
 - **机制类声称**(CSS/动效、落盘/wire 格式、schema、shim 流量、判据字段)的第二只眼 = **编译产物 / 运行时实物**,不是源码、配置或依赖清单——声称→实物→实案路径表见 SKILL.md「机制生效验收:实物判据(硬规则)」。
 - 收尾 `cleanup.mjs` 回收栈;证据默认落**主仓** `.claude/verify-evidence/`(不落 worktree),该目录 gitignored。
-- **证据交付必须归档进 PR**:cp 证据目录进 PR 分支 `docs/verify/<票号>/` 并 commit(`result.json` + 截图,多组证据加 README 索引),PR body 以 commit SHA 永久链引用(链接形态见 SKILL.md「证据归档纪律」)。运行期证据落 `.claude/verify-evidence/`(gitignored);**证据未随 PR 进仓引用的 verify 声明视为未验证**。
+- **证据交付必须归档进 PR**:在 PR 分支的检出上跑 `vp.mjs archive <票号> --from <证据目录>`,把证据目录归档进 `docs/verify/<票号>/` 并 commit(只拷贝,目标已存在即拒绝,不手工 `cp`;`result.json` + 截图,多组证据加 README 索引),PR body 以 commit SHA 永久链引用(推送后 `vp.mjs links <票号>` 打印;链接形态见 SKILL.md「证据归档纪律」)。运行期证据落 `.claude/verify-evidence/`(gitignored);**证据未随 PR 进仓引用的 verify 声明视为未验证**。
 - 报告跳过的入口时要带尝试过的命令与未满足的前置;不得把「从别的入口验过」当成「该入口已验」。
 
 ## Feature entry contract

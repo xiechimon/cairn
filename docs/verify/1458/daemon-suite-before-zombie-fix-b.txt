@@ -1,0 +1,31 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/daemon
+
+ ❯ test/workspace-hooks.test.ts (9 tests | 1 failed) 2255ms
+   ❯ workspace hook 原语（#1149） (9)
+     × 失败方式 4：超时 → 杀整组进程（挂起孙进程全灭）+ timeout 形错误 2222ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/workspace-hooks.test.ts > workspace hook 原语（#1149） > 失败方式 4：超时 → 杀整组进程（挂起孙进程全灭）+ timeout 形错误
+Error: pid 22746 still alive after group kill
+ ❯ assertDead test/workspace-hooks.test.ts:59:9
+     57|     await new Promise((r) => setTimeout(r, 50));
+     58|   }
+     59|   throw new Error(`pid ${pid} still alive after group kill`);
+       |         ^
+     60| }
+     61|
+ ❯ test/workspace-hooks.test.ts:135:5
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 83 passed (84)
+      Tests  1 failed | 849 passed (850)
+   Start at  09:07:43
+   Duration  40.30s (import 52%, tests 43%, transform 4%)
+
+    Isolate  84 workers spawned · ~135ms startup each (spawn + environment, per file)
+             at least ~3.65s faster with isolate: false — reuses workers across files instead of one per file
+

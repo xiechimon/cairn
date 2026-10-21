@@ -1,0 +1,5 @@
+## GIT_CONFIG_COUNT set in the parent env (this container)  pnpm exec vitest run test/workspace-hooks.test.ts (base test)
+     × 失败方式 7：credentials 非空 → GIT_CONFIG_* 进钩子 env；null → 无注入 17ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected 'cred=3\n' to contain 'cred=unset'
+      Tests  1 failed | 8 passed (9)

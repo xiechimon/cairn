@@ -1,0 +1,30 @@
+# How to re-run each round's stub-agent check from git (#1401, written after pr-gate run 6).
+# The earlier evidence files stay as they were committed (docs/verify is add-only, ADR 0015);
+# this file is where later notes go. The harness of each round lives at the commit named here.
+# Every line below was re-run on 2026-10-21 and printed the count shown.
+
+# round 2 (pr-gate run 2, pr-gate-harness.txt): harness at 4c27770
+git show 4c27770:docs/verify/1401/pr-gate-harness.mjs > h2.mjs
+git show 7f0b544:.claude/workflows/pr-gate.js > g.js && node h2.mjs g.js     # 5/14
+git show 4c27770:.claude/workflows/pr-gate.js > g.js && node h2.mjs g.js     # 14/14
+
+# round 3 (pr-gate run 3, pr-gate-harness-run3.txt): the harness moved to scripts/ at 2953b40
+git show 2953b40:scripts/pr-gate-harness.mjs > h3.mjs
+git show 3b0da7b:.claude/workflows/pr-gate.js > g.js && node h3.mjs g.js     # 16/22
+git show 2953b40:.claude/workflows/pr-gate.js > g.js && node h3.mjs g.js     # 22/22
+
+# round 4 (pr-gate run 4, pr-gate-selfcheck-run4.txt): renamed scripts/pr-gate-selfcheck.mjs, 26 cases at 37674a9
+git show 37674a9:scripts/pr-gate-selfcheck.mjs > sc4.mjs
+git show 2953b40:.claude/workflows/pr-gate.js > g.js && node sc4.mjs g.js    # 24/26
+git show 37674a9:.claude/workflows/pr-gate.js > g.js && node sc4.mjs g.js    # 26/26
+
+# round 5 (pr-gate run 5, pr-gate-selfcheck-run5.txt): 37 cases at 8ca12ea
+git show 8ca12ea:scripts/pr-gate-selfcheck.mjs > sc5.mjs
+git show 37674a9:.claude/workflows/pr-gate.js > g.js && node sc5.mjs g.js    # 32/37
+git show 2a1ddc1:.claude/workflows/pr-gate.js > g.js && node sc5.mjs g.js    # 37/37
+
+# round 6: see pr-gate-selfcheck-run6.txt (the self-check on this branch, 47 cases).
+
+# pr-gate-named-probe.txt: its first reading ("a snapshot at session start") was revised by
+# pr-gate-named-probe-2.txt (the name resolves against the session's current directory, and
+# the content can lag the file on disk).

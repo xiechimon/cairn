@@ -1,0 +1,57 @@
+#1406 P5a-2: output of the /security-review skill, copied verbatim below this 3-line header.
+Run on `origin/HEAD...HEAD` in the p5b worktree (/home/user/pacman/.claude/worktrees/p5b): origin/HEAD = origin/main 2294b087, HEAD 10898214.
+Run after p5a2-reviews.txt was written; that file records that the first attempt could not run because origin/HEAD was missing.
+## Security review: claude/bootstrap-p5b (P5a-2, #1406)
+
+**Range reviewed.** In `/home/user/pacman/.claude/worktrees/p5b`, `git log --oneline origin/HEAD..HEAD` lists exactly the four expected commits: 37077116, e92b20d0, 59bc0e8f, 10898214. HEAD is 10898214, and origin/HEAD is refs/remotes/origin/main at 2294b087. The skill reviewed `git diff origin/HEAD...HEAD`, which runs from the merge base 23a39da9 to 10898214: 23 files, 4381 insertions and 27 deletions. I checked that the skill's saved diff output is byte-identical to that three-dot diff.
+
+The skill's COMMITS section also shows 2294b087 and 1f61c793. Those are main commits the branch doesn't contain (the section prints both sides of the comparison). They are not in the diff that was reviewed.
+
+**Method note.** The skill says to run its find and false-positive phases as sub-tasks, but this session has no Agent/Task tool. I ran both phases myself, reading the code with the same exclusion rules and the confidence-8 cutoff.
+
+# Findings
+
+**None at or above the confidence threshold (8/10). No HIGH or MEDIUM findings.**
+
+These are the attack paths I traced and why each one is closed in this diff:
+
+1. **Cross-team read with another team's token.** Closed.
+   - `openTarget` (`apps/server/src/services/github-reads.ts:396-428`) selects the project with `project.id = projectId AND project.teamId = teamId`. A project that belongs to another team gets the same 404 as one that doesn't exist.
+   - The token comes from `openGithubToken(..., teamId)`, so it is always the caller's own team's token.
+   - `taskIdsBySourceRef` (`github-reads.ts:486-500`) is also filtered by `todo.teamId`.
+   - Where the team comes from:
+     - MCP face: `teamId` is taken from the verified API key row (`mcp-face.ts:469-473`), and each tool still needs its own grant (`Issues` / `Pull Requests` / `Workflow Runs`, all `kind: 'read'`).
+     - Chief face: `teamId` is taken server-side from the chief thread row after `ownedStep` (`machine-relay.ts:94-127`). It never comes from the tool params.
+   - The new tools don't use `requireProjectRow`, so its missing team check (already known) doesn't reach them.
+
+2. **Path traversal or SSRF through `githubRepo`.** Closed.
+   - The host is fixed to `https://api.github.com/` (`apps/server/src/lib/github.ts` `listUrl`).
+   - Each of owner and repo goes through `encodeURIComponent` (`repoPath`, `lib/github.ts:315`).
+   - `isGithubRepoRef` allows only `[A-Za-z0-9._-]` with exactly one slash, so `%` can't appear and no `%2e` form can be built.
+   - `.` and `..` segments are rejected explicitly (`github-reads.ts:408-416`). `...` and longer runs of dots are not dot-segments under WHATWG URL parsing. So this diff does not make the known `isGithubRepoRef` gap worse.
+
+3. **Query-parameter injection.** Closed.
+   - `branch` (1 to 255 characters) is set through `URLSearchParams`, which encodes it.
+   - `state` and `status` are zod enums.
+   - `page` and `perPage` are integers of at least 1, and `perPage` is capped server-side.
+   - Both faces validate with the same zod schema (`packages/shared/src/protocol/chief-tools.ts:715-735`). `parseWith` checks again in `executeGithubReadTool`.
+
+4. **SQL injection.** Closed. `projectId` and the sourceRef list reach drizzle as bound parameters through `eq` and `inArray`. The `sql\`lower(${todo.sourceRef})\`` fragment interpolates a column reference, not a value.
+
+5. **Token or URL leaking through errors.** Closed.
+   - `getListPage` (`lib/github.ts`) catches fetch and JSON errors and turns them into a failure kind.
+   - `readFailure` (`github-reads.ts:430-472`) builds the messages, which carry only the HTTP status and the `owner/repo` slug.
+   - If the token can't be decrypted, the original exception is replaced with a fixed 409 message.
+   - The token is only ever placed in the Authorization header, sent to the fixed api.github.com host.
+
+6. **Third-party GitHub text in model context.** Not reportable: user-controlled content reaching an LLM is excluded by the skill's rules. The diff also reduces the risk:
+   - Issue and PR bodies are not returned.
+   - `\p{Cf}` (format characters, including bidi overrides and zero-width characters) is stripped, control and separator characters are collapsed to a space, and each field is length-capped.
+   - `htmlUrl` is built from the slug and a numeric id, not copied from the response.
+   - The tool descriptions label these fields as data.
+
+7. **Malicious or compromised daemon.** Not made worse. It can only call these tools for the team of a chief thread it already owns. The daemon already receives git credentials for GitHub-backed projects.
+
+8. **Committed evidence (`docs/verify/1406/`, test fixtures).** Clean. I scanned for `gh[pousr]_`, `github_pat_`, Bearer and `sk-` patterns. The only token string is the documented dummy `ghp_live_p5a2_dummy` in `p5a2-live.txt`, and the captured fixtures are public xiechimon/pacman data.
+
+Nothing was edited, committed or pushed.

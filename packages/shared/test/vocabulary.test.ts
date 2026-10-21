@@ -17,6 +17,7 @@ import {
   CLI_COMMANDS,
   CONFIG_KINDS,
   canBoardDrop,
+  canOrchestrate,
   capabilitiesResponseSchema,
   DB_TABLES,
   DEVICE_ID_PATTERN,
@@ -39,6 +40,7 @@ import {
   MEMORY_TOOLS,
   MODEL_SOURCE_RUNTIMES,
   maskApiKey,
+  ORCHESTRATE_PHASES,
   ORPHAN_WORKTREE_TTL_MS,
   PHASE_VALUES,
   PI_STREAM_EVENTS,
@@ -90,6 +92,15 @@ describe('phase 九值权威单源 (02 §4.1, 锁定)', () => {
     // #753（todos.dev 2026-10-03/04 live 重测）推翻 #351「待处理不作落点」：
     // 已完成(有变更)→待处理 = 重开落位，落点正名 review。
     expect(BOARD_DROP_PHASES).toEqual(['todo', 'building', 'review', 'done']);
+  });
+
+  // #1457：raw PATCH 进执行中与开始门同吃 orchestrate 的相位集——两条入口
+  // 不得各自放宽。
+  it('canBoardDrop → building only for phases orchestrate accepts (#1457)', () => {
+    expect(ORCHESTRATE_PHASES).toEqual(['todo', 'failed']);
+    for (const phase of PHASE_VALUES) {
+      if (canBoardDrop(phase, 'building')) expect(canOrchestrate(phase), phase).toBe(true);
+    }
   });
 
   it('canBoardDrop is the per-source manual matrix (#753)', () => {

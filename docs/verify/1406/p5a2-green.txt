@@ -1,0 +1,240 @@
+#1406 P5a-2 green run
+head: 59bc0e8f (branch claude/bootstrap-p5b; code commits 37077116, e92b20d0, 59bc0e8f)
+date: 2026-10-21T10:18:21Z
+command: pnpm exec vitest run apps/server/test/github-reads.test.ts apps/server/test/mcp-face.test.ts packages/shared/test/chief-tools.test.ts apps/daemon/test/claude-t4-tools.test.ts apps/server/test/github-issues.test.ts apps/server/test/ci-loop.test.ts --reporter=verbose
+result: Test Files 6 passed (6), Tests 124 passed (124)
+
+red -> green: the 39 tests red in p5a2-red.txt are green here. A second failure
+mode was found by the gate run (vitest --changed): enum / integer / minimum in the
+chief JSON Schema made the daemon claude-code converter throw for the whole chief
+tool set (apps/daemon/test/claude-t4-tools.test.ts). Its red run, before commit
+59bc0e8f, is the second section below; the fix keeps the chief parameters to
+type + description.
+
+== green (verbose)
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p5b
+
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > raw 键集恰 49 件；现行词表 = raw − 除名 + 新增 = 52 件 3ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > 词表键集 = raw 键集 − 除名登记 + 新增登记（无其它增删改名） 2ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > 除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo（divergence 全量双向）；set_remote_shell 已回摆（XMON-115） 3ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > 分组 = 读 16 + 组织 21 + 执行 5 + 私有 10（raw 实数 − delete_skills + 四件新增 + 回摆一件） 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > 读侧全 replaySafe（bundle 提取：读工具带重试预算，r5 §3.1）；写侧不标 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > 每条过 remoteToolDefSchema（bundle 位形 name/label/description/parameters/replaySafe） 13ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > set_remote_shell 定义形（XMON-115 回摆）：agentId/enabled 双必填、写侧不标 replaySafe 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 52 词表（raw 49 − 除名 1 + 新增 4 + 回摆 1） > run_builds 定义形（#903）：withPlan/dispatchReason 皆可选判定参数，必填仅 todoIds 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > GitHub 读三件（#1406 P5a-2） > description 声明标题等字段是第三方写的数据、列表不带正文 2ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > GitHub 读三件（#1406 P5a-2） > chief 词表 JSON Schema 与 zod 参数 schema（MCP 面与执行面共用）同键、同必填 3ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > GitHub 读三件（#1406 P5a-2） > 参数只用 daemon 转换器认得的词：string / number + description 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > GitHub 读三件（#1406 P5a-2） > 页大小上限：issues / pull_requests 30、workflow_runs 20 0ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > relay wire（bundle 提取原样，r5 §3.1 raw） > 请求 body = {name, params} 2ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > relay wire（bundle 提取原样，r5 §3.1 raw） > 成功响应 = {text}（结果 JSON 串） 1ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 设置齿轮 canon + id 缝（r5 §2/§3.6，AC3 后端半） > 4 tab 与 chief 记录四字段对应（agent/charter/watches/wakes） 0ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 设置齿轮 canon + id 缝（r5 §2/§3.6，AC3 后端半） > 换绑二次确认告示 = r5 §2 原文（记忆不迁移） 0ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 设置齿轮 canon + id 缝（r5 §2/§3.6，AC3 后端半） > 关注与提醒空态 canon（r5 §2） 0ms
+ ✓ |@pacman/shared| test/chief-tools.test.ts > 设置齿轮 canon + id 缝（r5 §2/§3.6，AC3 后端半） > chief id 形 = chief-<userId>-<teamId>；conv id 判别单源 0ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B4 形态错配：local(plain)/hosted 项目 → 404，不出站 135ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 1 别的团队的项目 id → 404，三个工具都不出站、不碰任何 token 96ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET（无其它端点、无逐 PR 全量拉） 90ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > ETag 往返：首轮 200 存 etag，次轮携 if-none-match → 304 → 判据复用（不解析体） 82ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B5 未连接：github 项目无 connection → 404，不出站 75ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B3/B6/B10 代理面：state/page 透传上游，token 只进 Authorization 头 49ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 2 非 GitHub 项目（hosted / local / 无 repo）→ 错误结果，不出站 58ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 3 githubRepo 形坏 → 错误结果，不出站 56ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 批量对账：3 候选一轮 = 3 个条件 GET，红绿 pending 三态各自落位 + 对账行落日志 75ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 限流/读不到 = fail-open：不动任何行，下轮重试（无崩溃） 65ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 4 团队无 GitHub 连接 → 404 github connection not found，不走匿名 62ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B7/B8 封套：PR 条目滤除、畸形条目跳过、shape 过 schema 44ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B10 hasMore：Link 头 rel=next → true；缺 Link → false 128ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > token 阶梯：连接行在 → 条件 GET 带 Authorization 头（经既有 GitHub 连接读 checks） 91ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag） > 扫描面不含非候选：无 PR 的 build、非 building 相位、非 github 项目都不出站 60ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 5 token 密文解不开（keyfile 换了）→ 错误结果（非 500、非 SecretBoxError），不出站 105ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 项目闸与连接闸（1-5） > 参数形坏 → 400，不出站 69ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 在跑/排队 → 不动：无修复步、相位不动、无 errorMessage 58ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 混合（1 个 failure 已完成 + 1 个 queued）→ 仍 pending：全部完成前不判红 64ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > issues 读面（8-9） > 8 PR 滤掉、字段齐、无正文；htmlUrl 与 GitHub 的 html_url 同值；token 只进头 39ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > issues 读面（8-9） > 8 state / page 直透；无 Link rel=next → hasMore false 48ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B10 参数闸：state 非法 / page 非法 → 400，不出站 96ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > GET /api/projects/{id}/github/issues（B4-B11） > B9 上游映射：404 → 404；限流 403+remaining=0 → 429 122ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ② checks pending 不误判红（三态状态机） > 空 checks（仓无 CI / 竞态）→ 宽限内 pending 不动；超宽限按绿推闸 57ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 红 → 追加修复步：prompt 带失败 check 名与日志摘要 + PR 号；修复步排队 pending 48ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > issues 读面（8-9） > 9 本团队已有任务的 issue 标 taskId（大小写不敏感）；别的团队的任务不算 73ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > pull_requests / workflow_runs 读面 > PR 字段齐、无正文；state 直透；htmlUrl 同 GitHub 57ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C16 github 项目创建不播种 6 词；plain/local 项目播种不变 60ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C12/C13/C15 导入同步：新 label 建行（color 补 #）、二次导入被去重护栏拒绝 88ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 修复步在飞 → 不叠派（幂等）：同轮再 sweep 不追加第二条 55ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > N-1 轮完成仍红 → 追加第 N 轮；N 轮完成仍红 → 停手标 failed 转人工（不再叠派） 54ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > pull_requests / workflow_runs 读面 > workflow runs 字段齐；branch / status 直透，exclude_pull_requests=true 45ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > pull_requests / workflow_runs 读面 > workflow runs 无过滤 → 查询里不带 branch / status，结果里为 null 47ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C13 既有行颜色跟随 GitHub 真值更新 52ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > github 项目标签词表 = 仓库 label 镜像（C12-C16） > C14 仓库侧删 label：行保留，已挂 todo_tag 不动 53ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ③ 修复步死循环闸（连续 N 轮仍红停手） > 计数判据 = marker prompt 的修复轮步（原执行步不计入） 49ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 相位已 review（人工接管）→ 红也不派步不写 56ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 边界（10-11） > 10 perPage 超上限压到上限（issues / PR 30、runs 20），缺省即上限 61ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 边界（10-11） > 10 标题限 200 字、label / login / 分支 / run 名限 100 字（按码点截，末尾 …） 59ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 相位已 closed / failed → 同样不动 110ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D17/D18/D19/D20 导入落值：标题原样、spec=body、来源两列、多标签 41ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D18 body null → spec 空串 52ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D21 issue 不存在 → 404，不留半成品任务 48ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 边界（10-11） > 11 控制字符、bidi / 零宽 / tag 格式字符剥掉；换行变空格 59ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 401 → 424「token was rejected」，三个工具同律，不带 token / URL 55ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 ④ build 已被人手动推进/关闭时轮询器不回写（读当前 phase 再动） > 动作前重读相位：扫描快照与写面之间被人工推进 → 不写（网络窗内的竞态） 87ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > 绿 → 相位推进 review 闸（不派修复步）；hasChanges 承接不丢 50ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D13/D19 形态与连接闸：plain 项目 404；未连接 404；普通建任务来源两列 null 75ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > POST /api/projects/{id}/github/issues/import（D17-D22） > D 参数闸：number 缺失/非正整数 → 400 37ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 403 → 424「forbidden」，三个工具同律，不带 token / URL 83ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 403 primary rate limit → 429「rate limit」，三个工具同律，不带 token / URL 58ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 403 secondary rate limit (no headers) → 429「rate limit」，三个工具同律，不带 token / URL 39ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 403 retry-after → 429「rate limit」，三个工具同律，不带 token / URL 31ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 429 → 429「rate limit」，三个工具同律，不带 token / URL 46ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F27 local(plain) claim：todo.meta 缺省，工具面 = 单 tag 形（现行为不变） 84ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F28 github + issue 来源 claim：meta.titleFinal=true，vocab=镜像 name 列，工具面 = tags 数组形 81ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > green 后候选拿出扫描集：再 sweep 零请求（终态退出，不空转） 44ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > completeStep：执行步成 + PR 交付（prNumber 在）→ 停在 building；无 PR → review（既有行为） 178ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 404 → 404「not found」，三个工具同律，不带 token / URL 58ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 422 → 424「HTTP 422」，三个工具同律，不带 token / URL 35ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 500 → 502「HTTP 500」，三个工具同律，不带 token / URL 39ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > F28 github 手工建任务 claim：meta.titleFinal=false（占位标题仍走回填） 76ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E24 github relay：tags 数组多枚落值；集合外 name 400；title/tags 全缺 400 112ms
+ ✓ |@xiechimon/pacman| test/ci-loop.test.ts > #1150 绿推闸 / completeStep 持 building / scheduler 接线 > scheduler 接线：start() 启动即补扫 + 60s 自循环；stop() 停；tick() 不出站（同步契约） 131ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 503 → 502「HTTP 503」，三个工具同律，不带 token / URL 45ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 timeout → 504「no answer within」，三个工具同律，不带 token / URL 35ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 network → 502「network」，三个工具同律，不带 token / URL 35ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 not json → 502「malformed」，三个工具同律，不带 token / URL 41ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 6 超时值低于 daemon relay 超时，fetch 拿到 AbortSignal 57ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E26 github relay 兼容旧形单 tag 字符串（混部容忍，仅 tags 面） 83ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > titleFinal 机械闸（AC「不被回填覆盖」）：issue 来源任务带 title = 400，tags 仍放行；手工建任务 title 放行 124ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 7 形坏整体 → 502 malformed：issues / PR 非数组，runs 缺 workflow_runs 98ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > GitHub 失败（6-7） > 7 形坏条目跳过，好条目照出 50ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > set_task_meta 词表不变式两形态（E23-E26 / F27-F28） > E23 local(plain) relay：FIXED_TAGS 白名单不变——自定义 tag 行也拒 52ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > todo 溯源两列（#446 D6） > 导入任务两列落值；级联面不动既有列 47ms
+ ✓ |@xiechimon/pacman| test/github-issues.test.ts > 出站纪律 > mock 未配置路径 = 404（漏配显形） 46ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > 超时机制（12） > 三个 lib 读在 timeoutMs 到点时返回 timeout 失败 56ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > chief 面与 MCP 面（13） > 同一调用，两面返回同一份文本（三个工具） 154ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > chief 面与 MCP 面（13） > 错误结果：MCP 面 isError，文本带同一条短原因 89ms
+ ✓ |@xiechimon/pacman| test/github-reads.test.ts > chief 面与 MCP 面（13） > 两面参数同一套：MCP tools/list 的 inputSchema 与 chief 词表的 parameters 同键、同必填 68ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 认证面（02 §7.2：Bearer <apiKey>；mcpAccess 门） > 无凭证/坏凭证 = 401；mcpAccess=false = 403（错误形状 {error}） 134ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 24 工具白名单保形（02/A10；r3 §6 矩阵 1:1） > initialize → serverInfo + capabilities.tools 76ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 24 工具白名单保形（02/A10；r3 §6 矩阵 1:1） > 全量授权 → tools/list 恰 24 件 = 注册表名单（读 11 + 写 13） 47ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 24 工具白名单保形（02/A10；r3 §6 矩阵 1:1） > 部分授权 → tools/list 仅授出项；未授工具 call = JSON-RPC 错误（limits every call） 74ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 24 工具白名单保形（02/A10；r3 §6 矩阵 1:1） > 零授权 = MCP 对该 key 失效（tools/list 空；「Removing every MCP tool disables MCP」canon） 65ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 工具执行 = key 属主身份（02 §7.2） > create_todo → todo 落库（ownerId = 用户，无 chief 溯源）；todos 读回 58ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 工具执行 = key 属主身份（02 §7.2） > run_builds（key 属主）→ triggerSource user、不建 chief watch 72ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 工具执行 = key 属主身份（02 §7.2） > build 三操作跨团队拒绝（confirm/merge/cancel = 404 面，纵深防御 transitionTodos 同律） 52ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 工具执行 = key 属主身份（02 §7.2） > merge_builds 机器入口硬拒（#1256）：同团队合法 build 也拒，文案指认人工出口 68ms
+ ✓ |@xiechimon/pacman| test/mcp-face.test.ts > /api/mcp 工具执行 = key 属主身份（02 §7.2） > GitHub 读组（issues/pull_requests/workflow_runs）缺 projectId = 错误结果，不出站 54ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > chief docs 工具：type/required/description 回投保真 5ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > 嵌套 object（create_skill files：源 schema 无嵌套 required → 全 optional） 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > boolean/number 档（set_remote_shell enabled / set_wake at） 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > 空参工具：parameters 缺省 = shape {} 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > 词表外 type（enum）fail-closed 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > 顶层非 object schema fail-closed 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > properties 非 object fail-closed 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > parametersToShape（失败方式 2/3） > required 非字符串数组 fail-closed 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > remoteTools 无 relay = fail-closed（不静默丢） 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > relay 收裸名（def.name，非 mcp__pacman__ 前缀）+ 结果文本回投 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > relay 拒绝 → 工具结果文本 + isError（不抛断回合） 1ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > localTools 走 def.execute + 失败转结果文本 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > chief 词表全量转换零抛（词表完整性回归——数量随词表单源浮动） 3ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > mapMcpEndpoint（失败方式 6） > http → SDK http config（url/headers/alwaysLoad） 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > mapMcpEndpoint（失败方式 6） > stdio → SDK stdio config（command/args/env） 0ms
+ ✓ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > mapMcpEndpoint（失败方式 6） > 残缺端点 fail-closed：http 无 url / stdio 无 command 0ms
+
+ Test Files  6 passed (6)
+      Tests  124 passed (124)
+   Start at  10:18:14
+   Duration  7.63s (transform 41%, tests 31%, import 27%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 6.24s · 38% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+== red for the schema-vocabulary failure mode (before 59bc0e8f)
+command: pnpm exec vitest run apps/server/test/github-reads.test.ts packages/shared/test/chief-tools.test.ts apps/daemon/test/claude-t4-tools.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p5b
+
+ ❯ |@pacman/shared| test/chief-tools.test.ts (18 tests | 1 failed) 83ms
+   ❯ GitHub 读三件（#1406 P5a-2） (4)
+     × 参数只用 daemon 转换器认得的词：string / number + description 33ms
+ ❯ |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts (16 tests | 1 failed) 61ms
+   ❯ buildHostTools（失败方式 4/5/8） (5)
+     × chief 词表全量转换零抛（词表完整性回归——数量随词表单源浮动） 33ms
+ ❯ |@xiechimon/pacman| test/github-reads.test.ts (35 tests | 1 failed) 2044ms
+   ❯ chief 面与 MCP 面（13） (3)
+     × 两面参数同一套：MCP tools/list 的 inputSchema 与 chief 词表的 parameters 同键、同必填 80ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman-cli| test/claude-t4-tools.test.ts > buildHostTools（失败方式 4/5/8） > chief 词表全量转换零抛（词表完整性回归——数量随词表单源浮动）
+Error: claude-code backend: tool schema 'issues'.parameters.properties.state keys [enum] not in vocabulary (fail-closed)
+ ❯ forbidKeys src/backend/claude-code.ts:616:13
+    614|     );
+    615|     if (extra.length > 0) {
+    616|       throw new Error(
+       |             ^
+    617|         `claude-code backend: tool schema ${where} keys [${extra.join(…
+    618|       );
+ ❯ jsonSchemaToZod src/backend/claude-code.ts:623:7
+ ❯ jsonSchemaToZod src/backend/claude-code.ts:657:23
+ ❯ parametersToShape src/backend/claude-code.ts:686:11
+ ❯ buildHostTools src/backend/claude-code.ts:709:19
+ ❯ test/claude-t4-tools.test.ts:181:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@pacman/shared| test/chief-tools.test.ts > GitHub 读三件（#1406 P5a-2） > 参数只用 daemon 转换器认得的词：string / number + description
+AssertionError: issues.state: expected [ 'description', 'enum', 'type' ] to deeply equal [ 'description', 'type' ]
+
+- Expected
++ Received
+
+  [
+    "description",
++   "enum",
+    "type",
+  ]
+
+ ❯ test/chief-tools.test.ts:235:62
+    233|       };
+    234|       for (const [key, schema] of Object.entries(params.properties)) {
+    235|         expect(Object.keys(schema).sort(), `${name}.${key}`).toEqual([…
+       |                                                              ^
+    236|         expect(['string', 'number'], `${name}.${key}`).toContain(schem…
+    237|       }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/pacman| test/github-reads.test.ts > chief 面与 MCP 面（13） > 两面参数同一套：MCP tools/list 的 inputSchema 与 chief 词表的 parameters 同键、同必填
+AssertionError: issues.state: expected [ 'description', 'enum', 'type' ] to deeply equal [ 'description', 'type' ]
+
+- Expected
++ Received
+
+  [
+    "description",
++   "enum",
+    "type",
+  ]
+
+ ❯ test/github-reads.test.ts:1088:51
+    1086|         // chief 工具面建不起来）：integer 写成 number，enum 的值写进说明；校验
+    1087|         // 由 server 用同一个 zod schema 做（两面同一套）。
+    1088|         expect(Object.keys(schema).sort(), where).toEqual(['descriptio…
+       |                                                   ^
+    1089|         expect(schema.type, where).toBe(
+    1090|           mcpProps[prop]?.type === 'integer' ? 'number' : mcpProps[pro…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  3 failed | 66 passed (69)
+   Start at  10:11:02
+   Duration  8.14s (transform 57%, import 28%, tests 15%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 4.16s · 54% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
