@@ -39,8 +39,12 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled, auto_merge_enabled]
 
+# contents: write is for disablePullRequestAutoMerge alone: with
+# pull-requests: write only, the mutation answers "Resource not accessible by
+# integration" (run 39540555968 on #1441, 2026-10-21) and auto-merge stays
+# armed. checkout and the label calls need no more than read / pull-requests.
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 # One run per PR at a time, newest wins: a label added seconds after a body
@@ -118,7 +122,10 @@ jobs:
           fi
           if gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --disable-auto 2>disable-auto.err; then
             echo "pr-decision: auto-merge disarmed"
+          elif grep -q 'not in auto-merge mode\|not enabled' disable-auto.err; then
+            echo "pr-decision: auto-merge was not armed"
           else
             cat disable-auto.err
-            echo "pr-decision: auto-merge was not armed"
+            echo "FAIL disarm: auto-merge may still be armed on a PR with a pending decision"
+            exit 1
           fi
