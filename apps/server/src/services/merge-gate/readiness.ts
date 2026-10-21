@@ -1,12 +1,13 @@
 // 合并就绪判定（#1404，ADR 0021，spec 28 P3）：mergeReadiness(inputs) →
 // {ready, headSha, patchDigest, policy, blockers}。纯函数，输入是 I/O 外壳读好
-// 的事实（PR、检查、compare 文件、判定、轮次），不读库、不发请求、不取时钟。
+// 的事实（PR、检查、compare 的文件与提交、判定、轮次），不读库、不发请求、不取时钟。
 // 规矩：读不到的输入变成 blocker，不跳过；全部 blocker 都列出（不短路），按
 // MERGE_BLOCKERS 的固定顺序；blocking 与 chief 的 go 各自独立判，blocking 永远
 // 拦得住。ready ⇔ blockers 为空。
 
 import {
   type CompareFile,
+  EVIDENCE_PREFIX,
   GATE_LIMITS,
   MERGE_BLOCKERS,
   MERGE_GATE_STATUS_CONTEXT,
@@ -16,7 +17,7 @@ import {
   type MergeReadiness,
   type Phase,
 } from '@pacman/shared';
-import { computePatchDigest } from './digest.js';
+import { computePatchDigest, isEvidencePath } from './digest.js';
 import { parseRawEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
 
@@ -46,7 +47,7 @@ export interface GateCheckRun {
 
 export interface GateCommitStatus {
   context: string;
-  /** error / failure / pending / success */
+  /** error / failure / pending / success；外壳只传每个 context 最新的一条。 */
   state: string;
 }
 
@@ -70,12 +71,22 @@ export interface GateInputs {
     body: string;
     changedFiles: number;
   } | null;
-  /** null = 当前 head 的检查读不到。required 为 null = 必需清单读不到。 */
-  checks: { required: string[] | null; runs: GateCheckRun[]; statuses: GateCommitStatus[] } | null;
-  /** compare {base}...{head} 的全部文件；null = 读不到。 */
-  compareFiles: CompareFile[] | null;
-  /** body 里证据链的 SHA → 是否是 head 本身或其祖先；null = 未知。 */
-  evidenceLinkAncestry: Record<string, boolean | null>;
+  /** 当前 head 的检查；null = 读不到。required 为 null = 必需清单读不到。runs 每个
+   * 名字最新的一条，statuses 每个 context 最新的一条（同名的旧条目不传）。complete =
+   * runs 与 statuses 都读全了（分页读完）；false 时整份按读不到处理：缺席的可能只是
+   * 没读到，未通过的可能在没读的那页。 */
+  checks: {
+    required: string[] | null;
+    runs: GateCheckRun[];
+    statuses: GateCommitStatus[];
+    complete: boolean;
+  } | null;
+  /** compare {base}...{head} 一次读到的两样：全部文件（compareFilesFromResponse），与
+   * 本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。'unreadable' =
+   * 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' = 读到了、形状
+   * 不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），每次读
+   * 都一样，留人。commits 少给只会让证据链少认（拦），不会多放。 */
+  compare: { files: CompareFile[]; commits: string[] } | 'unreadable' | 'malformed';
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
   verdicts: GateVerdictView[];
   /** 当前摘要的闸轮次；perspectives 在建轮时冻结。human 策略下没有轮次。 */
@@ -95,6 +106,10 @@ const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
 );
 
+/** 证据前缀的大小写变体（Docs/Verify/ 之类）：paths.ts 的 opaque 豁免当它是证据，
+ * 摘要（isEvidencePath）不当。 */
+const isEvidenceCaseVariant = (name: string) =>
+  !isEvidencePath(name) && name.toLowerCase().startsWith(EVIDENCE_PREFIX);
 const runPasses = (r: GateCheckRun) =>
   r.status === 'completed' && r.conclusion !== null && PASSING_CONCLUSIONS.has(r.conclusion);
 const isOwnStatus = (s: GateCommitStatus) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT;
@@ -134,10 +149,14 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 检查（当前 head）。judged = 上面已按必需检查或 pr-evidence 记过自己码的条目。
-  const checks = i.checks;
+  // 没读全的列表与读不到同等：不拿半张清单判。
+  const checks = i.checks?.complete ? i.checks : null;
   const judged = new Set<GateCheckRun | GateCommitStatus>();
   if (checks === null || checks.required === null) {
-    block('required-checks-unreadable');
+    block(
+      'required-checks-unreadable',
+      ...(i.checks?.complete === false ? ['check list incomplete'] : []),
+    );
   } else {
     const required = checks.required;
     if (required.length === 0) block('required-checks-none');
@@ -209,49 +228,65 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     }
   }
 
-  // 补丁
+  // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。
+  const compare = typeof i.compare === 'string' ? null : i.compare;
+  if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
+  if (i.compare === 'malformed') block('compare-malformed');
   const digest =
-    i.compareFiles === null
+    compare === null
       ? null
-      : computePatchDigest(i.compareFiles, { expectedFileCount: pr?.changedFiles ?? null });
+      : computePatchDigest(compare.files, { expectedFileCount: pr?.changedFiles ?? null });
   const D = digest?.patchDigest ?? null;
-  if (digest === null) {
-    block('patch-unavailable', 'compare unreadable');
-  } else if (digest.unavailable === 'truncated' || digest.unavailable === 'count-mismatch') {
+  if (digest?.unavailable === 'truncated' || digest?.unavailable === 'count-mismatch') {
     block('compare-truncated', digest.unavailable);
-  } else if (digest.unavailable !== null) {
+  } else if (digest?.unavailable) {
     // 只有证据（empty）或有文件缺 blob sha（null-sha）：等多久都算不出摘要，留人。
     block('patch-unbindable', digest.unavailable);
   }
-  if (digest !== null && i.compareFiles !== null) {
+  if (digest !== null && compare !== null) {
     // 上限按整张补丁算：证据也计入，改名记两个文件（口径在 digest.ts）。不要
     // 换成 digest.kept 去数，那是摘要的口径，不是 D4 上限的口径。
     if (digest.countedLines > GATE_LIMITS.maxLines || digest.countedFiles > GATE_LIMITS.maxFiles) {
       block('size-cap', `${digest.countedLines} lines, ${digest.countedFiles} files`);
     }
-    const paths = classifyPaths(i.compareFiles, i.ticketRef);
+    const paths = classifyPaths(compare.files, i.ticketRef);
     if (paths.protected.length > 0) block('protected-path', ...paths.protected);
     if (paths.outsideAutoMerge.length > 0) block('outside-auto-merge', ...paths.outsideAutoMerge);
     if (paths.deletedTests.length > 0) block('test-deleted', ...paths.deletedTests);
-    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);
+    // 证据豁免取严的一侧：paths.ts 不分大小写，Docs/Verify/ 下没有 patch 的名字也
+    // 豁免了；摘要只认原样的 docs/verify/。这些名字补回 opaque。
+    const opaque = new Set(paths.opaque);
+    for (const f of compare.files) {
+      if (f.patchSha !== null) continue;
+      for (const name of [f.filename, f.previousFilename ?? f.filename]) {
+        if (isEvidenceCaseVariant(name)) opaque.add(name);
+      }
+    }
+    if (opaque.size > 0) block('opaque-file', ...opaque);
     if (paths.otherTicketEvidence.length > 0)
       block('evidence-outside-ticket', ...paths.otherTicketEvidence);
     if (paths.executableEvidence.length > 0)
       block('evidence-executable', ...paths.executableEvidence);
   }
 
-  // 来源与证据链
+  // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件：
+  // 只是 head 的祖先不够，main 历史里同票前一段（已 squash）的证据也是祖先，本 PR
+  // 却一份证据没加。compare 不可得时上面已拦，这里判不了，不再重复列出。
   if (i.issueNumber === null) block('issue-ref-missing');
-  if (pr !== null) {
+  if (pr !== null && compare !== null) {
     const { links } = parseRawEvidenceLinks(pr.body, {
       owner: i.repo.owner,
       repo: i.repo.name,
       ticketRef: i.ticketRef,
     });
-    if (!links.some((l) => i.evidenceLinkAncestry[l.sha] === true)) {
+    const commits = new Set(compare.commits);
+    const changed = new Set(
+      compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename),
+    );
+    if (!links.some((l) => commits.has(l.sha) && changed.has(l.path))) {
       block(
         'evidence-link-missing',
-        `${links.length} link(s) to docs/verify/${i.ticketRef}/, none at the head or an ancestor`,
+        `${links.length} link(s) to docs/verify/${i.ticketRef}/, none at a commit of this PR to a file it adds or changes`,
       );
     }
   }

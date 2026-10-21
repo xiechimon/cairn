@@ -161,8 +161,9 @@ export const MERGE_BLOCKERS = [
   { code: 'pr-evidence-not-green', class: 'transient', label: 'pr-evidence 未通过' },
   // 补丁
   // 摘要不可得分两类：compare 读不到可等（下一次巡检再读）；读到了却算不出
-  // （截断、只有证据、缺 blob sha）等不来，留人。
+  // （形状不对、截断、只有证据、缺 blob sha）每次读都一样，等不来，留人。
   { code: 'patch-unavailable', class: 'transient', label: '读不到 compare，补丁摘要暂不可得' },
+  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },
   { code: 'compare-truncated', class: 'human', label: 'compare 文件列表被截断' },
   {
     code: 'patch-unbindable',
@@ -186,7 +187,7 @@ export const MERGE_BLOCKERS = [
   {
     code: 'evidence-link-missing',
     class: 'transient',
-    label: 'PR body 缺指向本票证据的 raw 永久链',
+    label: 'PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链',
   },
   // verify（当前摘要）
   { code: 'verify-missing', class: 'transient', label: '当前补丁没有验证判定' },

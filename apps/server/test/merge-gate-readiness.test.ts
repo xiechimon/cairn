@@ -13,6 +13,11 @@
 // S1 第三轮（D4 在 #1410 上的修订）之后：证据目录外看不到 diff 的文件（二进制、
 // diff 过大、纯改名）被放过；证据目录里的截图被当成看不到 diff 而留人；800 行 /
 // 40 文件上限只数证据之外的部分。
+// S2 第四轮（pr-gate 在 #1421 首轮的建议）：读到了、形状不对的 compare 被当成可等，
+// 每次巡检形状都一样，闸永远等下去；证据链只要是 head 的祖先就算，main 历史里同票
+// 前一段（已 squash）的证据也算数，本 PR 却没加证据；检查列表没读全（分页没读完）
+// 却被当成全量；证据前缀的大小写变体（Docs/Verify/）下看不到 diff 的文件被当成
+// 证据放过。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿）。
 
 import { type CompareFile, MERGE_BLOCKER_CODES, type MergeBlockerCode } from '@pacman/shared';
@@ -26,6 +31,10 @@ import {
 
 const HEAD = 'a'.repeat(40);
 const OLD = 'b'.repeat(40);
+/** 本 PR 较早的一个提交：在 base..head 里，不是 head。 */
+const EARLIER = 'e'.repeat(40);
+/** main 历史里的提交：head 的祖先，不在 base..head 里（同票前一段已 squash 进 main）。 */
+const MAIN = 'f'.repeat(40);
 const file = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   status: 'modified',
   previousFilename: null,
@@ -41,7 +50,14 @@ const FILES = [
   file('apps/server/test/ci-loop.test.ts'),
 ];
 const D = computePatchDigest(FILES).patchDigest as string;
-const BODY = `evidence: https://raw.githubusercontent.com/xiechimon/pacman/${HEAD}/docs/verify/1404/result.json`;
+const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
+  file(filename, { status: 'added', additions: 0, deletions: 0, patchSha: null, ...over });
+/** 本 PR 加的证据：一张截图（没有行数、没有 patch，不进摘要）。每份文件列表都带着
+ * 它，body 的证据链指着它。 */
+const SHOT = opaque('docs/verify/1404/shot.png');
+const link = (sha: string, path = SHOT.filename) =>
+  `https://raw.githubusercontent.com/xiechimon/pacman/${sha}/${path}`;
+const BODY = `evidence: ${link(HEAD)}`;
 
 const v = (
   kind: GateVerdictView['kind'],
@@ -72,7 +88,7 @@ function green(): GateInputs {
       baseRepoFullName: 'xiechimon/pacman',
       headRepoFullName: 'xiechimon/pacman',
       body: BODY,
-      changedFiles: FILES.length,
+      changedFiles: FILES.length + 1,
     },
     checks: {
       required: ['check', 'pack-smoke'],
@@ -82,9 +98,9 @@ function green(): GateInputs {
         { name: 'pr-evidence', status: 'completed', conclusion: 'success' },
       ],
       statuses: [],
+      complete: true,
     },
-    compareFiles: FILES,
-    evidenceLinkAncestry: { [HEAD]: true },
+    compare: { files: [...FILES, SHOT], commits: [EARLIER, HEAD] },
     verdicts: [
       v('verify', 'pass'),
       v('review', 'pass', 'correctness'),
@@ -111,11 +127,14 @@ type Row = [MergeBlockerCode, (i: GateInputs) => void];
 const pr = (i: GateInputs) => i.pr as NonNullable<GateInputs['pr']>;
 const checks = (i: GateInputs) => i.checks as NonNullable<GateInputs['checks']>;
 const round = (i: GateInputs) => i.round as NonNullable<GateInputs['round']>;
+const compare = (i: GateInputs) => i.compare as Exclude<GateInputs['compare'], string>;
+/** 换文件列表，证据截图 SHOT 随行（body 的链接要指着本 PR 的证据）。 */
 const setFiles = (i: GateInputs, files: CompareFile[]) => {
-  i.compareFiles = files;
-  pr(i).changedFiles = files.length;
+  const all = [...files, SHOT];
+  compare(i).files = all;
+  pr(i).changedFiles = all.length;
   // 判定绑在新摘要上，让补丁类 blocker 单独出现
-  const d = computePatchDigest(files).patchDigest;
+  const d = computePatchDigest(all).patchDigest;
   i.verdicts = i.verdicts.map((x) => ({ ...x, patchDigest: d }));
 };
 
@@ -242,13 +261,19 @@ const ROWS: Row[] = [
   [
     'patch-unavailable',
     (i) => {
-      i.compareFiles = null;
+      i.compare = 'unreadable';
+    },
+  ],
+  [
+    'compare-malformed',
+    (i) => {
+      i.compare = 'malformed';
     },
   ],
   [
     'compare-truncated',
     (i) => {
-      pr(i).changedFiles = FILES.length + 1;
+      pr(i).changedFiles += 1;
     },
   ],
   ['patch-unbindable', (i) => setFiles(i, [file('docs/verify/1404/result.json')])],
@@ -269,19 +294,7 @@ const ROWS: Row[] = [
     'test-deleted',
     (i) => setFiles(i, [...FILES, file('apps/server/test/old.test.ts', { status: 'removed' })]),
   ],
-  [
-    'opaque-file',
-    (i) =>
-      setFiles(i, [
-        ...FILES,
-        file('apps/web/src/assets/logo.png', {
-          status: 'added',
-          additions: 0,
-          deletions: 0,
-          patchSha: null,
-        }),
-      ]),
-  ],
+  ['opaque-file', (i) => setFiles(i, [...FILES, opaque('apps/web/src/assets/logo.png')])],
   ['evidence-outside-ticket', (i) => setFiles(i, [...FILES, file('docs/verify/926/x.json')])],
   [
     'evidence-executable',
@@ -296,7 +309,7 @@ const ROWS: Row[] = [
   [
     'evidence-link-missing',
     (i) => {
-      i.evidenceLinkAncestry = { [HEAD]: false };
+      pr(i).body = `evidence: ${link(MAIN)}`;
     },
   ],
   [
@@ -519,21 +532,12 @@ describe('mergeReadiness：设计点名的组合', () => {
     expect(codesOf(i)).toEqual(['required-checks-unreadable']);
   });
 
-  test('证据链的 SHA 不知道是否是 head 的祖先：不算', () => {
-    const i = green();
-    i.evidenceLinkAncestry = { [HEAD]: null };
-    expect(codesOf(i)).toEqual(['evidence-link-missing']);
-  });
-
-  test('证据链指向别的票或钉在旧 SHA（不是祖先）：不算', () => {
+  test('证据链指向别的票或钉在旧 SHA（不在 base..head）：不算', () => {
     const a = green();
-    pr(a).body =
-      `https://raw.githubusercontent.com/xiechimon/pacman/${HEAD}/docs/verify/1403/x.json`;
+    pr(a).body = link(HEAD, 'docs/verify/1403/shot.png');
     expect(codesOf(a)).toEqual(['evidence-link-missing']);
     const b = green();
-    pr(b).body =
-      `https://raw.githubusercontent.com/xiechimon/pacman/${OLD}/docs/verify/1404/x.json`;
-    b.evidenceLinkAncestry = { [OLD]: false };
+    pr(b).body = link(OLD);
     expect(codesOf(b)).toEqual(['evidence-link-missing']);
   });
 
@@ -571,11 +575,12 @@ describe('mergeReadiness：设计点名的组合', () => {
     };
     expect(lines(800)).toEqual([]);
     expect(lines(801)).toEqual(['size-cap']);
+    // 证据截图随行，代码文件 n - 1 个，合计 n 个
     const files = (n: number) => {
       const i = green();
       setFiles(
         i,
-        Array.from({ length: n }, (_, k) =>
+        Array.from({ length: n - 1 }, (_, k) =>
           file(`apps/server/src/f${k}.ts`, { additions: 1, deletions: 0 }),
         ),
       );
@@ -595,7 +600,7 @@ describe('mergeReadiness：设计点名的组合', () => {
   test('不抛：空 body、空文件列表、空判定', () => {
     const i = green();
     pr(i).body = '';
-    i.compareFiles = [];
+    i.compare = { files: [], commits: [] };
     pr(i).changedFiles = 0;
     i.verdicts = [];
     expect(() => mergeReadiness(i)).not.toThrow();
@@ -620,10 +625,10 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
 
   test('读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated', () => {
     const a = green();
-    a.compareFiles = null;
+    a.compare = 'unreadable';
     expect(classesOf(a)).toEqual([['patch-unavailable', 'transient', 'compare unreadable']]);
     const b = green();
-    pr(b).changedFiles = FILES.length + 1;
+    pr(b).changedFiles += 1;
     expect(classesOf(b)).toEqual([['compare-truncated', 'human', 'count-mismatch']]);
   });
 
@@ -716,8 +721,6 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
 });
 
 describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算（S1 第三轮后）', () => {
-  const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
-    file(filename, { status: 'added', additions: 0, deletions: 0, patchSha: null, ...over });
   const many = (n: number, at: (k: number) => string, over: Partial<CompareFile> = {}) =>
     Array.from({ length: n }, (_, k) => file(at(k), { additions: 1, deletions: 0, ...over }));
 
@@ -745,7 +748,7 @@ describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补�
 
   test('证据目录里的截图（没有 patch）不留人', () => {
     const i = green();
-    setFiles(i, [...FILES, opaque('docs/verify/1404/shot.png')]);
+    setFiles(i, [...FILES, opaque('docs/verify/1404/after.png')]);
     expect(codesOf(i)).toEqual([]);
   });
 
@@ -767,16 +770,17 @@ describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补�
   });
 
   test('40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦', () => {
+    // 证据 9 个文本加随行的截图 SHOT（0 行），共 10 个
     const withEvidence = (code: number) => {
       const i = green();
       setFiles(i, [
         ...many(code, (k) => `apps/server/src/f${k}.ts`),
-        ...many(10, (k) => `docs/verify/1404/e${k}.txt`, { status: 'added' }),
+        ...many(9, (k) => `docs/verify/1404/e${k}.txt`, { status: 'added' }),
       ]);
       return classesOf(i);
     };
     expect(withEvidence(30)).toEqual([]);
-    expect(withEvidence(35)).toEqual([['size-cap', 'human', '45 lines, 45 files']]);
+    expect(withEvidence(35)).toEqual([['size-cap', 'human', '44 lines, 45 files']]);
   });
 
   test('800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦', () => {
@@ -790,6 +794,80 @@ describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补�
       return classesOf(i);
     };
     expect(withEvidence(100)).toEqual([]);
-    expect(withEvidence(101)).toEqual([['size-cap', 'human', '801 lines, 3 files']]);
+    expect(withEvidence(101)).toEqual([['size-cap', 'human', '801 lines, 4 files']]);
+  });
+});
+
+describe('mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信（S2 第四轮）', () => {
+  test('compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable', () => {
+    const a = green();
+    a.compare = 'malformed';
+    expect(classesOf(a)).toEqual([['compare-malformed', 'human']]);
+    const b = green();
+    b.compare = 'unreadable';
+    expect(classesOf(b)).toEqual([['patch-unavailable', 'transient', 'compare unreadable']]);
+  });
+
+  test('证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算', () => {
+    const i = green();
+    pr(i).body = `evidence: ${link(MAIN)}`;
+    expect(classesOf(i)).toEqual([
+      [
+        'evidence-link-missing',
+        'transient',
+        '1 link(s) to docs/verify/1404/, none at a commit of this PR to a file it adds or changes',
+      ],
+    ]);
+  });
+
+  test('证据链钉在本 PR 的提交上（不必是 head）、指向本 PR 加的证据：算', () => {
+    const i = green();
+    pr(i).body = `evidence: ${link(EARLIER)}`;
+    expect(codesOf(i)).toEqual([]);
+  });
+
+  test('钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算', () => {
+    const i = green();
+    pr(i).body = `evidence: ${link(HEAD, 'docs/verify/1404/s1-result.json')}`;
+    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+  });
+
+  test('指向本 PR 删掉的证据：不算', () => {
+    const i = green();
+    setFiles(i, [...FILES, opaque('docs/verify/1404/old.png', { status: 'removed' })]);
+    pr(i).body = `evidence: ${link(EARLIER, 'docs/verify/1404/old.png')}`;
+    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+  });
+
+  test('多条链接有一条合格即可：钉在 main 历史上的那条不拖累', () => {
+    const i = green();
+    pr(i).body = `${link(MAIN)}\n${link(EARLIER)}`;
+    expect(codesOf(i)).toEqual([]);
+  });
+
+  test('检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green', () => {
+    const incomplete = [['required-checks-unreadable', 'transient', 'check list incomplete']];
+    const a = green();
+    checks(a).complete = false;
+    expect(classesOf(a)).toEqual(incomplete);
+    const b = green();
+    checks(b).complete = false;
+    checks(b).runs = checks(b).runs.slice(0, 1);
+    expect(classesOf(b)).toEqual(incomplete);
+  });
+
+  test('证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人', () => {
+    const i = green();
+    setFiles(i, [
+      ...FILES,
+      opaque('Docs/Verify/1404/b.png'),
+      opaque('docs/verify/1404/c.png', {
+        status: 'renamed',
+        previousFilename: 'DOCS/verify/1404/c.png',
+      }),
+    ]);
+    expect(classesOf(i)).toEqual([
+      ['opaque-file', 'human', 'Docs/Verify/1404/b.png', 'DOCS/verify/1404/c.png'],
+    ]);
   });
 });
