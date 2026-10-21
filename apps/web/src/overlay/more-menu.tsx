@@ -1,6 +1,6 @@
 // 更多 menu (issue #66): popover anchored under the detail header's 更多
 // button. Four items 完成 / 复制链接 / 关闭 / 删除 (+ the review-phase 请求修改
-// row, #701); 删除 is the danger row.
+// row, #701, and the queued 停止 row, #1446); 删除 is the danger row.
 // #318: 完成/关闭 接真(r1 changelog 09-16「菜单项按当前 phase 出:Complete
 // 走看板自带 confirm-and-merge、Close 关闭语义」)——完成 = 相位适配动作
 // (confirm 关口确认 / review 验收弹层→merge 链,调用位裁定),关闭 = 关闭
@@ -21,6 +21,7 @@
 // data-action 载体原样保留（e2e 行为锚），别名 more-menu / more-menu-item
 // 随行透传（#411 别名优先）。
 
+import { CircleStop } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import {
   DropdownMenu,
@@ -39,10 +40,12 @@ interface MoreMenuProps {
   /** #318: 完成 = 相位适配动作(confirm/review);其余相位 disabled。 */
   onComplete: () => void;
   canComplete: boolean;
-  /** #318: 关闭 = phase closed 落账;server 漏斗现有边(todo/failed)外
-   *  disabled(review/confirm/done→closed 边归 W3 server 票,#318 注记)。 */
+  /** #318: 关闭 = phase closed 落账;可关相位由页面层判定（canClose）。 */
   onCloseTask: () => void;
   canClose: boolean;
+  /** #1446: queued 卡的停止（停掉等机器的 pending 步，卡回待开始）——
+   *  它没有 composer，停止钮无处可挂；缺省 = 行不渲染。 */
+  onStop?: () => void;
   /** #701: 审核关口人肉打回（请求修改）——live review 静息态在场；缺省 =
    *  行不渲染（fixture 捕获面与其余相位保持四行几何，DOM 字节不变）。 */
   onReject?: () => void;
@@ -63,6 +66,7 @@ export function MoreMenu({
   canComplete,
   onCloseTask,
   canClose,
+  onStop,
   onReject,
   anchor,
 }: MoreMenuProps) {
@@ -90,6 +94,18 @@ export function MoreMenu({
             action: 'reject',
             disabled: false,
             onClick: onReject,
+          },
+        ]
+      : []),
+    ...(onStop !== undefined
+      ? [
+          {
+            key: 'stop',
+            label: t('停止'),
+            Icon: CircleStop,
+            action: 'stop',
+            disabled: false,
+            onClick: onStop,
           },
         ]
       : []),

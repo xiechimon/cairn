@@ -1050,6 +1050,16 @@ export function TodoDetailPage() {
         canComplete={canComplete}
         onCloseTask={closeTask}
         canClose={canClose}
+        // #1446：queued 卡没有 composer，停止钮住更多菜单（停掉等机器的步，
+        // 卡回待开始）；其余相位缺省 = 行不渲染。
+        onStop={
+          live && phase === 'queued' && buildId != null
+            ? () => {
+                setMoreOpen(false);
+                setStopOpen(true);
+              }
+            : undefined
+        }
         // #701：审核关口显式打回入口——live review 静息态在场（运行中让位
         // steer 补话面）；fixture 面/其余相位缺省 = 行不渲染，四行几何不变。
         onReject={
@@ -1088,6 +1098,7 @@ export function TodoDetailPage() {
       />
       <StopConfirmDialog
         open={stopOpen}
+        queued={phase === 'queued'}
         onClose={() => setStopOpen(false)}
         onConfirm={(discard) => {
           setStopOpen(false);

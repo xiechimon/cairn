@@ -1,0 +1,24 @@
+# #1446 evidence: stop or close a queued task from its detail page
+
+Base = this branch before the #1446 commit (web unchanged since `bbd1e858`). Branch = `claude/optimistic-albattani-r5pmfn`.
+
+A queued task's 更多 menu shows 停止 (`apps/web/src/overlay/more-menu.tsx` `onStop`, wired in `routes/todo-detail-page.tsx` for a live queued task with a build). It opens `StopConfirmDialog` in its queued form: title 停止排队？, one line saying the task goes back to 待开始, no "discard this round" checkbox. Confirming calls the existing `POST /api/builds/:id/stop`. 更多 > 关闭 is enabled for queued (`detail/use-detail-actions.ts` `canClose`); the server stops the pending step before closing (#1445). planning / building are unchanged.
+
+## e2e: `apps/web/e2e/detail-queued-exit.spec.ts`
+
+Stubbed live boot (no `?scenario=`): one queued task and one planning task, each with a build. The stop POST and the todo PATCH are recorded.
+
+- `e2e-old-leg.txt`: before the change. 2 failed / 1 passed. The queued menu has no 停止 (`element(s) not found`), and its 关闭 is disabled (`Received: disabled`). The planning control passes.
+- `e2e-new-leg.txt`: after. 3 passed. 停止 → dialog 停止排队？ with no checkbox → `POST /api/builds/build-todo-queued/stop`; 关闭 → `PATCH /api/todos/todo-queued {phase:'closed'}`; planning shows no menu 停止 and keeps 关闭 disabled.
+
+| shot | `old/` | `new/` |
+|---|---|---|
+| `queued-more-menu.png` | 完成 / 复制链接 / 关闭 (disabled) / 删除 | 完成 / 停止 / 复制链接 / 关闭 / 删除 |
+| `queued-stop-dialog.png` | (no 停止 to open) | 停止排队？, one line, 取消 / 停止 |
+
+## Rerun
+
+```sh
+cd apps/web
+PACMAN_E2E_EVIDENCE=docs/verify/1446/new E2E_PORT=8398 pnpm exec playwright test detail-queued-exit.spec.ts
+```
