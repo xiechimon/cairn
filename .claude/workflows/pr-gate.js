@@ -3,7 +3,7 @@ export const meta = {
   description:
     'Pre-merge gate for one xiechimon/pacman PR at an exact head SHA: five review dimensions, two skeptics per blocking finding, go or no-go',
   whenToUse:
-    'Before enabling auto-merge or asking the user to merge a bootstrap PR (docs/spec/28 §7.5). Run the origin/main copy through scriptPath, not the PR working tree. args: {pr, headSha, ticket, changedFiles, deletedFiles, linesChanged}',
+    'Before enabling auto-merge or asking the user to merge a bootstrap PR (docs/spec/28 §7.5). Run the origin/main copy through scriptPath, not the PR working tree. args: {pr, headSha, ticket, changedFiles, deletedFiles, linesChanged, binaryFiles}',
   phases: [
     { title: 'Review', detail: 'five dimensions read the PR at headSha' },
     { title: 'Refute', detail: 'two skeptics per blocking finding' },
@@ -25,8 +25,8 @@ const MAX_SKEPTICS = 4
 // ADR 0021 D4, decided here so routing to the user does not depend on a
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
 // and tests, docs/verify evidence) may auto-merge, and only when no PROTECTED
-// class matches them; every other path, deleted test files, and patches over
-// 800 lines or 40 files route to the user. pr-gate runs 3, 4 and 5 each found
+// class matches them; every other path, deleted test files, binary files
+// outside docs/verify, and patches over 800 lines or 40 files route to the user. pr-gate runs 3, 4 and 5 each found
 // another agent-steering or gate file that a list of names missed
 // (AGENTS.override.md, .pi/skills, nested .claude/), so the list now says what
 // may merge alone instead of what may not. Matching ignores case (APFS).
@@ -96,6 +96,7 @@ const AUTO_MERGE_RE = AUTO_MERGE.map(globToRegExp)
 const isProtected = (f) => PROTECTED_RE.some((re) => re.test(f))
 const MAX_LINES = 800
 const MAX_FILES = 40
+const EVIDENCE_RE = globToRegExp('docs/verify/**')
 
 // Without --no-renames a rename lists only its new name, so a protected file
 // moved elsewhere would not match; without core.quotePath=false git C-quotes
@@ -104,7 +105,7 @@ const FILES_CMD = 'git -c core.quotePath=false diff --no-renames --name-only'
 // Attributes come from the empty tree, so a committed .gitattributes cannot
 // turn text into "- -" rows and zero the line count (run 6).
 const LINES_CMD = 'git --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat'
-const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha>\` with binary rows (- -) counted as 0}`
+const ARGS_HELP = `pr-gate args: {pr: number, ticket: number, headSha: 40-hex sha, changedFiles: non-empty string[] from \`${FILES_CMD} origin/main...<headSha>\`, deletedFiles: string[] from the same command with --diff-filter=D, linesChanged: non-negative integer, the sum of both columns of \`${LINES_CMD} origin/main...<headSha>\` with binary rows (- -) counted as 0, binaryFiles: string[], the paths of those binary rows}`
 const isPathList = (xs) => Array.isArray(xs) && xs.every((f) => typeof f === 'string' && f.length > 0)
 // File names reach agents that build git commands from them, so only letters,
 // digits, combining marks and ._/@+%- pass (every tracked path fits).
@@ -121,7 +122,9 @@ if (
   !isPathList(args.deletedFiles) ||
   !args.deletedFiles.every((f) => args.changedFiles.includes(f)) ||
   !Number.isInteger(args.linesChanged) ||
-  args.linesChanged < 0
+  args.linesChanged < 0 ||
+  !isPathList(args.binaryFiles) ||
+  !args.binaryFiles.every((f) => args.changedFiles.includes(f))
 ) {
   throw new Error(ARGS_HELP)
 }
@@ -133,7 +136,7 @@ const unsafe = args.changedFiles.filter((f) => !SAFE_PATH.test(f))
 if (unsafe.length > 0) {
   throw new Error(`pr-gate: path with a character outside letters, digits and ._/@+%- (${JSON.stringify(unsafe[0])}); review this PR by hand.`)
 }
-const { pr, headSha, ticket, changedFiles, deletedFiles, linesChanged } = args
+const { pr, headSha, ticket, changedFiles, deletedFiles, linesChanged, binaryFiles } = args
 const matchedProtected = changedFiles.filter(isProtected)
 
 // withFiles false: the safety reviewer lists the files from git itself, so its
@@ -163,7 +166,7 @@ const DIMENSIONS = [
   },
   {
     key: 'safety',
-    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha}\` in linesChanged (binary rows count 0). The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
+    prompt: `Dimension: safety and protected paths. First run \`${FILES_CMD} <your base ref>...${headSha}\` and put its output lines, unchanged, in changedFiles; run it again with --diff-filter=D for deletedFiles; put the sum of both columns of \`${LINES_CMD} <your base ref>...${headSha}\` in linesChanged (binary rows count 0) and the paths of its binary rows (- -) in binaryFiles. The script compares these with the caller's values and matches ADR 0021 D4 on them itself. Read D4 in docs/adr/0021-*.md at the head and add to protectedPaths any changed path that steers agents, gates a check or is a one-way door; a protected path is not a finding by itself. Then look for secrets or tokens in code or evidence, credentials handed to agents, issue or PR text reaching a prompt system layer or a shell, one-way doors (migrations, dependency changes, data deletion), and changes outside the ticket's scope.`,
   },
   {
     key: 'evidence',
@@ -204,8 +207,9 @@ const SAFETY_SCHEMA = {
     changedFiles: { type: 'array', items: { type: 'string' } },
     deletedFiles: { type: 'array', items: { type: 'string' } },
     linesChanged: { type: 'integer' },
+    binaryFiles: { type: 'array', items: { type: 'string' } },
   },
-  required: [...FINDINGS_SCHEMA.required, 'changedFiles', 'deletedFiles', 'linesChanged'],
+  required: [...FINDINGS_SCHEMA.required, 'changedFiles', 'deletedFiles', 'linesChanged', 'binaryFiles'],
 }
 
 const SKEPTIC_SCHEMA = {
@@ -327,7 +331,13 @@ const protectedPaths = [
 // count are checked against the safety reviewer's: the union and the larger.
 const allDeleted = [...new Set([...deletedFiles, ...(safety ? (safety.review.deletedFiles ?? []) : [])])]
 const deletedTests = allDeleted.filter(
-  (f) => /(^|\/)(e2e|test|tests|__tests__)\//.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/.test(f),
+  (f) => /(^|\/)(e2e|test|tests|__tests__)\//i.test(f) || /\.(test|spec)\.[cm]?[jt]sx?$/i.test(f),
+)
+// A binary row (- -) adds no lines and shows reviewers no diff; one NUL byte
+// makes git treat a source file as binary even with the empty tree's attributes
+// (/code-review on #1410), so only evidence may be binary without the user.
+const opaque = [...new Set([...binaryFiles, ...(safety ? (safety.review.binaryFiles ?? []) : [])])].filter(
+  (f) => !EVIDENCE_RE.test(f),
 )
 const lines = Math.max(linesChanged, safety && Number.isInteger(safety.review.linesChanged) ? safety.review.linesChanged : 0)
 const fileCount = new Set([...changedFiles, ...unlistedFiles]).size
@@ -338,6 +348,7 @@ const humanReasons = [
   ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
   ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify): ${outside.join(', ')}`] : []),
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
+  ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
   ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),
   ...(fileCount > MAX_FILES ? [`${fileCount} files changed (over ${MAX_FILES})`] : []),
 ]

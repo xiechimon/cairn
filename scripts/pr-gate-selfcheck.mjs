@@ -5,7 +5,7 @@
 // change to the script (spec 28 §7.5).
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
 // The failure modes come from pr-gate runs 2-6 on #1410
-// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json).
+// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json) and its /code-review.
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -55,6 +55,7 @@ const base = {
   changedFiles: ['apps/server/src/x.ts'],
   deletedFiles: [],
   linesChanged: 10,
+  binaryFiles: [],
 };
 const safetyFiles = (files) => ({ safety: { changedFiles: files } });
 const blocker = { title: 'bug', severity: 'blocking', failurePath: 'x' };
@@ -409,6 +410,79 @@ const cases = [
         reviews: { safety: { changedFiles: base.changedFiles, linesChanged: 900 } },
       });
       return r.mergedBy === 'user';
+    },
+  ],
+  [
+    'binaryFiles is required and lists changed paths only (code-review on #1410)',
+    async () => {
+      const { binaryFiles: _b, ...noBinary } = base;
+      for (const bad of [
+        noBinary,
+        { ...base, binaryFiles: ['apps/server/src/other.ts'] },
+        { ...base, binaryFiles: 'x' },
+      ]) {
+        try {
+          await gate(bad, { reviews: safetyFiles(base.changedFiles) });
+          return false;
+        } catch (e) {
+          if (!String(e).includes('binaryFiles')) return false;
+        }
+      }
+      return true;
+    },
+  ],
+  [
+    'a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)',
+    async () => {
+      const r = await gate(
+        { ...base, binaryFiles: base.changedFiles },
+        { reviews: safetyFiles(base.changedFiles) },
+      );
+      return (
+        r.mergedBy === 'user' &&
+        r.humanReasons.some((x) => x.startsWith('binary files') && x.includes('x.ts'))
+      );
+    },
+  ],
+  [
+    'a binary file under docs/verify stays mergeable without the user',
+    async () => {
+      const files = ['apps/server/src/x.ts', 'docs/verify/2/shot.png'];
+      const r = await gate(
+        { ...base, changedFiles: files, binaryFiles: ['docs/verify/2/shot.png'] },
+        { reviews: safetyFiles(files) },
+      );
+      return r.mergedBy === 'auto-merge' && r.humanReasons.length === 0;
+    },
+  ],
+  [
+    'a binary file only the safety reviewer listed routes to the user',
+    async () => {
+      const r = await gate(base, {
+        reviews: { safety: { changedFiles: base.changedFiles, binaryFiles: base.changedFiles } },
+      });
+      return r.mergedBy === 'user' && r.humanReasons.some((x) => x.startsWith('binary files'));
+    },
+  ],
+  [
+    'a deleted test is found whatever the case of its directory or suffix (code-review on #1410)',
+    async () => {
+      for (const f of [
+        'apps/server/Test/helper.ts',
+        'apps/web/src/a.Test.ts',
+        'apps/web/E2E/x.ts',
+      ]) {
+        const files = [f];
+        const r = await gate(
+          { ...base, changedFiles: files, deletedFiles: files },
+          { reviews: safetyFiles(files) },
+        );
+        if (
+          !(r.mergedBy === 'user' && r.humanReasons.some((x) => x.startsWith('deleted test files')))
+        )
+          return false;
+      }
+      return true;
     },
   ],
   [
