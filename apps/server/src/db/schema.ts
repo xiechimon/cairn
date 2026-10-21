@@ -805,8 +805,9 @@ interface GateRoundDispatch {
 
 // gate_digest：构建的 PR 在某个 head 上的补丁摘要（S1 computePatchDigest 的结果，
 // 只在摘要可得时落行；不可得时 gate_state 的快照带 patchDigest null 与对应 blocker）。
-// 同一 head 的摘要是确定的，故 (buildId, headSha) 为主键；update-branch 后新 head
-// 同摘要另落一行。
+// 每 (buildId, headSha) 一行；update-branch 后新 head 同摘要另落一行。摘要按三点
+// compare {base}...{head} 算，merge-base 一变（PR 改了 base 分支）同一 head 也会得出
+// 新摘要，故写入方按主键覆盖本行，不把旧行当成新 compare 的结果。
 export const gateDigest = sqliteTable(
   'gate_digest',
   {
