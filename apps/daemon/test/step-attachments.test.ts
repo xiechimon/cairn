@@ -15,7 +15,7 @@
 // 剥掉格式字符与换行变体后只剩空串、. 或 .. 的文件名落 attachment；素材化
 // 路径恒是 <materializeDir>/<stepId>/<一段名>。
 
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
 import type { MachineAttachmentResponse } from '@pacman/shared';
@@ -343,11 +343,11 @@ describe('materializeAttachmentFile', () => {
 
   test('A3d：stepId 带不出素材化根——落点不是 <materializeDir>/<一段>/<名> 就抛错，不写盘', () => {
     const s = setup();
-    for (const stepId of ['..', '', '.', '../escape', 'a/../..', 'a/b']) {
+    for (const stepId of ['..', '', '.', '../escape', 'a/../..', 'a/b', '../\nforged']) {
       expect(
         () => materializeFile(s.materializeDir, stepId, 'x.svg', Buffer.from('x')),
         JSON.stringify(stepId),
-      ).toThrow(/materialize/);
+      ).toThrow(/^materialize[^\n]*$/);
     }
     expect(existsSync(join(s.home, 'x.svg'))).toBe(false);
     expect(existsSync(join(s.home, 'escape'))).toBe(false);
@@ -487,6 +487,54 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
       const path = /查看图片：(\/[^\s`\]]+)\]/.exec(out.text)?.[1] ?? '';
       expect(path, out.text).toBe(join(s.materializeDir, 's1', 'attachment'));
       expect(readFileSync(path).equals(tiff)).toBe(true);
+    }
+  });
+
+  test('A3d：素材化落盘失败（stepId 带出根、写盘报错）→ 只这个 token 不可用，同一文本的 png 照常内联', async () => {
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>');
+    const attachments = {
+      id1: pngResponse(),
+      id2: {
+        fileName: 'diagram.svg',
+        mimeType: 'image/svg+xml',
+        sizeBytes: svg.byteLength,
+        contentBase64: svg.toString('base64'),
+      },
+    };
+    const svgToken = formatAttachmentToken('diagram.svg', 't1/id2.svg');
+    const body = `${TOKEN}\n${svgToken}`;
+    // 两种失败：stepId 是 ..（落点出根）；步目录的位置上已有同名文件（mkdir 报错）。
+    const cases: Array<[string, (s: ReturnType<typeof setup>) => void]> = [
+      ['..', () => {}],
+      [
+        's1',
+        (s) => {
+          mkdirSync(s.materializeDir, { recursive: true });
+          writeFileSync(join(s.materializeDir, 's1'), 'not a directory');
+        },
+      ],
+    ];
+    for (const [stepId, prepare] of cases) {
+      for (const text of [fenced(body), body]) {
+        const s = setup();
+        prepare(s);
+        const out = await resolveStepImages({
+          text,
+          stepId,
+          client: fakeClient(attachments).client,
+          materializeDir: s.materializeDir,
+          log: s.log,
+        });
+        expect(out.images, stepId).toHaveLength(1);
+        expect(out.text).toContain('[image attached: shot.png]');
+        expect(out.text).toContain(svgToken);
+        expect(out.text).toMatch(/\[图片附件 t1\/id2\.svg 不可用：.+ — 该图片未交付\]/);
+        expect(out.text).not.toContain('查看图片：');
+        expect(s.lines.some((l) => l.startsWith('attachment materialize failed: t1/id2.svg'))).toBe(
+          true,
+        );
+        expect(existsSync(join(s.home, 'diagram.svg'))).toBe(false);
+      }
     }
   });
 
