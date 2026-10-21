@@ -186,7 +186,7 @@ describe('computePatchDigest', () => {
   // D83D DE00：按码元排在 U+FF21 之前，按码点排在之后。
   test('补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点', () => {
     const files = [
-      file({ filename: 'apps/web/src/Ａ.ts', sha: '1'.repeat(40) }),
+      file({ filename: 'apps/web/src/\u{FF21}.ts', sha: '1'.repeat(40) }),
       file({ filename: 'apps/web/src/\u{1F600}.ts', sha: '2'.repeat(40) }),
     ];
     const byCodeUnit = 'pd2:b7719a254dc7af748b4dc6cc116a095045ab4a5953fb71d406dd36686dc04e88';

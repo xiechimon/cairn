@@ -138,9 +138,9 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
 
   test('不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k', () => {
     for (const p of [
-      'apps/web/src/AGENTſ.md',
-      'packages/x/src/pacKage.json',
-      'apps/server/src/ſcripts/x.sh',
+      'apps/web/src/AGENT\u{17F}.md',
+      'packages/x/src/pac\u{212A}age.json',
+      'apps/server/src/\u{17F}cripts/x.sh',
     ]) {
       const r = classify([f(p, { status: 'added' })]);
       expect(r.protected, p).toEqual([p]);
