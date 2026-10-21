@@ -307,8 +307,9 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
     }
     return;
   }
-  // #1445：已关闭的卡不因停止回报重开（keep 预定丢失 = 进程重启的兜底）。
-  if (todoRow.phase === 'closed') return;
+  // #1445 / #1451：卡已被写离执行中（关闭 / 标完成 / 挪回待开始）——keep 预定
+  // 丢失（进程重启）时的兜底，回报不改写这几个人写的相位。
+  if (todoRow.phase === 'closed' || todoRow.phase === 'done' || todoRow.phase === 'todo') return;
   const target = stopFallbackPhase(db, buildRow);
   if (todoRow.phase === target) return;
   db.update(todo)
@@ -1436,8 +1437,9 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  * runtime、补设归属机后由 claim 循环自动续跑）；在线机器上曾有心跳后停更的
  * claimed 步（执行/推送通道部分存活的歧义态，等 presence 过期走 ②）。
  * chief 步不在本面（chief.ts 扫尾）。
- * #1445 已关卡例外：closed 卡名下的 pending / waiting_quota 步一律停掉（关闭
- * 修复前的存量），失联 claimed 步停掉而不释放——释放回 pending 等于又能被领。
+ * #1445 / #1451 已关、已完成卡例外：closed / done 卡名下的 pending /
+ * waiting_quota 步一律停掉（修复前的存量），失联 claimed 步停掉而不释放——释放
+ * 回 pending 等于又能被领。
  * 释放语义：status → pending + machineId 清空（认领原子位复位，归属机回来
  * 经 claim 循环重领——#1259 起机器可见性由 agent 归属机闸单源判定）；claimedAt/
  * lastHeartbeatAt 保留作死亡时刻审计（重领即覆写）；createdAt 不动（FIFO
@@ -1447,14 +1449,19 @@ export const BUILD_ABANDONED_STEP_MS = 120_000;
  * 注记）。
  * 幂等：只扫 pending/claimed，终态步天然跳过。 */
 export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs()): void {
-  const closedLeftovers = deps.db
+  const exitedLeftovers = deps.db
     .select({ id: step.id })
     .from(step)
     .innerJoin(build, eq(step.buildId, build.id))
     .innerJoin(todo, eq(build.todoId, todo.id))
-    .where(and(eq(todo.phase, 'closed'), inArray(step.status, ['pending', 'waiting_quota'])))
+    .where(
+      and(
+        inArray(todo.phase, ['closed', 'done']),
+        inArray(step.status, ['pending', 'waiting_quota']),
+      ),
+    )
     .all();
-  for (const { id } of closedLeftovers) stopStepKeepPhase(deps, id);
+  for (const { id } of exitedLeftovers) stopStepKeepPhase(deps, id);
   const candidates = deps.db
     .select()
     .from(step)
@@ -1481,7 +1488,7 @@ export function sweepAbandonedBuildSteps(deps: BuildDeps, now: number = nowMs())
       const progressed =
         row.lastHeartbeatAt !== null && row.lastHeartbeatAt > (row.claimedAt ?? row.createdAt);
       if (machineRow === undefined || !machineRow.online || !progressed) {
-        if (todoRow.phase === 'closed') stopStepKeepPhase(deps, row.id);
+        if (todoRow.phase === 'closed' || todoRow.phase === 'done') stopStepKeepPhase(deps, row.id);
         else releaseClaimedStep(deps, row, todoRow);
       }
     }

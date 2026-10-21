@@ -23,6 +23,10 @@
 //     building→done 边本为拆卡父收口而设）：claimed 步零通知、继续跑。
 // 13. 修复后的回报落账不得把卡从 done 挪走；无活动步的 done（review 源）
 //     不发任何停止。
+// 14. keep 预定丢失（进程重启）后回报到达：卡已被标完成 / 挪回待开始，gate
+//     回落仍把它写回 confirm。
+// 15. 失联扫尾对已完成的卡同样放行：残留 pending 步不停，失联 claimed 步被
+//     释放回 pending、又能被领。
 
 import { STOP_MESSAGE } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -375,5 +379,53 @@ describe('#1451 把执行中的卡标完成也停活动步', () => {
     expect(out.transitioned).toEqual([completed.todoId]);
     expect(completeEvents.some((e) => e.type === 'stop')).toBe(false);
     expect(completed.s.db.select().from(stopPendingTable).all()).toEqual([]);
+  });
+});
+
+describe('#1451 预定丢失与失联扫尾：已完成同已关闭', () => {
+  test.each(['done', 'todo'] as const)(
+    'keep 预定丢失后回报到达：卡已是 %s，不被 gate 回落改写',
+    (phase) => {
+      const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
+      // 本 build 已有一个 done 的 plan 步 → gate 回落目标 = confirm。
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `${w.stepId}-done`,
+          buildId: w.buildId,
+          kind: 'plan',
+          status: 'done',
+          createdAt: w.base - 120_000,
+        })
+        .run();
+      // 直写相位、不经 stopActiveStepsAfterExit = 进程重启丢了 keep 预定。
+      w.s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, w.todoId)).run();
+      applyStoppedStep(w.s.svc, w.stepId);
+      expect(stepStatus(w)).toBe('stopped');
+      expect(todoPhase(w)).toBe(phase);
+    },
+  );
+
+  test('已完成卡的残留 pending 步：扫尾停掉', async () => {
+    const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
+    w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+    expect(stepStatus(w)).toBe('stopped');
+    expect(todoPhase(w)).toBe('done');
+    expect(await claim(w)).toBeNull();
+  });
+
+  test('已完成卡的失联 claimed 步：停掉，不释放回 pending', () => {
+    const w = makeWorld({
+      phase: 'building',
+      stepStatus: 'claimed',
+      stepKind: 'build',
+      claimedAgo: 60 * 60_000,
+      machineOnline: false,
+    });
+    w.s.db.update(todoTable).set({ phase: 'done' }).where(eq(todoTable.id, w.todoId)).run();
+    sweepAbandonedBuildSteps(w.s.svc, w.base);
+    expect(stepStatus(w)).toBe('stopped');
+    expect(todoPhase(w)).toBe('done');
   });
 });
