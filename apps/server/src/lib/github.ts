@@ -474,15 +474,9 @@ async function intakeConditionalGet(
   return { notModified: false, etag: got.etag, data: { link: got.link, body: got.data } };
 }
 
-/** 带某标签的 open issue（最旧在前）。hasMore = 还有下一页（进料面只领
- * 最旧的几条，不翻页）。 */
-export interface GithubLabeledIssues {
-  issues: GithubIssueSummary[];
-  hasMore: boolean;
-}
-
 /** 带标签的 open issue 列表条件读（进料候选面）。sort=created + direction=asc
- * = 稳定排序（列表不因条目更新而重排，304 更常见），且第一页就是最旧的。 */
+ * = 稳定排序（列表不因条目更新而重排，304 更常见），且第一页就是最旧的
+ * （进料只领最旧的几条，不翻页）。 */
 export async function githubOpenIssuesWithLabel(
   fetchImpl: FetchLike,
   token: string,
@@ -490,7 +484,7 @@ export async function githubOpenIssuesWithLabel(
   repo: string,
   label: string,
   opts: { etag?: string | null } = {},
-): Promise<GithubConditionalRead<GithubLabeledIssues> | null> {
+): Promise<GithubConditionalRead<GithubIssueSummary[]> | null> {
   const url =
     `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
     `&labels=${encodeURIComponent(label)}&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
@@ -503,11 +497,7 @@ export async function githubOpenIssuesWithLabel(
     const projected = projectIssue(raw as Record<string, unknown>);
     if (projected) issues.push(projected);
   }
-  return {
-    notModified: false,
-    etag: got.etag,
-    data: { issues, hasMore: (got.data.link ?? '').includes('rel="next"') },
-  };
+  return { notModified: false, etag: got.etag, data: issues };
 }
 
 /** issue 上一条标签事件（events 端点 labeled / unlabeled 的最小投影）。 */

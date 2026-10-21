@@ -35,7 +35,7 @@ import {
   type FetchLike,
   type GithubConditionalRead,
   type GithubIssueLabelEvents,
-  type GithubLabeledIssues,
+  type GithubIssueSummary,
   type GithubRepoPermission,
   githubCollaboratorPermission,
   githubIssueLabelEvents,
@@ -190,7 +190,7 @@ export function createIssueIntake(
   const log = (obj: object, msg: string) => run.logger?.info(obj, msg);
   // 缓存键都带 teamId：不同团队的 token 看到的表示可能不同（应答 Vary:
   // Authorization）。
-  const listCache: EtagCache<GithubLabeledIssues> = new Map();
+  const listCache: EtagCache<GithubIssueSummary[]> = new Map();
   const eventsCache: EtagCache<GithubIssueLabelEvents> = new Map();
   const stateCache: EtagCache<{ state: 'open' | 'closed' }> = new Map();
   const permissionCache = new Map<string, { at: number; permission: GithubRepoPermission }>();
@@ -285,8 +285,9 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
+    const full = () => inFlight(row.id) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
     // 满员不读列表（省一次读；下一轮有位再读）。
-    if (inFlight(row.id) >= ISSUE_INTAKE_IN_FLIGHT_CAP) return;
+    if (full()) return;
     const listKey = `${row.teamId}\u0000${owner}/${repo}`.toLowerCase();
     const page = await githubOpenIssuesWithLabel(
       run.githubFetch,
@@ -304,11 +305,12 @@ export function createIssueIntake(
       return;
     }
     if (page?.notModified === true) tally.listNotModified += 1;
-    const candidates = [...listedIssues.issues].sort((a, b) => a.number - b.number);
+    const candidates = [...listedIssues].sort((a, b) => a.number - b.number);
     tally.candidates += candidates.length;
     const claimed = claimedRefs(row.teamId);
     const listed = new Set<string>();
-    let waiting = 0;
+    // 满员后余下的候选都等下一轮（不再逐条数库）。
+    let atCap = false;
     for (const issue of candidates) {
       const ref = githubIssueSourceRef(owner, repo, issue.number);
       listed.add(`${listKey}#${issue.number}`);
@@ -316,8 +318,9 @@ export function createIssueIntake(
         tally.claimed += 1;
         continue;
       }
-      if (inFlight(row.id) >= ISSUE_INTAKE_IN_FLIGHT_CAP) {
-        waiting += 1;
+      if (!atCap) atCap = full();
+      if (atCap) {
+        tally.atCap += 1;
         continue;
       }
       const verdict = await labelerVerdict(
@@ -338,8 +341,9 @@ export function createIssueIntake(
         continue;
       }
       // 读窗口里别处可能已占位（webhook 导入）：导入前再数一次。
-      if (inFlight(row.id) >= ISSUE_INTAKE_IN_FLIGHT_CAP) {
-        waiting += 1;
+      atCap = full();
+      if (atCap) {
+        tally.atCap += 1;
         continue;
       }
       let todoId: string;
@@ -372,7 +376,6 @@ export function createIssueIntake(
         log({ todoId, err: errText(err) }, 'issue intake orchestrate failed');
       }
     }
-    tally.atCap += waiting;
     // events 缓存只留仍在列表里的 issue。
     for (const key of eventsCache.keys()) {
       if (key.startsWith(`${listKey}#`) && !listed.has(key)) eventsCache.delete(key);
