@@ -30,6 +30,10 @@
 // 18 钉住既有判据：只看最新一条 closed 事件；unlabeled 只认本标签；同刻按
 //    id；人关卡后「见过 open」被剪掉；正文只进 chief 线程的 user 消息、不进
 //    chief 的 system prompt。
+// 19 （code-review 发现）卡的任一 build 交付过 PR（prNumber 或只有 prUrl
+//    的存量形）都算：失败卡重跑出的新 build 还没 PR、旧 PR 仍开着并被合并 →
+//    不关。编排线程只认导入之后建的：删卡后复用的号撞上旧线程不算有人接手。
+//    重试不再进行时记一行带原因。
 //
 // 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
@@ -1714,6 +1718,51 @@ describe('15 已交付 PR 的卡留给 PR 对账', () => {
     expect(tally?.closed).toBe(0);
     expect(tally?.closeSkipped).toBe(1);
   });
+
+  test('失败卡的 PR 仍开着、重跑出的新 build 还没 PR，旧 PR 合并关了 issue → 卡不关', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    const row = todoOf(w.s, 1406);
+    if (row === undefined) throw new Error('1406 not imported');
+    setPhase(w, row.id, 'failed');
+    deliverPr(w, row.id, 1500);
+    // 重跑（startBuilds：failed → queued，新 build 的 prNumber / prUrl 为空，
+    // 成为 latestBuildId）。
+    attachActiveStep(w, row.id, 'claimed');
+    setPhase(w, row.id, 'building');
+    closeOnGithub(w, 1406, OWNER);
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, row.id)).toBe('building');
+    expect(tally?.closed).toBe(0);
+  });
+
+  test('build 只记了 prUrl（prNumber 缺位的存量形）同样算交付过 PR → 卡不关', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, ISSUE_1445_OPEN);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    seq += 1;
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: `build-intake-url-${seq}`,
+        todoId,
+        withPlan: false,
+        triggerSource: 'user',
+        prUrl: `https://github.com/${REPO}/pull/1502`,
+        createdAt: Date.now(),
+      })
+      .run();
+    w.s.db
+      .update(todoTable)
+      .set({ latestBuildId: `build-intake-url-${seq}` })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    closeOnGithub(w, 1445, OWNER);
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('building');
+    expect(tally?.closed).toBe(0);
+  });
 });
 
 describe('16 导入后编排失败：后续几轮重试，有上限', () => {
@@ -1780,7 +1829,7 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
 
   test('重试前有人已手动开始（已有编排线程）→ 不再重试', async () => {
     const w = await makeWorld({ list: [1406] });
-    const { intake, flaky } = flakyIntake(w);
+    const { intake, logs, flaky } = flakyIntake(w);
     await intake.sweep();
     flaky.failing = false;
     const row = todoOf(w.s, 1406);
@@ -1791,6 +1840,45 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     const second = await intake.sweep();
     expect(second?.orchestrated).toBe(0);
     expect(chiefThreads(w.s)).toHaveLength(1);
+    // 不再重试时记一行带原因（不静默丢）。
+    const dropped = logs.filter((l) => l.msg === 'issue intake orchestrate retry dropped');
+    expect(dropped.map((l) => l.obj)).toEqual([
+      expect.objectContaining({ todoId: row.id, reason: 'thread-exists' }),
+    ]);
+  });
+
+  test('删卡后号被复用：导入之前就有的同名编排线程不算有人接手，照常重试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    // 团队里最大号的卡 #1 编排过（留下「开始任务 #1」线程）后被删；下一张
+    // 导入的卡按 max+1 复用 #1。
+    w.s.db
+      .insert(todoTable)
+      .values({
+        id: 'todo-ghost-1',
+        teamId: w.s.team.id,
+        projectId: w.projectId,
+        title: 'ghost',
+        spec: '',
+        phase: 'todo',
+        phaseAt: Date.now(),
+        seqNum: 1,
+      })
+      .run();
+    const ghost = await req(w.s.app, 'POST', '/api/todos/todo-ghost-1/orchestrate');
+    expect(ghost.status).toBe(201);
+    w.s.db
+      .update(chiefThreadTable)
+      .set({ createdAt: Date.now() - 3_600_000 })
+      .run();
+    w.s.db.delete(todoTable).where(eq(todoTable.id, 'todo-ghost-1')).run();
+    const { intake, flaky } = flakyIntake(w);
+    await intake.sweep();
+    expect(todoOf(w.s, 1406)?.seqNum).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+    flaky.failing = false;
+    const second = await intake.sweep();
+    expect(second?.orchestrated).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(2);
   });
 });
 
