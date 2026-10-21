@@ -39,6 +39,17 @@ export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
  *  九值权威见 02 §4.1）。 */
 export const IN_PROGRESS_PHASES = ['queued', 'planning', 'building'] as const;
 
+/** 可开始的相位（#1457）：服务端 orchestrateTodo（REST POST
+ *  /api/todos/:id/orchestrate 与 webhook receiver）只收这两相，其余 409。
+ *  看板「落进执行中 = 开始门 → orchestrate」与 raw PATCH 进执行中
+ *  （canBoardDrop）都必须落在这个集合里——拖得进去、服务端拒收就是 #1434。
+ *  列规则可以更窄（failed 不可拖进执行中，实测），不能更宽。 */
+export const ORCHESTRATE_PHASES = ['todo', 'failed'] as const;
+
+/** orchestrate 判据；入参收 string（调用面常拿运行时值来问）。 */
+export const canOrchestrate = (phase: string): boolean =>
+  (ORCHESTRATE_PHASES as readonly string[]).includes(phase);
+
 /** 工作台 4 列（#351；前身 = r2 §4.1 的 6 列折叠）——列只是 phase 的折叠
  *  视图，非独立实体（CONTEXT.md）。 */
 export const BOARD_COLUMNS = ['待开始', '执行中', '待处理', '已完成'] as const;

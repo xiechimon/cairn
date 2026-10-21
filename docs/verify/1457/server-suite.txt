@@ -1,0 +1,12 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+
+ Test Files  110 passed (110)
+      Tests  1158 passed | 1 skipped (1159)
+   Start at  08:35:41
+   Duration  70.13s (import 49%, tests 46%, transform 4%)
+
+    Isolate  110 workers spawned · ~151ms startup each (spawn + environment, per file)
+             at least ~5.40s faster with isolate: false — reuses workers across files instead of one per file
+
