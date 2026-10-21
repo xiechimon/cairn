@@ -17,6 +17,7 @@ import {
   type MergeReadiness,
   type Phase,
 } from '@pacman/shared';
+import { isFullSha } from '../../lib/github.js';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
@@ -72,8 +73,9 @@ export interface GateInputs {
     draft: boolean;
     /** null = GitHub 还没算出来。 */
     mergeableState: string | null;
-    /** 40 位小写 SHA。不是（大写、缩写）= 外壳的毛病：没有可对的 head，PR 按读不到
-     * 处理（pr-unreadable，detail 点明），结果不报 head。 */
+    /** 40 位小写 SHA。不是（大写、缩写）= 外壳的毛病，只少了 head：记 pr-unreadable
+     * （detail 点明），compare 与检查没有 head 可对，结果不报 head 与摘要；PR 自己的
+     * blocker（已合并、fork、目标分支）照常判。 */
     headSha: string;
     baseRef: string;
     baseRepoFullName: string;
@@ -109,7 +111,8 @@ export interface GateInputs {
    *   html_url 照抄请求），commits 从旧到新、分页，一页的末一个不保证是 head（实拍见
    *   docs/verify/1404/s2-r10-github-shapes.txt）。
    * - files：全部文件（compareFilesFromResponse）。
-   * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），读全。
+   * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），读全；
+   *   totalCommits = 响应的 total_commits（各页合起来的条数）。
    * 读在 PR 的 head 上 = 三条都成立：
    *   1. headSha 等于 pr.headSha（外壳填的值）；
    *   2. commits 里有 pr.headSha（读在比 head 旧的提交上的 compare 没有它）；
@@ -118,7 +121,9 @@ export interface GateInputs {
    *      读到的提交往下到 head 的每一个都列着；在 head 上读的只列 head 与它的祖先，祖先
    *      不以 head 为父）。
    * 2 与 3 出自响应本身：外壳按分支名或从缓存读、却照 pr.headSha 填了 headSha，也认得
-   * 出。它们以 commits 读全为前提：少了 head 的子提交，后代上读的 compare 就认不出。
+   * 出。它们以 commits 读全为前提（少了 head 的子提交，后代上读的 compare 就认不出），
+   * 所以 commits 的条数要等于 totalCommits；不等 = 没读全（分页没读完），整份按读不到
+   * 处理（patch-unavailable，可等）。
    * 不成立 = 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，
    * 下一次巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
@@ -127,11 +132,11 @@ export interface GateInputs {
    * SHA 的，这里同样按 compare-malformed 留人：写错的 SHA 每次读都一样，不该成为永远对
    * 不上的可等；写错的父提交还会认不出 head 的子提交。commits 少给别的提交，证据链只会
    * 少认（拦）。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否
-   * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head
-   * 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），结果不报 head，
-   * 也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
+   * 已经存在（raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到或它的 head
+   * 写错时没有 head 可对：compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），
+   * 结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）。 */
   compare:
-    | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[] }
+    | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[]; totalCommits: number }
     | 'unreadable'
     | 'malformed';
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
@@ -148,7 +153,6 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
-const isSha = (s: string) => /^[0-9a-f]{40}$/.test(s);
 const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]));
 const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
@@ -206,12 +210,14 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (i.build.phase !== 'review') block('phase-not-review', i.build.phase);
   if (i.build.stepsInFlight > 0) block('work-in-flight', `${i.build.stepsInFlight} step(s)`);
 
-  // PR。head 不是 40 位小写 SHA：没有可对的 head，按读不到处理。
-  const prHeadMalformed = i.pr !== null && !isSha(i.pr.headSha);
-  const pr = prHeadMalformed ? null : i.pr;
+  // PR。head 不是 40 位小写 SHA：只少了 head（按读不到记，没有 head 可对、结果不报
+  // head），PR 自己的 blocker 照常判，不被吞掉。
+  const pr = i.pr;
+  const head = pr !== null && isFullSha(pr.headSha) ? pr.headSha : null;
   if (pr === null) {
-    block('pr-unreadable', ...(prHeadMalformed ? ['head SHA not 40 lowercase hex'] : []));
+    block('pr-unreadable');
   } else {
+    if (head === null) block('pr-unreadable', 'head SHA not 40 lowercase hex');
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
     if (
@@ -236,10 +242,10 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   let checks = i.checks;
   const checkShas =
     checks === null ? [] : [checks.headSha, checks.statusSha, ...checks.runs.map((r) => r.headSha)];
-  if (checks !== null && !checkShas.every(isSha)) {
+  if (checks !== null && !checkShas.every(isFullSha)) {
     block('required-checks-unreadable', 'check SHA not 40 lowercase hex');
     checks = null;
-  } else if (checks !== null && pr !== null && checkShas.some((s) => s !== pr.headSha)) {
+  } else if (checks !== null && head !== null && checkShas.some((s) => s !== head)) {
     block('required-checks-unreadable', 'checks not read at the PR head');
     checks = null;
   } else if (checks !== null && !checks.complete) {
@@ -326,25 +332,29 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 补丁。compare 读不到可等；读到了形状不对（含写错的 SHA），下一次读还是一样，留人。
-  // compare 不是在 PR 的 head 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，
-  // 读在了更早的提交上；或响应的提交里有以它为父的，读在了后代上）：说的是别的补丁，
-  // 按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果也
-  // 不报它的摘要，免得把别的补丁的结论安到 head 上。
+  // 提交没读全（条数不等于 total_commits）的，下面的 head 判定靠不住；不是在 PR 的 head
+  // 上读的（外壳填的 head 对不上；响应的提交里没有这个 head，读在了更早的提交上；或响应
+  // 的提交里有以它为父的，读在了后代上）的，说的是别的补丁。这两样都按读不到处理，下一
+  // 次巡检再读；摘要、文件数、路径、证据链与判定都不拿它判，结果也不报它的摘要，免得
+  // 把别的补丁的结论安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
   if (
     compare !== null &&
-    ![compare.headSha, ...compare.commits.flatMap((c) => [c.sha, ...c.parents])].every(isSha)
+    ![compare.headSha, ...compare.commits.flatMap((c) => [c.sha, ...c.parents])].every(isFullSha)
   ) {
     block('compare-malformed', 'compare SHA not 40 lowercase hex');
     compare = null;
+  } else if (compare !== null && compare.commits.length !== compare.totalCommits) {
+    block('patch-unavailable', 'compare commit list incomplete');
+    compare = null;
   } else if (
     compare !== null &&
-    pr !== null &&
-    (compare.headSha !== pr.headSha ||
-      !compare.commits.some((c) => c.sha === pr.headSha) ||
-      compare.commits.some((c) => c.parents.includes(pr.headSha)))
+    head !== null &&
+    (compare.headSha !== head ||
+      !compare.commits.some((c) => c.sha === head) ||
+      compare.commits.some((c) => c.parents.includes(head)))
   ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
@@ -483,8 +493,8 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     });
   return {
     ready: blockers.length === 0,
-    headSha: pr?.headSha ?? null,
-    patchDigest: pr === null ? null : D,
+    headSha: head,
+    patchDigest: head === null ? null : D,
     policy: i.policy.mergePolicy,
     blockers,
   };
