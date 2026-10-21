@@ -878,7 +878,7 @@ function ToolsRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'tools' }
               return (
                 <div key={`${i}-${pill}`} className="flex min-w-0 flex-col gap-1">
                   <div
-                    className="chat-tool-pill flex h-5 items-center gap-2 overflow-hidden rounded-[3px] border border-(--border) bg-(--secondary) pl-2.5 font-mono text-caption whitespace-nowrap text-(--text-tertiary) [&_svg]:flex-none"
+                    className="chat-tool-pill flex h-5 items-center gap-2 overflow-hidden rounded-[3px] border border-(--border) bg-(--secondary) pl-2.5 font-mono text-caption whitespace-nowrap text-(--text-secondary) [&_svg]:flex-none"
                     data-testid="tool-pill"
                   >
                     <Terminal width={12} height={12} />

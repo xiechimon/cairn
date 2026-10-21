@@ -308,9 +308,15 @@ const picked = new Set();
 const reasons = [];
 for (const path of paths) {
   const { specs, why } = classify(path);
-  reasons.push(`  ${path} → ${specs === null ? 'FULL' : specs.length === 0 ? 'none' : why}`);
+  // #1442: the axe sweep scans every main page in both themes, so any web
+  // source change runs it — one rule here, not a copy in every family.
+  const axe = specs !== null && path.startsWith('apps/web/src/');
+  reasons.push(
+    `  ${path} → ${specs === null ? 'FULL' : specs.length === 0 && !axe ? 'none' : why}${axe ? ' + a11y-axe' : ''}`,
+  );
   if (specs === null) full = true;
   for (const s of specs ?? []) picked.add(s);
+  if (axe) picked.add('a11y-axe');
 }
 
 const selection = full ? allSpecs : expand([...picked], allSpecs);
