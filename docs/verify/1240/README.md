@@ -49,6 +49,8 @@ Last 14 merged PR bodies (1239...1222) replayed through the gate:
 
 ## Promotion note
 
+Done on 2026-10-21 (#1440): `pr-evidence` is in the required checks, pinned to the Actions app; the live list is read back in ADR 0007. The note below is history.
+
 The `pr-evidence` job (now carrying both steps) is not yet a
 branch-protection required check. After merge, add `pr-evidence` to the
 required checks (contexts: `check`, `pack-smoke`, `e2e-gate`,

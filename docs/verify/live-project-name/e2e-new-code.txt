@@ -1,0 +1,12 @@
+
+Running 8 tests using 1 worker
+
+[1/8] e2e/live-project-name.spec.ts:139:3 › board card › projects pending: no project item, then each card’s own project
+[2/8] e2e/live-project-name.spec.ts:162:3 › board card › projects read failed: no project item
+[3/8] e2e/live-project-name.spec.ts:190:1 › drag overlay: no project while pending, the card’s own project once loaded
+[4/8] e2e/live-project-name.spec.ts:222:3 › detail chip popover › projects loaded: the head names the todo’s own project
+[5/8] e2e/live-project-name.spec.ts:237:3 › detail chip popover › projects pending: the head has no project, then fills in
+[6/8] e2e/live-project-name.spec.ts:262:3 › new-task dialog › projects pending: no project chip, and saving sends nothing to a fixture project
+[7/8] e2e/live-project-name.spec.ts:295:3 › new-task dialog › projects read failed: no project chip
+[8/8] e2e/live-project-name.spec.ts:308:3 › new-task dialog › projects loaded and empty: no project chip, saving creates the default project
+  8 passed (8.1s)

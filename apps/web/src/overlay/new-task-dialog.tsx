@@ -179,8 +179,9 @@ export interface NewTaskDialogProps {
   /** M5 live 面：保存并开始 = 创建 + POST builds（r2 §4.2 双钮语义）；
    * 缺省 = fixture 行为（同 保存）。#682 机器参数同 保存 面。 */
   onSaveAndStart?: (spec: string, projectId?: string) => void;
-  /** M5 live：项目集真值(选择器行数据源);缺省 = fixture canon 单默认
-   * 项目(live = projectsQ 投影,fixture = scenario projectNames)。 */
+  /** 项目集真值(选择器行数据源):live = projectsQ 投影(在途/失败 = 空集),
+   * fixture = scenario projectNames;缺省 = fixture canon 单默认项目。空集 =
+   * 无项目 chip。 */
   projects?: ProjectOption[];
   /** #682：机器集真值（选择器行数据源）；缺省 = 空集（chip 只显「自动」，
    * 选择器只有自动一行——单机/未加载的降级面）。 */
@@ -232,7 +233,7 @@ export function NewTaskDialog({
   // #318 未保存闸确认层开态
   const [discardOpen, setDiscardOpen] = useState(false);
   // #176 选择器 state:popover 开态 + 选中行。null = 未动,展示/提交取
-  // 首行;live 空项目集时 selected 退 undefined(chip 走 canon 名)。
+  // 首行;空项目集时 selected 退 undefined(不渲染项目 chip)。
   // XMON-87 记忆面:初值 = 上次选中的项目 id。存的值不在行集里(被删/无权限)
   // = find 打空、selected 落回首行——不报错不白屏,记忆位留着不动(行集可能
   // 只是还没加载,按缺省清记忆会误伤真值)。
@@ -288,7 +289,7 @@ export function NewTaskDialog({
   specMirrorRef.current = spec;
   const rows = projects ?? [DEFAULT_PROJECT];
   const selected = rows.find((row) => row.id === projectId) ?? rows[0];
-  const projectName = selected?.name ?? PROJECT_NAME;
+  const projectName = selected?.name;
   // #318: 附件 token 注入 spec 后由 spec 非空承载 dirty,不另计。
 
   const dirty = spec.trim() !== '';
@@ -631,7 +632,7 @@ export function NewTaskDialog({
                 registry Popover（Esc 归 Base UI 嵌套 layer 栈不变；定位从
                 wrap container + absolute CSS 迁 Positioner 参数 side=bottom
                 align=start sideOffset=8 = 原「left-0 top calc(100%+8px)」）。
-                空集不开面(live 无项目时提交走建默认项目路径)。选中回填
+                空集无 chip(live 无项目时提交走建默认项目路径)。选中回填
                 chip,提交携带 projectId。#666 律:chip 是 toggle 面——
                 initialFocus=false 焦点留触发位、toggle/aria-expanded 归
                 Trigger 原语（旧双写 state 竞态根因消失）;外点关走原生
@@ -639,82 +640,84 @@ export function NewTaskDialog({
                 原型实审裁决项）。Tab 提示 chip 换官网 Tooltip+Kbd 组合
                 （#983 kbd-hint 判决;TooltipTrigger→PopoverTrigger→Button
                 三层 render 复合,同一只 chip 钮）。 */}
-            <Popover
-              open={projectOpen && rows.length > 0}
-              onOpenChange={(next: boolean, details) => {
-                // #1060：外点自收先于 dialog 侧的一切关闭判定（元素级原生
-                // 监听在委托根之前），置手势消费闸——同一次点击里汇流点不再落穿。
-                if (!next && details.reason === 'outside-press') markGestureConsumed();
-                setProjectOpen(next);
-              }}
-            >
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          type="button"
-                          className={PROJECT_CHIP_CLS}
-                          data-testid="new-task-project-chip"
-                          aria-haspopup="listbox"
-                        />
-                      }
-                    />
-                  }
-                >
-                  <span className="size-5 rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-5 uppercase text-(--project-avatar-fg)">
-                    {projectName.charAt(0).toLowerCase()}
-                  </span>
-                  <span className="new-task-project-name min-w-0 max-w-55 truncate text-ui leading-4 text-foreground">
-                    {projectName}
-                  </span>
-                  <ChevronDown width={12} height={12} />
-                </TooltipTrigger>
-                {/* XMON-87 续二:Tab 提示(#468 族);label 字面量沿 ⌘K/⌘J
+            {projectName !== undefined && (
+              <Popover
+                open={projectOpen}
+                onOpenChange={(next: boolean, details) => {
+                  // #1060：外点自收先于 dialog 侧的一切关闭判定（元素级原生
+                  // 监听在委托根之前），置手势消费闸——同一次点击里汇流点不再落穿。
+                  if (!next && details.reason === 'outside-press') markGestureConsumed();
+                  setProjectOpen(next);
+                }}
+              >
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <PopoverTrigger
+                        render={
+                          <Button
+                            variant="ghost"
+                            type="button"
+                            className={PROJECT_CHIP_CLS}
+                            data-testid="new-task-project-chip"
+                            aria-haspopup="listbox"
+                          />
+                        }
+                      />
+                    }
+                  >
+                    <span className="size-5 rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-5 uppercase text-(--project-avatar-fg)">
+                      {projectName.charAt(0).toLowerCase()}
+                    </span>
+                    <span className="new-task-project-name min-w-0 max-w-55 truncate text-ui leading-4 text-foreground">
+                      {projectName}
+                    </span>
+                    <ChevronDown width={12} height={12} />
+                  </TooltipTrigger>
+                  {/* XMON-87 续二:Tab 提示(#468 族);label 字面量沿 ⌘K/⌘J
                     先例,不做平台探测。side=right sideOffset=8 = 旧 chip
                     「图标右侧 8px、垂直居中」落位。 */}
-                <TooltipContent side="right" sideOffset={8}>
-                  <Kbd>Tab</Kbd>
-                </TooltipContent>
-              </Tooltip>
-              <PopoverContent
-                side="bottom"
-                align="start"
-                sideOffset={8}
-                initialFocus={false}
-                role="listbox"
-                aria-label={t('项目')}
-                className={PROJECT_MENU_CLS}
-              >
-                {rows.map((row) => (
-                  <Button
-                    key={row.id}
-                    variant="ghost"
-                    type="button"
-                    className={OPTION_ROW_CLS}
-                    role="option"
-                    aria-selected={row.id === selected?.id}
-                    onClick={() => {
-                      setProjectId(row.id);
-                      if (rememberProject) writeRememberedProject(safeLocalStorage(), row.id);
-                      setProjectOpen(false);
-                    }}
-                  >
-                    <span className="size-4 flex-none rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-4 uppercase text-(--project-avatar-fg)">
-                      {row.name.charAt(0).toLowerCase()}
-                    </span>
-                    <span className="new-task-project-row-name min-w-0 truncate">{row.name}</span>
-                    {row.id === selected?.id && (
-                      <span className="ml-auto flex text-(--card-button)">
-                        <Check width={14} height={14} />
+                  <TooltipContent side="right" sideOffset={8}>
+                    <Kbd>Tab</Kbd>
+                  </TooltipContent>
+                </Tooltip>
+                <PopoverContent
+                  side="bottom"
+                  align="start"
+                  sideOffset={8}
+                  initialFocus={false}
+                  role="listbox"
+                  aria-label={t('项目')}
+                  className={PROJECT_MENU_CLS}
+                >
+                  {rows.map((row) => (
+                    <Button
+                      key={row.id}
+                      variant="ghost"
+                      type="button"
+                      className={OPTION_ROW_CLS}
+                      role="option"
+                      aria-selected={row.id === selected?.id}
+                      onClick={() => {
+                        setProjectId(row.id);
+                        if (rememberProject) writeRememberedProject(safeLocalStorage(), row.id);
+                        setProjectOpen(false);
+                      }}
+                    >
+                      <span className="size-4 flex-none rounded-(--radius-control) bg-(--project-avatar-bg) text-center text-caption leading-4 uppercase text-(--project-avatar-fg)">
+                        {row.name.charAt(0).toLowerCase()}
                       </span>
-                    )}
-                  </Button>
-                ))}
-              </PopoverContent>
-            </Popover>
+                      <span className="new-task-project-row-name min-w-0 truncate">{row.name}</span>
+                      {row.id === selected?.id && (
+                        <span className="ml-auto flex text-(--card-button)">
+                          <Check width={14} height={14} />
+                        </span>
+                      )}
+                    </Button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
           </span>
           <div className="pointer-events-none absolute inset-x-0 text-center font-heading text-heading font-medium text-foreground">
             {t('新建任务')}

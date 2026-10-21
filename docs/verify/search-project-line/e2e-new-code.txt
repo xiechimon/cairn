@@ -1,0 +1,22 @@
+
+
+Running 17 tests using 4 workers
+
+[1/17] e2e/search-focus.spec.ts:89:1 › ⌘K focuses the input — direct typing produces results
+[2/17] e2e/search-live-project-name.spec.ts:123:1 › live, projects loaded: pre-response rows carry each todo’s own project
+[3/17] e2e/search-close-flash.spec.ts:63:1 › 第二下 Ctrl+K 关闭不闪：退出透明度单调递减
+[4/17] e2e/search-result-rows.spec.ts:65:1 › 结果行点击 → 面板关闭 + 跳 todo 详情
+[5/17] e2e/search-focus.spec.ts:105:1 › mid-exit reopen refocuses the retained input
+[6/17] e2e/search-result-rows.spec.ts:76:1 › 前往行点击 → 面板关闭 + 跳对应路由
+[7/17] e2e/search-focus.spec.ts:120:1 › scrim 可点关: clicking the dark area closes the panel
+[8/17] e2e/search-result-rows.spec.ts:85:1 › 静息无常亮;hover 哪行亮哪行,且只亮一行
+[9/17] e2e/search-focus.spec.ts:131:1 › 常亮互斥: page-layer pill dims while the panel is open, restores on close
+[10/17] e2e/search-close-flash.spec.ts:88:1 › 三连击：关→开落在开态且输入聚焦
+[11/17] e2e/search-live-project-name.spec.ts:164:1 › live, projects read failed: pre-response rows show no project line
+[12/17] e2e/search-result-rows.spec.ts:103:1 › ↑↓ 键盘光标接管高亮;Enter 跳光标行
+[13/17] e2e/sidebar-search-offboard.spec.ts:21:3 › secondary page: search row opens the shared panel, Esc closes it
+[14/17] e2e/search-focus.spec.ts:155:1 › 常亮互斥 holds on the collapsed rail form
+[15/17] e2e/sidebar-search-offboard.spec.ts:21:3 › resources page: search row opens the shared panel, Esc closes it
+[16/17] e2e/search-result-rows.spec.ts:123:1 › 鼠标一动让位:键盘光标交还 hover
+[17/17] e2e/search-focus.spec.ts:184:1 › the caret is not clipped where it meets the input edge
+  17 passed (7.6s)
