@@ -1,0 +1,37 @@
+{
+  "base": "http://127.0.0.1:5273",
+  "dark": {
+    "board": {
+      "theme": "dark",
+      "sidebar": "rgb(26, 22, 18)",
+      "sheet": "rgb(36, 32, 27)",
+      "card": "rgb(47, 42, 38)",
+      "badge": "rgb(36, 32, 27)"
+    }
+  },
+  "flip": {
+    "toLight": {
+      "theme": "light",
+      "sidebar": "rgb(243, 238, 229)",
+      "sheet": "rgb(251, 249, 245)",
+      "card": "rgb(255, 255, 255)",
+      "badge": "rgb(251, 249, 245)"
+    },
+    "backToDark": {
+      "theme": "dark",
+      "sidebar": "rgb(26, 22, 18)",
+      "sheet": "rgb(36, 32, 27)",
+      "card": "rgb(47, 42, 38)",
+      "badge": "rgb(36, 32, 27)"
+    }
+  },
+  "light": {
+    "board": {
+      "theme": "light",
+      "sidebar": "rgb(243, 238, 229)",
+      "sheet": "rgb(251, 249, 245)",
+      "card": "rgb(255, 255, 255)",
+      "badge": "rgb(251, 249, 245)"
+    }
+  }
+}

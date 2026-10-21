@@ -1,0 +1,21 @@
+$ E2E_PORT=8399 pnpm --filter @pacman/web exec playwright test e2e/elevation-ladder.spec.ts e2e/visual-polish.spec.ts e2e/cds-dialogs.spec.ts e2e/cds-composer.spec.ts e2e/paper-team-pages.spec.ts e2e/chief-panel.spec.ts
+
+# red (spec written before the token change): 7 failed = the 7 ladder tests, 1096 passed
+[1103/1103] e2e/z-ladder.spec.ts:90:3 › z ladder: active surfaces above the docked drawer (#688) › focus lands in the dialog and typing reaches it
+  7 failed
+    e2e/elevation-ladder.spec.ts:82:5 › elevation ladder (light) › each rung is its pool plus one ring, ring last 
+    e2e/elevation-ladder.spec.ts:102:5 › elevation ladder (light) › pools hold the pre-ladder darkness; --top only in dark e2/e3 
+    e2e/elevation-ladder.spec.ts:129:5 › elevation ladder (light) › old slot names alias the ladder 
+    e2e/elevation-ladder.spec.ts:82:5 › elevation ladder (dark) › each rung is its pool plus one ring, ring last 
+    e2e/elevation-ladder.spec.ts:102:5 › elevation ladder (dark) › pools hold the pre-ladder darkness; --top only in dark e2/e3 
+    e2e/elevation-ladder.spec.ts:129:5 › elevation ladder (dark) › old slot names alias the ladder ─
+    e2e/elevation-ladder.spec.ts:157:5 › elevation ladder (dark) › one ring per edge on the rendered surfaces 
+  1096 passed (5.0m)
+
+# green (after the token change):
+[48/48] e2e/visual-polish.spec.ts:216:1 › collapsed rail draws no seam either (Paper PR 7)
+  48 passed (14.1s)
+
+# green again after the code-review fixes (alias assertion, dark hover ring, light --top):
+[48/48] e2e/visual-polish.spec.ts:217:1 › collapsed rail draws no seam either (Paper PR 7)
+  48 passed (25.3s)
