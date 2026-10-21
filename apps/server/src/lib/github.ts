@@ -416,9 +416,11 @@ export async function githubRepoLabels(
 // = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；token 必携、只进
 // Authorization 头（进料面不走匿名梯）：
 // - GET repos/{o}/{r}/issues?state=open&labels=&sort=created&direction=asc
-//   &per_page=100（条件读；PR 条目经 projectIssue 滤除）
+//   &per_page=100（条件读；PR 条目经 projectIssue 滤除；下一页按 Link
+//   rel="next" 的 URL 读，只跟 api.github.com 上的 URL）
 // - GET repos/{o}/{r}/issues/{n}/events?per_page=100（条件读；上游按时间升序，
-//   Link 有 rel="next" = 这一页不是完整历史）
+//   最新的在后面的页；下一页同样按 Link rel="next" 读，只跟 api.github.com；
+//   投影 labeled / unlabeled / closed）
 // - GET repos/{o}/{r}/collaborators/{login}/permission（permission = legacy
 //   基础角色：maintain 映射为 write、triage 映射为 read；role_name = 实际角色）
 // - GET repos/{o}/{r}/issues/{n}（条件读，只投影 state；body 不出本模块）
@@ -474,20 +476,41 @@ async function intakeConditionalGet(
   return { notModified: false, etag: got.etag, data: { link: got.link, body: got.data } };
 }
 
+/** Link 头里 rel="next" 的 URL；只认 api.github.com 上的（token 随请求走，
+ * 不跟到别的主机）。 */
+function nextPageUrl(link: string | null): string | null {
+  for (const part of (link ?? '').split(',')) {
+    const m = /<([^>]+)>\s*;\s*rel="next"/.exec(part);
+    if (m?.[1]?.startsWith('https://api.github.com/')) return m[1];
+  }
+  return null;
+}
+
+/** 带标签的 open issue 一页（next = 下一页 URL，没有或不可跟 = null）。 */
+export interface GithubLabeledIssuesPage {
+  issues: GithubIssueSummary[];
+  next: string | null;
+  /** 这一页满了（上游条目数 = per_page，PR 也算）。满页之后再长出的下一页
+   * 不改这一页的内容，ETag 不变、304 会带回过时的 next：调用方对满页不发
+   * If-None-Match。 */
+  full: boolean;
+}
+
 /** 带标签的 open issue 列表条件读（进料候选面）。sort=created + direction=asc
- * = 稳定排序（列表不因条目更新而重排，304 更常见），且第一页就是最旧的
- * （进料只领最旧的几条，不翻页）。 */
+ * = 稳定排序（列表不因条目更新而重排，304 更常见），且第一页就是最旧的。
+ * opts.url = 上一页给的 next（缺省 = 第一页）。 */
 export async function githubOpenIssuesWithLabel(
   fetchImpl: FetchLike,
   token: string,
   owner: string,
   repo: string,
   label: string,
-  opts: { etag?: string | null } = {},
-): Promise<GithubConditionalRead<GithubIssueSummary[]> | null> {
+  opts: { url?: string | null; etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubLabeledIssuesPage> | null> {
   const url =
+    opts.url ??
     `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
-    `&labels=${encodeURIComponent(label)}&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
+      `&labels=${encodeURIComponent(label)}&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
   if (!Array.isArray(got.data.body)) return null;
@@ -497,58 +520,76 @@ export async function githubOpenIssuesWithLabel(
     const projected = projectIssue(raw as Record<string, unknown>);
     if (projected) issues.push(projected);
   }
-  return { notModified: false, etag: got.etag, data: issues };
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: {
+      issues,
+      next: nextPageUrl(got.data.link),
+      full: got.data.body.length >= INTAKE_PER_PAGE,
+    },
+  };
 }
 
-/** issue 上一条标签事件（events 端点 labeled / unlabeled 的最小投影）。 */
-export interface GithubLabelEvent {
+/** issue 上一条事件（events 端点 labeled / unlabeled / closed 的最小投影）。 */
+export interface GithubIssueEvent {
   id: number;
-  event: 'labeled' | 'unlabeled';
-  label: string;
+  event: 'labeled' | 'unlabeled' | 'closed';
+  /** labeled / unlabeled 的 label.name；closed 为 null。 */
+  label: string | null;
   /** actor.login；账号已删（actor 为 null）→ null。 */
   actor: string | null;
   /** created_at 的毫秒值。 */
   at: number;
 }
 
-export interface GithubIssueLabelEvents {
-  events: GithubLabelEvent[];
-  /** false = 上游还有下一页：这一页不是完整历史（升序，最新的在后面的页）。 */
-  complete: boolean;
+/** issue 事件一页（升序，最新的在后面的页）。 */
+export interface GithubIssueEventsPage {
+  events: GithubIssueEvent[];
+  /** 上游还有下一页（Link 有 rel="next"）。 */
+  more: boolean;
+  /** 下一页 URL；没有，或指到 api.github.com 之外（不可跟）= null。 */
+  next: string | null;
+  /** 这一页满了（上游条目数 = per_page）：同 GithubLabeledIssuesPage.full，
+   * 调用方对满页不发 If-None-Match（新事件落到下一页时这一页 ETag 不变）。 */
+  full: boolean;
 }
 
-/** issue 标签事件条件读（D5 打标人核验）。只投影 labeled / unlabeled；这两种
- * 事件缺 id / created_at / label.name = 整读作废（null）——宁可本轮不领，
- * 不在缺字段的历史上判谁最后打的标。 */
-export async function githubIssueLabelEvents(
+/** issue 事件一页的条件读（D5 打标人核验 + 关闭人核验）。只投影 labeled /
+ * unlabeled / closed；这几种事件缺 id / created_at（标签事件再加 label.name）=
+ * 整读作废（null）——宁可本轮不动，不在缺字段的历史上判谁最后打的标、谁关的
+ * issue。opts.url = 上一页给的 next（缺省 = 第一页）。 */
+export async function githubIssueEvents(
   fetchImpl: FetchLike,
   token: string,
   owner: string,
   repo: string,
   issueNumber: number,
-  opts: { etag?: string | null } = {},
-): Promise<GithubConditionalRead<GithubIssueLabelEvents> | null> {
+  opts: { url?: string | null; etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubIssueEventsPage> | null> {
   const url =
+    opts.url ??
     `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/events` +
-    `?per_page=${INTAKE_PER_PAGE}`;
+      `?per_page=${INTAKE_PER_PAGE}`;
   const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
   if (got === null || got.notModified) return got;
   if (!Array.isArray(got.data.body)) return null;
-  const events: GithubLabelEvent[] = [];
+  const events: GithubIssueEvent[] = [];
   for (const raw of got.data.body as unknown[]) {
     if (typeof raw !== 'object' || raw === null) return null;
     const entry = raw as Record<string, unknown>;
-    if (entry.event !== 'labeled' && entry.event !== 'unlabeled') continue;
+    const event = entry.event;
+    if (event !== 'labeled' && event !== 'unlabeled' && event !== 'closed') continue;
     const label = entry.label as { name?: unknown } | null | undefined;
     const actor = entry.actor as { login?: unknown } | null | undefined;
     const at = typeof entry.created_at === 'string' ? Date.parse(entry.created_at) : Number.NaN;
-    if (typeof entry.id !== 'number' || !Number.isFinite(at) || typeof label?.name !== 'string') {
-      return null;
-    }
+    const labelName = typeof label?.name === 'string' ? label.name : null;
+    if (typeof entry.id !== 'number' || !Number.isFinite(at)) return null;
+    if (event !== 'closed' && labelName === null) return null;
     events.push({
       id: entry.id,
-      event: entry.event,
-      label: label.name,
+      event,
+      label: event === 'closed' ? null : labelName,
       actor: typeof actor?.login === 'string' ? actor.login : null,
       at,
     });
@@ -556,7 +597,12 @@ export async function githubIssueLabelEvents(
   return {
     notModified: false,
     etag: got.etag,
-    data: { events, complete: !(got.data.link ?? '').includes('rel="next"') },
+    data: {
+      events,
+      more: (got.data.link ?? '').includes('rel="next"'),
+      next: nextPageUrl(got.data.link),
+      full: got.data.body.length >= INTAKE_PER_PAGE,
+    },
   };
 }
 

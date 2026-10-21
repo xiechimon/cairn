@@ -4,7 +4,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
-import { BRAND, ENV_VARS } from '@pacman/shared';
+import { BRAND } from '@pacman/shared';
 import pino from 'pino';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -17,7 +17,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
-import { createScheduler } from './services/scheduler.js';
+import { createScheduler, issueIntakeRunOf } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 
 const config = loadConfig();
@@ -104,19 +104,14 @@ warnInsecureBind(logger, config);
 // ——与 AppContext.githubFetch 同源的缺省位）。
 // #1406 issue 进料挂同家族自循环（5 分钟：带 ready-for-agent 的 open issue
 // → D5 核打标人 → 导入 + 编排；issue 关了关卡）。opt-in（config.issueIntake，
-// 默认关）：关时不传运行位，调度器不起进料循环；启动日志一行写明开关状态。
-logger.info(
-  { issueIntake: config.issueIntake },
-  config.issueIntake
-    ? `github issue intake on (${ENV_VARS.issueIntake})`
-    : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
-);
+// 默认关）：issueIntakeRunOf 关时给 null，调度器不起进料循环；启动日志一行
+// 写明开关状态。
 const scheduler = createScheduler(
   { db, hub, machineHub, user: seeded.user, convHub, box: secretBox },
   { tickMs: config.schedulerTickMs },
   { attachmentsDir, logger },
   { githubFetch: globalThis.fetch, logger },
-  config.issueIntake ? { githubFetch: globalThis.fetch, logger } : null,
+  issueIntakeRunOf(config, { githubFetch: globalThis.fetch, logger }),
 );
 scheduler.start();
 

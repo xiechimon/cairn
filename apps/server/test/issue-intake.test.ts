@@ -49,9 +49,10 @@ import {
   ISSUE_INTAKE_IN_FLIGHT_CAP,
   ISSUE_INTAKE_INTERVAL_MS,
   ISSUE_INTAKE_LABEL,
+  ISSUE_INTAKE_MAX_EVENT_PAGES,
   ISSUE_INTAKE_PERMISSION_TTL_MS,
 } from '../src/services/issue-intake.js';
-import { createScheduler } from '../src/services/scheduler.js';
+import { createScheduler, issueIntakeRunOf } from '../src/services/scheduler.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -110,6 +111,20 @@ const LABELED_TEMPLATE = EVENTS_1406.find(
   (e) => e.event === 'labeled' && e.label?.name === LABEL,
 ) as RawEvent;
 const UNLABELED_TEMPLATE = EVENTS_1450.find((e) => e.event === 'unlabeled') as RawEvent;
+/** #1450 的真实 closed 事件（仓主关闭）。 */
+const CLOSED_TEMPLATE = EVENTS_1450.find((e) => e.event === 'closed') as RawEvent;
+
+function closedEvent(login: string | null, at: string, id: number): RawEvent {
+  return {
+    ...CLOSED_TEMPLATE,
+    id,
+    created_at: at,
+    actor:
+      login === null
+        ? null
+        : { ...(CLOSED_TEMPLATE.actor as NonNullable<RawEvent['actor']>), login },
+  };
+}
 
 function labelEvent(
   kind: 'labeled' | 'unlabeled',
@@ -129,6 +144,15 @@ function labelEvent(
   };
 }
 
+/** 不投影的填充事件（referenced：提交引用 issue），把历史撑过一页。 */
+function fillerEvents(fromId: number, count: number, at: string): RawEvent[] {
+  const out: RawEvent[] = [];
+  for (let i = 0; i < count; i++) {
+    out.push({ ...CLOSED_TEMPLATE, id: fromId + i, event: 'referenced', created_at: at });
+  }
+  return out;
+}
+
 function permissionBody(login: string, permission: string, roleName: string) {
   return { ...PERMISSION_ADMIN, permission, role_name: roleName, user: { login } };
 }
@@ -140,6 +164,7 @@ const BODY_WITH_INSTRUCTIONS =
 //    全部出站；扩展为按仓库状态作答 + If-None-Match 条件读）———————————————
 
 interface GhCall {
+  host: string;
   path: string;
   search: URLSearchParams;
   headers: Record<string, string>;
@@ -176,8 +201,10 @@ function githubFake(repo: string) {
     issues: new Map<number, RawIssue>(),
     /** 每条 issue 的 events；缺省 = #1406 的真实两条（仓主经 claude app 打标）。 */
     events: new Map<number, RawEvent[]>(),
-    /** events 还有下一页（Link rel="next"）。 */
+    /** events 永远还有下一页（历史长过任何上限）：每页都给 Link rel="next"。 */
     eventsHasNext: new Set<number>(),
+    /** events 的 Link rel="next" 指到 api.github.com 之外。 */
+    eventsForeignNext: new Set<number>(),
     /** login（小写）→ permission 应答；缺省 = 404。 */
     permissions: new Map<string, GhResponse>([
       [OWNER, { body: permissionBody(OWNER, 'admin', 'admin') }],
@@ -190,9 +217,6 @@ function githubFake(repo: string) {
 
   // GitHub 的 owner / repo 段不分大小写（官方文档参数说明）：fake 同样按小写匹配。
   const base = `/repos/${repo}`.toLowerCase();
-  function detailOf(n: number): RawIssue | undefined {
-    return state.issues.get(n) ?? state.open.find((i) => i.number === n);
-  }
 
   function resolve(url: URL, headers: Record<string, string>): GhResponse {
     const path = url.pathname.toLowerCase();
@@ -210,22 +234,38 @@ function githubFake(repo: string) {
       items = [...items].sort((a, b) =>
         url.searchParams.get('direction') === 'asc' ? a.number - b.number : b.number - a.number,
       );
-      return conditional(headers, items);
+      // 分页同上游：per_page 缺省 30、page 从 1 起，还有下一页就给 Link rel="next"。
+      const perPage = Number(url.searchParams.get('per_page') ?? '30');
+      const pageNo = Number(url.searchParams.get('page') ?? '1');
+      const slice = items.slice((pageNo - 1) * perPage, pageNo * perPage);
+      if (items.length <= pageNo * perPage) return conditional(headers, slice);
+      const next = new URL(url.toString());
+      next.searchParams.set('page', String(pageNo + 1));
+      return conditional(headers, slice, { link: `<${next.toString()}>; rel="next"` });
     }
     const eventsMatch = new RegExp(`^${base}/issues/(\\d+)/events$`).exec(path);
     if (eventsMatch) {
       const n = Number(eventsMatch[1]);
       const events = state.events.get(n) ?? EVENTS_1406;
-      const link: Record<string, string> = state.eventsHasNext.has(n)
-        ? {
-            link: `<https://api.github.com/repositories/1361226985/issues/${n}/events?per_page=100&page=2>; rel="next"`,
-          }
-        : {};
-      return conditional(headers, events, link);
+      // 分页同上游：per_page 缺省 30、page 从 1 起；还有下一页就给 Link rel="next"。
+      const perPage = Number(url.searchParams.get('per_page') ?? '30');
+      const pageNo = Number(url.searchParams.get('page') ?? '1');
+      const slice = state.eventsHasNext.has(n)
+        ? events
+        : events.slice((pageNo - 1) * perPage, pageNo * perPage);
+      const next = new URL(url.toString());
+      next.searchParams.set('page', String(pageNo + 1));
+      const link: Record<string, string> = state.eventsForeignNext.has(n)
+        ? { link: `<https://evil.example${url.pathname}?page=2>; rel="next"` }
+        : state.eventsHasNext.has(n) || events.length > pageNo * perPage
+          ? { link: `<${next.toString()}>; rel="next"` }
+          : {};
+      return conditional(headers, slice, link);
     }
     const issueMatch = new RegExp(`^${base}/issues/(\\d+)$`).exec(path);
     if (issueMatch) {
-      const issue = detailOf(Number(issueMatch[1]));
+      const n = Number(issueMatch[1]);
+      const issue = state.issues.get(n) ?? state.open.find((i) => i.number === n);
       if (issue === undefined) return { status: 404, body: { message: 'Not Found' } };
       return conditional(headers, issue);
     }
@@ -245,7 +285,13 @@ function githubFake(repo: string) {
   const impl: FetchLike = async (input, init) => {
     const url = new URL(String(input));
     const headers = { ...(init?.headers ?? {}) };
-    const call: GhCall = { path: url.pathname, search: url.searchParams, headers, status: 0 };
+    const call: GhCall = {
+      host: url.host,
+      path: url.pathname,
+      search: url.searchParams,
+      headers,
+      status: 0,
+    };
     calls.push(call);
     // 像真实网络读一样让出事件循环（并发场景靠它交错）。
     await new Promise((r) => setTimeout(r, 0));
@@ -423,6 +469,7 @@ function insertSourceTodo(
   phase: Phase,
   sourceKind: TodoSourceKind = 'github-issue',
   projectId: string = w.projectId,
+  sourceRef: string = refOf(n),
 ): string {
   seq += 1;
   const id = `todo-intake-${seq}`;
@@ -438,7 +485,7 @@ function insertSourceTodo(
       phaseAt: Date.now(),
       seqNum: seq,
       sourceKind,
-      sourceRef: refOf(n),
+      sourceRef,
     })
     .run();
   return id;
@@ -470,6 +517,31 @@ function attachActiveStep(w: World, todoId: string, status: 'pending' | 'claimed
 
 function setPhase(w: World, todoId: string, phase: Phase): void {
   w.s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, todoId)).run();
+}
+
+/** issue 在 GitHub 上被 login 关闭：详情转 closed、离开 open 列表、events 追加
+ * 一条 closed 事件（#1450 真实形状）。 */
+function closeOnGithub(w: World, n: number, login: string | null): void {
+  const current = w.gh.state.issues.get(n) ?? w.gh.state.open.find((i) => i.number === n);
+  if (current === undefined) throw new Error(`issue ${n} unknown to the fake`);
+  w.gh.state.issues.set(n, { ...current, state: 'closed' });
+  w.gh.state.open = w.gh.state.open.filter((i) => i.number !== n);
+  w.gh.state.events.set(n, [
+    ...(w.gh.state.events.get(n) ?? EVENTS_1406),
+    closedEvent(login, '2026-10-21T10:00:00Z', 70_000 + n),
+  ]);
+}
+
+function phaseOf(w: World, todoId: string): Phase | undefined {
+  return w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()?.phase;
+}
+
+/** 合成一批带 ready-for-agent 的 open issue（翻页 / 饥饿场景），号 = from..to。 */
+function syntheticIssues(from: number, to: number): RawIssue[] {
+  const template = LISTED[0] as RawIssue;
+  const out: RawIssue[] = [];
+  for (let n = from; n <= to; n++) out.push({ ...template, number: n, title: `synthetic ${n}` });
+  return out;
 }
 
 function chiefThreads(s: TestServer) {
@@ -685,15 +757,40 @@ describe('3 只认最新一条 labeled；events 读不全不领', () => {
     expect(takenNumbers(w.s)).toEqual([]);
   });
 
-  test('events 有下一页（Link rel="next"）→ 读不全，不领、不读 permission', async () => {
+  test('events 超过 ISSUE_INTAKE_MAX_EVENT_PAGES 页仍有下一页 → 读不全，不领、不读 permission', async () => {
     const w = await makeWorld({ list: [1406] });
     w.gh.state.eventsHasNext.add(1406);
     const tally = await w.intake.sweep();
     expect(takenNumbers(w.s)).toEqual([]);
     expect(tally?.notEligible).toBe(1);
     expect(w.gh.permissionReads()).toHaveLength(0);
+    const reads = w.gh.eventReads(1406);
+    expect(reads).toHaveLength(ISSUE_INTAKE_MAX_EVENT_PAGES);
     // events 读一页 100 条。
-    expect(w.gh.eventReads(1406)[0]?.search.get('per_page')).toBe('100');
+    expect(reads[0]?.search.get('per_page')).toBe('100');
+  });
+
+  test('events 跨页：第 1 页外人打标又被摘、第 2 页仓主重新打标 → 读第 2 页、领', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.events.set(1406, [
+      labelEvent('labeled', 'outsider', '2026-10-20T20:24:18Z', 1),
+      labelEvent('unlabeled', OWNER, '2026-10-20T20:25:00Z', 2),
+      ...fillerEvents(10, 120, '2026-10-20T21:00:00Z'),
+      labelEvent('labeled', OWNER, '2026-10-21T09:00:00Z', 500),
+    ]);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(w.gh.eventReads(1406)).toHaveLength(2);
+    expect(w.gh.permissionReads('outsider')).toHaveLength(0);
+  });
+
+  test('events 的 Link rel="next" 指到别的主机 → 读不全，不领、不出站', async () => {
+    const w = await makeWorld({ list: [1406] });
+    w.gh.state.eventsForeignNext.add(1406);
+    const tally = await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(tally?.notEligible).toBe(1);
+    expect(w.gh.calls.every((c) => c.host === 'api.github.com')).toBe(true);
   });
 });
 
@@ -926,67 +1023,182 @@ describe('10 导入后标签被摘', () => {
 // —— 11 issue 被关 ————————————————————————————————————————————————————————
 
 describe('11 issue 在 GitHub 被关', () => {
-  test('building 卡：经关闭路径落 closed，并停掉 pending 活动步', async () => {
+  // 只认本进程亲眼看到的 open → closed（导入时或某次读到 open 记为「见过
+  // open」），且关闭人（最新一条 closed 事件的 actor）在仓库上 triage 及以上。
+  // 首见即 closed 的卡（例：从已关闭 issue 手工导入）永不被对账关闭；被关后
+  // 有人把卡重开，也不再关第二次。
+  const OPEN_1445 = { ...ISSUE_1445_CLOSED, state: 'open', closed_at: null, state_reason: null };
+
+  test('先读到 open、再被协作者关闭 → 经关闭路径落 closed，并停掉 pending 活动步', async () => {
     const w = await makeWorld({ list: [] });
-    w.gh.state.issues.set(1445, ISSUE_1445_CLOSED);
+    w.gh.state.issues.set(1445, OPEN_1445);
     const todoId = insertSourceTodo(w, 1445, 'building');
     const stepId = attachActiveStep(w, todoId, 'pending');
-    const tally = await w.intake.sweep();
-    expect(tally?.closed).toBe(1);
-    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
-    expect(row?.phase).toBe('closed');
+    const first = await w.intake.sweep();
+    expect(first?.closed).toBe(0);
+    closeOnGithub(w, 1445, OWNER);
+    const second = await w.intake.sweep();
+    expect(second?.closed).toBe(1);
+    expect(phaseOf(w, todoId)).toBe('closed');
     const stepRow = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
     expect(stepRow?.status).toBe('stopped');
+  });
+
+  test('轮询器自己导入的卡：导入即记为见过 open，随后被协作者关闭 → 关闭', async () => {
+    const w = await makeWorld({ list: [1406] });
+    await w.intake.sweep();
+    const imported = todoOf(w.s, 1406);
+    expect(imported?.phase).toBe('todo');
+    closeOnGithub(w, 1406, OWNER);
+    await w.intake.sweep();
+    expect(todoOf(w.s, 1406)?.phase).toBe('closed');
   });
 
   test('todo / failed 卡同样关闭；review 与 done 卡不读不动', async () => {
     const w = await makeWorld({ list: [] });
     for (const n of [1445, 1446, 1447, 1448]) {
-      w.gh.state.issues.set(n, { ...ISSUE_1445_CLOSED, number: n });
+      w.gh.state.issues.set(n, { ...OPEN_1445, number: n });
     }
     const atTodo = insertSourceTodo(w, 1445, 'todo');
     const atFailed = insertSourceTodo(w, 1446, 'failed');
     const atReview = insertSourceTodo(w, 1447, 'review');
     const atDone = insertSourceTodo(w, 1448, 'done');
     await w.intake.sweep();
-    const phaseOf = (id: string) =>
-      w.s.db.select().from(todoTable).where(eq(todoTable.id, id)).get()?.phase;
-    expect(phaseOf(atTodo)).toBe('closed');
-    expect(phaseOf(atFailed)).toBe('closed');
+    for (const n of [1445, 1446, 1447, 1448]) closeOnGithub(w, n, OWNER);
+    await w.intake.sweep();
+    expect(phaseOf(w, atTodo)).toBe('closed');
+    expect(phaseOf(w, atFailed)).toBe('closed');
     // review 留给 #1414 的 PR 对账（合并关掉 issue 时仍以 done 收尾）。
-    expect(phaseOf(atReview)).toBe('review');
-    expect(phaseOf(atDone)).toBe('done');
+    expect(phaseOf(w, atReview)).toBe('review');
+    expect(phaseOf(w, atDone)).toBe('done');
     expect(w.gh.issueReads(1447)).toHaveLength(0);
     expect(w.gh.issueReads(1448)).toHaveLength(0);
   });
 
-  test('读期间卡被人推进 review → 写前重读相位，跳过', async () => {
+  test('从已关闭 issue 手工导入的卡（首见即 closed）→ 永不被对账关闭', async () => {
     const w = await makeWorld({ list: [] });
     w.gh.state.issues.set(1445, ISSUE_1445_CLOSED);
+    w.gh.state.events.set(1445, [closedEvent(OWNER, '2026-10-21T06:28:42Z', 1)]);
     const todoId = insertSourceTodo(w, 1445, 'building');
+    const first = await w.intake.sweep();
+    const second = await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('building');
+    expect(first?.closed).toBe(0);
+    expect(second?.closed).toBe(0);
+  });
+
+  test('被对账关掉后有人把卡重开（issue 仍 closed）→ 卡保持开着', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('closed');
+    // 人重开（closed → todo，phase.ts 唯一出边）。
+    setPhase(w, todoId, 'todo');
+    await w.intake.sweep();
+    await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('todo');
+  });
+
+  test.each([
+    ['外部作者自己关（read 权限）', 'outsider'],
+    ['关闭账号已删除（actor null）', null],
+  ] as const)('%s → 不关，计 closeSkipped', async (_name, closer) => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    w.gh.state.permissions.set('outsider', { body: permissionBody('outsider', 'read', 'read') });
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, closer);
+    const tally = await w.intake.sweep();
+    expect(phaseOf(w, todoId)).toBe('building');
+    expect(tally?.closed).toBe(0);
+    expect(tally?.closeSkipped).toBe(1);
+  });
+
+  test.each([
+    ['events 5xx', 'events', true],
+    ['events 读不全（Link rel="next"）', 'incomplete', false],
+    ['permission 5xx', 'permission', true],
+  ] as const)('关闭人核验：%s → 本轮不关，计 closeSkipped', async (_name, kind, recovers) => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    w.gh.state.permissions.set('closer', { body: permissionBody('closer', 'write', 'write') });
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, 'closer');
+    const failing =
+      kind === 'events'
+        ? `/repos/${REPO}/issues/1445/events`
+        : `/repos/${REPO}/collaborators/closer/permission`;
+    if (kind === 'incomplete') w.gh.state.eventsHasNext.add(1445);
+    else w.gh.overrides.set(failing, () => ({ status: 502, body: {} }));
+    const tally = await w.intake.sweep();
+    expect(tally?.closeSkipped).toBe(1);
+    expect(tally?.closed).toBe(0);
+    expect(phaseOf(w, todoId)).toBe('building');
+    if (recovers) {
+      w.gh.overrides.delete(failing);
+      expect((await w.intake.sweep())?.closed).toBe(1);
+      expect(phaseOf(w, todoId)).toBe('closed');
+    }
+  });
+
+  test('issue 事件过百、closed 事件在第 2 页 → 读到第 2 页并关闭', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    w.gh.state.events.set(1445, [...EVENTS_1406, ...fillerEvents(10, 120, '2026-10-21T08:00:00Z')]);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    const tally = await w.intake.sweep();
+    expect(tally?.closed).toBe(1);
+    expect(phaseOf(w, todoId)).toBe('closed');
+  });
+
+  test('重启（新的轮询器）首见即 closed → 不关', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
+    const restarted = createIssueIntake(
+      { ...w.s.svc, box: w.s.secretBox },
+      { githubFetch: w.gh.impl },
+    );
+    const tally = await restarted.sweep();
+    expect(tally?.closed).toBe(0);
+    expect(phaseOf(w, todoId)).toBe('building');
+  });
+
+  test('读期间卡被人推进 review → 写前重读相位，跳过', async () => {
+    const w = await makeWorld({ list: [] });
+    w.gh.state.issues.set(1445, OPEN_1445);
+    const todoId = insertSourceTodo(w, 1445, 'building');
+    await w.intake.sweep();
+    closeOnGithub(w, 1445, OWNER);
     w.gh.setOnCall((path) => {
-      if (path === `/repos/${REPO}/issues/1445`) setPhase(w, todoId, 'review');
+      if (path === `/repos/${REPO}/issues/1445/events`) setPhase(w, todoId, 'review');
     });
     await w.intake.sweep();
-    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
-    expect(row?.phase).toBe('review');
+    expect(phaseOf(w, todoId)).toBe('review');
   });
 
   test('open issue 不动；第二轮条件读（If-None-Match）304 复用；读失败不动', async () => {
     const w = await makeWorld({ list: [] });
-    const issue = { ...ISSUE_1445_CLOSED, state: 'open', closed_at: null, state_reason: null };
-    w.gh.state.issues.set(1445, issue);
+    w.gh.state.issues.set(1445, OPEN_1445);
     const todoId = insertSourceTodo(w, 1445, 'building');
     await w.intake.sweep();
     await w.intake.sweep();
     const reads = w.gh.issueReads(1445);
     expect(reads).toHaveLength(2);
-    expect(reads[1]?.headers['if-none-match']).toBe(etagOf(issue));
+    expect(reads[1]?.headers['if-none-match']).toBe(etagOf(OPEN_1445));
     expect(reads[1]?.status).toBe(304);
     w.gh.overrides.set(`/repos/${REPO}/issues/1445`, () => ({ status: 500, body: {} }));
     await w.intake.sweep();
-    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
-    expect(row?.phase).toBe('building');
+    expect(phaseOf(w, todoId)).toBe('building');
   });
 });
 
@@ -1225,5 +1437,198 @@ describe('opt-in：PACMAN_ISSUE_INTAKE', () => {
     scheduler.stop();
     expect(w.gh.calls).toHaveLength(0);
     expect(issueTodos(w.s)).toHaveLength(0);
+  });
+});
+
+// —— 第 2 轮（pr-gate #1461 run 1 建议）补测 ————————————————————————————————
+
+describe('1b 打标人权限：自定义角色的另外两条判据', () => {
+  test('legacy permission=write（role_name 是自定义角色）领；user.permissions.triage=true 领；两者都不满足不领', async () => {
+    const w = await makeWorld({ list: [1401, 1402, 1403] });
+    w.gh.state.events.set(1401, [labelEvent('labeled', 'releaser', '2026-10-20T20:23:11Z', 9101)]);
+    w.gh.state.permissions.set('releaser', {
+      body: permissionBody('releaser', 'write', 'release-manager'),
+    });
+    w.gh.state.events.set(1402, [labelEvent('labeled', 'wrangler', '2026-10-20T20:23:29Z', 9102)]);
+    w.gh.state.permissions.set('wrangler', {
+      body: {
+        permission: 'read',
+        role_name: 'issue-wrangler',
+        user: { login: 'wrangler', permissions: { pull: true, triage: true, push: false } },
+      },
+    });
+    w.gh.state.events.set(1403, [labelEvent('labeled', 'reader', '2026-10-20T20:23:42Z', 9103)]);
+    w.gh.state.permissions.set('reader', {
+      body: {
+        permission: 'read',
+        role_name: 'issue-reader',
+        user: { login: 'reader', permissions: { pull: true, triage: false, push: false } },
+      },
+    });
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1401, 1402]);
+  });
+});
+
+describe('5b 已占用：引用大小写不同也算同一条 issue', () => {
+  test('团队里已有 github:Xiechimon/Pacman#1406 的卡 → 1406 记 claimed，不再导入', async () => {
+    const w = await makeWorld({ list: [1406] });
+    insertSourceTodo(
+      w,
+      1406,
+      'building',
+      'github-issue',
+      w.projectId,
+      'github:Xiechimon/Pacman#1406',
+    );
+    const tally = await w.intake.sweep();
+    expect(tally?.claimed).toBe(1);
+    expect(tally?.imported).toBe(0);
+    expect(issueTodos(w.s)).toHaveLength(1);
+    expect(w.gh.eventReads(1406)).toHaveLength(0);
+  });
+});
+
+describe('13b permission 否定答案（404）同样缓存', () => {
+  test('非协作者打标：TTL 内第二轮仍是候选，但不再读 permission', async () => {
+    const w = await makeWorld({ list: [1404] });
+    w.gh.state.events.set(1404, [labelEvent('labeled', 'stranger', '2026-10-20T20:30:00Z', 1)]);
+    const t0 = 1_800_000_000_000;
+    const first = await w.intake.sweep(t0);
+    expect(first?.notEligible).toBe(1);
+    expect(w.gh.permissionReads('stranger')).toHaveLength(1);
+    const second = await w.intake.sweep(t0 + 60_000);
+    expect(second?.notEligible).toBe(1);
+    expect(w.gh.permissionReads('stranger')).toHaveLength(1);
+  });
+});
+
+describe('13c 候选列表翻页', () => {
+  test('最旧 100 条都已占用或不认，第 101 条照样被领（跟 Link rel="next" 读第 2 页）', async () => {
+    const w = await makeWorld();
+    w.gh.state.open = syntheticIssues(2001, 2101);
+    for (let n = 2001; n <= 2050; n++) insertSourceTodo(w, n, 'done');
+    w.gh.state.permissions.set('outsider', { body: permissionBody('outsider', 'read', 'read') });
+    for (let n = 2051; n <= 2100; n++) {
+      w.gh.state.events.set(n, [labelEvent('labeled', 'outsider', '2026-10-20T20:30:00Z', n)]);
+    }
+    const tally = await w.intake.sweep();
+    expect(todoOf(w.s, 2101)?.phase).toBe('todo');
+    expect(tally?.imported).toBe(1);
+    const lists = w.gh.listReads();
+    expect(lists).toHaveLength(2);
+    expect(lists[1]?.search.get('page')).toBe('2');
+    expect(tally?.listTruncated).toBe(0);
+  });
+
+  test('至多读 3 页（300 条）：更后面的不读，记 listTruncated', async () => {
+    const w = await makeWorld();
+    w.gh.state.open = syntheticIssues(3001, 3301);
+    for (let n = 3001; n <= 3300; n++) insertSourceTodo(w, n, 'done');
+    const tally = await w.intake.sweep();
+    expect(w.gh.listReads()).toHaveLength(3);
+    expect(todoOf(w.s, 3301)).toBeUndefined();
+    expect(tally?.imported).toBe(0);
+    expect(tally?.listTruncated).toBe(1);
+  });
+
+  test('满页之后长出第 2 页：第 1 页内容不变，下一轮不带 If-None-Match 重读，读到新页', async () => {
+    const w = await makeWorld();
+    w.gh.state.open = syntheticIssues(4001, 4100);
+    for (let n = 4001; n <= 4100; n++) insertSourceTodo(w, n, 'done');
+    await w.intake.sweep();
+    expect(w.gh.listReads()).toHaveLength(1);
+    // 第 101 条打标：第 1 页（最旧 100 条）内容与 ETag 都不变。
+    w.gh.state.open = syntheticIssues(4001, 4101);
+    await w.intake.sweep();
+    const lists = w.gh.listReads();
+    expect(lists).toHaveLength(3);
+    expect(lists[1]?.headers['if-none-match']).toBeUndefined();
+    expect(lists[2]?.search.get('page')).toBe('2');
+    expect(todoOf(w.s, 4101)?.phase).toBe('todo');
+  });
+
+  test('Link rel="next" 指向 api.github.com 之外 → 不跟（token 不出站到别的主机）', async () => {
+    const w = await makeWorld({ list: [1394] });
+    insertSourceTodo(w, 1394, 'done');
+    w.gh.overrides.set(`/repos/${REPO}/issues`, (_url, headers) =>
+      conditional(headers, w.gh.state.open, {
+        link: '<https://evil.example/repos/xiechimon/pacman/issues?page=2>; rel="next"',
+      }),
+    );
+    await w.intake.sweep();
+    expect(w.gh.calls.every((c) => c.host === 'api.github.com')).toBe(true);
+    expect(w.gh.listReads()).toHaveLength(1);
+  });
+});
+
+describe('sweep 自身出错', () => {
+  test('查库抛错（例：SQLITE_BUSY）→ 记一行带原因的错误、仍落对账行、不抛给调度器', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const broken = new Proxy(w.s.db, {
+      get(target, prop, receiver) {
+        if (prop === 'select') {
+          return () => {
+            throw new Error('SQLITE_BUSY: database is locked');
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const logs: LogLine[] = [];
+    const intake = createIssueIntake(
+      { ...w.s.svc, db: broken, box: w.s.secretBox },
+      {
+        githubFetch: w.gh.impl,
+        logger: { info: (obj, msg) => logs.push({ obj: obj as Record<string, unknown>, msg }) },
+      },
+    );
+    const tally = await intake.sweep();
+    expect(tally?.errors).toBe(1);
+    const failed = logs.find((l) => l.msg === 'issue intake sweep failed');
+    expect(String(failed?.obj.err)).toContain('SQLITE_BUSY');
+    expect(logs.some((l) => l.msg === 'issue intake sweep')).toBe(true);
+    // 下一轮照常（不重叠闸已释放）。
+    expect(await intake.sweep()).not.toBeNull();
+  });
+});
+
+describe('opt-in 接线：index.ts 经 issueIntakeRunOf 取进料运行位', () => {
+  function stubRun() {
+    const lines: LogLine[] = [];
+    const run = {
+      githubFetch: (async () => {
+        throw new Error('no outbound in this test');
+      }) as FetchLike,
+      logger: {
+        info: (obj: object, msg: string) =>
+          lines.push({ obj: obj as Record<string, unknown>, msg }),
+      },
+    };
+    return { run, lines };
+  }
+
+  test('关 → null，启动日志一行写明 off 与开启方法', () => {
+    const { run, lines } = stubRun();
+    expect(issueIntakeRunOf({ issueIntake: false }, run)).toBeNull();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.obj.issueIntake).toBe(false);
+    expect(lines[0]?.msg).toContain('off');
+    expect(lines[0]?.msg).toContain('PACMAN_ISSUE_INTAKE=1');
+  });
+
+  test('开 → 原样返回运行位，启动日志一行写明 on', () => {
+    const { run, lines } = stubRun();
+    expect(issueIntakeRunOf({ issueIntake: true }, run)).toBe(run);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]?.obj.issueIntake).toBe(true);
+    expect(lines[0]?.msg).toContain(' on ');
+  });
+
+  test('index.ts 的 createScheduler 第 5 位来自 issueIntakeRunOf(config, …)', () => {
+    const src = readFileSync(join(import.meta.dirname, '../src/index.ts'), 'utf8');
+    const call = /createScheduler\(([\s\S]*?)\n\);/.exec(src)?.[1] ?? '';
+    const args = call.split('\n').filter((l) => l.trim() !== '');
+    expect(args.at(-1)?.trim()).toMatch(/^issueIntakeRunOf\(config, /);
   });
 });

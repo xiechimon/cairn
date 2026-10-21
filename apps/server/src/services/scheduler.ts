@@ -12,7 +12,7 @@
 //   [设计]（wire/UI 无抢占观测）。孤儿（todo 已删）自愈出队 [设计]。
 // 时间线「由定时发起」= build.triggerSource 数据面（呈现归 web）。
 
-import type { Scheduler } from '@pacman/shared';
+import { ENV_VARS, type Scheduler } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, schedule, todo } from '../db/schema.js';
@@ -62,6 +62,22 @@ export interface CiPollRun {
 export interface IssueIntakeRun {
   githubFetch: FetchLike;
   logger: IssueIntakeLogger;
+}
+
+/** index.ts 接线单点（#1406 opt-in，默认关）：开关关 → null（调度器不起进料
+ * 循环），开 → 原样给出运行位；两种情况都在启动日志落一行写明开关状态。
+ * 抽函数 = 接线可钉（test/issue-intake.test.ts 钉它与 index.ts 的调用）。 */
+export function issueIntakeRunOf(
+  config: { issueIntake: boolean },
+  run: IssueIntakeRun,
+): IssueIntakeRun | null {
+  run.logger.info(
+    { issueIntake: config.issueIntake },
+    config.issueIntake
+      ? `github issue intake on (${ENV_VARS.issueIntake})`
+      : `github issue intake off (set ${ENV_VARS.issueIntake}=1 to enable)`,
+  );
+  return config.issueIntake ? run : null;
 }
 
 /** 附件回收运行位（#759：tick piggyback，缺省 = 不开回收——既有调用零改动）。 */

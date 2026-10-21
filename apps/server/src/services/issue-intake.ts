@@ -6,14 +6,20 @@
 // 1. token：团队连接 token（无连接 / 密文坏 / box 缺席 = 整队跳过，零匿名读——
 //    匿名 60/h 的 IP 预算归 ci-loop 与 #931，importGithubIssue 本就要 token）。
 // 2. 关闭对账：本队 github-issue 卡（相位不在 done / closed / review）逐张条件读
-//    issue state；closed → transitionTodos(closed)，即 chief / MCP close_todos 的
-//    关闭路径（#1445：写相位后停活动步）。review 卡留给 #1414 的 PR 对账：合并
-//    关掉 issue 时那张卡仍以 done 收尾。写前重读相位，变了就不动。
+//    issue state。只认本进程亲眼看到的 open → closed：导入时、或某次读到 open，
+//    记为「见过 open」；之后读到 closed，且最新一条 closed 事件的 actor 在仓库
+//    上是 triage 及以上（与打标人同一判据、同一缓存），才 transitionTodos(closed)
+//    ——chief / MCP close_todos 的关闭路径（#1445：写相位后停活动步）。首见即
+//    closed 的卡（例：从已关闭 issue 手工导入、或重启后）永不被对账关闭；关过
+//    一次即忘掉「见过 open」，有人把卡重开就不再关。外部作者关自己的 issue、
+//    任一读失败 = 本轮不关。review 卡留给 #1414 的 PR 对账：合并关掉 issue 时
+//    那张卡仍以 done 收尾。写前重读相位，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 // 4. 每个 github 项目（githubRepo 形好；同队同仓只取 id 最小的一个）：在飞
-//    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表），按号
-//    升序（最旧先）；团队级已占用的号跳过（大小写不敏感）；D5 核打标人：该
-//    标签最新一条 labeled 之后没有 unlabeled，且其 actor 在仓库上是 triage 及
+//    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表；按 Link
+//    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
+//    先）；团队级已占用的号跳过（大小写不敏感）；D5 核打标人：该标签最新一条
+//    labeled 之后没有 unlabeled，且其 actor 在仓库上是 triage 及
 //    以上（events 一页读不全 / 任一读失败 = 本轮不领）；importGithubIssue（409
 //    = 别路已领）→ orchestrateTodo。
 //
@@ -34,11 +40,12 @@ import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
   type GithubConditionalRead,
-  type GithubIssueLabelEvents,
-  type GithubIssueSummary,
+  type GithubIssueEvent,
+  type GithubIssueEventsPage,
+  type GithubLabeledIssuesPage,
   type GithubRepoPermission,
   githubCollaboratorPermission,
-  githubIssueLabelEvents,
+  githubIssueEvents,
   githubIssueState,
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
@@ -58,6 +65,14 @@ export const ISSUE_INTAKE_LABEL = 'ready-for-agent';
 
 /** 项目级在飞上限（spec 28 §4 P5a 默认 3）。 */
 export const ISSUE_INTAKE_IN_FLIGHT_CAP = 3;
+
+/** 候选列表至多读几页（每页 100，按创建时间升序）：最旧的一批全被占用或不认
+ * 时，后面的 issue 仍轮得到；再往后的记 listTruncated。 */
+export const ISSUE_INTAKE_MAX_LIST_PAGES = 3;
+
+/** issue 事件至多读几页（每页 100，升序）：引用多的长票（每个提到它的提交都
+ * 是一条 referenced 事件）过百很常见；再往后仍有下一页 = 读不全，不动。 */
+export const ISSUE_INTAKE_MAX_EVENT_PAGES = 5;
 
 /** permission 答案缓存时长（按 团队 × 仓 × login）：3 轮内不重读；权限被收回
  * 最多晚这么久生效。 */
@@ -91,8 +106,10 @@ export interface IssueIntakeTally {
   /** 跳过的项目：无 token / 密文坏 / chief 未绑定 / githubRepo 形坏 / 同仓重复 /
    * 列表读不到。 */
   skipped: number;
-  /** 列表 304，复用上轮列表。 */
+  /** 列表 304，复用上轮列表（按页计）。 */
   listNotModified: number;
+  /** 读满 ISSUE_INTAKE_MAX_LIST_PAGES 页仍有下一页的项目数。 */
+  listTruncated: number;
   candidates: number;
   /** 已被占用（团队里已有这条 issue 的卡，或导入时 409）。 */
   claimed: number;
@@ -106,7 +123,9 @@ export interface IssueIntakeTally {
   orchestrated: number;
   /** issue 已关 → 卡已关。 */
   closed: number;
-  /** issue 状态读不到，或写前相位变了：本轮不动。 */
+  /** 对账本轮不动：issue 状态读不到；或见过 open 的 issue 读到 closed，但
+   * events / permission 读不到、events 读不全、关闭人不到 triage 或账号已删、
+   * 写前相位变了。 */
   closeSkipped: number;
   errors: number;
 }
@@ -126,6 +145,7 @@ function emptyTally(): IssueIntakeTally {
     projects: 0,
     skipped: 0,
     listNotModified: 0,
+    listTruncated: 0,
     candidates: 0,
     claimed: 0,
     atCap: 0,
@@ -151,32 +171,47 @@ function settle<T>(cache: EtagCache<T>, key: string, page: GithubConditionalRead
   return page.data;
 }
 
+/** 条件读要带的 ETag：满页不带（满页之后长出的下一页不改它的内容，304 会
+ * 带回过时的 next / complete）。 */
+function etagFor<T extends { full: boolean }>(cache: EtagCache<T>, key: string): string | null {
+  const hit = cache.get(key);
+  return hit !== undefined && !hit.data.full ? hit.etag : null;
+}
+
 function errText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-function qualifies(p: GithubRepoPermission): boolean {
-  return (
-    LABELER_BASE_PERMISSIONS.has(p.permission) ||
-    (p.roleName !== null && LABELER_ROLES.has(p.roleName)) ||
-    p.triage === true
-  );
+/** 事件先后：created_at，同刻按 id（不信数组位置）。 */
+function later(a: GithubIssueEvent, b: GithubIssueEvent): boolean {
+  return a.at > b.at || (a.at === b.at && a.id > b.id);
+}
+
+/** 读到的事件历史（多页拼起来）；complete = 读到了最后一页。 */
+interface IssueHistory {
+  events: GithubIssueEvent[];
+  complete: boolean;
+}
+
+/** 满足条件的事件里最新的一条。 */
+function newestOf(
+  events: GithubIssueEvent[],
+  match: (e: GithubIssueEvent) => boolean,
+): GithubIssueEvent | null {
+  let newest: GithubIssueEvent | null = null;
+  for (const e of events) if (match(e) && (newest === null || later(e, newest))) newest = e;
+  return newest;
 }
 
 /** D5 第一半：该标签最新一条 labeled 的 actor（之后有 unlabeled / 读不全 /
  * 没有 labeled / 账号已删 → 不领的理由）。顺序按 created_at，同刻按 id，不信
  * 数组位置。 */
-function newestLabeler(data: GithubIssueLabelEvents): { login: string } | { reason: string } {
+function newestLabeler(data: IssueHistory): { login: string } | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
-  const later = (a: { at: number; id: number }, b: { at: number; id: number }) =>
-    a.at > b.at || (a.at === b.at && a.id > b.id);
-  let labeled: (typeof data.events)[number] | null = null;
-  let unlabeled: (typeof data.events)[number] | null = null;
-  for (const e of data.events) {
-    if (e.label.toLowerCase() !== ISSUE_INTAKE_LABEL) continue;
-    if (e.event === 'labeled' && (labeled === null || later(e, labeled))) labeled = e;
-    if (e.event === 'unlabeled' && (unlabeled === null || later(e, unlabeled))) unlabeled = e;
-  }
+  const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>
+    e.event === kind && e.label?.toLowerCase() === ISSUE_INTAKE_LABEL;
+  const labeled = newestOf(data.events, forLabel('labeled'));
+  const unlabeled = newestOf(data.events, forLabel('unlabeled'));
   if (labeled === null) return { reason: 'no-labeled-event' };
   if (unlabeled !== null && later(unlabeled, labeled)) return { reason: 'label-removed' };
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
@@ -190,11 +225,18 @@ export function createIssueIntake(
   const log = (obj: object, msg: string) => run.logger?.info(obj, msg);
   // 缓存键都带 teamId：不同团队的 token 看到的表示可能不同（应答 Vary:
   // Authorization）。
-  const listCache: EtagCache<GithubIssueSummary[]> = new Map();
-  const eventsCache: EtagCache<GithubIssueLabelEvents> = new Map();
+  const listCache: EtagCache<GithubLabeledIssuesPage> = new Map();
+  // events 缓存按页：键 = issue 键 + \u0001 + 页 URL（第一页 'first'）。
+  const eventsCache: EtagCache<GithubIssueEventsPage> = new Map();
   const stateCache: EtagCache<{ state: 'open' | 'closed' }> = new Map();
+  // 关闭人核验的 events 缓存与打标人的分开：后者只留仍在 open 列表里的 issue。
+  const closerEventsCache: EtagCache<GithubIssueEventsPage> = new Map();
   const permissionCache = new Map<string, { at: number; permission: GithubRepoPermission }>();
+  // 本进程见过 open 的 issue（团队 × sourceRef，小写）：关闭对账只认这些的
+  // open → closed。进程内存，重启即空（重启后首见即 closed 的不关）。
+  const seenOpen = new Set<string>();
   let sweeping = false;
+  const refKey = (teamId: string, sourceRef: string) => `${teamId}\u0000${sourceRef}`.toLowerCase();
 
   function teamToken(teamId: string): { token: string; box: SecretBox } | { reason: string } {
     const box = deps.box;
@@ -207,9 +249,9 @@ export function createIssueIntake(
     }
   }
 
-  /** 项目在飞数（每次导入前现数：sweep 期间 webhook 导入的卡同样占位）。 */
-  function inFlight(projectId: string): number {
-    return (
+  /** 项目在飞已满（每次导入前现数：sweep 期间 webhook 导入的卡同样占位）。 */
+  function projectFull(projectId: string): boolean {
+    const inFlight =
       deps.db
         .select({ n: sql<number>`count(*)` })
         .from(todo)
@@ -220,8 +262,8 @@ export function createIssueIntake(
             notInArray(todo.phase, NOT_IN_FLIGHT),
           ),
         )
-        .get()?.n ?? 0
-    );
+        .get()?.n ?? 0;
+    return inFlight >= ISSUE_INTAKE_IN_FLIGHT_CAP;
   }
 
   /** 团队已占用的 issue 引用（小写；导入的与自建的都算）。 */
@@ -236,21 +278,61 @@ export function createIssueIntake(
     );
   }
 
-  async function permissionOf(
+  /** login 在仓库上是不是 triage 及以上（打标人与关闭人同一判据）；null = 读
+   * 不到。答案按 团队 × 仓 × login 缓存 TTL。 */
+  async function hasTriage(
     teamId: string,
     token: string,
     owner: string,
     repo: string,
     login: string,
     now: number,
-  ): Promise<GithubRepoPermission | null> {
+  ): Promise<boolean | null> {
     const key = `${teamId}\u0000${owner}/${repo}\u0000${login}`.toLowerCase();
     const hit = permissionCache.get(key);
-    if (hit !== undefined && now - hit.at < ISSUE_INTAKE_PERMISSION_TTL_MS) return hit.permission;
-    const got = await githubCollaboratorPermission(run.githubFetch, token, owner, repo, login);
-    // 读不到不进缓存（下轮重读）；404 是明确的否定答案，照常缓存。
-    if (got !== null) permissionCache.set(key, { at: now, permission: got });
-    return got;
+    let p: GithubRepoPermission | null =
+      hit !== undefined && now - hit.at < ISSUE_INTAKE_PERMISSION_TTL_MS ? hit.permission : null;
+    if (p === null) {
+      p = await githubCollaboratorPermission(run.githubFetch, token, owner, repo, login);
+      // 读不到不进缓存（下轮重读）；404 是明确的否定答案，照常缓存。
+      if (p === null) return null;
+      permissionCache.set(key, { at: now, permission: p });
+    }
+    return (
+      LABELER_BASE_PERMISSIONS.has(p.permission) ||
+      (p.roleName !== null && LABELER_ROLES.has(p.roleName)) ||
+      p.triage === true
+    );
+  }
+
+  /** issue 的事件历史：按 Link rel="next" 读，至多 ISSUE_INTAKE_MAX_EVENT_PAGES
+   * 页；null = 某页读不到。下一页不可跟或超过页数 = complete false。 */
+  async function readHistory(
+    cache: EtagCache<GithubIssueEventsPage>,
+    issueKey: string,
+    token: string,
+    ref: { owner: string; repo: string; issueNumber: number },
+  ): Promise<IssueHistory | null> {
+    const events: GithubIssueEvent[] = [];
+    let url: string | null = null;
+    for (let pageNo = 1; pageNo <= ISSUE_INTAKE_MAX_EVENT_PAGES; pageNo += 1) {
+      const key: string = `${issueKey}\u0001${url ?? 'first'}`;
+      const page = await githubIssueEvents(
+        run.githubFetch,
+        token,
+        ref.owner,
+        ref.repo,
+        ref.issueNumber,
+        { url, etag: etagFor(cache, key) },
+      );
+      const data: GithubIssueEventsPage | null = settle(cache, key, page);
+      if (data === null) return null;
+      events.push(...data.events);
+      if (!data.more) return { events, complete: true };
+      if (data.next === null) return { events, complete: false };
+      url = data.next;
+    }
+    return { events, complete: false };
   }
 
   /** D5：谁最后打的 ready-for-agent，他在仓库上够不够 triage。 */
@@ -263,18 +345,71 @@ export function createIssueIntake(
     now: number,
   ): Promise<Verdict> {
     const key = `${teamId}\u0000${owner}/${repo}#${issueNumber}`.toLowerCase();
-    const page = await githubIssueLabelEvents(run.githubFetch, token, owner, repo, issueNumber, {
-      etag: eventsCache.get(key)?.etag ?? null,
-    });
-    const data = settle(eventsCache, key, page);
-    if (data === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
-    const labeler = newestLabeler(data);
+    const history = await readHistory(eventsCache, key, token, { owner, repo, issueNumber });
+    if (history === null) return { notTaken: 'unverifiable', reason: 'events-unreadable' };
+    const labeler = newestLabeler(history);
     if ('reason' in labeler) return { notTaken: 'not-eligible', reason: labeler.reason };
-    const permission = await permissionOf(teamId, token, owner, repo, labeler.login, now);
-    if (permission === null) return { notTaken: 'unverifiable', reason: 'permission-unreadable' };
-    return qualifies(permission)
-      ? 'eligible'
-      : { notTaken: 'not-eligible', reason: 'labeler-below-triage' };
+    const trusted = await hasTriage(teamId, token, owner, repo, labeler.login, now);
+    if (trusted === null) return { notTaken: 'unverifiable', reason: 'permission-unreadable' };
+    return trusted ? 'eligible' : { notTaken: 'not-eligible', reason: 'labeler-below-triage' };
+  }
+
+  /** 一条候选：D5 → 导入前再数在飞 → 导入（409 = 别路已领）→ 编排。 */
+  async function take(
+    row: ProjectRow,
+    owner: string,
+    repo: string,
+    access: { token: string; box: SecretBox },
+    issueNumber: number,
+    now: number,
+    tally: IssueIntakeTally,
+  ): Promise<'imported' | 'full' | 'not-taken'> {
+    const verdict = await labelerVerdict(row.teamId, access.token, owner, repo, issueNumber, now);
+    if (verdict !== 'eligible') {
+      if (verdict.notTaken === 'unverifiable') tally.unverifiable += 1;
+      else tally.notEligible += 1;
+      log(
+        { projectId: row.id, issue: issueNumber, reason: verdict.reason },
+        'issue intake candidate not taken',
+      );
+      return 'not-taken';
+    }
+    // 读窗口里别处可能已占位（webhook 导入）：导入前再数一次。
+    if (projectFull(row.id)) {
+      tally.atCap += 1;
+      return 'full';
+    }
+    let todoId: string;
+    try {
+      const record = await importGithubIssue(
+        { ...deps, box: access.box, githubFetch: run.githubFetch },
+        row,
+        issueNumber,
+      );
+      todoId = record.id;
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 409) {
+        tally.claimed += 1;
+        return 'not-taken';
+      }
+      tally.errors += 1;
+      log(
+        { projectId: row.id, issue: issueNumber, err: errText(err) },
+        'issue intake import failed',
+      );
+      return 'not-taken';
+    }
+    tally.imported += 1;
+    // 列表只给 open 的 issue：导入即「见过 open」（关闭对账的起点）。
+    seenOpen.add(refKey(row.teamId, githubIssueSourceRef(owner, repo, issueNumber)));
+    try {
+      orchestrateTodo(deps, todoId);
+      tally.orchestrated += 1;
+    } catch (err) {
+      tally.errors += 1;
+      log({ todoId, err: errText(err) }, 'issue intake orchestrate failed');
+    }
+    return 'imported';
   }
 
   async function intakeProject(
@@ -285,115 +420,111 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
-    const full = () => inFlight(row.id) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
     // 满员不读列表（省一次读；下一轮有位再读）。
-    if (full()) return;
+    if (projectFull(row.id)) return;
     const listKey = `${row.teamId}\u0000${owner}/${repo}`.toLowerCase();
-    const page = await githubOpenIssuesWithLabel(
-      run.githubFetch,
-      access.token,
-      owner,
-      repo,
-      ISSUE_INTAKE_LABEL,
-      { etag: listCache.get(listKey)?.etag ?? null },
-    );
-    const listedIssues = settle(listCache, listKey, page);
-    if (listedIssues === null) {
-      // 403 / 404（token 看不到该仓）、限流、网络：整项目本轮不领。
-      tally.skipped += 1;
-      log({ projectId: row.id, reason: 'list-unreadable' }, 'issue intake project skipped');
-      return;
-    }
-    if (page?.notModified === true) tally.listNotModified += 1;
-    const candidates = [...listedIssues].sort((a, b) => a.number - b.number);
-    tally.candidates += candidates.length;
     const claimed = claimedRefs(row.teamId);
     const listed = new Set<string>();
-    // 满员后余下的候选都等下一轮（不再逐条数库）。
+    const visitedPages = new Set<string>();
+    // 满员后余下的候选都等下一轮（不再逐条数库，也不再翻页）。
     let atCap = false;
-    for (const issue of candidates) {
-      const ref = githubIssueSourceRef(owner, repo, issue.number);
-      listed.add(`${listKey}#${issue.number}`);
-      if (claimed.has(ref.toLowerCase())) {
-        tally.claimed += 1;
-        continue;
+    let url: string | null = null;
+    for (let pageNo = 1; ; pageNo += 1) {
+      if (pageNo > ISSUE_INTAKE_MAX_LIST_PAGES) {
+        tally.listTruncated += 1;
+        log(
+          { projectId: row.id, pages: ISSUE_INTAKE_MAX_LIST_PAGES },
+          'issue intake list truncated',
+        );
+        break;
       }
-      if (!atCap) atCap = full();
-      if (atCap) {
-        tally.atCap += 1;
-        continue;
-      }
-      const verdict = await labelerVerdict(
-        row.teamId,
+      const pageKey: string = `${listKey}\u0000${url ?? 'first'}`;
+      visitedPages.add(pageKey);
+      const page = await githubOpenIssuesWithLabel(
+        run.githubFetch,
         access.token,
         owner,
         repo,
-        issue.number,
-        now,
+        ISSUE_INTAKE_LABEL,
+        { url, etag: etagFor(listCache, pageKey) },
       );
-      if (verdict !== 'eligible') {
-        if (verdict.notTaken === 'unverifiable') tally.unverifiable += 1;
-        else tally.notEligible += 1;
-        log(
-          { projectId: row.id, issue: issue.number, reason: verdict.reason },
-          'issue intake candidate not taken',
-        );
-        continue;
+      const data: GithubLabeledIssuesPage | null = settle(listCache, pageKey, page);
+      if (data === null) {
+        // 403 / 404（token 看不到该仓）、限流、网络：首页读不到 = 整项目本轮
+        // 不领；后面的页读不到 = 本轮停在这一页。
+        if (pageNo === 1) {
+          tally.skipped += 1;
+          log({ projectId: row.id, reason: 'list-unreadable' }, 'issue intake project skipped');
+          return;
+        }
+        log({ projectId: row.id, page: pageNo }, 'issue intake list page unreadable');
+        break;
       }
-      // 读窗口里别处可能已占位（webhook 导入）：导入前再数一次。
-      atCap = full();
-      if (atCap) {
-        tally.atCap += 1;
-        continue;
-      }
-      let todoId: string;
-      try {
-        const record = await importGithubIssue(
-          { ...deps, box: access.box, githubFetch: run.githubFetch },
-          row,
-          issue.number,
-        );
-        todoId = record.id;
-      } catch (err) {
-        if (err instanceof HttpError && err.status === 409) {
+      if (page?.notModified === true) tally.listNotModified += 1;
+      const candidates = [...data.issues].sort((a, b) => a.number - b.number);
+      tally.candidates += candidates.length;
+      for (const issue of candidates) {
+        const ref = githubIssueSourceRef(owner, repo, issue.number);
+        listed.add(`${listKey}#${issue.number}`);
+        if (claimed.has(ref.toLowerCase())) {
           tally.claimed += 1;
           continue;
         }
-        tally.errors += 1;
-        log(
-          { projectId: row.id, issue: issue.number, err: errText(err) },
-          'issue intake import failed',
-        );
-        continue;
+        if (!atCap) atCap = projectFull(row.id);
+        if (atCap) {
+          tally.atCap += 1;
+          continue;
+        }
+        const outcome = await take(row, owner, repo, access, issue.number, now, tally);
+        if (outcome === 'full') atCap = true;
+        if (outcome === 'imported') claimed.add(ref.toLowerCase());
       }
-      tally.imported += 1;
-      claimed.add(ref.toLowerCase());
-      try {
-        orchestrateTodo(deps, todoId);
-        tally.orchestrated += 1;
-      } catch (err) {
-        tally.errors += 1;
-        log({ todoId, err: errText(err) }, 'issue intake orchestrate failed');
-      }
+      if (atCap || data.next === null) break;
+      url = data.next;
     }
-    // events 缓存只留仍在列表里的 issue。
+    // 缓存只留这一轮读过的页、仍在列表里的 issue。
+    for (const key of listCache.keys()) {
+      if (key.startsWith(`${listKey}\u0000`) && !visitedPages.has(key)) listCache.delete(key);
+    }
     for (const key of eventsCache.keys()) {
-      if (key.startsWith(`${listKey}#`) && !listed.has(key)) eventsCache.delete(key);
+      const issueKey = key.split('\u0001')[0] ?? '';
+      if (key.startsWith(`${listKey}#`) && !listed.has(issueKey)) eventsCache.delete(key);
     }
   }
 
-  /** issue 在 GitHub 关了 → 卡经关闭路径落 closed（停活动步）。 */
+  /** 关闭人核验：最新一条 closed 事件的 actor 在仓库上是不是 triage 及以上。 */
+  async function closerVerdict(
+    teamId: string,
+    token: string,
+    ref: { owner: string; repo: string; issueNumber: number },
+    key: string,
+    now: number,
+  ): Promise<'trusted' | { reason: string }> {
+    const history = await readHistory(closerEventsCache, key, token, ref);
+    if (history === null) return { reason: 'events-unreadable' };
+    if (!history.complete) return { reason: 'events-incomplete' };
+    const closed = newestOf(history.events, (e) => e.event === 'closed');
+    if (closed === null) return { reason: 'no-closed-event' };
+    if (closed.actor === null) return { reason: 'closer-deleted' };
+    const trusted = await hasTriage(teamId, token, ref.owner, ref.repo, closed.actor, now);
+    if (trusted === null) return { reason: 'permission-unreadable' };
+    return trusted ? 'trusted' : { reason: 'closer-below-triage' };
+  }
+
+  /** issue 在 GitHub 上由可信的人从 open 关成 closed（本进程看到的变化）→ 卡
+   * 经关闭路径落 closed（停活动步）。 */
   async function reconcileClosed(
     teamId: string,
     token: string,
     rows: { id: string; phase: Phase; sourceRef: string }[],
+    now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
     const keep = new Set<string>();
     for (const t of rows) {
       const ref = parseGithubIssueSourceRef(t.sourceRef);
       if (ref === null) continue;
-      const key = `${teamId}\u0000${t.sourceRef}`.toLowerCase();
+      const key = refKey(teamId, t.sourceRef);
       keep.add(key);
       try {
         const page = await githubIssueState(
@@ -409,7 +540,22 @@ export function createIssueIntake(
           tally.closeSkipped += 1;
           continue;
         }
-        if (issue.state !== 'closed') continue;
+        if (issue.state === 'open') {
+          seenOpen.add(key);
+          continue;
+        }
+        // 没见过它 open（首见即 closed、重启后、或关过一次后卡被重开）：不是
+        // 本进程看到的 open → closed，不动。
+        if (!seenOpen.has(key)) continue;
+        const closer = await closerVerdict(teamId, token, ref, key, now);
+        if (closer !== 'trusted') {
+          tally.closeSkipped += 1;
+          log(
+            { todoId: t.id, issue: ref.issueNumber, reason: closer.reason },
+            'issue intake close skipped',
+          );
+          continue;
+        }
         // 写前重读相位：读窗口里被人推进（如进 review）/ 关闭 / 完成 → 不动。
         const fresh = deps.db
           .select({ phase: todo.phase })
@@ -421,15 +567,28 @@ export function createIssueIntake(
           continue;
         }
         const result = transitionTodos(deps, teamId, [t.id], 'closed', ISSUE_INTAKE_ACTOR);
-        if (result.transitioned.includes(t.id)) tally.closed += 1;
-        else tally.closeSkipped += 1;
+        if (result.transitioned.includes(t.id)) {
+          tally.closed += 1;
+          // 关过即忘：有人把卡重开（issue 仍 closed）不再关第二次。
+          seenOpen.delete(key);
+        } else tally.closeSkipped += 1;
       } catch (err) {
         tally.errors += 1;
         log({ todoId: t.id, err: errText(err) }, 'issue intake close failed');
       }
     }
-    for (const key of stateCache.keys()) {
-      if (key.startsWith(`${teamId}\u0000`.toLowerCase()) && !keep.has(key)) stateCache.delete(key);
+    // 只留本队仍在对账集里的卡。
+    const teamPrefix = `${teamId}\u0000`.toLowerCase();
+    for (const cache of [stateCache, closerEventsCache]) {
+      for (const key of cache.keys()) {
+        // closerEventsCache 的键带页后缀（\u0001…），按 issue 键比。
+        if (key.startsWith(teamPrefix) && !keep.has(key.split('\u0001')[0] ?? '')) {
+          cache.delete(key);
+        }
+      }
+    }
+    for (const key of seenOpen) {
+      if (key.startsWith(teamPrefix) && !keep.has(key)) seenOpen.delete(key);
     }
   }
 
@@ -446,7 +605,7 @@ export function createIssueIntake(
       log({ teamId, reason: got.reason }, 'issue intake team skipped');
       return;
     }
-    await reconcileClosed(teamId, got.token, toReconcile, tally);
+    await reconcileClosed(teamId, got.token, toReconcile, now, tally);
     if (projects.length === 0) return;
     if (!chiefCanOrchestrate(deps, teamId)) {
       tally.skipped += projects.length;
@@ -533,6 +692,10 @@ export function createIssueIntake(
           log({ teamId, err: errText(err) }, 'issue intake team failed');
         }
       }
+    } catch (err) {
+      // 查库等整轮级失败（例：SQLITE_BUSY）：记一行带原因，对账行照落。
+      tally.errors += 1;
+      log({ err: errText(err) }, 'issue intake sweep failed');
     } finally {
       sweeping = false;
     }
