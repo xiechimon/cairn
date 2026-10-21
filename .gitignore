@@ -88,6 +88,7 @@ credentials.enc
 .claude/skills/*
 !.claude/skills/verify-pacman/
 !.claude/skills/pr-pacman/
+!.claude/skills/verify-step-claim/
 !.claude/hillclimb/
 !.claude/settings.json
 !.claude/hooks/
