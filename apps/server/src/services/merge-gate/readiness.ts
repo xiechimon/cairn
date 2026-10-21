@@ -74,8 +74,10 @@ export interface GateInputs {
   /** PR head 的检查；null = 读不到。headSha = 外壳读检查时请求的提交：check run 与
    * commit status 都按这一个 40 位小写 SHA 读（不按分支名）。它不等于 pr.headSha
    * （比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）= 这份结果说的是别的提交，
-   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。required
-   * 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
+   * 整份按读不到处理（required-checks-unreadable，可等，下一次巡检再读）。GateCheckRun
+   * 与 GateCommitStatus 不带各自的 SHA，这里只能对 headSha；响应里的 SHA（每条 check
+   * run 的 head_sha、combined status 的 sha）由 S4 的外壳对过：有一条不等于请求的
+   * SHA，这次读就不算在这个提交上读的，整份传 null。required 为 null = 必需清单读不到。runs 每个 (app, 名字) 最新的一条，statuses 每个 context
    * 最新的一条（同一 app 同名的旧条目不传）。S4 的外壳按 app 与名字去重，不能只按
    * 名字：两个 app 报同名的检查时，只按名字会让失败的那条被同名的通过盖掉，GitHub 的
    * rollup 却照样算它；自家 status 未通过时 unstable 又按自家豁免，闸就看着一条失败
@@ -94,16 +96,21 @@ export interface GateInputs {
    *   响应没有 head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url
    *   里是缩写），commits 按时间排、分页，末一个不保证是 head。
    * - files：全部文件（compareFilesFromResponse）。
-   * - commits：本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。
-   * headSha 不等于 pr.headSha（比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读）=
-   * 文件与摘要说的不是 PR head 的补丁，按读不到处理（patch-unavailable，可等，下一次
-   * 巡检再读），文件数对不上也不报 compare-truncated：那是跨推送的竞态，不是截断。
+   * - commits：本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。读全时
+   *   含读到的 head。
+   * headSha 不等于 pr.headSha（比 PR 旧或比 PR 新都算：缓存的响应、跨推送的两次读），
+   * 或 commits 里没有 pr.headSha（按分支名或从缓存读的 compare，外壳却照 pr.headSha
+   * 填了 headSha：这一条出自响应本身，不只信外壳填的值）= 文件与摘要说的不是 PR head
+   * 的补丁，按读不到处理（patch-unavailable，可等，下一次巡检再读），文件数对不上也
+   * 不报 compare-truncated：那是跨推送的竞态，不是截断。
    * 'unreadable' = 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' =
    * 读到了、形状不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），
-   * 每次读都一样，留人。commits 少给只会让证据链少认（拦），不会多放。commits 不带
-   * 逐提交的文件列表，所以证据链指向的文件在那个提交上是否已经存在（raw 是否 404）
-   * 这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head 可对，compare 与检查照常
-   * 判（pr-unreadable 已拦，结果不报 head）。 */
+   * 每次读都一样，留人；headSha 不是 40 位小写 SHA 时外壳同样传 'malformed'，不要让
+   * 它在这里成为永远对不上的可等。commits 少给别的提交只会让证据链少认（拦），不会
+   * 多放。commits 不带逐提交的文件列表，所以证据链指向的文件在那个提交上是否已经存在
+   * （raw 是否 404）这里判不了，由 I/O 外壳（S4）去查。PR 读不到时没有 head 可对：
+   * compare 与检查照常判、blocker 照常列（pr-unreadable 已拦），结果不报 head，也不报
+   * 摘要（没有 head 的摘要绑不到哪个提交上）。 */
   compare:
     | { headSha: string; files: CompareFile[]; commits: string[] }
     | 'unreadable'
@@ -122,6 +129,10 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
+const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]));
+const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
+  MERGE_BLOCKERS.map((b) => [b.code, b]),
+);
 
 // detail 里的名字（文件、检查、分支、仓库）由 PR 作者或第三方起，原样会把换行、
 // 控制字符、指令样的文本与任意长的名单带进 status 描述与 chief 工具。名字一律写成
@@ -288,13 +299,17 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   // 补丁。compare 读不到可等；读到了形状不对，下一次读还是一样，留人。compare 不是在
-  // PR 的 head 上读的（旧或新）：说的是别的补丁，按读不到处理，下一次巡检再读；摘要、
-  // 文件数、路径、证据链与判定都不拿它判，结果也不报它的摘要，免得把别的补丁的结论
-  // 安到 head 上。
+  // PR 的 head 上读的（外壳填的 head 对不上，或响应自己的提交里没有这个 head）：说的是
+  // 别的补丁，按读不到处理，下一次巡检再读；摘要、文件数、路径、证据链与判定都不拿它
+  // 判，结果也不报它的摘要，免得把别的补丁的结论安到 head 上。
   let compare = typeof i.compare === 'string' ? null : i.compare;
   if (i.compare === 'unreadable') block('patch-unavailable', 'compare unreadable');
   if (i.compare === 'malformed') block('compare-malformed');
-  if (compare !== null && pr !== null && compare.headSha !== pr.headSha) {
+  if (
+    compare !== null &&
+    pr !== null &&
+    (compare.headSha !== pr.headSha || !compare.commits.includes(pr.headSha))
+  ) {
     block('patch-unavailable', 'compare not read at the PR head');
     compare = null;
   }
@@ -424,15 +439,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   if (!i.availability.verifier) block('no-verifier');
   if (!i.availability.decider) block('no-decider');
 
-  // 按词表顺序取出记下的码，类别与文案也从词表来。
-  const blockers: MergeBlocker[] = MERGE_BLOCKERS.flatMap((b) => {
-    const detail = found.get(b.code);
-    return detail === undefined ? [] : [{ code: b.code, class: b.class, label: b.label, detail }];
-  });
+  const blockers: MergeBlocker[] = [...found.entries()]
+    .sort(([a], [b]) => (ORDER.get(a) ?? 0) - (ORDER.get(b) ?? 0))
+    .map(([code, detail]) => {
+      const meta = META.get(code);
+      return { code, class: meta?.class ?? 'human', label: meta?.label ?? code, detail };
+    });
   return {
     ready: blockers.length === 0,
     headSha: pr?.headSha ?? null,
-    patchDigest: D,
+    patchDigest: pr === null ? null : D,
     policy: i.policy.mergePolicy,
     blockers,
   };
