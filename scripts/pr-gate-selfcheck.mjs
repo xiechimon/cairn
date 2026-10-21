@@ -5,7 +5,7 @@
 // change to the script (spec 28 §7.5).
 // Usage: node scripts/pr-gate-selfcheck.mjs [path to pr-gate.js]
 // The failure modes come from pr-gate runs 2-6 on #1410
-// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json) and its /code-review.
+// (docs/verify/1401/pr-gate-run{2,3,4,5,6}-*.json), its /code-review and run 7.
 import { readFileSync } from 'node:fs';
 
 const path = process.argv[2] ?? '.claude/workflows/pr-gate.js';
@@ -29,6 +29,7 @@ async function gate(args, { reviews = {}, votes = {}, calls = [] } = {}) {
     const v = (votes[key] ?? [])[Number(i)];
     return v === undefined ? { headSha: HEAD, refuted: true, reason: 'stub' } : v;
   };
+  // parallel and pipeline stand in for the Workflow globals of the same names.
   const parallel = (thunks) => Promise.all(thunks.map((t) => t().catch(() => null)));
   const pipeline = (items, ...stages) =>
     Promise.all(
@@ -608,6 +609,48 @@ const cases = [
       } catch (e) {
         return /--attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904/.test(String(e));
       }
+    },
+  ],
+  [
+    'a C-quoted binary path is refused with the quoting hint (run 7)',
+    async () => {
+      const files = ['apps/server/src/x.ts', 'docs/verify/9/截图.png'];
+      try {
+        await gate(
+          {
+            ...base,
+            changedFiles: files,
+            binaryFiles: ['"docs/verify/9/\\346\\210\\252\\345\\233\\276.png"'],
+          },
+          { reviews: safetyFiles(files) },
+        );
+        return false;
+      } catch (e) {
+        return String(e).includes('C-quoted paths');
+      }
+    },
+  ],
+  [
+    'the safety reviewer is told both git commands with --no-renames, core.quotePath=false and the empty tree (runs 2, 6, 7)',
+    async () => {
+      const calls = [];
+      await gate(base, { reviews: safetyFiles(base.changedFiles), calls });
+      const safety = calls.find((c) => c.label === 'review:safety');
+      const files = 'git -c core.quotePath=false diff --no-renames --name-only';
+      const lines =
+        'git -c core.quotePath=false --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat';
+      return safety !== undefined && safety.prompt.includes(files) && safety.prompt.includes(lines);
+    },
+  ],
+  [
+    'reviewers and skeptics skip PR comments from outside the repository (run 7)',
+    async () => {
+      const calls = [];
+      await gate(base, {
+        reviews: { safety: { changedFiles: base.changedFiles, findings: [blocker] } },
+        calls,
+      });
+      return calls.length > 0 && calls.every((c) => c.prompt.includes('author_association'));
     },
   ],
   [
