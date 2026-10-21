@@ -110,12 +110,21 @@ export async function listProjectGithubIssues(
  * 必携位同名冲突，Omit 后交集成立）。 */
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;
 
-/** #1406 进程内导入占位（团队 × sourceRef）。claimedSourceRefs 是应用层检查、
- * todo.sourceRef 无唯一约束，导入在检查与 createTodo 之间要等两次 GitHub 读：
- * webhook 与 issue 轮询器同时导入同一 issue 时两路都能过检查、各建一张卡。
+/** #1406 进程内导入占位（团队 × sourceRef → 项目 id）。claimedSourceRefs 是应用
+ * 层检查、todo.sourceRef 无唯一约束，导入在检查与 createTodo 之间要等两次 GitHub
+ * 读：webhook 与 issue 轮询器同时导入同一 issue 时两路都能过检查、各建一张卡。
  * 占位在第一次 await 之前落下、finally 里释放（建成后由 DB 行接手去重）。
- * 只管单进程（server 单实例；多实例同库不在本闸内）。 */
-const importsInFlight = new Set<string>();
+ * 只管单进程（server 单实例；多实例同库不在本闸内）。#1459：占位带项目 id，
+ * 在飞上限把还在等 GitHub 读的导入也算进去（importsInFlightFor）。 */
+const importsInFlight = new Map<string, string>();
+
+/** 项目里正在导入、还没落行的 issue 数（#1459 在飞上限现数用：检查与占位之间
+ * 没有 await，同时到的几路导入合起来不超上限）。 */
+export function importsInFlightFor(projectId: string): number {
+  let n = 0;
+  for (const p of importsInFlight.values()) if (p === projectId) n += 1;
+  return n;
+}
 
 /** 从 issue 建任务（ADR 0005 D3/D5/D6 落地）：
  * - 标题 = issue 标题原样（不走占位→回填两段式；createTodo 的派生仅对
@@ -147,7 +156,7 @@ export async function importGithubIssue(
   if (importsInFlight.has(claim)) {
     throw new HttpError(409, `issue ${ref} is being imported`);
   }
-  importsInFlight.add(claim);
+  importsInFlight.set(claim, row.id);
   try {
     const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
     // label 面失败 = 整个导入失败（不落半成品词表）；同名条目 issue 集后置
