@@ -1,4 +1,4 @@
 P1_SingleExecutorPerMachine FAIL TryClaim,HeartbeatAges,SchedulerTick,TryClaim
 P2_OnlyHolderResultApplied FAIL TryClaim,FinishSession,HeartbeatAges,SchedulerTick,TryClaim,FinishStepOwnedCheck
 P3_NoClaimAfterClose PASS
-P4_AcceptedStopReachesWorkers FAIL TryClaim,CloseCard,DeliverStopFetch,DeliverStopToHandle
+P4_AcceptedStopReachesWorkers PASS

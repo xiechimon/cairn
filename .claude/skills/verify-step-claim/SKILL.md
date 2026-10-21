@@ -1,6 +1,6 @@
 ---
 name: verify-step-claim
-description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡停止的 TLA+ 模型检查（TLC，一条命令约 1.5 到 2.5 分钟）。改到 tryClaim、heartbeatStep、ownedStep、finishStep、sweepAbandonedBuildSteps、sweepStaleMachines、sweepQuotaWaitSteps、stopActiveStepsAfterExit、fetchStop、scheduler tick 顺序，或 daemon 的领取循环、recover、deliverStop、runStep 的心跳 / 会话登记 / 收尾时用；判断改动有没有让「同一步被两处同时跑」「旧执行者的结果被采纳」「关卡后又被领走」「已接收的停止信号丢失」变得更好或更坏。
+description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡停止的 TLA+ 模型检查（TLC，一条命令约 2 到 3 分钟）。改到 tryClaim、heartbeatStep、ownedStep、finishStep、sweepAbandonedBuildSteps、sweepStaleMachines、sweepQuotaWaitSteps、stopActiveStepsAfterExit、fetchStop、scheduler tick 顺序，或 daemon 的领取循环、recover、deliverStop、runStep 的心跳 / 会话登记 / 收尾时用；判断改动有没有让「同一步被两处同时跑」「旧执行者的结果被采纳」「关卡后又被领走」「已接收的停止信号丢失」变得更好或更坏。
 ---
 
 # verify-step-claim
@@ -16,7 +16,7 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 ## 怎么跑
 
 ```sh
-.claude/skills/verify-step-claim/scripts/run.sh            # 四条全跑，8 核约 1.5 到 2.5 分钟（P3 占绝大部分，视机器负载）
+.claude/skills/verify-step-claim/scripts/run.sh            # 四条全跑，8 核约 2 到 3 分钟（P3、P4 两条 PASS 占绝大部分，视机器负载）
 .claude/skills/verify-step-claim/scripts/run.sh P1_SingleExecutorPerMachine   # 只跑一条，几秒
 ```
 
@@ -40,31 +40,32 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 
 ## 当前结果与已知发现（sync-commit 时）
 
-`P1 FAIL`、`P2 FAIL`、`P3 PASS`（2,193,222 个不同状态，8 核 88 到 132 秒）、`P4 FAIL`。三条 FAIL 是代码里的真问题，不是模型错误：每条反例都对着真代码复现过（见下文「复现证据」）。**不要为了让它们通过去削弱性质或模型。** 修掉代码问题后，按「更新验证」改模型，结果变 PASS，再把 `expected.txt` 那一行改成 PASS。
+`P1 FAIL`、`P2 FAIL`、`P3 PASS`、`P4 PASS`（P3 / P4 各 1,404,678 个不同状态，8 核各 40 到 120 秒）。F3 修复后停止不再经会话句柄投递，模型去掉了 `handle` / `stopReq` 两个变量，状态数从 2,193,222 降到 1,404,678。两条 FAIL 是代码里的真问题，不是模型错误：每条反例都对着真代码复现过（见下文「复现证据」）。**不要为了让它们通过去削弱性质或模型。** 修掉代码问题后，按「更新验证」改模型，结果变 PASS，再把 `expected.txt` 那一行改成 PASS。
+
+模型已跟到 F3 修复，但 `sync-commit` 仍是 23a39da9：本仓 squash 合并，分支上的提交号合并后不在 main 上。F3 修复合并后，把 `sync-commit` 推到那个 squash 提交。
 
 **F1（P1）同机重领，同一步两个执行者。**
 1. 机器 m1 的 daemon 领到步（`tryClaim`），runStep 开始准备工作区（clone / 等同项目锁 / `.agents/setup`，后者上限 20 分钟）。
-2. 心跳计时器在准备完成后才启动（`runner.ts:1133`），所以 120 秒内没有任何心跳落地。
+2. 心跳计时器在准备完成后才启动（`runner.ts:1142`），所以 120 秒内没有任何心跳落地。
 3. 调度一拍：步 claimed、心跳超 120 秒、`lastHeartbeatAt` 从未推进 → `sweepAbandonedBuildSteps` 在机器**在线**时也把它放回 pending、清掉 `machineId`，并唤醒等待中的领取请求。
-4. 同一台 daemon 的领取循环立刻又领到它（归属机只有 m1；领取循环不查这个步是否已在本机跑，`machine-loop.ts:666-689`）→ 第二个 runStep。
+4. 同一台 daemon 的领取循环立刻又领到它（归属机只有 m1；领取循环不查这个步是否已在本机跑，`machine-loop.ts:678-701`）→ 第二个 runStep。
 笔记本合盖或断网超过 150 秒也能走到这里（机器先被 `sweepStaleMachines` 翻离线，再被释放）。
 
 **F2（P2）旧执行者的回报被采纳。** 接 F1 第 4 步：第一个 runStep 准备失败（比如 setup 失败）报 `done(failed)` → `ownedStep` 只比机器号（`machines.ts:1265-1270`）→ 采纳，步变 failed、卡片变 failed，而第二个 runStep 还在跑。`finishStep` / `completeStep` 都不检查步当前状态，第二个执行者之后的回报同样被采纳。单次领取也能违反（交接时用诊断不变式确认过，时间窗窄）：success 回报通过 `ownedStep` 后在 await（`mergedPrElsewhere` 查 GitHub / `applyMergeLanding`）期间，扫尾把步放回 pending，await 结束后照样写成 done。
 
 **F4（无性质覆盖，推断）回报丢一次，步就一直卡在执行中。** 模型里用诊断不变式走到过这条 8 步路径，真代码没跑过：
 1. 会话开始，心跳已落地（`lastHeartbeatAt` 推进过）。
-2. 断网，会话结束，`client.done` 抛错（`machine-client.ts` 的 `request` 不重试），runner 留着 journal 直接返回（`runner.ts:2188-2195`）。
+2. 断网，会话结束，`client.done` 抛错（`machine-client.ts` 的 `request` 不重试），runner 留着 journal 直接返回（`runner.ts:2208-2215`）。
 3. 网络恢复，presence 照常，机器在线。
 4. 扫尾：心跳超时，但机器在线且心跳推进过 → 当成歧义态不动（`builds.ts:1499-1508`）。没有执行者，也没有人补报，直到 daemon 重启走 recover。
 四条性质都是安全性质，抓不到「一直不前进」；要抓需要加带公平性假设的活性性质（见「不在范围」）。
 
-**F3（P4）准备期收到的停止信号被丢掉。**
-1. 步已被 m1 领走，runStep 还在准备（会话句柄尚未登记，`runner.ts:1454` 才登记）。
-2. 用户关卡 → `stopActiveStepsAfterExit` 写 `stop_pending` 并推 stop 事件。
-3. daemon `deliverStop` → `GET /api/machine/stop` → `fetchStop` 返回 discard 并**删掉** `stop_pending` 行（`machines.ts:269`）。
-4. daemon 查 `sessionHandles.get(stepId)` 为空 → 记一行 `stop dropped (no live session)` 就返回（`machine-loop.ts:527-530`）。
-5. 准备完成后会话照常开始并跑完，回报 success；server 端再无停止记录，扫尾也不会停它（心跳新鲜）。
-模型还给出另外两条走到同一结局的路径（交接时用诊断不变式单独确认过）：F1 的双执行者状态下关卡，停止只投到最新登记的那个会话（`sessionHandles` 按步号覆盖），旧的那个继续跑；关卡后 daemon 崩溃重启，recover 按 journal 把这一步重新跑起来，而 `stop_pending` 已被 `fetchStop` 删掉，没人再去停它。
+**F3（P4）准备期收到的停止信号被丢掉——已修。**
+修复前（23a39da9）：步已被 m1 领走、runStep 还在准备（会话句柄要到开会话后才登记）时用户关卡 → `stopActiveStepsAfterExit` 写 `stop_pending` 并推 stop 事件 → daemon `deliverStop` 经 `fetchStop` 拉到 discard，server 随即删掉 `stop_pending` 行 → `sessionHandles.get(stepId)` 为空，记一行 `stop dropped (no live session)` 就返回 → 会话照常开始并跑完，回报 success。同一结局还有两条路径：F1 的双执行者状态下停止只投到最新登记的那个会话（`sessionHandles` 按步号覆盖）；关卡后 daemon 崩溃重启，recover 按 journal 把这一步重跑，而 server 的停止记录已删。
+修复（server 的拉取即确认不变，`fetchStop` 照旧删行）：
+1. 停止按 run 投递，不按会话句柄投递（`apps/daemon/src/step-stops.ts`）。runStep 进门登记本次 run 的停止位（`runner.ts:421`），`deliverStop` 把请求记到这一步在本机每一次还没收尾的 run 上（`machine-loop.ts:532`），再中断其中会话已开的。会话未开时只记下请求：开会话前查到就不开会话、直接报 stopped（`runner.ts:1446`）；开会话途中到的，会话一开即中断（`runner.ts:1473`）。同一步号两次 run 时两次都收到。run 在收尾读停止位时 settle（`runner.ts:1813`），之后到的停止不再接收，照旧记 `stop dropped (no live session)`。
+2. 有 run 接收时，`deliverStop` 在中断会话之前写 journal 的 `stopRequest`（`machine-loop.ts:538`；写失败只记日志，不挡投递；中断调用抛错就清掉这条记录）。recover 见到它就报 stopped、不重跑（`machine-loop.ts:444` → `runner.ts:2321` `resumeStoppedStep`）；awaiting-upload 残留仍按快照补报（会话已跑完，完成优先）。不开会话报 stopped 时与正常收尾同序：终稿快照落 journal、回传已有 transcript（任务行不丢）、再报 done。
+验证：P4 PASS。在模型里分别退回三处——只投给会话已开的 run、只投给最新一次 run、recover 不看 journal 里的停止——P4 都报违反，反例依次是准备期丢停止、F1 双执行者、关卡后崩溃重启（见「证明检查能失败」）。测试先红后绿：`apps/daemon/test/machine-stop.test.ts`「已接收的停止送达本机每一次 run（F3）」、`runner-stop.test.ts` 失败方式 5、`runner-network-retry.test.ts` 失败方式 5b、`machine-recover.test.ts` 两条「重启前已接收停止」。
 
 ### 复现证据（sync-commit 时实测）
 
@@ -72,7 +73,7 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 
 - server 半（F1 / F2）：在 `apps/server/test/` 下用 `bootServer()` 建一台在线机器 + 归属该机的 agent + pending build 步；`claimStep` → 推进 121 秒跑 `sweepAbandonedBuildSteps` → 步变 pending、`machineId` 清空 → 同机 `claimStep` 返回同一步 → 旧执行者 `heartbeatStep` 被接受 → 旧执行者 `finishStep(success)` 被接受（步 done、卡片 review）→ 新执行者 `finishStep(failed)` 也被接受（步 failed、卡片 failed）。
 - daemon 半（F1）：`apps/daemon/test/machine-loop-harness.ts` 的 `FakeMachineApi`，`mePatch = { maxConcurrent: 1 }`，两次推同一个 `CLAIMED`（步 s1）→ `createSession` 被调用 2 次、两次 `done(success)`。
-- daemon 半（F3）：同一 harness，`createSession` 挂住期间推 `{type:'stop', stepId:'s1'}`、`stopResponse = true` → 日志 `stop dropped (no live session)` → 放开后回报 `done(success)`，会话 `stop()` 调用 0 次。
+- daemon 半（F3）：同一 harness，`createSession` 挂住期间推 `{type:'stop', stepId:'s1'}`、`stopResponse = true` → 日志 `stop dropped (no live session)` → 放开后回报 `done(success)`，会话 `stop()` 调用 0 次。修复时改写成提交的测试，断言修复后的行为（见 F3「验证」）。
 
 ## 怎么分辨真 bug 和模型写错
 
@@ -82,22 +83,22 @@ TLC 报违反时，脚本打印反例：每一步是模型里的动作名，下�
 - 某一步在代码里不可能（前置条件比代码宽、把代码里一个同步块拆成了两步、漏了代码里的某个检查）→ 模型写错。改模型，写清楚错在哪，再跑。
 - 拿不准时写一个不提交的复现测试（见上面三条的搭法），用真代码走一遍。
 
-## 动作 ↔ 代码对照（行号为 sync-commit 时）
+## 动作 ↔ 代码对照（`runner.ts` / `machine-loop.ts` 行号为 F3 修复时，其余为 sync-commit 时）
 
 server 是单进程、better-sqlite3 同步写：两个 `await` 之间的代码不会被别的请求插进来。模型按 `await` 切原子步，这是忠实度的核心。
 
-- `TryClaim(m)` / `TryClaimResponseLost(m)`：`apps/server/src/services/machines.ts` `tryClaim`（923）的 worker 分支，归属机闸 1001，`status = pending` 条件写 1074-1091；`claimStep` 长轮询 1235。daemon 侧领到即发 runStep：`apps/daemon/src/machine-loop.ts` 634 起的循环、`runner.ts:512` `journal.claim`。ResponseLost = server 已写 claimed、daemon 没收到响应（B-C7 移交竞态）。
-- `StartSession(e)`：`runner.ts:662` `workspace.prepare` 结束 → 1133 心跳计时器启动 → 1454 `sessionHandles.set`。准备期 = 模型里的 `preparing`。
-- `HeartbeatStep(e)`：`runner.ts:1133-1135`（失败被吞）→ `machines.ts:1258` `heartbeatStep`，所有权只看 `ownedStep`（1265，只比机器号）。
-- `FinishSession(e)`：会话结束、读 `stopRequests`（`runner.ts:1790`）定结果，`journal.update(awaiting-upload)`（2175）。准备期失败走 `failStep`，模型只给 `failed`。
-- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`：`machines.ts:1771` `finishStep`。只有 success 回报可能带 `prUrl`（`runner.ts:2062` 条件）或是合并落地，才会在 1839 / 1860 处 await，所以只有 success 被拆成两步；其余结果校验和写入在同一同步块。写入：配额 → `quota-wait.ts:87` `applyQuotaWaitStep`；success → `builds.ts:1595` `completeStep`；stopped → `builds.ts:291` `applyStoppedStep`；failed → `builds.ts:1391` `applyStepFailure`；全部先清 `stop_pending`（`machines.ts:1901`）。都不检查步当前状态。
+- `TryClaim(m)` / `TryClaimResponseLost(m)`：`apps/server/src/services/machines.ts` `tryClaim`（923）的 worker 分支，归属机闸 1001，`status = pending` 条件写 1074-1091；`claimStep` 长轮询 1235。daemon 侧领到即发 runStep：`apps/daemon/src/machine-loop.ts` 646 起的循环；runStep 进门登记停止位（`runner.ts:421`）、`runner.ts:521` `journal.claim`，与领取响应同一同步段。ResponseLost = server 已写 claimed、daemon 没收到响应（B-C7 移交竞态）。
+- `StartSession(e)`：`runner.ts:671` `workspace.prepare` 结束 → 1142 心跳计时器启动 → 1446 停止位已有请求就不开会话（模型里这个 run 不走 StartSession，由 `FinishSession` 给 stopped）→ 1471 `sessionHandles.set` → 1473 `stop.attach`（开会话途中到的停止在这里兑现）。准备期 = 模型里的 `preparing`。
+- `HeartbeatStep(e)`：`runner.ts:1142-1144`（失败被吞）→ `machines.ts:1258` `heartbeatStep`，所有权只看 `ownedStep`（1265，只比机器号）。
+- `FinishSession(e)`：会话结束、读本次 run 的停止位并 settle（`runner.ts:1813`）定结果，`journal.update(awaiting-upload)`（2197）。准备期失败走 `failStep`，模型只给 `failed`；准备期停止位有请求 → 1446 直接报 stopped，模型给 `stopped`。`ex[e].halt` = 本次 run 的停止位有请求（会话已开则已中断）。
+- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`：`machines.ts:1771` `finishStep`。只有 success 回报可能带 `prUrl`（`runner.ts:2084` 条件）或是合并落地，才会在 1839 / 1860 处 await，所以只有 success 被拆成两步；其余结果校验和写入在同一同步块。写入：配额 → `quota-wait.ts:87` `applyQuotaWaitStep`；success → `builds.ts:1595` `completeStep`；stopped → `builds.ts:291` `applyStoppedStep`；failed → `builds.ts:1391` `applyStepFailure`；全部先清 `stop_pending`（`machines.ts:1901`）。都不检查步当前状态。
 - `SchedulerTick`：`apps/server/src/services/scheduler.ts:95` `tick` 一整拍原子，按 144 `sweepStaleMachines`（`machines.ts:645`）→ 151 `sweepAbandonedBuildSteps`（`builds.ts:1466`：先停已关 / 已完成卡片的 pending / waiting_quota 残留，再判 claimed：心跳超时且（机器离线或心跳从未推进）→ 已关卡片 `stopStepKeepPhase`（424），否则 `releaseClaimedStep`（1516））→ 157 `sweepQuotaWaitSteps`（`quota-wait.ts:142`）的顺序。
 - `CloseCard`：`builds.ts:464` `stopActiveStepsAfterExit` → 468 `prepareStopFor`：pending / waiting_quota 即停，claimed 写 `stop_pending` + `stopSignal`。
-- `DeliverStopFetch(m)` / `DeliverStopToHandle(m)`：`machine-loop.ts:523` `deliverStop` 先 `await client.stop` → `machines.ts:253` `fetchStop`（claimed + 机器号匹配才返回并删行），再查 `sessionHandles`。
-- `MarkPresence(m)` / `PresenceAges(m)`：`machines.ts:576` `markPresence`；daemon 启动时一次（`machine-loop.ts:303`），之后 30 秒定时器（578，recover 结束后才启动）。
-- `DaemonCrash(m)` / `DaemonStartRecover(m)` / `DaemonRecoverDone(m)`：`machine-loop.ts:428` recover，`machines.ts:668` `recoverSteps`（claimed + 本机）；有 journal 就 `await runStep`（awaiting-upload 只补报），没有就报 failed；recover 期间不推送流、不发 presence、不领取。
+- `DeliverStopFetch(m)` / `DeliverStopToRuns(m)`：`machine-loop.ts:528` `deliverStop` 先 `await client.stop` → `machines.ts:253` `fetchStop`（claimed + 机器号匹配才返回并删行），再在同一同步段里把请求记到本机这一步每一次还没 settle 的 run 上（532，`step-stops.ts` `StepStops.accept`；模型里本机所有 Working 执行者 `halt`），有 run 接收才写 journal `stopRequest`（538，模型 `jstop`），然后中断已开的会话。
+- `MarkPresence(m)` / `PresenceAges(m)`：`machines.ts:576` `markPresence`；daemon 启动时一次（`machine-loop.ts:304`），之后 30 秒定时器（590，recover 结束后才启动）。
+- `DaemonCrash(m)` / `DaemonStartRecover(m)` / `DaemonRecoverDone(m)`：`machine-loop.ts:429` recover，`machines.ts:668` `recoverSteps`（claimed + 本机）；有 journal 时：awaiting-upload 只补报，带 `stopRequest` 报 stopped 不重跑（444，`resumeStoppedStep`），否则 `await runStep`；没有 journal 就报 failed；recover 期间不推送流、不发 presence、不领取。journal 在磁盘上，`jstop` 跨崩溃保留。
 - `MachineStreamAbort(m)`：`apps/server/src/routes-machine.ts:318` 推送流 `onAbort` 立即 `markOffline`，并丢掉还没送到的 stop 事件。模型允许它在机器在线的任何时刻发生（daemon 退出、断网、代理掐断长连接、server 重启都会触发）。
-- `DaemonCrash(m)` 时正在被 server 处理的回报（`applying`）变成 `orphan`：server 照常写完，但发请求的进程已经没了，所以不再动这台机器的 journal 和会话句柄。
+- `DaemonCrash(m)` 时正在被 server 处理的回报（`applying`）变成 `orphan`：server 照常写完，但发请求的进程已经没了，所以不再动这台机器的 journal（含 `jstop`）。
 - `HeartbeatAges`、`QuotaProbeDue`、`Partition(m)`、`Reconnect(m)`、`RebindHomeMachine(m)`：时间流逝 / 网络 / 用户改 agent 归属机。
 
 ## 边界与假设
@@ -106,6 +107,7 @@ server 是单进程、better-sqlite3 同步写：两个 `await` 之间的代码�
 - 时间不建钟表：「有一个在跑的执行者在本机、网络通、心跳已经落过地」时心跳视为新鲜（30 秒一拍 ≪ 120 秒阈值），否则可以超时；presence 同理（30 秒 ≪ 150 秒）。这依赖事件循环不被卡住 90 秒以上。
 - 一台机器同时只有一个 daemon（`apps/daemon/src/supervisor.ts:32` 单实例锁）；daemon 崩溃时它的执行者一起结束（claude-code 子进程会不会成为孤儿进程未核实）。
 - 停止事件只在关卡那一刻推给当时在线、处于 up 状态的 daemon；断线后不重放（代码如此，模型如此）。
+- 拉取响应在 daemon 收到之前丢掉（崩溃、断线）时停止也丢：server 已删行，journal 还没写。模型里这时 `stopDelivered` 不置位，P4 不算它。
 - 状态视图 `StateView` 去掉了不影响后续行为的字段（非 claimed 时的心跳位、非 waiting_quota 时的探测位、非 awaiting 时的 journal 结果），只用于去重。
 - 只区分卡片「仍在执行」和「已离开执行」（`builds.ts:194` `hasLeftExecution`）；P3 / P4 只看后者。
 
@@ -122,7 +124,9 @@ server 是单进程、better-sqlite3 同步写：两个 `await` 之间的代码�
 
 ## 证明检查能失败（交接时做过一次）
 
-在真代码里把 `apps/server/src/services/builds.ts:1506` 的「已关 / 已完成卡片的失联 claimed 步 → `stopStepKeepPhase`」改成一律 `releaseClaimedStep`，按第 3 步把模型 `SchedulerTick` 里 `stopIt` / `release` 的判定跟着改（`release == stale`、`stopIt == FALSE`），跑 `run.sh P3_NoClaimAfterClose`：模型没改时 P3 仍通过，但末尾提示 `builds.ts` 有未提交改动；模型跟改后 P3 报违反（领取 → 推送流断开 → 关卡 → 心跳超时 → 扫尾放回 pending → 又被领走），退出 1。输出见 `docs/verify/step-claim-tla/run-p3-break.txt`。撤掉代码和模型两处改动，再跑一遍确认回到 `expected.txt`。P1 / P2 / P4 本身在当前代码上失败，反例即证明；它们由上面的复现测试对着真代码确认过。
+在真代码里把 `apps/server/src/services/builds.ts:1506` 的「已关 / 已完成卡片的失联 claimed 步 → `stopStepKeepPhase`」改成一律 `releaseClaimedStep`，按第 3 步把模型 `SchedulerTick` 里 `stopIt` / `release` 的判定跟着改（`release == stale`、`stopIt == FALSE`），跑 `run.sh P3_NoClaimAfterClose`：模型没改时 P3 仍通过，但末尾提示 `builds.ts` 有未提交改动；模型跟改后 P3 报违反（领取 → 推送流断开 → 关卡 → 心跳超时 → 扫尾放回 pending → 又被领走），退出 1。输出见 `docs/verify/step-claim-tla/run-p3-break.txt`。撤掉代码和模型两处改动，再跑一遍确认回到 `expected.txt`。P1 / P2 本身在当前代码上失败，反例即证明；它们由上面的复现测试对着真代码确认过。
+
+P4（F3 修复时做过一次）：在模型副本里分别把 `DeliverStopToRuns` 改成只给 `running` 的执行者置 `halt`、只给编号最大的 Working 执行者置 `halt`，把 `DaemonStartRecover` 的 `jstop` 判定改成 `FALSE`，三份各单线程跑一次 P4，都报违反，反例依次是 `TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRuns`（准备期丢停止）、`TryClaim,HeartbeatAges,SchedulerTick,TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRuns`（释放后同机重领再关卡）、`TryClaim,CloseCard,DeliverStopFetch,DeliverStopToRuns,DaemonCrash,DaemonStartRecover`（关卡后崩溃重启）。对应的代码退回由 F3「验证」里的三组测试抓住。
 
 ## 覆盖记录
 
@@ -138,7 +142,8 @@ sync-commit: 23a39da9
   apps/daemon/src/machine-loop.ts
   apps/daemon/src/runner.ts
   apps/daemon/src/journal.ts
+  apps/daemon/src/step-stops.ts
   apps/daemon/src/workspace.ts
 ```
 
-覆盖到的函数：`machines.ts` 的 `tryClaim`、`claimStep`、`heartbeatStep`、`ownedStep`、`finishStep`、`fetchStop`、`markPresence`、`sweepStaleMachines`、`recoverSteps`；`builds.ts` 的 `sweepAbandonedBuildSteps`、`releaseClaimedStep`、`stopActiveStepsAfterExit`、`prepareStopFor`、`stopStepKeepPhase`、`applyStoppedStep`、`applyStepFailure`、`completeStep`（只到写步状态与 `hasLeftExecution` 判定）；`quota-wait.ts` 的 `applyQuotaWaitStep`、`sweepQuotaWaitSteps`；`scheduler.ts` 的 `tick` 扫尾顺序；`machine-loop.ts` 的启动 presence、recover、`deliverStop`、领取循环；`runner.ts` 的 `journal.claim`、`workspace.prepare` 与心跳 / 会话登记的先后、`stopRequests` 读取、收尾回报；`journal.ts` 的状态；`workspace.ts` 的会话目录与项目锁。
+覆盖到的函数：`machines.ts` 的 `tryClaim`、`claimStep`、`heartbeatStep`、`ownedStep`、`finishStep`、`fetchStop`、`markPresence`、`sweepStaleMachines`、`recoverSteps`；`builds.ts` 的 `sweepAbandonedBuildSteps`、`releaseClaimedStep`、`stopActiveStepsAfterExit`、`prepareStopFor`、`stopStepKeepPhase`、`applyStoppedStep`、`applyStepFailure`、`completeStep`（只到写步状态与 `hasLeftExecution` 判定）；`quota-wait.ts` 的 `applyQuotaWaitStep`、`sweepQuotaWaitSteps`；`scheduler.ts` 的 `tick` 扫尾顺序；`machine-loop.ts` 的启动 presence、recover（含 `stopRequest` 分支）、`deliverStop`、领取循环；`runner.ts` 的停止位登记、`journal.claim`、`workspace.prepare` 与心跳 / 会话登记 / 开会话前停止检查的先后、停止位读取、收尾回报、`resumeStoppedStep`；`journal.ts` 的状态与 `stopRequest`；`step-stops.ts` 的 `RunStop`、`StepStops`；`workspace.ts` 的会话目录与项目锁。
