@@ -477,6 +477,17 @@ export function TodoDetailPage() {
     return (member?.actor as { modelId?: string | null } | undefined)?.modelId ?? null;
   }, [wireTodo?.assignment, membersQ.data]);
 
+  const chipAgentId = todo?.agent?.id;
+  const chipAgentModel = useMemo(() => {
+    if (chipAgentId === undefined) return undefined;
+    const actor = (membersQ.data ?? []).find(
+      (m) => m.memberType === 'agent' && m.actorId === chipAgentId,
+    )?.actor as { modelId?: string | null; thinkingLevel?: string | null } | undefined;
+    return actor?.modelId
+      ? { modelId: actor.modelId, thinkingLevel: actor.thinkingLevel ?? null }
+      : undefined;
+  }, [chipAgentId, membersQ.data]);
+
   // #476 meta 块来源 issue 行的标题真值（ADR 0006 D5：issue 侧为真值）：
   // 与 SourceIssueLine 同查询键（react-query 去重，不多打一次请求）；拉不
   // 到（未连接/限流/已删）退本地标题，行不因此丢失（D6 的隐藏律只约束回
@@ -841,6 +852,7 @@ export function TodoDetailPage() {
         <DetailHead
           todo={todo}
           projectName={projectsQ.data?.find((p) => p.id === todo.projectId)?.name}
+          agentModel={chipAgentModel}
           phase={live ? phase : (view.phaseOverride ?? todo.phase)}
           onMore={() => setMoreOpen(true)}
           reviewActive={reviewActive}

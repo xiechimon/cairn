@@ -19,8 +19,8 @@
     const boot = document.getElementById('boot');
     if (!boot) return;
 
-    const ink = theme === 'light' ? '#eae4e0' : '#2d2926';
-    const page = theme === 'light' ? '#f6f1ec' : '#1f1b18';
+    const ink = theme === 'light' ? '#eae4e0' : '#2f2a26';
+    const page = theme === 'light' ? '#f6f1ec' : '#24201b';
     boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:288px 1fr;background:${page};z-index:0`;
 
     const rail = document.createElement('div');

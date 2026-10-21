@@ -42,8 +42,8 @@ import { expect, type Page, test } from '@playwright/test';
 const NEW_PROJECT = '/app/project/new?scenario=01';
 const NEW_PROJECT_LIVE = '/app/project/new';
 
-/** shadcn.css 值正本: --focus-ring 暗 #f294d8 / --destructive 暗 #ffabb7
- *  （E 定版；--danger 并流别名已退役，消费直引 --destructive，#1002）. */
+/** shadcn.css 值正本: --destructive 暗 #ffabb7（E 色板暗侧值，Paper 暗色轮
+ *  #1396 沿用；--danger 并流别名已退役，消费直引 --destructive，#1002）. */
 const DANGER = 'rgb(255, 171, 183)';
 
 // #946/#910 载体：#prj-new-name / #prj-new-repo 的 id 与 label 配对是语义

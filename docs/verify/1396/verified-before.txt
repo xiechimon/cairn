@@ -1,0 +1,60 @@
+[34/44] e2e/accent-typo.spec.ts:198:3 › page shell back chevron keeps a keyboard focus ring (dark)
+  6) e2e/accent-typo.spec.ts:198:3 › page shell back chevron keeps a keyboard focus ring (dark) ────
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: "rgb(240, 146, 109)"
+    Received: "rgb(242, 148, 216)"
+      216 |     expect(ring.w).toBe('2px');
+      217 |     // the codebase ring recipe rides --focus-ring (Paper dark #f0926d / light #b4532a)
+    > 218 |     expect(ring.color).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(180, 83, 42)');
+          |                        ^
+      219 |   });
+      220 | }
+      221 |
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/cool-ellis-85c5b4/apps/web/e2e/accent-typo.spec.ts:218:24
+    Error Context: test-results/accent-typo-page-shell-bac-dce3b-a-keyboard-focus-ring-dark-/error-context.md
+[35/44] e2e/accent-typo.spec.ts:265:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (light)
+[36/44] e2e/segmented-controls.spec.ts:192:1 › team layout toggle: segmented face (paper track, white ringed chip)
+[37/44] e2e/accent-typo.spec.ts:284:3 › P5 main-button pair passes 4.5 in both themes (light)
+[38/44] e2e/segmented-controls.spec.ts:215:1 › chief tabs: hover steps the ink, click swaps the view
+[39/44] e2e/accent-typo.spec.ts:294:3 › Paper menu row hover rides menu-hover, delete row rides danger-soft (light)
+[40/44] e2e/segmented-controls.spec.ts:233:1 › chief tabs: indicator pill slides between chips — 150ms ease on left/top/width/height
+[41/44] e2e/segmented-controls.spec.ts:315:1 › chief tabs: reduced motion freezes the pill slide (#644)
+[42/44] e2e/accent-typo.spec.ts:265:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (dark)
+  7) e2e/accent-typo.spec.ts:265:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (dark) 
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: "rgb(47, 42, 38)"
+    Received: "rgb(38, 34, 31)"
+      278 |     // 亮 7.22，docs/verify/paper-tokens/contrast.txt）
+      279 |     expect(destructive).toBe(theme === 'dark' ? 'rgb(255, 171, 183)' : 'rgb(158, 44, 73)');
+    > 280 |     expect(card).toBe(theme === 'dark' ? 'rgb(47, 42, 38)' : 'rgb(255, 255, 255)');
+          |                  ^
+      281 |     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
+      282 |   });
+      283 |
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/cool-ellis-85c5b4/apps/web/e2e/accent-typo.spec.ts:280:18
+    Error Context: test-results/accent-typo-P5-danger-dest-afbb7-ds-on-card-passes-4-5-dark-/error-context.md
+[43/44] e2e/accent-typo.spec.ts:284:3 › P5 main-button pair passes 4.5 in both themes (dark)
+  8) e2e/accent-typo.spec.ts:284:3 › P5 main-button pair passes 4.5 in both themes (dark) ──────────
+    Error: expect(received).toBe(expected) // Object.is equality
+    Expected: "rgb(240, 146, 109)"
+    Received: "rgb(242, 148, 216)"
+      287 |     const bg = await resolveToken(page, '--card-button');
+      288 |     const fg = await resolveToken(page, '--text-on-accent');
+    > 289 |     expect(bg).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(180, 83, 42)');
+          |                ^
+      290 |     expect(fg).toBe(theme === 'dark' ? 'rgb(26, 22, 18)' : 'rgb(255, 255, 255)');
+      291 |     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
+      292 |   });
+        at /Users/xmon/Code/AgentProjects/pacman/.claude/worktrees/cool-ellis-85c5b4/apps/web/e2e/accent-typo.spec.ts:289:16
+    Error Context: test-results/accent-typo-P5-main-button-a3b04-es-4-5-in-both-themes-dark-/error-context.md
+[44/44] e2e/accent-typo.spec.ts:294:3 › Paper menu row hover rides menu-hover, delete row rides danger-soft (dark)
+  8 failed
+    e2e/accent-typo.spec.ts:198:3 › page shell back chevron keeps a keyboard focus ring (dark) ─────
+    e2e/accent-typo.spec.ts:265:3 › P5 danger: destructive resolves and reads on card, passes 4.5 (dark) 
+    e2e/accent-typo.spec.ts:284:3 › P5 main-button pair passes 4.5 in both themes (dark) ───────────
+    e2e/color-freeze.spec.ts:119:3 › frozen color slots stay put (dark) ────────────────────────────
+    e2e/color-freeze.spec.ts:137:3 › derived mix tokens resolve from existing slots (dark) ─────────
+    e2e/segmented-controls.spec.ts:56:1 › page-tab: selected chip keeps its fill under hover, same geometry as the rest state 
+    e2e/segmented-controls.spec.ts:129:1 › sched freq: the chosen radio reads against the track, hover steps the rest ink 
+    e2e/spec-brief-card.spec.ts:131:1 › 4. 简报卡配方 = 带框内容盒（1px 边线 / rounded-lg / surface-secondary 底） 
+  36 passed (13.9s)

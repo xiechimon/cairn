@@ -1,0 +1,67 @@
+
+
+Running 3 tests using 1 worker
+
+[1/3] e2e/queued-action.spec.ts:120:1 › detail: a queued task has no 开始, keeps 排队中 and the wait row
+  1) e2e/queued-action.spec.ts:120:1 › detail: a queued task has no 开始, keeps 排队中 and the wait row ─
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  getByTestId('detail-head').getByRole('button', { name: '开始', exact: true })
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" getByTestId('detail-head').getByRole('button', { name: '开始', exact: true }) with timeout 5000ms
+      - waiting for getByTestId('detail-head').getByRole('button', { name: '开始', exact: true })
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      125 |   await evidenceShot(page, 'detail-queued.png');
+      126 |   await evidencePanelShot(page, 'detail-queued-head.png', head, 8);
+    > 127 |   await expect(head.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
+          |                                                                       ^
+      128 |   await expect(page.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
+      129 | });
+      130 |
+        at /home/user/pacman/apps/web/e2e/queued-action.spec.ts:127:71
+
+    Error Context: test-results/queued-action-detail-a-que-d0782--keeps-排队中-and-the-wait-row/error-context.md
+
+
+[2/3] e2e/queued-action.spec.ts:131:1 › detail: a todo task keeps its 开始
+[3/3] e2e/queued-action.spec.ts:138:1 › board: the queued card has no 开始 on hover or focus, the todo card keeps it
+  2) e2e/queued-action.spec.ts:138:1 › board: the queued card has no 开始 on hover or focus, the todo card keeps it 
+
+    Error: expect(locator).toHaveCount(expected) failed
+
+    Locator:  locator('.board-column[data-column="todo"]').locator('[data-todo-id="todo-queued"]').getByRole('button', { name: '开始', exact: true })
+    Expected: 0
+    Received: 1
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "toHaveCount" locator('.board-column[data-column="todo"]').locator('[data-todo-id="todo-queued"]').getByRole('button', { name: '开始', exact: true }) with timeout 5000ms
+      - waiting for locator('.board-column[data-column="todo"]').locator('[data-todo-id="todo-queued"]').getByRole('button', { name: '开始', exact: true })
+        14 × locator resolved to 1 element
+           - unexpected value "1"
+
+
+      150 |   await settle(queued);
+      151 |   await evidencePanelShot(page, 'board-queued-hover.png', column);
+    > 152 |   await expect(queued.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
+          |                                                                         ^
+      153 |
+      154 |   await fresh.hover();
+      155 |   const start = fresh.getByRole('button', { name: '开始', exact: true });
+        at /home/user/pacman/apps/web/e2e/queued-action.spec.ts:152:73
+
+    Error Context: test-results/queued-action-board-the-qu-d0072-ocus-the-todo-card-keeps-it/error-context.md
+
+
+  2 failed
+    e2e/queued-action.spec.ts:120:1 › detail: a queued task has no 开始, keeps 排队中 and the wait row ──
+    e2e/queued-action.spec.ts:138:1 › board: the queued card has no 开始 on hover or focus, the todo card keeps it 
+  1 passed (16.9s)
