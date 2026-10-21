@@ -75,6 +75,8 @@
 //   ㊺ 合并步收尾（不经对账）也停掉没人领的 verify / review 步
 //   ㊻ 磨绿的匿名 check-runs 读同样记进进程级额度
 //   ㊼ compare 只取一页（per_page=1），不拉整份提交与补丁
+// pr-gate 第五轮补的：
+//   ㊽ 第二次读不到 compare 的网络窗内卡离开 review → 不写提示
 // 合并 SHA 落 system 行；收尾复用 merge 步同一条 done 漏斗（完成行 + 拆卡波次）。
 
 import type { Phase } from '@pacman/shared';
@@ -87,7 +89,12 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { applyBuildStepAction, finishTodoDone, requestMerge } from '../src/services/builds.js';
+import {
+  applyBuildStepAction,
+  DONE_ROW,
+  finishTodoDone,
+  requestMerge,
+} from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateTodo } from '../src/services/todos.js';
@@ -445,7 +452,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
     const rows = w.systemRows();
     expect(rows.some((c) => c.includes(`#${w.prNumber}`) && c.includes('abc1234'))).toBe(true);
-    expect(rows).toContain('🎉 任务已完成');
+    expect(rows).toContain(DONE_ROW);
     expect(mock.requests.some((u) => u.endsWith(`/repos/octo/demo/pulls/${w.prNumber}`))).toBe(
       true,
     );
@@ -771,7 +778,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('review');
     const rows = w.systemRows();
     expect(rows.filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`))).toHaveLength(1);
-    expect(rows.filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(rows.filter((c) => c === DONE_ROW)).toHaveLength(1);
   });
 
   test('⑱b merged before the card reached review (auto-merge the moment CI went green) → done', async () => {
@@ -799,7 +806,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
     await pollerFor(w, mock).sweep();
     expect(w.todoRow().phase).toBe('review');
-    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
     expect(w.systemRows().some((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`))).toBe(
       false,
     );
@@ -974,7 +981,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(
       w.systemRows().filter((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`)),
     ).toHaveLength(1);
-    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
   });
 
   test('⑱f closed by hand, then back to review → the close is reported once', async () => {
@@ -1053,7 +1060,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     };
     await pollerFor(w, mock).sweep();
     expect(w.todoRow().phase).toBe('review');
-    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
     expect(w.systemRows().some((c) => c.startsWith(`PR #${w.prNumber} 已在 GitHub 合并`))).toBe(
       false,
     );
@@ -1124,7 +1131,7 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     finishTodoDone(w.s.svc, w.todoId, w.buildId);
     finishTodoDone(w.s.svc, w.todoId, w.buildId);
     expect(w.todoRow().phase).toBe('done');
-    expect(w.systemRows().filter((c) => c === '🎉 任务已完成')).toHaveLength(1);
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
   });
 
   test('㊱ a sweep that starts while the last one runs does nothing', async () => {
@@ -1303,6 +1310,21 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     await pollerFor(w, mock, { anonReadsPerHour: 1 }).sweep();
     expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
     expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(0);
+  });
+
+  test('㊽ the card leaves review during the second unreadable compare → no hint', async () => {
+    const w = makeWorld({ connected: true, checkpoint: 'a'.repeat(40) });
+    const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true, compare: 502 } });
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    mock.onCompare = () => {
+      w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
+    };
+    await poller.sweep(t0 + 600_001);
+    expect(mock.compareRequests()).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('closed');
+    expect(w.systemRows()).toEqual([]);
   });
 
   test('㊼ compare asks for one page', async () => {

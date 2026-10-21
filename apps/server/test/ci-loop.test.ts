@@ -560,6 +560,48 @@ describe('#1150 ③ 修复步死循环闸（连续 N 轮仍红停手）', () => 
     expect(w.fixRoundSteps()).toHaveLength(1);
   });
 
+  test('#1403 没人领的 verify / review 步（排队中或等额度）不挡磨绿；已领取的照挡', async () => {
+    for (const kind of ['verify', 'review'] as const) {
+      for (const status of ['pending', 'waiting_quota'] as const) {
+        const w = makePrWorld({
+          checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+        });
+        w.s.db
+          .insert(stepTable)
+          .values({
+            id: `step-gate-${w.buildId}`,
+            buildId: w.buildId,
+            kind,
+            status,
+            createdAt: w.base,
+          })
+          .run();
+        await w.poller.sweep();
+        expect(w.mock.requests).toHaveLength(1);
+        expect(w.fixRoundSteps()).toHaveLength(1);
+      }
+    }
+    const held = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
+    });
+    held.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-gate-${held.buildId}`,
+        buildId: held.buildId,
+        kind: 'verify',
+        status: 'claimed',
+        machineId: 'machine-gate',
+        claimedAt: held.base,
+        lastHeartbeatAt: held.base,
+        createdAt: held.base,
+      })
+      .run();
+    await held.poller.sweep();
+    expect(held.mock.requests).toHaveLength(0);
+    expect(held.fixRoundSteps()).toHaveLength(0);
+  });
+
   test('N-1 轮完成仍红 → 追加第 N 轮；N 轮完成仍红 → 停手标 failed 转人工（不再叠派）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'failure' }],
