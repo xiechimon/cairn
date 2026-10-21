@@ -140,16 +140,17 @@ test('board: the queued card renders no 开始, the todo card shows it on hover'
   page,
 }) => {
   await page.goto('/app');
-  const column = page.locator('.board-column[data-column="todo"]');
-  const queued = column.locator(`[data-todo-id="${QUEUED_ID}"]`);
-  const fresh = column.locator(`[data-todo-id="${FRESH_ID}"]`);
+  // The queued card sits in 执行中 (#1447), the todo card in 待开始.
+  const running = page.locator('.board-column[data-column="building"]');
+  const queued = running.locator(`[data-todo-id="${QUEUED_ID}"]`);
+  const fresh = page.locator(`.board-column[data-column="todo"] [data-todo-id="${FRESH_ID}"]`);
   await expect(queued).toBeVisible();
   await expect(queued).toContainText('等机器');
 
   // No button in the DOM at all, so neither hover nor keyboard focus can show one.
   await queued.hover();
   await settle(queued);
-  await evidencePanelShot(page, 'board-queued-hover.png', column);
+  await evidencePanelShot(page, 'board-queued-hover.png', running);
   await expect(queued.getByRole('button', { name: '开始', exact: true })).toHaveCount(0);
 
   await fresh.hover();
