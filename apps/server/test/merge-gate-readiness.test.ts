@@ -64,6 +64,8 @@ const EARLIER = 'e'.repeat(40);
 const MAIN = 'f'.repeat(40);
 /** PR 的 head 之后推上来的提交（HEAD 的后代）。 */
 const NEWER = 'd'.repeat(40);
+/** 与本 PR 不相干的提交（以 MAIN 为父，不在 base...head 里）。 */
+const OTHER = '9'.repeat(40);
 /** compare 是在哪个提交上读的（headSha）。 */
 const readAt = <T extends object>(headSha: string, x: T) => ({ ...x, headSha });
 /** 检查是在哪个提交上读的：请求的 headSha、combined status 的 sha、每条 check run 的
@@ -1261,6 +1263,33 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(classesOf(i)).toEqual([
       ['patch-unavailable', 'transient', 'compare commit list incomplete'],
     ]);
+    // 另一个方向：条数比 total_commits 多、没有重复
+    const j = green();
+    j.compare = readAt(HEAD, {
+      ...withCommits(compare(j), [...chain(EARLIER, HEAD), { sha: OTHER, parents: [MAIN] }]),
+      totalCommits: 2,
+    });
+    expect(mergeReadiness(j).patchDigest).toBeNull();
+    expect(classesOf(j)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+  });
+
+  test('compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理', () => {
+    // 故事：外壳按分支名跨页读，页面错位：以 HEAD 为父的 NEWER 掉了，一个不相干的
+    // OTHER（以 MAIN 为父）占了它的位置，条数仍等于 total_commits。列着的提交里没有谁以
+    // HEAD 为父，可也没有谁以 OTHER 为父：HEAD 与 OTHER 都像是 head，响应说不清读在哪。
+    const i = green();
+    compareAtNewer(i);
+    i.compare = readAt(
+      HEAD,
+      withCommits(compare(i), [...chain(EARLIER, HEAD), { sha: OTHER, parents: [MAIN] }]),
+    );
+    pr(i).body = `evidence: ${link(OTHER)}`;
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
   });
 
   test('compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）', () => {
@@ -1285,16 +1314,12 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(classesOf(j)).toEqual([
       ['patch-unavailable', 'transient', 'compare commit list incomplete'],
     ]);
-    // 条数多出来、都不重复（混进了别的提交）：同样不算读全
+    // 同一 SHA 带着两份 parents（第二份是假的）：同样不算读全，不挑其中一份来用
     const k = green();
-    k.compare = readAt(HEAD, {
-      ...withCommits(compare(k), [
-        ...chain(EARLIER, HEAD),
-        { sha: '9'.repeat(40), parents: [MAIN] },
-      ]),
-      totalCommits: 2,
-    });
-    expect(mergeReadiness(k).patchDigest).toBeNull();
+    k.compare = readAt(
+      HEAD,
+      withCommits(compare(k), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [MAIN] }]),
+    );
     expect(classesOf(k)).toEqual([
       ['patch-unavailable', 'transient', 'compare commit list incomplete'],
     ]);
