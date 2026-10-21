@@ -1,0 +1,140 @@
+# #1466 red run: new tests against unchanged sources (origin/main 2294b08)
+# cmd: pnpm exec vitest run --reporter=verbose packages/shared/test/github-repo-ref.test.ts apps/server/test/github-repo-dot-segments.test.ts apps/server/test/project-team-guard.test.ts
+# git: 2294b087, src diff vs HEAD: 
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../user 10ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：./x 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：owner/.. 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：owner/. 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../.. 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：./. 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 拒绝 owner 或 repo 为 . / .. 的值：../. 1ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：octo/alpha 1ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：my.org/repo.js 1ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：.../x 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：owner/... 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：owner/.github 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：.x/y 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：x./y. 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 带点的合法名照过：a_b-c/d.e_f-g 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > isGithubRepoRef（#1466 失败方式 1/4） > 既有形状闸不变：空段、多斜杠、字符集外仍拒 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../user 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：./x 4ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：owner/.. 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：owner/. 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../.. 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：./. 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > . / .. 段 → null：../. 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > 合法值拆成 {owner, repo} 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubRepoRef（#1466 失败方式 2） > 形状不合法 → null 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../user#3 2ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:./x#3 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:owner/..#3 1ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:owner/.#3 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../..#3 2ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:./.#3 0ms
+ × |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > . / .. 段的来源引用 → null：github:../.#3 0ms
+ ✓ |@pacman/shared| test/github-repo-ref.test.ts > parseGithubIssueSourceRef（#1466 失败方式 3） > 合法引用照常互逆 0ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 docs：他队项目 404，文案与不存在 id 同形 184ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 create_todo：他队项目 404，文案与不存在 id 同形 67ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W1 POST /api/projects kind=github：字符串面与对象面都 400 128ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W2 PATCH local→github 转换：400，且不出站探可达 57ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W3 chief connect_repo：400，项目行不改 40ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 update_project：他队项目 404，文案与不存在 id 同形 68ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 connect_repo：他队项目 404，文案与不存在 id 同形 68ms
+ ✓ |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W4 带点的合法名照过（POST 201 / connect_repo 落值） 45ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（../user） 41ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（owner/..） 43ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T2-T4 越权调用无副作用：他队项目名 / 仓 / 任务集不变 60ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 69ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（../user） 49ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（owner/..） 35ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（../user） 37ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch 39ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：docs / create_todo / update_project / connect_repo / todos / watch_todos 38ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T2/T7 create_todo：他队项目 404，不建任务 39ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（owner/..） 38ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（../user） 36ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（owner/..） 32ms
+ × |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 [] 35ms
+ ✓ |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T8 同团队路径不变：create_todo + todos 40ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 CI 磨绿轮询：跳过该候选，零出站（../user） 44ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 CI 磨绿轮询：跳过该候选，零出站（owner/..） 34ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（../user） 54ms
+ × |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（owner/..） 57ms
+⎯⎯⎯⎯⎯⎯ Failed Tests 47 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  3 failed (3)
+      Tests  47 failed | 13 passed (60)
+exit=1
+
+# failure reasons (server files; shared failures are the same assertions: dot-segment values accepted, parseGithubRepoRef not exported yet -> TypeError)
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W1 POST /api/projects kind=github：字符串面与对象面都 400
+AssertionError: ../user: expected 201 to be 400 // Object.is equality
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W2 PATCH local→github 转换：400，且不出站探可达
+AssertionError: expected [ { method: 'GET', …(1) }, …(3) ] to have a length of +0 but got 4
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 写入面：. / .. 段拒绝（W1-W4） > W3 chief connect_repo：400，项目行不改
+AssertionError: ../user: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（../user）
+AssertionError: expected [ { method: 'GET', …(1) }, …(1) ] to deeply equal []
++     "url": "https://api.github.com/repos/../user/issues?state=open&page=1&per_page=30",
++     "url": "https://api.github.com/repos/../user/issues/7",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R1/R2 issue 列表与导入 → 404，零出站（owner/..）
+AssertionError: expected [ { method: 'GET', …(1) }, …(1) ] to deeply equal []
++     "url": "https://api.github.com/repos/owner/../issues?state=open&page=1&per_page=30",
++     "url": "https://api.github.com/repos/owner/../issues/7",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（../user）
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R3 建任务：不进 #452 自建 issue 面（来源两列 null），零出站（owner/..）
+AssertionError: expected 'github-issue-self' to be null
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（../user）
+AssertionError: expected [ { method: 'POST', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/../user/issues",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R4 未建成重试 → 404，零出站（owner/..）
+AssertionError: expected [ { method: 'POST', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/owner/../issues",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（../user）
+HttpError: github repo not found (or private without auth): https://api.github.com/repos/../user/issues/3
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R5/R6 来源引用带 . / .. 段：回显 404、标题回写不出站（owner/..）
+HttpError: github repo not found (or private without auth): https://api.github.com/repos/owner/../issues/3
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 CI 磨绿轮询：跳过该候选，零出站（../user）
+AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/../user/commits/pacman%2Fconv-<buildId>/check-runs?per_page=100",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R7 CI 磨绿轮询：跳过该候选，零出站（owner/..）
+AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/owner/../commits/pacman%2Fconv-<buildId>/check-runs?per_page=100",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（../user）
+AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/../user/pulls/888",
+ FAIL  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts > #1466 读路径：存量行按「不是合法 GitHub 仓」处理，零出站（R1-R8） > R8 PR 状态探测（第二张 PR 守卫）：不出站，fail-open 照常发起合并（owner/..）
+AssertionError: expected [ { method: 'GET', …(1) } ] to deeply equal []
++     "url": "https://api.github.com/repos/owner/../pulls/888",
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 docs：他队项目 404，文案与不存在 id 同形
+AssertionError: docs: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 create_todo：他队项目 404，文案与不存在 id 同形
+AssertionError: create_todo: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 update_project：他队项目 404，文案与不存在 id 同形
+AssertionError: update_project: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T1-T4/T7 connect_repo：他队项目 404，文案与不存在 id 同形
+AssertionError: connect_repo: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T2-T4 越权调用无副作用：他队项目名 / 仓 / 任务集不变
+AssertionError: docs: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 []
+AssertionError: expected [ { id: 'todo-b-1466', …(25) } ] to deeply equal []
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 chief 工具面：跨团队项目 id = 404（与不存在同形） > T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch
+AssertionError: expected [ 'todo-b-1466' ] to deeply equal []
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T2/T7 create_todo：他队项目 404，不建任务
+AssertionError: expected null to be an instance of HttpError
+ FAIL  |@xiechimon/pacman| test/project-team-guard.test.ts > #1466 MCP 工具面：跨团队项目 id = 404（与不存在同形） > T5 todos：他队 projectId 与不存在 id 同回 []
+AssertionError: expected [ { id: 'todo-b-1466', …(25) } ] to deeply equal []
+      1 AssertionError: expected true to be false // Object.is equality
+      1 AssertionError: expected { owner: '.', repo: '.', …(1) } to be null
+      1 AssertionError: expected { owner: '.', repo: 'x', …(1) } to be null
+      1 AssertionError: expected { owner: '..', repo: '.', …(1) } to be null
+      1 AssertionError: expected { owner: '..', repo: '..', …(1) } to be null
+      1 AssertionError: expected { owner: '..', repo: 'user', …(1) } to be null
+      1 AssertionError: expected { owner: 'owner', repo: '.', …(1) } to be null
+      1 AssertionError: expected { owner: 'owner', repo: '..', …(1) } to be null
+      3 TypeError: parseGithubRepoRef is not a function
+
+# Added while auditing callers (after the shared fix): apps/daemon/test/github-probe.test.ts case
+# "#1466 repo 段为 . / ..（存量 owner/.. 或 owner/. 行派生的 cloneUrl）→ null，不进探测".
+# Its red is mutation M1 in mutations.txt: M1 removes only the dot check, which restores the pre-fix
+# isGithubRepoRef semantics exactly (same character-class regex), and that case fails under it.
