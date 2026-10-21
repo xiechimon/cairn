@@ -1,0 +1,55 @@
+# #1404 S3 failure modes (written before the tests and the schema change).
+# S3 = the migration for the four server-owned gate tables: gate_digest, gate_round,
+# gate_verdict, gate_state. Nothing reads or writes them yet; S5a/S6a/S7 do.
+# Each line: id, what goes wrong, what it costs, which test or gate pins it.
+
+F1  The migration does not apply on a database created by main's server.
+    drizzle's migrator applies an entry only when its journal `when` is greater than
+    the newest created_at in __drizzle_migrations; a `when` below 0043's is skipped
+    silently, and every later gate write fails with "no such table".
+    Pin: upgrade test (journal cut before the gate migration, rows written, then the
+    full journal); live run of main's server then this branch's on one PACMAN_HOME.
+F2  UNIQUE (buildId, patchDigest) missing on gate_round: two rounds for one patch,
+    so S7 counts rounds twice and dispatches a second set of reviews for the same patch.
+    Pin: duplicate insert throws; the same digest on another build and another digest
+    on the same build both insert.
+F3  Two rounds share one round number in a build: the 4-round cap (GATE_LIMITS.roundsMax)
+    is counted from the wrong row. Pin: UNIQUE (buildId, round), duplicate throws.
+F4  A verdict is written twice for one step (retried done report, two evaluators):
+    the second row could flip the outcome the gate reads. Pin: PK stepId, duplicate throws.
+F5  A verdict for a step or build that does not exist is stored (a fabricated stepId).
+    Pin: FK stepId -> step.id and buildId -> build.id; both inserts throw.
+F6  Deleting a build leaves orphan gate rows (they would attach to nothing and a reused
+    id would inherit them). Pin: build delete removes the build's rows in all four
+    tables and leaves another build's rows alone.
+F7  Gate rows block the delete paths that exist today (todo reset deletes steps and then
+    the build; todo delete and project delete cascade todo -> build): "FOREIGN KEY
+    constraint failed" would make a task impossible to reset or delete once gated.
+    Pin: POST /api/todos/:id/reset, DELETE /api/todos/:id and DELETE /api/projects/:id
+    all succeed with rows in all four tables, and the rows are gone afterwards.
+F8  A verdict with patchDigest null (recorded at an unexpected head) or with no reported
+    head cannot be stored, so S5a would have to drop it or invent a digest.
+    Pin: insert with patchDigest null, headSha null, perspective null reads back as null.
+F9  A chief decision verdict (its step lives on the chief thread, step.buildId =
+    chief-<uuid>, no build row) cannot reference the gated build, or deleting the gated
+    build leaves it behind. Pin: decision verdict on a chief step; build delete removes it.
+F10 gate_state holds two snapshots for one build, so the reader picks either.
+    Pin: PK buildId, duplicate throws; upsert on buildId replaces the row.
+F11 Blockers JSON does not round-trip (quoted names with \u escapes, bidi controls,
+    CJK labels, a list at the S2 detail bounds) or is stored as something other than
+    JSON text. Pin: insert and read back deep-equal; json_valid() on the stored text.
+F12 gate_digest stores two digests for one (build, head). Pin: PK (buildId, headSha).
+F13 schema.ts, the migration SQL, the journal and the snapshot drift apart: drizzle-kit
+    generate then emits a second migration in CI, or the snapshot chain breaks.
+    Pin: `drizzle-kit generate` emits nothing after the change; `pnpm --filter
+    @xiechimon/pacman db:check` passes; schema.test.ts (table list = DB_TABLES, every
+    table has a CREATE TABLE in the migrations).
+F14 The tables are added to schema.ts but not to the shared DB_TABLES registry (or are
+    given a wire record), so the registry tests fail or a record projection is expected.
+    Pin: DB_TABLES and INTERNAL_ONLY_TABLES carry the four names; counts updated.
+F15 A machine path writes verdicts (plan fact 1: verdicts must not come from rows a
+    machine can forge). Pin: the machine wire modules (routes-machine.ts,
+    services/machine*.ts) do not reference the gate tables.
+F16 The migration is renumbered at merge time and the upgrade test still points at the
+    old number. Pin: tests find the migration by its content (CREATE TABLE `gate_verdict`),
+    not by number.

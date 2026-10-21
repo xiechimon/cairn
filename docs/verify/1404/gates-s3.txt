@@ -1,0 +1,57 @@
+# #1404 S3 gates. Branch claude/bootstrap-p3c at 2662c3b0 (cut from origin/main 2294b087), run in the p3c worktree.
+
+$ pnpm lint
+Checked 786 files in 1340ms. No fixes applied.
+Found 1 info.
+exit=0
+The one info is apps/web/src/resources/machines-page.tsx:317 noUselessFragments, present on main.
+
+$ node scripts/lint-warning-cap.mjs
+[lint-warning-cap] PASS: 0 warning(s) at or below cap 0 (baseline in-tree only, frozen from da2f165ac956).
+exit=0
+
+$ pnpm typecheck
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit=0
+
+$ pnpm spec:parse
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit=0
+
+$ node scripts/test-spawn-gate.mjs
+[test-spawn-gate] PASS: 513 test sources, no package-manager spawns.
+exit=0
+
+$ pnpm exec vitest run --changed origin/main
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+FAIL |@xiechimon/pacman-cli| test/runner-brief.test.ts > 简报接线：失败闸 > 擦除失败 → 不 commitAll、按 failed 收尾、transcript 落行（失败方式 4）
+ Test Files  1 failed | 243 passed (244)
+      Tests  1 failed | 2456 passed | 1 skipped (2458)
+exit=1
+The one failure is runner-brief.test.ts "擦除失败": this container runs as root (id -u = 0), the case makes the
+brief file unremovable through permissions, which root ignores. It is outside this change (apps/daemon is
+untouched); CI runs it as a normal user.
+
+$ E2E_AFFECTED_PORT=8394 pnpm --filter @pacman/web e2e:affected      (8394 free per lsof before the run)
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8394
+  live-server-reap.spec.ts token-gate.spec.ts
+  8 passed (11.2s)
+exit=0
+
+# Migration discipline (the CI drizzle steps, ci.yml 'db:check' and 'drizzle drift')
+$ pnpm --filter @xiechimon/pacman db:check && pnpm --filter @xiechimon/pacman db:generate && git add -N apps/server/drizzle && git diff --exit-code apps/server/drizzle
+drizzle 护栏通过：snapshot 链线性、无父子冲突
+db:check exit=0
+No schema changes, nothing to migrate (drizzle-kit prints an emoji after this, dropped here)
+drift diff exit=0
+
+$ node scripts/feature-map-staleness-gate.mjs
+feature-map-gate: OK (37 md files, 332 refs checked, 59 frozen in baseline)
+exit=0
+
+# code-review (Skill code-review, effort low, target origin/main..claude/bootstrap-p3c)
+Reviewed diff: 0044_merge_gate_tables.sql + journal + snapshot, the four tables in apps/server/src/db/schema.ts,
+the registration in packages/shared/src/tables.ts (the branch's 9 files at 2662c3b0; test and snapshot hunks skipped
+at low effort). Findings: none.
