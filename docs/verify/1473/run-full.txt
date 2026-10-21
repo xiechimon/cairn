@@ -1,0 +1,33 @@
+work dir: $TMPDIR/verify-step-claim.XXXX
+P1_SingleExecutorPerMachine: PASS in 26s, 799807 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.XXXX/P1_SingleExecutorPerMachine/tlc.log
+P2_OnlyHolderResultApplied: PASS in 19s, 799807 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.XXXX/P2_OnlyHolderResultApplied/tlc.log
+P3_NoClaimAfterClose: PASS in 19s, 799807 distinct states - matches expected
+  full log: $TMPDIR/verify-step-claim.XXXX/P3_NoClaimAfterClose/tlc.log
+P4_AcceptedStopReachesWorkers: FAIL in 1s, 350 distinct states - matches expected
+  1. Initial
+       st = "pending"
+       sm = NoMachine
+       phase = "open"
+       home = m1
+  2. TryClaim
+       st = "claimed"
+       sm = m1
+       holder = 1
+       ex = << [ mach |-> m1, stage |-> "preparing", beat |-> FALSE, halt |-> FALSE, out |-> "none", seen |-> 0 ], [ mach |-> m1, stage |-> "idle", beat |-> FALSE, halt |-> FALSE, out |-> "none", seen |-> 0 ] >>
+       journal = (m1 :> "active" @@ m2 :> "none")
+  3. CloseCard
+       phase = "closed"
+       stopPending = TRUE
+       stopEvt = (m1 :> TRUE @@ m2 :> FALSE)
+  4. DeliverStopFetch
+       stopPending = FALSE
+       stopEvt = (m1 :> FALSE @@ m2 :> FALSE)
+       stopInHand = (m1 :> TRUE @@ m2 :> FALSE)
+  5. DeliverStopToHandle
+       stopInHand = (m1 :> FALSE @@ m2 :> FALSE)
+       stopDelivered = (m1 :> TRUE @@ m2 :> FALSE)
+  full log: $TMPDIR/verify-step-claim.XXXX/P4_AcceptedStopReachesWorkers/tlc.log
+sync-commit 23a39da9 is not in this clone's history; cannot list covered-code changes
+exit 0

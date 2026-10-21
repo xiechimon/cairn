@@ -1,0 +1,4 @@
+server-tests.log: Test Files  123 passed (123)
+server-tests.log:      Tests  1825 passed | 1 skipped (1826)
+daemon-tests.log: Test Files  86 passed (86)
+daemon-tests.log:      Tests  874 passed (874)

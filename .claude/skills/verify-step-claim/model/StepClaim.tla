@@ -29,7 +29,7 @@ Live     == {"preparing", "running", "reporting", "applying"}
 Outcomes == {"success", "failed", "stopped", "quota"}
 
 Idle == [mach |-> InitialHome, stage |-> "idle", beat |-> FALSE,
-         halt |-> FALSE, out |-> "none"]
+         halt |-> FALSE, out |-> "none", seen |-> 0]
 
 TypeOK ==
   /\ st \in Statuses
@@ -47,7 +47,8 @@ TypeOK ==
   /\ journal \in [Machines -> {"none", "active", "awaiting"}]
   /\ jout \in [Machines -> Outcomes \cup {"none"}]
   /\ ex \in [ExecIds -> [mach : Machines, stage : Stages, beat : BOOLEAN,
-                         halt : BOOLEAN, out : Outcomes \cup {"none"}]]
+                         halt : BOOLEAN, out : Outcomes \cup {"none"},
+                         seen : 0..MaxClaims]]
   /\ holder \in ExecIds \cup {None}
   /\ staleApply \in BOOLEAN
   /\ stopDelivered \in [Machines -> BOOLEAN]
@@ -72,7 +73,7 @@ Init ==
 FreeIds == {e \in ExecIds : ex[e].stage = "idle"}
 NextId  == CHOOSE e \in FreeIds : \A f \in FreeIds : e <= f
 NewExec(m, stage, out) ==
-  [mach |-> m, stage |-> stage, beat |-> FALSE, halt |-> FALSE, out |-> out]
+  [mach |-> m, stage |-> stage, beat |-> FALSE, halt |-> FALSE, out |-> out, seen |-> 0]
 Gone == [Idle EXCEPT !.stage = "gone"]
 
 Involved(m) ==
@@ -82,20 +83,27 @@ Involved(m) ==
 KeepsFresh ==
   /\ sm /= NoMachine
   /\ connected[sm]
-  /\ \E e \in ExecIds : ex[e].mach = sm /\ ex[e].stage = "running" /\ ex[e].beat
+  /\ \E e \in ExecIds : ex[e].mach = sm /\ ex[e].stage \in Working /\ ex[e].beat
+
+InFlight(m) == {e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Live}
+Carrier(m)  == IF InFlight(m) = {} THEN None ELSE CHOOSE e \in InFlight(m) : TRUE
 
 ----------------------------------------------------------------------------
 
 TryClaim(m) ==
   /\ dm[m] = "up" /\ connected[m]
   /\ st = "pending" /\ home = m
-  /\ claims < MaxClaims /\ FreeIds /= {}
-  /\ LET e == NextId IN
-       /\ ex' = [ex EXCEPT ![e] = NewExec(m, "preparing", "none")]
-       /\ holder' = e
+  /\ claims < MaxClaims
+  /\ IF Carrier(m) /= None
+       THEN /\ holder' = Carrier(m)
+            /\ UNCHANGED <<ex, journal, jout>>
+       ELSE /\ FreeIds /= {}
+            /\ LET e == NextId IN
+                 /\ ex' = [ex EXCEPT ![e] = NewExec(m, "preparing", "none")]
+                 /\ holder' = e
+            /\ journal' = [journal EXCEPT ![m] = "active"]
+            /\ jout' = [jout EXCEPT ![m] = "none"]
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
-  /\ journal' = [journal EXCEPT ![m] = "active"]
-  /\ jout' = [jout EXCEPT ![m] = "none"]
   /\ claims' = claims + 1
   /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
                  connected, dm, handle, stopEvt, stopInHand, stopReq,
@@ -106,21 +114,21 @@ TryClaimResponseLost(m) ==
   /\ st = "pending" /\ home = m
   /\ claims < MaxClaims
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
-  /\ holder' = None
+  /\ holder' = Carrier(m)
   /\ claims' = claims + 1
   /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
                  daemon, ex, staleApply, stopDelivered, partitions, crashes, rebinds>>
 
 StartSession(e) ==
   /\ ex[e].stage = "preparing"
-  /\ ex' = [ex EXCEPT ![e].stage = "running", ![e].beat = FALSE]
+  /\ ex' = [ex EXCEPT ![e].stage = "running"]
   /\ handle' = [handle EXCEPT ![ex[e].mach] = e]
   /\ UNCHANGED <<server, connected, dm, stopEvt, stopInHand, stopReq, journal, jout,
                  ghosts, budgets>>
 
 HeartbeatStep(e) ==
   LET m == ex[e].mach IN
-  /\ ex[e].stage = "running" /\ connected[m]
+  /\ ex[e].stage \in Working /\ connected[m]
   /\ sm = m
   /\ ~(fresh /\ progressed /\ ex[e].beat)
   /\ fresh' = TRUE /\ progressed' = TRUE
@@ -155,7 +163,7 @@ ApplyOutcome(e) ==
              [] o = "stopped" -> "stopped"
   /\ probeDue' = FALSE
   /\ stopPending' = FALSE
-  /\ staleApply' = (staleApply \/ holder /= e)
+  /\ staleApply' = (staleApply \/ (holder /= e /\ ~(orphan /\ ex[e].seen = claims)))
   /\ holder' = None
   /\ ex' = [ex EXCEPT ![e] = Gone]
   /\ handle' = IF orphan THEN handle ELSE [handle EXCEPT ![m] = None]
@@ -168,8 +176,14 @@ FinishStepOwnedCheck(e) ==
   LET m == ex[e].mach IN
   /\ ex[e].stage = "reporting"
   /\ IF connected[m] /\ sm = m
-       THEN IF ex[e].out = "success"
-              THEN /\ ex' = [ex EXCEPT ![e].stage = "applying"]
+       THEN IF st /= "claimed"
+              THEN /\ ex' = [ex EXCEPT ![e] = Gone]
+                   /\ handle' = [handle EXCEPT ![m] = None]
+                   /\ journal' = [journal EXCEPT ![m] = "none"]
+                   /\ jout' = [jout EXCEPT ![m] = "none"]
+                   /\ UNCHANGED <<server, ghosts>>
+              ELSE IF ex[e].out = "success"
+              THEN /\ ex' = [ex EXCEPT ![e].stage = "applying", ![e].seen = claims]
                    /\ UNCHANGED <<server, handle, journal, jout, ghosts>>
               ELSE ApplyOutcome(e)
        ELSE /\ ex' = [ex EXCEPT ![e] = Gone]
@@ -178,8 +192,15 @@ FinishStepOwnedCheck(e) ==
   /\ UNCHANGED <<connected, dm, stopEvt, stopInHand, stopReq, budgets>>
 
 FinishStepApply(e) ==
+  LET m == ex[e].mach IN
   /\ ex[e].stage \in {"applying", "orphan"}
-  /\ ApplyOutcome(e)
+  /\ IF st = "claimed" /\ sm = m /\ claims = ex[e].seen
+       THEN ApplyOutcome(e)
+       ELSE /\ ex' = [ex EXCEPT ![e] = Gone]
+            /\ handle' = IF ex[e].stage = "orphan" THEN handle
+                          ELSE [handle EXCEPT ![m] = None]
+            /\ UNCHANGED <<server, connected, dm, stopEvt, stopInHand, stopReq,
+                           journal, jout, ghosts, budgets>>
 
 ----------------------------------------------------------------------------
 

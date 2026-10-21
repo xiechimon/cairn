@@ -1,0 +1,10 @@
+ ✓ test/step-reclaim.test.ts > #1473 同机同步只跑一份 > 在飞步被再次发回本机：不起第二个会话，只有一次 done 110ms
+ ✓ test/step-reclaim.test.ts > #1473 同机同步只跑一份 > 准备工作区期间就有心跳；准备失败后心跳停止 53ms
+ ✓ test/step-reclaim.test.ts > #1473 同机同步只跑一份 > 会话结束后上传与回报期间不再发心跳 104ms
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+ ✓ test/step-claim-report.test.ts > #1473 回报只对当前这次领取生效 > 放回后同机重领：在飞那份的回报落账，之后的回报不再改动 67ms
+ ✓ test/step-claim-report.test.ts > #1473 回报只对当前这次领取生效 > 卡已关、扫尾停掉的步：迟到回报不改步，git 凭证被回收 33ms
+ ✓ test/step-claim-report.test.ts > #1473 回报只对当前这次领取生效 > GitHub 探测期间步被放回又被领走：回报 409，新领取保持 claimed 51ms
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
