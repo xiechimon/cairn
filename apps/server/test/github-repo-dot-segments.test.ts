@@ -15,6 +15,8 @@
 //   R5 来源 issue 回显 / R6 #452 标题回写（todo.sourceRef 带 `..` 段）；
 //   R7 PR 交付：执行步成后停在 building 等 CI，而轮询器对这种行不出站——
 //      任务永远卡在 building；应与无 GitHub 仓的项目同样直进 review。
+//   R7b CI 轮询器自身的防御位：todo 已在 building、build 带 prNumber
+//      （R7 修前落下的行，或绕过交付闸的行），轮询器不出站、按跳过计数。
 //   R8 PR 状态探测（requestMerge 第二张 PR 守卫）。
 //   R9 builds.ts 交付闸本身（completeStep）：非法存量值走「无 GitHub 仓」
 //      分支（进 review、verify 槽在位即入队验证步）；合法值照旧停 building。
@@ -23,7 +25,7 @@
 
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   build as buildTable,
   project as projectTable,
@@ -118,12 +120,12 @@ function insertTodo(
   return id;
 }
 
-/** 已产 PR 的 build + 一条在跑的执行步（claimed）：completeStep 即「PR 交付」。 */
-function insertDeliveringBuild(
+/** todo 已在 building + 已产 PR 的 build（无在飞步）：CI 磨绿轮询的候选形态。 */
+function insertPrBuild(
   s: TestServer,
   projectId: string,
   over: Partial<typeof todoTable.$inferInsert> = {},
-): { todoId: string; buildId: string; stepId: string } {
+): { todoId: string; buildId: string } {
   const todoId = insertTodo(s, projectId, { phase: 'building', ...over });
   const buildId = newUuidv7();
   s.db
@@ -138,6 +140,16 @@ function insertDeliveringBuild(
       prNumber: 101,
     })
     .run();
+  return { todoId, buildId };
+}
+
+/** 已产 PR 的 build + 一条在跑的执行步（claimed）：completeStep 即「PR 交付」。 */
+function insertDeliveringBuild(
+  s: TestServer,
+  projectId: string,
+  over: Partial<typeof todoTable.$inferInsert> = {},
+): { todoId: string; buildId: string; stepId: string } {
+  const { todoId, buildId } = insertPrBuild(s, projectId, over);
   const stepId = `step-${buildId}`;
   s.db
     .insert(stepTable)
@@ -353,6 +365,36 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
       expect(rec.calls).toEqual([]);
       expect(phaseOf(s, todoId)).toBe('review');
       expect(stepsOf(s, buildId)).toEqual([{ kind: 'build', status: 'done' }]);
+    },
+  );
+
+  test.each(STORED_BAD_REFS)(
+    'R7b CI 轮询器防御位：已在 building 且带 PR 号的存量行 → 按跳过计数，零出站（%s）',
+    async (bad) => {
+      const rec = recorder();
+      const s = boot(rec);
+      const projectId = insertGithubProject(s, bad);
+      const { todoId, buildId } = insertPrBuild(s, projectId);
+      const info = vi.fn();
+      const poller = createCiPoller(
+        { ...s.svc, box: s.secretBox, reposDir: s.reposDir },
+        { githubFetch: rec.impl, logger: { info } },
+      );
+      await poller.sweep();
+      expect(rec.calls).toEqual([]);
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(info.mock.calls[0]?.[0]).toEqual({
+        candidates: 1,
+        pending: 0,
+        appended: 0,
+        advanced: 0,
+        failed: 0,
+        skipped: 1,
+        unreadable: 0,
+        errors: 0,
+      });
+      expect(phaseOf(s, todoId)).toBe('building');
+      expect(stepsOf(s, buildId)).toEqual([]);
     },
   );
 
