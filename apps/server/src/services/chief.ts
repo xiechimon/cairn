@@ -369,6 +369,25 @@ function requireBoundAgent(deps: ChiefDeps, row: ChiefRow) {
   return agentRow;
 }
 
+/** #1406 编排前置的只读探测（不建 chief 行）：与 sendChiefMessage 的
+ * requireBoundAgent 同一判据——chief 行在、绑了 Agent、Agent 有模型。issue
+ * 轮询器在导入前问它，不建出 orchestrateTodo 会 409 的卡。 */
+export function chiefCanOrchestrate(deps: ChiefDeps, teamId: string): boolean {
+  const row = deps.db
+    .select()
+    .from(chief)
+    .where(eq(chief.id, chiefIdFormat(deps.user.id, teamId)))
+    .get();
+  if (row === undefined) return false;
+  try {
+    requireBoundAgent(deps, row);
+    return true;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 409) return false;
+    throw err;
+  }
+}
+
 /** 用户 → Chief 发消息（发送 wire 未采 [设计]）：线程 get-or-create（标题 =
  * 首句截断 + …，r5 §3.6）+ user 消息行落库 + chief 步入队（回合 = 机器 step，
  * r5 §3.1）+ 机器 wake。模型 = 绑定 Agent 自身配置（#1260 无继承态——

@@ -29,6 +29,11 @@ import {
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
+import {
+  createIssueIntake,
+  ISSUE_INTAKE_INTERVAL_MS,
+  type IssueIntakeLogger,
+} from './issue-intake.js';
 import { sweepStaleMachines } from './machines.js';
 import { sweepIdleChiefUnread } from './notifications.js';
 import { PhaseTransitionError } from './phase.js';
@@ -51,6 +56,14 @@ export interface CiPollRun {
   logger: CiPollLogger;
 }
 
+/** #1406 issue 进料运行位：轮询器挂本调度器家族——自有 5 分钟循环
+ * （ISSUE_INTAKE_INTERVAL_MS，与 CI 磨绿环的 60s 分道，同样不进同步 tick）。
+ * 缺省/null = 不开进料（既有调用零改动）。 */
+export interface IssueIntakeRun {
+  githubFetch: FetchLike;
+  logger: IssueIntakeLogger;
+}
+
 /** 附件回收运行位（#759：tick piggyback，缺省 = 不开回收——既有调用零改动）。 */
 export interface AttachmentGcRun {
   attachmentsDir: string;
@@ -65,6 +78,7 @@ export function createScheduler(
   opts: SchedulerOptions,
   gc?: AttachmentGcRun | null,
   ci?: CiPollRun | null,
+  intake?: IssueIntakeRun | null,
 ): Scheduler {
   let timer: NodeJS.Timeout | null = null;
   // #1150 CI 磨绿环轮询器（可选运行位）：start/stop 生命周期与 tick 同家族；
@@ -74,6 +88,11 @@ export function createScheduler(
       ? createCiPoller(deps, { githubFetch: ci.githubFetch, logger: ci.logger })
       : null;
   let ciTimer: NodeJS.Timeout | null = null;
+  const issueIntake =
+    intake !== undefined && intake !== null
+      ? createIssueIntake(deps, { githubFetch: intake.githubFetch, logger: intake.logger })
+      : null;
+  let intakeTimer: NodeJS.Timeout | null = null;
   // 回收限流位（内存记上次 sweep 时刻；多实例同库时各自限流，重复 sweep
   // 无害——Victim 判定幂等，删过即无行）。
   let lastGcAt = 0;
@@ -189,6 +208,15 @@ export function createScheduler(
         }, CI_POLL_INTERVAL_MS);
         ciTimer.unref?.();
       }
+      // #1406 issue 进料：独立 5 分钟循环（启动即补扫；sweep 自带不重叠闸与
+      // 单项目容错，此处兜底 catch 防 interval 上抛）。
+      if (issueIntake !== null) {
+        void issueIntake.sweep().catch(() => {});
+        intakeTimer = setInterval(() => {
+          void issueIntake.sweep().catch(() => {});
+        }, ISSUE_INTAKE_INTERVAL_MS);
+        intakeTimer.unref?.();
+      }
     },
     stop() {
       if (timer !== null) {
@@ -198,6 +226,10 @@ export function createScheduler(
       if (ciTimer !== null) {
         clearInterval(ciTimer);
         ciTimer = null;
+      }
+      if (intakeTimer !== null) {
+        clearInterval(intakeTimer);
+        intakeTimer = null;
       }
     },
   };

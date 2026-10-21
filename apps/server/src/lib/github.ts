@@ -410,6 +410,225 @@ export async function githubRepoLabels(
   return parseLabels(data);
 }
 
+// —— issue 进料读面（#1406 P5a-1：issue 轮询器的出站读，只读）——————————————
+//
+// 四个读，全部 fail-open 返回 null（网络 / 超时 / 非 2xx / 形坏不区分：读不到
+// = 本轮不领、下轮重读，同 githubCommitCheckRuns 律）；token 必携、只进
+// Authorization 头（进料面不走匿名梯）：
+// - GET repos/{o}/{r}/issues?state=open&labels=&sort=created&direction=asc
+//   &per_page=100（条件读；PR 条目经 projectIssue 滤除）
+// - GET repos/{o}/{r}/issues/{n}/events?per_page=100（条件读；上游按时间升序，
+//   Link 有 rel="next" = 这一页不是完整历史）
+// - GET repos/{o}/{r}/collaborators/{login}/permission（permission = legacy
+//   基础角色：maintain 映射为 write、triage 映射为 read；role_name = 实际角色）
+// - GET repos/{o}/{r}/issues/{n}（条件读，只投影 state；body 不出本模块）
+// 条件读 304 只在带了 If-None-Match 且带 Authorization 时不计主限流（GitHub
+// REST 最佳实践「Use conditional requests」）。助手名刻意不与 #1414 的
+// conditionalGetJson 重名（两 PR 并行合入）。
+
+/** 条件读结果：notModified = 304（调用方复用上轮缓存）。 */
+export type GithubConditionalRead<T> =
+  | { notModified: true }
+  | { notModified: false; etag: string | null; data: T };
+
+/** 进料面单页条数（上游 per_page 上限 100）。 */
+const INTAKE_PER_PAGE = 100;
+
+/** 单次 GET（token 必携，etag 可选）。null = 网络 / 超时 / 2xx 体不是 JSON；
+ * 非 2xx 回 status 不带 data（调用方按状态码定语义）。 */
+async function intakeGet(
+  fetchImpl: FetchLike,
+  url: string,
+  token: string,
+  etag: string | null | undefined,
+): Promise<{ status: number; etag: string | null; link: string | null; data: unknown } | null> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      headers: { ...authHeaders(token), ...(etag != null ? { 'if-none-match': etag } : {}) },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch {
+    return null;
+  }
+  const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
+  if (!res.ok) return { ...head, data: undefined };
+  try {
+    return { ...head, data: await res.json() };
+  } catch {
+    return null;
+  }
+}
+
+/** 条件读：304（且确实带了 etag）→ notModified；其余非 2xx → null。 */
+async function intakeConditionalGet(
+  fetchImpl: FetchLike,
+  url: string,
+  token: string,
+  etag: string | null | undefined,
+): Promise<GithubConditionalRead<{ link: string | null; body: unknown }> | null> {
+  const got = await intakeGet(fetchImpl, url, token, etag);
+  if (got === null) return null;
+  if (got.status === 304) return etag != null ? { notModified: true } : null;
+  if (got.status < 200 || got.status >= 300) return null;
+  return { notModified: false, etag: got.etag, data: { link: got.link, body: got.data } };
+}
+
+/** 带某标签的 open issue（最旧在前）。hasMore = 还有下一页（进料面只领
+ * 最旧的几条，不翻页）。 */
+export interface GithubLabeledIssues {
+  issues: GithubIssueSummary[];
+  hasMore: boolean;
+}
+
+/** 带标签的 open issue 列表条件读（进料候选面）。sort=created + direction=asc
+ * = 稳定排序（列表不因条目更新而重排，304 更常见），且第一页就是最旧的。 */
+export async function githubOpenIssuesWithLabel(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  label: string,
+  opts: { etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubLabeledIssues> | null> {
+  const url =
+    `https://api.github.com/${repoPath(owner, repo)}/issues?state=open` +
+    `&labels=${encodeURIComponent(label)}&sort=created&direction=asc&per_page=${INTAKE_PER_PAGE}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  if (!Array.isArray(got.data.body)) return null;
+  const issues: GithubIssueSummary[] = [];
+  for (const raw of got.data.body as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const projected = projectIssue(raw as Record<string, unknown>);
+    if (projected) issues.push(projected);
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: { issues, hasMore: (got.data.link ?? '').includes('rel="next"') },
+  };
+}
+
+/** issue 上一条标签事件（events 端点 labeled / unlabeled 的最小投影）。 */
+export interface GithubLabelEvent {
+  id: number;
+  event: 'labeled' | 'unlabeled';
+  label: string;
+  /** actor.login；账号已删（actor 为 null）→ null。 */
+  actor: string | null;
+  /** created_at 的毫秒值。 */
+  at: number;
+}
+
+export interface GithubIssueLabelEvents {
+  events: GithubLabelEvent[];
+  /** false = 上游还有下一页：这一页不是完整历史（升序，最新的在后面的页）。 */
+  complete: boolean;
+}
+
+/** issue 标签事件条件读（D5 打标人核验）。只投影 labeled / unlabeled；这两种
+ * 事件缺 id / created_at / label.name = 整读作废（null）——宁可本轮不领，
+ * 不在缺字段的历史上判谁最后打的标。 */
+export async function githubIssueLabelEvents(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  opts: { etag?: string | null } = {},
+): Promise<GithubConditionalRead<GithubIssueLabelEvents> | null> {
+  const url =
+    `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}/events` +
+    `?per_page=${INTAKE_PER_PAGE}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  if (!Array.isArray(got.data.body)) return null;
+  const events: GithubLabelEvent[] = [];
+  for (const raw of got.data.body as unknown[]) {
+    if (typeof raw !== 'object' || raw === null) return null;
+    const entry = raw as Record<string, unknown>;
+    if (entry.event !== 'labeled' && entry.event !== 'unlabeled') continue;
+    const label = entry.label as { name?: unknown } | null | undefined;
+    const actor = entry.actor as { login?: unknown } | null | undefined;
+    const at = typeof entry.created_at === 'string' ? Date.parse(entry.created_at) : Number.NaN;
+    if (typeof entry.id !== 'number' || !Number.isFinite(at) || typeof label?.name !== 'string') {
+      return null;
+    }
+    events.push({
+      id: entry.id,
+      event: entry.event,
+      label: label.name,
+      actor: typeof actor?.login === 'string' ? actor.login : null,
+      at,
+    });
+  }
+  return {
+    notModified: false,
+    etag: got.etag,
+    data: { events, complete: !(got.data.link ?? '').includes('rel="next"') },
+  };
+}
+
+/** 用户在仓库上的权限（collaborators/{login}/permission 的投影）。 */
+export interface GithubRepoPermission {
+  /** legacy 基础角色：admin | write | read | none（maintain → write、triage →
+   * read，上游文档原文）。 */
+  permission: string;
+  /** 实际角色名（含自定义角色）；缺省 null。 */
+  roleName: string | null;
+  /** user.permissions.triage（继承 triage 的自定义角色的判据位）；缺省 null。 */
+  triage: boolean | null;
+}
+
+/** 用户在仓库上的权限读。404（非协作者，或 token 看不到该仓）投影为
+ * permission 'none'——明确的否定答案；其余失败（网络 / 超时 / 限流 / 5xx /
+ * 形坏）= null（未知）。 */
+export async function githubCollaboratorPermission(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  login: string,
+): Promise<GithubRepoPermission | null> {
+  const url =
+    `https://api.github.com/${repoPath(owner, repo)}/collaborators/` +
+    `${encodeURIComponent(login)}/permission`;
+  const got = await intakeGet(fetchImpl, url, token, null);
+  if (got === null) return null;
+  if (got.status === 404) return { permission: 'none', roleName: null, triage: false };
+  if (got.status < 200 || got.status >= 300) return null;
+  const body = got.data as
+    | { permission?: unknown; role_name?: unknown; user?: { permissions?: { triage?: unknown } } }
+    | null
+    | undefined;
+  if (typeof body?.permission !== 'string') return null;
+  const triage = body.user?.permissions?.triage;
+  return {
+    permission: body.permission,
+    roleName: typeof body.role_name === 'string' ? body.role_name : null,
+    triage: typeof triage === 'boolean' ? triage : null,
+  };
+}
+
+/** issue 状态条件读（关闭对账：issue 关了，任务跟着关）。只投影 state；
+ * 404 / 410（转走、删除）与其它失败一样 = null，调用方不动卡。 */
+export async function githubIssueState(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  opts: { etag?: string | null } = {},
+): Promise<GithubConditionalRead<{ state: 'open' | 'closed' }> | null> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
+  const got = await intakeConditionalGet(fetchImpl, url, token, opts.etag);
+  if (got === null || got.notModified) return got;
+  const state = (got.data.body as { state?: unknown } | null | undefined)?.state;
+  if (state !== 'open' && state !== 'closed') return null;
+  return { notModified: false, etag: got.etag, data: { state } };
+}
+
 // —— issue 写面（#452 / ADR 0006 写向：server 唯二写入点，文件头穷举律）———
 
 /** JSON 写请求单点（POST/PATCH 共用）：超时/网络/上游状态经既有映射

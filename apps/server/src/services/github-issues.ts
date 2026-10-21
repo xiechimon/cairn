@@ -110,6 +110,13 @@ export async function listProjectGithubIssues(
  * 必携位同名冲突，Omit 后交集成立）。 */
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;
 
+/** #1406 进程内导入占位（团队 × sourceRef）。claimedSourceRefs 是应用层检查、
+ * todo.sourceRef 无唯一约束，导入在检查与 createTodo 之间要等两次 GitHub 读：
+ * webhook 与 issue 轮询器同时导入同一 issue 时两路都能过检查、各建一张卡。
+ * 占位在第一次 await 之前落下、finally 里释放（建成后由 DB 行接手去重）。
+ * 只管单进程（server 单实例；多实例同库不在本闸内）。 */
+const importsInFlight = new Set<string>();
+
 /** 从 issue 建任务（ADR 0005 D3/D5/D6 落地）：
  * - 标题 = issue 标题原样（不走占位→回填两段式；createTodo 的派生仅对
  *   空白标题兜底，issue 标题非空即原样落库，>50 字符不截断）；
@@ -132,27 +139,37 @@ export async function importGithubIssue(
   if (claimedSourceRefs(deps.db, row.teamId, [ref]).has(ref)) {
     throw new HttpError(409, `issue ${ref} already has a task`);
   }
-  const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
-  // label 面失败 = 整个导入失败（不落半成品词表）；同名条目 issue 集后置
-  // 覆盖色（更新鲜）。
-  const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
-  syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
-  const names = [...new Set(detail.labels.map((l) => l.name))];
-  const resolved = resolveProjectTagIds(deps.db, row.id, names);
-  const tagIds = names
-    .map((name) => resolved.get(name))
-    .filter((id): id is string => id !== undefined);
-  return createTodo(deps, {
-    teamId: row.teamId,
-    projectId: row.id,
-    title: detail.title,
-    spec: detail.body ?? '',
-    tagIds,
-    createdBy: deps.user.id, // 人工触发导入 = seed 用户（REST 建任务面同律）
-    ownerId: deps.user.id,
-    sourceKind: 'github-issue',
-    sourceRef: ref,
-  });
+  // #1406：另一路正在导入同一 issue（还在等 GitHub 读）→ 同 409。
+  const claim = `${row.teamId}\u0000${ref}`;
+  if (importsInFlight.has(claim)) {
+    throw new HttpError(409, `issue ${ref} is being imported`);
+  }
+  importsInFlight.add(claim);
+  try {
+    const detail = await githubRepoIssue(fetchImpl, token, owner, repo, issueNumber);
+    // label 面失败 = 整个导入失败（不落半成品词表）；同名条目 issue 集后置
+    // 覆盖色（更新鲜）。
+    const repoLabels = await githubRepoLabels(fetchImpl, token, owner, repo);
+    syncGithubLabels(deps.db, row.id, [...repoLabels, ...detail.labels]);
+    const names = [...new Set(detail.labels.map((l) => l.name))];
+    const resolved = resolveProjectTagIds(deps.db, row.id, names);
+    const tagIds = names
+      .map((name) => resolved.get(name))
+      .filter((id): id is string => id !== undefined);
+    return createTodo(deps, {
+      teamId: row.teamId,
+      projectId: row.id,
+      title: detail.title,
+      spec: detail.body ?? '',
+      tagIds,
+      createdBy: deps.user.id, // 人工触发导入 = seed 用户（REST 建任务面同律）
+      ownerId: deps.user.id,
+      sourceKind: 'github-issue',
+      sourceRef: ref,
+    });
+  } finally {
+    importsInFlight.delete(claim);
+  }
 }
 
 /** 来源 issue 只读回显（#452 / ADR 0006 D5/D6）：任务详情页进入时拉一次，
