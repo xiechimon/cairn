@@ -1294,6 +1294,16 @@
           ],
           "status": "current",
           "purpose": "Sidebar search panel: Cmd+K, type the title, the matching task row shows."
+        },
+        "project-line": {
+          "script": ".claude/skills/verify-pacman/scripts/drive-search-project-line.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "⌘K search rows show their own project as the second line on the live stack: before /api/search answers (client-side rows), after it, and none while /api/projects is still loading; never the fixture project r3-lifecycle.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
         }
       }
     },

@@ -327,8 +327,8 @@ const cases = [
     () => {
       const run = mkdtempSync(join(tmpdir(), 'vp-selftest-run-'));
       writeFileSync(join(run, 'ports.json'), JSON.stringify({ serverPort: 8792, webPort: 5274 }));
-      const r = vp(['drive', 'search', '--dry-run'], { VERIFY_RUN_DIR: run });
-      const clash = vp(['drive', 'search', '--dry-run'], { VERIFY_RUN_DIR: run, VERIFY_PORT: '8791' });
+      const r = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run });
+      const clash = vp(['drive', 'search', 'search', '--dry-run'], { VERIFY_RUN_DIR: run, VERIFY_PORT: '8791' });
       rmSync(run, { recursive: true, force: true });
       return (
         r.code === 0 &&
@@ -405,7 +405,7 @@ const cases = [
     () => {
       const root = mkdtempSync(join(tmpdir(), 'vp-selftest-'));
       const ev = join(root, 'ev');
-      const r = vp(['drive', 'search'], { VERIFY_RUN_DIR: join(root, 'run'), VERIFY_EVIDENCE_DIR: ev });
+      const r = vp(['drive', 'search', 'search'], { VERIFY_RUN_DIR: join(root, 'run'), VERIFY_EVIDENCE_DIR: ev });
       const made = existsSync(ev);
       rmSync(root, { recursive: true, force: true });
       return r.code === 1 && /doctor failed/.test(r.out) && !made;
@@ -433,14 +433,14 @@ const cases = [
     'a tsx case runs from its package directory, a node case from the repo root',
     () => {
       const tsx = vp(['drive', 'failed-send', 'restart-combo', '--dry-run']);
-      const node = vp(['drive', 'search', '--dry-run'], {}, resolve(ROOT, 'apps'));
+      const node = vp(['drive', 'search', 'search', '--dry-run'], {}, resolve(ROOT, 'apps'));
       return tsx.out.includes(`cwd ${resolve(ROOT, 'apps/server')}`) && node.out.includes(`cwd ${ROOT}\n`);
     },
   ],
   [
     'a case that needs the stack runs doctor first',
     () => {
-      const r = vp(['drive', 'search', '--dry-run']);
+      const r = vp(['drive', 'search', 'search', '--dry-run']);
       return r.code === 0 && /doctor first/.test(r.out);
     },
   ],
