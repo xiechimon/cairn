@@ -31,17 +31,20 @@
 //    先）；团队级已占用的号跳过（大小写不敏感）；D5 核打标人：该标签最新一条
 //    labeled 之后没有 unlabeled、不是经 GitHub App 打的（performed_via_github_app
 //    在位 = 不领，记一行带 app：经 GitHub App 打标的 agent 会话不能给进料喂它
-//    自己开的 issue；用 gh 或 PAT 以仓主账号打的标不带这个字段，与仓主亲手打
-//    的分不开，这一条拦不住），且其 actor 在仓库上是 triage 及以上（events
-//    按 Link rel="next" 至多读 ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一
-//    页 = 读不全；读不全 / 任一读失败 = 本轮不领）；importGithubIssue（409 =
-//    别路已领；createdBy 记 chief 绑定的 Agent）→ orchestrateTodo；领到一条
-//    记一行日志（打标人）。
+//    自己开的 issue；OAuth App 令牌（gh auth login 的、团队 GitHub 连接令牌）
+//    与 PAT 打的标不带这个字段，与本人亲手打的分不开，这一条拦不住——连接令
+//    牌随步下发给 git 与仓内 .agents/setup / resume 钩子），且其 actor 在仓库
+//    上是 triage 及以上（events 按 Link rel="next" 至多读
+//    ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页 = 读不全；读不全 / 任一
+//    读失败 = 本轮不领）；importGithubIssue（409 = 别路已领；createdBy 记 chief
+//    绑定的 Agent）→ orchestrateTodo；领到一条记一行日志（打标人）。
 //
 // 纪律：issue 正文只经 importGithubIssue 进 todo.spec，不进日志、不进系统行；
-// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；任一 GitHub
-// 读遇限流（429 / 带限流信号的 403）= 本队本轮停读、记一行带重置时刻（同一
-// token 再读只会再被拒）；上一轮没跑完时新触发直接返回（不重叠）。
+// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；本模块自己
+// 的 GitHub 读（列表 / events / permission / issue 状态）遇限流（429 / 带限流
+// 信号的 403）= 本队本轮停读、记一行（有重置时刻就带上；同一 token 再读只会
+// 再被拒）——importGithubIssue 自己的读遇限流抛 HttpError，按导入失败记；
+// 上一轮没跑完时新触发直接返回（不重叠）。
 
 import {
   githubIssueSourceRef,
@@ -292,8 +295,9 @@ function newestOf(
 /** D5 第一半：该标签最新一条 labeled 的 actor（之后有 unlabeled / 读不全 /
  * 没有 labeled / 经 app 打的 / 账号已删 → 不领的理由）。经 app 打的标不算人
  * 打的：用户授权的 app 令牌下 actor 是授权的人，只看 actor 分不开 app 与本人。
- * gh（OAuth App 令牌）与 PAT 不填 performed_via_github_app，经它们打的标与本
- * 人打的一样，这里拦不住。顺序按 created_at，同刻按 id，不信数组位置。 */
+ * OAuth App 令牌与 PAT 不填 performed_via_github_app（gh 用哪种令牌就是哪种），
+ * 经它们打的标与本人打的一样，这里拦不住。顺序按 created_at，同刻按 id，不信
+ * 数组位置。 */
 function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
   const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>

@@ -734,8 +734,9 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
       '形坏（labeled 缺 label）',
       () => ({ body: [{ ...LABELED_TEMPLATE, label: undefined, id: 1 }] }),
     ],
-    // labeled / unlabeled / closed 缺 id 或 created_at = 整读作废（githubIssueEvents）：
-    // 只跳过那一条，摘标事件一丢，已摘的标就成了仓主最新打的。
+    // labeled / unlabeled 缺 id、created_at 或 label，数组里有一项不是对象 = 整读
+    // 作废（githubIssueEvents）：只跳过那一条，摘标事件一丢，已摘的标就成了仓主
+    // 最新打的。closed 事件缺字段的后果在关闭人核验上，见 11 组。
     [
       '形坏（仓主打标之后的 unlabeled 缺 created_at）',
       () => ({
@@ -770,13 +771,17 @@ describe('2 events / permission 读失败：本轮不领，下轮重读', () => 
       }),
     ],
     [
-      '形坏（closed 缺 created_at）',
+      '形坏（仓主打标之后的 unlabeled 缺 label）',
       () => ({
         body: [
           labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1),
-          { ...closedEvent(OWNER, '2026-10-20T20:30:00Z', 2), created_at: undefined },
+          { ...labelEvent('unlabeled', OWNER, '2026-10-20T20:30:00Z', 2), label: undefined },
         ],
       }),
+    ],
+    [
+      '形坏（仓主打标之后有一项不是对象）',
+      () => ({ body: [labelEvent('labeled', OWNER, '2026-10-20T20:24:18Z', 1), null] }),
     ],
   ];
 
@@ -1329,6 +1334,51 @@ describe('11 issue 在 GitHub 被关', () => {
     }
   });
 
+  // 缺 id / created_at 的 closed 事件让整读作废：跳过它，就会退回更早一条仓主关的
+  // closed，把外人关的 issue 当成仓主关的。
+  test.each([
+    ['缺 created_at', { created_at: undefined }],
+    ['缺 id', { id: undefined }],
+  ] as const)(
+    '关闭人核验：最新一条 closed（外人关的）%s → 整读作废，不关；读到完整的事件后按外人关处理，仍不关',
+    async (_name, broken) => {
+      const w = await makeWorld({ list: [] });
+      w.gh.state.issues.set(1445, OPEN_1445);
+      const todoId = insertSourceTodo(w, 1445, 'building');
+      await w.intake.sweep();
+      // 仓主先关过一次、又重开，后来外人关了（最新这条缺字段）。
+      const ownerClosed = closedEvent(OWNER, '2026-10-21T06:00:00Z', 1);
+      const reopened = {
+        ...ownerClosed,
+        id: 2,
+        event: 'reopened',
+        created_at: '2026-10-21T06:10:00Z',
+      };
+      const outsiderClosed = closedEvent('outsider', '2026-10-21T10:00:00Z', 3);
+      w.gh.state.issues.set(1445, ISSUE_1445_CLOSED);
+      const path = `/repos/${REPO}/issues/1445/events`;
+      w.gh.overrides.set(path, () => ({
+        body: [ownerClosed, reopened, { ...outsiderClosed, ...broken }],
+      }));
+      const tally = await w.intake.sweep();
+      expect(tally?.closed).toBe(0);
+      expect(tally?.closeSkipped).toBe(1);
+      expect(phaseOf(w, todoId)).toBe('building');
+      expect(w.gh.permissionReads()).toHaveLength(0);
+      const skipReasons = () =>
+        w.logs.filter((l) => l.msg === 'issue intake close skipped').map((l) => l.obj.reason);
+      expect(skipReasons()).toEqual(['events-unreadable']);
+      w.gh.overrides.delete(path);
+      w.gh.state.events.set(1445, [ownerClosed, reopened, outsiderClosed]);
+      const after = await w.intake.sweep();
+      expect(after?.closed).toBe(0);
+      expect(phaseOf(w, todoId)).toBe('building');
+      expect(w.gh.permissionReads('outsider')).toHaveLength(1);
+      expect(w.gh.permissionReads(OWNER)).toHaveLength(0);
+      expect(skipReasons()).toEqual(['events-unreadable', 'closer-below-triage']);
+    },
+  );
+
   test('issue 事件过百、closed 事件在第 2 页 → 读到第 2 页并关闭', async () => {
     const w = await makeWorld({ list: [] });
     w.gh.state.issues.set(1445, OPEN_1445);
@@ -1354,16 +1404,19 @@ describe('11 issue 在 GitHub 被关', () => {
       { ...w.s.svc, box: w.s.secretBox },
       { githubFetch: w.gh.impl },
     );
-    const readsBefore = w.gh.calls.length;
+    const issueReadsBefore = w.gh.issueReads(1445).length;
+    const eventReadsBefore = w.gh.eventReads(1445).length;
     const tally = await restarted.sweep();
     expect(tally?.closed).toBe(0);
     expect(phaseOf(w, todoId)).toBe('building');
     // 新轮询器确实读了这张卡的 issue（读到 closed）；首见即 closed，不去读关闭人。
-    const restartedReads = w.gh.calls.slice(readsBefore);
     expect(
-      restartedReads.filter((c) => c.path === `/repos/${REPO}/issues/1445`).map((c) => c.status),
+      w.gh
+        .issueReads(1445)
+        .slice(issueReadsBefore)
+        .map((c) => c.status),
     ).toEqual([200]);
-    expect(restartedReads.filter((c) => c.path.endsWith('/issues/1445/events'))).toHaveLength(0);
+    expect(w.gh.eventReads(1445)).toHaveLength(eventReadsBefore);
   });
 
   test('读期间卡被人推进 review → 写前重读相位，跳过', async () => {
