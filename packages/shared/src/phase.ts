@@ -50,14 +50,16 @@ export type BoardColumn = (typeof BOARD_COLUMNS)[number];
  * gate 三态（confirm / review / failed）同入 `待处理`——方案确认、变更验收、
  * 失败重试都是等用户处理的事；review+awaitingReply 与 failed 的钉顶是渲染
  * 行为（web columns.ts sortColumnTodos），列归属同 `待处理`。
- * `queued→待开始` 折叠与 `closed` 不占列为 [推断]（02 §4.1，改判触发 = UI 实验）。
+ * `queued→执行中`（#1447）：已开始的卡停在它的构建将要跑的那一步（参考站
+ * changelog 2026-09-12「a queued todo sits on the step its build will run」），
+ * 取代旧的 `queued→待开始` [推断] 折叠；待开始只收未开始的 todo。
  * `done` 列语义 =「已完成（近 7 天）」（changelog "Done (last 7 days)"）。
  */
 export function boardColumnFor(phase: Phase): BoardColumn | null {
   switch (phase) {
     case 'todo':
-    case 'queued':
       return '待开始';
+    case 'queued':
     case 'planning':
     case 'building':
       return '执行中';
@@ -114,8 +116,6 @@ export function canBoardDrop(from: Phase, to: Phase): boolean {
     case 'todo':
       return src !== '待开始';
     case 'building':
-      // 相位级（手动改相 PATCH）放行 待开始 两相。看板拖拽面更严：拖进执行中
-      // = 开始意图，queued 已开始不进（web columns.ts canDropOnColumn，#1434）。
       return src === '待开始';
     case 'review':
       return src === '已完成';

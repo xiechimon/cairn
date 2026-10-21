@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { pressUntil } from './helpers.js';
 
 // Issue #389 + #442 + #468 + XMON-37 acceptance, re-pinned for ADR 0013
@@ -147,7 +147,7 @@ const drawer = (page: Page) => page.locator('.chief-drawer');
 async function pressesStayClosed(
   page: Page,
   key: string,
-  surface: ReturnType<Page['locator']>,
+  surface: Locator,
 ) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.keyboard.press(key);
@@ -161,7 +161,7 @@ async function pressesStayClosed(
 async function pressesStayHidden(
   page: Page,
   key: string,
-  surface: ReturnType<Page['locator']>,
+  surface: Locator,
 ) {
   for (let attempt = 0; attempt < 6; attempt += 1) {
     await page.keyboard.press(key);
@@ -170,40 +170,17 @@ async function pressesStayHidden(
   }
 }
 
-/** Escape-until-closed, same retry law as pressUntil: the close listener
- *  registers in a passive effect too, so an Escape fired right after open
- *  can be lost (renderer input processing lags the assertion read under
- *  load — CI evidence: the dialog stayed mounted 5s+). Escape on an
- *  already-closed surface is a no-op, so retries never double-fire. */
-async function escapeUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Escape');
-    const closed = await surface
-      .waitFor({ state: 'hidden', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (closed) return;
-  }
-  throw new Error(`Escape never closed ${surface}`);
+/** The close listener registers in a passive effect too (CI evidence: the
+ *  dialog stayed mounted 5s+ after a single Escape). */
+async function escapeUntilHidden(page: Page, surface: Locator) {
+  await pressUntil(page, 'Escape', surface, 'hidden');
 }
 
-/** toggle close, same retry law as escapeUntilHidden: a delivered toggle
- *  hides the surface and the wait ends the loop; a lost key leaves it open
- *  and the re-press IS the toggle. A pathologically slow close makes the
- *  next press reopen — and the one after closes again — so the loop's end
- *  state is deterministically hidden, never a coin flip. 键固定 ⌘J——本文件里
- *  走这条 toggle 循环的面只有 chief 抽屉；XMON-87 的 Tab 换项目是「循环选择」
- *  语义、不关面，另有用例走 useProjectCycleHotkey。 */
-async function toggleUntilHidden(page: Page, surface: ReturnType<Page['locator']>) {
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+j');
-    const closed = await surface
-      .waitFor({ state: 'hidden', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (closed) return;
-  }
-  throw new Error('Meta+j never closed the surface');
+/** 键固定 ⌘J（toggle，见 pressUntil 的 toggle 注）——本文件里走这条循环的面
+ *  只有 chief 抽屉；XMON-87 的 Tab 换项目是「循环选择」语义、不关面，另有用例
+ *  走 useProjectCycleHotkey。 */
+async function toggleUntilHidden(page: Page, surface: Locator) {
+  await pressUntil(page, 'Meta+j', surface, 'hidden');
 }
 
 test('C on the board opens the new-task dialog; ⌘C and the retired N do not', async ({
@@ -519,8 +496,9 @@ test('⌘↵ and Ctrl+↵ inside the dialog fire 保存并开始 (card lands, di
   // The autofocused spec textarea is an editable target — the chord must
   // still fire from it (dialog-interior exemption; without it the guard
   // swallows the press and this wait times out).
-  // The retry loop waits on the outcome (the card landing), not on a surface
-  // opening: a lost press lands nothing, so a re-press cannot double-fire.
+  // The retry loop waits on the outcome (the card landing): a lost press
+  // lands nothing and is re-pressed. A save slower than the 1s wait lands a
+  // second card, and the strict card locator then fails the test loudly.
   await pressUntil(page, 'Meta+Enter', landedCard(page, '⌘↵ 建的卡'));
   await expect(dialog).not.toBeVisible();
 

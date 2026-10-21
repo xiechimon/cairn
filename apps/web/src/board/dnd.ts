@@ -82,8 +82,8 @@ export function moveTodo(
 export function resetTodoLocal(todos: TodoRecord[], todoId: string, now: number): TodoRecord[] {
   const moved = todos.find((t) => t.id === todoId);
   if (moved == null || !needsResetGate(moved)) return todos;
-  // 同列（queued 相位本就住待开始列）：只清产物位，不动位次。
-  if (moved.phase === 'todo' || moved.phase === 'queued') {
+  // 同列（带构建历史的 todo 卡本就住待开始列）：只清产物位，不动位次。
+  if (moved.phase === 'todo') {
     return todos.map((t) =>
       t.id === todoId
         ? {

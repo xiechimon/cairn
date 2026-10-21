@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { pressUntil } from './helpers.js';
 
 // Issue #387 acceptance: dicebear Lorelei avatar system — name-seeded
 // generative avatars via the dicebear HTTP API (same name → same image, no
@@ -154,23 +155,15 @@ test('search agent rows + project task rows are seeded (Agent 列表 / 任务行
   page,
 }) => {
   await stubDicebear(page);
-  // ⌘K 面板的 agent 命中行 = 搜索形态下的 Agent 列表面;热键监听在首帧后
-  // 注册(search-result-rows 同款 retry,丢键才重按)
+  // ⌘K 面板的 agent 命中行 = 搜索形态下的 Agent 列表面
   await page.goto('/app?scenario=01');
   await expect(page.locator('.sidebar-row').first()).toBeVisible();
-  for (let attempt = 0; attempt < 6; attempt += 1) {
-    await page.keyboard.press('Meta+k');
-    const opened = await page
-      .getByRole('dialog', { name: '搜索' })
-      .waitFor({ state: 'visible', timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (opened) break;
-  }
+  const searchPanel = page.getByRole('dialog', { name: '搜索' });
+  await pressUntil(page, 'Meta+k', searchPanel);
   await page.keyboard.type('r3-builder');
   // #949：agent 行头像位 = data-row-kind 行族载体（.search-row-icon--agent 类钉退役）
   await expect(
-    page.getByRole('dialog', { name: '搜索' }).locator('[data-row-kind="agent"] img').first(),
+    searchPanel.locator('[data-row-kind="agent"] img').first(),
   ).toHaveAttribute(
     'src',
     AGENT_SRC,
