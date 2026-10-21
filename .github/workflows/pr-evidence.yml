@@ -29,7 +29,8 @@ name: pr-evidence
 # Putting `types:` on ci.yml would re-trigger the whole pipeline on every body
 # edit; here only this job runs. `auto_merge_enabled` is listed so that arming
 # auto-merge on a labelled PR is undone within one run instead of waiting for
-# the next edit or push.
+# the next edit or push; `ready_for_review` so a draft's unchecked items are
+# judged the moment it stops being a draft.
 #
 # Third-party actions are pinned to full commit SHAs with trailing version
 # comments (#1076): a floating tag can be re-pointed upstream, which would
@@ -37,7 +38,7 @@ name: pr-evidence
 # the anchor Dependabot parses on upgrade — keep it.
 on:
   pull_request:
-    types: [opened, edited, synchronize, reopened, labeled, unlabeled, auto_merge_enabled]
+    types: [opened, edited, synchronize, reopened, ready_for_review, labeled, unlabeled, auto_merge_enabled]
 
 # contents: write is for disablePullRequestAutoMerge alone: with
 # pull-requests: write only, the mutation answers "Resource not accessible by
@@ -64,15 +65,25 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
-      # Labels are re-read from the API rather than taken from the event
-      # payload: a rerun replays the payload the run was created with, and a
-      # label added after that would be invisible to it. REST rather than
+      # The PR is read from the API as it is now, never from the event
+      # payload: a rerun replays the payload the run was created with, so a
+      # label added or a body fixed after that would be invisible to it (two
+      # red reruns on #1045 before this was understood). REST rather than
       # `gh pr view`/`gh pr edit`: gh's PR GraphQL path trips on this repo's
       # classic-projects field and can fail without applying the edit.
-      - name: Refuse while a person has a decision pending (needs-decision label)
+      - name: Read the PR as it is now
         run: |
-          labels=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '[.[].name] | join(",")')
-          case ",$labels," in
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/pr.json"
+          jq -r '.body // ""' "$RUNNER_TEMP/pr.json" > "$RUNNER_TEMP/pr-body.md"
+          echo "labels=$(jq -r '[.labels[].name] | join(",")' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+          echo "draft=$(jq -r '.draft' "$RUNNER_TEMP/pr.json")" >> "$GITHUB_OUTPUT"
+        id: pr
+
+      - name: Refuse while a person has a decision pending (needs-decision label)
+        env:
+          LABELS: ${{ steps.pr.outputs.labels }}
+        run: |
+          case ",$LABELS," in
             *,needs-decision,*)
               touch needs-decision.flag
               echo "FAIL needs-decision: a person has to remove the needs-decision label before this PR can merge"
@@ -84,18 +95,14 @@ jobs:
       # earlier step reds (#1240): a lane fixing a link problem should not
       # have to push again to discover a tasks problem.
       - name: Check PR body evidence (sections + links embedded + reachable)
-        if: ${{ !cancelled() }}
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: python3 scripts/pr-evidence-gate.py
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
+        run: python3 scripts/pr-evidence-gate.py "$RUNNER_TEMP/pr-body.md"
 
       - name: Check PR body tasks (Acceptance checklist exists and is fully checked)
-        if: ${{ !cancelled() }}
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+        if: ${{ !cancelled() && steps.pr.outcome == 'success' }}
         run: |
           set -o pipefail
-          python3 scripts/pr-tasks-gate.py | tee pr-tasks.log
+          python3 scripts/pr-tasks-gate.py "$RUNNER_TEMP/pr-body.md" | tee pr-tasks.log
 
       # A pending decision must not be racing an armed auto-merge. An
       # unchecked Acceptance item is a pending decision (verify it or waive
@@ -109,7 +116,7 @@ jobs:
       - name: Mark the decision pending and disarm auto-merge
         if: ${{ failure() }}
         env:
-          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          PR_DRAFT: ${{ steps.pr.outputs.draft }}
         run: |
           if [ "$PR_DRAFT" != "true" ] && grep -q 'FAIL unchecked-task' pr-tasks.log 2>/dev/null; then
             gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f 'labels[]=needs-decision' --silent

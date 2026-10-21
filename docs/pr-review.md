@@ -45,7 +45,7 @@ Open questions:
 三条硬规矩：
 
 - **Bad / Ugly 查完没发现问题，就在该节下明说**「未发现问题（查过 X / Y 面）」——这是结论，不是凑数；禁止的形态是只剩标题、一句敷衍的「无」。
-- **Open questions 没有就整节省略**，连标题都不留——它只收「卡住合并决策、需要用户拍板」的事，审出的一般问题归 Bad / Ugly。
+- **Open questions 没有就整节省略**，连标题都不留——它只收「卡住合并决策、需要用户拍板」的事，审出的一般问题归 Bad / Ugly。写了 Open questions 就同时 `gh pr edit <PR> --add-label needs-decision`（#1440）：`pr-evidence` 见标签即红、解除 auto-merge，用户拍板后由人摘标签；问题只留在评审文字里等于没问。
 - 六节全部写实条目；写不出真实条目的节不写。
 
 评审结论落 **PR 评论**（`gh pr comment`，长内容写一次性文件走 `--body-file`），不动 PR body——body 是作者的证据面，评审不改它。

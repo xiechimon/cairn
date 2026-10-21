@@ -8,8 +8,9 @@
 //     red run and lets auto-merge through;
 //   - a job-level `name:` renames the check, and branch protection then waits
 //     forever for a context nobody reports;
-//   - dropping `labeled` / `unlabeled` / `auto_merge_enabled` from the trigger
-//     list leaves a labelled PR green until the next push or body edit.
+//   - dropping `labeled` / `unlabeled` / `auto_merge_enabled` /
+//     `ready_for_review` from the trigger list leaves a labelled PR green
+//     until the next push or body edit.
 //
 // Zero-dependency on purpose (runs pre-install in the check job, like
 // lane-file-gate.mjs): the file is read line by line against the two-space
@@ -44,7 +45,7 @@ else {
           ...(body[typesAt].match(/\[(.*)\]/)?.[1] ?? '').split(','),
           ...body.slice(typesAt + 1).map((line) => line.match(/^ {6}- (\S+)/)?.[1] ?? ''),
         ].map((t) => t.trim());
-  for (const type of ['edited', 'labeled', 'unlabeled', 'auto_merge_enabled']) {
+  for (const type of ['edited', 'ready_for_review', 'labeled', 'unlabeled', 'auto_merge_enabled']) {
     if (!types.includes(type))
       failures.push(
         `on.pull_request.types lacks ${type}: a labelled PR would stay green until the next push`,
