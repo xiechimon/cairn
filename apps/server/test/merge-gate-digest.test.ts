@@ -5,6 +5,8 @@
 // 第三轮（ADR 0021 D4 修订）补的：800 行 / 40 文件按整张补丁算，证据也计入，
 // 改名记两个文件；compare 不给 patch 的条目要能认出来（二进制）；增删行数为负
 // 的响应按形状不对处理。
+// 第四轮补的：改名或复制条目缺 previous_filename 按形状不对处理（不然原名不进
+// 路径判定）；固定码元排序（换成 localeCompare 摘要就变）。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
 // 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
 // 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
@@ -124,6 +126,21 @@ describe('computePatchDigest', () => {
     ];
     expect(computePatchDigest(a).patchDigest).not.toBe(computePatchDigest(b).patchDigest);
     expect(computePatchDigest(c).patchDigest).not.toBe(computePatchDigest(d).patchDigest);
+  });
+
+  // 期望值由 Python 的 sorted()（按码点；BMP 内与 UTF-16 码元同序）独立算出，
+  // 见 docs/verify/1404/s1-r4-red-green.txt。码元序：B.ts < a-b.ts < a.b.ts < a/b.ts
+  // （'B' 0x42 < 'a' 0x61；'-' 0x2D < '.' 0x2E < '/' 0x2F）；localeCompare 把 a 排在 B 前。
+  test('排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要', () => {
+    const files = [
+      file({ filename: 'apps/web/src/a/b.ts', sha: '1'.repeat(40) }),
+      file({ filename: 'apps/web/src/a.b.ts', sha: '2'.repeat(40) }),
+      file({ filename: 'apps/web/src/B.ts', sha: '3'.repeat(40) }),
+      file({ filename: 'apps/web/src/a-b.ts', sha: '4'.repeat(40) }),
+    ];
+    const expected = 'pd1:705a58e14af8f2aac1703c4e4dbd299a69fa183e141630e556a97d7e12290436';
+    expect(computePatchDigest(files).patchDigest).toBe(expected);
+    expect(computePatchDigest([...files].reverse()).patchDigest).toBe(expected);
   });
 
   test('非删除条目的 sha 为空：摘要不可得', () => {
@@ -276,6 +293,18 @@ describe('真实 compare 响应夹具', () => {
     expect(compareFilesFromResponse({ files: [noSha] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: '' })] })).toBeNull();
     expect(compareFilesFromResponse({ files: [entry({ previous_filename: 7 })] })).toBeNull();
+  });
+
+  test('改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉', () => {
+    for (const status of ['renamed', 'copied']) {
+      const { previous_filename: _, ...noPrev } = entry({ status });
+      expect(compareFilesFromResponse({ files: [noPrev] }), status).toBeNull();
+      const nullPrev = entry({ status, previous_filename: null });
+      expect(compareFilesFromResponse({ files: [nullPrev] }), status).toBeNull();
+    }
+    expect(
+      compareFilesFromResponse({ files: [entry({ status: 'copied' })] })?.[0]?.previousFilename,
+    ).toBe('apps/server/src/b.ts');
   });
 
   test('patch 是非空字符串时 hasPatch 为真；缺省、空串、null 都为假', () => {

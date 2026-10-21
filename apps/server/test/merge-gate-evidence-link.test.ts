@@ -2,6 +2,7 @@
 // 的证据 raw 永久链」）。只认钉 40 位小写 SHA、指向本仓 docs/verify/<票号>/ 的
 // 链接；HTML 注释里的不算（与 scripts/pr-evidence-gate.py 同一约定）。
 // 第三轮补的：查询串与片段（?raw=true、#L3）不是路径的一部分。
+// 第四轮钉住的：票号是另一票号的前缀时（14040 与 1404）不算本票证据。
 
 import { describe, expect, test } from 'vitest';
 import { parseRawEvidenceLinks } from '../src/services/merge-gate/evidence-link.js';
@@ -36,6 +37,12 @@ describe('parseRawEvidenceLinks', () => {
     const r = parse(body);
     expect(r.links).toEqual([]);
     expect(r.others.length).toBe(6);
+  });
+
+  test('票号是另一票号的前缀：docs/verify/14040/ 不是 1404 的证据', () => {
+    const r = parse(raw('docs/verify/14040/a.json'));
+    expect(r.links).toEqual([]);
+    expect(r.others).toEqual([raw('docs/verify/14040/a.json')]);
   });
 
   test('仓名不分大小写', () => {

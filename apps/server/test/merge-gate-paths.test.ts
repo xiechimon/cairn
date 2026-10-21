@@ -8,6 +8,9 @@
 // 换大小写绕开别票 / 可执行检查；票号是另一票号的前缀。
 // 第三轮（ADR 0021 D4 修订）补的：证据目录之外的二进制文件留人。compare 对
 // 二进制不给 patch，纯改名也不给，分不出来，一并留人（严的一侧）。
+// 第四轮补的：删测试的目录与后缀不分大小写（ADR 0021 D4）；另把已有行为钉住：
+// 每种可执行扩展名、别票证据的改名原名、嵌套的 biome.json / .gitattributes、
+// daemon 的闸源码、e2e/ tests/ __tests__/ 目录。
 
 import type { CompareFile } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
@@ -53,8 +56,10 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
     ['biome', 'apps/web/biome.jsonc', 'apps/web/src/biome.ts'],
+    ['biome.json 嵌套在源码里', 'apps/web/src/biome.json', 'apps/web/src/biome.json.ts'],
     ['tsconfig', 'apps/server/tsconfig.base.json', 'apps/server/src/tsconfig.ts'],
     ['gitignore', 'apps/server/src/.gitignore', 'apps/server/src/gitignore.ts'],
+    ['gitattributes 嵌套', 'apps/web/src/.gitattributes', 'apps/web/src/gitattributes.ts'],
     ['迁移', 'apps/server/drizzle/0044_x.sql', 'apps/server/src/drizzle.ts'],
     ['依赖清单', 'packages/shared/package.json', 'packages/shared/src/package.ts'],
     ['锁文件', 'pnpm-lock.yaml', 'apps/web/src/lock.ts'],
@@ -70,6 +75,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
       'packages/shared/src/records/merge-gate.ts',
       'packages/shared/src/records/review.ts',
     ],
+    ['daemon 的合并决定', 'apps/daemon/src/merge-decision.ts', 'apps/daemon/src/merge.ts'],
   ];
   for (const [label, hit, miss] of cases) {
     test(label, () => {
@@ -117,6 +123,9 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
   test('闸源码另列一份（D4 ④）', () => {
     expect(classify([f('apps/server/src/services/merge-gate/readiness.ts')]).gateSource).toEqual([
       'apps/server/src/services/merge-gate/readiness.ts',
+    ]);
+    expect(classify([f('apps/daemon/src/merge-decision.ts')]).gateSource).toEqual([
+      'apps/daemon/src/merge-decision.ts',
     ]);
   });
 });
@@ -169,6 +178,31 @@ describe('删测试', () => {
       f('apps/web/src/x.ts', { status: 'removed' }),
     ]);
     expect(r.deletedTests).toEqual(['integration/test/helpers.ts', 'apps/web/src/x.test.tsx']);
+  });
+
+  test('e2e/、tests/、__tests__/ 目录下删掉的文件都算，不必带 .test 后缀', () => {
+    const removed = [
+      'apps/web/e2e/fixtures/board-helpers.ts',
+      'apps/server/tests/helpers.ts',
+      'packages/shared/src/__tests__/util.ts',
+    ];
+    const r = classify(removed.map((p) => f(p, { status: 'removed' })));
+    expect(r.deletedTests).toEqual(removed);
+  });
+
+  test('测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致）', () => {
+    const r = classify([
+      f('apps/server/Tests/helpers.ts', { status: 'removed' }),
+      f('apps/web/src/Foo.Test.tsx', { status: 'removed' }),
+      f('apps/web/E2E/a.ts', { status: 'removed' }),
+      f('apps/web/src/bar.ts', { status: 'renamed', previousFilename: 'apps/web/src/Bar.SPEC.ts' }),
+    ]);
+    expect(r.deletedTests).toEqual([
+      'apps/server/Tests/helpers.ts',
+      'apps/web/src/Foo.Test.tsx',
+      'apps/web/E2E/a.ts',
+      'apps/web/src/Bar.SPEC.ts',
+    ]);
   });
 
   test('把测试改名成非测试路径也算删测试', () => {
@@ -233,6 +267,32 @@ describe('证据目录', () => {
       f('docs/verify/1404/data.json', { status: 'added' }),
     ]);
     expect(r.executableEvidence).toEqual(['docs/verify/1404/probe.mjs', 'docs/verify/1404/run.SH']);
+  });
+
+  // 清单在这里照抄一份，不从 @pacman/shared 引：从词表里删掉一项时这条要红。
+  const EXECUTABLE = ['.mjs', '.cjs', '.js', '.mts', '.cts', '.ts', '.jsx', '.tsx', '.sh', '.py'];
+  test('每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出', () => {
+    for (const ext of EXECUTABLE) {
+      const files = [
+        f(`docs/verify/1404/new${ext}`, { status: 'added' }),
+        f(`docs/verify/1404/edit${ext}`),
+        f(`docs/verify/1404/notes${ext}`, {
+          status: 'renamed',
+          previousFilename: 'docs/verify/1404/notes.txt',
+        }),
+      ];
+      expect(classify(files).executableEvidence, ext).toEqual(files.map((x) => x.filename));
+    }
+  });
+
+  test('改名把别票的证据移进本票目录：按原名列出', () => {
+    const r = classify([
+      f('docs/verify/1404/x.json', {
+        status: 'renamed',
+        previousFilename: 'docs/verify/926/convergence-evidence.json',
+      }),
+    ]);
+    expect(r.otherTicketEvidence).toEqual(['docs/verify/926/convergence-evidence.json']);
   });
 
   test('证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行', () => {
