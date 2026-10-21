@@ -25,7 +25,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CHIEF_REMOTE_TOOLS, REMOTE_TOOL_TIMEOUT_MS } from '@pacman/shared';
+import { CHIEF_REMOTE_TOOLS, REMOTE_TOOL_TIMEOUT_MS, type SecretBox } from '@pacman/shared';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -44,7 +44,6 @@ import {
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { executeGithubReadTool } from '../src/services/github-reads.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
@@ -220,14 +219,20 @@ function world(opts: { routes?: Record<string, GhRoute>; connect?: boolean } = {
 }
 type World = ReturnType<typeof world>;
 
-/** chief 面：relay 执行体本身（machine-relay 把 chief 线程的 teamId 放进 ctx）。 */
-function chiefText(w: World, name: string, params: Record<string, unknown>): Promise<string> {
+/** chief 面：relay 执行体本身（machine-relay 把 chief 线程的 teamId 放进 ctx）。
+ * box 缺省 = 本 server 的 SecretBox；token 错误的用例换成会抛错的 box。 */
+function chiefText(
+  w: World,
+  name: string,
+  params: Record<string, unknown>,
+  box: SecretBox = w.s.secretBox,
+): Promise<string> {
   return executeChiefTool(
     {
       db: w.s.db,
       hub: w.s.hub,
       machineHub: w.s.machineHub,
-      box: w.s.secretBox,
+      box,
       user: w.s.user,
       reposDir: w.s.reposDir,
       attachmentsDir: w.s.attachmentsDir,
@@ -452,21 +457,25 @@ describe('项目闸与连接闸（1-5）', () => {
     expect(w.mock.calls).toHaveLength(0);
   });
 
-  test('5 box.open 抛 SecretBoxError → 409 reconnect GitHub，不出站', async () => {
-    const w = world();
-    const box = {
-      seal: (plaintext: string) => plaintext,
-      open: (): string => {
-        throw new SecretBoxError('envelope authentication failed (tampered or wrong keyfile)');
+  /** open 一律抛 err 的 box（连接行在，解 token 时出错）。 */
+  function throwingBox(err: unknown): SecretBox {
+    return {
+      seal: (plaintext) => plaintext,
+      open: () => {
+        throw err;
       },
     };
+  }
+
+  test('5 box.open 抛 SecretBoxError → 409 reconnect GitHub，不出站', async () => {
+    const w = world();
+    const box = throwingBox(
+      new SecretBoxError('envelope authentication failed (tampered or wrong keyfile)'),
+    );
     for (const name of TOOLS) {
-      const err = await executeGithubReadTool(
-        { db: w.s.db, box, githubFetch: w.mock.impl },
-        w.s.team.id,
-        name,
-        { projectId: w.projectId },
-      ).catch((e: unknown) => e);
+      const err = await chiefText(w, name, { projectId: w.projectId }, box).catch(
+        (e: unknown) => e,
+      );
       expect(err, name).toBeInstanceOf(HttpError);
       expect(err, name).toMatchObject({ status: 409 });
       expect((err as HttpError).message, name).toContain('reconnect GitHub');
@@ -489,19 +498,10 @@ describe('项目闸与连接闸（1-5）', () => {
 
     const w2 = world();
     const broken = new TypeError('box is broken');
-    const box = {
-      seal: (plaintext: string) => plaintext,
-      open: (): string => {
-        throw broken;
-      },
-    };
     for (const name of TOOLS) {
-      const err = await executeGithubReadTool(
-        { db: w2.s.db, box, githubFetch: w2.mock.impl },
-        w2.s.team.id,
-        name,
-        { projectId: w2.projectId },
-      ).catch((e: unknown) => e);
+      const err = await chiefText(w2, name, { projectId: w2.projectId }, throwingBox(broken)).catch(
+        (e: unknown) => e,
+      );
       expect(err, name).toBe(broken);
     }
     expect(w2.mock.calls).toHaveLength(0);
