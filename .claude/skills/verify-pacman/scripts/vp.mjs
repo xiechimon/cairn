@@ -45,7 +45,9 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
                                  stale and host-bound cases, and cases that need real-llm, github or
                                  rewrites-evidence, need --force; arguments after -- replace the
                                  case's default args; without VERIFY_EVIDENCE_DIR the case writes to
-                                 a new .claude/verify-evidence/<time>-<feature>-<case>/;
+                                 a new .claude/verify-evidence/<time>-<feature>-<case>/, created once
+                                 doctor passes (a probe with its own output option gets the directory
+                                 through it; a probe that writes fixed evidence is named instead);
                                  --dry-run prints what would run
   capture <path> [--name <label>] [--wait <ms>]
                                  screenshot a live route, record console errors and failed requests
@@ -54,7 +56,8 @@ const USAGE = `verify-pacman: node .claude/skills/verify-pacman/scripts/vp.mjs <
   archive <ticket> [--from <dir>]... [--latest <n>]
                                  copy evidence into docs/verify/<ticket>/<dir>/ (never overwrites);
                                  the source is --from, else VERIFY_EVIDENCE_DIR, else --latest <n>
-                                 (newest runs in the shared evidence root, other lanes' included)
+                                 (newest runs in the shared evidence root, other lanes' included);
+                                 --latest with either of the others is refused
   links <ticket> [--sha <sha>]   raw.githubusercontent.com links for docs/verify/<ticket>/ at a pushed SHA
   cleanup                        stop the stack (scripts/cleanup.mjs)
 
@@ -139,31 +142,44 @@ function driveCommand(argv) {
     fail(`${feature}/${name} needs ${forced.join(' and ')} (${why}). Re-run with --force to drive it.`);
   }
   if (c.usage && extra.length === 0) console.log(`vp: ${feature}/${name} usage: ${c.usage}`);
-  const args = extra.length > 0 ? extra : c.args;
+  const args = [...(extra.length > 0 ? extra : c.args)];
   const cwd = resolve(SCRIPT_ROOT, c.cwd ?? '.');
   // Every drive writes somewhere new unless told otherwise: several probes
   // default their evidence into docs/verify/<their ticket>/ or into scripts/,
-  // which would rewrite committed evidence (pr-gate run 3 on #1411).
-  if (!process.env.VERIFY_EVIDENCE_DIR) {
+  // which would rewrite committed evidence (pr-gate run 3 on #1411). A probe
+  // that writes fixed evidence by design gets no directory, and one that takes
+  // an output option gets the directory through it (pr-gate run 4).
+  const writes = c.evidence?.writes;
+  if (!process.env.VERIFY_EVIDENCE_DIR && writes === undefined) {
     const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
     process.env.VERIFY_EVIDENCE_DIR = join(EVIDENCE_ROOT, `${stamp}-${feature}-${name}`);
+  }
+  const flag = c.evidence?.flag;
+  if (flag !== undefined && process.env.VERIFY_EVIDENCE_DIR && !args.includes(flag)) {
+    args.push(flag, process.env.VERIFY_EVIDENCE_DIR);
   }
   const doctorFirst = c.needs.includes('stack');
   if (dryRun) {
     console.log(`vp: dry-run ${feature}/${name}${doctorFirst ? ' (doctor first)' : ''}`);
     console.log(`    runner ${c.runner ?? 'node'}  cwd ${cwd}`);
     console.log(`    script ${c.script}  args ${args.join(' ')}`.trimEnd());
-    console.log(`    VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR}`);
+    if (writes !== undefined) console.log(`    writes its evidence itself: ${writes}`);
+    if (process.env.VERIFY_EVIDENCE_DIR) console.log(`    VERIFY_EVIDENCE_DIR=${process.env.VERIFY_EVIDENCE_DIR}`);
     console.log(`    VERIFY_RUN_DIR=${process.env.VERIFY_RUN_DIR ?? ''}`);
     return 0;
   }
-  mkdirSync(process.env.VERIFY_EVIDENCE_DIR, { recursive: true });
-  console.log(`vp: evidence ${process.env.VERIFY_EVIDENCE_DIR}`);
   if (doctorFirst) {
     console.log(`vp: ${feature}/${name} needs the stack, running doctor first`);
     if (runNode(join(SCRIPTS_DIR, 'doctor.mjs'), []) !== 0) {
       fail('vp: doctor failed. Start the stack with `vp.mjs launch` (or fix what doctor reported) and retry.', 1);
     }
+  }
+  // After doctor: a failed doctor leaves no empty directory for --latest to pick.
+  if (writes !== undefined) {
+    console.log(`vp: ${feature}/${name} writes its evidence itself: ${writes}`);
+  } else {
+    mkdirSync(process.env.VERIFY_EVIDENCE_DIR, { recursive: true });
+    console.log(`vp: evidence ${process.env.VERIFY_EVIDENCE_DIR}`);
   }
   const script = resolve(SCRIPT_ROOT, c.script);
   if (!existsSync(script)) fail(`registered script is missing: ${c.script}`, 1);
@@ -247,6 +263,9 @@ function archiveCommand(argv) {
   if (stray.length > 0) fail(`unexpected argument(s) ${stray.join(' ')}: name a source with --from <dir>\n${usage}`);
   if (latestOption !== undefined && !/^[1-9][0-9]*$/.test(latestOption)) fail(`--latest needs a positive integer\n${usage}`);
   const envDir = process.env.VERIFY_EVIDENCE_DIR;
+  if (latestOption !== undefined && (from.length > 0 || envDir)) {
+    fail(`--latest cannot be combined with --from or VERIFY_EVIDENCE_DIR; name one source\n${usage}`);
+  }
   // No implicit "newest run": the evidence root is shared by every lane on this
   // machine, so the newest directory can be someone else's.
   if (from.length === 0 && !envDir && latestOption === undefined) {

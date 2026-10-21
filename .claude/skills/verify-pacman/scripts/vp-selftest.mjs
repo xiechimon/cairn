@@ -2,7 +2,7 @@
 // vp.mjs self-test (#1402): the dispatch and archive rules, checked without a
 // stack. drive cases use --dry-run, which prints the resolved command and the
 // evidence/run paths instead of running anything. archive cases use a
-// throwaway VERIFY_REPO_ROOT. Failure modes from pr-gate runs 2 and 3 on #1411.
+// throwaway VERIFY_REPO_ROOT. Failure modes from pr-gate runs 2, 3 and 4 on #1411.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -104,11 +104,74 @@ const cases = [
         for (const [name, c] of Object.entries(entry.cases)) {
           if (c.status !== 'current') continue;
           const src = readFileSync(resolve(ROOT, c.script), 'utf8');
-          if (/['"]POST['"]\s*,\s*`[^`]*\/agents`/.test(src) && !/machineId/.test(src)) broken.push(`${feature}/${name}`);
+          // Any call that passes .../agents as the URL with something after it: the
+          // helpers (sendJson, postJson, jpost, api) default to POST (pr-gate run 4).
+          if (/\/agents['"`]\s*,/.test(src) && !/machineId/.test(src)) broken.push(`${feature}/${name}`);
         }
       }
       if (broken.length > 0) console.log(`      broken: ${broken.join(', ')}`);
       return broken.length === 0;
+    },
+  ],
+  [
+    'every current case writes where drive points it, or the registry says where it writes',
+    () => {
+      const blind = [];
+      for (const [feature, entry] of Object.entries(REGISTRY.features)) {
+        for (const [name, c] of Object.entries(entry.cases)) {
+          if (c.status !== 'current') continue;
+          const src = readFileSync(resolve(ROOT, c.script), 'utf8');
+          if (!src.includes('VERIFY_EVIDENCE_DIR') && c.evidence?.flag === undefined && c.evidence?.writes === undefined) {
+            blind.push(`${feature}/${name}`);
+          }
+        }
+      }
+      if (blind.length > 0) console.log(`      blind: ${blind.join(', ')}`);
+      return blind.length === 0;
+    },
+  ],
+  [
+    'a case whose probe takes an output flag gets the evidence directory through it',
+    () => {
+      const r = vp(['drive', 'glass-journeys', 'create-task', '--dry-run']);
+      const own = vp(['drive', 'glass-journeys', 'create-task', '--dry-run', '--', 'create-task', '--out', '/tmp/x']);
+      const dir = r.out.match(/VERIFY_EVIDENCE_DIR=(\S+)/)?.[1] ?? 'missing';
+      return r.code === 0 && r.out.includes(`--out ${dir}`) && own.code === 0 && (own.out.match(/--out/g) ?? []).length === 1;
+    },
+  ],
+  [
+    'a case that writes its evidence itself gets no evidence directory',
+    () => {
+      const r = vp(['drive', 'pi-convergence', '--force', '--dry-run']);
+      return r.code === 0 && /writes its evidence itself: docs\/verify\/926\//.test(r.out) && !r.out.includes('VERIFY_EVIDENCE_DIR=/');
+    },
+  ],
+  [
+    '--force lets a stale case run',
+    () => {
+      const r = vp(['drive', 'stop-button', '--force', '--dry-run']);
+      return r.code === 0 && /script \S+drive-/.test(r.out);
+    },
+  ],
+  [
+    'a failed doctor leaves no evidence directory behind',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'vp-selftest-'));
+      const ev = join(root, 'ev');
+      const r = vp(['drive', 'search'], { VERIFY_RUN_DIR: join(root, 'run'), VERIFY_EVIDENCE_DIR: ev });
+      const made = existsSync(ev);
+      rmSync(root, { recursive: true, force: true });
+      return r.code === 1 && /doctor failed/.test(r.out) && !made;
+    },
+  ],
+  [
+    'links prints sha-pinned raw links and refuses a ticket with no evidence',
+    () => {
+      const r = vp(['links', '1402', '--sha', 'HEAD']);
+      const lines = r.out.split('\n').filter((l) => l.includes('raw.githubusercontent.com'));
+      const pinned = lines.every((l) => /\]\(https:\/\/raw\.githubusercontent\.com\/[^/]+\/[^/]+\/[0-9a-f]{40}\/docs\/verify\/1402\//.test(l));
+      const none = vp(['links', '999999', '--sha', 'HEAD']);
+      return r.code === 0 && lines.length > 0 && pinned && none.code === 1;
     },
   ],
   [
@@ -187,6 +250,17 @@ const cases = [
       const copied = existsSync(join(root, 'docs', 'verify', 'T5'));
       rmSync(root, { recursive: true, force: true });
       return codes.every((c) => c === 2) && !copied;
+    },
+  ],
+  [
+    'archive refuses --latest together with --from or VERIFY_EVIDENCE_DIR',
+    () => {
+      const { root, src } = tempRoot();
+      const a = vp(['archive', 'T7', '--from', join(src, 'run-b'), '--latest', '1'], { VERIFY_REPO_ROOT: root });
+      const b = vp(['archive', 'T7', '--latest', '1'], { VERIFY_REPO_ROOT: root, VERIFY_EVIDENCE_DIR: join(src, 'run-b') });
+      const copied = existsSync(join(root, 'docs', 'verify', 'T7'));
+      rmSync(root, { recursive: true, force: true });
+      return a.code === 2 && b.code === 2 && !copied;
     },
   ],
   [

@@ -1,5 +1,5 @@
 {
-  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script). recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
+  "$comment": "verify-pacman registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace args; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option, {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files.",
   "support": {
     "cleanup.mjs": {
       "kind": "infra",
@@ -81,9 +81,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The agent identity chip on the chief drawer's robot row and agent mention chips navigate to the agent settings page by click and by keyboard (Shift+Tab, Enter).",
-          "usage": "--expect=old optional; fresh DB required; env VERIFY_REPO_ROOT"
+          "usage": "--expect=old optional; fresh DB required; env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "ui-cleanup-finale": {
           "script": ".claude/skills/verify-pacman/scripts/drive-952-finale.mjs",
@@ -262,9 +263,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Chief dispatch judgment: the dispatchWithPlan setting is dead (no UI row, PATCH 400), and run_builds withPlan/dispatchReason in three forms is checked against SQLite through a fake machine wire.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -277,9 +279,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Chief drawer model selection persists via PATCH, runtime mark icon, and no dead buttons (gear, copy).",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; fresh DB"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -307,9 +310,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Chief drawer thinking/tool rows render a 24x24 avatar to the left of a flex text column (not a full-width Lorelei SVG); --expect=old reproduces the bug",
-          "usage": "[--expect=new|old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "[--expect=new|old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "compress-model-select": {
           "script": ".claude/skills/verify-pacman/scripts/drive-chief-model-select.mjs",
@@ -328,9 +332,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Chief turn text segments are sealed when a tool arrives (DB order, single-type content, SSE order, in-flight buffer kept, idempotent upload), and the drawer shows segments and live tool rows flat",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "stream-catchup": {
           "script": ".claude/skills/verify-pacman/scripts/drive-chief-catchup.mjs",
@@ -338,9 +343,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A chief conversation SSE subscriber that joins mid-turn gets a replayed text_delta snapshot with no duplicate or missing text, on both the API and the drawer.",
-          "usage": "optional --expect=old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+          "usage": "optional --expect=old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "threads-scroll": {
           "script": ".claude/skills/verify-pacman/scripts/drive-1094-threads-scroll.mjs",
@@ -348,9 +354,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Chief thread switcher with 22 threads stays scrollable and every row is clickable by real mouse coordinates",
-          "usage": "--expect=new|old (env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT)"
+          "usage": "--expect=new|old (env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -493,9 +500,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Human confirm gate records actor, drag to done shows a confirm dialog with an audit row, and chief cannot pass gates by itself",
-          "usage": "--expect=new|old (env VERIFY_RUN_DIR for baseline)"
+          "usage": "--expect=new|old (env VERIFY_RUN_DIR for baseline)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -539,9 +547,13 @@
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
           "args": [],
           "needs": [],
-          "status": "current",
+          "status": "stale",
           "purpose": "All six Control Glass journeys in one run.",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT",
+          "note": "executed 2026-10-21 in #1402: runs the board journey, which waits for .board-topbar-title (removed by #1375), so the run ends FAIL although create-task, dispatch, view-diff, request-changes and merge pass. Run those five as separate cases.",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "board": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -549,9 +561,13 @@
             "board"
           ],
           "needs": [],
-          "status": "current",
+          "status": "stale",
           "purpose": "Control Glass journey \"board\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "note": "executed 2026-10-21 in #1402: waits for .board-topbar-title, which #1375 (Paper board top bar) removed; the title is now an h1 inside header.board-topbar, so the journey times out after 30 s. The other five journeys pass in the same run.",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "create-task": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -561,7 +577,10 @@
           "needs": [],
           "status": "current",
           "purpose": "Control Glass journey \"create-task\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "dispatch": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -571,7 +590,10 @@
           "needs": [],
           "status": "current",
           "purpose": "Control Glass journey \"dispatch\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "merge": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -581,7 +603,10 @@
           "needs": [],
           "status": "current",
           "purpose": "Control Glass journey \"merge\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "request-changes": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -591,7 +616,10 @@
           "needs": [],
           "status": "current",
           "purpose": "Control Glass journey \"request-changes\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
         },
         "view-diff": {
           "script": ".cursor/skills/verify-pacman/scripts/glass.mjs",
@@ -601,7 +629,10 @@
           "needs": [],
           "status": "current",
           "purpose": "Control Glass journey \"view-diff\" (features/glass-journeys.md).",
-          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up"
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
         }
       }
     },
@@ -614,9 +645,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "The N key in the chief drawer returns to the new-thread view only while the drawer is open and the composer is not focused; also checks the KbdHint and aria-keyshortcuts.",
-          "usage": "env VERIFY_REPO_ROOT"
+          "usage": "env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "hotkeys-chain": {
           "script": ".claude/skills/verify-pacman/scripts/drive-hotkeys.mjs",
@@ -777,7 +809,7 @@
           ],
           "status": "current",
           "purpose": "Freezes a real daemon with SIGSTOP and proves the machine row turns offline once the 150s stale threshold passes, then returns online after SIGCONT.",
-          "usage": "--expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR"
+          "usage": "--expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR; run it on a fresh stack (a second run on one stack, with the machine of the first run enrolled again, failed check A once in #1402)"
         }
       }
     },
@@ -892,9 +924,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Persona roster seeding, the verify step with its verdict, three-perspective review fan-out and split_todo child cards all work end to end over the fake machine wire and the browser.",
-          "usage": "env VERIFY_REPO_ROOT (needs a fresh DB from relaunch)"
+          "usage": "env VERIFY_REPO_ROOT (needs a fresh DB from relaunch)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -928,7 +961,10 @@
           "status": "current",
           "purpose": "Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done. Writes docs/verify/926/convergence-evidence.json in place.",
           "runner": "tsx",
-          "cwd": "apps/daemon"
+          "cwd": "apps/daemon",
+          "evidence": {
+            "writes": "docs/verify/926/convergence-evidence.json"
+          }
         }
       }
     },
@@ -1167,9 +1203,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "A todo that failed at AI review recovers two ways: 'complete' from the UI menu merges the branch into bare-repo main and reaches done, or rerunning only the review returns it to the review gate.",
-          "usage": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         },
         "review-launch": {
           "script": ".claude/skills/verify-pacman/scripts/drive-review.mjs",
@@ -1490,9 +1527,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "Proves long thinking-preview rows are cut off by CSS truncation, not by overflowing width, in both the chief drawer and the detail transcript. Data is seeded through REST and a fake machine.",
-          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT, VERIFY_EVIDENCE_DIR"
+          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     },
@@ -1505,9 +1543,10 @@
           "needs": [
             "stack"
           ],
-          "status": "current",
+          "status": "stale",
           "purpose": "run_builds with no assignment gets a 400 from the chief relay; a step with no owner fails cleanly at claim without blocking the queue (REST and scheduler paths); the board and detail page show the failure.",
-          "usage": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB"
+          "usage": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
         }
       }
     }
