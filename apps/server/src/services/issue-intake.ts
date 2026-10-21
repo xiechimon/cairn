@@ -18,8 +18,8 @@
 //    变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
-//    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已有编排
-//    线程 = 有人接手，不再试）。
+//    ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS 次；卡已离开 todo 或导入后已开始
+//    编排（编排线程里有 chief 步）= 有人接手，不再试）。
 // 4. 每个 github 项目（githubRepo 形好；同队同仓只取 id 最小的一个）：在飞
 //    上限有余量才条件读 open + ready-for-agent 列表（304 复用上轮列表；按 Link
 //    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
@@ -42,8 +42,20 @@ import {
   parseGithubIssueSourceRef,
   type SecretBox,
 } from '@pacman/shared';
-import { and, asc, eq, gte, isNotNull, like, notExists, notInArray, or, sql } from 'drizzle-orm';
-import { build, chiefThread, project, todo } from '../db/schema.js';
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  gte,
+  isNotNull,
+  like,
+  notExists,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
+import { build, chiefThread, project, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
@@ -426,9 +438,11 @@ export function createIssueIntake(
     }
   }
 
-  /** 卡导入之后建了编排线程（有人手动开始了）：按 orchestrateThreadTitle 认
-   * 线程（web 的「在飞编排回合」判定同一标题）。只认导入之后建的——seqNum 是
-   * 团队内 max+1，删掉最大号的卡后下一张复用它的号，旧线程不算。 */
+  /** 卡导入之后开始了编排（有人手动开始了）：按 orchestrateThreadTitle 认
+   * 线程（web 的「在飞编排回合」判定同一标题），且线程里有 chief 步（回合
+   * 入了队）。只认导入之后建的——seqNum 是团队内 max+1，删掉最大号的卡后
+   * 下一张复用它的号，旧线程不算；没有 chief 步的线程是某次编排中途失败
+   * 留下的（sendChiefMessage 先建线程、后入队步），也不算。 */
   function startedSince(teamId: string, seqNum: number, importedAt: number): boolean {
     const thread = deps.db
       .select({ id: chiefThread.id })
@@ -438,30 +452,43 @@ export function createIssueIntake(
           eq(chiefThread.teamId, teamId),
           eq(chiefThread.title, orchestrateThreadTitle(seqNum)),
           gte(chiefThread.createdAt, importedAt),
+          exists(
+            deps.db
+              .select({ id: step.id })
+              .from(step)
+              .where(and(eq(step.buildId, chiefThread.id), eq(step.kind, 'chief'))),
+          ),
         ),
       )
       .get();
     return thread !== undefined;
   }
 
-  /** 重试本队导入后编排失败的卡。卡没了、离开了 todo、或导入后已有编排线程
-   * = 有人接手，不再试（记一行带原因）。 */
+  /** 重试本队导入后编排失败的卡。卡没了、离开了 todo、或导入后已开始编排
+   * = 有人接手，不再试（记一行带原因）。读库失败只跳过这张卡，不计次。 */
   function retryOrchestration(teamId: string, tally: IssueIntakeTally): void {
     for (const [todoId, entry] of orchestrateRetries) {
       if (entry.teamId !== teamId) continue;
-      const row = deps.db
-        .select({ phase: todo.phase, seqNum: todo.seqNum })
-        .from(todo)
-        .where(eq(todo.id, todoId))
-        .get();
-      const dropped =
-        row === undefined
-          ? 'todo-gone'
-          : row.phase !== 'todo'
-            ? 'left-todo'
-            : startedSince(teamId, row.seqNum, entry.importedAt)
-              ? 'thread-exists'
-              : null;
+      let dropped: 'todo-gone' | 'left-todo' | 'thread-exists' | null;
+      try {
+        const row = deps.db
+          .select({ phase: todo.phase, seqNum: todo.seqNum })
+          .from(todo)
+          .where(eq(todo.id, todoId))
+          .get();
+        dropped =
+          row === undefined
+            ? 'todo-gone'
+            : row.phase !== 'todo'
+              ? 'left-todo'
+              : startedSince(teamId, row.seqNum, entry.importedAt)
+                ? 'thread-exists'
+                : null;
+      } catch (err) {
+        tally.errors += 1;
+        log({ todoId, err: errText(err) }, 'issue intake orchestrate retry failed');
+        continue;
+      }
       if (dropped !== null) {
         orchestrateRetries.delete(todoId);
         log({ todoId, reason: dropped }, 'issue intake orchestrate retry dropped');
