@@ -28,14 +28,14 @@
     ],
     "dark": [
       {
-        "content": "#1f1b18",
+        "content": "#1a1612",
         "media": "(prefers-color-scheme: light)",
-        "outerHTML": "<meta name=\"theme-color\" content=\"#1f1b18\" media=\"(prefers-color-scheme: light)\">"
+        "outerHTML": "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: light)\">"
       },
       {
-        "content": "#1f1b18",
+        "content": "#1a1612",
         "media": "(prefers-color-scheme: dark)",
-        "outerHTML": "<meta name=\"theme-color\" content=\"#1f1b18\" media=\"(prefers-color-scheme: dark)\">"
+        "outerHTML": "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: dark)\">"
       }
     ]
   },
@@ -46,17 +46,17 @@
       "cardBackground": "rgb(235, 228, 216)"
     },
     "dark": {
-      "pageBackground": "rgb(31, 27, 24)",
-      "railRowBackground": "rgb(45, 41, 38)",
-      "cardBackground": "rgb(45, 41, 38)"
+      "pageBackground": "rgb(26, 22, 18)",
+      "railRowBackground": "rgb(36, 32, 27)",
+      "cardBackground": "rgb(36, 32, 27)"
     }
   },
   "staticMetaTags": [
     "<meta name=\"theme-color\" content=\"#f3eee5\" media=\"(prefers-color-scheme: light)\" />",
-    "<meta name=\"theme-color\" content=\"#1f1b18\" media=\"(prefers-color-scheme: dark)\" />"
+    "<meta name=\"theme-color\" content=\"#1a1612\" media=\"(prefers-color-scheme: dark)\" />"
   ],
   "manifest": {
-    "theme_color": "#1f1b18",
-    "background_color": "#1f1b18"
+    "theme_color": "#1a1612",
+    "background_color": "#1a1612"
   }
 }

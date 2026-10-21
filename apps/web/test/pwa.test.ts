@@ -8,7 +8,7 @@
 // name/short_name = Pacman + description 自写 + sw.js 通知兜底标题 =
 // Pacman；其余字段/字节仍须与 docs/research/assets/r1/ 原件逐字节一致。
 // #1430 追加 divergence：theme_color / background_color 对齐 Paper 暗色
-// token（manifest 不支持 media，取默认暗档 #1f1b18）。
+// canvas token（manifest 不支持 media，取默认暗档 #1a1612）。
 // #249 素材核账追加两处 divergence（D8 批次收口）：related_applications
 // 原站指针整段移除（产品无关联应用可指）；screenshots 换复刻 UI 实拍
 // （scripts/capture-pwa-screenshots.mjs）+ 自写 label，且文件必须真在
@@ -35,8 +35,8 @@ const MANIFEST_BRAND = {
 /** manifest screenshots 自写 label（#249；capture 脚本再生时同步此处）。 */
 const MANIFEST_SCREENSHOT_LABEL = 'Pacman task board — humans direct, agents execute';
 
-/** manifest theme_color / background_color（#1430：Paper 暗色 --background）。 */
-const MANIFEST_DARK_PAPER = '#1f1b18';
+/** manifest theme_color / background_color（#1430：Paper 暗色 --canvas）。 */
+const MANIFEST_DARK_PAPER = '#1a1612';
 
 describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => {
   it('manifest.webmanifest diverges only in the §3.4 brand slots + #249 D8 收口两处', () => {

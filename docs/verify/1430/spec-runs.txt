@@ -1,4 +1,41 @@
-# e2e: apps/web/e2e/theme-color-meta.spec.ts, before the color changes (red)
+# Round 2: dark values use the canvas token (#1a1612), boot rows #24201b
+# e2e: apps/web/e2e/theme-color-meta.spec.ts, before the canvas change (red)
+  ✘  1 e2e/theme-color-meta.spec.ts:31:1 › index.html ships a light and a dark theme-color, each scoped to its scheme (218ms)
+  ✘  2 e2e/theme-color-meta.spec.ts:52:1 › theme-color follows the stored theme across reloads (5.5s)
+  ✘  3 e2e/theme-color-meta.spec.ts:71:1 › a live theme switch in the user menu rewrites theme-color without a reload (5.3s)
+  ✘  4 e2e/theme-color-meta.spec.ts:83:1 › stored theme wins over the system scheme for the browser chrome color (5.3s)
+  ✓  5 e2e/theme-color-meta.spec.ts:116:1 › boot skeleton paints the light Paper tokens before the bundle mounts (82ms)
+  ✘  6 e2e/theme-color-meta.spec.ts:126:1 › boot skeleton paints the dark tokens before the bundle mounts (71ms)
+  5 failed
+  1 passed (20.4s)
+
+# e2e: same spec, after the canvas change (green)
+  ✓  1 e2e/theme-color-meta.spec.ts:31:1 › index.html ships a light and a dark theme-color, each scoped to its scheme (131ms)
+  ✓  2 e2e/theme-color-meta.spec.ts:52:1 › theme-color follows the stored theme across reloads (374ms)
+  ✓  3 e2e/theme-color-meta.spec.ts:71:1 › a live theme switch in the user menu rewrites theme-color without a reload (353ms)
+  ✓  4 e2e/theme-color-meta.spec.ts:83:1 › stored theme wins over the system scheme for the browser chrome color (265ms)
+  ✓  5 e2e/theme-color-meta.spec.ts:116:1 › boot skeleton paints the light Paper tokens before the bundle mounts (57ms)
+  ✓  6 e2e/theme-color-meta.spec.ts:126:1 › boot skeleton paints the dark tokens before the bundle mounts (55ms)
+  6 passed (3.6s)
+
+# unit: apps/web/test/pwa.test.ts, before the canvas change (red, verbatim)
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+ FAIL  test/pwa.test.ts > PWA files vs r1 capture originals (D3 replacement-phase gate) > manifest.webmanifest diverges only in the §3.4 brand slots + #249 D8 收口两处
+AssertionError: expected '#1f1b18' to be '#1a1612' // Object.is equality
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+
+# unit: apps/web/test/pwa.test.ts, after the canvas change (green, verbatim)
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+# affected e2e (scripts/e2e-affected.mjs, full-suite fallback, port 8398), after the canvas change
+[e2e:affected] 162/162 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
+  1115 passed (4.1m)
+AFFECTED_EXIT=0
+
+# Round 1 (dark #1f1b18), kept for history
+# e2e, before the color changes (red)
   ✘  1 e2e/theme-color-meta.spec.ts:31:1 › index.html ships a light and a dark theme-color, each scoped to its scheme (198ms)
   ✘  2 e2e/theme-color-meta.spec.ts:52:1 › theme-color follows the stored theme across reloads (5.3s)
   ✘  3 e2e/theme-color-meta.spec.ts:65:1 › stored theme wins over the system scheme for the browser chrome color (5.3s)
@@ -7,38 +44,13 @@
   4 failed
   1 passed (15.8s)
 
-# e2e: same spec, after the color changes (green)
-  ✓  1 e2e/theme-color-meta.spec.ts:31:1 › index.html ships a light and a dark theme-color, each scoped to its scheme (133ms)
-  ✓  2 e2e/theme-color-meta.spec.ts:52:1 › theme-color follows the stored theme across reloads (402ms)
-  ✓  3 e2e/theme-color-meta.spec.ts:65:1 › stored theme wins over the system scheme for the browser chrome color (276ms)
-  ✓  4 e2e/theme-color-meta.spec.ts:94:1 › boot skeleton paints the light Paper tokens before the bundle mounts (60ms)
-  ✓  5 e2e/theme-color-meta.spec.ts:101:1 › boot skeleton paints the dark tokens before the bundle mounts (56ms)
-  5 passed (3.3s)
-
-# e2e: same spec, after the review fixes (6 tests, adds the live user-menu switch)
-  ✓  1 e2e/theme-color-meta.spec.ts:31:1 › index.html ships a light and a dark theme-color, each scoped to its scheme (130ms)
-  ✓  2 e2e/theme-color-meta.spec.ts:52:1 › theme-color follows the stored theme across reloads (384ms)
-  ✓  3 e2e/theme-color-meta.spec.ts:67:1 › a live theme switch in the user menu rewrites theme-color without a reload (338ms)
-  ✓  4 e2e/theme-color-meta.spec.ts:79:1 › stored theme wins over the system scheme for the browser chrome color (267ms)
-  ✓  5 e2e/theme-color-meta.spec.ts:106:1 › boot skeleton paints the light Paper tokens before the bundle mounts (64ms)
-  ✓  6 e2e/theme-color-meta.spec.ts:113:1 › boot skeleton paints the dark tokens before the bundle mounts (63ms)
-  6 passed (3.7s)
-
-# e2e: live-switch test against theme.ts with the meta rewrite removed (mutation check)
-  ✘  1 e2e/theme-color-meta.spec.ts:67:1 › a live theme switch in the user menu rewrites theme-color without a reload (5.2s)
-
-# unit: apps/web/test/pwa.test.ts, before the manifest change (red, verbatim)
+# unit, before the manifest change (red, verbatim)
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
  FAIL  test/pwa.test.ts > PWA files vs r1 capture originals (D3 replacement-phase gate) > manifest.webmanifest diverges only in the §3.4 brand slots + #249 D8 收口两处
 AssertionError: expected '#18181b' to be '#1f1b18' // Object.is equality
  Test Files  1 failed (1)
       Tests  1 failed | 3 passed (4)
 
-# unit: apps/web/test/pwa.test.ts, after the color changes (green, verbatim)
- Test Files  1 passed (1)
-      Tests  4 passed (4)
-
-# affected e2e (scripts/e2e-affected.mjs, full-suite fallback, port 8398)
+# affected e2e, Round 1 (1097 passed)
 [e2e:affected] 159/159 specs (full-suite fallback for shared surfaces) on the standard fixture-build config, E2E_PORT=8398
   1097 passed (4.1m)
-AFFECTED_EXIT=0

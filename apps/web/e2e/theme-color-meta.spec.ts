@@ -9,7 +9,7 @@ import { expect, type Page, test } from '@playwright/test';
 const ROUTE = '/app?scenario=01';
 const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 const LIGHT_CHROME = '#f3eee5';
-const DARK_CHROME = '#1f1b18';
+const DARK_CHROME = '#1a1612';
 
 const themeColors = (page: Page) =>
   page.evaluate(() =>
@@ -58,7 +58,11 @@ test('theme-color follows the stored theme across reloads', async ({ page }) => 
   ] as const) {
     await page.evaluate(([k, v]) => localStorage.setItem(k, v), [THEME_KEY, theme]);
     await page.reload();
-    await expect.poll(() => themeColors(page)).toEqual([color, color]);
+    const canvas = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),
+    );
+    expect(canvas).toBe(color);
+    await expect.poll(() => themeColors(page)).toEqual([canvas, canvas]);
   }
 });
 
@@ -88,31 +92,43 @@ test('stored theme wins over the system scheme for the browser chrome color', as
   await expect.poll(() => effectiveThemeColors(page)).toEqual([DARK_CHROME]);
 });
 
+// Reads before applyTheme runs: the bundle is aborted, so the static
+// theme-color for the stored theme's media is what the first frame carries.
 async function bootSkeletonPaint(page: Page, theme: 'light' | 'dark') {
   await page.route(/\/assets\/.+\.js(\?|$)/, (route) => route.abort());
   await page.addInitScript(([k, t]) => localStorage.setItem(k, t), [THEME_KEY, theme]);
   await page.goto(ROUTE);
 
-  return page.evaluate(() => {
+  return page.evaluate((t) => {
     const boot = document.getElementById('boot');
     const row = boot?.firstElementChild?.firstElementChild;
     return {
       page: boot && getComputedStyle(boot).backgroundColor,
       row: row && getComputedStyle(row).backgroundColor,
+      canvas: getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim(),
+      staticChrome: document
+        .querySelector(`meta[name="theme-color"][media="(prefers-color-scheme: ${t})"]`)
+        ?.getAttribute('content'),
     };
-  });
+  }, theme);
 }
 
 test('boot skeleton paints the light Paper tokens before the bundle mounts', async ({ page }) => {
-  expect(await bootSkeletonPaint(page, 'light')).toEqual({
+  const paint = await bootSkeletonPaint(page, 'light');
+  expect({ page: paint.page, row: paint.row }).toEqual({
     page: 'rgb(243, 238, 229)',
     row: 'rgb(235, 228, 216)',
   });
+  expect(paint.canvas).toBe(LIGHT_CHROME);
+  expect(paint.staticChrome).toBe(paint.canvas);
 });
 
 test('boot skeleton paints the dark tokens before the bundle mounts', async ({ page }) => {
-  expect(await bootSkeletonPaint(page, 'dark')).toEqual({
-    page: 'rgb(31, 27, 24)',
-    row: 'rgb(45, 41, 38)',
+  const paint = await bootSkeletonPaint(page, 'dark');
+  expect({ page: paint.page, row: paint.row }).toEqual({
+    page: 'rgb(26, 22, 18)',
+    row: 'rgb(36, 32, 27)',
   });
+  expect(paint.canvas).toBe(DARK_CHROME);
+  expect(paint.staticChrome).toBe(paint.canvas);
 });
