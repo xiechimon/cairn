@@ -1,8 +1,62 @@
+Scope: all 6 workspace projects
+✓ Lockfile at ../../pnpm-lock.yaml passes supply-chain policies (verified 19m ago)
+../.. prepare$ husky
+../.. prepare: Done
+Done in 252ms using pnpm v12.5.1
 
 
-Running 3 tests using 1 worker
+Running 52 tests using 2 workers
 
-[1/3] e2e/queued-action.spec.ts:120:1 › detail: a queued task has no 开始, keeps 排队中 and the wait row
-[2/3] e2e/queued-action.spec.ts:131:1 › detail: a todo task keeps its 开始
-[3/3] e2e/queued-action.spec.ts:138:1 › board: the queued card has no 开始 on hover or focus, the todo card keeps it
-  3 passed (6.3s)
+[1/52] e2e/agent-detail.spec.ts:64:1 › 团队页的 Agent 卡是链接，点击落到详情路由
+[2/52] e2e/phase-chip-words.spec.ts:32:1 › board: the fresh task sits in 待开始, 待处理 holds the review card
+[3/52] e2e/phase-chip-words.spec.ts:42:1 › detail header: the fresh task chip reads the column word 待开始
+[4/52] e2e/agent-detail.spec.ts:72:1 › 详情路由直链可打开，不落 catch-all
+[5/52] e2e/phase-chip-words.spec.ts:47:1 › search rows: fresh reads 待开始, review 审核, done 已完成
+[6/52] e2e/agent-detail.spec.ts:81:1 › 三 tab 齐在，概览默认选中，点记忆切内容
+[7/52] e2e/agent-detail.spec.ts:96:1 › 概览：名称行内编辑提交后回显新值
+[8/52] e2e/phase-chip-words.spec.ts:60:1 › project task rows: fresh reads 待开始, review 审核
+[9/52] e2e/phase-chip-words.spec.ts:96:1 › schedule cards: todo reads 待开始, queued 排队中, confirm 确认
+[10/52] e2e/agent-detail.spec.ts:106:1 › 概览：职责位渲染 canon 空态并可编辑
+[11/52] e2e/queued-action.spec.ts:120:1 › detail: a queued task has no 开始, keeps 排队中 and the wait row
+[12/52] e2e/agent-detail.spec.ts:124:1 › 概览：存量 provider 绑定裸串回显，一级只列内置行与运行时源
+[13/52] e2e/queued-action.spec.ts:131:1 › detail: a todo task keeps its 开始
+[14/52] e2e/agent-detail.spec.ts:164:1 › 概览：两级菜单锚在触发钮上且整块在视口内（几何）
+[15/52] e2e/queued-action.spec.ts:138:1 › board: the queued card has no 开始 on hover or focus, the todo card keeps it
+[16/52] e2e/agent-detail.spec.ts:200:1 › 概览：思考强度空值是「未设置」下拉
+[17/52] e2e/agent-detail.spec.ts:210:1 › 概览：不摆「状态」行
+[18/52] e2e/agent-detail.spec.ts:218:1 › 记忆 tab：空态 = 图标 + 标题 + 说明
+[19/52] e2e/agent-detail.spec.ts:229:1 › 权限 tab：6 个工具开关全渲染（r3 §4 全 list，XMON-84 恢复）
+[20/52] e2e/agent-detail.spec.ts:237:1 › 权限 tab：6 档各带说明副文案
+[21/52] e2e/agent-detail.spec.ts:251:1 › 概览：运行时档在模型之上，值由 provider 派生
+[22/52] e2e/agent-detail.spec.ts:261:1 › 权限 tab：工具开关可切换
+[23/52] e2e/agent-detail.spec.ts:270:1 › 权限 tab：MCP 服务器逐个勾选行渲染
+[24/52] e2e/agent-detail.spec.ts:283:1 › 权限 tab：有密钥时密钥区恰好一行总开关
+[25/52] e2e/agent-detail.spec.ts:300:1 › 权限 tab：密钥总开关勾选态开→关→回
+[26/52] e2e/agent-detail.spec.ts:315:1 › 权限 tab：零密钥时是空态，无开关
+[27/52] e2e/agent-detail.spec.ts:326:1 › 权限 tab：零密钥空态旁有去添加密钥的入口，点击落到密钥页
+[28/52] e2e/agent-detail.spec.ts:339:1 › 权限 tab：有密钥时不出「去添加密钥」入口
+[29/52] e2e/agent-detail.spec.ts:427:1 › 思考强度：空值是下拉的「未设置」，选档 PATCH thinkingLevel，刷新后仍是该档
+[30/52] e2e/agent-detail.spec.ts:453:1 › 思考强度：claude-code 菜单含 off，不含 minimal
+[31/52] e2e/agent-detail.spec.ts:467:1 › 思考强度：切到 claude-code 时非法档随模型清空，合法档保留
+[32/52] e2e/agent-detail.spec.ts:493:1 › 权限 tab：保存失败出可见错误反馈，开关不回弹
+[33/52] e2e/agent-detail.spec.ts:520:1 › 权限 tab：保存成功不出错误行
+[34/52] e2e/agent-detail.spec.ts:539:1 › 授权技能：不限制 ↔ 勾空互转发显式 null/[]；勾选只进数组槽
+[35/52] e2e/agent-detail.spec.ts:582:1 › 默认 skill：单值 Select 只写 defaultSkill 槽，不带授权面键（两控件互不影响）
+[36/52] e2e/agent-detail.spec.ts:620:1 › 未知 agent id 不白屏，走回退呈现
+[37/52] e2e/agent-detail.spec.ts:629:1 › 记忆 tab：配额头 `记忆 · n / 100` 与搜索/排序控件齐在
+[38/52] e2e/agent-detail.spec.ts:640:1 › 记忆 tab：搜索按标题过滤，只留命中行
+[39/52] e2e/agent-detail.spec.ts:649:1 › 记忆 tab：搜索扫 content 且 ASCII 大小写不敏感
+[40/52] e2e/agent-detail.spec.ts:657:1 › 记忆 tab：零命中出「没有匹配的记忆。」，不回落 canon 空态
+[41/52] e2e/agent-detail.spec.ts:671:1 › 记忆 tab：`添加时间` 档按新 → 旧重排
+[42/52] e2e/agent-detail.spec.ts:693:1 › 记忆 tab：搜索与排序叠加——排序只在命中集内生效
+[43/52] e2e/agent-detail.spec.ts:709:1 › 记忆 tab：零记忆时不出搜索行，保留 canon 空态
+[44/52] e2e/agent-detail.spec.ts:719:1 › 概览：头部「编辑名称」进编辑态，取消回到原名
+[45/52] e2e/agent-detail.spec.ts:733:1 › 概览：职责的编辑钮是图标钮，带可访问名
+[46/52] e2e/agent-detail.spec.ts:750:1 › 概览：零在跑任务时段头不带计数，出 canon 空态
+[47/52] e2e/agent-detail.spec.ts:757:1 › 概览：有在跑任务时列出行，段头带计数
+[48/52] e2e/agent-detail.spec.ts:779:1 › 概览：点行进任务详情
+[49/52] e2e/agent-detail.spec.ts:791:1 › 概览：五个字段行长在同一张模板卡里，头像与名称在卡上方
+[50/52] e2e/agent-detail.spec.ts:816:1 › 记忆 tab：记忆行住在模板卡里
+[51/52] e2e/agent-detail.spec.ts:823:1 › 权限 tab：五组开关各自住在模板卡里（#1251 起新增机器匹配段）
+[52/52] e2e/agent-detail.spec.ts:838:1 › 记忆/权限卡：首行无底色、无上边线（无方角外溢、无 2px 顶边）
+  52 passed (31.5s)

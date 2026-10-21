@@ -9,8 +9,9 @@ Base = `e658294` (origin/main). Branch = `claude/optimistic-albattani-r5pmfn`.
 Stubbed live boot (no `?scenario=`, `page.route` answers `/api/*`). Two tasks: `queued` with a build, a pending plan step carrying the #1108 queue projection (`blocked: machine-offline`) and `waitingOn: machine`; `todo` with no build.
 
 - `e2e-old-leg.txt`: the spec on base `e658294`. 2 failed, 1 passed. The queued detail header and the queued card each resolve one 开始 button (`Expected: 0, Received: 1`). The chip (排队中) and wait-row (排队中：等机器上线) assertions before them pass, so the failures are not vacuous. The todo header test passes.
-- `e2e-new-leg.txt`: the same spec on the branch. 3 passed.
-- `e2e-affected.txt`: `pnpm --filter @pacman/web e2e:affected` on the branch. `phase.ts` is a shared path, so it runs the full suite.
+- `e2e-new-leg.txt`: on branch `fa42cb2`, `queued-action` + `phase-chip-words` + `agent-detail` (the two specs that pin the queued chip and the agent detail waiting row). 52 passed.
+- `e2e-affected.txt`: `pnpm --filter @pacman/web e2e:affected` on the branch. `phase.ts` is a shared path, so it ran the full suite: 1092 passed, 3 failed.
+- `e2e-preexisting-on-base.txt`: those 3 tests on base `e658294` with `--repeat-each=3`: 9/9 failed. `accent-typo` sidebar mark (light, dark) wants `mask-size: 100% auto` and gets `100%`; `segmented-controls` sched freq reads the same ink on the idle and chosen radio. They fail without this change too, as already recorded in `docs/verify/1400/e2e-preexisting-on-base.txt`.
 
 Screenshots (written by the spec with `PACMAN_E2E_EVIDENCE`):
 
