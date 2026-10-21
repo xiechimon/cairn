@@ -40,21 +40,25 @@
 // 停读（磨绿只记数，不受这两个上限拦）；pulls 读要给它可能跟着的 compare 留
 // 一次额度。每候选一次条件 GET pulls/{n}，合并后分支 head 与最后的 checkpoint
 // 不同时再加一次 compare（结果按 checkpoint 与 head 缓存，同一对只读一次）：
-// - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后的 checkpoint
-//   （daemon 除审核步外每一步收尾都提交并推送，verify 步推的提交同样算）
-//   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
+// - 已合并（不论谁合的）进了默认分支、且合并时的 head 包含最后收尾的那一步的
+//   checkpoint（daemon 除审核步外每一步收尾都提交并推送，verify 步推的提交同样
+//   算）→ system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
 // - 关闭未合并、紧接着的下一次读（隔一轮）仍关闭（为重跑 CI 关掉又重开 PR 不
 //   算；中间有步在飞没读、或有一次读不到，就从下一次读重新数）→ system 行 +
-//   build.errorMessage + failed；
+//   build.errorMessage + failed。只认目标是默认分支的 PR（与已合并同一条规则）：
+//   从工作分支往别的分支开的另一张 PR（协作者的 backport 等；daemon 探测取编号
+//   最大的 open PR 记在 build 上，本 build 真正的 PR 可能还开着）关掉 → 每轮提示
+//   一次，不写关闭行、不打回、不停步；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
 // - 写之前核对 PR 是本 build 的：PR 号是 daemon 按分支名查到的（gh pr list
 //   --head 只比分支名），公开仓里别人 fork 的同名分支开的 PR 也会被查到。head
 //   仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库改名或转移后照样
 //   对得上，fork 对不上）、head 分支是本 build 的工作分支才写；对不上（含 fork
 //   已删、head 仓为 null）→ 不收尾不打回，每轮提示一次，结果照常按 etag 缓存；
-//   响应缺 head 分支或 base 仓 id → 按读不到。
-// - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符、截到
-//   100 个字符（会话行经 chief / MCP 的会话读工具交给 agent）。
+//   响应缺 head 分支、base 分支、默认分支或 base 仓 id → 按读不到。
+// - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
+//   字符（双向覆盖、零宽字符）、截到 100 个字符（会话行经 chief / MCP 的会话读
+//   工具交给 agent，也在 web 时间线上显示）。
 // 每个结局每一轮只报告一次（轮界 = 本 build 最近一个 build / plan 步，#931
 // 返工复用同一个 build 时从新的一轮算起）：本轮已有完成行（合并步或对账写的）
 // 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收。人在报告之后把
@@ -63,7 +67,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import {
@@ -131,10 +135,11 @@ const CI_FIX_SUMMARY_MAX = 800;
 /** system 行里引用的一段 GitHub 文本的长度上界（字符数）。 */
 const GITHUB_TEXT_MAX = 100;
 
-/** GitHub 给的文本（分支名、合并者、合并提交）进 system 行之前：去掉控制字符，
- * 超过上界截断并加省略号。 */
+/** GitHub 给的文本（分支名、合并者、合并提交）进 system 行之前：去掉控制字符与
+ * 格式字符（git 分支名允许双向覆盖 U+202E、零宽字符这类，显示出来会把文字倒过来或
+ * 藏起来），超过上界截断并加省略号。 */
 function githubText(text: string): string {
-  const chars = Array.from(text.replace(/\p{Cc}/gu, ''));
+  const chars = Array.from(text.replace(/[\p{Cc}\p{Cf}]/gu, ''));
   return chars.length > GITHUB_TEXT_MAX
     ? `${chars.slice(0, GITHUB_TEXT_MAX).join('')}…`
     : chars.join('');
@@ -267,9 +272,9 @@ interface CiPollTally {
   merged: number;
   /** PR 关闭未合并 → failed。 */
   closedUnmerged: number;
-  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示（每轮一次）后留在
-   * review；之后每次 sweep 照样计在这里。review 各项之和 = reviewCandidates（单候选
-   * 异常记进 errors）。 */
+  /** 已合并但分支上有合并没带走的提交，或合进了非默认分支；关闭未合并而目标不是默认
+   * 分支：提示（每轮一次）后留在 review；之后每次 sweep 照样计在这里。review 各项
+   * 之和 = reviewCandidates（单候选异常记进 errors）。 */
   hinted: number;
   /** 本轮已报告过这个结局（人后来把卡拖回了 review）：交给人。 */
   settledBefore: number;
@@ -536,9 +541,14 @@ export function createCiPoller(
     }
     const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
     const since = roundStart(deps, cand.buildId);
-    // PR 是本 build 的才写（见文件头）：缺 head 分支或 base 仓 id 的响应不当终态缓存
-    // （同下文合并判据）。
-    if (pull.headRef === null || pull.baseRepoId === null) {
+    // PR 是本 build 的、目标是默认分支才写（见文件头）：缺这几个字段的响应不当终态
+    // 缓存，下次读不带它的 etag（304 会交回同一份）。
+    if (
+      pull.headRef === null ||
+      pull.baseRepoId === null ||
+      pull.baseRef === null ||
+      pull.defaultBranch === null
+    ) {
       pullCache.delete(key);
       closedSeenAt.delete(key);
       tally.reviewUnreadable += 1;
@@ -562,12 +572,6 @@ export function createCiPoller(
       return;
     }
     if (pull.merged) {
-      // 缺字段的已合并响应不当终态缓存：下次读不带它的 etag（304 会交回同一份）。
-      if (pull.baseRef === null || pull.defaultBranch === null) {
-        pullCache.delete(key);
-        tally.reviewUnreadable += 1;
-        return;
-      }
       if (pull.baseRef !== pull.defaultBranch) {
         hintOnce(
           cand.buildId,
@@ -580,6 +584,10 @@ export function createCiPoller(
       // 合并之后同分支又推了提交（修复轮，或 verify 步推的提交：daemon 除审核步外
       // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
       // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
+      // 最后推送 = 最后收尾，不是最后建的：上一轮建的 verify 步（Verifier 离线或
+      // 等额度）可以在下一轮的 build 步之后才跑。step 表没有收尾时刻列，按步最后
+      // 一次报到排（心跳 → 领取 → 入队，同 stepActivityAt；领取时心跳置为领取时刻，
+      // 之后每 30 s 一次）：同一 build 的步一个接一个跑时就是收尾顺序。
       const checkpoint =
         deps.db
           .select({ commit: step.checkpointCommit })
@@ -592,7 +600,10 @@ export function createCiPoller(
               isNotNull(step.checkpointCommit),
             ),
           )
-          .orderBy(desc(step.createdAt))
+          .orderBy(
+            desc(sql`coalesce(${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`),
+            desc(step.createdAt),
+          )
           .get()?.commit ?? null;
       if (checkpoint !== null && pull.headSha === null) {
         pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
@@ -684,6 +695,18 @@ export function createCiPoller(
     if (seen === undefined || readAt - seen < CI_CLOSED_CONFIRM_MS) {
       if (seen === undefined) closedSeenAt.set(key, readAt);
       tally.reviewPending += 1;
+      return;
+    }
+    // 目标不是默认分支（同上文合并判据）：多半是从工作分支往别的分支开的另一张 PR，
+    // 它关掉不说明本 build 的交付被否了。确认之后才提示（关掉又重开的不留提示）；
+    // closedSeenAt 留着，之后每次读照样落进 hinted。
+    if (pull.baseRef !== pull.defaultBranch) {
+      hintOnce(
+        cand.buildId,
+        `PR #${prNumber} 的目标分支是「${githubText(pull.baseRef)}」，不是默认分支「${githubText(pull.defaultBranch)}」；它在 GitHub 关闭且未合并，可能是从工作分支往别的分支开的另一张 PR。对账不据它打回；任务留在审核关口，由人核对这张 PR。`,
+        since,
+      );
+      tally.hinted += 1;
       return;
     }
     closedSeenAt.delete(key);
