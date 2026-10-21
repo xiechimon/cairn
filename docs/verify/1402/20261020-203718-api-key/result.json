@@ -1,0 +1,49 @@
+{
+  "probe": "api-key",
+  "ok": true,
+  "at": "2026-10-20T20:37:18.633Z",
+  "stack": {
+    "api": "http://127.0.0.1:8791",
+    "web": "http://127.0.0.1:5273",
+    "homeDir": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home",
+    "root": "/home/user/pacman/.claude/worktrees/p1/"
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "API 密钥页空态就绪"
+    },
+    {
+      "ok": true,
+      "label": "新建密钥弹窗打开(#287 两步流)"
+    },
+    {
+      "ok": true,
+      "label": "一次性明文形态 pacman_…(pacman_74f2b5a…,仅显示一次)"
+    },
+    {
+      "ok": true,
+      "label": "密钥列表出现掩码行(1 行)"
+    },
+    {
+      "ok": true,
+      "label": "API 掩码行(pacman_74f2b5a8…)"
+    },
+    {
+      "ok": true,
+      "label": "SQLite api_key 表存 keyHash 非明文(02 §8 护栏)"
+    }
+  ],
+  "artifacts": [
+    "01-keys-empty.png",
+    "02-keys-create-dialog.png",
+    "03-keys-once.png"
+  ],
+  "apiKeyMasked": "pacman_74f2b5a8…",
+  "dbApiKey": {
+    "id": "4R7Cw3XiDN75UcI7WSsm9",
+    "name": null,
+    "masked": "pacman_74f2b5a8…",
+    "keyHash": "b798154a451c02950a36a84c83f82bf90282e9ba2579e159d273c1761bab112a"
+  }
+}

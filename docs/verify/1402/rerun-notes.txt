@@ -1,0 +1,11 @@
+# Notes added after the fact for #1402 evidence. Earlier evidence files stay as first committed
+# (docs/verify is add-only, ADR 0015); later notes go here.
+
+# negative-control.txt (round 1): the seed for that run, recovered from the session log. In
+# apps/web/src/overlays/search-panel.tsx the todo result row attribute data-row-kind="todo" was
+# changed to data-row-kind="todo-seeded-regression", and the stack was relaunched.
+# positive-control.txt is the same drive after reverting that line and relaunching.
+# negative-control-2.txt records a second seed with its diff and the empty git diff after the revert.
+
+# inventory.json: the drive-inventory workflow listed only the 99 .mjs files; the two .mts rows
+# were added by hand in 0ef923f and carry "classifiedBy" saying so (see the PR's What section).

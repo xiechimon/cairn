@@ -1,0 +1,10 @@
+{
+  "url": "http://127.0.0.1:5273/app",
+  "title": "Pacman",
+  "navigation": "ok",
+  "screenshot": "board.png",
+  "consoleErrors": [
+    "Base UI: A component that acts as a button expected a native <button> because the `nativeButton` prop is true. Rendering a non-<button> removes native button semantics, which can impact forms and accessibility. Use a real <button> in the `render` prop, or set `nativeButton` to `false`.\n    at Button (http://127.0.0.1:5273/src/components/ui/button.tsx:36:25)\n    at BoardSurface (http://127.0.0.1:5273/src/board/board.tsx:263:24)\n    at BoardPage (http://127.0.0.1:5273/src/routes/board-page.tsx:686:33)"
+  ],
+  "failedRequests": []
+}
