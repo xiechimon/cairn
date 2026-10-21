@@ -63,7 +63,7 @@
 //   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
 //   那张新的已合并的；已合并的都要比本 build 自己最近一张关闭未合并的新：更早合并的是
 //   旧事）→ 改记它（号与链接，只在 build 上记的还是原来那张时）、每轮落一行，不打回、不
-//   提示，下一轮读它；记的那张在列表里又开着 → 按重开，不打回。关闭路径列不到 → 不写，
+//   提示，下一轮读它；记的那张在列表里又开着或已合并 → 不写，下一轮重读它。关闭路径列不到 → 不写，
 //   下一次读再列，连续第二次列不到 → 按段 1 打回；别人的 PR 那条路每 10 分钟（未连接
 //   GitHub 时每小时）最多列一次，没有或列不到 → 照常提示。记的 PR 开着但不是本 build 的，
 //   同样走别人的 PR 那条路。
@@ -351,6 +351,11 @@ export function createCiPoller(
    * 而没读（或读的网络窗里步开始）、读不到，都清掉。未连接 GitHub 时的 5 分钟节流与
    * 额度不够的跳过不清：两次读之间本来就隔着它们，清了就永远确认不了。 */
   const closedSeenAt = new Map<string, number>();
+  /** 关闭的看到时刻与关闭路径上列不到的次数一起清（一次关闭的确认从头数）。 */
+  function forgetClose(key: string): void {
+    closedSeenAt.delete(key);
+    listFailures.delete(key);
+  }
   /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
   const knownRows = new Set<string>();
   /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
@@ -465,7 +470,8 @@ export function createCiPoller(
 
   /** 本 build 工作分支往默认分支的 PR（见文件头）。只认本 build 自己的：head 仓与 base
    * 仓都是记的那张 PR 的目标仓（按仓库 id）、head 分支是本 build 的工作分支、目标是默认
-   * 分支。记的那张在两次读之间被重开（列表里它开着）→ 返回它自己，调用方按重开处理。
+   * 分支。记的那张在两次读之间被重开或合并（列表里它开着或已合并）→ 返回它自己，调用方
+   * 不写、下一轮重读。
    * 否则开着的那张优先；没有开着的，取已合并的里编号最大的一张，但只认比「人最近关掉
    * 不要的那张」新的：同一个分支可以先后开过好几张 PR，本 build 自己的、关闭未合并的里
    * 编号最大的那张之前合并的是旧事，不是替身（人关掉新的这张，就是不要这次改动）。关闭
@@ -493,8 +499,10 @@ export function createCiPoller(
         p.headRef === branch &&
         p.baseRef === recorded.defaultBranch,
     );
-    const reopened = own.find((p) => p.number === recorded.number && p.state === 'open');
-    if (reopened !== undefined) return reopened;
+    const changed = own.find(
+      (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
+    );
+    if (changed !== undefined) return changed;
     const open = own.filter((p) => p.state === 'open');
     const rejected = own.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
@@ -600,7 +608,7 @@ export function createCiPoller(
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
     if (hasActiveStep(cand.buildId)) {
-      closedSeenAt.delete(key); // 这段没读：之前读到的关闭不再算数
+      forgetClose(key); // 这段没读：之前读到的关闭不再算数
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
@@ -630,7 +638,7 @@ export function createCiPoller(
       });
       readAt = now + (nowMs() - sweepStartedAt);
       if (page === null) {
-        closedSeenAt.delete(key);
+        forgetClose(key);
         tally.reviewUnreadable += 1;
         return;
       }
@@ -647,13 +655,13 @@ export function createCiPoller(
     // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
     // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
     if (pull === null || (pull.state === 'open' && !foreign)) {
-      closedSeenAt.delete(key);
+      forgetClose(key);
       tally.reviewPending += 1;
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
-      closedSeenAt.delete(key);
+      forgetClose(key);
       tally.reviewSkipped += 1;
       return;
     }
@@ -663,7 +671,7 @@ export function createCiPoller(
     // 缓存，下次读不带它的 etag（304 会交回同一份）。
     if (!hasPullFields(pull)) {
       pullCache.delete(key);
-      closedSeenAt.delete(key);
+      forgetClose(key);
       tally.reviewUnreadable += 1;
       return;
     }
@@ -869,14 +877,15 @@ export function createCiPoller(
     }
     listFailures.delete(key);
     const found = sibling === 'unreadable' ? null : sibling;
-    closedSeenAt.delete(key);
+    forgetClose(key);
     // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
     // 读重新数）。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
       tally.reviewSkipped += 1;
       return;
     }
-    // 记的那张在两次读之间被重开了（列表里它开着）：不再算关闭，从下一次读重新数。
+    // 记的那张在两次读之间被重开或合并了（列表里它开着或已合并）：不再算关闭，不写，下一轮
+    // 重读它（合并了就按合并收尾）。
     if (found?.number === prNumber) {
       tally.reviewPending += 1;
       return;
@@ -1095,7 +1104,7 @@ export function createCiPoller(
     const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
     for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);
     for (const k of foreignListedAt.keys())
-      if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) foreignListedAt.delete(k);
+      if (!liveKeys.has(k.slice(k.indexOf('\u0000') + 1))) foreignListedAt.delete(k);
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
     for (const k of knownRows)
       if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);

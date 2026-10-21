@@ -28,6 +28,8 @@ A5  The list read fails (429, 502, thrown network error) -> nothing written, the
 A5b The list read fails at two confirming reads in a row -> the close is reported as in
     segment 1 (closed row, errorMessage, failed): the list is an addition, a confirmed
     close must not wait in review without a word.
+A5c A failed list read counts toward the fallback only within one close: a reopen (or any
+    event that restarts the close count) clears it. (Fourth /code-review pass.)
 A6  No list read on a first closed sighting, on a close and reopen, on a closed PR whose
     base is not the default branch, or when this round's close was already reported.
 A7  The phase changes, or a step starts, while the list read is in flight -> no write,
@@ -59,6 +61,9 @@ A14 The list parser reads the live response shape (number, state, merged_at, hea
 A15 The recorded PR shows up open in the list (it was reopened between the confirming
     read and the list read) -> not failed, nothing written, the close counts from the
     next read again; also when the list holds another open PR of the branch (A15b).
+A15c The recorded PR shows up merged in the list (merged between the confirming read and
+    the list read) -> nothing written (not failed as closed); the next read finishes the
+    card through the merged path. (Fourth /code-review pass.)
 A16 On the closed path a merged PR older than the recorded one (earlier work on the same
     branch) is not a replacement: a person who closed the newer PR rejected the change,
     so the card fails.
@@ -74,6 +79,8 @@ A20 The daemon probe records the foreign PR again after an adoption and the reco
 A21 Without a GitHub connection the foreign path lists the branch at most once an hour
     (the reconcile's own anonymous budget is 20 reads an hour).
 A22 The recorded PR changes -> the ten-minute (or hourly) wait starts again for it.
+A22b The listing time of a PR the build no longer records is dropped at the end of the
+    sweep, so going back to it lists at once. (Fourth /code-review pass.)
 A17 After a rename or transfer the stored owner is stale: the head filter uses the owner
     the PR response names (base.repo.owner.login), falling back to the stored one.
 

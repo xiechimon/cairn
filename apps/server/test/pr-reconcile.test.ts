@@ -3026,6 +3026,66 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(closedRows(w)).toHaveLength(1);
   });
 
+  test('[s2-A5c] a failed list read during an earlier close does not count toward a later close', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = 502;
+    const poller = pollerFor(w, mock);
+    const spec = mock.pulls[w.prNumber];
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000); // confirmed, the list read fails once
+    mock.status304 = false;
+    if (spec !== undefined) spec.state = 'open';
+    await poller.sweep(t0 + 120_000); // reopened to rerun CI
+    if (spec !== undefined) spec.state = 'closed';
+    await poller.sweep(t0 + 180_000);
+    await poller.sweep(t0 + 240_000); // confirmed again, the list read fails once more
+    expect(mock.listRequests()).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: w.prNumber, state: 'closed', merged: true }];
+    const poller = pollerFor(w, mock);
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+    const spec = mock.pulls[w.prNumber];
+    if (spec !== undefined) spec.merged = true;
+    mock.status304 = false;
+    await poller.sweep(t0 + 120_000);
+    expect(w.todoRow().phase).toBe('done');
+    expect(closedRows(w)).toEqual([]);
+  });
+
+  test('[s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once', async () => {
+    const f = foreignWorld();
+    headRefs.set(202, conversationBranch(f.w.buildId));
+    f.mock.pulls[202] = { state: 'closed', merged: true, mergeCommitSha: 'def5678' };
+    const poller = pollerFor(f.w, f.mock);
+    const setRecorded = (n: number) =>
+      f.w.s.db
+        .update(buildTable)
+        .set({ prNumber: n })
+        .where(eq(buildTable.id, f.currentBuildId))
+        .run();
+    const t0 = Date.now();
+    await poller.sweep(t0); // lists for #201
+    setRecorded(202);
+    await poller.sweep(t0 + 60_000); // lists for #202
+    setRecorded(201);
+    headRefs.set(305, f.own);
+    f.mock.pulls[305] = { state: 'open', merged: false };
+    f.mock.branchPulls = [{ number: 305 }];
+    await poller.sweep(t0 + 120_000); // #201 again: listed at once
+    expect(f.mock.listRequests()).toHaveLength(3);
+    expect(f.currentPr()).toBe(305);
+  });
+
   test('[s2-A13] the recorded URL is built from the repository and number, not taken from the response', async () => {
     const { w, mock } = closedWithSibling();
     mock.branchPulls = [{ number: 202, htmlUrl: 'https://evil.example/pull/202‮' }];
