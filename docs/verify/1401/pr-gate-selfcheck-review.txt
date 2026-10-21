@@ -1,0 +1,103 @@
+# pr-gate.js after the /code-review pass on #1410.
+# Red: this round's scripts/pr-gate-selfcheck.mjs against .claude/workflows/pr-gate.js of 9bec5a7. 4 new cases fail;
+# the fifth new case (a binary file under docs/verify stays mergeable) passes there and holds the old behavior.
+# Green: the same self-check at 28b1377. Mutations: each applied alone to pr-gate.js at 28b1377, then the self-check.
+# Last block: the NUL-byte case the review reported, reproduced in a scratch repo.
+
+== red ==
+pr-gate-selfcheck.mjs of this round against pr-gate.js of 9bec5a7
+PASS  clean change: go, auto-merge
+PASS  C-quoted path (core.quotePath on) is rejected
+PASS  unquoted non-ASCII ADR path routes to the user
+PASS  CI-called script outside the *gate* glob routes to the user
+PASS  rename out of a protected path (list built without --no-renames) is caught
+PASS  deletedFiles and linesChanged are each required
+PASS  deleted test file routes to the user
+PASS  over 800 lines routes to the user
+PASS  over 40 files routes to the user
+PASS  linesChanged must be a non-negative integer
+PASS  a path with a shell character is rejected
+PASS  CI gate helpers and data anywhere under scripts/ route to the user
+PASS  gate files outside root scripts/ route to the user (run 4)
+PASS  files that steer agents route to the user (run 4)
+PASS  a path a reviewer adds to protectedPaths routes to the user
+PASS  product source, tests, e2e and evidence do not route to the user
+PASS  paths outside the auto-merge set route to the user (run 5)
+PASS  agent-steering files the name list missed route to the user (run 5)
+PASS  case variants of protected paths route to the user (run 5)
+PASS  a protected path only the safety reviewer lists is matched (run 5)
+PASS  a deleted test helper (test directory only) routes to the user (run 5)
+PASS  a deleted colocated test (suffix only) routes to the user (run 5)
+PASS  a deleted path missing from changedFiles is an args error (run 5)
+PASS  pr and ticket must be positive integers (run 5)
+PASS  a path with a quote or space is rejected (run 5)
+PASS  configs CI runs under route to the user, at the root too
+PASS  a deletion only the safety reviewer reports routes to the user
+PASS  a larger line count from the safety reviewer routes to the user
+FAIL  binaryFiles is required and lists changed paths only (code-review on #1410)
+FAIL  a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410)
+PASS  a binary file under docs/verify stays mergeable without the user
+FAIL  a binary file only the safety reviewer listed routes to the user
+FAIL  a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+PASS  a reviewer that returns nothing blocks go
+PASS  findings past the skeptic cap are kept
+PASS  two skeptics refuting on the head withdraw the finding
+PASS  two skeptics confirming on the head keep the finding (run 5)
+PASS  a split vote keeps the finding (run 5)
+PASS  a dead skeptic keeps the finding
+PASS  skeptics that saw another head do not withdraw the finding
+PASS  a reviewer on another head blocks go
+PASS  a nested .gitattributes routes to the user (run 6)
+PASS  the line count ignores in-tree attributes (run 6)
+PASS  the merge readiness gate source routes to the user (run 6)
+PASS  migrations, the lockfile and .npmrc are protected, packages/* outside src and test is not auto (run 6)
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  a missing safety file list blocks go
+48/52 passed (.claude/workflows/pr-gate.js)
+exit=1
+
+== green at 28b1377 ==
+PASS  a deleted helper under e2e/, tests/ or __tests__/ routes to the user (run 6)
+PASS  exactly 800 lines and 40 files still auto-merge (run 6)
+PASS  a file only the safety reviewer lists counts toward the auto-merge set (run 6)
+PASS  headSha, an empty file list and non-string paths are args errors (run 6)
+PASS  the safety reviewer does not see the caller file list (run 6)
+PASS  the evidence reviewer and its skeptics run in their own worktree, skeptics under the fork rule (run 6)
+PASS  a missing safety file list blocks go
+52/52 passed (.claude/workflows/pr-gate.js)
+
+== mutations ==
+binary reason dropped            50/52 passed  caught by: a binary file outside docs/verify routes to the user: numstat counts it as 0 lines (code-review on #1410); a binary file only the safety reviewer listed routes to the user
+evidence not exempt              51/52 passed  caught by: a binary file under docs/verify stays mergeable without the user
+safety binary list ignored       51/52 passed  caught by: a binary file only the safety reviewer listed routes to the user
+binaryFiles not validated        51/52 passed  caught by: binaryFiles is required and lists changed paths only (code-review on #1410)
+test directory case-sensitive    51/52 passed  caught by: a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+test suffix case-sensitive       51/52 passed  caught by: a deleted test is found whatever the case of its directory or suffix (code-review on #1410)
+
+== definitions (name, original, replacement) ==
+M=[
+ ('binary reason dropped', "  ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),\n", ""),
+ ('evidence not exempt', "  (f) => !EVIDENCE_RE.test(f),\n)", "  (f) => true,\n)"),
+ ('safety binary list ignored', "...binaryFiles, ...(safety ? (safety.review.binaryFiles ?? []) : [])", "...binaryFiles"),
+ ('binaryFiles not validated', "  !isPathList(args.binaryFiles) ||\n  !args.binaryFiles.every((f) => args.changedFiles.includes(f))\n", "  false\n"),
+ ('test directory case-sensitive', "(e2e|test|tests|__tests__)\\//i.test(f)", "(e2e|test|tests|__tests__)\\//.test(f)"),
+ ('test suffix case-sensitive', "[cm]?[jt]sx?$/i.test(f)", "[cm]?[jt]sx?$/.test(f)"),
+]
+
+== NUL byte in a source file ==
+$ git --version
+git version 2.43.0
+$ git --attr-source=4b825dc642cb6eb9a060e54bf8d69288fbee4904 diff --no-renames --numstat HEAD~1...HEAD
+-	-	apps/web/src/x.ts
+$ git diff HEAD~1...HEAD | head -n 4
+diff --git a/apps/web/src/x.ts b/apps/web/src/x.ts
+new file mode 100644
+index 0000000..f8eb32b
+Binary files /dev/null and b/apps/web/src/x.ts differ
+$ wc -l apps/web/src/x.ts
+901 apps/web/src/x.ts

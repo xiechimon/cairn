@@ -1,0 +1,185 @@
+{
+ "pr": 1410,
+ "ticket": 1401,
+ "headSha": "b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0",
+ "go": true,
+ "blocking": [],
+ "suggestions": [
+  {
+   "dimension": "correctness",
+   "title": "ADR 0021 D3 and D4 disagree on files compare returns without a patch (pure renames, oversized diffs)",
+   "severity": "suggestion",
+   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "line": 36,
+   "failurePath": "D3 (line 36) says a file with no patch gets patchSha null and, outside the evidence directory, goes to a person under D4. D4 (line 37) names only binary files outside docs/verify among the forced-human cases. For pure renames it says compare counts them as 0 lines and that pr-gate's --no-renames is 'stricter on pure renames'. The P3 implementation in #1420 follows D3: apps/server/src/services/merge-gate/paths.ts lines 8-9, 66 and 103 route every no-patch file outside docs/verify (binary, oversized diff, pure rename) to the user. So for a pure rename apps/web/src/a.ts -> apps/web/src/b.ts the product gate answers user, while pr-gate (D + A rows, counted as whole files, not binary) answers auto-merge. D4's claim that pr-gate is the stricter of the two holds only for the line count, not for the routing.",
+   "evidence": "ADR 0021 D3: '没有 patch 时为 null（这种文件在证据目录外按 D4 留人）'. D4: '证据目录外的二进制文件 ... 纯改名为 0，pr-gate 用 --no-renames ... 在纯改名上更严'. The #1420 head paths.ts:8: '对二进制不给 patch，纯改名也不给，两者分不出来，没有 patch 的一律算'. Add 'compare 不给 patch 的文件（二进制、diff 过大、纯改名）' to D4's list, or drop the parenthetical from D3."
+  },
+  {
+   "dimension": "correctness",
+   "title": "ADR 0021 status line says its wording changed over six pr-gate rounds and only ever in the conservative direction; both parts are stale",
+   "severity": "suggestion",
+   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "line": 3,
+   "failurePath": "Commit 1517363 changed the merge-readiness blocker. It used to say '`mergeable_state` 不是 `clean`'. Now has_hooks counts as clean, and unstable passes when the only failing check is pacman/merge-gate. That relaxation is needed, because otherwise the gate locks on its own failing status, but it is not a move toward the conservative side. D3's patchSha also came from pr-gate run 3 on #1420, not from the six rounds on #1410. A reader who trusts the status line would assume no D2-D4 rule was loosened during construction.",
+   "evidence": "Line 3: 'D2–D4 的措辞在 #1410 施工中按 pr-gate 六轮评审的发现改过，每次都只往更保守的方向'. The 1517363 diff of the merge-readiness bullet at line 46 adds the has_hooks and unstable exceptions."
+  },
+  {
+   "dimension": "correctness",
+   "title": "The quoted-path error tells the caller to use core.quotePath=false even when git quotes for another reason",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 130,
+   "failurePath": "A PR adds apps/web/src/a\"b.ts or a path that contains a backslash. With core.quotePath=false, git still C-quotes it: a scratch repo on git 2.43 printed \"a\\\"b.ts\" and \"c\\\\d.ts\" from FILES_CMD. The check on lines 130-135 fires before SAFE_PATH and throws 'C-quoted paths ...; build the lists with core.quotePath=false'. The caller already used that flag, so it can rebuild and get the same error again, instead of getting the 'review this PR by hand' message that SAFE_PATH gives such paths. The gate still fails closed. Only the guidance is wrong.",
+   "evidence": "git -c core.quotePath=false diff --no-renames --name-only HEAD~1...HEAD in /tmp scratch printed \"a\\\"b.ts\" and \"c\\\\d.ts\"."
+  },
+  {
+   "dimension": "correctness",
+   "title": "LINES_CMD needs git 2.40 or later for --attr-source, and no minimum version is stated",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 116,
+   "failurePath": "`git --attr-source=<tree>` was added in git 2.40. Spec 28 §7.2 recommends running on the user's Mac. If that machine's git is older (Apple's bundled git has been 2.39.x), LINES_CMD exits with 'unknown option', and neither the caller nor the safety reviewer can produce linesChanged as ARGS_HELP specifies. If both fall back to plain `git diff --numstat`, the max() on line 369 no longer protects against the run 6 case: a committed `*.ts -diff` .gitattributes zeroes both counts. That .gitattributes would itself be protected only if it is in this PR; an older one already on main would not be. This depends on the git version in use, so it is conditional.",
+   "evidence": "pr-gate.js:116 LINES_CMD; ARGS_HELP on line 123 and spec 28 §7.5 name the command but no minimum git version; local git here is 2.43.0."
+  },
+  {
+   "dimension": "rules",
+   "title": "The squash method AGENTS.md prescribes, which ADR 0021 D2 points to for human merges, gives this PR a message with no ticket and no closing line",
+   "severity": "suggestion",
+   "file": "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+   "line": 35,
+   "failurePath": "ADR 0021 D2 says a human merging in the GitHub UI or CLI follows AGENTS.md's squash method (AGENTS.md:70). That method uses `gh api repos/xiechimon/pacman/pulls/<n>/commits -q '.[0].commit.message'`. For #1410, `.[0]` is ca088ce, \"docs: spec 28 自举闭环计划（pacman 自写 PR、自合 PR，goal 模式执行）\", whose message has no ticket in the subject and no `closes #1401`. The only closing line is in the 4th of 34 commits, e5414a2. A merger who follows AGENTS.md literally would put a ticket-less subject on main and leave #1401 open. The UI default (PR_TITLE + COMMIT_MESSAGES) and the squash message in the PR body's Issues section both carry `closes #1401`, so the risk sits only with a CLI merge that follows AGENTS.md rather than the body.",
+   "evidence": "REST pulls/1410/commits: .[0].sha = ca088cedbded3d23924f275af54f5444b7692d67, length 34. `git log --format=%B` shows `closes #1401` only in e5414a2. The PR body says: \"The first commit's message (what `.[0].commit.message` returns) has no ticket in its subject and no closing line, so squash with this message instead.\""
+  },
+  {
+   "dimension": "rules",
+   "title": "Three branch commit subjects lack the ticket required by <scope>(<ticket>): <subject>",
+   "severity": "suggestion",
+   "failurePath": "ca088ce \"docs: spec 28 自举闭环计划…\", 3944905 \"docs: spec 28 补云端会话变体…\" and 662cbd9 \"docs: spec 28 加 workflow 编排…\" have no (1401) in the subject. The PR is squashed, so only the squash message reaches main. The PR body's Risk section discloses this, and the Issues section supplies a compliant subject: \"docs(1401): ... (#1410)\". This matters only if the merge falls back to the first commit's message, as in the previous finding.",
+   "evidence": "`git log --format=%s` over base..b9791e2. Every other non-merge commit uses docs(1401)/chore(1401)."
+  },
+  {
+   "dimension": "rules",
+   "title": "Two AGENTS.md rule adjustments rely on the user's merge as the explicit confirmation required by User Override",
+   "severity": "suggestion",
+   "file": "docs/spec/28-自举闭环-自写自合.md",
+   "line": 227,
+   "failurePath": "1. AGENTS.md:96 adds an exception to the hard rule \"不切分支看 diff\": the pr-gate evidence dimension and its skeptics may run `checkout --detach` in their own worktrees.\n2. Spec 28 §7.4 (line 227) and D7 (line 74) declare that listing PRs that await the user's merge is \"a report, not a question\" under AGENTS.md:94, while §7.5 (line 247) has the main session \"请用户合并\". AGENTS.md:94 covers any question about a PR, including whether to merge. That carve-out lives in a spec, not in AGENTS.md.\nAGENTS.md:113-115 requires explicit user confirmation before its rules are overridden. D4 already routes this PR to a user merge, and the Risk section names the checkout exception, but not the needs-decision reading as a rule change. If the carve-out is meant to stand, the user should confirm both points when merging. Otherwise the needs-decision reading should move into AGENTS.md itself. The carve-out is low risk in practice: §7.5 line 257 enables auto-merge only for go verdicts outside D4, so a PR that awaits the user has no auto-merge armed, and that is the failure AGENTS.md:94 guards against (#1435).",
+   "evidence": "AGENTS.md:94, :96, :113-115 at the head; spec 28 lines 74, 227, 247, 257."
+  },
+  {
+   "dimension": "tests",
+   "title": "Self-check does not pin the skeptic prompt, so the withdraw rule can be emptied with CI still green",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 282,
+   "failurePath": "The ticket says the self-check covers the refute-and-withdraw rule. But no case checks what a skeptic is told. Example: an edit removes `${JSON.stringify(f)}` from the skeptic prompt at line 282, or removes the 'Try to refute it by tracing ... Set refuted to false only if you confirmed' sentence. Then `node scripts/pr-gate-selfcheck.mjs` still prints 73/73 (I ran both mutations). In a real run, a skeptic that never sees the finding cannot confirm it. The prompt's default is 'If you cannot confirm it, set refuted to true', so both skeptics refute. Every blocking finding up to the cap is then withdrawn, and go comes back true. The CI step in ci.yml would not notice. The code at the head is correct today; what is missing is a test that keeps it that way.",
+   "evidence": "Mutations 'skeptic-no-finding' and 'skeptic-no-trace' both give 73/73. The cases at selfcheck lines 527-592 only check the vote arithmetic. The prompt cases at lines 648-695 check refs, the comment filter and the read-only line, never the finding payload. A case that collects the refute:* calls and checks that each prompt contains JSON.stringify(blocker) and the 'refuted to false only if you confirmed' sentence would kill both mutations."
+  },
+  {
+   "dimension": "tests",
+   "title": "Acceptance item 4 claims a final-head pr-gate run that is not reported at this head",
+   "severity": "suggestion",
+   "file": "docs/verify/1401/pr-gate-run10-9460e04.json",
+   "line": 5,
+   "failurePath": "The ticked box says pr-gate ran 'once more on the final head', with that run 'reported in a PR comment'. The PR's only comment reports run 9 at 5ebdca2 ('go') and calls 5ebdca2 'the current head'. Since then, run 10 at 9460e04 was a no-go with one blocking finding (this file: go false). Commit 126f4c1 then changed pr-gate.js, and b9791e2 is the head now. A reader who goes from the ticked box to the comment finds a go verdict for a head that is seven commits old, from a gate copy that was changed afterwards. Nothing reports a run at b9791e2 yet. The pr-evidence check is green because the box is ticked.",
+   "evidence": "gh api repos/xiechimon/pacman/issues/1410/comments returns one comment (2026-10-21T07:50Z), about 5ebdca2. The run 10 JSON shows headSha 9460e04, go false, one blocking finding. The PR body ticks the item before the final-head verdict exists. Post the verdict at b9791e2 (or the head that gets merged) and replace the stale comment before the user merges, or untick the item until then."
+  },
+  {
+   "dimension": "tests",
+   "title": "Some deterministic routing details have no case",
+   "severity": "suggestion",
+   "file": "scripts/pr-gate-selfcheck.mjs",
+   "line": 233,
+   "failurePath": "These mutations of pr-gate.js all keep 73/73:\n(a) Dropping the safety reviewer's own protectedPaths at line 354. The case at selfcheck line 233 only feeds protectedPaths from the correctness reviewer, though safety is the dimension told to fill it.\n(b) Dropping `[cm]?` from the deleted-test regex at line 361. A deleted `foo.test.mjs` or `x.spec.cts` would then no longer route to the user.\n(c) Dropping the `skepticsMissing` count at line 307. This field is only reported.\nSeparately, the case 'the line count ignores in-tree attributes (run 6)' at line 612 only checks that the error text names --attr-source. Its name says more than it checks.",
+   "evidence": "Mutations 'safety-protected-ignored', 'test-suffix-cm' and 'skepticsMissing-dropped' each give 73/73 with the head self-check. At the head the gate behaves correctly on all three; the risk is a later edit."
+  },
+  {
+   "dimension": "safety",
+   "title": "D4 auto-merge set covers the security-sensitive surfaces CLAUDE.md singles out for /security-review",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 35,
+   "failurePath": "A PR that changes only one of these files gets mergedBy 'auto-merge' and go true from pr-gate (stub probe at the head): apps/server/src/lib/secret-box.ts, apps/server/src/services/credentials.ts, apps/server/src/routes-machine.ts, apps/server/src/routes-webhook.ts, apps/daemon/src/shell-channel.ts or apps/daemon/src/backend/command-gate.ts. Each matches apps/*/src/** and no PROTECTED class. CLAUDE.md requires /security-review on exactly these paths, and a person must confirm any finding left unfixed. pr-gate neither routes them to the user nor checks that /security-review ran, so under D7 the session would enable auto-merge on a go. This differs from the merge-authority files named in Risk: it covers the secrets, crypto and machine-dispatch code. Adding CLAUDE.md's list to PROTECTED and to ADR 0021 D4 would make that rule mechanical.",
+   "evidence": "pr-gate.js:35-43 (AUTO_MERGE), :44-76 (PROTECTED); ADR 0021 line 37; CLAUDE.md 'Issues and PRs' security-review list"
+  },
+  {
+   "dimension": "safety",
+   "title": "Class ③ protects migrations by the drizzle/ directory name, but the migration runner and its folder are in the auto-merge set",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 67,
+   "failurePath": "The server runs migrate(db, { migrationsFolder: MIGRATIONS_FOLDER }) at boot (apps/server/src/db/client.ts:50). The folder comes from resolveMigrationsFolder() in the same file (lines 22-28), and that file matches apps/*/src/**. A PR could repoint the folder to apps/server/src/db/migrations/ and add SQL there, or add raw DDL or data deletion to client.ts. Every one of those paths routes to auto-merge: the probe gives client.ts and apps/server/src/db/migrations/0042_x.sql both mergedBy auto-merge. The one-way door then leaves D4, although the ADR 0021 premortem relies on 迁移属 D4 留人. D4 could pin migrations to drizzle/ the way class ④ pins the gate's source, or protect apps/server/src/db/client.ts.",
+   "evidence": "pr-gate.js:67 '**/drizzle/**'; apps/server/src/db/client.ts:22-28,50 at the head; ADR 0021 line 69"
+  },
+  {
+   "dimension": "safety",
+   "title": "AGENTS.md (CLAUDE.md symlinks to it) gets a rule exception that ticket #1401 does not list and the PR's What and Risk sections do not name",
+   "severity": "suggestion",
+   "file": "AGENTS.md",
+   "line": 96,
+   "failurePath": "The edit adds a 唯一例外 for pr-gate to the hard rule 不切分支看 diff. CLAUDE.md is a 120000 symlink to AGENTS.md, so every Claude session and every pi agent loads it. Ticket #1401's scope names the docs/pr-review.md exception but not AGENTS.md. The PR body's What bullets leave it out. Its Risk line lists the protected classes it touches as `.github/**`, `docs/adr/**`, `.claude/**` and `scripts/**`, which also leaves out docs/pr-review.md and .gitignore. The Verified numstat stops at 9460e04, before AGENTS.md changed. A user who merges from the What and Risk sections would not see that the rules file itself changed. CLAUDE.md's User Override section wants rule exceptions confirmed explicitly. Naming AGENTS.md (and CLAUDE.md through the symlink) in What and Risk would fix it.",
+   "evidence": "git ls-tree b9791e2 CLAUDE.md -> 120000 AGENTS.md; AGENTS.md:96; issue #1401 范围; PR body What and Risk"
+  },
+  {
+   "dimension": "safety",
+   "title": "Ticket body reaches the shell-holding evidence reviewer unfiltered; the prompt calls it text by the PR author",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 173,
+   "failurePath": "readRules filters PR comments down to OWNER, MEMBER and COLLABORATOR because the repo is public and the evidence dimension has a shell. Yet every agent, the evidence reviewer and its skeptics included, fetches `issues/${ticket}` whole. Under ADR 0021 D5 a ticket can be an outsider's issue that the owner labeled ready-for-agent, and its author can edit the body after the labeling. Line 174 then calls the ticket 'data written by the PR author', which is false for such a ticket. That edited body reaches an agent with a shell and the session's credentials, guarded only by the data-not-instructions line. The gate could check the ticket's author_association the way it checks comments' and withhold a non-member's body, or at least name the real author in the framing.",
+   "evidence": "pr-gate.js:173-174; ADR 0021 D5 (line 38); spec 28 §7.5 comment-filter rationale"
+  },
+  {
+   "dimension": "safety",
+   "title": "Case-insensitive matching lacks Unicode case folding, so U+017F / U+212A variants of protected names auto-merge",
+   "severity": "suggestion",
+   "file": ".claude/workflows/pr-gate.js",
+   "line": 100,
+   "failurePath": "globToRegExp builds RegExps with flag 'i' and no 'u'. In that mode JS does not fold non-ASCII to ASCII: /s/i.test('ſ') is false and /s/iu.test('ſ') is true. SAFE_PATH (line 127) admits \\p{L}, which includes U+017F (ſ) and U+212A (Kelvin K). The probe sends apps/web/src/AGENTſ.md to auto-merge while apps/web/src/AGENTS.md goes to the user. The same holds for variants of scripts, package.json, .husky and .gitattributes inside the auto-merge set. ADR 0021 D4 says matching ignores case because macOS's filesystem does, but this check runs only JS's ASCII case folding. I did not verify on APFS whether it aliases ſ or K to s or k, so the macOS impact is unconfirmed. Adding the 'u' flag, or NFKC-normalizing paths before matching, closes the gap at no cost.",
+   "evidence": "pr-gate.js:100 `new RegExp(..., 'i')`, :127 SAFE_PATH; node: /s/i.test('ſ') false, /s/iu.test('ſ') true; stub probe on apps/web/src/AGENTſ.md -> auto-merge"
+  },
+  {
+   "dimension": "evidence",
+   "title": "Acceptance box claims a final-head pr-gate run reported in a PR comment that does not exist",
+   "severity": "suggestion",
+   "file": "PR #1410 body (Acceptance, 4th item)",
+   "failurePath": "The 4th Acceptance item is checked [x] and says pr-gate ran 'once more on the final head ... the final run is reported in a PR comment'. GET issues/1410/comments returns a single comment (OWNER, 2026-10-21T07:50Z), and it reports run 9 at 5ebdca2. No verdict exists for 126f4c1 or b9791e2, so pr-evidence goes green on a box whose evidence is not there yet. If the final run comes back no-go, the box stays ticked. This is the shape of the #1435 incident that AGENTS.md describes, where Acceptance was checked green before the outcome existed. Leave the box unchecked, or drop that clause, until the final-head comment is posted.",
+   "evidence": "`gh api repos/xiechimon/pacman/issues/1410/comments` returns 1 comment, body 'pr-gate run 9 on the current head `5ebdca2...`: **go**'. The run 10 JSON is for 9460e04. No comment names b9791e2 or 126f4c1."
+  },
+  {
+   "dimension": "evidence",
+   "title": "Verified numstat is for 9460e04, not the head; it leaves out AGENTS.md and the round 11 files",
+   "severity": "suggestion",
+   "file": "PR #1410 body (Verified, first code block)",
+   "failurePath": "Verified quotes `git diff --numstat origin/main...9460e04` (33 files, 4,473 lines). At the head b9791e2 the same command gives 38 files and 5,272 lines. The extra rows are `1 1 AGENTS.md`, the agent-steering file that CLAUDE.md symlinks to (a D4 class 1 path), plus gates-11.txt, pr-gate-run10-9460e04.json, r11-mutations.txt and r11-red-green.txt. The line counts also differ: pr-gate.js is 405 rather than 384, and pr-gate-selfcheck.mjs is 1014 rather than 841. A reviewer who reads the file list from Verified does not see the AGENTS.md edit. Risk's list of touched protected classes (.github, docs/adr, .claude, scripts) also leaves it out, although D4 already routes the PR to the user. The block is labelled with 9460e04, so nothing in it is false. Refreshing it to the head would make it match Risk's 5,272.",
+   "evidence": "At b9791e2, `git -c core.quotePath=false diff --no-renames --numstat <main>...b9791e2 | awk` gives 38 files, +5269 -3. The same command at 9460e04 gives 33 files, 4,473 lines, identical to the body."
+  }
+ ],
+ "protectedPaths": [
+  ".claude/workflows/pr-gate.js",
+  ".github/workflows/ci.yml",
+  ".gitignore",
+  "AGENTS.md",
+  "docs/adr/0018-多agent团队三层与机器能力闸.md",
+  "docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md",
+  "docs/pr-review.md",
+  "scripts/pr-gate-selfcheck.mjs",
+  "docs/spec/28-自举闭环-自写自合.md"
+ ],
+ "mergedBy": "user",
+ "humanReasons": [
+  "protected paths: .claude/workflows/pr-gate.js, .github/workflows/ci.yml, .gitignore, AGENTS.md, docs/adr/0018-多agent团队三层与机器能力闸.md, docs/adr/0021-自治合并-项目级策略与补丁绑定判定.md, docs/pr-review.md, scripts/pr-gate-selfcheck.mjs, docs/spec/28-自举闭环-自写自合.md",
+  "5272 lines changed (over 800)"
+ ],
+ "missing": [],
+ "shaMismatch": [],
+ "unlistedFiles": [],
+ "skepticsMissing": 0,
+ "checked": {
+  "correctness": "Fetched base/head into private refs. refs/pr-gate/1410/correctness/head resolved to b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0, and all private refs, including a temporary one for #1420, were deleted afterwards. The PR is from the same repo (head.repo.full_name = xiechimon/pacman). Read at the head, in full: .claude/workflows/pr-gate.js (405 lines), scripts/pr-gate-selfcheck.mjs (1014 lines), ADR 0021, spec 28 (277 lines), and the diffs of ci.yml, .gitignore, AGENTS.md (CLAUDE.md is a symlink to it), docs/pr-review.md and ADR 0018. Also read the PR body, the member comments filtered by author_association, and ticket #1401. Checked the script against the Workflow runtime semantics in the workflow-authoring reference: pipeline stages receive (prev, item, idx); a throwing stage drops its item to null; parallel never rejects; agent returns null on failure. The script handles each case: a null review becomes missing, a throwing stage becomes null and is filtered, and a dead or other-head skeptic keeps the finding and blocks go. The skepticsLeft check-and-decrement runs synchronously, so concurrent stages cannot race on it. Traced globToRegExp for every PROTECTED and AUTO_MERGE glob: anchoring, dirAlone tail, case-insensitive matching, escaping. Traced the go and mergedBy derivation: unions of caller and safety lists, max of the line counts, the files cap over caller plus unlisted paths, the deleted-test regex, and the docs/verify exemption for opaque files. Ran the head self-check from a scratch copy on node 22: 73/73. The head self-check against the 9460e04 copy gives 66/73, as the PR body claims. SAFE_PATH accepts all 7689 tracked paths at the head (0 rejected). git check-ignore with the head .gitignore does not ignore .claude/workflows/pr-gate.js. CI check-runs on the head are all green. The new ci.yml step runs after vitest and lint, needs no install, and resolves the gate path relative to the repo root. Checked that the code citations in ADR 0021 F1-F5 and spec 28 G1-G9 point to the cited symbols at af161e3: chief-tools.ts 856-864, mcp-face.ts:365, message.ts:55, machines.ts 2024-2052 applyMergeLanding, github.ts 13-16, records/github.ts scope, chief-tools 393-398, mcp-face 270-275, builds.ts 661/1054/1322-1328/1719, chief.ts wakeFacts, prompts.ts:40, ci-loop.ts green statuses and 60s poll, 101 verify-pacman scripts, 36 feature maps. Also checked these docs against the script: the spec 28 §7.5 output fields and skeptic rules, the four departures in docs/pr-review.md, and the worktree exception in AGENTS.md. I found no blocking correctness defect in the gate logic.",
+  "rules": "Head confirmed: refs/pr-gate/1410/rules/head resolved to b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0. Both private refs were deleted afterwards. Nothing was checked out in the shared clone.\n\nWhat I read:\n- The full diff against main (38 files).\n- All 34 commit messages: 26 regular commits and 8 merge commits.\n- The PR body.\n- The one PR comment (OWNER).\n- Ticket #1401.\n- The head versions of pr-gate.js, scripts/pr-gate-selfcheck.mjs, ADR 0021, spec 28, docs/pr-review.md and AGENTS.md. CLAUDE.md is a symlink to AGENTS.md.\n\nResults by rule:\n- **Seam discipline:** no imports of the packages biome blocks, and nothing under apps/daemon/src/backend is touched. pr-gate.js has no imports. The self-check imports only node:fs.\n- **Inline imports:** none. The self-check builds the script with `new AsyncFunction`, which is not an import.\n- **`any`:** none, since both files are plain JS.\n- **One-line single-use helpers:** none. isId, isPathList, isProtected, safetyFiles, isEvidence and gitCommands are each used more than once. The `parallel` stub stands in for a Workflow global.\n- **Closing keywords:**\n  - Commit messages: the only keyword followed by an issue number is `closes #1401` in e5414a2.\n  - PR body: only `Closes #1401` and the `closes #1401` line in its proposed squash message.\n  - Added non-evidence files: none. The only other matches are `closes #1401` quoted inside reviewer text in the docs/verify JSON files, which GitHub does not parse.\n  - No negated keyword anywhere.\n- **Attribution trailers:** every non-merge commit ends with the Co-Authored-By and Claude-Session lines. The merge commits are --no-edit merges, which AGENTS.md allows.\n- **Banned words (.husky/banned.txt):**\n  - Not in the PR body or any commit message.\n  - Not in any added line outside docs/verify.\n  - \"workaround\" appears in nine verbatim verdict JSONs (runs 1, 2 and 4 to 10). Each commit that added one of them states that PACMAN_ALLOW_BANNED_VOCAB=1 was set.\n- **Emoji:** none in added lines, commit messages, the PR body or the PR comment. The PR footer drops the robot emoji, as CLAUDE.md requires.\n- **ADRs:** ADR 0018 gains only a two-line header pointer, the pattern ADRs 0004/0009/0010/0013 already use. ADR 0021 is new, so editing it inside this PR is fine. Its relation to ADR 0007 is stated in ADR 0021 line 60.\n- **Docs that must change with behavior:** no product behavior or web components change. Spec 28 documents the new workflow and the CI step. docs/pr-review.md and AGENTS.md describe the pr-gate exception consistently with pr-gate.js (private refs named by head, comment filter, hooks off, fork rule).\n- **docs/pr-review.md checklist:**\n  - Every raw.githubusercontent link in the body points into docs/verify/1401/ at a commit that is an ancestor of the head, and every linked file exists there.\n  - Open PRs (#1411, #1414, #1420, #1421, #1456) share only .github/workflows/ci.yml with this PR (#1411). Its new step sits in a different place in the file, so there is no semantic clash.\n- **Repo settings:** the squash setting is PR_TITLE + COMMIT_MESSAGES.",
+  "tests": "Fetched refs/pr-gate/1410/tests/{base,head}. The head ref resolved to b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0. Both refs were deleted afterwards. I read the ticket (#1401), the PR body and its one comment over REST.\n\nTicket failure modes, each checked at the head:\n\n(1) `human` must stay the default. ADR 0021 D1 and its 双向门 section say \"默认 `human`\", and so does spec 28 §3 D1. The #1256 blocks are untouched: MERGE_HUMAN_ONLY_COPY is still in chief-tools.ts:870 and mcp-face.ts:365, and its test is apps/server/test/chief-dispatch.test.ts:223.\n\n(2) ADR 0018 body unchanged. The numstat is 2 0, and the diff only adds the two header lines under the status line.\n\n(3) No closing keyword in a negated sentence. I grepped every commit message in base..head and the PR body. The only hits are `closes #1401`, in e5414a2 and in the proposed squash message. The PR body names #1402-#1409 without any keyword.\n\n(4) Ledger matches the real ticket numbers. I checked over REST that #1402-#1409 have titles for P1-P8. #1411, #1414, #1420 and #1421 are open PRs on the bootstrap-p1/p2/p3a/p3b branches, which matches the §8 rows. The ADR 0021 header's ticket-to-phase list also matches.\n\nTests:\n- scripts/pr-gate-selfcheck.mjs is new and only grows. I went through the removed lines in its history: the c5e0e83 /simplify refactor into refuses() and gateFiles() keeps the same assertions, and 8e045cc and 1517363 make cases stricter. No case was deleted or weakened.\n- I ran the head self-check against the head gate (73/73) and against the 9460e04 copy (66/73, with the same seven FAILs as r11-red-green.txt). Against the 63cf351 copy it reads 56/73. On origin/main neither file exists, so the check fails there.\n- CI job `check` (119122568858) at the head logs \"73/73 passed\". All checks at the head are success.\n- I ran 17 mutations on pr-gate.js; one of them did not apply (a pattern typo), so 16 ran. These killed one or more cases: each go term (safetyListed, unlistedFiles), the skeptic head check, skeptic shaMismatch, withdraw-on-one-vote, the cap at 8, and skeptic isolation. These survived: the skeptic prompt without the finding or the refute instruction, the tests-dimension prompt emptied, the blocking definition emptied, the evidence raw-link rule removed, the safety reviewer's own protectedPaths dropped, the [cm] suffix dropped from the deleted-test regex, the empty-string path check, and the skepticsMissing counter.\n\nAcceptance items ticked in the PR body:\n- Items 1-3 are backed by the diff and by GitHub.\n- Item 4: the file is stored, meta.name is 'pr-gate', the self-check is in CI at 73/73, and runs 1-10 have committed JSON. The \"once more on the final head\" part has no report at this head (finding 2).",
+  "safety": "I fetched main and pull/1410/head into refs/pr-gate/1410/safety/{base,head}. The head ref resolved to b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0 and the merge base is 23a39da. I deleted both refs at the end. I did no checkout, switch, reset, stash, commit or push in the shared clone.\n\nFile lists come from git itself: 38 changed files, none deleted. The numstat with attributes from the empty tree sums to 5272 (5270 added + 2 deleted). It has no binary (- -) rows.\n\nRead in full at the head:\n- .claude/workflows/pr-gate.js (405 lines)\n- ADR 0021, D4 in particular\n- the spec 28 sections on decisions (§3), the per-phase flow (§4), the goal prompts (§7.1-§7.4) and the workflow rules (§7.5)\n- the diffs of .github/workflows/ci.yml, .gitignore, AGENTS.md, ADR 0018 and docs/pr-review.md\n- the head of scripts/pr-gate-selfcheck.mjs and a grep of its I/O calls\n- the diff since run 10's head (9460e04..b9791e2)\n\nWhat those reads show:\n- ci.yml adds one step to the check job. Triggers are push/pull_request only, with no pull_request_target and no secrets used by the step.\n- The self-check only does readFileSync plus AsyncFunction with stub agents: no exec, network or env access.\n- ADR 0018 gains 2 header lines and loses none.\n- .gitignore adds only `!.claude/workflows/`. The shared clone's .claude/workflows holds pr-gate.js only.\n- CLAUDE.md is a symlink (120000) to AGENTS.md, so the AGENTS.md edit reaches every session.\n\nOver REST I read PR #1410 (author xiechimon, same-repo head), its one comment (OWNER) and ticket #1401 (scope, failure modes, acceptance). I also grepped all commit messages: the only closing keyword is `closes #1401`.\n\nSecrets: I grepped every added line, including all 30 docs/verify/1401 files, for gh*_/github_pat_/sk-/sk-ant/AKIA/xox/private keys/Bearer/Authorization/JWT/password/secret/api_key/token assignments, proxy and .ccr paths, HTTPS_PROXY values, IPs, ts.net hosts, emails, session ids and long base64. Every hit is a commit SHA, the empty-tree id, or earlier reviewers' prose listing those same patterns. No credential is present.\n\nOne-way doors: none. There is no migration, no package.json, lockfile, pnpm-workspace or .npmrc change, and no deletion. ADR 0021 D1 defaults to human.\n\nPrompt and shell exposure at the head:\n- pr and ticket are integer-checked, headSha must be 40-hex, and changedFiles must pass SAFE_PATH before reaching prompts as JSON data.\n- PR comments are filtered by author_association in the command itself.\n- The run 10 fix puts core.hooksPath=/dev/null on every fetch, checkout and update-ref, and the fork check comes before any checkout.\n- PR-quoted commands and `HUSKY=0 pnpm install` still reach a shell for same-repo heads, as the Risk section states.\n- In this environment core.hooksPath is the absolute /home/user/pacman/.husky/_.\n\nD4 probe: I ran the head pr-gate.js with stub agents, in a scratch dir that has since been removed.\n- These route to auto-merge with go true when changed alone: secret-box.ts, services/credentials.ts, routes-machine.ts, routes-webhook.ts, daemon shell-channel.ts and backend/command-gate.ts, db/client.ts, db/schema.ts, a new apps/server/src/db/migrations/0042_x.sql, apps/web/src/AGENTſ.md and docs/verify/1/x.mjs.\n- These route to the user: apps/web/src/AGENTS.md, a bare `.claude` entry, apps/web/src/.claude and apps/server/src/drizzle/0001.sql. A soft hyphen in a path is refused by SAFE_PATH.\n\nThis PR itself routes to the user. It hits classes ① and ②, docs/spec/28 sits outside the auto-merge set, and 5272 lines is over 800.\n\nProcess note, not a finding: the prompt this review got comes from an older gate copy than the head. Its fetch and update-ref have no core.hooksPath=/dev/null, its comments command has no author filter, its ref names carry no head, and its safety schema has no binaryFiles. That makes no difference to this PR, which is same-repo, has no binary rows and has one OWNER comment. Spec 28 §7.5's \"origin/main copy\" cannot hold until this PR merges.",
+  "evidence": "Head confirmed: refs/pr-gate/1410/evidence/head resolved to b9791e21df29cdf78ebfb8b78ee88dcd960a6ad0. The merge base with main is 23a39da, which is main's tip. head.repo.full_name is xiechimon/pacman (not a fork), so I checked out the head detached in my own worktree with `git -c core.hooksPath=/dev/null checkout --detach`. No hooks ran, and the worktree has no file changes. I deleted both private refs afterwards, with hooks off.\n\nRaw links: the PR body has 29 raw.githubusercontent.com links across 8 commits (37674a9, 2a1ddc1, 5571e7a, 8ebb099, 16c5425, 3d20107, bb27936, b9791e2).\n- Every one of the 8 commits is in base..head (`git log`).\n- Every link points at docs/verify/1401/ and the file exists at its commit (`git ls-tree`).\n- Every link returns HTTP 200.\n- Each linked blob is byte-identical to the same path at the head, except the 4 files linked at the head itself.\n- All 29 evidence files at the head are linked.\n\nRe-runs (3, all pure node; the self-check imports only node:fs, so no install was needed):\n1. `node scripts/pr-gate-selfcheck.mjs` at the head printed 73/73 with exit 0. This matches gates-11.txt, r11-red-green.txt and Acceptance. The CI `check` job log for b9791e2 also prints 73/73, and every check run on the head is success.\n2. The head self-check against `git show 9460e04:.claude/workflows/pr-gate.js` printed 66/73 with exit 1. The seven FAIL lines are exactly the ones in r11-red-green.txt.\n3. The 1517363 self-check against the c29c5c9 gate copy printed 62/63. The one FAIL is the comment-filter case, as quoted in the body and in pr-gate-selfcheck-final-review.txt.\n\nI did not run pnpm typecheck: no .ts file in the diff is under typecheck, as the body says.\n\nChecked against git and REST:\n- The body's numstat at 9460e04 matches `git diff --no-renames --numstat` line for line (33 files, 4,473 lines).\n- The head total is 38 files and 5,272 lines, matching Risk.\n- ADR 0018 is `2 0`, and the two added lines match the quote.\n- `git check-ignore -v .claude/workflows/pr-gate.js` prints nothing (rc=1).\n- The sha256/16 hashes in pr-gate-named-probe-2.txt (1cf4ce8d…, d5cbfb45…, d217872f…) match `git show` of 7f0b544, 4c27770 and 2953b40.\n- The run1-10 JSONs carry the stated headSha and go (runs 8 and 9 go, the rest no-go). Run 10 has one blocking finding (core.hooksPath / post-checkout) with two confirming skeptics and humanReasons 4,473 lines.\n- r11-mutations.txt lists 15 mutations, all `exit=1 -> caught` (read only, not re-run).\n- The spec 28 §8 ledger rows match issues #1401-#1409 and PRs #1411/#1414/#1420/#1421 over REST.\n- ADR 0021 D1 states the default is `human`.\n- PR comments: exactly one, from the OWNER, for run 9 at 5ebdca2.\n\nNot verifiable from git: that the pre-commit chain ran and that PACMAN_ALLOW_BANNED_VOCAB was set on the listed commits."
+ }
+}

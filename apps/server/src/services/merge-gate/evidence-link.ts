@@ -1,8 +1,10 @@
 // PR body 里的 raw 证据链（#1404；AGENTS.md「验收必核 PR body 的证据 raw
 // 永久链」）。只认钉 40 位小写 SHA、指向本仓 docs/verify/<票号>/ 的链接：分支
-// 名会动，短 SHA 与大写写法不是 vp.mjs links 产出的形态，别的仓、别的票不算
-// 本票证据。HTML 注释里的链接不渲染，也不算（与 scripts/pr-evidence-gate.py
-// 同一约定）；没闭合的 `<!--` 让 GitHub 吞掉后文，后文也不算。`<!-->` 与
+// 名会动，短 SHA 与大写写法不是 verify-pacman 打印的 raw 链接的形态，别的仓、
+// 别的票不算本票证据。HTML 注释里的链接不渲染，也不算（与
+// scripts/pr-evidence-gate.py 同一约定）。没闭合的 `<!--` 在行首（至多三个空格
+// 缩进）开一个 HTML 块（cmark-gfm 第 2 类），GitHub 吞掉后文，后文也不算；在行中
+// 的（比如反引号里引用它）只是字面文字，不吞。`<!-->` 与
 // `<!--->` 是空注释：HTML 与 cmark-gfm 都在这个 `-->` 处结束，所以闭合从 `<!--`
 // 的第三个字符起找。链接后紧跟的句读与反引号不算进路径，查询串与片段
 // （`?raw=true`、`#L3`）也不算：去掉后路径合格照样认。同一文件（解码后的
@@ -25,21 +27,40 @@ const RAW_URL_RE = /https:\/\/raw\.githubusercontent\.com\/[^\s)"'<>\]`]+/g;
 const QUERY_OR_FRAGMENT_RE = /[?#]/;
 const TRAILING_PUNCT = '.,;:!?*_~';
 
+/** `<!--` 在行首、前面至多三个空格：cmark-gfm 第 2 类 HTML 块的开头。往回至多看
+ * 四个字符。 */
+function opensHtmlBlock(body: string, open: number): boolean {
+  let i = open;
+  while (i > 0 && open - i < 3 && body.charAt(i - 1) === ' ') i -= 1;
+  return i === 0 || body.charAt(i - 1) === '\n';
+}
+
 /** 闭合的 `<!-- ... -->` 换成一个空格（每段到从 `<!--` 的第三个字符起最近的 `-->`
- * 为止，`<!-->`、`<!--->` 即空注释）；第一个没闭合的 `<!--` 起的后文全部丢掉。
- * 每次 indexOf 都从上一次停下的位置往后找。 */
+ * 为止，`<!-->`、`<!--->` 即空注释）。没闭合的 `<!--` 开 HTML 块时，它起的后文全部
+ * 丢掉；在行中时是字面文字，照留，接着往后找。每次 indexOf 都从上一次停下的位置往
+ * 后找；最后一个 `-->` 的位置先取一次，没闭合的 `<!--` 不再往后扫。 */
 function visibleText(body: string): string {
+  const lastClose = body.lastIndexOf('-->');
   const parts: string[] = [];
   let pos = 0;
+  let from = 0;
   for (;;) {
-    const open = body.indexOf('<!--', pos);
-    const close = open === -1 ? -1 : body.indexOf('-->', open + 2);
-    if (close === -1) {
-      parts.push(body.slice(pos, open === -1 ? body.length : open));
+    const open = body.indexOf('<!--', from);
+    if (open === -1) {
+      parts.push(body.slice(pos));
       return parts.join(' ');
     }
-    parts.push(body.slice(pos, open));
-    pos = close + 3;
+    const close = open + 2 <= lastClose ? body.indexOf('-->', open + 2) : -1;
+    if (close !== -1) {
+      parts.push(body.slice(pos, open));
+      pos = close + 3;
+      from = pos;
+    } else if (opensHtmlBlock(body, open)) {
+      parts.push(body.slice(pos, open));
+      return parts.join(' ');
+    } else {
+      from = open + 4;
+    }
   }
 }
 
