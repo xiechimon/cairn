@@ -29,7 +29,8 @@ const MACHINE_NAME = 'verify-1136';
 const STALE_MS = 150_000; // 钉 MACHINE_STALE_OFFLINE_MS（apps/server machines.ts）
 const TICK_MS = 15_000; // 钉 config schedulerTickMs
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-const EVIDENCE = join(SCRIPT_ROOT, '.claude', 'verify-evidence', `${stamp}-1136-stale-sweep`);
+const EVIDENCE =
+  process.env.VERIFY_EVIDENCE_DIR ?? join(SCRIPT_ROOT, '.claude', 'verify-evidence', `${stamp}-1136-stale-sweep`);
 mkdirSync(EVIDENCE, { recursive: true });
 
 const checks = [];

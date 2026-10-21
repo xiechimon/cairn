@@ -1,0 +1,382 @@
+{
+  "probe": "drive-1136-stale-sweep",
+  "ticket": 1136,
+  "stack": {
+    "server": "http://127.0.0.1:8791",
+    "db": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/home/server/server.db",
+    "daemonHome": "/home/user/pacman/.claude/worktrees/p1/.claude/verify-run/daemon-1136",
+    "machineId": "DBVIgNFtOU2FNYH5YEVNk",
+    "machineName": "verify-1136"
+  },
+  "constants": {
+    "STALE_MS": 150000,
+    "TICK_MS": 15000
+  },
+  "phases": {
+    "healthy": [
+      {
+        "atMs": 2,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 1561
+      },
+      {
+        "atMs": 5005,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 6564
+      },
+      {
+        "atMs": 10011,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 11570
+      },
+      {
+        "atMs": 15015,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 16574
+      },
+      {
+        "atMs": 20020,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 21579
+      },
+      {
+        "atMs": 25026,
+        "online": true,
+        "lastSeenAt": 1792545710821,
+        "ageMs": 26585
+      },
+      {
+        "atMs": 30031,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 1563
+      },
+      {
+        "atMs": 35035,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 6567
+      },
+      {
+        "atMs": 40039,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 11571
+      },
+      {
+        "atMs": 45043,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 16575
+      },
+      {
+        "atMs": 50047,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 21579
+      },
+      {
+        "atMs": 55051,
+        "online": true,
+        "lastSeenAt": 1792545740848,
+        "ageMs": 26583
+      },
+      {
+        "atMs": 60055,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 1587
+      }
+    ],
+    "preThreshold": [
+      {
+        "atMs": 1,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 1602
+      },
+      {
+        "atMs": 5006,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 6607
+      },
+      {
+        "atMs": 10010,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 11611
+      },
+      {
+        "atMs": 15014,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 16615
+      },
+      {
+        "atMs": 20018,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 21619
+      },
+      {
+        "atMs": 25025,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 26626
+      },
+      {
+        "atMs": 30030,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 31631
+      },
+      {
+        "atMs": 35037,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 36638
+      },
+      {
+        "atMs": 40044,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 41645
+      },
+      {
+        "atMs": 45052,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 46653
+      },
+      {
+        "atMs": 50059,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 51660
+      },
+      {
+        "atMs": 55065,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 56666
+      },
+      {
+        "atMs": 60072,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 61673
+      },
+      {
+        "atMs": 65079,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 66680
+      },
+      {
+        "atMs": 70082,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 71683
+      },
+      {
+        "atMs": 75089,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 76690
+      },
+      {
+        "atMs": 80097,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 81698
+      },
+      {
+        "atMs": 85103,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 86704
+      },
+      {
+        "atMs": 90110,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 91711
+      },
+      {
+        "atMs": 95114,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 96715
+      },
+      {
+        "atMs": 100121,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 101722
+      },
+      {
+        "atMs": 105126,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 106727
+      },
+      {
+        "atMs": 110130,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 111731
+      },
+      {
+        "atMs": 115134,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 116735
+      },
+      {
+        "atMs": 120138,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 121739
+      },
+      {
+        "atMs": 125144,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 126745
+      },
+      {
+        "atMs": 130151,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 131752
+      },
+      {
+        "atMs": 135154,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 136755
+      },
+      {
+        "atMs": 140161,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 141762
+      },
+      {
+        "atMs": 145168,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 146769
+      },
+      {
+        "atMs": 150175,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 151776
+      },
+      {
+        "atMs": 155178,
+        "online": true,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 156779
+      },
+      {
+        "atMs": 160185,
+        "online": false,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 161786
+      }
+    ],
+    "flip": [
+      {
+        "atMs": 2,
+        "online": false,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 161788
+      }
+    ],
+    "recovery": [
+      {
+        "atMs": 1,
+        "online": false,
+        "lastSeenAt": 1792545770848,
+        "ageMs": 161799
+      },
+      {
+        "atMs": 5008,
+        "online": true,
+        "lastSeenAt": 1792545932660,
+        "ageMs": 4994
+      }
+    ]
+  },
+  "timings": {
+    "deathAt": 1792545772435,
+    "lastSeenAtAtDeath": 1792545770848,
+    "ageAtDeathMs": 1587,
+    "preWindowMs": 158413,
+    "flippedAt": 1792545932636,
+    "flipLatencyMs": 160201,
+    "flipFromLastSeenMs": 161788,
+    "recoverAt": 1792545932646,
+    "recoveredAt": 1792545937655,
+    "recoverLatencyMs": 5009
+  },
+  "checks": [
+    {
+      "ok": true,
+      "label": "daemon enroll → machine online（presence 置位）"
+    },
+    {
+      "ok": true,
+      "label": "markPresence 落 lastSeenAt（迁移列 + 写路径 live 实证）"
+    },
+    {
+      "ok": true,
+      "label": "A: 正常 presence 的机器不被误翻（60s 全程 online）"
+    },
+    {
+      "ok": true,
+      "label": "A: lastSeenAt 持续刷新（最大年龄 26.6s < 40s = 节拍 30s + 抖动）"
+    },
+    {
+      "ok": true,
+      "label": "B1: 列龄未到 150s 的样本全部 online——SSE ping 写入被对端 TCP 缓冲吸收、不触发 onAbort（票面未核实项实测：该通道抓不住静默死机）"
+    },
+    {
+      "ok": true,
+      "label": "B2: lastSeenAt 冻结在死机时刻（presence 是唯一写源；断连检测不写此列）"
+    },
+    {
+      "ok": true,
+      "label": "B3: 过阈在线机器翻 offline（sweepStaleMachines 生效）"
+    },
+    {
+      "ok": true,
+      "label": "B4: 翻转延迟 160201ms ∈ [列龄到阈 148.413s, + tick 15s + 采样余量 30s]"
+    },
+    {
+      "ok": true,
+      "label": "B5: 翻转判据锚 lastSeenAt（翻时刻的列年龄 161788ms ≥ 150s 阈值）"
+    },
+    {
+      "ok": true,
+      "label": "C1: 闪断恢复后翻回在线（presence becameOnline 路径）"
+    },
+    {
+      "ok": true,
+      "label": "C2: 恢复后 lastSeenAt 刷新（年龄 5.0s < 35s）"
+    },
+    {
+      "ok": true,
+      "label": "C3: 恢复延迟 5009ms < 90s（下一拍 presence + 抖动量级）"
+    }
+  ],
+  "failures": 0
+}
