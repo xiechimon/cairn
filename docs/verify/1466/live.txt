@@ -1,0 +1,476 @@
+#1466 live leg on a scratch server
+===================================
+
+commit       07ab360a4b339f27fa349ed6cedbdc3e07eaca2c (branch claude/bootstrap-p5c-1466), run from
+             the worktree checkout, source unmodified (git status clean before and after)
+date         2026-10-21, 11:26-11:27 UTC
+server port  8795 (lsof -iTCP:8795 empty before start; 8787/8398/8399/8791 not used)
+proxy port   8796 (logging CONNECT proxy, see "Outbound observation" below)
+PACMAN_HOME  /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home
+             (new empty directory; deleted at the end, see "Teardown")
+node         v22.22.0
+
+Server start (apps/server "start" script = tsx src/index.ts, same as verify-pacman launch.mjs):
+
+  H=/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home
+  mkdir -p $H/skills; echo '{}' > $H/claude.json
+  cd apps/server && PORT=8795 HOST=127.0.0.1 PACMAN_HOME=$H PACMAN_SKILLS_DIR=$H/skills \
+    PACMAN_MCP_CONFIG=$H/claude.json NODE_USE_ENV_PROXY=1 \
+    HTTPS_PROXY=http://127.0.0.1:8796 https_proxy=http://127.0.0.1:8796 \
+    HTTP_PROXY=http://127.0.0.1:8796 http_proxy=http://127.0.0.1:8796 \
+    setsid nohup pnpm exec tsx src/index.ts > server.out 2>&1 &
+  -> "pacman-server online", port 8795, dataDir $H/server, seed team = team A.
+     server.out for the run: 4 INFO lines (attachment gc, 2x ci pr-checks sweep with 0
+     candidates, online), 0 WARN, 0 ERROR.
+
+Outbound observation
+  The server's GitHub base (https://api.github.com) is hard-coded in apps/server/src/lib/github.ts,
+  so it was not repointed. Instead every outbound HTTPS request of the server process goes
+  through a logging forward proxy (NODE_USE_ENV_PROXY=1 + HTTPS_PROXY/https_proxy, both case
+  variants, because the sandbox exports a lowercase https_proxy that wins over the uppercase
+  one). The logging proxy appends "CONNECT host:port" with a timestamp for every tunnel and
+  chains it to the sandbox egress proxy (127.0.0.1:36147). Its source is in the appendix.
+  Each call below prints the proxy lines that appeared between sending the call and
+  +settle ms after the response (printed per call: 1.2-3 s for routes that could reach
+  GitHub, 3 s for the todo creates that fire the self-issue write in the background,
+  0.2-0.3 s for setup and MCP calls). Before the final log dump the driver waits 5 s more,
+  then matches every CONNECT line in the log against the control calls.
+  Note on the GitHub answers: this sandbox's egress proxy refuses api.github.com for
+  repositories not enabled for the session (HTTP 403, "GitHub access to this repository is
+  not enabled for this session ..."), so every call that does leave the server ends in the
+  server's mapping "502 github api 403: <url>". The 403 comes from the sandbox, not from
+  GitHub; what matters here is whether a CONNECT to api.github.com happened at all.
+
+How the calls were made
+  A Node driver ran each HTTP call as the literal curl command printed after "$" (plus
+  -w '\n%{http_code}' to capture the status) and each SQL statement through better-sqlite3
+  on $H/server/server.db while the server was running. "->" is the status and body.
+  The API key is masked to its first 8 characters everywhere ("pacman_1…[masked]"); the
+  server's own "masked" field is masked the same way.
+  GitHub connection row (check 2b): there is no API to create one without the OAuth flow, so
+  the row was inserted in SQL with a made-up token string sealed by the server's own
+  createKeyfileSecretBox() over the scratch keyfile (seal.mts, appendix); the server opens
+  it with openGithubToken like an OAuth-written row (GET .../github/connection says
+  connected, and the control calls send it to api.github.com).
+  Second team (check 3): the API serves one team (GET /api/teams returns only the seed
+  team), so team B is a row inserted in SQL; its project and todo were created through the
+  API in team A and then moved to team B with SQL UPDATEs (shown in place).
+  An earlier run of the same driver on another fresh scratch home was discarded and that
+  home deleted: the driver sent spec "" on the MCP create_todo control call, which the
+  MCP face rejects with "error: invalid spec" (driver bug, not a server finding). The
+  driver was fixed to send a non-empty spec on all three create_todo calls and the whole
+  leg was rerun from an empty PACMAN_HOME; only that rerun is recorded below.
+
+Result: 41/41 checks PASS (summary at the end of the transcript).
+  1. POST /api/projects refuses "../user", "./x", "owner/..", "owner/.", "../.." and the
+     picker object form {owner:"..",repo:"user"} with 400; PATCH local->github refuses
+     "../user", "./x", "owner/.." with 400; no outbound for any of them.
+     "my.org/repo.js", "x/..." and "octo-org/.github" pass the shape gate on POST, which
+     stores them (201, no outbound: POST has no reachability probe). On PATCH local->github,
+     "my.org/repo.js" and "x/..." pass the shape gate and the server sends its reachability
+     probe GET api.github.com/repos/{o}/{r} (CONNECT seen); it answers 502 "github api 403"
+     because the sandbox egress refuses the request, i.e. not the shape 400. The project
+     stays local (SQL row shown).
+  2. Stored rows githubRepo = "../user", "live1466-owner/..", "./x" (written by SQL):
+     issue list and issue import answer 404 {"error":"github issues not found"} with and
+     without a GitHub connection, no CONNECT; a todo created in the "../user" project gets
+     no self-issue (sourceKind null), its retry answers 404 "project is not github-backed",
+     and the issue echo for sourceRef "github:../user#1" answers 404 "source issue not
+     found", all with no CONNECT. The six CONNECT lines in the proxy log all belong to the
+     control calls on valid repos (2 PATCH probes, issue list, issue import, self-issue
+     create, issue echo).
+  3. MCP face with team A's key: create_todo on team B's project -> "error: project <id>",
+     identical to a missing id ("error: project no-such-project-1466"); no todo was added
+     to team B's project; todos {projectId: team B project} -> []; todos {} and projects
+     list nothing of team B. Controls on team A's project succeed. The MCP face returns
+     HttpError as a tool result (HTTP 200, isError true, text "error: <message>"), so the
+     "404" is the HttpError status behind the shared text, not an HTTP status here.
+  watch_todos is a chief-only tool (not on the MCP face); the chief tools need a chief LLM
+  turn, so the chief side of todos/watch_todos is covered by the unit tests in
+  apps/server/test/project-team-guard.test.ts, not by this live leg.
+
+Transcript
+----------
+=== 0. setup (seed team = team A; API key for the MCP face) ===
+$ curl -sS -X GET http://127.0.0.1:8795/api/auth/session
+-> 200 {"type":"user","id":"AyGhMyThwR3JdiQPRVyWA","displayName":"Owner","avatarUrl":null}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X GET http://127.0.0.1:8795/api/teams
+-> 200 [{"id":"X_uHAooWXEVBbiMYDfnZH","name":"Owner's team","createdAt":1792581963362,"plan":"free","avatarStyle":"notionist"}]
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/teams/X_uHAooWXEVBbiMYDfnZH/api-keys -H 'content-type: application/json' --data-raw '{"name":"live-1466","gitAccess":false,"mcpAccess":true,"toolGrants":{"read":["Todos","Projects"],"write":["Create Todo"]}}'
+-> 201 {"id":"_HQSV6Mp8jeaxin436B41","name":"live-1466","gitAccess":false,"mcpAccess":true,"toolGrants":{"read":["Todos","Projects"],"write":["Create Todo"]},"masked":"pacman_1…[masked]","createdAt":1792581968932,"plaintext":"pacman_1…[masked]"}
+   outbound seen by the logging proxy during this call (+200ms): none
+
+=== 1a. POST /api/projects kind=github: dot-segment owner/repo refused with 400 ===
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad ../user","kind":"github","githubRepo":"../user"}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "../user" -> 400, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad ./x","kind":"github","githubRepo":"./x"}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "./x" -> 400, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad owner/..","kind":"github","githubRepo":"owner/.."}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "owner/.." -> 400, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad owner/.","kind":"github","githubRepo":"owner/."}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "owner/." -> 400, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad ../..","kind":"github","githubRepo":"../.."}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "../.." -> 400, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"bad object form","kind":"github","githubRepo":{"owner":"..","repo":"user"}}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\""}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo {owner:"..",repo:"user"} (picker object form) -> 400, no outbound
+
+=== 1b. POST /api/projects kind=github: valid dotted names pass the shape gate ===
+(POST has no reachability probe: shape gate only, so 201 and no outbound is expected)
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"ok my.org/repo.js","kind":"github","githubRepo":"my.org/repo.js"}'
+-> 201 {"id":"JavkaauH79zr1-3dypSUr","name":"ok my.org/repo.js","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"my.org/repo.js","cloneUrl":"https://github.com/my.org/repo.js.git"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "my.org/repo.js" -> 201 (stored githubRepo=my.org/repo.js)
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"ok x/...","kind":"github","githubRepo":"x/..."}'
+-> 201 {"id":"pWHZ-fLVxukkUN50cAEWE","name":"ok x/...","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"x/...","cloneUrl":"https://github.com/x/....git"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "x/..." -> 201 (stored githubRepo=x/...)
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"ok octo-org/.github","kind":"github","githubRepo":"octo-org/.github"}'
+-> 201 {"id":"iqsVMNuY2mKd2KLpa4oV7","name":"ok octo-org/.github","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"octo-org/.github","cloneUrl":"https://github.com/octo-org/.github.git"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: POST githubRepo "octo-org/.github" -> 201 (stored githubRepo=octo-org/.github)
+sql> SELECT id, name, repoKind, githubRepo FROM project WHERE repoKind = 'github' ORDER BY name
+   = [{"id":"JavkaauH79zr1-3dypSUr","name":"ok my.org/repo.js","repoKind":"github","githubRepo":"my.org/repo.js"},{"id":"iqsVMNuY2mKd2KLpa4oV7","name":"ok octo-org/.github","repoKind":"github","githubRepo":"octo-org/.github"},{"id":"pWHZ-fLVxukkUN50cAEWE","name":"ok x/...","repoKind":"github","githubRepo":"x/..."}]
+
+=== 1c. PATCH /api/projects/{id} local→github conversion ===
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"local-1466","kind":"local","localPath":"/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home/localrepo"}'
+-> 201 {"id":"TtbcHtoBehYZq2SSDl6aq","name":"local-1466","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"local","localPath":"/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home/localrepo"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+$ curl -sS -X PATCH http://127.0.0.1:8795/api/projects/TtbcHtoBehYZq2SSDl6aq -H 'content-type: application/json' --data-raw '{"repoKind":"github","githubRepo":"../user"}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\" for kind conversion"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: PATCH conversion githubRepo "../user" -> 400 before any GitHub request
+$ curl -sS -X PATCH http://127.0.0.1:8795/api/projects/TtbcHtoBehYZq2SSDl6aq -H 'content-type: application/json' --data-raw '{"repoKind":"github","githubRepo":"./x"}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\" for kind conversion"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: PATCH conversion githubRepo "./x" -> 400 before any GitHub request
+$ curl -sS -X PATCH http://127.0.0.1:8795/api/projects/TtbcHtoBehYZq2SSDl6aq -H 'content-type: application/json' --data-raw '{"repoKind":"github","githubRepo":"owner/.."}'
+-> 400 {"error":"invalid body at githubRepo: expected \"owner/repo\" for kind conversion"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: PATCH conversion githubRepo "owner/.." -> 400 before any GitHub request
+
+-- valid dotted names on PATCH pass the shape gate and reach the reachability probe
+-- (GET api.github.com/repos/{o}/{r}); the result depends on this sandbox egress policy
+$ curl -sS -X PATCH http://127.0.0.1:8795/api/projects/TtbcHtoBehYZq2SSDl6aq -H 'content-type: application/json' --data-raw '{"repoKind":"github","githubRepo":"my.org/repo.js"}'
+-> 502 {"error":"github api 403: https://api.github.com/repos/my.org/repo.js"}
+   outbound seen by the logging proxy during this call (+1500ms): 2026-10-21T11:26:24.956Z CONNECT api.github.com:443
+   CHECK PASS: PATCH conversion githubRepo "my.org/repo.js" passes shape gate (not the shape 400) and probes GitHub (status 502)
+$ curl -sS -X PATCH http://127.0.0.1:8795/api/projects/TtbcHtoBehYZq2SSDl6aq -H 'content-type: application/json' --data-raw '{"repoKind":"github","githubRepo":"x/..."}'
+-> 502 {"error":"github api 403: https://api.github.com/repos/x/..."}
+   outbound seen by the logging proxy during this call (+1500ms): 2026-10-21T11:26:26.875Z CONNECT api.github.com:443
+   CHECK PASS: PATCH conversion githubRepo "x/..." passes shape gate (not the shape 400) and probes GitHub (status 502)
+sql> SELECT id, name, repoKind, githubRepo, localPath FROM project WHERE id = 'TtbcHtoBehYZq2SSDl6aq'
+   = [{"id":"TtbcHtoBehYZq2SSDl6aq","name":"local-1466","repoKind":"local","githubRepo":null,"localPath":"/tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home/localrepo"}]
+
+=== 2. stored invalid githubRepo rows: GitHub-reaching routes treat them as not-GitHub ===
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"valid-control","kind":"github","githubRepo":"live1466-owner/live1466-repo"}'
+-> 201 {"id":"RhMVTkSmNzG_xuM3pVKRg","name":"valid-control","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"live1466-owner/live1466-repo","cloneUrl":"https://github.com/live1466-owner/live1466-repo.git"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"stored-bad-1","kind":"github","githubRepo":"live1466-owner/placeholder-1"}'
+-> 201 {"id":"_4YKNk-ucvJi1gnnulV3j","name":"stored-bad-1","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"live1466-owner/placeholder-1","cloneUrl":"https://github.com/live1466-owner/placeholder-1.git"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"stored-bad-2","kind":"github","githubRepo":"live1466-owner/placeholder-2"}'
+-> 201 {"id":"J2w3N_2sImuPwsHO_1po1","name":"stored-bad-2","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"live1466-owner/placeholder-2","cloneUrl":"https://github.com/live1466-owner/placeholder-2.git"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"stored-bad-3","kind":"github","githubRepo":"live1466-owner/placeholder-3"}'
+-> 201 {"id":"f9ync_jZ462Dw_pnfq5vX","name":"stored-bad-3","teamId":"X_uHAooWXEVBbiMYDfnZH","repoKind":"github","githubRepo":"live1466-owner/placeholder-3","cloneUrl":"https://github.com/live1466-owner/placeholder-3.git"}
+   outbound seen by the logging proxy during this call (+200ms): none
+sql> UPDATE project SET githubRepo = '../user' WHERE id = '_4YKNk-ucvJi1gnnulV3j'
+   = {"changes":1,"lastInsertRowid":0}
+sql> UPDATE project SET githubRepo = 'live1466-owner/..' WHERE id = 'J2w3N_2sImuPwsHO_1po1'
+   = {"changes":1,"lastInsertRowid":0}
+sql> UPDATE project SET githubRepo = './x' WHERE id = 'f9ync_jZ462Dw_pnfq5vX'
+   = {"changes":1,"lastInsertRowid":0}
+sql> SELECT id, name, repoKind, githubRepo FROM project WHERE id IN ('RhMVTkSmNzG_xuM3pVKRg','_4YKNk-ucvJi1gnnulV3j','J2w3N_2sImuPwsHO_1po1','f9ync_jZ462Dw_pnfq5vX') ORDER BY name
+   = [{"id":"_4YKNk-ucvJi1gnnulV3j","name":"stored-bad-1","repoKind":"github","githubRepo":"../user"},{"id":"J2w3N_2sImuPwsHO_1po1","name":"stored-bad-2","repoKind":"github","githubRepo":"live1466-owner/.."},{"id":"f9ync_jZ462Dw_pnfq5vX","name":"stored-bad-3","repoKind":"github","githubRepo":"./x"},{"id":"RhMVTkSmNzG_xuM3pVKRg","name":"valid-control","repoKind":"github","githubRepo":"live1466-owner/live1466-repo"}]
+
+--- 2a. no GitHub connection yet
+$ curl -sS -X GET http://127.0.0.1:8795/api/teams/X_uHAooWXEVBbiMYDfnZH/github/connection
+-> 200 {"connected":false}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/_4YKNk-ucvJi1gnnulV3j/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: issues list on stored "../user" -> 404 github issues not found (form gate), no outbound
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/J2w3N_2sImuPwsHO_1po1/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: issues list on stored "live1466-owner/.." -> 404 github issues not found (form gate), no outbound
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/f9ync_jZ462Dw_pnfq5vX/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: issues list on stored "./x" -> 404 github issues not found (form gate), no outbound
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/RhMVTkSmNzG_xuM3pVKRg/github/issues
+-> 404 {"error":"github connection not found"}
+   outbound seen by the logging proxy during this call (+1200ms): none
+   CHECK PASS: control: issues list on valid repo passes the form gate and stops at the connection gate
+
+--- 2b. GitHub connection row present (fake token sealed with the scratch keyfile)
+$ (cd apps/server && pnpm exec tsx seal.mts <PACMAN_HOME>/server/secretbox.key live1466-fake-token-not-a-credential)  # server's createKeyfileSecretBox().seal
+   = v1:D0wh3wSR6… (91 chars)
+sql> INSERT INTO github_connection (teamId, login, accessTokenCipher, scope, createdAt) VALUES ('X_uHAooWXEVBbiMYDfnZH', 'live1466-fake', 'v1:D0wh3wSR6…', 'repo', 1792581968496)
+   = {"changes":1,"lastInsertRowid":1}
+$ curl -sS -X GET http://127.0.0.1:8795/api/teams/X_uHAooWXEVBbiMYDfnZH/github/connection
+-> 200 {"connected":true,"login":"live1466-fake","scope":"repo"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/RhMVTkSmNzG_xuM3pVKRg/github/issues
+-> 502 {"error":"github api 403: https://api.github.com/repos/live1466-owner/live1466-repo/issues?state=open&page=1&per_page=30"}
+   outbound seen by the logging proxy during this call (+2000ms): 2026-10-21T11:26:36.064Z CONNECT api.github.com:443
+   CHECK PASS: control: issues list on the valid repo now goes out to api.github.com (observation works) (status 502)
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/_4YKNk-ucvJi1gnnulV3j/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issues list on stored "../user" with a connection -> 404 github issues not found, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/_4YKNk-ucvJi1gnnulV3j/github/issues/import -H 'content-type: application/json' --data-raw '{"number":1}'
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issue import on stored "../user" -> 404 github issues not found, no outbound
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/J2w3N_2sImuPwsHO_1po1/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issues list on stored "live1466-owner/.." with a connection -> 404 github issues not found, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/J2w3N_2sImuPwsHO_1po1/github/issues/import -H 'content-type: application/json' --data-raw '{"number":1}'
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issue import on stored "live1466-owner/.." -> 404 github issues not found, no outbound
+$ curl -sS -X GET http://127.0.0.1:8795/api/projects/f9ync_jZ462Dw_pnfq5vX/github/issues
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issues list on stored "./x" with a connection -> 404 github issues not found, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/f9ync_jZ462Dw_pnfq5vX/github/issues/import -H 'content-type: application/json' --data-raw '{"number":1}'
+-> 404 {"error":"github issues not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: issue import on stored "./x" -> 404 github issues not found, no outbound
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/RhMVTkSmNzG_xuM3pVKRg/github/issues/import -H 'content-type: application/json' --data-raw '{"number":1}'
+-> 502 {"error":"github api 403: https://api.github.com/repos/live1466-owner/live1466-repo/issues/1"}
+   outbound seen by the logging proxy during this call (+2000ms): 2026-10-21T11:26:50.528Z CONNECT api.github.com:443
+   CHECK PASS: control: issue import on the valid repo goes out to api.github.com (status 502)
+
+--- 2c. self-created issue (#452 write path): new todo in a github project
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/_4YKNk-ucvJi1gnnulV3j/todos -H 'content-type: application/json' --data-raw '{"title":"todo in stored-bad-1","spec":""}'
+-> 201 {"id":"hOnQ3IzsuvKBfdG_3nJr8","teamId":"X_uHAooWXEVBbiMYDfnZH","projectId":"_4YKNk-ucvJi1gnnulV3j","title":"todo in stored-bad-1","spec":"","phase":"todo","phaseAt":1792582012930,"seqNum":1,"orderIndex":0,"tagIds":[],"assignment":null,"agent":null,"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":"AyGhMyThwR3JdiQPRVyWA","ownerId":"AyGhMyThwR3JdiQPRVyWA","sourceBuildId":null,"sourceKind":null,"sourceRef":null,"quotaWait":null}
+   outbound seen by the logging proxy during this call (+3000ms): none
+   CHECK PASS: todo in stored "../user" project: no self-issue planned (sourceKind null), no outbound (sourceKind=null)
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/RhMVTkSmNzG_xuM3pVKRg/todos -H 'content-type: application/json' --data-raw '{"title":"todo in valid-control","spec":""}'
+-> 201 {"id":"x5ZcpeXu9cxMUNAEeI7Hr","teamId":"X_uHAooWXEVBbiMYDfnZH","projectId":"RhMVTkSmNzG_xuM3pVKRg","title":"todo in valid-control","spec":"","phase":"todo","phaseAt":1792582015946,"seqNum":2,"orderIndex":0,"tagIds":[],"assignment":null,"agent":null,"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":"AyGhMyThwR3JdiQPRVyWA","ownerId":"AyGhMyThwR3JdiQPRVyWA","sourceBuildId":null,"sourceKind":"github-issue-self","sourceRef":null,"quotaWait":null}
+   outbound seen by the logging proxy during this call (+3000ms): 2026-10-21T11:26:55.954Z CONNECT api.github.com:443
+   CHECK PASS: control: todo in the valid github project plans a self-issue and goes out to api.github.com (sourceKind=github-issue-self)
+sql> UPDATE todo SET sourceKind = 'github-issue-self', sourceRef = NULL WHERE id = 'hOnQ3IzsuvKBfdG_3nJr8'
+   = {"changes":1,"lastInsertRowid":0}
+$ curl -sS -X POST http://127.0.0.1:8795/api/todos/hOnQ3IzsuvKBfdG_3nJr8/github-issue/retry
+-> 404 {"error":"project is not github-backed"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: retry self-issue for a todo of the stored "../user" project -> 404 project is not github-backed, no outbound
+
+--- 2d. source-issue echo (#452 read path): stored sourceRef with a dot segment
+sql> UPDATE todo SET sourceKind = 'github-issue', sourceRef = 'github:../user#1' WHERE id = 'hOnQ3IzsuvKBfdG_3nJr8'
+   = {"changes":1,"lastInsertRowid":0}
+$ curl -sS -X GET http://127.0.0.1:8795/api/todos/hOnQ3IzsuvKBfdG_3nJr8/github-issue
+-> 404 {"error":"source issue not found"}
+   outbound seen by the logging proxy during this call (+2000ms): none
+   CHECK PASS: echo for sourceRef "github:../user#1" -> 404 source issue not found, no outbound
+sql> UPDATE todo SET sourceKind = 'github-issue', sourceRef = 'github:live1466-owner/live1466-repo#1' WHERE id = 'hOnQ3IzsuvKBfdG_3nJr8'
+   = {"changes":1,"lastInsertRowid":0}
+$ curl -sS -X GET http://127.0.0.1:8795/api/todos/hOnQ3IzsuvKBfdG_3nJr8/github-issue
+-> 502 {"error":"github api 403: https://api.github.com/repos/live1466-owner/live1466-repo/issues/1"}
+   outbound seen by the logging proxy during this call (+2000ms): 2026-10-21T11:27:03.007Z CONNECT api.github.com:443
+   CHECK PASS: control: echo for a valid sourceRef goes out to api.github.com (status 502)
+
+=== 3. MCP face (/api/mcp, API key of team A): team B project is invisible ===
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"team-a-project"}'
+-> 201 {"id":"hAjOLC8a3uU5S8U_cZWhB","name":"team-a-project","teamId":"X_uHAooWXEVBbiMYDfnZH"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/hAjOLC8a3uU5S8U_cZWhB/todos -H 'content-type: application/json' --data-raw '{"title":"team A todo","spec":""}'
+-> 201 {"id":"ebiokTluwsXHcde7GuOZ9","teamId":"X_uHAooWXEVBbiMYDfnZH","projectId":"hAjOLC8a3uU5S8U_cZWhB","title":"team A todo","spec":"","phase":"todo","phaseAt":1792582025570,"seqNum":3,"orderIndex":0,"tagIds":[],"assignment":null,"agent":null,"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":"AyGhMyThwR3JdiQPRVyWA","ownerId":"AyGhMyThwR3JdiQPRVyWA","sourceBuildId":null,"sourceKind":null,"sourceRef":null,"quotaWait":null}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects -H 'content-type: application/json' --data-raw '{"name":"team-b-project"}'
+-> 201 {"id":"jazNN6Iju0zN1PCkd2iM0","name":"team-b-project","teamId":"X_uHAooWXEVBbiMYDfnZH"}
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/projects/jazNN6Iju0zN1PCkd2iM0/todos -H 'content-type: application/json' --data-raw '{"title":"team B todo","spec":""}'
+-> 201 {"id":"-mRAOXUSyHqjZz3SBKnUL","teamId":"X_uHAooWXEVBbiMYDfnZH","projectId":"jazNN6Iju0zN1PCkd2iM0","title":"team B todo","spec":"","phase":"todo","phaseAt":1792582025994,"seqNum":4,"orderIndex":0,"tagIds":[],"assignment":null,"agent":null,"latestBuildId":null,"lastRunAt":null,"hasChanges":false,"hasPlan":false,"buildHistory":[],"sourceTodo":null,"blockedBy":null,"v":1,"createdBy":"AyGhMyThwR3JdiQPRVyWA","ownerId":"AyGhMyThwR3JdiQPRVyWA","sourceBuildId":null,"sourceKind":null,"sourceRef":null,"quotaWait":null}
+   outbound seen by the logging proxy during this call (+200ms): none
+-- the API serves one team (GET /api/teams returns only the seed team), so team B is made
+-- in SQL: a team row, then the project and todo above are moved to it.
+sql> INSERT INTO team (id, name, createdAt, plan) VALUES ('live1466-team-b', 'Team B (live 1466)', 1792581968496, 'free')
+   = {"changes":1,"lastInsertRowid":2}
+sql> UPDATE project SET teamId = 'live1466-team-b' WHERE id = 'jazNN6Iju0zN1PCkd2iM0'
+   = {"changes":1,"lastInsertRowid":0}
+sql> UPDATE todo SET teamId = 'live1466-team-b' WHERE projectId = 'jazNN6Iju0zN1PCkd2iM0'
+   = {"changes":1,"lastInsertRowid":0}
+sql> SELECT id, teamId, name FROM project WHERE id IN ('hAjOLC8a3uU5S8U_cZWhB','jazNN6Iju0zN1PCkd2iM0')
+   = [{"id":"hAjOLC8a3uU5S8U_cZWhB","teamId":"X_uHAooWXEVBbiMYDfnZH","name":"team-a-project"},{"id":"jazNN6Iju0zN1PCkd2iM0","teamId":"live1466-team-b","name":"team-b-project"}]
+sql> SELECT id, teamId, projectId, title FROM todo WHERE id IN ('ebiokTluwsXHcde7GuOZ9','-mRAOXUSyHqjZz3SBKnUL')
+   = [{"id":"-mRAOXUSyHqjZz3SBKnUL","teamId":"live1466-team-b","projectId":"jazNN6Iju0zN1PCkd2iM0","title":"team B todo"},{"id":"ebiokTluwsXHcde7GuOZ9","teamId":"X_uHAooWXEVBbiMYDfnZH","projectId":"hAjOLC8a3uU5S8U_cZWhB","title":"team A todo"}]
+$ curl -sS -X GET http://127.0.0.1:8795/api/teams
+-> 200 [{"id":"X_uHAooWXEVBbiMYDfnZH","name":"Owner's team","createdAt":1792581963362,"plan":"free","avatarStyle":"notionist"}]
+   outbound seen by the logging proxy during this call (+200ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_todo","arguments":{"projectId":"jazNN6Iju0zN1PCkd2iM0","title":"cross-team probe","spec":"probe spec"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"error: project jazNN6Iju0zN1PCkd2iM0"}],"isError":true},"jsonrpc":"2.0","id":1}
+   outbound seen by the logging proxy during this call (+300ms): none
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"create_todo","arguments":{"projectId":"no-such-project-1466","title":"missing-project probe","spec":"probe spec"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"error: project no-such-project-1466"}],"isError":true},"jsonrpc":"2.0","id":2}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: create_todo on team B project -> isError "error: project <id>" (error: project jazNN6Iju0zN1PCkd2iM0)
+   CHECK PASS: create_todo on a missing project id -> isError "error: project <id>" (same text shape) (error: project no-such-project-1466)
+   CHECK PASS: cross-team and missing texts are identical once the id is swapped
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_todo","arguments":{"projectId":"hAjOLC8a3uU5S8U_cZWhB","title":"mcp control todo","spec":"control spec"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"{\"id\":\"VhSLFTNxjhkI5cOhOkz8M\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"hAjOLC8a3uU5S8U_cZWhB\",\"title\":\"mcp control todo\",\"spec\":\"control spec\",\"phase\":\"todo\",\"phaseAt\":1792582027065,\"seqNum\":4,\"orderIndex\":1,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":null,\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"quotaWait\":null}"}]},"jsonrpc":"2.0","id":3}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: control: create_todo on team A project succeeds
+sql> SELECT id, teamId, projectId, title FROM todo WHERE projectId = 'jazNN6Iju0zN1PCkd2iM0'
+   = [{"id":"-mRAOXUSyHqjZz3SBKnUL","teamId":"live1466-team-b","projectId":"jazNN6Iju0zN1PCkd2iM0","title":"team B todo"}]
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"todos","arguments":{"projectId":"jazNN6Iju0zN1PCkd2iM0"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"[]"}]},"jsonrpc":"2.0","id":4}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: todos {projectId: team B project} -> [] ([])
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"todos","arguments":{"projectId":"no-such-project-1466"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"[]"}]},"jsonrpc":"2.0","id":5}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: todos {projectId: missing id} -> [] ([])
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"todos","arguments":{"projectId":"hAjOLC8a3uU5S8U_cZWhB"}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"[{\"id\":\"ebiokTluwsXHcde7GuOZ9\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"hAjOLC8a3uU5S8U_cZWhB\",\"title\":\"team A todo\",\"spec\":\"\",\"phase\":\"todo\",\"phaseAt\":1792582025570,\"seqNum\":3,\"orderIndex\":0,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"AyGhMyThwR3JdiQPRVyWA\",\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"quotaWait\":null},{\"id\":\"VhSLFTNxjhkI5cOhOkz8M\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"hAjOLC8a3uU5S8U_cZWhB\",\"title\":\"mcp control todo\",\"spec\":\"control spec\",\"phase\":\"todo\",\"phaseAt\":1792582027065,\"seqNum\":4,\"orderIndex\":1,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":null,\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"quotaWait\":null}]"}]},"jsonrpc":"2.0","id":6}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: control: todos {projectId: team A project} lists team A todos (ids ebiokTluwsXHcde7GuOZ9,VhSLFTNxjhkI5cOhOkz8M)
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"todos","arguments":{}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"[{\"id\":\"hOnQ3IzsuvKBfdG_3nJr8\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"_4YKNk-ucvJi1gnnulV3j\",\"title\":\"todo in stored-bad-1\",\"spec\":\"\",\"phase\":\"todo\",\"phaseAt\":1792582012930,\"seqNum\":1,\"orderIndex\":0,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"AyGhMyThwR3JdiQPRVyWA\",\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":\"github-issue\",\"sourceRef\":\"github:live1466-owner/live1466-repo#1\",\"quotaWait\":null},{\"id\":\"x5ZcpeXu9cxMUNAEeI7Hr\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"RhMVTkSmNzG_xuM3pVKRg\",\"title\":\"todo in valid-control\",\"spec\":\"\",\"phase\":\"todo\",\"phaseAt\":1792582015946,\"seqNum\":2,\"orderIndex\":0,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"AyGhMyThwR3JdiQPRVyWA\",\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":\"github-issue-self\",\"sourceRef\":null,\"quotaWait\":null},{\"id\":\"ebiokTluwsXHcde7GuOZ9\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"hAjOLC8a3uU5S8U_cZWhB\",\"title\":\"team A todo\",\"spec\":\"\",\"phase\":\"todo\",\"phaseAt\":1792582025570,\"seqNum\":3,\"orderIndex\":0,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":\"AyGhMyThwR3JdiQPRVyWA\",\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"quotaWait\":null},{\"id\":\"VhSLFTNxjhkI5cOhOkz8M\",\"teamId\":\"X_uHAooWXEVBbiMYDfnZH\",\"projectId\":\"hAjOLC8a3uU5S8U_cZWhB\",\"title\":\"mcp control todo\",\"spec\":\"control spec\",\"phase\":\"todo\",\"phaseAt\":1792582027065,\"seqNum\":4,\"orderIndex\":1,\"tagIds\":[],\"assignment\":null,\"agent\":null,\"latestBuildId\":null,\"lastRunAt\":null,\"hasChanges\":false,\"hasPlan\":false,\"buildHistory\":[],\"sourceTodo\":null,\"blockedBy\":null,\"v\":1,\"createdBy\":null,\"ownerId\":\"AyGhMyThwR3JdiQPRVyWA\",\"sourceBuildId\":null,\"sourceKind\":null,\"sourceRef\":null,\"quotaWait\":null}]"}]},"jsonrpc":"2.0","id":7}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: todos {} (team-wide) does not include the team B todo (4 todos)
+$ curl -sS -X POST http://127.0.0.1:8795/api/mcp -H 'authorization: Bearer pacman_1…[masked]' -H 'accept: application/json, text/event-stream' -H 'content-type: application/json' --data-raw '{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"projects","arguments":{}}}'
+-> 200 {"result":{"content":[{"type":"text","text":"[{\"id\":\"JavkaauH79zr1-3dypSUr\",\"name\":\"ok my.org/repo.js\",\"repoKind\":\"github\",\"todoCount\":0},{\"id\":\"pWHZ-fLVxukkUN50cAEWE\",\"name\":\"ok x/...\",\"repoKind\":\"github\",\"todoCount\":0},{\"id\":\"iqsVMNuY2mKd2KLpa4oV7\",\"name\":\"ok octo-org/.github\",\"repoKind\":\"github\",\"todoCount\":0},{\"id\":\"TtbcHtoBehYZq2SSDl6aq\",\"name\":\"local-1466\",\"repoKind\":\"local\",\"todoCount\":0},{\"id\":\"RhMVTkSmNzG_xuM3pVKRg\",\"name\":\"valid-control\",\"repoKind\":\"github\",\"todoCount\":1},{\"id\":\"_4YKNk-ucvJi1gnnulV3j\",\"name\":\"stored-bad-1\",\"repoKind\":\"github\",\"todoCount\":1},{\"id\":\"J2w3N_2sImuPwsHO_1po1\",\"name\":\"stored-bad-2\",\"repoKind\":\"github\",\"todoCount\":0},{\"id\":\"f9ync_jZ462Dw_pnfq5vX\",\"name\":\"stored-bad-3\",\"repoKind\":\"github\",\"todoCount\":0},{\"id\":\"hAjOLC8a3uU5S8U_cZWhB\",\"name\":\"team-a-project\",\"repoKind\":null,\"todoCount\":2}]"}]},"jsonrpc":"2.0","id":8}
+   outbound seen by the logging proxy during this call (+300ms): none
+   CHECK PASS: projects lists no team B project (9 projects)
+
+   CHECK PASS: every CONNECT in the proxy log belongs to a control call (none to a dot-segment repo) (6 CONNECT lines, 6 attributed to control calls)
+
+=== logging proxy: full log for this run ===
+   2026-10-21T11:26:01.163Z logproxy listening 127.0.0.1:8796 -> 127.0.0.1:36147
+   2026-10-21T11:26:24.956Z CONNECT api.github.com:443
+   2026-10-21T11:26:26.875Z CONNECT api.github.com:443
+   2026-10-21T11:26:36.064Z CONNECT api.github.com:443
+   2026-10-21T11:26:50.528Z CONNECT api.github.com:443
+   2026-10-21T11:26:55.954Z CONNECT api.github.com:443
+   2026-10-21T11:27:03.007Z CONNECT api.github.com:443
+
+=== check summary ===
+PASS  POST githubRepo "../user" -> 400, no outbound
+PASS  POST githubRepo "./x" -> 400, no outbound
+PASS  POST githubRepo "owner/.." -> 400, no outbound
+PASS  POST githubRepo "owner/." -> 400, no outbound
+PASS  POST githubRepo "../.." -> 400, no outbound
+PASS  POST githubRepo {owner:"..",repo:"user"} (picker object form) -> 400, no outbound
+PASS  POST githubRepo "my.org/repo.js" -> 201
+PASS  POST githubRepo "x/..." -> 201
+PASS  POST githubRepo "octo-org/.github" -> 201
+PASS  PATCH conversion githubRepo "../user" -> 400 before any GitHub request
+PASS  PATCH conversion githubRepo "./x" -> 400 before any GitHub request
+PASS  PATCH conversion githubRepo "owner/.." -> 400 before any GitHub request
+PASS  PATCH conversion githubRepo "my.org/repo.js" passes shape gate (not the shape 400) and probes GitHub
+PASS  PATCH conversion githubRepo "x/..." passes shape gate (not the shape 400) and probes GitHub
+PASS  issues list on stored "../user" -> 404 github issues not found (form gate), no outbound
+PASS  issues list on stored "live1466-owner/.." -> 404 github issues not found (form gate), no outbound
+PASS  issues list on stored "./x" -> 404 github issues not found (form gate), no outbound
+PASS  control: issues list on valid repo passes the form gate and stops at the connection gate
+PASS  control: issues list on the valid repo now goes out to api.github.com (observation works)
+PASS  issues list on stored "../user" with a connection -> 404 github issues not found, no outbound
+PASS  issue import on stored "../user" -> 404 github issues not found, no outbound
+PASS  issues list on stored "live1466-owner/.." with a connection -> 404 github issues not found, no outbound
+PASS  issue import on stored "live1466-owner/.." -> 404 github issues not found, no outbound
+PASS  issues list on stored "./x" with a connection -> 404 github issues not found, no outbound
+PASS  issue import on stored "./x" -> 404 github issues not found, no outbound
+PASS  control: issue import on the valid repo goes out to api.github.com
+PASS  todo in stored "../user" project: no self-issue planned (sourceKind null), no outbound
+PASS  control: todo in the valid github project plans a self-issue and goes out to api.github.com
+PASS  retry self-issue for a todo of the stored "../user" project -> 404 project is not github-backed, no outbound
+PASS  echo for sourceRef "github:../user#1" -> 404 source issue not found, no outbound
+PASS  control: echo for a valid sourceRef goes out to api.github.com
+PASS  create_todo on team B project -> isError "error: project <id>"
+PASS  create_todo on a missing project id -> isError "error: project <id>" (same text shape)
+PASS  cross-team and missing texts are identical once the id is swapped
+PASS  control: create_todo on team A project succeeds
+PASS  todos {projectId: team B project} -> []
+PASS  todos {projectId: missing id} -> []
+PASS  control: todos {projectId: team A project} lists team A todos
+PASS  todos {} (team-wide) does not include the team B todo
+PASS  projects lists no team B project
+PASS  every CONNECT in the proxy log belongs to a control call (none to a dot-segment repo)
+41/41 PASS
+
+Teardown
+--------
+$ ps -eo pid,pgid,args | awk '$2==5852'   # server process group (setsid)
+ 5852  5852 node /opt/node22/bin/pnpm exec tsx src/index.ts
+ 5908  5852 node /root/.local/share/pnpm/.tools/pnpm/12.5.1/bin/../node_modules/pnpm/bin/pnpm.mjs exec tsx src
+ 5916  5852 /root/.local/share/pnpm/.tools/pnpm/12.5.1_tmp_245/node_modules/@pnpm/exe.linux-x64/pnpm exec tsx 
+ 5931  5852 node /home/user/pacman/.claude/worktrees/p5c/apps/server/node_modules/.bin/../tsx/dist/cli.mjs src
+ 5946  5852 /opt/node22/bin/node --require /home/user/pacman/.claude/worktrees/p5c/node_modules/.pnpm/tsx@4.23
+$ kill -TERM -5852
+exit 0
+$ ps -eo pgid | awk '$1==5852' | wc -l
+0
+$ kill 5849   # logging proxy
+exit 0
+$ lsof -iTCP:8795 -sTCP:LISTEN -P -n | wc -l
+0
+$ lsof -iTCP:8796 -sTCP:LISTEN -P -n | wc -l
+0
+$ curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8795/api/auth/session
+curl: (7) Failed to connect to 127.0.0.1 port 8795 after 0 ms: Couldn't connect to server
+000
+$ rm -rf /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home
+exit 0
+$ test -e /tmp/claude-0/-home-user-pacman/219f57bb-8cc6-5f6d-bbc7-09aaf28f3ace/scratchpad/live1466-home && echo present || echo gone
+gone
+
+Appendix A: logproxy.mjs (logging CONNECT proxy, run as: node logproxy.mjs 8796 proxy.txt http://127.0.0.1:36147)
+-----------------------------------------------------------------------------------------------------------
+// Logging forward proxy for the #1466 live leg: every CONNECT / plain proxy
+// request is appended to LOG (ISO time + target), then chained to UPSTREAM.
+import http from 'node:http';
+import net from 'node:net';
+import { appendFileSync } from 'node:fs';
+
+const PORT = Number(process.argv[2]);
+const LOG = process.argv[3];
+const UPSTREAM = new URL(process.argv[4]);
+const log = (line) => appendFileSync(LOG, `${new Date().toISOString()} ${line}\n`);
+
+const server = http.createServer((req, res) => {
+  log(`HTTP ${req.method} ${req.url}`);
+  res.writeHead(502, { 'content-type': 'text/plain' });
+  res.end('plain http proxying not supported by logproxy\n');
+});
+server.on('connect', (req, clientSocket, head) => {
+  log(`CONNECT ${req.url}`);
+  const up = net.connect(Number(UPSTREAM.port), UPSTREAM.hostname, () => {
+    up.write(`CONNECT ${req.url} HTTP/1.1\r\nHost: ${req.url}\r\n\r\n`);
+    if (head?.length) up.write(head);
+    up.pipe(clientSocket);
+    clientSocket.pipe(up);
+  });
+  up.on('error', (e) => { log(`UPSTREAM-ERROR ${req.url} ${e.message}`); clientSocket.destroy(); });
+  clientSocket.on('error', () => up.destroy());
+});
+server.listen(PORT, '127.0.0.1', () => log(`logproxy listening 127.0.0.1:${PORT} -> ${UPSTREAM.host}`));
+
+Appendix B: seal.mts (run as: cd apps/server && pnpm exec tsx seal.mts <PACMAN_HOME>/server/secretbox.key <plaintext>)
+----------------------------------------------------------------------------------------------------------------
+// Seal a plaintext with the scratch server's keyfile through the server's own
+// SecretBox (apps/server/src/lib/secret-box.ts), so the github_connection row
+// opens with openGithubToken exactly like an OAuth-written row.
+import { createKeyfileSecretBox } from '/home/user/pacman/.claude/worktrees/p5c/apps/server/src/lib/secret-box.ts';
+const [keyfile, plaintext] = process.argv.slice(2);
+if (!keyfile || !plaintext) throw new Error('usage: seal.mts <keyfile> <plaintext>');
+process.stdout.write(createKeyfileSecretBox(keyfile).seal(plaintext));
