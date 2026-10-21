@@ -8,7 +8,7 @@
 // 2026-09-12 pinning, rebound to 待处理 by #351). Card order inside a column
 // = manual order from drag drops (#73), pinned group first in 待处理.
 
-import { IN_PROGRESS_PHASES, type Phase } from '@pacman/shared';
+import { canOrchestrate, IN_PROGRESS_PHASES, type Phase } from '@pacman/shared';
 import type { TodoRecord } from '../fixtures/records.js';
 import { PHASE_UI } from '../phase.js';
 
@@ -112,7 +112,10 @@ export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
     case 'todo':
       return true;
     case 'building':
-      return src.id === 'todo';
+      // #1457：列规则之上再套 shared canOrchestrate——落位走开始门 →
+      // orchestrate。今天 待开始 只住 todo，这一项是兜底：哪天又有
+      // orchestrate 不收的相位住进 待开始（#1434 = queued），看板也不放行。
+      return src.id === 'todo' && canOrchestrate(todo.phase);
     case 'pending':
       return src.id === 'done' && todo.hasChanges === true;
     case 'done':

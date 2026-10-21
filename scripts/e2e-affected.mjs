@@ -161,6 +161,8 @@ const FILE_RULES = new Map([
   ],
   ['apps/web/src/components/form-layout.tsx', ['paper-', 'account-', ...AGENT, ...PAGES]],
   ['apps/web/src/components/brand-marks.tsx', ['machines-', 'title-', 'brand-']],
+  // #1455: vitest-only config (includes test/**/*.test.ts); not in the e2e build.
+  ['apps/web/vitest.config.ts', []],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
   ['apps/web/e2e/live-server-tether.mjs', LIVE_SERVER],
   ['apps/web/e2e/live-server-spawner.ts', LIVE_SERVER],
@@ -176,6 +178,10 @@ const DIR_RULES = [
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-'] },
+  // #1455: the web unit-test layer. vitest-only, never in the fixture build
+  // playwright serves, and nothing under e2e/ imports from it: no spec is
+  // affected. `pnpm exec vitest run --changed origin/main` covers it.
+  { prefix: 'apps/web/test/', specs: [] },
 ];
 
 // Cross-cutting paths: consumed (or rendered) everywhere, so the honest
@@ -393,7 +399,7 @@ if (selection.length === 0) {
   console.log(`[e2e:affected] changed paths (${source}):`);
   console.log(reasons.join('\n'));
   console.log(
-    '[e2e:affected] no web e2e surface touched — the stack layer (vitest integration) is the coverage for this change.',
+    '[e2e:affected] no web e2e surface touched — vitest (`pnpm exec vitest run --changed origin/main`) and CI cover this change.',
   );
   process.exit(0);
 }
