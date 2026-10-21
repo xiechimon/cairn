@@ -5,11 +5,18 @@
 // 失败方式（先于实现固化，全文 docs/verify/1404/s3-failure-modes.txt，下文按号引用）：
 // F1 旧库升级不应用本迁移（journal 的 when 不大于库里最新一条即被静默跳过）。
 // F2 同一构建同一摘要两轮。F3 同一构建两轮同号。F4 同一步两条判定。
-// F5 判定指向不存在的步或构建。F6 删构建留下孤儿行。F7 闸行挡住现有删除路径。
+// F5 判定指向不存在的构建（stepId 不设外键，见 F17/F18）。F6 删构建留下孤儿行。
+// F7 闸行挡住现有删除路径。
 // F8 摘要为空（head 对不上）的判定存不进。F9 chief 小合并步的判定挂不到被审构建。
 // F10 同一构建两份快照。F11 blockers JSON 往返失真。F12 同一 head 两份摘要。
 // F14 共享表清单漏登记。F15 机器回传路径写判定。F16 迁移按序号定位（合并期重编号即坏）。
 // F13（schema 与迁移漂移）由 drizzle-kit generate 空转与 db:check 两道闸钉住，不在本文件。
+// 第二轮（pr-gate 1469 run 1，失败方式全文 docs/verify/1404/s3-r2-red-green.txt）：
+// F17 后续迁移按 drizzle 形状重建 step：drizzle 在事务里跑迁移，PRAGMA foreign_keys=OFF
+// 不生效，DROP TABLE step 的隐式删行经 stepId 外键级联清空判定，步行却被拷回。
+// F18 删步而构建还在：记下的 block / tampered 判定随步消失。
+// F19 本迁移之后的迁移重建 build（或经 build.todoId 级联的 todo）：四表的行被清空。
+// F20 判定缺 expectedHeadSha 也能存。F21 轮缺 patchDigest 也能存（UNIQUE 视 NULL 互异）。
 
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -62,6 +69,14 @@ function count(sqlite: Database.Database, table: string, buildId: string): numbe
       n: number;
     }
   ).n;
+}
+
+/** 种 seed() 那一对 user / team（原生 SQL，同 seedBuild：只写建库那一刻的必填列，
+ * 不经 head 的 drizzle schema，旧库缺后来加的列也不碍事）。 */
+function seedTeam(sqlite: Database.Database): string {
+  insert(sqlite, 'user', { id: 'u-1', displayName: 'Owner' });
+  insert(sqlite, 'team', { id: 'team-1', name: "Owner's team", createdAt: 1 });
+  return 'team-1';
 }
 
 /** 种一个 project → todo → build → worker step（列取各表的必填最小集）。 */
@@ -185,19 +200,41 @@ function gateCounts(db: Db, buildId: string): Record<(typeof GATE_TABLES)[number
 
 // —— 迁移定位与旧库升级（F1 / F16）——————————————————————————————————————
 
-function readJournal(folder: string): { entries: { idx: number; tag: string; when: number }[] } {
-  return JSON.parse(readFileSync(join(folder, 'meta', '_journal.json'), 'utf8'));
-}
-
 const GATE_MARKER = /CREATE TABLE `gate_verdict`/;
 
+type Journal = { entries: { idx: number; tag: string; when: number }[] };
+
 function findGateEntry() {
-  const journal = readJournal(MIGRATIONS_FOLDER);
+  const journal: Journal = JSON.parse(
+    readFileSync(join(MIGRATIONS_FOLDER, 'meta', '_journal.json'), 'utf8'),
+  );
   const index = journal.entries.findIndex((e) =>
     GATE_MARKER.test(readFileSync(join(MIGRATIONS_FOLDER, `${e.tag}.sql`), 'utf8')),
   );
   expect(index, 'journal 里找不到建 gate_verdict 的 migration').toBeGreaterThan(0);
   return { journal, index, entry: journal.entries[index]! };
+}
+
+/** 测试用 migrations 目录（mkdtemp）：真 journal 的前 end 条；extra 另接一条合成
+ * 迁移，when 排在全部真迁移之后（模拟本迁移之后才写的一条）。 */
+function migrationsUpTo(
+  journal: Journal,
+  end: number,
+  extra?: { tag: string; sql: string },
+): string {
+  const dir = temp('pacman-migrations-');
+  mkdirSync(join(dir, 'meta'));
+  const entries = journal.entries.slice(0, end);
+  for (const e of entries) {
+    writeFileSync(join(dir, `${e.tag}.sql`), readFileSync(join(MIGRATIONS_FOLDER, `${e.tag}.sql`)));
+  }
+  if (extra) {
+    const when = Math.max(...journal.entries.map((e) => e.when)) + 1;
+    entries.push({ idx: entries.length, tag: extra.tag, when });
+    writeFileSync(join(dir, `${extra.tag}.sql`), extra.sql);
+  }
+  writeFileSync(join(dir, 'meta', '_journal.json'), JSON.stringify({ ...journal, entries }));
+  return dir;
 }
 
 describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
@@ -209,26 +246,11 @@ describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
 
   test('截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行', () => {
     const { journal, index } = findGateEntry();
-    const preDir = temp('pacman-migrations-pre-gate-');
-    mkdirSync(join(preDir, 'meta'));
-    for (const e of journal.entries.slice(0, index)) {
-      writeFileSync(
-        join(preDir, `${e.tag}.sql`),
-        readFileSync(join(MIGRATIONS_FOLDER, `${e.tag}.sql`)),
-      );
-    }
-    writeFileSync(
-      join(preDir, 'meta', '_journal.json'),
-      JSON.stringify({ ...journal, entries: journal.entries.slice(0, index) }, null, 2),
-    );
-
     const dbPath = join(temp('pacman-gate-upgrade-'), 'server.db');
     const old = new Database(dbPath);
     old.pragma('foreign_keys = ON');
-    const oldDb = drizzle(old, { schema });
-    migrate(oldDb, { migrationsFolder: preDir });
-    const { team } = seed(oldDb);
-    const ids = seedBuild(old, team.id, 'old');
+    migrate(drizzle(old), { migrationsFolder: migrationsUpTo(journal, index) });
+    const ids = seedBuild(old, seedTeam(old), 'old');
     const tableNames = (s: Database.Database) =>
       (s.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
         .map((r) => r.name)
@@ -275,6 +297,15 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
     );
   });
 
+  test('F21 缺 patchDigest 的轮被 NOT NULL 拒绝（UNIQUE 视 NULL 互异，空摘要能开无数轮）', () => {
+    const { sqlite, teamId } = memory();
+    const a = seedBuild(sqlite, teamId, 'a');
+    expect(() =>
+      insert(sqlite, 'gate_round', { ...roundRow('r1', a.build, D1, 1), patchDigest: null }),
+    ).toThrow(/NOT NULL constraint failed: gate_round\.patchDigest/);
+    expect(count(sqlite, 'gate_round', a.build)).toBe(0);
+  });
+
   test('缺省值：fixRound 0、state open、timedOut []、dispatches {}（drizzle 读回）', () => {
     const { db, sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
@@ -298,7 +329,7 @@ describe('gate_round：每 (buildId, patchDigest) 一轮', () => {
 
 // —— gate_verdict（F4 / F5 / F8 / F9）——————————————————————————————————
 
-describe('gate_verdict：每步一条，只挂真实的步与构建', () => {
+describe('gate_verdict：每步一条，只挂真实的构建', () => {
   test('F4 同一步的第二条判定被主键拒绝', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
@@ -309,15 +340,23 @@ describe('gate_verdict：每步一条，只挂真实的步与构建', () => {
     expect(sqlite.prepare('SELECT outcome FROM gate_verdict').all()).toEqual([{ outcome: 'pass' }]);
   });
 
-  test('F5 不存在的步、不存在的构建：外键拒绝', () => {
+  test('F5 不存在的构建：外键拒绝；stepId 不设外键（F17/F18），由派步的 server 写入方给出', () => {
     const { sqlite, teamId } = memory();
     const a = seedBuild(sqlite, teamId, 'a');
-    expect(() => insert(sqlite, 'gate_verdict', verdictRow('no-such-step', a.build))).toThrow(
-      /FOREIGN KEY constraint failed/,
-    );
     expect(() => insert(sqlite, 'gate_verdict', verdictRow(a.step, 'no-such-build'))).toThrow(
       /FOREIGN KEY constraint failed/,
     );
+    insert(sqlite, 'gate_verdict', verdictRow('no-such-step', a.build));
+    expect(count(sqlite, 'gate_verdict', a.build)).toBe(1);
+  });
+
+  test('F20 缺 expectedHeadSha 的判定被 NOT NULL 拒绝（判定只按 server 派步时钉下的 head 绑定）', () => {
+    const { sqlite, teamId } = memory();
+    const a = seedBuild(sqlite, teamId, 'a');
+    expect(() =>
+      insert(sqlite, 'gate_verdict', verdictRow(a.step, a.build, { expectedHeadSha: null })),
+    ).toThrow(/NOT NULL constraint failed: gate_verdict\.expectedHeadSha/);
+    expect(count(sqlite, 'gate_verdict', a.build)).toBe(0);
   });
 
   test('F8 head 对不上的判定（patchDigest null）、没报 head、没有视角：照存，读回 null', () => {
@@ -624,6 +663,94 @@ describe('F7 现有删除路径带着闸行照常成功', () => {
     expect(res.status).toBe(204);
     expectGone(s, buildId);
     s.dispose();
+  });
+});
+
+// —— 判定不随步走，后续迁移不清闸行（F17 / F18 / F19）——————————————————————
+
+describe('F17 / F18 / F19 闸行只随构建删除', () => {
+  test('F17 后续迁移按 drizzle 形状重建 step（__new_step、拷行、DROP TABLE step、改名）：判定与步一条不少', () => {
+    const { db, sqlite, teamId } = memory();
+    const a = seedBuild(sqlite, teamId, 'a');
+    const b = seedBuild(sqlite, teamId, 'b');
+    seedGateRows(sqlite, a.build, a.step);
+    insert(
+      sqlite,
+      'gate_verdict',
+      verdictRow(b.step, b.build, { kind: 'verify', perspective: null, outcome: 'tampered' }),
+    );
+    insert(sqlite, 'step', { id: 's-chief', buildId: 'chief-x', kind: 'chief', createdAt: 1 });
+    insert(
+      sqlite,
+      'gate_verdict',
+      verdictRow('s-chief', a.build, { kind: 'decision', perspective: 'chief' }),
+    );
+    const rows = (table: string) => sqlite.prepare(`SELECT * FROM "${table}" ORDER BY id`).all();
+    const verdicts = () => sqlite.prepare('SELECT * FROM gate_verdict ORDER BY stepId').all();
+    const stepsBefore = rows('step');
+    const verdictsBefore = verdicts();
+    expect(verdictsBefore).toHaveLength(3);
+
+    // drizzle-kit 改 step 列约束时生成的形状（同 0004_opposite_chimera.sql），列与建表
+    // 语句取自当前库，step 以后加列也照样成立。
+    const { sql: createStep } = sqlite
+      .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'step'")
+      .get() as { sql: string };
+    const cols = (sqlite.prepare('PRAGMA table_info(step)').all() as { name: string }[])
+      .map((c) => `"${c.name}"`)
+      .join(', ');
+    const recreate = [
+      'PRAGMA foreign_keys=OFF;',
+      `${createStep.replace(/^CREATE TABLE [`"]?step[`"]?/, 'CREATE TABLE `__new_step`')};`,
+      `INSERT INTO \`__new_step\`(${cols}) SELECT ${cols} FROM \`step\`;`,
+      'DROP TABLE `step`;',
+      'ALTER TABLE `__new_step` RENAME TO `step`;',
+      'PRAGMA foreign_keys=ON;',
+    ].join('--> statement-breakpoint\n');
+    const { journal } = findGateEntry();
+    migrate(db, {
+      migrationsFolder: migrationsUpTo(journal, journal.entries.length, {
+        tag: '9999_recreate_step',
+        sql: recreate,
+      }),
+    });
+
+    expect(
+      sqlite.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get(),
+      '合成迁移确实跑了',
+    ).toEqual({ n: journal.entries.length + 1 });
+    expect(rows('step')).toEqual(stepsBefore);
+    expect(verdicts()).toEqual(verdictsBefore);
+  });
+
+  test('F18 删步（构建还在）：判定留着；删构建才带走', () => {
+    const { sqlite, teamId } = memory();
+    const a = seedBuild(sqlite, teamId, 'a');
+    insert(sqlite, 'gate_verdict', verdictRow(a.step, a.build, { outcome: 'block' }));
+    sqlite.prepare('DELETE FROM step WHERE id = ?').run(a.step);
+    expect(sqlite.prepare('SELECT stepId, outcome FROM gate_verdict').all()).toEqual([
+      { stepId: a.step, outcome: 'block' },
+    ]);
+    sqlite.prepare('DELETE FROM build WHERE id = ?').run(a.build);
+    expect(count(sqlite, 'gate_verdict', a.build)).toBe(0);
+  });
+
+  test('F19 截到本迁移的库（四表各有行）→ 跑完之后的全部迁移：四表的行一条不少', () => {
+    // 之后的迁移若按 drizzle 形状重建 build（或经 build.todoId 级联的 todo），DROP TABLE
+    // 的隐式删行会清掉四表；那条迁移得先把闸行挪开再写回。
+    const { journal, index } = findGateEntry();
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = ON');
+    const db = drizzle(sqlite);
+    migrate(db, { migrationsFolder: migrationsUpTo(journal, index + 1) });
+    const a = seedBuild(sqlite, seedTeam(sqlite), 'a');
+    seedGateRows(sqlite, a.build, a.step);
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+    expect(
+      sqlite.prepare('SELECT count(*) AS n FROM __drizzle_migrations').get(),
+      '之后的迁移全部跑了',
+    ).toEqual({ n: journal.entries.length });
+    for (const t of GATE_TABLES) expect(count(sqlite, t, a.build), t).toBe(1);
   });
 });
 
