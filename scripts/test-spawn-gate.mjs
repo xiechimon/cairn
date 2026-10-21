@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 // Test spawn gate: test code must not start processes through a package
-// manager. `pnpm` / `npx` / `npm` / `yarn` resolve to corepack's node shim,
-// which exits on SIGTERM without forwarding it, so `child.kill()` reaches
-// only the shim and the real process tree is reparented to PID 1. The
-// token-gate e2e spec leaked 24 server trees (75 processes, ~1 GB) this way
-// on 2026-10-21.
+// manager. `corepack` / `pnpm` / `npx` / `npm` / `yarn` resolve to corepack's
+// node shim, which exits on SIGTERM without forwarding it, so `child.kill()`
+// reaches only the shim and the real process tree is reparented to PID 1.
 //
 // Flagged: async `spawn` / `exec` / `execFile` whose literal command is one
-// of those four, in tracked files under apps/web/e2e, apps/*/test,
+// of those, in tracked files under apps/web/e2e, apps/*/test,
 // packages/*/test and integration. The Sync variants block until the whole
 // child exits and are allowed. A command held in a variable is out of reach
 // here and stays a review concern.
@@ -24,7 +22,7 @@ import { join, resolve } from 'node:path';
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const TERRITORY = /^(apps\/web\/e2e|apps\/[^/]+\/test|packages\/[^/]+\/test|integration)\//;
 const SOURCE = /\.[cm]?[jt]sx?$/;
-const SHIM_SPAWN = /\b(spawn|exec|execFile)\(\s*(['"`])(pnpm|npx|npm|yarn)\b/g;
+const SHIM_SPAWN = /\b(spawn|exec|execFile)\(\s*(['"`])(corepack|pnpm|npx|npm|yarn)(?=['"`\s])/g;
 
 let files;
 try {
@@ -45,7 +43,13 @@ if (files.length === 0) {
 
 const violations = [];
 for (const file of files) {
-  const text = readFileSync(join(REPO_ROOT, file), 'utf8');
+  let text;
+  try {
+    text = readFileSync(join(REPO_ROOT, file), 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT' || err.code === 'EISDIR') continue;
+    throw err;
+  }
   for (const match of text.matchAll(SHIM_SPAWN)) {
     const line = text.slice(0, match.index).split('\n').length;
     violations.push(`${file}:${line}  ${match[1]}('${match[3]}', ...)`);

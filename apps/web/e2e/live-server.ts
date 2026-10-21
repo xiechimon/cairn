@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -77,22 +78,29 @@ export async function bootLiveServer(token: string | null): Promise<LiveServer> 
       LOG_LEVEL: 'warn',
       [ENV_VARS.home]: home,
       [ENV_VARS.webDir]: resolve(import.meta.dirname, '..', 'dist'),
-      ...(token !== null ? { [ENV_VARS.token]: token } : {}),
+      [ENV_VARS.token]: token ?? '',
     },
     stdio: ['pipe', 'ignore', 'inherit'],
   });
   const pgid = child.pid;
-  if (pgid === undefined) throw new Error('live server failed to spawn');
-  const dispose = async () => {
-    await reapGroup(pgid);
-    rmSync(home, { recursive: true, force: true });
+  if (pgid === undefined) {
+    const [err] = await once(child, 'error');
+    throw err;
+  }
+  let disposal: Promise<void> | undefined;
+  const dispose = () => {
+    disposal ??= (async () => {
+      if (child.exitCode === null && child.signalCode === null) await reapGroup(pgid);
+      rmSync(home, { recursive: true, force: true });
+    })();
+    return disposal;
   };
 
   const base = `http://127.0.0.1:${port}`;
   const deadline = Date.now() + 60_000;
   for (;;) {
     try {
-      const res = await fetch(`${base}/api/teams`);
+      const res = await fetch(`${base}/api/teams`, { signal: AbortSignal.timeout(2_000) });
       if (res.status === (token !== null ? 401 : 200)) break;
     } catch {}
     const exited = child.exitCode ?? child.signalCode;

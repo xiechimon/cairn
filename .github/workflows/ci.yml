@@ -69,8 +69,8 @@ jobs:
           node scripts/lane-file-gate.mjs
 
       # Test spawn gate: corepack's pnpm/npx shim swallows SIGTERM, so a test
-      # that spawns through it leaves the real process tree under PID 1
-      # (2026-10-21: 24 orphaned e2e servers). Zero-dependency, pre-install.
+      # that spawns through it leaves the real process tree under PID 1.
+      # Zero-dependency, pre-install.
       - name: Test spawn gate
         run: node scripts/test-spawn-gate.mjs
 

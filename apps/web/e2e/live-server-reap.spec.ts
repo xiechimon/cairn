@@ -1,6 +1,4 @@
-// e2e 起的真 apps/server 必须随调用方一起消失（2026-10-21 实测：token-gate
-// 每跑一次留两棵 `pnpm exec tsx src/index.ts` 树挂在 launchd 下，累计 24 棵 /
-// 75 进程 / ~916 MB）。失败方式：
+// e2e 起的真 apps/server 必须随调用方一起消失。失败方式：
 //   1. dispose 只打到包装层：corepack 的 pnpm shim 收到 SIGTERM 自己退出、
 //      不转发，pnpm-native → tsx → server → esbuild 整串被 PID 1 收养
 //   2. 调用方被 SIGKILL / 崩溃（Bash 超时、Ctrl-C、worker 崩），afterAll

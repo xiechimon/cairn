@@ -58,8 +58,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await authed.dispose();
-  await openServer.dispose();
+  await Promise.all([authed, openServer].map((server) => server?.dispose()));
 });
 
 test('鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token=', async ({
