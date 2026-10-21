@@ -14,11 +14,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronLeft, EllipsisVertical } from '../icons/index.js';
-import { ChipPopover } from '../overlays/chip-popover.js';
+import { type ChipAgentModel, ChipPopover } from '../overlays/chip-popover.js';
 import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
+  /** Chip popover 执行对话 row: the model of `todo.agent` (live only). */
+  agentModel?: ChipAgentModel;
   /** Rendered phase; the reject chain overrides the record's phase
    *  (replan streaming / building rounds, issue #75). */
   phase?: TodoRecord['phase'];
@@ -50,6 +52,7 @@ interface DetailHeadProps {
 
 export function DetailHead({
   todo,
+  agentModel,
   phase,
   onMore,
   onAction,
@@ -128,6 +131,7 @@ export function DetailHead({
         >
           <ChipPopover
             todo={todo}
+            agentModel={agentModel}
             onEditAssign={
               onEditAssign == null
                 ? undefined
