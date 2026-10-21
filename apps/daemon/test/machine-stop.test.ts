@@ -148,10 +148,12 @@ describe('stop 投递（M7 #308：事件 → 拉取-确认 → AgentSessionHandl
 //   1. 准备期（会话未开）拉到停止 → 停止被丢、会话照开照跑完 → 应不开会话、报 stopped
 //   2. 会话开启途中（createSession 在途）拉到停止 → 同上被丢 → 应一开即中断、报 stopped
 //   3. 两轮会话之间（流断续跑 / 协议回落重开）拉到停止 → 下一轮照跑 → 应一开即中断
+//      （runner-network-retry.test.ts）
 //   4. 同一步在本机有两次 run → 停止只到最新登记的会话 → 应两次都收到（runner-stop.test.ts）
 //   5. 接收停止后 daemon 重启、会话没跑完 → recover 重跑 → 应直接报 stopped（machine-recover.test.ts）
 //   6. 接收停止后重启、会话已跑完待补报 → 应补报原结果，完成优先（machine-recover.test.ts）
-//   7. 本机没有这一步在跑 → 照旧丢弃，不留下会停掉以后 run 的残留
+//   7. 本机没有这一步在跑，或 run 已过收尾判定 → 照旧丢弃，不落 journal（否则崩溃
+//      重启会把跑完的会话报成 stopped）
 //   8. 中断调用本身抛错 → 不按 stopped 判（会话没真停）
 describe('已接收的停止送达本机每一次 run（F3）', () => {
   /** createSession 挂到 openGate()；会话的 stop() 结束事件流且不产 done。 */
@@ -228,6 +230,7 @@ describe('已接收的停止送达本机每一次 run（F3）', () => {
     await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies[0]?.body.status).toBe('stopped');
     expect(probe.createCalls).toBe(0);
+    expect(api.uploads[0]?.body.messages.some((m) => m.role === 'user')).toBe(true);
     expect(new StepJournal(paths.outboxDir).get('s1')).toBeNull();
     await handle.stop();
     await handle.done;
@@ -280,16 +283,73 @@ describe('已接收的停止送达本机每一次 run（F3）', () => {
         throw new Error('unused');
       },
     };
-    const { handle, lines } = await boot({ api, backend });
+    const { handle, lines, paths } = await boot({ api, backend });
     await waitFor(() => api.parked !== null);
     api.parked?.(CLAIMED);
     await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
     api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
     await waitFor(() => lines.some((l) => l.includes('stop delivery failed')));
+    expect(new StepJournal(paths.outboxDir).get('s1')?.stopRequest ?? null).toBeNull();
     release();
     await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies[0]?.body.status).toBe('failed');
     await handle.stop();
     await handle.done;
   });
+
+  test('失败方式 7：收尾中（会话已跑完、终稿上传在途）拉到的停止 → 丢弃、不落 journal、照报原结果', async () => {
+    class UploadGateApi extends FakeMachineApi {
+      uploadCalls = 0;
+      private releaseUpload: () => void = () => {};
+      private readonly uploadGate = new Promise<void>((r) => {
+        this.releaseUpload = r;
+      });
+      override async uploadUrls(stepId: string) {
+        this.uploadCalls += 1;
+        await this.uploadGate;
+        return super.uploadUrls(stepId);
+      }
+      openUpload(): void {
+        this.releaseUpload();
+      }
+    }
+    const api = new UploadGateApi();
+    api.stopResponse = true;
+    const { backend } = fakeDoneBackend();
+    const { handle, lines, paths } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => api.uploadCalls === 1);
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => lines.some((l) => /stop (delivered|dropped)/.test(l)));
+    expect(lines.some((l) => l.includes('stop dropped (no live session)'))).toBe(true);
+    expect(new StepJournal(paths.outboxDir).get('s1')?.stopRequest ?? null).toBeNull();
+    api.openUpload();
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('success');
+    await handle.stop();
+    await handle.done;
+  });
+
+  function fakeDoneBackend() {
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-done',
+          events: (async function* () {
+            yield { type: 'text_delta', text: '写完了' } as StepEvent;
+            yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer() {},
+          async stop() {},
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    return { backend };
+  }
 });

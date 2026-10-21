@@ -1443,7 +1443,6 @@ async function runStepBody(
       }
       deltaBuf = '';
     }
-    // 准备期收到的停止：不开会话。
     if (pass === 0 && stop.request !== null) {
       clearInterval(heartbeat);
       cleanupBriefOnce();
@@ -1470,7 +1469,6 @@ async function runStepBody(
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     // steer 投递面注册（W3 #279）：在跑期间 deliverSteer 可达；各收尾路径注销。
     deps.sessionHandles?.set(stepId, handle);
-    // 开会话途中收到的停止：会话一开即中断。
     try {
       await stop.attach(handle);
     } catch (err) {
@@ -1812,7 +1810,7 @@ async function runStepBody(
   // 后置位；sawDone 优先 = stop 与自然完成竞态归完成（success 不改判）。
   // 判定先于 #698 no-op 闸：停止中断的事件流也是零事件零终局形态，闸不得
   // 给 stopped 收尾挂 no-op 错误文案。——
-  const stopReq = stop.request;
+  const stopReq = stop.settle();
   const stopped = stopReq !== null && !sawDone;
   if (stopReq !== null && sawDone) logger.step('stop arrived after completion — ignored');
   // —— #1261 配额熔断收尾：两路汇合成 quotaBlock 随 done 上报——
@@ -2321,7 +2319,7 @@ export async function resumePendingUpload(
  * （带上次会话号，续接链不断）。awaiting-upload 残留不走这里：会话已跑完，
  * 完成优先，按快照补报。 */
 export async function resumeStoppedStep(
-  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger'>,
+  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths'>,
   entry: StepJournalEntry,
 ): Promise<void> {
   deps.logger.recover(
@@ -2330,23 +2328,34 @@ export async function resumeStoppedStep(
   await reportStopped(deps, entry.stepId, entry.sessionId);
 }
 
-/** 没开会话的步报 done(stopped)。报不出去 = journal 保留，recover 再报。 */
+/** 没开会话（或会话没跑完就重启）的步报 done(stopped)：与收尾同序——终稿
+ * 快照落 journal → 回传已有 transcript → done。失败 = journal 残留，recover
+ * 快路径补报。 */
 async function reportStopped(
-  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger'>,
+  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths'>,
   stepId: string,
   sessionId: string | null,
 ): Promise<void> {
+  const { client, journal, logger } = deps;
+  const doneBody: MachineDoneBody = {
+    status: 'stopped',
+    ...(sessionId !== null ? { sessionId } : {}),
+  };
+  journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent: null });
   try {
-    await deps.client.done(stepId, {
-      status: 'stopped',
-      ...(sessionId !== null ? { sessionId } : {}),
-    });
-    deps.journal.remove(stepId);
+    const messages = new TranscriptBuffer(deps.paths.outboxDir, stepId).messages();
+    await putFinalArtifacts(client, logger, stepId, messages, null);
   } catch (err) {
-    deps.logger.step(
-      `done(stopped) report unreachable: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    return;
   }
+  try {
+    await client.done(stepId, doneBody);
+  } catch (err) {
+    logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
+    return;
+  }
+  journal.remove(stepId);
 }
 
 async function failStep(deps: RunStepDeps, stepId: string, message: string): Promise<void> {

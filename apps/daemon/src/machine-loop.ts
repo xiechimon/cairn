@@ -522,19 +522,30 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  // 停止投递（M7 #308，steer 三号分流同律）：拉取-确认后先落 journal（拉取
-  // 即确认，server 侧已清；重启后 recover 只能从这里知道这一步已被停），再
-  // 投给这一步在本机的每一次 run（会话未开的 run 开会话前后自行兑现）。收尾
+  // 停止投递（M7 #308，steer 三号分流同律）：拉取即确认，server 侧随即清掉
+  // 停止记录，所以接收的停止要落 journal，重启后 recover 只能从这里得知。收尾
   // 判 stopped / done(stopped) 回报 / discard rewind 归 runner。
   const deliverStop = async (stepId: string): Promise<void> => {
     try {
       const discard = await client.stop(stepId);
       if (discard === null) return; // server 门拒/旧步已丢弃（拉取-确认语义）。
-      journal.update(stepId, { stopRequest: { discard } });
-      const reached = await stops.deliver(stepId, { discard });
-      if (reached === 0) {
+      const runs = stops.accept(stepId, { discard });
+      if (runs.length === 0) {
         logger.step(`stop dropped (no live session) step=${stepId}`); // 收尾竞态
         return;
+      }
+      try {
+        journal.update(stepId, { stopRequest: { discard } });
+      } catch (err) {
+        logger.step(
+          `stop journal write failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      try {
+        await Promise.all(runs.map((run) => run.interrupt()));
+      } catch (err) {
+        journal.update(stepId, { stopRequest: null });
+        throw err;
       }
       logger.step(`stop delivered step=${stepId}`);
     } catch (err) {

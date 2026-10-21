@@ -249,7 +249,9 @@ DeliverStopToRuns(m) ==
   /\ stopInHand[m]
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
   /\ stopDelivered' = [stopDelivered EXCEPT ![m] = TRUE]
-  /\ jstop' = IF journal[m] /= "none" THEN [jstop EXCEPT ![m] = TRUE] ELSE jstop
+  /\ jstop' = IF journal[m] /= "none" /\ \E e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Working
+                THEN [jstop EXCEPT ![m] = TRUE]
+                ELSE jstop
   /\ ex' = [e \in ExecIds |->
               IF ex[e].mach = m /\ ex[e].stage \in Working
                 THEN [ex[e] EXCEPT !.halt = TRUE]
