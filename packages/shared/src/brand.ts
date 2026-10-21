@@ -112,6 +112,10 @@ export const ENV_VARS = {
   /** #1149 环境钩子超时毫秒覆写（缺省 20min，WORKSPACE_HOOK_TIMEOUT_MS）。
    * 非 20min 缺省即 opt-in：数值非法（非正整数）= 忽略 env，用缺省。 */
   hookTimeoutMs: 'PACMAN_HOOK_TIMEOUT_MS',
+  /** #1406 server 的 GitHub issue 进料轮询开关（opt-in，默认关）：1 / true /
+   * yes 才开——开了每 5 分钟把已连接 GitHub 的项目里带 ready-for-agent 的
+   * open issue（D5 核打标人）导入并派发，存量按最旧先；升级不自动开工。 */
+  issueIntake: 'PACMAN_ISSUE_INTAKE',
 } as const;
 
 /** API key 形态 `pacman_<48hex>`（02 §5.8 前缀 = 品牌槽；r3 §6 掩码样例原形

@@ -1,0 +1,9 @@
+# red leg: new tests before the implementation (main 89cc029 + test file only)
+$ pnpm exec vitest run test/pr-reconcile.test.ts
+     × ① merged on GitHub → todo done, merge sha in a system row, celebration row 70ms
+     × ② closed without merge → todo failed with the cause on the build 44ms
+     × ⑤ phase moved by a person during the network window → no write 42ms
+     × ⑦ after done, a second sweep does not touch the todo again 46ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  4 failed | 6 passed (10)

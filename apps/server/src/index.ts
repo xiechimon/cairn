@@ -17,7 +17,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { backfillMachineConcurrency, seedLocalMachine } from './services/machines.js';
 import { backfillPersonas } from './services/personas.js';
-import { createScheduler } from './services/scheduler.js';
+import { createScheduler, issueIntakeRunOf } from './services/scheduler.js';
 import { backfillFixedTags } from './services/tags.js';
 
 const config = loadConfig();
@@ -102,11 +102,16 @@ warnInsecureBind(logger, config);
 // #759 附件回收挂 tick（首 tick 即补扫，之后每小时一次；pino 直传 = GcLogger）。
 // #1150 CI 磨绿环挂同家族自循环（60s 轮询 PR checks；出站读 globalThis.fetch
 // ——与 AppContext.githubFetch 同源的缺省位）。
+// #1406 issue 进料挂同家族自循环（5 分钟：带 ready-for-agent 的 open issue
+// → D5 核打标人 → 导入 + 编排；issue 关了关卡）。opt-in（config.issueIntake，
+// 默认关）：issueIntakeRunOf 关时给 null，调度器不起进料循环；启动日志一行
+// 写明开关状态。
 const scheduler = createScheduler(
   { db, hub, machineHub, user: seeded.user, convHub, box: secretBox },
   { tickMs: config.schedulerTickMs },
   { attachmentsDir, logger },
   { githubFetch: globalThis.fetch, logger },
+  issueIntakeRunOf(config, { githubFetch: globalThis.fetch, logger }),
 );
 scheduler.start();
 

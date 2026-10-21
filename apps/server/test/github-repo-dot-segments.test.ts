@@ -120,14 +120,15 @@ function insertTodo(
   return id;
 }
 
-/** todo 已在 building + 已产 PR 的 build（无在飞步）：CI 磨绿轮询的候选形态。 */
+/** todo 已在 building + 已产 PR 的 build（无在飞步）：CI 磨绿轮询的候选形态
+ * （build 是 todo 的当前 build——#1403 起磨绿只看 todo.latestBuildId）。 */
 function insertPrBuild(
   s: TestServer,
   projectId: string,
   over: Partial<typeof todoTable.$inferInsert> = {},
 ): { todoId: string; buildId: string } {
-  const todoId = insertTodo(s, projectId, { phase: 'building', ...over });
   const buildId = newUuidv7();
+  const todoId = insertTodo(s, projectId, { phase: 'building', latestBuildId: buildId, ...over });
   s.db
     .insert(buildTable)
     .values({
@@ -383,7 +384,8 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
       await poller.sweep();
       expect(rec.calls).toEqual([]);
       expect(info).toHaveBeenCalledTimes(1);
-      expect(info.mock.calls[0]?.[0]).toEqual({
+      // 磨绿计数逐项钉；#1403 对账的计数（review 候选集）此处为 0。
+      expect(info.mock.calls[0]?.[0]).toMatchObject({
         candidates: 1,
         pending: 0,
         appended: 0,
@@ -392,6 +394,7 @@ describe('#1466 读路径：存量行按「不是合法 GitHub 仓」处理，�
         skipped: 1,
         unreadable: 0,
         errors: 0,
+        reviewCandidates: 0,
       });
       expect(phaseOf(s, todoId)).toBe('building');
       expect(stepsOf(s, buildId)).toEqual([]);

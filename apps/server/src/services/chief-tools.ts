@@ -1012,6 +1012,10 @@ export async function executeChiefTool(
  * mcp-face.ts 头注同语义）放行但落审计行。name = 宣告行 actor 位。 */
 export type TransitionActor = { kind: 'user' | 'agent'; name: string };
 
+/** transitionTodos 实际用到的 deps 子集（#1406：issue 轮询器的关闭对账从
+ * scheduler 的 BuildDeps 进来，没有 reposDir / skillsDir 等工具面位）。 */
+export type TransitionDeps = Pick<ChiefToolDeps, 'db' | 'hub' | 'machineHub' | 'user' | 'convHub'>;
+
 /** 批量 phase 流转（MCP server 面 complete/close/reopen 同吃，02 §7.2 六能力组
  * Manage lifecycle）。非法流转边跳过不中断 [设计]。
  * #900：agent 主体把闸相位（confirm/review）卡直推 done = 无 merge 步、无人
@@ -1020,7 +1024,7 @@ export type TransitionActor = { kind: 'user' | 'agent'; name: string };
  * #902：done 落地成功即往 todo 最新 build 会话落 DONE_ANNOUNCEMENT 行（actor
  * = 主体 displayName）；无会话（latestBuildId null）静默跳过。 */
 export function transitionTodos(
-  deps: ChiefToolDeps,
+  deps: TransitionDeps,
   teamId: string,
   todoIds: string[],
   to: 'closed' | 'todo' | 'done',

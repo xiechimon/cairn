@@ -1,0 +1,70 @@
+# P5a-1 round 3: /code-review (low) on this round's range, and what was done with each finding
+# The first call ran in the primary clone by mistake (its HEAD is another branch, so it reviewed a313966..that HEAD and
+# reported the intake as removed); both passes below ran with every git command pinned to the p5 worktree.
+
+## Pass 1: a313966..95208e8c (items 1-6 fixed), 14 findings
+1  Delivered-PR tasks are left to a PR reconcile (#1414) that is not on main; a failed task with an open PR then never
+   closes and keeps a cap slot.
+   -> Not changed. This is the requested design (item 1); review tasks already work this way. Noted for the Risk section.
+2  Only todo.latestBuildId was checked; startBuilds (failed -> queued re-run) makes a new latest build with no PR while
+   the old PR is still open and mergeable, and the merge then closes the task.
+   -> Fixed in 169bb718: any build of the task with prNumber or prUrl (builds.ts latestPrBuild's test), a correlated
+      NOT EXISTS in the reconcile query and in the write-time re-read. Test first in b1569895 (red there).
+3  sendChiefMessage is not transactional; an attempt that fails after the thread insert leaves a thread, and the retry
+   takes it as a person's start.
+   -> Fixed in 0b0eb7a3 after pass 2 raised it again: a thread counts only when it holds a chief step. Test first in
+      30b82990 (red there).
+4  A reused seqNum (max+1 per team after the top task is deleted) matches the deleted task's old orchestrate thread.
+   -> Fixed in 169bb718: only threads created at or after the import count. Test first in b1569895 (red there).
+5  Retries live in memory and are lost on restart.
+   -> Not changed: requested design (count attempts in memory). README and README.zh now say a restart forgets pending
+      retries.
+6  D5 trusts a label applied through a GitHub App on behalf of a triage user.
+   -> Not changed: item 4 says no behavior change to D5; viaApp is logged for audit. Left to segment 3 with the
+      provenance question.
+7  Altitude: use the closed event's commit_id (merge-driven close) instead of excluding delivered-PR tasks.
+   -> Not changed: item 1 asked for the prNumber rule. Recorded as an option.
+8  The retry does not re-check that the issue is still open and labeled.
+   -> Not changed: a task already imported is not withdrawn on unlabel (failure mode 3 / group 10), and the close
+      reconcile runs before the retry in each sweep, so a trusted close moves the task out of todo first.
+9  Retry entries for a team that loses its token, projects or chief stay in memory and never reach "given up".
+   -> Not changed: the map holds one small entry per failed import, the process cannot orchestrate for that team
+      anyway, and the entry is visited again once the team is usable.
+10 A dropped retry writes no log line.
+   -> Fixed in 169bb718: 'issue intake orchestrate retry dropped' with reason todo-gone / left-todo / thread-exists.
+      Test first in b1569895 (red there).
+11 prUrl-only builds (older shape) are treated as having no PR.
+   -> Fixed with 2 in 169bb718. Test first in b1569895 (red there).
+12 The viaApp comment said the actor is always the authorizing person; with an installation token it is <slug>[bot].
+   -> Fixed in 169bb718 (comments in github.ts and issue-intake.ts).
+13 newestLabeler returned {login, viaApp} and the verdict re-wrapped it as {labeler, viaApp}.
+   -> Fixed in 169bb718: one Labeler shape passed through.
+14 The chief_thread lookup has no index on title.
+   -> Not changed: it runs only for pending retries (failed imports, at most 3 tries each).
+
+## Pass 2: a313966..169bb718, 11 findings
+1  Same as pass 1 #3 (an empty thread from the intake's own failed attempt drops the retry).
+   -> Fixed in 0b0eb7a3 (thread must hold a chief step). Test first in 30b82990 (red there).
+2  The reads before a retry had no per-task try/catch; one throw ended the team's intake for the sweep.
+   -> Fixed in 0b0eb7a3: the error skips that task without counting an attempt ('issue intake orchestrate retry
+      failed'); the team's intake goes on. Test first in 30b82990 (red there).
+3  A task a person moved out of todo and back while the chief was unbound is still orchestrated later.
+   -> Not changed: the person put it back in todo, and the import's D5 check stands; low likelihood.
+4  A backward wall-clock step could make a person's start look older than the import.
+   -> Not changed: both times come from the same nowMs(); a backward step between them within one retry window is
+      not a case this loop guards against elsewhere either.
+5  If orchestrateTodo throws after the step is queued (a later publish), the tally counts an error and the next sweep
+   logs thread-exists.
+   -> Not changed: no second orchestration happens, which is the property that matters; only the counts read off.
+6  Same as pass 1 #9.  -> Not changed (as above).
+7  Altitude: make sendChiefMessage transactional instead of compensating in the retry.
+   -> Not changed: chief.ts is outside this ticket's scope; the chief-step check covers the intake's case.
+8  Altitude: link threads to todos structurally instead of by title.
+   -> Not changed: needs a schema change; the title rule is the one the web already uses (#1216).
+9  noDeliveredPr repeats latestPrBuild's predicate instead of sharing it.
+   -> Not changed: sharing it means editing builds.ts in this PR; the comment names the source.
+10 No index on build.todoId for the correlated NOT EXISTS.
+   -> Not changed: it runs once per open github-issue task per 5-minute sweep.
+11 The deliverPr test helper's comment said "latest build".
+   -> Fixed in 30b82990 (comment), and 8eb20fe6 adds a pin that one task's PR does not affect another task
+      (mutation M1d red).

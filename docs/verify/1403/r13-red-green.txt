@@ -1,0 +1,21 @@
+# #1403 round 13 (seventh /code-review pass on #1414): red against the sources of 7c272c5, green at f9f5a2f.
+# The 2 failing cases are the ones this round adds ([61], base and head sha variants).
+
+== red ==
+# ran against the sources of 7c272c5 with only the test file changed (apps/server/test/pr-reconcile.test.ts)
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+     × [61] a merged response without base is read again on a later sweep; the complete one finishes the card 41ms
+     × [61] a merged response without head sha (the build has a checkpoint) is read again on a later sweep; the complete one finishes the card 35ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+AssertionError: expected [ Array(1) ] to have a length of 2 but got 1
+ ❯ test/pr-reconcile.test.ts:1624:27
+    1624|       expect(pullReads()).toHaveLength(2);
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 103 passed (105)
+exit=1
+
+== green at f9f5a2f ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/ci-loop.test.ts
+ Test Files  2 passed (2)
+      Tests  105 passed (105)
+exit=0
