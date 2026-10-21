@@ -1,4 +1,4 @@
 P1_SingleExecutorPerMachine FAIL
 P2_OnlyHolderResultApplied FAIL
 P3_NoClaimAfterClose PASS
-P4_AcceptedStopReachesWorkers FAIL
+P4_AcceptedStopReachesWorkers PASS

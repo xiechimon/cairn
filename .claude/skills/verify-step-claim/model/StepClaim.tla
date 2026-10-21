@@ -9,14 +9,14 @@ VARIABLES
   st, sm, fresh, progressed, probeDue,
   phase, stopPending,
   online, presenceFresh, home,
-  connected, dm, handle, stopEvt, stopInHand, stopReq, journal, jout,
+  connected, dm, stopEvt, stopInHand, journal, jout, jstop,
   ex,
   holder, staleApply, stopDelivered,
   claims, partitions, crashes, rebinds
 
 server  == <<st, sm, fresh, progressed, probeDue, phase, stopPending,
              online, presenceFresh, home>>
-daemon  == <<connected, dm, handle, stopEvt, stopInHand, stopReq, journal, jout>>
+daemon  == <<connected, dm, stopEvt, stopInHand, journal, jout, jstop>>
 ghosts  == <<holder, staleApply, stopDelivered>>
 budgets == <<claims, partitions, crashes, rebinds>>
 vars    == <<server, daemon, ex, ghosts, budgets>>
@@ -41,11 +41,10 @@ TypeOK ==
   /\ home \in Machines
   /\ connected \in [Machines -> BOOLEAN]
   /\ dm \in [Machines -> {"down", "recovering", "up"}]
-  /\ handle \in [Machines -> ExecIds \cup {None}]
   /\ stopEvt \in [Machines -> BOOLEAN] /\ stopInHand \in [Machines -> BOOLEAN]
-  /\ stopReq \in [Machines -> BOOLEAN]
   /\ journal \in [Machines -> {"none", "active", "awaiting"}]
   /\ jout \in [Machines -> Outcomes \cup {"none"}]
+  /\ jstop \in [Machines -> BOOLEAN]
   /\ ex \in [ExecIds -> [mach : Machines, stage : Stages, beat : BOOLEAN,
                          halt : BOOLEAN, out : Outcomes \cup {"none"}]]
   /\ holder \in ExecIds \cup {None}
@@ -60,10 +59,9 @@ Init ==
   /\ home = InitialHome
   /\ connected = [m \in Machines |-> TRUE]
   /\ dm = [m \in Machines |-> "up"]
-  /\ handle = [m \in Machines |-> None]
   /\ stopEvt = [m \in Machines |-> FALSE] /\ stopInHand = [m \in Machines |-> FALSE]
-  /\ stopReq = [m \in Machines |-> FALSE]
   /\ journal = [m \in Machines |-> "none"] /\ jout = [m \in Machines |-> "none"]
+  /\ jstop = [m \in Machines |-> FALSE]
   /\ ex = [e \in ExecIds |-> Idle]
   /\ holder = None /\ staleApply = FALSE
   /\ stopDelivered = [m \in Machines |-> FALSE]
@@ -97,9 +95,10 @@ TryClaim(m) ==
   /\ st' = "claimed" /\ sm' = m /\ fresh' = TRUE /\ progressed' = FALSE
   /\ journal' = [journal EXCEPT ![m] = "active"]
   /\ jout' = [jout EXCEPT ![m] = "none"]
+  /\ jstop' = [jstop EXCEPT ![m] = FALSE]
   /\ claims' = claims + 1
   /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
-                 connected, dm, handle, stopEvt, stopInHand, stopReq,
+                 connected, dm, stopEvt, stopInHand,
                  staleApply, stopDelivered, partitions, crashes, rebinds>>
 
 TryClaimResponseLost(m) ==
@@ -112,14 +111,13 @@ TryClaimResponseLost(m) ==
   /\ UNCHANGED <<probeDue, phase, stopPending, online, presenceFresh, home,
                  daemon, ex, staleApply, stopDelivered, partitions, crashes, rebinds>>
 
-\* daemon runStep: workspace.prepare done -> heartbeat timer + session handle
+\* daemon runStep: workspace.prepare done -> heartbeat timer -> open the session.
+\* A run whose stop slot already holds a request does not open one (FinishSession).
 
 StartSession(e) ==
-  /\ ex[e].stage = "preparing"
+  /\ ex[e].stage = "preparing" /\ ~ex[e].halt
   /\ ex' = [ex EXCEPT ![e].stage = "running", ![e].beat = FALSE]
-  /\ handle' = [handle EXCEPT ![ex[e].mach] = e]
-  /\ UNCHANGED <<server, connected, dm, stopEvt, stopInHand, stopReq, journal, jout,
-                 ghosts, budgets>>
+  /\ UNCHANGED <<server, daemon, ghosts, budgets>>
 
 HeartbeatStep(e) ==
   LET m == ex[e].mach IN
@@ -132,9 +130,9 @@ HeartbeatStep(e) ==
                  daemon, ghosts, budgets>>
 
 FinishOutcomes(e) ==
-  IF ex[e].stage = "preparing" THEN {"failed"}
-  ELSE IF stopReq[ex[e].mach] THEN {"stopped", "success"}
-  ELSE IF ex[e].halt THEN {"failed", "success"}
+  IF ex[e].stage = "preparing"
+    THEN IF ex[e].halt THEN {"failed", "stopped"} ELSE {"failed"}
+  ELSE IF ex[e].halt THEN {"stopped", "success"}
   ELSE {"success", "failed", "quota"}
 
 FinishSession(e) ==
@@ -144,9 +142,8 @@ FinishSession(e) ==
        /\ ex' = [ex EXCEPT ![e].stage = "reporting", ![e].out = o,
                                  ![e].beat = FALSE, ![e].halt = FALSE]
        /\ jout' = [jout EXCEPT ![m] = o]
-  /\ stopReq' = IF ex[e].stage = "running" THEN [stopReq EXCEPT ![m] = FALSE] ELSE stopReq
   /\ journal' = [journal EXCEPT ![m] = "awaiting"]
-  /\ UNCHANGED <<server, connected, dm, handle, stopEvt, stopInHand, ghosts, budgets>>
+  /\ UNCHANGED <<server, connected, dm, stopEvt, stopInHand, jstop, ghosts, budgets>>
 
 \* server: finishStep writes for the reported outcome, without re-checking step status
 
@@ -162,11 +159,11 @@ ApplyOutcome(e) ==
   /\ staleApply' = (staleApply \/ holder /= e)
   /\ holder' = None
   /\ ex' = [ex EXCEPT ![e] = Gone]
-  /\ handle' = [handle EXCEPT ![m] = None]
   /\ journal' = IF dm[m] = "down" THEN journal ELSE [journal EXCEPT ![m] = "none"]
   /\ jout' = IF dm[m] = "down" THEN jout ELSE [jout EXCEPT ![m] = "none"]
+  /\ jstop' = IF dm[m] = "down" THEN jstop ELSE [jstop EXCEPT ![m] = FALSE]
   /\ UNCHANGED <<sm, fresh, progressed, phase, online, presenceFresh, home,
-                 connected, dm, stopEvt, stopInHand, stopReq, stopDelivered, budgets>>
+                 connected, dm, stopEvt, stopInHand, stopDelivered, budgets>>
 
 \* server: finishStep up to its first await. Only a success body can carry prUrl
 \* (mergedPrElsewhere) or be a merge landing (applyMergeLanding); every other
@@ -178,12 +175,11 @@ FinishStepOwnedCheck(e) ==
   /\ IF connected[m] /\ sm = m
        THEN IF ex[e].out = "success"
               THEN /\ ex' = [ex EXCEPT ![e].stage = "applying"]
-                   /\ UNCHANGED <<server, handle, journal, jout, ghosts>>
+                   /\ UNCHANGED <<server, journal, jout, jstop, ghosts>>
               ELSE ApplyOutcome(e)
        ELSE /\ ex' = [ex EXCEPT ![e] = Gone]
-            /\ handle' = [handle EXCEPT ![m] = None]
-            /\ UNCHANGED <<server, journal, jout, ghosts>>
-  /\ UNCHANGED <<connected, dm, stopEvt, stopInHand, stopReq, budgets>>
+            /\ UNCHANGED <<server, journal, jout, jstop, ghosts>>
+  /\ UNCHANGED <<connected, dm, stopEvt, stopInHand, budgets>>
 
 \* server: finishStep after its awaits
 
@@ -231,7 +227,7 @@ CloseCard ==
               /\ UNCHANGED st
          ELSE UNCHANGED <<st, stopPending, stopEvt>>
   /\ UNCHANGED <<sm, fresh, progressed, probeDue, online, presenceFresh, home,
-                 connected, dm, handle, stopInHand, stopReq, journal, jout,
+                 connected, dm, stopInHand, journal, jout, jstop,
                  ex, ghosts, budgets>>
 
 \* daemon deliverStop: client.stop (server fetchStop) ...
@@ -244,19 +240,21 @@ DeliverStopFetch(m) ==
             /\ stopInHand' = [stopInHand EXCEPT ![m] = TRUE]
        ELSE UNCHANGED <<stopPending, stopInHand>>
   /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, online, presenceFresh, home,
-                 connected, dm, handle, stopReq, journal, jout, ex, ghosts, budgets>>
+                 connected, dm, journal, jout, jstop, ex, ghosts, budgets>>
 
-\* ... then sessionHandles.get(stepId)
+\* ... then journal.update(stopRequest) and stops.deliver: every run of the step
+\* on this machine gets the request, whether or not its session is open yet
 
-DeliverStopToHandle(m) ==
+DeliverStopToRuns(m) ==
   /\ stopInHand[m]
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
   /\ stopDelivered' = [stopDelivered EXCEPT ![m] = TRUE]
-  /\ IF handle[m] /= None
-       THEN /\ stopReq' = [stopReq EXCEPT ![m] = TRUE]
-            /\ ex' = [ex EXCEPT ![handle[m]].halt = TRUE]
-       ELSE UNCHANGED <<stopReq, ex>>
-  /\ UNCHANGED <<server, connected, dm, handle, stopEvt, journal, jout,
+  /\ jstop' = IF journal[m] /= "none" THEN [jstop EXCEPT ![m] = TRUE] ELSE jstop
+  /\ ex' = [e \in ExecIds |->
+              IF ex[e].mach = m /\ ex[e].stage \in Working
+                THEN [ex[e] EXCEPT !.halt = TRUE]
+                ELSE ex[e]]
+  /\ UNCHANGED <<server, connected, dm, stopEvt, journal, jout,
                  holder, staleApply, budgets>>
 
 ----------------------------------------------------------------------------
@@ -296,14 +294,14 @@ Partition(m) ==
   /\ connected' = [connected EXCEPT ![m] = FALSE]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
   /\ partitions' = partitions + 1
-  /\ UNCHANGED <<server, dm, handle, stopInHand, stopReq, journal, jout, ex, ghosts,
+  /\ UNCHANGED <<server, dm, stopInHand, journal, jout, jstop, ex, ghosts,
                  claims, crashes, rebinds>>
 
 Reconnect(m) ==
   /\ Involved(m)
   /\ ~connected[m]
   /\ connected' = [connected EXCEPT ![m] = TRUE]
-  /\ UNCHANGED <<server, dm, handle, stopEvt, stopInHand, stopReq, journal, jout, ex,
+  /\ UNCHANGED <<server, dm, stopEvt, stopInHand, journal, jout, jstop, ex,
                  ghosts, budgets>>
 
 DaemonCrash(m) ==
@@ -314,15 +312,16 @@ DaemonCrash(m) ==
               IF ex[e].mach = m /\ ex[e].stage \in {"preparing", "running", "reporting"}
                 THEN Gone
                 ELSE ex[e]]
-  /\ handle' = [handle EXCEPT ![m] = None]
   /\ stopEvt' = [stopEvt EXCEPT ![m] = FALSE]
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
-  /\ stopReq' = [stopReq EXCEPT ![m] = FALSE]
   /\ crashes' = crashes + 1
-  /\ UNCHANGED <<server, connected, journal, jout, ghosts, claims, partitions, rebinds>>
+  /\ UNCHANGED <<server, connected, journal, jout, jstop, ghosts, claims, partitions,
+                 rebinds>>
 
 \* daemon start: presence, then POST /api/machine/recover, resumed runStep is awaited
-\* before the push stream, the presence timer and the claim loop start
+\* before the push stream, the presence timer and the claim loop start. A journal
+\* entry that recorded an accepted stop is reported stopped without a run;
+\* awaiting-upload is replayed first (completion wins).
 
 DaemonStartRecover(m) ==
   /\ Involved(m)
@@ -339,21 +338,23 @@ DaemonStartRecover(m) ==
                         /\ ex' = [ex EXCEPT ![e] =
                                     IF journal[m] = "awaiting"
                                       THEN NewExec(m, "reporting", jout[m])
-                                      ELSE NewExec(m, "preparing", "none")]
+                                      ELSE IF jstop[m]
+                                        THEN NewExec(m, "reporting", "stopped")
+                                        ELSE NewExec(m, "preparing", "none")]
                         /\ holder' = e
                    /\ dm' = [dm EXCEPT ![m] = "recovering"]
                    /\ UNCHANGED <<st, stopPending>>
        ELSE /\ dm' = [dm EXCEPT ![m] = "up"]
             /\ UNCHANGED <<st, stopPending, ex, holder>>
   /\ UNCHANGED <<sm, fresh, progressed, probeDue, phase, home,
-                 connected, handle, stopEvt, stopInHand, stopReq, journal, jout,
+                 connected, stopEvt, stopInHand, journal, jout, jstop,
                  staleApply, stopDelivered, budgets>>
 
 DaemonRecoverDone(m) ==
   /\ dm[m] = "recovering"
   /\ ~\E e \in ExecIds : ex[e].mach = m /\ ex[e].stage \in Live
   /\ dm' = [dm EXCEPT ![m] = "up"]
-  /\ UNCHANGED <<server, connected, handle, stopEvt, stopInHand, stopReq, journal, jout,
+  /\ UNCHANGED <<server, connected, stopEvt, stopInHand, journal, jout, jstop,
                  ex, ghosts, budgets>>
 
 RebindHomeMachine(m) ==
@@ -368,7 +369,7 @@ RebindHomeMachine(m) ==
 Next ==
   \/ \E m \in Machines :
        \/ TryClaim(m) \/ TryClaimResponseLost(m)
-       \/ DeliverStopFetch(m) \/ DeliverStopToHandle(m)
+       \/ DeliverStopFetch(m) \/ DeliverStopToRuns(m)
        \/ PresenceAges(m) \/ MarkPresence(m)
        \/ Partition(m) \/ Reconnect(m)
        \/ DaemonCrash(m) \/ DaemonStartRecover(m) \/ DaemonRecoverDone(m)
@@ -385,8 +386,8 @@ StateView ==
     IF st = "claimed" THEN <<fresh, progressed>> ELSE <<>>,
     IF st = "waiting_quota" THEN probeDue ELSE FALSE,
     phase, stopPending, online, presenceFresh, home,
-    connected, dm, handle, stopEvt, stopInHand, stopReq, journal,
-    [m \in Machines |-> IF journal[m] = "awaiting" THEN jout[m] ELSE "none"],
+    connected, dm, stopEvt, stopInHand, journal,
+    [m \in Machines |-> IF journal[m] = "awaiting" THEN jout[m] ELSE "none"], jstop,
     ex, ghosts, budgets>>
 
 ----------------------------------------------------------------------------

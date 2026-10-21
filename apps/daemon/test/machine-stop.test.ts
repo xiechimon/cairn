@@ -4,6 +4,7 @@
 import type { AgentBackend, StepEvent } from '@pacman/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
+import { StepJournal } from '../src/journal.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 
 describe('stop 投递（M7 #308：事件 → 拉取-确认 → AgentSessionHandle.stop → done(stopped)）', () => {
@@ -138,6 +139,156 @@ describe('stop 投递（M7 #308：事件 → 拉取-确认 → AgentSessionHandl
     api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
     await waitFor(() => lines.some((l) => l.includes('stop dropped (no live session)')));
     expect(probe.stopCalls).toBe(0);
+    await handle.stop();
+    await handle.done;
+  });
+});
+
+// 已接收的停止送达本机这一步的每一次 run（verify-step-claim F3 / P4）。失败方式：
+//   1. 准备期（会话未开）拉到停止 → 停止被丢、会话照开照跑完 → 应不开会话、报 stopped
+//   2. 会话开启途中（createSession 在途）拉到停止 → 同上被丢 → 应一开即中断、报 stopped
+//   3. 两轮会话之间（流断续跑 / 协议回落重开）拉到停止 → 下一轮照跑 → 应一开即中断
+//   4. 同一步在本机有两次 run → 停止只到最新登记的会话 → 应两次都收到（runner-stop.test.ts）
+//   5. 接收停止后 daemon 重启、会话没跑完 → recover 重跑 → 应直接报 stopped（machine-recover.test.ts）
+//   6. 接收停止后重启、会话已跑完待补报 → 应补报原结果，完成优先（machine-recover.test.ts）
+//   7. 本机没有这一步在跑 → 照旧丢弃，不留下会停掉以后 run 的残留
+//   8. 中断调用本身抛错 → 不按 stopped 判（会话没真停）
+describe('已接收的停止送达本机每一次 run（F3）', () => {
+  /** createSession 挂到 openGate()；会话的 stop() 结束事件流且不产 done。 */
+  function gatedStoppableBackend() {
+    let openGate: () => void = () => {};
+    const opened = new Promise<void>((r) => {
+      openGate = r;
+    });
+    const probe = { createCalls: 0, stopCalls: 0 };
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        probe.createCalls += 1;
+        await opened;
+        let release: () => void = () => {};
+        const gate = new Promise<void>((r) => {
+          release = r;
+        });
+        let stopped = false;
+        return {
+          sessionId: `pi-sess-${probe.createCalls}`,
+          events: (async function* () {
+            yield { type: 'text_delta', text: 'working' } as StepEvent;
+            await gate;
+            if (!stopped) yield { type: 'done', usage: [] } as StepEvent;
+          })(),
+          async steer() {},
+          async stop() {
+            probe.stopCalls += 1;
+            stopped = true;
+            release();
+          },
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    return { backend, probe, openGate };
+  }
+
+  /** token 拉取挂到 openToken()：runStep 停在准备期（会话未开）。 */
+  class TokenGateApi extends FakeMachineApi {
+    tokenCalls = 0;
+    private releaseToken: () => void = () => {};
+    private readonly tokenGate = new Promise<void>((r) => {
+      this.releaseToken = r;
+    });
+    override async token(stepId: string) {
+      this.tokenCalls += 1;
+      await this.tokenGate;
+      return super.token(stepId);
+    }
+    openToken(): void {
+      this.releaseToken();
+    }
+  }
+
+  test('失败方式 1：准备期拉到的停止 → 落 journal、不开会话、报 stopped', async () => {
+    const api = new TokenGateApi();
+    api.stopResponse = true;
+    const { backend, probe, openGate } = gatedStoppableBackend();
+    openGate();
+    const { handle, lines, paths } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => api.tokenCalls === 1);
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => lines.some((l) => /stop (delivered|dropped)/.test(l)));
+    expect(lines.some((l) => l.includes('stop dropped'))).toBe(false);
+    expect(new StepJournal(paths.outboxDir).get('s1')?.stopRequest).toEqual({ discard: true });
+    api.openToken();
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('stopped');
+    expect(probe.createCalls).toBe(0);
+    expect(new StepJournal(paths.outboxDir).get('s1')).toBeNull();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('失败方式 2：会话开启途中拉到的停止 → 会话一开即中断、报 stopped', async () => {
+    const api = new FakeMachineApi();
+    api.stopResponse = true;
+    const { backend, probe, openGate } = gatedStoppableBackend();
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => probe.createCalls === 1);
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => lines.some((l) => /stop (delivered|dropped)/.test(l)));
+    expect(lines.some((l) => l.includes('stop dropped'))).toBe(false);
+    openGate();
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('stopped');
+    expect(probe.stopCalls).toBe(1);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('失败方式 8：中断调用抛错 → 会话没真停，收尾不按 stopped 判', async () => {
+    const api = new FakeMachineApi();
+    api.stopResponse = false;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'pi-sess-throw',
+          events: (async function* () {
+            yield { type: 'text_delta', text: '跑着' } as StepEvent;
+            await gate;
+            yield { type: 'error', error: { message: 'boom', retryable: false } } as StepEvent;
+          })(),
+          async steer() {},
+          async stop() {
+            throw new Error('abort failed');
+          },
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend });
+    await waitFor(() => api.parked !== null);
+    api.parked?.(CLAIMED);
+    await waitFor(() => lines.some((l) => l.includes('new session conv-1')));
+    api.onStreamEvent?.({ type: 'stop', stepId: 's1' });
+    await waitFor(() => lines.some((l) => l.includes('stop delivery failed')));
+    release();
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('failed');
     await handle.stop();
     await handle.done;
   });

@@ -31,7 +31,7 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
 import { setupProxy } from './proxy.js';
-import { resumePendingUpload, runStep, type StopRequest } from './runner.js';
+import { resumePendingUpload, resumeStoppedStep, runStep } from './runner.js';
 import {
   ensureStateDirs,
   loadMachineJson,
@@ -42,6 +42,7 @@ import {
   saveMachineJson,
 } from './state.js';
 import { resolveStepImages, sweepStepAttachments } from './step-attachments.js';
+import { StepStops } from './step-stops.js';
 import { performSync } from './sync.js';
 import { DAEMON_VERSION } from './version.js';
 import { WorkspaceManager } from './workspace.js';
@@ -358,9 +359,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   // 注册表若在调用点之后才 const 初始化 = TDZ ReferenceError（crash-recover
   // 集成实测：重启 daemon 于 recover 即崩）。
   const sessionHandles = new Map<string, AgentSessionHandle>();
-  // 停止请求旗标（M7 #308）：deliverStop 拉取-确认后置位，runStep 收尾判
-  // stopped 消费；声明位纪律同 sessionHandles。
-  const stopRequests = new Map<string, StopRequest>();
+  // 停止位登记表（M7 #308）：runStep 进门登记、deliverStop 按步号投递；声明位
+  // 纪律同 sessionHandles。
+  const stops = new StepStops();
   // #1148 在飞 chief 步 id 集（本地闸不计数；与 inFlight 同进同出）。声明位
   // 纪律同 sessionHandles——recover 块的消费面（workerEnv）在其下方。
   const inFlightChief = new Set<string>();
@@ -437,6 +438,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         // 不重跑 agent 轮（重跑会白烧一轮模型并把同内容传成重复版本）。
         if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
           await resumePendingUpload(stepDeps(), entry, { running: 1 });
+          continue;
+        }
+        if (entry.stopRequest != null) {
+          await resumeStoppedStep(stepDeps(), entry);
           continue;
         }
         // journal 快照续跑：sessionId 在 → continue session（同 conv pi 会话
@@ -517,24 +522,22 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.step(`steer delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  // 停止投递（M7 #308，steer 三号分流同律）：拉取-确认置旗标 → live.stop()
-  // 中断 pi 会话；旗标先于 stop() 置位（runStep 的事件流结束即读）。收尾
+  // 停止投递（M7 #308，steer 三号分流同律）：拉取-确认后先落 journal（拉取
+  // 即确认，server 侧已清；重启后 recover 只能从这里知道这一步已被停），再
+  // 投给这一步在本机的每一次 run（会话未开的 run 开会话前后自行兑现）。收尾
   // 判 stopped / done(stopped) 回报 / discard rewind 归 runner。
   const deliverStop = async (stepId: string): Promise<void> => {
     try {
       const discard = await client.stop(stepId);
       if (discard === null) return; // server 门拒/旧步已丢弃（拉取-确认语义）。
-      const live = sessionHandles.get(stepId);
-      if (live === undefined) {
+      journal.update(stepId, { stopRequest: { discard } });
+      const reached = await stops.deliver(stepId, { discard });
+      if (reached === 0) {
         logger.step(`stop dropped (no live session) step=${stepId}`); // 收尾竞态
         return;
       }
-      stopRequests.set(stepId, { discard });
-      await live.stop();
       logger.step(`stop delivered step=${stepId}`);
     } catch (err) {
-      // 拉取/abort 失败旗标不残留（会话未真中断，自然收尾不被误判 stopped）。
-      stopRequests.delete(stepId);
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
@@ -606,7 +609,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
       sessionHandles,
-      stopRequests,
+      stops,
       // #867 T6：runtime 步凭据预检（机器名进失败文案；探针缺省 = 真 CLI）。
       machineName: config.name,
       claudeCodeAuthProbe: probeAuthAndRemember,

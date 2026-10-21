@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@pacman/shared';
+import type { StopRequest } from './step-stops.js';
 
 export type JournalState = 'claimed' | 'running' | 'awaiting-upload' | 'done' | 'failed';
 
@@ -30,6 +31,9 @@ export interface StepJournalEntry {
   /** 同上快照的 plan 半（plan 步收尾时的 plan.md 原文；非 plan 步/无产物 =
    * null——快路径无 plan 上传行）。 */
   planContent?: string | null;
+  /** 已接收的停止请求（deliverStop 拉取-确认后落盘）。重启后 recover 据此报
+   * stopped、不重跑；缺省 = 没收到停止。 */
+  stopRequest?: StopRequest | null;
   claimedAt: number;
   updatedAt: number;
 }

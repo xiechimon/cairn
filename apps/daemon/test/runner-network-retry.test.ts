@@ -33,6 +33,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { StepStops } from '../src/step-stops.js';
 
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached"}';
@@ -164,8 +165,12 @@ class FakeClient implements MachineApi {
 type Script = StepEvent[];
 
 /** 每次会话开启（create 或 continue）按序取下一条脚本；记录 continue 的
- * sessionId 以钉「续跑不断会话」语义。末次重试的 ~5s 延迟注入 1ms。 */
-function scriptedNetworkBackend(scripts: Script[]): {
+ * sessionId 以钉「续跑不断会话」语义。末次重试的 ~5s 延迟注入 1ms。
+ * onCreate = 新会话开启途中的钩子（停止钮在位的注入点）。 */
+function scriptedNetworkBackend(
+  scripts: Script[],
+  onCreate?: () => void,
+): {
   backend: AgentBackend;
   opened: { kind: 'new' | 'continue'; sessionId: string | null }[];
 } {
@@ -186,6 +191,7 @@ function scriptedNetworkBackend(scripts: Script[]): {
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(_sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+      onCreate?.();
       const handle = nextHandle(`pi-sess-${idx}`, 'new');
       opened.push({ kind: 'new', sessionId: handle.sessionId });
       return handle;
@@ -217,7 +223,11 @@ async function runNetworkCase(
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
-  const { backend, opened } = scriptedNetworkBackend(scripts);
+  const stops = new StepStops();
+  const { backend, opened } = scriptedNetworkBackend(
+    scripts,
+    opts.stopRequested ? () => void stops.deliver('step-net1', { discard: false }) : undefined,
+  );
   const deps = {
     client,
     journal,
@@ -227,7 +237,7 @@ async function runNetworkCase(
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
-    ...(opts.stopRequested ? { stopRequests: new Map([['step-net1', { discard: false }]]) } : {}),
+    stops,
   };
   await runStep(deps, claimedStep(), {
     ...(opts.finalWaitMs !== undefined ? { providerNetworkFinalWaitMs: opts.finalWaitMs } : {}),
