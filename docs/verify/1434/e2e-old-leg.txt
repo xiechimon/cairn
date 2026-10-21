@@ -1,0 +1,42 @@
+Scope: all 6 workspace projects
+✓ Lockfile at ../../pnpm-lock.yaml passes supply-chain policies (verified 1h ago)
+../.. prepare$ husky
+../.. prepare: Done
+Done in 1.2s using pnpm v12.5.1
+
+
+Running 2 tests using 1 worker
+
+[1/2] e2e/board-queued-drop.spec.ts:114:1 › a queued card does not light 执行中, and a drop there sends no start
+  1) e2e/board-queued-drop.spec.ts:114:1 › a queued card does not light 执行中, and a drop there sends no start 
+
+    Error: expect(locator).not.toHaveAttribute(expected) failed
+
+    Locator:  locator('.board-column[data-column="building"]')
+    Expected: not "true"
+    Received: "true"
+    Timeout:  5000ms
+
+    Call log:
+      - Expect "not toHaveAttribute" locator('.board-column[data-column="building"]') with timeout 5000ms
+      - waiting for locator('.board-column[data-column="building"]')
+        14 × locator resolved to <section aria-label="执行中" data-drop="true" data-column="building" data-drop-valid="true" class="board-column group/column relative flex h-full flex-col bg-(--drop-tint-hover)">…</section>
+           - unexpected value "true"
+
+
+      126 |   );
+      127 |   await evidencePanelShot(page, 'queued-over-building.png', building(page));
+    > 128 |   await expect(building(page)).not.toHaveAttribute('data-drop-valid', 'true');
+          |                                    ^
+      129 |   await expect(building(page)).not.toHaveAttribute('data-drop', 'true');
+      130 |   await page.mouse.up();
+      131 |   await expect(todoColumn(page).locator(`[data-todo-id="${QUEUED_ID}"]`)).toBeVisible();
+        at /tmp/claude-0/-home-user-pacman/24af00bf-1e02-5457-a0bc-fbc2f9e6ef47/scratchpad/base1434/apps/web/e2e/board-queued-drop.spec.ts:128:36
+
+    Error Context: test-results/board-queued-drop-a-queued-bba89-a-drop-there-sends-no-start/error-context.md
+
+
+[2/2] e2e/board-queued-drop.spec.ts:142:1 › a todo card still lights 执行中, and a drop there sends the start
+  1 failed
+    e2e/board-queued-drop.spec.ts:114:1 › a queued card does not light 执行中, and a drop there sends no start 
+  1 passed (11.5s)

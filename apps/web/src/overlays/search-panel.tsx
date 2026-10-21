@@ -26,7 +26,8 @@
 import type { SearchResponse } from '@pacman/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useAgentAvatarUrlById } from '../api/provider.js';
+import { useProjects } from '../api/hooks.js';
+import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -122,9 +123,9 @@ interface TodoRowItem {
   title: string;
   phase: TodoRecord['phase'];
   phaseAt: number;
-  /** fixture 行的 projectNames 查表键；服务端行缺省（projectName 自带）。 */
+  /** 客户端过滤行的项目查表键；服务端行缺省（projectName 自带）。 */
   projectId?: string;
-  /** 服务端 search 行自带（W4 #286）；fixture 行经 projectNames 查表。 */
+  /** 服务端 search 行自带（W4 #286）；客户端过滤行经 projectId 查表。 */
   projectName?: string;
 }
 interface AgentRowItem {
@@ -159,7 +160,8 @@ function TodoRow({
   /** Flat row position in the list (keyboard cursor + scroll-into-view). */
   index: number;
   onActivate: () => void;
-  /** M5 live：真项目名（fixture.projectNames 位 / 服务端行自带）；缺省 = capture canon。 */
+  /** 项目副行：fixture 面 = projectNames 查表 / capture canon；live 面 = 项目
+   *  读面查表 / 服务端行自带；缺省 = 不渲染副行。 */
   projectName?: string;
 }) {
   const { t } = useI18n();
@@ -180,9 +182,9 @@ function TodoRow({
         <span className="truncate leading-5 text-foreground">
           #{todo.seqNum} {todo.title}
         </span>
-        <span className="truncate text-meta text-content-tertiary">
-          {projectName ?? PROJECT_NAME}
-        </span>
+        {projectName !== undefined && (
+          <span className="truncate text-meta text-content-tertiary">{projectName}</span>
+        )}
       </span>
       {/* 时间列墨 = --text-tertiary（#949 better-colors 实测换槽：
           --text-dim × --popover-bg 亮模 2.89 < 槽地板 3，#908 裁决 2
@@ -268,23 +270,37 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
       : [...new Set(fixture.todos.map((t) => t.agent))]
           .filter((agent): agent is AgentRef => agent != null)
           .filter((agent) => agent.displayName.toLowerCase().includes(q));
-  // M5 live：项目 chip/命中 = 真项目名（首位；多项目面归后票）；fixture 面
-  // 保持 capture canon 常量。
+  // 服务端结果未到时的客户端过滤：live 面项目名只来自项目读面（在途/失败 =
+  // 无副行、无项目命中）；fixture 面 = scenario projectNames 首位，缺省
+  // capture canon。
+  const { live, teamId } = useLiveData();
+  const projectsQ = useProjects(teamId, live);
+  const liveProjects = live ? (projectsQ.data ?? []) : undefined;
   const projectName = fixture.projectNames
     ? (Object.values(fixture.projectNames)[0] ?? PROJECT_NAME)
     : PROJECT_NAME;
+  const clientProjectName = (projectId: string | undefined): string | undefined =>
+    liveProjects
+      ? liveProjects.find((project) => project.id === projectId)?.name
+      : ((projectId !== undefined ? fixture.projectNames?.[projectId] : undefined) ?? projectName);
   const projects: ProjectRowItem[] = useServer
     ? server.projects
-    : q !== '' && projectName.toLowerCase().includes(q)
-      ? [
-          {
-            id: fixture.projectNames
-              ? (Object.keys(fixture.projectNames)[0] ?? PROJECT_ID)
-              : PROJECT_ID,
-            name: projectName,
-          },
-        ]
-      : [];
+    : q === ''
+      ? []
+      : liveProjects
+        ? liveProjects
+            .filter((project) => project.name.toLowerCase().includes(q))
+            .map(({ id, name }) => ({ id, name }))
+        : projectName.toLowerCase().includes(q)
+          ? [
+              {
+                id: fixture.projectNames
+                  ? (Object.keys(fixture.projectNames)[0] ?? PROJECT_ID)
+                  : PROJECT_ID,
+                name: projectName,
+              },
+            ]
+          : [];
   const hitCount = todos.length + agents.length + projects.length;
 
   // Flat activation targets in render order — the ↑↓ cursor's index space
@@ -437,13 +453,7 @@ export function SearchPanel({ fixture, query, onQuery, open, onClose, server }: 
                     kbd={kbd}
                     index={index}
                     onActivate={() => go(`/app/todo/${todo.id}`)}
-                    projectName={
-                      useServer
-                        ? todo.projectName
-                        : ((todo.projectId !== undefined
-                            ? fixture.projectNames?.[todo.projectId]
-                            : undefined) ?? projectName)
-                    }
+                    projectName={useServer ? todo.projectName : clientProjectName(todo.projectId)}
                   />
                 ))}
               </>

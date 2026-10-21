@@ -19,6 +19,8 @@ import { PHASE_STATUS, PHASE_UI, RUNNING_INK } from '../phase.js';
 
 interface DetailHeadProps {
   todo: TodoRecord;
+  /** Live project name for the chip popover head; see ChipPopover. */
+  projectName?: string;
   /** Chip popover 执行对话 row: the model of `todo.agent` (live only). */
   agentModel?: ChipAgentModel;
   /** Rendered phase; the reject chain overrides the record's phase
@@ -52,6 +54,7 @@ interface DetailHeadProps {
 
 export function DetailHead({
   todo,
+  projectName,
   agentModel,
   phase,
   onMore,
@@ -131,6 +134,7 @@ export function DetailHead({
         >
           <ChipPopover
             todo={todo}
+            projectName={projectName}
             agentModel={agentModel}
             onEditAssign={
               onEditAssign == null

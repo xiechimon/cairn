@@ -1,0 +1,54 @@
+
+ RUN  v5.0.1 /home/user/pacman/apps/web
+
+ ❯ test/columns.test.ts (27 tests | 2 failed) 24ms
+   ❯ canDropOnColumn（#753 per-source 矩阵） (8)
+     × queued 源（已开始、等机器）：已完成 ✓（在飞关闸）；执行中 ✗；源列 ✗ 8ms
+     × 执行中 落点逐相位：只有未开始的 todo 可进（#1434） 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > queued 源（已开始、等机器）：已完成 ✓（在飞关闸）；执行中 ✗；源列 ✗
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/columns.test.ts:51:44
+     49|     const t = todo(1, 'queued');
+     50|     expect(canDropOnColumn(t, 'done')).toBe(true);
+     51|     expect(canDropOnColumn(t, 'building')).toBe(false);
+       |                                            ^
+     52|     expect(canDropOnColumn(t, 'pending')).toBe(false);
+     53|     expect(canDropOnColumn(t, 'todo')).toBe(false);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/columns.test.ts > canDropOnColumn（#753 per-source 矩阵） > 执行中 落点逐相位：只有未开始的 todo 可进（#1434）
+AssertionError: queued: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/columns.test.ts:58:66
+     56|   test('执行中 落点逐相位：只有未开始的 todo 可进（#1434）', () => {
+     57|     for (const phase of PHASE_VALUES) {
+     58|       expect(canDropOnColumn(todo(1, phase), 'building'), phase).toBe(…
+       |                                                                  ^
+     59|     }
+     60|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 25 passed (27)
+   Start at  01:59:27
+   Duration  1.56s (transform 71%, import 27%, tests 2%)
+

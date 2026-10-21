@@ -93,8 +93,10 @@ export const COLUMNS: BoardColumnDef[] = [
 /** 落位合法矩阵（#753，todos.dev 2026-10-03/04 live 重测；shared canBoardDrop
  *  的卡面镜像——那边是相位级 raw PATCH 判据，这边吃整卡所以带数据位）：
  *  - 每张卡都可拖；源列恒素面（同列落位 = 无操作）；
- *  - 执行中 只吃 待开始（拖入 = 开始意图，board.tsx startGate 路由）；
- *    待处理/已完成 源对它恒素面（实测）；
+ *  - 执行中 只吃 待开始 里未开始的 todo 卡（拖入 = 开始意图，board.tsx
+ *    startGate 路由；server orchestrate 只收 todo / failed）。queued 同住
+ *    待开始但已开始，不进（#1434）——比 canBoardDrop 的 queued→building
+ *    更严：执行中落位不发改相 PATCH。待处理/已完成 源对它恒素面（实测）；
  *  - 待处理 只吃 已完成 且 hasChanges（2026-10-04 实测：无变更的 done 卡
  *    拖拽时 待处理 恒素面）；待开始→待处理 恒素面（实测，#351 该对保留）；
  *  - 已完成 吃 待开始/执行中/待处理，含 failed（#1247 手动关边，不看
@@ -108,7 +110,7 @@ export function canDropOnColumn(todo: TodoRecord, columnId: string): boolean {
     case 'todo':
       return true;
     case 'building':
-      return src.id === 'todo';
+      return todo.phase === 'todo';
     case 'pending':
       return src.id === 'done' && todo.hasChanges === true;
     case 'done':
