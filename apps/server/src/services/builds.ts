@@ -264,18 +264,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (stoppedRow) {
-    deps.convHub?.publishStep(stepRow.buildId, {
-      id: stoppedRow.id,
-      buildId: stoppedRow.buildId,
-      kind: stoppedRow.kind,
-      machineId: stoppedRow.machineId,
-      createdAt: stoppedRow.createdAt,
-      status: stoppedRow.status,
-      checkpointCommit: stoppedRow.checkpointCommit,
-      skillInjection: stoppedRow.skillInjection ?? null,
-    });
-  }
+  if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
@@ -406,18 +395,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
-  if (stoppedRow) {
-    deps.convHub?.publishStep(stepRow.buildId, {
-      id: stoppedRow.id,
-      buildId: stoppedRow.buildId,
-      kind: stoppedRow.kind,
-      machineId: stoppedRow.machineId,
-      createdAt: stoppedRow.createdAt,
-      status: stoppedRow.status,
-      checkpointCommit: stoppedRow.checkpointCommit,
-      skillInjection: stoppedRow.skillInjection ?? null,
-    });
-  }
+  if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
@@ -425,10 +403,24 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   if (cancelledRow) publishBuild(deps, cancelledRow);
 }
 
+/** 会话流 step 事件（步状态变了之后发给详情页）。 */
+function publishStepRow(deps: BuildDeps, row: typeof step.$inferSelect): void {
+  deps.convHub?.publishStep(row.buildId, {
+    id: row.id,
+    buildId: row.buildId,
+    kind: row.kind,
+    machineId: row.machineId,
+    createdAt: row.createdAt,
+    status: row.status,
+    checkpointCommit: row.checkpointCommit,
+    skillInjection: row.skillInjection ?? null,
+  });
+}
+
 /** #1403：PR 对账收尾（done / failed）时停掉本 build 还没人领的 verify /
- * review 步——卡已收尾，它们之后再被领走就是在已收尾的卡上跑（blocking 审核
- * 会把 done 往 planning 推而抛错）。只改步状态，不写 build.errorMessage
- * （不是用户停止，收尾原因由对账自己的行说明）。 */
+ * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
+ * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
+ * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
 export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
   const rows = deps.db
     .select()
@@ -436,23 +428,14 @@ export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
     .where(
       and(
         eq(step.buildId, buildId),
-        eq(step.status, 'pending'),
+        inArray(step.status, ['pending', 'waiting_quota']),
         inArray(step.kind, ['verify', 'review']),
       ),
     )
     .all();
   for (const row of rows) {
     deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
-    deps.convHub?.publishStep(buildId, {
-      id: row.id,
-      buildId,
-      kind: row.kind,
-      machineId: row.machineId,
-      createdAt: row.createdAt,
-      status: 'stopped',
-      checkpointCommit: row.checkpointCommit,
-      skillInjection: row.skillInjection ?? null,
-    });
+    publishStepRow(deps, { ...row, status: 'stopped' });
   }
 }
 

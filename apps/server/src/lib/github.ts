@@ -135,7 +135,7 @@ export async function githubPullState(
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
 /** PR 对账读（#1403）：githubPullState 的两个字段 + 合并提交 SHA、合并者、head
- * SHA、base 分支与仓库默认分支。 */
+ * SHA、关闭时刻、base 分支与仓库默认分支。 */
 export interface GithubPull extends GithubPullState {
   /** merged 时 = squash/merge 落在 base 上的提交；未合并恒 null。 */
   mergeCommitSha: string | null;
@@ -143,6 +143,8 @@ export interface GithubPull extends GithubPullState {
   mergedBy: string | null;
   /** PR head 分支当前的提交（合并后 = 合并时的 head）；响应缺失 = null。 */
   headSha: string | null;
+  /** closed_at（epoch ms；GitHub 给到秒）；未关闭或缺失 = null。 */
+  closedAt: number | null;
   /** PR 的目标分支（base.ref）与仓库默认分支（base.repo.default_branch）；缺失 = null。 */
   baseRef: string | null;
   defaultBranch: string | null;
@@ -195,6 +197,7 @@ export async function githubPull(
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown } | null;
+    closed_at?: unknown;
     base?: { ref?: unknown; repo?: { default_branch?: unknown } | null } | null;
   };
   if (raw.state !== 'open' && raw.state !== 'closed') return null;
@@ -209,6 +212,10 @@ export async function githubPull(
         merged && typeof raw.merge_commit_sha === 'string' ? raw.merge_commit_sha : null,
       mergedBy: merged && typeof raw.merged_by?.login === 'string' ? raw.merged_by.login : null,
       headSha: typeof raw.head?.sha === 'string' ? raw.head.sha : null,
+      closedAt:
+        raw.state === 'closed' && typeof raw.closed_at === 'string'
+          ? Date.parse(raw.closed_at) || null
+          : null,
       baseRef: typeof raw.base?.ref === 'string' ? raw.base.ref : null,
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,

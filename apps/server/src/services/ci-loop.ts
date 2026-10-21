@@ -41,13 +41,15 @@
 //   → system 行写合并 SHA + done 收尾漏斗（与 merge 步成同一条）；
 // - 关闭未合并 → system 行 + build.errorMessage + failed；
 // - open → 不动；读不到 / 网络窗内相位被人改 → 不动（同磨绿面 ④ 纪律）。
-// 每个 build 每种结局只收一次尾：本 build 已有完成行（合并步或对账收过尾）
-// 就不再按「已合并」收，已有对账的关闭行就不再按「已关闭」收——人之后把卡
-// 拖回 review（done→review 重开、closed→review、failed→review 恢复）是人的
-// 决定。不看时钟：CI 一绿就合并（含 GitHub auto-merge）时卡在合并之后才进
-// review，照样收尾。收尾时停掉没人领的 verify / review 步。
+// 每个 build 每种结局只收一次尾。已合并：本 build 已有完成行（合并步或对账
+// 收过尾）或「标记为已完成」行（人手拖到已完成）就不再收；不看时钟——CI 一绿
+// 就合并（含 GitHub auto-merge）时卡在合并之后才进 review，照样收尾。已关闭：
+// 已有对账的关闭行就不再收；PR 在卡这次进入 review 之前就关了（人手关掉再
+// 拖回、或关在 review 之前）则提示一行交给人，不打成 failed（GitHub 的
+// closed_at 到秒，按秒与 todo.phaseAt 比）。收尾时停掉没人领的 verify /
+// review 步。
 
-import { conversationBranch } from '@pacman/shared';
+import { conversationBranch, DONE_ANNOUNCEMENT } from '@pacman/shared';
 import { and, desc, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, message, project, step, todo } from '../db/schema.js';
@@ -86,6 +88,9 @@ export const CI_EMPTY_CHECKS_GRACE_MS = 300_000;
 /** 未连接 GitHub 时 PR 对账的最短重读间隔（匿名主限流 60 次/小时，#931 /
  * #1217 守卫同用这份额度）。 */
 export const CI_ANON_READ_INTERVAL_MS = 300_000;
+
+/** compare 答 404（提交不在 GitHub 上）之后，同一对提交的最短重读间隔。 */
+export const CI_MISSING_COMPARE_RECHECK_MS = 600_000;
 
 /** 修复步 prompt 头行标记：修复轮计数判据（marker prompt 的 build 步 = 一轮
  * 修复；原执行步/confirm 步无 marker 不计——与 buildRestartPrompt 等模板步
@@ -216,7 +221,7 @@ interface CiPollTally {
   closedUnmerged: number;
   /** 已合并但分支上有合并没带走的提交，或合进了非默认分支：提示一次，不收尾。 */
   hinted: number;
-  /** 本 build 已为这个结局收过一次尾（人后来把卡拖回了 review）：交给人。 */
+  /** 本 build 已为这个结局收过一次尾，或 PR 在卡这次进入 review 之前就关了：交给人。 */
   settledBefore: number;
 }
 
@@ -235,8 +240,11 @@ export function createCiPoller(
   /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
   /** compare 结果（键 = PR + checkpoint + head；两个固定提交之间的结果不变，
-   * 读到即可复用；404 除外）。 */
-  const compareCache = new Map<string, string>();
+   * 读到即可复用；404 例外：那个提交之后可能被推上去，过 CI_MISSING_COMPARE_
+   * RECHECK_MS 再读）。 */
+  const compareCache = new Map<string, { status: string; at: number }>();
+  /** 本轮 sweep 见到的 review 候选的缓存键；sweep 末尾据此清掉别的缓存行。 */
+  const liveKeys = new Set<string>();
 
   /** 本 build 有在飞的步：已被领取或在等额度的任意步，以及排队中的非审核
    * 类步。没人领的 verify / review 步不算（Verifier 的机器离线时，卡不能
@@ -250,8 +258,11 @@ export function createCiPoller(
           and(
             eq(step.buildId, buildId),
             or(
-              inArray(step.status, ['claimed', 'waiting_quota']),
-              and(eq(step.status, 'pending'), notInArray(step.kind, ['verify', 'review'])),
+              eq(step.status, 'claimed'),
+              and(
+                inArray(step.status, ['pending', 'waiting_quota']),
+                notInArray(step.kind, ['verify', 'review']),
+              ),
             ),
           ),
         )
@@ -259,23 +270,44 @@ export function createCiPoller(
     );
   }
 
-  function systemRows(buildId: string): unknown[] {
-    return deps.db
-      .select({ content: message.content })
-      .from(message)
-      .where(and(eq(message.conversationId, buildId), eq(message.role, 'system')))
-      .all()
-      .map((r) => r.content);
+  function hasRow(buildId: string, role: 'system' | 'user', content: string): boolean {
+    return (
+      deps.db
+        .select({ id: message.id })
+        .from(message)
+        .where(
+          and(
+            eq(message.conversationId, buildId),
+            eq(message.role, role),
+            eq(message.content, content),
+          ),
+        )
+        .get() !== undefined
+    );
   }
 
-  /** 本 build 是否已为这个结局收过尾（完成行 / 对账的关闭行）。 */
+  /** 本 build 是否已为这个结局收过尾（完成行或人手「标记为已完成」/ 对账的关闭行）。 */
   function settled(buildId: string, merged: boolean, closedText: string): boolean {
-    return systemRows(buildId).includes(merged ? DONE_ROW : closedText);
+    return merged
+      ? hasRow(buildId, 'system', DONE_ROW) || hasRow(buildId, 'user', DONE_ANNOUNCEMENT)
+      : hasRow(buildId, 'system', closedText);
+  }
+
+  /** 失败收尾：build.errorMessage 落因 + 发 build 文档 + todo → failed。 */
+  function failWithMessage(
+    cand: { buildId: string; todoId: string },
+    teamId: string,
+    text: string,
+  ) {
+    deps.db.update(build).set({ errorMessage: text }).where(eq(build.id, cand.buildId)).run();
+    const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
+    setTodoPhase(deps, cand.todoId, 'failed');
   }
 
   /** 同一条提示只落一次（内容带提交 SHA）。 */
   function hintOnce(buildId: string, content: string, tally: CiPollTally): void {
-    if (systemRows(buildId).includes(content)) return;
+    if (hasRow(buildId, 'system', content)) return;
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
       role: 'system',
@@ -342,12 +374,13 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
+    const prNumber = buildRow.prNumber;
+    const key = `${target.fullName}#${prNumber}`;
+    liveKeys.add(key);
     if (hasActiveStep(cand.buildId)) {
       tally.skipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
-    const prNumber = buildRow.prNumber;
-    const key = `${target.fullName}#${prNumber}`;
     const token = tokenFor(target.teamId);
     if (token === null) {
       const last = anonReadAt.get(key);
@@ -382,6 +415,18 @@ export function createCiPoller(
       tally.settledBefore += 1;
       return;
     }
+    if (
+      !pull.merged &&
+      (pull.closedAt === null || pull.closedAt < Math.floor(fresh.phaseAt / 1000) * 1000)
+    ) {
+      hintOnce(
+        cand.buildId,
+        `PR #${prNumber} 在任务这次进入审核关口之前已在 GitHub 关闭（未合并）。任务留在审核关口，由人决定。`,
+        tally,
+      );
+      tally.settledBefore += 1;
+      return;
+    }
     if (pull.merged) {
       if (pull.baseRef === null || pull.defaultBranch === null) {
         tally.unreadable += 1;
@@ -406,9 +451,18 @@ export function createCiPoller(
           )
           .orderBy(desc(step.createdAt))
           .get()?.commit ?? null;
+      if (checkpoint !== null && pull.headSha === null) {
+        tally.unreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
+        return;
+      }
       if (checkpoint !== null && pull.headSha !== null && checkpoint !== pull.headSha) {
         const cmpKey = `${key}:${checkpoint}...${pull.headSha}`;
-        let status = compareCache.get(cmpKey) ?? null;
+        const cached = compareCache.get(cmpKey);
+        let status =
+          cached === undefined ||
+          (cached.status === 'missing' && now - cached.at >= CI_MISSING_COMPARE_RECHECK_MS)
+            ? null
+            : cached.status;
         if (status === null) {
           status = await githubCompareStatus(
             run.githubFetch,
@@ -422,8 +476,7 @@ export function createCiPoller(
             tally.unreadable += 1;
             return;
           }
-          // 404 不缓存：那个提交之后可能被推上去；其余结果对两个固定提交不会变。
-          if (status !== 'missing') compareCache.set(cmpKey, status);
+          compareCache.set(cmpKey, { status, at: now });
         }
         if (
           freshReviewRow(cand.todoId, cand.buildId) === null ||
@@ -469,11 +522,8 @@ export function createCiPoller(
       content: closedText,
       createdAt: nowMs(),
     });
-    deps.db.update(build).set({ errorMessage: closedText }).where(eq(build.id, cand.buildId)).run();
-    const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-    if (row) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
     stopUnclaimedGateSteps(deps, cand.buildId);
-    setTodoPhase(deps, cand.todoId, 'failed');
+    failWithMessage(cand, todoRow.teamId, closedText);
     tally.closedUnmerged += 1;
   }
 
@@ -548,14 +598,7 @@ export function createCiPoller(
       if (rounds >= CI_FIX_ROUNDS_MAX) {
         // 死循环闸（③）：停手转人工——build.errorMessage 落因 + todo → failed
         // （building→failed 合法边；failed→review 恢复闸 #702 照常可用）。
-        deps.db
-          .update(build)
-          .set({ errorMessage: deadLoopMessage(rounds) })
-          .where(eq(build.id, cand.buildId))
-          .run();
-        const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
-        if (row) deps.hub.publishBuildDoc(todoRow.teamId, toBuildRecord(row));
-        setTodoPhase(deps, cand.todoId, 'failed');
+        failWithMessage(cand, todoRow.teamId, deadLoopMessage(rounds));
         tally.failed += 1;
         return;
       }
@@ -627,6 +670,7 @@ export function createCiPoller(
         );
       }
     }
+    liveKeys.clear();
     for (const cand of reviewCandidates) {
       try {
         await reconcileOne(cand, now, tally);
@@ -637,6 +681,12 @@ export function createCiPoller(
           'pr reconcile candidate failed (sweep continues)',
         );
       }
+    }
+    // 离开 review 的 PR 不再留缓存行（进程常驻，否则只增不减）。
+    for (const k of pullCache.keys()) if (!liveKeys.has(k)) pullCache.delete(k);
+    for (const k of anonReadAt.keys()) if (!liveKeys.has(k)) anonReadAt.delete(k);
+    for (const k of compareCache.keys()) {
+      if (!liveKeys.has(k.slice(0, k.indexOf(':')))) compareCache.delete(k);
     }
     run.logger?.info(tally, 'ci pr-checks sweep');
   }
