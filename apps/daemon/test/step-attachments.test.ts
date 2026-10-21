@@ -346,7 +346,7 @@ describe('#1406 issue 原文围栏里的 token 行', () => {
       materializeDir: s.materializeDir,
       log: s.log,
     });
-    return { out, requested, s };
+    return { out, requested };
   }
 
   test('A1/A2：围栏里的 png token 行照常内联交付，锚行带引用前缀留在围栏里', async () => {

@@ -120,17 +120,16 @@ async function deliver(
   const home = mkdtempSync(join(tmpdir(), 'pacman-issue-fence-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
-  const fake = fakeBackend([{ type: 'done', usage: [] }]);
+  const { backend: base, created } = fakeBackend([{ type: 'done', usage: [] }]);
   const backend: AgentBackend =
     opts.missingSession === true
       ? {
-          ...fake.backend,
+          ...base,
           async continueSession(id) {
             throw new SessionNotResumableError(id);
           },
         }
-      : fake.backend;
-  const created = fake.created;
+      : base;
   const client = new FakeMachineApi();
   client.attachments = { ...opts.attachments };
   await runStep(
