@@ -380,15 +380,20 @@ export function createCiPoller(
     setTodoPhase(deps, cand.todoId, 'failed');
   }
 
-  /** 同一条提示只落一次（内容带提交 SHA）。 */
-  function hintOnce(buildId: string, content: string, since: number, tally: CiPollTally): void {
-    if (rowKnown(buildId, content, since)) return;
+  /** 对账写进本 build 会话的 system 行（提示、合并行、关闭行）。 */
+  function writeSystemRow(buildId: string, content: string): void {
     insertMessageRow(deps, buildId, {
       id: newRecordId(),
       role: 'system',
       content,
       createdAt: nowMs(),
     });
+  }
+
+  /** 同一条提示每轮（since 起）只落一次（按内容去重）。 */
+  function hintOnce(buildId: string, content: string, since: number, tally: CiPollTally): void {
+    if (rowKnown(buildId, content, since)) return;
+    writeSystemRow(buildId, content);
     tally.hinted += 1;
   }
 
@@ -439,7 +444,12 @@ export function createCiPoller(
     tally: CiPollTally,
   ): Promise<void> {
     const todoRow = freshReviewRow(cand.todoId, cand.buildId);
-    const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    // 只取 PR 号：build 行的 changes 列是整份 diff，每轮每候选不必读它。
+    const buildRow = deps.db
+      .select({ prNumber: build.prNumber })
+      .from(build)
+      .where(eq(build.id, cand.buildId))
+      .get();
     const target = todoRow === null ? null : githubTarget(todoRow.projectId);
     if (
       todoRow === null ||
@@ -495,8 +505,7 @@ export function createCiPoller(
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
-    const fresh = freshReviewRow(cand.todoId, cand.buildId);
-    if (fresh === null || hasActiveStep(cand.buildId)) {
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
       tally.reviewSkipped += 1;
       return;
     }
@@ -630,12 +639,10 @@ export function createCiPoller(
         pull.mergeCommitSha === null ? null : `合并提交 ${pull.mergeCommitSha.slice(0, 7)}`,
         pull.mergedBy === null ? null : `由 ${pull.mergedBy} 合并`,
       ].filter((x) => x !== null);
-      insertMessageRow(deps, cand.buildId, {
-        id: newRecordId(),
-        role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
-        createdAt: nowMs(),
-      });
+      writeSystemRow(
+        cand.buildId,
+        `PR #${prNumber} 已在 GitHub 合并${detail.length > 0 ? `（${detail.join('，')}）` : ''}`,
+      );
       finishTodoDone(deps, cand.todoId, cand.buildId);
       tally.merged += 1;
       return;
@@ -649,12 +656,7 @@ export function createCiPoller(
       return;
     }
     closedSeenAt.delete(key);
-    insertMessageRow(deps, cand.buildId, {
-      id: newRecordId(),
-      role: 'system',
-      content: closedText,
-      createdAt: nowMs(),
-    });
+    writeSystemRow(cand.buildId, closedText);
     stopUnclaimedGateSteps(deps, cand.buildId);
     failWithMessage(cand, todoRow.teamId, closedText);
     tally.closedUnmerged += 1;
@@ -671,7 +673,11 @@ export function createCiPoller(
       tally.skipped += 1;
       return;
     }
-    const buildRow = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
+    const buildRow = deps.db
+      .select({ prNumber: build.prNumber, prUrl: build.prUrl })
+      .from(build)
+      .where(eq(build.id, cand.buildId))
+      .get();
     const target = githubTarget(todoRow.projectId);
     if (buildRow === undefined || buildRow.prNumber === null || target === null) {
       // 形态不齐（PR 号缺失/项目非 github——生产不可达，防御位）：不出站、不写。
