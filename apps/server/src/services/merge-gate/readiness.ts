@@ -85,7 +85,9 @@ export interface GateInputs {
    * 本 PR 的提交 base..head（响应 commits[].sha，40 位小写，读全）。'unreadable' =
    * 没读到（请求失败、超时、非 2xx），下一次巡检再读；'malformed' = 读到了、形状
    * 不对（compareFilesFromResponse 返回 null，或 commits 不是 SHA 列表），每次读
-   * 都一样，留人。commits 少给只会让证据链少认（拦），不会多放。 */
+   * 都一样，留人。commits 少给只会让证据链少认（拦），不会多放。commits 不带逐提交
+   * 的文件列表，所以证据链指向的文件在那个提交上是否已经存在（raw 是否 404）这里
+   * 判不了，由 I/O 外壳（S4）去查。 */
   compare: { files: CompareFile[]; commits: string[] } | 'unreadable' | 'malformed';
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
   verdicts: GateVerdictView[];
@@ -105,6 +107,39 @@ const ORDER = new Map<string, number>(MERGE_BLOCKERS.map((b, i) => [b.code, i]))
 const META = new Map<string, (typeof MERGE_BLOCKERS)[number]>(
   MERGE_BLOCKERS.map((b) => [b.code, b]),
 );
+
+// detail 里的名字（文件、检查、分支、仓库）由 PR 作者或第三方起，原样会把换行、
+// 控制字符、指令样的文本与任意长的名单带进 status 描述与 chief 工具。名字一律写成
+// JSON 字符串；JSON 不转义、读起来却会变样的字符（C1 控制符、双向覆盖之类的格式符、
+// 行与段分隔符）也写成 \uXXXX。每个名字转义后至多 DETAIL_NAME_CHARS 个字符，超出
+// 截断并在引号外标 …；每份名单至多 DETAIL_NAMES 个，其余记 +N more。
+const DETAIL_NAMES = 10;
+const DETAIL_NAME_CHARS = 120;
+const UNSAFE_CHAR = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+
+function escapeChar(ch: string): string {
+  const json = JSON.stringify(ch).slice(1, -1);
+  if (json !== ch || !UNSAFE_CHAR.test(ch)) return json;
+  return Array.from(
+    { length: ch.length },
+    (_, k) => `\\u${ch.charCodeAt(k).toString(16).padStart(4, '0')}`,
+  ).join('');
+}
+
+function quoted(name: string): string {
+  let body = '';
+  for (const ch of name) {
+    const esc = escapeChar(ch);
+    if (body.length + esc.length > DETAIL_NAME_CHARS) return `"${body}"…`;
+    body += esc;
+  }
+  return `"${body}"`;
+}
+
+function names(list: readonly string[]): string[] {
+  const shown = list.slice(0, DETAIL_NAMES).map(quoted);
+  return list.length > DETAIL_NAMES ? [...shown, `+${list.length - DETAIL_NAMES} more`] : shown;
+}
 
 const runPasses = (r: GateCheckRun) =>
   r.status === 'completed' && r.conclusion !== null && PASSING_CONCLUSIONS.has(r.conclusion);
@@ -136,12 +171,15 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       pr.headRepoFullName === null ||
       pr.headRepoFullName.toLowerCase() !== pr.baseRepoFullName.toLowerCase()
     ) {
-      block('pr-from-fork', pr.headRepoFullName ?? 'head repository deleted');
+      block(
+        'pr-from-fork',
+        pr.headRepoFullName === null ? 'head repository deleted' : quoted(pr.headRepoFullName),
+      );
     }
     // 默认分支读不到是输入读不到，可等；不能当成目标分支不对去留人。
     if (i.repo.defaultBranch === null) block('pr-unreadable', 'default branch unreadable');
     else if (pr.baseRef !== i.repo.defaultBranch)
-      block('base-not-default', `${pr.baseRef} → ${i.repo.defaultBranch}`);
+      block('base-not-default', `${quoted(pr.baseRef)} → ${quoted(i.repo.defaultBranch)}`);
   }
 
   // 检查（当前 head）。judged = 上面已按必需检查或 pr-evidence 记过自己码的条目。
@@ -163,16 +201,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       const status = checks.statuses.find((s) => s.context.toLowerCase() === name.toLowerCase());
       if (run !== undefined) {
         judged.add(run);
-        if (run.status !== 'completed') block('required-check-pending', name);
+        if (run.status !== 'completed') block('required-check-pending', quoted(name));
         else if (!runPasses(run))
-          block('required-check-failed', `${name}: ${run.conclusion ?? 'none'}`);
+          block('required-check-failed', `${quoted(name)}: ${run.conclusion ?? 'none'}`);
       } else if (status !== undefined) {
         judged.add(status);
-        if (status.state === 'pending') block('required-check-pending', name);
+        if (status.state === 'pending') block('required-check-pending', quoted(name));
         else if (status.state !== 'success')
-          block('required-check-failed', `${name}: ${status.state}`);
+          block('required-check-failed', `${quoted(name)}: ${status.state}`);
       } else {
-        block('required-check-missing', name);
+        block('required-check-missing', quoted(name));
       }
     }
   }
@@ -212,13 +250,16 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     } else if (state === 'unstable') {
       if (notPassing === null) block('mergeable-state', 'unstable, checks unreadable');
       else if (notPassing.length > 0)
-        block('mergeable-state', `unstable: ${notPassing.map(checkName).join(', ')}`);
+        block('mergeable-state', `unstable: ${names(notPassing.map(checkName)).join(', ')}`);
       else if (!ownNotPassing) block('mergeable-state', 'unstable, no failing check visible');
     } else if (state === 'clean' || state === 'has_hooks') {
       // 必需检查与 pr-evidence 上面已各记自己的码，这里不重复列。
       const foreign = (notPassing ?? []).filter((x) => !judged.has(x));
       if (foreign.length > 0)
-        block('mergeable-state', `${state}, not passing: ${foreign.map(checkName).join(', ')}`);
+        block(
+          'mergeable-state',
+          `${state}, not passing: ${names(foreign.map(checkName)).join(', ')}`,
+        );
     } else {
       block('mergeable-state', state);
     }
@@ -246,21 +287,25 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('size-cap', `${digest.countedLines} lines, ${digest.countedFiles} files`);
     }
     const paths = classifyPaths(compare.files, i.ticketRef);
-    if (paths.protected.length > 0) block('protected-path', ...paths.protected);
-    if (paths.outsideAutoMerge.length > 0) block('outside-auto-merge', ...paths.outsideAutoMerge);
-    if (paths.deletedTests.length > 0) block('test-deleted', ...paths.deletedTests);
+    if (paths.protected.length > 0) block('protected-path', ...names(paths.protected));
+    if (paths.outsideAutoMerge.length > 0)
+      block('outside-auto-merge', ...names(paths.outsideAutoMerge));
+    if (paths.deletedTests.length > 0) block('test-deleted', ...names(paths.deletedTests));
     // 证据豁免只认原样的 docs/verify/（paths.ts 用 isEvidencePath，与摘要同一条）：
     // Docs/Verify/ 下没有 patch 的名字照样列进 opaque。
-    if (paths.opaque.length > 0) block('opaque-file', ...paths.opaque);
+    if (paths.opaque.length > 0) block('opaque-file', ...names(paths.opaque));
     if (paths.otherTicketEvidence.length > 0)
-      block('evidence-outside-ticket', ...paths.otherTicketEvidence);
+      block('evidence-outside-ticket', ...names(paths.otherTicketEvidence));
     if (paths.executableEvidence.length > 0)
-      block('evidence-executable', ...paths.executableEvidence);
+      block('evidence-executable', ...names(paths.executableEvidence));
   }
 
   // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件：
   // 只是 head 的祖先不够，main 历史里同票前一段（已 squash）的证据也是祖先，本 PR
   // 却一份证据没加。compare 不可得时上面已拦，这里判不了，不再重复列出。
+  // 判不了的另一样：链接钉在本 PR 较早的提交上、文件到后来的提交才加进来时，raw
+  // 是 404，可两条都成立。要判须知道每个提交动了哪些文件，compare 不给；文件在该
+  // SHA 上是否存在交给 S4 的外壳查（测试「readiness 不判链接的文件……」钉着这一点）。
   if (i.issueNumber === null) block('issue-ref-missing');
   if (pr !== null && compare !== null) {
     const { links } = parseRawEvidenceLinks(pr.body, {
