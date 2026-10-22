@@ -1266,7 +1266,7 @@ export async function githubIssueState(
   return { notModified: false, etag: got.etag, data: { state } };
 }
 
-// —— issue 写面（#452 / ADR 0006 写向：server 唯二写入点，文件头穷举律）———
+// —— issue 写面（#452 / ADR 0006 写向：文件头写面清单的三处之二，穷举律见文件头）———
 
 /** JSON 写请求单点（POST/PATCH 共用）：超时/网络/上游状态经既有映射
  * （mapFetchThrow / mapUpstreamStatus），token 只进 Authorization 头。 */

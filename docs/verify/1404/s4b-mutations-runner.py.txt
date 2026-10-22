@@ -1,0 +1,35 @@
+# S4b mutation runner. Usage: run_mutations.py <worktree> <out.tsv> [ids...]
+# Each mutation (id, failure mode, description, file, old, new) replaces text that occurs exactly once in
+# <file>, runs the six merge-gate test files, and restores the file from a copy taken before the run.
+import os, shutil, subprocess, sys, time
+repo, out = sys.argv[1], sys.argv[2]
+only = set(sys.argv[3:])
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mutations import M
+TESTS = ['apps/server/test/merge-gate-github-facts.test.ts', 'apps/server/test/merge-gate-status.test.ts',
+         'apps/server/test/merge-gate-github-adapter.test.ts', 'apps/server/test/merge-gate-readiness.test.ts',
+         'apps/server/test/merge-gate-evidence-link.test.ts', 'apps/server/test/merge-gate-imports.test.ts']
+files = sorted({m[3] for m in M})
+backup = {f: open(os.path.join(repo, f), encoding='utf-8').read() for f in files}
+rows = []
+try:
+    for mid, fm, desc, f, old, new in M:
+        if only and mid not in only: continue
+        src = backup[f]
+        n = src.count(old)
+        if n != 1:
+            rows.append((mid, fm, desc, f'NOT APPLIED ({n})', '')); print(mid, 'NOT APPLIED', n, flush=True); continue
+        open(os.path.join(repo, f), 'w', encoding='utf-8').write(src.replace(old, new))
+        t0 = time.time()
+        p = subprocess.run(['pnpm', 'exec', 'vitest', 'run', *TESTS], cwd=repo, capture_output=True, text=True, timeout=600)
+        tail = [l.strip() for l in (p.stdout + p.stderr).splitlines() if l.strip().startswith('Tests ')]
+        verdict = 'caught' if p.returncode != 0 else 'SURVIVED'
+        rows.append((mid, fm, desc, verdict, tail[-1] if tail else f'exit {p.returncode}'))
+        open(os.path.join(repo, f), 'w', encoding='utf-8').write(src)
+        print(mid, verdict, rows[-1][4], f'{time.time()-t0:.1f}s', flush=True)
+finally:
+    for f, src in backup.items():
+        open(os.path.join(repo, f), 'w', encoding='utf-8').write(src)
+with open(out, 'w', encoding='utf-8') as fh:
+    for r in rows: fh.write('\t'.join(r) + '\n')
+print(f"{len(rows)} mutations, {sum(r[3]=='caught' for r in rows)} caught, {sum(r[3]=='SURVIVED' for r in rows)} survived, {sum(r[3].startswith('NOT') for r in rows)} not applied")

@@ -250,3 +250,7 @@ The `step.finishedAt` schema comment now says that builds.ts writes it for build
 Not fixed:
 - A development or verify database that applied this branch's earlier `0045_step_finished_at` (journal `when` 1792674802072, later than main's 0045) would skip main's `0045_model_fallback_chain` and fail on 0046's duplicate column. Only databases that ran this unmerged branch before the renumber are affected; main never had the old number, and the CLAUDE.md rule requires the renumber. Such a database is reset. This goes into the PR's Risk section.
 - A PR read that keeps failing leaves the card at building (F11, decided).
+
+## 19. Merge of origin/main at f8483f73 (2026-10-22)
+
+main gained #1525 (P3 S4b, the merge gate's GitHub shell) and no new migration: the tail is still `0045_model_fallback_chain`, so `0046_step_finished_at` stays. The only conflict was spec 28 §8: this branch's P2 row kept, main's P3 row taken. `lib/github.ts` merged cleanly. Server suite on the merge: 135 files, 2396 passed, 1 skipped; `db:check` passes.
