@@ -292,9 +292,10 @@ export function buildCiFixPrompt(args: {
   ].join('\n');
 }
 
-/** 已完成的连续修复轮数（死循环闸计数）：marker prompt 的 build 步 = 一轮。
- * 无状态过滤——扫描集已挡在飞步（pending/claimed 跳过），此处全部是终态步。 */
-function countCiFixRounds(db: Db, buildId: string, head = CI_FIX_PROMPT_HEAD): number {
+/** 已完成的轮数（轮上限计数）：头行是 head marker 的 build 步 = 一轮（[ci-fix] 与
+ * [merge-conflict] 各数各的）。无状态过滤——扫描集已挡在飞步（pending/claimed 跳过），
+ * 此处全部是终态步。 */
+function countMarkedRounds(db: Db, buildId: string, head: string): number {
   return db
     .select({ id: step.id })
     .from(step)
@@ -494,7 +495,7 @@ export function createCiPoller(
     defaultBranch: string,
     fromReview: boolean,
   ): void {
-    const rounds = countCiFixRounds(deps.db, cand.buildId, CI_MERGE_CONFLICT_PROMPT_HEAD);
+    const rounds = countMarkedRounds(deps.db, cand.buildId, CI_MERGE_CONFLICT_PROMPT_HEAD);
     if (rounds >= CI_MERGE_CONFLICT_ROUNDS_MAX) {
       hintOnce(
         cand.buildId,
@@ -1113,7 +1114,7 @@ export function createCiPoller(
       return;
     }
     if (verdict.state === 'red') {
-      const rounds = countCiFixRounds(deps.db, cand.buildId);
+      const rounds = countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD);
       if (rounds >= CI_FIX_ROUNDS_MAX) {
         // 死循环闸（③）：停手转人工——build.errorMessage 落因 + todo → failed
         // （building→failed 合法边；failed→review 恢复闸 #702 照常可用）。
