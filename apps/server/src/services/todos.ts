@@ -31,7 +31,6 @@ import {
   machine,
   message,
   plan as planTable,
-  project,
   steerPending,
   step,
   stopPending,
@@ -50,7 +49,7 @@ import {
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { githubRepoOfProject } from './git.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
@@ -205,7 +204,8 @@ function waitingOnOf(
     if (home === undefined || !home.online) {
       return { on: 'machine', retryAt: null };
     }
-    if (!runtimeGatePasses(home, agentRow.provider)) {
+    // #1493：降级后按备选的 provider 判（claim 面同判据）。
+    if (!runtimeGatePasses(home, s.fallback?.model?.provider ?? agentRow.provider)) {
       return { on: 'machine', retryAt: null };
     }
     // #1251：归属机在线且 runtime 闸开，但能力快照缺 Agent 声明项——机器
@@ -637,10 +637,11 @@ export function isStartedTodoRow(row: {
  *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派是
  *    任务定义，不是产物）。执行机工作区文件与会话资产不动（daemon 本地物，
  *    server 够不着——dialog 文案如实声明）。
- *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后任何上报
- *    （heartbeat/completion）都落进 NotFoundError 404 被忽略，不存在「已删
- *    build 的落账把相位拽走」的路径（与 applyStoppedStep 的 gate 回落无交集，
- *    本函数不经过它）。
+ *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后的完成回报落进
+ *    NotFoundError 404，不存在「已删 build 的落账把相位拽走」的路径（与
+ *    applyStoppedStep 的 gate 回落无交集，本函数不经过它）。
+ *  - 在跑的步：上面发的停止信号来不及被拉取（行先删了）。daemon 的下一次心跳
+ *    得到 410（#1488），按停止收尾——不再 commit/push，不再耗模型。
  *  非 started 卡 = 无操作返回现记录（调用方本不该调；raw 调用无害）。
  *  expected 相位/build 快照对不上 = { stale: true } + 现记录（构建在 dialog
  *  打开后推进了——调用方刷新 dialog 文案重新确认，不得按旧文案重置）。 */
@@ -765,12 +766,7 @@ export async function flushSelfIssueWrites(): Promise<void> {
  * 形态，不进自建面。 */
 function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
   if (deps.box === undefined) return null;
-  const proj = deps.db
-    .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
-    .from(project)
-    .where(eq(project.id, projectId))
-    .get();
-  const ref = githubRepoOfProject(proj);
+  const ref = githubRepoOfProject(projectOfTodo(deps.db, { projectId, teamId }));
   if (ref === null) return null;
   if (!hasGithubConnection(deps.db, teamId)) return null;
   return ref;
@@ -797,12 +793,7 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef !== null) return null;
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
-  const proj = db
-    .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
-    .from(project)
-    .where(eq(project.id, row.projectId))
-    .get();
-  const repoRef = githubRepoOfProject(proj);
+  const repoRef = githubRepoOfProject(projectOfTodo(db, row));
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
   const token = openGithubToken({ db, box }, row.teamId);
   if (token === null) throw new HttpError(404, 'github connection not found');

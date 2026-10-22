@@ -25,6 +25,7 @@ import {
   AGENT_FAILURE_KINDS,
   classifyAgentFailure,
   classifyStepFailure,
+  isProviderAuthFailure,
   parseRetryAfterMs,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
@@ -200,5 +201,35 @@ describe('parseRetryAfterMs（#1261 F5）', () => {
 
   test('数值上限：过大的秒数收口（防 bogus relay 值把探测排到数年后）', () => {
     expect(parseRetryAfterMs('retry-after: 999999999')).toBeNull();
+  });
+});
+
+describe('isProviderAuthFailure（#1493 降级链触发：认证失败）', () => {
+  test.each([
+    '401 Unauthorized: missing or bad api key',
+    'Error: 401 {"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}}',
+    'Invalid API key provided',
+    'incorrect api key',
+    'invalid_api_key',
+    'API key expired',
+  ])('命中：%s', (msg) => {
+    expect(isProviderAuthFailure(msg)).toBe(true);
+  });
+
+  test.each([
+    '',
+    '402: quota exceeded',
+    '429 rate limited',
+    'request took 4013ms',
+    '400: bad protocol',
+    'Error: 403 usage limit reached',
+    'Not logged in · Please run /login',
+    // git / GitHub 凭证失败：与模型 provider 无关，换模型没用。
+    "remote: Unauthorized\nfatal: unable to access 'https://github.com/x/y.git/': The requested URL returned error: 401",
+    '401 Unauthorized',
+    'gh: Bad credentials (HTTP 401)',
+    'see PR #401',
+  ])('不命中：%s', (msg) => {
+    expect(isProviderAuthFailure(msg)).toBe(false);
   });
 });

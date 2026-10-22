@@ -56,6 +56,8 @@ export function stepQueueProjector(db: Db, teamId: string) {
       // #1251 blocked 位的 Agent 解析材料（agentIdForStep 三参 + 行存在查询）。
       kind: step.kind,
       prompt: step.prompt,
+      // #1493 降级后本步按备选的 provider 过 runtime 闸（claim 面同判据）。
+      fallback: step.fallback,
       todoRow: todo,
     })
     .from(step)
@@ -159,7 +161,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
       return { kind: 'machine-offline', missing: [] };
     }
     const agentRow = agentForRow(row);
-    if (agentRow?.modelId != null && runtimeGatePasses(home, agentRow.provider)) {
+    const provider =
+      ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
+    if (agentRow?.modelId != null && runtimeGatePasses(home, provider)) {
       const missing = missingCapabilities(home, agentRow);
       if (missing.length > 0) return { kind: 'capability-missing', missing };
     }
