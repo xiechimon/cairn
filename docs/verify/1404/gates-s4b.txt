@@ -1,0 +1,111 @@
+# #1404 S4b gates (CLAUDE.md: lint, typecheck, spec:parse, vitest --changed, e2e:affected), run by s4b-gates.sh.txt;
+# each command's last 25 lines (ANSI codes stripped) and its exit code. Port 8407 was checked free with lsof first.
+# The one lint info is the existing noUselessFragments note in apps/web/src/resources/machines-page.tsx.
+# Run on the final code (7ae5eb4); the commit that adds this file changes only docs/verify.
+
+# head 7ae5eb42715edfe10242558e95edc32d254e03d5 on claude/bootstrap-p3-s4b, origin/main b57b4a0db7fd966b876dab228f5ea027af2a290e, 2026-10-22T13:54:21Z
+$ pnpm lint
+    330 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed fragment.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    315 315 │               ) : null}
+    316 316 │               {estimate ? null : (
+    317     │ - ··············<>
+    318     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        317 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    319 318 │                     <>
+    320 319 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 822 files in 2s. No fixes applied.
+Found 1 info.
+exit 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.3s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.9s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ pnpm exec vitest run --changed origin/main
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=whitelist) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-it-skills-home-IeDO2x/workspaces/01a163ea-0503-788e-965f-e22c9603c0fc/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-it-skills-home-IeDO2x/workspaces/01a163ea-0503-788e-965f-e22c9603c0fc/.pi/skills)
+[skills] filtered: extra-skill not in agent allowlist
+[skills] loaded: 1 skills from /tmp/pacman-it-skills-Z3tstS
+[skills] catalog: entries=1 chars=574 bytes=612
+[step] brief written: AGENTS.md (create)
+[skills] deny: 1 skill dir(s) hard-blocked
+new session 01a163ea-0503-788e-965f-e22c9603c0fc
+[skills] denied-read: /tmp/pacman-it-skills-Z3tstS/extra-skill/SKILL.md (skill extra-skill not in allowlist)
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  146 passed (146)
+      Tests  2016 passed | 1 skipped (2017)
+   Start at  13:54:54
+   Duration  353.06s (tests 63%, import 36%)
+
+exit 0
+
+$ E2E_AFFECTED_PORT=8407 pnpm --filter @pacman/web e2e:affected
+  docs/verify/1404/s4b-mutations-runner.py.txt → none
+  docs/verify/1404/s4b-mutations.txt → none
+  docs/verify/1404/s4b-red-green.txt → none
+  docs/verify/1404/s4b-reviews.txt → none
+  docs/verify/1404/s4b-swap.sh.txt → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8407
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.5s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.5s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.0s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (547ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (601ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (755ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (682ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (697ms)
+
+  8 passed (15.0s)
+exit 0
+
