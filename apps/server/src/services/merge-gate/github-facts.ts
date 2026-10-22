@@ -368,7 +368,8 @@ function statusOf(v: unknown): StatusRow | null {
 }
 
 /** 分页读一个列表（check runs 或 statuses）：读到 total_count 条、或一页为空、或到页数上限。
- * 第 1 页只在上次的第 1 页就是全部时才发 etag。complete = 各页 total_count 一致且读够了条数。
+ * 第 1 页只在上次的第 1 页就是全部时才发 etag。complete = 读够了第 1 页说的条数（某页的
+ * total_count 与第 1 页不同时就停，条数到不了）。
  * 任何一条形状不对、或 accept(第 1 页的体, 这一页的体) 为假 = null。 */
 async function readPaged<T>(
   r: Reader,
@@ -381,7 +382,6 @@ async function readPaged<T>(
 ): Promise<{ rows: T[]; complete: boolean; first: Obj } | null> {
   const rows: T[] = [];
   let first: Obj | null = null;
-  let complete = true;
   for (let page = 1; page <= maxPages; page += 1) {
     const got = await readBody(
       r,
@@ -395,10 +395,8 @@ async function readPaged<T>(
     if (!Array.isArray(list)) return null;
     first ??= got.body;
     if (!accept(first, got.body)) return null;
-    if (got.body.total_count !== first.total_count) {
-      complete = false;
-      break;
-    }
+    // 各页的 total_count 不一致 = 不是同一次读：停下，条数对不上就不算读全。
+    if (got.body.total_count !== first.total_count) break;
     for (const v of list as unknown[]) {
       const row = parse(v);
       if (row === null) return null;
@@ -407,7 +405,7 @@ async function readPaged<T>(
     if (list.length === 0 || rows.length >= (first.total_count as number)) break;
   }
   if (first === null) return null;
-  return { rows, complete: complete && rows.length === first.total_count, first };
+  return { rows, complete: rows.length === first.total_count, first };
 }
 
 /** (app, 名字) 去重留 id 最大的一条，保持首次出现的位置；必需检查绑了 app 的排前面。 */

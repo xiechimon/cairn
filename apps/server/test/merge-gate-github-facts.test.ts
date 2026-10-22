@@ -370,6 +370,25 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
     const third = fakeGithub();
     await readGateGithubFacts(third.port, REQ, c2);
     expect(third.log[0]).toEqual(['pull', 7, { etag: null }]);
+    // A response without an etag clears the entry an earlier response left.
+    const c3 = newGateReadCache();
+    await read({}, c3);
+    await read({ pull: () => ok(prBody(), null) }, c3);
+    const fourth = fakeGithub();
+    await readGateGithubFacts(fourth.port, REQ, c3);
+    expect(fourth.log[0]).toEqual(['pull', 7, { etag: null }]);
+    // A cached runs page that was not the whole list is not reused: no etag is sent, and a
+    // not-modified answer (which the transport only gives when an etag was sent) is not trusted.
+    const runs = Array.from({ length: 150 }, (_, k) => run(`job ${k}`, { id: k + 1 }));
+    const c4 = newGateReadCache();
+    await read({ checkRuns: runPages(runs) }, c4);
+    const partial = await read({ checkRuns: () => ({ kind: 'not-modified' }) }, c4);
+    expect(partial.log.find(([n]) => n === 'checkRuns')).toEqual([
+      'checkRuns',
+      HEAD,
+      { filter: 'latest', page: 1, perPage: 100, etag: null },
+    ]);
+    expect(partial.checks).toBeNull();
     // A not-modified with nothing cached is not used.
     const g = await read({ pull: () => ({ kind: 'not-modified' }) });
     expect(g.pr).toBeNull();
@@ -404,6 +423,7 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
       const f = await read({ branch });
       expect(f.compare).toBe('unreadable');
       expect(names(f.log)).not.toContain('compare');
+      expect(f.notes).toContain('base branch tip unreadable; compare not read');
       expect(f.checks?.headSha).toBe(HEAD);
     }
   });
@@ -456,6 +476,8 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
       [{ sha: HEAD, parents: [BASE] }],
       [{ parents: [{ sha: BASE }] }],
       [{ sha: 7, parents: [] }],
+      [{ sha: HEAD, parents: [{}] }],
+      [{ sha: HEAD, parents: [{ sha: 7 }] }],
       'x',
     ]) {
       const f = await read({
@@ -572,6 +594,7 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     ).toBeNull();
     const rules = [
       { type: 'deletion' },
+      { type: 'pull_request', parameters: { required_approving_review_count: 1 } },
       {
         type: 'required_status_checks',
         parameters: {
@@ -603,7 +626,7 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     expect(await required({ rules: () => NOT_FOUND })).toBeNull();
     // Paging: a full page asks for the next; five full pages is the cap (null, not a partial list).
     const full = Array.from({ length: 100 }, () => ({ type: 'deletion' }));
-    const two = await read({ rules: (_n, o) => ok(o.page === 1 ? full : [rules[1]]) });
+    const two = await read({ rules: (_n, o) => ok(o.page === 1 ? full : [rules[2]]) });
     expect(two.checks?.required).toEqual(['check', 'pr-evidence', 'lint']);
     expect(two.log.filter(([n]) => n === 'rules')).toHaveLength(2);
     const capped = await read({ rules: () => ok(full) });
