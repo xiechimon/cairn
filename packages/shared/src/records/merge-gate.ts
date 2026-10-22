@@ -178,7 +178,11 @@ export const MERGE_BLOCKERS = [
   { code: 'phase-not-review', class: 'transient', label: '任务不在审核关口' },
   { code: 'work-in-flight', class: 'transient', label: '还有步骤在跑' },
   // PR
-  { code: 'pr-unreadable', class: 'transient', label: '读不到 PR 或仓库默认分支' },
+  {
+    code: 'pr-unreadable',
+    class: 'transient',
+    label: '读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA',
+  },
   { code: 'pr-not-open', class: 'human', label: 'PR 已合并或已关闭' },
   { code: 'pr-draft', class: 'transient', label: 'PR 是草稿' },
   { code: 'pr-from-fork', class: 'human', label: 'PR 来自 fork' },
@@ -205,7 +209,11 @@ export const MERGE_BLOCKERS = [
     class: 'transient',
     label: '读不到当前 head 的 compare，补丁摘要暂不可得',
   },
-  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },
+  {
+    code: 'compare-malformed',
+    class: 'human',
+    label: 'compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错',
+  },
   { code: 'compare-truncated', class: 'human', label: 'compare 文件列表被截断' },
   {
     code: 'patch-unbindable',
