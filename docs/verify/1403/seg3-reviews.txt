@@ -62,6 +62,18 @@ Ten findings (seg3-plan.md §14, red-green leg 5, mutations Q1-Q7):
 9. The duplicate step query before stopUnclaimedGateSteps. It now returns the stopped kinds.
 10. Ruleset rules past the first 100: not fixed (one page of the documented maximum; plan §14).
 
+## /code-review, round 5 (medium, origin/claude/bootstrap-p2-seg2b...9f179024)
+
+Eight candidate findings (seg3-plan.md §15, red-green leg 6, mutations R1-R5):
+1. The default branch name went unquoted into shell commands in the merge-conflict prompt. Fixed (F12b).
+2. A permission 403 on the rules read counted as "no rules". Fixed: only the plan message counts (F27b).
+3. pushNotSeen ignored verify and plan pushes. Fixed (F30d).
+4. Re-verify after a person moves the card by hand: not fixed (out of the grind's path; the marker row stays).
+5. The BEHIND hint named a merge policy. Reworded.
+6. The missing-check grace restarted on a re-run. Fixed (F4c).
+7. stopUnclaimedGateSteps published a stale finishedAt. Fixed.
+8. recordGrindAnonRead took no count. Fixed.
+
 ## /security-review
 
 Not run. The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.

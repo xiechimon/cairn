@@ -83,7 +83,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, desc, eq, inArray, isNotNull, like } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -272,10 +272,13 @@ export function buildMergeConflictPrompt(args: {
   defaultBranch: string;
   round: number;
 }): string {
+  // 默认分支名来自 GitHub（ref 名可以含 ; $ | & 与反引号）：命令里按 shell 单引号引起来，
+  // 说明文字里过 githubText。
+  const quote = (v: string) => `'${v.replaceAll("'", `'\\''`)}'`;
   return [
-    `${CI_MERGE_CONFLICT_PROMPT_HEAD} 解冲突轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 与默认分支「${args.defaultBranch}」冲突，GitHub 合并不了。`,
+    `${CI_MERGE_CONFLICT_PROMPT_HEAD} 解冲突轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 与默认分支「${githubText(args.defaultBranch)}」冲突，GitHub 合并不了。`,
     '',
-    `请在本分支上执行 git fetch origin ${args.defaultBranch}，再 git merge origin/${args.defaultBranch}，解决冲突后提交，并推送到同一分支。`,
+    `请在本分支上执行 git fetch origin ${quote(args.defaultBranch)}，再 git merge ${quote(`origin/${args.defaultBranch}`)}，解决冲突后提交，并推送到同一分支。`,
     '不要 rebase、不要 force-push、不要新开分支或 PR；推送后 CI 会重跑，系统会继续轮询。',
   ].join('\n');
 }
@@ -443,10 +446,10 @@ export function createCiPoller(
     );
   }
 
-  /** 磨绿的匿名读：只记进按 IP 的总数，不受额度拦。 */
-  function recordGrindAnonRead(now: number): void {
+  /** 磨绿的匿名读（count 次）：只记进按 IP 的总数，不受额度拦。 */
+  function recordGrindAnonRead(now: number, count = 1): void {
     anonFree(now);
-    anonAll.push(now);
+    for (let i = 0; i < count; i += 1) anonAll.push(now);
   }
 
   /** 取一次对账的匿名额度；need = 这次读之后还要留出的次数（pulls 读要给它
@@ -558,7 +561,7 @@ export function createCiPoller(
         and(
           eq(step.buildId, buildId),
           eq(step.status, 'done'),
-          inArray(step.kind, ['build', 'merge']),
+          ne(step.kind, 'review'), // 审核步不提交（同 lastPushedCheckpoint）
           isNotNull(step.finishedAt),
         ),
       )
@@ -782,7 +785,7 @@ export function createCiPoller(
         } else {
           hintOnce(
             cand.buildId,
-            `PR #${prNumber} 落后于默认分支「${githubText(pull.defaultBranch)}」。合并策略是由人合并（human），pacman 不替人更新分支：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
+            `PR #${prNumber} 落后于默认分支「${githubText(pull.defaultBranch)}」。pacman 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
             roundStart(deps, cand.buildId),
           );
         }
@@ -1116,8 +1119,7 @@ export function createCiPoller(
         : now - required.at >= CI_REQUIRED_CHECKS_TTL_MS)
     ) {
       if (grindToken === null) {
-        recordGrindAnonRead(now);
-        recordGrindAnonRead(now);
+        recordGrindAnonRead(now, 2); // 保护与规则两个读
       }
       const names = await githubRequiredChecks(
         run.githubFetch,
@@ -1156,8 +1158,12 @@ export function createCiPoller(
     // 304 → 用上次的 runs 按当前名单重判（etag 只在有缓存行时发送，此处恒有）。
     const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
     let verdict = verdictOfCheckRuns(runs, requiredNames);
+    // 宽限锚点：空检查或有必需检查缺 run 时起算；同一 head 上别的必需检查重跑（普通 pending）
+    // 时不清——缺的那个一直缺。
     const waiting =
-      verdict.state === 'empty' || (verdict.state === 'pending' && verdict.missing !== undefined);
+      verdict.state === 'empty' ||
+      (verdict.state === 'pending' &&
+        (verdict.missing !== undefined || (entry?.waitSince ?? null) !== null));
     const waitSince = waiting ? (entry?.waitSince ?? now) : null;
     cache.set(key, { sha: ref, etag: page.etag, runs, waitSince });
     // 竞态窗内（CI 可能还没注册 check）：不动。

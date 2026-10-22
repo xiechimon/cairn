@@ -206,3 +206,17 @@ The two required-list reads run in parallel (`Promise.all`). A lookup takes at m
 `stopUnclaimedGateSteps` returns the kinds it stopped. The round uses that instead of a second query to decide on the AI review note.
 
 Not fixed: ruleset rules are read as one page of 100 (`per_page=100`, the documented maximum). More than 100 active rules on one branch is left out of this segment.
+
+## 15. Fifth /code-review (2026-10-22, medium, on origin/claude/bootstrap-p2-seg2b...9f179024)
+
+Eight findings (candidates, not verified by the reviewer). Seven are fixed and one is not. The red leg was 4 failed / 72 passed (leg 6). Mutations R1-R5 were all killed.
+
+F12b. The merge-conflict prompt puts the default branch name in single quotes for the shell (`git fetch origin '<branch>'`, `git merge 'origin/<branch>'`), and passes it through `githubText` in prose. Git ref names may contain `;`, `$`, `|`, `&` and backticks.
+F27 / F27b (changed). A rules read answering 403 means "no rules" only when its message says the feature is not on the plan (`Upgrade to GitHub Pro or make this repository public to enable this feature.`). A permission 403 such as `Resource not accessible by integration` is unreadable. 404 still means no rules. The docs' status table for this endpoint lists only 200, so the 403 wording is GitHub's general paid-feature message, matched by /upgrade to github|enable this feature/i. If GitHub uses other wording, the card stays at building (no move) rather than being judged on a partial list.
+F30d. pushNotSeen counts every step except review steps as a pacman push, the same as lastPushedCheckpoint, so a verify step that pushed is waited out too.
+F4c. The missing-check grace keeps its start while another required check re-runs on the same head.
+The step published by stopUnclaimedGateSteps carries its finishedAt. No behaviour test: the published row only feeds the web step stream.
+recordGrindAnonRead takes a count.
+The BEHIND hint no longer names a merge policy. It says pacman does not update the branch and a person merges.
+
+Not fixed: re-verifying after a person moves the card to review by hand (not through the grind). The marker row stays in the timeline, and a person can start the verify.

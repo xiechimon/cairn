@@ -151,3 +151,19 @@ Q7 stopped AI review not detected	KILLED	1 failed | 371 passed (372)
 restored byte-identical: True
 
 Result: 7 of 7 killed.
+
+## Run 6 (the fifth /code-review's fixes; R1-R5)
+
+R1 default branch not quoted in the prompt	KILLED	1 failed | 375 passed (376)
+    red: [s3-F12b] a default branch name with shell characters is quoted in the merge-conflict prompt
+R2 any non-rate-limited 403 on rules means no rules	KILLED	1 failed | 375 passed (376)
+    red: [s3-F27b] the rules read answers 403 for the token’s permissions (not the plan): no move
+R3 pushNotSeen counts only build and merge steps	KILLED	1 failed | 375 passed (376)
+    red: [s3-F30d] a verify step that pushed just now also counts as pacman’s last push
+R4 missing-check anchor cleared on a plain pending	KILLED	1 failed | 375 passed (376)
+    red: [s3-F4c] the missing-check grace keeps its start while another required check re-runs
+R5 anonymous required read counted once	KILLED	1 failed | 375 passed (376)
+    red: [s3-F24] anonymous: the grind’s PR and required-list reads count toward the per-IP total
+restored byte-identical: True
+
+Result: 5 of 5 killed.

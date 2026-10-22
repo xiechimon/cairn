@@ -462,12 +462,9 @@ export function stopUnclaimedGateSteps(
     )
     .all();
   for (const row of rows) {
-    deps.db
-      .update(step)
-      .set({ status: 'stopped', finishedAt: nowMs() })
-      .where(eq(step.id, row.id))
-      .run();
-    publishStepRow(deps, { ...row, status: 'stopped' });
+    const finishedAt = nowMs();
+    deps.db.update(step).set({ status: 'stopped', finishedAt }).where(eq(step.id, row.id)).run();
+    publishStepRow(deps, { ...row, status: 'stopped', finishedAt });
   }
   // 停掉的步的种类（#1403 段 3：解冲突轮据此决定要不要落「AI 审核步已停」的行）。
   return rows.map((r) => r.kind);

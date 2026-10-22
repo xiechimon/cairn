@@ -88,3 +88,13 @@ Red: 5 failed / 67 passed (72). Failing lines:
   x [s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again
 
 Green after the fixes: the four affected files, 372 passed (372). Server suite: 129 files, 2188 passed, 1 skipped.
+
+## Leg 6: the fifth /code-review (F12b, F27b, F30d, F4c; F27 403 case reworded with the plan message)
+
+Red: 4 failed / 72 passed (76). Failing lines:
+  x [s3-F30d] a verify step that pushed just now also counts as pacman’s last push
+  x [s3-F27b] the rules read answers 403 for the token’s permissions (not the plan): no move
+  x [s3-F12b] a default branch name with shell characters is quoted in the merge-conflict prompt
+  x [s3-F4c] the missing-check grace keeps its start while another required check re-runs
+
+Green after the fixes: the four affected files, 376 passed (376).

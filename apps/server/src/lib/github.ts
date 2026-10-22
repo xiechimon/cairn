@@ -198,15 +198,16 @@ export interface GithubPullPage {
 }
 
 /** 条件 GET（ETag）：304 → notModified；非 2xx、网络错、响应体不是 JSON 对象
- * → null。githubPull 与 githubCommitCheckRuns 共用。absentOn 里的状态码（不是限流）
- * 按「没有这项」答空数组（必需检查名单的 rules 读：仓所在的套餐没有 ruleset）。 */
+ * → null。githubPull 与 githubCommitCheckRuns 共用。absent(状态码, 应答文本) 为真的非 2xx
+ * 应答（不是限流、不是 SSO 拒绝）按「没有这项」答空数组（必需检查名单的 rules 读：仓所在
+ * 的套餐没有 ruleset）。 */
 async function conditionalGetJson(
   fetchImpl: FetchLike,
   url: string,
   token: string | null,
   etag: string | null | undefined,
   timeoutMs: number,
-  absentOn: readonly number[] = [],
+  absent: ((status: number, text: string) => boolean) | null = null,
 ): Promise<
   { notModified: true } | { notModified: false; etag: string | null; data: object } | null
 > {
@@ -224,15 +225,13 @@ async function conditionalGetJson(
     return null;
   }
   if (res.status === 304) return { notModified: true };
-  // SAML SSO 拒绝（x-github-sso 头）不是「没有这项」：token 没被授权，读不到。
-  if (
-    absentOn.includes(res.status) &&
-    res.headers.get('x-github-sso') === null &&
-    !(await isRateLimitedResponse(res))
-  ) {
+  if (!res.ok) {
+    // SAML SSO 拒绝（x-github-sso 头）与限流都不是「没有这项」：读不到。
+    if (absent === null || res.headers.get('x-github-sso') !== null) return null;
+    const text = await res.text().catch(() => '');
+    if (isRateLimitedText(res, text) || !absent(res.status, text)) return null;
     return { notModified: false, etag: null, data: [] };
   }
-  if (!res.ok) return null;
   let data: unknown;
   try {
     data = await res.json();
@@ -1467,12 +1466,17 @@ export async function githubCommitCheckRuns(
   return { notModified: false, etag: got.etag, checkRuns };
 }
 
+/** rules 读 403 时「套餐没有 ruleset」的应答文本（私有仓在 Free 套餐上；文档的状态码表
+ * 只列 200，这一句是 GitHub 对付费功能的通用说法，按它认）。 */
+const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
+
 /** 默认分支的必需检查名单（#1403 段 3：磨绿只认它）：classic 分支保护
  * （`GET /repos/{o}/{r}/branches/{branch}` 的 protection.required_status_checks 里的
  * contexts 与 checks[].context）与 ruleset（`GET /repos/{o}/{r}/rules/branches/{branch}`
  * 里 type 为 required_status_checks 的规则的 parameters.required_status_checks[].context）
  * 取并集、去重；classic 的 enforcement_level 为 off 时它的名单不算（文档只说是 string，
- * 只认字面 off）。rules 读答 403 / 404 且不是限流、不是 SSO 拒绝 = 没有规则（ruleset 不在这个仓的套餐里，
+ * 只认字面 off）。rules 读答 404，或答 403 且说套餐没有这项功能（不是限流、不是 SSO 拒绝）
+ * = 没有规则（ruleset 不在这个仓的套餐里，
  * 或没有可见的规则）；除此之外两个读任一读不到（非 2xx、网络、限流、响应形不对）= null，
  * 调用方不动。
  * 合并闸 S4a（#1503）的原始读面落地后可改用它，接口不变。 */
@@ -1494,7 +1498,8 @@ export async function githubRequiredChecks(
       token,
       null,
       FETCH_TIMEOUT_MS,
-      [403, 404],
+      // 404 = 没有；403 只在说套餐没有这项功能时算没有（权限不够的 403 读不到，不当没有规则）。
+      (status, text) => status === 404 || (status === 403 && RULESETS_NOT_ON_PLAN.test(text)),
     ),
   ]);
   if (branchRead === null || branchRead.notModified) return null;
