@@ -65,6 +65,8 @@
 //       人（含只读成员）定，进了默认分支上的 squash 提交就会关掉任意 issue，绕过 D2
 //   D42 没有 closes 行时也传 commit_message（pacman 自己的一行）：不传时 GitHub 按仓库
 //       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
+//   D43 closes 行取 PR 读之后重读的任务行：读的网络窗里自建 issue 补上了 sourceRef（重试）
+//       → 带上它
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -510,6 +512,28 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expect(body.commit_title).toBe(`${title} (#201)`);
     },
   );
+
+  test('[2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line reads the re-read todo', async () => {
+    const w = makeWorld();
+    w.s.db
+      .update(todoTable)
+      .set({ sourceKind: 'github-issue-self', sourceRef: null })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    w.fake.onGet = () => {
+      w.s.db
+        .update(todoTable)
+        .set({ sourceRef: 'github:octo/demo#88' })
+        .where(eq(todoTable.id, w.todoId))
+        .run();
+    };
+    await requestMerge(w.deps, w.buildId);
+    const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
+      string,
+      unknown
+    >;
+    expect(body.commit_message).toBe('closes #88');
+  });
 
   test('[2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used', async () => {
     const w = makeWorld({ source: { kind: 'github-issue', ref: 'github:other/demo#77' } });

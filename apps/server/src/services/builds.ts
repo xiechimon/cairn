@@ -1727,7 +1727,8 @@ async function mergeThroughGithub(
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
       commitTitle: CLOSING_SHAPE.test(titled) ? `Merge pull request #${prNumber}` : titled,
-      commitMessage: closingLine(gate.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+      // 取读 PR 之后重读的任务行：读的网络窗里自建 issue 可能刚补上 sourceRef（D43）。
+      commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });
     if (result.kind === 'rate-limited') {
       // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。等多久与进料读同一
