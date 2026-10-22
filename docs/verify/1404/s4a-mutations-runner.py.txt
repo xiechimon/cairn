@@ -1,0 +1,29 @@
+# Apply each S4a mutation to lib/github.ts, run the transport test file, restore. Usage: run_mutations.py <repo> <backup> <out>
+import os, shutil, subprocess, sys, time
+repo, backup, out = sys.argv[1], sys.argv[2], sys.argv[3]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from mutations import M
+target = os.path.join(repo, 'apps/server/src/lib/github.ts')
+src = open(backup, encoding='utf-8').read()
+rows = []
+try:
+    for mid, fm, desc, old, new in M:
+        n = src.count(old)
+        if n != 1:
+            rows.append((mid, fm, desc, f'NOT APPLIED (old text found {n} times)', ''))
+            continue
+        open(target, 'w', encoding='utf-8').write(src.replace(old, new))
+        t0 = time.time()
+        p = subprocess.run(['pnpm', 'exec', 'vitest', 'run', 'apps/server/test/github-gate-transport.test.ts'],
+                           cwd=repo, capture_output=True, text=True, timeout=300)
+        tail = [l for l in (p.stdout + p.stderr).splitlines() if l.strip().startswith('Tests ')]
+        verdict = 'caught' if p.returncode != 0 else 'SURVIVED'
+        rows.append((mid, fm, desc, verdict, (tail[-1].strip() if tail else f'exit {p.returncode}')))
+        print(mid, verdict, rows[-1][4], f'{time.time()-t0:.1f}s', flush=True)
+finally:
+    shutil.copyfile(backup, target)
+with open(out, 'w', encoding='utf-8') as f:
+    for r in rows:
+        f.write('\t'.join(r) + '\n')
+caught = sum(1 for r in rows if r[3] == 'caught')
+print(f'{len(rows)} mutations, {caught} caught, {sum(1 for r in rows if r[3]=="SURVIVED")} survived, {sum(1 for r in rows if r[3].startswith("NOT"))} not applied')

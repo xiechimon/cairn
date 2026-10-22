@@ -464,3 +464,33 @@ describe('runner done.errorMessage ANSI 剥离（#1262）', () => {
     expect(client.doneBodies[0]?.body.errorMessage).toBe(TRANSIENT_503);
   });
 });
+
+// —— #1493 noOutput：成功收尾但 transcript 里没有任何 assistant 输出 ——————
+// server 侧「0 token 静默失败」只在 daemon 明说「无输出」时才判：pi 对不回
+// usage 的 relay 也报 0 token 行，单看 usage 会把正常完成的步误判成静默失败。
+
+describe('runner noOutput 信号（#1493）', () => {
+  test('成功但零 assistant 输出 → done 携带 noOutput', async () => {
+    const { client } = await runLifecycleCase(
+      [[...sessionOpenEcho(), { type: 'done', usage: [] }]],
+      { providerId: 'gw-lc-no-output' },
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(client.doneBodies[0]?.body.noOutput).toBe(true);
+  });
+
+  test('有 assistant 输出 → 不携带（负对照）', async () => {
+    const { client } = await runLifecycleCase(
+      [
+        [
+          ...sessionOpenEcho(),
+          { type: 'message_end', message: { role: 'assistant', content: '写好了' } },
+          { type: 'done', usage: [] },
+        ],
+      ],
+      { providerId: 'gw-lc-has-output' },
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(client.doneBodies[0]?.body.noOutput).toBeUndefined();
+  });
+});

@@ -17,7 +17,7 @@ import { asc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { AppContext } from './context.js';
-import { message, plan as planTable, project, todo, tokenUsage } from './db/schema.js';
+import { message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { jsonBody, requestOrigin, requireProject, svcOf } from './routes-helpers.js';
 import {
@@ -36,7 +36,12 @@ import {
 } from './services/builds.js';
 import { chiefThreadMessages, getChiefThread } from './services/chief.js';
 import { createSerialConnection } from './services/events.js';
-import { projectRepoRef, readBuildChangeFile, readBuildChanges } from './services/git.js';
+import {
+  projectOfTodo,
+  projectRepoRef,
+  readBuildChangeFile,
+  readBuildChanges,
+} from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { PhaseTransitionError } from './services/phase.js';
 
@@ -180,10 +185,10 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     let cloneUrl: string | null = null;
     let projectId: string | null = null;
     if (todoRow.projectId !== null) {
-      const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
-      // 项目须与任务同队（#1470）：他队项目视同无项目，不把他队仓库的 URL
-      // 下发到本队机器。
-      if (projRow && projRow.teamId === todoRow.teamId) {
+      // 项目须与任务同队（#1470 / #1497 projectOfTodo）：他队项目视同无项目，
+      // 不把他队仓库的 URL 下发到本队机器。
+      const projRow = projectOfTodo(ctx.db, todoRow);
+      if (projRow) {
         projectId = projRow.id;
         // 派生单源 = git.projectRepoRef（#1470：github 存量值不合法 = 无 URL）；
         // local 形态不经 clone 同步，照旧 null。

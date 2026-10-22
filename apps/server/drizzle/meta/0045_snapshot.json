@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "4c3d1af2-9c04-4e8c-a316-c8c702874a51",
+  "id": "5674600f-de6c-4457-a5be-3577ac76c03f",
   "prevId": "c3fbd25d-523e-495e-9167-460db4d6a78e",
   "tables": {
     "agent": {
@@ -132,6 +132,13 @@
         },
         "requiredCapabilities": {
           "name": "requiredCapabilities",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fallbackModels": {
+          "name": "fallbackModels",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -449,80 +456,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "autonomy_state": {
-      "name": "autonomy_state",
-      "columns": {
-        "projectId": {
-          "name": "projectId",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lastStartedAt": {
-          "name": "lastStartedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "baselineSha": {
-          "name": "baselineSha",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "lastBlockedReason": {
-          "name": "lastBlockedReason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "lastEvaluatedAt": {
-          "name": "lastEvaluatedAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "autonomy_state_projectId_project_id_fk": {
-          "name": "autonomy_state_projectId_project_id_fk",
-          "tableFrom": "autonomy_state",
-          "tableTo": "project",
-          "columnsFrom": [
-            "projectId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "autonomy_state_projectId_kind_pk": {
-          "columns": [
-            "projectId",
-            "kind"
-          ],
-          "name": "autonomy_state_projectId_kind_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1616,30 +1549,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "member_activity": {
-      "name": "member_activity",
-      "columns": {
-        "scope": {
-          "name": "scope",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "at": {
-          "name": "at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "message": {
       "name": "message",
       "columns": {
@@ -1909,13 +1818,6 @@
         },
         "localPath": {
           "name": "localPath",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "autonomy": {
-          "name": "autonomy",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -2445,6 +2347,13 @@
         },
         "quotaBlock": {
           "name": "quotaBlock",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fallback": {
+          "name": "fallback",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

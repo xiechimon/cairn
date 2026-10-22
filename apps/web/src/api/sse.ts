@@ -134,7 +134,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
         ? t('构建待审核')
         : record.type === 'quota_wait'
           ? t('等额度')
-          : record.entityRef.title;
+          : record.type === 'model_fallback'
+            ? t('已换备用模型')
+            : record.entityRef.title;
   const body =
     record.snippet ??
     (record.entityRef.seqNum !== null

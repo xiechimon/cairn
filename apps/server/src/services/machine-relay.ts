@@ -17,7 +17,7 @@ import {
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, project, type step, todo } from '../db/schema.js';
+import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { NotFoundError } from './builds.js';
 import {
@@ -27,6 +27,7 @@ import {
   holdForQuestion,
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
@@ -164,7 +165,8 @@ async function executeWorkerMemoryToolCall(
       teamId: todoRow.teamId,
       agentId,
       todoId: todoRow.id,
-      projectId: todoRow.projectId,
+      // 他队项目不进溯源缺省（#1497 projectOfTodo）。
+      projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
       buildId: row.buildId,
       attachmentsDir: deps.attachmentsDir,
     },
@@ -221,12 +223,10 @@ async function setTaskMeta(
   todoRow: typeof todo.$inferSelect,
   params: Record<string, unknown>,
 ): Promise<string> {
-  const projectRow = deps.db
-    .select({ repoKind: project.repoKind })
-    .from(project)
-    .where(eq(project.id, todoRow.projectId))
-    .get();
-  if (projectRow?.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
+  // 项目须与任务同队（#1497）：他队项目的标签集不进本队任务。
+  const projectRow = projectOfTodo(deps.db, todoRow);
+  if (!projectRow) throw new HttpError(404, `project ${todoRow.projectId}`);
+  if (projectRow.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
   const title = normalizedMetaTitle(params.title);
   let tagIds: string[] | undefined;
   if (params.tag !== undefined) {

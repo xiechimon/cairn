@@ -13,6 +13,7 @@ import type {
   ClaudeCodeReport,
   DocumentDiffFile,
   MachineCapabilities,
+  ModelRef,
   PersonaRole,
   Phase,
   ProjectRepoKind,
@@ -190,6 +191,16 @@ export interface QuotaWaitRow {
   probeAt: number;
 }
 
+/** #1493 step.fallback 列形态：降级链在本步上的进度。model = 本步当前改跑
+ * 的备选（null = 跑 agent 主模型）；tried = 本步已试过的 `<provider>/<modelId>`
+ * （含主模型，同一步不重复试同一模型，链走完即停）；zeroUsageRetried = 已因
+ * 「成功但 0 token」重试过一次。 */
+export interface StepFallbackRow {
+  model: ModelRef | null;
+  tried: string[];
+  zeroUsageRetried: boolean;
+}
+
 export const step = sqliteTable('step', {
   id: text('id').primaryKey(),
   /** ≡ conversationId。worker 步 = build.id（cascade 随行）；chief 步 =
@@ -210,6 +221,8 @@ export const step = sqliteTable('step', {
    * （quotaWait），列内字段集单源 = shared quotaBlockSchema + services/quota-wait.ts
    * 的 QuotaWaitRow 形。null = 未挂起。 */
   quotaBlock: json<QuotaWaitRow>('quotaBlock'),
+  /** [内部] #1493 降级链进度（StepFallbackRow）。null = 未降级、未重试。 */
+  fallback: json<StepFallbackRow>('fallback'),
   /** [内部] 引擎会话标识（done 回传；continue session 复用面——合并轮/重规划轮
    * 同 conv 续跑，02 §4.2/§5.7）。 */
   sessionId: text('sessionId'),
@@ -367,7 +380,7 @@ export const notification = sqliteTable('notification', {
   teamId: text('teamId').notNull(),
   userId: text('userId').notNull(),
   type: text('type')
-    .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait'>()
+    .$type<'plan_ready' | 'build_review' | 'chief_message' | 'quota_wait' | 'model_fallback'>()
     .notNull(),
   entityId: text('entityId').notNull(),
   entityRef: json<{ title: string; projectId: string | null; seqNum: number | null }>(
@@ -427,6 +440,10 @@ export const agent = sqliteTable(
      *  存量行——闸恒开，零回归）。消费面 = dispatch-eligibility 能力闸
      *  （claim/sweep/排队投影/machine-fit 四处单源）。JSON 列（tools 同形）。 */
     requiredCapabilities: json<RequiredCapabilities | null>('requiredCapabilities'),
+    /** 降级链（#1493）：有序备选模型（上限 5，写侧 zod 闸 fallbackModelsSchema）。
+     *  NULL = 不降级（缺省/存量行——行为不变）。消费面 = machines.ts finishStep
+     *  的降级分支（services/model-fallback.ts）。 */
+    fallbackModels: json<ModelRef[] | null>('fallbackModels'),
   },
   (t) => [
     // (teamId, persona) partial unique（#1250）：一队一角色——fan-out 与

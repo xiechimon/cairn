@@ -423,6 +423,8 @@ export const EN: Record<string, string> = {
   构建待审核: 'Build awaiting review',
   // #1261 等额度族（桌面通知标题 + 卡芯片 + 横幅 + 详情行标签）。
   等额度: 'Waiting for quota',
+  // #1493 降级链：桌面通知标题。
+  已换备用模型: 'Switched to fallback model',
   '等额度：{lane} {kind}，{probe} 自动探测续跑':
     'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
   '{lane} {kind}，{count} 个任务挂起等额度': '{lane} {kind}, {count} task(s) waiting for quota',
