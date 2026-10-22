@@ -321,10 +321,9 @@ describe('W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里',
     expect(prompts).toContain(
       `[wake:failed] ${ref} 运行失败。请先调用 machines 等工具核实环境，再向用户做法证式汇报（失败原因/定性/工作保全位置/环境建议）。`,
     );
-    for (const phase of ['confirm', 'review']) {
-      expect(prompts.some((p) => p.startsWith(`[wake:gate] ${ref} 停驻在 ${phase} 关口。`))).toBe(
-        true,
-      );
+    // review 关口有自己的文案（#1403 G9），confirm 关口照旧。
+    for (const head of [`停驻在 confirm 关口。`, `停驻在 review 关口：`]) {
+      expect(prompts.some((p) => p.startsWith(`[wake:gate] ${ref} ${head}`))).toBe(true);
     }
     for (const prompt of prompts) expect(prompt).not.toContain('【GitHub issue 原文');
     const plain = getTodo(deps(), id)!;

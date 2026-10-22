@@ -221,4 +221,24 @@ describe('watch/wake 主动回路三触发（r5 §3.5）', () => {
     expect(steps.at(-1)!.prompt).toContain('confirm_builds');
     expect(steps.at(-1)!.prompt).not.toContain('split_todo 父卡');
   });
+
+  test('#1403 G9（G3）：关注的卡经相位漏斗进 review → wake 文本是 review 关口的，不是自动确认规则', async () => {
+    const todoId = seedWatchedTodo();
+    const deps = { db: H.s.db, hub: H.s.hub, machineHub: H.s.machineHub, user: H.s.user };
+    addChiefWatch(deps, {
+      teamId: H.teamId,
+      todo: getTodo({ db: H.s.db, hub: H.s.hub, user: H.s.user }, todoId)!,
+      projectName: 'demo',
+      threadId: H.threadId,
+    });
+    for (const phase of ['queued', 'building', 'review'] as const) {
+      setTodoPhase(deps, todoId, phase);
+    }
+    const steps = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, H.threadId)).all();
+    const prompt = steps.at(-1)!.prompt ?? '';
+    expect(steps.at(-1)!.kind).toBe('chief');
+    expect(prompt).toContain('[wake:gate]');
+    expect(prompt).not.toContain('自动确认规则');
+    expect(prompt).toContain('「完成」');
+  });
 });

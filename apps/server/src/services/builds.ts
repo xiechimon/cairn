@@ -1096,6 +1096,13 @@ export async function applyBuildStepAction(
   }
 
   if (body.action === 'confirm') {
+    // #1403 G9：确认只属于 confirm 关口。别的相位先拒，再落宣告行——否则审计里留下一行
+    // 没发生的「通过了确认」：review 关口（review → building 不是边，setTodoPhase 会 409）；
+    // 已在 building 的第二次确认（双击、chief 与人同时确认）与 queued 的直执行卡（queued →
+    // building 是机器领取的边）则会多排一个执行步。
+    if (todoRecord.phase !== 'confirm') {
+      throw new HttpError(409, `确认仅适用于待确认（confirm）关口，当前相位 ${todoRecord.phase}`);
+    }
     // #902 确认闸通过宣告行（MERGE/REVIEW 同族行形）：actor 位答「在场的
     // 是谁」——此前 confirm 闸被按过在库里零痕迹（#892 §6 建议 3）。
     insertGateAnnouncement(deps, buildId, CONFIRM_ANNOUNCEMENT, actorName);

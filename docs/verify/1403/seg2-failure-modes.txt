@@ -1,0 +1,131 @@
+#1403 segment 2: failure modes, listed before the tests and the code
+Branch claude/bootstrap-p2-seg2, base cefad17 (segment 1 at f8ab21b plus origin/main).
+Scope of this commit set: item 2 (the build's PR identity), item 3 (G9), item 4 (test
+pins), item 6 (the P2 row of docs/spec/28 section 8). Item 1 (merge through the API with
+sha) waits for the user's decision on the design and is not in this set.
+
+Item 2: the build's PR identity
+-------------------------------
+The reconcile reads only build.prNumber, which the daemon probe refreshes when a non-review
+step finishes. Before a confirmed close fails the card, and once per round before a
+foreign PR leaves a hint, it lists the PRs of the build's own conversation branch
+(GET /repos/{o}/{r}/pulls?state=all&head=<owner>:<branch>&base=<default>&per_page=10) and
+adopts the build's own other PR.
+
+A1  PR #N closed and confirmed; an open PR #M from the same repository, the conversation
+    branch and the default base exists -> build.prNumber = M and build.prUrl = M's URL,
+    one row naming #N, #M and the branch; no closed row, no errorMessage, phase stays
+    review, unclaimed gate steps stay queued; the next sweep reads pulls/M.
+A2  As A1 with #M already merged and no open PR on the branch -> #M adopted; the next
+    sweep finishes the card through the merged path (its containment check applies).
+A3  No other PR on the branch -> failed as in segment 1, after exactly one list read.
+A4  The list holds only PRs that are not the build's own (a fork PR with the same branch
+    name, a deleted fork, a PR from another branch, one into another base, one whose base
+    repository is not the recorded PR's, a closed unmerged one) -> none adopted; failed
+    as in segment 1.
+A5  The list read fails (429, 502, thrown network error) -> nothing written, the close
+    stays seen; the next sweep confirms again, reads the list again, then acts.
+A5b The list read fails at two confirming reads in a row -> the close is reported as in
+    segment 1 (closed row, errorMessage, failed): the list is an addition, a confirmed
+    close must not wait in review without a word.
+A5c A failed list read counts toward the fallback only within one close: a reopen (or any
+    event that restarts the close count) clears it. (Fourth /code-review pass.)
+A6  No list read on a first closed sighting, on a close and reopen, on a closed PR whose
+    base is not the default branch, or when this round's close was already reported.
+A7  The phase changes, or a step starts, while the list read is in flight -> no write,
+    on the closed path and on the foreign path.
+A8  Anonymous: the list read uses the slot the pulls read reserved and is counted, so the
+    reconcile's own hourly budget is not exceeded.
+A9  The recorded PR is foreign (the #1217 / #1195 shape of pin 9b) and the build has its
+    own PR on its branch -> adopted, no foreign hint. Without one -> the foreign hint as
+    in segment 1, once per round; the branch is listed at most every ten minutes, so a
+    PR of its own opened or merged later is still found (A9b). A failed list read falls
+    back to the hint and is retried after ten minutes (A9c). The recorded number is
+    someone else's here, so the build's own merged PR is taken whatever its number (A9e).
+A9d The recorded PR is open but not the build's own (another branch, a fork) -> it is
+    not left pending forever: the build's own PR is adopted, or one hint per round.
+A10 After an adoption the old PR number is not read again.
+A11 One branch can carry several PRs into one base (the live capture of a reused branch
+    lists seven merged ones, seg2-live-capture.txt). An open PR is adopted before any
+    merged one (a merged PR from earlier work must not hide the live one); with only
+    merged ones, the highest number.
+A12 The board learns the new number (the build doc is published). The sweep log counts an adoption in `adopted`; every review candidate lands in
+    exactly one bucket.
+A13 The adoption row quotes no text from GitHub other than PR numbers; the branch name
+    in it is the build's own; the recorded URL is built from the repository and number,
+    not taken from the response.
+A14 The list parser reads the live response shape (number, state, merged_at, head ref and
+    repo id, base ref and repo id) and answers null for an error status, a thrown fetch
+    or a body that is not an array; the request URL is state=all, head=<owner>:<branch>,
+    base=<default>, per_page=10.
+A15 The recorded PR shows up open in the list (it was reopened between the confirming
+    read and the list read) -> not failed, nothing written, the close counts from the
+    next read again; also when the list holds another open PR of the branch (A15b).
+A15c The recorded PR shows up merged in the list (merged between the confirming read and
+    the list read) -> nothing written (not failed as closed); the next read finishes the
+    card through the merged path. (Fourth /code-review pass.)
+A16 On the closed path a merged PR older than the recorded one (earlier work on the same
+    branch) is not a replacement: a person who closed the newer PR rejected the change,
+    so the card fails.
+A18 A merged PR of the build counts only when it is newer than the newest PR of the build
+    that was closed without merge (on the closed path at least the recorded one): an
+    earlier merge is old work, and the person rejected the newer PR. (Third /code-review
+    pass; the second pass had the rule on the closed path only.)
+A19 The daemon probe records another PR on the build while the list read is in flight
+    -> the adoption changes build.prNumber only if it still holds the recorded number;
+    otherwise nothing is written and the next sweep reads the new number.
+A20 The daemon probe records the foreign PR again after an adoption and the reconcile
+    adopts again -> the adoption row is written once per round.
+A21 Without a GitHub connection the foreign path lists the branch at most once an hour
+    (the reconcile's own anonymous budget is 20 reads an hour).
+A22 The recorded PR changes -> the ten-minute (or hourly) wait starts again for it.
+A22b The listing time of a PR the build no longer records is dropped at the end of the
+    sweep, so going back to it lists at once. (Fourth /code-review pass.)
+A17 After a rename or transfer the stored owner is stale: the head filter uses the owner
+    the PR response names (base.repo.owner.login), falling back to the stored one.
+
+Item 3: G9, the review gate wake text
+-------------------------------------
+G1  wakeFacts for a todo at the review gate carries the confirm gate's auto-confirm rules
+    and tells the chief to call confirm_builds -> it must instead say this is the review
+    gate, that confirm_builds and merge_builds are not for it, and name the human exit.
+G2  The confirm gate texts (normal and split parent) stay as they are.
+G3  A watched todo entering review through the phase funnel enqueues a chief wake whose
+    prompt is the review gate text.
+G4  confirm_builds (chief) on a build whose todo is in review writes the "通过了确认" row,
+    then fails with an illegal phase transition -> it must fail before writing the row.
+G5  confirm at the confirm gate still writes the row and moves the todo to building.
+G6  A second confirm on a todo already in building (a double click, the chief and a
+    person at once) wrote a second row and queued a second build step -> refused with
+    409, one row, one build step. (Raised by /code-review; the first version of the
+    check let the same phase through.)
+G7  A confirm on a queued todo (direct execution, queued -> building is the claim edge)
+    wrote the row and queued a build step next to the pending one -> refused with 409.
+    Confirm is accepted only at the confirm gate. (Second /code-review pass.)
+
+Item 4: test pins for rules that had no test at f8ab21b
+-------------------------------------------------------
+Each pin passes on the unchanged sources; its red leg is the named mutation.
+T1  A close reported this round, then the card dragged back to review: a second sweep
+    (50 s or more after the first) must not confirm and report the close again (pins 18d
+    and 18f gain the second sweep). Mutation: the settled check ignores the closed row.
+T2  The round boundary counts only build and plan steps: a verify or review step created
+    after the completion row must not start a new round. Mutation: roundStart without
+    the kind filter.
+T3  The first closed sighting is dropped when the card leaves review: back in review,
+    the next closed read is a first sighting again. Mutation: no closedSeenAt cleanup at
+    the end of the sweep.
+T4  A failed build step's pushed checkpoint does not decide containment. Mutation: the
+    checkpoint query without the status filter.
+T5  The same for a stopped step (one reading of "the stopped-step filter"). Mutation:
+    the status filter also takes stopped.
+T6  stopUnclaimedGateSteps leaves a claimed verify step alone (the other reading).
+    Mutation: the status filter also takes claimed.
+T7  Pin 8b (an older build's closed PR does not fail the card whose current build has no
+    PR) swept once; since the two-read close rule one sweep can never fail a card, so the
+    pin held without the current-build rule (pr-gate run 11 on #1414, mutation M2c). It
+    now sweeps twice. Mutation: no current-build rule.
+
+Item 6: the ledger
+------------------
+L1  Only the P2 row of docs/spec/28 section 8 changes; no other line of that file.
