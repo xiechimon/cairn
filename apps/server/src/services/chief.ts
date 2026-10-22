@@ -29,7 +29,6 @@ import type {
 } from '@pacman/shared';
 import {
   CHIEF_REMOTE_TOOLS,
-  CHIEF_THREAD_ID_PREFIX,
   CHIEF_WATCH_REASON_DISPATCH,
   chiefIdFormat,
   chiefThreadTitle,
@@ -161,8 +160,12 @@ function refreshWatches(deps: ChiefDeps, watches: ChiefWatch[]): ChiefWatch[] {
 
 /** context.tokens = chief 会话累计用量（r5 §3.6 随回合增长 27065→29866；
  * 归属维 [推断]：token_usage 按 buildId 记账，chief 回合 buildId = conv id
- * `chief-%`——contextWindow 128000 = raw 观测值）。 */
-function chiefContext(deps: ChiefDeps): { tokens: number; contextWindow: number } | null {
+ * `chief-%`——contextWindow 128000 = raw 观测值）。只计本 chief 的 thread
+ * （#1470：chief 行按 user × team，他队 / 他人的 chief 回合不进本队读数）。 */
+function chiefContext(
+  deps: ChiefDeps,
+  chiefId: string,
+): { tokens: number; contextWindow: number } | null {
   const rows = deps.db
     .select({
       input: tokenUsage.input,
@@ -171,7 +174,15 @@ function chiefContext(deps: ChiefDeps): { tokens: number; contextWindow: number 
       cacheWrite: tokenUsage.cacheWrite,
     })
     .from(tokenUsage)
-    .where(sql`${tokenUsage.buildId} LIKE ${`${CHIEF_THREAD_ID_PREFIX}%`}`)
+    .where(
+      inArray(
+        tokenUsage.buildId,
+        deps.db
+          .select({ id: chiefThread.id })
+          .from(chiefThread)
+          .where(eq(chiefThread.chiefId, chiefId)),
+      ),
+    )
     .all();
   if (rows.length === 0) return null;
   const tokens = rows.reduce((n, r) => n + r.input + r.output + r.cacheRead + r.cacheWrite, 0);
@@ -260,7 +271,7 @@ export function getChiefEnvelope(deps: ChiefDeps, teamId: string): ChiefGetRespo
   return {
     chief: toChiefRecord(row),
     agentActor: agentRow ? agentRecordOfRow(agentRow) : null,
-    context: chiefContext(deps),
+    context: chiefContext(deps, row.id),
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId, row),
