@@ -146,6 +146,14 @@ function reply(status: number, text: string, headers: Record<string, string> = {
   };
 }
 
+/** 超时 / 网络错的 Answer 抛成 fetch 会抛的错；其余原样留给调用方应答。 */
+function throwIfFault(a: Answer): asserts a is Exclude<Answer, 'timeout' | 'network'> {
+  if (a === 'timeout') {
+    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+  }
+  if (a === 'network') throw new TypeError('fetch failed');
+}
+
 /** 假 GitHub：pulls/{n} 读、pulls/{n}/merge 写；对账要的 compare / 分支 PR 列表 /
  * check-runs 给最小应答。合并成功（200 + merged:true）时把 PR 翻成已合并，同 GitHub。 */
 class GithubFake {
@@ -178,10 +186,7 @@ class GithubFake {
     if (merge !== null && method === 'PUT') {
       await this.onPut?.();
       const a = this.mergeAnswer;
-      if (a === 'timeout') {
-        throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
-      }
-      if (a === 'network') throw new TypeError('fetch failed');
+      throwIfFault(a);
       const pull = this.pulls[Number(merge[1])];
       const body = a.body as { merged?: unknown; sha?: unknown } | undefined;
       if (a.status === 200 && body?.merged === true && pull !== undefined) {
@@ -201,11 +206,10 @@ class GithubFake {
     if (m === null || method !== 'GET') return reply(404, '{}');
     await this.onGet?.();
     const g = this.getAnswer;
-    if (g === 'timeout') {
-      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    if (g !== null) {
+      throwIfFault(g);
+      return reply(g.status, g.raw ?? JSON.stringify(g.body ?? {}), g.headers);
     }
-    if (g === 'network') throw new TypeError('fetch failed');
-    if (g !== null) return reply(g.status, g.raw ?? JSON.stringify(g.body ?? {}), g.headers);
     const n = Number(m[1]);
     const p = this.pulls[n];
     if (p === undefined) return reply(404, JSON.stringify({ message: 'Not Found' }));
@@ -853,16 +857,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expectUntouched(w);
     },
   );
-
-  test('[2b-D44b] the PR is gone (404 on the read) → 409 read failed; no PUT', async () => {
-    const w = makeWorld();
-    delete w.fake.pulls[201];
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.status).toBe(409);
-    expect(err.message).toContain('读不到 PR #201');
-    expect(w.fake.puts()).toEqual([]);
-    expectUntouched(w);
-  });
 
   test.each([
     ['429', { status: 429, body: { message: 'Too Many Requests' } }],

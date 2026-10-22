@@ -3277,7 +3277,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(w.todoRow().phase).toBe('failed');
   });
 
-  test('[2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the close is the maintainer’s act) → the older merged PR is not adopted', async () => {
+  test('[2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does not say who closed it) → the older merged PR is not adopted', async () => {
     const { w, mock } = closedWithSibling({ sibling: { state: 'closed', merged: true } });
     headRefs.set(203, conversationBranch(w.buildId));
     mock.branchPulls = [
