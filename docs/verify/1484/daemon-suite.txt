@@ -1,0 +1,14 @@
+## whole daemon suite, this branch. Container: uid 0, GIT_CONFIG_COUNT=3 inherited
+## (cd apps/daemon && pnpm exec vitest run)
+
+ RUN  v5.0.1 /home/user/pacman/apps/daemon
+
+
+ Test Files  86 passed (86)
+      Tests  896 passed (896)
+   Start at  09:59:24
+   Duration  43.79s (import 55%, tests 40%, transform 4%)
+
+    Isolate  86 workers spawned · ~133ms startup each (spawn + environment, per file)
+             at least ~3.69s faster with isolate: false — reuses workers across files instead of one per file
+
