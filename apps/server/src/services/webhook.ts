@@ -31,8 +31,11 @@
 // round 4：429 / 带限流信号的 403 抛 GithubRateLimitedError）同读不到，原因码另
 // 记 rate-limited（日志带 status 与重置时刻），不进缓存，下一条投递照判。打标
 // 人权限类的三种拒收（不到 triage、读不到、遇限流）对调用方只答同一句
-// SENDER_REFUSED_DETAIL：哪一种、哪个账号只进日志——202 不给 URL token 持有人
-// 当成按 login 查仓库权限的口子（#1477 pr-gate run 1）。导入的卡 createdBy 仍是
+// SENDER_REFUSED_DETAIL：哪一种、哪个账号只进日志（#1477 pr-gate run 1）。这只
+// 去掉 detail 里的权限结论：过了权限核验之后的结果（导入、duplicate、issue 读
+// 不到）与被拒不同，URL token 持有人仍能拿一条载荷推出某个 login 够不够 triage。
+// sender 不是 GitHub 账号名（`.` / `..` / 带 `/`）先拒，不拼进权限读的路径。
+// 导入的卡 createdBy 仍是
 // seed 用户（轮询器的关闭对账不碰）。注意：载荷只由 URL token 认证，sender 是
 // token 持有人说了算；本闸挡的是 GitHub 侧的触发（模板、外部打标），token 泄漏
 // 的补救仍是吊销。
@@ -75,7 +78,13 @@ export interface WebhookDeps extends OrchestrateDeps {
 
 /** 打标人权限类拒收（sender-below-triage / permission-unreadable /
  * rate-limited）的 202 detail：三种同一句，细节只进日志行。 */
-export const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
+const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
+
+/** GitHub 账号名的形状（字母数字与连字符，不以连字符起头；GitHub App 的 bot
+ * 账号带 `[bot]` 后缀）。sender 来自载荷（URL token 持有人说了算）、要拼进权限
+ * 读的路径：`.` / `..` 会被 URL 规范化改写成别的路径，带 `/` 的会读错仓库，
+ * 一律先拒。 */
+const GITHUB_LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}(\[bot\])?$/;
 
 /** 投递去重册（deliveryId → 到达时刻；模块级内存态——重启清零无害，
  * sourceRef 409 是持久闸）。惰性清扫：每次投递顺手清过期项，无定时器。 */
@@ -211,6 +220,12 @@ export async function receiveGithubWebhook(
     );
     return respond(logger, { result, deliveryId, detail: answer });
   };
+  // 打标人权限类的拒收：202 只答同一句，哪一种、哪个账号只进日志。
+  const refuseSender = (
+    reason: 'rate-limited' | 'permission-unreadable' | 'sender-below-triage',
+    detail: string,
+    extra: Record<string, unknown> = {},
+  ): WebhookReceiverResponse => refuse(reason, 'ignored', detail, extra, SENDER_REFUSED_DETAIL);
   // 存量行的 githubRepo 不合法（#1466：`.` / `..` 段会改写请求路径）：同按配置错
   // 收，不拆 full_name、不出站（轮询器与 importGithubIssue 同一判据）。
   const repoRef = githubRepoOfProject(repoRow);
@@ -223,6 +238,9 @@ export async function receiveGithubWebhook(
   }
   const atCapDetail = `project at the in-flight cap (${ISSUE_INTAKE_IN_FLIGHT_CAP} open github-issue tasks)`;
   if (sender === '') return refuse('no-sender', 'ignored', 'event has no sender');
+  if (!GITHUB_LOGIN.test(sender)) {
+    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login');
+  }
   // 先数上限（只读库）：满了不必读 GitHub。
   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
   const access = teamGithubToken(deps, tokenRow.teamId);
@@ -253,41 +271,32 @@ export async function receiveGithubWebhook(
     if (!(err instanceof GithubRateLimitedError)) throw err;
     const retryAt = err.retryAt(now);
     const resetAt = retryAt === null ? null : new Date(retryAt).toISOString();
-    return refuse(
+    return refuseSender(
       'rate-limited',
-      'ignored',
       `github rate limited reading the permission of ${sender} on ${fullName}${
         resetAt === null ? '' : ` (resets at ${resetAt})`
       }`,
       { status: err.status, resetAt },
-      SENDER_REFUSED_DETAIL,
     );
   }
   if (trusted === null) {
-    return refuse(
+    return refuseSender(
       'permission-unreadable',
-      'ignored',
       `permission of ${sender} on ${fullName} unreadable`,
-      {},
-      SENDER_REFUSED_DETAIL,
     );
   }
   if (!trusted) {
-    return refuse(
-      'sender-below-triage',
-      'ignored',
-      `${sender} is below triage on ${fullName}`,
-      {},
-      SENDER_REFUSED_DETAIL,
-    );
+    return refuseSender('sender-below-triage', `${sender} is below triage on ${fullName}`);
   }
   // 权限读的 await 期间别路可能已占位：导入前再数一次。这次现数与
   // importGithubIssue 落占位之间不隔 await，同时到的几条投递合起来不超上限。
   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
 
-  // 建 todo + 入编排。409（issue 已有任务，D4 持久闸）= 202 duplicate；
-  // GitHub 未连接（importGithubIssue 内 requireToken 404，读窗口里连接被删）=
-  // 202 misconfigured；上游瞬时失败（502/429）直透 = 唯一喂 GitHub 重试的分支。
+  // 建 todo + 入编排。409（issue 已有任务，D4 持久闸）= 202 duplicate；404 =
+  // 202 misconfigured，两种来源分开说：GitHub 未连接（importGithubIssue 内
+  // requireToken 的 404，权限读期间连接被删）与 GitHub 读 issue / 标签答 404
+  // （issue 不存在或已删，或团队 token 看不到）——重查一次团队 token 分辨；上游
+  // 瞬时失败（502/429）直透 = 唯一喂 GitHub 重试的分支。
   let todoId: string;
   try {
     const record = await importGithubIssue({ ...deps, githubFetch }, repoRow, issueNumber);
@@ -301,11 +310,14 @@ export async function receiveGithubWebhook(
       });
     }
     if (err instanceof HttpError && err.status === 404) {
-      return respond(logger, {
-        result: 'misconfigured',
-        deliveryId,
-        detail: 'github connection not found',
-      });
+      if ('reason' in teamGithubToken(deps, tokenRow.teamId)) {
+        return refuse('no-github-connection', 'misconfigured', 'github connection not found');
+      }
+      return refuse(
+        'issue-not-found',
+        'misconfigured',
+        `issue ${fullName}#${issueNumber} not found on GitHub (or not visible to the team token)`,
+      );
     }
     throw err;
   }

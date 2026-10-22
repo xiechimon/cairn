@@ -864,13 +864,17 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      const reset = Number(res.headers.get('x-ratelimit-reset') ?? Number.NaN);
-      const retryAfter = Number(res.headers.get('retry-after') ?? Number.NaN);
+      // 头不在、空串或不是非负整数 = 没给（Number('') 是 0，不能当「0 秒后」）。
+      const seconds = (name: string): number | null => {
+        const v = res.headers.get(name)?.trim() ?? '';
+        return /^\d+$/.test(v) ? Number(v) : null;
+      };
+      const reset = seconds('x-ratelimit-reset');
       throw new GithubRateLimitedError(
         url,
         res.status,
-        Number.isFinite(reset) ? reset * 1000 : null,
-        Number.isFinite(retryAfter) ? retryAfter : null,
+        reset === null ? null : reset * 1000,
+        seconds('retry-after'),
       );
     }
     return { ...head, data: undefined };
