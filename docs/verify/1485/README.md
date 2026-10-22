@@ -26,7 +26,7 @@ Today both values come from the server: the constant `x-access-token`, and a Git
 | `first-leg.txt` | `86923c68` (single-quoted `echo`) | 3 failed, 10 passed: `a\nb` → `a`, `x\cy` → `x`, `\0101` → `A` |
 | `new-leg.txt` | this branch | 13 passed |
 
-The whole daemon suite is in `docs/verify/1484/daemon-suite.txt` (903 passed).
+The whole daemon suite is in `docs/verify/1484/daemon-suite.txt` (911 passed).
 
 ## Rerun
 

@@ -4,11 +4,11 @@
  RUN  v5.0.1 /home/user/pacman/apps/daemon
 
 
- Test Files  86 passed (86)
-      Tests  903 passed (903)
-   Start at  10:16:17
-   Duration  43.56s (import 57%, tests 39%, transform 3%)
+ Test Files  87 passed (87)
+      Tests  911 passed (911)
+   Start at  10:32:10
+   Duration  43.81s (import 56%, tests 40%, transform 4%)
 
-    Isolate  86 workers spawned · ~139ms startup each (spawn + environment, per file)
-             at least ~3.84s faster with isolate: false — reuses workers across files instead of one per file
+    Isolate  87 workers spawned · ~130ms startup each (spawn + environment, per file)
+             at least ~3.65s faster with isolate: false — reuses workers across files instead of one per file
 

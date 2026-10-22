@@ -16,9 +16,9 @@
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2）
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → protocol https、host github.com，前面仍是空值重置 13ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → protocol https、host github.com，前面仍是空值重置 12ms
    → expected undefined to be 'https' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → protocol https、host github.com:443，前面仍是空值重置 2ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → protocol https、host github.com:443，前面仍是空值重置 1ms
    → expected undefined to be 'https' // Object.is equality
  × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → protocol http、host 127.0.0.1:8787，前面仍是空值重置 1ms
    → expected undefined to be 'http' // Object.is equality
@@ -28,25 +28,33 @@
    → expected undefined to be 'http' // Object.is equality
  × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://[::1]:8787/git/t/r → protocol http、host [::1]:8787，前面仍是空值重置 1ms
    → expected undefined to be 'http' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 ""（不是 http(s)）→ 只有重置，没有 helper 3ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 ""（不是 http(s)）→ 只有重置，没有 helper 2ms
    → expected '2' to be '1' // Object.is equality
  × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "/srv/repos/r.git"（不是 http(s)）→ 只有重置，没有 helper 1ms
    → expected '2' to be '1' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "git@github.com:o/r.git"（不是 http(s)）→ 只有重置，没有 helper 2ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "git@github.com:o/r.git"（不是 http(s)）→ 只有重置，没有 helper 3ms
    → expected '2' to be '1' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "file:///srv/r.git"（不是 http(s)）→ 只有重置，没有 helper 5ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "file:///srv/r.git"（不是 http(s)）→ 只有重置，没有 helper 1ms
    → expected '2' to be '1' // Object.is equality
  × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "ssh://git@github.com/o/r"（不是 http(s)）→ 只有重置，没有 helper 1ms
    → expected '2' to be '1' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置 19ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置 15ms
    → expected 'protocol=http\nhost=127.0.0.1:2\nuser…' not to contain 'pacman_fresh_token_123'
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host 25ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host 23ms
    → expected 'protocol=http\nhost=other_server:8787…' not to contain 'pacman_fresh_token_123'
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command） 10ms
-   → expected '10:16:08.557761 git.c:463            …' not to contain 'pacman_fresh_token_123'
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证 204ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 7：http 绑定被跳转到同主机 https 照常应答；https 不降级到 http 11ms
+   → expected 'protocol=http\nhost=pacman.internal\n…' not to contain 'pacman_fresh_token_123'
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境 1ms
+   → expected '2' to be '1' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带回车（git 的凭证协议装不下）→ 不装 helper，凭证不进环境 0ms
+   → expected '2' to be '1' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：用户名带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境 0ms
+   → expected '2' to be '1' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command） 7ms
+   → expected '10:32:00.193130 git.c:463            …' not to contain 'pacman_fresh_token_123'
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证 205ms
    → expected [ 'git:pacman_fresh_token_123', …(2) ] to deeply equal []
- × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证 139ms
+ × test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证 152ms
    → expected [ 'git:pacman_fresh_token_123', …(1) ] to deeply equal []
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "abc$(echo INJECTED)" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回
@@ -80,7 +88,7 @@
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 选项形 revision 不改工作区
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 不存在的 revision 不改工作区
 
-⎯⎯⎯⎯⎯⎯ Failed Tests 16 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯ Failed Tests 20 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → protocol https、host github.com，前面仍是空值重置
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → protocol https、host github.com:443，前面仍是空值重置
@@ -93,15 +101,15 @@ AssertionError: expected undefined to be 'https' // Object.is equality
 + Received:
 undefined
 
- ❯ test/git.test.ts:269:42
-    267|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
-    268|     expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
-    269|     expect(env.PACMAN_GIT_CRED_PROTOCOL).toBe(protocol);
+ ❯ test/git.test.ts:271:42
+    269|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    270|     expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
+    271|     expect(env.PACMAN_GIT_CRED_PROTOCOL).toBe(protocol);
        |                                          ^
-    270|     expect(env.PACMAN_GIT_CRED_HOST).toBe(host);
-    271|   });
+    272|     expect(env.PACMAN_GIT_CRED_HOST).toBe(host);
+    273|   });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → protocol http、host 127.0.0.1:8787，前面仍是空值重置
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://pacman_server:8787/git/t/r.git → protocol http、host pacman_server:8787，前面仍是空值重置
@@ -114,15 +122,15 @@ AssertionError: expected undefined to be 'http' // Object.is equality
 + Received:
 undefined
 
- ❯ test/git.test.ts:269:42
-    267|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
-    268|     expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
-    269|     expect(env.PACMAN_GIT_CRED_PROTOCOL).toBe(protocol);
+ ❯ test/git.test.ts:271:42
+    269|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    270|     expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
+    271|     expect(env.PACMAN_GIT_CRED_PROTOCOL).toBe(protocol);
        |                                          ^
-    270|     expect(env.PACMAN_GIT_CRED_HOST).toBe(host);
-    271|   });
+    272|     expect(env.PACMAN_GIT_CRED_HOST).toBe(host);
+    273|   });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 ""（不是 http(s)）→ 只有重置，没有 helper
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "/srv/repos/r.git"（不是 http(s)）→ 只有重置，没有 helper
@@ -134,15 +142,15 @@ AssertionError: expected '2' to be '1' // Object.is equality
 Expected: "1"
 Received: "2"
 
- ❯ test/git.test.ts:281:34
-    279|   ])('失败方式 2：绑定 %j（不是 http(s)）→ 只有重置，没有 helper', (url) => {
-    280|     const env = gitCredentialEnv({ ...CRED, url }, {});
-    281|     expect(env.GIT_CONFIG_COUNT).toBe('1');
+ ❯ test/git.test.ts:283:34
+    281|   ])('失败方式 2：绑定 %j（不是 http(s)）→ 只有重置，没有 helper', (url) => {
+    282|     const env = gitCredentialEnv({ ...CRED, url }, {});
+    283|     expect(env.GIT_CONFIG_COUNT).toBe('1');
        |                                  ^
-    282|     expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
-    283|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    284|     expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    285|     expect(env.GIT_CONFIG_VALUE_0).toBe('');
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置
 AssertionError: expected 'protocol=http\nhost=127.0.0.1:2\nuser…' not to contain 'pacman_fresh_token_123'
@@ -157,15 +165,15 @@ AssertionError: expected 'protocol=http\nhost=127.0.0.1:2\nuser…' not to conta
 + password=pacman_fresh_token_123
 +
 
- ❯ test/git.test.ts:318:40
-    316|       ['http', 'example.invalid'],
-    317|     ] as const) {
-    318|       expect(fill(protocol, host)).not.toContain(CRED.password);
+ ❯ test/git.test.ts:320:40
+    318|       ['http', 'example.invalid'],
+    319|     ] as const) {
+    320|       expect(fill(protocol, host)).not.toContain(CRED.password);
        |                                        ^
-    319|     }
-    320|   });
+    321|     }
+    322|   });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host
 AssertionError: expected 'protocol=http\nhost=other_server:8787…' not to contain 'pacman_fresh_token_123'
@@ -180,36 +188,77 @@ AssertionError: expected 'protocol=http\nhost=other_server:8787…' not to conta
 + password=pacman_fresh_token_123
 +
 
- ❯ test/git.test.ts:344:11
-    342|     expect(
-    343|       fillUrl('http://pacman_server:8787/git/t/r.git', 'http://other_s…
-    344|     ).not.toContain(CRED.password);
+ ❯ test/git.test.ts:346:11
+    344|     expect(
+    345|       fillUrl('http://pacman_server:8787/git/t/r.git', 'http://other_s…
+    346|     ).not.toContain(CRED.password);
        |           ^
-    345|     expect(fillUrl('https://github.com:8443/o/r.git', 'https://github.…
-    346|       CRED.password,
+    347|     expect(fillUrl('https://github.com:8443/o/r.git', 'https://github.…
+    348|       CRED.password,
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/20]⎯
 
- FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）
-AssertionError: expected '10:16:08.557761 git.c:463            …' not to contain 'pacman_fresh_token_123'
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 7：http 绑定被跳转到同主机 https 照常应答；https 不降级到 http
+AssertionError: expected 'protocol=http\nhost=pacman.internal\n…' not to contain 'pacman_fresh_token_123'
 
 - Expected
 + Received
 
 - pacman_fresh_token_123
-+ 10:16:08.557761 git.c:463               trace: built-in: git credential fill
-+ 10:16:08.557873 run-command.c:659       trace: run_command: 'f() { echo username=git; echo password=pacman_fresh_token_123; }; f get'
++ protocol=http
++ host=pacman.internal
++ username=git
++ password=pacman_fresh_token_123
 +
 
- ❯ test/git.test.ts:367:21
-    365|     const log = readFileSync(trace, 'utf8');
-    366|     expect(log).toContain('run_command');
-    367|     expect(log).not.toContain(CRED.password);
-       |                     ^
-    368|   });
-    369|
+ ❯ test/git.test.ts:368:69
+    366|       `password=${CRED.password}`,
+    367|     );
+    368|     expect(fill('https://pacman.internal/git/t/r.git', 'http')).not.to…
+       |                                                                     ^
+    369|   });
+    370|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/20]⎯
+
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带回车（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：用户名带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
+AssertionError: expected '2' to be '1' // Object.is equality
+
+Expected: "1"
+Received: "2"
+
+ ❯ test/git.test.ts:377:34
+    375|   ])('失败方式 8：%s（git 的凭证协议装不下）→ 不装 helper，凭证不进环境', (_label, patch) => {
+    376|     const env = gitCredentialEnv({ ...CRED, ...patch }, {});
+    377|     expect(env.GIT_CONFIG_COUNT).toBe('1');
+       |                                  ^
+    378|     expect(Object.keys(env).filter((k) => k.startsWith('PACMAN_GIT_CRE…
+    379|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/20]⎯
+
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）
+AssertionError: expected '10:32:00.193130 git.c:463            …' not to contain 'pacman_fresh_token_123'
+
+- Expected
++ Received
+
+- pacman_fresh_token_123
++ 10:32:00.193130 git.c:463               trace: built-in: git credential fill
++ 10:32:00.193261 run-command.c:659       trace: run_command: 'f() { echo username=git; echo password=pacman_fresh_token_123; }; f get'
++
+
+ ❯ test/git.test.ts:398:21
+    396|     const log = readFileSync(trace, 'utf8');
+    397|     expect(log).toContain('run_command');
+    398|     expect(log).not.toContain(CRED.password);
+       |                     ^
+    399|   });
+    400|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证
 AssertionError: expected [ 'git:pacman_fresh_token_123', …(2) ] to deeply equal []
@@ -224,15 +273,15 @@ AssertionError: expected [ 'git:pacman_fresh_token_123', …(2) ] to deeply equa
 +   "git:pacman_fresh_token_123",
 + ]
 
- ❯ test/git.test.ts:387:26
-    385|       await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
-    386|       await expect(gitPrim.fetch(dir, cred)).rejects.toThrow();
-    387|       expect(other.seen).toEqual([]);
+ ❯ test/git.test.ts:418:26
+    416|       await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
+    417|       await expect(gitPrim.fetch(dir, cred)).rejects.toThrow();
+    418|       expect(other.seen).toEqual([]);
        |                          ^
-    388|     } finally {
-    389|       vi.unstubAllEnvs();
+    419|     } finally {
+    420|       vi.unstubAllEnvs();
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/20]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证
 AssertionError: expected [ 'git:pacman_fresh_token_123', …(1) ] to deeply equal []
@@ -246,19 +295,19 @@ AssertionError: expected [ 'git:pacman_fresh_token_123', …(1) ] to deeply equa
 +   "git:pacman_fresh_token_123",
 + ]
 
- ❯ test/git.test.ts:405:26
-    403|       await expect(gitPrim.push(dir, 'main', cred)).rejects.toThrow();
-    404|       await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
-    405|       expect(other.seen).toEqual([]);
+ ❯ test/git.test.ts:436:26
+    434|       await expect(gitPrim.push(dir, 'main', cred)).rejects.toThrow();
+    435|       await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
+    436|       expect(other.seen).toEqual([]);
        |                          ^
-    406|       expect(bound.seen).toEqual([]);
-    407|     } finally {
+    437|       expect(bound.seen).toEqual([]);
+    438|     } finally {
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/16]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/20]⎯
 
 
  Test Files  1 failed (1)
-      Tests  16 failed | 44 skipped (60)
-   Start at  10:16:08
-   Duration  820ms (tests 62%, transform 29%, import 8%, worker 1%)
+      Tests  20 failed | 44 skipped (64)
+   Start at  10:31:59
+   Duration  882ms (tests 60%, transform 29%, import 10%, worker 1%)
 

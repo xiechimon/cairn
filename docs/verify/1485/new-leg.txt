@@ -29,22 +29,26 @@
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "ssh://git@github.com/o/r"（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 7：http 绑定被跳转到同主机 https 照常应答；https 不降级到 http
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：密码带回车（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 8：用户名带换行（git 的凭证协议装不下）→ 不装 helper，凭证不进环境
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证
  ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "abc$(echo INJECTED)" 原样返回 10ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回 6ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a;echo INJECTED" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "it's" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "*" 原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a\\nb" 原样返回 8ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "x\\cy" 原样返回 5ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回 8ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a;echo INJECTED" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "it's" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "*" 原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a\\nb" 原样返回 9ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "x\\cy" 原样返回 7ms
  ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "\\0101" 原样返回 6ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回 5ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码里的 $(touch …) 不执行 5ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回 6ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码里的 $(touch …) 不执行 6ms
  ↓ test/git.test.ts > machineGitEnv — 执行机本机凭据 env（#1225 兜底路） > 只设 TTY 守卫：不重置 credential.helper、不碰代理变量（票失败方式 3/4）
  ↓ test/git.test.ts > machineGitEnv — 执行机本机凭据 env（#1225 兜底路） > machine 路下全局 helper 正常应答（真 git credential fill，与重置测试互为反面）
  ↓ test/git.test.ts > isGitAuthFailure — 认证失败判定（降级触发器） > 认证失败原文 → true（mea 实测原文 / 无凭据 / 401 族）
@@ -65,7 +69,7 @@
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 不存在的 revision 不改工作区
 
  Test Files  1 passed (1)
-      Tests  13 passed | 47 skipped (60)
-   Start at  10:16:15
-   Duration  451ms (transform 53%, tests 27%, import 18%, worker 2%)
+      Tests  13 passed | 51 skipped (64)
+   Start at  10:32:07
+   Duration  479ms (transform 55%, tests 26%, import 17%, worker 1%)
 
