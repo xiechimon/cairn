@@ -6,24 +6,30 @@ export interface StopRequest {
 }
 
 /** 一次 runStep 的停止位。会话未开时只记下请求，runStep 开会话前查 request、
- * 开会话后 attach 兑现；收尾读取时 settle，此后再来的停止不再接收。中断调用
- * 抛错时请求作废：会话没真停，收尾不该按 stopped 判。 */
+ * 开会话后 attach 兑现；收尾读取时 settle 并注销，此后再来的停止找不到它。
+ * 请求随记随落盘（persist），中断调用抛错时作废并抹掉：会话没真停，收尾与
+ * 重启都不该按 stopped 判。 */
 export class RunStop {
   private current: StopRequest | null = null;
   private session: AgentSessionHandle | null = null;
-  private settled = false;
 
-  constructor(private readonly onLeave: () => void = () => {}) {}
+  constructor(
+    private readonly persist: (req: StopRequest | null) => void,
+    private readonly unregister: () => void,
+  ) {}
 
   get request(): StopRequest | null {
     return this.current;
   }
 
-  /** 记下请求（同步）；已 settle 返回 false。 */
-  accept(req: StopRequest): boolean {
-    if (this.settled) return false;
+  accept(req: StopRequest): void {
     this.current = req;
-    return true;
+    this.persist(req);
+  }
+
+  async deliver(req: StopRequest): Promise<void> {
+    this.accept(req);
+    await this.interrupt();
   }
 
   attach(session: AgentSessionHandle): Promise<void> {
@@ -36,53 +42,37 @@ export class RunStop {
   }
 
   settle(): StopRequest | null {
-    this.settled = true;
-    this.session = null;
+    this.unregister();
     return this.current;
   }
 
-  leave(): void {
-    this.settle();
-    this.onLeave();
-  }
-
-  /** 会话已开且有请求则中断。 */
-  async interrupt(): Promise<void> {
+  private async interrupt(): Promise<void> {
     const session = this.session;
     if (this.current === null || session === null) return;
     try {
       await session.stop();
     } catch (err) {
       this.current = null;
+      this.persist(null);
       throw err;
     }
   }
 }
 
-/** 本机在跑 run 的停止位登记表，按步号分组：同一步号可能同时有两次 run。 */
+/** 本机在跑 run 的停止位登记表（machine-loop 持有一份）。同一步号在本机只有
+ * 一次 run（#1473 领取循环不起第二次）。 */
 export class StepStops {
-  private readonly runs = new Map<string, Set<RunStop>>();
+  private readonly runs = new Map<string, RunStop>();
 
-  enter(stepId: string): RunStop {
-    const group = this.runs.get(stepId) ?? new Set<RunStop>();
-    this.runs.set(stepId, group);
-    const run = new RunStop(() => {
-      group.delete(run);
-      if (group.size === 0 && this.runs.get(stepId) === group) this.runs.delete(stepId);
+  enter(stepId: string, persist: (req: StopRequest | null) => void = () => {}): RunStop {
+    const run = new RunStop(persist, () => {
+      if (this.runs.get(stepId) === run) this.runs.delete(stepId);
     });
-    group.add(run);
+    this.runs.set(stepId, run);
     return run;
   }
 
-  /** 把请求记到这一步在本机每一次还没收尾的 run 上（同步）；返回接收的 run。 */
-  accept(stepId: string, req: StopRequest): RunStop[] {
-    return [...(this.runs.get(stepId) ?? [])].filter((run) => run.accept(req));
-  }
-
-  /** accept + 中断；返回接收的 run 数，0 = 本机没有这一步在跑。 */
-  async deliver(stepId: string, req: StopRequest): Promise<number> {
-    const runs = this.accept(stepId, req);
-    await Promise.all(runs.map((run) => run.interrupt()));
-    return runs.length;
+  get(stepId: string): RunStop | undefined {
+    return this.runs.get(stepId);
   }
 }

@@ -234,10 +234,11 @@ async function runNetworkCase(
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
   const stops = new StepStops();
+  const stopNow = () => void stops.get('step-net1')?.deliver({ discard: false });
   const { backend, opened } = scriptedNetworkBackend(
     scripts,
-    opts.stopRequested ? () => void stops.deliver('step-net1', { discard: false }) : undefined,
-    opts.stopBeforeRetry ? () => void stops.deliver('step-net1', { discard: false }) : undefined,
+    opts.stopRequested ? stopNow : undefined,
+    opts.stopBeforeRetry ? stopNow : undefined,
   );
   const deps = {
     client,

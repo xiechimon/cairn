@@ -92,7 +92,7 @@ import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
-import { RunStop, type StepStops } from './step-stops.js';
+import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
@@ -128,7 +128,7 @@ export interface RunStepDeps {
    * deliverSteer 按 stepId 消费。缺省 = 无 steer 面（单测形态）。 */
   sessionHandles?: Map<string, AgentSessionHandle>;
   /** 停止位登记表（M7 #308 stop 投递面）：runStep 进门登记本次 run 的停止位、
-   * 出门注销；machine-loop deliverStop 拉取-确认后投给该步的每一次 run。缺省
+   * 出门注销；machine-loop deliverStop 拉取-确认后投给该步的 run。缺省
    * = 无 stop 面（单测形态）。 */
   stops?: StepStops;
   /** heartbeat 节奏 [设计]（r3 未采具体值；presence 同族 ~30s）。 */
@@ -154,6 +154,9 @@ export interface RunStepOptions {
    * 按槽位构造）——透传 SessionOpts.env（backend 注入 agent 进程命令环境）。
    * chief 步不携带（不占槽）。 */
   env?: Record<string, string>;
+  /** recover：重启前已接收的停止（journal 的 stopRequest）。开会话前即按
+   * stopped 收尾，discard 照常回退。 */
+  stopRequest?: StopRequest;
   /** 零进展 auto_retry 预算覆盖（#708 测试注入；缺省 = RETRY_STORM_MAX）。 */
   retryStormMax?: number;
   /** 流超时三臂覆盖（测试注入毫秒级；缺省 = 02 §5.6 r3 三值）。 */
@@ -430,12 +433,22 @@ export async function runStep(
     deps.client.heartbeat(claimed.step.id).catch(() => {});
   }, deps.heartbeatIntervalMs ?? 30_000);
   if (heartbeat.unref) heartbeat.unref();
-  const stop = deps.stops?.enter(claimed.step.id) ?? new RunStop();
+  const stepId = claimed.step.id;
+  const stop = (deps.stops ?? new StepStops()).enter(stepId, (stopRequest) => {
+    try {
+      deps.journal.update(stepId, { stopRequest });
+    } catch (err) {
+      deps.logger.step(
+        `stop journal write failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  });
+  if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   try {
     await runClaimedStep(deps, claimed, opts, heartbeat, stop);
   } finally {
     clearInterval(heartbeat);
-    stop.leave();
+    stop.settle();
   }
 }
 
@@ -541,6 +554,7 @@ async function runClaimedStep(
     sessionId: opts.resume?.sessionId ?? claimed.session.sessionId,
     prompt,
     claimed,
+    stopRequest: stop.request,
   });
 
   // —— #730 图片附件解析下载（prompt 面）：整行 `![name](attachment:key)`
@@ -1217,7 +1231,7 @@ async function runClaimedStep(
     timedOut = true;
     timeoutArm = arm;
     askAbort.abort(); // #1049：等答循环随看门狗退场（不占线）
-    void handle.stop();
+    void handle?.stop();
   };
   const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
     if (watchdog) clearTimeout(watchdog);
@@ -1364,7 +1378,7 @@ async function runClaimedStep(
   // —— 会话轮（#654 协议 400 步内回落，Multica client.go「按错误回落」同
   // 律）：第一轮零进展且终局错误命中自适配签名 → backend 翻 compat 旋钮 →
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
-  let handle: AgentSessionHandle;
+  let handle: AgentSessionHandle | null = null;
   // #1286 / #1312：SessionNotResumableError 两面都降级 new session。
   // recover 重发 journal.prompt（pi 懒落盘窗口的兜底）；journal.prompt 为
   // null 仍显式失败。执行面（无 opts.resume）改投原任务，不把「方案已确认」
@@ -1434,6 +1448,7 @@ async function runClaimedStep(
     });
   };
   for (let pass = 0; ; pass++) {
+    if (stop.request !== null) break;
     if (pass > 0) {
       // 回落轮状态复位。duration cap 不在此复位——它是步级预算（#699）。
       // 增量缓冲显式丢弃（不 flush）：网络重试可在有进展后 continue，旧轮
@@ -1459,14 +1474,6 @@ async function runClaimedStep(
       }
       deltaBuf = '';
     }
-    if (pass === 0 && stop.request !== null) {
-      clearInterval(heartbeat);
-      cleanupBriefOnce();
-      clearCredentials(creds);
-      logger.step('step stopped by user before its session opened');
-      await reportStopped(deps, stepId, continueId);
-      return;
-    }
     // 回落轮带 resetLive：hub / 客户端清掉上轮在飞思考与正文；首轮不带。
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
@@ -1484,11 +1491,9 @@ async function runClaimedStep(
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     // steer 投递面注册（W3 #279）：在跑期间 deliverSteer 可达；各收尾路径注销。
     deps.sessionHandles?.set(stepId, handle);
-    try {
-      await stop.attach(handle);
-    } catch (err) {
+    stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    });
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();
@@ -1866,7 +1871,7 @@ async function runClaimedStep(
   // abort 吞掉终局 done 事件（backend/pi.ts stopping 位——停止钮与流超时
   // watchdog 共用 handle.stop()）→ usage 从 handle 累计面兜底（逐消息累积，
   // token 记账不因中断丢失）。
-  if (!sawDone) usage = handle.usage();
+  if (!sawDone && handle !== null) usage = handle.usage();
 
   // —— 简报擦除的主出口（#958 闸 1）——
   // 位置刻意选在此处：定时器已清、终态错误已归并，而在 `stopped` 分支与两处
@@ -2177,13 +2182,14 @@ async function runClaimedStep(
   // 是有效结论不折成 error。
   const verifyExtraction =
     claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
+  const sessionIdForDone = handle?.sessionId ?? continueId;
   const doneBody: MachineDoneBody = {
     status,
     // #1262：捕获侧剥 ANSI（SGR + OSC8）——工具输出（biome 等）的颜色码/
     // 超链接转义不落 build.errorMessage（板面纯文本）；单源 = shared
     // stripAnsiEscapes，web 渲染侧同函数兜底存量脏行。
     ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
-    sessionId: handle.sessionId,
+    ...(sessionIdForDone !== null ? { sessionId: sessionIdForDone } : {}),
     usage: [...usage],
     hasChanges,
     // per-step checkpoint（done 回传 commit：「恢复到此处」数据源 + 合并步
@@ -2327,49 +2333,6 @@ export async function resumePendingUpload(
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`); // 02 §5.7 收尾 canon 行
-}
-
-/** recover 面：重启前已接收停止、会话没跑完的步——不重跑，直接报 stopped
- * （带上次会话号，续接链不断）。awaiting-upload 残留不走这里：会话已跑完，
- * 完成优先，按快照补报。 */
-export async function resumeStoppedStep(
-  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths'>,
-  entry: StepJournalEntry,
-): Promise<void> {
-  deps.logger.recover(
-    `step ${entry.stepId} was stopped before the restart — reporting stopped (no agent round)`,
-  );
-  await reportStopped(deps, entry.stepId, entry.sessionId);
-}
-
-/** 没开会话（或会话没跑完就重启）的步报 done(stopped)：与收尾同序——终稿
- * 快照落 journal → 回传已有 transcript → done。失败 = journal 残留，recover
- * 快路径补报。 */
-async function reportStopped(
-  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths'>,
-  stepId: string,
-  sessionId: string | null,
-): Promise<void> {
-  const { client, journal, logger } = deps;
-  const doneBody: MachineDoneBody = {
-    status: 'stopped',
-    ...(sessionId !== null ? { sessionId } : {}),
-  };
-  journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent: null });
-  try {
-    const messages = new TranscriptBuffer(deps.paths.outboxDir, stepId).messages();
-    await putFinalArtifacts(client, logger, stepId, messages, null);
-  } catch (err) {
-    logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
-    return;
-  }
-  try {
-    await client.done(stepId, doneBody);
-  } catch (err) {
-    logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
-    return;
-  }
-  journal.remove(stepId);
 }
 
 async function failStep(

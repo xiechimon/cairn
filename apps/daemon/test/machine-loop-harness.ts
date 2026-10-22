@@ -335,6 +335,14 @@ export async function boot(opts: {
   return { handle, api, lines, paths, home };
 }
 
+export function defer<T = void>(): { promise: Promise<T>; resolve: (v: T) => void } {
+  let resolve: (v: T) => void = () => {};
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 export async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {

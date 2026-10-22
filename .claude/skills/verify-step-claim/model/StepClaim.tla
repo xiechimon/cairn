@@ -246,7 +246,7 @@ DeliverStopFetch(m) ==
   /\ UNCHANGED <<st, sm, fresh, progressed, probeDue, phase, online, presenceFresh, home,
                  connected, dm, journal, jout, jstop, ex, ghosts, budgets>>
 
-DeliverStopToRuns(m) ==
+DeliverStopToRun(m) ==
   /\ stopInHand[m]
   /\ stopInHand' = [stopInHand EXCEPT ![m] = FALSE]
   /\ stopDelivered' = [stopDelivered EXCEPT ![m] = TRUE]
@@ -344,9 +344,7 @@ DaemonStartRecover(m) ==
                         /\ ex' = [ex EXCEPT ![e] =
                                     IF journal[m] = "awaiting"
                                       THEN NewExec(m, "reporting", jout[m])
-                                      ELSE IF jstop[m]
-                                        THEN NewExec(m, "reporting", "stopped")
-                                        ELSE NewExec(m, "preparing", "none")]
+                                      ELSE [NewExec(m, "preparing", "none") EXCEPT !.halt = jstop[m]]]
                         /\ holder' = e
                    /\ dm' = [dm EXCEPT ![m] = "recovering"]
                    /\ UNCHANGED <<st, stopPending>>
@@ -375,7 +373,7 @@ RebindHomeMachine(m) ==
 Next ==
   \/ \E m \in Machines :
        \/ TryClaim(m) \/ TryClaimResponseLost(m)
-       \/ DeliverStopFetch(m) \/ DeliverStopToRuns(m)
+       \/ DeliverStopFetch(m) \/ DeliverStopToRun(m)
        \/ PresenceAges(m) \/ MarkPresence(m) \/ MachineStreamAbort(m)
        \/ Partition(m) \/ Reconnect(m)
        \/ DaemonCrash(m) \/ DaemonStartRecover(m) \/ DaemonRecoverDone(m)

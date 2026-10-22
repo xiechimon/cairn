@@ -1,5 +1,5 @@
 // runner 停止收尾（M7 #308）：runStep 的 stopped 路径——停止位（machine-loop
-// deliverStop 拉取-确认后经 StepStops 投给本步每一次 run）+ 中断事件流 →
+// deliverStop 拉取-确认后经 StepStops 投给本步的 run）+ 中断事件流 →
 // done(stopped) 回报；discard 勾选 → worktree rewind 到步起点 checkpoint
 // （restoreCheckpoint）；不 commit/push（步未完成其产物）；transcript 终稿
 // 上传保留（运行行「已取消」但过程行不丢）；plan.md 不上传（方案回到上一版）。
@@ -9,7 +9,6 @@
 //   2. discard=false → 不 rewind（worktree 保留本轮改动）+ done(stopped)
 //   3. plan 步停止 → plan.md 不上传（transcript.json 照传）
 //   4. 停止后 journal 清账（recover 面不残留）+ sessionHandles/停止位注销
-//   5. 同一步号两次 run 同时在跑 → 停止两次都到（verify-step-claim F3）
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -278,7 +277,7 @@ async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
   const running = runStep(deps, claimed);
   await waitFor(() => handles.length === 1);
   // 模拟 deliverStop：拉取-确认后投给本步的 run。
-  await stops.deliver('s1', { discard: opts.discard });
+  await stops.get('s1')?.deliver({ discard: opts.discard });
   await running;
   return { client, journal, calls, lines, sessionHandles, stops, cwd };
 }
@@ -316,64 +315,6 @@ describe('runner 停止收尾（M7 #308）', () => {
     const { journal, sessionHandles, stops } = await setup({ discard: true });
     expect(journal.pending()).toEqual([]);
     expect(sessionHandles.has('s1')).toBe(false);
-    expect(await stops.deliver('s1', { discard: true })).toBe(0);
-  });
-
-  test('失败方式 5：同一步号两次 run 同时在跑 → 两个会话都中断，两次 done(stopped)', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-stop-'));
-    const paths = statePaths(home, join(home, 'workspaces'));
-    const { logger } = captureLogger();
-    const client = new FakeClient();
-    const opened: string[] = [];
-    const backend: AgentBackend = {
-      capabilities: PI_CAPABILITIES,
-      async createSession() {
-        const sessionId = `pi-sess-${opened.length + 1}`;
-        opened.push(sessionId);
-        let release: () => void = () => {};
-        const gate = new Promise<void>((r) => {
-          release = r;
-        });
-        let stopped = false;
-        return {
-          sessionId,
-          events: (async function* () {
-            yield { type: 'text_delta', text: '跑着' } as StepEvent;
-            await gate;
-            if (!stopped) yield { type: 'done', usage: [] } as StepEvent;
-          })(),
-          async steer() {},
-          async stop() {
-            stopped = true;
-            release();
-          },
-          usage: () => [],
-        };
-      },
-      async continueSession() {
-        throw new Error('unused in stop tests');
-      },
-    };
-    const stops = new StepStops();
-    const deps = {
-      client,
-      journal: new StepJournal(paths.outboxDir),
-      backendFor: () => backend,
-      logger,
-      paths,
-      workspace: fakeWorkspace(join(home, 'ws', 'conv-1')).ws,
-      workspacesDir: join(home, 'workspaces'),
-      mcpConfigPath: join(home, 'claude.json'),
-      sessionHandles: new Map<string, AgentSessionHandle>(),
-      stops,
-      heartbeatIntervalMs: 60_000,
-    };
-    const first = runStep(deps, claimedBuildStep());
-    await waitFor(() => opened.length === 1);
-    const second = runStep(deps, claimedBuildStep());
-    await waitFor(() => opened.length === 2);
-    expect(await stops.deliver('s1', { discard: false })).toBe(2);
-    await Promise.all([first, second]);
-    expect(client.doneBodies.map((d) => d.body.status)).toEqual(['stopped', 'stopped']);
+    expect(stops.get('s1')).toBeUndefined();
   });
 });

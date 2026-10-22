@@ -31,7 +31,7 @@ import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
 import { type MachineApi, MachineClient } from './machine-client.js';
 import { setupProxy } from './proxy.js';
-import { resumePendingUpload, resumeStoppedStep, runStep } from './runner.js';
+import { resumePendingUpload, runStep } from './runner.js';
 import {
   ensureStateDirs,
   loadMachineJson,
@@ -440,10 +440,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           await resumePendingUpload(stepDeps(), entry, { running: 1 });
           continue;
         }
-        if (entry.stopRequest != null) {
-          await resumeStoppedStep(stepDeps(), entry);
-          continue;
-        }
         // journal 快照续跑：sessionId 在 → continue session（同 conv pi 会话
         // 复用，02 §4.2/§5.7）；不在 → new session 重发任务文本。
         // priorMachineId 只描述原先那份会话。journal.sessionId 已换成
@@ -464,6 +460,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         await runStep(stepDeps(), claimed, {
           resume: { sessionId: entry.sessionId, prompt: entry.prompt },
           running: 1,
+          ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
           // #1148 端口基座：续跑 worker 步照领槽（恢复面与主循环同律）。
           ...(claimed.step.kind === 'chief' ? {} : { env: workerEnv(stepRecord.id) }),
         });
@@ -529,24 +526,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     try {
       const discard = await client.stop(stepId);
       if (discard === null) return; // server 门拒/旧步已丢弃（拉取-确认语义）。
-      const runs = stops.accept(stepId, { discard });
-      if (runs.length === 0) {
+      const run = stops.get(stepId);
+      if (run === undefined) {
         logger.step(`stop dropped (no live session) step=${stepId}`); // 收尾竞态
         return;
       }
-      try {
-        journal.update(stepId, { stopRequest: { discard } });
-      } catch (err) {
-        logger.step(
-          `stop journal write failed: ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      try {
-        await Promise.all(runs.map((run) => run.interrupt()));
-      } catch (err) {
-        journal.update(stepId, { stopRequest: null });
-        throw err;
-      }
+      await run.deliver({ discard });
       logger.step(`stop delivered step=${stepId}`);
     } catch (err) {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
