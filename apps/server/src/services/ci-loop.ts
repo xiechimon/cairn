@@ -94,7 +94,7 @@ import {
   hasPullFields,
   isFullSha,
   isOwnPull,
-  isWriteAuthor,
+  WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -108,10 +108,10 @@ import {
   maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
-  teamGithubToken,
   toBuildRecord,
 } from './builds.js';
 import { githubRepoOfProject } from './git.js';
+import { teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -463,9 +463,10 @@ export function createCiPoller(
     if (changed !== undefined) return changed;
     // 改记只收有写权限的作者开的 PR（#1403 段 2b，#1489 pr-gate 建议 7）：人关掉本 build 的
     // PR 表示不要这次改动，之后没有写权限的人从同一分支另开一张，不能把这个决定翻过来。
-    const adoptable = own.filter((p) => isWriteAuthor(p.authorAssociation));
+    const adoptable = own.filter((p) => WRITE_AUTHOR_ASSOCIATIONS.has(p.authorAssociation ?? ''));
     const open = adoptable.filter((p) => p.state === 'open');
-    const rejected = own.reduce(
+    // 拒绝的下限同样只看有写权限的作者：没有写权限的人开了又关的 PR 不算有人否了这次改动。
+    const rejected = adoptable.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
       mergedAfter,
     );
@@ -562,7 +563,8 @@ export function createCiPoller(
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
-    const token = teamGithubToken(deps, target.teamId);
+    const access = teamGithubToken(deps, target.teamId);
+    const token = 'token' in access ? access.token : null;
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -684,7 +686,7 @@ export function createCiPoller(
       // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
       // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算（最后
       // 推送 = 最后收尾，取法见 lastPushedCheckpoint）。
-      const checkpoint = lastPushedCheckpoint(deps, cand.buildId);
+      const checkpoint = lastPushedCheckpoint(deps, cand.buildId, { mergeSteps: false });
       if (checkpoint !== null && pull.headSha === null) {
         pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
         tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
@@ -871,7 +873,8 @@ export function createCiPoller(
     }
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
-    const grindToken = teamGithubToken(deps, target.teamId);
+    const grindAccess = teamGithubToken(deps, target.teamId);
+    const grindToken = 'token' in grindAccess ? grindAccess.token : null;
     // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
     if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(

@@ -1171,7 +1171,7 @@ export function TodoDetailPage() {
                 }
                 // merge = 202 delegated（r3 §3.6）：合并步机器执行（GitHub 形态
                 // 有 PR 时 server 经 GitHub 合并，#1403 段 2b），phase 经 SSE
-                // 推进到 done（🎉 时间线行由 server 落库）。XMON-89：关
+                // 推进到 done（完成行由 server 落库）。XMON-89：关
                 // 弹层改挂 onSuccess——被拒（403/409）时弹层留着显原因，不再
                 // 静默关掉；202 到相位推进之间隔着机器执行，toast 是这段窗口
                 // 的可见回执（#1236）。

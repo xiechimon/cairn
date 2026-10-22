@@ -3275,6 +3275,18 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(w.todoRow().phase).toBe('failed');
   });
 
+  test('[2b-P7g] a closed PR by an author without write access does not count as a rejection: a write author’s merged PR is still adopted', async () => {
+    const { w, mock } = closedWithSibling({ sibling: { state: 'closed', merged: true } });
+    headRefs.set(203, conversationBranch(w.buildId));
+    mock.branchPulls = [
+      { number: 203, state: 'closed', authorAssociation: 'NONE' },
+      { number: 202, state: 'closed', merged: true, authorAssociation: 'OWNER' },
+    ];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prNumber).toBe(202);
+    expect(w.todoRow().phase).toBe('review');
+  });
+
   test('[2b-P7f] the recorded PR itself shows up open again in the list → no write, whoever opened it', async () => {
     const { w, mock } = closedWithSibling();
     mock.branchPulls = [{ number: w.prNumber, authorAssociation: 'NONE' }];

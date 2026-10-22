@@ -220,3 +220,20 @@ author_association, quoted from GitHub's docs (fetched 2026-10-22):
   &base=main&per_page=10 -> HTTP 200, one PR, #1489, "author_association": "OWNER",
   user xiechimon. Trimmed copy: apps/server/test/fixtures/github/branch-pulls-assoc.json
   (= docs/verify/1403/live-branch-pulls-assoc.json).
+
+Added after the third /code-review pass (tests first, red on 52b7d698):
+D36 A merge step merged the default branch into the conversation branch and pushed it
+    while the PR is open (the PR head is that commit): the API merge binds sha to it.
+    The API merge's "last pushed commit" counts merge steps; the reconcile's "the merge
+    contains the build's delivery" check does not (D35). Without this split, D35 made
+    every press on such a PR a head-mismatch 409.
+D3  (extended) Without a connection the reconcile reads anonymously and cannot read a
+    private repository: the no-connection refusal on a review card says so.
+D31 (extended) The busy refusal names the step kind in flight, including a merge step
+    queued before the upgrade, and says it can be stopped.
+P7g A closed PR from the branch by an author without write access does not raise the
+    rejection floor: a write author's merged PR is still adopted.
+Not changed after the third pass (reasons in seg2b-reviews.txt): MEMBER and COLLABORATOR
+can be read-only (the coordinator's rule, limit stated above); a pending verify step can
+be claimed while the PUT is in flight; a Verifier without the push permission reports a
+local commit as its checkpoint.

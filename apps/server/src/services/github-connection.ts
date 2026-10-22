@@ -61,6 +61,25 @@ export function openGithubToken(deps: GithubConnectionDeps, teamId: string): str
   return deps.box.open(row.accessTokenCipher);
 }
 
+/** 团队的 GitHub 读写权：连接 token 与密文 box；拿不到给原因（无 box / 无连接 / 密文
+ * 解不开）。issue 进料轮询器与 webhook（拿不到就不读，零匿名读）、PR 探测与 PR 对账（拿不到
+ * 走匿名读）、经 API 合并（拿不到 409，按原因说连接或重新连接，#1403 段 2b）共用。 */
+export function teamGithubToken(
+  deps: { db: Db; box?: SecretBox | undefined },
+  teamId: string,
+):
+  | { token: string; box: SecretBox }
+  | { reason: 'no-secret-box' | 'no-github-connection' | 'token-unreadable' } {
+  const box = deps.box;
+  if (box === undefined) return { reason: 'no-secret-box' };
+  try {
+    const token = openGithubToken({ db: deps.db, box }, teamId);
+    return token === null ? { reason: 'no-github-connection' } : { token, box };
+  } catch {
+    return { reason: 'token-unreadable' };
+  }
+}
+
 /** 连接行存在性（#452 写向；只读行不解密不抛）：createTodo 关键路径判
  * 「已连接才自建 issue」——未连接 = 不建、不报错、不亮失败态（ADR 0006 D2）；
  * 密文损坏留给异步出站时降级（停留未建成，可重试）。 */

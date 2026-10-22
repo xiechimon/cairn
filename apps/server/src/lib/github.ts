@@ -319,15 +319,15 @@ export interface GithubBranchPull {
   authorAssociation: string | null;
 }
 
-/** author_association 里表示作者对仓库有写权限的三个值（OWNER：仓库的 owner；MEMBER：
+/** author_association 里按作者对仓库有写权限算的三个值（OWNER：仓库的 owner；MEMBER：
  * 拥有仓库的组织的成员；COLLABORATOR：受邀协作者）。其余（CONTRIBUTOR、FIRST_TIMER、
- * FIRST_TIME_CONTRIBUTOR、MANNEQUIN、NONE）与缺失都不算。 */
-const WRITE_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-
-/** PR 作者对仓库有写权限（按 author_association，见 WRITE_AUTHOR_ASSOCIATIONS）。 */
-export function isWriteAuthor(association: string | null): boolean {
-  return association !== null && WRITE_AUTHOR_ASSOCIATIONS.has(association);
-}
+ * FIRST_TIME_CONTRIBUTOR、MANNEQUIN、NONE）与缺失都不算。MEMBER / COLLABORATOR 不带权限
+ * 级别：只读的组织成员或协作者同样落在这两个值里（列表响应不再多读一次权限）。 */
+export const WRITE_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+  'OWNER',
+  'MEMBER',
+  'COLLABORATOR',
+]);
 
 /** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
  * <owner>:<branch>&base=<base>&per_page=10`，GitHub 按创建时间倒序给）。同一个分支可以

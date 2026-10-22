@@ -42,7 +42,7 @@
 // token 再读只会再被拒）；上一轮没跑完时新触发直接返回（不重叠）。
 //
 // #1459：webhook 的 `pacman` 触发按同一 D5 判据核打标人（事件的 sender）、
-// 计入同一在飞上限。三样在模块级导出、两路共用：团队 token（teamGithubToken）、
+// 计入同一在飞上限。三样两路共用：团队 token（teamGithubToken，github-connection.ts）、
 // 打标人权限读与缓存（hasRepoTriage，缓存是进程里唯一一份，轮询器开没开都在；
 // 限流照常抛 GithubRateLimitedError，不进缓存，webhook 自己接住）、在飞现数
 // （projectAtInFlightCap，含还在等 GitHub 读的导入）。
@@ -89,7 +89,7 @@ import type { BuildDeps } from './builds.js';
 import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
 import { githubRepoOfProject } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue, importsInFlightFor } from './github-issues.js';
 import { orchestrateTodo } from './orchestrate.js';
 
@@ -311,24 +311,6 @@ function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { r
   }
   if (labeled.actor === null) return { reason: 'labeler-deleted' };
   return { labeler: labeled.actor };
-}
-
-/** 团队的 GitHub 读权：连接 token 与密文 box；拿不到给原因（无 box / 无连接 /
- * 密文解不开）。轮询器与 webhook 共用：拿不到就不读，零匿名读。 */
-export function teamGithubToken(
-  deps: { db: Db; box?: SecretBox | undefined },
-  teamId: string,
-):
-  | { token: string; box: SecretBox }
-  | { reason: 'no-secret-box' | 'no-github-connection' | 'token-unreadable' } {
-  const box = deps.box;
-  if (box === undefined) return { reason: 'no-secret-box' };
-  try {
-    const token = openGithubToken({ db: deps.db, box }, teamId);
-    return token === null ? { reason: 'no-github-connection' } : { token, box };
-  } catch {
-    return { reason: 'token-unreadable' };
-  }
 }
 
 /** 项目在飞已满：库里不在 done / closed 的 github-issue 卡，加上正在导入、还在

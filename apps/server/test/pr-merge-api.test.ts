@@ -47,6 +47,8 @@
 //       不落行
 //   D35 遗留合并步在 PR 已于 GitHub 合并之后推了「默认分支并进工作分支」的提交 → 那不是
 //       本 build 的交付提交（合并步不算最后推送的工作），对账照常收尾
+//   D36 合并步把默认分支并进工作分支并推送（开着的 PR 的 head 是它）→ 经 API 合并的 sha 绑它
+//       （分支上 pacman 最后推送的提交；对账的「交付包含」核对不算合并步，D35）
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -449,6 +451,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(err.message).toContain('连接 GitHub');
     expect(err.message).toContain('PR #201');
+    // without a connection the reconcile reads anonymously: only a public repository is readable
+    expect(err.message).toContain('私有仓库');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w);
   });
@@ -491,25 +495,30 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['a claimed verify step', 'verify', 'claimed'],
     ['a claimed review step', 'review', 'claimed'],
     ['a pending build step', 'build', 'pending'],
-  ] as const)('[2b-D31] %s on the build → 409; no request', async (_name, kind, status) => {
-    const w = makeWorld();
-    w.s.db
-      .insert(stepTable)
-      .values({
-        id: `step-busy-${w.buildId}`,
-        buildId: w.buildId,
-        kind,
-        status,
-        createdAt: Date.now(),
-      })
-      .run();
-    const err = await refusal(requestMerge(w.deps, w.buildId));
-    expect(err.status).toBe(409);
-    expect(w.fake.requests).toEqual([]);
-    expect(w.systemRows()).toEqual([]);
-    expect(w.userRows()).toEqual([]);
-    expect(w.phase()).toBe('review');
-  });
+    ['a merge step queued before the upgrade', 'merge', 'pending'],
+  ] as const)(
+    '[2b-D31] %s on the build → 409 naming the step; no request',
+    async (_name, kind, status) => {
+      const w = makeWorld();
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-busy-${w.buildId}`,
+          buildId: w.buildId,
+          kind,
+          status,
+          createdAt: Date.now(),
+        })
+        .run();
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain(`${kind} 步`);
+      expect(w.fake.requests).toEqual([]);
+      expect(w.systemRows()).toEqual([]);
+      expect(w.userRows()).toEqual([]);
+      expect(w.phase()).toBe('review');
+    },
+  );
 
   test('[2b-D31b] a step claimed while the PR read is in flight → 409; no PUT', async () => {
     const w = makeWorld();
@@ -995,6 +1004,27 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     await w.sweep();
     expect(w.phase()).toBe('done');
     expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+  });
+
+  test('[2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit', async () => {
+    const merged = 'cafe0123'.repeat(5);
+    const w = makeWorld({ pull: { headSha: merged } });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-merge-pushed-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'merge',
+        status: 'done',
+        checkpointCommit: merged,
+        lastHeartbeatAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    const put = w.fake.puts()[0] as Recorded;
+    expect((JSON.parse(put.body ?? 'null') as { sha: string }).sha).toBe(merged);
+    expect(w.phase()).toBe('done');
   });
 
   test('[2b-S1] a list answer of 404 or 429 is classified without reading its body; a 403 without rate-limit headers reads it', async () => {
