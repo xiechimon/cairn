@@ -1485,22 +1485,19 @@ export async function githubRequiredChecks(
 ): Promise<string[] | null> {
   const base = `https://api.github.com/${repoPath(owner, repo)}`;
   const seg = encodeURIComponent(branch);
-  const branchRead = await conditionalGetJson(
-    fetchImpl,
-    `${base}/branches/${seg}`,
-    token,
-    null,
-    FETCH_TIMEOUT_MS,
-  );
+  // 两个读互不依赖：并发发出（一次查名单最多一个超时的时长；匿名额度恒记两次）。
+  const [branchRead, rulesRead] = await Promise.all([
+    conditionalGetJson(fetchImpl, `${base}/branches/${seg}`, token, null, FETCH_TIMEOUT_MS),
+    conditionalGetJson(
+      fetchImpl,
+      `${base}/rules/branches/${seg}?per_page=100`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+      [403, 404],
+    ),
+  ]);
   if (branchRead === null || branchRead.notModified) return null;
-  const rulesRead = await conditionalGetJson(
-    fetchImpl,
-    `${base}/rules/branches/${seg}?per_page=100`,
-    token,
-    null,
-    FETCH_TIMEOUT_MS,
-    [403, 404],
-  );
   if (rulesRead === null || rulesRead.notModified || !Array.isArray(rulesRead.data)) return null;
   const names = new Set<string>();
   const status = (

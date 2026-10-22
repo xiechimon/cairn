@@ -54,6 +54,8 @@ afterAll(() => {
 const HEAD = 'a1b2c3d4'.repeat(5);
 const OLD = '0f1e2d3c'.repeat(5);
 const REPO_ID = 4242;
+/** pacman 刚推送、PR 读还没跟上的提交。 */
+const PUSHED = '5e6f7a8b'.repeat(5);
 
 interface Run {
   name: string;
@@ -466,6 +468,74 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(blocked.systemRows().filter((c) => c.includes('「b」'))).toHaveLength(1);
   });
 
+  test('[s3-F7b] no required list: action_required (waiting for a person) blocks too', async () => {
+    const w = makeWorld();
+    w.fake.runs[HEAD] = [{ name: 'a' }, { name: 'b', conclusion: 'action_required' }];
+    await w.poller.sweep();
+    expect(w.phase()).toBe('building');
+    expect(fixSteps(w)).toEqual([]);
+    expect(w.systemRows().filter((c) => c.includes('「b」'))).toHaveLength(1);
+  });
+
+  test('[s3-F26c] a name with one success passes although a sibling run of that name failed', async () => {
+    const w = makeWorld();
+    w.fake.protection = { contexts: ['check'], checks: [] };
+    w.fake.runs[HEAD] = [
+      { name: 'check', conclusion: 'failure' },
+      { name: 'check', conclusion: 'success' },
+    ];
+    await w.poller.sweep();
+    expect(w.phase()).toBe('review');
+    expect(fixSteps(w)).toEqual([]);
+  });
+
+  const pushedJustNow = (w: World, at: number) =>
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-p-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'build',
+        status: 'done',
+        prompt: `${CI_FIX_PROMPT_HEAD} round 1`,
+        checkpointCommit: PUSHED,
+        createdAt: at - 2_000,
+        finishedAt: at - 1_000,
+      })
+      .run();
+
+  test('[s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round', async () => {
+    const w = makeWorld();
+    const t0 = Date.now();
+    pushedJustNow(w, t0);
+    w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
+    await w.poller.sweep(t0);
+    expect(fixSteps(w)).toHaveLength(1); // only the round that pushed
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep(t0 + 60_000);
+    expect(conflictSteps(w)).toEqual([]);
+    expect(w.phase()).toBe('building');
+  });
+
+  test('[s3-F30b] past the grace the PR head decides (a person may have pushed on top)', async () => {
+    const w = makeWorld();
+    const t0 = Date.now();
+    pushedJustNow(w, t0);
+    w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
+    await w.poller.sweep(t0 + CI_EMPTY_CHECKS_GRACE_MS + 1_000);
+    expect(fixSteps(w)).toHaveLength(2);
+  });
+
+  test('[s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out', async () => {
+    const w = makeWorld({ phase: 'review' });
+    const t0 = Date.now();
+    pushedJustNow(w, t0);
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep(t0);
+    expect(conflictSteps(w)).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
+
   test.each([
     ['the branch read answers 500', { protection: 500 }],
     ['the branch read answers 404', { protection: 404 }],
@@ -751,6 +821,33 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     await w.poller.sweep();
     expect(w.steps().find((r) => r.kind === 'review')?.status).toBe('stopped');
     expect(w.systemRows().filter((c) => c.includes('AI 审核步'))).toHaveLength(1);
+  });
+
+  test('[s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again', async () => {
+    const w = makeWorld();
+    withVerifier(w);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-v-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'done',
+        createdAt: Date.now() - 5_000,
+        finishedAt: Date.now() - 4_000,
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    expect(conflictSteps(w)).toHaveLength(1);
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.fake.mergeableState = 'clean';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 60_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['done', 'pending']);
   });
 
   test('[s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review', async () => {

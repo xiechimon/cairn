@@ -207,25 +207,29 @@ export type CheckVerdict =
   | { state: 'blocked'; checks: { name: string; conclusion: string }[] };
 
 /** 可修的失败结论（派 [ci-fix]）。action_required 不在内：等人批准（fork 的 workflow、
- * 部署），agent 修不了——必需检查上按不算通过提示交人。 */
+ * 部署），agent 修不了——按不算通过提示交人。 */
 const FIXABLE = new Set(['failure', 'timed_out']);
+/** 没有必需名单时挡住的结论（其余 neutral、skipped 等不挡）。 */
+const BLOCKING_UNREQUIRED = new Set(['cancelled', 'action_required']);
 
 /** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。同名的 run
  * （不同 app 或 workflow 报的同一个名字）合成一个名字看：有没完成的 → pending；有可修的
- * 失败 → red；有一个 success → 这个名字过。
+ * 失败且没有 success → red；有一个 success → 这个名字过。
  * - 必需名单非空：只看名单里的名字。有没完成的 → pending；failure / timed_out → red
  *   （action_required 等人批准，agent 修不了，按不算通过）；某个名字没有 run → pending（missing）；有名字没有 success
  *   （cancelled、neutral、skipped、stale）→ blocked；否则 green。
  * - 必需名单为空（默认分支没有保护也没有规则）：看全部 run。零个 → empty；有没完成的 →
- *   pending；failure / timed_out → red；某个名字没有 success 而有 cancelled → blocked；其余
+ *   pending；failure / timed_out → red；某个名字没有 success 而有 cancelled 或
+ *   action_required → blocked；其余
  *   green：没有必需检查时 neutral 与 skipped 本就不挡。
  * pending 先于红绿判（「pending 被误判红」的闸）。 */
 export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = []): CheckVerdict {
   const counted = required.length > 0 ? runs.filter((r) => required.includes(r.name)) : runs;
   if (required.length === 0 && counted.length === 0) return { state: 'empty' };
   if (counted.some((r) => r.status !== 'completed')) return { state: 'pending' };
+  const passed = new Set(counted.filter((r) => r.conclusion === 'success').map((r) => r.name));
   const failures = counted
-    .filter((r) => FIXABLE.has(r.conclusion ?? ''))
+    .filter((r) => !passed.has(r.name) && FIXABLE.has(r.conclusion ?? ''))
     .map((r) => ({
       name: r.name,
       conclusion: r.conclusion ?? '',
@@ -234,11 +238,11 @@ export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = 
   if (failures.length > 0) return { state: 'red', failures };
   const missing = required.filter((name) => !counted.some((r) => r.name === name));
   if (missing.length > 0) return { state: 'pending', missing };
-  const passed = new Set(counted.filter((r) => r.conclusion === 'success').map((r) => r.name));
   // 每个名字一项（同名多个 run 的结论合在一起），提示里不重复。
   const blocked = new Map<string, Set<string>>();
   for (const r of counted) {
-    if (passed.has(r.name) || (required.length === 0 && r.conclusion !== 'cancelled')) continue;
+    if (passed.has(r.name)) continue;
+    if (required.length === 0 && !BLOCKING_UNREQUIRED.has(r.conclusion ?? '')) continue;
     blocked.set(r.name, (blocked.get(r.name) ?? new Set()).add(r.conclusion ?? ''));
   }
   if (blocked.size > 0) {
@@ -518,22 +522,17 @@ export function createCiPoller(
       hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
       return 'hinted';
     }
-    const has = (kind: 'verify' | 'review', unclaimedOnly: boolean) =>
+    // 本 build 已有 verify 步（没人领的、已跑完的）：解冲突轮把默认分支合进交付，回到 review
+    // 时为合并后的 head 重排一条（building 上复用 build 的返工轮同样）。
+    const reverify =
       deps.db
         .select({ id: step.id })
         .from(step)
-        .where(
-          and(
-            eq(step.buildId, cand.buildId),
-            eq(step.kind, kind),
-            ...(unclaimedOnly ? [inArray(step.status, ['pending', 'waiting_quota'])] : []),
-          ),
-        )
+        .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
         .get() !== undefined;
-    const reverify = fromReview && has('verify', false);
-    const stopsReview = fromReview && has('review', true);
+    let stopsReview = false;
     if (fromReview) {
-      stopUnclaimedGateSteps(deps, cand.buildId);
+      stopsReview = stopUnclaimedGateSteps(deps, cand.buildId).includes('review');
       setTodoPhase(deps, cand.todoId, 'queued');
     }
     enqueueStep(
@@ -546,6 +545,31 @@ export function createCiPoller(
     if (reverify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
     if (stopsReview) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
     return 'appended';
+  }
+
+  /** pacman 刚推送（CI_EMPTY_CHECKS_GRACE_MS 内收尾的执行 / 合并步回报了提交）而 PR 读到的
+   * head 还不是它：GitHub 还没跟上（head 与 mergeable_state 落后于推送），本轮不按这个 head
+   * 判红、解冲突。过了宽限仍不是它 → 按 PR 的 head 判（人可能在上面又推了提交）。 */
+  function pushNotSeen(buildId: string, headSha: string | null, now: number): boolean {
+    const last = deps.db
+      .select({ sha: step.checkpointCommit, at: step.finishedAt })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          eq(step.status, 'done'),
+          inArray(step.kind, ['build', 'merge']),
+          isNotNull(step.finishedAt),
+        ),
+      )
+      .orderBy(desc(step.finishedAt))
+      .get();
+    return (
+      last?.sha != null &&
+      last.at != null &&
+      last.sha !== headSha &&
+      now - last.at < CI_EMPTY_CHECKS_GRACE_MS
+    );
   }
 
   /** 同一条提示每轮（since 起）只落一次（按内容去重）。不计数：每次 sweep 由调用方
@@ -739,6 +763,7 @@ export function createCiPoller(
         pull !== null &&
         isOwnOpenDefaultPull(pull, branch) &&
         (state === 'dirty' || state === 'behind') &&
+        !pushNotSeen(cand.buildId, pull.headSha, now) &&
         freshReviewRow(cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
       ) {
@@ -1059,6 +1084,10 @@ export function createCiPoller(
     const own = isOwnOpenDefaultPull(pull, branch);
     if (own && pull.headSha === null) {
       tally.unreadable += 1;
+      return;
+    }
+    if (own && pushNotSeen(cand.buildId, pull.headSha, now)) {
+      tally.pending += 1;
       return;
     }
     if (own && pull.mergeableState === 'dirty') {

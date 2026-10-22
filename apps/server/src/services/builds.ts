@@ -446,7 +446,10 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
  * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
  * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
  * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
-export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
+export function stopUnclaimedGateSteps(
+  deps: BuildDeps,
+  buildId: string,
+): (typeof step.$inferSelect)['kind'][] {
   const rows = deps.db
     .select()
     .from(step)
@@ -466,6 +469,8 @@ export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
       .run();
     publishStepRow(deps, { ...row, status: 'stopped' });
   }
+  // 停掉的步的种类（#1403 段 3：解冲突轮据此决定要不要落「AI 审核步已停」的行）。
+  return rows.map((r) => r.kind);
 }
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };

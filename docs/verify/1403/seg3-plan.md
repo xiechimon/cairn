@@ -191,3 +191,18 @@ Not fixed:
 - A PR read that fails, or lacks the default branch, leaves the card untouched (F11, by design): the card is not advanced on a head it cannot name.
 
 At the next merge: the migration number. main now has `0045_model_fallback_chain` (#1493, after this branch was planned), so `0045_step_finished_at` is renumbered to the tail of main when segment 2b's new head (which merges main c99de10) is merged in.
+
+## 14. Fourth /code-review (2026-10-22, medium, on origin/claude/bootstrap-p2-seg2b...46e40de0)
+
+Ten findings. Eight are fixed (tests first), one is a cleanup done along the way, and one is not fixed. The red leg was 5 failed / 67 passed (leg 5). Mutations Q1-Q7 were all killed.
+
+F30. Right after pacman pushed (a build or merge step finished within CI_EMPTY_CHECKS_GRACE_MS and reported a commit), a PR read whose head is not that commit is waited out. There is no fix round on the old head's red and no merge-conflict round on its stale `dirty`. GitHub recomputes the head and `mergeable_state` after the push.
+F30b. Past the grace the PR head decides, because a person may have pushed on top. Waiting for ever would lock the card.
+F30c. The same applies to DIRTY / BEHIND at review.
+F7b. With no required list, `action_required` blocks as `cancelled` does: the workflow has not run.
+F26c. A name with one `success` passes, even when a sibling run of that name failed. No fix round is sent for it, consistent with F26.
+F13i. A merge-conflict round at building on a build that already has a verify step (#931 rework reuses the build) also queues the verify again.
+The two required-list reads run in parallel (`Promise.all`). A lookup takes at most one timeout, and the anonymous count of two reads is always exact.
+`stopUnclaimedGateSteps` returns the kinds it stopped. The round uses that instead of a second query to decide on the AI review note.
+
+Not fixed: ruleset rules are read as one page of 100 (`per_page=100`, the documented maximum). More than 100 active rules on one branch is left out of this segment.

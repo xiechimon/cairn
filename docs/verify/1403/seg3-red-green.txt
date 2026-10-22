@@ -77,3 +77,14 @@ Red: 5 failed / 61 passed (66). Failing lines:
   x [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
 
 Green after the fixes: the four affected files, 366 passed (366).
+
+## Leg 5: the fourth /code-review (F7b, F26c, F30, F30c, F13i; F30b is a control and passed on the red run)
+
+Red: 5 failed / 67 passed (72). Failing lines:
+  x [s3-F7b] no required list: action_required (waiting for a person) blocks too
+  x [s3-F26c] a name with one success passes although a sibling run of that name failed
+  x [s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round
+  x [s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out
+  x [s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again
+
+Green after the fixes: the four affected files, 372 passed (372). Server suite: 129 files, 2188 passed, 1 skipped.

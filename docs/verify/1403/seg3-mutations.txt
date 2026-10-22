@@ -131,3 +131,23 @@ P6 own PR ignores the base branch (shared predicate)	KILLED	2 failed | 364 passe
 restored byte-identical: True
 
 Result: 6 of 6 killed.
+
+## Run 5 (the fourth /code-review's fixes; Q1-Q7)
+
+Q1 grind ignores pushNotSeen	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round
+Q2 review ignores pushNotSeen	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out
+Q3 pushNotSeen without the grace window	KILLED	1 failed | 371 passed (372)
+    red: [s3-F30b] past the grace the PR head decides (a person may have pushed on top)
+Q4 a failed sibling makes a passed name red	KILLED	1 failed | 371 passed (372)
+    red: [s3-F26c] a name with one success passes although a sibling run of that name failed
+Q5 action_required does not block without a required list	KILLED	1 failed | 371 passed (372)
+    red: [s3-F7b] no required list: action_required (waiting for a person) blocks too
+Q6 re-verify marker only for rounds at review	KILLED	1 failed | 371 passed (372)
+    red: [s3-F13i] a merge-conflict round at building on a build that already ran a verify queues it again
+Q7 stopped AI review not detected	KILLED	1 failed | 371 passed (372)
+    red: [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
+restored byte-identical: True
+
+Result: 7 of 7 killed.

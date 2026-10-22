@@ -50,6 +50,18 @@ Ten findings (seg3-plan.md §13, red-green leg 4, mutations P1-P6):
 9. Migration 0045 collides with main's 0045_model_fallback_chain. To be renumbered at the next merge (the 2b head that merges main c99de10).
 10. The own-PR predicate was written twice. Fixed: one isOwnOpenDefaultPull.
 
+## /code-review, round 4 (medium, origin/claude/bootstrap-p2-seg2b...46e40de0)
+
+Ten findings (seg3-plan.md §14, red-green leg 5, mutations Q1-Q7):
+1-3. The grind, and the DIRTY handling at review, acted on a PR read that had not caught up with pacman's latest push. Fixed: a head that is not pacman's last pushed commit is waited out within the grace (F30, F30b, F30c).
+4. With no required list, action_required let the card advance. Fixed: it blocks (F7b).
+5. A failed sibling run made a passed name red. Fixed (F26c).
+6. Anonymous double-count when the branch read failed. Fixed by 8: both reads are always sent.
+7. A merge-conflict round at building did not re-verify. Fixed (F13i).
+8. The required-list reads ran one after the other. They now run together (Promise.all).
+9. The duplicate step query before stopUnclaimedGateSteps. It now returns the stopped kinds.
+10. Ruleset rules past the first 100: not fixed (one page of the documented maximum; plan §14).
+
 ## /security-review
 
 Not run. The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.
