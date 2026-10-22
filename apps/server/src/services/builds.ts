@@ -1569,6 +1569,17 @@ function closingLine(todoRow: TodoRow, repoRef: GithubRepoRef): string | null {
   return sameRepo ? `closes #${issue.issueNumber}` : null;
 }
 
+/** squash 提交标题里的关票形态（#1403 段 2b D41）：GitHub 的关票关键字（close / closes /
+ *  closed / fix / fixes / fixed / resolve / resolves / resolved，大小写不敏感，可带冒号），
+ *  后面紧跟一个带数字的记号（#N、GH-N、owner/repo#N、issue 链接都在内）。PR 标题由 PR 作者
+ *  定（WRITE_AUTHOR_ASSOCIATIONS 含只读成员），带着这种形态进默认分支就会关掉任意 issue，
+ *  绕过 closingLine 只关本仓来源 issue 的规则。故意宽：「Fix 404」这类误伤只丢掉 PR 标题。 */
+const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
+
+/** 没有 closes 行时 squash 提交的正文（D42）：总要传一个，不传 GitHub 就按仓库设置取 PR
+ *  正文或各提交 message。 */
+const PLAIN_MERGE_BODY = 'Merged by pacman.';
+
 /** 「GitHub 没有明确答复」行里的原因。 */
 function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
   switch (result.reason) {
@@ -1586,7 +1597,8 @@ function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>):
 /** 经 GitHub API 合并（#1403 段 2b）：先做完所有不写的检查（相位、#1217 守卫、权限闸、
  *  GitHub 连接、最后推送的提交、同一 build 没在合并），读 PR 核对（本 build 自己的、开着、
  *  进默认分支、head 就是最后推送的提交），相位再判一次，然后
- *  `PUT pulls/{n}/merge {sha, squash, "<PR 标题> (#n)", closes 行}`。结局三分：
+ *  `PUT pulls/{n}/merge {sha, squash, "<PR 标题> (#n)", closes 行}`（标题带关票形态时用
+ *  「Merge pull request #n」，没有 closes 行时正文是 pacman 自己的一行）。结局三分：
  *  - 合并了：宣告行 + 合并行，卡还在原关口就收尾（failed 先恢复到 review）；相位在请求
  *    期间被人改了只落行。
  *  - GitHub 明确拒绝：409 带 GitHub 的理由，不落行、不改相位（再点一次再发一次）。
@@ -1710,10 +1722,12 @@ async function mergeThroughGithub(
         `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。pacman 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
       );
     }
+    // 标题取 PR 标题（ADR 0021 D2），带关票形态时改用 pacman 自己的标题（D41）。
+    const titled = `${pull.title} (#${prNumber})`;
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
-      commitTitle: `${pull.title} (#${prNumber})`,
-      commitMessage: closingLine(gate.todoRow, repoRef),
+      commitTitle: CLOSING_SHAPE.test(titled) ? `Merge pull request #${prNumber}` : titled,
+      commitMessage: closingLine(gate.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });
     if (result.kind === 'rate-limited') {
       // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。等多久与进料读同一

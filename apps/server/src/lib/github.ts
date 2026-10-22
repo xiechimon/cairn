@@ -1320,7 +1320,8 @@ export type GithubMergeResult =
     };
 
 /** 合并 PR（squash）。sha = PR head 必须是的提交（GitHub 对不上答 409）；commitTitle /
- * commitMessage = squash 提交的标题与正文（commitMessage 为 null 时不传，用仓库的缺省）。
+ * commitMessage = squash 提交的标题与正文（总是传：不传时 GitHub 按仓库设置取 PR 正文或
+ * 各提交 message，关票关键字会随它进默认分支，#1403 段 2b D42）。
  * token 只进 Authorization 头；不抛错，结果分三类（GithubMergeResult）。 */
 export async function githubMergePull(
   fetchImpl: FetchLike,
@@ -1328,7 +1329,7 @@ export async function githubMergePull(
   owner: string,
   repo: string,
   prNumber: number,
-  input: { sha: string; commitTitle: string; commitMessage: string | null },
+  input: { sha: string; commitTitle: string; commitMessage: string },
 ): Promise<GithubMergeResult> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
   let res: Awaited<ReturnType<FetchLike>>;
@@ -1340,7 +1341,7 @@ export async function githubMergePull(
         sha: input.sha,
         merge_method: 'squash',
         commit_title: input.commitTitle,
-        ...(input.commitMessage !== null ? { commit_message: input.commitMessage } : {}),
+        commit_message: input.commitMessage,
       }),
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });

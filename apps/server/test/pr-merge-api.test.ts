@@ -17,8 +17,9 @@
 //       零行、相位不变；再点一次再发一次 PUT
 //   D11 PUT 401 → 409 请重新连接
 //   D12 PUT 200 但 merged=false → 按拒绝
-//   D13 PUT 超时 / 网络错 / 5xx / 429 / 403 限流 → 202、宣告行 + 一行「没有明确答复」、
-//       留在 review；之后对账读到已合并 → 收尾一次；读到 open → 不动
+//   D13 PUT 超时 / 网络错 / 5xx → 202、宣告行 + 一行「没有明确答复」、留在 review；之后
+//       对账读到已合并 → 收尾一次；读到 open → 不动（限流 429 / 带限流信号的 403 不在这里：
+//       GitHub 没有处理，409，见 D40）
 //   D14 PUT 200 应答体读不出 → 同 D13
 //   D15 同一 build 两次并发点合并 → 一次 GET、一次 PUT，另一次 409
 //   D16 PUT 在飞时对账 sweep（PR 已合并）→ 对账不读不写；只有 pacman 的合并行与一行完成行
@@ -58,6 +59,12 @@
 //   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
 //   D40 PUT 被限流（429，或带限流信号的 403）= GitHub 没有处理这次合并：409 带 GitHub 的
 //       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 编排者裁决）
+//   D41 PR 标题里有关票关键字 + 引用（close/closes/closed/fix/fixes/fixed/resolve/resolves/
+//       resolved，大小写不敏感，可带冒号，后跟 #N、GH-N、owner/repo#N 或链接）→ 提交标题
+//       不用 PR 标题，用 pacman 自己的「Merge pull request #n」：PR 标题由有写权限标记的
+//       人（含只读成员）定，进了默认分支上的 squash 提交就会关掉任意 issue，绕过 D2
+//   D42 没有 closes 行时也传 commit_message（pacman 自己的一行）：不传时 GitHub 按仓库
+//       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -390,6 +397,9 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
   throw new Error('expected requestMerge to refuse');
 }
 
+/** 没有 closes 行时 squash 提交的正文（D42）。 */
+const PLAIN_BODY = 'Merged by pacman.';
+
 const MERGED_ROW = `PR #201 已由 pacman 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）`;
 
 /** 拒绝之后的世界：零行、零合并步、相位不变。 */
@@ -414,6 +424,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       sha: CP,
       merge_method: 'squash',
       commit_title: `${PR_TITLE} (#201)`,
+      commit_message: PLAIN_BODY,
     });
     expect(put.headers['content-type']).toBe('application/json');
     expect(w.userRows()).toEqual([{ content: MERGE_ANNOUNCEMENT, actor: 'Xmon' }]);
@@ -454,8 +465,60 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       string,
       unknown
     >;
-    if (line === null) expect(body).not.toHaveProperty('commit_message');
-    else expect(body.commit_message).toBe(line);
+    expect(body.commit_message).toBe(line ?? PLAIN_BODY);
+  });
+
+  test.each([
+    ['a same-repository reference', 'Tidy up, closes #9'],
+    ['upper case with a colon and another repository', 'FIXES: octo/other#9 in the parser'],
+    ['an issue URL', 'Resolved https://github.com/octo/demo/issues/9'],
+    ['a GH- reference', 'fix GH-9 in the parser'],
+    ['no space after the colon', 'Close:#9'],
+    ['a keyword at the end, before the appended (#n)', 'Rename the handler; fixed'],
+    ['a second keyword after a harmless one', 'Fix the docs, resolves #12'],
+  ])(
+    '[2b-D41] a PR title with a closing keyword and a reference (%s) → the commit title is pacman’s own',
+    async (_name, title) => {
+      const w = makeWorld({
+        pull: { title },
+        source: { kind: 'github-issue', ref: 'github:octo/demo#77' },
+      });
+      await requestMerge(w.deps, w.buildId);
+      const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
+        string,
+        unknown
+      >;
+      expect(body.commit_title).toBe('Merge pull request #201');
+      expect(body.commit_message).toBe('closes #77');
+      expect(w.phase()).toBe('done');
+    },
+  );
+
+  test.each([
+    ['a keyword followed by a word', 'Fix the login flow'],
+    ['a keyword inside another word', 'Add a prefix #9 to the log'],
+    ['a reference with no keyword', 'Follow up on #9'],
+  ])(
+    '[2b-D41b] a PR title without a closing shape (%s) keeps the PR title',
+    async (_name, title) => {
+      const w = makeWorld({ pull: { title } });
+      await requestMerge(w.deps, w.buildId);
+      const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
+        string,
+        unknown
+      >;
+      expect(body.commit_title).toBe(`${title} (#201)`);
+    },
+  );
+
+  test('[2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used', async () => {
+    const w = makeWorld({ source: { kind: 'github-issue', ref: 'github:other/demo#77' } });
+    await requestMerge(w.deps, w.buildId);
+    const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<
+      string,
+      unknown
+    >;
+    expect(body).toHaveProperty('commit_message', PLAIN_BODY);
   });
 
   test('[2b-D3] no GitHub connection → 409 asking to connect GitHub; no request, no row, no step', async () => {
@@ -904,10 +967,21 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld();
     w.fake.mergeAnswer = { status: 502, raw: '' };
     await requestMerge(w.deps, w.buildId);
+    // 前提：合并确实经 API 发过、落了「没有明确答复」行（否则下面的「不动」什么也没证明）。
+    expect(w.fake.puts()).toHaveLength(1);
     const before = w.systemRows();
+    expect(before).toHaveLength(1);
+    expect(before[0]).toContain('没有明确答复');
+    const sent = w.fake.requests.length;
     await w.sweep();
+    // 对账读了这张 PR（读到 open）……
+    expect(w.fake.requests.slice(sent).map((r) => `${r.method} ${r.url}`)).toContain(
+      'GET https://api.github.com/repos/octo/demo/pulls/201',
+    );
+    // ……然后什么也没动。
     expect(w.phase()).toBe('review');
     expect(w.systemRows()).toEqual(before);
+    expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([]);
   });
 
   test('[2b-D15] two presses at once → one GET, one PUT; the other press gets 409', async () => {
