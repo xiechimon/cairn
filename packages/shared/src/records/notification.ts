@@ -9,6 +9,8 @@
 // 失败不通知的原判不破；挂起是「需要你知道但无需你动手」的新一类：额度恢复
 // 自动续跑，通知的意义 = 零进展期间不再静默）。snippet = 哪一路 relay + 恢复
 // 探测时刻。
+// #1493 增 model_fallback：降级链把任务换到备用模型接着跑（同属「需要你知道
+// 但无需你动手」）。snippet = 从哪个模型换到哪个 + 原因。
 
 import { z } from 'zod';
 import { epochMs, recordId } from './common.js';
@@ -18,6 +20,7 @@ export const NOTIFICATION_TYPES = [
   'build_review',
   'chief_message',
   'quota_wait',
+  'model_fallback',
 ] as const;
 export const notificationTypeSchema = z.enum(NOTIFICATION_TYPES);
 export type NotificationType = z.infer<typeof notificationTypeSchema>;

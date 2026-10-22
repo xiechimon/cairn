@@ -11,6 +11,10 @@
 //   4. 停止后 journal 清账（recover 面不残留）+ sessionHandles/停止位注销
 //   5. recover 带入重启前已接收的 discard 停止 → 不开会话，照样 rewind 到
 //      步起点 + done(stopped)
+//   6. #1488 心跳答 410（server 上这一步已不存在：卡被重置 / 删掉）→ 按停止
+//      收尾：会话中断、done(stopped)、不 commit/push（不往旧分支推）
+//   7. 心跳答 404（被放回或不归本机）与网络错误 → 照常跑：#1483 同机重领时
+//      这次 run 要接着跑新的领取
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -30,7 +34,7 @@ import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
-import type { MachineApi } from '../src/machine-client.js';
+import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { StepStops } from '../src/step-stops.js';
@@ -330,5 +334,67 @@ describe('runner 停止收尾（M7 #308）', () => {
     expect(calls).toContain(`restoreCheckpoint:abc123`);
     expect(calls).not.toContain('commitAll');
     expect(client.doneBodies[0]!.body.status).toBe('stopped');
+  });
+});
+
+describe('runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488）', () => {
+  /** 心跳每 20ms 打一次，按 `fail` 给的错误回绝。 */
+  async function heartbeatSetup(fail: () => Error) {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-hb-'));
+    const paths = statePaths(home, join(home, 'workspaces'));
+    const { logger, lines } = captureLogger();
+    let beats = 0;
+    const client = new (class extends FakeClient {
+      override async heartbeat() {
+        beats++;
+        throw fail();
+      }
+    })();
+    const handles: AgentSessionHandle[] = [];
+    const { backend } = stoppableBackend(handles);
+    const { ws, calls } = fakeWorkspace(join(home, 'ws', 'conv-1'));
+    const stops = new StepStops();
+    const running = runStep(
+      {
+        client,
+        journal: new StepJournal(paths.outboxDir),
+        backendFor: () => backend,
+        logger,
+        paths,
+        workspace: ws,
+        workspacesDir: join(home, 'workspaces'),
+        mcpConfigPath: join(home, 'claude.json'),
+        sessionHandles: new Map<string, AgentSessionHandle>(),
+        stops,
+        heartbeatIntervalMs: 20,
+      },
+      claimedBuildStep(),
+    );
+    await waitFor(() => handles.length === 1);
+    return { client, calls, lines, stops, running, beats: () => beats };
+  }
+
+  test('失败方式 6：心跳 410 → 会话中断，done(stopped)，不 commit/push', async () => {
+    const { client, calls, lines, running } = await heartbeatSetup(
+      () => new MachineApiError(410, '{"error":"step s1 no longer exists"}'),
+    );
+    await running;
+    expect(client.doneBodies).toHaveLength(1);
+    expect(client.doneBodies[0]!.body.status).toBe('stopped');
+    expect(calls).not.toContain('commitAll');
+    expect(calls).not.toContain('push');
+    expect(lines.some((l) => l.includes('no longer exists on the server'))).toBe(true);
+  });
+
+  test.each([
+    ['404（被放回 / 不归本机）', () => new MachineApiError(404, '{"error":"step s1 (not yours)"}')],
+    ['网络错误', () => new Error('fetch failed')],
+  ])('失败方式 7：心跳 %s → 照常跑，不停', async (_label, fail) => {
+    const { client, running, stops, beats } = await heartbeatSetup(fail);
+    await waitFor(() => beats() >= 5);
+    expect(client.doneBodies).toHaveLength(0); // 会话还在跑
+    await stops.get('s1')?.deliver({ discard: false }); // 收尾用的普通停止
+    await running;
+    expect(client.doneBodies).toHaveLength(1);
   });
 });

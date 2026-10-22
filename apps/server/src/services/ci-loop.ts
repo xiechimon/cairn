@@ -80,7 +80,7 @@
 import { conversationBranch } from '@pacman/shared';
 import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, project, step, todo } from '../db/schema.js';
+import { build, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
   type GithubBranchPull,
@@ -104,7 +104,7 @@ import {
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
-import { githubRepoOfProject } from './git.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -559,8 +559,8 @@ export function createCiPoller(
 
   /** github 形态目标（owner/repo）；非 github、缺仓名或仓名不合法（含 `.` / `..`
    * 段，#1466 githubRepoOfProject 同一道闸）→ null。 */
-  function githubTarget(projectId: string) {
-    const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+  function githubTarget(todoRow: { projectId: string; teamId: string }) {
+    const projRow = projectOfTodo(deps.db, todoRow);
     const ref = githubRepoOfProject(projRow);
     if (projRow === undefined || ref === null) return null;
     return {
@@ -594,7 +594,7 @@ export function createCiPoller(
       .from(build)
       .where(eq(build.id, cand.buildId))
       .get();
-    const target = todoRow === null ? null : githubTarget(todoRow.projectId);
+    const target = todoRow === null ? null : githubTarget(todoRow);
     if (
       todoRow === null ||
       buildRow === undefined ||
@@ -925,7 +925,7 @@ export function createCiPoller(
       .from(build)
       .where(eq(build.id, cand.buildId))
       .get();
-    const target = githubTarget(todoRow.projectId);
+    const target = githubTarget(todoRow);
     if (buildRow === undefined || buildRow.prNumber === null || target === null) {
       // 形态不齐（PR 号缺失/项目非 github/githubRepo 不合法 #1466——生产不可达，
       // 防御位）：不出站、不写。

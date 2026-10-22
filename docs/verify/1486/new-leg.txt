@@ -1,0 +1,71 @@
+## new leg: this branch; tests = this branch
+## (cd apps/server && pnpm exec vitest run --reporter=verbose test/patch-todo-reset-gate.test.ts test/manual-drop-matrix.test.ts test/close-stops-active-steps.test.ts)
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：已完成 源 > done(有变更)→review = 重开回审核关口：200 + phaseAt 刷新 101ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 done 卡 {"hasChanges":true} → 409 指向 /reset，卡不动 151ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 关闭 queued 卡即停 pending 步 > close_todos（chief / MCP 同漏斗）：步 stopped，机器领不到 91ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：已完成 源 > done(无变更)→review = 409（数据闸：没有可重开验收的东西） 40ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：已完成 源 > done→todo：没开始过 = 200；带变更（已开始）= 409 指向 /reset（#1486） 103ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 review 卡 {"latestBuildId":"build-1"} → 409 指向 /reset，卡不动 66ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 confirm 卡 {"hasPlan":true} → 409 指向 /reset，卡不动 63ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 关闭 queued 卡即停 pending 步 > PATCH phase=closed：步 stopped，机器领不到 135ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 关闭在跑的卡（claimed 步） > 委托停：stopPending 就位 + 机器收到 stop；回报 stopped 后卡仍是 closed 61ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：已完成 源 > done→building = 409（执行中只吃待开始源，实测恒素面） 40ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > confirm→done / review→done = 200（手动验收捷径；合并步不是本面语义） 108ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 failed 卡 {"lastRunAt":1} → 409 指向 /reset，卡不动 70ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 queued 卡 {} → 409 指向 /reset，卡不动 60ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 失联扫尾不放过已关卡的步 > 存量：已关卡还挂着 pending 步 → 扫尾停掉；未关的 queued 卡不动（控制组） 130ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 失联扫尾不放过已关卡的步 > 已关卡的失联 claimed 步：停掉，不释放回 pending 42ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > confirm/review/failed→closed = 200（#1247 canceled 结局） 116ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 planning 卡 {} → 409 指向 /reset，卡不动 63ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 1：已开始的 building 卡 {} → 409 指向 /reset，卡不动 71ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 关卡清掉在途的 stop-and-done 预定 > 预定 done 在途时关卡：回报落账后卡仍是 closed 54ms
+ ✓ test/close-stops-active-steps.test.ts > #1447 / #1486 raw PATCH 不能把 queued 卡挪回待开始 > queued → todo：409 指向 /reset，卡与 pending 步原样 45ms
+ ✓ test/close-stops-active-steps.test.ts > #1447 / #1486 raw PATCH 不能把 queued 卡挪回待开始 > 控制组：不改相位的 PATCH（含同相位 queued）不碰 pending 步 63ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 2：没开始过的 done 卡 → 200 挪回待开始 59ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 2：没开始过的 review 卡 → 200 挪回待开始 49ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > confirm/review→todo = 200（参考站：已开始的卡拖回待开始；重置语义另票） 84ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > →执行中：review→building = 409；confirm→building 走漏斗合法边仍放行 88ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 卡离开执行中后，停止回报不再改相位 > 关闭后、回报前重开：回报落账不覆盖重开后的相位 51ms
+ ✓ test/close-stops-active-steps.test.ts > #1445 卡离开执行中后，停止回报不再改相位 > raw PATCH planning → todo：409 指向 /reset，不发停止（#1486） 36ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > failed→done = 200 without hasChanges (#1247 manual close) 39ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > failed→review = 409 且仍走 #702 动作面专属文案（漏斗合法边被手动面拒收） 74ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 2：没开始过的 confirm 卡 → 200 挪回待开始 39ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 2：没开始过的 failed 卡 → 200 挪回待开始 36ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 3：closed → todo（重新打开）带历史也照常 200，历史保留 61ms
+ ✓ test/patch-todo-reset-gate.test.ts > PATCH phase=todo 的重置闸（#1486） > 失败方式 4：带历史的 todo 卡同相位 PATCH → 200 44ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待处理 源 > 同列迁移（confirm→review）= 409（拖拽不产生列内相位改写） 59ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待开始/执行中 源与非落点相 > todo→building = 200（#160 手动面保留：平面白名单时代的合法边不回归） 56ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > raw PATCH queued → done：步 stopped，机器领不到 65ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > raw PATCH planning → done：委托停 claimed 步，回报后卡仍是 done 40ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > complete_todos 标 building 卡完成：委托停 claimed 步，回报后卡仍是 done 39ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 把执行中的卡标完成也停活动步 > 控制组：review → done（无活动步）不发停止 125ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待开始/执行中 源与非落点相 > todo→review = 409（待开始→待处理 实测恒素面） 55ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待开始/执行中 源与非落点相 > building→done = 200；building→todo = 409 指向 /reset（进行中即已开始，#1486） 117ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > keep 预定丢失后回报到达：卡已是 done，不被 gate 回落改写 53ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > keep 预定丢失后回报到达：卡已是 todo，不被 gate 回落改写 52ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > 已完成卡的残留 pending 步：扫尾停掉 60ms
+ ✓ test/close-stops-active-steps.test.ts > #1451 预定丢失与失联扫尾：已完成同已关闭 > 已完成卡的失联 claimed 步：停掉，不释放回 pending 44ms
+ ✓ test/manual-drop-matrix.test.ts > 手动落位矩阵（#753）：待开始/执行中 源与非落点相 > 非落点相（failed/confirm/closed 作目标）= 409 {error}（漏斗兜底） 160ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > closed 卡的 plan 步成功回报（有方案文档）：回报不抛，步 done，卡仍 closed 45ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > done 卡的 build 步成功回报：回报不抛，卡仍 done 54ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > 关闭后重新打开回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm 56ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > closed 卡的 plan 步成功回报（无方案文档）：不补排重写步，机器领不到 72ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 停止在途时步先跑完：不推进、不补排已离开执行中的卡 > 控制组：planning 卡的 plan 步成功回报照常进 confirm 53ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > closed 卡的 merge 步成功回报：回报不抛，卡仍 closed 44ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > closed 卡的 review 步带 blocking 成功回报：回报不抛，不入队重规划 38ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > done 卡的 build 步零改动成功回报：步 done，不被产物闸记成失败 37ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > 关卡后重开并重跑（新 build）：旧 build 的步迟到成功不推进卡 52ms
+ ✓ test/close-stops-active-steps.test.ts > #1453 同一竞态的其余形态 > stop-and-done 预定 done 在途时 build 步先跑完：卡落 done，不进 review 38ms
+
+ Test Files  3 passed (3)
+      Tests  56 passed (56)
+   Start at  12:21:52
+   Duration  4.21s (transform 41%, tests 35%, import 24%)
+
+  Transform  transforming modules took 4.51s · 41% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

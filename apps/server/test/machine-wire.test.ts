@@ -642,7 +642,7 @@ describe('步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧）'
     expect(recovered.steps.map((s) => s.id)).toEqual([claimed.step.id]);
   });
 
-  test('他机步骤 = 404；未知步骤 = 404（错误形状 {error}）', async () => {
+  test('他机步骤 = 404；未知步骤 = 410（错误形状 {error}）', async () => {
     const w = await setupWorld({ claimHoldMs: 200 });
     await w.startBuild(true);
     const { body } = await w.claim();
@@ -666,11 +666,31 @@ describe('步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧）'
     });
     expect(res.status).toBe(404);
     expect(Object.keys((await res.json()) as object)).toEqual(['error']);
+    // 不存在的步 = 410（#1488：与被重置删掉的步同判，daemon 据此停掉在跑的会话）。
     const unknown = await call(w.s.app, 'POST', '/api/machine/heartbeat/nope', {
       cred: w.token,
       body: {},
     });
-    expect(unknown.status).toBe(404);
+    expect(unknown.status).toBe(410);
+  });
+
+  test('#1488 卡被重置删掉了在跑的步 → 心跳 410；本机仍持有的步 → 200', async () => {
+    const w = await setupWorld({ claimHoldMs: 200 });
+    await w.startBuild(true);
+    const { body } = await w.claim();
+    const claimed = claimedStepSchema.parse(body.step);
+    const beat = () =>
+      call(w.s.app, 'POST', `/api/machine/heartbeat/${claimed.step.id}`, {
+        cred: w.token,
+        body: {},
+      });
+    expect((await beat()).status).toBe(200);
+    expect((await call(w.s.app, 'POST', `/api/todos/${w.todoId}/reset`, { body: {} })).status).toBe(
+      200,
+    );
+    const gone = await beat();
+    expect(gone.status).toBe(410);
+    expect(Object.keys((await gone.json()) as object)).toEqual(['error']);
   });
 });
 

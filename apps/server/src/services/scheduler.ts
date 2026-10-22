@@ -29,6 +29,7 @@ import {
 import { fireDueChiefWakes, sweepAbandonedChiefSteps } from './chief.js';
 import { CI_POLL_INTERVAL_MS, type CiPollLogger, createCiPoller } from './ci-loop.js';
 import type { TeamStreamHub } from './events.js';
+import { projectOfTodo } from './git.js';
 import {
   createIssueIntake,
   ISSUE_INTAKE_INTERVAL_MS,
@@ -131,8 +132,12 @@ export function createScheduler(
     const due = dueSchedules(deps, now);
     for (const row of due) {
       const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-      if (!todoRow) {
-        // 孤儿自愈：todo 已删 → 出队 [设计]。
+      // 孤儿自愈：todo 已删，或任务已不属该项目 / 项目与任务不同队（#1497，
+      // startBuilds 会拒绝，这条定时再也触发不了）→ 出队 [设计]。先于
+      // cancelGateBuild 判，不取消一个接不上新 build 的关口；也不让 startBuilds
+      // 的 NotFoundError 从 tick 抛出（tick 在启动时同步跑）。
+      const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
+      if (!todoRow || todoRow.projectId !== row.projectId || !projectRow) {
         deps.db.delete(schedule).where(eq(schedule.id, row.id)).run();
         continue;
       }

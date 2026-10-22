@@ -1,0 +1,16 @@
+ ✓ test/runner-error-lifecycle.test.ts > combineTimeoutWithRootCause（超时收尸 + 根因组合） > 并存 → 组合成文（票面例「stream timeout；根因: 400 …」），不丢根因 2ms
+ ✓ test/runner-error-lifecycle.test.ts > combineTimeoutWithRootCause（超时收尸 + 根因组合） > 无根因 → 纯超时文案（零回归：超时但无底层错误的旧形态） 0ms
+ ✓ test/runner-error-lifecycle.test.ts > runner auto_retry 生命周期（#708） > storm：非签名可重试错 → 连续零进展超预算即收，发数 = 1+max，根因直报 16ms
+ ✓ test/runner-error-lifecycle.test.ts > runner auto_retry 生命周期（#708） > storm：签名错 → 回落轮翻旋钮，二度 storm → failed 根因（两会话，每轮发数 1+max） 6ms
+ ✓ test/runner-error-lifecycle.test.ts > runner auto_retry 生命周期（#708） > storm 边界：pi 自身预算 3 次退场（run8 连接错形）→ 不触发 storm，failed 根因 3ms
+ ✓ test/runner-error-lifecycle.test.ts > runner auto_retry 生命周期（#708） > progress 重置计数：错误与进展交替 → 不触发 storm，步 success 5ms
+ ✓ test/runner-error-lifecycle.test.ts > runner auto_retry 生命周期（#708） > 预算可注入：retryStormMax=1 → 第 2 发即收（发数 = 1+1） 3ms
+ ✓ test/runner-error-lifecycle.test.ts > 真 pi 事件形态：message_end(stopReason=error) + error + done > run9 形（非重试 400 带 body）：回落闸开——message_end(error) 不算进展，done 不闭锁 5ms
+ ✓ test/runner-error-lifecycle.test.ts > runner per-message usage 追溯行（#927） > message_end 携 usage → [step] message usage 行（含 cost）；done 体保 cost 位 4ms
+ ✓ test/runner-error-lifecycle.test.ts > runner per-message usage 追溯行（#927） > 无 usage 的消息（claude-code 面 / 旧投影）→ 零 usage 行（静默零回归） 3ms
+ ✓ test/runner-error-lifecycle.test.ts > runner done.errorMessage ANSI 剥离（#1262） > error 事件载荷带 SGR + OSC8 → doneBody.errorMessage 纯文本 3ms
+ ✓ test/runner-error-lifecycle.test.ts > runner done.errorMessage ANSI 剥离（#1262） > 干净错误文案逐字透传（零回归，与既有根因透传律一致） 3ms
+ ✓ test/runner-error-lifecycle.test.ts > runner noOutput 信号（#1493） > 成功但零 assistant 输出 → done 携带 noOutput 2ms
+ ✓ test/runner-error-lifecycle.test.ts > runner noOutput 信号（#1493） > 有 assistant 输出 → 不携带（负对照） 2ms
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
