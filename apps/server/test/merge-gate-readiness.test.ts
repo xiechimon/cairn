@@ -1308,6 +1308,31 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(r.ready).toBe(false);
     expect(r.patchDigest).toBeNull();
     expect(classesOf(i)).toEqual(notAtHead);
+    // OTHER 排在 HEAD 前面：只取末一个没被认作父提交的，取到的是 HEAD，就放过了
+    const j = green();
+    compareAtNewer(j);
+    j.compare = readAt(
+      HEAD,
+      withCommits(compare(j), [
+        ...chain(EARLIER),
+        { sha: OTHER, parents: [MAIN] },
+        { sha: HEAD, parents: [EARLIER] },
+      ]),
+    );
+    pr(j).body = `evidence: ${link(OTHER)}`;
+    expect(mergeReadiness(j).patchDigest).toBeNull();
+    expect(classesOf(j)).toEqual(notAtHead);
+  });
+
+  test('compare 的提交列表为空（total_commits 也是 0）：响应没有自己的 head，按没在 head 上读处理，不只凭外壳填的 head', () => {
+    // 故事：PR 的 head 已经在 base 一侧（或外壳读错了 base），base...head 一个提交也没有。
+    const i = green();
+    i.compare = readAt(HEAD, withCommits(compare(i), []));
+    expect(compare(i).totalCommits).toBe(0);
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
   });
 
   test('compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）', () => {

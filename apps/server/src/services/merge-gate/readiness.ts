@@ -109,9 +109,13 @@ export interface GateInputs {
    *   head 提交的字段（只有 base_commit 与 merge_base_commit，permalink_url 里是缩写，
    *   html_url 照抄请求），commits 从旧到新、分页，一页的末一个不保证是 head（实拍见
    *   docs/verify/1404/s2-r10-github-shapes.txt）。
-   * - files：全部文件（compareFilesFromResponse）。
-   * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），读全；
-   *   totalCommits = 响应的 total_commits（各页合起来的条数）。
+   * - files：全部文件（compareFilesFromResponse）。files 只在第 1 页；它与 commits 出自同
+   *   一次按 SHA 的请求（每一页都按同一个 {head} SHA 请求，不按分支名、不走按 URL 的
+   *   缓存），才说的是同一个提交。这里从 commits 认得出 compare 读在哪，从 files 认不出：
+   *   files 读在哪个提交上，靠外壳这样请求。
+   * - commits：本 PR 的提交 base...head（响应 commits[] 的 sha 与 parents[].sha），各页
+   *   读全；totalCommits = 第 1 页（带 files 的那页）响应的 total_commits。每一页的
+   *   total_commits 都要与第 1 页的相同，不同 = 各页读得不一致，外壳整份传 'unreadable'。
    * 读在 PR 的 head 上 = 两条都成立：
    *   1. headSha 等于 pr.headSha（外壳填的值）；
    *   2. 响应自己的 head 是 pr.headSha。读全的 base...head 里，head 以外的每个提交都有
