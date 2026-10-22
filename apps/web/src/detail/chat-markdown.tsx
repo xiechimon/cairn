@@ -293,7 +293,7 @@ export function AttachmentChip({
   );
 }
 
-const TASK_ICON_BOX = 'mt-[3px] flex size-4 flex-none items-center justify-center rounded-full';
+const TASK_ICON_BOX = 'mt-0.5 flex size-4 flex-none items-center justify-center rounded-full';
 
 function TaskIcon({ state }: { state: TaskState }) {
   if (state === 'done') {
