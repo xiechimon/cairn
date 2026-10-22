@@ -2225,6 +2225,11 @@ async function runClaimedStep(
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
     ...(skillInjectionFacts !== null ? { skillInjectionFacts } : {}),
+    // #1493 无输出信号：成功收尾但 transcript 零 assistant 消息（server「0 token
+    // 静默失败」判据的前提——单看 usage 会误判不回 usage 的 relay）。
+    ...(status === 'success' && !messages.some((m) => m.role === 'assistant')
+      ? { noOutput: true as const }
+      : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {

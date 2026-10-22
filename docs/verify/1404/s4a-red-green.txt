@@ -1,0 +1,304 @@
+# #1404 S4a: tests first, red and green legs for apps/server/test/github-gate-transport.test.ts.
+# Command for every leg (from the worktree root):
+#   pnpm exec vitest run apps/server/test/github-gate-transport.test.ts --reporter=verbose
+# Red legs: the eight transport functions exist with their final signatures but return
+# {kind:'failed', failure:{kind:'network'}} at once (first leg: stub bodies written before any implementation;
+# later legs: an early `return` inserted by s4a-stubify.py.txt into the implemented functions, the file
+# restored with cp afterwards and compared with cmp). Red is "each test fails because the behaviour is absent".
+# The 8 tests that pass in every red leg are the T1 "a failed request does not carry the token or the URL"
+# properties: a stub that never sends anything satisfies them trivially; their teeth show in the mutation
+# run (M68 puts the token in the URL and is caught by T1/T7).
+
+== Leg 1: first test file (79 tests), stub bodies, before the implementation ==
+ Tests  71 failed | 8 passed (79)
+
+== Leg 2: implementation, first run ==
+ Tests  1 failed | 78 passed (79)
+The one failure was the test, not the code: T12 "nothing in a body is projected" served the string 'text' through
+a stub that sends string bodies verbatim, so the body was not JSON and not-json was the right answer. The test now
+JSON-encodes those bodies. No source change.
+ Tests  79 passed (79)
+
+== Pins added after green (they target guards the first tests did not exercise) ==
+- T2/T4/T5: non-string token, branch, path, owner, repo (String(['pacman']) and '123' pass the character checks).
+- T7: the exact header set per request kind (GET, GET with etag, POST).
+- T15: "rate limit" in the text of a 422 is a status, not rate-limited (only a 403 counts the text).
+- T16: the 200-character cap counts characters: U+20000 is two UTF-16 units.
+- T6: page and per_page checked on all four paged reads (mutation M77 survived the first mutation run; see
+  s4a-mutations.txt).
+
+== Leg 3: final test file (80 tests), functions stubbed, code before /simplify (commit 90bfd6b) ==
+ Tests  72 failed | 8 passed (80)
+== Leg 4: same tests, code before /simplify ==
+ Tests  80 passed (80)
+
+== Leg 5: final test file, functions stubbed, code after /simplify (isFullSha reused, gateGet helper) ==
+× #1404 S4a gate transport: what is refused before any request > T2 pull: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 branch: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 rules: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 compare: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 check-runs: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 status: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 contents: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T2 create-status: a missing or header-unsafe token sends nothing
+× #1404 S4a gate transport: what is refused before any request > T3 compare base: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T3 compare head: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T3 check-runs: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T3 combined status: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T3 contents ref: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T3 status write: only a 40-character lowercase hex SHA goes into the request
+× #1404 S4a gate transport: what is refused before any request > T4 branch: unsafe path segments send nothing
+× #1404 S4a gate transport: what is refused before any request > T4 rules: unsafe path segments send nothing
+× #1404 S4a gate transport: what is refused before any request > T4 contents: unsafe path segments send nothing
+× #1404 S4a gate transport: what is refused before any request > T4 segments are percent-encoded one by one, "/" kept between them
+× #1404 S4a gate transport: what is refused before any request > T5 owner and repo must be GitHub names, not "." or ".."
+× #1404 S4a gate transport: what is refused before any request > T6 numbers, enums, etags and the status payload are checked before sending
+× #1404 S4a gate transport: what is sent > T1/T7 pull: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 branch: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 rules: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 compare: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 check-runs: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 status: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 contents: the token goes only into the Authorization header
+× #1404 S4a gate transport: what is sent > T1/T7 create-status: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1 pull: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 branch: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 rules: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 compare: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 check-runs: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 status: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 contents: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 create-status: a failed request does not carry the token or the URL
+× #1404 S4a gate transport: what is sent > T7 GET sends exactly the API headers, plus If-None-Match only with an etag; POST adds content-type
+× #1404 S4a gate transport: what is sent > T8 each read is the documented URL with exactly the caller values
+× #1404 S4a gate transport: what is sent > T9 If-None-Match is sent exactly when the caller gives an etag
+× #1404 S4a gate transport: what is sent > T9 compare, contents and the status write never send If-None-Match
+× #1404 S4a gate transport: what is sent > T10 pull: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 branch: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 rules: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 compare: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 check-runs: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 status: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 contents: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 create-status: the caller timeout aborts the request
+× #1404 S4a gate transport: what is sent > T10 each function applies its own timeoutMs
+× #1404 S4a gate transport: what is sent > T11 the status write is POST statuses/{sha} with exactly state, context and description
+× #1404 S4a gate transport: what is sent > T11 the status payload is sent as given, extra keys dropped
+× #1404 S4a gate transport: what comes back > T12 gate-pull-1479.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-branch-main.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-rules-main.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page1.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page2.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-check-runs-39a108e.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-status-39a108e.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 gate-contents-1490.json comes back unread, with its etag and Link
+× #1404 S4a gate transport: what comes back > T12 nothing in a body is projected, filtered or defaulted
+× #1404 S4a gate transport: what comes back > T13 a Link to a next page is returned, not followed
+× #1404 S4a gate transport: what comes back > T14 pull: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 branch: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 rules: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 compare: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 check-runs: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 contents: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T14 create-status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+× #1404 S4a gate transport: what comes back > T15 rate limiting is told apart from other refusals
+× #1404 S4a gate transport: what comes back > T16 GitHub error messages are cleaned and capped
+× #1404 S4a gate transport: what comes back > T17 pull: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 branch: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 rules: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 compare: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 check-runs: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 status: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 contents: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T17 create-status: a rejected fetch is timeout or network, never a throw
+× #1404 S4a gate transport: what comes back > T18 a refused status write comes back classified after one request
+⎯⎯⎯⎯⎯⎯ Failed Tests 72 ⎯⎯⎯⎯⎯⎯⎯
+- Tests first, twice ([s2-r9-red-green.txt](https://raw.githubusercontent.com/xiechimon/pacman/b65f00d46e06419edd20699c0d127b25946633ed/docs/verify/1404/s2-r9-red-green.txt)), over the four merge-gate test files and the shared snapshot test:
+- red 1   (tests only, source as at c4bf400)   Tests  3 failed | 341 passed (344)
+- green 1                                      Tests  344 passed (344)
+- red 2   (tests only, after code-review)      Tests  2 failed | 344 passed (346)
+- green 2                                      Tests  346 passed (346)
+- Tests share one stoppable backend and a defer() helper from the harness,
+- Tests share one stoppable backend and a defer() helper from the harness,
+Test Files  1 failed (1)
+Tests  72 failed | 8 passed (80)
+
+== Leg 6: final test file, code after /simplify ==
+✓ #1404 S4a gate transport: what is refused before any request > T2 pull: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 branch: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 rules: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 compare: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 check-runs: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 status: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 contents: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 create-status: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T3 compare base: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 compare head: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 check-runs: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 combined status: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 contents ref: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 status write: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T4 branch: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 rules: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 contents: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 segments are percent-encoded one by one, "/" kept between them
+✓ #1404 S4a gate transport: what is refused before any request > T5 owner and repo must be GitHub names, not "." or ".."
+✓ #1404 S4a gate transport: what is refused before any request > T6 numbers, enums, etags and the status payload are checked before sending
+✓ #1404 S4a gate transport: what is sent > T1/T7 pull: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 branch: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 rules: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 compare: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 check-runs: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 status: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 contents: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 create-status: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1 pull: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 branch: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 rules: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 compare: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 check-runs: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 status: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 contents: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 create-status: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T7 GET sends exactly the API headers, plus If-None-Match only with an etag; POST adds content-type
+✓ #1404 S4a gate transport: what is sent > T8 each read is the documented URL with exactly the caller values
+✓ #1404 S4a gate transport: what is sent > T9 If-None-Match is sent exactly when the caller gives an etag
+✓ #1404 S4a gate transport: what is sent > T9 compare, contents and the status write never send If-None-Match
+✓ #1404 S4a gate transport: what is sent > T10 pull: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 branch: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 rules: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 compare: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 check-runs: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 status: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 contents: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 create-status: the caller timeout aborts the request
+✓ #1404 S4a gate transport: what is sent > T10 each function applies its own timeoutMs
+✓ #1404 S4a gate transport: what is sent > T11 the status write is POST statuses/{sha} with exactly state, context and description
+✓ #1404 S4a gate transport: what is sent > T11 the status payload is sent as given, extra keys dropped
+✓ #1404 S4a gate transport: what comes back > T12 gate-pull-1479.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-branch-main.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-rules-main.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page1.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page2.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-check-runs-39a108e.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-status-39a108e.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-contents-1490.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 nothing in a body is projected, filtered or defaulted
+✓ #1404 S4a gate transport: what comes back > T13 a Link to a next page is returned, not followed
+✓ #1404 S4a gate transport: what comes back > T14 pull: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 branch: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 rules: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 compare: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 check-runs: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 contents: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 create-status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T15 rate limiting is told apart from other refusals
+✓ #1404 S4a gate transport: what comes back > T16 GitHub error messages are cleaned and capped
+✓ #1404 S4a gate transport: what comes back > T17 pull: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 branch: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 rules: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 compare: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 check-runs: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 status: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 contents: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 create-status: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T18 a refused status write comes back classified after one request
+Test Files  1 passed (1)
+Tests  80 passed (80)
+
+== Existing GitHub suites (FM-20), code before /simplify ==
+$ pnpm exec vitest run apps/server/test/pr-reconcile.test.ts apps/server/test/second-pr-guard.test.ts apps/server/test/ci-loop.test.ts apps/server/test/github-reads.test.ts apps/server/test/github-writeback.test.ts apps/server/test/issue-intake.test.ts apps/server/test/github-issues.test.ts
+ Test Files  7 passed (7)
+      Tests  450 passed (450)
+After /simplify: transport, pr-reconcile and issue-intake together 411 passed (411); the full set runs again in
+gates-s4a.txt (vitest --changed).
+
+== Leg 7: /code-review pins (timer cap; error-body read timeout), code before the fix (3bb1192) ==
+     × T6 numbers, enums, etags and the status payload are checked before sending 16ms
+     × T16 GitHub error messages are cleaned and capped 3ms
+      Tests  2 failed | 78 passed (80)
+== Leg 8: final test file, code after the fix (e664574) ==
+✓ #1404 S4a gate transport: what is refused before any request > T2 pull: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 branch: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 rules: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 compare: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 check-runs: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 status: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 contents: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T2 create-status: a missing or header-unsafe token sends nothing
+✓ #1404 S4a gate transport: what is refused before any request > T3 compare base: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 compare head: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 check-runs: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 combined status: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 contents ref: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T3 status write: only a 40-character lowercase hex SHA goes into the request
+✓ #1404 S4a gate transport: what is refused before any request > T4 branch: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 rules: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 contents: unsafe path segments send nothing
+✓ #1404 S4a gate transport: what is refused before any request > T4 segments are percent-encoded one by one, "/" kept between them
+✓ #1404 S4a gate transport: what is refused before any request > T5 owner and repo must be GitHub names, not "." or ".."
+✓ #1404 S4a gate transport: what is refused before any request > T6 numbers, enums, etags and the status payload are checked before sending
+✓ #1404 S4a gate transport: what is sent > T1/T7 pull: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 branch: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 rules: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 compare: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 check-runs: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 status: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 contents: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1/T7 create-status: the token goes only into the Authorization header
+✓ #1404 S4a gate transport: what is sent > T1 pull: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 branch: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 rules: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 compare: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 check-runs: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 status: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 contents: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T1 create-status: a failed request does not carry the token or the URL
+✓ #1404 S4a gate transport: what is sent > T7 GET sends exactly the API headers, plus If-None-Match only with an etag; POST adds content-type
+✓ #1404 S4a gate transport: what is sent > T8 each read is the documented URL with exactly the caller values
+✓ #1404 S4a gate transport: what is sent > T9 If-None-Match is sent exactly when the caller gives an etag
+✓ #1404 S4a gate transport: what is sent > T9 compare, contents and the status write never send If-None-Match
+✓ #1404 S4a gate transport: what is sent > T10 pull: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 branch: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 rules: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 compare: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 check-runs: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 status: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 contents: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 create-status: fetch gets a live AbortSignal
+✓ #1404 S4a gate transport: what is sent > T10 each function applies its own timeoutMs
+✓ #1404 S4a gate transport: what is sent > T11 the status write is POST statuses/{sha} with exactly state, context and description
+✓ #1404 S4a gate transport: what is sent > T11 the status payload is sent as given, extra keys dropped
+✓ #1404 S4a gate transport: what comes back > T12 gate-pull-1479.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-branch-main.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-rules-main.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page1.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-compare-1439-page2.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-check-runs-39a108e.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-status-39a108e.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 gate-contents-1490.json comes back unread, with its etag and Link
+✓ #1404 S4a gate transport: what comes back > T12 nothing in a body is projected, filtered or defaulted
+✓ #1404 S4a gate transport: what comes back > T13 a Link to a next page is returned, not followed
+✓ #1404 S4a gate transport: what comes back > T14 pull: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 branch: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 rules: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 compare: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 check-runs: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 contents: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T14 create-status: a 2xx body that is not JSON is not-json; a body read timeout is timeout
+✓ #1404 S4a gate transport: what comes back > T15 rate limiting is told apart from other refusals
+✓ #1404 S4a gate transport: what comes back > T16 GitHub error messages are cleaned and capped
+✓ #1404 S4a gate transport: what comes back > T17 pull: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 branch: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 rules: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 compare: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 check-runs: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 status: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 contents: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T17 create-status: a rejected fetch is timeout or network, never a throw
+✓ #1404 S4a gate transport: what comes back > T18 a refused status write comes back classified after one request
+Tests  80 passed (80)
+Transport, pr-reconcile, issue-intake and github-reads together after the fix: 450 passed (450).
