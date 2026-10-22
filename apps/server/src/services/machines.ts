@@ -1831,11 +1831,13 @@ export async function finishStep(
   // #1487（2026-10-22 裁决方案 a）：卡在合并步跑的时候被关闭或挪回待开始，
   // 成功回报不落地——默认分支不动，卡保持现相位，下面落一行时间线说明。
   const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
-  const landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
-  const landingError =
-    mergeSuccess && !landingSkipped
-      ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
-      : null;
+  let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
+  let landingError: string | null = null;
+  if (mergeSuccess && !landingSkipped) {
+    const landing = await applyMergeLanding(deps, stepRow, body.commit ?? null);
+    if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
+    else landingError = landing;
+  }
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
   // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
   // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
@@ -2079,6 +2081,9 @@ export async function finishStep(
   publishStepStatus(deps, stepId);
 }
 
+/** applyMergeLanding 的 git 检查期间卡被关闭 / 挪回待开始：不快进（#1487）。 */
+const MERGE_LANDING_SKIPPED = Symbol('merge-landing-skipped');
+
 /** #1487 合并没落地的时间线说明（卡在合并步跑的时候已关闭或挪回待开始）。 */
 export const MERGE_NOT_LANDED_NOTE =
   '合并步跑完时任务已取消或已挪回待开始，合并没有落地：默认分支保持不变';
@@ -2102,7 +2107,7 @@ async function applyMergeLanding(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
   commit: string | null,
-): Promise<string | null> {
+): Promise<string | null | typeof MERGE_LANDING_SKIPPED> {
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
@@ -2124,6 +2129,9 @@ async function applyMergeLanding(
       return `merge landing refused: ${branch} moved (non-fast-forward) — rerun the task`;
     }
   }
+  // 上面的 git 检查都是 await：期间卡可能被关闭。快进前最后再看一次（与
+  // updateBranchRef 的发起同步，之间插不进别的请求）。
+  if (mergeCardLeftReview(deps, stepRow)) return MERGE_LANDING_SKIPPED;
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
 }

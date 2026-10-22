@@ -10,7 +10,7 @@ import type { ClaimedStep } from '@pacman/shared';
 import { claimedStepSchema, machineTokenResponseSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   apiKey as apiKeyTable,
@@ -453,6 +453,27 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     expect(phaseOf(w)).toBe('closed');
     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
     expect(timeline(w, buildId).some((m) => m.content === '🎉 任务已完成')).toBe(false);
+  });
+
+  test('失败方式 1b：回报进来时卡还在审核、落地的 git 检查期间被关闭 → 仍不快进', async () => {
+    const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
+    // 在 applyMergeLanding 的第一个 git await（listBranches）期间关卡。
+    const real = systemGitOps.listBranches.bind(systemGitOps);
+    let closedInWindow = false;
+    const spy = vi.spyOn(systemGitOps, 'listBranches').mockImplementation(async (...args) => {
+      closedInWindow = true;
+      await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } });
+      return real(...args);
+    });
+    try {
+      await w.done(mergeStepId, { status: 'success', sessionId: 'pi-1', commit: convSha });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(closedInWindow).toBe(true);
+    expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main')).toBe(mainBefore);
+    expect(phaseOf(w)).toBe('closed');
+    expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
   });
 
   test('失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo', async () => {
