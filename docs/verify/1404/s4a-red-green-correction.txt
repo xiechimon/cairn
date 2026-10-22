@@ -1,0 +1,14 @@
+# #1404 S4a: correction to s4a-red-green.txt (2026-10-22, from the pr-gate run 1 suggestions on #1503).
+# docs/verify is add-only, so s4a-red-green.txt stays as merged (c99de10); this note says how to read it.
+
+In "Leg 5" of s4a-red-green.txt, lines 117 to 123 are not part of the red leg:
+- line 117 ("- Tests first, twice ([s2-r9-red-green.txt]...") and lines 118 to 121 (the "red 1 / green 1 /
+  red 2 / green 2" table) are lines of the S2 follow-up PR's body;
+- lines 122 and 123 ("- Tests share one stoppable backend and a defer() helper from the harness,") are a
+  sentence from another file.
+They were picked up because the filter that built the leg kept every line containing "Tests " from the
+vitest verbose output, and vitest echoed those lines from other files.
+
+The leg's real result is the summary that follows them, line 125: "Tests  72 failed | 8 passed (80)", with the
+transport functions stubbed (the 8 passes are the T1 "a failed request does not carry the token or the URL"
+properties, which a stub satisfies trivially). Leg 6 (80 of 80 pass) is unaffected.

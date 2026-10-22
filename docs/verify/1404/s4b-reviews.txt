@@ -58,3 +58,17 @@ apps/server/src/services/merge-gate-github.ts (tests excluded, rule 11).
 - No eval, dynamic import or deserialization into code (merge-gate-imports enforces this for gate source);
   status descriptions carry no blocker detail.
 Result: no high or medium finding, none at confidence 8 or more.
+
+== Added 2026-10-22, after #1503 (S4a) merged as c99de10 ==
+Items from pr-gate run 1 on #1503 (go, no blocking) taken in this branch:
+- lib/github.ts: the issue write section comment no longer says "server 唯二写入点"; it points to the
+  header's list of three write points.
+- s4a-red-green.txt, leg 5, lines 117 to 123 are stray lines; s4a-red-green-correction.txt (new, the old file is
+  left as merged) says so and gives the leg's real result (72 failed, 8 passed of 80).
+- New text uses "feat#12", not the earlier example, as the example of a branch name with "#".
+Risk, carried to P4 (#1405): the gate transport in apps/server/src/lib/github.ts is outside ADR 0021 D4 ④
+(lib/github.ts is in the auto-merge set). A later autonomous PR could change which requests the gate makes, or
+fabricate a whole consistent response; the gate catches responses that name another resource (PR number and
+base repository, compare's own head, run head_sha, status sha), not a wholesale forgery. Deferred to P4 open
+question 1 (#1405) and #1462 item 7: request builders into D4 ④, or lib/github.ts into ④. Autonomous merges
+stay off until that is decided.
