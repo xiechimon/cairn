@@ -1693,6 +1693,19 @@ async function mergeThroughGithub(
       commitTitle: `${pull.title} (#${prNumber})`,
       commitMessage: closingLine(gate.todoRow, repoRef),
     });
+    if (result.kind === 'rate-limited') {
+      // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。
+      const when =
+        result.resetAt !== null
+          ? `，限流在 ${new Date(result.resetAt).toISOString()} 解除`
+          : result.retryAfterSeconds !== null
+            ? `，${result.retryAfterSeconds} 秒后再试`
+            : '';
+      throw new HttpError(
+        409,
+        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${result.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}`,
+      );
+    }
     if (result.kind === 'refused') {
       throw new HttpError(
         409,

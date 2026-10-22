@@ -1285,12 +1285,21 @@ export async function githubUpdateIssueTitle(
  * - merged：200 且 merged 为 true；sha = 合并落在 base 上的提交。
  * - refused：GitHub 明确没合（4xx 且不是限流，或 200 但 merged 为 false）；message =
  *   应答体的 message（读不到为空串）。
+ * - rate-limited：429，或带限流信号的 403（remaining=0、retry-after、message 说二级限流）：
+ *   GitHub 没有处理这次请求，合并确定没有发生；resetAt = x-ratelimit-reset 换成的毫秒，
+ *   retryAfterSeconds = retry-after；缺省 null。
  * - unknown：不知道合没合——超时、网络错、5xx（GitHub 处理超过 10 秒会断开请求、回
- *   「Server Error」，合并可能已经发生）、限流（429，或带限流信号的 403）、200 的应答体
- *   读不出。 */
+ *   「Server Error」，合并可能已经发生）、200 的应答体读不出。 */
 export type GithubMergeResult =
   | { kind: 'merged'; sha: string }
   | { kind: 'refused'; status: number; message: string }
+  | {
+      kind: 'rate-limited';
+      status: number;
+      message: string;
+      resetAt: number | null;
+      retryAfterSeconds: number | null;
+    }
   | {
       kind: 'unknown';
       reason: 'timeout' | 'network' | 'status' | 'malformed';
@@ -1340,9 +1349,23 @@ export async function githubMergePull(
     data = null;
   }
   const message = optString(data?.message) ?? '';
-  if (res.status >= 500 || isRateLimitedText(res, text ?? '')) {
-    return { kind: 'unknown', reason: 'status', status: res.status };
+  // 限流 = GitHub 没有处理这次请求，合并确定没有发生（2026-10-22 编排者裁决）。
+  if (isRateLimitedText(res, text ?? '')) {
+    const reset = Number(res.headers.get('x-ratelimit-reset'));
+    const retryAfter = Number(res.headers.get('retry-after'));
+    return {
+      kind: 'rate-limited',
+      status: res.status,
+      message,
+      resetAt:
+        res.headers.get('x-ratelimit-reset') !== null && Number.isFinite(reset)
+          ? reset * 1000
+          : null,
+      retryAfterSeconds:
+        res.headers.get('retry-after') !== null && Number.isFinite(retryAfter) ? retryAfter : null,
+    };
   }
+  if (res.status >= 500) return { kind: 'unknown', reason: 'status', status: res.status };
   if (res.ok) {
     if (data?.merged === true && typeof data.sha === 'string') {
       return { kind: 'merged', sha: data.sha };

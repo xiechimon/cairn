@@ -56,6 +56,8 @@
 //   D39 failed 卡上已合并的 PR 不是本 build 的（fork、作者没有写权限、合进别的分支）→ 409，
 //       卡留在 failed（恢复到 review 只给对账能收尾的那种）
 //   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
+//   D40 PUT 被限流（429，或带限流信号的 403）= GitHub 没有处理这次合并：409 带 GitHub 的
+//       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 编排者裁决）
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -778,23 +780,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['500', { status: 500, body: { message: 'Server Error' } }],
     ['502', { status: 502, raw: '<html>bad gateway</html>' }],
     ['503', { status: 503, body: { message: 'Service Unavailable' } }],
-    ['429', { status: 429, body: { message: 'Too Many Requests' } }],
-    [
-      '403 with x-ratelimit-remaining 0',
-      {
-        status: 403,
-        body: { message: 'API rate limit exceeded' },
-        headers: { 'x-ratelimit-remaining': '0' },
-      },
-    ],
-    [
-      '403 with retry-after',
-      { status: 403, body: { message: 'slow down' }, headers: { 'retry-after': '60' } },
-    ],
-    [
-      '403 naming a secondary rate limit',
-      { status: 403, body: { message: 'You have exceeded a secondary rate limit.' } },
-    ],
     ['200 that is not JSON', { status: 200, raw: 'not json' }],
     ['200 without merged', { status: 200, body: { sha: MERGE_SHA } }],
     ['200 merged without sha', { status: 200, body: { merged: true } }],
@@ -812,6 +797,61 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([]);
     },
   );
+
+  test.each([
+    [
+      '429 with x-ratelimit-reset',
+      {
+        status: 429,
+        body: { message: 'Too Many Requests' },
+        headers: { 'x-ratelimit-reset': '1793016000' },
+      },
+      'Too Many Requests',
+      '2026-10-26T',
+    ],
+    [
+      '403 with x-ratelimit-remaining 0',
+      {
+        status: 403,
+        body: { message: 'API rate limit exceeded' },
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1793016000' },
+      },
+      'API rate limit exceeded',
+      '2026-10-26T',
+    ],
+    [
+      '403 with retry-after',
+      { status: 403, body: { message: 'slow down' }, headers: { 'retry-after': '60' } },
+      'slow down',
+      '60 秒',
+    ],
+    [
+      '403 naming a secondary rate limit',
+      { status: 403, body: { message: 'You have exceeded a secondary rate limit.' } },
+      'secondary rate limit',
+      null,
+    ],
+  ] as const)(
+    '[2b-D40] PUT is rate-limited (%s) → 409 with GitHub’s message and the reset time when known; nothing written',
+    async (_name, answer, message, reset) => {
+      const w = makeWorld();
+      w.fake.mergeAnswer = answer as Answer;
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain('限流');
+      expect(err.message).toContain(message);
+      if (reset !== null) expect(err.message).toContain(reset);
+      expectUntouched(w);
+    },
+  );
+
+  test('[2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row', async () => {
+    const w = makeWorld({ phase: 'failed' });
+    w.fake.mergeAnswer = { status: 429, body: { message: 'Too Many Requests' } };
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expectUntouched(w, 'failed');
+  });
 
   test('[2b-D13b] after no clear answer, a sweep that reads the PR merged finishes the card once', async () => {
     const w = makeWorld();

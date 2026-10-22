@@ -261,3 +261,16 @@ D4  (reworded) GitHub's PR head can lag a fresh push for a moment: the head-mism
     refusal says so before naming other causes.
 D31 (reworded) A claimed review step does not commit: its refusal does not say it will
     push.
+
+2026-10-22, after the coordinator's decision on the rate-limited merge (tests first, red on
+58492955: 5 failed):
+D40 PUT answered 429, or 403 with x-ratelimit-remaining 0, retry-after, or a message naming
+    a secondary rate limit: GitHub did not process the request, so the merge did not happen.
+    409 carrying GitHub's cleaned message and the reset time when known (x-ratelimit-reset as
+    an ISO time, or retry-after in seconds); no row; a failed card stays failed (D40b). This
+    replaces the rate-limit cases of D13, which now covers timeout, network error, 5xx and an
+    unreadable 200 only. The quote it rests on (troubleshooting page, above): "If you exceed
+    your primary rate limit, you will receive a `403 Forbidden` or `429 Too Many Requests `
+    response, and the `x-ratelimit-remaining` header will be `0`" and "If the `retry-after`
+    response header is present, you should not retry your request until after that many
+    seconds has elapsed."; "The `x-ratelimit-reset` header is in UTC epoch seconds."
