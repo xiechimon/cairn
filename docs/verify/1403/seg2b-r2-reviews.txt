@@ -1,0 +1,96 @@
+#1403 segment 2b, round 2: merge of main, /code-review, security note
+=====================================================================
+
+Date: 2026-10-22.
+
+Merge of origin/main c99de106 (#1503) into the branch: 1f531768
+----------------------------------------------------------------
+One conflict, apps/server/src/lib/github.ts:
+- Module header: main added the merge-gate raw reads (S4a) and the commit-status write
+  (POST statuses/{sha}); the branch added PUT pulls/{n}/merge. Resolved to list all four
+  writes (POST issues, PATCH issues/{n}, POST statuses/{sha}, PUT pulls/{n}/merge) and the
+  S4a reads; "only these three" became "only these four".
+- intakeGet's rate-limit throw: main inlined headerSeconds(); the branch had moved the same
+  parse into rateLimitOf (shared with the merge PUT, capped at 10 digits so new Date stays
+  in range). Kept rateLimitOf. main's headerSeconds stays: S4a's raw transport uses it.
+Checks after the resolution: server tsc clean; pr-merge-api + pr-reconcile +
+second-pr-guard 286/286; github*.test.ts (incl. main's github-gate-transport) 211/211.
+
+/code-review (medium) on 06c35b0d..HEAD (scope it chose: 95f2a30e)
+------------------------------------------------------------------
+Regex probes by the reviewer: every closing form tried was caught (colon, no space,
+upper case, owner/repo#N, issue URL, non-breaking space); no bypass found.
+
+1. PR description keywords (and the Development sidebar link) close issues on merge
+   regardless of the squash commit. Disposition: not fixed in this round, recorded for
+   Risk. Reasons: (a) the sidebar link needs write permission per GitHub's docs ("Anyone
+   with write permissions to a repository can manually link ..."), so a read-only member
+   cannot use it; (b) for description keywords the docs and this repository disagree:
+   the docs say a description keyword links and closes on merge into the default branch,
+   while CLAUDE.md records PRs 477-480, 487 and 488 whose keywords were only in the body
+   and whose issues stayed open after squash merge. Closing this path would mean reading
+   the PR body (and GraphQL closingIssuesReferences) and refusing; that needs a decision
+   and a live check, not a guess.
+2. Testing the composed "<title> (#n)" over-matches titles that end in a bare keyword
+   ("...; fixed" + " (#201)"), and digit tokens ("Fix CVE-2024-1"). Disposition: kept on
+   purpose. The fallback only loses the PR title; the composed string is what GitHub
+   parses, so checking it is the conservative choice. Recorded in spec 02 and in the
+   CLOSING_SHAPE comment.
+3. [2b-D41] "keyword at the end" pins that over-match. Disposition: same as 2 (it pins
+   that the check runs on the string GitHub sees; mutation T9).
+4. closingLine read gate.todoRow (taken before the PR read) while the phase check already
+   re-reads before.todoRow. Real case: a self-created issue's retry fills sourceRef while
+   the GET is in flight (todos.ts runSelfIssueCreate), and the closing line was lost.
+   Disposition: fixed tests first, [2b-D43] (red/green in seg2b-r2-red-green.txt).
+5. Evidence files untracked at 95f2a30e. Disposition: committed with this round
+   (docs(1403) commit).
+
+Security note on the title fix (manual; builds.ts is not on the AGENTS.md list)
+-------------------------------------------------------------------------------
+- Asset: the default branch's issue state. Actor: a PR author whose association is
+  OWNER / MEMBER / COLLABORATOR, including read-only members and collaborators, who can
+  edit the PR's title and body. Trigger: a person pressing merge in pacman; the squash
+  is done with the team's token.
+- Before: the PR title went verbatim into commit_title; with no closing line,
+  commit_message was omitted and GitHub filled the body from the repository default
+  (squash_merge_commit_message PR_BODY / COMMIT_MESSAGES / BLANK). Either field could
+  carry "<keyword> <reference>" and close any issue in the repository or one the token
+  can reach.
+- After: commit_title is the PR title only when the composed title has no closing shape;
+  otherwise "Merge pull request #n". commit_message is always pacman-owned: the closes
+  line for the task's own same-repo issue, else "Merged by pacman.". No PR-sourced text
+  reaches the body.
+- The detector is a superset of GitHub's documented syntax: keywords close/closes/closed/
+  fix/fixes/fixed/resolve/resolves/resolved, any case, optional colon, optional
+  whitespace, then any token holding an ASCII digit (#N, GH-N, owner/repo#N, issue URLs,
+  scheme-less URLs). The only leading guard is "not preceded by an ASCII letter"; GitHub
+  needs a word boundary there too. Residual: Unicode case folding (e.g. a dotless or
+  long-s letter) is not matched; GitHub matches ASCII keywords, so a folded keyword
+  would not be parsed either (not verified live).
+- Not covered (Risk): description keywords on the PR itself (finding 1), and the
+  sidebar link (write permission needed).
+- No new outbound request, no new data in rows or logs, no token handling change.
+
+Risk notes asked for by the orchestrator (pr-gate suggestions 1 and 2), no code change
+-------------------------------------------------------------------------------------
+A. PRs authored by a bot or app account. The daemon never writes to GitHub
+   (apps/daemon/src/github-probe.ts: "本模块永不写 GitHub"); the agent opens the build's PR
+   itself with the machine's gh CLI login (github-probe.ts: "机器 gh CLI（agent 开 PR 用的
+   就是它）"; runner.ts:2134 "机器 gh 梯在前——agent 开 PR 用的就是它"). The team's
+   GitHub connection token reaches the step only as the git push credential
+   (creds.git.password) and as the probe's REST token; it is not put in the agent's
+   environment as GH_TOKEN. So the PR's author is whoever the machine's gh is logged in
+   as. On xiechimon/pacman that is the owner's user account: the 30 latest closed PRs and
+   #1509 are all xiechimon, type User, author_association OWNER (gh api, 2026-10-22).
+   Consequence when a machine's gh is a bot or GitHub App token (author_association NONE
+   or CONTRIBUTOR): every merge press answers 409 (D38) and nothing is written. A review
+   card can still finish: the person merges on GitHub and the reconcile finishes it (the
+   reconcile does not filter the recorded PR by author; only adopting a different PR
+   needs a write author). A failed card cannot: after a GitHub merge the press answers
+   409 (D39) and the card stays failed (the reconcile reads only review cards, and failed
+   goes only to queued / closed / review); the person closes it or reruns.
+B. An unclear GitHub answer (timeout, network error, 5xx, unreadable 200) moves a failed
+   card back to review with the announcement row, even if GitHub actually refused. The
+   PR then stays open and the card sits at the review gate, where the person can press
+   merge again or act otherwise. Documented in spec 02 A6 ("没有明确答复 ... failed 恢复到
+   review（对账只读 review 卡）").

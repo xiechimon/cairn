@@ -204,7 +204,8 @@ function waitingOnOf(
     if (home === undefined || !home.online) {
       return { on: 'machine', retryAt: null };
     }
-    if (!runtimeGatePasses(home, agentRow.provider)) {
+    // #1493：降级后按备选的 provider 判（claim 面同判据）。
+    if (!runtimeGatePasses(home, s.fallback?.model?.provider ?? agentRow.provider)) {
       return { on: 'machine', retryAt: null };
     }
     // #1251：归属机在线且 runtime 闸开，但能力快照缺 Agent 声明项——机器

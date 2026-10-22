@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Read-only gh api captures for #1404 S4a. Usage: capture.sh <outdir>
+set -u
+OUT=$1
+mkdir -p "$OUT"
+H=(-H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28')
+R=repos/xiechimon/pacman
+HEAD1479=39a108e80bcd5d82e980599abf32d059b2fbad8c
+B1439=a6c0865edea6cc95d86b32eb33f6a265c0f20d21
+H1439=f9c4f852292592395e882e1d900ca215a1aafce5
+MAIN=93b9ce215b5ee101cf5e511ddd2cb8d212d04e71
+LOG="$OUT/capture.log"
+: > "$LOG"
+# name|path|extra header (optional)
+cap() {
+  local name=$1 path=$2 extra=${3:-}
+  local args=("${H[@]}")
+  [ -n "$extra" ] && args+=(-H "$extra")
+  echo "\$ gh api -i -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28'${extra:+ -H '$extra'} '$path'" >> "$LOG"
+  gh api -i "${args[@]}" "$path" > "$OUT/$name.raw" 2> "$OUT/$name.err"
+  echo "exit $?" >> "$LOG"
+  # split headers and body at the first blank line (CRLF or LF)
+  python3 -I - "$OUT/$name.raw" "$OUT/$name" >> "$LOG" <<'PY'
+import json, sys
+raw = open(sys.argv[1], 'rb').read().decode('utf-8')
+head, _, body = raw.replace('\r\n', '\n').partition('\n\n')
+lines = head.split('\n')
+keep = ('etag', 'link', 'last-modified', 'x-accepted-github-permissions', 'x-accepted-oauth-scopes', 'x-ratelimit-resource', 'content-type')
+print(lines[0])
+for l in lines[1:]:
+    k = l.split(':', 1)[0].lower()
+    if k in keep:
+        print('  ' + l)
+body = body.strip()
+if body:
+    try:
+        data = json.loads(body)
+    except ValueError:
+        print('  body: not JSON, %d bytes' % len(body.encode()))
+        sys.exit(0)
+    with open(sys.argv[2] + '.json', 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write('\n')
+    print('  body: %d bytes as received; JSON %s' % (len(body.encode()), type(data).__name__))
+else:
+    print('  body: empty')
+PY
+  echo >> "$LOG"
+}
+etag_of() { grep -i '^etag:' "$OUT/$1.raw" | head -1 | sed 's/^[Ee][Tt][Aa][Gg]: *//' | tr -d '\r'; }
+
+cap pull-1479 "$R/pulls/1479"
+cap pull-1479-conditional "$R/pulls/1479" "If-None-Match: $(etag_of pull-1479)"
+cap pull-missing "$R/pulls/999999"
+cap branch-main "$R/branches/main"
+cap branch-main-conditional "$R/branches/main" "If-None-Match: $(etag_of branch-main)"
+cap rules-main "$R/rules/branches/main?per_page=100&page=1"
+cap rules-missing-branch "$R/rules/branches/s4a-no-such-branch?per_page=100&page=1"
+cap compare-1439-p1 "$R/compare/$B1439...$H1439?per_page=2&page=1"
+cap compare-1439-p2 "$R/compare/$B1439...$H1439?per_page=2&page=2"
+cap compare-missing "$R/compare/$B1439...0000000000000000000000000000000000000000?per_page=2&page=1"
+cap check-runs-1479 "$R/commits/$HEAD1479/check-runs?filter=latest&per_page=100&page=1"
+cap check-runs-1479-conditional "$R/commits/$HEAD1479/check-runs?filter=latest&per_page=100&page=1" "If-None-Match: $(etag_of check-runs-1479)"
+cap check-runs-1479-p2 "$R/commits/$HEAD1479/check-runs?filter=latest&per_page=5&page=2"
+cap check-runs-1479-all "$R/commits/$HEAD1479/check-runs?filter=all&per_page=100&page=1"
+cap status-1479 "$R/commits/$HEAD1479/status?per_page=100&page=1"
+cap status-1479-conditional "$R/commits/$HEAD1479/status?per_page=100&page=1" "If-None-Match: $(etag_of status-1479)"
+cap contents-1490 "$R/contents/docs/verify/1490?ref=$MAIN"
+cap contents-missing "$R/contents/docs/verify/s4a-no-such-dir?ref=$MAIN"

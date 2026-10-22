@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "abf15c05-4f04-4f0a-ad39-86f80b1a9c66",
+  "id": "5674600f-de6c-4457-a5be-3577ac76c03f",
   "prevId": "c3fbd25d-523e-495e-9167-460db4d6a78e",
   "tables": {
     "agent": {
@@ -132,6 +132,13 @@
         },
         "requiredCapabilities": {
           "name": "requiredCapabilities",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fallbackModels": {
+          "name": "fallbackModels",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -2345,6 +2352,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "fallback": {
+          "name": "fallback",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "sessionId": {
           "name": "sessionId",
           "type": "text",
@@ -2368,13 +2382,6 @@
         },
         "lastHeartbeatAt": {
           "name": "lastHeartbeatAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "finishedAt": {
-          "name": "finishedAt",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

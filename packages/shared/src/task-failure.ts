@@ -162,6 +162,35 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
 }
 
 // ---------------------------------------------------------------------------
+// #1493：isProviderAuthFailure（降级链触发：认证失败）
+// ---------------------------------------------------------------------------
+
+const httpAuthCodeRe = digitBounded('401');
+
+/** 认证失败（模型 key 无效或过期）。classifyStepFailure 把它归 other（走失败
+ *  漏斗），本判定是降级链的附加触发——「重试没用、换一家可能行」。只认点名
+ *  API key / authentication 的文案：裸 401 / Unauthorized 也会出现在 git push、
+ *  GitHub 凭证过期等与模型无关的失败里，那种换模型没用还会把好 provider 记
+ *  连败。403 不在此列：403 常是 usage limit（quota）或并发拒绝（capacity）。 */
+export function isProviderAuthFailure(rawError: string): boolean {
+  const lower = rawError.trim().toLowerCase();
+  if (lower === '') return false;
+  if (
+    containsAny(lower, [
+      'authentication_error',
+      'invalid api key',
+      'invalid_api_key',
+      'invalid x-api-key',
+      'incorrect api key',
+      'api key expired',
+    ])
+  ) {
+    return true;
+  }
+  return httpAuthCodeRe.test(lower) && containsAny(lower, ['api key', 'api_key', 'x-api-key']);
+}
+
+// ---------------------------------------------------------------------------
 // #1261：classifyAgentFailure（daemon 检测面）+ parseRetryAfterMs
 // ---------------------------------------------------------------------------
 
