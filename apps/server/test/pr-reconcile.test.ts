@@ -2417,6 +2417,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
       title: 'server(1403): reconcile review-phase PRs merged or closed on GitHub',
+      authorAssociation: 'OWNER',
     });
   });
 
@@ -2436,6 +2437,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
       title: 'server(1453): a step that finishes before its stop lands leaves an exited card alone',
+      authorAssociation: 'OWNER',
     });
   });
 

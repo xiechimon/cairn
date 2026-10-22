@@ -49,6 +49,11 @@
 //       本 build 的交付提交（合并步不算最后推送的工作），对账照常收尾
 //   D36 合并步把默认分支并进工作分支并推送（开着的 PR 的 head 是它）→ 经 API 合并的 sha 绑它
 //       （分支上 pacman 最后推送的提交；对账的「交付包含」核对不算合并步，D35）
+//   D37 failed 卡的 PR 已在 GitHub 合并 → 恢复到 review、落一行、202、不发合并；对账收尾
+//       （看板上把 failed 卡拖到已完成会走合并弹层，再到这里：不能再让它 409）
+//   D38 PR 作者对仓库没有写权限（author_association 不是 OWNER / MEMBER / COLLABORATOR）
+//       → 409，不发合并（daemon 记的是分支上编号最大的开着的 PR，不看是谁开的）
+//   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -101,6 +106,8 @@ interface PullFake {
   defaultBranch?: string;
   mergeCommitSha?: string | null;
   mergedBy?: string | null;
+  /** author_association（缺省 OWNER）。 */
+  authorAssociation?: string;
 }
 
 interface Recorded {
@@ -183,6 +190,7 @@ class GithubFake {
         state: p.state,
         merged: p.merged,
         ...(p.title === null ? {} : { title: p.title ?? PR_TITLE }),
+        author_association: p.authorAssociation ?? 'OWNER',
         merge_commit_sha: p.merged ? (p.mergeCommitSha ?? MERGE_SHA) : 'e'.repeat(40),
         merged_by: p.merged && p.mergedBy != null ? { login: p.mergedBy } : null,
         merged_at: p.merged ? new Date().toISOString() : null,
@@ -492,13 +500,13 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 
   test.each([
-    ['a claimed verify step', 'verify', 'claimed'],
-    ['a claimed review step', 'review', 'claimed'],
-    ['a pending build step', 'build', 'pending'],
-    ['a merge step queued before the upgrade', 'merge', 'pending'],
+    ['a claimed verify step', 'verify', 'claimed', '验证步'],
+    ['a claimed review step', 'review', 'claimed', '审核步'],
+    ['a pending build step', 'build', 'pending', '执行步'],
+    ['a merge step queued before the upgrade', 'merge', 'pending', '合并步'],
   ] as const)(
     '[2b-D31] %s on the build → 409 naming the step; no request',
-    async (_name, kind, status) => {
+    async (_name, kind, status, label) => {
       const w = makeWorld();
       w.s.db
         .insert(stepTable)
@@ -512,7 +520,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .run();
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
-      expect(err.message).toContain(`${kind} 步`);
+      expect(err.message).toContain(label);
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -541,22 +549,59 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   });
 
   test.each([
-    ['the PR is already merged', { pull: { state: 'closed', merged: true, mergedBy: 'octo' } }],
-    ['no GitHub connection', { connected: false }],
-    ['the PR head moved', { pull: { headSha: 'abcdef01'.repeat(5) } }],
-    ['no checkpoint', { checkpoint: null }],
+    ['no GitHub connection', { connected: false }, '连接 GitHub 后再点合并'],
+    ['the PR head moved', { pull: { headSha: 'abcdef01'.repeat(5) } }, '再点一次合并'],
+    ['no checkpoint', { checkpoint: null }, '再点一次合并'],
   ] as const)(
-    '[2b-D32] failed card, %s → the refusal points to the board, not the reconcile',
-    async (_name, o) => {
+    '[2b-D32] failed card, %s → the refusal says how this card gets finished (the reconcile reads only review cards)',
+    async (_name, o, next) => {
       // restorable (the PR is recorded on the build) even without a checkpoint
       const w = makeWorld({ phase: 'failed', ...o });
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
-      expect(err.message).toContain('拖到已完成');
-      expect(err.message).not.toContain('对账');
+      expect(err.message).toContain(next);
+      expect(err.message).not.toContain('拖到已完成'); // the board's done dialog merges a failed card
       expectUntouched(w, 'failed');
     },
   );
+
+  test('[2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it', async () => {
+    const w = makeWorld({
+      phase: 'failed',
+      pull: { state: 'closed', merged: true, mergedBy: 'octo' },
+    });
+    expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toEqual({ delegated: true });
+    expect(w.fake.puts()).toEqual([]);
+    expect(w.phase()).toBe('review');
+    expect(w.userRows()).toEqual([]);
+    expect(w.systemRows()).toHaveLength(1);
+    expect(w.systemRows()[0]).toContain('PR #201 已在 GitHub 合并');
+    await w.sweep();
+    expect(w.phase()).toBe('done');
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+  });
+
+  test.each(['NONE', 'CONTRIBUTOR'] as const)(
+    '[2b-D38] the PR’s author has no write access (%s) → 409; no PUT',
+    async (association) => {
+      const w = makeWorld({ pull: { authorAssociation: association } });
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain(association);
+      expect(w.fake.puts()).toEqual([]);
+      expectUntouched(w);
+    },
+  );
+
+  test('[2b-D3c] the server has no secret box → 409 naming the server key, not the connection', async () => {
+    const w = makeWorld();
+    const { box: _box, ...noBox } = w.deps;
+    const err = await refusal(requestMerge(noBox, w.buildId));
+    expect(err.status).toBe(409);
+    expect(err.message).toContain('密钥');
+    expect(w.fake.requests).toEqual([]);
+    expectUntouched(w);
+  });
 
   test('[2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT', async () => {
     const head = 'abcdef01'.repeat(5);
@@ -578,11 +623,14 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['a short sha', 'abc1234'],
     ['upper-case hex', CP.toUpperCase()],
     ['a ref-like value', `${'a'.repeat(39)}/`],
-  ] as const)('[2b-D5] %s → 409; no request carries it', async (_name, checkpoint) => {
+  ] as const)('[2b-D5] %s → 409; no PUT, and no request carries it', async (_name, checkpoint) => {
     const w = makeWorld({ checkpoint });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
-    expect(w.fake.requests).toEqual([]);
+    expect(w.fake.puts()).toEqual([]);
+    for (const r of w.fake.requests) {
+      expect(`${r.url} ${r.body ?? ''}`).not.toContain(checkpoint ?? CP);
+    }
     expectUntouched(w);
   });
 
@@ -593,6 +641,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.message).toContain('已在 GitHub 合并');
     // the reconcile checks before it finishes (own PR, default branch, last pushed commit)
     expect(err.message).toContain('核对不上');
+    expect(err.message).toContain('不勾合并');
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
     await w.sweep();

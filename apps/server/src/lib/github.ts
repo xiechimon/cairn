@@ -148,6 +148,8 @@ export interface GithubPull extends GithubPullState {
   baseOwner: string | null;
   /** PR 标题（经 API 合并时提交标题取它，#1403 段 2b）；缺失 = null。 */
   title: string | null;
+  /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
+  authorAssociation: string | null;
 }
 
 /** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
@@ -237,6 +239,7 @@ export async function githubPull(
     state?: unknown;
     merged?: unknown;
     title?: unknown;
+    author_association?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -268,6 +271,7 @@ export async function githubPull(
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
       title: optString(raw.title),
+      authorAssociation: optString(raw.author_association),
     },
   };
 }

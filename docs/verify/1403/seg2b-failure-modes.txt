@@ -237,3 +237,17 @@ Not changed after the third pass (reasons in seg2b-reviews.txt): MEMBER and COLL
 can be read-only (the coordinator's rule, limit stated above); a pending verify step can
 be claimed while the PUT is in flight; a Verifier without the push permission reports a
 local commit as its checkpoint.
+
+Added after the fourth /code-review pass (tests first, red on bdeb6378):
+D37 Failed card whose PR is already merged on GitHub: restored to review, one row, 202, no
+    PUT; the next sweep finishes it. Before this, the board's done dialog (which merges a
+    failed card) led back to a 409 that told the person to drag the card to done: a loop.
+    To reach this case the PR read now comes before the checkpoint check; D5 keeps "no PUT,
+    and the value never reaches a request".
+D32 (reworded) Failed-card refusals say: merge on GitHub, then press merge again (D37);
+    without a connection, connect GitHub first.
+D38 The PR's author has no write access by the PR read's author_association (the daemon
+    records the highest-numbered open PR on the branch, whoever opened it): 409, no PUT.
+D3c The server has no secret box: 409 naming the server's key configuration.
+D31 (reworded) The busy refusal names the step kind in Chinese and no longer suggests a
+    stop (the build's stop takes the newest step, not necessarily the blocking one).

@@ -111,7 +111,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { githubRepoOfProject } from './git.js';
-import { teamGithubToken } from './github-connection.js';
+import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -563,8 +563,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
-    const access = teamGithubToken(deps, target.teamId);
-    const token = 'token' in access ? access.token : null;
+    const token = githubTokenOrNull(deps, target.teamId);
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -873,8 +872,7 @@ export function createCiPoller(
     }
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
-    const grindAccess = teamGithubToken(deps, target.teamId);
-    const grindToken = 'token' in grindAccess ? grindAccess.token : null;
+    const grindToken = githubTokenOrNull(deps, target.teamId);
     // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
     if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(

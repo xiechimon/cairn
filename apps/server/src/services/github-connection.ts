@@ -80,6 +80,16 @@ export function teamGithubToken(
   }
 }
 
+/** teamGithubToken 只要 token 的投影：拿不到（任何原因）= null，调用方走匿名读（PR 探测、
+ * PR 对账与磨绿）。 */
+export function githubTokenOrNull(
+  deps: { db: Db; box?: SecretBox | undefined },
+  teamId: string,
+): string | null {
+  const access = teamGithubToken(deps, teamId);
+  return 'token' in access ? access.token : null;
+}
+
 /** 连接行存在性（#452 写向；只读行不解密不抛）：createTodo 关键路径判
  * 「已连接才自建 issue」——未连接 = 不建、不报错、不亮失败态（ADR 0006 D2）；
  * 密文损坏留给异步出站时降级（停留未建成，可重试）。 */
