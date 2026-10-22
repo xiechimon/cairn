@@ -36,6 +36,20 @@ Not fixed, with reasons (seg3-plan.md §12; into the PR's Risk section):
 5. The merge-conflict cap is a lifetime count per build, the same as the [ci-fix] cap.
 7. A commit-status-only required context gives a blocked hint after the grace, not green. Reading the combined status is left to the merge gate (P3, S4a's githubCombinedStatusRaw).
 
+## /code-review, round 3 (medium, origin/claude/bootstrap-p2-seg2b...85aadc84)
+
+Ten findings (seg3-plan.md §13, red-green leg 4, mutations P1-P6):
+1. The re-verify marker was looked up from roundStart, so a [ci-fix] round after the conflict round hid it. Fixed: it is now looked up after the latest verify step (F13f).
+2. Stopped AI review steps were dropped silently. Fixed with a timeline note; reviewers are not re-chosen automatically (F13h).
+3. A verify that already finished on the pre-conflict head was not repeated. Fixed: any existing verify triggers the re-verify (F13g).
+4. Anonymous grind read cost: not fixed. Risk: the pre-segment-3 grind already used the full unauthenticated hour per PR; the remedy is connecting GitHub.
+5. A failed PR read stops the grind: not fixed. F11 is by design; the card does not move on a head it cannot name.
+6. The doc comment disagreed with FIXABLE. Fixed.
+7. A SAML SSO 403 on the rules read counted as "no rules". Fixed (F8 SSO case).
+8. Classic enforcement_level off was ignored. Fixed (F9b). Ruleset rules are read as one page of 100, as stated in the plan.
+9. Migration 0045 collides with main's 0045_model_fallback_chain. To be renumbered at the next merge (the 2b head that merges main c99de10).
+10. The own-PR predicate was written twice. Fixed: one isOwnOpenDefaultPull.
+
 ## /security-review
 
 Not run. The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.

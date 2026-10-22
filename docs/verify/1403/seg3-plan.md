@@ -173,3 +173,21 @@ Not fixed:
 - Required checks concluding `neutral` or `skipped` stay "not passing". The coordinator's segment-3 scope sets this ("neutral / skipped / cancelled no longer count as green"). GitHub's own merge box accepts them, so a required job skipped by a path filter leaves the card at building with a hint each round. This goes into the PR's Risk section for the user to confirm.
 - The merge-conflict round cap counts every `[merge-conflict]` step of the build, not consecutive ones. That is the same lifetime count per build as the `[ci-fix]` cap (`countMarkedRounds`); a rerun starts a new build.
 - A required context reported only as a commit status (or past the first 100 check runs) becomes a blocked hint after the grace, not green. The hint names it and a person moves the card. Reading the combined status is left for the merge gate (P3), which has S4a's `githubCombinedStatusRaw`.
+
+## 13. Third /code-review (2026-10-22, medium, on origin/claude/bootstrap-p2-seg2b...85aadc84)
+
+Ten findings. Seven are fixed (tests first), two are not, and one is handled at the next merge. The red leg was 5 failed / 61 passed (`seg3-red-green.txt` leg 4). Mutations P1-P6 were all killed.
+
+F8 (extended). A rules read answering 403 with `x-github-sso` (SAML SSO not authorised for the token) is unreadable, not "no rules".
+F9b. Classic protection whose `required_status_checks.enforcement_level` is `off`: its contexts are not required. The branch docs give `enforcement_level: string` with no value list, so only the literal `off` is acted on.
+F13f. The re-verify marker is looked up after the latest verify step, not after `roundStart`: a `[ci-fix]` round after the merge-conflict round no longer hides it.
+F13g. A verify step that already ran on the pre-conflict head is also queued again after a merge-conflict round at review. The merge commit changes the delivery.
+F13h. A pending AI review step stopped by the round is stated in the timeline (`CI_MERGE_CONFLICT_REVIEW_NOTE`). It is not queued again automatically, because a person chose the reviewers when they started it.
+The own-PR predicate is one function, `isOwnOpenDefaultPull` in `lib/github.ts`, used by the grind and the review reconcile.
+The verdict doc comment now matches FIXABLE (action_required is not fixable).
+
+Not fixed:
+- Anonymous grind cost: the head-SHA read adds one `pulls/{n}` read per sweep per candidate, plus two required-list reads every 10 minutes per repository. Before segment 3, one anonymous grinding PR already used 60 check-runs reads an hour, GitHub's whole unauthenticated limit. Connecting GitHub (token reads, where 304s are free) is the remedy. This goes into the PR's Risk section.
+- A PR read that fails, or lacks the default branch, leaves the card untouched (F11, by design): the card is not advanced on a head it cannot name.
+
+At the next merge: the migration number. main now has `0045_model_fallback_chain` (#1493, after this branch was planned), so `0045_step_finished_at` is renumbered to the tail of main when segment 2b's new head (which merges main c99de10) is merged in.

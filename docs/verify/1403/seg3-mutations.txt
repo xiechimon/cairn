@@ -112,3 +112,22 @@ N9 reverify slot ignores an active verify	KILLED	1 failed | 360 passed (361)
 restored byte-identical: True
 
 Result: 9 of 9 killed. (N8's mutant also renames the check in the hint, so more tests fail than F26b alone.)
+
+## Run 4 (the third /code-review's fixes; P1-P6, same harness and test files)
+
+P1 SSO 403 on rules treated as no rules	KILLED	1 failed | 365 passed (366)
+    red: [s3-F8] the rules read answers 403 asking for SAML SSO (x-github-sso): no move, no check-runs read
+P2 enforcement_level off ignored	KILLED	1 failed | 365 passed (366)
+    red: [s3-F9b] classic protection with enforcement_level off: its contexts are not required
+P3 re-verify window back to the round start	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13f] the re-verify survives a [ci-fix] round after the merge-conflict round
+P4 re-verify only when the verify was unclaimed	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13g] a verify that already ran on the pre-conflict head is queued again after the merge-conflict round
+P5 stopped AI review not said	KILLED	1 failed | 365 passed (366)
+    red: [s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline
+P6 own PR ignores the base branch (shared predicate)	KILLED	2 failed | 364 passed (366)
+    red: [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+    red: [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+restored byte-identical: True
+
+Result: 6 of 6 killed.

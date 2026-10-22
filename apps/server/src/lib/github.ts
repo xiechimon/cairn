@@ -174,6 +174,22 @@ export function isOwnPull(pull: GithubPull, branch: string): boolean {
   return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
 }
 
+/** 本 build 开着的、目标是默认分支的 PR（#1403 段 3：磨绿按它的 head SHA 读检查、按它的
+ * mergeable_state 解冲突或提示落后；review 对账同一判据）。 */
+export function isOwnOpenDefaultPull(
+  p: GithubPull,
+  branch: string,
+): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    hasPullFields(p) && isOwnPull(p, branch) && p.baseRef === p.defaultBranch && p.state === 'open'
+  );
+}
+
 export interface GithubPullPage {
   /** true = 304 Not Modified（调用方复用缓存判据，同 check-runs 条件 GET）。 */
   notModified: boolean;
@@ -208,7 +224,12 @@ async function conditionalGetJson(
     return null;
   }
   if (res.status === 304) return { notModified: true };
-  if (absentOn.includes(res.status) && !(await isRateLimitedResponse(res))) {
+  // SAML SSO 拒绝（x-github-sso 头）不是「没有这项」：token 没被授权，读不到。
+  if (
+    absentOn.includes(res.status) &&
+    res.headers.get('x-github-sso') === null &&
+    !(await isRateLimitedResponse(res))
+  ) {
     return { notModified: false, etag: null, data: [] };
   }
   if (!res.ok) return null;
@@ -1450,7 +1471,8 @@ export async function githubCommitCheckRuns(
  * （`GET /repos/{o}/{r}/branches/{branch}` 的 protection.required_status_checks 里的
  * contexts 与 checks[].context）与 ruleset（`GET /repos/{o}/{r}/rules/branches/{branch}`
  * 里 type 为 required_status_checks 的规则的 parameters.required_status_checks[].context）
- * 取并集、去重。rules 读答 403 / 404 且不是限流 = 没有规则（ruleset 不在这个仓的套餐里，
+ * 取并集、去重；classic 的 enforcement_level 为 off 时它的名单不算（文档只说是 string，
+ * 只认字面 off）。rules 读答 403 / 404 且不是限流、不是 SSO 拒绝 = 没有规则（ruleset 不在这个仓的套餐里，
  * 或没有可见的规则）；除此之外两个读任一读不到（非 2xx、网络、限流、响应形不对）= null，
  * 调用方不动。
  * 合并闸 S4a（#1503）的原始读面落地后可改用它，接口不变。 */
@@ -1484,15 +1506,20 @@ export async function githubRequiredChecks(
   const status = (
     branchRead.data as {
       protection?: {
-        required_status_checks?: { contexts?: unknown; checks?: unknown } | null;
+        required_status_checks?: {
+          enforcement_level?: unknown;
+          contexts?: unknown;
+          checks?: unknown;
+        } | null;
       } | null;
     }
   ).protection?.required_status_checks;
-  if (Array.isArray(status?.contexts)) {
-    for (const c of status.contexts) if (typeof c === 'string') names.add(c);
+  const classic = status?.enforcement_level === 'off' ? null : status;
+  if (Array.isArray(classic?.contexts)) {
+    for (const c of classic.contexts) if (typeof c === 'string') names.add(c);
   }
-  if (Array.isArray(status?.checks)) {
-    for (const c of status.checks as Array<{ context?: unknown } | null>) {
+  if (Array.isArray(classic?.checks)) {
+    for (const c of classic.checks as Array<{ context?: unknown } | null>) {
       if (typeof c?.context === 'string') names.add(c.context);
     }
   }

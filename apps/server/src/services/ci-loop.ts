@@ -83,7 +83,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -98,6 +98,7 @@ import {
   githubRequiredChecks,
   hasPullFields,
   isFullSha,
+  isOwnOpenDefaultPull,
   isOwnPull,
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
@@ -212,8 +213,8 @@ const FIXABLE = new Set(['failure', 'timed_out']);
 /** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。同名的 run
  * （不同 app 或 workflow 报的同一个名字）合成一个名字看：有没完成的 → pending；有可修的
  * 失败 → red；有一个 success → 这个名字过。
- * - 必需名单非空：只看名单里的名字。有没完成的 → pending；failure / timed_out /
- *   action_required → red；某个名字没有 run → pending（missing）；有名字没有 success
+ * - 必需名单非空：只看名单里的名字。有没完成的 → pending；failure / timed_out → red
+ *   （action_required 等人批准，agent 修不了，按不算通过）；某个名字没有 run → pending（missing）；有名字没有 success
  *   （cancelled、neutral、skipped、stale）→ blocked；否则 green。
  * - 必需名单为空（默认分支没有保护也没有规则）：看全部 run。零个 → empty；有没完成的 →
  *   pending；failure / timed_out → red；某个名字没有 success 而有 cancelled → blocked；其余
@@ -249,10 +250,15 @@ export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = 
   return { state: 'green' };
 }
 
-/** 解冲突轮在 review 上停掉了还没人领的 verify 步时落的行；磨绿回到 review 时据它（本轮里
- * 有这一行）为新 head 重排一条 verify（#1403 段 3）。 */
+/** 解冲突轮在 review 上、本 build 已有 verify 步时落的行：磨绿回到 review 时据它（在最近
+ * 一条 verify 步之后有这一行）为合并后的 head 重排一条 verify（#1403 段 3）。 */
 export const CI_MERGE_CONFLICT_VERIFY_NOTE =
-  '解冲突轮停掉了还没人领的验证步（它验的是冲突前的提交）；检查通过、回到审核关口时重排一条。';
+  '解冲突轮会把默认分支合进来、改动交付：之前的验证是冲突前的提交（还没人领的已停掉），检查通过、回到审核关口时重排一条验证步。';
+
+/** 解冲突轮在 review 上停掉了还没人领的 AI 审核步时落的行（审核步不自动重排：要几位、谁来
+ * 审是人发起时定的）。 */
+export const CI_MERGE_CONFLICT_REVIEW_NOTE =
+  '解冲突轮停掉了还没人领的 AI 审核步（它审的是冲突前的提交）；回到审核关口后如需审核，请重新发起。';
 
 /** 解冲突步指令（#1403 段 3，spec 23 同分支续轮）：同一分支上把默认分支合进来、解冲突、
  * 提交并推送；不 rebase、不 force-push、不新开分支或 PR。 */
@@ -512,19 +518,20 @@ export function createCiPoller(
       hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
       return 'hinted';
     }
-    const stopsVerify =
-      fromReview &&
+    const has = (kind: 'verify' | 'review', unclaimedOnly: boolean) =>
       deps.db
         .select({ id: step.id })
         .from(step)
         .where(
           and(
             eq(step.buildId, cand.buildId),
-            eq(step.kind, 'verify'),
-            inArray(step.status, ['pending', 'waiting_quota']),
+            eq(step.kind, kind),
+            ...(unclaimedOnly ? [inArray(step.status, ['pending', 'waiting_quota'])] : []),
           ),
         )
         .get() !== undefined;
+    const reverify = fromReview && has('verify', false);
+    const stopsReview = fromReview && has('review', true);
     if (fromReview) {
       stopUnclaimedGateSteps(deps, cand.buildId);
       setTodoPhase(deps, cand.todoId, 'queued');
@@ -536,8 +543,8 @@ export function createCiPoller(
       teamId,
       buildMergeConflictPrompt({ ...pr, defaultBranch, round: rounds + 1 }),
     );
-    // 落在入队之后：本轮（roundStart = 这条解冲突步）里能查到它。
-    if (stopsVerify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
+    if (reverify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
+    if (stopsReview) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_REVIEW_NOTE);
     return 'appended';
   }
 
@@ -730,10 +737,7 @@ export function createCiPoller(
       const state = pull?.mergeableState ?? null;
       if (
         pull !== null &&
-        // 不是 foreign 且字段齐 = 本 build 自己的 PR（foreign 的判据就是这两样）；目标是默认
-        // 分支（解冲突步合进来的是默认分支）。
-        hasPullFields(pull) &&
-        pull.baseRef === pull.defaultBranch &&
+        isOwnOpenDefaultPull(pull, branch) &&
         (state === 'dirty' || state === 'behind') &&
         freshReviewRow(cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
@@ -1052,11 +1056,7 @@ export function createCiPoller(
     // mergeable_state 解冲突；不是（fork 同名分支、别的分支、已关闭）→ 按本 build 的工作分支
     // 名读 check runs（段 3 前的读法），不解冲突：别人的 PR 冲突不归本 build 修。
     const branch = conversationBranch(cand.buildId);
-    const own =
-      hasPullFields(pull) &&
-      isOwnPull(pull, branch) &&
-      pull.baseRef === pull.defaultBranch &&
-      pull.state === 'open';
+    const own = isOwnOpenDefaultPull(pull, branch);
     if (own && pull.headSha === null) {
       tally.unreadable += 1;
       return;
@@ -1197,12 +1197,24 @@ export function createCiPoller(
     setTodoPhase(deps, cand.todoId, 'review');
     // #1250（ADR 0018 层 1）：CI 磨绿抵达 review 关口 = verify 入队的第二
     // 落点（第一 = completeStep 直进 review 的非 PR 面；槽空零动作幂等）。
+    // 最近一条 verify 步之后有过解冲突轮的行 → 为合并后的 head 重排（不看 roundStart：
+    // 解冲突轮之后的 [ci-fix] 轮会挪走它）。
+    const lastVerifyAt = deps.db
+      .select({ at: step.createdAt })
+      .from(step)
+      .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
+      .orderBy(desc(step.createdAt))
+      .get()?.at;
     maybeEnqueueVerifyStep(deps, todoRow, cand.buildId, {
-      reverify: rowKnown(
-        cand.buildId,
-        CI_MERGE_CONFLICT_VERIFY_NOTE,
-        roundStart(deps, cand.buildId),
-      ),
+      reverify:
+        lastVerifyAt !== undefined &&
+        hasMessageRow(
+          deps,
+          cand.buildId,
+          'system',
+          CI_MERGE_CONFLICT_VERIFY_NOTE,
+          lastVerifyAt + 1,
+        ),
     });
     tally.advanced += 1;
   }

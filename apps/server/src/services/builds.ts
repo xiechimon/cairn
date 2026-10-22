@@ -740,8 +740,9 @@ export function maybeEnqueueVerifyStep(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
   buildId: string,
-  /** reverify：之前那条 verify 步是 PR 对账的解冲突轮停掉的（没人领、验的是冲突前的
-   * head，#1403 段 3）——只要没有排队或在跑的 verify 步就再排一条。缺省每个 build 一条。 */
+  /** reverify：之后有过解冲突轮（PR 对账把默认分支合进了交付，#1403 段 3），之前的 verify
+   * 步（停掉的或已跑完的）验的是冲突前的提交——只要没有排队或在跑的 verify 步就再排一条。
+   * 缺省每个 build 一条。 */
   opts: { reverify?: boolean } = {},
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;

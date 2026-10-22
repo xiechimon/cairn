@@ -87,7 +87,9 @@ class Fake {
   /** ruleset 的 required_status_checks；数字 = 状态码。 */
   rules: string[] | number = [];
   /** rules 读的限流信号（状态码取 rules）：头 = x-ratelimit-remaining 0；text = 只在 message 里。 */
-  rulesRateLimit: 'header' | 'text' | null = null;
+  rulesRateLimit: 'header' | 'text' | 'sso' | null = null;
+  /** classic 保护 required_status_checks.enforcement_level（null = 不带）。 */
+  enforcement: string | null = null;
   runs: Record<string, Run[]> = {};
   onPull: (() => void) | null = null;
   /** PR 的 state / head 仓 id（null = fork 已删）/ head 分支（缺省本 build 的工作分支）。 */
@@ -128,6 +130,16 @@ class Fake {
         if (this.rulesRateLimit === 'header') {
           return reply(this.rules, { message: 'x' }, '"e"', { 'x-ratelimit-remaining': '0' });
         }
+        if (this.rulesRateLimit === 'sso') {
+          return reply(
+            this.rules,
+            { message: 'Resource protected by organization SAML enforcement.' },
+            '"e"',
+            {
+              'x-github-sso': 'required; url=https://github.com/orgs/octo/sso',
+            },
+          );
+        }
         const message =
           this.rulesRateLimit === 'text' ? 'You have exceeded a secondary rate limit.' : 'x';
         return reply(this.rules, { message });
@@ -159,6 +171,7 @@ class Fake {
             : {
                 enabled: true,
                 required_status_checks: {
+                  ...(this.enforcement === null ? {} : { enforcement_level: this.enforcement }),
                   contexts: p.contexts,
                   checks: p.checks.map((context) => ({ context, app_id: null })),
                   strict: true,
@@ -459,6 +472,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     ['the rules read answers 429', { rules: 429 }],
     ['the rules read answers 403 with x-ratelimit-remaining 0', { rules: 403, rl: 'header' }],
     ['the rules read answers 403 with a rate-limit message', { rules: 403, rl: 'text' }],
+    ['the rules read answers 403 asking for SAML SSO (x-github-sso)', { rules: 403, rl: 'sso' }],
   ] as const)('[s3-F8] %s: no move, no check-runs read', async (_name, o) => {
     const w = makeWorld();
     if ('protection' in o) w.fake.protection = o.protection;
@@ -481,6 +495,15 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('building');
     w.fake.runs[HEAD] = [{ name: 'a' }, { name: 'b' }, { name: 'c' }];
     await w.poller.sweep(t0 + 60_000);
+    expect(w.phase()).toBe('review');
+  });
+
+  test('[s3-F9b] classic protection with enforcement_level off: its contexts are not required', async () => {
+    const w = makeWorld();
+    w.fake.protection = { contexts: ['stale'], checks: [] };
+    w.fake.enforcement = 'off';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep();
     expect(w.phase()).toBe('review');
   });
 
@@ -660,6 +683,74 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('review');
     const verifies = w.steps().filter((r) => r.kind === 'verify');
     expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
+  });
+
+  test('[s3-F13f] the re-verify survives a [ci-fix] round after the merge-conflict round', async () => {
+    const w = makeWorld({ phase: 'review' });
+    withVerifier(w);
+    addVerify(w, 'pending');
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.setPhase('building');
+    w.fake.mergeableState = 'clean';
+    // the merge broke a check: one [ci-fix] round, then green
+    w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'failure' }];
+    await w.poller.sweep(t0 + 60_000);
+    expect(fixSteps(w)).toHaveLength(1);
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 120_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
+  });
+
+  test('[s3-F13g] a verify that already ran on the pre-conflict head is queued again after the merge-conflict round', async () => {
+    const w = makeWorld({ phase: 'review' });
+    withVerifier(w);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-v-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'done',
+        createdAt: Date.now() - 5_000,
+        finishedAt: Date.now() - 4_000,
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    expect(w.phase()).toBe('queued');
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.setPhase('building');
+    w.fake.mergeableState = 'clean';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 60_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['done', 'pending']);
+  });
+
+  test('[s3-F13h] an unclaimed AI review step stopped by the merge-conflict round is said in the timeline', async () => {
+    const w = makeWorld({ phase: 'review' });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-r-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'review',
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep();
+    expect(w.steps().find((r) => r.kind === 'review')?.status).toBe('stopped');
+    expect(w.systemRows().filter((c) => c.includes('AI 审核步'))).toHaveLength(1);
   });
 
   test('[s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review', async () => {
