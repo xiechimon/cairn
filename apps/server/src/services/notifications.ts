@@ -219,3 +219,34 @@ export function notifyQuotaWait(
     snippet: `${lane} ${kindText}：任务挂起等额度，额度恢复后自动续跑`,
   });
 }
+
+/** model_fallback（#1493）：降级链把任务换到备用模型接着跑——quota_wait 同类
+ * （需要你知道，无需你动手）。组合键 = userId:todoId，与 quota_wait 共用一行
+ * （同一任务最新的那件事覆盖旧的）。agent 归因同 notifyQuotaWait。 */
+export function notifyModelFallback(
+  deps: NotificationDeps,
+  todoRow: {
+    id: string;
+    teamId: string;
+    title: string;
+    projectId: string;
+    seqNum: number;
+    assignment?: { plan?: { agentId?: string } | null; build?: { agentId?: string } | null } | null;
+  },
+  snippet: string,
+): NotificationRecord {
+  const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
+  const agentRow = agentId
+    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
+    : undefined;
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'model_fallback',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: agentRow
+      ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
+      : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
+    snippet,
+  });
+}

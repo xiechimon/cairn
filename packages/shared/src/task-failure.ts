@@ -162,6 +162,32 @@ export function classifyStepFailure(rawError: string): StepFailureKind {
 }
 
 // ---------------------------------------------------------------------------
+// #1493：isProviderAuthFailure（降级链触发：认证失败）
+// ---------------------------------------------------------------------------
+
+const httpAuthCodeRe = digitBounded('401');
+
+/** 认证失败（401 / key 无效或过期）。classifyStepFailure 把它归 other（走失败
+ *  漏斗），本判定是降级链的附加触发——「重试没用、换一家可能行」。403 不在
+ *  此列：403 常是 usage limit（quota 桶）或并发拒绝（capacity 桶）。 */
+export function isProviderAuthFailure(rawError: string): boolean {
+  const lower = rawError.trim().toLowerCase();
+  if (lower === '') return false;
+  return (
+    httpAuthCodeRe.test(lower) ||
+    containsAny(lower, [
+      'authentication_error',
+      'unauthorized',
+      'invalid api key',
+      'invalid_api_key',
+      'invalid x-api-key',
+      'incorrect api key',
+      'api key expired',
+    ])
+  );
+}
+
+// ---------------------------------------------------------------------------
 // #1261：classifyAgentFailure（daemon 检测面）+ parseRetryAfterMs
 // ---------------------------------------------------------------------------
 

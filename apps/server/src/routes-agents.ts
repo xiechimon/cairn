@@ -137,6 +137,9 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
         // #1251 能力要求声明：nullish——显式 null 与缺省同值（无要求）；
         // 形状校验在 createAgentBodySchema（requiredCapabilitiesSchema）。
         requiredCapabilities: body.requiredCapabilities ?? null,
+        // #1493 降级链：nullish——显式 null 与缺省同值（不降级）；上限 5 在
+        // createAgentBodySchema（fallbackModelsSchema）。
+        fallbackModels: body.fallbackModels ?? null,
       })
       .run();
     return c.json({ id }, 201); // r5 §1/§8 补录：创建 → 201 {id}
@@ -230,6 +233,8 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
       // #1251：可空列同律——显式 null = 清回无要求（undefined = 不动，形状
       // 校验在 patchAgentBodySchema）。
       'requiredCapabilities',
+      // #1493：可空列同律——显式 null = 清空降级链。
+      'fallbackModels',
     ] as const) {
       if (body[key] !== undefined) {
         // null 语义：可空列显式清空（description/provider/modelId/thinkingLevel）。

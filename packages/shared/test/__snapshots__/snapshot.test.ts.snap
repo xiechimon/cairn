@@ -4873,6 +4873,7 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                 "build_review",
                 "chief_message",
                 "quota_wait",
+                "model_fallback",
               ],
               "type": "string",
             },
@@ -5038,6 +5039,35 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
     },
     "displayName": {
       "type": "string",
+    },
+    "fallbackModels": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modelId": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "provider",
+              "modelId",
+            ],
+            "type": "object",
+          },
+          "maxItems": 5,
+          "type": "array",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "id": {
       "type": "string",
@@ -6011,6 +6041,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > notificati
         "build_review",
         "chief_message",
         "quota_wait",
+        "model_fallback",
       ],
       "type": "string",
     },

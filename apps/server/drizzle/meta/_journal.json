@@ -316,6 +316,13 @@
       "when": 1792586626268,
       "tag": "0044_merge_gate_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "6",
+      "when": 1792671132751,
+      "tag": "0045_model_fallback_chain",
+      "breakpoints": true
     }
   ]
 }
