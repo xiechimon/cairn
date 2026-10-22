@@ -1195,11 +1195,18 @@ async function tryClaim(
         provider: agentRow.provider,
         modelId: agentRow.modelId,
         thinkingLevel: agentRow.thinkingLevel,
-        // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆。
+        // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
+        // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
+        // 项目的 systemPrompt（#1494）。
         memories: db
           .select({ title: agentMemory.title, content: agentMemory.content })
           .from(agentMemory)
-          .where(eq(agentMemory.agentId, agentRow.id))
+          .where(
+            and(
+              eq(agentMemory.agentId, agentRow.id),
+              or(eq(agentMemory.projectId, cand.todoRow.projectId), isNull(agentMemory.projectId)),
+            ),
+          )
           .all(),
         // #1169 拆字段透传（原 skills 单字段两义分家）：defaultSkill（携带，
         // 单值——daemon 据此排 #1116 注入绑定序首位）+ skillsAllowlist（授权；
