@@ -254,3 +254,12 @@ Not fixed:
 ## 19. Merge of origin/main at f8483f73 (2026-10-22)
 
 main gained #1525 (P3 S4b, the merge gate's GitHub shell) and no new migration: the tail is still `0045_model_fallback_chain`, so `0046_step_finished_at` stays. The only conflict was spec 28 §8: this branch's P2 row kept, main's P3 row taken. `lib/github.ts` merged cleanly. Server suite on the merge: 135 files, 2396 passed, 1 skipped; `db:check` passes.
+
+## 20. Merge of origin/main at d4fd908c, after #1509 (segment 2b) landed as a squash (2026-10-22)
+
+main now holds segment 2b as one squash commit, plus `0046_autonomy_gates` (#1504). 2b's own commits on this branch overlapped the squash, so the conflicted files were resolved by applying only segment 3's own changes onto main. The base for each file is the tree of 2b ff4c4247 merged with main f8483f73 (`git merge-tree --write-tree`, tree 7ab29298; only spec 28 conflicts there). Then `git merge-file` ran with ours = this branch's HEAD, base = that tree, theirs = origin/main.
+- `lib/github.ts`, `services/builds.ts`, `services/ci-loop.ts`, `test/pr-reconcile.test.ts`, spec 02: merged with no conflicts. Each differs from origin/main by exactly segment 3's delta (110, 69, 416 and 16 changed lines, the same counts as segment 3's diff against the base tree).
+- `services/webhook.ts`: segment 3 never changed it, so main's version is taken.
+- Spec 28 §8: this branch's P2 row, now saying segment 2b is merged (d4fd908); main's P3 row.
+- Migration: main's `0046_snapshot.json` and `_journal.json` taken; this branch's `0046_step_finished_at.sql` removed and regenerated as `apps/server/drizzle/0047_step_finished_at.sql` (``ALTER TABLE `step` ADD `finishedAt` integer;``). `db:check` passes; spec 02 says 0047.
+Server suite on the merge: 137 files, 2456 passed, 1 skipped.

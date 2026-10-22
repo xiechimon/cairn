@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "2f27aa46-7865-4423-a7fd-4b7ac336d145",
+  "id": "398ff4e5-c2af-4392-8fb1-3cb6d5d0a8df",
   "prevId": "5674600f-de6c-4457-a5be-3577ac76c03f",
   "tables": {
     "agent": {
@@ -456,6 +456,80 @@
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "autonomy_state": {
+      "name": "autonomy_state",
+      "columns": {
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "lastStartedAt": {
+          "name": "lastStartedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "baselineSha": {
+          "name": "baselineSha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastBlockedReason": {
+          "name": "lastBlockedReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "lastEvaluatedAt": {
+          "name": "lastEvaluatedAt",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "autonomy_state_projectId_project_id_fk": {
+          "name": "autonomy_state_projectId_project_id_fk",
+          "tableFrom": "autonomy_state",
+          "tableTo": "project",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "autonomy_state_projectId_kind_pk": {
+          "columns": [
+            "projectId",
+            "kind"
+          ],
+          "name": "autonomy_state_projectId_kind_pk"
+        }
+      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -1549,6 +1623,30 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "member_activity": {
+      "name": "member_activity",
+      "columns": {
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "at": {
+          "name": "at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "message": {
       "name": "message",
       "columns": {
@@ -1818,6 +1916,13 @@
         },
         "localPath": {
           "name": "localPath",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "autonomy": {
+          "name": "autonomy",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -2382,13 +2487,6 @@
         },
         "lastHeartbeatAt": {
           "name": "lastHeartbeatAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "finishedAt": {
-          "name": "finishedAt",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

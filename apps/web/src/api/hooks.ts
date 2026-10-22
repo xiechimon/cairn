@@ -10,6 +10,7 @@ import type {
   AskUserAnswer,
   AskUserQuestionContent,
   Assignment,
+  AutonomyRecord,
   BuildRecord,
   CapabilitiesResponse,
   ChiefGetResponse,
@@ -37,6 +38,7 @@ import type {
   ModelSourcesEnvelope,
   OAuthAuthorizeResponse,
   PatchAgentBody,
+  PatchAutonomyBody,
   PatchChiefBody,
   PatchMachineBody,
   PatchProjectBody,
@@ -107,6 +109,14 @@ export const useProjects = (teamId: string | undefined, enabled: boolean) =>
     queryKey: ['projects', teamId],
     queryFn: () => api.get<ProjectRecord[]>(`/api/projects?teamId=${teamId}`),
     enabled: enabled && teamId !== undefined,
+  });
+
+/** #1491 后台自动任务的闸：设置 + 每种任务最近一次判定（项目设置页读）。 */
+export const useProjectAutonomy = (projectId: string | undefined, enabled: boolean) =>
+  useQuery({
+    queryKey: ['project-autonomy', projectId],
+    queryFn: () => api.get<AutonomyRecord>(`/api/projects/${projectId}/autonomy`),
+    enabled: enabled && projectId !== undefined,
   });
 
 /** W4 #286：⌘K 面板 live 面服务端搜索——GET /api/search?q= 防抖 250ms
@@ -822,6 +832,16 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (input: { id: string; body: PatchProjectBody }) =>
         api.patch<ProjectRecord>(`/api/projects/${input.id}`, input.body),
       onSuccess: invalidateAll,
+    }),
+    // #1491 闸设置写面：缺键不动（shared patchAutonomyBodySchema）。
+    patchAutonomy: useMutation({
+      mutationFn: (input: { id: string; body: PatchAutonomyBody }) =>
+        api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
+      // 应答即新真值：先落缓存，设置页清草稿时不回闪旧值。
+      onSuccess: (record, input) => {
+        qc.setQueryData(['project-autonomy', input.id], record);
+        invalidateAll();
+      },
     }),
     // #440 原生文件夹选取（ADR 0003）：取消 = {path:null} 正常结局非错误面；
     // 纯读取动作，无缓存失效。
