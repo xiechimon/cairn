@@ -56,6 +56,17 @@
 //   对得上，fork 对不上）、head 分支是本 build 的工作分支才写；对不上（含 fork
 //   已删、head 仓为 null）→ 不收尾不打回，每轮提示一次，结果照常按 etag 缓存；
 //   响应缺 head 分支、base 分支、默认分支或 base 仓 id → 按读不到。
+// - build 上记的 PR 号只在非审核步收尾时由 daemon 探测刷新：人在 review 期间关掉
+//   它、从同一工作分支另开一张时，记的号就过时了（#1403 段 2）。确认关闭之后、打回
+//   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
+//   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
+//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
+//   那张新的已合并的；已合并的都要比本 build 自己最近一张关闭未合并的新：更早合并的是
+//   旧事）→ 改记它（号与链接，只在 build 上记的还是原来那张时）、每轮落一行，不打回、不
+//   提示，下一轮读它；记的那张在列表里又开着或已合并 → 不写，下一轮重读它。关闭路径列不到 → 不写，
+//   下一次读再列，连续第二次列不到 → 按段 1 打回；别人的 PR 那条路每 10 分钟（未连接
+//   GitHub 时每小时）最多列一次，没有或列不到 → 照常提示。记的 PR 开着但不是本 build 的，
+//   同样走别人的 PR 那条路。
 // - system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
 //   字符（双向覆盖、零宽字符）、截到 100 个字符（会话行经 chief / MCP 的会话读
 //   工具交给 agent，也在 web 时间线上显示）。
@@ -72,8 +83,10 @@ import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import {
   type FetchLike,
+  type GithubBranchPull,
   type GithubCheckRun,
   type GithubPull,
+  githubBranchPulls,
   githubCommitCheckRuns,
   githubCompareStatus,
   githubPull,
@@ -120,6 +133,13 @@ export const CI_ANON_READS_PER_HOUR = 20;
  * 算，留 10 次给 #931 / #1217 守卫。磨绿只记数、不受它拦，对账在总数满了时
  * 不读。 */
 export const CI_ANON_IP_READS_PER_HOUR = 50;
+
+/** 记的 PR 不是本 build 的时候，隔这么久再列一次工作分支上的 PR（本 build 自己的 PR 可能
+ * 之后才开出来或合并；列表读不到时同样隔这么久再试）。 */
+export const CI_FOREIGN_RELIST_MS = 600_000;
+
+/** 同上，未连接 GitHub 时（匿名额度按 IP 算，对账自己每小时只有 20 次）。 */
+export const CI_FOREIGN_RELIST_ANON_MS = 3_600_000;
 
 /** PR 读到关闭未合并之后，隔这么久再读到仍关闭才打成 failed：为重跑 CI 关掉又
  * 重开 PR 很常见，一次 sweep 落在中间不算（略短于一轮 sweep，下一轮即确认）。 */
@@ -279,12 +299,26 @@ interface CiPollTally {
   hinted: number;
   /** 本轮已报告过这个结局（人后来把卡拖回了 review）：交给人。 */
   settledBefore: number;
+  /** 记的 PR 关闭了或不是本 build 的，工作分支上另有本 build 的 PR：改记它。 */
+  adopted: number;
 }
 
 /** PR 对账的条件读缓存行（etag + 上轮 PR 状态；304 时复用）。 */
 interface PullCacheEntry {
   etag: string | null;
   pull: GithubPull | null;
+}
+
+/** 对账判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
+function hasPullFields(p: GithubPull): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
+  );
 }
 
 export function createCiPoller(
@@ -307,12 +341,21 @@ export function createCiPoller(
     string,
     Map<string, { status: string; at: number; failures: number }>
   >();
+  /** 记的 PR 不是本 build 的候选上次列工作分支 PR 的时刻（键 = build + 记的 PR）。 */
+  const foreignListedAt = new Map<string, number>();
+  /** 关闭路径上连续列不到工作分支 PR 的次数（按 PR）：到第二次就按段 1 打回。 */
+  const listFailures = new Map<string, number>();
   /** 每个 review 候选上次读 pulls 的时刻（匿名额度轮着用：最久没读的先读）。 */
   const lastReadByBuild = new Map<string, number>();
   /** 首次读到关闭未合并的时刻（按 PR）。确认读要紧跟在它之后：读到 open、有步在飞
    * 而没读（或读的网络窗里步开始）、读不到，都清掉。未连接 GitHub 时的 5 分钟节流与
    * 额度不够的跳过不清：两次读之间本来就隔着它们，清了就永远确认不了。 */
   const closedSeenAt = new Map<string, number>();
+  /** 关闭的看到时刻与关闭路径上列不到的次数一起清（一次关闭的确认从头数）。 */
+  function forgetClose(key: string): void {
+    closedSeenAt.delete(key);
+    listFailures.delete(key);
+  }
   /** 已确认的「本轮已报告」与「提示已落」（只缓存肯定结果，免得每轮查表）。 */
   const knownRows = new Set<string>();
   /** 本轮 sweep 见到的候选的缓存键（review / 磨绿各一份）；sweep 末尾据此清掉
@@ -425,6 +468,81 @@ export function createCiPoller(
     writeSystemRow(buildId, content);
   }
 
+  /** 本 build 工作分支往默认分支的 PR（见文件头）。只认本 build 自己的：head 仓与 base
+   * 仓都是记的那张 PR 的目标仓（按仓库 id）、head 分支是本 build 的工作分支、目标是默认
+   * 分支。记的那张在两次读之间被重开或合并（列表里它开着或已合并）→ 返回它自己，调用方
+   * 不写、下一轮重读。
+   * 否则开着的那张优先；没有开着的，取已合并的里编号最大的一张，但只认比「人最近关掉
+   * 不要的那张」新的：同一个分支可以先后开过好几张 PR，本 build 自己的、关闭未合并的里
+   * 编号最大的那张之前合并的是旧事，不是替身（人关掉新的这张，就是不要这次改动）。关闭
+   * 路径把记的那张的号作下限传进来（它就是被关掉的那张），别人的 PR 那条路传 0（记的号
+   * 是别人的）。head 过滤用响应里目标仓现在的 owner（仓库改名或转移后存的名字会过时）。
+   * 'unreadable' = 列表读不到；'skipped' = 匿名额度不够。 */
+  async function ownBranchPull(
+    branch: string,
+    target: { owner: string; repo: string },
+    token: string | null,
+    recorded: { number: number; baseRepoId: number; defaultBranch: string; owner: string },
+    mergedAfter: number,
+    now: number,
+  ): Promise<GithubBranchPull | null | 'unreadable' | 'skipped'> {
+    if (token === null && !takeAnonRead(now)) return 'skipped';
+    const list = await githubBranchPulls(run.githubFetch, token, target.owner, target.repo, {
+      head: `${recorded.owner}:${branch}`,
+      base: recorded.defaultBranch,
+    });
+    if (list === null) return 'unreadable';
+    const own = list.filter(
+      (p) =>
+        p.headRepoId === recorded.baseRepoId &&
+        p.baseRepoId === recorded.baseRepoId &&
+        p.headRef === branch &&
+        p.baseRef === recorded.defaultBranch,
+    );
+    const changed = own.find(
+      (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
+    );
+    if (changed !== undefined) return changed;
+    const open = own.filter((p) => p.state === 'open');
+    const rejected = own.reduce(
+      (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
+      mergedAfter,
+    );
+    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > rejected);
+    return pool.reduce<GithubBranchPull | null>(
+      (best, p) => (best === null || p.number > best.number ? p : best),
+      null,
+    );
+  }
+
+  /** 改记本 build 的 PR（号与链接，链接按仓名与号拼，不取响应里的）、发 build 文档、落
+   * 一行说明（只引 PR 号与本 build 自己的工作分支名；同一句每轮一次）。只在 build 上记的
+   * 仍是 from 时改：列表读的网络窗里 daemon 探测可能已改记了更新的值。没改成 → false。 */
+  function adoptPull(
+    buildId: string,
+    teamId: string,
+    fullName: string,
+    from: number,
+    to: GithubBranchPull,
+    reason: string,
+    since: number,
+  ): boolean {
+    const changed = deps.db
+      .update(build)
+      .set({ prNumber: to.number, prUrl: `https://github.com/${fullName}/pull/${to.number}` })
+      .where(and(eq(build.id, buildId), eq(build.prNumber, from)))
+      .run().changes;
+    if (changed === 0) return false;
+    const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+    if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
+    hintOnce(
+      buildId,
+      `PR #${from} ${reason}；本任务工作分支「${conversationBranch(buildId)}」上${to.state === 'open' ? '开着' : '已合并'}的 PR #${to.number} 改记为本任务的 PR，对账接着读它。`,
+      since,
+    );
+    return true;
+  }
+
   /** 读当前 phase，不在磨绿集 = 不动（④：已被人工推进/关闭/终态）。 */
   function freshGrindRow(todoId: string) {
     const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
@@ -490,7 +608,7 @@ export function createCiPoller(
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
     if (hasActiveStep(cand.buildId)) {
-      closedSeenAt.delete(key); // 这段没读：之前读到的关闭不再算数
+      forgetClose(key); // 这段没读：之前读到的关闭不再算数
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
@@ -520,21 +638,30 @@ export function createCiPoller(
       });
       readAt = now + (nowMs() - sweepStartedAt);
       if (page === null) {
-        closedSeenAt.delete(key);
+        forgetClose(key);
         tally.reviewUnreadable += 1;
         return;
       }
       pull = page.notModified ? (entry?.pull ?? null) : page.pull;
       pullCache.set(key, { etag: page.etag, pull });
     }
-    if (pull === null || pull.state === 'open') {
-      closedSeenAt.delete(key);
+    const branch = conversationBranch(cand.buildId);
+    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时 headRepoId
+    // 是 null，同样对不上。字段不齐时不算（下文按读不到）。
+    const foreign =
+      pull !== null &&
+      hasPullFields(pull) &&
+      (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch);
+    // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
+    // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
+    if (pull === null || (pull.state === 'open' && !foreign)) {
+      forgetClose(key);
       tally.reviewPending += 1;
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
     if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
-      closedSeenAt.delete(key);
+      forgetClose(key);
       tally.reviewSkipped += 1;
       return;
     }
@@ -542,26 +669,50 @@ export function createCiPoller(
     const since = roundStart(deps, cand.buildId);
     // PR 是本 build 的、目标是默认分支才写（见文件头）：缺这几个字段的响应不当终态
     // 缓存，下次读不带它的 etag（304 会交回同一份）。
-    if (
-      pull.headRef === null ||
-      pull.baseRepoId === null ||
-      pull.baseRef === null ||
-      pull.defaultBranch === null
-    ) {
+    if (!hasPullFields(pull)) {
       pullCache.delete(key);
-      closedSeenAt.delete(key);
+      forgetClose(key);
       tally.reviewUnreadable += 1;
       return;
     }
-    const branch = conversationBranch(cand.buildId);
-    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时
-    // headRepoId 是 null，同样对不上。对不上的结果留在缓存里（PR 的 head 不会变）。
-    if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
-      hintOnce(
-        cand.buildId,
-        `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`,
-        since,
-      );
+    const recorded = {
+      number: prNumber,
+      baseRepoId: pull.baseRepoId,
+      defaultBranch: pull.defaultBranch,
+      owner: pull.baseOwner ?? target.owner,
+    };
+    // 不是本 build 的 PR：结果留在缓存里（PR 的 head 不会变）。
+    if (foreign) {
+      const foreignText = `PR #${prNumber} 的 head 不是本任务在 ${target.fullName} 的工作分支「${branch}」，可能是别人 fork 里同名分支开的 PR。对账不据它收尾或打回；任务留在审核关口，由人核对这张 PR。`;
+      // 先看工作分支上有没有本 build 自己的 PR（每 CI_FOREIGN_RELIST_MS 最多列一次，未连接
+      // GitHub 时每 CI_FOREIGN_RELIST_ANON_MS：它可能之后才开出来或合并）；没有、列不到或
+      // 额度不够 → 照常提示（每轮一次）。记的 PR 换了就从头算。
+      const listKey = `${cand.buildId}\u0000${key}`;
+      const listedAt = foreignListedAt.get(listKey);
+      const relistMs = token === null ? CI_FOREIGN_RELIST_ANON_MS : CI_FOREIGN_RELIST_MS;
+      if (listedAt === undefined || now - listedAt >= relistMs) {
+        const own = await ownBranchPull(branch, target, token, recorded, 0, now);
+        if (own !== 'skipped') foreignListedAt.set(listKey, now);
+        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+          tally.reviewSkipped += 1;
+          return;
+        }
+        if (own !== null && own !== 'unreadable' && own !== 'skipped') {
+          const adopted = adoptPull(
+            cand.buildId,
+            todoRow.teamId,
+            target.fullName,
+            prNumber,
+            own,
+            '的 head 不是本任务的工作分支',
+            since,
+          );
+          if (adopted) tally.adopted += 1;
+          else tally.reviewSkipped += 1; // build 上记的 PR 在网络窗里换了：下一轮按新的读
+          return;
+        }
+      }
+      hintOnce(cand.buildId, foreignText, since);
       tally.reviewForeign += 1;
       return;
     }
@@ -708,7 +859,50 @@ export function createCiPoller(
       tally.hinted += 1;
       return;
     }
-    closedSeenAt.delete(key);
+    // 打回之前看工作分支上有没有本 build 的另一张 PR（见文件头）。
+    const sibling = await ownBranchPull(branch, target, token, recorded, prNumber, now);
+    // 列不到 → 这次不写，关闭照样算看到过，下一次读确认之后再列；连续第二次列不到 → 按段 1
+    // 打回（列表只是补充，不能让一张已确认关闭的卡一直不声不响地留在 review）。
+    if (sibling === 'unreadable') {
+      const failures = (listFailures.get(key) ?? 0) + 1;
+      if (failures < 2) {
+        listFailures.set(key, failures);
+        tally.reviewUnreadable += 1;
+        return;
+      }
+    }
+    if (sibling === 'skipped') {
+      tally.reviewSkipped += 1;
+      return;
+    }
+    const found = sibling === 'unreadable' ? null : sibling;
+    forgetClose(key);
+    // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
+    // 读重新数）。
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+      tally.reviewSkipped += 1;
+      return;
+    }
+    // 记的那张在两次读之间被重开或合并了（列表里它开着或已合并）：不再算关闭，不写，下一轮
+    // 重读它（合并了就按合并收尾）。
+    if (found?.number === prNumber) {
+      tally.reviewPending += 1;
+      return;
+    }
+    if (found !== null) {
+      const adopted = adoptPull(
+        cand.buildId,
+        todoRow.teamId,
+        target.fullName,
+        prNumber,
+        found,
+        '在 GitHub 关闭且未合并',
+        since,
+      );
+      if (adopted) tally.adopted += 1;
+      else tally.reviewSkipped += 1; // build 上记的 PR 在网络窗里换了：下一轮按新的读
+      return;
+    }
     writeSystemRow(cand.buildId, closedText);
     stopUnclaimedGateSteps(deps, cand.buildId);
     failWithMessage(cand, todoRow.teamId, closedText);
@@ -869,6 +1063,7 @@ export function createCiPoller(
       closedUnmerged: 0,
       hinted: 0,
       settledBefore: 0,
+      adopted: 0,
     };
     grindKeys.clear();
     for (const cand of candidates) {
@@ -907,6 +1102,9 @@ export function createCiPoller(
     for (const k of closedSeenAt.keys()) if (!liveKeys.has(k)) closedSeenAt.delete(k);
     const reviewBuilds = new Set(reviewCandidates.map((c) => c.buildId));
     for (const k of lastReadByBuild.keys()) if (!reviewBuilds.has(k)) lastReadByBuild.delete(k);
+    for (const k of foreignListedAt.keys())
+      if (!liveKeys.has(k.slice(k.indexOf('\u0000') + 1))) foreignListedAt.delete(k);
+    for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
     for (const k of knownRows)
       if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
     run.logger?.info(tally, 'ci pr-checks sweep');

@@ -1,0 +1,21 @@
+#1403 segment 2: CI on #1489 at e92277d, run against main 50a5500 (which carries #1480)
+
+The `check` job (https://github.com/xiechimon/pacman/actions/runs/39760896708/job/119764501462)
+failed one test that #1480 added on main and this branch's G9 change meets only after the merge:
+
+ FAIL  @xiechimon/pacman  test/issue-fence.test.ts > W1-W5 chief wake 提示：issue 导入任务的标题只在围栏里 > W4：其他任务的 wake 文本逐字节不变
+AssertionError: expected false to be true // Object.is equality
+ Test Files  1 failed | 281 passed (282)
+      Tests  1 failed | 3805 passed (3806)
+
+W4 pinned both gate wakes by the prefix "停驻在 <phase> 关口。". Segment 2's G9 gives the review gate
+its own text ("停驻在 review 关口：改动已就绪，等人验收。"), so the review prefix no longer matched.
+Fix: merge origin/main 50a5500 into the branch (adf8bf6, no conflict) and pin each gate by its own
+prefix: confirm "停驻在 confirm 关口。" (unchanged), review "停驻在 review 关口：". The rest of W4
+(settle and failed text byte for byte, no fence for plain tasks, orchestration and self-issue
+sources unchanged) is untouched.
+
+Local, apps/server, after the change:
+$ pnpm exec vitest run test/issue-fence.test.ts test/chief-watch.test.ts test/chief-auto-confirm.test.ts test/gate-actor.test.ts test/pr-reconcile.test.ts
+ Test Files  5 passed (5)
+      Tests  207 passed (207)

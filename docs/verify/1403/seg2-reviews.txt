@@ -1,0 +1,121 @@
+#1403 segment 2: review outcomes
+================================
+
+All reviews ran on the diff of this branch (claude/bootstrap-p2-seg2), from inside
+/home/user/pacman/.claude/worktrees/p3a. Before the merge of main: origin/claude/
+bootstrap-p2...HEAD, checked to list only this branch's commits; after it:
+origin/main...HEAD.
+
+/simplify (after cf1bca12; commit c944542e)
+-------------------------------------------
+Single pass done inline, without the Agent tool (not the four-agent fan-out).
+- Fixed: ownBranchPull took the build id only to recompute the conversation branch
+  both callers hold; it takes the branch. githubBranchPulls reads refs through the
+  file's existing optString.
+- Skipped: reusing main's getListPage / projectArray as they were (getListPage needs
+  a token; the reconcile reads anonymously too); a shared PR URL builder (one inline
+  use elsewhere, no helper); folding the in-flight re-check into stillOurs (it adds a
+  DONE_ROW condition that would change the closed path).
+
+/code-review medium, pass 1 (on c944542e; fixes in eaa9d064)
+------------------------------------------------------------
+1. An older merged PR on the branch was adopted when the person closed the newer one.
+   Fixed: a merged PR must be newer than the recorded one (A16; widened in pass 3).
+2. Foreign path: an unreadable or skipped list fell through to the hint and was never
+   retried in the round. Fixed (reworked in pass 2: relist every ten minutes).
+3. The head filter used the stored owner, stale after a rename or transfer. Fixed:
+   owner from base.repo.owner.login (A17).
+4. A reopened recorded PR could lose to another open PR of the branch. Fixed: the
+   recorded PR comes first (A15b). GitHub refuses two open PRs from one head into one
+   base, so this is robustness.
+5. An open recorded PR that is not the build's own stayed pending, so a merge of the
+   build's own PR went unseen. Fixed: it takes the foreign path (A9d).
+6. A second confirm in building wrote a second row and queued a second build step.
+   Fixed (G6; tightened in pass 2).
+7. Adoption rows without dedupe; old cache entries. Not changed then: each adoption
+   was a separate event and the sweep-end cleanup drops the old key (rows deduped in
+   pass 3).
+8. Adoption latency on the anonymous closed path. Not changed: right after a pulls
+   read the list read always has the slot that read kept, so "skipped" cannot happen
+   there.
+9. Hand-rolled projection next to projectArray. Fixed: githubBranchPulls projects
+   through projectArray.
+
+/code-review medium, pass 2 (on eaa9d064; fixes in f2b4c25d and 45ec317f)
+--------------------------------------------------------------------------
+1. Foreign path: the newer-than rule dropped the build's own merged PR when the
+   foreign number was higher. Fixed: the rule on the closed path only (A9e; replaced
+   by the rejection floor in pass 3).
+2. Confirm from queued (queued -> building is the claim edge) still wrote the row
+   and queued a duplicate build step. Fixed: confirm is accepted only at the confirm
+   gate (G7).
+3. Foreign path listed only until the hint landed; a later own PR was missed. Fixed:
+   relist every ten minutes regardless of the hint (A9b).
+4. A list that keeps failing hid the foreign hint and listed every sweep. Fixed with
+   3: a failed list falls back to the hint and is retried after ten minutes (A9c).
+5. Open foreign PRs now hint each round; closedSeenAt not cleared on that path.
+   Behavior change intended (pass 1 item 5). The clear was added, then removed in
+   45ec317f: no path reaches it (the foreign path never confirms a close).
+6. Spec 02 did not state the newer-than and reopen rules. Fixed.
+7. githubBranchPulls loses rate-limit classification. Not changed: the reconcile's
+   other reads (githubPull, githubCompareStatus) also collapse throttling into
+   "unreadable", and main's getListPage needs a token.
+8. Stale closedSeenAt for an adopted key. A clear was added, then removed in 45ec317f:
+   the sweep-end cleanup already drops a key that was not read in the sweep.
+9. Altitude: other readers of build.prNumber keep a stale number. Not changed: the
+   adopted number is written to build.prNumber, so every reader sees it afterwards;
+   the CI grind reads checks by branch, and its head-SHA rework is segment 3. The root
+   cause (the daemon probe) is listed under "Left open" below.
+
+/code-review medium, pass 3 (on 45ec317f; fixes in 3f37f34c)
+------------------------------------------------------------
+1. Foreign path (mergedAfter 0) could adopt an older merged PR while a newer PR of
+   the build had been closed unmerged. Fixed: a merged PR counts only when newer than
+   the newest PR of the build closed without merge, on both paths (A18).
+2. A recorded backport PR (conversation branch into another base) blocks identity
+   repair. Deferred, see "Left open".
+3. Adoption overwrote a daemon probe value written during the list read. Fixed:
+   compare-and-set on build.prNumber (A19).
+4. Probe and adoption can alternate and write a row each time. Rows fixed: once per
+   round (A20). The alternation itself is the daemon probe, see "Left open".
+5. Anonymous relists eat the reconcile's hourly budget. Fixed: hourly without a token
+   (A21).
+6. Closed path: a list that keeps failing left the card in review without a word.
+   Fixed: the second failed read in a row reports the close as segment 1 does (A5b).
+7. prUrl uses the stored owner/repo. Not changed: GitHub redirects renamed-repository
+   URLs, and pacman's other recorded links use stored names; the owner fix was for
+   the head filter, which does not redirect.
+8. Field-completeness check duplicated. Fixed: one type guard, hasPullFields.
+9. Relist throttle keyed by build only. Fixed: keyed by build and recorded PR (A22).
+
+/code-review medium, pass 4 (on 3f37f34c; fixes in 31da268d and 034441ed)
+--------------------------------------------------------------------------
+1. A list-failure count left from an earlier close could fail a later close on one
+   transient error. Fixed: forgetClose clears it with the close sighting (A5c).
+2. The recorded PR merged between the two reads was failed as closed. Fixed: the
+   recorded PR merged or open in the list means no write and a re-read (A15c).
+3. Listing times of PRs no longer recorded stayed in memory. Fixed: cleanup by PR key
+   (A22b).
+4. A second identical adoption in a round writes no row. Not changed: it is the same
+   statement, the build doc is still published, and the repetition comes from the
+   daemon probe (see "Left open").
+No fifth pass ran; the pass 4 fixes are covered by tests written for them and by the
+mutation run (M41-M44, M40b).
+
+/security-review
+----------------
+Not required. The diff touches apps/server/src/lib/github.ts, services/ci-loop.ts,
+services/chief.ts, services/builds.ts, tests, fixtures and docs. None is on the
+AGENTS.md "/security-review" list (machines.ts, routes-machine.ts, mcp-face.ts and
+the key and credential files are not touched). The only GitHub call added is a read
+(pulls list).
+
+Left open (not in this segment)
+-------------------------------
+- The daemon PR probe (apps/daemon/src/github-probe.ts) records the highest-numbered
+  open PR by branch name without filtering by owner or base. It can record a fork's
+  same-named PR or a backport PR, and record it again after an adoption. Filtering
+  the probe by owner and default base fixes pass 3 items 2 and 4 at the source;
+  segment 1's Risk already lists it as a follow-up.
+- Item 1 of the segment (merge through the API with sha) waits for the user's
+  decision between design D and P.
