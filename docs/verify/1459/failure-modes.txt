@@ -67,3 +67,30 @@ such a holder could import any issue with no check; the D5 check guards the
 GitHub-side triggers (issue templates, outside labelers), not a leaked token.
 Revoking the token (DELETE /api/teams/:id/webhook-tokens/:tid) remains the
 remedy.
+
+----------------------------------------------------------------------------------------------------
+2026-10-21 note, round 2 (after #1477 merged as bc1d99f; pr-gate run 1 on 1573cda). Added, nothing above edited.
+
+F4 is out of date for 429: since the merge of #1406 round 4 (merge-p5-r4.txt), a 429 on the permission read, or a 403
+with a rate-limit signal, throws GithubRateLimitedError and the webhook refuses it with its own reason `rate-limited`
+(log carries status and reset time); that is W4b (4 cases). W4 has 5 cases (403 without a rate-limit signal, 500,
+502, network error / timeout, malformed 200 body), reason permission-unreadable.
+
+F15: D2 no longer reaches the import's own 404. Since #1459 the missing connection is refused earlier by
+teamGithubToken (reason no-github-connection, W5a). The import's 404 is now reached only when the connection
+disappears during the permission read; W16 covers that (202 misconfigured "github connection not found").
+
+Round 2 failure modes and tests (apps/server/test/webhook.test.ts unless noted):
+F16  stored githubRepo with a `.` or `..` segment     202 misconfigured, reason malformed-repo,   W17 `../user` and `owner/..`
+     (rows from before #1466), payload full_name      zero GitHub requests, nothing cached
+     equal to it
+F17  orchestration throws after the import (chief     task exists; 'github webhook import         W18
+     not bound to an agent, 409)                      accepted' line still written
+F18  the poller sweeps while a webhook import is      the poller counts it: at cap-1 it reads    W15
+     still waiting on GitHub                          no list and takes nothing
+F19  the URL-token holder probes logins' permission   sender-below-triage, permission-unreadable W1, W2, W4, W4b, W12b (202 detail);
+     through the 202 detail                           and rate-limited all answer one detail,    log line `detail` carries the specifics
+                                                      "sender not confirmed for import (reason
+                                                      in the server log)"
+F20  secondary limit with both retry-after and        logged reset time = now + retry-after      issue-intake.test.ts group 24 (4 cases)
+     x-ratelimit-reset                                (GitHub docs: honor retry-after first)
