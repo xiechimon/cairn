@@ -7888,6 +7888,8 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "gate_round",
   "gate_verdict",
   "gate_state",
+  "autonomy_state",
+  "member_activity",
 ]
 `;
 
