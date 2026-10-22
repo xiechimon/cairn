@@ -41,12 +41,12 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 
 ## 当前结果与已知发现（sync-commit 时）
 
-`P1 PASS`、`P2 PASS`、`P3 PASS`（各 799,807 个不同状态，4 核 19 到 47 秒）、`P4 FAIL`。P4 是代码里的真问题，不是模型错误：反例对着真代码复现过（见下文「复现证据」）。**不要为了让它通过去削弱性质或模型。** 修掉代码问题后，按「更新验证」改模型，结果变 PASS，再把 `expected.txt` 那一行改成 PASS。
+`P1 PASS`、`P2 PASS`、`P3 PASS`（各 794,525 个不同状态，4 核约 16 秒）、`P4 FAIL`。P4 是代码里的真问题，不是模型错误：反例对着真代码复现过（见下文「复现证据」）。**不要为了让它通过去削弱性质或模型。** 修掉代码问题后，按「更新验证」改模型，结果变 PASS，再把 `expected.txt` 那一行改成 PASS。
 
 F1、F2 已由 #1473 修掉（下面保留原发现，供对照）：
 - daemon `runStep` 入口即起心跳，会话结束与失败回报前各自停，`finally` 兜住其余出口（`runner.ts:425-443`、`failStep` 2328）。模型：`HeartbeatStep` / `KeepsFresh` 在 `preparing` 也成立，`StartSession` 不再清 `beat`。
 - daemon 领取循环：领到的步号已在 `inFlight` 里就什么也不起（`machine-loop.ts:673`），在飞那份就是新这次领取的执行者。模型：`TryClaim` / `TryClaimResponseLost` 在本机有 `Live` 执行者时只把 `holder` 交给它（`Carrier(m)`），不建新执行者、不动 journal。
-- server `finishStep`：步已不是 claimed 就答 ok、只回收 git 凭证（`machines.ts:1788`）；await 之后复查「同机、同一次领取（`claimedAt`）、仍 claimed」，不符就 409，之前不写步 / build / 卡片（`machines.ts:1825-1833`）。模型：`FinishStepOwnedCheck` 先判 `st`，success 记下 `seen = claims`；`FinishStepApply` 复查不过就丢弃（daemon 侧 = done 失败，journal 留着）。
+- server `finishStep`：步已不是 claimed（记名本机，或已放回、无记名且同团队）就答 ok、只回收 git 凭证（`machines.ts:1788-1799`）；await 之后复查「同机、同一次领取（`claimedAt`）、仍 claimed」，不符就 409，之前不写步 / build / 卡片（`machines.ts:1827-1836`）。模型：`FinishStepOwnedCheck` 在 `sm = m` 或（`sm = NoMachine` 且不是 claimed）时先判 `st`，success 记下 `seen = claims`；`FinishStepApply` 复查不过就丢弃（daemon 侧 = done 失败，journal 留着）。
 
 **F1（P1，已修）同机重领，同一步两个执行者。**
 1. 机器 m1 的 daemon 领到步（`tryClaim`），runStep 开始准备工作区（clone / 等同项目锁 / `.agents/setup`，后者上限 20 分钟）。
@@ -96,7 +96,7 @@ server 是单进程、better-sqlite3 同步写：两个 `await` 之间的代码�
 - `StartSession(e)`：`runner.ts:694` `workspace.prepare` 结束 → 1480 `sessionHandles.set`。准备期 = 模型里的 `preparing`。心跳在 runStep 入口（434）就已起，不随会话开始重置。
 - `HeartbeatStep(e)`：`runner.ts:434-436`（失败被吞；`preparing` / `running` 都发）→ `machines.ts:1263` `heartbeatStep`，所有权只看 `ownedStep`（1270，只比机器号）。
 - `FinishSession(e)`：会话结束停心跳（`runner.ts:1786`）、读 `stopRequests`（1815）定结果，`journal.update(awaiting-upload)`（2200）。准备期失败走 `failStep`（2328，先停心跳），模型只给 `failed`。
-- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`：`machines.ts:1776` `finishStep`。先 `ownedStep`，步已不是 claimed → 只回收凭证、答 ok（1788）。只有 success 回报可能带 `prUrl`（`runner.ts:2189`）或是合并落地，才会在 1812 / 1819 处 await，所以只有 success 被拆成两步；await 后复查同机、同 `claimedAt`、仍 claimed，不符 409（1825-1833）；其余结果校验和写入在同一同步块。写入：配额 → `quota-wait.ts:87` `applyQuotaWaitStep`；success → `builds.ts:1611` `completeStep`；stopped → `builds.ts:292` `applyStoppedStep`；failed → `builds.ts:1407` `applyStepFailure`；全部先清 `stop_pending`（`machines.ts:1927`）。
+- `FinishStepOwnedCheck(e)` / `FinishStepApply(e)`：`machines.ts:1776` `finishStep`。先 `ownedStep`，步已不是 claimed → 只回收凭证、答 ok（1788-1799）。只有 success 回报可能带 `prUrl`（`runner.ts:2189`）或是合并落地，才会在 1813 / 1820 处 await，所以只有 success 被拆成两步；await 后复查同机、同 `claimedAt`、仍 claimed，不符 409（1827-1836）；其余结果校验和写入在同一同步块。写入：配额 → `quota-wait.ts:87` `applyQuotaWaitStep`；success → `builds.ts:1611` `completeStep`；stopped → `builds.ts:292` `applyStoppedStep`；failed → `builds.ts:1407` `applyStepFailure`；全部先清 `stop_pending`（`machines.ts:1938`）。
 - `SchedulerTick`：`apps/server/src/services/scheduler.ts:130` `tick` 一整拍原子，按 179 `sweepStaleMachines`（`machines.ts:646`）→ 186 `sweepAbandonedBuildSteps`（`builds.ts:1482`：先停已关 / 已完成卡片的 pending / waiting_quota 残留，再判 claimed：心跳超时且（机器离线或心跳从未推进）→ 已关卡片 `stopStepKeepPhase`（1522 → 414），否则 `releaseClaimedStep`（1532））→ 192 `sweepQuotaWaitSteps`（`quota-wait.ts:142`）的顺序。
 - `CloseCard`：`builds.ts:465` `stopActiveStepsAfterExit` → 469 `prepareStopFor`：pending / waiting_quota 即停，claimed 写 `stop_pending` + `stopSignal`。
 - `DeliverStopFetch(m)` / `DeliverStopToHandle(m)`：`machine-loop.ts:523` `deliverStop` 先 `await client.stop` → `machines.ts:254` `fetchStop`（claimed + 机器号匹配才返回并删行），再查 `sessionHandles`。

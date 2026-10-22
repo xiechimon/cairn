@@ -6,7 +6,8 @@
 //   2. 迟到回报复活已停的步：卡已关、扫尾把失联步停掉（stopped），原执行者
 //      迟到的 done 仍把步写成 done / failed。
 //   3. 迟到回报不回收凭证：上一条拒写时连 per-step git 凭证也留着（XMON-59
-//      重放契约：重报答 ok，凭证随步收尾回收）。
+//      重放契约：重报答 ok，凭证随步收尾回收）；已放回 pending 的步回 404，
+//      daemon 留着一份永远不会被 recover 的 journal。
 //   4. await 窗口内换了领取：success 回报过了所有权校验后在 GitHub 探测里
 //      等待，期间步被放回 pending 又被领走，await 回来照写 done——新领取
 //      被旧回报收掉。
@@ -20,6 +21,7 @@ import {
   machine as machineTable,
   project as projectTable,
   step as stepTable,
+  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
@@ -187,6 +189,27 @@ describe('#1473 回报只对当前这次领取生效', () => {
     expect(w.stepRow().status).toBe('stopped');
     expect(w.stepRow().sessionId).toBeNull();
     expect(w.todoRow().phase).toBe('closed');
+    expect(w.credentialCount()).toBe(0);
+  });
+
+  test('已放回 pending 的步：原执行者的回报答 ok、不写，凭证被回收；他团队机器仍 404', async () => {
+    const w = makeWorld();
+    await w.claim();
+    issueStepGitCredential(w.deps, { teamId: w.teamId, stepId: STEP });
+    w.sweep();
+    expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
+    w.s.db.insert(teamTable).values({ id: 'team-other', name: 'other', createdAt: nowMs() }).run();
+    w.s.db
+      .insert(machineTable)
+      .values({ id: 'machine-other-team', teamId: 'team-other', name: 'x', online: true })
+      .run();
+    await expect(
+      finishStep(w.deps, 'machine-other-team', STEP, { status: 'failed', errorMessage: 'x' }),
+    ).rejects.toThrow(/not yours/);
+    expect(w.credentialCount()).toBe(1);
+    await finishStep(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'late' });
+    expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
+    expect(w.todoRow().phase).toBe('building');
     expect(w.credentialCount()).toBe(0);
   });
 

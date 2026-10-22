@@ -1780,23 +1780,24 @@ export async function finishStep(
   body: MachineDoneBody,
 ): Promise<void> {
   const { db } = deps;
-  const stepRow = ownedStep(deps, machineId, stepId);
   // #1473 回报只对仍 claimed 的步生效：已收尾（done 重放，XMON-59）、被扫尾
-  // 停掉、或回报落在已放回的步上，一律答 ok、不写——落账函数都不看步当前
-  // 状态，放进去就会把步和卡片再改一遍。凭证照收（凭证生命周期 = 步生命
-  // 周期，这次执行已经结束）。
-  if (stepRow.status !== 'claimed') {
-    revokeStepGitCredential(deps, stepId);
-    return;
+  // 停掉、或已被放回 pending（machineId 已清空）的步，一律答 ok、不写——落账
+  // 函数都不看步当前状态，放进去就会把步和卡片再改一遍。凭证照收（凭证生命
+  // 周期 = 步生命周期，这次执行已经结束）。归属：记名本机，或已放回（无
+  // 记名）且同团队；他机记名的步、他团队的步对本机仍是 404。
+  const found = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (found && found.status !== 'claimed') {
+    const released =
+      found.machineId === null &&
+      stepTeamId(deps, found) ===
+        db.select({ teamId: machine.teamId }).from(machine).where(eq(machine.id, machineId)).get()
+          ?.teamId;
+    if (found.machineId === machineId || released) {
+      revokeStepGitCredential(deps, stepId);
+      return;
+    }
   }
-  // #1108 空位释放 wake：本机一个 claimed 位即将转终态——唤醒全团队挂起的
-  // claim 长轮询（本机若无在飞空位会立刻领队头 pending 步；它机各多一次
-  // tryClaim，同步读可忽略）。没有它，满载机器的空位要等满 ~75s hold 才
-  // 被下一轮重试发现（enqueue wake 只覆盖新步入队路径）。
-  {
-    const teamId = stepTeamId(deps, stepRow);
-    if (teamId !== null) deps.machineHub.wake(teamId);
-  }
+  const stepRow = ownedStep(deps, machineId, stepId);
   // per-step 一次性 git 凭证回收（步收尾即撤销，成败均回收——凭证生命周期 =
   // 步生命周期，02 §8 运行时层「不落盘常驻」的 server 半）。
   revokeStepGitCredential(deps, stepId);
@@ -1820,8 +1821,9 @@ export async function finishStep(
       : null;
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
   // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
-  // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片。之后到函数
-  // 结束都是同步写，不会再被别的请求插进来。
+  // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
+  // 例外：默认分支已快进到这个 commit，重领后的合并步再落一次是同一 commit，
+  // 快进幂等）。之后到函数结束都是同步写，不会再被别的请求插进来。
   {
     const current = db.select().from(step).where(eq(step.id, stepId)).get();
     if (
@@ -1831,6 +1833,15 @@ export async function finishStep(
     ) {
       throw conflict(`step ${stepId} was released or claimed again while its report was applied`);
     }
+  }
+  // #1108 空位释放 wake：本机一个 claimed 位即将转终态——唤醒全团队挂起的
+  // claim 长轮询（本机若无在飞空位会立刻领队头 pending 步；它机各多一次
+  // tryClaim，同步读可忽略）。没有它，满载机器的空位要等满 ~75s hold 才
+  // 被下一轮重试发现（enqueue wake 只覆盖新步入队路径）。放在复查之后：
+  // 409 的回报不释放空位。被唤醒的领取在下一拍才跑，看到的是下面写完的状态。
+  {
+    const teamId = stepTeamId(deps, stepRow);
+    if (teamId !== null) deps.machineHub.wake(teamId);
   }
   if (body.sessionId !== undefined) {
     db.update(step).set({ sessionId: body.sessionId }).where(eq(step.id, stepId)).run();

@@ -175,7 +175,7 @@ ApplyOutcome(e) ==
 FinishStepOwnedCheck(e) ==
   LET m == ex[e].mach IN
   /\ ex[e].stage = "reporting"
-  /\ IF connected[m] /\ sm = m
+  /\ IF connected[m] /\ (sm = m \/ (sm = NoMachine /\ st /= "claimed"))
        THEN IF st /= "claimed"
               THEN /\ ex' = [ex EXCEPT ![e] = Gone]
                    /\ handle' = [handle EXCEPT ![m] = None]
