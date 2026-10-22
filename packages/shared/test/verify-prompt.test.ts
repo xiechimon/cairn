@@ -11,7 +11,11 @@
 //   5. verdict schema：evidence 缺省空数组；path 必填非空；词表外字段剥除。
 
 import { describe, expect, test } from 'vitest';
-import { buildVerifyStepPrompt, verifyVerdictSchema } from '../src/records/verify.js';
+import {
+  buildVerifyStepPrompt,
+  reconcileVerifyVerdict,
+  verifyVerdictSchema,
+} from '../src/records/verify.js';
 
 const TASK = '#1250 实现 verify 步\n\n范围与界限……';
 const PLAN = '# plan\n\n## Verification\n- e2e 全绿\n';
@@ -107,5 +111,75 @@ describe('verifyVerdictSchema 形状（#1250）', () => {
         evidence: [{ path: '' }],
       }).success,
     ).toBe(false);
+  });
+});
+
+// #1492 verify 步按方案 Verification 清单逐项出判定。失败方式先于实现固化：
+//   6. 清单没进材料 → Verifier 当场自己想验什么（票面现状）。
+//   7. evidence 不对应清单项 → 人看不出哪项验了哪项没验。
+//   8. 清单有项没证据却报 passed=true → 合并闸读到假通过。
+//   9. 没有清单（直执行任务、老方案）→ 行为不变，不因缺清单判失败。
+describe('Verification 清单逐项判定（#1492）', () => {
+  const ITEMS = ['`pnpm lint` 通过', 'apps/server/test/x.test.ts 全绿'];
+
+  test('失败方式 6：清单编号列进材料，并要求 evidence 带 item 序号', () => {
+    const prompt = buildVerifyStepPrompt({
+      ticketRef: '1492',
+      taskText: TASK,
+      planText: PLAN,
+      verificationItems: ITEMS,
+      pr: null,
+    });
+    expect(prompt).toContain('## 验证清单');
+    expect(prompt).toContain('1. `pnpm lint` 通过');
+    expect(prompt).toContain('2. apps/server/test/x.test.ts 全绿');
+    expect(prompt).toContain('"item"');
+  });
+
+  test('失败方式 9：无清单时不出清单段', () => {
+    const prompt = buildVerifyStepPrompt({
+      ticketRef: '1',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+    });
+    expect(prompt).not.toContain('## 验证清单');
+  });
+
+  test('失败方式 7：evidence 的 item 字段可选，老 verdict 照样解析', () => {
+    const parsed = verifyVerdictSchema.parse({
+      passed: true,
+      conclusion: 'ok',
+      evidence: [{ path: 'docs/verify/1/a.json', item: 1 }, { path: 'docs/verify/1/b.json' }],
+    });
+    expect(parsed.evidence[0]?.item).toBe(1);
+    expect(parsed.evidence[1]?.item).toBeUndefined();
+  });
+
+  test('失败方式 8：清单有项没证据 → passed 置 false 并点名', () => {
+    const r = reconcileVerifyVerdict(
+      { passed: true, conclusion: '都过了', evidence: [{ path: 'docs/verify/1/a.json', item: 1 }] },
+      ITEMS,
+    );
+    expect(r.passed).toBe(false);
+    expect(r.conclusion).toContain('清单第 2 项无证据');
+    expect(r.conclusion).toContain('都过了');
+  });
+
+  test('清单每项都有证据 → verdict 原样不动', () => {
+    const v = {
+      passed: true,
+      conclusion: 'ok',
+      evidence: [
+        { path: 'docs/verify/1/a.json', item: 1 },
+        { path: 'docs/verify/1/b.json', item: 2 },
+      ],
+    };
+    expect(reconcileVerifyVerdict(v, ITEMS)).toEqual(v);
+  });
+
+  test('失败方式 9：无清单 → verdict 原样不动', () => {
+    const v = { passed: true, conclusion: 'ok', evidence: [] };
+    expect(reconcileVerifyVerdict(v, [])).toEqual(v);
   });
 });

@@ -39,6 +39,7 @@ import {
   openConvStream,
   postProject,
   req,
+  withVerification,
 } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
@@ -284,7 +285,7 @@ describe('conversation stream（02 §1.2 会话流，M5 live streaming 服务端
     const planUpload = ((await planUrlsRes.json()) as { uploads: { url: string }[] }).uploads[0]!;
     await call(s.app, 'PUT', planUpload.url.replace(/^https?:\/\/[^/]+/, ''), {
       cred: token,
-      text: '# 方案\nContext: x',
+      text: withVerification('# 方案\nContext: x'),
       contentType: 'text/markdown',
     });
     await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
@@ -513,7 +514,7 @@ describe('[推断] build 详情读面（M5 overlay 数据源，wire.test 登记�
           id: 'plan-m5-1',
           buildId,
           version: 1,
-          content: '# 方案\nContext: x',
+          content: withVerification('# 方案\nContext: x'),
           createdAt: Date.now(),
         })
         .run();

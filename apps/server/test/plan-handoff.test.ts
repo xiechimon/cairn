@@ -35,7 +35,14 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, openConvStream, postProject } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  openConvStream,
+  postProject,
+  withVerification,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -239,7 +246,7 @@ describe('plan 关交接物校验（#113 候选1：plan 即文件 plan.md，02 �
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案\nContext: x');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案\nContext: x'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       expect(w.todoRow().hasPlan).toBe(true);
@@ -254,7 +261,7 @@ describe('plan 关交接物校验（#113 候选1：plan 即文件 plan.md，02 �
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       // 驳回 → 重规划步（prompt 带 feedback 指令 = 续轮指令步）。
@@ -289,7 +296,7 @@ describe('build 步 spec 兜底（#113 候选2：交接物仍缺失 → 强制 n
       // confirm 态只剩老版本 server 已放行的升级窗口残留——直插构造该态：
       // 正常走到 confirm 后清 planDocId（模拟老库残留）。
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       w.s.db.update(buildTable).set({ planDocId: null }).where(eq(buildTable.id, buildId)).run();
@@ -313,7 +320,7 @@ describe('build 步 spec 兜底（#113 候选2：交接物仍缺失 → 强制 n
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案\nContext: x');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案\nContext: x'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       await confirm(w, buildId);
       const buildStep = await w.claim();
@@ -354,7 +361,7 @@ describe('XMON-59：upload 缝发事件 + done 重放幂等（相位漏斗静默
       const claimed = await w.claim();
       const stream = await openConvStream(w.s.app, buildId); // 订阅先于上传（SSE 无重放）
       try {
-        await w.uploadPlan(claimed.step.id, '# 方案 v1');
+        await w.uploadPlan(claimed.step.id, withVerification('# 方案 v1'));
         const raw = await stream.next((ev) => ev.type === 'step', 3000);
         const ev = conversationStreamEventSchema.parse(raw); // shared 单源全形状复验
         if (ev.type !== 'step') throw new Error(`expected step event, got ${ev.type}`);
@@ -372,7 +379,7 @@ describe('XMON-59：upload 缝发事件 + done 重放幂等（相位漏斗静默
     try {
       await w.startBuild(true);
       const claimed = await w.claim();
-      await w.uploadPlan(claimed.step.id, '# 方案 v1');
+      await w.uploadPlan(claimed.step.id, withVerification('# 方案 v1'));
       await w.done(claimed.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       expect(w.todoRow().hasPlan).toBe(true);
@@ -423,7 +430,7 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       await confirm(w, buildId);
       const buildStep = await w.claim();
@@ -450,12 +457,12 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       // done 已收尾：恢复重传若撞上已收尾步（done 实际成功、响应丢失后旧
       // journal 残留重放）不得改写版本面。恢复真路径只会对仍 claimed 的步
       // 重传（recover 只返回 claimed），本腿钉的是收尾后的迟到上传被拒。
-      const res = await w.tryUploadPlan(planStep.step.id, '# 方案 v1');
+      const res = await w.tryUploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       expect(res.status).toBe(409);
       expect(w.plansOf(buildId)).toHaveLength(1);
       expect(w.buildRowOf(buildId).planDocId).toBe(w.plansOf(buildId)[0]!.id);
@@ -469,13 +476,13 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       // 「PUT 成功 / done 失败 → 恢复重传」形：fresh 预签名 URL、同内容。
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       const plans = w.plansOf(buildId);
       expect(plans).toHaveLength(1);
       expect(plans[0]!.version).toBe(1);
-      expect(plans[0]!.content).toBe('# 方案 v1');
+      expect(plans[0]!.content).toBe(withVerification('# 方案 v1'));
       expect(w.buildRowOf(buildId).planDocId).toBe(plans[0]!.id);
       // 收尾照常：幂等不挡正常流。
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
@@ -491,8 +498,8 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
-      await w.uploadPlan(planStep.step.id, '# 方案 v2（改稿）');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v2（改稿）'));
       const plans = w.plansOf(buildId);
       expect(plans.map((p) => p.version)).toEqual([1, 2]);
       expect(w.buildRowOf(buildId).planDocId).toBe(plans[1]!.id);
@@ -506,7 +513,7 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
     try {
       const buildId = await w.startBuild(true);
       const planStep = await w.claim();
-      await w.uploadPlan(planStep.step.id, '# 方案 v1');
+      await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
       // 驳回 → 重规划步（不同 stepId）；轮次产物与 v1 逐字节相同。
       const rev = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
@@ -520,12 +527,12 @@ describe('#1026/#1027 plan 上传接收端：入参校验 + 步+内容幂等', (
       expect(rev.status).toBe(202);
       const replan = await w.claim();
       expect(replan.step.id).not.toBe(planStep.step.id);
-      await w.uploadPlan(replan.step.id, '# 方案 v1');
+      await w.uploadPlan(replan.step.id, withVerification('# 方案 v1'));
       // 不同步的相同内容 = 新版本（v2，空 diff）：版本面如实记录「新一轮
       // 规划发生过」，这正是幂等键带「步」的原因。
       const plans = w.plansOf(buildId);
       expect(plans.map((p) => p.version)).toEqual([1, 2]);
-      expect(plans[1]!.content).toBe('# 方案 v1');
+      expect(plans[1]!.content).toBe(withVerification('# 方案 v1'));
       expect(w.buildRowOf(buildId).planDocId).toBe(plans[1]!.id);
     } finally {
       w.s.dispose();

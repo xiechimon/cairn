@@ -37,7 +37,13 @@ import {
   todo as todoTable,
   tokenUsage,
 } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  withVerification,
+} from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
 
@@ -527,7 +533,7 @@ describe('步骤 journal 全链（02 §5.4 词表 + §4.2 主时序机器侧）'
     const planUpload = machineUploadUrlsResponseSchema.parse(await planUrlsRes.json()).uploads[0]!;
     const planPut = await call(w.s.app, 'PUT', planUpload.url.replace(/^https?:\/\/[^/]+/, ''), {
       ...cred,
-      text: '# 方案\nContext: 探针\n',
+      text: withVerification('# 方案\nContext: 探针\n'),
       contentType: 'text/markdown',
     });
     expect(machineOkResponseSchema.parse(await planPut.json())).toEqual({ ok: true });
@@ -779,7 +785,7 @@ describe('merge 权限闸：requestMerge 校验 build 槽 Agent 两开关（XMON
     const planUpload = machineUploadUrlsResponseSchema.parse(await planUrls.json()).uploads[0]!;
     await call(w.s.app, 'PUT', planUpload.url.replace(/^https?:\/\/[^/]+/, ''), {
       ...cred,
-      text: '# 方案\n',
+      text: withVerification('# 方案\n'),
       contentType: 'text/markdown',
     });
     await call(w.s.app, 'POST', `/api/machine/done/${step1.step.id}`, {

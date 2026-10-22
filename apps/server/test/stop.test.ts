@@ -38,7 +38,13 @@ import {
   stopPending as stopPendingTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  withVerification,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-stop-1';
 
@@ -212,7 +218,7 @@ describe('stop 服务端写面（M7 #308）', () => {
     // 注：plan 步 done(success) 必须先上传 plan.md，否则 #113 自动补写步入队
     // （仍有活动步）。
     const claimed = await w.claim();
-    await w.uploadPlan(claimed.step.id, '# plan v1');
+    await w.uploadPlan(claimed.step.id, withVerification('# plan v1'));
     await w.done(claimed.step.id, { status: 'success' });
     const late = await w.stop(buildId, true);
     expect(late.status).toBe(409);
@@ -281,7 +287,7 @@ describe('stop 服务端写面（M7 #308）', () => {
   test('失败方式 5：旧步 pending → 新步拉取 null + 丢弃', async () => {
     const buildId = await w.startBuild(true);
     const first = await w.claim();
-    await w.uploadPlan(first.step.id, '# plan v1');
+    await w.uploadPlan(first.step.id, withVerification('# plan v1'));
     await w.stop(buildId, true);
     // 竞态：机器在拉取前自然完成 → pending 定向旧步。
     await w.done(first.step.id, { status: 'success' });
@@ -314,7 +320,7 @@ describe('stop 服务端写面（M7 #308）', () => {
   test('失败方式 6b/7：停 build 步 → confirm 回落（plan v1 保留）且不发通知', async () => {
     const buildId = await w.startBuild(true);
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# plan v1');
+    await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
     await w.done(planStep.step.id, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     await w.confirm(buildId);
@@ -338,7 +344,7 @@ describe('stop 服务端写面（M7 #308）', () => {
   test('失败方式 6c：停 merge 步 → review 不动', async () => {
     const buildId = await w.startBuild(true);
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# plan v1');
+    await w.uploadPlan(planStep.step.id, withVerification('# plan v1'));
     await w.done(planStep.step.id, { status: 'success' });
     await w.confirm(buildId);
     const buildStep = await w.claim();
