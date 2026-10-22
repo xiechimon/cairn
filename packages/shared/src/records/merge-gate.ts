@@ -178,7 +178,11 @@ export const MERGE_BLOCKERS = [
   { code: 'phase-not-review', class: 'transient', label: '任务不在审核关口' },
   { code: 'work-in-flight', class: 'transient', label: '还有步骤在跑' },
   // PR
-  { code: 'pr-unreadable', class: 'transient', label: '读不到 PR 或仓库默认分支' },
+  {
+    code: 'pr-unreadable',
+    class: 'transient',
+    label: '读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA',
+  },
   { code: 'pr-not-open', class: 'human', label: 'PR 已合并或已关闭' },
   { code: 'pr-draft', class: 'transient', label: 'PR 是草稿' },
   { code: 'pr-from-fork', class: 'human', label: 'PR 来自 fork' },
@@ -186,22 +190,30 @@ export const MERGE_BLOCKERS = [
   { code: 'mergeable-state', class: 'transient', label: 'GitHub 判定暂不可合并' },
   // 检查
   { code: 'self-required', class: 'human', label: 'pacman/merge-gate 被设成了必需检查' },
-  { code: 'required-checks-unreadable', class: 'transient', label: '读不到必需检查清单' },
+  {
+    code: 'required-checks-unreadable',
+    class: 'transient',
+    label: '读不到当前 head 的检查或必需检查清单',
+  },
   { code: 'required-checks-none', class: 'human', label: '默认分支没有必需检查' },
   { code: 'required-check-missing', class: 'transient', label: '必需检查在当前 head 上缺席' },
   { code: 'required-check-pending', class: 'transient', label: '必需检查还在跑' },
   { code: 'required-check-failed', class: 'transient', label: '必需检查未通过' },
   { code: 'pr-evidence-not-green', class: 'transient', label: 'pr-evidence 未通过' },
   // 补丁
-  // 摘要不可得分两类：compare 读不到、或不是在 PR 的 head 上读的，可等（下一次巡检
-  // 再读）；读到了却算不出（形状不对、截断、只有证据、缺 blob sha）每次读都一样，
-  // 等不来，留人。
+  // 摘要不可得分两类：compare 读不到、或不是在 PR 的 head 上读的（比 PR 旧或新），
+  // 可等（下一次巡检再读）；读到了却算不出（形状不对、截断、只有证据、缺 blob sha）
+  // 每次读都一样，等不来，留人。
   {
     code: 'patch-unavailable',
     class: 'transient',
     label: '读不到当前 head 的 compare，补丁摘要暂不可得',
   },
-  { code: 'compare-malformed', class: 'human', label: '读到了 compare，响应形状不对' },
+  {
+    code: 'compare-malformed',
+    class: 'human',
+    label: 'compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错',
+  },
   { code: 'compare-truncated', class: 'human', label: 'compare 文件列表被截断' },
   {
     code: 'patch-unbindable',
@@ -252,10 +264,10 @@ export const MERGE_BLOCKERS = [
 ] as const satisfies readonly { code: string; class: BlockerClass; label: string }[];
 
 export type MergeBlockerCode = (typeof MERGE_BLOCKERS)[number]['code'];
-export const MERGE_BLOCKER_CODES = MERGE_BLOCKERS.map((b) => b.code) as MergeBlockerCode[];
+export const MERGE_BLOCKER_CODES = MERGE_BLOCKERS.map((b) => b.code) as readonly MergeBlockerCode[];
 
 export const mergeBlockerSchema = z.object({
-  code: z.enum(MERGE_BLOCKER_CODES as [MergeBlockerCode, ...MergeBlockerCode[]]),
+  code: z.enum(MERGE_BLOCKER_CODES as readonly [MergeBlockerCode, ...MergeBlockerCode[]]),
   class: z.enum(BLOCKER_CLASSES),
   label: z.string(),
   detail: z.array(z.string()),
@@ -271,3 +283,23 @@ export const mergeReadinessSchema = z.object({
   blockers: z.array(mergeBlockerSchema),
 });
 export type MergeReadiness = z.infer<typeof mergeReadinessSchema>;
+
+// 闸的数据常量深冻住：'@pacman/shared' 的总出口在 import 时会运行 shared 的别的模块，
+// 它们可自动合并；冻住之后它们改不了闸的清单、上限与词表（ESM 是严格模式，改写即
+// 抛错）。本模块只从 zod import，不会有别的模块抢在这几行之前拿到这些值。新加数组或
+// 普通对象导出时加进这张表（测试 merge-gate-imports 逐个检查导出是否冻住）。
+for (const value of [
+  MERGE_POLICIES,
+  GATE_LIMITS,
+  EVIDENCE_EXECUTABLE_EXTENSIONS,
+  AUTO_MERGE_PATH_GLOBS,
+  PROTECTED_PATH_GLOBS,
+  MERGE_GATE_SOURCE_GLOBS,
+  COMPARE_FILE_STATUSES,
+  BLOCKER_CLASSES,
+  ...MERGE_BLOCKERS,
+  MERGE_BLOCKERS,
+  MERGE_BLOCKER_CODES,
+]) {
+  Object.freeze(value);
+}

@@ -1,0 +1,135 @@
+# #1404 S2 round 9 reviews: code-review at medium effort on the explicit range c4bf400..b484957 (the round 9 commits so far, test files included),
+# and the /simplify pass over readiness.ts (pr-gate run 4 suggestion).
+
+== code-review ==
+Range: c4bf4005060e8d86b998394d1a116b7a227e7e36..b48495726ab6529b84fe02cedf750cd8c73dae7b (c4bf400 = PR #1421's head at pr-gate run 4;
+b484957 = the round 9 fix commit, HEAD at review time; the review fixes and the evidence commit came after).
+$ cd /home/user/pacman/.claude/worktrees/p3b && git diff --shortstat c4bf4005..b4849572
+ 5 files changed, 247 insertions(+), 64 deletions(-)
+  Skill: code-review (forked execution)
+  args:  medium c4bf4005060e8d86b998394d1a116b7a227e7e36..b48495726ab6529b84fe02cedf750cd8c73dae7b (repo: /home/user/pacman/.claude/worktrees/p3b;
+         cd there in every Bash call, e.g. `cd /home/user/pacman/.claude/worktrees/p3b && git diff c4bf4005060e8d86b998394d1a116b7a227e7e36..b48495726ab6529b84fe02cedf750cd8c73dae7b`).
+         Review the whole range including the test files (apps/server/test/merge-gate-readiness.test.ts, packages/shared/test/snapshot.test.ts and
+         its .snap): 5 files, +247/-64.
+  What it read (from its transcript, three Bash calls, each starting with `cd /home/user/pacman/.claude/worktrees/p3b &&`):
+    1. git diff --stat, git log --oneline and git diff of exactly that range: 21273 characters, 5 `diff --git` sections (readiness.ts, the readiness
+       test, merge-gate.ts, snapshot.test.ts and its .snap), both round 9 commits (2970bf4, b484957). This is the diff under review, test files included.
+    2-3. readiness.ts lines 150-450 at b484957 (the worktree was clean: the first mutation sweep had finished), plus greps for MergeBlockerCode,
+       compare.commits and other callers of mergeReadiness (none).
+  Findings (9), as returned, with what was done:
+  1. readiness.ts:297, the guard dropped its only response-derived check (compare.commits.includes(pr.headSha)) and trusts the shell's headSha label.
+     Confirmed, fixed: the guard blocks when headSha differs OR the compare's own commits lack pr.headSha (87700dc), with a new red-first test
+     (60af36c). This reverses b484957's decision to drop the commits check.
+  2. readiness.ts:204, checks are bound only by the shell's checks.headSha; GateCheckRun / GateCommitStatus carry no SHA.
+     Not changed in readiness (the input has no per-run SHA to compare); the contract comment now says S4 compares each run's head_sha and the
+     combined status sha with the requested SHA and passes null on a mismatch (87700dc). Left for S4.
+  3. readiness.ts:204, a malformed headSha (short, uppercase) becomes an endless transient wait.
+     Contract only: a compare headSha that is not a 40-char lowercase SHA is passed as 'malformed' by the shell (87700dc). Checks have no
+     malformed state; a malformed checks.headSha stays a transient wait. Left for S4, which builds the input.
+  4. readiness.ts:204, with pr === null the compare is digested and its digest reported with no head.
+     Confirmed, fixed: patchDigest is null when the PR is unreadable; blockers are still listed (87700dc), new red-first test (60af36c).
+  5. readiness.ts:428, the /simplify flatMap drops a recorded code that is not in the vocabulary and the gate opens (the old code kept it as 'human').
+     Confirmed, fixed: the /simplify change is reverted to the sort and map with the 'human' fallback (87700dc). The fallback is deliberate fail-closed
+     code; AGENTS.md asks before removing such code. No input can reach it (codes are typed from the vocabulary), so no test; the original
+     'unsorted blockers' mutation applies again and is caught.
+  6. readiness.ts:345, nothing ties compare.commits to compare.headSha once the commits check is gone.
+     Covered by finding 1's fix (commits must contain the PR head again). Partial commit lists remain a contract breach (commits are read in full).
+  7. readiness.ts:211, required-checks-unreadable is recorded twice (with detail, then without).
+     Not changed: block() accumulates details per code by design; the second call adds no detail.
+  8. snapshot.test.ts:253, the vocabulary snapshot pins code and class but not the label, and this round changes a label.
+     Fixed: the snapshot holds code, class and label for every blocker, in order (60af36c).
+  9. merge-gate-readiness.test.ts:12, a broken line in the failure-mode header.
+     Fixed: reflowed (60af36c).
+  After the fixes: 346 of 346 (green 2 in s2-r9-red-green.txt), gates in gates-s2-9.txt, mutations in s2-mutations-9.txt.
+  The review fixes (60af36c, 87700dc) were not reviewed again.
+
+  The findings as the skill returned them:
+```json
+[
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 297,
+    "summary": "The head-binding guard dropped its only check that comes from the response (`compare.commits.includes(pr.headSha)`). It now relies only on `compare.headSha`, a label the S4 shell supplies, so a stale compare gets through whenever that label is wrong.",
+    "failure_scenario": "S4 fetches compare by branch name, or from a cache keyed on an older request, and fills in `headSha: pr.headSha` (the obvious way to build GateInputs). The response's commits stop at EARLIER and do not include HEAD. The old code blocked this with patch-unavailable. The new code sees headSha === pr.headSha, computes D from the older patch, and can return ready=true with headSha=HEAD for a patch nobody reviewed. Keeping both checks (headSha equality AND commits.includes(pr.headSha)) costs nothing and keeps the guard that does not trust the shell."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 204,
+    "summary": "Check results are matched to the PR head only by the shell's self-reported `checks.headSha`. Nothing in the data itself is compared: GateCheckRun and GateCommitStatus carry no head_sha, so each run's own head_sha from GitHub is never checked against pr.headSha.",
+    "failure_scenario": "The shell lists check-runs with `?ref=<branch>`, or reuses an earlier response, and sets `headSha: pr.headSha`. The runs belong to the previous push and are green, while HEAD's CI is still pending or has failed. The gate counts the required checks as passed and does not raise required-check-pending or required-check-failed for the real head."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 204,
+    "summary": "`headSha` is compared with strict string equality, and nothing checks that it is a 40-char lowercase SHA. A badly formed value (uppercase, abbreviated, a branch name) shows up as the transient required-checks-unreadable or patch-unavailable, so the gate waits forever and never hands off to a human.",
+    "failure_scenario": "The shell passes `checks.headSha` as an uppercase SHA or a 7-char short SHA, and pr.headSha is the full lowercase SHA. Every patrol returns 'checks not read at the PR head' (transient), so the gate keeps waiting and never escalates. The same input should be treated as malformed and fail the same way on every read, like compare-malformed, which goes to a human."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 204,
+    "summary": "When pr === null, neither compare.headSha nor checks.headSha is compared with anything. The compare is still turned into a digest (D) and returned as patchDigest, and the checks are judged as normal, even though they may describe any commit.",
+    "failure_scenario": "The PR read fails (pr-unreadable) while compare and checks were read on NEWER or EARLIER. The result has headSha=null but patchDigest=D of a patch that was never tied to anything, and anything that consumes patchDigest by itself may attach verdicts or status to the wrong patch. The new docs say 'compare 与检查照常判', but D is still reported."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 428,
+    "summary": "`ready` is now computed from `MERGE_BLOCKERS.flatMap(...)`, so any recorded code missing from the vocabulary is dropped silently and the gate opens. The old sort/map kept such codes, with class 'human' as the fallback.",
+    "failure_scenario": "Someone records a code through a cast, or renames or removes an entry in MERGE_BLOCKERS while a call site keeps a stale string, for example during a merge conflict. Today `found` has the code, but `blockers` is [] and ready=true. Computing `ready: found.size === 0`, or asserting that every key in `found` was emitted, keeps the gate failing closed."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 345,
+    "summary": "Once commits no longer has to include the head, nothing keeps `compare.commits` consistent with `compare.headSha`, but the evidence chain still uses commits as its set of commits in this PR.",
+    "failure_scenario": "The commits come from a different or partial page (compare caps commits at 250 and paginates), or the shell pairs headSha=HEAD with the commits list from an earlier read. Evidence links pinned to commits in the PR are then rejected, giving evidence-link-missing (transient, so the gate waits forever). Links to a commit outside base..head could also be accepted if the list is too long. The old includes(head) check at least tied commits to the head."
+  },
+  {
+    "file": "apps/server/src/services/merge-gate/readiness.ts",
+    "line": 211,
+    "summary": "required-checks-unreadable is now raised twice when checks are mismatched or incomplete: once with detail and again with no detail in the `checks === null` branch. The result is still right, but the code relies on the second call adding no detail.",
+    "failure_scenario": "If someone later adds a default detail to the generic branch (for example 'required list unreadable'), mismatched or incomplete checks would report two contradictory details. Folding the reasons into one branch that sets a single reason variable would be clearer."
+  },
+  {
+    "file": "packages/shared/test/snapshot.test.ts",
+    "line": 253,
+    "summary": "The new vocabulary snapshot covers code and class but not label, and this same PR changes the user-facing label of required-checks-unreadable. Label changes, which become the status description, are not pinned.",
+    "failure_scenario": "The test title says the first blocker becomes the status description, and the status description comes from the label, yet a label edit such as the '读不到当前 head 的检查或必需检查清单' change passes the snapshot unnoticed. Including `b.label` in the snapshot string would pin it."
+  },
+  {
+    "file": "apps/server/test/merge-gate-readiness.test.ts",
+    "line": 12,
+    "summary": "The rewrapped failure-mode header comment has a broken line ('clean 时放过手上清单里别家未通过的检查；两个' then a line holding only 'app 的同名检查…'), which leaves a dangling fragment in the list of failure modes this file pins.",
+    "failure_scenario": "Cosmetic only. Reflow the paragraph so it reads as one continuous list."
+  }
+]
+```
+
+== /simplify over readiness.ts (pr-gate run 4 suggestion: no /simplify pass since round 4's b1eee22) ==
+  Skill: simplify
+  args:  Scope: the whole file apps/server/src/services/merge-gate/readiness.ts in the worktree /home/user/pacman/.claude/worktrees/p3b
+         (cd there in every Bash call), not only the uncommitted diff. Include the round 7 detail-quoting logic (escapeChar, quoted, names,
+         UNSAFE_CHAR, DETAIL_* constants) and the round 9 head checks. Behavior must not change: apply only behavior-keeping changes; the four
+         merge-gate test files under apps/server/test/merge-gate-*.test.ts and packages/shared/test/snapshot.test.ts must stay green. Do not touch
+         test files or packages/shared. Repo rules: no inline/dynamic imports, no any, single-line single-use helpers inlined, comments in
+         Chinese technical prose with no emoji.
+  How it ran: the Agent tool was not available in this context, so the skill ran as a single-pass inline review in the same session over its four
+  angles (reuse, simplification, efficiency, altitude), not the usual four-agent fan-out. It ran on the working tree after the round 9 fix and
+  before the fix commit, so its changes are part of b484957 (green 1 in s2-r9-red-green.txt).
+  Findings and what was done:
+  1. Simplification, applied in b484957, reverted in 87700dc: the ORDER and META maps, the sort of found.entries() by ORDER and the fallbacks
+     (?? 0, ?? 'human', ?? code) were replaced by one pass over MERGE_BLOCKERS in order. code-review finding 5 showed the fallbacks are a
+     fail-closed net (a code outside the vocabulary stays a 'human' blocker instead of vanishing), so the original form is back.
+  2. Simplification, applied: self-required was detected by a separate required.some(...) scan with the same predicate the loop used to skip the
+     own name; now the loop records self-required where it skips the name (one predicate, so case handling cannot drift between the two).
+  3. Simplification, applied: the digest ternary plus the guard `digest !== null && compare !== null` (the second half only narrowed the type)
+     become one `if (compare !== null)` branch that sets D.
+  4. Reuse, no change: the closest existing helpers are cleanGithubText (apps/server/src/services/github-reads.ts) and sanitizePreview
+     (apps/daemon/src/backend/provider-response.ts). Both are lossy (format characters deleted, controls folded to spaces); readiness quotes names
+     as JSON strings that parse back to the original name, which the detail tests pin (JSON.parse(d) === name). Reusing them would change behavior.
+  5. Detail quoting (escapeChar, quoted, names), no change: the per-character loop is what keeps truncation from cutting inside an escape;
+     escapeChar is JSON.stringify plus \uXXXX for the raw-unsafe characters JSON leaves alone, already minimal.
+  6. Efficiency, no change: every list is small (verdicts, perspectives, check runs); at() filtering the verdicts per perspective costs nothing measurable.
+  7. Altitude, no change: the head checks sit where the inputs meet (each input carries the commit it was read at, readiness compares it with
+     pr.headSha); the checks and compare branches have the same shape (block, then treat the input as unread).
+  The mutations whose replaced text changes 2 and 3 reworded have round 9 adaptations in s2-mutations-9.txt (self-required not flagged,
+  self-required matched case-sensitively, own required name not skipped). After the pass: 344 of 344 over the four merge-gate test files and the
+  shared snapshot test, biome ci and tsc clean. Kept in the final source (87700dc): changes 2 and 3.
