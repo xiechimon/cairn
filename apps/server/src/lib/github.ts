@@ -417,8 +417,15 @@ function isRateLimited(res: { status: number; headers: { get(n: string): string 
  * 二级限流可以不带 retry-after（上游文档「Exceeding the rate limit」：403 或
  * 429 + 说明超了二级限流的 message）。 */
 async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
-  if (isRateLimited(res)) return true;
-  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));
+  return isRateLimitedText(res, await res.text().catch(() => ''));
+}
+
+/** isRateLimitedResponse 的同步半边：应答文本已读出时用（应答体只能读一次）。 */
+function isRateLimitedText(
+  res: { status: number; headers: { get(n: string): string | null } },
+  text: string,
+): boolean {
+  return isRateLimited(res) || (res.status === 403 && /rate limit/i.test(text));
 }
 
 /** 进料读遇到限流（#1406：429，或带限流信号的 403）：调用方本轮停读——同一
@@ -1288,11 +1295,7 @@ export async function githubMergePull(
     data = null;
   }
   const message = optString(data?.message) ?? '';
-  if (
-    res.status >= 500 ||
-    isRateLimited(res) ||
-    (res.status === 403 && /rate limit/i.test(text ?? ''))
-  ) {
+  if (res.status >= 500 || isRateLimitedText(res, text ?? '')) {
     return { kind: 'unknown', reason: 'status', status: res.status };
   }
   if (res.ok) {

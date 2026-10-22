@@ -224,9 +224,6 @@ let seq = 0;
 
 function makeWorld(opts: WorldOpts = {}): World {
   seq += 1;
-  const fakeRef: { fake: GithubFake | null } = { fake: null };
-  const s = bootServer({ githubFetch: (i, init) => (fakeRef.fake as GithubFake).fetch(i, init) });
-  disposables.push(() => s.dispose());
   const rnd = `${seq}-${Math.random().toString(36).slice(2, 8)}`;
   const base = Date.now();
   const projectId = `proj-mapi-${rnd}`;
@@ -235,6 +232,12 @@ function makeWorld(opts: WorldOpts = {}): World {
   const agentId = `agent-mapi-${rnd}`;
   const prNumber = opts.prNumber === undefined ? 201 : opts.prNumber;
   const repoKind = opts.repoKind ?? 'github';
+  const fake = new GithubFake(
+    prNumber === null ? {} : { [prNumber]: { state: 'open', merged: false, ...opts.pull } },
+    () => conversationBranch(buildId),
+  );
+  const s = bootServer({ githubFetch: fake.fetch });
+  disposables.push(() => s.dispose());
   s.db
     .insert(projectTable)
     .values({
@@ -316,11 +319,6 @@ function makeWorld(opts: WorldOpts = {}): World {
       { teamId: s.team.id, login: 'octo', accessToken: TOKEN, scope: 'read:user repo' },
     );
   }
-  const fake = new GithubFake(
-    prNumber === null ? {} : { [prNumber]: { state: 'open', merged: false, ...opts.pull } },
-    () => conversationBranch(buildId),
-  );
-  fakeRef.fake = fake;
   const deps: BuildDeps = { ...s.svc, box: s.secretBox, githubFetch: fake.fetch };
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: fake.fetch });
   const messages = () =>

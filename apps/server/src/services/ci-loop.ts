@@ -104,10 +104,10 @@ import {
   mergeInFlight,
   roundStart,
   stopUnclaimedGateSteps,
+  teamGithubToken,
   toBuildRecord,
 } from './builds.js';
 import { githubRepoOfProject } from './git.js';
-import { openGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -565,15 +565,6 @@ export function createCiPoller(
 
   /** token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
    * 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。 */
-  function tokenFor(teamId: string): string | null {
-    if (deps.box === undefined) return null;
-    try {
-      return openGithubToken({ db: deps.db, box: deps.box }, teamId);
-    } catch {
-      return null;
-    }
-  }
-
   async function reconcileOne(
     cand: { buildId: string; todoId: string },
     now: number,
@@ -604,7 +595,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
-    const token = tokenFor(target.teamId);
+    const token = teamGithubToken(deps, target.teamId);
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -914,7 +905,7 @@ export function createCiPoller(
     }
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
-    const grindToken = tokenFor(target.teamId);
+    const grindToken = teamGithubToken(deps, target.teamId);
     // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
     if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(

@@ -66,6 +66,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import {
   type FetchLike,
+  type GithubMergeResult,
   githubMergePull,
   githubPull,
   githubPullState,
@@ -841,17 +842,20 @@ async function probePullState(
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
   const { owner, repo } = repoRef;
-  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
-  // box 缺席按未连接处理（探测是辅助面，不把主请求 500 掉）。
-  let token: string | null = null;
-  if (deps.box) {
-    try {
-      token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-    } catch {
-      token = null;
-    }
-  }
+  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。
+  const token = teamGithubToken(deps, teamId);
   return githubPullState(deps.githubFetch ?? fetch, token, owner, repo, prNumber, timeoutMs);
+}
+
+/** 团队 GitHub 连接的 token；未连接、box 缺席或密文解不开（损坏 / keyfile 换了）一律
+ *  null——按未连接处理，不把主请求 500 掉（PR 探测、PR 对账、经 API 合并共用）。 */
+export function teamGithubToken(deps: BuildDeps, teamId: string): string | null {
+  if (deps.box === undefined) return null;
+  try {
+    return openGithubToken({ db: deps.db, box: deps.box }, teamId);
+  } catch {
+    return null;
+  }
 }
 
 /** 复用目标的 PR 状态判定（#931 失败方式 3）：open / 探测不到 → null（复用
@@ -1482,6 +1486,20 @@ function closingLine(todoRow: TodoRow, repoRef: GithubRepoRef): string | null {
   return sameRepo ? `closes #${issue.issueNumber}` : null;
 }
 
+/** 「GitHub 没有明确答复」行里的原因。 */
+function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
+  switch (result.reason) {
+    case 'timeout':
+      return '请求超时';
+    case 'network':
+      return '网络错误';
+    case 'malformed':
+      return `HTTP ${result.status}，应答读不出`;
+    case 'status':
+      return `HTTP ${result.status}`;
+  }
+}
+
 /** 经 GitHub API 合并（#1403 段 2b）：先做完所有不写的检查（相位、#1217 守卫、权限闸、
  *  GitHub 连接、最后推送的提交、同一 build 没在合并），读 PR 核对（本 build 自己的、开着、
  *  进默认分支、head 就是最后推送的提交），相位再判一次，然后
@@ -1498,20 +1516,12 @@ async function mergeThroughGithub(
   repoRef: GithubRepoRef,
   actor: string,
 ): Promise<{ delegated: true }> {
-  const fullName = `${repoRef.owner}/${repoRef.repo}`;
   apiMergeGate(deps, row);
   await assertNoMergedPrElsewhere(deps, row, prNumber);
   // 守卫探测的网络窗里相位可能已被改（对账收尾、人关卡）：重读再判。
   const gate = apiMergeGate(deps, row);
   assertMergeTools(deps, gate.todoRow);
-  let token: string | null = null;
-  if (deps.box) {
-    try {
-      token = openGithubToken({ db: deps.db, box: deps.box }, gate.todoRow.teamId);
-    } catch {
-      token = null; // 连接解不开（密文损坏 / keyfile 换了）按没有连接处理
-    }
-  }
+  const token = teamGithubToken(deps, gate.todoRow.teamId);
   if (token === null) {
     throw new HttpError(
       409,
@@ -1566,7 +1576,7 @@ async function mergeThroughGithub(
     if (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的 head 不是本任务在 ${fullName} 的工作分支「${branch}」，pacman 不合并它：请在 GitHub 上核对这张 PR。`,
+        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，pacman 不合并它：请在 GitHub 上核对这张 PR。`,
       );
     }
     if (pull.baseRef !== pull.defaultBranch) {
@@ -1608,23 +1618,13 @@ async function mergeThroughGithub(
     const atGate = now?.phase === gate.todoRow.phase;
     if (atGate && gate.failed) setTodoPhase(deps, row.todoId, 'review');
     insertGateAnnouncement(deps, row.id, MERGE_ANNOUNCEMENT, actor);
-    const reason =
-      result.kind === 'merged'
-        ? null
-        : result.reason === 'timeout'
-          ? '请求超时'
-          : result.reason === 'network'
-            ? '网络错误'
-            : result.reason === 'malformed'
-              ? `HTTP ${result.status}，应答读不出`
-              : `HTTP ${result.status}`;
     insertMessageRow(deps, row.id, {
       id: newRecordId(),
       role: 'system',
       content:
         result.kind === 'merged'
           ? `PR #${prNumber} 已由 pacman 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
-          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${reason}）。pacman 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
+          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。pacman 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
       createdAt: nowMs(),
     });
     if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
