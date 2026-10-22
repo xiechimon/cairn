@@ -70,10 +70,16 @@ function withoutTrailingPunct(url: string): string {
   return url.slice(0, end);
 }
 
-/** 逐段 URL 解码再用 `/` 连起来；坏的百分号转义（`%E0%A4%A`）返回 null。 */
+/** 解码后的段里不收的字符（S4b，#1404 评论 6314008085）：`/`（%2F 把一段拆成两段或拼出目录）、
+ * `\\`、`?`、`#` 与控制字符（含换行、NUL）。raw 上这样的地址不是那个文件，外壳也不拿它去
+ * contents 探测。 */
+const UNSAFE_DECODED = /[/\\?#\p{Cc}]/u;
+
+/** 逐段 URL 解码再用 `/` 连起来；坏的百分号转义（`%E0%A4%A`）或解码后有不收的字符返回 null。 */
 function decodedPath(segments: readonly string[]): string | null {
   try {
-    return segments.map((p) => decodeURIComponent(p)).join('/');
+    const decoded = segments.map((p) => decodeURIComponent(p));
+    return decoded.some((d) => UNSAFE_DECODED.test(d)) ? null : decoded.join('/');
   } catch {
     return null;
   }
@@ -110,4 +116,24 @@ export function parseRawEvidenceLinks(
     else others.push(url);
   }
   return { links, others };
+}
+
+/** 合格的证据链（S4b；readiness 与外壳共用这一条）：钉在本 PR 的提交上（compare 的 commits），
+ * 指向本 PR 增改的文件（compare 的 files，删掉的不算）。只是 head 的祖先不够：main 历史里
+ * 同票前一段（已 squash）的证据也是祖先，本 PR 却一份证据没加。按 body 里的顺序。 */
+export function qualifyingEvidenceLinks(
+  body: string,
+  args: { owner: string; repo: string; ticketRef: string },
+  compare: {
+    commits: readonly { sha: string }[];
+    files: readonly { status: string; filename: string }[];
+  },
+): RawEvidenceLink[] {
+  const commits = new Set(compare.commits.map((c) => c.sha));
+  const changed = new Set(
+    compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename),
+  );
+  return parseRawEvidenceLinks(body, args).links.filter(
+    (l) => commits.has(l.sha) && changed.has(l.path),
+  );
 }

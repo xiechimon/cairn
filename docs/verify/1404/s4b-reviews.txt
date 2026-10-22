@@ -1,0 +1,92 @@
+# #1404 S4b reviews: /simplify, /code-review (medium, origin/claude/bootstrap-p3-s4...HEAD), /security-review.
+
+== /simplify (single inline pass; the Agent tool was not available, so not the four-agent fan-out) ==
+Nothing needed changing. Considered and kept:
+- the shell's isCount next to digest.ts's private one: they differ (isSafeInteger against isInteger), and
+  merging them would change what compareFilesFromResponse accepts;
+- readiness parses the PR body a second time only when no link qualifies, to report the link count;
+- readPaged's accept callback, used only by the combined-status read (its per-page sha check).
+
+== /code-review at medium, head f4f4d89 ==
+1. Required checks are matched by name; a same-named run from another app, or a commit status, can stand in
+   for an app-bound required check when the bound app has not reported.
+   Kept (user decision Q3 on #1404, comment 6339562372): GateInputs carries names; the shell lists the bound
+   app's run first, and GitHub's mergeable_state reports blocked for a missing app-bound required check, which
+   readiness blocks on. Carrying app ids in GateInputs is a later gate change. Risk.
+2. ownStatus was taken from a combined-status read that was not complete.
+   Fixed (1ed5aa0): an incomplete read makes ownStatus 'unreadable'; the planner then does not write. Pin F15
+   red first.
+3. GateReadCache grows without bound.
+   Skipped: the caller owns the cache's lifetime; eviction belongs with the S6a/S7 wiring. Risk.
+4. Links past the 5-probe cap were missing from evidence, so readiness read them as absent.
+   Fixed (1ed5aa0): they are recorded with present null (readiness: "presence unreadable"). Pin F16 red first.
+5. The 1,000-commit and 1,000-run caps leave an over-cap PR waiting (transient) instead of going to a person.
+   Kept (plan section 4.3). Risk.
+6. readCompare reported whatever failure the shared reader last saw.
+   Fixed (1ed5aa0): the failure is reset at the start of readCompare. Not observable through
+   readGateGithubFacts; readCompareAt's own failure is pinned in F7.
+7. enforcement_level off still counted as required.
+   Fixed (1ed5aa0): off adds no classic required checks. Pin F11 red first.
+8. Classic protection and a ruleset binding the same context to two apps: only the first-listed run is judged
+   as the required check.
+   Kept with finding 1 (same mechanism; mergeable_state covers the unreported app). Risk.
+9. "unchanged" compares the description exactly; if GitHub normalizes stored descriptions the planner would
+   rewrite on every evaluation.
+   Not verifiable without a live status write. Risk, for S7: capture the round trip on the drill repository;
+   S7's per-SHA write cap bounds the cost.
+After the fixes: 227 of 227 tests, 103 of 103 mutations (s4b-mutations.txt).
+
+== /security-review ==
+The skill collected its diff from /home/user/pacman (branch claude/nice-faraday-o329b3), not from this
+worktree, so the diff it printed is unrelated to S4b. The review was done by hand under the skill's rules (high
+and medium only, confidence 8 or more, its hard exclusions) on
+git diff origin/claude/bootstrap-p3-s4...HEAD in /home/user/pacman/.claude/worktrees/p3b, limited to
+apps/server/src/services/merge-gate/{github-port,github-facts,gate-status,evidence-link,readiness}.ts and
+apps/server/src/services/merge-gate-github.ts (tests excluded, rule 11).
+- Gate source makes no network call and does not import lib/github.ts; the adapter only forwards to S4a's
+  validated transport. No new credential, host or write path; the token never enters gate source.
+- Untrusted input into requests: the base branch name goes through S4a's segment checks and encoding; evidence
+  probe paths come from qualifyingEvidenceLinks (decoded "/", "\", "?", "#", control characters, "." and ".."
+  refused; only the ticket's docs/verify/<ticket>/, files this PR adds or changes, commits of this PR) and are
+  checked again by S4a. No host control, no traversal.
+- Gate logic: a response naming another PR or repository is rejected; compare and checks are bound to SHAs
+  from the responses; unreadable inputs never pass (null or unreadable, which readiness turns into blockers);
+  the planner refuses the human policy, a missing head, checks read elsewhere and an unreadable current
+  status. Nothing calls the shell or the writer yet, and the P3 production policy is human.
+- The name-only required-check matching (code review 1) has no concrete exploit path today (mergeable_state
+  backs it, no caller): confidence below 8, kept as a defense-in-depth item in Risk.
+- No eval, dynamic import or deserialization into code (merge-gate-imports enforces this for gate source);
+  status descriptions carry no blocker detail.
+Result: no high or medium finding, none at confidence 8 or more.
+
+== Added 2026-10-22, after #1503 (S4a) merged as c99de10 ==
+Items from pr-gate run 1 on #1503 (go, no blocking) taken in this branch:
+- lib/github.ts: the issue write section comment no longer says "server 唯二写入点"; it points to the
+  header's list of three write points.
+- s4a-red-green.txt, leg 5, lines 117 to 123 are stray lines; s4a-red-green-correction.txt (new, the old file is
+  left as merged) says so and gives the leg's real result (72 failed, 8 passed of 80).
+- New text uses "feat#12", not the earlier example, as the example of a branch name with "#".
+Risk, carried to P4 (#1405): the gate transport in apps/server/src/lib/github.ts is outside ADR 0021 D4 ④
+(lib/github.ts is in the auto-merge set). A later autonomous PR could change which requests the gate makes, or
+fabricate a whole consistent response; the gate catches responses that name another resource (PR number and
+base repository, compare's own head, run head_sha, status sha), not a wholesale forgery. Deferred to P4 open
+question 1 (#1405) and #1462 item 7: request builders into D4 ④, or lib/github.ts into ④. Autonomous merges
+stay off until that is decided.
+
+== Added 2026-10-22, pr-gate run 1 on #1525 at 63f23fc (go, no blocking, five suggestions) ==
+1. pickRuns ranks the bound app's run first, but a required check bound to an app can still be satisfied by
+   another app's same-named run when the bound app has not reported. Recorded, no code: this is the Q3 Risk item
+   above (code review findings 1 and 8). Backstop: GitHub's mergeable_state reports blocked when an app-bound
+   required check from the bound app is missing, and readiness blocks on any mergeable_state other than clean or
+   has_hooks; nothing calls the gate yet. Carrying app ids in GateInputs remains a later gate change.
+2. Conditional-read cache keys for check runs and the combined status were per PR. Fixed in fd1e888 (keyed on
+   the head SHA), test F19 red first, mutations N106 and N107.
+3. No shell-to-readiness test for a 300-file compare. Added in fd1e888 as a pin (it passed at once), mutation N108.
+4. "%2e%2e" and "%2F..%2F" cases already pass on main's parser: recorded as pins in s4b-red-green.txt.
+5. The production binding of the gate's port, apps/server/src/services/merge-gate-github.ts, sits outside the
+   D4 class 4 gate-source locations, like lib/github.ts; a later PR changing only that file could alter what the
+   shell sees once S6a/S7 wire it. Same deferral as lib/github.ts: P4 open question 1 (#1405) and #1462 item 7
+   (request builders and binding into class 4, or these files added to class 4). Autonomous merges stay off
+   until that is decided. Risk.
+Cache growth note: keying on the head SHA adds one runs and one status entry per evaluated head; eviction stays
+with the cache's owner (S6a/S7), as recorded for code review finding 3.
