@@ -651,6 +651,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld({ checkpoint });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
+    expect(err.message).toContain('有效的提交 SHA');
     expect(w.fake.puts()).toEqual([]);
     for (const r of w.fake.requests) {
       expect(`${r.url} ${r.body ?? ''}`).not.toContain(checkpoint ?? CP);
