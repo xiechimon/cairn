@@ -1,0 +1,143 @@
+#1403 segment 2b: failure modes, listed before the tests and the code
+Branch claude/bootstrap-p2-seg2b, from origin/claude/bootstrap-p2-seg2 at e92277d2, with
+origin/main 50a55000 (#1480) merged in as a685876b.
+Scope: design D (#1403 comment 6338182522, the user's decision of 2026-10-22). For a
+GitHub-form build with a recorded PR, a person pressing merge in pacman makes the server
+merge the PR through GitHub's REST API, bound to the build's last pushed commit. The
+machine merge step is no longer used for that form. GitHub form without a PR, hosted and
+local keep today's merge step.
+
+The path in requestMerge (GitHub form with build.prNumber):
+  1. checks without writes: phase review, or failed and restorable (#702); the #1217
+     second-PR guard, then the phase again; the XMON-77 permission gate; a GitHub token;
+     the build's last pushed checkpoint (40 hex); no merge of this build in flight
+  2. GET pulls/{n} with the token; then the checks on the PR; then the phase again
+  3. PUT pulls/{n}/merge {sha: checkpoint, merge_method: squash,
+     commit_title: "<PR title> (#n)", commit_message: "closes #N" only for an issue of
+     the same repository}
+  4. merged -> rows and done; refused -> 409 with GitHub's message, nothing written;
+     no clear answer -> 202 and one row, the reconcile settles it
+
+Merge request outcomes
+----------------------
+D1  Review card, token, own open PR whose head is the last checkpoint: exactly one PUT to
+    pulls/{n}/merge, body {sha: checkpoint, merge_method: "squash",
+    commit_title: "<title> (#n)"}; then the MERGE_ANNOUNCEMENT row (actor as today), one
+    row "PR #n 已由 pacman 经 GitHub 合并（squash，合并提交 abc1234）", DONE_ROW,
+    phase done, unclaimed verify / review steps stopped; no merge step row; the response
+    is {delegated: true}.
+D2  Closing line: commit_message is exactly "closes #N" when the todo came from issue N
+    of the project's own repository (sourceKind github-issue or github-issue-self,
+    sourceRef github:<owner>/<repo>#N, owner and repo compared without ASCII case);
+    absent for an issue of another repository, an orchestration source, no sourceRef,
+    a malformed ref.
+D3  No GitHub connection, or a connection the box cannot decrypt: 409 that asks to
+    connect GitHub (or to merge on GitHub); no GitHub request, no rows, no step, phase
+    unchanged.
+D4  The PR head differs from the last checkpoint: 409 naming both short shas; no PUT.
+D5  No checkpoint, or one that is not 40 hex: 409; no GitHub request; the value never
+    reaches a request URL or body.
+D6  The PR is already merged at the read: no PUT; 409 saying the reconcile finishes the
+    card; the next sweep does.
+D7  The PR is closed and not merged: 409; no PUT.
+D8  Not the build's own PR (head repository id differs from the base's, head repository
+    null, head branch is not the build's conversation branch): 409; no PUT.
+D9  Base branch is not the default branch: 409; no PUT.
+D10 PUT answers 405 / 409 / 422 / 404 / 403 without a rate-limit signal: 409 carrying
+    GitHub's message with control and format characters removed and the length bounded;
+    no rows; phase unchanged; a second press sends a second PUT (no hidden state).
+D11 PUT answers 401: 409 asking to reconnect GitHub.
+D12 PUT answers 200 with merged false: a refusal (as D10).
+D13 PUT times out, throws a network error, answers 500 / 502 / 503, 429, 403 with
+    x-ratelimit-remaining 0, 403 with retry-after, or 403 whose message names a rate
+    limit: 202 {delegated: true}, MERGE_ANNOUNCEMENT and one row saying GitHub gave no
+    clear answer; the card stays in review; a following sweep that reads the PR merged
+    finishes it once (its merged row, one DONE_ROW); a sweep that reads it open
+    changes nothing.
+D14 PUT answers 200 with a body that is not JSON or has no merged / sha: as D13.
+D15 Two presses on one build at the same time: one GET and one PUT; the second press
+    gets 409.
+D16 The reconcile sweeps while the PUT is in flight and its read already says merged:
+    it writes nothing; the card ends with one DONE_ROW and one merged row (pacman's).
+D17 The person closes the card while the GET is in flight: 409 at the re-read, no PUT.
+    Closes it while the PUT is in flight and GitHub merges: the two rows are written,
+    no throw, the phase stays closed (no DONE_ROW).
+D18 Failed card that can be restored: merged -> restored and done; refused -> stays
+    failed, no row; no clear answer -> restored to review (the reconcile reads only
+    review cards) with the row.
+D19 Failed card that cannot be restored (build leg not done, or no artifact): today's
+    409, no GitHub request.
+D20 The #1217 guard and the permission gate refuse before any request to the PR
+    (second-pr-guard and gate tests, updated for this path).
+D21 Phase building (or anything other than review / restorable failed): 409, no GitHub
+    request, no rows.
+D22 githubRepo with a "." or ".." segment (#1466): not GitHub form; today's merge step;
+    no request.
+D23 Hosted and local: merge step enqueued as before; its done finishes as before.
+D24 GitHub form without build.prNumber: merge step as before; its done finishes as
+    before.
+D25 A merge step completes on a GitHub-form build that has prNumber (queued before the
+    upgrade, or the merge step reported a PR): phase stays review, no DONE_ROW, one row
+    saying the card finishes when PR #n is merged on GitHub; a later merge on GitHub is
+    finished by the reconcile.
+D26 The token appears only in the Authorization header of the GET and the PUT, never in
+    a URL, an error text or a row.
+D27 The wire stays 202 {delegated: true} on the merged and the no-clear-answer outcomes.
+D28 The reconcile treats a build whose API merge is in flight like a build with a step
+    in flight (no read, no write), before and after its PR read.
+D29 GitHub text in the merged row and in the refusal (merge commit sha, message) goes
+    through the same cleaning as the reconcile's rows (control and format characters
+    removed, 100 characters at most).
+
+GitHub REST facts this path relies on
+--------------------------------------
+Fetched 2026-10-22 from docs.github.com/api/article/body?pathname=... (rendered
+Markdown of the pages below).
+
+Merge a pull request, https://docs.github.com/en/rest/pulls/pulls#merge-a-pull-request
+- "PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge"
+- Body parameters: "`commit_title` (string) Title for the automatic commit message.";
+  "`commit_message` (string) Extra detail to append to automatic commit message.";
+  "`sha` (string) SHA that pull request head must match to allow merge.";
+  "`merge_method` (string) The merge method to use. Can be one of: `merge`, `squash`,
+  `rebase`"
+- Status codes: "200 - if merge was successful"; "403 - Forbidden"; "404 - Resource not
+  found"; "405 - Method Not Allowed if merge cannot be performed"; "409 - Conflict if sha
+  was provided and pull request head did not match"; "422 - Validation failed, or the
+  endpoint has been spammed."
+- "Response schema (Status: 200): `sha`: required, string; `merged`: required, boolean;
+  `message`: required, string"
+- "Creating content too quickly using this endpoint may result in secondary rate
+  limiting."
+- The page also says: "We recommend using the asynchronous merge API instead. This
+  endpoint does not support stacked pull requests or merging with a merge queue."
+  Design D names this endpoint (ADR 0021 D2, spec 28 D2: "REST merge 带 sha"); the
+  asynchronous one needs a second call to read the result (plan section 2.3). On a
+  repository whose base branch uses a merge queue this endpoint refuses, and the person
+  sees GitHub's message (D10).
+
+Get a pull request, https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request
+- "GET /repos/{owner}/{repo}/pulls/{pull_number}"
+- Fields used: `title` ("required, string"), `state`, `merged`, `head.sha`, `head.ref`,
+  `head.repo.id`, `base.ref`, `base.repo.id`, `base.repo.default_branch` (segment 1's
+  parser; segment 1 found head.repo null for a deleted fork).
+
+Errors and rate limits, https://docs.github.com/en/rest/using-the-rest-api/troubleshooting-the-rest-api
+- "If you exceed your primary rate limit, you will receive a `403 Forbidden` or `429
+  Too Many Requests ` response, and the `x-ratelimit-remaining` header will be `0`. If
+  you exceed a secondary rate limit, you will receive a `403 Forbidden` or `429 Too Many
+  Requests ` response and an error message that indicates that you exceeded a secondary
+  rate limit."
+- "If the `retry-after` response header is present, you should not retry your request
+  until after that many seconds has elapsed."
+- "If GitHub takes more than 10 seconds to process an API request, GitHub will terminate
+  the request and you will receive a timeout response and a "Server Error" message."
+  (plan section 8). A merge can have happened behind such a response: 5xx is "no clear
+  answer" (D13), never a refusal.
+- "If you observe an error that is not addressed here, you should refer to the error
+  message that the API gives you."
+
+Error body, https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api
+- "Unless otherwise specified, the response body is in JSON format."
+- The page's error example reads the text from `error.response.data.message`; the 200
+  schema above also carries `message`. The refusal text is that field.

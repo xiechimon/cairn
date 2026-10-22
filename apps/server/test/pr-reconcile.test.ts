@@ -90,11 +90,13 @@
 //        build 的工作分支才写；对不上（含 fork 已删、head 仓为 null）→ 不收尾、不打回，
 //        每轮提示一次，按 etag 缓存；缺 head 分支或 base 仓 id → 读不到
 //   [63] 合并步经 completeStep 收尾（不是直接调 finishTodoDone）同样停掉没人领的 verify 步
+//        （本地仓形态；GitHub 形态有 PR 的 build 由 pacman 经 GitHub 合并，合并步完成不收尾，
+//        见 pr-merge-api.test.ts [2b-D25]）
 //   [64] 对账把拆卡子项收尾成 done → 推进拆卡波次：阻塞已解的兄弟卡开跑
 //   [65] system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
 //        字符（双向覆盖、零宽字符，[65c]），截到 100 个字符
 //   [66] 真实 GitHub 响应（test/fixtures/github，docs/verify/1403 同存）按对账用到的
-//        字段解析
+//        字段解析（段 2b 起含 PR 标题：经 API 合并的提交标题取它）
 //   [67] 关闭要两次紧挨着的读都看到才算：两次读之间有一段没读（有步在飞而跳过，含读的
 //        网络窗里步开始）或有一次读不到 → 之前那次关闭不算数，从下一次读重新数（中间
 //        可能重开又关过）；未连接 GitHub 时每 5 分钟一次的节流不算空档
@@ -373,6 +375,8 @@ function makeWorld(
     connected?: boolean;
     /** project.githubRepo（默认 octo/demo）。 */
     githubRepo?: string;
+    /** project.repoKind（默认 github；local 时 githubRepo 为 null）。 */
+    repoKind?: 'github' | 'local';
   } = {},
 ): World {
   const s = bootServer();
@@ -397,8 +401,8 @@ function makeWorld(
       id: projectId,
       name: `demo-${rnd}`,
       teamId: s.team.id,
-      repoKind: 'github',
-      githubRepo: opts.githubRepo ?? 'octo/demo',
+      repoKind: opts.repoKind ?? 'github',
+      githubRepo: opts.repoKind === 'local' ? null : (opts.githubRepo ?? 'octo/demo'),
     })
     .run();
   s.db
@@ -1988,7 +1992,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   );
 
   test('[63] a merge step completing through completeStep stops an unclaimed verify step', () => {
-    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
+    // local form: on a GitHub build with a PR the merge step no longer finishes the card
+    // (#1403 segment 2b, pr-merge-api.test.ts [2b-D25])
+    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify', repoKind: 'local' });
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     const mergeStepId = `step-merge-done-${w.buildId}`;
     w.s.db
@@ -2405,6 +2411,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRepoId: 1361226985,
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
+      title: 'server(1403): reconcile review-phase PRs merged or closed on GitHub',
     });
   });
 
@@ -2423,6 +2430,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRepoId: 1361226985,
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
+      title: 'server(1453): a step that finishes before its stop lands leaves an exited card alone',
     });
   });
 

@@ -21,8 +21,8 @@
 //   下轮重试（读不到 ≠ 红）；
 // - build 已被人手动推进/关闭时不得回写：候选是扫描快照，动作前重读当前
 //   phase（两次：网络读之前、写面之前——网络窗是人工动作最可能落进的缝）；
-// - 有步在飞（hasActiveStep：已领取的任意步，排队中或等额度的非审核类步）
-//   不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
+// - 有步在飞（hasActiveStep：已领取的任意步，排队中或等额度的非审核类步，以及
+//   人点的合并正在经 GitHub API 进行，#1403 段 2b）不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
 //   sweep 不追加第二条）。没人领（排队中或等额度）的 verify / review 步不挡
 //   磨绿与对账。
 //
@@ -78,7 +78,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import {
@@ -99,13 +99,16 @@ import {
   enqueueStep,
   finishTodoDone,
   hasMessageRow,
+  lastPushedCheckpoint,
   maybeEnqueueVerifyStep,
+  mergeInFlight,
   roundStart,
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { openGithubToken } from './github-connection.js';
+import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -152,19 +155,6 @@ export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 
 /** fix prompt 里单条失败摘要的截断（prompt 是会话注入位，不给无界长文本）。 */
 const CI_FIX_SUMMARY_MAX = 800;
-
-/** system 行里引用的一段 GitHub 文本的长度上界（字符数）。 */
-const GITHUB_TEXT_MAX = 100;
-
-/** GitHub 给的文本（分支名、合并者、合并提交）进 system 行之前：去掉控制字符与
- * 格式字符（git 分支名允许双向覆盖 U+202E、零宽字符这类，显示出来会把文字倒过来或
- * 藏起来），超过上界截断并加省略号。 */
-function githubText(text: string): string {
-  const chars = Array.from(text.replace(/[\p{Cc}\p{Cf}]/gu, ''));
-  return chars.length > GITHUB_TEXT_MAX
-    ? `${chars.slice(0, GITHUB_TEXT_MAX).join('')}…`
-    : chars.join('');
-}
 
 /** 对账日志口（scheduler 接线传 pino；每 sweep 一行：候选数 × 三态落位）。 */
 export interface CiPollLogger {
@@ -400,6 +390,8 @@ export function createCiPoller(
    * 步。没人领（排队中或等额度）的 verify / review 步不算（Verifier 的机器
    * 离线或额度耗尽时，卡不能因此永远停在 review）。 */
   function hasActiveStep(buildId: string): boolean {
+    // 人点的合并正在经 GitHub API 进行（#1403 段 2b）：结果由它落，对账不插手。
+    if (mergeInFlight(buildId)) return true;
     return (
       deps.db
         .select({ id: step.id })
@@ -733,28 +725,9 @@ export function createCiPoller(
       }
       // 合并之后同分支又推了提交（修复轮，或 verify 步推的提交：daemon 除审核步外
       // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
-      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
-      // 最后推送 = 最后收尾，不是最后建的：上一轮建的 verify 步（Verifier 离线或
-      // 等额度）可以在下一轮的 build 步之后才跑。step 表没有收尾时刻列，按步最后
-      // 一次报到排（心跳 → 领取 → 入队，同 stepActivityAt；领取时心跳置为领取时刻，
-      // 之后每 30 s 一次）：同一 build 的步一个接一个跑时就是收尾顺序。
-      const checkpoint =
-        deps.db
-          .select({ commit: step.checkpointCommit })
-          .from(step)
-          .where(
-            and(
-              eq(step.buildId, cand.buildId),
-              ne(step.kind, 'review'),
-              eq(step.status, 'done'),
-              isNotNull(step.checkpointCommit),
-            ),
-          )
-          .orderBy(
-            desc(sql`coalesce(${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`),
-            desc(step.createdAt),
-          )
-          .get()?.commit ?? null;
+      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算（最后
+      // 推送 = 最后收尾，取法见 lastPushedCheckpoint）。
+      const checkpoint = lastPushedCheckpoint(deps, cand.buildId);
       if (checkpoint !== null && pull.headSha === null) {
         pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
         tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面

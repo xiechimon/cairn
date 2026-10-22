@@ -10,10 +10,13 @@
 //   读向，token 纪律同上位）
 // - GET repos/{o}/{r} → #1242 local→github 转换面可达性判定（token 纪律
 //   同上位；匿名梯 = 无连接时公开仓可达）
-// 写面（#452 / ADR 0006——server 唯二的 api.github.com 写入点，穷举律：
-// grep `api.github.com` 的 POST/PATCH 只此两处；不改 scope、不新增凭证面）：
+// 写面（#452 / ADR 0006，#1403 段 2b / ADR 0021 D2——server 的 api.github.com 写入点
+// 只此三处，穷举律：grep `api.github.com` 的 POST/PATCH/PUT 只此三处；不改 scope、不新增
+// 凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
 // - PATCH repos/{o}/{r}/issues/{n} → agent 回填标题写进 issue
+// - PUT repos/{o}/{r}/pulls/{n}/merge → 人在 pacman 里点合并（GitHub 形态、build 记着
+//   PR）：sha 绑本 build 最后推送的提交、squash（githubMergePull）
 // OAuth 面（#231 握手）：
 // - POST github.com/login/oauth/access_token（form-encoded：client_id/
 //   client_secret/code/redirect_uri，Accept: json）→ access_token
@@ -143,6 +146,8 @@ export interface GithubPull extends GithubPullState {
   defaultBranch: string | null;
   /** 目标仓现在的 owner（base.repo.owner.login；仓库改名或转移后是新名字）；缺失 = null。 */
   baseOwner: string | null;
+  /** PR 标题（经 API 合并时提交标题取它，#1403 段 2b）；缺失 = null。 */
+  title: string | null;
 }
 
 export interface GithubPullPage {
@@ -212,6 +217,7 @@ export async function githubPull(
   const raw = got.data as {
     state?: unknown;
     merged?: unknown;
+    title?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -242,6 +248,7 @@ export async function githubPull(
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
+      title: optString(raw.title),
     },
   };
 }
@@ -1218,6 +1225,85 @@ export async function githubUpdateIssueTitle(
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
+}
+
+// —— PR 合并写面（#1403 段 2b / ADR 0021 D2：人点合并 = server 经 REST 合并）————————
+
+/** 合并 PR 的结果（`PUT /repos/{o}/{r}/pulls/{n}/merge`）：
+ * - merged：200 且 merged 为 true；sha = 合并落在 base 上的提交。
+ * - refused：GitHub 明确没合（4xx 且不是限流，或 200 但 merged 为 false）；message =
+ *   应答体的 message（读不到为空串）。
+ * - unknown：不知道合没合——超时、网络错、5xx（GitHub 处理超过 10 秒会断开请求、回
+ *   「Server Error」，合并可能已经发生）、限流（429，或带限流信号的 403）、200 的应答体
+ *   读不出。 */
+export type GithubMergeResult =
+  | { kind: 'merged'; sha: string }
+  | { kind: 'refused'; status: number; message: string }
+  | {
+      kind: 'unknown';
+      reason: 'timeout' | 'network' | 'status' | 'malformed';
+      status: number | null;
+    };
+
+/** 合并 PR（squash）。sha = PR head 必须是的提交（GitHub 对不上答 409）；commitTitle /
+ * commitMessage = squash 提交的标题与正文（commitMessage 为 null 时不传，用仓库的缺省）。
+ * token 只进 Authorization 头；不抛错，结果分三类（GithubMergeResult）。 */
+export async function githubMergePull(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  input: { sha: string; commitTitle: string; commitMessage: string | null },
+): Promise<GithubMergeResult> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: 'PUT',
+      headers: { ...authHeaders(token), 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sha: input.sha,
+        merge_method: 'squash',
+        commit_title: input.commitTitle,
+        ...(input.commitMessage !== null ? { commit_message: input.commitMessage } : {}),
+      }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    return { kind: 'unknown', reason: isAbort(err) ? 'timeout' : 'network', status: null };
+  }
+  // 应答体只读一次：文本既给限流判据（二级限流的 403 可以只在 message 里说），也给 JSON。
+  let text: string | null;
+  try {
+    text = await res.text();
+  } catch {
+    text = null;
+  }
+  let data: { merged?: unknown; sha?: unknown; message?: unknown } | null = null;
+  try {
+    const parsed: unknown = text === null ? null : JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null) data = parsed;
+  } catch {
+    data = null;
+  }
+  const message = optString(data?.message) ?? '';
+  if (
+    res.status >= 500 ||
+    isRateLimited(res) ||
+    (res.status === 403 && /rate limit/i.test(text ?? ''))
+  ) {
+    return { kind: 'unknown', reason: 'status', status: res.status };
+  }
+  if (res.ok) {
+    if (data?.merged === true && typeof data.sha === 'string') {
+      return { kind: 'merged', sha: data.sha };
+    }
+    if (data?.merged === false) return { kind: 'refused', status: res.status, message };
+    return { kind: 'unknown', reason: 'malformed', status: res.status };
+  }
+  if (res.status >= 400) return { kind: 'refused', status: res.status, message };
+  return { kind: 'unknown', reason: 'status', status: res.status };
 }
 
 // —— PR checks 只读面（#1150 CI 磨绿环：轮询器的唯一出站读）———————————————————

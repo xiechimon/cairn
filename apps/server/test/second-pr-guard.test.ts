@@ -15,9 +15,10 @@
 //  3. 合并面照放行：首 PR merged + 本 build 自己开了 PR → requestMerge 必须
 //     409 点名双 PR，且不落 MERGE_ANNOUNCEMENT、不入队 merge 步
 //  4. 正常落地路被误拦：本 build 自己的 PR merged（唯一 PR build）→
-//     requestMerge 仍 202 + 宣告行 + merge 步入队（排除自身 PR）
+//     守卫排除自身 PR、不按双 PR 拒（#1403 段 2b 起 GitHub 形态有 PR 的合并经
+//     GitHub API，未连接 GitHub 时由下一道闸 409 请连接）
 //  5. 合法返工重投被误拦：首 PR closed-unmerged → claim 无守卫无 note、
-//     requestMerge 202（返工重开 PR 是正当路径）
+//     合并面守卫不拦（返工重开 PR 是正当路径）
 //  6. 探测失败误拦：GitHub 不可达 → fail-open（claim 无守卫、merge 202）
 //  7. 常规首 PR 流程被误改：无更早 PR build → claim 不出站探测（mock 被调
 //     即测试红）、instruction 缺省、无 note
@@ -328,21 +329,29 @@ describe('#1217 同 todo 第二张 PR 守卫（claim 面 + 合并面 + 回填面
     expect(stepsOf(w, w.b2Id).some((st) => st.kind === 'merge')).toBe(false);
   });
 
-  test('失败方式 4：本 build 自己的 PR merged（唯一 PR build）→ requestMerge 仍 202（正常落地路）', async () => {
+  test('失败方式 4：本 build 自己的 PR merged（唯一 PR build）→ 守卫不拦（排除自身），走到下一道闸', async () => {
     const w = makeWorld({
       todoPhase: 'review',
       b1PrFields: false,
       b2PrFields: true,
       githubFetch: prFetchMock({ [PR2_NUMBER]: { state: 'closed', merged: true } }),
     });
-    // B2 自身 PR 已合并（人在 GitHub 合的）→ pacman merge 照走（排除自身）。
-    const result = await requestMerge(w.deps, w.b2Id, 'tester');
-    expect(result).toEqual({ delegated: true });
-    expect(messagesOf(w, w.b2Id).some((m) => m.content === '发起了合并')).toBe(true);
-    expect(stepsOf(w, w.b2Id).some((st) => st.kind === 'merge')).toBe(true);
+    // B2 自身 PR 已合并（人在 GitHub 合的）→ 守卫排除自身，不按双 PR 拒。#1403 段 2b：
+    // GitHub 形态、build 有 PR 的合并由 server 经 GitHub API 发起，本世界没连 GitHub →
+    // 下一道闸 409 请连接（不落行、不入队合并步；PR 已合并时对账会收尾）。
+    const refused = await requestMerge(w.deps, w.b2Id, 'tester').then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(refused).toBeInstanceOf(HttpError);
+    expect((refused as HttpError).status).toBe(409);
+    expect((refused as HttpError).message).toContain('连接 GitHub');
+    expect((refused as HttpError).message).not.toContain(`#${PR1_NUMBER}`);
+    expect(messagesOf(w, w.b2Id).some((m) => m.content === '发起了合并')).toBe(false);
+    expect(stepsOf(w, w.b2Id).some((st) => st.kind === 'merge')).toBe(false);
   });
 
-  test('失败方式 5：首 PR closed-unmerged → claim 无守卫、requestMerge 202（合法返工重投）', async () => {
+  test('失败方式 5：首 PR closed-unmerged → claim 无守卫、合并面守卫不拦（合法返工重投）', async () => {
     const w = makeWorld({
       githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: false } }),
     });
@@ -368,7 +377,14 @@ describe('#1217 同 todo 第二张 PR 守卫（claim 面 + 合并面 + 回填面
       .set({ prUrl: PR2_URL, prNumber: PR2_NUMBER })
       .where(eq(buildTable.id, w.b2Id))
       .run();
-    expect(await requestMerge(w.deps, w.b2Id, 'tester')).toEqual({ delegated: true });
+    // 守卫不拦；#1403 段 2b：下一道闸是 GitHub 连接（未连接 = 409 请连接，不是双 PR 拒）。
+    const refused = await requestMerge(w.deps, w.b2Id, 'tester').then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(refused).toBeInstanceOf(HttpError);
+    expect((refused as HttpError).message).toContain('连接 GitHub');
+    expect((refused as HttpError).message).not.toContain(`#${PR1_NUMBER}`);
   });
 
   test('失败方式 6：探测失败 → fail-open（claim 无守卫、merge 202）', async () => {
