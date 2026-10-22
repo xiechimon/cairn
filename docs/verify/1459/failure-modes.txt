@@ -94,3 +94,24 @@ F19  the URL-token holder probes logins' permission   sender-below-triage, permi
                                                       in the server log)"
 F20  secondary limit with both retry-after and        logged reset time = now + retry-after      issue-intake.test.ts group 24 (4 cases)
      x-ratelimit-reset                                (GitHub docs: honor retry-after first)
+
+----------------------------------------------------------------------------------------------------
+2026-10-22 note, round 2 review (/code-review on the round 2 diff). Added, nothing above edited.
+
+Correction to the 2026-10-21 note on F15: the import's own 404 is not reached only through a deleted connection.
+GitHub's 404 on the issue or labels read (issue missing or deleted, or not visible to the team token) arrives as the
+same HttpError 404. Since b9f6d92f the webhook tells them apart by reading the team token again: token gone ->
+"github connection not found" (reason no-github-connection, W16); token present -> "issue <repo>#<n> not found on
+GitHub (or not visible to the team token)" (reason issue-not-found, W19). Both answer 202 misconfigured and log a
+refusal line.
+
+Correction to F19 in the same note: the generic detail keeps the permission verdict out of the answer text, but the
+outcome after the permission check (created, duplicate, issue-not-found) still differs from a refusal, so a holder
+of the URL token can still infer whether a login has triage. Revoking a leaked token remains the remedy.
+
+Round 2 review rows:
+F21  sender login that is not a GitHub login          202 ignored, reason sender-malformed, zero   W20 (`..`, `.`, `a/b`); W20b `[bot]`
+     (`..` / `.` normalize the permission URL into   GitHub requests; an empty login stays        login still read; W20 `` -> no-sender
+     another API path for the team token)            no-sender
+F22  empty retry-after header on a rate-limited       not read as 0 s; the logged reset is         issue-intake.test.ts group 24 (4 cases)
+     answer                                           x-ratelimit-reset
