@@ -160,6 +160,11 @@ describe('evaluateAutonomyGates', () => {
         reason: 'cooldown',
       });
     });
+
+    test('a clock jump of more than one window does not lock the gate', () => {
+      expect(evaluateAutonomyGates(input({ lastStartedAt: NOW + 24 * 60 * MIN })).ok).toBe(true);
+      expect(evaluateAutonomyGates(input({ lastStartedAt: NOW + 15 * MIN })).ok).toBe(true);
+    });
   });
 
   describe('daily budget', () => {

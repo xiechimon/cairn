@@ -2100,6 +2100,35 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     expect(issueTodos(w.s)).toHaveLength(1);
   });
 
+  test('#1491 总开关关了 → 重试等着、不算一次尝试；打开后照常重试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, logs, flaky } = flakyIntake(w);
+    await intake.sweep();
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    flaky.failing = false;
+    w.s.db
+      .update(projectTable)
+      .set({ autonomy: { ...GATES_OFF, enabled: false } })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    for (let i = 0; i < ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS + 1; i += 1) {
+      const gated = await intake.sweep();
+      expect(gated?.orchestrated).toBe(0);
+    }
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(
+      logs.filter((l) => l.msg === 'issue intake orchestrate retry gated').map((l) => l.obj.reason),
+    ).toContain('disabled');
+    w.s.db
+      .update(projectTable)
+      .set({ autonomy: GATES_OFF })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    const resumed = await intake.sweep();
+    expect(resumed?.orchestrated).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(1);
+  });
+
   test('一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试', async () => {
     const w = await makeWorld({ list: [1406] });
     const { intake, logs, flaky } = flakyIntake(w);

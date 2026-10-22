@@ -84,7 +84,7 @@ function registerStaticSpa(app: Hono, webDir: string): void {
 function registerMemberActivity(app: Hono, ctx: AppContext): void {
   app.use('/api/*', async (c, next) => {
     await next();
-    if (!countsAsMemberWrite(c.req.method, new URL(c.req.url).pathname, c.res.status)) return;
+    if (!countsAsMemberWrite(c.req.method, c.req.path, c.res.status)) return;
     try {
       recordMemberWrite(ctx.db, nowMs());
     } catch {

@@ -94,13 +94,15 @@ import {
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
 import {
+  type AutonomyGateResult,
   autonomySettingsOf,
-  autonomySpentToday,
   autonomyStateOf,
   evaluateAutonomyGates,
+  evaluateRequestedRun,
   lastMemberWriteAt,
   recordAutonomyStart,
   recordAutonomyVerdict,
+  spentForGate,
 } from './autonomy-gates.js';
 import type { BuildDeps } from './builds.js';
 import { chiefBinding } from './chief.js';
@@ -588,14 +590,27 @@ export function createIssueIntake(
    * = 有人接手；chief 换绑了别的 Agent（卡的 createdBy 不是现在的 Agent）=
    * 卡已出关闭对账范围，issue 被关也没人收尾——都不再试（记一行带原因）。
    * 读库失败只跳过这张卡，不计次。 */
-  function retryOrchestration(teamId: string, agentId: string, tally: IssueIntakeTally): void {
+  function retryOrchestration(
+    teamId: string,
+    agentId: string,
+    now: number,
+    tally: IssueIntakeTally,
+  ): void {
     for (const [todoId, entry] of orchestrateRetries) {
       if (entry.teamId !== teamId) continue;
       let dropped: 'todo-gone' | 'left-todo' | 'chief-rebound' | 'thread-exists' | null;
+      let gate: AutonomyGateResult = { ok: true };
       try {
         const row = deps.db
-          .select({ phase: todo.phase, seqNum: todo.seqNum, createdBy: todo.createdBy })
+          .select({
+            phase: todo.phase,
+            seqNum: todo.seqNum,
+            createdBy: todo.createdBy,
+            projectId: todo.projectId,
+            autonomy: project.autonomy,
+          })
           .from(todo)
+          .innerJoin(project, eq(project.id, todo.projectId))
           .where(eq(todo.id, todoId))
           .get();
         dropped =
@@ -608,6 +623,10 @@ export function createIssueIntake(
                 : startedSince(teamId, row.seqNum, entry.importedAt)
                   ? 'thread-exists'
                   : null;
+        // 触发闸（#1491）：总开关关了或当天预算满，重试也等着（不算一次尝试）。
+        if (row !== undefined && dropped === null) {
+          gate = evaluateRequestedRun(deps.db, { id: row.projectId, autonomy: row.autonomy }, now);
+        }
       } catch (err) {
         tally.errors += 1;
         log({ todoId, err: errText(err) }, 'issue intake orchestrate retry failed');
@@ -616,6 +635,10 @@ export function createIssueIntake(
       if (dropped !== null) {
         orchestrateRetries.delete(todoId);
         log({ todoId, reason: dropped }, 'issue intake orchestrate retry dropped');
+        continue;
+      }
+      if (!gate.ok) {
+        log({ todoId, reason: gate.reason }, 'issue intake orchestrate retry gated');
         continue;
       }
       orchestrateImported(todoId, { ...entry, attempts: entry.attempts + 1 }, tally);
@@ -692,14 +715,15 @@ export function createIssueIntake(
   ): Promise<void> {
     // 触发闸（#1491）：没开、满员、人刚在用、冷却中、当天预算满或读不到 =
     // 本轮不读列表（省一次读）；候选不动，下一轮重判。
+    const settings = autonomySettingsOf(row);
     const gate = evaluateAutonomyGates({
       now,
-      settings: autonomySettingsOf(row),
+      settings,
       inFlight: projectInFlight(deps.db, row.id),
       inFlightCap: ISSUE_INTAKE_IN_FLIGHT_CAP,
       lastMemberWriteAt: lastMemberWriteAt(deps.db),
       lastStartedAt: autonomyStateOf(deps.db, row.id, 'issue-intake')?.lastStartedAt ?? null,
-      spentTodayUsd: autonomySpentToday(deps.db, row.id, now),
+      spentTodayUsd: spentForGate(deps.db, row.id, settings, now),
     });
     recordAutonomyVerdict(deps.db, row.id, 'issue-intake', gate, now);
     if (!gate.ok) {
@@ -935,7 +959,7 @@ export function createIssueIntake(
       log({ teamId, reason: 'chief-not-bound' }, 'issue intake team skipped');
       return;
     }
-    retryOrchestration(teamId, createdBy, tally);
+    retryOrchestration(teamId, createdBy, now, tally);
     const seenRepos = new Set<string>();
     for (const row of projects) {
       // 拆段走 server 出站单口（#1466：`.` / `..` 段同按形坏跳过）。

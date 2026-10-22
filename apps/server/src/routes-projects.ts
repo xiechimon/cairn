@@ -297,8 +297,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     return c.json(result satisfies FsListResult);
   });
 
-  // 删项目（#189 删除区复活前置）：级联语义单源 = services/projects.ts 头注；
-  // 危险操作区删除流 UI 证据 r2 24c，wire 未采（INFERRED_ROUTES 登记）。
   // #1491 后台自动任务的闸：设置 + 每种任务最近一次判定（设置页读）。
   app.get('/api/projects/:id/autonomy', (c) => {
     const row = requireProject(ctx, c.req.param('id'));
@@ -311,6 +309,8 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     return c.json(patchAutonomy(ctx.db, row.id, body, nowMs()));
   });
 
+  // 删项目（#189 删除区复活前置）：级联语义单源 = services/projects.ts 头注；
+  // 危险操作区删除流 UI 证据 r2 24c，wire 未采（INFERRED_ROUTES 登记）。
   app.delete('/api/projects/:id', (c) => {
     const id = c.req.param('id');
     if (!deleteProject({ db: ctx.db, reposDir: ctx.reposDir }, id)) {

@@ -120,22 +120,25 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
             {t('保存')}
           </Button>
         </SettingsRow>
-        {data.kinds.map((k) => (
-          <SettingsRow key={k.kind} label={t(KIND_LABELS[k.kind])}>
-            <span
-              className={
-                k.lastBlockedReason === null ? SETTINGS_HINT_CLS : 'text-ui text-foreground'
-              }
-              data-testid={`autonomy-state-${k.kind}`}
-            >
-              {k.lastEvaluatedAt === null
-                ? t('还没判过')
-                : k.lastBlockedReason === null
-                  ? t('最近一次放行')
-                  : `${t('最近一次被拦：')}${t(REASON_LABELS[k.lastBlockedReason])}`}
-            </span>
-          </SettingsRow>
-        ))}
+        {/* 进料恒显示；园丁、自治合并接上闸、判过一次后才出行。 */}
+        {data.kinds
+          .filter((k) => k.kind === 'issue-intake' || k.lastEvaluatedAt !== null)
+          .map((k) => (
+            <SettingsRow key={k.kind} label={t(KIND_LABELS[k.kind])}>
+              <span
+                className={
+                  k.lastBlockedReason === null ? SETTINGS_HINT_CLS : 'text-ui text-foreground'
+                }
+                data-testid={`autonomy-state-${k.kind}`}
+              >
+                {k.lastEvaluatedAt === null
+                  ? t('还没判过')
+                  : k.lastBlockedReason === null
+                    ? t('最近一次放行')
+                    : `${t('最近一次被拦：')}${t(REASON_LABELS[k.lastBlockedReason])}`}
+              </span>
+            </SettingsRow>
+          ))}
       </SettingsCard>
     </section>
   );

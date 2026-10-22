@@ -837,7 +837,11 @@ export function useApiMutations(teamId: string | undefined) {
     patchAutonomy: useMutation({
       mutationFn: (input: { id: string; body: PatchAutonomyBody }) =>
         api.patch<AutonomyRecord>(`/api/projects/${input.id}/autonomy`, input.body),
-      onSuccess: invalidateAll,
+      // 应答即新真值：先落缓存，设置页清草稿时不回闪旧值。
+      onSuccess: (record, input) => {
+        qc.setQueryData(['project-autonomy', input.id], record);
+        invalidateAll();
+      },
     }),
     // #440 原生文件夹选取（ADR 0003）：取消 = {path:null} 正常结局非错误面；
     // 纯读取动作，无缓存失效。

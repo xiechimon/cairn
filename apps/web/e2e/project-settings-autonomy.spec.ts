@@ -5,7 +5,7 @@ import { expect, type Page, test } from '@playwright/test';
 // user me / projects 供数，其余 GET 一律 500）。钉四条：
 //  · github 项目才有这张卡；local 项目不渲染。
 //  · 读面：阈值回显 GET /api/projects/{id}/autonomy；每种任务最近一次判定——
-//    没判过 / 放行 / 被拦带原因。
+//    放行 / 被拦带原因；没判过的园丁、自治合并不出行。
 //  · 写面：改数字 → 保存 → PATCH 只带改过的键；开关即时 PATCH {enabled}。
 //    非法数（负数、分钟带小数）保存钮禁用。
 //  · 失败可见：PATCH 500 → toast。
@@ -112,7 +112,8 @@ test('autonomy card: github project shows thresholds and the last verdict per ki
   await expect(card.getByTestId('autonomy-state-issue-intake')).toHaveText(
     '最近一次被拦：有人正在用，让路',
   );
-  await expect(card.getByTestId('autonomy-state-gardener')).toHaveText('还没判过');
+  // 园丁还没接上闸（没判过）：不出行；进料恒显示。
+  await expect(card.getByTestId('autonomy-state-gardener')).toHaveCount(0);
   await expect(card.getByTestId('autonomy-state-auto-merge')).toHaveText('最近一次放行');
 });
 

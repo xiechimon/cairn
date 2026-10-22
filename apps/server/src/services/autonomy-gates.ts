@@ -58,9 +58,11 @@ export interface AutonomyGateInput {
 
 export type AutonomyGateResult = { ok: true } | { ok: false; reason: AutonomyGateReason };
 
-/** 窗口内判定：at 在 now 之前不足 minutes 分钟，或在 now 之后（时钟回拨）。 */
+/** 窗口内判定：at 与 now 相距不足 minutes 分钟。at 在 now 之后（时钟回拨）也
+ * 算，偏保守；但回拨超过一个窗口的时刻不算，免得一次时钟跳变把闸锁上一整天
+ * （被拦就不会开跑，lastStartedAt 也就不会被改写）。 */
 function within(now: number, at: number | null, minutes: number): boolean {
-  return minutes > 0 && at !== null && now - at < minutes * MINUTE_MS;
+  return minutes > 0 && at !== null && Math.abs(now - at) < minutes * MINUTE_MS;
 }
 
 export function evaluateAutonomyGates(input: AutonomyGateInput): AutonomyGateResult {
@@ -94,6 +96,38 @@ export function autonomySettingsOf(row: { autonomy: AutonomySettings | null }): 
   return { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}) };
 }
 
+/** 日预算闸要用时才读花费（三表联查）：总开关关着或预算是 0 时给 0。 */
+export function spentForGate(
+  db: Db,
+  projectId: string,
+  settings: AutonomySettings,
+  now: number,
+): number | null {
+  return settings.enabled && settings.dailyBudgetUsd > 0
+    ? autonomySpentToday(db, projectId, now)
+    : 0;
+}
+
+/** 人明确要的开跑（GitHub 上打标经 webhook 进来）与已放进来的活（导入后的
+ * 编排重试）：只看总开关与日预算。让路与冷却管的是后台自己起意的那一轮；
+ * 在飞上限由调用方自己数。 */
+export function evaluateRequestedRun(
+  db: Db,
+  row: { id: string; autonomy: AutonomySettings | null },
+  now: number,
+): AutonomyGateResult {
+  const settings = autonomySettingsOf(row);
+  return evaluateAutonomyGates({
+    now,
+    settings,
+    inFlight: 0,
+    inFlightCap: 1,
+    lastMemberWriteAt: null,
+    lastStartedAt: null,
+    spentTodayUsd: spentForGate(db, row.id, settings, now),
+  });
+}
+
 /** 当天（UTC）该项目自动任务的花费：build 落在当天、触发源是 chief / 定时
  * 的 token_usage.costTotal 合计（成本按 build 开跑那天算）。读失败 = null。 */
 export function autonomySpentToday(db: Db, projectId: string, now: number): number | null {
@@ -120,7 +154,10 @@ export function autonomySpentToday(db: Db, projectId: string, now: number): numb
 }
 
 /** 不算人的写操作的 /api/ 面：机器（daemon，含 chief / worker 步回传）、MCP
- * （agent 拿 apiKey 调）、GitHub webhook、OAuth 回跳。 */
+ * （agent 拿 apiKey 调）、GitHub webhook、OAuth 回跳。与 lib/token-auth.ts 的
+ * 豁免清单同一组路径，那边加了新的机器面这里要跟着加：漏了的话机器流量会被
+ * 当成人在用，进料一直让路。百分号编码的路径不豁免，按人的写操作记（只会多
+ * 让路，不会少）。 */
 const NON_MEMBER_API_PREFIXES = ['/api/machine', '/api/mcp', '/api/webhook', '/api/oauth/callback'];
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
