@@ -1525,7 +1525,9 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   if (busy !== null) {
     throw new HttpError(
       409,
-      `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
+      busy === 'review'
+        ? '本任务还有一个审核步在跑：等审核结论出来再合并。'
+        : `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
     );
   }
   return { todoRow, failed };
@@ -1631,21 +1633,7 @@ async function mergeThroughGithub(
         `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
       );
     }
-    if (pull.merged) {
-      if (!gate.failed) {
-        throw new HttpError(409, `PR #${prNumber} 已在 GitHub 合并，没有再发起合并：${hint}。`);
-      }
-      // failed 卡（本轮已交付，apiMergeGate 判过）：恢复到 review，对账读到合并后核对并收尾。
-      setTodoPhase(deps, row.todoId, 'review');
-      insertMessageRow(deps, row.id, {
-        id: newRecordId(),
-        role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，pacman 对账核对后收尾（核对不上时在时间线说明）。`,
-        createdAt: nowMs(),
-      });
-      return { delegated: true };
-    }
-    if (pull.state === 'closed') {
+    if (pull.state === 'closed' && !pull.merged) {
       throw new HttpError(
         409,
         `PR #${prNumber} 在 GitHub 上已关闭且未合并，无法合并：重新打开它，或重新运行任务。`,
@@ -1672,6 +1660,21 @@ async function mergeThroughGithub(
         `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，pacman 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
       );
     }
+    if (pull.merged) {
+      if (!gate.failed) {
+        throw new HttpError(409, `PR #${prNumber} 已在 GitHub 合并，没有再发起合并：${hint}。`);
+      }
+      // failed 卡（本轮已交付，apiMergeGate 判过；PR 是本 build 的、作者有写权限、合进默认
+      // 分支，上文判过）：恢复到 review，对账读到合并后核对并收尾。
+      setTodoPhase(deps, row.todoId, 'review');
+      insertMessageRow(deps, row.id, {
+        id: newRecordId(),
+        role: 'system',
+        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，pacman 对账核对后收尾（核对不上时在时间线说明）。`,
+        createdAt: nowMs(),
+      });
+      return { delegated: true };
+    }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
@@ -1682,7 +1685,7 @@ async function mergeThroughGithub(
     if (pull.headSha !== checkpoint) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：分支在 GitHub 上有了别的提交（有人推送，或点了 Update branch）。pacman 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
+        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。pacman 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
       );
     }
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {

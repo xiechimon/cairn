@@ -53,6 +53,8 @@
 //       （看板上把 failed 卡拖到已完成会走合并弹层，再到这里：不能再让它 409）
 //   D38 PR 作者对仓库没有写权限（author_association 不是 OWNER / MEMBER / COLLABORATOR）
 //       → 409，不发合并（daemon 记的是分支上编号最大的开着的 PR，不看是谁开的）
+//   D39 failed 卡上已合并的 PR 不是本 build 的（fork、作者没有写权限、合进别的分支）→ 409，
+//       卡留在 failed（恢复到 review 只给对账能收尾的那种）
 //   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
@@ -521,6 +523,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
       expect(err.message).toContain(label);
+      // a review step does not commit: the refusal does not say it will push
+      expect(err.message.includes('推送')).toBe(kind !== 'review');
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -581,6 +585,24 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
   });
 
+  test.each([
+    ['a fork’s PR', { headRepoId: 9999 }],
+    ['an outsider’s PR', { authorAssociation: 'NONE' }],
+    ['a PR merged into another branch', { baseRef: 'release' }],
+  ] as const)(
+    '[2b-D39] failed card, the merged PR is %s → 409, the card stays failed',
+    async (_name, pull) => {
+      const w = makeWorld({
+        phase: 'failed',
+        pull: { state: 'closed', merged: true, mergedBy: 'octo', ...pull },
+      });
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(w.fake.puts()).toEqual([]);
+      expectUntouched(w, 'failed');
+    },
+  );
+
   test.each(['NONE', 'CONTRIBUTOR'] as const)(
     '[2b-D38] the PR’s author has no write access (%s) → 409; no PUT',
     async (association) => {
@@ -610,6 +632,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(err.message).toContain(head.slice(0, 7));
     expect(err.message).toContain(CP.slice(0, 7));
+    // GitHub's PR head can lag a fresh push for a moment
+    expect(err.message).toContain('还没同步');
     expect(w.fake.gets()).toHaveLength(1);
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);

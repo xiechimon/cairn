@@ -251,3 +251,13 @@ D38 The PR's author has no write access by the PR read's author_association (the
 D3c The server has no secret box: 409 naming the server's key configuration.
 D31 (reworded) The busy refusal names the step kind in Chinese and no longer suggests a
     stop (the build's stop takes the newest step, not necessarily the blocking one).
+
+Added after the fifth /code-review pass (tests first, red on dd6fdc1e):
+D39 Failed card whose merged PR is not the build's own (a fork's), has an author without
+    write access, or went into another branch: 409, the card stays failed. The restore
+    of D37 now runs only after the own-PR, author and base checks, so it only hands the
+    reconcile a card it can finish.
+D4  (reworded) GitHub's PR head can lag a fresh push for a moment: the head-mismatch
+    refusal says so before naming other causes.
+D31 (reworded) A claimed review step does not commit: its refusal does not say it will
+    push.
