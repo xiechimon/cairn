@@ -4,6 +4,7 @@
 // 断网重试预算在 machine-loop（claim 指数退避封顶 30s，r3 §1.5）。
 
 import {
+  type AgentTodoReport,
   type ClaimedStep,
   type ClaudeCodeReport,
   type MachineAskBody,
@@ -117,6 +118,7 @@ export interface MachineApi {
    * 事件；失败不重试（活动是呈现信号，丢了下一拍会再来）。可选成员 =
    * 单测桩缺省不实现（与 sessionHandles 缺省同律）。 */
   activity?(stepId: string, activity: StepActivityReport): Promise<void>;
+  agentTodo?(stepId: string, todo: AgentTodoReport): Promise<void>;
   /** remoteTools relay 执行（chief 步服务端工具）：POST tool/{stepId}
    * {name, params} → {text}（r5 §3.1 bundle）。replaySafe → 重试预算
    * REMOTE_TOOL_RETRY_DELAYS_MS；超时 REMOTE_TOOL_TIMEOUT_MS。返回结果文本。 */
@@ -361,6 +363,13 @@ export class MachineClient implements MachineApi {
   async activity(stepId: string, activity: StepActivityReport): Promise<void> {
     await this.request('POST', `/api/machine/tool/${stepId}`, {
       body: { kind: 'activity' as const, activity },
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async agentTodo(stepId: string, todo: AgentTodoReport): Promise<void> {
+    await this.request('POST', `/api/machine/tool/${stepId}`, {
+      body: { kind: 'agent_todo' as const, todo },
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }
