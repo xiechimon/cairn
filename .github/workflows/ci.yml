@@ -377,3 +377,15 @@ jobs:
 
       - name: Feature map staleness gate (#1160)
         run: node scripts/feature-map-staleness-gate.mjs
+
+  comment-discipline-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Comment discipline gate (advisory, #1520)
+        env:
+          COMMENT_DISCIPLINE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "${COMMENT_DISCIPLINE_BASE_SHA:-main}"
+          node --test scripts/comment-discipline-gate.test.mjs
+          node scripts/comment-discipline-gate.mjs
