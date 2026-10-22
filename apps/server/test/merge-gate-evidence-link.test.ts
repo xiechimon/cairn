@@ -17,7 +17,10 @@
 
 import { performance } from 'node:perf_hooks';
 import { describe, expect, test } from 'vitest';
-import { parseRawEvidenceLinks } from '../src/services/merge-gate/evidence-link.js';
+import {
+  parseRawEvidenceLinks,
+  qualifyingEvidenceLinks,
+} from '../src/services/merge-gate/evidence-link.js';
 
 const SHA = 'f44b920639de983be1e050899e5217509204b43f';
 const raw = (path: string, sha = SHA, slug = 'xiechimon/pacman') =>
@@ -218,4 +221,75 @@ describe('parseRawEvidenceLinks', () => {
       expect(performance.now() - t0).toBeLessThan(200);
     });
   }
+});
+
+// S4b（#1404 评论 6314008085 的路径安全项）：解码后的路径段里有 `/`（%2F）、`\\`、`?`、`#`、
+// 换行、NUL 或别的控制字符的链接不算（列进 others）：raw 上这样的地址不是那个文件，外壳也
+// 不拿它去 contents 探测。%2e%2e 解码成 `..` 段，同样不算。
+describe('parseRawEvidenceLinks：解码后的路径段安全（S4b）', () => {
+  test.each([
+    ['%2e%2e 穿越', 'docs/verify/1404/%2e%2e/1405/x.png'],
+    ['%2E%2E 大写', 'docs/verify/1404/%2E%2E/%2E%2E/README.md'],
+    ['%2F 把一段拆成两段', 'docs/verify/1404/a%2F..%2F..%2Fx.png'],
+    ['%2F 拼出目录', 'docs/verify/1404/sub%2Fx.png'],
+    ['%5C 反斜杠', 'docs/verify/1404/a%5Cb.png'],
+    ['%3F 问号', 'docs/verify/1404/a%3Fb.png'],
+    ['%23 井号', 'docs/verify/1404/a%23b.png'],
+    ['%0A 换行', 'docs/verify/1404/a%0Ab.png'],
+    ['%00 NUL', 'docs/verify/1404/a%00b.png'],
+    ['%7F 控制字符', 'docs/verify/1404/a%7Fb.png'],
+  ])('%s：不算', (_label, path) => {
+    const r = parse(raw(path));
+    expect(r.links).toEqual([]);
+    expect(r.others).toEqual([raw(path)]);
+  });
+
+  test('假腿：空格、中文、加号这样的普通字符照常认', () => {
+    expect(parse(raw('docs/verify/1404/01%20%E6%88%AA%E5%9B%BE+a.png')).links).toEqual([
+      { sha: SHA, path: 'docs/verify/1404/01 截图+a.png' },
+    ]);
+  });
+});
+
+// S4b：readiness 与外壳共用的「合格链接」：钉在本 PR 的提交上、指向本 PR 增改的文件。
+describe('qualifyingEvidenceLinks', () => {
+  const OTHER = 'a'.repeat(40);
+  const compare = {
+    commits: [{ sha: SHA }],
+    files: [
+      { status: 'added', filename: 'docs/verify/1404/a.png' },
+      { status: 'modified', filename: 'docs/verify/1404/b.json' },
+      { status: 'removed', filename: 'docs/verify/1404/gone.png' },
+      { status: 'renamed', filename: 'docs/verify/1404/new.txt' },
+    ],
+  };
+  const q = (body: string) =>
+    qualifyingEvidenceLinks(
+      body,
+      { owner: 'xiechimon', repo: 'pacman', ticketRef: '1404' },
+      compare,
+    );
+
+  test('提交在本 PR 里、文件是本 PR 增改的：合格，按 body 里的顺序', () => {
+    const body = [
+      raw('docs/verify/1404/b.json'),
+      raw('docs/verify/1404/a.png'),
+      raw('docs/verify/1404/new.txt'),
+    ].join(' ');
+    expect(q(body)).toEqual([
+      { sha: SHA, path: 'docs/verify/1404/b.json' },
+      { sha: SHA, path: 'docs/verify/1404/a.png' },
+      { sha: SHA, path: 'docs/verify/1404/new.txt' },
+    ]);
+  });
+
+  test('提交不在本 PR 里、文件被本 PR 删掉、文件不在补丁里、别的票：都不合格', () => {
+    const body = [
+      raw('docs/verify/1404/a.png', OTHER),
+      raw('docs/verify/1404/gone.png'),
+      raw('docs/verify/1404/untouched.png'),
+      raw('docs/verify/1405/a.png'),
+    ].join(' ');
+    expect(q(body)).toEqual([]);
+  });
 });
