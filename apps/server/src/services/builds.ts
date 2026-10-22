@@ -66,7 +66,7 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { githubRepoOfProject, hasRepoBinding, readBuildChanges } from './git.js';
+import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
@@ -656,12 +656,24 @@ export function startBuilds(
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
-  const created: BuildRecord[] = [];
+  // 归属校验先于任何建 build（#1497）：任务须属该项目，项目须与任务同队——
+  // 本队任务指向他队项目（#1466 前 create_todo 可造）按项目不存在处理。
+  // 所有调用方（REST、定时、chief、MCP）都经这里。相位校验仍在下方逐卡现读
+  // （同一 id 重复出现时第二次读到 queued，照旧 409）。
+  const projectRow = deps.db.select().from(project).where(eq(project.id, input.projectId)).get();
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord || todoRecord.projectId !== input.projectId) {
       throw new NotFoundError(`todo ${todoId}`);
     }
+    if (projectRow?.teamId !== todoRecord.teamId) {
+      throw new NotFoundError(`project ${input.projectId}`);
+    }
+  }
+  const created: BuildRecord[] = [];
+  for (const todoId of input.todoIds) {
+    const todoRecord = getTodo(deps, todoId);
+    if (!todoRecord) throw new NotFoundError(`todo ${todoId}`);
     // todo → queued（02 §4.1：已启动，等空闲机器）。
     assertPhaseTransition(todoRecord.phase, 'queued');
     const id = newUuidv7(); // buildId ≡ conversationId（UUIDv7，r3 §3.0）
@@ -825,7 +837,7 @@ async function probePullState(
   prNumber: number,
   timeoutMs?: number,
 ): Promise<{ state: 'open' | 'closed'; merged: boolean } | null> {
-  const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+  const projRow = projectOfTodo(deps.db, { projectId, teamId });
   // 非 github 形态或 githubRepo 不合法（#1466：`.` / `..` 段改写请求路径）→ 不探测。
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
@@ -1154,11 +1166,7 @@ export async function applyBuildStepAction(
     // ——否则审核者只能对方案表态，而它的结论与人的结论被并列呈现，看起来
     // 像对同一件事的两次独立复核。
     const gate: ReviewGate = todoRecord.phase === 'review' ? 'review' : 'confirm';
-    const projectRow = deps.db
-      .select()
-      .from(project)
-      .where(eq(project.id, todoRecord.projectId))
-      .get();
+    const projectRow = projectOfTodo(deps.db, todoRecord);
     // 有检出 = 项目绑了仓库（daemon 侧同判据 = claim 载荷 project.repo 非空；
     // 单源 = git.hasRepoBinding/projectRepoRef）。未绑 = 不写检出段，不谎称。
     const checkout = hasRepoBinding(projectRow);
@@ -1713,7 +1721,7 @@ export function completeStep(
     // 与 prNumber 缺位的存量形（仅 prUrl，#931 不猜号同律）→ 既有直进 review
     // 行为逐字节不变。githubRepo 存量值不合法（#1466）同按无 GitHub 仓处理：
     // 轮询器对它不出站，停在 building 就再没有出口。
-    const projRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+    const projRow = projectOfTodo(deps.db, todoRow);
     const deliveredGithubPr = buildRow.prNumber !== null && githubRepoOfProject(projRow) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {

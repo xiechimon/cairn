@@ -75,7 +75,6 @@ import {
   chiefThread,
   machine,
   message,
-  project,
   steerPending,
   step,
   stopPending,
@@ -124,7 +123,13 @@ import {
 } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { diffTextNamesAFile, parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
+import {
+  diffTextNamesAFile,
+  parseUnifiedDiff,
+  projectOfTodo,
+  projectRepoRef,
+  repoDirFor,
+} from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { markModelDead } from './model-liveness.js';
@@ -1120,11 +1125,7 @@ async function tryClaim(
             sessionId: priorSessionId,
             ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
-    const projectRow = db
-      .select()
-      .from(project)
-      .where(eq(project.id, cand.todoRow.projectId))
-      .get();
+    const projectRow = projectOfTodo(db, cand.todoRow);
     // repo 绑定位（M3b worktree 契约接线，02 §3/§5.5 + spec 12 G2-T2 三形态）：
     // 托管 = `<origin>/git/<teamId>/<repoName>`（本地主机代位）；github = https
     // 派生（执行凭证 = stepToken 从 github_connection 下发）；local = cloneUrl
@@ -1623,9 +1624,7 @@ export function stepToken(
   // push_credential，r5 §3.1）：hosted = 一次性 gitAccess key 发行；github =
   // github_connection token（spec 12 G2-T2 执行凭证面）；local = null（本地
   // 路径 clone/push 无需凭证）。
-  const projectRow = todoRow
-    ? deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get()
-    : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   const git =
     projectRow?.repoKind === 'hosted' && todoRow
       ? issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId })
@@ -2074,9 +2073,7 @@ async function applyMergeLanding(
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
-  const projectRow = todoRow
-    ? deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get()
-    : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   if (!todoRow || projectRow?.repoKind !== 'hosted' || projectRow.repoName === null) {
     return null; // 未绑托管 repo：无可落地 ref（github 形态 PR 面归后票）。
   }
