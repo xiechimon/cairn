@@ -40,10 +40,10 @@ export type PlanRow = z.infer<typeof planRowSchema>;
 export type PlanContractCheck = { ok: true; items: string[] } | { ok: false; problem: string };
 
 /** 一项检查的「可执行锚点」。纯规则判定，不引入 LLM 判官（#1492 失败方式）：
- *  行内代码 / 代码围栏、URL、带扩展名的仓内路径、接口路径，或命令词。 */
+ *  行内代码、URL、带扩展名的仓内路径、接口路径，或命令词。代码围栏整体算
+ *  一项且自带锚点，不经这张表。 */
 const ANCHOR_PATTERNS: readonly RegExp[] = [
   /`[^`]+`/,
-  /^```/,
   /https?:\/\/\S+/,
   /[\w.-]+(?:\/[\w.-]+)+\.\w{1,8}\b/,
   // 仓根下的单个文件名（README.md、package.json）也是可核对的对象。
@@ -55,77 +55,103 @@ const ANCHOR_PATTERNS: readonly RegExp[] = [
   /^(?:node|make|python3?|go|sh|bun|deno)\b/i,
 ];
 
-/** 模糊占位词：任一项含它即拒，带锚点也不行。 */
-const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/i;
+/** 模糊占位词：任一项含它即拒，带锚点也不行。英文只认全大写（小写 todo 是
+ *  本仓的业务名词）；行内代码里的字样不算（`rg TODO src` 是正经检查）。 */
+const VAGUE_PATTERN = /\b(?:TODO|TBD|FIXME)\b|待定|待补|待确认/;
 
-const LIST_ITEM = /^\s*(?:[-*•]|\d+[.)])\s+(.*)$/;
-const HEADING = /^(#{1,6})\s*(.*?)\s*:?\s*$/;
-const LABEL = /^([A-Za-z][A-Za-z ]{0,24}?)\s*:\s*(.*)$/;
+const LIST_ITEM = /^(\s*)(?:[-*•]|\d+[.)])\s+(.*)$/;
+const HEADING = /^(#{1,6})\s+(.*)$/;
+const LABEL = /^(?:\d+[.)、]\s*)?([A-Za-z][A-Za-z ]{0,24}?)\s*[:：]\s*(.*)$/;
 
-function isPlanSectionName(name: string): boolean {
-  return PLAN_SECTIONS.some((s) => s.toLowerCase() === name.trim().toLowerCase());
+/** 小节名归一：去强调符、序号前缀（「4. 」）与尾部冒号（半角 / 全角）。 */
+function cleanSectionName(text: string): string {
+  return text
+    .replace(/\*\*|__/g, '')
+    .replace(/^\d+(?:\.\d+)*[.)、]?\s*/, '')
+    .replace(/\s*[:：]\s*$/, '')
+    .trim()
+    .toLowerCase();
 }
 
-/** 取出 Verification 小节的原始行（含标签同行余段）。undefined = 没有该小节。
- *  两种写法都认（web mapPlanDoc 同律）：`## Verification` 标题——遇到同级或
- *  更高级标题、或其它四段标签即止；行首 `Verification:` 标签——遇到任何标题
- *  或其它四段标签即止。 */
-function verificationLines(content: string): string[] | undefined {
+function isPlanSectionName(name: string): boolean {
+  return PLAN_SECTIONS.some((s) => s.toLowerCase() === name);
+}
+
+type SectionMark =
+  | { kind: 'heading'; level: number; name: string }
+  | { kind: 'label'; name: string; rest: string };
+
+/** 一行是不是小节起头：`## Verification`（含 `## 4. Verification：`）或行首
+ *  标签 `Verification:`（含 `**Verification**:`）。 */
+function sectionMark(line: string): SectionMark | null {
+  const h = HEADING.exec(line);
+  if (h !== null) {
+    return { kind: 'heading', level: h[1]?.length ?? 1, name: cleanSectionName(h[2] ?? '') };
+  }
+  const l = LABEL.exec(line.replace(/\*\*|__/g, ''));
+  if (l === null) return null;
+  return { kind: 'label', name: cleanSectionName(l[1] ?? ''), rest: (l[2] ?? '').trim() };
+}
+
+/** 取出 Verification 小节：标签同行余段（head）+ 小节原始行。undefined =
+ *  没有该小节。标题写法遇到同级或更高级标题、或其它四段起头即止；标签
+ *  写法遇到任何标题或其它四段标签即止。小节内的下级标题只是分组，跳过。 */
+function verificationSection(content: string): { head: string; lines: string[] } | undefined {
   const lines = content.split('\n');
   let start = -1;
   let level = 0;
-  const out: string[] = [];
+  let head = '';
   for (let i = 0; i < lines.length; i++) {
-    const line = (lines[i] ?? '').trim();
-    const h = HEADING.exec(line);
-    if (h !== null && h[2]?.toLowerCase() === 'verification') {
-      start = i + 1;
-      level = h[1]?.length ?? 1;
-      break;
-    }
-    const l = LABEL.exec(line);
-    if (l !== null && l[1]?.trim().toLowerCase() === 'verification') {
-      start = i + 1;
-      level = 0;
-      if ((l[2] ?? '').trim() !== '') out.push(l[2] ?? '');
-      break;
-    }
+    const mark = sectionMark((lines[i] ?? '').trim());
+    if (mark?.name !== 'verification') continue;
+    start = i + 1;
+    if (mark.kind === 'heading') level = mark.level;
+    else head = mark.rest;
+    break;
   }
   if (start < 0) return undefined;
+  const out: string[] = [];
   let inFence = false;
   for (let i = start; i < lines.length; i++) {
     const raw = lines[i] ?? '';
     const line = raw.trim();
-    if (line.startsWith('```')) inFence = !inFence;
-    if (!inFence && !line.startsWith('```')) {
-      const h = HEADING.exec(line);
-      if (
-        h !== null &&
-        (level === 0 || (h[1]?.length ?? 1) <= level || isPlanSectionName(h[2] ?? ''))
-      )
-        break;
-      const l = LABEL.exec(line);
-      if (h === null && l !== null && isPlanSectionName(l[1] ?? '')) break;
-      // 小节内的下级标题只是分组，不算检查项。
-      if (h !== null) continue;
+    const fenceLine = line.startsWith('```');
+    if (!inFence && !fenceLine) {
+      const mark = sectionMark(line);
+      if (mark?.kind === 'heading') {
+        if (level === 0 || mark.level <= level || isPlanSectionName(mark.name)) break;
+        continue;
+      }
+      if (mark?.kind === 'label' && isPlanSectionName(mark.name)) break;
     }
+    if (fenceLine) inFence = !inFence;
     out.push(raw);
   }
-  return out;
+  return { head, lines: out };
 }
 
-/** 小节原始行 → 检查项：列表项各算一项（缩进续行并入上一项）；没有列表
- *  标记的非空行各算一项；一个代码围栏整体算一项。 */
-function splitItems(lines: readonly string[]): { text: string; fenced: boolean }[] {
-  const items: { text: string; fenced: boolean; list: boolean }[] = [];
+/** 小节 → 检查项。一个代码围栏整体算一项；有列表时列表项各算一项，缩进的
+ *  子项和非列表行并入上一项（「期望全部通过」这类补充说明），列表之前的
+ *  引导句不算项；没有列表时每个非空行各算一项。标签同行余段总是一项。 */
+function splitItems(section: { head: string; lines: string[] }): {
+  text: string;
+  fenced: boolean;
+}[] {
+  const isList = (raw: string) => LIST_ITEM.test(raw);
+  let inFenceScan = false;
+  const hasList = section.lines.some((raw) => {
+    if (raw.trim().startsWith('```')) inFenceScan = !inFenceScan;
+    return !inFenceScan && isList(raw);
+  });
+  const items: { text: string; fenced: boolean; indent: number | null }[] = [];
+  if (section.head !== '') items.push({ text: section.head, fenced: false, indent: null });
   let fence: string[] | null = null;
-  let blank = false;
-  for (const raw of lines) {
+  for (const raw of section.lines) {
     const line = raw.trim();
     if (fence !== null) {
       fence.push(raw);
       if (line.startsWith('```')) {
-        items.push({ text: fence.join('\n'), fenced: true, list: false });
+        items.push({ text: fence.join('\n'), fenced: true, indent: null });
         fence = null;
       }
       continue;
@@ -134,35 +160,37 @@ function splitItems(lines: readonly string[]): { text: string; fenced: boolean }
       fence = [raw];
       continue;
     }
-    if (line === '') {
-      blank = true;
+    if (line === '') continue;
+    const prev = items[items.length - 1];
+    const li = LIST_ITEM.exec(raw);
+    if (li !== null) {
+      const indent = li[1]?.length ?? 0;
+      const text = (li[2] ?? '').trim();
+      if (prev?.indent != null && indent > prev.indent) prev.text = `${prev.text} ${text}`;
+      else items.push({ text, fenced: false, indent });
       continue;
     }
-    const li = LIST_ITEM.exec(raw);
-    const prev = items[items.length - 1];
-    if (li !== null) items.push({ text: (li[1] ?? '').trim(), fenced: false, list: true });
-    else if (prev?.list === true && !blank && /^\s/.test(raw)) prev.text = `${prev.text} ${line}`;
-    else items.push({ text: line, fenced: false, list: false });
-    blank = false;
+    if (!hasList) items.push({ text: line, fenced: false, indent: null });
+    else if (prev !== undefined && !prev.fenced) prev.text = `${prev.text} ${line}`;
   }
   // 未闭合的围栏照样算一项（模型漏写收尾 ``` 不该把命令判成空话）。
-  if (fence !== null) items.push({ text: fence.join('\n'), fenced: true, list: false });
+  if (fence !== null) items.push({ text: fence.join('\n'), fenced: true, indent: null });
   return items.map(({ text, fenced }) => ({ text, fenced }));
 }
 
 /** plan.md 结构闸（#1492）：Verification 小节必须存在、非空，每一项都有
  *  可执行锚点且不含模糊占位词。其余三段仍是自由文本（r3 §3.3），不在此校验。 */
 export function checkPlanContract(content: string): PlanContractCheck {
-  const lines = verificationLines(content);
-  if (lines === undefined) return { ok: false, problem: '方案缺少 Verification 小节' };
-  const items = splitItems(lines);
+  const section = verificationSection(content.replace(/\r\n?/g, '\n'));
+  if (section === undefined) return { ok: false, problem: '方案缺少 Verification 小节' };
+  const items = splitItems(section);
   if (items.length === 0) return { ok: false, problem: 'Verification 小节为空' };
   const vague: number[] = [];
   const unanchored: number[] = [];
   items.forEach((item, i) => {
-    if (VAGUE_PATTERN.test(item.text)) vague.push(i + 1);
-    else if (!item.fenced && !ANCHOR_PATTERNS.some((p) => p.test(item.text)))
-      unanchored.push(i + 1);
+    if (item.fenced) return;
+    if (VAGUE_PATTERN.test(item.text.replace(/`[^`]*`/g, ''))) vague.push(i + 1);
+    else if (!ANCHOR_PATTERNS.some((p) => p.test(item.text))) unanchored.push(i + 1);
   });
   const named = (ns: number[]) => ns.map((n) => `第 ${n} 项`).join('、');
   const problems: string[] = [];

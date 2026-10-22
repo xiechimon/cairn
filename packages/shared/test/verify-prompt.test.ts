@@ -178,6 +178,24 @@ describe('Verification 清单逐项判定（#1492）', () => {
     expect(reconcileVerifyVerdict(v, ITEMS)).toEqual(v);
   });
 
+  test('版本墙：证据都不带序号（旧 daemon）→ 不判失败，结论写明未逐项对账', () => {
+    const r = reconcileVerifyVerdict(
+      { passed: true, conclusion: 'ok', evidence: [{ path: 'docs/verify/1/a.json' }] },
+      ITEMS,
+    );
+    expect(r.passed).toBe(true);
+    expect(r.conclusion).toContain('未逐项对账');
+  });
+
+  test('item 写成字符串 "2" 也认', () => {
+    const parsed = verifyVerdictSchema.parse({
+      passed: true,
+      conclusion: 'ok',
+      evidence: [{ path: 'a', item: '2' }],
+    });
+    expect(parsed.evidence[0]?.item).toBe(2);
+  });
+
   test('失败方式 9：无清单 → verdict 原样不动', () => {
     const v = { passed: true, conclusion: 'ok', evidence: [] };
     expect(reconcileVerifyVerdict(v, [])).toEqual(v);

@@ -125,6 +125,41 @@ describe('checkPlanContract 合格（#1492 失败方式 4–7）', () => {
   });
 });
 
+// 自审补的误拦形态（校验太严 = 正常方案被打回、补写一次后整轮失败）。
+describe('checkPlanContract 不误拦常见写法（#1492 失败方式：校验太严）', () => {
+  test('小写 todo 是业务名词；行内代码里的 TODO 是正经检查', () => {
+    expect(
+      checkPlanContract(
+        '## Verification\n- `pnpm vitest run packages/shared/test/todo.test.ts` 通过\n',
+      ).ok,
+    ).toBe(true);
+    expect(checkPlanContract('## Verification\n- `rg TODO src` 无输出\n').ok).toBe(true);
+  });
+
+  test('加粗标签、带序号标题、全角冒号都认', () => {
+    for (const head of ['**Verification**:', '## 4. Verification', '## Verification：']) {
+      expect(checkPlanContract(`${head}\n- \`pnpm test\`\n`).ok, head).toBe(true);
+    }
+  });
+
+  test('列表前的引导句不算项，子项并入父项', () => {
+    expect(checkPlanContract('## Verification\n以下各项全部通过：\n- `pnpm test`\n').ok).toBe(true);
+    expect(checkPlanContract('## Verification\n- `pnpm test`\n  - 期望全部通过\n')).toEqual({
+      ok: true,
+      items: ['`pnpm test` 期望全部通过'],
+    });
+  });
+
+  test('「#1492 回归」这类行不当标题截断小节', () => {
+    const r = checkPlanContract('## Verification\n- `pnpm test`\n#1492 回归\n- `pnpm lint`\n');
+    expect(r.ok && r.items.length).toBe(2);
+  });
+
+  test('CRLF 行尾与 LF 同判', () => {
+    expect(checkPlanContract('## Verification\r\n- `pnpm test`\r\n  跑完看输出\r\n').ok).toBe(true);
+  });
+});
+
 describe('planVerificationItems（verify 步的清单输入）', () => {
   test('合格方案返回清单；不合格或无小节返回空数组（老方案不回溯）', () => {
     expect(planVerificationItems(GOOD)).toHaveLength(3);

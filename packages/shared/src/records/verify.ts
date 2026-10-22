@@ -15,7 +15,7 @@ export const verifyEvidenceSchema = z.object({
   note: z.string().optional(),
   /** 对应方案 Verification 清单的第几项（从 1 起，#1492）。缺省 = 老 verdict
    *  或无清单任务，不对应具体清单项。 */
-  item: z.number().int().min(1).optional(),
+  item: z.coerce.number().int().min(1).optional(),
 });
 export type VerifyEvidence = z.infer<typeof verifyEvidenceSchema>;
 
@@ -121,6 +121,11 @@ export function reconcileVerifyVerdict(
   items: readonly string[],
 ): VerifyVerdict {
   if (items.length === 0) return verdict;
+  // 版本墙：证据一条都没带序号 = 旧 daemon（schema 剥掉了 item）或 agent 没按
+  // 清单编号——无从逐项对账，如实写明，不替它判失败（hasChanges 缺省同律 fail-open）。
+  if (!verdict.evidence.some((e) => e.item !== undefined)) {
+    return { ...verdict, conclusion: `证据未按清单编号，未逐项对账。${verdict.conclusion}` };
+  }
   const covered = new Set(verdict.evidence.map((e) => e.item));
   const missing = items.map((_, i) => i + 1).filter((n) => !covered.has(n));
   if (missing.length === 0) return verdict;

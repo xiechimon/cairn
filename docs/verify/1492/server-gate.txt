@@ -1,41 +1,41 @@
- ✓ test/persona-split-verify.test.ts > #1250 persona seeding > 失败方式 1：六员落库、persona 位/档位/契约全文各就各位；模型取当时清单可领值 86ms
- ✓ test/persona-split-verify.test.ts > #1250 persona seeding > 失败方式 2：幂等 = 补缺不覆盖（二次零插入、编辑保留、null 模型启动补值、删行复活） 50ms
- ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 补写轮仍无 plan.md → 失败收尾：step failed + todo failed + errorMessage「规划未产出方案」 193ms
- ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 3：review 关口抵达且 verify 槽在位 → verify 步入队 + 宣告行；槽空零动作 145ms
- ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 首轮无 plan.md 仍走 #113 补写轮（重试一次，不是直接失败） 113ms
- ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 4：verify 步收尾 → VERIFY_VERDICT 消息落地、phase 不动、agent 走 verify 槽 91ms
- ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 5：verify 槽空 → 无主步失败文案点名 verify 槽（agentForStep null 的补法） 40ms
- ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 负例：补写轮写出 plan.md → 照常过闸进 confirm（hasPlan 置位） 80ms
- ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 失败重启轮（新 build 首个 plan 步、prompt 带 restart 指令）→ 同样享一次补写重试 155ms
- ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 6：agentId 缺省 → 三条 review 步各挂 persona agent（meta header）+ 单条宣告行 85ms
- ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 7：persona 删净 + review 槽在位 → 回落单步；两者皆缺 → 400 78ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > done success + hasChanges=false → 失败收尾「构建零改动」 129ms
- ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 8：fan-out 两份 blocking verdict → 只入队一条修订步（去重闸） 154ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 负例：hasChanges=true → 照常进 review（有物过闸） 82ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 版本墙负例：老 daemon 不携带 hasChanges → fail-open 照常 review 66ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 9：校验族——相位非 todo 409 / 双拆 409 / 少于两张 400 / 索引越界 400 / 环 400 / agent 越队 404 67ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 10：happy path——子卡/依赖边/父方案文档/父停 confirm/宣告行 44ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 3（B-C14 假完成形状）：done success 零产出零 errorMessage → 按失败收尾 65ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 4（不误伤）：review 步 hasChanges=false 照常收 verdict，不落 failed 64ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 11：父 confirm → 派发无阻塞子卡（直执行）+ 父进 building；阻塞子卡不动 52ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 12：子卡 done → 波次推进（B 自动派发）+ 全 done 父自动收 56ms
- ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 5（真值源）：无 repo 项目 hasChanges=true 照常 review——闸不读恒空投影 52ms
- ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 6：hasChanges=false + workBranchDrift → 失败原因点名分支偏离 54ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > failed child manual done does not start the next wave (#1247) 53ms
+ ✓ test/persona-split-verify.test.ts > #1250 persona seeding > 失败方式 1：六员落库、persona 位/档位/契约全文各就各位；模型取当时清单可领值 67ms
+ ✓ test/persona-split-verify.test.ts > #1250 persona seeding > 失败方式 2：幂等 = 补缺不覆盖（二次零插入、编辑保留、null 模型启动补值、删行复活） 49ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 补写轮仍无 plan.md → 失败收尾：step failed + todo failed + errorMessage「规划未产出方案」 160ms
+ ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 3：review 关口抵达且 verify 槽在位 → verify 步入队 + 宣告行；槽空零动作 132ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 首轮无 plan.md 仍走 #113 补写轮（重试一次，不是直接失败） 61ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 负例：补写轮写出 plan.md → 照常过闸进 confirm（hasPlan 置位） 82ms
+ ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 4：verify 步收尾 → VERIFY_VERDICT 消息落地、phase 不动、agent 走 verify 槽 81ms
+ ✓ test/persona-split-verify.test.ts > #1250 verify 步（层 1） > 失败方式 5：verify 槽空 → 无主步失败文案点名 verify 槽（agentForStep null 的补法） 45ms
+ ✓ test/artifact-gate.test.ts > 闸 1（B-C10）：plan 步无方案文档 → confirm 不可达 > 失败重启轮（新 build 首个 plan 步、prompt 带 restart 指令）→ 同样享一次补写重试 108ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > done success + hasChanges=false → 失败收尾「构建零改动」 58ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 负例：hasChanges=true → 照常进 review（有物过闸） 55ms
+ ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 6：agentId 缺省 → 三条 review 步各挂 persona agent（meta header）+ 单条宣告行 80ms
+ ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 7：persona 删净 + review 槽在位 → 回落单步；两者皆缺 → 400 71ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 版本墙负例：老 daemon 不携带 hasChanges → fail-open 照常 review 53ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 3（B-C14 假完成形状）：done success 零产出零 errorMessage → 按失败收尾 57ms
+ ✓ test/persona-split-verify.test.ts > #1250 review fan-out 三视角 > 失败方式 8：fan-out 两份 blocking verdict → 只入队一条修订步（去重闸） 88ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 9：校验族——相位非 todo 409 / 双拆 409 / 少于两张 400 / 索引越界 400 / 环 400 / agent 越队 404 60ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 4（不误伤）：review 步 hasChanges=false 照常收 verdict，不落 failed 72ms
+ ✓ test/artifact-gate.test.ts > 闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不可达 > 失败方式 5（真值源）：无 repo 项目 hasChanges=true 照常 review——闸不读恒空投影 67ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 10：happy path——子卡/依赖边/父方案文档/父停 confirm/宣告行 46ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 11：父 confirm → 派发无阻塞子卡（直执行）+ 父进 building；阻塞子卡不动 47ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > 失败方式 12：子卡 done → 波次推进（B 自动派发）+ 全 done 父自动收 64ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 6：hasChanges=false + workBranchDrift → 失败原因点名分支偏离 64ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 7：hasChanges=true + workBranchDrift → 硬失败，点名两分支，不保留 PR 55ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > failed child manual done does not start the next wave (#1247) 57ms
  ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > failed child manual done still closes the parent when every sibling is done (#1247) 53ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > review child manual done still starts the next wave (#1247) 61ms
- ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > manual done stops the pending step (#1247, #1451) 61ms
- ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 7：hasChanges=true + workBranchDrift → 硬失败，点名两分支，不保留 PR 69ms
- ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 9：老 daemon 载荷（无 drift 字段）→「构建零改动」不变 69ms
- ✓ test/persona-split-verify.test.ts > #1259 persona 归属机（seeding × 绑定模型桥接） > 无机器播种 → null；mea 在场播种 → 绑 mea；补值不覆盖用户换绑 37ms
- ✓ test/persona-split-verify.test.ts > #1492 verify 步按清单出判定 > 方案带 Verification → confirm → verify 材料列清单；漏项证据 → passed=false 点名 77ms
- ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 10、12：首轮空话方案 → 留 planning，入队点名问题的结构补写轮 69ms
- ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 11：结构补写轮仍不合格 → 失败收尾，原因点名，plan 步封顶两轮 68ms
- ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 13：结构补写轮没重新上传 → 按旧版判，仍不合格即失败 77ms
- ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 结构补写轮补齐 Verification → 进 confirm 67ms
- ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 14：首轮合格方案直接进 confirm，不多跑补写轮 55ms
- ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 15：build 步机器报失败 → 落兜底报告，含失败原因 52ms
- ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 产物闸失败（构建零改动）同样落兜底报告 53ms
- ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 16：失败原因为空串 → errorMessage 补成说明文字 58ms
- ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 17：plan 步失败不落构建兜底报告 67ms
+ ✓ test/artifact-gate.test.ts > 闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」 > 失败方式 9：老 daemon 载荷（无 drift 字段）→「构建零改动」不变 51ms
+ ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 10、12：首轮空话方案 → 留 planning，入队点名问题的结构补写轮 56ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > review child manual done still starts the next wave (#1247) 56ms
+ ✓ test/persona-split-verify.test.ts > #1250 split_todo（层 2） > manual done stops the pending step (#1247, #1451) 54ms
+ ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 11：结构补写轮仍不合格 → 失败收尾，原因点名，plan 步封顶两轮 69ms
+ ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 13：结构补写轮没重新上传 → 按旧版判，仍不合格即失败 65ms
+ ✓ test/persona-split-verify.test.ts > #1259 persona 归属机（seeding × 绑定模型桥接） > 无机器播种 → null；mea 在场播种 → 绑 mea；补值不覆盖用户换绑 33ms
+ ✓ test/persona-split-verify.test.ts > #1492 verify 步按清单出判定 > 方案带 Verification → confirm → verify 材料列清单；漏项证据 → passed=false 点名 79ms
+ ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 结构补写轮补齐 Verification → 进 confirm 75ms
+ ✓ test/artifact-gate.test.ts > plan 结构闸（#1492）：Verification 不合格 → confirm 不可达 > 失败方式 14：首轮合格方案直接进 confirm，不多跑补写轮 93ms
+ ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 15：build 步机器报失败 → 落兜底报告，含失败原因 53ms
+ ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 产物闸失败（构建零改动）同样落兜底报告 48ms
+ ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 16：失败原因为空串 → errorMessage 补成说明文字 47ms
+ ✓ test/artifact-gate.test.ts > build 步兜底报告（#1492） > 失败方式 17：plan 步失败不落构建兜底报告 57ms
       Tests  40 passed (40)

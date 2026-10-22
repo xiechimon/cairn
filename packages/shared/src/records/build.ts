@@ -53,8 +53,9 @@ export type MergeAcceptedResponse = z.infer<typeof mergeAcceptedResponseSchema>;
 export const BUILD_FALLBACK_REPORT_HEAD = '构建步兜底报告';
 
 /** build 步异常结束时由系统写的收尾报告（#1492，参照 PilotDeck ReportContract
- *  的兜底报告）：agent 没交报告、卡片上只剩一行错误时，把系统已知的事实
- *  列齐——失败原因、已知改动、PR、下一步。只陈述库里有的事实，不猜。 */
+ *  的兜底报告）：卡片上只剩一行错误时，把系统已知的事实列齐——失败原因、
+ *  已知改动、PR、下一步。只陈述库里有的事实，不猜（步可能根本没跑过，也
+ *  可能改动落在别的分支上，所以不说 agent 做了什么、改动在哪）。 */
 export function buildFallbackReport(args: {
   reason: string;
   /** 已知改动文件（build.changes 投影）；undefined = 没有改动记录。 */
@@ -70,10 +71,10 @@ export function buildFallbackReport(args: {
   const pr =
     args.pr !== null ? `#${args.pr.number}${args.pr.url !== null ? ` ${args.pr.url}` : ''}` : '无';
   return [
-    `${BUILD_FALLBACK_REPORT_HEAD}：本步异常结束，agent 没有交出收尾说明，以下由系统根据已知记录生成。`,
+    `${BUILD_FALLBACK_REPORT_HEAD}：本步异常结束，以下由系统根据已知记录生成。`,
     `- 失败原因：${args.reason}`,
     `- 已知改动：${files}`,
     `- PR：${pr}`,
-    '- 下一步：看过失败原因后带反馈重跑；已有改动保留在会话分支上。',
+    '- 下一步：看过失败原因后带反馈重跑。',
   ].join('\n');
 }

@@ -12,15 +12,17 @@ export interface TicketDedupeInput {
 const MARKER_HEAD = '<!-- pacman-dedupe: ';
 const MARKER_TAIL = ' -->';
 
-function normalizePath(p: string): string {
-  return p.trim().replace(/^\.\//, '').replace(/\/+$/, '');
-}
-
 /** 去重键：类别小写去空白 + 路径归一（去 ./ 前缀与尾 /）后排序去重，`|` 连接。 */
 export function ticketDedupeKey(input: TicketDedupeInput): string {
   const category = input.category.trim().toLowerCase().replace(/\s+/g, '-');
   if (category === '') throw new Error('ticket dedupe category must not be empty');
-  const paths = [...new Set(input.paths.map(normalizePath).filter((p) => p !== ''))].sort();
+  const paths = [
+    ...new Set(
+      input.paths
+        .map((p) => p.trim().replace(/^\.\//, '').replace(/\/+$/, ''))
+        .filter((p) => p !== ''),
+    ),
+  ].sort();
   return [category, ...paths].join('|');
 }
 

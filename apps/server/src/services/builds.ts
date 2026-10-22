@@ -730,12 +730,7 @@ export function maybeEnqueueVerifyStep(
   //（sourceRef 单源反解）；无关联 = seqNum（本地仓的同一约定位）。
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
-  const planRow = deps.db
-    .select({ content: planTable.content })
-    .from(planTable)
-    .where(eq(planTable.buildId, buildId))
-    .orderBy(desc(planTable.version))
-    .get();
+  const planRow = latestPlanRow(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef,
     // #1406：GitHub issue 导入任务的标题与正文进 issue 原文围栏（ADR 0021 D5）。
@@ -1605,6 +1600,7 @@ function stepArtifactGate(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   outcome: { hasChanges?: boolean; workBranchDrift?: { expected: string; actual: string } },
+  planContract: PlanContractCheck | null,
 ): string | null {
   if (stepRow.kind === 'plan') {
     const planRow = deps.db
@@ -1615,9 +1611,12 @@ function stepArtifactGate(
     if (planRow !== undefined) {
       // #1492 结构闸：结构补写轮仍不合格 = 失败收尾（每轮规划最多补写一次）；
       // 非补写轮的不合格在 completeStep 落 done 后入队补写轮。
-      const contract = planContractOfStep(deps, stepRow);
-      if (contract !== null && !contract.ok && isPlanContractRewritePrompt(stepRow.prompt)) {
-        return `方案结构不合格：${contract.problem}`;
+      if (
+        planContract !== null &&
+        !planContract.ok &&
+        isPlanContractRewritePrompt(stepRow.prompt)
+      ) {
+        return `方案结构不合格：${planContract.problem}`;
       }
       return null;
     }
@@ -1648,6 +1647,19 @@ function stepArtifactGate(
   return null;
 }
 
+/** 本 build 最新一版方案（version 最大）；没有方案 = undefined。 */
+function latestPlanRow(
+  deps: BuildDeps,
+  buildId: string,
+): { content: string; stepId: string | null } | undefined {
+  return deps.db
+    .select({ content: planTable.content, stepId: planTable.stepId })
+    .from(planTable)
+    .where(eq(planTable.buildId, buildId))
+    .orderBy(desc(planTable.version))
+    .get();
+}
+
 /** #1492 plan 步的结构闸结论：只看本步自己上传的那一版（老 plan 行、没重新
  *  上传方案的重规划步不回溯）；结构补写轮例外——它没重新上传就按本 build
  *  最新一版判，旧版不合格方案不能借补写轮混进 confirm。null = 无可判的方案。 */
@@ -1656,12 +1668,7 @@ function planContractOfStep(
   stepRow: typeof step.$inferSelect,
 ): PlanContractCheck | null {
   const rewrite = isPlanContractRewritePrompt(stepRow.prompt);
-  const latest = deps.db
-    .select({ content: planTable.content, stepId: planTable.stepId })
-    .from(planTable)
-    .where(eq(planTable.buildId, stepRow.buildId))
-    .orderBy(desc(planTable.version))
-    .get();
+  const latest = latestPlanRow(deps, stepRow.buildId);
   if (latest === undefined) return null;
   if (!rewrite && latest.stepId !== stepRow.id) return null;
   return checkPlanContract(latest.content);
@@ -1717,7 +1724,9 @@ export function completeStep(
   }
   // 产物闸（#703）：失败收尾不落 done（完成判据 = 契约产物存在，不是会话
   // 结束——B-C10 空方案 / B-C11 零改动 / B-C14 假完成同病族）。
-  const gateFailure = stepArtifactGate(deps, stepRow, outcome);
+  // #1492 结构闸结论只算一次：产物闸与 plan 腿的补写判定共用。
+  const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
+  const gateFailure = stepArtifactGate(deps, stepRow, outcome, planContract);
   if (gateFailure !== null) {
     // #1277：有提交的偏离拒绝记录。finishStep 在闸前已把 daemon 上报的 PR
     // 写入 build 行；硬失败不保留这次回填。无提交偏离（hasChanges=false）
@@ -1758,14 +1767,13 @@ export function completeStep(
     }
     // #1492 结构闸：本步交的方案 Verification 不合格 → 留 planning + 结构补写
     // 一轮（问题点名进指令）。补写轮自身不合格已在产物闸失败收尾，到不了这里。
-    const contract = planContractOfStep(deps, stepRow);
-    if (contract !== null && !contract.ok) {
+    if (planContract !== null && !planContract.ok) {
       enqueueStep(
         deps,
         stepRow.buildId,
         'plan',
         todoRow.teamId,
-        buildPlanContractRewritePrompt(contract.problem),
+        buildPlanContractRewritePrompt(planContract.problem),
       );
       return;
     }
@@ -1894,12 +1902,7 @@ export function completeStep(
     // 返回结论」；passed=false 是有效结论不是本步失败（提取面不会把它折成
     // error）。
     // #1492 清单对账：方案有 Verification 清单时，缺证据的项点名、passed 置 false。
-    const latestPlan = deps.db
-      .select({ content: planTable.content })
-      .from(planTable)
-      .where(eq(planTable.buildId, buildRow.id))
-      .orderBy(desc(planTable.version))
-      .get();
+    const latestPlan = latestPlanRow(deps, buildRow.id);
     const verdict: VerifyVerdict =
       outcome.verifyVerdict !== undefined
         ? reconcileVerifyVerdict(
