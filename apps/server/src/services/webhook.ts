@@ -54,6 +54,11 @@ import { project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type FetchLike, GithubRateLimitedError } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
+import {
+  evaluateRequestedRun,
+  recordAutonomyStart,
+  recordAutonomyVerdict,
+} from './autonomy-gates.js';
 import { githubRepoOfProject } from './git.js';
 import { importGithubIssue } from './github-issues.js';
 import {
@@ -261,6 +266,15 @@ export async function receiveGithubWebhook(
   }
   // 先数上限（只读库）：满了不必读 GitHub。
   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
+  // 触发闸（#1491）：打标是人明确要的，不让路、不冷却；总开关关了或当天预算
+  // 满（读不到同样算满）就不领。标签留在 issue 上，轮询器开着时下一轮重判。
+  const gate = evaluateRequestedRun(deps.db, repoRow, nowMs());
+  if (!gate.ok) {
+    recordAutonomyVerdict(deps.db, repoRow.id, 'issue-intake', gate, nowMs());
+    return refuse('gated', 'ignored', `project autonomy gate: ${gate.reason}`, {
+      gate: gate.reason,
+    });
+  }
   const access = teamGithubToken(deps, tokenRow.teamId);
   if ('reason' in access) {
     return refuse(
@@ -340,6 +354,8 @@ export async function receiveGithubWebhook(
     throw err;
   }
 
+  // 导入即开跑一次：轮询器的冷却从这里起算。
+  recordAutonomyStart(deps.db, repoRow.id, 'issue-intake', nowMs());
   // 审计：谁的打标导入了这张卡（轮询器 'issue intake candidate taken' 同律）。
   // 写在编排之前：编排抛错时卡已建成，这一行照样要在。
   logger?.info({ deliveryId, todoId, sender }, 'github webhook import accepted');
