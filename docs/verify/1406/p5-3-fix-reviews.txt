@@ -1,0 +1,81 @@
+#1406 P5-3 follow-up: review skills on branch claude/bootstrap-p5-3-fix (worktree .claude/worktrees/p5d).
+Every run started with `cd <worktree> && git rev-parse --abbrev-ref HEAD` printing claude/bootstrap-p5-3-fix,
+and reviewed `git diff 24db1c4d...HEAD` (24db1c4d = origin/main when the branch was cut; the two later main
+commits, cd84a984 #1469 and dcf839e3 #1476, touch none of this branch's files; git merge-tree with
+dcf839e3 is clean).
+
+== /simplify (head c8b7bddc) ==
+Ran as a single inline pass: the Agent tool is not available in this session, so the skill's 4-agent
+fan-out did not run; all four angles (reuse, simplification, efficiency, altitude) were worked in one pass.
+Fixed (4598afcd):
+  - step-attachments.test.ts: the resolve() helper returned an unused `s`.
+  - runner-issue-fence.test.ts: deliver() kept a redundant `fake` / `created` alias; destructured instead.
+Kept, with reason:
+  - FORMAT_CHARS repeats the one-line regex in server github-reads.ts cleanGithubText. Sharing it means
+    moving a server helper into shared, outside this diff, for one regex literal.
+  - emit closure per token line, and parseAttachmentTokenLines(bodies.join('\n')): reuses the existing
+    key-grammar parser; token lines are few, no measurable cost.
+  - Efficiency: the resolver now splits the text once instead of twice; the fence pass is startsWith only.
+  - Altitude: fence-aware acceptance sits in the resolver, the one place that sees both daemon-built and
+    server-built (verify) fenced text; ATTACHMENT_TOKEN_LINE is unchanged for its other users.
+
+== /code-review medium (head 4598afcd) ==
+Eight findings (the skill ran without its verify pass). Decisions:
+  1. emit() split rewritten / note text on "\n" only; a server file name with U+2028 / U+2029 / U+0085
+     (isValidFileName allows them) or an error reason with "\r" could start an unprefixed line inside the
+     fence. CONFIRMED, FIXED in 58f6246b: shared quoteIssueLines (Cf strip + line-break fold + per-line
+     prefix) is the one quoting path for fenceIssueText and the daemon's rewritten lines. Test first
+     (red at 4598afcd, green at 58f6246b, p5-3-fix-red-green.txt round 2); mutation M10 kills a naive
+     per-"\n" prefix.
+  2. Tokens written by the issue author inside the fence now trigger downloads of same-team attachments.
+     NOT FIXED, reason: this is the behavior before #1475 (the raw spec line was a whole-line token and was
+     downloaded); #1475 made it inert only as a side effect, which is the regression this PR reverses, as
+     asked. The author needs the team id and a 21-character random record id (126 bits, newRecordId) of an
+     existing attachment; the download is team-scoped on the server. Narrowing the machine attachment
+     route to attachments the task references would touch apps/server/src/services/machines.ts (a
+     security-review path); offered to the orchestrator as a follow-up.
+  3. Cf stripping changes the delivered bytes, so a fenced row logged by a #1475 daemon for an issue whose
+     text holds Cf characters is shown as a user bubble by the new web. NOT FIXED, reason: already listed as
+     known limit C3 in p5-3-fix-failure-modes.txt; needs Cf characters in an imported issue and a daemon from
+     the #1475 window; cosmetic (the brief renders twice). Adding a third, unstripped candidate to
+     classifyUserText would keep a second fence variant alive for that window only.
+  4. Stripping all of Cf also removes ZWJ inside emoji sequences, ZWNJ, soft hyphen. NOT CHANGED, reason:
+     the orchestrator asked for category Cf explicitly, and it matches cleanGithubText, which already strips
+     \p{Cf} from the same GitHub titles and bodies when they reach the chief through tool results. The model
+     still reads the visible text; only invisible joiners are lost.
+  5. issueFenceQuotedLines opens a region on any bare line starting with the fence marker, in any text.
+     NOT A DEFECT, reason (failure mode A9): issue text is always quoted, so it can never write a bare
+     marker line; only text the team wrote (steer, plain spec, chief-written child spec) can, and that text
+     can write bare whole-line tokens just as well. Delivering a quoted token there gives nobody more than
+     they already have.
+  6. errorMessage stays unfenced in failed wakes. NOT FIXED, reason: build.errorMessage is set from the
+     daemon's done body (runtime / landing errors, STOP_MESSAGE), not copied from the task title or spec by
+     server code; the blocking finding and this PR's scope are the title. Noted for the orchestrator.
+  7. Altitude: resolve attachments on raw title + spec before fencing. NOT TAKEN, reason: the verify
+     instruction is fenced by the server and resolved by the daemon, so the daemon must read fenced text
+     anyway; resolving before fencing would need a second mechanism for that path. The part of the point
+     that holds (two quoting implementations) is closed by fix 1: one quoting function in shared.
+  8. Evidence files untracked. ADDRESSED: committed with this file in the evidence commit.
+
+== /code-review medium, second pass (head 58f6246b, after fix 1) ==
+Asked to skip the eight decided items unless 58f6246b changed their substance. Three findings:
+  1. Inside the fence the materialized path note goes through quoteIssueLines (Cf strip, line-break fold),
+     but the file on disk kept the raw server name; a name with U+200B or U+2028 gave the agent a path
+     that does not exist. CONFIRMED, FIXED in 7d2a3c70 at the source: safeFileName also drops U+0085,
+     U+2028, U+2029 and Cf, so the on-disk name and the note path are one string inside and outside the
+     fence (failure mode A3c; test red at 58f6246b, green at 7d2a3c70; mutation M11).
+  2. Altitude: clean the name at the source rather than at output. TAKEN for the path (same fix as 1).
+     The display name in the anchor and note stays res.fileName as before, outside the fence byte for byte.
+  3. Inside the fence the display name in the anchor is cleaned like all fenced text, so it can differ
+     from the daemon log and from unfenced prompts for names with Cf characters or U+2028. NOT CHANGED,
+     reason: cosmetic; cleaning the display name for unfenced tasks too would change plain-task output
+     (failure mode A10) for no delivery gain. The path, which the agent acts on, now matches everywhere.
+
+== /security-review ==
+Not required. AGENTS.md lists the security-sensitive paths (secret-box, keys, token-auth,
+attachments-token, services/{secrets,credentials,api-keys,webhook-tokens,oauth}, routes-machine,
+services/machine*, daemon {credentials,secret-channel,shell-channel,machine-client}, backend/command-gate,
+services/{mcp-face,mcp-servers}, routes-webhook). This diff touches none of them:
+  apps/daemon/src/step-attachments.ts, packages/shared/src/records/prompts.ts,
+  apps/server/src/services/chief.ts, apps/server/src/services/chief-tools.ts,
+  docs/spec/02-架构平价.md, tests and docs/verify/1406.

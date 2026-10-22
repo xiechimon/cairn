@@ -25,11 +25,11 @@ import {
   DONE_ANNOUNCEMENT,
   filterAgentTools,
   IN_PROGRESS_PHASES,
+  ISSUE_FENCE_OPEN,
   isChiefConversationId,
   MEMORY_QUOTA_PER_AGENT,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
-  quotesIssueFence,
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
@@ -1147,7 +1147,7 @@ export function saveMemoryEntry(
   // #1406（ADR 0021 D5）：记忆每轮进系统提示层，GitHub issue 原文围栏里是仓外
   // 作者写的数据，逐字搬进记忆就等于把它升进系统层。只认得出逐字搬运的围栏
   // 标记；改写过的转述认不出，那一半靠 chief 章程与围栏首行的禁令。
-  if (quotesIssueFence(input.title) || quotesIssueFence(input.content)) {
+  if (input.title.includes(ISSUE_FENCE_OPEN) || input.content.includes(ISSUE_FENCE_OPEN)) {
     throw new HttpError(
       400,
       'invalid params.content: text quoted from a GitHub issue fence is third-party data and is not saved as memory',
