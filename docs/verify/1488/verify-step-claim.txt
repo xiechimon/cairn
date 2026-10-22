@@ -1,0 +1,17 @@
+## .claude/skills/verify-step-claim/scripts/run.sh, this branch
+work dir: /tmp/verify-step-claim.kNLLA6
+P1_SingleExecutorPerMachine: PASS in 19s, 685236 distinct states - matches expected
+  full log: /tmp/verify-step-claim.kNLLA6/P1_SingleExecutorPerMachine/tlc.log
+P2_OnlyHolderResultApplied: PASS in 20s, 685236 distinct states - matches expected
+  full log: /tmp/verify-step-claim.kNLLA6/P2_OnlyHolderResultApplied/tlc.log
+P3_NoClaimAfterClose: PASS in 19s, 685236 distinct states - matches expected
+  full log: /tmp/verify-step-claim.kNLLA6/P3_NoClaimAfterClose/tlc.log
+P4_AcceptedStopReachesWorkers: PASS in 20s, 685236 distinct states - matches expected
+  full log: /tmp/verify-step-claim.kNLLA6/P4_AcceptedStopReachesWorkers/tlc.log
+covered code changed since sync-commit 659d8cb5; re-read these against the model:
+  commit b73ae7b8 daemon, server(1488): a step deleted by reset stops on its next heartbeat
+  commit 8d0fcbd7 server(1487): a merge that finishes after its card was cancelled does not land
+  commit 29e60bb7 daemon(1484): the per-step git credential answers only for its own host, and its values never pass through the shell (#1499)
+  commit 6cceda81 server(1494): worker 步只注入本项目与全局的 agent 记忆 (#1498)
+  commit 93b9ce21 daemon(1490): an accepted stop reaches the step before the session opens and across a restart (#1495)
+  commit 9296b8b8 server(1403): the reconcile follows the build's own PR; review-gate wake text and confirm check (#1489)

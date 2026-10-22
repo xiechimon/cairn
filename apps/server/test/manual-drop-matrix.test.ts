@@ -54,11 +54,13 @@ describe('手动落位矩阵（#753）：已完成 源', () => {
     expect(await res.json()).toHaveProperty('error');
   });
 
-  test('done→todo = 200（实测 uncomplete 语义，本仓载体 = PATCH phase）', async () => {
-    const { s, id } = await setup('done', true);
-    const res = await patchPhase(s, id, 'todo');
+  test('done→todo：没开始过 = 200；带变更（已开始）= 409 指向 /reset（#1486）', async () => {
+    const fresh = await setup('done');
+    const res = await patchPhase(fresh.s, fresh.id, 'todo');
     expect(res.status).toBe(200);
     expect(todoRecordSchema.parse(await res.json()).phase).toBe('todo');
+    const started = await setup('done', true);
+    expect((await patchPhase(started.s, started.id, 'todo')).status).toBe(409);
   });
 
   test('done→building = 409（执行中只吃待开始源，实测恒素面）', async () => {
@@ -142,9 +144,9 @@ describe('手动落位矩阵（#753）：待开始/执行中 源与非落点相'
     expect((await patchPhase(s, id, 'review')).status).toBe(409);
   });
 
-  test('building→todo / building→done = 200（执行中源行沿用既有语义 [设计]）', async () => {
+  test('building→done = 200；building→todo = 409 指向 /reset（进行中即已开始，#1486）', async () => {
     const a = await setup('building');
-    expect((await patchPhase(a.s, a.id, 'todo')).status).toBe(200);
+    expect((await patchPhase(a.s, a.id, 'todo')).status).toBe(409);
     const b = await setup('building');
     expect((await patchPhase(b.s, b.id, 'done')).status).toBe(200);
   });

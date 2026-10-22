@@ -70,6 +70,7 @@ import {
   message as messageTable,
   project as projectTable,
   step as stepTable,
+  team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
@@ -526,7 +527,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expect(err.status).toBe(409);
       expect(err.message).toContain(label);
       // a review step does not commit: the refusal does not say it will push
-      expect(err.message.includes('推送')).toBe(kind !== 'review');
+      // #1487 (main): a merge step in flight is refused before any other check, with its own text
+      expect(err.message.includes('推送')).toBe(kind !== 'review' && kind !== 'merge');
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -1195,6 +1197,48 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       failure: { kind: 'rate-limited', status: 403 },
     });
     expect(text).toHaveBeenCalledTimes(1);
+  });
+
+  test.each(['closed', 'todo'] as const)(
+    '[2b-M1] a card that is %s (cancelled or reset, #1505) → no merge: refused before any request',
+    async (phase) => {
+      const w = makeWorld({ phase });
+      await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
+        `illegal phase transition: ${phase} -> done`,
+      );
+      expect(w.fake.requests).toEqual([]);
+      expect(w.userRows()).toEqual([]);
+    },
+  );
+
+  test.each(['closed', 'todo'] as const)(
+    '[2b-M2] the card is %s while the PR read is in flight (#1505) → no PUT, nothing written',
+    async (phase) => {
+      const w = makeWorld();
+      w.fake.onGet = () => {
+        w.s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, w.todoId)).run();
+      };
+      await expect(requestMerge(w.deps, w.buildId)).rejects.toThrow(
+        `illegal phase transition: ${phase} -> done`,
+      );
+      expect(w.fake.puts()).toEqual([]);
+      expect(w.systemRows()).toEqual([]);
+      expect(w.userRows()).toEqual([]);
+    },
+  );
+
+  test('[2b-M3] the todo points at another team’s GitHub project (#1497) → not GitHub form: no GitHub request', async () => {
+    const w = makeWorld();
+    const other = 'team-other-m3';
+    w.s.db.insert(teamTable).values({ id: other, name: 'other', createdAt: Date.now() }).run();
+    const projectId = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()
+      ?.projectId as string;
+    w.s.db.update(projectTable).set({ teamId: other }).where(eq(projectTable.id, projectId)).run();
+    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(w.fake.requests).toEqual([]);
+    expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([
+      { kind: 'merge', status: 'pending' },
+    ]);
   });
 
   test('[2b-D26] the token travels only in the Authorization header', async () => {
