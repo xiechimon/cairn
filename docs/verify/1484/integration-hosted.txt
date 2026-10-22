@@ -10,10 +10,10 @@
 
  Test Files  1 passed (1)
       Tests  1 passed (1)
-   Start at  10:32:54
-   Duration  7.88s (tests 48%, transform 29%, import 23%)
+   Start at  10:40:29
+   Duration  7.66s (tests 50%, transform 28%, import 22%)
 
-  Transform  transforming modules took 2.27s · 29% of tracked time, re-done on every run
+  Transform  transforming modules took 2.10s · 28% of tracked time, re-done on every run
              persist transforms across runs with fsModuleCache: true
              learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
 

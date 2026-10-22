@@ -1,7 +1,7 @@
 ## new: apps/daemon/src/git.ts = this branch
 ## (cd apps/daemon && node_modules/.bin/tsx ../../docs/verify/1484/repro.mts)
 credential bound to: https://github.com/o/r.git
-origin before: /tmp/repro-1484-TFc0hz/real.git
-origin after the agent's set-url: http://127.0.0.1:45039/elsewhere.git
-tagPush failed: Error: git push failed (128): fatal: could not read Username for 'http://127.0.0.1:45039': terminal prompts disabled
+origin before: /tmp/repro-1484-xIKiHQ/real.git
+origin after the agent's set-url: http://127.0.0.1:38235/elsewhere.git
+tagPush failed: Error: git push failed (128): fatal: could not read Username for 'http://127.0.0.1:38235': terminal prompts disabled
 credentials the other host received: []
