@@ -82,7 +82,7 @@ import {
   todo,
   tokenUsage,
 } from '../db/schema.js';
-import { conflict } from '../lib/errors.js';
+import { conflict, HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
@@ -1268,6 +1268,12 @@ export async function claimStep(
 // —— journal：heartbeat / tool / token / upload-urls / done（02 §5.4）——————————
 
 export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: string): void {
+  // #1488：步行已不存在（卡被重置 / 删除，行随 build 删掉）= 410，与「不归本机」
+  // 的 404 分开——daemon 据 410 停掉在跑的会话；404 照常跑（#1483 同机重领时，
+  // 被放回的步的这次 run 接着跑新的领取）。
+  if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
+    throw new HttpError(410, `step ${stepId} no longer exists`);
+  }
   const row = ownedStep(deps, machineId, stepId);
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
