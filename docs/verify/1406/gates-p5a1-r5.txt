@@ -1,0 +1,66 @@
+# P5a-1 round 5 gates
+# head: 0567408901710e03f57f68e82ab8950ea1f8b265 (Merge origin/main (bc1d99f) into claude/bootstrap-p5)
+# origin/main at the run: bc1d99f8b4a2f658e5638eb8a6f394f69179ff73 (contained in the head)
+# Diff of the head against origin/main: README.md, README.zh.md, apps/server/src/services/issue-intake.ts,
+# apps/server/test/issue-intake.test.ts, docs/spec/28 (round 5 only; 5 files, +249 -26).
+# The evidence commit after this head adds only files under docs/verify/1406/ (outside biome's includes, the
+# TypeScript projects, vitest and the e2e-affected map).
+# worktree /home/user/pacman/.claude/worktrees/p5, user root, 2026-10-21.
+# An earlier full run on 4845cc2b (before #1477 landed on main) also exited 0 on all five gates.
+
+## pnpm lint  (biome ci .)
+exit=0
+Checked 808 files in 5s. No fixes applied.
+Found 1 info.
+(the info is apps/web/src/resources/machines-page.tsx noUselessFragments; this branch does not touch that file)
+
+## pnpm typecheck  (pnpm -r typecheck)
+exit=0
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+
+## pnpm spec:parse
+exit=0
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (2.7s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (8.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+
+## pnpm exec vitest run --changed origin/main
+exit=0
+ Test Files  136 passed (136)
+      Tests  1590 passed | 1 skipped (1591)
+   Start at  15:55:24
+   Duration  344.42s (tests 63%, import 36%)
+
+## E2E_AFFECTED_PORT=8405 pnpm --filter @pacman/web e2e:affected
+port check before the run: lsof -iTCP:8405 -sTCP:LISTEN printed nothing (rc 1)
+exit=0
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  README.md → none
+  README.zh.md → none
+  apps/server/src/services/issue-intake.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/issue-intake.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8405
+  live-server-reap.spec.ts token-gate.spec.ts
+Running 8 tests using 2 workers
+  ✓  2 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (4.3s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (6.7s)
+  ✓  1 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (2.5s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (780ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (920ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (714ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (848ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (743ms)
+  8 passed (26.7s)
+(the known root-only runner-brief failure is in a spec the affected set did not select)

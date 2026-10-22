@@ -428,10 +428,12 @@ export class GithubRateLimitedError extends Error {
     this.name = 'GithubRateLimitedError';
   }
 
-  /** 限流解除的时刻：reset 头优先，否则 now + retry-after；都没有 = null。 */
+  /** 限流解除的时刻：retry-after 优先（GitHub 文档「Exceeding the rate limit」：
+   * 有 retry-after 就等它；二级限流常同时带主窗口的 x-ratelimit-reset，那个时刻
+   * 可能远在之后），否则 x-ratelimit-reset；都没有 = null。 */
   retryAt(now: number): number | null {
-    if (this.resetAt !== null) return this.resetAt;
-    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;
+    if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;
+    return this.resetAt;
   }
 }
 
@@ -925,13 +927,17 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      const reset = Number(res.headers.get('x-ratelimit-reset') ?? Number.NaN);
-      const retryAfter = Number(res.headers.get('retry-after') ?? Number.NaN);
+      // 头不在、空串或不是非负整数 = 没给（Number('') 是 0，不能当「0 秒后」）。
+      const seconds = (name: string): number | null => {
+        const v = res.headers.get(name)?.trim() ?? '';
+        return /^\d+$/.test(v) ? Number(v) : null;
+      };
+      const reset = seconds('x-ratelimit-reset');
       throw new GithubRateLimitedError(
         url,
         res.status,
-        Number.isFinite(reset) ? reset * 1000 : null,
-        Number.isFinite(retryAfter) ? retryAfter : null,
+        reset === null ? null : reset * 1000,
+        seconds('retry-after'),
       );
     }
     return { ...head, data: undefined };
