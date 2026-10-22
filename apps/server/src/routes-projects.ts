@@ -11,6 +11,7 @@ import {
   type FsPickResult,
   githubIssuesResponseSchema,
   importGithubIssueBodySchema,
+  patchAutonomyBodySchema,
   patchProjectBodySchema,
 } from '@pacman/shared';
 import { eq, inArray } from 'drizzle-orm';
@@ -29,6 +30,7 @@ import {
   svcOf,
   toTagRecord,
 } from './routes-helpers.js';
+import { patchAutonomy, readAutonomy } from './services/autonomy-gates.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
@@ -297,6 +299,18 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   // 删项目（#189 删除区复活前置）：级联语义单源 = services/projects.ts 头注；
   // 危险操作区删除流 UI 证据 r2 24c，wire 未采（INFERRED_ROUTES 登记）。
+  // #1491 后台自动任务的闸：设置 + 每种任务最近一次判定（设置页读）。
+  app.get('/api/projects/:id/autonomy', (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    return c.json(readAutonomy(ctx.db, row.id, nowMs()));
+  });
+
+  app.patch('/api/projects/:id/autonomy', async (c) => {
+    const row = requireProject(ctx, c.req.param('id'));
+    const body = parseWith(patchAutonomyBodySchema, await jsonBody(c), 'body');
+    return c.json(patchAutonomy(ctx.db, row.id, body, nowMs()));
+  });
+
   app.delete('/api/projects/:id', (c) => {
     const id = c.req.param('id');
     if (!deleteProject({ db: ctx.db, reposDir: ctx.reposDir }, id)) {

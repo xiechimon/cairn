@@ -93,6 +93,15 @@ import {
   githubOpenIssuesWithLabel,
 } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
+import {
+  autonomySettingsOf,
+  autonomySpentToday,
+  autonomyStateOf,
+  evaluateAutonomyGates,
+  lastMemberWriteAt,
+  recordAutonomyStart,
+  recordAutonomyVerdict,
+} from './autonomy-gates.js';
 import type { BuildDeps } from './builds.js';
 import { chiefBinding } from './chief.js';
 import { type TransitionActor, transitionTodos } from './chief-tools.js';
@@ -187,6 +196,8 @@ export interface IssueIntakeTally {
   closeSkipped: number;
   /** 本轮遇限流停读的团队。 */
   rateLimited: number;
+  /** 被触发闸（#1491）拦下、本轮不读列表的项目（在飞已满也算在这里）。 */
+  gated: number;
   errors: number;
 }
 
@@ -255,6 +266,7 @@ function emptyTally(): IssueIntakeTally {
     closed: 0,
     closeSkipped: 0,
     rateLimited: 0,
+    gated: 0,
     errors: 0,
   };
 }
@@ -347,6 +359,11 @@ export function teamGithubToken(
  * 每次导入前现数：现数与 importGithubIssue 落占位之间不隔 await，同时到的几路
  * 导入（webhook 批量投递、轮询器）合起来不超上限。 */
 export function projectAtInFlightCap(db: Db, projectId: string): boolean {
+  return projectInFlight(db, projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
+}
+
+/** 项目在飞数（projectAtInFlightCap 的计数，触发闸的在飞输入同源）。 */
+function projectInFlight(db: Db, projectId: string): number {
   const inFlight =
     db
       .select({ n: sql<number>`count(*)` })
@@ -359,7 +376,7 @@ export function projectAtInFlightCap(db: Db, projectId: string): boolean {
         ),
       )
       .get()?.n ?? 0;
-  return inFlight + importsInFlightFor(projectId) >= ISSUE_INTAKE_IN_FLIGHT_CAP;
+  return inFlight + importsInFlightFor(projectId);
 }
 
 /** permission 答案缓存（按 团队 × 仓 × login，小写）：模块级，进程里唯一一份，
@@ -673,14 +690,33 @@ export function createIssueIntake(
     now: number,
     tally: IssueIntakeTally,
   ): Promise<void> {
-    // 满员不读列表（省一次读；下一轮有位再读）。
-    if (projectAtInFlightCap(deps.db, row.id)) return;
+    // 触发闸（#1491）：没开、满员、人刚在用、冷却中、当天预算满或读不到 =
+    // 本轮不读列表（省一次读）；候选不动，下一轮重判。
+    const gate = evaluateAutonomyGates({
+      now,
+      settings: autonomySettingsOf(row),
+      inFlight: projectInFlight(deps.db, row.id),
+      inFlightCap: ISSUE_INTAKE_IN_FLIGHT_CAP,
+      lastMemberWriteAt: lastMemberWriteAt(deps.db),
+      lastStartedAt: autonomyStateOf(deps.db, row.id, 'issue-intake')?.lastStartedAt ?? null,
+      spentTodayUsd: autonomySpentToday(deps.db, row.id, now),
+    });
+    recordAutonomyVerdict(deps.db, row.id, 'issue-intake', gate, now);
+    if (!gate.ok) {
+      tally.gated += 1;
+      // 满员是常态（领满 3 张后每轮都是），不逐轮记行。
+      if (gate.reason !== 'in-flight-cap') {
+        log({ projectId: row.id, reason: gate.reason }, 'issue intake project gated');
+      }
+      return;
+    }
     const listKey = `${row.teamId}\u0000${owner}/${repo}`.toLowerCase();
     const claimed = claimedRefs(row.teamId);
     const listed = new Set<string>();
     const visitedPages = new Set<string>();
     // 满员后余下的候选都等下一轮（不再逐条数库，也不再翻页）。
     let atCap = false;
+    let started = false;
     let url: string | null = null;
     for (let pageNo = 1; ; pageNo += 1) {
       if (pageNo > ISSUE_INTAKE_MAX_LIST_PAGES) {
@@ -730,7 +766,12 @@ export function createIssueIntake(
         }
         const outcome = await take(row, owner, repo, access, issue.number, now, tally);
         if (outcome === 'full') atCap = true;
-        if (outcome === 'imported') claimed.add(ref.toLowerCase());
+        if (outcome === 'imported') {
+          claimed.add(ref.toLowerCase());
+          // 本轮领到了 = 开跑过一次，冷却从这里起算（同一轮余下的照常领到上限）。
+          if (!started) recordAutonomyStart(deps.db, row.id, 'issue-intake', now);
+          started = true;
+        }
       }
       if (atCap || data.next === null) break;
       url = data.next;

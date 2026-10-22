@@ -42,6 +42,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, SquarePen } from '../icons/index.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
+import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { PageShell, TabGroup } from './shell.js';
 
 const TABS = [
@@ -346,6 +347,11 @@ export function ProjectSettingsPage() {
               </div>
             </div>
           </SettingsCard>
+        )}
+        {/* #1491 后台自动任务的闸（issue 进料 / 园丁 / 自治合并都只对
+            github 项目开跑）：阈值可改、每种任务最近一次被拦的原因。 */}
+        {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
+          <ProjectAutonomyCard projectId={id} teamId={teamId} />
         )}
         {/* 危险操作区(#207 复活): #189 DELETE /api/projects/:id 已落地,
             钮接真确认流。#1174：说明写清级联带走什么——列举项 = server

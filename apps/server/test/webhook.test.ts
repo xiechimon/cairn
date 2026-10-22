@@ -1032,6 +1032,12 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(hook.body.result).toBe('created');
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
     listForPoller(8, SENDER);
+    // 触发闸（#1491）的人在用 / 冷却 / 预算关掉：本用例钉的是 permission 缓存。
+    s.db
+      .update(projectTable)
+      .set({ autonomy: { enabled: true, quietMinutes: 0, cooldownMinutes: 0, dailyBudgetUsd: 0 } })
+      .where(eq(projectTable.id, projectId))
+      .run();
     const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: mock.impl });
     const tally = await intake.sweep();
     expect(tally?.imported).toBe(1);
