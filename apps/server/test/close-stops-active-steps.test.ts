@@ -255,14 +255,14 @@ describe('#1445 关卡清掉在途的 stop-and-done 预定', () => {
   });
 });
 
-describe('#1447 raw PATCH 把 queued 卡挪回待开始也停 pending 步', () => {
-  test('queued → todo：步 stopped，机器领不到', async () => {
+describe('#1447 / #1486 raw PATCH 不能把 queued 卡挪回待开始', () => {
+  test('queued → todo：409 指向 /reset，卡与 pending 步原样', async () => {
+    // #1447 曾让这条 PATCH 停步并落 todo；#1486 起已开始的卡只能经 /reset 挪回。
     const w = makeWorld({ phase: 'queued', stepStatus: 'pending' });
     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'todo' });
-    expect(res.status).toBe(200);
-    expect(todoPhase(w)).toBe('todo');
-    expect(await claim(w)).toBeNull();
-    expect(stepStatus(w)).toBe('stopped');
+    expect(res.status).toBe(409);
+    expect(todoPhase(w)).toBe('queued');
+    expect(stepStatus(w)).toBe('pending');
   });
 
   test('控制组：不改相位的 PATCH（含同相位 queued）不碰 pending 步', async () => {
@@ -291,24 +291,17 @@ describe('#1445 卡离开执行中后，停止回报不再改相位', () => {
     expect(todoPhase(w)).toBe('review');
   });
 
-  test('raw PATCH planning → todo：委托停 claimed 步', async () => {
+  test('raw PATCH planning → todo：409 指向 /reset，不发停止（#1486）', async () => {
     const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
     const events: { type: string }[] = [];
     w.s.machineHub.subscribe(w.teamId, (ev) => {
       if ('type' in ev) events.push(ev as { type: string });
     });
     const res = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'todo' });
-    expect(res.status).toBe(200);
-    expect(
-      w.s.db
-        .select()
-        .from(stopPendingTable)
-        .all()
-        .map((p) => p.stepId),
-    ).toEqual([w.stepId]);
-    expect(events.some((e) => e.type === 'stop')).toBe(true);
-    applyStoppedStep(w.s.svc, w.stepId);
-    expect(todoPhase(w)).toBe('todo');
+    expect(res.status).toBe(409);
+    expect(w.s.db.select().from(stopPendingTable).all()).toEqual([]);
+    expect(events.some((e) => e.type === 'stop')).toBe(false);
+    expect(todoPhase(w)).toBe('planning');
   });
 });
 
@@ -478,9 +471,12 @@ describe('#1453 停止在途时步先跑完：不推进、不补排已离开执�
     expect(todoPhase(w)).toBe('done');
   });
 
-  test('挪回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm', async () => {
+  test('关闭后重新打开回待开始的卡的 plan 步成功回报：卡仍 todo，不进 confirm', async () => {
+    // #1486 起进行中的卡不能 PATCH 回待开始；仍能落到「待开始 + 步在跑」的路
+    // 是先关闭、再重新打开（closed → todo）。
     const w = makeWorld({ phase: 'planning', stepStatus: 'claimed' });
     withPlanDoc(w);
+    await move(w, 'closed');
     await move(w, 'todo');
     await expect(report(w, success())).resolves.toBeUndefined();
     expect(todoPhase(w)).toBe('todo');

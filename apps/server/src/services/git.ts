@@ -29,7 +29,7 @@ import {
   type ProjectTreeResponse,
   parseGithubRepoRef,
 } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
@@ -98,6 +98,20 @@ export async function provisionHostedRepo(
  * 只查库行，目录残留会让同名新项目在旧库内容上 reinit/seed 冲突。 */
 export function removeHostedRepoDir(reposDir: string, teamId: string, repoName: string): void {
   rmSync(repoDirFor(reposDir, teamId, repoName), { recursive: true, force: true });
+}
+
+/** 任务所属项目行，须与任务同队（#1497）：本队任务指向他队项目（#1466 前
+ * create_todo 可造的存量行）按未绑项目处理——不读他队仓库、不发凭证、不拿
+ * 他队的 GitHub 仓出站。按 todo 行解析项目的地方都走这里。 */
+export function projectOfTodo(
+  db: Db,
+  todoRow: { projectId: string; teamId: string },
+): ProjectRow | undefined {
+  return db
+    .select()
+    .from(project)
+    .where(and(eq(project.id, todoRow.projectId), eq(project.teamId, todoRow.teamId)))
+    .get();
 }
 
 /** 托管 clone URL（本地主机代位；origin = 请求源 [设计]——单机自 host，
@@ -540,7 +554,7 @@ export async function readBuildChanges(
   if (!buildRow) throw notFound(`build ${buildId}`);
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
-  const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+  const projRow = projectOfTodo(ctx.db, todoRow);
   if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
     const stored = buildRow.changes;
     if (stored == null) return { files: [], reported: false };
@@ -585,7 +599,7 @@ export async function readBuildChangeFile(
   if (!buildRow) throw notFound(`build ${buildId}`);
   const todoRow = ctx.db.select().from(todoTable).where(eq(todoTable.id, buildRow.todoId)).get();
   if (!todoRow) throw notFound(`todo ${buildRow.todoId}`);
-  const projRow = ctx.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+  const projRow = projectOfTodo(ctx.db, todoRow);
   if (projRow?.repoKind !== 'hosted' || projRow.repoName === null) {
     throw notFound(`hosted repo for build ${buildId}`);
   }
