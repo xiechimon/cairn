@@ -1219,20 +1219,30 @@ describe('#1459 round 2 W review 发现', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test.each([['..'], ['.'], ['a/b'], [''], ['alice.acme'], ['_alice'], ['-alice'], ['alice_']])(
-    'W20 sender 的 login 不是 GitHub 账号名（%j）→ 202 ignored，零出站，记日志',
-    async (login) => {
-      const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
-      const direct = await deliverDirect(payload, 'w20');
-      expect(direct.response.result).toBe('ignored');
-      expect(refusals(direct.lines)).toEqual([
-        expect.objectContaining({ reason: login === '' ? 'no-sender' : 'sender-malformed' }),
-      ]);
-      // 团队 token 不出站（`..` 会把权限读改写成别的路径）。
-      expect(mock.calls).toEqual([]);
-      expect(issueTasks()).toHaveLength(0);
-    },
-  );
+  test.each([
+    ['..'],
+    ['.'],
+    ['a/b'],
+    [''],
+    ['alice.acme'],
+    ['_alice'],
+    ['-alice'],
+    ['alice_'],
+    // 至多 39 个字符（EMU 的含下划线与短码）：40 个的一律拒。
+    ['a'.repeat(40)],
+    [`${'a'.repeat(31)}_abcdefgh`],
+    [`${'a'.repeat(40)}[bot]`],
+  ])('W20 sender 的 login 不是 GitHub 账号名（%j）→ 202 ignored，零出站，记日志', async (login) => {
+    const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
+    const direct = await deliverDirect(payload, 'w20');
+    expect(direct.response.result).toBe('ignored');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ reason: login === '' ? 'no-sender' : 'sender-malformed' }),
+    ]);
+    // 团队 token 不出站（`..` 会把权限读改写成别的路径）。
+    expect(mock.calls).toEqual([]);
+    expect(issueTasks()).toHaveLength(0);
+  });
 
   test('W20b bot 账号（login 带 [bot]）照常读权限', async () => {
     // 路径里的方括号经 encodeURIComponent 编码。
@@ -1252,13 +1262,20 @@ describe('#1459 round 2 W review 发现', () => {
   // GitHub 文档（Enterprise Managed Users 的用户名）：GitHub.com 上托管账号的用户名
   // 是 IDP-USERNAME_SHORT-CODE（例 mona-cat_octo），开通 SAML 的设置账号是
   // SHORT-CODE_admin。这些人照轮询器的判据读权限（#1496 pr-gate 建议 1 / 9）。
-  test.each([['alice_acme'], ['mona-cat_octo'], ['octo_admin'], ['octo-helper[bot]']])(
+  test.each([
+    ['alice_acme', 'User'],
+    ['mona-cat_octo', 'User'],
+    ['octo_admin', 'User'],
+    // 正好 39 个字符（含下划线与八位短码）。
+    [`${'a'.repeat(30)}_abcdefgh`, 'User'],
+    ['octo-builder[bot]', 'Bot'],
+  ])(
     'W21 GitHub 认的账号名（%s：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入',
-    async (login) => {
+    async (login, type) => {
       routes[`/repos/${REPO}/collaborators/${encodeURIComponent(login)}/permission`] = {
         body: permissionBody(login, 'admin', 'admin'),
       };
-      const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
+      const payload = { ...labeledPayload(), sender: { login, type } };
       const direct = await deliverDirect(payload, 'w21');
       expect(direct.response.result).toBe('created');
       expect(refusals(direct.lines)).toEqual([]);
@@ -1266,4 +1283,21 @@ describe('#1459 round 2 W review 发现', () => {
       expect(issueTasks()).toHaveLength(1);
     },
   );
+});
+
+describe('#1459 round 3 W 日志里的 sender', () => {
+  test('W22 sender-malformed 的 sender 很长（载荷里没有长度上限）→ 日志行只记前 64 个字符与总长', async () => {
+    const login = `${'.'.repeat(1000)}/x`;
+    const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
+    const direct = await deliverDirect(payload, 'w22');
+    expect(direct.response.result).toBe('ignored');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({
+        reason: 'sender-malformed',
+        sender: login.slice(0, 64),
+        senderLength: login.length,
+      }),
+    ]);
+    expect(mock.calls).toEqual([]);
+  });
 });
