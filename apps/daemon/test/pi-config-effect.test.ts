@@ -152,3 +152,57 @@ describe('materializeProvider cost 声明位（#927）', () => {
     });
   });
 });
+
+describe('materializeProvider 上下文/输出上限声明位（#1526）', () => {
+  function providerWith(providerId: string, models: ProviderConfig['models']): ProviderConfig {
+    return { ...gateway(providerId), models };
+  }
+  function loadModels(path: string, providerId: string): Record<string, unknown>[] {
+    const raw = JSON.parse(readFileSync(path, 'utf8')) as {
+      providers: Record<string, { models?: Record<string, unknown>[] }>;
+    };
+    return raw.providers[providerId]?.models ?? [];
+  }
+
+  test('模型声明 contextWindow=1000000 → models.json 条目 = 声明值（1M 上下文不再被 128k 默认截短）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(
+      path,
+      providerWith('ctx-gw', [
+        { id: 'glm-5.3', name: 'glm-5.3', contextWindow: 1_000_000, maxTokens: 32_768 },
+      ]),
+    );
+    expect(loadModels(path, 'ctx-gw')[0]).toMatchObject({
+      id: 'glm-5.3',
+      contextWindow: 1_000_000,
+      maxTokens: 32_768,
+    });
+  });
+
+  test('未声明 → 128k/16k 默认同形（不配时行为不变）', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(path, providerWith('ctx-none', [{ id: 'm2', name: 'M2' }]));
+    expect(loadModels(path, 'ctx-none')[0]).toMatchObject({
+      id: 'm2',
+      contextWindow: 128_000,
+      maxTokens: 16_384,
+    });
+  });
+
+  test('同 provider 两模型仅其一声明 → 覆盖按模型独立，不串扰', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const path = join(dir, 'models.json');
+    materializeProvider(
+      path,
+      providerWith('ctx-mixed', [
+        { id: 'big', name: 'Big', contextWindow: 1_000_000 },
+        { id: 'small', name: 'Small' },
+      ]),
+    );
+    const models = loadModels(path, 'ctx-mixed');
+    expect(models[0]).toMatchObject({ id: 'big', contextWindow: 1_000_000, maxTokens: 16_384 });
+    expect(models[1]).toMatchObject({ id: 'small', contextWindow: 128_000, maxTokens: 16_384 });
+  });
+});
