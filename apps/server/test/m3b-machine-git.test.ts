@@ -21,6 +21,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
+import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
 import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-m3b-1';
@@ -406,6 +407,101 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     expect(todoRow.phase).toBe('failed');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toContain('non-fast-forward');
+  });
+});
+
+describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409', () => {
+  // 2026-10-22 裁决方案 a：卡已关闭或已挪回待开始时，合并步的成功回报不再把
+  // 托管仓默认分支快进；卡保持原相位，时间线落一行说明合并没有落地。
+  /** 走到「合并步已被领走」：返回 world、buildId、conv 分支 sha、合并步 id、main 原 tip。 */
+  async function mergeInFlight() {
+    const w = await setupGitWorld();
+    const buildId = await w.startBuild();
+    const planStep = await w.claim();
+    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n');
+    await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
+    await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
+    const buildStep = await w.claim();
+    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    await w.done(buildStep.step.id, {
+      status: 'success',
+      sessionId: 'pi-1',
+      hasChanges: true,
+      commit: convSha,
+    });
+    const mainBefore = await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main');
+    expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
+      202,
+    );
+    const mergeStep = await w.claim();
+    expect(mergeStep.step.kind).toBe('merge');
+    return { w, buildId, convSha, mergeStepId: mergeStep.step.id, mainBefore };
+  }
+  const phaseOf = (w: Awaited<ReturnType<typeof setupGitWorld>>) =>
+    w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!.phase;
+  const timeline = (w: Awaited<ReturnType<typeof setupGitWorld>>, buildId: string) =>
+    w.s.db.select().from(messageTable).where(eq(messageTable.conversationId, buildId)).all();
+
+  test('失败方式 1：合并步在跑时关闭 → 成功回报不快进 main，卡仍 closed，时间线说明', async () => {
+    const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
+    expect(
+      (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } }))
+        .status,
+    ).toBe(200);
+    await w.done(mergeStepId, { status: 'success', sessionId: 'pi-1', commit: convSha });
+    expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main')).toBe(mainBefore);
+    expect(phaseOf(w)).toBe('closed');
+    expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
+    expect(timeline(w, buildId).some((m) => m.content === '🎉 任务已完成')).toBe(false);
+  });
+
+  test('失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo', async () => {
+    const { w, buildId, convSha, mergeStepId, mainBefore } = await mergeInFlight();
+    expect(
+      (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'closed' } }))
+        .status,
+    ).toBe(200);
+    expect(
+      (await call(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { body: { phase: 'todo' } })).status,
+    ).toBe(200);
+    await w.done(mergeStepId, { status: 'success', sessionId: 'pi-1', commit: convSha });
+    expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/main')).toBe(mainBefore);
+    expect(phaseOf(w)).toBe('todo');
+    expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LANDED_NOTE)).toBe(true);
+  });
+
+  test('失败方式 3：同一 build 已有在途合并步（pending 或已领走）→ 再请求合并 409，不多排一个', async () => {
+    const w = await setupGitWorld();
+    const buildId = await w.startBuild();
+    const planStep = await w.claim();
+    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n');
+    await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
+    await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
+    const buildStep = await w.claim();
+    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    await w.done(buildStep.step.id, {
+      status: 'success',
+      sessionId: 'pi-1',
+      hasChanges: true,
+      commit: convSha,
+    });
+    expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
+      202,
+    );
+    expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
+      409,
+    );
+    await w.claim();
+    expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} })).status).toBe(
+      409,
+    );
+    const mergeSteps = w.s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, buildId))
+      .all()
+      .filter((r) => r.kind === 'merge');
+    expect(mergeSteps).toHaveLength(1);
   });
 });
 

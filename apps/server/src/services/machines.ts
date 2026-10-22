@@ -1822,8 +1822,12 @@ export async function finishStep(
   // 合并步落地（02 §4.2：merge 202 delegated → 机器 git merge + push → server
   // bare repo 默认分支 fast-forward [设计]；r3 §3.6「服务端 main 验证」同语义）。
   // 落地失败（非快进/无 commit）= 步按 failed 收尾（失败仅人工重跑，02/A6）。
+  // #1487（2026-10-22 裁决方案 a）：卡在合并步跑的时候被关闭或挪回待开始，
+  // 成功回报不落地——默认分支不动，卡保持现相位，下面落一行时间线说明。
+  const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
+  const landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
   const landingError =
-    stepRow.kind === 'merge' && body.status === 'success'
+    mergeSuccess && !landingSkipped
       ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
       : null;
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
@@ -1849,6 +1853,15 @@ export async function finishStep(
   {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) deps.machineHub.wake(teamId);
+  }
+  if (landingSkipped) {
+    upsertMessage(deps, {
+      id: `merge-not-landed-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: MERGE_NOT_LANDED_NOTE,
+      createdAt: nowMs(),
+    });
   }
   if (body.sessionId !== undefined) {
     db.update(step).set({ sessionId: body.sessionId }).where(eq(step.id, stepId)).run();
@@ -2058,6 +2071,20 @@ export async function finishStep(
   // 失败收尾同函数——闸失败与机器报失败走同一条漏斗）。
   applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`);
   publishStepStatus(deps, stepId);
+}
+
+/** #1487 合并没落地的时间线说明（卡在合并步跑的时候已关闭或挪回待开始）。 */
+export const MERGE_NOT_LANDED_NOTE =
+  '合并步跑完时任务已取消或已挪回待开始，合并没有落地：默认分支保持不变';
+
+/** 合并步所属的卡已离开审核、走向取消（closed / todo）——成功回报不落地
+ * （#1487）。done 不在此列：手动标完成期间合并跑完照常落地。 */
+function mergeCardLeftReview(deps: MachineDeps, stepRow: typeof step.$inferSelect): boolean {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  const todoRow = buildRow
+    ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+    : undefined;
+  return todoRow?.phase === 'closed' || todoRow?.phase === 'todo';
 }
 
 /** 合并落地（M3b [设计]，02 §4.2 merge 202 delegated 的 server 半）：机器合并

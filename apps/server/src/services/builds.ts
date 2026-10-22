@@ -1373,6 +1373,20 @@ export async function requestMerge(
   // 时间线「发起了合并」行（r3 §3.6 实测：`15:06 Xmon Dai 发起了合并`；
   // 行形 [设计]——role user 纯文本 = shared MERGE_ANNOUNCEMENT 单源，呈现层
   // 拼装时间/actor）。
+  // #1487：同一 build 已有在途合并步（排队、等额度或已领走）= 409，不多排一个——
+  // 两个合并步先后跑完会各落一次地、各推一次。
+  const inFlight = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'merge'),
+        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+      ),
+    )
+    .get();
+  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
