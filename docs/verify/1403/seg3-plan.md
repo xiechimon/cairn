@@ -137,3 +137,22 @@ F24. Anonymous grind: the PR read and the required-list reads count toward the p
   - `docs/spec/02` (the grind and reconcile bullets);
   - `docs/spec/28` §8, the P2 row only;
   - evidence `docs/verify/1403/seg3-*`.
+
+## 10. Failure modes added after the first /code-review (2026-10-22)
+
+The first `/code-review` at medium on `origin/claude/bootstrap-p2-seg2b...HEAD` found ten issues. They change F4 and F14 and add the modes below. Tests were written first. The red leg was 11 failed / 40 passed (`seg3-red-green.txt`).
+
+F4 (changed). A required check is missing from the runs: pending. Past the empty-checks grace it is a blocked hint (conclusion `missing`), never green. The check may be reported as a commit status, or sit past the first 100 check runs; this segment reads neither.
+F14 (changed). `dirty` again after 2 merge-conflict rounds at building: no third step. The card goes to failed with the reason, as the `[ci-fix]` round cap does.
+F14b. The same at review: no third step, the card stays at review, one hint per round.
+F13b. `dirty` at review stops the unclaimed verify and review steps before the card goes back to queued. Those steps check the old head.
+F25. At building, the recorded PR is not this build's open PR: a fork PR with the same branch name, a deleted fork (head repo null), a PR from another branch, or a closed PR. No merge-conflict step. Check runs are read by the build's own branch name, as before segment 3.
+F25b. The same at review with `dirty`: no merge-conflict round.
+F26. Several runs share a name (re-runs, two apps, two workflows): one `success` passes the name. A `cancelled` or `skipped` sibling does not block it, with or without a required list.
+F27. The rules read answers 403 or 404 without a rate-limit signal (rulesets are not on this repository's plan): no rules, and the classic list decides. A 403 with a rate-limit signal (header or message) stays unreadable: two more F8 cases.
+F28. The check runs answer 304 after the required list was refreshed: the verdict is recomputed from the cached runs against the current list. The cache keeps runs, not a verdict.
+F29. Housekeeping, with no behaviour test: required-list entries past the TTL are pruned in the sweep; the hint memo keeps grind builds too, not only review builds.
+
+## 11. S4a landed on main (#1503, c99de106), 2026-10-22
+
+S4a's `githubBranchRaw` and `githubBranchRulesRaw` require a token: `commonInvalid` answers `invalid: token` for anything that is not a header-safe token string. The CI grind also runs without a GitHub connection, reading public repositories anonymously (`githubCommitCheckRuns` and `githubPull` take `token: string | null`). So `githubRequiredChecks` stays on the existing `conditionalGetJson` path and is not rebuilt on S4a's raw reads. It is one narrow read with a different contract (a list of names or null), not a copy of S4a's functions. The merge gate (P3) keeps S4a's raw reads for its own decisions.

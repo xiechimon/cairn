@@ -62,12 +62,14 @@ interface Run {
   summary?: string;
 }
 
-function reply(status: number, body: unknown, etag = '"e"') {
+function reply(status: number, body: unknown, etag = '"e"', extra: Record<string, string> = {}) {
   const text = JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (n: string) => (n.toLowerCase() === 'etag' ? etag : null) },
+    headers: {
+      get: (n: string) => (n.toLowerCase() === 'etag' ? etag : (extra[n.toLowerCase()] ?? null)),
+    },
     json: () => Promise.resolve(JSON.parse(text) as unknown),
     text: () => Promise.resolve(text),
   };
@@ -84,12 +86,20 @@ class Fake {
   protection: { contexts: string[]; checks: string[] } | null | number = null;
   /** ruleset 的 required_status_checks；数字 = 状态码。 */
   rules: string[] | number = [];
+  /** rules 读的限流信号（状态码取 rules）：头 = x-ratelimit-remaining 0；text = 只在 message 里。 */
+  rulesRateLimit: 'header' | 'text' | null = null;
   runs: Record<string, Run[]> = {};
   onPull: (() => void) | null = null;
+  /** PR 的 state / head 仓 id（null = fork 已删）/ head 分支（缺省本 build 的工作分支）。 */
+  pullState: 'open' | 'closed' = 'open';
+  headRepoId: number | null = REPO_ID;
+  headRef: string | null = null;
+  /** true = 应答里没有 head.ref（字段不齐的 PR 响应）。 */
+  headRefMissing = false;
 
   reads = (part: string) => this.requests.filter((u) => u.includes(part));
 
-  readonly fetch: FetchLike = async (input) => {
+  readonly fetch: FetchLike = async (input, init) => {
     const url = String(input);
     this.requests.push(url);
     if (/\/pulls\/\d+$/.test(url)) {
@@ -98,17 +108,28 @@ class Fake {
       if (this.pullStatus !== 200) return reply(this.pullStatus, { message: 'x' });
       return reply(200, {
         number: Number(url.split('/').at(-1)),
-        state: 'open',
+        state: this.pullState,
         merged: false,
         title: 'demo',
         author_association: 'OWNER',
         ...(this.mergeableState === null ? {} : { mergeable_state: this.mergeableState }),
-        head: { sha: this.headSha, ref: this.branch, repo: { id: REPO_ID } },
+        head: {
+          sha: this.headSha,
+          ref: this.headRefMissing ? undefined : (this.headRef ?? this.branch),
+          repo: this.headRepoId === null ? null : { id: this.headRepoId },
+        },
         base: { ref: 'main', repo: { id: REPO_ID, default_branch: 'main' } },
       });
     }
     if (/\/rules\/branches\//.test(url)) {
-      if (typeof this.rules === 'number') return reply(this.rules, { message: 'x' });
+      if (typeof this.rules === 'number') {
+        if (this.rulesRateLimit === 'header') {
+          return reply(this.rules, { message: 'x' }, '"e"', { 'x-ratelimit-remaining': '0' });
+        }
+        const message =
+          this.rulesRateLimit === 'text' ? 'You have exceeded a secondary rate limit.' : 'x';
+        return reply(this.rules, { message });
+      }
       return reply(
         200,
         this.rules.length === 0
@@ -146,16 +167,22 @@ class Fake {
     const cr = url.match(/\/commits\/([^/]+)\/check-runs/);
     if (cr !== null) {
       const runs = this.runs[decodeURIComponent(cr[1] ?? '')] ?? [];
-      return reply(200, {
-        total_count: runs.length,
-        check_runs: runs.map((r) => ({
-          name: r.name,
-          status: r.status ?? 'completed',
-          conclusion: r.conclusion === undefined ? 'success' : r.conclusion,
-          head_sha: decodeURIComponent(cr[1] ?? ''),
-          output: { title: null, summary: r.summary ?? null },
-        })),
-      });
+      const etag = `"runs-${JSON.stringify(runs).length}"`;
+      if (init?.headers?.['if-none-match'] === etag) return reply(304, {}, etag);
+      return reply(
+        200,
+        {
+          total_count: runs.length,
+          check_runs: runs.map((r) => ({
+            name: r.name,
+            status: r.status ?? 'completed',
+            conclusion: r.conclusion === undefined ? 'success' : r.conclusion,
+            head_sha: decodeURIComponent(cr[1] ?? ''),
+            output: { title: null, summary: r.summary ?? null },
+          })),
+        },
+        etag,
+      );
     }
     return reply(404, { message: 'Not Found' });
   };
@@ -338,15 +365,19 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     },
   );
 
-  test('[s3-F4] a missing required check is pending, also past the empty-checks grace', async () => {
+  test('[s3-F4] a missing required check is pending; past the empty-checks grace it is a blocked hint (a commit status or a run past page 1 is not read), never green', async () => {
     const w = makeWorld();
     w.fake.protection = { contexts: ['check', 'e2e'], checks: [] };
     w.fake.runs[HEAD] = [{ name: 'check' }];
     const t0 = Date.now();
     await w.poller.sweep(t0);
+    expect(w.systemRows()).toEqual([]);
     await w.poller.sweep(t0 + CI_EMPTY_CHECKS_GRACE_MS + 60_000);
     expect(w.phase()).toBe('building');
     expect(w.steps()).toEqual([]);
+    const hints = w.systemRows().filter((c) => c.includes('「e2e」'));
+    expect(hints).toHaveLength(1);
+    expect(hints[0]).toContain('missing');
   });
 
   test('[s3-F4b] no run at all with a required list: pending past the grace (not "no CI")', async () => {
@@ -401,10 +432,13 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     ['the branch read answers 500', { protection: 500 }],
     ['the branch read answers 404', { protection: 404 }],
     ['the rules read answers 429', { rules: 429 }],
+    ['the rules read answers 403 with x-ratelimit-remaining 0', { rules: 403, rl: 'header' }],
+    ['the rules read answers 403 with a rate-limit message', { rules: 403, rl: 'text' }],
   ] as const)('[s3-F8] %s: no move, no check-runs read', async (_name, o) => {
     const w = makeWorld();
     if ('protection' in o) w.fake.protection = o.protection;
     if ('rules' in o) w.fake.rules = o.rules;
+    if ('rl' in o) w.fake.rulesRateLimit = o.rl;
     w.fake.runs[HEAD] = [{ name: 'check' }];
     await w.poller.sweep();
     expect(w.fake.reads('/check-runs')).toEqual([]);
@@ -498,7 +532,130 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     await w.poller.sweep(t0);
     await w.poller.sweep(t0 + 60_000);
     expect(conflictSteps(w)).toHaveLength(2);
+    // at building the card goes to failed (as the [ci-fix] dead-loop gate does): a person can act on it
+    expect(w.phase()).toBe('failed');
+    const build = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get();
+    expect(build?.errorMessage).toContain('冲突');
+  });
+
+  test('[s3-F14b] dirty after two merge-conflict rounds at review: no third step, the card stays, one hint per round', async () => {
+    const w = makeWorld({ phase: 'review' });
+    for (const i of [1, 2]) {
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-mc-${i}-${w.buildId}`,
+          buildId: w.buildId,
+          kind: 'build',
+          status: 'done',
+          prompt: `${CI_MERGE_CONFLICT_PROMPT_HEAD} round ${i}`,
+          createdAt: Date.now() - 1_000 + i,
+        })
+        .run();
+    }
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    await w.poller.sweep(t0 + 60_000);
+    expect(conflictSteps(w)).toHaveLength(2);
+    expect(w.phase()).toBe('review');
     expect(w.systemRows().filter((c) => c.includes('冲突'))).toHaveLength(1);
+  });
+
+  test('[s3-F13b] dirty at review stops the unclaimed verify step before the card goes back to queued', async () => {
+    const w = makeWorld({ phase: 'review' });
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-v-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'pending',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep();
+    expect(w.phase()).toBe('queued');
+    expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
+  });
+
+  test.each([
+    ['a fork PR with the same branch name', { headRepoId: 9999 }],
+    ['a deleted fork (head repo null)', { headRepoId: null }],
+    ['a PR from another branch', { headRef: 'feature/other' }],
+    ['a closed PR', { pullState: 'closed' }],
+  ] as const)(
+    '[s3-F25] building, the recorded PR is %s: no merge-conflict step; checks are read by the build’s own branch name',
+    async (_name, o) => {
+      const w = makeWorld();
+      Object.assign(w.fake, o);
+      w.fake.mergeableState = 'dirty';
+      await w.poller.sweep();
+      expect(conflictSteps(w)).toEqual([]);
+      expect(w.fake.reads('/check-runs')).toEqual([
+        expect.stringContaining(`/commits/${encodeURIComponent(w.fake.branch)}/check-runs`),
+      ]);
+    },
+  );
+
+  test.each([
+    ['a deleted fork (head repo null)', { headRepoId: null }],
+    ['a PR from another branch', { headRef: 'feature/other' }],
+    ['a response without head.ref', { headRefMissing: true }],
+  ] as const)(
+    '[s3-F25b] review, the recorded PR is %s and dirty: no merge-conflict round',
+    async (_name, o) => {
+      const w = makeWorld({ phase: 'review' });
+      Object.assign(w.fake, o);
+      w.fake.mergeableState = 'dirty';
+      await w.poller.sweep();
+      expect(conflictSteps(w)).toEqual([]);
+      expect(w.phase()).toBe('review');
+    },
+  );
+
+  test('[s3-F26] runs that share a name: one success counts, a cancelled or skipped sibling does not block', async () => {
+    const req = makeWorld();
+    req.fake.protection = { contexts: ['check'], checks: [] };
+    req.fake.runs[HEAD] = [
+      { name: 'check', conclusion: 'cancelled' },
+      { name: 'check', conclusion: 'success' },
+    ];
+    await req.poller.sweep();
+    expect(req.phase()).toBe('review');
+    const none = makeWorld();
+    none.fake.runs[HEAD] = [
+      { name: 'ci', conclusion: 'skipped' },
+      { name: 'ci', conclusion: 'cancelled' },
+      { name: 'ci', conclusion: 'success' },
+    ];
+    await none.poller.sweep();
+    expect(none.phase()).toBe('review');
+  });
+
+  test.each([403, 404])(
+    '[s3-F27] the rules read answers %i (no rulesets on this plan or server): no rules, the classic list decides',
+    async (status) => {
+      const w = makeWorld();
+      w.fake.rules = status;
+      w.fake.runs[HEAD] = [{ name: 'check' }];
+      await w.poller.sweep();
+      expect(w.phase()).toBe('review');
+    },
+  );
+
+  test('[s3-F28] the verdict follows a refreshed required list even when the check runs answer 304', async () => {
+    const w = makeWorld();
+    w.fake.protection = { contexts: ['check', 'gone'], checks: [] };
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    expect(w.phase()).toBe('building');
+    w.fake.protection = { contexts: ['check'], checks: [] };
+    await w.poller.sweep(t0 + 600_001);
+    expect(w.fake.reads('/check-runs')).toHaveLength(2);
+    expect(w.phase()).toBe('review');
   });
 
   test('[s3-F15] dirty with a step in flight: nothing', async () => {
@@ -658,14 +815,17 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
   });
 
   test('[s3-F24] anonymous: the grind’s PR and required-list reads count toward the per-IP total', async () => {
-    const w = makeWorld({ connected: false, anonIpReadsPerHour: 4 });
+    // five per IP: the grind's four reads leave one, and the review PR read needs two free
+    // slots (counting the two required-list reads as one would leave two)
+    const w = makeWorld({ connected: false, anonIpReadsPerHour: 5 });
     w.fake.runs[HEAD] = [{ name: 'check', status: 'in_progress', conclusion: null }];
-    // a review card in the same project: its PR read needs two free slots
     const r = makeWorld({ phase: 'review', s: w.s, fake: w.fake });
     await w.poller.sweep();
     // the grind read the PR, the branch, the rules and the check runs: four
     expect(w.fake.reads('/check-runs')).toHaveLength(1);
-    expect(w.fake.reads('/pulls/201')).toHaveLength(1);
+    expect(w.fake.reads('/branches/')).toHaveLength(2);
+    // only the grind's PR read: the review card's read was skipped for the budget
+    expect(w.fake.reads('/pulls/')).toHaveLength(1);
     expect(r.phase()).toBe('review');
   });
 });

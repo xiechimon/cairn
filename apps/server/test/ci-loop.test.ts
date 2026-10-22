@@ -61,7 +61,8 @@ function headOf(prNumber: number): string {
   return prNumber.toString(16).padStart(8, '0').repeat(5);
 }
 
-/** GitHub mock：pulls/{n} 回开着的 PR（head = headOf(n)，mergeable_state clean），默认分支
+/** GitHub mock：pulls/{n} 回本 build 开着的 PR（head = headOf(n)、head 分支 = state.branch，
+ * mergeable_state clean），默认分支
  * 的保护与规则回空（没有必需检查），commits/{sha}/check-runs 按状态回应。只把 check-runs
  * 请求记进 requests（URL + 头；磨绿的计数纪律按它），其余记进 otherRequests。
  * if-none-match 命中 etag 且状态 200 → 304（真实 GitHub 的条件 GET 语义）。 */
@@ -75,6 +76,8 @@ class CheckRunsMock {
       etag?: string;
       /** 覆盖 check-runs 的状态码（429 限流面 / 404 读不到面）。 */
       status?: number;
+      /** 本 build 的工作分支（PR 的 head ref；对不上时磨绿按分支名读，#1403 段 3）。 */
+      branch: string;
     },
   ) {}
 
@@ -90,7 +93,7 @@ class CheckRunsMock {
           state: 'open',
           merged: false,
           mergeable_state: 'clean',
-          head: { sha: headOf(n), ref: 'x', repo: { id: 1 } },
+          head: { sha: headOf(n), ref: this.state.branch, repo: { id: 1 } },
           base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
         }),
       );
@@ -261,6 +264,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     checks: opts.checks ?? [],
     etag: opts.etag,
     status: opts.status,
+    branch: conversationBranch(buildId),
   });
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
   return {
@@ -342,7 +346,7 @@ function addCandidate(
     todoId,
     buildId,
     prNumber,
-    mock: new CheckRunsMock({ checks }),
+    mock: new CheckRunsMock({ checks, branch: conversationBranch(buildId) }),
   };
 }
 

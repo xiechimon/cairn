@@ -195,7 +195,9 @@ export interface CiCheckFailure {
 
 export type CheckVerdict =
   | { state: 'green' }
-  | { state: 'pending' }
+  /** missing：必需检查里还没有任何 run 的名字（其余必需检查都已完成且没有可修的失败）。
+   * 超过 CI_EMPTY_CHECKS_GRACE_MS 仍缺 → 调用方按 blocked 提示（conclusion 记 missing）。 */
+  | { state: 'pending'; missing?: string[] }
   /** PR head 零 check run（仓无 CI / CI 未注册竞态——宽限归调用方；只在没有必需名单时出现）。 */
   | { state: 'empty' }
   | { state: 'red'; failures: CiCheckFailure[] }
@@ -203,49 +205,43 @@ export type CheckVerdict =
    * stale）：不推进、不派修复步，提示交人（#1403 段 3）。 */
   | { state: 'blocked'; checks: { name: string; conclusion: string }[] };
 
-/** 可修的失败结论（派 [ci-fix]）。 */
+/** 可修的失败结论（派 [ci-fix]）。没有必需名单时 action_required 不算（沿用段 3 前）。 */
 const FIXABLE = new Set(['failure', 'timed_out', 'action_required']);
+const FIXABLE_UNREQUIRED = new Set(['failure', 'timed_out']);
 
-/** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。
- * - 必需名单非空：只看名单里的名字。某个名字没有 run → pending；有没完成的 → pending；
- *   failure / timed_out / action_required → red；全 success → 过；其余结论（cancelled、
- *   neutral、skipped、stale）→ blocked。
+/** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。同名的 run
+ * （不同 app 或 workflow 报的同一个名字）合成一个名字看：有没完成的 → pending；有可修的
+ * 失败 → red；有一个 success → 这个名字过。
+ * - 必需名单非空：只看名单里的名字。有没完成的 → pending；failure / timed_out /
+ *   action_required → red；某个名字没有 run → pending（missing）；有名字没有 success
+ *   （cancelled、neutral、skipped、stale）→ blocked；否则 green。
  * - 必需名单为空（默认分支没有保护也没有规则）：看全部 run。零个 → empty；有没完成的 →
- *   pending；failure / timed_out → red；cancelled → blocked；其余（success、neutral、
- *   skipped）→ green：没有必需检查时 neutral 与 skipped 本就不挡。
+ *   pending；failure / timed_out → red；某个名字没有 success 而有 cancelled → blocked；其余
+ *   green：没有必需检查时 neutral 与 skipped 本就不挡。
  * pending 先于红绿判（「pending 被误判红」的闸）。 */
 export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = []): CheckVerdict {
-  const failure = (r: GithubCheckRun): CiCheckFailure => ({
-    name: r.name,
-    conclusion: r.conclusion ?? '',
-    summary: r.outputSummary ?? r.outputTitle,
-  });
-  if (required.length > 0) {
-    const counted = runs.filter((r) => required.includes(r.name));
-    if (required.some((name) => !counted.some((r) => r.name === name))) return { state: 'pending' };
-    if (counted.some((r) => r.status !== 'completed')) return { state: 'pending' };
-    const failures = counted.filter((r) => FIXABLE.has(r.conclusion ?? '')).map(failure);
-    if (failures.length > 0) return { state: 'red', failures };
-    const blocked = counted.filter((r) => r.conclusion !== 'success');
-    if (blocked.length > 0) {
-      return {
-        state: 'blocked',
-        checks: blocked.map((r) => ({ name: r.name, conclusion: r.conclusion ?? '' })),
-      };
-    }
-    return { state: 'green' };
-  }
-  if (runs.length === 0) return { state: 'empty' };
-  if (runs.some((r) => r.status !== 'completed')) return { state: 'pending' };
-  const failures = runs
-    .filter((r) => r.conclusion === 'failure' || r.conclusion === 'timed_out')
-    .map(failure);
+  const fixable = required.length > 0 ? FIXABLE : FIXABLE_UNREQUIRED;
+  const counted = required.length > 0 ? runs.filter((r) => required.includes(r.name)) : runs;
+  if (required.length === 0 && counted.length === 0) return { state: 'empty' };
+  if (counted.some((r) => r.status !== 'completed')) return { state: 'pending' };
+  const failures = counted
+    .filter((r) => fixable.has(r.conclusion ?? ''))
+    .map((r) => ({
+      name: r.name,
+      conclusion: r.conclusion ?? '',
+      summary: r.outputSummary ?? r.outputTitle,
+    }));
   if (failures.length > 0) return { state: 'red', failures };
-  const cancelled = runs.filter((r) => r.conclusion === 'cancelled');
-  if (cancelled.length > 0) {
+  const missing = required.filter((name) => !counted.some((r) => r.name === name));
+  if (missing.length > 0) return { state: 'pending', missing };
+  const passed = new Set(counted.filter((r) => r.conclusion === 'success').map((r) => r.name));
+  const blocked = counted.filter(
+    (r) => !passed.has(r.name) && (required.length > 0 || r.conclusion === 'cancelled'),
+  );
+  if (blocked.length > 0) {
     return {
       state: 'blocked',
-      checks: cancelled.map((r) => ({ name: r.name, conclusion: 'cancelled' })),
+      checks: blocked.map((r) => ({ name: r.name, conclusion: r.conclusion ?? '' })),
     };
   }
   return { state: 'green' };
@@ -310,12 +306,13 @@ function deadLoopMessage(rounds: number): string {
 /** ETag 缓存行（进程内存——单进程 server；重启失缓存 = 下轮多一次全量读，
  * 无害）。verdict 缓存仅在 304 时复用（200 恒刷新）。 */
 interface PrChecksCacheEntry {
-  /** 这份 etag 对应的 head SHA（head 变了不带它）。 */
+  /** 这份 etag 对应的提交（PR 的 head SHA；不是本 build 开着的 PR 时为分支名）。变了不带它。 */
   sha: string;
   etag: string | null;
-  verdict: CheckVerdict | null;
-  /** 首见「空 checks」的时刻（宽限锚点；非空 verdict 恒 null）。 */
-  emptySince: number | null;
+  /** 上次读到的 check runs：304 时按当时的必需名单重判（名单可能已刷新）。 */
+  runs: GithubCheckRun[];
+  /** 首见「空 checks」或「必需检查缺 run」的时刻（宽限锚点；别的判据恒 null）。 */
+  waitSince: number | null;
 }
 
 interface CiPollTally {
@@ -485,26 +482,32 @@ export function createCiPoller(
   }
 
   /** 解冲突轮（#1403 段 3，spec 23 同分支续轮）：PR 与默认分支冲突 → 同一 build 派一条
-   * [merge-conflict] 执行步；review 上的卡先回 queued（领取时进 building，磨绿接手）。已跑满
-   * CI_MERGE_CONFLICT_ROUNDS_MAX 轮仍冲突 → 不再派，每轮提示一次。调用方已核对卡仍在原相位、
-   * 没有步在飞。 */
+   * [merge-conflict] 执行步；review 上的卡先停掉没领走的 verify / review 步（交付要变，它们
+   * 验的是旧 head；回 review 时 completeStep 与磨绿重排），再回 queued（领取时进 building，
+   * 磨绿接手）。已跑满 CI_MERGE_CONFLICT_ROUNDS_MAX 轮仍冲突 → 不再派：building 上按死循环闸
+   * 转 failed（同 [ci-fix]），review 上每轮提示一次、卡留在关口。调用方已核对卡仍在原相位、
+   * 是本 build 开着的 PR、没有步在飞。 */
   function mergeConflictRound(
     cand: { buildId: string; todoId: string },
     teamId: string,
     pr: { prNumber: number; prUrl: string | null },
     defaultBranch: string,
     fromReview: boolean,
-  ): void {
+  ): 'appended' | 'failed' | 'hinted' {
     const rounds = countMarkedRounds(deps.db, cand.buildId, CI_MERGE_CONFLICT_PROMPT_HEAD);
     if (rounds >= CI_MERGE_CONFLICT_ROUNDS_MAX) {
-      hintOnce(
-        cand.buildId,
-        `PR #${pr.prNumber} 与默认分支「${githubText(defaultBranch)}」冲突，已自动解冲突 ${rounds} 轮仍冲突：不再派解冲突步，由人处理（在 GitHub 上解决冲突，或打回重做）。`,
-        roundStart(deps, cand.buildId),
-      );
-      return;
+      const text = `PR #${pr.prNumber} 与默认分支「${githubText(defaultBranch)}」冲突，已自动解冲突 ${rounds} 轮仍冲突：不再派解冲突步，由人处理（在 GitHub 上解决冲突，或打回重做）。`;
+      if (!fromReview) {
+        failWithMessage(cand, teamId, text);
+        return 'failed';
+      }
+      hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
+      return 'hinted';
     }
-    if (fromReview) setTodoPhase(deps, cand.todoId, 'queued');
+    if (fromReview) {
+      stopUnclaimedGateSteps(deps, cand.buildId);
+      setTodoPhase(deps, cand.todoId, 'queued');
+    }
     enqueueStep(
       deps,
       cand.buildId,
@@ -512,6 +515,7 @@ export function createCiPoller(
       teamId,
       buildMergeConflictPrompt({ ...pr, defaultBranch, round: rounds + 1 }),
     );
+    return 'appended';
   }
 
   /** 同一条提示每轮（since 起）只落一次（按内容去重）。不计数：每次 sweep 由调用方
@@ -703,19 +707,24 @@ export function createCiPoller(
       const state = pull?.mergeableState ?? null;
       if (
         pull !== null &&
-        pull.defaultBranch !== null &&
+        // 不是 foreign 且字段齐 = 本 build 自己的 PR（foreign 的判据就是这两样）。
+        hasPullFields(pull) &&
         (state === 'dirty' || state === 'behind') &&
         freshReviewRow(cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
       ) {
         if (state === 'dirty') {
-          mergeConflictRound(
+          const done = mergeConflictRound(
             cand,
             todoRow.teamId,
             { prNumber, prUrl: buildRow.prUrl },
             pull.defaultBranch,
             true,
           );
+          if (done === 'appended') {
+            tally.reviewPending += 1;
+            return;
+          }
         } else {
           hintOnce(
             cand.buildId,
@@ -1008,30 +1017,35 @@ export function createCiPoller(
     );
     const pull =
       pullPage === null ? null : pullPage.notModified ? (pullEntry?.pull ?? null) : pullPage.pull;
-    if (
-      pullPage === null ||
-      pull === null ||
-      pull.headSha === null ||
-      pull.defaultBranch === null
-    ) {
+    if (pullPage === null || pull === null || pull.defaultBranch === null) {
       grindPullCache.delete(key);
       tally.unreadable += 1;
       return;
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
-    if (pull.mergeableState === 'dirty') {
+    // 记的 PR 是本 build 开着的那张（同仓、head 是工作分支）才按它的 head SHA 读、按它的
+    // mergeable_state 解冲突；不是（fork 同名分支、别的分支、已关闭）→ 按本 build 的工作分支
+    // 名读 check runs（段 3 前的读法），不解冲突：别人的 PR 冲突不归本 build 修。
+    const branch = conversationBranch(cand.buildId);
+    const own = hasPullFields(pull) && isOwnPull(pull, branch) && pull.state === 'open';
+    if (own && pull.headSha === null) {
+      tally.unreadable += 1;
+      return;
+    }
+    if (own && pull.mergeableState === 'dirty') {
       if (freshGrindRow(cand.todoId) === null || hasActiveStep(deps, cand.buildId)) {
         tally.skipped += 1;
         return;
       }
-      mergeConflictRound(
+      const done = mergeConflictRound(
         cand,
         todoRow.teamId,
         { prNumber: buildRow.prNumber, prUrl: buildRow.prUrl },
         pull.defaultBranch,
         false,
       );
-      tally.appended += 1;
+      if (done === 'failed') tally.failed += 1;
+      else tally.appended += 1;
       return;
     }
     // 必需检查名单（默认分支的保护与规则）：按仓库与默认分支缓存；读不到 → 不动。
@@ -1056,7 +1070,7 @@ export function createCiPoller(
       required = { at: now, names };
       requiredCache.set(reqKey, required);
     }
-    const headSha = pull.headSha;
+    const headSha = own && pull.headSha !== null ? pull.headSha : branch;
     const cached = cache.get(key);
     const entry = cached?.sha === headSha ? cached : null;
     if (grindToken === null) recordGrindAnonRead(now);
@@ -1074,27 +1088,31 @@ export function createCiPoller(
       tally.unreadable += 1; // 限流/私仓匿名/网络 = 读不到 ≠ 红：不动，下轮重试
       return;
     }
-    let verdict: CheckVerdict;
-    let emptySince: number | null = null;
-    if (page.notModified) {
-      verdict = entry?.verdict ?? { state: 'empty' }; // etag 只在有缓存行时发送，此处恒有
-      emptySince = entry?.emptySince ?? now;
-    } else {
-      verdict = verdictOfCheckRuns(page.checkRuns, required.names);
-      emptySince = verdict.state === 'empty' ? (entry?.emptySince ?? now) : null;
-    }
-    cache.set(key, { sha: headSha, etag: page.etag, verdict, emptySince });
+    // 304 → 用上次的 runs 按当前名单重判（etag 只在有缓存行时发送，此处恒有）。
+    const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
+    let verdict = verdictOfCheckRuns(runs, required.names);
+    const waiting = verdict.state === 'empty' || (verdict.state === 'pending' && verdict.missing);
+    const waitSince = waiting ? (entry?.waitSince ?? now) : null;
+    cache.set(key, { sha: headSha, etag: page.etag, runs, waitSince });
+    // 竞态窗内（CI 可能还没注册 check）：不动。
+    const inGrace = now - (waitSince ?? now) < CI_EMPTY_CHECKS_GRACE_MS;
     if (verdict.state === 'pending') {
+      if (verdict.missing === undefined || inGrace) {
+        tally.pending += 1;
+        return;
+      }
+      // 超宽限仍缺的必需检查：不当「仓无 CI」放行，按不算通过提示交人（它可能报在 commit
+      // status 上，或在 check runs 第一页之外——这两处都不读）。
+      verdict = {
+        state: 'blocked',
+        checks: verdict.missing.map((name) => ({ name, conclusion: 'missing' })),
+      };
+    }
+    if (verdict.state === 'empty' && inGrace) {
       tally.pending += 1;
       return;
     }
-    if (verdict.state === 'empty') {
-      if (now - (emptySince ?? now) < CI_EMPTY_CHECKS_GRACE_MS) {
-        tally.pending += 1; // 竞态窗内（CI 可能还没注册 check）：不动
-        return;
-      }
-      // 超宽限 = 仓无 CI（且没有必需检查）：无可磨，按绿交人（不把无 CI 仓锁死在 building）。
-    }
+    // empty 超宽限 = 仓无 CI（且没有必需检查）：无可磨，按绿交人（不把无 CI 仓锁死在 building）。
     // 写面前再读当前 phase（④）：网络窗内被人工推进/关闭 → 弃写。
     if (freshGrindRow(cand.todoId) === null) {
       tally.skipped += 1;
@@ -1107,7 +1125,7 @@ export function createCiPoller(
         .join('、');
       hintOnce(
         cand.buildId,
-        `PR #${buildRow.prNumber} 的 head ${headSha.slice(0, 7)} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
+        `PR #${buildRow.prNumber} 的 head ${own ? headSha.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
         roundStart(deps, cand.buildId),
       );
       tally.pending += 1;
@@ -1235,6 +1253,13 @@ export function createCiPoller(
     for (const k of foreignListedAt.keys())
       if (!liveKeys.has(k.slice(k.indexOf('\u0000') + 1))) foreignListedAt.delete(k);
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
+    for (const k of requiredCache.keys()) {
+      if (now - (requiredCache.get(k)?.at ?? now) >= CI_REQUIRED_CHECKS_TTL_MS) {
+        requiredCache.delete(k);
+      }
+    }
+    // 磨绿候选的提示也走 rowKnown（blocked 提示）：它们的记忆一并留着。
+    for (const c of candidates) reviewBuilds.add(c.buildId);
     for (const k of knownRows)
       if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
     run.logger?.info(tally, 'ci pr-checks sweep');

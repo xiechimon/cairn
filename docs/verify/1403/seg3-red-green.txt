@@ -1,0 +1,56 @@
+# #1403 segment 3: red and green legs
+
+Branch claude/bootstrap-p2-seg3, worktree .claude/worktrees/p3a. Command: pnpm exec vitest run test/pr-seg3.test.ts (apps/server).
+
+## Leg 1: plan failure modes F1-F24 (2026-10-22, tests written before ci-loop.ts / github.ts / builds.ts changes)
+
+Red: 26 failed / 13 passed (39). Failing lines:
+  x [s3-F1] the grind reads the PR, then the check runs of its head SHA (not the branch name)
+  x [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+  x [s3-F3] a required check concluding skipped: no advance, no fix round, one hint per round
+  x [s3-F3] a required check concluding cancelled: no advance, no fix round, one hint per round
+  x [s3-F4] a missing required check is pending, also past the empty-checks grace
+  x [s3-F4b] no run at all with a required list: pending past the grace (not "no CI")
+  x [s3-F5] a non-required check fails while the required ones pass: green
+  x [s3-F6] a required check concluding failure: a [ci-fix] round
+  x [s3-F6] a required check concluding timed_out: a [ci-fix] round
+  x [s3-F6] a required check concluding action_required: a [ci-fix] round
+  x [s3-F7] no required list: neutral and skipped do not block, cancelled does
+  x [s3-F8] the branch read answers 500: no move, no check-runs read
+  x [s3-F8] the branch read answers 404: no move, no check-runs read
+  x [s3-F8] the rules read answers 429: no move, no check-runs read
+  x [s3-F9] required names: classic contexts, classic checks and ruleset checks together
+  x [s3-F10] the required list is read once per repository and branch for ten minutes
+  x [s3-F11] the PR read fails (502): no check-runs read, no move
+  x [s3-F11] the PR read fails (a network error): no check-runs read, no move
+  x [s3-F12] dirty at building: one [merge-conflict] step on the same build, no [ci-fix]
+  x [s3-F13] dirty at review: the card goes back to queued with one [merge-conflict] step
+  x [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+  x [s3-F17] behind at review: one hint per round naming update-branch, no request, phase kept
+  x [s3-F17b] behind at building: the checks decide
+  x [s3-F19] a blocked-check hint cleans GitHub text
+  x [s3-F20] completeStep writes finishedAt; the last pushed checkpoint follows it
+  x [s3-F23] merge-conflict rounds do not count as CI fix rounds
+
+Green after the implementation: 39 passed (39).
+
+## Leg 2: the ten /code-review findings (F4 and F14 changed, F13b, F14b, F25, F25b, F26, F27, F28)
+
+Red: 11 failed / 40 passed (51). Failing lines:
+  x [s3-F4] a missing required check is pending; past the empty-checks grace it is a blocked hint (a commit status or a run past page 1 is not read), never green
+  x [s3-F14] dirty after two merge-conflict rounds: no third step, one hint per round
+  x [s3-F13b] dirty at review stops the unclaimed verify step before the card goes back to queued
+  x [s3-F25] building, the recorded PR is a fork PR with the same branch name: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a deleted fork (head repo null): no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a PR from another branch: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25] building, the recorded PR is a closed PR: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F26] runs that share a name: one success counts, a cancelled or skipped sibling does not block
+  x [s3-F27] the rules read answers 403 (no rulesets on this plan or server): no rules, the classic list decides
+  x [s3-F27] the rules read answers 404 (no rulesets on this plan or server): no rules, the classic list decides
+  x [s3-F28] the verdict follows a refreshed required list even when the check runs answer 304
+
+Green after the fixes: 51 passed (51); with the later F8, F24 and F25b additions, 54 passed (54). ci-loop.test.ts then failed 2/24: its mock answered pulls/{n} with head ref 'x', which the own-PR check (F25) now reads by branch name. The mock now answers with the build's own branch: 24 passed (24).
+
+Two F8 cases were added after the fix (the rules read answers 403 with a rate-limit header, or with a rate-limit message): they passed at once, so mutation M15 in seg3-mutations.txt is their red leg.
+
+Server suite after the fixes: 129 files, 2167 passed, 1 skipped.
