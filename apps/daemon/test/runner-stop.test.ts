@@ -9,6 +9,8 @@
 //   2. discard=false → 不 rewind（worktree 保留本轮改动）+ done(stopped)
 //   3. plan 步停止 → plan.md 不上传（transcript.json 照传）
 //   4. 停止后 journal 清账（recover 面不残留）+ sessionHandles/停止位注销
+//   5. recover 带入重启前已接收的 discard 停止 → 不开会话，照样 rewind 到
+//      步起点 + done(stopped)
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -248,7 +250,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
   throw new Error('waitFor timeout');
 }
 
-async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
+async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean; recovered?: boolean }) {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-stop-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
@@ -274,12 +276,16 @@ async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
     heartbeatIntervalMs: 60_000,
   };
   const claimed = claimedBuildStep(opts.kind ?? 'build');
-  const running = runStep(deps, claimed);
-  await waitFor(() => handles.length === 1);
-  // 模拟 deliverStop：拉取-确认后投给本步的 run。
-  await stops.get('s1')?.deliver({ discard: opts.discard });
-  await running;
-  return { client, journal, calls, lines, sessionHandles, stops, cwd };
+  if (opts.recovered) {
+    await runStep(deps, claimed, { stopRequest: { discard: opts.discard } });
+  } else {
+    const running = runStep(deps, claimed);
+    await waitFor(() => handles.length === 1);
+    // 模拟 deliverStop：拉取-确认后投给本步的 run。
+    await stops.get('s1')?.deliver({ discard: opts.discard });
+    await running;
+  }
+  return { client, journal, calls, lines, sessionHandles, stops, cwd, handles };
 }
 
 describe('runner 停止收尾（M7 #308）', () => {
@@ -316,5 +322,13 @@ describe('runner 停止收尾（M7 #308）', () => {
     expect(journal.pending()).toEqual([]);
     expect(sessionHandles.has('s1')).toBe(false);
     expect(stops.get('s1')).toBeUndefined();
+  });
+
+  test('失败方式 5：recover 带入 discard 停止 → 不开会话，rewind 到步起点 + done(stopped)', async () => {
+    const { client, calls, handles } = await setup({ discard: true, recovered: true });
+    expect(handles).toHaveLength(0);
+    expect(calls).toContain(`restoreCheckpoint:abc123`);
+    expect(calls).not.toContain('commitAll');
+    expect(client.doneBodies[0]!.body.status).toBe('stopped');
   });
 });

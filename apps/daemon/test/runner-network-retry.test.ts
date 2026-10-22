@@ -11,6 +11,8 @@
 //     单轮收尾 failed。
 //  5. 停止钮在位 → 不重试（用户要的是退出，不是续跑）。
 //  5b. 停止在两轮之间（续跑会话开启途中）到达 → 续跑会话一开即中断，报 stopped。
+//  5c. 停止在末次重试的退避等待中到达（真 pi 失败流以 done 收尾）→ 不开末轮，
+//      报 stopped，不报上轮的网络错误。
 //  6. 中途有进展的流断 → 重试走 continue（断点续跑，不重放整轮）。
 
 import { mkdtempSync } from 'node:fs';
@@ -217,6 +219,7 @@ function scriptedNetworkBackend(
 interface RunCaseOpts {
   stopRequested?: boolean;
   stopBeforeRetry?: boolean;
+  stopDuringFinalWait?: boolean;
   finalWaitMs?: number;
 }
 
@@ -235,6 +238,13 @@ async function runNetworkCase(
   const journal = new StepJournal(paths.outboxDir);
   const stops = new StepStops();
   const stopNow = () => void stops.get('step-net1')?.deliver({ discard: false });
+  if (opts.stopDuringFinalWait) {
+    const step = logger.step;
+    logger.step = (msg) => {
+      step(msg);
+      if (msg.includes('before final attempt')) stopNow();
+    };
+  }
   const { backend, opened } = scriptedNetworkBackend(
     scripts,
     opts.stopRequested ? stopNow : undefined,
@@ -347,6 +357,21 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
 
     expect(opened).toHaveLength(2);
     expect(client.doneBodies[0]?.body.status).toBe('stopped');
+  });
+
+  test('失败方式 5c：停止在末次重试的退避等待中到达 → 不开末轮，报 stopped', async () => {
+    const failedRound: Script = [
+      { type: 'error', error: { message: NETWORK_ERROR, retryable: false } },
+      { type: 'done', usage: [] },
+    ];
+    const { client, opened } = await runNetworkCase([failedRound, failedRound], {
+      stopDuringFinalWait: true,
+      finalWaitMs: 1,
+    });
+
+    expect(opened).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('stopped');
+    expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
   });
 
   test('失败方式 6：中途有进展的流断 → 重试仍走 continue（断点续跑，不重放整轮）', async () => {

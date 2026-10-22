@@ -1448,7 +1448,6 @@ async function runClaimedStep(
     });
   };
   for (let pass = 0; ; pass++) {
-    if (stop.request !== null) break;
     if (pass > 0) {
       // 回落轮状态复位。duration cap 不在此复位——它是步级预算（#699）。
       // 增量缓冲显式丢弃（不 flush）：网络重试可在有进展后 continue，旧轮
@@ -1474,6 +1473,7 @@ async function runClaimedStep(
       }
       deltaBuf = '';
     }
+    if (stop.request !== null) break;
     // 回落轮带 resetLive：hub / 客户端清掉上轮在飞思考与正文；首轮不带。
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
