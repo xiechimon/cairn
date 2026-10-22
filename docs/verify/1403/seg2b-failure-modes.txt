@@ -279,3 +279,10 @@ D40c (2026-10-22, after /code-review of ae058c9f; tests first, 4 red): the wait 
     x-ratelimit-reset), as GithubRateLimitedError.retryAt does for the intake reads; an
     empty, blank, negative or fractional header counts as absent. The merge path now uses
     the intake's header parser (rateLimitOf in lib/github.ts) instead of its own.
+D40d (2026-10-22, second /code-review of the rate-limit change): a header of more than ten
+    digits counts as absent (a larger UTC-second value is past the Date range and
+    toISOString throws, which turned the 409 into a 500 and could break the intake and
+    webhook catches that share the parser). The rate-limited refusal also gives the same
+    next step as the other refusals (press merge later, or merge on GitHub). The test case
+    was added together with the fix; its red leg is reasoned (the old parser accepted the
+    value and toISOString throws), not recorded.

@@ -98,3 +98,17 @@ Considered and dismissed (confidence in brackets):
   merge) is the same as before (a machine merge step).
 Commits after bdeb6378 (dd6fdc1e, 86690452, aa33fd34) tighten the same path (author check,
 restore conditions, texts) and add no new request or credential use.
+
+Rate-limited merge (coordinator's decision, 2026-10-22)
+-------------------------------------------------------
+/code-review, medium, on ae058c9f: 3 findings, all fixed in 03549d78 (tests first, D40c):
+reset shown before retry-after; malformed headers read as 0; a second copy of the header
+parser (now rateLimitOf, shared with the intake reads).
+/code-review, medium, on ae058c9f..03549d78: 6 findings. Fixed: out-of-range header values
+made toISOString throw (bounded to ten digits, D40d); the rate-limited refusal lacked the
+next-step hint. Not changed: detection (isRateLimited) still treats any retry-after and an
+exact "0" remaining as the signal, as the intake reads do, so a 403 refusal that used the
+last quota unit reads as rate-limited (the GitHub message is still shown); the merge message
+orders retry-after before reset inline instead of calling retryAt(); the result carries a
+GithubRateLimitedError value object.
+Mutations for the touched rule: 7 run (R1-R7), 7 caught (seg2b-mutations.txt).

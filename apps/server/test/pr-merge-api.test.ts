@@ -855,6 +855,12 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['an empty x-ratelimit-reset', { 'x-ratelimit-reset': ' ' }, null, '1970'],
     ['an empty retry-after', { 'retry-after': '' }, null, '0 秒'],
     ['a fractional retry-after', { 'retry-after': '1.5' }, null, '1.5'],
+    [
+      'an x-ratelimit-reset beyond any date',
+      { 'x-ratelimit-reset': '99999999999999' },
+      '直接在那里合并',
+      '99999',
+    ],
   ] as const)(
     '[2b-D40c] rate-limited with %s → the wait shown follows retry-after first and ignores malformed values',
     async (_name, headers, shown, absent) => {

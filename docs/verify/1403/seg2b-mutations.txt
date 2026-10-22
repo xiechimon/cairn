@@ -532,3 +532,67 @@ M51  reconcile uses the team token when there is one
     x [2b-P5] a failed list read counts within one close only: the card leaving review and coming back starts again
     x [s2-T3] the first closed sighting is dropped when the card leaves review
 
+
+Rate-limited merge (2026-10-22), tree 03549d78, same command and runner:
+
+R1  D40 a rate-limited PUT is its own outcome
+  file: apps/server/src/lib/github.ts
+  mutation: rate limits fall through to the status rules
+  result: caught (Tests  5 failed | 275 passed (280))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+
+R2  D40 the rate-limited outcome is a 409 with no row
+  file: apps/server/src/services/builds.ts
+  mutation: the rate-limited branch is skipped (rows and 202 follow)
+  result: caught (Tests  9 failed | 271 passed (280))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty x-ratelimit-reset → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with a fractional retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row
+
+R3  D40 the reset time from x-ratelimit-reset
+  file: apps/server/src/lib/github.ts
+  mutation: resetAt is always null
+  result: caught (Tests  2 failed | 278 passed (280))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+
+R4  D40c retry-after comes first
+  file: apps/server/src/services/builds.ts
+  mutation: x-ratelimit-reset is shown first
+  result: caught (Tests  1 failed | 279 passed (280))
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+
+R5  D13 5xx stays no clear answer
+  file: apps/server/src/lib/github.ts
+  mutation: 5xx becomes a refusal
+  result: caught (Tests  4 failed | 276 passed (280))
+    x [2b-D13/D14] PUT gives no clear answer (500) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (502) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (503) → 202, the announcement and one row; review stays
+    x [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing
+
+R6  D40b a failed card is not restored on a rate limit
+  file: apps/server/src/services/builds.ts
+  mutation: the rate-limited branch restores the card first
+  result: caught (Tests  1 failed | 279 passed (280))
+    x [2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row
+
+R7  D40c malformed headers count as absent
+  file: apps/server/src/lib/github.ts
+  mutation: any header value is a number
+  result: caught (Tests  3 failed | 277 passed (280))
+    x [2b-D40c] rate-limited with an empty x-ratelimit-reset → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with a fractional retry-after → the wait shown follows retry-after first and ignores malformed values
+
+Result: 7 mutations, 7 caught.

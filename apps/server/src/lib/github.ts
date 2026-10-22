@@ -491,14 +491,15 @@ export class GithubRateLimitedError extends Error {
 }
 
 /** 限流应答的头 → GithubRateLimitedError（进料读与合并写共用）。头不在、空串或不是非负
- * 整数 = 没给（Number('') 是 0，不能当「0 秒后」）。 */
+ * 整数 = 没给（Number('') 是 0，不能当「0 秒后」）；超过 10 位的数同样不算（UTC 秒到
+ * 2286 年为止，再大 new Date 就出界，toISOString 会抛）。 */
 function rateLimitOf(
   url: string,
   res: { status: number; headers: { get(n: string): string | null } },
 ): GithubRateLimitedError {
   const seconds = (name: string): number | null => {
     const v = res.headers.get(name)?.trim() ?? '';
-    return /^\d+$/.test(v) ? Number(v) : null;
+    return /^\d{1,10}$/.test(v) ? Number(v) : null;
   };
   const reset = seconds('x-ratelimit-reset');
   return new GithubRateLimitedError(

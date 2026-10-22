@@ -1705,7 +1705,7 @@ async function mergeThroughGithub(
             : '';
       throw new HttpError(
         409,
-        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}`,
+        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}——稍后再点合并，或直接在那里合并（${hint}）`,
       );
     }
     if (result.kind === 'refused') {
