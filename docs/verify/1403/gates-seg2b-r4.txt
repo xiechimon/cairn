@@ -1,0 +1,17 @@
+Segment 2b, merge of main f8483f7 (#1525), 2026-10-22
+Tree: 8054460c (merge of origin/main f8483f73 into ff4c4247)
+
+Conflict: docs/spec/28 section 8, P2 and P3 rows only.
+- P2 row: this branch's row kept; owner column notes the user's 2026-10-22 authorisation for the session to merge after pr-gate go and green CI; status: segments 1 and 2 merged, 2b this PR, segment 3 not yet opened.
+- P3 row: main's row kept; S4b recorded as #1525, merged, f8483f7; S5 onward handed to pacman's own build.
+lib/github.ts merged without conflict.
+
+Gates (all exit 0):
+pnpm typecheck: exit 0
+pnpm lint: exit 0 (, apps/web/src/resources/machines-page.tsx, not touched by this branch)
+pnpm spec:parse: exit 0
+pnpm exec vitest run --changed origin/main: exit 0
+ Test Files  156 passed (156)
+      Tests  2089 passed | 1 skipped (2090)
+E2E_AFFECTED_PORT=8411 pnpm --filter @pacman/web e2e:affected: exit 0 (port 8411 checked free with lsof; full suite because the branch diff includes i18n/en.ts)
+  1182 passed (11.0m)
