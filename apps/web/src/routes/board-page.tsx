@@ -820,12 +820,13 @@ export function BoardPage() {
                   return;
                 }
                 // XMON-89：关弹层改挂 onSuccess——被拒（403/409）时弹层留着
-                // 显原因；#1236：202 委派到相位推进之间隔着机器执行，toast
+                // 显原因；#1236：202 委派到相位推进之间隔着机器执行（GitHub
+                // 形态有 PR 时是 server 经 GitHub 合并，#1403 段 2b），toast
                 // 是这段窗口的可见回执。
                 mutations.mergeBuild.mutate(target.latestBuildId, {
                   onSuccess: () => {
                     closeOverlay();
-                    toastSuccess(t('已发起合并，机器执行完成后任务进入已完成。'));
+                    toastSuccess(t('已发起合并，合并完成后任务进入已完成。'));
                   },
                   onError: (error) => setMergeReject(mergeRejectCopy(error, t)),
                 });

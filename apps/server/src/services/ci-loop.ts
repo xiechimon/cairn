@@ -78,7 +78,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, eq, inArray, isNotNull, like, notInArray, or } from 'drizzle-orm';
+import { and, eq, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, project, step, todo } from '../db/schema.js';
 import {
@@ -91,6 +91,7 @@ import {
   githubCompareStatus,
   githubPull,
   isFullSha,
+  isOwnPull,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -98,10 +99,10 @@ import {
   DONE_ROW,
   enqueueStep,
   finishTodoDone,
+  hasActiveStep,
   hasMessageRow,
   lastPushedCheckpoint,
   maybeEnqueueVerifyStep,
-  mergeInFlight,
   roundStart,
   stopUnclaimedGateSteps,
   teamGithubToken,
@@ -386,32 +387,6 @@ export function createCiPoller(
     return true;
   }
 
-  /** 本 build 有在飞的步：已被领取的任意步，以及排队中或等额度的非审核类
-   * 步。没人领（排队中或等额度）的 verify / review 步不算（Verifier 的机器
-   * 离线或额度耗尽时，卡不能因此永远停在 review）。 */
-  function hasActiveStep(buildId: string): boolean {
-    // 人点的合并正在经 GitHub API 进行（#1403 段 2b）：结果由它落，对账不插手。
-    if (mergeInFlight(buildId)) return true;
-    return (
-      deps.db
-        .select({ id: step.id })
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, buildId),
-            or(
-              eq(step.status, 'claimed'),
-              and(
-                inArray(step.status, ['pending', 'waiting_quota']),
-                notInArray(step.kind, ['verify', 'review']),
-              ),
-            ),
-          ),
-        )
-        .get() !== undefined
-    );
-  }
-
   /** 本轮（since 起）是否已有这一行；肯定结果记进 knownRows，之后不再查表。 */
   function rowKnown(buildId: string, content: string, since: number): boolean {
     const memo = `${buildId}\u0000${since}\u0000${content}`;
@@ -426,7 +401,7 @@ export function createCiPoller(
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
       freshReviewRow(cand.todoId, cand.buildId) !== null &&
-      !hasActiveStep(cand.buildId) &&
+      !hasActiveStep(deps, cand.buildId) &&
       !rowKnown(cand.buildId, DONE_ROW, since)
     );
   }
@@ -563,8 +538,6 @@ export function createCiPoller(
     };
   }
 
-  /** token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
-   * 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。 */
   async function reconcileOne(
     cand: { buildId: string; todoId: string },
     now: number,
@@ -590,7 +563,7 @@ export function createCiPoller(
     const prNumber = buildRow.prNumber;
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
-    if (hasActiveStep(cand.buildId)) {
+    if (hasActiveStep(deps, cand.buildId)) {
       forgetClose(key); // 这段没读：之前读到的关闭不再算数
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
@@ -629,12 +602,8 @@ export function createCiPoller(
       pullCache.set(key, { etag: page.etag, pull });
     }
     const branch = conversationBranch(cand.buildId);
-    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时 headRepoId
-    // 是 null，同样对不上。字段不齐时不算（下文按读不到）。
-    const foreign =
-      pull !== null &&
-      hasPullFields(pull) &&
-      (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch);
+    // 字段不齐时不算（下文按读不到）。
+    const foreign = pull !== null && hasPullFields(pull) && !isOwnPull(pull, branch);
     // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
     // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
     if (pull === null || (pull.state === 'open' && !foreign)) {
@@ -643,7 +612,7 @@ export function createCiPoller(
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       forgetClose(key);
       tally.reviewSkipped += 1;
       return;
@@ -676,7 +645,10 @@ export function createCiPoller(
       if (listedAt === undefined || now - listedAt >= relistMs) {
         const own = await ownBranchPull(branch, target, token, recorded, 0, now);
         if (own !== 'skipped') foreignListedAt.set(listKey, now);
-        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+        if (
+          freshReviewRow(cand.todoId, cand.buildId) === null ||
+          hasActiveStep(deps, cand.buildId)
+        ) {
           tally.reviewSkipped += 1;
           return;
         }
@@ -843,7 +815,7 @@ export function createCiPoller(
     forgetClose(key);
     // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
     // 读重新数）。
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.reviewSkipped += 1;
       return;
     }
@@ -899,7 +871,7 @@ export function createCiPoller(
     const key = `${target.fullName}#${buildRow.prNumber}`;
     grindKeys.add(key); // 先登记：在飞步跳过的这一轮不清它的缓存行
     // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
-    if (hasActiveStep(cand.buildId)) {
+    if (hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
     }

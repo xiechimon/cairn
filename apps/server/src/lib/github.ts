@@ -150,6 +150,13 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
 }
 
+/** 这张 PR 是从 branch 开的、head 仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库
+ * 改名或转移后照样对得上；fork 对不上，fork 已删时 head 仓为 null 同样对不上）。PR 对账与
+ * 经 API 合并（#1403）判断「是不是本 build 的 PR」共用。 */
+export function isOwnPull(pull: GithubPull, branch: string): boolean {
+  return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
+}
+
 export interface GithubPullPage {
   /** true = 304 Not Modified（调用方复用缓存判据，同 check-runs 条件 GET）。 */
   notModified: boolean;

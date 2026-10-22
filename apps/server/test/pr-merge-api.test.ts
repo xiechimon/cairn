@@ -38,6 +38,13 @@
 //   D27 REST 线形不变：202 {delegated:true}；拒绝 = 409 {error}
 //   D28 合并请求在飞时对账把它当在飞步：不读不写
 //   D29 GitHub 文本（合并提交、拒绝 message）进行与文案前按对账同一规则清洗
+//   D30 build 不是任务的当前 build（重跑之后旧 build 的 PR 还开着）→ 409，零出站
+//   D31 本 build 有步在跑（已领取的 verify 步之后还会推提交）→ 409，零出站；没人领的
+//       verify / review 步不挡（收尾时停掉，D1）
+//   D32 failed 卡上的拒绝文案不说「对账会收尾」（对账只读 review 卡）：指向看板拖到已完成
+//   D33 连接在但解不开 → 请重新连接 GitHub
+//   D34 合并步在到不了 done 的相位完成（#931 返工复用同一 build）→ 照旧抛非法相位转移、
+//       不落行
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -448,10 +455,92 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       .run();
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
-    expect(err.message).toContain('连接 GitHub');
+    expect(err.message).toContain('重新连接 GitHub');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w);
   });
+
+  test('[2b-D30] the build is not the todo’s current build → 409; no request', async () => {
+    const w = makeWorld();
+    const newer = `${w.buildId}-newer`;
+    w.s.db
+      .insert(buildTable)
+      .values({
+        id: newer,
+        todoId: w.todoId,
+        withPlan: false,
+        triggerSource: 'schedule',
+        createdAt: Date.now(),
+      })
+      .run();
+    w.s.db.update(todoTable).set({ latestBuildId: newer }).where(eq(todoTable.id, w.todoId)).run();
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.requests).toEqual([]);
+    expectUntouched(w);
+  });
+
+  test.each([
+    ['a claimed verify step', 'verify', 'claimed'],
+    ['a claimed review step', 'review', 'claimed'],
+    ['a pending build step', 'build', 'pending'],
+  ] as const)('[2b-D31] %s on the build → 409; no request', async (_name, kind, status) => {
+    const w = makeWorld();
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-busy-${w.buildId}`,
+        buildId: w.buildId,
+        kind,
+        status,
+        createdAt: Date.now(),
+      })
+      .run();
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.requests).toEqual([]);
+    expect(w.systemRows()).toEqual([]);
+    expect(w.userRows()).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
+
+  test('[2b-D31b] a step claimed while the PR read is in flight → 409; no PUT', async () => {
+    const w = makeWorld();
+    w.fake.onGet = () => {
+      w.s.db
+        .insert(stepTable)
+        .values({
+          id: `step-late-${w.buildId}`,
+          buildId: w.buildId,
+          kind: 'verify',
+          status: 'claimed',
+          createdAt: Date.now(),
+        })
+        .run();
+    };
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(w.fake.puts()).toEqual([]);
+    expectUntouched(w);
+  });
+
+  test.each([
+    ['the PR is already merged', { pull: { state: 'closed', merged: true, mergedBy: 'octo' } }],
+    ['no GitHub connection', { connected: false }],
+    ['the PR head moved', { pull: { headSha: 'abcdef01'.repeat(5) } }],
+    ['no checkpoint', { checkpoint: null }],
+  ] as const)(
+    '[2b-D32] failed card, %s → the refusal points to the board, not the reconcile',
+    async (_name, o) => {
+      // restorable (the PR is recorded on the build) even without a checkpoint
+      const w = makeWorld({ phase: 'failed', ...o });
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain('拖到已完成');
+      expect(err.message).not.toContain('对账');
+      expectUntouched(w, 'failed');
+    },
+  );
 
   test('[2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT', async () => {
     const head = 'abcdef01'.repeat(5);
@@ -852,6 +941,26 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     await w.sweep();
     expect(w.phase()).toBe('done');
     expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+  });
+
+  test('[2b-D34] a merge step completes while the card cannot reach done (planning) → illegal phase transition, no row', () => {
+    const w = makeWorld({ phase: 'planning' });
+    const mergeStepId = `step-merge-planning-${w.buildId}`;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: mergeStepId,
+        buildId: w.buildId,
+        kind: 'merge',
+        status: 'claimed',
+        createdAt: Date.now(),
+      })
+      .run();
+    expect(() => completeStep(w.deps, mergeStepId)).toThrow(
+      'illegal phase transition: planning -> done',
+    );
+    expect(w.systemRows()).toEqual([]);
+    expect(w.phase()).toBe('planning');
   });
 
   test('[2b-D26] the token travels only in the Authorization header', async () => {

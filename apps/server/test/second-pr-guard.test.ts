@@ -199,7 +199,8 @@ function makeWorld(opts: WorldOpts = {}): World {
         id: `step-1217-${suffix}-${i}`,
         buildId: b2Id,
         kind: opts.stepKind ?? 'build',
-        status: 'pending',
+        // review 关口上执行步已收尾（#1403 段 2b 起经 API 合并时有步在跑会被拒）
+        status: opts.todoPhase === 'review' ? 'done' : 'pending',
         machineId: null,
         createdAt: base - 50_000 + i,
       })

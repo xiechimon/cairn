@@ -89,6 +89,23 @@ D29 GitHub text in the merged row and in the refusal (merge commit sha, message)
     through the same cleaning as the reconcile's rows (control and format characters
     removed, 100 characters at most).
 
+Added after the first /code-review pass (tests first, red on 2a3b2965):
+D30 The build is not the todo's current build (a rerun made a newer build while the old
+    PR stays open): 409, no request. Merging it would finish the card while the current
+    run's PR is unmerged.
+D31 A step of the build is in flight (claimed, or pending / waiting for quota and not a
+    verify or review step): 409, no request; also when it is claimed while the PR read
+    is in flight (no PUT). A claimed verify step pushes when it finishes; a squash
+    merge before that leaves its commit out. Unclaimed verify / review steps do not
+    block (D1 stops them).
+D32 Failed card, refusals that point elsewhere (PR already merged, no connection, head
+    moved, no checkpoint): the text does not promise the reconcile (it reads only review
+    cards) and points to dragging the card to done on the board.
+D33 A connection exists but does not decrypt: 409 asking to reconnect GitHub.
+D34 A merge step completes on a GitHub build with a PR while the card cannot reach done
+    (planning, after a #931 rework of the same build): illegal phase transition as
+    before, no row.
+
 GitHub REST facts this path relies on
 --------------------------------------
 Fetched 2026-10-22 from docs.github.com/api/article/body?pathname=... (rendered
