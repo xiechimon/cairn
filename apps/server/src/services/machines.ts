@@ -75,6 +75,7 @@ import {
   chiefThread,
   machine,
   message,
+  type StepFallbackRow,
   steerPending,
   step,
   stopPending,
@@ -132,7 +133,16 @@ import {
 } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import {
+  effectiveModel,
+  isZeroUsageSilentSuccess,
+  planModelFallback,
+  recordProviderOutcome,
+  ZERO_USAGE_FAILURE,
+  ZERO_USAGE_RETRY_NOTE,
+} from './model-fallback.js';
 import { markModelDead } from './model-liveness.js';
+import { notifyModelFallback } from './notifications.js';
 // #1261 配额挂起面（quotaBlock → waiting_quota，不走 failed 漏斗）。
 import { applyQuotaWaitStep } from './quota-wait.js';
 import type { LocalSkill } from './skills.js';
@@ -1005,9 +1015,11 @@ async function tryClaim(
     // pending 等补设；#1257 挂起语义下由板面 waitingOn chip 透出「等机器」，
     // 补设即自动续领）。
     if (agentRow.machineId !== machineId) continue;
+    // #1493 本步实际跑的模型（降级后 = 备选）：runtime 闸与 claim 载荷都按它。
+    const model = effectiveModel(agentRow, cand.stepRow);
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
-    if (!runtimeGatePasses(machineRow, agentRow.provider)) continue;
+    if (!runtimeGatePasses(machineRow, model.provider)) continue;
     // #1251 能力闸（ADR 0018 决策 4.3，判据单源 dispatch-eligibility）：机器
     // 上报快照不满足 agent.requiredCapabilities = 不可领（步留 pending 给能力
     // 齐的机器；未上报快照 = 未知放行，老 daemon 零回归）。候选级 continue
@@ -1036,13 +1048,22 @@ async function tryClaim(
     // 结果集，且判定与领取在同一同步块内（单进程 better-sqlite3），前后移
     // 零语义差。#1259：会话机归属已由 agent 归属机保证（同 agent 恒同机），
     // 原「会话亲和让行」闸随之退役。
+    // #1493：会话只在同一 provider 跑出的步之间续——最近一次会话若由降级备选
+    // 跑出而本步不在同一备选 provider 上（或反过来），按无可续会话处理（新会话，
+    // brief 重新注入）。都未降级时两侧同为 null，行为不变。
     const prior = db
-      .select({ sessionId: step.sessionId, machineId: step.machineId })
+      .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
       .from(step)
       .where(and(eq(step.buildId, cand.stepRow.buildId), sql`${step.sessionId} is not null`))
       .orderBy(asc(step.createdAt))
       .all();
-    const priorRow = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const priorRow =
+      latestPrior !== null &&
+      (latestPrior.fallback?.model?.provider ?? null) ===
+        (cand.stepRow.fallback?.model?.provider ?? null)
+        ? latestPrior
+        : null;
     const priorSessionId = priorRow?.sessionId ?? null;
     // #1312：上一轮会话的机器与本步领取机不同（归属机换绑 / 迁移）时告诉
     // daemon。同机不带该字段，claim 形与旧 daemon 逐字段一致。
@@ -1193,9 +1214,10 @@ async function tryClaim(
         id: agentRow.id,
         displayName: agentRow.displayName,
         description: agentRow.description,
-        provider: agentRow.provider,
-        modelId: agentRow.modelId,
-        thinkingLevel: agentRow.thinkingLevel,
+        provider: model.provider,
+        modelId: model.modelId,
+        // #1493：思考强度是按主模型配的，备选不一定支持——降级时回落默认。
+        thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
         // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
         // 项目的 systemPrompt（#1494）。
@@ -1638,7 +1660,11 @@ export function stepToken(
         ? githubExecCredential(deps, todoRow.teamId)
         : null;
   return {
-    provider: toProviderConfig(bundle.provider, agentRow?.provider),
+    // #1493：降级后按备选的 provider（resolveStepCredentials 同读 step.fallback）。
+    provider: toProviderConfig(
+      bundle.provider,
+      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+    ),
     secrets: bundle.secrets,
     git,
   };
@@ -1963,6 +1989,29 @@ export async function finishStep(
   // stop_pending 卫生清理（全终态共通，M7 #308）：stop 与自然完成/失败的
   // 竞态残留随收尾即清（拉取-确认面另有定向步校验双保险，不复活）。
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  // #1493 降级链 + provider 熔断（worker 步；chief 步无 build 行 = null，不进）。
+  // 熔断器记账按本步实际跑的模型（降级后 = 备选）；0 token 的「成功」不算成功。
+  // 降级命中即 return：步回 pending 换备选重派，不进下方 quota-wait / 失败漏斗；
+  // 不命中（步类禁止降级 / 没配备选 / 链走完）落到原有分支，行为不变。
+  const worker = workerStepContext(deps, stepRow);
+  const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
+  if (worker?.agentRow) {
+    recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
+  }
+  if (worker !== null) {
+    const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
+    if (plan !== null) {
+      if (plan.trigger === 'model_unavailable') {
+        markModelDead(plan.from.provider, plan.from.modelId);
+      }
+      requeueStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, worker.todoRow, worker.agentRow, plan.note);
+      return;
+    }
+  }
   // #1261 配额熔断分支：daemon 识别 quota/capacity 后随 done 携带 quotaBlock
   // ——挂起等额度（waiting_quota + 通知 + 探测续跑），**不**走下方 failed 漏斗
   // （todo 不落 failed）。早于 chief/success/stopped/failed 各分支：配额事件
@@ -1985,22 +2034,14 @@ export async function finishStep(
   // 下架）→ 标注 dead 即时生效（后续选择器/闸即时置灰 + 拒绝）。
   // 发生在 applyStepFailure 之前——dead 回填与失败收尾两条轨道并行，
   // 回填失败不影响步失败漏斗（markModelDead 是纯内存写，永不抛）。
+  // #1493：回填本步实际跑的模型（降级后 = 备选，不是 agent 主模型）。
   if (
     outcome.status === 'failed' &&
-    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable' &&
+    worker?.agentRow
   ) {
-    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-    if (buildRow) {
-      const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-      const agentId =
-        todoRow?.assignment?.build?.agentId ?? todoRow?.assignment?.plan?.agentId ?? null;
-      if (agentId) {
-        const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
-        if (agentRow?.modelId && agentRow?.provider) {
-          markModelDead(agentRow.provider, agentRow.modelId);
-        }
-      }
-    }
+    const ran = effectiveModel(worker.agentRow, stepRow);
+    if (ran.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
   }
   // #1186：配额挂起已经 return（那次运行还没结束）。断言是旁路写，
   // 写在 chief / success / stopped / failed 分叉之前，三支收尾都带上。
@@ -2046,6 +2087,25 @@ export async function finishStep(
     }
     return;
   }
+  // #1493 0 token 静默成功：同模型重试一次，第二次按失败收尾。
+  if (zeroUsage) {
+    if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
+      requeueStep(
+        deps,
+        stepRow,
+        {
+          model: stepRow.fallback?.model ?? null,
+          tried: stepRow.fallback?.tried ?? [],
+          zeroUsageRetried: true,
+        },
+        { id: `zero-usage-retry-${stepRow.id}`, content: ZERO_USAGE_RETRY_NOTE },
+      );
+      return;
+    }
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE);
+    publishStepStatus(deps, stepId);
+    return;
+  }
   if (outcome.status === 'success') {
     completeStep(deps, stepId, {
       hasChanges: outcome.hasChanges,
@@ -2078,6 +2138,52 @@ export async function finishStep(
   // 失败收尾同函数——闸失败与机器报失败走同一条漏斗）。
   applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`);
   publishStepStatus(deps, stepId);
+}
+
+/** worker 步收尾上下文（build → todo → 本步 agent）。chief 步 / 行缺失 = null。 */
+function workerStepContext(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+): { todoRow: typeof todo.$inferSelect; agentRow: typeof agent.$inferSelect | null } | null {
+  if (isChiefConversation(stepRow.buildId)) return null;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow) return null;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (!todoRow) return null;
+  return { todoRow, agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) };
+}
+
+/** #1493 步回 pending 重派（降级换备选 / 0 token 重试共用）：认领位复位 +
+ * 清本步 sessionId + 写降级进度 + 会话流 system 行。会话续接由 claim 面按
+ * provider 判（换了 provider 的步不续旧会话）。不另行 wake：finishStep 前段
+ * 的空位释放 wake 已覆盖，被唤醒的领取看到的是这里写完的状态。todo / build
+ * 不落失败痕迹。 */
+function requeueStep(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  fallback: StepFallbackRow,
+  note: { id: string; content: string },
+): void {
+  deps.db
+    .update(step)
+    .set({
+      status: 'pending',
+      machineId: null,
+      sessionId: null,
+      fallback,
+      holdReason: null,
+      holdUntil: null,
+    })
+    .where(eq(step.id, stepRow.id))
+    .run();
+  upsertMessage(deps, {
+    id: note.id,
+    conversationId: stepRow.buildId,
+    role: 'system',
+    content: note.content,
+    createdAt: nowMs(),
+  });
+  publishStepStatus(deps, stepRow.id);
 }
 
 /** applyMergeLanding 的 git 检查期间卡被关闭 / 挪回待开始：不快进（#1487）。 */

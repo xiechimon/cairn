@@ -131,6 +131,8 @@ export function agentRecordOf(row: typeof agent.$inferSelect): AgentRecord {
     persona: row.persona,
     // #1251：能力要求声明（null = 无要求），恒随行（persona 同律）。
     requiredCapabilities: row.requiredCapabilities,
+    // #1493：降级链（null = 不降级），恒随行。
+    fallbackModels: row.fallbackModels,
   };
 }
 

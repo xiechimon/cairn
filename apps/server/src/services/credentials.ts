@@ -112,8 +112,12 @@ export function resolveStepCredentials(
 
   const boxDeps: ProviderDeps & SecretDeps = deps;
   let provider: StepCredentialBundle['provider'] = null;
-  if (agentRow?.provider) {
-    const opened = openProviderKey(boxDeps, todoRow.teamId, agentRow.provider);
+  // #1493 降级链：步换到备选模型后，模型 key 按备选的 provider 解（provider
+  // 行仍是本团队的——openProviderKey 按 teamId 查，备选不能跨团队取 key）。
+  const providerId = stepRow.fallback?.model?.provider ?? agentRow?.provider ?? null;
+  const modelId = stepRow.fallback?.model?.modelId ?? agentRow?.modelId ?? null;
+  if (agentRow && providerId) {
+    const opened = openProviderKey(boxDeps, todoRow.teamId, providerId);
     if (opened) {
       provider = {
         providerId: opened.row.providerId,
@@ -124,7 +128,7 @@ export function resolveStepCredentials(
         compat: opened.row.compat,
         apiKey: opened.apiKey,
         models: opened.row.models,
-        modelId: agentRow.modelId,
+        modelId,
       };
     }
   }
