@@ -33,3 +33,21 @@ Also on this head: the full server suite passed at each code commit (last full r
 Not run: integration/test/done-dialog-e2e.test.ts (its toast text changed with the web copy;
 spec:parse covers its parse; it runs in CI). Live leg against GitHub: not run (fake GitHub
 only, by decision); the host leg stays 待宿主.
+
+Final gates on 9ffafdeb (after the rate-limited merge change; contains origin/main d4f5f18f)
+Run 2026-10-22 in /home/user/pacman/.claude/worktrees/p5d.
+
+$ pnpm lint                                  exit 0
+  Checked 816 files in 1840ms. No fixes applied. Found 1 info (the existing machines-page.tsx note).
+$ pnpm typecheck                             exit 0
+$ pnpm spec:parse                            exit 0
+  [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+$ pnpm exec vitest run --changed origin/main   exit 0   (origin/main = d4f5f18f)
+   Test Files  151 passed (151)
+        Tests  1918 passed | 1 skipped (1919)
+$ lsof -iTCP:8404 -sTCP:LISTEN                exit 1 (no listener)
+$ E2E_AFFECTED_PORT=8404 pnpm --filter @pacman/web e2e:affected   exit 0
+  apps/web/src/i18n/en.ts → FULL (shared surface); 169/169 specs, E2E_PORT=8404
+  Running 1181 tests using 2 workers
+    1181 passed (9.8m)
+Full server suite at 9ffafdeb: 126 files, 2082 passed, 1 skipped.
