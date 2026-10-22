@@ -80,7 +80,7 @@ export function ProjectAutonomyCard({ projectId, teamId }: { projectId: string; 
   return (
     <section className="flex flex-col gap-2" aria-label={t('后台自动任务')}>
       <h3 className="m-0 px-1 text-meta font-normal text-content-tertiary">{t('后台自动任务')}</h3>
-      <SettingsCard className="prj-set-autonomy">
+      <SettingsCard>
         <SettingsRow
           label={t('允许后台自动开跑')}
           hint={t(
