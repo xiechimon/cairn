@@ -845,6 +845,29 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     },
   );
 
+  test.each([
+    [
+      'retry-after next to a later x-ratelimit-reset (a secondary limit)',
+      { 'retry-after': '60', 'x-ratelimit-remaining': '4000', 'x-ratelimit-reset': '1793016000' },
+      '60 秒',
+      '2026-10-26T',
+    ],
+    ['an empty x-ratelimit-reset', { 'x-ratelimit-reset': ' ' }, null, '1970'],
+    ['an empty retry-after', { 'retry-after': '' }, null, '0 秒'],
+    ['a fractional retry-after', { 'retry-after': '1.5' }, null, '1.5'],
+  ] as const)(
+    '[2b-D40c] rate-limited with %s → the wait shown follows retry-after first and ignores malformed values',
+    async (_name, headers, shown, absent) => {
+      const w = makeWorld();
+      w.fake.mergeAnswer = { status: 429, body: { message: 'Too Many Requests' }, headers };
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      if (shown !== null) expect(err.message).toContain(shown);
+      expect(err.message).not.toContain(absent);
+      expectUntouched(w);
+    },
+  );
+
   test('[2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row', async () => {
     const w = makeWorld({ phase: 'failed' });
     w.fake.mergeAnswer = { status: 429, body: { message: 'Too Many Requests' } };

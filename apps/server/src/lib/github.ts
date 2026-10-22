@@ -490,6 +490,25 @@ export class GithubRateLimitedError extends Error {
   }
 }
 
+/** 限流应答的头 → GithubRateLimitedError（进料读与合并写共用）。头不在、空串或不是非负
+ * 整数 = 没给（Number('') 是 0，不能当「0 秒后」）。 */
+function rateLimitOf(
+  url: string,
+  res: { status: number; headers: { get(n: string): string | null } },
+): GithubRateLimitedError {
+  const seconds = (name: string): number | null => {
+    const v = res.headers.get(name)?.trim() ?? '';
+    return /^\d+$/.test(v) ? Number(v) : null;
+  };
+  const reset = seconds('x-ratelimit-reset');
+  return new GithubRateLimitedError(
+    url,
+    res.status,
+    reset === null ? null : reset * 1000,
+    seconds('retry-after'),
+  );
+}
+
 /** 认证面仓库条目（GitHub `GET /user/repos` 元素最小投影；camelCase =
  * lib 内部形，wire 封套（full_name/private snake_case）归 shared
  * githubReposResponseSchema，routes 层映射）。 */
@@ -980,18 +999,7 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      // 头不在、空串或不是非负整数 = 没给（Number('') 是 0，不能当「0 秒后」）。
-      const seconds = (name: string): number | null => {
-        const v = res.headers.get(name)?.trim() ?? '';
-        return /^\d+$/.test(v) ? Number(v) : null;
-      };
-      const reset = seconds('x-ratelimit-reset');
-      throw new GithubRateLimitedError(
-        url,
-        res.status,
-        reset === null ? null : reset * 1000,
-        seconds('retry-after'),
-      );
+      throw rateLimitOf(url, res);
     }
     return { ...head, data: undefined };
   }
@@ -1286,20 +1294,14 @@ export async function githubUpdateIssueTitle(
  * - refused：GitHub 明确没合（4xx 且不是限流，或 200 但 merged 为 false）；message =
  *   应答体的 message（读不到为空串）。
  * - rate-limited：429，或带限流信号的 403（remaining=0、retry-after、message 说二级限流）：
- *   GitHub 没有处理这次请求，合并确定没有发生；resetAt = x-ratelimit-reset 换成的毫秒，
- *   retryAfterSeconds = retry-after；缺省 null。
+ *   GitHub 没有处理这次请求，合并确定没有发生；limit = 头里的解除时刻（rateLimitOf，
+ *   与进料读同一解析与先后：retry-after 优先）。
  * - unknown：不知道合没合——超时、网络错、5xx（GitHub 处理超过 10 秒会断开请求、回
  *   「Server Error」，合并可能已经发生）、200 的应答体读不出。 */
 export type GithubMergeResult =
   | { kind: 'merged'; sha: string }
   | { kind: 'refused'; status: number; message: string }
-  | {
-      kind: 'rate-limited';
-      status: number;
-      message: string;
-      resetAt: number | null;
-      retryAfterSeconds: number | null;
-    }
+  | { kind: 'rate-limited'; message: string; limit: GithubRateLimitedError }
   | {
       kind: 'unknown';
       reason: 'timeout' | 'network' | 'status' | 'malformed';
@@ -1351,19 +1353,7 @@ export async function githubMergePull(
   const message = optString(data?.message) ?? '';
   // 限流 = GitHub 没有处理这次请求，合并确定没有发生（2026-10-22 编排者裁决）。
   if (isRateLimitedText(res, text ?? '')) {
-    const reset = Number(res.headers.get('x-ratelimit-reset'));
-    const retryAfter = Number(res.headers.get('retry-after'));
-    return {
-      kind: 'rate-limited',
-      status: res.status,
-      message,
-      resetAt:
-        res.headers.get('x-ratelimit-reset') !== null && Number.isFinite(reset)
-          ? reset * 1000
-          : null,
-      retryAfterSeconds:
-        res.headers.get('retry-after') !== null && Number.isFinite(retryAfter) ? retryAfter : null,
-    };
+    return { kind: 'rate-limited', message, limit: rateLimitOf(url, res) };
   }
   if (res.status >= 500) return { kind: 'unknown', reason: 'status', status: res.status };
   if (res.ok) {

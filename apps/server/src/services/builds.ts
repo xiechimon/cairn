@@ -1694,16 +1694,18 @@ async function mergeThroughGithub(
       commitMessage: closingLine(gate.todoRow, repoRef),
     });
     if (result.kind === 'rate-limited') {
-      // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。
+      // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。等多久与进料读同一
+      // 先后：retry-after 优先（二级限流常同时带主窗口更晚的 x-ratelimit-reset）。
+      const { limit } = result;
       const when =
-        result.resetAt !== null
-          ? `，限流在 ${new Date(result.resetAt).toISOString()} 解除`
-          : result.retryAfterSeconds !== null
-            ? `，${result.retryAfterSeconds} 秒后再试`
+        limit.retryAfterSeconds !== null
+          ? `，${limit.retryAfterSeconds} 秒后再试`
+          : limit.resetAt !== null
+            ? `，限流在 ${new Date(limit.resetAt).toISOString()} 解除`
             : '';
       throw new HttpError(
         409,
-        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${result.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}`,
+        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}`,
       );
     }
     if (result.kind === 'refused') {

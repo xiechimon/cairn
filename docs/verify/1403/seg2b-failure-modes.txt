@@ -274,3 +274,8 @@ D40 PUT answered 429, or 403 with x-ratelimit-remaining 0, retry-after, or a mes
     response, and the `x-ratelimit-remaining` header will be `0`" and "If the `retry-after`
     response header is present, you should not retry your request until after that many
     seconds has elapsed."; "The `x-ratelimit-reset` header is in UTC epoch seconds."
+D40c (2026-10-22, after /code-review of ae058c9f; tests first, 4 red): the wait shown
+    follows retry-after first (a secondary limit often carries a later primary-window
+    x-ratelimit-reset), as GithubRateLimitedError.retryAt does for the intake reads; an
+    empty, blank, negative or fractional header counts as absent. The merge path now uses
+    the intake's header parser (rateLimitOf in lib/github.ts) instead of its own.
