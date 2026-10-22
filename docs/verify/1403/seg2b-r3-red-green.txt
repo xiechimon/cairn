@@ -1,0 +1,72 @@
+#1403 segment 2b round 3 (PR #1509): red/green and pins
+Base of this round: efea0f26 (pr-gate run 2 verdict: go, six suggestions).
+Fix commit 07782010, code-review follow-up 68738770 (after merging origin/main 2ff0b937 as 7494968e).
+
+== 1. Adoption rejection floor (pr-gate correctness suggestion, ci-loop.ts ownBranchPull) ==
+Tests written first in apps/server/test/pr-reconcile.test.ts:
+  [2b-P7g] flipped: the round 2 test pinned the regressed rule (a NONE-authored PR closed
+           unmerged did not count, the older OWNER-merged PR was adopted). It now expects
+           no adoption and the card failed.
+  [2b-P7h] new, foreign path (mergedAfter = 0), the gate's exact scenario: own #150 merged
+           by OWNER, own #160 by NONE / CONTRIBUTOR / null closed unmerged -> nothing adopted.
+
+RED on efea0f26 code (vitest -t 2b-P7, before the ci-loop.ts change):
+     × [2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the close is the maintainer’s act) → the older merged PR is not adopted 46ms
+     × [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by CONTRIBUTOR closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 48ms
+     × [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by NONE closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 39ms
+     × [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by null closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 44ms
+  Tests 4 failed | 13 passed (of the 2b-P7 group). Failure: expected 150 to be 201 (the old
+  merged PR #150 was re-adopted).
+
+Fix: const rejected = own.reduce(...) instead of adoptable.reduce(...); the author filter
+stays on the adoptable pool (open / merged candidates).
+
+GREEN after the fix (vitest -t 2b-P7, verbose):
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (NONE) is not adopted → failed as in segment 1 120ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (CONTRIBUTOR) is not adopted → failed as in segment 1 59ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIME_CONTRIBUTOR) is not adopted → failed as in segment 1 70ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIMER) is not adopted → failed as in segment 1 45ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (MANNEQUIN) is not adopted → failed as in segment 1 46ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (null) is not adopted → failed as in segment 1 42ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7b] closed path: an open PR from the build’s branch by OWNER is adopted 351ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7b] closed path: an open PR from the build’s branch by MEMBER is adopted 42ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7b] closed path: an open PR from the build’s branch by COLLABORATOR is adopted 41ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7c] foreign path: an open PR from the build’s own branch by an author without write access is not adopted; the hint 39ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7d] closed path: a merged PR from the build’s branch whose author has no write access is not adopted 44ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the close is the maintainer’s act) → the older merged PR is not adopted 41ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by NONE closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 39ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by CONTRIBUTOR closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 37ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7h] foreign path: own #150 merged by OWNER, own #160 by null closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness) 36ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7f] the recorded PR itself shows up open again in the list → no write, whoever opened it 45ms
+ ✓ test/pr-reconcile.test.ts > #1403 segment 2: the PR the build tracks > [2b-P7e] the list parser reads author_association (live capture, docs/verify/1403/live-branch-pulls-assoc.json) 1ms
+      Tests  17 passed | 169 skipped (186)
+
+== 2. API merge: the PR GET fails (pr-gate tests suggestion) ==
+GithubFake gained getAnswer (Answer | null): when set, GET pulls/{n} answers it instead of
+the pulls table (timeout / network throw like fetch does). Tests [2b-D44a/c/d] written before
+any code change; they passed at once on efea0f26 code, so they are PINS of existing
+behaviour (mergeThroughGithub already refuses on pull === null). Mutations M5-M8 in
+seg2b-r3-mutations.txt show they bite. [2b-D44b] (PR deleted -> fake's own 404) was folded
+into D44a's 404 row after /code-review flagged it as a duplicate.
+
+PIN run (before the D44b fold):
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (404) → 409 read failed; no PUT; nothing written 74ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (429) → 409 read failed; no PUT; nothing written 46ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (403 with x-ratelimit-remaining 0) → 409 read failed; no PUT; nothing written 46ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (403 naming a secondary rate limit) → 409 read failed; no PUT; nothing written 37ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (500) → 409 read failed; no PUT; nothing written 37ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (502 with an HTML page) → 409 read failed; no PUT; nothing written 37ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (200 whose body is not JSON) → 409 read failed; no PUT; nothing written 40ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (200 whose body is a JSON array) → 409 read failed; no PUT; nothing written 65ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (a timeout) → 409 read failed; no PUT; nothing written 41ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44a] the PR read fails (a network error) → 409 read failed; no PUT; nothing written 43ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44b] the PR is gone (404 on the read) → 409 read failed; no PUT 37ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (429) → 409; the card stays failed with no row 38ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (503) → 409; the card stays failed with no row 37ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44c] failed card, the PR read fails (a network error) → 409; the card stays failed with no row 44ms
+ ✓ test/pr-merge-api.test.ts > #1403 segment 2b: the server merges the PR through the GitHub API > [2b-D44d] a read failure does not stick: the next press reads again and merges 54ms
+      Tests  15 passed | 105 skipped (120)
+
+== Whole files at 68738770 ==
+pnpm exec vitest run test/pr-merge-api.test.ts test/pr-reconcile.test.ts -> Tests 305 passed (305)
+(pr-merge-api 119, pr-reconcile 186)

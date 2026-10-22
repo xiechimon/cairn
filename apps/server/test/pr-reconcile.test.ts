@@ -3287,7 +3287,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     expect(w.todoRow().phase).toBe('failed');
   });
 
-  test('[2b-P7g] a closed PR by an author without write access does not count as a rejection: a write author’s merged PR is still adopted', async () => {
+  test('[2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does not say who closed it) → the older merged PR is not adopted', async () => {
     const { w, mock } = closedWithSibling({ sibling: { state: 'closed', merged: true } });
     headRefs.set(203, conversationBranch(w.buildId));
     mock.branchPulls = [
@@ -3295,9 +3295,26 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       { number: 202, state: 'closed', merged: true, authorAssociation: 'OWNER' },
     ];
     await sweepTwice(pollerFor(w, mock));
-    expect(w.buildRow().prNumber).toBe(202);
-    expect(w.todoRow().phase).toBe('review');
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(w.todoRow().phase).toBe('failed');
   });
+
+  test.each(['NONE', 'CONTRIBUTOR', null] as const)(
+    '[2b-P7h] foreign path: own #150 merged by OWNER, own #160 by %s closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness)',
+    async (association) => {
+      const f = foreignWorld();
+      headRefs.set(150, f.own);
+      headRefs.set(160, f.own);
+      f.mock.branchPulls = [
+        { number: 160, state: 'closed', authorAssociation: association },
+        { number: 150, state: 'closed', merged: true, authorAssociation: 'OWNER' },
+      ];
+      await pollerFor(f.w, f.mock).sweep();
+      expect(f.currentPr()).toBe(201);
+      expect(f.currentRows().some((c) => c.includes('改记为本任务的 PR'))).toBe(false);
+      expect(f.currentRows().some((c) => c.includes('PR #201 的 head'))).toBe(true);
+    },
+  );
 
   test('[2b-P7f] the recorded PR itself shows up open again in the list → no write, whoever opened it', async () => {
     const { w, mock } = closedWithSibling();

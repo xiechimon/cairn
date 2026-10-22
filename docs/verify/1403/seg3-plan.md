@@ -226,3 +226,10 @@ Not fixed: re-verifying after a person moves the card to review by hand (not thr
 Segment 2b's head efea0f26 merges main c99de106, which carries `0045_model_fallback_chain` (#1493) and S4a's gate transport (#1503). The merge took main's `0045_snapshot.json` and `_journal.json` and removed this branch's `0045_step_finished_at.sql`. `pnpm db:generate --name step_finished_at` on the merged schema then produced `apps/server/drizzle/0046_step_finished_at.sql` (``ALTER TABLE `step` ADD `finishedAt` integer;``), which is the tail after main's 0045, as the CLAUDE.md drizzle rule requires. `pnpm db:check` passes ("snapshot 链线性、无父子冲突"). If main gains another migration before this branch lands, it is renumbered again at that merge.
 
 The other conflicts: `lib/github.ts` (both sides appended at the end of the check-runs section; both kept: `githubRequiredChecks` and S4a's raw gate transport) and spec 02 (this branch's segment-3 bullet kept, segment 2b's updated merge bullet taken from 2b: this branch had not changed it).
+
+## 17. Merge of segment 2b at ff4c4247 (2026-10-22)
+
+Segment 2b's round-3 head ff4c4247 merges main 2ff0b937. main's drizzle folder still ends at `0045_model_fallback_chain`, so `0046_step_finished_at` stays at the tail (`db:check` passes). Conflicts:
+- `apps/server/src/services/builds.ts`, the failed-step write: both kept. 2b brings #1492's non-empty `errorMessage` fallback; this branch writes `finishedAt` with the status.
+- Spec 02: this branch's segment-3 bullet kept; segment 2b's merge bullet taken from 2b, since this branch's copy was identical to efea0f26.
+`ci-loop.ts` merged without conflict. 2b changed only the adoption rejection floor (it counts every own PR), which the segment-3 grind and DIRTY paths do not touch. Server suite on the merge: 132 files, 2338 passed, 1 skipped.

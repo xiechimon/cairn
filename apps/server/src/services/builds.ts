@@ -27,6 +27,8 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  buildFallbackReport,
+  buildPlanContractRewritePrompt,
   buildPlanRewritePrompt,
   buildReplanPrompt,
   buildRestartPrompt,
@@ -37,14 +39,19 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
+  checkPlanContract,
   conversationBranch,
   hasBlockingFinding,
+  isPlanContractRewritePrompt,
   MERGE_ANNOUNCEMENT,
+  type PlanContractCheck,
   parseGithubIssueSourceRef,
   personaByRole,
+  planVerificationItems,
   REVIEW_ANNOUNCEMENT,
   REVIEW_FANOUT_ROLES,
   REVIEW_VERDICT_KIND,
+  reconcileVerifyVerdict,
   STOP_MESSAGE,
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
@@ -769,17 +776,14 @@ export function maybeEnqueueVerifyStep(
   //（sourceRef 单源反解）；无关联 = seqNum（本地仓的同一约定位）。
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
-  const planRow = deps.db
-    .select({ content: planTable.content })
-    .from(planTable)
-    .where(eq(planTable.buildId, buildId))
-    .orderBy(desc(planTable.version))
-    .get();
+  const planRow = latestPlanRow(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef,
     // #1406：GitHub issue 导入任务的标题与正文进 issue 原文围栏（ADR 0021 D5）。
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
+    // #1492：方案 Verification 清单逐项进材料（无清单 = 老方案 / 直执行，按旧口径）。
+    verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
   });
   insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
@@ -1834,9 +1838,12 @@ function enqueueReviewRevision(
 export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
-  errorMessage: string,
+  rawErrorMessage: string,
 ): void {
   const { db } = deps;
+  // #1492：空原因会让卡片上的失败横幅（errorMessage 非空才渲染）整块消失。
+  const errorMessage =
+    rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
   db.update(step)
     .set({ status: 'failed', finishedAt: nowMs() })
     .where(eq(step.id, stepRow.id))
@@ -1844,6 +1851,25 @@ export function applyStepFailure(
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
+  // #1492 build 步兜底报告：机器报失败、产物闸、失联收尾都经本漏斗，会话里
+  // 落一条系统报告（失败原因 + 已知改动 + PR + 下一步），不只剩一行错误。
+  if (stepRow.kind === 'build') {
+    const changes = buildRow.changes;
+    const files =
+      changes == null
+        ? undefined
+        : (Array.isArray(changes) ? changes : changes.files).map((f) => f.path);
+    insertMessageRow(deps, buildRow.id, {
+      id: newRecordId(),
+      role: 'system',
+      content: buildFallbackReport({
+        reason: errorMessage,
+        ...(files !== undefined ? { files } : {}),
+        pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+      }),
+      createdAt: nowMs(),
+    });
+  }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
@@ -1997,6 +2023,7 @@ function stepArtifactGate(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   outcome: { hasChanges?: boolean; workBranchDrift?: { expected: string; actual: string } },
+  planContract: PlanContractCheck | null,
 ): string | null {
   if (stepRow.kind === 'plan') {
     const planRow = deps.db
@@ -2004,7 +2031,18 @@ function stepArtifactGate(
       .from(planTable)
       .where(eq(planTable.buildId, stepRow.buildId))
       .get();
-    if (planRow !== undefined) return null;
+    if (planRow !== undefined) {
+      // #1492 结构闸：结构补写轮仍不合格 = 失败收尾（每轮规划最多补写一次）；
+      // 非补写轮的不合格在 completeStep 落 done 后入队补写轮。
+      if (
+        planContract !== null &&
+        !planContract.ok &&
+        isPlanContractRewritePrompt(stepRow.prompt)
+      ) {
+        return `方案结构不合格：${planContract.problem}`;
+      }
+      return null;
+    }
     // 本 build 首个 plan 步（无其它 plan 步行）→ 补写轮重试，非闸失败。判据
     // 不用 prompt===null：失败重启轮首步带 restart 指令（prompt 非 null）同样
     // 该享一次重试，否则重启即硬失败。
@@ -2030,6 +2068,33 @@ function stepArtifactGate(
     if (outcome.hasChanges === false) return '构建零改动';
   }
   return null;
+}
+
+/** 本 build 最新一版方案（version 最大）；没有方案 = undefined。 */
+function latestPlanRow(
+  deps: BuildDeps,
+  buildId: string,
+): { content: string; stepId: string | null } | undefined {
+  return deps.db
+    .select({ content: planTable.content, stepId: planTable.stepId })
+    .from(planTable)
+    .where(eq(planTable.buildId, buildId))
+    .orderBy(desc(planTable.version))
+    .get();
+}
+
+/** #1492 plan 步的结构闸结论：只看本步自己上传的那一版（老 plan 行、没重新
+ *  上传方案的重规划步不回溯）；结构补写轮例外——它没重新上传就按本 build
+ *  最新一版判，旧版不合格方案不能借补写轮混进 confirm。null = 无可判的方案。 */
+function planContractOfStep(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+): PlanContractCheck | null {
+  const rewrite = isPlanContractRewritePrompt(stepRow.prompt);
+  const latest = latestPlanRow(deps, stepRow.buildId);
+  if (latest === undefined) return null;
+  if (!rewrite && latest.stepId !== stepRow.id) return null;
+  return checkPlanContract(latest.content);
 }
 
 /** 机器步完成后的 phase 推进（M3 claim/journal 面挂接点；M2a 供编排测试
@@ -2094,7 +2159,9 @@ export function completeStep(
   }
   // 产物闸（#703）：失败收尾不落 done（完成判据 = 契约产物存在，不是会话
   // 结束——B-C10 空方案 / B-C11 零改动 / B-C14 假完成同病族）。
-  const gateFailure = stepArtifactGate(deps, stepRow, outcome);
+  // #1492 结构闸结论只算一次：产物闸与 plan 腿的补写判定共用。
+  const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
+  const gateFailure = stepArtifactGate(deps, stepRow, outcome, planContract);
   if (gateFailure !== null) {
     // #1277：有提交的偏离拒绝记录。finishStep 在闸前已把 daemon 上报的 PR
     // 写入 build 行；硬失败不保留这次回填。无提交偏离（hasChanges=false）
@@ -2135,6 +2202,18 @@ export function completeStep(
       .get();
     if (!planDoc) {
       enqueueStep(deps, stepRow.buildId, 'plan', todoRow.teamId, PLAN_REWRITE_PROMPT);
+      return;
+    }
+    // #1492 结构闸：本步交的方案 Verification 不合格 → 留 planning + 结构补写
+    // 一轮（问题点名进指令）。补写轮自身不合格已在产物闸失败收尾，到不了这里。
+    if (planContract !== null && !planContract.ok) {
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        'plan',
+        todoRow.teamId,
+        buildPlanContractRewritePrompt(planContract.problem),
+      );
       return;
     }
     // plan 卡就绪 → confirm（02 §4.2：phase=confirm 等人工）；hasPlan 置位
@@ -2260,11 +2339,20 @@ export function completeStep(
     // Error）=「判定提取失败」+ 原因上浮；两字段皆缺（旧 daemon）=「验证未
     // 返回结论」；passed=false 是有效结论不是本步失败（提取面不会把它折成
     // error）。
-    const verdict: VerifyVerdict = outcome.verifyVerdict ?? {
-      passed: false,
-      conclusion: outcome.verifyVerdictError !== undefined ? '判定提取失败' : '验证未返回结论',
-      evidence: [],
-    };
+    // #1492 清单对账：方案有 Verification 清单时，缺证据的项点名、passed 置 false。
+    const latestPlan = latestPlanRow(deps, buildRow.id);
+    const verdict: VerifyVerdict =
+      outcome.verifyVerdict !== undefined
+        ? reconcileVerifyVerdict(
+            outcome.verifyVerdict,
+            planVerificationItems(latestPlan?.content ?? ''),
+          )
+        : {
+            passed: false,
+            conclusion:
+              outcome.verifyVerdictError !== undefined ? '判定提取失败' : '验证未返回结论',
+            evidence: [],
+          };
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',

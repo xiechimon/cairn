@@ -13,6 +13,9 @@ import type { DocumentDiffFile } from './document-diff.js';
 export const verifyEvidenceSchema = z.object({
   path: z.string().min(1),
   note: z.string().optional(),
+  /** 对应方案 Verification 清单的第几项（从 1 起，#1492）。缺省 = 老 verdict
+   *  或无清单任务，不对应具体清单项。 */
+  item: z.coerce.number().int().min(1).optional(),
 });
 export type VerifyEvidence = z.infer<typeof verifyEvidenceSchema>;
 
@@ -38,6 +41,9 @@ export function buildVerifyStepPrompt(args: {
   taskText: string;
   /** 方案全文（无方案轮传空串——直执行任务照常可验）。 */
   planText: string;
+  /** 方案 Verification 清单（#1492，plan.ts planVerificationItems 解析）。缺省或
+   *  空 = 无清单（直执行任务、老方案），不出清单段。 */
+  verificationItems?: readonly string[];
   /** 本轮交付的 PR（无 PR 传 null——hosted/local 形态如实说明）。 */
   pr: { number: number; url: string | null } | null;
   /** 变更面（审核关口可得时传；单文件级 diff 概览）。 */
@@ -61,6 +67,16 @@ export function buildVerifyStepPrompt(args: {
           `${args.changes.length} 个文件（${args.changes.map((f) => f.path).join('、')}）——完整 diff 在工作区自查。`,
         ].join('\n')
       : '';
+  const items = args.verificationItems ?? [];
+  const checklistSection =
+    items.length > 0
+      ? [
+          '',
+          '## 验证清单',
+          '方案的 Verification 清单如下。逐项执行并出判定：evidence 里每一项至少一条证据，用 item 字段写清单序号；清单里有项没有证据，本步按未通过记。',
+          ...items.map((it, i) => `${i + 1}. ${it}`),
+        ]
+      : [];
   const sections = [
     `请验证以下任务的本轮交付。**验证步**：在会话分支的可写工作区上起真实栈跑 e2e / 关键路径，把证据（截图、API JSON、落库行、日志摘录）落进 docs/verify/${args.ticketRef}/，回贴 PR body，结尾按下方契约输出 verdict。工作区对验证产物可写：证据文件正常 git add / commit / push；除此之外不改动交付物本身。`,
     '',
@@ -72,7 +88,13 @@ export function buildVerifyStepPrompt(args: {
       {
         passed: true,
         conclusion: '<一句话：跑通了什么、对账结果>',
-        evidence: [{ path: 'docs/verify/1250/<证据文件>', note: '<可选：这份证据证明了什么>' }],
+        evidence: [
+          {
+            path: 'docs/verify/1250/<证据文件>',
+            note: '<可选：这份证据证明了什么>',
+            ...(items.length > 0 ? { item: 1 } : {}),
+          },
+        ],
       },
       null,
       2,
@@ -83,9 +105,34 @@ export function buildVerifyStepPrompt(args: {
     '## 待验证任务',
     args.taskText,
     ...(args.planText !== '' ? ['', '## 方案', args.planText] : []),
+    ...checklistSection,
     '',
     prSection,
     changesSection,
   ];
   return sections.join('\n');
+}
+
+/** 清单对账（#1492，server 收尾时调用）：方案有 Verification 清单时，清单里
+ *  每一项都要有 evidence 对应（item 序号）；缺证据的项点名进结论、passed 置
+ *  false——Verifier 漏验不能以「通过」落进合并闸。无清单 = 原样返回。 */
+export function reconcileVerifyVerdict(
+  verdict: VerifyVerdict,
+  items: readonly string[],
+): VerifyVerdict {
+  if (items.length === 0) return verdict;
+  // 版本墙：证据一条都没带序号 = 旧 daemon（schema 剥掉了 item）或 agent 没按
+  // 清单编号——无从逐项对账，如实写明，不替它判失败（hasChanges 缺省同律 fail-open）。
+  if (!verdict.evidence.some((e) => e.item !== undefined)) {
+    return { ...verdict, conclusion: `证据未按清单编号，未逐项对账。${verdict.conclusion}` };
+  }
+  const covered = new Set(verdict.evidence.map((e) => e.item));
+  const missing = items.map((_, i) => i + 1).filter((n) => !covered.has(n));
+  if (missing.length === 0) return verdict;
+  const named = missing.map((n) => `第 ${n} 项`).join('、');
+  return {
+    ...verdict,
+    passed: false,
+    conclusion: `清单${named}无证据。${verdict.conclusion}`,
+  };
 }

@@ -22,7 +22,13 @@ import {
 } from '../src/db/schema.js';
 import { systemGitOps } from '../src/lib/git.js';
 import { MERGE_NOT_LANDED_NOTE } from '../src/services/machines.js';
-import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  type TestServer,
+  withVerification,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-m3b-1';
 
@@ -298,7 +304,7 @@ describe('plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文
       expect(res.status).toBe(200);
     };
 
-    await put('plan.md', '# Context\n方案 v1\n');
+    await put('plan.md', withVerification('# Context\n方案 v1\n'));
     const plans = w.s.db.select().from(planTable).where(eq(planTable.buildId, buildId)).all();
     expect(plans).toHaveLength(1);
     expect(plans[0]!.version).toBe(1);
@@ -335,7 +341,7 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     // plan → confirm → build → review → merge 步（server 面驱动，daemon 面归
     // integration m3b-demo）。plan 步带 plan.md 交接物（#113：无产物不进 confirm）。
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n');
+    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
@@ -385,7 +391,7 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n'); // 交接物（#113）
+    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n')); // 交接物（#113）
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
@@ -418,7 +424,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n');
+    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
@@ -495,7 +501,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     const w = await setupGitWorld();
     const buildId = await w.startBuild();
     const planStep = await w.claim();
-    await w.uploadPlan(planStep.step.id, '# Context\n方案 v1\n');
+    await w.uploadPlan(planStep.step.id, withVerification('# Context\n方案 v1\n'));
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();

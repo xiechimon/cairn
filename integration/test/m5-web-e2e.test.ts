@@ -42,7 +42,7 @@ const PLAN_MD = (marker: string) =>
     `Context: ${marker} 探针任务。`,
     'Changes: 在 README.md 追加一行探针。',
     'Edge cases: 无。',
-    'Verification: 读回确认。',
+    'Verification: 读回 README.md 确认。',
   ].join('\n');
 
 let stub: StubLlm;
