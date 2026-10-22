@@ -29,15 +29,25 @@
 //  F1 PACMAN_TOKEN 开：receiver 免 Bearer 可达（错 token 仍 401——自有闸）；
 //  F2 PACMAN_TOKEN 开：token mgmt 端点仍要 Bearer（401 无凭证）；
 //  F3 /api/webhookfoo 段边界不豁免（401）。
+// W #1459 打标人按 D5 核 + 计入在飞上限（清单 docs/verify/1459/failure-modes.txt，
+//   W 编号对位）：sender 在仓库上 triage 及以上才导入，权限读与缓存复用 #1406
+//   轮询器的；读不到 / 没 token / 到上限 = 不导入、记日志、202 带原因。
+//   W4b（合入 #1406 round 4 后）：permission 读遇限流（429 / 带限流信号的
+//   403）在 lib 里抛 GithubRateLimitedError；webhook 照读不到处理：202 ignored，
+//   原因码 rate-limited（日志带 status 与重置时刻），不缓存，限流过后照判。
 // 出站纪律：githubFetch 注入 mock，测试面零真实出站。
 
-import { webhookReceiverResponseSchema } from '@pacman/shared';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { type Phase, type TodoSourceKind, webhookReceiverResponseSchema } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import {
   chiefMessage as chiefMessageTable,
   chiefThread as chiefThreadTable,
+  githubConnection as githubConnectionTable,
   project as projectTable,
   step as stepTable,
   todo as todoTable,
@@ -47,6 +57,7 @@ import { HttpError } from '../src/lib/errors.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { importGithubIssue } from '../src/services/github-issues.js';
+import { createIssueIntake, ISSUE_INTAKE_IN_FLIGHT_CAP } from '../src/services/issue-intake.js';
 import { receiveGithubWebhook, resetWebhookDeliveryWindow } from '../src/services/webhook.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
@@ -54,6 +65,34 @@ const GH_TOKEN = 'ghp_webhook_test_token';
 const REPO = 'octo/alpha';
 const ISSUE_PATH = `/repos/${REPO}/issues/7`;
 const LABELS_PATH = `/repos/${REPO}/labels`;
+/** 缺省打标人（webhook sender）：仓主，permission 应答 admin。 */
+const SENDER = 'octo';
+const permissionPath = (login: string) => `/repos/${REPO}/collaborators/${login}/permission`;
+/** permission 应答形状取 GitHub OpenAPI 示例（#1406 夹具，代理拦 collaborators 路径）。 */
+const PERMISSION_EXAMPLE = JSON.parse(
+  readFileSync(
+    join(import.meta.dirname, 'fixtures/issue-intake/permission-admin.docs-example.json'),
+    'utf8',
+  ),
+) as { permission: string; role_name: string; user: Record<string, unknown> };
+
+function permissionBody(
+  login: string,
+  permission: string,
+  roleName: string,
+  triage: boolean | undefined = undefined,
+) {
+  return {
+    ...PERMISSION_EXAMPLE,
+    permission,
+    role_name: roleName,
+    user: {
+      ...PERMISSION_EXAMPLE.user,
+      login,
+      ...(triage !== undefined ? { permissions: { pull: true, triage, push: false } } : {}),
+    },
+  };
+}
 
 const ISSUE_DETAIL = {
   number: 7,
@@ -64,13 +103,23 @@ const ISSUE_DETAIL = {
 };
 const LABELS_FULL = [{ name: 'pacman', color: '0075ca', description: null }];
 
-/** labeled 事件载荷（GitHub issues webhook 原形的消费子集）。 */
-function labeledPayload(labelName = 'pacman') {
+/** labeled 事件载荷（GitHub issues webhook 原形的消费子集）。sender = 打标人
+ * （缺省仓主；null = 载荷不带 sender）；author = issue 作者（issue.user）。 */
+function labeledPayload(
+  labelName = 'pacman',
+  opts: { sender?: string | null; issue?: number; author?: string } = {},
+) {
+  const sender = opts.sender === undefined ? SENDER : opts.sender;
   return {
     action: 'labeled',
-    issue: { number: 7, title: ISSUE_DETAIL.title },
+    issue: {
+      number: opts.issue ?? 7,
+      title: ISSUE_DETAIL.title,
+      user: { login: opts.author ?? SENDER },
+    },
     label: { name: labelName },
     repository: { full_name: REPO },
+    ...(sender !== null ? { sender: { login: sender, type: 'User' } } : {}),
   };
 }
 
@@ -89,8 +138,17 @@ function post(
   );
 }
 
-/** ghMock：按 pathname 分发（github-issues.test.ts 同族，此处收窄为静态路由）。 */
-function ghMock(routes: Record<string, { status?: number; body: unknown }>): {
+type MockRoute = {
+  status?: number;
+  body: unknown;
+  throws?: boolean;
+  headers?: Record<string, string>;
+};
+
+/** ghMock：按 pathname 分发（github-issues.test.ts 同族，此处收窄为静态路由；
+ * routes 按引用持有，用例可在 boot 之后增改。throws = 网络失败 / 超时；
+ * headers = 应答头（键小写）。 */
+function ghMock(routes: Record<string, MockRoute>): {
   impl: FetchLike;
   calls: string[];
 } {
@@ -99,11 +157,12 @@ function ghMock(routes: Record<string, { status?: number; body: unknown }>): {
     const url = new URL(String(input));
     calls.push(url.pathname);
     const route = routes[url.pathname];
+    if (route?.throws === true) throw new TypeError('fetch failed');
     const status = route?.status ?? 200;
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: { get: () => null },
+      headers: { get: (name: string) => route?.headers?.[name.toLowerCase()] ?? null },
       json: async () => route?.body ?? {},
       text: async () => JSON.stringify(route?.body ?? {}),
     };
@@ -111,10 +170,11 @@ function ghMock(routes: Record<string, { status?: number; body: unknown }>): {
   return { impl, calls };
 }
 
-function defaultRoutes(overrides: Record<string, { status?: number; body: unknown }> = {}) {
+function defaultRoutes(overrides: Record<string, MockRoute> = {}): Record<string, MockRoute> {
   return {
     [ISSUE_PATH]: { body: ISSUE_DETAIL },
     [LABELS_PATH]: { body: LABELS_FULL },
+    [permissionPath(SENDER)]: { body: permissionBody(SENDER, 'admin', 'admin') },
     ...overrides,
   };
 }
@@ -140,19 +200,22 @@ async function postGithubProject(app: Hono): Promise<string> {
 }
 
 let s: TestServer;
+let routes: Record<string, MockRoute>;
 let mock: { impl: FetchLike; calls: string[] };
 let token: { id: string; plaintext: string };
+let projectId: string;
 
 beforeEach(async () => {
   // 投递去重册是模块级内存态（跨 bootServer 存续）——用例间清零隔离。
   resetWebhookDeliveryWindow();
-  mock = ghMock(defaultRoutes());
+  routes = defaultRoutes();
+  mock = ghMock(routes);
   s = bootServer({ githubFetch: mock.impl });
   upsertGithubConnection(
     { db: s.db, box: s.secretBox },
     { teamId: s.team.id, login: 'octo', accessToken: GH_TOKEN, scope: 'repo' },
   );
-  await postGithubProject(s.app);
+  projectId = await postGithubProject(s.app);
   // chief 绑定 Agent（orchestrateTodo 前置；orchestration-source 同形 seed）。
   s.db
     .insert((await import('../src/db/schema.js')).agent)
@@ -558,5 +621,454 @@ describe('#1406 webhook 与另一路导入同一 issue 并发', () => {
       expect(directResult.status).toBe('fulfilled');
       expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(0);
     }
+  });
+});
+
+// —— #1459 打标人按 D5 核 + 计入在飞上限 ————————————————————————————————————
+// W 编号对位 docs/verify/1459/failure-modes.txt。
+
+const REFUSED_LOG = 'github webhook import refused';
+const CAP_DETAIL = `project at the in-flight cap (${ISSUE_INTAKE_IN_FLIGHT_CAP} open github-issue tasks)`;
+
+type LogLine = Record<string, unknown>;
+
+/** HTTP 面投递（状态码 + 封套；非 202 时原样给 JSON）。 */
+async function deliverHttp(
+  body: unknown,
+  deliveryId: string,
+): Promise<{ status: number; body: ReturnType<typeof webhookReceiverResponseSchema.parse> }> {
+  const res = await post(s.app, `/api/webhook/github/${token.plaintext}`, body, {
+    'x-github-event': 'issues',
+    'x-github-delivery': deliveryId,
+  });
+  const json: unknown = await res.json();
+  return {
+    status: res.status,
+    body: (res.status === 202 ? webhookReceiverResponseSchema.parse(json) : json) as ReturnType<
+      typeof webhookReceiverResponseSchema.parse
+    >,
+  };
+}
+
+/** 服务面直达（带可捕获的 pino 日志：每行解析成对象）。 */
+async function deliverDirect(body: unknown, deliveryId: string, fetchImpl: FetchLike = mock.impl) {
+  const lines: LogLine[] = [];
+  const logger = pino(
+    { level: 'info' },
+    {
+      write: (line: string) => {
+        lines.push(JSON.parse(line) as LogLine);
+      },
+    },
+  );
+  const response = await receiveGithubWebhook(
+    { ...s.svc, box: s.secretBox, githubFetch: fetchImpl, logger },
+    { token: token.plaintext, event: 'issues', deliveryId, body },
+  );
+  return { response, lines };
+}
+
+const refusals = (lines: LogLine[]) => lines.filter((l) => l.msg === REFUSED_LOG);
+const permissionReads = () => mock.calls.filter((p) => p.endsWith('/permission'));
+const issueReads = () => mock.calls.filter((p) => /\/issues\/\d+$/.test(p));
+const issueTasks = () =>
+  s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all();
+
+let taskSeq = 900;
+
+/** 直插一张来源卡（在飞上限场景；webhook 导入的形状：createdBy = seed 用户）。 */
+function insertIssueTask(
+  n: number,
+  phase: Phase,
+  sourceKind: TodoSourceKind = 'github-issue',
+): void {
+  taskSeq += 1;
+  s.db
+    .insert(todoTable)
+    .values({
+      id: `todo-wh-${taskSeq}`,
+      teamId: s.team.id,
+      projectId,
+      title: `issue ${n}`,
+      spec: '',
+      phase,
+      phaseAt: Date.now(),
+      seqNum: taskSeq,
+      sourceKind,
+      sourceRef: `github:${REPO}#${n}`,
+      createdBy: s.user.id,
+    })
+    .run();
+}
+
+/** issue 详情读卡在闸门上（并发场景：先占位的一路握着占位等 GitHub）。 */
+function gatedFetch(paths: string[]): { impl: FetchLike; open: () => void } {
+  let open: () => void = () => {};
+  const gate = new Promise<void>((r) => {
+    open = r;
+  });
+  const impl: FetchLike = async (input, init) => {
+    if (paths.includes(new URL(String(input)).pathname)) await gate;
+    return mock.impl(input, init);
+  };
+  return { impl, open };
+}
+
+/** 轮询器看到的带 ready-for-agent 的 open issue 与它的 labeled 事件（#1406
+ * events-1406.json 的形状，actor = login）。 */
+function listForPoller(n: number, labeler: string): void {
+  routes[`/repos/${REPO}/issues`] = {
+    body: [
+      {
+        number: n,
+        title: `issue ${n}`,
+        state: 'open',
+        labels: [{ name: 'ready-for-agent', color: '0E8A16' }],
+        created_at: '2026-10-21T00:00:00Z',
+        body: null,
+      },
+    ],
+  };
+  routes[`/repos/${REPO}/issues/${n}`] = { body: { ...ISSUE_DETAIL, number: n } };
+  routes[`/repos/${REPO}/issues/${n}/events`] = {
+    body: [
+      {
+        id: 1,
+        actor: { login: labeler, id: 1, type: 'User' },
+        event: 'labeled',
+        commit_id: null,
+        created_at: '2026-10-21T00:00:01Z',
+        label: { name: 'ready-for-agent', color: '0E8A16' },
+        performed_via_github_app: null,
+      },
+    ],
+  };
+}
+
+describe('#1459 W 打标人（sender）按 D5 核', () => {
+  test('W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志', async () => {
+    routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
+    const payload = labeledPayload('pacman', { sender: 'outsider', author: 'outsider' });
+    const http = await deliverHttp(payload, 'w1-http');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'ignored',
+      deliveryId: 'w1-http',
+      detail: `outsider is below triage on ${REPO}`,
+    });
+    expect(permissionReads()).toEqual([permissionPath('outsider')]);
+    expect(issueReads()).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+    const direct = await deliverDirect(payload, 'w1-direct');
+    expect(direct.response.result).toBe('ignored');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({
+        deliveryId: 'w1-direct',
+        issue: 7,
+        sender: 'outsider',
+        reason: 'sender-below-triage',
+      }),
+    ]);
+    // 404 是明确的否定答案：TTL 内不重读（与轮询器同一缓存律）。
+    expect(permissionReads()).toHaveLength(1);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test('W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入', async () => {
+    routes[permissionPath('reader')] = { body: permissionBody('reader', 'read', 'read', false) };
+    const http = await deliverHttp(labeledPayload('pacman', { sender: 'reader' }), 'w2');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'ignored',
+      deliveryId: 'w2',
+      detail: `reader is below triage on ${REPO}`,
+    });
+    expect(issueReads()).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test.each([
+    ['triage', permissionBody('labeler', 'read', 'triage')],
+    ['write', permissionBody('labeler', 'write', 'write')],
+    ['maintain', permissionBody('labeler', 'write', 'maintain')],
+    ['admin', permissionBody('labeler', 'admin', 'admin')],
+    ['custom role built on triage', permissionBody('labeler', 'read', 'issue-wrangler', true)],
+  ])('W3 打标人 %s → 202 created（先读 permission 再导入）', async (_role, body) => {
+    routes[permissionPath('labeler')] = { body };
+    const http = await deliverHttp(labeledPayload('pacman', { sender: 'labeler' }), 'w3');
+    expect(http.status).toBe(202);
+    expect(http.body.result).toBe('created');
+    expect(issueTasks()).toHaveLength(1);
+    expect(permissionReads()).toEqual([permissionPath('labeler')]);
+    expect(mock.calls.indexOf(permissionPath('labeler'))).toBeLessThan(
+      mock.calls.indexOf(ISSUE_PATH),
+    );
+  });
+
+  test.each([
+    ['403', { status: 403, body: { message: 'Forbidden' } }],
+    ['500', { status: 500, body: {} }],
+    ['502', { status: 502, body: {} }],
+    ['network error / timeout', { body: null, throws: true }],
+    ['malformed 200 body', { body: { role_name: 'admin' } }],
+  ] satisfies Array<[string, MockRoute]>)(
+    'W4 permission 读失败（%s）→ 202 ignored，不导入，记日志，不缓存',
+    async (_case, route) => {
+      routes[permissionPath(SENDER)] = route;
+      const http = await deliverHttp(labeledPayload(), 'w4-http');
+      expect(http.status).toBe(202);
+      expect(http.body).toEqual({
+        result: 'ignored',
+        deliveryId: 'w4-http',
+        detail: `permission of ${SENDER} on ${REPO} unreadable`,
+      });
+      const direct = await deliverDirect(labeledPayload(), 'w4-direct');
+      expect(direct.response.result).toBe('ignored');
+      expect(refusals(direct.lines)).toEqual([
+        expect.objectContaining({ sender: SENDER, reason: 'permission-unreadable' }),
+      ]);
+      // 读不到不进缓存：第二次投递重读。
+      expect(permissionReads()).toHaveLength(2);
+      expect(issueReads()).toHaveLength(0);
+      expect(issueTasks()).toHaveLength(0);
+    },
+  );
+
+  const RESET_AT = new Date(1_800_000_600_000).toISOString();
+  test.each([
+    ['429 without headers', { status: 429, body: { message: 'API rate limit exceeded' } }, null],
+    [
+      '429 with retry-after 60',
+      {
+        status: 429,
+        headers: { 'retry-after': '60' },
+        body: { message: 'API rate limit exceeded' },
+      },
+      'retry-after',
+    ],
+    [
+      '403 with x-ratelimit-remaining 0 and x-ratelimit-reset',
+      {
+        status: 403,
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1800000600' },
+        body: { message: 'API rate limit exceeded for user ID 1.' },
+      },
+      RESET_AT,
+    ],
+    [
+      '403 secondary limit, message only',
+      {
+        status: 403,
+        body: {
+          message:
+            'You have exceeded a secondary rate limit. Please wait a few minutes before you try again.',
+        },
+      },
+      null,
+    ],
+  ] satisfies Array<[string, MockRoute, string | null]>)(
+    'W4b permission 读遇限流（%s）→ 202 ignored rate-limited，不导入，记日志带重置时刻，不缓存，限流过后照判',
+    async (_case, route, reset) => {
+      routes[permissionPath(SENDER)] = route;
+      const http = await deliverHttp(labeledPayload(), 'w4b-http');
+      expect(http.status).toBe(202);
+      expect(http.body.result).toBe('ignored');
+      expect(http.body.deliveryId).toBe('w4b-http');
+      const prefix = `github rate limited reading the permission of ${SENDER} on ${REPO}`;
+      if (reset === null) expect(http.body.detail).toBe(prefix);
+      else if (reset === 'retry-after') {
+        expect(http.body.detail).toMatch(
+          new RegExp(`^${prefix} \\(resets at \\d{4}-\\d\\d-\\d\\dT[^)]+Z\\)$`),
+        );
+      } else expect(http.body.detail).toBe(`${prefix} (resets at ${reset})`);
+      const direct = await deliverDirect(labeledPayload(), 'w4b-direct');
+      expect(direct.response.result).toBe('ignored');
+      expect(refusals(direct.lines)).toEqual([
+        expect.objectContaining({
+          deliveryId: 'w4b-direct',
+          sender: SENDER,
+          reason: 'rate-limited',
+          status: route.status,
+          resetAt: reset === null ? null : reset === 'retry-after' ? expect.any(String) : reset,
+        }),
+      ]);
+      // 限流不进缓存：第二次投递重读；没读 issue、没建卡。
+      expect(permissionReads()).toHaveLength(2);
+      expect(issueReads()).toHaveLength(0);
+      expect(issueTasks()).toHaveLength(0);
+      // 限流过后（新投递）照判：读到 admin → 导入。
+      routes[permissionPath(SENDER)] = { body: permissionBody(SENDER, 'admin', 'admin') };
+      const after = await deliverHttp(labeledPayload(), 'w4b-after');
+      expect(after.body.result).toBe('created');
+      expect(permissionReads()).toHaveLength(3);
+      expect(issueTasks()).toHaveLength(1);
+    },
+  );
+
+  test('W5a 团队没有 GitHub 连接 → 202 misconfigured，零出站（不匿名读），记日志', async () => {
+    s.db.delete(githubConnectionTable).where(eq(githubConnectionTable.teamId, s.team.id)).run();
+    const http = await deliverHttp(labeledPayload(), 'w5a');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'misconfigured',
+      deliveryId: 'w5a',
+      detail: 'github connection not found',
+    });
+    const direct = await deliverDirect(labeledPayload(), 'w5a-direct');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ reason: 'no-github-connection' }),
+    ]);
+    expect(mock.calls).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test('W5b 连接 token 解不开（密文坏）→ 202 misconfigured（不是 500），零出站，记日志', async () => {
+    s.db
+      .update(githubConnectionTable)
+      .set({ accessTokenCipher: 'not-a-sealed-token' })
+      .where(eq(githubConnectionTable.teamId, s.team.id))
+      .run();
+    const http = await deliverHttp(labeledPayload(), 'w5b');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'misconfigured',
+      deliveryId: 'w5b',
+      detail: 'github token unreadable',
+    });
+    const direct = await deliverDirect(labeledPayload(), 'w5b-direct');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ reason: 'token-unreadable' }),
+    ]);
+    expect(mock.calls).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test('W12a 载荷不带 sender → 202 ignored，零出站，记日志', async () => {
+    const payload = labeledPayload('pacman', { sender: null });
+    const http = await deliverHttp(payload, 'w12a');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'ignored',
+      deliveryId: 'w12a',
+      detail: 'event has no sender',
+    });
+    const direct = await deliverDirect(payload, 'w12a-direct');
+    expect(refusals(direct.lines)).toEqual([expect.objectContaining({ reason: 'no-sender' })]);
+    expect(mock.calls).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test('W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored', async () => {
+    routes[permissionPath('ghost')] = { status: 404, body: { message: 'Not Found' } };
+    const http = await deliverHttp(labeledPayload('pacman', { sender: 'ghost' }), 'w12b');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'ignored',
+      deliveryId: 'w12b',
+      detail: `ghost is below triage on ${REPO}`,
+    });
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test('W13 webhook 导入的卡 createdBy 仍是 seed 用户（轮询器的关闭对账不碰）', async () => {
+    const http = await deliverHttp(labeledPayload(), 'w13');
+    expect(http.body.result).toBe('created');
+    const row = s.db.select().from(todoTable).where(eq(todoTable.id, http.body.todoId!)).get();
+    expect(row?.createdBy).toBe(s.user.id);
+  });
+
+  test('W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）', async () => {
+    routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
+    const first = await deliverHttp(labeledPayload('pacman', { issue: 7 }), 'w14a-1');
+    const second = await deliverHttp(labeledPayload('pacman', { issue: 8 }), 'w14a-2');
+    expect([first.body.result, second.body.result]).toEqual(['created', 'created']);
+    expect(permissionReads()).toEqual([permissionPath(SENDER)]);
+  });
+
+  test('W14b webhook 读到的答案轮询器直接用：轮询器领同一打标人的 issue 不再读 permission', async () => {
+    const hook = await deliverHttp(labeledPayload(), 'w14b');
+    expect(hook.body.result).toBe('created');
+    expect(permissionReads()).toEqual([permissionPath(SENDER)]);
+    listForPoller(8, SENDER);
+    const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: mock.impl });
+    const tally = await intake.sweep();
+    expect(tally?.imported).toBe(1);
+    expect(issueTasks().map((t) => t.sourceRef)).toEqual([`github:${REPO}#7`, `github:${REPO}#8`]);
+    expect(permissionReads()).toEqual([permissionPath(SENDER)]);
+  });
+});
+
+describe('#1459 W 计入在飞上限', () => {
+  test('W6 项目到上限（todo / building / failed 三张）→ 202 ignored，零出站，记日志', async () => {
+    insertIssueTask(101, 'todo');
+    insertIssueTask(102, 'building');
+    insertIssueTask(103, 'failed');
+    const http = await deliverHttp(labeledPayload(), 'w6');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({ result: 'ignored', deliveryId: 'w6', detail: CAP_DETAIL });
+    const direct = await deliverDirect(labeledPayload(), 'w6-direct');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ issue: 7, reason: 'at-cap' }),
+    ]);
+    expect(mock.calls).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(ISSUE_INTAKE_IN_FLIGHT_CAP);
+  });
+
+  test('W6b done / closed 的卡与自建 issue 卡不计入 → 202 created', async () => {
+    insertIssueTask(101, 'done');
+    insertIssueTask(102, 'closed');
+    insertIssueTask(103, 'building', 'github-issue-self');
+    const http = await deliverHttp(labeledPayload(), 'w6b');
+    expect(http.body.result).toBe('created');
+  });
+
+  test('W8 差一位到上限时两条投递同时到（批量打标）→ 只导入一条，另一条 202 ignored 到上限', async () => {
+    insertIssueTask(101, 'todo');
+    insertIssueTask(102, 'building');
+    routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
+    const gated = gatedFetch([ISSUE_PATH, `/repos/${REPO}/issues/8`]);
+    const a = deliverDirect(labeledPayload('pacman', { issue: 7 }), 'w8-a', gated.impl);
+    const b = deliverDirect(labeledPayload('pacman', { issue: 8 }), 'w8-b', gated.impl);
+    setTimeout(gated.open, 30);
+    const results = await Promise.all([a, b]);
+    expect(results.map((r) => r.response.result).sort()).toEqual(['created', 'ignored']);
+    const refused = results.find((r) => r.response.result === 'ignored');
+    expect(refused?.response.detail).toBe(CAP_DETAIL);
+    expect(refusals(refused?.lines ?? [])).toEqual([expect.objectContaining({ reason: 'at-cap' })]);
+    expect(issueTasks()).toHaveLength(ISSUE_INTAKE_IN_FLIGHT_CAP);
+  });
+});
+
+describe('#1459 W 并发与重投', () => {
+  test('W7 webhook 与轮询器同时导入同一 issue → 一张卡（另一路 409）', async () => {
+    listForPoller(7, SENDER);
+    const gated = gatedFetch([ISSUE_PATH]);
+    const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: gated.impl });
+    const hook = deliverDirect(labeledPayload(), 'w7', gated.impl);
+    const sweep = intake.sweep();
+    setTimeout(gated.open, 30);
+    const [hookResult, tally] = await Promise.all([hook, sweep]);
+    expect(issueTasks()).toHaveLength(1);
+    expect(['created', 'duplicate']).toContain(hookResult.response.result);
+    const webhookImported = hookResult.response.result === 'created' ? 1 : 0;
+    expect((tally?.imported ?? 0) + webhookImported).toBe(1);
+    expect(s.db.select().from(chiefThreadTable).all()).toHaveLength(1);
+  });
+
+  test('W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入', async () => {
+    routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
+    const payload = labeledPayload('pacman', { sender: 'outsider', author: 'outsider' });
+    const first = await deliverHttp(payload, 'w9');
+    expect(first.status).toBe(202);
+    expect(first.body.result).toBe('ignored');
+    const inWindow = await deliverHttp(payload, 'w9');
+    expect(inWindow.status).toBe(202);
+    expect(inWindow.body.result).toBe('duplicate');
+    // GitHub 的 Redeliver 沿用原 delivery id；窗口过后重新判定。
+    resetWebhookDeliveryWindow();
+    const later = await deliverHttp(payload, 'w9');
+    expect(later.status).toBe(202);
+    expect(later.body).toEqual(first.body);
+    expect(issueTasks()).toHaveLength(0);
   });
 });

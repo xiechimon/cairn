@@ -117,17 +117,23 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
 
   test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
     const { s, token, step } = await world();
+    // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。
+    const otherProject = await postProject(s.app, 'other');
+    const otherTodoRes = await call(s.app, 'POST', `/api/projects/${otherProject}/todos`, {
+      body: { title: '另一任务', spec: '' },
+    });
+    const { id: otherTodo } = (await otherTodoRes.json()) as { id: string };
     const res = await relay(s.app, token, step.step.id, 'save_memory', {
       title: 't',
       content: 'c',
-      projectId: 'proj-x',
-      sourceTodoId: 'todo-y',
+      projectId: otherProject,
+      sourceTodoId: otherTodo,
     });
     const saved = memoryRecordSchema.parse(
       JSON.parse(((await res.json()) as { text: string }).text),
     );
-    expect(saved.projectId).toBe('proj-x');
-    expect(saved.sourceTodoId).toBe('todo-y');
+    expect(saved.projectId).toBe(otherProject);
+    expect(saved.sourceTodoId).toBe(otherTodo);
     s.dispose();
   });
 
