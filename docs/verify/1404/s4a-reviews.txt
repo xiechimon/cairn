@@ -45,7 +45,7 @@ Checked:
 - ETag header: visible ASCII only.
 - The new write POST statuses/{sha}: body is JSON.stringify of exactly {state, context, description}; state
   is one of the four documented values; no target_url. No caller in this PR; S7 uses the team's existing
-  `repo`-scoped connection token (no new credential, no scope change; README F5 in s4-plan.md).
+  `repo`-scoped connection token (no new credential, no scope change; fact F5 in s4-plan.md).
 - Responses: parsed with res.json() and returned as data; no eval or code deserialization. GitHub error
   messages are stripped of control and format characters and capped at 200 characters.
 - Redirects: fetch follows them as for the existing reads; undici drops Authorization on a cross-origin
