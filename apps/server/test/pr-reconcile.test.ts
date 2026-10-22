@@ -270,6 +270,11 @@ class PullsMock {
       if (typeof status === 'number') return Promise.resolve(res(status, '"c"', {}));
       return Promise.resolve(res(200, '"c"', { status }));
     }
+    // 默认分支的保护与规则（#1403 段 3 磨绿的必需检查名单）：没有保护、没有规则。
+    if (/\/rules\/branches\//.test(url)) return Promise.resolve(res(200, '"r"', []));
+    if (/\/branches\/[^/?]+$/.test(url)) {
+      return Promise.resolve(res(200, '"b"', { name: 'main', protected: false }));
+    }
     if (url.includes('/check-runs')) {
       if (!this.checkRuns) return Promise.resolve(res(404, '"x"', {}));
       return Promise.resolve(
@@ -1619,7 +1624,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     mock.checkRuns = true;
     await pollerFor(w, mock, { anonIpReadsPerHour: 2 }).sweep();
     expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
-    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(0);
+    // the grind's own PR read (head SHA, #1403 segment 3) is counted too; the review card is not read
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/401'))).toHaveLength(0);
   });
 
   test('㊽ the card leaves review during the second unreadable compare → no hint', async () => {
@@ -2373,11 +2379,13 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {
+  test('building-phase builds stay with the CI grind path (its PR read gives the head SHA; not reconciled)', async () => {
     const w = makeWorld({ phase: 'building' });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
     await pollerFor(w, mock).sweep();
-    expect(mock.requests.some((u) => u.includes('/pulls/'))).toBe(false);
+    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('building');
+    expect(w.systemRows()).toEqual([]);
   });
 });
 
@@ -2418,6 +2426,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseOwner: 'xiechimon',
       title: 'server(1403): reconcile review-phase PRs merged or closed on GitHub',
       authorAssociation: 'OWNER',
+      mergeableState: 'blocked',
     });
   });
 
@@ -2438,6 +2447,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseOwner: 'xiechimon',
       title: 'server(1453): a step that finishes before its stop lands leaves an exited card alone',
       authorAssociation: 'OWNER',
+      mergeableState: 'unknown',
     });
   });
 

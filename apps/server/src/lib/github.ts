@@ -150,6 +150,9 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
   authorAssociation: string | null;
+  /** mergeable_state（文档只写「required, string」不列值）：pacman 只认 behind 与 dirty
+   * （#1403 段 3）；缺失 = null。 */
+  mergeableState: string | null;
 }
 
 /** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
@@ -240,6 +243,7 @@ export async function githubPull(
     merged?: unknown;
     title?: unknown;
     author_association?: unknown;
+    mergeable_state?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -272,6 +276,7 @@ export async function githubPull(
       baseOwner: optString(raw.base?.repo?.owner?.login),
       title: optString(raw.title),
       authorAssociation: optString(raw.author_association),
+      mergeableState: optString(raw.mergeable_state),
     },
   };
 }
@@ -1397,8 +1402,8 @@ export interface GithubCheckRunsPage {
 const CHECK_RUNS_PER_PAGE = 100;
 
 /** PR head 的 check-runs 只读（`GET /repos/{o}/{r}/commits/{ref}/check-runs`；
- * ref = conv 分支名，上游解析分支头——PR 的 head 即分支 tip，无需再拉
- * pulls/{n} 取 sha）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
+ * ref = PR 的 head SHA：#1403 段 3 起磨绿先读 pulls/{n} 拿 head，再按这个提交读，
+ * 不按分支名——分支头在两次读之间会动）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
  * 复用判据，不出全量体）。token 可空（匿名梯，公开仓可达）。null = 读不到
  * （网络/404 私仓/限流/响应形坏不区分——fail-open 语义归调用方，同
  * githubPullState）。单次尝试、FETCH_TIMEOUT_MS 上界，不重试。 */
@@ -1434,6 +1439,67 @@ export async function githubCommitCheckRuns(
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };
+}
+
+/** 默认分支的必需检查名单（#1403 段 3：磨绿只认它）：classic 分支保护
+ * （`GET /repos/{o}/{r}/branches/{branch}` 的 protection.required_status_checks 里的
+ * contexts 与 checks[].context）与 ruleset（`GET /repos/{o}/{r}/rules/branches/{branch}`
+ * 里 type 为 required_status_checks 的规则的 parameters.required_status_checks[].context）
+ * 取并集、去重。两个读任一读不到（非 2xx、网络、响应形不对）= null，调用方不动。
+ * 合并闸 S4a（#1503）的原始读面落地后可改用它，接口不变。 */
+export async function githubRequiredChecks(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string[] | null> {
+  const base = `https://api.github.com/${repoPath(owner, repo)}`;
+  const seg = encodeURIComponent(branch);
+  const branchRead = await conditionalGetJson(
+    fetchImpl,
+    `${base}/branches/${seg}`,
+    token,
+    null,
+    FETCH_TIMEOUT_MS,
+  );
+  if (branchRead === null || branchRead.notModified) return null;
+  const rulesRead = await conditionalGetJson(
+    fetchImpl,
+    `${base}/rules/branches/${seg}?per_page=100`,
+    token,
+    null,
+    FETCH_TIMEOUT_MS,
+  );
+  if (rulesRead === null || rulesRead.notModified || !Array.isArray(rulesRead.data)) return null;
+  const names = new Set<string>();
+  const status = (
+    branchRead.data as {
+      protection?: {
+        required_status_checks?: { contexts?: unknown; checks?: unknown } | null;
+      } | null;
+    }
+  ).protection?.required_status_checks;
+  if (Array.isArray(status?.contexts)) {
+    for (const c of status.contexts) if (typeof c === 'string') names.add(c);
+  }
+  if (Array.isArray(status?.checks)) {
+    for (const c of status.checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  for (const rule of rulesRead.data as Array<{
+    type?: unknown;
+    parameters?: { required_status_checks?: unknown } | null;
+  } | null>) {
+    const checks =
+      rule?.type === 'required_status_checks' ? rule.parameters?.required_status_checks : null;
+    if (!Array.isArray(checks)) continue;
+    for (const c of checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  return [...names];
 }
 
 // —— OAuth token 交换面（#231 握手：callback 收码后唯一一次出站）———————————

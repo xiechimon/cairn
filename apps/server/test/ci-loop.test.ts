@@ -56,22 +56,53 @@ function res(status: number, etag: string, body: unknown) {
   };
 }
 
-/** GitHub check-runs 端点 mock：记录全部请求（URL + 头），按状态回应。
+/** 一个候选在假 GitHub 上的 PR head（#1403 段 3：check runs 按它读）。 */
+function headOf(prNumber: number): string {
+  return prNumber.toString(16).padStart(8, '0').repeat(5);
+}
+
+/** GitHub mock：pulls/{n} 回开着的 PR（head = headOf(n)，mergeable_state clean），默认分支
+ * 的保护与规则回空（没有必需检查），commits/{sha}/check-runs 按状态回应。只把 check-runs
+ * 请求记进 requests（URL + 头；磨绿的计数纪律按它），其余记进 otherRequests。
  * if-none-match 命中 etag 且状态 200 → 304（真实 GitHub 的条件 GET 语义）。 */
 class CheckRunsMock {
   requests: { url: string; headers: Record<string, string> }[] = [];
+  otherRequests: string[] = [];
 
   constructor(
     private readonly state: {
       checks: CheckSpec[];
       etag?: string;
-      /** 覆盖状态码（429 限流面 / 404 读不到面）。 */
+      /** 覆盖 check-runs 的状态码（429 限流面 / 404 读不到面）。 */
       status?: number;
     },
   ) {}
 
   readonly fetch = (input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
+    const pr = url.match(/\/pulls\/(\d+)$/);
+    if (pr !== null) {
+      this.otherRequests.push(url);
+      const n = Number(pr[1]);
+      return Promise.resolve(
+        res(200, '"pr"', {
+          number: n,
+          state: 'open',
+          merged: false,
+          mergeable_state: 'clean',
+          head: { sha: headOf(n), ref: 'x', repo: { id: 1 } },
+          base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
+        }),
+      );
+    }
+    if (/\/rules\/branches\//.test(url)) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"r"', []));
+    }
+    if (/\/branches\/[^/?]+$/.test(url)) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"b"', { name: 'main', protected: false }));
+    }
     this.requests.push({ url, headers: { ...(init?.headers ?? {}) } });
     const etag = this.state.etag ?? '"etag-1"';
     const status = this.state.status ?? 200;
@@ -318,7 +349,7 @@ function addCandidate(
 // ——— ① 扫描面纪律（批量 + ETag 条件请求 + 429 fail-open）———————————————————
 
 describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', () => {
-  test('一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET（无其它端点、无逐 PR 全量拉）', async () => {
+  test('一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET，按 PR 的 head SHA 读（#1403 段 3：先读 PR，再按默认分支读必需检查名单）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
@@ -328,7 +359,13 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
     const req = w.mock.requests[0];
     if (req === undefined) throw new Error('no request made');
     expect(req.url).toContain('https://api.github.com/repos/octo/demo/commits/');
-    expect(req.url).toContain(`${encodeURIComponent(conversationBranch(w.buildId))}/check-runs`);
+    expect(req.url).toContain(`/commits/${headOf(w.prNumber)}/check-runs`);
+    expect(req.url).not.toContain(encodeURIComponent(conversationBranch(w.buildId)));
+    expect(w.mock.otherRequests).toEqual([
+      'https://api.github.com/repos/octo/demo/pulls/101',
+      'https://api.github.com/repos/octo/demo/branches/main',
+      'https://api.github.com/repos/octo/demo/rules/branches/main?per_page=100',
+    ]);
     expect(req.url).toContain('per_page=');
     // 未暖缓存的轮不带 if-none-match（首轮读一次，此后条件读）。
     expect(req.headers['if-none-match']).toBeUndefined();
@@ -369,12 +406,13 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
       {
         githubFetch: (input, init) => {
           const url = String(input);
-          // 同仓同端点，按分支名分派到各候选的 mock。
+          // 同仓：PR 读按号、check runs 按 head SHA 分派到各候选的 mock；保护与规则归第一个。
           for (const c of all) {
-            if (url.includes(encodeURIComponent(conversationBranch(c.buildId)))) {
+            if (url.endsWith(`/pulls/${c.prNumber}`) || url.includes(headOf(c.prNumber))) {
               return c.mock.fetch(url, init);
             }
           }
+          if (/\/branches\//.test(url)) return red.mock.fetch(url, init);
           throw new Error(`unexpected url ${url}`);
         },
         logger: { info },
