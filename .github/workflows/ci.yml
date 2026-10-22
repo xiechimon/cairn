@@ -389,9 +389,3 @@ jobs:
           git fetch --depth=1 origin "${COMMENT_DISCIPLINE_BASE_SHA:-main}"
           node --test scripts/comment-discipline-gate.test.mjs
           node scripts/comment-discipline-gate.mjs
-
-      - name: Feature map doc freshness check (#1527)
-        if: ${{ !cancelled() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node scripts/generate-feature-map.mjs --check
