@@ -80,3 +80,35 @@ M23 lastPushedCheckpoint ignores finishedAt	KILLED	1 failed | 353 passed (354)
 restored byte-identical: True
 
 Result: 23 of 23 killed.
+
+## Run 3 (the second /code-review's fixes; targeted set N1-N9, same harness and test files)
+
+N1 action_required fixable again	KILLED	1 failed | 359 passed (360)
+    red: [s3-F6b] a required check concluding action_required (a person must approve): blocked hint, no [ci-fix]
+N2 failed required-list read not remembered in the sweep	KILLED	1 failed | 359 passed (360)
+    red: [s3-F8c] a failed required-list read is not retried by the next candidate in the same sweep
+N3 grind own check ignores the base branch	KILLED	1 failed | 359 passed (360)
+    red: [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+N4 review dirty ignores the base branch	KILLED	1 failed | 359 passed (360)
+    red: [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+N5 no re-verify after the merge-conflict round	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+N6 re-verify regardless of the marker	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review
+N7 marker row not written	KILLED	1 failed | 359 passed (360)
+    red: [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+N8 blocked entries per run, not per name	KILLED	6 failed | 354 passed (360)
+    red: [s3-F19] a blocked-check hint cleans GitHub text
+    red: [s3-F26b] a blocked hint names a check once when several runs share its name
+    red: [s3-F3] a required check concluding cancelled: no advance, no fix round, one hint per round
+    red: [s3-F3] a required check concluding neutral: no advance, no fix round, one hint per round
+N9 reverify slot ignores an active verify	SURVIVED	360 passed (360)
+restored byte-identical: True
+
+N9 survived: no test re-entered review in the same round while the re-queued verify was still queued. F13e was added; rerun:
+
+N9 reverify slot ignores an active verify	KILLED	1 failed | 360 passed (361)
+    red: [s3-F13e] the card reaches review again in the same round while that verify is still queued: no second verify
+restored byte-identical: True
+
+Result: 9 of 9 killed. (N8's mutant also renames the check in the hint, so more tests fail than F26b alone.)

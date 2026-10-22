@@ -54,3 +54,15 @@ Green after the fixes: 51 passed (51); with the later F8, F24 and F25b additions
 Two F8 cases were added after the fix (the rules read answers 403 with a rate-limit header, or with a rate-limit message): they passed at once, so mutation M15 in seg3-mutations.txt is their red leg.
 
 Server suite after the fixes: 129 files, 2167 passed, 1 skipped.
+
+## Leg 3: the second /code-review (F6b, F8c, F13c, F25 and F25b base-branch cases, F26b; F13d is a control and passed on the red run)
+
+Red: 6 failed / 54 passed (60). Failing lines:
+  x [s3-F6b] a required check concluding action_required (a person must approve): blocked hint, no [ci-fix]
+  x [s3-F8c] a failed required-list read is not retried by the next candidate in the same sweep
+  x [s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review
+  x [s3-F26b] a blocked hint names a check once when several runs share its name
+  x [s3-F25] building, the recorded PR is a PR into another base branch: no merge-conflict step; checks are read by the build’s own branch name
+  x [s3-F25b] review, the recorded PR is a PR into another base branch and dirty: no merge-conflict round
+
+Green after the fixes: the four affected files, 360 passed (360). F13e was added afterwards for mutation N9 (it passed at once; N9 is its red leg): 361 passed.

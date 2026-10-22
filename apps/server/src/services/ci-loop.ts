@@ -83,7 +83,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, eq, isNotNull, like } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -205,9 +205,9 @@ export type CheckVerdict =
    * stale）：不推进、不派修复步，提示交人（#1403 段 3）。 */
   | { state: 'blocked'; checks: { name: string; conclusion: string }[] };
 
-/** 可修的失败结论（派 [ci-fix]）。没有必需名单时 action_required 不算（沿用段 3 前）。 */
-const FIXABLE = new Set(['failure', 'timed_out', 'action_required']);
-const FIXABLE_UNREQUIRED = new Set(['failure', 'timed_out']);
+/** 可修的失败结论（派 [ci-fix]）。action_required 不在内：等人批准（fork 的 workflow、
+ * 部署），agent 修不了——必需检查上按不算通过提示交人。 */
+const FIXABLE = new Set(['failure', 'timed_out']);
 
 /** 判定（#1403 段 3：按 PR head SHA 读到的 check runs，只认必需检查名单）。同名的 run
  * （不同 app 或 workflow 报的同一个名字）合成一个名字看：有没完成的 → pending；有可修的
@@ -220,12 +220,11 @@ const FIXABLE_UNREQUIRED = new Set(['failure', 'timed_out']);
  *   green：没有必需检查时 neutral 与 skipped 本就不挡。
  * pending 先于红绿判（「pending 被误判红」的闸）。 */
 export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = []): CheckVerdict {
-  const fixable = required.length > 0 ? FIXABLE : FIXABLE_UNREQUIRED;
   const counted = required.length > 0 ? runs.filter((r) => required.includes(r.name)) : runs;
   if (required.length === 0 && counted.length === 0) return { state: 'empty' };
   if (counted.some((r) => r.status !== 'completed')) return { state: 'pending' };
   const failures = counted
-    .filter((r) => fixable.has(r.conclusion ?? ''))
+    .filter((r) => FIXABLE.has(r.conclusion ?? ''))
     .map((r) => ({
       name: r.name,
       conclusion: r.conclusion ?? '',
@@ -235,17 +234,25 @@ export function verdictOfCheckRuns(runs: GithubCheckRun[], required: string[] = 
   const missing = required.filter((name) => !counted.some((r) => r.name === name));
   if (missing.length > 0) return { state: 'pending', missing };
   const passed = new Set(counted.filter((r) => r.conclusion === 'success').map((r) => r.name));
-  const blocked = counted.filter(
-    (r) => !passed.has(r.name) && (required.length > 0 || r.conclusion === 'cancelled'),
-  );
-  if (blocked.length > 0) {
+  // 每个名字一项（同名多个 run 的结论合在一起），提示里不重复。
+  const blocked = new Map<string, Set<string>>();
+  for (const r of counted) {
+    if (passed.has(r.name) || (required.length === 0 && r.conclusion !== 'cancelled')) continue;
+    blocked.set(r.name, (blocked.get(r.name) ?? new Set()).add(r.conclusion ?? ''));
+  }
+  if (blocked.size > 0) {
     return {
       state: 'blocked',
-      checks: blocked.map((r) => ({ name: r.name, conclusion: r.conclusion ?? '' })),
+      checks: [...blocked].map(([name, c]) => ({ name, conclusion: [...c].join('/') })),
     };
   }
   return { state: 'green' };
 }
+
+/** 解冲突轮在 review 上停掉了还没人领的 verify 步时落的行；磨绿回到 review 时据它（本轮里
+ * 有这一行）为新 head 重排一条 verify（#1403 段 3）。 */
+export const CI_MERGE_CONFLICT_VERIFY_NOTE =
+  '解冲突轮停掉了还没人领的验证步（它验的是冲突前的提交）；检查通过、回到审核关口时重排一条。';
 
 /** 解冲突步指令（#1403 段 3，spec 23 同分支续轮）：同一分支上把默认分支合进来、解冲突、
  * 提交并推送；不 rebase、不 force-push、不新开分支或 PR。 */
@@ -374,8 +381,9 @@ export function createCiPoller(
   const pullCache = new Map<string, PullCacheEntry>();
   /** 磨绿的 PR 条件读缓存（#1403 段 3：head SHA 与 mergeable_state 从这里来）。 */
   const grindPullCache = new Map<string, PullCacheEntry>();
-  /** 必需检查名单（键 = 仓库全名与默认分支；CI_REQUIRED_CHECKS_TTL_MS 内复用）。 */
-  const requiredCache = new Map<string, { at: number; names: string[] }>();
+  /** 必需检查名单（键 = 仓库全名与默认分支；CI_REQUIRED_CHECKS_TTL_MS 内复用）。names null =
+   * 读不到：只在同一轮 sweep 里复用（同仓的下一张卡不再读），下一轮重读。 */
+  const requiredCache = new Map<string, { at: number; names: string[] | null }>();
   /** 匿名读的上次时刻（按 PR）。 */
   const anonReadAt = new Map<string, number>();
   /** compare 结果（键 = PR + checkpoint + head；两个固定提交之间的结果不变，
@@ -504,6 +512,19 @@ export function createCiPoller(
       hintOnce(cand.buildId, text, roundStart(deps, cand.buildId));
       return 'hinted';
     }
+    const stopsVerify =
+      fromReview &&
+      deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(
+          and(
+            eq(step.buildId, cand.buildId),
+            eq(step.kind, 'verify'),
+            inArray(step.status, ['pending', 'waiting_quota']),
+          ),
+        )
+        .get() !== undefined;
     if (fromReview) {
       stopUnclaimedGateSteps(deps, cand.buildId);
       setTodoPhase(deps, cand.todoId, 'queued');
@@ -515,6 +536,8 @@ export function createCiPoller(
       teamId,
       buildMergeConflictPrompt({ ...pr, defaultBranch, round: rounds + 1 }),
     );
+    // 落在入队之后：本轮（roundStart = 这条解冲突步）里能查到它。
+    if (stopsVerify) writeSystemRow(cand.buildId, CI_MERGE_CONFLICT_VERIFY_NOTE);
     return 'appended';
   }
 
@@ -707,8 +730,10 @@ export function createCiPoller(
       const state = pull?.mergeableState ?? null;
       if (
         pull !== null &&
-        // 不是 foreign 且字段齐 = 本 build 自己的 PR（foreign 的判据就是这两样）。
+        // 不是 foreign 且字段齐 = 本 build 自己的 PR（foreign 的判据就是这两样）；目标是默认
+        // 分支（解冲突步合进来的是默认分支）。
         hasPullFields(pull) &&
+        pull.baseRef === pull.defaultBranch &&
         (state === 'dirty' || state === 'behind') &&
         freshReviewRow(cand.todoId, cand.buildId) !== null &&
         !hasActiveStep(deps, cand.buildId)
@@ -1023,11 +1048,15 @@ export function createCiPoller(
       return;
     }
     grindPullCache.set(key, { etag: pullPage.etag, pull });
-    // 记的 PR 是本 build 开着的那张（同仓、head 是工作分支）才按它的 head SHA 读、按它的
+    // 记的 PR 是本 build 开着的那张（同仓、head 是工作分支、目标是默认分支）才按它的 head SHA 读、按它的
     // mergeable_state 解冲突；不是（fork 同名分支、别的分支、已关闭）→ 按本 build 的工作分支
     // 名读 check runs（段 3 前的读法），不解冲突：别人的 PR 冲突不归本 build 修。
     const branch = conversationBranch(cand.buildId);
-    const own = hasPullFields(pull) && isOwnPull(pull, branch) && pull.state === 'open';
+    const own =
+      hasPullFields(pull) &&
+      isOwnPull(pull, branch) &&
+      pull.baseRef === pull.defaultBranch &&
+      pull.state === 'open';
     if (own && pull.headSha === null) {
       tally.unreadable += 1;
       return;
@@ -1051,7 +1080,12 @@ export function createCiPoller(
     // 必需检查名单（默认分支的保护与规则）：按仓库与默认分支缓存；读不到 → 不动。
     const reqKey = `${target.fullName}\u0000${pull.defaultBranch}`;
     let required = requiredCache.get(reqKey);
-    if (required === undefined || now - required.at >= CI_REQUIRED_CHECKS_TTL_MS) {
+    if (
+      required === undefined ||
+      (required.names === null
+        ? required.at !== now
+        : now - required.at >= CI_REQUIRED_CHECKS_TTL_MS)
+    ) {
       if (grindToken === null) {
         recordGrindAnonRead(now);
         recordGrindAnonRead(now);
@@ -1063,13 +1097,14 @@ export function createCiPoller(
         target.repo,
         pull.defaultBranch,
       );
-      if (names === null) {
-        tally.unreadable += 1;
-        return;
-      }
       required = { at: now, names };
       requiredCache.set(reqKey, required);
     }
+    if (required.names === null) {
+      tally.unreadable += 1;
+      return;
+    }
+    const requiredNames = required.names;
     // check runs 读哪个提交：本 build 开着的 PR 用它的 head SHA，否则用工作分支名。
     const ref = own && pull.headSha !== null ? pull.headSha : branch;
     const cached = cache.get(key);
@@ -1091,7 +1126,7 @@ export function createCiPoller(
     }
     // 304 → 用上次的 runs 按当前名单重判（etag 只在有缓存行时发送，此处恒有）。
     const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
-    let verdict = verdictOfCheckRuns(runs, required.names);
+    let verdict = verdictOfCheckRuns(runs, requiredNames);
     const waiting =
       verdict.state === 'empty' || (verdict.state === 'pending' && verdict.missing !== undefined);
     const waitSince = waiting ? (entry?.waitSince ?? now) : null;
@@ -1162,7 +1197,13 @@ export function createCiPoller(
     setTodoPhase(deps, cand.todoId, 'review');
     // #1250（ADR 0018 层 1）：CI 磨绿抵达 review 关口 = verify 入队的第二
     // 落点（第一 = completeStep 直进 review 的非 PR 面；槽空零动作幂等）。
-    maybeEnqueueVerifyStep(deps, todoRow, cand.buildId);
+    maybeEnqueueVerifyStep(deps, todoRow, cand.buildId, {
+      reverify: rowKnown(
+        cand.buildId,
+        CI_MERGE_CONFLICT_VERIFY_NOTE,
+        roundStart(deps, cand.buildId),
+      ),
+    });
     tally.advanced += 1;
   }
 

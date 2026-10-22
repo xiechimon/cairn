@@ -740,13 +740,24 @@ export function maybeEnqueueVerifyStep(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
   buildId: string,
+  /** reverify：之前那条 verify 步是 PR 对账的解冲突轮停掉的（没人领、验的是冲突前的
+   * head，#1403 段 3）——只要没有排队或在跑的 verify 步就再排一条。缺省每个 build 一条。 */
+  opts: { reverify?: boolean } = {},
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'verify')))
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'verify'),
+        ...(opts.reverify === true
+          ? [inArray(step.status, ['pending', 'claimed', 'waiting_quota'])]
+          : []),
+      ),
+    )
     .get();
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();

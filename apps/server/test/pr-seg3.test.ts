@@ -96,6 +96,8 @@ class Fake {
   headRef: string | null = null;
   /** true = 应答里没有 head.ref（字段不齐的 PR 响应）。 */
   headRefMissing = false;
+  /** PR 的目标分支（默认 main = 默认分支）。 */
+  baseRef = 'main';
 
   reads = (part: string) => this.requests.filter((u) => u.includes(part));
 
@@ -118,7 +120,7 @@ class Fake {
           ref: this.headRefMissing ? undefined : (this.headRef ?? this.branch),
           repo: this.headRepoId === null ? null : { id: this.headRepoId },
         },
-        base: { ref: 'main', repo: { id: REPO_ID, default_branch: 'main' } },
+        base: { ref: this.baseRef, repo: { id: REPO_ID, default_branch: 'main' } },
       });
     }
     if (/\/rules\/branches\//.test(url)) {
@@ -398,7 +400,30 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(fixSteps(w)).toEqual([]);
   });
 
-  test.each(['failure', 'timed_out', 'action_required'])(
+  test('[s3-F6b] a required check concluding action_required (a person must approve): blocked hint, no [ci-fix]', async () => {
+    const w = makeWorld();
+    w.fake.protection = { contexts: ['check'], checks: [] };
+    w.fake.runs[HEAD] = [{ name: 'check', conclusion: 'action_required' }];
+    await w.poller.sweep();
+    expect(w.phase()).toBe('building');
+    expect(fixSteps(w)).toEqual([]);
+    expect(w.systemRows().filter((c) => c.includes('action_required'))).toHaveLength(1);
+  });
+
+  test('[s3-F8c] a failed required-list read is not retried by the next candidate in the same sweep', async () => {
+    const a = makeWorld();
+    const b = makeWorld({ s: a.s, fake: a.fake, projectId: undefined });
+    a.fake.protection = 500;
+    const t0 = Date.now();
+    await a.poller.sweep(t0);
+    expect(a.fake.reads('/demo/branches/main')).toHaveLength(1);
+    expect(a.phase()).toBe('building');
+    expect(b.phase()).toBe('building');
+    await a.poller.sweep(t0 + 60_000);
+    expect(a.fake.reads('/demo/branches/main')).toHaveLength(2);
+  });
+
+  test.each(['failure', 'timed_out'])(
     '[s3-F6] a required check concluding %s: a [ci-fix] round',
     async (conclusion) => {
       const w = makeWorld();
@@ -580,11 +605,95 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
   });
 
+  const withVerifier = (w: World) =>
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: null, verify: { agentId: 'agent-verify' } } })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+  const addVerify = (w: World, status: 'pending' | 'stopped') =>
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-v-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status,
+        createdAt: Date.now() - 5_000,
+        ...(status === 'stopped' ? { finishedAt: Date.now() - 4_000 } : {}),
+      })
+      .run();
+
+  test('[s3-F13c] a verify step the merge-conflict round stopped is queued again when the grind brings the card back to review', async () => {
+    const w = makeWorld({ phase: 'review' });
+    withVerifier(w);
+    addVerify(w, 'pending');
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    expect(w.phase()).toBe('queued');
+    // the round ran: its step is done, the PR merges cleanly and the checks are green
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.setPhase('building');
+    w.fake.mergeableState = 'clean';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 60_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
+  });
+
+  test('[s3-F13e] the card reaches review again in the same round while that verify is still queued: no second verify', async () => {
+    const w = makeWorld({ phase: 'review' });
+    withVerifier(w);
+    addVerify(w, 'pending');
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.setPhase('building');
+    w.fake.mergeableState = 'clean';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 60_000);
+    w.setPhase('building');
+    await w.poller.sweep(t0 + 120_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
+  });
+
+  test('[s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review', async () => {
+    const w = makeWorld();
+    withVerifier(w);
+    addVerify(w, 'stopped');
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep();
+    expect(w.phase()).toBe('review');
+    expect(
+      w
+        .steps()
+        .filter((r) => r.kind === 'verify')
+        .map((r) => r.status),
+    ).toEqual(['stopped']);
+  });
+
+  test('[s3-F26b] a blocked hint names a check once when several runs share its name', async () => {
+    const w = makeWorld();
+    w.fake.runs[HEAD] = [
+      { name: 'build', conclusion: 'cancelled' },
+      { name: 'build', conclusion: 'cancelled' },
+    ];
+    await w.poller.sweep();
+    const hint = w.systemRows().find((c) => c.includes('「build」'));
+    expect(hint?.split('「build」')).toHaveLength(2);
+  });
+
   test.each([
     ['a fork PR with the same branch name', { headRepoId: 9999 }],
     ['a deleted fork (head repo null)', { headRepoId: null }],
     ['a PR from another branch', { headRef: 'feature/other' }],
     ['a closed PR', { pullState: 'closed' }],
+    ['a PR into another base branch', { baseRef: 'release' }],
   ] as const)(
     '[s3-F25] building, the recorded PR is %s: no merge-conflict step; checks are read by the build’s own branch name',
     async (_name, o) => {
@@ -603,6 +712,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     ['a deleted fork (head repo null)', { headRepoId: null }],
     ['a PR from another branch', { headRef: 'feature/other' }],
     ['a response without head.ref', { headRefMissing: true }],
+    ['a PR into another base branch', { baseRef: 'release' }],
   ] as const)(
     '[s3-F25b] review, the recorded PR is %s and dirty: no merge-conflict round',
     async (_name, o) => {

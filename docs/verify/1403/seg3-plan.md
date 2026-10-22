@@ -156,3 +156,20 @@ F29. Housekeeping, with no behaviour test: required-list entries past the TTL ar
 ## 11. S4a landed on main (#1503, c99de106), 2026-10-22
 
 S4a's `githubBranchRaw` and `githubBranchRulesRaw` require a token: `commonInvalid` answers `invalid: token` for anything that is not a header-safe token string. The CI grind also runs without a GitHub connection, reading public repositories anonymously (`githubCommitCheckRuns` and `githubPull` take `token: string | null`). So `githubRequiredChecks` stays on the existing `conditionalGetJson` path and is not rebuilt on S4a's raw reads. It is one narrow read with a different contract (a list of names or null), not a copy of S4a's functions. The merge gate (P3) keeps S4a's raw reads for its own decisions.
+
+## 12. Second /code-review (2026-10-22, medium, on origin/claude/bootstrap-p2-seg2b...a5cbcf5a)
+
+Eight findings. Five are fixed (tests first), three are not, with the reasons below. The red leg was 6 failed / 54 passed (`seg3-red-green.txt`).
+
+F6 (changed). A required check concluding `action_required` waits for a person (a fork workflow approval, a deployment). The agent cannot fix it, so it is now a blocked hint (F6b), not a `[ci-fix]` round.
+F8c. A failed required-list read is remembered for the rest of the sweep: the next candidate in the same repository does not read it again. The next sweep reads again.
+F13c. A verify step that the merge-conflict round stopped at review is queued again when the grind brings the card back to review. The round leaves a marker row, `CI_MERGE_CONFLICT_VERIFY_NOTE`, in that round. `maybeEnqueueVerifyStep` takes `reverify` and then only checks for a queued or running verify step.
+F13d. A verify step stopped another way (a person) is not queued again: one verify per build, as before.
+F13e. If the card reaches review again in the same round while that verify is still queued, there is no second verify.
+F25 / F25b (extended). A PR whose base is not the default branch is not this build's own PR: no merge-conflict round, and the grind reads check runs by the branch name.
+F26b. A blocked hint names a check once when several runs share its name (conclusions are joined with `/`).
+
+Not fixed:
+- Required checks concluding `neutral` or `skipped` stay "not passing". The coordinator's segment-3 scope sets this ("neutral / skipped / cancelled no longer count as green"). GitHub's own merge box accepts them, so a required job skipped by a path filter leaves the card at building with a hint each round. This goes into the PR's Risk section for the user to confirm.
+- The merge-conflict round cap counts every `[merge-conflict]` step of the build, not consecutive ones. That is the same lifetime count per build as the `[ci-fix]` cap (`countMarkedRounds`); a rerun starts a new build.
+- A required context reported only as a commit status (or past the first 100 check runs) becomes a blocked hint after the grace, not green. The hint names it and a person moves the card. Reading the combined status is left for the merge gate (P3), which has S4a's `githubCombinedStatusRaw`.

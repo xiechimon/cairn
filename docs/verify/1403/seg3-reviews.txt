@@ -1,0 +1,41 @@
+# #1403 segment 3: reviews (2026-10-22)
+
+## /code-review, round 1 (medium, origin/claude/bootstrap-p2-seg2b...HEAD before the 2b merge 986e53da)
+
+Ten findings. All fixed in 4599495b, tests first (seg3-plan.md §10, seg3-red-green.txt leg 2):
+1. The grind lacked the own-open-PR check: a fork PR or a closed PR could get a merge-conflict step. It now reads by the branch name and does no conflict handling unless the PR is this build's open PR (F25).
+2. A required context reported only as a commit status was missing for ever: pending past the grace. It is now a blocked hint, never green (F4).
+3. Runs sharing a name were judged run by run. Now one success passes the name (F26).
+4. A rules read answering 403/404 (no rulesets on the plan) blocked the grind. It now means no rules; a rate-limited 403 stays unreadable (F27, two more F8 cases).
+5. The merge-conflict cap at building only hinted. The card now goes to failed, as with [ci-fix]; at review it hints (F14, F14b).
+6. Review -> queued left unclaimed verify/review steps queued on the old head. They are stopped first (F13b; the re-verify gap was fixed in round 2).
+7. The per_page 100 limit was not stated: now named in the missing-check hint comment and in spec 02.
+8. The review dirty/behind path did not require complete PR fields and an own PR (F25b).
+9. The cache kept a verdict, so a 304 ignored a refreshed required list. It now keeps runs and re-judges them (F28).
+10. requiredCache was never pruned, and the knownRows memos were dropped for grind builds. Both fixed (housekeeping, F29).
+
+## /simplify (single pass in this context, no 4-agent fan-out: the Agent tool was not available)
+
+On 4599495b. Fixed in a5cbcf5a:
+- the check-runs ref local was renamed from headSha to ref, since it can hold a branch name;
+- the stale cache comment now says runs are kept;
+- requiredCache is pruned by entry;
+- hint memos are kept through a separate set of review and grind builds, instead of adding to reviewBuilds after it had pruned lastReadByBuild.
+Nothing was skipped.
+
+## /code-review, round 2 (medium, origin/claude/bootstrap-p2-seg2b...a5cbcf5a)
+
+Eight findings. Five were fixed, tests first (seg3-plan.md §12, red-green leg 3, mutations N1-N9):
+1. A verify step the merge-conflict round stopped was never queued again, because the verify slot is one per build. Fixed with a marker row and the reverify option (F13c, F13d, F13e).
+2. Own PR did not check that the base is the default branch. Fixed (F25, F25b).
+4. action_required counted as fixable. It is now a blocked hint (F6b).
+6. A failed required-list read was retried by every candidate. It is now remembered for the sweep (F8c).
+8. The blocked hint repeated a name shared by several runs. Fixed (F26b).
+Not fixed, with reasons (seg3-plan.md §12; into the PR's Risk section):
+3. Required neutral/skipped are not passing. That is the coordinator's scope for segment 3; the user should confirm it.
+5. The merge-conflict cap is a lifetime count per build, the same as the [ci-fix] cap.
+7. A commit-status-only required context gives a blocked hint after the grace, not green. Reading the combined status is left to the merge gate (P3, S4a's githubCombinedStatusRaw).
+
+## /security-review
+
+Not run. The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.
