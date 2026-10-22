@@ -455,6 +455,13 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     expect(p.log).toEqual([['compare', BASE, OTHER, { page: 1, perPage: 100 }]]);
     expect(r.compare).toMatchObject({ headSha: OTHER, totalCommits: 2 });
     expect(r.behindBy).toBe(0);
+    expect(r.failure).toBeNull();
+    const failed = await readCompareAt(fakeGithub({ compare: () => NOT_FOUND }).port, BASE, OTHER);
+    expect(failed).toEqual({
+      compare: 'unreadable',
+      behindBy: null,
+      failure: { kind: 'status', status: 404, message: 'Not Found' },
+    });
   });
 
   test('F8 total_commits, commits, files and behind_by: malformed values never pass', async () => {
@@ -580,6 +587,31 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     expect(
       await required({ branch: () => ok(branchBody({ protection: { enabled: true } })) }),
     ).toEqual([]);
+    // enforcement_level off: GitHub does not require them (code review, finding 7).
+    expect(
+      await required({
+        branch: () =>
+          ok(
+            branchBody({
+              protection: {
+                required_status_checks: { enforcement_level: 'off', contexts: ['ci'] },
+              },
+            }),
+          ),
+      }),
+    ).toEqual([]);
+    expect(
+      await required({
+        branch: () =>
+          ok(
+            branchBody({
+              protection: {
+                required_status_checks: { enforcement_level: 'everyone', contexts: ['ci'] },
+              },
+            }),
+          ),
+      }),
+    ).toEqual(['ci']);
     expect(
       await required({
         branch: () =>
@@ -774,6 +806,11 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     expect(f.ownStatus).toEqual({ state: 'pending', description: 'waiting' });
     const none = await read();
     expect(none.ownStatus).toBeNull();
+    // A status read that is not complete may have the gate's own status on an unread page: unreadable,
+    // so the planner does not write blind (code review, finding 2).
+    const partial = await read({ combinedStatus: statusPages([status('ci', 'success')], HEAD, 2) });
+    expect(partial.checks?.complete).toBe(false);
+    expect(partial.ownStatus).toBe('unreadable');
     const unreadable = await read({ combinedStatus: () => NOT_FOUND });
     expect(unreadable.checks).toBeNull();
     expect(unreadable.ownStatus).toBe('unreadable');
@@ -818,7 +855,17 @@ describe('readGateGithubFacts: evidence presence (F16, F17)', () => {
       contents: () => listing('nothing.png'),
     });
     expect(capped.log.filter(([n]) => n === 'contents')).toHaveLength(5);
-    expect(capped.evidence).toHaveLength(5);
+    // Links past the probe cap are unknown (null), not absent (code review, finding 4).
+    expect(capped.evidence.map((e) => e.present)).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      null,
+      null,
+    ]);
     const shared = await read({
       pull: () =>
         ok(

@@ -220,6 +220,8 @@ function projectBranch(body: unknown): { tip: string | null; classic: Binding[] 
   const rsc = body.protection.required_status_checks;
   if (rsc == null) return { tip, classic: [] };
   if (!isObj(rsc)) return { tip, classic: null };
+  // enforcement_level off：GitHub 不要求这些检查，闸也不要求（code review 第 7 条）。
+  if (rsc.enforcement_level === 'off') return { tip, classic: [] };
   const list: unknown[] | null = Array.isArray(rsc.checks)
     ? rsc.checks.map((c) => (isObj(c) ? binding(c.context, c.app_id) : null))
     : Array.isArray(rsc.contexts)
@@ -279,6 +281,8 @@ function commitsOf(v: unknown): GateCompareCommit[] | null {
 }
 
 async function readCompare(r: Reader, baseSha: string, headSha: string): Promise<GateCompareRead> {
+  // failure 只报 compare 自己的请求（共用的 Reader 上可能还留着别的读的失败）。
+  r.failure = null;
   const unreadable = (): GateCompareRead => ({
     compare: 'unreadable',
     behindBy: null,
@@ -495,7 +499,11 @@ async function probeEvidence(
     const dirKey = `${sha}:${dir}`;
     let listing = listings.get(dirKey);
     if (listing === undefined) {
-      if (listings.size >= EVIDENCE_PROBES) break;
+      // 探测数到了上限：余下的链接记为读不到（null），不当成不存在（code review 第 4 条）。
+      if (listings.size >= EVIDENCE_PROBES) {
+        out.push({ sha, path, present: null });
+        continue;
+      }
       listing = await listDirectory(r, dir, sha);
       listings.set(dirKey, listing);
     }
@@ -596,7 +604,12 @@ export async function readGateGithubFacts(
   if (statuses !== null) {
     const picked = pickStatuses(statuses.rows);
     const own = picked.find((s) => s.context.toLowerCase() === MERGE_GATE_STATUS_CONTEXT);
-    facts.ownStatus = own === undefined ? null : { state: own.state, description: own.description };
+    // 没读全时自家 status 可能在没读的那页：按读不到算，状态写入不盲写（code review 第 2 条）。
+    facts.ownStatus = !statuses.complete
+      ? 'unreadable'
+      : own === undefined
+        ? null
+        : { state: own.state, description: own.description };
     if (runs !== null) {
       facts.checks = {
         headSha: head,
