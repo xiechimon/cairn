@@ -13,14 +13,18 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@pacman/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
-const TOKEN: GitCredentials = { username: 'x-access-token', password: 'ghp_stale_token' };
+const TOKEN: BoundGitCredentials = {
+  username: 'x-access-token',
+  password: 'ghp_stale_token',
+  url: 'https://github.com/xiechimon/pacman.git',
+};
 /** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
@@ -69,7 +73,7 @@ async function seedOrigin(): Promise<void> {
 }
 
 function prepareInput(overrides: {
-  credentials?: GitCredentials | null;
+  credentials?: BoundGitCredentials | null;
   machineCredentialFallback?: boolean;
 }) {
   return {
@@ -86,13 +90,13 @@ function prepareInput(overrides: {
 
 /** gitPrim.clone 桩：cred 非空（integration 路）→ 抛 mea 实测 auth 原文；
  * null（machine 路）→ 真 clone 落地。 */
-function cloneSpyFailsForToken(): { calls: (GitCredentials | null)[] } {
-  const calls: (GitCredentials | null)[] = [];
+function cloneSpyFailsForToken(): { calls: (BoundGitCredentials | null)[] } {
+  const calls: (BoundGitCredentials | null)[] = [];
   const realClone = gitPrim.clone;
   vi.spyOn(gitPrim, 'clone').mockImplementation(((
     url: string,
     dir: string,
-    cred: GitCredentials | null,
+    cred: BoundGitCredentials | null,
   ) => {
     calls.push(cred);
     if (cred !== null) return Promise.reject(new Error(MEA_AUTH_FAILURE));
@@ -147,11 +151,11 @@ describe('workspace prepare 凭据降级（#1225 clone 半）', () => {
   test('失败方式 3：基座已在位 → fetch 同降级序，来源 machine', async () => {
     // 先用 machine 路物化基座（token null = 现行为）。
     await ws.prepare(prepareInput({ credentials: null }));
-    const calls: (GitCredentials | null)[] = [];
+    const calls: (BoundGitCredentials | null)[] = [];
     const realFetch = gitPrim.fetch;
     vi.spyOn(gitPrim, 'fetch').mockImplementation(((
       repoDir: string,
-      cred: GitCredentials | null,
+      cred: BoundGitCredentials | null,
     ) => {
       calls.push(cred);
       if (cred !== null) return Promise.reject(new Error(MEA_AUTH_FAILURE));
@@ -166,12 +170,12 @@ describe('workspace prepare 凭据降级（#1225 clone 半）', () => {
   }, 30_000);
 
   test('失败方式 4：token 有效 → 单次 clone，来源 integration（集成有效时行为不变）', async () => {
-    const calls: (GitCredentials | null)[] = [];
+    const calls: (BoundGitCredentials | null)[] = [];
     const realClone = gitPrim.clone;
     vi.spyOn(gitPrim, 'clone').mockImplementation(((
       url: string,
       dir: string,
-      cred: GitCredentials | null,
+      cred: BoundGitCredentials | null,
     ) => {
       calls.push(cred);
       return realClone(url, dir, cred);

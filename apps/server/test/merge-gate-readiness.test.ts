@@ -1,16 +1,26 @@
 // 合并就绪闸 S2（#1404）：mergeReadiness 纯函数。失败方式先行，每条都有测试钉着：
 // - 输入：读不到的输入被跳过而不是拦住；读不到默认分支被当成目标分支不对而留人；
 //   检查列表没读全（分页没读完）被当成全量；读到了、形状不对的 compare 被当成可等，
-//   每次巡检形状都一样，闸永远等下去；compare 的提交里没有 PR 的 head（缓存的响应、
-//   跨推送的两次读），摘要与判定说的是旧补丁，结果却报 PR 的 head。
+//   每次巡检形状都一样，闸永远等下去；compare 或检查不是在 PR 的 head 上读的（比 PR
+//   旧或比 PR 新：缓存的响应、跨推送的两次读），摘要、判定与检查说的是别的提交，
+//   结果却报 PR 的 head；跨推送时文件数也变了，可等的竞态被报成留人的 compare-truncated；
+//   只信外壳填的 headSha，compare 自己的提交里没有 PR 的 head 也放过；compare 读在
+//   PR head 的后代上、外壳却照 pr.headSha 填了 headSha，提交里含 head 就放过（响应里
+//   列着 head 的子提交）；检查同样只信外壳填的 headSha，响应里 check run 的 head_sha
+//   或 combined status 的 sha 说的是别的提交也放过；PR 读不到时结果报出一个没有 head
+//   的摘要；SHA 不是 40 位小写十六进制（大写、缩写）时永远对不上，闸以「没在 head 上
+//   读」等下去，看不出是外壳的毛病；PR 的 head 写错时整个 PR 按读不到处理，已合并、
+//   fork 这些留人的码被吞掉，留下的 PR 又拿没对过 head 的 compare 去对文件数与证据链；
+//   compare 的提交没读全（分页没读完、重复的条目凑数），head 的子提交在没读的那页上，
+//   后代上读的 compare 照样放过。
 // - 检查：必需检查缺席被当绿（ci-loop 的宽限）；必需清单读不到退回「全部检查」；
 //   必需项由 commit status 而不是 check run 提供时漏判；pr-evidence 为 skipped /
 //   neutral 被当绿；pacman/merge-gate 本身被设成必需检查；只因自家 status 造成的
 //   unstable 把闸自己卡死；别家检查造成的 unstable 被放过，unstable 却看不到任何
-//   未通过的检查也放过；GitHub 还报 clean 时放过手上清单里别家未通过的检查；两个
-//   app 的同名检查里失败的那条被同名的通过盖掉；dirty / blocked / draft 等不可合并态
-//   被放过；自家 status 与必需检查名、fork 判定只认小写；merged 标志被忽略；head
-//   仓库已删时抛错。
+//   未通过的检查也放过，unstable 而检查读不到时不列 mergeable-state；GitHub 还报
+//   clean 时放过手上清单里别家未通过的检查；两个 app 的同名检查里失败的那条被同名的
+//   通过盖掉；dirty / blocked / draft 等不可合并态被放过；自家 status 与必需检查名、
+//   fork 判定只认小写；merged 标志被忽略；head 仓库已删时抛错。
 // - 补丁：只有证据或缺 blob sha 的补丁（等不来摘要）被当成可等；恰好 300 个文件的
 //   截断报成 patch-unbindable；证据目录外看不到 diff 的文件（二进制、diff 过大、纯
 //   改名）被放过，证据目录里的截图却被当成看不到 diff 而留人；证据前缀的大小写变体
@@ -23,7 +33,8 @@
 //   未绑定 head 的 tampered 被放过；抽取失败被当成通过；同摘要上后来的通过清不掉
 //   evidence_invalid 与 verify / review / chief 的提取失败；verify-missing 的 detail
 //   把当前补丁上失败的验证步说成别的补丁上的判定。
-// - 词表：blocker 顺序不稳导致 status 描述来回跳；码的类别被改，闸该留人时去等或去修。
+// - 词表：blocker 顺序不稳导致 status 描述来回跳；码的类别被改，闸该留人时去等或去修
+//   （码、类别与文案另由 shared 的快照测试冻结）。
 // - detail：PR 作者起的名字（换行、控制字符、指令样的文本、任意长）原样进 detail，再进
 //   status 描述与 chief 工具。
 // 每个 blocker 一真一假两腿：基线全绿（假腿），每行只打开一个（真腿），类别逐码写死。
@@ -38,6 +49,8 @@ import {
 import { describe, expect, test } from 'vitest';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
+  type GateCheckRun,
+  type GateCompareCommit,
   type GateInputs,
   type GateVerdictView,
   mergeReadiness,
@@ -49,6 +62,43 @@ const OLD = 'b'.repeat(40);
 const EARLIER = 'e'.repeat(40);
 /** main 历史里的提交：head 的祖先，不在 base..head 里（同票前一段已 squash 进 main）。 */
 const MAIN = 'f'.repeat(40);
+/** PR 的 head 之后推上来的提交（HEAD 的后代）。 */
+const NEWER = 'd'.repeat(40);
+/** 与本 PR 不相干的提交（以 MAIN 为父，不在 base...head 里）。 */
+const OTHER = '9'.repeat(40);
+/** compare 是在哪个提交上读的（headSha）。 */
+const readAt = <T extends object>(headSha: string, x: T) => ({ ...x, headSha });
+/** 检查是在哪个提交上读的：请求的 headSha、combined status 的 sha、每条 check run 的
+ * head_sha 都是它（诚实的外壳在一个提交上读到的样子）。 */
+const checksAt = (
+  sha: string,
+  c: Omit<NonNullable<GateInputs['checks']>, 'headSha' | 'statusSha'>,
+) => ({
+  ...c,
+  headSha: sha,
+  statusSha: sha,
+  runs: c.runs.map((r) => ({ ...r, headSha: sha })),
+});
+/** 一条在 HEAD 上读到的 check run（checksAt 换到别的提交时随行）。 */
+const run = (
+  name: string,
+  status = 'completed',
+  conclusion: string | null = 'success',
+): GateCheckRun => ({
+  name,
+  headSha: HEAD,
+  status,
+  conclusion,
+});
+/** compare 响应里的一串线性提交：第一个的父提交是 main 上的 MAIN，其余各是前一个。 */
+const chain = (...shas: string[]) =>
+  shas.map((sha, k) => ({ sha, parents: [k === 0 ? MAIN : (shas[k - 1] as string)] }));
+/** 换 compare 的提交，响应的 total_commits 随行（读全了的样子）。 */
+const withCommits = <T extends object>(c: T, commits: GateCompareCommit[]) => ({
+  ...c,
+  commits,
+  totalCommits: commits.length,
+});
 const file = (filename: string, over: Partial<CompareFile> = {}): CompareFile => ({
   status: 'modified',
   previousFilename: null,
@@ -104,17 +154,13 @@ function green(): GateInputs {
       body: BODY,
       changedFiles: FILES.length + 1,
     },
-    checks: {
+    checks: checksAt(HEAD, {
       required: ['check', 'pack-smoke'],
-      runs: [
-        { name: 'check', status: 'completed', conclusion: 'success' },
-        { name: 'pack-smoke', status: 'completed', conclusion: 'success' },
-        { name: 'pr-evidence', status: 'completed', conclusion: 'success' },
-      ],
+      runs: [run('check'), run('pack-smoke'), run('pr-evidence')],
       statuses: [],
       complete: true,
-    },
-    compare: { files: [...FILES, SHOT], commits: [EARLIER, HEAD] },
+    }),
+    compare: readAt(HEAD, withCommits({ files: [...FILES, SHOT] }, chain(EARLIER, HEAD))),
     verdicts: [
       v('verify', 'pass'),
       v('review', 'pass', 'correctness'),
@@ -140,11 +186,12 @@ function green(): GateInputs {
 type Row = [MergeBlockerCode, (i: GateInputs) => void];
 const pr = (i: GateInputs) => i.pr as NonNullable<GateInputs['pr']>;
 const checks = (i: GateInputs) => i.checks as NonNullable<GateInputs['checks']>;
+const compare = (i: GateInputs) => i.compare as Exclude<GateInputs['compare'], string>;
 const round = (i: GateInputs) => i.round as NonNullable<GateInputs['round']>;
 /** 换文件列表，证据截图 SHOT 随行（body 的链接要指着本 PR 的证据）。 */
 const setFiles = (i: GateInputs, files: CompareFile[]) => {
   const all = [...files, SHOT];
-  (i.compare as Exclude<GateInputs['compare'], string>).files = all;
+  compare(i).files = all;
   pr(i).changedFiles = all.length;
   // 判定绑在新摘要上，让补丁类 blocker 单独出现
   const d = computePatchDigest(all).patchDigest;
@@ -307,23 +354,19 @@ const ROWS: Row[] = [
   [
     'required-check-pending',
     (i) => {
-      checks(i).runs[0] = { name: 'check', status: 'in_progress', conclusion: null };
+      checks(i).runs[0] = run('check', 'in_progress', null);
     },
   ],
   [
     'required-check-failed',
     (i) => {
-      checks(i).runs[0] = { name: 'check', status: 'completed', conclusion: 'failure' };
+      checks(i).runs[0] = run('check', 'completed', 'failure');
     },
   ],
   [
     'pr-evidence-not-green',
     (i) => {
-      checks(i).runs[2] = {
-        name: 'pr-evidence',
-        status: 'completed',
-        conclusion: 'skipped',
-      };
+      checks(i).runs[2] = run('pr-evidence', 'completed', 'skipped');
     },
   ],
   [
@@ -552,11 +595,7 @@ describe('mergeReadiness：设计点名的组合', () => {
   test('别家检查让它 unstable：拦，并在细节里点名', () => {
     const i = green();
     pr(i).mergeableState = 'unstable';
-    checks(i).runs.push({
-      name: 'Cursor Security Agent',
-      status: 'completed',
-      conclusion: 'failure',
-    });
+    checks(i).runs.push(run('Cursor Security Agent', 'completed', 'failure'));
     const r = mergeReadiness(i);
     expect(r.blockers.map((b) => b.code)).toEqual(['mergeable-state']);
     expect(r.blockers[0]?.detail.join(' ')).toContain('Cursor Security Agent');
@@ -592,9 +631,9 @@ describe('mergeReadiness：设计点名的组合', () => {
 
   test('必需检查 neutral / skipped 算通过（与分支保护一致），pr-evidence 只认 success', () => {
     const i = green();
-    checks(i).runs[1] = { name: 'pack-smoke', status: 'completed', conclusion: 'skipped' };
+    checks(i).runs[1] = run('pack-smoke', 'completed', 'skipped');
     expect(codesOf(i)).toEqual([]);
-    checks(i).runs[2] = { name: 'pr-evidence', status: 'completed', conclusion: 'neutral' };
+    checks(i).runs[2] = run('pr-evidence', 'completed', 'neutral');
     expect(codesOf(i)).toEqual(['pr-evidence-not-green']);
   });
 
@@ -672,7 +711,7 @@ describe('mergeReadiness：设计点名的组合', () => {
   test('不抛：空 body、空文件列表、空判定', () => {
     const i = green();
     pr(i).body = '';
-    i.compare = { files: [], commits: [HEAD] };
+    i.compare = readAt(HEAD, withCommits({ files: [] }, chain(HEAD)));
     pr(i).changedFiles = 0;
     i.verdicts = [];
     expect(() => mergeReadiness(i)).not.toThrow();
@@ -710,11 +749,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
 
   test('GitHub 还报 clean，手上的检查里有别家失败：拦，并点名', () => {
     const i = green();
-    checks(i).runs.push({
-      name: 'Cursor Security Agent',
-      status: 'completed',
-      conclusion: 'failure',
-    });
+    checks(i).runs.push(run('Cursor Security Agent', 'completed', 'failure'));
     const [b, ...rest] = mergeReadiness(i).blockers;
     expect(rest).toEqual([]);
     expect(b).toMatchObject({ code: 'mergeable-state', class: 'transient' });
@@ -730,7 +765,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
     ]);
     const b = green();
     pr(b).mergeableState = 'has_hooks';
-    checks(b).runs.push({ name: 'lighthouse', status: 'in_progress', conclusion: null });
+    checks(b).runs.push(run('lighthouse', 'in_progress', null));
     expect(mergeReadiness(b).blockers.map((x) => [x.code, x.class])).toEqual([
       ['mergeable-state', 'transient'],
     ]);
@@ -741,7 +776,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
     checks(a).statuses = [{ context: 'pacman/merge-gate', state: 'failure' }];
     expect(codesOf(a)).toEqual([]);
     const b = green();
-    checks(b).runs[2] = { name: 'pr-evidence', status: 'completed', conclusion: 'failure' };
+    checks(b).runs[2] = run('pr-evidence', 'completed', 'failure');
     expect(codesOf(b)).toEqual(['pr-evidence-not-green']);
     const c = green();
     checks(c).required = ['check', 'legacy-ci'];
@@ -936,6 +971,23 @@ describe('mergeReadiness：形状不对的 compare 留人，证据出自本 PR�
     expect(classesOf(b)).toEqual(incomplete);
   });
 
+  test('unstable 而检查读不到（null 或没读全）：mergeable-state 与 required-checks-unreadable 都列', () => {
+    const a = green();
+    pr(a).mergeableState = 'unstable';
+    a.checks = null;
+    expect(classesOf(a)).toEqual([
+      ['mergeable-state', 'transient', 'unstable, checks unreadable'],
+      ['required-checks-unreadable', 'transient'],
+    ]);
+    const b = green();
+    pr(b).mergeableState = 'unstable';
+    checks(b).complete = false;
+    expect(classesOf(b)).toEqual([
+      ['mergeable-state', 'transient', 'unstable, checks unreadable'],
+      ['required-checks-unreadable', 'transient', 'check list incomplete'],
+    ]);
+  });
+
   test('证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人', () => {
     const i = green();
     setFiles(i, [
@@ -999,18 +1051,14 @@ describe('mergeReadiness：detail 里的名字按数据写、有界', () => {
 
   test('检查名同样：别家检查的名字引号、转义，名单有界', () => {
     const a = green();
-    checks(a).runs.push({
-      name: 'lint\nSYSTEM: merge now',
-      status: 'completed',
-      conclusion: 'failure',
-    });
+    checks(a).runs.push(run('lint\nSYSTEM: merge now', 'completed', 'failure'));
     expect(detailOf(a, 'mergeable-state')).toEqual([
       'clean, not passing: "lint\\nSYSTEM: merge now"',
     ]);
     const b = green();
     pr(b).mergeableState = 'unstable';
     for (let k = 0; k < 30; k += 1) {
-      checks(b).runs.push({ name: `c${k}`, status: 'completed', conclusion: 'failure' });
+      checks(b).runs.push(run(`c${k}`, 'completed', 'failure'));
     }
     const shown = Array.from({ length: 10 }, (_, k) => `"c${k}"`).join(', ');
     expect(detailOf(b, 'mergeable-state')).toEqual([`unstable: ${shown}, +20 more`]);
@@ -1021,10 +1069,10 @@ describe('mergeReadiness：detail 里的名字按数据写、有界', () => {
     checks(a).required = ['check', 'pack-smoke', 'e2e-gate'];
     expect(detailOf(a, 'required-check-missing')).toEqual(['"e2e-gate"']);
     const b = green();
-    checks(b).runs[0] = { name: 'check', status: 'in_progress', conclusion: null };
+    checks(b).runs[0] = run('check', 'in_progress', null);
     expect(detailOf(b, 'required-check-pending')).toEqual(['"check"']);
     const c = green();
-    checks(c).runs[0] = { name: 'check', status: 'completed', conclusion: 'failure' };
+    checks(c).runs[0] = run('check', 'completed', 'failure');
     expect(detailOf(c, 'required-check-failed')).toEqual(['"check": failure']);
     const d = green();
     pr(d).baseRef = 'release';
@@ -1120,20 +1168,377 @@ describe('mergeReadiness：提取失败可清、不可合并态、截断、大�
   });
 });
 
-describe('mergeReadiness：compare 在 PR 的 head 上读，判定只认当前摘要', () => {
-  test('compare 的提交里没有 PR 的 head：可等的 patch-unavailable，不报摘要、不拿它判', () => {
+describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要', () => {
+  const notAtHead = [['patch-unavailable', 'transient', 'compare not read at the PR head']];
+  /** 推送后的 NEWER 上读到的 compare：ci-loop.ts 又改了一行（文件数不变；extra 另加
+   * 文件），判定都绑在这份补丁的摘要上。PR 与检查仍是在 HEAD 上读的。 */
+  const compareAtNewer = (i: GateInputs, extra: CompareFile[] = []) => {
+    const changedFiles = pr(i).changedFiles;
+    setFiles(i, [
+      file('apps/server/src/services/ci-loop.ts', {
+        sha: '2'.repeat(40),
+        patchSha: 'd'.repeat(64),
+      }),
+      ...FILES.slice(1),
+      ...extra,
+    ]);
+    pr(i).changedFiles = changedFiles;
+    i.compare = readAt(NEWER, withCommits(compare(i), chain(EARLIER, HEAD, NEWER)));
+  };
+
+  test('compare 读在比 PR head 旧的提交上：可等的 patch-unavailable，不报摘要、不拿它判', () => {
     // 故事：外壳读到的 compare 停在较早的 EARLIER（缓存的响应、跨推送的两次读），body
     // 的证据链也钉在 EARLIER 上，判定绑在 EARLIER 那份补丁的摘要上。看起来全绿，可
     // PR 的 head 已是 HEAD，HEAD 的补丁没人审过。
     const i = green();
-    (i.compare as Exclude<GateInputs['compare'], string>).commits = [EARLIER];
+    i.compare = readAt(EARLIER, withCommits(compare(i), chain(EARLIER)));
     pr(i).body = `evidence: ${link(EARLIER)}`;
     const r = mergeReadiness(i);
     expect(r.ready).toBe(false);
     expect(r.patchDigest).toBeNull();
-    expect(classesOf(i)).toEqual([
-      ['patch-unavailable', 'transient', 'compare not read at the PR head'],
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
+  test('compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha）', () => {
+    // 故事：外壳按分支名或从缓存读到一份停在 EARLIER 的 compare，headSha 却照 pr.headSha
+    // 填。响应自己的 commits 里没有 HEAD，文件与摘要说的是 EARLIER 的补丁。
+    const i = green();
+    i.compare = readAt(HEAD, withCommits(compare(i), chain(EARLIER)));
+    pr(i).body = `evidence: ${link(EARLIER)}`;
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
+  test('compare 自报读在 PR 的 head 上、实则读在后代上：响应里列着 head 的子提交，同样按没在 head 上读处理', () => {
+    // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER；外壳按分支名或从缓存读到
+    // NEWER 上的 compare，headSha 却照 pr.headSha 填。HEAD 在它的提交里（只看「有没有
+    // head」放过），可 NEWER 以 HEAD 为父：这份 compare 读过了 head。
+    const a = green();
+    compareAtNewer(a);
+    a.compare = readAt(HEAD, compare(a));
+    const r = mergeReadiness(a);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(a)).toEqual(notAtHead);
+    // 隔了几代也一样：head 的子提交总在列表里
+    const b = green();
+    compareAtNewer(b);
+    b.compare = readAt(HEAD, withCommits(compare(b), chain(EARLIER, HEAD, NEWER, '9'.repeat(40))));
+    expect(classesOf(b)).toEqual(notAtHead);
+    // 后代是合并提交：head 是它的第一个父提交（把 main 合进来），或第二个
+    for (const parents of [
+      [HEAD, MAIN],
+      [MAIN, HEAD],
+    ]) {
+      const c = green();
+      compareAtNewer(c);
+      c.compare = readAt(
+        HEAD,
+        withCommits(compare(c), [...chain(EARLIER, HEAD), { sha: NEWER, parents }]),
+      );
+      expect(classesOf(c)).toEqual(notAtHead);
+    }
+  });
+
+  test('compare 在 PR 的 head 上读、head 本身是合并提交：照常 ready（看谁以 head 为父，不看谁有两个父提交）', () => {
+    const i = green();
+    i.compare = withCommits(compare(i), [
+      ...chain(EARLIER),
+      { sha: HEAD, parents: [EARLIER, MAIN] },
     ]);
+    expect(mergeReadiness(i).ready).toBe(true);
+    // PR 里合进了一条旁支 SIDE（以 MAIN 为父），SIDE 的日期晚、排在 head 之后：head 不是
+    // 列表的末一个，也不是第一父提交链上的唯一一端。看所有父提交，没被认作父提交的
+    // 仍只有 HEAD。
+    const SIDE = '7'.repeat(40);
+    const j = green();
+    j.compare = withCommits(compare(j), [
+      ...chain(EARLIER),
+      { sha: HEAD, parents: [EARLIER, SIDE] },
+      { sha: SIDE, parents: [MAIN] },
+    ]);
+    expect(mergeReadiness(j).ready).toBe(true);
+  });
+
+  test('外壳填的 head 与响应自己的 head 两样各对一半：外壳说读在 NEWER、提交说读在 HEAD，也按没在 head 上读处理', () => {
+    // 故事：外壳按 NEWER 请求，拿到的却是缓存里 HEAD 那次的提交列表（文件也说不清是哪次的）。
+    const i = green();
+    i.compare = readAt(NEWER, compare(i));
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
+  test('compare 的提交没读全（条数不等于响应的 total_commits，分页没读完）：可等的 patch-unavailable；head 的子提交在没读的那页上也不放过', () => {
+    // 故事：外壳按分支名读到 NEWER 上的 compare，照 pr.headSha 填了 headSha，提交只读了
+    // 第一页：列着 EARLIER 与 HEAD，以 HEAD 为父的 NEWER 在第二页。
+    const i = green();
+    compareAtNewer(i);
+    i.compare = readAt(HEAD, { ...withCommits(compare(i), chain(EARLIER, HEAD)), totalCommits: 3 });
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+    // 另一个方向：条数比 total_commits 多、没有重复
+    const j = green();
+    j.compare = readAt(HEAD, {
+      ...withCommits(compare(j), [...chain(EARLIER, HEAD), { sha: OTHER, parents: [MAIN] }]),
+      totalCommits: 2,
+    });
+    expect(mergeReadiness(j).patchDigest).toBeNull();
+    expect(classesOf(j)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+  });
+
+  test('compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理', () => {
+    // 故事：外壳按分支名跨页读，页面错位：以 HEAD 为父的 NEWER 掉了，一个不相干的
+    // OTHER（以 MAIN 为父）占了它的位置，条数仍等于 total_commits。列着的提交里没有谁以
+    // HEAD 为父，可也没有谁以 OTHER 为父：HEAD 与 OTHER 都像是 head，响应说不清读在哪。
+    const i = green();
+    compareAtNewer(i);
+    i.compare = readAt(
+      HEAD,
+      withCommits(compare(i), [...chain(EARLIER, HEAD), { sha: OTHER, parents: [MAIN] }]),
+    );
+    pr(i).body = `evidence: ${link(OTHER)}`;
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
+    // OTHER 排在 HEAD 前面：只取末一个没被认作父提交的，取到的是 HEAD，就放过了
+    const j = green();
+    compareAtNewer(j);
+    j.compare = readAt(
+      HEAD,
+      withCommits(compare(j), [
+        ...chain(EARLIER),
+        { sha: OTHER, parents: [MAIN] },
+        { sha: HEAD, parents: [EARLIER] },
+      ]),
+    );
+    pr(j).body = `evidence: ${link(OTHER)}`;
+    expect(mergeReadiness(j).patchDigest).toBeNull();
+    expect(classesOf(j)).toEqual(notAtHead);
+  });
+
+  test('compare 的提交列表为空（total_commits 也是 0）：响应没有自己的 head，按没在 head 上读处理，不只凭外壳填的 head', () => {
+    // 故事：PR 的 head 已经在 base 一侧（或外壳读错了 base），base...head 一个提交也没有。
+    const i = green();
+    i.compare = readAt(HEAD, withCommits(compare(i), []));
+    expect(compare(i).totalCommits).toBe(0);
+    const r = mergeReadiness(i);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
+  test('compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）', () => {
+    // 故事：外壳跨页读时页面错位，第二页重复了第一页的 HEAD，以 HEAD 为父的 NEWER 掉了。
+    const i = green();
+    compareAtNewer(i);
+    i.compare = readAt(
+      HEAD,
+      withCommits(compare(i), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [EARLIER] }]),
+    );
+    expect(compare(i).totalCommits).toBe(3);
+    expect(classesOf(i)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+    // 不同 SHA 数够了、条数多出来：重复是页面错位的迹象，读到的这份不可信，同样不算读全
+    const j = green();
+    j.compare = readAt(HEAD, {
+      ...withCommits(compare(j), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [EARLIER] }]),
+      totalCommits: 2,
+    });
+    expect(mergeReadiness(j).patchDigest).toBeNull();
+    expect(classesOf(j)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+    // 同一 SHA 带着两份 parents（第二份是假的）：同样不算读全，不挑其中一份来用
+    const k = green();
+    k.compare = readAt(
+      HEAD,
+      withCommits(compare(k), [...chain(EARLIER, HEAD), { sha: HEAD, parents: [MAIN] }]),
+    );
+    expect(classesOf(k)).toEqual([
+      ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+    ]);
+  });
+
+  test('compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要', () => {
+    // 故事：外壳在 HEAD 上读了 PR 与检查，作者随后推了 NEWER（改一行，文件数不变），
+    // compare 读到的是 NEWER。HEAD 在 NEWER 的 base..head 里，文件数对得上，判定都绑在
+    // NEWER 的摘要上：看起来全绿，可报的 head 是 HEAD，HEAD 的补丁没人审过。
+    const a = green();
+    compareAtNewer(a);
+    const r = mergeReadiness(a);
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(a)).toEqual(notAtHead);
+    // 同一竞态的另一种读法：PR 与检查读在推送前的 EARLIER，compare 读在推送后的 HEAD
+    const b = green();
+    pr(b).headSha = EARLIER;
+    b.checks = checksAt(EARLIER, checks(b));
+    expect(mergeReadiness(b).ready).toBe(false);
+    expect(classesOf(b)).toEqual(notAtHead);
+  });
+
+  test('compare 读在后代上、推送还加了文件（文件数不同）：仍是可等的 patch-unavailable，不是留人的 compare-truncated', () => {
+    const i = green();
+    compareAtNewer(i, [file('apps/server/src/services/ci-loop-retry.ts', { status: 'added' })]);
+    expect(compare(i).files).toHaveLength(pr(i).changedFiles + 1);
+    expect(classesOf(i)).toEqual(notAtHead);
+  });
+
+  test('检查读在别的提交上（比 PR head 旧或新）：可等的 required-checks-unreadable，那份结果不拿来判', () => {
+    const elsewhere = [
+      ['required-checks-unreadable', 'transient', 'checks not read at the PR head'],
+    ];
+    for (const sha of [EARLIER, NEWER]) {
+      const a = green();
+      a.checks = checksAt(sha, checks(a));
+      expect(mergeReadiness(a).ready).toBe(false);
+      expect(classesOf(a)).toEqual(elsewhere);
+      // 那份结果里的失败也不列：它说的不是 PR 的 head
+      const b = green();
+      checks(b).runs[0] = run('check', 'completed', 'failure');
+      b.checks = checksAt(sha, checks(b));
+      expect(classesOf(b)).toEqual(elsewhere);
+      // GitHub 报 unstable 时与读不到同等：手上没有这个 head 的检查，说不清是谁让它 unstable 的
+      const c = green();
+      pr(c).mergeableState = 'unstable';
+      c.checks = checksAt(sha, checks(c));
+      expect(classesOf(c)).toEqual([
+        ['mergeable-state', 'transient', 'unstable, checks unreadable'],
+        ...elsewhere,
+      ]);
+    }
+  });
+
+  test('检查自报读在 PR 的 head 上、响应说的却是别的提交：任何一条 check run 的 head_sha 或 combined status 的 sha 不是 PR 的 head，都按没在 head 上读处理', () => {
+    // 故事：外壳按分支名或从缓存读检查，headSha 却照 pr.headSha 填。上一次推送的检查
+    // 全绿，PR 真正的 head 上的 CI 还在跑或已失败。
+    const elsewhere = [
+      ['required-checks-unreadable', 'transient', 'checks not read at the PR head'],
+    ];
+    for (const sha of [EARLIER, NEWER]) {
+      // 整份响应在别的提交上
+      const a = green();
+      a.checks = { ...checksAt(sha, checks(a)), headSha: HEAD };
+      expect(mergeReadiness(a).ready).toBe(false);
+      expect(classesOf(a)).toEqual(elsewhere);
+      // 只有一条 check run 在别的提交上：那份结果不拿来判，它的失败也不列
+      const b = green();
+      checks(b).runs[0] = { ...run('check', 'completed', 'failure'), headSha: sha };
+      expect(classesOf(b)).toEqual(elsewhere);
+      // 只有 combined status 在别的提交上
+      const c = green();
+      checks(c).statusSha = sha;
+      expect(classesOf(c)).toEqual(elsewhere);
+    }
+  });
+
+  test('SHA 不是 40 位小写十六进制（大写、缩写）：PR 按读不到处理，compare 留人，检查按读不到处理，detail 都点明', () => {
+    for (const bad of [HEAD.toUpperCase(), HEAD.slice(0, 7)]) {
+      // PR 的 head：没有可对的 head，结果不报 head，也不报摘要
+      const a = green();
+      pr(a).headSha = bad;
+      const r = mergeReadiness(a);
+      expect(r.headSha).toBeNull();
+      expect(r.patchDigest).toBeNull();
+      expect(classesOf(a)).toEqual([
+        ['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex'],
+      ]);
+      // compare：请求的 head、提交、父提交里有一个不是 SHA，每次读都一样，留人。父提交尤其要
+      // 管：写错的 head 认不出谁以 head 为父，后代上读的 compare 就放过了
+      const malformed = [['compare-malformed', 'human', 'compare SHA not 40 lowercase hex']];
+      const b = green();
+      b.compare = readAt(bad, compare(b));
+      expect(classesOf(b)).toEqual(malformed);
+      const c = green();
+      c.compare = withCommits(compare(c), [...chain(EARLIER), { sha: bad, parents: [EARLIER] }]);
+      expect(classesOf(c)).toEqual(malformed);
+      const d = green();
+      compareAtNewer(d);
+      d.compare = readAt(
+        HEAD,
+        withCommits(compare(d), [...chain(EARLIER, HEAD), { sha: NEWER, parents: [bad] }]),
+      );
+      expect(classesOf(d)).toEqual(malformed);
+      // 检查：请求的 head、某条 check run 的 head_sha、combined status 的 sha
+      const unreadable = [
+        ['required-checks-unreadable', 'transient', 'check SHA not 40 lowercase hex'],
+      ];
+      const e = green();
+      checks(e).headSha = bad;
+      expect(classesOf(e)).toEqual(unreadable);
+      const f = green();
+      checks(f).runs[1] = { ...run('pack-smoke'), headSha: bad };
+      expect(classesOf(f)).toEqual(unreadable);
+      // 写错 SHA 的那份结果不拿来判：里面的失败也不列
+      checks(f).runs[0] = run('check', 'completed', 'failure');
+      expect(classesOf(f)).toEqual(unreadable);
+      const g = green();
+      checks(g).statusSha = bad;
+      expect(classesOf(g)).toEqual(unreadable);
+    }
+  });
+
+  test('PR 的 head 写错只少了 head：PR 自己的 blocker（已合并、fork、目标分支不对）照列，不被 pr-unreadable 吞掉', () => {
+    const i = green();
+    pr(i).headSha = HEAD.toUpperCase();
+    pr(i).state = 'closed';
+    pr(i).merged = true;
+    pr(i).headRepoFullName = 'someone/pacman';
+    pr(i).baseRef = 'release';
+    const r = mergeReadiness(i);
+    expect(r.headSha).toBeNull();
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual([
+      ['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex'],
+      ['pr-not-open', 'human', 'merged'],
+      ['pr-from-fork', 'human', '"someone/pacman"'],
+      ['base-not-default', 'human', '"release" → "main"'],
+    ]);
+  });
+
+  test('PR 的 head 写错时 compare 没有 head 可对：文件数与证据链不拿它判（同 PR 读不到），跨推送的竞态不报成留人的 compare-truncated', () => {
+    const malformedHead = [['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex']];
+    // compare 读在推送后的 NEWER 上，推送加了文件：文件数与 PR 报的对不上
+    const a = green();
+    pr(a).headSha = HEAD.toUpperCase();
+    compareAtNewer(a, [file('apps/server/src/services/ci-loop-retry.ts', { status: 'added' })]);
+    expect(classesOf(a)).toEqual(malformedHead);
+    // compare 读在更早的 EARLIER 上，body 的证据链钉在 HEAD：不报 evidence-link-missing
+    const b = green();
+    pr(b).headSha = HEAD.toUpperCase();
+    b.compare = readAt(EARLIER, withCommits(compare(b), chain(EARLIER)));
+    expect(classesOf(b)).toEqual(malformedHead);
+  });
+
+  test('PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）', () => {
+    const i = green();
+    i.pr = null;
+    const r = mergeReadiness(i);
+    expect(r.headSha).toBeNull();
+    expect(r.patchDigest).toBeNull();
+    expect(classesOf(i)).toEqual([['pr-unreadable', 'transient']]);
+  });
+
+  test('PR、compare 与检查都在同一个提交上读：照常判（都在后代 NEWER 上也 ready，报 NEWER 与它的摘要）', () => {
+    const i = green();
+    compareAtNewer(i);
+    pr(i).headSha = NEWER;
+    i.checks = checksAt(NEWER, checks(i));
+    const r = mergeReadiness(i);
+    expect(r.blockers).toEqual([]);
+    expect(r.ready).toBe(true);
+    expect(r.headSha).toBe(NEWER);
+    expect(r.patchDigest).toBe(computePatchDigest(compare(i).files).patchDigest);
+    expect(r.patchDigest).not.toBe(D);
   });
 
   for (const [kind, perspective, missing] of [
@@ -1189,16 +1594,16 @@ describe('mergeReadiness：compare 在 PR 的 head 上读，判定只认当前�
 
   test('两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉', () => {
     const a = green();
-    checks(a).runs.push({ name: 'check', status: 'completed', conclusion: 'failure' });
+    checks(a).runs.push(run('check', 'completed', 'failure'));
     expect(classesOf(a)).toEqual([['mergeable-state', 'transient', 'clean, not passing: "check"']]);
     const b = green();
-    checks(b).runs.unshift({ name: 'check', status: 'completed', conclusion: 'failure' });
+    checks(b).runs.unshift(run('check', 'completed', 'failure'));
     expect(classesOf(b)).toEqual([['required-check-failed', 'transient', '"check": failure']]);
     // 自家 status 还没通过时 GitHub 报 unstable；同名的失败看不见，自家 status 的豁免就把它放过
     const c = green();
     pr(c).mergeableState = 'unstable';
     checks(c).statuses = [{ context: 'pacman/merge-gate', state: 'pending' }];
-    checks(c).runs.push({ name: 'check', status: 'completed', conclusion: 'failure' });
+    checks(c).runs.push(run('check', 'completed', 'failure'));
     expect(classesOf(c)).toEqual([['mergeable-state', 'transient', 'unstable: "check"']]);
   });
 });

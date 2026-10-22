@@ -1,0 +1,13 @@
+## what host= git 2.43.0 writes to a credential helper's stdin for a given remote URL
+## printf 'url=<URL>\n' | git -c credential.helper= -c credential.helper=<dump script> credential fill
+http://PacMan_Server:8787/r.git               -> protocol=http host=PacMan_Server:8787 
+https://GitHub.com/o/r.git                    -> protocol=https host=GitHub.com 
+https://github.com:443/o/r                    -> protocol=https host=github.com:443 
+https://x-access-token@github.com/o/r.git     -> protocol=https host=github.com 
+http://[::1]:8787/r                           -> protocol=http host=[::1]:8787 
+https://bücher.example/r                     -> protocol=https host=bücher.example 
+
+## URL-scoped key (the first fix) vs a host with _ : does credential.http://<host>.helper answer?
+pacman-server:8787 -> answered
+pacman_server:8787 -> did not answer
+a_b.example.com -> did not answer

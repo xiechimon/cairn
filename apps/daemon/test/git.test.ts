@@ -10,7 +10,9 @@
 //   5. auth 失败 = 确定性失败：withGitNetRetries 不再对它烧 6s 重试预算
 
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
@@ -27,7 +29,9 @@ import {
 } from '../src/git.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
 
-const CRED = { username: 'git', password: 'pacman_fresh_token_123' };
+/** 凭证签发给的主机（#1484：helper 只对它应答）；下文 fill 测试走 host=127.0.0.1:1。 */
+const CRED_HOST = 'http://127.0.0.1:1';
+const CRED = { username: 'git', password: 'pacman_fresh_token_123', url: `${CRED_HOST}/repo.git` };
 
 /** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
@@ -47,8 +51,9 @@ describe('gitCredentialEnv — per-step 凭证 env 注入（02 §8 不落盘）'
     expect(env.GIT_CONFIG_VALUE_0).toBe('');
     // 本步唯一凭证来源 = 内联 helper（echo username/password）。
     expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
-    expect(env.GIT_CONFIG_VALUE_1).toContain(`username=${CRED.username}`);
-    expect(env.GIT_CONFIG_VALUE_1).toContain(`password=${CRED.password}`);
+    expect(env.GIT_CONFIG_VALUE_1).toContain('PACMAN_GIT_CRED_PASSWORD');
+    expect(env.PACMAN_GIT_CRED_USERNAME).toBe(CRED.username);
+    expect(env.PACMAN_GIT_CRED_PASSWORD).toBe(CRED.password);
     // 交互提示关闭（无 tty 挂起护栏）。
     expect(env.GIT_TERMINAL_PROMPT).toBe('0');
   });
@@ -113,7 +118,8 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
     expect(env.GIT_CONFIG_KEY_3).toBe('credential.helper');
     expect(env.GIT_CONFIG_VALUE_3).toBe('');
     expect(env.GIT_CONFIG_KEY_4).toBe('credential.helper');
-    expect(env.GIT_CONFIG_VALUE_4).toContain(`password=${CRED.password}`);
+    expect(env.GIT_CONFIG_VALUE_4).toContain('PACMAN_GIT_CRED_PASSWORD');
+    expect(env.PACMAN_GIT_CRED_PASSWORD).toBe(CRED.password);
   });
 
   test.each([' 2', '+2'])('失败方式 1：git 也认的 COUNT 写法 %j → 同样接在后面', (count) => {
@@ -130,14 +136,16 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
     expect(env.GIT_CONFIG_KEY_0).toBe('http.proxy');
     expect(env.GIT_CONFIG_KEY_1).toBe('http.sslCAInfo');
     expect(env.GIT_CONFIG_VALUE_2).toBe('');
-    expect(env.GIT_CONFIG_VALUE_3).toContain(`password=${CRED.password}`);
+    expect(env.GIT_CONFIG_VALUE_3).toContain('PACMAN_GIT_CRED_PASSWORD');
+    expect(env.PACMAN_GIT_CRED_PASSWORD).toBe(CRED.password);
   });
 
   test('失败方式 2：父环境无 GIT_CONFIG_* → COUNT=2，重置在 0、helper 在 1', () => {
     const env = gitCredentialEnv(CRED, { PATH: '/usr/bin', HOME: '/home/x' });
     expect(env.GIT_CONFIG_COUNT).toBe('2');
     expect(env.GIT_CONFIG_VALUE_0).toBe('');
-    expect(env.GIT_CONFIG_VALUE_1).toContain(`password=${CRED.password}`);
+    expect(env.GIT_CONFIG_VALUE_1).toContain('PACMAN_GIT_CRED_PASSWORD');
+    expect(env.PACMAN_GIT_CRED_PASSWORD).toBe(CRED.password);
     expect(Object.keys(env).filter((k) => k.startsWith('GIT_CONFIG_'))).toHaveLength(5);
   });
 
@@ -152,7 +160,8 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
     expect(env.GIT_CONFIG_COUNT).toBe('2');
     expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
     expect(env.GIT_CONFIG_VALUE_0).toBe('');
-    expect(env.GIT_CONFIG_VALUE_1).toContain(`password=${CRED.password}`);
+    expect(env.GIT_CONFIG_VALUE_1).toContain('PACMAN_GIT_CRED_PASSWORD');
+    expect(env.PACMAN_GIT_CRED_PASSWORD).toBe(CRED.password);
   });
 
   test('失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置', () => {
@@ -197,6 +206,289 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+// —— #1484 helper 只对凭证签发给的主机应答 ——————
+//   1. 签发远端的 protocol 与 host 按绑定 URL 原文取（去 userinfo；大小写、显式
+//      端口、带 _ 的主机名保留），与 git 从 remote URL 取的逐字节一致；重置条目不变
+//   2. 绑定 URL 不是 http(s)（空、本地路径、scp 形、file://）→ 不写 helper，只留重置
+//   3. 真 git：绑定主机的 credential fill 拿到 token；换端口、去掉端口、换主机拿不到；
+//      带 _ 的主机名（docker 服务名）照常拿到
+//   4. 全局配置里同主机的 credential.<url>.helper（如 gh 写的那种）照样被重置
+//   5. worktree 的 origin 被改指别的主机（set-url）或经 insteadOf 改写 → push /
+//      tagPush / fetch 不向那台主机发凭证；指向绑定主机时照常认证
+//   6. 凭证值不进 helper 的 sh -c 命令行（argv 本机他人可读），只在环境里
+//   7. http 绑定经跳转升到同主机 https 照常应答（更安全的通道）；https 不降级到 http
+//   8. 用户名 / 密码带换行或回车（git 凭证协议按行分隔，会被读成别的字段）→ 明确报错，
+//      不静默丢掉 helper（否则步后面以误导的「terminal prompts disabled」失败）
+
+/** 要 Basic 认证的假远端：无 Authorization → 401 质询；带了 → 记下解码值、回 403。 */
+async function basicAuthRemote(): Promise<{ base: string; seen: string[]; close: () => void }> {
+  const seen: string[] = [];
+  const server = createServer((req, res) => {
+    const auth = req.headers.authorization;
+    if (auth === undefined) {
+      res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="probe"' });
+    } else {
+      seen.push(Buffer.from(auth.replace(/^Basic /, ''), 'base64').toString('utf8'));
+      res.writeHead(403);
+    }
+    res.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  return { base: `http://127.0.0.1:${port}`, seen, close: () => server.close() };
+}
+
+/** 一个带提交与 annotated tag v1 的工作树，origin 指向 `originUrl`。 */
+function seededWorktree(originUrl: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'pacman-git-scope-'));
+  const git = (...args: string[]) => {
+    const r = spawnSync('git', args, { cwd: dir, encoding: 'utf8' });
+    if (r.status !== 0) throw new Error(`git ${args.join(' ')}: ${r.stderr}`);
+  };
+  git('init', '-q', '-b', 'main');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'seed');
+  git('-c', 'user.name=t', '-c', 'user.email=t@t', 'tag', '-a', 'v1', '-m', 'v1');
+  git('remote', 'add', 'origin', originUrl);
+  return dir;
+}
+
+describe('gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484）', () => {
+  test.each([
+    ['https://github.com/o/r.git', 'https', 'github.com'],
+    ['https://github.com:443/o/r', 'https', 'github.com:443'],
+    ['http://127.0.0.1:8787/git/team/r', 'http', '127.0.0.1:8787'],
+    ['https://x-access-token@GitHub.com/o/r.git', 'https', 'GitHub.com'],
+    ['http://pacman_server:8787/git/t/r.git', 'http', 'pacman_server:8787'],
+    ['http://[::1]:8787/git/t/r', 'http', '[::1]:8787'],
+  ])('失败方式 1：绑定 %s → protocol %s、host %s，前面仍是空值重置', (url, protocol, host) => {
+    const env = gitCredentialEnv({ ...CRED, url }, {});
+    expect(env.GIT_CONFIG_COUNT).toBe('2');
+    expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    expect(env.GIT_CONFIG_KEY_1).toBe('credential.helper');
+    expect(env.PACMAN_GIT_CRED_PROTOCOL).toBe(protocol);
+    expect(env.PACMAN_GIT_CRED_HOST).toBe(host);
+  });
+
+  test.each([
+    '',
+    '/srv/repos/r.git',
+    'git@github.com:o/r.git',
+    'file:///srv/r.git',
+    'ssh://git@github.com/o/r',
+  ])('失败方式 2：绑定 %j（不是 http(s)）→ 只有重置，没有 helper', (url) => {
+    const env = gitCredentialEnv({ ...CRED, url }, {});
+    expect(env.GIT_CONFIG_COUNT).toBe('1');
+    expect(env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+    expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    expect(Object.keys(env).filter((k) => k.startsWith('PACMAN_GIT_CRED_'))).toEqual([]);
+    expect(JSON.stringify(env)).not.toContain(CRED.password);
+  });
+
+  test('失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-scope-home-'));
+    const staleHelper = join(home, 'stale-helper.sh');
+    writeFileSync(staleHelper, '#!/bin/sh\necho username=git\necho password=STALE_REVOKED\n');
+    chmodSync(staleHelper, 0o755);
+    writeFileSync(
+      join(home, '.gitconfig'),
+      `[credential "${CRED_HOST}"]\n\thelper = ${staleHelper}\n`,
+    );
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    const env = { ...base, ...gitCredentialEnv(CRED, base) };
+    const fill = (protocol: string, host: string) =>
+      spawnSync('git', ['credential', 'fill'], {
+        input: `protocol=${protocol}\nhost=${host}\n\n`,
+        encoding: 'utf8',
+        env,
+      }).stdout;
+
+    const bound = fill('http', '127.0.0.1:1');
+    expect(bound).toContain(`password=${CRED.password}`);
+    expect(bound).not.toContain('STALE_REVOKED');
+    for (const [protocol, host] of [
+      ['http', '127.0.0.1:2'],
+      ['http', '127.0.0.1'],
+      ['http', 'example.invalid'],
+    ] as const) {
+      expect(fill(protocol, host)).not.toContain(CRED.password);
+    }
+  });
+
+  test('失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-scope-url-'));
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    const fillUrl = (bound: string, requested: string) =>
+      spawnSync('git', ['credential', 'fill'], {
+        input: `url=${requested}\n\n`,
+        encoding: 'utf8',
+        env: { ...base, ...gitCredentialEnv({ ...CRED, url: bound }, base) },
+      }).stdout;
+    for (const url of [
+      'http://pacman_server:8787/git/t/r.git',
+      'https://GitHub.com/o/r.git',
+      'https://github.com:8443/o/r.git',
+    ]) {
+      expect(fillUrl(url, url)).toContain(`password=${CRED.password}`);
+    }
+    expect(
+      fillUrl('http://pacman_server:8787/git/t/r.git', 'http://other_server:8787/git/t/r.git'),
+    ).not.toContain(CRED.password);
+    expect(fillUrl('https://github.com:8443/o/r.git', 'https://github.com/o/r.git')).not.toContain(
+      CRED.password,
+    );
+  });
+
+  test('失败方式 7：http 绑定被跳转到同主机 https 照常应答；https 不降级到 http', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-scope-upgrade-'));
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    const fill = (bound: string, protocol: string) =>
+      spawnSync('git', ['credential', 'fill'], {
+        input: `protocol=${protocol}\nhost=pacman.internal\n\n`,
+        encoding: 'utf8',
+        env: { ...base, ...gitCredentialEnv({ ...CRED, url: bound }, base) },
+      }).stdout;
+    expect(fill('http://pacman.internal/git/t/r.git', 'https')).toContain(
+      `password=${CRED.password}`,
+    );
+    expect(fill('https://pacman.internal/git/t/r.git', 'http')).not.toContain(CRED.password);
+  });
+
+  test.each([
+    ['密码带换行', { password: 'a\nb' }],
+    ['密码带回车', { password: 'a\rb' }],
+    ['用户名带换行', { username: 'u\nhost=evil.example' }],
+  ])('失败方式 8：%s（git 的凭证协议装不下）→ 明确报错，不交给 git', (_label, patch) => {
+    expect(() => gitCredentialEnv({ ...CRED, ...patch }, {})).toThrow(/line break/);
+  });
+
+  test('失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-argv-'));
+    const trace = join(home, 'trace.log');
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+      GIT_TRACE: trace,
+    };
+    const out = spawnSync('git', ['credential', 'fill'], {
+      input: 'protocol=http\nhost=127.0.0.1:1\n\n',
+      encoding: 'utf8',
+      env: { ...base, ...gitCredentialEnv(CRED, base) },
+    }).stdout;
+    expect(out).toContain(`password=${CRED.password}`); // 正对照：helper 确实跑了
+    const log = readFileSync(trace, 'utf8');
+    expect(log).toContain('run_command');
+    expect(log).not.toContain(CRED.password);
+  });
+
+  test('失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证', async () => {
+    const bound = await basicAuthRemote();
+    const other = await basicAuthRemote();
+    stubOutInheritedGitConfig();
+    try {
+      const cred = { ...CRED, url: `${bound.base}/real.git` };
+      const dir = seededWorktree(cred.url);
+      // 正对照：origin 指向绑定主机 → 凭证照常送达。
+      await expect(gitPrim.push(dir, 'main', cred)).rejects.toThrow();
+      expect(bound.seen).toEqual([`${cred.username}:${cred.password}`]);
+      // agent 在 worktree 里改指 origin。
+      spawnSync('git', ['remote', 'set-url', 'origin', `${other.base}/elsewhere.git`], {
+        cwd: dir,
+      });
+      await expect(gitPrim.push(dir, 'main', cred)).rejects.toThrow();
+      await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
+      await expect(gitPrim.fetch(dir, cred)).rejects.toThrow();
+      expect(other.seen).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+      bound.close();
+      other.close();
+    }
+  }, 30_000);
+
+  test('失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证', async () => {
+    const bound = await basicAuthRemote();
+    const other = await basicAuthRemote();
+    stubOutInheritedGitConfig();
+    try {
+      const cred = { ...CRED, url: `${bound.base}/real.git` };
+      const dir = seededWorktree(cred.url);
+      spawnSync('git', ['config', `url.${other.base}/.insteadOf`, `${bound.base}/`], { cwd: dir });
+      await expect(gitPrim.push(dir, 'main', cred)).rejects.toThrow();
+      await expect(gitPrim.tagPush(dir, 'v1', cred)).rejects.toThrow();
+      expect(other.seen).toEqual([]);
+      expect(bound.seen).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+      bound.close();
+      other.close();
+    }
+  }, 30_000);
+});
+
+// —— #1485 凭证值在 shell 里原样，不展开、不执行 ——————
+
+describe('gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485）', () => {
+  const fillPassword = (cred: typeof CRED): { username?: string; password?: string } => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-quote-'));
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    const out = spawnSync('git', ['credential', 'fill'], {
+      input: 'protocol=http\nhost=127.0.0.1:1\n\n',
+      encoding: 'utf8',
+      env: { ...base, ...gitCredentialEnv(cred, base) },
+    }).stdout;
+    const field = (name: string) =>
+      out
+        .split('\n')
+        .find((line) => line.startsWith(`${name}=`))
+        ?.slice(name.length + 1);
+    return { username: field('username'), password: field('password') };
+  };
+
+  test.each([
+    'abc$(echo INJECTED)',
+    'a`echo INJECTED`b',
+    '$HOME',
+    'a;echo INJECTED',
+    "it's",
+    'two  words',
+    'back\\slash',
+    '*',
+    'a\\nb',
+    'x\\cy',
+    '\\0101',
+  ])('密码 %j 原样返回', (password) => {
+    expect(fillPassword({ ...CRED, password }).password).toBe(password);
+  });
+
+  test('用户名同样原样返回', () => {
+    expect(fillPassword({ ...CRED, username: "o'$(echo X)" }).username).toBe("o'$(echo X)");
+  });
+
+  test('密码里的 $(touch …) 不执行', () => {
+    const marker = join(mkdtempSync(join(tmpdir(), 'pacman-git-quote-marker-')), 'ran');
+    fillPassword({ ...CRED, password: `x$(touch ${marker})` });
+    expect(existsSync(marker)).toBe(false);
   });
 });
 

@@ -1,0 +1,439 @@
+# #1404 S2 round 10 (pr-gate run 1 on #1479 at b65f00d: go, 11 suggestions; verdict in the scratchpad, not committed), after merging origin/main
+# (e410e82) into the branch as 1813905. Tests first for every rule change; each red leg ran with the new tests in the worktree on top of the named
+# source commit, and the tests were then committed unchanged as the tests-only commit named (the pre-commit hook typechecked each one).
+# Command for every leg (readiness tests + the shared snapshot test):
+#   CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+#
+# Legs, oldest first:
+#   shape   8be3d18  inputs carry the response's SHAs (GateCheckRun.headSha, checks.statusSha, compare.commits as {sha, parents}); no rule change,
+#                    existing tests adapted to the shape through helpers: 212 passed (212). Output not kept; the next leg's 213 green tests are
+#                    the same set.
+#   red 1   22615fd  tests only, source as at 8be3d18: 3 failed | 213 passed (216). Suggestion 1 (compare labelled HEAD, read at a descendant,
+#                    linear, several generations, merge with HEAD as first or second parent), suggestion 7 (check run head_sha or combined status
+#                    sha at another commit), suggestion 8 (malformed PR, compare and check SHAs). One pin green in both legs: a compare at the head
+#                    whose head is a merge commit stays ready.
+#   green 1 de82853  readiness.ts only: 216 passed (216).
+#   (749e056 docs: spec 28 ledger row; then /code-review pass 1 on origin/main...749e056, see s2-r10-reviews.txt)
+#   red 2   7591a14  tests only, source as at 749e056: 2 failed | 216 passed (218). Pass 1 finding 4 (commit list shorter than total_commits, the
+#                    head's child on the unread page) and finding 1 (a malformed PR head keeps pr-not-open, pr-from-fork, base-not-default).
+#   green 2 0cd8b31  readiness.ts only (totalCommits; head kept apart from the PR; isFullSha reused): 218 passed (218).
+#   red 3   ec70343  tests only, source as at 0cd8b31: 2 failed | 218 passed (220). Pass 2 findings 4 (repeated commits making up the count) and
+#                    1, 2, 6 (malformed head: no compare-truncated from the PR's file count, no evidence-link judgement on an unbound compare).
+#   green 3 47fe67f  readiness.ts only: 220 passed (220).
+#   420c4f9          readiness.ts only, the completeness check reduced to distinct SHAs (pass 3 finding 7): 220 passed (220). Not tests first: it was
+#                    meant as a no-behaviour simplification; pass 4 showed it accepted a list padded with a repeat, and it was reverted below.
+#   red 4   b84f009  tests only, source as at 420c4f9: 1 failed | 219 passed (220). Pass 4 findings 1-4 (more entries than total_commits, distinct
+#                    SHAs equal to it).
+#   green 4 3bfcf40  readiness.ts only (length equal and no repeats): 220 passed (220).
+#   b75b3d5          pins and a contract comment, no rule change (pass 5 findings 3, 4, 7): 220 passed (220).
+#   red 5   705d746  tests only, source as at b75b3d5: 1 failed | 220 passed (221). Pass 6 finding 1 (a foreign commit in place of an unread child
+#                    of the head, count equal, no repeats). The same commit moves the too-many count case and pins one SHA with two parent lists.
+#   green 5 a73799a  readiness.ts only (the compare's own head derived from its commits replaces the two response clauses): 221 passed (221).
+#   c9d7d84          pins for the four round 10 mutations that survived at a73799a and a contract comment, no rule change: 222 passed (222).
+# A multi-case test stops at its first failing assertion, so each red leg shows the first sub-case of each new test; s2-mutations-10.txt shows
+# every rule turning at least one test red when undone alone.
+
+== red 1: tests 22615fd on source 8be3d18 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (136 tests | 3 failed) 115ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (20)
+     × compare 自报读在 PR 的 head 上、实则读在后代上：响应里列着 head 的子提交，同样按没在 head 上读处理 15ms
+     × 检查自报读在 PR 的 head 上、响应说的却是别的提交：任何一条 check run 的 head_sha 或 combined status 的 sha 不是 PR 的 head，都按没在 head 上读处理 1ms
+     × SHA 不是 40 位小写十六进制（大写、缩写）：PR 按读不到处理，compare 留人，检查按读不到处理，detail 都点明 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 自报读在 PR 的 head 上、实则读在后代上：响应里列着 head 的子提交，同样按没在 head 上读处理
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1210:21
+    1208|     a.compare = readAt(HEAD, compare(a));
+    1209|     const r = mergeReadiness(a);
+    1210|     expect(r.ready).toBe(false);
+       |                     ^
+    1211|     expect(r.patchDigest).toBeNull();
+    1212|     expect(classesOf(a)).toEqual(notAtHead);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 检查自报读在 PR 的 head 上、响应说的却是别的提交：任何一条 check run 的 head_sha 或 combined status 的 sha 不是 PR 的 head，都按没在 head 上读处理
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1302:39
+    1300|       const a = green();
+    1301|       a.checks = { ...checksAt(sha, checks(a)), headSha: HEAD };
+    1302|       expect(mergeReadiness(a).ready).toBe(false);
+       |                                       ^
+    1303|       expect(classesOf(a)).toEqual(elsewhere);
+    1304|       // 只有一条 check run 在别的提交上：那份结果不拿来判，它的失败也不列
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > SHA 不是 40 位小写十六进制（大写、缩写）：PR 按读不到处理，compare 留人，检查按读不到处理，detail 都点明
+AssertionError: expected 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA…' to be null
+
+- Expected:
+null
+
++ Received:
+"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+
+ ❯ test/merge-gate-readiness.test.ts:1321:25
+    1319|       pr(a).headSha = bad;
+    1320|       const r = mergeReadiness(a);
+    1321|       expect(r.headSha).toBeNull();
+       |                         ^
+    1322|       expect(r.patchDigest).toBeNull();
+    1323|       expect(classesOf(a)).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 213 passed (216)
+   Start at  15:40:44
+   Duration  1.95s (transform 77%, import 16%, tests 7%)
+exit 1
+
+== green 1: de82853 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  216 passed (216)
+   Start at  15:42:37
+   Duration  2.34s (transform 78%, import 16%, tests 6%)
+exit 0
+
+== red 2: tests 7591a14 on source 749e056 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (138 tests | 2 failed) 120ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (22)
+     × compare 的提交没读全（条数不等于响应的 total_commits，分页没读完）：可等的 patch-unavailable；head 的子提交在没读的那页上也不放过 15ms
+     × PR 的 head 写错只少了 head：PR 自己的 blocker（已合并、fork、目标分支不对）照列，不被 pr-unreadable 吞掉 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交没读全（条数不等于响应的 total_commits，分页没读完）：可等的 patch-unavailable；head 的子提交在没读的那页上也不放过
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1258:21
+    1256|     i.compare = readAt(HEAD, { ...withCommits(compare(i), chain(EARLIE…
+    1257|     const r = mergeReadiness(i);
+    1258|     expect(r.ready).toBe(false);
+       |                     ^
+    1259|     expect(r.patchDigest).toBeNull();
+    1260|     expect(classesOf(i)).toEqual([
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 的 head 写错只少了 head：PR 自己的 blocker（已合并、fork、目标分支不对）照列，不被 pr-unreadable 吞掉
+AssertionError: expected [ [ 'pr-unreadable', …(2) ] ] to deeply equal [ [ 'pr-unreadable', …(2) ], …(3) ]
+
+- Expected
++ Received
+
+@@ -2,21 +2,6 @@
+    [
+      "pr-unreadable",
+      "transient",
+      "head SHA not 40 lowercase hex",
+    ],
+-   [
+-     "pr-not-open",
+-     "human",
+-     "merged",
+-   ],
+-   [
+-     "pr-from-fork",
+-     "human",
+-     "\"someone/pacman\"",
+-   ],
+-   [
+-     "base-not-default",
+-     "human",
+-     "\"release\" → \"main\"",
+-   ],
+  ]
+
+ ❯ test/merge-gate-readiness.test.ts:1391:26
+    1389|     expect(r.headSha).toBeNull();
+    1390|     expect(r.patchDigest).toBeNull();
+    1391|     expect(classesOf(i)).toEqual([
+       |                          ^
+    1392|       ['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex'],
+    1393|       ['pr-not-open', 'human', 'merged'],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 216 passed (218)
+   Start at  15:48:02
+   Duration  3.03s (transform 81%, import 15%, tests 4%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.27s · 82% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             on CI this only helps when the cache directory is persisted between runs
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+exit 1
+
+== green 2: 0cd8b31 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  218 passed (218)
+   Start at  15:49:44
+   Duration  2.27s (transform 81%, import 13%, tests 5%)
+exit 0
+
+== red 3: tests ec70343 on source 0cd8b31 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (140 tests | 2 failed) 131ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (24)
+     × compare 的提交有重复、条数凑够了 total_commits：同样算没读全（重复的不顶替没读到的） 14ms
+     × PR 的 head 写错时 compare 没有 head 可对：文件数与证据链不拿它判（同 PR 读不到），跨推送的竞态不报成留人的 compare-truncated 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交有重复、条数凑够了 total_commits：同样算没读全（重复的不顶替没读到的）
+AssertionError: expected [] to deeply equal [ [ 'patch-unavailable', …(2) ] ]
+
+- Expected
++ Received
+
+- [
+-   [
+-     "patch-unavailable",
+-     "transient",
+-     "compare commit list incomplete",
+-   ],
+- ]
++ []
+
+ ❯ test/merge-gate-readiness.test.ts:1275:26
+    1273|     );
+    1274|     expect(compare(i).totalCommits).toBe(3);
+    1275|     expect(classesOf(i)).toEqual([
+       |                          ^
+    1276|       ['patch-unavailable', 'transient', 'compare commit list incomple…
+    1277|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 的 head 写错时 compare 没有 head 可对：文件数与证据链不拿它判（同 PR 读不到），跨推送的竞态不报成留人的 compare-truncated
+AssertionError: expected [ [ 'pr-unreadable', …(2) ], …(1) ] to deeply equal [ [ 'pr-unreadable', …(2) ] ]
+
+- Expected
++ Received
+
+@@ -2,6 +2,11 @@
+    [
+      "pr-unreadable",
+      "transient",
+      "head SHA not 40 lowercase hex",
+    ],
++   [
++     "compare-truncated",
++     "human",
++     "count-mismatch",
++   ],
+  ]
+
+ ❯ test/merge-gate-readiness.test.ts:1420:26
+    1418|     pr(a).headSha = HEAD.toUpperCase();
+    1419|     compareAtNewer(a, [file('apps/server/src/services/ci-loop-retry.ts…
+    1420|     expect(classesOf(a)).toEqual(malformedHead);
+       |                          ^
+    1421|     // compare 读在更早的 EARLIER 上，body 的证据链钉在 HEAD：不报 evidence-link-missi…
+    1422|     const b = green();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  2 failed | 218 passed (220)
+   Start at  15:52:40
+   Duration  2.31s (transform 76%, import 15%, tests 8%)
+exit 1
+
+== green 3: 47fe67f ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  220 passed (220)
+   Start at  15:54:22
+   Duration  2.63s (transform 79%, import 13%, tests 8%)
+exit 0
+
+== 420c4f9 (distinct SHAs only) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  220 passed (220)
+   Start at  15:57:28
+   Duration  1.87s (transform 79%, import 14%, tests 6%)
+exit 0
+
+== red 4: tests b84f009 on source 420c4f9 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (140 tests | 1 failed) 179ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (24)
+     × compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的） 26ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）
+AssertionError: expected [] to deeply equal [ [ 'patch-unavailable', …(2) ] ]
+
+- Expected
++ Received
+
+- [
+-   [
+-     "patch-unavailable",
+-     "transient",
+-     "compare commit list incomplete",
+-   ],
+- ]
++ []
+
+ ❯ test/merge-gate-readiness.test.ts:1284:26
+    1282|       totalCommits: 2,
+    1283|     });
+    1284|     expect(classesOf(j)).toEqual([
+       |                          ^
+    1285|       ['patch-unavailable', 'transient', 'compare commit list incomple…
+    1286|     ]);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 219 passed (220)
+   Start at  15:59:35
+   Duration  3.09s (transform 77%, import 15%, tests 6%, environment 1%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.10s · 77% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             on CI this only helps when the cache directory is persisted between runs
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+exit 1
+
+== green 4: 3bfcf40 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  220 passed (220)
+   Start at  16:00:42
+   Duration  2.25s (transform 78%, import 15%, tests 6%)
+exit 0
+
+== b75b3d5 (pins, comment) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  220 passed (220)
+   Start at  16:04:11
+   Duration  2.31s (transform 74%, import 20%, tests 5%, worker 1%)
+exit 0
+
+== red 5: tests 705d746 on source b75b3d5 ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (141 tests | 1 failed) 130ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (25)
+     × compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理 15ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1290:21
+    1288|     pr(i).body = `evidence: ${link(OTHER)}`;
+    1289|     const r = mergeReadiness(i);
+    1290|     expect(r.ready).toBe(false);
+       |                     ^
+    1291|     expect(r.patchDigest).toBeNull();
+    1292|     expect(classesOf(i)).toEqual(notAtHead);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 220 passed (221)
+   Start at  16:06:38
+   Duration  2.30s (transform 80%, import 14%, tests 7%)
+exit 1
+
+== green 5: a73799a ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  221 passed (221)
+   Start at  16:07:57
+   Duration  2.77s (transform 82%, import 13%, tests 5%, worker 1%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.15s · 84% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             on CI this only helps when the cache directory is persisted between runs
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+exit 0
+
+== c9d7d84 (pins, comment) ==
+$ cd /home/user/pacman/.claude/worktrees/p3b && CI=true pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts packages/shared/test/snapshot.test.ts
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+
+ Test Files  2 passed (2)
+      Tests  222 passed (222)
+   Start at  16:15:38
+   Duration  1.88s (transform 81%, import 13%, tests 5%)
+exit 0

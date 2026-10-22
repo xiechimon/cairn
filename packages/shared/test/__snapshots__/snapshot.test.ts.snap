@@ -7713,6 +7713,61 @@ exports[`协议词表快照（02 §5/§6 canonical） > worktree 契约（02 §5
 }
 `;
 
+exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 1`] = `
+[
+  "policy-human: policy, 项目策略为人工合并",
+  "autonomy-paused: policy, 自治合并已暂停",
+  "not-applicable: policy, 不是 GitHub PR 形态的构建",
+  "not-current-build: transient, 不是任务的当前构建",
+  "phase-not-review: transient, 任务不在审核关口",
+  "work-in-flight: transient, 还有步骤在跑",
+  "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
+  "pr-not-open: human, PR 已合并或已关闭",
+  "pr-draft: transient, PR 是草稿",
+  "pr-from-fork: human, PR 来自 fork",
+  "base-not-default: human, PR 的目标分支不是默认分支",
+  "mergeable-state: transient, GitHub 判定暂不可合并",
+  "self-required: human, pacman/merge-gate 被设成了必需检查",
+  "required-checks-unreadable: transient, 读不到当前 head 的检查或必需检查清单",
+  "required-checks-none: human, 默认分支没有必需检查",
+  "required-check-missing: transient, 必需检查在当前 head 上缺席",
+  "required-check-pending: transient, 必需检查还在跑",
+  "required-check-failed: transient, 必需检查未通过",
+  "pr-evidence-not-green: transient, pr-evidence 未通过",
+  "patch-unavailable: transient, 读不到当前 head 的 compare，补丁摘要暂不可得",
+  "compare-malformed: human, compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错",
+  "compare-truncated: human, compare 文件列表被截断",
+  "patch-unbindable: human, 补丁无法取摘要（证据之外没有文件，或有文件缺 blob sha）",
+  "size-cap: human, 补丁超过 800 行或 40 个文件",
+  "protected-path: human, 改动命中 D4 保护路径",
+  "outside-auto-merge: human, 改动在可自动合并集之外",
+  "test-deleted: human, 删除了测试",
+  "opaque-file: human, 证据目录外有看不到 diff 的文件（二进制、diff 过大或纯改名）",
+  "evidence-outside-ticket: human, 改动了别的票的证据目录",
+  "evidence-executable: human, 证据目录里新增或改动了可执行文件",
+  "issue-ref-missing: human, 任务来源解不出 issue 号",
+  "evidence-link-missing: transient, PR body 缺钉在本 PR 提交上、指向本 PR 证据的 raw 永久链",
+  "verify-missing: transient, 当前补丁没有验证判定",
+  "verify-failed: transient, 验证未通过",
+  "verify-extraction-failed: transient, 验证判定提取失败",
+  "verify-evidence-invalid: transient, 验证证据不在本票目录",
+  "verify-tampered: human, 验证者改了代码",
+  "review-missing: transient, 有视角还没有审核判定",
+  "review-blocking: transient, 审核有 blocking 发现",
+  "review-extraction-failed: transient, 审核判定提取失败",
+  "perspective-timed-out: human, 审核视角超时",
+  "decision-missing: transient, chief 还没有出 go/no-go",
+  "decision-no-go: transient, chief 判 no-go",
+  "decision-extraction-failed: transient, chief 判定提取失败",
+  "fix-rounds-exhausted: human, 修复轮用完",
+  "fix-no-change: human, 修复轮没有改动补丁",
+  "gate-rounds-exhausted: human, 闸轮次用完",
+  "no-reviewers: human, 团队没有可派的审核视角",
+  "no-verifier: human, 团队没有可派的验证者",
+  "no-decider: human, chief 没有可用的 agent",
+]
+`;
+
 exports[`协议词表快照（02 §5/§6 canonical） > 品牌串命名常量表（02 §5.8 + 素材替换计划 §2） 1`] = `
 {
   "BRAND": {

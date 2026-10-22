@@ -12,7 +12,7 @@
 //      refs/heads/<conv>，不碰用户工作树）；用户 HEAD 与脏文件内容原样
 //   4. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
 //      clone/fetch/push 全程 token 不出现在 argv；对照 env 面
-//      最后一条 GIT_CONFIG_VALUE_* 携带 token（凭证确实经 env credential.helper 注入）
+//      PACMAN_GIT_CRED_* 携带 token（凭证确实经 env 注入，credential.helper 读它）
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -27,7 +27,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conversationBranch, type GitCredentials } from '@pacman/shared';
+import { type BoundGitCredentials, conversationBranch } from '@pacman/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -38,7 +38,13 @@ const PROJECT_ID = 'proj-local-1';
 const CONV_A = '01a0b86f-aaaa-72a8-bba4-75c5cfd6598f';
 /** 探针 token（argv 泄漏断言的判别串；形近真实 GitHub token 但为假值）。 */
 const PROBE_TOKEN = 'ghp_PROBE0000000000000000000000000000';
-const PROBE_CRED: GitCredentials = { username: 'x-access-token', password: PROBE_TOKEN };
+// 远端是本地 bare 仓（无需凭证）；绑定 URL 取 github 形态，helper 照样进 env，
+// 正对照「token 确实经 env 注入」才有东西可查（#1484）。
+const PROBE_CRED: BoundGitCredentials = {
+  username: 'x-access-token',
+  password: PROBE_TOKEN,
+  url: 'https://github.com/o/r.git',
+};
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -205,9 +211,8 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
       [
         '#!/bin/sh',
         `{ printf '%s ' "$@"; printf '\\n'; } >> "${argvLog}"`,
-        // 只记 helper 位 = 最后一条（COUNT-1）：父环境自带 GIT_CONFIG_* 时它不在
-        // 1 号（#1460）。
-        `printenv "GIT_CONFIG_VALUE_$((\${GIT_CONFIG_COUNT:-0} - 1))" >> "${envLog}" 2>/dev/null || true`,
+        // 凭证值在 PACMAN_GIT_CRED_*（helper 本体是定值，#1484）。
+        `printenv PACMAN_GIT_CRED_USERNAME PACMAN_GIT_CRED_PASSWORD >> "${envLog}" 2>/dev/null || true`,
         `exec "${realGit}" "$@"`,
       ].join('\n'),
     );
@@ -252,9 +257,9 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     expect(argv).not.toContain('x-access-token');
     expect(argv).not.toContain('credential.helper');
     // 正对照：token 确实经 GIT_CONFIG_* env 注入（否则「argv 无 token」空转）
-    // ——最后一个 VALUE 位 = 内联 credential.helper 函数体（git.ts gitCredentialEnv）。
+    // ——PACMAN_GIT_CRED_* = 内联 credential.helper 读取的凭证（git.ts gitCredentialEnv）。
     const envDump = readFileSync(envLog, 'utf8');
     expect(envDump).toContain(PROBE_TOKEN);
-    expect(envDump).toContain('echo username=x-access-token');
+    expect(envDump).toContain('x-access-token');
   }, 30_000);
 });

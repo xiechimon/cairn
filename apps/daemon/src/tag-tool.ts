@@ -8,7 +8,7 @@
 // 发布流不挂接（leader 裁定）：pacman 无发布管线；tag 推 origin 后用户仓
 // 自身 CI 自然生效。
 
-import type { CommitIdentity, GitCredentials, LocalToolDef } from '@pacman/shared';
+import type { BoundGitCredentials, CommitIdentity, LocalToolDef } from '@pacman/shared';
 import { gitPrim } from './git.js';
 
 /** 本地工具名（词值单源 = protocol/machine-wire.ts LOCAL_TOOL_CREATE_TAG）。 */
@@ -19,7 +19,7 @@ export interface CreateTagToolOpts {
    * 明确原因——secret-channel 同律）。 */
   repoDir: string | null;
   /** per-step git 凭证（local 形态 = null，file 远端无需凭证）。 */
-  cred: GitCredentials | null;
+  cred: BoundGitCredentials | null;
   /** tagger 身份（必传）：annotated tag 没有 git 可用的兜底身份，无全局
    * user.name/user.email 的机器上 `git tag -a` 挂 128。调用方传本步的提交
    * 身份，标签署名与步内提交同源。 */

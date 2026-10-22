@@ -1,0 +1,63 @@
+# #1459 round 3 (pr-gate on #1496 at e1a6ad1, post-merge go with suggestions): red and green legs
+# Worktree /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5-r6 from origin/main 93b9ce21.
+# Tests were committed before the code that makes them pass; each red leg ran at the tests-only commit.
+# Command: pnpm exec vitest run --reporter=verbose apps/server/test/webhook.test.ts [issue-intake, github-issues]
+
+## Source: GitHub docs on Enterprise Managed User usernames
+Fetched 2026-10-22 from
+https://docs.github.com/api/article/body?pathname=/en/enterprise-cloud@latest/admin/managing-iam/iam-configuration-reference/username-considerations-for-external-authentication
+Quoted lines:
+  * On GitHub.com, GitHub also adds an underscore and your enterprise's shortcode to the end of each username.
+  Each enterprise that uses managed user accounts is associated with a shortcode, which is an alphanumeric string between three and eight characters.
+  The setup user who configures SAML SSO has a username in the format of **SHORT-CODE\_admin**. For example, if your enterprise's shortcode is "octo", the setup user will be "octo\_admin."
+  When you provision a new user from your identity provider, the new managed user account will have a GitHub username in the format of **@IDP-USERNAME\_SHORT-CODE** (for example, "mona-cat\_octo").
+  Usernames, including underscore and short code, must not exceed 39 characters.
+  Usernames for user accounts on GitHub can only contain alphanumeric characters and dashes (`-`).
+Data-residency (GHE.com) setup user example from the same page: * The only place you are likely to see the shortcode is in the username of the setup admin, which will look like `2abvd19d_admin`.
+
+## Red leg 1: 8b0bf505 (tests before the fix; suggestions 1, 8, 9), webhook.test.ts
+ Test Files  1 failed (1)
+      Tests  3 failed | 63 passed (66)
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（alice_acme：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（mona-cat_octo：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（octo_admin：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+Green guards at 8b0bf505: W21 `octo-helper[bot]`; W20 now also refuses `alice.acme`, `_alice`, `-alice`, `alice_`;
+W2 and W12b read the refusal log line (reason sender-below-triage).
+
+## Green leg 1: after 72a963c2 (EMU logins accepted; contract comment), webhook + issue-intake + github-issues
+ Test Files  3 passed (3)
+      Tests  260 passed (260)
+
+## Red leg 2: bad80636 (tests before the review fixes), webhook.test.ts
+ Test Files  1 failed (1)
+      Tests  1 failed | 70 passed (71)
+  FAIL |@xiechimon/pacman| test/webhook.test.ts > #1459 round 3 W 日志里的 sender > W22 sender-malformed 的 sender 很长（载荷里没有长度上限）→ 日志行只记前 64 个字符与总长
+Green guards at bad80636: W20 refuses 40-character logins (plain, EMU, `[bot]`); W21 accepts a 39-character EMU login
+and its bot case uses its own login with sender type Bot.
+
+## Green leg 2: after 74b38124 (shape and length split; truncated log), webhook + issue-intake + github-issues
+ Test Files  3 passed (3)
+      Tests  265 passed (265)
+new and changed round 3 tests:
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 W 打标人（sender）按 D5 核 > W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（".."）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"."）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"a/b"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（""）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"alice.acme"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"_alice"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"-alice"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"alice_"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W20 sender 的 login 不是 GitHub 账号名（"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[bot]"）→ 202 ignored，零出站，记日志
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（alice_acme：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（mona-cat_octo：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（octo_admin：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_abcdefgh：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 2 W review 发现 > W21 GitHub 认的账号名（octo-builder[bot]：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入
+  ✓ |@xiechimon/pacman| test/webhook.test.ts > #1459 round 3 W 日志里的 sender > W22 sender-malformed 的 sender 很长（载荷里没有长度上限）→ 日志行只记前 64 个字符与总长
+
+## Final head
+905e4f78 (origin/main 6cceda8 merged): the same files pass inside vitest --changed origin/main (r3-gates.txt).
