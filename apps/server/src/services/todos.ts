@@ -636,10 +636,11 @@ export function isStartedTodoRow(row: {
  *    同步行随 build FK cascade；todo 行保留（标题/需求/标签/指派是
  *    任务定义，不是产物）。执行机工作区文件与会话资产不动（daemon 本地物，
  *    server 够不着——dialog 文案如实声明）。
- *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后任何上报
- *    （heartbeat/completion）都落进 NotFoundError 404 被忽略，不存在「已删
- *    build 的落账把相位拽走」的路径（与 applyStoppedStep 的 gate 回落无交集，
- *    本函数不经过它）。
+ *  - 迟到回报天然免疫：daemon 侧持有的 step/buildId 在删除后的完成回报落进
+ *    NotFoundError 404，不存在「已删 build 的落账把相位拽走」的路径（与
+ *    applyStoppedStep 的 gate 回落无交集，本函数不经过它）。
+ *  - 在跑的步：上面发的停止信号来不及被拉取（行先删了）。daemon 的下一次心跳
+ *    得到 410（#1488），按停止收尾——不再 commit/push，不再耗模型。
  *  非 started 卡 = 无操作返回现记录（调用方本不该调；raw 调用无害）。
  *  expected 相位/build 快照对不上 = { stale: true } + 现记录（构建在 dialog
  *  打开后推进了——调用方刷新 dialog 文案重新确认，不得按旧文案重置）。 */

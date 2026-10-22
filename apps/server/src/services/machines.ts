@@ -81,7 +81,7 @@ import {
   todo,
   tokenUsage,
 } from '../db/schema.js';
-import { conflict } from '../lib/errors.js';
+import { conflict, HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
@@ -1269,6 +1269,12 @@ export async function claimStep(
 // —— journal：heartbeat / tool / token / upload-urls / done（02 §5.4）——————————
 
 export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: string): void {
+  // #1488：步行已不存在（卡被重置 / 删除，行随 build 删掉）= 410，与「不归本机」
+  // 的 404 分开——daemon 据 410 停掉在跑的会话；404 照常跑（#1483 同机重领时，
+  // 被放回的步的这次 run 接着跑新的领取）。
+  if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
+    throw new HttpError(410, `step ${stepId} no longer exists`);
+  }
   const row = ownedStep(deps, machineId, stepId);
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
@@ -1821,10 +1827,16 @@ export async function finishStep(
   // 合并步落地（02 §4.2：merge 202 delegated → 机器 git merge + push → server
   // bare repo 默认分支 fast-forward [设计]；r3 §3.6「服务端 main 验证」同语义）。
   // 落地失败（非快进/无 commit）= 步按 failed 收尾（失败仅人工重跑，02/A6）。
-  const landingError =
-    stepRow.kind === 'merge' && body.status === 'success'
-      ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
-      : null;
+  // #1487（2026-10-22 裁决方案 a）：卡在合并步跑的时候被关闭或挪回待开始，
+  // 成功回报不落地——默认分支不动，卡保持现相位，下面落一行时间线说明。
+  const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
+  let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
+  let landingError: string | null = null;
+  if (mergeSuccess && !landingSkipped) {
+    const landing = await applyMergeLanding(deps, stepRow, body.commit ?? null);
+    if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
+    else landingError = landing;
+  }
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
   // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
   // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
@@ -1848,6 +1860,15 @@ export async function finishStep(
   {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) deps.machineHub.wake(teamId);
+  }
+  if (landingSkipped) {
+    upsertMessage(deps, {
+      id: `merge-not-landed-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: MERGE_NOT_LANDED_NOTE,
+      createdAt: nowMs(),
+    });
   }
   if (body.sessionId !== undefined) {
     db.update(step).set({ sessionId: body.sessionId }).where(eq(step.id, stepId)).run();
@@ -2059,6 +2080,23 @@ export async function finishStep(
   publishStepStatus(deps, stepId);
 }
 
+/** applyMergeLanding 的 git 检查期间卡被关闭 / 挪回待开始：不快进（#1487）。 */
+const MERGE_LANDING_SKIPPED = Symbol('merge-landing-skipped');
+
+/** #1487 合并没落地的时间线说明（卡在合并步跑的时候已关闭或挪回待开始）。 */
+export const MERGE_NOT_LANDED_NOTE =
+  '合并步跑完时任务已取消或已挪回待开始，合并没有落地：默认分支保持不变';
+
+/** 合并步所属的卡已离开审核、走向取消（closed / todo）——成功回报不落地
+ * （#1487）。done 不在此列：手动标完成期间合并跑完照常落地。 */
+function mergeCardLeftReview(deps: MachineDeps, stepRow: typeof step.$inferSelect): boolean {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  const todoRow = buildRow
+    ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+    : undefined;
+  return todoRow?.phase === 'closed' || todoRow?.phase === 'todo';
+}
+
 /** 合并落地（M3b [设计]，02 §4.2 merge 202 delegated 的 server 半）：机器合并
  * 步 push 后，bare repo 默认分支 fast-forward 到 done 回传的 conv 分支 HEAD。
  * 护栏：现 tip 必须是该 commit 祖先（非快进 = main 在合并窗口被推进 → 步按
@@ -2068,7 +2106,7 @@ async function applyMergeLanding(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
   commit: string | null,
-): Promise<string | null> {
+): Promise<string | null | typeof MERGE_LANDING_SKIPPED> {
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
@@ -2088,6 +2126,9 @@ async function applyMergeLanding(
       return `merge landing refused: ${branch} moved (non-fast-forward) — rerun the task`;
     }
   }
+  // 上面的 git 检查都是 await：期间卡可能被关闭。快进前最后再看一次（与
+  // updateBranchRef 的发起同步，之间插不进别的请求）。
+  if (mergeCardLeftReview(deps, stepRow)) return MERGE_LANDING_SKIPPED;
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
 }
