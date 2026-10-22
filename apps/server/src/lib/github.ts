@@ -1364,7 +1364,6 @@ export interface GithubPageOpts {
 export const GITHUB_COMMIT_STATUS_STATES = ['error', 'failure', 'pending', 'success'] as const;
 export type GithubCommitStatusState = (typeof GITHUB_COMMIT_STATUS_STATES)[number];
 
-const GATE_SHA = /^[0-9a-f]{40}$/;
 /** token 与 ETag 都进请求头：只收可见 ASCII，CR/LF、空格与非 ASCII 进不了头。 */
 const HEADER_TOKEN = /^[\x21-\x7e]+$/;
 /** GitHub 的 owner / 仓库名：字母、数字、`-`、`_`、`.`。 */
@@ -1502,6 +1501,15 @@ async function gateRequest(
   };
 }
 
+/** 闸传输的 GET（etag 为 null 时不发 If-None-Match）。 */
+const gateGet = (
+  fetchImpl: FetchLike,
+  token: string,
+  url: string,
+  etag: string | null,
+  timeoutMs: number,
+) => gateRequest(fetchImpl, token, url, { method: 'GET', etag, payload: null, timeoutMs });
+
 /** 闸传输的 URL。path 已逐段编码；query 的值都已核过（正整数、`latest`/`all`、40 位 SHA），
  * 不需再编码。 */
 const gateUrl = (
@@ -1529,12 +1537,13 @@ export async function githubPullRaw(
   const bad =
     commonInvalid(token, owner, repo, opts) ?? (isPositiveInt(prNumber) ? null : 'prNumber');
   if (bad !== null) return invalidResult(bad);
-  return gateRequest(fetchImpl, token, gateUrl(owner, repo, `pulls/${prNumber}`), {
-    method: 'GET',
-    etag: opts.etag,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `pulls/${prNumber}`),
+    opts.etag,
+    opts.timeoutMs,
+  );
 }
 
 /** 分支原样读（`GET repos/{o}/{r}/branches/{branch}`：分支头提交与 protection 摘要）。 */
@@ -1550,12 +1559,13 @@ export async function githubBranchRaw(
   if (bad !== null) return invalidResult(bad);
   const path = encodedPath(branch);
   if (path === null) return invalidResult('branch');
-  return gateRequest(fetchImpl, token, gateUrl(owner, repo, `branches/${path}`), {
-    method: 'GET',
-    etag: opts.etag,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `branches/${path}`),
+    opts.etag,
+    opts.timeoutMs,
+  );
 }
 
 /** 分支上生效的规则集规则原样读（`GET repos/{o}/{r}/rules/branches/{branch}`，一页）。 */
@@ -1575,12 +1585,7 @@ export async function githubBranchRulesRaw(
     per_page: opts.perPage,
     page: opts.page,
   });
-  return gateRequest(fetchImpl, token, url, {
-    method: 'GET',
-    etag: opts.etag,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
 }
 
 /** 三点 compare 的一页原样读（`GET repos/{o}/{r}/compare/{base}...{head}`），两头都按 SHA
@@ -1596,20 +1601,15 @@ export async function githubCompareRaw(
 ): Promise<GithubRawResult> {
   const bad =
     commonInvalid(token, owner, repo, opts) ??
-    (GATE_SHA.test(baseSha) ? null : 'base') ??
-    (GATE_SHA.test(headSha) ? null : 'head') ??
+    (isFullSha(baseSha) ? null : 'base') ??
+    (isFullSha(headSha) ? null : 'head') ??
     pageInvalid(opts);
   if (bad !== null) return invalidResult(bad);
   const url = gateUrl(owner, repo, `compare/${baseSha}...${headSha}`, {
     per_page: opts.perPage,
     page: opts.page,
   });
-  return gateRequest(fetchImpl, token, url, {
-    method: 'GET',
-    etag: null,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(fetchImpl, token, url, null, opts.timeoutMs);
 }
 
 /** 一个提交上的 check runs 一页原样读（`GET repos/{o}/{r}/commits/{sha}/check-runs`），按
@@ -1624,7 +1624,7 @@ export async function githubCheckRunsRaw(
 ): Promise<GithubRawResult> {
   const bad =
     commonInvalid(token, owner, repo, opts) ??
-    (GATE_SHA.test(sha) ? null : 'sha') ??
+    (isFullSha(sha) ? null : 'sha') ??
     pageInvalid(opts) ??
     (opts.filter === 'latest' || opts.filter === 'all' ? null : 'filter');
   if (bad !== null) return invalidResult(bad);
@@ -1633,12 +1633,7 @@ export async function githubCheckRunsRaw(
     per_page: opts.perPage,
     page: opts.page,
   });
-  return gateRequest(fetchImpl, token, url, {
-    method: 'GET',
-    etag: opts.etag,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
 }
 
 /** 一个提交的 combined status 一页原样读（`GET repos/{o}/{r}/commits/{sha}/status`），按 SHA 读。 */
@@ -1651,20 +1646,13 @@ export async function githubCombinedStatusRaw(
   opts: GithubConditionalOpts & GithubPageOpts,
 ): Promise<GithubRawResult> {
   const bad =
-    commonInvalid(token, owner, repo, opts) ??
-    (GATE_SHA.test(sha) ? null : 'sha') ??
-    pageInvalid(opts);
+    commonInvalid(token, owner, repo, opts) ?? (isFullSha(sha) ? null : 'sha') ?? pageInvalid(opts);
   if (bad !== null) return invalidResult(bad);
   const url = gateUrl(owner, repo, `commits/${sha}/status`, {
     per_page: opts.perPage,
     page: opts.page,
   });
-  return gateRequest(fetchImpl, token, url, {
-    method: 'GET',
-    etag: opts.etag,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
 }
 
 /** 某提交上一个仓内路径的原样读（`GET repos/{o}/{r}/contents/{path}?ref={sha}`；目录给条目
@@ -1678,16 +1666,17 @@ export async function githubContentsRaw(
   ref: string,
   opts: GithubRawOpts,
 ): Promise<GithubRawResult> {
-  const bad = commonInvalid(token, owner, repo, opts) ?? (GATE_SHA.test(ref) ? null : 'ref');
+  const bad = commonInvalid(token, owner, repo, opts) ?? (isFullSha(ref) ? null : 'ref');
   if (bad !== null) return invalidResult(bad);
   const encoded = encodedPath(path);
   if (encoded === null) return invalidResult('path');
-  return gateRequest(fetchImpl, token, gateUrl(owner, repo, `contents/${encoded}`, { ref }), {
-    method: 'GET',
-    etag: null,
-    payload: null,
-    timeoutMs: opts.timeoutMs,
-  });
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `contents/${encoded}`, { ref }),
+    null,
+    opts.timeoutMs,
+  );
 }
 
 /** 在提交上写一条 commit status（`POST repos/{o}/{r}/statuses/{sha}`）。请求体恰好是
@@ -1705,7 +1694,7 @@ export async function githubCreateCommitStatus(
   const states: readonly string[] = GITHUB_COMMIT_STATUS_STATES;
   const bad =
     commonInvalid(token, owner, repo, opts) ??
-    (GATE_SHA.test(sha) ? null : 'sha') ??
+    (isFullSha(sha) ? null : 'sha') ??
     (states.includes(status.state) ? null : 'state') ??
     (typeof status.context === 'string' && status.context !== '' ? null : 'context') ??
     (typeof status.description === 'string' ? null : 'description');
