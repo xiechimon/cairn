@@ -315,7 +315,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
         : cliMessage;
       if (state.interrupted) {
         // interrupt 终态（stop()/watchdog abort）：流被停止语义（词表
-        // message_stop），非失败——stopped 收尾归 runner stopRequests 判定。
+        // message_stop），非失败——stopped 收尾归 runner 停止位判定。
         return [
           {
             type: 'message_stop',
@@ -433,7 +433,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       this.queue.end();
     } catch (err) {
       // abort/interrupt 面吞错（pi stopping 同律）：stopped 收尾归 runner
-      // stopRequests 旗标，错误文本不冒充失败原因。
+      // 停止位，错误文本不冒充失败原因。
       if (this.stopping) {
         this.queue.end();
         return;
