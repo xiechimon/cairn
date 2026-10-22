@@ -179,3 +179,14 @@ S3 branch encoded whole (%2F)	KILLED	1 failed | 407 passed (408)
 restored byte-identical: True
 
 Result: 3 of 3 killed.
+
+## Run 8 (the CLOSING_SHAPE title fix; T1)
+
+T1 closing shape tested on the title with " (#n)" appended	KILLED	4 failed | 407 passed (411)
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a keyword at the end, before the appended (#n)) keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "close") keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "fix") keeps the PR title
+    red: [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "resolved") keeps the PR title
+restored byte-identical: True
+
+Result: 1 of 1 killed.

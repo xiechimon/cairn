@@ -107,3 +107,12 @@ Red: 3 failed / 76 passed (79). Failing lines:
   x [s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review
 
 Green after the fixes: the four affected files, 408 passed (408).
+
+## Leg 8: the CLOSING_SHAPE title fix from the #1509 pr-gate (run 4 at 0d67951, correctness item 1), 2026-10-22
+
+pnpm exec vitest run test/pr-merge-api.test.ts -t 2b-D41. Red: 3 failed / 10 passed. Failing lines:
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "fix") keeps the PR title
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "close") keeps the PR title
+  x [2b-D41b] a PR title without a closing shape ([2b-D41c] a title ending in "resolved") keeps the PR title
+
+Green after testing pull.title alone (builds.ts, mergeThroughGithub): the existing [2b-D41] case 'Rename the handler; fixed' then failed, because it expected the appended ' (#n)' to count. That is the false positive the pr-gate names: the number is this PR's own, which the merge closes anyway. It moved to the D41c list (title kept). pr-merge-api.test.ts: 122 passed (122).

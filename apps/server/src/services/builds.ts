@@ -1750,7 +1750,9 @@ async function mergeThroughGithub(
     const titled = `${pull.title} (#${prNumber})`;
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
-      commitTitle: CLOSING_SHAPE.test(titled) ? `Merge pull request #${prNumber}` : titled,
+      // 只验 PR 标题本身：拼上「 (#n)」再验，以 fix / close / resolve 结尾的标题会经「(#n」
+      // 误命中而丢掉标题（#1509 pr-gate 第 4 轮）。
+      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
       // 取读 PR 之后重读的任务行：读的网络窗里自建 issue 可能刚补上 sourceRef（D43）。
       commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });

@@ -86,6 +86,19 @@ The reviewer confirmed both resolutions: the migration chain (0046 after main's 
 7. The chief step's write has no finishedAt. The schema comment now names the build steps only. machines.ts (security-review list) is left unchanged.
 8. The stale githubRequiredChecks comment about S4a. Fixed.
 
+## #1509 pr-gate run 4 (at 0d67951, go, no blocking findings), 2026-10-22
+
+The verdict is in the coordinator's scratchpad as pr-gate-1509-run4-0d67951.json.
+
+Fixed on this branch: correctness item 1. CLOSING_SHAPE was tested on `${pull.title} (#n)`, so titles ending in fix / close / resolve ("Add CI fix", "Make dialog close", "Bug resolved") matched through "(#n" and lost their title. It is now tested on pull.title alone ([2b-D41c], red-green leg 8, mutation T1). The old [2b-D41] case "Rename the handler; fixed" moved to the kept-title list: the appended number is this PR's own.
+
+Handed to follow-up as the coordinator listed them, with no code on this branch (suggestion numbers from the verdict; suggestions 6 and 8-10 were not in that list):
+- Suggestion 2, closing keywords in the PR description: GitHub also links issues from the PR body, so "fixes other#5" in a description still closes that issue when pacman merges, even though commit_title and commit_message are rewritten.
+- Suggestion 3: a pending verify step, which the merge gate does not wait for, can be claimed while the merge PUT is in flight and push after the squash.
+- Suggestion 4: the server's merge message differs from ADR 0021 D2 and no ADR supersedes it. The ADR note is waiting for the user.
+- Suggestion 5: the #1217 second-PR guard tests 4 and 5 no longer reach the merge path. A test with a connected GitHub should show that a passing guard leads to the API merge.
+- Suggestion 7: when PACMAN_TOKEN is unset, the new write to the default branch can be reached through an unauthenticated REST route.
+
 ## /security-review
 
 Not run (checked again after the ff4c4247 merge and its fixes). The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.
