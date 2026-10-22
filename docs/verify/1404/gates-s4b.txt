@@ -226,3 +226,112 @@ $ pnpm exec vitest run --changed origin/main
       Tests  2060 passed | 1 skipped (2061)
 exit 0
 and the file alone, three times: Tests  9 passed (9), Tests  9 passed (9), Tests  9 passed (9).
+
+== Rerun 2026-10-22 after the pr-gate run 1 follow-ups on #1525 (fd1e888, 440efd4) and merging origin/main
+== (0a5bc64) into the branch (800d43d). Port 8407 checked free with lsof first. ==
+# head 800d43dc6c56ecc88dc58bf6db0737e8b71134ba on claude/bootstrap-p3-s4b, origin/main 0a5bc64a798ff9d65630be0669b7c6e32717661c, 2026-10-22T15:02:56Z
+$ pnpm lint
+    330 │           </div>
+  
+  ℹ A fragment is redundant if it contains only one child, or if it is the child of a html element, and is not a keyed fragment.
+  
+  ℹ Unsafe fix: Remove the Fragment
+  
+    315 315 │               ) : null}
+    316 316 │               {estimate ? null : (
+    317     │ - ··············<>
+    318     │ - ················{hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+        317 │ + ··············hardware·!==·undefined·&&·hardware.memoryTotalMb·!==·undefined·&&·(
+    319 318 │                     <>
+    320 319 │                       <BasisRow label={t('核数')} value={String(hardware.cpuCores)} />
+    ······· │ 
+    325 324 │                       <BasisRow label={t('负载')} value={hardware.loadAvg1.toFixed(2)} />
+    326 325 │                     </>
+    327     │ - ················)}
+    328     │ - ··············</>
+        326 │ + ················)
+    329 327 │               )}
+    330 328 │             </div>
+  
+
+Checked 828 files in 1793ms. No fixes applied.
+Found 1 info.
+exit 0
+
+$ pnpm typecheck
+$ pnpm -r typecheck
+packages/shared typecheck$ tsc --noEmit
+packages/shared typecheck: Done
+apps/daemon typecheck$ tsc --noEmit
+apps/web typecheck$ tsc --noEmit
+apps/server typecheck$ tsc --noEmit
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck$ tsc --noEmit
+integration typecheck: Done
+exit 0
+
+$ pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1182 tests in 169 files collected, disk count matches (2.2s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (3.1s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ pnpm exec vitest run --changed origin/main
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4a-home-s22MCr/workspaces/chief-01a16428-ca25-7128-84b9-2c8d7e743bc6/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m4a-home-s22MCr/workspaces/chief-01a16428-ca25-7128-84b9-2c8d7e743bc6/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session chief-01a16428-ca25-7128-84b9-2c8d7e743bc6
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+finished (0 running)
+[machine] Shutting down…
+
+
+ Test Files  149 passed (149)
+      Tests  2062 passed | 1 skipped (2063)
+   Start at  15:03:24
+   Duration  352.87s (tests 65%, import 35%)
+
+    Isolate  149 workers spawned · ~215ms startup each (spawn + environment, per file)
+             at least ~10.45s faster with isolate: false — reuses workers across files instead of one per file
+
+exit 0
+
+$ E2E_AFFECTED_PORT=8407 pnpm --filter @pacman/web e2e:affected
+  docs/verify/1404/s4b-mutations-runner.py.txt → none
+  docs/verify/1404/s4b-mutations.txt → none
+  docs/verify/1404/s4b-red-green.txt → none
+  docs/verify/1404/s4b-reviews.txt → none
+  docs/verify/1404/s4b-swap.sh.txt → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8407
+  live-server-reap.spec.ts token-gate.spec.ts
+[WebServer] [plugin builtin:vite-reporter] 
+[WebServer] (!) Some chunks are larger than 500 kB after minification. Consider:
+[WebServer] - Using dynamic import() to code-split the application
+[WebServer] - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+[WebServer] - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+
+Running 8 tests using 2 workers
+
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (1.7s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (2.5s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (786ms)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (475ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (513ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (441ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (491ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (452ms)
+
+  8 passed (11.1s)
+exit 0
+
