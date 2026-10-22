@@ -375,3 +375,9 @@ jobs:
 
       - name: Feature map staleness gate (#1160)
         run: node scripts/feature-map-staleness-gate.mjs
+
+      - name: Feature map doc freshness check (#1527)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/generate-feature-map.mjs --check
