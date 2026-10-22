@@ -503,9 +503,9 @@ export function createCiPoller(
   }
 
   /** 解冲突轮（#1403 段 3，spec 23 同分支续轮）：PR 与默认分支冲突 → 同一 build 派一条
-   * [merge-conflict] 执行步；review 上的卡先停掉没领走的 verify / review 步（交付要变，它们
-   * 验的是旧 head；回 review 时 completeStep 与磨绿重排），再回 queued（领取时进 building，
-   * 磨绿接手）。已跑满 CI_MERGE_CONFLICT_ROUNDS_MAX 轮仍冲突 → 不再派：building 上按死循环闸
+   * [merge-conflict] 执行步；先停掉没领走的 verify / review 步（交付要变，它们验的是旧 head；
+   * 已有 verify 的 build 回 review 时磨绿重排一条，见 CI_MERGE_CONFLICT_VERIFY_NOTE），review
+   * 上的卡再回 queued（领取时进 building，磨绿接手）。已跑满 CI_MERGE_CONFLICT_ROUNDS_MAX 轮仍冲突 → 不再派：building 上按死循环闸
    * 转 failed（同 [ci-fix]），review 上每轮提示一次、卡留在关口。调用方已核对卡仍在原相位、
    * 是本 build 开着的 PR、没有步在飞。 */
   function mergeConflictRound(
@@ -533,11 +533,9 @@ export function createCiPoller(
         .from(step)
         .where(and(eq(step.buildId, cand.buildId), eq(step.kind, 'verify')))
         .get() !== undefined;
-    let stopsReview = false;
-    if (fromReview) {
-      stopsReview = stopUnclaimedGateSteps(deps, cand.buildId).includes('review');
-      setTodoPhase(deps, cand.todoId, 'queued');
-    }
+    // 没人领的 verify / review 步验的是冲突前的提交：building 上（复用 build 的返工轮）同样停掉。
+    const stopsReview = stopUnclaimedGateSteps(deps, cand.buildId).includes('review');
+    if (fromReview) setTodoPhase(deps, cand.todoId, 'queued');
     enqueueStep(
       deps,
       cand.buildId,
@@ -562,6 +560,8 @@ export function createCiPoller(
           eq(step.buildId, buildId),
           eq(step.status, 'done'),
           ne(step.kind, 'review'), // 审核步不提交（同 lastPushedCheckpoint）
+          // 没推送的步（没有提交）不算：它不能盖住之前那次推送（同 lastPushedCheckpoint）。
+          isNotNull(step.checkpointCommit),
           isNotNull(step.finishedAt),
         ),
       )

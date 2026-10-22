@@ -167,7 +167,7 @@ class Fake {
             ],
       );
     }
-    if (/\/branches\/[^/?]+$/.test(url)) {
+    if (/\/repos\/octo\/demo\/branches\/[^?]+$/.test(url)) {
       const p = this.protection;
       if (typeof p === 'number') return reply(p, { message: 'x' });
       return reply(200, {
@@ -553,6 +553,27 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('review');
   });
 
+  test('[s3-F30e] a later step that pushed nothing does not hide pacman’s last push', async () => {
+    const w = makeWorld({ phase: 'review' });
+    const t0 = Date.now();
+    pushedJustNow(w, t0);
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `step-np-${w.buildId}`,
+        buildId: w.buildId,
+        kind: 'verify',
+        status: 'done',
+        createdAt: t0 - 800,
+        finishedAt: t0 - 500,
+      })
+      .run();
+    w.fake.mergeableState = 'dirty';
+    await w.poller.sweep(t0);
+    expect(conflictSteps(w)).toEqual([]);
+    expect(w.phase()).toBe('review');
+  });
+
   test('[s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out', async () => {
     const w = makeWorld({ phase: 'review' });
     const t0 = Date.now();
@@ -602,6 +623,17 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.runs[HEAD] = [{ name: 'check' }];
     await w.poller.sweep();
     expect(w.phase()).toBe('review');
+  });
+
+  test('[s3-F9c] a default branch with a slash keeps the slash in the branch and rules paths', async () => {
+    const w = makeWorld();
+    w.fake.defaultBranch = 'release/main';
+    w.fake.baseRef = 'release/main';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep();
+    expect(w.fake.reads('/repos/octo/demo/branches/release/main')).toHaveLength(1);
+    expect(w.fake.reads('/rules/branches/release/main')).toHaveLength(1);
+    expect(w.fake.reads('%2F')).toEqual([]);
   });
 
   test('[s3-F10] the required list is read once per repository and branch for ten minutes', async () => {
@@ -875,6 +907,24 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('review');
     const verifies = w.steps().filter((r) => r.kind === 'verify');
     expect(verifies.map((r) => r.status).sort()).toEqual(['done', 'pending']);
+  });
+
+  test('[s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review', async () => {
+    const w = makeWorld();
+    withVerifier(w);
+    addVerify(w, 'pending');
+    w.fake.mergeableState = 'dirty';
+    const t0 = Date.now();
+    await w.poller.sweep(t0);
+    expect(conflictSteps(w)).toHaveLength(1);
+    expect(w.steps().find((r) => r.kind === 'verify')?.status).toBe('stopped');
+    w.s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.kind, 'build')).run();
+    w.fake.mergeableState = 'clean';
+    w.fake.runs[HEAD] = [{ name: 'check' }];
+    await w.poller.sweep(t0 + 60_000);
+    expect(w.phase()).toBe('review');
+    const verifies = w.steps().filter((r) => r.kind === 'verify');
+    expect(verifies.map((r) => r.status).sort()).toEqual(['pending', 'stopped']);
   });
 
   test('[s3-F13d] a verify step stopped otherwise (by a person) is not queued again when the grind reaches review', async () => {

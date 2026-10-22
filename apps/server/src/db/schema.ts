@@ -229,8 +229,8 @@ export const step = sqliteTable('step', {
   claimedAt: epochMs('claimedAt'),
   /** [内部] heartbeat/<stepId> 续活时刻（02 §5.4）。 */
   lastHeartbeatAt: epochMs('lastHeartbeatAt'),
-  /** [内部] 步收尾时刻（#1403 段 3：步写成 done / failed / stopped 时落）。「最后推送
-   * 的提交」按它排；迁移之前的行为 null，回落最后一次报到。 */
+  /** [内部] 步收尾时刻（#1403 段 3：builds.ts 把 build 的步写成 done / failed / stopped 时
+   * 落；chief 回合步不落）。「最后推送的提交」按它排；迁移之前的行为 null，回落最后一次报到。 */
   finishedAt: epochMs('finishedAt'),
   /** [内部] 入队时合成的续轮指令（M4a [设计]）：驳回 feedback 注入重规划轮
    * （r5 §4「v2 内容忠实执行反馈」宿主等价物）、chief 回合任务文本/wake 事实

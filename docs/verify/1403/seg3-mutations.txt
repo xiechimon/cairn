@@ -167,3 +167,15 @@ R5 anonymous required read counted once	KILLED	1 failed | 375 passed (376)
 restored byte-identical: True
 
 Result: 5 of 5 killed.
+
+## Run 7 (the fixes from the review of the two merges; S1-S3)
+
+S1 pushNotSeen counts steps without a commit	KILLED	1 failed | 407 passed (408)
+    red: [s3-F30e] a later step that pushed nothing does not hide pacman’s last push
+S2 building round keeps unclaimed gate steps	KILLED	1 failed | 407 passed (408)
+    red: [s3-F13j] a merge-conflict round at building stops an unclaimed verify step and queues it again at review
+S3 branch encoded whole (%2F)	KILLED	1 failed | 407 passed (408)
+    red: [s3-F9c] a default branch with a slash keeps the slash in the branch and rules paths
+restored byte-identical: True
+
+Result: 3 of 3 killed.

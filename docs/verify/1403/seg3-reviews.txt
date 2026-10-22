@@ -74,6 +74,18 @@ Eight candidate findings (seg3-plan.md §15, red-green leg 6, mutations R1-R5):
 7. stopUnclaimedGateSteps published a stale finishedAt. Fixed.
 8. recordGrindAnonRead took no count. Fixed.
 
+## /code-review on the two merges (medium, cbbf2faf and b7ed77d0, 2026-10-22)
+
+The reviewer confirmed both resolutions: the migration chain (0046 after main's 0045, the only difference is step.finishedAt) and the failed-step write (the #1492 fallback plus finishedAt). Eight findings (seg3-plan.md §18, red-green leg 7, mutations S1-S3):
+1. pushNotSeen counted steps that pushed nothing. Fixed (F30e).
+2. A database that applied the old 0045 breaks after the renumber. Not fixed: only databases that ran this branch before the renumber; Risk.
+3. A failed PR read leaves the card (F11): decided earlier.
+4. A merge-conflict round at building left unclaimed verify steps queued. Fixed (F13j).
+5. The branch was encoded whole (%2F). Fixed with encodedPath (F9c).
+6. pushNotSeen duplicated lastPushedCheckpoint's filter. They now share the checkpoint filter; kept separate because pushNotSeen also needs finishedAt.
+7. The chief step's write has no finishedAt. The schema comment now names the build steps only. machines.ts (security-review list) is left unchanged.
+8. The stale githubRequiredChecks comment about S4a. Fixed.
+
 ## /security-review
 
-Not run. The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.
+Not run (checked again after the ff4c4247 merge and its fixes). The diff (origin/claude/bootstrap-p2-seg2b...HEAD) touches none of the listed files: apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts, services/{secrets,credentials,api-keys,webhook-tokens,oauth}.ts, routes-machine.ts, services/machine*.ts, the daemon credential and channel files, command-gate.ts, services/{mcp-face,mcp-servers}.ts, routes-webhook.ts.

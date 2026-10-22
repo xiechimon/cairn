@@ -1491,7 +1491,7 @@ const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
  * = 没有规则（ruleset 不在这个仓的套餐里，
  * 或没有可见的规则）；除此之外两个读任一读不到（非 2xx、网络、限流、响应形不对）= null，
  * 调用方不动。
- * 合并闸 S4a（#1503）的原始读面落地后可改用它，接口不变。 */
+ * 不建在 S4a（#1503）的原始读面上：那些读必须带 token，磨绿在未连接 GitHub 时匿名读公开仓。 */
 export async function githubRequiredChecks(
   fetchImpl: FetchLike,
   token: string | null,
@@ -1500,7 +1500,9 @@ export async function githubRequiredChecks(
   branch: string,
 ): Promise<string[] | null> {
   const base = `https://api.github.com/${repoPath(owner, repo)}`;
-  const seg = encodeURIComponent(branch);
+  // 按段编码、保留 `/`（同 S4a 的 encodedPath：release/main 不写成 release%2Fmain）。
+  const seg = encodedPath(branch);
+  if (seg === null) return null;
   // 两个读互不依赖：并发发出（一次查名单最多一个超时的时长；匿名额度恒记两次）。
   const [branchRead, rulesRead] = await Promise.all([
     conditionalGetJson(fetchImpl, `${base}/branches/${seg}`, token, null, FETCH_TIMEOUT_MS),

@@ -233,3 +233,20 @@ Segment 2b's round-3 head ff4c4247 merges main 2ff0b937. main's drizzle folder s
 - `apps/server/src/services/builds.ts`, the failed-step write: both kept. 2b brings #1492's non-empty `errorMessage` fallback; this branch writes `finishedAt` with the status.
 - Spec 02: this branch's segment-3 bullet kept; segment 2b's merge bullet taken from 2b, since this branch's copy was identical to efea0f26.
 `ci-loop.ts` merged without conflict. 2b changed only the adoption rejection floor (it counts every own PR), which the segment-3 grind and DIRTY paths do not touch. Server suite on the merge: 132 files, 2338 passed, 1 skipped.
+
+## 18. /code-review on the two merges (2026-10-22, medium, cbbf2faf and b7ed77d0)
+
+The reviewer confirmed both resolutions:
+- the 0046 snapshot chains to main's 0045, and the only schema difference is `step.finishedAt`;
+- the failed-step write keeps #1492's fallback and adds `finishedAt`.
+Eight findings. Four are fixed (tests first; red leg 3 failed / 76 passed, leg 7; mutations S1-S3 all killed), one is handled in a comment, and three are not fixed.
+
+F30e. pushNotSeen skips steps without a commit (`isNotNull(step.checkpointCommit)`, as lastPushedCheckpoint does), so a later verify or no-change step does not hide pacman's push. This also covers the reviewer's duplicate-query note: the two queries now share the filter.
+F13j. A merge-conflict round at building also stops unclaimed verify and review steps, so a verify queued on a reused build does not run on the pre-merge head and block the re-verify.
+F9c. `githubRequiredChecks` encodes the branch per segment with S4a's `encodedPath`: `release/main` stays `release/main`, not `release%2Fmain`.
+The `githubRequiredChecks` doc comment says why it is not built on S4a's reads (they require a token).
+The `step.finishedAt` schema comment now says that builds.ts writes it for build steps, and that chief turn steps do not. The chief step's write is in `services/machines.ts`, a file on the security-review list. It is left unchanged; no query reads `finishedAt` for chief steps.
+
+Not fixed:
+- A development or verify database that applied this branch's earlier `0045_step_finished_at` (journal `when` 1792674802072, later than main's 0045) would skip main's `0045_model_fallback_chain` and fail on 0046's duplicate column. Only databases that ran this unmerged branch before the renumber are affected; main never had the old number, and the CLAUDE.md rule requires the renumber. Such a database is reset. This goes into the PR's Risk section.
+- A PR read that keeps failing leaves the card at building (F11, decided).
