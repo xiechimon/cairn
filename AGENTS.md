@@ -51,6 +51,12 @@ pnpm spec:parse # spec 解析闸（#1052）：只收集不执行、秒级，覆�
 
 派活给 Codex / Grok / pi 时，使用 `docs/agent-dispatch-prompts.md`，提示必须包含：「不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。」
 
+## 错误台账
+
+任务中犯错并修好后，当轮按 `docs/lessons.md` 的格式新增或更新一行；同类错误合并，lane 冲突按类别合并。按台账阶梯取最高可行级，能落机器检查就落机器检查；新闸必须用真实失误做负对照，确认旧错变红、修正后变绿。
+
+推送前运行 `pnpm prepush`，按改动路径执行检查；纯文档跳过代码检查。CI 使用同一入口，dead-class 保持独立咨询性检查，全量 E2E 保持四分片。
+
 ## Dependencies & Install Security
 
 - 锁文件 `pnpm-lock.yaml`：**入 commit 前先确认**——除非是依赖变更伴随的合法 lockfile diff，否则视为误操作（`git reset pnpm-lock.yaml` 退出 staging）。已获授权的合法改动，过闸唯一出口是 `PACMAN_ALLOW_LOCKFILE_CHANGE=1 git commit ...`（对齐 pi 的 `PI_ALLOW_LOCKFILE_CHANGE`，接受 `1`/`true`/`yes`）；pre-commit 锁文件闸不提供其它出口。
