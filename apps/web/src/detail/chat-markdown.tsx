@@ -320,7 +320,7 @@ function TaskIcon({ state }: { state: TaskState }) {
 function TaskCard({ items }: { items: TaskItem[] }) {
   return (
     <ul
-      className="chat-md-tasks my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm"
+      className="my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm"
       data-testid="md-tasks"
     >
       {items.map((item, i) => (
