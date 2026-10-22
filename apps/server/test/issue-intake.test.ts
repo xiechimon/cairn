@@ -1601,6 +1601,8 @@ describe('14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓', () 
           teamId: w.s.team.id,
           repoKind: 'github',
           githubRepo: 'Xiechimon/Pacman',
+          // id 随机排序时它可能先于 makeWorld 的项目被选中：闸同样关掉。
+          autonomy: GATES_OFF,
         },
       ])
       .run();
@@ -2767,6 +2769,7 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
         teamId: w.s.team.id,
         repoKind: 'github',
         githubRepo: REPO,
+        autonomy: GATES_OFF,
       })
       .run();
     const res = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/webhook-tokens`, {
@@ -2950,6 +2953,7 @@ describe('24 限流：本队本轮停读', () => {
         teamId: w.s.team.id,
         repoKind: 'github',
         githubRepo: 'xiechimon/other',
+        autonomy: GATES_OFF,
       })
       .run();
     w.gh.overrides.set(`/repos/${REPO}/issues`, () => limited);
