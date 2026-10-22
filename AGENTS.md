@@ -2,6 +2,7 @@
 
 > 仓库级 agent / 人类共同规则。规则**可覆写**但需用户显式确认（见末尾"User Override"）。
 > 项目背景与历史决策在 `~/.claude/projects/-Users-xmon-Code-AgentProjects-pacman/memory/MEMORY.md`——本文件只列规则不重复事实。
+> 工作方式、分工、模型规则与当前进展摘要见 `.claude/workflow.md`；收尾复盘用 `.claude/skills/retro-pacman`。
 
 ## Conversational Style
 
