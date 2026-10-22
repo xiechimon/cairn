@@ -264,10 +264,10 @@ export const MERGE_BLOCKERS = [
 ] as const satisfies readonly { code: string; class: BlockerClass; label: string }[];
 
 export type MergeBlockerCode = (typeof MERGE_BLOCKERS)[number]['code'];
-export const MERGE_BLOCKER_CODES = MERGE_BLOCKERS.map((b) => b.code) as MergeBlockerCode[];
+export const MERGE_BLOCKER_CODES = MERGE_BLOCKERS.map((b) => b.code) as readonly MergeBlockerCode[];
 
 export const mergeBlockerSchema = z.object({
-  code: z.enum(MERGE_BLOCKER_CODES as [MergeBlockerCode, ...MergeBlockerCode[]]),
+  code: z.enum(MERGE_BLOCKER_CODES as readonly [MergeBlockerCode, ...MergeBlockerCode[]]),
   class: z.enum(BLOCKER_CLASSES),
   label: z.string(),
   detail: z.array(z.string()),

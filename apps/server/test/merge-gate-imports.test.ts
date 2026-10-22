@@ -7,8 +7,9 @@
 // - merge-gate/ 下的模块从这几处之外 import：相对路径跳出 merge-gate/、别的包、
 //   node:crypto 以外的内置模块（node:module、node:vm 之类能按路径加载别的文件）；
 // - 绕开静态 import 加载代码：import()、require()、createRequire、import.meta、eval、
-//   Function（构造或借名）、process、globalThis；只写不用的 import 照样会加载外面的
-//   模块（运行时按 verbatimModuleSyntax 保留它）；.tsx / .jsx 模块不在检查之内；
+//   Function（构造、借名，或经 .constructor 取到）、process、globalThis；只写不用的
+//   import 照样会加载外面的模块（运行时按 verbatimModuleSyntax 保留它）；漏查
+//   .tsx / .jsx 模块；
 // - 从 '@pacman/shared' 这个总出口取 records/merge-gate.ts 以外的运行时值（总出口还带着
 //   shared 的几十个别的模块，它们都可自动合并）；名字虽是 records 里的，总出口
 //   （index.ts、records/index.ts，都不是闸的路径）却把它改指到别的模块；用命名空间 /
@@ -38,8 +39,7 @@ const GATE_DIR = resolve(import.meta.dirname, '../src/services/merge-gate');
 const RECORDS = resolve(import.meta.dirname, '../../../packages/shared/src/records/merge-gate.ts');
 const NODE_BUILTINS = new Set(['node:crypto']);
 const LOADERS =
-  /\b(?:import|require)\s*\(|\bimport\.meta\b|\bcreateRequire\b|\beval\b|\bFunction\b|\bprocess\b|\bglobalThis\b/g;
-const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/;
+  /\b(?:import|require)\s*\(|\bimport\.meta\b|\bcreateRequire\b|\beval\b|\bFunction\b|\bconstructor\b|\bprocess\b|\bglobalThis\b/g;
 const LOADER: Record<string, 'ts' | 'tsx' | 'js' | 'jsx'> = {
   ts: 'ts',
   mts: 'ts',
@@ -50,6 +50,7 @@ const LOADER: Record<string, 'ts' | 'tsx' | 'js' | 'jsx'> = {
   cjs: 'js',
   jsx: 'jsx',
 };
+const CODE_FILE = new RegExp(`\\.(?:${Object.keys(LOADER).join('|')})$`);
 
 /** 转成 JS：注释、只作类型用的 import 与类型都去掉，没用到的 import 留着（运行时按
  * verbatimModuleSyntax 也留着），import 语句由 esbuild 重印。 */
@@ -75,9 +76,11 @@ function specifiers(js: string): string[] {
  * import 与 export * 记成 'non-named:'。 */
 function sharedNames(js: string): string[] {
   const names: string[] = [];
+  let parsed = 0;
   for (const m of js.matchAll(
     /^(?:import|export)\s+(\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*(['"])@pacman\/shared\2/gm,
   )) {
+    parsed += 1;
     const clause = (m[1] as string).trim();
     const braces = /^\{([^}]*)\}$/.exec(clause);
     if (braces === null) {
@@ -89,6 +92,10 @@ function sharedNames(js: string): string[] {
       if (name !== '') names.push(name.split(/\s+as\s+/)[0] as string);
     }
   }
+  // 没被上面的形状认出的 '@pacman/shared' 语句（例如 esbuild 把非 ASCII 的名字印成
+  // \uXXXX）一律记下，不让它悄悄漏过；只为副作用的 import 不带名字，不算。
+  const statements = [...js.matchAll(/\bfrom\s*(['"])@pacman\/shared\1/g)].length;
+  if (statements !== parsed) names.push(`non-named:${statements - parsed} unparsed`);
   return names;
 }
 
@@ -113,8 +120,10 @@ const foreignName = (name: string) =>
 /** 数组与普通对象，连同其中的数组与普通对象，都冻住了吗（zod schema 之类的类实例不算）。 */
 function deepFrozen(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return true;
+  // 冻不住内容的容器（Map、Set、类型化数组）一律算没冻住
+  if (value instanceof Map || value instanceof Set || ArrayBuffer.isView(value)) return false;
   const proto = Object.getPrototypeOf(value);
-  if (!Array.isArray(value) && proto !== Object.prototype) return true;
+  if (!Array.isArray(value) && proto !== Object.prototype && proto !== null) return true;
   return Object.isFrozen(value) && Object.values(value).every(deepFrozen);
 }
 
@@ -139,6 +148,7 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
         'const h = createRequire(import.meta.url);',
         "const i = eval('1') + new Function('return 1')() + process.pid + globalThis.x;",
         'const F = Function;',
+        "const G = (() => {}).constructor('return 1');",
         "import { unused } from '../../lib/unused.js';",
         "import {} from '../../lib/empty.js';",
       ].join('\n'),
@@ -170,11 +180,16 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
         'dynamic:import.meta',
         'dynamic:eval',
         'dynamic:Function',
+        'dynamic:constructor',
         'dynamic:process',
         'dynamic:globalThis',
       ]),
     );
     expect(sharedNames(sample)).toEqual(['evil', 'good', 'other', 'non-named:* as all']);
+    // esbuild 把非 ASCII 的名字印成 \uXXXX：形状认不出也要记下
+    expect(sharedNames(toJs("import * as ñ from '@pacman/shared';\nexport const v = ñ;"))).toEqual([
+      'non-named:1 unparsed',
+    ]);
     // 前一句没有分号（esbuild 重印的函数声明）时，名字不被吞进前一句
     expect(
       sharedNames(
@@ -241,6 +256,9 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(thawed).toEqual([]);
     // 检查确实看到了数据常量（不是全被当成类实例跳过）
     expect(Array.isArray(recordValues.PROTECTED_PATH_GLOBS)).toBe(true);
-    expect(deepFrozen([Object.freeze({ a: [] })])).toBe(false);
+    expect(deepFrozen(Object.freeze([Object.freeze({ a: [] })]))).toBe(false);
+    expect(deepFrozen(Object.freeze([Object.freeze({ a: Object.freeze([]) })]))).toBe(true);
+    expect(deepFrozen(Object.freeze(Object.assign(Object.create(null), { a: [] })))).toBe(false);
+    expect(deepFrozen(Object.freeze(new Set(['**'])))).toBe(false);
   });
 });
