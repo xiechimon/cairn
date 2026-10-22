@@ -31,7 +31,6 @@ import {
   machine,
   message,
   plan as planTable,
-  project,
   steerPending,
   step,
   stopPending,
@@ -50,7 +49,7 @@ import {
   runtimeGatePasses,
 } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { githubRepoOfProject } from './git.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { hasGithubConnection, openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodoPhase } from './notifications.js';
@@ -765,12 +764,7 @@ export async function flushSelfIssueWrites(): Promise<void> {
  * 形态，不进自建面。 */
 function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
   if (deps.box === undefined) return null;
-  const proj = deps.db
-    .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
-    .from(project)
-    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
-    .get();
-  const ref = githubRepoOfProject(proj);
+  const ref = githubRepoOfProject(projectOfTodo(deps.db, { projectId, teamId }));
   if (ref === null) return null;
   if (!hasGithubConnection(deps.db, teamId)) return null;
   return ref;
@@ -797,12 +791,7 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef !== null) return null;
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
-  const proj = db
-    .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
-    .from(project)
-    .where(and(eq(project.id, row.projectId), eq(project.teamId, row.teamId)))
-    .get();
-  const repoRef = githubRepoOfProject(proj);
+  const repoRef = githubRepoOfProject(projectOfTodo(db, row));
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
   const token = openGithubToken({ db, box }, row.teamId);
   if (token === null) throw new HttpError(404, 'github connection not found');

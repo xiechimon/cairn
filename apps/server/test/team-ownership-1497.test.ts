@@ -29,7 +29,7 @@ import {
 import { HttpError } from '../src/lib/errors.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { NotFoundError, startBuilds } from '../src/services/builds.js';
-import { executeChiefTool } from '../src/services/chief-tools.js';
+import { executeChiefTool, executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { readBuildChangeFile } from '../src/services/git.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
@@ -288,6 +288,29 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     }
     expect(exists(s, otherAgent)).toBe(true);
     expect(exists(s, otherTeam)).toBe(true);
+  });
+
+  test('V4 worker delete_memory：别的 Agent 的记忆 → 404，不删', async () => {
+    const { s, todoId } = await world();
+    const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
+    const err = await executeWorkerMemoryTool(
+      s.db,
+      {
+        teamId: s.team.id,
+        agentId: AGENT_ID,
+        todoId,
+        projectId: null,
+        buildId: 'build-1497',
+        attachmentsDir: s.attachmentsDir,
+      },
+      'delete_memory',
+      { memoryId: otherAgent },
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect((err as HttpError).status).toBe(404);
+    expect(exists(s, otherAgent)).toBe(true);
   });
 
   test('V5 本 Agent 本团队的记忆照删', async () => {

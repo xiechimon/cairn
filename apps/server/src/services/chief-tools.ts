@@ -1214,7 +1214,8 @@ export interface WorkerMemoryCtx {
   teamId: string;
   agentId: string;
   todoId: string;
-  projectId: string;
+  /** 任务所属项目；与任务不同队时为 null（#1497）。 */
+  projectId: string | null;
   /** buildId ≡ conversationId（CONTEXT.md）= sourceBuildId 溯源位（r5 §6）。 */
   buildId: string;
   /** 附件读取路径（#310/r9 §3.1 worker 面 attachment 工具执行需要）。 */
@@ -1257,8 +1258,10 @@ export async function executeWorkerMemoryTool(
     }
     case 'delete_memory': {
       const memoryId = str(params, 'memoryId');
-      // 越权防御：只删本 Agent 本团队条目。
-      db.delete(agentMemory)
+      // 越权防御：只删本 Agent 本团队条目；别人的与不存在的同 404（#1497，
+      // chief delete_memory 同律）。
+      const removed = db
+        .delete(agentMemory)
         .where(
           and(
             eq(agentMemory.id, memoryId),
@@ -1266,7 +1269,8 @@ export async function executeWorkerMemoryTool(
             eq(agentMemory.teamId, ctx.teamId),
           ),
         )
-        .run();
+        .run().changes;
+      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
     case 'memories': {

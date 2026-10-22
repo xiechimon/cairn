@@ -165,7 +165,8 @@ async function executeWorkerMemoryToolCall(
       teamId: todoRow.teamId,
       agentId,
       todoId: todoRow.id,
-      projectId: todoRow.projectId,
+      // 他队项目不进溯源缺省（#1497 projectOfTodo）。
+      projectId: projectOfTodo(deps.db, todoRow)?.id ?? null,
       buildId: row.buildId,
       attachmentsDir: deps.attachmentsDir,
     },
@@ -222,8 +223,10 @@ async function setTaskMeta(
   todoRow: typeof todo.$inferSelect,
   params: Record<string, unknown>,
 ): Promise<string> {
+  // 项目须与任务同队（#1497）：他队项目的标签集不进本队任务。
   const projectRow = projectOfTodo(deps.db, todoRow);
-  if (projectRow?.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
+  if (!projectRow) throw new HttpError(404, `project ${todoRow.projectId}`);
+  if (projectRow.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
   const title = normalizedMetaTitle(params.title);
   let tagIds: string[] | undefined;
   if (params.tag !== undefined) {
