@@ -24,6 +24,7 @@ import { useMemo } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import type { DocSegment } from '../fixtures/records.js';
+import { Check } from '../icons/index.js';
 import { ATTACHMENT_LINE } from '../overlay/attachment-paste.js';
 import { Segments } from './segments.js';
 
@@ -36,8 +37,12 @@ export type ChatBlock =
   | { kind: 'head'; level: number; segments: DocSegment[] }
   | { kind: 'ordered'; depth: number; ordinal: number; segments: DocSegment[] }
   | { kind: 'bullet'; depth: number; segments: DocSegment[] }
+  | { kind: 'tasks'; items: TaskItem[] }
   | { kind: 'code'; lang?: string; text: string }
   | { kind: 'attachment'; name: string; key: string };
+
+export type TaskState = 'todo' | 'doing' | 'done';
+export type TaskItem = { state: TaskState; segments: DocSegment[] };
 
 /** Indent width per nesting level (px). Two source spaces = one level. */
 const DEPTH_PX = 18;
@@ -49,6 +54,14 @@ function depthOf(indent: string): number {
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*(\S*)\s*$/;
 const HEADING = /^ {0,3}(#{1,6})\s+(.*)$/;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
+const TASK = /^\s*[-*]\s+\[([ xX~/])\]\s+(.*)$/;
+const TASK_STATE: Record<string, TaskState> = {
+  ' ': 'todo',
+  x: 'done',
+  X: 'done',
+  '~': 'doing',
+  '/': 'doing',
+};
 const BULLET = /^(\s*)[-*•]\s+(.*)$/;
 /** Whole-line attachment token: single-sourced in overlay/attachment-paste.ts
  *  since #757 (composer strip parses the same shape the renderer chips). */
@@ -129,6 +142,20 @@ export function parseChatMarkdown(text: string): ChatBlock[] {
         ordinal: Number(ordered[2]),
         segments: inlineSegments((ordered[3] ?? '').trim()),
       });
+      i += 1;
+      continue;
+    }
+
+    const task = TASK.exec(raw);
+    if (task !== null) {
+      flushPara();
+      const item: TaskItem = {
+        state: TASK_STATE[task[1] ?? ' '] ?? 'todo',
+        segments: inlineSegments((task[2] ?? '').trim()),
+      };
+      const last = blocks[blocks.length - 1];
+      if (last?.kind === 'tasks') last.items.push(item);
+      else blocks.push({ kind: 'tasks', items: [item] });
       i += 1;
       continue;
     }
@@ -266,6 +293,58 @@ export function AttachmentChip({
   );
 }
 
+const TASK_ICON_BOX = 'mt-[3px] flex size-4 flex-none items-center justify-center rounded-full';
+
+function TaskIcon({ state }: { state: TaskState }) {
+  if (state === 'done') {
+    return (
+      <span className={`${TASK_ICON_BOX} bg-(--text-tertiary) text-(--card)`}>
+        <Check width={10} height={10} />
+      </span>
+    );
+  }
+  if (state === 'doing') {
+    return (
+      <span
+        className={`${TASK_ICON_BOX} animate-spin border-[1.5px] border-(--border) border-t-(--text-secondary) motion-reduce:animate-none`}
+      />
+    );
+  }
+  return (
+    <span className={`${TASK_ICON_BOX} border-[1.5px] border-dashed border-(--text-tertiary)`} />
+  );
+}
+
+/** 待办卡（借鉴 Claude Desktop 的 To Do）：`- [ ]` 待做 = 虚线圈，`- [~]` 进行中 =
+ *  转圈，`- [x]` 完成 = 勾 + 划线淡化；连续任务行合成一张圆角卡。 */
+function TaskCard({ items }: { items: TaskItem[] }) {
+  return (
+    <ul
+      className="chat-md-tasks my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm"
+      data-testid="md-tasks"
+    >
+      {items.map((item, i) => (
+        <li
+          // task order is stable; items carry no ids
+          key={i}
+          className="flex items-start gap-3 text-ui"
+          data-testid="md-task"
+          data-state={item.state}
+        >
+          <TaskIcon state={item.state} />
+          <span
+            className={`min-w-0 ${
+              item.state === 'done' ? 'text-(--text-tertiary) line-through' : 'text-(--foreground)'
+            }`}
+          >
+            <Segments segments={item.segments} codeClassName="chat-code" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Renders an agent reply's block markdown. Inline code chips reuse the
  *  transcript's `.chat-code` class so the chip family stays consistent. */
 export function ChatMarkdown({ text }: { text: string }) {
@@ -324,6 +403,8 @@ export function ChatMarkdown({ text }: { text: string }) {
                 </span>
               </div>
             );
+          case 'tasks':
+            return <TaskCard key={i} items={block.items} />;
           case 'code':
             return (
               // 围栏块 = .chat-code 的块级孪生：mono、正常对比度、自带底 +
