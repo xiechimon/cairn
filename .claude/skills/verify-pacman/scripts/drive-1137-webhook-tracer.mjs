@@ -270,7 +270,7 @@ check('K1 载荷不带 sender 202 ignored「event has no sender」（no-sender�
 const dGhost = randomUUID();
 const ghost = await receiver(hookToken, 'issues', dGhost, labeledPayload({ sender: { login: 'ghost', type: 'User' } }));
 save('13-sender-below-triage.json', { deliveryId: dGhost, ...ghost });
-check('K2 sender 不到 triage 202 ignored，detail 不说是哪种拒收（sender-below-triage）', ghost.status === 202 && ghost.body?.result === 'ignored' && ghost.body?.detail === SENDER_REFUSED_DETAIL, `status=${ghost.status} detail=${ghost.body?.detail}`);
+check('K2 sender 不到 triage 202 ignored，detail 不说是哪种拒收（原因码见 L2）', ghost.status === 202 && ghost.body?.result === 'ignored' && ghost.body?.detail === SENDER_REFUSED_DETAIL, `status=${ghost.status} detail=${ghost.body?.detail}`);
 
 // 投递 10：项目凑满在飞上限（已导入 1 张 + 直插 2 张在飞卡）→ at-cap（零出站）
 let seq = 900_000;
@@ -293,13 +293,22 @@ const consumed = [dCreated, dReplay, dPing, dLabel, dMisconf, dNoSender, dGhost,
 const lines = serverLog.split('\n');
 const deliveryLineIdx = lines.map((l, i) => ({ l, i })).filter(({ l }) => consumed.some((d) => l.includes(d)));
 const keep = new Set();
+// 拒收行（'github webhook import refused'）的 reason / detail 在 deliveryId 之后
+// 几行（pretty 形态每个字段一行），窗口取到 +8 行。
 for (const { i } of deliveryLineIdx) {
-  for (let j = Math.max(0, i - 1); j <= Math.min(lines.length - 1, i + 1); j++) keep.add(j);
+  for (let j = Math.max(0, i - 1); j <= Math.min(lines.length - 1, i + 8); j++) keep.add(j);
 }
 const logEntries = [...keep].sort((a, b) => a - b).map((i) => lines[i]);
 save('11-tracer-server-log.txt', logEntries.join('\n') + '\n');
-check('J1 server.log 每投递一条 deliveryId 追踪记录（≥5 条）', deliveryLineIdx.length >= 5, `entries=${deliveryLineIdx.length}`);
+check('J1 server.log 每投递一条 deliveryId 追踪记录（≥8 条）', deliveryLineIdx.length >= consumed.length, `entries=${deliveryLineIdx.length}`);
 check('J2 created 投递记录带 result: "created"（pino 结构化）', lines.some((l, i) => l.includes(dCreated) && (lines[i + 1] ?? '').includes('"created"')));
+// #1459 拒收的原因码只在日志里（202 的 detail 对打标人权限类拒收只有同一句）。
+// pretty 形态字段在 deliveryId 之后几行，JSON 形态在同一行：两种都认。
+const refusalReason = (deliveryId, reason) =>
+  lines.some((l, i) => l.includes(deliveryId) && lines.slice(i, i + 9).some((n) => n.includes(`"${reason}"`)));
+check('L1 no-sender 投递的日志原因码 no-sender', refusalReason(dNoSender, 'no-sender'));
+check('L2 ghost 投递的日志原因码 sender-below-triage（不是 permission-unreadable / rate-limited）', refusalReason(dGhost, 'sender-below-triage'));
+check('L3 at-cap 投递的日志原因码 at-cap', refusalReason(dCap, 'at-cap'));
 
 opened.close();
 finish({
