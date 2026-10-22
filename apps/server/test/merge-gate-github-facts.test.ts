@@ -15,6 +15,7 @@ import {
   readGateGithubFacts,
 } from '../src/services/merge-gate/github-facts.js';
 import type { GateGithubPort, GateRaw } from '../src/services/merge-gate/github-port.js';
+import { mergeReadiness } from '../src/services/merge-gate/readiness.js';
 
 const HEAD = 'a'.repeat(40);
 const BASE = 'b'.repeat(40);
@@ -409,6 +410,50 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
     const g = await read({ pull: () => NOT_FOUND });
     expect(g.pr).toBeNull();
     expect(names(g.log)).toEqual(['pull']);
+  });
+});
+
+describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run 1 on #1525)', () => {
+  test('F19 the check-runs and status ETags of the old head are never sent for the new head', async () => {
+    const NEWER = 'd'.repeat(40);
+    const cache = newGateReadCache();
+    // First evaluation at HEAD: single, complete pages with ETags, so a later read at HEAD may be conditional.
+    await read(
+      {
+        checkRuns: (_s, o) =>
+          ({ ...runPages([run('check', { id: 1 })])(_s, o), etag: '"runs-head"' }) as GateRaw,
+        combinedStatus: (_s, o) =>
+          ({ ...statusPages([])(_s, o), etag: '"status-head"' }) as GateRaw,
+      },
+      cache,
+    );
+    // The author pushes NEWER: the PR now names it as its head.
+    const pushed = (sha: string) =>
+      read(
+        {
+          pull: () =>
+            ok(
+              prBody({
+                head: { sha, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/pacman' } },
+              }),
+            ),
+          compare: comparePages(chain(EARLIER, sha)),
+          checkRuns: runPages([run('check', { id: 2, head_sha: sha })]),
+          combinedStatus: statusPages([], sha),
+        },
+        cache,
+      );
+    const after = await pushed(NEWER);
+    expect(after.log.filter(([n]) => n === 'checkRuns' || n === 'combinedStatus')).toEqual([
+      ['checkRuns', NEWER, { filter: 'latest', page: 1, perPage: 100, etag: null }],
+      ['combinedStatus', NEWER, { page: 1, perPage: 100, etag: null }],
+    ]);
+    // Back at HEAD (the same URLs as the first evaluation): its own ETags are still the ones sent.
+    const back = await pushed(HEAD);
+    expect(back.log.filter(([n]) => n === 'checkRuns' || n === 'combinedStatus')).toEqual([
+      ['checkRuns', HEAD, { filter: 'latest', page: 1, perPage: 100, etag: '"runs-head"' }],
+      ['combinedStatus', HEAD, { page: 1, perPage: 100, etag: '"status-head"' }],
+    ]);
   });
 });
 
@@ -970,5 +1015,37 @@ describe('readGateGithubFacts: rate limits, throws, concurrency (F18)', () => {
     expect(f.checks).toBeNull();
     expect(f.compare).toBe('unreadable');
     expect(f.pr).toEqual(GREEN_PR);
+  });
+});
+
+describe('readGateGithubFacts into mergeReadiness: a truncated compare (pr-gate run 1 on #1525, suggestion 3)', () => {
+  test('300 files on page 1 and changed_files 301: compare-truncated, a human blocker, no digest', async () => {
+    const files = Array.from({ length: 300 }, (_, k) => ghFile(`apps/server/src/f${k}.ts`));
+    const f = await read({
+      pull: () => ok(prBody({ changed_files: 301 })),
+      compare: comparePages(chain(EARLIER, HEAD), files),
+    });
+    expect((f.compare as { files: unknown[] }).files).toHaveLength(300);
+    expect(f.pr?.changedFiles).toBe(301);
+    const r = mergeReadiness({
+      policy: { mergePolicy: 'autonomous', autonomyPaused: false },
+      build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
+      repo: { owner: REQ.owner, name: REQ.repo, defaultBranch: f.defaultBranch },
+      ticketRef: REQ.ticketRef,
+      issueNumber: 1404,
+      pr: f.pr,
+      checks: f.checks,
+      compare: f.compare,
+      evidence: f.evidence,
+      verdicts: [],
+      round: null,
+      availability: { reviewerPerspectives: ['correctness'], verifier: true, decider: true },
+    });
+    expect(r.ready).toBe(false);
+    expect(r.patchDigest).toBeNull();
+    expect(r.blockers.find((b) => b.code === 'compare-truncated')).toMatchObject({
+      class: 'human',
+      detail: ['truncated'],
+    });
   });
 });

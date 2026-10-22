@@ -583,9 +583,11 @@ export async function readGateGithubFacts(
     facts.baseBehindBy = c.behindBy;
   }
 
+  // 条件读的缓存键带 head 的 SHA：推送之后旧 head 的 ETag 不会拿去问新 head 的 URL（#1525 pr-gate
+  // 第 1 轮建议 2）。
   const runs = await readPaged(
     r,
-    `runs:${repoKey}#${req.prNumber}`,
+    `runs:${repoKey}@${head}`,
     RUN_PAGES,
     'check_runs',
     runOf,
@@ -594,7 +596,7 @@ export async function readGateGithubFacts(
   );
   const statuses = await readPaged(
     r,
-    `status:${repoKey}#${req.prNumber}`,
+    `status:${repoKey}@${head}`,
     STATUS_PAGES,
     'statuses',
     statusOf,
