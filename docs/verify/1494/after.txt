@@ -1,0 +1,5 @@
+$ pnpm exec vitest run test/m4b-memory.test.ts test/chief-memory.test.ts   (apps/server)
+      Tests  12 passed (12)
+
+$ pnpm exec vitest run test/m4b-memory-e2e.test.ts   (integration)
+      Tests  2 passed (2)
