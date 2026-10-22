@@ -660,7 +660,8 @@ async function deliverHttp(
 }
 
 /** 服务面直达（带可捕获的 pino 日志：每行解析成对象）。 */
-async function deliverDirect(body: unknown, deliveryId: string, fetchImpl: FetchLike = mock.impl) {
+/** 可捕获的 pino 日志（每行解析成对象）。 */
+function captureLogger(): { logger: pino.Logger; lines: LogLine[] } {
   const lines: LogLine[] = [];
   const logger = pino(
     { level: 'info' },
@@ -670,6 +671,11 @@ async function deliverDirect(body: unknown, deliveryId: string, fetchImpl: Fetch
       },
     },
   );
+  return { logger, lines };
+}
+
+async function deliverDirect(body: unknown, deliveryId: string, fetchImpl: FetchLike = mock.impl) {
+  const { logger, lines } = captureLogger();
   const response = await receiveGithubWebhook(
     { ...s.svc, box: s.secretBox, githubFetch: fetchImpl, logger },
     { token: token.plaintext, event: 'issues', deliveryId, body },
@@ -1098,29 +1104,6 @@ describe('#1459 W 并发与重投', () => {
 
 // —— #1459 round 2（pr-gate run 1 on #1477）————————————————————————————————
 
-/** 带可捕获日志的服务面直达（会抛错的场景用：deliverDirect 会把错抛出去、
- * 拿不到日志行）。 */
-function captureLogger(): { logger: pino.Logger; lines: LogLine[] } {
-  const lines: LogLine[] = [];
-  const logger = pino(
-    { level: 'info' },
-    {
-      write: (line: string) => {
-        lines.push(JSON.parse(line) as LogLine);
-      },
-    },
-  );
-  return { logger, lines };
-}
-
-/** 直插一个 github 项目（REST 面会拒的存量形状：#1466 之前建的行）。 */
-function insertGithubProject(id: string, githubRepo: string): void {
-  s.db
-    .insert(projectTable)
-    .values({ id, name: id, teamId: s.team.id, repoKind: 'github', githubRepo })
-    .run();
-}
-
 describe('#1459 round 2 W 存量 githubRepo 形坏', () => {
   test.each([
     ['../user', '~proj-dotdot-owner'],
@@ -1128,7 +1111,11 @@ describe('#1459 round 2 W 存量 githubRepo 形坏', () => {
   ])(
     'W17 项目存的 githubRepo 是 %s（含 . / .. 段）→ 202 misconfigured，零出站，不进权限缓存，记日志',
     async (githubRepo, id) => {
-      insertGithubProject(id, githubRepo);
+      // 直插（REST 面会拒的存量形状：#1466 之前建的行）。
+      s.db
+        .insert(projectTable)
+        .values({ id, name: id, teamId: s.team.id, repoKind: 'github', githubRepo })
+        .run();
       const payload = { ...labeledPayload(), repository: { full_name: githubRepo } };
       const http = await deliverHttp(payload, `w17-http-${id}`);
       expect(http.status).toBe(202);
@@ -1201,5 +1188,51 @@ describe('#1459 round 2 W 在飞现数与导入的 404', () => {
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
     expect(issueReads()).toHaveLength(0);
     expect(issueTasks()).toHaveLength(0);
+  });
+});
+
+describe('#1459 round 2 W review 发现', () => {
+  test('W19 导入时 GitHub 说 issue 不存在（详情读 404，连接还在）→ 202 misconfigured 说 issue 读不到，不说连接没了，记日志', async () => {
+    routes[ISSUE_PATH] = { status: 404, body: { message: 'Not Found' } };
+    const direct = await deliverDirect(labeledPayload(), 'w19');
+    expect(direct.response).toEqual({
+      result: 'misconfigured',
+      deliveryId: 'w19',
+      detail: `issue ${REPO}#7 not found on GitHub (or not visible to the team token)`,
+    });
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ deliveryId: 'w19', issue: 7, reason: 'issue-not-found' }),
+    ]);
+    expect(issueTasks()).toHaveLength(0);
+  });
+
+  test.each([['..'], ['.'], ['a/b'], ['']])(
+    'W20 sender 的 login 不是 GitHub 账号名（%j）→ 202 ignored，零出站，记日志',
+    async (login) => {
+      const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
+      const direct = await deliverDirect(payload, 'w20');
+      expect(direct.response.result).toBe('ignored');
+      expect(refusals(direct.lines)).toEqual([
+        expect.objectContaining({ reason: login === '' ? 'no-sender' : 'sender-malformed' }),
+      ]);
+      // 团队 token 不出站（`..` 会把权限读改写成别的路径）。
+      expect(mock.calls).toEqual([]);
+      expect(issueTasks()).toHaveLength(0);
+    },
+  );
+
+  test('W20b bot 账号（login 带 [bot]）照常读权限', async () => {
+    // 路径里的方括号经 encodeURIComponent 编码。
+    routes[`/repos/${REPO}/collaborators/octo-helper%5Bbot%5D/permission`] = {
+      status: 404,
+      body: { message: 'Not Found' },
+    };
+    const payload = { ...labeledPayload(), sender: { login: 'octo-helper[bot]', type: 'Bot' } };
+    const direct = await deliverDirect(payload, 'w20b');
+    expect(direct.response.result).toBe('ignored');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ reason: 'sender-below-triage' }),
+    ]);
+    expect(permissionReads()).toHaveLength(1);
   });
 });

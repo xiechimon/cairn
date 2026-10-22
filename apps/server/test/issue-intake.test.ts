@@ -2819,6 +2819,20 @@ describe('24 限流：本队本轮停读', () => {
       },
       new Date(T0 + 60_000).toISOString(),
     ],
+    // 头在但是空串（代理或 GitHub 改了形状）：不当 0 秒，照 x-ratelimit-reset。
+    [
+      '403（retry-after 是空串，x-ratelimit-remaining 0 带 reset）',
+      {
+        status: 403,
+        headers: {
+          'retry-after': '',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': '1800000600',
+        },
+        body: { message: 'API rate limit exceeded for user ID 1.' },
+      },
+      new Date(1_800_000_600_000).toISOString(),
+    ],
     [
       '403（二级限流，只有 message）',
       {
