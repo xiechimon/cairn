@@ -27,7 +27,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conversationBranch, type GitCredentials } from '@pacman/shared';
+import { type BoundGitCredentials, conversationBranch } from '@pacman/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -38,7 +38,13 @@ const PROJECT_ID = 'proj-local-1';
 const CONV_A = '01a0b86f-aaaa-72a8-bba4-75c5cfd6598f';
 /** 探针 token（argv 泄漏断言的判别串；形近真实 GitHub token 但为假值）。 */
 const PROBE_TOKEN = 'ghp_PROBE0000000000000000000000000000';
-const PROBE_CRED: GitCredentials = { username: 'x-access-token', password: PROBE_TOKEN };
+// 远端是本地 bare 仓（无需凭证）；绑定 URL 取 github 形态，helper 照样进 env，
+// 正对照「token 确实经 env 注入」才有东西可查（#1484）。
+const PROBE_CRED: BoundGitCredentials = {
+  username: 'x-access-token',
+  password: PROBE_TOKEN,
+  url: 'https://github.com/o/r.git',
+};
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -255,6 +261,6 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     // ——最后一个 VALUE 位 = 内联 credential.helper 函数体（git.ts gitCredentialEnv）。
     const envDump = readFileSync(envLog, 'utf8');
     expect(envDump).toContain(PROBE_TOKEN);
-    expect(envDump).toContain('echo username=x-access-token');
+    expect(envDump).toContain('username=x-access-token');
   }, 30_000);
 });

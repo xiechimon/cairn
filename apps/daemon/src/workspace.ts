@@ -15,11 +15,11 @@
 import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  type BoundGitCredentials,
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
   conversationBranch,
   type GitCredentialSource,
-  type GitCredentials,
   LOCAL_ERROR_REASON_COPY,
   LocalRepoUnreachableError,
   ORPHAN_WORKTREE_TTL_MS,
@@ -155,7 +155,7 @@ export class WorkspaceManager implements WorktreeOps {
       let credentialSource: GitCredentialSource = 'integration';
       const runNet = async (
         what: string,
-        op: (cred: GitCredentials | null) => Promise<void>,
+        op: (cred: BoundGitCredentials | null) => Promise<void>,
         onFallback?: (reason: string) => void,
       ): Promise<GitCredentialSource> => {
         const source = await withGitCredentialFallback(op, input.credentials, {
@@ -284,7 +284,7 @@ export class WorkspaceManager implements WorktreeOps {
   private async runHookStage(
     cwd: string,
     name: 'setup' | 'resume',
-    credentials: GitCredentials | null,
+    credentials: BoundGitCredentials | null,
   ): Promise<WorkspaceHookNoteData[]> {
     try {
       const note = await runWorkspaceHook({
@@ -340,7 +340,7 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
-  async push(cwd: string, branch: string, credentials: GitCredentials | null): Promise<void> {
+  async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
     // 重试预算覆盖 git-host 5xx 窗口（02 §5.5/r3 bundle 注原话语义）。
     await withGitNetRetries(() => gitPrim.push(cwd, branch, credentials));
   }

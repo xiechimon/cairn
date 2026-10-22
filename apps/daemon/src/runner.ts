@@ -582,7 +582,7 @@ async function runClaimedStep(
   // fabricate 伪 api_key 配置，此处不透传伪语义。非 runtime 步逐字节保持
   // 原行为（creds.provider → agent.provider 回退）。
   const tokenRes = await client.token(stepId);
-  const creds = pushCredential(tokenRes);
+  const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   const agent = claimed.agent;
   const runtimeId = isBackendRuntimeId(agent?.provider) ? agent.provider : null;
   // let（#654）：回落闸翻 compat 旋钮时重赋值（sessionOpts.provider 同步）。

@@ -467,7 +467,11 @@ describe('#1149 环境生命周期钩子（prepare 两挂点）', () => {
     try {
       prepared = await ws.prepare({
         ...prepareInput(CONV_A),
-        credentials: { username: 'x-access-token', password: 'step-token' },
+        credentials: {
+          username: 'x-access-token',
+          password: 'step-token',
+          url: 'https://github.com/o/r.git',
+        },
       });
     } finally {
       vi.unstubAllEnvs();

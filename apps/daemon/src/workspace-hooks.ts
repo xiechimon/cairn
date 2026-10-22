@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@pacman/shared';
 import { gitCredentialEnv } from './git.js';
 
 /** 输出内存闸（字符）：stdout+stderr 按到达序合并，超出即停收（shell-channel
@@ -47,7 +47,7 @@ export interface RunWorkspaceHookInput {
   cwd: string;
   name: 'setup' | 'resume';
   /** 步级 git 凭证（非空 → GIT_CONFIG_* env 注入；null → 无注入）。 */
-  credentials: GitCredentials | null;
+  credentials: BoundGitCredentials | null;
   timeoutMs: number;
   /** 日志行出口（workspace 前缀面；缺失即跳过 = 零行）。 */
   log: (line: string) => void;

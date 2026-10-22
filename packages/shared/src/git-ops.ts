@@ -96,6 +96,14 @@ export interface GitCredentials {
   password: string;
 }
 
+/** daemon 侧持有的 per-step git 凭证（#1484）：绑定签发它的远端 URL（claim 的
+ * repo.cloneUrl），helper 只对该 URL 的 scheme + host 应答——worktree 的
+ * origin 被改指别处（set-url / insteadOf）时凭证不跟过去。daemon 收到 token
+ * 响应时绑定（credentials.ts pushCredential），不上 wire。 */
+export interface BoundGitCredentials extends GitCredentials {
+  url: string;
+}
+
 /** 本步 git 网络操作的凭据来源（#1225）：'integration' = server per-step
  * 下发 token（既有唯一路）；'machine' = 执行机本机 git 凭据（credential
  * helper / ~/.git-credentials / gh——integration token 认证失败时降级，或
@@ -128,7 +136,7 @@ export interface WorktreePrepareInput {
   repoKind?: ProjectRepoKind;
   workspacesRoot: string;
   /** per-step 凭证（托管 http 远端必需；GitHub 形态凭证面归后票）。 */
-  credentials: GitCredentials | null;
+  credentials: BoundGitCredentials | null;
   /** github 形态同机执行加速位（ADR 0017 / #1213）：claim 载荷的
    * project.repo.localPath。双条件判定（路径存在 + origin 归一化后与
    * cloneUrl 同仓）通过 → 基座自该路径本地 clone（省传输）后 origin 重指
@@ -184,7 +192,7 @@ export interface WorktreeOps {
   ): Promise<{ committed: boolean; head: string | null }>;
   /** push 本 conversation 工作分支（02 §5.5「每步结束自动 push」；凭证 env
    * 注入）。成功 = `pushed <convBranch>` 日志行由调用方落。 */
-  push(cwd: string, branch: string, credentials: GitCredentials | null): Promise<void>;
+  push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void>;
   /** 合并步：`git merge --no-edit origin/<defaultBranch>`（02 §5.5/r3 §3.6
    * 「git merge origin/main 结果为 "Already up to date"」样本）；冲突 =
    * merge 自动中止并抛错（失败仅人工重跑，02/A6）。local 形态的落地面 =
