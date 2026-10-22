@@ -16,7 +16,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@pacman/shared';
 import { describe, expect, test, vi } from 'vitest';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
@@ -25,7 +25,11 @@ import {
 } from '../src/workspace-hooks.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
 
-const CREDS: GitCredentials = { username: 'x-access-token', password: 'step-token-secret' };
+const CREDS: BoundGitCredentials = {
+  username: 'x-access-token',
+  password: 'step-token-secret',
+  url: 'https://github.com/o/r.git',
+};
 
 function tmpRoot(): string {
   return mkdtempSync(join(tmpdir(), 'pacman-hook-'));

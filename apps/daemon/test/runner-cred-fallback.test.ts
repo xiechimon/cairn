@@ -44,6 +44,8 @@ vi.mock('../src/github-probe.js', async (importOriginal) => {
 });
 
 const GITHUB_TOKEN: GitCredentials = { username: 'x-access-token', password: 'ghp_steptoken' };
+/** runner 交给 push 的凭证 = token 响应绑定 claim 的 cloneUrl（#1484）。 */
+const GITHUB_STEP_CRED = { ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' };
 /** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
@@ -297,7 +299,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
     );
     // integration 一发（auth 失败）+ machine 二发（成功）。
     expect(workspace.pushes).toEqual([
-      { branch: 'pacman/conv-conv-1', cred: GITHUB_TOKEN },
+      { branch: 'pacman/conv-conv-1', cred: GITHUB_STEP_CRED },
       { branch: 'pacman/conv-conv-1', cred: null },
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
@@ -317,7 +319,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
-    expect(workspace.pushes).toEqual([{ branch: 'pacman/conv-conv-1', cred: GITHUB_TOKEN }]);
+    expect(workspace.pushes).toEqual([{ branch: 'pacman/conv-conv-1', cred: GITHUB_STEP_CRED }]);
     const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('integration');
     expect(client.doneBodies[0]!.body.status).toBe('success');

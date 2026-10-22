@@ -4,11 +4,12 @@
 // 模块消费；isomorphic-git/simple-git 不引入，01 §4.2）。
 // 注入安全：全程 argv 数组（无 shell）。
 // 凭证纪律（02 §5.4/§8 per-step 下发不落盘 + relay 工具名对照 push_credential
-// r5 §3.1）：git 凭证只经 GIT_CONFIG_* env 注入 credential.helper（git ≥2.31）
-// ——不进 argv（ps 面）、不进 .git/config、不进 ~/.git-credentials、不落任何盘。
+// r5 §3.1）：git 凭证只经 env 注入（GIT_CONFIG_* 挂定值 credential.helper，git
+// ≥2.31；凭证值在 PACMAN_GIT_CRED_*）——不进 argv（ps 面，含 helper 的 sh -c）、
+// 不进 .git/config、不进 ~/.git-credentials、不落任何盘。
 
 import { spawn } from 'node:child_process';
-import type { CommitIdentity, GitCredentialSource, GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@pacman/shared';
 
 export interface GitRunResult {
   /** 子进程退出码；signal 终止（含超时）时 = null（不映射为 0——signaled 退出
@@ -62,33 +63,75 @@ export async function runGitOk(
   throw new Error(`git ${args[0]} failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
 }
 
-/** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。密码含 shell 元
- * 字符亦安全（credential.helper 值不经 shell——git 直接以 `sh -c` 执行 fn
- * 体，echo 单引号位转义 `'` → `'\''`）。`parent` = 调用方要合并进去的环境
- * （runGit / 钩子都是 `{ ...process.env, ...本函数结果 }`）。 */
+/** 内联 credential.helper 本体（#1484 / #1485）：定值，不含任何凭证值。git 以
+ * `sh -c '<本体> get'` 运行它，并把请求（protocol= / host= 等行）写进 stdin。
+ * 只在 get、host 与签发远端完全一致、protocol 相同（或 http 绑定被跳转升到
+ * https——同主机更安全的通道；https 不降级到 http）时，从环境变量印出用户名
+ * 与密码；printf '%s' 原样输出，不经 echo 的反斜杠转义，也不经 shell 展开。
+ * 凭证只在环境里：sh -c 的 argv（/proc/<pid>/cmdline，本机其他用户可读）里
+ * 只有这段定值。 */
+const CREDENTIAL_HELPER =
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: sh parameter expansion inside the helper body, not a JS template
+  '!f() { p=; h=; while IFS= read -r l; do case "$l" in protocol=*) p=${l#protocol=} ;; host=*) h=${l#host=} ;; esac; done; ' +
+  'if test "$1" = get && test "$h" = "$PACMAN_GIT_CRED_HOST" && ' +
+  '{ test "$p" = "$PACMAN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$PACMAN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
+  `printf 'username=%s\\npassword=%s\\n' "$PACMAN_GIT_CRED_USERNAME" "$PACMAN_GIT_CRED_PASSWORD"; fi; }; f`;
+
+/** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。helper 本体与凭证
+ * 值分开：本体是 CREDENTIAL_HELPER 定值，签发远端与凭证值走 PACMAN_GIT_CRED_*
+ * 环境变量。`parent` = 调用方要合并进去的环境（runGit / 钩子都是
+ * `{ ...process.env, ...本函数结果 }`）。 */
 export function gitCredentialEnv(
-  cred: GitCredentials,
+  cred: BoundGitCredentials,
   parent: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  const sq = (v: string) => v.replace(/'/g, `'\\''`);
-  const helper = `!f() { echo username=${sq(cred.username)}; echo password=${sq(cred.password)}; }; f`;
   // #1460：接在父环境自带的 GIT_CONFIG_* 之后（容器 / CI 的代理、CA 配置），
   // 从 0 写会盖掉它们，COUNT=2 又把 2 号以后的藏起来。
   const n = inheritedGitConfigCount(parent);
+  // 用户名 / 密码带换行或回车：git 的凭证协议按行分隔，这样的值会被读成别的
+  // 字段。明确报错（server 签发的值不会有），不静默丢掉 helper——否则步后面
+  // 以误导的「terminal prompts disabled」失败。
+  if (/[\r\n\0]/.test(cred.username + cred.password)) {
+    throw new Error('per-step git credential contains a line break; refusing to pass it to git');
+  }
+  // #1484：helper 只应答签发远端。git 按实际连接的 URL（insteadOf 改写、HTTP
+  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。
+  const target = credentialTarget(cred.url);
   return {
     // 空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
-    // helper，含父环境条目里的）。缺此条则系统级/全局 osxkeychain 等 helper
-    // 叠加在前：同主机命中陈旧凭证（上一步已撤销的 token）致 auth 失败，且
-    // 成功轮会回写钥匙串（凭证落盘面，破 02 §8 不落盘纪律）。重置后本步内联
-    // helper 是唯一来源。
-    GIT_CONFIG_COUNT: String(n + 2),
+    // helper，含父环境条目与 URL 作用域条目里的）。缺此条则系统级/全局
+    // osxkeychain 等 helper 叠加在前：同主机命中陈旧凭证（上一步已撤销的
+    // token）致 auth 失败，且成功轮会回写钥匙串（凭证落盘面，破 02 §8 不落盘
+    // 纪律）。重置后本步内联 helper 是唯一来源。
+    GIT_CONFIG_COUNT: String(target === null ? n + 1 : n + 2),
     [`GIT_CONFIG_KEY_${n}`]: 'credential.helper',
     [`GIT_CONFIG_VALUE_${n}`]: '',
-    [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
-    [`GIT_CONFIG_VALUE_${n + 1}`]: helper,
+    ...(target === null
+      ? {}
+      : {
+          [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
+          [`GIT_CONFIG_VALUE_${n + 1}`]: CREDENTIAL_HELPER,
+          PACMAN_GIT_CRED_PROTOCOL: target.protocol,
+          PACMAN_GIT_CRED_HOST: target.host,
+          PACMAN_GIT_CRED_USERNAME: cred.username,
+          PACMAN_GIT_CRED_PASSWORD: cred.password,
+        }),
     // 交互提示关闭（无 tty 场景挂起护栏）。
     GIT_TERMINAL_PROMPT: '0',
   };
+}
+
+/** 凭证绑定 URL → git 请求里会出现的 protocol 与 host（#1484）。host 按 URL 原文
+ * 截取：去掉 userinfo，大小写、显式端口、非 ASCII 字符都保留。git 自己就这样
+ * 从 remote URL 取 host（截到第一个 / ? #，另做 %xx 解码；server 签发的
+ * cloneUrl 不含 %xx），而 origin 的 URL 正是这个 cloneUrl（workspace 复用基座
+ * 时也先指回它），两边逐字节一致，不依赖任何归一化（git 的 URL 作用域匹配不
+ * 认带 _ 的主机名）。不是 http(s)（本地路径、scp 形、file、ssh）= null：git
+ * 不为这些远端问 helper，凭证不写进环境。 */
+function credentialTarget(url: string): { protocol: string; host: string } | null {
+  const m = /^(https?):\/\/(?:[^@/?#]*@)?([^/?#]+)/.exec(url);
+  if (m?.[1] === undefined || m[2] === undefined) return null;
+  return { protocol: m[1], host: m[2] };
 }
 
 /** 父环境里 git 会读的 GIT_CONFIG_* 条数（#1460）。COUNT 的写法按 git 的
@@ -156,8 +199,8 @@ export interface GitCredentialFallbackOpts {
  * 语义成立时发生。cred 为 null（server 未下发，如未连 GitHub）= machine 路
  * 单次执行，无降级事件。 */
 export async function withGitCredentialFallback(
-  op: (cred: GitCredentials | null) => Promise<void>,
-  cred: GitCredentials | null,
+  op: (cred: BoundGitCredentials | null) => Promise<void>,
+  cred: BoundGitCredentials | null,
   opts: GitCredentialFallbackOpts,
 ): Promise<GitCredentialSource> {
   if (cred === null) {
@@ -206,14 +249,14 @@ const BRANCH_SCAN_MAX_REVS = 20;
 // —— 原语面（workspace.ts 组装 02 §5.5 契约行为）——————————————————————————
 
 export const gitPrim = {
-  async clone(url: string, dir: string, cred: GitCredentials | null): Promise<void> {
+  async clone(url: string, dir: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['clone', '--end-of-options', url, dir], {
       env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
       timeoutMs: NET_TIMEOUT_MS,
     });
   },
 
-  async fetch(repoDir: string, cred: GitCredentials | null): Promise<void> {
+  async fetch(repoDir: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['fetch', '--prune', 'origin'], {
       cwd: repoDir,
       env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
@@ -255,6 +298,19 @@ export const gitPrim = {
     return url === '' ? null : url;
   },
 
+  /** origin 的原始配置值（`remote.origin.url`，#1484）：不经 insteadOf 改写——
+   * `remote get-url` 返回改写后的 URL，与 cloneUrl 比较会误判偏离。无 origin /
+   * git 失败 = null。 */
+  async originConfigUrl(dir: string): Promise<string | null> {
+    const r = await runGit(['config', '--get', 'remote.origin.url'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) return null;
+    const url = r.stdout.trim();
+    return url === '' ? null : url;
+  },
+
   /** git 仓判定（`rev-parse --git-dir` code 0；工作树仓与裸库同形——#1210
    * 执行面 fail-loud 预检只问「能否作为 clone 源」，worktree-only 的收紧
    * 属 server 创建闸 validateLocalRepoPath，不在执行面重判）。 */
@@ -278,7 +334,7 @@ export const gitPrim = {
   /** `git remote set-head origin -a`（#1213/ADR 0017）：向真值远端查询其 HEAD
    * 并重钉 origin/HEAD——clone 自本地源的 origin/HEAD 是**用户检出分支**，
    * 默认分支判定会漂；本原语把 defaultBranch 真值源拉回远端。 */
-  async remoteSetHeadAuto(repoDir: string, cred: GitCredentials | null): Promise<void> {
+  async remoteSetHeadAuto(repoDir: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['remote', 'set-head', 'origin', '--auto'], {
       cwd: repoDir,
       env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
@@ -450,7 +506,7 @@ export const gitPrim = {
     return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
   },
 
-  async push(dir: string, branch: string, cred: GitCredentials | null): Promise<void> {
+  async push(dir: string, branch: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['push', '--end-of-options', 'origin', `refs/heads/${branch}`], {
       cwd: dir,
       env: cred ? gitCredentialEnv(cred) : machineGitEnv(),
@@ -480,7 +536,7 @@ export const gitPrim = {
   /** `git push origin refs/tags/<tag>`（XMON-111 T1）：凭证注入同 push 原语
    * （per-step token 只经 env credential.helper，不进 argv/磁盘）。远端已有
    * 同名异值 tag = git 拒绝（永不 force）→ 抛错携带拒绝原文。 */
-  async tagPush(dir: string, tag: string, cred: GitCredentials | null): Promise<void> {
+  async tagPush(dir: string, tag: string, cred: BoundGitCredentials | null): Promise<void> {
     await runGitOk(['push', '--end-of-options', 'origin', `refs/tags/${tag}`], {
       cwd: dir,
       env: cred ? gitCredentialEnv(cred) : machineGitEnv(),

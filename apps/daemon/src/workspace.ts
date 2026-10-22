@@ -15,11 +15,11 @@
 import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  type BoundGitCredentials,
   BRIEF_MARKER_BEGIN,
   BRIEF_RECONCILE_FILENAMES,
   conversationBranch,
   type GitCredentialSource,
-  type GitCredentials,
   LOCAL_ERROR_REASON_COPY,
   LocalRepoUnreachableError,
   ORPHAN_WORKTREE_TTL_MS,
@@ -155,7 +155,7 @@ export class WorkspaceManager implements WorktreeOps {
       let credentialSource: GitCredentialSource = 'integration';
       const runNet = async (
         what: string,
-        op: (cred: GitCredentials | null) => Promise<void>,
+        op: (cred: BoundGitCredentials | null) => Promise<void>,
         onFallback?: (reason: string) => void,
       ): Promise<GitCredentialSource> => {
         const source = await withGitCredentialFallback(op, input.credentials, {
@@ -215,6 +215,14 @@ export class WorkspaceManager implements WorktreeOps {
           );
         }
       } else {
+        // #1484：per-step 凭证只对 cloneUrl 的主机应答，基座 origin 已偏离（server
+        // 地址变了，或 worktree 里被 set-url——worktree 与基座共用配置）时先指回，
+        // fetch 才认证得上。
+        const origin = await gitPrim.originConfigUrl(baseRepoDir);
+        if (origin !== null && origin !== input.cloneUrl) {
+          await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
+          this.logger.workspace('Repo origin re-pointed to the project clone URL');
+        }
         await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));
       }
       const defaultBranch = await gitPrim.remoteDefaultBranch(baseRepoDir);
@@ -284,7 +292,7 @@ export class WorkspaceManager implements WorktreeOps {
   private async runHookStage(
     cwd: string,
     name: 'setup' | 'resume',
-    credentials: GitCredentials | null,
+    credentials: BoundGitCredentials | null,
   ): Promise<WorkspaceHookNoteData[]> {
     try {
       const note = await runWorkspaceHook({
@@ -340,7 +348,7 @@ export class WorkspaceManager implements WorktreeOps {
     ]);
   }
 
-  async push(cwd: string, branch: string, credentials: GitCredentials | null): Promise<void> {
+  async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
     // 重试预算覆盖 git-host 5xx 窗口（02 §5.5/r3 bundle 注原话语义）。
     await withGitNetRetries(() => gitPrim.push(cwd, branch, credentials));
   }
