@@ -43,9 +43,9 @@ export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   // #702（#519 B-C17）：failed→review = 条件边——审核步之死不再锁死已完成
   // build 的合并路（build 步 done 且产物在〔PR/分支在〕时恢复审核关口，merge
   // 与只重跑审核两出口共用）。合法性数据依赖，静态表不可表达：边表只记
-  // 「这条流转在相位机上合法」，数据闸进服务端判定（builds.ts restoreFailedReview
-  // = 唯一放行点，REST merge / steps action review / chief merge_builds 三生产者
-  // 同摄）；手动 PATCH 面拒收 failed→review（todos.ts）。恢复 ≠ 审核通过。
+  // 「这条流转在相位机上合法」，数据闸进服务端判定（builds.ts 恢复判据
+  // assertDeliveredBuild = 唯一放行点，restoreFailedReview 与经 GitHub API 合并共用；
+  // REST merge / steps action review / chief merge_builds 三生产者同摄）；手动 PATCH 面拒收 failed→review（todos.ts）。恢复 ≠ 审核通过。
   // 系统漏斗仍拒 failed→done。手动列迁移另走 canBoardDrop（#1247）。
   failed: ['queued', 'closed', 'review'],
   closed: ['todo'], // reopen [推断]（MCP reopen_todos 词表证据，wire 未采）

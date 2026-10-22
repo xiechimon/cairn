@@ -70,8 +70,14 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ENV_VARS, githubIssueSourceRef, type Phase, type TodoSourceKind } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import {
+  type AutonomySettings,
+  ENV_VARS,
+  githubIssueSourceRef,
+  type Phase,
+  type TodoSourceKind,
+} from '@pacman/shared';
+import { eq, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
 import {
@@ -84,6 +90,7 @@ import {
   project as projectTable,
   step as stepTable,
   todo as todoTable,
+  tokenUsage as tokenUsageTable,
 } from '../src/db/schema.js';
 import { type FetchLike, githubIssueEvents } from '../src/lib/github.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
@@ -453,10 +460,22 @@ function bindChief(s: TestServer): void {
   s.db.update(chiefTable).set({ agentId: CHIEF_AGENT_ID }).run();
 }
 
+/** 触发闸（#1491）只留总开关：人在用、冷却、日预算三道关掉。本文件钉的是
+ * 进料自己的判据；闸在 26 组单独钉。用例里经 HTTP 建项目、改相位都是人的
+ * 写操作，闸开着时每轮都会让路。 */
+const GATES_OFF: AutonomySettings = {
+  enabled: true,
+  quietMinutes: 0,
+  cooldownMinutes: 0,
+  dailyBudgetUsd: 0,
+};
+
 async function postGithubProject(s: TestServer, name: string, githubRepo: string): Promise<string> {
   const res = await req(s.app, 'POST', '/api/projects', { name, kind: 'github', githubRepo });
   if (res.status !== 201) throw new Error(`postGithubProject: ${res.status}`);
-  return ((await res.json()) as { id: string }).id;
+  const id = ((await res.json()) as { id: string }).id;
+  s.db.update(projectTable).set({ autonomy: GATES_OFF }).where(eq(projectTable.id, id)).run();
+  return id;
 }
 
 interface LogLine {
@@ -1582,6 +1601,8 @@ describe('14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓', () 
           teamId: w.s.team.id,
           repoKind: 'github',
           githubRepo: 'Xiechimon/Pacman',
+          // id 随机排序时它可能先于 makeWorld 的项目被选中：闸同样关掉。
+          autonomy: GATES_OFF,
         },
       ])
       .run();
@@ -2079,6 +2100,35 @@ describe('16 导入后编排失败：后续几轮重试，有上限', () => {
     expect(third?.orchestrated).toBe(0);
     expect(chiefThreads(w.s)).toHaveLength(1);
     expect(issueTodos(w.s)).toHaveLength(1);
+  });
+
+  test('#1491 总开关关了 → 重试等着、不算一次尝试；打开后照常重试', async () => {
+    const w = await makeWorld({ list: [1406] });
+    const { intake, logs, flaky } = flakyIntake(w);
+    await intake.sweep();
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    flaky.failing = false;
+    w.s.db
+      .update(projectTable)
+      .set({ autonomy: { ...GATES_OFF, enabled: false } })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    for (let i = 0; i < ISSUE_INTAKE_MAX_ORCHESTRATE_ATTEMPTS + 1; i += 1) {
+      const gated = await intake.sweep();
+      expect(gated?.orchestrated).toBe(0);
+    }
+    expect(chiefThreads(w.s)).toHaveLength(0);
+    expect(
+      logs.filter((l) => l.msg === 'issue intake orchestrate retry gated').map((l) => l.obj.reason),
+    ).toContain('disabled');
+    w.s.db
+      .update(projectTable)
+      .set({ autonomy: GATES_OFF })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    const resumed = await intake.sweep();
+    expect(resumed?.orchestrated).toBe(1);
+    expect(chiefThreads(w.s)).toHaveLength(1);
   });
 
   test('一直失败 → 连同导入那次共试 3 次，记一行放弃，之后不再试', async () => {
@@ -2719,6 +2769,7 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
         teamId: w.s.team.id,
         repoKind: 'github',
         githubRepo: REPO,
+        autonomy: GATES_OFF,
       })
       .run();
     const res = await req(w.s.app, 'POST', `/api/teams/${w.s.team.id}/webhook-tokens`, {
@@ -2902,6 +2953,7 @@ describe('24 限流：本队本轮停读', () => {
         teamId: w.s.team.id,
         repoKind: 'github',
         githubRepo: 'xiechimon/other',
+        autonomy: GATES_OFF,
       })
       .run();
     w.gh.overrides.set(`/repos/${REPO}/issues`, () => limited);
@@ -3002,5 +3054,170 @@ describe('25 覆盖钉：导入失败与读不到的后续列表页', () => {
     expect(
       w.logs.filter((l) => l.msg === 'issue intake list page unreadable').map((l) => l.obj),
     ).toEqual([{ projectId: w.projectId, page: 2 }]);
+  });
+});
+
+// —— 26 触发闸（#1491）————————————————————————————————————————————————————
+// 进料开一轮前问 evaluateAutonomyGates：没开 / 人刚在用 / 冷却 / 日预算满
+// （或读不到）= 本轮不读列表、不领；候选不动，下一轮重判。被拦的原因记一行
+// 日志，GET /api/projects/{id}/autonomy 读得到。
+
+describe('26 触发闸（#1491）', () => {
+  const MIN = 60_000;
+
+  function setGates(w: World, over: Partial<AutonomySettings>): void {
+    w.s.db
+      .update(projectTable)
+      .set({ autonomy: { ...GATES_OFF, ...over } })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+  }
+
+  /** 项目上一笔 chief 开的 build，成本 usd，开跑于 at。 */
+  function spend(w: World, usd: number, at: number, triggerSource: 'chief' | 'user' = 'chief') {
+    // 号取 90000 段，不撞夹具里的 issue。
+    const todoId = insertSourceTodo(w, 90_000 + seq, 'done');
+    const buildId = `build-spend-${seq}`;
+    w.s.db
+      .insert(buildTable)
+      .values({ id: buildId, todoId, withPlan: false, triggerSource, createdAt: at })
+      .run();
+    w.s.db
+      .insert(tokenUsageTable)
+      .values({ buildId, model: 'anthropic/stub', costTotal: usd })
+      .run();
+  }
+
+  async function blockedReason(w: World): Promise<string | null> {
+    const res = await req(w.s.app, 'GET', `/api/projects/${w.projectId}/autonomy`);
+    const body = (await res.json()) as {
+      kinds: Array<{ kind: string; lastBlockedReason: string | null }>;
+    };
+    return body.kinds.find((k) => k.kind === 'issue-intake')?.lastBlockedReason ?? null;
+  }
+
+  function gatedLogs(w: World) {
+    return w.logs.filter((l) => l.msg === 'issue intake project gated').map((l) => l.obj);
+  }
+
+  test('项目关了后台自动任务 → 不读列表、不领；打开后下一轮领', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { enabled: false });
+    const tally = await w.intake.sweep();
+    expect(tally?.gated).toBe(1);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(w.gh.listReads()).toEqual([]);
+    expect(gatedLogs(w)).toEqual([{ projectId: w.projectId, reason: 'disabled' }]);
+    expect(await blockedReason(w)).toBe('disabled');
+    setGates(w, { enabled: true });
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([1406]);
+    expect(await blockedReason(w)).toBeNull();
+  });
+
+  test('人刚在用（建项目是人的写操作）→ 让路；静默窗口过了再领', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { quietMinutes: 10 });
+    const t0 = Date.now();
+    await w.intake.sweep(t0);
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(gatedLogs(w)).toEqual([{ projectId: w.projectId, reason: 'member-active' }]);
+    await w.intake.sweep(t0 + 10 * MIN + 1_000);
+    expect(takenNumbers(w.s)).toEqual([1406]);
+  });
+
+  test('只算人的写操作：agent 自己的导入、读请求都不让路', async () => {
+    const w = await makeWorld({ list: [1394, 1401] });
+    setGates(w, { quietMinutes: 10 });
+    const t0 = Date.now() + 10 * MIN + 1_000;
+    // 第一轮领满（上限 3 张，只有两条候选）；轮询器自己的写不算人的操作。
+    await w.intake.sweep(t0);
+    expect(takenNumbers(w.s)).toEqual([1394, 1401]);
+    await req(w.s.app, 'GET', `/api/projects/${w.projectId}/autonomy`);
+    const done = todoOf(w.s, 1394);
+    if (done === undefined) throw new Error('1394 missing');
+    setPhase(w, done.id, 'done');
+    w.gh.state.open.push({ ...(LISTED.find((i) => i.number === 1402) as RawIssue) });
+    await w.intake.sweep(t0 + MIN);
+    expect(takenNumbers(w.s)).toEqual([1394, 1401, 1402]);
+  });
+
+  test('冷却：上一轮领过，冷却内的新候选等着；冷却过了再领', async () => {
+    const w = await makeWorld({ list: [1394, 1401] });
+    setGates(w, { cooldownMinutes: 15 });
+    insertSourceTodo(w, 1001, 'building');
+    insertSourceTodo(w, 1002, 'building');
+    const t0 = Date.now();
+    await w.intake.sweep(t0);
+    expect(takenNumbers(w.s)).toEqual([1001, 1002, 1394]);
+    const done = todoOf(w.s, 1394);
+    if (done === undefined) throw new Error('1394 missing');
+    setPhase(w, done.id, 'done');
+    await w.intake.sweep(t0 + 15 * MIN - 1);
+    expect(takenNumbers(w.s)).toEqual([1001, 1002, 1394]);
+    expect(gatedLogs(w)).toEqual([{ projectId: w.projectId, reason: 'cooldown' }]);
+    await w.intake.sweep(t0 + 15 * MIN);
+    expect(takenNumbers(w.s)).toEqual([1001, 1002, 1394, 1401]);
+  });
+
+  test('被拦的那几轮没领到，冷却不重新起算', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { cooldownMinutes: 15, enabled: false });
+    const t0 = Date.now();
+    await w.intake.sweep(t0);
+    setGates(w, { cooldownMinutes: 15 });
+    await w.intake.sweep(t0 + MIN);
+    expect(takenNumbers(w.s)).toEqual([1406]);
+  });
+
+  test('当天预算满 → 不领；只算 chief / 定时开的 build', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { dailyBudgetUsd: 5 });
+    const now = Date.now();
+    // 人手动开始的 build 不算自动任务的花费。
+    spend(w, 100, now, 'user');
+    spend(w, 3, now);
+    await w.intake.sweep(now);
+    expect(todoOf(w.s, 1406)).toBeDefined();
+    const w2 = await makeWorld({ list: [1406] });
+    setGates(w2, { dailyBudgetUsd: 5 });
+    spend(w2, 3, now);
+    spend(w2, 2, now);
+    const tally = await w2.intake.sweep(now);
+    expect(tally?.gated).toBe(1);
+    expect(todoOf(w2.s, 1406)).toBeUndefined();
+    expect(gatedLogs(w2)).toEqual([{ projectId: w2.projectId, reason: 'budget' }]);
+    expect(await blockedReason(w2)).toBe('budget');
+  });
+
+  test('日预算按 UTC 日切：昨天的花费不算今天；跨过零点额度重开', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { dailyBudgetUsd: 5 });
+    const midnight = Date.UTC(2026, 9, 23);
+    spend(w, 50, midnight - 1);
+    await w.intake.sweep(midnight - 1);
+    expect(todoOf(w.s, 1406)).toBeUndefined();
+    await w.intake.sweep(midnight);
+    expect(todoOf(w.s, 1406)).toBeDefined();
+  });
+
+  test('花费读不到 → 不领（不放行）', async () => {
+    const w = await makeWorld({ list: [1406] });
+    setGates(w, { dailyBudgetUsd: 5 });
+    w.s.db.run(sql`ALTER TABLE token_usage RENAME TO token_usage_gone`);
+    await w.intake.sweep();
+    expect(takenNumbers(w.s)).toEqual([]);
+    expect(gatedLogs(w)).toEqual([{ projectId: w.projectId, reason: 'budget-unreadable' }]);
+  });
+
+  test('满员照旧不读列表，也不逐轮记 gated 行；原因可查', async () => {
+    const w = await makeWorld({ list: [1406] });
+    insertSourceTodo(w, 1001, 'building');
+    insertSourceTodo(w, 1002, 'building');
+    insertSourceTodo(w, 1003, 'building');
+    const tally = await w.intake.sweep();
+    expect(tally?.gated).toBe(1);
+    expect(gatedLogs(w)).toEqual([]);
+    expect(await blockedReason(w)).toBe('in-flight-cap');
   });
 });

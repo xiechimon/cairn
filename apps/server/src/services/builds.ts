@@ -3,7 +3,9 @@
 //   （UUIDv7，r3 §3.0）。
 // - step 队列 server 持有、机器 claim：POST builds → 入队规划步（withPlan）或
 //   执行步（直执行）；确认 → 入队执行步；驳回 → 入队重规划步（同 conv
-//   continue session，执行在 M3）；merge → 202 delegated + 入队合并步。
+//   continue session，执行在 M3）；merge → 202 delegated + 入队合并步；GitHub
+//   形态、build 记着 PR 时 merge = server 经 GitHub API 合并 PR（#1403 段 2b），
+//   线形同为 202 delegated。
 // - 失败仅人工重跑（r3 §3.7）：重跑 = 新 POST builds（新 conv/新 build）。
 // 机器侧执行（claim/心跳/phase 推进 planning→confirm→…）归 M3；本层只持有
 // 队列与人工触发的 phase 流转。
@@ -11,11 +13,13 @@
 import type {
   Assignment,
   BuildRecord,
+  GithubRepoRef,
   Phase,
   ReviewGate,
   ReviewVerdict,
   SecretBox,
   StepJournalRow,
+  StepKind,
   StepRecord,
   TriggerSource,
   UserRecord,
@@ -53,7 +57,7 @@ import {
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
 } from '@pacman/shared';
-import { and, asc, desc, eq, gte, inArray, isNotNull, ne, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -68,13 +72,24 @@ import {
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { type FetchLike, githubPullState } from '../lib/github.js';
+import {
+  type FetchLike,
+  type GithubMergeResult,
+  githubMergePull,
+  githubPull,
+  githubPullState,
+  hasPullFields,
+  isFullSha,
+  isOwnPull,
+  WRITE_AUTHOR_ASSOCIATIONS,
+} from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
+import { githubText } from './github-text.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
@@ -113,6 +128,7 @@ export interface BuildDeps {
 }
 
 type BuildRow = typeof build.$inferSelect;
+type TodoRow = typeof todo.$inferSelect;
 
 export function toBuildRecord(row: BuildRow): BuildRecord {
   return {
@@ -300,7 +316,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
+  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -422,7 +438,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
+  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -437,7 +453,10 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
  * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
  * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
  * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
-export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
+export function stopUnclaimedGateSteps(
+  deps: BuildDeps,
+  buildId: string,
+): (typeof step.$inferSelect)['kind'][] {
   const rows = deps.db
     .select()
     .from(step)
@@ -450,9 +469,12 @@ export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
     )
     .all();
   for (const row of rows) {
-    deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
-    publishStepRow(deps, { ...row, status: 'stopped' });
+    const finishedAt = nowMs();
+    deps.db.update(step).set({ status: 'stopped', finishedAt }).where(eq(step.id, row.id)).run();
+    publishStepRow(deps, { ...row, status: 'stopped', finishedAt });
   }
+  // 停掉的步的种类（#1403 段 3：解冲突轮据此决定要不要落「AI 审核步已停」的行）。
+  return rows.map((r) => r.kind);
 }
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
@@ -727,13 +749,25 @@ export function maybeEnqueueVerifyStep(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
   buildId: string,
+  /** reverify：之后有过解冲突轮（PR 对账把默认分支合进了交付，#1403 段 3），之前的 verify
+   * 步（停掉的或已跑完的）验的是冲突前的提交——只要没有排队或在跑的 verify 步就再排一条。
+   * 缺省每个 build 一条。 */
+  opts: { reverify?: boolean } = {},
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'verify')))
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'verify'),
+        ...(opts.reverify === true
+          ? [inArray(step.status, ['pending', 'claimed', 'waiting_quota'])]
+          : []),
+      ),
+    )
     .get();
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
@@ -846,16 +880,8 @@ async function probePullState(
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
   const { owner, repo } = repoRef;
-  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。密文损坏/
-  // box 缺席按未连接处理（探测是辅助面，不把主请求 500 掉）。
-  let token: string | null = null;
-  if (deps.box) {
-    try {
-      token = openGithubToken({ db: deps.db, box: deps.box }, teamId);
-    } catch {
-      token = null;
-    }
-  }
+  // token 阶梯：github_connection（已连接）→ 匿名（公开仓可达）。
+  const token = githubTokenOrNull(deps, teamId);
   return githubPullState(deps.githubFetch ?? fetch, token, owner, repo, prNumber, timeoutMs);
 }
 
@@ -922,6 +948,25 @@ export async function mergedPrElsewhere(
     if (state?.merged) return { prNumber: row.prNumber, prUrl: row.prUrl };
   }
   return null;
+}
+
+/** #1217 第二张 PR 守卫（合并面兜底）：本 build 自己开了 PR 且同 todo 已有更早的
+ *  GitHub merged PR → 409 点名双 PR，拒收（同一 todo 两张 PR 先后落地 = 重复交付，
+ *  卡 #25 实锤：首 PR #1202 合并后重跑轮又开 #1205 并被合并）。首 PR closed-unmerged
+ *  不拦（返工重投正当）；探测不到不拦（fail-open——守卫主防线在 claim 面指令，此处
+ *  是机器面外的第二道）。调用方放在权限闸、宣告行与任何合并动作之前：拒收即无痕。 */
+async function assertNoMergedPrElsewhere(
+  deps: BuildDeps,
+  row: BuildRow,
+  prNumber: number,
+): Promise<void> {
+  const priorMerged = await mergedPrElsewhere(deps, row.todoId, row.id);
+  if (priorMerged !== null) {
+    throw new HttpError(
+      409,
+      `本任务已有已合并的 PR #${priorMerged.prNumber}，本 build 又开了 PR #${prNumber}——疑似重复交付，拒绝发起合并（请人工复核后处理）`,
+    );
+  }
 }
 
 /** 确认回路（02 §4.2，r5 §4 实走）：POST /api/builds/{id}/steps
@@ -1285,15 +1330,25 @@ export async function applyBuildStepAction(
  * 只重跑审核两出口共用本闸。条件进服务端判定（「build 步 done 且产物在」）：
  * build 腿未完成（执行步 failed/未跑）或 done 但零产物（无 checkpointCommit
  * 且无 PR）的 failed 任务不获得该出路（半完成 build 不许被误放行）。恢复 ≠
- * 审核通过：落 review 等人工决策，done 仍只能经合并步落地——恢复后的合并 =
+ * 审核通过：落 review 等人工决策，done 仍只能经合并落地——恢复后的合并 =
  * 人工接受未完成 AI 审核的交付物，责任在人（02 §4.2 回写）。
- * 调用方：requestMerge（REST /builds/{id}/merge + chief merge_builds）与
- * applyBuildStepAction action:"review"（审核重跑）——两者均先经本闸再走
- * 既有流程，正常 review 相位不经过这里。 */
+ * 调用方：requestMerge 的合并步那条路（REST /builds/{id}/merge + chief
+ * merge_builds）与 applyBuildStepAction action:"review"（审核重跑）——两者均先经
+ * 本闸再走既有流程，正常 review 相位不经过这里。经 GitHub API 合并（#1403 段 2b）
+ * 只用判据半边 assertDeliveredBuild，等 GitHub 的结局再恢复。 */
 function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
-  const { db } = deps;
-  const todoRow = db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (todoRow?.phase !== 'failed') return; // 非失败相位 = 无可恢复
+  assertDeliveredBuild(deps, row);
+  // 走漏斗（条件边在边表里，setTodoPhase 放行）：review 进入通知 + chief wake
+  // 由漏斗照发——「改动就绪等你」对恢复态同样成立，不是静默改相。
+  setTodoPhase(deps, todoRow.id, 'review');
+}
+
+/** 恢复闸的判据半边（不写）：本 build 的执行步已 done 且产物在，否则 409 点名原因。
+ *  经 GitHub API 合并（#1403 段 2b）先判后合：GitHub 明确拒绝时 failed 卡原样不动。 */
+function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
+  const { db } = deps;
   // build 腿：本 build 的执行步（序贯取最新）已 done。
   const buildStep = db
     .select()
@@ -1314,13 +1369,13 @@ function restoreFailedReview(deps: BuildDeps, row: BuildRow): void {
       `failed 任务的审核关口恢复仅对本轮已交付的 build 开放（${reason}），请重新运行任务`,
     );
   }
-  // 走漏斗（条件边在边表里，setTodoPhase 放行）：review 进入通知 + chief wake
-  // 由漏斗照发——「改动就绪等你」对恢复态同样成立，不是静默改相。
-  setTodoPhase(deps, todoRow.id, 'review');
 }
 
-/** 合并（02 §4.2/A6：merge = 202 delegated 机器执行；机器领合并步 continue
- * session 复用执行轮会话 → git merge --no-edit → phase=done，执行面归 M3）。 */
+/** 合并（02 §4.2/A6：merge = 202 delegated）。两条路：
+ * - GitHub 形态、build 记着 PR（#1403 段 2b，设计 D / ADR 0021 D2）：server 经 GitHub
+ *   REST 合并这张 PR（mergeThroughGithub），不派机器合并步。
+ * - 其余（托管仓、本地仓、GitHub 形态没有 PR、githubRepo 不合法）：机器领合并步
+ *   continue session 复用执行轮会话 → git merge --no-edit → phase=done，执行面归 M3。 */
 export async function requestMerge(
   deps: BuildDeps,
   buildId: string,
@@ -1347,6 +1402,10 @@ export async function requestMerge(
     )
     .get();
   if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
+  const pr = githubPrOf(deps, todoRow, row.prNumber);
+  if (pr !== null) {
+    return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
+  }
   // #702（B-C17）：failed 相位先过恢复闸（build 腿已交付 → 回 review 关口；
   // 未交付 → 409 点名原因）。之后的合并关口判定与正常 review 一致。
   restoreFailedReview(deps, row);
@@ -1354,55 +1413,395 @@ export async function requestMerge(
     // biome-ignore lint/style/noNonNullAssertion: restoreFailedReview transitions phase in place, never deletes the row; second get() must match the first
     todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get()!;
   }
-  // 合并关口 = review（「将改动合并到默认分支」确认弹层，r3 §3.6）。
+  // 合并关口 = review（「将改动合并到默认分支」确认弹层，r3 §3.6）。#1217 第二张 PR
+  // 守卫只对 GitHub 形态有意义（探测读 GitHub），在 mergeThroughGithub 里。
   assertPhaseTransition(todoRow.phase, 'done');
-  // #1217 第二张 PR 守卫（合并面兜底）：本 build 自己开了 PR 且同 todo 已有
-  // 更早的 GitHub merged PR → 409 点名双 PR，拒收（同一 todo 两张 PR 先后落地
-  // = 重复交付，卡 #25 实锤：首 PR #1202 合并后重跑轮又开 #1205 并被合并）。
-  // 本 build 无自身 PR 不拦（合并步本身是合法路径）；首 PR closed-unmerged 不
-  // 拦（返工重投正当）；探测不到不拦（fail-open——守卫主防线在 claim 面指令，
-  // 此处是机器面外的第二道）。放在权限闸/宣告行/入队之前：拒收即无痕。
-  if (row.prNumber !== null) {
-    const priorMerged = await mergedPrElsewhere(deps, row.todoId, row.id);
-    if (priorMerged !== null) {
-      throw new HttpError(
-        409,
-        `本任务已有已合并的 PR #${priorMerged.prNumber}，本 build 又开了 PR #${row.prNumber}——疑似重复交付，拒绝发起合并（请人工复核后处理）`,
-      );
-    }
-    // 探测的网络窗里相位可能已被改（#1403 PR 对账会把 review 收成 done/failed）：
-    // 重读再判，不在已收尾的卡上入队合并步。
-    const after = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
-    if (!after) throw new NotFoundError(`todo ${row.todoId}`);
-    assertPhaseTransition(after.phase, 'done');
-  }
-  // 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
-  // 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、
-  // github done 语义即已推），assignment.build 槽 Agent 必须同时持有两开关；
-  // 缺 = 403 并点名缺失项（chief merge_builds 与 REST /builds/{id}/merge 两
-  // 生产者同摄于此）。build 槽未指派 = 无权限主体可判，不拦（未指派步不可
-  // 领是既有语义）。
-  const buildAgentId = todoRow.assignment?.build?.agentId;
-  if (buildAgentId) {
-    const agentRow = deps.db.select().from(agent).where(eq(agent.id, buildAgentId)).get();
-    if (agentRow) {
-      const missing = [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter(
-        (t) => !agentRow.tools.includes(t),
-      );
-      if (missing.length > 0) {
-        throw new HttpError(
-          403,
-          `Agent ${agentRow.displayName} 未获「${missing.join('」「')}」授权（Agent 详情页权限 tab），无法发起合并`,
-        );
-      }
-    }
-  }
+  assertMergeTools(deps, todoRow);
   // 时间线「发起了合并」行（r3 §3.6 实测：`15:06 Xmon Dai 发起了合并`；
   // 行形 [设计]——role user 纯文本 = shared MERGE_ANNOUNCEMENT 单源，呈现层
   // 拼装时间/actor）。
   insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
   enqueueStep(deps, buildId, 'merge', todoRow.teamId);
   return { delegated: true };
+}
+
+/** GitHub 形态、build 记着 PR：目标仓与 PR 号；否则 null。经 API 合并（requestMerge 的
+ *  分流）、合并步收尾（不收这类卡）与 #1150 磨绿入口（执行步成停在 building）同一判据。
+ *  githubRepo 不合法（#1466）、项目不与任务同队（#1497）同按不是 GitHub 形态。 */
+function githubPrOf(
+  deps: BuildDeps,
+  todoRow: { projectId: string; teamId: string },
+  prNumber: number | null,
+): { repoRef: GithubRepoRef; prNumber: number } | null {
+  if (prNumber === null) return null;
+  // 项目须与任务同队（#1497 projectOfTodo）：他队项目按未绑处理，不拿他队的仓出站。
+  const repoRef = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
+  return repoRef === null ? null : { repoRef, prNumber };
+}
+
+/** 权限闸（XMON-77）：合并步收尾 = git merge + conv 分支 push（三形态 repo
+ * 的落地都以推送为前置——local ff 落地、hosted applyMergeLanding 读推送态、
+ * github done 语义即已推），assignment.build 槽 Agent 必须同时持有两开关；
+ * 缺 = 403 并点名缺失项（chief merge_builds 与 REST /builds/{id}/merge 两
+ * 生产者同摄于此；经 GitHub API 合并同闸，web 合并弹层的禁用态读同一判据）。
+ * build 槽未指派 = 无权限主体可判，不拦（未指派步不可领是既有语义）。 */
+function assertMergeTools(deps: BuildDeps, todoRow: TodoRow): void {
+  const buildAgentId = todoRow.assignment?.build?.agentId;
+  if (!buildAgentId) return;
+  const agentRow = deps.db.select().from(agent).where(eq(agent.id, buildAgentId)).get();
+  if (!agentRow) return;
+  const missing = [AGENT_TOOL_MERGE, AGENT_TOOL_PUSH].filter((t) => !agentRow.tools.includes(t));
+  if (missing.length > 0) {
+    throw new HttpError(
+      403,
+      `Agent ${agentRow.displayName} 未获「${missing.join('」「')}」授权（Agent 详情页权限 tab），无法发起合并`,
+    );
+  }
+}
+
+// —— #1403 段 2b：经 GitHub API 合并（设计 D，2026-10-22 用户裁决）————————————————
+
+/** 步的种类在中文文案里的叫法（经 API 合并的「还有步在跑」拒绝）。 */
+const STEP_KIND_TEXT: Record<StepKind, string> = {
+  plan: '规划',
+  build: '执行',
+  merge: '合并',
+  chief: '编排',
+  review: '审核',
+  verify: '验证',
+};
+
+/** 正在经 GitHub API 合并的 build（进程内）：同一 build 第二次点合并 409；PR 对账把它
+ *  当作在飞步，GitHub 应答之前不读不写（hasActiveStep）。 */
+const mergingBuilds = new Set<string>();
+
+/** 本 build 在飞的步的种类：已被领取的任意步，以及排队中或等额度的非审核类步；没有为
+ *  null。没人领（排队中或等额度）的 verify / review 步不算（Verifier 的机器离线或额度
+ *  耗尽时，卡不能因此永远停在 review；收尾时由 finishTodoDone 停掉）。在飞的步收尾时还会
+ *  提交并推送，经 API 合并在它跑完之前不发（#1403 段 2b）。 */
+function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
+  return (
+    deps.db
+      .select({ kind: step.kind })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          or(
+            eq(step.status, 'claimed'),
+            and(
+              inArray(step.status, ['pending', 'waiting_quota']),
+              notInArray(step.kind, ['verify', 'review']),
+            ),
+          ),
+        ),
+      )
+      .get()?.kind ?? null
+  );
+}
+
+/** PR 对账的在飞判据（#1403）：本 build 有在飞的步，或人点的合并正在经 GitHub API
+ *  进行（结果由它落，对账不插手）。 */
+export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
+  return mergingBuilds.has(buildId) || stepKindInFlight(deps, buildId) !== null;
+}
+
+/** 本 build 最后推送的提交：最后收尾的那一步（审核步除外：它不提交）回报的
+ *  checkpointCommit；没有为 null。最后推送 = 最后收尾，不是最后建的：上一轮建的 verify
+ *  步（Verifier 离线或等额度）可以在下一轮的 build 步之后才跑。按步的收尾时刻排
+ *  （finishedAt，#1403 段 3）；迁移之前收尾的行没有它，回落最后一次报到（心跳 → 领取 →
+ *  入队，同 stepActivityAt）。两个用处：
+ *  - 经 API 合并的 sha（mergeSteps true）：分支上 pacman 最后推送的提交，合并步把默认
+ *    分支并进工作分支的提交也算（PR 的 head 就是它）。
+ *  - PR 对账核对「合并包含本 build 的交付」（mergeSteps false）：合并步的提交不是交付；
+ *    GitHub 形态有 PR 的 build 上它只会是升级前排下的遗留步，PR 在 GitHub 合并之后才推上
+ *    去也不该挡收尾（#1403 段 2b）。 */
+export function lastPushedCheckpoint(
+  deps: BuildDeps,
+  buildId: string,
+  opts: { mergeSteps: boolean },
+): string | null {
+  return (
+    deps.db
+      .select({ commit: step.checkpointCommit })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          notInArray(step.kind, opts.mergeSteps ? ['review'] : ['review', 'merge']),
+          eq(step.status, 'done'),
+          isNotNull(step.checkpointCommit),
+        ),
+      )
+      .orderBy(
+        desc(
+          sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
+        ),
+        desc(step.createdAt),
+      )
+      .get()?.commit ?? null
+  );
+}
+
+/** 经 API 合并的关口闸（不写；每次 await 之后重判）。相位：review 放行；failed 且本轮
+ *  已交付（#702 恢复闸的判据）放行、failed 为 true（GitHub 合并或无明确答复之后才恢复
+ *  到 review，明确拒绝时卡原样不动）；到不了 done 的相位抛非法相位转移（与合并步那条路
+ *  同一错误）；building 这类到得了 done 却不是合并关口的 409。相位之后两道：这次运行仍是
+ *  任务的当前运行（重跑之后旧 build 的 PR 可能还开着，合了它就把当前运行的交付晾在一
+ *  边）；本 build 没有在飞的步。 */
+function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
+  const failed = todoRow.phase === 'failed';
+  if (failed) {
+    assertDeliveredBuild(deps, row);
+  } else {
+    assertPhaseTransition(todoRow.phase, 'done');
+    if (todoRow.phase !== 'review') {
+      throw new HttpError(409, `合并只在审核关口发起，当前相位 ${todoRow.phase}`);
+    }
+  }
+  if (todoRow.latestBuildId !== null && todoRow.latestBuildId !== row.id) {
+    throw new HttpError(
+      409,
+      `这次运行已不是任务的当前运行（任务重跑过），pacman 不经它合并 PR #${row.prNumber}`,
+    );
+  }
+  const busy = stepKindInFlight(deps, row.id);
+  if (busy !== null) {
+    throw new HttpError(
+      409,
+      busy === 'review'
+        ? '本任务还有一个审核步在跑：等审核结论出来再合并。'
+        : `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
+    );
+  }
+  return { todoRow, failed };
+}
+
+/** squash 提交正文的关票行（ADR 0021 D2）：任务来自本仓的 issue N（GitHub issue 导入或
+ *  自建 issue）时为 `closes #N`；别的仓的 issue、编排来源、无来源、畸形引用 = null。 */
+function closingLine(todoRow: TodoRow, repoRef: GithubRepoRef): string | null {
+  if (todoRow.sourceKind !== 'github-issue' && todoRow.sourceKind !== 'github-issue-self') {
+    return null;
+  }
+  const issue = todoRow.sourceRef === null ? null : parseGithubIssueSourceRef(todoRow.sourceRef);
+  if (issue === null) return null;
+  const sameRepo =
+    issue.owner.toLowerCase() === repoRef.owner.toLowerCase() &&
+    issue.repo.toLowerCase() === repoRef.repo.toLowerCase();
+  return sameRepo ? `closes #${issue.issueNumber}` : null;
+}
+
+/** squash 提交标题里的关票形态（#1403 段 2b D41）：GitHub 的关票关键字（close / closes /
+ *  closed / fix / fixes / fixed / resolve / resolves / resolved，大小写不敏感，可带冒号），
+ *  后面紧跟一个带数字的记号（#N、GH-N、owner/repo#N、issue 链接都在内）。PR 标题由 PR 作者
+ *  定（WRITE_AUTHOR_ASSOCIATIONS 含只读成员），带着这种形态进默认分支就会关掉任意 issue，
+ *  绕过 closingLine 只关本仓来源 issue 的规则。故意宽：「Fix 404」这类误伤只丢掉 PR 标题。 */
+const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s*\S*\d/i;
+
+/** 没有 closes 行时 squash 提交的正文（D42）：总要传一个，不传 GitHub 就按仓库设置取 PR
+ *  正文或各提交 message。 */
+const PLAIN_MERGE_BODY = 'Merged by pacman.';
+
+/** 「GitHub 没有明确答复」行里的原因。 */
+function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
+  switch (result.reason) {
+    case 'timeout':
+      return '请求超时';
+    case 'network':
+      return '网络错误';
+    case 'malformed':
+      return `HTTP ${result.status}，应答读不出`;
+    case 'status':
+      return `HTTP ${result.status}`;
+  }
+}
+
+/** 经 GitHub API 合并（#1403 段 2b）：先做完所有不写的检查（相位、#1217 守卫、权限闸、
+ *  GitHub 连接、最后推送的提交、同一 build 没在合并），读 PR 核对（本 build 自己的、开着、
+ *  进默认分支、head 就是最后推送的提交），相位再判一次，然后
+ *  `PUT pulls/{n}/merge {sha, squash, "<PR 标题> (#n)", closes 行}`（标题带关票形态时用
+ *  「Merge pull request #n」，没有 closes 行时正文是 pacman 自己的一行）。结局三分：
+ *  - 合并了：宣告行 + 合并行，卡还在原关口就收尾（failed 先恢复到 review）；相位在请求
+ *    期间被人改了只落行。
+ *  - GitHub 明确拒绝：409 带 GitHub 的理由，不落行、不改相位（再点一次再发一次）。
+ *  - 没有明确答复：宣告行 + 一行说明，failed 恢复到 review（对账只读 review 卡），202；
+ *    PR 对账读到它合并就收尾（sha 绑了最后推送的提交，包含关系天然成立）。 */
+async function mergeThroughGithub(
+  deps: BuildDeps,
+  row: BuildRow,
+  prNumber: number,
+  repoRef: GithubRepoRef,
+  actor: string,
+): Promise<{ delegated: true }> {
+  apiMergeGate(deps, row);
+  await assertNoMergedPrElsewhere(deps, row, prNumber);
+  // 守卫探测的网络窗里相位可能已被改（对账收尾、人关卡）：重读再判。
+  const gate = apiMergeGate(deps, row);
+  assertMergeTools(deps, gate.todoRow);
+  // 拒绝文案里「之后怎么收尾」。review 卡：PR 在 GitHub 上合并后由对账核对并收尾（PR 不是
+  // 本 build 的、合进别的分支、漏了最后推送的提交时，对账只在时间线说明）。failed 卡：对账
+  // 不读（只读 review 卡），看板上把它拖到已完成也走合并弹层回到这里；在 GitHub 上合并之后
+  // 再点一次合并，下文把它恢复到 review 交给对账。
+  const hint = gate.failed
+    ? '在 GitHub 上合并后再点一次合并：pacman 把卡恢复到审核关口，由对账核对后收尾'
+    : 'pacman 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
+  const access = teamGithubToken(deps, gate.todoRow.teamId);
+  if ('reason' in access) {
+    if (access.reason === 'no-secret-box') {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 要经 GitHub 合并，但 server 没有配置密钥（secret box），读不了团队的 GitHub 连接：请检查 server 的密钥配置。`,
+      );
+    }
+    const reconnect = access.reason === 'token-unreadable';
+    const connect = reconnect ? '重新连接 GitHub' : '连接 GitHub';
+    // 没有可用连接时对账匿名读：私有仓库读不到。failed 卡在 GitHub 上合并之后也要经这里
+    // 恢复，没有连接就到不了。
+    const next = gate.failed
+      ? `任务处于失败态：${connect} 后再点合并`
+      : `请${connect} 后再点合并，或直接在 GitHub 上合并这张 PR（${hint}；私有仓库没有连接时对账读不到它）`;
+    throw new HttpError(
+      409,
+      reconnect
+        ? `PR #${prNumber} 要经 GitHub 合并，但团队的 GitHub 连接解不开（密钥换过或密文损坏）：${next}。`
+        : `PR #${prNumber} 要经 GitHub 合并，但团队没有连接 GitHub：${next}。`,
+    );
+  }
+  const token = access.token;
+  // 同一 build 的合并请求不叠发：检查与登记之间没有 await。
+  if (mergingBuilds.has(row.id)) {
+    throw new HttpError(409, `PR #${prNumber} 的合并请求正在进行，等它返回后再试。`);
+  }
+  mergingBuilds.add(row.id);
+  try {
+    const fetchImpl = deps.githubFetch ?? fetch;
+    const page = await githubPull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber);
+    // 读 PR 的网络窗里相位可能已被改：重读再判，且仍是开头那个关口。
+    const before = apiMergeGate(deps, row);
+    if (before.todoRow.phase !== gate.todoRow.phase) {
+      throw new HttpError(409, `读取 PR 期间任务相位已变为 ${before.todoRow.phase}，没有发起合并`);
+    }
+    const pull = page?.pull ?? null;
+    const branch = conversationBranch(row.id);
+    if (pull === null || !hasPullFields(pull) || pull.title === null || pull.headSha === null) {
+      throw new HttpError(
+        409,
+        `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
+      );
+    }
+    if (pull.state === 'closed' && !pull.merged) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 在 GitHub 上已关闭且未合并，无法合并：重新打开它，或重新运行任务。`,
+      );
+    }
+    // 本 build 自己的 PR（与 PR 对账同一判据）：fork 里同名分支开的 PR 不合。
+    if (!isOwnPull(pull, branch)) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，pacman 不合并它：请在 GitHub 上核对这张 PR。`,
+      );
+    }
+    // 作者要对仓库有写权限（与对账改记同一判据）：daemon 记的是工作分支上编号最大的开着的
+    // PR，不看是谁开的；没有写权限的人从这个分支开的 PR，标题与正文由他定。
+    if (!WRITE_AUTHOR_ASSOCIATIONS.has(pull.authorAssociation ?? '')) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），pacman 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
+      );
+    }
+    if (pull.baseRef !== pull.defaultBranch) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，pacman 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
+      );
+    }
+    if (pull.merged) {
+      if (!gate.failed) {
+        throw new HttpError(409, `PR #${prNumber} 已在 GitHub 合并，没有再发起合并：${hint}。`);
+      }
+      // failed 卡（本轮已交付，apiMergeGate 判过；PR 是本 build 的、作者有写权限、合进默认
+      // 分支，上文判过）：恢复到 review，对账读到合并后核对并收尾。
+      setTodoPhase(deps, row.todoId, 'review');
+      insertMessageRow(deps, row.id, {
+        id: newRecordId(),
+        role: 'system',
+        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，pacman 对账核对后收尾（核对不上时在时间线说明）。`,
+        createdAt: nowMs(),
+      });
+      return { delegated: true };
+    }
+    const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
+    if (checkpoint === null || !isFullSha(checkpoint)) {
+      throw new HttpError(
+        409,
+        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），pacman 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
+      );
+    }
+    if (pull.headSha !== checkpoint) {
+      throw new HttpError(
+        409,
+        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。pacman 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
+      );
+    }
+    // 标题取 PR 标题（ADR 0021 D2），带关票形态时改用 pacman 自己的标题（D41）。
+    const titled = `${pull.title} (#${prNumber})`;
+    const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
+      sha: checkpoint,
+      // 只验 PR 标题本身：拼上「 (#n)」再验，以 fix / close / resolve 结尾的标题会经「(#n」
+      // 误命中而丢掉标题（#1509 pr-gate 第 4 轮）。
+      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
+      // 取读 PR 之后重读的任务行：读的网络窗里自建 issue 可能刚补上 sourceRef（D43）。
+      commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
+    });
+    if (result.kind === 'rate-limited') {
+      // 限流的请求 GitHub 没有处理：合并确定没有发生，不落行、不恢复卡。等多久与进料读同一
+      // 先后：retry-after 优先（二级限流常同时带主窗口更晚的 x-ratelimit-reset）。
+      const { limit } = result;
+      const when =
+        limit.retryAfterSeconds !== null
+          ? `，${limit.retryAfterSeconds} 秒后再试`
+          : limit.resetAt !== null
+            ? `，限流在 ${new Date(limit.resetAt).toISOString()} 解除`
+            : '';
+      throw new HttpError(
+        409,
+        `GitHub 限流，没有处理合并 PR #${prNumber} 的请求（HTTP ${limit.status}${when}）${result.message === '' ? '' : `：${githubText(result.message)}`}——稍后再点合并，或直接在那里合并（${hint}）`,
+      );
+    }
+    if (result.kind === 'refused') {
+      throw new HttpError(
+        409,
+        result.status === 401
+          ? `GitHub 不认团队的 GitHub 连接（HTTP 401），PR #${prNumber} 没有合并：请重新连接 GitHub 后再点合并。`
+          : `GitHub 拒绝合并 PR #${prNumber}（HTTP ${result.status}）${result.message === '' ? '' : `：${githubText(result.message)}`}——可在 GitHub 上处理后直接在那里合并（${hint}）`,
+      );
+    }
+    // 合并了，或不知道合没合：请求已经发出，落宣告行。卡还在开头那个关口才动相位。
+    const now = deps.db
+      .select({ phase: todo.phase })
+      .from(todo)
+      .where(eq(todo.id, row.todoId))
+      .get();
+    const atGate = now?.phase === gate.todoRow.phase;
+    if (atGate && gate.failed) setTodoPhase(deps, row.todoId, 'review');
+    insertGateAnnouncement(deps, row.id, MERGE_ANNOUNCEMENT, actor);
+    insertMessageRow(deps, row.id, {
+      id: newRecordId(),
+      role: 'system',
+      content:
+        result.kind === 'merged'
+          ? `PR #${prNumber} 已由 pacman 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
+          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。pacman 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
+      createdAt: nowMs(),
+    });
+    if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
+    return { delegated: true };
+  } finally {
+    mergingBuilds.delete(row.id);
+  }
 }
 
 /** plan 步未产 plan.md 的自动补写指令（#113 裁定候选1，02 §4.2「plan 即文件」
@@ -1447,7 +1846,10 @@ export function applyStepFailure(
   // #1492：空原因会让卡片上的失败横幅（errorMessage 非空才渲染）整块消失。
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
-  db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
+  db.update(step)
+    .set({ status: 'failed', finishedAt: nowMs() })
+    .where(eq(step.id, stepRow.id))
+    .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
@@ -1724,12 +2126,20 @@ export function completeStep(
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     return;
   }
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) {
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     return;
   }
   // #1453 / #1247：停止信号在途时步先正常跑完。卡已被写离执行中、步属旧
@@ -1741,7 +2151,11 @@ export function completeStep(
   const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
   if (reserved !== undefined || staleBuild || hasLeftExecution(todoRow.phase)) {
     afterStopPhaseByBuild.delete(buildRow.id);
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
@@ -1772,7 +2186,11 @@ export function completeStep(
     }
     return;
   }
-  deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+  deps.db
+    .update(step)
+    .set({ status: 'done', finishedAt: nowMs() })
+    .where(eq(step.id, stepId))
+    .run();
 
   if (stepRow.kind === 'plan') {
     // 交接物校验（#113：05 §5 实跑发现规划轮可跳过写 plan.md 直接交付，build 轮
@@ -1815,8 +2233,7 @@ export function completeStep(
     // 与 prNumber 缺位的存量形（仅 prUrl，#931 不猜号同律）→ 既有直进 review
     // 行为逐字节不变。githubRepo 存量值不合法（#1466）同按无 GitHub 仓处理：
     // 轮询器对它不出站，停在 building 就再没有出口。
-    const projRow = projectOfTodo(deps.db, todoRow);
-    const deliveredGithubPr = buildRow.prNumber !== null && githubRepoOfProject(projRow) !== null;
+    const deliveredGithubPr = githubPrOf(deps, todoRow, buildRow.prNumber) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
@@ -1948,6 +2365,23 @@ export function completeStep(
           ? { extractionError: outcome.verifyVerdictError }
           : {}),
       }),
+      createdAt: nowMs(),
+    });
+    return;
+  }
+  // #1403 段 2b：GitHub 形态、build 记着 PR 的任务以 PR 在 GitHub 上合并为准（人点合并
+  // = server 经 GitHub API 合并，不再派合并步）。这里完成的合并步是升级前排下的，或
+  // build 在合并步回报时才记上 PR：步跑完不等于 PR 合并了——不收尾，落一行；PR 合并后
+  // 由对账收尾（本轮没有完成行，对账照常收）。
+  const pr = githubPrOf(deps, todoRow, buildRow.prNumber);
+  if (pr !== null) {
+    // 到不了 done 的相位照旧拒（与 finishTodoDone 同一判据，#931 返工复用同一 build 时
+    // 旧合并步迟到）：不落行。
+    assertPhaseTransition(todoRow.phase, 'done');
+    insertMessageRow(deps, buildRow.id, {
+      id: newRecordId(),
+      role: 'system',
+      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上合并为准，pacman 对账读到它合并后收尾。它若还开着：在审核关口点「合并」由 pacman 经 GitHub 合并，或直接在 GitHub 上合并。`,
       createdAt: nowMs(),
     });
     return;

@@ -6,6 +6,9 @@
 import type {
   ActiveRun,
   Assignment,
+  AutonomyGateReason,
+  AutonomyKind,
+  AutonomySettings,
   ChiefWatch,
   ClaudeCodeReport,
   DocumentDiffFile,
@@ -73,6 +76,8 @@ export const project = sqliteTable('project', {
   /** local 形态：用户本机 git 工作树仓绝对路径（spec 12 / #359；server 端
    * `~` 展开 + 三态校验后的规范化值，daemon 镜像 clone 同源消费）。 */
   localPath: text('localPath'),
+  /** 后台自动任务的闸设置（#1491）：null = 用 shared DEFAULT_AUTONOMY_SETTINGS。 */
+  autonomy: json<AutonomySettings | null>('autonomy'),
 });
 
 // —— todo（02 §4.1 字段表全量；tagIds/buildHistory/agent 为派生面不存列）——————
@@ -229,6 +234,9 @@ export const step = sqliteTable('step', {
   claimedAt: epochMs('claimedAt'),
   /** [内部] heartbeat/<stepId> 续活时刻（02 §5.4）。 */
   lastHeartbeatAt: epochMs('lastHeartbeatAt'),
+  /** [内部] 步收尾时刻（#1403 段 3：builds.ts 把 build 的步写成 done / failed / stopped 时
+   * 落；chief 回合步不落）。「最后推送的提交」按它排；迁移之前的行为 null，回落最后一次报到。 */
+  finishedAt: epochMs('finishedAt'),
   /** [内部] 入队时合成的续轮指令（M4a [设计]）：驳回 feedback 注入重规划轮
    * （r5 §4「v2 内容忠实执行反馈」宿主等价物）、chief 回合任务文本/wake 事实
    * （r5 §3.1/§3.5）。claim 载荷 `instruction` 位透出。 */
@@ -928,4 +936,33 @@ export const gateState = sqliteTable('gate_state', {
   /** MergeReadiness.blockers，按 MERGE_BLOCKERS 的固定顺序。 */
   blockers: json<GateBlockerRow[]>('blockers').notNull(),
   evaluatedAt: epochMs('evaluatedAt').notNull(),
+});
+
+// —— #1491 后台自动任务触发闸 ——————————————————————————————————————————————
+
+// autonomy_state：每 (项目, 任务种类) 一行。lastStartedAt 供冷却，baselineSha
+// 供休眠（上次开跑时 main 的头），lastBlockedReason 供设置页显示。
+export const autonomyState = sqliteTable(
+  'autonomy_state',
+  {
+    projectId: text('projectId')
+      .notNull()
+      .references(() => project.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<AutonomyKind>().notNull(),
+    lastStartedAt: epochMs('lastStartedAt'),
+    /** 上次开跑时 main 的头；null = 不用休眠闸的任务，或没读到。 */
+    baselineSha: text('baselineSha'),
+    /** 最近一次判定被拦的原因；null = 最近一次放行。 */
+    lastBlockedReason: text('lastBlockedReason').$type<AutonomyGateReason | null>(),
+    lastEvaluatedAt: epochMs('lastEvaluatedAt'),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.kind] })],
+);
+
+// member_activity：人（board 上的成员，经 /api/ 鉴权面发的写请求）最近一次写
+// 操作的时刻。agent 走 /api/mcp、机器走 /api/machine、webhook 走 /api/webhook，
+// 都不记。scope 眼下只有 'server' 一行（本实例上任何项目的写操作都算）。
+export const memberActivity = sqliteTable('member_activity', {
+  scope: text('scope').primaryKey(),
+  at: epochMs('at').notNull(),
 });

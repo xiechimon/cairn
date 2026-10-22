@@ -246,6 +246,20 @@ describe('provider record (r3 §2 实测原样, key 打码)', () => {
     expect(providerRecordSchema.parse(sample)).toEqual(sample);
   });
 
+  it('keeps optional per-model contextWindow/maxTokens (#1526) and rejects non-positive values', () => {
+    const declared = {
+      ...sample,
+      models: [{ id: 'glm-5.3', name: 'glm-5.3', contextWindow: 1_000_000, maxTokens: 32_768 }],
+    };
+    expect(providerRecordSchema.parse(declared)).toEqual(declared);
+    expect(
+      providerRecordSchema.safeParse({
+        ...sample,
+        models: [{ id: 'm', name: 'm', contextWindow: 0 }],
+      }).success,
+    ).toBe(false);
+  });
+
   it('never models apiKey — 只写不读 (02 §8/r3 §2)', () => {
     const shape = providerRecordSchema.shape;
     expect('apiKey' in shape).toBe(false);

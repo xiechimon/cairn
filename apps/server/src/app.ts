@@ -8,9 +8,11 @@ import { Hono } from 'hono';
 import type { Logger } from 'pino';
 import type { AppContext } from './context.js';
 import { HttpError } from './lib/errors.js';
+import { nowMs } from './lib/ids.js';
 import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
 import { registerMachineRoutes } from './routes-machine.js';
+import { countsAsMemberWrite, recordMemberWrite } from './services/autonomy-gates.js';
 import { NotFoundError } from './services/builds.js';
 import { PhaseTransitionError } from './services/phase.js';
 
@@ -77,10 +79,25 @@ function registerStaticSpa(app: Hono, webDir: string): void {
   });
 }
 
+/** #1491 人在用就让路：/api/ 上人发的写请求成功后记一笔时刻（后台自动任务的
+ * 闸读它）。记账失败不影响请求本身。 */
+function registerMemberActivity(app: Hono, ctx: AppContext): void {
+  app.use('/api/*', async (c, next) => {
+    await next();
+    if (!countsAsMemberWrite(c.req.method, c.req.path, c.res.status)) return;
+    try {
+      recordMemberWrite(ctx.db, nowMs());
+    } catch {
+      // 记不上 = 闸少看到一次人的操作；请求照常返回。
+    }
+  });
+}
+
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   // 可选 token 鉴权闸（#251）：全仓唯一新缝，先于一切路由注册；null = 不注册。
   registerTokenAuth(app, ctx.authToken);
+  registerMemberActivity(app, ctx);
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);
   if (ctx.webDir) registerStaticSpa(app, ctx.webDir);

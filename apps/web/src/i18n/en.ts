@@ -485,6 +485,30 @@ export const EN: Record<string, string> = {
   保存名称: 'Save name',
   保存描述: 'Save description',
   '描述保存失败，请重试。': 'Failed to save description. Try again.',
+  // #1491 project settings: background autonomy gates card
+  后台自动任务: 'Background tasks',
+  允许后台自动开跑: 'Allow background runs',
+  'issue 进料、园丁等后台任务开一轮前先过这道闸；下面的分钟数或预算填 0 = 关掉那一道。':
+    'Issue intake, the gardener and other background tasks check these gates before each run; set a number to 0 to turn that gate off.',
+  '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
+  '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
+  '每日预算（USD）': 'Daily budget (USD)',
+  '今日已花（UTC）': 'Spent today (UTC)',
+  读不到: 'Unavailable',
+  保存后台自动任务设置: 'Save background task settings',
+  'issue 进料': 'Issue intake',
+  园丁: 'Gardener',
+  自治合并: 'Auto-merge',
+  还没判过: 'Not checked yet',
+  最近一次放行: 'Last check: allowed',
+  '最近一次被拦：': 'Last check blocked: ',
+  未开启: 'turned off',
+  '没有新提交，休眠中': 'no new commits, sleeping',
+  在飞任务已满: 'in-flight limit reached',
+  '有人正在用，让路': 'someone is active, yielding',
+  冷却中: 'cooling down',
+  今日预算已用完: "today's budget is used up",
+  '花费读不到，先不跑': 'spend unreadable, holding off',
   '转换失败，请重试。': 'Conversion failed. Try again.',
   '转换为 GitHub 形态': 'Convert to GitHub form',
   '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。':
@@ -711,8 +735,8 @@ export const EN: Record<string, string> = {
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
   '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
     'Todo data is not ready, so the request was not sent. Refresh the page and try again.',
-  '已发起合并，机器执行完成后任务进入已完成。':
-    'Merge started. The todo moves to done once the machine finishes the merge.',
+  '已发起合并，合并完成后任务进入已完成。':
+    'Merge started. The todo moves to done once the merge completes.',
   '任务已完成，改动保留在会话分支。':
     'Todo completed. The changes stay on the conversation branch.',
   '失败任务只能经合并完成，不能跳过合并。':

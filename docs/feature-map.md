@@ -50,12 +50,13 @@
 | job | 命名步骤 |
 |---|---|
 | `check` | Conflict markers、Lane file gate (#1199)、Test spawn gate、PR evidence workflow shape gate、UI debt gate (#851)、UI registry gate (#989)、UI consumer shape gate (#1054)、Install dependencies、Spec parse gate (#1052)、verify-pacman CLI self-test (#1402)、Install Playwright chromium、Drizzle snapshot chain guard、Drizzle migration drift check、Typecheck、Test (vitest，轻 project)、Test (vitest，集成栈单独跑)、Lint (biome ci)、pr-gate self-check (#1401)、Lint warning cap gate (#1192)、UI drift gate (#851) |
-| `e2e` | Install ffmpeg、Install dependencies、Install Playwright chromium、E2E (shard ${{ matrix.shard }}/4, #693)、CSS mechanism gate (#747) |
+| `e2e` | Install dependencies、Install Playwright chromium、E2E (shard ${{ matrix.shard }}/4, #693)、CSS mechanism gate (#747) |
 | `e2e-gate` | Aggregate e2e shards |
 | `pack-smoke` | Install dependencies、Pack smoke (main package tarball, bare node) |
 | `dead-class-gate` | Install dependencies、Dead class gate (#1036) |
 | `issue-label-gate` | Issue label gate |
-| `feature-map-gate` | Feature map staleness gate (#1160)、Feature map doc freshness check (#1527) |
+| `feature-map-gate` | Feature map staleness gate (#1160) |
+| `comment-discipline-gate` | Comment discipline gate (advisory, #1520)、Feature map doc freshness check (#1527) |
 
 ### 0.6 已知局限（首版如实登记）
 
@@ -70,22 +71,22 @@
 
 | 项 | 数 |
 |---|---|
-| 地图行（issue） | 605 |
-| 其中 差异化面 | 85 |
+| 地图行（issue） | 609 |
+| 其中 差异化面 | 86 |
 | 其中 运行轴 | 137 |
-| 其中 通用面 | 383 |
-| 状态 已做 | 532 |
+| 其中 通用面 | 386 |
+| 状态 已做 | 536 |
 | 状态 在跑 | 6 |
 | 状态 待开 | 3 |
 | 状态 未验证 | 64 |
-| 锚 = 证据目录 + 测试引用 | 289 |
-| 锚 = 仅证据目录 | 78 |
-| 锚 = 仅测试引用 | 171 |
+| 锚 = 证据目录 + 测试引用 | 291 |
+| 锚 = 仅证据目录 | 79 |
+| 锚 = 仅测试引用 | 172 |
 | 无锚（`[未验证]`） | 67 |
-| 被引用的 PR（不生成行，§3.2） | 107 |
+| 被引用的 PR（不生成行，§3.2） | 115 |
 | 解析不到的票号（§3.3） | 0 |
 | 非 GitHub 票号的证据目录（§3.4） | 76 |
-| 扫描面：spec 册 / 测试文件 | 30 / 492 |
+| 扫描面：spec 册 / 测试文件 | 30 / 500 |
 
 ## 2. 功能地图
 
@@ -173,17 +174,18 @@
 | [#1312](https://github.com/xiechimon/pacman/issues/1312) daemon/server: build 步在同机续不上 plan 会话——session not found 且无降级，plan→confirm→build 断链 | 差异化面 | 已做 | `docs/verify/1312/`<br>`apps/daemon/test/claude-transcript-path.test.ts`<br>`apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/daemon/test/runner-recover-degrade.test.ts`<br>`apps/server/test/machine-pin.test.ts`<br>`packages/shared/test/confirmed-plan-note.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
 | [#1313](https://github.com/xiechimon/pacman/issues/1313) web/server: review 期零实质改动的卡没有「不合并」收口——「完成」强制 merge conv 分支且要 agent 合并授权 | 差异化面 | 已做 | `docs/verify/1313/`<br>`apps/server/test/delivery-surface.test.ts`<br>`apps/web/e2e/empty-review-closeout.spec.ts` |
 | [#1316](https://github.com/xiechimon/pacman/issues/1316) daemon: git 2.43.0 rejects reset --hard --end-of-options | 差异化面 | 已做 | `docs/verify/1316/`<br>`apps/daemon/test/git.test.ts`<br>`apps/daemon/test/sync.test.ts` |
-| [#1404](https://github.com/xiechimon/pacman/issues/1404) server,shared,daemon: 自举闭环 P3 合并就绪闸（判定绑 patchDigest、自动审核与验证、chief go/no-go、pacman/merge-gate） | 差异化面 | 在跑 | `docs/verify/1404/`<br>`apps/server/test/github-gate-transport.test.ts`<br>`apps/server/test/merge-gate-digest.test.ts`<br>`apps/server/test/merge-gate-evidence-link.test.ts`<br>`apps/server/test/merge-gate-imports.test.ts`<br>`apps/server/test/merge-gate-paths.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts`<br>`apps/server/test/merge-gate-tables.test.ts`<br>`apps/server/test/schema.test.ts`<br>`packages/shared/test/snapshot.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
+| [#1404](https://github.com/xiechimon/pacman/issues/1404) server,shared,daemon: 自举闭环 P3 合并就绪闸（判定绑 patchDigest、自动审核与验证、chief go/no-go、pacman/merge-gate） | 差异化面 | 在跑 | `docs/verify/1404/`<br>`apps/server/test/github-gate-transport.test.ts`<br>`apps/server/test/merge-gate-digest.test.ts`<br>`apps/server/test/merge-gate-evidence-link.test.ts`<br>`apps/server/test/merge-gate-github-adapter.test.ts`<br>`apps/server/test/merge-gate-github-facts.test.ts`<br>`apps/server/test/merge-gate-imports.test.ts`<br>`apps/server/test/merge-gate-paths.test.ts`<br>`apps/server/test/merge-gate-readiness.test.ts`<br>`apps/server/test/merge-gate-status.test.ts`<br>`apps/server/test/merge-gate-tables.test.ts`<br>`apps/server/test/schema.test.ts`<br>`packages/shared/test/snapshot.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1440](https://github.com/xiechimon/pacman/issues/1440) 合并闸：人类裁决待定时 PR 仍被 auto-merge 合入（#1435 事故，needs-decision 标签 + pr-evidence 必需检查） | 差异化面 | 已做 | `docs/verify/1440/` |
 | [#1442](https://github.com/xiechimon/pacman/issues/1442) web: axe-core accessibility gate in e2e, and the violations it finds | 差异化面 | 已做 | `docs/verify/1442/`<br>`apps/web/e2e/a11y-axe.spec.ts` |
 | [#1457](https://github.com/xiechimon/pacman/issues/1457) shared: one rule for which phases can start, so the board cannot offer a drop the server rejects | 差异化面 | 已做 | `docs/verify/1457/`<br>`apps/server/test/github-reads.test.ts`<br>`apps/server/test/issue-intake.test.ts`<br>`apps/web/test/columns.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
+| [#1491](https://github.com/xiechimon/pacman/issues/1491) server: 后台自动任务的触发闸（冷却、日预算、人在用就让路、没变化就休眠） | 差异化面 | 已做 | `docs/verify/1491/`<br>`apps/server/test/autonomy-api.test.ts`<br>`apps/server/test/autonomy-gates.test.ts`<br>`apps/server/test/issue-intake.test.ts`<br>`apps/server/test/schema.test.ts`<br>`apps/server/test/webhook.test.ts`<br>`apps/server/test/wire.test.ts`<br>`apps/web/e2e/project-settings-autonomy.spec.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#1492](https://github.com/xiechimon/pacman/issues/1492) server,daemon: plan 结构契约（Verification 必须可机器校验）+ 报告兜底 + 票 dedupeKey | 差异化面 | 已做 | `docs/verify/1492/`<br>`apps/server/test/artifact-gate.test.ts`<br>`apps/server/test/persona-split-verify.test.ts`<br>`packages/shared/test/plan-contract-prompt.test.ts`<br>`packages/shared/test/plan-contract.test.ts`<br>`packages/shared/test/ticket-dedupe.test.ts`<br>`packages/shared/test/verify-prompt.test.ts` |
 | [#16](https://github.com/xiechimon/pacman/issues/16) 研究：上游核心近读 — agent loop / bus / session / memory | 运行轴 | 已做 | `apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts` |
 | [#25](https://github.com/xiechimon/pacman/issues/25) 设计：agent core TS 化（loop / runner / bus / session / memory） | 运行轴 | 已做 | `apps/server/test/rework-plan-fallback.test.ts`<br>`apps/server/test/second-pr-guard.test.ts` |
 | [#27](https://github.com/xiechimon/pacman/issues/27) 设计：providers 路由 + config + security + CLI TS 化 | 运行轴 | 已做 | `integration/test/board-trio-e2e.test.ts` |
 | [#37](https://github.com/xiechimon/pacman/issues/37) 研究：协议面与 executor 行为观察（API/WS 词表、MCP、tds start、BYOK/OAuth 面） | 运行轴 | 未验证 | [未验证] |
 | [#41](https://github.com/xiechimon/pacman/issues/41) 设计：架构平价（编排/executor/MCP/密钥/通知） | 运行轴 | 未验证 | [未验证] |
-| [#79](https://github.com/xiechimon/pacman/issues/79) M3a daemon 骨架（T2 时间盒）：AgentBackend 缝 + machine 协议 + upload-urls | 运行轴 | 已做 | `integration/test/m3a-demo.test.ts` |
+| [#79](https://github.com/xiechimon/pacman/issues/79) M3a daemon 骨架（T2 时间盒）：AgentBackend 缝 + machine 协议 + upload-urls | 运行轴 | 已做 | `apps/server/test/pr-merge-api.test.ts`<br>`integration/test/m3a-demo.test.ts` |
 | [#80](https://github.com/xiechimon/pacman/issues/80) M3b daemon 深面：worktree 契约 + step 三类 + merge 202（单机生命周期实跑） | 运行轴 | 已做 | `integration/test/m3b-demo.test.ts` |
 | [#82](https://github.com/xiechimon/pacman/issues/82) M4b 编排深面：memory 写路径 + MCP 双面 + watch/wake 三触发 | 运行轴 | 未验证 | [未验证] |
 | [#109](https://github.com/xiechimon/pacman/issues/109) 品牌槽切换：tds 族 → pacman 族（素材替换计划 D3 触发：与正版 todos.dev 同机共存冲突，提前执行） | 运行轴 | 已做 | `apps/server/test/git-hosting.test.ts`<br>`apps/web/test/i18n.test.ts`<br>`apps/web/test/pwa.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
@@ -255,7 +257,7 @@
 | [#926](https://github.com/xiechimon/pacman/issues/926) daemon: 重试与收敛时序显式化（retry.* 未接、agent_settled 取代 willRetry 猜测） | 运行轴 | 已做 | `docs/verify/926/`<br>`apps/daemon/test/map-pi-event.test.ts`<br>`apps/daemon/test/pi-retry-config.test.ts`<br>`apps/daemon/test/runner-error-lifecycle.test.ts` |
 | [#927](https://github.com/xiechimon/pacman/issues/927) daemon: 成本可见性（usage 已在用、cost 未接；缓存保留未设） | 运行轴 | 已做 | `apps/daemon/test/map-pi-event.test.ts`<br>`apps/daemon/test/pi-config-effect.test.ts`<br>`apps/daemon/test/pi-session-policy.test.ts`<br>`apps/daemon/test/runner-error-lifecycle.test.ts`<br>`apps/server/test/machine-wire.test.ts`<br>`integration/test/pi-session-policy.test.ts`<br>`packages/shared/test/vocabulary.test.ts` |
 | [#930](https://github.com/xiechimon/pacman/issues/930) daemon: MCP 桥改用 pi 原生 MCP（registerMcpServer/createMcpExtension；解析层保留） | 运行轴 | 已做 | `apps/daemon/test/mcp-config.test.ts`<br>`apps/daemon/test/pi-mcp-attention.test.ts`<br>`integration/test/m4b-mcp-e2e.test.ts` |
-| [#931](https://github.com/xiechimon/pacman/issues/931) server+daemon: 有 PR 的任务返工要回到原分支/原 PR —— 失败重启现在另起新会话、孤儿化原 PR | 运行轴 | 已做 | `docs/verify/931/`<br>`apps/server/test/ci-loop.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/rework-branch-reuse.test.ts`<br>`apps/server/test/second-pr-guard.test.ts`<br>`apps/web/test/transcript-user-words.test.ts`<br>`integration/test/rework-branch-reuse-e2e.test.ts` |
+| [#931](https://github.com/xiechimon/pacman/issues/931) server+daemon: 有 PR 的任务返工要回到原分支/原 PR —— 失败重启现在另起新会话、孤儿化原 PR | 运行轴 | 已做 | `docs/verify/931/`<br>`apps/server/test/ci-loop.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/rework-branch-reuse.test.ts`<br>`apps/server/test/second-pr-guard.test.ts`<br>`apps/web/test/transcript-user-words.test.ts`<br>`integration/test/rework-branch-reuse-e2e.test.ts` |
 | [#955](https://github.com/xiechimon/pacman/issues/955) daemon,server,web: 总管过程按事件边界实时封段——流式期分行，工具与思考各成一行 | 运行轴 | 已做 | `docs/verify/955/`<br>`apps/daemon/test/machine-step-exec.test.ts`<br>`apps/daemon/test/segment.test.ts`<br>`apps/server/test/conv-stream-catchup.test.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-segments.test.ts` |
 | [#958](https://github.com/xiechimon/pacman/issues/958) daemon,server: write the step brief into the worktree and let each CLI load it natively (supersedes spec 17 A9) | 运行轴 | 已做 | `apps/daemon/test/runner-brief.test.ts`<br>`apps/daemon/test/workspace.test.ts`<br>`integration/test/skills-inject-e2e.test.ts` |
 | [#982](https://github.com/xiechimon/pacman/issues/982) registry 件漂移审计：17 件 CLI 同源件逐件 diff 上游，本地偏离判去留 | 运行轴 | 已做 | `apps/web/e2e/accent-typo.spec.ts`<br>`apps/web/e2e/checkbox-unified.spec.ts` |
@@ -314,10 +316,10 @@
 | [#1488](https://github.com/xiechimon/pacman/issues/1488) server: reset deletes a running step before the daemon pulls its stop, so the step runs to the end | 运行轴 | 已做 | `docs/verify/1488/`<br>`apps/daemon/test/runner-stop.test.ts`<br>`apps/server/test/machine-wire.test.ts` |
 | [#1490](https://github.com/xiechimon/pacman/issues/1490) daemon: a stop fetched before the session opens, or before a crash, is dropped | 运行轴 | 已做 | `docs/verify/1490/` |
 | [#1493](https://github.com/xiechimon/pacman/issues/1493) server,daemon: 模型降级链 + provider 熔断（额度用完或模型挂了换备选接着跑） | 运行轴 | 已做 | `docs/verify/1493/`<br>`apps/daemon/test/runner-error-lifecycle.test.ts`<br>`apps/server/test/model-fallback.test.ts`<br>`apps/server/test/provider-health.test.ts`<br>`packages/shared/test/task-failure.test.ts` |
-| [#1497](https://github.com/xiechimon/pacman/issues/1497) Team ownership checks in startBuilds, claim and chief delete_memory (after #1470) | 运行轴 | 已做 | `docs/verify/1497/`<br>`apps/server/test/team-ownership-1497.test.ts` |
+| [#1497](https://github.com/xiechimon/pacman/issues/1497) Team ownership checks in startBuilds, claim and chief delete_memory (after #1470) | 运行轴 | 已做 | `docs/verify/1497/`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/team-ownership-1497.test.ts` |
 | [#10](https://github.com/xiechimon/pacman/issues/10) Kernel: MCP agent channel | 通用面 | 已做 | `apps/web/e2e/branch-button.spec.ts`<br>`apps/web/e2e/overlay-focus.spec.ts` |
 | [#11](https://github.com/xiechimon/pacman/issues/11) Kernel: HTTP API surface | 通用面 | 已做 | `packages/shared/test/records.test.ts` |
-| [#12](https://github.com/xiechimon/pacman/issues/12) Kernel: SPA three screens | 通用面 | 已做 | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
+| [#12](https://github.com/xiechimon/pacman/issues/12) Kernel: SPA three screens | 通用面 | 已做 | `apps/daemon/test/runner-issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/chief-stream-markdown.spec.ts`<br>`apps/web/test/chief-markdown.test.ts`<br>`apps/web/test/mention-token.test.ts`<br>`packages/shared/test/issue-fence.test.ts` |
 | [#13](https://github.com/xiechimon/pacman/issues/13) Kernel: logging + crash recovery | 通用面 | 已做 | `apps/web/e2e/agent-detail.spec.ts` |
 | [#14](https://github.com/xiechimon/pacman/issues/14) Map: nanobot TS 复刻（pacman）— 系统设计 spec + ROADMAP | 通用面 | 已做 | `apps/server/test/gate-actor.test.ts` |
 | [#15](https://github.com/xiechimon/pacman/issues/15) 研究：作者构建顺序考古（上游 git 历史） | 通用面 | 已做 | `apps/web/e2e/overlay-focus.spec.ts` |
@@ -343,7 +345,8 @@
 | [#72](https://github.com/xiechimon/pacman/issues/72) Web: Chief 面板静态面（drawer/线程/设置 4 tab） | 通用面 | 未验证 | [未验证] |
 | [#73](https://github.com/xiechimon/pacman/issues/73) Web: 动效 + 拖拽排序 | 通用面 | 已做 | `apps/web/e2e/board-dnd.spec.ts`<br>`apps/web/test/columns.test.ts`<br>`apps/web/test/dnd.test.ts` |
 | [#74](https://github.com/xiechimon/pacman/issues/74) Web: 中英双语接线 + PWA（manifest/sw.js 字节搬，push handler 形状保留） | 通用面 | 已做 | `apps/web/e2e/storage-unavailable.spec.ts`<br>`apps/web/test/created-at.test.ts`<br>`apps/web/test/i18n-coverage.test.ts`<br>`apps/web/test/i18n.test.ts`<br>`apps/web/test/pwa.test.ts`<br>`apps/web/test/rel-time.test.ts` |
-| [#78](https://github.com/xiechimon/pacman/issues/78) M2c server：密钥三层 + 搜索 + 通知 SSE 三事件 | 通用面 | 已做 | `apps/server/test/wire.test.ts` |
+| [#77](https://github.com/xiechimon/pacman/issues/77) M2b server：repo 托管双形态 + cron 定时闭环 | 通用面 | 已做 | `apps/server/test/pr-merge-api.test.ts` |
+| [#78](https://github.com/xiechimon/pacman/issues/78) M2c server：密钥三层 + 搜索 + 通知 SSE 三事件 | 通用面 | 已做 | `apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/wire.test.ts` |
 | [#83](https://github.com/xiechimon/pacman/issues/83) M5 汇合：fixture 切真 API + live streaming + E2E 主时序全链（含 M6 终验） | 通用面 | 已做 | `apps/server/test/m5-face.test.ts`<br>`integration/test/m5-web-e2e.test.ts` |
 | [#104](https://github.com/xiechimon/pacman/issues/104) 升级窗口：TypeScript 5.9.3 → 7.0.2（工具链兼容面核实 + 全量回归） | 通用面 | 未验证 | [未验证] |
 | [#105](https://github.com/xiechimon/pacman/issues/105) 升级窗口：react-router 7.18.4 → 8.4.0（library mode 回归 + 路由形状保真） | 通用面 | 未验证 | [未验证] |
@@ -386,7 +389,7 @@
 | [#189](https://github.com/xiechimon/pacman/issues/189) task: DELETE /api/projects/:id 端点 + 级联设计——project-settings 删除区复活前置 | 通用面 | 已做 | `apps/server/test/project-delete.test.ts`<br>`apps/server/test/wire.test.ts`<br>`apps/web/e2e/project-settings-dead-buttons.spec.ts`<br>`apps/web/e2e/project-settings-delete.spec.ts` |
 | [#193](https://github.com/xiechimon/pacman/issues/193) task: .dlg 壳层矮视口溢出家族修——max-height/overflow 统一收编 | 通用面 | 已做 | `apps/web/e2e/dialog-viewport.spec.ts` |
 | [#194](https://github.com/xiechimon/pacman/issues/194) task: e2e spec inline import 家族清扫——top-level import 合规 | 通用面 | 未验证 | [未验证] |
-| [#201](https://github.com/xiechimon/pacman/issues/201) grilling: GitHub 技能扫描路线——server 出站 fetch vs GitOps clone vs 出账 | 通用面 | 已做 | `apps/server/test/pr-reconcile.test.ts` |
+| [#201](https://github.com/xiechimon/pacman/issues/201) grilling: GitHub 技能扫描路线——server 出站 fetch vs GitOps clone vs 出账 | 通用面 | 已做 | `apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/pr-seg3.test.ts` |
 | [#202](https://github.com/xiechimon/pacman/issues/202) task: prj-file-row 接文件详情面——useProjectFile + viewer 容器渲染 | 通用面 | 已做 | `apps/server/test/pr-reconcile.test.ts`<br>`apps/web/e2e/diff-full-file.spec.ts`<br>`apps/web/e2e/file-viewer.spec.ts` |
 | [#203](https://github.com/xiechimon/pacman/issues/203) task: server 长 chief 压缩模型槽——compactionModel 列 + PATCH 第三槽 | 通用面 | 已做 | `apps/server/test/chief-settings.test.ts` |
 | [#204](https://github.com/xiechimon/pacman/issues/204) task: chief 设置面压缩模型启用——下拉接 providers 真值（静态化翻回） | 通用面 | 未验证 | [未验证] |
@@ -649,7 +652,7 @@
 | [#1197](https://github.com/xiechimon/pacman/issues/1197) 修复 documents.ts diff 增删行统计误杀 ++/-- 前缀行 | 通用面 | 已做 | `docs/verify/1197/` |
 | [#1211](https://github.com/xiechimon/pacman/issues/1211) local-repo builds mutate the user's main checkout: conv branch fast-forwarded into local main, process files left tracked | 通用面 | 已做 | `docs/verify/1211/`<br>`apps/daemon/test/local-executor.test.ts`<br>`apps/daemon/test/runner-local.test.ts`<br>`apps/daemon/test/workspace-local-unreachable.test.ts`<br>`integration/test/g2t2-local-lifecycle.test.ts` |
 | [#1216](https://github.com/xiechimon/pacman/issues/1216) web: board UI reliability trio — save-and-start doesn't start, rerun from failed unresponsive, failed card detail renders blank | 通用面 | 已做 | `docs/verify/1216/`<br>`integration/test/board-trio-e2e.test.ts` |
-| [#1217](https://github.com/xiechimon/pacman/issues/1217) server: guard against a second PR for a todo whose first PR is already merged | 通用面 | 已做 | `apps/daemon/test/runner-branch-drift.test.ts`<br>`apps/server/test/machine-wire.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/second-pr-guard.test.ts`<br>`integration/test/done-dialog-e2e.test.ts`<br>`packages/shared/test/work-branch-note.test.ts` |
+| [#1217](https://github.com/xiechimon/pacman/issues/1217) server: guard against a second PR for a todo whose first PR is already merged | 通用面 | 已做 | `apps/daemon/test/runner-branch-drift.test.ts`<br>`apps/server/test/machine-wire.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/second-pr-guard.test.ts`<br>`integration/test/done-dialog-e2e.test.ts`<br>`packages/shared/test/work-branch-note.test.ts` |
 | [#1219](https://github.com/xiechimon/pacman/issues/1219) server: cancelled/stuck queued builds block scheduling — cancel returns 409 queued→queued and chief run_builds fails | 通用面 | 已做 | `apps/server/test/queued-cancel-release.test.ts` |
 | [#1242](https://github.com/xiechimon/pacman/issues/1242) server,web: project identity is immutable — support rename and local→github kind conversion; PATCH silently no-ops every field except localPath | 通用面 | 已做 | `docs/verify/1242/`<br>`apps/server/test/project-dual-source.test.ts`<br>`apps/server/test/project-identity.test.ts`<br>`apps/web/e2e/project-settings-identity.spec.ts`<br>`apps/web/e2e/project-settings-local-path.spec.ts` |
 | [#1243](https://github.com/xiechimon/pacman/issues/1243) web: agent description 长文本在两处渲染面溢出（团队卡固定高溢出卡盒、详情页值槽 flex-none 撑破行宽） | 通用面 | 已做 | `docs/verify/1243/`<br>`apps/server/test/agent-desc-limit.test.ts`<br>`apps/web/e2e/agent-desc-overflow.spec.ts` |
@@ -679,7 +682,7 @@
 | [#1397](https://github.com/xiechimon/pacman/issues/1397) web: 项目页 Paper 页面（任务 / 文件两个 tab） | 通用面 | 已做 | `docs/verify/1397/`<br>`apps/web/e2e/paper-project-page.spec.ts` |
 | [#1400](https://github.com/xiechimon/pacman/issues/1400) web: 待处理 means two things (fresh-task chip vs needs-you board column) | 通用面 | 已做 | `docs/verify/1400/`<br>`apps/web/e2e/agent-detail.spec.ts`<br>`apps/web/e2e/phase-chip-words.spec.ts`<br>`apps/web/e2e/queued-action.spec.ts` |
 | [#1401](https://github.com/xiechimon/pacman/issues/1401) docs: 自举闭环 P0 裁决落盘（ADR 0021 自治合并 + spec 28 + 各期开票） | 通用面 | 已做 | `docs/verify/1401/` |
-| [#1403](https://github.com/xiechimon/pacman/issues/1403) server: 自举闭环 P2 GitHub PR 面 + 合并对账（merged 回推 done、BEHIND/DIRTY、按 head SHA 读 checks） | 通用面 | 在跑 | `docs/verify/1403/`<br>`apps/server/test/chief-auto-confirm.test.ts`<br>`apps/server/test/chief-watch.test.ts`<br>`apps/server/test/ci-loop.test.ts`<br>`apps/server/test/gate-actor.test.ts`<br>`apps/server/test/github-repo-dot-segments.test.ts`<br>`apps/server/test/issue-fence.test.ts`<br>`apps/server/test/pr-reconcile.test.ts` |
+| [#1403](https://github.com/xiechimon/pacman/issues/1403) server: 自举闭环 P2 GitHub PR 面 + 合并对账（merged 回推 done、BEHIND/DIRTY、按 head SHA 读 checks） | 通用面 | 在跑 | `docs/verify/1403/`<br>`apps/server/test/chief-auto-confirm.test.ts`<br>`apps/server/test/chief-watch.test.ts`<br>`apps/server/test/ci-loop.test.ts`<br>`apps/server/test/gate-actor.test.ts`<br>`apps/server/test/github-repo-dot-segments.test.ts`<br>`apps/server/test/issue-fence.test.ts`<br>`apps/server/test/pr-merge-api.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/pr-seg3.test.ts`<br>`apps/server/test/second-pr-guard.test.ts` |
 | [#1407](https://github.com/xiechimon/pacman/issues/1407) skills,server: 自举闭环 P6 纠错回路与园丁（correct skill、纠错票触发、每周园丁定时任务） | 通用面 | 在跑 | `packages/shared/test/ticket-dedupe.test.ts` |
 | [#1409](https://github.com/xiechimon/pacman/issues/1409) ops: 自举闭环 P8 毕业（shadow 十张零误放 → 演练仓五条负对照 → 本仓 autonomous）（待宿主） | 通用面 | 待开 | [未验证] |
 | [#1416](https://github.com/xiechimon/pacman/issues/1416) web: 可点击的资源行把设置卡的分隔线盖成透明 | 通用面 | 已做 | `docs/verify/1416/` |
@@ -695,8 +698,10 @@
 | [#1466](https://github.com/xiechimon/pacman/issues/1466) server,shared: githubRepo 接受 . 与 ..（GitHub 请求路径可被改写），requireProjectRow 不核团队 | 通用面 | 已做 | `docs/verify/1466/`<br>`apps/daemon/test/github-probe.test.ts`<br>`apps/server/test/github-reads.test.ts`<br>`apps/server/test/github-repo-dot-segments.test.ts`<br>`apps/server/test/pr-reconcile.test.ts`<br>`apps/server/test/project-team-guard.test.ts`<br>`apps/server/test/team-ownership-1470.test.ts`<br>`apps/server/test/team-ownership-1497.test.ts`<br>`apps/server/test/webhook.test.ts`<br>`packages/shared/test/github-repo-ref.test.ts` |
 | [#1470](https://github.com/xiechimon/pacman/issues/1470) Multi-team ownership checks left after #1466: MCP run_builds and schedule_todo, conversation, usage, save_memory, clone URLs | 通用面 | 已做 | `docs/verify/1470/`<br>`apps/server/test/m4b-memory.test.ts`<br>`apps/server/test/team-ownership-1470.test.ts`<br>`apps/server/test/team-ownership-1497.test.ts` |
 | [#1486](https://github.com/xiechimon/pacman/issues/1486) server: a started card moved back to todo by PATCH or reopen_todos keeps its builds and flags; reset clears them | 通用面 | 已做 | `docs/verify/1486/`<br>`apps/server/test/close-stops-active-steps.test.ts`<br>`apps/server/test/manual-drop-matrix.test.ts`<br>`apps/server/test/patch-todo-reset-gate.test.ts` |
-| [#1487](https://github.com/xiechimon/pacman/issues/1487) server: a merge step that finishes after its card is closed lands on a hosted repo with no trace | 通用面 | 已做 | `docs/verify/1487/`<br>`apps/server/test/m3b-machine-git.test.ts` |
+| [#1487](https://github.com/xiechimon/pacman/issues/1487) server: a merge step that finishes after its card is closed lands on a hosted repo with no trace | 通用面 | 已做 | `docs/verify/1487/`<br>`apps/server/test/m3b-machine-git.test.ts`<br>`apps/server/test/pr-merge-api.test.ts` |
 | [#1494](https://github.com/xiechimon/pacman/issues/1494) server: worker 步注入的 agent 记忆不按项目过滤，跨项目串用 | 通用面 | 已做 | `docs/verify/1494/`<br>`apps/server/test/m4b-memory.test.ts`<br>`integration/test/m4b-memory-e2e.test.ts` |
+| [#1520](https://github.com/xiechimon/pacman/issues/1520) 注释纪律：AGENTS.md 加规则 + lint 禁止新增注释 | 通用面 | 已做 | `docs/verify/1520/` |
+| [#1526](https://github.com/xiechimon/pacman/issues/1526) 自定义 provider 模型的上下文和最大输出写死 128K/16K，1M 模型被浪费 | 通用面 | 已做 | `docs/verify/1526/`<br>`apps/daemon/test/pi-config-effect.test.ts`<br>`packages/shared/test/records.test.ts` |
 | [#1527](https://github.com/xiechimon/pacman/issues/1527) 功能地图：生成物移出 spec 编号序列、CI 加 --check、每日刷新 | 通用面 | 在跑 | `docs/verify/1527/` |
 
 ## 3. 没锚与挂不上的行（后续要补的活）
@@ -781,6 +786,7 @@
 
 | PR | 标题 | 状态 | 引用来源 |
 |---|---|---|---|
+| [#88](https://github.com/xiechimon/pacman/pull/88) | web(71): 路由批 C — schedules + project 三页像素面 + parity 矩阵加行（#71） | closed | 测试 ×1 |
 | [#101](https://github.com/xiechimon/pacman/pull/101) | daemon(80): M3b daemon 深面 — worktree 契约 + step 三类 + merge 202（单机生命周期实跑） | closed | 测试 ×3 |
 | [#102](https://github.com/xiechimon/pacman/pull/102) | server(81): M4a Chief 编排 — remoteTools relay + 措辞→spec + 驳回 v2 + 双 Agent 分派（#81） | closed | 测试 ×1 |
 | [#108](https://github.com/xiechimon/pacman/pull/108) | web(83): M5 汇合 — fixture 切真 API + live streaming 真 SSE + E2E 主时序全链（含 M6 终验） | closed | spec ×1 |
@@ -884,10 +890,17 @@
 | [#1475](https://github.com/xiechimon/pacman/pull/1475) | shared(1406): GitHub issue text fenced as data; Implementer names the repo rules | closed | spec ×1、测试 ×1 |
 | [#1476](https://github.com/xiechimon/pacman/pull/1476) | verify(1402): registry gate, drive lines in the feature maps, stack-state marks | closed | spec ×1 |
 | [#1477](https://github.com/xiechimon/pacman/pull/1477) | server(1459): webhook pacman trigger follows D5 and the in-flight cap | closed | spec ×1、测试 ×1 |
-| [#1479](https://github.com/xiechimon/pacman/pull/1479) | server(1404): merge gate S2 follow-up, compare and checks bound to the PR head | closed | spec ×1 |
+| [#1479](https://github.com/xiechimon/pacman/pull/1479) | server(1404): merge gate S2 follow-up, compare and checks bound to the PR head | closed | spec ×1、测试 ×3 |
 | [#1480](https://github.com/xiechimon/pacman/pull/1480) | shared(1406): images inside the issue fence delivered; issue titles fenced in chief wakes | closed | spec ×1、测试 ×1 |
 | [#1483](https://github.com/xiechimon/pacman/pull/1483) | daemon, server(1473): a released step is not run twice on one machine, and an old run's report is not applied | closed | 测试 ×1 |
+| [#1489](https://github.com/xiechimon/pacman/pull/1489) | server(1403): the reconcile follows the build's own PR; review-gate wake text and confirm check | closed | spec ×1、测试 ×1 |
 | [#1496](https://github.com/xiechimon/pacman/pull/1496) | server(1406): intake and webhook follow-ups from pr-gate on #1461 and #1477 | closed | spec ×1、测试 ×1 |
+| [#1502](https://github.com/xiechimon/pacman/pull/1502) | server(1459): webhook accepts EMU sender logins; refusal reasons pinned | closed | spec ×1 |
+| [#1503](https://github.com/xiechimon/pacman/pull/1503) | server(1404): merge gate S4a, raw GitHub transport for the gate's reads and the status write | closed | spec ×1 |
+| [#1505](https://github.com/xiechimon/pacman/pull/1505) | server, daemon: reset is the only way back to todo, a cancelled card's merge does not land, a deleted step stops (#1486, #1487, #1488) | closed | 测试 ×1 |
+| [#1509](https://github.com/xiechimon/pacman/pull/1509) | server(1403): pressing merge on a GitHub task merges its PR through the API | closed | spec ×2、测试 ×1 |
+| [#1525](https://github.com/xiechimon/pacman/pull/1525) | server(1404): merge gate S4b, the gate's GitHub shell, evidence presence and status plan | closed | spec ×1、测试 ×1 |
+| [#1531](https://github.com/xiechimon/pacman/pull/1531) | server(1403): CI grind reads checks by head SHA, only required checks decide, BEHIND and DIRTY handled | closed | spec ×1 |
 
 ### 3.3 解析不到的票号
 

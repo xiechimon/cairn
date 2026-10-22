@@ -90,11 +90,13 @@
 //        build 的工作分支才写；对不上（含 fork 已删、head 仓为 null）→ 不收尾、不打回，
 //        每轮提示一次，按 etag 缓存；缺 head 分支或 base 仓 id → 读不到
 //   [63] 合并步经 completeStep 收尾（不是直接调 finishTodoDone）同样停掉没人领的 verify 步
+//        （本地仓形态；GitHub 形态有 PR 的 build 由 pacman 经 GitHub 合并，合并步完成不收尾，
+//        见 pr-merge-api.test.ts [2b-D25]）
 //   [64] 对账把拆卡子项收尾成 done → 推进拆卡波次：阻塞已解的兄弟卡开跑
 //   [65] system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
 //        字符（双向覆盖、零宽字符，[65c]），截到 100 个字符
 //   [66] 真实 GitHub 响应（test/fixtures/github，docs/verify/1403 同存）按对账用到的
-//        字段解析
+//        字段解析（段 2b 起含 PR 标题：经 API 合并的提交标题取它）
 //   [67] 关闭要两次紧挨着的读都看到才算：两次读之间有一段没读（有步在飞而跳过，含读的
 //        网络窗里步开始）或有一次读不到 → 之前那次关闭不算数，从下一次读重新数（中间
 //        可能重开又关过）；未连接 GitHub 时每 5 分钟一次的节流不算空档
@@ -210,6 +212,8 @@ interface BranchPullSpec {
   baseRef?: string;
   baseRepoId?: number;
   htmlUrl?: string;
+  /** author_association（缺省 OWNER）；null = 响应里没有这个字段。 */
+  authorAssociation?: string | null;
 }
 
 /** pulls/{n} 端点 mock：按 PR 号回应；compare 按 spec 回应；工作分支 PR 列表按
@@ -266,6 +270,11 @@ class PullsMock {
       if (typeof status === 'number') return Promise.resolve(res(status, '"c"', {}));
       return Promise.resolve(res(200, '"c"', { status }));
     }
+    // 默认分支的保护与规则（#1403 段 3 磨绿的必需检查名单）：没有保护、没有规则。
+    if (/\/rules\/branches\//.test(url)) return Promise.resolve(res(200, '"r"', []));
+    if (/\/branches\/[^/?]+$/.test(url)) {
+      return Promise.resolve(res(200, '"b"', { name: 'main', protected: false }));
+    }
     if (url.includes('/check-runs')) {
       if (!this.checkRuns) return Promise.resolve(res(404, '"x"', {}));
       return Promise.resolve(
@@ -290,6 +299,9 @@ class PullsMock {
             state: p.state ?? 'open',
             merged_at: p.merged === true ? listedAt : null,
             html_url: p.htmlUrl ?? `https://github.com/octo/demo/pull/${p.number}`,
+            ...(p.authorAssociation === null
+              ? {}
+              : { author_association: p.authorAssociation ?? 'OWNER' }),
             head: {
               ref: p.headRef ?? headRefs.get(p.number) ?? '',
               repo: p.headRepoId === null ? null : { id: p.headRepoId ?? REPO_ID },
@@ -373,6 +385,8 @@ function makeWorld(
     connected?: boolean;
     /** project.githubRepo（默认 octo/demo）。 */
     githubRepo?: string;
+    /** project.repoKind（默认 github；local 时 githubRepo 为 null）。 */
+    repoKind?: 'github' | 'local';
   } = {},
 ): World {
   const s = bootServer();
@@ -397,8 +411,8 @@ function makeWorld(
       id: projectId,
       name: `demo-${rnd}`,
       teamId: s.team.id,
-      repoKind: 'github',
-      githubRepo: opts.githubRepo ?? 'octo/demo',
+      repoKind: opts.repoKind ?? 'github',
+      githubRepo: opts.repoKind === 'local' ? null : (opts.githubRepo ?? 'octo/demo'),
     })
     .run();
   s.db
@@ -1610,7 +1624,8 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     mock.checkRuns = true;
     await pollerFor(w, mock, { anonIpReadsPerHour: 2 }).sweep();
     expect(mock.requests.filter((u) => u.includes('/check-runs'))).toHaveLength(1);
-    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(0);
+    // the grind's own PR read (head SHA, #1403 segment 3) is counted too; the review card is not read
+    expect(mock.requests.filter((u) => u.endsWith('/pulls/401'))).toHaveLength(0);
   });
 
   test('㊽ the card leaves review during the second unreadable compare → no hint', async () => {
@@ -1988,7 +2003,9 @@ describe('#1403 PR reconcile for review-phase builds', () => {
   );
 
   test('[63] a merge step completing through completeStep stops an unclaimed verify step', () => {
-    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify' });
+    // local form: on a GitHub build with a PR the merge step no longer finishes the card
+    // (#1403 segment 2b, pr-merge-api.test.ts [2b-D25])
+    const w = makeWorld({ inflight: 'pending', inflightKind: 'verify', repoKind: 'local' });
     w.s.db.update(todoTable).set({ hasChanges: true }).where(eq(todoTable.id, w.todoId)).run();
     const mergeStepId = `step-merge-done-${w.buildId}`;
     w.s.db
@@ -2362,11 +2379,13 @@ describe('#1403 PR reconcile for review-phase builds', () => {
     expect(w.todoRow().phase).toBe('done');
   });
 
-  test('building-phase builds stay with the CI grind path (no pulls read for them)', async () => {
+  test('building-phase builds stay with the CI grind path (its PR read gives the head SHA; not reconciled)', async () => {
     const w = makeWorld({ phase: 'building' });
     const mock = new PullsMock({ [w.prNumber]: { state: 'closed', merged: true } });
     await pollerFor(w, mock).sweep();
-    expect(mock.requests.some((u) => u.includes('/pulls/'))).toBe(false);
+    expect(mock.requests.filter((u) => u.includes('/pulls/'))).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('building');
+    expect(w.systemRows()).toEqual([]);
   });
 });
 
@@ -2405,6 +2424,9 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRepoId: 1361226985,
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
+      title: 'server(1403): reconcile review-phase PRs merged or closed on GitHub',
+      authorAssociation: 'OWNER',
+      mergeableState: 'blocked',
     });
   });
 
@@ -2423,6 +2445,9 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
       baseRepoId: 1361226985,
       defaultBranch: 'main',
       baseOwner: 'xiechimon',
+      title: 'server(1453): a step that finishes before its stop lands leaves an exited card alone',
+      authorAssociation: 'OWNER',
+      mergeableState: 'unknown',
     });
   });
 
@@ -3121,6 +3146,8 @@ describe('#1403 segment 2: the PR the build tracks', () => {
         headRepoId: 1361226985,
         baseRef: 'main',
         baseRepoId: 1361226985,
+        // the segment 2 captures were trimmed without author_association ([2b-P7e] reads it)
+        authorAssociation: null,
       },
     ]);
     const merged = await githubBranchPulls(
@@ -3142,8 +3169,188 @@ describe('#1403 segment 2: the PR the build tracks', () => {
     const args = ['o', 'r', { head: 'o:b', base: 'main' }] as const;
     expect(await githubBranchPulls(serve(200, { message: 'x' }), null, ...args)).toBeNull();
     expect(await githubBranchPulls(serve(404, []), null, ...args)).toBeNull();
-    const thrown = () => Promise.reject(new TypeError('fetch failed'));
-    expect(await githubBranchPulls(thrown, null, ...args)).toBeNull();
+    expect(
+      await githubBranchPulls(() => Promise.reject(new TypeError('fetch failed')), null, ...args),
+    ).toBeNull();
+  });
+
+  // —— #1403 段 2b：段 2 合并前 pr-gate（#1489 run 1）的建议 4-7 ————————————————————
+
+  test('[2b-P4] the recorded PR is foreign and the card leaves review while the list read is in flight → no write', async () => {
+    const f = foreignWorld();
+    headRefs.set(305, f.own);
+    f.mock.pulls[305] = { state: 'open', merged: false };
+    f.mock.branchPulls = [{ number: 305 }];
+    f.mock.onList = () => {
+      f.w.s.db
+        .update(todoTable)
+        .set({ phase: 'planning' })
+        .where(eq(todoTable.id, f.w.todoId))
+        .run();
+    };
+    await pollerFor(f.w, f.mock).sweep();
+    expect(f.mock.listRequests()).toHaveLength(1);
+    expect(f.currentPr()).toBe(201);
+    expect(f.currentRows()).toEqual([]);
+  });
+
+  test('[2b-P5] a failed list read counts within one close only: the card leaving review and coming back starts again', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = 502;
+    const poller = pollerFor(w, mock);
+    const setPhase = (phase: Phase) =>
+      w.s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, w.todoId)).run();
+    const t0 = Date.now();
+    await poller.sweep(t0);
+    await poller.sweep(t0 + 60_000); // confirmed, the list read fails once
+    setPhase('planning');
+    await poller.sweep(t0 + 120_000); // not a candidate: its close count and list failures go
+    setPhase('review');
+    await poller.sweep(t0 + 180_000);
+    await poller.sweep(t0 + 240_000); // confirmed again, the list read fails once more
+    expect(mock.listRequests()).toHaveLength(2);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[2b-P6] anonymous: a foreign list read skipped for lack of budget does not count as a listing', async () => {
+    const f = foreignWorld({ connected: false });
+    const poller = pollerFor(f.w, f.mock, { anonIpReadsPerHour: 2 });
+    const t0 = Date.now();
+    await poller.sweep(t0); // reads pulls/201 (merged, cached from now on) and lists the branch
+    expect(f.mock.listRequests()).toHaveLength(1);
+    // a building card's anonymous check-runs reads use up the hour's budget before the relist
+    addReviewCard(f.w, 401);
+    const grind = `${f.w.todoId}-401`;
+    const setGrind = (phase: Phase) =>
+      f.w.s.db.update(todoTable).set({ phase }).where(eq(todoTable.id, grind)).run();
+    setGrind('building');
+    await poller.sweep(t0 + 3_000_000);
+    await poller.sweep(t0 + 3_300_000);
+    setGrind('closed');
+    await poller.sweep(t0 + 3_600_001); // the relist is due, the budget is not there: skipped
+    expect(f.mock.listRequests()).toHaveLength(1);
+    await poller.sweep(t0 + 6_900_001); // the budget is back: lists now, not an hour after the skip
+    expect(f.mock.listRequests()).toHaveLength(2);
+  });
+
+  test.each([
+    'NONE',
+    'CONTRIBUTOR',
+    'FIRST_TIME_CONTRIBUTOR',
+    'FIRST_TIMER',
+    'MANNEQUIN',
+    null,
+  ] as const)(
+    '[2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (%s) is not adopted → failed as in segment 1',
+    async (association) => {
+      const { w, mock } = closedWithSibling();
+      mock.branchPulls = [{ number: 202, authorAssociation: association }];
+      await sweepTwice(pollerFor(w, mock));
+      expect(mock.listRequests()).toHaveLength(1);
+      expect(w.buildRow().prNumber).toBe(w.prNumber);
+      expect(w.todoRow().phase).toBe('failed');
+      expect(closedRows(w)).toHaveLength(1);
+    },
+  );
+
+  test.each(['OWNER', 'MEMBER', 'COLLABORATOR'] as const)(
+    '[2b-P7b] closed path: an open PR from the build’s branch by %s is adopted',
+    async (association) => {
+      const { w, mock } = closedWithSibling();
+      mock.branchPulls = [{ number: 202, authorAssociation: association }];
+      await sweepTwice(pollerFor(w, mock));
+      expect(w.buildRow().prNumber).toBe(202);
+      expect(w.todoRow().phase).toBe('review');
+      expect(closedRows(w)).toEqual([]);
+    },
+  );
+
+  test('[2b-P7c] foreign path: an open PR from the build’s own branch by an author without write access is not adopted; the hint', async () => {
+    const f = foreignWorld();
+    headRefs.set(305, f.own);
+    f.mock.pulls[305] = { state: 'open', merged: false };
+    f.mock.branchPulls = [{ number: 305, authorAssociation: 'NONE' }];
+    await pollerFor(f.w, f.mock).sweep();
+    expect(f.mock.listRequests()).toHaveLength(1);
+    expect(f.currentPr()).toBe(201);
+    expect(f.currentRows().some((c) => c.includes('PR #201 的 head'))).toBe(true);
+  });
+
+  test('[2b-P7d] closed path: a merged PR from the build’s branch whose author has no write access is not adopted', async () => {
+    const { w, mock } = closedWithSibling({ sibling: { state: 'closed', merged: true } });
+    mock.branchPulls = [
+      { number: 202, state: 'closed', merged: true, authorAssociation: 'CONTRIBUTOR' },
+    ];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(w.todoRow().phase).toBe('failed');
+  });
+
+  test('[2b-P7g] closed path: a newer PR closed unmerged sets the rejection floor whoever authored it (the list does not say who closed it) → the older merged PR is not adopted', async () => {
+    const { w, mock } = closedWithSibling({ sibling: { state: 'closed', merged: true } });
+    headRefs.set(203, conversationBranch(w.buildId));
+    mock.branchPulls = [
+      { number: 203, state: 'closed', authorAssociation: 'NONE' },
+      { number: 202, state: 'closed', merged: true, authorAssociation: 'OWNER' },
+    ];
+    await sweepTwice(pollerFor(w, mock));
+    expect(w.buildRow().prNumber).toBe(w.prNumber);
+    expect(w.todoRow().phase).toBe('failed');
+  });
+
+  test.each(['NONE', 'CONTRIBUTOR', null] as const)(
+    '[2b-P7h] foreign path: own #150 merged by OWNER, own #160 by %s closed unmerged → nothing adopted (pr-gate 1509 run 2, correctness)',
+    async (association) => {
+      const f = foreignWorld();
+      headRefs.set(150, f.own);
+      headRefs.set(160, f.own);
+      f.mock.branchPulls = [
+        { number: 160, state: 'closed', authorAssociation: association },
+        { number: 150, state: 'closed', merged: true, authorAssociation: 'OWNER' },
+      ];
+      await pollerFor(f.w, f.mock).sweep();
+      expect(f.currentPr()).toBe(201);
+      expect(f.currentRows().some((c) => c.includes('改记为本任务的 PR'))).toBe(false);
+      expect(f.currentRows().some((c) => c.includes('PR #201 的 head'))).toBe(true);
+    },
+  );
+
+  test('[2b-P7f] the recorded PR itself shows up open again in the list → no write, whoever opened it', async () => {
+    const { w, mock } = closedWithSibling();
+    mock.branchPulls = [{ number: w.prNumber, authorAssociation: 'NONE' }];
+    await sweepTwice(pollerFor(w, mock));
+    expect(mock.listRequests()).toHaveLength(1);
+    expect(w.todoRow().phase).toBe('review');
+    expect(w.systemRows()).toEqual([]);
+  });
+
+  test('[2b-P7e] the list parser reads author_association (live capture, docs/verify/1403/live-branch-pulls-assoc.json)', async () => {
+    const body: unknown = JSON.parse(
+      readFileSync(
+        resolve(import.meta.dirname, 'fixtures/github', 'branch-pulls-assoc.json'),
+        'utf8',
+      ),
+    );
+    const list = await githubBranchPulls(
+      () => Promise.resolve(res(200, '"live"', body)),
+      null,
+      'xiechimon',
+      'pacman',
+      { head: 'xiechimon:claude/bootstrap-p2-seg2', base: 'main' },
+    );
+    expect(list).toEqual([
+      {
+        number: 1489,
+        state: 'closed',
+        merged: true,
+        headRef: 'claude/bootstrap-p2-seg2',
+        headRepoId: 1361226985,
+        baseRef: 'main',
+        baseRepoId: 1361226985,
+        authorAssociation: 'OWNER',
+      },
+    ]);
   });
 
   // —— T2-T6：pin rules that had no test at f8ab21b（T1 is in ⑱d / ⑱f）————————————

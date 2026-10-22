@@ -32,6 +32,8 @@ export const providerModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   cost: modelCostRatesSchema.optional(),
+  contextWindow: z.number().int().positive().optional(),
+  maxTokens: z.number().int().positive().optional(),
 });
 export type ProviderModel = z.infer<typeof providerModelSchema>;
 

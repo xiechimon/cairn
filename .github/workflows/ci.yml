@@ -232,6 +232,9 @@ jobs:
   # 红不掩盖其余 shard 的结果。
   e2e:
     runs-on: ubuntu-latest
+    # 分片正常 5 到 10 分钟；装包类步骤卡住时不再无限挂着占住合并（整个 job 的
+    # 兜底，不是对测试时长的限制）。
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -247,14 +250,13 @@ jobs:
           node-version: 24
           cache: pnpm
 
-      # `apt-get update` 去掉了（2026-10-07 夜实测）：它本身不是装 ffmpeg 必需的——
-      # 镜像的 apt 列表在构建时就烤好了，直接的 install 走的是现成索引。而 update
-      # 要遍历所有源，慢起来单步能爬 11m42s（实测），4 个分片同时卡在这一步、测试
-      # 一步没跑，是当晚 CI 拖成「分片挂死」的真凶。删掉它把这一步的失败面收窄成
-      # 「装不上包」这一种真故障。
-      - name: Install ffmpeg
-        run: sudo apt-get install -y ffmpeg
-
+      # 不再 apt 装 ffmpeg（2026-10-22 实测）：e2e 分片里没有任何 spec / 脚本调
+      # 系统 ffmpeg（grep apps/web/e2e scripts integration 零命中；唯一的消费者是
+      # 本地的 verify-pacman 驱动脚本）；录像用的 ffmpeg 由下面
+      # `playwright install chromium` 自带。这一步反而是 CI 的拖慢点：run
+      # 39808252360 的 e2e (3) 停在 apt-get install 上 42 分钟没进测试，e2e (1)
+      # 同一步等了 14 分钟，而四个分片的测试本体只要 2 到 3 分钟。此前
+      # （2026-10-07）去掉 apt-get update 治的是同一个病的一半。
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -375,6 +377,18 @@ jobs:
 
       - name: Feature map staleness gate (#1160)
         run: node scripts/feature-map-staleness-gate.mjs
+
+  comment-discipline-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Comment discipline gate (advisory, #1520)
+        env:
+          COMMENT_DISCIPLINE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "${COMMENT_DISCIPLINE_BASE_SHA:-main}"
+          node --test scripts/comment-discipline-gate.test.mjs
+          node scripts/comment-discipline-gate.mjs
 
       - name: Feature map doc freshness check (#1527)
         if: ${{ !cancelled() }}
