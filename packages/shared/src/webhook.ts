@@ -10,7 +10,8 @@
 //   非 issues 事件 / 非 labeled / 非触发 label / 重复投递 / 已有任务）一律
 //   202 + 结构化 result，只有上游 API 瞬时失败（502 直透）喂重试；
 // - #1459（ADR 0021 D5）：打标人 = 事件的 sender，在仓库上 triage 及以上才
-//   导入；读不到权限 / 没 token / 项目在飞已满 = 不导入，同样 202。打标人权限
+//   导入；没有 sender / sender 不是 GitHub 账号名 / 读不到权限 / 没 token /
+//   项目在飞已满 / 导入时 GitHub 找不到 issue = 不导入，同样 202。打标人权限
 //   类的拒收（不到 triage / 读不到 / 遇限流）detail 只答同一句，细节进日志。
 
 import { z } from 'zod';
@@ -52,11 +53,14 @@ export type GithubIssuesEvent = z.infer<typeof githubIssuesEventSchema>;
 export const webhookReceiverResponseSchema = z.object({
   /** created = 建 todo + 入编排；duplicate = 重复投递或 issue 已有任务；
    * ignored = 非 issues 事件 / 非 labeled / 非触发 label / 载荷形坏 / 不导入
-   * （#1459：没有 sender、sender 不到 triage、权限读不到或遇限流、项目在飞
-   * 已满）；
+   * （#1459：没有 sender、sender 不是 GitHub 账号名、sender 不到 triage、权限读
+   * 不到或遇限流、项目在飞已满）；
    * misconfigured = repo 未映射项目 / 项目存的 githubRepo 不是 owner/repo /
-   * GitHub 未连接或 token 解不开（重试无意义，收 202）。detail = 原因；打标人
-   * 权限类的三种拒收共用一句，不说是哪种、哪个账号。 */
+   * GitHub 未连接或 token 解不开 / 导入时 GitHub 说 issue 不存在或团队 token 看
+   * 不到。两种都收 202（重试无意义）。detail = 一句人读的原因（打标人权限类的
+   * 三种拒收共用一句，不说是哪种、哪个账号）；#1459 的拒收原因码（no-sender、
+   * sender-malformed、issue-not-found 等）只在 'github webhook import refused'
+   * 日志行的 reason 里，不在响应里。 */
   result: z.enum(['created', 'duplicate', 'ignored', 'misconfigured']),
   /** X-GitHub-Delivery 原样回显（请求段对账键）。 */
   deliveryId: z.string(),
