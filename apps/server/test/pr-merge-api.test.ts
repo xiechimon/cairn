@@ -58,7 +58,8 @@
 //       卡留在 failed（恢复到 review 只给对账能收尾的那种）
 //   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
 //   D40 PUT 被限流（429，或带限流信号的 403）= GitHub 没有处理这次合并：409 带 GitHub 的
-//       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 编排者裁决）
+//       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 用户裁决，
+//       https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）
 //   D41 PR 标题里有关票关键字 + 引用（close/closes/closed/fix/fixes/fixed/resolve/resolves/
 //       resolved，大小写不敏感，可带冒号，后跟 #N、GH-N、owner/repo#N 或链接）→ 提交标题
 //       不用 PR 标题，用 pacman 自己的「Merge pull request #n」：PR 标题由有写权限标记的
@@ -67,6 +68,9 @@
 //       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
 //   D43 closes 行取 PR 读之后重读的任务行：读的网络窗里自建 issue 补上了 sourceRef（重试）
 //       → 带上它
+//   D44 PR 读本身失败（404、限流 429 / 带限流信号的 403、5xx、超时、网络错、200 但应答体
+//       不是 JSON 对象）→ 409「读不到」，不 PUT、零行；failed 卡留在 failed（#1509 pr-gate
+//       第 2 轮 tests 建议；票的第一条失败方式）
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
@@ -150,6 +154,8 @@ class GithubFake {
     status: 200,
     body: { sha: MERGE_SHA, merged: true, message: 'Pull Request successfully merged' },
   };
+  /** 非 null = pulls/{n} 读不按 pulls 表应答，改答这个（读失败注入位，D44）。 */
+  getAnswer: Answer | null = null;
   /** pulls/{n} 读到达、应答之前调用（网络窗竞态注入位）。 */
   onGet: (() => Promise<void> | void) | null = null;
   /** merge 写到达、应答之前调用。 */
@@ -194,6 +200,12 @@ class GithubFake {
     const m = url.match(/\/pulls\/(\d+)$/);
     if (m === null || method !== 'GET') return reply(404, '{}');
     await this.onGet?.();
+    const g = this.getAnswer;
+    if (g === 'timeout') {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    }
+    if (g === 'network') throw new TypeError('fetch failed');
+    if (g !== null) return reply(g.status, g.raw ?? JSON.stringify(g.body ?? {}), g.headers);
     const n = Number(m[1]);
     const p = this.pulls[n];
     if (p === undefined) return reply(404, JSON.stringify({ message: 'Not Found' }));
@@ -802,6 +814,82 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
+  });
+
+  test.each([
+    ['404', { status: 404, body: { message: 'Not Found' } }],
+    [
+      '429',
+      { status: 429, body: { message: 'Too Many Requests' }, headers: { 'retry-after': '60' } },
+    ],
+    [
+      '403 with x-ratelimit-remaining 0',
+      {
+        status: 403,
+        body: { message: 'API rate limit exceeded' },
+        headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1793016000' },
+      },
+    ],
+    [
+      '403 naming a secondary rate limit',
+      { status: 403, body: { message: 'You have exceeded a secondary rate limit.' } },
+    ],
+    ['500', { status: 500, body: { message: 'Server Error' } }],
+    ['502 with an HTML page', { status: 502, raw: '<html>Bad Gateway</html>' }],
+    ['200 whose body is not JSON', { status: 200, raw: 'not json' }],
+    ['200 whose body is a JSON array', { status: 200, raw: '[]' }],
+    ['a timeout', 'timeout'],
+    ['a network error', 'network'],
+  ] as const)(
+    '[2b-D44a] the PR read fails (%s) → 409 read failed; no PUT; nothing written',
+    async (_name, answer) => {
+      const w = makeWorld();
+      w.fake.getAnswer = answer as Answer;
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain('读不到 PR #201 在 GitHub 上的状态');
+      expect(w.fake.gets()).toHaveLength(1);
+      expect(w.fake.puts()).toEqual([]);
+      expectUntouched(w);
+    },
+  );
+
+  test('[2b-D44b] the PR is gone (404 on the read) → 409 read failed; no PUT', async () => {
+    const w = makeWorld();
+    delete w.fake.pulls[201];
+    const err = await refusal(requestMerge(w.deps, w.buildId));
+    expect(err.status).toBe(409);
+    expect(err.message).toContain('读不到 PR #201');
+    expect(w.fake.puts()).toEqual([]);
+    expectUntouched(w);
+  });
+
+  test.each([
+    ['429', { status: 429, body: { message: 'Too Many Requests' } }],
+    ['503', { status: 503, body: {} }],
+    ['a network error', 'network'],
+  ] as const)(
+    '[2b-D44c] failed card, the PR read fails (%s) → 409; the card stays failed with no row',
+    async (_name, answer) => {
+      const w = makeWorld({ phase: 'failed' });
+      w.fake.getAnswer = answer as Answer;
+      const err = await refusal(requestMerge(w.deps, w.buildId));
+      expect(err.status).toBe(409);
+      expect(err.message).toContain('读不到 PR #201');
+      expect(w.fake.puts()).toEqual([]);
+      expectUntouched(w, 'failed');
+    },
+  );
+
+  test('[2b-D44d] a read failure does not stick: the next press reads again and merges', async () => {
+    const w = makeWorld();
+    w.fake.getAnswer = { status: 502, raw: 'Bad Gateway' };
+    await refusal(requestMerge(w.deps, w.buildId));
+    w.fake.getAnswer = null;
+    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(w.fake.gets()).toHaveLength(2);
+    expect(w.fake.puts()).toHaveLength(1);
+    expect(w.phase()).toBe('done');
   });
 
   test.each([

@@ -1363,7 +1363,8 @@ export async function githubMergePull(
     data = null;
   }
   const message = optString(data?.message) ?? '';
-  // 限流 = GitHub 没有处理这次请求，合并确定没有发生（2026-10-22 编排者裁决）。
+  // 限流 = GitHub 没有处理这次请求，合并确定没有发生：409、不落行（2026-10-22 用户裁决，
+  // 记在 https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）。
   if (isRateLimitedText(res, text ?? '')) {
     return { kind: 'rate-limited', message, limit: rateLimitOf(url, res) };
   }

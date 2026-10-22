@@ -465,8 +465,10 @@ export function createCiPoller(
     // PR 表示不要这次改动，之后没有写权限的人从同一分支另开一张，不能把这个决定翻过来。
     const adoptable = own.filter((p) => WRITE_AUTHOR_ASSOCIATIONS.has(p.authorAssociation ?? ''));
     const open = adoptable.filter((p) => p.state === 'open');
-    // 拒绝的下限同样只看有写权限的作者：没有写权限的人开了又关的 PR 不算有人否了这次改动。
-    const rejected = adoptable.reduce(
+    // 拒绝的下限看本 build 的全部 PR、不按作者筛：关掉 PR 的是维护者，不是作者（#1509
+    // pr-gate 第 2 轮 correctness 建议）。没有写权限的人开的新 PR 被关掉未合并，同样表示不要
+    // 这次改动，比它旧的已合并 PR 不能再被改记回来。
+    const rejected = own.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
       mergedAfter,
     );
