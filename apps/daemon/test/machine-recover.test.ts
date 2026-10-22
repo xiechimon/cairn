@@ -8,7 +8,7 @@ import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { StepJournalEntry } from '../src/journal.js';
 import { StepJournal } from '../src/journal.js';
 import type { StatePaths } from '../src/state.js';
-import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
   test('server 有 claimed 步而本地无 journal → done failed（journal lost）', async () => {
@@ -34,6 +34,7 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
       state: StepJournalEntry['state'];
       planContent: string;
       doneBody: MachineDoneBody;
+      stopRequest: { discard: boolean };
     }>,
   ): void {
     const journal = new StepJournal(paths.outboxDir);
@@ -73,6 +74,52 @@ describe('recover 对账（02 §5.4 步 journal 恢复）', () => {
     expect(lines.some((l) => l.includes('awaiting upload — replaying final report'))).toBe(true);
     expect(lines.some((l) => l.includes('new session conv-1'))).toBe(false);
     expect(lines.some((l) => l.includes('continue session conv-1'))).toBe(false);
+    await handle.stop();
+    await handle.done;
+  });
+
+  // F3 失败方式 5/6：重启前已接收停止。会话没跑完 → 不重跑、直接报 stopped
+  // （带上次会话号，续接链不断）；会话已跑完待补报 → 补报原结果，完成优先。
+  test('重启前已接收停止、会话没跑完 → recover 报 stopped，不开会话', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
+    ];
+    const { backend, created } = fakeBackend([{ type: 'done', usage: [] }]);
+    const { handle, paths } = await boot({
+      api,
+      backend,
+      seedJournal: (paths) =>
+        seedS1Journal(paths, { state: 'running', stopRequest: { discard: true } }),
+    });
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]).toMatchObject({
+      stepId: 's1',
+      body: { status: 'stopped', sessionId: 'pi-sess-1' },
+    });
+    expect(created).toHaveLength(0);
+    expect(new StepJournal(paths.outboxDir).get('s1')).toBeNull();
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('重启前已接收停止、会话已跑完待补报 → 补报原结果（完成优先）', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
+    ];
+    const { handle } = await boot({
+      api,
+      seedJournal: (paths) =>
+        seedS1Journal(paths, {
+          state: 'awaiting-upload',
+          planContent: '# 方案',
+          doneBody: { status: 'success', sessionId: 'pi-sess-1' },
+          stopRequest: { discard: true },
+        }),
+    });
+    await waitFor(() => api.doneBodies.length === 1);
+    expect(api.doneBodies[0]?.body.status).toBe('success');
     await handle.stop();
     await handle.done;
   });
