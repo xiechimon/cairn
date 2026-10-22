@@ -57,7 +57,7 @@ let projectId = '';
 let machineToken = '';
 
 const PLAN_MD =
-  '# Plan\n\nContext: 探针。\nChanges: 探针改动。\nEdge cases: 无。\nVerification: 集成测试。\n';
+  '# Plan\n\nContext: 探针。\nChanges: 探针改动。\nEdge cases: 无。\nVerification: 读回 README.md。\n';
 
 // —— DB 真值辅助 ————————————————————————————————————————————————
 

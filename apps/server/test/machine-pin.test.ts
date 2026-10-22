@@ -38,7 +38,14 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
-import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  type TestServer,
+  withVerification,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-home-1';
 const CC_AGENT_ID = 'agent-home-cc';
@@ -217,7 +224,7 @@ describe('#1312 续接会话的异机标记', () => {
         authorization: `Bearer ${w.tokenA}`,
         'content-type': 'text/markdown',
       },
-      body: '# 方案\nContext: 1312\n',
+      body: withVerification('# 方案\nContext: 1312\n'),
     });
     expect(machineOkResponseSchema.parse(await planPut.json())).toEqual({ ok: true });
     const doneRes = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {

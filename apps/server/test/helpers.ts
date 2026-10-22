@@ -294,3 +294,9 @@ export function machineIdByName(s: TestServer, name: string): string {
   if (row === undefined) throw new Error(`machineIdByName: ${name} 不在库里`);
   return row.id;
 }
+
+/** #1492 plan 结构闸：测试方案样本补一段合格的 Verification（每项带可执行
+ *  锚点），否则 plan 步会被留在规划中走结构补写轮，进不了 confirm。 */
+export function withVerification(plan: string): string {
+  return `${plan}\n\n## Verification\n- \`pnpm test\` 通过\n`;
+}
