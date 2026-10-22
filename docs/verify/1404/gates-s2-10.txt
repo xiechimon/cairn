@@ -1,0 +1,68 @@
+# #1404 S2 round 10 gates, run once in order on the round 10 head before this file (fedd279: the code at c9d7d84 plus the evidence commit),
+# clean tree before and after (git status --short empty). origin/main at the time was 659d8cb (two commits past e410e82, the main merged into
+# the branch as 1813905; `git merge-tree` shows no conflict with it), so `--changed origin/main` compares against a main two commits newer
+# than the one merged in (#1477, #1483); the branch was not merged again. Port 8408 was free (lsof -iTCP:8408 printed nothing, rc 1) before the e2e run; no other playwright ran in this worktree.
+# Each block: the command, the lines that state the result, and the exit code. Full logs stayed in the scratchpad.
+
+HEAD fedd279005492ad4fd1cb47916f542cdb4e53571 on claude/bootstrap-p3-s2r9
+
+$ cd /home/user/pacman/.claude/worktrees/p3b && pnpm lint
+Checked 808 files in 1856ms. No fixes applied.
+Found 1 info.
+exit 0
+
+$ cd /home/user/pacman/.claude/worktrees/p3b && pnpm typecheck
+packages/shared typecheck: Done
+apps/web typecheck: Done
+apps/daemon typecheck: Done
+apps/server typecheck: Done
+integration typecheck: Done
+exit 0
+
+$ cd /home/user/pacman/.claude/worktrees/p3b && pnpm spec:parse
+$ node scripts/spec-parse-gate.mjs
+[spec-parse-gate] apps/web/e2e: 1181 tests in 169 files collected, disk count matches (8.4s)
+[spec-parse-gate] integration/test: 30 test files parsed clean by tsc (4.2s)
+[spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+exit 0
+
+$ cd /home/user/pacman/.claude/worktrees/p3b && pnpm exec vitest run --changed origin/main
+(the run prints expected stderr from tests that drive stub providers and failing commits; the result lines:)
+ Test Files  253 passed (253)
+      Tests  3097 passed | 1 skipped (3098)
+exit 0
+
+$ cd /home/user/pacman/.claude/worktrees/p3b && E2E_AFFECTED_PORT=8408 pnpm --filter @pacman/web e2e:affected
+$ node ../../scripts/e2e-affected.mjs
+[e2e:affected] changed paths (git (working tree + branch vs origin/main)):
+  apps/server/src/services/merge-gate/readiness.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  apps/server/test/merge-gate-readiness.test.ts → server surface (these specs spawn a real server; the stack layer is the real coverage)
+  "docs/spec/28-\350\207\252\344\270\276\351\227\255\347\216\257-\350\207\252\345\206\231\350\207\252\345\220\210.md" → none
+  docs/verify/1404/gates-s2-9.txt → none
+  docs/verify/1404/pr-gate-1421-run4-c4bf400.json → none
+  docs/verify/1404/s2-mutations-10.txt → none
+  docs/verify/1404/s2-mutations-9.txt → none
+  docs/verify/1404/s2-r10-github-shapes.txt → none
+  docs/verify/1404/s2-r10-red-green.txt → none
+  docs/verify/1404/s2-r10-reviews.txt → none
+  docs/verify/1404/s2-r9-carry.txt → none
+  docs/verify/1404/s2-r9-red-green.txt → none
+  docs/verify/1404/s2-r9-reviews.txt → none
+  packages/shared/src/records/merge-gate.ts → none
+  packages/shared/test/__snapshots__/snapshot.test.ts.snap → none
+  packages/shared/test/snapshot.test.ts → none
+[e2e:affected] 2/169 specs on the standard fixture-build config, E2E_PORT=8408
+  live-server-reap.spec.ts token-gate.spec.ts
+Running 8 tests using 2 workers
+  ✓  1 e2e/live-server-reap.spec.ts:47:1 › dispose 之后 server 整棵进程树不留一个 (2.2s)
+  ✓  2 e2e/token-gate.spec.ts:64:1 › 鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI 且 SSE 带 ?token= (1.2s)
+  ✓  3 e2e/live-server-reap.spec.ts:57:1 › 调用方被 SIGKILL、teardown 没机会跑 → server 树自行退出 (3.6s)
+  ✓  4 e2e/token-gate.spec.ts:105:1 › 鉴权开：陈旧坏 token 首访即落门页且坏值被清除 (714ms)
+  ✓  5 e2e/token-gate.spec.ts:118:1 › 鉴权开：localStorage 已有好 token → 首访直达 UI 零门页 (853ms)
+  ✓  6 e2e/token-gate.spec.ts:137:1 › 鉴权关：零门页零 token 附带，行为与现状一致 (666ms)
+  ✓  7 e2e/token-gate.spec.ts:156:1 › #1048 门页指引：zh 面告诉令牌从哪来（变量名 / EnvironmentFile / 重启关闭） (532ms)
+  ✓  8 e2e/token-gate.spec.ts:173:1 › #1048 门页指引：en 面同一事实不失真（变量名经字典模板插值） (491ms)
+  8 passed (14.5s)
+exit 0
+
+All five gates exit 0.
