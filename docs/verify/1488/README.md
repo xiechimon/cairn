@@ -13,7 +13,7 @@ Base = `29e60bb7` (origin/main).
 | `new-leg-server.txt` | this branch | 2 passed (410 after reset, 200 while held, 404 for another machine's step) |
 | `old-leg-daemon.txt` | runner.ts from origin/main | 1 failed: on heartbeat 410 the run never ends (`Test timed out in 5000ms`) |
 | `new-leg-daemon.txt` | this branch | 8 passed: 410 → `done(stopped)`, no commitAll / push; 404 and a network error → keeps running |
-| `server-suite.txt` | this branch, whole server suite (includes #1486, #1487) | 125 files, 1956 passed, 1 skipped |
+| `server-suite.txt` | this branch, whole server suite (includes #1486, #1487) | 125 files, 1957 passed, 1 skipped |
 | `daemon-suite.txt` | this branch, whole daemon suite | 87 files, 945 passed |
 | `verify-step-claim.txt` | TLA+ model of the step lifecycle | P1-P4 PASS, 685,236 states each, matching `expected.txt` |
 
