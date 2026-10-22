@@ -16,34 +16,44 @@
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2）
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效
- ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → helper 键 credential.https://github.com.helper，前面仍是空值重置
- ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → helper 键 credential.https://github.com.helper，前面仍是空值重置
- ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → helper 键 credential.http://127.0.0.1:8787.helper，前面仍是空值重置
- ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://x-access-token@GitHub.com/o/r.git → helper 键 credential.https://github.com.helper，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → protocol https、host github.com，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → protocol https、host github.com:443，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → protocol http、host 127.0.0.1:8787，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://x-access-token@GitHub.com/o/r.git → protocol https、host GitHub.com，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://pacman_server:8787/git/t/r.git → protocol http、host pacman_server:8787，前面仍是空值重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://[::1]:8787/git/t/r → protocol http、host [::1]:8787，前面仍是空值重置
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 ""（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "/srv/repos/r.git"（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "git@github.com:o/r.git"（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "file:///srv/r.git"（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "ssh://git@github.com/o/r"（不是 http(s)）→ 只有重置，没有 helper
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host
+ ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证
  ↓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证
  × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "abc$(echo INJECTED)" 原样返回 21ms
    → expected 'abcINJECTED' to be 'abc$(echo INJECTED)' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回 8ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回 10ms
    → expected 'aINJECTEDb' to be 'a`echo INJECTED`b' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回 10ms
-   → expected '/tmp/pacman-git-quote-NJB5SB' to be '$HOME' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a;echo INJECTED" 原样返回 9ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回 7ms
+   → expected '/tmp/pacman-git-quote-D55tLZ' to be '$HOME' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a;echo INJECTED" 原样返回 10ms
    → expected 'a' to be 'a;echo INJECTED' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "it's" 原样返回 10ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "it's" 原样返回 7ms
    → expected undefined to be 'it\'s' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回 7ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回 6ms
    → expected 'two words' to be 'two  words' // Object.is equality
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回 8ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回 7ms
    → expected 'backslash' to be 'back\slash' // Object.is equality
- ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "*" 原样返回 6ms
- × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回 7ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "*" 原样返回 5ms
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a\\nb" 原样返回 7ms
+   → expected 'anb' to be 'a\nb' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "x\\cy" 原样返回 6ms
+   → expected 'xcy' to be 'x\cy' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "\\0101" 原样返回 6ms
+   → expected '0101' to be '\0101' // Object.is equality
+ × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回 6ms
    → expected undefined to be 'o\'$(echo X)' // Object.is equality
  × test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码里的 $(touch …) 不执行 9ms
    → expected true to be false // Object.is equality
@@ -66,7 +76,7 @@
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 选项形 revision 不改工作区
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 不存在的 revision 不改工作区
 
-⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+⎯⎯⎯⎯⎯⎯ Failed Tests 12 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "abc$(echo INJECTED)" 原样返回
 AssertionError: expected 'abcINJECTED' to be 'abc$(echo INJECTED)' // Object.is equality
@@ -74,15 +84,15 @@ AssertionError: expected 'abcINJECTED' to be 'abc$(echo INJECTED)' // Object.is 
 Expected: "abc$(echo INJECTED)"
 Received: "abcINJECTED"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回
 AssertionError: expected 'aINJECTEDb' to be 'a`echo INJECTED`b' // Object.is equality
@@ -90,31 +100,31 @@ AssertionError: expected 'aINJECTEDb' to be 'a`echo INJECTED`b' // Object.is equ
 Expected: "a`echo INJECTED`b"
 Received: "aINJECTEDb"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回
-AssertionError: expected '/tmp/pacman-git-quote-NJB5SB' to be '$HOME' // Object.is equality
+AssertionError: expected '/tmp/pacman-git-quote-D55tLZ' to be '$HOME' // Object.is equality
 
 Expected: "$HOME"
-Received: "/tmp/pacman-git-quote-NJB5SB"
+Received: "/tmp/pacman-git-quote-D55tLZ"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a;echo INJECTED" 原样返回
 AssertionError: expected 'a' to be 'a;echo INJECTED' // Object.is equality
@@ -122,15 +132,15 @@ AssertionError: expected 'a' to be 'a;echo INJECTED' // Object.is equality
 Expected: "a;echo INJECTED"
 Received: "a"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "it's" 原样返回
 AssertionError: expected undefined to be 'it\'s' // Object.is equality
@@ -141,15 +151,15 @@ AssertionError: expected undefined to be 'it\'s' // Object.is equality
 + Received:
 undefined
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回
 AssertionError: expected 'two words' to be 'two  words' // Object.is equality
@@ -157,15 +167,15 @@ AssertionError: expected 'two words' to be 'two  words' // Object.is equality
 Expected: "two  words"
 Received: "two words"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回
 AssertionError: expected 'backslash' to be 'back\slash' // Object.is equality
@@ -173,15 +183,63 @@ AssertionError: expected 'backslash' to be 'back\slash' // Object.is equality
 Expected: "back\slash"
 Received: "backslash"
 
- ❯ test/git.test.ts:388:58
-    386|     '*',
-    387|   ])('密码 %j 原样返回', (password) => {
-    388|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
        |                                                          ^
-    389|   });
-    390|
+    452|   });
+    453|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/12]⎯
+
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a\\nb" 原样返回
+AssertionError: expected 'anb' to be 'a\nb' // Object.is equality
+
+Expected: "a\nb"
+Received: "anb"
+
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+       |                                                          ^
+    452|   });
+    453|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/12]⎯
+
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "x\\cy" 原样返回
+AssertionError: expected 'xcy' to be 'x\cy' // Object.is equality
+
+Expected: "x\cy"
+Received: "xcy"
+
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+       |                                                          ^
+    452|   });
+    453|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/12]⎯
+
+ FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "\\0101" 原样返回
+AssertionError: expected '0101' to be '\0101' // Object.is equality
+
+Expected: "\0101"
+Received: "0101"
+
+ ❯ test/git.test.ts:451:58
+    449|     '\\0101',
+    450|   ])('密码 %j 原样返回', (password) => {
+    451|     expect(fillPassword({ ...CRED, password }).password).toBe(password…
+       |                                                          ^
+    452|   });
+    453|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回
 AssertionError: expected undefined to be 'o\'$(echo X)' // Object.is equality
@@ -192,15 +250,15 @@ AssertionError: expected undefined to be 'o\'$(echo X)' // Object.is equality
 + Received:
 undefined
 
- ❯ test/git.test.ts:392:73
-    390|
-    391|   test('用户名同样原样返回', () => {
-    392|     expect(fillPassword({ ...CRED, username: "o'$(echo X)" }).username…
+ ❯ test/git.test.ts:455:73
+    453|
+    454|   test('用户名同样原样返回', () => {
+    455|     expect(fillPassword({ ...CRED, username: "o'$(echo X)" }).username…
        |                                                                         ^
-    393|   });
-    394|
+    456|   });
+    457|
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/12]⎯
 
  FAIL  test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码里的 $(touch …) 不执行
 AssertionError: expected true to be false // Object.is equality
@@ -211,19 +269,19 @@ AssertionError: expected true to be false // Object.is equality
 - false
 + true
 
- ❯ test/git.test.ts:398:32
-    396|     const marker = join(mkdtempSync(join(tmpdir(), 'pacman-git-quote-m…
-    397|     fillPassword({ ...CRED, password: `x$(touch ${marker})` });
-    398|     expect(existsSync(marker)).toBe(false);
+ ❯ test/git.test.ts:461:32
+    459|     const marker = join(mkdtempSync(join(tmpdir(), 'pacman-git-quote-m…
+    460|     fillPassword({ ...CRED, password: `x$(touch ${marker})` });
+    461|     expect(existsSync(marker)).toBe(false);
        |                                ^
-    399|   });
-    400| });
+    462|   });
+    463| });
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/12]⎯
 
 
  Test Files  1 failed (1)
-      Tests  9 failed | 1 passed | 43 skipped (53)
-   Start at  09:59:20
-   Duration  507ms (transform 48%, tests 33%, import 17%, worker 2%)
+      Tests  12 failed | 1 passed | 47 skipped (60)
+   Start at  10:16:09
+   Duration  658ms (transform 57%, tests 25%, import 17%, worker 1%)
 

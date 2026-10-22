@@ -4,8 +4,9 @@
 // 模块消费；isomorphic-git/simple-git 不引入，01 §4.2）。
 // 注入安全：全程 argv 数组（无 shell）。
 // 凭证纪律（02 §5.4/§8 per-step 下发不落盘 + relay 工具名对照 push_credential
-// r5 §3.1）：git 凭证只经 GIT_CONFIG_* env 注入 credential.helper（git ≥2.31）
-// ——不进 argv（ps 面）、不进 .git/config、不进 ~/.git-credentials、不落任何盘。
+// r5 §3.1）：git 凭证只经 env 注入（GIT_CONFIG_* 挂定值 credential.helper，git
+// ≥2.31；凭证值在 PACMAN_GIT_CRED_*）——不进 argv（ps 面，含 helper 的 sh -c）、
+// 不进 .git/config、不进 ~/.git-credentials、不落任何盘。
 
 import { spawn } from 'node:child_process';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@pacman/shared';
@@ -62,55 +63,66 @@ export async function runGitOk(
   throw new Error(`git ${args[0]} failed (${r.code}): ${r.stderr.trim() || r.stdout.trim()}`);
 }
 
-/** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。helper 值由 git
- * 以 `sh -c` 执行：用户名与密码放在单引号里、其中的 `'` 转义成 `'\''`，shell
- * 不展开 `$(...)`、反引号、`$VAR`，也不按 `;` 断句（#1485）。`parent` = 调用方
- * 要合并进去的环境（runGit / 钩子都是 `{ ...process.env, ...本函数结果 }`）。 */
+/** 内联 credential.helper 本体（#1484 / #1485）：定值，不含任何凭证值。git 以
+ * `sh -c '<本体> get'` 运行它，并把请求（protocol= / host= 等行）写进 stdin。
+ * 只在 get 且 protocol、host 与签发远端完全一致时，从环境变量印出用户名与
+ * 密码；printf '%s' 原样输出，不经 echo 的反斜杠转义，也不经 shell 展开。凭证
+ * 只在环境里：sh -c 的 argv（/proc/<pid>/cmdline，本机其他用户可读）里只有
+ * 这段定值。 */
+const CREDENTIAL_HELPER =
+  // biome-ignore lint/suspicious/noTemplateCurlyInString: sh parameter expansion inside the helper body, not a JS template
+  '!f() { p=; h=; while IFS= read -r l; do case "$l" in protocol=*) p=${l#protocol=} ;; host=*) h=${l#host=} ;; esac; done; ' +
+  'if test "$1" = get && test "$p" = "$PACMAN_GIT_CRED_PROTOCOL" && test "$h" = "$PACMAN_GIT_CRED_HOST"; then ' +
+  `printf 'username=%s\\npassword=%s\\n' "$PACMAN_GIT_CRED_USERNAME" "$PACMAN_GIT_CRED_PASSWORD"; fi; }; f`;
+
+/** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。helper 本体与凭证
+ * 值分开：本体是 CREDENTIAL_HELPER 定值，签发远端与凭证值走 PACMAN_GIT_CRED_*
+ * 环境变量。`parent` = 调用方要合并进去的环境（runGit / 钩子都是
+ * `{ ...process.env, ...本函数结果 }`）。 */
 export function gitCredentialEnv(
   cred: BoundGitCredentials,
   parent: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  const sq = (v: string) => v.replace(/'/g, `'\\''`);
-  const helper = `!f() { echo 'username=${sq(cred.username)}'; echo 'password=${sq(cred.password)}'; }; f`;
   // #1460：接在父环境自带的 GIT_CONFIG_* 之后（容器 / CI 的代理、CA 配置），
   // 从 0 写会盖掉它们，COUNT=2 又把 2 号以后的藏起来。
   const n = inheritedGitConfigCount(parent);
-  // #1484：helper 只挂在签发主机下（credential.<scheme>://<host>.helper）。git
-  // 按实际连接的 URL（insteadOf 改写之后）找凭证，origin 被改指别处时不给。
-  const scope = credentialScope(cred.url);
+  // #1484：helper 只应答签发远端。git 按实际连接的 URL（insteadOf 改写、HTTP
+  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。
+  const target = credentialTarget(cred.url);
   return {
     // 空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
     // helper，含父环境条目与 URL 作用域条目里的）。缺此条则系统级/全局
     // osxkeychain 等 helper 叠加在前：同主机命中陈旧凭证（上一步已撤销的
     // token）致 auth 失败，且成功轮会回写钥匙串（凭证落盘面，破 02 §8 不落盘
     // 纪律）。重置后本步内联 helper 是唯一来源。
-    GIT_CONFIG_COUNT: String(scope === null ? n + 1 : n + 2),
+    GIT_CONFIG_COUNT: String(target === null ? n + 1 : n + 2),
     [`GIT_CONFIG_KEY_${n}`]: 'credential.helper',
     [`GIT_CONFIG_VALUE_${n}`]: '',
-    ...(scope === null
+    ...(target === null
       ? {}
       : {
-          [`GIT_CONFIG_KEY_${n + 1}`]: `credential.${scope}.helper`,
-          [`GIT_CONFIG_VALUE_${n + 1}`]: helper,
+          [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
+          [`GIT_CONFIG_VALUE_${n + 1}`]: CREDENTIAL_HELPER,
+          PACMAN_GIT_CRED_PROTOCOL: target.protocol,
+          PACMAN_GIT_CRED_HOST: target.host,
+          PACMAN_GIT_CRED_USERNAME: cred.username,
+          PACMAN_GIT_CRED_PASSWORD: cred.password,
         }),
     // 交互提示关闭（无 tty 场景挂起护栏）。
     GIT_TERMINAL_PROMPT: '0',
   };
 }
 
-/** 凭证绑定 URL → helper 键里的 `<scheme>://<host>[:port]`（#1484；默认端口与
- * userinfo 去掉、host 小写，与 git 的 URL 归一化一致）。不是 http(s)（本地
- * 路径、scp 形、file、ssh，或空串）= null：git 不会为这些远端问 helper，
- * 凭证不写进环境。 */
-function credentialScope(url: string): string | null {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return null;
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
-  return `${parsed.protocol}//${parsed.host}`;
+/** 凭证绑定 URL → git 请求里会出现的 protocol 与 host（#1484）。host 按 URL 原文
+ * 截取：去掉 userinfo，大小写、显式端口、非 ASCII 字符都保留。git 自己就这样
+ * 从 remote URL 取 host（截到第一个 / ? #），而 origin 的 URL 正是这个
+ * cloneUrl，两边逐字节一致，不依赖任何归一化（git 的 URL 作用域匹配不认带 _
+ * 的主机名）。不是 http(s)（本地路径、scp 形、file、ssh，或空串）= null：git
+ * 不为这些远端问 helper，凭证不写进环境。 */
+function credentialTarget(url: string): { protocol: string; host: string } | null {
+  const m = /^(https?):\/\/(?:[^@/?#]*@)?([^/?#]+)/.exec(url);
+  if (m?.[1] === undefined || m[2] === undefined) return null;
+  return { protocol: m[1], host: m[2] };
 }
 
 /** 父环境里 git 会读的 GIT_CONFIG_* 条数（#1460）。COUNT 的写法按 git 的

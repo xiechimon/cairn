@@ -16,18 +16,22 @@
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 3：父环境 COUNT 缺 VALUE → 退回从 0 写（COUNT=2）
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 1/4：真 git——父环境的键仍生效，父环境的 credential.helper 被重置
  ↓ test/git.test.ts > gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460） > 失败方式 5：runGit 组合——默认父环境 = process.env，进程自带的键仍生效
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → helper 键 credential.https://github.com.helper，前面仍是空值重置 3ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → helper 键 credential.https://github.com.helper，前面仍是空值重置 1ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → helper 键 credential.http://127.0.0.1:8787.helper，前面仍是空值重置 0ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://x-access-token@GitHub.com/o/r.git → helper 键 credential.https://github.com.helper，前面仍是空值重置 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com/o/r.git → protocol https、host github.com，前面仍是空值重置 2ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://github.com:443/o/r → protocol https、host github.com:443，前面仍是空值重置 1ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://127.0.0.1:8787/git/team/r → protocol http、host 127.0.0.1:8787，前面仍是空值重置 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 https://x-access-token@GitHub.com/o/r.git → protocol https、host GitHub.com，前面仍是空值重置 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://pacman_server:8787/git/t/r.git → protocol http、host pacman_server:8787，前面仍是空值重置 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1：绑定 http://[::1]:8787/git/t/r → protocol http、host [::1]:8787，前面仍是空值重置 0ms
  ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 ""（不是 http(s)）→ 只有重置，没有 helper 1ms
  ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "/srv/repos/r.git"（不是 http(s)）→ 只有重置，没有 helper 0ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "git@github.com:o/r.git"（不是 http(s)）→ 只有重置，没有 helper 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "git@github.com:o/r.git"（不是 http(s)）→ 只有重置，没有 helper 1ms
  ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "file:///srv/r.git"（不是 http(s)）→ 只有重置，没有 helper 0ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "ssh://git@github.com/o/r"（不是 http(s)）→ 只有重置，没有 helper 1ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置 20ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证 189ms
- ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证 145ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 2：绑定 "ssh://git@github.com/o/r"（不是 http(s)）→ 只有重置，没有 helper 0ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 3/4：真 git——绑定主机拿到 token，别的主机拿不到，同主机的全局 helper 被重置 22ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 1/3：真 git——带 _ 的主机名与原文大小写、端口照常匹配，git 自己从 URL 取 host 24ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command） 7ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：origin 被 set-url 改指别的主机 → push / tagPush / fetch 不发凭证；绑定主机照常认证 206ms
+ ✓ test/git.test.ts > gitCredentialEnv — helper 只对凭证签发给的主机应答（#1484） > 失败方式 5：insteadOf 把绑定主机改写到别的主机 → 不发凭证 152ms
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "abc$(echo INJECTED)" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a`echo INJECTED`b" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "$HOME" 原样返回
@@ -36,6 +40,9 @@
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "two  words" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "back\\slash" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "*" 原样返回
+ ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "a\\nb" 原样返回
+ ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "x\\cy" 原样返回
+ ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码 "\\0101" 原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 用户名同样原样返回
  ↓ test/git.test.ts > gitCredentialEnv — helper 里的用户名与密码原样交给 git（#1485） > 密码里的 $(touch …) 不执行
  ↓ test/git.test.ts > machineGitEnv — 执行机本机凭据 env（#1225 兜底路） > 只设 TTY 守卫：不重置 credential.helper、不碰代理变量（票失败方式 3/4）
@@ -58,7 +65,7 @@
  ↓ test/git.test.ts > resetHard — git 2.43 拒绝 reset --end-of-options（#1316） > 不存在的 revision 不改工作区
 
  Test Files  1 passed (1)
-      Tests  12 passed | 41 skipped (53)
-   Start at  09:59:21
-   Duration  760ms (tests 57%, transform 34%, import 9%, worker 1%)
+      Tests  16 passed | 44 skipped (60)
+   Start at  10:16:14
+   Duration  788ms (tests 64%, transform 27%, import 8%, worker 1%)
 
