@@ -283,3 +283,23 @@ export const mergeReadinessSchema = z.object({
   blockers: z.array(mergeBlockerSchema),
 });
 export type MergeReadiness = z.infer<typeof mergeReadinessSchema>;
+
+// 闸的数据常量深冻住：'@pacman/shared' 的总出口在 import 时会运行 shared 的别的模块，
+// 它们可自动合并；冻住之后它们改不了闸的清单、上限与词表（ESM 是严格模式，改写即
+// 抛错）。本模块只从 zod import，不会有别的模块抢在这几行之前拿到这些值。新加数组或
+// 普通对象导出时加进这张表（测试 merge-gate-imports 逐个检查导出是否冻住）。
+for (const value of [
+  MERGE_POLICIES,
+  GATE_LIMITS,
+  EVIDENCE_EXECUTABLE_EXTENSIONS,
+  AUTO_MERGE_PATH_GLOBS,
+  PROTECTED_PATH_GLOBS,
+  MERGE_GATE_SOURCE_GLOBS,
+  COMPARE_FILE_STATUSES,
+  BLOCKER_CLASSES,
+  ...MERGE_BLOCKERS,
+  MERGE_BLOCKERS,
+  MERGE_BLOCKER_CODES,
+]) {
+  Object.freeze(value);
+}
