@@ -1,0 +1,11 @@
+Missing closing line: exit 1; closing-keyword: missing branch commit closing line for #1541
+Matching closing lines: exit 0; closing-keyword: OK (2 declared issues)
+✔ requires each declared issue to have a closing line in branch commits (492.441791ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 536.615542
