@@ -300,7 +300,8 @@ for (const { i } of deliveryLineIdx) {
 }
 const logEntries = [...keep].sort((a, b) => a - b).map((i) => lines[i]);
 save('11-tracer-server-log.txt', logEntries.join('\n') + '\n');
-check('J1 server.log 每投递一条 deliveryId 追踪记录（≥8 条）', deliveryLineIdx.length >= consumed.length, `entries=${deliveryLineIdx.length}`);
+const missingDeliveries = consumed.filter((d) => !lines.some((l) => l.includes(d)));
+check('J1 server.log 里每条被消费的投递都有 deliveryId 追踪记录（8 条投递）', missingDeliveries.length === 0, `missing=${missingDeliveries.length} lines=${deliveryLineIdx.length}`);
 check('J2 created 投递记录带 result: "created"（pino 结构化）', lines.some((l, i) => l.includes(dCreated) && (lines[i + 1] ?? '').includes('"created"')));
 // #1459 拒收的原因码只在日志里（202 的 detail 对打标人权限类拒收只有同一句）。
 // pretty 形态字段在 deliveryId 之后几行，JSON 形态在同一行：两种都认。

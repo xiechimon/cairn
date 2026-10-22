@@ -1,0 +1,48 @@
+# #1459 round 3 reviews
+# Worktree /home/user/pacman/.claude/worktrees/p5, branch claude/bootstrap-p5-r6.
+
+## pr-gate suggestions on #1496 handled here (verdict pr-gate-1496-run1-e1a6ad1, go with 12 suggestions)
+1 and 9  EMU logins (`alice_acme`, `mona-cat_octo`, `octo_admin`) were refused as sender-malformed. The login check
+         accepts one trailing `_` + letters and digits segment, per GitHub's docs (quoted in r3-red-green.txt);
+         `.`, `..`, `/`, leading `-` or `_`, trailing `_` and over 39 characters stay refused (W20, W21; S1-S3, S6-S8).
+2 and 5  The shared result-enum comment lists the round 2 refusals; it now also says the reason codes are log-only.
+3 and 4  Spec 28 section 8 P5 row: #1496 merged as f45a36b; the follow-up named with its branch and no pending status.
+6        Changelog entry .claude/skills/verify-pacman/changelog/2026-10-22-1459.md.
+8        W2 and W12b assert the refusal reason from the log line (S4 / S5 red; before this branch S4 left them green).
+Not handled here, as the coordinator scoped it: 7 and 11 (PR body vs evidence on /security-review), 10 (scope note),
+12 (the probe has not run live; recorded again in r3-gates.txt).
+
+## /code-review (medium) on `git diff origin/main...HEAD` at 7fefb28d (branch confirmed in the worktree)
+12 findings.
+
+Fixed (tests first in bad80636; fixes in 74b38124, fa1d8dd6, f9a22b21):
+2.  The 39-character limit had no test: W20 now refuses 40-character plain, EMU and `[bot]` logins, W21 accepts a
+    39-character EMU login (S6, S7 red).
+3.  The P5 row said the follow-up was on its branch and waiting to merge, which turns false on merge. The row now
+    names the follow-up and its branch without a pending status; the completion column lists only merged work.
+4.  The comment cited the 3-8 shortcode and dash rules the regex does not enforce. The comment now says the regex
+    is deliberately looser there (old accounts; the loose side only costs a permission read, never a path rewrite).
+5.  Probe J1 counted log lines, so a delivery with no record could pass; it now requires each of the 8 consumed
+    deliveries to have a deliveryId line. The changelog says so and that L1-L3 have not run against a live stack.
+6 and 11. W21's bot case reused W20b's login (cached 404 'none', relying on a random team id) with sender type User;
+    it now uses octo-builder[bot] with type Bot.
+8.  The shared comment named log-only reason codes as if they were in the response, and its header omitted the
+    round 2 refusals; both reworded (the 202 note now covers both ignored and misconfigured).
+9.  A sender-malformed refusal logged the payload's login in full (no length limit in the schema); the log line
+    keeps the first 64 characters and the length (W22; S9 red).
+10. The lookahead regex is replaced by isGithubLogin(): strip `[bot]`, check length <= 39, test a plain regex.
+12. The P5 row's evidence column adds docs/verify/1459/.
+
+Not fixed, with reasons:
+1.  Allow-list versus deny-list: the reviewer suggests refusing only `.` / `..` segments (encodeURIComponent already
+    encodes `/`), ideally inside githubCollaboratorPermission for both callers. The coordinator asked to keep `.`,
+    `..` and `/` refused and to allow `_` where GitHub allows it; the allow-list stays, documented as deliberately
+    loose where GitHub's own rules are uncertain. The poller's logins come from GitHub's events and are not checked.
+7.  No evidence on the branch at review time: this file, r3-red-green.txt, r3-mutations.txt and r3-gates.txt are the
+    evidence, added in the last commit.
+
+## /security-review
+Not run for this follow-up. The CLAUDE.md list names apps/server/src/routes-webhook.ts, which this branch does not
+touch; the change narrows nothing and widens one input check (an underscore segment) whose only effect is a
+collaborator-permission read with the login URL-encoded. `.` / `..` / `/` stay refused, the length limit stays, and
+the new log truncation removes an unbounded write.

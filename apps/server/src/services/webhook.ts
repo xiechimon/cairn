@@ -80,11 +80,25 @@ export interface WebhookDeps extends OrchestrateDeps {
  * rate-limited）的 202 detail：三种同一句，细节只进日志行。 */
 const SENDER_REFUSED_DETAIL = 'sender not confirmed for import (reason in the server log)';
 
-/** GitHub 账号名的形状（字母数字与连字符，不以连字符起头；GitHub App 的 bot
- * 账号带 `[bot]` 后缀）。sender 来自载荷（URL token 持有人说了算）、要拼进权限
- * 读的路径：`.` / `..` 会被 URL 规范化改写成别的路径，带 `/` 的会读错仓库，
- * 一律先拒。 */
-const GITHUB_LOGIN = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}(\[bot\])?$/;
+/** GitHub 账号名的形状：字母数字与连字符，不以连字符起头；Enterprise Managed
+ * Users 的托管账号再带一段下划线加短码（GitHub 文档「Username considerations for
+ * external authentication」：「On GitHub.com, GitHub also adds an underscore and
+ * your enterprise's shortcode to the end of each username」，格式
+ * IDP-USERNAME_SHORT-CODE，例 mona-cat_octo；设置账号是 SHORT-CODE_admin）。这里
+ * 有意比文档宽：下划线后不限位数（文档的短码是三到八位），连字符不查连写与结尾
+ * （老账号有这种名字）——宽的那边只多一次权限读，不会改写路径。sender 来自载荷
+ * （URL token 持有人说了算）、要拼进权限读的路径：`.` / `..` 会被 URL 规范化改写
+ * 成别的路径，带 `/` 的会读错资源，一律先拒。轮询器的打标人来自 GitHub 的 events
+ * 应答，不过这道形状闸。 */
+const GITHUB_LOGIN_BASE = /^[A-Za-z0-9][A-Za-z0-9-]*(?:_[A-Za-z0-9]+)?$/;
+
+/** 账号名是不是 GitHub 认的形状：去掉 GitHub App bot 账号的 `[bot]` 后缀后至多 39
+ * 个字符（文档：「Usernames, including underscore and short code, must not exceed
+ * 39 characters」），再过 GITHUB_LOGIN_BASE。 */
+function isGithubLogin(login: string): boolean {
+  const base = login.endsWith('[bot]') ? login.slice(0, -'[bot]'.length) : login;
+  return base.length <= 39 && GITHUB_LOGIN_BASE.test(base);
+}
 
 /** 投递去重册（deliveryId → 到达时刻；模块级内存态——重启清零无害，
  * sourceRef 409 是持久闸）。惰性清扫：每次投递顺手清过期项，无定时器。 */
@@ -238,8 +252,12 @@ export async function receiveGithubWebhook(
   }
   const atCapDetail = `project at the in-flight cap (${ISSUE_INTAKE_IN_FLIGHT_CAP} open github-issue tasks)`;
   if (sender === '') return refuse('no-sender', 'ignored', 'event has no sender');
-  if (!GITHUB_LOGIN.test(sender)) {
-    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login');
+  if (!isGithubLogin(sender)) {
+    // 载荷里的 login 没有长度上限：日志只记前 64 个字符与总长。
+    return refuse('sender-malformed', 'ignored', 'event sender is not a GitHub login', {
+      sender: sender.slice(0, 64),
+      senderLength: sender.length,
+    });
   }
   // 先数上限（只读库）：满了不必读 GitHub。
   if (projectAtInFlightCap(deps.db, repoRow.id)) return refuse('at-cap', 'ignored', atCapDetail);
