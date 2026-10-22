@@ -1372,6 +1372,8 @@ const GITHUB_NAME = /^[A-Za-z0-9_.-]+$/;
 const UNSAFE_SEGMENT = /[\p{Cc}?#]/u;
 const UNSAFE_MESSAGE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu;
 const MESSAGE_MAX = 200;
+/** setTimeout / AbortSignal.timeout 能收的最大毫秒数（有符号 32 位）。 */
+const TIMER_MAX_MS = 2_147_483_647;
 
 const invalidResult = (field: string): GithubRawResult => ({
   kind: 'failed',
@@ -1413,7 +1415,8 @@ function commonInvalid(
       return field;
     }
   }
-  if (!isPositiveInt(opts.timeoutMs)) return 'timeoutMs';
+  // 计时器的上限：再大 AbortSignal.timeout 会抛 RangeError（不发请求就被记成 network）。
+  if (!isPositiveInt(opts.timeoutMs) || opts.timeoutMs > TIMER_MAX_MS) return 'timeoutMs';
   if (opts.etag !== undefined && opts.etag !== null && !HEADER_TOKEN.test(opts.etag)) return 'etag';
   return null;
 }
@@ -1473,8 +1476,14 @@ async function gateRequest(
   // 304 只在发了 If-None-Match 时是「与你手上的一样」；没发 etag 的 304 按其余状态码交回。
   if (res.status === 304 && req.etag !== null) return { kind: 'not-modified' };
   if (!res.ok) {
-    // 应答体只读一次：限流的文本判据与 message 共用这一份；读不到按空文本。
-    const text = await res.text().catch(() => '');
+    // 应答体只读一次：限流的文本判据与 message 共用这一份。读的时候超时 = 超时（头已说限流
+    // 的除外）：没读到的文本里可能正是二级限流的说明，不能当成普通状态码；别的读不到按空文本。
+    let text = '';
+    try {
+      text = await res.text();
+    } catch (err) {
+      if (isAbort(err) && !isRateLimited(res)) return failedResult({ kind: 'timeout' });
+    }
     if (isRateLimited(res) || (res.status === 403 && /rate limit/i.test(text))) {
       const reset = headerSeconds(res.headers, 'x-ratelimit-reset');
       return failedResult({
@@ -1510,8 +1519,7 @@ const gateGet = (
   timeoutMs: number,
 ) => gateRequest(fetchImpl, token, url, { method: 'GET', etag, payload: null, timeoutMs });
 
-/** 闸传输的 URL。path 已逐段编码；query 的值都已核过（正整数、`latest`/`all`、40 位 SHA），
- * 不需再编码。 */
+/** 闸传输的 URL。path 已逐段编码。 */
 const gateUrl = (
   owner: string,
   repo: string,
@@ -1521,9 +1529,7 @@ const gateUrl = (
   `https://api.github.com/${repoPath(owner, repo)}/${path}` +
   (query === undefined
     ? ''
-    : `?${Object.entries(query)
-        .map(([k, v]) => `${k}=${v}`)
-        .join('&')}`);
+    : `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}`);
 
 /** PR 原样读（`GET repos/{o}/{r}/pulls/{n}`）。 */
 export async function githubPullRaw(
@@ -1681,7 +1687,8 @@ export async function githubContentsRaw(
 
 /** 在提交上写一条 commit status（`POST repos/{o}/{r}/statuses/{sha}`）。请求体恰好是
  * {state, context, description}，不带 target_url；描述的长度与内容由调用方定。不重试，
- * 失败按分类交回（422 = GitHub 拒收，例如同一 SHA 与 context 已满 1000 条）。 */
+ * 失败按分类交回（422 = GitHub 拒收，例如同一 SHA 与 context 已满 1000 条，或描述过长：上限
+ * 文档未写，第三方实测 140 个字符，截断由闸做）。 */
 export async function githubCreateCommitStatus(
   fetchImpl: FetchLike,
   token: string,

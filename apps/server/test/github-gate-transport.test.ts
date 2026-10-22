@@ -390,7 +390,8 @@ describe('#1404 S4a gate transport: what is refused before any request', () => {
           timeoutMs: T,
         }),
     ]);
-    for (const timeoutMs of [0, -5, Number.NaN, 1.5, Number.POSITIVE_INFINITY]) {
+    // 2 ** 31 and 2 ** 33: beyond the timer limit, AbortSignal.timeout would throw (code review, finding 1).
+    for (const timeoutMs of [0, -5, Number.NaN, 1.5, Number.POSITIVE_INFINITY, 2 ** 31, 2 ** 33]) {
       cases.push([
         'timeoutMs',
         (f) => githubContentsRaw(f, TOKEN, O, R, 'docs', MAIN, { timeoutMs }),
@@ -605,30 +606,16 @@ describe('#1404 S4a gate transport: what is sent', () => {
     }
   });
 
-  test.each(ALL)('T10 %s: the caller timeout aborts the request', async (_n, call) => {
-    const short: Array<(f: FetchLike) => Promise<GithubRawResult>> = [
-      (f) => githubPullRaw(f, TOKEN, O, R, 1, { etag: null, timeoutMs: 20 }),
-    ];
-    // Run the table entry with its own (long) timeout to see the signal is passed at all,
-    // then a 20 ms one to see the caller's value is the one applied.
+  test.each(ALL)('T10 %s: fetch gets a live AbortSignal', async (_n, call) => {
     const seen = stub(OK);
     await call(seen.fetch);
     expect(seen.calls[0]?.init.signal).toBeInstanceOf(AbortSignal);
-    for (const s of short) {
-      const hang = stub(
-        ({ init }) =>
-          new Promise((_resolve, reject) => {
-            init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
-          }),
-      );
-      const started = Date.now();
-      expect(await s(hang.fetch)).toEqual({ kind: 'failed', failure: { kind: 'timeout' } });
-      expect(Date.now() - started).toBeLessThan(5_000);
-    }
+    expect(seen.calls[0]?.init.signal?.aborted).toBe(false);
   });
 
   test('T10 each function applies its own timeoutMs', async () => {
     const calls: Array<(f: FetchLike) => Promise<GithubRawResult>> = [
+      (f) => githubPullRaw(f, TOKEN, O, R, 1, { etag: null, timeoutMs: 20 }),
       (f) => githubBranchRaw(f, TOKEN, O, R, 'main', { etag: null, timeoutMs: 20 }),
       (f) =>
         githubBranchRulesRaw(f, TOKEN, O, R, 'main', {
@@ -672,7 +659,9 @@ describe('#1404 S4a gate transport: what is sent', () => {
             init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
           }),
       );
+      const started = Date.now();
       expect(await call(hang.fetch)).toEqual({ kind: 'failed', failure: { kind: 'timeout' } });
+      expect(Date.now() - started).toBeLessThan(5_000);
     }
   });
 
@@ -1040,7 +1029,27 @@ describe('#1404 S4a gate transport: what comes back', () => {
         failure: { kind: 'status', status: 404, message },
       });
     }
-    // An error body that cannot be read still gives a status.
+    // An error body whose read times out is a timeout, unless the headers already say rate-limited
+    // (code review, finding 3: a header-less secondary-limit 403 must not turn into a plain status).
+    const slow403 = stub({ status: 403, bodyError: new DOMException('timed out', 'TimeoutError') });
+    expect(
+      await githubPullRaw(slow403.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T }),
+    ).toEqual({
+      kind: 'failed',
+      failure: { kind: 'timeout' },
+    });
+    const slow429 = stub({
+      status: 429,
+      headers: { 'retry-after': '30' },
+      bodyError: new DOMException('timed out', 'TimeoutError'),
+    });
+    expect(
+      await githubPullRaw(slow429.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T }),
+    ).toEqual({
+      kind: 'failed',
+      failure: { kind: 'rate-limited', status: 429, resetAt: null, retryAfterSeconds: 30 },
+    });
+    // An error body that cannot be read for another reason still gives a status.
     const broken = stub({ status: 502, bodyError: new TypeError('terminated') });
     expect(await githubPullRaw(broken.fetch, TOKEN, O, R, 1, { etag: null, timeoutMs: T })).toEqual(
       {
