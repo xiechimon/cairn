@@ -188,20 +188,20 @@
   --cds-radius-md: 6px;
   --cds-radius-lg: 8px;
   /* DESIGN.md rounded.card: the one corner for every card-like surface. */
-  --radius-card: 10px;
+  --radius-card: 20px;
   --cds-radius-xl: 12px;
   --cds-radius-2xl: 16px;
   /* DESIGN.md 弹窗与菜单: menus, popovers and select popups share the card
      corner. */
-  --radius-popover: 10px;
+  --radius-popover: 18px;
   /* DESIGN.md 弹窗与菜单: the three dialog widths (S / M / L). */
   --dialog-w-s: 400px;
   --dialog-w-m: 480px;
   --dialog-w-l: 640px;
   --radius-composer: 20px;
   --radius-bubble: 18px;
-  --radius-control: 5px;
-  --radius-window: 12px;
+  --radius-control: 10px;
+  --radius-window: 20px;
   /* ---- elevation ladder (#1428) ----
      Three resting tiers. A rung is its pool plus one outer ring of one CSS
      pixel in the --border scale (DESIGN.md 颜色: rings never thin to
@@ -377,8 +377,8 @@
      .light 自此只持非颜色层的 light 侧 + drop-tint 3 色槽镜像；--surface-1
      在 :root 指 canvas，两侧同形。 */
 
-  --radius-popover: 10px;
-  --radius-window: 12px;
+  --radius-popover: 18px;
+  --radius-window: 20px;
 
   /* elevation ladder (#1428), light side: the Paper 定稿 pools (DESIGN.md
      任务卡 / 弹窗与菜单), ring in --border; the aliases live in :root. */

@@ -297,25 +297,25 @@
   /* Paper 三层纸面按角色落槽：canvas = 侧栏所在应用底（经 --surface-1，
      见 tokens.css .light）；sheet = 主面板（看板 board-main 走 --background）；
      card = 白色任务卡与浮层。次级面 secondary/muted/accent 取 hover 档。 */
-  --canvas: #f3eee5;
-  --background: #fbf9f5;
-  --foreground: #2b2620;
-  --card: #ffffff;
-  --card-foreground: #2b2620;
+  --canvas: #efe6d0;
+  --background: #f7f1e1;
+  --foreground: #1b2b24;
+  --card: #fffdf6;
+  --card-foreground: #1b2b24;
   --popover: #ffffff;
   --popover-foreground: #2b2620;
-  --primary: #2b2620;
-  --primary-foreground: #fbf9f5;
-  --secondary: #ebe4d8;
+  --primary: #173a2f;
+  --primary-foreground: #f2ead7;
+  --secondary: #e8dec5;
   --secondary-foreground: #2b2620;
-  --muted: #ebe4d8;
+  --muted: #e8dec5;
   --muted-foreground: #5e564d;
-  --accent: #ebe4d8;
+  --accent: #e8dec5;
   --accent-foreground: #2b2620;
   /* 亮模 destructive 走深档（solid 保高明度、文字走深档的 Radix 形随定版
      色板入册；实测见 docs/verify/988/） */
   --destructive: #9e2c49;
-  --border: #ece5da;
+  --border: #e2d8bf;
   --input: #cbc5c1;
   --ring: #8f8985;
   /* sidebar row hover = DESIGN.md hover (Paper Grouped sidebar); selected
@@ -337,11 +337,11 @@
   --text-tertiary: #746a5f;
   --text-dim: #b0a597;
   --icon: #9a9086;
-  --card-button: #b4532a;
-  --focus-ring: #b4532a;
+  --card-button: #173a2f;
+  --focus-ring: #173a2f;
   --col-dot-idle: #67594d;
   --col-dot-confirm: #faab3f;
-  --col-dot-building: #006390;
+  --col-dot-building: #e0a020;
   --col-dot-done: #007031;
   --badge-attention: #faab3f;
   --badge-done: #007031;
@@ -395,14 +395,14 @@
   --spot-soft: color-mix(in srgb, var(--card-button) 14%, var(--card));
   --accent-soft: color-mix(in srgb, var(--card-button) 14%, transparent);
   --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
-  --spot-text-on-tint: #8a3a1a;
+  --spot-text-on-tint: #173a2f;
   --spot-disabled: color-mix(in srgb, var(--card-button) 60%, var(--card));
   --spot-disabled-fg: #ffffff;
   --running: #5f8f5a;
   --running-text: #4f7049;
   --running-bar: #7ea476;
   --running-track: #ebe5da;
-  --accent-hover: #f6ebe3;
+  --accent-hover: #ece3cc;
   --dialog-surface: var(--background);
   --dialog-backdrop: rgb(43 38 32 / 0.14);
   --menu-hover: #f6f2ec;
