@@ -17,7 +17,6 @@ import {
   type MergeReadiness,
   type Phase,
 } from '@pacman/shared';
-import { isFullSha } from '../../lib/github.js';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
@@ -156,6 +155,10 @@ export interface GateInputs {
 }
 
 const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
+// 闸认的 SHA：40 位小写十六进制。写在闸自己的源码里，不从 lib/github.ts 取：ADR 0021
+// D4 ④ 按路径认闸的源码，判定从别处 import，只改那个文件的 PR 就能改掉闸认什么，
+// 路径判定却看不出它碰了闸（测试 merge-gate-imports 钉着）。
+const isFullSha = (s: string) => /^[0-9a-f]{40}$/.test(s);
 
 /** compare 响应自己的 head：commits 里没被别的列着的提交认作父提交的那一个（读全的
  * base...head 恰好一个，见 GateInputs.compare）。没有或不止一个 = 说不清读在哪，null。 */
