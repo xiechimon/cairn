@@ -60,13 +60,9 @@ import {
   recordAutonomyVerdict,
 } from './autonomy-gates.js';
 import { githubRepoOfProject } from './git.js';
+import { teamGithubToken } from './github-connection.js';
 import { importGithubIssue } from './github-issues.js';
-import {
-  hasRepoTriage,
-  ISSUE_INTAKE_IN_FLIGHT_CAP,
-  projectAtInFlightCap,
-  teamGithubToken,
-} from './issue-intake.js';
+import { hasRepoTriage, ISSUE_INTAKE_IN_FLIGHT_CAP, projectAtInFlightCap } from './issue-intake.js';
 import { type OrchestrateDeps, orchestrateTodo } from './orchestrate.js';
 import { verifyWebhookToken } from './webhook-tokens.js';
 

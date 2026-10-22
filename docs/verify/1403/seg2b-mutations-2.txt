@@ -1,0 +1,753 @@
+#1403 segment 2b: mutation runs, round 2
+========================================
+
+Date: 2026-10-22. Tree: 95f2a30e (claude/bootstrap-p2-seg2b: origin/main c99de106 merged
+in at 1f531768, then the closing-keyword fix). Replaces the scope of seg2b-mutations.txt
+(tree aa33fd34), which predates the merge 0f8ad77a (githubPrOf through projectOfTodo,
+#1497) and the #1487-first ordering in requestMerge (pr-gate run 1 on 06c35b0d,
+suggestion 5).
+
+Runner: the same script as seg2b-mutations.txt (each mutation replaces exact text that
+must occur exactly once, possibly several pairs; the file is restored from a fresh
+pristine copy and checked by sha256 before the next mutation), with a new pristine
+directory taken from 95f2a30e. Command per mutation, in apps/server:
+
+  pnpm exec vitest run test/pr-merge-api.test.ts test/pr-reconcile.test.ts \
+    test/second-pr-guard.test.ts
+
+Unmutated: 297 passed (297). "caught" = at least one test fails.
+
+Set:
+- M01-M51 and R1-R7 from round 1, except M38 and M39 (their target line no longer exists:
+  the rate-limited branch was split out in the R round; R5 covers "5xx becomes a refusal"
+  and R1 covers "rate limits fall through"). Re-targeted to the current text: M03 (the
+  composed title is the bare PR title), M28 (githubPrOf now takes the todo row), R7 (the
+  header parser is now rateLimitOf's, capped at 10 digits).
+- New: T1-T9 (the closing-shape title fallback, D41/D41b), B1-B2 (the body is always
+  sent, D42), G1 (githubPrOf reads the project without the team, #1497 / M3), O1 (the
+  #1487 in-flight merge-step check moves after the GitHub routing), R8 (the 10-digit cap
+  on header seconds is dropped).
+
+Result: 70 mutations, 70 caught, 0 surviving.
+
+M01  D1 sha binds the merge
+  file: apps/server/src/lib/github.ts
+  mutation: the PUT body loses sha
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit
+
+M02  D1 squash
+  file: apps/server/src/lib/github.ts
+  mutation: merge_method 'merge' instead of 'squash'
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+
+M03  D1 commit title "<title> (#n)"
+  file: apps/server/src/services/builds.ts
+  mutation: commit title is the bare PR title
+  result: caught (Tests  5 failed | 292 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+    x [2b-D41b] a PR title without a closing shape (a keyword followed by a word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a keyword inside another word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a reference with no keyword) keeps the PR title
+
+M04  D2 closing line only for the same repository
+  file: apps/server/src/services/builds.ts
+  mutation: the owner comparison always passes
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D2] closing line for an issue of another repository
+    x [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+
+M05  D2 closing line only for an issue source kind
+  file: apps/server/src/services/builds.ts
+  mutation: the source kind check is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+
+M06  D2 owner and repo compared without ASCII case
+  file: apps/server/src/services/builds.ts
+  mutation: the repo comparison is case-sensitive
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D2] closing line for a self-created issue, owner and repo in another case
+
+M07  D3 no token, no request
+  file: apps/server/src/services/builds.ts
+  mutation: the missing-token refusal is skipped
+  result: caught (Tests  6 failed | 291 passed (297))
+    x 失败方式 4：本 build 自己的 PR merged（唯一 PR build）→ 守卫不拦（排除自身），走到下一道闸
+    x 失败方式 5：首 PR closed-unmerged → claim 无守卫、合并面守卫不拦（合法返工重投）
+    x [2b-D3] no GitHub connection → 409 asking to connect GitHub; no request, no row, no step
+    x [2b-D3b] a connection the box cannot decrypt → the same 409; no request
+    x [2b-D32] failed card, no GitHub connection → the refusal says how this card gets finished (the reconcile reads only review cards)
+    x [2b-D3c] the server has no secret box → 409 naming the server key, not the connection
+
+M08  D5 checkpoint must be 40 hex
+  file: apps/server/src/services/builds.ts
+  mutation: only a missing checkpoint is refused
+  result: caught (Tests  3 failed | 294 passed (297))
+    x [2b-D5] a short sha → 409; no PUT, and no request carries it
+    x [2b-D5] upper-case hex → 409; no PUT, and no request carries it
+    x [2b-D5] a ref-like value → 409; no PUT, and no request carries it
+
+M09  D15 second press refused while one is in flight
+  file: apps/server/src/services/builds.ts
+  mutation: the in-flight check is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D15] two presses at once → one GET, one PUT; the other press gets 409
+
+M10  D16/D28 the in-flight mark
+  file: apps/server/src/services/builds.ts
+  mutation: the build is never marked as merging
+  result: caught (Tests  3 failed | 294 passed (297))
+    x [2b-D15] two presses at once → one GET, one PUT; the other press gets 409
+    x [2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes
+    x [2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes
+
+M11  D10 the mark is cleared after a refusal
+  file: apps/server/src/services/builds.ts
+  mutation: the mark is never cleared
+  result: caught (Tests  10 failed | 287 passed (297))
+    x [2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it
+    x [2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT
+    x [2b-D6] the PR is already merged → 409 saying the reconcile finishes it; no PUT; the next sweep does
+    x [2b-D10] PUT answers 405 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 409 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 422 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 404 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 403 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D13b] after no clear answer, a sweep that reads the PR merged finishes the card once
+    x [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing
+
+M12  D17a/D31b gate re-checked after the PR read
+  file: apps/server/src/services/builds.ts
+  mutation: the gate is not re-read after the PR read
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D31b] a step claimed while the PR read is in flight → 409; no PUT
+    x [2b-D17a] the card is closed while the PR read is in flight → refused at the re-read; no PUT
+    x [2b-M2] the card is closed while the PR read is in flight (#1505) → no PUT, nothing written
+    x [2b-M2] the card is todo while the PR read is in flight (#1505) → no PUT, nothing written
+
+M13  D8 own PR only
+  file: apps/server/src/services/builds.ts
+  mutation: the own-PR check is dropped
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D39] failed card, the merged PR is a fork’s PR → 409, the card stays failed
+    x [2b-D8] the head repository is another one (a fork) → 409; no PUT
+    x [2b-D8] the head repository is gone (null) → 409; no PUT
+    x [2b-D8] the head branch is not the build’s conversation branch → 409; no PUT
+
+M14  D38 author needs write access
+  file: apps/server/src/services/builds.ts
+  mutation: the author check is dropped
+  result: caught (Tests  3 failed | 294 passed (297))
+    x [2b-D39] failed card, the merged PR is an outsider’s PR → 409, the card stays failed
+    x [2b-D38] the PR’s author has no write access (NONE) → 409; no PUT
+    x [2b-D38] the PR’s author has no write access (CONTRIBUTOR) → 409; no PUT
+
+M15  D9 default branch only
+  file: apps/server/src/services/builds.ts
+  mutation: the base check is dropped
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D39] failed card, the merged PR is a PR merged into another branch → 409, the card stays failed
+    x [2b-D9] the PR targets a branch other than the default → 409; no PUT
+
+M16  D4 head must be the last pushed commit
+  file: apps/server/src/services/builds.ts
+  mutation: the head check is dropped
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D32] failed card, the PR head moved → the refusal says how this card gets finished (the reconcile reads only review cards)
+    x [2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT
+
+M17  D6 review card with a merged PR: 409
+  file: apps/server/src/services/builds.ts
+  mutation: a review card goes the restore way
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D6] the PR is already merged → 409 saying the reconcile finishes it; no PUT; the next sweep does
+
+M18  D37 failed card with a merged PR is restored
+  file: apps/server/src/services/builds.ts
+  mutation: the restore is dropped (falls through to the PUT path)
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it
+
+M19  D10 refusal is a 409 with no rows
+  file: apps/server/src/services/builds.ts
+  mutation: a refusal is handled like no clear answer
+  result: caught (Tests  11 failed | 286 passed (297))
+    x [2b-D10] PUT answers 405 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 409 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 422 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 404 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 403 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10b/D29] the refusal text is cleaned: format characters removed, 100 characters at most
+    x [2b-D11] PUT answers 401 → 409 asking to reconnect GitHub; nothing written
+    x [2b-D12] PUT answers 200 with merged false → a refusal; nothing written
+    x [2b-D18b] failed card that can be restored, GitHub refuses → stays failed, no row
+    x [2b-D26] the token travels only in the Authorization header
+    x [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses
+
+M20  D11 401 asks to reconnect
+  file: apps/server/src/services/builds.ts
+  mutation: 401 gets the generic refusal text
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D11] PUT answers 401 → 409 asking to reconnect GitHub; nothing written
+
+M21  D18 failed card restored after merged / no clear answer
+  file: apps/server/src/services/builds.ts
+  mutation: no restore after the PUT
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D18a] failed card that can be restored, GitHub merges → restored, then done
+    x [2b-D18c] failed card that can be restored, no clear answer → restored to review with the row
+
+M22  D17b phase left the gate during the PUT: rows only
+  file: apps/server/src/services/builds.ts
+  mutation: finishes even when the phase moved
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D17b] the card is closed while the PUT is in flight and GitHub merges → the rows, no throw, phase stays closed
+
+M23  D30 only the current build
+  file: apps/server/src/services/builds.ts
+  mutation: the current-build check is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D30] the build is not the todo’s current build → 409; no request
+
+M24  D31 a step in flight blocks
+  file: apps/server/src/services/builds.ts
+  mutation: the busy check is dropped
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D31] a claimed verify step on the build → 409 naming the step; no request
+    x [2b-D31] a claimed review step on the build → 409 naming the step; no request
+    x [2b-D31] a pending build step on the build → 409 naming the step; no request
+    x [2b-D31b] a step claimed while the PR read is in flight → 409; no PUT
+
+M25  D21 only the review gate
+  file: apps/server/src/services/builds.ts
+  mutation: any phase that can reach done passes
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D21] a building card → 409; no request, no row
+
+M26  D36 the API merge counts merge-step pushes
+  file: apps/server/src/services/builds.ts
+  mutation: merge steps never count
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit
+
+M27  D35 the reconcile does not count merge-step pushes
+  file: apps/server/src/services/builds.ts
+  mutation: merge steps always count
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card
+
+M28  D25 a merge step on a GitHub build with a PR does not finish
+  file: apps/server/src/services/builds.ts
+  mutation: the merge-step tail rule is dropped
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D25] a merge step completes on a GitHub build with a PR → stays in review, one row naming the PR; a later GitHub merge is finished by the reconcile
+    x [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card
+
+M29  D34 the merge-step tail keeps the phase check
+  file: apps/server/src/services/builds.ts
+  mutation: the tail writes its row in any phase
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D34] a merge step completes while the card cannot reach done (planning) → illegal phase transition, no row
+
+M30  D7 closed and unmerged
+  file: apps/server/src/services/builds.ts
+  mutation: the closed-unmerged check is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D7] the PR is closed and not merged → 409; no PUT
+
+M31  D3c no secret box names the server key
+  file: apps/server/src/services/builds.ts
+  mutation: the secret-box branch is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D3c] the server has no secret box → 409 naming the server key, not the connection
+
+M32  D3b/D33 unreadable connection asks to reconnect
+  file: apps/server/src/services/builds.ts
+  mutation: always the connect text
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D3b] a connection the box cannot decrypt → the same 409; no request
+
+M33  D32 failed-card hint
+  file: apps/server/src/services/builds.ts
+  mutation: failed cards get the review-card hint
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D32] failed card, the PR head moved → the refusal says how this card gets finished (the reconcile reads only review cards)
+    x [2b-D32] failed card, no checkpoint → the refusal says how this card gets finished (the reconcile reads only review cards)
+
+M34  D16/D28 the reconcile sees an API merge in flight
+  file: apps/server/src/services/builds.ts
+  mutation: hasActiveStep ignores the in-flight mark
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes
+    x [2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes
+
+M35  D31 claimed steps count as in flight
+  file: apps/server/src/services/builds.ts
+  mutation: claimed steps do not count
+  result: caught (Tests  9 failed | 288 passed (297))
+    x [2b-D31] a claimed verify step on the build → 409 naming the step; no request
+    x [2b-D31] a claimed review step on the build → 409 naming the step; no request
+    x [2b-D31b] a step claimed while the PR read is in flight → 409; no PUT
+    x ⑩a a merge step in flight → reconcile does not step in
+    x ㊶ a grind candidate skipped for an in-flight step keeps its check-runs cache row
+    x [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+    x [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+    x [s2-A7] a step starts while the list read is in flight → no write
+    x [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+
+M36  D14 merged needs a sha
+  file: apps/server/src/lib/github.ts
+  mutation: a 200 with merged true and no sha counts as merged
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D13/D14] PUT gives no clear answer (200 merged without sha) → 202, the announcement and one row; review stays
+
+M37  D12 merged false is a refusal
+  file: apps/server/src/lib/github.ts
+  mutation: merged false becomes no clear answer
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D12] PUT answers 200 with merged false → a refusal; nothing written
+
+M40  S1 only a 403 without headers reads the body
+  file: apps/server/src/lib/github.ts
+  mutation: every failure reads the body
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-S1] a list answer of 404 or 429 is classified without reading its body; a 403 without rate-limit headers reads it
+
+M41  D38 the PR read carries author_association
+  file: apps/server/src/lib/github.ts
+  mutation: the PR read drops it
+  result: caught (Tests  64 failed | 233 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D2] closing line for an issue of the same repository
+    x [2b-D2] closing line for a self-created issue, owner and repo in another case
+    x [2b-D2] closing line for an issue of another repository
+    x [2b-D2] closing line for an orchestration source
+    x [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+    x [2b-D2] closing line for a malformed issue ref
+    x [2b-D2] closing line for no source
+    x [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+    x [2b-D41b] a PR title without a closing shape (a keyword followed by a word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a keyword inside another word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a reference with no keyword) keeps the PR title
+    x [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+    x [2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it
+    x [2b-D38] the PR’s author has no write access (NONE) → 409; no PUT
+    x [2b-D38] the PR’s author has no write access (CONTRIBUTOR) → 409; no PUT
+    x [2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT
+    x [2b-D5] no checkpoint → 409; no PUT, and no request carries it
+    x [2b-D5] a short sha → 409; no PUT, and no request carries it
+    x [2b-D5] upper-case hex → 409; no PUT, and no request carries it
+    x [2b-D5] a ref-like value → 409; no PUT, and no request carries it
+    x [2b-D6] the PR is already merged → 409 saying the reconcile finishes it; no PUT; the next sweep does
+    x [2b-D9] the PR targets a branch other than the default → 409; no PUT
+    x [2b-D10] PUT answers 405 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 409 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 422 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 404 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 403 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10b/D29] the refusal text is cleaned: format characters removed, 100 characters at most
+    x [2b-D11] PUT answers 401 → 409 asking to reconnect GitHub; nothing written
+    x [2b-D12] PUT answers 200 with merged false → a refusal; nothing written
+    x [2b-D13/D14] PUT gives no clear answer (a timeout) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (a network error) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (500) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (502) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (503) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 that is not JSON) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 without merged) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 merged without sha) → 202, the announcement and one row; review stays
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D13b] after no clear answer, a sweep that reads the PR merged finishes the card once
+    x [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing
+    x [2b-D15] two presses at once → one GET, one PUT; the other press gets 409
+    x [2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes
+    x [2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes
+    x [2b-D17b] the card is closed while the PUT is in flight and GitHub merges → the rows, no throw, phase stays closed
+    x [2b-D18a] failed card that can be restored, GitHub merges → restored, then done
+    x [2b-D18c] failed card that can be restored, no clear answer → restored to review with the row
+    x [2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit
+    x [2b-D26] the token travels only in the Authorization header
+    x [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses
+    x [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+    x [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+
+M42  P7e the list carries author_association
+  file: apps/server/src/lib/github.ts
+  mutation: every listed PR reads as OWNER
+  result: caught (Tests  10 failed | 287 passed (297))
+    x [s2-A14] the branch PR list parser: live captures, and unreadable answers
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (NONE) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (CONTRIBUTOR) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIME_CONTRIBUTOR) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIMER) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (MANNEQUIN) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (null) is not adopted → failed as in segment 1
+    x [2b-P7c] foreign path: an open PR from the build’s own branch by an author without write access is not adopted; the hint
+    x [2b-P7d] closed path: a merged PR from the build’s branch whose author has no write access is not adopted
+    x [2b-P7g] a closed PR by an author without write access does not count as a rejection: a write author’s merged PR is still adopted
+
+M43  D9b the PR title is read
+  file: apps/server/src/lib/github.ts
+  mutation: the title is never read
+  result: caught (Tests  70 failed | 227 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D2] closing line for an issue of the same repository
+    x [2b-D2] closing line for a self-created issue, owner and repo in another case
+    x [2b-D2] closing line for an issue of another repository
+    x [2b-D2] closing line for an orchestration source
+    x [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+    x [2b-D2] closing line for a malformed issue ref
+    x [2b-D2] closing line for no source
+    x [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+    x [2b-D41b] a PR title without a closing shape (a keyword followed by a word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a keyword inside another word) keeps the PR title
+    x [2b-D41b] a PR title without a closing shape (a reference with no keyword) keeps the PR title
+    x [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+    x [2b-D32] failed card, the PR head moved → the refusal says how this card gets finished (the reconcile reads only review cards)
+    x [2b-D32] failed card, no checkpoint → the refusal says how this card gets finished (the reconcile reads only review cards)
+    x [2b-D37] failed card whose PR is already merged on GitHub → restored to review with one row, 202, no PUT; the next sweep finishes it
+    x [2b-D38] the PR’s author has no write access (NONE) → 409; no PUT
+    x [2b-D38] the PR’s author has no write access (CONTRIBUTOR) → 409; no PUT
+    x [2b-D4] the PR head is not the last pushed commit → 409 naming both short shas; no PUT
+    x [2b-D5] no checkpoint → 409; no PUT, and no request carries it
+    x [2b-D5] a short sha → 409; no PUT, and no request carries it
+    x [2b-D5] upper-case hex → 409; no PUT, and no request carries it
+    x [2b-D5] a ref-like value → 409; no PUT, and no request carries it
+    x [2b-D6] the PR is already merged → 409 saying the reconcile finishes it; no PUT; the next sweep does
+    x [2b-D7] the PR is closed and not merged → 409; no PUT
+    x [2b-D8] the head repository is another one (a fork) → 409; no PUT
+    x [2b-D8] the head repository is gone (null) → 409; no PUT
+    x [2b-D8] the head branch is not the build’s conversation branch → 409; no PUT
+    x [2b-D9] the PR targets a branch other than the default → 409; no PUT
+    x [2b-D10] PUT answers 405 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 409 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 422 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 404 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10] PUT answers 403 → 409 with GitHub’s message; nothing written; a second press tries again
+    x [2b-D10b/D29] the refusal text is cleaned: format characters removed, 100 characters at most
+    x [2b-D11] PUT answers 401 → 409 asking to reconnect GitHub; nothing written
+    x [2b-D12] PUT answers 200 with merged false → a refusal; nothing written
+    x [2b-D13/D14] PUT gives no clear answer (a timeout) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (a network error) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (500) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (502) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (503) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 that is not JSON) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 without merged) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (200 merged without sha) → 202, the announcement and one row; review stays
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D13b] after no clear answer, a sweep that reads the PR merged finishes the card once
+    x [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing
+    x [2b-D15] two presses at once → one GET, one PUT; the other press gets 409
+    x [2b-D16] the reconcile sweeps while the PUT is in flight and the PR reads merged → it neither reads nor writes
+    x [2b-D28] the reconcile sweeps while the PR read is in flight → it neither reads nor writes
+    x [2b-D17b] the card is closed while the PUT is in flight and GitHub merges → the rows, no throw, phase stays closed
+    x [2b-D18a] failed card that can be restored, GitHub merges → restored, then done
+    x [2b-D18c] failed card that can be restored, no clear answer → restored to review with the row
+    x [2b-D36] a merge step pushed its merge of the default branch to the open PR → the API merge binds sha to that commit
+    x [2b-D26] the token travels only in the Authorization header
+    x [2b-D27] REST: 202 {delegated:true} when GitHub merges; 409 {error} when it refuses
+    x [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+    x [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+
+M44  P7 adoption needs a write author
+  file: apps/server/src/services/ci-loop.ts
+  mutation: every own-branch PR is adoptable
+  result: caught (Tests  9 failed | 288 passed (297))
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (NONE) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (CONTRIBUTOR) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIME_CONTRIBUTOR) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (FIRST_TIMER) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (MANNEQUIN) is not adopted → failed as in segment 1
+    x [2b-P7a] closed path: an open PR from the build’s branch whose author has no write access (null) is not adopted → failed as in segment 1
+    x [2b-P7c] foreign path: an open PR from the build’s own branch by an author without write access is not adopted; the hint
+    x [2b-P7d] closed path: a merged PR from the build’s branch whose author has no write access is not adopted
+    x [2b-P7g] a closed PR by an author without write access does not count as a rejection: a write author’s merged PR is still adopted
+
+M45  P7g the rejection floor counts write authors only
+  file: apps/server/src/services/ci-loop.ts
+  mutation: every closed own-branch PR raises the floor
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-P7g] a closed PR by an author without write access does not count as a rejection: a write author’s merged PR is still adopted
+
+M46  D35 the reconcile leaves merge steps out
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the reconcile counts merge-step pushes
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card
+
+M47  P4 foreign path re-reads the phase after the list read
+  file: apps/server/src/services/ci-loop.ts
+  mutation: only the in-flight half of the re-read stays
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-P4] the recorded PR is foreign and the card leaves review while the list read is in flight → no write
+
+M48  P5 list failures go when the card leaves review
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the end-of-sweep cleanup keeps them
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-P5] a failed list read counts within one close only: the card leaving review and coming back starts again
+
+M49  P6 a skipped list read is not a listing
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the relist time is stamped on a skip
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-P6] anonymous: a foreign list read skipped for lack of budget does not count as a listing
+
+M50  P7f the recorded PR is not filtered by author
+  file: apps/server/src/services/ci-loop.ts
+  mutation: the recorded PR must have a write author too
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-P7f] the recorded PR itself shows up open again in the list → no write, whoever opened it
+
+M51  reconcile uses the team token when there is one
+  file: apps/server/src/services/github-connection.ts
+  mutation: the projection always answers null
+  result: caught (Tests  29 failed | 268 passed (297))
+    x ⑫a connected: the second read is conditional and a 304 changes nothing
+    x ⑫b a thrown network error → nothing changes; the next sweep reads again
+    x ㉞ marked done by hand while the PR was open, reopened, then merged → finished
+    x [57] a close counts when the two reads happened 50 s apart, not the two sweep starts
+    x [62d] a closed PR whose head repo is null (fork deleted) is foreign: one hint per round, counted, kept in the cache
+    x [67a] a step runs after the first closed read (the sweep skips the read): the first read after it does not confirm the close
+    x [67a] a step runs after the first closed read (it starts during the read, the sweep drops what it read): the first read after it does not confirm the close
+    x [67b] a read that gets nothing (a network error) between two closed reads: the count starts over
+    x [67b] a read that gets nothing (a response without head) between two closed reads: the count starts over
+    x [69] every review candidate lands in exactly one bucket of the sweep log, also after its hint is written
+    x [70a] a PR from the work branch into another branch (a backport) closed without merge → after the confirming read, one hint and nothing else
+    x [70c] a closed response without base.ref is unreadable: not failed; the close counts again from the next complete read
+    x [70c] a closed response without default_branch is unreadable: not failed; the close counts again from the next complete read
+    x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+    x [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+    x [s2-A5] the list read fails (502) → nothing written; the next sweep confirms again and acts
+    x [s2-A5] the list read fails (429) → nothing written; the next sweep confirms again and acts
+    x [s2-A5] the list read fails (throw) → nothing written; the next sweep confirms again and acts
+    x [s2-A7] the card leaves review while the list read is in flight → no write
+    x [s2-A7] a step starts while the list read is in flight → no write
+    x [s2-A15] the recorded PR shows up open in the list (reopened between the two reads) → not failed, nothing written
+    x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+    x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+    x [s2-A5b] the list read fails at two confirming reads in a row → the close is reported as in segment 1
+    x [s2-A5c] a failed list read during an earlier close does not count toward a later close
+    x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+    x [2b-P5] a failed list read counts within one close only: the card leaving review and coming back starts again
+    x [s2-T3] the first closed sighting is dropped when the card leaves review
+
+R1  D40 a rate-limited PUT is its own outcome
+  file: apps/server/src/lib/github.ts
+  mutation: rate limits fall through to the status rules
+  result: caught (Tests  5 failed | 292 passed (297))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+
+R2  D40 the rate-limited outcome is a 409 with no row
+  file: apps/server/src/services/builds.ts
+  mutation: the rate-limited branch is skipped (rows and 202 follow)
+  result: caught (Tests  10 failed | 287 passed (297))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with retry-after) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 naming a secondary rate limit) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty x-ratelimit-reset → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with a fractional retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row
+
+R3  D40 the reset time from x-ratelimit-reset
+  file: apps/server/src/lib/github.ts
+  mutation: resetAt is always null
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D40] PUT is rate-limited (429 with x-ratelimit-reset) → 409 with GitHub’s message and the reset time when known; nothing written
+    x [2b-D40] PUT is rate-limited (403 with x-ratelimit-remaining 0) → 409 with GitHub’s message and the reset time when known; nothing written
+
+R4  D40c retry-after comes first
+  file: apps/server/src/services/builds.ts
+  mutation: x-ratelimit-reset is shown first
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D40c] rate-limited with retry-after next to a later x-ratelimit-reset (a secondary limit) → the wait shown follows retry-after first and ignores malformed values
+
+R5  D13 5xx stays no clear answer
+  file: apps/server/src/lib/github.ts
+  mutation: 5xx becomes a refusal
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D13/D14] PUT gives no clear answer (500) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (502) → 202, the announcement and one row; review stays
+    x [2b-D13/D14] PUT gives no clear answer (503) → 202, the announcement and one row; review stays
+    x [2b-D13c] after no clear answer, a sweep that reads the PR open changes nothing
+
+R6  D40b a failed card is not restored on a rate limit
+  file: apps/server/src/services/builds.ts
+  mutation: the rate-limited branch restores the card first
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D40b] failed card, PUT rate-limited → 409, the card stays failed with no row
+
+R7  D40c malformed headers count as absent
+  file: apps/server/src/lib/github.ts
+  mutation: any header value is a number
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D40c] rate-limited with an empty x-ratelimit-reset → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an empty retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with a fractional retry-after → the wait shown follows retry-after first and ignores malformed values
+    x [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values
+
+T1  D41 a closing shape in the title falls back
+  file: apps/server/src/services/builds.ts
+  mutation: the title check is dropped (the PR title always used)
+  result: caught (Tests  7 failed | 290 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+
+T2  D41 every keyword form
+  file: apps/server/src/services/builds.ts
+  mutation: resolve/resolves/resolved missing from the keyword list
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+
+T3  D41 every keyword form
+  file: apps/server/src/services/builds.ts
+  mutation: fix only, not fixes/fixed
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+
+T4  D41 a colon after the keyword
+  file: apps/server/src/services/builds.ts
+  mutation: no colon allowed, whitespace required
+  result: caught (Tests  2 failed | 295 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+
+T5  D41 case-insensitive
+  file: apps/server/src/services/builds.ts
+  mutation: the i flag is dropped
+  result: caught (Tests  3 failed | 294 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+
+T6  D41 every reference form
+  file: apps/server/src/services/builds.ts
+  mutation: only #N references count
+  result: caught (Tests  4 failed | 293 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+
+T7  D41b a keyword inside another word is not one
+  file: apps/server/src/services/builds.ts
+  mutation: the leading letter guard is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D41b] a PR title without a closing shape (a keyword inside another word) keeps the PR title
+
+T8  D41b a keyword followed by a word keeps the title
+  file: apps/server/src/services/builds.ts
+  mutation: any keyword at all falls back
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D41b] a PR title without a closing shape (a keyword followed by a word) keeps the PR title
+
+T9  D41 the check runs on the composed title
+  file: apps/server/src/services/builds.ts
+  mutation: the check reads the bare PR title (misses a keyword right before the appended (#n))
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+
+B1  D42 the body is always sent
+  file: apps/server/src/services/builds.ts
+  mutation: no fallback body (null reaches the PUT)
+  result: caught (Tests  7 failed | 290 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D2] closing line for an issue of another repository
+    x [2b-D2] closing line for an orchestration source
+    x [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+    x [2b-D2] closing line for a malformed issue ref
+    x [2b-D2] closing line for no source
+    x [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+
+B2  D42 the body is always sent
+  file: apps/server/src/lib/github.ts
+  mutation: commit_message left out of the PUT body
+  result: caught (Tests  16 failed | 281 passed (297))
+    x [2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done
+    x [2b-D2] closing line for an issue of the same repository
+    x [2b-D2] closing line for a self-created issue, owner and repo in another case
+    x [2b-D2] closing line for an issue of another repository
+    x [2b-D2] closing line for an orchestration source
+    x [2b-D2] closing line for an orchestration source holding an issue-shaped ref
+    x [2b-D2] closing line for a malformed issue ref
+    x [2b-D2] closing line for no source
+    x [2b-D41] a PR title with a closing keyword and a reference (a same-repository reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (upper case with a colon and another repository) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (an issue URL) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a GH- reference) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (no space after the colon) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a keyword at the end, before the appended (#n)) → the commit title is pacman’s own
+    x [2b-D41] a PR title with a closing keyword and a reference (a second keyword after a harmless one) → the commit title is pacman’s own
+    x [2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used
+
+G1  M3 (#1497) the project must be the todo team's
+  file: apps/server/src/services/builds.ts
+  mutation: githubPrOf reads the project by id without the team
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-M3] the todo points at another team’s GitHub project (#1497) → not GitHub form: no GitHub request
+
+O1  #1487 an in-flight merge step is refused first
+  file: apps/server/src/services/builds.ts
+  mutation: the #1487 check moves after the GitHub routing
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D31] a merge step queued before the upgrade on the build → 409 naming the step; no request
+
+R8  D40c a reset beyond any date counts as absent
+  file: apps/server/src/lib/github.ts
+  mutation: the 10-digit cap is dropped
+  result: caught (Tests  1 failed | 296 passed (297))
+    x [2b-D40c] rate-limited with an x-ratelimit-reset beyond any date → the wait shown follows retry-after first and ignores malformed values
+
+Addendum (after /code-review round 2, finding 4; tree 95f2a30e plus the D43 change)
+-----------------------------------------------------------------------------------
+D43  the closing line reads the todo row re-read after the PR read
+  file: apps/server/src/services/builds.ts
+  mutation: closingLine(gate.todoRow, ...) instead of closingLine(before.todoRow, ...)
+  (the pre-fix text; this is the red leg recorded in seg2b-r2-red-green.txt)
+  result: caught (Tests  1 failed | 297 passed (298))
+    x [2b-D43] the self-created issue is recorded while the PR read is in flight → the closing line reads the re-read todo
+
+Total: 71 mutations, 71 caught.

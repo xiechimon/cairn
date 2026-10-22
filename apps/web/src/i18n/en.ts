@@ -735,8 +735,8 @@ export const EN: Record<string, string> = {
   '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
   '任务数据未就绪，完成请求未送出。请刷新页面后重试。':
     'Todo data is not ready, so the request was not sent. Refresh the page and try again.',
-  '已发起合并，机器执行完成后任务进入已完成。':
-    'Merge started. The todo moves to done once the machine finishes the merge.',
+  '已发起合并，合并完成后任务进入已完成。':
+    'Merge started. The todo moves to done once the merge completes.',
   '任务已完成，改动保留在会话分支。':
     'Todo completed. The changes stay on the conversation branch.',
   '失败任务只能经合并完成，不能跳过合并。':

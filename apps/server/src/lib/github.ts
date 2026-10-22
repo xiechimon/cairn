@@ -12,13 +12,15 @@
 //   同上位；匿名梯 = 无连接时公开仓可达）
 // - 合并就绪闸的原样读（#1404 S4a：PR、分支、规则集、compare、check runs、
 //   combined status、contents；应答原样交回，清单见「合并就绪闸的 GitHub 传输」一节）
-// 写面（#452 / ADR 0006，#1404 / ADR 0021——server 的 api.github.com 写入点，穷举律：
-// grep `api.github.com` 的 POST/PATCH 只此三处；不改 scope（commit status 在团队连接
-// 已有的 `repo` scope 内）、不新增凭证面）：
+// 写面（#452 / ADR 0006，#1404 / ADR 0021，#1403 段 2b / ADR 0021 D2——server 的
+// api.github.com 写入点，穷举律：grep `api.github.com` 的 POST/PATCH/PUT 只此四处；不改
+// scope（commit status 与合并都在团队连接已有的 `repo` scope 内）、不新增凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
 // - PATCH repos/{o}/{r}/issues/{n} → agent 回填标题写进 issue
 // - POST repos/{o}/{r}/statuses/{sha} → 合并就绪闸的 commit status `pacman/merge-gate`
 //   （githubCreateCommitStatus；S4a 只有传输，调用方是 S7，`human` 策略下不写）
+// - PUT repos/{o}/{r}/pulls/{n}/merge → 人在 pacman 里点合并（GitHub 形态、build 记着
+//   PR）：sha 绑本 build 最后推送的提交、squash（githubMergePull）
 // OAuth 面（#231 握手）：
 // - POST github.com/login/oauth/access_token（form-encoded：client_id/
 //   client_secret/code/redirect_uri，Accept: json）→ access_token
@@ -148,6 +150,29 @@ export interface GithubPull extends GithubPullState {
   defaultBranch: string | null;
   /** 目标仓现在的 owner（base.repo.owner.login；仓库改名或转移后是新名字）；缺失 = null。 */
   baseOwner: string | null;
+  /** PR 标题（经 API 合并时提交标题取它，#1403 段 2b）；缺失 = null。 */
+  title: string | null;
+  /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
+  authorAssociation: string | null;
+}
+
+/** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
+export function hasPullFields(p: GithubPull): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
+  );
+}
+
+/** 这张 PR 是从 branch 开的、head 仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库
+ * 改名或转移后照样对得上；fork 对不上，fork 已删时 head 仓为 null 同样对不上）。PR 对账与
+ * 经 API 合并（#1403）判断「是不是本 build 的 PR」共用。 */
+export function isOwnPull(pull: GithubPull, branch: string): boolean {
+  return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
 }
 
 export interface GithubPullPage {
@@ -217,6 +242,8 @@ export async function githubPull(
   const raw = got.data as {
     state?: unknown;
     merged?: unknown;
+    title?: unknown;
+    author_association?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -247,6 +274,8 @@ export async function githubPull(
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
+      title: optString(raw.title),
+      authorAssociation: optString(raw.author_association),
     },
   };
 }
@@ -294,7 +323,19 @@ export interface GithubBranchPull {
   headRepoId: number | null;
   baseRef: string | null;
   baseRepoId: number | null;
+  /** PR 作者与仓库的关系（author_association）；响应缺失 = null。 */
+  authorAssociation: string | null;
 }
+
+/** author_association 里按作者对仓库有写权限算的三个值（OWNER：仓库的 owner；MEMBER：
+ * 拥有仓库的组织的成员；COLLABORATOR：受邀协作者）。其余（CONTRIBUTOR、FIRST_TIMER、
+ * FIRST_TIME_CONTRIBUTOR、MANNEQUIN、NONE）与缺失都不算。MEMBER / COLLABORATOR 不带权限
+ * 级别：只读的组织成员或协作者同样落在这两个值里（列表响应不再多读一次权限）。 */
+export const WRITE_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+  'OWNER',
+  'MEMBER',
+  'COLLABORATOR',
+]);
 
 /** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
  * <owner>:<branch>&base=<base>&per_page=10`，GitHub 按创建时间倒序给）。同一个分支可以
@@ -322,6 +363,7 @@ export async function githubBranchPulls(
         number?: unknown;
         state?: unknown;
         merged_at?: unknown;
+        author_association?: unknown;
         head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
         base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
       };
@@ -334,6 +376,7 @@ export async function githubBranchPulls(
         headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
         baseRef: optString(p.base?.ref),
         baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+        authorAssociation: optString(p.author_association),
       };
     },
   );
@@ -416,7 +459,16 @@ function isRateLimited(res: { status: number; headers: { get(n: string): string 
  * 429 + 说明超了二级限流的 message）。 */
 async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
   if (isRateLimited(res)) return true;
-  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));
+  // 只有没带限流头的 403 要看应答文本：别的失败不读应答体（慢的错误体不拖住调用方）。
+  return res.status === 403 && isRateLimitedText(res, await res.text().catch(() => ''));
+}
+
+/** isRateLimitedResponse 的同步半边：应答文本已读出时用（应答体只能读一次）。 */
+function isRateLimitedText(
+  res: { status: number; headers: { get(n: string): string | null } },
+  text: string,
+): boolean {
+  return isRateLimited(res) || (res.status === 403 && /rate limit/i.test(text));
 }
 
 /** 头里的秒数：缺省、为空或不是非负整数 = null（Number('') 是 0，不能当「0 秒后」）。 */
@@ -446,6 +498,26 @@ export class GithubRateLimitedError extends Error {
     if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;
     return this.resetAt;
   }
+}
+
+/** 限流应答的头 → GithubRateLimitedError（进料读与合并写共用）。头不在、空串或不是非负
+ * 整数 = 没给（Number('') 是 0，不能当「0 秒后」）；超过 10 位的数同样不算（UTC 秒到
+ * 2286 年为止，再大 new Date 就出界，toISOString 会抛）。 */
+function rateLimitOf(
+  url: string,
+  res: { status: number; headers: { get(n: string): string | null } },
+): GithubRateLimitedError {
+  const seconds = (name: string): number | null => {
+    const v = res.headers.get(name)?.trim() ?? '';
+    return /^\d{1,10}$/.test(v) ? Number(v) : null;
+  };
+  const reset = seconds('x-ratelimit-reset');
+  return new GithubRateLimitedError(
+    url,
+    res.status,
+    reset === null ? null : reset * 1000,
+    seconds('retry-after'),
+  );
 }
 
 /** 认证面仓库条目（GitHub `GET /user/repos` 元素最小投影；camelCase =
@@ -938,13 +1010,7 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      const reset = headerSeconds(res.headers, 'x-ratelimit-reset');
-      throw new GithubRateLimitedError(
-        url,
-        res.status,
-        reset === null ? null : reset * 1000,
-        headerSeconds(res.headers, 'retry-after'),
-      );
+      throw rateLimitOf(url, res);
     }
     return { ...head, data: undefined };
   }
@@ -1230,6 +1296,88 @@ export async function githubUpdateIssueTitle(
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
+}
+
+// —— PR 合并写面（#1403 段 2b / ADR 0021 D2：人点合并 = server 经 REST 合并）————————
+
+/** 合并 PR 的结果（`PUT /repos/{o}/{r}/pulls/{n}/merge`）：
+ * - merged：200 且 merged 为 true；sha = 合并落在 base 上的提交。
+ * - refused：GitHub 明确没合（4xx 且不是限流，或 200 但 merged 为 false）；message =
+ *   应答体的 message（读不到为空串）。
+ * - rate-limited：429，或带限流信号的 403（remaining=0、retry-after、message 说二级限流）：
+ *   GitHub 没有处理这次请求，合并确定没有发生；limit = 头里的解除时刻（rateLimitOf，
+ *   与进料读同一解析与先后：retry-after 优先）。
+ * - unknown：不知道合没合——超时、网络错、5xx（GitHub 处理超过 10 秒会断开请求、回
+ *   「Server Error」，合并可能已经发生）、200 的应答体读不出。 */
+export type GithubMergeResult =
+  | { kind: 'merged'; sha: string }
+  | { kind: 'refused'; status: number; message: string }
+  | { kind: 'rate-limited'; message: string; limit: GithubRateLimitedError }
+  | {
+      kind: 'unknown';
+      reason: 'timeout' | 'network' | 'status' | 'malformed';
+      status: number | null;
+    };
+
+/** 合并 PR（squash）。sha = PR head 必须是的提交（GitHub 对不上答 409）；commitTitle /
+ * commitMessage = squash 提交的标题与正文（总是传：不传时 GitHub 按仓库设置取 PR 正文或
+ * 各提交 message，关票关键字会随它进默认分支，#1403 段 2b D42）。
+ * token 只进 Authorization 头；不抛错，结果分三类（GithubMergeResult）。 */
+export async function githubMergePull(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  input: { sha: string; commitTitle: string; commitMessage: string },
+): Promise<GithubMergeResult> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: 'PUT',
+      headers: { ...authHeaders(token), 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sha: input.sha,
+        merge_method: 'squash',
+        commit_title: input.commitTitle,
+        commit_message: input.commitMessage,
+      }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    return { kind: 'unknown', reason: isAbort(err) ? 'timeout' : 'network', status: null };
+  }
+  // 应答体只读一次：文本既给限流判据（二级限流的 403 可以只在 message 里说），也给 JSON。
+  let text: string | null;
+  try {
+    text = await res.text();
+  } catch {
+    text = null;
+  }
+  let data: { merged?: unknown; sha?: unknown; message?: unknown } | null = null;
+  try {
+    const parsed: unknown = text === null ? null : JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null) data = parsed;
+  } catch {
+    data = null;
+  }
+  const message = optString(data?.message) ?? '';
+  // 限流 = GitHub 没有处理这次请求，合并确定没有发生：409、不落行（2026-10-22 用户裁决，
+  // 记在 https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）。
+  if (isRateLimitedText(res, text ?? '')) {
+    return { kind: 'rate-limited', message, limit: rateLimitOf(url, res) };
+  }
+  if (res.status >= 500) return { kind: 'unknown', reason: 'status', status: res.status };
+  if (res.ok) {
+    if (data?.merged === true && typeof data.sha === 'string') {
+      return { kind: 'merged', sha: data.sha };
+    }
+    if (data?.merged === false) return { kind: 'refused', status: res.status, message };
+    return { kind: 'unknown', reason: 'malformed', status: res.status };
+  }
+  if (res.status >= 400) return { kind: 'refused', status: res.status, message };
+  return { kind: 'unknown', reason: 'status', status: res.status };
 }
 
 // —— PR checks 只读面（#1150 CI 磨绿环：轮询器的唯一出站读）———————————————————

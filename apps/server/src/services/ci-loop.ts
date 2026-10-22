@@ -21,8 +21,8 @@
 //   下轮重试（读不到 ≠ 红）；
 // - build 已被人手动推进/关闭时不得回写：候选是扫描快照，动作前重读当前
 //   phase（两次：网络读之前、写面之前——网络窗是人工动作最可能落进的缝）；
-// - 有步在飞（hasActiveStep：已领取的任意步，排队中或等额度的非审核类步）
-//   不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
+// - 有步在飞（hasActiveStep：已领取的任意步，排队中或等额度的非审核类步，以及
+//   人点的合并正在经 GitHub API 进行，#1403 段 2b）不叠派：读到的 checks 是推送前旧 head 的，等它跑完重评（幂等：同轮重复
 //   sweep 不追加第二条）。没人领（排队中或等额度）的 verify / review 步不挡
 //   磨绿与对账。
 //
@@ -60,7 +60,8 @@
 //   它、从同一工作分支另开一张时，记的号就过时了（#1403 段 2）。确认关闭之后、打回
 //   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
 //   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
-//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
+//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支、作者有写权限即
+//   author_association 为 OWNER / MEMBER / COLLABORATOR，段 2b；开着的，或比记的
 //   那张新的已合并的；已合并的都要比本 build 自己最近一张关闭未合并的新：更早合并的是
 //   旧事）→ 改记它（号与链接，只在 build 上记的还是原来那张时）、每轮落一行，不打回、不
 //   提示，下一轮读它；记的那张在列表里又开着或已合并 → 不写，下一轮重读它。关闭路径列不到 → 不写，
@@ -78,7 +79,7 @@
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
 import { conversationBranch } from '@pacman/shared';
-import { and, desc, eq, inArray, isNotNull, like, ne, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
 import {
@@ -90,7 +91,10 @@ import {
   githubCommitCheckRuns,
   githubCompareStatus,
   githubPull,
+  hasPullFields,
   isFullSha,
+  isOwnPull,
+  WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -98,14 +102,17 @@ import {
   DONE_ROW,
   enqueueStep,
   finishTodoDone,
+  hasActiveStep,
   hasMessageRow,
+  lastPushedCheckpoint,
   maybeEnqueueVerifyStep,
   roundStart,
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { openGithubToken } from './github-connection.js';
+import { githubTokenOrNull } from './github-connection.js';
+import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -152,19 +159,6 @@ export const CI_FIX_PROMPT_HEAD = '[ci-fix]';
 
 /** fix prompt 里单条失败摘要的截断（prompt 是会话注入位，不给无界长文本）。 */
 const CI_FIX_SUMMARY_MAX = 800;
-
-/** system 行里引用的一段 GitHub 文本的长度上界（字符数）。 */
-const GITHUB_TEXT_MAX = 100;
-
-/** GitHub 给的文本（分支名、合并者、合并提交）进 system 行之前：去掉控制字符与
- * 格式字符（git 分支名允许双向覆盖 U+202E、零宽字符这类，显示出来会把文字倒过来或
- * 藏起来），超过上界截断并加省略号。 */
-function githubText(text: string): string {
-  const chars = Array.from(text.replace(/[\p{Cc}\p{Cf}]/gu, ''));
-  return chars.length > GITHUB_TEXT_MAX
-    ? `${chars.slice(0, GITHUB_TEXT_MAX).join('')}…`
-    : chars.join('');
-}
 
 /** 对账日志口（scheduler 接线传 pino；每 sweep 一行：候选数 × 三态落位）。 */
 export interface CiPollLogger {
@@ -309,18 +303,6 @@ interface PullCacheEntry {
   pull: GithubPull | null;
 }
 
-/** 对账判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
-function hasPullFields(p: GithubPull): p is GithubPull & {
-  headRef: string;
-  baseRef: string;
-  defaultBranch: string;
-  baseRepoId: number;
-} {
-  return (
-    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
-  );
-}
-
 export function createCiPoller(
   deps: BuildDeps,
   run: {
@@ -396,30 +378,6 @@ export function createCiPoller(
     return true;
   }
 
-  /** 本 build 有在飞的步：已被领取的任意步，以及排队中或等额度的非审核类
-   * 步。没人领（排队中或等额度）的 verify / review 步不算（Verifier 的机器
-   * 离线或额度耗尽时，卡不能因此永远停在 review）。 */
-  function hasActiveStep(buildId: string): boolean {
-    return (
-      deps.db
-        .select({ id: step.id })
-        .from(step)
-        .where(
-          and(
-            eq(step.buildId, buildId),
-            or(
-              eq(step.status, 'claimed'),
-              and(
-                inArray(step.status, ['pending', 'waiting_quota']),
-                notInArray(step.kind, ['verify', 'review']),
-              ),
-            ),
-          ),
-        )
-        .get() !== undefined
-    );
-  }
-
   /** 本轮（since 起）是否已有这一行；肯定结果记进 knownRows，之后不再查表。 */
   function rowKnown(buildId: string, content: string, since: number): boolean {
     const memo = `${buildId}\u0000${since}\u0000${content}`;
@@ -434,7 +392,7 @@ export function createCiPoller(
   function stillOurs(cand: { buildId: string; todoId: string }, since: number): boolean {
     return (
       freshReviewRow(cand.todoId, cand.buildId) !== null &&
-      !hasActiveStep(cand.buildId) &&
+      !hasActiveStep(deps, cand.buildId) &&
       !rowKnown(cand.buildId, DONE_ROW, since)
     );
   }
@@ -503,12 +461,19 @@ export function createCiPoller(
       (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
     );
     if (changed !== undefined) return changed;
-    const open = own.filter((p) => p.state === 'open');
+    // 改记只收有写权限的作者开的 PR（#1403 段 2b，#1489 pr-gate 建议 7）：人关掉本 build 的
+    // PR 表示不要这次改动，之后没有写权限的人从同一分支另开一张，不能把这个决定翻过来。
+    const adoptable = own.filter((p) => WRITE_AUTHOR_ASSOCIATIONS.has(p.authorAssociation ?? ''));
+    const open = adoptable.filter((p) => p.state === 'open');
+    // 拒绝的下限看本 build 的全部 PR、不按作者筛（#1509 pr-gate 第 2 轮 correctness 建议）：
+    // 作者没有写权限的 PR 可能是维护者关掉的（不要这次改动），也可能是作者自己关的；列表应答
+    // 里没有关闭人，分不出来。两头取不改记：误判的代价是卡打回 failed、等人处理，反过来是把
+    // 维护者已否掉的旧 PR 改记回来。
     const rejected = own.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
       mergedAfter,
     );
-    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > rejected);
+    const pool = open.length > 0 ? open : adoptable.filter((p) => p.merged && p.number > rejected);
     return pool.reduce<GithubBranchPull | null>(
       (best, p) => (best === null || p.number > best.number ? p : best),
       null,
@@ -571,17 +536,6 @@ export function createCiPoller(
     };
   }
 
-  /** token 阶梯（#931 同律）：连接 token → 匿名（公开仓可达）；box 缺席/密文
-   * 损坏按未连接（轮询是辅助面，不把 500 打进调度循环）。 */
-  function tokenFor(teamId: string): string | null {
-    if (deps.box === undefined) return null;
-    try {
-      return openGithubToken({ db: deps.db, box: deps.box }, teamId);
-    } catch {
-      return null;
-    }
-  }
-
   async function reconcileOne(
     cand: { buildId: string; todoId: string },
     now: number,
@@ -607,12 +561,12 @@ export function createCiPoller(
     const prNumber = buildRow.prNumber;
     const key = `${target.fullName}#${prNumber}`;
     liveKeys.add(key);
-    if (hasActiveStep(cand.buildId)) {
+    if (hasActiveStep(deps, cand.buildId)) {
       forgetClose(key); // 这段没读：之前读到的关闭不再算数
       tally.reviewSkipped += 1; // merge 步在飞：合并结果由它收尾
       return;
     }
-    const token = tokenFor(target.teamId);
+    const token = githubTokenOrNull(deps, target.teamId);
     const entry = pullCache.get(key) ?? null;
     let pull: GithubPull | null;
     let readAt = now;
@@ -646,12 +600,8 @@ export function createCiPoller(
       pullCache.set(key, { etag: page.etag, pull });
     }
     const branch = conversationBranch(cand.buildId);
-    // head 仓按 id 与同一份响应的 base 仓比；head.repo 为 null（fork 已删）时 headRepoId
-    // 是 null，同样对不上。字段不齐时不算（下文按读不到）。
-    const foreign =
-      pull !== null &&
-      hasPullFields(pull) &&
-      (pull.headRepoId !== pull.baseRepoId || pull.headRef !== branch);
+    // 字段不齐时不算（下文按读不到）。
+    const foreign = pull !== null && hasPullFields(pull) && !isOwnPull(pull, branch);
     // open → 不动；不是本 build 的 open PR 除外：走下文别人的 PR 那条路（提示，或改记本
     // build 自己的 PR），否则本 build 真正的 PR 合并了也看不到。
     if (pull === null || (pull.state === 'open' && !foreign)) {
@@ -660,7 +610,7 @@ export function createCiPoller(
       return;
     }
     // 写面前再读（④）：网络窗内相位或当前 build 变了、或有步开始在飞 → 弃写。
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       forgetClose(key);
       tally.reviewSkipped += 1;
       return;
@@ -693,7 +643,10 @@ export function createCiPoller(
       if (listedAt === undefined || now - listedAt >= relistMs) {
         const own = await ownBranchPull(branch, target, token, recorded, 0, now);
         if (own !== 'skipped') foreignListedAt.set(listKey, now);
-        if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+        if (
+          freshReviewRow(cand.todoId, cand.buildId) === null ||
+          hasActiveStep(deps, cand.buildId)
+        ) {
           tally.reviewSkipped += 1;
           return;
         }
@@ -733,28 +686,9 @@ export function createCiPoller(
       }
       // 合并之后同分支又推了提交（修复轮，或 verify 步推的提交：daemon 除审核步外
       // 每一步收尾都提交并推送）：那个提交不在这次合并里，不收尾。head 包含最后
-      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算。
-      // 最后推送 = 最后收尾，不是最后建的：上一轮建的 verify 步（Verifier 离线或
-      // 等额度）可以在下一轮的 build 步之后才跑。step 表没有收尾时刻列，按步最后
-      // 一次报到排（心跳 → 领取 → 入队，同 stepActivityAt；领取时心跳置为领取时刻，
-      // 之后每 30 s 一次）：同一 build 的步一个接一个跑时就是收尾顺序。
-      const checkpoint =
-        deps.db
-          .select({ commit: step.checkpointCommit })
-          .from(step)
-          .where(
-            and(
-              eq(step.buildId, cand.buildId),
-              ne(step.kind, 'review'),
-              eq(step.status, 'done'),
-              isNotNull(step.checkpointCommit),
-            ),
-          )
-          .orderBy(
-            desc(sql`coalesce(${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`),
-            desc(step.createdAt),
-          )
-          .get()?.commit ?? null;
+      // 推送的 checkpoint（含 GitHub update-branch 的合并提交盖在上面）才算（最后
+      // 推送 = 最后收尾，取法见 lastPushedCheckpoint）。
+      const checkpoint = lastPushedCheckpoint(deps, cand.buildId, { mergeSteps: false });
       if (checkpoint !== null && pull.headSha === null) {
         pullCache.delete(key); // 同上：缺字段的响应不当终态缓存
         tally.reviewUnreadable += 1; // 合并时的 head 不明，无法核对 checkpoint 在不在里面
@@ -879,7 +813,7 @@ export function createCiPoller(
     forgetClose(key);
     // 列表读的网络窗里卡离开 review、换了当前 build 或有步开始在飞 → 不写（关闭从下一次
     // 读重新数）。
-    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(cand.buildId)) {
+    if (freshReviewRow(cand.todoId, cand.buildId) === null || hasActiveStep(deps, cand.buildId)) {
       tally.reviewSkipped += 1;
       return;
     }
@@ -935,13 +869,13 @@ export function createCiPoller(
     const key = `${target.fullName}#${buildRow.prNumber}`;
     grindKeys.add(key); // 先登记：在飞步跳过的这一轮不清它的缓存行
     // 有步在飞不叠派（幂等，口径见 hasActiveStep）：读到的 checks 是旧 head 的。
-    if (hasActiveStep(cand.buildId)) {
+    if (hasActiveStep(deps, cand.buildId)) {
       tally.skipped += 1;
       return;
     }
     const entry = cache.get(key) ?? null;
     // ref = conv 分支名（PR 的 head 即分支 tip——不逐 PR 拉 pulls/{n} 取 sha）。
-    const grindToken = tokenFor(target.teamId);
+    const grindToken = githubTokenOrNull(deps, target.teamId);
     // 匿名读记进进程级额度（不拦磨绿，只让对账看见同一份 IP 额度已用了多少）。
     if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(
