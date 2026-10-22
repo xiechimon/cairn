@@ -1,0 +1,100 @@
+#1403 segment 2b: review record
+===============================
+
+Worktree /home/user/pacman/.claude/worktrees/p5d, branch claude/bootstrap-p2-seg2b. Every
+review below read this worktree (git commands run as `cd .../p5d && git ...`); each pass
+names its range and head.
+
+/simplify (one pass, at fe6a8f91, range origin/claude/bootstrap-p2-seg2...HEAD)
+-------------------------------------------------------------------------------
+Single-pass review without the Agent tool (the four-angle fan-out could not run); all four
+angles (reuse, simplification, efficiency, altitude) were worked through in one context.
+Fixed in 2a3b2965:
+- three copies of "team token, or null without box or on a bad cipher" became one helper
+  (later moved to github-connection.ts, see pass 3 and 4);
+- the 403 rate-limit-by-text check shared with isRateLimitedResponse (the first version
+  made every failure read its body; pass 2 found it, fixed in 5f78a77e, pinned by S1);
+- the no-clear-answer reason became a switch; the test world builds its fake first.
+Skipped: the three gate re-reads (each follows an await); the merge path not using
+writeJson (that helper maps 409 to "repo is empty" and throws HttpError, the merge needs
+three outcomes).
+
+/code-review, medium, five passes
+---------------------------------
+Pass 1 (range origin/claude/bootstrap-p2-seg2...HEAD at 2a3b2965): 12 findings.
+  Fixed in 39f8f38a (tests D30-D34 first): stale build merged (D30); failed-card refusals
+  promised the reconcile (D32); a claimed step pushing after the squash (D31); undecryptable
+  connection text (D33); merge-step tail without the phase check (D34); one own-PR predicate
+  (isOwnPull); stale JSDoc; the single-use mergeInFlight helper; the web toast that said the
+  machine merges.
+  Not changed: rate-limited PUT as no clear answer (design D as the coordinator gave it);
+  process-local in-flight Set and no persisted request state (design D); #1217 guard before
+  the cheap checks (the duplicate-delivery refusal comes first; probes only run when earlier
+  PR builds exist).
+Pass 2 (range origin/main...HEAD at 6efdd458, after merging origin/main with #1489): 13.
+  Fixed in 5f78a77e (tests D35, S1 first): merge-step push counted as delivered work (D35);
+  body read on every failure (S1); the merged refusal's promise; next step on a refusal;
+  shared hasPullFields; settleHint inlined.
+  Not changed: a pending verify step claimed during the PUT (needs the claim path in
+  services/machines.ts; window is the PUT, up to 15 s; flagged); failed->review->done
+  notification on a merged failed card (same as the merge-step path); token helper catch-all
+  (the probe and reconcile kept it before); the gate's re-reads.
+Pass 3 (origin/main...HEAD at 52b7d698): 11.
+  Fixed in bdeb6378 (tests D36, D3, D31, P7g first): leaving merge steps out made every press
+  refuse when a merge step pushed to an open PR (D36: two checkpoint modes); private-repo note
+  for an anonymous reconcile (D3); busy text names the step (D31); outsider closed PRs no
+  longer raise the rejection floor (P7g); the two teamGithubToken exports became one in
+  github-connection.ts; the dead #1217 block in the merge-step path; a rewrapped comment's
+  emoji; isWriteAuthor inlined.
+  Not changed: MEMBER and COLLABORATOR can be read-only (the coordinator's rule; limit stated
+  in seg2b-failure-modes.txt); a Verifier without the push permission reports a local commit
+  as its checkpoint (segment 1's checkpoint semantics; the failed-card hint routes through
+  GitHub).
+Pass 4 (origin/main...HEAD at bdeb6378): 8.
+  Fixed in dd6fdc1e (tests D37, D38, D3c, D32, D31 first): a failed card with a merged PR
+  looped between the board's done dialog and a 409 (D37 restores it to review); the API merge
+  did not check the PR author (D38); the merged refusal's next step; secret-box text (D3c);
+  busy text in Chinese, no stop advice; githubTokenOrNull and githubPrOf.
+  Not changed: private organization members can read as CONTRIBUTOR to anonymous or limited
+  viewers (adoption then falls back to segment 1's close; the API merge reads with the team
+  token).
+Pass 5 (origin/main...HEAD at dd6fdc1e): 7.
+  Fixed in 86690452 (tests D39, D4, D31 first): the failed-card restore ran before the own-PR,
+  author and base checks (D39); head-lag wording (D4); a review step does not push (D31).
+  Not changed: squash only (ADR 0021 D2; a repository without squash gets GitHub's 405 text);
+  a step that pushed and then failed is not a checkpoint (segment 1 semantics; the failed-card
+  hint goes through GitHub); a pending pre-upgrade merge step blocks the API merge and the
+  reconcile (rules 10 and 15 of pr-reconcile pin the reconcile side; the refusal names the
+  merge step); the gate's three reads and two token opens per press.
+Five passes ran; the coordinator asked for a rerun after fixes, and each pass after the
+first found fewer and narrower items.
+
+/security-review (at bdeb6378, range origin/main...HEAD)
+-------------------------------------------------------
+Run because this is the first server-side write to GitHub with the team token. The skill's
+preloaded git status and diff came from the shell's default directory (branch
+claude/bootstrap-p2-seg2), not this worktree; the review read the p5d diff directly and
+names worktree and head in its report. The Agent tool was not available, so the
+identification and false-positive passes ran inline.
+Result: no finding at confidence 8 or above.
+Considered and dismissed (confidence in brackets):
+- Token exposure [1]: Authorization header only (authHeaders); refusal text carries GitHub's
+  cleaned message, the repository name and pacman's branch name; [2b-D26] pins it.
+- Request target [1]: owner and repo through parseGithubRepoRef (#1466) and
+  encodeURIComponent; the PR number is the build row's integer; the host is fixed; the sha is
+  40 lower-case hex before it reaches the body.
+- Body content [2]: the PR title becomes commit_title through JSON.stringify (GitHub's own
+  default squash title); the closing line comes only from a server-written sourceRef naming
+  the same repository; since dd6fdc1e the PR author must have write access (D38).
+- Authorization [3]: POST /api/builds/:id/merge gains no caller; the REST surface is the
+  single-user one with the optional authToken, unchanged; chief and MCP merge_builds stay
+  hard-blocked; the XMON-77 gate runs first. The write uses the connection owner's GitHub
+  rights; an admin whose branch protection does not enforce admins can merge without
+  required checks, as on GitHub itself (ADR 0021 D2 and spec 28 D2 chose the team token).
+- Adoption by a read-only MEMBER or COLLABORATOR [3]: such an author cannot push to the
+  branch, and the API merge binds sha to pacman's last pushed commit, so the merged tree is
+  pacman's work.
+- Cross-site POST to the merge route [2]: unchanged route and authentication; its effect (a
+  merge) is the same as before (a machine merge step).
+Commits after bdeb6378 (dd6fdc1e, 86690452, aa33fd34) tighten the same path (author check,
+restore conditions, texts) and add no new request or credential use.
