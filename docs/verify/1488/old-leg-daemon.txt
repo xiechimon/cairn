@@ -1,0 +1,37 @@
+## old leg: apps/daemon/src/runner.ts = origin/main 29e60bb7; tests = this branch
+## (cd apps/daemon && pnpm exec vitest run --reporter=verbose test/runner-stop.test.ts)
+
+ RUN  v5.0.1 /home/user/pacman/apps/daemon
+
+ ✓ test/runner-stop.test.ts > runner 停止收尾（M7 #308） > 失败方式 1：discard=true → rewind 到步起点 + done(stopped) + 无 commit/push 22ms
+ ✓ test/runner-stop.test.ts > runner 停止收尾（M7 #308） > 失败方式 2：discard=false → 不 rewind（本轮改动保留）+ done(stopped) 13ms
+ ✓ test/runner-stop.test.ts > runner 停止收尾（M7 #308） > 失败方式 3：plan 步停止 → plan.md 不上传，transcript.json 照传 13ms
+ ✓ test/runner-stop.test.ts > runner 停止收尾（M7 #308） > 失败方式 4：停止后 journal 清账 + 注册表注销 14ms
+ ✓ test/runner-stop.test.ts > runner 停止收尾（M7 #308） > 失败方式 5：recover 带入 discard 停止 → 不开会话，rewind 到步起点 + done(stopped) 2ms
+ × test/runner-stop.test.ts > runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488） > 失败方式 6：心跳 410 → 会话中断，done(stopped)，不 commit/push 5005ms
+   → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ✓ test/runner-stop.test.ts > runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488） > 失败方式 7：心跳 404（被放回 / 不归本机） → 照常跑，不停 105ms
+ ✓ test/runner-stop.test.ts > runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488） > 失败方式 7：心跳 网络错误 → 照常跑，不停 105ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/runner-stop.test.ts > runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488） > 失败方式 6：心跳 410 → 会话中断，done(stopped)，不 commit/push
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ test/runner-stop.test.ts:377:3
+    375|   }
+    376|
+    377|   test('失败方式 6：心跳 410 → 会话中断，done(stopped)，不 commit/push', async () =>…
+       |   ^
+    378|     const { client, calls, lines, running } = await heartbeatSetup(
+    379|       () => new MachineApiError(410, '{"error":"step s1 no longer exis…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 7 passed (8)
+   Start at  12:21:44
+   Duration  7.15s (tests 75%, import 13%, transform 12%)
+

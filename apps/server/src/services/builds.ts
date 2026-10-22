@@ -80,7 +80,7 @@ import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { githubRepoOfProject, hasRepoBinding, readBuildChanges } from './git.js';
+import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -672,12 +672,24 @@ export function startBuilds(
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
-  const created: BuildRecord[] = [];
+  // 归属校验先于任何建 build（#1497）：任务须属该项目，项目须与任务同队——
+  // 本队任务指向他队项目（#1466 前 create_todo 可造）按项目不存在处理。
+  // 所有调用方（REST、定时、chief、MCP）都经这里。相位校验仍在下方逐卡现读
+  // （同一 id 重复出现时第二次读到 queued，照旧 409）。
+  const projectRow = deps.db.select().from(project).where(eq(project.id, input.projectId)).get();
   for (const todoId of input.todoIds) {
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord || todoRecord.projectId !== input.projectId) {
       throw new NotFoundError(`todo ${todoId}`);
     }
+    if (projectRow?.teamId !== todoRecord.teamId) {
+      throw new NotFoundError(`project ${input.projectId}`);
+    }
+  }
+  const created: BuildRecord[] = [];
+  for (const todoId of input.todoIds) {
+    const todoRecord = getTodo(deps, todoId);
+    if (!todoRecord) throw new NotFoundError(`todo ${todoId}`);
     // todo → queued（02 §4.1：已启动，等空闲机器）。
     assertPhaseTransition(todoRecord.phase, 'queued');
     const id = newUuidv7(); // buildId ≡ conversationId（UUIDv7，r3 §3.0）
@@ -841,7 +853,7 @@ async function probePullState(
   prNumber: number,
   timeoutMs?: number,
 ): Promise<{ state: 'open' | 'closed'; merged: boolean } | null> {
-  const projRow = deps.db.select().from(project).where(eq(project.id, projectId)).get();
+  const projRow = projectOfTodo(deps.db, { projectId, teamId });
   // 非 github 形态或 githubRepo 不合法（#1466：`.` / `..` 段改写请求路径）→ 不探测。
   const repoRef = githubRepoOfProject(projRow);
   if (repoRef === null) return null;
@@ -1181,11 +1193,7 @@ export async function applyBuildStepAction(
     // ——否则审核者只能对方案表态，而它的结论与人的结论被并列呈现，看起来
     // 像对同一件事的两次独立复核。
     const gate: ReviewGate = todoRecord.phase === 'review' ? 'review' : 'confirm';
-    const projectRow = deps.db
-      .select()
-      .from(project)
-      .where(eq(project.id, todoRecord.projectId))
-      .get();
+    const projectRow = projectOfTodo(deps.db, todoRecord);
     // 有检出 = 项目绑了仓库（daemon 侧同判据 = claim 载荷 project.repo 非空；
     // 单源 = git.hasRepoBinding/projectRepoRef）。未绑 = 不写检出段，不谎称。
     const checkout = hasRepoBinding(projectRow);
@@ -1357,7 +1365,22 @@ export async function requestMerge(
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
-  const pr = githubPrOf(deps, todoRow.projectId, row.prNumber);
+  // #1487：同一 build 已有在途合并步（排队、等额度或已领走）= 409，不多排一个——
+  // 两个合并步先后跑完会各落一次地、各推一次。放在最前：拒收不该先改相位或
+  // 去探 GitHub。
+  const inFlight = deps.db
+    .select({ id: step.id })
+    .from(step)
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'merge'),
+        inArray(step.status, ['pending', 'claimed', 'waiting_quota']),
+      ),
+    )
+    .get();
+  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
+  const pr = githubPrOf(deps, todoRow, row.prNumber);
   if (pr !== null) {
     return mergeThroughGithub(deps, row, pr.prNumber, pr.repoRef, actor ?? deps.user.displayName);
   }
@@ -1382,16 +1405,15 @@ export async function requestMerge(
 
 /** GitHub 形态、build 记着 PR：目标仓与 PR 号；否则 null。经 API 合并（requestMerge 的
  *  分流）、合并步收尾（不收这类卡）与 #1150 磨绿入口（执行步成停在 building）同一判据。
- *  githubRepo 不合法（#1466）同按不是 GitHub 形态。 */
+ *  githubRepo 不合法（#1466）、项目不与任务同队（#1497）同按不是 GitHub 形态。 */
 function githubPrOf(
   deps: BuildDeps,
-  projectId: string,
+  todoRow: { projectId: string; teamId: string },
   prNumber: number | null,
 ): { repoRef: GithubRepoRef; prNumber: number } | null {
   if (prNumber === null) return null;
-  const repoRef = githubRepoOfProject(
-    deps.db.select().from(project).where(eq(project.id, projectId)).get(),
-  );
+  // 项目须与任务同队（#1497 projectOfTodo）：他队项目按未绑处理，不拿他队的仓出站。
+  const repoRef = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
   return repoRef === null ? null : { repoRef, prNumber };
 }
 
@@ -2076,7 +2098,7 @@ export function completeStep(
     // 与 prNumber 缺位的存量形（仅 prUrl，#931 不猜号同律）→ 既有直进 review
     // 行为逐字节不变。githubRepo 存量值不合法（#1466）同按无 GitHub 仓处理：
     // 轮询器对它不出站，停在 building 就再没有出口。
-    const deliveredGithubPr = githubPrOf(deps, todoRow.projectId, buildRow.prNumber) !== null;
+    const deliveredGithubPr = githubPrOf(deps, todoRow, buildRow.prNumber) !== null;
     if (!deliveredGithubPr) {
       setTodoPhase(deps, todoRow.id, 'review', {
         hasChanges: outcome.hasChanges ?? true,
@@ -2207,7 +2229,7 @@ export function completeStep(
   // = server 经 GitHub API 合并，不再派合并步）。这里完成的合并步是升级前排下的，或
   // build 在合并步回报时才记上 PR：步跑完不等于 PR 合并了——不收尾，落一行；PR 合并后
   // 由对账收尾（本轮没有完成行，对账照常收）。
-  const pr = githubPrOf(deps, todoRow.projectId, buildRow.prNumber);
+  const pr = githubPrOf(deps, todoRow, buildRow.prNumber);
   if (pr !== null) {
     // 到不了 done 的相位照旧拒（与 finishTodoDone 同一判据，#931 返工复用同一 build 时
     // 旧合并步迟到）：不落行。
