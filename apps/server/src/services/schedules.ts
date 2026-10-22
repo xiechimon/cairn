@@ -15,10 +15,11 @@ import { SCHEDULE_MINUTE_STEPS } from '@pacman/shared';
 import { CronExpressionParser } from 'cron-parser';
 import { and, eq, isNotNull, lte } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { project, schedule, todo } from '../db/schema.js';
+import { schedule, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
+import { projectOfTodo } from './git.js';
 
 export interface ScheduleDeps {
   db: Db;
@@ -106,7 +107,7 @@ export function computeNextRunAt(
 export function toScheduleRecord(deps: ScheduleDeps, row: ScheduleRow): ScheduleRecord | null {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) return null; // todo 已删 = 孤儿行（触发面自愈删除，scheduler.ts）
-  const projectRow = deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get();
+  const projectRow = projectOfTodo(deps.db, todoRow);
   return {
     id: row.id,
     teamId: row.teamId,

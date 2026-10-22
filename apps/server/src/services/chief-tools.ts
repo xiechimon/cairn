@@ -964,19 +964,23 @@ export async function executeChiefTool(
       return json(row);
     }
     case 'delete_memory': {
-      // 越权防御（#1497，worker delete_memory 同律）：只删绑定 Agent 本团队条目。
+      // 越权防御（#1497）：只删绑定 Agent 本团队条目；别人的与不存在的同 404，
+      // 不回报一次没发生的删除。
       const memoryId = str(params, 'memoryId');
-      if (ctx.chiefAgentId !== null) {
-        db.delete(agentMemory)
-          .where(
-            and(
-              eq(agentMemory.id, memoryId),
-              eq(agentMemory.agentId, ctx.chiefAgentId),
-              eq(agentMemory.teamId, ctx.teamId),
-            ),
-          )
-          .run();
-      }
+      const removed =
+        ctx.chiefAgentId === null
+          ? 0
+          : db
+              .delete(agentMemory)
+              .where(
+                and(
+                  eq(agentMemory.id, memoryId),
+                  eq(agentMemory.agentId, ctx.chiefAgentId),
+                  eq(agentMemory.teamId, ctx.teamId),
+                ),
+              )
+              .run().changes;
+      if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
     case 'memories': {
@@ -984,7 +988,7 @@ export async function executeChiefTool(
       const rows = db
         .select()
         .from(agentMemory)
-        .where(eq(agentMemory.agentId, ctx.chiefAgentId))
+        .where(and(eq(agentMemory.agentId, ctx.chiefAgentId), eq(agentMemory.teamId, ctx.teamId)))
         .orderBy(asc(agentMemory.createdAt))
         .all();
       return json(rows);

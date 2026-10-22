@@ -9,6 +9,9 @@
 //     本队的 git 凭证。
 //  V4 chief delete_memory：按 id 删掉别的 Agent / 他队的记忆。
 //  V5 同团队路径不变。
+//  V6 startBuilds 同一 id 出现两次：第二次照旧 409，不建第二个 build。
+//  V7 build 变更读面（readBuildChangeFile）：任务指向他队 hosted 项目时读到
+//     他队 bare 仓。
 
 import type { ClaimedStep } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
@@ -19,12 +22,16 @@ import {
   agent as agentTable,
   build as buildTable,
   project as projectTable,
+  schedule as scheduleTable,
   team as teamTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { HttpError } from '../src/lib/errors.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { NotFoundError, startBuilds } from '../src/services/builds.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
+import { readBuildChangeFile } from '../src/services/git.js';
+import { PhaseTransitionError } from '../src/services/phase.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { createSchedule } from '../src/services/schedules.js';
 import { bindAllAgents, bootServer, issueApiKey, type TestServer } from './helpers.js';
@@ -145,6 +152,39 @@ describe('#1497 startBuilds：项目须与任务同队', () => {
     const scheduler = createScheduler(s.svc, { tickMs: 60_000 });
     expect(() => scheduler.tick(at + 1_000)).not.toThrow();
     expect(stateOf(s, todoId).builds).toBe(0);
+    // 这条定时再也触发不了：出队，不在每个 tick 上重试。
+    expect(s.db.select().from(scheduleTable).where(eq(scheduleTable.todoId, todoId)).all()).toEqual(
+      [],
+    );
+  });
+
+  test('V6 同一 id 出现两次：第二次 409，只有一个 build', async () => {
+    const { s, projectId, todoId } = await world();
+    expect(() =>
+      startBuilds(s.svc, { projectId, todoIds: [todoId, todoId], assignment, withPlan: false }),
+    ).toThrow(PhaseTransitionError);
+    expect(stateOf(s, todoId).builds).toBe(1);
+  });
+
+  test('V7 变更读面：任务指向他队 hosted 项目 → 404，不读他队仓库', async () => {
+    const { s, projectId, todoId } = await world();
+    const [created] = startBuilds(s.svc, {
+      projectId,
+      todoIds: [todoId],
+      assignment,
+      withPlan: false,
+    });
+    pointAtTeamB(s, todoId);
+    const err = await readBuildChangeFile(
+      { db: s.db, reposDir: s.reposDir },
+      created?.id ?? '',
+      'README.md',
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(HttpError);
+    expect((err as HttpError).status).toBe(404);
   });
 
   test('V5 本队项目照常建 build', async () => {
@@ -214,8 +254,8 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     return id;
   }
 
-  async function chiefDelete(s: TestServer, memoryId: string): Promise<void> {
-    await executeChiefTool(
+  async function chiefDelete(s: TestServer, memoryId: string): Promise<unknown> {
+    return executeChiefTool(
       { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
       {
         teamId: s.team.id,
@@ -238,8 +278,14 @@ describe('#1497 chief delete_memory：只删本 Agent 本团队条目', () => {
     const { s } = await world();
     const otherAgent = insertMemory(s, 'agent-other-1497', s.team.id);
     const otherTeam = insertMemory(s, AGENT_ID, TEAM_B);
-    await chiefDelete(s, otherAgent);
-    await chiefDelete(s, otherTeam);
+    for (const id of [otherAgent, otherTeam]) {
+      const err = await chiefDelete(s, id).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(err).toBeInstanceOf(HttpError);
+      expect((err as HttpError).status).toBe(404);
+    }
     expect(exists(s, otherAgent)).toBe(true);
     expect(exists(s, otherTeam)).toBe(true);
   });

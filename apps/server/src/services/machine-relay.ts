@@ -17,7 +17,7 @@ import {
   updateSkillToolParamsSchema,
 } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
-import { agent, build, chief, chiefThread, project, type step, todo } from '../db/schema.js';
+import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { NotFoundError } from './builds.js';
 import {
@@ -27,6 +27,7 @@ import {
   holdForQuestion,
 } from './chief-questions.js';
 import { executeChiefTool, executeWorkerMemoryTool } from './chief-tools.js';
+import { projectOfTodo } from './git.js';
 import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { resolveFixedTagId, resolveProjectTagIds } from './tags.js';
@@ -221,11 +222,7 @@ async function setTaskMeta(
   todoRow: typeof todo.$inferSelect,
   params: Record<string, unknown>,
 ): Promise<string> {
-  const projectRow = deps.db
-    .select({ repoKind: project.repoKind })
-    .from(project)
-    .where(eq(project.id, todoRow.projectId))
-    .get();
+  const projectRow = projectOfTodo(deps.db, todoRow);
   if (projectRow?.repoKind === 'github') return setTaskMetaGithubForm(deps, todoRow, params);
   const title = normalizedMetaTitle(params.title);
   let tagIds: string[] | undefined;

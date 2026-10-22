@@ -768,7 +768,7 @@ function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): Githu
   const proj = deps.db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
     .from(project)
-    .where(eq(project.id, projectId))
+    .where(and(eq(project.id, projectId), eq(project.teamId, teamId)))
     .get();
   const ref = githubRepoOfProject(proj);
   if (ref === null) return null;
@@ -800,7 +800,7 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   const proj = db
     .select({ repoKind: project.repoKind, githubRepo: project.githubRepo })
     .from(project)
-    .where(eq(project.id, row.projectId))
+    .where(and(eq(project.id, row.projectId), eq(project.teamId, row.teamId)))
     .get();
   const repoRef = githubRepoOfProject(proj);
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');

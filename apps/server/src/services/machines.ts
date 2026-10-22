@@ -75,7 +75,6 @@ import {
   chiefThread,
   machine,
   message,
-  project,
   steerPending,
   step,
   stopPending,
@@ -124,7 +123,13 @@ import {
 } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { diffTextNamesAFile, parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
+import {
+  diffTextNamesAFile,
+  parseUnifiedDiff,
+  projectOfTodo,
+  projectRepoRef,
+  repoDirFor,
+} from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { markModelDead } from './model-liveness.js';
@@ -1120,7 +1125,7 @@ async function tryClaim(
             sessionId: priorSessionId,
             ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
-    const projectRow = teamProjectOf(db, cand.todoRow);
+    const projectRow = projectOfTodo(db, cand.todoRow);
     // repo 绑定位（M3b worktree 契约接线，02 §3/§5.5 + spec 12 G2-T2 三形态）：
     // 托管 = `<origin>/git/<teamId>/<repoName>`（本地主机代位）；github = https
     // 派生（执行凭证 = stepToken 从 github_connection 下发）；local = cloneUrl
@@ -1612,7 +1617,7 @@ export function stepToken(
   // push_credential，r5 §3.1）：hosted = 一次性 gitAccess key 发行；github =
   // github_connection token（spec 12 G2-T2 执行凭证面）；local = null（本地
   // 路径 clone/push 无需凭证）。
-  const projectRow = todoRow ? teamProjectOf(deps.db, todoRow) : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   const git =
     projectRow?.repoKind === 'hosted' && todoRow
       ? issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId })
@@ -1624,20 +1629,6 @@ export function stepToken(
     secrets: bundle.secrets,
     git,
   };
-}
-
-/** 任务所属项目行，须与任务同队（#1497）：本队任务指向他队项目（#1466 前
- * create_todo 可造的存量行）按未绑项目处理——claim 载荷不带他队仓库，凭证
- * 端点不发凭证，合并落地不动他队仓库。 */
-function teamProjectOf(
-  db: Db,
-  todoRow: { projectId: string; teamId: string },
-): typeof project.$inferSelect | undefined {
-  return db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, todoRow.projectId), eq(project.teamId, todoRow.teamId)))
-    .get();
 }
 
 /** GitHub 执行凭证（spec 12 G2-T2）：connection 行 token → per-step
@@ -2075,7 +2066,7 @@ async function applyMergeLanding(
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
-  const projectRow = todoRow ? teamProjectOf(deps.db, todoRow) : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   if (!todoRow || projectRow?.repoKind !== 'hosted' || projectRow.repoName === null) {
     return null; // 未绑托管 repo：无可落地 ref（github 形态 PR 面归后票）。
   }
