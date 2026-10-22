@@ -1,0 +1,319 @@
+# #1404 S4b: tests first, red and green legs for the merge gate's GitHub shell.
+# Test files (vitest, from the worktree root):
+#   apps/server/test/merge-gate-github-facts.test.ts   (new: F1-F18, a fake GitHub port that pages and logs)
+#   apps/server/test/merge-gate-status.test.ts         (new: S1-S4)
+#   apps/server/test/merge-gate-github-adapter.test.ts (new: A1, A2 end to end over S4a's live fixtures)
+#   apps/server/test/merge-gate-readiness.test.ts      (evidence input, raw-404 test rewritten, totalCommits pins)
+#   apps/server/test/merge-gate-evidence-link.test.ts  (path safety, qualifyingEvidenceLinks)
+#   apps/server/test/merge-gate-imports.test.ts        (#1479's import rules over the new gate files)
+# Command: pnpm exec vitest run <the six files> --reporter=verbose
+#
+# Red legs: the new modules are stubs with the final signatures (github-facts returns an all-unreadable facts
+# object, gate-status plans nothing, the adapter answers network), and readiness.ts / evidence-link.ts are the
+# versions before S4b (HEAD of the merge, fffd5cdb) plus a qualifyingEvidenceLinks stub returning []. The files
+# were swapped in with cp and restored from copies afterwards, compared with cmp (s4b-swap.sh.txt).
+# The passes in the red leg are the earlier merge-gate tests and these new pins, which the old code already
+# satisfied:
+# - path safety: "%2e%2e" and "%2E%2E" decode to "..", and "%2F" splitting a segment into ".." segments, were
+#   already refused by the old ".." check;
+# - qualifyingEvidenceLinks: the negative case (nothing qualifies) is met by a stub returning [];
+# - gate-status: "every description fits in 140 characters" is met by an empty stub description;
+# - readiness: totalCommits -1, 1.5, NaN already fail closed (patch-unavailable), the pr-gate run 3 on #1479
+#   suggestion 4 pin; the readiness evidence test whose link is at MAIN (not a commit of the PR).
+# Two existing readiness tests that link evidence at EARLIER got an evidence entry for EARLIER: under the new
+# rule a link counts only when the shell has found its file at that commit.
+
+== Red, final test files (227 tests), stubs ==
+Test Files  5 failed | 1 passed (6)
+Tests  44 failed | 183 passed (227)
+
+× merge-gate-github-adapter.test.ts > githubGatePort (A1) > each method sends the S4a request for the bound repository, token and the gate parameters
+× merge-gate-github-adapter.test.ts > githubGatePort (A1) > the bound timeout is the one applied
+× merge-gate-github-adapter.test.ts > githubGatePort end to end over the live captures (A2) > readGateGithubFacts reads PR #1479, main, its rules, a paged compare, check runs and the combined status
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the honest read > every input read at the PR head, in order, one request at a time
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F1 a response for another PR or another base repository is not used
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F2 a missing or wrongly typed field makes the PR unreadable, never a default
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F3 null body is empty text; a deleted head repository is null; mergeable_state and default branch may be absent
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F4 the PR read is conditional on the cached etag and a 304 re-projects the cached body
+× merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F5 a malformed head SHA reads nothing at the head
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F6 no readable base tip: compare unreadable, never requested by branch name
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F7 every compare page by the same two SHAs; files from page 1 only; readCompareAt reads at the SHAs given
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F8 total_commits, commits, files and behind_by: malformed values never pass
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F9 paging: all pages, as read; stop at an empty page or the 10-page cap; one failed page is unreadable
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F10 a push between page reads is passed as read
+× merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F11 the required list: branch protection plus rulesets, null when either cannot be read
+× merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F12 runs and the combined status by the head SHA; their SHAs come from the responses
+× merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F13 paging runs and statuses; complete only when every page agrees and the count is reached
+× merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F14 runs deduped per (app, name), newest id kept; a required check bound to an app is listed first
+× merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F15 malformed entries, case-insensitive contexts, the own status
+× merge-gate-github-facts.test.ts > readGateGithubFacts: evidence presence (F16, F17) > F16 only qualifying links are probed, at their own commit; stop at the first present; at most 5 probes
+× merge-gate-github-facts.test.ts > readGateGithubFacts: evidence presence (F16, F17) > F17 what a probe answer means; present is remembered for the commit, absent is not
+× merge-gate-github-facts.test.ts > readGateGithubFacts: rate limits, throws, concurrency (F18) > F18 a rate-limited read stops the evaluation; retryAt prefers retry-after
+× merge-gate-github-facts.test.ts > readGateGithubFacts: rate limits, throws, concurrency (F18) > F18 a port that throws is a failed read, never a throw out of the shell
+× merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 链接的文件在那个提交上不存在（raw 404）：evidence-link-missing（S4b 外壳查过的 evidence 输入）
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > ready is success, with the start of the patch digest
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > only transient blockers: pending, first blocker label and code, count of the rest
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > any human- or policy-class blocker: failure, whatever comes first
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > no state is ever error; ready only with no blocker
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > blocker detail (author-controlled names) never reaches the description
+× merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > a description over the limit is cut to 140 code points ending in an ellipsis
+× merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S1 never under the human policy, from either the project or the readiness result
+× merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S1 no head, checks read at another commit, or the current status unreadable: no write
+× merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S2 the same state and description already on the head: no write
+× merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S2 none yet, or a different value (ours from before, or written by someone else): write ours at the head
+× merge-gate-status.test.ts > writeGateStatus (S4) > one createStatus call with the planned SHA and payload; the result comes back as is
+× merge-gate-status.test.ts > writeGateStatus (S4) > a failure is returned after one call, not retried, not thrown
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %2F 拼出目录：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %5C 反斜杠：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %3F 问号：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %23 井号：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %0A 换行：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %00 NUL：不算
+× merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %7F 控制字符：不算
+× merge-gate-evidence-link.test.ts > qualifyingEvidenceLinks > 提交在本 PR 里、文件是本 PR 增改的：合格，按 body 里的顺序
+
+== Green, implementation (011c246) ==
+Test Files  6 passed (6)
+Tests  227 passed (227)
+
+== Mutation pins (f4f4d89): added after the first mutation run, each kills a mutant that survived it ==
+(cache entry cleared by a response without an etag; partial cached page not reused; parents without a sha;
+rule types other than deletion; the note saying why the compare was not read.) Green: 227 of 227.
+
+== /code-review pins (1ed5aa0): red against 1ed5aa0's parent, green after the fix ==
+× F11 the required list: branch protection plus rulesets, null when either cannot be read 88ms
+× F15 malformed entries, case-insensitive contexts, the own status 135ms
+× F16 only qualifying links are probed, at their own commit; stop at the first present; at most 5 probes 46ms
+Tests  3 failed | 17 passed (20)
+After the fix: Tests  227 passed (227).
+
+== Final green, all six files at 1ed5aa0 ==
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 基线全绿：ready，没有 blocker（每个 blocker 的假腿）
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 每个 blocker 码都有一行真腿（加码不写腿即变红）
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 词表里每个码的类别与 CLASS 表逐码相同
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > policy-human：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > autonomy-paused：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > not-applicable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > not-current-build：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > phase-not-review：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > work-in-flight：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-unreadable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-not-open：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-draft：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-from-fork：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > base-not-default：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > mergeable-state：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > self-required：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-checks-unreadable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-checks-none：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-pending：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-failed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-evidence-not-green：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > patch-unavailable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > compare-malformed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > compare-truncated：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > patch-unbindable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > size-cap：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > protected-path：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > outside-auto-merge：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > test-deleted：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > opaque-file：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-outside-ticket：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-executable：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > issue-ref-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-link-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-failed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-extraction-failed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-evidence-invalid：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-tampered：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-blocking：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-extraction-failed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > perspective-timed-out：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-missing：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-no-go：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-extraction-failed：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > fix-rounds-exhausted：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > fix-no-change：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > gate-rounds-exhausted：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-reviewers：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-verifier：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-decider：只打开它
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > chief 的 go 与同一摘要上的 blocking 同在：不 ready
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > blocking 之后同视角又通过一次：仍拦（不允许重掷）
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 旧摘要上的通过不算：review-missing / verify-missing / decision-missing
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 未绑定 head 的判定（patchDigest 为空）不算
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 只因自家 pacman/merge-gate status 而 unstable：不拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 别家检查让它 unstable：拦，并在细节里点名
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算）
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > verify 步失败（没有结论）不算有判定：verify-missing
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 必需检查 neutral / skipped 算通过（与分支保护一致），pr-evidence 只认 success
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 读不到检查：拦，不退回「全部检查」
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 证据链指向别的票或钉在旧 SHA（不在 base..head）：不算
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 审核视角按轮次冻结的集合算，不按团队当前的
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > blocker 顺序固定：同一输入两次结果相同，且按词表顺序
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 插入顺序与词表顺序不同时，按词表排
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 800 行、40 个文件整数边界：恰好不拦，多一即拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 每个 blocker 带类别与固定文案
+✓ merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 不抛：空 body、空文件列表、空判定
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 有文件缺 blob sha（子模块之类）：摘要等不来，留人
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > GitHub 还报 clean，手上的检查里有别家失败：拦，并点名
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理）
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 通过在另一份补丁上：清不掉同摘要的 evidence_invalid
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default
+✓ merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读到了默认分支、PR 指向别处：仍是留人的 base-not-default
+✓ merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列）
+✓ merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 证据目录里的截图（没有 patch）不留人
+✓ merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前
+✓ merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据链钉在本 PR 的提交上（不必是 head）、指向本 PR 加的证据：算
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 指向本 PR 删掉的证据：不算
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 多条链接有一条合格即可：钉在 main 历史上的那条不拖累
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > unstable 而检查读不到（null 或没读全）：mergeable-state 与 required-checks-unreadable 都列
+✓ merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人
+✓ merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 文件名一律 JSON 引号：换行与指令样的文本落成一行，可原样解回
+✓ merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > JSON 不转义的也转：C1 控制符、双向覆盖、行分隔符写成 \uXXXX
+✓ merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more
+✓ merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 检查名同样：别家检查的名字引号、转义，名单有界
+✓ merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 必需检查名、分支名、仓库名也引号
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 verify 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 review 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 decision 先提取失败、后又通过：清掉（与 evidence_invalid 同理）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 dirty：只记 mergeable-state
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 blocked：只记 mergeable-state
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 behind：只记 mergeable-state
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 draft：只记 mergeable-state
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 unknown：只记 mergeable-state
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > compare 恰好 300 个文件、PR 也报 300：compare-truncated（truncated），不是 patch-unbindable
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 自家 status 与必需检查名不分大小写：Pacman/merge-gate
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 自家必需检查名跳过：没有它的 status 也只记 self-required，不记 required-check-missing
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > fork 判定不分大小写：XieChiMon/Pacman 是同仓
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > merged 标志算数：closed 且 merged 记 merged；state 还是 open 也记
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > head 仓库已删（headRepoFullName 为 null）：pr-from-fork，不抛
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 链接的文件在那个提交上不存在（raw 404）：evidence-link-missing（S4b 外壳查过的 evidence 输入）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > evidence 项只认合格的链接：不合格链接的 present 不让它算数
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > totalCommits 不是非负整数（-1）：按没读全处理，可等的 patch-unavailable（#1479 pr-gate 第 3 轮建议 4）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > totalCommits 不是非负整数（1.5）：按没读全处理，可等的 patch-unavailable（#1479 pr-gate 第 3 轮建议 4）
+✓ merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > totalCommits 不是非负整数（NaN）：按没读全处理，可等的 patch-unavailable（#1479 pr-gate 第 3 轮建议 4）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在比 PR head 旧的提交上：可等的 patch-unavailable，不报摘要、不拿它判
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 自报读在 PR 的 head 上、实则读在后代上：响应里列着 head 的子提交，同样按没在 head 上读处理
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 在 PR 的 head 上读、head 本身是合并提交：照常 ready（看谁以 head 为父，不看谁有两个父提交）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 外壳填的 head 与响应自己的 head 两样各对一半：外壳说读在 NEWER、提交说读在 HEAD，也按没在 head 上读处理
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交没读全（条数不等于响应的 total_commits，分页没读完）：可等的 patch-unavailable；head 的子提交在没读的那页上也不放过
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交条数对、没有重复，却混进了别的提交顶替没读到的：响应自己的 head 不止一个，同样按没在 head 上读处理
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交列表为空（total_commits 也是 0）：响应没有自己的 head，按没在 head 上读处理，不只凭外壳填的 head
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 的提交有重复：凑够了 total_commits 或多出来，都算没读全（重复的不顶替没读到的）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在后代上、推送还加了文件（文件数不同）：仍是可等的 patch-unavailable，不是留人的 compare-truncated
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 检查读在别的提交上（比 PR head 旧或新）：可等的 required-checks-unreadable，那份结果不拿来判
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 检查自报读在 PR 的 head 上、响应说的却是别的提交：任何一条 check run 的 head_sha 或 combined status 的 sha 不是 PR 的 head，都按没在 head 上读处理
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > SHA 不是 40 位小写十六进制（大写、缩写）：PR 按读不到处理，compare 留人，检查按读不到处理，detail 都点明
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 的 head 写错只少了 head：PR 自己的 blocker（已合并、fork、目标分支不对）照列，不被 pr-unreadable 吞掉
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 的 head 写错时 compare 没有 head 可对：文件数与证据链不拿它判（同 PR 读不到），跨推送的竞态不报成留人的 compare-truncated
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR、compare 与检查都在同一个提交上读：照常判（都在后代 NEWER 上也 ready，报 NEWER 与它的摘要）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 verify 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 verify 通过（{pass, null}）不算当前补丁的
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 review 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 review 通过（{pass, null}）不算当前补丁的
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 decision 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上）
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 decision 通过（{pass, null}）不算当前补丁的
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 tampered（{tampered, null}）照样算：verify-tampered
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列
+✓ merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the honest read > every input read at the PR head, in order, one request at a time
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F1 a response for another PR or another base repository is not used
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F2 a missing or wrongly typed field makes the PR unreadable, never a default
+✓ merge-gate-github-adapter.test.ts > githubGatePort (A1) > each method sends the S4a request for the bound repository, token and the gate parameters
+✓ merge-gate-github-adapter.test.ts > githubGatePort (A1) > the bound timeout is the one applied
+✓ merge-gate-github-adapter.test.ts > githubGatePort end to end over the live captures (A2) > readGateGithubFacts reads PR #1479, main, its rules, a paged compare, check runs and the combined status
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F3 null body is empty text; a deleted head repository is null; mergeable_state and default branch may be absent
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F4 the PR read is conditional on the cached etag and a 304 re-projects the cached body
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: the PR (F1 to F5) > F5 a malformed head SHA reads nothing at the head
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F6 no readable base tip: compare unreadable, never requested by branch name
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F7 every compare page by the same two SHAs; files from page 1 only; readCompareAt reads at the SHAs given
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F8 total_commits, commits, files and behind_by: malformed values never pass
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > ready is success, with the start of the patch digest
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > only transient blockers: pending, first blocker label and code, count of the rest
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > any human- or policy-class blocker: failure, whatever comes first
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > no state is ever error; ready only with no blocker
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > blocker detail (author-controlled names) never reaches the description
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > every description fits in 140 characters, counted in code points
+✓ merge-gate-status.test.ts > gateStatusFor (S3: state, description, context) > a description over the limit is cut to 140 code points ending in an ellipsis
+✓ merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S1 never under the human policy, from either the project or the readiness result
+✓ merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S1 no head, checks read at another commit, or the current status unreadable: no write
+✓ merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S2 the same state and description already on the head: no write
+✓ merge-gate-status.test.ts > planGateStatusWrite (S1, S2) > S2 none yet, or a different value (ours from before, or written by someone else): write ours at the head
+✓ merge-gate-status.test.ts > writeGateStatus (S4) > one createStatus call with the planned SHA and payload; the result comes back as is
+✓ merge-gate-status.test.ts > writeGateStatus (S4) > a failure is returned after one call, not retried, not thrown
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F9 paging: all pages, as read; stop at an empty page or the 10-page cap; one failed page is unreadable
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F10 a push between page reads is passed as read
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > 解析认得每种写法，注释与花括号里的 ; 骗不过它
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > 读到了闸的源码（不是对零个文件恒真）
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > 每个模块只从 '@pacman/shared'、node:crypto 或 merge-gate/ 里的相对路径 import，不另行加载代码
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > 从 '@pacman/shared' 取的运行时值就是 records/merge-gate.ts 导出的那一个
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > merge-gate/ 里没有指向别处的符号链接（任何扩展名，目录也算）
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > records/merge-gate.ts 只从 'zod' import，不另行加载代码
+✓ merge-gate-imports.test.ts > merge-gate 源码只从闸自己的源码 import > records/merge-gate.ts 导出的数组与对象都冻住了（别的 shared 模块改不了闸的清单与上限）
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: base branch, compare and required checks (F6 to F11) > F11 the required list: branch protection plus rulesets, null when either cannot be read
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F12 runs and the combined status by the head SHA; their SHAs come from the responses
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > markdown 链接与 <img src> 都认，路径按 URL 解码
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 别的仓、别的票、短 SHA、大写 SHA、分支名都不算，列进 others
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 票号是另一票号的前缀：docs/verify/14040/ 不是 1404 的证据
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 仓名不分大小写
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > HTML 注释里的链接不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一链接出现两次只记一次
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一路径钉在两个 SHA 上是两条
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 坏的百分号转义（%E0%A4%A）列进 others，不抛
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 链接后面紧跟的标点与反引号不算进路径
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 闭合的注释之后的链接照常算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 两段闭合注释之间的链接照常算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 空注释 <!--> 与 <!---> 在自身的 --> 处结束（HTML 与 cmark-gfm 同样），其后的链接照常算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 目录穿越与仓外路径不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 路径里有 . 段的不算，列进 others
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 去掉查询串与片段后不指向文件的不算：目录本身不是证据
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一行里成串没闭合的 <!--，65,536 个字符在 200 ms 内
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %2e%2e 穿越：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %2E%2E 大写：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %2F 把一段拆成两段：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %2F 拼出目录：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %5C 反斜杠：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %3F 问号：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %23 井号：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %0A 换行：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %00 NUL：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > %7F 控制字符：不算
+✓ merge-gate-evidence-link.test.ts > parseRawEvidenceLinks：解码后的路径段安全（S4b） > 假腿：空格、中文、加号这样的普通字符照常认
+✓ merge-gate-evidence-link.test.ts > qualifyingEvidenceLinks > 提交在本 PR 里、文件是本 PR 增改的：合格，按 body 里的顺序
+✓ merge-gate-evidence-link.test.ts > qualifyingEvidenceLinks > 提交不在本 PR 里、文件被本 PR 删掉、文件不在补丁里、别的票：都不合格
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F13 paging runs and statuses; complete only when every page agrees and the count is reached
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F14 runs deduped per (app, name), newest id kept; a required check bound to an app is listed first
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: checks at the head (F12 to F15) > F15 malformed entries, case-insensitive contexts, the own status
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: evidence presence (F16, F17) > F16 only qualifying links are probed, at their own commit; stop at the first present; at most 5 probes
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: evidence presence (F16, F17) > F17 what a probe answer means; present is remembered for the commit, absent is not
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: rate limits, throws, concurrency (F18) > F18 a rate-limited read stops the evaluation; retryAt prefers retry-after
+✓ merge-gate-github-facts.test.ts > readGateGithubFacts: rate limits, throws, concurrency (F18) > F18 a port that throws is a failed read, never a throw out of the shell
+Test Files  6 passed (6)
+Tests  227 passed (227)
