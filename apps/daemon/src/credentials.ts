@@ -48,8 +48,8 @@ export interface StepCredentials {
 }
 
 /** push_credential 对照位：token/{stepId} 响应 → 步内内存凭证束。git 凭证绑定
- * `repoUrl`（claim 的 project.repo.cloneUrl，#1484）；步未绑 repo = 空串，
- * gitCredentialEnv 对它不写 helper，凭证进不了任何 git 调用。 */
+ * `repoUrl`（claim 的 project.repo.cloneUrl，#1484）；步未绑 repo = null，没有
+ * 可绑定的主机，凭证不进任何 git 调用。 */
 export function pushCredential(
   token: MachineTokenResponse,
   repoUrl: string | null,
@@ -57,7 +57,7 @@ export function pushCredential(
   return {
     provider: token.provider,
     secrets: openSecretVault(token.secrets),
-    git: token.git === null ? null : { ...token.git, url: repoUrl ?? '' },
+    git: token.git === null || repoUrl === null ? null : { ...token.git, url: repoUrl },
   };
 }
 

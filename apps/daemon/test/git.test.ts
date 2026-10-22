@@ -213,12 +213,14 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
 //   1. 签发远端的 protocol 与 host 按绑定 URL 原文取（去 userinfo；大小写、显式
 //      端口、带 _ 的主机名保留），与 git 从 remote URL 取的逐字节一致；重置条目不变
 //   2. 绑定 URL 不是 http(s)（空、本地路径、scp 形、file://）→ 不写 helper，只留重置
-//   3. 真 git：绑定主机的 credential fill 拿到 token；换端口、换 scheme 的主机拿不到；
+//   3. 真 git：绑定主机的 credential fill 拿到 token；换端口、去掉端口、换主机拿不到；
 //      带 _ 的主机名（docker 服务名）照常拿到
 //   4. 全局配置里同主机的 credential.<url>.helper（如 gh 写的那种）照样被重置
 //   5. worktree 的 origin 被改指别的主机（set-url）或经 insteadOf 改写 → push /
 //      tagPush / fetch 不向那台主机发凭证；指向绑定主机时照常认证
 //   6. 凭证值不进 helper 的 sh -c 命令行（argv 本机他人可读），只在环境里
+//   7. http 绑定经跳转升到同主机 https 照常应答（更安全的通道）；https 不降级到 http
+//   8. 用户名 / 密码带换行或回车（git 凭证协议按行分隔，会被读成别的字段）→ 不装 helper
 
 /** 要 Basic 认证的假远端：无 Authorization → 401 质询；带了 → 记下解码值、回 403。 */
 async function basicAuthRemote(): Promise<{ base: string; seen: string[]; close: () => void }> {
@@ -312,7 +314,7 @@ describe('gitCredentialEnv — helper 只对凭证签发给的主机应答（#14
     expect(bound).not.toContain('STALE_REVOKED');
     for (const [protocol, host] of [
       ['http', '127.0.0.1:2'],
-      ['https', '127.0.0.1:1'],
+      ['http', '127.0.0.1'],
       ['http', 'example.invalid'],
     ] as const) {
       expect(fill(protocol, host)).not.toContain(CRED.password);
@@ -345,6 +347,35 @@ describe('gitCredentialEnv — helper 只对凭证签发给的主机应答（#14
     expect(fillUrl('https://github.com:8443/o/r.git', 'https://github.com/o/r.git')).not.toContain(
       CRED.password,
     );
+  });
+
+  test('失败方式 7：http 绑定被跳转到同主机 https 照常应答；https 不降级到 http', () => {
+    const home = mkdtempSync(join(tmpdir(), 'pacman-git-scope-upgrade-'));
+    const base: NodeJS.ProcessEnv = {
+      ...envWithoutGitConfig(),
+      HOME: home,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+    const fill = (bound: string, protocol: string) =>
+      spawnSync('git', ['credential', 'fill'], {
+        input: `protocol=${protocol}\nhost=pacman.internal\n\n`,
+        encoding: 'utf8',
+        env: { ...base, ...gitCredentialEnv({ ...CRED, url: bound }, base) },
+      }).stdout;
+    expect(fill('http://pacman.internal/git/t/r.git', 'https')).toContain(
+      `password=${CRED.password}`,
+    );
+    expect(fill('https://pacman.internal/git/t/r.git', 'http')).not.toContain(CRED.password);
+  });
+
+  test.each([
+    ['密码带换行', { password: 'a\nb' }],
+    ['密码带回车', { password: 'a\rb' }],
+    ['用户名带换行', { username: 'u\nhost=evil.example' }],
+  ])('失败方式 8：%s（git 的凭证协议装不下）→ 不装 helper，凭证不进环境', (_label, patch) => {
+    const env = gitCredentialEnv({ ...CRED, ...patch }, {});
+    expect(env.GIT_CONFIG_COUNT).toBe('1');
+    expect(Object.keys(env).filter((k) => k.startsWith('PACMAN_GIT_CRED_'))).toEqual([]);
   });
 
   test('失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）', () => {

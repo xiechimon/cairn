@@ -126,6 +126,16 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines).toContain('[workspace] Worktree reused');
   }, 30_000);
 
+  test('#1484：复用基座时 origin 已偏离 cloneUrl → 先指回 cloneUrl 再 fetch', async () => {
+    // per-step 凭证只对 cloneUrl 的主机应答，基座 origin 必须跟 claim 一致。偏离
+    // 来源：server 地址变了，或 worktree 里 set-url（worktree 与基座共用配置）。
+    const first = await ws.prepare(prepareInput(CONV_A));
+    await runGit(['remote', 'set-url', 'origin', join(root, 'gone.git')], { cwd: first.cwd });
+    const second = await ws.prepare(prepareInput(CONV_B));
+    expect(await gitPrim.remoteUrl(second.baseRepoDir)).toBe(originDir);
+    expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
+  }, 30_000);
+
   test('base 二择：origin/<convBranch> 已 fetch 时优先（异机续跑面）', async () => {
     // 从种子工作区把 conv 分支推上远端（带独有提交）。
     const branch = conversationBranch(CONV_A);

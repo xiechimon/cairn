@@ -65,14 +65,16 @@ export async function runGitOk(
 
 /** 内联 credential.helper 本体（#1484 / #1485）：定值，不含任何凭证值。git 以
  * `sh -c '<本体> get'` 运行它，并把请求（protocol= / host= 等行）写进 stdin。
- * 只在 get 且 protocol、host 与签发远端完全一致时，从环境变量印出用户名与
- * 密码；printf '%s' 原样输出，不经 echo 的反斜杠转义，也不经 shell 展开。凭证
- * 只在环境里：sh -c 的 argv（/proc/<pid>/cmdline，本机其他用户可读）里只有
- * 这段定值。 */
+ * 只在 get、host 与签发远端完全一致、protocol 相同（或 http 绑定被跳转升到
+ * https——同主机更安全的通道；https 不降级到 http）时，从环境变量印出用户名
+ * 与密码；printf '%s' 原样输出，不经 echo 的反斜杠转义，也不经 shell 展开。
+ * 凭证只在环境里：sh -c 的 argv（/proc/<pid>/cmdline，本机其他用户可读）里
+ * 只有这段定值。 */
 const CREDENTIAL_HELPER =
   // biome-ignore lint/suspicious/noTemplateCurlyInString: sh parameter expansion inside the helper body, not a JS template
   '!f() { p=; h=; while IFS= read -r l; do case "$l" in protocol=*) p=${l#protocol=} ;; host=*) h=${l#host=} ;; esac; done; ' +
-  'if test "$1" = get && test "$p" = "$PACMAN_GIT_CRED_PROTOCOL" && test "$h" = "$PACMAN_GIT_CRED_HOST"; then ' +
+  'if test "$1" = get && test "$h" = "$PACMAN_GIT_CRED_HOST" && ' +
+  '{ test "$p" = "$PACMAN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$PACMAN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
   `printf 'username=%s\\npassword=%s\\n' "$PACMAN_GIT_CRED_USERNAME" "$PACMAN_GIT_CRED_PASSWORD"; fi; }; f`;
 
 /** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。helper 本体与凭证
@@ -87,8 +89,10 @@ export function gitCredentialEnv(
   // 从 0 写会盖掉它们，COUNT=2 又把 2 号以后的藏起来。
   const n = inheritedGitConfigCount(parent);
   // #1484：helper 只应答签发远端。git 按实际连接的 URL（insteadOf 改写、HTTP
-  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。
-  const target = credentialTarget(cred.url);
+  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。用户名 /
+  // 密码带换行或回车时不装 helper：git 的凭证协议按行分隔，这样的值会被读成
+  // 别的字段（server 签发的值不会有）。
+  const target = /[\r\n\0]/.test(cred.username + cred.password) ? null : credentialTarget(cred.url);
   return {
     // 空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
     // helper，含父环境条目与 URL 作用域条目里的）。缺此条则系统级/全局
@@ -115,9 +119,10 @@ export function gitCredentialEnv(
 
 /** 凭证绑定 URL → git 请求里会出现的 protocol 与 host（#1484）。host 按 URL 原文
  * 截取：去掉 userinfo，大小写、显式端口、非 ASCII 字符都保留。git 自己就这样
- * 从 remote URL 取 host（截到第一个 / ? #），而 origin 的 URL 正是这个
- * cloneUrl，两边逐字节一致，不依赖任何归一化（git 的 URL 作用域匹配不认带 _
- * 的主机名）。不是 http(s)（本地路径、scp 形、file、ssh，或空串）= null：git
+ * 从 remote URL 取 host（截到第一个 / ? #，另做 %xx 解码；server 签发的
+ * cloneUrl 不含 %xx），而 origin 的 URL 正是这个 cloneUrl（workspace 复用基座
+ * 时也先指回它），两边逐字节一致，不依赖任何归一化（git 的 URL 作用域匹配不
+ * 认带 _ 的主机名）。不是 http(s)（本地路径、scp 形、file、ssh）= null：git
  * 不为这些远端问 helper，凭证不写进环境。 */
 function credentialTarget(url: string): { protocol: string; host: string } | null {
   const m = /^(https?):\/\/(?:[^@/?#]*@)?([^/?#]+)/.exec(url);

@@ -215,6 +215,14 @@ export class WorkspaceManager implements WorktreeOps {
           );
         }
       } else {
+        // #1484：per-step 凭证只对 cloneUrl 的主机应答，基座 origin 已偏离（server
+        // 地址变了，或 worktree 里被 set-url——worktree 与基座共用配置）时先指回，
+        // fetch 才认证得上。
+        const origin = await gitPrim.remoteUrl(baseRepoDir);
+        if (origin !== null && origin !== input.cloneUrl) {
+          await gitPrim.setRemoteUrl(baseRepoDir, input.cloneUrl);
+          this.logger.workspace('Repo origin re-pointed to the project clone URL');
+        }
         await runNet('fetch', (cred) => withGitNetRetries(() => gitPrim.fetch(baseRepoDir, cred)));
       }
       const defaultBranch = await gitPrim.remoteDefaultBranch(baseRepoDir);
