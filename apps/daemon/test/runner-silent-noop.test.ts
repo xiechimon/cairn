@@ -8,7 +8,7 @@
 //      同律 failed（回声不算进展，防「事件面非空」绕过闸）
 //   3. 正常轮（有 done）→ success 不受闸影响（防误伤）
 //   4. 有进展事件（text_delta）+ done → success 不受闸影响
-//   5. 停止钮中断（stopRequests 旗标）→ 仍 stopped 收尾（闸不覆盖停止）
+//   5. 停止钮中断（停止位）→ 仍 stopped 收尾（闸不覆盖停止）
 //   6. pi prompt() 预检拒绝（真 PiBackend + preset provider 无凭据：auth 校验
 //      在 agent run 之前 throw）→ 事件面快速收到 error 事件且流终结（现状：
 //      吞掉后挂到流超时看门狗——测试形态 = 超时失败；修复后 = 真因文案）

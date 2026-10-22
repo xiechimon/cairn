@@ -11,7 +11,7 @@
 // 取用台账持有，agent 经 per-step 本地取用通道（runner 注册的本地 pi 工具）
 // 显式取用，取用留审计行（步 id + agent id + 密钥名 + 时间，永不写值）。
 
-import type { GitCredentials, MachineTokenResponse, ProviderConfig } from '@pacman/shared';
+import type { BoundGitCredentials, MachineTokenResponse, ProviderConfig } from '@pacman/shared';
 
 /** 本步团队密钥的取用台账。明文由闭包捕获（模块外不可枚举），只经 take()
  * 交出；clearCredentials 后 take() 恒 null——步收尾即失效，失败/中断步同路。 */
@@ -42,13 +42,23 @@ export interface StepCredentials {
   /** 团队密钥取用台账（02 §8 运行时层；形状见本文件头注）。 */
   secrets: SecretVault;
   /** 托管 repo git 凭证（02 §3 凭证纪律：仅 per-step 注入——手动 fetch 无
-   * 凭证失败；注入形 = git.ts gitCredentialEnv，argv/磁盘均不落）。 */
-  git: GitCredentials | null;
+   * 凭证失败；注入形 = git.ts gitCredentialEnv，argv/磁盘均不落）。绑定本步
+   * 项目 repo 的 cloneUrl，helper 只对该主机应答（#1484）。 */
+  git: BoundGitCredentials | null;
 }
 
-/** push_credential 对照位：token/{stepId} 响应 → 步内内存凭证束。 */
-export function pushCredential(token: MachineTokenResponse): StepCredentials {
-  return { provider: token.provider, secrets: openSecretVault(token.secrets), git: token.git };
+/** push_credential 对照位：token/{stepId} 响应 → 步内内存凭证束。git 凭证绑定
+ * `repoUrl`（claim 的 project.repo.cloneUrl，#1484）；步未绑 repo = null，没有
+ * 可绑定的主机，凭证不进任何 git 调用。 */
+export function pushCredential(
+  token: MachineTokenResponse,
+  repoUrl: string | null,
+): StepCredentials {
+  return {
+    provider: token.provider,
+    secrets: openSecretVault(token.secrets),
+    git: token.git === null || repoUrl === null ? null : { ...token.git, url: repoUrl },
+  };
 }
 
 /** 步收尾清空（引用置空；明文串本身随 GC）。 */

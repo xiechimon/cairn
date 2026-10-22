@@ -1,0 +1,540 @@
+# #1404 S2 round 9 (pr-gate run 4 on #1421 at c4bf400, no-go: two blocking findings, one root cause; verdict copied to pr-gate-1421-run4-c4bf400.json),
+# then /code-review at medium effort on c4bf400..b484957 (s2-r9-reviews.txt). Tests first twice; four legs, each at a commit:
+#   red 1   2970bf4  tests only (apps/server/test/merge-gate-readiness.test.ts, packages/shared/test/snapshot.test.ts and its .snap); source as at c4bf400
+#   green 1 b484957  readiness.ts and merge-gate.ts only (`git diff 2970bf4 b484957 --stat` lists only those two files)
+#   red 2   60af36c  tests only (the same three test files); source as at b484957
+#   green 2 87700dc  readiness.ts only (`git diff 60af36c 87700dc --stat` lists only that file)
+# The test file typechecks against both the old and the new GateInputs (the fixture gives compare and checks the commit they were read at through
+# readAt(headSha, ...)), so both tests-only commits passed the pre-commit typecheck.
+# Red 1: 3 of 130 readiness tests, the pr-gate run 4 rules:
+#   - a compare read at a descendant of pr.headSha (same file count) gives only the transient patch-unavailable, not ready, no patch digest
+#     (at c4bf400 readiness returns ready=true); the same test also reads the race the other way (PR and checks at EARLIER, compare at HEAD);
+#   - a compare read at a descendant whose push added a file gives patch-unavailable, not compare-truncated (at c4bf400: compare-truncated, human, count-mismatch);
+#   - checks read at another commit (EARLIER or NEWER) give only the transient required-checks-unreadable "checks not read at the PR head"; a failure in
+#     that list is not judged; under unstable mergeable-state reads "unstable, checks unreadable" (at c4bf400 readiness returns ready=true).
+# Red 2: 2 of 132 readiness tests, the code-review findings:
+#   - a compare whose headSha says pr.headSha but whose own commits lack it gives patch-unavailable, not ready, no digest (at b484957: ready=true,
+#     the guard trusted the shell's headSha alone);
+#   - with the PR unreadable the result reports neither head nor patch digest (at b484957: the compare's digest with headSha null).
+# Pins the source already had (green in every leg; s2-mutations-9.txt shows each one red under a mutation of the rule it pins):
+#   a compare read at a commit older than pr.headSha gives patch-unavailable (the existing test, now giving that compare its head EARLIER);
+#   PR, compare and checks all read at NEWER give ready, reporting NEWER and its digest; unstable with checks null or incomplete lists both
+#   mergeable-state and required-checks-unreadable (pr-gate run 4 suggestion); the shared snapshot freezes the blocker vocabulary in order
+#   (red 1: code and class; red 2 adds the label, after code-review finding 8).
+# Every leg ran with a clean tree at the named commit (only untracked evidence files under docs/verify/1404/); this file was written after.
+
+== red 1: commit 2970bf4 (tests only), source at c4bf400 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts packages/shared/test/snapshot.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (130 tests | 3 failed) 143ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (14)
+     × compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要 29ms
+     × compare 读在后代上、推送还加了文件（文件数不同）：仍是可等的 patch-unavailable，不是留人的 compare-truncated 4ms
+     × 检查读在别的提交上（比 PR head 旧或新）：可等的 required-checks-unreadable，那份结果不拿来判 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1185:21
+    1183|     compareAtNewer(a);
+    1184|     const r = mergeReadiness(a);
+    1185|     expect(r.ready).toBe(false);
+       |                     ^
+    1186|     expect(r.patchDigest).toBeNull();
+    1187|     expect(classesOf(a)).toEqual(notAtHead);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在后代上、推送还加了文件（文件数不同）：仍是可等的 patch-unavailable，不是留人的 compare-truncated
+AssertionError: expected [ [ 'compare-truncated', …(2) ] ] to deeply equal [ [ 'patch-unavailable', …(2) ] ]
+
+- Expected
++ Received
+
+  [
+    [
+-     "patch-unavailable",
+-     "transient",
+-     "compare not read at the PR head",
++     "compare-truncated",
++     "human",
++     "count-mismatch",
+    ],
+  ]
+
+ ❯ test/merge-gate-readiness.test.ts:1200:26
+    1198|     compareAtNewer(i, [file('apps/server/src/services/ci-loop-retry.ts…
+    1199|     expect(compare(i).files).toHaveLength(pr(i).changedFiles + 1);
+    1200|     expect(classesOf(i)).toEqual(notAtHead);
+       |                          ^
+    1201|   });
+    1202|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 检查读在别的提交上（比 PR head 旧或新）：可等的 required-checks-unreadable，那份结果不拿来判
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1210:39
+    1208|       const a = green();
+    1209|       a.checks = readAt(sha, checks(a));
+    1210|       expect(mergeReadiness(a).ready).toBe(false);
+       |                                       ^
+    1211|       expect(classesOf(a)).toEqual(elsewhere);
+    1212|       // 那份结果里的失败也不列：它说的不是 PR 的 head
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  3 failed | 341 passed (344)
+   Start at  14:17:55
+   Duration  2.23s (transform 71%, import 22%, tests 7%, worker 1%)
+
+  Transform  |@xiechimon/pacman| transforming modules took 2.45s · 67% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+exit=1
+
+== green 1: commit b484957 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts packages/shared/test/snapshot.test.ts --reporter=verbose
+(verbose list of 344 passing tests omitted here; summary lines as printed)
+ Test Files  5 passed (5)
+      Tests  344 passed (344)
+   Start at  14:21:06
+   Duration  3.04s (transform 71%, import 21%, tests 8%)
+exit=0
+
+== red 2: commit 60af36c (tests only), source at b484957 ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts packages/shared/test/snapshot.test.ts
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ❯ |@xiechimon/pacman| test/merge-gate-readiness.test.ts (132 tests | 2 failed) 109ms
+   ❯ mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 (16)
+     × compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha） 13ms
+     × PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上） 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha）
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ test/merge-gate-readiness.test.ts:1187:21
+    1185|     pr(i).body = `evidence: ${link(EARLIER)}`;
+    1186|     const r = mergeReadiness(i);
+    1187|     expect(r.ready).toBe(false);
+       |                     ^
+    1188|     expect(r.patchDigest).toBeNull();
+    1189|     expect(classesOf(i)).toEqual(notAtHead);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上）
+AssertionError: expected 'pd2:81a5d0d51175a08649b739ea1176dbf3a…' to be null
+
+- Expected:
+null
+
++ Received:
+"pd2:81a5d0d51175a08649b739ea1176dbf3a02ca2a50f0de1b31fcffdca69663330"
+
+ ❯ test/merge-gate-readiness.test.ts:1247:27
+    1245|     const r = mergeReadiness(i);
+    1246|     expect(r.headSha).toBeNull();
+    1247|     expect(r.patchDigest).toBeNull();
+       |                           ^
+    1248|     expect(classesOf(i)).toEqual([['pr-unreadable', 'transient']]);
+    1249|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 344 passed (346)
+   Start at  14:38:10
+   Duration  1.70s (transform 70%, import 23%, tests 6%, worker 1%)
+
+exit=1
+
+== green 2: commit 87700dc ==
+$ pnpm exec vitest run apps/server/test/merge-gate-readiness.test.ts apps/server/test/merge-gate-digest.test.ts apps/server/test/merge-gate-paths.test.ts apps/server/test/merge-gate-evidence-link.test.ts packages/shared/test/snapshot.test.ts --reporter=verbose
+
+ RUN  v5.0.1 /home/user/pacman/.claude/worktrees/p3b
+
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > **/ 含仓根，* 不跨目录，不分大小写 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > protect：末尾的 /** 也认目录项本身，不认同名前缀；不带时不认 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > globToRegExp > protect 按 Unicode 折叠，不带时只折 ASCII 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > CI 6ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 钩子 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > agent 设置 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > pi 技能 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > cursor 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > MCP 配置 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > scout 放行表 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > CLAUDE 变体 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > AGENTS 变体 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 评审口径 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ADR 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸脚本 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 配置 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > biome 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > biome.json 嵌套在源码里 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > tsconfig 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > gitignore 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > gitattributes 嵌套 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 迁移 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 依赖清单 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 锁文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 工作区 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > npmrc 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸源码 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸词表 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > daemon 的合并决定 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 大小写变体照样命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 名字里有换行、回车、空格或其它白名单外字符：一律算保护（与 pr-gate SAFE_PATH 同一白名单） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 只多一个空格就算保护：集内源码路径本身不命中任何保护 glob 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 不分大小写按 Unicode 折叠：ſ（U+017F）同 s、K（U+212A）同 k 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 保护 glob 末尾的 /** 也认同名的目录项本身（指向别处的符号链接，与 pr-gate.js 的 protect 一致） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 安全敏感面与跑迁移的 DB 引导：清单里每个文件都算保护，不进 gateSource 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 与其它保护 glob 同样不分大小写 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 的 machine*.ts：machines.ts、machine-relay.ts 命中；* 不跨目录，machine/x.ts 不命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > ⑤ 锚定在原路径：近邻与别处的同名文件仍可自动合并 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 复制条目的原名也判类：从保护文件复制出来算命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 改名把保护文件移走：按原路径命中 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 闸源码另列一份（D4 ④） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 保护类别：任意层级、不分大小写，各一真一假 > 普通的保护路径不进 gateSource 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 产品源码、测试、e2e 与本票证据在集内 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 集外路径（文档、根文件、public、eval）各自列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 可自动合并集的 glob 不认目录项本身：docs/verify、apps/web/src 单独出现算集外 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 可自动合并集只折 ASCII 大小写：只靠 Unicode 折叠才像集内的名字（ſrc、pacKages）落在集外 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 保护路径不重复记进集外 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 默认拒绝：可自动合并集之外一律留人 > 改名从集外移进集内：按原路径记集外 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 删除测试目录下的文件，或删除 .test / .spec 文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > e2e/、tests/、__tests__/ 目录下删掉的文件都算，不必带 .test 后缀 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > .test.mts / .spec.cts 与仓根 test/、e2e/ 目录下删掉的文件都算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试目录与后缀按 Unicode 折叠（收紧的一侧）：teſt/ 是测试目录，.teſt.ts 是测试文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试目录与 .test / .spec 后缀不分大小写（ADR 0021 D4，与 pr-gate 的 /i 一致） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 把测试改名成非测试路径也算删测试 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 改测试、加测试都不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 删测试 > 测试的任何改名都算删了原测试（与 pr-gate 的 --no-renames 一致），含测试目录里改成不被收集的名字 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 写本票目录可以，写别的票的目录列出（含删除） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 本 PR 新增或改动的可执行证据列出，删除的不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 每种可执行扩展名：新增、改动、在证据目录里改名成它，都列出 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 改名把别票的证据移进本票目录：按原名列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 证据目录前缀换大小写也照样检查别票与可执行文件；.tsx / .jsx 算可执行 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 判别票与可执行用的证据前缀按 Unicode 折叠（收紧的一侧）：docſ/verify/1405/x.sh 列进别票与可执行，同时落在可自动合并集外 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 单独的 docs/verify 条目（顶替证据目录的符号链接）列进别票：票号段为空 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 可执行扩展名同样按 Unicode 折叠：.ſh、.jſ 算可执行 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 票号是另一票号的前缀：14040 不是 1404 的目录 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 证据目录 > 票号段大小写敏感匹配之外不做猜测：XMON-104 与 xmon-104 是两个目录 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 证据目录之外的列进 opaque，含删除；证据目录里的不算，前缀大小写敏感（与摘要同一条） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > compare 不给 patch 的条目（二进制、diff 过大、纯改名） > 改名没有 patch：两头里落在证据目录之外的名字都列出 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族 > shell：.bash .zsh .fish 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族 > PowerShell：.ps1 .psm1 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族 > Windows 批处理：.bat .cmd 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 可执行扩展名：shell、PowerShell、Windows 批处理与 HTML 四族 > HTML（浏览器打开即跑脚本）：.html .htm 新增即列出，扩展名换大小写也算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > AUTO_MERGE 与 AUTO_MERGE_PATH_GLOBS 逐项同序 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > PROTECTED 与 PROTECTED_PATH_GLOBS 加 MERGE_GATE_SOURCE_GLOBS 逐项同序 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-paths.test.ts > 与 .claude/workflows/pr-gate.js 同一份清单 > 解析器找不到数组、找不到收尾的 ]、遇到不认识的行都报错 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 基线全绿：ready，没有 blocker（每个 blocker 的假腿） 9ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 每个 blocker 码都有一行真腿（加码不写腿即变红） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > 词表里每个码的类别与 CLASS 表逐码相同 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > policy-human：只打开它 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > autonomy-paused：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > not-applicable：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > not-current-build：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > phase-not-review：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > work-in-flight：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-unreadable：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-not-open：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-draft：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-from-fork：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > base-not-default：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > mergeable-state：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > self-required：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-checks-unreadable：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-checks-none：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-missing：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-pending：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > required-check-failed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > pr-evidence-not-green：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > patch-unavailable：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > compare-malformed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > compare-truncated：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > patch-unbindable：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > size-cap：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > protected-path：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > outside-auto-merge：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > test-deleted：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > opaque-file：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-outside-ticket：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-executable：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > issue-ref-missing：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > evidence-link-missing：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-missing：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-failed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-extraction-failed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-evidence-invalid：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > verify-tampered：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-missing：只打开它 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-blocking：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > review-extraction-failed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > perspective-timed-out：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-missing：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-no-go：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > decision-extraction-failed：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > fix-rounds-exhausted：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > fix-no-change：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > gate-rounds-exhausted：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-reviewers：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-verifier：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：每个 blocker 一真一假 > no-decider：只打开它 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > chief 的 go 与同一摘要上的 blocking 同在：不 ready 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > blocking 之后同视角又通过一次：仍拦（不允许重掷） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 旧摘要上的通过不算：review-missing / verify-missing / decision-missing 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 未绑定 head 的判定（patchDigest 为空）不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 只因自家 pacman/merge-gate status 而 unstable：不拦 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 别家检查让它 unstable：拦，并在细节里点名 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > has_hooks 与 clean 同等对待；unknown 拦（GitHub 还在算） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > verify 步失败（没有结论）不算有判定：verify-missing 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 必需项由 commit status 提供也认；status 为 pending / error 分别记 pending / failed 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 必需检查 neutral / skipped 算通过（与分支保护一致），pr-evidence 只认 success 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 读不到检查：拦，不退回「全部检查」 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 证据链指向别的票或钉在旧 SHA（不在 base..head）：不算 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 审核视角按轮次冻结的集合算，不按团队当前的 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > blocker 顺序固定：同一输入两次结果相同，且按词表顺序 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 插入顺序与词表顺序不同时，按词表排 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 800 行、40 个文件整数边界：恰好不拦，多一即拦 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 每个 blocker 带类别与固定文案 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：设计点名的组合 > 不抛：空 body、空文件列表、空判定 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 只有证据的补丁、空补丁：摘要等不来，留人（human），不是可等的 patch-unavailable 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 有文件缺 blob sha（子模块之类）：摘要等不来，留人 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读不到 compare：仍是可等的 patch-unavailable；截断仍是留人的 compare-truncated 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > GitHub 还报 clean，手上的检查里有别家失败：拦，并点名 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > has_hooks 同样：别家 commit status 失败、别家检查还在跑，都拦 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > unstable 却看不到任何未通过的检查（自家 status 也是 success）：拦 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 同摘要上 evidence_invalid 之后又通过：清掉（与 extraction_failed 同理） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 通过在另一份补丁上：清不掉同摘要的 evidence_invalid 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读不到默认分支：可等的 pr-unreadable，不是留人的 base-not-default 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：等不来的留人，读不到的可等，检查以手上的为准 > 读到了默认分支、PR 指向别处：仍是留人的 base-not-default 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 证据目录外的二进制与纯改名：opaque-file，留人，逐个点名（改名两头都列） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 证据目录里的截图（没有 patch）不留人 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > opaque-file 在词表里排在 D4 路径码之间：删测试之后、别票证据之前 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 40 文件上限计入证据：35 个代码文件加 10 个证据文件拦，30 加 10 不拦 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：看不到 diff 的文件留人，上限按整张补丁算 > 800 行上限计入证据：代码 700 行，证据 100 行不拦，101 行拦 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据链钉在 main 历史上（head 的祖先、不在 base..head）：不算，路径是本 PR 的证据也不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据链钉在本 PR 的提交上（不必是 head）、指向本 PR 加的证据：算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 钉在本 PR 的提交上、指向本 PR 没增改的证据（同票前一段留在 main 的）：不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 指向本 PR 删掉的证据：不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 多条链接有一条合格即可：钉在 main 历史上的那条不拖累 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 检查列表没读全：整份按读不到处理（可等），不拿半张清单判 missing / not-green 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > unstable 而检查读不到（null 或没读全）：mergeable-state 与 required-checks-unreadable 都列 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信 > 证据前缀的大小写变体（Docs/Verify/）不算证据：看不到 diff 的照样 opaque-file 留人 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 文件名一律 JSON 引号：换行与指令样的文本落成一行，可原样解回 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > JSON 不转义的也转：C1 控制符、双向覆盖、行分隔符写成 \uXXXX 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 每个名字至多 120 个字符（转义后计，截断处标 …），每条至多 10 个名字，其余记 +N more 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 检查名同样：别家检查的名字引号、转义，名单有界 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：detail 里的名字按数据写、有界 > 必需检查名、分支名、仓库名也引号 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 verify 先提取失败、后又通过：清掉（与 evidence_invalid 同理） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 review 先提取失败、后又通过：清掉（与 evidence_invalid 同理） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 同摘要上 decision 先提取失败、后又通过：清掉（与 evidence_invalid 同理） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 dirty：只记 mergeable-state 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 blocked：只记 mergeable-state 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 behind：只记 mergeable-state 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 draft：只记 mergeable-state 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > mergeable_state 为 unknown：只记 mergeable-state 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > compare 恰好 300 个文件、PR 也报 300：compare-truncated（truncated），不是 patch-unbindable 4ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 自家 status 与必需检查名不分大小写：Pacman/merge-gate 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > 自家必需检查名跳过：没有它的 status 也只记 self-required，不记 required-check-missing 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > fork 判定不分大小写：XieChiMon/Pacman 是同仓 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > merged 标志算数：closed 且 merged 记 merged；state 还是 open 也记 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > head 仓库已删（headRepoFullName 为 null）：pr-from-fork，不抛 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：提取失败可清、不可合并态、截断、大小写与 PR 状态 > readiness 不判链接的文件在那个提交上是否已存在（raw 404）：交给 S4 外壳 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在比 PR head 旧的提交上：可等的 patch-unavailable，不报摘要、不拿它判 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 自报读在 PR 的 head 上、提交里却没有这个 head：同样按没在 head 上读处理（不只信外壳填的 headSha） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在 PR head 的后代上（文件数相同）：可等的 patch-unavailable，不 ready、不报摘要 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > compare 读在后代上、推送还加了文件（文件数不同）：仍是可等的 patch-unavailable，不是留人的 compare-truncated 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 检查读在别的提交上（比 PR head 旧或新）：可等的 required-checks-unreadable，那份结果不拿来判 3ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR 读不到：没有 head 可对，结果不报 head，也不报摘要（没有 head 的摘要绑不到哪个提交上） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > PR、compare 与检查都在同一个提交上读：照常判（都在后代 NEWER 上也 ready，报 NEWER 与它的摘要） 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 verify 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 verify 通过（{pass, null}）不算当前补丁的 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 review 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 review 通过（{pass, null}）不算当前补丁的 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 别的摘要上 decision 拦、当前摘要上通过：不拦（旧补丁上的拦不跟到新补丁上） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 decision 通过（{pass, null}）不算当前补丁的 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 未绑定 head 的 tampered（{tampered, null}）照样算：verify-tampered 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > verify-missing 的 detail 只数别的摘要上或未绑定的判定，当前补丁上失败的验证步单列 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-readiness.test.ts > mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要 > 两个 app 的同名检查都在（外壳按 app 与名字去重）：失败的那条不被同名的通过盖掉 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > user 7ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > team 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > project 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > todo 8ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > tag 3ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > build 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > step 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > message 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > plan 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > schedule 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > notification 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > agent 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > agent_memory 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > provider 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > secret 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > api_key 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > machine 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > token_usage 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > chief 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > chief_thread 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > chief_message 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > record 形状 24 表投影——zod → JSON Schema 快照 > whats_new 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > createTodoBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > createScheduleBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > createProjectBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > githubReposResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > githubConnectionStatus 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > projectTreeResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > projectFileResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > projectBranchesResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > startBuildsBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > mergeAcceptedResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > buildStepActionBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > patchChiefBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > conversationMessagesResponse 3ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > notificationsResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > searchResponse 3ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > setSecretBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > teamStreamEvent 3ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > conversationStreamEvent 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > planRow 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > stepJournalRow 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > apiKeyRow 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > machineJson 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > deviceJson 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > body/封套 schema 快照 > daemonJson 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > stepEvent = 02 §5.6 pi 词表会话内 15 件 1:1（01 §5 锁定） 3ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > 机器面 13 端点动词 + 路径（MACHINE_WIRE，动词 [推断] 登记面） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > claimedStep 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineClaimBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineClaimResponse 4ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineDoneBody 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineEnrollBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineEnrollResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machinePresenceBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineRecoverResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineStreamEvent 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineToolBody 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineThinkingDeltaBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineTranscriptDeltaBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineTokenResponse 2ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineUploadUrlsBody 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > machineUploadUrlsResponse 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canonical） > transcriptUpload 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > web REST 端点词表（02 §6.1） 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > DELETE 面规则（[推断]，02 §6.1）与 divergence 登记 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 机器面 13 端点（02 §5/r3 §1.6） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > SSE 三通道（02 §1.2） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > executor CLI 面（02 §5.1） 1ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 本地状态布局与日志前缀（02 §5.3） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > worktree 契约（02 §5.5） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > pi 流事件/配置 kind/流超时/机器工具/代理探测（02 §5.6） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 步骤生命周期行序（02 §5.7）与上线序列 canon（02 §5.4） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > MCP server 面 24 工具白名单 + 能力六组（02 §7.2） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > provider presets 38 项目录（r3 §2/02 §6.2） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > localStorage 键名契约（02 §6.4/r2 §1.5） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > phase 九值 + 看板列 + 语义（02 §4.1） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 品牌串命名常量表（02 §5.8 + 素材替换计划 §2） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6） 0ms
+ ✓ |@pacman/shared| test/snapshot.test.ts > 协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表：码、类别与文案，按固定顺序（#1404；S5–S9 按类别分流，首个 blocker 即 status 描述） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > markdown 链接与 <img src> 都认，路径按 URL 解码 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 别的仓、别的票、短 SHA、大写 SHA、分支名都不算，列进 others 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 票号是另一票号的前缀：docs/verify/14040/ 不是 1404 的证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 仓名不分大小写 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > HTML 注释里的链接不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一链接出现两次只记一次 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 同一路径钉在两个 SHA 上是两条 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 坏的百分号转义（%E0%A4%A）列进 others，不抛 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 链接后面紧跟的标点与反引号不算进路径 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 闭合的注释之后的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 两段闭合注释之间的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 被注释切开的 URL 不拼回一条链接：GitHub 渲染的是注释前那一截 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 空注释 <!--> 与 <!---> 在自身的 --> 处结束（HTML 与 cmark-gfm 同样），其后的链接照常算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 没闭合的 HTML 注释吞掉后文（GitHub 不渲染），其中的链接不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行中没闭合的 <!--（比如反引号里引用它）只是字面文字，不吞后文 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 行首至多三个空格缩进的没闭合 <!-- 开 HTML 块，吞后文；四个空格是缩进代码块，不吞 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 目录穿越与仓外路径不算 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 路径里有 . 段的不算，列进 others 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 查询串与片段不算进路径：?raw=true、#L3 照样认，同一文件只记一次 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 去掉查询串与片段后不指向文件的不算：目录本身不是证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一条链接后跟一长串句点再加一个字母，65,536 个字符在 200 ms 内 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：成串没闭合的 <!--，65,536 个字符在 200 ms 内 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-evidence-link.test.ts > parseRawEvidenceLinks > 对抗性 body 线性解析：一行里成串没闭合的 <!--，65,536 个字符在 200 ms 内 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 带版本前缀，同一组文件任意顺序算出同一个摘要 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改一个 blob sha，摘要就变 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > status、filename、blob sha 都不变、只有 patchSha 变：摘要就变 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 没有 patch 的条目元组第五位是 JSON null（不是空串、不是字符串 "null"），对上独立算出的摘要 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只改 docs/verify/ 下的证据，摘要不变 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改名跨过 docs/verify/ 边界（进或出）都计入摘要 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > previous_filename 进摘要：同名同 sha 的改名来源不同，摘要不同 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只有仓根的 docs/verify/ 算证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 文件名含制表符或换行不会与别的元组撞车 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 排序按 UTF-16 码元、与区域设置无关：大小写与标点混排的一组对上独立算出的摘要 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 补充平面字符挨着 U+E000–U+FFFF 的字符：按 UTF-16 码元排，不按码点 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 非删除条目的 sha 为空：摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 删除条目的 sha 为空也照常计算（真实响应里删除条目带旧 blob sha） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 299 个文件照常；300 个即视为截断，摘要不可得 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 300 的上限按整张列表算，证据条目也计入：299 个代码文件加 1 个 docs/verify 条目即视为截断 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 与 PR 的 changed_files 对不上即视为截断 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > compare 给的条目比 changed_files 多：同样对不上，摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 空文件列表：摘要不可得（没有可绑定的补丁） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 只有证据的补丁：证据之外没有文件，摘要不可得 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 行数与文件数按整张补丁算，docs/verify/ 的证据也计入；摘要照旧不计证据 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 改名（带 previous_filename 的条目）记两个文件，纯改名行数为 0，证据里的改名也算 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > computePatchDigest > 复制（copied，带 previous_filename）同改名一样记两个文件 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 解析出 58 个文件，删除条目带旧 blob sha，证据目录里有可执行文件 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > compare 不给 patch 的正是 20 张 PNG（二进制），patchSha 为 null；其余 38 个条目的 patchSha 是 patch 文本的 sha256 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 解析出的每个条目都合 @pacman/shared 的 compareFileSchema，且没有词表之外的字段 5ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 摘要与独立实现一致，证据目录的 22 个文件不进摘要但计入文件数与行数 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 合入 main 解冲突保留本 PR 版本：status、filename、blob 不变，补丁文本变了，摘要不同 1ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 响应形状不对（缺 files、files 非数组、条目缺字段）返回 null 2ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > previous_filename 映射到 previousFilename；缺省为 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > sha 缺失、previous_filename 为空串或非字符串：形状不对，返回 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > 改名或复制条目缺 previous_filename（缺省或 null）：形状不对，返回 null，原名不能悄悄丢掉 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > patch 是非空字符串时 patchSha 是它的 sha256（hex）；缺省、空串、null、非字符串都为 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > status 不在 COMPARE_FILE_STATUSES 里、filename 不是字符串：形状不对，返回 null 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > filename 为空串：形状不对，返回 null（compareFileSchema 要求至少一个字符） 0ms
+ ✓ |@xiechimon/pacman| test/merge-gate-digest.test.ts > 真实 compare 响应夹具 > additions、deletions 或 changes 为负：形状不对，返回 null（与 compareFileSchema 的非负一致） 0ms
+
+ Test Files  5 passed (5)
+      Tests  346 passed (346)
+   Start at  14:39:37
+   Duration  1.72s (transform 69%, import 24%, tests 6%, worker 1%)
+
+exit=0

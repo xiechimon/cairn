@@ -23,7 +23,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials, GitCredentials } from '@pacman/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { commitEnv, runGit } from '../src/git.js';
 import { buildCreateTagTool } from '../src/tag-tool.js';
@@ -316,7 +316,11 @@ describe('create_tag — github 形态真推送（HTTP + x-access-token Basic au
     const w = await makeHttpWorld('gh-ok', PROBE_CRED);
     try {
       await w.commit('a.txt', 'feat a');
-      const tool = buildCreateTagTool({ repoDir: w.work, cred: PROBE_CRED, identity: IDENTITY });
+      const tool = buildCreateTagTool({
+        repoDir: w.work,
+        cred: { ...PROBE_CRED, url: w.remoteUrl },
+        identity: IDENTITY,
+      });
       const out = await tool.execute({ tag: 'v3.0.0', message: 'github shape push' });
       expect(out).toContain('v3.0.0');
       expect(await remoteTags(w.remoteBare)).toContain('v3.0.0');
@@ -330,9 +334,10 @@ describe('create_tag — github 形态真推送（HTTP + x-access-token Basic au
     const w = await makeHttpWorld('gh-expired', PROBE_CRED);
     try {
       await w.commit('a.txt', 'feat a');
-      const expired: GitCredentials = {
+      const expired: BoundGitCredentials = {
         username: 'x-access-token',
         password: 'ghp_EXPIRED00000000000000000000000000',
+        url: w.remoteUrl,
       };
       const tool = buildCreateTagTool({ repoDir: w.work, cred: expired, identity: IDENTITY });
       const out = await tool.execute({ tag: 'v4.0.0', message: 'will fail auth' });
@@ -349,7 +354,11 @@ describe('create_tag — github 形态真推送（HTTP + x-access-token Basic au
     try {
       const first = await w.commit('a.txt', 'first');
       // 远端先落 v5.0.0 指向 first。
-      const okTool = buildCreateTagTool({ repoDir: w.work, cred: PROBE_CRED, identity: IDENTITY });
+      const okTool = buildCreateTagTool({
+        repoDir: w.work,
+        cred: { ...PROBE_CRED, url: w.remoteUrl },
+        identity: IDENTITY,
+      });
       await okTool.execute({ tag: 'v5.0.0', message: 'remote wins' });
       expect(await remoteTags(w.remoteBare)).toContain('v5.0.0');
       // 本地删 tag、前进 commit、在新 HEAD 重打同名异值 tag → 推送被拒。

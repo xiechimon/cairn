@@ -1,5 +1,5 @@
-// runner 停止收尾（M7 #308）：runStep 的 stopped 路径——stopRequests 旗标
-// （machine-loop deliverStop 拉取-确认后置位）+ live.stop() 中断事件流 →
+// runner 停止收尾（M7 #308）：runStep 的 stopped 路径——停止位（machine-loop
+// deliverStop 拉取-确认后经 StepStops 投给本步的 run）+ 中断事件流 →
 // done(stopped) 回报；discard 勾选 → worktree rewind 到步起点 checkpoint
 // （restoreCheckpoint）；不 commit/push（步未完成其产物）；transcript 终稿
 // 上传保留（运行行「已取消」但过程行不丢）；plan.md 不上传（方案回到上一版）。
@@ -8,7 +8,9 @@
 //      无 commitAll/push
 //   2. discard=false → 不 rewind（worktree 保留本轮改动）+ done(stopped)
 //   3. plan 步停止 → plan.md 不上传（transcript.json 照传）
-//   4. 停止后 journal 清账（recover 面不残留）+ sessionHandles/stopRequests 注销
+//   4. 停止后 journal 清账（recover 面不残留）+ sessionHandles/停止位注销
+//   5. recover 带入重启前已接收的 discard 停止 → 不开会话，照样 rewind 到
+//      步起点 + done(stopped)
 
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -31,6 +33,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { StepStops } from '../src/step-stops.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -247,7 +250,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
   throw new Error('waitFor timeout');
 }
 
-async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
+async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean; recovered?: boolean }) {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-stop-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
@@ -258,7 +261,7 @@ async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
   const cwd = join(home, 'ws', 'conv-1');
   const { ws, calls } = fakeWorkspace(cwd);
   const sessionHandles = new Map<string, AgentSessionHandle>();
-  const stopRequests = new Map<string, { discard: boolean }>();
+  const stops = new StepStops();
   const deps = {
     client,
     journal,
@@ -269,17 +272,20 @@ async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean }) {
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     sessionHandles,
-    stopRequests,
+    stops,
     heartbeatIntervalMs: 60_000,
   };
   const claimed = claimedBuildStep(opts.kind ?? 'build');
-  const running = runStep(deps, claimed);
-  await waitFor(() => handles.length === 1);
-  // 模拟 deliverStop：拉取-确认置位 → live.stop()。
-  stopRequests.set('s1', { discard: opts.discard });
-  await handles[0]!.stop();
-  await running;
-  return { client, journal, calls, lines, sessionHandles, stopRequests, cwd };
+  if (opts.recovered) {
+    await runStep(deps, claimed, { stopRequest: { discard: opts.discard } });
+  } else {
+    const running = runStep(deps, claimed);
+    await waitFor(() => handles.length === 1);
+    // 模拟 deliverStop：拉取-确认后投给本步的 run。
+    await stops.get('s1')?.deliver({ discard: opts.discard });
+    await running;
+  }
+  return { client, journal, calls, lines, sessionHandles, stops, cwd, handles };
 }
 
 describe('runner 停止收尾（M7 #308）', () => {
@@ -312,9 +318,17 @@ describe('runner 停止收尾（M7 #308）', () => {
   });
 
   test('失败方式 4：停止后 journal 清账 + 注册表注销', async () => {
-    const { journal, sessionHandles, stopRequests } = await setup({ discard: true });
+    const { journal, sessionHandles, stops } = await setup({ discard: true });
     expect(journal.pending()).toEqual([]);
     expect(sessionHandles.has('s1')).toBe(false);
-    expect(stopRequests.has('s1')).toBe(false);
+    expect(stops.get('s1')).toBeUndefined();
+  });
+
+  test('失败方式 5：recover 带入 discard 停止 → 不开会话，rewind 到步起点 + done(stopped)', async () => {
+    const { client, calls, handles } = await setup({ discard: true, recovered: true });
+    expect(handles).toHaveLength(0);
+    expect(calls).toContain(`restoreCheckpoint:abc123`);
+    expect(calls).not.toContain('commitAll');
+    expect(client.doneBodies[0]!.body.status).toBe('stopped');
   });
 });

@@ -16,9 +16,12 @@
 //    （#1445：写相位后停活动步）。首见即 closed 的卡（例：重启后才读到）永不
 //    被对账关闭；关过一次即忘掉「见过 open」，有人把卡重开就不再关。外部
 //    作者关自己的 issue、任一读失败 = 本轮不关。review 卡与 build 交付过 PR
-//    的卡（building 磨绿中 / failed / 重跑中）留给 PR 对账：合并带关闭引用关掉
-//    issue 时，那张卡不以 closed 收尾。拆卡父卡还有子卡不在 done / closed 时
-//    也不碰（关了它，最后一张子卡 done 时的父卡收口会撞 closed → done 非法边）。
+//    的卡（building 磨绿中 / failed / 重跑中）不归这里关：合并带关闭引用关掉
+//    issue 时，那张卡不该以 closed 收尾。眼下 PR 侧只有 ci-loop 的 review 期
+//    对账（#1414，PR 合并 → done、未合并关闭 → failed）；其余相位的这类卡
+//    由 ci-loop 的磨绿推进，或等人处理（spec 28 P2 的后续段）。拆卡父卡还有
+//    子卡不在 done / closed 时也不碰（关了它，最后一张子卡 done 时的父卡收口会
+//    撞 closed → done 非法边）。
 //    写前重读相位、PR 与子卡，变了就不动。
 // 3. chief 未绑定（orchestrateTodo 的前置）→ 本队不导入，不建无法编排的卡。
 //    绑好的队先重试上几轮导入后编排失败的卡（进程内记次，连同导入那次至多
@@ -30,16 +33,21 @@
 //    rel="next" 翻页，至多 ISSUE_INTAKE_MAX_LIST_PAGES 页），按号升序（最旧
 //    先）；团队级已占用的号跳过（大小写不敏感）；D5 核打标人：该标签最新一条
 //    labeled 之后没有 unlabeled、不是经 GitHub App 打的（performed_via_github_app
-//    在位 = 不领，记一行带 app：持有仓主授权的 agent 会话不能给进料喂它自己开
-//    的 issue），且其 actor 在仓库上是 triage 及以上（events 按 Link rel="next"
-//    至多读 ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页 = 读不全；读不全 /
-//    任一读失败 = 本轮不领）；importGithubIssue（409 = 别路已领；createdBy 记
-//    chief 绑定的 Agent）→ orchestrateTodo；领到一条记一行日志（打标人）。
+//    在位 = 不领，记一行带 app：经 GitHub App 打标的 agent 会话不能给进料喂它
+//    自己开的 issue；OAuth App 令牌（gh auth login 的、团队 GitHub 连接令牌）
+//    与 PAT 打的标不带这个字段，与本人亲手打的分不开，这一条拦不住——连接令
+//    牌随步下发给 git 与仓内 .agents/setup / resume 钩子），且其 actor 在仓库
+//    上是 triage 及以上（events 按 Link rel="next" 至多读
+//    ISSUE_INTAKE_MAX_EVENT_PAGES 页，读满仍有下一页 = 读不全；读不全 / 任一
+//    读失败 = 本轮不领）；importGithubIssue（409 = 别路已领；createdBy 记 chief
+//    绑定的 Agent）→ orchestrateTodo；领到一条记一行日志（打标人）。
 //
 // 纪律：issue 正文只经 importGithubIssue 进 todo.spec，不进日志、不进系统行；
-// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；任一 GitHub
-// 读遇限流（429 / 带限流信号的 403）= 本队本轮停读、记一行带重置时刻（同一
-// token 再读只会再被拒）；上一轮没跑完时新触发直接返回（不重叠）。
+// 每轮一行对账日志（只有计数）；单卡 / 单项目 / 单队异常不杀整轮；本模块自己
+// 的 GitHub 读（列表 / events / permission / issue 状态）遇限流（429 / 带限流
+// 信号的 403）= 本队本轮停读、记一行（有重置时刻就带上；同一 token 再读只会
+// 再被拒）——importGithubIssue 自己的读遇限流抛 HttpError，按导入失败记；
+// 上一轮没跑完时新触发直接返回（不重叠）。
 //
 // #1459：webhook 的 `pacman` 触发按同一 D5 判据核打标人（事件的 sender）、
 // 计入同一在飞上限。三样两路共用：团队 token（teamGithubToken，github-connection.ts）、
@@ -128,7 +136,8 @@ const LABELER_BASE_PERMISSIONS = new Set(['write', 'admin']);
 /** 在飞上限不计的相位。failed 计入：失败卡仍挂在项目上等人处理，不再多领。 */
 const NOT_IN_FLIGHT: Phase[] = ['done', 'closed'];
 
-/** 关闭对账不碰的相位：done / closed 已终态；review 归 #1414 的 PR 对账。
+/** 关闭对账不碰的相位：done / closed 已终态；review 是人审关口，进料不关
+ * （交付过 PR 的 review 卡由 #1414 的 PR 对账收尾，没 PR 的等人）。
  * 相位之外还有两条：任一 build 交付过 PR 的卡（见 noDeliveredPr）、还有子卡
  * 没收完的拆卡父卡（见 noOpenChildren）也不碰。 */
 const CLOSE_RECONCILE_SKIPPED: Phase[] = ['done', 'closed', 'review'];
@@ -296,8 +305,10 @@ function newestOf(
 
 /** D5 第一半：该标签最新一条 labeled 的 actor（之后有 unlabeled / 读不全 /
  * 没有 labeled / 经 app 打的 / 账号已删 → 不领的理由）。经 app 打的标不算人
- * 打的：用户授权的 app 令牌下 actor 是授权的人，持有仓主授权的 agent 会话打
- * 的标与仓主本人打的分不开。顺序按 created_at，同刻按 id，不信数组位置。 */
+ * 打的：用户授权的 app 令牌下 actor 是授权的人，只看 actor 分不开 app 与本人。
+ * OAuth App 令牌与 PAT 不填 performed_via_github_app（gh 用哪种令牌就是哪种），
+ * 经它们打的标与本人打的一样，这里拦不住。顺序按 created_at，同刻按 id，不信
+ * 数组位置。 */
 function newestLabeler(data: IssueHistory): { labeler: string } | AppLabel | { reason: string } {
   if (!data.complete) return { reason: 'events-incomplete' };
   const forLabel = (kind: 'labeled' | 'unlabeled') => (e: GithubIssueEvent) =>
@@ -391,8 +402,9 @@ export function createIssueIntake(
 
   /** 卡没有任何 build 交付过 PR（prNumber 或 prUrl 在，builds.ts latestPrBuild
    * 同一判据；只看最新 build 不够：失败卡重跑出的新 build 还没 PR 时，旧 PR
-   * 仍开着、仍可能被合并）。交付过的卡，合并带关闭引用关掉 issue 时由 PR
-   * 对账收尾，关闭对账不碰。用在以 todo 为主表的查询里（相关子查询）。 */
+   * 仍开着、仍可能被合并）。交付过的卡关闭对账不碰：合并带关闭引用关掉 issue
+   * 时它不该以 closed 收尾（review 期的由 #1414 的 PR 对账收尾，其余相位见头注
+   * 第 2 条）。用在以 todo 为主表的查询里（相关子查询）。 */
   function noDeliveredPr() {
     return notExists(
       deps.db
@@ -788,7 +800,8 @@ export function createIssueIntake(
           continue;
         }
         // 写前重读相位、PR 与子卡：读窗口里被人推进（如进 review）/ 关闭 /
-        // 完成，build 交付了 PR（留给 PR 对账），或有了还在跑的子卡 → 不动。
+        // 完成，build 交付了 PR（不归这里关，见 noDeliveredPr），或有了还在跑
+        // 的子卡 → 不动。
         const fresh = deps.db
           .select({ phase: todo.phase })
           .from(todo)

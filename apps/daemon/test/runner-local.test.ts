@@ -410,7 +410,8 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
       { git: GITHUB_TOKEN },
     );
     expect(calls).toContain('prepare:https://github.com/o/r.git');
-    expect(pushes[0]!.cred).toEqual(GITHUB_TOKEN);
+    // runner 把 token 响应绑定到 claim 的 cloneUrl 再交给 push（#1484）。
+    expect(pushes[0]!.cred).toEqual({ ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' });
     // 探测面同消费 per-step 凭证：token 进 gh/REST 梯（#704 同款钉法）。
     expect(probeMock).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -92,16 +92,11 @@ import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
 import { resolveStepImages } from './step-attachments.js';
+import { type RunStop, StepStops, type StopRequest } from './step-stops.js';
 import { buildCreateTagTool } from './tag-tool.js';
 import { materializeTeamSkills } from './team-skills.js';
 import { extractVerifyVerdict } from './verify-verdict.js';
 import { localRepoUnreachableMessage } from './workspace.js';
-
-/** 停止请求（M7 #308）：discard = 确认弹层「丢弃本轮修改」勾选位——
- * true 时收尾 rewind worktree 到步起点 checkpoint（r9 §3.3）。 */
-export interface StopRequest {
-  discard: boolean;
-}
 
 /** #1225 凭据来源行文案（build 记录面 = transcript system 行）。只写来源名；
  * 本函数不接收凭据对象——结构上杜绝 token 值进记录（票失败方式 2）。 */
@@ -132,10 +127,10 @@ export interface RunStepDeps {
    * runStep 装卸（handle 创建即注册、各收尾路径注销），machine-loop 的
    * deliverSteer 按 stepId 消费。缺省 = 无 steer 面（单测形态）。 */
   sessionHandles?: Map<string, AgentSessionHandle>;
-  /** 停止请求旗标（M7 #308 stop 投递面）：machine-loop deliverStop 拉取-
-   * 确认后置位，runStep 事件流结束后消费判 stopped 收尾。缺省 = 无 stop
-   * 面（单测形态）。 */
-  stopRequests?: Map<string, StopRequest>;
+  /** 停止位登记表（M7 #308 stop 投递面）：runStep 进门登记本次 run 的停止位、
+   * 出门注销；machine-loop deliverStop 拉取-确认后投给该步的 run。缺省
+   * = 无 stop 面（单测形态）。 */
+  stops?: StepStops;
   /** heartbeat 节奏 [设计]（r3 未采具体值；presence 同族 ~30s）。 */
   heartbeatIntervalMs?: number;
   /** PACMAN_SKILLS_DIR 扫描根（#1299 /name 派发判定与 Skill 工具目录面；
@@ -159,6 +154,9 @@ export interface RunStepOptions {
    * 按槽位构造）——透传 SessionOpts.env（backend 注入 agent 进程命令环境）。
    * chief 步不携带（不占槽）。 */
   env?: Record<string, string>;
+  /** recover：重启前已接收的停止（journal 的 stopRequest）。开会话前即按
+   * stopped 收尾，discard 照常回退。 */
+  stopRequest?: StopRequest;
   /** 零进展 auto_retry 预算覆盖（#708 测试注入；缺省 = RETRY_STORM_MAX）。 */
   retryStormMax?: number;
   /** 流超时三臂覆盖（测试注入毫秒级；缺省 = 02 §5.6 r3 三值）。 */
@@ -435,10 +433,22 @@ export async function runStep(
     deps.client.heartbeat(claimed.step.id).catch(() => {});
   }, deps.heartbeatIntervalMs ?? 30_000);
   if (heartbeat.unref) heartbeat.unref();
+  const stepId = claimed.step.id;
+  const stop = (deps.stops ?? new StepStops()).enter(stepId, (stopRequest) => {
+    try {
+      deps.journal.update(stepId, { stopRequest });
+    } catch (err) {
+      deps.logger.step(
+        `stop journal write failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  });
+  if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   try {
-    await runClaimedStep(deps, claimed, opts, heartbeat);
+    await runClaimedStep(deps, claimed, opts, heartbeat, stop);
   } finally {
     clearInterval(heartbeat);
+    stop.settle();
   }
 }
 
@@ -447,6 +457,7 @@ async function runClaimedStep(
   claimed: ClaimedStep,
   opts: RunStepOptions,
   heartbeat: ReturnType<typeof setInterval>,
+  stop: RunStop,
 ): Promise<void> {
   const { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
@@ -543,6 +554,7 @@ async function runClaimedStep(
     sessionId: opts.resume?.sessionId ?? claimed.session.sessionId,
     prompt,
     claimed,
+    stopRequest: stop.request,
   });
 
   // —— #730 图片附件解析下载（prompt 面）：整行 `![name](attachment:key)`
@@ -582,7 +594,7 @@ async function runClaimedStep(
   // fabricate 伪 api_key 配置，此处不透传伪语义。非 runtime 步逐字节保持
   // 原行为（creds.provider → agent.provider 回退）。
   const tokenRes = await client.token(stepId);
-  const creds = pushCredential(tokenRes);
+  const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   const agent = claimed.agent;
   const runtimeId = isBackendRuntimeId(agent?.provider) ? agent.provider : null;
   // let（#654）：回落闸翻 compat 旋钮时重赋值（sessionOpts.provider 同步）。
@@ -1219,7 +1231,7 @@ async function runClaimedStep(
     timedOut = true;
     timeoutArm = arm;
     askAbort.abort(); // #1049：等答循环随看门狗退场（不占线）
-    void handle.stop();
+    void handle?.stop();
   };
   const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
     if (watchdog) clearTimeout(watchdog);
@@ -1366,7 +1378,7 @@ async function runClaimedStep(
   // —— 会话轮（#654 协议 400 步内回落，Multica client.go「按错误回落」同
   // 律）：第一轮零进展且终局错误命中自适配签名 → backend 翻 compat 旋钮 →
   // 重开一轮（单次预算：第二起失败 / 有进展 / 无可翻即按现状收尾）。——
-  let handle: AgentSessionHandle;
+  let handle: AgentSessionHandle | null = null;
   // #1286 / #1312：SessionNotResumableError 两面都降级 new session。
   // recover 重发 journal.prompt（pi 懒落盘窗口的兜底）；journal.prompt 为
   // null 仍显式失败。执行面（无 opts.resume）改投原任务，不把「方案已确认」
@@ -1461,6 +1473,7 @@ async function runClaimedStep(
       }
       deltaBuf = '';
     }
+    if (stop.request !== null) break;
     // 回落轮带 resetLive：hub / 客户端清掉上轮在飞思考与正文；首轮不带。
     activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);
     try {
@@ -1478,6 +1491,9 @@ async function runClaimedStep(
     journal.update(stepId, { state: 'running', sessionId: handle.sessionId });
     // steer 投递面注册（W3 #279）：在跑期间 deliverSteer 可达；各收尾路径注销。
     deps.sessionHandles?.set(stepId, handle);
+    stop.attach(handle).catch((err: unknown) => {
+      logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
+    });
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();
@@ -1715,6 +1731,7 @@ async function runClaimedStep(
       await failStep(deps, heartbeat, stepId, err instanceof Error ? err.message : String(err));
       return;
     }
+    stop.detach();
     // —— #1257 provider_network 流断重试（Multica MUL-4910 同形）：终局错误
     // 分类 network（upstream stream disconnected / connection reset 族）→
     // 会话续跑重试（continueSession 同一会话，不重放整轮），总尝试 3 次
@@ -1724,7 +1741,7 @@ async function runClaimedStep(
     // 意图优先于续跑）。
     {
       const failureText = lastModelError ?? lastError;
-      const stopPending = deps.stopRequests?.get(stepId) !== undefined;
+      const stopPending = stop.request !== null;
       if (
         failureText !== null &&
         lastError !== null &&
@@ -1812,10 +1829,9 @@ async function runClaimedStep(
   // 后置位；sawDone 优先 = stop 与自然完成竞态归完成（success 不改判）。
   // 判定先于 #698 no-op 闸：停止中断的事件流也是零事件零终局形态，闸不得
   // 给 stopped 收尾挂 no-op 错误文案。——
-  const stopReq = deps.stopRequests?.get(stepId);
-  if (stopReq !== undefined) deps.stopRequests?.delete(stepId);
-  const stopped = stopReq !== undefined && !sawDone;
-  if (stopReq !== undefined && sawDone) logger.step('stop arrived after completion — ignored');
+  const stopReq = stop.settle();
+  const stopped = stopReq !== null && !sawDone;
+  if (stopReq !== null && sawDone) logger.step('stop arrived after completion — ignored');
   // —— #1261 配额熔断收尾：两路汇合成 quotaBlock 随 done 上报——
   // ① 中途熔断（error 事件分类命中即停，quotaTrip 在位）；
   // ② 终局分类（pi 不重试的 402：error + done 自然收尾，quotaTrip 可能未置
@@ -1855,7 +1871,7 @@ async function runClaimedStep(
   // abort 吞掉终局 done 事件（backend/pi.ts stopping 位——停止钮与流超时
   // watchdog 共用 handle.stop()）→ usage 从 handle 累计面兜底（逐消息累积，
   // token 记账不因中断丢失）。
-  if (!sawDone) usage = handle.usage();
+  if (!sawDone && handle !== null) usage = handle.usage();
 
   // —— 简报擦除的主出口（#958 闸 1）——
   // 位置刻意选在此处：定时器已清、终态错误已归并，而在 `stopped` 分支与两处
@@ -2166,13 +2182,14 @@ async function runClaimedStep(
   // 是有效结论不折成 error。
   const verifyExtraction =
     claimed.step.kind === 'verify' ? extractVerifyVerdict(transcript.messages()) : null;
+  const sessionIdForDone = handle?.sessionId ?? continueId;
   const doneBody: MachineDoneBody = {
     status,
     // #1262：捕获侧剥 ANSI（SGR + OSC8）——工具输出（biome 等）的颜色码/
     // 超链接转义不落 build.errorMessage（板面纯文本）；单源 = shared
     // stripAnsiEscapes，web 渲染侧同函数兜底存量脏行。
     ...(lastError !== null ? { errorMessage: stripAnsiEscapes(lastError) } : {}),
-    sessionId: handle.sessionId,
+    ...(sessionIdForDone !== null ? { sessionId: sessionIdForDone } : {}),
     usage: [...usage],
     hasChanges,
     // per-step checkpoint（done 回传 commit：「恢复到此处」数据源 + 合并步
@@ -2205,7 +2222,6 @@ async function runClaimedStep(
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId); // journal 残留 recover 面重传，handle 不再 steer
-    deps.stopRequests?.delete(stepId);
     return;
   }
 
@@ -2215,13 +2231,11 @@ async function runClaimedStep(
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     clearCredentials(creds);
     deps.sessionHandles?.delete(stepId); // journal 残留 recover 补报，handle 不再 steer
-    deps.stopRequests?.delete(stepId);
     return; // journal 残留，recover 面补报
   }
   clearCredentials(creds);
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);
-  deps.stopRequests?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`);
 }
 
@@ -2291,10 +2305,7 @@ async function putFinalArtifacts(
  * 派发 gate = `state === 'awaiting-upload' && doneBody != null`；快照缺失
  * （旧格式条目/快照前崩溃）派发方走整步重跑原路径。 */
 export async function resumePendingUpload(
-  deps: Pick<
-    RunStepDeps,
-    'client' | 'journal' | 'logger' | 'paths' | 'sessionHandles' | 'stopRequests'
-  >,
+  deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths' | 'sessionHandles'>,
   entry: StepJournalEntry,
   opts: { running?: number } = {},
 ): Promise<void> {
@@ -2321,7 +2332,6 @@ export async function resumePendingUpload(
   }
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);
-  deps.stopRequests?.delete(stepId);
   logger.raw(`finished (${running - 1} running)`); // 02 §5.7 收尾 canon 行
 }
 
@@ -2333,7 +2343,6 @@ async function failStep(
 ): Promise<void> {
   clearInterval(heartbeat); // 回报期不续心跳（与会话收尾同律）
   deps.sessionHandles?.delete(stepId); // 覆盖 handle 后失败路径（前置失败 = 无键可删）
-  deps.stopRequests?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
     await deps.client.done(stepId, { status: 'failed', errorMessage: message });
