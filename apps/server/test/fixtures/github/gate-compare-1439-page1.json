@@ -1,0 +1,372 @@
+{
+  "url": "https://api.github.com/repos/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5",
+  "html_url": "https://github.com/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5",
+  "permalink_url": "https://github.com/xiechimon/pacman/compare/xiechimon:a6c0865...xiechimon:f9c4f85",
+  "diff_url": "https://github.com/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5.diff",
+  "patch_url": "https://github.com/xiechimon/pacman/compare/a6c0865edea6cc95d86b32eb33f6a265c0f20d21...f9c4f852292592395e882e1d900ca215a1aafce5.patch",
+  "base_commit": {
+    "sha": "a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "node_id": "C_kwDOUSKs6doAKGE2YzA4NjVlZGVhNmNjOTVkODZiMzJlYjMzZjZhMjY1YzBmMjBkMjE",
+    "commit": {
+      "author": {
+        "name": "Xmon Dai",
+        "email": "xiechimon@qq.com",
+        "date": "2026-10-21T04:06:28Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-10-21T04:06:28Z"
+      },
+      "message": "ci(1440): hold merges while a person's decision is pending\n\npr-evidence turns red while a PR carries the needs-decision label and,\nwhile the label is on, disarms GitHub auto-merge on every run (labeled,\nunlabeled and auto_merge_enabled join the trigger); an unchecked\nAcceptance item adds the label. pr-evidence is now a required status\ncheck on main (pinned to the Actions app), and a zero-dependency shape\ngate keeps it load-bearing: no job-level if or name, no paths filter,\nlabel triggers present.\n\nProcess (AGENTS.md, pr-pacman skill, ADR 0007 revision): disarm\nauto-merge, add the label, then ask; only a person removes the label.\n\n#1435 merged on 2026-10-21 while the user's decision was still open:\nauto-merge was armed, the orchestrator edited the Acceptance boxes green\nbefore asking, and pr-evidence was advisory then.\n\nFollow-up commits squashed in:\n\n* ci(1440): one run per PR, drafts stay unlabelled, gate reads block-form types\n* ci(1440): contents: write for disablePullRequestAutoMerge, loud disarm failure\n* ci(1440): read the PR from the API every run, judge drafts on ready_for_review\n* docs(1440): merge guard evidence from the live demo on #1441\n\ncloses #1440",
+      "tree": {
+        "sha": "9c58e7341769b0e737c411eae2027d4a000d51da",
+        "url": "https://api.github.com/repos/xiechimon/pacman/git/trees/9c58e7341769b0e737c411eae2027d4a000d51da"
+      },
+      "url": "https://api.github.com/repos/xiechimon/pacman/git/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq2DpECRC1aQ7uu5UhlAAAwEMQAH9ZUJSefDVZYucuvUZILDt6\nlkUvHaKyGx4Tswn8BMUjVQOSDK+xvEp7qwrOtsBbeGtnLeV9FiUhKPyS/To/IEp3\n6Zgx3w/fg970ovoqY67GMNOGJPmoad3JSXZ29XPTY8PQF3WUheuLCBFazL7OKw0O\nMxf0ns/nTIxRK4y80gSK2vIw8g3ljb6xlETE2UfV2HZbqk3xZ5dyqm+KejyBnRwN\n2BuFH/0bVX69lgf4Z8NzVAnmGO1KKVO8vQNjjY43tqTCsJ1WPAlUAi8plUUOA+On\noSUwP10CRvqinaNXxPi/yiaBYX99Kj83kT+8eI4xNONGuxeNpKrjNQoBxhgctgo4\nrVSExYCY3sHArGyOAAGqP6wCI0aERbqc5mWEJk3OOOZ3rzN99fs7vSUN7Zhmhf7E\nbaQUu6R/1Y1zs4psLPSQ8rc24lqi8hqDM96tAKL437Cj4WgbBY20JcXPfPKFHA7s\n/MTGTwErlVL9nWkCYK31nwdDThi9exwKBdjDWUrSykXqjS5HzohhMFe8KwvUSvF6\nr1ArvP98Y355mfgvrYodr3WIgbSOiaC5m17ShcIvJ4CYmiKq5mn6VFJYsAjjSU6H\n4NgQ5SQ4W6dNE6nU+jY0R/tAqmm72wUw12NDATa4eNeVmhAF0FAg8hi0h8nakXSz\nRx1vh1CV07VBMOqnYmgB\n=K8JU\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 9c58e7341769b0e737c411eae2027d4a000d51da\nparent e4f6f911a7e14f19789b35911d05302b28c1835b\nauthor Xmon Dai <xiechimon@qq.com> 1792555588 -0700\ncommitter GitHub <noreply@github.com> 1792555588 -0700\n\nci(1440): hold merges while a person's decision is pending\n\npr-evidence turns red while a PR carries the needs-decision label and,\nwhile the label is on, disarms GitHub auto-merge on every run (labeled,\nunlabeled and auto_merge_enabled join the trigger); an unchecked\nAcceptance item adds the label. pr-evidence is now a required status\ncheck on main (pinned to the Actions app), and a zero-dependency shape\ngate keeps it load-bearing: no job-level if or name, no paths filter,\nlabel triggers present.\n\nProcess (AGENTS.md, pr-pacman skill, ADR 0007 revision): disarm\nauto-merge, add the label, then ask; only a person removes the label.\n\n#1435 merged on 2026-10-21 while the user's decision was still open:\nauto-merge was armed, the orchestrator edited the Acceptance boxes green\nbefore asking, and pr-evidence was advisory then.\n\nFollow-up commits squashed in:\n\n* ci(1440): one run per PR, drafts stay unlabelled, gate reads block-form types\n* ci(1440): contents: write for disablePullRequestAutoMerge, loud disarm failure\n* ci(1440): read the PR from the API every run, judge drafts on ready_for_review\n* docs(1440): merge guard evidence from the live demo on #1441\n\ncloses #1440",
+        "verified_at": "2026-10-21T04:06:28Z"
+      }
+    },
+    "url": "https://api.github.com/repos/xiechimon/pacman/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "html_url": "https://github.com/xiechimon/pacman/commit/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "comments_url": "https://api.github.com/repos/xiechimon/pacman/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21/comments",
+    "author": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "node_id": "U_kgDOCV-m2w",
+      "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/xiechimon",
+      "html_url": "https://github.com/xiechimon",
+      "followers_url": "https://api.github.com/users/xiechimon/followers",
+      "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+      "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+      "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+      "repos_url": "https://api.github.com/users/xiechimon/repos",
+      "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "e4f6f911a7e14f19789b35911d05302b28c1835b",
+        "url": "https://api.github.com/repos/xiechimon/pacman/commits/e4f6f911a7e14f19789b35911d05302b28c1835b",
+        "html_url": "https://github.com/xiechimon/pacman/commit/e4f6f911a7e14f19789b35911d05302b28c1835b"
+      }
+    ]
+  },
+  "merge_base_commit": {
+    "sha": "a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "node_id": "C_kwDOUSKs6doAKGE2YzA4NjVlZGVhNmNjOTVkODZiMzJlYjMzZjZhMjY1YzBmMjBkMjE",
+    "commit": {
+      "author": {
+        "name": "Xmon Dai",
+        "email": "xiechimon@qq.com",
+        "date": "2026-10-21T04:06:28Z"
+      },
+      "committer": {
+        "name": "GitHub",
+        "email": "noreply@github.com",
+        "date": "2026-10-21T04:06:28Z"
+      },
+      "message": "ci(1440): hold merges while a person's decision is pending\n\npr-evidence turns red while a PR carries the needs-decision label and,\nwhile the label is on, disarms GitHub auto-merge on every run (labeled,\nunlabeled and auto_merge_enabled join the trigger); an unchecked\nAcceptance item adds the label. pr-evidence is now a required status\ncheck on main (pinned to the Actions app), and a zero-dependency shape\ngate keeps it load-bearing: no job-level if or name, no paths filter,\nlabel triggers present.\n\nProcess (AGENTS.md, pr-pacman skill, ADR 0007 revision): disarm\nauto-merge, add the label, then ask; only a person removes the label.\n\n#1435 merged on 2026-10-21 while the user's decision was still open:\nauto-merge was armed, the orchestrator edited the Acceptance boxes green\nbefore asking, and pr-evidence was advisory then.\n\nFollow-up commits squashed in:\n\n* ci(1440): one run per PR, drafts stay unlabelled, gate reads block-form types\n* ci(1440): contents: write for disablePullRequestAutoMerge, loud disarm failure\n* ci(1440): read the PR from the API every run, judge drafts on ready_for_review\n* docs(1440): merge guard evidence from the live demo on #1441\n\ncloses #1440",
+      "tree": {
+        "sha": "9c58e7341769b0e737c411eae2027d4a000d51da",
+        "url": "https://api.github.com/repos/xiechimon/pacman/git/trees/9c58e7341769b0e737c411eae2027d4a000d51da"
+      },
+      "url": "https://api.github.com/repos/xiechimon/pacman/git/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+      "comment_count": 0,
+      "verification": {
+        "verified": true,
+        "reason": "valid",
+        "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq2DpECRC1aQ7uu5UhlAAAwEMQAH9ZUJSefDVZYucuvUZILDt6\nlkUvHaKyGx4Tswn8BMUjVQOSDK+xvEp7qwrOtsBbeGtnLeV9FiUhKPyS/To/IEp3\n6Zgx3w/fg970ovoqY67GMNOGJPmoad3JSXZ29XPTY8PQF3WUheuLCBFazL7OKw0O\nMxf0ns/nTIxRK4y80gSK2vIw8g3ljb6xlETE2UfV2HZbqk3xZ5dyqm+KejyBnRwN\n2BuFH/0bVX69lgf4Z8NzVAnmGO1KKVO8vQNjjY43tqTCsJ1WPAlUAi8plUUOA+On\noSUwP10CRvqinaNXxPi/yiaBYX99Kj83kT+8eI4xNONGuxeNpKrjNQoBxhgctgo4\nrVSExYCY3sHArGyOAAGqP6wCI0aERbqc5mWEJk3OOOZ3rzN99fs7vSUN7Zhmhf7E\nbaQUu6R/1Y1zs4psLPSQ8rc24lqi8hqDM96tAKL437Cj4WgbBY20JcXPfPKFHA7s\n/MTGTwErlVL9nWkCYK31nwdDThi9exwKBdjDWUrSykXqjS5HzohhMFe8KwvUSvF6\nr1ArvP98Y355mfgvrYodr3WIgbSOiaC5m17ShcIvJ4CYmiKq5mn6VFJYsAjjSU6H\n4NgQ5SQ4W6dNE6nU+jY0R/tAqmm72wUw12NDATa4eNeVmhAF0FAg8hi0h8nakXSz\nRx1vh1CV07VBMOqnYmgB\n=K8JU\n-----END PGP SIGNATURE-----\n",
+        "payload": "tree 9c58e7341769b0e737c411eae2027d4a000d51da\nparent e4f6f911a7e14f19789b35911d05302b28c1835b\nauthor Xmon Dai <xiechimon@qq.com> 1792555588 -0700\ncommitter GitHub <noreply@github.com> 1792555588 -0700\n\nci(1440): hold merges while a person's decision is pending\n\npr-evidence turns red while a PR carries the needs-decision label and,\nwhile the label is on, disarms GitHub auto-merge on every run (labeled,\nunlabeled and auto_merge_enabled join the trigger); an unchecked\nAcceptance item adds the label. pr-evidence is now a required status\ncheck on main (pinned to the Actions app), and a zero-dependency shape\ngate keeps it load-bearing: no job-level if or name, no paths filter,\nlabel triggers present.\n\nProcess (AGENTS.md, pr-pacman skill, ADR 0007 revision): disarm\nauto-merge, add the label, then ask; only a person removes the label.\n\n#1435 merged on 2026-10-21 while the user's decision was still open:\nauto-merge was armed, the orchestrator edited the Acceptance boxes green\nbefore asking, and pr-evidence was advisory then.\n\nFollow-up commits squashed in:\n\n* ci(1440): one run per PR, drafts stay unlabelled, gate reads block-form types\n* ci(1440): contents: write for disablePullRequestAutoMerge, loud disarm failure\n* ci(1440): read the PR from the API every run, judge drafts on ready_for_review\n* docs(1440): merge guard evidence from the live demo on #1441\n\ncloses #1440",
+        "verified_at": "2026-10-21T04:06:28Z"
+      }
+    },
+    "url": "https://api.github.com/repos/xiechimon/pacman/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "html_url": "https://github.com/xiechimon/pacman/commit/a6c0865edea6cc95d86b32eb33f6a265c0f20d21",
+    "comments_url": "https://api.github.com/repos/xiechimon/pacman/commits/a6c0865edea6cc95d86b32eb33f6a265c0f20d21/comments",
+    "author": {
+      "login": "xiechimon",
+      "id": 157263579,
+      "node_id": "U_kgDOCV-m2w",
+      "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/xiechimon",
+      "html_url": "https://github.com/xiechimon",
+      "followers_url": "https://api.github.com/users/xiechimon/followers",
+      "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+      "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+      "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+      "repos_url": "https://api.github.com/users/xiechimon/repos",
+      "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "web-flow",
+      "id": 19864447,
+      "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+      "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/web-flow",
+      "html_url": "https://github.com/web-flow",
+      "followers_url": "https://api.github.com/users/web-flow/followers",
+      "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+      "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+      "organizations_url": "https://api.github.com/users/web-flow/orgs",
+      "repos_url": "https://api.github.com/users/web-flow/repos",
+      "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/web-flow/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "e4f6f911a7e14f19789b35911d05302b28c1835b",
+        "url": "https://api.github.com/repos/xiechimon/pacman/commits/e4f6f911a7e14f19789b35911d05302b28c1835b",
+        "html_url": "https://github.com/xiechimon/pacman/commit/e4f6f911a7e14f19789b35911d05302b28c1835b"
+      }
+    ]
+  },
+  "status": "ahead",
+  "ahead_by": 3,
+  "behind_by": 0,
+  "total_commits": 3,
+  "commits": [
+    {
+      "sha": "0d4d7f2114541642177799f6993a96b3c2aa91bc",
+      "node_id": "C_kwDOUSKs6doAKDBkNGQ3ZjIxMTQ1NDE2NDIxNzc3OTlmNjk5M2E5NmIzYzJhYTkxYmM",
+      "commit": {
+        "author": {
+          "name": "xiechimon",
+          "email": "xiechimon@qq.com",
+          "date": "2026-10-21T03:28:31Z"
+        },
+        "committer": {
+          "name": "xiechimon",
+          "email": "xiechimon@qq.com",
+          "date": "2026-10-21T03:28:31Z"
+        },
+        "message": "docs(1430): manifest and theme-color readback through Chromium's own parser\n\nThe first-paint evidence had the DOM readback and the manifest file diff but\nno reading by a browser's manifest parser. manifest-cdp.mjs opens the dev\nserver in Chromium (Playwright), stores each theme in localStorage, and asks\nthe browser for its parsed manifest over CDP (Page.getAppManifest); the result\nis manifest-cdp.json: zero parse errors, theme_color and background_color\n#1a1612, and the theme-color metas rewritten to the stored theme's --canvas\n(#f3eee5 light, #1a1612 dark) by theme.ts.\n\nAddress-bar and install-splash screenshots are still not captured: headless\nChromium draws no browser chrome and Safari access was declined on the host.\nIssue #1430 is already closed; this supplements its evidence.",
+        "tree": {
+          "sha": "b32e4fb098abc90784d9e6695bcb0b3409a31461",
+          "url": "https://api.github.com/repos/xiechimon/pacman/git/trees/b32e4fb098abc90784d9e6695bcb0b3409a31461"
+        },
+        "url": "https://api.github.com/repos/xiechimon/pacman/git/commits/0d4d7f2114541642177799f6993a96b3c2aa91bc",
+        "comment_count": 0,
+        "verification": {
+          "verified": false,
+          "reason": "unsigned",
+          "signature": null,
+          "payload": null,
+          "verified_at": null
+        }
+      },
+      "url": "https://api.github.com/repos/xiechimon/pacman/commits/0d4d7f2114541642177799f6993a96b3c2aa91bc",
+      "html_url": "https://github.com/xiechimon/pacman/commit/0d4d7f2114541642177799f6993a96b3c2aa91bc",
+      "comments_url": "https://api.github.com/repos/xiechimon/pacman/commits/0d4d7f2114541642177799f6993a96b3c2aa91bc/comments",
+      "author": {
+        "login": "xiechimon",
+        "id": 157263579,
+        "node_id": "U_kgDOCV-m2w",
+        "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/xiechimon",
+        "html_url": "https://github.com/xiechimon",
+        "followers_url": "https://api.github.com/users/xiechimon/followers",
+        "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+        "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+        "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+        "repos_url": "https://api.github.com/users/xiechimon/repos",
+        "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "committer": {
+        "login": "xiechimon",
+        "id": 157263579,
+        "node_id": "U_kgDOCV-m2w",
+        "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/xiechimon",
+        "html_url": "https://github.com/xiechimon",
+        "followers_url": "https://api.github.com/users/xiechimon/followers",
+        "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+        "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+        "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+        "repos_url": "https://api.github.com/users/xiechimon/repos",
+        "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "parents": [
+        {
+          "sha": "81bc4e17b9307cbac700f8180311917f35553f84",
+          "url": "https://api.github.com/repos/xiechimon/pacman/commits/81bc4e17b9307cbac700f8180311917f35553f84",
+          "html_url": "https://github.com/xiechimon/pacman/commit/81bc4e17b9307cbac700f8180311917f35553f84"
+        }
+      ]
+    },
+    {
+      "sha": "dd67d27a5ca17f9dd2ad6ad9a9d143cae4c030e5",
+      "node_id": "C_kwDOUSKs6doAKGRkNjdkMjdhNWNhMTdmOWRkMmFkNmFkOWE5ZDE0M2NhZTRjMDMwZTU",
+      "commit": {
+        "author": {
+          "name": "Xmon Dai",
+          "email": "xiechimon@qq.com",
+          "date": "2026-10-21T03:59:41Z"
+        },
+        "committer": {
+          "name": "GitHub",
+          "email": "noreply@github.com",
+          "date": "2026-10-21T03:59:41Z"
+        },
+        "message": "Merge branch 'main' into docs/1430-evidence-cdp",
+        "tree": {
+          "sha": "bd1df61287eda05de37490d3be8ead32c122c290",
+          "url": "https://api.github.com/repos/xiechimon/pacman/git/trees/bd1df61287eda05de37490d3be8ead32c122c290"
+        },
+        "url": "https://api.github.com/repos/xiechimon/pacman/git/commits/dd67d27a5ca17f9dd2ad6ad9a9d143cae4c030e5",
+        "comment_count": 0,
+        "verification": {
+          "verified": true,
+          "reason": "valid",
+          "signature": "-----BEGIN PGP SIGNATURE-----\n\nwsFcBAABCAAQBQJq2DitCRC1aQ7uu5UhlAAAOyEQACFKidlnImQUk+J4/lbvb9IA\n7a61ghCIF7Wcd7djShNV64gSu1za9dmtZJ2yRXkWTJzRjMC25b6Lb2mfeKGY3V96\nreg5wYEpnvW0D1o00pnyk9y3r6sECiNniw09U2ADZ2N1K8PTxcK/0AcrE7/hsexY\nbAFBnk89cf+MfJNboJP+UPox2U28YU+Q8ZYM5aPGNzU6w9PqsK4jdp3hCzXnjps9\ncxHremK4LmZUkpiA/77uQ6A5vcM+XN4u+EqxV61kU5E2C6i6zI/MAzPL3/IIhKR9\nPT1IiQEf9FzahetIaKE+f1dd2tW62kBHTtEpGBPAlmd9p5qLxAanc/1xsz//nlu0\nLvFu/fXRp8ppwqbyjlO9I3/m6rG1MKqa7+WIyOO3buvkGNNunj/rbeLtbsp+tos6\nGg3AswulVi7TIA5kyCwTVhjLvAvwcd0oq2kFlsr7W53EAOBV1+KUWv6K/AIONV9T\nh7Xliw/WAr3+jiFpJRGfSkjG+MoYs+LJ7YiWlaH3qJUQM9fMk/M6npNijsRWXRl5\nXaKd5LWgHEBowSyEH6tjxmMLFqwHGpnYx7cTYW2W5FN1Vj2BG0AbfG9nGzCGIFee\nHmnVuSPIWNtyDk2uuptYIacLWItwboXdbktvMD7AXgvju/0QG4DsjiK3vf0098Tk\ncTUvOHO/XFz7w7EnWYhB\n=h5m5\n-----END PGP SIGNATURE-----\n",
+          "payload": "tree bd1df61287eda05de37490d3be8ead32c122c290\nparent 0d4d7f2114541642177799f6993a96b3c2aa91bc\nparent e4f6f911a7e14f19789b35911d05302b28c1835b\nauthor Xmon Dai <xiechimon@qq.com> 1792555181 -0700\ncommitter GitHub <noreply@github.com> 1792555181 -0700\n\nMerge branch 'main' into docs/1430-evidence-cdp",
+          "verified_at": "2026-10-21T03:59:42Z"
+        }
+      },
+      "url": "https://api.github.com/repos/xiechimon/pacman/commits/dd67d27a5ca17f9dd2ad6ad9a9d143cae4c030e5",
+      "html_url": "https://github.com/xiechimon/pacman/commit/dd67d27a5ca17f9dd2ad6ad9a9d143cae4c030e5",
+      "comments_url": "https://api.github.com/repos/xiechimon/pacman/commits/dd67d27a5ca17f9dd2ad6ad9a9d143cae4c030e5/comments",
+      "author": {
+        "login": "xiechimon",
+        "id": 157263579,
+        "node_id": "U_kgDOCV-m2w",
+        "avatar_url": "https://avatars.githubusercontent.com/u/157263579?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/xiechimon",
+        "html_url": "https://github.com/xiechimon",
+        "followers_url": "https://api.github.com/users/xiechimon/followers",
+        "following_url": "https://api.github.com/users/xiechimon/following{/other_user}",
+        "gists_url": "https://api.github.com/users/xiechimon/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/xiechimon/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/xiechimon/subscriptions",
+        "organizations_url": "https://api.github.com/users/xiechimon/orgs",
+        "repos_url": "https://api.github.com/users/xiechimon/repos",
+        "events_url": "https://api.github.com/users/xiechimon/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/xiechimon/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "committer": {
+        "login": "web-flow",
+        "id": 19864447,
+        "node_id": "MDQ6VXNlcjE5ODY0NDQ3",
+        "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/web-flow",
+        "html_url": "https://github.com/web-flow",
+        "followers_url": "https://api.github.com/users/web-flow/followers",
+        "following_url": "https://api.github.com/users/web-flow/following{/other_user}",
+        "gists_url": "https://api.github.com/users/web-flow/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/web-flow/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/web-flow/subscriptions",
+        "organizations_url": "https://api.github.com/users/web-flow/orgs",
+        "repos_url": "https://api.github.com/users/web-flow/repos",
+        "events_url": "https://api.github.com/users/web-flow/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/web-flow/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "parents": [
+        {
+          "sha": "0d4d7f2114541642177799f6993a96b3c2aa91bc",
+          "url": "https://api.github.com/repos/xiechimon/pacman/commits/0d4d7f2114541642177799f6993a96b3c2aa91bc",
+          "html_url": "https://github.com/xiechimon/pacman/commit/0d4d7f2114541642177799f6993a96b3c2aa91bc"
+        },
+        {
+          "sha": "e4f6f911a7e14f19789b35911d05302b28c1835b",
+          "url": "https://api.github.com/repos/xiechimon/pacman/commits/e4f6f911a7e14f19789b35911d05302b28c1835b",
+          "html_url": "https://github.com/xiechimon/pacman/commit/e4f6f911a7e14f19789b35911d05302b28c1835b"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "sha": "71d0cccb65549c3739c8418f6ed9527e8e1e30b9",
+      "filename": "docs/verify/1430/manifest-cdp.json",
+      "status": "added",
+      "additions": 48,
+      "deletions": 0,
+      "changes": 48,
+      "blob_url": "https://github.com/xiechimon/pacman/blob/f9c4f852292592395e882e1d900ca215a1aafce5/docs%2Fverify%2F1430%2Fmanifest-cdp.json",
+      "raw_url": "https://github.com/xiechimon/pacman/raw/f9c4f852292592395e882e1d900ca215a1aafce5/docs%2Fverify%2F1430%2Fmanifest-cdp.json",
+      "contents_url": "https://api.github.com/repos/xiechimon/pacman/contents/docs%2Fverify%2F1430%2Fmanifest-cdp.json?ref=f9c4f852292592395e882e1d900ca215a1aafce5",
+      "patch": "@@ -0,0 +1,48 @@\n+{\n+  \"light\": {\n+    \"chromium\": \"153.0.8010.12\",\n+    \"manifestUrl\": \"http://localhost:5300/manifest.webmanifest\",\n+    \"manifestErrors\": [],\n+    \"manifest\": {\n+      \"theme_color\": \"#1a1612\",\n+      \"background_color\": \"#1a1612\",\n+      \"display\": \"standalone\",\n+      \"name\": \"Pacman\"\n+    },\n+    \"themeColorMetas\": [\n+      {\n+        \"content\": \"#f3eee5\",\n+        \"media\": \"(prefers-color-scheme: light)\"\n+      },\n+      {\n+        \"content\": \"#f3eee5\",\n+        \"media\": \"(prefers-color-scheme: dark)\"\n+      }\n+    ],\n+    \"canvasToken\": \"#f3eee5\",\n+    \"dataTheme\": \"light\"\n+  },\n+  \"dark\": {\n+    \"chromium\": \"153.0.8010.12\",\n+    \"manifestUrl\": \"http://localhost:5300/manifest.webmanifest\",\n+    \"manifestErrors\": [],\n+    \"manifest\": {\n+      \"theme_color\": \"#1a1612\",\n+      \"background_color\": \"#1a1612\",\n+      \"display\": \"standalone\",\n+      \"name\": \"Pacman\"\n+    },\n+    \"themeColorMetas\": [\n+      {\n+        \"content\": \"#1a1612\",\n+        \"media\": \"(prefers-color-scheme: light)\"\n+      },\n+      {\n+        \"content\": \"#1a1612\",\n+        \"media\": \"(prefers-color-scheme: dark)\"\n+      }\n+    ],\n+    \"canvasToken\": \"#1a1612\",\n+    \"dataTheme\": \"dark\"\n+  }\n+}"
+    },
+    {
+      "sha": "29dde1f28b46723c0ab00441aba83712d1f032b0",
+      "filename": "docs/verify/1430/manifest-cdp.mjs",
+      "status": "added",
+      "additions": 26,
+      "deletions": 0,
+      "changes": 26,
+      "blob_url": "https://github.com/xiechimon/pacman/blob/f9c4f852292592395e882e1d900ca215a1aafce5/docs%2Fverify%2F1430%2Fmanifest-cdp.mjs",
+      "raw_url": "https://github.com/xiechimon/pacman/raw/f9c4f852292592395e882e1d900ca215a1aafce5/docs%2Fverify%2F1430%2Fmanifest-cdp.mjs",
+      "contents_url": "https://api.github.com/repos/xiechimon/pacman/contents/docs%2Fverify%2F1430%2Fmanifest-cdp.mjs?ref=f9c4f852292592395e882e1d900ca215a1aafce5",
+      "patch": "@@ -0,0 +1,26 @@\n+import { chromium } from '@playwright/test';\n+const base = 'http://localhost:5300';\n+const browser = await chromium.launch();\n+const out = {};\n+for (const theme of ['light', 'dark']) {\n+  const ctx = await browser.newContext({ colorScheme: theme });\n+  const page = await ctx.newPage();\n+  await page.goto(`${base}/app?scenario=01`, { waitUntil: 'networkidle' });\n+  await page.evaluate((t) => localStorage.setItem('pacman-theme', t), theme);\n+  await page.reload({ waitUntil: 'networkidle' });\n+  const cdp = await ctx.newCDPSession(page);\n+  const m = await cdp.send('Page.getAppManifest');\n+  const parsed = m.data ? JSON.parse(m.data) : null;\n+  out[theme] = {\n+    chromium: browser.version(),\n+    manifestUrl: m.url,\n+    manifestErrors: m.errors,\n+    manifest: parsed ? { theme_color: parsed.theme_color, background_color: parsed.background_color, display: parsed.display, name: parsed.name } : null,\n+    themeColorMetas: await page.evaluate(() => [...document.querySelectorAll('meta[name=\"theme-color\"]')].map(m => ({ content: m.content, media: m.getAttribute('media') }))),\n+    canvasToken: await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim()),\n+    dataTheme: await page.evaluate(() => document.documentElement.dataset.theme),\n+  };\n+  await ctx.close();\n+}\n+await browser.close();\n+console.log(JSON.stringify(out, null, 2));"
+    }
+  ]
+}
