@@ -12,7 +12,10 @@
 #   T6 then sent bad page / per_page values to all four paged reads.
 # Run 2 (same code, extended tests): 108 of 108 caught.
 # Run 3 (code after /simplify: isFullSha reused, gateGet helper; strings rewritten, M109 and M110 added for
-#   gateGet): 110 of 110 caught. Table below (id, failure mode, mutation, verdict, vitest summary).
+#   gateGet): 110 of 110 caught.
+# Run 4 (code after the /code-review fixes: timer cap, aborted error-body read, URLSearchParams; M59 rewritten,
+#   M111 to M113 added for the new branches; M25's text corrected and run alone with s4a-mutations-one.py.txt):
+#   113 of 113 caught. Table below (id, failure mode, mutation, verdict, vitest summary).
 
 M01	FM-2	isFullSha accepts uppercase	caught	Tests  6 failed | 74 passed (80)
 M02	FM-2	isFullSha unanchored at the end	caught	Tests  6 failed | 74 passed (80)
@@ -61,16 +64,16 @@ M44	FM-9	If-None-Match never sent	caught	Tests  2 failed | 78 passed (80)
 M45	FM-11	POST without content-type	caught	Tests  2 failed | 78 passed (80)
 M46	FM-7	content-type on every request	caught	Tests  1 failed | 79 passed (80)
 M47	FM-11	GET carries a body	caught	Tests  1 failed | 79 passed (80)
-M48	FM-10	caller timeout ignored	caught	Tests  9 failed | 71 passed (80)
+M48	FM-10	caller timeout ignored	caught	Tests  1 failed | 79 passed (80)
 M49	FM-10	no signal at all	caught	Tests  9 failed | 71 passed (80)
-M50	FM-18	fetch timeout reported as network	caught	Tests  17 failed | 63 passed (80)
+M50	FM-18	fetch timeout reported as network	caught	Tests  9 failed | 71 passed (80)
 M51	FM-18	fetch network error reported as timeout	caught	Tests  8 failed | 72 passed (80)
 M52	FM-16	rate-limit text check dropped	caught	Tests  1 failed | 79 passed (80)
 M53	FM-16	rate-limit text counted on any status	caught	Tests  1 failed | 79 passed (80)
-M54	FM-16	rate-limit headers ignored	caught	Tests  1 failed | 79 passed (80)
+M54	FM-16	rate-limit headers ignored	caught	Tests  2 failed | 78 passed (80)
 M55	FM-16	resetAt left in seconds	caught	Tests  1 failed | 79 passed (80)
-M56	FM-16	retry-after dropped	caught	Tests  1 failed | 79 passed (80)
-M57	FM-16	empty header read as 0	caught	Tests  1 failed | 79 passed (80)
+M56	FM-16	retry-after dropped	caught	Tests  2 failed | 78 passed (80)
+M57	FM-16	empty header read as 0	caught	Tests  2 failed | 78 passed (80)
 M58	FM-16	header value not trimmed	caught	Tests  1 failed | 79 passed (80)
 M59	FM-17	unreadable error body throws	caught	Tests  1 failed | 79 passed (80)
 M60	FM-15	body-read timeout reported as not-json	caught	Tests  8 failed | 72 passed (80)
@@ -123,6 +126,9 @@ M106	FM-19	status write retried once on failure	caught	Tests  1 failed | 79 pass
 M107	FM-13	Link followed once	caught	Tests  2 failed | 78 passed (80)
 M108	FM-8	method not set on GET	caught	Tests  1 failed | 79 passed (80)
 M109	FM-9	gateGet drops the etag	caught	Tests  2 failed | 78 passed (80)
-M110	FM-10	gateGet ignores the timeout	caught	Tests  9 failed | 71 passed (80)
+M110	FM-10	gateGet ignores the timeout	caught	Tests  1 failed | 79 passed (80)
+M111	FM-16	aborted error-body read swallowed (review finding 3)	caught	Tests  1 failed | 79 passed (80)
+M112	FM-16	aborted error-body read ignores rate-limit headers	caught	Tests  1 failed | 79 passed (80)
+M113	FM-5	timer cap dropped (review finding 1)	caught	Tests  1 failed | 79 passed (80)
 
-110 mutations, 110 caught, 0 survived.
+113 mutations, 113 caught, 0 survived.

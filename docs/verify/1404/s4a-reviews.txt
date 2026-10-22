@@ -1,0 +1,53 @@
+# #1404 S4a reviews: /simplify, /code-review (medium, origin/main...HEAD) and /security-review.
+
+== /simplify (single inline pass; the Agent tool was not available, so not the four-agent fan-out) ==
+Fixed (3bb1192):
+- Reuse: the transport's own SHA regex duplicated isFullSha in the same file; the checks call isFullSha.
+- Simplification: the seven reads repeated one gateRequest GET block; they share gateGet.
+Skipped: reusing ci-loop's message cleaner (lib/ does not import services/). Efficiency and altitude: nothing.
+
+== /code-review at medium on origin/main...HEAD (head 159e6a9) ==
+1. timeoutMs above the timer limit made AbortSignal.timeout throw, reported as network.
+   Fixed (e664574): refused locally as invalid above 2,147,483,647 ms. Pin T6 (2**31, 2**33) red first.
+2. "?" and "#" are refused in branch and path segments although encodeURIComponent would make them safe, so a
+   legal branch such as "fix#12" or a file "C#.md" is refused.
+   Kept: the plan's conservative choice (s4-plan.md 4.1, FM-3). The gate then cannot read such a base branch
+   and waits instead of passing; S4b's evidence probes treat such paths as not verifiable. Goes in Risk.
+3. An error body whose read times out was swallowed, so a header-less secondary-limit 403 came back as status.
+   Fixed (e664574): a timed-out read gives timeout unless the headers already show a rate limit. Pins in T16
+   (403 -> timeout, 429 with retry-after -> rate-limited) red first.
+4. The parametrised T10 only drove the pull read to a timeout.
+   Fixed (e664574): each row checks its own live signal; the per-function timeout test covers all eight.
+5. gateRequest repeats the request skeleton of getListPage and intakeGet.
+   Skipped: folding them in changes existing behaviour (intake throws GithubRateLimitedError, the list reads
+   return GithubListFailure) outside S4a's scope. Goes in Risk.
+6. Query string built by hand.
+   Fixed (e664574): URLSearchParams.
+7. No local 140-character description check.
+   Kept: GitHub does not document the limit (s4-plan.md A1); S4b truncates. The 422 doc comment now names
+   "description too long" as a cause. Goes in Risk.
+8. The repository root cannot be listed (empty path refused).
+   Skipped: not needed; S4b probes docs/verify/<ticket>/ directories.
+After the fixes: transport tests 80 of 80, mutations 113 of 113 (s4a-mutations.txt).
+
+== /security-review ==
+The skill collected its diff from /home/user/pacman (branch claude/nice-faraday-o329b3), not from this
+worktree, so the diff it printed is unrelated to S4a. The review below was done by hand under the skill's rules
+(high and medium only, confidence 8 or more, its hard exclusions), on git diff origin/main...HEAD in
+/home/user/pacman/.claude/worktrees/p3c, apps/server/src/lib/github.ts; the test file is excluded (rule 11).
+Checked:
+- Token: required, visible ASCII only (no CR/LF header injection), sent only as Authorization: Bearer through
+  the existing authHeaders; never in a URL, a result or an error.
+- Host and protocol: fixed https://api.github.com/repos/{owner}/{repo}/. owner and repo match
+  [A-Za-z0-9_.-]+ and are not "." or ".."; path segments with empty, ".", ".." or control/?/# are refused and
+  the rest encodeURIComponent'd ("%2e%2e" becomes "%252e%252e"); SHAs are 40 lowercase hex; query values are
+  validated and serialized by URLSearchParams. No host control (exclusion 13), no reachable path traversal.
+- ETag header: visible ASCII only.
+- The new write POST statuses/{sha}: body is JSON.stringify of exactly {state, context, description}; state
+  is one of the four documented values; no target_url. No caller in this PR; S7 uses the team's existing
+  `repo`-scoped connection token (no new credential, no scope change; README F5 in s4-plan.md).
+- Responses: parsed with res.json() and returned as data; no eval or code deserialization. GitHub error
+  messages are stripped of control and format characters and capped at 200 characters.
+- Redirects: fetch follows them as for the existing reads; undici drops Authorization on a cross-origin
+  redirect, and api.github.com redirects stay on api.github.com.
+Result: no high or medium finding, none at confidence 8 or more.
