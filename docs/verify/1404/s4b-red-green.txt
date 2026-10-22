@@ -317,3 +317,18 @@ After the fix: Tests  227 passed (227).
 ✓ merge-gate-github-facts.test.ts > readGateGithubFacts: rate limits, throws, concurrency (F18) > F18 a port that throws is a failed read, never a throw out of the shell
 Test Files  6 passed (6)
 Tests  227 passed (227)
+
+== Added 2026-10-22, after pr-gate run 1 on #1525 (go, five suggestions) ==
+F19 (suggestion 2): the check-run and status ETags of the old head must not be sent for the new head's URLs.
+  Red on 63f23fc (cache keyed per PR):
+    × F19 the check-runs and status ETags of the old head are never sent for the new head
+    Tests  1 failed | 20 passed (21)  (merge-gate-github-facts.test.ts)
+  Green on fd1e888 (keys carry the head SHA): Tests  228 passed (228)  (the six files)
+Shell-to-readiness truncation (suggestion 3): 300 files on page 1 with changed_files 301, read through
+  readGateGithubFacts into mergeReadiness, gives compare-truncated (human, detail "truncated") and no digest.
+  It passed at once: a pin, not a red test. Mutation N108 (the shell drops a page-1 file) kills it.
+  Six files after both: Tests  229 passed (229).
+Path-safety pins (suggestion 4): of the S4b path-safety cases, "%2e%2e", "%2E%2E" and "a%2F..%2F..%2Fx.png" already
+  failed on main's parser (its ".." check after decoding), so they are pins; they appear among the 183 passes of
+  the red leg above. The cases that drive the new UNSAFE_DECODED check are "sub%2Fx.png", "%5C", "%3F", "%23",
+  "%0A", "%00" and "%7F" (all red on the stubbed leg).

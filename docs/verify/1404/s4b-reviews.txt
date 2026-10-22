@@ -72,3 +72,21 @@ fabricate a whole consistent response; the gate catches responses that name anot
 base repository, compare's own head, run head_sha, status sha), not a wholesale forgery. Deferred to P4 open
 question 1 (#1405) and #1462 item 7: request builders into D4 ④, or lib/github.ts into ④. Autonomous merges
 stay off until that is decided.
+
+== Added 2026-10-22, pr-gate run 1 on #1525 at 63f23fc (go, no blocking, five suggestions) ==
+1. pickRuns ranks the bound app's run first, but a required check bound to an app can still be satisfied by
+   another app's same-named run when the bound app has not reported. Recorded, no code: this is the Q3 Risk item
+   above (code review findings 1 and 8). Backstop: GitHub's mergeable_state reports blocked when an app-bound
+   required check from the bound app is missing, and readiness blocks on any mergeable_state other than clean or
+   has_hooks; nothing calls the gate yet. Carrying app ids in GateInputs remains a later gate change.
+2. Conditional-read cache keys for check runs and the combined status were per PR. Fixed in fd1e888 (keyed on
+   the head SHA), test F19 red first, mutations N106 and N107.
+3. No shell-to-readiness test for a 300-file compare. Added in fd1e888 as a pin (it passed at once), mutation N108.
+4. "%2e%2e" and "%2F..%2F" cases already pass on main's parser: recorded as pins in s4b-red-green.txt.
+5. The production binding of the gate's port, apps/server/src/services/merge-gate-github.ts, sits outside the
+   D4 class 4 gate-source locations, like lib/github.ts; a later PR changing only that file could alter what the
+   shell sees once S6a/S7 wire it. Same deferral as lib/github.ts: P4 open question 1 (#1405) and #1462 item 7
+   (request builders and binding into class 4, or these files added to class 4). Autonomous merges stay off
+   until that is decided. Risk.
+Cache growth note: keying on the head SHA adds one runs and one status entry per evaluated head; eviction stays
+with the cache's owner (S6a/S7), as recorded for code review finding 3.

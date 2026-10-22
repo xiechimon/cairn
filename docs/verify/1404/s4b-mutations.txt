@@ -128,3 +128,11 @@ N104	B-25	incomplete status read trusted for ownStatus (review 2)	caught	Tests  
 N105	B-27	links past the probe cap dropped (review 4)	caught	Tests  1 failed | 226 passed (227)
 
 103 mutations, 103 caught, 0 survived.
+
+== Added 2026-10-22, after pr-gate run 1 on #1525 ==
+Three mutations added for fd1e888 (the head-SHA cache keys and the end-to-end truncation pin), run on fd1e888:
+N106	B-5	check-runs ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)	caught	Tests  1 failed | 228 passed (229)
+N107	B-5	status ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)	caught	Tests  1 failed | 228 passed (229)
+N108	B-9	shell drops a file from page 1 (end-to-end truncation pin, #1525 pr-gate suggestion 3)	caught	Tests  6 failed | 223 passed (229)
+3 of 3 caught. The fd1e888 change touches only the two cache-key lines, which no earlier mutation targets;
+the earlier 103 were not rerun. Total: 106 mutations, 106 caught.

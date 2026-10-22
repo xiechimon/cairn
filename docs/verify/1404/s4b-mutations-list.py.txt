@@ -117,4 +117,7 @@ M = [
  ('N104','B-25','incomplete status read trusted for ownStatus (review 2)',F,"    facts.ownStatus = !statuses.complete\n      ? 'unreadable'\n      : own === undefined","    facts.ownStatus = own === undefined"),
  ('N105','B-27','links past the probe cap dropped (review 4)',F,"        out.push({ sha, path, present: null });\n        continue;","        break;"),
  # The failure reset at the start of readCompare (review 6) is not observable through readGateGithubFacts (GateGithubFacts has no compare failure) and readCompareAt starts from a fresh reader; no mutation.
+ ('N106','B-5','check-runs ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)',F,"    `runs:${repoKey}@${head}`,","    `runs:${repoKey}#${req.prNumber}`,"),
+ ('N107','B-5','status ETag cached per PR, not per head SHA (#1525 pr-gate suggestion 2)',F,"    `status:${repoKey}@${head}`,","    `status:${repoKey}#${req.prNumber}`,"),
+ ('N108','B-9','shell drops a file from page 1 (end-to-end truncation pin, #1525 pr-gate suggestion 3)',F,"    compare: { headSha, files, commits, totalCommits: total },","    compare: { headSha, files: files.slice(0, -1), commits, totalCommits: total },"),
 ]
