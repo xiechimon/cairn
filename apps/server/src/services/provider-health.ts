@@ -69,6 +69,13 @@ export class ProviderHealthTracker {
     this.entries.set(providerId, e);
   }
 
+  /** 探测步以与 provider 健康无关的结局收尾（模型 404 / 停止 / 普通失败 /
+   * 静默成功）：只释放探测位，状态不变。 */
+  releaseProbe(providerId: string): void {
+    const e = this.entries.get(providerId);
+    if (e !== undefined) e.probeAt = null;
+  }
+
   recordSuccess(providerId: string): void {
     this.entries.delete(providerId);
   }

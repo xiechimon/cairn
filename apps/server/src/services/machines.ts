@@ -76,6 +76,7 @@ import {
   machine,
   message,
   project,
+  type StepFallbackRow,
   steerPending,
   step,
   stopPending,
@@ -129,8 +130,6 @@ import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import {
   effectiveModel,
-  type FallbackPlan,
-  fallbackNote,
   isZeroUsageSilentSuccess,
   planModelFallback,
   recordProviderOutcome,
@@ -1044,13 +1043,22 @@ async function tryClaim(
     // 结果集，且判定与领取在同一同步块内（单进程 better-sqlite3），前后移
     // 零语义差。#1259：会话机归属已由 agent 归属机保证（同 agent 恒同机），
     // 原「会话亲和让行」闸随之退役。
+    // #1493：会话只在同一 provider 跑出的步之间续——最近一次会话若由降级备选
+    // 跑出而本步不在同一备选 provider 上（或反过来），按无可续会话处理（新会话，
+    // brief 重新注入）。都未降级时两侧同为 null，行为不变。
     const prior = db
-      .select({ sessionId: step.sessionId, machineId: step.machineId })
+      .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
       .from(step)
       .where(and(eq(step.buildId, cand.stepRow.buildId), sql`${step.sessionId} is not null`))
       .orderBy(asc(step.createdAt))
       .all();
-    const priorRow = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const priorRow =
+      latestPrior !== null &&
+      (latestPrior.fallback?.model?.provider ?? null) ===
+        (cand.stepRow.fallback?.model?.provider ?? null)
+        ? latestPrior
+        : null;
     const priorSessionId = priorRow?.sessionId ?? null;
     // #1312：上一轮会话的机器与本步领取机不同（归属机换绑 / 迁移）时告诉
     // daemon。同机不带该字段，claim 形与旧 daemon 逐字段一致。
@@ -1207,7 +1215,8 @@ async function tryClaim(
         description: agentRow.description,
         provider: model.provider,
         modelId: model.modelId,
-        thinkingLevel: agentRow.thinkingLevel,
+        // #1493：思考强度是按主模型配的，备选不一定支持——降级时回落默认。
+        thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
         // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
         // 项目的 systemPrompt（#1494）。
@@ -1966,8 +1975,8 @@ export async function finishStep(
   // 不命中（步类禁止降级 / 没配备选 / 链走完）落到原有分支，行为不变。
   const worker = workerStepContext(deps, stepRow);
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
-  if (worker?.agentRow && !zeroUsage) {
-    recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome);
+  if (worker?.agentRow) {
+    recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
   }
   if (worker !== null) {
     const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
@@ -1975,7 +1984,11 @@ export async function finishStep(
       if (plan.trigger === 'model_unavailable') {
         markModelDead(plan.from.provider, plan.from.modelId);
       }
-      applyModelFallbackStep(deps, stepRow, worker.todoRow, plan);
+      requeueStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, worker.todoRow, worker.agentRow, plan.note);
       return;
     }
   }
@@ -2054,10 +2067,19 @@ export async function finishStep(
     }
     return;
   }
-  // #1493 0 token 静默成功：同模型新会话重试一次，第二次按失败收尾。
+  // #1493 0 token 静默成功：同模型重试一次，第二次按失败收尾。
   if (zeroUsage) {
     if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
-      requeueZeroUsageStep(deps, stepRow);
+      requeueStep(
+        deps,
+        stepRow,
+        {
+          model: stepRow.fallback?.model ?? null,
+          tried: stepRow.fallback?.tried ?? [],
+          zeroUsageRetried: true,
+        },
+        { id: `zero-usage-retry-${stepRow.id}`, content: ZERO_USAGE_RETRY_NOTE },
+      );
       return;
     }
     applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE);
@@ -2111,14 +2133,16 @@ function workerStepContext(
   return { todoRow, agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) };
 }
 
-/** #1493 换备选重派：步回 pending（认领位复位）+ 新会话（freshSession，旧
- * provider 的会话不跨家续）+ 写降级进度 + 会话流 system 行 + model_fallback
- * 通知 + 团队 wake。todo / build 不落失败痕迹。 */
-function applyModelFallbackStep(
+/** #1493 步回 pending 重派（降级换备选 / 0 token 重试共用）：认领位复位 +
+ * 清本步 sessionId + 写降级进度 + 会话流 system 行。会话续接由 claim 面按
+ * provider 判（换了 provider 的步不续旧会话）。不另行 wake：finishStep 前段
+ * 的空位释放 wake 已覆盖，被唤醒的领取看到的是这里写完的状态。todo / build
+ * 不落失败痕迹。 */
+function requeueStep(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
-  todoRow: typeof todo.$inferSelect,
-  plan: FallbackPlan,
+  fallback: StepFallbackRow,
+  note: { id: string; content: string },
 ): void {
   deps.db
     .update(step)
@@ -2126,53 +2150,20 @@ function applyModelFallbackStep(
       status: 'pending',
       machineId: null,
       sessionId: null,
-      freshSession: true,
-      fallback: plan.row,
+      fallback,
       holdReason: null,
       holdUntil: null,
     })
     .where(eq(step.id, stepRow.id))
     .run();
-  const note = fallbackNote(plan);
   upsertMessage(deps, {
-    id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+    id: note.id,
     conversationId: stepRow.buildId,
     role: 'system',
-    content: note,
-    createdAt: nowMs(),
-  });
-  notifyModelFallback(deps, todoRow, note);
-  publishStepStatus(deps, stepRow.id);
-  deps.machineHub.wake(todoRow.teamId);
-}
-
-/** #1493 0 token 静默成功的一次重试：同模型、新会话，记 zeroUsageRetried。 */
-function requeueZeroUsageStep(deps: MachineDeps, stepRow: typeof step.$inferSelect): void {
-  deps.db
-    .update(step)
-    .set({
-      status: 'pending',
-      machineId: null,
-      sessionId: null,
-      freshSession: true,
-      fallback: {
-        model: stepRow.fallback?.model ?? null,
-        tried: stepRow.fallback?.tried ?? [],
-        zeroUsageRetried: true,
-      },
-    })
-    .where(eq(step.id, stepRow.id))
-    .run();
-  upsertMessage(deps, {
-    id: `zero-usage-retry-${stepRow.id}`,
-    conversationId: stepRow.buildId,
-    role: 'system',
-    content: ZERO_USAGE_RETRY_NOTE,
+    content: note.content,
     createdAt: nowMs(),
   });
   publishStepStatus(deps, stepRow.id);
-  const teamId = stepTeamId(deps, stepRow);
-  if (teamId !== null) deps.machineHub.wake(teamId);
 }
 
 /** 合并落地（M3b [设计]，02 §4.2 merge 202 delegated 的 server 半）：机器合并

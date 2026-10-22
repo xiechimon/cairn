@@ -222,23 +222,14 @@ export function notifyQuotaWait(
 
 /** model_fallback（#1493）：降级链把任务换到备用模型接着跑——quota_wait 同类
  * （需要你知道，无需你动手）。组合键 = userId:todoId，与 quota_wait 共用一行
- * （同一任务最新的那件事覆盖旧的）。agent 归因同 notifyQuotaWait。 */
+ * （同一任务最新的那件事覆盖旧的）。agent 归因 = 换了模型的那一步的 agent
+ * （调用方已解析），缺则属主代行。 */
 export function notifyModelFallback(
   deps: NotificationDeps,
-  todoRow: {
-    id: string;
-    teamId: string;
-    title: string;
-    projectId: string;
-    seqNum: number;
-    assignment?: { plan?: { agentId?: string } | null; build?: { agentId?: string } | null } | null;
-  },
+  todoRow: { id: string; teamId: string; title: string; projectId: string; seqNum: number },
+  agentRow: { displayName: string; avatarUrl: string | null } | null,
   snippet: string,
 ): NotificationRecord {
-  const agentId = todoRow.assignment?.build?.agentId ?? todoRow.assignment?.plan?.agentId ?? null;
-  const agentRow = agentId
-    ? deps.db.select().from(agent).where(eq(agent.id, agentId)).get()
-    : undefined;
   return upsertAndPublish(deps, {
     teamId: todoRow.teamId,
     type: 'model_fallback',

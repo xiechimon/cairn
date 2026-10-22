@@ -1,6 +1,6 @@
 // 模型降级链（#1493）：主模型额度用完 / 模型 404 / 认证失败时，plan 与 build
-// 步换到 agent.fallbackModels 里下一个健康的备选，同一步回 pending 用新会话
-// 重跑。口径定稿见 #1493 评论「实现口径」，要点：
+// 步换到 agent.fallbackModels 里下一个健康的备选，同一步回 pending 重跑（换了
+// provider 不续旧会话：claim 的会话续接只认同一 provider 跑出的会话）。口径定稿见 #1493 评论「实现口径」，要点：
 //  - 只有 plan / build 步可换。review / verify / merge 步的结论是合并就绪闸
 //    的输入（ADR 0021），换成弱模型等于让弱模型放行——只等不换；chief 步
 //    靠会话续接，换模型 = 丢对话，也不换。
@@ -78,11 +78,17 @@ export function isProviderFailure(outcome: MachineDoneBody): boolean {
   );
 }
 
-/** 熔断器记账：成功清零，provider 面失败计一次。stopped 与其它失败不计。 */
-export function recordProviderOutcome(provider: string | null, outcome: MachineDoneBody): void {
+/** 熔断器记账：成功清零，provider 面失败计一次。其余结局（停止、模型 404、
+ * 普通失败、静默成功）不改状态，只释放可能占着的半开探测位。 */
+export function recordProviderOutcome(
+  provider: string | null,
+  outcome: MachineDoneBody,
+  silent: boolean,
+): void {
   if (provider === null) return;
-  if (outcome.status === 'success') providerHealth.recordSuccess(provider);
+  if (outcome.status === 'success' && !silent) providerHealth.recordSuccess(provider);
   else if (isProviderFailure(outcome)) providerHealth.recordFailure(provider);
+  else providerHealth.releaseProbe(provider);
 }
 
 export interface FallbackPlan {
@@ -91,6 +97,8 @@ export interface FallbackPlan {
   to: ModelRef;
   /** 写回 step.fallback 的新值。 */
   row: StepFallbackRow;
+  /** 会话流 system 行 / 通知 snippet 文案。 */
+  note: string;
 }
 
 /** 选下一个备选。null = 不降级（步类不许 / 不是触发类错误 / 没配备选 /
@@ -127,6 +135,7 @@ export function planModelFallback(
     trigger,
     from,
     to,
+    note: `已换备用模型：${modelKey(from)} ${TRIGGER_TEXT[trigger]}，改用 ${modelKey(to)} 接着跑。换了 provider 不续旧会话，任务说明会重新带上。`,
     row: {
       model: { provider: to.provider, modelId: to.modelId },
       tried: [...tried, modelKey(to)],
@@ -135,23 +144,19 @@ export function planModelFallback(
   };
 }
 
-/** 会话流 system 行 / 通知 snippet 文案。 */
-export function fallbackNote(plan: FallbackPlan): string {
-  return `已换备用模型：${modelKey(plan.from)} ${TRIGGER_TEXT[plan.trigger]}，改用 ${modelKey(plan.to)} 接着跑。本步用新会话重跑，任务说明会重新带上。`;
-}
-
 // —— 0 token 静默失败 ——————————————————————————————————————————————————————
 
-/** 静默成功判定：plan / build 步报成功、上报了 usage、且所有行 input+output
- * 都是 0、无变更。没上报 usage（老 daemon / 部分后端）不判，避免误伤。 */
+/** 静默成功判定：plan / build 步报成功、daemon 明说没有任何 assistant 输出
+ * （noOutput）、所有 usage 行 input+output 都是 0、无变更。只看 usage 会误判：
+ * pi 对不回 usage 的 relay 也报 0 token 行。旧 daemon 不带 noOutput = 不判。 */
 export function isZeroUsageSilentSuccess(kind: StepKind, outcome: MachineDoneBody): boolean {
   if (!FALLBACK_STEP_KINDS.includes(kind)) return false;
   if (outcome.status !== 'success' || outcome.hasChanges === true) return false;
-  const usage = outcome.usage ?? [];
-  return usage.length > 0 && usage.every((u) => u.input + u.output === 0);
+  if (outcome.noOutput !== true) return false;
+  return (outcome.usage ?? []).every((u) => u.input + u.output === 0);
 }
 
 export const ZERO_USAGE_RETRY_NOTE =
-  '模型返回成功但用了 0 token、没有任何输出，按静默失败处理：同一模型用新会话重试一次。';
+  '模型返回成功但用了 0 token、没有任何输出，按静默失败处理：同一模型重试一次。';
 export const ZERO_USAGE_FAILURE =
   '模型连续两次返回成功但用了 0 token、没有任何输出（静默失败），步按失败收尾。';

@@ -12,6 +12,8 @@
 //      熔断。断言任何成功清零回 healthy。
 //   H6 探测位泄漏：拿到探测位的步再没回报（机器失联）= provider 永久不可选。
 //      断言探测租期过后探测位释放。
+//   H7 探测位空占：探测步以 404 / 停止 / 普通失败收尾（既不算成功也不算
+//      provider 连败），探测位一直占到租期满。断言 releaseProbe 立即释放。
 
 import { describe, expect, test } from 'vitest';
 import {
@@ -127,6 +129,16 @@ describe('provider 熔断器（#1493）', () => {
     clock.now += PROBE_LEASE_MS - 1;
     expect(t.tryAcquire('relay-a')).toBe(false);
     clock.now += 1;
+    expect(t.tryAcquire('relay-a')).toBe(true);
+  });
+
+  test('H7：探测步以与 provider 无关的结局收尾（404 / 停止 / 普通失败）→ 释放探测位、状态不变', () => {
+    const { t, clock } = tracker();
+    fail(t, 'relay-a', 5);
+    clock.now += HALF_OPEN_AFTER_MS;
+    expect(t.tryAcquire('relay-a')).toBe(true);
+    t.releaseProbe('relay-a');
+    expect(t.state('relay-a')).toBe('half_open');
     expect(t.tryAcquire('relay-a')).toBe(true);
   });
 

@@ -13,7 +13,10 @@
 //   X8 runtime 闸漏判：选了归属机没开 runtime 的备选，步卡 pending。断言跳过。
 //   X9 不可见：换模型零痕迹。断言会话流 system 行 + model_fallback 通知。
 //   X10 404 / 认证失败不换：断言两类都换。
-//   X11 0 token 静默成功：断言重试一次，第二次按失败收尾；没上报 usage 不判。
+//   X11 0 token 静默成功：断言重试一次，第二次按失败收尾；daemon 没说「无
+//      输出」或没上报 usage 都不判（pi 对不回 usage 的 relay 也报 0 token）。
+//   X12 降级后续不上自己的会话：备选上跑出的会话在挂起释放后被丢弃。断言
+//      续接本步在备选上的会话。
 
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -29,6 +32,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { providerHealth } from '../src/services/provider-health.js';
+import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { bootServer, issueApiKey, postProject, type TestServer } from './helpers.js';
 
 const AGENT_ID = 'agent-fallback-1';
@@ -262,6 +266,22 @@ describe('模型降级链（#1493）', () => {
     expect(row.fallback?.model).toEqual({ provider: 'relay-c', modelId: 'model-c' });
   });
 
+  test('X12：降级后的步挂起等额度、释放重领时续它自己在备选上的会话', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    await startBuild(w);
+    const a = await claim(w);
+    await done(w, a.stepId, quotaDone('relay-a'));
+    const b = await claim(w);
+    expect(b.session.action).toBe('new');
+    await done(w, b.stepId, quotaDone('relay-b'));
+    const held = stepRow(w, a.stepId);
+    expect(held.status).toBe('waiting_quota');
+    sweepQuotaWaitSteps(w.s.svc, held.quotaBlock!.probeAt + 1);
+    const c = await claim(w);
+    expect(c.provider).toBe('relay-b');
+    expect(c.session).toEqual({ action: 'continue', sessionId: 'sess-relay-b' });
+  });
+
   test.each(['review', 'merge'] as const)(
     'X3：%s 步禁止降级——额度用完只等不换（负对照）',
     async (kind) => {
@@ -380,11 +400,11 @@ describe('0 token 静默失败（#1493）', () => {
     { model: 'relay-a/model-a', input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   ];
 
-  test('X11：成功但 0 token → 同模型重试一次，再来一次按失败收尾', async () => {
+  test('X11：成功但 0 token 且无输出 → 同模型重试一次，再来一次按失败收尾', async () => {
     const w = await setupWorld(null);
     const buildId = await startBuild(w);
     const a = await claim(w);
-    await done(w, a.stepId, { status: 'success', usage: zeroUsage });
+    await done(w, a.stepId, { status: 'success', usage: zeroUsage, noOutput: true });
     let row = stepRow(w, a.stepId);
     expect(row.status).toBe('pending');
     expect(row.fallback?.zeroUsageRetried).toBe(true);
@@ -392,11 +412,20 @@ describe('0 token 静默失败（#1493）', () => {
     const b = await claim(w);
     expect(b.stepId).toBe(a.stepId);
     expect(b.provider).toBe('relay-a');
-    await done(w, b.stepId, { status: 'success', usage: zeroUsage });
+    await done(w, b.stepId, { status: 'success', usage: zeroUsage, noOutput: true });
     row = stepRow(w, a.stepId);
     expect(row.status).toBe('failed');
     const buildRow = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.errorMessage).toContain('0 token');
+  });
+
+  test('X11 负对照：0 token 但 daemon 没说无输出（不回 usage 的 relay）不判', async () => {
+    const w = await setupWorld(null);
+    await startBuild(w);
+    const a = await claim(w);
+    await done(w, a.stepId, { status: 'success', usage: zeroUsage });
+    expect(stepRow(w, a.stepId).status).not.toBe('pending');
+    expect(stepRow(w, a.stepId).fallback).toBeNull();
   });
 
   test('X11 负对照：没上报 usage（老 daemon）不判', async () => {
