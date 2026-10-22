@@ -64,6 +64,8 @@
 //       resolved，大小写不敏感，可带冒号，后跟 #N、GH-N、owner/repo#N 或链接）→ 提交标题
 //       不用 PR 标题，用 pacman 自己的「Merge pull request #n」：PR 标题由有写权限标记的
 //       人（含只读成员）定，进了默认分支上的 squash 提交就会关掉任意 issue，绕过 D2
+//   D41c 关票形态只验 PR 标题本身（#1403 段 3，#1509 pr-gate 第 4 轮）：以 fix / close /
+//       resolve 结尾的标题拼上「 (#n)」后不再误命中，保留 PR 标题
 //   D42 没有 closes 行时也传 commit_message（pacman 自己的一行）：不传时 GitHub 按仓库
 //       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
 //   D43 closes 行取 PR 读之后重读的任务行：读的网络窗里自建 issue 补上了 sourceRef（重试）
@@ -492,7 +494,6 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['an issue URL', 'Resolved https://github.com/octo/demo/issues/9'],
     ['a GH- reference', 'fix GH-9 in the parser'],
     ['no space after the colon', 'Close:#9'],
-    ['a keyword at the end, before the appended (#n)', 'Rename the handler; fixed'],
     ['a second keyword after a harmless one', 'Fix the docs, resolves #12'],
   ])(
     '[2b-D41] a PR title with a closing keyword and a reference (%s) → the commit title is pacman’s own',
@@ -516,6 +517,14 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['a keyword followed by a word', 'Fix the login flow'],
     ['a keyword inside another word', 'Add a prefix #9 to the log'],
     ['a reference with no keyword', 'Follow up on #9'],
+    // [2b-D41c] (#1403 segment 3, from the #1509 pr-gate): the shape is tested on the title
+    // alone; with " (#201)" appended, a trailing keyword would match "(#2" and drop the title.
+    ['[2b-D41c] a title ending in "fix"', 'Add CI fix'],
+    ['[2b-D41c] a title ending in "close"', 'Make dialog close'],
+    ['[2b-D41c] a title ending in "resolved"', 'Bug resolved'],
+    // Formerly a [2b-D41] case: "fixed (#201)" can only name this PR itself, which the merge
+    // closes anyway, so the title is kept.
+    ['[2b-D41c] a keyword at the end, before the appended (#n)', 'Rename the handler; fixed'],
   ])(
     '[2b-D41b] a PR title without a closing shape (%s) keeps the PR title',
     async (_name, title) => {

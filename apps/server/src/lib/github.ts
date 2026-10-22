@@ -154,6 +154,9 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
   authorAssociation: string | null;
+  /** mergeable_state（文档只写「required, string」不列值）：pacman 只认 behind 与 dirty
+   * （#1403 段 3）；缺失 = null。 */
+  mergeableState: string | null;
 }
 
 /** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
@@ -175,6 +178,22 @@ export function isOwnPull(pull: GithubPull, branch: string): boolean {
   return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
 }
 
+/** 本 build 开着的、目标是默认分支的 PR（#1403 段 3：磨绿按它的 head SHA 读检查、按它的
+ * mergeable_state 解冲突或提示落后；review 对账同一判据）。 */
+export function isOwnOpenDefaultPull(
+  p: GithubPull,
+  branch: string,
+): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    hasPullFields(p) && isOwnPull(p, branch) && p.baseRef === p.defaultBranch && p.state === 'open'
+  );
+}
+
 export interface GithubPullPage {
   /** true = 304 Not Modified（调用方复用缓存判据，同 check-runs 条件 GET）。 */
   notModified: boolean;
@@ -183,13 +202,16 @@ export interface GithubPullPage {
 }
 
 /** 条件 GET（ETag）：304 → notModified；非 2xx、网络错、响应体不是 JSON 对象
- * → null。githubPull 与 githubCommitCheckRuns 共用。 */
+ * → null。githubPull 与 githubCommitCheckRuns 共用。absent(状态码, 应答文本) 为真的非 2xx
+ * 应答（不是限流、不是 SSO 拒绝）按「没有这项」答空数组（必需检查名单的 rules 读：仓所在
+ * 的套餐没有 ruleset）。 */
 async function conditionalGetJson(
   fetchImpl: FetchLike,
   url: string,
   token: string | null,
   etag: string | null | undefined,
   timeoutMs: number,
+  absent: ((status: number, text: string) => boolean) | null = null,
 ): Promise<
   { notModified: true } | { notModified: false; etag: string | null; data: object } | null
 > {
@@ -207,7 +229,13 @@ async function conditionalGetJson(
     return null;
   }
   if (res.status === 304) return { notModified: true };
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // SAML SSO 拒绝（x-github-sso 头）与限流都不是「没有这项」：读不到。
+    if (absent === null || res.headers.get('x-github-sso') !== null) return null;
+    const text = await res.text().catch(() => '');
+    if (isRateLimitedText(res, text) || !absent(res.status, text)) return null;
+    return { notModified: false, etag: null, data: [] };
+  }
   let data: unknown;
   try {
     data = await res.json();
@@ -244,6 +272,7 @@ export async function githubPull(
     merged?: unknown;
     title?: unknown;
     author_association?: unknown;
+    mergeable_state?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -276,6 +305,7 @@ export async function githubPull(
       baseOwner: optString(raw.base?.repo?.owner?.login),
       title: optString(raw.title),
       authorAssociation: optString(raw.author_association),
+      mergeableState: optString(raw.mergeable_state),
     },
   };
 }
@@ -1409,8 +1439,8 @@ export interface GithubCheckRunsPage {
 const CHECK_RUNS_PER_PAGE = 100;
 
 /** PR head 的 check-runs 只读（`GET /repos/{o}/{r}/commits/{ref}/check-runs`；
- * ref = conv 分支名，上游解析分支头——PR 的 head 即分支 tip，无需再拉
- * pulls/{n} 取 sha）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
+ * ref = PR 的 head SHA：#1403 段 3 起磨绿先读 pulls/{n} 拿 head，再按这个提交读，
+ * 不按分支名——分支头在两次读之间会动）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
  * 复用判据，不出全量体）。token 可空（匿名梯，公开仓可达）。null = 读不到
  * （网络/404 私仓/限流/响应形坏不区分——fail-open 语义归调用方，同
  * githubPullState）。单次尝试、FETCH_TIMEOUT_MS 上界，不重试。 */
@@ -1446,6 +1476,81 @@ export async function githubCommitCheckRuns(
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };
+}
+
+/** rules 读 403 时「套餐没有 ruleset」的应答文本（私有仓在 Free 套餐上；文档的状态码表
+ * 只列 200，这一句是 GitHub 对付费功能的通用说法，按它认）。 */
+const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
+
+/** 默认分支的必需检查名单（#1403 段 3：磨绿只认它）：classic 分支保护
+ * （`GET /repos/{o}/{r}/branches/{branch}` 的 protection.required_status_checks 里的
+ * contexts 与 checks[].context）与 ruleset（`GET /repos/{o}/{r}/rules/branches/{branch}`
+ * 里 type 为 required_status_checks 的规则的 parameters.required_status_checks[].context）
+ * 取并集、去重；classic 的 enforcement_level 为 off 时它的名单不算（文档只说是 string，
+ * 只认字面 off）。rules 读答 404，或答 403 且说套餐没有这项功能（不是限流、不是 SSO 拒绝）
+ * = 没有规则（ruleset 不在这个仓的套餐里，
+ * 或没有可见的规则）；除此之外两个读任一读不到（非 2xx、网络、限流、响应形不对）= null，
+ * 调用方不动。
+ * 不建在 S4a（#1503）的原始读面上：那些读必须带 token，磨绿在未连接 GitHub 时匿名读公开仓。 */
+export async function githubRequiredChecks(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string[] | null> {
+  const base = `https://api.github.com/${repoPath(owner, repo)}`;
+  // 按段编码、保留 `/`（同 S4a 的 encodedPath：release/main 不写成 release%2Fmain）。
+  const seg = encodedPath(branch);
+  if (seg === null) return null;
+  // 两个读互不依赖：并发发出（一次查名单最多一个超时的时长；匿名额度恒记两次）。
+  const [branchRead, rulesRead] = await Promise.all([
+    conditionalGetJson(fetchImpl, `${base}/branches/${seg}`, token, null, FETCH_TIMEOUT_MS),
+    conditionalGetJson(
+      fetchImpl,
+      `${base}/rules/branches/${seg}?per_page=100`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+      // 404 = 没有；403 只在说套餐没有这项功能时算没有（权限不够的 403 读不到，不当没有规则）。
+      (status, text) => status === 404 || (status === 403 && RULESETS_NOT_ON_PLAN.test(text)),
+    ),
+  ]);
+  if (branchRead === null || branchRead.notModified) return null;
+  if (rulesRead === null || rulesRead.notModified || !Array.isArray(rulesRead.data)) return null;
+  const names = new Set<string>();
+  const status = (
+    branchRead.data as {
+      protection?: {
+        required_status_checks?: {
+          enforcement_level?: unknown;
+          contexts?: unknown;
+          checks?: unknown;
+        } | null;
+      } | null;
+    }
+  ).protection?.required_status_checks;
+  const classic = status?.enforcement_level === 'off' ? null : status;
+  if (Array.isArray(classic?.contexts)) {
+    for (const c of classic.contexts) if (typeof c === 'string') names.add(c);
+  }
+  if (Array.isArray(classic?.checks)) {
+    for (const c of classic.checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  for (const rule of rulesRead.data as Array<{
+    type?: unknown;
+    parameters?: { required_status_checks?: unknown } | null;
+  } | null>) {
+    const checks =
+      rule?.type === 'required_status_checks' ? rule.parameters?.required_status_checks : null;
+    if (!Array.isArray(checks)) continue;
+    for (const c of checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  return [...names];
 }
 
 // —— 合并就绪闸的 GitHub 传输（#1404 S4a；计划 docs/verify/1404/s4-plan.md §4.1）————————
