@@ -126,11 +126,14 @@ export function projectRepoRef(
   if (row?.repoKind === 'hosted' && row.repoName !== null) {
     return { kind: 'hosted', cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) };
   }
-  if (row?.repoKind === 'github' && row.githubRepo !== null) {
+  // github 形态经 githubRepoOfProject 拆段（#1470）：存量值不合法 = 视同未绑，
+  // 不拼 `https://github.com/../user.git` 这类指不到仓库的 URL。
+  const githubRef = githubRepoOfProject(row);
+  if (githubRef !== null) {
     return {
       kind: 'github',
-      cloneUrl: githubCloneUrl(row.githubRepo),
-      ...(row.localPath !== null ? { localPath: row.localPath } : {}),
+      cloneUrl: githubCloneUrl(githubRef),
+      ...(row?.localPath != null ? { localPath: row.localPath } : {}),
     };
   }
   if (row?.repoKind === 'local' && row.localPath !== null) {
@@ -151,8 +154,8 @@ export function githubRepoOfProject(
 }
 
 /** GitHub 接入 clone URL（https 派生 [设计]；凭证 per-step 注入归 M3，02 §8）。 */
-export function githubCloneUrl(githubRepo: string): string {
-  return `https://github.com/${githubRepo}.git`;
+export function githubCloneUrl(ref: GithubRepoRef): string {
+  return `https://github.com/${ref.owner}/${ref.repo}.git`;
 }
 
 /** `~` 展开（spec 12：local 路径表单支持 `~/…` 粘贴；浏览器无从知道 server
@@ -212,6 +215,9 @@ export function validateGithubLocalSlotPath(rawPath: string | null | undefined):
 }
 
 export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord {
+  // github 形态 cloneUrl 经 githubRepoOfProject（#1470）；githubRepo 列原样回显，
+  // 设置页才看得见并改掉不合法的存量值。
+  const githubRef = githubRepoOfProject(row);
   return {
     id: row.id,
     name: row.name,
@@ -225,9 +231,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.repoKind === 'hosted' && row.repoName !== null && origin !== undefined
       ? { cloneUrl: hostedCloneUrl(origin, row.teamId, row.repoName) }
       : {}),
-    ...(row.repoKind === 'github' && row.githubRepo !== null
-      ? { cloneUrl: githubCloneUrl(row.githubRepo) }
-      : {}),
+    ...(githubRef !== null ? { cloneUrl: githubCloneUrl(githubRef) } : {}),
   };
 }
 
