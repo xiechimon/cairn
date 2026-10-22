@@ -427,6 +427,27 @@ export async function runStep(
   claimed: ClaimedStep,
   opts: RunStepOptions = {},
 ): Promise<void> {
+  // heartbeat 续活（失败不打断执行——与 presence 同纪律 [推断]）。入口即起
+  // （#1473）：workspace.prepare（clone / 项目锁 / setup 上限 20 分钟）期间
+  // 无心跳，server 扫尾会把在线机器上的步当失联放回 pending。会话结束与
+  // 失败回报前各自先停（收尾期不续），finally 兜住其余出口。
+  const heartbeat = setInterval(() => {
+    deps.client.heartbeat(claimed.step.id).catch(() => {});
+  }, deps.heartbeatIntervalMs ?? 30_000);
+  if (heartbeat.unref) heartbeat.unref();
+  try {
+    await runClaimedStep(deps, claimed, opts, heartbeat);
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
+
+async function runClaimedStep(
+  deps: RunStepDeps,
+  claimed: ClaimedStep,
+  opts: RunStepOptions,
+  heartbeat: ReturnType<typeof setInterval>,
+): Promise<void> {
   const { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
   const stepId = claimed.step.id;
@@ -577,6 +598,7 @@ export async function runStep(
     clearCredentials(creds);
     await failStep(
       deps,
+      heartbeat,
       stepId,
       runtimeId !== null ? `${runtimeId} step has no model id` : 'no agent/model on claimed step',
     );
@@ -607,6 +629,7 @@ export async function runStep(
       clearCredentials(creds);
       await failStep(
         deps,
+        heartbeat,
         stepId,
         `Agent 未获「${missing.join('」「')}」授权（Agent 详情页权限 tab），合并步拒绝执行`,
       );
@@ -625,7 +648,12 @@ export async function runStep(
     const auth = await (deps.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
     if (auth.state === 'not-logged-in') {
       clearCredentials(creds);
-      await failStep(deps, stepId, claudeCodeAuthFailureMessage(deps.machineName ?? hostname()));
+      await failStep(
+        deps,
+        heartbeat,
+        stepId,
+        claudeCodeAuthFailureMessage(deps.machineName ?? hostname()),
+      );
       return;
     }
     if (auth.state === 'unknown') {
@@ -659,7 +687,7 @@ export async function runStep(
   if (repo !== null) {
     if (!deps.workspace) {
       clearCredentials(creds);
-      await failStep(deps, stepId, 'workspace ops unavailable for repo-bound step');
+      await failStep(deps, heartbeat, stepId, 'workspace ops unavailable for repo-bound step');
       return;
     }
     try {
@@ -686,6 +714,7 @@ export async function runStep(
       // 裸 git 错误对用户与 chief 都读不出「去修哪台机、哪个路径」。
       await failStep(
         deps,
+        heartbeat,
         stepId,
         err instanceof LocalRepoUnreachableError
           ? localRepoUnreachableMessage(deps.machineName ?? hostname(), err)
@@ -770,7 +799,7 @@ export async function runStep(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     logger.skills(`team-skills-failed: ${reason}`);
-    await failStep(deps, stepId, `team skills distribution failed: ${reason}`);
+    await failStep(deps, heartbeat, stepId, `team skills distribution failed: ${reason}`);
     return;
   }
   // 团队密钥取用通道（02 §8 运行时层）：明文不经进程环境，只有真正需要密钥
@@ -1128,16 +1157,10 @@ export async function runStep(
       logger.step(`brief write failed: ${reason}`);
       cleanupBriefOnce();
       clearCredentials(creds);
-      await failStep(deps, stepId, `运行简报写入失败（${reason}）`);
+      await failStep(deps, heartbeat, stepId, `运行简报写入失败（${reason}）`);
       return;
     }
   }
-
-  // heartbeat 续活（失败不打断执行——与 presence 同纪律 [推断]）。
-  const heartbeat = setInterval(() => {
-    client.heartbeat(stepId).catch(() => {});
-  }, deps.heartbeatIntervalMs ?? 30_000);
-  if (heartbeat.unref) heartbeat.unref();
 
   let usage: AgentTokenUsage = [];
   let lastError: string | null = null;
@@ -1443,12 +1466,11 @@ export async function runStep(
     try {
       handle = await openSession();
     } catch (err) {
-      clearInterval(heartbeat);
       flushDeltas();
       flushThinking();
       cleanupBriefOnce();
       clearCredentials(creds);
-      await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
+      await failStep(deps, heartbeat, stepId, err instanceof Error ? err.message : String(err));
       return;
     }
     logger.raw(continueId !== null ? `continue session ${convId}` : `new session ${convId}`);
@@ -1683,7 +1705,6 @@ export async function runStep(
         }
       }
     } catch (err) {
-      clearInterval(heartbeat);
       if (watchdog) clearTimeout(watchdog);
       if (bodyTimeout) clearTimeout(bodyTimeout);
       if (durationCap) clearTimeout(durationCap);
@@ -1691,7 +1712,7 @@ export async function runStep(
       flushThinking();
       cleanupBriefOnce();
       clearCredentials(creds);
-      await failStep(deps, stepId, err instanceof Error ? err.message : String(err));
+      await failStep(deps, heartbeat, stepId, err instanceof Error ? err.message : String(err));
       return;
     }
     // —— #1257 provider_network 流断重试（Multica MUL-4910 同形）：终局错误
@@ -2304,7 +2325,13 @@ export async function resumePendingUpload(
   logger.raw(`finished (${running - 1} running)`); // 02 §5.7 收尾 canon 行
 }
 
-async function failStep(deps: RunStepDeps, stepId: string, message: string): Promise<void> {
+async function failStep(
+  deps: RunStepDeps,
+  heartbeat: ReturnType<typeof setInterval>,
+  stepId: string,
+  message: string,
+): Promise<void> {
+  clearInterval(heartbeat); // 回报期不续心跳（与会话收尾同律）
   deps.sessionHandles?.delete(stepId); // 覆盖 handle 后失败路径（前置失败 = 无键可删）
   deps.stopRequests?.delete(stepId);
   deps.logger.step(`failed: ${message}`);

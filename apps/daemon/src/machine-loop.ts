@@ -666,6 +666,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (!step || stopping) continue;
       logger.raw(`claim step=${step.step.id}`);
       const stepId = step.step.id;
+      // #1473 同机重领：server 扫尾把本机在飞的步放回 pending 后又发回本机
+      // （准备期无心跳 / 断网后机器被翻离线）。再起一个 runStep = 同一
+      // worktree、同一分支两个会话；在飞那份照常跑完，它的心跳与 done 就是
+      // 新这次领取的执行者（server 所有权按机器号判）。
+      if (inFlight.has(stepId)) {
+        logger.step(`claim for step ${stepId} already running here — keeping the run in flight`);
+        continue;
+      }
       if (step.step.kind === 'chief') inFlightChief.add(stepId);
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
       const launched = runStep(stepDeps(), step, {

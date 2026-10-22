@@ -82,6 +82,7 @@ import {
   todo,
   tokenUsage,
 } from '../db/schema.js';
+import { conflict } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
@@ -1779,11 +1780,65 @@ export async function finishStep(
   body: MachineDoneBody,
 ): Promise<void> {
   const { db } = deps;
+  // #1473 回报只对仍 claimed 的步生效：已收尾（done 重放，XMON-59）、被扫尾
+  // 停掉、或已被放回 pending（machineId 已清空）的步，一律答 ok、不写——落账
+  // 函数都不看步当前状态，放进去就会把步和卡片再改一遍。凭证照收（凭证生命
+  // 周期 = 步生命周期，这次执行已经结束）。归属：记名本机，或已放回（无
+  // 记名）且同团队；他机记名的步、他团队的步对本机仍是 404。
+  const found = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (found && found.status !== 'claimed') {
+    const released =
+      found.machineId === null &&
+      stepTeamId(deps, found) ===
+        db.select({ teamId: machine.teamId }).from(machine).where(eq(machine.id, machineId)).get()
+          ?.teamId;
+    if (found.machineId === machineId || released) {
+      revokeStepGitCredential(deps, stepId);
+      return;
+    }
+  }
   const stepRow = ownedStep(deps, machineId, stepId);
+  // per-step 一次性 git 凭证回收（步收尾即撤销，成败均回收——凭证生命周期 =
+  // 步生命周期，02 §8 运行时层「不落盘常驻」的 server 半）。
+  revokeStepGitCredential(deps, stepId);
+  // #1217 第二张 PR 警告（done 回填面兜底）：本步回填了新 PR 且同 todo 已有
+  // 更早的 GitHub merged PR（守卫探测判，排除本 build 自身）——agent 无视
+  // claim 面守卫指令仍开了第二张 PR，疑似重复交付。落 conv system 警告
+  // note 点名双 PR（PR 面可见；合并面 409 之外的第二道兜底——即便合并闸
+  // 也会拦，警告先让板面看得见）。deterministic id = 同 build 重报幂等；
+  // 无先前 PR build / 探测不到 = 不警告（fail-open，正常落地路零出站）。
+  let priorMerged: { prNumber: number; prUrl: string | null } | null = null;
+  if (body.prUrl !== undefined && body.prNumber !== undefined) {
+    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (buildRow) priorMerged = await mergedPrElsewhere(deps, buildRow.todoId, stepRow.buildId);
+  }
+  // 合并步落地（02 §4.2：merge 202 delegated → 机器 git merge + push → server
+  // bare repo 默认分支 fast-forward [设计]；r3 §3.6「服务端 main 验证」同语义）。
+  // 落地失败（非快进/无 commit）= 步按 failed 收尾（失败仅人工重跑，02/A6）。
+  const landingError =
+    stepRow.kind === 'merge' && body.status === 'success'
+      ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
+      : null;
+  // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
+  // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
+  // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
+  // 例外：默认分支已快进到这个 commit，重领后的合并步再落一次是同一 commit，
+  // 快进幂等）。之后到函数结束都是同步写，不会再被别的请求插进来。
+  {
+    const current = db.select().from(step).where(eq(step.id, stepId)).get();
+    if (
+      current?.status !== 'claimed' ||
+      current.machineId !== machineId ||
+      current.claimedAt !== stepRow.claimedAt
+    ) {
+      throw conflict(`step ${stepId} was released or claimed again while its report was applied`);
+    }
+  }
   // #1108 空位释放 wake：本机一个 claimed 位即将转终态——唤醒全团队挂起的
   // claim 长轮询（本机若无在飞空位会立刻领队头 pending 步；它机各多一次
   // tryClaim，同步读可忽略）。没有它，满载机器的空位要等满 ~75s hold 才
-  // 被下一轮重试发现（enqueue wake 只覆盖新步入队路径）。
+  // 被下一轮重试发现（enqueue wake 只覆盖新步入队路径）。放在复查之后：
+  // 409 的回报不释放空位。被唤醒的领取在下一拍才跑，看到的是下面写完的状态。
   {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) deps.machineHub.wake(teamId);
@@ -1796,9 +1851,6 @@ export async function finishStep(
   if (body.commit !== undefined) {
     db.update(step).set({ checkpointCommit: body.commit }).where(eq(step.id, stepId)).run();
   }
-  // per-step 一次性 git 凭证回收（步收尾即撤销，成败均回收——凭证生命周期 =
-  // 步生命周期，02 §8 运行时层「不落盘常驻」的 server 半）。
-  revokeStepGitCredential(deps, stepId);
   // 交付面回填（#704 / B-C16，Multica link-back 只读方向）：daemon 步收尾
   // 上报的 PR（github 形态 agent 开的 PR）与变更 diff（非 hosted 形态投影
   // 真值源）落 build 行。字段缺席 = 未上报/探测失败——保持 null 不造数据
@@ -1831,38 +1883,19 @@ export async function finishStep(
       }
     }
   }
-  // #1217 第二张 PR 警告（done 回填面兜底）：本步回填了新 PR 且同 todo 已有
-  // 更早的 GitHub merged PR（守卫探测判，排除本 build 自身）——agent 无视
-  // claim 面守卫指令仍开了第二张 PR，疑似重复交付。落 conv system 警告
-  // note 点名双 PR（PR 面可见；合并面 409 之外的第二道兜底——即便合并闸
-  // 也会拦，警告先让板面看得见）。deterministic id = 同 build 重报幂等；
-  // 无先前 PR build / 探测不到 = 不警告（fail-open，正常落地路零出站）。
-  if (body.prUrl !== undefined && body.prNumber !== undefined) {
-    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-    if (buildRow) {
-      const priorMerged = await mergedPrElsewhere(deps, buildRow.todoId, stepRow.buildId);
-      if (priorMerged !== null) {
-        upsertMessage(deps, {
-          id: secondPrWarningNoteRowId(stepRow.buildId),
-          conversationId: stepRow.buildId,
-          role: 'system',
-          content: buildSecondPrWarningNote({
-            prNumber: body.prNumber,
-            mergedPrNumber: priorMerged.prNumber,
-            mergedPrUrl: priorMerged.prUrl,
-          }),
-          createdAt: nowMs(),
-        });
-      }
-    }
+  if (priorMerged !== null && body.prNumber !== undefined) {
+    upsertMessage(deps, {
+      id: secondPrWarningNoteRowId(stepRow.buildId),
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: buildSecondPrWarningNote({
+        prNumber: body.prNumber,
+        mergedPrNumber: priorMerged.prNumber,
+        mergedPrUrl: priorMerged.prUrl,
+      }),
+      createdAt: nowMs(),
+    });
   }
-  // 合并步落地（02 §4.2：merge 202 delegated → 机器 git merge + push → server
-  // bare repo 默认分支 fast-forward [设计]；r3 §3.6「服务端 main 验证」同语义）。
-  // 落地失败（非快进/无 commit）= 步按 failed 收尾（失败仅人工重跑，02/A6）。
-  const landingError =
-    stepRow.kind === 'merge' && body.status === 'success'
-      ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
-      : null;
   const outcome: MachineDoneBody =
     landingError !== null ? { ...body, status: 'failed', errorMessage: landingError } : body;
   // token 记账（02 §6.2：build × model × 四维；成本五列 = #927——pi 报的
