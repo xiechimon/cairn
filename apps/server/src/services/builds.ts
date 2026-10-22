@@ -316,7 +316,7 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
+  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -438,7 +438,7 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   const { db } = deps;
   const stepRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
-  db.update(step).set({ status: 'stopped' }).where(eq(step.id, stepId)).run();
+  db.update(step).set({ status: 'stopped', finishedAt: nowMs() }).where(eq(step.id, stepId)).run();
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
   const stoppedRow = db.select().from(step).where(eq(step.id, stepId)).get();
   if (stoppedRow) publishStepRow(deps, stoppedRow);
@@ -453,7 +453,10 @@ function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
  * review 步（排队中或等额度挂起）——卡已收尾，它们之后再被领走就是在已收尾的
  * 卡上跑（blocking 审核会把 done 往 planning 推而抛错）。只改步状态，不写
  * build.errorMessage（不是用户停止，收尾原因由对账自己的行说明）。 */
-export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
+export function stopUnclaimedGateSteps(
+  deps: BuildDeps,
+  buildId: string,
+): (typeof step.$inferSelect)['kind'][] {
   const rows = deps.db
     .select()
     .from(step)
@@ -466,9 +469,12 @@ export function stopUnclaimedGateSteps(deps: BuildDeps, buildId: string): void {
     )
     .all();
   for (const row of rows) {
-    deps.db.update(step).set({ status: 'stopped' }).where(eq(step.id, row.id)).run();
-    publishStepRow(deps, { ...row, status: 'stopped' });
+    const finishedAt = nowMs();
+    deps.db.update(step).set({ status: 'stopped', finishedAt }).where(eq(step.id, row.id)).run();
+    publishStepRow(deps, { ...row, status: 'stopped', finishedAt });
   }
+  // 停掉的步的种类（#1403 段 3：解冲突轮据此决定要不要落「AI 审核步已停」的行）。
+  return rows.map((r) => r.kind);
 }
 
 export type StopAndMarkDoneResult = { state: 'ready' } | { state: 'stopping' };
@@ -743,13 +749,25 @@ export function maybeEnqueueVerifyStep(
   deps: BuildDeps,
   todoRow: typeof todo.$inferSelect,
   buildId: string,
+  /** reverify：之后有过解冲突轮（PR 对账把默认分支合进了交付，#1403 段 3），之前的 verify
+   * 步（停掉的或已跑完的）验的是冲突前的提交——只要没有排队或在跑的 verify 步就再排一条。
+   * 缺省每个 build 一条。 */
+  opts: { reverify?: boolean } = {},
 ): void {
   const verifyAgentId = todoRow.assignment?.verify?.agentId;
   if (verifyAgentId == null) return;
   const existing = deps.db
     .select({ id: step.id })
     .from(step)
-    .where(and(eq(step.buildId, buildId), eq(step.kind, 'verify')))
+    .where(
+      and(
+        eq(step.buildId, buildId),
+        eq(step.kind, 'verify'),
+        ...(opts.reverify === true
+          ? [inArray(step.status, ['pending', 'claimed', 'waiting_quota'])]
+          : []),
+      ),
+    )
     .get();
   if (existing !== undefined) return;
   const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
@@ -1490,9 +1508,9 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
 
 /** 本 build 最后推送的提交：最后收尾的那一步（审核步除外：它不提交）回报的
  *  checkpointCommit；没有为 null。最后推送 = 最后收尾，不是最后建的：上一轮建的 verify
- *  步（Verifier 离线或等额度）可以在下一轮的 build 步之后才跑。step 表没有收尾时刻列，
- *  按步最后一次报到排（心跳 → 领取 → 入队，同 stepActivityAt；领取时心跳置为领取时刻，
- *  之后每 30 s 一次）：同一 build 的步一个接一个跑时就是收尾顺序。两个用处：
+ *  步（Verifier 离线或等额度）可以在下一轮的 build 步之后才跑。按步的收尾时刻排
+ *  （finishedAt，#1403 段 3）；迁移之前收尾的行没有它，回落最后一次报到（心跳 → 领取 →
+ *  入队，同 stepActivityAt）。两个用处：
  *  - 经 API 合并的 sha（mergeSteps true）：分支上 pacman 最后推送的提交，合并步把默认
  *    分支并进工作分支的提交也算（PR 的 head 就是它）。
  *  - PR 对账核对「合并包含本 build 的交付」（mergeSteps false）：合并步的提交不是交付；
@@ -1516,7 +1534,9 @@ export function lastPushedCheckpoint(
         ),
       )
       .orderBy(
-        desc(sql`coalesce(${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`),
+        desc(
+          sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
+        ),
         desc(step.createdAt),
       )
       .get()?.commit ?? null
@@ -1730,7 +1750,9 @@ async function mergeThroughGithub(
     const titled = `${pull.title} (#${prNumber})`;
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
-      commitTitle: CLOSING_SHAPE.test(titled) ? `Merge pull request #${prNumber}` : titled,
+      // 只验 PR 标题本身：拼上「 (#n)」再验，以 fix / close / resolve 结尾的标题会经「(#n」
+      // 误命中而丢掉标题（#1509 pr-gate 第 4 轮）。
+      commitTitle: CLOSING_SHAPE.test(pull.title) ? `Merge pull request #${prNumber}` : titled,
       // 取读 PR 之后重读的任务行：读的网络窗里自建 issue 可能刚补上 sourceRef（D43）。
       commitMessage: closingLine(before.todoRow, repoRef) ?? PLAIN_MERGE_BODY,
     });
@@ -1824,7 +1846,10 @@ export function applyStepFailure(
   // #1492：空原因会让卡片上的失败横幅（errorMessage 非空才渲染）整块消失。
   const errorMessage =
     rawErrorMessage.trim() === '' ? `${stepRow.kind} 步异常结束，未上报原因` : rawErrorMessage;
-  db.update(step).set({ status: 'failed' }).where(eq(step.id, stepRow.id)).run();
+  db.update(step)
+    .set({ status: 'failed', finishedAt: nowMs() })
+    .where(eq(step.id, stepRow.id))
+    .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
   db.update(build).set({ errorMessage }).where(eq(build.id, buildRow.id)).run();
@@ -2101,12 +2126,20 @@ export function completeStep(
   if (!stepRow) throw new NotFoundError(`step ${stepId}`);
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) {
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     return;
   }
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) {
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     return;
   }
   // #1453 / #1247：停止信号在途时步先正常跑完。卡已被写离执行中、步属旧
@@ -2118,7 +2151,11 @@ export function completeStep(
   const staleBuild = todoRow.latestBuildId !== null && todoRow.latestBuildId !== buildRow.id;
   if (reserved !== undefined || staleBuild || hasLeftExecution(todoRow.phase)) {
     afterStopPhaseByBuild.delete(buildRow.id);
-    deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+    deps.db
+      .update(step)
+      .set({ status: 'done', finishedAt: nowMs() })
+      .where(eq(step.id, stepId))
+      .run();
     if (reserved !== undefined && reserved !== 'keep') landReservedPhase(deps, todoRow, reserved);
     return;
   }
@@ -2149,7 +2186,11 @@ export function completeStep(
     }
     return;
   }
-  deps.db.update(step).set({ status: 'done' }).where(eq(step.id, stepId)).run();
+  deps.db
+    .update(step)
+    .set({ status: 'done', finishedAt: nowMs() })
+    .where(eq(step.id, stepId))
+    .run();
 
   if (stepRow.kind === 'plan') {
     // 交接物校验（#113：05 §5 实跑发现规划轮可跳过写 plan.md 直接交付，build 轮

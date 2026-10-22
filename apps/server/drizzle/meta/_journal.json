@@ -330,6 +330,13 @@
       "when": 1792683877630,
       "tag": "0046_autonomy_gates",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "6",
+      "when": 1792688838285,
+      "tag": "0047_step_finished_at",
+      "breakpoints": true
     }
   ]
 }
