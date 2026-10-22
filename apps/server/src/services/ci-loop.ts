@@ -304,7 +304,7 @@ function deadLoopMessage(rounds: number): string {
 }
 
 /** ETag 缓存行（进程内存——单进程 server；重启失缓存 = 下轮多一次全量读，
- * 无害）。verdict 缓存仅在 304 时复用（200 恒刷新）。 */
+ * 无害）。runs 仅在 304 时复用（200 恒刷新），判据每轮按当时的必需名单重算。 */
 interface PrChecksCacheEntry {
   /** 这份 etag 对应的提交（PR 的 head SHA；不是本 build 开着的 PR 时为分支名）。变了不带它。 */
   sha: string;
@@ -1070,16 +1070,17 @@ export function createCiPoller(
       required = { at: now, names };
       requiredCache.set(reqKey, required);
     }
-    const headSha = own && pull.headSha !== null ? pull.headSha : branch;
+    // check runs 读哪个提交：本 build 开着的 PR 用它的 head SHA，否则用工作分支名。
+    const ref = own && pull.headSha !== null ? pull.headSha : branch;
     const cached = cache.get(key);
-    const entry = cached?.sha === headSha ? cached : null;
+    const entry = cached?.sha === ref ? cached : null;
     if (grindToken === null) recordGrindAnonRead(now);
     const page = await githubCommitCheckRuns(
       run.githubFetch,
       grindToken,
       target.owner,
       target.repo,
-      headSha,
+      ref,
       {
         etag: entry?.etag ?? null,
       },
@@ -1091,9 +1092,10 @@ export function createCiPoller(
     // 304 → 用上次的 runs 按当前名单重判（etag 只在有缓存行时发送，此处恒有）。
     const runs = page.notModified ? (entry?.runs ?? []) : page.checkRuns;
     let verdict = verdictOfCheckRuns(runs, required.names);
-    const waiting = verdict.state === 'empty' || (verdict.state === 'pending' && verdict.missing);
+    const waiting =
+      verdict.state === 'empty' || (verdict.state === 'pending' && verdict.missing !== undefined);
     const waitSince = waiting ? (entry?.waitSince ?? now) : null;
-    cache.set(key, { sha: headSha, etag: page.etag, runs, waitSince });
+    cache.set(key, { sha: ref, etag: page.etag, runs, waitSince });
     // 竞态窗内（CI 可能还没注册 check）：不动。
     const inGrace = now - (waitSince ?? now) < CI_EMPTY_CHECKS_GRACE_MS;
     if (verdict.state === 'pending') {
@@ -1125,7 +1127,7 @@ export function createCiPoller(
         .join('、');
       hintOnce(
         cand.buildId,
-        `PR #${buildRow.prNumber} 的 head ${own ? headSha.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
+        `PR #${buildRow.prNumber} 的 head ${own ? ref.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
         roundStart(deps, cand.buildId),
       );
       tally.pending += 1;
@@ -1253,15 +1255,12 @@ export function createCiPoller(
     for (const k of foreignListedAt.keys())
       if (!liveKeys.has(k.slice(k.indexOf('\u0000') + 1))) foreignListedAt.delete(k);
     for (const k of listFailures.keys()) if (!liveKeys.has(k)) listFailures.delete(k);
-    for (const k of requiredCache.keys()) {
-      if (now - (requiredCache.get(k)?.at ?? now) >= CI_REQUIRED_CHECKS_TTL_MS) {
-        requiredCache.delete(k);
-      }
-    }
+    for (const [k, v] of requiredCache)
+      if (now - v.at >= CI_REQUIRED_CHECKS_TTL_MS) requiredCache.delete(k);
     // 磨绿候选的提示也走 rowKnown（blocked 提示）：它们的记忆一并留着。
-    for (const c of candidates) reviewBuilds.add(c.buildId);
+    const memoBuilds = new Set([...reviewBuilds, ...candidates.map((c) => c.buildId)]);
     for (const k of knownRows)
-      if (!reviewBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
+      if (!memoBuilds.has(k.slice(0, k.indexOf('\u0000')))) knownRows.delete(k);
     run.logger?.info(tally, 'ci pr-checks sweep');
   }
 
