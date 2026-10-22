@@ -150,6 +150,18 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
 }
 
+/** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
+export function hasPullFields(p: GithubPull): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
+  );
+}
+
 /** 这张 PR 是从 branch 开的、head 仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库
  * 改名或转移后照样对得上；fork 对不上，fork 已删时 head 仓为 null 同样对不上）。PR 对账与
  * 经 API 合并（#1403）判断「是不是本 build 的 PR」共用。 */
@@ -303,6 +315,18 @@ export interface GithubBranchPull {
   headRepoId: number | null;
   baseRef: string | null;
   baseRepoId: number | null;
+  /** PR 作者与仓库的关系（author_association）；响应缺失 = null。 */
+  authorAssociation: string | null;
+}
+
+/** author_association 里表示作者对仓库有写权限的三个值（OWNER：仓库的 owner；MEMBER：
+ * 拥有仓库的组织的成员；COLLABORATOR：受邀协作者）。其余（CONTRIBUTOR、FIRST_TIMER、
+ * FIRST_TIME_CONTRIBUTOR、MANNEQUIN、NONE）与缺失都不算。 */
+const WRITE_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+/** PR 作者对仓库有写权限（按 author_association，见 WRITE_AUTHOR_ASSOCIATIONS）。 */
+export function isWriteAuthor(association: string | null): boolean {
+  return association !== null && WRITE_AUTHOR_ASSOCIATIONS.has(association);
 }
 
 /** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
@@ -331,6 +355,7 @@ export async function githubBranchPulls(
         number?: unknown;
         state?: unknown;
         merged_at?: unknown;
+        author_association?: unknown;
         head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
         base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
       };
@@ -343,6 +368,7 @@ export async function githubBranchPulls(
         headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
         baseRef: optString(p.base?.ref),
         baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+        authorAssociation: optString(p.author_association),
       };
     },
   );
@@ -424,7 +450,9 @@ function isRateLimited(res: { status: number; headers: { get(n: string): string 
  * 二级限流可以不带 retry-after（上游文档「Exceeding the rate limit」：403 或
  * 429 + 说明超了二级限流的 message）。 */
 async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
-  return isRateLimitedText(res, await res.text().catch(() => ''));
+  if (isRateLimited(res)) return true;
+  // 只有没带限流头的 403 要看应答文本：别的失败不读应答体（慢的错误体不拖住调用方）。
+  return res.status === 403 && isRateLimitedText(res, await res.text().catch(() => ''));
 }
 
 /** isRateLimitedResponse 的同步半边：应答文本已读出时用（应答体只能读一次）。 */

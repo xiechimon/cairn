@@ -158,3 +158,65 @@ Error body, https://docs.github.com/en/rest/using-the-rest-api/getting-started-w
 - "Unless otherwise specified, the response body is in JSON format."
 - The page's error example reads the text from `error.response.data.message`; the 200
   schema above also carries `message`. The refusal text is that field.
+
+Added after the second /code-review pass (tests first, red on 6efdd458):
+D35 A leftover merge step pushes its merge of the default branch into the conversation
+    branch after the PR was merged on GitHub: that commit is not the build's delivered
+    work, so it is not the last pushed checkpoint (merge steps are left out like review
+    steps); the reconcile still finishes the card.
+S1  The list reads' failure classification reads the response body only for a 403
+    without rate-limit headers (a secondary rate limit says so in its message); 404 and
+    429 are classified without reading it. The /simplify commit had made every failure
+    read the body.
+
+Folded in from the segment 2 pr-gate (#1489, run 1 at 83259a9, suggestions 1-7; tests
+first, red on 6efdd458; pins P4-P6 and P7f pass on both sides, their red legs are
+mutations in seg2b-mutations.txt):
+P2  spec 02 section 4.2, the 确认回路 bullet: a confirm is accepted only in the confirm
+    phase; anything else is 409 with no row and no build step.
+P3  The single-use `thrown` helper in [s2-A14] is inlined.
+P4  Foreign path: the card leaves review while the branch list read is in flight -> no
+    adoption, no row.
+P5  The list-failure count belongs to one close: a confirmed close with one failed list
+    read, the card leaves review and comes back, the close is confirmed again and the
+    list read fails once more -> still review (the count started again).
+P6  Anonymous: a foreign list read skipped for lack of budget does not count as a
+    listing; the branch is listed on the first sweep that has budget, not an hour later.
+P7  Adoption takes only a PR whose author has write access, by the list response's
+    author_association: OWNER, MEMBER or COLLABORATOR. CONTRIBUTOR, FIRST_TIMER,
+    FIRST_TIME_CONTRIBUTOR, MANNEQUIN, NONE and a missing field are not adopted, on the
+    closed path (open or merged) and the foreign path (P7a, P7c, P7d); the three write
+    values are (P7b). The recorded PR showing up open again in the list is not
+    adoption and is not filtered (P7f). The parser reads the field from a live capture
+    (P7e, docs/verify/1403/live-branch-pulls-assoc.json).
+P1  Not done: a PR opened after the close was reported, on a card a person dragged back
+    to review, is still not adopted (as on main before segment 2). Doing it needs a
+    branch list read on every sweep for every such card, throttled per card like the
+    foreign path's relist and sharing the anonymous budget, plus a rule for which
+    merged PRs count after a reported close. That is new state and a new rule, not a
+    small change.
+
+author_association, quoted from GitHub's docs (fetched 2026-10-22):
+- REST, List pull requests, response "Array of `Pull Request Simple`":
+  "`author_association`: required, string, enum: `COLLABORATOR`, `CONTRIBUTOR`,
+  `FIRST_TIMER`, `FIRST_TIME_CONTRIBUTOR`, `MANNEQUIN`, `MEMBER`, `NONE`, `OWNER`"
+  (https://docs.github.com/en/rest/pulls/pulls#list-pull-requests)
+- GraphQL reference, CommentAuthorAssociation ("A comment author association with
+  repository."), https://docs.github.com/en/graphql/reference/issues:
+  "`COLLABORATOR`: Author has been invited to collaborate on the repository."
+  "`CONTRIBUTOR`: Author has previously committed to the repository."
+  "`FIRST_TIMER`: Author has not previously committed to GitHub."
+  "`FIRST_TIME_CONTRIBUTOR`: Author has not previously committed to the repository."
+  "`MANNEQUIN`: Author is a placeholder for an unclaimed user."
+  "`MEMBER`: Author is a member of the organization that owns the repository."
+  "`NONE`: Author has no association with the repository."
+  "`OWNER`: Author is the owner of the repository."
+- Limit of the rule: MEMBER is organization membership and COLLABORATOR an invitation;
+  neither names the permission level, so an organization member or collaborator with
+  read-only access still counts. The field is what the list response carries without a
+  further request per PR.
+- Live capture (read-only GET through the agent proxy, 2026-10-22 11:05:40 UTC, the
+  request headers the server sends): pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2-seg2
+  &base=main&per_page=10 -> HTTP 200, one PR, #1489, "author_association": "OWNER",
+  user xiechimon. Trimmed copy: apps/server/test/fixtures/github/branch-pulls-assoc.json
+  (= docs/verify/1403/live-branch-pulls-assoc.json).

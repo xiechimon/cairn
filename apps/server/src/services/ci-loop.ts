@@ -60,7 +60,8 @@
 //   它、从同一工作分支另开一张时，记的号就过时了（#1403 段 2）。确认关闭之后、打回
 //   之前，以及每轮第一次读到别人的 PR、提示之前，列一次本 build 工作分支往默认分支
 //   的 PR（`pulls?state=all&head=<owner>:<分支>&base=<默认分支>`，owner 取响应里目标仓
-//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支；开着的，或比记的
+//   现在的）：有本 build 自己的另一张（同一个仓、本 build 的工作分支、作者有写权限即
+//   author_association 为 OWNER / MEMBER / COLLABORATOR，段 2b；开着的，或比记的
 //   那张新的已合并的；已合并的都要比本 build 自己最近一张关闭未合并的新：更早合并的是
 //   旧事）→ 改记它（号与链接，只在 build 上记的还是原来那张时）、每轮落一行，不打回、不
 //   提示，下一轮读它；记的那张在列表里又开着或已合并 → 不写，下一轮重读它。关闭路径列不到 → 不写，
@@ -90,8 +91,10 @@ import {
   githubCommitCheckRuns,
   githubCompareStatus,
   githubPull,
+  hasPullFields,
   isFullSha,
   isOwnPull,
+  isWriteAuthor,
 } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
@@ -300,18 +303,6 @@ interface PullCacheEntry {
   pull: GithubPull | null;
 }
 
-/** 对账判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
-function hasPullFields(p: GithubPull): p is GithubPull & {
-  headRef: string;
-  baseRef: string;
-  defaultBranch: string;
-  baseRepoId: number;
-} {
-  return (
-    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
-  );
-}
-
 export function createCiPoller(
   deps: BuildDeps,
   run: {
@@ -470,12 +461,15 @@ export function createCiPoller(
       (p) => p.number === recorded.number && (p.state === 'open' || p.merged),
     );
     if (changed !== undefined) return changed;
-    const open = own.filter((p) => p.state === 'open');
+    // 改记只收有写权限的作者开的 PR（#1403 段 2b，#1489 pr-gate 建议 7）：人关掉本 build 的
+    // PR 表示不要这次改动，之后没有写权限的人从同一分支另开一张，不能把这个决定翻过来。
+    const adoptable = own.filter((p) => isWriteAuthor(p.authorAssociation));
+    const open = adoptable.filter((p) => p.state === 'open');
     const rejected = own.reduce(
       (n, p) => (p.state === 'closed' && !p.merged && p.number > n ? p.number : n),
       mergedAfter,
     );
-    const pool = open.length > 0 ? open : own.filter((p) => p.merged && p.number > rejected);
+    const pool = open.length > 0 ? open : adoptable.filter((p) => p.merged && p.number > rejected);
     return pool.reduce<GithubBranchPull | null>(
       (best, p) => (best === null || p.number > best.number ? p : best),
       null,

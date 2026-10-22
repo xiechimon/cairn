@@ -70,6 +70,7 @@ import {
   githubMergePull,
   githubPull,
   githubPullState,
+  hasPullFields,
   isFullSha,
   isOwnPull,
 } from '../lib/github.js';
@@ -1454,8 +1455,9 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
   return mergingBuilds.has(buildId) || buildStepInFlight(deps, buildId);
 }
 
-/** 本 build 最后推送的提交：最后收尾的那一步（审核步除外：它不提交）回报的
- *  checkpointCommit；没有为 null。最后推送 = 最后收尾，不是最后建的：上一轮建的 verify
+/** 本 build 最后推送的提交：最后收尾的那一步（审核步与合并步除外：审核步不提交，合并步
+ *  的提交是把默认分支并进工作分支，不是本 build 的交付——GitHub 形态有 PR 的 build 上它
+ *  只会是升级前排下的遗留步，#1403 段 2b）回报的 checkpointCommit；没有为 null。最后推送 = 最后收尾，不是最后建的：上一轮建的 verify
  *  步（Verifier 离线或等额度）可以在下一轮的 build 步之后才跑。step 表没有收尾时刻列，
  *  按步最后一次报到排（心跳 → 领取 → 入队，同 stepActivityAt；领取时心跳置为领取时刻，
  *  之后每 30 s 一次）：同一 build 的步一个接一个跑时就是收尾顺序。PR 对账核对「合并
@@ -1468,7 +1470,7 @@ export function lastPushedCheckpoint(deps: BuildDeps, buildId: string): string |
       .where(
         and(
           eq(step.buildId, buildId),
-          ne(step.kind, 'review'),
+          notInArray(step.kind, ['review', 'merge']),
           eq(step.status, 'done'),
           isNotNull(step.checkpointCommit),
         ),
@@ -1512,14 +1514,6 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
     );
   }
   return { todoRow, failed };
-}
-
-/** 拒绝文案里「之后怎么收尾」：review 卡由 PR 对账读到合并后收尾；failed 卡对账不读
- *  （只读 review 卡），PR 在 GitHub 上合并后由人在看板把卡拖到已完成。 */
-function settleHint(failed: boolean): string {
-  return failed
-    ? '任务处于失败态，PR 在 GitHub 上合并后在看板把卡拖到已完成'
-    : 'pacman 对账读到合并后会收尾';
 }
 
 /** squash 提交正文的关票行（ADR 0021 D2）：任务来自本仓的 issue N（GitHub issue 导入或
@@ -1571,7 +1565,12 @@ async function mergeThroughGithub(
   // 守卫探测的网络窗里相位可能已被改（对账收尾、人关卡）：重读再判。
   const gate = apiMergeGate(deps, row);
   assertMergeTools(deps, gate.todoRow);
-  const hint = settleHint(gate.failed);
+  // 拒绝文案里「之后怎么收尾」：review 卡由 PR 对账读到合并后核对并收尾（PR 不是本 build
+  // 的、合进别的分支、漏了最后推送的提交时，对账只在时间线说明）；failed 卡对账不读（只读
+  // review 卡），由人在看板把卡拖到已完成。
+  const hint = gate.failed
+    ? '任务处于失败态，PR 在 GitHub 上合并后在看板把卡拖到已完成'
+    : 'pacman 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理）';
   const token = teamGithubToken(deps, gate.todoRow.teamId);
   if (token === null) {
     throw new HttpError(
@@ -1598,15 +1597,7 @@ async function mergeThroughGithub(
     const page = await githubPull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber);
     const pull = page?.pull ?? null;
     const branch = conversationBranch(row.id);
-    if (
-      pull === null ||
-      pull.title === null ||
-      pull.headSha === null ||
-      pull.headRef === null ||
-      pull.baseRef === null ||
-      pull.baseRepoId === null ||
-      pull.defaultBranch === null
-    ) {
+    if (pull === null || !hasPullFields(pull) || pull.title === null || pull.headSha === null) {
       throw new HttpError(
         409,
         `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
@@ -1655,7 +1646,7 @@ async function mergeThroughGithub(
         409,
         result.status === 401
           ? `GitHub 不认团队的 GitHub 连接（HTTP 401），PR #${prNumber} 没有合并：请重新连接 GitHub 后再点合并。`
-          : `GitHub 拒绝合并 PR #${prNumber}（HTTP ${result.status}）${result.message === '' ? '' : `：${githubText(result.message)}`}`,
+          : `GitHub 拒绝合并 PR #${prNumber}（HTTP ${result.status}）${result.message === '' ? '' : `：${githubText(result.message)}`}——可在 GitHub 上处理后直接在那里合并（${hint}）`,
       );
     }
     // 合并了，或不知道合没合：请求已经发出，落宣告行。卡还在开头那个关口才动相位。

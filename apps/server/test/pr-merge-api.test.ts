@@ -45,10 +45,13 @@
 //   D33 连接在但解不开 → 请重新连接 GitHub
 //   D34 合并步在到不了 done 的相位完成（#931 返工复用同一 build）→ 照旧抛非法相位转移、
 //       不落行
+//   D35 遗留合并步在 PR 已于 GitHub 合并之后推了「默认分支并进工作分支」的提交 → 那不是
+//       本 build 的交付提交（合并步不算最后推送的工作），对账照常收尾
+//   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
 import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
@@ -59,7 +62,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import type { FetchLike } from '../src/lib/github.js';
+import { type FetchLike, githubListPulls } from '../src/lib/github.js';
 import { type BuildDeps, completeStep, DONE_ROW, requestMerge } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -128,6 +131,8 @@ class GithubFake {
   onGet: (() => Promise<void> | void) | null = null;
   /** merge 写到达、应答之前调用。 */
   onPut: (() => Promise<void> | void) | null = null;
+  /** compare 的 status（对账核对 checkpoint 是否在合并里；缺省 identical）。 */
+  compareStatus = 'identical';
   constructor(
     readonly pulls: Record<number, PullFake>,
     readonly branchOf: (n: number) => string,
@@ -158,7 +163,9 @@ class GithubFake {
       }
       return reply(a.status, a.raw ?? JSON.stringify(a.body ?? {}), a.headers);
     }
-    if (url.includes('/compare/')) return reply(200, JSON.stringify({ status: 'identical' }));
+    if (url.includes('/compare/')) {
+      return reply(200, JSON.stringify({ status: this.compareStatus }));
+    }
     if (/\/pulls\?/.test(url)) return reply(200, '[]');
     if (url.includes('/check-runs')) return reply(404, '{}');
     const m = url.match(/\/pulls\/(\d+)$/);
@@ -575,6 +582,8 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
     expect(err.message).toContain('已在 GitHub 合并');
+    // the reconcile checks before it finishes (own PR, default branch, last pushed commit)
+    expect(err.message).toContain('核对不上');
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);
     await w.sweep();
@@ -640,6 +649,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       expect(err.message).toContain('GitHub 拒绝合并 PR #201');
       expect(err.message).toContain(`HTTP ${status}`);
       expect(err.message).toContain(message);
+      expect(err.message).toContain('直接在那里合并');
       expectUntouched(w);
       await refusal(requestMerge(w.deps, w.buildId));
       expect(w.fake.puts()).toHaveLength(2);
@@ -961,6 +971,57 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     );
     expect(w.systemRows()).toEqual([]);
     expect(w.phase()).toBe('planning');
+  });
+
+  test('[2b-D35] a leftover merge step pushes a merge of the default branch after the PR merged on GitHub → that commit is not the build’s last pushed work; the sweep finishes the card', async () => {
+    const w = makeWorld({ pull: { state: 'closed', merged: true, mergedBy: 'octo' } });
+    w.fake.compareStatus = 'behind'; // the merge step's commit is not in the merged head
+    const mergeStepId = `step-merge-left-${w.buildId}`;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: mergeStepId,
+        buildId: w.buildId,
+        kind: 'merge',
+        status: 'claimed',
+        // its done report carries the commit it pushed (finishStep writes it before completeStep)
+        checkpointCommit: 'cafe0123'.repeat(5),
+        lastHeartbeatAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+    completeStep(w.deps, mergeStepId);
+    expect(w.phase()).toBe('review');
+    await w.sweep();
+    expect(w.phase()).toBe('done');
+    expect(w.systemRows().filter((c) => c === DONE_ROW)).toHaveLength(1);
+  });
+
+  test('[2b-S1] a list answer of 404 or 429 is classified without reading its body; a 403 without rate-limit headers reads it', async () => {
+    const text = vi.fn(() => Promise.resolve('{"message":"API rate limit exceeded"}'));
+    const answer = (status: number) => () =>
+      Promise.resolve({
+        ok: false,
+        status,
+        headers: { get: () => null },
+        json: () => Promise.resolve({}),
+        text,
+      });
+    const opts = { state: 'open', page: 1, perPage: 10, timeoutMs: 1_000 } as const;
+    expect(await githubListPulls(answer(404), 't', 'o', 'r', opts)).toEqual({
+      ok: false,
+      failure: { kind: 'status', status: 404 },
+    });
+    expect(await githubListPulls(answer(429), 't', 'o', 'r', opts)).toEqual({
+      ok: false,
+      failure: { kind: 'rate-limited', status: 429 },
+    });
+    expect(text).not.toHaveBeenCalled();
+    expect(await githubListPulls(answer(403), 't', 'o', 'r', opts)).toEqual({
+      ok: false,
+      failure: { kind: 'rate-limited', status: 403 },
+    });
+    expect(text).toHaveBeenCalledTimes(1);
   });
 
   test('[2b-D26] the token travels only in the Authorization header', async () => {
