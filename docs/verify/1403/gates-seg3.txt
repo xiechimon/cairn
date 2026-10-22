@@ -40,3 +40,25 @@ Details:
   result: 1182 passed (9.2m)
 
 Server suite on the main merge (apps/server, pnpm exec vitest run): 135 files, 2396 passed, 1 skipped. db:check: "drizzle 护栏通过：snapshot 链线性、无父子冲突" (migration 0046 at main's tail, main ends at 0045).
+
+## 2026-10-22, third run: after merging main d4fd908c (#1509 squash) and the CLOSING_SHAPE title fix
+
+Run on cde42fc1: the merge c57de32b (main d4fd908c; migration now 0047) plus the title fix cde42fc1.
+
+branch claude/bootstrap-p2-seg3 head cde42fc1 origin/claude/bootstrap-p2-seg2b 0d67951e origin/main d4fd908c
+
+$ pnpm lint   exit 0
+$ pnpm typecheck   exit 0
+$ pnpm spec:parse   exit 0
+$ pnpm exec vitest run --changed origin/main   exit 0
+$ lsof -iTCP:8406 -sTCP:LISTEN   exit 1 (1 = no listener)
+$ E2E_AFFECTED_PORT=8406 pnpm --filter @pacman/web e2e:affected   exit 0
+
+Details:
+- lint: Checked 840 files in 1702ms. No fixes applied.
+- spec:parse: [spec-parse-gate] PASS: every spec in apps/web/e2e and integration/test parses.
+- vitest --changed origin/main: Test Files  155 passed (155); Tests  2150 passed | 1 skipped (2151)
+- e2e:affected: against origin/main only segment 3's files differ. Every server file maps to the "server surface" family (specs that spawn a real server), the docs map to none, and there was no full-suite fallback this time.
+  result: 8 passed (11.0s)
+
+Server suite on cde42fc1 (apps/server, pnpm exec vitest run): 137 files, 2459 passed, 1 skipped. db:check: "drizzle 护栏通过：snapshot 链线性、无父子冲突" (0047_step_finished_at after main's 0046_autonomy_gates).
