@@ -24,13 +24,19 @@
 //     重试，否则重启即硬失败。
 
 import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema, machineUploadUrlsResponseSchema, PLAN_FILE_NAME } from '@pacman/shared';
+import {
+  claimedStepSchema,
+  isPlanContractRewritePrompt,
+  machineUploadUrlsResponseSchema,
+  PLAN_FILE_NAME,
+} from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
+  message as messageTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
@@ -147,6 +153,8 @@ async function setupWorld() {
     s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
   const stepsOf = (buildId: string) =>
     s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
+  const messagesOf = (buildId: string) =>
+    s.db.select().from(messageTable).where(eq(messageTable.conversationId, buildId)).all();
   return {
     s,
     token,
@@ -160,10 +168,17 @@ async function setupWorld() {
     buildRow,
     stepRow,
     stepsOf,
+    messagesOf,
   };
 }
 
 type World = Awaited<ReturnType<typeof setupWorld>>;
+
+/** 过结构闸的方案（#1492：Verification 每项都有可执行锚点）。 */
+const GOOD_PLAN =
+  '# 方案\nContext: x\n\n## Verification\n- `pnpm exec vitest run README.test.ts` 通过\n';
+/** 交了 plan.md 但 Verification 只有空话。 */
+const VAGUE_PLAN = '# 方案\nContext: x\n\n## Verification\n- 确认没问题\n';
 
 /** withPlan 链路走两轮空方案 plan 步（B-C10 形状：首轮 + 补写轮都不写 plan.md）。 */
 async function runTwoEmptyPlanRounds(w: World): Promise<{ buildId: string; secondStepId: string }> {
@@ -218,7 +233,7 @@ describe('闸 1（B-C10）：plan 步无方案文档 → confirm 不可达', () 
       const first = await w.claim();
       await w.done(first.step.id, { status: 'success', sessionId: 'pi-1' });
       const second = await w.claim();
-      await w.uploadPlan(second.step.id, '# 方案\nContext: x');
+      await w.uploadPlan(second.step.id, GOOD_PLAN);
       await w.done(second.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       expect(w.todoRow().hasPlan).toBe(true);
@@ -462,6 +477,171 @@ describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改�
         sessionId: 'pi-d3',
       });
       expect(w.buildRow(buildId).errorMessage).toBe('构建零改动');
+    } finally {
+      w.s.dispose();
+    }
+  });
+});
+
+// #1492 plan 结构闸：plan 步交了 plan.md 但 Verification 不合格（缺节 / 空话）
+// → 不进 confirm，走一次结构补写轮；补写轮仍不合格 → 按失败收尾。失败方式：
+// 10. 空话方案直接进 confirm（票面现状：只要写了就算过）。
+// 11. 补写轮无限循环：补写轮仍不合格必须失败收尾，plan 步封顶两轮。
+// 12. 补写提示不点名问题 → agent 不知道改哪里。
+// 13. 补写轮没重新上传方案也被放进 confirm（旧版不合格方案混过去）。
+// 14. 合格方案被误拦（校验太严）。
+describe('plan 结构闸（#1492）：Verification 不合格 → confirm 不可达', () => {
+  test('失败方式 10、12：首轮空话方案 → 留 planning，入队点名问题的结构补写轮', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(true);
+      const first = await w.claim();
+      await w.uploadPlan(first.step.id, VAGUE_PLAN);
+      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c1' });
+      expect(w.todoRow().phase).toBe('planning');
+      expect(w.todoRow().hasPlan).toBe(false);
+      const pending = w
+        .stepsOf(buildId)
+        .filter((st) => st.kind === 'plan' && st.status === 'pending');
+      expect(pending).toHaveLength(1);
+      expect(isPlanContractRewritePrompt(pending[0]!.prompt)).toBe(true);
+      expect(pending[0]!.prompt).toContain('第 1 项');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('失败方式 11：结构补写轮仍不合格 → 失败收尾，原因点名，plan 步封顶两轮', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(true);
+      const first = await w.claim();
+      await w.uploadPlan(first.step.id, VAGUE_PLAN);
+      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c2' });
+      const second = await w.claim();
+      await w.uploadPlan(second.step.id, `${VAGUE_PLAN}- 再看一眼\n`);
+      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c2' });
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.stepRow(second.step.id).status).toBe('failed');
+      expect(w.buildRow(buildId).errorMessage).toContain('方案结构不合格');
+      expect(w.buildRow(buildId).errorMessage).toContain('Verification');
+      expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(2);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('失败方式 13：结构补写轮没重新上传 → 按旧版判，仍不合格即失败', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(true);
+      const first = await w.claim();
+      await w.uploadPlan(first.step.id, VAGUE_PLAN);
+      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c3' });
+      const second = await w.claim();
+      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c3' });
+      expect(w.todoRow().phase).toBe('failed');
+      expect(w.buildRow(buildId).errorMessage).toContain('方案结构不合格');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('结构补写轮补齐 Verification → 进 confirm', async () => {
+    const w = await setupWorld();
+    try {
+      await w.startBuild(true);
+      const first = await w.claim();
+      await w.uploadPlan(first.step.id, VAGUE_PLAN);
+      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c4' });
+      const second = await w.claim();
+      await w.uploadPlan(second.step.id, GOOD_PLAN);
+      await w.done(second.step.id, { status: 'success', sessionId: 'pi-c4' });
+      expect(w.todoRow().phase).toBe('confirm');
+      expect(w.todoRow().hasPlan).toBe(true);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('失败方式 14：首轮合格方案直接进 confirm，不多跑补写轮', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(true);
+      const first = await w.claim();
+      await w.uploadPlan(first.step.id, GOOD_PLAN);
+      await w.done(first.step.id, { status: 'success', sessionId: 'pi-c5' });
+      expect(w.todoRow().phase).toBe('confirm');
+      expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(1);
+    } finally {
+      w.s.dispose();
+    }
+  });
+});
+
+// #1492 build 步异常结束的兜底报告：失败收尾时会话里必须有一条系统写的报告，
+// 卡片上不留空白。失败方式：
+// 15. build 步失败后会话里只有错误横幅的数据源，没有可读的收尾报告。
+// 16. 失败原因是空字符串 → 失败横幅（errorMessage 非空才显示）整块消失。
+// 17. 报告误伤：plan / review 步失败不该落构建报告。
+describe('build 步兜底报告（#1492）', () => {
+  test('失败方式 15：build 步机器报失败 → 落兜底报告，含失败原因', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(false);
+      const buildStep = await w.claim();
+      await w.done(buildStep.step.id, {
+        status: 'failed',
+        errorMessage: 'agent 进程退出码 137',
+        sessionId: 'pi-f1',
+      });
+      expect(w.todoRow().phase).toBe('failed');
+      const reports = w
+        .messagesOf(buildId)
+        .filter((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+      expect(reports).toHaveLength(1);
+      expect(String(reports[0]!.content)).toContain('agent 进程退出码 137');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('产物闸失败（构建零改动）同样落兜底报告', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(false);
+      const buildStep = await w.claim();
+      await w.done(buildStep.step.id, { status: 'success', hasChanges: false, sessionId: 'pi-f2' });
+      const report = w
+        .messagesOf(buildId)
+        .find((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+      expect(String(report?.content)).toContain('构建零改动');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('失败方式 16：失败原因为空串 → errorMessage 补成说明文字', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = await w.startBuild(false);
+      const buildStep = await w.claim();
+      await w.done(buildStep.step.id, { status: 'failed', errorMessage: '', sessionId: 'pi-f3' });
+      expect(w.buildRow(buildId).errorMessage).toBe('build 步异常结束，未上报原因');
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('失败方式 17：plan 步失败不落构建兜底报告', async () => {
+    const w = await setupWorld();
+    try {
+      const { buildId } = await runTwoEmptyPlanRounds(w);
+      expect(w.todoRow().phase).toBe('failed');
+      const reports = w
+        .messagesOf(buildId)
+        .filter((m) => m.role === 'system' && String(m.content).startsWith('构建步兜底报告'));
+      expect(reports).toHaveLength(0);
     } finally {
       w.s.dispose();
     }

@@ -47,7 +47,14 @@ import {
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  req,
+  withVerification,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-review-1';
 const REVIEW_AGENT_ID = 'agent-reviewer-1';
@@ -313,7 +320,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('失败方式 2：缺 agentId → 400 (zod body schema)', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     // 推到 confirm phase（plan done(success) 后自然进 confirm，confirm(buildId)
     // 会再推到 building——所以这里不调 confirm）。
@@ -330,7 +337,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('选人策略不进服务端：显式指定同厂商 agentId 照常受理（不回归成 409）', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     // 产出步 Agent = 执行侧槽 AGENT_ID（provider 'stub-gw'）。
@@ -348,7 +355,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('选人策略不进服务端：跨厂商 agentId 同样照常受理（无厂商判据）', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
 
@@ -375,7 +382,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('happy path：confirm 态发起审核 → review 步入队 + REVIEW_ANNOUNCEMENT + phase 留 confirm', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
 
@@ -415,7 +422,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('happy path：claim review 步 → claim 载荷 agent = 模态选定的 reviewer（不经 assignment 槽）', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
 
@@ -440,7 +447,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('happy path：空 focus 允许（可选 textarea 可空）', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     const res = await w.startReview(buildId, { agentId: REVIEW_AGENT_ID, focus: '' });
@@ -454,7 +461,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
     // done(success) → phase = 'review'。
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     await w.confirm(buildId);
     expect(w.todoRow().phase).toBe('building');
@@ -470,7 +477,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('终态闭环（无 blocking）：review 步 done(success, 空 verdict) → REVIEW_VERDICT_KIND 消息落地 + phase 不动', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
@@ -521,7 +528,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('终态闭环（blocking）：review 步 done(success, 含 blocking verdict) → REVIEW_VERDICT_KIND 消息 + phase 转 planning + 重规划步入队', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     expect(w.todoRow().phase).toBe('confirm');
     await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
@@ -604,7 +611,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('终态闭环（daemon 未传 findings）：verdict 兜底消息落地 + 不触发修订', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
 
@@ -641,7 +648,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
   test('终态闭环（#700 daemon 报提取失败）：「判定提取失败」+ 原因上浮 + 不触发修订', async () => {
     const buildId = await w.startBuild(true);
     const planClaimed = await w.claim();
-    await w.uploadPlan(planClaimed.stepId, '# plan v1');
+    await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
     await w.done(planClaimed.stepId, { status: 'success' });
     await w.startReview(buildId, { agentId: REVIEW_AGENT_ID });
 
@@ -696,7 +703,7 @@ describe('AI 审核发起写面（M7 #312）', () => {
 //   6. review 步 session = new：prompt 真的会被投递（不是接续别人的会话）。
 const CONV_CHANGE_FILE = 'src/parse.ts';
 const CONV_CHANGE_BODY = 'export function parseInput() {}\n';
-const PLAN_V1 = '# plan v1\n\n## Changes\n- 加 parseInput\n';
+const PLAN_V1 = withVerification('# plan v1\n\n## Changes\n- 加 parseInput\n');
 
 /** 走到审核关口（plan done → confirm → build done → phase=review）。 */
 async function advanceToReviewGate(w: World): Promise<string> {

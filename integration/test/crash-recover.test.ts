@@ -96,7 +96,7 @@ describe('崩溃恢复（T2：AgentSession 缝 × 宿主 durable 编排）', () 
         toolCall: {
           name: 'bash',
           arguments: {
-            command: `cat > plan.md <<'EOF'\n# 方案\n\nContext: 崩溃恢复探针。\nChanges: README 加一行。\nEOF`,
+            command: `cat > plan.md <<'EOF'\n# 方案\n\nContext: 崩溃恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\nEOF`,
           },
         },
       },

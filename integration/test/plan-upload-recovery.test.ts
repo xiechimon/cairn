@@ -40,7 +40,8 @@ import {
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const DAEMON_DIR = fileURLToPath(new URL('../../apps/daemon', import.meta.url));
-const PLAN_CONTENT = '# 方案\n\nContext: 恢复探针。\nChanges: README 加一行。\n';
+const PLAN_CONTENT =
+  '# 方案\n\nContext: 恢复探针。\nChanges: README 加一行。\nVerification: 读回 README.md。\n';
 
 /** 可控代理（daemon → server 的机器面）：forward = 全转发（SSE/长轮询透传，
  * Host 保留 = 预签名 URL 的 origin 落在代理上，daemon 的 PUT 同样过代理）；

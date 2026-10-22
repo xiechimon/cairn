@@ -819,3 +819,70 @@ describe('#1259 persona 归属机（seeding × 绑定模型桥接）', () => {
     expect(implementer.machineId).toBe(meaMachine);
   });
 });
+
+// #1492 verify 步按方案 Verification 清单逐项出判定（规划 → 确认 → 执行 →
+// 验证全链，HTTP 面走真路由）。失败方式：
+//  1. 清单没进 verify 步材料 → Verifier 当场自己想验什么。
+//  2. Verifier 漏验清单项仍报 passed=true → 合并闸读到假通过。
+describe('#1492 verify 步按清单出判定', () => {
+  test('方案带 Verification → confirm → verify 材料列清单；漏项证据 → passed=false 点名', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    const verifierId = personaAgentId(w.s, 'verifier');
+    const buildId = await w.startBuild(
+      {
+        plan: { agentId: implementerId },
+        build: { agentId: implementerId },
+        verify: { agentId: verifierId },
+      },
+      true,
+    );
+    const planClaimed = await w.claim();
+    expect(planClaimed.kind).toBe('plan');
+    // plan.md 产物落库（真链路由 daemon 上传；completeStep 的 plan 腿只读 plan 行）。
+    w.s.db
+      .insert(planTable)
+      .values({
+        id: 'plan-1492',
+        buildId,
+        version: 1,
+        content:
+          '## Context\n探针\n\n## Verification\n- `pnpm lint` 通过\n- apps/server/test/x.test.ts 全绿\n',
+        stepId: planClaimed.stepId,
+        createdAt: Date.now(),
+      })
+      .run();
+    await w.done(planClaimed.stepId, { status: 'success' });
+    expect(w.todoRow().phase).toBe('confirm');
+    const confirm = await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, {
+      body: { action: 'confirm' },
+    });
+    expect(confirm.status).toBe(202);
+    const buildClaimed = await w.claim();
+    expect(buildClaimed.kind).toBe('build');
+    await w.done(buildClaimed.stepId, { status: 'success', hasChanges: true });
+    expect(w.todoRow().phase).toBe('review');
+    const verifyStep = w.stepsOf(buildId).find((r) => r.kind === 'verify')!;
+    expect(verifyStep.prompt).toContain('## 验证清单');
+    expect(verifyStep.prompt).toContain('1. `pnpm lint` 通过');
+    expect(verifyStep.prompt).toContain('2. apps/server/test/x.test.ts 全绿');
+    const verifyClaimed = await w.claim();
+    expect(verifyClaimed.kind).toBe('verify');
+    await w.done(verifyClaimed.stepId, {
+      status: 'success',
+      verifyVerdict: {
+        passed: true,
+        conclusion: 'lint 过了',
+        evidence: [{ path: 'docs/verify/1492/lint.txt', item: 1 }],
+      },
+    });
+    const verdictMsg = w
+      .messagesOf(buildId)
+      .map((m) => m.content)
+      .find((c) => typeof c === 'string' && c.includes(VERIFY_VERDICT_KIND));
+    const parsed = verifyVerdictSchema.parse(JSON.parse(verdictMsg as string).verdict);
+    expect(parsed.passed).toBe(false);
+    expect(parsed.conclusion).toContain('清单第 2 项无证据');
+    expect(parsed.evidence[0]?.item).toBe(1);
+  });
+});
