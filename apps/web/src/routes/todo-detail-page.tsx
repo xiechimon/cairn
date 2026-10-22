@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
+import { agentTodoStore } from '../api/agent-todo.js';
 import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
@@ -335,6 +336,9 @@ export function TodoDetailPage() {
   const activity = useSyncExternalStore(activityStore.subscribe, () =>
     buildId != null ? activityStore.get(buildId) : null,
   );
+  const agentTodo = useSyncExternalStore(agentTodoStore.subscribe, () =>
+    buildId != null ? agentTodoStore.get(buildId) : null,
+  );
   const streamHandlers = useMemo(
     () => ({
       // todo/phase 面由 team stream 驱动失效；此处兜底本页 todo 键。走收敛缝
@@ -443,6 +447,7 @@ export function TodoDetailPage() {
         liveThinking,
         stopping,
         activity,
+        agentTodo,
       }),
       ...(latestPlan ? { doc: mapPlanDoc(latestPlan.content) } : {}),
       ...(changesQ.data
@@ -463,6 +468,7 @@ export function TodoDetailPage() {
     liveText,
     liveThinking,
     activity,
+    agentTodo,
     latestPlan,
     changesQ.data,
     changesExpanded,

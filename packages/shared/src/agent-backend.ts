@@ -8,6 +8,7 @@
 // 本文件零依赖 pi——shared 零反向（01 §3）。
 
 import { z } from 'zod';
+import { agentTodoItemSchema } from './agent-todo.js';
 // 类型-only（编译期擦除）：brief-file.ts 反向依赖本模块的 isBackendRuntimeId，
 // 值导入会成环。
 import type { BriefBackendId } from './brief-file.js';
@@ -32,6 +33,7 @@ export const toolCallRecordSchema = z.object({
   isError: z.boolean().optional(),
   startedAt: epochMs.optional(),
   endedAt: epochMs.optional(),
+  todo: z.array(agentTodoItemSchema).optional(),
 });
 export type ToolCallRecord = z.infer<typeof toolCallRecordSchema>;
 

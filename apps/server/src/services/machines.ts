@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type {
+  AgentTodoReport,
   ClaimedStep,
   ClaudeCodeReport,
   GitCredentials,
@@ -1426,6 +1427,16 @@ export function reportActivity(
 ): void {
   const row = ownedStep(deps, machineId, stepId);
   deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: nowMs() });
+}
+
+export function reportAgentTodo(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  report: AgentTodoReport,
+): void {
+  const row = ownedStep(deps, machineId, stepId);
+  deps.convHub?.publishAgentTodo(row.buildId, { ...report, stepId, at: nowMs() });
 }
 
 /** GET /api/machine/attachment/{stepId}/{attachmentId} 服务层（#730）：daemon

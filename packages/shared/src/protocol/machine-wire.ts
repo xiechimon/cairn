@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
+import { agentTodoReportSchema } from '../agent-todo.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
 import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
@@ -433,6 +434,12 @@ export const machineTranscriptRowBodySchema = z.object({
 });
 export type MachineTranscriptRowBody = z.infer<typeof machineTranscriptRowBodySchema>;
 
+export const machineAgentTodoBodySchema = z.object({
+  kind: z.literal('agent_todo'),
+  todo: agentTodoReportSchema,
+});
+export type MachineAgentTodoBody = z.infer<typeof machineAgentTodoBodySchema>;
+
 /** POST /api/machine/tool/{stepId}——同径双形（r5 §3.1 bundle 提取）+ 复刻
  * 增量第三形（transcript delta [设计]，machineTranscriptDeltaBodySchema）+
  * #905 第四形（activity [设计]，machineActivityBodySchema）+ #955 第五形
@@ -457,6 +464,7 @@ export const machineToolBodySchema = z.union([
   machineThinkingDeltaBodySchema,
   machineActivityBodySchema,
   machineTranscriptRowBodySchema,
+  machineAgentTodoBodySchema,
 ]);
 
 /** relay 执行响应（bundle 消费面 `reply.body?.text`）；失败 = {error}(+transient)。 */
