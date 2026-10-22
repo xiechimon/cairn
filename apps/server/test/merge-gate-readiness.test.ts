@@ -161,6 +161,8 @@ function green(): GateInputs {
       complete: true,
     }),
     compare: readAt(HEAD, withCommits({ files: [...FILES, SHOT] }, chain(EARLIER, HEAD))),
+    // S4b：外壳查过链接的文件在那个提交上存在（raw 不是 404）。
+    evidence: [{ sha: HEAD, path: SHOT.filename, present: true }],
     verdicts: [
       v('verify', 'pass'),
       v('review', 'pass', 'correctness'),
@@ -938,6 +940,8 @@ describe('mergeReadiness：形状不对的 compare 留人，证据出自本 PR�
   test('证据链钉在本 PR 的提交上（不必是 head）、指向本 PR 加的证据：算', () => {
     const i = green();
     pr(i).body = `evidence: ${link(EARLIER)}`;
+    // S4b：外壳查过，文件在 EARLIER 上存在。
+    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: true }];
     expect(codesOf(i)).toEqual([]);
   });
 
@@ -957,6 +961,8 @@ describe('mergeReadiness：形状不对的 compare 留人，证据出自本 PR�
   test('多条链接有一条合格即可：钉在 main 历史上的那条不拖累', () => {
     const i = green();
     pr(i).body = `${link(MAIN)}\n${link(EARLIER)}`;
+    // S4b：外壳查过，文件在 EARLIER 上存在。
+    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: true }];
     expect(codesOf(i)).toEqual([]);
   });
 
@@ -1158,14 +1164,60 @@ describe('mergeReadiness：提取失败可清、不可合并态、截断、大�
     expect(classesOf(i)).toEqual([['pr-from-fork', 'human', 'head repository deleted']]);
   });
 
-  test('readiness 不判链接的文件在那个提交上是否已存在（raw 404）：交给 S4 外壳', () => {
-    // 故事：shot.png 在 head 才加进来，链接钉在更早的 EARLIER 上，raw 是 404。compare
-    // 的 commits 不带逐提交的文件列表，readiness 看不出这一点，照样算数；文件在该
-    // SHA 上是否存在由 S4 的 I/O 外壳去查。
+  test('链接的文件在那个提交上不存在（raw 404）：evidence-link-missing（S4b 外壳查过的 evidence 输入）', () => {
+    // 故事：shot.png 在 head 才加进来，链接钉在更早的 EARLIER 上，raw 是 404。compare 的
+    // commits 不带逐提交的文件列表；外壳（S4b）按 contents 列目录查过，present 为 false。
+    const missing = (detail: string) => [['evidence-link-missing', 'transient', detail]];
     const i = green();
     pr(i).body = `evidence: ${link(EARLIER)}`;
+    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: false }];
+    expect(classesOf(i)).toEqual(
+      missing(
+        '1 link(s) at a commit of this PR to a file it adds or changes, none present at its commit',
+      ),
+    );
+    // 外壳读不到（null）同样不算数，可等。
+    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: null }];
+    expect(classesOf(i)).toEqual(
+      missing('1 link(s) at a commit of this PR to a file it adds or changes, presence unreadable'),
+    );
+    // 外壳没查这一条（没有对应的 evidence 项）：不算数。
+    i.evidence = [{ sha: HEAD, path: SHOT.filename, present: true }];
+    expect(classesOf(i)).toEqual(
+      missing(
+        '1 link(s) at a commit of this PR to a file it adds or changes, none present at its commit',
+      ),
+    );
+    // 假腿：查过、存在。
+    i.evidence = [{ sha: EARLIER, path: SHOT.filename, present: true }];
+    expect(codesOf(i)).toEqual([]);
+    // 两条合格的链接，一条不存在、一条存在：有一条存在就够。
+    pr(i).body = `evidence: ${link(EARLIER)} and ${link(HEAD)}`;
+    i.evidence = [
+      { sha: EARLIER, path: SHOT.filename, present: false },
+      { sha: HEAD, path: SHOT.filename, present: true },
+    ];
     expect(codesOf(i)).toEqual([]);
   });
+
+  test('evidence 项只认合格的链接：不合格链接的 present 不让它算数', () => {
+    // 链接钉在 main 历史上的 MAIN（不是本 PR 的提交），evidence 却说存在：照样 evidence-link-missing。
+    const i = green();
+    pr(i).body = `evidence: ${link(MAIN)}`;
+    i.evidence = [{ sha: MAIN, path: SHOT.filename, present: true }];
+    expect(codesOf(i)).toEqual(['evidence-link-missing']);
+  });
+
+  test.each([-1, 1.5, Number.NaN])(
+    'totalCommits 不是非负整数（%s）：按没读全处理，可等的 patch-unavailable（#1479 pr-gate 第 3 轮建议 4）',
+    (n) => {
+      const i = green();
+      compare(i).totalCommits = n;
+      expect(classesOf(i)).toEqual([
+        ['patch-unavailable', 'transient', 'compare commit list incomplete'],
+      ]);
+    },
+  );
 });
 
 describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只认当前摘要', () => {

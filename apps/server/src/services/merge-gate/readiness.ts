@@ -18,7 +18,7 @@ import {
   type Phase,
 } from '@pacman/shared';
 import { computePatchDigest } from './digest.js';
-import { parseRawEvidenceLinks } from './evidence-link.js';
+import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';
 
 /** 一条判定在闸眼里的样子。patchDigest = 判定绑定的补丁摘要；判定 head 与
@@ -145,6 +145,10 @@ export interface GateInputs {
     | { headSha: string; files: CompareFile[]; commits: GateCompareCommit[]; totalCommits: number }
     | 'unreadable'
     | 'malformed';
+  /** 外壳（S4b）查过的证据链：合格的链接（qualifyingEvidenceLinks）指向的文件在那个提交上
+   * 是否存在（contents 列目录；raw 404 的链接在 GitHub 上打不开）。present = true 存在、
+   * false 不存在、null 读不到。外壳没查的链接没有对应项，按不存在算。 */
+  evidence: { sha: string; path: string; present: boolean | null }[];
   /** 本构建的全部判定，各摘要上的都在内（换构建即换一份）。 */
   verdicts: GateVerdictView[];
   /** 当前摘要的闸轮次；perspectives 在建轮时冻结。human 策略下没有轮次。 */
@@ -163,7 +167,7 @@ const PASSING_CONCLUSIONS = new Set(['success', 'neutral', 'skipped']);
 // D4 ④ 按路径认闸的源码，判定从别处 import，只改那个文件的 PR 就能改掉闸认什么，
 // 路径判定却看不出它碰了闸（测试 merge-gate-imports 钉着）。
 const FULL_SHA = /^[0-9a-f]{40}$/;
-const isFullSha = (s: string) => FULL_SHA.test(s);
+export const isFullSha = (s: string) => FULL_SHA.test(s);
 
 /** compare 响应自己的 head：commits 里没被别的列着的提交认作父提交的那一个（读全的
  * base...head 恰好一个，见 GateInputs.compare）。没有或不止一个 = 说不清读在哪，null。 */
@@ -413,28 +417,31 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
       block('evidence-executable', ...names(paths.executableEvidence));
   }
 
-  // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件：
-  // 只是 head 的祖先不够，main 历史里同票前一段（已 squash）的证据也是祖先，本 PR
-  // 却一份证据没加。compare 不可得时上面已拦，这里判不了，不再重复列出；没有 PR 的
-  // head 可对时 compare 的提交可能是别的提交的，也不判（pr-unreadable 已拦）。
-  // 判不了的另一样：链接钉在本 PR 较早的提交上、文件到后来的提交才加进来时，raw
-  // 是 404，可两条都成立。要判须知道每个提交动了哪些文件，compare 不给；文件在该
-  // SHA 上是否存在交给 S4 的外壳查（测试「readiness 不判链接的文件……」钉着这一点）。
+  // 来源与证据链。链接要钉在本 PR 的提交上（base..head），且指向本 PR 增改的文件
+  // （qualifyingEvidenceLinks，外壳用同一条）；链接的文件还要在那个提交上存在（外壳查过的
+  // evidence 输入，raw 404 的链接打不开）。compare 不可得时上面已拦，这里判不了，不再重复
+  // 列出；没有 PR 的 head 可对时 compare 的提交可能是别的提交的，也不判（pr-unreadable 已拦）。
   if (i.issueNumber === null) block('issue-ref-missing');
   if (pr !== null && head !== null && compare !== null) {
-    const { links } = parseRawEvidenceLinks(pr.body, {
-      owner: i.repo.owner,
-      repo: i.repo.name,
-      ticketRef: i.ticketRef,
+    const args = { owner: i.repo.owner, repo: i.repo.name, ticketRef: i.ticketRef };
+    const qualifying = qualifyingEvidenceLinks(pr.body, args, compare);
+    // 没有对应项（外壳没查这一条）按不存在算；null（读不到）照留，详情里说明。
+    const presence = qualifying.map((l): boolean | null => {
+      const e = i.evidence.find((x) => x.sha === l.sha && x.path === l.path);
+      return e === undefined ? false : e.present;
     });
-    const commits = new Set(compare.commits.map((c) => c.sha));
-    const changed = new Set(
-      compare.files.filter((f) => f.status !== 'removed').map((f) => f.filename),
-    );
-    if (!links.some((l) => commits.has(l.sha) && changed.has(l.path))) {
+    if (qualifying.length === 0) {
+      const { links } = parseRawEvidenceLinks(pr.body, args);
       block(
         'evidence-link-missing',
         `${links.length} link(s) to ${EVIDENCE_PREFIX}${i.ticketRef}/, none at a commit of this PR to a file it adds or changes`,
+      );
+    } else if (!presence.includes(true)) {
+      block(
+        'evidence-link-missing',
+        `${qualifying.length} link(s) at a commit of this PR to a file it adds or changes, ${
+          presence.includes(null) ? 'presence unreadable' : 'none present at its commit'
+        }`,
       );
     }
   }
