@@ -389,3 +389,17 @@ jobs:
           git fetch --depth=1 origin "${COMMENT_DISCIPLINE_BASE_SHA:-main}"
           node --test scripts/comment-discipline-gate.test.mjs
           node scripts/comment-discipline-gate.mjs
+
+  closing-keyword-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+      - name: Closing keyword gate (advisory, #1541)
+        run: |
+          node --test scripts/check-closing-keyword.test.mjs
+          node scripts/check-closing-keyword.mjs
