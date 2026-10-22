@@ -88,11 +88,15 @@ export function gitCredentialEnv(
   // #1460：接在父环境自带的 GIT_CONFIG_* 之后（容器 / CI 的代理、CA 配置），
   // 从 0 写会盖掉它们，COUNT=2 又把 2 号以后的藏起来。
   const n = inheritedGitConfigCount(parent);
+  // 用户名 / 密码带换行或回车：git 的凭证协议按行分隔，这样的值会被读成别的
+  // 字段。明确报错（server 签发的值不会有），不静默丢掉 helper——否则步后面
+  // 以误导的「terminal prompts disabled」失败。
+  if (/[\r\n\0]/.test(cred.username + cred.password)) {
+    throw new Error('per-step git credential contains a line break; refusing to pass it to git');
+  }
   // #1484：helper 只应答签发远端。git 按实际连接的 URL（insteadOf 改写、HTTP
-  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。用户名 /
-  // 密码带换行或回车时不装 helper：git 的凭证协议按行分隔，这样的值会被读成
-  // 别的字段（server 签发的值不会有）。
-  const target = /[\r\n\0]/.test(cred.username + cred.password) ? null : credentialTarget(cred.url);
+  // 跳转之后）组请求，origin 被改指别处时 host 对不上，拿不到凭证。
+  const target = credentialTarget(cred.url);
   return {
     // 空值重置 credential.helper 列表（git 语义：空值清空此前累积的全部
     // helper，含父环境条目与 URL 作用域条目里的）。缺此条则系统级/全局
@@ -286,6 +290,19 @@ export const gitPrim = {
    * null（调用方按失格回落处理，不抛）。只读 config，不触网络。 */
   async remoteUrl(dir: string): Promise<string | null> {
     const r = await runGit(['remote', 'get-url', 'origin'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) return null;
+    const url = r.stdout.trim();
+    return url === '' ? null : url;
+  },
+
+  /** origin 的原始配置值（`remote.origin.url`，#1484）：不经 insteadOf 改写——
+   * `remote get-url` 返回改写后的 URL，与 cloneUrl 比较会误判偏离。无 origin /
+   * git 失败 = null。 */
+  async originConfigUrl(dir: string): Promise<string | null> {
+    const r = await runGit(['config', '--get', 'remote.origin.url'], {
       cwd: dir,
       timeoutMs: META_TIMEOUT_MS,
     });

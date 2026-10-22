@@ -136,6 +136,26 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
   }, 30_000);
 
+  test('#1484：比较的是 origin 的原始配置值，insteadOf 改写不触发重指', async () => {
+    // 机器配置里常见 url.<ssh>.insteadOf <https>：git remote get-url 返回改写后的
+    // URL，与 cloneUrl 永远不等；拿它比会每步重写共享配置、打误导日志。
+    const alias = 'pacman-alias:repo';
+    stubOutInheritedGitConfig();
+    vi.stubEnv('GIT_CONFIG_COUNT', '1');
+    vi.stubEnv('GIT_CONFIG_KEY_0', `url.${originDir}.insteadOf`);
+    vi.stubEnv('GIT_CONFIG_VALUE_0', alias);
+    try {
+      await ws.prepare({ ...prepareInput(CONV_A), cloneUrl: alias });
+      logger.lines.length = 0;
+      await ws.prepare({ ...prepareInput(CONV_B), cloneUrl: alias });
+      expect(logger.lines).not.toContain(
+        '[workspace] Repo origin re-pointed to the project clone URL',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  }, 30_000);
+
   test('base 二择：origin/<convBranch> 已 fetch 时优先（异机续跑面）', async () => {
     // 从种子工作区把 conv 分支推上远端（带独有提交）。
     const branch = conversationBranch(CONV_A);

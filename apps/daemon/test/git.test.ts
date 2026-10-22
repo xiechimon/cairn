@@ -220,7 +220,8 @@ describe('gitCredentialEnv — 追加在父环境的 GIT_CONFIG_* 之后（#1460
 //      tagPush / fetch 不向那台主机发凭证；指向绑定主机时照常认证
 //   6. 凭证值不进 helper 的 sh -c 命令行（argv 本机他人可读），只在环境里
 //   7. http 绑定经跳转升到同主机 https 照常应答（更安全的通道）；https 不降级到 http
-//   8. 用户名 / 密码带换行或回车（git 凭证协议按行分隔，会被读成别的字段）→ 不装 helper
+//   8. 用户名 / 密码带换行或回车（git 凭证协议按行分隔，会被读成别的字段）→ 明确报错，
+//      不静默丢掉 helper（否则步后面以误导的「terminal prompts disabled」失败）
 
 /** 要 Basic 认证的假远端：无 Authorization → 401 质询；带了 → 记下解码值、回 403。 */
 async function basicAuthRemote(): Promise<{ base: string; seen: string[]; close: () => void }> {
@@ -372,10 +373,8 @@ describe('gitCredentialEnv — helper 只对凭证签发给的主机应答（#14
     ['密码带换行', { password: 'a\nb' }],
     ['密码带回车', { password: 'a\rb' }],
     ['用户名带换行', { username: 'u\nhost=evil.example' }],
-  ])('失败方式 8：%s（git 的凭证协议装不下）→ 不装 helper，凭证不进环境', (_label, patch) => {
-    const env = gitCredentialEnv({ ...CRED, ...patch }, {});
-    expect(env.GIT_CONFIG_COUNT).toBe('1');
-    expect(Object.keys(env).filter((k) => k.startsWith('PACMAN_GIT_CRED_'))).toEqual([]);
+  ])('失败方式 8：%s（git 的凭证协议装不下）→ 明确报错，不交给 git', (_label, patch) => {
+    expect(() => gitCredentialEnv({ ...CRED, ...patch }, {})).toThrow(/line break/);
   });
 
   test('失败方式 6：凭证值不进 helper 的 sh -c 命令行（GIT_TRACE 记录的 run_command）', () => {
