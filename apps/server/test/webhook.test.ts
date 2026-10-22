@@ -799,6 +799,11 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       deliveryId: 'w2',
       detail: SENDER_REFUSED_DETAIL,
     });
+    // 202 只有那一句：哪种拒收由日志行的原因码钉（读到 read，不是读不到）。
+    const direct = await deliverDirect(labeledPayload('pacman', { sender: 'reader' }), 'w2-direct');
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ sender: 'reader', reason: 'sender-below-triage' }),
+    ]);
     expect(issueReads()).toHaveLength(0);
     expect(issueTasks()).toHaveLength(0);
   });
@@ -996,6 +1001,14 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       deliveryId: 'w12b',
       detail: SENDER_REFUSED_DETAIL,
     });
+    // 404 是明确的否定答案：原因码是不到 triage，不是读不到。
+    const direct = await deliverDirect(
+      labeledPayload('pacman', { sender: 'ghost' }),
+      'w12b-direct',
+    );
+    expect(refusals(direct.lines)).toEqual([
+      expect.objectContaining({ sender: 'ghost', reason: 'sender-below-triage' }),
+    ]);
     expect(issueTasks()).toHaveLength(0);
   });
 
@@ -1206,7 +1219,7 @@ describe('#1459 round 2 W review 发现', () => {
     expect(issueTasks()).toHaveLength(0);
   });
 
-  test.each([['..'], ['.'], ['a/b'], ['']])(
+  test.each([['..'], ['.'], ['a/b'], [''], ['alice.acme'], ['_alice'], ['-alice'], ['alice_']])(
     'W20 sender 的 login 不是 GitHub 账号名（%j）→ 202 ignored，零出站，记日志',
     async (login) => {
       const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
@@ -1235,4 +1248,22 @@ describe('#1459 round 2 W review 发现', () => {
     ]);
     expect(permissionReads()).toHaveLength(1);
   });
+
+  // GitHub 文档（Enterprise Managed Users 的用户名）：GitHub.com 上托管账号的用户名
+  // 是 IDP-USERNAME_SHORT-CODE（例 mona-cat_octo），开通 SAML 的设置账号是
+  // SHORT-CODE_admin。这些人照轮询器的判据读权限（#1496 pr-gate 建议 1 / 9）。
+  test.each([['alice_acme'], ['mona-cat_octo'], ['octo_admin'], ['octo-helper[bot]']])(
+    'W21 GitHub 认的账号名（%s：EMU 托管账号带下划线与短码、bot 带 [bot]）→ 读权限，够 triage 就导入',
+    async (login) => {
+      routes[`/repos/${REPO}/collaborators/${encodeURIComponent(login)}/permission`] = {
+        body: permissionBody(login, 'admin', 'admin'),
+      };
+      const payload = { ...labeledPayload(), sender: { login, type: 'User' } };
+      const direct = await deliverDirect(payload, 'w21');
+      expect(direct.response.result).toBe('created');
+      expect(refusals(direct.lines)).toEqual([]);
+      expect(permissionReads()).toHaveLength(1);
+      expect(issueTasks()).toHaveLength(1);
+    },
+  );
 });
