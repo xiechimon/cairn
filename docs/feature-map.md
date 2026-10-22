@@ -70,16 +70,16 @@
 
 | 项 | 数 |
 |---|---|
-| 地图行（issue） | 604 |
+| 地图行（issue） | 605 |
 | 其中 差异化面 | 85 |
 | 其中 运行轴 | 137 |
-| 其中 通用面 | 382 |
+| 其中 通用面 | 383 |
 | 状态 已做 | 532 |
-| 状态 在跑 | 5 |
+| 状态 在跑 | 6 |
 | 状态 待开 | 3 |
 | 状态 未验证 | 64 |
 | 锚 = 证据目录 + 测试引用 | 289 |
-| 锚 = 仅证据目录 | 77 |
+| 锚 = 仅证据目录 | 78 |
 | 锚 = 仅测试引用 | 171 |
 | 无锚（`[未验证]`） | 67 |
 | 被引用的 PR（不生成行，§3.2） | 107 |
@@ -697,6 +697,7 @@
 | [#1486](https://github.com/xiechimon/pacman/issues/1486) server: a started card moved back to todo by PATCH or reopen_todos keeps its builds and flags; reset clears them | 通用面 | 已做 | `docs/verify/1486/`<br>`apps/server/test/close-stops-active-steps.test.ts`<br>`apps/server/test/manual-drop-matrix.test.ts`<br>`apps/server/test/patch-todo-reset-gate.test.ts` |
 | [#1487](https://github.com/xiechimon/pacman/issues/1487) server: a merge step that finishes after its card is closed lands on a hosted repo with no trace | 通用面 | 已做 | `docs/verify/1487/`<br>`apps/server/test/m3b-machine-git.test.ts` |
 | [#1494](https://github.com/xiechimon/pacman/issues/1494) server: worker 步注入的 agent 记忆不按项目过滤，跨项目串用 | 通用面 | 已做 | `docs/verify/1494/`<br>`apps/server/test/m4b-memory.test.ts`<br>`integration/test/m4b-memory-e2e.test.ts` |
+| [#1527](https://github.com/xiechimon/pacman/issues/1527) 功能地图：生成物移出 spec 编号序列、CI 加 --check、每日刷新 | 通用面 | 在跑 | `docs/verify/1527/` |
 
 ## 3. 没锚与挂不上的行（后续要补的活）
 
