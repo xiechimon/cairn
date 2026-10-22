@@ -43,7 +43,7 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 
 `P1 PASS`、`P2 PASS`、`P3 PASS`、`P4 PASS`（各 685,236 个不同状态，8 核各十几秒）。F1 / F2 由 #1473 修掉，F3 由停止投递修复修掉（见下）。F3 修复后停止不再经会话句柄投递，模型去掉了 `handle` / `stopReq` 两个变量，状态数从 794,525 降到 685,236。以后哪条变成 FAIL，先按「怎么分辨真 bug 和模型写错」判断；**不要为了让它通过去削弱性质或模型。**
 
-`sync-commit` 指向 #1473 的 squash 提交 659d8cb5，模型同时已跟到 F3 修复。本仓 squash 合并，分支上的提交号合并后不在 main 上：F3 修复合并后，把 `sync-commit` 推到那个 squash 提交。
+`sync-commit` 指向 #1495（F3 修复）的 squash 提交 93b9ce21。本仓 squash 合并，分支上的提交号合并后不在 main 上：以后同步模型的改动合并后，把 `sync-commit` 推到那个 squash 提交。
 
 F1、F2 已由 #1473 修掉（下面保留原发现，供对照）：
 - daemon `runStep` 入口即起心跳，会话结束与失败回报前各自停，`finally` 兜住其余出口（`runner.ts:423-454`、`failStep` 2338）。模型：`HeartbeatStep` / `KeepsFresh` 在 `preparing` 也成立，`StartSession` 不再清 `beat`。
@@ -147,7 +147,7 @@ F3 修完后做过一次（P4，模型副本里单线程跑）：
 
 `run.sh` 读下面两处：`sync-commit` 行和 `coverage` 代码块（每行两个空格开头的路径）。
 
-sync-commit: 659d8cb5
+sync-commit: 93b9ce21
 
 ```coverage
   apps/server/src/services/machines.ts
