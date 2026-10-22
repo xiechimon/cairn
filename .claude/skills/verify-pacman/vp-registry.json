@@ -554,8 +554,8 @@
             "github"
           ],
           "status": "current",
-          "purpose": "A GitHub issues labeled webhook creates a todo and orchestrates a chief thread. It also covers the failure paths: bad token (401), duplicate delivery, replay, ping, an ignored label and an unmapped repo.",
-          "usage": "env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "purpose": "A GitHub issues labeled webhook whose sender has triage or above on the repo creates a todo and orchestrates a chief thread (#1459, ADR 0021 D5). It also covers the failure paths: bad token (401), duplicate delivery, replay, ping, an ignored label, an unmapped repo, and the import refusals answered 202 ignored: no-sender, sender-below-triage (sender ghost) and at-cap (3 open github-issue tasks), each checked by its reason code in server.log. The permission-unreadable and rate-limited refusals cannot be produced against real GitHub; apps/server/test/webhook.test.ts W4 / W4b cover them.",
+          "usage": "env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_GITHUB_SENDER (a login with triage, write, maintain or admin on VERIFY_GITHUB_REPO whose permission the token can read; default the repo owner segment, which only fits a user-owned repo), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
           "runner": "tsx",
           "cwd": "apps/server"
         }

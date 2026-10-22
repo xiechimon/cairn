@@ -169,12 +169,13 @@ describe('M4b memory E2E：指令触发 + 执行步中写 + 溯源 + 零自动�
 
   test('无指令轮：零写入（5+ 运行实测语义等价）+ 读侧注入痕迹上 wire（04 附录 A）', async () => {
     // 注入痕迹断言前采样：任务二的 provider 请求体应含已存记忆 title。
-    world2 = await seedWorld(
-      server.url,
-      server.teamId,
-      { title: '无记忆指令任务', spec: '在 README.md 追加一行任务二探针。' },
-      { projectName: 'm4b-mem-2' },
-    );
+    // 任务二与任务一同项目：注入只取本项目与全局条目（#1494），任务一存的条目
+    // 带任务一的 projectId。
+    const todo2Res = await api(server.url, 'POST', `/api/projects/${world1.projectId}/todos`, {
+      title: '无记忆指令任务',
+      spec: '在 README.md 追加一行任务二探针。',
+    });
+    world2 = { projectId: world1.projectId, todoId: (todo2Res.body as { id: string }).id };
     const started = await api(server.url, 'POST', `/api/projects/${world2.projectId}/builds`, {
       todoIds: [world2.todoId],
       assignment: { plan: null, build: { agentId: AGENT_ID } },

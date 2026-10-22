@@ -141,6 +141,8 @@ export interface GithubPull extends GithubPullState {
   baseRef: string | null;
   baseRepoId: number | null;
   defaultBranch: string | null;
+  /** 目标仓现在的 owner（base.repo.owner.login；仓库改名或转移后是新名字）；缺失 = null。 */
+  baseOwner: string | null;
 }
 
 export interface GithubPullPage {
@@ -213,7 +215,10 @@ export async function githubPull(
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
-    base?: { ref?: unknown; repo?: { id?: unknown; default_branch?: unknown } | null } | null;
+    base?: {
+      ref?: unknown;
+      repo?: { id?: unknown; default_branch?: unknown; owner?: { login?: unknown } | null } | null;
+    } | null;
   };
   // merged 缺失或不是布尔 → 读不到：不能把一次被裁掉的响应读成「关闭未合并」。
   if ((raw.state !== 'open' && raw.state !== 'closed') || typeof raw.merged !== 'boolean') {
@@ -236,6 +241,7 @@ export async function githubPull(
       baseRepoId: typeof raw.base?.repo?.id === 'number' ? raw.base.repo.id : null,
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
+      baseOwner: optString(raw.base?.repo?.owner?.login),
     },
   };
 }
@@ -270,6 +276,63 @@ export async function githubCompareStatus(
   } catch {
     return null;
   }
+}
+
+/** 工作分支上的一张 PR（#1403 段 2 PR 身份：`GET /repos/{o}/{r}/pulls` 的列表项投影）。
+ * 列表项没有 merged 布尔，merged = merged_at 非空。head.repo 为 null（fork 已删）时
+ * headRepoId 是 null。 */
+export interface GithubBranchPull {
+  number: number;
+  state: 'open' | 'closed';
+  merged: boolean;
+  headRef: string | null;
+  headRepoId: number | null;
+  baseRef: string | null;
+  baseRepoId: number | null;
+}
+
+/** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
+ * <owner>:<branch>&base=<base>&per_page=10`，GitHub 按创建时间倒序给）。同一个分支可以
+ * 先后开过好几张 PR。token 可空（匿名梯，公开仓可达）。null = 读不到（网络、非 2xx、
+ * 响应不是数组）；形状不对的项跳过。 */
+export async function githubBranchPulls(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  opts: { head: string; base: string },
+): Promise<GithubBranchPull[] | null> {
+  const url = listUrl(owner, repo, 'pulls', {
+    state: 'all',
+    head: opts.head,
+    base: opts.base,
+    per_page: 10,
+  });
+  const got = await conditionalGetJson(fetchImpl, url, token, null, FETCH_TIMEOUT_MS);
+  if (got === null || got.notModified) return null;
+  const page = projectArray<GithubBranchPull>(
+    { ok: true, data: got.data, hasMore: false },
+    (raw) => {
+      const p = raw as {
+        number?: unknown;
+        state?: unknown;
+        merged_at?: unknown;
+        head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+        base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
+      };
+      if (typeof p.number !== 'number' || (p.state !== 'open' && p.state !== 'closed')) return null;
+      return {
+        number: p.number,
+        state: p.state,
+        merged: typeof p.merged_at === 'string',
+        headRef: optString(p.head?.ref),
+        headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
+        baseRef: optString(p.base?.ref),
+        baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+      };
+    },
+  );
+  return page.ok ? page.items : null;
 }
 
 /** #1242 转换面可达性判定：GET /repos/{o}/{r}。可达 = resolve（2xx）；
@@ -365,10 +428,12 @@ export class GithubRateLimitedError extends Error {
     this.name = 'GithubRateLimitedError';
   }
 
-  /** 限流解除的时刻：reset 头优先，否则 now + retry-after；都没有 = null。 */
+  /** 限流解除的时刻：retry-after 优先（GitHub 文档「Exceeding the rate limit」：
+   * 有 retry-after 就等它；二级限流常同时带主窗口的 x-ratelimit-reset，那个时刻
+   * 可能远在之后），否则 x-ratelimit-reset；都没有 = null。 */
   retryAt(now: number): number | null {
-    if (this.resetAt !== null) return this.resetAt;
-    return this.retryAfterSeconds !== null ? now + this.retryAfterSeconds * 1000 : null;
+    if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;
+    return this.resetAt;
   }
 }
 
@@ -862,13 +927,17 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      const reset = Number(res.headers.get('x-ratelimit-reset') ?? Number.NaN);
-      const retryAfter = Number(res.headers.get('retry-after') ?? Number.NaN);
+      // 头不在、空串或不是非负整数 = 没给（Number('') 是 0，不能当「0 秒后」）。
+      const seconds = (name: string): number | null => {
+        const v = res.headers.get(name)?.trim() ?? '';
+        return /^\d+$/.test(v) ? Number(v) : null;
+      };
+      const reset = seconds('x-ratelimit-reset');
       throw new GithubRateLimitedError(
         url,
         res.status,
-        Number.isFinite(reset) ? reset * 1000 : null,
-        Number.isFinite(retryAfter) ? retryAfter : null,
+        reset === null ? null : reset * 1000,
+        seconds('retry-after'),
       );
     }
     return { ...head, data: undefined };

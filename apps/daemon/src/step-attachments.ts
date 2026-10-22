@@ -8,32 +8,48 @@
 //     step-attachments/<stepId>/）+ token 行下追加绝对路径 + Read 提示——
 //     引擎 Read 工具按需转换（pi photon / CC 内建）后进上下文
 //   - text/pdf → 零触碰（既有 attachment 工具路径不动）
-// 失败可见律：下载失败（pending/404/网络）与 key 语法复验不过 → token 原样
-// 保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过（票面失败方式
-// 3/10）。原文保真律：journal/transcript 侧的原始文本不经本模块（runner
-// 在解析前已落 transcript）——web 渲染面的 chip 形态不因展开而丢。
+// 失败可见律：下载失败（pending/404/网络）、素材化落盘失败与 key 语法复验
+// 不过 → token 原样保留 + 文本注明不可用 + 日志行——步不崩、不静默假装看过
+// （票面失败方式 3/10），同一文本里其余图片照常交付。原文保真律：
+// journal/transcript 侧的原始文本不经本模块（runner 在解析前已落
+// transcript）——web 渲染面的 chip 形态不因展开而丢。
+// #1406 issue 原文围栏：GitHub issue 导入任务的标题与 spec 逐行带引用前缀进
+// 围栏。围栏里的整行 token 去掉这一层前缀照常解析，改写行与注记行按围栏同一
+// 引用律（quoteIssueLines）写回，留在围栏里；围栏外的引用 token 行不认（web
+// 不给它渲染 chip）。
 
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { basename, dirname, join, relative, sep } from 'node:path';
 import type { DeliveredImage, MachineAttachmentResponse } from '@pacman/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
   isImageAttachmentExt,
+  issueFenceQuotedLines,
   parseAttachmentTokenLines,
+  quoteIssueLines,
 } from '@pacman/shared';
+
+/** 单个格式字符（Unicode Cf）。 */
+const FORMAT_CHAR = /^\p{Cf}$/u;
 
 /** 素材化文件名的独立安全化（票面失败方式 2 的纵深防御第二道）：server 面
  * isValidFileName 已挡 / 与 \，但 label 是用户可控文本——落盘名恒取
- * basename 段并剥控制字符，防 `../evil/name.bmp` 类 label 逃逸。 */
+ * basename 段并剥控制字符，防 `../evil/name.bmp` 类 label 逃逸。#1406：
+ * isValidFileName 放过的换行变体（U+0085 / U+2028 / U+2029）与格式字符
+ * （Unicode Cf）也剥掉——路径写进提示行，模型侧会在这些字符处断行，围栏
+ * 引用律也会改写它们，落盘名与提示里的路径只有同一份才对得上。剥完只剩
+ * 空串、. 或 ..（isValidFileName 放过的 `\u200b..\u200b` 一类）同样落
+ * attachment——它们会被 join 解析成步目录本身或素材化根。 */
 function safeFileName(fileName: string): string {
   const base = basename(fileName.replaceAll('\\', '/'));
   let out = '';
   for (const ch of base) {
-    const cp = ch.codePointAt(0);
-    if (cp !== undefined && cp < 0x20) continue;
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp < 0x20 || cp === 0x85 || cp === 0x2028 || cp === 0x2029) continue;
+    if (FORMAT_CHAR.test(ch)) continue;
     out += ch;
   }
-  return out === '' || out === '.' ? 'attachment' : out;
+  return out === '' || out === '.' || out === '..' ? 'attachment' : out;
 }
 
 /** 响应 mime → 素材化文件的规范扩展名（mime 与 fileName 扩展名漂移时以
@@ -63,16 +79,23 @@ function inlineMime(mimeType: string): string | null {
 }
 
 /** 素材化落盘（幂等覆写）：`<materializeDir>/<stepId>/<name>`。
- * 返回绝对路径（提示行与 Read 用）。 */
+ * 返回绝对路径（提示行与 Read 用）。落点不是素材化根下恰好两段（步目录 +
+ * 文件名）就抛错、不建目录不写盘——文件名已由 safeFileName 收成一段，这一
+ * 道管 stepId（server 下发，空串、.. 或带 / 都会把落点带出步目录）。 */
 export function materializeFile(
   materializeDir: string,
   stepId: string,
   fileName: string,
   bytes: Buffer,
 ): string {
-  const dir = join(materializeDir, stepId);
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, safeFileName(fileName));
+  const path = join(materializeDir, stepId, safeFileName(fileName));
+  const segments = relative(materializeDir, path).split(sep);
+  if (segments.length !== 2 || segments.includes('..')) {
+    throw new Error(
+      `materialize path outside ${materializeDir}/<stepId>/: ${JSON.stringify(path)}`,
+    );
+  }
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, bytes);
   return path;
 }
@@ -143,17 +166,31 @@ type Outcome =
   | { kind: 'unavailable'; note: string }
   | { kind: 'untouched' };
 
+/** 整行 token 形态的行：body = token 本身；quoted = 它是围栏里的引用行。 */
+interface TokenLine {
+  quoted: boolean;
+  body: string;
+}
+
+/** 逐行认 token 形态（整行形状命中，含 key 语法复验不过的行——它们也要可见地
+ * 失败，而不是无声当普通文本）；非 token 行为 null。 */
+function tokenLinesOf(lines: readonly string[]): (TokenLine | null)[] {
+  const quoted = issueFenceQuotedLines(lines);
+  return lines.map((line, i) => {
+    if (ATTACHMENT_TOKEN_LINE.test(line)) return { quoted: false, body: line };
+    const body = quoted[i] ?? null;
+    return body !== null && ATTACHMENT_TOKEN_LINE.test(body) ? { quoted: true, body } : null;
+  });
+}
+
 /** 解析 + 下载 + 分路（纯文本管线——逐 token 求结果后按行重建文本）。 */
 export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<ResolvedStepImages> {
-  // token 形态行全集（整行形状命中）：含 key 语法复验不过的行——它们也要
-  // 可见地失败（注记），而不是无声当普通文本。
-  const tokenLines = new Set<string>();
-  for (const line of opts.text.split('\n')) {
-    if (ATTACHMENT_TOKEN_LINE.test(line)) tokenLines.add(line);
-  }
-  const refs = parseAttachmentTokenLines(opts.text);
+  const lines = opts.text.split('\n');
+  const tokens = tokenLinesOf(lines);
+  const bodies = tokens.flatMap((t) => (t === null ? [] : [t.body]));
   const images: DeliveredImage[] = [];
-  if (tokenLines.size === 0) return { text: opts.text, images };
+  if (bodies.length === 0) return { text: opts.text, images };
+  const refs = parseAttachmentTokenLines(bodies.join('\n'));
   // 逐 token 处置（串行：同步下载窗口不放大并发；10MiB cap = 单件内存上界，
   // 串行即同刻至多一件在途——票面失败方式 8 的内存预算答案）。
   const outcomes = new Map<string, Outcome>();
@@ -163,32 +200,49 @@ export async function resolveStepImages(opts: ResolveStepImagesOpts): Promise<Re
     if (outcome.kind === 'inline') images.push(outcome.image);
   }
   // 重建文本：token 形态行按处置改写（key 语法外 = 不可用注记，零下载——
-  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。
+  // 纵深防御 + 可见失败）；其余行原样（原文保真律）。围栏里的改写行与注记行
+  // 按围栏引用律写回（文件名与报错原文可能带换行变体），产物不出围栏。
   const outLines: string[] = [];
-  for (const line of opts.text.split('\n')) {
-    if (!tokenLines.has(line)) {
+  for (const [i, line] of lines.entries()) {
+    const token = tokens[i] ?? null;
+    if (token === null) {
       outLines.push(line);
       continue;
     }
-    const outcome = outcomes.get(line);
+    const emit = (text: string): void => {
+      outLines.push(token.quoted ? quoteIssueLines(text) : text);
+    };
+    const outcome = outcomes.get(token.body);
     if (outcome === undefined) {
       outLines.push(line);
-      outLines.push('[图片附件形态不合法（key 语法外）——该图片未交付]');
+      emit('[图片附件形态不合法（key 语法外）——该图片未交付]');
       opts.log(`attachment token rejected (key grammar): ${line}`);
       continue;
     }
     if (outcome.kind === 'inline') {
-      outLines.push(outcome.anchor);
+      emit(outcome.anchor);
     } else if (outcome.kind === 'untouched') {
       outLines.push(line);
     } else if (outcome.kind === 'materialized') {
-      outLines.push(outcome.note); // token 行替换为路径提示行（路径即锚）
+      emit(outcome.note); // token 行替换为路径提示行（路径即锚）
     } else {
       outLines.push(line); // 不可用：token 原样保留（票面失败方式 3 裁定）
-      outLines.push(outcome.note);
+      emit(outcome.note);
     }
   }
   return { text: outLines.join('\n'), images };
+}
+
+/** 不可用处置（下载或落盘失败）：日志行 + 注记；token 行原样保留由重建处负责。 */
+function unavailable(
+  key: string,
+  stage: 'download' | 'materialize',
+  err: unknown,
+  log: (line: string) => void,
+): Outcome {
+  const reason = err instanceof Error ? err.message : String(err);
+  log(`attachment ${stage} failed: ${key} — ${reason}`);
+  return { kind: 'unavailable', note: `[图片附件 ${key} 不可用：${reason} — 该图片未交付]` };
 }
 
 /** 单 token 分路处置。 */
@@ -201,12 +255,7 @@ async function resolveOne(
   try {
     res = await opts.client.attachment(opts.stepId, ref.attachmentId);
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    opts.log(`attachment download failed: ${ref.key} — ${reason}`);
-    return {
-      kind: 'unavailable',
-      note: `[图片附件 ${ref.key} 不可用：${reason} — 该图片未交付]`,
-    };
+    return unavailable(ref.key, 'download', err, opts.log);
   }
   // 分类以响应 mime 为权威（key ext 只是预筛——漂移时按真值分路）。
   const mime = inlineMime(res.mimeType);
@@ -218,12 +267,18 @@ async function resolveOne(
     };
   }
   const bytes = Buffer.from(res.contentBase64, 'base64');
-  const path = materializeFile(
-    opts.materializeDir,
-    opts.stepId,
-    withMimeExt(res.fileName, res.mimeType),
-    bytes,
-  );
+  let path: string;
+  try {
+    path = materializeFile(
+      opts.materializeDir,
+      opts.stepId,
+      withMimeExt(res.fileName, res.mimeType),
+      bytes,
+    );
+  } catch (err) {
+    // 落盘失败只让这一个 token 不可用（同下载失败）：同一文本里已解析的图片照常交付。
+    return unavailable(ref.key, 'materialize', err, opts.log);
+  }
   opts.log(
     `attachment materialized: ${res.fileName} → ${path} (${res.mimeType} 不支持内联交付，走 Read 路线)`,
   );

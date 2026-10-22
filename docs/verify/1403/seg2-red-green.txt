@@ -1,0 +1,83 @@
+#1403 segment 2: red and green legs
+===================================
+
+Test files: apps/server/test/pr-reconcile.test.ts, chief-auto-confirm.test.ts,
+chief-watch.test.ts, gate-actor.test.ts (fixtures apps/server/test/fixtures/github/
+branch-pulls-*.json). Failure modes: seg2-failure-modes.txt.
+
+The tests were written before the code. A red leg runs the tests of the named tree
+against four unchanged sources (apps/server/src/lib/github.ts, services/ci-loop.ts,
+services/chief.ts, services/builds.ts): the four files are copied to the scratchpad,
+overwritten with `git show <ref>:<path>`, the run is taken, and the copies are put
+back and checked with sha256sum -c. Pins (T1-T7) and guards pass on both sides;
+their red leg is the mutation run (seg2-mutations.txt).
+
+Command (in apps/server):
+  pnpm exec vitest run test/pr-reconcile.test.ts test/chief-auto-confirm.test.ts \
+    test/chief-watch.test.ts test/gate-actor.test.ts
+
+1. First leg, before /code-review: tests of cf1bca12 against the sources of cefad17
+   (segment 1 plus main at the time)
+   red:   Tests  22 failed | 158 passed (180)
+   green: Tests  180 passed (180)   (sources of cf1bca12)
+
+2. Final leg, after four /code-review passes: tests of 034441ed against the sources of
+   origin/main (bc1d99f8; the four files are the same at 659d8cb5, which the branch
+   now contains: #1414 as b616110, #1461, #1477, #1483)
+   red:   Tests  40 failed | 157 passed (197)
+   green: Tests  197 passed (197)   (sources of 034441ed)
+   green: Tests  197 passed (197)   (merge commit 9be72069; the four sources are identical to 034441ed's)
+
+   Tests red on the unchanged sources:
+     x #1403 G9（G3）：关注的卡经相位漏斗进 review → wake 文本是 review 关口的，不是自动确认规则
+     x G1 review gate → no auto-confirm rules, no confirm_builds instruction, names the human exit
+     x G1 review gate on a todo that has split children → still the review text
+     x G4 chief confirm_builds on a review build → refused, no 通过了确认 row, phase unchanged
+     x G6 a second confirm on a todo already in building → 409, no second row, no second build step
+     x G7 confirm on a queued todo (direct execution, no confirm gate) → 409, no row, no build step
+     x G4 REST steps confirm on a review build → 409, no 通过了确认 row
+     x [66a] an open PR (pulls/1414): no merge commit, even though GitHub sends its test-merge sha
+     x [66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id
+     x [s2-A1] closed and confirmed, an open PR from the build's own branch → that PR is recorded, nothing fails
+     x [s2-A2] the PR on the same branch is already merged → it is recorded, then the merged path finishes the card
+     x [s2-A3] no other PR on the branch → failed as before, after one list read
+     x [s2-A5] the list read fails (502) → nothing written; the next sweep confirms again and acts
+     x [s2-A5] the list read fails (429) → nothing written; the next sweep confirms again and acts
+     x [s2-A5] the list read fails (throw) → nothing written; the next sweep confirms again and acts
+     x [s2-A7] the card leaves review while the list read is in flight → no write
+     x [s2-A7] a step starts while the list read is in flight → no write
+     x [s2-A8] anonymous: the list read takes the slot the pulls read kept for it, within the reconcile's own budget
+     x [s2-A15] the recorded PR shows up open in the list (reopened between the two reads) → not failed, nothing written
+     x [s2-A9] the recorded PR is another build's (9b shape) and this build has its own PR → its own PR is recorded, no foreign hint
+     x [s2-A7b] the recorded PR is foreign and a step starts while the list read is in flight → no write
+     x [s2-A9b] the recorded PR is foreign and the build has no PR of its own → one hint per round; the branch is listed again after ten minutes and a PR of its own found then is recorded
+     x [s2-A11] an open PR and merged ones → the open one
+     x [s2-A11] only merged ones → the highest number
+     x [s2-A15b] the recorded PR is open again and the list also has a higher open PR of the branch → still a reopen, nothing recorded
+     x [s2-A17] the list asks for the owner the PR response names, not the stored one (renamed or transferred repository)
+     x [s2-A9c] the recorded PR is foreign and the list read fails (502) → the hint as before; the branch is listed again after ten minutes
+     x [s2-A9c] the recorded PR is foreign and the list read fails (throw) → the hint as before; the branch is listed again after ten minutes
+     x [s2-A9e] the recorded PR is foreign and the build's own merged PR has a lower number → recorded (the recorded number is someone else's)
+     x [s2-A9d] the recorded PR is open but not the build's own → it is not left pending: the build's own PR is recorded, or one hint per round
+     x [s2-A19] the build records another PR while the list read is in flight (the daemon probe) → that value is kept, nothing written
+     x [s2-A20] the daemon probe records the foreign PR again and the reconcile adopts again → the adoption row is written once per round
+     x [s2-A21] anonymous: the foreign path lists the branch at most once an hour
+     x [s2-A22] the recorded PR changes: the ten-minute wait starts again for the new one
+     x [s2-A5b] the list read fails at two confirming reads in a row → the close is reported as in segment 1
+     x [s2-A5c] a failed list read during an earlier close does not count toward a later close
+     x [s2-A15c] the recorded PR shows up merged in the list (merged between the two reads) → nothing written; the next read finishes the card
+     x [s2-A22b] the build goes back to a PR it recorded before: the old listing time is gone, the branch is listed at once
+     x [s2-A13] the recorded URL is built from the repository and number, not taken from the response
+     x [s2-A14] the branch PR list parser: live captures, and unreadable answers
+
+   [66a] and [66b] are segment 1's live-response tests; they now also expect
+   baseOwner (base.repo.owner.login), which the unchanged parser does not read.
+
+   New tests that pass on both sides (guards, or pins whose red leg is a mutation):
+   [s2-A4] x6, [s2-A6], [s2-A16], [s2-A18], [s2-T2], [s2-T3], [s2-T4], [s2-T5],
+   [s2-T6], G2, T1 inside 18d / 18f, T7 inside 8b.
+
+3. Whole server project: on the merge commit 071d8bf8, 122 files, 1838 passed,
+   1 skipped; on 3f37f34c, 122 files, 1844 passed, 1 skipped (apps/server:
+   pnpm exec vitest run). On 9be72069, `pnpm exec vitest run --changed origin/main`
+   passes 139 files (gates-seg2.txt).

@@ -1,4 +1,4 @@
 P1_SingleExecutorPerMachine PASS
 P2_OnlyHolderResultApplied PASS
 P3_NoClaimAfterClose PASS
-P4_AcceptedStopReachesWorkers FAIL TryClaim,CloseCard,DeliverStopFetch,DeliverStopToHandle
+P4_AcceptedStopReachesWorkers PASS

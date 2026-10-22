@@ -70,3 +70,31 @@ describe('wakeFacts — #1254 auto-confirm gate 文本', () => {
     expect(text).not.toContain('confirm_builds');
   });
 });
+
+// #1403 G9（spec 28 §2.2）：review 关口与 confirm 关口同用 gate 触发，wakeFacts 曾对
+// review 也给出 confirm 关口的「自动确认规则」，chief 照做调 confirm_builds 会先落一行
+// 「通过了确认」再 409。review 关口给自己的文案：不调 confirm_builds / merge_builds，
+// 汇报改动是否就绪，指认人工出口。
+describe('wakeFacts — #1403 G9 review gate text', () => {
+  test('G1 review gate → no auto-confirm rules, no confirm_builds instruction, names the human exit', () => {
+    const text = wakeFacts('gate', todo({ phase: 'review' }), null, { isSplitParent: false });
+    expect(text).not.toContain('自动确认规则');
+    expect(text).not.toMatch(/直接调 confirm_builds/);
+    expect(text).toContain('review');
+    expect(text).toContain('merge_builds');
+    expect(text).toContain('「完成」');
+  });
+
+  test('G1 review gate on a todo that has split children → still the review text', () => {
+    const text = wakeFacts('gate', todo({ phase: 'review' }), null, { isSplitParent: true });
+    expect(text).not.toContain('拆解方案必须人审');
+    expect(text).not.toContain('自动确认规则');
+    expect(text).toContain('「完成」');
+  });
+
+  test('G2 the confirm gate keeps its auto-confirm rules', () => {
+    const text = wakeFacts('gate', todo({ phase: 'confirm' }), null, { isSplitParent: false });
+    expect(text).toContain('自动确认规则');
+    expect(text).not.toContain('「完成」');
+  });
+});

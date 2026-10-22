@@ -117,17 +117,23 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
 
   test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
     const { s, token, step } = await world();
+    // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。
+    const otherProject = await postProject(s.app, 'other');
+    const otherTodoRes = await call(s.app, 'POST', `/api/projects/${otherProject}/todos`, {
+      body: { title: '另一任务', spec: '' },
+    });
+    const { id: otherTodo } = (await otherTodoRes.json()) as { id: string };
     const res = await relay(s.app, token, step.step.id, 'save_memory', {
       title: 't',
       content: 'c',
-      projectId: 'proj-x',
-      sourceTodoId: 'todo-y',
+      projectId: otherProject,
+      sourceTodoId: otherTodo,
     });
     const saved = memoryRecordSchema.parse(
       JSON.parse(((await res.json()) as { text: string }).text),
     );
-    expect(saved.projectId).toBe('proj-x');
-    expect(saved.sourceTodoId).toBe('todo-y');
+    expect(saved.projectId).toBe(otherProject);
+    expect(saved.sourceTodoId).toBe(otherTodo);
     s.dispose();
   });
 
@@ -203,7 +209,7 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
   });
 
   test('读侧注入形（04 附录 A 验证面）：下一轮 claim 载荷 agent.memories 携带已存条目', async () => {
-    const { s, token, step, todoId } = await world();
+    const { s, token, step, todoId, projectId } = await world();
     await relay(s.app, token, step.step.id, 'save_memory', {
       title: '注入验证',
       content: '第二轮应见我',
@@ -212,27 +218,61 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
       cred: token,
       body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
-    // 第二个任务 → claim：注入位 = agent.memories（宿主每步开跑注入 systemPrompt
-    // 的载荷半；daemon 半 = composeWorkerSystemPrompt，apps/daemon runner）。
-    const projectId2 = await postProject(s.app, 'p2');
-    const t2 = await call(s.app, 'POST', `/api/projects/${projectId2}/todos`, {
-      body: { title: 't2', spec: 's2' },
-    });
-    const { id: todo2 } = (await t2.json()) as { id: string };
-    expect(todo2).not.toBe(todoId);
-    await call(s.app, 'POST', `/api/projects/${projectId2}/builds`, {
-      body: {
-        todoIds: [todo2],
-        assignment: { plan: null, build: { agentId: AGENT_ID } },
-        withPlan: false,
-      },
-    });
-    const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', {
+    // 同项目第二个任务 → claim：注入位 = agent.memories（宿主每步开跑注入
+    // systemPrompt 的载荷半；daemon 半 = composeWorkerSystemPrompt，apps/daemon runner）。
+    const step2 = await claimNextTask(s, token, projectId);
+    expect(step2.todo?.id).not.toBe(todoId);
+    expect(step2.agent?.memories).toEqual([{ title: '注入验证', content: '第二轮应见我' }]);
+    s.dispose();
+  });
+
+  test('读侧按项目收窄（#1494）：别的项目的条目不注入，全局条目（projectId 空）照常注入', async () => {
+    const { s, token, step, projectId } = await world();
+    await relay(s.app, token, step.step.id, 'save_memory', { title: '项目一', content: 'p1' });
+    await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
-      body: {},
+      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
     });
-    const { step: step2 } = (await claimRes.json()) as { step: ClaimedStep | null };
-    expect(step2?.agent?.memories).toEqual([{ title: '注入验证', content: '第二轮应见我' }]);
+    const now = Date.now();
+    s.db
+      .insert(agentMemory)
+      .values({
+        id: 'mem-global',
+        agentId: AGENT_ID,
+        teamId: s.team.id,
+        title: '全局',
+        content: 'g',
+        projectId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const projectId2 = await postProject(s.app, 'p2');
+    expect(projectId2).not.toBe(projectId);
+    const step2 = await claimNextTask(s, token, projectId2);
+    expect(step2.agent?.memories).toEqual([{ title: '全局', content: 'g' }]);
     s.dispose();
   });
 });
+
+async function claimNextTask(
+  s: Awaited<ReturnType<typeof world>>['s'],
+  token: string,
+  projectId: string,
+): Promise<ClaimedStep> {
+  const t = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+    body: { title: 't2', spec: 's2' },
+  });
+  const { id: todoId } = (await t.json()) as { id: string };
+  await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
+    body: {
+      todoIds: [todoId],
+      assignment: { plan: null, build: { agentId: AGENT_ID } },
+      withPlan: false,
+    },
+  });
+  const claimRes = await call(s.app, 'POST', '/api/machine/tasks/claim', { cred: token, body: {} });
+  const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
+  if (!step) throw new Error('no step claimed');
+  return step;
+}

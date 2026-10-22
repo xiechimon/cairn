@@ -1,0 +1,122 @@
+# P5a-1 round 5: merges of origin/main into claude/bootstrap-p5
+# worktree /home/user/pacman/.claude/worktrees/p5, user root, 2026-10-21. Every merge is a merge commit; no rebase.
+# Round 5 started from 22cf8db1 (pr-gate run 4: no-go, spec 28 section 8 conflict with main dcf839e3).
+
+## Merge 1: c2f2baa13fc8222d253053d79987680a56085cd6  Merge origin/main (dcf839e) into claude/bootstrap-p5
+parents: 22cf8db1 (PR head at gate run 4) + dcf839e3 (origin/main: #1468, #1474, #1475, #1421, #1469, #1476 and more)
+$ git merge --no-ff --no-commit origin/main
+Auto-merging apps/server/src/services/chief-tools.ts
+Auto-merging apps/server/src/services/chief.ts
+Auto-merging apps/server/src/services/github-issues.ts
+Auto-merging docs/spec/28-自举闭环-自写自合.md
+CONFLICT (content): Merge conflict in docs/spec/28-自举闭环-自写自合.md
+Auto-merging packages/shared/test/__snapshots__/snapshot.test.ts.snap
+Auto-merging packages/shared/test/vocabulary.test.ts
+
+Conflict: spec 28 section 8, the P1 row (#1476 rewrote P0 and P1 on main; this branch had rewritten P0 the same way
+and P5). Resolution: P0 and P1 rows exactly as main has them; the P5 row rewritten to hold at that merge:
+  | P5 进料 + 仓规内化 | #1406 | #1461（段 1：issue 轮询，默认关闭）；#1467（段 2：chief / MCP 读工具，已合并，49af6f2）；#1475（段 3：issue 正文按数据围栏、Implementer 点名仓规，已合并，61e6cb2），其 pr-gate 发现由分支 `claude/bootstrap-p5-3-fix` 的跟进 PR 修；#1477（#1459：webhook 的 `pacman` 触发走 D5 与在飞上限，叠在 #1461 上） | `docs/verify/1406/`；「演练仓打标 → 无人介入出 PR」待宿主 | 用户（超 800 行） | 段 1 待用户合并；段 2、段 3 已合并，段 3 的跟进修复施工中；#1477 待段 1 合并；P5b 待 P4 |
+Auto-merged files, both sides kept:
+- github-issues.ts: main's requireGithubRepo through githubRepoOfProject (#1468) and this branch's lower-case
+  claimedSourceRefs, in-process import claim and createdBy option.
+- chief.ts: main's ISSUE_FENCE_OPEN line in composeChiefSystemPrompt (#1475) and this branch's chiefBinding probe.
+- chief-tools.ts: main's team check in requireProjectRow and quotesIssueFence (#1468, #1475) and this branch's
+  TransitionDeps type.
+- the shared snapshot and vocabulary.test.ts: both sides' pins.
+The intake's own repo check then used isGithubRepoRef, which after #1468 refuses `.` / `..` segments.
+
+Pre-commit hook: the comment-discipline gate matched lines only in three files that come from main verbatim
+(docs/verify/1404/pr-gate-1421-run2-68d499f.json, pr-gate-1421-run3-04ffa3b.json, pr-gate-1469-run1-3330010.json;
+staged blob = origin/main blob for each: eb51660a, 47513874, 02707cfd). No line this branch adds matched. Committed
+with PACMAN_ALLOW_BANNED_VOCAB=1 for those main-side files, as the merge commit message says; biome ci, typecheck
+and test-spawn-gate in the hook passed.
+
+Tests on c2f2baa1 (pnpm exec vitest run --reporter=verbose <16 files>): Test Files 16 passed, Tests 464 passed
+      18 passed   0 other  |@pacman/shared| test/chief-tools.test.ts
+      33 passed   0 other  |@pacman/shared| test/github-repo-ref.test.ts
+      16 passed   0 other  |@pacman/shared| test/issue-fence.test.ts
+      79 passed   0 other  |@pacman/shared| test/snapshot.test.ts
+      39 passed   0 other  |@pacman/shared| test/vocabulary.test.ts
+       3 passed   0 other  |@xiechimon/pacman| test/chief-memory.test.ts
+      11 passed   0 other  |@xiechimon/pacman| test/chief-tools.test.ts
+      29 passed   0 other  |@xiechimon/pacman| test/github-issues.test.ts
+      39 passed   0 other  |@xiechimon/pacman| test/github-reads.test.ts
+       7 passed   0 other  |@xiechimon/pacman| test/issue-fence.test.ts
+     141 passed   0 other  |@xiechimon/pacman| test/issue-intake.test.ts
+      11 passed   0 other  |@xiechimon/pacman| test/machine-pin.test.ts
+      10 passed   0 other  |@xiechimon/pacman| test/orchestration-source.test.ts
+       1 passed   0 other  |@xiechimon/pacman| test/persona-repo-rules.test.ts
+       8 passed   0 other  |@xiechimon/pacman| test/phase.test.ts
+      19 passed   0 other  |@xiechimon/pacman| test/webhook.test.ts
+pnpm -r typecheck on the merge tree: exit 0.
+
+## Merge 2: 6b74199afc233bf75ebad04252e8c970de1bdcec  Merge origin/main (b616110) into claude/bootstrap-p5
+parents: e4cb6ddd (round 5 after the first review fixes) + b616110b (#1414, review-phase PR reconcile of #1403)
+$ git merge --no-ff --no-commit origin/main
+Auto-merging apps/server/src/lib/github.ts
+Automatic merge went well
+lib/github.ts: main adds githubPull, githubCompareStatus and conditionalGetJson; this branch adds the intake reads.
+No duplicate names (typecheck exit 0). No banned-vocabulary match in the staged additions.
+Tests on the merge tree (19 files incl. ci-loop, pr-reconcile, github-repo-dot-segments): 640 passed
+      18 passed   0 failed  |@pacman/shared| test/chief-tools.test.ts
+      33 passed   0 failed  |@pacman/shared| test/github-repo-ref.test.ts
+      16 passed   0 failed  |@pacman/shared| test/issue-fence.test.ts
+      79 passed   0 failed  |@pacman/shared| test/snapshot.test.ts
+      39 passed   0 failed  |@pacman/shared| test/vocabulary.test.ts
+       3 passed   0 failed  |@xiechimon/pacman| test/chief-memory.test.ts
+      11 passed   0 failed  |@xiechimon/pacman| test/chief-tools.test.ts
+      24 passed   0 failed  |@xiechimon/pacman| test/ci-loop.test.ts
+      29 passed   0 failed  |@xiechimon/pacman| test/github-issues.test.ts
+      39 passed   0 failed  |@xiechimon/pacman| test/github-reads.test.ts
+      21 passed   0 failed  |@xiechimon/pacman| test/github-repo-dot-segments.test.ts
+       7 passed   0 failed  |@xiechimon/pacman| test/issue-fence.test.ts
+     151 passed   0 failed  |@xiechimon/pacman| test/issue-intake.test.ts
+      11 passed   0 failed  |@xiechimon/pacman| test/machine-pin.test.ts
+      10 passed   0 failed  |@xiechimon/pacman| test/orchestration-source.test.ts
+       1 passed   0 failed  |@xiechimon/pacman| test/persona-repo-rules.test.ts
+       8 passed   0 failed  |@xiechimon/pacman| test/phase.test.ts
+     121 passed   0 failed  |@xiechimon/pacman| test/pr-reconcile.test.ts
+      19 passed   0 failed  |@xiechimon/pacman| test/webhook.test.ts
+README rows were then updated for #1414 in c36e0634 (the reconcile is on main).
+
+## While round 5 ran: #1461 was squash-merged
+A parallel session pushed ca9b76a0 (merge of dcf839e3) and 0471b6b8 (intake splits githubRepo through
+githubRepoOfProject) to claude/bootstrap-p5; the user squash-merged #1461 from 0471b6b8 at 15:23:35Z as e410e826,
+and the remote branch was deleted. None of this round's commits after c2f2baa1 are in e410e826. The coordinator
+asked for the round 5 result on a new branch, claude/bootstrap-p5-r5; claude/bootstrap-p5 was not pushed.
+
+## Merge 3: 4845cc2be2f594a597aadbb17af49d6c80a42162  Merge origin/main (e410e82) into claude/bootstrap-p5
+parents: 6a6fd572 (round 5 after the second review pass) + e410e826 (squash of #1461)
+$ git merge --no-ff --no-commit origin/main
+CONFLICT (content): README.md, README.zh.md, docs/spec/28-自举闭环-自写自合.md
+CONFLICT (add/add): apps/server/src/services/issue-intake.ts, apps/server/test/issue-intake.test.ts
+The merge base b616110b predates the intake, so git sees the two versions of the intake files as two additions.
+Resolution: each file is the three-way merge with base c2f2baa1 (this branch right after merge 1, i.e. #1461 as of
+22cf8db plus main dcf839e3):
+  $ git merge-tree --write-tree --merge-base=c2f2baa1 origin/main HEAD   -> 8b3e4a7a, no conflicts
+Main's side relative to that base is 0471b6b8's githubRepoOfProject change in issue-intake.ts and the section 8 rows
+P1 and P3 (and its own P5 row); this branch's side is the round 5 work. The five files were taken from 8b3e4a7a
+(checked: README.md, README.zh.md and the test file equal this branch's; issue-intake.ts differs from this branch's
+only by the githubRepoOfProject change), then the section 8 P5 row was rewritten:
+  | P5 进料 + 仓规内化 | #1406 | #1461（段 1：issue 轮询，默认关闭，已合并，e410e82）；#1467（段 2：chief / MCP 读工具，已合并，49af6f2）；#1475（段 3：issue 文本围栏 + 仓规，已合并，61e6cb2）；#1480（段 3 的 pr-gate 跟进修复）；#1477（#1459：webhook 的 `pacman` 触发走 D5 与在飞上限）；段 1 第 5 轮的测试与文档补丁在分支 `claude/bootstrap-p5`，未开 PR | `docs/verify/1406/`；「演练仓打标 → 无人介入出 PR」待宿主 | 用户（超 800 行） | 段 1、2、3 已合并；#1480、#1477 待合并；段 1 第 5 轮补丁待开 PR；P5b 待 P4 |
+After this merge the branch's diff against main is the round 5 work only (5 files).
+Tests: issue-intake, github-issues, webhook: 203 passed; pnpm -r typecheck exit 0.
+
+## 9b1c9bc55eca2a58bf1b06815ad9c2a7c2c2dc6b  docs(1406): spec 28 ledger names the round 5 branch
+P5 row: the round 5 patch is on claude/bootstrap-p5-r5, PR not opened.
+
+## Merge 4: 0567408901710e03f57f68e82ab8950ea1f8b265  Merge origin/main (bc1d99f) into claude/bootstrap-p5
+parents: 9b1c9bc5 + bc1d99f8 (#1477, webhook `pacman` trigger under D5 and the cap, #1459)
+$ git merge --no-ff --no-commit origin/main
+CONFLICT (content): README.md, README.zh.md, apps/server/src/services/issue-intake.ts
+Auto-merging apps/server/test/issue-intake.test.ts
+Resolution, both sides kept:
+- issue-intake.ts header: this branch's rate-limit paragraph and main's new #1459 paragraph, in that order. #1477's
+  code changes (teamGithubToken, projectAtInFlightCap, module-level hasRepoTriage) auto-merged untouched.
+- README.md / README.zh.md PACMAN_ISSUE_INTAKE row: main inserted sentences on the `pacman` label webhook after
+  "The startup log says whether intake is on." (zh: 启动日志写明进料开没开。); the row is this branch's text with
+  main's inserted sentences appended verbatim (checked by script: main's row = base row + that insertion).
+- spec 28 section 8 P5 row: #1477 marked merged:
+  | P5 进料 + 仓规内化 | #1406 | #1461（段 1：issue 轮询，默认关闭，已合并，e410e82）；#1467（段 2：chief / MCP 读工具，已合并，49af6f2）；#1475（段 3：issue 文本围栏 + 仓规，已合并，61e6cb2）；#1480（段 3 的 pr-gate 跟进修复）；#1477（#1459：webhook 的 `pacman` 触发走 D5 与在飞上限，已合并，bc1d99f）；段 1 第 5 轮的测试与文档补丁在分支 `claude/bootstrap-p5-r5`，PR 待开 | `docs/verify/1406/`；「演练仓打标 → 无人介入出 PR」待宿主 | 用户（超 800 行） | 段 1、2、3 与 #1477 已合并；#1480 待合并；段 1 第 5 轮补丁待开 PR；P5b 待 P4 |
+Tests: issue-intake, github-issues, webhook: 231 passed; pnpm -r typecheck exit 0. Full gates on this head:
+gates-p5a1-r5.txt.

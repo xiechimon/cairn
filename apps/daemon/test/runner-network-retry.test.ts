@@ -10,6 +10,9 @@
 //  4. quota 类错误（402/usage limit）→ 不重试（挂起语义在 server done 面），
 //     单轮收尾 failed。
 //  5. 停止钮在位 → 不重试（用户要的是退出，不是续跑）。
+//  5b. 停止在两轮之间（续跑会话开启途中）到达 → 续跑会话一开即中断，报 stopped。
+//  5c. 停止在末次重试的退避等待中到达（真 pi 失败流以 done 收尾）→ 不开末轮，
+//      报 stopped，不报上轮的网络错误。
 //  6. 中途有进展的流断 → 重试走 continue（断点续跑，不重放整轮）。
 
 import { mkdtempSync } from 'node:fs';
@@ -33,6 +36,7 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
+import { StepStops } from '../src/step-stops.js';
 
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached"}';
@@ -164,8 +168,13 @@ class FakeClient implements MachineApi {
 type Script = StepEvent[];
 
 /** 每次会话开启（create 或 continue）按序取下一条脚本；记录 continue 的
- * sessionId 以钉「续跑不断会话」语义。末次重试的 ~5s 延迟注入 1ms。 */
-function scriptedNetworkBackend(scripts: Script[]): {
+ * sessionId 以钉「续跑不断会话」语义。末次重试的 ~5s 延迟注入 1ms。
+ * onCreate = 新会话开启途中的钩子（停止钮在位的注入点）。 */
+function scriptedNetworkBackend(
+  scripts: Script[],
+  onCreate?: () => void,
+  onContinue?: () => void,
+): {
   backend: AgentBackend;
   opened: { kind: 'new' | 'continue'; sessionId: string | null }[];
 } {
@@ -173,24 +182,32 @@ function scriptedNetworkBackend(scripts: Script[]): {
   let idx = 0;
   const nextHandle = (sessionId: string, _kind: 'new' | 'continue'): AgentSessionHandle => {
     const script = scripts[idx++] ?? [{ type: 'done', usage: [] }];
+    let stopped = false;
     return {
       sessionId,
       events: (async function* () {
-        for (const ev of script) yield ev as never;
+        for (const ev of script) {
+          if (stopped) return;
+          yield ev as never;
+        }
       })(),
       async steer() {},
-      async stop() {},
+      async stop() {
+        stopped = true;
+      },
       usage: () => [],
     };
   };
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(_sessionOpts: SessionOpts): Promise<AgentSessionHandle> {
+      onCreate?.();
       const handle = nextHandle(`pi-sess-${idx}`, 'new');
       opened.push({ kind: 'new', sessionId: handle.sessionId });
       return handle;
     },
     async continueSession(sessionId: string, _sessionOpts: SessionOpts) {
+      onContinue?.();
       const handle = nextHandle(sessionId, 'continue');
       opened.push({ kind: 'continue', sessionId });
       return handle;
@@ -201,6 +218,8 @@ function scriptedNetworkBackend(scripts: Script[]): {
 
 interface RunCaseOpts {
   stopRequested?: boolean;
+  stopBeforeRetry?: boolean;
+  stopDuringFinalWait?: boolean;
   finalWaitMs?: number;
 }
 
@@ -217,7 +236,20 @@ async function runNetworkCase(
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
-  const { backend, opened } = scriptedNetworkBackend(scripts);
+  const stops = new StepStops();
+  const stopNow = () => void stops.get('step-net1')?.deliver({ discard: false });
+  if (opts.stopDuringFinalWait) {
+    const step = logger.step;
+    logger.step = (msg) => {
+      step(msg);
+      if (msg.includes('before final attempt')) stopNow();
+    };
+  }
+  const { backend, opened } = scriptedNetworkBackend(
+    scripts,
+    opts.stopRequested ? stopNow : undefined,
+    opts.stopBeforeRetry ? stopNow : undefined,
+  );
   const deps = {
     client,
     journal,
@@ -227,7 +259,7 @@ async function runNetworkCase(
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
-    ...(opts.stopRequested ? { stopRequests: new Map([['step-net1', { discard: false }]]) } : {}),
+    stops,
   };
   await runStep(deps, claimedStep(), {
     ...(opts.finalWaitMs !== undefined ? { providerNetworkFinalWaitMs: opts.finalWaitMs } : {}),
@@ -309,6 +341,37 @@ describe('#1257 runner provider_network 流断重试（会话续跑）', () => {
 
     expect(opened).toHaveLength(1);
     expect(client.doneBodies[0]?.body.status).toBe('stopped');
+  });
+
+  test('失败方式 5b：停止在两轮之间到达 → 续跑会话一开即中断，报 stopped', async () => {
+    const { client, opened } = await runNetworkCase(
+      [
+        [{ type: 'error', error: { message: NETWORK_ERROR, retryable: false } }],
+        [
+          { type: 'text_delta', text: '续跑中' },
+          { type: 'done', usage: [] },
+        ],
+      ],
+      { stopBeforeRetry: true },
+    );
+
+    expect(opened).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('stopped');
+  });
+
+  test('失败方式 5c：停止在末次重试的退避等待中到达 → 不开末轮，报 stopped', async () => {
+    const failedRound: Script = [
+      { type: 'error', error: { message: NETWORK_ERROR, retryable: false } },
+      { type: 'done', usage: [] },
+    ];
+    const { client, opened } = await runNetworkCase([failedRound, failedRound], {
+      stopDuringFinalWait: true,
+      finalWaitMs: 1,
+    });
+
+    expect(opened).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('stopped');
+    expect(client.doneBodies[0]?.body.errorMessage).toBeUndefined();
   });
 
   test('失败方式 6：中途有进展的流断 → 重试仍走 continue（断点续跑，不重放整轮）', async () => {
