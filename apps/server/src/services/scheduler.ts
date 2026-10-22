@@ -21,6 +21,7 @@ import { nowMs } from '../lib/ids.js';
 import { ATTACHMENT_GC_INTERVAL_MS, type GcLogger, sweepAttachments } from './attachment-gc.js';
 import {
   type BuildDeps,
+  NotFoundError,
   startBuilds,
   sweepAbandonedBuildSteps,
   sweepZombieQueuedTodos,
@@ -146,7 +147,9 @@ export function createScheduler(
           triggerSource: 'schedule',
         });
       } catch (err) {
-        if (err instanceof PhaseTransitionError) {
+        // NotFoundError（#1497）：任务已不属该项目，或项目与任务不同队——本轮
+        // 不触发、不抛出（tick 在启动时同步跑，抛出会拖垮启动）。
+        if (err instanceof PhaseTransitionError || err instanceof NotFoundError) {
           // 进行中/搁置 phase：本轮不触发。周期档仍滚动（同一落点不重复尝试）；
           // once 保留 nextRunAt，todo 可重跑后的下一 tick 补触发 [设计]。
           if (isRecurring(row.kind) && row.at !== null) {

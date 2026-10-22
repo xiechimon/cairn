@@ -964,8 +964,19 @@ export async function executeChiefTool(
       return json(row);
     }
     case 'delete_memory': {
+      // 越权防御（#1497，worker delete_memory 同律）：只删绑定 Agent 本团队条目。
       const memoryId = str(params, 'memoryId');
-      db.delete(agentMemory).where(eq(agentMemory.id, memoryId)).run();
+      if (ctx.chiefAgentId !== null) {
+        db.delete(agentMemory)
+          .where(
+            and(
+              eq(agentMemory.id, memoryId),
+              eq(agentMemory.agentId, ctx.chiefAgentId),
+              eq(agentMemory.teamId, ctx.teamId),
+            ),
+          )
+          .run();
+      }
       return json({ deleted: memoryId });
     }
     case 'memories': {

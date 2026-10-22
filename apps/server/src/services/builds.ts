@@ -656,12 +656,25 @@ export function startBuilds(
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
-  const created: BuildRecord[] = [];
-  for (const todoId of input.todoIds) {
+  // 逐卡校验先于任何建 build（#1497）：任务须属该项目，项目须与任务同队——
+  // 本队任务指向他队项目（#1466 前 create_todo 可造）按项目不存在处理。
+  // 所有调用方（REST、定时、chief、MCP）都经这里，不再只靠入口各自校验。
+  const todoRecords = input.todoIds.map((todoId) => {
     const todoRecord = getTodo(deps, todoId);
     if (!todoRecord || todoRecord.projectId !== input.projectId) {
       throw new NotFoundError(`todo ${todoId}`);
     }
+    const owned = deps.db
+      .select({ id: project.id })
+      .from(project)
+      .where(and(eq(project.id, input.projectId), eq(project.teamId, todoRecord.teamId)))
+      .get();
+    if (!owned) throw new NotFoundError(`project ${input.projectId}`);
+    return todoRecord;
+  });
+  const created: BuildRecord[] = [];
+  for (const todoRecord of todoRecords) {
+    const todoId = todoRecord.id;
     // todo → queued（02 §4.1：已启动，等空闲机器）。
     assertPhaseTransition(todoRecord.phase, 'queued');
     const id = newUuidv7(); // buildId ≡ conversationId（UUIDv7，r3 §3.0）
