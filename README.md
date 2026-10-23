@@ -49,19 +49,19 @@ Cairn (formerly pacman) began as a clean-room study of todos.dev's public interf
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
 
 ```sh
-npx @xiechimon/cairn
+npx @xiechimon/pacman
 ```
 
 One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team.
 
-Use a different port with `PORT=9000 npx @xiechimon/cairn`.
+Use a different port with `PORT=9000 npx @xiechimon/pacman`.
 
 ### Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
 
 ```sh
-npm i -g @xiechimon/cairn-cli
+npm i -g @xiechimon/pacman-cli
 # One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
 cairn start --api-key <cairn_...> --team <teamId>
 # Daily use (credentials persisted in ~/.cairn/machine.json):

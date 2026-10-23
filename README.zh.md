@@ -49,19 +49,19 @@ Cairn（原名 pacman）起步于对 todos.dev 公开界面的 clean-room 研究
 环境要求：Node.js 22 或 24（LTS 线自带 better-sqlite3 预编译产物；其它版本可能回退源码编译，需要构建工具链）。
 
 ```sh
-npx @xiechimon/cairn
+npx @xiechimon/pacman
 ```
 
 一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.cairn` 下自动建库 + 迁移 + seed 默认团队。
 
-换端口：`PORT=9000 npx @xiechimon/cairn`。
+换端口：`PORT=9000 npx @xiechimon/pacman`。
 
 ### 让自己的机器跑 build
 
 不起 daemon 也能用全部界面功能；要让 agent 真在某台机器上跑 build 时再登记。在执行机上：
 
 ```sh
-npm i -g @xiechimon/cairn-cli
+npm i -g @xiechimon/pacman-cli
 # 首次注册：网页 /app/api-keys 建 key（明文只显示一次），然后
 cairn start --api-key <cairn_...> --team <teamId>
 # 日常（凭据已存 ~/.cairn/machine.json）：
