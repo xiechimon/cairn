@@ -18,7 +18,7 @@
 // new session 上下文真空，位置行是 agent 唯一知道「写哪里」的通道；build 步
 // 不附。断言里的组合串 = withNote(home, compose(...)) 同形。
 
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type {
@@ -26,6 +26,7 @@ import type {
   AgentSessionHandle,
   ClaimedStep,
   MachineDoneBody,
+  MachineHeartbeatBody,
   MachineStreamEvent,
   StepEvent,
   ToolCallRecord,
@@ -107,7 +108,10 @@ class FakeClient implements MachineApi {
   async claim() {
     return null;
   }
-  async heartbeat() {}
+  heartbeats: MachineHeartbeatBody[] = [];
+  async heartbeat(_stepId: string, body: MachineHeartbeatBody = {}) {
+    this.heartbeats.push(body);
+  }
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
   async relayTool() {
@@ -196,13 +200,26 @@ function handle(sessionId: string): AgentSessionHandle {
   };
 }
 
-async function setup(claimed: ClaimedStep, backend: AgentBackend) {
+async function setup(
+  claimed: ClaimedStep,
+  backend: AgentBackend,
+  options: { skill?: string; observeClient?: (client: FakeClient) => void } = {},
+) {
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-restart-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
+  options.observeClient?.(client);
+  const skillsDir = join(home, 'skills');
+  if (options.skill !== undefined) {
+    mkdirSync(join(skillsDir, 'probe'), { recursive: true });
+    writeFileSync(
+      join(skillsDir, 'probe', 'SKILL.md'),
+      `---\nname: probe\ndescription: Probe skill\n---\n${options.skill}`,
+    );
+  }
   await runStep(
     {
       client,
@@ -213,6 +230,7 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
       workspacesDir,
       mcpConfigPath: join(home, 'claude.json'),
       heartbeatIntervalMs: 60_000,
+      ...(options.skill !== undefined ? { skillsDir } : {}),
     },
     claimed,
   );
@@ -225,6 +243,41 @@ function withNote(home: string, basePrompt: string): string {
 }
 
 describe('重启轮反馈投递（#720）', () => {
+  test('reports the prepared harness before opening the agent session', async () => {
+    const { backend } = recordingBackend();
+    let reported: MachineHeartbeatBody[] = [];
+    const createSession = backend.createSession.bind(backend);
+    backend.createSession = async (opts) => {
+      expect(reported).toContainEqual({
+        baseSha: null,
+        harnessHash: expect.stringMatching(/^[0-9a-f]{64}$/),
+      });
+      return createSession(opts);
+    };
+    await setup(restartStep({ kind: 'build' }), backend, {
+      observeClient: (client) => {
+        reported = client.heartbeats;
+      },
+    });
+  });
+
+  test('runtime fingerprint changes with injected skill content and tool descriptions', async () => {
+    const claimed = restartStep({ kind: 'build' });
+    const { backend } = recordingBackend();
+    const first = await setup(claimed, backend, { skill: 'first skill body' });
+    const same = await setup(claimed, backend, { skill: 'first skill body' });
+    const changed = await setup(claimed, backend, { skill: 'changed skill body' });
+    expect(first.client.heartbeats[0]?.harnessHash).toBe(same.client.heartbeats[0]?.harnessHash);
+    expect(first.client.heartbeats[0]?.harnessHash).not.toBe(
+      changed.client.heartbeats[0]?.harnessHash,
+    );
+    claimed.remoteTools = [{ name: 'probe', description: 'Probe a resource', parameters: {} }];
+    const withTool = await setup(claimed, backend, { skill: 'first skill body' });
+    expect(first.client.heartbeats[0]?.harnessHash).not.toBe(
+      withTool.client.heartbeats[0]?.harnessHash,
+    );
+  });
+
   test('new session + instruction 在位 → 会话 prompt = 任务文本 + 重启指令组合串', async () => {
     const instruction = buildRestartPrompt('把测试也补上');
     const { backend, prompts } = recordingBackend();

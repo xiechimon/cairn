@@ -387,6 +387,19 @@ export type MachineStopResponse = z.infer<typeof machineStopResponseSchema>;
 // —— 步骤 journal 端点（02 §5.4 词表）———————————————————————————————————————
 
 /** POST /api/machine/heartbeat/{stepId}——续活；响应 {ok:true} [推断]。 */
+export const machineHeartbeatBodySchema = z.object({
+  baseSha: z
+    .string()
+    .regex(/^[0-9a-f]{40}$/)
+    .nullable()
+    .optional(),
+  harnessHash: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
+});
+export type MachineHeartbeatBody = z.infer<typeof machineHeartbeatBodySchema>;
+
 export const machineHeartbeatResponseSchema = machineOkResponseSchema;
 
 /** POST /api/machine/tool/{stepId} 第三形 [设计]（M5 live streaming 复刻
@@ -839,6 +852,7 @@ export const MACHINE_WIRE = [
   {
     method: 'POST',
     path: '/api/machine/heartbeat/{stepId}',
+    request: machineHeartbeatBodySchema,
     response: machineHeartbeatResponseSchema,
   },
   {

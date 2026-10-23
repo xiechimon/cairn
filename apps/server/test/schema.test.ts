@@ -17,7 +17,7 @@ describe('37 表 migration（01 §6 清单）', () => {
     const tables = Object.values(schema).filter((v) => is(v, SQLiteTable));
     const names = tables.map((t) => getTableConfig(t as SQLiteTable).name).sort();
     expect(names).toEqual([...DB_TABLES].sort());
-    expect(names).toHaveLength(37); // 01 §6 原清单 30（含 skill/mcp_server/document_diff）− skill/mcp_server（spec 13 退役）− document_diff（#1029 死 schema：diff 端点自 plan 行现算，从未写入）+ spec 12 github_connection（内部凭证表）+ skill_audit（XMON-109 写审计）+ XMON-108 shell_command（内部审计表）+ #1137 webhook_token（内部凭证表）+ #1404 gate_digest/gate_round/gate_verdict/gate_state（合并就绪闸内部表）+ #1491 autonomy_state/member_activity（触发闸内部表）
+    expect(names).toHaveLength(38); // 01 §6 原清单 30（含 skill/mcp_server/document_diff）− skill/mcp_server（spec 13 退役）− document_diff（#1029 死 schema：diff 端点自 plan 行现算，从未写入）+ spec 12 github_connection（内部凭证表）+ skill_audit（XMON-109 写审计）+ XMON-108 shell_command（内部审计表）+ #1137 webhook_token（内部凭证表）+ #1404 gate_digest/gate_round/gate_verdict/gate_state（合并就绪闸内部表）+ #1491 autonomy_state/member_activity（触发闸内部表）
     expect(names).toContain('chief');
     expect(names).toContain('attachment');
     expect(names).toContain('branch_sync');

@@ -84,6 +84,7 @@ import {
   WRITE_AUTHOR_ASSOCIATIONS,
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
+import { recordBuildFeedback } from './build-provenance.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -1040,6 +1041,7 @@ export async function applyBuildStepAction(
     if (reworkTarget !== null && prClosed === null) {
       // —— 复用路：不建新 build——同 conversationId = 同分支 = 原 PR。——
       const now = nowMs();
+      recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
       // 消息先于首步入队（transcript 排序 + machine wake 后置）：反馈行（用户
       // 话语）+ 轮界 note（system → web note 面：去向 + 被清空 errorMessage 的
       // 失败原因承接，原因不随轮界蒸发）。
@@ -1095,6 +1097,7 @@ export async function applyBuildStepAction(
     }
     // —— 新建路：无 PR build（现行行为，逐字节保持）或原 PR 已合并/已关闭
     // （prClosed 在位）——新 conversationId = 新分支。——
+    recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
     const newId = newUuidv7();
     const createdAt = nowMs();
     deps.db
@@ -1305,6 +1308,14 @@ export async function applyBuildStepAction(
   if (todoRecord.phase !== 'confirm' && todoRecord.phase !== 'review') {
     throw new HttpError(409, `revision 仅在待确认/审核关口允许，当前相位 ${todoRecord.phase}`);
   }
+  recordBuildFeedback(
+    deps.db,
+    buildId,
+    'revision',
+    todoRecord.phase === 'confirm' ? 'plan' : 'build',
+    body.feedback,
+    actorName,
+  );
   // 用户驳回消息行进 transcript（role user，r5 §3.6/§4 时间线呈现）。
   insertMessageRow(deps, buildId, {
     id: newRecordId(),
