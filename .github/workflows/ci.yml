@@ -390,6 +390,17 @@ jobs:
           node --test scripts/single-use-helper-gate.test.mjs
           node scripts/single-use-helper-gate.mjs
 
+  npm-command-gate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Package names in install commands exist on npm
+        run: |
+          node --test scripts/npm-command-gate.test.mjs
+          node scripts/npm-command-gate.mjs
+
   closing-keyword-gate:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
