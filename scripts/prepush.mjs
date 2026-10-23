@@ -9,6 +9,7 @@ export function prepushPlan(paths, mode = 'local') {
   if (mode === 'advisory') return advisory;
   const required = [
     ['node', 'scripts/ui-debt-gate.mjs'],
+    ['node', 'scripts/ui-drift-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
