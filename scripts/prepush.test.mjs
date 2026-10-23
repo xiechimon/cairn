@@ -20,7 +20,7 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/prepush-vitest.mjs',
-    'pnpm --filter @pacman/web e2e:affected -- apps/web/src/main.tsx',
+    'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
 });
@@ -61,7 +61,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
 });
 
 test('CLI skips real document changes and rejects a missing base', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'pacman-prepush-'));
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
   const runGit = (args) =>
     execFileSync(
       'git',

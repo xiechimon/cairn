@@ -1,12 +1,12 @@
 #!/bin/sh
-# Install (or remove) the pacman daemon user-domain launchd job.
+# Install (or remove) the cairn daemon user-domain launchd job.
 #
-#   install.sh                        render + bootstrap com.xiechimon.pacman-daemon
+#   install.sh                        render + bootstrap com.xiechimon.cairn-daemon
 #   install.sh --uninstall             bootout + remove the plist (leaves logs)
 #   install.sh --label NAME            job label override (test jobs)
 #   install.sh --repo DIR              checkout override (default: main checkout)
-#   install.sh --home DIR              PACMAN_HOME override (default: ~/.pacman)
-#   install.sh --server URL            PACMAN_SERVER override (test jobs)
+#   install.sh --home DIR              CAIRN_HOME override (default: ~/.cairn)
+#   install.sh --server URL            CAIRN_SERVER override (test jobs)
 #
 # Installed artifacts live OUTSIDE the repo (plist in ~/Library/LaunchAgents,
 # rendered wrapper in $HOME_DIR) so deleting this checkout never orphans the
@@ -18,10 +18,10 @@
 # take effect and must never host this).
 set -eu
 
-LABEL="com.xiechimon.pacman-daemon"
-REPO="/Users/xmon/Code/AgentProjects/pacman"
+LABEL="com.xiechimon.cairn-daemon"
+REPO="/Users/xmon/Code/AgentProjects/cairn"
 NODE_BIN="/Users/xmon/.local/share/fnm/node-versions/v24.14.0/installation/bin/node"
-HOME_DIR="$HOME/.pacman"
+HOME_DIR="$HOME/.cairn"
 SERVER_URL=""
 UNINSTALL=0
 
@@ -44,10 +44,10 @@ fi
 UID_N="$(id -u)"
 DOMAIN_TARGET="gui/$UID_N"
 DEST="$HOME/Library/LaunchAgents/$LABEL.plist"
-RUN_DEST="$HOME_DIR/pacman-daemon-run.sh"
+RUN_DEST="$HOME_DIR/cairn-daemon-run.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-TEMPLATE="$HERE/com.xiechimon.pacman-daemon.plist.template"
-RUN_SRC="$HERE/pacman-daemon-run.sh"
+TEMPLATE="$HERE/com.xiechimon.cairn-daemon.plist.template"
+RUN_SRC="$HERE/cairn-daemon-run.sh"
 
 if [ "$UNINSTALL" = "1" ]; then
   if launchctl list "$LABEL" >/dev/null 2>&1; then
@@ -77,7 +77,7 @@ RUN_ESC="$(esc "$RUN_DEST")"
 HOME_ESC="$(esc "$HOME_DIR")"
 
 # Rendered wrapper copy: the installed job never depends on this checkout.
-sed -e "s|@PACMAN_REPO@|$REPO_ESC|g" -e "s|@NODE_BIN@|$(esc "$NODE_BIN")|g" \
+sed -e "s|@CAIRN_REPO@|$REPO_ESC|g" -e "s|@NODE_BIN@|$(esc "$NODE_BIN")|g" \
   "$RUN_SRC" > "$RUN_DEST"
 chmod +x "$RUN_DEST"
 
@@ -85,11 +85,11 @@ NODE_DIR="$(dirname "$NODE_BIN")"
 # BSD sed cannot substitute multiline text; feed the env block via r-file.
 ENV_SNIPPET="$(mktemp)"
 trap 'rm -f "$ENV_SNIPPET"' EXIT
-if [ -n "$SERVER_URL" ] || [ "$HOME_DIR" != "$HOME/.pacman" ]; then
+if [ -n "$SERVER_URL" ] || [ "$HOME_DIR" != "$HOME/.cairn" ]; then
   {
-    printf '    <key>PACMAN_HOME</key>\n    <string>%s</string>\n' "$HOME_DIR"
+    printf '    <key>CAIRN_HOME</key>\n    <string>%s</string>\n' "$HOME_DIR"
     if [ -n "$SERVER_URL" ]; then
-      printf '    <key>PACMAN_SERVER</key>\n    <string>%s</string>\n' "$SERVER_URL"
+      printf '    <key>CAIRN_SERVER</key>\n    <string>%s</string>\n' "$SERVER_URL"
     fi
   } > "$ENV_SNIPPET"
 else

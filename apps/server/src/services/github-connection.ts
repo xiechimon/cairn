@@ -8,7 +8,7 @@
 // - DAO 语义：重认证 = 覆盖（teamId 单行，onConflictDoUpdate）、断开 = 删行
 //   （幂等，缺行不抛）。
 
-import type { GithubConnectionStatus, SecretBox } from '@pacman/shared';
+import type { GithubConnectionStatus, SecretBox } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { githubConnection } from '../db/schema.js';

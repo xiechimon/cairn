@@ -1,0 +1,1628 @@
+{
+  "$comment": "verify-cairn registry (#1402). One entry per drive case: script (repo-relative), default args, needs (stack = vp.mjs launch first; vp.mjs drive runs doctor for these; fresh-stack = a stack nothing was driven on since launch, vp.mjs drive refuses otherwise unless --force; own-stack = the probe starts and stops its own stack, vp.mjs drive refuses while a stack is up in VERIFY_RUN_DIR; real-llm, github and rewrites-evidence mean the case spends model tokens, calls GitHub or rewrites committed docs/verify evidence, so vp.mjs drive asks for --force), status (current | stale | host-bound; non-current cases need --force), purpose, optional usage (script arguments, passed after --, which replace the default args they name (the same option before '=', or the same probe or journey name) while the other defaults stay; a probe that runs its pre-fix mode without arguments gets the post-fix flag as args), optional runner tsx with cwd (the repo-relative package directory whose tsx runs the script), optional evidence for a probe that does not read VERIFY_EVIDENCE_DIR: {flag} = vp.mjs passes the drive's evidence directory through that option (or uses the value given after --), {writes} = the probe writes its evidence to that path by design and vp.mjs creates no directory for it, {env} = the probe reads the directory from that variable. needsArgs = the usage names required positional arguments; vp.mjs drive refuses to run the case without a positional argument after --. recipe = the feature file, null when the feature has no map entry yet. support lists scripts that are not drive cases. New cases go here, not into new drive-<ticket>.mjs files: scripts/vp-registry-gate.mjs (run by the self-test in CI) fails on a script in scripts/ that is not registered, on a new script named drive-<number>, and on a feature map that does not name its vp.mjs drive line.",
+  "support": {
+    "cleanup.mjs": {
+      "kind": "infra",
+      "purpose": "Tears down the launch.mjs stack using its pid files (SIGTERM, then SIGKILL), reaps leftover daemons tied to this stack's server port, and deletes VERIFY_RUN_DIR. Evidence is kept."
+    },
+    "doctor.mjs": {
+      "kind": "infra",
+      "purpose": "Read-only health check: it confirms the process group is alive, the ports answer, and the auth session, teams and projects endpoints return 200."
+    },
+    "drive.mjs": {
+      "kind": "infra",
+      "purpose": "Multi-probe dispatcher for board, new-task, api-key, search and theme; registered per probe under its feature."
+    },
+    "launch.mjs": {
+      "kind": "infra",
+      "purpose": "Starts an isolated verify stack: the server on 8791 and vite on 5273, with a scratch CAIRN_HOME and skills dir. It writes pid files and ports.json."
+    },
+    "setup-branch-sync-seed.mjs": {
+      "kind": "seed",
+      "purpose": "Creates the todo/build plus a dirty git origin/target in /tmp with the step checkpoint at C2; prints ids and apiKey JSON"
+    },
+    "setup-review-700-seed.mjs": {
+      "kind": "seed",
+      "purpose": "Seeds a provider pointing at stub-review-700, an agent, a project, and two todos driven to confirm phase for the verdict extraction scenarios A and B; prints the IDs and token as JSON."
+    },
+    "setup-review-seed.mjs": {
+      "kind": "seed",
+      "purpose": "Seeds provider/agent/project/todo and a machine driving plan to confirm phase; prints ids JSON."
+    },
+    "stub-llm-verify.mjs": {
+      "kind": "stub",
+      "purpose": "OpenAI-compatible SSE stub that delays a single turn so the stop path has a window; the delay is cleared when the client aborts."
+    },
+    "stub-review-700.mjs": {
+      "kind": "stub",
+      "purpose": "OpenAI-compatible SSE stub that replays the review verdict JSON together with a set_task_meta tool call, plus extract-fail and delayed-replan modes."
+    },
+    "vp.mjs": {
+      "kind": "infra",
+      "purpose": "Single entry point: launch, doctor, list, drive, capture, archive, links, cleanup."
+    },
+    "vp-selftest.mjs": {
+      "kind": "test",
+      "purpose": "Self-test for vp.mjs: drive argument and path rules through --dry-run, archive refusals and copies in a throwaway VERIFY_REPO_ROOT, and the registry gate on this checkout and on fake skill directories. No stack needed."
+    },
+    "vp-registry-gate.mjs": {
+      "kind": "test",
+      "purpose": "Registry gate: every file in scripts/ is registered, no new drive-<number> script, registry paths, statuses and needs are valid, a docs/verify writer needs rewrites-evidence, and every feature map names its vp.mjs drive line. Run by vp-selftest.mjs."
+    }
+  },
+  "features": {
+    "account-controls": {
+      "recipe": null,
+      "cases": {
+        "rename-and-notify-toggle": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1031-account-controls.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Account page rename round-trips through PATCH /api/user/me to SQLite and persists; the push-notification switch works both ways under granted and denied permission states.",
+          "note": "static check by /code-review on #1411: waits for .profile-hint, which apps/web/src no longer has (the profile-* classes were renamed)."
+        }
+      }
+    },
+    "agent-detail": {
+      "recipe": "features/agent-detail.md",
+      "cases": {
+        "edit-and-create": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-agent-detail.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Edits an agent's overview, permission and secret toggles in the detail page, then creates an agent with a chosen model. Each change is checked against the server's saved values.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "executed 2026-10-20 in #1402: the seeding POST /api/teams/:id/agents returns 400 \"invalid body at machineId\"; the probe predates the home-machine binding (ADR 0019) and sends no machineId"
+        },
+        "identity-chip-link": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-agent-identity.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "The agent identity chip on the chief drawer's robot row and agent mention chips navigate to the agent settings page by click and by keyboard (Shift+Tab, Enter).",
+          "usage": "--expect=old optional; fresh DB required; env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "ui-cleanup-finale": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-952-finale.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Runtime checks for the #952 cleanup: dialog shell, create-agent form, agent detail, account page, team org chart, retired-class audit and token contrast.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "static spot-check by the #1402 inventory, not executed: The header says C6/C7 selectors moved to the registry (#1010) and that later waves (#1002/#1003/#1007/#1008) changed the geometry and token values it asserts. The .agent-runtime-menu handle class is not found anywhere in apps/web/src. drive-1010-select.mjs and drive-agent-detail.mjs replace it."
+        }
+      }
+    },
+    "ansi-error-display": {
+      "recipe": null,
+      "cases": {
+        "ansi-error": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1262-ansi-error.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Seeds a failed build whose errorMessage is a real ANSI-polluted row, then proves the failure row and run history show it with no ESC or OSC8 sequences.",
+          "usage": "env SERVER, WEB, POLLUTED_ROW_FILE, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "api-keys": {
+      "recipe": "features/api-keys.md",
+      "cases": {
+        "create": {
+          "script": ".claude/skills/verify-cairn/scripts/drive.mjs",
+          "args": [
+            "api-key"
+          ],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "Create an API key from the empty state: one-time plaintext, masked row, SQLite stores the hash only.",
+          "usage": "needs a fresh database (re-run vp.mjs launch)"
+        }
+      }
+    },
+    "attachments": {
+      "recipe": "features/attachments.md",
+      "cases": {
+        "clipboard-paste": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-paste.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Pasting an image into the detail composer or the new-task spec runs the grant, upload and token chain, renders an attachment chip, and stores a SQLite row with disk bytes matching the sample",
+          "usage": "<todoId> in confirm phase (from setup-review-seed.mjs); env VERIFY_REPO_ROOT",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
+        },
+        "new-task-and-composer-upload": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-attachments.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Attachment upload via the new-task dialog (and optionally the composer) puts a token in the spec, writes the SQLite row and file on disk, and reads back through GET /api/attachments/:id",
+          "usage": "[todoId] (optional; adds the composer path, seed via setup-review-seed.mjs); that seed answers 400 without machineId since ADR 0019, so only the new-task path runs today"
+        }
+      }
+    },
+    "avatars": {
+      "recipe": "features/avatars.md",
+      "cases": {
+        "dicebear-avatars": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-avatars.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "The sidebar, the user menu and agent create/cards build dicebear avatar URLs while avatarUrl stays null in the API and SQLite.",
+          "note": "static check by /code-review on #1411: reads .team-agent-avatar img, a class apps/web/src no longer has."
+        }
+      }
+    },
+    "board-new-task": {
+      "recipe": "features/board-new-task.md",
+      "cases": {
+        "board": {
+          "script": ".claude/skills/verify-cairn/scripts/drive.mjs",
+          "args": [
+            "board"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Workbench shell layout screenshot (four columns since #351).",
+          "note": "static check by /code-review on #1411: waits for .board-topbar-title, which #1375 (Paper board top bar) removed; the same wait fails glass-journeys/board live."
+        },
+        "new-task": {
+          "script": ".claude/skills/verify-cairn/scripts/drive.mjs",
+          "args": [
+            "new-task"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "New-task dialog end to end: card on the board, GET /api/todos row and SQLite row; creates the default project when none exists."
+        },
+        "overlay-css-migration": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-948-overlay.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "Overlay-domain migration: new-task dialog path, computed geometry of the utility classes, popovers, more-menu and delete-confirm, retired CSS sheets never loaded, light mode.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+          "note": "static spot-check by the #1402 inventory, not executed: The selector data-testid=new-task-machine-chip no longer exists in apps/web/src. new-task-dialog.tsx only lists new-task-machine-dot, though new-task-head and new-task-project-chip are still there."
+        }
+      }
+    },
+    "board-sidebar": {
+      "recipe": null,
+      "cases": {
+        "board-sidebar-render-contrast": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-943-board-sidebar.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Board/sidebar geometry, button migration, interaction paths, removed board.css rules, and dual-theme WCAG contrast",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; drive.mjs new-task must run first"
+        }
+      }
+    },
+    "board-zoom-fit": {
+      "recipe": null,
+      "cases": {
+        "zoom-fit": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1035-zoom-fit.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "At each simulated zoom width the board columns fit without horizontal overflow, the column floor is 200px normally and 280px with chief docked (Cmd+J), and Escape returns it to normal.",
+          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "branch-sync": {
+      "recipe": "features/branch-sync.md",
+      "cases": {
+        "sync-ui": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-branch-sync.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "stale",
+          "purpose": "Branch sync from the detail right pane resets the dirty target dir to the commit (POST, SQLite row, stream event, git state)",
+          "usage": "<todoId> <buildId>",
+          "note": "Needs a todo from setup-branch-sync-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
+        }
+      }
+    },
+    "chief-dispatch-judgment": {
+      "recipe": "features/chief-dispatch-judgment.md",
+      "cases": {
+        "dispatch-judgment": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-903-dispatch-judgment.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief dispatch judgment: the dispatchWithPlan setting is dead (no UI row, PATCH 400), and run_builds withPlan/dispatchReason in three forms is checked against SQLite through a fake machine wire.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "chief-drawer": {
+      "recipe": null,
+      "cases": {
+        "drawer-model-select": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-drawer.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief drawer model selection persists via PATCH, runtime mark icon, and no dead buttons (gear, copy).",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "chief-floating-window": {
+      "recipe": null,
+      "cases": {
+        "a0-live": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1009-a0-live.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief floating-window shell on live data: geometry, minimize, refresh restore, Cmd+J/Esc, cross-route persistence, deep links, suppressed routes",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "chief-segments": {
+      "recipe": "features/chief-segments.md",
+      "cases": {
+        "avatar-geometry": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1033-avatar.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief drawer thinking/tool rows render a 24x24 avatar to the left of a flex text column (not a full-width Lorelei SVG); --expect=old reproduces the bug",
+          "usage": "[--expect=new|old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "compress-model-select": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-model-select.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "The chief settings compression-model picker options match the toModelOptions projection of GET model-sources, with custom providers excluded.",
+          "usage": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional)",
+          "note": "static spot-check by the #1402 inventory, not executed: #1259/#1260 removed the compression-model selector from the chief settings Agent tab (drive-1259 asserts it is absent); no button aria-label=\"压缩模型\" remains in apps/web/src."
+        },
+        "segment-sealing": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-segments.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief turn text segments are sealed when a tool arrives (DB order, single-type content, SSE order, in-flight buffer kept, idempotent upload), and the drawer shows segments and live tool rows flat",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "stream-catchup": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-catchup.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "A chief conversation SSE subscriber that joins mid-turn gets a replayed text_delta snapshot with no duplicate or missing text, on both the API and the drawer.",
+          "usage": "optional --expect=old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "threads-scroll": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1094-threads-scroll.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Chief thread switcher with 22 threads stays scrollable and every row is clickable by real mouse coordinates",
+          "usage": "--expect=new|old (env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "chief-unread": {
+      "recipe": null,
+      "cases": {
+        "unread-badge": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1303-chief-unread.mjs",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "The chief unread badge counts unread threads. Wake turns are excluded, threads idle for 8 days become read after a tick, and the badge shows 99+ with a tooltip giving the true count.",
+          "usage": "--expect=old|new; fresh DB required; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "detail-right-pane": {
+      "recipe": "features/detail-right-pane.md",
+      "cases": {
+        "detail-css-live": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-945-detail.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "current",
+          "purpose": "After the detail.css removal, the live detail page keeps composer textarea styles, the disclosure button box, task-meta, the status chip tone, the stop button and readable contrast.",
+          "usage": "[--skip-build]; env RUNNING_ID, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+        },
+        "detail-live-migration": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-951-detail.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "Live-only detail surfaces after removing overlays.css: create-agent warning, branch section machine pill/switch/stop confirm, AI review modal and its contrast, and retired selectors have no stylesheet rules.",
+          "usage": "env SEED951_JSON (seed-951-live.mjs), SEED_REVIEW_JSON (setup-review-seed.mjs), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; STUB_PORT=8919",
+          "note": "static check by /code-review on #1411: reads .ui-checkbox input, a class apps/web/src no longer has."
+        },
+        "machine-pin": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1208-machine-pin.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Dispatch honors a todo's machine pin, and the detail machine row shows a pinned-machine footnote when a build is reassigned to another machine.",
+          "usage": "optional --expect=old (origin/main baseline stack 8793/5275); env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        },
+        "three-pane": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-detail-pane.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Checks the detail page's 3-pane geometry in the fresh and thread states, and switching between the right pane's four views without any modal.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "static spot-check by the #1402 inventory, not executed: Its branch-section check looks for the .dlg-machine-picker, .dlg-dir--input and .dlg-machine classes. These no longer exist in apps/web: branch-dialog.tsx only mentions .dlg-machine-dot in a comment as an old class name (#951)."
+        }
+      }
+    },
+    "dual-source": {
+      "recipe": null,
+      "cases": {
+        "dual-source": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1213-dual-source.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm",
+            "github"
+          ],
+          "status": "stale",
+          "purpose": "Proves that for a github project with a localPath set, the daemon uses the local clone as its base and still fetches to the remote tip. With a bad path it falls back to a GitHub clone. The settings page edits the localPath field.",
+          "usage": "env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "failed-run-error": {
+      "recipe": null,
+      "cases": {
+        "fail-raw-error-dialog": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1258-fail-links.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Failed todo row's view raw error opens dialog with full build.errorMessage, no guide link, X closes.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "failed-send": {
+      "recipe": "features/failed-send.md",
+      "cases": {
+        "restart-with-feedback": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-failed-send.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "stale",
+          "purpose": "Sending from the composer in failed phase restarts with feedback: new build, feedback in a new conversation, failed->queued; non-failed restart returns 409",
+          "usage": "<todoId> <failedBuildId> (a failed todo from setup-branch-sync-seed.mjs and a daemon run, features/failed-send.md)",
+          "note": "Needs a todo from setup-branch-sync-seed.mjs (the recipe in features/failed-send.md), which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by pr-gate run 5 on #1411; fix the seed first."
+        },
+        "restart-combo": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1279-restart-combo.mts",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "A failed-restart round stores the feedback and the daemon combo as two user rows; after the task title drifts, the combo row stays out of the user bubbles and the feedback stays in (#1279).",
+          "runner": "tsx",
+          "cwd": "apps/server"
+        }
+      }
+    },
+    "gate-actor": {
+      "recipe": null,
+      "cases": {
+        "gate-actor": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-902-gate-actor.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Human confirm gate records actor, drag to done shows a confirm dialog with an audit row, and chief cannot pass gates by itself",
+          "usage": "--expect=new|old (env VERIFY_RUN_DIR for baseline)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "github-oauth-picker": {
+      "recipe": "features/github-oauth-picker.md",
+      "cases": {
+        "oauth-and-manual-repo": {
+          "script": ".claude/skills/verify-cairn/scripts/probe-github-oauth.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "GitHub connection status/authorize/disconnect/repos endpoints and the UI manual fallback that creates a github project",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
+        }
+      }
+    },
+    "github-webhook": {
+      "recipe": null,
+      "cases": {
+        "webhook-tracer": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1137-webhook-tracer.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "github"
+          ],
+          "status": "current",
+          "purpose": "A GitHub issues labeled webhook whose sender has triage or above on the repo creates a todo and orchestrates a chief thread (#1459, ADR 0021 D5). It also covers the failure paths: bad token (401), duplicate delivery, replay, ping, an ignored label, an unmapped repo, and the import refusals answered 202 ignored: no-sender, sender-below-triage (sender ghost) and at-cap (3 open github-issue tasks), each checked by its reason code in server.log. The permission-unreadable and rate-limited refusals cannot be produced against real GitHub; apps/server/test/webhook.test.ts W4 / W4b cover them.",
+          "usage": "env GH_WEBHOOK_VERIFY_TOKEN, VERIFY_GITHUB_REPO, VERIFY_GITHUB_ISSUE, VERIFY_GITHUB_SENDER (a login with triage, write, maintain or admin on VERIFY_GITHUB_REPO whose permission the token can read; default the repo owner segment, which only fits a user-owned repo), VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "runner": "tsx",
+          "cwd": "apps/server"
+        }
+      }
+    },
+    "glass-journeys": {
+      "recipe": "features/glass-journeys.md",
+      "cases": {
+        "all": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "stale",
+          "purpose": "All six Control Glass journeys in one run.",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT",
+          "note": "executed 2026-10-21 in #1402: runs the board journey, which waits for .board-topbar-title (removed by #1375), so the run ends FAIL although create-task, dispatch, view-diff, request-changes and merge pass. Run those five as separate cases.",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "board": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "board"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "stale",
+          "purpose": "Control Glass journey \"board\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "note": "executed 2026-10-21 in #1402: waits for .board-topbar-title, which #1375 (Paper board top bar) removed; the title is now an h1 inside header.board-topbar, so the journey times out after 30 s. The other five journeys pass in the same run.",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "create-task": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "create-task"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Control Glass journey \"create-task\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "dispatch": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "dispatch"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Control Glass journey \"dispatch\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "merge": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "merge"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Control Glass journey \"merge\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "request-changes": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "request-changes"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Control Glass journey \"request-changes\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
+        },
+        "view-diff": {
+          "script": ".cursor/skills/verify-cairn/scripts/glass.mjs",
+          "args": [
+            "view-diff"
+          ],
+          "needs": [
+            "own-stack"
+          ],
+          "status": "current",
+          "purpose": "Control Glass journey \"view-diff\" (features/glass-journeys.md).",
+          "usage": "starts and stops its own stack on VERIFY_PORT / VERIFY_WEB_PORT; run vp.mjs cleanup first if a vp stack is up",
+          "evidence": {
+            "flag": "--out"
+          }
+        }
+      }
+    },
+    "hotkeys": {
+      "recipe": "features/hotkeys.md",
+      "cases": {
+        "chief-new-thread-key": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-chief-new-thread-key.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "The N key in the chief drawer returns to the new-thread view only while the drawer is open and the composer is not focused; also checks the KbdHint and aria-keyshortcuts.",
+          "usage": "env VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "hotkeys-chain": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-hotkeys.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "The C new-task hotkey, the ⌘J tooltip and chief drawer focus, ⌘K negative cases and C on schedules each create real todos."
+        },
+        "newtask-key-c": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-newtask-key.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Pressing c opens New Task on the board, project page and global sidebar while the old key n does not; the input-focus guard and sidebar entry are checked; evidence is screenshots, API rows and SQLite rows.",
+          "usage": "[oldKey default n] [--expect=old]; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR"
+        }
+      }
+    },
+    "local-daemon-executor": {
+      "recipe": "features/local-daemon-executor.md",
+      "cases": {
+        "local-unreachable": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1210-local-unreachable.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "A local-form project whose repo path is unreachable fails the build step before clone with a named machine/path/remedy message, and works normally once the path is restored",
+          "usage": "[--expect=new|old]; env SERVER, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, VERIFY_REPO_ROOT",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "mea-live-claude-code": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1259-mea-live.mjs",
+          "args": [],
+          "needs": [
+            "remote-host",
+            "daemon",
+            "real-llm",
+            "rewrites-evidence"
+          ],
+          "status": "host-bound",
+          "purpose": "On the mea host, creates an agent through the three-level cascade in the browser, then a real claude-code task edits the README.",
+          "usage": "env MEA_WEB (default 127.0.0.1:5274), MEA_SERVER (default 127.0.0.1:8792)",
+          "evidence": {
+            "writes": "docs/verify/1259/"
+          },
+          "note": "static spot-check by the #1402 inventory, not executed: runs only against a named remote host"
+        }
+      }
+    },
+    "local-repo-api": {
+      "recipe": "features/local-repo-api.md",
+      "cases": {
+        "local-repo-api": {
+          "script": ".claude/skills/verify-cairn/scripts/probe-local-repos.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "POST /api/projects with kind=local returns 400 not_found, 400 not_git or 201 as appropriate; hosted projects are not broken; GitHub repos return 404 when not connected; the SQLite shape is correct.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
+        }
+      }
+    },
+    "machine-binding": {
+      "recipe": null,
+      "cases": {
+        "agent-machine-binding": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1259-1260-binding.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "Agent steps and chief turns go only to the agent's home machine; the chief holds a concurrency slot; rebinding is validated; machine deletion is protected and agents can be migrated; sweep keeps steps pending; UI shows machine details and the chief model as read-only.",
+          "usage": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB"
+        }
+      }
+    },
+    "machine-capability-gate": {
+      "recipe": null,
+      "cases": {
+        "capability-gate": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1251-capability-gate.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "stale",
+          "purpose": "Machine capability reporting, dispatch gate that leaves steps pending with a visible reason, agent machine-fit, and real daemon reporting",
+          "usage": "env VERIFY_REPO_ROOT; server launched with CAIRN_MCP_CONFIG fixture",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        }
+      }
+    },
+    "machine-concurrency": {
+      "recipe": "features/machine-concurrency.md",
+      "cases": {
+        "agent-concurrency-cap": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1138-agent-concurrency.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Per-agent maxConcurrentTasks gate: PATCH validation, claim blocked per agent pool across machines, freed slot handoff, null clears the limit",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        },
+        "cap-and-queue": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1108-concurrency.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "With machine maxConcurrent=2, two turns run in parallel, the third queues visibly (turnQueue, drawer and machines page), takes over a freed slot, and PATCH validates bounds",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        },
+        "recommended-concurrency": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1241-recommended-concurrency.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "current",
+          "purpose": "The daemon's hardware fingerprint yields a recommended concurrency value. It checks the recommended, manual and estimated states, the basis popover, that a heartbeat does not overwrite a manual value, and that 'restore recommended' works.",
+          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME"
+        },
+        "zombie-claim": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1065-zombie-claim.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "A killed machine's held claim long-poll never takes a newly queued step; the live machine claims it instead (fake machine wire, no daemon).",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        }
+      }
+    },
+    "machine-stale-sweep": {
+      "recipe": null,
+      "cases": {
+        "stale-sweep": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1136-stale-sweep.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack",
+            "daemon"
+          ],
+          "status": "current",
+          "purpose": "Freezes a real daemon with SIGSTOP and proves the machine row turns offline once the 150s stale threshold passes, then returns online after SIGCONT.",
+          "usage": "--expect=old optional; env VERIFY_PORT, VERIFY_RUN_DIR; run it on a fresh stack (a second run on one stack, with the machine of the first run enrolled again, failed check A once in #1402)"
+        }
+      }
+    },
+    "machines-local-row": {
+      "recipe": "features/machines-local-row.md",
+      "cases": {
+        "local-row": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-machines-local.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Machines page pins the local row with runtime brand marks and a shell toggle that persists across reload"
+        }
+      }
+    },
+    "mcp-servers": {
+      "recipe": "features/mcp-servers.md",
+      "cases": {
+        "command-gate-mcp-bridge": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-929-930.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "The bash command gate blocks rm -rf with a refusal the model can see and lets legal bash run. It also checks the MCP native bridge: echo and resources work, a dead endpoint degrades without blocking, and the stdio child is closed on shutdown.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME, MCP_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "readonly-config": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-mcp.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "The MCP page shows the local config read-only: the API projection hides secrets, write routes return 404, rows have no new or more entry points, and there is no mcp_server table.",
+          "usage": "launch with CAIRN_MCP_CONFIG=<fixture claude.json>; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "mentions": {
+      "recipe": "features/mentions.md",
+      "cases": {
+        "mention-picker": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-mentions.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Mention picker inserts agent token into new-task spec and optionally detail composer draft.",
+          "usage": "[todoId] (optional; the todoId path needs a todo from setup-review-seed.mjs, which answers 400 without machineId since ADR 0019); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "overlay-registry": {
+      "recipe": null,
+      "cases": {
+        "overlay-registry": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1008-overlay-registry.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Popover, Dialog, AlertDialog, Tooltip and DropdownMenu overlays across new-task, detail, account, schedules and theme run on the registry components, and saving still writes matching API and SQLite rows.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "overlays": {
+      "recipe": null,
+      "cases": {
+        "overlays-contrast": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-949-overlays.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Cmd-K panel and chip popover overlay styling, overlays.css retirement and contrast in both themes.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; requires drive.mjs new-task run first"
+        }
+      }
+    },
+    "paper-sidebar": {
+      "recipe": null,
+      "cases": {
+        "grouped-sidebar": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-paper-sidebar.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Paper Grouped sidebar counts match the board columns, and the expanded, resources, needs-me filter and collapsed-rail states are correct in the URL and aria attributes.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; run with the proxy env unset"
+        }
+      }
+    },
+    "persona-verify": {
+      "recipe": "features/persona-verify.md",
+      "cases": {
+        "persona-verify": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1250-persona-verify.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "Persona roster seeding, the verify step with its verdict, three-perspective review fan-out and split_todo child cards all work end to end over the fake machine wire and the browser.",
+          "usage": "env VERIFY_REPO_ROOT (needs a fresh DB from relaunch)",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "phase-chip-words": {
+      "recipe": null,
+      "cases": {
+        "chip-word": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1400-chip-word.mjs",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "#1400: the phase chip word on every surface (board columns, detail header for todo / queued / confirm, Cmd-K search rows, schedule card, project task row). --expect=new wants 待开始 for todo and 排队中 for queued, and 待处理 only for the needs-you column; --expect=old records the base build. Seeds over REST and a direct UPDATE on the scratch SQLite; rerun needs a fresh stack.",
+          "usage": "[--expect=new|--expect=old]"
+        }
+      }
+    },
+    "pi-convergence": {
+      "recipe": null,
+      "cases": {
+        "convergence": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-926-convergence.mts",
+          "args": [],
+          "needs": [
+            "stub-llm",
+            "rewrites-evidence"
+          ],
+          "status": "current",
+          "purpose": "Runtime proof for #926: pi reads the daemon retry settings back, a real pi AgentSession against a stub LLM emits agent_settled after agent_end, and the daemon maps only agent_settled to done. Writes docs/verify/926/convergence-evidence.json in place.",
+          "runner": "tsx",
+          "cwd": "apps/daemon",
+          "evidence": {
+            "writes": "docs/verify/926/convergence-evidence.json"
+          }
+        }
+      }
+    },
+    "pi-policy": {
+      "recipe": null,
+      "cases": {
+        "pi-policy": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-925-pi-policy.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "Proves the pi session policy end to end: the trust layer denies .pi/SYSTEM.md, the policy announcement line appears, the cache-retention setting reaches the request, and per-build usage records cost and the four token counts.",
+          "usage": "env SERVER, VERIFY_RUN_DIR, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "plan-doc-chain": {
+      "recipe": null,
+      "cases": {
+        "plan-chain": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-904-plan-chain.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "withPlan build writes plan.md to plan table, confirm card and right-pane doc show it for hosted and bare dir, negative leg fails.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        },
+        "plan-first-round": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1025-plan-first-round.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "Plan.md contract is injected into first-round plan prompt (A leg) and missing plan triggers rewrite round then failed close (B leg).",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        }
+      }
+    },
+    "project-commit-detail": {
+      "recipe": "features/project-commit-detail.md",
+      "cases": {
+        "commit-detail": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1102-commit-detail.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Project history row opens commit diff for hosted, local and unreachable repos with REST and browser checks.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
+        }
+      }
+    },
+    "project-files-drill": {
+      "recipe": "features/project-files-drill.md",
+      "cases": {
+        "folder-drill": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1097-folder-drill.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Project Files folder drill-down for hosted and local repos: tree?path= REST values, breadcrumbs, same-name files kept apart, 3-level nesting, and no file read sent on a folder click.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "project-files-local": {
+      "recipe": "features/project-files-local.md",
+      "cases": {
+        "local-files": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1030-local-files.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Local project Files tab opens on a git worktree with a non-main default branch, hosted repos show no regression, and an unreachable local path degrades to a readable message with an API 404 and reason=not_found.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
+        }
+      }
+    },
+    "project-identity": {
+      "recipe": null,
+      "cases": {
+        "identity-patch-and-convert": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1242-project-identity.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack",
+            "github"
+          ],
+          "status": "current",
+          "purpose": "Project identity PATCH (rename/description), local-to-github conversion with in-flight build 409, board note, and new steps resolve the new repo shape",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; needs a fresh DB"
+        }
+      }
+    },
+    "project-new-form": {
+      "recipe": "features/project-new-form.md",
+      "cases": {
+        "new-form": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-project-new-form.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Covers the new-project form: repo menu rows, name auto-fill, focus ring, local path errors, the submit gate, and three create flows checked in both the API and SQLite.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env must be unset"
+        }
+      }
+    },
+    "provider-picker": {
+      "recipe": "features/provider-picker.md",
+      "cases": {
+        "picker-dialog": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-provider-picker.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "The add-provider picker dialog is checked end to end: search, preset key forms, oauth labels, the disabled codex row and the custom gateway disclosure. Creating a provider is confirmed through the API and SQLite.",
+          "usage": "run after drive-providers-tabs.mjs; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "providers-tabs": {
+      "recipe": "features/providers-tabs.md",
+      "cases": {
+        "claude-bin-detection": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1050-claude-bin.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "current",
+          "purpose": "Daemon detects the local claude binary version/auth and reports it via enroll; providers page shows version line and login badge, and shows not-installed when the binary is missing",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, SERVER, WEB, DB, VERIFY_EVIDENCE_DIR, STUB_VERSION"
+        },
+        "runtime-tabs": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-providers-tabs.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "Providers page pi/Claude Code runtime tabs: empty state, model rows after seeding a provider, ?runtime= sync, header card matches model-sources API and machine report",
+          "usage": "needs a fresh DB; run before drive-provider-picker"
+        }
+      }
+    },
+    "quota-wait": {
+      "recipe": null,
+      "cases": {
+        "quota-wait-resume": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1261-quota-wait.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "A relay 429 trips the quota circuit breaker, the todo parks as waiting_quota with board banner, chip and notification, and it resumes on its own once the relay recovers",
+          "usage": "env VERIFY_PORT=8802 VERIFY_WEB_PORT=5282 at launch; VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "registry-select": {
+      "recipe": null,
+      "cases": {
+        "schedule-time-select": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1010-select.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Registry compound select on the schedule dialog's hour/minute pickers: open, pick and echo back on the real user path, ARIA structure, and light/dark contrast.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "review-700": {
+      "recipe": "features/review-700.md",
+      "cases": {
+        "verdict-extraction": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-review-700.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "A failed verdict extraction shows as a danger tag; a verdict followed by set_task_meta in the same turn is still extracted and sends the task back to replanning.",
+          "usage": "<todoA> <todoB>; env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Needs a todo from setup-review-700-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
+        }
+      }
+    },
+    "review-modal": {
+      "recipe": "features/review-modal.md",
+      "cases": {
+        "empty-review": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1313-empty-review.mjs",
+          "args": [
+            "--expect=after"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "A review with an empty diff hides the merge row and can be completed without merge permission, while a review with file changes still requires it.",
+          "usage": "--expect=before|after [--focus=hunkless]"
+        },
+        "failed-review-restore": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-failed-review-restore.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "A todo that failed at AI review recovers two ways: 'complete' from the UI menu merges the branch into bare-repo main and reaches done, or rerunning only the review returns it to the review gate.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        },
+        "review-launch": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-review.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "AI review modal launch from confirm phase enqueues review step, shows announcement, and simulated done closes loop.",
+          "usage": "<todoId> in confirm phase (from setup-review-seed.mjs); env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR",
+          "note": "Needs a todo from setup-review-seed.mjs (written for this probe, #312) or the same seed steps in features/review-modal.md, which create the agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by pr-gate run 5 on #1411; fix the seed first."
+        }
+      }
+    },
+    "review-reject": {
+      "recipe": "features/review-reject.md",
+      "cases": {
+        "blocking-revision": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-review-blocking.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "AI review with a blocking verdict moves phase back to planning, writes a summary note, and enqueues a new plan step with review facts",
+          "usage": "<todoId> <agentId>; env REVIEW_MACHINE_TOKEN (after setup-review-seed.mjs)",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
+        },
+        "human-reject": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-review-reject.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Two human-reject paths from review (more-menu request changes and the composer) send the task back to planning with a feedback transcript row and a template prompt, while plan v1 and the build are kept.",
+          "usage": "<todoId> positional; env REVIEW_MACHINE_TOKEN, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR; run setup-review-seed.mjs first",
+          "note": "Needs a todo from setup-review-seed.mjs, which creates its agent with POST /api/teams/:id/agents and no machineId (400 since ADR 0019, createAgentBodySchema). Found by /code-review on #1411; fix the seed first."
+        }
+      }
+    },
+    "schedules-dialog": {
+      "recipe": null,
+      "cases": {
+        "schedule-dialog-and-settings-cards": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1007-pages.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Schedules new-schedule Dialog saves (POST /api/schedules + SQLite row) with Esc/backdrop/X close paths, and project settings page renders registry Card structure",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; proxy env unset"
+        }
+      }
+    },
+    "search": {
+      "recipe": "features/search.md",
+      "cases": {
+        "search": {
+          "script": ".claude/skills/verify-cairn/scripts/drive.mjs",
+          "args": [
+            "search"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "Sidebar search panel: Cmd+K, type the title, the matching task row shows."
+        },
+        "project-line": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-search-project-line.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "current",
+          "purpose": "⌘K search rows show their own project as the second line on the live stack: before /api/search answers (client-side rows), after it, and none while /api/projects is still loading; never the fixture project r3-lifecycle.",
+          "usage": "fresh stack for each run (it seeds two todos and expects exactly two result rows); env VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "secondary-shell": {
+      "recipe": null,
+      "cases": {
+        "secondary-domain": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-947-secondary.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Team/org chart/api-keys secondary pages: geometry, slots, interaction paths, secondary.css cleared, WCAG contrast in both themes",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "skill-import": {
+      "recipe": "features/skill-import.md",
+      "cases": {
+        "import-rollback": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1185-import-rollback.mjs",
+          "args": [
+            "--expect=new"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "When skill-sources.json registration fails, imported skill is rolled back (new) or left behind (old).",
+          "usage": "--expect=old | --expect=new; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        },
+        "local-and-github-import": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1170-skill-import.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "github"
+          ],
+          "status": "current",
+          "purpose": "Skill import via localPath and GitHub URL, refresh re-pull, machine manifest digest, audit rows, and SSRF/path/binary rejections"
+        }
+      }
+    },
+    "skills-injection": {
+      "recipe": "features/skills-injection.md",
+      "cases": {
+        "claim-injection": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1106-skill-inject.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "The dispatch claim payload injects only the domain-relevant skills (explicit mention, zero hits, step-row rules) and the detail pane renders the injected-skills row.",
+          "usage": "--phase=claim; env SERVER, WEB_URL, SKILLS_DIR, DB, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "injection-check": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1186-skill-injection.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "A completed dispatch saves the injected skill set and a skill_injection_check row: yellow injected-unread with an open allowlist, red allowlist-closed with a closed one.",
+          "usage": "env EVIDENCE_DIR (default /tmp/1186-after)",
+          "evidence": {
+            "env": "EVIDENCE_DIR"
+          },
+          "note": "static spot-check by the #1402 inventory, not executed: Repo root is hardcoded to /workspace (reads /workspace/.claude/verify-run/ports.json) and ignores VERIFY_REPO_ROOT/VERIFY_RUN_DIR, so it does not run from a worktree lane as written."
+        },
+        "native-plugin": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1171-native-plugin.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "real-llm"
+          ],
+          "status": "stale",
+          "purpose": "Team skills native plugin channel: wire phase uses a fake claude CLI to check --plugin-dir, the version gate and allowlist legs; behavior phase checks real-model Skill discovery with zero leftover files in the worktree.",
+          "usage": "phase argument wire|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, VERIFY_EVIDENCE_DIR, MODEL (default glm-5.3); daemon is spawned by the script itself",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId in the body, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by /code-review on #1411: the first scan passed any file that names machineId anywhere; the self-test now judges each call's own body."
+        },
+        "skill-read-facts": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-918-skill-facts.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "The live row and detail summary show skills that were read (skill: demo-skill), denied reads are marked as blocked, and a control task with no skills shows no empty entries.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR, SKILLS_DIR, DAEMON_HOME",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "skills-manifest": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-920-skills-manifest.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "stale",
+          "purpose": "The machine skills manifest and per-file endpoints serve oversized skills with sha256 checks and negative 404s; the daemon materializes skills incrementally and fails loudly against an old server",
+          "usage": "--phase=wire|daemon-success|daemon-incremental|daemon-fail [--expect=new|old]; env SERVER, VERIFY_RUN_DIR, SKILLS_DIR, DB, DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "skills-routing": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-919-skills-routing.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "real-llm",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "behavior: a real model picks up a skill without being told (marker in output, transcript Read row, detail skills summary). deny-ui: a denied read shows as a blocked row and in the block count.",
+          "usage": "--phase=behavior|deny-ui; env SERVER, WEB, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, STUB_PORT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        },
+        "skills-split": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1169-skills-split.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "real-llm"
+          ],
+          "status": "stale",
+          "purpose": "skillsAllowlist and defaultSkill are separate fields across REST, the claim payload and the machine skill selection; the behavior phase checks that an agent with no skills set can read SKILL.md.",
+          "usage": "phase argv api|behavior; env SERVER, WEB, VERIFY_RUN_DIR, DB, DAEMON_HOME, LOCAL_SKILLS, MODEL, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "step-error-lifecycle": {
+      "recipe": null,
+      "cases": {
+        "error-lifecycle": {
+          "script": ".claude/skills/verify-cairn/scripts/probe-error-lifecycle.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon"
+          ],
+          "status": "stale",
+          "purpose": "A persistent 400 from a mock gateway fails the step in bounded time with the root cause shown and at most 8 requests. Patching provider compat then takes effect without a daemon restart, and removing it reverts the request fields.",
+          "usage": "env VERIFY_REPO_ROOT, MOCK_PORT (default 8799), VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "step-hold-retry": {
+      "recipe": null,
+      "cases": {
+        "hang-retry": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1257-hang-retry.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "Unclaimed steps wait for a machine instead of failing, a quota error triggers a 402 hold and backoff re-claim, and a broken stream resumes the same session; three legs checked via SQLite, REST and board chips.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR; embedded stub LLM; starts the daemon itself",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId, which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by a scan after chief-floating-window/a0-live failed that way live (#1411 pr-gate run 3)."
+        }
+      }
+    },
+    "stop-button": {
+      "recipe": "features/stop-button.md",
+      "cases": {
+        "stop-chain": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-stop.mjs",
+          "args": [],
+          "needsArgs": true,
+          "needs": [
+            "stack",
+            "daemon",
+            "stub-llm"
+          ],
+          "status": "stale",
+          "purpose": "Full stop-button chain from the detail page: start, stop during streaming, confirm with discard, stopping transition, cancelled row, then the gate falls back to pending.",
+          "usage": "<todoId>; env VERIFY_REPO_ROOT, STOP_DAEMON_HOME, VERIFY_EVIDENCE_DIR",
+          "note": "static spot-check by the #1402 inventory, not executed: It starts the build with the UI Start button, which now calls POST /orchestrate (409 when no chief is bound, and the chief turn never dispatches through the stub). drive-951 and features/stop-button.md both record this UI start path as stale."
+        }
+      }
+    },
+    "tags": {
+      "recipe": "features/tags.md",
+      "cases": {
+        "fixed-vocab-untitled": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-tags.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "A new task has no title or tag inputs, its title comes from the first line of the body, the project has the 6 seeded fixed tags (API and SQLite), and detail renders no chips row when a task has no tags."
+        }
+      }
+    },
+    "theme": {
+      "recipe": "features/theme.md",
+      "cases": {
+        "persist": {
+          "script": ".claude/skills/verify-cairn/scripts/drive.mjs",
+          "args": [
+            "theme"
+          ],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "cairn-theme persistence in localStorage, light and dark both survive a reload."
+        },
+        "sealed-tokens-audit": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-953-sealed.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "In dark and light mode, retired CSS rules are absent, selected-row colors and contrast match the tokens, screenshots cover four surfaces, and cross-surface token contrast passes WCAG",
+          "usage": "env VERIFY_RUN_DIR, VERIFY_REPO_ROOT, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "thinking-delta": {
+      "recipe": null,
+      "cases": {
+        "live-thinking-text": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1308-thinking-delta.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "thinking_delta activity is accepted, reaches the conversation stream, and the detail page shows the reasoning text once",
+          "usage": "--expect=old|new (default new); env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        }
+      }
+    },
+    "thinking-truncate": {
+      "recipe": null,
+      "cases": {
+        "thinking-truncate": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1034-thinking-truncate.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "stale",
+          "purpose": "Proves long thinking-preview rows are cut off by CSS truncation, not by overflowing width, in both the chief drawer and the detail transcript. Data is seeded through REST and a fake machine.",
+          "usage": "--expect=new|old; env VERIFY_REPO_ROOT, VERIFY_PORT, VERIFY_WEB_PORT, VERIFY_EVIDENCE_DIR",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    },
+    "unassigned-build": {
+      "recipe": null,
+      "cases": {
+        "unassigned-build": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-1104-unassigned-build.mjs",
+          "args": [],
+          "needs": [
+            "stack",
+            "fresh-stack"
+          ],
+          "status": "stale",
+          "purpose": "run_builds with no assignment gets a 400 from the chief relay; a step with no owner fails cleanly at claim without blocking the queue (REST and scheduler paths); the board and detail page show the failure.",
+          "usage": "env VERIFY_REPO_ROOT (VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR optional); needs a fresh DB",
+          "note": "Creates its agent with POST /api/teams/:id/agents and no machineId (through a POST-by-default helper), which answers 400 since ADR 0019 made the home machine required (createAgentBodySchema). Found by pr-gate run 4 on #1411; unassigned-build and gate-actor failed that way live."
+        }
+      }
+    }
+  }
+}

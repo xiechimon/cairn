@@ -1,7 +1,7 @@
 // 运行简报的落盘与擦除（#958 闸 1/闸 2，spec 24）。
 //
 // 简报写进任务 worktree 里引擎原生会读的上下文文件（词表与落点判定在
-// @pacman/shared 的 brief-file.ts），跑完再**逐字节回滚**。 Multipic 的三态
+// @cairn/shared 的 brief-file.ts），跑完再**逐字节回滚**。 Multipic 的三态
 // 写入语义照搬：文件缺失 → 只写块（无前导分隔符）；已有文件无块 → 追加
 // 分隔符+块；已有块 → 原地替换（幂等，重跑不叠副本）。
 //
@@ -19,7 +19,7 @@ import {
   BRIEF_MARKER_END as END,
   resolveBriefTarget,
   BRIEF_MANAGED_SEPARATOR as SEP,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 /** 本机文件系统是否大小写不敏感（决定 `existsSync('CLAUDE.md')` 在盘上是
  * `CLAUDE.MD` 时成立与否）。落点判定与写入必须同源，否则会在用户已跟踪文件旁

@@ -37,7 +37,7 @@
 //     关卡后重开、重跑（新 build）时旧 build 的步迟到成功把卡推进 confirm；
 //     stop-and-done 预定 done 在途时 build 步先跑完，卡进 review 而非 done。
 
-import { type MachineDoneBody, STOP_MESSAGE } from '@pacman/shared';
+import { type MachineDoneBody, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

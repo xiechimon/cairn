@@ -17,7 +17,7 @@
 // 回退（apps/server/src/services/credentials.ts 的 `build ?? plan`）——不为审核
 // 场景另发明一条。
 
-import type { Assignment } from '@pacman/shared';
+import type { Assignment } from '@cairn/shared';
 
 /** 审核候选行 = members 读面 memberType:"agent" 行的投影（含 provider）。 */
 export interface ReviewCandidate {

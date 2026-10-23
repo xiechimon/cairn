@@ -6,13 +6,13 @@
 // 落地的动作：写本地偏好，sse.ts fireDesktopNotification 消费它——granted
 // 但偏好 off 时静默不弹。
 //
-// 键走品牌槽（brand localStoragePrefix，locale.ts 同族）：pacman.notifyEnabled。
+// 键走品牌槽（brand localStoragePrefix，locale.ts 同族）：cairn.notifyEnabled。
 // 存值 '1'/'0' 而非 'on'/'off'——与 locale 的裸值风格一致，且让 e2e 能直接
 // setItem('0'/'1') 驱动 sse 闸门（notify-click.spec T5）。异型/垃圾值一律回落
 // null（= 未表态，显示态跟随权限），不因存储被写坏而误锁某一档。
 
 /** 品牌槽键（单键，locale 的 dual-key 是观测复刻特例，本档无此约束）。 */
-export const NOTIFY_PREF_KEY = 'pacman.notifyEnabled';
+export const NOTIFY_PREF_KEY = 'cairn.notifyEnabled';
 
 export type NotifyPref = 'on' | 'off';
 

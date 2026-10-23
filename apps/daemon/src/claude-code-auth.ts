@@ -31,7 +31,7 @@ export type ClaudeCodeAuthRun = (
 ) => Promise<{ stdout: string }>;
 
 export interface ClaudeCodeAuthProbeOpts {
-  /** `claude` 可执行文件（缺省 PATH 解析；`PACMAN_CLAUDE_BIN` 可覆盖）。 */
+  /** `claude` 可执行文件（缺省 PATH 解析；`CAIRN_CLAUDE_BIN` 可覆盖）。 */
   command?: string;
   timeoutMs?: number;
   run?: ClaudeCodeAuthRun;
@@ -95,7 +95,7 @@ function defaultRun(
 export async function probeClaudeCodeAuth(
   opts: ClaudeCodeAuthProbeOpts = {},
 ): Promise<ClaudeCodeAuthProbe> {
-  const command = opts.command ?? process.env.PACMAN_CLAUDE_BIN ?? 'claude';
+  const command = opts.command ?? process.env.CAIRN_CLAUDE_BIN ?? 'claude';
   const run = opts.run ?? defaultRun;
   try {
     const { stdout } = await run(command, ['auth', 'status'], {
@@ -121,6 +121,6 @@ export function claudeCodeAuthFailureMessage(machineName: string): string {
     '补法（在该机器上做，任选其一）：① 运行 `claude` 完成 /login；',
     '② 在 ~/.claude/settings.json 的 env 里配 ANTHROPIC_API_KEY 或 ANTHROPIC_AUTH_TOKEN；',
     '③ 配 apiKeyHelper 输出密钥。',
-    '凭据不跨机——每台要跑 claude-code 的机器各自配（pacman 不传登录态）。',
+    '凭据不跨机——每台要跑 claude-code 的机器各自配（cairn 不传登录态）。',
   ].join('');
 }

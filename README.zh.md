@@ -52,7 +52,7 @@ Cairn（原名 pacman）起步于对 todos.dev 公开界面的 clean-room 研究
 npx @xiechimon/pacman
 ```
 
-一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.pacman` 下自动建库 + 迁移 + seed 默认团队。
+一条命令：下载、启动、托管在 **http://127.0.0.1:8787/app**。首启在 `~/.cairn` 下自动建库 + 迁移 + seed 默认团队。
 
 换端口：`PORT=9000 npx @xiechimon/pacman`。
 
@@ -63,12 +63,12 @@ npx @xiechimon/pacman
 ```sh
 npm i -g @xiechimon/pacman-cli
 # 首次注册：网页 /app/api-keys 建 key（明文只显示一次），然后
-pacman start --api-key <pacman_...> --team <teamId>
-# 日常（凭据已存 ~/.pacman/machine.json）：
-pacman start        # stop / restart / logs -f / status 同面
+cairn start --api-key <cairn_...> --team <teamId>
+# 日常（凭据已存 ~/.cairn/machine.json）：
+cairn start        # stop / restart / logs -f / status 同面
 ```
 
-两个包都装 `pacman` 这个 bin：同机全局双装时后装的占名。干净的分工是——浏览机跑 server，执行机装 pacman-cli。
+两个包都装 `cairn` 这个 bin：同机全局双装时后装的占名。干净的分工是——浏览机跑 server，执行机装 cairn-cli。
 
 ### 从源码开发
 
@@ -87,16 +87,16 @@ server 环境变量（全部可选）：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `PACMAN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。 |
+| `CAIRN_TOKEN` | 未设 | 守护 `/api/*` 的 Bearer token。设 = 开鉴权（web 首访出 token 门页）；未设 = 关（默认）。两条 SSE stream 端点额外接受 `?token=`（EventSource 设不了 header）。绑非 localhost 接口时务必设。 |
 | `PORT` | `8787` | HTTP 监听端口。 |
-| `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `PACMAN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `PACMAN_TOKEN`。显式 `0.0.0.0`/`::` 且 `PACMAN_TOKEN` 未设 → 启动日志 WARN。 |
-| `PACMAN_HOME` | `~/.pacman` | 数据根。server 状态在 `<PACMAN_HOME>/server/`（`server.db`、`secretbox.key`、托管裸仓）；daemon 的 `machine.json`、`daemon.log`、`workspaces/` 在根下。**备份 = 整目录拷走**——密文离了 keyfile 永久不可解，只拷 db 没用。 |
-| `PACMAN_GITHUB_OAUTH_CLIENT_ID`<br>`PACMAN_GITHUB_OAUTH_CLIENT_SECRET` | 未设 | 自注册 GitHub OAuth App 的凭证对，开启 provider OAuth 登录。两件同设或同缺——只配一件 server 启动即报错，不静默。 |
-| `PACMAN_WEB_DIR` | `apps/web/dist`（存在即托管） | SPA 静态托管根覆写；未设且无构建产物 = 纯 API 形态。 |
-| `PACMAN_SKILLS_DIR` | `~/.agents/skills` | 技能根目录。每个含 `SKILL.md` 的一级子目录 = 一个技能（id = frontmatter `name`，缺省回落目录名）。每次请求现扫，不入库——加技能 = 往目录放文件夹，删技能 = 删文件夹。 |
-| `PACMAN_ISSUE_INTAKE` | 未设（关） | GitHub issue 进料。`1`、`true` 或 `yes` 开，其余值一律关，默认关。开了之后 server 每 5 分钟从已连接 GitHub、且总管已绑定带模型 Agent 的团队的每个 GitHub 项目里，领带 `ready-for-agent` 标签的 open issue，导入成任务并开始编排。只领该标签最新一条 `labeled` 事件由仓库 triage、write、maintain 或 admin 权限用户打上、且不经 GitHub App 的 issue。经 GitHub App 打的标不算，即使 app 持有该用户的授权；但这一条只认得出 GitHub App：用 OAuth App 令牌或个人访问令牌（PAT）打的标，看上去与该用户亲手打的一样，照领。OAuth App 令牌包括 `gh auth login` 拿到的令牌，也包括团队的 GitHub 连接令牌。pacman 把连接令牌随步下发给 git 命令（git 自己的钩子也在这个环境里跑），也交给仓库里的 `.agents/setup` 与 `.agents/resume` 钩子，能改这些钩子的 agent 代码就读得到它；pacman 的 agent 步还能直接用机器上已登录的 `gh`。两条路都能让 agent 以对应账号的身份打标、给进料喂票。别人打的、或打了又摘的也不领。每个项目同时至多 3 张不在已完成 / 已关闭的导入任务（失败的也算）。开启时已经打着标签的存量 issue 也会被领，按最旧先、受同一上限约束（每个项目每轮至多读 300 条带标签的 issue）——开之前先看清哪些 issue 打着标签。进料导入的任务以总管绑定的 Agent 为创建者，进料也只关这些任务：手工导入或 webhook 导入的任务从不被它关闭，总管没绑 Agent 的团队不关任何任务，总管换绑别的 Agent 之后，换绑前领的任务也不再由它关闭。这样的任务，server 见过它的 issue 处于 open、之后又看到它被 triage 及以上权限的用户关闭，才把任务关闭；server 第一次看到 issue 时它已关闭（例如重启后）、外部作者自己关掉的 issue、被人重新打开的任务都不动，审核中的任务、有 build 开出过 PR 的任务也不动，拆分后子任务还没全部完成或关闭的任务也不动。这些审核中、开出过 PR 的任务进料从不关闭。build 开出过 PR 的审核中任务，PR 合并进默认分支后 PR 对账可以把它收尾为已完成，PR 未合并就关闭的可以收尾为失败（对账还核别的条件，不满足时只留提示）；施工中的任务继续走 CI 循环；没有 PR 的审核中任务、失败的任务留在原处，等人手动处理。导入后开始编排失败的，后面几轮重试，连同第一次至多 3 次（重启后不再重试），之后任务留在待开始等人处理。进料自己的 GitHub 读（issue 列表、issue 事件、协作者权限、issue 状态）遇到限流时，该团队这一轮停读，等下一轮，GitHub 给了限流解除的时刻就写进日志；导入时的读遇到限流，只算这一次导入失败，本轮接着看下一条 issue。启动日志写明进料开没开。`pacman` 标签的 webhook（`POST /api/webhook/github/<token>`，进料开没开都生效）守同一条权限判据、同一上限：打标人（事件的 `sender`）在仓库上有 triage、write、maintain 或 admin 权限、且项目未到上限 3，才导入；外部作者从带该标签的模板开的 issue 不导入。sender 不是 GitHub 账号名、打标人权限读不到（读失败，或 GitHub 以限流作答）、团队没有可用的 GitHub token、项目已到上限、项目存的仓库名不是 `owner/repo`、或 GitHub 上找不到该 issue，都不导入，记一行日志写明原因，投递以 202 作答。拒收若关于打标人的权限（不到 triage、读不到、遇限流），作答只说打标人未获确认，不说是哪一种、什么权限，细节在日志里。这只让作答文字不带权限结论：之后导入是否继续，仍会显出打标人够不够格，所以 webhook URL 泄漏了仍要吊销它的 token。 |
+| `HOST` | 未设（全部接口） | HTTP 绑定地址。分体部署（server 在常开主机、daemon 在另一台机器用 `CAIRN_SERVER` 指过来）时设为该主机的局域网/内网地址，并同设 `CAIRN_TOKEN`。显式 `0.0.0.0`/`::` 且 `CAIRN_TOKEN` 未设 → 启动日志 WARN。 |
+| `CAIRN_HOME` | `~/.cairn` | 数据根。server 状态在 `<CAIRN_HOME>/server/`（`server.db`、`secretbox.key`、托管裸仓）；daemon 的 `machine.json`、`daemon.log`、`workspaces/` 在根下。**备份 = 整目录拷走**——密文离了 keyfile 永久不可解，只拷 db 没用。 |
+| `CAIRN_GITHUB_OAUTH_CLIENT_ID`<br>`CAIRN_GITHUB_OAUTH_CLIENT_SECRET` | 未设 | 自注册 GitHub OAuth App 的凭证对，开启 provider OAuth 登录。两件同设或同缺——只配一件 server 启动即报错，不静默。 |
+| `CAIRN_WEB_DIR` | `apps/web/dist`（存在即托管） | SPA 静态托管根覆写；未设且无构建产物 = 纯 API 形态。 |
+| `CAIRN_SKILLS_DIR` | `~/.agents/skills` | 技能根目录。每个含 `SKILL.md` 的一级子目录 = 一个技能（id = frontmatter `name`，缺省回落目录名）。每次请求现扫，不入库——加技能 = 往目录放文件夹，删技能 = 删文件夹。 |
+| `CAIRN_ISSUE_INTAKE` | 未设（关） | GitHub issue 进料。`1`、`true` 或 `yes` 开，其余值一律关，默认关。开了之后 server 每 5 分钟从已连接 GitHub、且总管已绑定带模型 Agent 的团队的每个 GitHub 项目里，领带 `ready-for-agent` 标签的 open issue，导入成任务并开始编排。只领该标签最新一条 `labeled` 事件由仓库 triage、write、maintain 或 admin 权限用户打上、且不经 GitHub App 的 issue。经 GitHub App 打的标不算，即使 app 持有该用户的授权；但这一条只认得出 GitHub App：用 OAuth App 令牌或个人访问令牌（PAT）打的标，看上去与该用户亲手打的一样，照领。OAuth App 令牌包括 `gh auth login` 拿到的令牌，也包括团队的 GitHub 连接令牌。cairn 把连接令牌随步下发给 git 命令（git 自己的钩子也在这个环境里跑），也交给仓库里的 `.agents/setup` 与 `.agents/resume` 钩子，能改这些钩子的 agent 代码就读得到它；cairn 的 agent 步还能直接用机器上已登录的 `gh`。两条路都能让 agent 以对应账号的身份打标、给进料喂票。别人打的、或打了又摘的也不领。每个项目同时至多 3 张不在已完成 / 已关闭的导入任务（失败的也算）。开启时已经打着标签的存量 issue 也会被领，按最旧先、受同一上限约束（每个项目每轮至多读 300 条带标签的 issue）——开之前先看清哪些 issue 打着标签。进料导入的任务以总管绑定的 Agent 为创建者，进料也只关这些任务：手工导入或 webhook 导入的任务从不被它关闭，总管没绑 Agent 的团队不关任何任务，总管换绑别的 Agent 之后，换绑前领的任务也不再由它关闭。这样的任务，server 见过它的 issue 处于 open、之后又看到它被 triage 及以上权限的用户关闭，才把任务关闭；server 第一次看到 issue 时它已关闭（例如重启后）、外部作者自己关掉的 issue、被人重新打开的任务都不动，审核中的任务、有 build 开出过 PR 的任务也不动，拆分后子任务还没全部完成或关闭的任务也不动。这些审核中、开出过 PR 的任务进料从不关闭。build 开出过 PR 的审核中任务，PR 合并进默认分支后 PR 对账可以把它收尾为已完成，PR 未合并就关闭的可以收尾为失败（对账还核别的条件，不满足时只留提示）；施工中的任务继续走 CI 循环；没有 PR 的审核中任务、失败的任务留在原处，等人手动处理。导入后开始编排失败的，后面几轮重试，连同第一次至多 3 次（重启后不再重试），之后任务留在待开始等人处理。进料自己的 GitHub 读（issue 列表、issue 事件、协作者权限、issue 状态）遇到限流时，该团队这一轮停读，等下一轮，GitHub 给了限流解除的时刻就写进日志；导入时的读遇到限流，只算这一次导入失败，本轮接着看下一条 issue。启动日志写明进料开没开。`cairn` 标签的 webhook（`POST /api/webhook/github/<token>`，进料开没开都生效）守同一条权限判据、同一上限：打标人（事件的 `sender`）在仓库上有 triage、write、maintain 或 admin 权限、且项目未到上限 3，才导入；外部作者从带该标签的模板开的 issue 不导入。sender 不是 GitHub 账号名、打标人权限读不到（读失败，或 GitHub 以限流作答）、团队没有可用的 GitHub token、项目已到上限、项目存的仓库名不是 `owner/repo`、或 GitHub 上找不到该 issue，都不导入，记一行日志写明原因，投递以 202 作答。拒收若关于打标人的权限（不到 triage、读不到、遇限流），作答只说打标人未获确认，不说是哪一种、什么权限，细节在日志里。这只让作答文字不带权限结论：之后导入是否继续，仍会显出打标人够不够格，所以 webhook URL 泄漏了仍要吊销它的 token。 |
 
-daemon 环境变量（上述 CLI flag 的等价覆写）：`PACMAN_SERVER`（默认 `http://127.0.0.1:8787`）、`PACMAN_API_KEY`、`PACMAN_TEAM`、`PACMAN_WORKSPACES_DIR`（默认 `<PACMAN_HOME>/workspaces`）。
+daemon 环境变量（上述 CLI flag 的等价覆写）：`CAIRN_SERVER`（默认 `http://127.0.0.1:8787`）、`CAIRN_API_KEY`、`CAIRN_TEAM`、`CAIRN_WORKSPACES_DIR`（默认 `<CAIRN_HOME>/workspaces`）。
 
 ## 开发
 
@@ -107,7 +107,7 @@ pnpm dev:web      # vite dev server，http://localhost:5173，/api 与 /git prox
 
 vite dev server 带 `strictPort`：撞端口即启动失败，不静默顺延到下一个空闲口。危险的是
 顺延而不是撞端口本身——proxy 目标不变，顺延后的界面会去驱动持有该端口的别的栈。
-覆写走 `PACMAN_DEV_WEB_PORT` / `PACMAN_DEV_SERVER_PORT`。
+覆写走 `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`。
 
 提交前三闸：
 
@@ -123,9 +123,9 @@ pnpm test         # vitest
 |---|---|
 | `CONTEXT.md` | 领域模型与术语表（中文界面词 ↔ 英文原词 ↔ 内部名，canonical） |
 | `apps/web` | Web UI（React + vite） |
-| `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/pacman`，目录名 ≠ 包名） |
-| `apps/daemon` | 执行机 daemon（包名 `@xiechimon/pacman-cli`，目录名 ≠ 包名） |
-| `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@pacman/shared`） |
+| `apps/server` | server：Hono REST + SSE + SQLite（包名 `@xiechimon/cairn`，目录名 ≠ 包名） |
+| `apps/daemon` | 执行机 daemon（包名 `@xiechimon/cairn-cli`，目录名 ≠ 包名） |
+| `packages/shared` | 协议词表 / 记录形状 / 品牌槽单源（`@cairn/shared`） |
 | `docs/spec/` | 实现正典 00–25 册（中文） |
 | `docs/research/` | r1–r15 原站盘点与后续产品调研（历史档案） |
 | `scripts/` | 构建期工具（含 `generate-icons.mjs`） |
@@ -146,4 +146,4 @@ Apache-2.0 — 见 [LICENSE](./LICENSE)。
 
 ## 渊源
 
-pacman 起步于对 todos.dev 公开界面与协议的 clean-room 研究——一次 agent-workspace 设计探索。现为独立项目，有自己的路线图，不使用 todos.dev 的任何代码或素材。
+cairn 起步于对 todos.dev 公开界面与协议的 clean-room 研究——一次 agent-workspace 设计探索。现为独立项目，有自己的路线图，不使用 todos.dev 的任何代码或素材。

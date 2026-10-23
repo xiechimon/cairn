@@ -11,8 +11,8 @@ import { isBackendRuntimeId } from './agent-backend.js';
 /** 托管区的起止标记。用 HTML 注释：在任何 markdown 渲染器里都是惰性的，喂给
  * 模型当指令也无害。改这两个串会让已带旧标记的文件失去可切除性——是破坏性
  * 变更，要有意识地升并给出迁移。 */
-export const BRIEF_MARKER_BEGIN = '<!-- BEGIN PACMAN-RUNTIME (auto-managed; do not edit) -->';
-export const BRIEF_MARKER_END = '<!-- END PACMAN-RUNTIME -->';
+export const BRIEF_MARKER_BEGIN = '<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->';
+export const BRIEF_MARKER_END = '<!-- END CAIRN-RUNTIME -->';
 
 /** 用户既有内容与托管区之间的固定分隔符。它**算托管区的一部分**——擦除时连它
  * 一起剥掉，文件才能逐字节回滚到注入前，无论用户文件原本以 0 个、1 个还是多个

@@ -32,14 +32,14 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   buildTaskPromptText,
   CONTINUE_PROMPTS,
   classifyUserText,
   formatAttachmentToken,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
@@ -251,7 +251,7 @@ async function runRecover(
   backend: AgentBackend,
   resume: { sessionId: string | null; prompt: string | null },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-recover-degrade-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-recover-degrade-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();
@@ -285,7 +285,7 @@ async function runExec(
     }) => void;
   },
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-exec-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-exec-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();

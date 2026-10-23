@@ -8,7 +8,7 @@
 // 行为面（验收）：绿直接进 review 不派修复步；completeStep 对 PR 交付持
 // building（磨绿前不进人工闸）；scheduler 接线（自循环，不进同步 tick 契约）。
 
-import { conversationBranch, type Phase } from '@pacman/shared';
+import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -909,7 +909,7 @@ describe('#1533 ci-fix 转绿纠错票', () => {
       expect(created[0]?.labels).toEqual(['correction', 'enhancement', 'needs-triage']);
       expect(created[0]?.body).toContain('待归因');
       expect(created[0]?.body).toContain('负对照');
-      expect(created[0]?.body).toContain('pacman-dedupe: ci-fix:lint');
+      expect(created[0]?.body).toContain('cairn-dedupe: ci-fix:lint');
       expect(w.todoRow().phase).toBe('review');
       w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
       await poller.sweep();
@@ -947,7 +947,7 @@ describe('#1533 ci-fix 转绿纠错票', () => {
           state: 'open',
           title: 'correction',
           labels: [{ name: 'correction' }],
-          body: '<!-- pacman-dedupe: ci-fix:lint -->',
+          body: '<!-- cairn-dedupe: ci-fix:lint -->',
         };
         return Promise.resolve(
           res(200, '', /\/issues\/200$/.test(String(input)) ? issue : writes > 0 ? [issue] : []),

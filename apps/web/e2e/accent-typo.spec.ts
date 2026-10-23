@@ -29,7 +29,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`font baseline: body 400, card title 500, var font really loaded (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const m = await page.evaluate(async () => {
@@ -50,7 +50,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`empty-state headline rides the Paper EmptyState title tier (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/schedules?scenario=11');
     const w = await page.evaluate(
       () => getComputedStyle(document.querySelector('.sched-empty h2')!).fontWeight,
@@ -58,8 +58,8 @@ for (const theme of ['light', 'dark'] as const) {
     expect(w).toBe('500');
   });
 
-  test(`sidebar header carries the Pacman pixel mark + name (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+  test(`sidebar header carries the Cairn pixel mark + name (${theme})`, async ({ page }) => {
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const m = await page.evaluate(() => {
@@ -89,13 +89,13 @@ for (const theme of ['light', 'dark'] as const) {
     expect(m.markPaint).not.toBe('rgba(0, 0, 0, 0)');
     expect(m.markText).toBe('');
     expect(m.markBox).toEqual({ w: 16, h: 16 });
-    expect(m.nameText).toContain('Pacman');
+    expect(m.nameText).toContain('Cairn');
     // the head row keeps its /app/team navigation law
     expect(m.nameHref).toContain('/app/team');
   });
 
   test(`page shell back chevron hover shows no background change (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
 
     const read = () =>
@@ -113,7 +113,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`the sidebar collapse toggle rests bare and shows the row hover on hover (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const read = () =>
@@ -148,7 +148,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`the sidebar toggles hold face and geometry while pressed (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const read = (sel: string) =>
@@ -197,7 +197,7 @@ for (const theme of ['light', 'dark'] as const) {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`page shell back chevron keeps a keyboard focus ring (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/resources/machines/Kd8fG2hJ4mN9pQ1rStUvWx3?scenario=06');
     // keyboard modality: tab until the back chevron owns focus
     for (let i = 0; i < 40; i++) {
@@ -266,7 +266,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`P5 danger: destructive resolves and reads on card, passes 4.5 (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     // --destructive-foreground 判死退役（#987 §3.1：官方 v4 集无此槽、base-nova
     // 件 0 消费）。destructive 现按 base-nova 形消费——text-destructive 压
@@ -283,7 +283,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
   test(`P5 main-button pair passes 4.5 in both themes (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
@@ -295,7 +295,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`Paper menu row hover rides menu-hover, delete row rides danger-soft (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=27');
     await page.locator('.detail-head-icon--more').click();
     const menu = page.locator('.more-menu');

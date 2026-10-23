@@ -6,7 +6,7 @@
 // observed waiting-on-user board placement.
 // Timestamps are epoch milliseconds (02 §6.2 schedule record precedent).
 
-// phase 九值枚举单源 = @pacman/shared（02 §4.1；#65 M1 收口），本地不再定义。
+// phase 九值枚举单源 = @cairn/shared（02 §4.1；#65 M1 收口），本地不再定义。
 // GithubRepoSummary = repo picker 行封套单源（spec 12 数据契约，#359）。
 import {
   type AgentRecord,
@@ -26,7 +26,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 export type { Phase };
 export { PHASE_VALUES };
@@ -232,7 +232,7 @@ export interface ProjectContent {
   branch: string;
   files: string[];
   repoName: string;
-  /** True = the `Pacman 托管` chip rides beside the repo name (r2 24c). */
+  /** True = the `Cairn 托管` chip rides beside the repo name (r2 24c). */
   hosted: boolean;
   /** repo 形态（spec 12 三形态，词表单源 = shared ProjectRepoKind；live 面
    *  = wireProject.repoKind 透传）。local = Files tab 开闸读本地仓（#1030，
@@ -280,7 +280,7 @@ export interface ApiKeyRecord {
   id: string;
   /** Optional key name (r3 §6 `密钥名称（可选）`); null shows the mask alone. */
   name: string | null;
-  /** List-row mask `pacman_afe07565…` (r3 §6 display rule; prefix 随品牌槽). */
+  /** List-row mask `cairn_afe07565…` (r3 §6 display rule; prefix 随品牌槽). */
   masked: string;
   gitAccess: boolean;
   mcpAccess: boolean;

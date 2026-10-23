@@ -20,10 +20,10 @@ const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECTS = [
   {
     id: GITHUB_PROJECT_ID,
-    name: 'pacman',
+    name: 'cairn',
     teamId: TEAM_ID,
     repoKind: 'github',
-    githubRepo: 'xiechimon/pacman',
+    githubRepo: 'xiechimon/cairn',
   },
   {
     id: LOCAL_PROJECT_ID,

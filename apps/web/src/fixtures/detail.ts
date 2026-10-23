@@ -2,7 +2,7 @@
 // per-phase detail sets, r3 legacy details, and the build-scoped overlay
 // payload lookup (issue #68).
 
-import { BRAND, conversationBranch } from '@pacman/shared';
+import { BRAND, conversationBranch } from '@cairn/shared';
 import {
   at,
   legacyDone,

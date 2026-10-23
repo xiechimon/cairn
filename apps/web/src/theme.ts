@@ -1,6 +1,6 @@
 // Theme mechanism (r2 §1.5): dark is the :root default, light is opted in
 // by putting .light on <html>. Persisted under the brand-slot key
-// `pacman-theme` (observed original `tds-theme`, r2 §1.5; D3 同形替换
+// `cairn-theme` (observed original `tds-theme`, r2 §1.5; D3 同形替换
 // #109; values: "light" | "dark"), mirrored to data-theme like the official app.
 // The only visible control is the 外观 segmented row inside the user-menu
 // popover (#122 wired it to applyTheme; the popover open/close trigger
@@ -15,7 +15,7 @@
 
 import { safeLocalStorage } from './safe-storage.js';
 
-export const THEME_STORAGE_KEY = 'pacman-theme'; // mirrored in e2e (theme-toggle / sidebar-visual specs)
+export const THEME_STORAGE_KEY = 'cairn-theme'; // mirrored in e2e (theme-toggle / sidebar-visual specs)
 
 export type Theme = 'light' | 'dark';
 

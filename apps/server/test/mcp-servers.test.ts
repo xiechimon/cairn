@@ -23,7 +23,7 @@ import {
   MCP_MIN_CLI_VERSION,
   mcpServerRecordSchema,
   WORKER_REMOTE_TOOLS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agentMemory, agent as agentTable } from '../src/db/schema.js';
@@ -58,7 +58,7 @@ async function call(
 
 /** 写一份 config fixture，返回路径；不传 content = 不存在文件的路径。 */
 function configPath(content?: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-mcp-cfg-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-cfg-'));
   const p = join(dir, 'claude.json');
   if (content !== undefined) {
     writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content), 'utf8');

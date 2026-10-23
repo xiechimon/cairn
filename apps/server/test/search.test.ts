@@ -4,7 +4,7 @@
 // project.name / agent.displayName（placeholder「搜索任务、项目、成员…」三组，
 // r2 04 面板形——空输入「前往」组与无结果态文案 = 客户端面，shared canon）。
 
-import { searchResponseSchema } from '@pacman/shared';
+import { searchResponseSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { agent } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';

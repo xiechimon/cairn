@@ -70,7 +70,7 @@ test('chart 组织图：每个节点带服务商徽标与模型行', async ({ pa
 });
 
 test('chart 组织图：节点是 Paper 卡，创建 Agent 只在顶栏', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await openChart(page, 'team-org-chart');
   const shape = await page
     .getByTestId('team-chart-node')

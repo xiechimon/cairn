@@ -28,7 +28,7 @@
 // 6. chief 绑定悬空 —— 该团队 chief 回合硬 404。
 // 7. 误伤邻 Agent —— 同团队邻 Agent 的授权面被波及。
 
-import { todoRecordSchema } from '@pacman/shared';
+import { todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {

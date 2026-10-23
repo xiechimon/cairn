@@ -1,4 +1,4 @@
-import { appendPlanLocationNote, buildPlanFirstRoundInstruction } from '@pacman/shared';
+import { appendPlanLocationNote, buildPlanFirstRoundInstruction } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 
 // 会话列用户话语面（#612）：live transcript 的 role-user wire 行里混着系统
@@ -36,7 +36,7 @@ const SPEC = [
 // 剥注记后整行退场。
 const TASK_PROMPT = appendPlanLocationNote(
   `${TITLE}\n\n${SPEC}\n\n${buildPlanFirstRoundInstruction()}`,
-  '/home/u/.pacman/plans/conv-uw-1/plan.md',
+  '/home/u/.cairn/plans/conv-uw-1/plan.md',
 );
 
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -66,10 +66,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };

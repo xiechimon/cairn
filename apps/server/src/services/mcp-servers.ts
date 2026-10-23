@@ -15,11 +15,11 @@ import {
   CLAUDE_CONFIG_FILE_NAME,
   type McpServerRecord,
   parseClaudeMcpEntries,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 export interface McpServerDeps {
   /** 本机 config 读路径（AppContext.mcpConfigPath 注入；默认 ~/.claude.json，
-   *  PACMAN_MCP_CONFIG 可覆盖——config.ts 单源）。 */
+   *  CAIRN_MCP_CONFIG 可覆盖——config.ts 单源）。 */
   mcpConfigPath: string;
 }
 

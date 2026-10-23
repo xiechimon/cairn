@@ -62,7 +62,7 @@
 // 25 覆盖钉：非 409 的导入失败（502）不结束本项目这一轮、不记「见过 open」；
 //    后面的列表页读不到（3 页里的第 2 页）只领读到的，记一行。
 //
-// 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/pacman 的只读
+// 上游形状取实物：test/fixtures/issue-intake/ 是对 xiechimon/cairn 的只读
 // 抓取（去掉 URL 字段与 issue 正文；docs/verify/1406/ 有副本与抓取记录）。
 // permission 端点被本容器的出站代理拦下（403 非 GitHub 应答），其夹具取自
 // GitHub 官方 OpenAPI 描述里的示例应答（permission-admin.docs-example.json）。
@@ -76,7 +76,7 @@ import {
   githubIssueSourceRef,
   type Phase,
   type TodoSourceKind,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { loadConfig } from '../src/config.js';
@@ -112,7 +112,7 @@ import { receiveGithubWebhook } from '../src/services/webhook.js';
 import { bootServer, req, type TestServer } from './helpers.js';
 
 const OWNER = 'xiechimon';
-const REPO = 'xiechimon/pacman';
+const REPO = 'xiechimon/cairn';
 const TOKEN = 'ghp_issue_intake_token';
 const LABEL = 'ready-for-agent';
 /** seedChief 建的、chief 绑定的 Agent（轮询器导入卡的 createdBy）。 */
@@ -507,7 +507,7 @@ async function makeWorld(
       { teamId: s.team.id, login: OWNER, accessToken: TOKEN, scope: 'read:user repo' },
     );
   }
-  const projectId = await postGithubProject(s, 'pacman', REPO);
+  const projectId = await postGithubProject(s, 'cairn', REPO);
   seedChief(s, opts.chief ?? 'bound');
   const logs: LogLine[] = [];
   const intake = createIssueIntake(
@@ -522,7 +522,7 @@ async function makeWorld(
   return { s, gh, projectId, logs, intake };
 }
 
-const refOf = (n: number) => githubIssueSourceRef('xiechimon', 'pacman', n);
+const refOf = (n: number) => githubIssueSourceRef('xiechimon', 'cairn', n);
 
 function issueTodos(s: TestServer) {
   return s.db.select().from(todoTable).where(eq(todoTable.sourceKind, 'github-issue')).all();
@@ -1600,7 +1600,7 @@ describe('14 githubRepo 形坏、非 GitHub 项目、两个项目同一仓', () 
           name: 'same repo',
           teamId: w.s.team.id,
           repoKind: 'github',
-          githubRepo: 'Xiechimon/Pacman',
+          githubRepo: 'Xiechimon/Cairn',
           // id 随机排序时它可能先于 makeWorld 的项目被选中：闸同样关掉。
           autonomy: GATES_OFF,
         },
@@ -1668,32 +1668,32 @@ describe('scheduler 接线', () => {
   });
 });
 
-// —— opt-in 开关（PACMAN_ISSUE_INTAKE，默认关）—————————————————————————————
+// —— opt-in 开关（CAIRN_ISSUE_INTAKE，默认关）—————————————————————————————
 // 进料会自己导入并派发仓里已打 ready-for-agent 的存量 issue（最旧先），本仓
 // 大多数 issue 都打着这个标签：升级不该让实例自己开工（spec 28 P8 分阶段
 // 上线）。只有显式设了才开；接受仓里布尔 env 的既有写法 1 / true / yes。
 
-describe('opt-in：PACMAN_ISSUE_INTAKE', () => {
+describe('opt-in：CAIRN_ISSUE_INTAKE', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
   test('变量名走品牌槽', () => {
-    expect(ENV_VARS.issueIntake).toBe('PACMAN_ISSUE_INTAKE');
+    expect(ENV_VARS.issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
 
   test('未设 → 关', () => {
-    vi.stubEnv('PACMAN_ISSUE_INTAKE', undefined);
+    vi.stubEnv('CAIRN_ISSUE_INTAKE', undefined);
     expect(loadConfig().issueIntake).toBe(false);
   });
 
   test.each(['1', 'true', 'TRUE', 'yes', 'Yes'])('%s → 开', (value) => {
-    vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    vi.stubEnv('CAIRN_ISSUE_INTAKE', value);
     expect(loadConfig().issueIntake).toBe(true);
   });
 
   test.each(['0', 'false', 'no', '', 'on', 'enabled', '2', ' 1'])('%j → 关', (value) => {
-    vi.stubEnv('PACMAN_ISSUE_INTAKE', value);
+    vi.stubEnv('CAIRN_ISSUE_INTAKE', value);
     expect(loadConfig().issueIntake).toBe(false);
   });
 
@@ -1748,7 +1748,7 @@ describe('1b 打标人权限：自定义角色的另外两条判据', () => {
 });
 
 describe('5b 已占用：引用大小写不同也算同一条 issue', () => {
-  test('团队里已有 github:Xiechimon/Pacman#1406 的卡 → 1406 记 claimed，不再导入', async () => {
+  test('团队里已有 github:Xiechimon/Cairn#1406 的卡 → 1406 记 claimed，不再导入', async () => {
     const w = await makeWorld({ list: [1406] });
     insertSourceTodo(
       w,
@@ -1756,7 +1756,7 @@ describe('5b 已占用：引用大小写不同也算同一条 issue', () => {
       'building',
       'github-issue',
       w.projectId,
-      'github:Xiechimon/Pacman#1406',
+      'github:Xiechimon/Cairn#1406',
     );
     const tally = await w.intake.sweep();
     expect(tally?.claimed).toBe(1);
@@ -1830,7 +1830,7 @@ describe('13c 候选列表翻页', () => {
     insertSourceTodo(w, 1394, 'done');
     w.gh.overrides.set(`/repos/${REPO}/issues`, (_url, headers) =>
       conditional(headers, w.gh.state.open, {
-        link: '<https://evil.example/repos/xiechimon/pacman/issues?page=2>; rel="next"',
+        link: '<https://evil.example/repos/xiechimon/cairn/issues?page=2>; rel="next"',
       }),
     );
     await w.intake.sweep();
@@ -1891,7 +1891,7 @@ describe('opt-in 接线：index.ts 经 issueIntakeRunOf 取进料运行位', () 
     expect(lines).toHaveLength(1);
     expect(lines[0]?.obj.issueIntake).toBe(false);
     expect(lines[0]?.msg).toContain('off');
-    expect(lines[0]?.msg).toContain('PACMAN_ISSUE_INTAKE=1');
+    expect(lines[0]?.msg).toContain('CAIRN_ISSUE_INTAKE=1');
   });
 
   test('开 → 原样返回运行位，启动日志一行写明 on', () => {
@@ -2264,7 +2264,7 @@ describe('17 经 app 打的标：投影保留 slug', () => {
     gh.state.events.set(1451, [
       { ...LABELED_TEMPLATE, id: 1, performed_via_github_app: { id: 5 } },
     ]);
-    const read1406 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1406);
+    const read1406 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'cairn', 1406);
     expect(read1406).toMatchObject({
       notModified: false,
       data: {
@@ -2280,7 +2280,7 @@ describe('17 经 app 打的标：投影保留 slug', () => {
         ],
       },
     });
-    const read1450 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1450);
+    const read1450 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'cairn', 1450);
     expect(read1450).toMatchObject({
       notModified: false,
       data: {
@@ -2291,7 +2291,7 @@ describe('17 经 app 打的标：投影保留 slug', () => {
         ],
       },
     });
-    const read1451 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'pacman', 1451);
+    const read1451 = await githubIssueEvents(gh.impl, TOKEN, 'xiechimon', 'cairn', 1451);
     // 上游 integration 形里 slug 不是必有字段：经 app 却缺 slug 仍是经 app。
     expect(read1451).toMatchObject({ data: { events: [{ id: 1, viaApp: 'unknown' }] } });
   });
@@ -2394,7 +2394,7 @@ describe('20 关闭对账只碰轮询器领的卡（createdBy = chief 绑定的 
       body: JSON.stringify({
         action: 'labeled',
         issue: { number: 1406, title: 'webhook' },
-        label: { name: 'pacman' },
+        label: { name: 'cairn' },
         repository: { full_name: REPO },
         // #1459：webhook 按 D5 核打标人（仓主 = admin）。
         sender: { login: OWNER, type: 'User' },
@@ -2751,14 +2751,14 @@ describe('22 拆卡父卡：子卡没收完不对账关闭', () => {
 });
 
 describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只建一张卡', () => {
-  /** 世界项目改成 Xiechimon/Pacman（轮询器从它领，引用写成这种大小写）；另
-   * 建一个 xiechimon/pacman 项目（id 排在后面，轮询器按同仓跳过），webhook
+  /** 世界项目改成 Xiechimon/Cairn（轮询器从它领，引用写成这种大小写）；另
+   * 建一个 xiechimon/cairn 项目（id 排在后面，轮询器按同仓跳过），webhook
    * 的 full_name 映射到它，引用写成另一种大小写。 */
   async function twoCases() {
     const w = await makeWorld({ list: [1406] });
     w.s.db
       .update(projectTable)
-      .set({ githubRepo: 'Xiechimon/Pacman' })
+      .set({ githubRepo: 'Xiechimon/Cairn' })
       .where(eq(projectTable.id, w.projectId))
       .run();
     w.s.db
@@ -2787,7 +2787,7 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
           body: {
             action: 'labeled',
             issue: { number: 1406, title: 'case' },
-            label: { name: 'pacman' },
+            label: { name: 'cairn' },
             repository: { full_name: REPO },
             // #1459：webhook 按 D5 核打标人（仓主 = admin）。
             sender: { login: OWNER, type: 'User' },
@@ -2798,10 +2798,10 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
     return { w, deliver };
   }
 
-  test('轮询器先以 github:Xiechimon/Pacman#1406 领走，webhook 随后以 github:xiechimon/pacman#1406 投递 → 一张卡，webhook 记 duplicate', async () => {
+  test('轮询器先以 github:Xiechimon/Cairn#1406 领走，webhook 随后以 github:xiechimon/cairn#1406 投递 → 一张卡，webhook 记 duplicate', async () => {
     const { w, deliver } = await twoCases();
     await w.intake.sweep();
-    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:Xiechimon/Pacman#1406']);
+    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:Xiechimon/Cairn#1406']);
     const hook = await deliver();
     expect(hook.result).toBe('duplicate');
     expect(issueTodos(w.s)).toHaveLength(1);
@@ -2826,7 +2826,7 @@ describe('23 引用大小写不同的同一条 issue：webhook 与轮询器只�
     await new Promise((r) => setTimeout(r, 20));
     open();
     const [hookResult, tally] = await Promise.all([hook, sweep]);
-    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:xiechimon/pacman#1406']);
+    expect(issueTodos(w.s).map((t) => t.sourceRef)).toEqual(['github:xiechimon/cairn#1406']);
     expect(hookResult.result).toBe('created');
     expect(tally?.claimed).toBe(1);
     expect(tally?.imported).toBe(0);

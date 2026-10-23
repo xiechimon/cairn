@@ -49,7 +49,7 @@ function preBackfillMigrations(): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
   const backfillIdx = journal.entries.findIndex((e) => e.tag === findBackfillEntry().tag);
   expect(backfillIdx, '回填 migration 应在 journal 内').toBeGreaterThan(0);
-  const dir = temp('pacman-migrations-pre-concurrency-');
+  const dir = temp('cairn-migrations-pre-concurrency-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, backfillIdx)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
@@ -63,7 +63,7 @@ function preBackfillMigrations(): string {
 }
 
 function buildPreBackfillDb(rows: { id: string; maxConcurrent: number }[]): string {
-  const dir = temp('pacman-concurrency-db-');
+  const dir = temp('cairn-concurrency-db-');
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });

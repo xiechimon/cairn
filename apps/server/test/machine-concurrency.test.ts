@@ -13,7 +13,7 @@
 // 6. 旧形态零漂移：缺 maxConcurrent 字段的机器记录（老 server 响应形）→
 //    wire 解析通过（optional 契约）。
 
-import { machineRecordSchema } from '@pacman/shared';
+import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {

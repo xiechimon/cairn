@@ -21,7 +21,7 @@
 // 7. 控制组：宽限内活 queued 步不动；正常 queued→building 认领路径不变。
 // 8. chief cancel_builds 404 校验同 confirm/merge 面（requireTeamBuild 同律）。
 
-import { type ClaimedStep, type Phase, STOP_MESSAGE } from '@pacman/shared';
+import { type ClaimedStep, type Phase, STOP_MESSAGE } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

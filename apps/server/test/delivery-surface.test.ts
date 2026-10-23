@@ -16,8 +16,8 @@
 //   7. changesDiff 空串 → {files:[], reported:true, changed:false}（空提交）
 //   8. changesDiff 只有 100% rename（无 hunk）→ files 空且 changed:true
 
-import type { ClaimedStep } from '@pacman/shared';
-import { CHANGES_DIFF_MAX_BYTES, claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { CHANGES_DIFF_MAX_BYTES, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';

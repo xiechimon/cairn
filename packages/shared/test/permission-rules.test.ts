@@ -1,4 +1,4 @@
-// 命令闸规则表（#866 T5 tracer：对齐 AMP 闸门哲学 + pacman 双闸）。
+// 命令闸规则表（#866 T5 tracer：对齐 AMP 闸门哲学 + cairn 双闸）。
 // AMP 哲学（docs/research/amp-native-sandbox-orb.md §2.1）：可逆免闸（Git 让
 // 改错成本趋零），闸只设在不可逆处（部署、生产库）。本仓双闸（confirm = 方案
 // 审批、review = 改后审计）是流程闸；本表是第三道执行层闸（命令闸），永不替

@@ -3,16 +3,16 @@
 // - 编排来源（sourceKind='orchestration'，#640）：一行「来源 · 总管编排
 //   会话」，点击开总管抽屉定位该会话（sourceRef = chief:<uuid> 反解单源
 //   parseOrchestrationSourceRef）——比参考站多给的一面（它详情页零来源，
-//   r14 §5.4：pacman 的 sourceRef 有会话粒度，链回编排回合）；
+//   r14 §5.4：cairn 的 sourceRef 有会话粒度，链回编排回合）；
 // - 未建成（sourceKind='github-issue-self' 且 sourceRef=null）：一行状态 +
 //   重试按钮（AC3 重试入口；POST retry 成功后查询失效重取，行自动升级）；
 // - 已建成/导入：进入时拉一次回显（useGithubIssueEcho，staleTime ∞ 不轮询）
 //   → issue 当前标题 + 状态；与本地标题不一致 → 一行中性提示，**不自动覆盖
-//   本地值**（D5：issue 侧为真值，pacman 侧只显示差异）；
+//   本地值**（D5：issue 侧为真值，cairn 侧只显示差异）；
 // - 拉不到（未连接/token 失效/限流/issue 被删）→ 整行隐藏，不显示陈旧值、
 //   不弹错（D6：回显是补充信息，不该把详情页变成错误现场）。
 
-import { parseOrchestrationSourceRef, type TodoRecord } from '@pacman/shared';
+import { parseOrchestrationSourceRef, type TodoRecord } from '@cairn/shared';
 import { useGithubIssueEcho } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';

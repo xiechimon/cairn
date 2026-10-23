@@ -26,7 +26,7 @@ import type {
   Phase,
   TodoRecord,
   UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_WATCH_REASON_DISPATCH,
@@ -37,7 +37,7 @@ import {
   isBackendRuntimeId,
   isIssueSourcedTask,
   newChiefThreadId,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {

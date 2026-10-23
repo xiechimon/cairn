@@ -10,7 +10,7 @@ import {
   ENV_VARS,
   MACHINE_TOKEN_PATTERN,
   WORKSPACE_HOOK_TIMEOUT_MS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_SERVER_URL, loadDaemonConfig, WorkspacesDirError } from '../src/config.js';
 import {
@@ -27,11 +27,11 @@ import {
 } from '../src/state.js';
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-cfg-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
 }
 
 describe('loadDaemonConfig（Settings 缝优先级）', () => {
-  test('defaults: PACMAN_SERVER 缺省=DEFAULT_SERVER_URL, hostname name, ~/.pacman home', () => {
+  test('defaults: CAIRN_SERVER 缺省=DEFAULT_SERVER_URL, hostname name, ~/.cairn home', () => {
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.serverUrl).toBe(DEFAULT_SERVER_URL);
     expect(cfg.home.endsWith(BRAND.homeDirName)).toBe(true);
@@ -39,19 +39,19 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
     expect(cfg.foreground).toBe(false);
   });
 
-  test('env 层：PACMAN_* 五件词表（r3 §1.1 观测原名 TDS_*，替换相位同形）', () => {
+  test('env 层：CAIRN_* 五件词表（r3 §1.1 观测原名 TDS_*，替换相位同形）', () => {
     const home = tmp();
     const cfg = loadDaemonConfig(
       {},
       {
         [ENV_VARS.server]: 'http://10.0.0.2:9999/',
-        [ENV_VARS.apiKey]: 'pacman_key',
+        [ENV_VARS.apiKey]: 'cairn_key',
         [ENV_VARS.team]: 'team-1',
         [ENV_VARS.home]: home,
       },
     );
     expect(cfg.serverUrl).toBe('http://10.0.0.2:9999'); // 尾斜杠归一
-    expect(cfg.apiKey).toBe('pacman_key');
+    expect(cfg.apiKey).toBe('cairn_key');
     expect(cfg.teamId).toBe('team-1');
     expect(cfg.home).toBe(home);
   });
@@ -101,7 +101,7 @@ describe('loadDaemonConfig（Settings 缝优先级）', () => {
     expect(cfg.mcpConfigPath).toBe(join(homedir(), '.claude.json'));
   });
 
-  test('mcpConfigPath env 覆盖（PACMAN_MCP_CONFIG）', () => {
+  test('mcpConfigPath env 覆盖（CAIRN_MCP_CONFIG）', () => {
     const cfg = loadDaemonConfig({}, { [ENV_VARS.mcpConfig]: '/tmp/custom-claude.json' });
     expect(cfg.mcpConfigPath).toBe('/tmp/custom-claude.json');
   });
@@ -120,7 +120,7 @@ describe('#1149 环境钩子超时（hookTimeoutMs，Settings 缝优先级同律
     const cfg = loadDaemonConfig({}, {});
     expect(cfg.hookTimeoutMs).toBe(WORKSPACE_HOOK_TIMEOUT_MS);
   });
-  test('env 覆盖（PACMAN_HOOK_TIMEOUT_MS）', () => {
+  test('env 覆盖（CAIRN_HOOK_TIMEOUT_MS）', () => {
     const cfg = loadDaemonConfig({}, { [ENV_VARS.hookTimeoutMs]: '45000' });
     expect(cfg.hookTimeoutMs).toBe(45_000);
   });
@@ -138,7 +138,7 @@ describe('#1149 环境钩子超时（hookTimeoutMs，Settings 缝优先级同律
 
 describe('本地状态布局（02 §5.3）', () => {
   test('ensureStateDirs 建齐 home + outbox/chat-sessions/agent-runtime/workspaces', () => {
-    const home = join(tmp(), 'pacman-home');
+    const home = join(tmp(), 'cairn-home');
     const paths = statePaths(home);
     ensureStateDirs(paths);
     for (const dir of [

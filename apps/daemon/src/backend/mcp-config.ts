@@ -5,18 +5,18 @@
 // config 文件形状；解析与归一律单源 = shared parseClaudeMcpEntries（server
 // 投影面同一份消费形状与规则）。
 // 凭证边界：env/headers 值只存在于执行机 config 文件 → 子进程环境/请求头，
-// 从不跨 wire、从不落 pacman 状态目录。
+// 从不跨 wire、从不落 cairn 状态目录。
 // 容忍律（与 server 读取缝同律）：文件缺失/坏 JSON = 空集；条目级校验失败 =
 // 跳过该条；未知 slug = 跳过 + onMissing 降级行回调。
 
 import { readFileSync } from 'node:fs';
-import type { McpEndpoint } from '@pacman/shared';
+import type { McpEndpoint } from '@cairn/shared';
 import {
   type ClaudeMcpEntry,
   MCP_CONNECT_FAILED_CANON,
   MCP_NOT_IN_CONFIG_CANON,
   parseClaudeMcpEntries,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 export interface ResolveMcpOpts {
   /** 「config 里找不到」降级行出口（runner 接 logger.mcp；缺省 = 静默）。 */

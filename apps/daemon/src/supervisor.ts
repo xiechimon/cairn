@@ -10,7 +10,7 @@ import { nextBackoffMs } from './machine-loop.js';
 import { clearDaemonJson, loadDaemonJson, statePaths, writeDaemonJson } from './state.js';
 
 /** spawn argv 前缀 [设计]：dev 模式 cliPath 为 .ts 源（pnpm dev:daemon），纯
- * node 原生 TS 不解 workspace 包内 .js 后缀 specifier（@pacman/shared/src
+ * node 原生 TS 不解 workspace 包内 .js 后缀 specifier（@cairn/shared/src
  * /index.ts → ./agent-backend.js，ERR_MODULE_NOT_FOUND）——须挂 tsx loader；
  * 产物模式 cliPath 为构建后 .js，原样直跑。判定按扩展名，不加运行时探测。 */
 function nodeCliArgv(cliPath: string, rest: string[]): string[] {

@@ -3,7 +3,7 @@
 // （02 §5.8 尾注）；HTTP 动词与载荷细形 r3 未逐一采集处 = [推断]/[设计]
 // （04 §3 不判负口径），实现期重放补采后回写 02 §11 收紧。
 // 认证（02 §8/§5.3）：机器面 = `Authorization: Bearer <machine token 64hex>`；
-// enroll = `Authorization: Bearer <apiKey pacman_48hex>`（前缀 = brand.ts
+// enroll = `Authorization: Bearer <apiKey cairn_48hex>`（前缀 = brand.ts
 // apiKeyPrefix 槽）；token 服务端存哈希。
 
 import { z } from 'zod';
@@ -35,7 +35,7 @@ export const MACHINE_AUTH_SCHEME = 'Bearer';
  * `--api-key <key> --team <teamId>`；--name 默认 hostname，r3 §1.1）。 */
 export const machineEnrollBodySchema = z.object({
   teamId: recordId,
-  /** pacman start --name（缺省 = hostname）。 */
+  /** cairn start --name（缺省 = hostname）。 */
   name: z.string().optional(),
   /** CLI 版本（机器页 latestCliVersion 数据源，r5 §8）。 */
   cliVersion: z.string().optional(),
@@ -117,7 +117,7 @@ export type MachineRecoverResponse = z.infer<typeof machineRecoverResponseSchema
  * claim 语义惯用形）。#503 起空体：原 `running`（在跑步数）字段只服务已被
  * 摘除的并发门，server 侧从未读它。
  * #1148 增 `maxWorkers`（daemon worker 并发上限自报）：值 = daemon 侧
- * effective cap（env PACMAN_DAEMON_MAX_CONCURRENT > DB machine 行 > 默认，
+ * effective cap（env CAIRN_DAEMON_MAX_CONCURRENT > DB machine 行 > 默认，
  * daemon 解析单源）。server 的 worker 容量闸取 min(machine.maxConcurrent,
  * 此值)——chief 步不受它约束。缺省 = 老 daemon 形（server 只按机器行；
  * 纯增可选字段，zod strip 语义，无版本墙）。 */
@@ -328,7 +328,7 @@ export const machineSyncCommandSchema = z.object({
   /** 同步目标目录（机器本机路径；web 默认 `~/<homeDirName>/workspaces/<buildId>`，
    * 用户可改——r1 changelog 09-13 文本）。 */
   directory: z.string(),
-  /** ref = 分支名（`pacman/conv-<uuid>`，brand conversationBranch）；
+  /** ref = 分支名（`cairn/conv-<uuid>`，brand conversationBranch）；
    * commit = 完整 40hex sha（daemon 端 fetch 后 reset --hard 到此 sha，spec
    * `目标提交 <12hex>` r3 §3.9 展示形但 wire 用 40hex 简化对拍）。 */
   ref: z.string(),

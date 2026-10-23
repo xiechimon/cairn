@@ -14,19 +14,19 @@ import type { Locator, Page } from '@playwright/test';
  * Evidence generation is now explicit — a task that needs fresh screenshots
  * for its PR runs:
  *
- *   PACMAN_E2E_EVIDENCE=docs/verify/<ticket> npx playwright test <spec>
+ *   CAIRN_E2E_EVIDENCE=docs/verify/<ticket> npx playwright test <spec>
  *
  * The value resolves from the repo root (a subdir like <ticket>/after is
  * fine), the directory is created on demand, and the task branch commits the
  * regenerated PNGs. Unset = no-op: the committed history stays byte-frozen
  * and the SHA-pinned raw links in merged PR bodies keep matching main.
  */
-const EVIDENCE_ROOT = process.env.PACMAN_E2E_EVIDENCE
-  ? resolve(import.meta.dirname, '../../..', process.env.PACMAN_E2E_EVIDENCE)
+const EVIDENCE_ROOT = process.env.CAIRN_E2E_EVIDENCE
+  ? resolve(import.meta.dirname, '../../..', process.env.CAIRN_E2E_EVIDENCE)
   : null;
 
 /**
- * Capture `name` under PACMAN_E2E_EVIDENCE; silently skipped when unset.
+ * Capture `name` under CAIRN_E2E_EVIDENCE; silently skipped when unset.
  *
  * `clip` (page coordinates) frames a panel instead of the whole viewport —
  * a detail change is unreadable in a 1440px-wide page shot. Callers clamp it

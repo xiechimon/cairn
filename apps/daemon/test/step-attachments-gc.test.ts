@@ -14,7 +14,7 @@ import { STEP_ATTACHMENTS_TTL_MS, sweepStepAttachments } from '../src/step-attac
 const DAY = 24 * 60 * 60 * 1000;
 
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-step-att-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
 }
 
 function putStep(root: string, stepId: string, mtimeAgoMs: number): void {

@@ -6,7 +6,7 @@
 // app's only settings face, #148) and the page's one primary action,
 // 创建 Agent.
 // #148: the tablist is a real toggle persisted to the registered
-// client-state key (r2 §1.5 `pacman.teamMembersLayout`); chart drops the
+// client-state key (r2 §1.5 `cairn.teamMembersLayout`); chart drops the
 // stats bar (r2 §8.1 17c) and renders the org chart (#490). The tablist
 // itself stays in both layouts — 17c shows it absent, but a toggle with no
 // way back is a trap (divergence noted, 01 册 §8).
@@ -45,7 +45,7 @@ import { TeamChart } from './team-chart.js';
 
 /** r2 §1.5 registered client-state key (packages/shared protocol/
  *  client-state.ts): the team view switch, grid | chart; absent = grid. */
-export const TEAM_LAYOUT_STORAGE_KEY = 'pacman.teamMembersLayout';
+export const TEAM_LAYOUT_STORAGE_KEY = 'cairn.teamMembersLayout';
 
 type TeamLayout = 'grid' | 'chart';
 

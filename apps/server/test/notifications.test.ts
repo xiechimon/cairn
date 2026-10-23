@@ -6,7 +6,7 @@
 // - 行 id = 组合键 "<userId>:<entityId>"（同键 upsert）；channels 恒 ["in_app"]
 // - 未读联动：GET /api/teams/{id}/notifications → unreadThreadIds
 
-import { notificationEventSchema, notificationRecordSchema } from '@pacman/shared';
+import { notificationEventSchema, notificationRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent, chiefThread, notification, plan as planTable } from '../src/db/schema.js';

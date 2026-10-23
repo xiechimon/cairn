@@ -1,4 +1,4 @@
-import { findDuplicateTicket, ticketDedupeKey, ticketDedupeMarker } from '@pacman/shared';
+import { findDuplicateTicket, ticketDedupeKey, ticketDedupeMarker } from '@cairn/shared';
 import { and, eq, like, sql } from 'drizzle-orm';
 import { build, message, step, todo } from '../db/schema.js';
 import {

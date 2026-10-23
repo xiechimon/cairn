@@ -43,7 +43,7 @@ test.describe('chief drawer model row (#615)', () => {
     // tertiary 12px 小字——AA 正文档 4.5:1 是地板。
     for (const theme of ['dark', 'light'] as const) {
       await page.goto('/app?scenario=111');
-      await page.evaluate((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.evaluate((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.reload();
       await expect(drawer(page)).toBeVisible();
       const name = modelName(page);

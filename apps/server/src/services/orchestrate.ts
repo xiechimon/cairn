@@ -5,7 +5,7 @@
 // buildOrchestratePrompt → sendChiefMessage（新 chief 线程 + 编排请求首条
 // 用户消息 + chief 步入队）→ convHub 推送。
 
-import { buildOrchestratePrompt, canOrchestrate } from '@pacman/shared';
+import { buildOrchestratePrompt, canOrchestrate } from '@cairn/shared';
 import { conflict, notFound } from '../lib/errors.js';
 import { sendChiefMessage } from './chief.js';
 import type { ConversationStreamHub } from './events.js';

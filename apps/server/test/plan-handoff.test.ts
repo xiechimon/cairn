@@ -17,13 +17,13 @@
 //  5. 驳回重规划轮（续轮指令步）未新产 plan.md → 误触发自动补写（界混淆）；
 //  6. withPlan=false 直执行面被波及（planDocId 恒 null 误判交接缺失）。
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
   conversationStreamEventSchema,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

@@ -8,7 +8,7 @@
 // 2026-09-12 pinning, rebound to 待处理 by #351). Card order inside a column
 // = manual order from drag drops (#73), pinned group first in 待处理.
 
-import { canOrchestrate, IN_PROGRESS_PHASES, type Phase } from '@pacman/shared';
+import { canOrchestrate, IN_PROGRESS_PHASES, type Phase } from '@cairn/shared';
 import type { TodoRecord } from '../fixtures/records.js';
 import { PHASE_UI } from '../phase.js';
 

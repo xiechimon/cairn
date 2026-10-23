@@ -4,7 +4,7 @@ import { expect, type Page, test } from '@playwright/test';
 // The 项目 / 资源 GroupHeaders hide their sub-rows (r2 §1.1) and flip their
 // aria to 展开… (r6), in the expanded sidebar and in the rail alike. Every
 // collapse survives a reload through its localStorage key — the project
-// group rides the observed original key shape (pacman.sidebarProjectsCollapsed,
+// group rides the observed original key shape (cairn.sidebarProjectsCollapsed,
 // r2 §1.5), the resource group the [推断] twin.
 // (#351 裁定：看板列收起全家随 6→4 列收敛删除——列收起钮/窄条/持久键
 // 不复存在，本 spec 只保留侧栏族。)
@@ -54,7 +54,7 @@ test('sidebar group collapse hides sub-rows, flips aria, survives reload', async
 });
 
 test('rail group collapse hides member rows and survives reload', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
 
   await expect(page.locator('.rail-row .project-avatar')).toBeVisible();
@@ -80,10 +80,10 @@ test('both sidebar groups persist side by side', async ({ page }) => {
   await page.reload();
   await expect(skills(page)).toBeVisible();
   await expect(projectRows(page)).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem('pacman.sidebarResourcesCollapsed'))).toBe(
+  expect(await page.evaluate(() => localStorage.getItem('cairn.sidebarResourcesCollapsed'))).toBe(
     '0',
   );
-  expect(await page.evaluate(() => localStorage.getItem('pacman.sidebarProjectsCollapsed'))).toBe(
+  expect(await page.evaluate(() => localStorage.getItem('cairn.sidebarProjectsCollapsed'))).toBe(
     '1',
   );
 });

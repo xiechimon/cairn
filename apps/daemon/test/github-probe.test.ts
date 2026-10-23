@@ -20,7 +20,7 @@ afterAll(() => {
 
 /** gh 替身脚本：退出 0 + stdout 固定 JSON（gh pr list --json 响应形）。 */
 function fakeGh(stdout: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-gh-probe-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
   disposables.push(dir);
   const path = join(dir, 'gh');
   writeFileSync(path, `#!/bin/sh\necho '${stdout.replace(/'/g, "'\\''")}'\n`, {
@@ -32,7 +32,7 @@ function fakeGh(stdout: string): string {
 /** 退出 1 的 gh 替身（模拟 gh 未登录/查询失败——真实 gh 对无 PR 分支退出 0
  * 空数组，对错误形态退出 1）。 */
 function failingGh(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-gh-probe-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-gh-probe-'));
   disposables.push(dir);
   const path = join(dir, 'gh');
   writeFileSync(path, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
@@ -61,7 +61,7 @@ describe('gh 梯（失败方式 1/2）', () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
-      branch: 'pacman/conv-x',
+      branch: 'cairn/conv-x',
       ghPath: gh,
       fetchImpl: fetchJson([{ number: 99, html_url: 'u', state: 'open' }]),
     });
@@ -72,7 +72,7 @@ describe('gh 梯（失败方式 1/2）', () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
-      branch: 'pacman/conv-x',
+      branch: 'cairn/conv-x',
       ghPath: failingGh(),
       fetchImpl: fetchJson(GITHUB_API_ROWS),
     });
@@ -91,14 +91,14 @@ describe('REST 梯（失败方式 2/3/4）', () => {
     const probe = await probeGithubPr({
       owner: 'o',
       repo: 'r',
-      branch: 'pacman/conv-x',
+      branch: 'cairn/conv-x',
       ghPath: failingGh(),
       token: 'ghp_secret',
       fetchImpl,
     });
     expect(probe).toEqual({ number: 14, url: 'https://github.com/o/r/pull/14' });
     expect(seen.url).toBe(
-      'https://api.github.com/repos/o/r/pulls?head=o%3Apacman%2Fconv-x&state=all',
+      'https://api.github.com/repos/o/r/pulls?head=o%3Acairn%2Fconv-x&state=all',
     );
     expect(seen.url).not.toContain('ghp_secret');
     expect(seen.headers?.authorization).toBe('Bearer ghp_secret');

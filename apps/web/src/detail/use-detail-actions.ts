@@ -4,7 +4,7 @@
 // return 之上（原代码靠 `if (todo == null) return null` 保证非空，hook 化后
 // 守卫内收进各回调）。
 
-import type { Assignment } from '@pacman/shared';
+import type { Assignment } from '@cairn/shared';
 import { type Dispatch, type SetStateAction, useCallback, useMemo } from 'react';
 import type { useNavigate } from 'react-router';
 import type { useApiMutations, useMachines, useMembers, useSteps } from '../api/hooks.js';

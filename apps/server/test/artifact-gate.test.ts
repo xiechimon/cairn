@@ -23,13 +23,13 @@
 //     ——失败重启轮（新 build 首步、prompt 带 restart 指令）同样享一次补写
 //     重试，否则重启即硬失败。
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
   isPlanContractRewritePrompt,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -413,7 +413,7 @@ describe('闸 2（B-C11/B-C14）：build 步零改动 / 假完成 → review 不
 //  9. 版本墙：老 daemon 载荷（无 drift 字段）→ 行为与现状逐字一致
 describe('闸 2 偏离点名（#1195）：分支偏离不再是「构建零改动」', () => {
   const DRIFT = {
-    expected: 'pacman/conv-0198f6c0-0000-7000-8000-000000000000',
+    expected: 'cairn/conv-0198f6c0-0000-7000-8000-000000000000',
     actual: 'dogfood/tracer-1153-verification-note',
   };
 

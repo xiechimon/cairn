@@ -6,7 +6,7 @@
 //   3. 步已收仍挂在飞思考 → 与落库行叠成两份。
 //   4. 思考行挤掉 streaming / 打字行 → 相位兜底或正文增量消失。
 
-import type { BuildRecord, StepJournalRow } from '@pacman/shared';
+import type { BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapChief, mapTranscript } from '../src/api/mappers.js';
 import { NOW, todo } from './helpers.js';
@@ -105,7 +105,7 @@ describe('mapChief 在飞思考（#1308）', () => {
     toolDefHashes: {},
     toolResultHashes: {},
     activeRun: { phase: 'chief' },
-  } as unknown as import('@pacman/shared').ChiefThread;
+  } as unknown as import('@cairn/shared').ChiefThread;
 
   const USER = {
     id: 'AbCdEfGhIjKlMnOpQrStU',

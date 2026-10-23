@@ -1,6 +1,6 @@
 // 环境生命周期钩子执行原语（#1149）：.agents/setup 与 .agents/resume 两个
 // 可执行文件驱动环境生命周期，形态照 Amp（docs/research/amp-native-sandbox-orb.md
-// §3.2）—— 同路径同名 = 一份配置 Amp 与 pacman 两用。本模块 = 进程执行面：
+// §3.2）—— 同路径同名 = 一份配置 Amp 与 cairn 两用。本模块 = 进程执行面：
 // 直接 exec 文件（+x 必需、shebang 生效）、detached 自建进程组、stdin ignore、
 // stdout/stderr 到达序合并收集、超时 SIGKILL 杀整组（后台挂起的孙进程全灭）。
 // 策略层（fresh→setup 失败=步失败、reused→resume 失败=warning、worktree 回滚）
@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { BoundGitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@cairn/shared';
 import { gitCredentialEnv } from './git.js';
 
 /** 输出内存闸（字符）：stdout+stderr 按到达序合并，超出即停收（shell-channel

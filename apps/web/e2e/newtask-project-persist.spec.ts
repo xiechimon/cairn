@@ -17,7 +17,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 // 行 = getByRole('option')；chip 上的项目名 = chip scope getByText（一级
 // text 载体，头像字母 span 不含全名故唯一命中）。断言语义逐字不动。
 
-const STORAGE_KEY = 'pacman.newTaskProjectId'; // mirrored: new-task-dialog.tsx
+const STORAGE_KEY = 'cairn.newTaskProjectId'; // mirrored: new-task-dialog.tsx
 const BOARD = '/app?scenario=newtask-projects';
 const PROJECT = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=newtask-projects';
 

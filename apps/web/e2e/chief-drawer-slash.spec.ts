@@ -51,10 +51,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: 'proj-1',
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };
@@ -84,7 +84,7 @@ async function openDrawer(page: Page) {
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/skills?*', (route) =>
     route.fulfill({
-      json: [{ id: 'skill-1', name: 'verify-pacman', description: 'Live stack' }],
+      json: [{ id: 'skill-1', name: 'verify-cairn', description: 'Live stack' }],
     }),
   );
   await page.route(`**/api/teams/${TEAM_ID}/machines`, (route) =>
@@ -135,7 +135,7 @@ test('trigger: `/` opens builtins plus skills, review/stop hidden (F2)', async (
   await expect(rows.nth(1)).toContainText('/attach');
   await expect(rows.nth(2)).toContainText('/mention');
   await expect(rows.nth(3)).toContainText('/help');
-  await expect(rows.nth(4)).toContainText('/verify-pacman');
+  await expect(rows.nth(4)).toContainText('/verify-cairn');
   await expect(menu).not.toContainText('/review');
   await expect(menu).not.toContainText('/stop');
 

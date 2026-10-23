@@ -117,7 +117,7 @@ async function tokenColor(page: Page, name: string): Promise<string> {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`frozen color slots stay put (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     await page.waitForSelector('.board-sidebar');
 
@@ -135,7 +135,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
   test(`derived mix tokens resolve from existing slots (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     await page.waitForSelector('.board-sidebar');
 
@@ -162,7 +162,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 test('CDS structural tokens land at locked mon values', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
   await page.waitForSelector('.board-sidebar');
   const vals = await page.evaluate(() => {

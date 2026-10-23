@@ -21,6 +21,22 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
+import type {
+  AgentBackend,
+  AgentBackendCapabilities,
+  AgentSessionHandle,
+  AgentTokenUsage,
+  BriefChannel,
+  DeliveredImage,
+  McpEndpoint,
+  ModelUsage,
+  ProviderCompat,
+  ProviderConfig,
+  SessionOpts,
+  StepEvent,
+  ToolCallRecord,
+} from '@cairn/shared';
+import { ENV_VARS, THINKING_LEVELS } from '@cairn/shared';
 import {
   type AgentSession,
   createAgentSession,
@@ -36,22 +52,6 @@ import {
   SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
-import type {
-  AgentBackend,
-  AgentBackendCapabilities,
-  AgentSessionHandle,
-  AgentTokenUsage,
-  BriefChannel,
-  DeliveredImage,
-  McpEndpoint,
-  ModelUsage,
-  ProviderCompat,
-  ProviderConfig,
-  SessionOpts,
-  StepEvent,
-  ToolCallRecord,
-} from '@pacman/shared';
-import { ENV_VARS, THINKING_LEVELS } from '@pacman/shared';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { SessionNotResumableError } from './errors.js';
 import { connectFailedLine } from './mcp-config.js';
@@ -88,7 +88,7 @@ const PI_BUILTIN_TOOLS = ['read', 'bash', 'edit', 'write'];
 //   D1 project trust = **deny**。pi 的 `SettingsManager.inMemory` 缺省
 //      projectTrusted=true——任务 worktree 里的 `.pi/SYSTEM.md` 会**静默成为
 //      会话系统提示词**（agent-session 消费 loader.getSystemPrompt()），
-//      `.pi/APPEND_SYSTEM.md` 同族。pacman 的授权面全部自有（简报 = runner
+//      `.pi/APPEND_SYSTEM.md` 同族。cairn 的授权面全部自有（简报 = runner
 //      写入的 AGENTS.md、skills = catalog+allowlist+读闸 #917、MCP = server
 //      授权桥、命令 = #866 闸），项目级 pi 资源加载即旁路这些面 → 钉
 //      projectTrusted:false，且受保护资源在位时落 `[trust] denied:` 行
@@ -195,7 +195,7 @@ export function piUnattendedEnvPins(env: NodeJS.ProcessEnv): Record<string, stri
   return pins;
 }
 
-/** 缓存保留档（#927 D6）：`PACMAN_PI_CACHE_RETENTION=long` 才 long，其余
+/** 缓存保留档（#927 D6）：`CAIRN_PI_CACHE_RETENTION=long` 才 long，其余
  * （未设/乱值）一律 short = pi 缺省档显式化。long 的请求面由 pi 适配器落：
  * anthropic-messages → cache_control ttl 1h；openai-completions →
  * prompt_cache_retention 24h。缺省 short 的理由：部分网关通道拒未知字段
@@ -506,7 +506,7 @@ const CUSTOM_MODEL_DEFAULTS = {
   maxTokens: 16_384,
 };
 
-/** 开关：`PACMAN_CUSTOM_MODEL_REASONING=1` 时，自定义端点的模型条目改标
+/** 开关：`CAIRN_CUSTOM_MODEL_REASONING=1` 时，自定义端点的模型条目改标
  * `reasoning: true` 并附档位映射——pi 据此下发 `reasoning_effort`，思考深度才
  * 受 `thinkingLevel` 控制。不开时模型条目维持原样（pi 当它不推理，档位旋钮
  * 是死的，见 wiki/评测记录里的实测）。
@@ -902,7 +902,7 @@ export interface PiBackendOpts {
   /** MCP per-turn 连接降级行出口（runner 接 logger.mcp，r3 §1.5 canon 行形；
    * 02 §7.1 失败降级不阻断）。 */
   onMcpLog?: (msg: string) => void;
-  /** skills 执行面注入（spec 14/#371）：skillsDir = PACMAN_SKILLS_DIR 扫描根；
+  /** skills 执行面注入（spec 14/#371）：skillsDir = CAIRN_SKILLS_DIR 扫描根；
    * cwd = daemon home（project 级解析不随任务 worktree 跳变）。
    * 缺省 = 不注入（既有调用面零回归）。 */
   skills?: { skillsDir: string; cwd: string };
@@ -1035,7 +1035,7 @@ export class PiBackend implements AgentBackend {
     // 表对它们一体生效。返回 {block, reason} 由 pi 转成 error tool result
     // （agent 可见改道文案）；放行 undefined，执行面零参与。
     const gateExtension: InlineExtension = {
-      name: 'pacman-command-gate',
+      name: 'cairn-command-gate',
       factory: (pi) => {
         pi.on(
           'tool_call',
@@ -1054,7 +1054,7 @@ export class PiBackend implements AgentBackend {
     const mcpEndpoints = opts.mcpServers ?? [];
     const onMcpLog = this.opts.onMcpLog;
     const mcpRegisterExtension: InlineExtension = {
-      name: 'pacman-mcp-bridge',
+      name: 'cairn-mcp-bridge',
       factory: (pi) => {
         for (const endpoint of mcpEndpoints) {
           try {
@@ -1090,7 +1090,7 @@ export class PiBackend implements AgentBackend {
       settingsManager,
       // pi 原生发现关断（#917，spec 14 §技能可见面收归 3）：loader 自注入的
       // `<available_skills>` 段（agentDir/skills 与 .pi/skills 默认目录）与
-      // pacman catalog 构成重复清单，且不受 agent.skills 白名单约束。关断后
+      // cairn catalog 构成重复清单，且不受 agent.skills 白名单约束。关断后
       // 技能目录只剩简报文件通道一份。`noContextFiles` / `agentsFilesOverride`
       // 是 AGENTS.md 简报的承重位（spec 24 §通道漂移），一概不动。
       noSkills: true,

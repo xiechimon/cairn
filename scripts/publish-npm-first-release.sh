@@ -208,7 +208,7 @@ TOTAL_STAGES=6
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$REPO_ROOT"
 
-banner "pacman · npm 首发 0.1.0（@xiechimon 两包）"
+banner "cairn · npm 首发 0.1.0（@xiechimon 两包）"
 
 # ── Stage 1: npm 账号确认 ─────────────────────────────────────────────────
 stage "npm 账号确认"
@@ -256,7 +256,7 @@ say "建一枚首发专用 granular token：scope 尽量限 @xiechimon，短期�
 open_url "https://www.npmjs.com/settings/${NPM_USERNAME}/tokens/granular-access-tokens/new"
 step "直达失败走菜单：头像 → Access Tokens → Generate New Token（若出现类型"
 step "选择，选 Granular——2025-11 起经典 token 已移除，只剩这一种）。"
-step "Token name：pacman-first-publish-0.1.0。"
+step "Token name：cairn-first-publish-0.1.0。"
 step "Packages and scopes → Permissions：Read and write (publish and stage)。"
 step "Select Packages → 先试 Only select packages and scopes，搜 @xiechimon。"
 say "首发前 scope 名下还没有包，选择器多半搜不到它——退路（官方文档同款建议）："
@@ -294,7 +294,7 @@ note "没进 shell history。重跑向导要重新粘贴（或重新生成一枚
 stage "首发执行（主包先、cli 包后；发布命令在你的终端跑）"
 say "先做前置自检（只读）：包整形、registry 状态、工作区干净度。"
 PKG_DIRS=( "apps/server" "apps/daemon" )
-PKG_NAMES=( "@xiechimon/pacman" "@xiechimon/pacman-cli" )
+PKG_NAMES=( "@xiechimon/cairn" "@xiechimon/cairn-cli" )
 PKG_HINTS=( "#261 主包整形" "#262 cli 改名" )
 PUBLISH_READY=1
 TO_PUBLISH=()
@@ -349,8 +349,8 @@ for i in 0 1; do
   fi
 done
 if (( PUBLISH_READY )); then
-  say "发布顺序：@xiechimon/pacman（主包，内嵌 web，npx 主路径）先发，"
-  say "@xiechimon/pacman-cli 后发——两包互不依赖，顺序只让验收链尽早可测。"
+  say "发布顺序：@xiechimon/cairn（主包，内嵌 web，npx 主路径）先发，"
+  say "@xiechimon/cairn-cli 后发——两包互不依赖，顺序只让验收链尽早可测。"
   RECHECK=1
   if [[ -z "${NPM_PUBLISH_TOKEN:-}" && ${#TO_PUBLISH[@]} -gt 0 ]]; then
     warn "token 未采集成功——发布命令不展示。先重跑向导完成 Stage 3 token 采集，"
@@ -381,11 +381,11 @@ if (( PUBLISH_READY )); then
       V1=$(npm view "${PKG_NAMES[0]}" version </dev/null 2>/dev/null || true)
       V2=$(npm view "${PKG_NAMES[1]}" version </dev/null 2>/dev/null || true)
       [[ "$V1" == "0.1.0" && "$V2" == "0.1.0" ]] && break
-      warn "registry 还没看全（pacman=${V1:-无} cli=${V2:-无}），第 $round 巡。"
+      warn "registry 还没看全（cairn=${V1:-无} cli=${V2:-无}），第 $round 巡。"
       pause "等半分钟再回车，我重查"
     done
     if [[ "$V1" == "0.1.0" && "$V2" == "0.1.0" ]]; then
-      printf '  %s✓ registry 复核通过：@xiechimon/pacman@0.1.0 与 @xiechimon/pacman-cli@0.1.0%s\n' "$GREEN" "$RESET"
+      printf '  %s✓ registry 复核通过：@xiechimon/cairn@0.1.0 与 @xiechimon/cairn-cli@0.1.0%s\n' "$GREEN" "$RESET"
     else
       warn "registry 复核未过——发布没成功或没发全；回上一步排查（E401→token，E403→权限/2FA，404→命令没真跑）。"
       SKIPPED+=("registry 复核（两包未齐）")
@@ -413,10 +413,10 @@ if [[ "${V1:-}" == "0.1.0" && "${V2:-}" == "0.1.0" ]]; then
     exit 1
   fi
   note "验收端口 $ACCEPT_PORT（5173/8787 是主仓 dev 栈不动；8390/8399 是别的车道段位）。"
-  ACCEPT_HOME=$(mktemp -d "${TMPDIR:-/tmp}/pacman-accept.XXXXXX")
-  say "隔离 HOME：$ACCEPT_HOME——npx 缓存、~/.pacman 数据全落在这里，验收后整目录删掉。"
+  ACCEPT_HOME=$(mktemp -d "${TMPDIR:-/tmp}/cairn-accept.XXXXXX")
+  say "隔离 HOME：$ACCEPT_HOME——npx 缓存、~/.cairn 数据全落在这里，验收后整目录删掉。"
   say "在你自己的终端跑（bash / zsh / fish 通用 env 前缀形态）："
-  step "env PORT=$ACCEPT_PORT HOME=$ACCEPT_HOME npx -y @xiechimon/pacman"
+  step "env PORT=$ACCEPT_PORT HOME=$ACCEPT_HOME npx -y @xiechimon/cairn"
   note "冷缓存要下整包 + better-sqlite3 预编译二进制，几十秒属正常；"
   note "Node 22/24 LTS 即装即跑，更新的 major 可能现场编译（W2-D3 已声明）。"
   pause "看到 server 监听日志（或仍在下载）就回车——我这边轮询探测"
@@ -439,26 +439,26 @@ if [[ "${V1:-}" == "0.1.0" && "${V2:-}" == "0.1.0" ]]; then
     warn "GET /api/user/me → ${ME_CODE:-000}（对照 #261 失败方式 3：migrate/seed 未进包）。"
     SKIPPED+=("npx 验收 /api/user/me 200")
   fi
-  if [[ -f "$ACCEPT_HOME/.pacman/server/server.db" ]]; then
-    printf '  %s✓ %s/.pacman/server/server.db 已落盘（首启自动建库）%s\n' "$GREEN" "$ACCEPT_HOME" "$RESET"
+  if [[ -f "$ACCEPT_HOME/.cairn/server/server.db" ]]; then
+    printf '  %s✓ %s/.cairn/server/server.db 已落盘（首启自动建库）%s\n' "$GREEN" "$ACCEPT_HOME" "$RESET"
   else
-    warn "隔离 HOME 下没找到 .pacman/server/server.db——首启建库没跑成。"
+    warn "隔离 HOME 下没找到 .cairn/server/server.db——首启建库没跑成。"
     SKIPPED+=("首启建库落盘")
   fi
   say "接着验执行机链（W2-D5 第二段）：网页建 API key → 全局装 cli → enroll。"
   open_url "http://127.0.0.1:$ACCEPT_PORT/app/api-keys"
   step "新建一把 key（名字随意，如 accept），明文只显示一次——复制。"
-  step "npm install -g @xiechimon/pacman-cli    # 真实用户路径，落本机全局 prefix"
-  step "env HOME=$ACCEPT_HOME pacman start --api-key <粘贴那把key> --team <teamId> --server http://127.0.0.1:$ACCEPT_PORT"
+  step "npm install -g @xiechimon/cairn-cli    # 真实用户路径，落本机全局 prefix"
+  step "env HOME=$ACCEPT_HOME cairn start --api-key <粘贴那把key> --team <teamId> --server http://127.0.0.1:$ACCEPT_PORT"
   note "teamId 来源：server 启动日志的 teamId 字段，或看板「添加机器」弹窗"
   note "「改用 API key 注册」展开的命令文案（两处均带 --team 真值/占位）。"
-  note "pacman start 默认后台化（enroll 完即返回）；机器名默认取 hostname。"
+  note "cairn start 默认后台化（enroll 完即返回）；机器名默认取 hostname。"
   open_url "http://127.0.0.1:$ACCEPT_PORT/app/resources/machines"
-  confirm "机器列表出现你的主机名行了？" || warn "没出现就回终端看 pacman 报错（enroll 401→key 抄错；404→--server 端口不对）"
+  confirm "机器列表出现你的主机名行了？" || warn "没出现就回终端看 cairn 报错（enroll 401→key 抄错；404→--server 端口不对）"
   say "收尾清理（enroll 验完即可做）："
   step "Ctrl-C 停掉 npx 的 server"
-  step "env HOME=$ACCEPT_HOME pacman stop"
-  step "npm rm -g @xiechimon/pacman-cli    # 可选——留着就是你机器上的正式 cli"
+  step "env HOME=$ACCEPT_HOME cairn stop"
+  step "npm rm -g @xiechimon/cairn-cli    # 可选——留着就是你机器上的正式 cli"
   if confirm "要我现在删掉隔离目录 $ACCEPT_HOME 吗？"; then
     rm -rf "$ACCEPT_HOME" && note "✓ 已删 $ACCEPT_HOME"
   fi
@@ -471,7 +471,7 @@ stage "收尾与事后处置"
 say "首发 token 用后处置：回 tokens 页删掉首发那枚（尤其走了 All Packages 退路的）；"
 say "日常后续发布直接 npm login + OTP 即可，不依赖任何长期 token。"
 open_url "https://www.npmjs.com/settings/${NPM_USERNAME}/tokens"
-step "Tokens 列表 → 找 pacman-first-publish-0.1.0 → Delete。"
+step "Tokens 列表 → 找 cairn-first-publish-0.1.0 → Delete。"
 note "本向导没向磁盘写任何凭证（.env / .npmrc 均未动过）；token 随进程消失。"
 note "W2 收尾对照：#265 README quickstart 换 npx 形态、#264 CI pack 冒烟、"
 note "#266 首发实测记录（本向导的真人首跑就写在 #266 里）。"

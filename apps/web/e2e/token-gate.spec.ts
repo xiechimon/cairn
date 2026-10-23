@@ -1,5 +1,5 @@
 // Token 门页 e2e（#253，spec #247 D9）：与其余 spec 的 fixture 面不同，
-// 本 spec 起真 apps/server 进程（PACMAN_HOME scratch 目录 + 托管 fixture 构建的
+// 本 spec 起真 apps/server 进程（CAIRN_HOME scratch 目录 + 托管 fixture 构建的
 // dist）打真 401 闸。失败方式枚举（web 面，server 面归 test/token-auth.test.ts）：
 //   1. 鉴权开 + 无 token 首访 → 门页盖住 UI
 //   2. 错 token → 停留门页 + 通用错误文案，localStorage 不写坏值
@@ -18,7 +18,7 @@
 // systemd 单元 EnvironmentFile 指向的 env 文件；删变量 + 重启服务端 = 关闭
 // 鉴权（envStr 只在进程启动时读一次）。
 
-import { ENV_VARS } from '@pacman/shared';
+import { ENV_VARS } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
@@ -29,7 +29,7 @@ declare global {
   }
 }
 
-const GATE_TOKEN = 'pacman-e2e-gate-token-0123456789abcdef';
+const GATE_TOKEN = 'cairn-e2e-gate-token-0123456789abcdef';
 
 /** 记录每个 EventSource 构造 URL（?token= 面断言）。 */
 async function recordEventSourceUrls(page: Page): Promise<void> {
@@ -76,7 +76,7 @@ test('鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI
   await page.locator('.token-gate-submit').click();
   await expect(page.locator('.token-gate-error')).toHaveText('令牌无效，请重试。');
   await expect(page.locator('.token-gate')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('pacman.token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   // 错误细节不泄漏：server {error} 内容不出现在页面
   expect(await page.locator('.token-gate').innerText()).not.toContain('Unauthorized');
 
@@ -90,7 +90,7 @@ test('鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI
   await expect(page.locator('.board-sidebar')).toBeVisible();
   const retried = await retryLands;
   expect(retried.request().headers().authorization).toBe(`Bearer ${GATE_TOKEN}`);
-  expect(await page.evaluate(() => localStorage.getItem('pacman.token'))).toBe(GATE_TOKEN);
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBe(GATE_TOKEN);
 
   // SSE 以 ?token= 建流（EventSource 无法设 header 的协议例外）
   await expect
@@ -104,12 +104,12 @@ test('鉴权开：首访落门页；错 token 停留不落盘；对 token 进 UI
 
 test('鉴权开：陈旧坏 token 首访即落门页且坏值被清除', async ({ page }) => {
   await recordEventSourceUrls(page);
-  await page.addInitScript(() => localStorage.setItem('pacman.token', 'stale-bad-token'));
+  await page.addInitScript(() => localStorage.setItem('cairn.token', 'stale-bad-token'));
   await page.goto(`${authed.base}/app`);
 
   // 失败方式 3：门页出现，坏值清除（SSE 不得带坏 token 建流）
   await expect(page.locator('.token-gate')).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('pacman.token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   for (const url of await streamUrls(page)) {
     expect(url).not.toContain('stale-bad-token');
   }
@@ -118,7 +118,7 @@ test('鉴权开：陈旧坏 token 首访即落门页且坏值被清除', async (
 test('鉴权开：localStorage 已有好 token → 首访直达 UI 零门页', async ({ page }) => {
   await recordEventSourceUrls(page);
   await page.addInitScript(
-    (token: string) => localStorage.setItem('pacman.token', token),
+    (token: string) => localStorage.setItem('cairn.token', token),
     GATE_TOKEN,
   );
   const firstLoad = page.waitForResponse(
@@ -172,8 +172,8 @@ test('#1048 门页指引：zh 面告诉令牌从哪来（变量名 / Environment
 
 test('#1048 门页指引：en 面同一事实不失真（变量名经字典模板插值）', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pacman.locale', 'en');
-    localStorage.setItem('pacman-locale', 'en');
+    localStorage.setItem('cairn.locale', 'en');
+    localStorage.setItem('cairn-locale', 'en');
   });
   await page.goto(`${authed.base}/app`);
   const help = page.locator('.token-gate-help');

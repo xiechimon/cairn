@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config';
 
 // apps/web unit tests live in test/ (i18n coverage + PWA, #74). The
 // Playwright e2e specs under e2e/ stay out of vitest — they run via
-// `pnpm --filter @pacman/web e2e` (issue #75 AC3).
+// `pnpm --filter @cairn/web e2e` (issue #75 AC3).
 //
 // resolve.alias 与 vite.config.ts 同值（#425 的 @/* 别名）：components/ui
 // 的 registry 同源件按 refresh 管线 R1 用 `@/components/ui/<x>.js` 形态

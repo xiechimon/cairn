@@ -345,7 +345,7 @@ def main():
               f"({' / '.join(TEMPLATE_SECTIONS)}).")
         print("pr-evidence: the global show-me /pr template "
               "(Summary/Evidence/Merge Danger) does not satisfy this gate; "
-              "use the repo skill .claude/skills/pr-pacman/SKILL.md.")
+              "use the repo skill .claude/skills/pr-cairn/SKILL.md.")
 
     links = find_links(body)
 

@@ -41,7 +41,7 @@ import {
   type SkillFileBody,
   type SkillRecord,
   skillRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { skillAudit } from '../db/schema.js';

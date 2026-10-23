@@ -21,7 +21,7 @@
 // - 工具开关 = 档案缺省集（Implementer/Verifier 推送分支；其余空——
 //   只读角色不持交付面权限）。
 
-import { PERSONA_PROFILES, type PersonaRole } from '@pacman/shared';
+import { PERSONA_PROFILES, type PersonaRole } from '@cairn/shared';
 import { and, asc, eq, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, machine as machineTable, provider as providerTable, team } from '../db/schema.js';

@@ -292,7 +292,7 @@ test('权限 tab：有密钥时密钥区恰好一行总开关', async ({ page })
   // 注入 shell」改成「按需取用、不预置进 shell」，本断言没跟上，一直红着；
   // 现值抄自 packages/shared/src/records/agent.ts 的常量。
   await expect(page.locator('.agent-secret-hint')).toHaveText(
-    '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在机器需要 pacman CLI 0.1.28 及以上。',
+    '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在机器需要 cairn CLI 0.1.28 及以上。',
   );
 });
 

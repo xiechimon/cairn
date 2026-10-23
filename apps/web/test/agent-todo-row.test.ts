@@ -1,4 +1,4 @@
-import type { AgentTodo, BuildRecord, StepJournalRow } from '@pacman/shared';
+import type { AgentTodo, BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';

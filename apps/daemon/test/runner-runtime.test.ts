@@ -38,7 +38,7 @@ import type {
   SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
@@ -211,7 +211,7 @@ async function setup(
     machineName?: string;
   } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-runtime-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(opts.tokenProvider ?? null);
@@ -365,7 +365,7 @@ describe('runner runtime 步续会话（spec 17 A7）', () => {
       ...claimedStep({ provider: 'claude-code', modelId: 'claude-sonnet-4-5' }),
       session: { action: 'continue' as const, sessionId: 'sdk-session-uuid' },
     };
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-runtime-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-runtime-'));
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient(null);

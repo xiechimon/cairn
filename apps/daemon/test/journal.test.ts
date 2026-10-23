@@ -3,12 +3,12 @@
 import { existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { StepJournal, TranscriptBuffer } from '../src/journal.js';
 
 function tmp(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-journal-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-journal-'));
 }
 
 const claimed: ClaimedStep = {

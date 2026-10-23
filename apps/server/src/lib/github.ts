@@ -17,9 +17,9 @@
 // scope（commit status 与合并都在团队连接已有的 `repo` scope 内）、不新增凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
 // - PATCH repos/{o}/{r}/issues/{n} → agent 回填标题写进 issue
-// - POST repos/{o}/{r}/statuses/{sha} → 合并就绪闸的 commit status `pacman/merge-gate`
+// - POST repos/{o}/{r}/statuses/{sha} → 合并就绪闸的 commit status `cairn/merge-gate`
 //   （githubCreateCommitStatus；S4a 只有传输，调用方是 S7，`human` 策略下不写）
-// - PUT repos/{o}/{r}/pulls/{n}/merge → 人在 pacman 里点合并（GitHub 形态、build 记着
+// - PUT repos/{o}/{r}/pulls/{n}/merge → 人在 cairn 里点合并（GitHub 形态、build 记着
 //   PR）：sha 绑本 build 最后推送的提交、squash（githubMergePull）
 // OAuth 面（#231 握手）：
 // - POST github.com/login/oauth/access_token（form-encoded：client_id/
@@ -56,12 +56,12 @@ const API_HEADERS = {
   accept: 'application/vnd.github+json',
   'x-github-api-version': '2022-11-28',
   // GitHub 要求 UA；品牌串不引 shared（lib 层零依赖纪律），字面量即可。
-  'user-agent': 'pacman-server',
+  'user-agent': 'cairn-server',
 } as const;
 
 // OAuth form POST 的 UA（与 API_HEADERS 字面量同值；form 面只吃 accept/
 // content-type/user-agent，不挂 REST 版本头）。
-const USER_AGENT = 'pacman-server';
+const USER_AGENT = 'cairn-server';
 
 /** 出站错误 → HttpError 单点映射（映射表见文件头注释）。headers 参数 =
  * 认证面扩展位（Authorization 头；错误路径只消费 url，token 永不进 message）。
@@ -154,7 +154,7 @@ export interface GithubPull extends GithubPullState {
   title: string | null;
   /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
   authorAssociation: string | null;
-  /** mergeable_state（文档只写「required, string」不列值）：pacman 只认 behind 与 dirty
+  /** mergeable_state（文档只写「required, string」不列值）：cairn 只认 behind 与 dirty
    * （#1403 段 3）；缺失 = null。 */
   mergeableState: string | null;
 }
@@ -1394,7 +1394,7 @@ export async function githubMergePull(
   }
   const message = optString(data?.message) ?? '';
   // 限流 = GitHub 没有处理这次请求，合并确定没有发生：409、不落行（2026-10-22 用户裁决，
-  // 记在 https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）。
+  // 记在 https://github.com/xiechimon/cairn/issues/1403#issuecomment-6344983763）。
   if (isRateLimitedText(res, text ?? '')) {
     return { kind: 'rate-limited', message, limit: rateLimitOf(url, res) };
   }

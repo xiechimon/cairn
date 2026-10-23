@@ -12,7 +12,7 @@
 // 由 chief 逐次派发自行判定(run_builds withPlan + dispatchReason 回执),
 // settings 无「派发方式」行。
 
-import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@pacman/shared';
+import { MEMORY_EMPTY_COPY, MEMORY_QUOTA_PER_AGENT } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
 import { useApiMutations, useChief, useMachines, useMembers, useMemories } from '../api/hooks.js';

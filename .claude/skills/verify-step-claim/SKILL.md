@@ -1,6 +1,6 @@
 ---
 name: verify-step-claim
-description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡停止的 TLA+ 模型检查（TLC，一条命令约 1 分钟）。改到 tryClaim、heartbeatStep、ownedStep、finishStep、sweepAbandonedBuildSteps、sweepStaleMachines、sweepQuotaWaitSteps、stopActiveStepsAfterExit、fetchStop、scheduler tick 顺序，或 daemon 的领取循环、recover、deliverStop、runStep 的心跳 / 会话登记 / 收尾时用；判断改动有没有让「同一步被两处同时跑」「旧执行者的结果被采纳」「关卡后又被领走」「已接收的停止信号丢失」变得更好或更坏。
+description: cairn 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡停止的 TLA+ 模型检查（TLC，一条命令约 1 分钟）。改到 tryClaim、heartbeatStep、ownedStep、finishStep、sweepAbandonedBuildSteps、sweepStaleMachines、sweepQuotaWaitSteps、stopActiveStepsAfterExit、fetchStop、scheduler tick 顺序，或 daemon 的领取循环、recover、deliverStop、runStep 的心跳 / 会话登记 / 收尾时用；判断改动有没有让「同一步被两处同时跑」「旧执行者的结果被采纳」「关卡后又被领走」「已接收的停止信号丢失」变得更好或更坏。
 ---
 
 # verify-step-claim
@@ -20,7 +20,7 @@ description: pacman 步的领取 / 心跳 / 失联释放 / 收尾回报 / 关卡
 .claude/skills/verify-step-claim/scripts/run.sh P1_SingleExecutorPerMachine   # 只跑一条，几秒
 ```
 
-前置：Java 11+（本机 `~/.sdkman/candidates/java/current/bin/java`，17.0.7）和 `~/.cache/pacman/tla2tools-1.7.4.jar`。jar 缺失时脚本打印下载命令并退出 2；脚本校验 SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`（v1.7.4 官方 release，2,274,532 字节）。路径可用 `PACMAN_TLA_JAR`、`JAVA` 覆盖。TLC 的中间产物全写在 `$TMPDIR/verify-step-claim.*`，不进仓。
+前置：Java 11+（本机 `~/.sdkman/candidates/java/current/bin/java`，17.0.7）和 `~/.cache/cairn/tla2tools-1.7.4.jar`。jar 缺失时脚本打印下载命令并退出 2；脚本校验 SHA-256 `936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88`（v1.7.4 官方 release，2,274,532 字节）。路径可用 `CAIRN_TLA_JAR`、`JAVA` 覆盖。TLC 的中间产物全写在 `$TMPDIR/verify-step-claim.*`，不进仓。
 
 `expected.txt` 每行：配置名、预期结果，预期 FAIL 的还记着反例的动作序列（逗号分隔，不含初始状态）。预期 FAIL 的性质用单线程跑（几百到几千个状态，一两秒），反例是确定的；预期 PASS 的用全部核。
 

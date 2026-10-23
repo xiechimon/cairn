@@ -1,5 +1,5 @@
 #!/usr/bin/env -S pnpm exec tsx
-// 记录代理：把 PACMAN_EVAL_RELAY_URL 指到它，就能看到 daemon 真正发出去的请求体。
+// 记录代理：把 CAIRN_EVAL_RELAY_URL 指到它，就能看到 daemon 真正发出去的请求体。
 //
 // 为什么需要它：模型条目写对了（reasoning/map/compat 都在）不等于 pi 真的把它翻译
 // 成了 wire 字段——中间还隔着 pi 的 compat 探测、档位夹取、以及我们看不到的组装。

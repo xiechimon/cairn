@@ -79,7 +79,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求完成改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m4b-mem-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-mem-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

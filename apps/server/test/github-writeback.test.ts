@@ -5,7 +5,7 @@
 // 出站纪律：token 只进 Authorization 头（never URL/响应），githubFetch 注入
 // mock——测试面零真实出站。
 
-import { type ClaimedStep, todoRecordSchema } from '@pacman/shared';
+import { type ClaimedStep, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test, vi } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';

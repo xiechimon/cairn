@@ -65,7 +65,7 @@ function trimmedMigrations(): string {
     ),
   );
   expect(dropIdx, 'journal 里找不到 drop 退役表的 migration').toBeGreaterThan(0);
-  const dir = temp('pacman-migrations-old-');
+  const dir = temp('cairn-migrations-old-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, dropIdx)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
@@ -101,7 +101,7 @@ interface LegacyWorld {
 function buildLegacyDb(opts: { skillRows?: number; mcpRows?: number } = {}): LegacyWorld {
   const skillRows = opts.skillRows ?? 2;
   const mcpRows = opts.mcpRows ?? 1;
-  const dir = temp('pacman-legacy-db-');
+  const dir = temp('cairn-legacy-db-');
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });
@@ -196,7 +196,7 @@ function exportFiles(homeDir: string): string[] {
 describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
   test('L1/L5：旧库两表有行 → 导出落盘内容齐、mcpServers 清空 + skills 列迁移退役、两表消失', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 2, mcpRows: 1 });
-    const home = temp('pacman-legacy-home-');
+    const home = temp('cairn-legacy-home-');
     const { db, close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
@@ -244,7 +244,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
 
   test('L2：旧库两表零行 → 不落文件，表照删', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 0, mcpRows: 0 });
-    const home = temp('pacman-legacy-home-');
+    const home = temp('cairn-legacy-home-');
     const { close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
@@ -256,9 +256,9 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
   });
 
   test('L3：全新库 → 干净迁移、不落文件（同轮建表即删不算升级数据）', () => {
-    const dir = temp('pacman-fresh-db-');
+    const dir = temp('cairn-fresh-db-');
     const dbPath = join(dir, 'server.db');
-    const home = temp('pacman-legacy-home-');
+    const home = temp('cairn-legacy-home-');
     const { close } = openDbWithHandle(dbPath, { legacyExportDir: home });
     try {
       expect(tableExists(dbPath, 'skill')).toBe(false);
@@ -288,7 +288,7 @@ describe('legacy-export 迁移护栏（skill + mcp_server 表退役）', () => {
 
   test('L5b：二次启动幂等——表已 drop = 不再产出第二份', () => {
     const { dbPath } = buildLegacyDb({ skillRows: 1, mcpRows: 1 });
-    const home = temp('pacman-legacy-home-');
+    const home = temp('cairn-legacy-home-');
     openDbWithHandle(dbPath, { legacyExportDir: home }).close();
     openDbWithHandle(dbPath, { legacyExportDir: home }).close();
     expect(existsSync(dbPath)).toBe(true);

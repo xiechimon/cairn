@@ -67,7 +67,7 @@ export async function pickFolder(): Promise<string | null> {
   // 退出码/本地化 stderr 不参与分类。
   const script = [
     'try',
-    'return "PATH:" & (POSIX path of (choose folder with prompt "pacman · 选择项目文件夹"))',
+    'return "PATH:" & (POSIX path of (choose folder with prompt "cairn · 选择项目文件夹"))',
     'on error errStr number errNum',
     'return "ERR:" & errNum',
     'end try',

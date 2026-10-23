@@ -16,8 +16,8 @@
 //  7. waitingOn 派生：quota 挂起 → {on:'quota'}；归属机离线 / 团队零在线 →
 //     {on:'machine'}；机器健康可领 → 缺席（正常排队）；非在飞相位 → 缺席。
 
-import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

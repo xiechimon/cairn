@@ -29,7 +29,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -226,7 +226,7 @@ function quotaCycles(n: number, message: string): StepEvent[] {
 }
 
 async function runQuotaCase(script: StepEvent[], providerId = 'gw-quota') {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-quota-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-quota-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

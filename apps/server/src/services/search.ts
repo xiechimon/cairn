@@ -6,7 +6,7 @@
 // LIKE 通配转义 [设计]：% _ \ 按字面匹配（ESCAPE '\'）；ASCII 大小写不敏感
 // = SQLite LIKE 内建行为，中文逐字节相等。
 
-import type { SearchResponse } from '@pacman/shared';
+import type { SearchResponse } from '@cairn/shared';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { AnySQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Db } from '../db/client.js';

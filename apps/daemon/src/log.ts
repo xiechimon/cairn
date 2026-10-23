@@ -9,7 +9,7 @@
 
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { DAEMON_LOG_PREFIXES } from '@pacman/shared';
+import { DAEMON_LOG_PREFIXES } from '@cairn/shared';
 import pino from 'pino';
 
 export type DaemonLogPrefix = (typeof DAEMON_LOG_PREFIXES)[number];

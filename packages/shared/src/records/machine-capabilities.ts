@@ -46,7 +46,7 @@ export const machineCapabilitiesSchema = z.object({
   /** 已装 MCP server slug 集（小写归一，parseClaudeMcpEntries 单源；与
    *  agent.mcpServers 勾选值 / claim 载荷 slug 同值域）。 */
   mcpServers: z.array(z.string()),
-  /** 本机技能目录名集（machine-owned skills，PACMAN_SKILLS_DIR 扫描根）。
+  /** 本机技能目录名集（machine-owned skills，CAIRN_SKILLS_DIR 扫描根）。
    *  team skills 维持 server 单源按步下发（票面界限），不进本清单。 */
   skills: z.array(z.string()),
   hardware: machineHardwareSchema.optional(),

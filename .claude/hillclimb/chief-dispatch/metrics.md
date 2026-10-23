@@ -110,13 +110,13 @@ decision_ok  168/176 = 95.5%   95%CI [92.4%, 98.5%]
 
 ## 怎么跑
 
-凭据：relay key 取 `PACMAN_EVAL_RELAY_KEY`，缺省回落 `~/.claude/settings.json`
-的 `env.ANTHROPIC_AUTH_TOKEN`。relay 地址可用 `PACMAN_EVAL_RELAY_URL` 覆盖。
+凭据：relay key 取 `CAIRN_EVAL_RELAY_KEY`，缺省回落 `~/.claude/settings.json`
+的 `env.ANTHROPIC_AUTH_TOKEN`。relay 地址可用 `CAIRN_EVAL_RELAY_URL` 覆盖。
 密钥只在进程内持有，不落盘、不进仓。
 
 ```sh
 # 全量 baseline（36 用例 × 3 reps，约 $5 / 35 分钟）
-pnpm --filter @pacman/integration exec tsx eval/chief-dispatch/run-eval.mts \
+pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
   --flow .claude/hillclimb/chief-dispatch --variant baseline --model glm-5.3 --reps 3
 
 # 出报告 → .claude/hillclimb/chief-dispatch/report.html
@@ -137,10 +137,10 @@ node integration/eval/chief-dispatch/build-report-lite.mts .claude/hillclimb/chi
 
 ## 已知缺口（如实记录，不掩盖）
 
-1. **截断只能靠征兆判定。** pacman 目前不上报模型的 `finish_reason`，runner 只能用
+1. **截断只能靠征兆判定。** cairn 目前不上报模型的 `finish_reason`，runner 只能用
    「回合正常结束但既无工具调用也无正文」当截断特征。这会把截断和「模型主动不作为」
    混在一起。修法是让 daemon 在 step 事件/transcript 里带上 `stop_reason`（加法改动）。
-2. **served-model 断言较弱。** 模型 id 取自 `token_usage.model`，是 pacman 自己记的账，
+2. **served-model 断言较弱。** 模型 id 取自 `token_usage.model`，是 cairn 自己记的账，
    不是上游响应回显的——它能发现「daemon 选了别的模型」，发现不了 relay 静默换模型。
 3. **relay 不报成本。** `cost_usd` 按 OpenRouter 挂牌价现算，不是账单实测值。
 4. **链路失败率约 5%。** 108 回合里 5 条没跑到模型（零 token）或 `fetch failed`。
@@ -197,7 +197,7 @@ cache 读是最大项，而它随**往返次数**线性增长（每次工具调�
 
 ### 杠杆②：降思考档位 —— 结构性不通（2026-09-29）
 
-`PACMAN_EVAL_CHIEF_THINKING` 旋钮已加（评测 seed 里一个参数，不动产品代码）。
+`CAIRN_EVAL_CHIEF_THINKING` 旋钮已加（评测 seed 里一个参数，不动产品代码）。
 但 A/B 显示它对 relay 上的模型**无效**：默认档位输出 4,452 token / $0.0636，
 `low` 档位输出 5,513 / $0.0657（4 条用例里 3 条输出反而变多，纯跑间噪声）。
 
@@ -207,12 +207,12 @@ cache 读是最大项，而它随**往返次数**线性增长（每次工具调�
 自定义端点写的条目只有 `reasoning/input/cost/contextWindow/maxTokens`——
 **两个字段都没有**，pi 手里没有可翻译的目标。
 
-**产品含义**：pacman 的自定义端点路径完全没有推理深度控制。对 relay 上的模型，
+**产品含义**：cairn 的自定义端点路径完全没有推理深度控制。对 relay 上的模型，
 推理 token 照生成照计费，用户没有任何开关。输出占成本 26.6%，这一块目前不可管理。
 要打开它得为每个模型声明 `thinkingFormat`/`thinkingLevelMap`（需逐 provider 的
 wire 知识，属 spec 11 的地界）。
 
-`PACMAN_EVAL_CHIEF_THINKING` 保留：对声明了思考能力的模型有效，是评测该有的旋钮。
+`CAIRN_EVAL_CHIEF_THINKING` 保留：对声明了思考能力的模型有效，是评测该有的旋钮。
 
 ### 杠杆②补：自定义端点接推理档位 —— 已实现（opt-in），效果未定论（2026-09-29/30）
 
@@ -221,7 +221,7 @@ wire 知识，属 spec 11 的地界）。
 通用分支下发 `reasoning_effort`（值经 `thinkingLevelMap` 映射）。我们的 relay 三者
 都不匹配，落到 `thinkingFormat:'openai'` + `supportsReasoningEffort:true`。
 
-实现：`PACMAN_CUSTOM_MODEL_REASONING=1` 时，`materializeProvider` 给自定义端点的
+实现：`CAIRN_CUSTOM_MODEL_REASONING=1` 时，`materializeProvider` 给自定义端点的
 模型条目写 `reasoning:true` + 七档映射 + `compat:{supportsDeveloperRole:false}`。
 **opt-in 而非默认**：不同后端对 `reasoning_effort` 容忍度不同——实测本 relay 只认
 low/high/max，传 `medium` 直接 400，默认打开会让一部分自定义端点整条挂掉。映射只

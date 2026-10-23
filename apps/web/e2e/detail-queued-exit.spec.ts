@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { evidencePanelShot } from './evidence';
 
 // #1446: a queued task (started, waiting for a machine) has a way out from its
-// detail page. Pacman never times out a queued step (#1257), so without one a
+// detail page. Cairn never times out a queued step (#1257), so without one a
 // task whose home machine never returns stays queued. 更多 gains 停止 for a
 // queued task (POST /api/builds/:id/stop, back to 待开始) and 关闭 is enabled
 // (PATCH phase=closed; the server stops the pending step first, #1445).
@@ -24,10 +24,10 @@ const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarSty
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
   id: 'proj-1',
-  name: 'pacman',
+  name: 'cairn',
   teamId: 'team-1',
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };

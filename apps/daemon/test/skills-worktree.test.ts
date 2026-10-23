@@ -16,7 +16,7 @@ import {
 } from '../src/backend/skills.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `pacman-skills-wt-${tag}-`));
+  return mkdtempSync(join(tmpdir(), `cairn-skills-wt-${tag}-`));
 }
 
 function writeSkill(
@@ -83,7 +83,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     expect(names.size).toBe(1); // only team skill, worktree dir missing silently
   });
 
-  test('仅 worktree 有技能 → PACMAN_SKILLS_DIR 空也可见 worktree 技能', () => {
+  test('仅 worktree 有技能 → CAIRN_SKILLS_DIR 空也可见 worktree 技能', () => {
     const root = fixtureRoot('wt-only');
     const emptySkillsDir = join(root, 'empty-skills');
     mkdirSync(emptySkillsDir, { recursive: true });
@@ -105,7 +105,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     const root = fixtureRoot('collision');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
-    writeSkill(skillsDir, 'shared-skill', { description: 'pacman version' });
+    writeSkill(skillsDir, 'shared-skill', { description: 'cairn version' });
 
     const worktreeDir = join(root, 'worktree');
     const wtSkillsDir = join(worktreeDir, '.claude', 'skills');
@@ -116,7 +116,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
       ...baseCollectOpts(skillsDir, root),
       worktreeSkillsDirs: piWorktreeSkillDirs(worktreeDir),
     });
-    // first-wins: PACMAN_SKILLS_DIR is in skillPaths before worktreeSkillsDirs
+    // first-wins: CAIRN_SKILLS_DIR is in skillPaths before worktreeSkillsDirs
     expect(fileMap.has('shared-skill')).toBe(true);
     const path = fileMap.get('shared-skill')!;
     expect(path).toContain('skills/shared-skill/SKILL.md');
@@ -127,7 +127,7 @@ describe('skills 联合扫描（#1299 worktree 侧）', () => {
     const root = fixtureRoot('collision-log');
     const skillsDir = join(root, 'skills');
     mkdirSync(skillsDir, { recursive: true });
-    writeSkill(skillsDir, 'shared-skill', { description: 'pacman version' });
+    writeSkill(skillsDir, 'shared-skill', { description: 'cairn version' });
 
     const worktreeDir = join(root, 'worktree');
     const wtSkillsDir = join(worktreeDir, '.claude', 'skills');

@@ -3,14 +3,14 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ToolCallRecord } from '@pacman/shared';
+import type { ToolCallRecord } from '@cairn/shared';
 import {
   appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 

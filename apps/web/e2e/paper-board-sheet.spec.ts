@@ -48,8 +48,8 @@ for (const theme of ['light', 'dark'] as const) {
     test(`board sheet matches the page shell sheet (${label})`, async ({ page }) => {
       await page.addInitScript(
         ([t, r]) => {
-          localStorage.setItem('pacman-theme', t);
-          if (r) localStorage.setItem('pacman.sidebar-collapsed', '1');
+          localStorage.setItem('cairn-theme', t);
+          if (r) localStorage.setItem('cairn.sidebar-collapsed', '1');
         },
         [theme, rail] as const,
       );
@@ -93,7 +93,7 @@ test.describe('on a 2x screen', () => {
   test.use({ deviceScaleFactor: 2 });
 
   test('sheet and card outlines stay one CSS pixel', async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+    await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
     await page.goto(BOARD);
     const sheet = await page
       .locator('.board-sheet')

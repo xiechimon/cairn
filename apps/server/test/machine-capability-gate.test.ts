@@ -225,16 +225,16 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     const w = await setupWorld();
     const m = await enrollMachineRest(w, {
       name: 'cap-enroll',
-      capabilities: { mcpServers: ['figma'], skills: ['verify-pacman'] },
+      capabilities: { mcpServers: ['figma'], skills: ['verify-cairn'] },
     });
     const row = w.s.db.select().from(machineTable).where(eq(machineTable.id, m.machineId)).get()!;
-    expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-pacman'] });
+    expect(row.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
     // GET me 读面随行。
     const me = await w.s.app.request('/api/machine/me', {
       headers: { authorization: `Bearer ${m.token}` },
     });
     const meBody = (await me.json()) as { capabilities?: unknown };
-    expect(meBody.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-pacman'] });
+    expect(meBody.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
     // team machines 列表读面随行。
     const list = await req(w.s.app, 'GET', `/api/teams/${w.s.team.id}/machines`);
     const listBody = (await list.json()) as { machines?: unknown[] } | unknown[];
@@ -242,7 +242,7 @@ describe('#1251 能力上报持久化 + 心跳红线', () => {
     const mine = (machines as { id: string; capabilities?: unknown }[]).find(
       (r) => r.id === m.machineId,
     );
-    expect(mine?.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-pacman'] });
+    expect(mine?.capabilities).toEqual({ mcpServers: ['figma'], skills: ['verify-cairn'] });
   });
 
   test('失败方式 1：presence 带 capabilities → 覆写落列', async () => {

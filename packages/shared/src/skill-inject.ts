@@ -13,7 +13,7 @@
 // 零命中 = []（配置事实非故障，调用方零注入不报错）；不保底全量注入。
 //
 // 边界（票面）：不做向量检索/embedding；不改技能携带/授予模型；description
-// 正本仍是用户侧技能根的 SKILL.md frontmatter，pacman 不接管编辑。
+// 正本仍是用户侧技能根的 SKILL.md frontmatter，cairn 不接管编辑。
 
 import { z } from 'zod';
 

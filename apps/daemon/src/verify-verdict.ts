@@ -10,7 +10,7 @@
 // 坏条目丢弃、丢弃明细注记进 conclusion）> failed；全坏仍 failed——不把
 // 「evidence 全坏」静默折成通过。
 
-import { type VerifyVerdict, verifyEvidenceSchema, verifyVerdictSchema } from '@pacman/shared';
+import { type VerifyVerdict, verifyEvidenceSchema, verifyVerdictSchema } from '@cairn/shared';
 import { contentToText, extractCodeFence, extractJsonSpan } from './review-findings.js';
 
 type TranscriptMessageLike = {

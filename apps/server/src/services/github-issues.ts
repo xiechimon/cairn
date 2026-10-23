@@ -6,7 +6,7 @@
 // - token 唯一读出点 = openGithubToken（github-connection.ts），仅经
 //   lib/github.ts 出站边界进 Authorization 头（never URL/日志/wire）；
 // - 导入面每次现拉 issue 详情与仓库 label 集，不缓存第二真值（ADR 0005
-//   premortem 护栏：两个真值源漂移——「仓库改了，pacman 至少不变得更错」）；
+//   premortem 护栏：两个真值源漂移——「仓库改了，cairn 至少不变得更错」）；
 // - 先 fetch 后建：上游 404（issue 不存在）直透，不留半成品任务。
 
 import {
@@ -18,7 +18,7 @@ import {
   parseGithubIssueSourceRef,
   type SecretBox,
   type TodoRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type project as projectTable, todo as todoTable } from '../db/schema.js';
@@ -57,7 +57,7 @@ function requireToken(deps: GithubIssueFaceDeps, teamId: string): string {
   return token;
 }
 
-/** 已占用来源引用集（ADR 0006 D4 导入护栏，pacman 侧反查）：本团队已落库
+/** 已占用来源引用集（ADR 0006 D4 导入护栏，cairn 侧反查）：本团队已落库
  * 的 sourceRef 全集——「一条 issue 至多一个任务」同时盖住自建的 issue 与
  * 导入过的 issue，不在 GitHub 侧打标记 label。#1406：按小写比、回小写集
  * （GitHub 的 owner / repo 不分大小写，两个项目把同一仓写成不同大小写时，

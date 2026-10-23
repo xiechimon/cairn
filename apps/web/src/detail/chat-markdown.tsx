@@ -20,7 +20,7 @@
 // 独立行」拼接，web api/attachments.ts 契约）。行中内联的 token 不在块语法
 // 内（保持字面文本，与 agent 回复同律）。
 
-import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@pacman/shared';
+import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@cairn/shared';
 import { useMemo } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';

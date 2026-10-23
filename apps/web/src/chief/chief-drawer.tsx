@@ -33,7 +33,7 @@
 // 已被落地的 grant/upload/read 链与提及 wire  retire——只开交互面，不加新后端
 // 面。语音输入维持 wontfix 不渲染（#304 C5，本票不含）。
 // #306 wontfix 出账：r8 随拍在线程视图头部多出的「更多」（⋮）钮——原站
-// 菜单内容从未点开无正典（r8-chief-panel-adhoc §3），pacman server chief
+// 菜单内容从未点开无正典（r8-chief-panel-adhoc §3），cairn server chief
 // 面亦无线程管理 mutation（GET/POST threads 外无删除/重命名端点），无
 // local-first 对象面，按 M7 处置二分律移除不渲染；头部三钮双视图同律。
 // #645：头部 +（新主题）挂裸键 N（抽屉作用域——overlays/hotkeys 的
@@ -46,7 +46,7 @@ import {
   type AskUserAnswer,
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   type Dispatch,
   type SetStateAction,
@@ -186,9 +186,9 @@ const EXAMPLE_ICONS = {
  *  （store.ts DRAFT_NEW_SESSION 注，MUL-4864）。空稿删键不留残
  *  （store.ts writeDrafts 的 removeItem 同律）；发送成功清稿即清键，被拒
  *  保留（#631 契约，持久化是加载面不是发送面）。品牌前缀纪律照
- *  pacman.chief-open 先例（use-chief-surface.ts）。fixture 面永不读写
+ *  cairn.chief-open 先例（use-chief-surface.ts）。fixture 面永不读写
  *  （采集确定性——scenario 的 chief.draft 是捕获形草稿唯一来源）。 */
-export const CHIEF_DRAFT_STORAGE_KEY = 'pacman.chief-draft';
+export const CHIEF_DRAFT_STORAGE_KEY = 'cairn.chief-draft';
 
 function readStoredChiefDraft(): string {
   try {

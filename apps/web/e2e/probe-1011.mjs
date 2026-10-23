@@ -105,7 +105,7 @@ async function probeFace(browser, face) {
     colorScheme: 'light',
   });
   const page = await context.newPage();
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(`${BASE}/app?scenario=${scenario}`);
 
   const trigger = page.getByRole('button', { name: triggerName });

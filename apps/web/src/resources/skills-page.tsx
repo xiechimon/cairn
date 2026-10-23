@@ -8,7 +8,7 @@
 // 开 SkillDialog（frontmatter 表单化），行点击开编辑。空态文案指路目录 +
 // 界面新建双入口（canon = shared SKILL_PAGE_COPY 单源消费，{dir} =
 // SKILLS_DIR_DEFAULT；env 覆写在 server 侧，i18n 键经 COMPUTED_KEYS 登记）。
-import { SKILL_PAGE_COPY, SKILLS_DIR_DEFAULT } from '@pacman/shared';
+import { SKILL_PAGE_COPY, SKILLS_DIR_DEFAULT } from '@cairn/shared';
 import { Puzzle } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';

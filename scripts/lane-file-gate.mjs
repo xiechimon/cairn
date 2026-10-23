@@ -4,8 +4,8 @@
 // #1189 merged BLOCKED.md into main (c7a5a2d6), and #1153's branch carried
 // PROGRESS.md into review (PR #1198, deleted by 701b5588). Written warnings
 // did not hold; this gate makes the failure loud instead.
-// #1203 adds plan.md: the pacman plan step's handoff file — the product now
-// writes it outside the repo checkout (daemon PACMAN_HOME plans dir), so a
+// #1203 adds plan.md: the cairn plan step's handoff file — the product now
+// writes it outside the repo checkout (daemon CAIRN_HOME plans dir), so a
 // root plan.md is always a leak. Two leaks already happened: kanban conv card
 // #24 committed plan.md at the repo root (PR #1201 first version), and PR
 // #1168 landed one on main.
@@ -36,7 +36,7 @@
 //
 // The remedy the failure prints: move lane process files under
 // .herdr-project/<lane>/ — those paths are untracked by policy; delete
-// plan.md — it is the pacman plan handoff, which lives outside the checkout.
+// plan.md — it is the cairn plan handoff, which lives outside the checkout.
 //
 // Usage:
 //   node scripts/lane-file-gate.mjs                # leg 1
@@ -124,7 +124,7 @@ console.error('  folder instead, e.g.:');
 console.error('');
 console.error('    .herdr-project/<lane>/PROGRESS.md');
 console.error('');
-console.error('  A root plan.md is a pacman plan-step handoff leak (#1203): the plan file');
+console.error('  A root plan.md is a cairn plan-step handoff leak (#1203): the plan file');
 console.error('  lives outside the repo checkout, so delete it — do not commit it.');
 console.error('');
 console.error('  .herdr-project/ is untracked by policy, and the root-anchored .gitignore');

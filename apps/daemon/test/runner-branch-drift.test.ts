@@ -16,7 +16,7 @@
 //   3. HEAD 偏离且处处无提交 → hasChanges=false + workBranchDrift 携带
 //      （server 闸点名偏离的入参面）
 //   4. 无偏离无提交 → hasChanges=false 且不带 drift 字段（现状钉扎）
-//   5. 邻座会话分支（pacman/conv-<他 build>）有新提交 → 不算本步产物
+//   5. 邻座会话分支（cairn/conv-<他 build>）有新提交 → 不算本步产物
 //      （共享基座仓的兄弟 conv 不误认——假阳即假过闸）
 //   6. 测试桩缺新可选方法（老实现/版本墙）→ 收尾行为与现状逐字一致
 //   7. currentBranch 返回 null（detached HEAD / 查询失败）→ 无 drift 不炸
@@ -39,8 +39,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
-import { buildWorkBranchNote, conversationBranch } from '@pacman/shared';
+} from '@cairn/shared';
+import { buildWorkBranchNote, conversationBranch } from '@cairn/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -286,7 +286,7 @@ async function runOnce(opts: RunOpts): Promise<{
   probeMock.mockImplementation(
     async (o: { branch: string }) => opts.probeByBranch?.[o.branch] ?? null,
   );
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-drift-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-drift-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -376,7 +376,7 @@ describe('#1195 收尾偏离检测与产物并集面', () => {
       fake: {
         headBranch: CONV_BRANCH,
         ahead: 0,
-        workBranches: ['pacman/conv-0198f6c0-1111-7000-8000-111111111111'],
+        workBranches: ['cairn/conv-0198f6c0-1111-7000-8000-111111111111'],
       },
     });
     expect(body.hasChanges).toBe(false);

@@ -59,7 +59,7 @@ let page: Page;
 beforeAll(async () => {
   // 集成面文件串行（vitest.config fileParallelism:false，#349）——各自构建
   // 共享 dist 是既定形态（m5 同款）。
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });
@@ -84,7 +84,7 @@ beforeAll(async () => {
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
     webDir: WEB_DIST,
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-666-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-666-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'c666' },
     {},

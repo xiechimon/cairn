@@ -7,12 +7,12 @@
 //   1. 镜像 clone 落 <workspacesRoot>/<projectId>/repo，对象文件走硬链接
 //      （nlink ≥ 2，近零成本）；托管存储面零写入（reposDir 无 bare repo——
 //      applyMergeLanding hosted-only）
-//   2. build 步收尾：conv 分支 pacman/conv-<buildId> push 回用户仓库
+//   2. build 步收尾：conv 分支 cairn/conv-<buildId> push 回用户仓库
 //      refs/heads（非 bare 收 push），携带探针行；用户工作树未被触碰
 //      （reflog/main/HEAD/status 与种子态一致）
 //   3. merge 步收尾：conv 分支 tip = merge 步 checkpointCommit 落用户仓库
 //      refs/heads；用户当前分支 HEAD/reflog 零变化、工作树无探针行、status
-//      干净（#1211：用户仓库只多 pacman/ 分支）
+//      干净（#1211：用户仓库只多 cairn/ 分支）
 //   4. 脏工作区变体：用户对同一文件有未提交改动 → merge 步照常 done（落地
 //      不读用户工作区）；用户 HEAD 不动、脏文件原样（永不动用户工作树）
 
@@ -46,7 +46,7 @@ import {
 } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
-const IDENTITY = { name: 'it-user', email: 'it-user@pacman.local' };
+const IDENTITY = { name: 'it-user', email: 'it-user@cairn.local' };
 const PLAN_MD = [
   '# 方案',
   '',
@@ -64,7 +64,7 @@ let home: string;
 
 /** 用户本机 git 工作树仓种子（local 形态 clone 源 + 落地面）。 */
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'pacman-g2t2-user-')), 'repo');
+  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# user repo\n');
   await runGit(['add', '-A'], { cwd: dir });
@@ -124,7 +124,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-g2t2-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-g2t2-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'g2t2-mbp' },
     {},
@@ -198,7 +198,7 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     await waitFor(() => server.todoPhase(todoId) === 'review', 120_000);
 
     // —— 失败方式 2：conv 分支已 push 回用户仓库（非 bare 收 push），带探针行 ——
-    const branch = `pacman/conv-${buildId}`;
+    const branch = `cairn/conv-${buildId}`;
     const branchSha = await systemGitOps.resolveCommit(userRepo, `refs/heads/${branch}`);
     expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
     const readme = await systemGitOps.readFileAt(userRepo, branchSha!, 'README.md');
@@ -273,7 +273,7 @@ describe('G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回�
     // conv 分支照常落用户仓库；用户工作树永不被触碰：HEAD 不动、脏文件原样。
     const dirtyLanded = await systemGitOps.resolveCommit(
       dirtyRepo,
-      `refs/heads/pacman/conv-${dirtyBuildId}`,
+      `refs/heads/cairn/conv-${dirtyBuildId}`,
     );
     expect(dirtyLanded).toMatch(/^[0-9a-f]{40}$/);
     expect(await headOf(dirtyRepo)).toBe(headBefore);

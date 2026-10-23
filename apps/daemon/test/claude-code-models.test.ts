@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 function tmpHome(settingsJson?: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-daemon-cc-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-daemon-cc-'));
   dirs.push(dir);
   if (settingsJson !== undefined) {
     mkdirSync(join(dir, '.claude'), { recursive: true });

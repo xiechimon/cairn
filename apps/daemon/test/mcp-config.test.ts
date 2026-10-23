@@ -11,12 +11,12 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MCP_NOT_IN_CONFIG_CANON } from '@pacman/shared';
+import { MCP_NOT_IN_CONFIG_CANON } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { notInConfigLine, resolveMcpEndpoints } from '../src/backend/mcp-config.js';
 
 function cfg(content: unknown): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-mcp-daemon-cfg-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-mcp-daemon-cfg-'));
   const p = join(dir, 'claude.json');
   writeFileSync(p, typeof content === 'string' ? content : JSON.stringify(content), 'utf8');
   return p;
@@ -68,7 +68,7 @@ describe('resolveMcpEndpoints — slug → 本机 config 解析（spec 13）', (
 
   test('文件缺失 / 坏 JSON = 空集，全部走 onMissing，不抛', () => {
     const missing: string[] = [];
-    const absent = join(tmpdir(), 'pacman-no-such-claude.json');
+    const absent = join(tmpdir(), 'cairn-no-such-claude.json');
     expect(resolveMcpEndpoints(absent, ['a'], { onMissing: (s) => missing.push(s) })).toEqual([]);
     expect(missing).toEqual(['a']);
     expect(resolveMcpEndpoints(cfg('{{{ not json'), ['a'])).toEqual([]);

@@ -14,7 +14,7 @@
 // 已取消 = ink-3），不再是药丸徽章；字号走六档键；自由文本 =
 // FORM_CONTROL_CLS；底部 = 文字按钮 + 一个墨色主按钮。
 
-import type { AskUserAnswer } from '@pacman/shared';
+import type { AskUserAnswer } from '@cairn/shared';
 import { Ban, CircleCheck, CircleHelp, type LucideIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';

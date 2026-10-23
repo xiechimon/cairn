@@ -74,10 +74,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: 'proj-1',
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };
@@ -114,7 +114,7 @@ async function stubMentionSources(page: Page) {
   await page.route('**/api/todos?*', (route) => route.fulfill({ json: [WIRE_CARD] }));
   await page.route('**/api/projects?*', (route) => route.fulfill({ json: [PROJECT] }));
   await page.route('**/api/skills?*', (route) =>
-    route.fulfill({ json: [{ id: 'skill-1', name: 'verify-pacman', description: 'Live stack' }] }),
+    route.fulfill({ json: [{ id: 'skill-1', name: 'verify-cairn', description: 'Live stack' }] }),
   );
   await page.route(`**/api/teams/${TEAM_ID}/machines`, (route) =>
     route.fulfill({ json: [{ id: 'machine-1', name: 'xmonsMac' }] }),

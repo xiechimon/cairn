@@ -7,7 +7,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { SECRET_BOX_ENVELOPE_VERSION } from '@pacman/shared';
+import { SECRET_BOX_ENVELOPE_VERSION } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   createEphemeralSecretBox,
@@ -17,7 +17,7 @@ import {
 
 const tmpDirs: string[] = [];
 function tmpKeyfile(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-secretbox-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-secretbox-'));
   tmpDirs.push(dir);
   return join(dir, 'server', 'secretbox.key'); // 嵌套目录顺带验证 mkdir -p
 }

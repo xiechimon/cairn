@@ -5,7 +5,7 @@
 //   R2 运行历史 meta 残留：mapRunHistory 的第 N 次运行行拼进原始转义。
 //   R3 对照组：干净 errorMessage 逐字不变（零回归）。
 
-import type { BuildRecord, TodoRecord as WireTodo } from '@pacman/shared';
+import type { BuildRecord, TodoRecord as WireTodo } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapRunHistory, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord } from '../src/fixtures/records.js';

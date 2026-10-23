@@ -39,7 +39,7 @@ interface SegmentsProps {
  *  router Link (real anchor) keeps keyboard activation, middle-click and
  *  open-in-new-tab for free. skill/project/machine stay non-clickable spans
  *  until their own navigation tickets: the reference landing surfaces for
- *  those three were never captured (project has a pacman route but no
+ *  those three were never captured (project has a cairn route but no
  *  captured chip behavior; skill/machine have no per-entity route at all).
  *  No mentionId, no navigation — the chip stays an inert span. */
 function mentionHref(seg: DocSegment): string | null {

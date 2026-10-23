@@ -4,7 +4,7 @@
 // 项目标签集镜像（多枚可贴）；meta 缺省 = local/hosted 现行为文本逐字节不变
 // （F27）；titleFinal 在调用面短路（F28/F29），本文件钉 compose 两面。
 
-import { FIXED_TAGS } from '@pacman/shared';
+import { FIXED_TAGS } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { composeTaskMetaInstruction, composeWorkerSystemPrompt } from '../src/runner.js';
 

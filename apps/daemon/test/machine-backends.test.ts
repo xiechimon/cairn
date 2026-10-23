@@ -1,7 +1,7 @@
 // per-step 后端解析（spec 17 A3：backendFor 唯一分叉）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
 // = ./machine-loop-harness.ts，每个测试自 boot 自停）。
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 

@@ -12,7 +12,7 @@
 // todo 的第二次业务事件覆盖行并重置 readAt（站内未读按 thread 非按事件）。
 // channels 恒 ["in_app"]（r5 §7.2 实测值；复刻按 R1 divergence 恒定，04 §5）。
 
-import type { NotificationRecord, TodoRecord, UserRecord } from '@pacman/shared';
+import type { NotificationRecord, TodoRecord, UserRecord } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, chiefThread, notification } from '../db/schema.js';

@@ -1,7 +1,7 @@
 export const meta = {
   name: 'pr-gate',
   description:
-    'Pre-merge gate for one xiechimon/pacman PR at an exact head SHA: five review dimensions, two skeptics per blocking finding (at most four in all), go or no-go',
+    'Pre-merge gate for one xiechimon/cairn PR at an exact head SHA: five review dimensions, two skeptics per blocking finding (at most four in all), go or no-go',
   whenToUse:
     'Before enabling auto-merge or asking the user to merge a bootstrap PR (docs/spec/28 §7.5). Run the origin/main copy through scriptPath, not the PR working tree. args: {pr, headSha, ticket, changedFiles, deletedFiles, linesChanged, binaryFiles}',
   phases: [
@@ -19,7 +19,7 @@ export const meta = {
 // edit the gate that judges it. Edits to this file are merged by the user
 // (ADR 0021 D4 lists .claude/workflows/**).
 
-const REPO = 'xiechimon/pacman'
+const REPO = 'xiechimon/cairn'
 // 5 reviewers + 4 skeptics stays under the 10-agent guideline.
 const MAX_SKEPTICS = 4
 
@@ -216,7 +216,7 @@ const DIMENSIONS = [
   },
   {
     key: 'rules',
-    prompt: `Dimension: repository rules. Check the diff and the commit messages (\`git log --format=%B <your base ref>..${headSha}\`) against CLAUDE.md and AGENTS.md: seam discipline (biome.json noRestrictedImports, apps/daemon/src/backend), no inline import, no unexplained any, one-line single-use helpers inlined, the ticket's closing keyword in a commit message and no closing keyword followed by an issue number anywhere else (negations count), commit subject format <scope>(<ticket>): <subject> and the attribution trailers, .husky/banned.txt vocabulary, no emoji in commits, PR or code, ADRs overturned by a new ADR instead of edited, documents that must change with the behavior (docs/spec, .claude/skills/verify-pacman/features, apps/web/COMPONENTS.md), and the review checklist in docs/pr-review.md.`,
+    prompt: `Dimension: repository rules. Check the diff and the commit messages (\`git log --format=%B <your base ref>..${headSha}\`) against CLAUDE.md and AGENTS.md: seam discipline (biome.json noRestrictedImports, apps/daemon/src/backend), no inline import, no unexplained any, one-line single-use helpers inlined, the ticket's closing keyword in a commit message and no closing keyword followed by an issue number anywhere else (negations count), commit subject format <scope>(<ticket>): <subject> and the attribution trailers, .husky/banned.txt vocabulary, no emoji in commits, PR or code, ADRs overturned by a new ADR instead of edited, documents that must change with the behavior (docs/spec, .claude/skills/verify-cairn/features, apps/web/COMPONENTS.md), and the review checklist in docs/pr-review.md.`,
   },
   {
     key: 'tests',

@@ -10,7 +10,7 @@ import {
   scheduleRecordSchema,
   type TodoRecord,
   todoRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { machine as machineTable, todo as todoTable } from '../src/db/schema.js';

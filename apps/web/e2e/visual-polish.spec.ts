@@ -82,7 +82,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`board card rides the single-source edge ring + card-tier shadow (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const card = await edgeContract(page, '.todo-card');
@@ -103,7 +103,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`board column container rides the same edge ring + card-tier shadow (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const column = await edgeContract(page, '.board-column');
@@ -117,7 +117,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`notify banner rides the same edge ring + card-tier shadow (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=notify-banner');
 
     const banner = await edgeContract(page, '.board-notify-banner');
@@ -135,7 +135,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`account popover rides the V2 shell border, keeps the overlay-plate hard shadow (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
 
     const menu = await edgeContract(page, '.user-menu');
@@ -149,7 +149,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
   test(`sidebar sits on canvas beside the sheet, no seam of its own (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const probe = await page.evaluate(() => {
@@ -178,7 +178,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`board grid lays out four even columns with no horizontal scroll (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const metrics = await page.locator('.board-scroller').evaluate((el) => {
@@ -216,8 +216,8 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('collapsed rail draws no seam either (Paper PR 7)', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pacman-theme', 'dark');
-    localStorage.setItem('pacman.sidebar-collapsed', '1');
+    localStorage.setItem('cairn-theme', 'dark');
+    localStorage.setItem('cairn.sidebar-collapsed', '1');
   });
   await page.goto('/app?scenario=01');
 

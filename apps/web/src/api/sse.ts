@@ -16,8 +16,8 @@ import type {
   ConversationStepEvent,
   NotificationRecord,
   TranscriptRow,
-} from '@pacman/shared';
-import { isChiefConversationId } from '@pacman/shared';
+} from '@cairn/shared';
+import { isChiefConversationId } from '@cairn/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
@@ -122,7 +122,7 @@ async function showViaServiceWorker(
 function fireDesktopNotification(record: NotificationRecord): void {
   if (!document.hidden) return;
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
-  // #1031 偏好档闸门：帐号页开关关档（pacman.notifyEnabled=0）即使用户已授权
+  // #1031 偏好档闸门：帐号页开关关档（cairn.notifyEnabled=0）即使用户已授权
   // 也不弹——「关」是能落地的动作，不只是控件视觉。permission 是能力面、
   // 偏好是意愿面，两层都过才发。
   // #1091：获取点走安全缝——通知事件是运行期路径，裸 `localStorage` 实参在

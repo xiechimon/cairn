@@ -1,5 +1,5 @@
 // 可选 token 鉴权（#251，spec #247 Implementation/Testing Decisions）：
-// PACMAN_TOKEN 设 = 开、未设 = 关（关态零回归由全量套件担）。好测试 = 只打
+// CAIRN_TOKEN 设 = 开、未设 = 关（关态零回归由全量套件担）。好测试 = 只打
 // 外部行为（HTTP 请求级）——失败方式枚举先于实现固化（spec #247 十条中
 // server 侧八条 + WARN 两条；门页两条归 #253 web 面）：
 //   1. 开 + 无 token → /api/* 401 {error}
@@ -11,22 +11,22 @@
 //   7. 开 + stream 端点 ?token= 正确 → 流建立（EventSource 无法设 header）
 //   8. 开 + /_mp/* 与静态 SPA 壳 → 豁免（204 no-op 与非密 UI）
 //   9. 0.0.0.0 显式绑定 + 关 → WARN 文案；默认绑定/回环/开 → 无 WARN
-//  10. env 映射：PACMAN_TOKEN → authToken（空串 = 关）；HOST → host
-//  11. 开 + /api/mcp 持有效 apiKey（无 PACMAN_TOKEN）→ 穿闸达 mcp 自有鉴权面
+//  10. env 映射：CAIRN_TOKEN → authToken（空串 = 关）；HOST → host
+//  11. 开 + /api/mcp 持有效 apiKey（无 CAIRN_TOKEN）→ 穿闸达 mcp 自有鉴权面
 //      （XMON-49，02/A1 分体部署解锁：豁免四条 → 五条，与 machine/git 同族
 //      = 自有 Bearer 凭证面；闸叠其上 = 单 header 双凭证死锁，mcp 整面死）
 //  12. 开 + /api/mcp 无凭证 → mcp 自有 401（文案 ≠ 闸形状，钉来源面）；
-//      PACMAN_TOKEN 冒充 apiKey → mcp 面 401（token 不升格为 MCP 凭证）
+//      CAIRN_TOKEN 冒充 apiKey → mcp 面 401（token 不升格为 MCP 凭证）
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { MCP_TOOL_REGISTRY } from '@pacman/shared';
+import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { insecureBindWarning, loadConfig, warnInsecureBind } from '../src/config.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
-const TOKEN = 'pacman-test-token-0123456789abcdef';
+const TOKEN = 'cairn-test-token-0123456789abcdef';
 const authHeaders = { authorization: `Bearer ${TOKEN}` };
 
 /** 带任意 header 的请求（helpers.req 不带 header 面）。 */
@@ -89,9 +89,9 @@ describe('token 鉴权：保护面（失败方式 1/2/6）', () => {
 });
 
 describe('token 鉴权：豁免面四条（失败方式 3/4/5/8）', () => {
-  test('开 + /api/machine/* 持机器凭证（enroll Bearer apiKey）→ 照常，无需 PACMAN_TOKEN', async () => {
+  test('开 + /api/machine/* 持机器凭证（enroll Bearer apiKey）→ 照常，无需 CAIRN_TOKEN', async () => {
     const s = bootServer({ authToken: TOKEN });
-    // api-key 发行端点在保护面内——持 PACMAN_TOKEN 取 key
+    // api-key 发行端点在保护面内——持 CAIRN_TOKEN 取 key
     const issued = await reqWith(s, 'POST', `/api/teams/${s.team.id}/api-keys`, authHeaders, {
       name: 'machine-bootstrap',
       gitAccess: false,
@@ -134,7 +134,7 @@ describe('token 鉴权：豁免面四条（失败方式 3/4/5/8）', () => {
     expect(anon.headers.get('www-authenticate')?.startsWith('Basic')).toBe(true);
 
     // 有效 Basic api_key(gitAccess) → 照常（git http-backend 200 广告面）
-    const GIT_KEY = 'pacman_e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0';
+    const GIT_KEY = 'cairn_e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0';
     insertGitApiKey(s, GIT_KEY);
     const basic = Buffer.from(`git:${GIT_KEY}`).toString('base64');
     const authed = await reqWith(s, 'GET', gitPath, { authorization: `Basic ${basic}` });
@@ -149,7 +149,7 @@ describe('token 鉴权：豁免面四条（失败方式 3/4/5/8）', () => {
   });
 
   test('开 + /_mp/* 与静态 SPA 壳 → 豁免（204 no-op 与非密 UI）', async () => {
-    const webDir = mkdtempSync(join(tmpdir(), 'pacman-token-spa-'));
+    const webDir = mkdtempSync(join(tmpdir(), 'cairn-token-spa-'));
     tmpDirs.push(webDir);
     writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>shell</title>');
     const s = bootServer({ authToken: TOKEN, webDir });
@@ -168,13 +168,13 @@ describe('token 鉴权：豁免面四条（失败方式 3/4/5/8）', () => {
 
 describe('token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁免五条）', () => {
   // 与 machine/git 同族：自有 Bearer 凭证面（mcp-face verifyApiKey + key 级
-  // 工具白名单），闸再叠一道 = 同一 Authorization header 要同时装 PACMAN_TOKEN
+  // 工具白名单），闸再叠一道 = 同一 Authorization header 要同时装 CAIRN_TOKEN
   // 与 apiKey 两个值——必死锁。豁免后自有鉴权自担（无/坏凭证照旧 mcp 401）。
 
   const ALL_READ = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'read').map((t) => t.grant);
   const ALL_WRITE = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write').map((t) => t.grant);
 
-  /** 发行面在保护面内——持 PACMAN_TOKEN 取 mcpAccess key（门页/闸同律）。 */
+  /** 发行面在保护面内——持 CAIRN_TOKEN 取 mcpAccess key（门页/闸同律）。 */
   async function issueMcpKey(s: TestServer): Promise<string> {
     const issued = await reqWith(s, 'POST', `/api/teams/${s.team.id}/api-keys`, authHeaders, {
       name: 'mcp-gate-probe',
@@ -210,7 +210,7 @@ describe('token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁�
     );
   }
 
-  test('开 + /api/mcp 持有效 apiKey（无 PACMAN_TOKEN）→ 穿闸达 mcp 自有面（initialize 200）', async () => {
+  test('开 + /api/mcp 持有效 apiKey（无 CAIRN_TOKEN）→ 穿闸达 mcp 自有面（initialize 200）', async () => {
     const s = bootServer({ authToken: TOKEN });
     const key = await issueMcpKey(s);
     const res = await mcpInitialize(s, key);
@@ -238,7 +238,7 @@ describe('token 鉴权：/api/mcp 豁免面（失败方式 11/12，XMON-49 豁�
     expect(body.error).toBe('mcp authentication required');
   });
 
-  test('开 + /api/mcp 持 PACMAN_TOKEN 冒充 apiKey → mcp 面 401（token 不升格为 MCP 凭证）', async () => {
+  test('开 + /api/mcp 持 CAIRN_TOKEN 冒充 apiKey → mcp 面 401（token 不升格为 MCP 凭证）', async () => {
     const s = bootServer({ authToken: TOKEN });
     const res = await mcpInitialize(s, TOKEN);
     expect(res.status).toBe(401);
@@ -326,7 +326,7 @@ describe('0.0.0.0 裸绑 WARN（失败方式 9/10）', () => {
     // 文案断言绑定面与开关名两要素。
     const warn = insecureBindWarning(loadConfig({ host: '0.0.0.0', authToken: null }));
     expect(warn).toMatch(/0\.0\.0\.0/);
-    expect(warn).toMatch(/PACMAN_TOKEN/);
+    expect(warn).toMatch(/CAIRN_TOKEN/);
     expect(insecureBindWarning(loadConfig({ host: null, authToken: null }))).toBeNull();
     expect(insecureBindWarning(loadConfig({ host: '127.0.0.1', authToken: null }))).toBeNull();
     expect(insecureBindWarning(loadConfig({ host: '0.0.0.0', authToken: TOKEN }))).toBeNull();
@@ -348,12 +348,12 @@ describe('0.0.0.0 裸绑 WARN（失败方式 9/10）', () => {
     expect(calls).toHaveLength(1);
   });
 
-  test('env 映射：PACMAN_TOKEN → authToken（空串 = 关）；HOST → host', () => {
-    vi.stubEnv('PACMAN_TOKEN', TOKEN);
+  test('env 映射：CAIRN_TOKEN → authToken（空串 = 关）；HOST → host', () => {
+    vi.stubEnv('CAIRN_TOKEN', TOKEN);
     vi.stubEnv('HOST', '0.0.0.0');
     expect(loadConfig().authToken).toBe(TOKEN);
     expect(loadConfig().host).toBe('0.0.0.0');
-    vi.stubEnv('PACMAN_TOKEN', '');
+    vi.stubEnv('CAIRN_TOKEN', '');
     expect(loadConfig().authToken).toBeNull();
     vi.unstubAllEnvs();
     expect(loadConfig().authToken).toBeNull();

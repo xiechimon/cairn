@@ -11,7 +11,7 @@
 // for `packageManagerDependencies`).
 //
 // Why diff-aware: the previous guard in .husky/pre-commit was binary — any
-// staged pnpm-lock.yaml required PACMAN_ALLOW_LOCKFILE_CHANGE, so routine
+// staged pnpm-lock.yaml required CAIRN_ALLOW_LOCKFILE_CHANGE, so routine
 // workspace-side edits (a renamed or newly linked workspace dependency, a
 // catalog specifier edit, lockfile regeneration) all tripped it and the only
 // way through was the env var. This gate auto-allows commits whose
@@ -24,7 +24,7 @@
 //
 // Fail-closed: anything the gate cannot parse, or cannot read from git, is
 // treated as an external change. A block is always overridable with
-// PACMAN_ALLOW_LOCKFILE_CHANGE (1/true/yes) — the same escape hatch the
+// CAIRN_ALLOW_LOCKFILE_CHANGE (1/true/yes) — the same escape hatch the
 // binary gate used, so lane discipline keeps working unchanged.
 //
 // Exit code 0 = allow, 1 = block. Run from the repo root (husky does).
@@ -32,7 +32,7 @@
 import { execFileSync } from 'node:child_process';
 
 const LOCKFILE = 'pnpm-lock.yaml';
-const allowValue = process.env.PACMAN_ALLOW_LOCKFILE_CHANGE;
+const allowValue = process.env.CAIRN_ALLOW_LOCKFILE_CHANGE;
 const allowed = allowValue === '1' || allowValue === 'true' || allowValue === 'yes';
 const EXTERNAL_SECTIONS = new Set(['packages', 'snapshots']);
 const SUMMARY_CAP = 40;
@@ -187,7 +187,7 @@ function block(summary) {
   }
   console.error('');
   console.error('If this lockfile change is intentional, commit with:');
-  console.error('  PACMAN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
+  console.error('  CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
   console.error('To drop it, run `git reset pnpm-lock.yaml`.');
   process.exit(1);
 }
@@ -200,7 +200,7 @@ const stagedFiles = git(['diff', '--cached', '--name-only'])
 if (!stagedFiles.includes(LOCKFILE)) process.exit(0);
 
 if (allowed) {
-  console.error(`${LOCKFILE} is staged; PACMAN_ALLOW_LOCKFILE_CHANGE is set, allowing commit.`);
+  console.error(`${LOCKFILE} is staged; CAIRN_ALLOW_LOCKFILE_CHANGE is set, allowing commit.`);
   process.exit(0);
 }
 
@@ -211,7 +211,7 @@ if (after === undefined) {
   console.error(`${LOCKFILE} is staged for deletion — removing the lockfile needs review.`);
   console.error('');
   console.error('If this deletion is intentional, commit with:');
-  console.error('  PACMAN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
+  console.error('  CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
   process.exit(1);
 }
 if (before === undefined) {
@@ -220,7 +220,7 @@ if (before === undefined) {
   );
   console.error('');
   console.error('If this addition is intentional, commit with:');
-  console.error('  PACMAN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
+  console.error('  CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
   process.exit(1);
 }
 
@@ -232,7 +232,7 @@ if (!beforeParsed.ok || !afterParsed.ok) {
   );
   console.error('');
   console.error('If this change is intentional, commit with:');
-  console.error('  PACMAN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
+  console.error('  CAIRN_ALLOW_LOCKFILE_CHANGE=1 git commit ...');
   process.exit(1);
 }
 

@@ -14,8 +14,8 @@
 
 import { useSyncExternalStore } from 'react';
 
-/** localStorage 键（品牌前缀纪律同 pacman.locale / pacman.sidebar-collapsed）。 */
-export const TOKEN_STORAGE_KEY = 'pacman.token';
+/** localStorage 键（品牌前缀纪律同 cairn.locale / cairn.sidebar-collapsed）。 */
+export const TOKEN_STORAGE_KEY = 'cairn.token';
 
 export function readStoredToken(): string | null {
   try {

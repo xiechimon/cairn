@@ -17,7 +17,7 @@ import {
   type ProviderModel,
   type SecretBox,
   stepTakesSecrets,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, apiKey, build, chief, chiefThread, step, todo } from '../db/schema.js';

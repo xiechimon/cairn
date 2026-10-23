@@ -9,7 +9,7 @@ import {
   MEMORY_QUOTA_PER_AGENT,
   memoryRecordSchema,
   WORKER_REMOTE_TOOLS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agentMemory, agent as agentTable, build as buildTable } from '../src/db/schema.js';

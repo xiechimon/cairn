@@ -13,13 +13,13 @@ import {
   ENV_VARS,
   SKILLS_DIR_DEFAULT,
   TEAM_STREAM_PING_INTERVAL_MS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { z } from 'zod';
 
 export const serverConfigSchema = z.object({
   /** HTTP 监听端口（默认值 [设计]——官方端口不可观测）。 */
   port: z.number().int().min(0).max(65535),
-  /** 用户数据根（`~/.pacman` 位；DB 等在 `server/` 子目录，legacy-export
+  /** 用户数据根（`~/.cairn` 位；DB 等在 `server/` 子目录，legacy-export
    * 升级护栏文件落根，spec 13 #367）。 */
   homeDir: z.string(),
   /** 单一数据根（DB 文件 + keyfile + bare repo 存储，01 §4.2）。 */
@@ -57,7 +57,7 @@ export const serverConfigSchema = z.object({
    *  （insecureBindWarning，#251 验收面 6）。 */
   host: z.string().nullable(),
   /** 本机 MCP config 读路径（spec 13/#368：MCP 页只读投影源；默认
-   *  ~/.claude.json，PACMAN_MCP_CONFIG 覆盖。UI 展示读 server 本机、任务
+   *  ~/.claude.json，CAIRN_MCP_CONFIG 覆盖。UI 展示读 server 本机、任务
    *  执行读 daemon 本机——多机分歧文档化不桥接）。 */
   mcpConfigPath: z.string(),
   /** GitHub issue 进料轮询（#1406，spec 28 P5a）：env ENV_VARS.issueIntake
@@ -82,7 +82,7 @@ function envStr(name: string): string | null {
 }
 
 /** 布尔 env 开关：1 / true / yes（后两者不分大小写）= 开，其余 = 关（仓内既有
- * 写法：daemon pi.ts truthyEnvFlag、pre-commit 的 PACMAN_ALLOW_* 闸）。 */
+ * 写法：daemon pi.ts truthyEnvFlag、pre-commit 的 CAIRN_ALLOW_* 闸）。 */
 function envFlag(name: string): boolean {
   const raw = process.env[name];
   if (raw === undefined) return false;
@@ -116,7 +116,7 @@ function expandHome(path: string): string {
 }
 
 export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig {
-  // 用户主目录槽 = ENV_VARS.home（PACMAN_HOME；r3 §1.1 实测原名 TDS_HOME）；默认 ~/.pacman。
+  // 用户主目录槽 = ENV_VARS.home（CAIRN_HOME；r3 §1.1 实测原名 TDS_HOME）；默认 ~/.cairn。
   const home = process.env[ENV_VARS.home] ?? join(homedir(), BRAND.homeDirName);
   // 数据根子目录名 `server` [设计]（品牌位归 #44 一次性替换面）。
   const dataDir = join(home, 'server');

@@ -31,7 +31,7 @@
 # 「仓路径取不到」而拒绝，手工清场必须写绝对字面路径。脚本内部 REPO_ROOT 在入口
 # 一次性解析成绝对路径，全部 git 调用带 -C "$REPO_ROOT"，打印的路径也都是绝对路径。
 #
-# 与 herdr 层清场工具（~/.herdr-projects/pacman/scratch/sweep-lanes.sh）的分工：
+# 与 herdr 层清场工具（~/.herdr-projects/cairn/scratch/sweep-lanes.sh）的分工：
 # 本脚本只管 git+GitHub 层，判据 = merged PR；herdr workspace 关闭、以及「没开过
 # PR 的探针分支」的回收归 sweep-lanes（判据 = 线程 resolved）。清 lane worktree 前
 # 先关掉对应 herdr workspace / resolve 线程，否则那个会话会留下幽灵锚（worktree
@@ -73,7 +73,7 @@ EOF
 # ---- 参数 ----------------------------------------------------------------
 MODE=dry
 FORCE_DIRTY=0
-TMPD=$(mktemp -d "${TMPDIR:-/tmp}/pacman-cleanup-merged.XXXXXX")
+TMPD=$(mktemp -d "${TMPDIR:-/tmp}/cairn-cleanup-merged.XXXXXX")
 trap 'rm -rf "$TMPD"' EXIT
 SCOPE_FILE="$TMPD/scope"; : > "$SCOPE_FILE"
 MERGED_FILE="$TMPD/merged"; OPEN_FILE="$TMPD/open"

@@ -25,7 +25,7 @@
 //       执行中... tail — the 已取消 run stamp is the cue; claiming
 //       execution for a dead run would lie
 
-import type { BuildRecord, StepJournalRow } from '@pacman/shared';
+import type { BuildRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';

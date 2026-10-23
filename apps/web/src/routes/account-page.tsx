@@ -3,7 +3,7 @@
 // swap button (#306) are gone: a single-user self-host has no account face for
 // them. The name is inline-editable and lands PATCH /api/user/me (#1031).
 //
-// 推送通知 (#1031) is a stored preference (pacman.notifyEnabled, read by the
+// 推送通知 (#1031) is a stored preference (cairn.notifyEnabled, read by the
 // sse.ts desktop-notification gate) layered over Notification.permission:
 // until the user picks, it follows the permission; a non-granted "on" also
 // drives the #114 requestPermission() path, and on + denied explains the block
@@ -71,7 +71,7 @@ export function AccountPage() {
     );
   };
   // #1031 推送通知开关 = 用户偏好档（本地持久化）× 浏览器权限，两层分离：
-  //  · 偏好档（pacman.notifyEnabled）：显示态主源。null（未表态）时跟随权限
+  //  · 偏好档（cairn.notifyEnabled）：显示态主源。null（未表态）时跟随权限
   //    ——granted 显示开、其余显示关；一旦点过就以偏好为准，不再被权限推导。
   //  · 权限（Notification.permission）：只决定「真弹与否」（sse.ts 闸门）与
   //    非 granted 态点开时驱动一次 requestPermission（#114 banner 同一路径）。

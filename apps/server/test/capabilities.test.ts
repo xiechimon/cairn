@@ -4,7 +4,7 @@
 // 只断言读面把那份词表原样送出来，不复算词表（七档期望值写成字面量，
 // 来源 = 上游 pi-agent-core 的 ThinkingLevel 联合）。
 
-import { capabilitiesResponseSchema } from '@pacman/shared';
+import { capabilitiesResponseSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { bootServer, req } from './helpers.js';
 

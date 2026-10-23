@@ -8,7 +8,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DAEMON_LOG_PREFIXES } from '@pacman/shared';
+import { DAEMON_LOG_PREFIXES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   appendSkillsCatalog,
@@ -18,7 +18,7 @@ import {
 import { createDaemonLogger, isLogPrefix } from '../src/log.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `pacman-skills-${tag}-`));
+  return mkdtempSync(join(tmpdir(), `cairn-skills-${tag}-`));
 }
 
 /** 写一个 skill 目录（<root>/<dirName>/SKILL.md）；返回 SKILL.md 绝对路径。 */

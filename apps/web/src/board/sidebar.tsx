@@ -4,7 +4,7 @@
 // icon-only twin of the same rows. Class aliases (board-sidebar, sidebar-*,
 // rail-*) stay as e2e carriers.
 
-import { BRAND } from '@pacman/shared';
+import { BRAND } from '@cairn/shared';
 import {
   Box,
   ChartColumn,
@@ -104,8 +104,8 @@ const USAGE_ROW: ResourceRow = { label: '用量', href: '/app/usage', Icon: Char
 /** Fold keys. 项目: "1" folded, absent open. 资源: "0" open, absent folded
  *  (the Grouped layout folds resources by default). */
 export const GROUP_STORAGE_KEYS = {
-  project: 'pacman.sidebarProjectsCollapsed',
-  resource: 'pacman.sidebarResourcesCollapsed',
+  project: 'cairn.sidebarProjectsCollapsed',
+  resource: 'cairn.sidebarResourcesCollapsed',
 } as const;
 
 type GroupId = keyof typeof GROUP_STORAGE_KEYS;

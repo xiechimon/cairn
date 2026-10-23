@@ -106,7 +106,7 @@ const PAGES: AuditPage[] = [
 for (const theme of ['light', 'dark'] as const) {
   for (const p of PAGES) {
     test(`axe: ${p.name} (${theme})`, async ({ page }) => {
-      await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       // Reduced motion ends the dialog fade/zoom keyframes at once (motion.css),
       // so color-contrast reads final colours; settleTransitions below covers
       // the transitions it leaves alone.

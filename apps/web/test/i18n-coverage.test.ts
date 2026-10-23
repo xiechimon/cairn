@@ -33,7 +33,7 @@ import {
   MEMORY_UI_COPY,
   NOTIFICATION_BANNER_COPY,
   SKILL_PAGE_COPY,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { PROBE_TOOL_CALL_LABEL } from '../src/fixtures/fixtures.js';
 import { EN } from '../src/i18n/en.js';

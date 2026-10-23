@@ -23,7 +23,7 @@ import {
   GITHUB_READ_PER_PAGE_MAX,
   githubIssueSourceRef,
   githubReadToolParamsSchemas,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, todo } from '../db/schema.js';

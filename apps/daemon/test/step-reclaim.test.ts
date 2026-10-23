@@ -17,7 +17,7 @@ import type {
   MachineDoneBody,
   StepEvent,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -116,7 +116,7 @@ function gatedWorkspace(gate: Promise<void>): WorktreeOps {
 }
 
 function stepDeps(api: FakeMachineApi, extra: { workspace?: WorktreeOps; backend?: AgentBackend }) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-reclaim-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-reclaim-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const backend = extra.backend ?? gatedBackend(Promise.resolve()).backend;
   return {

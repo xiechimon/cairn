@@ -11,7 +11,7 @@ import {
   ENV_VARS,
   WORKSPACE_HOOK_TIMEOUT_MS,
   WORKSPACES_DIR_GUARD_CANON,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { z } from 'zod';
 
 export const daemonConfigSchema = z.object({
@@ -20,20 +20,20 @@ export const daemonConfigSchema = z.object({
   teamId: z.string().optional(),
   /** --name 默认 hostname（r3 §1.1）。 */
   name: z.string(),
-  /** PACMAN_HOME 默认 ~/.pacman（02 §5.3 布局根；r3 §1.1 实测原名 TDS_HOME）。 */
+  /** CAIRN_HOME 默认 ~/.cairn（02 §5.3 布局根；r3 §1.1 实测原名 TDS_HOME）。 */
   home: z.string(),
   /** 持久工作区根（02 §5.5 baseRepo/任务目录的父层）。 */
   workspacesDir: z.string(),
   foreground: z.boolean(),
-  /** skills 扫描根（spec 14/#371）：PACMAN_SKILLS_DIR 缺省 ~/.agents/skills；
+  /** skills 扫描根（spec 14/#371）：CAIRN_SKILLS_DIR 缺省 ~/.agents/skills；
    * 目录不存在 = 空 skills 集，非致命（扫描层降级，config 不校验存在性）。 */
   skillsDir: z.string(),
   /** 本机 MCP config（spec 13/#368）：claim slug 列表在此解析成执行端点。
-   * 默认 ~/.claude.json；PACMAN_MCP_CONFIG 覆盖。执行机各读各机——stdio
+   * 默认 ~/.claude.json；CAIRN_MCP_CONFIG 覆盖。执行机各读各机——stdio
    * 命令在真正的执行机上起，密钥值从不跨 wire。 */
   mcpConfigPath: z.string(),
   /** #1149 环境钩子超时 ms（缺省 WORKSPACE_HOOK_TIMEOUT_MS 20min；
-   * PACMAN_HOOK_TIMEOUT_MS 覆写，非正整数 = 忽略用缺省）。 */
+   * CAIRN_HOOK_TIMEOUT_MS 覆写，非正整数 = 忽略用缺省）。 */
   hookTimeoutMs: z.number().int().positive(),
 });
 export type DaemonConfig = z.infer<typeof daemonConfigSchema>;
@@ -48,7 +48,7 @@ export interface DaemonConfigInput {
   foreground?: boolean;
   mcpConfigPath?: string;
   skillsDir?: string;
-  /** #1149 环境钩子超时 ms 覆写（env PACMAN_HOOK_TIMEOUT_MS 同位）。 */
+  /** #1149 环境钩子超时 ms 覆写（env CAIRN_HOOK_TIMEOUT_MS 同位）。 */
   hookTimeoutMs?: number;
 }
 
@@ -83,7 +83,7 @@ export function loadDaemonConfig(
   const teamId = input.teamId ?? env[ENV_VARS.team];
   const serverUrl = input.serverUrl ?? env[ENV_VARS.server] ?? DEFAULT_SERVER_URL;
   // skills 扫描根（spec 14/#371）：默认 ~/.agents/skills 是跨工具 agents 目录
-  // [设计]（非 BRAND 槽——pacman 与用户其它 agent 工具共享同一 skills 正本）。
+  // [设计]（非 BRAND 槽——cairn 与用户其它 agent 工具共享同一 skills 正本）。
   const skillsDir = resolve(
     input.skillsDir ?? env[ENV_VARS.skillsDir] ?? join(homedir(), '.agents', 'skills'),
   );

@@ -7,7 +7,7 @@ import { expect, type Page, test } from '@playwright/test';
 // differ from the system scheme.
 
 const ROUTE = '/app?scenario=01';
-const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
+const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 const LIGHT_CHROME = '#efe6d0';
 const DARK_CHROME = '#1a1612';
 

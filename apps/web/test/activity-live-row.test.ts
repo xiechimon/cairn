@@ -16,7 +16,7 @@
 //   W11 半程行（无 result 的开始半 upsert）不计入汇总——读取完成才是事实；
 //      终态行同 id 覆盖后自然计入。
 
-import type { BuildRecord, StepActivity, StepJournalRow, ToolCallRecord } from '@pacman/shared';
+import type { BuildRecord, StepActivity, StepJournalRow, ToolCallRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { activityLabel } from '../src/api/activity.js';
 import { mapChief, mapTranscript } from '../src/api/mappers.js';
@@ -272,7 +272,7 @@ describe('mapChief 活动相位（#905 W7）', () => {
     toolDefHashes: {},
     toolResultHashes: {},
     activeRun: { phase: 'chief' },
-  } as unknown as import('@pacman/shared').ChiefThread;
+  } as unknown as import('@cairn/shared').ChiefThread;
 
   const USER = {
     id: 'AbCdEfGhIjKlMnOpQrStU',
@@ -417,7 +417,7 @@ describe('mapChief 排队投影（#1108 Q6）', () => {
     toolDefHashes: {},
     toolResultHashes: {},
     activeRun: { phase: 'chief' },
-  } as unknown as import('@pacman/shared').ChiefThread;
+  } as unknown as import('@cairn/shared').ChiefThread;
 
   const USER_Q = {
     id: 'AbCdEfGhIjKlMnOpQrStU',
@@ -426,7 +426,7 @@ describe('mapChief 排队投影（#1108 Q6）', () => {
     createdAt: NOW,
   } as unknown as import('../src/api/mappers.js').MessageRow;
 
-  function chiefOfThread(thread: import('@pacman/shared').ChiefThread) {
+  function chiefOfThread(thread: import('@cairn/shared').ChiefThread) {
     return mapChief(ENV_Q, {
       threads: [thread],
       activeThreadId: 'chief-bbb',

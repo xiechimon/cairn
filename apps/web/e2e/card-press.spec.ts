@@ -45,7 +45,7 @@ async function resolveVar(page: Page, prop: string, value: string) {
 
 for (const theme of ['light', 'dark'] as const) {
   test(`press tints the whole card one surface step (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     const card = page.locator('[data-column="done"] [data-todo-id]').first();
     const box = await card.boundingBox();

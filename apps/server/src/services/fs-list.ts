@@ -17,8 +17,8 @@
 import { type Dirent, existsSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
-import type { FsListEntry, FsListErrorReason, FsListResult } from '@pacman/shared';
-import { FS_LIST_MAX_ENTRIES } from '@pacman/shared';
+import type { FsListEntry, FsListErrorReason, FsListResult } from '@cairn/shared';
+import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
 import { HttpError } from '../lib/errors.js';
 
 /** Node errno code → reason 分译（S3/S7/S8 断链与 ELOOP 同归 not_found；

@@ -95,7 +95,7 @@ function expectGlobalOutline(info: FocusInfo) {
 }
 
 async function themed(page: Page, theme: 'dark' | 'light', url: string) {
-  await page.addInitScript((value) => localStorage.setItem('pacman-theme', value), theme);
+  await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
   await page.goto(url);
 }
 

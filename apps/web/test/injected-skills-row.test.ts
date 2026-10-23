@@ -6,7 +6,7 @@
 //   F4 全部步 null（chief 面 / 旧 server）→ 不产行零噪声
 //   F5 无 build → 不产行（行随 run 行走）
 
-import type { BuildRecord, SkillInjectionRecord, StepJournalRow } from '@pacman/shared';
+import type { BuildRecord, SkillInjectionRecord, StepJournalRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';

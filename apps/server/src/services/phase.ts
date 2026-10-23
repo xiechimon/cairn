@@ -13,7 +13,7 @@
 // r1 §443）、closed→todo（reopen，MCP reopen_todos r5 §3.1）。未直接观测的边
 // 标 [推断]（04 §3 不判负）。
 
-import { canBoardDrop, type Phase } from '@pacman/shared';
+import { canBoardDrop, type Phase } from '@cairn/shared';
 
 export const PHASE_TRANSITIONS: Readonly<Record<Phase, readonly Phase[]>> = {
   // #1250（ADR 0018 层 2）：todo→confirm = chief split_todo 的父卡停驻边——

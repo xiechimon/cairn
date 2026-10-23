@@ -27,7 +27,7 @@
 //   F12 相位未起（current=null）时 noteSkill 不凭空发报——技能集搭下一份
 //      相位报的便车（runStep 先 setPhase('preparing')，此为防御性边界）。
 
-import { STEP_ACTIVITY_PHASES, type StepActivityReport } from '@pacman/shared';
+import { STEP_ACTIVITY_PHASES, type StepActivityReport } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { createActivityTracker, SKILL_FACTS_CAP } from '../src/activity.js';
 

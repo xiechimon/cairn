@@ -20,7 +20,7 @@ import { evidencePanelShot } from './evidence';
 //
 // Boot stubs follow live-project-name.spec.ts: teams + user me succeed,
 // every other GET 500s into the app's isError tolerance; no ?scenario= =
-// live. Evidence shots (PACMAN_E2E_EVIDENCE) sit before the assertions so
+// live. Evidence shots (CAIRN_E2E_EVIDENCE) sit before the assertions so
 // the same run also frames the old code.
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -120,7 +120,7 @@ async function openRow(page: Page, todoId: string) {
 
 /** evidencePanelShot after the popover's enter fade; regression runs skip both. */
 async function shot(page: Page, name: string) {
-  if (process.env.PACMAN_E2E_EVIDENCE === undefined) return;
+  if (process.env.CAIRN_E2E_EVIDENCE === undefined) return;
   await page.waitForTimeout(300);
   await evidencePanelShot(page, name, page.locator('.chip-popover'));
 }
@@ -191,7 +191,7 @@ test('members read failed: the name alone', async ({ page }) => {
 });
 
 test('en locale: the null thinking level reads Default', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.locale', 'en'));
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
   await stubLiveBoot(page);
   await serveMembers(page);
   const { popover, row } = await openRow(page, 'todo-2');

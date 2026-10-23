@@ -92,8 +92,8 @@ describe('Implementer 仓规（#1406 P5-3）', () => {
     for (const needle of [
       'AGENTS.md',
       'CLAUDE.md',
-      'pr-pacman',
-      'verify-pacman',
+      'pr-cairn',
+      'verify-cairn',
       '<scope>(<票号>): <subject>',
       'closes #',
       'commit message',

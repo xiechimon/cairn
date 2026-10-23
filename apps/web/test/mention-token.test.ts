@@ -258,7 +258,7 @@ const ROSTER: InlineRosterGroups = {
   agent: [{ id: 'a1', label: 'builder' }],
   todo: [{ id: 't1', label: '#3 fix login', seq: 3 }],
   skill: [{ id: 's1', label: 'review' }],
-  project: [{ id: 'p1', label: 'pacman' }],
+  project: [{ id: 'p1', label: 'cairn' }],
   machine: [{ id: 'm1', label: 'mea' }],
 };
 

@@ -21,7 +21,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -167,7 +167,7 @@ function fakeWorkspace(cwd: string): WorktreeOps {
       return {
         cwd,
         baseRepoDir: join(cwd, '..', 'repo'),
-        branch: 'pacman/conv-conv-1',
+        branch: 'cairn/conv-conv-1',
         defaultBranch: 'main',
         reused: false,
       };
@@ -249,7 +249,7 @@ async function run(opts: {
   durationCapMs?: number;
   envCap?: string;
 }): Promise<MachineDoneBody> {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-timeout-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-timeout-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const client = new FakeClient();
@@ -329,7 +329,7 @@ describe('runner 流超时护栏（#699）', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=150ms)');
   });
 
-  test('失败方式 3（env 旋钮）：PACMAN_STREAM_DURATION_CAP_MS 配置上界生效', async () => {
+  test('失败方式 3（env 旋钮）：CAIRN_STREAM_DURATION_CAP_MS 配置上界生效', async () => {
     const body = await run({
       backend: streamingBackend({
         firstEventMs: 20,

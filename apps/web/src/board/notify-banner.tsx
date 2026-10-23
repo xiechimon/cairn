@@ -8,7 +8,7 @@
 // the r7 board baselines predate the strip, so fixture scenarios opt in via
 // ui.notificationBanner and the live board reads the real permission.
 
-import { NOTIFICATION_BANNER_COPY } from '@pacman/shared';
+import { NOTIFICATION_BANNER_COPY } from '@cairn/shared';
 import { useCallback, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';

@@ -19,7 +19,7 @@ import {
   type MachineDoneBody,
   type ModelRef,
   type StepKind,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type agent, machine, type StepFallbackRow, type step } from '../db/schema.js';

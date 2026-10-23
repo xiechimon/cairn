@@ -20,7 +20,7 @@
 //  C1 落库的 sourceRef 与 shared orchestrationSourceRef 单源严格互逆
 //     （反解 = 编排会话 threadId，详情面板链回会话的消费位）。
 
-import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@pacman/shared';
+import { orchestrationSourceRef, parseOrchestrationSourceRef } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, test } from 'vitest';
 import {

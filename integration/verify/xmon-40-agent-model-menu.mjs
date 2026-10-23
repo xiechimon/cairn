@@ -6,7 +6,7 @@
 //
 // 只采可观测事实：DOM 几何 + 真实点击结果 + API 数据源计数；不读实现代码反推需求。
 //
-// 用法（栈须先由 verify-pacman launch.mjs 起好）：
+// 用法（栈须先由 verify-cairn launch.mjs 起好）：
 //   node integration/verify/xmon-40-agent-model-menu.mjs
 // env: VERIFY_WEB_PORT / VERIFY_EVIDENCE_DIR / XMON40_MODEL_COUNT / XMON40_TAG
 

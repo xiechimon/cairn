@@ -29,7 +29,7 @@ import type {
   SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -228,7 +228,7 @@ function recordingBackend(): { backend: AgentBackend; sessions: SessionOpts[] } 
 }
 
 async function setup(outcome: SkillsOutcome) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-team-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-team-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(outcome);

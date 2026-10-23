@@ -48,7 +48,7 @@ import {
   MEMORY_UI_COPY,
   type PatchAgentBody,
   THINKING_LEVELS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { Brain, SearchX } from 'lucide-react';
 import { useCallback, useState } from 'react';

@@ -8,7 +8,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { type LocalErrorReason, PROJECT_LOCAL_ERROR_REASONS } from '@pacman/shared';
+import { type LocalErrorReason, PROJECT_LOCAL_ERROR_REASONS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { project } from '../src/db/schema.js';
@@ -32,7 +32,7 @@ afterAll(() => {
 
 /** 真 git 工作树仓（`git init` 即够——is-inside-work-tree 判定不要求首提交）。 */
 async function makeGitRepo(): Promise<string> {
-  const dir = tempDir('pacman-local-repo-');
+  const dir = tempDir('cairn-local-repo-');
   const r = await runGit(['init', dir]);
   expect(r.code).toBe(0);
   return dir;
@@ -74,7 +74,7 @@ describe('POST /api/projects kind=local——localPath 校验三态（#359 AC）
   // 常态：server 在 Mac、repo 在 mea）。daemon 侧 workspace.ts 预检抛
   // LocalRepoUnreachableError，runner 合成步失败文案点名机器/路径/原因。
   test('松闸一：路径不存在 → 201（可达性归 daemon 端预检）', async () => {
-    const missing = join(tempDir('pacman-local-base-'), 'no-such-dir');
+    const missing = join(tempDir('cairn-local-base-'), 'no-such-dir');
     const r = await postCreate({ name: 'p-gone', kind: 'local', localPath: missing });
     expect(r.status).toBe(201);
     expect(r.body.repoKind).toBe('local');
@@ -82,7 +82,7 @@ describe('POST /api/projects kind=local——localPath 校验三态（#359 AC）
   });
 
   test('松闸二：存在但不是 git 仓 → 201（可达性归 daemon 端预检）', async () => {
-    const plain = tempDir('pacman-local-plain-');
+    const plain = tempDir('cairn-local-plain-');
     const r = await postCreate({ name: 'p-plain', kind: 'local', localPath: plain });
     expect(r.status).toBe(201);
     expect(r.body.repoKind).toBe('local');
@@ -90,7 +90,7 @@ describe('POST /api/projects kind=local——localPath 校验三态（#359 AC）
   });
 
   test('松闸三：指向普通文件 → 201（非目录形态仍过，可达性归 daemon）', async () => {
-    const dir = tempDir('pacman-local-file-');
+    const dir = tempDir('cairn-local-file-');
     const file = join(dir, 'not-a-repo.txt');
     writeFileSync(file, 'x');
     const r = await postCreate({ name: 'p-file', kind: 'local', localPath: file });
@@ -183,7 +183,7 @@ describe('local 项目读面——Files tab 开闸（#1030）', () => {
   /** 带 README 提交的 local 工作树仓；默认分支钉 trunk（非 main——机器
    * init.defaultBranch 不可依赖，且非 main HEAD 正是 F1 要钉的失败面）。 */
   async function makeLocalRepo(): Promise<string> {
-    const dir = tempDir('pacman-local-read-');
+    const dir = tempDir('cairn-local-read-');
     expect((await runGit(['init', '-b', 'trunk', dir], { env: READ_GIT_ENV })).code).toBe(0);
     writeFileSync(join(dir, 'README.md'), '# local-read-probe\n');
     for (const args of [
@@ -464,7 +464,7 @@ describe('tree 路由 path 参数透传（#1097）', () => {
   /** 嵌套仓：README.md + docs/README.md + docs/guide/deep.md（同名跨目录 +
    *  3 层深嵌套，一把 fixture 盖住 P1/P2/P4）。 */
   async function makeNestedRepo(): Promise<string> {
-    const dir = tempDir('pacman-tree-path-');
+    const dir = tempDir('cairn-tree-path-');
     expect((await runGit(['init', '-b', 'trunk', dir], { env: GIT_ENV })).code).toBe(0);
     mkdirSync(join(dir, 'docs', 'guide'), { recursive: true });
     writeFileSync(join(dir, 'README.md'), '# root readme\n');

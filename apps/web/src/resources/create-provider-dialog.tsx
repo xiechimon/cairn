@@ -37,7 +37,7 @@ import {
   PROVIDER_PRESET_IDS,
   PROVIDER_XAI_PRESET,
   type ProviderApi,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';

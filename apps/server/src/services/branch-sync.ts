@@ -5,7 +5,7 @@
 // transitionBranchSync）。force 语义 = 丢弃修改 + 删未跟踪文件，仅本次生效
 // （r1 changelog 09-13）。
 
-import type { BranchSyncRecord, BranchSyncStatus, MachineSyncCommand } from '@pacman/shared';
+import type { BranchSyncRecord, BranchSyncStatus, MachineSyncCommand } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { branchSync, build as buildTable, machine } from '../db/schema.js';
