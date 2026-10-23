@@ -10,10 +10,24 @@
 // （派给谁），不读 transcript。判分口径与「工作约定」逐条对应。
 
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHIEF_DISPATCH_HARNESS_PATHS } from '@cairn/shared';
 import { type Case, gradeCase, type RosterAgent } from './grade.mts';
+import {
+  buildHarnessEvalResult,
+  decisionOkRate,
+  parseResultsJsonl,
+  traceDigest,
+} from './harness-eval-result.mts';
 import {
   bootStack,
   disposeLeftovers,
@@ -171,6 +185,8 @@ function parseArgs(argv: string[]) {
     concurrency: 4,
     timeoutS: 1800,
     approveHarness: false,
+    writeVerify: undefined as string | undefined,
+    patchDigest: undefined as string | undefined,
   };
   const val = (i: number): string => {
     const v = argv[i];
@@ -190,6 +206,8 @@ function parseArgs(argv: string[]) {
     else if (k === '--concurrency') a.concurrency = +val(++i);
     else if (k === '--timeout-s') a.timeoutS = +val(++i);
     else if (k === '--approve-harness') a.approveHarness = true;
+    else if (k === '--write-verify') a.writeVerify = val(++i);
+    else if (k === '--patch-digest') a.patchDigest = val(++i);
     else if (k === '-h' || k === '--help') {
       usage();
       process.exit(0);
@@ -220,13 +238,13 @@ function parseArgs(argv: string[]) {
 }
 function usage() {
   console.error(
-    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness]',
+    'usage: run-eval.mts --flow DIR --variant ID [--model ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness] [--write-verify PATH --patch-digest DIGEST]',
   );
 }
 
 function checkHarness(statePath: string, st: Record<string, unknown>, approve: boolean) {
   const self = fileURLToPath(import.meta.url);
-  const listed = Array.isArray(st.harness_paths) ? (st.harness_paths as unknown[]).map(String) : [];
+  const listed = [...CHIEF_DISPATCH_HARNESS_PATHS];
   const paths = [...new Set([self, ...listed.map((p) => resolveFromRoot(p))])].sort();
   const h = createHash('sha256');
   const hashed: string[] = [];
@@ -247,6 +265,7 @@ function checkHarness(statePath: string, st: Record<string, unknown>, approve: b
   const sha = h.digest('hex');
   if (st.harness_sha === sha) return;
   if (approve) {
+    st.harness_paths = listed;
     st.harness_sha = sha;
     writeFileSync(statePath, `${JSON.stringify(st, null, 2)}\n`);
     console.error(
@@ -357,6 +376,10 @@ async function main() {
     }
   }
   checkHarness(statePath, st, ARGS.approveHarness);
+  if (ARGS.writeVerify && !ARGS.patchDigest) {
+    console.error('--write-verify requires --patch-digest');
+    process.exit(2);
+  }
   const ctx = { ...ARGS, state: st };
 
   const resultsPath = join(vdir, 'results.jsonl');
@@ -536,6 +559,26 @@ async function main() {
   console.error(`[${ARGS.variant}] done - ${ok} ok, ${fail} failed -> ${resultsPath}`);
   const cleaned = disposeLeftovers();
   if (cleaned > 0) console.error(`[${ARGS.variant}] 收尾清掉 ${cleaned} 个残留 scratch 目录`);
+  if (ARGS.writeVerify && ARGS.patchDigest) {
+    const sha = typeof st.harness_sha === 'string' ? st.harness_sha : '';
+    const rows = existsSync(resultsPath)
+      ? parseResultsJsonl(readFileSync(resultsPath, 'utf8'))
+      : [];
+    const tracesDir = join(vdir, 'traces');
+    const traces = existsSync(tracesDir)
+      ? readdirSync(tracesDir)
+          .filter((n) => n.endsWith('.json'))
+          .map((n) => ({ name: n, body: new Uint8Array(readFileSync(join(tracesDir, n))) }))
+      : [];
+    const result = buildHarnessEvalResult({
+      patchDigest: ARGS.patchDigest,
+      harness_sha: sha,
+      decision_ok: decisionOkRate(rows) ?? 0,
+      trace_digest: traceDigest(traces),
+    });
+    mkdirSync(dirname(ARGS.writeVerify), { recursive: true });
+    writeFileSync(ARGS.writeVerify, `${JSON.stringify(result, null, 2)}\n`);
+  }
   process.exit(fail ? 1 : 0);
 }
 

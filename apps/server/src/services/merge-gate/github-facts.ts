@@ -15,10 +15,15 @@
 // 读全部串行；任何一次读被限流，本次求值停读，余下的按读不到处理。端口抛错按网络错。
 // 不读库、不取时钟（now 由调用方给）、不 import 闸外的东西（测试 merge-gate-imports）。
 
-import { MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
+import {
+  EVIDENCE_PREFIX,
+  HARNESS_REGRESSION_RESULT_NAME,
+  MERGE_GATE_STATUS_CONTEXT,
+} from '@cairn/shared';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
+import { touchesHarness } from './paths.js';
 import {
   type GateCheckRun,
   type GateCompareCommit,
@@ -70,6 +75,7 @@ export interface GateGithubFacts {
   checks: GateInputs['checks'];
   compare: GateInputs['compare'];
   evidence: GateEvidencePresence[];
+  harnessEvalText: string | null;
   /** compare 的 behind_by（目标分支领先 PR 几个提交）；P4-0 的 GateInputs.pr.baseBehindBy。 */
   baseBehindBy: number | null;
   /** head 上自家 cairn/merge-gate 的当前值（状态写入只在值变化时写）；没有 = null，
@@ -517,6 +523,18 @@ async function probeEvidence(
   return out;
 }
 
+async function readHeadFileText(r: Reader, path: string, sha: string): Promise<string | null> {
+  const res = await send(r, () => r.port.contents(path, sha));
+  if (res === null || res.kind !== 'ok' || !isObj(res.body)) return null;
+  if (res.body.type !== 'file' || typeof res.body.content !== 'string') return null;
+  if (res.body.encoding !== 'base64') return null;
+  try {
+    return Buffer.from(res.body.content.replace(/\s/g, ''), 'base64').toString('utf8');
+  } catch {
+    return null;
+  }
+}
+
 // —— 求值 ——
 
 export async function readGateGithubFacts(
@@ -531,6 +549,7 @@ export async function readGateGithubFacts(
     checks: null,
     compare: 'unreadable',
     evidence: [],
+    harnessEvalText: null,
     baseBehindBy: null,
     ownStatus: 'unreadable',
     rateLimited: null,
@@ -627,6 +646,13 @@ export async function readGateGithubFacts(
 
   if (typeof facts.compare !== 'string') {
     facts.evidence = await probeEvidence(r, req, pr, facts.compare);
+    if (touchesHarness(facts.compare.files)) {
+      facts.harnessEvalText = await readHeadFileText(
+        r,
+        `${EVIDENCE_PREFIX}${req.ticketRef}/${HARNESS_REGRESSION_RESULT_NAME}`,
+        head,
+      );
+    }
   }
   return done();
 }
