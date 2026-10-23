@@ -4,7 +4,7 @@ import { expect, type Page, test } from '@playwright/test';
 // EmptyState (adopted on API keys) and the settings list card.
 //
 // Failure modes, each pinned below:
-//  R1 --radius-card drifts off the DESIGN.md card value (10px)
+//  R1 --radius-card drifts off the DESIGN.md card value (20px)
 //  R2 the board task card stops reading the token
 //  R3 the settings card goes back to its own corner (12px in #1386) or the
 //     registry Card's rounded-xl (14px)
@@ -36,8 +36,8 @@ test('board task card and account settings card share --radius-card (R1–R3)', 
   await setTheme(page, 'light');
   await page.goto('/app?scenario=01');
   await expect(page.locator('.todo-card').first()).toBeVisible();
-  expect(await tokenRadius(page), 'R1').toBe('10px');
-  await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '10px');
+  expect(await tokenRadius(page), 'R1').toBe('20px');
+  await expect(page.locator('.todo-card').first(), 'R2').toHaveCSS('border-top-left-radius', '20px');
 
   await page.goto('/app/account?scenario=13');
   const card = page.locator('.account-card');

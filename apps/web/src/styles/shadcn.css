@@ -334,7 +334,7 @@
      --icon = 带文字标签的图标（侧栏导航、列标题）；纯图标按钮仍用 tertiary，
      保住 3:1 非文本对比。 */
   --text-secondary: #5e564d;
-  --text-tertiary: #746a5f;
+  --text-tertiary: #6f6558;
   --text-dim: #b0a597;
   --icon: #9a9086;
   --card-button: #173a2f;

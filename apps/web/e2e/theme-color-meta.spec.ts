@@ -8,7 +8,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 const ROUTE = '/app?scenario=01';
 const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
-const LIGHT_CHROME = '#f3eee5';
+const LIGHT_CHROME = '#efe6d0';
 const DARK_CHROME = '#1a1612';
 
 const themeColors = (page: Page) =>
@@ -116,8 +116,8 @@ async function bootSkeletonPaint(page: Page, theme: 'light' | 'dark') {
 test('boot skeleton paints the light Paper tokens before the bundle mounts', async ({ page }) => {
   const paint = await bootSkeletonPaint(page, 'light');
   expect({ page: paint.page, row: paint.row }).toEqual({
-    page: 'rgb(243, 238, 229)',
-    row: 'rgb(235, 228, 216)',
+    page: 'rgb(239, 230, 208)',
+    row: 'rgb(232, 222, 197)',
   });
   expect(paint.canvas).toBe(LIGHT_CHROME);
   expect(paint.staticChrome).toBe(paint.canvas);

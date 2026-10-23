@@ -121,9 +121,9 @@ for (const theme of ['light', 'dark'] as const) {
     expect(first.value.idleInk).not.toBe(first.value.selectedInk);
     expect(first.value.selectedBg).not.toBe(first.value.trackBg);
     if (theme === 'light') {
-      expect(first.value.trackBg).toBe('rgb(243, 238, 229)'); // canvas
-      expect(first.value.selectedBg).toBe('rgb(255, 255, 255)'); // card
-      expect(first.value.selectedInk).toBe('rgb(43, 38, 32)'); // ink
+      expect(first.value.trackBg).toBe('rgb(239, 230, 208)'); // canvas
+      expect(first.value.selectedBg).toBe('rgb(255, 253, 246)'); // card
+      expect(first.value.selectedInk).toBe('rgb(27, 43, 36)'); // ink
       expect(first.value.idleInk).toBe('rgb(94, 86, 77)'); // ink-2
     }
     for (const { name, value } of faces.slice(1)) {

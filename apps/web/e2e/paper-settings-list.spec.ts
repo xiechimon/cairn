@@ -65,7 +65,7 @@ function expectOneCardShape(p: CardProbe) {
     expect(row.bottom, 'F4: 1px divider in --border between rows').toBe(`1px ${p.border}`);
   }
   for (const row of p.rows) expect(row.bg, 'F5: row fill').toBe('rgba(0, 0, 0, 0)');
-  expect(p.cardBg).toBe('rgb(255, 255, 255)');
+  expect(p.cardBg).toBe('rgb(255, 253, 246)');
   expect(p.cardShadow, 'F7: 1px outline at 2x').toContain(`${p.border} 0px 0px 0px 1px`);
   expect(
     p.rows.map((r) => r.label),
@@ -123,7 +123,7 @@ test('account: the selected density segment is a white tab with a 1px ring (F8)'
       return { bg: cs.backgroundColor, shadow: cs.boxShadow };
     });
   const selected = await face(on);
-  expect(selected.bg).toBe('rgb(255, 255, 255)');
+  expect(selected.bg).toBe('rgb(255, 253, 246)');
   expect(selected.shadow).toContain('0px 0px 0px 1px');
   expect((await face(off)).bg).toBe('rgba(0, 0, 0, 0)');
   // Language trigger and segmented track share the 32px control height.

@@ -2,7 +2,7 @@
 // 页面模式). Failure modes pinned here:
 // 1. An empty state grows a tinted icon tile again.
 // 2. The list falls back to one card per item, or its rows lose the 52px
-//    settings-row height or the 10px card corner.
+//    settings-row height or the 20px card corner.
 // 3. The 新建定时 dialog footer goes back to an outline 取消 + bare primary
 //    instead of FormActions (text 取消, 32px primary on the right).
 
@@ -38,11 +38,11 @@ for (const [name, url] of [
   ['schedules', '/app/schedules?scenario=r3-93'],
   ['api-keys', '/app/api-keys?scenario=api-keys-created'],
 ] as const) {
-  test(`${name} list: one settings card of 52px rows, 10px corner`, async ({ page }) => {
+  test(`${name} list: one settings card of 52px rows, 20px corner`, async ({ page }) => {
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
     await expect(cards).toHaveCount(1);
-    await expect(cards).toHaveCSS('border-top-left-radius', '10px');
+    await expect(cards).toHaveCSS('border-top-left-radius', '20px');
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );

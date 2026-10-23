@@ -140,7 +140,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // an overlay anchored to the corner, not an in-flow column (D10)
     expect(skin.position).toBe('fixed');
     // --radius-window token (A0 实审裁决 3), Multica rounded-xl 原值
-    expect(skin.radius).toBe('12px');
+    expect(skin.radius).toBe('20px');
     // edge-ring hairline + --floating-shadow 双层（D2，非 none）
     expect(skin.shadow).not.toBe('none');
     expect(skin.shadow).toContain('inset');
