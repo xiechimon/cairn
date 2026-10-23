@@ -44,6 +44,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   PHASE_VALUES,
   PI_STREAM_EVENTS,
+  PUBLISHED_PACKAGES,
   RECORD_SCHEMAS,
   remoteToolDefSchema,
   SECRET_BOX_ENVELOPE_VERSION,
@@ -623,5 +624,15 @@ describe('machine wire (02 §5 canonical, wire 层进 CI)', () => {
     expect(byPath['/api/machine/stream']).toBe('GET'); // SSE wake（02 §1.2）
     expect(byPath['/api/machine/me']).toBe('GET');
     expect(byPath['/api/machine/token/{stepId}']).toBe('GET');
+  });
+});
+
+describe('PUBLISHED_PACKAGES', () => {
+  it('安装命令和启动命令来自同一个已发布的包（包名与命令名成对）', () => {
+    const pairs: Record<string, string> = {
+      '@xiechimon/pacman-cli': 'pacman',
+      '@xiechimon/cairn-cli': 'cairn',
+    };
+    expect(pairs[PUBLISHED_PACKAGES.cli.name]).toBe(PUBLISHED_PACKAGES.cli.command);
   });
 });
