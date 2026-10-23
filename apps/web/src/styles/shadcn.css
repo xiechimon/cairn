@@ -128,6 +128,10 @@
   /* 主按钮 = 墨底（暗侧墨是亮的）+ sheet 字 */
   --primary: #ece7df;
   --primary-foreground: #24201b;
+  --fab-surface: #173a2f;
+  --fab-mark: #f2ead7;
+  --fab-badge: #e0a020;
+  --fab-badge-text: #1a1612;
   /* 次级面底 = hover 档（surface-secondary / surface-hover / row-selected /
      chief-tab-bg / range-chip-bg / pill-idle-bg / agent-avatar-bg 等值档全部
      并入，§3.3-B） */
