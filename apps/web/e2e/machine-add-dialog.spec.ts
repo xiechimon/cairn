@@ -37,7 +37,7 @@ test('添加机器 button opens the dialog with the two-step command blocks', as
   );
   const commands = dialog.locator('code');
   await expect(commands).toHaveCount(2);
-  await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/cairn-cli@latest');
+  await expect(commands.nth(0)).toHaveText('npm install -g @xiechimon/pacman-cli@latest');
   await expect(commands.nth(1)).toHaveText('cairn start');
   // API key disclosure collapsed by default
   await expect(
@@ -89,7 +89,7 @@ test('copy buttons write their command to the clipboard', async ({ page, context
   await copy.first().click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
-    .toBe('npm install -g @xiechimon/cairn-cli@latest');
+    .toBe('npm install -g @xiechimon/pacman-cli@latest');
   await copy.nth(1).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))

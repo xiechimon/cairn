@@ -139,3 +139,8 @@ export function gitHostedRepoPath(teamId: string, repoName: string): string {
 export function conversationBranch(conversationId: string): string {
   return `${BRAND.branchPrefix}${conversationId}`;
 }
+
+/** 界面里给用户抄的 npm 包名：npm 上实际存在的名字。cairn 包发布后改成 BRAND 里的新名。 */
+export const PUBLISHED_PACKAGES = {
+  cli: '@xiechimon/pacman-cli',
+} as const;

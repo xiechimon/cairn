@@ -16,7 +16,7 @@
 // .dlg-enroll-copy 等值);disclosure = ghost 文字钮(正典表 §5.4
 // model-add 同族配方:贴左、无框、secondary 墨)。
 
-import { BRAND } from '@cairn/shared';
+import { BRAND, PUBLISHED_PACKAGES } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { Button } from '../components/ui/button.js';
@@ -60,7 +60,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
   useEffect(() => {
     if (apiKeyOpen) apiKeyRef.current?.scrollIntoView({ block: 'nearest' });
   }, [apiKeyOpen]);
-  const installCmd = `npm install -g ${BRAND.cliPackageName}@latest`;
+  const installCmd = `npm install -g ${PUBLISHED_PACKAGES.cli}@latest`;
   const startCmd = `${BRAND.cliCommandName} start`;
   const apiKeyCmd = `${BRAND.cliCommandName} start --api-key <key> --team ${teamId ?? '<teamId>'}`;
   const copyButton = (cmd: string) => (
