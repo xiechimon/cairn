@@ -23,8 +23,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
-import { LOCAL_TOOL_CREATE_TAG } from '@pacman/shared';
+} from '@cairn/shared';
+import { LOCAL_TOOL_CREATE_TAG } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -195,7 +195,7 @@ function fakeWorkspace(): WorktreeOps {
       return {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `pacman/conv-${input.conversationId}`,
+        branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: false,
       };
@@ -224,7 +224,7 @@ async function setup(claimed: ClaimedStep) {
   probeMock.mockReset();
   // 不存在的仓库（o/r）的真值：gh / REST 双梯 404 → null（面板 PR 槽留空）。
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-tag-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-tag-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);

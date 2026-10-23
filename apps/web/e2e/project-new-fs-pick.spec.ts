@@ -14,7 +14,7 @@ import { expect, type Page, test } from '@playwright/test';
 // 6. pick 结果覆盖对话框期间的手改路径（S11 最后动作赢，失败方式清单见 #440）
 // 7. local 选态常驻「单机器形态」标注（#1152 / ADR 0016），不占 status 活区域
 //
-// 原生真路径（探测两态 / 对话框回填 / 取消退出码）走 verify-pacman 人工面。
+// 原生真路径（探测两态 / 对话框回填 / 取消退出码）走 verify-cairn 人工面。
 
 const NEW_PROJECT_LIVE = '/app/project/new';
 

@@ -7,7 +7,7 @@
 //    server → transcript 工具行落库；坏端点降级不阻断（canon 行 `[mcp] dead:
 //    connect failed — …`，r3 §1.5）；config 未命中 slug 走扩展降级行（`[mcp]
 //    ghost: not in local config — …`，spec 13）。
-// ② server 面（外部 MCP 客户端 ← pacman）：真 sdk Client（StreamableHTTP）连
+// ② server 面（外部 MCP 客户端 ← cairn）：真 sdk Client（StreamableHTTP）连
 //    /api/mcp，Bearer apiKey + key 级白名单（initialize/tools/list/tools/call
 //    全往返）；未授工具 call 被拒（limits every call）；create_todo 以 key 属主
 //    身份落库。
@@ -15,9 +15,9 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { MCP_TOOL_REGISTRY } from '@pacman/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -54,7 +54,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   external = await startExternalMcp();
-  home = mkdtempSync(join(tmpdir(), 'pacman-m4b-mcp-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-mcp-home-'));
   // spec 13（#368）：MCP 登记面 = 本机 config 文件——一个活端点（headers
   // 凭证只落此文件）+ 一个死端点；server 展示面与 daemon 执行面同指本
   // fixture（单机退化形；多机 = 各读各机，见 spec 13 Q6）。

@@ -108,7 +108,7 @@ describe('POST /api/teams/:id/providers/oauth/:preset/authorize', () => {
     const { s } = bootOAuth({ json: {} }, { client: null });
     const { res, body } = await authorize(s);
     expect(res.status).toBe(400);
-    expect(body.error).toContain('PACMAN_GITHUB_OAUTH_CLIENT_ID');
+    expect(body.error).toContain('CAIRN_GITHUB_OAUTH_CLIENT_ID');
   });
 
   it('3. happy：签发授权 URL 四参齐 + state 入册', async () => {

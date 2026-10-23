@@ -7,7 +7,7 @@
 // （dlg-ghissues / prj-issues-*）退役——皮肤迁 token utility 等值，e2e 载体
 // 迁语义位（role=dialog/menu、按钮文案、aria-pressed、文本）。
 
-import type { GithubIssueState, TodoRecord } from '@pacman/shared';
+import type { GithubIssueState, TodoRecord } from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useApiMutations, useGithubIssues } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';

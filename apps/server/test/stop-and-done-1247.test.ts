@@ -1,5 +1,5 @@
 // #1247 stop-then-done + canceled（closed）结局。
-import { STOP_MESSAGE, todoRecordSchema } from '@pacman/shared';
+import { STOP_MESSAGE, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';

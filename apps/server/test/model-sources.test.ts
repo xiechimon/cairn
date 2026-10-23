@@ -11,7 +11,7 @@
 // presence 更新即反映（30s 节拍实时语义的 server 侧）。
 
 import { hostname } from 'node:os';
-import { modelSourcesEnvelopeSchema } from '@pacman/shared';
+import { modelSourcesEnvelopeSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { getModelSources } from '../src/services/providers.js';
 import { bootServer, issueApiKey, req, type TestServer } from './helpers.js';

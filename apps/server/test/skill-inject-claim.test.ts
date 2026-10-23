@@ -19,8 +19,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, chief as chiefTable, step as stepTable } from '../src/db/schema.js';
@@ -38,7 +38,7 @@ const CHIEF_AGENT_ID = 'agent-si-chief';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'pacman-si-skills-'));
+  const root = mkdtempSync(join(tmpdir(), 'cairn-si-skills-'));
   roots.push(root);
   return root;
 }

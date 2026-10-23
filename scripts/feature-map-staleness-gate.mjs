@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// feature-map 陈旧闸（#1160，advisory）：verify-pacman feature map 引用的仓内
+// feature-map 陈旧闸（#1160，advisory）：verify-cairn feature map 引用的仓内
 // 路径与选择子必须能在当前树命中——过期必须机器可见，不靠人记得维护。
 //
 // 为什么它是机器活：#1156（Agent 详情页头像被裁）本该被 map 拦住——
@@ -58,7 +58,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 const ROOT = process.cwd();
-const FEATURES_DIR_DEFAULT = '.claude/skills/verify-pacman/features';
+const FEATURES_DIR_DEFAULT = '.claude/skills/verify-cairn/features';
 const SRC_DIR = 'apps/web/src';
 const BASELINE_PATH = 'scripts/feature-map-staleness-baseline.json';
 

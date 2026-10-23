@@ -1,5 +1,5 @@
 // #703 产物闸 daemon 侧真值面：闸的判定素材由 runner 收尾时产出——
-// ① plan.md 产物收集（#1203 起从 PACMAN_HOME 面 `<home>/plans/<convId>/`
+// ① plan.md 产物收集（#1203 起从 CAIRN_HOME 面 `<home>/plans/<convId>/`
 //    读；旧位 = 工作区根目录仅作回落腿——在飞 conv 的方案仍在旧位时读一次，
 //    不写回），空白文件不算产物（空方案 = 无方案）；
 // ② 续轮指令投递（claim 载荷 instruction）：补写/驳回重规划轮的指令必须真的
@@ -30,13 +30,13 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   appendPlanLocationNote,
   buildPlanRewritePrompt,
   CONTINUE_PROMPTS,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -222,7 +222,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 const DONE_EVENT: StepEvent = { type: 'done', usage: [] };
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-artifact-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-artifact-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();
@@ -243,7 +243,7 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
 }
 
 describe('plan.md 产物收集（闸 1 真值面）', () => {
-  test('plan 步按投递注记行写 plan.md（新位）→ 收集并上传；新位在 PACMAN_HOME 面', async () => {
+  test('plan 步按投递注记行写 plan.md（新位）→ 收集并上传；新位在 CAIRN_HOME 面', async () => {
     const claimed = claimedNoRepoStep('plan');
     let notePath: string | null = null;
     const { backend } = writingBackend([DONE_EVENT], (_cwd, prompt) => {
@@ -254,7 +254,7 @@ describe('plan.md 产物收集（闸 1 真值面）', () => {
     expect(client.uploadNames).toEqual([['transcript.json', PLAN_FILE_NAME]]);
     const planPut = client.uploads.find((u) => u.url === 'http://server/up/1');
     expect(planPut?.body).toBe('# 方案\nContext: x');
-    // 注记行真带路径且在 PACMAN_HOME 面（worktree/裸任务目录树之外）。
+    // 注记行真带路径且在 CAIRN_HOME 面（worktree/裸任务目录树之外）。
     expect(notePath).toBe(join(home, 'plans', 'conv-1', PLAN_FILE_NAME));
   });
 

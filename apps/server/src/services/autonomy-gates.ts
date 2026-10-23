@@ -25,7 +25,7 @@ import {
   type AutonomySettings,
   DEFAULT_AUTONOMY_SETTINGS,
   type PatchAutonomyBody,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { autonomyState, build, memberActivity, project, todo, tokenUsage } from '../db/schema.js';

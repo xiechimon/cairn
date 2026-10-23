@@ -5,8 +5,8 @@
 // （r1 捕获未含），复刻面 N/A——无需切换，登记于此。
 // D3 已触发（2026-09-23, #109）：品牌槽已切 replacement 值，本 gate 的新
 // 契约 = 冻结面只允许素材替换计划 §3.4 的品牌槽 divergence——manifest
-// name/short_name = Pacman + description 自写 + sw.js 通知兜底标题 =
-// Pacman；其余字段/字节仍须与 docs/research/assets/r1/ 原件逐字节一致。
+// name/short_name = Cairn + description 自写 + sw.js 通知兜底标题 =
+// Cairn；其余字段/字节仍须与 docs/research/assets/r1/ 原件逐字节一致。
 // #1430 追加 divergence：theme_color / background_color 对齐 Paper 暗色
 // canvas token（manifest 不支持 media，取默认暗档 #1a1612）。
 // #249 素材核账追加两处 divergence（D8 批次收口）：related_applications
@@ -24,16 +24,16 @@ const ROOT = resolve(import.meta.dirname, '../../..');
 const R1_DIR = resolve(ROOT, 'docs/research/assets/r1');
 const PUBLIC_DIR = resolve(ROOT, 'apps/web/public');
 
-/** manifest 品牌槽替换值（素材替换计划 §3.4：`Pacman` + 自写 description）。 */
+/** manifest 品牌槽替换值（素材替换计划 §3.4：`Cairn` + 自写 description）。 */
 const MANIFEST_BRAND = {
-  name: 'Pacman',
-  shortName: 'Pacman',
+  name: 'Cairn',
+  shortName: 'Cairn',
   description:
-    'Pacman — a local-first, self-hosted workspace where humans direct the work and agents execute it.',
+    'Cairn — a local-first, self-hosted workspace where humans direct the work and agents execute it.',
 } as const;
 
 /** manifest screenshots 自写 label（#249；capture 脚本再生时同步此处）。 */
-const MANIFEST_SCREENSHOT_LABEL = 'Pacman task board — humans direct, agents execute';
+const MANIFEST_SCREENSHOT_LABEL = 'Cairn task board — humans direct, agents execute';
 
 /** manifest theme_color / background_color（#1430：Paper 暗色 --canvas）。 */
 const MANIFEST_DARK_PAPER = '#1a1612';
@@ -97,7 +97,7 @@ describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => 
   it('sw.js diverges only in the notification-title brand slot', () => {
     const original = readFileSync(resolve(R1_DIR, 'sw.js'), 'utf8');
     const shipped = readFileSync(resolve(PUBLIC_DIR, 'sw.js'), 'utf8');
-    expect(shipped).toBe(original.replace("n.title || 'Todos'", "n.title || 'Pacman'"));
+    expect(shipped).toBe(original.replace("n.title || 'Todos'", "n.title || 'Cairn'"));
   });
 
   it('sw.js keeps the push + notificationclick handler shape', () => {
@@ -112,6 +112,6 @@ describe('PWA files vs r1 capture originals (D3 replacement-phase gate)', () => 
     const html = readFileSync(resolve(ROOT, 'apps/web/index.html'), 'utf8');
     expect(html).toContain('<link rel="manifest" href="/manifest.webmanifest" />');
     // 站点 <title> 品牌词槽（素材替换计划 §3.4：自写，从产品定位 = 产品名）
-    expect(html).toContain('<title>Pacman</title>');
+    expect(html).toContain('<title>Cairn</title>');
   });
 });

@@ -429,17 +429,17 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     ]);
   });
 
-  it('live values are the replacement pacman family (D3 已触发 2026-09-23, #109)', () => {
-    expect(BRAND.cliCommandName).toBe('pacman');
-    expect(BRAND.envPrefix).toBe('PACMAN_');
-    expect(BRAND.homeDirName).toBe('.pacman');
-    expect(BRAND.branchPrefix).toBe('pacman/conv-');
-    expect(BRAND.apiKeyPrefix).toBe('pacman_');
-    expect(BRAND.manifestName).toBe('Pacman');
+  it('live values are the replacement cairn family (D3 已触发 2026-09-23, #109)', () => {
+    expect(BRAND.cliCommandName).toBe('cairn');
+    expect(BRAND.envPrefix).toBe('CAIRN_');
+    expect(BRAND.homeDirName).toBe('.cairn');
+    expect(BRAND.branchPrefix).toBe('cairn/conv-');
+    expect(BRAND.apiKeyPrefix).toBe('cairn_');
+    expect(BRAND.manifestName).toBe('Cairn');
     // 非品牌槽保持项:
     expect(BRAND.remoteMcpPath).toBe('/api/mcp');
     // 自有包名 (02 §5.8 复刻处置: 自发包名; 06 册 W2-D1: npm 公发改名):
-    expect(BRAND.cliPackageName).toBe('@xiechimon/pacman-cli');
+    expect(BRAND.cliPackageName).toBe('@xiechimon/cairn-cli');
   });
 
   it('BRAND live values = BRAND_SLOTS replacement column (单源纪律, 素材替换计划 §2)', () => {
@@ -450,8 +450,8 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
     expect(BRAND.sessionCookieName).toBe(BRAND_SLOTS.sessionCookie.replacement);
   });
 
-  it('env vars are the PACMAN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*)', () => {
-    // 替换相位 = PACMAN_ 同形（观测五件原名 r3 §1.1 = TDS_*，登记在
+  it('env vars are the CAIRN_ same-shape replacement (素材替换计划 §2; r3 §1.1 观测原名 TDS_*)', () => {
+    // 替换相位 = CAIRN_ 同形（观测五件原名 r3 §1.1 = TDS_*，登记在
     // BRAND_SLOTS.envPrefix.todosDev）；复刻增量位（webDir = M5 SPA 静态托管
     // 覆写 [设计]；githubOauth 两件 = #231 握手面 client 凭证 [设计]；
     // token = #251 可选鉴权自有面 [设计]；mcpConfig = spec 13/#368 本地 MCP
@@ -472,37 +472,37 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
-      server: 'PACMAN_SERVER',
-      apiKey: 'PACMAN_API_KEY',
-      team: 'PACMAN_TEAM',
-      workspacesDir: 'PACMAN_WORKSPACES_DIR',
-      home: 'PACMAN_HOME',
+      server: 'CAIRN_SERVER',
+      apiKey: 'CAIRN_API_KEY',
+      team: 'CAIRN_TEAM',
+      workspacesDir: 'CAIRN_WORKSPACES_DIR',
+      home: 'CAIRN_HOME',
     });
-    expect(webDir).toBe('PACMAN_WEB_DIR');
-    expect(githubOauthClientId).toBe('PACMAN_GITHUB_OAUTH_CLIENT_ID');
-    expect(githubOauthClientSecret).toBe('PACMAN_GITHUB_OAUTH_CLIENT_SECRET');
-    expect(token).toBe('PACMAN_TOKEN');
-    expect(mcpConfig).toBe('PACMAN_MCP_CONFIG');
+    expect(webDir).toBe('CAIRN_WEB_DIR');
+    expect(githubOauthClientId).toBe('CAIRN_GITHUB_OAUTH_CLIENT_ID');
+    expect(githubOauthClientSecret).toBe('CAIRN_GITHUB_OAUTH_CLIENT_SECRET');
+    expect(token).toBe('CAIRN_TOKEN');
+    expect(mcpConfig).toBe('CAIRN_MCP_CONFIG');
     // spec 13 #367 / spec 14 #371 自有面 [设计]：技能根目录覆写（缺省
     // SKILLS_DIR_DEFAULT）
-    expect(skillsDir).toBe('PACMAN_SKILLS_DIR');
+    expect(skillsDir).toBe('CAIRN_SKILLS_DIR');
     // 自有面 [设计]：=1 时 materializeProvider 给自定义端点写 reasoning:true，
     // pi 才下发 reasoning_effort（opt-in，后端容忍度不一，默认关）
-    expect(customModelReasoning).toBe('PACMAN_CUSTOM_MODEL_REASONING');
+    expect(customModelReasoning).toBe('CAIRN_CUSTOM_MODEL_REASONING');
     // 自有面 [设计]（#927，spec 26）：pi 提示缓存保留档——long 才长保留
     // （pi 适配器落 ttl 1h / prompt_cache_retention 24h）；缺省 short 显式化
-    expect(piCacheRetention).toBe('PACMAN_PI_CACHE_RETENTION');
+    expect(piCacheRetention).toBe('CAIRN_PI_CACHE_RETENTION');
     // 自有面 [设计]（#1149）：环境钩子超时 ms 覆写（缺省 20min，票面钉死）
-    expect(hookTimeoutMs).toBe('PACMAN_HOOK_TIMEOUT_MS');
+    expect(hookTimeoutMs).toBe('CAIRN_HOOK_TIMEOUT_MS');
     // 自有面 [设计]（#1406）：issue 进料轮询 opt-in（1 / true / yes 才开，默认关）
-    expect(issueIntake).toBe('PACMAN_ISSUE_INTAKE');
+    expect(issueIntake).toBe('CAIRN_ISSUE_INTAKE');
   });
 
   it('credential formats match the observed shapes (key prefix 随 BRAND 槽)', () => {
-    expect(API_KEY_PATTERN.test('pacman_0123456789abcdef0123456789abcdef0123456789abcdef')).toBe(
+    expect(API_KEY_PATTERN.test('cairn_0123456789abcdef0123456789abcdef0123456789abcdef')).toBe(
       true,
     );
-    expect(API_KEY_PATTERN.test('pacman_short')).toBe(false);
+    expect(API_KEY_PATTERN.test('cairn_short')).toBe(false);
     // 复刻相位前缀已切换——原站前缀 key 不再匹配（D3 已触发，#109）。
     expect(API_KEY_PATTERN.test('tds_0123456789abcdef0123456789abcdef0123456789abcdef')).toBe(
       false,
@@ -513,10 +513,10 @@ describe('brand slots (02 §5.8 收口 + 素材替换计划 §2 替换值正典)
 
   it('API-key list-row mask follows the r3 §6 display rule', () => {
     // 展示规则原形（r3 §6 样例 `tds_afe07565…`）：品牌前缀 + 前 8 hex +
-    // 省略号；前缀随 BRAND.apiKeyPrefix 槽（替换相位 = pacman_）。
-    const plaintext = `pacman_afe07565${'0'.repeat(40)}`;
+    // 省略号；前缀随 BRAND.apiKeyPrefix 槽（替换相位 = cairn_）。
+    const plaintext = `cairn_afe07565${'0'.repeat(40)}`;
     expect(API_KEY_PATTERN.test(plaintext)).toBe(true);
-    expect(maskApiKey(plaintext)).toBe('pacman_afe07565…');
+    expect(maskApiKey(plaintext)).toBe('cairn_afe07565…');
   });
 
   it('SecretBox envelope version word is v1 (01 §4.2)', () => {

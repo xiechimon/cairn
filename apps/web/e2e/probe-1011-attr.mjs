@@ -72,7 +72,7 @@ const context = await browser.newContext({
   colorScheme: 'light',
 });
 const page = await context.newPage();
-await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
 const SCENARIO = process.argv[4] ?? '101';
 const TRIGGER = process.argv[5] ?? '压缩模型';
 const DIALOG = process.argv[6] ?? '压缩模型';

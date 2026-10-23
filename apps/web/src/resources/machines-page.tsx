@@ -5,7 +5,7 @@
 // the empty state when there is no machine); CreateMachineDialog flow
 // unchanged: run the same CLI on the target box.
 // A7: no row carries a navigation/menu handler, so no row renders chevron or
-// ellipsis affordances. The former `Pacman 托管机器` facade row is gone —
+// ellipsis affordances. The former `Cairn 托管机器` facade row is gone —
 // hosted execution does not exist in the local-first architecture.
 // #503: per-runtime 开关摘除，改官方品牌 mark（启用 = 品牌原色，未启用 =
 // 35% 透明，read-only）。enabledRuntimes 字段与 PATCH /api/machines/{id}
@@ -24,7 +24,7 @@
 // 归属机（无独立设定面），本页只有观测——「关电脑前确认编排已落在常开机器
 // 上」的观测面。
 
-import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@pacman/shared';
+import { AGENT_TOOL_SHELL, MACHINE_RUNTIMES, type MachineRuntime } from '@cairn/shared';
 import { cn } from 'cn';
 import { Monitor, Plus as PlusIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';

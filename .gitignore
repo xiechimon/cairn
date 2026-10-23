@@ -77,7 +77,7 @@ credentials.enc
 .DS_Store
 
 # Claude — 本地 agent 状态全忽略。以下例外是项目级产物，随仓走：
-# verify-pacman（验证 harness）、pr-pacman（本仓 PR body 契约；名字刻意
+# verify-cairn（验证 harness）、pr-cairn（本仓 PR body 契约；名字刻意
 # 不叫 pr——个人级 skill 同名优先级压过项目级，叫 pr 会被全局 /pr 盖掉）、
 # hillclimb（评测数据：输入集、判分口径、跑分）与云端会话启动 hook
 # （settings.json 注册 + hooks/session-start.sh 装依赖）、workflows（命名
@@ -87,10 +87,10 @@ credentials.enc
 .claude/*
 !.claude/skills/
 .claude/skills/*
-!.claude/skills/verify-pacman/
-!.claude/skills/pr-pacman/
+!.claude/skills/verify-cairn/
+!.claude/skills/pr-cairn/
 !.claude/skills/verify-step-claim/
-!.claude/skills/retro-pacman/
+!.claude/skills/retro-cairn/
 !.claude/workflow.md
 !.claude/hillclimb/
 !.claude/settings.json
@@ -116,7 +116,7 @@ playwright-report/
 # Lane process files (#1199): lane threads draft PROGRESS.md / BLOCKED.md at
 # the worktree root. Root-anchored so same-named docs in subdirectories stay
 # unaffected.
-# plan.md (#1203): pacman plan-step handoff — the daemon writes it outside the
+# plan.md (#1203): cairn plan-step handoff — the daemon writes it outside the
 # repo checkout; a root plan.md is always a leak (gate: scripts/lane-file-gate.mjs).
 /PROGRESS.md
 /BLOCKED.md

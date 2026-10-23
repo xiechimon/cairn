@@ -123,7 +123,7 @@ describe('POST /api/teams/:id/github/oauth/authorize（connection 族签发）',
     try {
       const { res, body } = await authorizeConnection(s);
       expect(res.status).toBe(400);
-      expect(body.error).toContain('PACMAN_GITHUB_OAUTH_CLIENT_ID');
+      expect(body.error).toContain('CAIRN_GITHUB_OAUTH_CLIENT_ID');
     } finally {
       s.dispose();
     }

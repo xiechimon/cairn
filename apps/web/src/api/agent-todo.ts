@@ -1,4 +1,4 @@
-import type { AgentTodo } from '@pacman/shared';
+import type { AgentTodo } from '@cairn/shared';
 
 type Listener = () => void;
 

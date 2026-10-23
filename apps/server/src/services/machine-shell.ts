@@ -4,8 +4,8 @@
 // machines.ts journal 内核（ownedStep / agentForStep）。路由面 =
 // routes-machine.ts 的 shell / shell-result 端点。
 
-import type { MachineShellPrecheckBody, MachineShellResultBody } from '@pacman/shared';
-import { AGENT_TOOL_SHELL } from '@pacman/shared';
+import type { MachineShellPrecheckBody, MachineShellResultBody } from '@cairn/shared';
+import { AGENT_TOOL_SHELL } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { build, machine, shellCommand, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';

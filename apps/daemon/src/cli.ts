@@ -16,7 +16,7 @@ import {
 } from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { BRAND, PROVIDER_COMMAND_NOTICE } from '@pacman/shared';
+import { BRAND, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
 import { Command } from 'commander';
 import {
   type DaemonConfig,
@@ -97,7 +97,7 @@ export function buildProgram(): Command {
   const program = new Command();
   program
     .name(BRAND.cliCommandName)
-    .description('pacman executor daemon (02 §5.1 command face)')
+    .description('cairn executor daemon (02 §5.1 command face)')
     .version(DAEMON_VERSION, '-v, --version');
 
   program

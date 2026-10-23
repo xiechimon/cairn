@@ -82,7 +82,7 @@
 // 来一次。不看时钟：CI 一绿就合并（含 GitHub auto-merge）时卡在合并之后才进
 // review，照样收尾。收尾时停掉没人领的 verify / review 步。
 
-import { conversationBranch } from '@pacman/shared';
+import { conversationBranch } from '@cairn/shared';
 import { and, desc, eq, isNotNull, like, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, step, todo } from '../db/schema.js';
@@ -549,7 +549,7 @@ export function createCiPoller(
     return 'appended';
   }
 
-  /** pacman 刚推送（CI_EMPTY_CHECKS_GRACE_MS 内收尾的执行 / 合并步回报了提交）而 PR 读到的
+  /** cairn 刚推送（CI_EMPTY_CHECKS_GRACE_MS 内收尾的执行 / 合并步回报了提交）而 PR 读到的
    * head 还不是它：GitHub 还没跟上（head 与 mergeable_state 落后于推送），本轮不按这个 head
    * 判红、解冲突。过了宽限仍不是它 → 按 PR 的 head 判（人可能在上面又推了提交）。 */
   function pushNotSeen(buildId: string, headSha: string | null, now: number): boolean {
@@ -789,7 +789,7 @@ export function createCiPoller(
         } else {
           hintOnce(
             cand.buildId,
-            `PR #${prNumber} 落后于默认分支「${githubText(pull.defaultBranch)}」。pacman 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
+            `PR #${prNumber} 落后于默认分支「${githubText(pull.defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
             roundStart(deps, cand.buildId),
           );
         }

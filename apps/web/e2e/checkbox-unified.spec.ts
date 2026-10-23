@@ -27,10 +27,10 @@ import { evidenceShot } from './evidence';
 // （board-filter.spec，role=checkbox 载体）。
 // stop-confirm dialog 与 accept 同形（同类同 JSX），但 fixture 面没有
 // running 态可开它（OverlayKind 无 stop、fixtures 无 activeRun）：由 live 面
-// verify-pacman 的 drive-stop 探针 + 截图证据覆盖，见 docs/verify/XMON-72/。
+// verify-cairn 的 drive-stop 探针 + 截图证据覆盖，见 docs/verify/XMON-72/。
 //
 // 证据截图走 evidenceShot（默认不落盘；要为本票 PR 再生证据时设
-// PACMAN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。
+// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。
 // 历史证据 = 已提交的 docs/verify/XMON-72/，回归跑不许再重写它。
 
 /** r7 34：accept 弹层冻开在看板面上，merge 默认勾选。 */

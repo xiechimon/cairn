@@ -5,11 +5,11 @@
 // 注入安全：全程 argv 数组（无 shell）。
 // 凭证纪律（02 §5.4/§8 per-step 下发不落盘 + relay 工具名对照 push_credential
 // r5 §3.1）：git 凭证只经 env 注入（GIT_CONFIG_* 挂定值 credential.helper，git
-// ≥2.31；凭证值在 PACMAN_GIT_CRED_*）——不进 argv（ps 面，含 helper 的 sh -c）、
+// ≥2.31；凭证值在 CAIRN_GIT_CRED_*）——不进 argv（ps 面，含 helper 的 sh -c）、
 // 不进 .git/config、不进 ~/.git-credentials、不落任何盘。
 
 import { spawn } from 'node:child_process';
-import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@pacman/shared';
+import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 
 export interface GitRunResult {
   /** 子进程退出码；signal 终止（含超时）时 = null（不映射为 0——signaled 退出
@@ -73,12 +73,12 @@ export async function runGitOk(
 const CREDENTIAL_HELPER =
   // biome-ignore lint/suspicious/noTemplateCurlyInString: sh parameter expansion inside the helper body, not a JS template
   '!f() { p=; h=; while IFS= read -r l; do case "$l" in protocol=*) p=${l#protocol=} ;; host=*) h=${l#host=} ;; esac; done; ' +
-  'if test "$1" = get && test "$h" = "$PACMAN_GIT_CRED_HOST" && ' +
-  '{ test "$p" = "$PACMAN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$PACMAN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
-  `printf 'username=%s\\npassword=%s\\n' "$PACMAN_GIT_CRED_USERNAME" "$PACMAN_GIT_CRED_PASSWORD"; fi; }; f`;
+  'if test "$1" = get && test "$h" = "$CAIRN_GIT_CRED_HOST" && ' +
+  '{ test "$p" = "$CAIRN_GIT_CRED_PROTOCOL" || { test "$p" = https && test "$CAIRN_GIT_CRED_PROTOCOL" = http; }; }; then ' +
+  `printf 'username=%s\\npassword=%s\\n' "$CAIRN_GIT_CRED_USERNAME" "$CAIRN_GIT_CRED_PASSWORD"; fi; }; f`;
 
 /** per-step git 凭证 → env 注入（内存态；见头注凭证纪律）。helper 本体与凭证
- * 值分开：本体是 CREDENTIAL_HELPER 定值，签发远端与凭证值走 PACMAN_GIT_CRED_*
+ * 值分开：本体是 CREDENTIAL_HELPER 定值，签发远端与凭证值走 CAIRN_GIT_CRED_*
  * 环境变量。`parent` = 调用方要合并进去的环境（runGit / 钩子都是
  * `{ ...process.env, ...本函数结果 }`）。 */
 export function gitCredentialEnv(
@@ -111,10 +111,10 @@ export function gitCredentialEnv(
       : {
           [`GIT_CONFIG_KEY_${n + 1}`]: 'credential.helper',
           [`GIT_CONFIG_VALUE_${n + 1}`]: CREDENTIAL_HELPER,
-          PACMAN_GIT_CRED_PROTOCOL: target.protocol,
-          PACMAN_GIT_CRED_HOST: target.host,
-          PACMAN_GIT_CRED_USERNAME: cred.username,
-          PACMAN_GIT_CRED_PASSWORD: cred.password,
+          CAIRN_GIT_CRED_PROTOCOL: target.protocol,
+          CAIRN_GIT_CRED_HOST: target.host,
+          CAIRN_GIT_CRED_USERNAME: cred.username,
+          CAIRN_GIT_CRED_PASSWORD: cred.password,
         }),
     // 交互提示关闭（无 tty 场景挂起护栏）。
     GIT_TERMINAL_PROMPT: '0',

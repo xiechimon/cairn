@@ -6,7 +6,7 @@
 // 4. Menu rows are 32px with 13.5px text and 15px icons; the panel is 18px
 //    corners with 4px padding.
 // 5. The provider picker groups rows and search hides empty groups.
-// Screenshots: PACMAN_E2E_EVIDENCE=docs/verify/paper-overlays.
+// Screenshots: CAIRN_E2E_EVIDENCE=docs/verify/paper-overlays.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 import { evidenceShot } from './evidence.js';
 
@@ -56,7 +56,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`backdrop is the light dim, no blur, on dialogs and confirms (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     const want = await (async () => {
       await page.goto(SECRETS);
       return resolveColor(page, 'var(--dialog-backdrop)');
@@ -79,7 +79,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const width = async (dialog: Locator) => (await dialog.boundingBox())?.width;
 
   const secret = await openFromTopbar(page, SECRETS, '添加密钥');
@@ -102,7 +102,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
 });
 
 test('dialog face: sheet surface, 16px corners, 16px serif title, 28px close', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
   await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f7f1e1'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '16px');
@@ -115,7 +115,7 @@ test('dialog face: sheet surface, 16px corners, 16px serif title, 28px close', a
 });
 
 test('split footer: hint left, actions right, no band fill', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(MACHINES);
   await page.getByRole('button', { name: '添加机器' }).first().click();
   const dialog = page.getByRole('dialog', { name: '添加机器' });
@@ -167,7 +167,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
 test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px padding', async ({
   page,
 }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(DETAIL);
   await page.getByRole('button', { name: '更多' }).click();
   const menu = page.locator('.more-menu');
@@ -195,7 +195,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px pa
 });
 
 test('user menu rides the same Paper menu face', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
   await page.getByRole('complementary').getByRole('button', { name: 'Xmon Dai' }).click();
   const menu = page.locator('.user-menu');
@@ -212,7 +212,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
 });
 
 test('provider picker: grouped rows, search hides empty groups', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   const dialog = await openFromTopbar(page, PROVIDERS, '添加模型服务');
   await expect(dialog.locator('fieldset')).toHaveCount(6);
   for (const name of ['订阅登录', '模型厂商', '云平台', '推理平台', '网关与聚合', '其他']) {

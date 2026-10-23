@@ -1,17 +1,17 @@
 // apiKey 服务面（02 §6.2 形状 + 02 §8/r3 §6 实测展示规则）。
-// - 创建：生成 `pacman_<48hex>` 明文，响应含明文一次（一次性展示，02 §8；
+// - 创建：生成 `cairn_<48hex>` 明文，响应含明文一次（一次性展示，02 §8；
 //   文案 canon「请立即复制密钥，它仅显示一次。」= shared API_KEY_ONE_TIME_COPY，
 //   web 面渲染）。服务端存哈希不存可逆值（[设计] 02 §8——登录校验只需匹配）。
-// - 列表：行掩码 `pacman_afe07565…`（r3 §6 样例原形前缀 tds_ 随品牌槽切换；
+// - 列表：行掩码 `cairn_afe07565…`（r3 §6 样例原形前缀 tds_ 随品牌槽切换；
 //   掩码函数 = shared maskApiKey 单源）。
 //   行标识/掩码列 wire 字段未采 [推断]（records/api-key.ts 注同），按 DB 行
 //   安全子集投影：{id,name,gitAccess,mcpAccess,toolGrants,masked,createdAt}。
-// - 校验：哈希比对（机器注册 `pacman start --api-key` 与 MCP Bearer 双用途，
+// - 校验：哈希比对（机器注册 `cairn start --api-key` 与 MCP Bearer 双用途，
 //   r3 §6；HTTP 挂接面归 M3）。撤销面未观测，不发明（04 附录 A 补采口径）。
 
 import { randomBytes } from 'node:crypto';
-import type { ApiKeyRow as SharedApiKeyRow } from '@pacman/shared';
-import { BRAND, maskApiKey } from '@pacman/shared';
+import type { ApiKeyRow as SharedApiKeyRow } from '@cairn/shared';
+import { BRAND, maskApiKey } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apiKey } from '../db/schema.js';
@@ -40,7 +40,7 @@ export function toApiKeyRowView(row: ApiKeyRow): ApiKeyRowView {
   };
 }
 
-/** `pacman_<48hex>`（02 §5.8 API key 形态，前缀 = 品牌槽；hex 小写 [推断]，brand.ts 注同）。 */
+/** `cairn_<48hex>`（02 §5.8 API key 形态，前缀 = 品牌槽；hex 小写 [推断]，brand.ts 注同）。 */
 export function newApiKeyPlaintext(): string {
   return `${BRAND.apiKeyPrefix}${randomBytes(24).toString('hex')}`;
 }

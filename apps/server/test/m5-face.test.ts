@@ -22,7 +22,7 @@ import {
   conversationStreamEventSchema,
   machineRecordSchema,
   tokenUsageSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -568,7 +568,7 @@ describe('[推断] build 详情读面（M5 overlay 数据源，wire.test 登记�
 });
 
 describe('SPA 静态同源托管（02/A1）', () => {
-  const webDir = mkdtempSync(join(tmpdir(), 'pacman-web-dir-'));
+  const webDir = mkdtempSync(join(tmpdir(), 'cairn-web-dir-'));
   afterAll(() => rmSync(webDir, { recursive: true, force: true }));
   mkdirSync(join(webDir, 'assets'), { recursive: true });
   writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>spa</title>');

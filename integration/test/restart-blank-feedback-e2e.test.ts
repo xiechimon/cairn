@@ -14,7 +14,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildTaskPromptText } from '@pacman/shared';
+import { buildTaskPromptText } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -57,7 +57,7 @@ beforeAll(async () => {
   // 一轮文本应答（内容无关紧要——断言的是请求体里 user 消息长什么样）。
   stub = await startStubLlm([{ status: 400 }, { content: '重启轮照常执行。' }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-restart-blank-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-restart-blank-home-'));
   const paths: StatePaths = statePaths(home, join(home, 'workspaces'));
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
   const config = loadDaemonConfig(

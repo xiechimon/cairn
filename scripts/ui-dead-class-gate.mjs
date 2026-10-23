@@ -74,7 +74,7 @@
 //                    `[class*=name]`, toHaveClass) inside a string/regex
 //                    literal of the test corpus (apps/web/e2e,
 //                    apps/web/test, integration/test, scripts/,
-//                    .claude/skills/verify-pacman/scripts) or inside a src
+//                    .claude/skills/verify-cairn/scripts) or inside a src
 //                    DOM-selector API call (querySelector/closest/matches).
 //                    The index is rebuilt every run, so this ledger cannot
 //                    go stale.
@@ -660,7 +660,7 @@ function buildReferenceIndex(srcTexts) {
   };
 
   // Test corpus: any selector-shaped name inside a string/regex literal.
-  // The verify-pacman driver scripts are live tooling (re-run against the
+  // The verify-cairn driver scripts are live tooling (re-run against the
   // real app on every verification round), so their selectors pin class
   // names exactly like e2e specs do. docs/verify/** is NOT here on purpose:
   // archived one-shot evidence pinned to its PR sha, not a live consumer.
@@ -669,7 +669,7 @@ function buildReferenceIndex(srcTexts) {
     [join(WEB_DIR, 'test'), ['.ts', '.tsx']],
     [join(REPO_ROOT, 'integration/test'), ['.ts', '.tsx']],
     [join(REPO_ROOT, 'scripts'), ['.mjs', '.js']],
-    [join(REPO_ROOT, '.claude/skills/verify-pacman/scripts'), ['.mjs', '.js']],
+    [join(REPO_ROOT, '.claude/skills/verify-cairn/scripts'), ['.mjs', '.js']],
   ];
   for (const [dir, exts] of corpusDirs) {
     for (const f of walkFiles(dir, exts)) {
@@ -815,7 +815,7 @@ async function main() {
   if (!compiled) {
     console.error(
       'ui-dead-class-gate: no compiled CSS — apps/web/dist absent and @tailwindcss/postcss unresolvable.\n' +
-        'Run `pnpm install` (compile mode) or `pnpm --filter @pacman/web build` (dist mode) first.',
+        'Run `pnpm install` (compile mode) or `pnpm --filter @cairn/web build` (dist mode) first.',
     );
     return 2;
   }

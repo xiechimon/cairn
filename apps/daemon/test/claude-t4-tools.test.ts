@@ -7,8 +7,8 @@
 //   6. mcpServers 映射错（字段对调/残缺）→ 纯函数映射对拍 + 残缺 throw
 //   8. remoteTools 无 relay 静默丢 → fail-closed throw
 
-import type { LocalToolDef, RemoteToolDef } from '@pacman/shared';
-import { CHIEF_REMOTE_TOOLS } from '@pacman/shared';
+import type { LocalToolDef, RemoteToolDef } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import { buildHostTools, mapMcpEndpoint, parametersToShape } from '../src/backend/claude-code.js';
@@ -116,7 +116,7 @@ describe('buildHostTools（失败方式 4/5/8）', () => {
     );
   });
 
-  test('relay 收裸名（def.name，非 mcp__pacman__ 前缀）+ 结果文本回投', async () => {
+  test('relay 收裸名（def.name，非 mcp__cairn__ 前缀）+ 结果文本回投', async () => {
     const calls: Array<{ name: string; params: Record<string, unknown> }> = [];
     const tools = buildHostTools({
       remoteTools: [byName('projects')],

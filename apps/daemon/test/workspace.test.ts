@@ -22,14 +22,14 @@ import {
   conversationBranch,
   ORPHAN_WORKTREE_TTL_MS,
   RemoteBranchDivergedError,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 import { stubOutInheritedGitConfig } from './git-config-env.js';
 
-const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
+const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -93,16 +93,16 @@ function seedHook(name: 'setup' | 'resume', body: string): void {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'pacman-ws-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'pacman-ws-origin-')), 'repo.git');
-  seedDir = join(tmpdir(), `pacman-ws-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  root = mkdtempSync(join(tmpdir(), 'cairn-ws-root-'));
+  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-origin-')), 'repo.git');
+  seedDir = join(tmpdir(), `cairn-ws-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedOrigin();
 });
 
 describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
-  test('prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 pacman/conv-*', async () => {
+  test('prepare：基座 clone 落 <root>/<projectId>/repo + worktree add -b 落 <root>/<convId>，分支 cairn/conv-*', async () => {
     const prepared = await ws.prepare(prepareInput(CONV_A));
     expect(prepared.cwd).toBe(join(root, CONV_A));
     expect(prepared.baseRepoDir).toBe(join(root, PROJECT_ID, 'repo'));
@@ -139,7 +139,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
   test('#1484：比较的是 origin 的原始配置值，insteadOf 改写不触发重指', async () => {
     // 机器配置里常见 url.<ssh>.insteadOf <https>：git remote get-url 返回改写后的
     // URL，与 cloneUrl 永远不等；拿它比会每步重写共享配置、打误导日志。
-    const alias = 'pacman-alias:repo';
+    const alias = 'cairn-alias:repo';
     stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
     vi.stubEnv('GIT_CONFIG_KEY_0', `url.${originDir}.insteadOf`);
@@ -194,7 +194,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     // ① 漏网的简报文件（agent 自己 git add 过 / 擦除失败留下的形态）。
     writeFileSync(
       join(prepared.cwd, 'AGENTS.md'),
-      `<!-- BEGIN PACMAN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END PACMAN-RUNTIME -->\n`,
+      `<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END CAIRN-RUNTIME -->\n`,
     );
     // ② agent 合法产出的普通文件——必须照常进提交（认内容不认名的理由）。
     writeFileSync(join(prepared.cwd, 'NOTES.md'), 'agent 的产物\n');
@@ -220,7 +220,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
     // 的那条路径，本函数是它唯一的可见性面。
     writeFileSync(
       join(prepared.cwd, 'AGENTS.md'),
-      `<!-- BEGIN PACMAN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END PACMAN-RUNTIME -->\n`,
+      `<!-- BEGIN CAIRN-RUNTIME (auto-managed; do not edit) -->\n简报\n<!-- END CAIRN-RUNTIME -->\n`,
     );
     await runGit(['add', '-A'], { cwd: prepared.cwd });
     await runGit(
@@ -228,7 +228,7 @@ describe('worktree 契约（02 §5.5 / r3 §1.4）', () => {
         '-c',
         'user.name=it-agent',
         '-c',
-        'user.email=it@pacman.local',
+        'user.email=it@cairn.local',
         'commit',
         '-m',
         'agent self-commit',

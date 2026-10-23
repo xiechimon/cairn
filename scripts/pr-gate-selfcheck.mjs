@@ -220,7 +220,7 @@ const cases = [
       const files = [
         '.claude/settings.json',
         '.claude/hooks/pre.sh',
-        '.claude/skills/pr-pacman/SKILL.md',
+        '.claude/skills/pr-cairn/SKILL.md',
         'apps/web/CLAUDE.md',
         'apps/server/AGENTS.md',
         'docs/pr-review.md',
@@ -287,7 +287,7 @@ const cases = [
         '.pi/skills/x/SKILL.md',
         'apps/web/.claude/skills/x/SKILL.md',
         'apps/server/src/.claude/settings.json',
-        '.cursor/skills/verify-pacman/SKILL.md',
+        '.cursor/skills/verify-cairn/SKILL.md',
         '.mcp.json',
         '.ckignore',
       ]),

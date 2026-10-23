@@ -1,5 +1,5 @@
 // skills 执行面注入 E2E（spec 14 / #371 + #372 per-agent 白名单 + #917 硬挡）：
-// daemon 扫描 PACMAN_SKILLS_DIR → 按 agent.skills 勾选过滤 → `<available_skills>`
+// daemon 扫描 CAIRN_SKILLS_DIR → 按 agent.skills 勾选过滤 → `<available_skills>`
 // catalog 追加进 session systemPrompt（不覆盖既有段）→ agent 按 catalog 指引用
 // read 工具真读 SKILL.md（连通性硬验收：catalog 不能是装饰品——read 结果带正文
 // marker 落库即证路径可达）。白名单面：授权 skill 在位、同目录未授权 skill
@@ -102,7 +102,7 @@ function collectConvActivities(convId: string): {
 
 beforeAll(async () => {
   // fixture skills 目录：单 skill（frontmatter name + description + 正文 marker）。
-  skillsDir = mkdtempSync(join(tmpdir(), 'pacman-it-skills-'));
+  skillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-skills-'));
   const dir = join(skillsDir, 'demo-skill');
   mkdirSync(dir, { recursive: true });
   skillFile = join(dir, 'SKILL.md');
@@ -163,7 +163,7 @@ beforeAll(async () => {
     .set({ skillsAllowlist: ['demo-skill'] })
     .where(eq(agentTable.id, AGENT_ID))
     .run();
-  home = mkdtempSync(join(tmpdir(), 'pacman-it-skills-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-it-skills-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -177,7 +177,7 @@ beforeAll(async () => {
   );
   paths = statePaths(config.home, config.workspacesDir);
   // pi 原生发现面种入（#917 noSkills 实证）：agentDir/skills 是 pi resource
-  // loader 的默认扫描位之一——#958 接线实录里它与 pacman catalog 两份清单
+  // loader 的默认扫描位之一——#958 接线实录里它与 cairn catalog 两份清单
   // 并存。种一个带 marker 的原生技能，断言面 = stub 捕获的 LLM 输入**不含**
   // 该 marker（before 态：未关断时它会以 `<available_skills>` 段出现）。
   const nativeDupDir = join(paths.agentRuntimeDir, 'skills', 'native-dup');

@@ -1,8 +1,8 @@
 // steer 投递（W3 #279：事件 → 拉取-确认 → handle.steer）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
 // = ./machine-loop-harness.ts，每个测试自 boot 自停）。
 
-import type { AgentBackend, DeliveredImage, StepEvent } from '@pacman/shared';
-import { formatAttachmentToken } from '@pacman/shared';
+import type { AgentBackend, DeliveredImage, StepEvent } from '@cairn/shared';
+import { formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';

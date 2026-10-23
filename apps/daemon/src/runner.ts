@@ -31,7 +31,7 @@ import type {
   SkillInjectionFacts,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
@@ -64,7 +64,7 @@ import {
   stepTakesSecrets,
   stripAnsiEscapes,
   transcriptPromptRowId,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { createActivityTracker } from './activity.js';
 import { parseAgentTodoText } from './agent-todo.js';
 import { SessionNotResumableError } from './backend/errors.js';
@@ -137,7 +137,7 @@ export interface RunStepDeps {
   stops?: StepStops;
   /** heartbeat 节奏 [设计]（r3 未采具体值；presence 同族 ~30s）。 */
   heartbeatIntervalMs?: number;
-  /** PACMAN_SKILLS_DIR 扫描根（#1299 /name 派发判定与 Skill 工具目录面；
+  /** CAIRN_SKILLS_DIR 扫描根（#1299 /name 派发判定与 Skill 工具目录面；
    * config.skillsDir 透传，machine-loop 注入）。缺省 = 不构建 Skill 工具与
    * /name 检测（旧测试面零回归）。 */
   skillsDir?: string;
@@ -154,7 +154,7 @@ export interface RunStepOptions {
   resume?: { sessionId: string | null; prompt: string | null };
   /** 已认领的运行数（canon 行 `(n running)` 的 n）。 */
   running?: number;
-  /** #1148 步级 env 注入（worker 步端口基座 PACMAN_PORT_BASE；machine-loop
+  /** #1148 步级 env 注入（worker 步端口基座 CAIRN_PORT_BASE；machine-loop
    * 按槽位构造）——透传 SessionOpts.env（backend 注入 agent 进程命令环境）。
    * chief 步不携带（不占槽）。 */
   env?: Record<string, string>;
@@ -165,7 +165,7 @@ export interface RunStepOptions {
   retryStormMax?: number;
   /** 流超时三臂覆盖（测试注入毫秒级；缺省 = 02 §5.6 r3 三值）。 */
   streamTimeouts?: { first: number; idle: number; body: number };
-  /** 步级流时长上界覆盖（测试注入；缺省 = env PACMAN_STREAM_DURATION_CAP_MS
+  /** 步级流时长上界覆盖（测试注入；缺省 = env CAIRN_STREAM_DURATION_CAP_MS
    * 或 STREAM_DURATION_CAP_DEFAULT_MS）。 */
   streamDurationCapMs?: number;
   /** #1257 provider_network 末次重试前延迟覆盖（测试注入毫秒级；缺省 =
@@ -204,7 +204,7 @@ export const STREAM_DURATION_CAP_DEFAULT_MS = 3_600_000;
 
 /** 上界 env 旋钮（#699：可配绝对上界）；非法/非正值回落默认值——0 不是
  * 「拆墙」出口，墙保持是墙。 */
-export const STREAM_DURATION_CAP_ENV = 'PACMAN_STREAM_DURATION_CAP_MS';
+export const STREAM_DURATION_CAP_ENV = 'CAIRN_STREAM_DURATION_CAP_MS';
 
 function envDurationCapMs(env: NodeJS.ProcessEnv): number | null {
   const raw = env[STREAM_DURATION_CAP_ENV];
@@ -557,7 +557,7 @@ async function runClaimedStep(
         : buildTaskPrompt(claimed));
   // #1203 plan.md 交接位置注记行：plan 步交接物搬到 repo 检出之外
   // （`<home>/plans/<convId>/plan.md`，step-attachments 同律的 worktree 外
-  // PACMAN_HOME 面目录）——local-repo 项目的 conv 工作区即 checkout，plan.md
+  // CAIRN_HOME 面目录）——local-repo 项目的 conv 工作区即 checkout，plan.md
   // 落工作区根会被 agent 提交进仓库根（#24 / PR #1201 首版实锤）。路径是
   // 执行机本地事实，server 侧模板位置无关化，由 daemon 在投递前单点组装
   // （journal/wire 行与投递内容同串——recover 面 resume prompt 已含注记时
@@ -888,8 +888,8 @@ async function runClaimedStep(
   // 没有 git 可用的兜底身份（无全局 user.name/user.email 的机器上直接挂 128），
   // 故必须显式注入。
   const stepIdentity: CommitIdentity = {
-    name: claimed.agent?.displayName ?? 'pacman-agent',
-    email: `${claimed.step.machineId ?? 'machine'}@pacman.local`,
+    name: claimed.agent?.displayName ?? 'cairn-agent',
+    email: `${claimed.step.machineId ?? 'machine'}@cairn.local`,
   };
   // create_tag 注册面（XMON-111 T1）：claim localTools 词集是唯一判据（server
   // claimLocalTools 判定单源，daemon 不自判权限）；词缺席/缺省 = 不注册
@@ -2138,7 +2138,7 @@ async function runClaimedStep(
           );
         }
         // local 形态落地 = conv 分支 push 回用户仓库（#1211：push 即收尾，
-        // 用户主检出的分支/工作树永不被 pacman 推进——合并到默认分支由用户
+        // 用户主检出的分支/工作树永不被 cairn 推进——合并到默认分支由用户
         // 自取）。hosted 落地在 server applyMergeLanding（hosted-only 不变）；
         // github v1 done 语义 = conv 分支已推上，不落地。
       }
@@ -2149,7 +2149,7 @@ async function runClaimedStep(
       // （agent 自建分支交付后切回会话分支的事故形——base = 步起点
       // checkpoint、窗口下界 = 步起点墙钟）。扫描只在 HEAD 计数为 0 时启动
       // （有物不烧 git 调用）；邻座会话分支（共享基座仓里其它 build 的
-      // pacman/conv-<他>）按品牌前缀排除——别的 build 的产物不能记到本步。
+      // cairn/conv-<他>）按品牌前缀排除——别的 build 的产物不能记到本步。
       const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
       if (headAhead === 0 && headAtStart !== null && git.branchesWithNewCommits) {
         try {
@@ -2240,7 +2240,7 @@ async function runClaimedStep(
   let planContent: string | null = null;
   if (claimed.step.kind === 'plan' && !stopped) {
     // #703 闸 1 真值面：产物契约不随 repo 形态变化——空白文件不算产物（空
-    // 方案 = 无方案）。#1203 起正位 = repo 检出外的 PACMAN_HOME 面
+    // 方案 = 无方案）。#1203 起正位 = repo 检出外的 CAIRN_HOME 面
     // （`<plansDir>/<convId>/plan.md`，prompt 注记行指定的路径）；旧位
     // （cwd = worktree 检出 / 无 repo 裸任务目录）只作回落腿——在飞 conv
     // 的方案仍写在旧位时读一次，不写回（新位空白也不回落：空方案语义不被

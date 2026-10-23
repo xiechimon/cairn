@@ -19,7 +19,7 @@
 // （#640 前 board eager 位吃 firstAgentId 的卡片级开始已改直发编排回合，
 // eager 语义保持原状不动查询面）。
 
-import type { TodoRecord as WireTodo } from '@pacman/shared';
+import type { TodoRecord as WireTodo } from '@cairn/shared';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { attachFile } from '../api/attachments.js';

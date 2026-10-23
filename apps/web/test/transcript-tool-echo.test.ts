@@ -15,7 +15,7 @@
 //   F5 pure-JSON tool output → no output slab in the tools group; the pill
 //      stays and terminal-text outputs keep rendering (#469 law intact)
 
-import type { ToolCallRecord } from '@pacman/shared';
+import type { ToolCallRecord } from '@cairn/shared';
 import { expect, test } from 'vitest';
 import { mapTranscript, type MessageRow } from '../src/api/mappers.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';

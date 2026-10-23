@@ -34,7 +34,7 @@ import {
   claimedStepSchema,
   projectConvertedNote,
   projectRenamedNote,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -298,7 +298,7 @@ describe('PATCH /api/projects/{id}——系统注记面（#1242）', () => {
 describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () => {
   test('K1 缺键 localPath → 保留原值（local 绑定转加速位）+ cloneUrl 切换 + 注记', async () => {
     const id = 'proj-ident-k1';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const t = await createTodoWithBuild(id, '转换探针');
     // 无在飞步的静止点：步收尾走机器协议不在本测范围，直接置终态
     // （409 闸单独测步状态词表，此处只关心转换本体）。
@@ -307,33 +307,33 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
     expect(r.status).toBe(200);
     expect(r.body.repoKind).toBe('github');
     expect(r.body.githubRepo).toBe('octo/conv');
-    expect(r.body.localPath).toBe('/Users/who/code/pacman');
+    expect(r.body.localPath).toBe('/Users/who/code/cairn');
     expect(r.body.cloneUrl).toBe('https://github.com/octo/conv.git');
     const row = projectRow(id);
     expect(row?.repoKind).toBe('github');
-    expect(row?.localPath).toBe('/Users/who/code/pacman');
+    expect(row?.localPath).toBe('/Users/who/code/cairn');
     const notes = noteRowsFor([t.buildId]);
     expect(notes).toHaveLength(1);
     expect(notes[0]?.content).toBe(
-      projectConvertedNote({ githubRepo: 'octo/conv', localPath: '/Users/who/code/pacman' }),
+      projectConvertedNote({ githubRepo: 'octo/conv', localPath: '/Users/who/code/cairn' }),
     );
   });
 
   test('K2 转换带 localPath 字符串：绝对路径落值；相对路径 400 + not_absolute（两条件闸同函数）', async () => {
     const id = 'proj-ident-k2';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const ok = await patchProject(s.app, id, {
       repoKind: 'github',
       githubRepo: 'octo/conv',
-      localPath: '/data/mea/pacman',
+      localPath: '/data/mea/cairn',
     });
     expect(ok.status).toBe(200);
-    expect(projectRow(id)?.localPath).toBe('/data/mea/pacman');
+    expect(projectRow(id)?.localPath).toBe('/data/mea/cairn');
   });
 
   test('K2b 相对路径 → 400 + reason not_absolute', async () => {
     const id = 'proj-ident-k2b';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const r = await patchProject(s.app, id, {
       repoKind: 'github',
       githubRepo: 'octo/conv',
@@ -346,7 +346,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
 
   test('K3 转换带 localPath:null → 加速位清空', async () => {
     const id = 'proj-ident-k3';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const r = await patchProject(s.app, id, {
       repoKind: 'github',
       githubRepo: 'octo/conv',
@@ -358,7 +358,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
 
   test('K4 缺 githubRepo → 400；K5 形状非法 → 400', async () => {
     const id = 'proj-ident-k4';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const r4 = await patchProject(s.app, id, { repoKind: 'github' });
     expect(r4.status).toBe(400);
     expect(String(r4.body.error)).toContain('githubRepo');
@@ -382,7 +382,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
           repoKind: 'local',
           repoName: null,
           githubRepo: null,
-          localPath: '/Users/who/code/pacman',
+          localPath: '/Users/who/code/cairn',
           description: null,
         })
         .run();
@@ -417,7 +417,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
           repoKind: 'local',
           repoName: null,
           githubRepo: null,
-          localPath: '/Users/who/code/pacman',
+          localPath: '/Users/who/code/cairn',
           description: null,
         })
         .run();
@@ -432,7 +432,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
 
   test('K7 有在飞 build（pending 步）→ 409；步终态后 → 200', async () => {
     const id = 'proj-ident-k7';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const t = await createTodoWithBuild(id, '在飞闸探针');
     const blocked = await patchProject(s.app, id, { repoKind: 'github', githubRepo: 'octo/conv' });
     expect(blocked.status).toBe(409);
@@ -445,7 +445,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
 
   test('K8 github 项目再转换 → 400（已是目标形态）；github→local 反向 → 400', async () => {
     const id = 'proj-ident-k8';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     const conv = await patchProject(s.app, id, { repoKind: 'github', githubRepo: 'octo/conv' });
     expect(conv.status).toBe(200);
     const again = await patchProject(s.app, id, { repoKind: 'github', githubRepo: 'octo/other' });
@@ -457,7 +457,7 @@ describe('PATCH /api/projects/{id}——local→github 转换（#1242）', () =>
 
   test('K9 repoKind local/hosted（非 github 目标）→ 400', async () => {
     const id = 'proj-ident-k9';
-    insertLocalProject(id, '/Users/who/code/pacman');
+    insertLocalProject(id, '/Users/who/code/cairn');
     for (const repoKind of ['local', 'hosted'] as const) {
       const r = await patchProject(s.app, id, { repoKind });
       expect(r.status).toBe(400);
@@ -544,12 +544,12 @@ describe('转换后 claim 载荷 repo 形态（#1242）', () => {
       .insert(projectTable)
       .values({
         id: projectId,
-        name: 'pacman',
+        name: 'cairn',
         teamId: s2.team.id,
         repoKind: 'local',
         repoName: null,
         githubRepo: null,
-        localPath: '/Users/who/code/pacman',
+        localPath: '/Users/who/code/cairn',
         description: null,
       })
       .run();
@@ -580,7 +580,7 @@ describe('转换后 claim 载荷 repo 形态（#1242）', () => {
     expect(claimed.project?.repo).toEqual({
       kind: 'github',
       cloneUrl: 'https://github.com/octo/conv.git',
-      localPath: '/Users/who/code/pacman',
+      localPath: '/Users/who/code/cairn',
     });
   });
 });

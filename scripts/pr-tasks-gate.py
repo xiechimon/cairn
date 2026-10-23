@@ -139,7 +139,7 @@ def main():
         print(f"pr-tasks: the body contract is {TEMPLATE_PATH} "
               f"({' / '.join(TEMPLATE_SECTIONS)}); its Acceptance section "
               "must carry at least one task-list item, all checked.")
-        print("pr-tasks: see .claude/skills/pr-pacman/SKILL.md.")
+        print("pr-tasks: see .claude/skills/pr-cairn/SKILL.md.")
     else:
         items = tasks(section, section_line_offset(body))
         if not items:

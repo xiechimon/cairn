@@ -19,7 +19,7 @@
 // 8. 写面与投影：PATCH maxConcurrentTasks 落库即时生效；显式 null 清回
 //    不限；0 / 51 → 400；记录带字段；老 server 形（缺字段）wire 可解析。
 
-import { agentRecordSchema } from '@pacman/shared';
+import { agentRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

@@ -15,7 +15,7 @@
 // 带 model 副题)——unassign 前置未指派行、option.model 副题、
 // confirmRebind=false 跳过换绑二次确认(开始面重选无记忆告示语义)。
 
-import { CHIEF_REBIND_CONFIRM_COPY, type TeamMember } from '@pacman/shared';
+import { CHIEF_REBIND_CONFIRM_COPY, type TeamMember } from '@cairn/shared';
 import { useEffect, useMemo, useState } from 'react';
 import { SEARCH_BOX_CLS, SEARCH_INPUT_CLASS } from '../components/model-select-core.js';
 import { Button } from '../components/ui/button.js';

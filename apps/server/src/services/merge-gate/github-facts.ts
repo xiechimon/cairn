@@ -9,13 +9,13 @@
 //   页；commits 照读到的原样传（不去重、不排序）；各页的 total_commits 要一致。
 // - check runs 与 combined status 都按 PR head 的 SHA 读；check run 按 (app, 名字) 只留 id 最大
 //   的一条，必需检查绑了 app 的，那个 app 的那条排在前面（readiness 按名字取第一条）；status
-//   按 context（不分大小写）只留最新的一条，自家 pacman/merge-gate 那条另给状态写入用。
+//   按 context（不分大小写）只留最新的一条，自家 cairn/merge-gate 那条另给状态写入用。
 // - 证据链：合格的链接（qualifyingEvidenceLinks）逐条按 contents 列它所在的目录，看文件在那个
 //   提交上在不在；一个在就停，至多探 5 个 (提交, 目录)。
 // 读全部串行；任何一次读被限流，本次求值停读，余下的按读不到处理。端口抛错按网络错。
 // 不读库、不取时钟（now 由调用方给）、不 import 闸外的东西（测试 merge-gate-imports）。
 
-import { MERGE_GATE_STATUS_CONTEXT } from '@pacman/shared';
+import { MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
 import { compareFilesFromResponse } from './digest.js';
 import { qualifyingEvidenceLinks } from './evidence-link.js';
 import type { GateGithubPort, GateRaw, GateRawFailure } from './github-port.js';
@@ -72,7 +72,7 @@ export interface GateGithubFacts {
   evidence: GateEvidencePresence[];
   /** compare 的 behind_by（目标分支领先 PR 几个提交）；P4-0 的 GateInputs.pr.baseBehindBy。 */
   baseBehindBy: number | null;
-  /** head 上自家 pacman/merge-gate 的当前值（状态写入只在值变化时写）；没有 = null，
+  /** head 上自家 cairn/merge-gate 的当前值（状态写入只在值变化时写）；没有 = null，
    * combined status 读不到 = 'unreadable'。 */
   ownStatus: { state: string; description: string | null } | null | 'unreadable';
   /** 本次求值被限流：retryAt = 可再读的时刻（retry-after 优先，否则 x-ratelimit-reset）。 */

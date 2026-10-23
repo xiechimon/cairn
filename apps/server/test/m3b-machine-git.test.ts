@@ -6,8 +6,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema, machineTokenResponseSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema, machineTokenResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -205,7 +205,7 @@ describe('per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 p
     const token = machineTokenResponseSchema.parse(await tokenRes.json());
     expect(token.git).not.toBeNull();
     expect(token.git?.username).toBe('git');
-    expect(token.git?.password).toMatch(/^pacman_[0-9a-f]{48}$/);
+    expect(token.git?.password).toMatch(/^cairn_[0-9a-f]{48}$/);
     // 发行面 = apiKey 行（gitAccess=true，服务端只存哈希）。
     const rows = w.s.db
       .select()
@@ -345,7 +345,7 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
-    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, {
       status: 'success',
       sessionId: 'pi-1',
@@ -395,7 +395,7 @@ describe('merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服�
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
-    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, { status: 'success', sessionId: 'pi-1', commit: convSha });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`, { body: {} });
     const mergeStep = await w.claim();
@@ -428,7 +428,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
-    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, {
       status: 'success',
       sessionId: 'pi-1',
@@ -505,7 +505,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
     await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
     await call(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { body: { action: 'confirm' } });
     const buildStep = await w.claim();
-    const convSha = await fakePushConvBranch(w.repoDir, `pacman/conv-${buildId}`);
+    const convSha = await fakePushConvBranch(w.repoDir, `cairn/conv-${buildId}`);
     await w.done(buildStep.step.id, {
       status: 'success',
       sessionId: 'pi-1',
@@ -534,7 +534,7 @@ describe('#1487 合并步在跑时卡离开审核：成功回报不落地；重�
 
 describe('托管 repo provision 种子提交（M3b [设计]：空库不能 worktree）', () => {
   test('init bare 即立 refs/heads/main（空树种子）', async () => {
-    const dir = join(mkdtempSync(join(tmpdir(), 'pacman-seed-')), 'x.git');
+    const dir = join(mkdtempSync(join(tmpdir(), 'cairn-seed-')), 'x.git');
     disposables.push(() => rmSync(dir, { recursive: true, force: true }));
     await systemGitOps.initBareRepo(dir);
     expect(await systemGitOps.resolveCommit(dir, 'refs/heads/main')).toBeNull();

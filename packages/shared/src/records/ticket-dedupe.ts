@@ -9,7 +9,7 @@ export interface TicketDedupeInput {
   paths: readonly string[];
 }
 
-const MARKER_HEAD = '<!-- pacman-dedupe: ';
+const MARKER_HEAD = '<!-- cairn-dedupe: ';
 const MARKER_TAIL = ' -->';
 
 /** 去重键：类别小写去空白 + 路径归一（去 ./ 前缀与尾 /）后排序去重，`|` 连接。 */

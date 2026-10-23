@@ -1,5 +1,5 @@
 ---
-name: Pacman
+name: Cairn
 direction: Paper Dense · Grouped sidebar · Hybrid type
 reference: docs/board-paper-r5.html?v=3
 reference-dark: docs/board-paper-dark.html
@@ -89,7 +89,7 @@ spacing:
 
 ## 方向
 
-pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，每天打开看板几十次，核心问题是「哪些事等我处理」。
+cairn 是多 lane coding agent 编排台。用户是键盘优先的工程师，每天打开看板几十次，核心问题是「哪些事等我处理」。
 
 定稿方向：**纸面、紧凑、一个强调色**。暖白纸面分三层（canvas 底 → sheet 主面板 → 白色卡片），层级靠底色深浅加发丝环，不靠重阴影。彩色只有两个：赭红 `accent` 表示「需要你」与可操作，绿色 `running` 表示「正在跑」。其余一律墨色阶梯。
 
@@ -276,7 +276,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 ## 给 agent 的美学约束（粘贴进提示词）
 
 ```text
-Pacman UI rules (source: apps/web/DESIGN.md):
+Cairn UI rules (source: apps/web/DESIGN.md):
 - Look: warm paper, dense, calm. Three layers: canvas #f3eee5 → sheet #fbf9f5 → white cards. Hairline rings, almost no shadow. Elevation is three tokens with the ring baked in: --e1 card/row, --e2 menu/popover, --e3 dialog/floating window. Never add a second ring or a raw shadow; --top (dark-only inset top highlight) rides e2/e3 only.
 - Dark (:root default): the same ladder, lighter with elevation: canvas #1a1612 → sheet #24201b → card #2f2a26 → popover #37322d (menus and dialogs). Ink #ece7df / #c5c0b9 / #aca7a0. Accent #f0926d with dark text on it (badge, project tiles). Running #7fb980. Only token values differ between themes.
 - One accent: terracotta (accent) only for "needs you", action links, count badges, active icons. Green (running) only for running/online. Everything else is ink greys.

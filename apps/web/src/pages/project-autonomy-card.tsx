@@ -7,7 +7,7 @@ import type {
   AutonomyKind,
   AutonomyRecord,
   AutonomySettings,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { useState } from 'react';
 import { useApiMutations, useProjectAutonomy } from '../api/hooks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';

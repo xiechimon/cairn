@@ -9,7 +9,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 const light = async (page: Page, url: string) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(url);
 };
 

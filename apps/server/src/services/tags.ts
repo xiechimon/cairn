@@ -9,7 +9,7 @@
 //   标签的历史不该被外部仓库改写。
 // 两形态共用一条不变式：贴的标签必须在本项目标签集内（tag 表现查）。
 
-import { FIXED_TAGS, TAG_DEFAULT_COLOR } from '@pacman/shared';
+import { FIXED_TAGS, TAG_DEFAULT_COLOR } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, tag } from '../db/schema.js';

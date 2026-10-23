@@ -22,7 +22,7 @@ import type {
   ToolCallRecord,
   TranscriptRow,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -185,7 +185,7 @@ function backendOf(script: StepEvent[] | AsyncIterable<StepEvent>): AgentBackend
 }
 
 async function run(script: StepEvent[] | AsyncIterable<StepEvent>) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-think-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-think-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const client = new RecordingClient();
   await runStep(

@@ -16,14 +16,14 @@
 // - 800 行 / 40 文件只数一部分：按整张补丁算，证据也计入，改名与复制记两个文件；
 //   compare 不给 patch 的条目（二进制）要能认出来。
 // 夹具 test/fixtures/merge-gate-compare-sample.json 是一次真实的只读 compare
-// 响应（xiechimon/pacman 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
+// 响应（xiechimon/cairn 52d2cdc...b4b1f96，per_page=1；patch 有则换成一句占位、
 // 无则仍缺）；去掉 patch 后与 docs/verify/1404/compare-sample.json 同一份，放在
 // 测试目录里是因为摘要不计 docs/verify/，测试读的夹具不能落在摘要之外。夹具的
 // 摘要绑的是占位文本的 patchSha，不是真实补丁的。
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type CompareFile, compareFileSchema, GATE_LIMITS } from '@pacman/shared';
+import { type CompareFile, compareFileSchema, GATE_LIMITS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   compareFilesFromResponse,
@@ -336,7 +336,7 @@ describe('真实 compare 响应夹具', () => {
     ).toBe(true);
   });
 
-  test('解析出的每个条目都合 @pacman/shared 的 compareFileSchema，且没有词表之外的字段', () => {
+  test('解析出的每个条目都合 @cairn/shared 的 compareFileSchema，且没有词表之外的字段', () => {
     for (const f of compareFilesFromResponse(sample) ?? []) {
       expect(compareFileSchema.parse(f), f.filename).toEqual(f);
     }

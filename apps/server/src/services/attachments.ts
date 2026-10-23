@@ -131,7 +131,7 @@ export interface GrantOutput {
 
 export interface AttachmentDeps {
   db: Db;
-  secretBox: import('@pacman/shared').SecretBox;
+  secretBox: import('@cairn/shared').SecretBox;
   attachmentsDir: string;
   userId: string;
   teamId: string;

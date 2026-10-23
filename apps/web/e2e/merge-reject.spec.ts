@@ -29,7 +29,7 @@ const BUILD_ID = 'build-1';
 const PROJECT_ID = 'proj-1';
 
 // 证据截图走 evidenceShot（默认不落盘；要为本票 PR 再生证据时设
-// PACMAN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。
+// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> 再跑，见 e2e/evidence.ts）。
 // 历史证据 = 已提交的 docs/verify/XMON-89/，回归跑不许再重写它。
 //
 // #951/#910 重钉：.dlg-accept 容器 → role=dialog 可及名「完成任务」一级
@@ -90,10 +90,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };

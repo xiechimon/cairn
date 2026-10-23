@@ -186,7 +186,7 @@ finish() {
 
 
 # #231 OAuth 连号向导（github-copilot 族；M6 终验票 #232 的真人执行面）。
-# 产物：.env 落 PACMAN_GITHUB_OAUTH_CLIENT_ID/SECRET 两件（server config.ts
+# 产物：.env 落 CAIRN_GITHUB_OAUTH_CLIENT_ID/SECRET 两件（server config.ts
 # env 读位——server 不自动读 .env，stage 3 的启动命令负责 source）。
 
 TOTAL_STAGES=5
@@ -194,22 +194,22 @@ TOTAL_STAGES=5
 # .env 落仓根（本脚本在 scripts/ 下一层）；ENV_FILE 环境变量可覆写。
 ENV_FILE="${ENV_FILE:-$(cd "$(dirname "$0")/.." && pwd)/.env}"
 
-banner "pacman · GitHub Copilot OAuth 连号"
+banner "cairn · GitHub Copilot OAuth 连号"
 
 # ── Stage 1: 定 server origin（callback URL 的宿主部分）────────────────────
 stage "定 server origin"
 say "OAuth App 注册的 callback URL 必须与 server 实际 origin 逐字符一致。"
 say "本机直连形态用默认即可；局域网/云主机形态换成那台机器的可达 origin。"
-ask PACMAN_ORIGIN "server origin（默认 http://127.0.0.1:8787，不带尾斜杠）:"
-PACMAN_ORIGIN="${PACMAN_ORIGIN:-http://127.0.0.1:8787}"
-note "callback URL 将是：${PACMAN_ORIGIN}/api/oauth/callback"
+ask CAIRN_ORIGIN "server origin（默认 http://127.0.0.1:8787，不带尾斜杠）:"
+CAIRN_ORIGIN="${CAIRN_ORIGIN:-http://127.0.0.1:8787}"
+note "callback URL 将是：${CAIRN_ORIGIN}/api/oauth/callback"
 
 # ── Stage 2: 注册 GitHub OAuth App ─────────────────────────────────────────
 stage "注册 GitHub OAuth App"
 open_url "https://github.com/settings/applications/new"
-step "Application name：任意（例如 pacman-selfhost）。"
-step "Homepage URL：${PACMAN_ORIGIN}"
-step "Authorization callback URL：${PACMAN_ORIGIN}/api/oauth/callback  ← 逐字符抄"
+step "Application name：任意（例如 cairn-selfhost）。"
+step "Homepage URL：${CAIRN_ORIGIN}"
+step "Authorization callback URL：${CAIRN_ORIGIN}/api/oauth/callback  ← 逐字符抄"
 step "Register application 提交。"
 pause "注册完成回这里继续"
 
@@ -217,24 +217,24 @@ pause "注册完成回这里继续"
 stage "抄回 Client ID / Client Secret"
 say "注册成功的 App 页面上："
 step "Client ID 直接可见（Iv1.… 或 23 位内字符串），复制。"
-ask PACMAN_GITHUB_OAUTH_CLIENT_ID "粘贴 Client ID:"
+ask CAIRN_GITHUB_OAUTH_CLIENT_ID "粘贴 Client ID:"
 step "点 Generate a new client secret，立即复制（只显示一次）。"
-ask_secret PACMAN_GITHUB_OAUTH_CLIENT_SECRET "粘贴 Client Secret:"
-write_env PACMAN_GITHUB_OAUTH_CLIENT_ID "$PACMAN_GITHUB_OAUTH_CLIENT_ID"
-write_env PACMAN_GITHUB_OAUTH_CLIENT_SECRET "$PACMAN_GITHUB_OAUTH_CLIENT_SECRET"
+ask_secret CAIRN_GITHUB_OAUTH_CLIENT_SECRET "粘贴 Client Secret:"
+write_env CAIRN_GITHUB_OAUTH_CLIENT_ID "$CAIRN_GITHUB_OAUTH_CLIENT_ID"
+write_env CAIRN_GITHUB_OAUTH_CLIENT_SECRET "$CAIRN_GITHUB_OAUTH_CLIENT_SECRET"
 
 # ── Stage 4: 带 env 起 server（web 由 server 同源托管）─────────────────────
 stage "起 server"
 say "server 只从进程环境读这两件（config.ts，不自动读 .env），所以启动命令"
 say "必须先 source。仓库根执行："
-step "pnpm --filter @pacman/web build        # 首回或 web 有改动时"
+step "pnpm --filter @cairn/web build        # 首回或 web 有改动时"
 step "set -a; source .env; set +a; pnpm dev:server"
-note "web 产物托管在 server 同端口（02/A1 同源形态），开 ${PACMAN_ORIGIN}/app 即是。"
+note "web 产物托管在 server 同端口（02/A1 同源形态），开 ${CAIRN_ORIGIN}/app 即是。"
 pause "server 起来了再回这里"
 
 # ── Stage 5: 连号 + 验证 ───────────────────────────────────────────────────
 stage "连号"
-open_url "${PACMAN_ORIGIN}/app/resources/providers"
+open_url "${CAIRN_ORIGIN}/app/resources/providers"
 step "点右上角 添加 → 弹窗顶部「连接订阅」段 → 点 GitHub Copilot。"
 step "页面跳 GitHub 授权页 → 点 Authorize。"
 step "授权后自动跳回模型服务页，列表出现 GitHub Copilot 行即成。"

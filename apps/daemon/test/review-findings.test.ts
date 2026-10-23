@@ -20,7 +20,7 @@
 //      findings 含义是「方案通过」，不可静默折）；
 //   8. 顺位：严格有效（新→旧）> 降级（最新可降级者）> failed。
 
-import { hasBlockingFinding } from '@pacman/shared';
+import { hasBlockingFinding } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { extractReviewVerdict, type ReviewVerdictExtraction } from '../src/review-findings.js';
 

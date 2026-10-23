@@ -10,9 +10,9 @@
 |---|---|---|---|
 | 团队 | Team | `team` | 顶层租户边界，项目、Agent、机器、资源与套餐（plan）都归属其下。 |
 | 项目 | Project | `project` | 团队下聚合任务、仓库与文件的单位。 |
-| 仓库 | Repo | `repo` | 项目绑定的代码来源，两种形态：GitHub 接入（`githubRepo`）或本地文件夹（`localPath`，必须是 git 仓库——server 三态校验 not_absolute / not_found / not_git）。是 Project 的属性，不是独立租户层。hosted（Pacman 托管）形态已移除。**形态的可丢性分叉**（ADR 0016）：`githubRepo` 真值在远端、机器死了换机续跑；`localPath` 是单机器缓存形态——真值在该机文件系统，机器损坏进度随机器走，不享受换机续跑。**双执行源**（ADR 0017 / #1213）：`githubRepo` 形态项目可加挂可选 `localPath` 作同机执行加速位——真值恒为 GitHub（server 只验绝对路径形态，daemon 物化时双条件判定「路径存在 + 该路径 origin 与 githubRepo 同仓」，不过则静默回落 GitHub clone）；同一项目被两种机器执行，各走各能到的源。**local 形态的执行边界**（#1210）：local 形态的 `localPath` 是登记机文件系统上的路径，步骤只在仓库所在机器上可执行；其它执行机上路径不可达 = daemon 在 clone/fetch 之前显式失败，步 errorMessage 点名机器、路径、原因与补法（把任务钉选改回仓库所在机器，或跨机开发用 GitHub 形态建项目）。 |
+| 仓库 | Repo | `repo` | 项目绑定的代码来源，两种形态：GitHub 接入（`githubRepo`）或本地文件夹（`localPath`，必须是 git 仓库——server 三态校验 not_absolute / not_found / not_git）。是 Project 的属性，不是独立租户层。hosted（Cairn 托管）形态已移除。**形态的可丢性分叉**（ADR 0016）：`githubRepo` 真值在远端、机器死了换机续跑；`localPath` 是单机器缓存形态——真值在该机文件系统，机器损坏进度随机器走，不享受换机续跑。**双执行源**（ADR 0017 / #1213）：`githubRepo` 形态项目可加挂可选 `localPath` 作同机执行加速位——真值恒为 GitHub（server 只验绝对路径形态，daemon 物化时双条件判定「路径存在 + 该路径 origin 与 githubRepo 同仓」，不过则静默回落 GitHub clone）；同一项目被两种机器执行，各走各能到的源。**local 形态的执行边界**（#1210）：local 形态的 `localPath` 是登记机文件系统上的路径，步骤只在仓库所在机器上可执行；其它执行机上路径不可达 = daemon 在 clone/fetch 之前显式失败，步 errorMessage 点名机器、路径、原因与补法（把任务钉选改回仓库所在机器，或跨机开发用 GitHub 形态建项目）。 |
 
-_Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的任务检出目录（`~/.pacman/workspaces/<conversationId>`）；禁止用它指代团队或任何界面层级。
+_Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的任务检出目录（`~/.cairn/workspaces/<conversationId>`）；禁止用它指代团队或任何界面层级。
 
 ## 任务生命周期
 
@@ -25,7 +25,7 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 | 方案 | Plan | `plan` | build 内类型化的规划产物卡（Context / Changes / Edge cases / Verification）；不是独立实体。 |
 | 标签 | Tag | `tag` | todo 的 category 标签。**词表来源与数量上限随仓库形态分叉**：`githubRepo` 项目 = 该仓库实际的 label 集（动态，issue 挂几个贴几个）；`local` 项目 = 固定 6 词表（bug / feature / improvement / refactor / docs / chore），随项目播种，每任务至多 1 个。两形态都是派发时由执行 agent 回填、无人工创建/挑选 UI（ADR 0002 D4/D5，ADR 0005 D2/D4）。 |
 | 占位标题 | Placeholder title | `title`（占位态） | 保存任务时落库的首行截断标题（正文首行 ≤50 字符）；执行 agent 接单后用 LLM 总结回填正式标题覆盖之。**仅 local 项目**——github 项目从 issue 建的任务直接用 issue 标题，没有占位态（ADR 0005 D5）。 |
-| 来源 | Source | `sourceKind` / `sourceRef` | todo 的出处——**外部出处或编排出处**（#640 / r14 §5.3：不再限于外部）；一个任务至多一个，归 `todo` 既有的溯源家族。两族：`github-issue` / `github-issue-self`（外部，`sourceRef` 形如 `github:owner/repo#123`）——github 项目的任务**两侧都有落点**，领来的记下那枚 issue、自派的建一枚（ADR 0005 D6、ADR 0006 D1），但**不改写 issue 的状态、不自动覆盖**，issue 侧仍是真值、pacman 只显示差异（ADR 0006 D5/D6）；`orchestration`（编排，`sourceRef` 形如 `chief:<uuid>`）——总管编排回合拆出的子卡，指向那次请求的编排会话（per-request 粒度，答「哪次请求拆的」，与答「谁建的」的 `createdBy`/`sourceBuildId` 三层各答一问，r14 §5.3）。至多一个来源，GitHub 接入项目的镜像写向优先占槽（r14 §5.7）。 |
+| 来源 | Source | `sourceKind` / `sourceRef` | todo 的出处——**外部出处或编排出处**（#640 / r14 §5.3：不再限于外部）；一个任务至多一个，归 `todo` 既有的溯源家族。两族：`github-issue` / `github-issue-self`（外部，`sourceRef` 形如 `github:owner/repo#123`）——github 项目的任务**两侧都有落点**，领来的记下那枚 issue、自派的建一枚（ADR 0005 D6、ADR 0006 D1），但**不改写 issue 的状态、不自动覆盖**，issue 侧仍是真值、cairn 只显示差异（ADR 0006 D5/D6）；`orchestration`（编排，`sourceRef` 形如 `chief:<uuid>`）——总管编排回合拆出的子卡，指向那次请求的编排会话（per-request 粒度，答「哪次请求拆的」，与答「谁建的」的 `createdBy`/`sourceBuildId` 三层各答一问，r14 §5.3）。至多一个来源，GitHub 接入项目的镜像写向优先占槽（r14 §5.7）。 |
 
 边界裁决：
 - **无 Goal 概念** —— 工作单元只有一个，即 `todo`；「Goal」不引入。
@@ -33,14 +33,14 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 - **`待处理` 只指看板「需要我处理」列**（`confirm` / `review` / `failed`）。`todo` 在 `待开始` 列，芯片词 `待开始`；`queued`（已启动、等空闲机器）在 `执行中` 列，芯片词 `排队中`（#1400，列位 #1447）。芯片词可以和列名不同（`确认` / `审核` / `失败` 都在 `待处理` 列），但芯片词与某个列名同字时，该 phase 必须在那一列。
 - Build 与 Conversation 是一个实体的两面（执行 vs 消息流），不拆成两套 id。
 - **新建任务无「标题」填写面** —— 用户只写任务正文，标题 = 占位标题 → agent 回填两段式（ADR 0002，**仅 local 项目**；github 项目的任务从 issue 取标题，见 ADR 0005 D5）；标签的 state 轴不引入，已由 `phase` 承载。
-- **标签与标题的真值随仓库形态分叉** —— `githubRepo` 项目的元信息对 issue 取真值，`local` 项目留在 pacman 内（ADR 0005 D1）。分叉的依据是约束不是偏好：local 项目没有外部真值可依。读这条词表时不要默认两种形态行为一致。
-- **`issue` 不是 pacman 实体** —— GitHub issue 只在「来源」里作为外部引用出现。pacman 会往 GitHub 建 issue、写它的标题（ADR 0006 D1/D3），但**不引入 Issue 记录、不镜像状态、不做自动同步**——真值方向始终是 issue → pacman（ADR 0005 D1、ADR 0006 D5）。
+- **标签与标题的真值随仓库形态分叉** —— `githubRepo` 项目的元信息对 issue 取真值，`local` 项目留在 cairn 内（ADR 0005 D1）。分叉的依据是约束不是偏好：local 项目没有外部真值可依。读这条词表时不要默认两种形态行为一致。
+- **`issue` 不是 cairn 实体** —— GitHub issue 只在「来源」里作为外部引用出现。cairn 会往 GitHub 建 issue、写它的标题（ADR 0006 D1/D3），但**不引入 Issue 记录、不镜像状态、不做自动同步**——真值方向始终是 issue → cairn（ADR 0005 D1、ADR 0006 D5）。
 
 ## 执行体
 
 | 中文界面词 | 英文原词 | 内部名 | 定义 / 边界 |
 |---|---|---|---|
-| 机器 | Machine | `machine` | 登记的执行主机（`pacman` daemon + 内嵌 pi runtime），领取并运行 build 步。一个机器可承载多个 Agent 的步；它不是 Agent 的属性。 |
+| 机器 | Machine | `machine` | 登记的执行主机（`cairn` daemon + 内嵌 pi runtime），领取并运行 build 步。一个机器可承载多个 Agent 的步；它不是 Agent 的属性。 |
 | Agent | Agent | `agent` | 配了模型、职责、技能、工具、密钥、MCP 与记忆的执行角色；运行在某台机器上。 |
 | 总管 | Chief | `chief` | 每「用户×团队」一个的调度与对话代理，负责分派任务；领域上区别于干活的 worker Agent。 |
 | 主力机 | Primary machine | `chief.machineId` | chief 的默认执行机器（#895）：chief 新线程钉选缺省链的第二级（`todo.machineId` → 本槽 → null），钉选语义同 `todo.machineId`——确定性、无自动回退，解除归用户；null = 自动（任何在线机器认领 + 会话亲和）。只辖 chief 线程的钉选，不辖 worker 派发。设定面在 chief 设置 Agent tab「机器」槽（PATCH /chief），machines 页只读三态标注（总管主机 / 回合进行中 / 等待机器）。 |
@@ -57,7 +57,7 @@ _Avoid_：**Workspace** —— 它不是领域实体，仅指执行机本地的�
 | 模型 | Model | `model` | Provider 下的一个具名可选项。[排除项：内置 built-in 模型走 Pro，不在复刻范围。] |
 | MCP 服务器 | MCP server | `mcpServer` | 团队接入、为 Agent 提供额外工具的外部 MCP 服务器（方向：外部 → Agent）；工具名 `mcp__<标识符>__<工具>`。 |
 | 团队密钥 | Secret | `secret` | 按 Agent 授权、按步下发的键值，只写不读；明文不预置进任务 shell 环境（agent 经取用通道显式取用，取用留审计行）。 |
-| API 密钥 | API key | `apiKey` | `pacman_…` 形态的凭证，用于注册机器与作为 MCP Bearer，带读/写工具白名单。 |
+| API 密钥 | API key | `apiKey` | `cairn_…` 形态的凭证，用于注册机器与作为 MCP Bearer，带读/写工具白名单。 |
 
 边界裁决：
 - **「密钥」是重载词，强制拆两义** —— `secret`（团队密钥）≠ `apiKey`（访问令牌）。代码里两词严格分开。

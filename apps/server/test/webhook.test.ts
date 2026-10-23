@@ -2,7 +2,7 @@
 // token-auth 豁免面。失败方式清单（先列后写，代码是让场景通过的手段）：
 //
 // A created 全链
-//  A1 触发 label（pacman）labeled 事件 → 202 {result:'created'}，todo 行
+//  A1 触发 label（cairn）labeled 事件 → 202 {result:'created'}，todo 行
 //     sourceKind/sourceRef 落值 + chief_thread/chief_message/step 行（派发段）
 //     + webhook_token.lastUsedAt 回写（落库段）；
 //  A2 响应封套过 shared webhookReceiverResponseSchema（请求段对账）。
@@ -27,8 +27,8 @@
 //  E3 token mgmt：创建一次性明文 + 列表掩码（keyHash 永不出）+ 删除 204/
 //     404；属他 team 的删除 → 404。
 // F token-auth 豁免面
-//  F1 PACMAN_TOKEN 开：receiver 免 Bearer 可达（错 token 仍 401——自有闸）；
-//  F2 PACMAN_TOKEN 开：token mgmt 端点仍要 Bearer（401 无凭证）；
+//  F1 CAIRN_TOKEN 开：receiver 免 Bearer 可达（错 token 仍 401——自有闸）；
+//  F2 CAIRN_TOKEN 开：token mgmt 端点仍要 Bearer（401 无凭证）；
 //  F3 /api/webhookfoo 段边界不豁免（401）。
 // W #1459 打标人按 D5 核 + 计入在飞上限（清单 docs/verify/1459/failure-modes.txt，
 //   W 编号对位）：sender 在仓库上 triage 及以上才导入，权限读与缓存复用 #1406
@@ -44,7 +44,7 @@
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type Phase, type TodoSourceKind, webhookReceiverResponseSchema } from '@pacman/shared';
+import { type Phase, type TodoSourceKind, webhookReceiverResponseSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import pino from 'pino';
@@ -106,16 +106,16 @@ function permissionBody(
 const ISSUE_DETAIL = {
   number: 7,
   title: 'webhook 入口测试 issue',
-  body: '正文：贴 pacman 标签自动建任务。',
+  body: '正文：贴 cairn 标签自动建任务。',
   state: 'open',
-  labels: [{ name: 'pacman', color: '0075ca' }],
+  labels: [{ name: 'cairn', color: '0075ca' }],
 };
-const LABELS_FULL = [{ name: 'pacman', color: '0075ca', description: null }];
+const LABELS_FULL = [{ name: 'cairn', color: '0075ca', description: null }];
 
 /** labeled 事件载荷（GitHub issues webhook 原形的消费子集）。sender = 打标人
  * （缺省仓主；null = 载荷不带 sender）；author = issue 作者（issue.user）。 */
 function labeledPayload(
-  labelName = 'pacman',
+  labelName = 'cairn',
   opts: { sender?: string | null; issue?: number; author?: string } = {},
 ) {
   const sender = opts.sender === undefined ? SENDER : opts.sender;
@@ -295,7 +295,7 @@ describe('A created 全链（请求/落库/派发三段 tracer）', () => {
       .where(eq(chiefMessageTable.threadId, body.threadId!))
       .all();
     expect(messages).toHaveLength(1);
-    expect(messages[0]!.content).toContain('正文：贴 pacman 标签自动建任务。');
+    expect(messages[0]!.content).toContain('正文：贴 cairn 标签自动建任务。');
     const steps = s.db.select().from(stepTable).where(eq(stepTable.buildId, body.threadId!)).all();
     expect(steps).toHaveLength(1);
     expect(steps[0]!.kind).toBe('chief');
@@ -479,7 +479,7 @@ describe('E token 面', () => {
 
   test('E3 token mgmt：创建一次性明文 + 列表掩码 + 删除 404/跨 team', async () => {
     const created = await createWebhookToken(s.app, s.team.id, 'second');
-    expect(created.plaintext).toMatch(/^pacman_wh_[0-9a-f]{36}$/);
+    expect(created.plaintext).toMatch(/^cairn_wh_[0-9a-f]{36}$/);
     const list = (await (
       await req(s.app, 'GET', `/api/teams/${s.team.id}/webhook-tokens`)
     ).json()) as Array<Record<string, unknown>>;
@@ -508,7 +508,7 @@ describe('E token 面', () => {
   });
 });
 
-describe('F token-auth 豁免面（PACMAN_TOKEN 开）', () => {
+describe('F token-auth 豁免面（CAIRN_TOKEN 开）', () => {
   function bootAuthed(): TestServer {
     const authed = bootServer({ authToken: 'gate-token', githubFetch: mock.impl });
     upsertGithubConnection(
@@ -766,7 +766,7 @@ function listForPoller(n: number, labeler: string): void {
 describe('#1459 W 打标人（sender）按 D5 核', () => {
   test('W1 外部作者经 issue 模板自动打标（sender = 作者，permission 404）→ 202 ignored，不导入、不读 issue，记日志', async () => {
     routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
-    const payload = labeledPayload('pacman', { sender: 'outsider', author: 'outsider' });
+    const payload = labeledPayload('cairn', { sender: 'outsider', author: 'outsider' });
     const http = await deliverHttp(payload, 'w1-http');
     expect(http.status).toBe(202);
     expect(http.body).toEqual({
@@ -795,7 +795,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
 
   test('W2 打标人只有 read（role read、triage false）→ 202 ignored，不导入', async () => {
     routes[permissionPath('reader')] = { body: permissionBody('reader', 'read', 'read', false) };
-    const http = await deliverHttp(labeledPayload('pacman', { sender: 'reader' }), 'w2');
+    const http = await deliverHttp(labeledPayload('cairn', { sender: 'reader' }), 'w2');
     expect(http.status).toBe(202);
     expect(http.body).toEqual({
       result: 'ignored',
@@ -803,7 +803,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       detail: SENDER_REFUSED_DETAIL,
     });
     // 202 只有那一句：哪种拒收由日志行的原因码钉（读到 read，不是读不到）。
-    const direct = await deliverDirect(labeledPayload('pacman', { sender: 'reader' }), 'w2-direct');
+    const direct = await deliverDirect(labeledPayload('cairn', { sender: 'reader' }), 'w2-direct');
     expect(refusals(direct.lines)).toEqual([
       expect.objectContaining({ sender: 'reader', reason: 'sender-below-triage' }),
     ]);
@@ -819,7 +819,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     ['custom role built on triage', permissionBody('labeler', 'read', 'issue-wrangler', true)],
   ])('W3 打标人 %s → 202 created（先读 permission 再导入）', async (_role, body) => {
     routes[permissionPath('labeler')] = { body };
-    const http = await deliverHttp(labeledPayload('pacman', { sender: 'labeler' }), 'w3');
+    const http = await deliverHttp(labeledPayload('cairn', { sender: 'labeler' }), 'w3');
     expect(http.status).toBe(202);
     expect(http.body.result).toBe('created');
     expect(issueTasks()).toHaveLength(1);
@@ -981,7 +981,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
   });
 
   test('W12a 载荷不带 sender → 202 ignored，零出站，记日志', async () => {
-    const payload = labeledPayload('pacman', { sender: null });
+    const payload = labeledPayload('cairn', { sender: null });
     const http = await deliverHttp(payload, 'w12a');
     expect(http.status).toBe(202);
     expect(http.body).toEqual({
@@ -997,7 +997,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
 
   test('W12b sender 是 ghost（GitHub 认不出人时的占位账号，permission 404）→ 202 ignored', async () => {
     routes[permissionPath('ghost')] = { status: 404, body: { message: 'Not Found' } };
-    const http = await deliverHttp(labeledPayload('pacman', { sender: 'ghost' }), 'w12b');
+    const http = await deliverHttp(labeledPayload('cairn', { sender: 'ghost' }), 'w12b');
     expect(http.status).toBe(202);
     expect(http.body).toEqual({
       result: 'ignored',
@@ -1005,10 +1005,7 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
       detail: SENDER_REFUSED_DETAIL,
     });
     // 404 是明确的否定答案：原因码是不到 triage，不是读不到。
-    const direct = await deliverDirect(
-      labeledPayload('pacman', { sender: 'ghost' }),
-      'w12b-direct',
-    );
+    const direct = await deliverDirect(labeledPayload('cairn', { sender: 'ghost' }), 'w12b-direct');
     expect(refusals(direct.lines)).toEqual([
       expect.objectContaining({ sender: 'ghost', reason: 'sender-below-triage' }),
     ]);
@@ -1024,8 +1021,8 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
 
   test('W14a 同一 sender 两次投递（不同 issue）：permission 只读一次（与轮询器同一缓存）', async () => {
     routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
-    const first = await deliverHttp(labeledPayload('pacman', { issue: 7 }), 'w14a-1');
-    const second = await deliverHttp(labeledPayload('pacman', { issue: 8 }), 'w14a-2');
+    const first = await deliverHttp(labeledPayload('cairn', { issue: 7 }), 'w14a-1');
+    const second = await deliverHttp(labeledPayload('cairn', { issue: 8 }), 'w14a-2');
     expect([first.body.result, second.body.result]).toEqual(['created', 'created']);
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
   });
@@ -1078,8 +1075,8 @@ describe('#1459 W 计入在飞上限', () => {
     insertIssueTask(102, 'building');
     routes[`/repos/${REPO}/issues/8`] = { body: { ...ISSUE_DETAIL, number: 8 } };
     const gated = gatedFetch([ISSUE_PATH, `/repos/${REPO}/issues/8`]);
-    const a = deliverDirect(labeledPayload('pacman', { issue: 7 }), 'w8-a', gated.impl);
-    const b = deliverDirect(labeledPayload('pacman', { issue: 8 }), 'w8-b', gated.impl);
+    const a = deliverDirect(labeledPayload('cairn', { issue: 7 }), 'w8-a', gated.impl);
+    const b = deliverDirect(labeledPayload('cairn', { issue: 8 }), 'w8-b', gated.impl);
     setTimeout(gated.open, 30);
     const results = await Promise.all([a, b]);
     expect(results.map((r) => r.response.result).sort()).toEqual(['created', 'ignored']);
@@ -1108,7 +1105,7 @@ describe('#1459 W 并发与重投', () => {
 
   test('W9 被拒的投递重投（同 X-GitHub-Delivery）：窗口内 202 duplicate，窗口外照判 202 ignored，始终不导入', async () => {
     routes[permissionPath('outsider')] = { status: 404, body: { message: 'Not Found' } };
-    const payload = labeledPayload('pacman', { sender: 'outsider', author: 'outsider' });
+    const payload = labeledPayload('cairn', { sender: 'outsider', author: 'outsider' });
     const first = await deliverHttp(payload, 'w9');
     expect(first.status).toBe(202);
     expect(first.body.result).toBe('ignored');

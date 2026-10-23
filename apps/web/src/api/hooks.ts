@@ -1,6 +1,6 @@
 // TanStack Query 数据层（M5，01 §4.1/S8 锁定：server state 全走查询失效
 // 重取；SSE 事件仅作 invalidateQueries 提示信号——见 sse.ts）。
-// 查询键词表 = 本文件 QK 单源；wire 类型单源 = @pacman/shared（02/A9）。
+// 查询键词表 = 本文件 QK 单源；wire 类型单源 = @cairn/shared（02/A9）。
 
 import type {
   AgentMachineFitResponse,
@@ -64,8 +64,8 @@ import type {
   TokenUsage,
   UpdateSkillBody,
   UserRecord,
-} from '@pacman/shared';
-import { SKILL_ENTRY_FILE } from '@pacman/shared';
+} from '@cairn/shared';
+import { SKILL_ENTRY_FILE } from '@cairn/shared';
 import {
   keepPreviousData,
   useMutation,

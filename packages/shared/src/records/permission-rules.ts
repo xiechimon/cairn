@@ -1,4 +1,4 @@
-// 命令闸规则表形状（#866 T5 tracer：对齐 AMP 闸门哲学 + pacman 双闸）。
+// 命令闸规则表形状（#866 T5 tracer：对齐 AMP 闸门哲学 + cairn 双闸）。
 // AMP 权限模型（docs/research/amp-native-sandbox-orb.md §1.2）：每次工具调用
 // 前按序匹配规则表，命中即执行动作，未命中回落默认。本表取其三动作子集
 // allow/ask/reject（AMP 还有 delegate——外接 OPA/脚本，本仓 tracer 不做）：

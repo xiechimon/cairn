@@ -6,8 +6,8 @@
 // - scheduler.tick(now) 不把最后活动早于 7 天的 chief 线程置读。
 // 用户回合仍是未读。正好 7 天、更新的 lastTurnAt、非 chief 通知不被 tick 改掉。
 
-import type { ClaimedStep } from '@pacman/shared';
-import { chiefIdFormat, claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { chiefIdFormat, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';

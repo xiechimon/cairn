@@ -12,7 +12,7 @@ const top = (page: Page, selector: string) =>
   page.locator(selector).first().evaluate((el) => el.getBoundingClientRect().top);
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
 });
 
 test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
@@ -29,11 +29,11 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
       return cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
     }),
   ).toContain('/logo-mark.svg');
-  await expect(team.getByRole('link', { name: 'Pacman' })).toBeVisible();
+  await expect(team.getByRole('link', { name: 'Cairn' })).toBeVisible();
   await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
   await expect(team.getByRole('button', { name: '收起侧边栏' })).toBeVisible();
   const nameFont = await team
-    .getByText('Pacman', { exact: true })
+    .getByText('Cairn', { exact: true })
     .evaluate((el) => getComputedStyle(el).fontFamily);
   expect(nameFont).toContain('sourceSerif4');
 
@@ -142,7 +142,7 @@ test('资源 folds by default, opens to an indented sub-list, survives reload', 
 
   await page.reload();
   await expect(sidebar(page).getByRole('link', { name: '技能' })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem('pacman.sidebarResourcesCollapsed'))).toBe(
+  expect(await page.evaluate(() => localStorage.getItem('cairn.sidebarResourcesCollapsed'))).toBe(
     '0',
   );
 });
@@ -225,7 +225,7 @@ test('user row second line reads machines online and running count', async ({ pa
 });
 
 test('collapsed rail keeps 需要我处理 with its badge and the expand toggle', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=01');
   const aside = sidebar(page);
   expect(await aside.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);

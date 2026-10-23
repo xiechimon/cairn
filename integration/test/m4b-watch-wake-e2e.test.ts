@@ -16,7 +16,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CHIEF_WATCH_REASON_DISPATCH } from '@pacman/shared';
+import { CHIEF_WATCH_REASON_DISPATCH } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -161,7 +161,7 @@ beforeAll(async () => {
     { toolCall: { name: 'machines', arguments: {} } },
     {
       content:
-        '失败原因：执行步的模型服务返回 400，属环境问题，这不是代码问题。工作保全在分支 pacman/conv- 前缀的会话分支上，没有丢失。建议检查 stub provider 配置后重跑。',
+        '失败原因：执行步的模型服务返回 400，属环境问题，这不是代码问题。工作保全在分支 cairn/conv- 前缀的会话分支上，没有丢失。建议检查 stub provider 配置后重跑。',
     },
   ];
   stub = await startStubLlm(script);
@@ -170,7 +170,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试 Agent：按指令使用工具，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m4b-wake-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m4b-wake-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

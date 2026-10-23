@@ -1,6 +1,6 @@
 // 请求处理上下文：DB + 事件 hub + SecretBox + seed 单用户/团队（02 §2 保形恒一行）。
 
-import type { SecretBox, TeamRecord, UserRecord } from '@pacman/shared';
+import type { SecretBox, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { FetchLike } from './lib/github.js';
@@ -48,7 +48,7 @@ export interface AppContext {
   /** 附件存储根（#310，r9 §4 wire；`<attachmentsDir>/<teamId>/<id>.<ext>`）。 */
   attachmentsDir: string;
   /** 技能根目录（spec 13 #367：本地目录现扫只读投影，不入库；缺省 =
-   *  SKILLS_DIR_DEFAULT `~/.agents/skills`，env PACMAN_SKILLS_DIR 覆写，
+   *  SKILLS_DIR_DEFAULT `~/.agents/skills`，env CAIRN_SKILLS_DIR 覆写，
    *  config.ts 单源展开）。 */
   skillsDir: string;
   /** 技能导入来源登记文件（#1170：数据根 skill-sources.json——refresh 重拉

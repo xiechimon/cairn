@@ -17,7 +17,7 @@ export const branchSyncRecordSchema = z.object({
   /** 目标同步目录（机器本机路径，~ 开头 = 用户家目录相对；web 默认
    * `~/<homeDirName>/workspaces/<buildId>`，可改）。 */
   directory: z.string(),
-  /** 目标 ref = 分支名（如 `pacman/conv-<uuid>`，brand conversationBranch）；
+  /** 目标 ref = 分支名（如 `cairn/conv-<uuid>`，brand conversationBranch）；
    * commit = 12hex 目标 commit（spec `目标提交 <12hex>` r3 §3.9 同族显示）。 */
   ref: z.string(),
   commit: z.string(),

@@ -46,7 +46,7 @@ test('sidebar avatar chips (expanded + rail) and user-menu head share one seeded
   await page.keyboard.press('Escape');
 
   // rail chip: collapse via the persisted key (SIDEBAR_STORAGE_KEY mirror)
-  await page.evaluate(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.reload();
   await expect(page.locator('.rail-user img')).toHaveAttribute('src', USER_SRC);
 });

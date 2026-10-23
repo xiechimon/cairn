@@ -11,13 +11,13 @@
 //   显式拒非 https 与私网/回环/link-local host（给贴错内网地址的用户
 //   明确报错，而不是含糊的「不支持」）。
 // - localPath：resolve+realpath 归一；归一后落在技能根内（含根本身）=
-//   400——技能根已被 pacman 现扫管理，自指导入无意义；根外任意可读目录
+//   400——技能根已被 cairn 现扫管理，自指导入无意义；根外任意可读目录
 //   是 local 形态的信任面（server 进程权限 = 操作者本人）。
 // - 只读复制：源目录零写入；walk 不追符号链接（listSkillFiles 同律，
 //   链接文件不入包）；.git 目录（VCS 元数据）不入包。
 // - 二进制：写面 body 是 utf8 文本（CreateSkillBody content: string），
 //   非 utf8 文件显式 400 点名——不静默丢弃（Multica 的 PG TEXT 列同因
-//   选择跳过；pacman 写面纪律是显式拒绝，走私一个缺资产的半技能更糟）。
+//   选择跳过；cairn 写面纪律是显式拒绝，走私一个缺资产的半技能更糟）。
 //
 // 上限：单文件/总量沿用 shared MAX_SKILL_FILE_BYTES / MAX_SKILL_TOTAL_BYTES
 // （写面闸在 createLocalSkill；URL 分支先用树声明的 size 预检——超限在
@@ -44,7 +44,7 @@ import {
   SKILL_ENTRY_FILE,
   type SkillFileBody,
   type SkillRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
@@ -88,8 +88,8 @@ export const SKILL_IMPORT_MAX_FILES = 256;
 
 const GH_API_BASE = 'https://api.github.com';
 const GH_RAW_BASE = 'https://raw.githubusercontent.com';
-/** GitHub API 要求 User-Agent（无 UA = 403）；自报家门 = pacman 导入通道。 */
-const GH_USER_AGENT = 'pacman-skill-import';
+/** GitHub API 要求 User-Agent（无 UA = 403）；自报家门 = cairn 导入通道。 */
+const GH_USER_AGENT = 'cairn-skill-import';
 const GH_HEADERS: Record<string, string> = {
   'user-agent': GH_USER_AGENT,
   accept: 'application/vnd.github+json',
@@ -203,7 +203,7 @@ function collectFromLocalPath(rawPath: string, skillsDir: string): Collected {
   if (real === rootReal || real.startsWith(rootReal + sep)) {
     throw new HttpError(
       400,
-      `localPath ${rawPath} resolves inside the pacman skills directory (${skillsDir}) — it is already visible to pacman; import from a directory outside it`,
+      `localPath ${rawPath} resolves inside the cairn skills directory (${skillsDir}) — it is already visible to cairn; import from a directory outside it`,
     );
   }
   const files: SkillFileBody[] = [];

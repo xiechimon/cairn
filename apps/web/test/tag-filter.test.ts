@@ -15,7 +15,7 @@
 //     tagId = null 优雅退化（C2）、多标签只渲染首个可解析项——渲染上限
 //     而非数据假设（C3，ADR 0005 Premortem 护栏：github 形态多标签时
 //     版面问题交给卡片渲染的上限，不交给词表）。
-import { FIXED_TAGS } from '@pacman/shared';
+import { FIXED_TAGS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   buildTagOptions,

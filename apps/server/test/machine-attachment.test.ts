@@ -9,7 +9,7 @@
 //   5. ready 附件 → 200 {fileName, mimeType, sizeBytes, contentBase64}
 //      （base64 与磁盘字节 round-trip + shared schema 对拍）。
 
-import { machineAttachmentResponseSchema, machineEnrollResponseSchema } from '@pacman/shared';
+import { machineAttachmentResponseSchema, machineEnrollResponseSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,

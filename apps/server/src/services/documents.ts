@@ -5,8 +5,8 @@
 // diff 计算 = npm `diff`（01 §4.1「npm diff 算数据」，pin 9.0.0）；wire 响应
 // 形状未实测（r5 §4 UI 触点为靶），hunks 结构 = structuredPatch 投影 [推断]。
 
-import type { DocumentDiff, DocumentDiffFile } from '@pacman/shared';
-import { PLAN_FILE_NAME } from '@pacman/shared';
+import type { DocumentDiff, DocumentDiffFile } from '@cairn/shared';
+import { PLAN_FILE_NAME } from '@cairn/shared';
 import { structuredPatch } from 'diff';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';

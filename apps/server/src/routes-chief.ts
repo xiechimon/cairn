@@ -8,7 +8,7 @@ import {
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
   patchChiefBodySchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { notFound, parseWith } from './lib/errors.js';

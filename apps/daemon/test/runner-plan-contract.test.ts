@@ -35,7 +35,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   appendPlanLocationNote,
   buildPlanFirstRoundInstruction,
@@ -43,7 +43,7 @@ import {
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -203,7 +203,7 @@ function handle(sessionId: string): AgentSessionHandle {
 }
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-plan-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();
@@ -225,7 +225,7 @@ async function setup(claimed: ClaimedStep, backend: AgentBackend) {
   return { client, home };
 }
 
-/** #1203 期望投递形：基础 prompt + 交接位置注记行（路径在 PACMAN_HOME 面）。 */
+/** #1203 期望投递形：基础 prompt + 交接位置注记行（路径在 CAIRN_HOME 面）。 */
 function withNote(home: string, basePrompt: string): string {
   return appendPlanLocationNote(basePrompt, join(home, 'plans', 'conv-1', PLAN_FILE_NAME));
 }

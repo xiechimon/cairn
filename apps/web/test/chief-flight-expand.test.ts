@@ -11,7 +11,7 @@
 //   F-E7 工具行文本 = pillOf 投影（`bash <命令>` 族），不是裸工具名——一排
 //        「Bash」读不出跑了什么；裸名只在无 command/file_path/path 时出现
 
-import type { ChiefGetResponse, ChiefThread } from '@pacman/shared';
+import type { ChiefGetResponse, ChiefThread } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { mapChief, type MessageRow } from '../src/api/mappers.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';

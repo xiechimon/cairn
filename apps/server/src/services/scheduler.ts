@@ -12,7 +12,7 @@
 //   [设计]（wire/UI 无抢占观测）。孤儿（todo 已删）自愈出队 [设计]。
 // 时间线「由定时发起」= build.triggerSource 数据面（呈现归 web）。
 
-import { ENV_VARS, type Scheduler } from '@pacman/shared';
+import { ENV_VARS, type Scheduler } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, schedule, todo } from '../db/schema.js';

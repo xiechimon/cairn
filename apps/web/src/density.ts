@@ -1,15 +1,15 @@
 // Density preference (CDS PR-9): comfortable (default rem-scale) vs compact
 // (`[data-density=compact]` → --rem-scale 0.9375 + tighter card/meta).
-// Persisted under brand-slot key `pacman-density`, mirrored to
+// Persisted under brand-slot key `cairn-density`, mirrored to
 // documentElement.dataset.density like theme → data-theme.
 // applyDensity broadcasts DENSITY_EVENT so account + user-menu segment
 // state stay in sync (Bugbot on #1366).
 
 import { safeLocalStorage } from './safe-storage.js';
 
-export const DENSITY_STORAGE_KEY = 'pacman-density';
+export const DENSITY_STORAGE_KEY = 'cairn-density';
 /** Window event name; detail = Density. */
-export const DENSITY_EVENT = 'pacman-density';
+export const DENSITY_EVENT = 'cairn-density';
 
 export type Density = 'comfortable' | 'compact';
 

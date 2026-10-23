@@ -664,10 +664,10 @@ const MD_SAMPLE = [
   '```',
 ].join('\n');
 
-const MD_TOOL_PILLS = ['bash ls -la', 'bash echo "hello from pacman"'];
+const MD_TOOL_PILLS = ['bash ls -la', 'bash echo "hello from cairn"'];
 const MD_TOOL_OUTPUTS = [
   'total 16\ndrwxr-xr-x@ 4 xmon  staff  128 Sep 30 10:00 .\ndrwxr-xr-x@ 6 xmon  staff  192 Sep 30 09:00 ..',
-  'hello from pacman',
+  'hello from cairn',
 ];
 
 const MD_TOOLOUT_TRANSCRIPT: TranscriptItem[] = [

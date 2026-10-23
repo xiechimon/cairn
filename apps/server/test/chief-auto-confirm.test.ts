@@ -1,6 +1,6 @@
 // #1254 auto-confirm plan：wakeFacts gate 文本 / triggerChiefWakes 拆卡父探测。
 
-import type { TodoRecord } from '@pacman/shared';
+import type { TodoRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { wakeFacts } from '../src/services/chief.js';
 

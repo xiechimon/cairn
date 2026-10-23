@@ -3,7 +3,7 @@
 // 端点）在此钉住；全链（pi 真会话阻塞 → 同回合续）归 integration
 // chief-ask-user.test.ts。
 
-import type { AskUserQuestion, MachineAskResponse } from '@pacman/shared';
+import type { AskUserQuestion, MachineAskResponse } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';

@@ -31,7 +31,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseSkillFrontmatter, skillRecordSchema } from '@pacman/shared';
+import { parseSkillFrontmatter, skillRecordSchema } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
@@ -43,7 +43,7 @@ import { bootServer, insertMachine, req, type TestServer } from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'pacman-skills-'));
+  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
   roots.push(root);
   return root;
 }

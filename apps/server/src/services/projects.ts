@@ -14,7 +14,7 @@
 // - localPath 两条件闸不可绕（票面失败方式 2）：转换面与既有加速位写面
 //   同函数 validateGithubLocalSlotPath（services/git.ts）。转换缺键 = 保留
 //   原值——local 创建闸绑定的仓路径就地转为加速位（用户 2026-10-11 定案
-//   「原 pacman 项目转 github 形态 + localPath 加速位」的落点）；null =
+//   「原 cairn 项目转 github 形态 + localPath 加速位」的落点）；null =
 //   清空。
 // - githubRepo 可达性（票面改法）：GET /repos/{o}/{r} 经 lib/github 薄桥
 //   （token = openGithubToken 唯一读出点，无连接 = 匿名梯）；404 → 400，
@@ -44,8 +44,8 @@
 //   - 不发 SSE 文档事件：deleteTodo 同律无发布；web 复活票走 invalidateAll
 //     客户端重取（#172 Notes 正典）。
 
-import type { PatchProjectBody, SecretBox } from '@pacman/shared';
-import { projectConvertedNote, projectRenamedNote } from '@pacman/shared';
+import type { PatchProjectBody, SecretBox } from '@cairn/shared';
+import { projectConvertedNote, projectRenamedNote } from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, build, chief, project, schedule, step, tag, todo } from '../db/schema.js';

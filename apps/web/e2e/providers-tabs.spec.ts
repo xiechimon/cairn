@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 // #356 (spec 11 §A1-A4/A7): providers 页 = runtime tablist（pi / Claude
 // Code），tab 状态走 ?runtime= search param（刷新/分享/深链回定位），每
 // tab = header 卡（runtime 名 + 说明 + 已安装在 <hostname>）+ 模型行
-// （显示名 → 模型 id，data-runtime/data-model-id 契约句柄）。「Pacman
+// （显示名 → 模型 id，data-runtime/data-model-id 契约句柄）。「Cairn
 // （内置）」facade 行与 38 项 preset 列表行已除（数据层全留，preset 仅
 // 在 picker dialog 内）；A7 行可点感收编：纯展示行无 chevron/三点。
 // 数据源 = fixture canon（scenario=10 的 providerSources，见 fixtures.ts
@@ -51,7 +51,7 @@ test('pi tab：fixture 模型行 + facade/38 项负向 + 无可点感装饰', as
   await expect(rows.nth(0)).toContainText('claude-sonnet-5');
   // A1/A5 负向：facade 行与 38 项 preset 名单不出现在页面正文
   const main = page.locator(`${SHELL} .page-main`);
-  await expect(main).not.toContainText('Pacman（内置）');
+  await expect(main).not.toContainText('Cairn（内置）');
   await expect(main).not.toContainText('DeepSeek');
   await expect(main).not.toContainText('OpenRouter');
   // A7：纯展示行无 chevron/三点（行内零 svg 零 button）
@@ -98,7 +98,7 @@ test('header 卡：runtime 名 + 说明 + 「已安装在 <hostname>」（两 ta
   const piHead = page.locator(`${SHELL} [data-testid="runtime-head"][data-runtime="pi"]`);
   await expect(piHead).toContainText('pi');
   await expect(piHead).toContainText(`已安装在 ${CANON_HOST}`);
-  await expect(piHead).toContainText('pacman 自有运行时');
+  await expect(piHead).toContainText('cairn 自有运行时');
   await page.locator(`${SHELL} [role="tab"][data-runtime="claude-code"]`).click();
   const ccHead = page.locator(
     `${SHELL} [data-testid="runtime-head"][data-runtime="claude-code"]`,

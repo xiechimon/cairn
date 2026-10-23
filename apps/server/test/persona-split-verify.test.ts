@@ -14,7 +14,7 @@ import {
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

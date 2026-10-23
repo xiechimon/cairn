@@ -1,7 +1,7 @@
 // worktree 契约落地（02 §5.5 全表，r3 §1.4 实测；shared WorktreeOps 缝的
 // daemon 实现，01 §4.3）：
 // - 基座 clone `<workspacesRoot>/<projectId>/repo`；任务 worktree
-//   `<workspacesRoot>/<conversationId>`；分支 `pacman/conv-<conversationId>`
+//   `<workspacesRoot>/<conversationId>`；分支 `cairn/conv-<conversationId>`
 //   （brand.ts conversationBranch()）。
 // - `worktree add -b <branch> <dir> <base>`，base = origin/<convBranch>
 //   （已 fetch 时）否则 origin/<defaultBranch>。
@@ -30,7 +30,7 @@ import {
   type WorkspaceHookNoteData,
   type WorktreeOps,
   type WorktreePrepareInput,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { gitPrim, withGitCredentialFallback, withGitNetRetries } from './git.js';
 import type { DaemonLogger } from './log.js';
 import {
@@ -355,7 +355,7 @@ export class WorkspaceManager implements WorktreeOps {
 
   /** 合并步 conv 分支与默认分支的合并（02 §5.5/r3 §3.6）。local 形态的落地
    * = conv 分支 push 回用户仓库（#1211：用户主检出的分支/工作树永不被
-   * pacman 触碰——本类所有 git 操作的作用域都限于基座 clone 与其 worktree，
+   * cairn 触碰——本类所有 git 操作的作用域都限于基座 clone 与其 worktree，
    * 从不对用户仓库目录执行 merge/branch 类写操作）。 */
   async mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }> {
     const output = await gitPrim.mergeNoEdit(cwd, `origin/${defaultBranch}`);

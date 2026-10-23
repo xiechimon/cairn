@@ -1,4 +1,4 @@
-// 代理探测（02 §5.6/r3 §1.5：启动读系统/环境代理并打印 `[pacman] Proxy: <url>`；
+// 代理探测（02 §5.6/r3 §1.5：启动读系统/环境代理并打印 `[cairn] Proxy: <url>`；
 // 代理死持续重试不退出——重试纪律在 machine-loop）。env 词表 = undici
 // EnvHttpProxyAgent honor 三件（01 §4.3：HTTP_PROXY/HTTPS_PROXY/NO_PROXY）。
 //
@@ -7,7 +7,7 @@
 // EnvHttpProxyAgent 构造时自读 env，覆盖必须走构造参数 noProxy（先合并 env
 // 既有 NO_PROXY 条目再传入，不吞用户配置）。
 
-import { BRAND, PROXY_ENV_VARS } from '@pacman/shared';
+import { BRAND, PROXY_ENV_VARS } from '@cairn/shared';
 import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici';
 import type { DaemonLogger } from './log.js';
 

@@ -1,6 +1,6 @@
 // #931 返工回原分支（server 面）：failed 重启不再必另起新 conversationId——
 // todo 已有产过 PR 的 build 时，restart 复用该 build（buildId ≡ conversationId
-// ≡ 分支 pacman/conv-<id>，复用即「原分支 + 原 PR」），强制新会话（用户裁定
+// ≡ 分支 cairn/conv-<id>，复用即「原分支 + 原 PR」），强制新会话（用户裁定
 // 「只复用分支、上下文真空」）；原 PR 已合并/已关闭时才允许新分支，且判定
 // 可见（新 conv 落 system note 点名旧 PR 与新分支——「为什么这次是新 PR」
 // 用户可辨）。
@@ -19,14 +19,14 @@
 //     （#701 已钉的边；本票验收要求两路收敛）
 // 10. 复用轮纯重启（空白反馈）语义漂移：无反馈行、无 instruction、note 照落
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import {
   buildRestartPrompt,
   buildReviewRejectPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

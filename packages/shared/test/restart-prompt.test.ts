@@ -137,12 +137,12 @@ describe('classifyUserText 组合行识别（失败方式 4/5）', () => {
       buildTaskPromptText('漂移前标题', SPEC),
       buildRestartPrompt('把测试也补上'),
     );
-    expect(classifyUserText(appendWorkBranchNote(base, 'pacman/conv-1279').trim(), task)).toBe(
+    expect(classifyUserText(appendWorkBranchNote(base, 'cairn/conv-1279').trim(), task)).toBe(
       'synthetic',
     );
     expect(
       classifyUserText(
-        appendPlanLocationNote(base, '/tmp/pacman/plans/conv-1279/plan.md').trim(),
+        appendPlanLocationNote(base, '/tmp/cairn/plans/conv-1279/plan.md').trim(),
         task,
       ),
     ).toBe('synthetic');

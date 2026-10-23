@@ -15,7 +15,7 @@
 // - 指派时最小探活（max_tokens=1，5s 超时，失败重试一次再判死）：对真 relay
 //   发最小 completion 验证模型可调通性。结果缓存 TTL 10min。
 
-import type { ModelSourceModel, SecretBox } from '@pacman/shared';
+import type { ModelSourceModel, SecretBox } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { provider } from '../db/schema.js';

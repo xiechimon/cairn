@@ -29,12 +29,12 @@ import { expect, type Page, test } from '@playwright/test';
 //      render verbatim; on the fixture face the click stays inert (send is
 //      live-only, #129 contract) and the view does not change.
 //   9. the open state persists across a reload (D5, reversing 0004 D9):
-//      localStorage pacman.chief-open on the live face, default closed.
+//      localStorage cairn.chief-open on the live face, default closed.
 //  10. the composer's size follows its content (XMON-102): one fixed height
 //      on every state (3 lines), overflow kept inside the box.
 //  11. the composer placeholder does not follow the turn state (#624): the
 //      r5 113 running face carries the steer canon, the idle faces the idle
-//      canon — both single-sourced from @pacman/shared.
+//      canon — both single-sourced from @cairn/shared.
 // 载体契约（D6）：关 = 在 DOM 但 hidden/inert（keepMounted 常驻）——count-0
 // 断言族退役，关态断言走 toBeHidden + count 1（#1067：hidden 的
 // display:none 副作用被 app.css 中和成 visibility/opacity 停靠，布局盒
@@ -329,7 +329,7 @@ test.describe('chief panel floating form (ADR 0013)', () => {
     // r5 113: the running face (activeRun projection = ChiefContent.running)
     // carries the steer placeholder; the idle faces keep the idle canon —
     // 111 (fresh thread) and 114 (turn ended, 完成 44s footer) straddle the
-    // two idle shapes. Values verbatim from @pacman/shared
+    // two idle shapes. Values verbatim from @cairn/shared
     // (CHIEF_INPUT_PLACEHOLDER / CHIEF_INPUT_PLACEHOLDER_STEERING).
     const placeholderAt = async (scenario: string) => {
       await page.goto(`/app?scenario=${scenario}`);

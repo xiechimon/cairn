@@ -7,7 +7,7 @@
 // machines.ts journal 内核（ownedStep）；路由面 = routes-machine.ts 的
 // ask / tool 端点。
 
-import type { MachineAskBody, MachineAskResponse } from '@pacman/shared';
+import type { MachineAskBody, MachineAskResponse } from '@cairn/shared';
 import {
   AGENT_TOOL_SKILL_CREATE,
   AGENT_TOOL_SKILL_UPDATE,
@@ -15,7 +15,7 @@ import {
   derivePlaceholderTitle,
   FIXED_TAGS,
   updateSkillToolParamsSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { agent, build, chief, chiefThread, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';

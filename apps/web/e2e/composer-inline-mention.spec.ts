@@ -56,10 +56,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };
@@ -226,7 +226,7 @@ test('filter: fuzzy subsequence, smart case, empty-state row', async ({ page }) 
   await expect(rows.nth(1)).toContainText('reviewer');
   await expect(rows.nth(2)).toContainText('deploy-bot');
   await expect(rows.nth(3)).toContainText('#9 内联提及探针');
-  await expect(rows.nth(4)).toContainText('pacman');
+  await expect(rows.nth(4)).toContainText('cairn');
 });
 
 test('filter: candidate list caps at 15 (CN=15)', async ({ page }) => {
@@ -581,7 +581,7 @@ test('files: empty query lists entities then files in roster order', async ({ pa
   await expect(rows.nth(0)).toContainText('builder');
   await expect(rows.nth(2)).toContainText('deploy-bot');
   await expect(rows.nth(3)).toContainText('#9 内联提及探针');
-  await expect(rows.nth(4)).toContainText('pacman');
+  await expect(rows.nth(4)).toContainText('cairn');
   await expect(rows.nth(5)).toContainText('apps/web/src/ui/button.tsx');
   await expect(rows.nth(6)).toContainText('apps/web/src/ui/');
   await evidenceShot(page, 'files-unified-list.png');
@@ -742,7 +742,7 @@ test('five-kind: bare @ lists all five kinds in roster order', async ({ page }) 
   await expect(rows.nth(0)).toContainText('builder');
   await expect(rows.nth(3)).toContainText('#9 内联提及探针');
   await expect(rows.nth(4)).toContainText('code-review');
-  await expect(rows.nth(5)).toContainText('pacman');
+  await expect(rows.nth(5)).toContainText('cairn');
   await expect(rows.nth(6)).toContainText('mea');
   await evidenceShot(page, 'five-kind-list.png');
 });
@@ -785,7 +785,7 @@ test('five-kind: project click inserts the scheme token and the chip confirms', 
   await input.fill('@pacm');
   await expect(rows).toHaveCount(1);
   await rows.first().click();
-  await expect(input).toHaveValue('[pacman](project:proj-1) ');
+  await expect(input).toHaveValue('[cairn](project:proj-1) ');
   const strip = page.getByTestId('composer-card').getByRole('status', { name: '提及' });
   await expect(strip.locator('.mention-chip--project')).toHaveCount(1);
 });

@@ -9,7 +9,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AGENT_TOOL_SHELL } from '@pacman/shared';
+import { AGENT_TOOL_SHELL } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -72,7 +72,7 @@ beforeAll(async () => {
     .set({ tools: ['合并分支', '推送分支', AGENT_TOOL_SHELL] })
     .where(eq(agentTable.id, AGENT_ID))
     .run();
-  home = mkdtempSync(join(tmpdir(), 'pacman-it-shell-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-it-shell-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

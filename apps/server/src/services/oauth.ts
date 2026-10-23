@@ -13,7 +13,7 @@
 // = 覆盖，DAO 单点）；回跳落点按族分支（routes 层，kind 不可判时默认
 // providers 页 = #243 既有律）。
 
-import { GITHUB_CONNECTION_OAUTH, OAUTH_FAMILIES, type SecretBox } from '@pacman/shared';
+import { GITHUB_CONNECTION_OAUTH, OAUTH_FAMILIES, type SecretBox } from '@cairn/shared';
 import type { Db } from '../db/client.js';
 import {
   exchangeOAuthCode,
@@ -101,7 +101,7 @@ function sweep(states: Map<string, OAuthStateEntry>): void {
 function notConfigured(): OAuthFlowError {
   return new OAuthFlowError(
     'not-configured',
-    'oauth client not configured (set PACMAN_GITHUB_OAUTH_CLIENT_ID/PACMAN_GITHUB_OAUTH_CLIENT_SECRET)',
+    'oauth client not configured (set CAIRN_GITHUB_OAUTH_CLIENT_ID/CAIRN_GITHUB_OAUTH_CLIENT_SECRET)',
   );
 }
 

@@ -31,14 +31,14 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   appendPlanLocationNote,
   buildRestartPrompt,
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -205,7 +205,7 @@ async function setup(
   backend: AgentBackend,
   options: { skill?: string; observeClient?: (client: FakeClient) => void } = {},
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-restart-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-restart-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger } = captureLogger();

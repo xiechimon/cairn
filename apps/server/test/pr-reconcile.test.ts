@@ -1,5 +1,5 @@
 // #1403 PR 对账（ci-loop 第二候选集）：review 关口上的 GitHub 形态 build，PR
-// 在 GitHub 上的终态回写 pacman。失败方式先于实现列出（AGENTS.md 测试规则）：
+// 在 GitHub 上的终态回写 cairn。失败方式先于实现列出（AGENTS.md 测试规则）：
 //   ① PR 已在 GitHub 合并（不论谁合的）→ todo 停在 review 永不收尾
 //   ② PR 关闭未合并 → todo 仍挂 review，看不出这张 PR 已经没了
 //   ③ PR 仍 open → 对账不得改任何东西
@@ -90,7 +90,7 @@
 //        build 的工作分支才写；对不上（含 fork 已删、head 仓为 null）→ 不收尾、不打回，
 //        每轮提示一次，按 etag 缓存；缺 head 分支或 base 仓 id → 读不到
 //   [63] 合并步经 completeStep 收尾（不是直接调 finishTodoDone）同样停掉没人领的 verify 步
-//        （本地仓形态；GitHub 形态有 PR 的 build 由 pacman 经 GitHub 合并，合并步完成不收尾，
+//        （本地仓形态；GitHub 形态有 PR 的 build 由 cairn 经 GitHub 合并，合并步完成不收尾，
 //        见 pr-merge-api.test.ts [2b-D25]）
 //   [64] 对账把拆卡子项收尾成 done → 推进拆卡波次：阻塞已解的兄弟卡开跑
 //   [65] system 行里引用的 GitHub 文本（分支名、合并者、合并提交）去掉控制字符与格式
@@ -112,7 +112,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { conversationBranch, type Phase } from '@pacman/shared';
+import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -2409,8 +2409,8 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
     const body = fixture('pull-1414-open.json') as { merge_commit_sha?: unknown };
     expect(typeof body.merge_commit_sha).toBe('string');
     const { fetch, urls } = serve(body);
-    const page = await githubPull(fetch, null, 'xiechimon', 'pacman', 1414);
-    expect(urls).toEqual(['https://api.github.com/repos/xiechimon/pacman/pulls/1414']);
+    const page = await githubPull(fetch, null, 'xiechimon', 'cairn', 1414);
+    expect(urls).toEqual(['https://api.github.com/repos/xiechimon/cairn/pulls/1414']);
     expect(page?.etag).toBe('"live"');
     expect(page?.pull).toEqual({
       state: 'open',
@@ -2432,7 +2432,7 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
 
   test('[66b] a merged PR (pulls/1454): merge commit, merger login, head repo id = base repo id', async () => {
     const { fetch } = serve(fixture('pull-1454-merged.json'));
-    const page = await githubPull(fetch, null, 'xiechimon', 'pacman', 1454);
+    const page = await githubPull(fetch, null, 'xiechimon', 'cairn', 1454);
     expect(page?.pull).toEqual({
       state: 'closed',
       merged: true,
@@ -2458,11 +2458,9 @@ describe('#1403 [66] live GitHub response shapes (captured over REST, see docs/v
     '[66c] compare between two commits on main reads %s',
     async (status, file, base, head) => {
       const { fetch, urls } = serve(fixture(file));
-      expect(await githubCompareStatus(fetch, null, 'xiechimon', 'pacman', base, head)).toBe(
-        status,
-      );
+      expect(await githubCompareStatus(fetch, null, 'xiechimon', 'cairn', base, head)).toBe(status);
       expect(urls).toEqual([
-        `https://api.github.com/repos/xiechimon/pacman/compare/${base}...${head}?per_page=1`,
+        `https://api.github.com/repos/xiechimon/cairn/compare/${base}...${head}?per_page=1`,
       ]);
     },
   );
@@ -3131,11 +3129,11 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       serve(200, fixture('branch-pulls-open.json')),
       null,
       'xiechimon',
-      'pacman',
+      'cairn',
       { head: 'xiechimon:claude/bootstrap-p2', base: 'main' },
     );
     expect(urls).toEqual([
-      'https://api.github.com/repos/xiechimon/pacman/pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2&base=main&per_page=10',
+      'https://api.github.com/repos/xiechimon/cairn/pulls?state=all&head=xiechimon%3Aclaude%2Fbootstrap-p2&base=main&per_page=10',
     ]);
     expect(open).toEqual([
       {
@@ -3154,7 +3152,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       serve(200, fixture('branch-pulls-merged.json')),
       null,
       'xiechimon',
-      'pacman',
+      'cairn',
       { head: 'xiechimon:claude/optimistic-albattani-r5pmfn', base: 'main' },
     );
     expect(merged?.map((p) => [p.number, p.state, p.merged])).toEqual([
@@ -3336,7 +3334,7 @@ describe('#1403 segment 2: the PR the build tracks', () => {
       () => Promise.resolve(res(200, '"live"', body)),
       null,
       'xiechimon',
-      'pacman',
+      'cairn',
       { head: 'xiechimon:claude/bootstrap-p2-seg2', base: 'main' },
     );
     expect(list).toEqual([

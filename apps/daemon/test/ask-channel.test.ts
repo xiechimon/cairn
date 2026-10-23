@@ -10,7 +10,7 @@
 
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { MachineAskResponse } from '@pacman/shared';
+import type { MachineAskResponse } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { buildHostTools } from '../src/backend/claude-code.js';
 import { headlessCaptureUi } from '../src/backend/pi.js';

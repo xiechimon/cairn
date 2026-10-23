@@ -2,7 +2,7 @@
 // 端口基座分段 + env 兜底取值序。三条验收（票面）：
 //   1. 上限 1、一个 worker 在跑时：chief 回合立即被领（不被卡）；第二个
 //      worker 不领。
-//   2. 两个并发 worker 步的环境里 PACMAN_PORT_BASE 不同段（槽位 ×100：
+//   2. 两个并发 worker 步的环境里 CAIRN_PORT_BASE 不同段（槽位 ×100：
 //      20000/20100/20200…）。
 //   3. env 覆盖生效序（env > DB > 默认）实测一遍（DB 2 / env 1 → 实际 1）。
 // 失败方式（先于实现固化，实现前本文件全红）：
@@ -58,7 +58,7 @@ async function bootStack(opts: {
 }): Promise<Stack> {
   const stub = await startStubLlm(opts.responses);
   const server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  const home = mkdtempSync(join(tmpdir(), 'pacman-1148-home-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-1148-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'pb-mbp' },
     {},
@@ -153,13 +153,13 @@ function stepsOf(stack: Stack, buildId: string) {
 }
 
 describe('#1148 E2E：端口基座分段（两个并发 worker 步不同段）', () => {
-  test('两个并发 worker 步的 bash 环境里 PACMAN_PORT_BASE = 20000 / 20100', async () => {
+  test('两个并发 worker 步的 bash 环境里 CAIRN_PORT_BASE = 20000 / 20100', async () => {
     // stub 按请求序派发（不知请求来自哪个步）——两步并发时序交错不定，故
     // 头部铺 6 个 bash 槽（bash = 变更类工具，#703 产物闸过；两步各至少跑
     // 一次）、尾段 content 恒重复（收尾）。任一交错序下两步都「bash ≥1 次 +
     // content 收尾」。
     const bashProbe = {
-      toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$PACMAN_PORT_BASE"` } },
+      toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
     };
     const stack = await bootStack({
       responses: [
@@ -200,7 +200,7 @@ describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
         // worker r1：延迟的 bash 轮（占住唯一 worker 槽 6s）。
         {
           delayMs: 6_000,
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$PACMAN_PORT_BASE"` } },
+          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         // chief r1：延迟 2s 的收尾文本（拉宽 claimed 观察窗——慢 runner 上纯
         // 文本回合可在一个轮询间隔（100ms）内跑完，status 窗口会被跳过）。
@@ -209,7 +209,7 @@ describe('#1260 E2E：chief 占机器并发槽（上限 1）', () => {
         { content: '探针完成。' },
         // 第二个 worker 的两轮。
         {
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$PACMAN_PORT_BASE"` } },
+          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
       ],
@@ -282,12 +282,12 @@ describe('#1148 E2E：env 兜底取值序（env > DB > 默认）', () => {
         // worker 1 r1：延迟 bash 轮（占住 env=1 的唯一位 6s）。
         {
           delayMs: 6_000,
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$PACMAN_PORT_BASE"` } },
+          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
         // worker 2 的两轮（env 位释放后照跑）。
         {
-          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$PACMAN_PORT_BASE"` } },
+          toolCall: { name: 'bash', arguments: { command: `printf 'PB=%s' "$CAIRN_PORT_BASE"` } },
         },
         { content: '探针完成。' },
       ],

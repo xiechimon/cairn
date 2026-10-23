@@ -79,7 +79,7 @@ const RUNGS = [
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`elevation ladder (${theme})`, () => {
     test.beforeEach(async ({ page }) => {
-      await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     });
 
     test('each rung is its pool plus one ring, ring last', async ({ page }) => {

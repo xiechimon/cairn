@@ -31,7 +31,7 @@ import {
   REVIEW_ANNOUNCEMENT,
   REVIEW_VERDICT_KIND,
   reviewVerdictSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
@@ -262,7 +262,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
     const projRow = s.db.select().from(projectTable).where(eq(projectTable.id, projectId)).get();
     expect(projRow?.repoName).toBeTruthy();
     const bareDir = join(s.reposDir, s.team.id, `${projRow?.repoName}.git`);
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-review-511-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-review-511-'));
     dirs.push(dir);
     const repoDir = join(dir, 'repo');
     const git = async (args: string[]) => {

@@ -33,7 +33,7 @@
 // 内消费点），按钮上带常亮按键角标。守卫/闸/标识三处细节见各自行注。
 // XMON-87 选择记忆：rememberProject 面（board / 侧栏全局面）把选中项目 id 落
 // localStorage，刷新后 chip 回上次那行——此前是纯表单 state，刷新即掉回
-// rows[0]（用户实测「选 Pacman → 刷新 → 回第一个」）。锚定面不记忆，理由见
+// rows[0]（用户实测「选 Cairn → 刷新 → 回第一个」）。锚定面不记忆，理由见
 // 该 prop 注记。
 // XMON-87 续二：Tab 直接换项目（chip 上挂 Tab 悬浮提示 chip，#468 族）——循环
 // 而不是开面（「直接切换」要的是按一下就换）；开态门与守卫见
@@ -121,9 +121,9 @@ interface ProjectOption {
 }
 
 /** XMON-87 选择记忆位(localStorage 键;e2e 镜像 newtask-project-persist.spec.ts)。
- *  单租户单机、无账号维度——与 pacman.sidebar-collapsed /
- *  pacman.dirBrowser.lastDir 同律。 */
-export const NEW_TASK_PROJECT_STORAGE_KEY = 'pacman.newTaskProjectId';
+ *  单租户单机、无账号维度——与 cairn.sidebar-collapsed /
+ *  cairn.dirBrowser.lastDir 同律。 */
+export const NEW_TASK_PROJECT_STORAGE_KEY = 'cairn.newTaskProjectId';
 
 /** 读记忆位:隐私模式等抛 = 无记忆(dir-browser W13 同律)。#1091:参数可空——
  *  调用点必须传 safeLocalStorage():裸 `localStorage` 实参在 Storage 不可用

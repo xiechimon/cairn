@@ -51,7 +51,7 @@ beforeAll(async () => {
     { content: '修改已完成并验证通过。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  const home = mkdtempSync(join(tmpdir(), 'pacman-it-home-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-it-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'it-mbp' },
     {},

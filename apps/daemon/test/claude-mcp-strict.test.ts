@@ -28,7 +28,7 @@ type McpRecord = ClaudeSdkOptionParts['mcpServers'];
 
 function parts(over: Partial<ClaudeSdkOptionParts> = {}): ClaudeSdkOptionParts {
   return {
-    cwd: '/tmp/pacman-mcp-strict-wt',
+    cwd: '/tmp/cairn-mcp-strict-wt',
     modelId: 'glm-5.3',
     resumeId: null,
     sessionId: 'sess-1307',
@@ -41,7 +41,7 @@ function parts(over: Partial<ClaudeSdkOptionParts> = {}): ClaudeSdkOptionParts {
 
 /** 受管集在位形（组装面只认 record 透传，条目取合法 http 形即可）。 */
 function withSeam(): McpRecord {
-  return { pacman: { type: 'http', url: 'https://example.invalid/mcp' } };
+  return { cairn: { type: 'http', url: 'https://example.invalid/mcp' } };
 }
 
 function fakeProcess(): SpawnedProcess {
@@ -162,18 +162,18 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
     expect(args).toContain('--setting-sources=user,project,local');
   });
 
-  test('受管、仅 in-process pacman：严格模式，argv 不序列化 sdk server', async () => {
-    const pacman = createSdkMcpServer({ name: 'pacman', alwaysLoad: true, tools: [] });
+  test('受管、仅 in-process cairn：严格模式，argv 不序列化 sdk server', async () => {
+    const cairn = createSdkMcpServer({ name: 'cairn', alwaysLoad: true, tools: [] });
     const { options, args } = await spawnArgs(
-      parts({ mcpServers: { pacman }, strictMcpConfig: true }),
+      parts({ mcpServers: { cairn }, strictMcpConfig: true }),
     );
-    expect(options.mcpServers?.pacman).toBe(pacman);
+    expect(options.mcpServers?.cairn).toBe(cairn);
     expect(args).toContain('--strict-mcp-config');
     expect(mcpConfig(args)).toBe(null);
   });
 
   test('受管、显式 stdio 端点：--mcp-config 只有该端点，并带严格模式', async () => {
-    const pacman = createSdkMcpServer({ name: 'pacman', alwaysLoad: true, tools: [] });
+    const cairn = createSdkMcpServer({ name: 'cairn', alwaysLoad: true, tools: [] });
     const figma = mapMcpEndpoint({
       slug: 'figma',
       transport: 'stdio',
@@ -181,9 +181,9 @@ describe('claude-code spawn MCP isolation (#1307, tri-state)', () => {
       args: ['--stdio'],
     });
     const { options, args } = await spawnArgs(
-      parts({ mcpServers: { pacman, figma }, strictMcpConfig: true }),
+      parts({ mcpServers: { cairn, figma }, strictMcpConfig: true }),
     );
-    expect(options.mcpServers?.pacman).toBe(pacman);
+    expect(options.mcpServers?.cairn).toBe(cairn);
     expect(options.mcpServers?.figma).toBe(figma);
     expect(args).toContain('--strict-mcp-config');
     expect(mcpConfig(args)).toBe(

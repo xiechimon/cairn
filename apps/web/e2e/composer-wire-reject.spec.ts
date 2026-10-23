@@ -33,7 +33,7 @@ const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyl
 
 // Evidence screenshots go through evidenceShot (no-op by default; to
 // regenerate evidence for a PR, run with
-// PACMAN_E2E_EVIDENCE=docs/verify/<ticket> — see e2e/evidence.ts).
+// CAIRN_E2E_EVIDENCE=docs/verify/<ticket> — see e2e/evidence.ts).
 // Historical evidence = the committed docs/verify/625/after/; regression
 // runs must never rewrite it.
 
@@ -81,10 +81,10 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };

@@ -38,7 +38,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { MachineSkillsManifestResponse } from '@pacman/shared';
+import type { MachineSkillsManifestResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   materializeTeamSkills,
@@ -48,7 +48,7 @@ import {
 } from '../src/team-skills.js';
 
 function cacheRoot(tag: string): string {
-  return join(mkdtempSync(join(tmpdir(), `pacman-team-skills-${tag}-`)), 'team-skills');
+  return join(mkdtempSync(join(tmpdir(), `cairn-team-skills-${tag}-`)), 'team-skills');
 }
 
 function sha256(bytes: Buffer): string {

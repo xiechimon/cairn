@@ -143,7 +143,7 @@ test('常亮互斥: page-layer pill dims while the panel is open, restores on cl
 
 test('常亮互斥 holds on the collapsed rail form', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pacman.sidebar-collapsed', '1');
+    localStorage.setItem('cairn.sidebar-collapsed', '1');
   });
   await page.goto(BOARD);
   const rail = litPill(page);

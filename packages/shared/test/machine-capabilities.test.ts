@@ -35,10 +35,10 @@ describe('machineCapabilitiesSchema（daemon 上报的机器能力清单）', ()
   it('合法清单：mcpServers slug 集 + 本机技能名集', () => {
     const parsed = machineCapabilitiesSchema.parse({
       mcpServers: ['figma', 'context7'],
-      skills: ['verify-pacman', 'pr-pacman'],
+      skills: ['verify-cairn', 'pr-cairn'],
     });
     expect(parsed.mcpServers).toEqual(['figma', 'context7']);
-    expect(parsed.skills).toEqual(['verify-pacman', 'pr-pacman']);
+    expect(parsed.skills).toEqual(['verify-cairn', 'pr-cairn']);
   });
 
   it('空集合法（机器没装 MCP / 没有本机技能）', () => {

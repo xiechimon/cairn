@@ -4,7 +4,7 @@
 // 请选择一个文件查看 placeholder; 任务 = search/filter/sort toolbar + view
 // toggle + todo rows (r2 26) or the 暂无内容 empty state (r2 24b).
 // #178: the toolbar is live — the list|grid toggle persists through the
-// registered client-state key (pacman.projectTasksLayout, the
+// registered client-state key (cairn.projectTasksLayout, the
 // teamMembersLayout twin), 筛选/排序 open anchored popovers (family law
 // #67/#127) driving client-side filter/sort, and the search box filters
 // by title.
@@ -14,7 +14,7 @@ import {
   type LocalErrorReason,
   type ProjectCommitDetailResponse,
   type ProjectFileResponse,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { cn } from 'cn';
 import { ListTodo } from 'lucide-react';
 import { Fragment, type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
@@ -313,9 +313,9 @@ function FilesPane({
 }
 
 /** #178 view-switch client-state key, [推断] same shape as the r2 §1.5
- *  observed pacman.teamMembersLayout (registered in shared
+ *  observed cairn.teamMembersLayout (registered in shared
  *  protocol/client-state.ts); absent = list. */
-export const PROJECT_TASKS_LAYOUT_STORAGE_KEY = 'pacman.projectTasksLayout';
+export const PROJECT_TASKS_LAYOUT_STORAGE_KEY = 'cairn.projectTasksLayout';
 
 type TasksLayout = 'list' | 'grid';
 type TaskFilter = 'all' | 'active' | 'done';
@@ -974,7 +974,7 @@ export function ProjectPage() {
   // 查询失败面容忍，票面验收）；local/hosted/fixture 面零漂移。查询 enabled
   // 收窄到 github 形态项目（页面挂载不空转，useGithubConnection 同律）。
   const isGithubRepoEntry = live && wireProject?.repoKind === 'github';
-  // github 项目 Files tab 诚实降级（#704 / B-C1）：pacman 不保存该形态的仓库
+  // github 项目 Files tab 诚实降级（#704 / B-C1）：cairn 不保存该形态的仓库
   // 文件副本（Multica link-back 只读方向——关联不镜像），文件面 = 说明 + 外链
   // GitHub；变更与 PR 面走 daemon 上报真值（任务详情 changes / 分支 PR 面板）。
   // 判据复用 issues 入口同源位（live && repoKind === 'github'）。

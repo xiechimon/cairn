@@ -11,7 +11,7 @@
 //      null，无解释无重试无回板，删除入口够不着）。修复面 = 加载中/
 //      加载失败(可重试)/不存在(回看板) 三态面板 + failed 卡详情可删。
 //
-// 假机器 wire 配方同 verify-pacman drive-903（enroll → claim → relay →
+// 假机器 wire 配方同 verify-cairn drive-903（enroll → claim → relay →
 // done）；claim 响应双层包装 {step:{step,…}}。三台机器分道：M1 钉 ①的
 // 规划步（钉选是 claim 硬约束，别机看不见，防陈旧步顶歪后续认领）、M2 走
 // chief 回合与 ②的执行步、M3 铺垫失败卡。waitForStep 对计划外 chief 步
@@ -22,7 +22,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { orchestrateThreadTitle } from '@pacman/shared';
+import { orchestrateThreadTitle } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -220,7 +220,7 @@ function cardInColumn(columnName: string, todoId: string) {
 
 beforeAll(async () => {
   // web 生产构建（scenario-blind = 恒 live 数据源；集成面文件串行，#349）。
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });

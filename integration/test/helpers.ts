@@ -8,10 +8,10 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ProjectRepoKind, Scheduler } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { ProjectRepoKind, Scheduler } from '@pacman/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { createApp } from '../../apps/server/src/app.js';
@@ -76,11 +76,11 @@ export async function bootRealServer(opts: {
   const machineHub = new MachineWakeHub();
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
-  const reposDir = mkdtempSync(join(tmpdir(), 'pacman-it-repos-'));
-  const attachmentsDir = mkdtempSync(join(tmpdir(), 'pacman-it-att-'));
+  const reposDir = mkdtempSync(join(tmpdir(), 'cairn-it-repos-'));
+  const attachmentsDir = mkdtempSync(join(tmpdir(), 'cairn-it-att-'));
   // 技能根（spec 13 #367 现扫面）：隔离的空目录 = 空集语义，集成用例
   // 需要技能行时显式往里建目录。
-  const skillsDir = mkdtempSync(join(tmpdir(), 'pacman-it-skills-'));
+  const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-skills-'));
   const app = createApp({
     db,
     hub,
@@ -104,15 +104,15 @@ export async function bootRealServer(opts: {
     attachmentsDir,
     skillsDir,
     // #1170 导入来源登记：隔离目录内（与 skillsDir 同纪律；集成用例需要
-    // 导入/refresh 时走 PACMAN_HOME 无关的隔离路径）。
+    // 导入/refresh 时走 CAIRN_HOME 无关的隔离路径）。
     skillSourcesPath: join(
-      mkdtempSync(join(tmpdir(), 'pacman-it-skill-sources-')),
+      mkdtempSync(join(tmpdir(), 'cairn-it-skill-sources-')),
       'skill-sources.json',
     ),
     webDir: opts.webDir ?? null,
     // #251 可选 token 鉴权：集成面全部走关态（默认行为零改动）。
     authToken: null,
-    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `pacman-it-mcp-${randomUUID()}.json`),
+    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-it-mcp-${randomUUID()}.json`),
   });
   const scheduler = opts.scheduler
     ? createScheduler({ db, hub, user, convHub }, { tickMs: 60_000 })

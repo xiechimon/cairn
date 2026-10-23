@@ -1,4 +1,4 @@
-// esbuild 单文件 bundle（06 册 §11 W2-D2：主包 `@xiechimon/pacman` 的 server
+// esbuild 单文件 bundle（06 册 §11 W2-D2：主包 `@xiechimon/cairn` 的 server
 // 产物 = 单 ESM 文件，承 daemon `build.mjs` 先例）。JS 依赖全打入；native 的
 // better-sqlite3 外置为 external 运行时依赖（Node 22/24 LTS 预编译覆盖，
 // W2-D3 留现状决议）。shebang 供 bin 字段直跑（npx 主路径）。
@@ -10,7 +10,7 @@ import { build } from 'esbuild';
 // 头注）。onLoad 整模块替换——esbuild define 不作用于模块作用域标识符
 // （实测 2026-09-25），define 路线不通，此为确定性最强的开关。
 const bundleFormFlag = {
-  name: 'pacman-bundle-form',
+  name: 'cairn-bundle-form',
   setup(b) {
     b.onLoad({ filter: /src[\\/]bundle-form\.ts$/ }, () => ({
       contents: 'export const BUNDLED_FORM = true;',

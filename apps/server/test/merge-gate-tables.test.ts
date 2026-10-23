@@ -21,7 +21,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { DB_TABLES, INTERNAL_ONLY_TABLES, todoRecordSchema } from '@pacman/shared';
+import { DB_TABLES, INTERNAL_ONLY_TABLES, todoRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -208,7 +208,7 @@ function migrationsUpTo(
   end: number,
   extra?: { tag: string; sql: string },
 ): string {
-  const dir = temp('pacman-migrations-');
+  const dir = temp('cairn-migrations-');
   mkdirSync(join(dir, 'meta'));
   const entries = journal.entries.slice(0, end);
   for (const e of entries) {
@@ -232,7 +232,7 @@ describe('F1 / F16 旧库升级：main 的库补跑本迁移', () => {
 
   test('截到本迁移之前的库（带构建行）→ 全量 migrate：四表建成、旧行不动、可为旧构建写闸行', () => {
     const { journal, index } = findGateEntry();
-    const dbPath = join(temp('pacman-gate-upgrade-'), 'server.db');
+    const dbPath = join(temp('cairn-gate-upgrade-'), 'server.db');
     const old = new Database(dbPath);
     old.pragma('foreign_keys = ON');
     migrate(drizzle(old), { migrationsFolder: migrationsUpTo(journal, index) });

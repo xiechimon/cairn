@@ -5,7 +5,7 @@
 // 失败方式先行枚举（仓规：先列失败方式再写实现）——
 // LP localPath 导入：LP1 happy → 201 + 落盘 + 来源记录 + 审计 create 行 +
 //   列表可见 / LP2 源目录无 SKILL.md → 400 点名 / LP3 路径不存在或非目录
-//   → 400 / LP4 源在技能根内（含 symlink 解析后）→ 400（已由 pacman 管理）
+//   → 400 / LP4 源在技能根内（含 symlink 解析后）→ 400（已由 cairn 管理）
 //   / LP5 超单文件上限 → 400 点名（树状来源同闸）/ LP6 非 utf8 二进制文件
 //   → 400 点名（文本通道边界，不静默丢弃）/ LP7 符号链接文件不入包
 //   （listSkillFiles 同律：不追链接，无链接走私）/ LP8 只读复制——源目录
@@ -56,7 +56,7 @@ import {
   MAX_SKILL_FILE_BYTES,
   machineSkillsManifestResponseSchema,
   skillRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, skillAudit } from '../src/db/schema.js';
@@ -67,7 +67,7 @@ import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './help
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'pacman-skills-'));
+  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
   roots.push(root);
   return root;
 }
@@ -273,7 +273,7 @@ describe('POST /api/teams/{id}/skills/import（localPath）', () => {
     }
   });
 
-  test('LP4：源在技能根内（含 symlink 解析后）→ 400（已由 pacman 管理）', async () => {
+  test('LP4：源在技能根内（含 symlink 解析后）→ 400（已由 cairn 管理）', async () => {
     const skillsDir = makeRoot();
     mkdirSync(join(skillsDir, 'already-here'));
     writeFileSync(join(skillsDir, 'already-here', 'SKILL.md'), skillMd('already-here', 'd'));

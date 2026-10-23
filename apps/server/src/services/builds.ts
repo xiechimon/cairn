@@ -23,7 +23,7 @@ import type {
   StepRecord,
   TriggerSource,
   UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
@@ -56,7 +56,7 @@ import {
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
@@ -291,7 +291,7 @@ export function requestStop(
 }
 
 /** gate 回落目标（r9 §3.3「todo 落上一完成 turn 的 gate」的 build 内投影
- * [设计]——pacman 重跑 = 新 build 新会话新分支，跨 build 回落会指向旧会话的
+ * [设计]——cairn 重跑 = 新 build 新会话新分支，跨 build 回落会指向旧会话的
  * 变更面（latestBuildId 已换），故回落以本 build 为界）：最近 done 步的
  * 关口（plan→confirm / build|merge→review）；无 done 步 → build.prevPhase
  * （回到本轮开始前的面：fresh→todo、失败重跑→failed、定时复跑→done…）。 */
@@ -1522,7 +1522,7 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
  *  步（Verifier 离线或等额度）可以在下一轮的 build 步之后才跑。按步的收尾时刻排
  *  （finishedAt，#1403 段 3）；迁移之前收尾的行没有它，回落最后一次报到（心跳 → 领取 →
  *  入队，同 stepActivityAt）。两个用处：
- *  - 经 API 合并的 sha（mergeSteps true）：分支上 pacman 最后推送的提交，合并步把默认
+ *  - 经 API 合并的 sha（mergeSteps true）：分支上 cairn 最后推送的提交，合并步把默认
  *    分支并进工作分支的提交也算（PR 的 head 就是它）。
  *  - PR 对账核对「合并包含本 build 的交付」（mergeSteps false）：合并步的提交不是交付；
  *    GitHub 形态有 PR 的 build 上它只会是升级前排下的遗留步，PR 在 GitHub 合并之后才推上
@@ -1575,7 +1575,7 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   if (todoRow.latestBuildId !== null && todoRow.latestBuildId !== row.id) {
     throw new HttpError(
       409,
-      `这次运行已不是任务的当前运行（任务重跑过），pacman 不经它合并 PR #${row.prNumber}`,
+      `这次运行已不是任务的当前运行（任务重跑过），cairn 不经它合并 PR #${row.prNumber}`,
     );
   }
   const busy = stepKindInFlight(deps, row.id);
@@ -1613,7 +1613,7 @@ const CLOSING_SHAPE = /(?<![a-z])(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\
 
 /** 没有 closes 行时 squash 提交的正文（D42）：总要传一个，不传 GitHub 就按仓库设置取 PR
  *  正文或各提交 message。 */
-const PLAIN_MERGE_BODY = 'Merged by pacman.';
+const PLAIN_MERGE_BODY = 'Merged by cairn.';
 
 /** 「GitHub 没有明确答复」行里的原因。 */
 function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>): string {
@@ -1633,7 +1633,7 @@ function unclearReason(result: Extract<GithubMergeResult, { kind: 'unknown' }>):
  *  GitHub 连接、最后推送的提交、同一 build 没在合并），读 PR 核对（本 build 自己的、开着、
  *  进默认分支、head 就是最后推送的提交），相位再判一次，然后
  *  `PUT pulls/{n}/merge {sha, squash, "<PR 标题> (#n)", closes 行}`（标题带关票形态时用
- *  「Merge pull request #n」，没有 closes 行时正文是 pacman 自己的一行）。结局三分：
+ *  「Merge pull request #n」，没有 closes 行时正文是 cairn 自己的一行）。结局三分：
  *  - 合并了：宣告行 + 合并行，卡还在原关口就收尾（failed 先恢复到 review）；相位在请求
  *    期间被人改了只落行。
  *  - GitHub 明确拒绝：409 带 GitHub 的理由，不落行、不改相位（再点一次再发一次）。
@@ -1656,8 +1656,8 @@ async function mergeThroughGithub(
   // 不读（只读 review 卡），看板上把它拖到已完成也走合并弹层回到这里；在 GitHub 上合并之后
   // 再点一次合并，下文把它恢复到 review 交给对账。
   const hint = gate.failed
-    ? '在 GitHub 上合并后再点一次合并：pacman 把卡恢复到审核关口，由对账核对后收尾'
-    : 'pacman 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
+    ? '在 GitHub 上合并后再点一次合并：cairn 把卡恢复到审核关口，由对账核对后收尾'
+    : 'cairn 对账读到合并后核对并收尾（核对不上时在时间线说明，由人处理，例如完成时不勾合并）';
   const access = teamGithubToken(deps, gate.todoRow.teamId);
   if ('reason' in access) {
     if (access.reason === 'no-secret-box') {
@@ -1712,7 +1712,7 @@ async function mergeThroughGithub(
     if (!isOwnPull(pull, branch)) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，pacman 不合并它：请在 GitHub 上核对这张 PR。`,
+        `PR #${prNumber} 的 head 不是本任务在 ${repoRef.owner}/${repoRef.repo} 的工作分支「${branch}」，cairn 不合并它：请在 GitHub 上核对这张 PR。`,
       );
     }
     // 作者要对仓库有写权限（与对账改记同一判据）：daemon 记的是工作分支上编号最大的开着的
@@ -1720,13 +1720,13 @@ async function mergeThroughGithub(
     if (!WRITE_AUTHOR_ASSOCIATIONS.has(pull.authorAssociation ?? '')) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），pacman 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
+        `PR #${prNumber} 的作者对仓库没有写权限（author_association ${githubText(pull.authorAssociation ?? '缺失')}），cairn 不经 API 合并它：请在 GitHub 上核对后合并（${hint}）。`,
       );
     }
     if (pull.baseRef !== pull.defaultBranch) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，pacman 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
+        `PR #${prNumber} 的目标分支「${githubText(pull.baseRef)}」不是默认分支「${githubText(pull.defaultBranch)}」，cairn 只把改动合进默认分支：请在 GitHub 上核对这张 PR。`,
       );
     }
     if (pull.merged) {
@@ -1739,7 +1739,7 @@ async function mergeThroughGithub(
       insertMessageRow(deps, row.id, {
         id: newRecordId(),
         role: 'system',
-        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，pacman 对账核对后收尾（核对不上时在时间线说明）。`,
+        content: `PR #${prNumber} 已在 GitHub 合并：任务回到审核关口，cairn 对账核对后收尾（核对不上时在时间线说明）。`,
         createdAt: nowMs(),
       });
       return { delegated: true };
@@ -1748,16 +1748,16 @@ async function mergeThroughGithub(
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
         409,
-        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），pacman 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
+        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），cairn 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
       );
     }
     if (pull.headSha !== checkpoint) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。pacman 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
+        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。cairn 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
       );
     }
-    // 标题取 PR 标题（ADR 0021 D2），带关票形态时改用 pacman 自己的标题（D41）。
+    // 标题取 PR 标题（ADR 0021 D2），带关票形态时改用 cairn 自己的标题（D41）。
     const titled = `${pull.title} (#${prNumber})`;
     const result = await githubMergePull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber, {
       sha: checkpoint,
@@ -1804,8 +1804,8 @@ async function mergeThroughGithub(
       role: 'system',
       content:
         result.kind === 'merged'
-          ? `PR #${prNumber} 已由 pacman 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
-          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。pacman 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
+          ? `PR #${prNumber} 已由 cairn 经 GitHub 合并（squash，合并提交 ${githubText(result.sha).slice(0, 7)}）`
+          : `已请 GitHub 合并 PR #${prNumber}，GitHub 没有明确答复（${unclearReason(result)}）。cairn 对账会读这张 PR：已合并就收尾；还开着就留在审核关口，可以再点合并。`,
       createdAt: nowMs(),
     });
     if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
@@ -2392,7 +2392,7 @@ export function completeStep(
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上合并为准，pacman 对账读到它合并后收尾。它若还开着：在审核关口点「合并」由 pacman 经 GitHub 合并，或直接在 GitHub 上合并。`,
+      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上合并为准，cairn 对账读到它合并后收尾。它若还开着：在审核关口点「合并」由 cairn 经 GitHub 合并，或直接在 GitHub 上合并。`,
       createdAt: nowMs(),
     });
     return;

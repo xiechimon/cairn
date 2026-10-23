@@ -47,7 +47,7 @@ function preBackfillMigrations(): string {
     ),
   );
   expect(backfillIdx, 'journal 里找不到推送分支回填 migration').toBeGreaterThan(0);
-  const dir = temp('pacman-migrations-pre-backfill-');
+  const dir = temp('cairn-migrations-pre-backfill-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, backfillIdx)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
@@ -73,7 +73,7 @@ interface LegacyAgent {
 
 /** 建回填前旧库 + seed team + 插四种形态的 agent 行。 */
 function buildPreBackfillDb(rows: LegacyAgent[]): { dbPath: string } {
-  const dir = temp('pacman-backfill-db-');
+  const dir = temp('cairn-backfill-db-');
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });

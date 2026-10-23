@@ -11,7 +11,7 @@
 // 取用台账持有，agent 经 per-step 本地取用通道（runner 注册的本地 pi 工具）
 // 显式取用，取用留审计行（步 id + agent id + 密钥名 + 时间，永不写值）。
 
-import type { BoundGitCredentials, MachineTokenResponse, ProviderConfig } from '@pacman/shared';
+import type { BoundGitCredentials, MachineTokenResponse, ProviderConfig } from '@cairn/shared';
 
 /** 本步团队密钥的取用台账。明文由闭包捕获（模块外不可枚举），只经 take()
  * 交出；clearCredentials 后 take() 恒 null——步收尾即失效，失败/中断步同路。 */

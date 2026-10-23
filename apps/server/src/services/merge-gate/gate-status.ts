@@ -1,11 +1,11 @@
-// pacman/merge-gate commit status 的纯规划（#1404 S4b，计划 docs/verify/1404/s4-plan.md §4.6）：
+// cairn/merge-gate commit status 的纯规划（#1404 S4b，计划 docs/verify/1404/s4-plan.md §4.6）：
 // 由 readiness 的结果定 state 与描述，再决定这一次写不写。写的时机、按团队限速与调度归 S7；
 // 这里只保证：human 策略下永远不写；只写在 readiness 的 head 上，且检查（含 combined status）
 // 就是在那个 head 上读的；head 上自家 status 读不到时不盲写；值没变不写（对照的是 GitHub 上
 // 那个 SHA 的当前值，别人写的不同的值下次求值时改回来）。描述不带 blocker 的 detail（文件名、
 // 检查名由 PR 作者或第三方起），至多 140 个字符（GitHub 文档没写上限，第三方实测 140）。
 
-import { MERGE_GATE_STATUS_CONTEXT, type MergePolicy, type MergeReadiness } from '@pacman/shared';
+import { MERGE_GATE_STATUS_CONTEXT, type MergePolicy, type MergeReadiness } from '@cairn/shared';
 import type { GateGithubPort, GateRaw, GateStatusState } from './github-port.js';
 
 export const GATE_STATUS_DESCRIPTION_MAX = 140;

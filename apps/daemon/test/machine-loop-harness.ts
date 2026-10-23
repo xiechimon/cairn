@@ -19,7 +19,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import { loadDaemonConfig } from '../src/config.js';
@@ -29,7 +29,7 @@ import { runMachine } from '../src/machine-loop.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
 
 function tmpHome(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-loop-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-loop-'));
 }
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -285,7 +285,7 @@ export async function boot(opts: {
   preEnrolled?: { serverUrl: string };
   /** #1026：runMachine 起动前预置 journal 条目（recover 快路径派发面）。 */
   seedJournal?: (paths: StatePaths) => void;
-  /** #1148：cap 解析 env 源注入面（PACMAN_DAEMON_MAX_CONCURRENT；缺省 =
+  /** #1148：cap 解析 env 源注入面（CAIRN_DAEMON_MAX_CONCURRENT；缺省 =
    * 真 process.env，proxyEnv 同律）。 */
   capEnv?: NodeJS.ProcessEnv;
 }) {
@@ -294,7 +294,7 @@ export async function boot(opts: {
   const config = loadDaemonConfig(
     {
       serverUrl: 'http://server',
-      apiKey: 'pacman_k',
+      apiKey: 'cairn_k',
       teamId: 'team-1',
       home,
       name: 'test-mbp',

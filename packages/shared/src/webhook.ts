@@ -17,7 +17,7 @@
 import { z } from 'zod';
 
 /** 触发 label 名（贴此 label 的 issue 事件 → 建 todo + orchestrate）。 */
-export const WEBHOOK_TRIGGER_LABEL = 'pacman';
+export const WEBHOOK_TRIGGER_LABEL = 'cairn';
 
 /** X-GitHub-Delivery 去重窗口（重复投递防御，server 内存态；跨窗口/重启
  * 由 todo.sourceRef 409 持久闸兜底）。 */

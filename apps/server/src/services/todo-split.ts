@@ -13,7 +13,7 @@
 // - 确认派发与波次推进不在此文件（builds.ts confirmSplitParent /
 //   advanceSplitWaves——它们要 startBuilds，本文件不 import builds）。
 
-import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@pacman/shared';
+import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, plan as planTable, todo } from '../db/schema.js';

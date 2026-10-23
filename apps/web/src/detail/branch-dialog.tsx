@@ -19,7 +19,7 @@
 // registry opacity 降档）。保留的是语义映射与 layout 位：数据 mono 排版、
 // 机器状态点 token 色、满宽同步钮。
 
-import type { BranchSyncRecord, BranchSyncStatus, MachineRecord } from '@pacman/shared';
+import type { BranchSyncRecord, BranchSyncStatus, MachineRecord } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { useState } from 'react';

@@ -13,13 +13,13 @@ import type {
   ClaimedStep,
   DeliveredImage,
   MachineCapabilities,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   CLAIM_BACKOFF_CAP_MS,
   CLAIM_POLL_INTERVAL_MS,
   isBackendRuntimeId,
   ORPHAN_WORKTREE_TTL_MS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { type ClaudeCodeAuthProbe, probeClaudeCodeAuth } from './claude-code-auth.js';
@@ -74,7 +74,7 @@ export interface MachineLoopOpts {
   claimBackoffBaseMs?: number;
   /** 代理探测 env 面（默认 process.env；测试注入 {} 关闭）。 */
   proxyEnv?: NodeJS.ProcessEnv;
-  /** #1148 cap 解析 env 源（PACMAN_DAEMON_MAX_CONCURRENT；默认 process.env，
+  /** #1148 cap 解析 env 源（CAIRN_DAEMON_MAX_CONCURRENT；默认 process.env，
    * proxyEnv 同律——测试注入隔离）。 */
   capEnv?: NodeJS.ProcessEnv;
   heartbeatIntervalMs?: number;
@@ -84,7 +84,7 @@ export interface MachineLoopOpts {
   /** 孤儿 worktree 回收 TTL（缺省 7×24h，02 §5.5/r3 §1.4；测试注入缩短）。 */
   orphanTtlMs?: number;
   /** #1149 环境钩子超时（缺省 WORKSPACE_HOOK_TIMEOUT_MS 20min；测试注入
-   * 缩短时标；PACMAN_HOOK_TIMEOUT_MS 覆写在 cli.ts 组装入参时生效）。 */
+   * 缩短时标；CAIRN_HOOK_TIMEOUT_MS 覆写在 cli.ts 组装入参时生效）。 */
   hookTimeoutMs?: number;
 }
 
@@ -112,7 +112,7 @@ export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): numb
  * daemon 的显式意志，DB machine 行是 server 侧团队配置）。取值序（钉死）：
  * env > DB（me.maxConcurrent）> 默认 1。值域：正整数；非法/非正值忽略
  * （回落下一级，宁保守不误伤）。 */
-export const DAEMON_MAX_CONCURRENT_ENV = 'PACMAN_DAEMON_MAX_CONCURRENT';
+export const DAEMON_MAX_CONCURRENT_ENV = 'CAIRN_DAEMON_MAX_CONCURRENT';
 
 /** #1148 本地闸取值序 env > DB > 默认（纯函数单源；机器循环 + 单测共用）。 */
 export function resolveLocalCap(
@@ -128,9 +128,9 @@ export function resolveLocalCap(
 }
 
 /** #1148 per-worker 步端口基座 env 名：按槽位分段的端口基段下发给 worker 步
- * 的命令环境（项目 dev server 自愿消费——pacman 仓自身的 PACMAN_DEV_WEB_PORT
+ * 的命令环境（项目 dev server 自愿消费——cairn 仓自身的 CAIRN_DEV_WEB_PORT
  * / E2E_PORT 纪律直接受益）。chief 步不携带（不占槽自然无段）。 */
-export const PORT_BASE_ENV = 'PACMAN_PORT_BASE';
+export const PORT_BASE_ENV = 'CAIRN_PORT_BASE';
 
 /** 首段基座（槽 1 → 20000；槽 2 → 20100；槽 N → 20000 + (N-1)×100）。 */
 export const PORT_BASE_FLOOR = 20_000;
@@ -155,7 +155,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     createPiBackend({
       agentDir: paths.agentRuntimeDir,
       sessionDir: paths.chatSessionsDir,
-      // skills 执行面注入（spec 14/#371）：skillsDir = PACMAN_SKILLS_DIR 扫描根；
+      // skills 执行面注入（spec 14/#371）：skillsDir = CAIRN_SKILLS_DIR 扫描根；
       // cwd = daemon home（project 级解析不随任务 worktree 切换跳变）。
       skills: { skillsDir: config.skillsDir, cwd: config.home },
       resolveSessionFile: (sid) => resolveSessionFile(paths, sid),
@@ -242,7 +242,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         // 那一个，与 machines 页显示同值）。
         machineName: config.name,
         // #1050 路径单源：探到的绝对路径钉给 SDK，免掉「探的二进制」与
-        // 「执行的二进制」不是一个（PACMAN_CLAUDE_BIN 此前只喂 auth 探针）。
+        // 「执行的二进制」不是一个（CAIRN_CLAUDE_BIN 此前只喂 auth 探针）。
         ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
         // #1171 原生插件通道两位：缓存分区单源（plugins/ 在 team-skills 缓存
         // 根下）+ #1050 探测版本（下限闸输入；探测缺位 = 版本不可证 →
@@ -268,7 +268,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let machineJson = loadMachineJson(paths);
   // server 迁移诊断（#519 控制面搬家）：token 由注册时 server 签发，配置指向
   // 另一地址后旧 token 打新 server——若对面是全新库，唯一表象是 claim 401
-  // 退避死循环，本行是排障第一线索（轮询地址仍以配置为准，A1「PACMAN_SERVER
+  // 退避死循环，本行是排障第一线索（轮询地址仍以配置为准，A1「CAIRN_SERVER
   // 指过去」语义不变）。
   if (machineJson && machineJson.serverUrl !== config.serverUrl) {
     logger.machine(
@@ -314,7 +314,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   // 效，下调由 server 闸即刻拦住本地旧值多发的一次 claim。读失败保留旧值
   // （闸宁可保守）。
   // #1148 两处增量：① 取值序 env > DB > 默认（resolveLocalCap 单源，
-  // PACMAN_DAEMON_MAX_CONCURRENT 覆盖 DB 值）；② serverGates 标记（me
+  // CAIRN_DAEMON_MAX_CONCURRENT 覆盖 DB 值）；② serverGates 标记（me
   // 携 maxConcurrent = #1108+ server，worker 容量闸权威在 server 侧）——
   // 本地 park 面收窄到「server 无闸」的混版本保护（见 claim 主循环注释）。
   let localCap = 1;
@@ -537,7 +537,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
-  const deliverSync = async (cmd: import('@pacman/shared').MachineSyncCommand): Promise<void> => {
+  const deliverSync = async (cmd: import('@cairn/shared').MachineSyncCommand): Promise<void> => {
     // 第四事件分流（M7 #319 [设计]，08 册附录 B「分支同步」）：分支对话框
     // 「同步到机器」server 派发；performSync 内部 ack running + 收尾 synced
     // /failed + 异常吞掉（本函数不抛——sync 是独立轨道，失败落账即闭环）。
@@ -624,7 +624,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   //   （me 无 maxConcurrent、无闸）保留本地 park 护混版本（chief 在飞不
   //   计数；其 pending 等收尾 = 现状保守形）。
   // ② 端口基座：worker 步领槽（1 起最小空闲整数，收尾释放即重用），
-  //   PACMAN_PORT_BASE = 段公式（portBaseForSlot）随 RunStepOptions.env 注
+  //   CAIRN_PORT_BASE = 段公式（portBaseForSlot）随 RunStepOptions.env 注
   //   入 agent 命令环境；并发在飞步恒不同槽（串槽 = 票面失败方式 2）。
   // runStep 自身失败面已走 done failed 闭环，发射处 catch 是
   // unhandled-rejection 防御位。优雅停止契约不变：循环退出后等在飞步全部

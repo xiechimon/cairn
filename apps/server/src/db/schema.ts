@@ -25,7 +25,7 @@ import type {
   StepKind,
   TodoSourceKind,
   TriggerSource,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import {
   index,
@@ -305,7 +305,7 @@ export const branchSync = sqliteTable('branch_sync', {
   /** 目标同步目录（机器本机路径；web 默认 `~/<homeDirName>/workspaces/<buildId>`，
    * 用户可改——r1 changelog 09-13 文本）。 */
   directory: text('directory').notNull(),
-  /** 分支名（`pacman/conv-<uuid>`，brand conversationBranch）。 */
+  /** 分支名（`cairn/conv-<uuid>`，brand conversationBranch）。 */
   ref: text('ref').notNull(),
   /** 完整 40hex sha（spec 展示形 = 12hex，但 wire 用全 sha 简化对拍）。 */
   commit: text('commit').notNull(),
@@ -541,7 +541,7 @@ export const apiKey = sqliteTable('api_key', {
   toolGrants: json<{ read: string[]; write: string[] }>('toolGrants').notNull(),
   /** [内部] key 哈希（登录校验只需匹配，02 §8）。 */
   keyHash: text('keyHash').notNull(),
-  /** [内部] 列表行掩码（`pacman_afe07565…`；展示规则 r3 §6，前缀随品牌槽）。 */
+  /** [内部] 列表行掩码（`cairn_afe07565…`；展示规则 r3 §6，前缀随品牌槽）。 */
   masked: text('masked').notNull(),
   createdAt: epochMs('createdAt').notNull(),
 });

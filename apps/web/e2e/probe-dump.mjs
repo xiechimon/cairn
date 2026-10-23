@@ -30,8 +30,8 @@
 // flagged VIOLATION, never silently converted.
 //
 // Usage (from apps/web, or anywhere via the workspace filter):
-//   pnpm --filter @pacman/web probe:dump                    # full suite
-//   pnpm --filter @pacman/web probe:dump -- --specs sidebar-visual accent-typo
+//   pnpm --filter @cairn/web probe:dump                    # full suite
+//   pnpm --filter @cairn/web probe:dump -- --specs sidebar-visual accent-typo
 //   node e2e/probe-dump.mjs --out ../../docs/verify/921
 //   node e2e/probe-dump.mjs --skip-run --ndjson /tmp/records.ndjson
 //
@@ -937,8 +937,8 @@ function baseEnv(port, ndjsonPath) {
   }
   env.NO_PROXY = 'localhost,127.0.0.1';
   env.E2E_PORT = String(port);
-  if (ndjsonPath == null) delete env.PACMAN_PROBE_DUMP_FILE;
-  else env.PACMAN_PROBE_DUMP_FILE = ndjsonPath;
+  if (ndjsonPath == null) delete env.CAIRN_PROBE_DUMP_FILE;
+  else env.CAIRN_PROBE_DUMP_FILE = ndjsonPath;
   return env;
 }
 

@@ -2,7 +2,7 @@
 // 列折叠映射单源 = shared boardColumnFor（#351 起单键：仅 phase，4 列）；
 // 流转边集 = src/services/phase.ts PHASE_TRANSITIONS（出处逐边注记）。
 
-import { BOARD_COLUMNS, boardColumnFor, PHASE_VALUES, type Phase } from '@pacman/shared';
+import { BOARD_COLUMNS, boardColumnFor, PHASE_VALUES, type Phase } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { canTransitionPhase, PHASE_TRANSITIONS } from '../src/services/phase.js';
 

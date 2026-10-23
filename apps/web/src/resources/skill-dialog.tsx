@@ -21,7 +21,7 @@ import {
   SKILL_DIR_NAME_RE,
   SKILL_ENTRY_FILE,
   splitSkillEntry,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';

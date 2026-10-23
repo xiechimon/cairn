@@ -11,7 +11,7 @@
 //      （live-row useLiveSeconds 复用）——没有 at 就不渲染该行（#471：
 //      缺席的数，不是冻结的数）。
 
-import type { StepActivity } from '@pacman/shared';
+import type { StepActivity } from '@cairn/shared';
 import type { TVars } from '../i18n/translate.js';
 
 type Listener = () => void;

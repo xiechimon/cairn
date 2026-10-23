@@ -17,7 +17,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
 });
 
 interface CardProbe {

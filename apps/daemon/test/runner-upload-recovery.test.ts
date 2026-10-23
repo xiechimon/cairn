@@ -20,8 +20,8 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
-import { PLAN_FILE_NAME } from '@pacman/shared';
+} from '@cairn/shared';
+import { PLAN_FILE_NAME } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -201,7 +201,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 const DONE_EVENT: StepEvent = { type: 'done', usage: [] };
 
 async function setup(claimed: ClaimedStep, backend: AgentBackend, client: MachineApi) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-upload-recovery-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-upload-recovery-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { logger, lines } = captureLogger();

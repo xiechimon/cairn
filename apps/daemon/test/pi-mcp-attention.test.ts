@@ -6,7 +6,7 @@
 //   A2 非 attention 通知（still connecting / 其它扩展）——不产行；
 //   A3 多 server 各一行、行序保持；
 //   A4 connectFailedLine 拼形（canon = MCP_CONNECT_FAILED_CANON）。
-import { MCP_CONNECT_FAILED_CANON } from '@pacman/shared';
+import { MCP_CONNECT_FAILED_CANON } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { connectFailedLine } from '../src/backend/mcp-config.js';
 import { parseMcpAttentionMessage } from '../src/backend/pi.js';

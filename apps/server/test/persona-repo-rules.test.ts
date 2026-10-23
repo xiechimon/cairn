@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AGENT_DESC_MAX_LENGTH } from '@pacman/shared';
+import { AGENT_DESC_MAX_LENGTH } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
@@ -18,7 +18,7 @@ import { bootServer } from './helpers.js';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 describe('Implementer 档案点名的技能（#1406 P5-3）', () => {
-  test('F11/F12：播种落库的 Implementer 职责文本在长度闸内，点名的 *-pacman 技能都在本仓', () => {
+  test('F11/F12：播种落库的 Implementer 职责文本在长度闸内，点名的 *-cairn 技能都在本仓', () => {
     const s = bootServer();
     try {
       ensurePersonasSeeded(s.db, s.team.id);
@@ -29,8 +29,8 @@ describe('Implementer 档案点名的技能（#1406 P5-3）', () => {
         .get();
       const description = row?.description ?? '';
       expect(description.length).toBeLessThanOrEqual(AGENT_DESC_MAX_LENGTH);
-      const named = [...new Set(description.match(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)*-pacman\b/g))];
-      expect(named).toEqual(expect.arrayContaining(['pr-pacman', 'verify-pacman']));
+      const named = [...new Set(description.match(/\b[a-z][a-z0-9]*(?:-[a-z0-9]+)*-cairn\b/g))];
+      expect(named).toEqual(expect.arrayContaining(['pr-cairn', 'verify-cairn']));
       for (const name of named) {
         expect(existsSync(join(REPO_ROOT, '.claude', 'skills', name, 'SKILL.md')), name).toBe(true);
       }

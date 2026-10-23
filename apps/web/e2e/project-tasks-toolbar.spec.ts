@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 // Issue #178: the project 任务 toolbar joins the living controls — the
 // list|grid view toggle (role=tab, aria-selected carrier) persists through the registered
-// client-state key (pacman.projectTasksLayout, teamMembersLayout twin), the
+// client-state key (cairn.projectTasksLayout, teamMembersLayout twin), the
 // 筛选/排序 buttons open anchored popovers (family law #67/#127: Escape,
 // click-catcher, retained-mount exit) whose options client-side filter and
 // sort the in-page todos, and the search box filters by title. The fixture
@@ -19,7 +19,7 @@ import { expect, type Page, test } from '@playwright/test';
 // 7. filter and search compose
 
 const TASKS = '/app/project/ZAQczKCu0MOAzC1ZqcFlX?scenario=prj-tasks';
-const LAYOUT_KEY = 'pacman.projectTasksLayout';
+const LAYOUT_KEY = 'cairn.projectTasksLayout';
 
 const REVIEW_TITLE = '在 README.md 末尾追加一行「r3 lifecycle probe」';
 const DONE_TITLE = '在 README.md 末尾追加一行「r3 lifecycle probe2」';
@@ -48,7 +48,7 @@ test('view toggle swaps rows for grid cards and persists', async ({ page }) => {
   await expect(listBtn).toHaveAttribute('aria-selected', 'false');
   expect(await page.evaluate((k) => localStorage.getItem(k), LAYOUT_KEY)).toBe('grid');
 
-  // the choice survives a reload (pacman.projectTasksLayout)
+  // the choice survives a reload (cairn.projectTasksLayout)
   await page.reload();
   await expect(page.getByTestId('task-card')).toHaveCount(2);
   await expect(page.getByTestId('task-row')).toHaveCount(0);

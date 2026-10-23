@@ -1,18 +1,18 @@
-# @xiechimon/pacman
+# @xiechimon/cairn
 
-复刻 server（03 ROADMAP M2）：Hono REST + SSE（全 SSE 无 WebSocket，02 §1.2）、SQLite（better-sqlite3 + Drizzle，migration 进 repo、CI 校验 drift，01 §6）、单用户 seed + team 保形（02 §2）。协议词表单源 = `@pacman/shared`（02 §5/§6 canonical；路由对拍 = `test/wire.test.ts`）。
+复刻 server（03 ROADMAP M2）：Hono REST + SSE（全 SSE 无 WebSocket，02 §1.2）、SQLite（better-sqlite3 + Drizzle，migration 进 repo、CI 校验 drift，01 §6）、单用户 seed + team 保形（02 §2）。协议词表单源 = `@cairn/shared`（02 §5/§6 canonical；路由对拍 = `test/wire.test.ts`）。
 
 ## 运行
 
 ```sh
 pnpm dev:server          # tsx watch（开发）
-pnpm --filter @xiechimon/pacman start
-PORT=8791 PACMAN_HOME=/tmp/pacman-demo bash apps/server/scripts/demo.sh  # demo 面（另窗起 server）
+pnpm --filter @xiechimon/cairn start
+PORT=8791 CAIRN_HOME=/tmp/cairn-demo bash apps/server/scripts/demo.sh  # demo 面（另窗起 server）
 ```
 
 ## 数据根（单一数据根，备份 = 拷目录，01 §4.2）
 
-默认 `~/.pacman/server/`（`PACMAN_HOME` 覆盖主目录；目录名 = 品牌槽，D3 已触发切换，#109）：
+默认 `~/.cairn/server/`（`CAIRN_HOME` 覆盖主目录；目录名 = 品牌槽，D3 已触发切换，#109）：
 
 | 文件 | 内容 |
 |---|---|
@@ -23,7 +23,7 @@ PORT=8791 PACMAN_HOME=/tmp/pacman-demo bash apps/server/scripts/demo.sh  # demo 
 
 - **at-rest**：provider key、team Secret 值统一 AES-256-GCM 加密落库（信封 = `v1` 版本头 + iv + ciphertext + authTag）；密钥源 = 本地 keyfile，不引外部 KMS/口令派生（Q5 锁定）。
 - **运行时**：模型 key per-step 下发（`services/credentials.ts` 解析链；HTTP 端点 `/api/machine/token/{stepId}` 归 M3 接线），executor 内存持有、不落盘常驻；团队 Secret 按 Agent 授权集下发（按 step kind 收窄：plan/review/chief 步恒空），明文只在 `token/{stepId}` 返回值里出现、不预置进任务 shell 环境——daemon 持真值，agent 经 per-step 取用通道显式取用。
-- **API 面**：key 类字段**写只读掩码**——GET 永不返回 `apiKey` / secret 值；apiKey 存哈希（SHA-256）不存可逆值，创建响应含明文一次 `pacman_<48hex>`（「请立即复制密钥，它仅显示一次。」），此后列表行掩码 `pacman_afe07565…`。
+- **API 面**：key 类字段**写只读掩码**——GET 永不返回 `apiKey` / secret 值；apiKey 存哈希（SHA-256）不存可逆值，创建响应含明文一次 `cairn_<48hex>`（「请立即复制密钥，它仅显示一次。」），此后列表行掩码 `cairn_afe07565…`。
 
 > **护栏（02 §8 恢复口径）：keyfile 丢失 = 全部存量 provider key 与团队 Secret 值报废，需重录。**
 > 加密是磁盘静态保护，不是可恢复备份——「加密 ≠ 可恢复」。备份数据根目录时连同

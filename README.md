@@ -1,8 +1,8 @@
 <div align="center">
-  <img src="apps/web/public/logo.svg" alt="pacman app icon" width="128" height="128">
+  <img src="apps/web/public/logo.svg" alt="cairn app icon" width="128" height="128">
 </div>
 
-# pacman
+# cairn
 
 A self-hosted, open-source **agent workspace**: a task board where you write the tasks and AI agents build them on your own machines.
 
@@ -22,33 +22,33 @@ You file a task on a kanban board. An agent picks it up, checks out a worktree a
 ## Why
 
 - **Gated by design.** Every run stops for you twice — at the plan and at the diff — and the AI reviewer can block, not just comment. The only open-source, self-hostable agent workspace that does this today.
-- **Honest lineage.** pacman began as a clean-room study of todos.dev's public interface (see [Origins](#origins)) and is now an independent product; its roadmap diverges from real usage, not from anyone else's spec.
+- **Honest lineage.** cairn began as a clean-room study of todos.dev's public interface (see [Origins](#origins)) and is now an independent product; its roadmap diverges from real usage, not from anyone else's spec.
 
 ## Quickstart
 
 Requirements: Node.js 22 or 24 (LTS lines ship prebuilt `better-sqlite3` binaries; other versions may fall back to source compilation and need a build toolchain).
 
 ```sh
-npx @xiechimon/pacman
+npx @xiechimon/cairn
 ```
 
-One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.pacman`, runs migrations, and seeds a default team.
+One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team.
 
-Use a different port with `PORT=9000 npx @xiechimon/pacman`.
+Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
 ### Run builds on your own machines
 
 The UI is fully usable without a daemon; register a machine when you want agents to actually run builds on it. On each machine that executes builds:
 
 ```sh
-npm i -g @xiechimon/pacman-cli
+npm i -g @xiechimon/cairn-cli
 # One-time enrollment: create an API key in the web UI (/app/api-keys, plaintext shown once), then
-pacman start --api-key <pacman_...> --team <teamId>
-# Daily use (credentials persisted in ~/.pacman/machine.json):
-pacman start        # also: stop / restart / logs -f / status
+cairn start --api-key <cairn_...> --team <teamId>
+# Daily use (credentials persisted in ~/.cairn/machine.json):
+cairn start        # also: stop / restart / logs -f / status
 ```
 
-Both packages install a `pacman` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `pacman-cli` where agents build.
+Both packages install a `cairn` bin: installing both globally on the same machine means whichever came last wins the name. The clean split is running the server where you browse and `cairn-cli` where agents build.
 
 ### Develop from source
 
@@ -67,16 +67,16 @@ Server environment variables (all optional):
 
 | Variable | Default | Description |
 |---|---|---|
-| `PACMAN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. |
+| `CAIRN_TOKEN` | unset | Bearer token guarding `/api/*`. Set to enable authentication — the web UI asks for the token on first visit; unset means auth off (default). The two SSE stream endpoints additionally accept `?token=` (EventSource cannot set headers). Always set this when binding the server to a non-localhost interface. |
 | `PORT` | `8787` | HTTP listen port. |
-| `HOST` | unset (all interfaces) | HTTP bind address. For split deployment (server on an always-on host, daemon on another machine pointing `PACMAN_SERVER` at it), set this to that host's LAN address and set `PACMAN_TOKEN` alongside. Explicit `0.0.0.0`/`::` with `PACMAN_TOKEN` unset logs a startup warning. |
-| `PACMAN_HOME` | `~/.pacman` | Data root. Server state lives under `<PACMAN_HOME>/server/` (`server.db`, `secretbox.key`, hosted bare repos); the daemon keeps `machine.json`, `daemon.log`, and `workspaces/` at the root. **Backup = copy the whole directory** — the db alone is useless without the keyfile, since secrets are stored encrypted. |
-| `PACMAN_GITHUB_OAUTH_CLIENT_ID`<br>`PACMAN_GITHUB_OAUTH_CLIENT_SECRET` | unset | Credentials of a self-registered GitHub OAuth App, enabling OAuth provider sign-in. Set both or neither — the server refuses to start on a half-configured pair. |
-| `PACMAN_WEB_DIR` | `apps/web/dist` if present | Override for the SPA static-hosting root; unset with no build output = API-only mode. |
-| `PACMAN_SKILLS_DIR` | `~/.agents/skills` | Skills root. Each immediate subdirectory containing a `SKILL.md` is one skill (id = its frontmatter `name`, falling back to the directory name). Scanned live on every request — skills are never stored in the database; add a skill by dropping a folder in, remove one by deleting the folder. |
-| `PACMAN_ISSUE_INTAKE` | unset (off) | GitHub issue intake. `1`, `true` or `yes` turns it on; anything else leaves it off, and it is off by default. When on, every 5 minutes the server takes open issues labeled `ready-for-agent` from each GitHub project of a team that has a GitHub connection and a chief bound to an agent with a model, imports them as tasks and starts orchestration. An issue is taken only if the newest `labeled` event for that label was made by a user with triage, write, maintain or admin on the repository, and not through a GitHub App. A label applied through a GitHub App does not count, even when the app acts with that user's authorization. This check recognizes GitHub Apps only: a label applied with an OAuth App token or a personal access token looks the same as the user labeling by hand, and is taken. OAuth App tokens include the one `gh auth login` obtains and the team's GitHub connection token. pacman passes the connection token to the steps' git commands (git's own hooks run with it) and to the repository's `.agents/setup` and `.agents/resume` hooks, so agent code that can change those hooks can read it; pacman's agent steps can also run the machine's logged-in `gh` directly. Either way an agent can label issues as that account and feed the intake. Labels applied by anyone else, or removed again, are ignored too. Each project has at most 3 imported issue tasks outside done and closed at a time (failed ones count). Issues already labeled when you turn it on are taken too, oldest first, up to that limit (the server reads up to 300 labeled issues per project per sweep), so check what is labeled before enabling it. Tasks the intake imports list the chief's bound agent as their creator, and the intake closes only those tasks: a task imported by hand or by the webhook is never closed by it, nothing is closed for a team whose chief has no bound agent, and after the chief is bound to another agent, tasks taken before are no longer closed by it. Such a task is closed when the server saw its issue open and then saw it closed by a user with triage or above; a task whose issue the server first sees already closed (for example after a restart), an issue closed by its outside author, or a task someone reopened is left alone, and so is a task in review or one with a build that opened a pull request, and a split task whose subtasks are not all done or closed. The intake never closes those review and pull-request tasks. For a task in review whose build opened a pull request, the pull-request reconcile can finish it as done after a merge into the default branch, or as failed after the pull request is closed without merge (it checks more than that and may only leave a hint); a building task keeps going through the CI loop; a task in review without a pull request, or a failed one, stays where it is until a person moves it. If starting orchestration fails after an import, later sweeps try again, up to 3 tries in all (a restart forgets pending retries); after that the task stays in to-do for a person. When GitHub answers one of the intake's own reads (issue list, issue events, collaborator permission, issue state) with a rate limit, that team's sweep stops until the next one, and the log gives the reset time when GitHub sends one; a rate limit on the reads of an import fails just that import, and the sweep goes on to the next issue. The startup log says whether intake is on. The `pacman` label webhook (`POST /api/webhook/github/<token>`, active whether or not intake is on) applies the same permission check and the same limit: it imports an issue only when the user who applied the label (the event's `sender`) has triage, write, maintain or admin on the repository and the project is below the limit of 3, so an issue an outside author opens from a template that carries the label is not imported. When the sender is not a GitHub login name, that user's permission cannot be read (the read fails, or GitHub answers it with a rate limit), the team has no usable GitHub token, the project is at the limit, the project's stored repository name is not `owner/repo`, or GitHub does not find the issue, nothing is imported, the reason is logged, and the delivery is answered 202. When the refusal is about the sender's permission (below triage, unreadable, rate limited), the answer only says the sender was not confirmed, not which case or what permission; the log has the details. That keeps the verdict out of the answer text only: whether the import then goes ahead still shows whether a sender qualified, so a leaked webhook URL is still handled by revoking its token. |
+| `HOST` | unset (all interfaces) | HTTP bind address. For split deployment (server on an always-on host, daemon on another machine pointing `CAIRN_SERVER` at it), set this to that host's LAN address and set `CAIRN_TOKEN` alongside. Explicit `0.0.0.0`/`::` with `CAIRN_TOKEN` unset logs a startup warning. |
+| `CAIRN_HOME` | `~/.cairn` | Data root. Server state lives under `<CAIRN_HOME>/server/` (`server.db`, `secretbox.key`, hosted bare repos); the daemon keeps `machine.json`, `daemon.log`, and `workspaces/` at the root. **Backup = copy the whole directory** — the db alone is useless without the keyfile, since secrets are stored encrypted. |
+| `CAIRN_GITHUB_OAUTH_CLIENT_ID`<br>`CAIRN_GITHUB_OAUTH_CLIENT_SECRET` | unset | Credentials of a self-registered GitHub OAuth App, enabling OAuth provider sign-in. Set both or neither — the server refuses to start on a half-configured pair. |
+| `CAIRN_WEB_DIR` | `apps/web/dist` if present | Override for the SPA static-hosting root; unset with no build output = API-only mode. |
+| `CAIRN_SKILLS_DIR` | `~/.agents/skills` | Skills root. Each immediate subdirectory containing a `SKILL.md` is one skill (id = its frontmatter `name`, falling back to the directory name). Scanned live on every request — skills are never stored in the database; add a skill by dropping a folder in, remove one by deleting the folder. |
+| `CAIRN_ISSUE_INTAKE` | unset (off) | GitHub issue intake. `1`, `true` or `yes` turns it on; anything else leaves it off, and it is off by default. When on, every 5 minutes the server takes open issues labeled `ready-for-agent` from each GitHub project of a team that has a GitHub connection and a chief bound to an agent with a model, imports them as tasks and starts orchestration. An issue is taken only if the newest `labeled` event for that label was made by a user with triage, write, maintain or admin on the repository, and not through a GitHub App. A label applied through a GitHub App does not count, even when the app acts with that user's authorization. This check recognizes GitHub Apps only: a label applied with an OAuth App token or a personal access token looks the same as the user labeling by hand, and is taken. OAuth App tokens include the one `gh auth login` obtains and the team's GitHub connection token. cairn passes the connection token to the steps' git commands (git's own hooks run with it) and to the repository's `.agents/setup` and `.agents/resume` hooks, so agent code that can change those hooks can read it; cairn's agent steps can also run the machine's logged-in `gh` directly. Either way an agent can label issues as that account and feed the intake. Labels applied by anyone else, or removed again, are ignored too. Each project has at most 3 imported issue tasks outside done and closed at a time (failed ones count). Issues already labeled when you turn it on are taken too, oldest first, up to that limit (the server reads up to 300 labeled issues per project per sweep), so check what is labeled before enabling it. Tasks the intake imports list the chief's bound agent as their creator, and the intake closes only those tasks: a task imported by hand or by the webhook is never closed by it, nothing is closed for a team whose chief has no bound agent, and after the chief is bound to another agent, tasks taken before are no longer closed by it. Such a task is closed when the server saw its issue open and then saw it closed by a user with triage or above; a task whose issue the server first sees already closed (for example after a restart), an issue closed by its outside author, or a task someone reopened is left alone, and so is a task in review or one with a build that opened a pull request, and a split task whose subtasks are not all done or closed. The intake never closes those review and pull-request tasks. For a task in review whose build opened a pull request, the pull-request reconcile can finish it as done after a merge into the default branch, or as failed after the pull request is closed without merge (it checks more than that and may only leave a hint); a building task keeps going through the CI loop; a task in review without a pull request, or a failed one, stays where it is until a person moves it. If starting orchestration fails after an import, later sweeps try again, up to 3 tries in all (a restart forgets pending retries); after that the task stays in to-do for a person. When GitHub answers one of the intake's own reads (issue list, issue events, collaborator permission, issue state) with a rate limit, that team's sweep stops until the next one, and the log gives the reset time when GitHub sends one; a rate limit on the reads of an import fails just that import, and the sweep goes on to the next issue. The startup log says whether intake is on. The `cairn` label webhook (`POST /api/webhook/github/<token>`, active whether or not intake is on) applies the same permission check and the same limit: it imports an issue only when the user who applied the label (the event's `sender`) has triage, write, maintain or admin on the repository and the project is below the limit of 3, so an issue an outside author opens from a template that carries the label is not imported. When the sender is not a GitHub login name, that user's permission cannot be read (the read fails, or GitHub answers it with a rate limit), the team has no usable GitHub token, the project is at the limit, the project's stored repository name is not `owner/repo`, or GitHub does not find the issue, nothing is imported, the reason is logged, and the delivery is answered 202. When the refusal is about the sender's permission (below triage, unreadable, rate limited), the answer only says the sender was not confirmed, not which case or what permission; the log has the details. That keeps the verdict out of the answer text only: whether the import then goes ahead still shows whether a sender qualified, so a leaked webhook URL is still handled by revoking its token. |
 
-Daemon environment variables (alternatives to the CLI flags above): `PACMAN_SERVER` (default `http://127.0.0.1:8787`), `PACMAN_API_KEY`, `PACMAN_TEAM`, `PACMAN_WORKSPACES_DIR` (default `<PACMAN_HOME>/workspaces`).
+Daemon environment variables (alternatives to the CLI flags above): `CAIRN_SERVER` (default `http://127.0.0.1:8787`), `CAIRN_API_KEY`, `CAIRN_TEAM`, `CAIRN_WORKSPACES_DIR` (default `<CAIRN_HOME>/workspaces`).
 
 ## Development
 
@@ -88,7 +88,7 @@ pnpm dev:web      # vite dev server on http://localhost:5173, proxying /api and 
 The vite dev server runs with `strictPort`: a taken port fails startup instead of silently
 shifting to the next free one. The shift is the dangerous case, not the clash — the proxy
 target stays fixed, so a shifted UI would drive whichever stack owns the port, not yours.
-Override with `PACMAN_DEV_WEB_PORT` / `PACMAN_DEV_SERVER_PORT`.
+Override with `CAIRN_DEV_WEB_PORT` / `CAIRN_DEV_SERVER_PORT`.
 
 Quality gates before committing:
 
@@ -104,9 +104,9 @@ pnpm test         # vitest
 |---|---|
 | `CONTEXT.md` | Domain model & glossary — canonical terminology (Chinese interface terms ↔ English ↔ internal names) |
 | `apps/web` | Web UI (React + vite) |
-| `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/pacman` — directory name differs from package name) |
-| `apps/daemon` | Executor daemon (package `@xiechimon/pacman-cli` — directory name differs from package name) |
-| `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@pacman/shared`) |
+| `apps/server` | Server: Hono REST + SSE + SQLite (package `@xiechimon/cairn` — directory name differs from package name) |
+| `apps/daemon` | Executor daemon (package `@xiechimon/cairn-cli` — directory name differs from package name) |
+| `packages/shared` | Protocol vocabulary, record shapes, brand-slot single source (`@cairn/shared`) |
 | `docs/spec/` | Implementation canon, volumes 00–26 (Chinese) |
 | `docs/research/` | r1–r15 site inventories and later product research (historical archive) |
 | `scripts/` | Build-time tools (incl. `generate-icons.mjs`) |
@@ -127,4 +127,4 @@ Apache-2.0 — see [LICENSE](./LICENSE).
 
 ## Origins
 
-pacman began as a clean-room study of todos.dev's public interface and protocols — an exploration of agent-workspace design. It is now an independent project with its own roadmap, and uses no code or assets from todos.dev.
+cairn began as a clean-room study of todos.dev's public interface and protocols — an exploration of agent-workspace design. It is now an independent project with its own roadmap, and uses no code or assets from todos.dev.

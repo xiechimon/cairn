@@ -20,7 +20,7 @@ import {
   parseReviewPromptMeta,
   type RequiredCapabilities,
   type StepKind,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';

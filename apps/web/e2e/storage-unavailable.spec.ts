@@ -107,7 +107,7 @@ test('sandboxed boot survives a persistence interaction (writes silently dropped
 
   // F13: a persistence interaction in a dead-storage environment must be a
   // silent no-op, not a throw — toggle the sidebar collapse (the toggle
-  // writes pacman.sidebar-collapsed on every click).
+  // writes cairn.sidebar-collapsed on every click).
   await frame.locator('[aria-label="收起侧边栏"]').first().click();
   await expect(frame.locator('[aria-label="展开侧边栏"]').first()).toBeVisible();
 

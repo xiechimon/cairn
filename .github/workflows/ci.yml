@@ -42,7 +42,7 @@ jobs:
           cache: pnpm
 
       # 冲突标记闸（2026-10-08）：合并冲突标记被提交进 main 过一次
-      # （`.claude/skills/verify-pacman/SKILL.md` 里嵌套的 `<<<<<<<`，由解冲突
+      # （`.claude/skills/verify-cairn/SKILL.md` 里嵌套的 `<<<<<<<`，由解冲突
       # 脚本只处理最外层所致）。这种破损**不报错、不影响构建、也没人读得出来**
       # ——只有机器能替人抓住。只认带引用名的 `<<<<<<< ` / `>>>>>>> `（行首 +
       # 空格），不认裸 `=======`（markdown 的 setext 标题就是一行等号，会误伤）。
@@ -117,15 +117,15 @@ jobs:
       - name: Prepush self-test
         run: node --test scripts/prepush.test.mjs
 
-      # verify-pacman 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
+      # verify-cairn 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
       # 规则。drive 多走 --dry-run；要真跑的几条在自建的 skill 副本里配桩探针跑，
       # archive / links 在自建的空仓根里跑，都不起栈。capture 那条连一个关着的
       # 端口：有浏览器时记下导航失败，没有浏览器（本 job 此时还没装 chromium）时
       # 记下启动失败，两条路都要写出 result.json。其中一条跑注册表闸
       # （vp-registry-gate.mjs）：scripts/ 下没登记的脚本、新加的 drive-<票号>
       # 脚本、feature map 缺 vp.mjs drive 行，都在这里红。
-      - name: verify-pacman CLI self-test (#1402)
-        run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
+      - name: verify-cairn CLI self-test (#1402)
+        run: node .claude/skills/verify-cairn/scripts/vp-selftest.mjs
 
       - name: Install Playwright chromium
         run: pnpm exec playwright install chromium --with-deps
@@ -136,11 +136,11 @@ jobs:
       # 且不再生成任何迁移——下面这步的 git diff 就恒为空，闸静默失效。
       # db:check 直接校验链不变量把这种情况变成硬失败。
       - name: Drizzle snapshot chain guard
-        run: pnpm --filter @xiechimon/pacman db:check
+        run: pnpm --filter @xiechimon/cairn db:check
 
       - name: Drizzle migration drift check
         run: |
-          pnpm --filter @xiechimon/pacman db:generate
+          pnpm --filter @xiechimon/cairn db:generate
           git add -N apps/server/drizzle
           git diff --exit-code apps/server/drizzle
 
@@ -189,7 +189,7 @@ jobs:
         run: node scripts/ui-drift-gate.mjs
 
   # e2e 全量归 CI（#693 分层职责）：本地开发期只跑受影响面
-  # （pnpm --filter @pacman/web e2e:affected），全量唯一执行点在这。
+  # （pnpm --filter @cairn/web e2e:affected），全量唯一执行点在这。
   # 4 分片并行（playwright --shard，按测试精确切分、并集 = 全量 83 spec，
   # 覆盖面不降）：单 shard ≈ setup + fixture build + 1/4 测试量 ≈ 2 分钟，
   # 远小于原 check job 里串行的 223s e2e 步。独立 job/runner 也顺带消掉了
@@ -218,7 +218,7 @@ jobs:
 
       # 不再 apt 装 ffmpeg（2026-10-22 实测）：e2e 分片里没有任何 spec / 脚本调
       # 系统 ffmpeg（grep apps/web/e2e scripts integration 零命中；唯一的消费者是
-      # 本地的 verify-pacman 驱动脚本）；录像用的 ffmpeg 由下面
+      # 本地的 verify-cairn 驱动脚本）；录像用的 ffmpeg 由下面
       # `playwright install chromium` 自带。这一步反而是 CI 的拖慢点：run
       # 39808252360 的 e2e (3) 停在 apt-get install 上 42 分钟没进测试，e2e (1)
       # 同一步等了 14 分钟，而四个分片的测试本体只要 2 到 3 分钟。此前
@@ -330,8 +330,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/issue-label-gate.mjs
 
-  # feature-map 陈旧闸（#1160，advisory）：verify-pacman feature map
-  # （.claude/skills/verify-pacman/features/*.md）引用的仓内路径 / .类名 /
+  # feature-map 陈旧闸（#1160，advisory）：verify-cairn feature map
+  # （.claude/skills/verify-cairn/features/*.md）引用的仓内路径 / .类名 /
   # [data-*] 选择子 / CSS 声明形，必须能在当前树命中。avatars.md 陈旧的
   # 「Root 走 display:contents」条目掩护了 #1156（头像被裁本该被 map 拦住）
   # ——map 过期靠人记忆维护必漏，过期可见是机器活。
@@ -370,7 +370,7 @@ jobs:
         run: |
           git fetch --depth=1 origin "${VP_REACH_BASE_SHA:-main}"
           node --test docs/verify/1542/reach.test.mjs
-          node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs --check-reach
+          node .claude/skills/verify-cairn/scripts/vp-registry-gate.mjs --check-reach
 
   single-use-helper-gate:
     runs-on: ubuntu-latest

@@ -23,10 +23,10 @@ import {
 } from '../src/services/merge-gate/evidence-link.js';
 
 const SHA = 'f44b920639de983be1e050899e5217509204b43f';
-const raw = (path: string, sha = SHA, slug = 'xiechimon/pacman') =>
+const raw = (path: string, sha = SHA, slug = 'xiechimon/cairn') =>
   `https://raw.githubusercontent.com/${slug}/${sha}/${path}`;
 const parse = (body: string, ticketRef = '1404') =>
-  parseRawEvidenceLinks(body, { owner: 'xiechimon', repo: 'pacman', ticketRef });
+  parseRawEvidenceLinks(body, { owner: 'xiechimon', repo: 'cairn', ticketRef });
 
 describe('parseRawEvidenceLinks', () => {
   test('markdown 链接与 <img src> 都认，路径按 URL 解码', () => {
@@ -42,7 +42,7 @@ describe('parseRawEvidenceLinks', () => {
 
   test('别的仓、别的票、短 SHA、大写 SHA、分支名都不算，列进 others', () => {
     const body = [
-      raw('docs/verify/1404/a.json', SHA, 'someone/pacman'),
+      raw('docs/verify/1404/a.json', SHA, 'someone/cairn'),
       raw('docs/verify/1403/a.json'),
       raw('docs/verify/1404/a.json', SHA.slice(0, 7)),
       raw('docs/verify/1404/a.json', SHA.toUpperCase()),
@@ -61,7 +61,7 @@ describe('parseRawEvidenceLinks', () => {
   });
 
   test('仓名不分大小写', () => {
-    expect(parse(raw('docs/verify/1404/a.json', SHA, 'XieChimon/Pacman')).links).toHaveLength(1);
+    expect(parse(raw('docs/verify/1404/a.json', SHA, 'XieChimon/Cairn')).links).toHaveLength(1);
   });
 
   test('HTML 注释里的链接不算', () => {
@@ -77,7 +77,7 @@ describe('parseRawEvidenceLinks', () => {
   test('同一文件按解码后的 sha 与路径只记一次：仓主大小写不同、路径写成 %61 也是同一份', () => {
     const body = [
       raw('docs/verify/1404/a.txt'),
-      raw('docs/verify/1404/%61.txt', SHA, 'XiechiMon/Pacman'),
+      raw('docs/verify/1404/%61.txt', SHA, 'XiechiMon/Cairn'),
     ].join('\n');
     expect(parse(body)).toEqual({
       links: [{ sha: SHA, path: 'docs/verify/1404/a.txt' }],
@@ -266,7 +266,7 @@ describe('qualifyingEvidenceLinks', () => {
   const q = (body: string) =>
     qualifyingEvidenceLinks(
       body,
-      { owner: 'xiechimon', repo: 'pacman', ticketRef: '1404' },
+      { owner: 'xiechimon', repo: 'cairn', ticketRef: '1404' },
       compare,
     );
 

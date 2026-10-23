@@ -13,12 +13,12 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
   GITHUB_ACCESS_TOKEN_USERNAME,
   machineTokenResponseSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -116,7 +116,7 @@ async function setupWorld(projectBody: Record<string, unknown>): Promise<WireWor
 
 /** 真 git 工作树仓（validateLocalRepoPath 的 isGitRepo 闸要真仓）。 */
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'pacman-g2t2-user-')), 'repo');
+  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-g2t2-user-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   return dir;
 }
