@@ -50,6 +50,7 @@ import type {
   AgentBackend,
   AgentBackendCapabilities,
   AgentSessionHandle,
+  AgentTodoItem,
   AgentTokenUsage,
   BriefChannel,
   DeliveredImage,
@@ -61,6 +62,7 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@pacman/shared';
+import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@pacman/shared';
 import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
@@ -97,6 +99,23 @@ const SDK_ASK_TOOL = 'AskUserQuestion';
 /** 流级可重试判定（pi.ts isRetryableError 同律：瞬态词表正则）。 */
 function isRetryableError(message: string): boolean {
   return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
+}
+
+export function todoFromTodoWrite(name: unknown, input: unknown): AgentTodoItem[] | null {
+  if (name !== 'TodoWrite') return null;
+  const todos = (input as { todos?: unknown } | null | undefined)?.todos;
+  if (!Array.isArray(todos) || todos.length === 0) return null;
+  const items: AgentTodoItem[] = [];
+  for (const raw of todos) {
+    const content = (raw as { content?: unknown })?.content;
+    const status = (raw as { status?: unknown })?.status;
+    if (typeof content !== 'string' || content === '') continue;
+    const state = typeof status === 'string' ? CLAUDE_TODO_STATUS_STATES[status] : undefined;
+    if (state === undefined) continue;
+    if (items.length >= AGENT_TODO_MAX_ITEMS) break;
+    items.push({ text: content, state });
+  }
+  return items.length > 0 ? items : null;
 }
 
 // —— SDKMessage → StepEvent 映射（纯函数 + 显式 state）—————————————
@@ -227,10 +246,12 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
           // pending 段（无 result——词表「live 回传时缺省」）；终稿段由后续
           // user 帧 tool_result 回填（pi 两段发射同律，runner 以 result 在位
           // 门控 relay）。
+          const todo = todoFromTodoWrite(b.name, b.input);
           const call: ToolCallRecord = {
             id: b.id,
             name: b.name ?? '',
             arguments: b.input,
+            ...(todo !== null ? { todo } : {}),
           };
           state.calls.set(call.id, call);
           out.push({ type: 'toolcall_end', call });

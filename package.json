@@ -17,6 +17,7 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "lint": "biome ci .",
+    "prepush": "node scripts/prepush.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
     "prepare": "husky"

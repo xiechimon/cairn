@@ -12,6 +12,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activityStore } from '../src/api/activity.js';
+import { agentTodoStore } from '../src/api/agent-todo.js';
 import { liveTextStore } from '../src/api/live-text.js';
 import { liveThinkingStore } from '../src/api/live-thinking.js';
 import { startConversationStream } from '../src/api/sse.js';
@@ -65,6 +66,7 @@ beforeEach(() => {
   liveTextStore.clear(CONV);
   liveThinkingStore.clear(CONV);
   activityStore.clear(CONV);
+  agentTodoStore.clear(CONV);
 });
 
 afterEach(() => {
@@ -73,6 +75,7 @@ afterEach(() => {
   liveTextStore.clear(CONV);
   liveThinkingStore.clear(CONV);
   activityStore.clear(CONV);
+  agentTodoStore.clear(CONV);
 });
 
 describe('进场先清：补发即快照（失败方式 1）', () => {
@@ -361,5 +364,58 @@ describe('思考增量（#1308）', () => {
       step: { id: 's1', buildId: CONV, kind: 'plan', machineId: null, createdAt: 1, status: 'done' },
     });
     expect(liveThinkingStore.get(CONV)).toBe('');
+  });
+});
+
+describe('agent 待办清单单槽（#1524）', () => {
+  const todoEvent = (items: { text: string; state: 'todo' | 'doing' | 'done' }[]) => ({
+    type: 'agent_todo' as const,
+    todo: { stepId: 's1', at: 100, items },
+  });
+
+  it('agent_todo 事件入槽；后到覆盖先到（整表替换）', () => {
+    const es = startStream(freshClient());
+    es.push(todoEvent([{ text: '第一条', state: 'todo' }]));
+    expect(agentTodoStore.get(CONV)).toMatchObject({
+      stepId: 's1',
+      items: [{ text: '第一条', state: 'todo' }],
+    });
+    es.push(todoEvent([{ text: '第二条', state: 'doing' }]));
+    expect(agentTodoStore.get(CONV)).toMatchObject({
+      stepId: 's1',
+      items: [{ text: '第二条', state: 'doing' }],
+    });
+  });
+
+  it('step 终态（done/failed/stopped）清槽；claimed 不清', () => {
+    for (const status of ['done', 'failed', 'stopped'] as const) {
+      agentTodoStore.clear(CONV);
+      const es = startStream(freshClient());
+      es.push(todoEvent([{ text: '条目', state: 'todo' }]));
+      es.push({
+        type: 'step',
+        step: { id: 's1', buildId: CONV, kind: 'plan', machineId: null, createdAt: 1, status },
+      });
+      expect(agentTodoStore.get(CONV)).toBeNull();
+    }
+    agentTodoStore.clear(CONV);
+    const es = startStream(freshClient());
+    es.push(todoEvent([{ text: '条目', state: 'todo' }]));
+    es.push({
+      type: 'step',
+      step: { id: 's1', buildId: CONV, kind: 'plan', machineId: null, createdAt: 1, status: 'claimed' },
+    });
+    expect(agentTodoStore.get(CONV)).not.toBeNull();
+  });
+
+  it('流重建即清槽：新订阅先作废旧清单，hub 补发接管', () => {
+    agentTodoStore.set(CONV, { stepId: 's0', at: 50, items: [{ text: '旧', state: 'todo' }] });
+    FakeEventSource.instances = [];
+    startConversationStream(CONV, freshClient(), {});
+    expect(agentTodoStore.get(CONV)).toBeNull();
+    const es = FakeEventSource.instances[0] as FakeEventSource;
+    es.fireOpen();
+    es.push(todoEvent([{ text: '补发', state: 'doing' }]));
+    expect(agentTodoStore.get(CONV)).toMatchObject({ items: [{ text: '补发', state: 'doing' }] });
   });
 });

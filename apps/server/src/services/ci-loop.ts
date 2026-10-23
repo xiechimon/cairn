@@ -116,6 +116,7 @@ import {
   stopUnclaimedGateSteps,
   toBuildRecord,
 } from './builds.js';
+import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
@@ -1232,6 +1233,13 @@ export function createCiPoller(
       return;
     }
     // 绿 → phase 推进 review 闸（通知 + chief wake 走 setTodoPhase 漏斗）。
+    if (
+      verdict.state === 'green' &&
+      own &&
+      countMarkedRounds(deps.db, cand.buildId, CI_FIX_PROMPT_HEAD) > 0
+    ) {
+      hintOnce(cand.buildId, CI_FIX_GREEN_EVENT, 0);
+    }
     setTodoPhase(deps, cand.todoId, 'review');
     // #1250（ADR 0018 层 1）：CI 磨绿抵达 review 关口 = verify 入队的第二
     // 落点（第一 = completeStep 直进 review 的非 PR 面；槽空零动作幂等）。
@@ -1317,6 +1325,14 @@ export function createCiPoller(
           'ci pr-checks poll candidate failed (sweep continues)',
         );
       }
+    }
+    try {
+      await drainCiCorrections(deps, run.githubFetch);
+    } catch (err) {
+      run.logger?.info(
+        { err: err instanceof Error ? err.message : String(err) },
+        'ci correction deferred',
+      );
     }
     liveKeys.clear();
     // 最久没读的先读：匿名额度不够全读时，后面的卡也轮得到。

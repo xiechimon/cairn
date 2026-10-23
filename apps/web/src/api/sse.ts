@@ -12,6 +12,7 @@
 
 import type {
   ConversationActivityEvent,
+  ConversationAgentTodoEvent,
   ConversationStepEvent,
   NotificationRecord,
   TranscriptRow,
@@ -25,6 +26,7 @@ import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
+import { agentTodoStore } from './agent-todo.js';
 import { readStoredToken, useAuth } from './auth.js';
 import { invalidateConverged } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
@@ -200,6 +202,7 @@ export function startConversationStream(
   liveTextStore.clear(conversationId);
   liveThinkingStore.clear(conversationId);
   activityStore.clear(conversationId);
+  agentTodoStore.clear(conversationId);
   // resync（#462）：重连/看门狗重建即全量失效重取，补断线窗口内丢失的
   // message/step 事件（plan 卡/进度行停更的根治面）；#740 另加清缓冲——
   // 新订阅上服务端补发的是当前段全量快照（含断线窗口内流掉的增量）。
@@ -210,6 +213,7 @@ export function startConversationStream(
     liveTextStore.clear(conversationId);
     liveThinkingStore.clear(conversationId);
     activityStore.clear(conversationId);
+    agentTodoStore.clear(conversationId);
     void invalidateConverged(qc);
   };
   return connect(
@@ -231,6 +235,11 @@ export function startConversationStream(
             liveThinkingStore.clear(conversationId);
           }
           activityStore.set(conversationId, activity);
+          break;
+        }
+        case 'agent_todo': {
+          const todo = (ev as ConversationAgentTodoEvent).todo;
+          agentTodoStore.set(conversationId, todo);
           break;
         }
         case 'message': {
@@ -258,6 +267,7 @@ export function startConversationStream(
             liveTextStore.clear(conversationId);
             liveThinkingStore.clear(conversationId);
             activityStore.clear(conversationId);
+            agentTodoStore.clear(conversationId);
           }
           void invalidateConverged(qc, { queryKey: ['steps', conversationId] });
           void invalidateConverged(qc, { queryKey: ['build', conversationId] });

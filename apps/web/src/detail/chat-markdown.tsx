@@ -20,6 +20,7 @@
 // 独立行」拼接，web api/attachments.ts 契约）。行中内联的 token 不在块语法
 // 内（保持字面文本，与 agent 回复同律）。
 
+import { AGENT_TODO_LINE_RE, AGENT_TODO_MARKER_STATES, type AgentTodoState } from '@pacman/shared';
 import { useMemo } from 'react';
 import { inlineSegments } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
@@ -41,7 +42,7 @@ export type ChatBlock =
   | { kind: 'code'; lang?: string; text: string }
   | { kind: 'attachment'; name: string; key: string };
 
-export type TaskState = 'todo' | 'doing' | 'done';
+export type TaskState = AgentTodoState;
 export type TaskItem = { state: TaskState; segments: DocSegment[] };
 
 /** Indent width per nesting level (px). Two source spaces = one level. */
@@ -54,14 +55,6 @@ function depthOf(indent: string): number {
 const FENCE = /^ {0,3}(`{3,}|~{3,})\s*(\S*)\s*$/;
 const HEADING = /^ {0,3}(#{1,6})\s+(.*)$/;
 const ORDERED = /^(\s*)(\d+)[.)]\s+(.*)$/;
-const TASK = /^\s*[-*]\s+\[([ xX~/])\]\s+(.*)$/;
-const TASK_STATE: Record<string, TaskState> = {
-  ' ': 'todo',
-  x: 'done',
-  X: 'done',
-  '~': 'doing',
-  '/': 'doing',
-};
 const BULLET = /^(\s*)[-*•]\s+(.*)$/;
 /** Whole-line attachment token: single-sourced in overlay/attachment-paste.ts
  *  since #757 (composer strip parses the same shape the renderer chips). */
@@ -146,11 +139,11 @@ export function parseChatMarkdown(text: string): ChatBlock[] {
       continue;
     }
 
-    const task = TASK.exec(raw);
+    const task = AGENT_TODO_LINE_RE.exec(raw);
     if (task !== null) {
       flushPara();
       const item: TaskItem = {
-        state: TASK_STATE[task[1] ?? ' '] ?? 'todo',
+        state: AGENT_TODO_MARKER_STATES[task[1] ?? ' '] ?? 'todo',
         segments: inlineSegments((task[2] ?? '').trim()),
       };
       const last = blocks[blocks.length - 1];
@@ -317,7 +310,7 @@ function TaskIcon({ state }: { state: TaskState }) {
 
 /** 待办卡（借鉴 Claude Desktop 的 To Do）：`- [ ]` 待做 = 虚线圈，`- [~]` 进行中 =
  *  转圈，`- [x]` 完成 = 勾 + 划线淡化；连续任务行合成一张圆角卡。 */
-function TaskCard({ items }: { items: TaskItem[] }) {
+export function TaskCard({ items }: { items: TaskItem[] }) {
   return (
     <ul
       className="my-2 flex list-none flex-col gap-2 rounded-2xl border border-(--border) bg-(--card) px-4 py-3.5 shadow-sm"

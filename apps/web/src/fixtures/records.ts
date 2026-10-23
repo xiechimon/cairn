@@ -11,6 +11,7 @@
 import {
   type AgentRecord,
   type AgentTask,
+  type AgentTodoItem,
   type DocumentDiffFile,
   type GithubRepoSummary,
   type MachineHardware,
@@ -650,7 +651,8 @@ export type TranscriptItem =
       text: string;
       /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
       id?: string;
-    };
+    }
+  | { kind: 'agent-todo'; items: AgentTodoItem[] };
 
 /** AI 审核 finding 显示形态（M7 #330，r8 §3.1）：严重度 + 标题 + 描述 +
  * 引用位（文件:行）+ 可选建议。dataSource = server verdict message 解出

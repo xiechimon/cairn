@@ -8,6 +8,7 @@
 // SSE 写入按连接串行化（promise 链），避免交错。
 
 import type {
+  AgentTodo,
   BranchSyncRecord,
   BuildRecord,
   ConversationStepEvent,
@@ -130,6 +131,7 @@ export class ConversationStreamHub {
   /** 每会话最后一份步活动相位（#905，瞬态单槽）：订阅进场补发用，步终态
    *  即清。LRU 上限与 textBuffers 同值（delete+set 触碰序）。 */
   private readonly lastActivity = new Map<string, StepActivity>();
+  private readonly lastAgentTodo = new Map<string, AgentTodo>();
 
   subscribe(conversationId: string, conn: TeamStreamConnection): () => void {
     let set = this.byConv.get(conversationId);
@@ -153,6 +155,10 @@ export class ConversationStreamHub {
     const activity = this.lastActivity.get(conversationId);
     if (activity !== undefined) {
       void conn.send({ type: 'activity', activity });
+    }
+    const agentTodo = this.lastAgentTodo.get(conversationId);
+    if (agentTodo !== undefined) {
+      void conn.send({ type: 'agent_todo', todo: agentTodo });
     }
     return () => {
       set?.delete(conn);
@@ -240,6 +246,16 @@ export class ConversationStreamHub {
     this.publish(conversationId, { type: 'activity', activity });
   }
 
+  publishAgentTodo(conversationId: string, todo: AgentTodo): void {
+    this.lastAgentTodo.delete(conversationId);
+    this.lastAgentTodo.set(conversationId, todo);
+    if (this.lastAgentTodo.size > CONV_TEXT_BUFFER_MAX_CONVS) {
+      const oldest = this.lastAgentTodo.keys().next().value;
+      if (oldest !== undefined) this.lastAgentTodo.delete(oldest);
+    }
+    this.publish(conversationId, { type: 'agent_todo', todo });
+  }
+
   /** 步状态流转（pending/claimed/done/failed/stopped）。 */
   publishStep(conversationId: string, step: ConversationStepEvent['step']): void {
     // 终态 = 回合/步终局（终稿行通常先行落库，此为兜底；stopped/failed 无终稿
@@ -256,6 +272,7 @@ export class ConversationStreamHub {
     this.textBuffers.delete(conversationId);
     this.thinkingBuffers.delete(conversationId);
     this.lastActivity.delete(conversationId);
+    this.lastAgentTodo.delete(conversationId);
   }
 
   publish(conversationId: string, payload: object): void {

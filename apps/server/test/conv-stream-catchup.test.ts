@@ -530,3 +530,72 @@ describe('hub 活动相位（#905）', () => {
     expect(activityFrames(subscribeFresh(hub, `c${CONV_TEXT_BUFFER_MAX_CONVS}`))).toHaveLength(1);
   });
 });
+
+describe('hub agent 待办清单（#1524）', () => {
+  const list = (at: number) =>
+    ({
+      stepId: 'step-1',
+      at,
+      items: [
+        { text: '通读 poteto 的推文观点', state: 'todo' },
+        { text: '开票沉淀注释规则', state: 'doing' },
+        { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
+      ],
+    }) as import('@pacman/shared').AgentTodo;
+
+  function todoFrames(conn: FakeConn): unknown[] {
+    return conn.frames.filter((f) => (f as { type: string }).type === 'agent_todo');
+  }
+
+  test('零订阅期多份清单 → 进场只补发最后一份，帧过词表', () => {
+    const hub = new ConversationStreamHub();
+    hub.publishAgentTodo('c1', { ...list(100), items: [{ text: '旧', state: 'todo' }] });
+    hub.publishAgentTodo('c1', list(200));
+    const conn = new FakeConn();
+    hub.subscribe('c1', conn);
+    const frames = todoFrames(conn);
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toEqual({ type: 'agent_todo', todo: list(200) });
+    expect(conversationStreamEventSchema.parse(frames[0])).toBeTruthy();
+    hub.publishAgentTodo('c1', { ...list(300), items: [{ text: '新', state: 'doing' }] });
+    expect(todoFrames(conn)).toHaveLength(2);
+  });
+
+  test('step 终态（done/failed/stopped）清单槽；claimed 不清', () => {
+    for (const status of ['done', 'failed', 'stopped'] as const) {
+      const hub = new ConversationStreamHub();
+      hub.publishAgentTodo('c1', list(100));
+      hub.publishStep('c1', stepRow('c1', status));
+      expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
+    }
+    const hub = new ConversationStreamHub();
+    hub.publishAgentTodo('c1', list(100));
+    hub.publishStep('c1', stepRow('c1', 'claimed'));
+    expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(1);
+  });
+
+  test('clearConversationBuffer（rewind 通道）同清单槽', () => {
+    const hub = new ConversationStreamHub();
+    hub.publishAgentTodo('c1', list(100));
+    hub.clearConversationBuffer('c1');
+    expect(todoFrames(subscribeFresh(hub, 'c1'))).toHaveLength(0);
+  });
+
+  test('跨会话隔离——A 的清单不进 B 的补发与 live 流', () => {
+    const hub = new ConversationStreamHub();
+    hub.publishAgentTodo('cA', list(100));
+    const b = subscribeFresh(hub, 'cB');
+    expect(todoFrames(b)).toHaveLength(0);
+    hub.publishAgentTodo('cA', list(200));
+    expect(todoFrames(b)).toHaveLength(0);
+  });
+
+  test('缓冲会话数上限同律驱逐清单单槽（无界内存防御）', () => {
+    const hub = new ConversationStreamHub();
+    for (let i = 0; i <= CONV_TEXT_BUFFER_MAX_CONVS; i++) {
+      hub.publishAgentTodo(`c${i}`, list(i));
+    }
+    expect(todoFrames(subscribeFresh(hub, 'c0'))).toHaveLength(0);
+    expect(todoFrames(subscribeFresh(hub, `c${CONV_TEXT_BUFFER_MAX_CONVS}`))).toHaveLength(1);
+  });
+});
