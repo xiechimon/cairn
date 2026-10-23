@@ -170,6 +170,8 @@ export const build = sqliteTable('build', {
    * `{ files: [], changed: true }`，完成弹层不把这类改动当成空提交。 */
   changes: json<DocumentDiffFile[] | { files: DocumentDiffFile[]; changed: true }>('changes'),
   diffHash: text('diffHash'),
+  baseSha: text('baseSha'),
+  harnessHash: text('harnessHash'),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -966,3 +968,20 @@ export const memberActivity = sqliteTable('member_activity', {
   scope: text('scope').primaryKey(),
   at: epochMs('at').notNull(),
 });
+
+export const buildFeedback = sqliteTable(
+  'build_feedback',
+  {
+    id: text('id').primaryKey(),
+    buildId: text('buildId')
+      .notNull()
+      .references(() => build.id, { onDelete: 'cascade' }),
+    kind: text('kind').$type<'revision' | 'restart'>().notNull(),
+    side: text('side').$type<'plan' | 'build'>().notNull(),
+    feedback: text('feedback').notNull(),
+    actor: text('actor').notNull(),
+    stepId: text('stepId'),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [index('build_feedback_buildId_idx').on(t.buildId)],
+);

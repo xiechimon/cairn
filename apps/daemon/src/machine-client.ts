@@ -14,6 +14,7 @@ import {
   type MachineClaimBody,
   type MachineDoneBody,
   type MachineEnrollResponse,
+  type MachineHeartbeatBody,
   type MachineRecord,
   type MachineRecoverResponse,
   type MachineShellPrecheckResponse,
@@ -99,7 +100,7 @@ export interface MachineApi {
    * body = #1148 maxWorkers 自报（调用方传 effective cap）；缺省 = 空 body
    * （老 server / 测试桩兼容面）。 */
   claim(signal?: AbortSignal, body?: MachineClaimBody): Promise<ClaimedStep | null>;
-  heartbeat(stepId: string): Promise<void>;
+  heartbeat(stepId: string, body?: MachineHeartbeatBody): Promise<void>;
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
   /** live transcript 文本增量（machineToolBodySchema 第三形 [设计]，M5 live
    * streaming）：pi text_delta 节流批量转发，server 侧瞬态进 conversation
@@ -325,9 +326,10 @@ export class MachineClient implements MachineApi {
     return res.step;
   }
 
-  async heartbeat(stepId: string): Promise<void> {
+  async heartbeat(stepId: string, body: MachineHeartbeatBody = {}): Promise<void> {
     await this.request('POST', `/api/machine/heartbeat/${stepId}`, {
-      body: {},
+      body,
+      signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

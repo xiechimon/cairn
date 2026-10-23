@@ -337,6 +337,13 @@
       "when": 1792688838285,
       "tag": "0047_step_finished_at",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "6",
+      "when": 1792722730010,
+      "tag": "0048_acoustic_mentor",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,7 @@ import {
   machineEnrollConfirmBodySchema,
   machineEnrollPollBodySchema,
   machineEnrollStartBodySchema,
+  machineHeartbeatBodySchema,
   machinePresenceBodySchema,
   machineShellPrecheckBodySchema,
   machineShellResultBodySchema,
@@ -39,6 +40,7 @@ import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { newRecordId } from './lib/ids.js';
 import { transitionBranchSync } from './services/branch-sync.js';
+import { recordBuildProvenance } from './services/build-provenance.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { precheckShellCommand, reportShellResult } from './services/machine-shell.js';
 import { createUploadUrls, receivePlanUpload, receiveUpload } from './services/machine-uploads.js';
@@ -356,9 +358,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   });
 
   // —— POST /api/machine/heartbeat/{stepId} ———————————————————————————————————
-  app.post('/api/machine/heartbeat/:stepId', (c) => {
+  app.post('/api/machine/heartbeat/:stepId', async (c) => {
     const row = me(c);
+    const body = parseWith(machineHeartbeatBodySchema, (await jsonBody(c)) ?? {}, 'body');
     heartbeatStep(deps, row.id, c.req.param('stepId'));
+    recordBuildProvenance(ctx.db, c.req.param('stepId'), body);
     return c.json({ ok: true as const });
   });
 

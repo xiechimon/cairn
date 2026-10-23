@@ -51,6 +51,7 @@ export const DB_TABLES = [
   // #1491 后台自动任务触发闸（server 独占）
   'autonomy_state', // 每 (项目, 任务种类) 一行：上次开跑、休眠基线、最近一次被拦原因
   'member_activity', // 人最近一次写操作的时刻（人在用就让路）
+  'build_feedback',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -95,4 +96,5 @@ export const INTERNAL_ONLY_TABLES = [
   // 只给闸读，不出 wire。
   'autonomy_state',
   'member_activity',
+  'build_feedback',
 ] as const;

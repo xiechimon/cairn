@@ -23,6 +23,7 @@ import type {
   LocalToolDef,
   MachineAskBody,
   MachineDoneBody,
+  MachineHeartbeatBody,
   PreparedWorkspace,
   ProviderConfig,
   QuotaBlock,
@@ -84,6 +85,7 @@ import {
 import { clearCredentials, pushCredential } from './credentials.js';
 import { withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
+import { computeHarnessHash } from './harness-hash.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
@@ -445,8 +447,9 @@ export async function runStep(
   // 删了，停止信号来不及被拉取）→ 按停止收尾：中断会话、done(stopped)、不
   // commit/push（不往旧分支推）。404（被放回、不归本机）照常跑——#1483 同机
   // 重领时这次 run 接着跑新的领取。其余错误（网络）照旧吞掉。
+  const provenance: MachineHeartbeatBody = {};
   const heartbeat = setInterval(() => {
-    deps.client.heartbeat(stepId).catch((err: unknown) => {
+    deps.client.heartbeat(stepId, provenance).catch((err: unknown) => {
       if (!(err instanceof MachineApiError) || err.status !== 410 || stop.request !== null) return;
       deps.logger.step(`step ${stepId} no longer exists on the server — stopping`);
       stop.deliver({ discard: false }).catch((stopErr: unknown) => {
@@ -459,7 +462,7 @@ export async function runStep(
   if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   try {
-    await runClaimedStep(deps, claimed, opts, heartbeat, stop);
+    await runClaimedStep(deps, claimed, opts, heartbeat, stop, provenance);
   } finally {
     clearInterval(heartbeat);
     stop.settle();
@@ -472,6 +475,7 @@ async function runClaimedStep(
   opts: RunStepOptions,
   heartbeat: ReturnType<typeof setInterval>,
   stop: RunStop,
+  provenance: MachineHeartbeatBody,
 ): Promise<void> {
   const { client, journal, logger } = deps;
   const now = deps.now ?? (() => Date.now());
@@ -1001,7 +1005,7 @@ async function runClaimedStep(
   // #1186：简报目录构造（composeBody）把 scan + 预算之后的名字交回来。
   // 回调在 doneBody 落 journal 之前触发，recover 重放 done 时名字跟着走。
   // 没走到简报（更早失败）保持 null，done 不带本字段。
-  let skillInjectionFacts: SkillInjectionFacts | null = null;
+  const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   // 工具面按步全量透传（#647/T4）：claude-code 后端把 host 注入工具
   // （remoteTools relay + localTools 本地执行）包成 in-process MCP server、
   // McpEndpoint 映射 SDK 原生 config——T1 期的 runtimeDrop 降级（worker/review
@@ -1058,7 +1062,7 @@ async function runClaimedStep(
     // deny 面（#917）不受重排影响——授权上限只看 skillsAllowlist。
     ...(isChief || injectedForSession === undefined ? {} : { injectedSkills: injectedForSession }),
     onSkillsResolved: (names) => {
-      skillInjectionFacts = names;
+      skillInjection.facts = names;
     },
     // 团队技能物化目录（XMON-112 S2）：backend 把它排在本机 skillsDir 之前
     // 扫描（同名冲突团队条目胜，pi first-wins）；null = 纯本机（零回归）。
@@ -1211,6 +1215,42 @@ async function runClaimedStep(
       clearCredentials(creds);
       await failStep(deps, heartbeat, stepId, `运行简报写入失败（${reason}）`);
       return;
+    }
+  }
+
+  if (!isChief) {
+    try {
+      const skillFiles =
+        deps.skillsDir === undefined
+          ? new Map<string, string>()
+          : collectVisibleSkillFileMap({
+              skillsDir: deps.skillsDir,
+              cwd: deps.paths.home,
+              ...(sessionOpts.skillsAllowlist !== undefined
+                ? { allowlist: sessionOpts.skillsAllowlist }
+                : {}),
+              ...(injectedForSession !== undefined ? { injectedSkills: injectedForSession } : {}),
+              ...(teamSkillsDir !== null ? { teamSkillsDir } : {}),
+              ...(isPi ? { worktreeSkillsDirs: piWorktreeSkillDirs(cwd) } : {}),
+            });
+      const injectedNames = skillInjection.facts?.injected;
+      const skills = [...skillFiles]
+        .filter(([name]) => injectedNames === undefined || injectedNames.includes(name))
+        .map(([name, path]) => ({ name, content: readFileSync(path, 'utf8') }));
+      provenance.baseSha = headAtStart;
+      provenance.harnessHash = computeHarnessHash({
+        systemPrompt: systemPrompt ?? '',
+        skills,
+        tools: [...(remoteTools ?? []), ...localToolDefs].map(({ name, description }) => ({
+          name,
+          description,
+        })),
+      });
+      await client.heartbeat(stepId, provenance);
+    } catch (err: unknown) {
+      logger.step(
+        `build provenance report failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
@@ -2257,7 +2297,7 @@ async function runClaimedStep(
     // #1261 配额熔断信号（server 侧挂起等额度的判据；旧 server zod strip =
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
-    ...(skillInjectionFacts !== null ? { skillInjectionFacts } : {}),
+    ...(skillInjection.facts !== null ? { skillInjectionFacts: skillInjection.facts } : {}),
     // #1493 无输出信号：成功收尾但 transcript 零 assistant 消息（server「0 token
     // 静默失败」判据的前提——单看 usage 会误判不回 usage 的 relay）。
     ...(status === 'success' && !messages.some((m) => m.role === 'assistant')
