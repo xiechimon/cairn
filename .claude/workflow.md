@@ -34,6 +34,8 @@
 - grok：`grok -p "<任务>" -m <模型> --always-approve --cwd <目录>`，要联网或搜 X 就别加 `--disable-web-search`。
 - codex：`codex exec -s workspace-write -C <目录> "<票>"`，不能绑端口、不能跑 e2e，可以生成图片。
 
+后台起以上命令一律走 `scripts/dispatch-agent.mjs start <id> -- <命令>`：脱离进程组启动、立即核对进程并写状态文件（`( ... & )` / `nohup` 直起的任务会被工具调用边界的进程组清理杀掉）。汇报前先 `check <id>` 读状态文件，直起的任务没有状态记录，check 报进程不存在（#1556）。
+
 ## 4. 模型规则
 
 - 只用 1M 上下文的模型。
