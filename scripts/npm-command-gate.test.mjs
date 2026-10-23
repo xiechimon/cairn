@@ -19,6 +19,17 @@ test('collects package names from npx and npm install commands', () => {
   ]);
 });
 
+test('collects package names from the PUBLISHED_PACKAGES table', () => {
+  const text = [
+    "export const BRAND = { cliPackageName: '@xiechimon/cairn-cli' } as const;",
+    'export const PUBLISHED_PACKAGES = {',
+    "  cli: { name: '@xiechimon/pacman-cli', command: 'pacman' },",
+    "  server: { name: '@xiechimon/pacman', command: 'pacman' },",
+    '} as const;',
+  ].join('\n');
+  assert.deepEqual(packagesIn(text), ['@xiechimon/pacman-cli', '@xiechimon/pacman']);
+});
+
 test('reports packages the registry answers 404 for', async () => {
   const published = new Set(['@xiechimon/pacman']);
   const fetchFn = async (url) => ({

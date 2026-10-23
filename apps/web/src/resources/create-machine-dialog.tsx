@@ -1,8 +1,8 @@
 // 添加机器 dialog (wayfinder #181, #179 裁决落账 = CLI 两步表单; copy
 // authority = r2 11b 弹窗 + r3 §1.2 API key 分支): rides DialogShell (#68
 // family law — X / Esc / backdrop). 引导语 + 两段带 复制 的命令块(安装
-// CLI → `npm install -g @xiechimon/cairn-cli@latest`;在机器上执行 → `cairn start`
-// ——包名/命令名走 BRAND 品牌槽,#44);底部「在云服务器上运行?改用 API
+// CLI → `npm install -g <包名>@latest`;在机器上执行 → `<命令名> start`
+// ——包名/命令名成对取自 PUBLISHED_PACKAGES.cli);底部「在云服务器上运行?改用 API
 // key 注册」disclosure 展开 `cairn start --api-key <key> --team <teamId>`
 // (teamId 内嵌 = 02 §5.2 路径二 → POST /api/machine/enroll 端点链,
 // routes-machine.ts schema 核实)+「获取 API key →」跳 /app/api-keys
