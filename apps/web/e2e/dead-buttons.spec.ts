@@ -270,6 +270,43 @@ test('api-keys empty state drops the 查看文档 button, keeps 新建密钥 (#3
   await expect(keysEmpty.getByRole('button', { name: '新建密钥' })).toBeVisible();
 });
 
+test('api-keys non-empty state keeps 新建密钥 visible and opens the create dialog', async ({ page }) => {
+  await page.route('**/api/**', (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.abort();
+    if (request.method() !== 'GET') return route.fallback();
+    if (path === '/api/teams') {
+      return route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      });
+    }
+    if (path === '/api/user/me') {
+      return route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } });
+    }
+    if (path === '/api/teams/team-1/api-keys') {
+      return route.fulfill({
+        json: [
+          {
+            id: 'key-1',
+            name: 'Existing key',
+            masked: 'pacman_afe07565…',
+            gitAccess: false,
+            mcpAccess: false,
+          },
+        ],
+      });
+    }
+    return route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } });
+  });
+  await page.goto('/app/api-keys');
+  await expect(page.getByText('Existing key', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('keys-empty')).toHaveCount(0);
+  const create = page.getByRole('button', { name: '新建密钥', exact: true });
+  await expect(create).toBeVisible();
+  await create.click();
+  await expect(page.getByRole('dialog', { name: '新建密钥', exact: true })).toBeVisible();
+});
+
 test('resources empty state drops the 查看文档 link (#307); skills 空态主钮 = 新建技能弹窗 (XMON-114)', async ({
   page,
 }) => {

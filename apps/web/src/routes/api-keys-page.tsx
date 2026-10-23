@@ -69,6 +69,13 @@ export function ApiKeysPage() {
         />
       ) : (
         <>
+          {live && (
+            <div className="mt-6 flex justify-end">
+              <Button className={DIALOG_PRIMARY_BUTTON} onClick={() => setCreateOpen(true)}>
+                {t('新建密钥')}
+              </Button>
+            </div>
+          )}
           {keys
             .filter((key) => key.plaintext != null)
             .map((key) => (

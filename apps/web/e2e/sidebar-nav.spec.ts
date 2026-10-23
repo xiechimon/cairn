@@ -129,8 +129,8 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
   await page.goto('/app?scenario=01');
   const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await lightRow.hover();
-  // --sidebar-hover light = DESIGN.md hover #ebe4d8 (Paper Grouped sidebar)
-  await expect.poll(() => pillBg(lightRow)).toBe('rgb(235, 228, 216)');
+  // --sidebar-hover light = DESIGN.md hover #e8dec5 (Paper Grouped sidebar)
+  await expect.poll(() => pillBg(lightRow)).toBe('rgb(232, 222, 197)');
 });
 
 test('rail hover tints the row', async ({ page }) => {

@@ -16,7 +16,7 @@ import { expect, test } from '@playwright/test';
 // - .res-back: hover 无背景变化 (现状即无 hover 面, 此处把律钉死防回潮);
 //   键盘 focus 环由 app.css 全局 :focus-visible 规则承载 (#388, 2px
 //   --focus-ring + offset 2)——本 spec 断言该环在 res-back 上双主题生效
-//   （Paper 暗 #f0926d / 亮 #b4532a）。
+//   （Paper 暗 #f0926d / 亮 #173a2f）。
 // - P5 danger：--destructive 两值（暗 #ffabb7 / 亮 #9e2c49）压 --card
 //   面拼对比度（文本 ≥4.5，§5.1 门）。--destructive-foreground 已判死退役
 //   （#987 §3.1），destructive 改按 base-nova 形 text-destructive 消费。
@@ -217,8 +217,8 @@ for (const theme of ['light', 'dark'] as const) {
     });
     expect(ring.style).toBe('solid');
     expect(ring.w).toBe('2px');
-    // the codebase ring recipe rides --focus-ring (Paper dark #f0926d / light #b4532a)
-    expect(ring.color).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(180, 83, 42)');
+    // the codebase ring recipe rides --focus-ring (Paper dark #f0926d / light #173a2f)
+    expect(ring.color).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(23, 58, 47)');
   });
 }
 
@@ -280,7 +280,7 @@ for (const theme of ['light', 'dark'] as const) {
     // Paper card 面过文本 4.5 门（暗 7.95，docs/verify/1396/contrast.txt /
     // 亮 7.22，docs/verify/paper-tokens/contrast.txt）
     expect(destructive).toBe(theme === 'dark' ? 'rgb(255, 171, 183)' : 'rgb(158, 44, 73)');
-    expect(card).toBe(theme === 'dark' ? 'rgb(47, 42, 38)' : 'rgb(255, 255, 255)');
+    expect(card).toBe(theme === 'dark' ? 'rgb(47, 42, 38)' : 'rgb(255, 253, 246)');
     expect(await contrastOf(page, destructive, card)).toBeGreaterThanOrEqual(4.5);
   });
 
@@ -289,7 +289,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto('/app?scenario=01');
     const bg = await resolveToken(page, '--card-button');
     const fg = await resolveToken(page, '--text-on-accent');
-    expect(bg).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(180, 83, 42)');
+    expect(bg).toBe(theme === 'dark' ? 'rgb(240, 146, 109)' : 'rgb(23, 58, 47)');
     expect(fg).toBe(theme === 'dark' ? 'rgb(26, 22, 18)' : 'rgb(255, 255, 255)');
     expect(await contrastOf(page, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });

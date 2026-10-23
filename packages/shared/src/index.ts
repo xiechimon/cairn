@@ -34,5 +34,6 @@ export * from './tables.js';
 export * from './task-failure.js';
 // spec 15 #394：占位标题派生 + 固定标签词表（ADR 0002 自觉背离原站的面）。
 export * from './task-meta.js';
+export * from './trajectory-pack.js';
 // #1137：GitHub webhook 事件入口（触发 label / 去重窗口 / 载荷与响应形状）。
 export * from './webhook.js';

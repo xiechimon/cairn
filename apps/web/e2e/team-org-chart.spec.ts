@@ -85,8 +85,8 @@ test('chart 组织图：节点是 Paper 卡，创建 Agent 只在顶栏', async 
         width: el.getBoundingClientRect().width,
       };
     });
-  expect(shape.radius).toBe('10px');
-  expect(shape.bg).toBe('rgb(255, 255, 255)');
+  expect(shape.radius).toBe('20px');
+  expect(shape.bg).toBe('rgb(255, 253, 246)');
   expect(shape.shadow).toContain('0px 0px 0px 1px');
   expect(shape.height).toBe(NODE_H);
   expect(shape.width).toBe(220);

@@ -19,8 +19,8 @@
     const boot = document.getElementById('boot');
     if (!boot) return;
 
-    const ink = theme === 'light' ? '#ebe4d8' : '#24201b';
-    const page = theme === 'light' ? '#f3eee5' : '#1a1612';
+    const ink = theme === 'light' ? '#e8dec5' : '#24201b';
+    const page = theme === 'light' ? '#efe6d0' : '#1a1612';
     boot.style.cssText = `position:fixed;inset:0;display:grid;grid-template-columns:288px 1fr;background:${page};z-index:0`;
 
     const rail = document.createElement('div');
@@ -40,7 +40,7 @@
       const count = Math.max(0, Math.min(12, Number(n) || 0));
       for (let i = 0; i < count; i += 1) {
         const card = document.createElement('div');
-        card.style.cssText = `height:72px;border-radius:10px;margin-bottom:8px;background:${ink}`;
+        card.style.cssText = `height:72px;border-radius:20px;margin-bottom:8px;background:${ink}`;
         col.appendChild(card);
       }
       grid.appendChild(col);

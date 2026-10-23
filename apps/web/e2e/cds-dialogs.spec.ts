@@ -36,7 +36,7 @@ test('CDS search panel: 16px edge-radius + de-boxed input', async ({ page }) => 
   expect(m.inputBg === 'rgba(0, 0, 0, 0)' || m.inputBg === 'transparent').toBeTruthy();
 });
 
-test('Paper user-menu: 10px + shadow-popover, no solid border', async ({ page }) => {
+test('Paper user-menu: 18px + shadow-popover, no solid border', async ({ page }) => {
   await page.goto('/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=17');
   await expect(page.locator('.user-menu')).toBeVisible();
 
@@ -57,8 +57,8 @@ test('Paper user-menu: 10px + shadow-popover, no solid border', async ({ page })
         .trim(),
     };
   });
-  expect(m.radiusPopover).toBe('10px');
-  expect(m.radius).toBe('10px');
+  expect(m.radiusPopover).toBe('18px');
+  expect(m.radius).toBe('18px');
   expect(m.border).toBe('0px');
   expect(m.shadow).not.toBe('none');
   expect(m.shadow).toContain('0px 0px 0px 1px');
