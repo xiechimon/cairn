@@ -360,6 +360,18 @@ jobs:
           node --test scripts/comment-discipline-gate.test.mjs
           node scripts/comment-discipline-gate.mjs
 
+  probe-reach-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Probe reach gate (advisory, #1542)
+        env:
+          VP_REACH_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "${VP_REACH_BASE_SHA:-main}"
+          node --test docs/verify/1542/reach.test.mjs
+          node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs --check-reach
+
   single-use-helper-gate:
     runs-on: ubuntu-latest
     steps:

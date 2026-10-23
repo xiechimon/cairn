@@ -10,6 +10,7 @@
 // file's location, not the caller's cwd.
 // Usage: node .claude/skills/verify-pacman/scripts/vp-registry-gate.mjs
 
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve, sep } from 'node:path';
@@ -109,6 +110,27 @@ const support = registry.support ?? {};
 const cases = Object.entries(features).flatMap(([feature, entry]) =>
   Object.entries(entry.cases ?? {}).map(([name, c]) => ({ id: `${feature}/${name}`, feature, name, c })),
 );
+if (process.argv.includes('--check-reach')) {
+  const explicit = process.argv.slice(process.argv.indexOf('--check-reach') + 1).filter((arg) => arg !== '--');
+  const base = process.env.VP_REACH_BASE_SHA || 'origin/main';
+  const paths = explicit.length > 0 ? explicit : [
+    ...execFileSync('git', ['diff', '--name-only', '--no-renames', '--diff-filter=A', '-z', base, '--'], { cwd: ROOT, encoding: 'utf8' }).split('\0'),
+    ...execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: ROOT, encoding: 'utf8' }).split('\0'),
+  ];
+  const scripts = new Set(cases.map(({ c }) => resolve(ROOT, c.script ?? '')));
+  for (const path of new Set(paths)) {
+    if (/(?:^|\/)drive-[^/]+\.(?:[cm]?js|[cm]?ts|tsx)$/.test(path) && !scripts.has(resolve(ROOT, path))) {
+      problem(path, 'drive script is not a case in vp-registry.json');
+    }
+  }
+  const result = spawnSync(process.execPath, [join(ROOT, 'scripts/e2e-affected.mjs'), '--check-coverage', '--', ...paths.filter(Boolean)], {
+    cwd: ROOT,
+    stdio: 'inherit',
+  });
+  for (const p of problems) console.log(`vp-registry-gate: ${p}`);
+  process.exit(problems.length > 0 || result.status !== 0 ? 1 : 0);
+}
+
 if (cases.length === 0) problems.push('vp-registry.json has no cases');
 
 const caseScripts = new Set();

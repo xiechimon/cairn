@@ -1,0 +1,17 @@
+✔ apps/web/e2e/unmapped-reach.spec.ts (39.55925ms)
+✔ apps/web/e2e/board-reach.spec.ts (35.254334ms)
+✔ apps/web/e2e/a11y-axe.spec.ts (35.157292ms)
+✔ registry reach: scripts/drive-unregistered.mjs (78.229208ms)
+✔ registry reach: docs/verify/1542/drive-unregistered.mts (76.483583ms)
+✔ registry reach: .claude/skills/verify-pacman/scripts/drive-hotkeys.mjs (74.709167ms)
+✔ registry reach: apps/web/e2e/unmapped-reach.spec.ts (73.806ms)
+✔ registry reach: apps/web/e2e/board-reach.spec.ts (86.237625ms)
+✔ discovers committed, staged and untracked additions from the base (768.846292ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1323.766667

@@ -371,6 +371,21 @@ const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
 const explicit = argv.filter((a) => !a.startsWith('--'));
 
+if (argv.includes('--check-coverage')) {
+  const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
+  prefixes.push('a11y-axe');
+  const missing = explicit.filter(
+    (path) =>
+      path.startsWith(E2E_PREFIX) &&
+      path.endsWith('.spec.ts') &&
+      !prefixes.some((prefix) => path.slice(E2E_PREFIX.length).startsWith(prefix)),
+  );
+  for (const path of missing)
+    console.log(`[e2e:affected] ${path}: no family table entry reaches this spec`);
+  console.log(`[e2e:affected] coverage: ${missing.length} uncovered spec(s)`);
+  process.exit(missing.length > 0 ? 1 : 0);
+}
+
 const { paths, source } = changedPaths(explicit);
 if (paths.length === 0) {
   console.log('[e2e:affected] no changed paths — nothing to run.');
