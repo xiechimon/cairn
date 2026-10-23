@@ -17,7 +17,7 @@ export function prepushPlan(paths, mode = 'local') {
     ? required
     : [
         ...required,
-        ['pnpm', 'test'],
+        ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
         ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
       ];

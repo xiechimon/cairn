@@ -19,7 +19,7 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
-    'pnpm test',
+    'node scripts/prepush-vitest.mjs',
     'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
@@ -113,4 +113,20 @@ test('CLI skips real document changes and rejects a missing base', () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('prepush vitest only forgives files listed as known local red', async () => {
+  const { unexpectedFailures } = await import('./prepush-vitest.mjs');
+  const known = [{ file: 'a/known.test.ts', reason: 'r' }];
+  const report = {
+    testResults: [
+      { name: '/r/a/known.test.ts', status: 'failed' },
+      { name: '/r/b/new.test.ts', status: 'failed' },
+      { name: '/r/c/ok.test.ts', status: 'passed' },
+    ],
+  };
+  assert.deepEqual(unexpectedFailures(report, known, '/r'), {
+    unexpected: ['b/new.test.ts'],
+    knownFailed: ['a/known.test.ts'],
+  });
 });
