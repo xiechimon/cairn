@@ -17,6 +17,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { completeStep } from '../src/services/builds.js';
 import {
   buildCiFixPrompt,
@@ -56,22 +57,56 @@ function res(status: number, etag: string, body: unknown) {
   };
 }
 
-/** GitHub check-runs 端点 mock：记录全部请求（URL + 头），按状态回应。
+/** 一个候选在假 GitHub 上的 PR head（#1403 段 3：check runs 按它读）。 */
+function headOf(prNumber: number): string {
+  return prNumber.toString(16).padStart(8, '0').repeat(5);
+}
+
+/** GitHub mock：pulls/{n} 回本 build 开着的 PR（head = headOf(n)、head 分支 = state.branch，
+ * mergeable_state clean），默认分支
+ * 的保护与规则回空（没有必需检查），commits/{sha}/check-runs 按状态回应。只把 check-runs
+ * 请求记进 requests（URL + 头；磨绿的计数纪律按它），其余记进 otherRequests。
  * if-none-match 命中 etag 且状态 200 → 304（真实 GitHub 的条件 GET 语义）。 */
 class CheckRunsMock {
   requests: { url: string; headers: Record<string, string> }[] = [];
+  otherRequests: string[] = [];
 
   constructor(
     private readonly state: {
       checks: CheckSpec[];
       etag?: string;
-      /** 覆盖状态码（429 限流面 / 404 读不到面）。 */
+      /** 覆盖 check-runs 的状态码（429 限流面 / 404 读不到面）。 */
       status?: number;
+      /** 本 build 的工作分支（PR 的 head ref；对不上时磨绿按分支名读，#1403 段 3）。 */
+      branch: string;
     },
   ) {}
 
   readonly fetch = (input: string | URL, init?: { headers?: Record<string, string> }) => {
     const url = String(input);
+    const pr = url.match(/\/pulls\/(\d+)$/);
+    if (pr !== null) {
+      this.otherRequests.push(url);
+      const n = Number(pr[1]);
+      return Promise.resolve(
+        res(200, '"pr"', {
+          number: n,
+          state: 'open',
+          merged: false,
+          mergeable_state: 'clean',
+          head: { sha: headOf(n), ref: this.state.branch, repo: { id: 1 } },
+          base: { ref: 'main', repo: { id: 1, default_branch: 'main' } },
+        }),
+      );
+    }
+    if (/\/rules\/branches\//.test(url)) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"r"', []));
+    }
+    if (/\/branches\/[^/?]+$/.test(url)) {
+      this.otherRequests.push(url);
+      return Promise.resolve(res(200, '"b"', { name: 'main', protected: false }));
+    }
     this.requests.push({ url, headers: { ...(init?.headers ?? {}) } });
     const etag = this.state.etag ?? '"etag-1"';
     const status = this.state.status ?? 200;
@@ -230,6 +265,7 @@ function makePrWorld(opts: WorldOpts = {}): PrWorld {
     checks: opts.checks ?? [],
     etag: opts.etag,
     status: opts.status,
+    branch: conversationBranch(buildId),
   });
   const poller = createCiPoller({ ...s.svc, box: s.secretBox }, { githubFetch: mock.fetch });
   return {
@@ -311,14 +347,14 @@ function addCandidate(
     todoId,
     buildId,
     prNumber,
-    mock: new CheckRunsMock({ checks }),
+    mock: new CheckRunsMock({ checks, branch: conversationBranch(buildId) }),
   };
 }
 
 // ——— ① 扫描面纪律（批量 + ETag 条件请求 + 429 fail-open）———————————————————
 
 describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', () => {
-  test('一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET（无其它端点、无逐 PR 全量拉）', async () => {
+  test('一轮 sweep = 一条 DB 扫描取全候选，每候选恰好 1 个 check-runs GET，按 PR 的 head SHA 读（#1403 段 3：先读 PR，再按默认分支读必需检查名单）', async () => {
     const w = makePrWorld({
       checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
     });
@@ -328,7 +364,13 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
     const req = w.mock.requests[0];
     if (req === undefined) throw new Error('no request made');
     expect(req.url).toContain('https://api.github.com/repos/octo/demo/commits/');
-    expect(req.url).toContain(`${encodeURIComponent(conversationBranch(w.buildId))}/check-runs`);
+    expect(req.url).toContain(`/commits/${headOf(w.prNumber)}/check-runs`);
+    expect(req.url).not.toContain(encodeURIComponent(conversationBranch(w.buildId)));
+    expect(w.mock.otherRequests).toEqual([
+      'https://api.github.com/repos/octo/demo/pulls/101',
+      'https://api.github.com/repos/octo/demo/branches/main',
+      'https://api.github.com/repos/octo/demo/rules/branches/main?per_page=100',
+    ]);
     expect(req.url).toContain('per_page=');
     // 未暖缓存的轮不带 if-none-match（首轮读一次，此后条件读）。
     expect(req.headers['if-none-match']).toBeUndefined();
@@ -369,12 +411,13 @@ describe('#1150 ① 扫描面纪律：批量扫描 + 条件请求（ETag）', ()
       {
         githubFetch: (input, init) => {
           const url = String(input);
-          // 同仓同端点，按分支名分派到各候选的 mock。
+          // 同仓：PR 读按号、check runs 按 head SHA 分派到各候选的 mock；保护与规则归第一个。
           for (const c of all) {
-            if (url.includes(encodeURIComponent(conversationBranch(c.buildId)))) {
+            if (url.endsWith(`/pulls/${c.prNumber}`) || url.includes(headOf(c.prNumber))) {
               return c.mock.fetch(url, init);
             }
           }
+          if (/\/branches\//.test(url)) return red.mock.fetch(url, init);
           throw new Error(`unexpected url ${url}`);
         },
         logger: { info },
@@ -826,5 +869,125 @@ describe('#1150 绿推闸 / completeStep 持 building / scheduler 接线', () =>
     expect(w.mock.requests.length).toBeGreaterThanOrEqual(1);
     scheduler.stop();
     expect(CI_POLL_INTERVAL_MS).toBe(60_000);
+  });
+});
+
+describe('#1533 ci-fix 转绿纠错票', () => {
+  test.each([
+    ['success', 2, 1],
+    ['success', 0, 0],
+    ['failure', 1, 0],
+    [null, 1, 0],
+  ] as const)('%s，修复轮 %s：只在修复后真绿触发', async (conclusion, fixRounds, expected) => {
+    const w = makePrWorld({
+      fixRounds,
+      checks: conclusion === null ? [] : [{ name: 'lint', status: 'completed', conclusion }],
+    });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    const created: { title: string; body: string; labels: string[] }[] = [];
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      {
+        githubFetch: (input, init) => {
+          if (String(input).includes('/issues')) {
+            if (init?.method === 'POST') {
+              created.push(JSON.parse(init.body ?? '{}'));
+              return Promise.resolve(res(201, '', { number: 200 }));
+            }
+            return Promise.resolve(res(200, '', []));
+          }
+          return w.mock.fetch(input, init);
+        },
+      },
+    );
+    await poller.sweep();
+    expect(created).toHaveLength(expected);
+    if (expected) {
+      expect(created[0]?.labels).toEqual(['correction', 'enhancement', 'needs-triage']);
+      expect(created[0]?.body).toContain('待归因');
+      expect(created[0]?.body).toContain('负对照');
+      expect(created[0]?.body).toContain('pacman-dedupe: ci-fix:lint');
+      expect(w.todoRow().phase).toBe('review');
+      w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+      await poller.sweep();
+      expect(created).toHaveLength(1);
+    }
+  });
+
+  test('开票失败不挡审核，重启后补偿；另一 build 同类去重、异类另开', async () => {
+    const w = makePrWorld({
+      fixRounds: 1,
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    let available = false;
+    let writes = 0;
+    let lists = 0;
+    const extra = addCandidate(
+      w.s,
+      [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+      { phase: 'todo' },
+    );
+    const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues')) {
+        if (!available) return Promise.resolve(res(503, '', {}));
+        if (init?.method === 'POST') {
+          writes += 1;
+          return Promise.resolve(res(201, '', { number: 200 }));
+        }
+        lists += 1;
+        const issue = {
+          number: 200,
+          state: 'open',
+          title: 'correction',
+          labels: [{ name: 'correction' }],
+          body: '<!-- pacman-dedupe: ci-fix:lint -->',
+        };
+        return Promise.resolve(
+          res(200, '', /\/issues\/200$/.test(String(input)) ? issue : writes > 0 ? [issue] : []),
+        );
+      }
+      if (
+        String(input).includes(headOf(extra.prNumber)) ||
+        String(input).endsWith(`/pulls/${extra.prNumber}`)
+      )
+        return extra.mock.fetch(input, init);
+      return w.mock.fetch(input, init);
+    };
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    available = true;
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(writes).toBe(1);
+    expect(w.todoRow().phase).toBe('review');
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `${extra.buildId}-fix`,
+        buildId: extra.buildId,
+        kind: 'build',
+        status: 'done',
+        createdAt: w.base,
+        prompt: buildCiFixPrompt({
+          prNumber: extra.prNumber,
+          prUrl: null,
+          round: 1,
+          failures: [
+            { name: 'lint', conclusion: 'failure', summary: null },
+            { name: 'typecheck', conclusion: 'failure', summary: null },
+          ],
+        }),
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, extra.todoId)).run();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(writes).toBe(2);
+    expect(lists).toBe(3);
   });
 });

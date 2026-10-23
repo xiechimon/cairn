@@ -1,0 +1,125 @@
+ RUN  v5.0.1 /home/claude/pacman/integration
+ ✓ test/plan-upload-recovery.test.ts > #1026/#1028 终稿回传失败恢复（真进程重启） > PUT 成功 / done 失败 → daemon 重启快路径补报：不重跑会话、无重复版本 5899ms
+ ✓ test/plan-upload-recovery.test.ts > #1026/#1028 终稿回传失败恢复（真进程重启） > server 收尾窗关停 → 同端口重开 → 旧 URL 404（可解释）→ 重发 URL 落库 → daemon 重启快路径补报 7667ms
+ ✓ test/rework-branch-reuse-e2e.test.ts > #931 两条返工路回原分支（E2E） > 失败重启与审核打回：同 conv / 同分支 / 新提交落原分支 / 会话形态正确 3248ms
+[diag] stub requests consumed: 11
+[diag] daemon.log tail:
+ ✓ test/m3b-demo.test.ts > M3b demo：单机全生命周期实跑 todo→done（02 §4.2 主时序） > 新建 → 规划：worktree 契约落地 + plan.md v1 落库 + push（r3 §1.4/§3.3） 841ms
+ ✓ test/m3b-demo.test.ts > M3b demo：单机全生命周期实跑 todo→done（02 §4.2 主时序） > 确认 → 执行：continue session + bash 真改动 → commit/push → review + hasChanges（git 真值） 553ms
+ ✓ test/m3b-demo.test.ts > M3b demo：单机全生命周期实跑 todo→done（02 §4.2 主时序） > 审核 → merge 202 delegated → 合并步 → main fast-forward → done（02 §4.2/A6 + r3 §3.6） 338ms
+ ✓ test/m3b-demo.test.ts > M3b demo：单机全生命周期实跑 todo→done（02 §4.2 主时序） > 失败仅人工重跑（02/A6）：provider 400 → failed → 无自动重跑 → POST builds 重跑 = 新 conv/新分支 3186ms
+[diag] stub requests consumed: 8
+[diag] daemon.log tail:
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a163a2-ec09-72ab-b27f-1ea390aa7834
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-ec09-72ab-b27f-1ea390aa7834/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-ec09-72ab-b27f-1ea390aa7834/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a163a2-ec09-72ab-b27f-1ea390aa7834
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a163a2-ec09-72ab-b27f-1ea390aa7834
+finished (0 running)
+claim step=iCClU9heY7n8TgnnPeHgE
+step iCClU9heY7n8TgnnPeHgE for conv 01a163a2-f2af-75cf-bbea-f777f895594a (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Cloning VBdqyAcC3qrO2DcPXTDV1/m3b-failure (branch: main)
+[workspace] Worktree added (pacman/conv-01a163a2-f2af-75cf-bbea-f777f895594a from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: pacman-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-f2af-75cf-bbea-f777f895594a/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-f2af-75cf-bbea-f777f895594a/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a163a2-f2af-75cf-bbea-f777f895594a
+[step] message usage: stub-gw/stub-model input=0 output=0 cacheRead=0 cacheWrite=0 cost=0
+[step] error: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:38989/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:38989/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}" (retryable=false)
+[step] brief removed (AGENTS.md)
+[step] step failed: 400: {"message":"stub provider error","type":"invalid_request_error"}
+provider response: POST http://127.0.0.1:38989/v1/chat/completions -> 400 application/json (not an SSE stream); provider baseUrl "http://127.0.0.1:38989/v1"; machine "m3b-mbp"; first bytes: "{"error":{"message":"stub provider error","type":"invalid_request_error"}}"
+finished (0 running)
+claim step=6LGBsjTTu-QZpTWdTz8lB
+step 6LGBsjTTu-QZpTWdTz8lB for conv 01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9 (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree added (pacman/conv-01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9 from origin/main)
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: pacman-m3b-home-
+[skills] unknown-dispatch: plans
+[skills] unknown-dispatch: plan
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-m3b-home-C4mSTp/workspaces/01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+new session 01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a163a2-fd4d-7a9c-88dc-49f2a0ed72e9
+finished (0 running)
+[machine] Shutting down…
+ ✓ test/g2t2-local-lifecycle.test.ts > G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回用户仓库 = 落地，主检出零触碰） > 失败方式 1-3：plan/build → conv 分支 push 回用户仓库 → merge → conv 分支更新即落地，用户主检出零变化（#1211） 1664ms
+ ✓ test/g2t2-local-lifecycle.test.ts > G2-T2 local 形态全生命周期（spec 12：镜像 clone + push 回用户仓库 = 落地，主检出零触碰） > 失败方式 4：脏工作区 → merge 步照常 done（#1211：落地不读用户工作区）；用户 HEAD/脏文件原样 1341ms
+[diag] stub requests consumed: 10
+[diag] daemon.log tail:
+finished (0 running)
+claim step=udpFFGr0l9mZrqRVAgM3R
+step udpFFGr0l9mZrqRVAgM3R for conv 01a163a3-0fdb-7c03-84e6-83eac35c8c3d (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-numlmA/workspaces/01a163a3-0fdb-7c03-84e6-83eac35c8c3d/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-numlmA/workspaces/01a163a3-0fdb-7c03-84e6-83eac35c8c3d/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+finished (0 running)
+claim step=aKyiZgRPvHohk0R134_IZ
+step aKyiZgRPvHohk0R134_IZ for conv 01a163a3-0fdb-7c03-84e6-83eac35c8c3d (1 running)
+using model stub-gw/stub-model
+[workspace] 准备工作区...
+[workspace] Worktree reused
+[mcp] managed-empty: strict MCP set (runtime config not inherited)
+[skills] team-manifest-empty: server distributed zero skills (selection=all) — running with local skills only
+[skills] unknown-dispatch: conv-01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+[skills] missing-skill-md: skill path does not exist (/root/.agents/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-numlmA/workspaces/01a163a3-0fdb-7c03-84e6-83eac35c8c3d/.claude/skills)
+[skills] missing-skill-md: skill path does not exist (/tmp/pacman-g2t2-home-numlmA/workspaces/01a163a3-0fdb-7c03-84e6-83eac35c8c3d/.pi/skills)
+[skills] catalog: entries=0 chars=0 bytes=0
+[step] brief written: AGENTS.md (create)
+continue session 01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+[step] message usage: stub-gw/stub-model input=0 output=980 cacheRead=100 cacheWrite=0 cost=0
+[step] brief removed (AGENTS.md)
+pushed pacman/conv-01a163a3-0fdb-7c03-84e6-83eac35c8c3d
+finished (0 running)
+[machine] Shutting down…
+ ✓ test/pi-session-policy.test.ts > pi 会话策略（#925 trust/telemetry/settings + #927 cost/cache） > 失败方式 1-6：deny 记录可观测、简报不回归、策略行可读、retention 上送、成本落库、四维零变化 787ms
+ ✓ test/crash-recover.test.ts > 崩溃恢复（T2：AgentSession 缝 × 宿主 durable 编排） > SIGKILL 于步中 → 重启 → recover 对账 → continue session 续跑 → confirm 5791ms
+ ✓ test/m3a-demo.test.ts > M3a demo：server 派 step → daemon 真执行 → transcript 回传落库 > 规划步全链（wake 低延迟派发 + pi 真会话 + upload-urls 落库 + phase→confirm） 354ms
+ ✓ test/m3a-demo.test.ts > M3a demo：server 派 step → daemon 真执行 → transcript 回传落库 > 确认 → 执行步 = continue session（同 conv pi 会话复用，02 §4.2/§5.7；T2 证据 A） 114ms
+ ✓ test/m3a-demo.test.ts > M3a demo：server 派 step → daemon 真执行 → transcript 回传落库 > claim 节奏 = server hold 同构（r3 §1.5 ~75–76s 的缩短时标实测；生产默认 75s 在 wire 测钉死） 3201ms
+[timing] wake→confirm(含 pi 真执行) = 286ms; idle claim cadence(hold=1s) = 4/3.2s
+ ✓ test/m3a-demo.test.ts > M3a demo：server 派 step → daemon 真执行 → transcript 回传落库 > wake 低延迟派发时延证据落盘（票面 AC：claim/wake 时序对照实测） 0ms
+ Test Files  7 passed (7)
+      Tests  15 passed (15)
+   Start at  12:42:38
+   Duration  52.45s (tests 75%, import 19%, transform 6%)

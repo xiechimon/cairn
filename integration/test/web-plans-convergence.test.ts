@@ -45,7 +45,7 @@ const PLAN_MD = [
   'Context: #666 收敛探针任务。',
   'Changes: 在 plan.md 落一版方案（无其它改动）。',
   'Edge cases: 无。',
-  'Verification: 方案卡上屏即验证。',
+  'Verification: 方案卡上屏即验证（读回 README.md）。',
 ].join('\n');
 
 let stub: StubLlm;

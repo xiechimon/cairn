@@ -32,7 +32,13 @@ import {
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import type { TestServer } from './helpers.js';
-import { bindAllAgents, bootServer, issueApiKey, postProject } from './helpers.js';
+import {
+  bindAllAgents,
+  bootServer,
+  issueApiKey,
+  postProject,
+  withVerification,
+} from './helpers.js';
 
 const AGENT_ID = 'agent-702-1';
 const REVIEW_AGENT_ID = 'agent-702-reviewer';
@@ -283,7 +289,7 @@ async function driveToDeadlock(
 ): Promise<string> {
   const buildId = await w.startBuild(true);
   const planClaimed = await w.claim();
-  await w.uploadPlan(planClaimed.stepId, '# plan v1');
+  await w.uploadPlan(planClaimed.stepId, withVerification('# plan v1'));
   await w.done(planClaimed.stepId, { status: 'success', sessionId: 'pi-session-1' });
   await w.confirm(buildId);
   const buildClaimed = await w.claim();

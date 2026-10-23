@@ -5,6 +5,7 @@
 // （TanStack Query invalidateQueries，01 §4.1/S8）。
 
 import { z } from 'zod';
+import { agentTodoSchema } from '../agent-todo.js';
 import { branchSyncRecordSchema } from '../records/branch-sync.js';
 import { buildRecordSchema } from '../records/build.js';
 import { recordId } from '../records/common.js';
@@ -149,6 +150,12 @@ export const conversationActivityEventSchema = z.object({
 });
 export type ConversationActivityEvent = z.infer<typeof conversationActivityEventSchema>;
 
+export const conversationAgentTodoEventSchema = z.object({
+  type: z.literal('agent_todo'),
+  todo: agentTodoSchema,
+});
+export type ConversationAgentTodoEvent = z.infer<typeof conversationAgentTodoEventSchema>;
+
 export const conversationStreamEventSchema = z.discriminatedUnion('type', [
   pingEventSchema,
   conversationMessageEventSchema,
@@ -156,5 +163,6 @@ export const conversationStreamEventSchema = z.discriminatedUnion('type', [
   conversationThinkingDeltaEventSchema,
   conversationStepEventSchema,
   conversationActivityEventSchema,
+  conversationAgentTodoEventSchema,
 ]);
 export type ConversationStreamEvent = z.infer<typeof conversationStreamEventSchema>;

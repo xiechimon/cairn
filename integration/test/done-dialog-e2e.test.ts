@@ -57,7 +57,7 @@ let projectId = '';
 let machineToken = '';
 
 const PLAN_MD =
-  '# Plan\n\nContext: 探针。\nChanges: 探针改动。\nEdge cases: 无。\nVerification: 集成测试。\n';
+  '# Plan\n\nContext: 探针。\nChanges: 探针改动。\nEdge cases: 无。\nVerification: 读回 README.md。\n';
 
 // —— DB 真值辅助 ————————————————————————————————————————————————
 
@@ -361,7 +361,7 @@ describe('#1236 完成任务确认 dialog（真 web dist + 真 server + 假机�
     await page.waitForTimeout(600);
     await shot('merge-toast');
     // 成功反馈立即可见（改前：弹层关闭后到相位推进之间零标识）。
-    await pexpect(page.getByText('已发起合并，机器执行完成后任务进入已完成。')).toBeVisible();
+    await pexpect(page.getByText('已发起合并，合并完成后任务进入已完成。')).toBeVisible();
     await pexpect(dialog).toHaveCount(0);
     // 恰好一条 merge 步入队（confirm 在飞禁用 = 双击不双发）+ 宣告行落库。
     await waitFor(() => stepsOf(card.buildId, 'merge').length >= 1, 10_000);

@@ -1,0 +1,97 @@
+## old leg: apps/server/src/services/machines.ts apps/server/src/services/builds.ts = origin/main 29e60bb7; tests = this branch
+## (cd apps/server && pnpm exec vitest run --reporter=verbose test/m3b-machine-git.test.ts -t '#1487|fast-forward|非快进')
+
+ RUN  v5.0.1 /home/user/pacman/apps/server
+
+ ↓ test/m3b-machine-git.test.ts > claim 载荷 repo 绑定位（M3b worktree 契约接线，02 §3/§5.5） > 托管项目 → project.repo {kind:hosted, cloneUrl=/git/<teamId>/<repoName>}
+ ↓ test/m3b-machine-git.test.ts > per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 push_credential r5 §3.1） > token/{stepId} → git {username,password}；done 后回收（撤销 = 行删除）
+ ↓ test/m3b-machine-git.test.ts > per-step 一次性 git 凭证（02 §5.4/§8；relay 工具名对照 push_credential r5 §3.1） > 未绑 repo 项目 → git null（M3a 兼容形状）
+ ↓ test/m3b-machine-git.test.ts > plan.md 产物上传（02 §4.2/r5 §4：plan 即文件，版本 = 文件版本） > upload-urls plan.md → plan v1 + build.planDocId；重规划轮 → v2
+ ↓ test/m3b-machine-git.test.ts > done 回传 commit = per-step checkpoint（r3 §3.5「恢复到此处」数据面） > step.checkpointCommit 落库
+ ✓ test/m3b-machine-git.test.ts > merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服务端 main 验证） > 合并步 done(commit) → bare repo main fast-forward + 时间线 🎉 250ms
+ ✓ test/m3b-machine-git.test.ts > merge 202 delegated → 合并步落地（02 §4.2/A6；r3 §3.6 服务端 main 验证） > 非快进（main 在合并窗口被推进）→ 步 failed + todo failed（失败仅人工重跑，02/A6） 206ms
+ × test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1：合并步在跑时关闭 → 成功回报不快进 main，卡仍 closed，时间线说明 213ms
+   → expected '60431e5e17d28dfcdc9b56cb52684a2dab62b…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+ × test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1b：回报进来时卡还在审核、落地的 git 检查期间被关闭 → 仍不快进 197ms
+   → expected '46f57741632067d8b4038982aa526e11ef127…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+ × test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo 184ms
+   → expected '99e5eaf9d9e2e0bc562412e3c10d4fc9ef592…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+ × test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 3：同一 build 已有在途合并步（pending 或已领走）→ 再请求合并 409，不多排一个 128ms
+   → expected 202 to be 409 // Object.is equality
+ ↓ test/m3b-machine-git.test.ts > 托管 repo provision 种子提交（M3b [设计]：空库不能 worktree） > init bare 即立 refs/heads/main（空树种子）
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1：合并步在跑时关闭 → 成功回报不快进 main，卡仍 closed，时间线说明
+AssertionError: expected '60431e5e17d28dfcdc9b56cb52684a2dab62b…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+
+Expected: "93281329a5f7d055995d0084d1496edfb542bc2a"
+Received: "60431e5e17d28dfcdc9b56cb52684a2dab62b3e3"
+
+ ❯ test/m3b-machine-git.test.ts:452:76
+    450|     ).toBe(200);
+    451|     await w.done(mergeStepId, { status: 'success', sessionId: 'pi-1', …
+    452|     expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/mai…
+       |                                                                            ^
+    453|     expect(phaseOf(w)).toBe('closed');
+    454|     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LA…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 1b：回报进来时卡还在审核、落地的 git 检查期间被关闭 → 仍不快进
+AssertionError: expected '46f57741632067d8b4038982aa526e11ef127…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+
+Expected: "93281329a5f7d055995d0084d1496edfb542bc2a"
+Received: "46f57741632067d8b4038982aa526e11ef1278cb"
+
+ ❯ test/m3b-machine-git.test.ts:474:76
+    472|     }
+    473|     expect(closedInWindow).toBe(true);
+    474|     expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/mai…
+       |                                                                            ^
+    475|     expect(phaseOf(w)).toBe('closed');
+    476|     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LA…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 2：关闭后重新打开回待开始 → 同样不落地，卡仍 todo
+AssertionError: expected '99e5eaf9d9e2e0bc562412e3c10d4fc9ef592…' to be '93281329a5f7d055995d0084d1496edfb542b…' // Object.is equality
+
+Expected: "93281329a5f7d055995d0084d1496edfb542bc2a"
+Received: "99e5eaf9d9e2e0bc562412e3c10d4fc9ef592fac"
+
+ ❯ test/m3b-machine-git.test.ts:489:76
+    487|     ).toBe(200);
+    488|     await w.done(mergeStepId, { status: 'success', sessionId: 'pi-1', …
+    489|     expect(await systemGitOps.resolveCommit(w.repoDir, 'refs/heads/mai…
+       |                                                                            ^
+    490|     expect(phaseOf(w)).toBe('todo');
+    491|     expect(timeline(w, buildId).some((m) => m.content === MERGE_NOT_LA…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/m3b-machine-git.test.ts > #1487 合并步在跑时卡离开审核：成功回报不落地；重复合并请求 409 > 失败方式 3：同一 build 已有在途合并步（pending 或已领走）→ 再请求合并 409，不多排一个
+AssertionError: expected 202 to be 409 // Object.is equality
+
+- Expected
++ Received
+
+- 409
++ 202
+
+ ❯ test/m3b-machine-git.test.ts:512:96
+    510|       202,
+    511|     );
+    512|     expect((await call(w.s.app, 'POST', `/api/builds/${buildId}/merge`…
+       |                                                                                                ^
+    513|       409,
+    514|     );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 2 passed | 6 skipped (12)
+   Start at  12:34:56
+   Duration  3.82s (transform 47%, tests 33%, import 21%)
+

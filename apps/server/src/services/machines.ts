@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import type {
+  AgentTodoReport,
   ClaimedStep,
   ClaudeCodeReport,
   GitCredentials,
@@ -75,14 +76,14 @@ import {
   chiefThread,
   machine,
   message,
-  project,
+  type StepFallbackRow,
   steerPending,
   step,
   stopPending,
   todo,
   tokenUsage,
 } from '../db/schema.js';
-import { conflict } from '../lib/errors.js';
+import { conflict, HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { hashCredential } from '../lib/hash.js';
@@ -124,10 +125,25 @@ import {
 } from './dispatch-eligibility.js';
 import { quotaHoldBackoffMs, quotaHoldNote } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
-import { diffTextNamesAFile, parseUnifiedDiff, projectRepoRef, repoDirFor } from './git.js';
+import {
+  diffTextNamesAFile,
+  parseUnifiedDiff,
+  projectOfTodo,
+  projectRepoRef,
+  repoDirFor,
+} from './git.js';
 import { openGithubToken } from './github-connection.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import {
+  effectiveModel,
+  isZeroUsageSilentSuccess,
+  planModelFallback,
+  recordProviderOutcome,
+  ZERO_USAGE_FAILURE,
+  ZERO_USAGE_RETRY_NOTE,
+} from './model-fallback.js';
 import { markModelDead } from './model-liveness.js';
+import { notifyModelFallback } from './notifications.js';
 // #1261 配额挂起面（quotaBlock → waiting_quota，不走 failed 漏斗）。
 import { applyQuotaWaitStep } from './quota-wait.js';
 import type { LocalSkill } from './skills.js';
@@ -1000,9 +1016,11 @@ async function tryClaim(
     // pending 等补设；#1257 挂起语义下由板面 waitingOn chip 透出「等机器」，
     // 补设即自动续领）。
     if (agentRow.machineId !== machineId) continue;
+    // #1493 本步实际跑的模型（降级后 = 备选）：runtime 闸与 claim 载荷都按它。
+    const model = effectiveModel(agentRow, cand.stepRow);
     // #682 enabledRuntimes 真闸：机器未开步所需 runtime = 不可领（步留
     // pending 给能跑的机器——机器开 pi、步跑 claude-code agent = 不投给该机）。
-    if (!runtimeGatePasses(machineRow, agentRow.provider)) continue;
+    if (!runtimeGatePasses(machineRow, model.provider)) continue;
     // #1251 能力闸（ADR 0018 决策 4.3，判据单源 dispatch-eligibility）：机器
     // 上报快照不满足 agent.requiredCapabilities = 不可领（步留 pending 给能力
     // 齐的机器；未上报快照 = 未知放行，老 daemon 零回归）。候选级 continue
@@ -1031,13 +1049,22 @@ async function tryClaim(
     // 结果集，且判定与领取在同一同步块内（单进程 better-sqlite3），前后移
     // 零语义差。#1259：会话机归属已由 agent 归属机保证（同 agent 恒同机），
     // 原「会话亲和让行」闸随之退役。
+    // #1493：会话只在同一 provider 跑出的步之间续——最近一次会话若由降级备选
+    // 跑出而本步不在同一备选 provider 上（或反过来），按无可续会话处理（新会话，
+    // brief 重新注入）。都未降级时两侧同为 null，行为不变。
     const prior = db
-      .select({ sessionId: step.sessionId, machineId: step.machineId })
+      .select({ sessionId: step.sessionId, machineId: step.machineId, fallback: step.fallback })
       .from(step)
       .where(and(eq(step.buildId, cand.stepRow.buildId), sql`${step.sessionId} is not null`))
       .orderBy(asc(step.createdAt))
       .all();
-    const priorRow = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const latestPrior = prior.length > 0 ? (prior[prior.length - 1] ?? null) : null;
+    const priorRow =
+      latestPrior !== null &&
+      (latestPrior.fallback?.model?.provider ?? null) ===
+        (cand.stepRow.fallback?.model?.provider ?? null)
+        ? latestPrior
+        : null;
     const priorSessionId = priorRow?.sessionId ?? null;
     // #1312：上一轮会话的机器与本步领取机不同（归属机换绑 / 迁移）时告诉
     // daemon。同机不带该字段，claim 形与旧 daemon 逐字段一致。
@@ -1120,11 +1147,7 @@ async function tryClaim(
             sessionId: priorSessionId,
             ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
           };
-    const projectRow = db
-      .select()
-      .from(project)
-      .where(eq(project.id, cand.todoRow.projectId))
-      .get();
+    const projectRow = projectOfTodo(db, cand.todoRow);
     // repo 绑定位（M3b worktree 契约接线，02 §3/§5.5 + spec 12 G2-T2 三形态）：
     // 托管 = `<origin>/git/<teamId>/<repoName>`（本地主机代位）；github = https
     // 派生（执行凭证 = stepToken 从 github_connection 下发）；local = cloneUrl
@@ -1192,9 +1215,10 @@ async function tryClaim(
         id: agentRow.id,
         displayName: agentRow.displayName,
         description: agentRow.description,
-        provider: agentRow.provider,
-        modelId: agentRow.modelId,
-        thinkingLevel: agentRow.thinkingLevel,
+        provider: model.provider,
+        modelId: model.modelId,
+        // #1493：思考强度是按主模型配的，备选不一定支持——降级时回落默认。
+        thinkingLevel: cand.stepRow.fallback?.model ? null : agentRow.thinkingLevel,
         // 记忆注入（02 §4.4 读路径最小形，注入形 [推断] 保留）：执行 Agent 记忆，
         // 只取本任务项目的条目与全局条目（projectId 空）——别的项目的经验不进本
         // 项目的 systemPrompt（#1494）。
@@ -1268,6 +1292,12 @@ export async function claimStep(
 // —— journal：heartbeat / tool / token / upload-urls / done（02 §5.4）——————————
 
 export function heartbeatStep(deps: MachineDeps, machineId: string, stepId: string): void {
+  // #1488：步行已不存在（卡被重置 / 删除，行随 build 删掉）= 410，与「不归本机」
+  // 的 404 分开——daemon 据 410 停掉在跑的会话；404 照常跑（#1483 同机重领时，
+  // 被放回的步的这次 run 接着跑新的领取）。
+  if (!deps.db.select({ id: step.id }).from(step).where(eq(step.id, stepId)).get()) {
+    throw new HttpError(410, `step ${stepId} no longer exists`);
+  }
   const row = ownedStep(deps, machineId, stepId);
   deps.db.update(step).set({ lastHeartbeatAt: nowMs() }).where(eq(step.id, row.id)).run();
 }
@@ -1397,6 +1427,16 @@ export function reportActivity(
 ): void {
   const row = ownedStep(deps, machineId, stepId);
   deps.convHub?.publishActivity(row.buildId, { ...report, stepId, at: nowMs() });
+}
+
+export function reportAgentTodo(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  report: AgentTodoReport,
+): void {
+  const row = ownedStep(deps, machineId, stepId);
+  deps.convHub?.publishAgentTodo(row.buildId, { ...report, stepId, at: nowMs() });
 }
 
 /** GET /api/machine/attachment/{stepId}/{attachmentId} 服务层（#730）：daemon
@@ -1623,9 +1663,7 @@ export function stepToken(
   // push_credential，r5 §3.1）：hosted = 一次性 gitAccess key 发行；github =
   // github_connection token（spec 12 G2-T2 执行凭证面）；local = null（本地
   // 路径 clone/push 无需凭证）。
-  const projectRow = todoRow
-    ? deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get()
-    : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   const git =
     projectRow?.repoKind === 'hosted' && todoRow
       ? issueStepGitCredential(deps, { teamId: todoRow.teamId, stepId })
@@ -1633,7 +1671,11 @@ export function stepToken(
         ? githubExecCredential(deps, todoRow.teamId)
         : null;
   return {
-    provider: toProviderConfig(bundle.provider, agentRow?.provider),
+    // #1493：降级后按备选的 provider（resolveStepCredentials 同读 step.fallback）。
+    provider: toProviderConfig(
+      bundle.provider,
+      stepRow?.fallback?.model?.provider ?? agentRow?.provider,
+    ),
     secrets: bundle.secrets,
     git,
   };
@@ -1822,10 +1864,16 @@ export async function finishStep(
   // 合并步落地（02 §4.2：merge 202 delegated → 机器 git merge + push → server
   // bare repo 默认分支 fast-forward [设计]；r3 §3.6「服务端 main 验证」同语义）。
   // 落地失败（非快进/无 commit）= 步按 failed 收尾（失败仅人工重跑，02/A6）。
-  const landingError =
-    stepRow.kind === 'merge' && body.status === 'success'
-      ? await applyMergeLanding(deps, stepRow, body.commit ?? null)
-      : null;
+  // #1487（2026-10-22 裁决方案 a）：卡在合并步跑的时候被关闭或挪回待开始，
+  // 成功回报不落地——默认分支不动，卡保持现相位，下面落一行时间线说明。
+  const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
+  let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
+  let landingError: string | null = null;
+  if (mergeSuccess && !landingSkipped) {
+    const landing = await applyMergeLanding(deps, stepRow, body.commit ?? null);
+    if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
+    else landingError = landing;
+  }
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
   // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
   // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
@@ -1849,6 +1897,15 @@ export async function finishStep(
   {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) deps.machineHub.wake(teamId);
+  }
+  if (landingSkipped) {
+    upsertMessage(deps, {
+      id: `merge-not-landed-${stepId}`,
+      conversationId: stepRow.buildId,
+      role: 'system',
+      content: MERGE_NOT_LANDED_NOTE,
+      createdAt: nowMs(),
+    });
   }
   if (body.sessionId !== undefined) {
     db.update(step).set({ sessionId: body.sessionId }).where(eq(step.id, stepId)).run();
@@ -1943,6 +2000,29 @@ export async function finishStep(
   // stop_pending 卫生清理（全终态共通，M7 #308）：stop 与自然完成/失败的
   // 竞态残留随收尾即清（拉取-确认面另有定向步校验双保险，不复活）。
   db.delete(stopPending).where(eq(stopPending.conversationId, stepRow.buildId)).run();
+  // #1493 降级链 + provider 熔断（worker 步；chief 步无 build 行 = null，不进）。
+  // 熔断器记账按本步实际跑的模型（降级后 = 备选）；0 token 的「成功」不算成功。
+  // 降级命中即 return：步回 pending 换备选重派，不进下方 quota-wait / 失败漏斗；
+  // 不命中（步类禁止降级 / 没配备选 / 链走完）落到原有分支，行为不变。
+  const worker = workerStepContext(deps, stepRow);
+  const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
+  if (worker?.agentRow) {
+    recordProviderOutcome(effectiveModel(worker.agentRow, stepRow).provider, outcome, zeroUsage);
+  }
+  if (worker !== null) {
+    const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
+    if (plan !== null) {
+      if (plan.trigger === 'model_unavailable') {
+        markModelDead(plan.from.provider, plan.from.modelId);
+      }
+      requeueStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, worker.todoRow, worker.agentRow, plan.note);
+      return;
+    }
+  }
   // #1261 配额熔断分支：daemon 识别 quota/capacity 后随 done 携带 quotaBlock
   // ——挂起等额度（waiting_quota + 通知 + 探测续跑），**不**走下方 failed 漏斗
   // （todo 不落 failed）。早于 chief/success/stopped/failed 各分支：配额事件
@@ -1965,22 +2045,14 @@ export async function finishStep(
   // 下架）→ 标注 dead 即时生效（后续选择器/闸即时置灰 + 拒绝）。
   // 发生在 applyStepFailure 之前——dead 回填与失败收尾两条轨道并行，
   // 回填失败不影响步失败漏斗（markModelDead 是纯内存写，永不抛）。
+  // #1493：回填本步实际跑的模型（降级后 = 备选，不是 agent 主模型）。
   if (
     outcome.status === 'failed' &&
-    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
+    classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable' &&
+    worker?.agentRow
   ) {
-    const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-    if (buildRow) {
-      const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-      const agentId =
-        todoRow?.assignment?.build?.agentId ?? todoRow?.assignment?.plan?.agentId ?? null;
-      if (agentId) {
-        const agentRow = db.select().from(agent).where(eq(agent.id, agentId)).get();
-        if (agentRow?.modelId && agentRow?.provider) {
-          markModelDead(agentRow.provider, agentRow.modelId);
-        }
-      }
-    }
+    const ran = effectiveModel(worker.agentRow, stepRow);
+    if (ran.provider && ran.modelId) markModelDead(ran.provider, ran.modelId);
   }
   // #1186：配额挂起已经 return（那次运行还没结束）。断言是旁路写，
   // 写在 chief / success / stopped / failed 分叉之前，三支收尾都带上。
@@ -2026,6 +2098,25 @@ export async function finishStep(
     }
     return;
   }
+  // #1493 0 token 静默成功：同模型重试一次，第二次按失败收尾。
+  if (zeroUsage) {
+    if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
+      requeueStep(
+        deps,
+        stepRow,
+        {
+          model: stepRow.fallback?.model ?? null,
+          tried: stepRow.fallback?.tried ?? [],
+          zeroUsageRetried: true,
+        },
+        { id: `zero-usage-retry-${stepRow.id}`, content: ZERO_USAGE_RETRY_NOTE },
+      );
+      return;
+    }
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE);
+    publishStepStatus(deps, stepId);
+    return;
+  }
   if (outcome.status === 'success') {
     completeStep(deps, stepId, {
       hasChanges: outcome.hasChanges,
@@ -2060,6 +2151,69 @@ export async function finishStep(
   publishStepStatus(deps, stepId);
 }
 
+/** worker 步收尾上下文（build → todo → 本步 agent）。chief 步 / 行缺失 = null。 */
+function workerStepContext(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+): { todoRow: typeof todo.$inferSelect; agentRow: typeof agent.$inferSelect | null } | null {
+  if (isChiefConversation(stepRow.buildId)) return null;
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  if (!buildRow) return null;
+  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  if (!todoRow) return null;
+  return { todoRow, agentRow: agentForStep(deps, todoRow, stepRow.kind, stepRow.prompt) };
+}
+
+/** #1493 步回 pending 重派（降级换备选 / 0 token 重试共用）：认领位复位 +
+ * 清本步 sessionId + 写降级进度 + 会话流 system 行。会话续接由 claim 面按
+ * provider 判（换了 provider 的步不续旧会话）。不另行 wake：finishStep 前段
+ * 的空位释放 wake 已覆盖，被唤醒的领取看到的是这里写完的状态。todo / build
+ * 不落失败痕迹。 */
+function requeueStep(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  fallback: StepFallbackRow,
+  note: { id: string; content: string },
+): void {
+  deps.db
+    .update(step)
+    .set({
+      status: 'pending',
+      machineId: null,
+      sessionId: null,
+      fallback,
+      holdReason: null,
+      holdUntil: null,
+    })
+    .where(eq(step.id, stepRow.id))
+    .run();
+  upsertMessage(deps, {
+    id: note.id,
+    conversationId: stepRow.buildId,
+    role: 'system',
+    content: note.content,
+    createdAt: nowMs(),
+  });
+  publishStepStatus(deps, stepRow.id);
+}
+
+/** applyMergeLanding 的 git 检查期间卡被关闭 / 挪回待开始：不快进（#1487）。 */
+const MERGE_LANDING_SKIPPED = Symbol('merge-landing-skipped');
+
+/** #1487 合并没落地的时间线说明（卡在合并步跑的时候已关闭或挪回待开始）。 */
+export const MERGE_NOT_LANDED_NOTE =
+  '合并步跑完时任务已取消或已挪回待开始，合并没有落地：默认分支保持不变';
+
+/** 合并步所属的卡已离开审核、走向取消（closed / todo）——成功回报不落地
+ * （#1487）。done 不在此列：手动标完成期间合并跑完照常落地。 */
+function mergeCardLeftReview(deps: MachineDeps, stepRow: typeof step.$inferSelect): boolean {
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  const todoRow = buildRow
+    ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+    : undefined;
+  return todoRow?.phase === 'closed' || todoRow?.phase === 'todo';
+}
+
 /** 合并落地（M3b [设计]，02 §4.2 merge 202 delegated 的 server 半）：机器合并
  * 步 push 后，bare repo 默认分支 fast-forward 到 done 回传的 conv 分支 HEAD。
  * 护栏：现 tip 必须是该 commit 祖先（非快进 = main 在合并窗口被推进 → 步按
@@ -2069,14 +2223,12 @@ async function applyMergeLanding(
   deps: MachineDeps,
   stepRow: typeof step.$inferSelect,
   commit: string | null,
-): Promise<string | null> {
+): Promise<string | null | typeof MERGE_LANDING_SKIPPED> {
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   const todoRow = buildRow
     ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
     : undefined;
-  const projectRow = todoRow
-    ? deps.db.select().from(project).where(eq(project.id, todoRow.projectId)).get()
-    : undefined;
+  const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
   if (!todoRow || projectRow?.repoKind !== 'hosted' || projectRow.repoName === null) {
     return null; // 未绑托管 repo：无可落地 ref（github 形态 PR 面归后票）。
   }
@@ -2091,6 +2243,9 @@ async function applyMergeLanding(
       return `merge landing refused: ${branch} moved (non-fast-forward) — rerun the task`;
     }
   }
+  // 上面的 git 检查都是 await：期间卡可能被关闭。快进前最后再看一次（与
+  // updateBranchRef 的发起同步，之间插不进别的请求）。
+  if (mergeCardLeftReview(deps, stepRow)) return MERGE_LANDING_SKIPPED;
   await systemGitOps.updateBranchRef(dir, branch, commit);
   return null;
 }

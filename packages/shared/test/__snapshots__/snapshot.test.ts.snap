@@ -852,6 +852,10 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
     "hasChanges": {
       "type": "boolean",
     },
+    "noOutput": {
+      "const": true,
+      "type": "boolean",
+    },
     "prNumber": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
@@ -1011,6 +1015,11 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
           "items": {
             "additionalProperties": false,
             "properties": {
+              "item": {
+                "maximum": 9007199254740991,
+                "minimum": 1,
+                "type": "integer",
+              },
               "note": {
                 "type": "string",
               },
@@ -1621,6 +1630,11 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
               "items": {
                 "additionalProperties": false,
                 "properties": {
+                  "contextWindow": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "type": "integer",
+                  },
                   "cost": {
                     "additionalProperties": false,
                     "properties": {
@@ -1651,6 +1665,11 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
                   },
                   "id": {
                     "type": "string",
+                  },
+                  "maxTokens": {
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "type": "integer",
                   },
                   "name": {
                     "type": "string",
@@ -1725,6 +1744,31 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
           "maximum": 9007199254740991,
           "minimum": -9007199254740991,
           "type": "integer",
+        },
+        "todo": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "enum": [
+                  "todo",
+                  "doing",
+                  "done",
+                ],
+                "type": "string",
+              },
+              "text": {
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "text",
+              "state",
+            ],
+            "type": "object",
+          },
+          "type": "array",
         },
       },
       "required": [
@@ -1901,6 +1945,55 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       "required": [
         "kind",
         "row",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "agent_todo",
+          "type": "string",
+        },
+        "todo": {
+          "additionalProperties": false,
+          "properties": {
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "todo",
+                      "doing",
+                      "done",
+                    ],
+                    "type": "string",
+                  },
+                  "text": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "text",
+                  "state",
+                ],
+                "type": "object",
+              },
+              "maxItems": 64,
+              "type": "array",
+            },
+          },
+          "required": [
+            "items",
+          ],
+          "type": "object",
+        },
+      },
+      "required": [
+        "kind",
+        "todo",
       ],
       "type": "object",
     },
@@ -2090,6 +2183,31 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
               "type": "integer",
+            },
+            "todo": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "todo",
+                      "doing",
+                      "done",
+                    ],
+                    "type": "string",
+                  },
+                  "text": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "text",
+                  "state",
+                ],
+                "type": "object",
+              },
+              "type": "array",
             },
           },
           "required": [
@@ -3173,6 +3291,65 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
       "required": [
         "type",
         "activity",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "todo": {
+          "additionalProperties": false,
+          "properties": {
+            "at": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "items": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "todo",
+                      "doing",
+                      "done",
+                    ],
+                    "type": "string",
+                  },
+                  "text": {
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "text",
+                  "state",
+                ],
+                "type": "object",
+              },
+              "maxItems": 64,
+              "type": "array",
+            },
+            "stepId": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "items",
+            "stepId",
+            "at",
+          ],
+          "type": "object",
+        },
+        "type": {
+          "const": "agent_todo",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "todo",
       ],
       "type": "object",
     },
@@ -4873,6 +5050,7 @@ exports[`body/封套 schema 快照 > teamStreamEvent > teamStreamEvent.json 1`] 
                 "build_review",
                 "chief_message",
                 "quota_wait",
+                "model_fallback",
               ],
               "type": "string",
             },
@@ -5038,6 +5216,35 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent > ag
     },
     "displayName": {
       "type": "string",
+    },
+    "fallbackModels": {
+      "anyOf": [
+        {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "modelId": {
+                "minLength": 1,
+                "type": "string",
+              },
+              "provider": {
+                "minLength": 1,
+                "type": "string",
+              },
+            },
+            "required": [
+              "provider",
+              "modelId",
+            ],
+            "type": "object",
+          },
+          "maxItems": 5,
+          "type": "array",
+        },
+        {
+          "type": "null",
+        },
+      ],
     },
     "id": {
       "type": "string",
@@ -6011,6 +6218,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > notificati
         "build_review",
         "chief_message",
         "quota_wait",
+        "model_fallback",
       ],
       "type": "string",
     },
@@ -6174,6 +6382,11 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > provider >
       "items": {
         "additionalProperties": false,
         "properties": {
+          "contextWindow": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
+          },
           "cost": {
             "additionalProperties": false,
             "properties": {
@@ -6204,6 +6417,11 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > provider >
           },
           "id": {
             "type": "string",
+          },
+          "maxTokens": {
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "type": "integer",
           },
           "name": {
             "type": "string",
@@ -7888,6 +8106,8 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "gate_round",
   "gate_verdict",
   "gate_state",
+  "autonomy_state",
+  "member_activity",
 ]
 `;
 

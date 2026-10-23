@@ -45,11 +45,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type Phase, type TodoSourceKind, webhookReceiverResponseSchema } from '@pacman/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+  autonomyState as autonomyStateTable,
+  build as buildTableForGate,
   chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -57,6 +59,7 @@ import {
   project as projectTable,
   step as stepTable,
   todo as todoTable,
+  tokenUsage as tokenUsageTable,
   webhookToken as webhookTokenTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
@@ -1032,6 +1035,12 @@ describe('#1459 W 打标人（sender）按 D5 核', () => {
     expect(hook.body.result).toBe('created');
     expect(permissionReads()).toEqual([permissionPath(SENDER)]);
     listForPoller(8, SENDER);
+    // 触发闸（#1491）的人在用 / 冷却 / 预算关掉：本用例钉的是 permission 缓存。
+    s.db
+      .update(projectTable)
+      .set({ autonomy: { enabled: true, quietMinutes: 0, cooldownMinutes: 0, dailyBudgetUsd: 0 } })
+      .where(eq(projectTable.id, projectId))
+      .run();
     const intake = createIssueIntake({ ...s.svc, box: s.secretBox }, { githubFetch: mock.impl });
     const tally = await intake.sweep();
     expect(tally?.imported).toBe(1);
@@ -1299,5 +1308,87 @@ describe('#1459 round 3 W 日志里的 sender', () => {
       }),
     ]);
     expect(mock.calls).toEqual([]);
+  });
+});
+
+// #1491 触发闸：打标是人明确要的，webhook 不让路、不冷却；总开关关了或当天
+// 预算满（读不到同算满）→ 202 ignored，不建卡、不读 GitHub，原因记进
+// autonomy_state；导入成功记一次开跑（轮询器冷却从这里起算）。
+describe('#1491 W 触发闸', () => {
+  function setAutonomy(over: Record<string, unknown>): void {
+    s.db
+      .update(projectTable)
+      .set({
+        autonomy: {
+          enabled: true,
+          quietMinutes: 10,
+          cooldownMinutes: 15,
+          dailyBudgetUsd: 5,
+          ...over,
+        },
+      })
+      .where(eq(projectTable.id, projectId))
+      .run();
+  }
+
+  function intakeState() {
+    return s.db
+      .select()
+      .from(autonomyStateTable)
+      .where(eq(autonomyStateTable.projectId, projectId))
+      .get();
+  }
+
+  test('W-gate1 项目关了后台自动任务 → 202 ignored，零出站、不建卡，原因可查', async () => {
+    setAutonomy({ enabled: false });
+    const http = await deliverHttp(labeledPayload(), 'wg1');
+    expect(http.status).toBe(202);
+    expect(http.body).toEqual({
+      result: 'ignored',
+      deliveryId: 'wg1',
+      detail: 'project autonomy gate: disabled',
+    });
+    expect(mock.calls).toHaveLength(0);
+    expect(issueTasks()).toHaveLength(0);
+    expect(intakeState()?.lastBlockedReason).toBe('disabled');
+  });
+
+  test('W-gate2 当天预算满 → 202 ignored；花费读不到同样不领', async () => {
+    setAutonomy({});
+    insertIssueTask(901, 'done');
+    const todoId = `todo-wh-${taskSeq}`;
+    s.db
+      .insert(buildTableForGate)
+      .values({
+        id: 'b-gate',
+        todoId,
+        withPlan: false,
+        triggerSource: 'chief',
+        createdAt: Date.now(),
+      })
+      .run();
+    s.db.insert(tokenUsageTable).values({ buildId: 'b-gate', model: 'a/m', costTotal: 5 }).run();
+    const full = await deliverHttp(labeledPayload(), 'wg2');
+    expect(full.body).toMatchObject({ result: 'ignored', detail: 'project autonomy gate: budget' });
+    s.db.run(sql`ALTER TABLE token_usage RENAME TO token_usage_gone`);
+    const unreadable = await deliverHttp(labeledPayload(), 'wg2b');
+    expect(unreadable.body).toMatchObject({
+      result: 'ignored',
+      detail: 'project autonomy gate: budget-unreadable',
+    });
+    expect(issueTasks().filter((t) => t.phase !== 'done')).toHaveLength(0);
+  });
+
+  test('W-gate3 人刚在用、冷却中都不拦 webhook；导入记一次开跑', async () => {
+    // beforeEach 建项目、建 token 都是人的写操作（刚刚）；再记一次「上次开跑」。
+    setAutonomy({ dailyBudgetUsd: 0 });
+    s.db
+      .insert(autonomyStateTable)
+      .values({ projectId, kind: 'issue-intake', lastStartedAt: Date.now() })
+      .run();
+    const before = Date.now();
+    const http = await deliverHttp(labeledPayload(), 'wg3');
+    expect(http.body.result).toBe('created');
+    expect(intakeState()?.lastStartedAt).toBeGreaterThanOrEqual(before);
   });
 });

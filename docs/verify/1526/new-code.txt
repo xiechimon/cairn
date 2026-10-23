@@ -1,0 +1,9 @@
+
+ RUN  v5.0.1 /private/tmp/pm-1526-1792684364/apps/daemon
+
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  01:36:45
+   Duration  1.06s (import 75%, transform 24%, tests 1%)
+

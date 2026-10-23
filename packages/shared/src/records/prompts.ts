@@ -185,7 +185,37 @@ export function composeTaskPromptWithInstruction(taskText: string, instruction: 
  *  注记行（buildPlanLocationNote）承载——路径是执行机本地事实，server 侧
  *  模板无法预知。 */
 export function buildPlanRewritePrompt(): string {
-  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`;
+  return `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。${PLAN_VERIFICATION_RULE}`;
+}
+
+/** #1492 Verification 硬要求句（首轮契约、补写轮、结构补写轮共用）。判定
+ *  规则单源 = records/plan.ts checkPlanContract，本句只是把规则讲给 agent。 */
+export const PLAN_VERIFICATION_RULE =
+  'Verification 每一项必须是可执行的检查：命令、测试文件路径或可断言的结果（如接口返回值），不写「确认没问题」这类空话，也不留待定、待补之类的占位。';
+
+/** #1492 之前的首轮契约与补写指令原文：库里已落的会话行仍是这两句，过滤侧
+ *  照样要认出来（否则老会话里的合成行会冒充用户气泡）。 */
+const LEGACY_PLAN_PROMPTS = [
+  `规划步未产出 ${PLAN_FILE_NAME} 交接文件。请将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）再结束本步；若改动已在规划轮完成，${PLAN_FILE_NAME} 如实记录改动内容与验证方式即可。`,
+  `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。`,
+] as const;
+
+const PLAN_CONTRACT_REWRITE_HEAD = '方案的 Verification 小节没过结构检查：「';
+const PLAN_CONTRACT_REWRITE_TAIL = `」。请更新 ${PLAN_FILE_NAME} 交接位置指定的文件，补齐 Verification 小节再结束本步。${PLAN_VERIFICATION_RULE}其余小节不必改动。`;
+
+/** #1492 结构补写指令：plan 步交了 plan.md，但 Verification 没过结构闸
+ *  （checkPlanContract）时的补写轮 prompt，问题原文内嵌。server 写侧与
+ *  呈现层过滤侧（wrappedBy 识别）单源在此。 */
+export function buildPlanContractRewritePrompt(problem: string): string {
+  return `${PLAN_CONTRACT_REWRITE_HEAD}${problem}${PLAN_CONTRACT_REWRITE_TAIL}`;
+}
+
+/** 这条 plan 步指令是不是结构补写指令（server 据此判定「本轮已经补写过一次」）。
+ *  只比头尾：交接位置注记行由 daemon 追加在投递串上，不进 step.prompt。 */
+export function isPlanContractRewritePrompt(prompt: string | null | undefined): boolean {
+  return (
+    prompt != null && wrappedBy(prompt, PLAN_CONTRACT_REWRITE_HEAD, PLAN_CONTRACT_REWRITE_TAIL)
+  );
 }
 
 /** 首轮 plan 步的 plan.md 契约指令（#1025 单源）：此前契约只存在于纠错
@@ -199,7 +229,7 @@ export function buildPlanRewritePrompt(): string {
  *  「工作区根目录」= local-repo 项目的 checkout 根，plan.md 落那里会被
  *  agent 提交进仓库根——#24 / PR #1201 首版实锤）。 */
 export function buildPlanFirstRoundInstruction(): string {
-  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。`;
+  return `本步的交接物是 ${PLAN_FILE_NAME}：结束本步前，将方案写入 ${PLAN_FILE_NAME} 交接位置指定的文件（覆盖 Context/Changes/Edge cases/Verification 四段）。${PLAN_VERIFICATION_RULE}`;
 }
 
 /** #1203 交接位置注记行的头尾（写侧组装与过滤侧剥离共用的锚点）。 */
@@ -409,6 +439,7 @@ const SYNTHETIC_EXACT: ReadonlySet<string> = new Set([
   ...Object.values(CONTINUE_PROMPTS).filter((v) => v !== ''),
   buildPlanRewritePrompt(),
   buildPlanFirstRoundInstruction(),
+  ...LEGACY_PLAN_PROMPTS,
 ]);
 
 function wrappedBy(text: string, head: string, tail: string): boolean {
@@ -425,6 +456,7 @@ function matchesSyntheticTemplates(text: string): boolean {
     wrappedBy(text, REVIEW_REJECT_HEAD, REVIEW_REJECT_TAIL) ||
     wrappedBy(text, RESTART_HEAD, RESTART_TAIL) ||
     wrappedBy(text, MERGED_PR_GUARD_HEAD, MERGED_PR_GUARD_TAIL) ||
+    wrappedBy(text, PLAN_CONTRACT_REWRITE_HEAD, PLAN_CONTRACT_REWRITE_TAIL) ||
     parseReviewPromptMeta(text) !== null
   );
 }

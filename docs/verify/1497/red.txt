@@ -1,0 +1,10 @@
+     × V1 本队任务指向他队项目 → NotFound project，不建 build、相位不动 165ms
+     × V1 REST 入口同样 404 132ms
+     × V2 定时触发：tick 不抛出，不建 build 171ms
+     × V7 变更读面：任务指向他队 hosted 项目 → 404，不读他队仓库 105ms
+     × V3 任务指向他队 hosted 项目：载荷无 repo，凭证 git = null 94ms
+     × V4 别的 Agent / 他队的记忆不被删 72ms
+     × V4 worker delete_memory：别的 Agent 的记忆 → 404，不删 64ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+ Test Files  1 failed (1)
+      Tests  7 failed | 4 passed (11)

@@ -653,6 +653,11 @@ const MD_SAMPLE = [
   '- 顶层要点',
   '  - 嵌套要点',
   '',
+  '- [x] 查 pi 模型上下文是不是都 1M',
+  '- [~] 开票沉淀注释规则',
+  '- [ ] 通读 poteto 的推文观点',
+  '- [ ] 重排模型清单和派活方案',
+  '',
   '```sh',
   'total 16',
   'drwxr-xr-x  4 xmon  staff  128 Sep 30 10:00 .',
@@ -690,6 +695,29 @@ export const mdToolout: FixtureSet = {
     transcript: MD_TOOLOUT_TRANSCRIPT,
     doc: DOC_V2,
     changes: probeChanges(true),
+  },
+};
+
+const AGENT_TODO_TRANSCRIPT: TranscriptItem[] = [
+  ...PROBE_BUILD_OPEN,
+  {
+    kind: 'agent-todo',
+    items: [
+      { text: '通读 poteto 的推文观点', state: 'todo' },
+      { text: '开票沉淀注释规则', state: 'doing' },
+      { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
+      { text: '重排模型清单和派活方案', state: 'todo' },
+    ],
+  },
+  { kind: 'streaming', seconds: 12, label: '模型思考中...' },
+];
+
+export const agentTodoLive: FixtureSet = {
+  todos: [probeTodo('building', r7(13, 35))],
+  now: r7(13, 36),
+  detail: {
+    transcript: AGENT_TODO_TRANSCRIPT,
+    doc: DOC_V2,
   },
 };
 

@@ -9,7 +9,7 @@
 3. **读关联 issue**：body / 评论 / commit message / 交叉链接里引用的每张 issue 全文（含评论）。先理解「要什么」，再评「给的是不是那个」。
 4. **不切分支看 diff**：只用 `gh pr view` / `gh pr diff` / `gh api` / `git show <ref>:<path>`（fetch 后）；需要 PR 文件内容就落一次性文件读。**绝不 `gh pr checkout`、绝不 `git switch`**——本仓多车道长期并行、各占独立 worktree 施工，评审者一 checkout 就把 worktree 挪到别人的分支上，撞碎正在施工的现场；评审是只读动作，不改变任何工作区状态。
    - 被 diff 触及的代码文件**整读**（不截断）再对照 diff；diff 没碰但验证行为必须读到的代码路径（调用方、接口另一端、共享面）也一并读。
-5. **检查 docs 是否需要同步**：改了已有行为或加了新机制时，`docs/spec/`（分层职责、验收口径、功能地图）、`apps/web/COMPONENTS.md`、`.claude/skills/verify-pacman/SKILL.md` 这类文档面是否该跟着变。发现缺口记进 `Bad` 或 `Tests`，不当场替作者改。
+5. **检查 docs 是否需要同步**：改了已有行为或加了新机制时，`docs/spec/`（分层职责、验收口径）、`docs/feature-map.md`（功能地图活册）、`apps/web/COMPONENTS.md`、`.claude/skills/verify-pacman/SKILL.md` 这类文档面是否该跟着变。发现缺口记进 `Bad` 或 `Tests`，不当场替作者改。
 
 ## 例外：`pr-gate` workflow（ADR 0021、spec 28 §7.5）
 

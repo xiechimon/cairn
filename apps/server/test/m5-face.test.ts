@@ -39,6 +39,7 @@ import {
   openConvStream,
   postProject,
   req,
+  withVerification,
 } from './helpers.js';
 
 type TestServer = ReturnType<typeof bootServer>;
@@ -239,6 +240,42 @@ describe('conversation stream（02 §1.2 会话流，M5 live streaming 服务端
       });
       expect(badSkillFact.status).toBe(400);
 
+      const todoRes = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: token,
+        body: {
+          kind: 'agent_todo',
+          todo: {
+            items: [
+              { text: '通读 poteto 的推文观点', state: 'todo' },
+              { text: '开票沉淀注释规则', state: 'doing' },
+              { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
+            ],
+          },
+        },
+      });
+      expect(todoRes.status).toBe(200);
+      const todoEv = await stream.next((ev) => ev.type === 'agent_todo');
+      const parsedTodo = conversationStreamEventSchema.parse(todoEv);
+      expect(parsedTodo.type === 'agent_todo' && parsedTodo.todo.stepId).toBe(stepId);
+      expect(parsedTodo.type === 'agent_todo' && typeof parsedTodo.todo.at).toBe('number');
+      expect(parsedTodo.type === 'agent_todo' && parsedTodo.todo.items).toEqual([
+        { text: '通读 poteto 的推文观点', state: 'todo' },
+        { text: '开票沉淀注释规则', state: 'doing' },
+        { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
+      ]);
+
+      const badTodo = await call(s.app, 'POST', `/api/machine/tool/${stepId}`, {
+        cred: token,
+        body: { kind: 'agent_todo', todo: { items: [{ text: 'a', state: 'later' }] } },
+      });
+      expect(badTodo.status).toBe(400);
+
+      const foreignTodo = await call(s.app, 'POST', '/api/machine/tool/no-such-step', {
+        cred: token,
+        body: { kind: 'agent_todo', todo: { items: [] } },
+      });
+      expect(foreignTodo.status).toBe(404);
+
       // ⑤ 非本机 step 的 delta/activity = 404（所有权校验与 tool 面同款）。
       const foreign = await call(s.app, 'POST', '/api/machine/tool/no-such-step', {
         cred: token,
@@ -284,7 +321,7 @@ describe('conversation stream（02 §1.2 会话流，M5 live streaming 服务端
     const planUpload = ((await planUrlsRes.json()) as { uploads: { url: string }[] }).uploads[0]!;
     await call(s.app, 'PUT', planUpload.url.replace(/^https?:\/\/[^/]+/, ''), {
       cred: token,
-      text: '# 方案\nContext: x',
+      text: withVerification('# 方案\nContext: x'),
       contentType: 'text/markdown',
     });
     await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
@@ -513,7 +550,7 @@ describe('[推断] build 详情读面（M5 overlay 数据源，wire.test 登记�
           id: 'plan-m5-1',
           buildId,
           version: 1,
-          content: '# 方案\nContext: x',
+          content: withVerification('# 方案\nContext: x'),
           createdAt: Date.now(),
         })
         .run();

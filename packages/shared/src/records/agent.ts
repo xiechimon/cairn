@@ -127,6 +127,17 @@ export const AGENT_PERMISSION_COPY = {
     '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。',
 } as const;
 
+/** 降级链上限（#1493）：每个 Agent 最多配 5 个备选模型。 */
+export const FALLBACK_MODELS_MAX = 5;
+
+/** 降级链（#1493）：有序备选模型（元素同 model-source ModelRef 形，写侧
+ *  要求两段非空）。主模型额度用完 / 404 / 认证失败时，
+ *  plan 与 build 步按序换到下一个健康备选（review / verify / merge / chief
+ *  步禁止降级）。null 或 [] = 永不换模型（行为与无本字段时一致）。 */
+export const fallbackModelsSchema = z
+  .array(z.object({ provider: z.string().min(1), modelId: z.string().min(1) }))
+  .max(FALLBACK_MODELS_MAX);
+
 export const agentRecordSchema = z.object({
   id: recordId,
   displayName: z.string(),
@@ -176,6 +187,9 @@ export const agentRecordSchema = z.object({
    *  不领该 Agent 的步）+ agent 面「哪些机器可跑它」。nullish 加法契约
    *  （maxConcurrentTasks 同律）：老 server 响应缺字段照常解析。 */
   requiredCapabilities: requiredCapabilitiesSchema.nullish(),
+  /** 降级链（#1493）：null = 不降级。nullish 加法契约（requiredCapabilities
+   *  同律）：老 server 响应缺字段照常解析。 */
+  fallbackModels: fallbackModelsSchema.nullish(),
 });
 export type AgentRecord = z.infer<typeof agentRecordSchema>;
 
@@ -210,6 +224,8 @@ export const createAgentBodySchema = z.object({
   /** 能力要求声明（#1251）：nullish——显式 null = 清空回无要求（与缺省
    * 同值）；对象形状由 requiredCapabilitiesSchema 收严（类型错 400）。 */
   requiredCapabilities: requiredCapabilitiesSchema.nullish(),
+  /** 降级链（#1493）：nullish——显式 null = 清空（不降级）；超过 5 个 400。 */
+  fallbackModels: fallbackModelsSchema.nullish(),
 });
 export type CreateAgentBody = z.infer<typeof createAgentBodySchema>;
 

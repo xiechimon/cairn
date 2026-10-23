@@ -131,6 +131,17 @@ test('B3: nested list items indent past their parent', async ({ page }) => {
   expect(nestedLeft).toBeGreaterThan(parentLeft);
 });
 
+test('B3b: task list lines render as one todo card with per-state rows', async ({ page }) => {
+  await page.goto(ROUTE);
+  await expect(page.getByTestId('md-tasks')).toHaveCount(1);
+  const tasks = page.getByTestId('md-task');
+  await expect(tasks).toHaveCount(4);
+  await expect(tasks.nth(0)).toHaveAttribute('data-state', 'done');
+  await expect(tasks.nth(1)).toHaveAttribute('data-state', 'doing');
+  await expect(tasks.nth(2)).toHaveAttribute('data-state', 'todo');
+  await expect(page.getByTestId('agent-text')).not.toContainText('[ ]');
+});
+
 test('B4: a code fence renders as a mono block with no literal ``` leak', async ({ page }) => {
   await page.goto(ROUTE);
   const code = page.getByTestId('md-code').first();

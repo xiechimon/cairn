@@ -20,6 +20,7 @@ import {
   agentDetailSecrets,
   agentLongRole,
   agentLongRoleTeam,
+  agentTodoLive,
   apiKeysCreated,
   boardChiefProbes,
   boardDarkFresh,
@@ -224,6 +225,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // block-rendering pin — an agent reply with raw block markdown + a
       // tool group whose bash stdout renders as left-aligned mono blocks
       'md-toolout': mdToolout,
+      'agent-todo': agentTodoLive,
       // #919 named scenario (no capture, md-toolout precedent): skill
       // routing rows (read + blocked) in the thread column and the 技能
       // summary section row in the pane type select

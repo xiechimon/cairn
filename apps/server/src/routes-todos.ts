@@ -34,6 +34,7 @@ import {
   createTodo,
   deleteTodo,
   getTodo,
+  isStartedTodoRow,
   listTodos,
   resetTodo,
   retrySelfIssueCreate,
@@ -98,6 +99,20 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     const body = parseWith(patchTodoBodySchema, await jsonBody(c), 'body');
     const prior = getTodo(svc, id);
+    // #1486（2026-10-22 裁决）：已开始的卡（进行中，或带构建历史）挪回待开始只走
+    // 重置——PATCH 改相会留下旧 build 与产物位，下一轮被 #1217 守卫误判重复
+    // 交付。closed → todo 是重新打开（保留历史，与 reopen_todos 同语义），不拦。
+    if (
+      body.phase === 'todo' &&
+      prior != null &&
+      prior.phase !== 'todo' &&
+      prior.phase !== 'closed' &&
+      isStartedTodoRow(prior)
+    ) {
+      throw conflict(
+        `这张卡已经开始过，挪回待开始要重置（清空构建历史）：POST /api/todos/${id}/reset`,
+      );
+    }
     let record: TodoRecord | null;
     try {
       // #160：HTTP PATCH phase = 看板拖拽手动改相面（六列 dropPhase 目标
@@ -116,16 +131,15 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     // settleSplitOnDone（兄弟都 done 时父收，不在这里派发新构建）。
     if (body.phase === 'done' && prior?.phase !== 'failed') advanceSplitWaves(svc, id);
     // #1445：手动关闭（详情 关闭 / 看板 已取消）同停活动步，机器不再领这张卡。
-    // raw PATCH 把执行中的卡挪回待开始或标完成（web 走 /reset 与
-    // stop-and-done，不经这里）同理（#1447、#1451）：pending 步留着会被领走，
-    // claimed 步零通知继续跑。只认这两个出口：漏斗边（building→review 等）
-    // 不在此列。判 record（写后值）不判 body：同相位 PATCH 在 updateTodo
-    // 里静默 no-op。
+    // raw PATCH 把执行中的卡标完成（web 走 stop-and-done，不经这里）同理
+    // （#1451）：pending 步留着会被领走，claimed 步零通知继续跑。挪回待开始
+    // 已在上面拒收（#1486，只走 /reset）。漏斗边（building→review 等）不在此
+    // 列。判 record（写后值）不判 body：同相位 PATCH 在 updateTodo 里静默 no-op。
     const closing = record.phase === 'closed' && prior?.phase !== 'closed';
     const exited =
       prior != null &&
       (IN_PROGRESS_PHASES as readonly string[]).includes(prior.phase) &&
-      (record.phase === 'todo' || record.phase === 'done');
+      record.phase === 'done';
     if (closing || exited) stopActiveStepsAfterExit(svc, id);
     return c.json(record);
   });

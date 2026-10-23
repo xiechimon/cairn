@@ -29,6 +29,7 @@ import { whatsNewRecordSchema } from './whats-new.js';
 
 export * from './agent.js';
 export * from './api-key.js';
+export * from './autonomy.js';
 export * from './branch-sync.js';
 export * from './build.js';
 export * from './capabilities.js';
@@ -58,6 +59,7 @@ export * from './skill.js';
 export * from './step.js';
 export * from './tag.js';
 export * from './team.js';
+export * from './ticket-dedupe.js';
 export * from './todo.js';
 export * from './token-usage.js';
 export * from './user.js';

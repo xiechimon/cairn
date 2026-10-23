@@ -1,0 +1,6 @@
+
+ Test Files  5 passed (5)
+      Tests  55 passed (55)
+   Start at  03:07:26
+   Duration  1.84s (transform 51%, import 38%, tests 11%)
+

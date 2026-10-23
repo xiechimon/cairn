@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
+  AgentTodoItem,
   AgentTokenUsage,
   ClaimedStep,
   CommitIdentity,
@@ -64,6 +65,7 @@ import {
   transcriptPromptRowId,
 } from '@pacman/shared';
 import { createActivityTracker } from './activity.js';
+import { parseAgentTodoText } from './agent-todo.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
@@ -84,7 +86,7 @@ import { withGitCredentialFallback } from './git.js';
 import { githubRepoRefOf, probeGithubPr } from './github-probe.js';
 import { type StepJournal, type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
-import { isTransientUploadError, type MachineApi } from './machine-client.js';
+import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
@@ -429,10 +431,6 @@ export async function runStep(
   // （#1473）：workspace.prepare（clone / 项目锁 / setup 上限 20 分钟）期间
   // 无心跳，server 扫尾会把在线机器上的步当失联放回 pending。会话结束与
   // 失败回报前各自先停（收尾期不续），finally 兜住其余出口。
-  const heartbeat = setInterval(() => {
-    deps.client.heartbeat(claimed.step.id).catch(() => {});
-  }, deps.heartbeatIntervalMs ?? 30_000);
-  if (heartbeat.unref) heartbeat.unref();
   const stepId = claimed.step.id;
   const stop = (deps.stops ?? new StepStops()).enter(stepId, (stopRequest) => {
     try {
@@ -443,6 +441,22 @@ export async function runStep(
       );
     }
   });
+  // #1488：心跳答 410 = server 上这一步已不存在（卡被重置 / 删掉，行随 build
+  // 删了，停止信号来不及被拉取）→ 按停止收尾：中断会话、done(stopped)、不
+  // commit/push（不往旧分支推）。404（被放回、不归本机）照常跑——#1483 同机
+  // 重领时这次 run 接着跑新的领取。其余错误（网络）照旧吞掉。
+  const heartbeat = setInterval(() => {
+    deps.client.heartbeat(stepId).catch((err: unknown) => {
+      if (!(err instanceof MachineApiError) || err.status !== 410 || stop.request !== null) return;
+      deps.logger.step(`step ${stepId} no longer exists on the server — stopping`);
+      stop.deliver({ discard: false }).catch((stopErr: unknown) => {
+        deps.logger.step(
+          `stop after heartbeat 410 failed: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
+        );
+      });
+    });
+  }, deps.heartbeatIntervalMs ?? 30_000);
+  if (heartbeat.unref) heartbeat.unref();
   if (opts.stopRequest !== undefined) stop.accept(opts.stopRequest);
   try {
     await runClaimedStep(deps, claimed, opts, heartbeat, stop);
@@ -486,6 +500,32 @@ async function runClaimedStep(
     ...(deps.now !== undefined ? { now: deps.now } : {}),
   });
   activity.setPhase('preparing');
+
+  let agentTodoRelayWarned = false;
+  let lastAgentTodo: AgentTodoItem[] | null = null;
+  const reportAgentTodo = (items: readonly AgentTodoItem[]): void => {
+    if (items.length === 0) return;
+    if (
+      lastAgentTodo !== null &&
+      lastAgentTodo.length === items.length &&
+      lastAgentTodo.every((it, i) => {
+        const next = items[i];
+        return next !== undefined && it.text === next.text && it.state === next.state;
+      })
+    ) {
+      return;
+    }
+    lastAgentTodo = items.map((it) => ({ ...it }));
+    client.agentTodo?.(stepId, { items: items.map((it) => ({ ...it })) })?.catch((err: unknown) => {
+      if (agentTodoRelayWarned) return;
+      agentTodoRelayWarned = true;
+      logger.step(
+        `agent todo relay failed (suppressed until next step): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
+  };
 
   // chief 步（回合 = 机器 step，r5 §3.1）：任务文本 = server 合成的 instruction
   // （用户消息 / wake 事实），无 todo 语境；remoteTools relay + systemPrompt 走
@@ -1344,6 +1384,10 @@ async function runClaimedStep(
       // 上报失败不打断步——终稿 upload-urls 兜底（与工具行同纪律）。
       logger.step(`segment row relay failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+    if (seg.kind === 'text') {
+      const items = parseAgentTodoText(seg.text);
+      if (items !== null) reportAgentTodo(items);
+    }
   };
   /** 封出当前未封段并落行；无内容 = no-op。 */
   const sealSegment = async (): Promise<void> => {
@@ -1572,6 +1616,7 @@ async function runClaimedStep(
               const skillFact = classifySkillFact(ev.call);
               if (skillFact !== null) activity.noteSkill(skillFact);
             }
+            if (ev.call.todo !== undefined) reportAgentTodo(ev.call.todo);
             transcript.upsert({
               id: ev.call.id,
               role: 'assistant',
@@ -2213,6 +2258,11 @@ async function runClaimedStep(
     // 普通失败，混版本零破坏）。
     ...(quotaBlock !== null ? { quotaBlock } : {}),
     ...(skillInjectionFacts !== null ? { skillInjectionFacts } : {}),
+    // #1493 无输出信号：成功收尾但 transcript 零 assistant 消息（server「0 token
+    // 静默失败」判据的前提——单看 usage 会误判不回 usage 的 relay）。
+    ...(status === 'success' && !messages.some((m) => m.role === 'assistant')
+      ? { noOutput: true as const }
+      : {}),
   };
   journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
   try {

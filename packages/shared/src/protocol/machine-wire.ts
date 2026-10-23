@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
+import { agentTodoReportSchema } from '../agent-todo.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
 import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
@@ -433,6 +434,12 @@ export const machineTranscriptRowBodySchema = z.object({
 });
 export type MachineTranscriptRowBody = z.infer<typeof machineTranscriptRowBodySchema>;
 
+export const machineAgentTodoBodySchema = z.object({
+  kind: z.literal('agent_todo'),
+  todo: agentTodoReportSchema,
+});
+export type MachineAgentTodoBody = z.infer<typeof machineAgentTodoBodySchema>;
+
 /** POST /api/machine/tool/{stepId}——同径双形（r5 §3.1 bundle 提取）+ 复刻
  * 增量第三形（transcript delta [设计]，machineTranscriptDeltaBodySchema）+
  * #905 第四形（activity [设计]，machineActivityBodySchema）+ #955 第五形
@@ -457,6 +464,7 @@ export const machineToolBodySchema = z.union([
   machineThinkingDeltaBodySchema,
   machineActivityBodySchema,
   machineTranscriptRowBodySchema,
+  machineAgentTodoBodySchema,
 ]);
 
 /** relay 执行响应（bundle 消费面 `reply.body?.text`）；失败 = {error}(+transient)。 */
@@ -612,6 +620,11 @@ export const machineDoneBodySchema = z.object({
    * 混版本零破坏；同 findingsError 的无害冗余律）。空流/非配额错误不携带
    * （分类面不猜——不可见即污染可观测性）。 */
   quotaBlock: quotaBlockSchema.optional(),
+  /** #1493 无输出信号：status=success 但本步 transcript 没有任何 assistant
+   *  消息时 daemon 携带 true。server 的「0 token 静默失败」判定要求它在位——
+   *  pi 对不回 usage 的 relay 也报 0 token 行，单看 usage 会误判。旧 daemon
+   *  缺席 = 不判（zod strip / 缺省，混版本零破坏）。 */
+  noOutput: z.literal(true).optional(),
   /** #1186 实际注入名集：daemon 在 scan + 字节预算之后随 done 携带
    * （injected / omitted / unrendered）。旧 daemon 缺席 = server 不落断言
    * （zod strip，混版本零破坏）。不是 step.skillInjection：那一列是 claim

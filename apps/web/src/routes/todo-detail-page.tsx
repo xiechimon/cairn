@@ -19,6 +19,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
+import { agentTodoStore } from '../api/agent-todo.js';
 import { ApiError } from '../api/client.js';
 import {
   useApiMutations,
@@ -335,6 +336,9 @@ export function TodoDetailPage() {
   const activity = useSyncExternalStore(activityStore.subscribe, () =>
     buildId != null ? activityStore.get(buildId) : null,
   );
+  const agentTodo = useSyncExternalStore(agentTodoStore.subscribe, () =>
+    buildId != null ? agentTodoStore.get(buildId) : null,
+  );
   const streamHandlers = useMemo(
     () => ({
       // todo/phase 面由 team stream 驱动失效；此处兜底本页 todo 键。走收敛缝
@@ -443,6 +447,7 @@ export function TodoDetailPage() {
         liveThinking,
         stopping,
         activity,
+        agentTodo,
       }),
       ...(latestPlan ? { doc: mapPlanDoc(latestPlan.content) } : {}),
       ...(changesQ.data
@@ -463,6 +468,7 @@ export function TodoDetailPage() {
     liveText,
     liveThinking,
     activity,
+    agentTodo,
     latestPlan,
     changesQ.data,
     changesExpanded,
@@ -1169,15 +1175,16 @@ export function TodoDetailPage() {
                   );
                   return;
                 }
-                // merge = 202 delegated（r3 §3.6）：合并步机器执行，phase 经
-                // SSE 推进到 done（🎉 时间线行由 server 落库）。XMON-89：关
+                // merge = 202 delegated（r3 §3.6）：合并步机器执行（GitHub 形态
+                // 有 PR 时 server 经 GitHub 合并，#1403 段 2b），phase 经 SSE
+                // 推进到 done（完成行由 server 落库）。XMON-89：关
                 // 弹层改挂 onSuccess——被拒（403/409）时弹层留着显原因，不再
                 // 静默关掉；202 到相位推进之间隔着机器执行，toast 是这段窗口
                 // 的可见回执（#1236）。
                 mutations.mergeBuild.mutate(buildId, {
                   onSuccess: () => {
                     closeOverlay();
-                    toastSuccess(t('已发起合并，机器执行完成后任务进入已完成。'));
+                    toastSuccess(t('已发起合并，合并完成后任务进入已完成。'));
                   },
                   onError: (error) => setMergeReject(mergeRejectCopy(error, t)),
                 });

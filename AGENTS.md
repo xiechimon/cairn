@@ -2,6 +2,7 @@
 
 > 仓库级 agent / 人类共同规则。规则**可覆写**但需用户显式确认（见末尾"User Override"）。
 > 项目背景与历史决策在 `~/.claude/projects/-Users-xmon-Code-AgentProjects-pacman/memory/MEMORY.md`——本文件只列规则不重复事实。
+> 工作方式、分工、模型规则与当前进展摘要见 `.claude/workflow.md`；收尾复盘用 `.claude/skills/retro-pacman`。
 
 ## Conversational Style
 
@@ -15,6 +16,7 @@
 
 - **缝纪律先于一切**：biome 的 `noRestrictedImports` 已经把 `@earendil-works/*`、`@modelcontextprotocol/sdk`、`simple-git`、`isomorphic-git`、`cron-parser` 锁死只能经薄桥模块消费。**改这些 import 路径前先看 `biome.json` 注释**（缝纪律 01 §5/§7.3 等条款）——改文件位置之前先校验 seam 是否仍然成立。
 - 改自己没完整读过的文件前先 Read；不要靠搜索片段做广义修改。
+- **注释纪律**：默认不写新注释，用命名和代码结构表达意图；仅允许解释浏览器 / 平台 bug、第三方怪癖等外部行为或公开 API 文档的注释。写给将来的补救或待办类注释违规，先修代码；机器检查见下方「注释检查」。存量注释不在清理范围。
 - 默认无 `any`；需要时写明 `any intentionally - <理由>`。
 - 单行 helper 且唯一调用点 → inline。
 - 外部包 API: bundled types → 读 `node_modules/<pkg>/dist/*.d.ts`; 仅 `@types/` → 读 `node_modules/@types/<pkg>/index.d.ts` + 同包 JS 源; 无类型 → 跑 `node -e` 或查 docs, 不靠记忆推。pnpm 仓顶层 node_modules 只挂直接依赖——路径不存在就去 `node_modules/.pnpm/<pkg>@<ver>/node_modules/<pkg>/`（本仓实测）。钉 `npm ls <pkg>` 版本。详 `~/.agents/wiki/wiki/外部包 API 事实源调研.md`。
@@ -45,6 +47,16 @@ pnpm spec:parse # spec 解析闸（#1052）：只收集不执行、秒级，覆�
 - `dev:web` / `dev:server` / `dev:daemon` ——dev server，端口 `5173` / `8787`。vite 带 `strictPort`——撞端口即启动失败，不静默顺延到下一个空闲口（顺延才是危险的：proxy 目标不变，界面会去驱动持有该端口的别的栈）。覆写：`PACMAN_DEV_WEB_PORT` / `PACMAN_DEV_SERVER_PORT`。
 - **E2E_PORT** 默认 8399——跑前先 `lsof -iTCP:8399` 查占用，占用的是别的车道**不能杀**，换端口。**`e2e:affected` 默认走 8398**（`E2E_AFFECTED_PORT` 覆写，显式 `E2E_PORT` 优先）——与全量分道，同款撞端口纪律。
 - **同 worktree 内不要并跑两个 playwright**——`vite build --mode fixture` 写同一个 `dist/`，会互踩。跨 worktree 各用各的 dist 无碍。
+
+注释检查：`node scripts/comment-discipline-gate.mjs` 对比 `origin/main`，只检查 `apps/`、`packages/` 下 ts / tsx / mjs / css 的新增独立注释行及块注释续行。例外在 `scripts/comment-discipline-allowlist.json` 按 `path`、完整 `line`、`reason` 登记，仅用于外部怪异行为或公开 API 文档。CI 独立 advisory job 报红，暂不列为必需检查。
+
+派活给 Codex / Grok / pi 时，使用 `docs/agent-dispatch-prompts.md`，提示必须包含：「不写新注释；用命名和代码结构表达意图，例外遵循仓库注释纪律。」
+
+## 错误台账
+
+任务中犯错并修好后，当轮按 `docs/lessons.md` 的格式新增或更新一行；同类错误合并，lane 冲突按类别合并。按台账阶梯取最高可行级，能落机器检查就落机器检查；新闸必须用真实失误做负对照，确认旧错变红、修正后变绿。
+
+推送前运行 `pnpm prepush`，按改动路径执行检查；纯文档跳过代码检查。CI 使用同一入口，dead-class 保持独立咨询性检查，全量 E2E 保持四分片。
 
 ## Dependencies & Install Security
 

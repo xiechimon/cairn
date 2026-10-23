@@ -9,6 +9,7 @@
 // `第 N 次运行 · 相对时间 · tokens · 错误`。
 
 import type {
+  AgentTodo,
   BuildRecord,
   ChiefGetResponse,
   ChiefThread,
@@ -603,6 +604,7 @@ export interface TranscriptInput {
    *  fixture 捕获或静默窗口，streaming 行回落既有基础标签）。消费侧带
    *  stepId 过滤：陈旧步的相位不挂到在跑步头上（W1）。 */
   activity?: StepActivity | null;
+  agentTodo?: AgentTodo | null;
 }
 
 export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
@@ -618,6 +620,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     liveThinking = '',
     stopping = false,
     activity = null,
+    agentTodo = null,
   } = input;
   const head: TranscriptItem[] = [];
   if (build?.triggerSource === 'schedule') head.push({ kind: 'scheduled' });
@@ -838,6 +841,10 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         kind: 'robot',
         paragraphs: [{ segments: [{ text: liveText }] }],
       });
+    }
+    const liveTodo = agentTodo != null && agentTodo.stepId === running.id ? agentTodo : null;
+    if (liveTodo !== null && liveTodo.items.length > 0) {
+      items.push({ kind: 'agent-todo', items: liveTodo.items });
     }
     // #905：活动相位接管行标签——stepId 对在跑步过滤（W1 陈旧相位不跨步）；
     // stopping 过渡态优先级更高（停止在途比模型相位更要解释）；无信号 =

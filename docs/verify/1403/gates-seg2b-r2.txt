@@ -1,0 +1,17 @@
+#1403 segment 2b, round 2: gates
+================================
+
+## 2026-10-22, tree ca69febb (claude/bootstrap-p2-seg2b; origin/main c99de106 merged in at 1f531768)
+
+Code at this tree is the same as b78c107c (ca69febb adds docs/verify files only).
+
+- pnpm lint            exit 0 (biome ci: 823 files, no errors, 1 info)
+- pnpm typecheck       exit 0 (pnpm -r typecheck, all packages incl. integration)
+- pnpm spec:parse      exit 0 (apps/web/e2e: 1181 tests in 169 files collected, disk count
+                       matches; integration/test: 30 files parse clean)
+- pnpm exec vitest run --changed origin/main
+                       exit 0: Test Files 155 passed (155); Tests 2059 passed | 1 skipped (2060)
+- E2E_AFFECTED_PORT=8409 pnpm --filter @pacman/web e2e:affected
+                       exit 0: apps/web/src/i18n/en.ts is a shared surface → full-suite
+                       fallback, 169/169 specs, 1181 passed (10.6m). Port 8409 checked free
+                       with lsof before the run.

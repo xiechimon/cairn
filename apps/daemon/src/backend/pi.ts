@@ -1338,6 +1338,8 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
       // ——pi calculateCost 据此算 per-message cost。未声明维持零价（诚实 0，
       // 宿主不造价格表）。
       ...(m.cost !== undefined ? { cost: m.cost } : {}),
+      ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
+      ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
       ...customModelReasoning(),
     })),
   };

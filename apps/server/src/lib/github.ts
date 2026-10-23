@@ -10,10 +10,17 @@
 //   读向，token 纪律同上位）
 // - GET repos/{o}/{r} → #1242 local→github 转换面可达性判定（token 纪律
 //   同上位；匿名梯 = 无连接时公开仓可达）
-// 写面（#452 / ADR 0006——server 唯二的 api.github.com 写入点，穷举律：
-// grep `api.github.com` 的 POST/PATCH 只此两处；不改 scope、不新增凭证面）：
+// - 合并就绪闸的原样读（#1404 S4a：PR、分支、规则集、compare、check runs、
+//   combined status、contents；应答原样交回，清单见「合并就绪闸的 GitHub 传输」一节）
+// 写面（#452 / ADR 0006，#1404 / ADR 0021，#1403 段 2b / ADR 0021 D2——server 的
+// api.github.com 写入点，穷举律：grep `api.github.com` 的 POST/PATCH/PUT 只此四处；不改
+// scope（commit status 与合并都在团队连接已有的 `repo` scope 内）、不新增凭证面）：
 // - POST repos/{o}/{r}/issues → 自派任务建时建 issue（关键路径之外触发）
 // - PATCH repos/{o}/{r}/issues/{n} → agent 回填标题写进 issue
+// - POST repos/{o}/{r}/statuses/{sha} → 合并就绪闸的 commit status `pacman/merge-gate`
+//   （githubCreateCommitStatus；S4a 只有传输，调用方是 S7，`human` 策略下不写）
+// - PUT repos/{o}/{r}/pulls/{n}/merge → 人在 pacman 里点合并（GitHub 形态、build 记着
+//   PR）：sha 绑本 build 最后推送的提交、squash（githubMergePull）
 // OAuth 面（#231 握手）：
 // - POST github.com/login/oauth/access_token（form-encoded：client_id/
 //   client_secret/code/redirect_uri，Accept: json）→ access_token
@@ -143,6 +150,48 @@ export interface GithubPull extends GithubPullState {
   defaultBranch: string | null;
   /** 目标仓现在的 owner（base.repo.owner.login；仓库改名或转移后是新名字）；缺失 = null。 */
   baseOwner: string | null;
+  /** PR 标题（经 API 合并时提交标题取它，#1403 段 2b）；缺失 = null。 */
+  title: string | null;
+  /** PR 作者与仓库的关系（author_association，经 API 合并核对作者有写权限）；缺失 = null。 */
+  authorAssociation: string | null;
+  /** mergeable_state（文档只写「required, string」不列值）：pacman 只认 behind 与 dirty
+   * （#1403 段 3）；缺失 = null。 */
+  mergeableState: string | null;
+}
+
+/** 对账与经 API 合并的判据要的字段齐了：head 分支、base 分支、默认分支与 base 仓 id。 */
+export function hasPullFields(p: GithubPull): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    p.headRef !== null && p.baseRepoId !== null && p.baseRef !== null && p.defaultBranch !== null
+  );
+}
+
+/** 这张 PR 是从 branch 开的、head 仓与 base 仓是同一个仓（同一份响应里按仓库 id 比：仓库
+ * 改名或转移后照样对得上；fork 对不上，fork 已删时 head 仓为 null 同样对不上）。PR 对账与
+ * 经 API 合并（#1403）判断「是不是本 build 的 PR」共用。 */
+export function isOwnPull(pull: GithubPull, branch: string): boolean {
+  return pull.headRepoId !== null && pull.headRepoId === pull.baseRepoId && pull.headRef === branch;
+}
+
+/** 本 build 开着的、目标是默认分支的 PR（#1403 段 3：磨绿按它的 head SHA 读检查、按它的
+ * mergeable_state 解冲突或提示落后；review 对账同一判据）。 */
+export function isOwnOpenDefaultPull(
+  p: GithubPull,
+  branch: string,
+): p is GithubPull & {
+  headRef: string;
+  baseRef: string;
+  defaultBranch: string;
+  baseRepoId: number;
+} {
+  return (
+    hasPullFields(p) && isOwnPull(p, branch) && p.baseRef === p.defaultBranch && p.state === 'open'
+  );
 }
 
 export interface GithubPullPage {
@@ -153,13 +202,16 @@ export interface GithubPullPage {
 }
 
 /** 条件 GET（ETag）：304 → notModified；非 2xx、网络错、响应体不是 JSON 对象
- * → null。githubPull 与 githubCommitCheckRuns 共用。 */
+ * → null。githubPull 与 githubCommitCheckRuns 共用。absent(状态码, 应答文本) 为真的非 2xx
+ * 应答（不是限流、不是 SSO 拒绝）按「没有这项」答空数组（必需检查名单的 rules 读：仓所在
+ * 的套餐没有 ruleset）。 */
 async function conditionalGetJson(
   fetchImpl: FetchLike,
   url: string,
   token: string | null,
   etag: string | null | undefined,
   timeoutMs: number,
+  absent: ((status: number, text: string) => boolean) | null = null,
 ): Promise<
   { notModified: true } | { notModified: false; etag: string | null; data: object } | null
 > {
@@ -177,7 +229,13 @@ async function conditionalGetJson(
     return null;
   }
   if (res.status === 304) return { notModified: true };
-  if (!res.ok) return null;
+  if (!res.ok) {
+    // SAML SSO 拒绝（x-github-sso 头）与限流都不是「没有这项」：读不到。
+    if (absent === null || res.headers.get('x-github-sso') !== null) return null;
+    const text = await res.text().catch(() => '');
+    if (isRateLimitedText(res, text) || !absent(res.status, text)) return null;
+    return { notModified: false, etag: null, data: [] };
+  }
   let data: unknown;
   try {
     data = await res.json();
@@ -212,6 +270,9 @@ export async function githubPull(
   const raw = got.data as {
     state?: unknown;
     merged?: unknown;
+    title?: unknown;
+    author_association?: unknown;
+    mergeable_state?: unknown;
     merge_commit_sha?: unknown;
     merged_by?: { login?: unknown } | null;
     head?: { sha?: unknown; ref?: unknown; repo?: { id?: unknown } | null } | null;
@@ -242,6 +303,9 @@ export async function githubPull(
       defaultBranch:
         typeof raw.base?.repo?.default_branch === 'string' ? raw.base.repo.default_branch : null,
       baseOwner: optString(raw.base?.repo?.owner?.login),
+      title: optString(raw.title),
+      authorAssociation: optString(raw.author_association),
+      mergeableState: optString(raw.mergeable_state),
     },
   };
 }
@@ -289,7 +353,19 @@ export interface GithubBranchPull {
   headRepoId: number | null;
   baseRef: string | null;
   baseRepoId: number | null;
+  /** PR 作者与仓库的关系（author_association）；响应缺失 = null。 */
+  authorAssociation: string | null;
 }
+
+/** author_association 里按作者对仓库有写权限算的三个值（OWNER：仓库的 owner；MEMBER：
+ * 拥有仓库的组织的成员；COLLABORATOR：受邀协作者）。其余（CONTRIBUTOR、FIRST_TIMER、
+ * FIRST_TIME_CONTRIBUTOR、MANNEQUIN、NONE）与缺失都不算。MEMBER / COLLABORATOR 不带权限
+ * 级别：只读的组织成员或协作者同样落在这两个值里（列表响应不再多读一次权限）。 */
+export const WRITE_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+  'OWNER',
+  'MEMBER',
+  'COLLABORATOR',
+]);
 
 /** 一个 head 分支往一个 base 分支的 PR（`GET /repos/{o}/{r}/pulls?state=all&head=
  * <owner>:<branch>&base=<base>&per_page=10`，GitHub 按创建时间倒序给）。同一个分支可以
@@ -317,6 +393,7 @@ export async function githubBranchPulls(
         number?: unknown;
         state?: unknown;
         merged_at?: unknown;
+        author_association?: unknown;
         head?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
         base?: { ref?: unknown; repo?: { id?: unknown } | null } | null;
       };
@@ -329,6 +406,7 @@ export async function githubBranchPulls(
         headRepoId: typeof p.head?.repo?.id === 'number' ? p.head.repo.id : null,
         baseRef: optString(p.base?.ref),
         baseRepoId: typeof p.base?.repo?.id === 'number' ? p.base.repo.id : null,
+        authorAssociation: optString(p.author_association),
       };
     },
   );
@@ -411,7 +489,22 @@ function isRateLimited(res: { status: number; headers: { get(n: string): string 
  * 429 + 说明超了二级限流的 message）。 */
 async function isRateLimitedResponse(res: Awaited<ReturnType<FetchLike>>): Promise<boolean> {
   if (isRateLimited(res)) return true;
-  return res.status === 403 && /rate limit/i.test(await res.text().catch(() => ''));
+  // 只有没带限流头的 403 要看应答文本：别的失败不读应答体（慢的错误体不拖住调用方）。
+  return res.status === 403 && isRateLimitedText(res, await res.text().catch(() => ''));
+}
+
+/** isRateLimitedResponse 的同步半边：应答文本已读出时用（应答体只能读一次）。 */
+function isRateLimitedText(
+  res: { status: number; headers: { get(n: string): string | null } },
+  text: string,
+): boolean {
+  return isRateLimited(res) || (res.status === 403 && /rate limit/i.test(text));
+}
+
+/** 头里的秒数：缺省、为空或不是非负整数 = null（Number('') 是 0，不能当「0 秒后」）。 */
+function headerSeconds(headers: { get(name: string): string | null }, name: string): number | null {
+  const v = headers.get(name)?.trim() ?? '';
+  return /^\d+$/.test(v) ? Number(v) : null;
 }
 
 /** 进料读遇到限流（#1406：429，或带限流信号的 403）：调用方本轮停读——同一
@@ -435,6 +528,26 @@ export class GithubRateLimitedError extends Error {
     if (this.retryAfterSeconds !== null) return now + this.retryAfterSeconds * 1000;
     return this.resetAt;
   }
+}
+
+/** 限流应答的头 → GithubRateLimitedError（进料读与合并写共用）。头不在、空串或不是非负
+ * 整数 = 没给（Number('') 是 0，不能当「0 秒后」）；超过 10 位的数同样不算（UTC 秒到
+ * 2286 年为止，再大 new Date 就出界，toISOString 会抛）。 */
+function rateLimitOf(
+  url: string,
+  res: { status: number; headers: { get(n: string): string | null } },
+): GithubRateLimitedError {
+  const seconds = (name: string): number | null => {
+    const v = res.headers.get(name)?.trim() ?? '';
+    return /^\d{1,10}$/.test(v) ? Number(v) : null;
+  };
+  const reset = seconds('x-ratelimit-reset');
+  return new GithubRateLimitedError(
+    url,
+    res.status,
+    reset === null ? null : reset * 1000,
+    seconds('retry-after'),
+  );
 }
 
 /** 认证面仓库条目（GitHub `GET /user/repos` 元素最小投影；camelCase =
@@ -927,18 +1040,7 @@ async function intakeGet(
   const head = { status: res.status, etag: res.headers.get('etag'), link: res.headers.get('link') };
   if (!res.ok) {
     if (await isRateLimitedResponse(res)) {
-      // 头不在、空串或不是非负整数 = 没给（Number('') 是 0，不能当「0 秒后」）。
-      const seconds = (name: string): number | null => {
-        const v = res.headers.get(name)?.trim() ?? '';
-        return /^\d+$/.test(v) ? Number(v) : null;
-      };
-      const reset = seconds('x-ratelimit-reset');
-      throw new GithubRateLimitedError(
-        url,
-        res.status,
-        reset === null ? null : reset * 1000,
-        seconds('retry-after'),
-      );
+      throw rateLimitOf(url, res);
     }
     return { ...head, data: undefined };
   }
@@ -1164,7 +1266,7 @@ export async function githubIssueState(
   return { notModified: false, etag: got.etag, data: { state } };
 }
 
-// —— issue 写面（#452 / ADR 0006 写向：server 唯二写入点，文件头穷举律）———
+// —— issue 写面（#452 / ADR 0006 写向：文件头写面清单的三处之二，穷举律见文件头）———
 
 /** JSON 写请求单点（POST/PATCH 共用）：超时/网络/上游状态经既有映射
  * （mapFetchThrow / mapUpstreamStatus），token 只进 Authorization 头。 */
@@ -1202,7 +1304,7 @@ export async function githubCreateIssue(
   token: string,
   owner: string,
   repo: string,
-  input: { title: string; body: string },
+  input: { title: string; body: string; labels?: string[] },
 ): Promise<{ number: number }> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
   const data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;
@@ -1224,6 +1326,88 @@ export async function githubUpdateIssueTitle(
 ): Promise<void> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues/${issueNumber}`;
   await writeJson(fetchImpl, 'PATCH', url, token, { title });
+}
+
+// —— PR 合并写面（#1403 段 2b / ADR 0021 D2：人点合并 = server 经 REST 合并）————————
+
+/** 合并 PR 的结果（`PUT /repos/{o}/{r}/pulls/{n}/merge`）：
+ * - merged：200 且 merged 为 true；sha = 合并落在 base 上的提交。
+ * - refused：GitHub 明确没合（4xx 且不是限流，或 200 但 merged 为 false）；message =
+ *   应答体的 message（读不到为空串）。
+ * - rate-limited：429，或带限流信号的 403（remaining=0、retry-after、message 说二级限流）：
+ *   GitHub 没有处理这次请求，合并确定没有发生；limit = 头里的解除时刻（rateLimitOf，
+ *   与进料读同一解析与先后：retry-after 优先）。
+ * - unknown：不知道合没合——超时、网络错、5xx（GitHub 处理超过 10 秒会断开请求、回
+ *   「Server Error」，合并可能已经发生）、200 的应答体读不出。 */
+export type GithubMergeResult =
+  | { kind: 'merged'; sha: string }
+  | { kind: 'refused'; status: number; message: string }
+  | { kind: 'rate-limited'; message: string; limit: GithubRateLimitedError }
+  | {
+      kind: 'unknown';
+      reason: 'timeout' | 'network' | 'status' | 'malformed';
+      status: number | null;
+    };
+
+/** 合并 PR（squash）。sha = PR head 必须是的提交（GitHub 对不上答 409）；commitTitle /
+ * commitMessage = squash 提交的标题与正文（总是传：不传时 GitHub 按仓库设置取 PR 正文或
+ * 各提交 message，关票关键字会随它进默认分支，#1403 段 2b D42）。
+ * token 只进 Authorization 头；不抛错，结果分三类（GithubMergeResult）。 */
+export async function githubMergePull(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  input: { sha: string; commitTitle: string; commitMessage: string },
+): Promise<GithubMergeResult> {
+  const url = `https://api.github.com/${repoPath(owner, repo)}/pulls/${prNumber}/merge`;
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: 'PUT',
+      headers: { ...authHeaders(token), 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sha: input.sha,
+        merge_method: 'squash',
+        commit_title: input.commitTitle,
+        commit_message: input.commitMessage,
+      }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (err) {
+    return { kind: 'unknown', reason: isAbort(err) ? 'timeout' : 'network', status: null };
+  }
+  // 应答体只读一次：文本既给限流判据（二级限流的 403 可以只在 message 里说），也给 JSON。
+  let text: string | null;
+  try {
+    text = await res.text();
+  } catch {
+    text = null;
+  }
+  let data: { merged?: unknown; sha?: unknown; message?: unknown } | null = null;
+  try {
+    const parsed: unknown = text === null ? null : JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null) data = parsed;
+  } catch {
+    data = null;
+  }
+  const message = optString(data?.message) ?? '';
+  // 限流 = GitHub 没有处理这次请求，合并确定没有发生：409、不落行（2026-10-22 用户裁决，
+  // 记在 https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）。
+  if (isRateLimitedText(res, text ?? '')) {
+    return { kind: 'rate-limited', message, limit: rateLimitOf(url, res) };
+  }
+  if (res.status >= 500) return { kind: 'unknown', reason: 'status', status: res.status };
+  if (res.ok) {
+    if (data?.merged === true && typeof data.sha === 'string') {
+      return { kind: 'merged', sha: data.sha };
+    }
+    if (data?.merged === false) return { kind: 'refused', status: res.status, message };
+    return { kind: 'unknown', reason: 'malformed', status: res.status };
+  }
+  if (res.status >= 400) return { kind: 'refused', status: res.status, message };
+  return { kind: 'unknown', reason: 'status', status: res.status };
 }
 
 // —— PR checks 只读面（#1150 CI 磨绿环：轮询器的唯一出站读）———————————————————
@@ -1255,8 +1439,8 @@ export interface GithubCheckRunsPage {
 const CHECK_RUNS_PER_PAGE = 100;
 
 /** PR head 的 check-runs 只读（`GET /repos/{o}/{r}/commits/{ref}/check-runs`；
- * ref = conv 分支名，上游解析分支头——PR 的 head 即分支 tip，无需再拉
- * pulls/{n} 取 sha）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
+ * ref = PR 的 head SHA：#1403 段 3 起磨绿先读 pulls/{n} 拿 head，再按这个提交读，
+ * 不按分支名——分支头在两次读之间会动）。条件 GET（If-None-Match 携带上轮 etag → 304 → 调用方
  * 复用判据，不出全量体）。token 可空（匿名梯，公开仓可达）。null = 读不到
  * （网络/404 私仓/限流/响应形坏不区分——fail-open 语义归调用方，同
  * githubPullState）。单次尝试、FETCH_TIMEOUT_MS 上界，不重试。 */
@@ -1292,6 +1476,495 @@ export async function githubCommitCheckRuns(
     });
   }
   return { notModified: false, etag: got.etag, checkRuns };
+}
+
+/** rules 读 403 时「套餐没有 ruleset」的应答文本（私有仓在 Free 套餐上；文档的状态码表
+ * 只列 200，这一句是 GitHub 对付费功能的通用说法，按它认）。 */
+const RULESETS_NOT_ON_PLAN = /upgrade to github|enable this feature/i;
+
+/** 默认分支的必需检查名单（#1403 段 3：磨绿只认它）：classic 分支保护
+ * （`GET /repos/{o}/{r}/branches/{branch}` 的 protection.required_status_checks 里的
+ * contexts 与 checks[].context）与 ruleset（`GET /repos/{o}/{r}/rules/branches/{branch}`
+ * 里 type 为 required_status_checks 的规则的 parameters.required_status_checks[].context）
+ * 取并集、去重；classic 的 enforcement_level 为 off 时它的名单不算（文档只说是 string，
+ * 只认字面 off）。rules 读答 404，或答 403 且说套餐没有这项功能（不是限流、不是 SSO 拒绝）
+ * = 没有规则（ruleset 不在这个仓的套餐里，
+ * 或没有可见的规则）；除此之外两个读任一读不到（非 2xx、网络、限流、响应形不对）= null，
+ * 调用方不动。
+ * 不建在 S4a（#1503）的原始读面上：那些读必须带 token，磨绿在未连接 GitHub 时匿名读公开仓。 */
+export async function githubRequiredChecks(
+  fetchImpl: FetchLike,
+  token: string | null,
+  owner: string,
+  repo: string,
+  branch: string,
+): Promise<string[] | null> {
+  const base = `https://api.github.com/${repoPath(owner, repo)}`;
+  // 按段编码、保留 `/`（同 S4a 的 encodedPath：release/main 不写成 release%2Fmain）。
+  const seg = encodedPath(branch);
+  if (seg === null) return null;
+  // 两个读互不依赖：并发发出（一次查名单最多一个超时的时长；匿名额度恒记两次）。
+  const [branchRead, rulesRead] = await Promise.all([
+    conditionalGetJson(fetchImpl, `${base}/branches/${seg}`, token, null, FETCH_TIMEOUT_MS),
+    conditionalGetJson(
+      fetchImpl,
+      `${base}/rules/branches/${seg}?per_page=100`,
+      token,
+      null,
+      FETCH_TIMEOUT_MS,
+      // 404 = 没有；403 只在说套餐没有这项功能时算没有（权限不够的 403 读不到，不当没有规则）。
+      (status, text) => status === 404 || (status === 403 && RULESETS_NOT_ON_PLAN.test(text)),
+    ),
+  ]);
+  if (branchRead === null || branchRead.notModified) return null;
+  if (rulesRead === null || rulesRead.notModified || !Array.isArray(rulesRead.data)) return null;
+  const names = new Set<string>();
+  const status = (
+    branchRead.data as {
+      protection?: {
+        required_status_checks?: {
+          enforcement_level?: unknown;
+          contexts?: unknown;
+          checks?: unknown;
+        } | null;
+      } | null;
+    }
+  ).protection?.required_status_checks;
+  const classic = status?.enforcement_level === 'off' ? null : status;
+  if (Array.isArray(classic?.contexts)) {
+    for (const c of classic.contexts) if (typeof c === 'string') names.add(c);
+  }
+  if (Array.isArray(classic?.checks)) {
+    for (const c of classic.checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  for (const rule of rulesRead.data as Array<{
+    type?: unknown;
+    parameters?: { required_status_checks?: unknown } | null;
+  } | null>) {
+    const checks =
+      rule?.type === 'required_status_checks' ? rule.parameters?.required_status_checks : null;
+    if (!Array.isArray(checks)) continue;
+    for (const c of checks as Array<{ context?: unknown } | null>) {
+      if (typeof c?.context === 'string') names.add(c.context);
+    }
+  }
+  return [...names];
+}
+
+// —— 合并就绪闸的 GitHub 传输（#1404 S4a；计划 docs/verify/1404/s4-plan.md §4.1）————————
+//
+// 闸（services/merge-gate/**，S4b）经注入的端口用这几个函数读写 GitHub（闸的源码不 import
+// 本模块，ADR 0021 D4 ④）。这里只发一个请求、把应答原样交回：应答体不投影、不过滤、不补
+// 缺省，应答说明什么一律由闸自己的源码判；改变闸看到什么的参数（per_page、page、filter、
+// etag、超时）都由调用方给，这里不设缺省。token 必携（闸不走匿名梯），只进 Authorization
+// 头；参数先在本地核，不合规返回 invalid，不发请求。单次尝试，不重试，不跟 Link。
+// 端点（S4a 只有传输，调用方是 S4b 的闸外壳与 S7 的状态写入）：
+// - GET repos/{o}/{r}/pulls/{n}（可条件读）
+// - GET repos/{o}/{r}/branches/{branch}（可条件读；分支保护的必需检查在 protection 里，
+//   不走要管理员权限的 branches/{branch}/protection）
+// - GET repos/{o}/{r}/rules/branches/{branch}?per_page=&page=（可条件读）
+// - GET repos/{o}/{r}/compare/{base}...{head}?per_page=&page=（两头都是 SHA；不发条件读）
+// - GET repos/{o}/{r}/commits/{sha}/check-runs?filter=&per_page=&page=（可条件读）
+// - GET repos/{o}/{r}/commits/{sha}/status?per_page=&page=（可条件读）
+// - GET repos/{o}/{r}/contents/{path}?ref={sha}（不发条件读）
+// - POST repos/{o}/{r}/statuses/{sha}（写面，见文件头清单）
+
+/** 闸传输的失败分类。invalid = 参数在本地被拒、没发请求（field 指明哪一个参数）；
+ * rate-limited = 429，或带限流信号的 403（resetAt = x-ratelimit-reset 换成的毫秒，
+ * retryAfterSeconds = retry-after；头缺省、为空或不是非负整数 = null）；status = 其余非
+ * 2xx（含没发 etag 却得到的 304），message = GitHub 应答体里的 message，去控制字符与格式
+ * 字符、至多 200 个字符，没有则 null；not-json = 2xx 的应答体不是 JSON。 */
+export type GithubRawFailure =
+  | { kind: 'invalid'; field: string }
+  | { kind: 'timeout' }
+  | { kind: 'network' }
+  | {
+      kind: 'rate-limited';
+      status: number;
+      resetAt: number | null;
+      retryAfterSeconds: number | null;
+    }
+  | { kind: 'status'; status: number; message: string | null }
+  | { kind: 'not-json' };
+
+/** 闸传输的结果。ok = 2xx，body 是原样解析出的 JSON（不论形状），etag 与 Link 头原样
+ * 交回；not-modified = 发了 If-None-Match 且得到 304。 */
+export type GithubRawResult =
+  | { kind: 'ok'; status: number; etag: string | null; link: string | null; body: unknown }
+  | { kind: 'not-modified' }
+  | { kind: 'failed'; failure: GithubRawFailure };
+
+export interface GithubRawOpts {
+  /** 本次请求的超时（毫秒，正整数）。 */
+  timeoutMs: number;
+}
+
+export interface GithubConditionalOpts extends GithubRawOpts {
+  /** 上次应答的 ETag；null = 不发 If-None-Match。 */
+  etag: string | null;
+}
+
+export interface GithubPageOpts {
+  /** 从 1 起的页号。 */
+  page: number;
+  /** 每页条数，1 到 100（上游上限 100）。 */
+  perPage: number;
+}
+
+/** commit status 的 state（GitHub REST「Create a commit status」的取值）。 */
+export const GITHUB_COMMIT_STATUS_STATES = ['error', 'failure', 'pending', 'success'] as const;
+export type GithubCommitStatusState = (typeof GITHUB_COMMIT_STATUS_STATES)[number];
+
+/** token 与 ETag 都进请求头：只收可见 ASCII，CR/LF、空格与非 ASCII 进不了头。 */
+const HEADER_TOKEN = /^[\x21-\x7e]+$/;
+/** GitHub 的 owner / 仓库名：字母、数字、`-`、`_`、`.`。 */
+const GITHUB_NAME = /^[A-Za-z0-9_.-]+$/;
+/** 路径段里不收的字符：控制字符（含 NUL）、`?`、`#`。 */
+const UNSAFE_SEGMENT = /[\p{Cc}?#]/u;
+const UNSAFE_MESSAGE = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu;
+const MESSAGE_MAX = 200;
+/** setTimeout / AbortSignal.timeout 能收的最大毫秒数（有符号 32 位）。 */
+const TIMER_MAX_MS = 2_147_483_647;
+
+const invalidResult = (field: string): GithubRawResult => ({
+  kind: 'failed',
+  failure: { kind: 'invalid', field },
+});
+const failedResult = (failure: GithubRawFailure): GithubRawResult => ({ kind: 'failed', failure });
+
+const isPositiveInt = (n: number) => Number.isSafeInteger(n) && n >= 1;
+
+/** 分支名或仓内路径 → 逐段编码、段间留 `/`；有空段、`.`、`..` 或不收的字符 = null。 */
+function encodedPath(path: string): string | null {
+  if (typeof path !== 'string') return null;
+  const segments = path.split('/');
+  if (segments.some((s) => s === '' || s === '.' || s === '..' || UNSAFE_SEGMENT.test(s))) {
+    return null;
+  }
+  try {
+    return segments.map((s) => encodeURIComponent(s)).join('/');
+  } catch {
+    // 落单的代理项（lone surrogate）编码时抛 URIError。
+    return null;
+  }
+}
+
+/** 各函数共有的参数：token、owner、repo、超时、etag（只有条件读有）。不合规的那一个的名字，
+ * 都合规 = null。 */
+function commonInvalid(
+  token: string,
+  owner: string,
+  repo: string,
+  opts: { timeoutMs: number; etag?: string | null },
+): string | null {
+  if (typeof token !== 'string' || !HEADER_TOKEN.test(token)) return 'token';
+  for (const [field, name] of [
+    ['owner', owner],
+    ['repo', repo],
+  ] as const) {
+    if (typeof name !== 'string' || !GITHUB_NAME.test(name) || name === '.' || name === '..') {
+      return field;
+    }
+  }
+  // 计时器的上限：再大 AbortSignal.timeout 会抛 RangeError（不发请求就被记成 network）。
+  if (!isPositiveInt(opts.timeoutMs) || opts.timeoutMs > TIMER_MAX_MS) return 'timeoutMs';
+  if (opts.etag !== undefined && opts.etag !== null && !HEADER_TOKEN.test(opts.etag)) return 'etag';
+  return null;
+}
+
+function pageInvalid(opts: GithubPageOpts): string | null {
+  if (!isPositiveInt(opts.page)) return 'page';
+  if (!Number.isSafeInteger(opts.perPage) || opts.perPage < 1 || opts.perPage > 100) {
+    return 'perPage';
+  }
+  return null;
+}
+
+/** 非 2xx 应答体里 GitHub 的 message：去控制字符与格式字符（换行、双向覆盖、零宽字符），
+ * 至多 MESSAGE_MAX 个字符；体不是 JSON 对象、没有 message 或清理后为空 = null。 */
+function githubMessage(text: string): string | null {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  const message = (data as { message?: unknown } | null)?.message;
+  if (typeof message !== 'string') return null;
+  const clean = Array.from(message.replace(UNSAFE_MESSAGE, ' ').trim())
+    .slice(0, MESSAGE_MAX)
+    .join('');
+  return clean === '' ? null : clean;
+}
+
+/** 闸传输的单次请求。参数已核过；url 不含 token。 */
+async function gateRequest(
+  fetchImpl: FetchLike,
+  token: string,
+  url: string,
+  req: {
+    method: 'GET' | 'POST';
+    etag: string | null;
+    payload: Record<string, unknown> | null;
+    timeoutMs: number;
+  },
+): Promise<GithubRawResult> {
+  let res: Awaited<ReturnType<FetchLike>>;
+  try {
+    res = await fetchImpl(url, {
+      method: req.method,
+      headers: {
+        ...authHeaders(token),
+        ...(req.etag !== null ? { 'if-none-match': req.etag } : {}),
+        ...(req.payload !== null ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(req.payload !== null ? { body: JSON.stringify(req.payload) } : {}),
+      signal: AbortSignal.timeout(req.timeoutMs),
+    });
+  } catch (err) {
+    return failedResult({ kind: isAbort(err) ? 'timeout' : 'network' });
+  }
+  // 304 只在发了 If-None-Match 时是「与你手上的一样」；没发 etag 的 304 按其余状态码交回。
+  if (res.status === 304 && req.etag !== null) return { kind: 'not-modified' };
+  if (!res.ok) {
+    // 应答体只读一次：限流的文本判据与 message 共用这一份。读的时候超时 = 超时（头已说限流
+    // 的除外）：没读到的文本里可能正是二级限流的说明，不能当成普通状态码；别的读不到按空文本。
+    let text = '';
+    try {
+      text = await res.text();
+    } catch (err) {
+      if (isAbort(err) && !isRateLimited(res)) return failedResult({ kind: 'timeout' });
+    }
+    if (isRateLimited(res) || (res.status === 403 && /rate limit/i.test(text))) {
+      const reset = headerSeconds(res.headers, 'x-ratelimit-reset');
+      return failedResult({
+        kind: 'rate-limited',
+        status: res.status,
+        resetAt: reset === null ? null : reset * 1000,
+        retryAfterSeconds: headerSeconds(res.headers, 'retry-after'),
+      });
+    }
+    return failedResult({ kind: 'status', status: res.status, message: githubMessage(text) });
+  }
+  let body: unknown;
+  try {
+    body = await res.json();
+  } catch (err) {
+    return failedResult({ kind: isAbort(err) ? 'timeout' : 'not-json' });
+  }
+  return {
+    kind: 'ok',
+    status: res.status,
+    etag: res.headers.get('etag'),
+    link: res.headers.get('link'),
+    body,
+  };
+}
+
+/** 闸传输的 GET（etag 为 null 时不发 If-None-Match）。 */
+const gateGet = (
+  fetchImpl: FetchLike,
+  token: string,
+  url: string,
+  etag: string | null,
+  timeoutMs: number,
+) => gateRequest(fetchImpl, token, url, { method: 'GET', etag, payload: null, timeoutMs });
+
+/** 闸传输的 URL。path 已逐段编码。 */
+const gateUrl = (
+  owner: string,
+  repo: string,
+  path: string,
+  query?: Record<string, string | number>,
+) =>
+  `https://api.github.com/${repoPath(owner, repo)}/${path}` +
+  (query === undefined
+    ? ''
+    : `?${new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]))}`);
+
+/** PR 原样读（`GET repos/{o}/{r}/pulls/{n}`）。 */
+export async function githubPullRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  prNumber: number,
+  opts: GithubConditionalOpts,
+): Promise<GithubRawResult> {
+  const bad =
+    commonInvalid(token, owner, repo, opts) ?? (isPositiveInt(prNumber) ? null : 'prNumber');
+  if (bad !== null) return invalidResult(bad);
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `pulls/${prNumber}`),
+    opts.etag,
+    opts.timeoutMs,
+  );
+}
+
+/** 分支原样读（`GET repos/{o}/{r}/branches/{branch}`：分支头提交与 protection 摘要）。 */
+export async function githubBranchRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  branch: string,
+  opts: GithubConditionalOpts,
+): Promise<GithubRawResult> {
+  const bad = commonInvalid(token, owner, repo, opts);
+  if (bad !== null) return invalidResult(bad);
+  const path = encodedPath(branch);
+  if (path === null) return invalidResult('branch');
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `branches/${path}`),
+    opts.etag,
+    opts.timeoutMs,
+  );
+}
+
+/** 分支上生效的规则集规则原样读（`GET repos/{o}/{r}/rules/branches/{branch}`，一页）。 */
+export async function githubBranchRulesRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  branch: string,
+  opts: GithubConditionalOpts & GithubPageOpts,
+): Promise<GithubRawResult> {
+  const bad = commonInvalid(token, owner, repo, opts) ?? pageInvalid(opts);
+  if (bad !== null) return invalidResult(bad);
+  const path = encodedPath(branch);
+  if (path === null) return invalidResult('branch');
+  const url = gateUrl(owner, repo, `rules/branches/${path}`, {
+    per_page: opts.perPage,
+    page: opts.page,
+  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
+}
+
+/** 三点 compare 的一页原样读（`GET repos/{o}/{r}/compare/{base}...{head}`），两头都按 SHA
+ * 请求。不发条件读：闸要每一页都是按同一对 SHA 现读的（#1479 的外壳契约）。 */
+export async function githubCompareRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  baseSha: string,
+  headSha: string,
+  opts: GithubRawOpts & GithubPageOpts,
+): Promise<GithubRawResult> {
+  const bad =
+    commonInvalid(token, owner, repo, opts) ??
+    (isFullSha(baseSha) ? null : 'base') ??
+    (isFullSha(headSha) ? null : 'head') ??
+    pageInvalid(opts);
+  if (bad !== null) return invalidResult(bad);
+  const url = gateUrl(owner, repo, `compare/${baseSha}...${headSha}`, {
+    per_page: opts.perPage,
+    page: opts.page,
+  });
+  return gateGet(fetchImpl, token, url, null, opts.timeoutMs);
+}
+
+/** 一个提交上的 check runs 一页原样读（`GET repos/{o}/{r}/commits/{sha}/check-runs`），按
+ * SHA 读，filter 由调用方给。 */
+export async function githubCheckRunsRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  sha: string,
+  opts: GithubConditionalOpts & GithubPageOpts & { filter: 'latest' | 'all' },
+): Promise<GithubRawResult> {
+  const bad =
+    commonInvalid(token, owner, repo, opts) ??
+    (isFullSha(sha) ? null : 'sha') ??
+    pageInvalid(opts) ??
+    (opts.filter === 'latest' || opts.filter === 'all' ? null : 'filter');
+  if (bad !== null) return invalidResult(bad);
+  const url = gateUrl(owner, repo, `commits/${sha}/check-runs`, {
+    filter: opts.filter,
+    per_page: opts.perPage,
+    page: opts.page,
+  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
+}
+
+/** 一个提交的 combined status 一页原样读（`GET repos/{o}/{r}/commits/{sha}/status`），按 SHA 读。 */
+export async function githubCombinedStatusRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  sha: string,
+  opts: GithubConditionalOpts & GithubPageOpts,
+): Promise<GithubRawResult> {
+  const bad =
+    commonInvalid(token, owner, repo, opts) ?? (isFullSha(sha) ? null : 'sha') ?? pageInvalid(opts);
+  if (bad !== null) return invalidResult(bad);
+  const url = gateUrl(owner, repo, `commits/${sha}/status`, {
+    per_page: opts.perPage,
+    page: opts.page,
+  });
+  return gateGet(fetchImpl, token, url, opts.etag, opts.timeoutMs);
+}
+
+/** 某提交上一个仓内路径的原样读（`GET repos/{o}/{r}/contents/{path}?ref={sha}`；目录给条目
+ * 列表）。ref 只收 40 位 SHA。不发条件读。 */
+export async function githubContentsRaw(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  path: string,
+  ref: string,
+  opts: GithubRawOpts,
+): Promise<GithubRawResult> {
+  const bad = commonInvalid(token, owner, repo, opts) ?? (isFullSha(ref) ? null : 'ref');
+  if (bad !== null) return invalidResult(bad);
+  const encoded = encodedPath(path);
+  if (encoded === null) return invalidResult('path');
+  return gateGet(
+    fetchImpl,
+    token,
+    gateUrl(owner, repo, `contents/${encoded}`, { ref }),
+    null,
+    opts.timeoutMs,
+  );
+}
+
+/** 在提交上写一条 commit status（`POST repos/{o}/{r}/statuses/{sha}`）。请求体恰好是
+ * {state, context, description}，不带 target_url；描述的长度与内容由调用方定。不重试，
+ * 失败按分类交回（422 = GitHub 拒收，例如同一 SHA 与 context 已满 1000 条，或描述过长：上限
+ * 文档未写，第三方实测 140 个字符，截断由闸做）。 */
+export async function githubCreateCommitStatus(
+  fetchImpl: FetchLike,
+  token: string,
+  owner: string,
+  repo: string,
+  sha: string,
+  status: { state: GithubCommitStatusState; context: string; description: string },
+  opts: GithubRawOpts,
+): Promise<GithubRawResult> {
+  const states: readonly string[] = GITHUB_COMMIT_STATUS_STATES;
+  const bad =
+    commonInvalid(token, owner, repo, opts) ??
+    (isFullSha(sha) ? null : 'sha') ??
+    (states.includes(status.state) ? null : 'state') ??
+    (typeof status.context === 'string' && status.context !== '' ? null : 'context') ??
+    (typeof status.description === 'string' ? null : 'description');
+  if (bad !== null) return invalidResult(bad);
+  return gateRequest(fetchImpl, token, gateUrl(owner, repo, `statuses/${sha}`), {
+    method: 'POST',
+    etag: null,
+    payload: { state: status.state, context: status.context, description: status.description },
+    timeoutMs: opts.timeoutMs,
+  });
 }
 
 // —— OAuth token 交换面（#231 握手：callback 收码后唯一一次出站）———————————
