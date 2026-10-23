@@ -4,7 +4,8 @@
 files and symbols that changed and what they replace or fix. Screenshots
 belong here when the change is visible in the running app; commit them under
 docs/verify/<ticket>/ and embed them as ![label](raw-url) with a SHA-pinned
-raw URL. -->
+raw URL of the form https://raw.githubusercontent.com/<owner>/<repo>/<sha>/<path>
+(github.com/.../raw/ redirects and fails the reachability check). -->
 
 ## Verified
 
@@ -29,7 +30,8 @@ dependencies (pi / claude-agent-sdk / code already in this repo)? If an
 equivalent was rejected, give the checkable reason (security boundary,
 different data source, different interaction semantics); "more
 controllable" or "fits our model better" do not qualify. If the PR adds
-no mechanism, say so in one line. -->
+no mechanism, a one-line answer such as "No new mechanism: <what it replaces or
+changes>" is enough. -->
 
 ## Risk
 

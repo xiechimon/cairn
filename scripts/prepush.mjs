@@ -17,6 +17,7 @@ export function prepushPlan(paths, mode = 'local') {
     ? required
     : [
         ...required,
+        ['pnpm', 'test'],
         ...advisory,
         ['pnpm', '--filter', '@pacman/web', 'e2e:affected', '--', ...paths],
       ];
