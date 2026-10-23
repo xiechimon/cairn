@@ -1,16 +1,39 @@
 <div align="center">
-  <img src="apps/web/public/logo.svg" alt="pacman 应用图标" width="128" height="128">
+  <img src="apps/web/public/logo.svg" alt="Cairn 应用图标" width="112" height="112">
+
+  <h1>Cairn</h1>
+
+  <p><b>你写票，agent 在你自己的机器上干活，合不合由你把关。</b></p>
+
+  <p>自托管、开源的多 agent 编排工作台，而且它在开发它自己。</p>
+
+  <p>
+    <a href="https://cairn.xmon.me">官网</a> ·
+    <a href="#快速开始">快速开始</a> ·
+    <a href="./README.md">English</a>
+  </p>
+
+  <p>
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-173a2f?style=flat-square">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
+    <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
+  </p>
 </div>
 
-# pacman
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
+  <img alt="Cairn 看板：任务从待开始、规划、执行到待审核、已完成，每张票都由一个 agent 领走" src="docs/assets/readme/board-light.png">
+</picture>
 
-自托管、开源的 **agent workspace**：一块任务看板——你写任务，AI agent 在你自己的机器上把它们做出来。
+## 亮点
 
-[English](./README.md) | 简体中文
+- **多 agent 编排。** 每个 agent 有自己的模型、职责、技能、MCP、密钥和记忆。负责调度的 chief 只派活不写代码，上下文保持干净；写代码和审代码交给 coder、reviewer。
+- **人工关卡是硬的。** 每次运行停两次等你：计划一次，diff 一次。AI 审核者能直接拦下合并，不只是留评论。
+- **自举闭环。** Cairn 自己领票、实现、审核、开 PR，正在用它自己开发它自己。
+- **评测与轨迹驱动。** 每次构建记录基线提交和 harness 哈希，驳回写成结构化记录，再用强弱模型对照评测决定哪些提示词、技能、路由的改动留下。这里的「训练」指优化 harness，不微调模型。
+- **跑在你自己的机器上。** 在任意主机上跑 daemon 就能登记成执行机，每次构建在独立的 git worktree 里进行，计划、diff、工具调用实时推回看板。
 
-## 是什么
-
-你在看板上立一个任务，agent 领取后检出 worktree 与分支，把过程以对话流实时打回界面——方案卡、diff、工具调用全程可见。运行到审核关口暂停，由人决定合不合。
+## 功能
 
 - **任务与阶段** — 看板 + 带序号的任务、标签、按周期自动重跑的定时。
 - **Agent** — 配了模型、职责、技能、MCP 服务器、密钥与记忆的执行角色；每用户一个「总管」agent 负责分派。
@@ -19,10 +42,7 @@
 - **仓库** — server 自托管 git 仓（API key 走 push/pull），或从 GitHub 接入。
 - **全实时** — 看板与会话走 SSE 流、通知、按 build × 模型记账 token 用量。
 
-## 为什么
-
-- **以闸为核。**每一次运行都在两处为你停留——方案与 diff——且 AI 审核者能否决，而不只是评论。今天唯一做到这一点的开源、可自托管 agent workspace。
-- **出身透明。** pacman 起步于对 todos.dev 公开界面的 clean-room 研究（见[渊源](#渊源)），现为自主产品；分化路线从真实使用中涌现，不抄任何人的 spec。
+Cairn（原名 pacman）起步于对 todos.dev 公开界面的 clean-room 研究（见[渊源](#渊源)），现为独立产品。
 
 ## 快速开始
 
