@@ -12,11 +12,11 @@
 // 单实例独占 SQLite，前提成立；崩溃落点只可能是无行有文件，不可是 404）。
 // 配额走准入（grant 时卡，不删有引用件 = R4）。
 
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { attachment, chiefMessage, message, plan, steerPending, todo } from '../db/schema.js';
+import { attachment, chiefMessage, message, plan, steerPending, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 
 /** grant 落库未上传行的保质期（策略 §4：grant 5min 后永不可达 ready）。 */
@@ -150,5 +150,53 @@ export function sweepAttachments(
     { pending: stats.pending, orphan: stats.orphan, reclaimedBytes: stats.reclaimedBytes },
     `attachment gc: ${stats.pending} pending, ${stats.orphan} orphan, ${stats.reclaimedBytes} bytes reclaimed`,
   );
+  return stats;
+}
+
+export function sweepStepSessions(
+  deps: { db: Db; attachmentsDir: string; logger: GcLogger },
+  now: number = nowMs(),
+): { orphan: number; reclaimedBytes: number } {
+  const dir = join(deps.attachmentsDir, 'step-sessions');
+  const stats = { orphan: 0, reclaimedBytes: 0 };
+  if (!existsSync(dir)) return stats;
+  const live = new Set(
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .all()
+      .map((r) => r.id),
+  );
+  const orphanCutoff = now - ATTACHMENT_ORPHAN_GRACE_MS;
+  for (const name of readdirSync(dir)) {
+    if (!name.endsWith('.jsonl')) continue;
+    const stepId = name.slice(0, -'.jsonl'.length);
+    if (live.has(stepId)) continue;
+    const abs = join(dir, name);
+    let size = 0;
+    let mtimeMs = now;
+    try {
+      const st = statSync(abs);
+      size = st.size;
+      mtimeMs = st.mtimeMs;
+    } catch {
+      continue;
+    }
+    if (mtimeMs > orphanCutoff) continue;
+    try {
+      unlinkSync(abs);
+    } catch (err) {
+      deps.logger.info({ stepId, err: String(err) }, 'session gc unlink failed');
+      continue;
+    }
+    stats.orphan += 1;
+    stats.reclaimedBytes += size;
+  }
+  if (stats.orphan > 0) {
+    deps.logger.info(
+      { orphan: stats.orphan, reclaimedBytes: stats.reclaimedBytes },
+      `session gc: ${stats.orphan} orphan, ${stats.reclaimedBytes} bytes reclaimed`,
+    );
+  }
   return stats;
 }

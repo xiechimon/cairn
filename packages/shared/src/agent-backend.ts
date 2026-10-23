@@ -281,6 +281,7 @@ export interface AgentSessionHandle {
    * continueSession(id) 的解析键——宿主 durable 编排的会话持久化索引面
    * （00/D3：durable 语义宿主自持）。 */
   readonly sessionId: string;
+  readonly sessionFile?: string;
   readonly events: AsyncIterable<StepEvent>;
   /** 中途补话（W3 #279）；images = 随话交付的图片（#730，可选——缺省 =
    * 纯文本，既有调用面零变化）。 */

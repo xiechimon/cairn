@@ -31,6 +31,7 @@ export interface StepJournalEntry {
   /** 同上快照的 plan 半（plan 步收尾时的 plan.md 原文；非 plan 步/无产物 =
    * null——快路径无 plan 上传行）。 */
   planContent?: string | null;
+  sessionFile?: string | null;
   /** 已接收的停止请求（deliverStop 拉取-确认后落盘）。重启后 recover 据此报
    * stopped、不重跑；缺省 = 没收到停止。 */
   stopRequest?: StopRequest | null;
