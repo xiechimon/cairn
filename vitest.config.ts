@@ -1,4 +1,7 @@
 import { defineConfig } from 'vitest/config';
+import { scrubGitEnv } from './scripts/scrub-git-env.mjs';
+
+scrubGitEnv();
 
 // Root aggregation for the per-package colocated test/ dirs (01-stack-v2 §4.5:
 // vitest projects mode). apps/web's test dir landed with #73 (dnd pure
