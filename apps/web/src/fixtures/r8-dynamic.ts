@@ -698,6 +698,29 @@ export const mdToolout: FixtureSet = {
   },
 };
 
+const AGENT_TODO_TRANSCRIPT: TranscriptItem[] = [
+  ...PROBE_BUILD_OPEN,
+  {
+    kind: 'agent-todo',
+    items: [
+      { text: '通读 poteto 的推文观点', state: 'todo' },
+      { text: '开票沉淀注释规则', state: 'doing' },
+      { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
+      { text: '重排模型清单和派活方案', state: 'todo' },
+    ],
+  },
+  { kind: 'streaming', seconds: 12, label: '模型思考中...' },
+];
+
+export const agentTodoLive: FixtureSet = {
+  todos: [probeTodo('building', r7(13, 35))],
+  now: r7(13, 36),
+  detail: {
+    transcript: AGENT_TODO_TRANSCRIPT,
+    doc: DOC_V2,
+  },
+};
+
 /** #919 named scenario（无 capture，mdToolout 先例）：技能路由行为验收的
  *  UI 面钉扎 #918 落地的那张脸（并行票先合，本票 seam 4 的验收对象即它）：
  *  活行披露面的技能事实行（▶ 命中 / ✕ 挡下）+ 持久汇总行（技能/挡下两列）。

@@ -14,6 +14,7 @@ import { join } from 'node:path';
 import type {
   AgentBackend,
   AgentSessionHandle,
+  AgentTodoItem,
   AgentTokenUsage,
   ClaimedStep,
   CommitIdentity,
@@ -64,6 +65,7 @@ import {
   transcriptPromptRowId,
 } from '@pacman/shared';
 import { createActivityTracker } from './activity.js';
+import { parseAgentTodoText } from './agent-todo.js';
 import { SessionNotResumableError } from './backend/errors.js';
 import { notInConfigLine, resolveMcpEndpoints } from './backend/mcp-config.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
@@ -498,6 +500,32 @@ async function runClaimedStep(
     ...(deps.now !== undefined ? { now: deps.now } : {}),
   });
   activity.setPhase('preparing');
+
+  let agentTodoRelayWarned = false;
+  let lastAgentTodo: AgentTodoItem[] | null = null;
+  const reportAgentTodo = (items: readonly AgentTodoItem[]): void => {
+    if (items.length === 0) return;
+    if (
+      lastAgentTodo !== null &&
+      lastAgentTodo.length === items.length &&
+      lastAgentTodo.every((it, i) => {
+        const next = items[i];
+        return next !== undefined && it.text === next.text && it.state === next.state;
+      })
+    ) {
+      return;
+    }
+    lastAgentTodo = items.map((it) => ({ ...it }));
+    client.agentTodo?.(stepId, { items: items.map((it) => ({ ...it })) })?.catch((err: unknown) => {
+      if (agentTodoRelayWarned) return;
+      agentTodoRelayWarned = true;
+      logger.step(
+        `agent todo relay failed (suppressed until next step): ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    });
+  };
 
   // chief 步（回合 = 机器 step，r5 §3.1）：任务文本 = server 合成的 instruction
   // （用户消息 / wake 事实），无 todo 语境；remoteTools relay + systemPrompt 走
@@ -1356,6 +1384,10 @@ async function runClaimedStep(
       // 上报失败不打断步——终稿 upload-urls 兜底（与工具行同纪律）。
       logger.step(`segment row relay failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+    if (seg.kind === 'text') {
+      const items = parseAgentTodoText(seg.text);
+      if (items !== null) reportAgentTodo(items);
+    }
   };
   /** 封出当前未封段并落行；无内容 = no-op。 */
   const sealSegment = async (): Promise<void> => {
@@ -1584,6 +1616,7 @@ async function runClaimedStep(
               const skillFact = classifySkillFact(ev.call);
               if (skillFact !== null) activity.noteSkill(skillFact);
             }
+            if (ev.call.todo !== undefined) reportAgentTodo(ev.call.todo);
             transcript.upsert({
               id: ev.call.id,
               role: 'assistant',

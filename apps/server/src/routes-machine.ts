@@ -11,6 +11,7 @@
 import type { ToolCallRecord } from '@pacman/shared';
 import {
   machineActivityBodySchema,
+  machineAgentTodoBodySchema,
   machineAskBodySchema,
   machineClaimBodySchema,
   machineDoneBodySchema,
@@ -59,6 +60,7 @@ import {
   markPresence,
   recoverSteps,
   reportActivity,
+  reportAgentTodo,
   reportThinkingDelta,
   reportTool,
   reportTranscriptDelta,
@@ -112,6 +114,15 @@ function isActivityBody(raw: unknown): boolean {
     typeof raw === 'object' &&
     'kind' in raw &&
     (raw as { kind: unknown }).kind === 'activity'
+  );
+}
+
+function isAgentTodoBody(raw: unknown): boolean {
+  return (
+    raw !== null &&
+    typeof raw === 'object' &&
+    'kind' in raw &&
+    (raw as { kind: unknown }).kind === 'agent_todo'
   );
 }
 
@@ -373,6 +384,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     if (isActivityBody(raw)) {
       const act = parseWith(machineActivityBodySchema, raw, 'body');
       reportActivity(deps, row.id, c.req.param('stepId'), act.activity);
+      return c.json({ ok: true as const });
+    }
+    if (isAgentTodoBody(raw)) {
+      const body = parseWith(machineAgentTodoBodySchema, raw, 'body');
+      reportAgentTodo(deps, row.id, c.req.param('stepId'), body.todo);
       return c.json({ ok: true as const });
     }
     if (isTranscriptRowBody(raw)) {

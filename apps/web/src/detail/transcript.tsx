@@ -30,7 +30,7 @@ import {
   FileTab,
   Terminal,
 } from '../icons/index.js';
-import { ChatMarkdown } from './chat-markdown.js';
+import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { Segments } from './segments.js';
 
 /** Live step facts the streaming row discloses (#873): the panel is the one
@@ -477,6 +477,17 @@ function Row({
           <span className="chat-text -mt-px ml-3 max-w-[68ch] min-w-0 text-card-title leading-[1.6] break-words text-(--foreground)">
             <ThinkingRow text={item.text} />
           </span>
+        </div>
+      );
+    case 'agent-todo':
+      return (
+        <div className="mt-3.5 max-w-[68ch] pl-8" data-testid="agent-todo">
+          <TaskCard
+            items={item.items.map((it) => ({
+              state: it.state,
+              segments: inlineSegments(it.text),
+            }))}
+          />
         </div>
       );
     case 'fail':

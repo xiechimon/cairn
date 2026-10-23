@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
-// Feature map generator (#894). Writes docs/spec/25-功能地图.md — the living
+// Feature map generator (#894). Writes docs/feature-map.md — the living
 // register of what exists, at which tier, in which state, anchored to which
 // verification artifact. Every cell is extracted; nothing is hand-edited on
 // either side. To change the map, change the rules below and re-run.
 //
 // Row sources (union of ticket numbers, normalized — leading zeros dropped):
-//   1. `#NNN` references inside docs/spec/*.md (this generated doc excluded,
-//      so the output never feeds back into the input).
+//   1. `#NNN` references inside docs/spec/*.md (the generated doc lives
+//      outside docs/spec/, so the output never feeds back into the input).
 //   2. Numeric directory names under docs/verify/ (landed acceptance evidence).
 //   3. `#NNN` references inside the CI test surface: *.test.ts / *.test.tsx /
 //      *.spec.ts under apps/, packages/, integration/ (skipping node_modules,
@@ -42,8 +42,8 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
-const DOC_NAME = '25-功能地图.md';
-const DOC_REL = join('docs', 'spec', DOC_NAME);
+const DOC_NAME = 'feature-map.md';
+const DOC_REL = join('docs', DOC_NAME);
 const DOC_PATH = join(REPO_ROOT, DOC_REL);
 
 // Ticket reference: `#` + 2-4 digits, not followed by another hex digit (so a
@@ -100,7 +100,6 @@ function collectSpecRefs() {
   for (const name of readdirSync(dir)
     .filter((n) => n.endsWith('.md'))
     .sort()) {
-    if (name === DOC_NAME) continue; // the output must never feed the input
     const relPath = `docs/spec/${name}`;
     for (const num of refMatches(readFileSync(join(dir, name), 'utf8'))) {
       addToIndex(refs, num, relPath);
@@ -311,7 +310,7 @@ rows.sort((a, b) => TIER_ORDER.indexOf(a.tier) - TIER_ORDER.indexOf(b.tier) || b
 // ---------------------------------------------------------------------------
 
 const out = [];
-out.push('# 25 · 功能地图（当前状态活册）');
+out.push('# 功能地图（当前状态活册）');
 out.push('');
 out.push(
   '> 本册由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；改口径 = 改脚本后重跑（#894 立首版规则）。',
@@ -322,7 +321,7 @@ out.push(
 out.push('> 前置：`gh` 已登录、api.github.com 可达。');
 out.push('> 与 03 册分工：03-ROADMAP = 构建顺序历史册；本册 = 当前状态活册。');
 out.push(
-  '> 编号注：原落 22 号，与先合占号的《22-色彩与几何token-scale正本表》撞号；按该册 §0 撞号纪律重编到尾部 25（#952）。',
+  '> 编号注：曾落 spec 序列 22 号，撞号重编至 25（#952）；#1527 起移出编号序列，改落 `docs/feature-map.md`（生成物不占手写册号）。',
 );
 out.push('');
 out.push('## 0. 抽取口径');
@@ -333,9 +332,7 @@ out.push('### 0.1 行与列');
 out.push('');
 out.push('行 = 票号并集（三个来源，票号按数值归一、前导零去除）：');
 out.push('');
-out.push(
-  `1. \`docs/spec/*.md\`（本册除外）里的 \`${REF_SOURCE}\` 引用——负向前瞻排除十六进制色值；`,
-);
+out.push(`1. \`docs/spec/*.md\` 里的 \`${REF_SOURCE}\` 引用——负向前瞻排除十六进制色值；`);
 out.push('2. `docs/verify/` 的纯数字目录名（已落地验收产物）；');
 out.push(
   `3. CI 测试面（${TEST_ROOTS.join('、')} 下的 ${TEST_SUFFIXES.join(' / ')}，跳过 ${[...TEST_SKIP_DIRS].sort().join('、')}）里的票号引用。`,

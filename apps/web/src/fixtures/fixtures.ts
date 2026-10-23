@@ -101,6 +101,7 @@ export {
 } from './detail.js';
 export { projectFixture, projectLocalFiles, projectTasks, projectTasksEmpty } from './projects.js';
 export {
+  agentTodoLive,
   boardFailed,
   compareMenuV2,
   detailFailed12,
