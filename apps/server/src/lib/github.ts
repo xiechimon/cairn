@@ -1304,7 +1304,7 @@ export async function githubCreateIssue(
   token: string,
   owner: string,
   repo: string,
-  input: { title: string; body: string },
+  input: { title: string; body: string; labels?: string[] },
 ): Promise<{ number: number }> {
   const url = `https://api.github.com/${repoPath(owner, repo)}/issues`;
   const data = (await writeJson(fetchImpl, 'POST', url, token, input)) as Record<string, unknown>;

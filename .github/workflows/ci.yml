@@ -30,6 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
 
       # reads packageManager from package.json
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -81,27 +83,6 @@ jobs:
       - name: PR evidence workflow shape gate
         run: node scripts/pr-evidence-workflow-gate.mjs
 
-      # 止血闸转永久回归闸（#851 出身 #908 波 0a；#1012 封版裁决：保留，
-      # 理由见 docs/verify/1012/README.md）：per-face CSS 逐文件行数、裸控件
-      # 总数、Tailwind 任意值（text-[Npx] 与间距类 -[Npx] 两个总数，Paper
-      # 改版 PR 2 加的第三本账，D5）只许降不许升。封版终态即地板（0 per-face 文件；3 裸控件 = 全部
-      # deliberate-native 豁免的隐藏 file 触发器），棘轮自此纯防回潮——它是
-      # 「非 registry 新增为零」的机械载体，且 #989 registry 闸的面到
-      # components/ui 为止，消费侧 CSS 文件与裸 button/input/select/textarea
-      # 总量没有第二道闸。比较基准取 PR base sha 上的基线文件（下面先
-      # fetch），所以分支内重新冻结基线抬不高自己的天花板（脚本内 D3）。
-      # 纯源码扫描、零依赖，故意排在 install 之前：违规车道的红灯一分钟内
-      # 就到，不用等整个 check job 跑完。push（main / prototype/**）没有
-      # base sha，退回仓内基线自校——main 上「树高于账本」同样红。
-      - name: UI debt gate (#851)
-        env:
-          UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$UI_DEBT_BASE_SHA" ]; then
-            git fetch --depth=1 origin "$UI_DEBT_BASE_SHA"
-          fi
-          node scripts/ui-debt-gate.mjs
-
       # components/ui registry 闸（#989，地图 #980）：白名单清单 + 内容 hash
       # 账本 + pristine 件对照 vendored 上游快照 + 状态棘轮（S5 对照 base
       # manifest，复用上面已 fetch 的 base sha）。手写原语进 components/ui
@@ -127,20 +108,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Spec 解析闸（#1052）：e2e spec 少一个 `  });` 不进任何本地快速闸——
-      # biome 只警告、apps/web 的 tsconfig 不含 e2e/，第一道红是 CI e2e 分片
-      # 在收集期炸（分钟级反馈：fixture build + 分片启动）。`playwright test
-      # --list` 只解析收集不执行、不构建、不起浏览器（实测 109 文件 / 849
-      # 用例 1.6s），integration/test 那半交给它自己的 tsc（~0.5s）。排在
-      # chromium 安装之前：坏 spec 的红灯不陪跑浏览器安装。
-      # 「排在 e2e 分片之前」是**信号序**不是 DAG 序：e2e 是独立 job（#693），
-      # 与本 job 并行，不给它加 needs——串行化会把所有健康 PR 的 e2e 反馈压后
-      # 整个 check job 的时长，恰是 #693 要消掉的延迟。本步在 job 开头 ~1 分钟
-      # （install 后 3s）出信号，分片要等 ffmpeg + chromium + fixture build
-      # 才进收集期：坏 spec 时这里总是先红。分片白跑的 runner 分钟数是接受的
-      # 代价，换健康 PR 的并行反馈不降速。
-      - name: Spec parse gate (#1052)
-        run: pnpm spec:parse
+      - name: Prepush checks (#1533)
+        env:
+          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: pnpm prepush --ci
+
+      - name: Prepush self-test
+        run: node --test scripts/prepush.test.mjs
 
       # verify-pacman 入口自测（#1402）：vp.mjs 的分派、证据、capture、links 与归档
       # 规则。drive 多走 --dry-run；要真跑的几条在自建的 skill 副本里配桩探针跑，
@@ -149,9 +124,6 @@ jobs:
       # 记下启动失败，两条路都要写出 result.json。其中一条跑注册表闸
       # （vp-registry-gate.mjs）：scripts/ 下没登记的脚本、新加的 drive-<票号>
       # 脚本、feature map 缺 vp.mjs drive 行，都在这里红。
-      # 排在 install 之后：vp.mjs 顶层引 @playwright/test（capture 用），装依赖
-      # 之前跑整个脚本在 import 处崩（#1411 首轮 CI 实测 1/8）。排在 Spec 解析闸
-      # 之后：自测约一分钟，放在前面会让 #1052 的「install 后 3s」不成立。
       - name: verify-pacman CLI self-test (#1402)
         run: node .claude/skills/verify-pacman/scripts/vp-selftest.mjs
 
@@ -172,9 +144,6 @@ jobs:
           git add -N apps/server/drizzle
           git diff --exit-code apps/server/drizzle
 
-      - name: Typecheck
-        run: pnpm typecheck
-
       # 集成栈单独一步（2026-09-30）：它在场内起真 server + 真 daemon +
       # Chromium，与轻 project 同跑时在 2 vCPU runner 上争核假红——实测：同 sha
       # 连跑两次同点同败、纯文档提交也红、本地同一条 10.9s 过。分组清单在根
@@ -184,9 +153,6 @@ jobs:
 
       - name: Test (vitest，集成栈单独跑)
         run: VITEST_PROJECT_SET=integration pnpm test
-
-      - name: Lint (biome ci)
-        run: pnpm lint
 
       # pr-gate self-check (#1401): .claude/workflows/pr-gate.js decides ADR
       # 0021 D4 routing and go / no-go in plain code; this runs that code with
@@ -268,7 +234,7 @@ jobs:
       # 各跑全量 688 用例（实测 4m03–5m32/shard），分片形同虚设。去掉 `--`（pnpm
       # 会把脚本名之后的未知 flag 直接转发）后每分片 173/171/…，并集 = 全量。
       - name: E2E (shard ${{ matrix.shard }}/4, #693)
-        run: pnpm --filter @pacman/web e2e --shard=${{ matrix.shard }}/4
+        run: pnpm prepush --e2e-shard ${{ matrix.shard }}/4
 
       # 编译产物闸（#747）：上面的 E2E 步经 webServer fixture-build 已写出
       # apps/web/dist，本步只做 grep 断言，不另付全构建。防的是 #656/#677
@@ -329,6 +295,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
 
       # reads packageManager from root package.json
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
@@ -342,7 +310,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Dead class gate (#1036)
-        run: node scripts/ui-dead-class-gate.mjs --compile
+        env:
+          PREPUSH_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: pnpm prepush --advisory
 
   # 票标签闸（advisory）：每张 open issue 必须带「一个分类 + 一个状态」双标签
   # （bug|enhancement + needs-triage|needs-info|ready-for-agent|ready-for-human|

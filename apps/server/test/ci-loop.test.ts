@@ -17,6 +17,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { completeStep } from '../src/services/builds.js';
 import {
   buildCiFixPrompt,
@@ -868,5 +869,125 @@ describe('#1150 绿推闸 / completeStep 持 building / scheduler 接线', () =>
     expect(w.mock.requests.length).toBeGreaterThanOrEqual(1);
     scheduler.stop();
     expect(CI_POLL_INTERVAL_MS).toBe(60_000);
+  });
+});
+
+describe('#1533 ci-fix 转绿纠错票', () => {
+  test.each([
+    ['success', 2, 1],
+    ['success', 0, 0],
+    ['failure', 1, 0],
+    [null, 1, 0],
+  ] as const)('%s，修复轮 %s：只在修复后真绿触发', async (conclusion, fixRounds, expected) => {
+    const w = makePrWorld({
+      fixRounds,
+      checks: conclusion === null ? [] : [{ name: 'lint', status: 'completed', conclusion }],
+    });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    const created: { title: string; body: string; labels: string[] }[] = [];
+    const poller = createCiPoller(
+      { ...w.s.svc, box: w.s.secretBox },
+      {
+        githubFetch: (input, init) => {
+          if (String(input).includes('/issues')) {
+            if (init?.method === 'POST') {
+              created.push(JSON.parse(init.body ?? '{}'));
+              return Promise.resolve(res(201, '', { number: 200 }));
+            }
+            return Promise.resolve(res(200, '', []));
+          }
+          return w.mock.fetch(input, init);
+        },
+      },
+    );
+    await poller.sweep();
+    expect(created).toHaveLength(expected);
+    if (expected) {
+      expect(created[0]?.labels).toEqual(['correction', 'enhancement', 'needs-triage']);
+      expect(created[0]?.body).toContain('待归因');
+      expect(created[0]?.body).toContain('负对照');
+      expect(created[0]?.body).toContain('pacman-dedupe: ci-fix:lint');
+      expect(w.todoRow().phase).toBe('review');
+      w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, w.todoId)).run();
+      await poller.sweep();
+      expect(created).toHaveLength(1);
+    }
+  });
+
+  test('开票失败不挡审核，重启后补偿；另一 build 同类去重、异类另开', async () => {
+    const w = makePrWorld({
+      fixRounds: 1,
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    upsertGithubConnection(
+      { db: w.s.db, box: w.s.secretBox },
+      { teamId: w.teamId, login: 'octo', accessToken: 'token-plain', scope: 'repo' },
+    );
+    let available = false;
+    let writes = 0;
+    let lists = 0;
+    const extra = addCandidate(
+      w.s,
+      [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+      { phase: 'todo' },
+    );
+    const githubFetch: FetchLike = (input, init) => {
+      if (String(input).includes('/issues')) {
+        if (!available) return Promise.resolve(res(503, '', {}));
+        if (init?.method === 'POST') {
+          writes += 1;
+          return Promise.resolve(res(201, '', { number: 200 }));
+        }
+        lists += 1;
+        const issue = {
+          number: 200,
+          state: 'open',
+          title: 'correction',
+          labels: [{ name: 'correction' }],
+          body: '<!-- pacman-dedupe: ci-fix:lint -->',
+        };
+        return Promise.resolve(
+          res(200, '', /\/issues\/200$/.test(String(input)) ? issue : writes > 0 ? [issue] : []),
+        );
+      }
+      if (
+        String(input).includes(headOf(extra.prNumber)) ||
+        String(input).endsWith(`/pulls/${extra.prNumber}`)
+      )
+        return extra.mock.fetch(input, init);
+      return w.mock.fetch(input, init);
+    };
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(w.todoRow().phase).toBe('review');
+    available = true;
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(writes).toBe(1);
+    expect(w.todoRow().phase).toBe('review');
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: `${extra.buildId}-fix`,
+        buildId: extra.buildId,
+        kind: 'build',
+        status: 'done',
+        createdAt: w.base,
+        prompt: buildCiFixPrompt({
+          prNumber: extra.prNumber,
+          prUrl: null,
+          round: 1,
+          failures: [
+            { name: 'lint', conclusion: 'failure', summary: null },
+            { name: 'typecheck', conclusion: 'failure', summary: null },
+          ],
+        }),
+      })
+      .run();
+    w.s.db.update(todoTable).set({ phase: 'building' }).where(eq(todoTable.id, extra.todoId)).run();
+    await createCiPoller({ ...w.s.svc, box: w.s.secretBox }, { githubFetch }).sweep();
+    expect(writes).toBe(2);
+    expect(lists).toBe(3);
   });
 });
