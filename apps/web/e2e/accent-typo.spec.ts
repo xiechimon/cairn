@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 //   font-variation-settings)。500/600 档抽钉 .todo-card-title /
 //   .sched-empty h2, 顺带钉 var 字体真载入 (font-display: optional 下
 //   fallback 静默接管是本面最隐蔽的回退)。
-// - 侧栏头 = 品牌槽: mark 用真资产 logo.svg 作 alpha mask, 随
+// - 侧栏头 = 品牌槽: mark 用真资产 logo-mark.svg 作 alpha mask, 随
 //   currentColor 双主题换色 (mark 图单点替换位 = 该 mask url);
 //   名 = BRAND.manifestName。头部 43px 行几何与 /app/team 导航由
 //   sidebar-seam / sidebar-nav 既有断言守。
@@ -80,9 +80,9 @@ for (const theme of ['light', 'dark'] as const) {
         nameHref: name.getAttribute('href'),
       };
     });
-    // DESIGN.md 侧栏 item 1: logo.svg pixel mark at 16px, one grid cell per
-    // CSS pixel, painted in the row ink through the mask
-    expect(m.maskImage).toContain('/logo.svg');
+    // DESIGN.md 侧栏 item 1: logo-mark.svg spiral at 16px, painted in the row ink
+    // through the mask
+    expect(m.maskImage).toContain('/logo-mark.svg');
     // A one-value mask-size means `<value> auto`. Chrome for Testing 153
     // serializes it as `100% auto`, Chromium 141 as `100%` (#1427).
     const maskSize = m.maskSize.trim().split(/\s+/);
