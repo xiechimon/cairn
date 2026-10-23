@@ -3,7 +3,7 @@
 //    --dialog-backdrop with no blur, in both themes.
 // 2. Dialog widths are the three sizes: S 400 / M 480 / L 640.
 // 3. The footer splits: hint left, actions right, no band fill.
-// 4. Menu rows are 32px with 13.5px text and 15px icons; the panel is 10px
+// 4. Menu rows are 32px with 13.5px text and 15px icons; the panel is 18px
 //    corners with 4px padding.
 // 5. The provider picker groups rows and search hides empty groups.
 // Screenshots: PACMAN_E2E_EVIDENCE=docs/verify/paper-overlays.
@@ -104,7 +104,7 @@ test('dialog widths are S 400 / M 480 / L 640', async ({ page }) => {
 test('dialog face: sheet surface, 16px corners, 16px serif title, 28px close', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
   const dialog = await openFromTopbar(page, SECRETS, '添加密钥');
-  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#fbf9f5'));
+  await expect(dialog).toHaveCSS('background-color', await resolveColor(page, '#f7f1e1'));
   await expect(dialog).toHaveCSS('border-top-left-radius', '16px');
   const title = dialog.getByTestId('dialog-head').getByText('添加密钥');
   await expect(title).toHaveCSS('font-size', '16px');
@@ -164,7 +164,7 @@ test('footer stays on screen on a short viewport; only the body scrolls', async 
   expect(overflow).toBe(true);
 });
 
-test('Paper menu: 32px rows, 13.5px text, 15px icons, 10px panel corners, 4px padding', async ({
+test('Paper menu: 32px rows, 13.5px text, 15px icons, 18px panel corners, 4px padding', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
@@ -173,7 +173,7 @@ test('Paper menu: 32px rows, 13.5px text, 15px icons, 10px panel corners, 4px pa
   const menu = page.locator('.more-menu');
   await expect(menu).toBeVisible();
   await settle(menu);
-  await expect(menu).toHaveCSS('border-top-left-radius', '10px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '4px');
   await expect(menu).toHaveCSS('background-color', 'rgb(255, 255, 255)');
 
@@ -201,7 +201,7 @@ test('user menu rides the same Paper menu face', async ({ page }) => {
   const menu = page.locator('.user-menu');
   await expect(menu).toBeVisible();
   await settle(menu.locator('..'));
-  await expect(menu).toHaveCSS('border-top-left-radius', '10px');
+  await expect(menu).toHaveCSS('border-top-left-radius', '18px');
   await expect(menu).toHaveCSS('padding-top', '4px');
   for (const label of ['帐号', 'API 密钥', 'MCP']) {
     const row = menu.locator('a.user-menu-row', { hasText: label });
@@ -223,7 +223,7 @@ test('provider picker: grouped rows, search hides empty groups', async ({ page }
   await expect(dialog.getByRole('group', { name: '订阅登录' }).locator('[data-preset-id]')).toHaveCount(2);
   const codex = dialog.locator('[data-preset-id="openai-codex"]');
   await expect(codex).toBeDisabled();
-  await expect(codex).toHaveCSS('color', await resolveColor(page, '#746a5f'));
+  await expect(codex).toHaveCSS('color', await resolveColor(page, '#6f6558'));
   await evidenceShot(page, 'provider-picker.png');
 
   await dialog.getByLabel('搜索服务商...').fill('cloudflare');

@@ -2,7 +2,7 @@
 // (apps/web/DESIGN.md 页面模式). Failure modes pinned here:
 // 1. An empty state grows a tinted icon tile again (orange / beige block).
 // 2. A list falls back to one card per item, or its rows lose the 52px
-//    settings-row height or the 10px card corner.
+//    settings-row height or the 20px card corner.
 // 3. The machines page brings back the full-width dashed 添加机器 bar.
 // 4. The providers runtime tabs fall back to their own pill skin instead of
 //    the Paper segmented face (canvas track, white chosen tab with a ring).
@@ -45,11 +45,11 @@ for (const [name, url, rows] of [
   ['secrets', '/app/resources/secrets?scenario=agent-detail-secrets', 2],
   ['machines', '/app/resources/machines?scenario=06', 2],
 ] as const) {
-  test(`${name} list: one settings card of 52px rows, 10px corner`, async ({ page }) => {
+  test(`${name} list: one settings card of 52px rows, 20px corner`, async ({ page }) => {
     await light(page, url);
     const cards = page.locator('[data-testid="page-col"] .settings-card');
     await expect(cards).toHaveCount(1);
-    await expect(cards).toHaveCSS('border-top-left-radius', '10px');
+    await expect(cards).toHaveCSS('border-top-left-radius', '20px');
     const heights = await cards.evaluate((el) =>
       [...el.children].map((row) => row.getBoundingClientRect().height),
     );
@@ -70,9 +70,9 @@ test('machines: 添加机器 sits in the top bar, no dashed full-width bar', asy
 test('providers runtime tabs: canvas track, chosen tab white with a 1px ring', async ({ page }) => {
   await light(page, '/app/resources/providers?scenario=06');
   const list = page.getByRole('tablist', { name: '模型服务' });
-  await expect(list).toHaveCSS('background-color', 'rgb(243, 238, 229)');
+  await expect(list).toHaveCSS('background-color', 'rgb(239, 230, 208)');
   const chosen = list.getByRole('tab', { selected: true });
-  await expect(chosen).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(chosen).toHaveCSS('background-color', 'rgb(255, 253, 246)');
   const ring = await chosen.evaluate((el) => getComputedStyle(el).boxShadow);
   expect(ring).toContain('0px 0px 0px 1px');
   await expect(chosen).toHaveCSS('height', '28px');

@@ -41,35 +41,35 @@ const FROZEN_HEX: Record<'dark' | 'light', Record<string, string>> = {
     'project-tile-6': '#6eb3b2',
   },
   light: {
-    canvas: '#f3eee5',
-    background: '#fbf9f5',
-    foreground: '#2b2620',
-    card: '#ffffff',
-    'card-foreground': '#2b2620',
+    canvas: '#efe6d0',
+    background: '#f7f1e1',
+    foreground: '#1b2b24',
+    card: '#fffdf6',
+    'card-foreground': '#1b2b24',
     popover: '#ffffff',
     'popover-foreground': '#2b2620',
-    primary: '#2b2620',
-    'primary-foreground': '#fbf9f5',
-    secondary: '#ebe4d8',
+    primary: '#173a2f',
+    'primary-foreground': '#f2ead7',
+    secondary: '#e8dec5',
     'secondary-foreground': '#2b2620',
-    muted: '#ebe4d8',
+    muted: '#e8dec5',
     'muted-foreground': '#5e564d',
-    accent: '#ebe4d8',
+    accent: '#e8dec5',
     'accent-foreground': '#2b2620',
     destructive: '#9e2c49',
-    border: '#ece5da',
+    border: '#e2d8bf',
     input: '#cbc5c1',
     ring: '#8f8985',
     'text-secondary': '#5e564d',
-    'text-tertiary': '#746a5f',
-    'card-button': '#b4532a',
-    'focus-ring': '#b4532a',
-    'spot-text-on-tint': '#8a3a1a',
+    'text-tertiary': '#6f6558',
+    'card-button': '#173a2f',
+    'focus-ring': '#173a2f',
+    'spot-text-on-tint': '#173a2f',
     running: '#5f8f5a',
     'running-text': '#4f7049',
     'running-bar': '#7ea476',
     'running-track': '#ebe5da',
-    'accent-hover': '#f6ebe3',
+    'accent-hover': '#ece3cc',
     'menu-hover': '#f6f2ec',
     'project-tile-1': '#c06a43',
     'project-tile-2': '#7d8b5a',
@@ -90,8 +90,8 @@ const FROZEN_RGB: Record<'dark' | 'light', Record<string, string>> = {
     'dialog-backdrop': 'rgb(0 0 0 / 0.45)',
   },
   light: {
-    // Paper Grouped sidebar: light row hover = DESIGN.md hover (#ebe4d8)
-    'sidebar-hover': 'rgb(235 228 216)',
+    // Paper Grouped sidebar: light row hover = DESIGN.md hover (#e8dec5)
+    'sidebar-hover': 'rgb(232, 222, 197)',
     'sidebar-active': 'rgb(28 25 21 / 0.1)',
     'drop-tint-border': 'rgb(180 83 42)',
     'drop-tint-base': 'rgb(180 83 42 / 0.05)',
@@ -141,9 +141,9 @@ for (const theme of ['light', 'dark'] as const) {
 
     const pairs: Array<[string, string]> = [
       ['surface-0', 'var(--background)'],
-      ['canvas', theme === 'light' ? '#f3eee5' : '#1a1612'],
+      ['canvas', theme === 'light' ? '#efe6d0' : '#1a1612'],
       ['surface-1', 'var(--canvas)'],
-      ['accent-hover', theme === 'light' ? '#f6ebe3' : '#46362f'],
+      ['accent-hover', theme === 'light' ? '#ece3cc' : '#46362f'],
       ['dialog-surface', theme === 'light' ? 'var(--background)' : 'var(--popover)'],
       ['menu-hover', theme === 'light' ? '#f6f2ec' : '#403b36'],
       ['surface-2', 'var(--card)'],
@@ -185,7 +185,7 @@ test('CDS structural tokens land at locked mon values', async ({ page }) => {
   expect(vals.sidebar).toBe('248px');
   expect(vals.chat).toBe('768px');
   expect(vals.edge).toBe('16px');
-  expect(vals.card).toBe('10px');
+  expect(vals.card).toBe('20px');
   expect(vals.cdsMd).toBe('6px');
   expect(vals.shadcnMd).not.toBe('6px');
   expect(vals.shadcnMd.length).toBeGreaterThan(0);

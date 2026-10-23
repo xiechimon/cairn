@@ -116,8 +116,8 @@ test('active row = sheet fill + hairline ring + accent icon', async ({ page }) =
   });
   expect(m.bg).toBe(m.sheet);
   expect(m.ring).not.toBe('none');
-  expect(m.accent).toBe('#b4532a');
-  expect(m.icon).toBe('rgb(180, 83, 42)');
+  expect(m.accent).toBe('#173a2f');
+  expect(m.icon).toBe('rgb(23, 58, 47)');
 });
 
 test('资源 folds by default, opens to an indented sub-list, survives reload', async ({ page }) => {

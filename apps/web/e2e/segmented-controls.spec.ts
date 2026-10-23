@@ -17,8 +17,8 @@ import { settleTransitions } from './helpers.js';
 const PROJ = '/app/project/ZAQczKCu0MOAzC1ZqcFlX';
 
 const CARD_DARK = 'rgb(47, 42, 38)'; // --card dark
-const CARD_LIGHT = 'rgb(255, 255, 255)'; // --card light
-const CANVAS_LIGHT = 'rgb(243, 238, 229)'; // --canvas light
+const CARD_LIGHT = 'rgb(255, 253, 246)'; // --card light
+const CANVAS_LIGHT = 'rgb(239, 230, 208)'; // --canvas light
 const CLEAR = 'rgba(0, 0, 0, 0)';
 
 const bg = (loc: Locator) => loc.evaluate((el) => getComputedStyle(el).backgroundColor);

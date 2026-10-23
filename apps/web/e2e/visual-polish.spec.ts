@@ -94,7 +94,7 @@ for (const theme of ['light', 'dark'] as const) {
     // since #1428 is --e1 (the sm pool, then one 1px ring last); hover lift
     // is separate.
     expect(card.border).toBe('0px');
-    expect(card.radius).toBe('10px');
+    expect(card.radius).toBe('20px');
     expect(card.shadow).toContain('0px 0px 0px 1px');
     expect(card.shadow).not.toContain('inset');
     expect(card.shadow).toContain(card.panelShadow);
@@ -143,7 +143,7 @@ for (const theme of ['light', 'dark'] as const) {
     // (light: outer hairline ring + soft pool; dark: inset highlight, no
     // solid border). Border width collapses to 0; separation rides shadow.
     expect(menu.border).toBe('0px');
-    expect(menu.radius).toBe('10px');
+    expect(menu.radius).toBe('18px');
     expect(menu.shadow).not.toBe('none');
     expect(menu.shadow).toContain('0px 0px 0px');
   });
