@@ -1,11 +1,3 @@
-// #1512 步收尾会话 JSONL 随 transcript 上传。
-// 失败方式先固化：
-//   1. handle.sessionFile 在位且文件可读 → upload-urls 含 session.jsonl，
-//      PUT body = 文件原文；transcript.json 仍传；done success
-//   2. 文件不存在 → 不请求 session.jsonl，步仍 success，日志可见
-//   3. 超过上限 → 不请求 session.jsonl，步仍 success，日志可见
-//   4. session PUT 失败 → transcript 仍上传、done 仍报，日志可见
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,45 +19,6 @@ import type { DaemonLogger } from '../src/log.js';
 import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
-
-function captureLogger(): { logger: DaemonLogger; lines: string[] } {
-  const lines: string[] = [];
-  const push = (prefix: string | undefined, msg: string) =>
-    lines.push(prefix ? `[${prefix}] ${msg}` : msg);
-  const logger: DaemonLogger = {
-    raw: (msg) => push(undefined, msg),
-    prefixed: (prefix, msg) => push(prefix, msg),
-    supervisor: (msg) => push('supervisor', msg),
-    machine: (msg) => push('machine', msg),
-    step: (msg) => push('step', msg),
-    workspace: (msg) => push('workspace', msg),
-    recover: (msg) => push('recover', msg),
-    wake: (msg) => push('wake', msg),
-    skills: (msg) => push('skills', msg),
-    gate: (msg) => push('gate', msg),
-    trust: (msg) => push('trust', msg),
-    mcp: (msg) => push('mcp', msg),
-  };
-  return { logger, lines };
-}
-
-function claimedBuildStep(): ClaimedStep {
-  return {
-    step: { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
-    conversationId: 'conv-1',
-    session: { action: 'new', sessionId: null },
-    todo: { id: 't1', seqNum: 1, title: '会话附件', spec: '跑一步' },
-    project: { id: 'p1', name: 'demo', repo: null },
-    agent: {
-      id: 'a1',
-      displayName: 'stub-builder',
-      description: null,
-      provider: null,
-      modelId: 'stub-model',
-      thinkingLevel: null,
-    },
-  };
-}
 
 class FakeClient implements MachineApi {
   uploads: { name: string; body: TranscriptUpload | string }[] = [];
@@ -179,7 +132,26 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
   const home = mkdtempSync(join(tmpdir(), 'pacman-runner-session-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
-  const { logger, lines } = captureLogger();
+  const { logger, lines } = (() => {
+    const lines: string[] = [];
+    const push = (prefix: string | undefined, msg: string) =>
+      lines.push(prefix ? `[${prefix}] ${msg}` : msg);
+    const logger: DaemonLogger = {
+      raw: (msg) => push(undefined, msg),
+      prefixed: (prefix, msg) => push(prefix, msg),
+      supervisor: (msg) => push('supervisor', msg),
+      machine: (msg) => push('machine', msg),
+      step: (msg) => push('step', msg),
+      workspace: (msg) => push('workspace', msg),
+      recover: (msg) => push('recover', msg),
+      wake: (msg) => push('wake', msg),
+      skills: (msg) => push('skills', msg),
+      gate: (msg) => push('gate', msg),
+      trust: (msg) => push('trust', msg),
+      mcp: (msg) => push('mcp', msg),
+    };
+    return { logger, lines };
+  })();
   const journal = new StepJournal(paths.outboxDir);
   await runStep(
     {
@@ -192,7 +164,21 @@ async function setup(backend: AgentBackend, client: FakeClient = new FakeClient(
       mcpConfigPath: join(home, 'claude.json'),
       heartbeatIntervalMs: 60_000,
     },
-    claimedBuildStep(),
+    {
+      step: { id: 's1', buildId: 'conv-1', kind: 'build', machineId: 'm1', createdAt: 1 },
+      conversationId: 'conv-1',
+      session: { action: 'new', sessionId: null },
+      todo: { id: 't1', seqNum: 1, title: '会话附件', spec: '跑一步' },
+      project: { id: 'p1', name: 'demo', repo: null },
+      agent: {
+        id: 'a1',
+        displayName: 'stub-builder',
+        description: null,
+        provider: null,
+        modelId: 'stub-model',
+        thinkingLevel: null,
+      },
+    } satisfies ClaimedStep,
   );
   return { client, lines };
 }

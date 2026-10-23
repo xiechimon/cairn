@@ -1,11 +1,3 @@
-// #1512 会话 JSONL 读面上限与失败可见：步收尾上传前的本地准备。
-// 失败方式先固化：
-//   1. 路径缺席 → 不读、不落日志（stub / 无会话后端）
-//   2. 文件不存在 → null + 日志
-//   3. 读取失败 → null + 日志
-//   4. 超过上限 → 跳过 + 日志（不截断，半截 JSONL 比缺席更糟）
-//   5. 未超上限 → 原样返回
-
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

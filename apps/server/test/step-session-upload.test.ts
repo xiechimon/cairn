@@ -1,10 +1,3 @@
-// #1512 会话 JSONL 经 upload-urls 落盘、按 stepId 取回、上限与回收。
-// 失败方式先固化：
-//   1. PUT session.jsonl → 按 stepId 服务函数 / GET 取回原文
-//   2. 超过 SESSION_JSONL_MAX_BYTES → 不落盘，取回 404
-//   3. 未上传 → 取回 404
-//   4. 步行还在 → GC 不动；步行已删且超 orphan grace → 收
-
 import { existsSync, utimesSync } from 'node:fs';
 import {
   machineEnrollResponseSchema,
