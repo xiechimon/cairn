@@ -156,6 +156,7 @@ export const SCENARIOS: Record<string, FixtureSet> = SCENARIOS_ENABLED
       // #1303：未读徽标封顶。100 渲染 99+，99 仍是 99。命名场景无 capture。
       'chief-unread-cap': { ...boardDefault, chiefUnread: 100 },
       'chief-unread-99': { ...boardDefault, chiefUnread: 99 },
+      'chief-busy': { ...boardDefault, chiefBusy: true },
       // #1259 创建弹窗的服务商告警行（信息性，不顶掉表单）：机器在、
       // providerSources 空——pi 创建照跑，claude-code 无候选才见告警。
       'team-no-sources': {

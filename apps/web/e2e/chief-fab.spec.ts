@@ -38,22 +38,19 @@ test.describe('detail FAB renders only with unread (#443)', () => {
     await expect(fab.locator('.fab-badge')).toHaveText('3');
   });
 
-  test('the FAB keeps the A0 corner geometry (40x40 @ 8px inset, fixed)', async ({ page }) => {
+  test('the FAB keeps the corner anchor and grows into a 40px-tall pill when unread', async ({ page }) => {
     await page.goto(`${DETAIL}?scenario=detail-unread`);
     const geometry = await page.locator('.chief-fab').evaluate((el) => {
       const cs = getComputedStyle(el);
-      return { width: cs.width, height: cs.height, right: cs.right, bottom: cs.bottom, position: cs.position };
+      return {
+        wide: el.getBoundingClientRect().width > 40,
+        height: cs.height,
+        right: cs.right,
+        bottom: cs.bottom,
+        position: cs.position,
+      };
     });
-    // ADR 0013 D4: Multica launcher 原值——40px 正圆、距内容区右/下各 8px、
-    // 角落锚定（fixed）；detail 特例位（right 504/bottom 104）与 composer
-    // 让位（bottom 104）随 0004 D7 退役
-    expect(geometry).toEqual({
-      width: '40px',
-      height: '40px',
-      right: '8px',
-      bottom: '8px',
-      position: 'fixed',
-    });
+    expect(geometry).toEqual({ wide: true, height: '40px', right: '8px', bottom: '8px', position: 'fixed' });
   });
 });
 
@@ -97,15 +94,12 @@ test.describe('FAB icon follows the bound agent (#444)', () => {
     await expect(img).toHaveAttribute('src', R3_SRC);
     await expect(fab.locator('svg')).toHaveCount(0);
     await expect(fab.locator('.fab-badge')).toHaveText('2');
-    // 头像铺满 40×40 圆（D4 几何），FAB 位置不动
     const fabBox = await fab.boundingBox();
     const imgBox = await img.boundingBox();
-    expect(fabBox?.width).toBeCloseTo(40, 0);
     expect(fabBox?.height).toBeCloseTo(40, 0);
-    expect(imgBox?.x).toBeCloseTo(fabBox?.x ?? Number.NaN, 0);
-    expect(imgBox?.y).toBeCloseTo(fabBox?.y ?? Number.NaN, 0);
-    expect(imgBox?.width).toBeCloseTo(40, 0);
-    expect(imgBox?.height).toBeCloseTo(40, 0);
+    expect(imgBox?.y).toBeCloseTo((fabBox?.y ?? Number.NaN) + 4, 0);
+    expect(imgBox?.width).toBeCloseTo(32, 0);
+    expect(imgBox?.height).toBeCloseTo(32, 0);
   });
 
   test('bound: a non-board route swaps at the same single consumption point', async ({ page }) => {
@@ -148,5 +142,46 @@ test.describe('chief unread badge cap (#1303)', () => {
   test('unread 99 stays 99', async ({ page }) => {
     await page.goto('/app?scenario=chief-unread-99');
     await expect(page.getByRole('button', { name: '总管', exact: true }).locator('.fab-badge')).toHaveText('99');
+  });
+});
+
+test.describe('chief FAB brand states', () => {
+  test('idle: a 40px brand green disc, the spiral holds still, no label', async ({ page }) => {
+    await page.goto('/app?scenario=01');
+    const fab = page.getByRole('button', { name: '总管', exact: true });
+    await expect(fab).not.toHaveAttribute('data-expanded');
+    await expect(fab).toHaveText('');
+    const look = await fab.evaluate((el) => ({
+      bg: getComputedStyle(el).backgroundColor,
+      width: el.getBoundingClientRect().width,
+      spin: getComputedStyle(el.querySelector('svg') as Element).animationName,
+    }));
+    expect(look).toEqual({ bg: 'rgb(23, 58, 47)', width: 40, spin: 'none' });
+  });
+
+  test('busy: the pill says 思考中… and the spiral spins', async ({ page }) => {
+    await page.goto('/app?scenario=chief-busy');
+    const fab = page.getByRole('button', { name: '总管', exact: true });
+    await expect(fab).toHaveAttribute('data-expanded', 'true');
+    await expect(fab).toHaveText('思考中…');
+    const look = await fab.evaluate((el) => ({
+      wide: el.getBoundingClientRect().width > 40,
+      spin: getComputedStyle(el.querySelector('svg') as Element).animationName,
+    }));
+    expect(look).toEqual({ wide: true, spin: 'spin' });
+  });
+
+  test('unread: the pill names the count', async ({ page }) => {
+    await page.goto('/app?scenario=chief-unread-99');
+    await expect(page.getByRole('button', { name: '总管', exact: true })).toHaveText('99 条新消息');
+  });
+
+  test('reduced motion: busy keeps the label but stops the spin', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/app?scenario=chief-busy');
+    const fab = page.getByRole('button', { name: '总管', exact: true });
+    await expect(fab).toHaveText('思考中…');
+    const spin = await fab.evaluate((el) => getComputedStyle(el.querySelector('svg') as Element).animationName);
+    expect(spin).toBe('none');
   });
 });

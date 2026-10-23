@@ -54,6 +54,7 @@ export interface ChiefSurface {
   /** Unread chief threads — the FAB badge (live: notifications; fixture:
    *  the capture's chiefUnread field). */
   chiefUnread: number;
+  chiefBusy: boolean;
   /** Composer send (live only; absent = fixture static face, read-only
    *  draft + inert send). 返回 Promise = 异步发送（#631：rejected 时
    *  drawer 保留 draft 不丢字，detail composer 同契）。 */
@@ -247,6 +248,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     ? (notificationsQ.data?.unreadThreadIds ?? []).filter((id) => id.startsWith('chief-')).length
     : 0;
   const chiefUnread = live ? liveUnread : (fixture.chiefUnread ?? 0);
+  const chiefBusy = live
+    ? liveThreads.some((thread) => thread.activeRun != null)
+    : fixture.chiefBusy === true;
 
   // #631 失败反馈（同步半）：PATCH / rewind / 发送失败 → toastError（共享
   // 原语住 components/ui/toaster.tsx：server 原因进 description 透传不翻译
@@ -306,6 +310,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     setChiefView,
     chiefData,
     chiefUnread,
+    chiefBusy,
     onSend,
     onThread,
     onNewThread,

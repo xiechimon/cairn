@@ -310,6 +310,7 @@ export interface FixtureSet {
   /** Unread chief messages — the blue count badge on the 总管 FAB
    *  (r8 78–81 dark captures; absent from the r7 light set). */
   chiefUnread?: number;
+  chiefBusy?: boolean;
   /** Overlay open-states (issue #67); absent = all closed. */
   ui?: OverlayUi;
   /** Sidebar 用量 nav row present (issue #67): the live site grew it

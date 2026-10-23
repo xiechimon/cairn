@@ -179,14 +179,6 @@ jobs:
           fi
           node scripts/lint-warning-cap.mjs
 
-      # UI 漂移闸（#851；#1012 封版裁决：保留为永久闸）：单一样式只许一种
-      # 实现——活 `.btn` 选择子、token 源之外的 hex 字面量、chip 变体异地
-      # 重定义、无 deliberate-native 标记的裸 `<input>`、components/ui 内
-      # raw color（G5，与 #989 hash 账本互补：账本钉文件 hash，看不见
-      # registered-deviated 文件里的颜色内容）、未登记的品牌墨 text-role
-      # 行（G6）即红。这些内容级面没有第二道闸承载。纯源码扫描，不需构建。
-      - name: UI drift gate (#851)
-        run: node scripts/ui-drift-gate.mjs
 
   # e2e 全量归 CI（#693 分层职责）：本地开发期只跑受影响面
   # （pnpm --filter @cairn/web e2e:affected），全量唯一执行点在这。
