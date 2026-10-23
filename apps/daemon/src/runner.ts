@@ -59,6 +59,7 @@ import {
   parseReviewPromptMeta,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   type ReviewGate,
+  SESSION_FILE_NAME,
   STREAM_TIMEOUTS_MS,
   skillCallName,
   stepTakesSecrets,
@@ -92,6 +93,7 @@ import { isTransientUploadError, type MachineApi, MachineApiError } from './mach
 import { extractReviewVerdict } from './review-findings.js';
 import { buildSecretTool } from './secret-channel.js';
 import { type SealedSegment, SegmentBuffer, segmentContent } from './segment.js';
+import { readSessionJsonlForUpload } from './session-jsonl.js';
 import { buildRemoteShellTool } from './shell-channel.js';
 import { buildSkillLoadTool } from './skill-tool.js';
 import type { StatePaths } from './state.js';
@@ -2304,9 +2306,14 @@ async function runClaimedStep(
       ? { noOutput: true as const }
       : {}),
   };
-  journal.update(stepId, { state: 'awaiting-upload', doneBody, planContent });
+  journal.update(stepId, {
+    state: 'awaiting-upload',
+    doneBody,
+    planContent,
+    sessionFile: handle?.sessionFile ?? null,
+  });
   try {
-    await putFinalArtifacts(client, logger, stepId, messages, planContent);
+    await putFinalArtifacts(client, logger, stepId, messages, planContent, handle?.sessionFile);
   } catch (err) {
     // 回传失败 = journal 残留 awaiting-upload，recover 快路径重传（#1026）。
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -2337,15 +2344,16 @@ async function runClaimedStep(
 const UPLOAD_RETRY_ATTEMPTS = 3;
 const UPLOAD_RETRY_DELAY_MS = 1_000;
 
-/** 终稿回传文件清单（transcript.json + plan.md，收尾与快路径同构）。 */
 function finalUploadFiles(
   messages: TranscriptUpload['messages'],
   planContent: string | null,
+  sessionContent: string | null,
 ): { name: string; size?: number }[] {
   const files: { name: string; size?: number }[] = [
     { name: 'transcript.json', size: JSON.stringify(messages).length },
   ];
   if (planContent !== null) files.push({ name: PLAN_FILE_NAME, size: planContent.length });
+  if (sessionContent !== null) files.push({ name: SESSION_FILE_NAME, size: sessionContent.length });
   return files;
 }
 
@@ -2360,8 +2368,10 @@ async function putFinalArtifacts(
   stepId: string,
   messages: TranscriptUpload['messages'],
   planContent: string | null,
+  sessionFile: string | undefined,
 ): Promise<void> {
-  const files = finalUploadFiles(messages, planContent);
+  const sessionContent = readSessionJsonlForUpload(sessionFile, (msg) => logger.step(msg));
+  const files = finalUploadFiles(messages, planContent, sessionContent);
   for (let attempt = 1; ; attempt++) {
     try {
       const { uploads } = await client.uploadUrls(stepId, files);
@@ -2369,6 +2379,21 @@ async function putFinalArtifacts(
         if (upload.name === PLAN_FILE_NAME) {
           if (planContent !== null) {
             await client.putUpload(upload.url, upload.headers, planContent, 'text/markdown');
+          }
+        } else if (upload.name === SESSION_FILE_NAME) {
+          if (sessionContent !== null) {
+            try {
+              await client.putUpload(
+                upload.url,
+                upload.headers,
+                sessionContent,
+                'application/x-ndjson',
+              );
+            } catch (err) {
+              logger.step(
+                `session upload failed: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
           }
         } else if (upload.name === 'transcript.json') {
           await client.putUpload(upload.url, upload.headers, { stepId, messages });
@@ -2409,7 +2434,14 @@ export async function resumePendingUpload(
   const messages = transcript.messages();
   const planContent = entry.planContent ?? null;
   try {
-    await putFinalArtifacts(client, logger, stepId, messages, planContent);
+    await putFinalArtifacts(
+      client,
+      logger,
+      stepId,
+      messages,
+      planContent,
+      entry.sessionFile ?? undefined,
+    );
   } catch (err) {
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     return; // journal 残留保留，下次重启再试

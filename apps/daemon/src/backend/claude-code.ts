@@ -411,6 +411,7 @@ const TERMINAL_EVENT_TYPES: readonly string[] = ['done', 'error', 'message_stop'
 
 class ClaudeSessionHandle implements AgentSessionHandle {
   readonly sessionId: string;
+  readonly sessionFile: string;
   readonly events: AsyncIterable<StepEvent>;
   private readonly queue = new AsyncQueue<StepEvent>();
   private readonly input: AsyncQueue<SDKUserMessage>;
@@ -424,6 +425,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     q: Query,
     opts: {
       sessionId: string;
+      cwd: string;
       state: ClaudeMapState;
       abort: AbortController;
       input: AsyncQueue<SDKUserMessage>;
@@ -431,6 +433,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   ) {
     this.q = q;
     this.sessionId = opts.sessionId;
+    this.sessionFile = sdkTranscriptPath(opts.cwd, opts.sessionId);
     this.state = opts.state;
     this.abort = opts.abort;
     this.input = opts.input;
@@ -1164,7 +1167,7 @@ export class ClaudeCodeBackend implements AgentBackend {
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined) input.push(buildUserMessage(opts.prompt, opts.promptImages));
     const q = query({ prompt: input.iterable(), options: sdkOptions });
-    return new ClaudeSessionHandle(q, { sessionId, state, abort, input });
+    return new ClaudeSessionHandle(q, { sessionId, cwd: opts.cwd, state, abort, input });
   }
 }
 
