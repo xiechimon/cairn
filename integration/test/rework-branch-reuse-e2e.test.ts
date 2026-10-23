@@ -264,10 +264,9 @@ describe('#931 两条返工路回原分支（E2E）', () => {
     expect(builds).toHaveLength(1);
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get()!;
     expect(todoRow.latestBuildId).toBe(buildId);
-    expect((await systemGitOps.listBranches(bareDir)).branches.map((b) => b.name)).toEqual([
-      'main',
-      branch,
-    ]); // 无第二条 conv 分支
+    expect((await systemGitOps.listBranches(bareDir)).branches.map((b) => b.name).sort()).toEqual(
+      ['main', branch].sort(),
+    ); // 无第二条 conv 分支
     const buildRow = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.prNumber).toBe(PR_NUMBER);
     expect(buildRow.prUrl).toBe(PR_URL);
