@@ -275,6 +275,31 @@ describe('mapPiSessionEvent（AgentSessionEvent → StepEvent 投影）', () => 
     expect(usage).toEqual({ model: 'p/m', input: 1, output: 2, cacheRead: 3, cacheWrite: 4 });
   });
 
+  test('stopReason=length 透传 rawStopReason / responseModel（#1512）', () => {
+    const out = map({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: 'cut off',
+        stopReason: 'length',
+        rawStopReason: 'max_tokens',
+        responseModel: 'claude-opus-4',
+      },
+    });
+    expect(out).toEqual([
+      {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: 'cut off',
+          stopReason: 'length',
+          rawStopReason: 'max_tokens',
+          responseModel: 'claude-opus-4',
+        },
+      },
+    ]);
+  });
+
   test('stopReason=error → message_end + error{retryable 判定}；aborted → message_stop', () => {
     const err = map({
       type: 'message_end',

@@ -31,6 +31,7 @@ import {
   machineTranscriptRowBodySchema,
   machineUploadUrlsBodySchema,
   PLAN_FILE_NAME,
+  SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@pacman/shared';
 import type { Context, Hono } from 'hono';
@@ -43,7 +44,13 @@ import { transitionBranchSync } from './services/branch-sync.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { precheckShellCommand, reportShellResult } from './services/machine-shell.js';
-import { createUploadUrls, receivePlanUpload, receiveUpload } from './services/machine-uploads.js';
+import {
+  createUploadUrls,
+  getStepSession,
+  receivePlanUpload,
+  receiveSessionUpload,
+  receiveUpload,
+} from './services/machine-uploads.js';
 import {
   authorizeEnrollmentMachine,
   claimStep,
@@ -504,12 +511,19 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     if (!upload || upload.machineId !== row.id) throw new HttpError(404, 'upload not found');
     if (upload.name === PLAN_FILE_NAME) {
       receivePlanUpload(deps, upload, await c.req.text());
+    } else if (upload.name === SESSION_FILE_NAME) {
+      receiveSessionUpload(deps, upload, await c.req.text());
     } else {
       const body = parseWith(transcriptUploadSchema, await jsonBody(c), 'body');
       receiveUpload(deps, upload, body);
     }
     ctx.uploads.delete(uploadId); // 一次性
     return c.json({ ok: true as const });
+  });
+
+  app.get('/api/machine/session/:stepId', (c) => {
+    const row = me(c);
+    return c.json(getStepSession(deps, row.id, c.req.param('stepId')));
   });
 
   // —— POST /api/machine/done/{stepId}（收尾 + phase 推进 + 记账 + 合并落地）———

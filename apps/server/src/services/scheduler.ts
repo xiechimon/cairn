@@ -18,7 +18,12 @@ import type { Db } from '../db/client.js';
 import { build, schedule, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
-import { ATTACHMENT_GC_INTERVAL_MS, type GcLogger, sweepAttachments } from './attachment-gc.js';
+import {
+  ATTACHMENT_GC_INTERVAL_MS,
+  type GcLogger,
+  sweepAttachments,
+  sweepStepSessions,
+} from './attachment-gc.js';
 import {
   type BuildDeps,
   startBuilds,
@@ -201,6 +206,10 @@ export function createScheduler(
       lastGcAt = now;
       try {
         sweepAttachments(
+          { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
+          now,
+        );
+        sweepStepSessions(
           { db: deps.db, attachmentsDir: gc.attachmentsDir, logger: gc.logger },
           now,
         );
