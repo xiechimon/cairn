@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
 
 const script = resolve('scripts/single-use-helper-gate.mjs');
 
-test('checks added helpers with symbol references and exact exemptions', () => {
+test('checks added helpers with symbol references and named exemptions', () => {
   const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-'));
   const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
   const run = () =>
@@ -32,6 +32,14 @@ test('checks added helpers with symbol references and exact exemptions', () => {
     git('commit', '-m', 'baseline');
     git('update-ref', 'refs/remotes/origin/main', 'HEAD');
     assert.equal(run().status, 0);
+    for (const name of ['existing', 'missing']) {
+      writeFileSync(
+        allowlist,
+        JSON.stringify([{ path: 'apps/demo/code.ts', name, reason: 'Deliberate boundary' }]),
+      );
+      assert.equal(run().status, name === 'existing' ? 0 : 2);
+    }
+    writeFileSync(allowlist, '[]');
     for (const source of [
       'function once() { return 1; }\nonce();',
       'const once = () => 1;\nonce();',
@@ -74,13 +82,18 @@ test('checks added helpers with symbol references and exact exemptions', () => {
     writeFileSync(file, `${baseline}${declaration}\nonce();\n`);
     writeFileSync(
       allowlist,
-      JSON.stringify([
-        { path: 'apps/demo/code.ts', name: 'once', declaration, reason: 'Deliberate boundary' },
-      ]),
+      JSON.stringify([{ path: 'apps/demo/code.ts', name: 'once', reason: 'Deliberate boundary' }]),
     );
     assert.equal(run().status, 0);
     writeFileSync(file, `${baseline}function once() { return 2; }\nonce();\n`);
-    assert.equal(run().status, 1);
+    assert.equal(run().status, 0);
+    for (const entry of [
+      { path: 'apps/demo/code.ts', name: 'once', reason: ' ' },
+      { path: 'apps/demo/code.ts', name: 'missing', reason: 'Deliberate boundary' },
+    ]) {
+      writeFileSync(allowlist, JSON.stringify([entry]));
+      assert.equal(run().status, 2);
+    }
     writeFileSync(allowlist, '[{}]');
     assert.equal(run().status, 2);
     writeFileSync(allowlist, '[]');
@@ -89,6 +102,43 @@ test('checks added helpers with symbol references and exact exemptions', () => {
     assert.equal(run().status, 1);
     git('update-ref', '-d', 'refs/remotes/origin/main');
     assert.equal(run().status, 2);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test('does not flag an existing large function when a parameter or body changes', () => {
+  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-runner-'));
+  const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+  const baseline = readFileSync('apps/daemon/src/runner.ts', 'utf8');
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    mkdirSync(resolve(cwd, 'apps/daemon/src'), { recursive: true });
+    mkdirSync(resolve(cwd, 'scripts'));
+    const file = resolve(cwd, 'apps/daemon/src/runner.ts');
+    writeFileSync(file, baseline);
+    writeFileSync(resolve(cwd, 'scripts/single-use-helper-allowlist.json'), '[]');
+    git('add', 'apps/daemon/src/runner.ts', 'scripts/single-use-helper-allowlist.json');
+    git('commit', '-m', 'baseline');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    for (const changed of [
+      baseline.replace('  stop: RunStop,', '  stop: RunStop,\n  extra?: unknown,'),
+      baseline.replace(
+        '  const stepId = claimed.step.id;',
+        '  const stepId = String(claimed.step.id);',
+      ),
+    ]) {
+      assert.notEqual(changed, baseline);
+      writeFileSync(file, changed);
+      const result = spawnSync(process.execPath, [script], {
+        cwd,
+        encoding: 'utf8',
+        env: { ...process.env, SINGLE_USE_HELPER_BASE_SHA: '' },
+      });
+      assert.equal(result.status, 0, result.stderr);
+    }
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }

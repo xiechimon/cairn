@@ -23,14 +23,13 @@ try {
       (entry) =>
         typeof entry?.path !== 'string' ||
         typeof entry.name !== 'string' ||
-        typeof entry.declaration !== 'string' ||
         typeof entry.reason !== 'string' ||
         !entry.reason.trim(),
     )
   ) {
-    throw new Error('Allowlist entries require path, name, declaration and reason');
+    throw new Error('Allowlist entries require path, name and reason');
   }
-  const files = git(
+  const changedFiles = git(
     'diff',
     '--name-only',
     '-z',
@@ -43,6 +42,7 @@ try {
   )
     .split('\0')
     .filter((path) => /\.(ts|tsx|mjs)$/.test(path));
+  const files = [...new Set([...changedFiles, ...allowlist.map((entry) => entry.path)])];
   let violations = 0;
   if (files.length) {
     const config = resolve('.single-use-helper-gate.virtual.json');
@@ -97,6 +97,7 @@ try {
               )
           : [],
       );
+      const names = new Set();
       const visit = (node) => {
         if (
           (isFunctionDeclaration(node) && node.body && node.name) ||
@@ -106,38 +107,26 @@ try {
             (isArrowFunction(node.initializer) || isFunctionExpression(node.initializer)))
         ) {
           const name = node.name;
+          names.add(name.text);
           const start = node.getStart(source);
-          const end = node.end;
           const firstLine = source.getLineAndCharacterOfPosition(start).line + 1;
-          const lastLine = source.getLineAndCharacterOfPosition(end).line + 1;
           const symbol = checker.getSymbolAtLocation(name);
           const declarationParent = isVariableDeclaration(node) ? node.parent.parent : node;
           const directlyExported = declarationParent.modifiers?.some(
             (modifier) => modifier.kind === SyntaxKind.ExportKeyword,
           );
-          if (
-            symbol &&
-            !exported.has(symbol.id) &&
-            !directlyExported &&
-            Array.from(added).some((number) => number >= firstLine && number <= lastLine)
-          ) {
+          if (symbol && !exported.has(symbol.id) && !directlyExported && added.has(firstLine)) {
             const references = checker
               .getReferencesToSymbolInFile(resolve(path), symbol)
               .filter(
                 (reference) => reference.resolve()?.getStart(source) !== name.getStart(source),
               );
-            const declaration = source.text.slice(start, end);
             if (
               references.length === 1 &&
-              !allowlist.some(
-                (entry) =>
-                  entry.path === path &&
-                  entry.name === name.text &&
-                  entry.declaration === declaration,
-              )
+              !allowlist.some((entry) => entry.path === path && entry.name === name.text)
             ) {
               console.error(
-                `${path}:${firstLine}: single-use non-exported function ${name.text}; inline it or add an exact allowlist entry`,
+                `${path}:${firstLine}: single-use non-exported function ${name.text}; inline it or add a named allowlist entry`,
               );
               violations++;
             }
@@ -146,6 +135,10 @@ try {
         node.forEachChild(visit);
       };
       visit(source);
+      for (const entry of allowlist.filter((entry) => entry.path === path)) {
+        if (!names.has(entry.name))
+          throw new Error(`Allowlist function ${entry.name} does not exist in ${path}`);
+      }
     }
   }
   console.log(`single-use-helper-gate: ${violations} single-use helper(s)`);
