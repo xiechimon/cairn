@@ -17,6 +17,8 @@ test('local code checks include both UI gates and affected e2e', () => {
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
+    'node scripts/comment-discipline-gate.mjs',
+    'node scripts/single-use-helper-gate.mjs',
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
@@ -28,7 +30,12 @@ test('local code checks include both UI gates and affected e2e', () => {
 
 test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
   const paths = ['apps/web/src/main.tsx'];
-  assert.deepEqual(prepushPlan(paths, 'ci'), prepushPlan(paths).slice(0, -3));
+  assert.deepEqual(
+    prepushPlan(paths, 'ci'),
+    prepushPlan(paths)
+      .slice(0, -3)
+      .filter((args) => !args[1].endsWith('-gate.mjs') || args[1].startsWith('scripts/ui-')),
+  );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);

@@ -14,10 +14,15 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
   ];
+  const localOnly = [
+    ['node', 'scripts/comment-discipline-gate.mjs'],
+    ['node', 'scripts/single-use-helper-gate.mjs'],
+  ];
   return mode === 'ci'
     ? required
     : [
         ...required,
+        ...localOnly,
         ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
         ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
