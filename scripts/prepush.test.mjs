@@ -19,6 +19,7 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
+    'pnpm test',
     'pnpm --filter @pacman/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
@@ -26,7 +27,7 @@ test('local code checks include both UI gates and affected e2e', () => {
 
 test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
   const paths = ['apps/web/src/main.tsx'];
-  assert.deepEqual(prepushPlan(paths, 'ci'), prepushPlan(paths).slice(0, -2));
+  assert.deepEqual(prepushPlan(paths, 'ci'), prepushPlan(paths).slice(0, -3));
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],
   ]);
