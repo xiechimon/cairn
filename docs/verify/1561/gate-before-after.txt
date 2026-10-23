@@ -1,0 +1,8 @@
+old gate on feat/build-basesha-harness-hash (#1560):
+apps/daemon/src/runner.ts:472: single-use non-exported function runClaimedStep; inline it or add an exact allowlist entry
+single-use-helper-gate: 1 single-use helper(s)
+
+new gate on the same branch:
+single-use-helper-gate: 0 single-use helper(s)
+
+node --test scripts/single-use-helper-gate.test.mjs: tests 2, pass 2, fail 0
