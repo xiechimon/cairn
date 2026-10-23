@@ -1,0 +1,95 @@
+import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
+import test from 'node:test';
+
+const script = resolve('scripts/single-use-helper-gate.mjs');
+
+test('checks added helpers with symbol references and exact exemptions', () => {
+  const cwd = mkdtempSync(resolve(tmpdir(), 'single-use-gate-'));
+  const git = (...args) => execFileSync('git', args, { cwd, stdio: 'pipe' });
+  const run = () =>
+    spawnSync(process.execPath, [script], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, SINGLE_USE_HELPER_BASE_SHA: '' },
+    });
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'Test');
+    mkdirSync(resolve(cwd, 'apps/demo'), { recursive: true });
+    mkdirSync(resolve(cwd, 'packages/demo'), { recursive: true });
+    mkdirSync(resolve(cwd, 'scripts'));
+    const allowlist = resolve(cwd, 'scripts/single-use-helper-allowlist.json');
+    writeFileSync(allowlist, '[]');
+    const file = resolve(cwd, 'apps/demo/code.ts');
+    const baseline = 'function existing() { return 1; }\nexisting();\n';
+    writeFileSync(file, baseline);
+    git('add', 'apps/demo/code.ts', 'scripts/single-use-helper-allowlist.json');
+    git('commit', '-m', 'baseline');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    assert.equal(run().status, 0);
+    for (const source of [
+      'function once() { return 1; }\nonce();',
+      'const once = () => 1;\nonce();',
+      'const once = function () { return 1; };\nonce();',
+      'function once() { return 1; }\nconst object = { once };',
+      'export function outer() { function once() {} once(); }',
+      'function once() { return 1; }\nonce();\nconst object = { once: 2 }; object.once;',
+      'function once() { return 1; }\nonce();\nfunction other(once: number) { return once; }',
+    ]) {
+      writeFileSync(file, `${baseline}${source}\n`);
+      const result = run();
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, /apps\/demo\/code.ts:3:.*once/);
+      console.log(`Rejected: ${result.stderr.trim()}`);
+    }
+    for (const source of [
+      'function twice() {}\ntwice(); twice();',
+      'export function once() {}\nonce();',
+      'export const once = () => 1;\nonce();',
+      'function once() {}\nexport { once as publicName };\nonce();',
+      'const once = () => 1;\nexport default once;',
+      'function unused() {}',
+      'const text = "function once() {} once()";',
+    ]) {
+      writeFileSync(file, `${baseline}${source}\n`);
+      const result = run();
+      assert.equal(result.status, 0, result.stderr);
+      console.log(`Accepted: ${source.replaceAll('\n', ' ')}`);
+    }
+    const declaration = 'function once() { return 1; }';
+    for (const path of ['packages/demo/code.tsx', 'scripts/demo.mjs']) {
+      writeFileSync(file, baseline);
+      writeFileSync(resolve(cwd, path), `${declaration}\nonce();\n`);
+      git('add', path);
+      const result = run();
+      assert.equal(result.status, 1, result.stderr);
+      assert.ok(result.stderr.includes(`${path}:1:`));
+      writeFileSync(resolve(cwd, path), 'export {};\n');
+    }
+    writeFileSync(file, `${baseline}${declaration}\nonce();\n`);
+    writeFileSync(
+      allowlist,
+      JSON.stringify([
+        { path: 'apps/demo/code.ts', name: 'once', declaration, reason: 'Deliberate boundary' },
+      ]),
+    );
+    assert.equal(run().status, 0);
+    writeFileSync(file, `${baseline}function once() { return 2; }\nonce();\n`);
+    assert.equal(run().status, 1);
+    writeFileSync(allowlist, '[{}]');
+    assert.equal(run().status, 2);
+    writeFileSync(allowlist, '[]');
+    git('add', 'apps/demo/code.ts');
+    git('commit', '-m', 'candidate');
+    assert.equal(run().status, 1);
+    git('update-ref', '-d', 'refs/remotes/origin/main');
+    assert.equal(run().status, 2);
+  } finally {
+    rmSync(cwd, { recursive: true, force: true });
+  }
+});
