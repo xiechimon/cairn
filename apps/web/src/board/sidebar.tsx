@@ -411,9 +411,6 @@ export function BoardSidebar({
           to={{ pathname: '/app/team', search: plain }}
           aria-current={selected === 'team' ? 'page' : undefined}
         >
-          {/* logo-mark.svg is the spiral alone on a transparent ground, so the
-              mask takes currentColor. A mask url has no utility class, so it
-              rides inline. */}
           <span
             data-testid="brand-mark"
             aria-hidden="true"
