@@ -3,12 +3,21 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const SCANNED = [':(glob)README*.md', ':(glob)site/**/*.html', ':(glob)apps/web/src/**/*.tsx'];
+const SCANNED = [
+  ':(glob)README*.md',
+  ':(glob)site/**/*.html',
+  ':(glob)apps/web/src/**/*.tsx',
+  'packages/shared/src/brand.ts',
+];
 const COMMAND =
   /\b(?:npx(?:\s+-y)?|npm\s+(?:i|install)(?:\s+-g)?)\s+((?:@[a-z0-9][\w.-]*\/)?[a-z0-9][\w.-]*)/g;
+const PUBLISHED_TABLE = /PUBLISHED_PACKAGES\s*=\s*\{([\s\S]*?)\n\}/;
+const TABLE_NAME = /\bname:\s*'([^']+)'/g;
 
 export function packagesIn(text) {
   const names = [...text.matchAll(COMMAND)].map((m) => m[1].replace(/(?<=.)@.*$/, ''));
+  const table = text.match(PUBLISHED_TABLE)?.[1] ?? '';
+  names.push(...[...table.matchAll(TABLE_NAME)].map((m) => m[1]));
   return [...new Set(names)];
 }
 
