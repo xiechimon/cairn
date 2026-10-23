@@ -80,9 +80,7 @@ for (const theme of ['light', 'dark'] as const) {
         nameHref: name.getAttribute('href'),
       };
     });
-    // DESIGN.md 侧栏 item 1: logo.svg pixel mark at 16px, one grid cell per
-    // CSS pixel, painted in the row ink through the mask
-    expect(m.maskImage).toContain('/logo.svg');
+    expect(m.maskImage).toContain('/logo-mark.svg');
     // A one-value mask-size means `<value> auto`. Chrome for Testing 153
     // serializes it as `100% auto`, Chromium 141 as `100%` (#1427).
     const maskSize = m.maskSize.trim().split(/\s+/);

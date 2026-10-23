@@ -28,7 +28,7 @@ test('five parts stack top to bottom in a 248px sidebar', async ({ page }) => {
       const cs = getComputedStyle(el);
       return cs.getPropertyValue('mask-image') || cs.getPropertyValue('-webkit-mask-image');
     }),
-  ).toContain('/logo.svg');
+  ).toContain('/logo-mark.svg');
   await expect(team.getByRole('link', { name: 'Pacman' })).toBeVisible();
   await expect(team.getByRole('button', { name: '搜索' })).toBeVisible();
   await expect(team.getByRole('button', { name: '收起侧边栏' })).toBeVisible();

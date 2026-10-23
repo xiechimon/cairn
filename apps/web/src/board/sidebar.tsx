@@ -411,17 +411,14 @@ export function BoardSidebar({
           to={{ pathname: '/app/team', search: plain }}
           aria-current={selected === 'team' ? 'page' : undefined}
         >
-          {/* logo.svg is a 16-cell pixel grid: at 100% one cell is one CSS
-              pixel, so the mark never resamples. A mask url has no utility
-              class, so it rides inline. */}
           <span
             data-testid="brand-mark"
             aria-hidden="true"
             className="sidebar-brand-mark block size-4 flex-none"
             style={{
               backgroundColor: 'currentColor',
-              WebkitMask: 'url("/logo.svg") center / 100% no-repeat',
-              mask: 'url("/logo.svg") center / 100% no-repeat',
+              WebkitMask: 'url("/logo-mark.svg") center / 100% no-repeat',
+              mask: 'url("/logo-mark.svg") center / 100% no-repeat',
             }}
           />
           <span className="truncate font-heading text-heading font-semibold">

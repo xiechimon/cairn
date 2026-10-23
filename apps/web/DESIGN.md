@@ -134,7 +134,7 @@ pacman 是多 lane coding agent 编排台。用户是键盘优先的工程师，
 
 ### 侧栏（Grouped）
 从上到下：
-1. **工作区行**：像素吃豆人标记（`public/logo.svg` 作 mask，16px，一格一个 CSS 像素，取行墨色 `ink`）+ 衬线品牌名 + 下拉箭头；右侧两个图标按钮：搜索（⌘K）、收起侧栏。
+1. **工作区行**：螺旋标记（`public/logo-mark.svg` 作 mask，16px，取行墨色 `ink`）+ 衬线品牌名 + 下拉箭头；右侧两个图标按钮：搜索（⌘K）、收起侧栏。
 2. **新任务按钮**：白底（`sheet`）、发丝环、赭红加号、右侧键帽 `C`。它是动作，不是导航项。
 3. **工作导航**：工作台、需要我处理（右侧赭红计数徽章）、定时。激活项 = `sheet` 底 + 发丝环 + 赭红图标。
 4. **项目**：分组标签「项目」+ 右侧加号；每个项目一行 = 彩色首字母方块（`project-tiles` 按序取色）+ 名称 + 未完成数。
@@ -287,7 +287,7 @@ Pacman UI rules (source: apps/web/DESIGN.md):
 - Dialogs: DialogShell with size s (400) / m (480) / l (640), light dim backdrop (no blur), 16px serif title + optional 12px sub-line, split footer (12px ink-3 hint left, actions right, ink primary). Menus: white, 10px corners, 4px padding, 32px rows, 13.5px text, 15px ink-3 icons, #f6f2ec hover, danger rows in destructive.
 - Segmented controls only from components/segmented.tsx: SegmentedTabs for view switches, SegmentedRadio for value pickers. Canvas track, white selected option with a 1px ring, inset keyboard ring. Never hand-roll role=tab/radio or restyle TabsList.
 - One card corner: --radius-card (10px) on every card-like surface. Pages compose EmptyState / SettingsHeader+SettingsCard+SettingsRow / FormStack+FormField+FormActions; no tinted icon tiles, no full-width submit bars, no two-tone cards, no pill buttons.
-- Sidebar = Grouped: workspace row (16px pixel pac-man mark from logo.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
+- Sidebar = Grouped: workspace row (16px spiral mark from logo-mark.svg in ink, serif name), New task button, Workbench / Needs me / Schedules, Projects, collapsed Resources, user row with machine status.
 - Use components/ui primitives and tokens; no hex in components.
 ```
 
