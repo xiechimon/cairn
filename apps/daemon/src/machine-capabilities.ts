@@ -29,7 +29,7 @@ import {
   type MachineCapabilities,
   type MachineHardware,
   parseClaudeMcpEntries,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 /** 探测源两位（daemon config 直取：mcpConfigPath / skillsDir）。 */
 export interface MachineCapabilitySources {

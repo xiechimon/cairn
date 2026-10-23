@@ -36,7 +36,7 @@ const teamRowBox = (page: Page) =>
 test.describe('sidebar seam (Paper Grouped)', () => {
   for (const theme of SEAM_VARIANTS) {
     test(`board expanded: no seam, no internal divider (${theme})`, async ({ page }) => {
-      await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app?scenario=01');
 
       const m = await page.evaluate(() => {
@@ -62,9 +62,9 @@ test.describe('sidebar seam (Paper Grouped)', () => {
     test(`team page: the active workspace row keeps the board geometry (${theme})`, async ({
       page,
     }) => {
-      await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+      await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
       await page.goto('/app/team?scenario=12');
-      await expect(page.getByRole('link', { name: 'Pacman' })).toHaveAttribute(
+      await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
         'aria-current',
         'page',
       );
@@ -73,8 +73,8 @@ test.describe('sidebar seam (Paper Grouped)', () => {
 
     test(`rail: no seam either (${theme})`, async ({ page }) => {
       await page.addInitScript((t) => {
-        localStorage.setItem('pacman-theme', t);
-        localStorage.setItem('pacman.sidebar-collapsed', '1');
+        localStorage.setItem('cairn-theme', t);
+        localStorage.setItem('cairn.sidebar-collapsed', '1');
       }, theme);
       await page.goto('/app?scenario=01');
 
@@ -101,7 +101,7 @@ test.describe('sidebar seam (Paper Grouped)', () => {
       test(`${name} shell: no seam, same workspace row (${theme})`, async ({
         page,
       }) => {
-        await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+        await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
         await page.goto(url);
         const m = await page.evaluate(() => {
           const ss = getComputedStyle(document.querySelector('aside')!);

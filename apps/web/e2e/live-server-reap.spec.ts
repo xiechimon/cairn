@@ -3,7 +3,7 @@
 //      不转发，pnpm-native → tsx → server → esbuild 整串被 PID 1 收养
 //   2. 调用方被 SIGKILL / 崩溃（Bash 超时、Ctrl-C、worker 崩），afterAll
 //      没机会跑，server 树原样留存
-// 判据与实现无关：按 PACMAN_HOME=<本次 home> 反查整机进程环境——包装层、
+// 判据与实现无关：按 CAIRN_HOME=<本次 home> 反查整机进程环境——包装层、
 // tsx、server、esbuild 任一层还活着都算残留。
 
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process';
@@ -11,7 +11,7 @@ import { once } from 'node:events';
 import { rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createInterface } from 'node:readline';
-import { ENV_VARS } from '@pacman/shared';
+import { ENV_VARS } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 import { bootLiveServer } from './live-server';
 

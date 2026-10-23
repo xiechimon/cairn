@@ -25,7 +25,7 @@ import {
   type ReviewVerdict,
   reviewFindingSchema,
   reviewVerdictSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 type TranscriptMessageLike = {
   role: 'system' | 'user' | 'assistant';

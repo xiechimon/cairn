@@ -5,7 +5,7 @@
 //      钉 + enableInstallTelemetry:false 声明——pi 缺省是 true）；
 //   D3 file-backed settings = 显式声明绕过（PI_SETTINGS_BYPASS 清单 +
 //      PI_DAEMON_SETTINGS 声明面，行为与清单相符）。
-// 缓存保留（#927 D6）同走 env 钉面：PACMAN_PI_CACHE_RETENTION → PI_CACHE_RETENTION。
+// 缓存保留（#927 D6）同走 env 钉面：CAIRN_PI_CACHE_RETENTION → PI_CACHE_RETENTION。
 // pi 包不在测试面出现——缝纪律（backend/pi.ts 桥导入）。
 
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
@@ -24,7 +24,7 @@ import {
 } from '../src/backend/pi.js';
 
 function worktree(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-trust-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-trust-'));
 }
 
 function plant(dir: string, rel: string, content = 'x'): void {
@@ -103,18 +103,18 @@ describe('#925 D2/D3 telemetry off + settings 绕过声明', () => {
 });
 
 describe('#927 D6 缓存保留：显式设置（配置可读）', () => {
-  test('PACMAN_PI_CACHE_RETENTION 未设/乱值 → short（缺省显式化，请求面零漂移）', () => {
+  test('CAIRN_PI_CACHE_RETENTION 未设/乱值 → short（缺省显式化，请求面零漂移）', () => {
     expect(resolvePiCacheRetention({})).toBe('short');
-    expect(resolvePiCacheRetention({ PACMAN_PI_CACHE_RETENTION: 'LONG' })).toBe('short');
-    expect(resolvePiCacheRetention({ PACMAN_PI_CACHE_RETENTION: '1h' })).toBe('short');
+    expect(resolvePiCacheRetention({ CAIRN_PI_CACHE_RETENTION: 'LONG' })).toBe('short');
+    expect(resolvePiCacheRetention({ CAIRN_PI_CACHE_RETENTION: '1h' })).toBe('short');
   });
 
   test('=long → long（anthropic ttl 1h / openai prompt_cache_retention 24h 由 pi 适配器落）', () => {
-    expect(resolvePiCacheRetention({ PACMAN_PI_CACHE_RETENTION: 'long' })).toBe('long');
+    expect(resolvePiCacheRetention({ CAIRN_PI_CACHE_RETENTION: 'long' })).toBe('long');
   });
 
   test('策略行可读：trust/telemetry/version-check/cache-retention/settings 五位齐', () => {
-    const line = piSessionPolicyLine({ PACMAN_PI_CACHE_RETENTION: 'long' });
+    const line = piSessionPolicyLine({ CAIRN_PI_CACHE_RETENTION: 'long' });
     expect(line).toContain('trust=deny');
     expect(line).toContain('telemetry=off');
     expect(line).toContain('version-check=off');

@@ -1,7 +1,7 @@
 // 事件映射纯函数面（02 §5.6 pi 词表 → 01 §5 StepEvent 缝词表的宿主投影，
 // 映射登记 = backend/pi.ts 头注 [推断]）。pi 包不在测试面出现——缝纪律。
 
-import { THINKING_LEVELS } from '@pacman/shared';
+import { THINKING_LEVELS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   type AgentSessionEventLike,

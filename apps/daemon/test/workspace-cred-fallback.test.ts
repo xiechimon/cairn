@@ -13,22 +13,22 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BoundGitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
-const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
+const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const TOKEN: BoundGitCredentials = {
   username: 'x-access-token',
   password: 'ghp_stale_token',
-  url: 'https://github.com/xiechimon/pacman.git',
+  url: 'https://github.com/xiechimon/cairn.git',
 };
 /** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
-  "fatal: Authentication failed for 'https://github.com/xiechimon/pacman.git/'";
+  "fatal: Authentication failed for 'https://github.com/xiechimon/cairn.git/'";
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -107,11 +107,11 @@ function cloneSpyFailsForToken(): { calls: (BoundGitCredentials | null)[] } {
 
 beforeEach(async () => {
   vi.restoreAllMocks();
-  root = mkdtempSync(join(tmpdir(), 'pacman-ws-cred-root-'));
-  originDir = join(mkdtempSync(join(tmpdir(), 'pacman-ws-cred-origin-')), 'repo.git');
+  root = mkdtempSync(join(tmpdir(), 'cairn-ws-cred-root-'));
+  originDir = join(mkdtempSync(join(tmpdir(), 'cairn-ws-cred-origin-')), 'repo.git');
   seedDir = join(
     tmpdir(),
-    `pacman-ws-cred-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    `cairn-ws-cred-seed-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
@@ -132,7 +132,7 @@ describe('workspace prepare 凭据降级（#1225 clone 半）', () => {
     expect(calls).toEqual([TOKEN, null]);
     expect(prepared.credentialSource).toBe('machine');
     // worktree 真落地（machine 路真 clone 成功）。
-    expect(prepared.branch).toBe('pacman/conv-'.concat(CONV_A));
+    expect(prepared.branch).toBe('cairn/conv-'.concat(CONV_A));
     // 降级日志：原文回传、不携带 token 值（票失败方式 2）。
     const fallbackLine = logger.lines.find((l) => l.includes('machine credentials'));
     expect(fallbackLine).toBeDefined();

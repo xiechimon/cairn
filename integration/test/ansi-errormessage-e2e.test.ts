@@ -73,7 +73,7 @@ describe('#1262 E2E：lint 失败提交 → errorMessage 纯文本落库', () =>
       { content: '修改完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-    home = mkdtempSync(join(tmpdir(), 'pacman-1262-home-'));
+    home = mkdtempSync(join(tmpdir(), 'cairn-1262-home-'));
     const config = loadDaemonConfig(
       {
         serverUrl: server.url,

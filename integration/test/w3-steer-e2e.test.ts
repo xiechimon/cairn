@@ -55,7 +55,7 @@ beforeAll(async () => {
     { content: '收到，补上。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-w3-steer-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-w3-steer-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

@@ -23,7 +23,7 @@ import {
 
 const TOKEN = 'gho_s4aTransportTestToken0123456789';
 const O = 'xiechimon';
-const R = 'pacman';
+const R = 'cairn';
 const API = `https://api.github.com/repos/${O}/${R}`;
 const BASE = 'a6c0865edea6cc95d86b32eb33f6a265c0f20d21';
 const HEAD = 'f9c4f852292592395e882e1d900ca215a1aafce5';
@@ -128,7 +128,7 @@ const ALL: Array<[string, (f: FetchLike, token?: string) => Promise<GithubRawRes
         O,
         R,
         SHA,
-        { state: 'pending', context: 'pacman/merge-gate', description: 'waiting' },
+        { state: 'pending', context: 'cairn/merge-gate', description: 'waiting' },
         { timeoutMs: T },
       ),
   ],
@@ -222,7 +222,7 @@ describe('#1404 S4a gate transport: what is refused before any request', () => {
           O,
           R,
           s,
-          { state: 'success', context: 'pacman/merge-gate', description: 'ready' },
+          { state: 'success', context: 'cairn/merge-gate', description: 'ready' },
           { timeoutMs: T },
         ),
     ],
@@ -330,7 +330,7 @@ describe('#1404 S4a gate transport: what is refused before any request', () => {
       [O, 'x#y', 'repo'],
       [O, 'x%2e', 'repo'],
       [null as unknown as string, R, 'owner'],
-      [O, ['pacman'] as unknown as string, 'repo'],
+      [O, ['cairn'] as unknown as string, 'repo'],
     ] as const) {
       const { fetch, calls } = stub(OK);
       expect(
@@ -430,7 +430,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
       expect(c?.init.headers).toMatchObject({
         accept: 'application/vnd.github+json',
         'x-github-api-version': '2022-11-28',
-        'user-agent': 'pacman-server',
+        'user-agent': 'cairn-server',
         authorization: `Bearer ${TOKEN}`,
       });
       const otherValues = Object.entries(c?.init.headers ?? {}).filter(
@@ -669,7 +669,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
     const created = {
       id: 1,
       state: 'failure',
-      context: 'pacman/merge-gate',
+      context: 'cairn/merge-gate',
       description: '项目策略为人工合并 (policy-human)',
     };
     const { fetch, calls } = stub({ status: 201, headers: { etag: '"s1"' }, body: created });
@@ -681,7 +681,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
       SHA,
       {
         state: 'failure',
-        context: 'pacman/merge-gate',
+        context: 'cairn/merge-gate',
         description: '项目策略为人工合并 (policy-human)',
       },
       { timeoutMs: T },
@@ -694,7 +694,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
     expect(c?.init.headers?.['content-type']).toBe('application/json');
     expect(JSON.parse(c?.init.body ?? 'null')).toEqual({
       state: 'failure',
-      context: 'pacman/merge-gate',
+      context: 'cairn/merge-gate',
       description: '项目策略为人工合并 (policy-human)',
     });
     expect(Object.keys(JSON.parse(c?.init.body ?? '{}')).sort()).toEqual([
@@ -709,14 +709,14 @@ describe('#1404 S4a gate transport: what is sent', () => {
       const { fetch, calls } = stub({ status: 201, body: {} });
       const status = {
         state,
-        context: 'Pacman/Merge-Gate',
+        context: 'Cairn/Merge-Gate',
         description: '',
         target_url: 'https://evil.example',
       };
       await githubCreateCommitStatus(fetch, TOKEN, O, R, SHA, status, { timeoutMs: T });
       expect(JSON.parse(calls[0]?.init.body ?? 'null')).toEqual({
         state,
-        context: 'Pacman/Merge-Gate',
+        context: 'Cairn/Merge-Gate',
         description: '',
       });
     }
@@ -1123,7 +1123,7 @@ describe('#1404 S4a gate transport: what comes back', () => {
           O,
           R,
           SHA,
-          { state: 'success', context: 'pacman/merge-gate', description: 'ready' },
+          { state: 'success', context: 'cairn/merge-gate', description: 'ready' },
           { timeoutMs: T },
         ),
       ).toEqual(expected);

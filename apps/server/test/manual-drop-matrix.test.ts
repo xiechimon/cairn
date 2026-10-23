@@ -12,7 +12,7 @@
 // 边级单源 = shared canBoardDrop（vocabulary.test 钉真值表）；本文件钉 HTTP
 // 面的状态码与错误形状 {error}（r5 §1 实测族）。
 
-import { type Phase, todoRecordSchema } from '@pacman/shared';
+import { type Phase, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { todo as todoTable } from '../src/db/schema.js';

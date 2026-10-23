@@ -1,7 +1,7 @@
 // #1251 可见 pending reason（排队投影 blocked 位 + 板面挂起态）：
 // pending 成因区分「等机器上线」（等待有用）与「缺能力」（装 X 即解锁，给修法）
 // ——Multica dispatch/reason.go 族语义对位（runtime_offline vs runtime_unusable
-// 的分野：等待有没有用），落 pacman 两个读面：
+// 的分野：等待有没有用），落 cairn 两个读面：
 // - 步级 = stepQueueProjector 的 queue.blocked（step-queue.ts，#1108 排队投影
 //   扩展位——transcript「排队中」行与 chief turnQueue 两面同源）；
 // - 板面 = todo waitingOn 派生（#1257 律：pending 不再失败收尾，挂起等机器；

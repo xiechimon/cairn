@@ -27,7 +27,7 @@ import {
   composeTaskPromptWithInstruction,
   conversationBranch,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -101,11 +101,11 @@ function countLog(line: string): number {
 
 /** 证据捕获（apps/web/e2e/evidence.ts 同律的 integration 形：opt-in env，
  * 未设 = no-op——回归跑不写跟踪路径）：
- *   PACMAN_IT_EVIDENCE=docs/verify/931 pnpm --filter integration exec vitest run \
+ *   CAIRN_IT_EVIDENCE=docs/verify/931 pnpm --filter integration exec vitest run \
  *   test/rework-branch-reuse-e2e.test.ts
  * 值从仓根 resolve（evidence.ts 同式），目录按需建。 */
-const EVIDENCE_ROOT = process.env.PACMAN_IT_EVIDENCE
-  ? resolve(import.meta.dirname, '../..', process.env.PACMAN_IT_EVIDENCE)
+const EVIDENCE_ROOT = process.env.CAIRN_IT_EVIDENCE
+  ? resolve(import.meta.dirname, '../..', process.env.CAIRN_IT_EVIDENCE)
   : null;
 
 function evidenceText(name: string, text: string): void {
@@ -156,7 +156,7 @@ beforeAll(async () => {
     claimHoldMs: 1_000,
     agentDescription: '你是集成测试执行 Agent：按任务要求用 bash 工具完成文件改动，然后简短汇报。',
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-rework-reuse-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-rework-reuse-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,
@@ -264,10 +264,9 @@ describe('#931 两条返工路回原分支（E2E）', () => {
     expect(builds).toHaveLength(1);
     const todoRow = server.db.select().from(todoTable).where(eq(todoTable.id, world.todoId)).get()!;
     expect(todoRow.latestBuildId).toBe(buildId);
-    expect((await systemGitOps.listBranches(bareDir)).branches.map((b) => b.name)).toEqual([
-      'main',
-      branch,
-    ]); // 无第二条 conv 分支
+    expect((await systemGitOps.listBranches(bareDir)).branches.map((b) => b.name).sort()).toEqual(
+      ['main', branch].sort(),
+    ); // 无第二条 conv 分支
     const buildRow = server.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
     expect(buildRow.prNumber).toBe(PR_NUMBER);
     expect(buildRow.prUrl).toBe(PR_URL);

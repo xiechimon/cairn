@@ -28,7 +28,7 @@ import {
   type ProjectRecord,
   type ProjectTreeResponse,
   parseGithubRepoRef,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build as buildTable, project, todo as todoTable } from '../db/schema.js';
@@ -249,10 +249,10 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
   };
 }
 
-/** GitHub 接入 `owner/repo` 形状校验——单源已迁 @pacman/shared（web 表单
+/** GitHub 接入 `owner/repo` 形状校验——单源已迁 @cairn/shared（web 表单
  * 同吃，#305）；此处 re-export 维持 routes/skills/chief-tools 三个既有
  * import 面不动。 */
-export { isGithubRepoRef } from '@pacman/shared';
+export { isGithubRepoRef } from '@cairn/shared';
 
 /** 文件浏览面的 repo 目录解析（#1030 起 hosted + local 双形态放行；GitHub
  * 形态无本地存储面仍 404）。hosted = server 侧 bare 目录（自 provisioning

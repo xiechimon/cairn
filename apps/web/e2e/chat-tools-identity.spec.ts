@@ -76,7 +76,7 @@ test('I3: expanded copy still puts pills and outputs on the clipboard', async ({
   const clip = await readClipboard(page);
   expect(clip).toContain('bash ls -la');
   expect(clip).toContain('total 16');
-  expect(clip).toContain('hello from pacman');
+  expect(clip).toContain('hello from cairn');
 });
 
 test('I4: expand/collapse interaction and the #470 row geometry are untouched', async ({

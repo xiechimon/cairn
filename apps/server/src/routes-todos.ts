@@ -10,7 +10,7 @@ import {
   IN_PROGRESS_PHASES,
   phaseSchema,
   type TodoRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';

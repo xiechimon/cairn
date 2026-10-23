@@ -4,7 +4,7 @@
 // machines.ts / chief.ts / builds.ts / todos.ts / chief-tools.ts 等以接口
 // 边界消费（不应为拿一个 transport 原语 import 协议实现模块）。
 
-import type { MachineStreamEvent, MachineSyncCommand } from '@pacman/shared';
+import type { MachineStreamEvent, MachineSyncCommand } from '@cairn/shared';
 
 // —— wake 通道（claim 长轮询等待者 + SSE stream 订阅者，按 team 分组）—————————
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 # 双包 pack 冒烟（#264/#299）：`npm pack`（发布真身形态；prepack 自建 bundle +
 # web dist）→ manifest 断言（双包）→ 仓外临时目录装主包 tarball → 裸 `node` 起
-# → 断言 `/api/user/me` 200 + `/app` 200 + 数据根隔离（临时 PACMAN_HOME）。
+# → 断言 `/api/user/me` 200 + `/app` 200 + 数据根隔离（临时 CAIRN_HOME）。
 # 失败方式枚举 = spec #260 Testing Decisions + 首发 0.1.0 事故（#266）固化：
 #   1. bundle 缺依赖（external 误伤）→ 裸 node 起不来 → 红
 #   2. web dist 未进包 / webDir 解析错 → /app 非 200 → 红
@@ -10,12 +10,12 @@
 #   5. dependencies 残留 catalog:/workspace:（npm 原样打包、装包静默崩）→ 红
 #   6. bin 路径带 ./ 前缀（npm publish 判 invalid 静默摘除、npx 无入口）→ 红
 # 仓外安装 = 规避 npm 沿目录树爬到仓根解析 `catalog:` 的祖先坑；探针一律
-# 不碰真实 ~/.pacman。cli 包断言 manifest+内容清单（不起进程——enroll 链
+# 不碰真实 ~/.cairn。cli 包断言 manifest+内容清单（不起进程——enroll 链
 # 归 e2e/首发实测）。
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/pacman-pack-smoke.XXXXXX")
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/cairn-pack-smoke.XXXXXX")
 SERVER_PID=""
 cleanup() {
   if [ -n "$SERVER_PID" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi
@@ -23,18 +23,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "== pack @xiechimon/pacman（prepack: web build + esbuild bundle + stage-web） =="
+echo "== pack @xiechimon/cairn（prepack: web build + esbuild bundle + stage-web） =="
 # npm pack = npm publish 的真身形态：pnpm pack 会替换 catalog:/workspace:，npm 不会——
 # 断言必须测发布形态（首发 0.1.0 坏包教训，#299）。
 (cd "$ROOT/apps/server" && npm pack --pack-destination "$WORK" >/dev/null)
 
-TGZ=$(find "$WORK" -maxdepth 1 -name 'xiechimon-pacman-*.tgz' ! -name '*-cli-*' | head -n1)
+TGZ=$(find "$WORK" -maxdepth 1 -name 'xiechimon-cairn-*.tgz' ! -name '*-cli-*' | head -n1)
 [ -n "$TGZ" ] || { echo "FAIL: server tarball 未产出"; exit 1; }
 
-echo "== pack @xiechimon/pacman-cli（prepack: esbuild bundle） =="
+echo "== pack @xiechimon/cairn-cli（prepack: esbuild bundle） =="
 (cd "$ROOT/apps/daemon" && npm pack --pack-destination "$WORK" >/dev/null)
 
-TGZ_CLI=$(find "$WORK" -maxdepth 1 -name 'xiechimon-pacman-cli-*.tgz' | head -n1)
+TGZ_CLI=$(find "$WORK" -maxdepth 1 -name 'xiechimon-cairn-cli-*.tgz' | head -n1)
 [ -n "$TGZ_CLI" ] || { echo "FAIL: cli tarball 未产出"; exit 1; }
 
 echo "== tarball manifest 断言（双包） =="
@@ -46,7 +46,7 @@ process.stdin.on('data',d=>s+=d).on('end',()=>{
   const deps=Object.entries(p.dependencies||{});
   const bad=deps.filter(([,v])=>/workspace:|catalog:/.test(v));
   if (bad.length) { console.error('FAIL: '+p.name+' dependencies 残留 workspace/catalog: '+JSON.stringify(bad)); process.exit(1); }
-  if (!p.bin || !p.bin.pacman) { console.error('FAIL: '+p.name+' bin.pacman 缺'); process.exit(1); }
+  if (!p.bin || !p.bin.cairn) { console.error('FAIL: '+p.name+' bin.cairn 缺'); process.exit(1); }
   const binBad=Object.entries(p.bin).filter(([,v])=>String(v).startsWith('./'));
   if (binBad.length) { console.error('FAIL: '+p.name+' bin 路径带 ./ 前缀（npm publish 会静默摘除 bin）: '+JSON.stringify(binBad)); process.exit(1); }
   console.log('ok: '+p.name+'@'+p.version+' deps = ' + (deps.map(([k])=>k).join(', ') || '(none)'));
@@ -79,15 +79,15 @@ npm init -y >/dev/null 2>&1
 npm install "$TGZ" --no-audit --no-fund >/dev/null 2>&1
 echo "ok: npm install $(basename "$TGZ")"
 
-echo "== 裸 node 起（隔离 PACMAN_HOME） =="
-PKG="$WORK/install/node_modules/@xiechimon/pacman"
+echo "== 裸 node 起（隔离 CAIRN_HOME） =="
+PKG="$WORK/install/node_modules/@xiechimon/cairn"
 PORT=""
 for candidate in 8395 8396 8397 8398; do
   if ! lsof -iTCP:$candidate -sTCP:LISTEN >/dev/null 2>&1; then PORT=$candidate; break; fi
 done
 [ -n "$PORT" ] || { echo "FAIL: 8395-8398 全被占用"; exit 1; }
 echo "using port $PORT"
-PORT=$PORT PACMAN_HOME="$WORK/home" node "$PKG/dist/index.mjs" > "$WORK/server.out" 2>&1 &
+PORT=$PORT CAIRN_HOME="$WORK/home" node "$PKG/dist/index.mjs" > "$WORK/server.out" 2>&1 &
 SERVER_PID=$!
 
 wait_200() {

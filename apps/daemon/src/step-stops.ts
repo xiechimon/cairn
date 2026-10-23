@@ -1,4 +1,4 @@
-import type { AgentSessionHandle } from '@pacman/shared';
+import type { AgentSessionHandle } from '@cairn/shared';
 
 /** 停止请求：discard = 「丢弃本轮修改」勾选位，true → 收尾 rewind 到步起点。 */
 export interface StopRequest {

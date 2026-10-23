@@ -1,7 +1,7 @@
 // Probe-dump instrumentation preload (#921).
 //
 // Loaded into every node process of a probe-dump run via
-// NODE_OPTIONS="--import <this file>"; inert unless PACMAN_PROBE_DUMP_FILE
+// NODE_OPTIONS="--import <this file>"; inert unless CAIRN_PROBE_DUMP_FILE
 // is set. Two capture layers, both recording NDJSON lines into that file:
 //
 //   1. Assertion capture — the module-level `expect` export of
@@ -33,7 +33,7 @@
 import { appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-const DUMP_FILE = process.env.PACMAN_PROBE_DUMP_FILE;
+const DUMP_FILE = process.env.CAIRN_PROBE_DUMP_FILE;
 if (DUMP_FILE != null && DUMP_FILE !== '') {
   try {
     instrument(createRequire(import.meta.url));

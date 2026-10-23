@@ -131,7 +131,7 @@ test('plan-diff 面同路径接词级 span(scenario 72 的真 del/add 对)', asy
 
 for (const theme of ['light', 'dark'] as const) {
   test(`词级底色骑比整行底色更深的 token,非透明且可区分(${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto(ROUTE);
     for (const kind of ['add', 'del'] as const) {
       const row = page.locator(`[data-kind="${kind}"]`, { hasText: 'timeoutMs' });

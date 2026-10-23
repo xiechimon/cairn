@@ -255,7 +255,7 @@ async function shot(name: string): Promise<void> {
 
 beforeAll(async () => {
   // web 生产构建（scenario-blind = 恒 live 数据源；集成面文件串行，#349）。
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });
@@ -274,7 +274,7 @@ beforeAll(async () => {
   // local 形态项目：合并落地（applyMergeLanding）只对 hosted 生效，本文件的
   // 判据面是弹层→写面→相位，不是 bare repo 落地（那面归 g2t2）——local 让
   // 假机器回报的 merge 步不背真 commit 也能按生产语义走完 completeStep。
-  const userRepo = mkdtempSync(join(tmpdir(), 'pacman-done-dialog-repo-'));
+  const userRepo = mkdtempSync(join(tmpdir(), 'cairn-done-dialog-repo-'));
   spawnSync('git', ['init', '-b', 'main'], { cwd: userRepo });
   const project = await api(server.url, 'POST', '/api/projects', {
     name: 'done-dialog-probe',

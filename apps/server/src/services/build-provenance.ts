@@ -1,4 +1,4 @@
-import type { MachineHeartbeatBody } from '@pacman/shared';
+import type { MachineHeartbeatBody } from '@cairn/shared';
 import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, buildFeedback, step } from '../db/schema.js';

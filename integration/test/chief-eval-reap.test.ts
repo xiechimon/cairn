@@ -26,7 +26,7 @@ describe('reapEscapees', () => {
   const pids: number[] = [];
 
   const makeHome = (): string => {
-    const home = mkdtempSync(join(tmpdir(), 'pacman-eval-chief-test-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-eval-chief-test-'));
     homes.push(home);
     return home;
   };
@@ -90,6 +90,6 @@ describe('reapEscapees', () => {
   });
 
   test('目录不存在时返回 0 而不抛', async () => {
-    expect(await reapEscapees(join(tmpdir(), 'pacman-eval-chief-absent-xyz'))).toBe(0);
+    expect(await reapEscapees(join(tmpdir(), 'cairn-eval-chief-absent-xyz'))).toBe(0);
   });
 });

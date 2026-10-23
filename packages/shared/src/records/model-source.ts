@@ -1,5 +1,5 @@
 // model-source record（spec 11 §A3/A4 数据契约单源，#356）：providers 页
-// runtime tabs 的封套形状。pacman 自身不提供远程模型服务——页面语义 =
+// runtime tabs 的封套形状。cairn 自身不提供远程模型服务——页面语义 =
 // 各 runtime 的模型来源直读：pi 段 = 用户配置的 custom provider 的
 // models[] 投影；claude-code 段 = 各执行机 daemon 读本机
 // ~/.claude/settings.json 经 presence/enroll 上报、server 按机器聚合
@@ -65,7 +65,7 @@ export type ClaudeAuthStateWire = z.infer<typeof claudeAuthStateSchema>;
 export const modelSourceSchema = z.object({
   runtime: modelSourceRuntimeSchema,
   /** claude-code：上报机器的 settings.json 存在且解析为对象；pi 恒 true
-   *  （server 在跑 = pacman 自有 runtime 可用）。**不是**「二进制装了」的
+   *  （server 在跑 = cairn 自有 runtime 可用）。**不是**「二进制装了」的
    *  判据——那是 `bin`（#1050）。 */
   installed: z.boolean(),
   /** 上报机器的 hostname（os.hostname()）——「已安装在 <hostname>」文案源。

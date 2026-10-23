@@ -4,7 +4,7 @@
 // SecretBox（AES-256-GCM + keyfile，01 §4.2）。
 // API 面纪律：GET 永不返回 value（record 投影 = shared secretRecordSchema）。
 
-import type { SecretBox, SecretRecord } from '@pacman/shared';
+import type { SecretBox, SecretRecord } from '@cairn/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { secret } from '../db/schema.js';

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# backup-server-db.sh — pacman server SQLite DB 的小时级备份（#1151 / ADR 0016 裁决 7）。
+# backup-server-db.sh — cairn server SQLite DB 的小时级备份（#1151 / ADR 0016 裁决 7）。
 #
 #   scripts/ops/backup-server-db.sh --db <server.db 路径> --out <备份目录> [--remote <ssh目标:目录>] [--keep N]
 #

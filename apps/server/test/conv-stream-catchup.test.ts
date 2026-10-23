@@ -14,8 +14,8 @@
 //    逐帧过 shared conversationStreamEventSchema；回合终局后新订阅零补发。
 // live 栈中途进场实测（第二客户端见前缀）归 docs/verify/740/ 证据面。
 
-import type { ConversationStepEvent, TranscriptRow } from '@pacman/shared';
-import { conversationStreamEventSchema } from '@pacman/shared';
+import type { ConversationStepEvent, TranscriptRow } from '@cairn/shared';
+import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';
@@ -465,7 +465,7 @@ describe('chief wire 面：中途进场补发（#740 票面症状路径）', () 
 
 describe('hub 活动相位（#905）', () => {
   const act = (phase: 'thinking' | 'tool' | 'responding', at: number, extra?: object) =>
-    ({ stepId: 'step-1', at, phase, ...extra }) as import('@pacman/shared').StepActivity;
+    ({ stepId: 'step-1', at, phase, ...extra }) as import('@cairn/shared').StepActivity;
 
   function activityFrames(conn: FakeConn): unknown[] {
     return conn.frames.filter((f) => (f as { type: string }).type === 'activity');
@@ -541,7 +541,7 @@ describe('hub agent 待办清单（#1524）', () => {
         { text: '开票沉淀注释规则', state: 'doing' },
         { text: '查 pi 模型上下文是不是都 1M', state: 'done' },
       ],
-    }) as import('@pacman/shared').AgentTodo;
+    }) as import('@cairn/shared').AgentTodo;
 
   function todoFrames(conn: FakeConn): unknown[] {
     return conn.frames.filter((f) => (f as { type: string }).type === 'agent_todo');

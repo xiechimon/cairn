@@ -1,4 +1,4 @@
-import type { AgentRecord, AgentTask, MemoryRecord, SecretRecord } from '@pacman/shared';
+import type { AgentRecord, AgentTask, MemoryRecord, SecretRecord } from '@cairn/shared';
 import { boardDefault } from './board.js';
 import { CHIEF_EXAMPLES } from './chief.js';
 import { legacyDone, legacyReview, PROJECT_ID, R3_BUILDER, TEAM_ID } from './core.js';

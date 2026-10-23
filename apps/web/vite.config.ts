@@ -1,12 +1,12 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
-// dev 端口从 PACMAN_DEV_WEB_PORT 读，缺省 5173（= vite 默认，与 proxy 侧的
-// PACMAN_DEV_SERVER_PORT 对称）。空串/非法值同样回落缺省。
-const devWebPort = Number(process.env.PACMAN_DEV_WEB_PORT) || 5173;
+// dev 端口从 CAIRN_DEV_WEB_PORT 读，缺省 5173（= vite 默认，与 proxy 侧的
+// CAIRN_DEV_SERVER_PORT 对称）。空串/非法值同样回落缺省。
+const devWebPort = Number(process.env.CAIRN_DEV_WEB_PORT) || 5173;
 
 // dev 期 proxy → server（01 §4.1 构建行；M5 live 数据源同源化——cookie 会话
-// 与 SSE 免 CORS）。目标端口 = PACMAN_DEV_SERVER_PORT，缺省 8787
+// 与 SSE 免 CORS）。目标端口 = CAIRN_DEV_SERVER_PORT，缺省 8787
 // （apps/server/src/config.ts 的 PORT 缺省）。preview 形态不经 proxy
 // （静态托管/fixture）。
 /** preview 下 /api、/git 一律 404（#483）。preview 是静态托管面，这两个前缀
@@ -51,7 +51,7 @@ export default defineConfig({
     port: devWebPort,
     // strictPort：vite 缺省「被占就静默 +1」在多栈并行下有两重害处——界面
     // 地址每次漂移，且 proxy 仍指向本栈 server 之外（界面实际驱动的是别人
-    // 的栈）。撞端口即启动失败，换号走 PACMAN_DEV_WEB_PORT。
+    // 的栈）。撞端口即启动失败，换号走 CAIRN_DEV_WEB_PORT。
     strictPort: true,
     // watch 排除 .claude/**——并行 agent worktree 落在仓内任意深度的
     // .claude/worktrees/ 时,其 pnpm install/构建动静会触发 vite 全量重载
@@ -59,11 +59,11 @@ export default defineConfig({
     watch: { ignored: ['**/.claude/**'] },
     proxy: {
       '/api': {
-        target: `http://127.0.0.1:${process.env.PACMAN_DEV_SERVER_PORT ?? 8787}`,
+        target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
         changeOrigin: true,
       },
       '/git': {
-        target: `http://127.0.0.1:${process.env.PACMAN_DEV_SERVER_PORT ?? 8787}`,
+        target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
         changeOrigin: true,
       },
     },

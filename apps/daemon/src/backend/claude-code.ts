@@ -14,7 +14,7 @@
 // 冷重试通道）；A8 steer = 流输入队列（下轮消费）——pi 的中途注入语义差异
 // 已文档化不抹平，interrupt 归 T2；A9 skills catalog 追加 systemPrompt（复用
 // pi 的 buildSkillsCatalog 通道）；A10 工具面已按 #647（T4）接线：host 注入
-// 工具（remoteTools relay + localTools 本地执行）包成一个 `pacman` in-process
+// 工具（remoteTools relay + localTools 本地执行）包成一个 `cairn` in-process
 // MCP server（createSdkMcpServer）交给 SDK，McpEndpoint 映射 SDK 原生 config
 // （工具名 `mcp__<slug>__<tool>` 与 pi 原生 MCP 命名同形，#930）；A11 model verbatim
 // 透传；A13
@@ -61,8 +61,8 @@ import type {
   SessionOpts,
   StepEvent,
   ToolCallRecord,
-} from '@pacman/shared';
-import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@pacman/shared';
+} from '@cairn/shared';
+import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeAuthFailureMessage } from '../claude-code-auth.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
@@ -154,7 +154,7 @@ export function createClaudeMapState(opts?: {
   };
 }
 
-/** SDK ModelUsage/usage → pacman 行集（A6）。modelUsage 优先（per-model 总计，
+/** SDK ModelUsage/usage → cairn 行集（A6）。modelUsage 优先（per-model 总计，
  *  含 subagent/sidechain）；缺席时以 result.usage 合成单行（键 = modelId）。 */
 function toUsageRows(
   msg: {
@@ -584,7 +584,7 @@ function claudeProjectsRoot(): string {
 /** CLI 会话 store（Claude Code 2.1.278 实测，#1312）：
  *  ~/.claude/projects/<cwd-slug>/<sessionId>.jsonl。slug 把解析后 cwd 里
  *  每个非字母数字字符换成 `-`（`/`、`.`、`_` 都算）。只替换 `/` 时
- *  `~/.pacman` 工作区的预检路径与 CLI 落盘目录不一致，continue 在文件
+ *  `~/.cairn` 工作区的预检路径与 CLI 落盘目录不一致，continue 在文件
  *  还在的情况下被判 miss。
  *  净化后超过 200 字符时截到 200 并附路径哈希（sdk `hm`）。250 字符 cwd
  *  的 CLI 落盘目录以 `-ebpasi` 结尾，与本式一致；不截断则长路径预检仍 miss。
@@ -607,14 +607,14 @@ export function sdkTranscriptPath(cwd: string, sessionId: string): string {
 }
 
 // —— T4 工具面（#647：SDK mcpServers + createSdkMcpServer in-process 回调）——
-// host 注入工具（remoteTools relay / localTools 本地执行）包成一个 `pacman`
+// host 注入工具（remoteTools relay / localTools 本地执行）包成一个 `cairn`
 // in-process MCP server；McpEndpoint 映射 SDK 原生 config。与 pi customTool 的
-// 已知语义差异（票面明示不抹平）：工具名经 MCP 面恒带 `mcp__pacman__` 前缀
+// 已知语义差异（票面明示不抹平）：工具名经 MCP 面恒带 `mcp__cairn__` 前缀
 // （pi 裸名）；参数经 zod shape 解析——多出的键被剥、缺 required 报错给模型
 // 自纠（pi 透传 server 校验）。
 
-/** host 注入工具的 in-process server 名（工具名形 `mcp__pacman__<name>`）。 */
-const HOST_MCP_SERVER_NAME = 'pacman';
+/** host 注入工具的 in-process server 名（工具名形 `mcp__cairn__<name>`）。 */
+const HOST_MCP_SERVER_NAME = 'cairn';
 
 /** JSON Schema 词表（host 注入面现行为全集，chief-tools obj/str/arr/bool/num
  *  帮手产物 + 本地工具同形）。词表外形态（type 或键）fail-closed：静默丢
@@ -720,7 +720,7 @@ export interface HostToolSources {
 
 /** remoteTools + localTools → in-process server 工具集。remoteTools 非空而
  *  relay 缺席 = 内部不变量破裂（runner 恒成对注入），fail-closed 不静默丢。
- *  handler 闭包钉 def.name 发 relay——CLI 工具名带 `mcp__pacman__` 前缀，
+ *  handler 闭包钉 def.name 发 relay——CLI 工具名带 `mcp__cairn__` 前缀，
  *  relay 协议按裸名匹配（服务端 switch(name) 词表）。拒绝/传输失败 → 工具
  *  结果文本（pi customTool 同律，不抛断回合）；isError 位给模型显式错误信号
  *  （MCP 原生通道，pi 侧无此概念——transcript 行 isError 随之可观测）。 */
@@ -836,7 +836,7 @@ export function buildSkillDenyRules(denied: readonly DeniedSkillEntry[]): string
 // —— 原生插件通道（#1171）：团队技能进 Claude Code 原生 Skill 发现面 ——————
 // SDK `plugins` 选项（pluginDelivery 缺省 'argv' → 每插件一个 `--plugin-dir`
 // 旗标）把 daemon 缓存 plugins/ 分区里的插件目录交给 CLI 原生加载：技能以
-// `pacman-team-skills:<name>` 限定形进 Skill 工具清单（alias = 非限定名），
+// `cairn-team-skills:<name>` 限定形进 Skill 工具清单（alias = 非限定名），
 // 任务 worktree 零写入。deny 三条规则形不改一字即命中插件限定名（alias
 // 匹配；#1171 调研评论探针 2 实测），allowed 技能不误伤。catalog XML 简报
 // 通道照常并存（票面边界）——本通道任何失败都回落 catalog，不阻断步。
@@ -1017,7 +1017,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
 
 export interface ClaudeCodeBackendOpts {
   /** skills 执行面注入（spec 14/#371，A9 复用 pi 通道）：skillsDir =
-   *  PACMAN_SKILLS_DIR 扫描根；cwd = daemon home。缺省 = 不注入。 */
+   *  CAIRN_SKILLS_DIR 扫描根；cwd = daemon home。缺省 = 不注入。 */
   skills?: { skillsDir: string; cwd: string };
   /** `[skills]` 诊断行出口（machine-loop 接 logger.skills，与 pi 同型）。 */
   onSkillsLog?: (msg: string) => void;
@@ -1106,9 +1106,9 @@ export class ClaudeCodeBackend implements AgentBackend {
     const append = opts.systemPrompt;
     // A4 零凭据：不消费 opts.provider（inert 占位）；A11 model verbatim；
     // A13 bypassPermissions + disallowedTools（readOnly 收 Edit/Write）。
-    // #1049 起 AskUserQuestion 仍恒拒，理由换血：SDK 原生问答工具与 pacman 的
-    // 结构化 ask_user（mcp__pacman__ask_user，阻塞语义 = in-process MCP 工具
-    // 调用默认无超时）是同一能力的两个面——留一个通道（pacman 词表件），问答
+    // #1049 起 AskUserQuestion 仍恒拒，理由换血：SDK 原生问答工具与 cairn 的
+    // 结构化 ask_user（mcp__cairn__ask_user，阻塞语义 = in-process MCP 工具
+    // 调用默认无超时）是同一能力的两个面——留一个通道（cairn 词表件），问答
     // 卡/幂等/收口全走 server 单源；实测 SDK 会话里原生工具本就不进 toolset
     // （verify/1049 probe：模型自报「no AskUserQuestion tool in my toolset」，
     // onUserDialog + supportedDialogKinds 已声明也不改变）。

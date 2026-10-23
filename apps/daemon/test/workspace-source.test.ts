@@ -24,7 +24,7 @@ import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { normalizedRepoRef, WorkspaceManager } from '../src/workspace.js';
 
-const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
+const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -80,7 +80,7 @@ async function advanceTruth(): Promise<string> {
 
 /** 用户本机仓（localPath 候选）：clone 自真值（origin 指真值）。 */
 async function makeUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'pacman-dual-user-')), 'repo');
+  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-user-')), 'repo');
   await runGit(['clone', truthDir, dir]);
   return dir;
 }
@@ -97,9 +97,9 @@ function prepareInput(localPath: string | null) {
 }
 
 beforeEach(async () => {
-  root = mkdtempSync(join(tmpdir(), 'pacman-dual-root-'));
-  truthDir = join(mkdtempSync(join(tmpdir(), 'pacman-dual-truth-')), 'truth.git');
-  seedDir = join(mkdtempSync(join(tmpdir(), 'pacman-dual-seed-')), 'seed');
+  root = mkdtempSync(join(tmpdir(), 'cairn-dual-root-'));
+  truthDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-truth-')), 'truth.git');
+  seedDir = join(mkdtempSync(join(tmpdir(), 'cairn-dual-seed-')), 'seed');
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
   await seedTruth();
@@ -138,7 +138,7 @@ describe('双执行源选源（github 形态 localPath 加速位，#1213）', ()
   test('D2 origin 对不上 → 回落（防误吸）', async () => {
     const userRepo = await makeUserRepo();
     // origin 重指另一个 bare（同 owner/repo 名也救不了：host/路径归一后不同）。
-    const other = join(mkdtempSync(join(tmpdir(), 'pacman-dual-other-')), 'truth.git');
+    const other = join(mkdtempSync(join(tmpdir(), 'cairn-dual-other-')), 'truth.git');
     await runGit(['init', '--bare', other]);
     await runGit(['remote', 'set-url', 'origin', other], { cwd: userRepo });
     const prepared = await ws.prepare(prepareInput(userRepo));

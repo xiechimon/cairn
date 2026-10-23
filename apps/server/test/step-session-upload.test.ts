@@ -13,7 +13,7 @@ import {
   machineUploadUrlsResponseSchema,
   SESSION_FILE_NAME,
   SESSION_JSONL_MAX_BYTES,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, step as stepTable } from '../src/db/schema.js';

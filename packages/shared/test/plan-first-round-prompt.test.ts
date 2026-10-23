@@ -35,7 +35,7 @@ const TASK_TEXT = buildTaskPromptText(TITLE, SPEC);
 const CONTRACT = buildPlanFirstRoundInstruction();
 const REWRITE = buildPlanRewritePrompt();
 /** 任意机器本地路径（过滤侧只认形状，不认路径值）。 */
-const PLAN_FILE = '/home/u/.pacman/plans/0198f6c0-0000-7000-8000-000000000000/plan.md';
+const PLAN_FILE = '/home/u/.cairn/plans/0198f6c0-0000-7000-8000-000000000000/plan.md';
 const NOTE = buildPlanLocationNote(PLAN_FILE);
 
 describe('契约文本位置无关化（失败方式 1）', () => {

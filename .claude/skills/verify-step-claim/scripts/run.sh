@@ -9,7 +9,7 @@ REPO_ROOT="$(git -C "$SKILL_DIR" rev-parse --show-toplevel)"
 TLA_VERSION="1.7.4"
 TLA_SHA256="936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88"
 TLA_URL="https://github.com/tlaplus/tlaplus/releases/download/v${TLA_VERSION}/tla2tools.jar"
-JAR="${PACMAN_TLA_JAR:-$HOME/.cache/pacman/tla2tools-${TLA_VERSION}.jar}"
+JAR="${CAIRN_TLA_JAR:-$HOME/.cache/cairn/tla2tools-${TLA_VERSION}.jar}"
 JAVA="${JAVA:-java}"
 TRACE_VARS="st sm phase home holder ex fresh progressed online presenceFresh connected dm stopPending stopEvt stopInHand journal jstop staleApply stopDelivered"
 

@@ -14,7 +14,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { conversationBranch, diffFileContentSchema } from '@pacman/shared';
+import { conversationBranch, diffFileContentSchema } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { build as buildTable, todo as todoTable } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
@@ -72,7 +72,7 @@ async function setupWorld() {
   insertBuild(s, projectId, BUILD_ID, 'todo-full');
   insertBuild(s, projectId, NO_BRANCH_BUILD_ID, 'todo-nobranch'); // conv 分支永不推
 
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-diff-full-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-diff-full-'));
   dirs.push(dir);
   const bareDir = join(s.reposDir, s.team.id, 'diff-full.git');
   const repoDir = join(dir, 'repo');

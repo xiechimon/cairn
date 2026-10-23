@@ -1,4 +1,4 @@
-import type { ModelSource } from '@pacman/shared';
+import type { ModelSource } from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,

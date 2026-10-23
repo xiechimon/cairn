@@ -40,7 +40,7 @@ import {
   machineRecordSchema,
   machineShellPrecheckResponseSchema,
   SHELL_COMMAND_CHAR_LIMIT,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

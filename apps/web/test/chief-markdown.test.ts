@@ -28,7 +28,7 @@
 //   F-D4 javascript: 伪链成锚（scheme 白名单退化；现状已挡 → 负例钉住防回归）
 //   F-D5 渲染链出现 dangerouslySetInnerHTML（解析器产 React 节点的 XSS 律退化）
 
-import type { AgentRecord, ChiefGetResponse, ChiefThread } from '@pacman/shared';
+import type { AgentRecord, ChiefGetResponse, ChiefThread } from '@cairn/shared';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';

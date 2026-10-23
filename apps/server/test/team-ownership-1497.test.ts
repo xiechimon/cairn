@@ -13,7 +13,7 @@
 //  V7 build 变更读面（readBuildChangeFile）：任务指向他队 hosted 项目时读到
 //     他队 bare 仓。
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';

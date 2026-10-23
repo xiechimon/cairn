@@ -28,7 +28,7 @@
 //     文本+守卫组合行）classifyUserText 必须判 synthetic（呈现面退场，可见
 //     性由 system note 承担——#612 词表纪律）
 
-import type { ClaimedStep, MachineDoneBody } from '@pacman/shared';
+import type { ClaimedStep, MachineDoneBody } from '@cairn/shared';
 import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
@@ -36,7 +36,7 @@ import {
   buildSecondPrWarningNote,
   classifyUserText,
   composeTaskPromptWithInstruction,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

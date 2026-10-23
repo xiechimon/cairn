@@ -29,7 +29,7 @@ import { expect, type Page, test } from '@playwright/test';
 //    brand ring (outline none + focus-ring border + 1px ring), not the UA blue
 //
 // submit + error face (live build, stubbed network — skills-readonly
-// precedent; the real-server three-state validation is verify-pacman's
+// precedent; the real-server three-state validation is verify-cairn's
 // local-repo-api feature):
 // 10. untouched submit posts a repo-less body (no kind) and navigates on 201
 // 11. local/github submits carry kind + localPath / kind + githubRepo
@@ -161,8 +161,8 @@ test('the GitHub row swaps the trigger for the auth face; manual link reveals th
   await expect(page.locator('#prj-new-repo')).toHaveText('认证 GitHub');
   const input = await revealManualRepoInput(page);
   await expect(input).toHaveAttribute('placeholder', 'owner/repo');
-  await input.fill('xiechimon/pacman');
-  await expect(input).toHaveValue('xiechimon/pacman');
+  await input.fill('xiechimon/cairn');
+  await expect(input).toHaveValue('xiechimon/cairn');
 });
 
 test('the 本地文件夹 row swaps the trigger for the path input; swap reopens', async ({ page }) => {
@@ -227,10 +227,10 @@ test('github owner/repo backfills the repo segment once valid', async ({ page })
   const name = page.locator('#prj-new-name');
   await repo.fill('xiechimon');
   await expect(name).toHaveValue('');
-  await repo.fill('xiechimon/pacman');
-  await expect(name).toHaveValue('pacman');
+  await repo.fill('xiechimon/cairn');
+  await expect(name).toHaveValue('cairn');
   await name.fill('Renamed');
-  await repo.fill('xiechimon/pacman-web');
+  await repo.fill('xiechimon/cairn-web');
   await expect(name).toHaveValue('Renamed');
 });
 
@@ -281,13 +281,13 @@ test('local and github submits carry kind + their wire field', async ({ page }) 
   await expect(page).toHaveURL(/\/app\/project\/proj-1$/);
 
   await page.goto(NEW_PROJECT_LIVE);
-  await fillLiveForm(page, { kind: 'github', value: 'xiechimon/pacman' });
+  await fillLiveForm(page, { kind: 'github', value: 'xiechimon/cairn' });
   await page.getByRole('button', { name: '创建项目' }).click();
   await expect(page).toHaveURL(/\/app\/project\/proj-1$/);
 
   expect(bodies).toEqual([
     { name: 'my-repo', teamId: 'team-1', kind: 'local', localPath: '/tmp/my-repo' },
-    { name: 'pacman', teamId: 'team-1', kind: 'github', githubRepo: 'xiechimon/pacman' },
+    { name: 'cairn', teamId: 'team-1', kind: 'github', githubRepo: 'xiechimon/cairn' },
   ]);
 });
 
@@ -304,7 +304,7 @@ test('empty local path / invalid github ref keep 创建项目 disabled', async (
   await selectLiveRow(page, 'GitHub 仓库');
   await expect(submit).toBeDisabled();
   await revealManualRepoInput(page);
-  await page.locator('#prj-new-repo').fill('xiechimon/pacman');
+  await page.locator('#prj-new-repo').fill('xiechimon/cairn');
   await expect(submit).toBeEnabled();
 });
 

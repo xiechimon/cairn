@@ -2,7 +2,7 @@
 // /api/projects/{id}/autonomy、member_activity 中间件。闸本身见
 // autonomy-gates.test.ts，进料接入见 issue-intake.test.ts 26 组。
 
-import { DEFAULT_AUTONOMY_SETTINGS } from '@pacman/shared';
+import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { countsAsMemberWrite, lastMemberWriteAt } from '../src/services/autonomy-gates.js';
 import { bootServer, req, type TestServer } from './helpers.js';

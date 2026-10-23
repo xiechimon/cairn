@@ -12,7 +12,7 @@ import {
   planRowSchema,
   startBuildsBodySchema,
   tokenUsageSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';

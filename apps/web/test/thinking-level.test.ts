@@ -10,7 +10,7 @@
 // F4  词表空集（后端没有档位）→ 任何存值都不呈现
 // F5  词表序不参与呈现（投影只判成员，不做排序/截断）
 
-import { THINKING_LEVELS } from '@pacman/shared';
+import { THINKING_LEVELS } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { toThinkingLevelDisplay } from '../src/api/mappers.js';
 

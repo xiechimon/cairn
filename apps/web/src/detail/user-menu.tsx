@@ -3,13 +3,13 @@
 // the item list — since #163 three real-navigation rows (帐号 / API 密钥 /
 // MCP) instead of the frozen plain-text list (r7 §4.1.4). The 外观 row is
 // live (#122): each segment drives applyTheme, so the switch repaints
-// via the root .light class and persists under `pacman-theme`. The
+// via the root .light class and persists under `cairn-theme`. The
 // open/close trigger landed with #127 — the sidebar avatar chips (rail +
 // expanded) toggle the popover through the anchored-overlay family
 // wiring; the capture state still rides the fixture flag. #163: the panel
 // is bottom-anchored above the avatar chip (detail.css `.user-menu`) —
 // the frozen capture top covered the chip off the 732-tall viewport.
-// XMON-107 (用户裁决): the capture's head mail line is removed — pacman
+// XMON-107 (用户裁决): the capture's head mail line is removed — cairn
 // 无邮箱账位面（单用户 seed 自动登录），live 态曾渲染 fixture 常量地址。
 
 import { KeyRound, Plug, User } from 'lucide-react';

@@ -26,7 +26,7 @@ import type {
   SessionOpts,
   ToolCallRecord,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -159,7 +159,7 @@ function fakeWorkspace(): WorktreeOps {
       return {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `pacman/conv-${input.conversationId}`,
+        branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: false,
       };
@@ -209,7 +209,7 @@ function capturingBackend(captured: SessionOpts[]): AgentBackend {
 
 async function run(claimed: ClaimedStep, localConfig?: Record<string, unknown>) {
   const captured: SessionOpts[] = [];
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-mcp-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-mcp-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

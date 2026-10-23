@@ -8,7 +8,7 @@
 //   - **fire-and-forget**：sink 抛错（旧 server 对第四形 400 / 网络断）被吞，
 //     活动是呈现信号不是数据面——终稿 transcript 与步状态另有正本。
 
-import type { SkillFact, StepActivityPhase, StepActivityReport } from '@pacman/shared';
+import type { SkillFact, StepActivityPhase, StepActivityReport } from '@cairn/shared';
 
 /** 事件 flowing 期的重发节流窗：browser 端「最近信号 Ns 前」的新鲜度上限
  *  ≈ repeatMs + 事件间隔。5s = 「在动」肉眼可辨、量级远低于 30s heartbeat。 */

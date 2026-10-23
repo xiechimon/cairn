@@ -46,7 +46,7 @@ export const buildHistoryEntrySchema = z.object({
  * - `github-issue`：任务**来自** issue（导入面，#446）——标题真值在 GitHub
  *   侧（titleFinal），不可回填覆盖；
  * - `github-issue-self`：issue **来自**任务（自派建时出站，#452）——标题真值
- *   在 pacman 侧，占位标题仍走 agent 回填并写进 issue（ADR 0006 D3）；
+ *   在 cairn 侧，占位标题仍走 agent 回填并写进 issue（ADR 0006 D3）；
  *   sourceRef=null 表示「未建成」（建 issue 失败的可重试态，ADR 0006 D2）。
  * - `orchestration`：任务**来自**一次总管编排回合（#640 / r14 §5.3）——
  *   sourceRef = 编排会话 id（per-request 粒度，`chief:<uuid>` 形，

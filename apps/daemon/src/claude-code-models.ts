@@ -17,7 +17,7 @@ import {
   type ClaudeAuthStateWire,
   type ClaudeCodeReport,
   parseClaudeCodeModelSource,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import type { ClaudeBinInfo } from './claude-code-bin.js';
 

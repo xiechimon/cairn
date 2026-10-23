@@ -13,11 +13,11 @@ import { expect, test } from '@playwright/test';
 const ROSTER = '/app/team?scenario=team-roster';
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.teamMembersLayout', 'grid'));
+  await page.addInitScript(() => localStorage.setItem('cairn.teamMembersLayout', 'grid'));
 });
 
 test('agent card is a Paper card: 20px corner, white, 1px ring plus a lift', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto(ROSTER);
   const card = page.getByTestId('team-agent-card').first();
   const face = await card.evaluate((el) => {

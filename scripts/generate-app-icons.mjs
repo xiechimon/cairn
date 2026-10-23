@@ -60,7 +60,7 @@ writeFileSync(join(PUBLIC_DIR, 'logo.svg'), TILE);
 writeFileSync(join(PUBLIC_DIR, 'logo-mark.svg'), MARK);
 console.log('wrote apps/web/public/logo.svg, logo-mark.svg');
 
-const iconset = join(mkdtempSync(join(tmpdir(), 'pacman-icon-')), 'AppIcon.iconset');
+const iconset = join(mkdtempSync(join(tmpdir(), 'cairn-icon-')), 'AppIcon.iconset');
 mkdirSync(iconset);
 for (const base of [16, 32, 128, 256, 512]) {
   writeFileSync(join(iconset, `icon_${base}x${base}.png`), await png(TILE, base));

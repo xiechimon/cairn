@@ -18,7 +18,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 //  8. wake 消费路径（openWindow 落地页 consumePendingNav）不收敛—— T2
 //  9. chief 深链参数不被消费：drawer 不开 / 开错线程 / 参数残留 URL—— T4
 // 10. chief 深链指向不存在的线程：必须安静降级（不开 drawer、参数照清、不崩）—— T4
-// 11. 帐号开关关档（#1031 本地偏好覆盖 pacman.notifyEnabled=0）不落到通知
+// 11. 帐号开关关档（#1031 本地偏好覆盖 cairn.notifyEnabled=0）不落到通知
 //     本体：权限 granted + 偏好 off 时 SSE 通知照弹 —— T5
 
 const TEAM = { id: 't1', name: '团队' };
@@ -454,8 +454,8 @@ test.describe('推送通知点击闭环（XMON-106）', () => {
     page,
   }) => {
     // 偏好 off 先落存储再进页面：fireDesktopNotification 的闸门读的就是
-    // localStorage 的 pacman.notifyEnabled（帐号页开关「关」的落地面）。
-    await page.addInitScript(() => localStorage.setItem('pacman.notifyEnabled', '0'));
+    // localStorage 的 cairn.notifyEnabled（帐号页开关「关」的落地面）。
+    await page.addInitScript(() => localStorage.setItem('cairn.notifyEnabled', '0'));
     await stubNotification(page);
     await stubEventSource(page);
     await hideDocument(page);
@@ -468,7 +468,7 @@ test.describe('推送通知点击闭环（XMON-106）', () => {
     // 阴性断言不吃盲等：紧接着的阳性对照（偏好开回来 → 第二条必达）若链路
     // 断了会超时红；若抑制闸没生效，第一条会被记进 __swNotifs，终值 2 ≠ 1
     // 同样红——两个失败方向都收敛到同一条 poll。
-    await page.evaluate(() => localStorage.setItem('pacman.notifyEnabled', '1'));
+    await page.evaluate(() => localStorage.setItem('cairn.notifyEnabled', '1'));
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await expect.poll(() => page.evaluate(() => window.__swNotifs.length)).toBe(1);
     expect(await page.evaluate(() => window.__swNotifs[0].options.data)).toEqual({

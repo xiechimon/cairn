@@ -5,7 +5,7 @@
 // 机器在线态 × 步状态 × 步 kind，以及落库行/会话流事件的对接形状。
 // 机器在线位直写 DB（生产置位路径 wake SSE 断连面归 machine-wire 测试）。
 
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';

@@ -8,7 +8,7 @@
 //      不受闸限制
 //   4. 同相位 todo PATCH 照常 200（no-op）
 
-import { type Phase, todoRecordSchema } from '@pacman/shared';
+import { type Phase, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { todo as todoTable } from '../src/db/schema.js';

@@ -10,7 +10,7 @@ import {
   AUTONOMY_GATE_REASONS,
   type AutonomySettings,
   DEFAULT_AUTONOMY_SETTINGS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   type AutonomyGateInput,

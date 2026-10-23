@@ -3,8 +3,8 @@
 
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { BRAND } from '@cairn/shared';
 import { serve } from '@hono/node-server';
-import { BRAND } from '@pacman/shared';
 import pino from 'pino';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -124,7 +124,7 @@ const server = serve(
   (info) => {
     logger.info(
       { port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
-      `pacman-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 ${BRAND.cliCommandName} start --api-key <key> --team <teamId>`,
+      `cairn-server online — 机器注册：POST /api/teams/{id}/api-keys 取 key 后 ${BRAND.cliCommandName} start --api-key <key> --team <teamId>`,
     );
   },
 );

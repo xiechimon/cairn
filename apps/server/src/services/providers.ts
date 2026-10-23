@@ -23,7 +23,7 @@ import {
   type ProviderPreset,
   type ProviderRecord,
   type SecretBox,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { machine, provider } from '../db/schema.js';

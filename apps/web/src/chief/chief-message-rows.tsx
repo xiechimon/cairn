@@ -8,7 +8,7 @@
 // 状态（copiedKey/toolsOpen/rewindConfirm）留在 drawer——rewind 确认层与
 // composer 同住一处；行经 props 收回调。
 
-import type { AskUserAnswer } from '@pacman/shared';
+import type { AskUserAnswer } from '@cairn/shared';
 import type { CSSProperties } from 'react';
 import type { CurrentUser } from '../api/provider.js';
 import { ThinkingRow, ToolActivityRow } from '../components/chat/agent-rows.js';

@@ -40,7 +40,7 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   buildTaskPromptText,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';
@@ -318,7 +318,7 @@ describe('mapTranscript 合成 prompt 过滤（#612）', () => {
     const newBranch = buildReworkNewBranchNote({
       prNumber: 888,
       prUrl: 'https://github.com/demo-owner/demo-repo/pull/888',
-      branch: 'pacman/conv-01a10c27-0000-0000-0000-000000000000',
+      branch: 'cairn/conv-01a10c27-0000-0000-0000-000000000000',
       outcome: 'merged',
     });
     const items = render({

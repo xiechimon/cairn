@@ -23,7 +23,7 @@ export const CHIEF_EXAMPLES: ChiefExample[] = [
   { icon: 'bars', text: '查一下这个月的 token 用量' },
 ];
 
-/** r5 100/111 composer draft (localStorage pacman.cache.chief-draft-v1, the
+/** r5 100/111 composer draft (localStorage cairn.cache.chief-draft-v1, the
  *  capture shows it restored into the textarea). */
 const CHIEF_DRAFT =
   '我想做一个能在浏览器里直接玩的网页小游戏 （比如贪吃蛇或打砖块）： 单文件 HTML + Canvas， 不用任何构建工具，做完能在项目的文件页直接试玩。请在现有的入门项目里做， 组建 Agent 团队把游戏逻辑、 画面手感、 难度调优拆成并行任务， 然后向我汇报方案， 等我确认后再开始动工。';

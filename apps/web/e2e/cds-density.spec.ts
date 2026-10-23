@@ -30,7 +30,7 @@ test('CDS density: comfortable default; compact rem-scale 0.9375 + data-density'
       density: root.dataset.density ?? null,
       remScale: cs.getPropertyValue('--rem-scale').trim(),
       padCard: cs.getPropertyValue('--pad-card').trim(),
-      stored: localStorage.getItem('pacman-density'),
+      stored: localStorage.getItem('cairn-density'),
     };
   });
   expect(after.density).toBe('compact');
@@ -42,7 +42,7 @@ test('CDS density: comfortable default; compact rem-scale 0.9375 + data-density'
   await page.waitForFunction(() => document.documentElement.dataset.density === 'comfortable');
   const back = await page.evaluate(() => ({
     density: document.documentElement.dataset.density ?? null,
-    stored: localStorage.getItem('pacman-density'),
+    stored: localStorage.getItem('cairn-density'),
     padCard: getComputedStyle(document.documentElement).getPropertyValue('--pad-card').trim(),
   }));
   expect(back.density).toBe('comfortable');

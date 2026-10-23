@@ -234,7 +234,7 @@ export function BoardSurface({
     );
     if (cols.every((n) => n === 0)) return;
     try {
-      localStorage.setItem('pacman-boot-shape', JSON.stringify({ cols }));
+      localStorage.setItem('cairn-boot-shape', JSON.stringify({ cols }));
     } catch {}
   }, [visibleTodos, onlyColumn]);
 
@@ -489,7 +489,7 @@ export function BoardSurface({
   );
 }
 
-const COLUMN_SCROLL_KEY = 'pacman.board.column-scroll';
+const COLUMN_SCROLL_KEY = 'cairn.board.column-scroll';
 
 function readColumnScroll(): Record<string, number> {
   const storage = safeSessionStorage();

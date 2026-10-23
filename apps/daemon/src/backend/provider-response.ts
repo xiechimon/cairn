@@ -11,7 +11,7 @@
 // 缝纪律：本文件不 import `@earendil-works/*`——`fetch` 契约是 WHATWG 标准面，
 // 宿主（pi.ts）负责把它接进 pi 的请求选项。
 
-import { parseRetryAfterMs } from '@pacman/shared';
+import { parseRetryAfterMs } from '@cairn/shared';
 
 /** 响应形态记录（每次 provider HTTP 响应一份）。 */
 export interface ProviderResponseShape {

@@ -82,10 +82,10 @@ const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarSty
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
   id: 'proj-1',
-  name: 'pacman',
+  name: 'cairn',
   teamId: 'team-1',
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };
@@ -141,7 +141,7 @@ function wireChief(charter: string, watchCount: number) {
       projectId: 'proj-1',
       seqNum: i + 1,
       title: `关注条目 ${i}`,
-      projectName: 'pacman',
+      projectName: 'cairn',
       phase: 'building',
       reason: 'Dispatched by the chief: report back when it parks at a gate or settles.',
       createdAt: 0,
@@ -274,7 +274,7 @@ function wireSchedule(i: number) {
       seqNum: i + 1,
       title: `滚动探针定时 ${i}`,
       phase: 'todo',
-      projectName: 'pacman',
+      projectName: 'cairn',
       ownerId: 'user-1',
     },
   };

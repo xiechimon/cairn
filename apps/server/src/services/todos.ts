@@ -13,7 +13,7 @@ import type {
   TodoRecord,
   TodoSourceKind,
   UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   DONE_ANNOUNCEMENT,
   derivePlaceholderTitle,
@@ -22,7 +22,7 @@ import {
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, eq, inArray, max, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {

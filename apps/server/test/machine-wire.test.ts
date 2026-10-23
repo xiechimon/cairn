@@ -22,7 +22,7 @@ import {
   machineTokenResponseSchema,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -202,7 +202,7 @@ describe('enroll / me / presence / recover（02 §5.2–§5.4）', () => {
       await call(w.s.app, 'GET', '/api/machine/me'),
       await call(w.s.app, 'GET', '/api/machine/me', { cred: 'deadbeef' }),
       await call(w.s.app, 'POST', '/api/machine/enroll', {
-        cred: 'pacman_nope',
+        cred: 'cairn_nope',
         body: { teamId: w.s.team.id },
       }),
     ]) {

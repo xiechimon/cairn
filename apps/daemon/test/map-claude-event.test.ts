@@ -20,7 +20,7 @@
 //  11. auth 类失败 → 文案点名机器 + 凭据类 + 补法（state.machineName 注入）
 
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { type StepEvent, stepEventSchema } from '@pacman/shared';
+import { type StepEvent, stepEventSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { createClaudeMapState, mapClaudeMessage } from '../src/backend/claude-code.js';
 

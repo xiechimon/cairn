@@ -27,7 +27,7 @@ import {
   formatAttachmentToken,
   type MachineAttachmentResponse,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { StepJournal } from '../src/journal.js';
@@ -117,7 +117,7 @@ async function deliver(
   images: readonly unknown[];
   home: string;
 }> {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-issue-fence-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-issue-fence-'));
   const workspacesDir = join(home, 'workspaces');
   const paths = statePaths(home, workspacesDir);
   const { backend: base, created } = fakeBackend([{ type: 'done', usage: [] }]);

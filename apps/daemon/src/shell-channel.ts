@@ -20,7 +20,7 @@ import {
   type MachineShellResultBody,
   SHELL_COMMAND_CHAR_LIMIT,
   SHELL_OUTPUT_CHAR_LIMIT,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { MachineApiError } from './machine-client.js';
 
 /** 单命令超时缺省值 [设计]（票面未定值：够构建类命令跑完、短于挂死命令

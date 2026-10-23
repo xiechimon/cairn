@@ -10,7 +10,7 @@
 //   Function（构造、借名，或经 .constructor 取到）、process、globalThis；只写不用的
 //   import 照样会加载外面的模块（运行时按 verbatimModuleSyntax 保留它）；漏查
 //   .tsx / .jsx 模块；
-// - 从 '@pacman/shared' 这个总出口取 records/merge-gate.ts 以外的运行时值（总出口还带着
+// - 从 '@cairn/shared' 这个总出口取 records/merge-gate.ts 以外的运行时值（总出口还带着
 //   shared 的几十个别的模块，它们都可自动合并）；名字虽是 records 里的，总出口
 //   （index.ts、records/index.ts，都不是闸的路径）却把它改指到别的模块；用命名空间 /
 //   默认 import 让逐个名字的检查看不见；
@@ -25,12 +25,12 @@
 // 再从转出的代码里取模块名与名字。正则也扫字符串字面量，文案里出现同形文字时会多报
 // （严的一侧）。
 // 这条测试防的是闸的源码直接依赖闸外的文件；闸的源码里有意写出的混淆加载本身就是
-// 闸路径上的改动，要人合。'@pacman/shared' 的总出口在 import 时会运行 shared 的全部
+// 闸路径上的改动，要人合。'@cairn/shared' 的总出口在 import 时会运行 shared 的全部
 // 模块，别的 shared 模块改全局（例如改原型）这里管不到，那是整个进程的完整性问题。
 
 import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import * as shared from '@pacman/shared';
+import * as shared from '@cairn/shared';
 import { transformSync } from 'esbuild';
 import { describe, expect, test } from 'vitest';
 import * as records from '../../../packages/shared/src/records/merge-gate.js';
@@ -72,13 +72,13 @@ function specifiers(js: string): string[] {
   return found;
 }
 
-/** 转出的 JS 里从 '@pacman/shared' 取的名字（只作类型用的已被去掉）；命名空间、默认
+/** 转出的 JS 里从 '@cairn/shared' 取的名字（只作类型用的已被去掉）；命名空间、默认
  * import 与 export * 记成 'non-named:'。 */
 function sharedNames(js: string): string[] {
   const names: string[] = [];
   let parsed = 0;
   for (const m of js.matchAll(
-    /^(?:import|export)\s+(\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*(['"])@pacman\/shared\2/gm,
+    /^(?:import|export)\s+(\{[^}]*\}|\*(?:\s+as\s+[\w$]+)?|[\w$]+(?:\s*,\s*(?:\{[^}]*\}|\*\s+as\s+[\w$]+))?)\s*from\s*(['"])@cairn\/shared\2/gm,
   )) {
     parsed += 1;
     const clause = (m[1] as string).trim();
@@ -92,15 +92,15 @@ function sharedNames(js: string): string[] {
       if (name !== '') names.push(name.split(/\s+as\s+/)[0] as string);
     }
   }
-  // 没被上面的形状认出的 '@pacman/shared' 语句（例如 esbuild 把非 ASCII 的名字印成
+  // 没被上面的形状认出的 '@cairn/shared' 语句（例如 esbuild 把非 ASCII 的名字印成
   // \uXXXX）一律记下，不让它悄悄漏过；只为副作用的 import 不带名字，不算。
-  const statements = [...js.matchAll(/\bfrom\s*(['"])@pacman\/shared\1/g)].length;
+  const statements = [...js.matchAll(/\bfrom\s*(['"])@cairn\/shared\1/g)].length;
   if (statements !== parsed) names.push(`non-named:${statements - parsed} unparsed`);
   return names;
 }
 
 function allowed(spec: string, file: string): boolean {
-  if (spec === '@pacman/shared' || NODE_BUILTINS.has(spec)) return true;
+  if (spec === '@cairn/shared' || NODE_BUILTINS.has(spec)) return true;
   if (!spec.startsWith('./') && !spec.startsWith('../')) return false;
   const target = resolve(dirname(file), spec);
   return target === GATE_DIR || target.startsWith(GATE_DIR + sep);
@@ -139,9 +139,9 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
         "import './side-effect.js';",
         "import { createRequire } from 'node:module';",
         '// 闸只 import type 的东西',
-        "import { evil /* ; */ } from '@pacman/shared';",
-        "import { type T, good, other as alias } from '@pacman/shared';",
-        "import * as all from '@pacman/shared';",
+        "import { evil /* ; */ } from '@cairn/shared';",
+        "import { type T, good, other as alias } from '@cairn/shared';",
+        "import * as all from '@cairn/shared';",
         'export const used = [a, c, d, evil, good, alias, all];',
         "const f = await import('../../lib/github.js');",
         "const g = require('x');",
@@ -162,9 +162,9 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
         '../../lib/github.js',
         './x.js',
         'node:module',
-        '@pacman/shared',
-        '@pacman/shared',
-        '@pacman/shared',
+        '@cairn/shared',
+        '@cairn/shared',
+        '@cairn/shared',
         '../other/e.js',
         'node:fs',
         './side-effect.js',
@@ -187,14 +187,14 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     );
     expect(sharedNames(sample)).toEqual(['evil', 'good', 'other', 'non-named:* as all']);
     // esbuild 把非 ASCII 的名字印成 \uXXXX：形状认不出也要记下
-    expect(sharedNames(toJs("import * as ñ from '@pacman/shared';\nexport const v = ñ;"))).toEqual([
+    expect(sharedNames(toJs("import * as ñ from '@cairn/shared';\nexport const v = ñ;"))).toEqual([
       'non-named:1 unparsed',
     ]);
     // 前一句没有分号（esbuild 重印的函数声明）时，名字不被吞进前一句
     expect(
       sharedNames(
         toJs(
-          "export function f() {}\nimport { MERGE_BLOCKERS } from '@pacman/shared';\nf(MERGE_BLOCKERS);",
+          "export function f() {}\nimport { MERGE_BLOCKERS } from '@cairn/shared';\nf(MERGE_BLOCKERS);",
         ),
       ),
     ).toEqual(['MERGE_BLOCKERS']);
@@ -204,14 +204,14 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(foreignName('phaseSchema')).toBe(true);
     expect(foreignName('MERGE_BLOCKERS')).toBe(false);
     const file = join(GATE_DIR, 'readiness.ts');
-    expect(allowed('@pacman/shared', file)).toBe(true);
+    expect(allowed('@cairn/shared', file)).toBe(true);
     expect(allowed('node:crypto', file)).toBe(true);
     expect(allowed('node:module', file)).toBe(false);
     expect(allowed('./digest.js', file)).toBe(true);
     expect(allowed('../../lib/github.js', file)).toBe(false);
     expect(allowed('../merge-gate-extra/x.js', file)).toBe(false);
     expect(allowed('zod', file)).toBe(false);
-    expect(allowed('@pacman/shared/src/brand.js', file)).toBe(false);
+    expect(allowed('@cairn/shared/src/brand.js', file)).toBe(false);
   });
 
   test('读到了闸的源码（不是对零个文件恒真）', () => {
@@ -219,7 +219,7 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(names).toEqual(expect.arrayContaining(['digest.ts', 'readiness.ts']));
   });
 
-  test("每个模块只从 '@pacman/shared'、node:crypto 或 merge-gate/ 里的相对路径 import，不另行加载代码", () => {
+  test("每个模块只从 '@cairn/shared'、node:crypto 或 merge-gate/ 里的相对路径 import，不另行加载代码", () => {
     const outside = gateJs.flatMap(({ file, js }) =>
       specifiers(js)
         .filter((spec) => !allowed(spec, file))
@@ -228,7 +228,7 @@ describe('merge-gate 源码只从闸自己的源码 import', () => {
     expect(outside).toEqual([]);
   });
 
-  test("从 '@pacman/shared' 取的运行时值就是 records/merge-gate.ts 导出的那一个", () => {
+  test("从 '@cairn/shared' 取的运行时值就是 records/merge-gate.ts 导出的那一个", () => {
     const foreign = gateJs.flatMap(({ file, js }) =>
       sharedNames(js)
         .filter(foreignName)

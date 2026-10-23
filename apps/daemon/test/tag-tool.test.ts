@@ -23,19 +23,19 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BoundGitCredentials, GitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials, GitCredentials } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { commitEnv, runGit } from '../src/git.js';
 import { buildCreateTagTool } from '../src/tag-tool.js';
 
-const IDENTITY = { name: 'tag-agent', email: 'tag@pacman.local' };
+const IDENTITY = { name: 'tag-agent', email: 'tag@cairn.local' };
 /** 探针 token（形近真实 GitHub token 的假值；github 形态代位凭证）。 */
 const PROBE_TOKEN = 'ghp_PROBE0000000000000000000000000000';
 const PROBE_CRED: GitCredentials = { username: 'x-access-token', password: PROBE_TOKEN };
 
 const dirs: string[] = [];
 function workdir(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `pacman-tag-${prefix}-`));
+  const dir = mkdtempSync(join(tmpdir(), `cairn-tag-${prefix}-`));
   dirs.push(dir);
   return dir;
 }
@@ -136,7 +136,7 @@ async function startHttpGit(opts: { root: string; accept: GitCredentials }): Pro
           ...(req.headers['content-type'] ? { CONTENT_TYPE: req.headers['content-type'] } : {}),
           CONTENT_LENGTH: String(body.byteLength),
           GIT_COMMITTER_NAME: 'tag-http-e2e',
-          GIT_COMMITTER_EMAIL: 'http@pacman.local',
+          GIT_COMMITTER_EMAIL: 'http@cairn.local',
         },
       });
       const out: Buffer[] = [];

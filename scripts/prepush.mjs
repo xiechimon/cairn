@@ -9,6 +9,7 @@ export function prepushPlan(paths, mode = 'local') {
   if (mode === 'advisory') return advisory;
   const required = [
     ['node', 'scripts/ui-debt-gate.mjs'],
+    ['node', 'scripts/ui-drift-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
@@ -19,7 +20,7 @@ export function prepushPlan(paths, mode = 'local') {
         ...required,
         ['node', 'scripts/prepush-vitest.mjs'],
         ...advisory,
-        ['pnpm', '--filter', '@pacman/web', 'e2e:affected', '--', ...paths],
+        ['pnpm', '--filter', '@cairn/web', 'e2e:affected', '--', ...paths],
       ];
 }
 
@@ -53,7 +54,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
   const plan =
     args[0] === '--e2e-shard'
-      ? [['pnpm', '--filter', '@pacman/web', 'e2e', `--shard=${args[1]}`]]
+      ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
       : prepushPlan(changedPaths(), args[0]?.slice(2) ?? 'local');
   for (const [command, ...commandArgs] of plan) {
     console.log(`[prepush] ${command} ${commandArgs.join(' ')}`);

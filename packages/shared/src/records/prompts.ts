@@ -26,7 +26,7 @@ export interface TaskSource {
 }
 
 /** 任务正文是否出自仓外作者：只有从 GitHub issue 导入的任务。自建 issue
- *  （'github-issue-self'）与编排来源的正文是 pacman 侧写的，不进围栏。 */
+ *  （'github-issue-self'）与编排来源的正文是 cairn 侧写的，不进围栏。 */
 export function isIssueSourcedTask(source: TaskSource | undefined): boolean {
   return source?.sourceKind === 'github-issue';
 }
@@ -237,7 +237,7 @@ const PLAN_NOTE_HEAD = `${PLAN_FILE_NAME} 交接位置：`;
 const PLAN_NOTE_TAIL = `。该位置在仓库检出之外——将方案写入此文件；不要在仓库工作区里创建 ${PLAN_FILE_NAME}，也不要把它 git add 或提交。`;
 
 /** #1203 plan.md 交接位置注记行（daemon 投递面单源）：plan 步 prompt 尾部
- *  追加的一行——plan.md 交接物搬到 repo 检出之外（PACMAN_HOME 面
+ *  追加的一行——plan.md 交接物搬到 repo 检出之外（CAIRN_HOME 面
  *  `<home>/plans/<conversationId>/`），路径是执行机本地事实，由 daemon 组装
  *  后随 prompt 投递并记 wire 行。写侧（runner appendPlanLocationNote）与
  *  过滤侧（stripPlanLocationNote）单源在此。 */
@@ -270,7 +270,7 @@ const MERGED_PR_GUARD_TAIL =
   '。不要再开新的 Pull Request——该 PR 已把改动合入默认分支，再开就是重复交付；本步及后续步都不要调用 gh pr create，如确有改动，在会话分支上提交并推送即可。';
 
 /** #1217 守卫指令（claim 面单源）：todo 已有 GitHub merged 真值 PR 时，后续
- *  build 的 plan/build 步 instruction 尾部追加的禁令行。pacman 不写 GitHub
+ *  build 的 plan/build 步 instruction 尾部追加的禁令行。cairn 不写 GitHub
  *  （link-back 只读），PR 由执行侧 agent 经机器 gh CLI 开——预防面 = 指令层
  *  明说（首 PR 已合并、再开即重复交付），合并面 409 与回填警告 note 是兜底。
  *  写侧（server claim）与过滤侧（classifyUserText）单源在此。 */

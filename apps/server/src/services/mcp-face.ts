@@ -1,5 +1,5 @@
 // MCP server 面（02 §7.2，00/D4 薄桥的 server 半；M4b）——外部 MCP 客户端
-// （Claude Code/Codex/VS Code…）← pacman。端点 /api/mcp（路径保形），
+// （Claude Code/Codex/VS Code…）← cairn。端点 /api/mcp（路径保形），
 // Authorization: Bearer <apiKey>；调用以 key 属主身份执行（r3 §5.2）。
 // 权限模型（r3 §6 矩阵 1:1）：key 级工具白名单 24 件 = 读 11 组 + 写 13 项
 // （MCP_TOOL_REGISTRY 单源）；「The key's tool selection limits every call」=
@@ -13,8 +13,6 @@
 // server+transport，enableJsonResponse——self-host 单机无会话粘滞需求 [设计]）。
 // 缝纪律（00/D4、01 §7.3）：本文件 = server 侧唯一 sdk 消费位（biome override）。
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
@@ -22,7 +20,9 @@ import {
   MCP_TOOL_REGISTRY,
   MERGE_HUMAN_ONLY_COPY,
   type UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';

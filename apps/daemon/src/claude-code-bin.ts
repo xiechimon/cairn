@@ -7,7 +7,7 @@
 // 「二进制在、能用、只是没写配置」显示成「未安装」。两个方向都摆正。
 //
 // 解析出的路径另有第二个消费点：SDK 的 `pathToClaudeCodeExecutable`
-// （`@anthropic-ai/claude-agent-sdk` Options）。此前 `PACMAN_CLAUDE_BIN` 只喂
+// （`@anthropic-ai/claude-agent-sdk` Options）。此前 `CAIRN_CLAUDE_BIN` 只喂
 // auth 探针、SDK 侧不认——「探的二进制」与「执行的二进制」可能不是一个。
 // 单源之后两边同值。
 //
@@ -37,7 +37,7 @@ export type ClaudeBinRun = (
 ) => Promise<{ stdout: string }>;
 
 export interface ClaudeBinProbeOpts {
-  /** `claude` 可执行文件（缺省 `PACMAN_CLAUDE_BIN` ?? 'claude'；裸名走 PATH）。 */
+  /** `claude` 可执行文件（缺省 `CAIRN_CLAUDE_BIN` ?? 'claude'；裸名走 PATH）。 */
   command?: string;
   /** 2s 上界：version 实测 95ms，5s 那个值是给 `claude auth status` 的；
    *  presence 节拍不许被一个挂住的子进程拖住。 */
@@ -129,7 +129,7 @@ function defaultRun(
 /** 本机 claude 二进制探测。任何失败（PATH 里没有 / 无执行位 / spawn 失败 /
  *  超时 / 无输出）→ null，永不抛——探测不许把 presence 节拍或上线序列搞挂。 */
 export async function probeClaudeBin(opts: ClaudeBinProbeOpts = {}): Promise<ClaudeBinInfo | null> {
-  const command = opts.command ?? process.env.PACMAN_CLAUDE_BIN ?? 'claude';
+  const command = opts.command ?? process.env.CAIRN_CLAUDE_BIN ?? 'claude';
   if (opts.run === undefined) {
     // 真路径：先解析到绝对路径（同时给出「在不在」的判据），再跑版本。
     const env = opts.env ?? process.env;

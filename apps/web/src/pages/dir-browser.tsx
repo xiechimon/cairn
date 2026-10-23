@@ -21,7 +21,7 @@
 // #946：per-face 类（dir-browser-*）退役——e2e 载体迁语义位
 // （role=dialog/list/listitem、按钮文案、aria-pressed）。
 
-import { FS_LIST_MAX_ENTRIES } from '@pacman/shared';
+import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useFsList } from '../api/hooks.js';
@@ -31,7 +31,7 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronRight, GitCommit } from '../icons/index.js';
 
 /** 记住上次位置的 localStorage 键（单租户单机，ADR 0003 D5）。 */
-const LAST_DIR_KEY = 'pacman.dirBrowser.lastDir';
+const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
 
 /** 面包屑段钮：ghost 件默认形态 + 紧凑布局位；末段（aria-current=location）
  *  加重 = 状态载体，字重/墨色走 registry 词汇。 */

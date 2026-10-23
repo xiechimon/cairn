@@ -13,8 +13,8 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 //   4. a boot without stored theme follows the system prefers-color-scheme,
 //      while a stored value always wins.
 
-const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
-const SIDEBAR_KEY = 'pacman.sidebar-collapsed'; // apps/web/src/board/app-sidebar.tsx
+const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
+const SIDEBAR_KEY = 'cairn.sidebar-collapsed'; // apps/web/src/board/app-sidebar.tsx
 
 const rootTheme = (page: Page) =>
   page.evaluate(() => ({
@@ -135,12 +135,12 @@ test.describe('sidebar form is route-invariant', () => {
     page,
   }) => {
     // 资源 folds by default in the Grouped sidebar; open it to reach 技能
-    await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
+    await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
     await page.goto('/app?scenario=01');
     const sidebar = page.getByRole('complementary');
     const boardBox = await captureSidebarBox(page, sidebar, '/app');
 
-    await page.getByRole('link', { name: 'Pacman' }).click();
+    await page.getByRole('link', { name: 'Cairn' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
     await expectSidebarBox(page, sidebar, '/app/team', boardBox);
 
@@ -160,7 +160,7 @@ test.describe('sidebar form is route-invariant', () => {
     await expect(page.locator(ROUTE_ANCHOR['/app'])).toBeVisible();
     const board = await headContentX(page);
 
-    await page.getByRole('link', { name: 'Pacman' }).click();
+    await page.getByRole('link', { name: 'Cairn' }).click();
     await expect(page).toHaveURL('/app/team?scenario=01');
     // the active face repaints the row's background only (Paper Grouped
     // sidebar: sheet + hairline); the icon and the name must not drift as it
@@ -172,7 +172,7 @@ test.describe('sidebar form is route-invariant', () => {
   test('collapsed rail survives route hops (storage-backed on every shell)', async ({ page }) => {
     await page.addInitScript((k) => {
       localStorage.setItem(k, '1');
-      localStorage.setItem('pacman.sidebarResourcesCollapsed', '0');
+      localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');
     }, SIDEBAR_KEY);
     await page.goto('/app?scenario=03');
     const rail = page.getByRole('complementary');

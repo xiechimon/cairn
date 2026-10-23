@@ -39,7 +39,7 @@ const dismissButton = (dialog: Locator) =>
 //     待开始双轨 (#755)：未开始卡（零历史）静默改相，已开始卡开重置确认闸
 //     （中断构建 + 清空对话/方案/改动），确认前零提交；
 //   · the overlay unmounts on the pointerup frame — no drop glide (#391's
-//     250ms flight was a pacman invention; the reference snaps).
+//     250ms flight was a cairn invention; the reference snaps).
 // The pointer sequence uses trusted moves past the PointerSensor 5px
 // threshold, drop point inside the target's list area.
 // #943/#910 重钉：卡 = [data-todo-id]、列表 = [data-column-list]（均为既有
@@ -777,7 +777,7 @@ test('same-column gesture: siblings never shift, drop is a no-op', async ({ page
 // recipe, not a pixel-ink floor) ----
 for (const theme of ['light', 'dark'] as const) {
   test(`lifted card rides the compact drag-tier recipe (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=22');
     const source = page.locator('[data-column="todo"] [data-todo-id]').first();
     const sourceBox = await source.boundingBox();
@@ -845,7 +845,7 @@ for (const theme of ['light', 'dark'] as const) {
 // law kept: the paint surface is the column section, header included) ----
 for (const theme of ['light', 'dark'] as const) {
   test(`valid targets tint base tier, hovered column tints hot (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=22');
     const list = await page.locator('[data-column-list="done"]').boundingBox();
     if (list == null) throw new Error('done list missing');
@@ -964,7 +964,7 @@ test('committed drop never flashes the card back to the source column', async ({
 });
 
 // ---- no drop glide (#616): the overlay unmounts on the pointerup frame —
-// #391's 250ms flight was a pacman invention; the reference snaps ----
+// #391's 250ms flight was a cairn invention; the reference snaps ----
 test('overlay unmounts with the pointerup frame — no glide', async ({ page }) => {
   await page.goto('/app?scenario=22');
   const list = await page.locator('[data-column-list="done"]').boundingBox();

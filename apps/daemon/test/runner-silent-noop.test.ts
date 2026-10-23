@@ -26,7 +26,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { createPiBackend, PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -179,7 +179,7 @@ function scriptedBackend(script: StepEvent[]): { backend: AgentBackend; handle: 
 }
 
 async function runNoopCase(script: StepEvent[]) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-noop-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-noop-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -234,7 +234,7 @@ describe('pi prompt() 预检拒绝上浮（#698 洞 2：吞错 → 看门狗假�
   // 之前 throw（无 API key）——原先被 .catch(void err) 吞掉，事件流永远不
   // 终结（挂到 300s 看门狗）。修复后：error 事件快速到达 + 流终结。
   test('失败方式 6：无凭据 preset provider → error 事件到达且流终结（真因文案）', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'pacman-pi-noop-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-pi-noop-'));
     // 预检要走到「无凭据」分支：环境里的 ANTHROPIC_API_KEY / AUTH_TOKEN（本
     // 会话跑在 relay 上）会让 provider 视作已配置——走运行期 403 而非预检拒
     // 绝。清掉并在结束后恢复。

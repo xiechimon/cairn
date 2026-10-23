@@ -4,7 +4,7 @@
 //   - png/jpg/jpeg/gif/webp → machine 面下载 → **内联交付**（backend 缝
 //     DeliveredImage；claude-code = image content block，pi = PromptOptions
 //     .images / steer 第二参——两引擎同机制，CC 本尊同款）
-//   - svg/bmp/ico/avif → 下载 → **素材化**到 worktree 外（PACMAN_HOME 面
+//   - svg/bmp/ico/avif → 下载 → **素材化**到 worktree 外（CAIRN_HOME 面
 //     step-attachments/<stepId>/）+ token 行下追加绝对路径 + Read 提示——
 //     引擎 Read 工具按需转换（pi photon / CC 内建）后进上下文
 //   - text/pdf → 零触碰（既有 attachment 工具路径不动）
@@ -20,14 +20,14 @@
 
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
-import type { DeliveredImage, MachineAttachmentResponse } from '@pacman/shared';
+import type { DeliveredImage, MachineAttachmentResponse } from '@cairn/shared';
 import {
   ATTACHMENT_TOKEN_LINE,
   isImageAttachmentExt,
   issueFenceQuotedLines,
   parseAttachmentTokenLines,
   quoteIssueLines,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 /** 单个格式字符（Unicode Cf）。 */
 const FORMAT_CHAR = /^\p{Cf}$/u;

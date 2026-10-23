@@ -2,8 +2,8 @@
 // - provider：apiKey 只写不读——GET/PATCH 响应永不返回；密文经 SecretBox
 //   （v1 信封落 apiKeyCipher [内部] 列）；presets[] 38 项原样（r3 §2）
 // - secret：值只写不读（保存后只能覆盖或删除，r2 §6.3）；密文经 SecretBox
-// - apiKey：创建响应含明文一次 `pacman_<48hex>`（r3 §6 原形前缀 tds_ 随槽切换）；
-//   列表行掩码 `pacman_afe07565…`；服务端存哈希不存可逆值（[设计] 02 §8）
+// - apiKey：创建响应含明文一次 `cairn_<48hex>`（r3 §6 原形前缀 tds_ 随槽切换）；
+//   列表行掩码 `cairn_afe07565…`；服务端存哈希不存可逆值（[设计] 02 §8）
 // 泄漏扫描纪律：三面全部 GET/POST/PATCH 响应串扫明文子串，命中即红。
 
 import {
@@ -15,7 +15,7 @@ import {
   providerRecordSchema,
   secretRecordSchema,
   setSecretBodySchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   apiKey as apiKeyTable,
@@ -271,7 +271,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
     toolGrants: { read: ['Todos', 'Projects'], write: ['Create Todo'] },
   };
 
-  test('POST 创建：明文一次 pacman_<48hex> + 行掩码 pacman_afe07565…；库存哈希', async () => {
+  test('POST 创建：明文一次 cairn_<48hex> + 行掩码 cairn_afe07565…；库存哈希', async () => {
     const s = bootServer();
     const res = await req(s.app, 'POST', teamPath(s), body);
     expect(res.status).toBe(201);
@@ -289,7 +289,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
     expect(API_KEY_PATTERN.test(created.plaintext)).toBe(true);
     // 行掩码 = 品牌前缀 + 前 8 hex + 省略号（r3 §6 展示规则，shared 单源）。
     expect(created.masked).toBe(maskApiKey(created.plaintext));
-    expect(created.masked).toMatch(/^pacman_[0-9a-f]{8}…$/);
+    expect(created.masked).toMatch(/^cairn_[0-9a-f]{8}…$/);
     expect(created.name).toBe('笔记本');
     expect(created.gitAccess).toBe(true);
     expect(created.mcpAccess).toBe(true);
@@ -304,7 +304,7 @@ describe('apiKey 面（r3 §6 实测展示规则 + 02 §8 存哈希）', () => {
 
     // 校验只需匹配（verifyApiKey = 机器注册/MCP Bearer 挂接点，面归 M3）。
     expect(verifyApiKey({ db: s.db }, created.plaintext)?.id).toBe(created.id);
-    expect(verifyApiKey({ db: s.db }, 'pacman_wrong')).toBeNull();
+    expect(verifyApiKey({ db: s.db }, 'cairn_wrong')).toBeNull();
   });
 
   test('GET 列表：掩码行、无明文无哈希（此后任何视图不再出现明文）', async () => {

@@ -15,7 +15,7 @@
 //   后代上读的 compare 照样放过。
 // - 检查：必需检查缺席被当绿（ci-loop 的宽限）；必需清单读不到退回「全部检查」；
 //   必需项由 commit status 而不是 check run 提供时漏判；pr-evidence 为 skipped /
-//   neutral 被当绿；pacman/merge-gate 本身被设成必需检查；只因自家 status 造成的
+//   neutral 被当绿；cairn/merge-gate 本身被设成必需检查；只因自家 status 造成的
 //   unstable 把闸自己卡死；别家检查造成的 unstable 被放过，unstable 却看不到任何
 //   未通过的检查也放过，unstable 而检查读不到时不列 mergeable-state；GitHub 还报
 //   clean 时放过手上清单里别家未通过的检查；两个 app 的同名检查里失败的那条被同名的
@@ -45,7 +45,7 @@ import {
   MERGE_BLOCKER_CODES,
   MERGE_BLOCKERS,
   type MergeBlockerCode,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
@@ -120,7 +120,7 @@ const opaque = (filename: string, over: Partial<CompareFile> = {}) =>
  * 它，body 的证据链指着它。 */
 const SHOT = opaque('docs/verify/1404/shot.png');
 const link = (sha: string, path = SHOT.filename) =>
-  `https://raw.githubusercontent.com/xiechimon/pacman/${sha}/${path}`;
+  `https://raw.githubusercontent.com/xiechimon/cairn/${sha}/${path}`;
 const BODY = `evidence: ${link(HEAD)}`;
 
 const v = (
@@ -139,7 +139,7 @@ function green(): GateInputs {
   return {
     policy: { mergePolicy: 'autonomous', autonomyPaused: false },
     build: { isGithubPr: true, isCurrent: true, phase: 'review', stepsInFlight: 0 },
-    repo: { owner: 'xiechimon', name: 'pacman', defaultBranch: 'main' },
+    repo: { owner: 'xiechimon', name: 'cairn', defaultBranch: 'main' },
     ticketRef: '1404',
     issueNumber: 1404,
     pr: {
@@ -149,8 +149,8 @@ function green(): GateInputs {
       mergeableState: 'clean',
       headSha: HEAD,
       baseRef: 'main',
-      baseRepoFullName: 'xiechimon/pacman',
-      headRepoFullName: 'xiechimon/pacman',
+      baseRepoFullName: 'xiechimon/cairn',
+      headRepoFullName: 'xiechimon/cairn',
       body: BODY,
       changedFiles: FILES.length + 1,
     },
@@ -313,7 +313,7 @@ const ROWS: Row[] = [
   [
     'pr-from-fork',
     (i) => {
-      pr(i).headRepoFullName = 'someone/pacman';
+      pr(i).headRepoFullName = 'someone/cairn';
     },
   ],
   [
@@ -331,8 +331,8 @@ const ROWS: Row[] = [
   [
     'self-required',
     (i) => {
-      checks(i).required = ['check', 'pacman/merge-gate'];
-      checks(i).statuses = [{ context: 'pacman/merge-gate', state: 'success' }];
+      checks(i).required = ['check', 'cairn/merge-gate'];
+      checks(i).statuses = [{ context: 'cairn/merge-gate', state: 'success' }];
     },
   ],
   [
@@ -587,10 +587,10 @@ describe('mergeReadiness：设计点名的组合', () => {
     expect(codesOf(i)).toEqual(['verify-missing']);
   });
 
-  test('只因自家 pacman/merge-gate status 而 unstable：不拦', () => {
+  test('只因自家 cairn/merge-gate status 而 unstable：不拦', () => {
     const i = green();
     pr(i).mergeableState = 'unstable';
-    checks(i).statuses = [{ context: 'pacman/merge-gate', state: 'pending' }];
+    checks(i).statuses = [{ context: 'cairn/merge-gate', state: 'pending' }];
     expect(codesOf(i)).toEqual([]);
   });
 
@@ -775,7 +775,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
 
   test('clean 时：自家 status 未通过不拦；必需检查与 pr-evidence 失败只记各自的码', () => {
     const a = green();
-    checks(a).statuses = [{ context: 'pacman/merge-gate', state: 'failure' }];
+    checks(a).statuses = [{ context: 'cairn/merge-gate', state: 'failure' }];
     expect(codesOf(a)).toEqual([]);
     const b = green();
     checks(b).runs[2] = run('pr-evidence', 'completed', 'failure');
@@ -794,7 +794,7 @@ describe('mergeReadiness：等不来的留人，读不到的可等，检查以�
     ]);
     const b = green();
     pr(b).mergeableState = 'unstable';
-    checks(b).statuses = [{ context: 'pacman/merge-gate', state: 'success' }];
+    checks(b).statuses = [{ context: 'cairn/merge-gate', state: 'success' }];
     expect(mergeReadiness(b).blockers.map((x) => [x.code, x.class])).toEqual([
       ['mergeable-state', 'transient'],
     ]);
@@ -1084,8 +1084,8 @@ describe('mergeReadiness：detail 里的名字按数据写、有界', () => {
     pr(d).baseRef = 'release';
     expect(detailOf(d, 'base-not-default')).toEqual(['"release" → "main"']);
     const e = green();
-    pr(e).headRepoFullName = 'someone/pacman';
-    expect(detailOf(e, 'pr-from-fork')).toEqual(['"someone/pacman"']);
+    pr(e).headRepoFullName = 'someone/cairn';
+    expect(detailOf(e, 'pr-from-fork')).toEqual(['"someone/cairn"']);
   });
 });
 
@@ -1125,26 +1125,26 @@ describe('mergeReadiness：提取失败可清、不可合并态、截断、大�
     ]);
   });
 
-  test('自家 status 与必需检查名不分大小写：Pacman/merge-gate', () => {
+  test('自家 status 与必需检查名不分大小写：Cairn/merge-gate', () => {
     const a = green();
     pr(a).mergeableState = 'unstable';
-    checks(a).statuses = [{ context: 'Pacman/merge-gate', state: 'pending' }];
+    checks(a).statuses = [{ context: 'Cairn/merge-gate', state: 'pending' }];
     expect(codesOf(a)).toEqual([]);
     const b = green();
-    checks(b).required = ['check', 'pack-smoke', 'Pacman/merge-gate'];
+    checks(b).required = ['check', 'pack-smoke', 'Cairn/merge-gate'];
     expect(codesOf(b)).toEqual(['self-required']);
   });
 
   test('自家必需检查名跳过：没有它的 status 也只记 self-required，不记 required-check-missing', () => {
     const i = green();
-    checks(i).required = ['check', 'pack-smoke', 'pacman/merge-gate'];
+    checks(i).required = ['check', 'pack-smoke', 'cairn/merge-gate'];
     checks(i).statuses = [];
     expect(codesOf(i)).toEqual(['self-required']);
   });
 
-  test('fork 判定不分大小写：XieChiMon/Pacman 是同仓', () => {
+  test('fork 判定不分大小写：XieChiMon/Cairn 是同仓', () => {
     const i = green();
-    pr(i).headRepoFullName = 'XieChiMon/Pacman';
+    pr(i).headRepoFullName = 'XieChiMon/Cairn';
     expect(codesOf(i)).toEqual([]);
   });
 
@@ -1544,7 +1544,7 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     pr(i).headSha = HEAD.toUpperCase();
     pr(i).state = 'closed';
     pr(i).merged = true;
-    pr(i).headRepoFullName = 'someone/pacman';
+    pr(i).headRepoFullName = 'someone/cairn';
     pr(i).baseRef = 'release';
     const r = mergeReadiness(i);
     expect(r.headSha).toBeNull();
@@ -1552,7 +1552,7 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     expect(classesOf(i)).toEqual([
       ['pr-unreadable', 'transient', 'head SHA not 40 lowercase hex'],
       ['pr-not-open', 'human', 'merged'],
-      ['pr-from-fork', 'human', '"someone/pacman"'],
+      ['pr-from-fork', 'human', '"someone/cairn"'],
       ['base-not-default', 'human', '"release" → "main"'],
     ]);
   });
@@ -1654,7 +1654,7 @@ describe('mergeReadiness：compare 与检查在 PR 的 head 上读，判定只�
     // 自家 status 还没通过时 GitHub 报 unstable；同名的失败看不见，自家 status 的豁免就把它放过
     const c = green();
     pr(c).mergeableState = 'unstable';
-    checks(c).statuses = [{ context: 'pacman/merge-gate', state: 'pending' }];
+    checks(c).statuses = [{ context: 'cairn/merge-gate', state: 'pending' }];
     checks(c).runs.push(run('check', 'completed', 'failure'));
     expect(classesOf(c)).toEqual([['mergeable-state', 'transient', 'unstable: "check"']]);
   });

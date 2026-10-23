@@ -18,8 +18,8 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
-import { SESSION_FILE_NAME, SESSION_JSONL_MAX_BYTES } from '@pacman/shared';
+} from '@cairn/shared';
+import { SESSION_FILE_NAME, SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';

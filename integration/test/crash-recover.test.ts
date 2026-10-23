@@ -15,7 +15,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ENV_VARS } from '@pacman/shared';
+import { ENV_VARS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { step as stepTable } from '../../apps/server/src/db/schema.js';
@@ -103,7 +103,7 @@ describe('崩溃恢复（T2：AgentSession 缝 × 宿主 durable 编排）', () 
       { content: '恢复后续跑完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = mkdtempSync(join(tmpdir(), 'pacman-crash-home-'));
+    home = mkdtempSync(join(tmpdir(), 'cairn-crash-home-'));
     const world = await seedWorld(server.url, server.teamId, {
       title: '崩溃恢复探针',
       spec: '写一行崩溃恢复探针。',

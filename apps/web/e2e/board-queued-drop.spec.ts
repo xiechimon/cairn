@@ -22,10 +22,10 @@ const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyl
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };

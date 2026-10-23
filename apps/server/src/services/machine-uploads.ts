@@ -8,7 +8,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { SESSION_JSONL_MAX_BYTES, type TranscriptUpload } from '@pacman/shared';
+import { SESSION_JSONL_MAX_BYTES, type TranscriptUpload } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import { build, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';

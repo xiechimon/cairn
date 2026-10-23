@@ -22,7 +22,7 @@
    相等，0 分叉，故并是纯别名退役、零渲染色变）。补位族按官方 Adding New
    Tokens 形登记（:root + .light 双定义 + @theme inline 映射）。
 
-   主题机制沿用 pacman 反相规约（#106）：:root = dark 默认，.light = 浅色
+   主题机制沿用 cairn 反相规约（#106）：:root = dark 默认，.light = 浅色
    镜像——与 shadcn 文档的 :root=light/.dark=dark 相反，有意为之；app.css
    的 @custom-variant dark 已是「dark = 非 .light」，shadcn 组件内的 dark:
    工具类在本仓恰好命中暗色默认态。
@@ -98,7 +98,7 @@
 /* shadcn 的 base 兜底（官方是 `* { border-color: var(--border) }`）：TW4 的
    `border` 工具类只给宽度，颜色默认 currentColor——没有这条，Card 的描边会
    取到近白字色。本仓收窄到 [data-slot]（shadcn 组件源码自带的锚点），旧页
-   零波及：pacman 既有 CSS 全部显式写 border-color，不需要也不该吃全局兜底。 */
+   零波及：cairn 既有 CSS 全部显式写 border-color，不需要也不该吃全局兜底。 */
 @layer base {
   [data-slot] {
     border-color: var(--border);
@@ -128,6 +128,10 @@
   /* 主按钮 = 墨底（暗侧墨是亮的）+ sheet 字 */
   --primary: #ece7df;
   --primary-foreground: #24201b;
+  --fab-surface: #173a2f;
+  --fab-mark: #f2ead7;
+  --fab-badge: #e0a020;
+  --fab-badge-text: #1a1612;
   /* 次级面底 = hover 档（surface-secondary / surface-hover / row-selected /
      chief-tab-bg / range-chip-bg / pill-idle-bg / agent-avatar-bg 等值档全部
      并入，§3.3-B） */

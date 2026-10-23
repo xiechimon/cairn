@@ -18,7 +18,7 @@ import { Agent, createServer as createTcpServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type ClaimedStep, claimedStepSchema, ENV_VARS, PLAN_FILE_NAME } from '@pacman/shared';
+import { type ClaimedStep, claimedStepSchema, ENV_VARS, PLAN_FILE_NAME } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -215,7 +215,7 @@ describe('#1026/#1028 终稿回传失败恢复（真进程重启）', () => {
       { content: '规划完成。' },
     ]);
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500 });
-    home = mkdtempSync(join(tmpdir(), 'pacman-plan-uploads-'));
+    home = mkdtempSync(join(tmpdir(), 'cairn-plan-uploads-'));
     proxyHandle = await startProxy(server.url);
     const { buildId } = await startBuild(
       '幂等恢复探针',
@@ -292,7 +292,7 @@ describe('#1026/#1028 终稿回传失败恢复（真进程重启）', () => {
   }, 240_000);
 
   test('server 收尾窗关停 → 同端口重开 → 旧 URL 404（可解释）→ 重发 URL 落库 → daemon 重启快路径补报', async () => {
-    const dbPath = join(mkdtempSync(join(tmpdir(), 'pacman-plan-restart-')), 'pacman.db');
+    const dbPath = join(mkdtempSync(join(tmpdir(), 'cairn-plan-restart-')), 'cairn.db');
     let serverClosed = false;
     stub = await startStubLlm(
       [
@@ -318,7 +318,7 @@ describe('#1026/#1028 终稿回传失败恢复（真进程重启）', () => {
     );
     server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 500, dbPath });
     const port = Number(new URL(server.url).port);
-    home = mkdtempSync(join(tmpdir(), 'pacman-plan-restart-home-'));
+    home = mkdtempSync(join(tmpdir(), 'cairn-plan-restart-home-'));
 
     // —— 直连腿（#1028 ①）：本机机器领步 → 预签名 URL → server 重启 → 旧
     // URL 404 → 重发 URL → PUT 200 落库。——

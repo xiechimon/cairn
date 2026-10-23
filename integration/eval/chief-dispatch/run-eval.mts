@@ -3,7 +3,7 @@
 // 脚手架以下的部分未改动——resume / 抖动退避 / 每 case 墙钟硬顶 / served-model
 // 断言 / harness 完整性闸 / errors 侧车 都是脚手架原装）。
 //
-//   pnpm --filter @pacman/integration exec tsx eval/chief-dispatch/run-eval.mts \
+//   pnpm --filter @cairn/integration exec tsx eval/chief-dispatch/run-eval.mts \
 //     --flow .claude/hillclimb/chief-dispatch --variant baseline --model glm-5.3 --reps 3
 //
 // 判什么：chief 回合结束后的**环境终态**——新建 todo 行的 assignment.build.agentId
@@ -32,7 +32,7 @@ import {
 let ARGS: ReturnType<typeof parseArgs>;
 let ROSTER: RosterAgent[] = [];
 let CHIEF_MODEL = 'glm-5.3';
-const RELAY_BASE_URL = process.env.PACMAN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1';
+const RELAY_BASE_URL = process.env.CAIRN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1';
 
 /** relay 各模型的挂牌价（OpenRouter 列表价，$/1M token，2026-09-29 拉取）。
  * relay 自己不报成本，`models.json` 里 cost 全是 0，所以只能外部取价。 */
@@ -109,7 +109,7 @@ async function runCase(
       e.failure_class = 'harness_error';
       throw e;
     }
-    // 截断的可观测特征：回合「正常结束」但既没调工具也没吐正文。pacman 目前
+    // 截断的可观测特征：回合「正常结束」但既没调工具也没吐正文。cairn 目前
     // 不上报模型 finish_reason，只能靠这个特征判定——见交付说明的已知缺口。
     const truncated =
       ev.toolCalls.length === 0 && ev.assistantText === '' && ev.stepStatus === 'done';
@@ -331,7 +331,7 @@ function pathSafeId(id: string): string {
 // 噪声，不是评测结果的一部分。只吞这一种（scratch 目录下的 daemon.log ENOENT），
 // 别的照旧抛出——不用宽口径 handler 掩盖真问题。
 process.on('uncaughtException', (err: NodeJS.ErrnoException) => {
-  const inScratch = typeof err?.path === 'string' && err.path.includes('pacman-eval-');
+  const inScratch = typeof err?.path === 'string' && err.path.includes('cairn-eval-');
   if (err?.code === 'ENOENT' && inScratch) {
     console.error(`(忽略拆除噪声) ENOENT ${err.path}`);
     return;
@@ -432,7 +432,7 @@ async function main() {
             const latency_s = (Date.now() - tAttempt) / 1000;
             // served-model 断言：跑分必须由请求的那个模型产出。容忍 alias→snapshot
             // 的日期后缀解析；别的差异（另一档快照、兄弟模型、静默换模）一律判失败。
-            // 注意这只能发现「daemon 选了别的模型」——模型 id 是 pacman 自己记的账，
+            // 注意这只能发现「daemon 选了别的模型」——模型 id 是 cairn 自己记的账，
             // 不是上游响应回显的，relay 静默换模它看不出来（见 metrics.md 已知缺口）。
             if (ctx.model && run.model && run.model !== ctx.model) {
               const base = ctx.model.replace(/-latest$|-0$/, '');

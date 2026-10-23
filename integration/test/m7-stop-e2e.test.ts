@@ -46,7 +46,7 @@ beforeAll(async () => {
   // 门控轮：延迟 8s 的单轮——期间步 claimed、pi 会话在跑，POST stop 窗口。
   stub = await startStubLlm([{ content: '这轮永远不会说完…', delayMs: 8_000 }]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m7-stop-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m7-stop-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

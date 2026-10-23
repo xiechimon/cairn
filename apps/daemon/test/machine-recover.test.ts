@@ -1,7 +1,7 @@
 // recover 对账（02 §5.4 步 journal 恢复）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
 // = ./machine-loop-harness.ts，每个测试自 boot 自停）。
 
-import type { AgentBackend, ClaimedStep, MachineDoneBody, StepEvent } from '@pacman/shared';
+import type { AgentBackend, ClaimedStep, MachineDoneBody, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';

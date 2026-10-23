@@ -27,7 +27,7 @@ pnpm install --frozen-lockfile
 # 直接跑 e2e 会报 Executable doesn't exist。做法：建别名目录，把缺的 <name>-<rev> 软链到同名预装
 # 的最高修订，再用 CLAUDE_ENV_FILE 把会话的 PLAYWRIGHT_BROWSERS_PATH 指过去。仅为本地受影响面
 # 能跑；浏览器大版本不同，视觉/几何断言以 CI（真修订）为准。
-ALIAS_DIR="$HOME/.cache/pacman-pw-browsers"
+ALIAS_DIR="$HOME/.cache/cairn-pw-browsers"
 PREINSTALLED="${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}"
 # resume 时会话环境可能已指向别名目录，回到预装源头重算。
 [ "$PREINSTALLED" = "$ALIAS_DIR" ] && PREINSTALLED=/opt/pw-browsers

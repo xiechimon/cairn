@@ -8,7 +8,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { SECRET_BOX_ENVELOPE_VERSION, type SecretBox } from '@pacman/shared';
+import { SECRET_BOX_ENVELOPE_VERSION, type SecretBox } from '@cairn/shared';
 
 const KEY_BYTES = 32; // AES-256
 const IV_BYTES = 12; // GCM 推荐 iv 长

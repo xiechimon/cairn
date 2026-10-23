@@ -56,7 +56,7 @@ function preSplitMigrations(): string {
   const journal = readJournal(MIGRATIONS_FOLDER);
   const splitIdx = journal.entries.findIndex((entry) => entry.tag === findSplitEntry().tag);
   expect(splitIdx, '拆字段 migration 应在 journal 内').toBeGreaterThan(0);
-  const dir = temp('pacman-migrations-pre-split-');
+  const dir = temp('cairn-migrations-pre-split-');
   mkdirSync(join(dir, 'meta'));
   for (const entry of journal.entries.slice(0, splitIdx)) {
     cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
@@ -82,7 +82,7 @@ interface LegacyAgent {
 
 /** 建拆字段前旧库 + seed team + 插 skills 四形态的 agent 行。 */
 function buildPreSplitDb(rows: LegacyAgent[]): { dbPath: string } {
-  const dir = temp('pacman-split-db-');
+  const dir = temp('cairn-split-db-');
   const dbPath = join(dir, 'server.db');
   const sqlite = new Database(dbPath);
   const db = drizzle(sqlite, { schema });

@@ -1,6 +1,6 @@
 (() => {
   try {
-    let theme = localStorage.getItem('pacman-theme');
+    let theme = localStorage.getItem('cairn-theme');
     if (theme !== 'light' && theme !== 'dark') {
       theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     }
@@ -8,7 +8,7 @@
     document.documentElement.dataset.theme = theme;
 
     let shape = { cols: [3, 3, 3, 3] };
-    const raw = localStorage.getItem('pacman-boot-shape');
+    const raw = localStorage.getItem('cairn-boot-shape');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);

@@ -21,7 +21,7 @@
 //
 // Cost: this script never builds. Run it where a dist already exists —
 // in CI that is the e2e job, whose webServer fixture-builds before the
-// tests. Locally: `pnpm --filter @pacman/web exec vite build --mode
+// tests. Locally: `pnpm --filter @cairn/web exec vite build --mode
 // fixture` (or plain `vite build`) first, then `node
 // scripts/css-mechanism-gate.mjs`. A dist built from older sources gives
 // a stale answer, so rebuild after touching styles or class names.

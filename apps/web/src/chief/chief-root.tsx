@@ -91,6 +91,7 @@ export function ChiefRoot() {
   const windowOpen = surface.chiefView === 'drawer';
   // D4：窗开 = FAB 不渲染（互斥，Multica `if (isOpen) return null` 同律）。
   const fabVisible = !windowOpen && (!isDetailRoute(pathname) || surface.chiefUnread > 0);
+  const fabExpanded = surface.chiefUnread > 0 || surface.chiefBusy;
   return (
     <ChiefRootContext.Provider value={api}>
       <Outlet />
@@ -115,13 +116,32 @@ export function ChiefRoot() {
                 size="icon"
                 aria-label={t('总管')}
                 onClick={() => surface.setChiefView('drawer')}
-                className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer rounded-full border-none bg-(--card) font-normal shadow-[var(--edge-ring),var(--floating-shadow)] hover:bg-(--card) dark:hover:bg-(--card) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-6"
+                data-busy={surface.chiefBusy || undefined}
+                data-expanded={fabExpanded || undefined}
+                className="chief-fab fixed right-2 bottom-2 z-(--z-floating) size-10 cursor-pointer gap-1 rounded-full border-none bg-(--fab-surface) font-normal text-(--fab-mark) shadow-[var(--edge-ring),var(--floating-shadow)] hover:bg-(--fab-surface) hover:text-(--fab-mark) dark:hover:bg-(--fab-surface) active:not-aria-[haspopup]:translate-y-0 data-expanded:w-auto data-expanded:pr-3.5 data-expanded:pl-1"
               >
-                <ChiefFabIcon chief={surface.chiefData} />
                 {surface.chiefUnread > 0 && (
-                  <span className="fab-badge absolute -top-1 right-0 h-4 min-w-4 rounded-full bg-(--card-button) px-1 text-center text-caption leading-4 font-semibold text-(--text-on-accent)">
-                    {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
+                  <span
+                    aria-hidden="true"
+                    className="ml-1.5 size-1.5 flex-none rounded-full bg-(--fab-badge)"
+                  />
+                )}
+                <ChiefFabIcon
+                  chief={surface.chiefData}
+                  busy={surface.chiefBusy}
+                  expanded={fabExpanded}
+                />
+                {surface.chiefUnread > 0 ? (
+                  <span className="text-ui font-medium whitespace-nowrap">
+                    <span className="fab-badge">
+                      {surface.chiefUnread > 99 ? '99+' : surface.chiefUnread}
+                    </span>{' '}
+                    {t('条新消息')}
                   </span>
+                ) : (
+                  surface.chiefBusy && (
+                    <span className="text-ui font-medium whitespace-nowrap">{t('思考中…')}</span>
+                  )
                 )}
               </Button>
             }

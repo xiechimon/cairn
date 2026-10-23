@@ -12,6 +12,7 @@ import { constants, readFileSync, realpathSync } from 'node:fs';
 import { access as fsAccess, readFile as fsReadFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { basename, join, sep } from 'node:path';
+import type { SkillsInjectionNames } from '@cairn/shared';
 import {
   DefaultResourceLoader,
   detectSupportedImageMimeTypeFromFile,
@@ -22,7 +23,6 @@ import {
   SettingsManager,
   type Skill,
 } from '@earendil-works/pi-coding-agent';
-import type { SkillsInjectionNames } from '@pacman/shared';
 
 // —— skills 执行面注入（spec 14/#371）————————————————————————
 // catalog 是索引不全文：token 预算只与 catalog 长度线性相关，skill 全文由
@@ -43,7 +43,7 @@ export const SKILLS_CATALOG_BUDGET_BYTES = 1 << 20;
 /** 保证不存在的 pi 默认 agentDir（spec 14：强制 loadSkills 跳过 user 级默认
  * 扫描——includeDefaults:false 下 agentDir 仅参与 source 标注，传不存在路径
  * 杜绝任何静默默认加载）。 */
-const NO_PI_DEFAULT_AGENT_DIR = join(homedir(), '.pacman-no-such', 'agent');
+const NO_PI_DEFAULT_AGENT_DIR = join(homedir(), '.cairn-no-such', 'agent');
 
 /** pi 诊断 → `[skills] <type>:` 词表归类（spec 14 日志族：collision /
  * invalid-frontmatter / missing-skill-md；其余 warning/error → invalid 透传）。
@@ -56,7 +56,7 @@ function classifySkillDiagnostic(d: ResourceDiagnostic): string {
 }
 
 export interface SkillsCatalogOpts {
-  /** 扫描根（PACMAN_SKILLS_DIR；目录缺失 = 空集非致命，pi 出诊断行）。 */
+  /** 扫描根（CAIRN_SKILLS_DIR；目录缺失 = 空集非致命，pi 出诊断行）。 */
   skillsDir: string;
   /** loadSkills 的 cwd = daemon home（非任务 worktree——project 级解析不随
    * worktree 切换跳变，spec 14 Implementation Decisions）。 */

@@ -27,7 +27,7 @@ import {
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
@@ -98,7 +98,7 @@ beforeAll(async () => {
     { content: '已按反馈调整，重启轮方案就绪。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m7-restart-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m7-restart-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

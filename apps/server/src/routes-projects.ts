@@ -13,7 +13,7 @@ import {
   importGithubIssueBodySchema,
   patchAutonomyBodySchema,
   patchProjectBodySchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';

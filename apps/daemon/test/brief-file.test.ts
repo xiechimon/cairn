@@ -13,7 +13,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '@pacman/shared';
+import { BRIEF_MARKER_BEGIN, BRIEF_MARKER_END } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   cleanupBriefFile,
@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 function freshDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-brief-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-brief-'));
   dirs.push(dir);
   return dir;
 }

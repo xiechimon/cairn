@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Pacman pre-commit — single hook, runs the canonical check chain.
+# Cairn pre-commit — single hook, runs the canonical check chain.
 # Mirrors earendil-works/pi's pattern: lockfile guard + format+lint+typecheck + restage.
 set -e
 
@@ -12,16 +12,16 @@ STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 #    lockfile changes (importers/catalogs/settings) auto-pass; external
 #    dependency changes (packages/snapshots) block with a per-package summary.
 #    Escape hatch keeps the same env var the binary gate used —
-#    PACMAN_ALLOW_LOCKFILE_CHANGE (1/true/yes) — so lane discipline and
+#    CAIRN_ALLOW_LOCKFILE_CHANGE (1/true/yes) — so lane discipline and
 #    AGENTS.md keep working unchanged. AGENTS.md bans `git commit --no-verify`,
 #    so an authorized lockfile change needs a sanctioned exit through the
 #    hook itself.
 node scripts/check-lockfile-commit.mjs
 
-# 1.5 黑名单注释（实现 ~/Code/AgentProjects/pacman/CLAUDE.md「注释纪律」）
+# 1.5 黑名单注释（实现 ~/Code/AgentProjects/cairn/CLAUDE.md「注释纪律」）
 # 黑名单外置到 .husky/banned.txt，本文件不含关键字词自身（避免自匹配）
 # 同时排除 .husky/ 目录（工具脚本，加新词维护就改 banned.txt）
-# 放行出口 = 显式环境变量 PACMAN_ALLOW_BANNED_VOCAB（1/true/yes），同锁文件闸形态（#661）：
+# 放行出口 = 显式环境变量 CAIRN_ALLOW_BANNED_VOCAB（1/true/yes），同锁文件闸形态（#661）：
 # AGENTS.md 禁止绕过本钩子，提示文案不得再推荐绕过路径
 HUSKY_DIR="$(git rev-parse --show-toplevel)/.husky"
 BANNED_FILE="$HUSKY_DIR/banned.txt"
@@ -54,14 +54,14 @@ if [ -n "$STAGED_FOR_GREP" ]; then
     fi
   }
   if [ -n "$BANNED_MATCH" ]; then
-    ALLOW_BANNED=${PACMAN_ALLOW_BANNED_VOCAB:-}
+    ALLOW_BANNED=${CAIRN_ALLOW_BANNED_VOCAB:-}
     if [ "$ALLOW_BANNED" = "1" ] || [ "$ALLOW_BANNED" = "true" ] || [ "$ALLOW_BANNED" = "yes" ]; then
-      echo "banned vocabulary in staged additions; PACMAN_ALLOW_BANNED_VOCAB is set, allowing commit." >&2
+      echo "banned vocabulary in staged additions; CAIRN_ALLOW_BANNED_VOCAB is set, allowing commit." >&2
     else
       echo "Blocked (comment discipline): banned vocabulary in staged additions." >&2
-      echo "   This is allowed ONLY when the wording is deliberate (per pacman CLAUDE.md)." >&2
+      echo "   This is allowed ONLY when the wording is deliberate (per cairn CLAUDE.md)." >&2
       echo "   Fix the offending lines; if this addition is intentional, commit with:" >&2
-      echo "     PACMAN_ALLOW_BANNED_VOCAB=1 git commit ..." >&2
+      echo "     CAIRN_ALLOW_BANNED_VOCAB=1 git commit ..." >&2
       echo "$BANNED_MATCH" | sed 's/^/  /' >&2
       exit 1
     fi

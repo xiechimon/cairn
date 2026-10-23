@@ -1,5 +1,5 @@
 // #1403 段 2b（设计 D，2026-10-22 用户裁决）：GitHub 形态、build 记着 PR 的任务，人在
-// pacman 里点合并 = server 经 GitHub REST 合并这张 PR（PUT pulls/{n}/merge，sha 绑本 build
+// cairn 里点合并 = server 经 GitHub REST 合并这张 PR（PUT pulls/{n}/merge，sha 绑本 build
 // 最后推送的提交、squash、标题取 PR 标题、同仓 issue 来源带 closes 行），不再派机器合并步。
 // GitHub 形态没有 PR、托管仓与本地仓照旧派合并步。失败方式先于实现列出（AGENTS.md 测试
 // 规则），编号同 docs/verify/1403/seg2b-failure-modes.txt：
@@ -22,7 +22,7 @@
 //       GitHub 没有处理，409，见 D40）
 //   D14 PUT 200 应答体读不出 → 同 D13
 //   D15 同一 build 两次并发点合并 → 一次 GET、一次 PUT，另一次 409
-//   D16 PUT 在飞时对账 sweep（PR 已合并）→ 对账不读不写；只有 pacman 的合并行与一行完成行
+//   D16 PUT 在飞时对账 sweep（PR 已合并）→ 对账不读不写；只有 cairn 的合并行与一行完成行
 //   D17 GET 在飞时人关卡 → 重读 409、不 PUT；PUT 在飞时人关卡、GitHub 合并成功 → 落两行、
 //       不抛、相位留 closed
 //   D18 failed 可恢复：合并 → 恢复后 done；拒绝 → 仍 failed、零行；无明确答复 → 恢复到
@@ -49,7 +49,7 @@
 //   D35 遗留合并步在 PR 已于 GitHub 合并之后推了「默认分支并进工作分支」的提交 → 那不是
 //       本 build 的交付提交（合并步不算最后推送的工作），对账照常收尾
 //   D36 合并步把默认分支并进工作分支并推送（开着的 PR 的 head 是它）→ 经 API 合并的 sha 绑它
-//       （分支上 pacman 最后推送的提交；对账的「交付包含」核对不算合并步，D35）
+//       （分支上 cairn 最后推送的提交；对账的「交付包含」核对不算合并步，D35）
 //   D37 failed 卡的 PR 已在 GitHub 合并 → 恢复到 review、落一行、202、不发合并；对账收尾
 //       （看板上把 failed 卡拖到已完成会走合并弹层，再到这里：不能再让它 409）
 //   D38 PR 作者对仓库没有写权限（author_association 不是 OWNER / MEMBER / COLLABORATOR）
@@ -59,14 +59,14 @@
 //   D3c server 没有密钥箱 → 409 点名 server 的密钥，不说「连接 GitHub」
 //   D40 PUT 被限流（429，或带限流信号的 403）= GitHub 没有处理这次合并：409 带 GitHub 的
 //       message 与解除时刻（知道时），不落行、不恢复 failed 卡（2026-10-22 用户裁决，
-//       https://github.com/xiechimon/pacman/issues/1403#issuecomment-6344983763）
+//       https://github.com/xiechimon/cairn/issues/1403#issuecomment-6344983763）
 //   D41 PR 标题里有关票关键字 + 引用（close/closes/closed/fix/fixes/fixed/resolve/resolves/
 //       resolved，大小写不敏感，可带冒号，后跟 #N、GH-N、owner/repo#N 或链接）→ 提交标题
-//       不用 PR 标题，用 pacman 自己的「Merge pull request #n」：PR 标题由有写权限标记的
+//       不用 PR 标题，用 cairn 自己的「Merge pull request #n」：PR 标题由有写权限标记的
 //       人（含只读成员）定，进了默认分支上的 squash 提交就会关掉任意 issue，绕过 D2
 //   D41c 关票形态只验 PR 标题本身（#1403 段 3，#1509 pr-gate 第 4 轮）：以 fix / close /
 //       resolve 结尾的标题拼上「 (#n)」后不再误命中，保留 PR 标题
-//   D42 没有 closes 行时也传 commit_message（pacman 自己的一行）：不传时 GitHub 按仓库
+//   D42 没有 closes 行时也传 commit_message（cairn 自己的一行）：不传时 GitHub 按仓库
 //       设置取正文（PR 正文或各提交 message），D41 的同一条路从正文进来
 //   D43 closes 行取 PR 读之后重读的任务行：读的网络窗里自建 issue 补上了 sourceRef（重试）
 //       → 带上它
@@ -75,7 +75,7 @@
 //       第 2 轮 tests 建议；票的第一条失败方式）
 //   S1  列表读的失败分类：404 / 429 不读应答体，没带限流头的 403 才读（二级限流写在 message）
 
-import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@pacman/shared';
+import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -418,9 +418,9 @@ async function refusal(p: Promise<unknown>): Promise<HttpError> {
 }
 
 /** 没有 closes 行时 squash 提交的正文（D42）。 */
-const PLAIN_BODY = 'Merged by pacman.';
+const PLAIN_BODY = 'Merged by cairn.';
 
-const MERGED_ROW = `PR #201 已由 pacman 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）`;
+const MERGED_ROW = `PR #201 已由 cairn 经 GitHub 合并（squash，合并提交 ${MERGE_SHA.slice(0, 7)}）`;
 
 /** 拒绝之后的世界：零行、零合并步、相位不变。 */
 function expectUntouched(w: World, phase: Phase = 'review'): void {
@@ -496,7 +496,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     ['no space after the colon', 'Close:#9'],
     ['a second keyword after a harmless one', 'Fix the docs, resolves #12'],
   ])(
-    '[2b-D41] a PR title with a closing keyword and a reference (%s) → the commit title is pacman’s own',
+    '[2b-D41] a PR title with a closing keyword and a reference (%s) → the commit title is cairn’s own',
     async (_name, title) => {
       const w = makeWorld({
         pull: { title },
@@ -560,7 +560,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(body.commit_message).toBe('closes #88');
   });
 
-  test('[2b-D42] no closing line → commit_message is still sent (pacman’s own line), so the repository default (the PR body) is not used', async () => {
+  test('[2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used', async () => {
     const w = makeWorld({ source: { kind: 'github-issue', ref: 'github:other/demo#77' } });
     await requestMerge(w.deps, w.buildId);
     const body = JSON.parse((w.fake.puts()[0] as Recorded).body ?? 'null') as Record<

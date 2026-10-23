@@ -22,7 +22,7 @@
 //   P9  内容寻址幂等：同 (view, allowed 集) 两次调用 → 同一目录、第二次
 //       不重建（篡改探针文件保留）；allowed 集不同 → 不同 key
 //   P10 hardlink 装配：插件文件与 view 文件同 inode（共享 blob，非复制）
-//   P11 plugin.json 形状钉死：name = pacman-team-skills、无 mcpServers 键、
+//   P11 plugin.json 形状钉死：name = cairn-team-skills、无 mcpServers 键、
 //       插件根无 .mcp.json（skipMcpDiscovery 不发的配套保证——该选项会
 //       翻译成 --plugin-dir-no-mcp，版本下限无实证）
 //   P12 buildClaudeSdkOptions：plugins 在位 → 原样进 opts；缺省/空数组 →
@@ -48,7 +48,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { MachineSkillsManifestResponse } from '@pacman/shared';
+import type { MachineSkillsManifestResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   buildClaudeSdkOptions,
@@ -64,7 +64,7 @@ import {
 } from '../src/team-skills.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `pacman-native-plugin-${tag}-`));
+  return mkdtempSync(join(tmpdir(), `cairn-native-plugin-${tag}-`));
 }
 
 /** 写一个 skill 目录（<root>/<dirName>/SKILL.md）；返回 baseDir。 */
@@ -181,7 +181,7 @@ describe('collectTeamSkillEntries（与 catalog/deny 同扫描源的团队条目
   test('realpath 漂移：teamSkillsDir 以 symlink 形传入仍识别（P13，macOS /tmp 同形）', () => {
     const root = fixtureRoot('realpath');
     const view = makeView(root, ['team-a']);
-    const viaSymlink = join(tmpdir(), `pacman-sym-view-${sha256(root).slice(0, 8)}`);
+    const viaSymlink = join(tmpdir(), `cairn-sym-view-${sha256(root).slice(0, 8)}`);
     symlinkSync(view, viaSymlink);
     try {
       const entries = collectTeamSkillEntries(
@@ -248,7 +248,7 @@ describe('ensureTeamSkillsPlugin（cacheRoot/plugins 分区装配）', () => {
     const view = makeView(root, ['team-a']);
     const dir = ensureTeamSkillsPlugin({ cacheRoot: root, viewDir: view, dirNames: ['team-a'] });
     const manifest = JSON.parse(readFileSync(join(dir!, '.claude-plugin', 'plugin.json'), 'utf8'));
-    expect(manifest.name).toBe('pacman-team-skills');
+    expect(manifest.name).toBe('cairn-team-skills');
     expect('mcpServers' in manifest).toBe(false);
     expect(existsSync(join(dir!, '.mcp.json'))).toBe(false);
     expect(readdirSync(join(dir!)).sort()).toEqual(['.claude-plugin', 'skills']);

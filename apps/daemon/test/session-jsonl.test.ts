@@ -9,7 +9,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { SESSION_JSONL_MAX_BYTES } from '@pacman/shared';
+import { SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { readSessionJsonlForUpload } from '../src/session-jsonl.js';
 

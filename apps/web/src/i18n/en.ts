@@ -47,6 +47,8 @@ export const EN: Record<string, string> = {
   '展开{label}': 'Expand {label}',
   总管: 'Chief',
   '{n} 个总管会话有未读': '{n} chief sessions have unread',
+  条新消息: 'new messages',
+  '思考中…': 'Thinking…',
   返回: 'Back',
   更多: 'More',
   关闭: 'Close',
@@ -315,7 +317,7 @@ export const EN: Record<string, string> = {
   本地路径: 'Local path',
   'GitHub 地址': 'GitHub URL',
   'server 本机上的技能目录路径，目录里要有 SKILL.md。':
-    'Path to a skill directory on the pacman server machine — it must contain a SKILL.md.',
+    'Path to a skill directory on the cairn server machine — it must contain a SKILL.md.',
   'GitHub 公共仓库或其中子目录的地址；导入后可用 refresh 重新拉取。':
     'Address of a public GitHub repository or a subdirectory of one; after importing you can refresh to re-pull it.',
   '两字段二选一：填其中一个，另一个留空。':
@@ -328,7 +330,7 @@ export const EN: Record<string, string> = {
   '尚无 MCP 服务器。': 'No MCP servers yet.',
   // spec 13/#368 本地 config 只读制：空态文案 = 配置指引（无添加钮）。
   '读取 server 本机 ~/.claude.json 的 mcpServers 段：在该文件添加配置并刷新，即出现在这里。MCP 服务器为 Agent 提供额外工具；授权在每个 Agent 的页面上单独进行。':
-    'Reads the mcpServers section of ~/.claude.json on the pacman server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
+    'Reads the mcpServers section of ~/.claude.json on the cairn server machine — add entries there and refresh to see them here. MCP servers give Agents extra tools; authorization happens per Agent, on its own page.',
   '尚无密钥。': 'No secrets yet.',
   '团队密钥按 Agent 授权，在需要它的执行步中下发，不预置进任务 shell 环境。值只写不读：保存后只能覆盖或删除，无法再次查看。':
     'Team secrets are granted per Agent and released to the build steps that need them — never pre-set into the task shell environment. Values are write-only: once saved they can be overwritten or deleted, never viewed again.',
@@ -446,7 +448,7 @@ export const EN: Record<string, string> = {
   仓库: 'Repo',
   选择仓库: 'Select repo',
   // #360（spec 12）repo 选择面两行：GitHub 仓库 / 本地文件夹（hosted 行
-  // 创建入口移除；下方「Pacman 托管」= 存量 hosted 项目的设置面显示键，
+  // 创建入口移除；下方「Cairn 托管」= 存量 hosted 项目的设置面显示键，
   // 与本表无关，保留）。
   'GitHub 仓库': 'GitHub repo',
   本地文件夹: 'Local folder',
@@ -476,7 +478,7 @@ export const EN: Record<string, string> = {
   '目录条目过多，只列出前 {n} 条': 'Too many entries — showing the first {n}',
   基本信息: 'Basic info',
   标签: 'Tags',
-  'Pacman 托管': 'Pacman hosted',
+  'Cairn 托管': 'Cairn hosted',
   目标分支: 'Target branch',
   // #1213/ADR 0017 双执行源：github 形态项目的 localPath 同机加速位字段。
   本机加速路径: 'Local acceleration path',
@@ -872,8 +874,8 @@ export const EN: Record<string, string> = {
   其他: 'Other',
   // #356 runtime tabs(spec 11 §A1-A4;tab 名 pi/Claude Code 不译,槽位名
   // default/opus/… 为配置标识符不译;{hostname} = 上报机器名插值)
-  'pacman 自有运行时。模型来自你添加的服务商。':
-    "pacman's own runtime. Models come from the providers you add.",
+  'cairn 自有运行时。模型来自你添加的服务商。':
+    "cairn's own runtime. Models come from the providers you add.",
   '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。':
     'Model slots from the executor machine’s Claude Code config (~/.claude/settings.json).',
   '已安装在 {hostname}': 'Installed on {hostname}',
@@ -1056,8 +1058,8 @@ export const EN: Record<string, string> = {
     'Let this Agent add new skills to the team skill library.',
   '允许该 Agent 修改团队技能库中已有的技能。':
     'Let this Agent modify skills already in the team skill library.',
-  '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在机器需要 pacman CLI 0.1.28 及以上。':
-    'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The machine must have pacman CLI 0.1.28 or newer.',
+  '任务执行时，该 Agent 可在需要密钥的执行步中按需取用团队密钥，每次取用都会留下记录；密钥不预置进 shell 环境。所在机器需要 cairn CLI 0.1.28 及以上。':
+    'When running a task, this Agent can retrieve team secrets on demand in the execution steps that need them; every retrieval is recorded, and secrets are never preloaded into the shell environment. The machine must have cairn CLI 0.1.28 or newer.',
   '该 Agent 执行任务时可使用的团队 MCP 服务器，其工具以 mcp__<服务器>__<工具> 的形式出现。':
     'Team MCP servers this Agent may use while running tasks; their tools appear as mcp__<server>__<tool>.',
   '说明该 Agent 的常驻职责，可多行。该说明会注入它执行的每个任务的系统提示词，也会提供给总管用于分派。':

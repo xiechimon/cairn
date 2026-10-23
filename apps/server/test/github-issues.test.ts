@@ -12,7 +12,7 @@ import {
   FIXED_TAGS,
   githubIssuesResponseSchema,
   todoRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

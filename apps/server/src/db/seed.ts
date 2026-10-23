@@ -2,7 +2,7 @@
 // team 表与全部 teamId 路径段形状保留，数据恒 seed 一行。幂等：已有行即返回。
 // seed 内容（displayName/team name/avatarStyle）= [设计]（无观测 canon，内容自选）。
 
-import type { TeamRecord, UserRecord } from '@pacman/shared';
+import type { TeamRecord, UserRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { Db } from './client.js';

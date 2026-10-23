@@ -16,7 +16,7 @@ import type {
   StepActivity,
   TodoRecord,
   TranscriptRow,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 /** 单条 SSE 连接的写入口；seq 由 hub 按连接分配。 */
 export interface TeamStreamConnection {

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { SESSION_JSONL_MAX_BYTES } from '@pacman/shared';
+import { SESSION_JSONL_MAX_BYTES } from '@cairn/shared';
 
 export function readSessionJsonlForUpload(
   sessionFile: string | undefined,

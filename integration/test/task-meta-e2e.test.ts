@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FIXED_TAGS, type TagRecord } from '@pacman/shared';
+import { FIXED_TAGS, type TagRecord } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -31,7 +31,7 @@ beforeAll(async () => {
   // web 生产构建（scenario-blind = 恒 live 数据源，#58 gate）。与 m5-web-e2e
   // 同款；dist 为两文件共用，CI 顺序跑不互踩（同 worktree 内 dist 互斥纪律
   // 归 AGENTS.md，此处均为 vite 默认 mode）。
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });

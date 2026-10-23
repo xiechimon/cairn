@@ -1,6 +1,6 @@
 // 可选 token 鉴权中间件（#251，spec #247 Implementation Decisions——全仓
 // 唯一新缝：app 组装处一道 HTTP 中间件，路由面零散鉴权检查禁止）。
-// PACMAN_TOKEN 设 = 开、未设 = 关（关 = 不注册，行为与现状完全一致）。
+// CAIRN_TOKEN 设 = 开、未设 = 关（关 = 不注册，行为与现状完全一致）。
 //
 // 传输：Bearer 头为主干道；唯一例外 = 两条 SSE stream 端点接受 `?token=`
 // query（原生 EventSource 无法设 header 的协议限制）——其余端点拒收 query
@@ -9,7 +9,7 @@
 //
 // 豁免清单（绕过面 = 仅此六条：spec #247 钉死四条 + XMON-49 增补 /api/mcp，
 // 02/A1 分体部署解锁——闸叠在自有 Bearer 面上 = 同一 Authorization header 要
-// 同时装 PACMAN_TOKEN 与 apiKey 两个值，必死锁，远端 MCP 消费面整面死；
+// 同时装 CAIRN_TOKEN 与 apiKey 两个值，必死锁，远端 MCP 消费面整面死；
 // #1137 增补 /api/webhook/ 前缀——GitHub webhook 无法自定义 Authorization
 // 头，receiver 自带路径 token 闸（webhook_token 哈希反查，machine/mcp 族
 // 同款「自有凭证 + 默认保护」结构））：

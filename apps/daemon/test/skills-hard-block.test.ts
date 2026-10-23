@@ -32,7 +32,7 @@ import {
 } from '../src/backend/skills.js';
 
 function fixtureRoot(tag: string): string {
-  return mkdtempSync(join(tmpdir(), `pacman-hardblock-${tag}-`));
+  return mkdtempSync(join(tmpdir(), `cairn-hardblock-${tag}-`));
 }
 
 /** 写一个 skill 目录（<root>/<dirName>/SKILL.md）；返回 baseDir。 */
@@ -301,13 +301,13 @@ describe('buildClaudeSdkOptions（spec 14 §裁决后的范围 1/2：settingSour
     // 缺省（无 per-step env）：不设 env 键（subprocess 继承 process.env，现行为）。
     expect('env' in buildClaudeSdkOptions(baseParts())).toBe(false);
     // 注入：SDK env REPLACES（不合并）→ 必须展开 process.env 保 PATH/HOME 等
-    // 继承位，per-step 值（PACMAN_PORT_BASE）最后覆盖。
+    // 继承位，per-step 值（CAIRN_PORT_BASE）最后覆盖。
     const opts = buildClaudeSdkOptions({
       ...baseParts(),
-      env: { PACMAN_PORT_BASE: '20100' },
+      env: { CAIRN_PORT_BASE: '20100' },
     });
-    expect(opts.env).toEqual({ ...process.env, PACMAN_PORT_BASE: '20100' });
-    expect(opts.env?.PACMAN_PORT_BASE).toBe('20100');
+    expect(opts.env).toEqual({ ...process.env, CAIRN_PORT_BASE: '20100' });
+    expect(opts.env?.CAIRN_PORT_BASE).toBe('20100');
     expect(opts.env?.PATH).toBe(process.env.PATH);
   });
 

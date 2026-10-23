@@ -12,7 +12,7 @@ import {
   buildTaskPromptText,
   composeTaskPromptWithInstruction,
   type TodoRecord as WireTodo,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript, toDisplayTodo } from '../src/api/mappers.js';
 import type { TodoRecord, TranscriptItem } from '../src/fixtures/records.js';

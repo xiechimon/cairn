@@ -54,7 +54,7 @@ const resolve = (page: Page, token: string) =>
 
 for (const theme of ['light', 'dark'] as const) {
   test(`⌘K hint rides the search button tooltip (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
     const button = page.getByTestId('team-row').getByRole('button', { name: '搜索' });
     await button.hover();
@@ -62,7 +62,7 @@ for (const theme of ['light', 'dark'] as const) {
   });
 
   test(`hover and selected rows share one geometry (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const geo = await page.evaluate(() => {
@@ -86,7 +86,7 @@ for (const theme of ['light', 'dark'] as const) {
   test(`selected row = sheet fill + hairline, distinct from hover (${theme})`, async ({
     page,
   }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.goto('/app?scenario=01');
 
     const sidebarBg = await page.evaluate(
@@ -112,8 +112,8 @@ for (const theme of ['light', 'dark'] as const) {
 
 test('machine-online dot sits centered on the 机器 row', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pacman-theme', 'dark');
-    localStorage.setItem('pacman.sidebarResourcesCollapsed', '0');
+    localStorage.setItem('cairn-theme', 'dark');
+    localStorage.setItem('cairn.sidebarResourcesCollapsed', '0');
   });
   // chief fixture scenarios count one machine online
   await page.goto('/app?scenario=100');

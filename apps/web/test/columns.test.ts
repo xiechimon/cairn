@@ -1,7 +1,7 @@
 // Column view ordering (issue #73): failed / review-awaiting cards pin to
 // the TOP of 待处理 (#351: the pinned group moved from 执行中 to the merged
 // gate column); everything else keeps manual/fixture order.
-import { BOARD_DROP_PHASES, canOrchestrate, PHASE_VALUES } from '@pacman/shared';
+import { BOARD_DROP_PHASES, canOrchestrate, PHASE_VALUES } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   attentionCount,

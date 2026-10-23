@@ -18,8 +18,8 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative } from 'node:path';
-import type { MachineAttachmentResponse } from '@pacman/shared';
-import { buildTaskPromptText, formatAttachmentToken } from '@pacman/shared';
+import type { MachineAttachmentResponse } from '@cairn/shared';
+import { buildTaskPromptText, formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { materializeFile, resolveStepImages } from '../src/step-attachments.js';
 
@@ -54,7 +54,7 @@ function pngResponse(): MachineAttachmentResponse {
 }
 
 function setup() {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-step-att-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-step-att-'));
   const materializeDir = join(home, 'step-attachments');
   const worktree = join(home, 'workspaces', 'conv-1');
   mkdirSync(worktree, { recursive: true });

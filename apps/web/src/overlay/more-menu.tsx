@@ -4,7 +4,7 @@
 // #318: 完成/关闭 接真(r1 changelog 09-16「菜单项按当前 phase 出:Complete
 // 走看板自带 confirm-and-merge、Close 关闭语义」)——完成 = 相位适配动作
 // (confirm 关口确认 / review 验收弹层→merge 链,调用位裁定),关闭 = 关闭
-// 语义落 closed。无该相位语义的行渲染 disabled(原站按相位出项,pacman
+// 语义落 closed。无该相位语义的行渲染 disabled(原站按相位出项,cairn
 // 保持四行恒定;运行中禁用同 r1 Delete-in-turn 先例)。r1 的
 // 延迟 Undo 窗口不落地([设计] 票内裁量 wontfix:关闭即刻生效,重开走
 // closed→todo reopen 面)。

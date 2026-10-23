@@ -10,7 +10,7 @@
 // 失效重取），本模块只做纯推导；fixture 面查询不启用 → undefined → 恒无
 // 在飞，DOM 零变化。
 
-import { type ChiefThread, orchestrateThreadTitle } from '@pacman/shared';
+import { type ChiefThread, orchestrateThreadTitle } from '@cairn/shared';
 
 /** 线程的一轮回合是否在飞（排队待认领 或 已被认领在跑）。 */
 export function threadTurnInFlight(thread: ChiefThread): boolean {

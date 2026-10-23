@@ -11,8 +11,8 @@
 //      于带续轮指令的返工步，首跑语义是回归红线（chief 400 自纠回路不摘）。
 //  A4. plan 槽在位的返工步 → plan agent 认领（现状行为不变，卡 #24 形）。
 
-import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

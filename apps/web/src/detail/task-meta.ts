@@ -3,7 +3,7 @@
 // task-meta-block.tsx；fixture 面恒 null（无来源/机器/模型数据源），空态
 // 占位「暂无方案」字节不变。
 
-import { conversationBranch, parseGithubIssueSourceRef } from '@pacman/shared';
+import { conversationBranch, parseGithubIssueSourceRef } from '@cairn/shared';
 import type { useBuild, useBuildUsage } from '../api/hooks.js';
 import type { toDisplayTodo } from '../api/mappers.js';
 import type { TaskMetaFields } from './task-meta-block.js';

@@ -50,7 +50,7 @@ import {
   type ToolCallRecord,
   type TranscriptRow,
   type TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 export class MachineApiError extends Error {
   constructor(

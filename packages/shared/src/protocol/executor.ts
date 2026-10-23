@@ -133,8 +133,8 @@ export const WORKTREE_CONTRACT = {
 export const ORPHAN_WORKTREE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 /** 环境生命周期钩子（#1149，形态照 Amp docs/research/amp-native-sandbox-orb.md
  * §3.2）：仓内 `.agents/setup`（装机，幂等契约）/ `.agents/resume`（唤醒后
- * 修复钩子）。同路径同名 = 一份配置 Amp 与 pacman 两用。默认超时 20 分钟
- * （票面钉死），超时杀整组进程；可用 PACMAN_HOOK_TIMEOUT_MS 覆写。 */
+ * 修复钩子）。同路径同名 = 一份配置 Amp 与 cairn 两用。默认超时 20 分钟
+ * （票面钉死），超时杀整组进程；可用 CAIRN_HOOK_TIMEOUT_MS 覆写。 */
 export const WORKSPACE_HOOK_TIMEOUT_MS = 20 * 60 * 1000;
 /** 钩子运行注记（PreparedWorkspace.hooks 槽，workspace → runner 投影面）：
  * runner 把它落成 transcript system 行（用户在步日志里看得见 setup/resume
@@ -177,8 +177,8 @@ export type PiStreamEvent = (typeof PI_STREAM_EVENTS)[number];
 export const CONFIG_KINDS = ['api_key', 'oauth', 'http', 'stdio'] as const;
 
 /** 流超时护栏（r3 bundle 原文数值，02 §5.6/01 §4.3 照抄）。数值 = r3 一手
- * 证据；重置语义 = pacman 侧 #699 修订（三臂事件到达即重置 + 步级绝对上界
- * PACMAN_STREAM_DURATION_CAP_MS，语义正本 02 §5.6，执行面 runner.ts）。 */
+ * 证据；重置语义 = cairn 侧 #699 修订（三臂事件到达即重置 + 步级绝对上界
+ * CAIRN_STREAM_DURATION_CAP_MS，语义正本 02 §5.6，执行面 runner.ts）。 */
 export const STREAM_TIMEOUTS_MS = {
   streamFirstEvent: 300_000,
   streamIdle: 480_000,

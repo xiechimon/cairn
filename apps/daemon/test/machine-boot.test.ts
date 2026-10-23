@@ -56,16 +56,16 @@ describe('上线序列 canon（02 §5.4/r3 §1.5）', () => {
 
   test('#1251 能力清单随 enroll 与每拍 presence 上行（注入桩钉内容）', async () => {
     const { handle, api } = await boot({
-      capabilitiesProbe: () => ({ mcpServers: ['figma'], skills: ['verify-pacman'] }),
+      capabilitiesProbe: () => ({ mcpServers: ['figma'], skills: ['verify-cairn'] }),
     });
     await waitFor(() => api.presenceBodies.length > 0);
     expect((api.enrollBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
-      skills: ['verify-pacman'],
+      skills: ['verify-cairn'],
     });
     expect((api.presenceBodies[0] as { capabilities?: unknown }).capabilities).toEqual({
       mcpServers: ['figma'],
-      skills: ['verify-pacman'],
+      skills: ['verify-cairn'],
     });
     await handle.stop();
     await handle.done;
@@ -81,7 +81,7 @@ describe('上线序列 canon（02 §5.4/r3 §1.5）', () => {
 });
 
 describe('server 迁移诊断（#519 控制面搬家：machine.json 注册时 serverUrl 与现配置不一致）', () => {
-  test('失败方式：旧 machine.json + 新 PACMAN_SERVER → 启动即警告行（含两地址与再注册指引），照常上线', async () => {
+  test('失败方式：旧 machine.json + 新 CAIRN_SERVER → 启动即警告行（含两地址与再注册指引），照常上线', async () => {
     const api = new FakeMachineApi();
     const { handle, lines } = await boot({
       api,

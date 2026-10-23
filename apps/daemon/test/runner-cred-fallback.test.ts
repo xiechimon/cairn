@@ -25,7 +25,7 @@ import type {
   MachineStreamEvent,
   ToolCallRecord,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -49,7 +49,7 @@ const GITHUB_STEP_CRED = { ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' };
 /** 票 #1225 现象段原文（mea 2026-10-11 实测 push 失败 stderr）。 */
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
-  "fatal: Authentication failed for 'https://github.com/xiechimon/pacman.git/'";
+  "fatal: Authentication failed for 'https://github.com/xiechimon/cairn.git/'";
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -186,7 +186,7 @@ function fakeWorkspace(opts: {
       return {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `pacman/conv-${input.conversationId}`,
+        branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: false,
         ...(opts.credentialSource !== undefined ? { credentialSource: opts.credentialSource } : {}),
@@ -251,7 +251,7 @@ async function setup(
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-cred-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-cred-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -299,8 +299,8 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
     );
     // integration 一发（auth 失败）+ machine 二发（成功）。
     expect(workspace.pushes).toEqual([
-      { branch: 'pacman/conv-conv-1', cred: GITHUB_STEP_CRED },
-      { branch: 'pacman/conv-conv-1', cred: null },
+      { branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED },
+      { branch: 'cairn/conv-conv-1', cred: null },
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
     // 来源行：machine；transcript 与日志都不携带 token 值（票失败方式 2）。
@@ -319,7 +319,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
-    expect(workspace.pushes).toEqual([{ branch: 'pacman/conv-conv-1', cred: GITHUB_STEP_CRED }]);
+    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED }]);
     const row = transcriptRows(paths).find((r) => r.id === 'git-credential-s1');
     expect(String(row?.content)).toContain('integration');
     expect(client.doneBodies[0]!.body.status).toBe('success');
@@ -380,7 +380,7 @@ describe('runner push 凭据降级 + 来源行（#1225）', () => {
       { git: null, workspace },
     );
     // local：cred null（现行为），失败原错误直抛——不套凭据序。
-    expect(workspace.pushes).toEqual([{ branch: 'pacman/conv-conv-1', cred: null }]);
+    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
     expect(client.doneBodies[0]!.body.status).toBe('failed');
     expect(String(client.doneBodies[0]!.body.errorMessage)).toContain('bad object');
     expect(transcriptRows(paths).some((r) => r.id === 'git-credential-s1')).toBe(false);

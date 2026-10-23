@@ -15,7 +15,7 @@
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { cpus, tmpdir, totalmem } from 'node:os';
 import { join } from 'node:path';
-import { machineHardwareSchema } from '@pacman/shared';
+import { machineHardwareSchema } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
   createMachineCapabilitiesProbe,
@@ -25,7 +25,7 @@ import {
 
 const tmpDirs: string[] = [];
 function tmpRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-caps-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-caps-'));
   tmpDirs.push(dir);
   return dir;
 }
@@ -82,8 +82,8 @@ describe('probeMachineCapabilities（一次性探测，全函数）', () => {
   test('失败方式 4：skills = 含 SKILL.md 的一级子目录名', () => {
     const root = tmpRoot();
     const skills = join(root, 'skills');
-    mkdirSync(join(skills, 'verify-pacman'), { recursive: true });
-    writeFileSync(join(skills, 'verify-pacman', 'SKILL.md'), '# verify');
+    mkdirSync(join(skills, 'verify-cairn'), { recursive: true });
+    writeFileSync(join(skills, 'verify-cairn', 'SKILL.md'), '# verify');
     mkdirSync(join(skills, 'no-manifest')); // 无 SKILL.md → 不算
     writeFileSync(join(skills, 'loose.md'), 'x'); // 散文件 → 不算
     mkdirSync(join(skills, 'nested', 'deep'), { recursive: true });
@@ -92,7 +92,7 @@ describe('probeMachineCapabilities（一次性探测，全函数）', () => {
       mcpConfigPath: join(root, 'absent.json'),
       skillsDir: skills,
     });
-    expect(caps.skills).toEqual(['nested', 'verify-pacman']);
+    expect(caps.skills).toEqual(['nested', 'verify-cairn']);
   });
 
   test('失败方式 6：输出排序确定', () => {

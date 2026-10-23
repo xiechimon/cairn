@@ -15,7 +15,7 @@
 // This hook is the one chief instance for the app, so it installs the
 // machine's key listener.
 
-import type { AskUserAnswer, TranscriptRow } from '@pacman/shared';
+import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
@@ -54,6 +54,7 @@ export interface ChiefSurface {
   /** Unread chief threads — the FAB badge (live: notifications; fixture:
    *  the capture's chiefUnread field). */
   chiefUnread: number;
+  chiefBusy: boolean;
   /** Composer send (live only; absent = fixture static face, read-only
    *  draft + inert send). 返回 Promise = 异步发送（#631：rejected 时
    *  drawer 保留 draft 不丢字，detail composer 同契）。 */
@@ -87,10 +88,10 @@ export interface ChiefDeepLink {
 }
 
 /** 开态持久化键（ADR 0013 D5，0004 D9「开态刷新即关」的反转）：品牌前缀
- *  纪律照 `pacman.sidebar-collapsed` 先例（app-sidebar.ts）；默认 = 关
+ *  纪律照 `cairn.sidebar-collapsed` 先例（app-sidebar.ts）；默认 = 关
  *  （Multica "never pops uninvited" 同律）。fixture 面永不读写（采集
  *  确定性——scenario 的 chief.view 是捕获形唯一开态源）。 */
-export const CHIEF_OPEN_STORAGE_KEY = 'pacman.chief-open';
+export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
 
 function readStoredChiefOpen(): boolean {
   try {
@@ -247,6 +248,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     ? (notificationsQ.data?.unreadThreadIds ?? []).filter((id) => id.startsWith('chief-')).length
     : 0;
   const chiefUnread = live ? liveUnread : (fixture.chiefUnread ?? 0);
+  const chiefBusy = live
+    ? liveThreads.some((thread) => thread.activeRun != null)
+    : fixture.chiefBusy === true;
 
   // #631 失败反馈（同步半）：PATCH / rewind / 发送失败 → toastError（共享
   // 原语住 components/ui/toaster.tsx：server 原因进 description 透传不翻译
@@ -306,6 +310,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
     setChiefView,
     chiefData,
     chiefUnread,
+    chiefBusy,
     onSend,
     onThread,
     onNewThread,

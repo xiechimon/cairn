@@ -19,7 +19,7 @@
 // F8  空 id 行跳过（shared modelSourceModelSchema min(1) 卫生在本层对齐）
 // F9  活性取严：同 model id 任一源标 dead → 所有行标 dead（#1288）
 
-import type { ModelSource } from '@pacman/shared';
+import type { ModelSource } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
 import { toModelOptions } from '../src/api/mappers.js';
 

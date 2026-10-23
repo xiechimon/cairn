@@ -7,7 +7,7 @@
 //   10. 符号链接 cwd → slug 解析到真实路径（与直连路径同串）
 //   11. cwd 缺失 → 不抛（原路径判 miss，resume 走冷重试通道）
 //   12. cwd 含 `.` / `_` 等非字母数字 → slug 与 CLI 2.1.278 同规则
-//       （`/[^a-zA-Z0-9]/g` → `-`）。只替换 `/` 时 `~/.pacman` 工作区
+//       （`/[^a-zA-Z0-9]/g` → `-`）。只替换 `/` 时 `~/.cairn` 工作区
 //       预检恒 miss（#1312）。
 //   13. 净化后 slug 超过 200 → 截到 200 再加路径哈希。CLI 2.1.278 在
 //       250 字符 cwd 上落盘目录以 `-ebpasi` 结尾，与本式一致。不截断时
@@ -37,8 +37,8 @@ function cliProjectSlug(resolved: string): string {
 
 describe('sdkTranscriptPath 路径解析（A7 resume 预检）', () => {
   test('失败方式 10：符号链接 cwd 的 slug = 真实路径的 slug', () => {
-    const real = mkdtempSync(join(tmpdir(), 'pacman-cc-path-'));
-    const link = join(tmpdir(), `pacman-cc-link-${randomUUID()}`);
+    const real = mkdtempSync(join(tmpdir(), 'cairn-cc-path-'));
+    const link = join(tmpdir(), `cairn-cc-link-${randomUUID()}`);
     symlinkSync(real, link);
     const throughLink = sdkTranscriptPath(link, 'sess-1');
     const direct = sdkTranscriptPath(real, 'sess-1');
@@ -53,7 +53,7 @@ describe('sdkTranscriptPath 路径解析（A7 resume 预检）', () => {
   });
 
   test('失败方式 12：非字母数字 cwd 字符按 CLI 规则换成 -', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'pacman-cc-slug-'));
+    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-slug-'));
     const cwd = join(parent, 'dot.hidden_dir');
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);
@@ -67,7 +67,7 @@ describe('sdkTranscriptPath 路径解析（A7 resume 预检）', () => {
   });
 
   test('失败方式 13：净化后超过 200 的 cwd 截断并附路径哈希', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'pacman-cc-long-'));
+    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-long-'));
     const cwd = join(parent, 'p'.repeat(220));
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);
@@ -82,7 +82,7 @@ describe('sdkTranscriptPath 路径解析（A7 resume 预检）', () => {
   });
 
   test('失败方式 14：配置目录覆写合法项目名，非法名与缺配置目录不覆写', () => {
-    const parent = mkdtempSync(join(tmpdir(), 'pacman-cc-over-'));
+    const parent = mkdtempSync(join(tmpdir(), 'cairn-cc-over-'));
     const cwd = join(parent, 'dot.hidden_dir');
     mkdirSync(cwd);
     const resolved = realpathSync(cwd);

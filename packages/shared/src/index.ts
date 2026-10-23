@@ -1,4 +1,4 @@
-// @pacman/shared——复刻协议面的唯一契约源（03 ROADMAP M1）。
+// @cairn/shared——复刻协议面的唯一契约源（03 ROADMAP M1）。
 // canonical 词表全量落 TypeScript schema：executor/machine 协议（02 §5）+
 // web REST/SSE（02 §6/§1.2）+ record 形状 24 表投影（02 §6.2/01 §6）+
 // phase 九值枚举单源（02 §4.1）+ 品牌串命名常量表（02 §5.8/#44 §2）。

@@ -33,10 +33,10 @@ interface WireProject {
 function localProject(): WireProject {
   return {
     id: LOCAL_PROJECT_ID,
-    name: 'pacman-local',
+    name: 'cairn-local',
     teamId: TEAM_ID,
     repoKind: 'local',
-    localPath: '/Users/who/code/pacman',
+    localPath: '/Users/who/code/cairn',
   };
 }
 
@@ -103,20 +103,20 @@ test('settings: name and description edits reach PATCH; description clear writes
   await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
 
   const nameInput = page.getByRole('textbox', { name: NAME_FIELD });
-  await expect(nameInput).toHaveValue('pacman-local');
+  await expect(nameInput).toHaveValue('cairn-local');
   const nameSave = page.getByRole('button', { name: '保存名称' });
   await expect(nameSave).toBeDisabled();
 
-  await nameInput.fill('pacman-main');
+  await nameInput.fill('cairn-main');
   await expect(nameSave).toBeEnabled();
   const refetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
   await nameSave.click();
   await refetched;
-  expect(stub.patches[0]?.body).toEqual({ name: 'pacman-main' });
+  expect(stub.patches[0]?.body).toEqual({ name: 'cairn-main' });
   // invalidate 重取回显新名（名称纯显示面——数据源即侧栏/卡面同源）
-  await expect(nameInput).toHaveValue('pacman-main');
+  await expect(nameInput).toHaveValue('cairn-main');
 
   const descInput = page.getByRole('textbox', { name: DESC_FIELD });
   await expect(descInput).toHaveValue('');
@@ -163,7 +163,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   const repoInput = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
   const pathInput = page.getByRole('textbox', { name: '本机加速路径' });
   // localPath 预填现值（local 绑定路径就地转加速位）
-  await expect(pathInput).toHaveValue('/Users/who/code/pacman');
+  await expect(pathInput).toHaveValue('/Users/who/code/cairn');
   // 转换钮：空 repo 禁用
   const convert = page.getByRole('button', { name: '转换' });
   await expect(convert).toBeDisabled();
@@ -174,7 +174,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   await expect(page.getByText('GitHub 仓库格式应为 owner/repo。')).toBeVisible();
   await expect(stub.patches).toHaveLength(0);
 
-  await repoInput.fill('xiechimon/pacman');
+  await repoInput.fill('xiechimon/cairn');
   const refetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
@@ -182,8 +182,8 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   await refetched;
   expect(stub.patches[0]?.body).toEqual({
     repoKind: 'github',
-    githubRepo: 'xiechimon/pacman',
-    localPath: '/Users/who/code/pacman',
+    githubRepo: 'xiechimon/cairn',
+    localPath: '/Users/who/code/cairn',
   });
   // invalidate 重取 → 形态切面：转换卡卸载，基本信息卡加速位行上线
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);

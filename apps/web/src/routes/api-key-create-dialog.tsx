@@ -10,7 +10,7 @@
 // Paper 表单：名称行 = FormField，footer = FormActions（取消 + 创建）；
 // 工具盘是 8px 角白底发丝框，最高 264px 内滚。
 
-import { CHIEF_REMOTE_TOOLS } from '@pacman/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';

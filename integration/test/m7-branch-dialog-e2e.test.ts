@@ -20,9 +20,9 @@
 // 「picker 可点」即「占位缺席」）、getByLabel（目录 input 补 aria-label）、
 // role=listbox（菜单缺席）与分支名文案一级。
 //
-// 本用例不覆盖真同步执行（需 daemon 在线机器）——那一面由 verify-pacman 的
+// 本用例不覆盖真同步执行（需 daemon 在线机器）——那一面由 verify-cairn 的
 // `drive-branch-sync.mjs` 探针真栈跑（配方与验证状态见
-// .claude/skills/verify-pacman/features/branch-sync.md）。
+// .claude/skills/verify-cairn/features/branch-sync.md）。
 
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -41,7 +41,7 @@ let page: Page;
 let todoId = '';
 
 beforeAll(async () => {
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });

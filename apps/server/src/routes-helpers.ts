@@ -14,7 +14,7 @@ import {
   type MemoryRecord,
   phaseSchema,
   type TagRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -28,7 +28,7 @@ import type { GithubIssueFaceDeps } from './services/github-issues.js';
 export const SESSION_COOKIE = BRAND.sessionCookieName;
 
 /** git http 认证域 [设计]（Basic realm；品牌槽归 #44）。 */
-export const GIT_AUTH_REALM = 'pacman-git';
+export const GIT_AUTH_REALM = 'cairn-git';
 
 export function requireTeam(ctx: AppContext, id: string): void {
   // team 恒 seed 一行（02 §2.2）；其余 id 一律 404。

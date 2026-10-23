@@ -47,7 +47,7 @@ import {
   WEBHOOK_DEDUP_WINDOW_MS,
   WEBHOOK_TRIGGER_LABEL,
   type WebhookReceiverResponse,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { project } from '../db/schema.js';

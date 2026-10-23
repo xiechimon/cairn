@@ -9,8 +9,8 @@
 //   （Intl…resolvedOptions().timeZone，01 §4.2）。
 // - once 触发后自动出队（r3 §9：GET /api/schedules?team= → []）。
 
-import type { CreateScheduleBody, ScheduleKind, ScheduleRecord } from '@pacman/shared';
-import { SCHEDULE_MINUTE_STEPS } from '@pacman/shared';
+import type { CreateScheduleBody, ScheduleKind, ScheduleRecord } from '@cairn/shared';
+import { SCHEDULE_MINUTE_STEPS } from '@cairn/shared';
 // 缝实现位：cron-parser 只在本模块出现（01 §3 Scheduler 缝纪律）。
 import { CronExpressionParser } from 'cron-parser';
 import { and, eq, isNotNull, lte } from 'drizzle-orm';

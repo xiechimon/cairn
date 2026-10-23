@@ -249,7 +249,7 @@ export interface SessionOpts {
    * 全量工具面（worker/chief 步现行为）。落点 = backend 工具面构建，宿主
    * 无从旁路。 */
   readOnly?: boolean;
-  /** #1148 per-step env 注入（worker 步端口基座 PACMAN_PORT_BASE 等）：值进
+  /** #1148 per-step env 注入（worker 步端口基座 CAIRN_PORT_BASE 等）：值进
    * agent 进程的命令环境——pi = bash 工具 spawn env（spawnHook）；claude-code
    * = SDK options.env（整替语义，backend 展开 process.env）。注意它**不是**
    * wire 字段（claim 载荷不携带）：槽位分配是 machine-loop 的本地事实，env
@@ -297,7 +297,7 @@ export interface AgentSessionHandle {
  * 文件、systemPrompt 通道清空；缺席 = 本后端不读，runner 保留 inline
  * systemPrompt 通道（未来第三个后端的逃生口，Multica 的 prompt-only mode 同律）。 */
 export interface BriefChannel {
-  /** 落点用哪套候选序与新建名（`@pacman/shared` brief-file.ts 的 BriefBackendId）。
+  /** 落点用哪套候选序与新建名（`@cairn/shared` brief-file.ts 的 BriefBackendId）。
    * 这不是装饰——写错文件 = 简报完全不被读，且全搬之后没有回退通道。 */
   readonly backendId: BriefBackendId;
   /** 完整简报正文 = 后端贡献（技能目录等）接在 `base`（runner 侧的 systemPrompt

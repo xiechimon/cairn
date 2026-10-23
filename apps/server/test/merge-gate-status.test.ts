@@ -1,4 +1,4 @@
-// #1404 S4b: the pure planner for the pacman/merge-gate commit status (merge-gate/gate-status.ts).
+// #1404 S4b: the pure planner for the cairn/merge-gate commit status (merge-gate/gate-status.ts).
 // Failure modes B-32 to B-38 in docs/verify/1404/s4b-failure-modes.txt (S1 to S4 below):
 // - a status is planned under the human policy, with no head, against another commit, or when the
 //   gate's own current status on that SHA cannot be read;
@@ -12,7 +12,7 @@ import {
   MERGE_GATE_STATUS_CONTEXT,
   type MergeBlocker,
   type MergeReadiness,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   GATE_STATUS_DESCRIPTION_MAX,
@@ -199,7 +199,7 @@ describe('planGateStatusWrite (S1, S2)', () => {
         current: { state: 'failure', description: value.description },
       }),
     ).toEqual(expected);
-    expect(MERGE_GATE_STATUS_CONTEXT).toBe('pacman/merge-gate');
+    expect(MERGE_GATE_STATUS_CONTEXT).toBe('cairn/merge-gate');
   });
 });
 

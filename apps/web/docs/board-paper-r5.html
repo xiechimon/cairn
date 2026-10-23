@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pacman board — Paper Dense + Grouped, round 5 type</title>
+<title>cairn board — Paper Dense + Grouped, round 5 type</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -282,18 +282,18 @@ const P = {
 const icon = (n, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 
 const SEED = [
-  {id:68, proj:'pacman-gh-probe', title:'实现 #1267：全局手势收单一状态机', state:'todo', ago:'4 天前'},
-  {id:72, proj:'pacman-gh-probe', title:'实现 #1277：分支漂移交付改硬失败', state:'todo', ago:'4 天前'},
-  {id:74, proj:'pacman', title:'侧栏 288px 一级表面与滚动渐隐', state:'running', agent:'glm', step:'运行 e2e:affected', done:3, total:7, ago:'12 分钟'},
-  {id:75, proj:'pacman', title:'按机器能力推荐并发上限', state:'running', agent:'kimi', step:'编辑 machine-capacity.ts', done:2, total:5, ago:'4 分钟'},
-  {id:22, proj:'pacman', tag:'improvement', title:'调慢 spinner 至 1.8s 同步呼吸律：补全 PR1119 证据段', state:'failed', why:'e2e 失败 2 条 · visual-polish.spec', ago:'6 天前', agent:'glm'},
-  {id:26, proj:'pacman', tag:'feature', title:'实现 issue #1138：claim 闸加 agent 级 maxConcurrentTasks', state:'confirm', why:'计划 5 步，等你确认', ago:'4 天前', agent:'claude'},
-  {id:48, proj:'pacman-gh-probe', title:'实现 #1186 skills 注入面三前置条件的机器断言', state:'review', why:'PR #1283 · +214 −37', ago:'4 天前', agent:'kimi'},
-  {id:25, proj:'pacman', tag:'chore', title:'合并会话分支改动到默认分支', state:'failed', why:'合并冲突 · 3 个文件', ago:'5 天前', agent:'glm'},
-  {id:69, proj:'pacman-gh-probe', title:'实现 #1251：机器能力上报 + 派发能力闸', state:'done', ago:'3 天前', agent:'glm'},
-  {id:65, proj:'pacman-gh-probe', title:'实现 #1261：daemon 配额信号熔断 + waiting_quota 挂起', state:'done', ago:'3 天前', agent:'kimi'},
-  {id:62, proj:'pacman-gh-probe', title:'#1257 计划：认领超时不判死 build，挂起等机器', state:'done', ago:'4 天前', agent:'claude'},
-  {id:71, proj:'pacman-gh-probe', title:'实现 #1195：构建产物稀释 conv 分支零改动误报', state:'done', ago:'4 天前', agent:'glm'},
+  {id:68, proj:'cairn-gh-probe', title:'实现 #1267：全局手势收单一状态机', state:'todo', ago:'4 天前'},
+  {id:72, proj:'cairn-gh-probe', title:'实现 #1277：分支漂移交付改硬失败', state:'todo', ago:'4 天前'},
+  {id:74, proj:'cairn', title:'侧栏 288px 一级表面与滚动渐隐', state:'running', agent:'glm', step:'运行 e2e:affected', done:3, total:7, ago:'12 分钟'},
+  {id:75, proj:'cairn', title:'按机器能力推荐并发上限', state:'running', agent:'kimi', step:'编辑 machine-capacity.ts', done:2, total:5, ago:'4 分钟'},
+  {id:22, proj:'cairn', tag:'improvement', title:'调慢 spinner 至 1.8s 同步呼吸律：补全 PR1119 证据段', state:'failed', why:'e2e 失败 2 条 · visual-polish.spec', ago:'6 天前', agent:'glm'},
+  {id:26, proj:'cairn', tag:'feature', title:'实现 issue #1138：claim 闸加 agent 级 maxConcurrentTasks', state:'confirm', why:'计划 5 步，等你确认', ago:'4 天前', agent:'claude'},
+  {id:48, proj:'cairn-gh-probe', title:'实现 #1186 skills 注入面三前置条件的机器断言', state:'review', why:'PR #1283 · +214 −37', ago:'4 天前', agent:'kimi'},
+  {id:25, proj:'cairn', tag:'chore', title:'合并会话分支改动到默认分支', state:'failed', why:'合并冲突 · 3 个文件', ago:'5 天前', agent:'glm'},
+  {id:69, proj:'cairn-gh-probe', title:'实现 #1251：机器能力上报 + 派发能力闸', state:'done', ago:'3 天前', agent:'glm'},
+  {id:65, proj:'cairn-gh-probe', title:'实现 #1261：daemon 配额信号熔断 + waiting_quota 挂起', state:'done', ago:'3 天前', agent:'kimi'},
+  {id:62, proj:'cairn-gh-probe', title:'#1257 计划：认领超时不判死 build，挂起等机器', state:'done', ago:'4 天前', agent:'claude'},
+  {id:71, proj:'cairn-gh-probe', title:'实现 #1195：构建产物稀释 conv 分支零改动误报', state:'done', ago:'4 天前', agent:'glm'},
 ];
 let tasks = SEED.map(t => ({...t}));
 
@@ -311,8 +311,8 @@ const ACTION_ICON = {todo:'play', failed:'rotate', confirm:'check', review:'arro
 const STATE_ICON = {failed:'xCircle', confirm:'listChecks', review:'pr'};
 const LABEL = {todo:'排队中', running:'执行中', failed:'失败', confirm:'待确认', review:'待审阅', done:'已合并'};
 const PROJ = [
-  {n:'pacman', l:'P', c:'#c06a43'},
-  {n:'pacman-gh-probe', l:'G', c:'#7d8b5a'},
+  {n:'cairn', l:'P', c:'#c06a43'},
+  {n:'cairn-gh-probe', l:'G', c:'#7d8b5a'},
   {n:'凭证链路验证', l:'凭', c:'#6b7a8f'},
 ];
 const RES = [['puzzle','技能'], ['plug','MCP'], ['key','密钥'], ['server','机器'], ['layers','模型服务']];
@@ -321,7 +321,7 @@ const tile = p => `<span class="tile" style="background:${p.c}">${p.l}</span>`;
 const nav = (ic, label, right = '', on = false, lead = '') =>
   `<a class="nav${on ? ' on' : ''}">${lead || (ic ? icon(ic, 16) : '')}<span class="lbl">${label}</span>${right}</a>`;
 const pill = () => attn() ? `<span class="pill">${attn()}</span>` : '';
-const ws = (toggle = true) => `<div class="ws"><span class="ws-logo">P</span><span class="ws-name">Pacman</span>${icon('chevronDown', 14)}<span class="grow"></span>${toggle ? `<span class="icon-btn">${icon('panelLeft', 15)}</span>` : ''}</div>`;
+const ws = (toggle = true) => `<div class="ws"><span class="ws-logo">P</span><span class="ws-name">Cairn</span>${icon('chevronDown', 14)}<span class="grow"></span>${toggle ? `<span class="icon-btn">${icon('panelLeft', 15)}</span>` : ''}</div>`;
 const user = () => `<div class="user"><span class="av">O</span>Owner<span class="more">${icon('more', 15)}</span></div>`;
 
 function card(t, i) {
@@ -379,7 +379,7 @@ function ink() {
 
 function grouped(type) {
   return board('app-grouped ' + type, `<aside class="s1 sb-grp">
-    <div class="ws"><span class="ws-logo">P</span><span class="ws-name">Pacman</span>${icon('chevronDown', 14)}<span class="grow"></span><span class="icon-btn" title="搜索 ⌘K">${icon('search', 15)}</span><span class="icon-btn">${icon('panelLeft', 15)}</span></div>
+    <div class="ws"><span class="ws-logo">P</span><span class="ws-name">Cairn</span>${icon('chevronDown', 14)}<span class="grow"></span><span class="icon-btn" title="搜索 ⌘K">${icon('search', 15)}</span><span class="icon-btn">${icon('panelLeft', 15)}</span></div>
     <button class="grp-new">${icon('plus', 15)}新任务<kbd>C</kbd></button>
     ${nav('board', '工作台', '', true)}${nav('alert', '需要我处理', pill())}${nav('clock', '定时')}
     <div class="sec">项目<span class="add">${icon('plus', 13)}</span></div>
@@ -394,7 +394,7 @@ function grouped(type) {
 
 function sheet() {
   return board('app-sheet', `<aside class="sb-sheet">
-    <div class="ws"><span class="ws-logo">P</span><span class="ws-name">Pacman</span><span class="grow"></span><span class="icon-btn" title="搜索 ⌘K">${icon('search', 16)}</span></div>
+    <div class="ws"><span class="ws-logo">P</span><span class="ws-name">Cairn</span><span class="grow"></span><span class="icon-btn" title="搜索 ⌘K">${icon('search', 16)}</span></div>
     <a class="nav sh-new">${icon('plus', 17)}<span class="lbl">新任务</span><span class="kbd">C</span></a>
     ${nav('board', '工作台', attn() ? `<span class="sh-count">${attn()}</span>` : '', true)}${nav('clock', '定时')}
     <div class="sh-sec">项目</div>

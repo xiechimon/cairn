@@ -1,7 +1,7 @@
 // spec 15 #394 server 面：占位标题派生（createTodo 落库）+ 固定词表播种 +
 // set_task_meta worker 窄工具 relay。失败方式清单 = spec 15 Testing Decisions。
 
-import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@pacman/shared';
+import { type ClaimedStep, FIXED_TAGS, todoRecordSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';

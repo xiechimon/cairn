@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@pacman/shared';
+import type { ClaimedStep, MachineDoneBody, StepKind, TranscriptUpload } from '@cairn/shared';
 import type { StopRequest } from './step-stops.js';
 
 export type JournalState = 'claimed' | 'running' | 'awaiting-upload' | 'done' | 'failed';

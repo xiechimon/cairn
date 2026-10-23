@@ -1,4 +1,4 @@
-import { BRAND, maskApiKey } from '@pacman/shared';
+import { BRAND, maskApiKey } from '@cairn/shared';
 import { boardDefault } from './board.js';
 import type { ApiKeyRecord, FixtureSet } from './records.js';
 

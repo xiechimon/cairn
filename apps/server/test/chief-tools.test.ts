@@ -9,7 +9,7 @@ import {
   CHIEF_TOOL_NAMES,
   CHIEF_TOOLS_ADDED,
   CHIEF_TOOLS_REMOVED,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable } from '../src/db/schema.js';

@@ -25,12 +25,13 @@
 // （echo 里提一句 rm -rf / 不该炸），变量展开/转义/编码绕行不在射程内（防误
 // 不防恶）。claude-code 后端仍跑 bypassPermissions（钩子在 bypass 下是否触发
 // 未验证，动 permissionMode 是全量行为变更，留给后续票），缺口见 PR 与报告。
+
+import { matchPermissionRule, type PermissionAction, type PermissionRule } from '@cairn/shared';
 import {
   isToolCallEventType,
   type ToolCallEvent,
   type ToolCallEventResult,
 } from '@earendil-works/pi-coding-agent';
-import { matchPermissionRule, type PermissionAction, type PermissionRule } from '@pacman/shared';
 
 export type { PermissionRule };
 

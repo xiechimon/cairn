@@ -37,7 +37,7 @@ describe('loopbackNoProxy', () => {
   });
 
   test('非回环 server 不注入', () => {
-    expect(loopbackNoProxy({}, 'https://pacman.example.com')).toBeUndefined();
+    expect(loopbackNoProxy({}, 'https://cairn.example.com')).toBeUndefined();
   });
 
   test('缺 serverUrl 或坏 URL 不注入', () => {

@@ -3,7 +3,7 @@ import {
   AGENT_TODO_MARKER_STATES,
   AGENT_TODO_MAX_ITEMS,
   type AgentTodoItem,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})/;
 

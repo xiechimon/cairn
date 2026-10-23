@@ -23,7 +23,7 @@
 //       行只挂闸相位来源；
 //   12. 闸相位卡无 latestBuildId——行无处落但不得 500（改相本身要成功）。
 
-import { CONFIRM_ANNOUNCEMENT, DONE_ANNOUNCEMENT, MERGE_ANNOUNCEMENT } from '@pacman/shared';
+import { CONFIRM_ANNOUNCEMENT, DONE_ANNOUNCEMENT, MERGE_ANNOUNCEMENT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {

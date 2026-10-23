@@ -15,12 +15,13 @@ test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/prepush-vitest.mjs',
-    'pnpm --filter @pacman/web e2e:affected -- apps/web/src/main.tsx',
+    'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
 });
@@ -54,6 +55,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/ui-debt-gate.mjs',
+    'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs',
   ]) {
     assert.ok(!workflow.includes(`run: ${command}`));
@@ -61,7 +63,7 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
 });
 
 test('CLI skips real document changes and rejects a missing base', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'pacman-prepush-'));
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));
   const runGit = (args) =>
     execFileSync(
       'git',

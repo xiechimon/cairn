@@ -42,7 +42,7 @@ async function expectInkStep(idle: Locator, selected: Locator) {
 }
 
 async function themed(page: Page, theme: 'dark' | 'light', url: string) {
-  await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+  await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
   await page.goto(url);
 }
 

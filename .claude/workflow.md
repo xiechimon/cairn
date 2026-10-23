@@ -1,11 +1,11 @@
-# Pacman 工作流（给任何接手的 Claude / agent）
+# Cairn 工作流（给任何接手的 Claude / agent）
 
 > 目的：换账号、换机器后，新的 Claude（Desktop / Code）克隆本仓，读完这一页和 `AGENTS.md` 就能按同样方式继续。本文件只写工作方式、分工和当前进展摘要；规则细节以 `AGENTS.md` 为准，冲突时 `AGENTS.md` 赢。
 > 本仓是公开的：不写密钥、内部地址、个人信息、额度细节。
 
 ## 1. 项目目标
 
-让 pacman 能自己迭代自己：跑通 spec 28 自举闭环（ADR 0021），pacman 自己领票、实现、审核、合并 PR；再用评测与轨迹数据闭环持续优化 harness（提示词、技能、路由）。不微调模型：这里说的「训练」指优化 harness，不是改权重。杂活交给便宜的执行器，尽量省 Claude 的 token。
+让 cairn 能自己迭代自己：跑通 spec 28 自举闭环（ADR 0021），cairn 自己领票、实现、审核、合并 PR；再用评测与轨迹数据闭环持续优化 harness（提示词、技能、路由）。不微调模型：这里说的「训练」指优化 harness，不是改权重。杂活交给便宜的执行器，尽量省 Claude 的 token。
 
 ## 2. 工作方式
 
@@ -14,7 +14,7 @@
 - 不给人留手动步骤（例如去 GitHub 摘标签）。不给 PR 打 `needs-decision`：需要拍板的事在聊天里问，问完自己合并。
 - 设计取舍（改变原定行为、动 ADR 或保护路径）先问人，再动手。
 - 开完 PR 就打开 GitHub auto-merge 然后收工，不要挂着盯 CI。
-- 每个线程收尾前自动做一次 retro（见 `.claude/skills/retro-pacman/SKILL.md`），不用人提醒。错误台账在 `docs/lessons.md`。
+- 每个线程收尾前自动做一次 retro（见 `.claude/skills/retro-cairn/SKILL.md`），不用人提醒。错误台账在 `docs/lessons.md`。
 - 一件事一个本机线程：新主题开新线程，不往已有的「调度本机 agent」线程里堆活；已有事项在原线程做完。
 - 线程默认模型用 Sonnet 级以省 token；拆票、审改动、写 PR、做取舍才是 Claude 的活。
 - 派活时不要停下来等人排优先级，自己选顺序直接做。附图片直接附在回复里，别只放进文件库。
@@ -34,6 +34,8 @@
 - grok：`grok -p "<任务>" -m <模型> --always-approve --cwd <目录>`，要联网或搜 X 就别加 `--disable-web-search`。
 - codex：`codex exec -s workspace-write -C <目录> "<票>"`，不能绑端口、不能跑 e2e，可以生成图片。
 
+后台起以上命令一律走 `scripts/dispatch-agent.mjs start <id> -- <命令>`：脱离进程组启动、立即核对进程并写状态文件（`( ... & )` / `nohup` 直起的任务会被工具调用边界的进程组清理杀掉）。汇报前先 `check <id>` 读状态文件，直起的任务没有状态记录，check 报进程不存在（#1556）。
+
 ## 4. 模型规则
 
 - 只用 1M 上下文的模型。
@@ -49,10 +51,10 @@
 - 过程错误复盘：台账 `docs/lessons.md`；后续 L1 `pnpm prepush`（#1533）、L2 fail→fix 检测器（#1535，依赖 E0）、L3 拦截计数与复发升级（#1534）。动 AGENTS.md 的票由人合并。
 - 注释纪律 #1520；另有待办：单开票清理存量注释。
 - 已知：150 多个陈旧远端分支待清理；云端构建 better-sqlite3 需先 `npm i -g node-gyp`。
-- pacman 自己不能合并自己的 PR：chief 的 merge_builds 被硬拒（`chief.ts`），人在 web 界面点「完成」。
+- cairn 自己不能合并自己的 PR：chief 的 merge_builds 被硬拒（`chief.ts`），人在 web 界面点「完成」。
 
 ## 6. 接手清单
 
 1. 读 `AGENTS.md`、本文件、`docs/lessons.md`。
-2. 看 `.claude/skills/`：`pr-pacman`（写 PR body）、`retro-pacman`（收尾复盘）、`verify-pacman`、`verify-step-claim`。
+2. 看 `.claude/skills/`：`pr-cairn`（写 PR body）、`retro-cairn`（收尾复盘）、`verify-cairn`、`verify-step-claim`。
 3. `gh issue list` 看在途票，从 spec 28 主线和评测闭环里挑下一张，不等人排序。

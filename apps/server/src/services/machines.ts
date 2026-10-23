@@ -30,7 +30,7 @@ import type {
   ToolCallRecord,
   TranscriptRow,
   UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   AGENT_TOOL_SHELL,
   AGENT_TOOL_TAG,
@@ -63,7 +63,7 @@ import {
   suggestSkillsForMessage,
   WORKER_REMOTE_TOOLS,
   WORKER_REMOTE_TOOLS_GITHUB,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, eq, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
@@ -954,7 +954,7 @@ async function tryClaim(
   // 不再剔除 chief，chief 候选与 worker 候选同闸（chief = 普通 agent，
   // 无并发特权；Multica leader 同律）。
   // #1148 maxWorkers（claim body 自报）：闸取 min(DB, 自报)——daemon 侧
-  // env PACMAN_DAEMON_MAX_CONCURRENT 覆盖 DB 的 server 落点；缺省（老
+  // env CAIRN_DAEMON_MAX_CONCURRENT 覆盖 DB 的 server 落点；缺省（老
   // daemon）只按机器行。
   const running = machineRunningCount(db, machineId);
   const workerCap = Math.min(
@@ -1167,7 +1167,7 @@ async function tryClaim(
     const isGithubProject = projectRow?.repoKind === 'github';
     // titleFinal = 仅**导入**任务（'github-issue'，标题真值在 issue 侧，ADR
     // 0005 D5）；自建 issue 任务（'github-issue-self'，#452 / ADR 0006 D3）
-    // 标题真值在 pacman 侧——占位标题仍走 agent 回填并写进 issue，恒 false。
+    // 标题真值在 cairn 侧——占位标题仍走 agent 回填并写进 issue，恒 false。
     const taskMeta =
       isGithubProject && projectRow
         ? {

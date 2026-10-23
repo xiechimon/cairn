@@ -1,5 +1,5 @@
 // webhook token 服务面（#1137；api-keys.ts 同族逐位对齐）：
-// - 创建：`pacman_wh_<36hex>` 明文一次性返回（前缀区分 apiKey 凭证族）；
+// - 创建：`cairn_wh_<36hex>` 明文一次性返回（前缀区分 apiKey 凭证族）；
 //   服务端存哈希不存可逆值（hashCredential，02 §8 同律）。
 // - 列表：行掩码（maskApiKey 同规则），tokenHash 永不出响应。
 // - 撤销：删行（receiver 反查即 miss → 401，吊销即时生效）。
@@ -9,7 +9,7 @@
 //   随机凭证，可吊销。
 
 import { randomBytes } from 'node:crypto';
-import { maskApiKey } from '@pacman/shared';
+import { maskApiKey } from '@cairn/shared';
 import { asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { webhookToken } from '../db/schema.js';
@@ -41,9 +41,9 @@ export function toWebhookTokenRowView(row: WebhookTokenRow): WebhookTokenRowView
   };
 }
 
-/** `pacman_wh_<36hex>`（webhook 凭证族形态；hex 小写，apiKey 同律）。 */
+/** `cairn_wh_<36hex>`（webhook 凭证族形态；hex 小写，apiKey 同律）。 */
 export function newWebhookTokenPlaintext(): string {
-  return `pacman_wh_${randomBytes(18).toString('hex')}`;
+  return `cairn_wh_${randomBytes(18).toString('hex')}`;
 }
 
 export function listWebhookTokens(deps: WebhookTokenDeps, teamId: string): WebhookTokenRowView[] {
