@@ -782,7 +782,7 @@ test('five-kind: project click inserts the scheme token and the chip confirms', 
   page,
 }) => {
   const { input, rows } = await openDetail(page, AGENTS, FIVE_KIND);
-  await input.fill('@pacm');
+  await input.fill('@cair');
   await expect(rows).toHaveCount(1);
   await rows.first().click();
   await expect(input).toHaveValue('[cairn](project:proj-1) ');
