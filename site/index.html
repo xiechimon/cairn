@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN" data-lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cairn</title>
+<meta name="description" content="Cairn is a self-hosted multi-agent workspace: agents claim tickets, build and review on your machines, and nothing merges without your gate.">
+<meta property="og:title" content="Cairn">
+<meta property="og:description" content="Self-hosted multi-agent orchestration with human gates and a self-improving harness.">
+<meta property="og:image" content="https://cairn.xmon.me/img/board-en-light.webp">
+<link rel="canonical" href="https://cairn.xmon.me/">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<meta name="color-scheme" content="light dark">
+<script>
+(function(){var h=document.documentElement,t=null,l=null;
+try{t=localStorage.getItem("cairn-theme");l=localStorage.getItem("cairn-lang")}catch(e){}
+h.dataset.theme=t||(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");
+h.dataset.lang=l||((navigator.language||"").toLowerCase().indexOf("zh")===0?"zh":"en");
+h.lang=h.dataset.lang==="zh"?"zh-CN":"en";})();
+</script>
+<style>
+:root{--bg:#efe6d0;--surface:#f7f1e1;--card:#fffdf6;--ink:#1b2b24;--muted:#5e564d;--line:#e2d8bf;--primary:#173a2f;--on-primary:#f2ead7;--soft:#e8dec5;--glow:rgba(23,58,47,.14)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1d1a16;--surface:#24201b;--card:#2f2a26;--ink:#ece7df;--muted:#c5c0b9;--line:#3e3a34;--primary:#ece7df;--on-primary:#24201b;--soft:#3c3732;--glow:rgba(0,0,0,.45)}}
+:root[data-theme=dark]{--bg:#1d1a16;--surface:#24201b;--card:#2f2a26;--ink:#ece7df;--muted:#c5c0b9;--line:#3e3a34;--primary:#ece7df;--on-primary:#24201b;--soft:#3c3732;--glow:rgba(0,0,0,.45)}
+*{box-sizing:border-box}
+html{background:var(--bg);color-scheme:light}
+html[data-theme=dark]{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Noto Sans SC",sans-serif;transition:background .2s,color .2s}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+nav{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;text-decoration:none;font-family:Georgia,"Times New Roman",serif}
+.brand img{width:32px;height:32px;border-radius:8px}
+.r{display:flex;gap:8px;align-items:center}
+.r a{text-decoration:none;font-size:14px;padding:6px 10px}
+.pill{background:none;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer;font:inherit;font-size:14px;line-height:1.4}
+.pill:hover{background:var(--soft)}
+.hero{padding:28px 0 8px;text-align:center}
+h1{font-family:Georgia,"Times New Roman","Songti SC",serif;font-weight:600;font-size:clamp(32px,5.6vw,56px);line-height:1.15;margin:0 0 14px;letter-spacing:-.01em}
+.sub{max-width:700px;margin:0 auto 24px;color:var(--muted);font-size:18px}
+.cta{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;background:var(--primary);color:var(--on-primary);padding:11px 20px;border-radius:14px;text-decoration:none;font-weight:600}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.shot{margin:32px auto 0;border-radius:22px;overflow:hidden;border:1px solid var(--line);box-shadow:0 24px 60px var(--glow);background:var(--surface);aspect-ratio:2880/1400}
+.shot img{display:none;width:100%;height:auto}
+.shot video{display:block;width:100%;height:100%;object-fit:cover;background:#000}
+.shot.has-video{aspect-ratio:16/9}
+.shot.has-video img{display:none!important}
+html[data-lang=zh][data-theme=light] .s-zh-light,html[data-lang=zh][data-theme=dark] .s-zh-dark,html[data-lang=en][data-theme=light] .s-en-light,html[data-lang=en][data-theme=dark] .s-en-dark{display:block}
+.cap{color:var(--muted);font-size:13px;margin-top:10px;text-align:center}
+section{padding:56px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:22px}
+.card h3{margin:0 0 6px;font-size:18px}
+.card p{margin:0 0 16px;color:var(--muted);font-size:15px}
+.card svg{width:100%;height:auto;display:block}
+svg .n{fill:var(--surface);stroke:var(--line)}
+svg .p{fill:var(--primary)}
+svg .t{fill:var(--ink);font:600 12px -apple-system,"PingFang SC",sans-serif}
+svg .tp{fill:var(--on-primary);font:600 12px -apple-system,"PingFang SC",sans-serif}
+svg .l{stroke:var(--muted);stroke-width:1.5;fill:none}
+svg .ah{fill:var(--muted)}
+.install{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:20px 22px}
+.install b{font-size:18px}
+.install .hint{color:var(--muted);font-size:14px;display:block}
+pre{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 16px;font:15px ui-monospace,SFMono-Regular,Menlo,monospace;overflow:auto}
+footer{padding:40px 0 32px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+[data-l]{display:none}
+html[data-lang=zh] [data-l=zh],html[data-lang=en] [data-l=en]{display:inline}
+@media (max-width:820px){.grid{grid-template-columns:1fr}.sub{font-size:16px}.r a.gh{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav>
+  <a class="brand" href="#"><img src="logo.svg" alt="">Cairn</a>
+  <div class="r">
+    <a class="gh" href="https://github.com/xiechimon/cairn">GitHub</a>
+    <button class="pill" id="theme" type="button" aria-label="Toggle theme"><span data-l="zh">深色 / 浅色</span><span data-l="en">Dark / Light</span></button>
+    <button class="pill" id="lang" type="button"><span data-l="zh">EN</span><span data-l="en">中文</span></button>
+  </div>
+</nav>
+
+<header class="hero">
+  <h1><span data-l="zh">你写任务，agent 干活，你来把关。</span><span data-l="en">You write the tasks. Agents build. You gate.</span></h1>
+  <p class="sub"><span data-l="zh">Cairn 是自托管的多 agent 编排工作台：agent 在你自己的机器上领任务、写代码、互相审核，合并前必须过你这一关。</span><span data-l="en">Cairn is a self-hosted multi-agent workspace. Agents claim tasks, write code and review each other on your own machines, and nothing merges without your sign-off.</span></p>
+  <div class="cta">
+    <a class="btn" href="https://github.com/xiechimon/cairn"><span data-l="zh">在 GitHub 查看</span><span data-l="en">View on GitHub</span></a>
+    <a class="btn ghost" href="#start"><span data-l="zh">一行命令跑起来</span><span data-l="en">Run it with one command</span></a>
+  </div>
+  <div class="shot">
+    <img class="s-zh-light" src="img/board-zh-light.webp" width="2160" height="1050" alt="Cairn 看板">
+    <img class="s-zh-dark" src="img/board-zh-dark.webp" width="2160" height="1050" alt="Cairn 看板（深色）" loading="lazy">
+    <img class="s-en-light" src="img/board-en-light.webp" width="2160" height="1050" alt="Cairn board" loading="lazy">
+    <img class="s-en-dark" src="img/board-en-dark.webp" width="2160" height="1050" alt="Cairn board (dark)" loading="lazy">
+  </div>
+  <p class="cap"><span data-l="zh">真实界面截图，演示数据。</span><span data-l="en">Real UI, sample data.</span></p>
+</header>
+
+<section>
+  <div class="grid">
+    <div class="card">
+      <h3><span data-l="zh">多 agent 分工</span><span data-l="en">Agents with roles</span></h3>
+      <p><span data-l="zh">chief 只派活不写代码，coder 并行实现，reviewer 审改动，你只在计划和合并两处拍板。</span><span data-l="en">A chief only dispatches, coders build in parallel, a reviewer checks the diff, and you decide at the plan and the merge.</span></p>
+      <svg viewBox="0 0 300 150" role="img" aria-label="chief to coders to reviewer to you">
+        <defs><marker id="a1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L8 4L0 8z"/></marker></defs>
+        <rect class="n" x="4" y="58" width="62" height="34" rx="10"/><text class="t" x="35" y="80" text-anchor="middle">chief</text>
+        <rect class="n" x="104" y="10" width="72" height="30" rx="10"/><text class="t" x="140" y="30" text-anchor="middle">coder-1</text>
+        <rect class="n" x="104" y="60" width="72" height="30" rx="10"/><text class="t" x="140" y="80" text-anchor="middle">coder-2</text>
+        <rect class="n" x="104" y="110" width="72" height="30" rx="10"/><text class="t" x="140" y="130" text-anchor="middle">coder-3</text>
+        <rect class="n" x="200" y="58" width="56" height="34" rx="10"/><text class="t" x="228" y="80" text-anchor="middle">review</text>
+        <circle class="p" cx="282" cy="75" r="15"/><text class="tp" x="282" y="79" text-anchor="middle">✓</text>
+        <path class="l" d="M66 70C86 50 88 28 102 26" marker-end="url(#a1)"/><path class="l" d="M66 75H102" marker-end="url(#a1)"/><path class="l" d="M66 80C86 100 88 122 102 124" marker-end="url(#a1)"/>
+        <path class="l" d="M176 26C190 28 186 60 198 68" marker-end="url(#a1)"/><path class="l" d="M176 75H198" marker-end="url(#a1)"/><path class="l" d="M176 124C190 122 186 90 198 82" marker-end="url(#a1)"/>
+        <path class="l" d="M256 75H265" marker-end="url(#a1)"/>
+      </svg>
+    </div>
+    <div class="card">
+      <h3><span data-l="zh">用自己开发自己</span><span data-l="en">Builds itself</span></h3>
+      <p><span data-l="zh">Cairn 的新功能由 Cairn 里的 agent 领票、实现、审核、开 PR，跑在同一个闭环里。</span><span data-l="en">Cairn's own features are claimed, built, reviewed and shipped as PRs by agents running inside Cairn.</span></p>
+      <svg viewBox="0 0 300 150" role="img" aria-label="claim, build, review, merge loop">
+        <defs><marker id="a2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0L8 4L0 8z"/></marker></defs>
+        <circle class="p" cx="150" cy="75" r="22"/><text class="tp" x="150" y="79" text-anchor="middle">Cairn</text>
+        <rect class="n" x="110" y="4" width="80" height="30" rx="10"/><text class="t" x="150" y="24" text-anchor="middle"><tspan data-l="zh">领票</tspan><tspan data-l="en">claim</tspan></text>
+        <rect class="n" x="214" y="60" width="80" height="30" rx="10"/><text class="t" x="254" y="80" text-anchor="middle"><tspan data-l="zh">实现</tspan><tspan data-l="en">build</tspan></text>
+        <rect class="n" x="110" y="116" width="80" height="30" rx="10"/><text class="t" x="150" y="136" text-anchor="middle"><tspan data-l="zh">审核</tspan><tspan data-l="en">review</tspan></text>
+        <rect class="n" x="6" y="60" width="80" height="30" rx="10"/><text class="t" x="46" y="80" text-anchor="middle"><tspan data-l="zh">合并</tspan><tspan data-l="en">merge</tspan></text>
+        <path class="l" d="M192 22C224 26 250 38 254 56" marker-end="url(#a2)"/><path class="l" d="M254 92C250 112 224 126 194 130" marker-end="url(#a2)"/>
+        <path class="l" d="M108 130C76 126 50 112 46 94" marker-end="url(#a2)"/><path class="l" d="M46 58C50 38 76 26 106 22" marker-end="url(#a2)"/>
+      </svg>
+    </div>
+    <div class="card">
+      <h3><span data-l="zh">评测驱动，不微调模型</span><span data-l="en">Eval-driven, no fine-tuning</span></h3>
+      <p><span data-l="zh">每次构建记下 harness 版本，用评测和轨迹数据改提示词、技能和路由；同一个错优先落成类型和测试。</span><span data-l="en">Every build records its harness version; evals and trajectories tune prompts, skills and routing, and repeat mistakes become types and tests.</span></p>
+      <svg viewBox="0 0 300 150" role="img" aria-label="prevention layers">
+        <rect class="p" x="40" y="6" width="220" height="30" rx="10"/><text class="tp" x="150" y="26" text-anchor="middle"><tspan data-l="zh">架构与类型：错误写不出来</tspan><tspan data-l="en">Types: the bug can't be written</tspan></text>
+        <rect class="n" x="30" y="42" width="240" height="30" rx="10"/><text class="t" x="150" y="62" text-anchor="middle"><tspan data-l="zh">lint 与测试：CI 自动拦下</tspan><tspan data-l="en">Lint and tests: CI catches it</tspan></text>
+        <rect class="n" x="20" y="78" width="260" height="30" rx="10"/><text class="t" x="150" y="98" text-anchor="middle"><tspan data-l="zh">技能与规则：尽量少</tspan><tspan data-l="en">Skills and rules: keep few</tspan></text>
+        <rect class="n" x="10" y="114" width="280" height="30" rx="10"/><text class="t" x="150" y="134" text-anchor="middle"><tspan data-l="zh">人工审阅：最后一道</tspan><tspan data-l="en">Human review: last resort</tspan></text>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="start">
+  <div class="install">
+    <div><b><span data-l="zh">一行命令跑起来</span><span data-l="en">Run it locally</span></b><span class="hint"><span data-l="zh">需要 Node.js 22 或 24，启动后打开 127.0.0.1:8787/app</span><span data-l="en">Needs Node.js 22 or 24, then open 127.0.0.1:8787/app</span></span></div>
+    <pre>npx @xiechimon/cairn</pre>
+  </div>
+</section>
+
+<footer>
+  <span>Cairn · Apache-2.0</span>
+  <a href="https://github.com/xiechimon/cairn">github.com/xiechimon/cairn</a>
+</footer>
+</div>
+<script>
+(function(){var h=document.documentElement,mq=matchMedia("(prefers-color-scheme: dark)");
+function save(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+function stored(k){try{return localStorage.getItem(k)}catch(e){return null}}
+mq.addEventListener("change",function(e){if(!stored("cairn-theme"))h.dataset.theme=e.matches?"dark":"light"});
+document.getElementById("theme").onclick=function(){var n=h.dataset.theme==="dark"?"light":"dark";h.dataset.theme=n;save("cairn-theme",n)};
+var shot=document.querySelector(".shot");
+fetch("media/promo.mp4",{method:"HEAD"}).then(function(r){
+  if(!r.ok||(r.headers.get("content-type")||"").indexOf("video")!==0)return;
+  var v=document.createElement("video");v.src="media/promo.mp4";v.controls=true;v.playsInline=true;v.preload="metadata";
+  var poster=shot.querySelector("img."+"s-"+h.dataset.lang+"-"+h.dataset.theme);if(poster)v.poster=poster.currentSrc||poster.src;
+  shot.appendChild(v);shot.classList.add("has-video");
+}).catch(function(){});
+document.getElementById("lang").onclick=function(){var n=h.dataset.lang==="zh"?"en":"zh";h.dataset.lang=n;h.lang=n==="zh"?"zh-CN":"en";save("cairn-lang",n)};
+})();
+</script>
+</body>
+</html>
