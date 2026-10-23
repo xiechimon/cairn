@@ -659,8 +659,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const m of messages) {
     const paired = toolCallOfContent(m.content);
     if (paired === null) continue;
-    const pairedText = resultToText(paired.result);
-    if (pairedText !== null && pairedText !== '') toolNameByResult.set(pairedText, paired.name);
+    const pairedText = resultToText(paired.result)?.trim();
+    if (pairedText !== undefined && pairedText !== '')
+      toolNameByResult.set(pairedText, paired.name);
   }
 
   const entries: TimelineEntry[] = [];

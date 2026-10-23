@@ -14,6 +14,7 @@
 //   F4 unpaired JSON-object system row → dropped (plumbing, no human face)
 //   F5 pure-JSON tool output → no output slab in the tools group; the pill
 //      stays and terminal-text outputs keep rendering (#469 law intact)
+//   F6 tool output ending in a newline still pairs (the echo lookup trims)
 
 import type { ToolCallRecord } from '@cairn/shared';
 import { expect, test } from 'vitest';
@@ -108,4 +109,13 @@ test('F5: pure-JSON tool output hangs no slab; terminal text output stays', () =
   const group = items.find((i): i is Extract<TranscriptItem, { kind: 'tools' }> => i.kind === 'tools');
   expect(group?.pills).toEqual(['set_task_meta', 'bash']);
   expect(group?.outputs).toEqual([null, 'probe ok\n']);
+});
+
+test('F6: a bash echo ending in a newline pairs with its toolcall and leaves no note', () => {
+  const output = '== role: assistant id: call-1\n{"kind":"toolcall"}\n';
+  const items = render([
+    toolMessage(toolCall('bash', output), NOW - 4_000),
+    echoMessage(output, NOW - 3_900),
+  ]);
+  expect(notes(items)).toEqual([]);
 });
