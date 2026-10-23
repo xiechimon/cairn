@@ -1,16 +1,39 @@
 <div align="center">
-  <img src="apps/web/public/logo.svg" alt="cairn app icon" width="128" height="128">
+  <img src="apps/web/public/logo.svg" alt="Cairn app icon" width="112" height="112">
+
+  <h1>Cairn</h1>
+
+  <p><b>You write the tickets. Agents build them on your machines. You gate what merges.</b></p>
+
+  <p>A self-hosted, open-source multi-agent workspace that also develops itself.</p>
+
+  <p>
+    <a href="https://cairn.xmon.me">Website</a> ·
+    <a href="#quickstart">Quickstart</a> ·
+    <a href="./README.zh.md">简体中文</a>
+  </p>
+
+  <p>
+    <img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-173a2f?style=flat-square">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-173a2f?style=flat-square">
+    <img alt="Self-hosted" src="https://img.shields.io/badge/self--hosted-SQLite-173a2f?style=flat-square">
+  </p>
 </div>
 
-# cairn
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
+  <img alt="Cairn board: tickets move from to-do through planning, running and review to done, each one claimed by an agent" src="docs/assets/readme/board-light.png">
+</picture>
 
-A self-hosted, open-source **agent workspace**: a task board where you write the tasks and AI agents build them on your own machines.
+## Highlights
 
-English | [简体中文](./README.zh.md)
+- **Multi-agent orchestration.** Each agent has its own model, role, skills, MCP servers, secrets and memory. A chief agent only dispatches, so its context stays clean; coder and reviewer agents do the work.
+- **Human gates, enforced.** Every run stops twice for you: at the plan and at the diff. The AI reviewer can block a merge, not just comment on it.
+- **Bootstrap loop.** Cairn claims its own tickets, implements them, reviews them and opens the PRs: it is being used to build itself.
+- **Eval and trajectory driven.** Every build records its base SHA and a harness hash, and rejections are stored as structured records. Strong-vs-weak model A/B evals then decide which prompt, skill and routing changes stay. "Training" here means improving the harness, never fine-tuning weights.
+- **Your machines.** Register any host by running the daemon on it. Builds run there in their own git worktree, and the board streams plans, diffs and tool calls back live.
 
-## What
-
-You file a task on a kanban board. An agent picks it up, checks out a worktree and a branch, and streams its work back to the UI as a conversation — plan cards, diffs, tool calls, all in real time. The run pauses at review so a human decides what merges.
+## Features
 
 - **Tasks & phases** — kanban board with numbered tasks, tags, and schedules that re-run a task on a cycle.
 - **Agents** — execution roles configured with a model, responsibilities, skills, MCP servers, secrets, and memory. A per-user "chief" agent dispatches work.
@@ -19,10 +42,7 @@ You file a task on a kanban board. An agent picks it up, checks out a worktree a
 - **Repos** — git repositories hosted by the server itself (push/pull with an API key) or connected from GitHub.
 - **Live everything** — SSE streams for board and conversation updates, notifications, token-usage accounting per build and model.
 
-## Why
-
-- **Gated by design.** Every run stops for you twice — at the plan and at the diff — and the AI reviewer can block, not just comment. The only open-source, self-hostable agent workspace that does this today.
-- **Honest lineage.** cairn began as a clean-room study of todos.dev's public interface (see [Origins](#origins)) and is now an independent product; its roadmap diverges from real usage, not from anyone else's spec.
+Cairn (formerly pacman) began as a clean-room study of todos.dev's public interface (see [Origins](#origins)) and is now an independent product.
 
 ## Quickstart
 
