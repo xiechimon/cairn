@@ -14,6 +14,7 @@ test('documentation skips code checks, unknown paths fail closed', () => {
 test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
+    'node scripts/ci-job-structure-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',

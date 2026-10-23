@@ -10,6 +10,7 @@ export function prepushPlan(paths, mode = 'local') {
   const required = [
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
+    ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
