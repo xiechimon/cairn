@@ -25,7 +25,7 @@
 //   F23 [merge-conflict] 轮不算进 [ci-fix] 的轮数
 //   F24 匿名磨绿：PR 读与名单读同样记进按 IP 的额度
 
-import { conversationBranch, type Phase } from '@pacman/shared';
+import { conversationBranch, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -54,7 +54,7 @@ afterAll(() => {
 const HEAD = 'a1b2c3d4'.repeat(5);
 const OLD = '0f1e2d3c'.repeat(5);
 const REPO_ID = 4242;
-/** pacman 刚推送、PR 读还没跟上的提交。 */
+/** cairn 刚推送、PR 读还没跟上的提交。 */
 const PUSHED = '5e6f7a8b'.repeat(5);
 
 interface Run {
@@ -510,7 +510,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
       })
       .run();
 
-  test('[s3-F30] right after pacman pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round', async () => {
+  test('[s3-F30] right after cairn pushed, a PR read still on the old head is waited out: no fix round, no merge-conflict round', async () => {
     const w = makeWorld();
     const t0 = Date.now();
     pushedJustNow(w, t0);
@@ -532,7 +532,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(fixSteps(w)).toHaveLength(2);
   });
 
-  test('[s3-F30d] a verify step that pushed just now also counts as pacman’s last push', async () => {
+  test('[s3-F30d] a verify step that pushed just now also counts as cairn’s last push', async () => {
     const w = makeWorld({ phase: 'review' });
     const t0 = Date.now();
     w.s.db
@@ -553,7 +553,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('review');
   });
 
-  test('[s3-F30e] a later step that pushed nothing does not hide pacman’s last push', async () => {
+  test('[s3-F30e] a later step that pushed nothing does not hide cairn’s last push', async () => {
     const w = makeWorld({ phase: 'review' });
     const t0 = Date.now();
     pushedJustNow(w, t0);
@@ -574,7 +574,7 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     expect(w.phase()).toBe('review');
   });
 
-  test('[s3-F30c] at review, a dirty read on the head before pacman’s last push is waited out', async () => {
+  test('[s3-F30c] at review, a dirty read on the head before cairn’s last push is waited out', async () => {
     const w = makeWorld({ phase: 'review' });
     const t0 = Date.now();
     pushedJustNow(w, t0);

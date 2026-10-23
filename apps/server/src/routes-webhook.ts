@@ -1,10 +1,10 @@
 // Webhook 域（#1137）：GitHub receiver（自有路径 token 闸）+ webhook token
-// mgmt 三端点（requireTeam 闸，api-keys 同族；不豁免 PACMAN_TOKEN——管理面
+// mgmt 三端点（requireTeam 闸，api-keys 同族；不豁免 CAIRN_TOKEN——管理面
 // 在 /api/teams/ 下，走既有 Bearer）。
 // #1125 拆域：routes.ts 的一个资源域切片；词表单源与对拍契约不变（wire.test
 // INFERRED_ROUTES 登记四个端点）。
 
-import { webhookReceiverResponseSchema } from '@pacman/shared';
+import { webhookReceiverResponseSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -43,7 +43,7 @@ export function registerWebhookRoutes(app: Hono, ctx: AppContext): void {
     return c.json(webhookReceiverResponseSchema.parse(response), 202);
   });
 
-  // —— token mgmt（api-keys 三端点同族；管理面不豁免 PACMAN_TOKEN）————————
+  // —— token mgmt（api-keys 三端点同族；管理面不豁免 CAIRN_TOKEN）————————
   app.get('/api/teams/:id/webhook-tokens', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);

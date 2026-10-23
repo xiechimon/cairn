@@ -2,7 +2,7 @@
 
 // Toast 原语（#631）：shadcn 官方 toast 实现是 sonner——本件即其官方配方
 // （toaster 壳 + `--normal-*` CSS 变量皮肤）按本仓形态的适配：
-// - 主题：仓内无 next-themes，pacman 反相规约（theme.ts）= dark 是 :root
+// - 主题：仓内无 next-themes，cairn 反相规约（theme.ts）= dark 是 :root
 //   默认、light 由 html.light 挂类——sonner 只吃 'light'|'dark' 主题位，
 //   用 MutationObserver 跟根元素 class 翻转（外观切换即时生效，已开 toast
 //   不留旧肤）。

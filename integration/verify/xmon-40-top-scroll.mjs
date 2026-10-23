@@ -7,7 +7,7 @@
 // 全程只用真实滚轮事件（page.mouse.wheel）与真实点击，不借助任何"程序化滚到
 // 目标"；并带一个改动前对照（把本轮唯一那行实现改动在运行时还原）验探针能红。
 //
-// 用法（栈须先由 verify-pacman launch.mjs 起好）：
+// 用法（栈须先由 verify-cairn launch.mjs 起好）：
 //   node integration/verify/xmon-40-top-scroll.mjs
 
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';

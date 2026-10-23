@@ -17,13 +17,13 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
 import {
   claimedStepSchema,
   machineOkResponseSchema,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -509,7 +509,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
   function prePinMigrations(): string {
     const journal = readJournal(MIGRATIONS_FOLDER);
     const cut = pinMigrationIdx();
-    const dir = temp('pacman-migrations-pre-pin-');
+    const dir = temp('cairn-migrations-pre-pin-');
     mkdirSync(join(dir, 'meta'));
     for (const entry of journal.entries.slice(0, cut)) {
       cpSync(join(MIGRATIONS_FOLDER, `${entry.tag}.sql`), join(dir, `${entry.tag}.sql`));
@@ -529,7 +529,7 @@ describe('#682 0022 回填（存量 [] 机器行 → [pi]）', () => {
   }
 
   function buildPrePinDb(): string {
-    const dir = temp('pacman-pin-db-');
+    const dir = temp('cairn-pin-db-');
     const dbPath = join(dir, 'server.db');
     const sqlite = new Database(dbPath);
     const db = drizzle(sqlite, { schema });

@@ -13,7 +13,7 @@
 // 深链，不再静默发第二条 POST——重复回合只会排队多跑一轮，还会把「点了
 // 没反应」的观感放大（生产实测同卡连点出 3–5 条线程）。
 
-import type { ChiefThread } from '@pacman/shared';
+import type { ChiefThread } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';

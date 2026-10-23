@@ -24,7 +24,7 @@ self.addEventListener('push', (event) => {
     } catch {}
     // The payload title is the todo title, not the app name, so iOS's fixed "from <app name>"
     // attribution line never duplicates it — the message body stays in the (multi-line) body slot.
-    await self.registration.showNotification(n.title || 'Pacman', {
+    await self.registration.showNotification(n.title || 'Cairn', {
       body: n.body,
       tag: n.tag,
       data: { href },

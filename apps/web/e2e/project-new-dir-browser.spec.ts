@@ -21,7 +21,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 const NEW_PROJECT_LIVE = '/app/project/new';
 const HOME = '/Users/e2e';
-const LAST_DIR_KEY = 'pacman.dirBrowser.lastDir';
+const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
 
 /** Live-face boot stub（project-new-fs-pick.spec 同款）：seed team +
  *  session succeed，其余 GET 500（shell 容忍）。注册序 = 匹配反序。 */

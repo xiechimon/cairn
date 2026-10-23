@@ -38,7 +38,7 @@ test('avatar 落点：侧栏人像走 components/ui 落点', async ({ page }) =>
     await expect(face.locator('[data-slot="avatar-fallback"]')).toHaveCount(0);
   }
   // 侧栏收起态的 rail chip 是同一落点的第二形态
-  await page.evaluate(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.reload();
   await expect(page.locator('.rail-user [data-slot="avatar-image"]')).toHaveCount(1);
 });

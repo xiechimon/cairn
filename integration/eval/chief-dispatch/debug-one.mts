@@ -25,7 +25,7 @@ if (c === undefined) throw new Error(`${CASE_ID} 不在 ${flowDir}/cases.json �
 const stack = await bootStack();
 try {
   const world = await seedWorld(stack, {
-    relayBaseUrl: process.env.PACMAN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1',
+    relayBaseUrl: process.env.CAIRN_EVAL_RELAY_URL ?? 'http://112.80.47.186:8783/v1',
     relayKey: relayKey(),
     roster: d.roster,
     chiefModelId: 'glm-5.3',

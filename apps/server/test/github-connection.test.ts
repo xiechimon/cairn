@@ -4,7 +4,7 @@
 // 明文不进表任何列、不进出站 URL、仅出现在 Authorization 头；repos 封套
 // 永不带 token 或密文。失败方式先于实现枚举（仓测试纪律）。
 
-import { githubReposResponseSchema } from '@pacman/shared';
+import { githubReposResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { githubConnection } from '../src/db/schema.js';

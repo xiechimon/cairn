@@ -8,7 +8,7 @@
 // 5. GET 记录缺 kind / enabledRuntimes 字段（schema 投影漏位）
 
 import { hostname } from 'node:os';
-import { machineRecordSchema } from '@pacman/shared';
+import { machineRecordSchema } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';

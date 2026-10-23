@@ -39,7 +39,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** 仓根（本模块在 integration/eval/chief-dispatch/ 下）。flow 路径与
  * `_state.json.harness_paths` 都锚在这里而不是 cwd：runner 常从
- * `pnpm --filter @pacman/integration exec tsx …` 里被调用，那个 cwd 是
+ * `pnpm --filter @cairn/integration exec tsx …` 里被调用，那个 cwd 是
  * integration/，锚 cwd 会把 flow 解析到错地方，还会让 harness 哈希随调用位置
  * 漂移——同一份 harness 在不同 cwd 下算出不同的 sha，闸就废了。 */
 export const REPO_ROOT = resolve(HERE, '../../..');
@@ -123,10 +123,10 @@ export interface Stack {
   close: () => Promise<void>;
 }
 
-/** relay 凭据：优先 PACMAN_EVAL_RELAY_KEY，回落本机 ~/.claude/settings.json。
+/** relay 凭据：优先 CAIRN_EVAL_RELAY_KEY，回落本机 ~/.claude/settings.json。
  * 密钥永不落盘、永不进仓——runner 只在进程内持有。 */
 export function relayKey(): string {
-  const fromEnv = process.env.PACMAN_EVAL_RELAY_KEY;
+  const fromEnv = process.env.CAIRN_EVAL_RELAY_KEY;
   if (fromEnv && fromEnv !== '') return fromEnv;
   const raw = JSON.parse(readFileSync(join(homedir(), '.claude', 'settings.json'), 'utf8')) as {
     env?: Record<string, string>;
@@ -134,7 +134,7 @@ export function relayKey(): string {
   const token = raw.env?.ANTHROPIC_AUTH_TOKEN;
   if (!token) {
     throw new Error(
-      'relay key 缺失：设 PACMAN_EVAL_RELAY_KEY，或在 ~/.claude/settings.json 的 env.ANTHROPIC_AUTH_TOKEN 里配',
+      'relay key 缺失：设 CAIRN_EVAL_RELAY_KEY，或在 ~/.claude/settings.json 的 env.ANTHROPIC_AUTH_TOKEN 里配',
     );
   }
   return token;
@@ -147,14 +147,14 @@ export async function bootStack(): Promise<Stack> {
     providerBaseUrl: 'http://127.0.0.1:9/v1',
     claimHoldMs: 1_000,
   });
-  const home = mkdtempSync(join(tmpdir(), 'pacman-eval-chief-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-eval-chief-'));
   // 两条隔离护栏，缺一条评测就在测用户的机器而不是被测对象：
   // - skillsDir 默认 ~/.agents/skills：不经隔离，用户本机 80 个技能的清单会
   //   经 daemon 的 <available_skills> 注入 chief 系统提示词（实测污染 50 条）。
   // - mcpConfigPath 默认 ~/.claude.json：不经隔离，daemon 会真的 spawn 用户
   //   配置的 MCP server 进程。
-  const skillsDir = mkdtempSync(join(tmpdir(), 'pacman-eval-skills-'));
-  const mcpConfigPath = join(tmpdir(), `pacman-eval-mcp-${randomUUID()}.json`);
+  const skillsDir = mkdtempSync(join(tmpdir(), 'cairn-eval-skills-'));
+  const mcpConfigPath = join(tmpdir(), `cairn-eval-mcp-${randomUUID()}.json`);
   // claim 占位闸（接替 #503 摘除的 maxConcurrent=1 + 占位步机制）：park 后
   // daemon 的 claim POST 在 harness 的 fetch 缝挂起，signal abort（停机或
   // claimTimeout 护栏）时返回 {step:null}——chief 步领走后 flip，chief 派出的
@@ -266,7 +266,7 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
   const repoName = (row as { repoName?: string | null } | undefined)?.repoName;
   if (!repoName) throw new Error(`项目 ${projectId} 无 repoName，无法种内容`);
   const bare = repoDirFor(stack.server.reposDir, stack.server.teamId, repoName);
-  const work = mkdtempSync(join(tmpdir(), 'pacman-eval-repo-'));
+  const work = mkdtempSync(join(tmpdir(), 'cairn-eval-repo-'));
   const git = (...args: string[]): string => {
     const r = spawnSync('git', args, { cwd: work, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')} 失败: ${r.stderr || r.stdout}`);
@@ -278,7 +278,7 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
     git('add', '-A');
     git(
       '-c',
-      'user.email=eval@pacman.local',
+      'user.email=eval@cairn.local',
       '-c',
       'user.name=eval',
       'commit',
@@ -291,11 +291,11 @@ export function seedRepoContent(stack: Stack, projectId: string, projectName: st
   }
 }
 
-/** chief 的思考档位。默认 null = 用绑定 Agent 自己的设置；`PACMAN_EVAL_CHIEF_THINKING`
+/** chief 的思考档位。默认 null = 用绑定 Agent 自己的设置；`CAIRN_EVAL_CHIEF_THINKING`
  * 可覆盖（off/minimal/low/medium/high/xhigh/max），用来量「降档位省多少、质量掉不掉」
  * ——一个参数、可一键回退，不动任何产品代码。 */
 function chiefThinkingLevel(): string | null {
-  const v = process.env.PACMAN_EVAL_CHIEF_THINKING;
+  const v = process.env.CAIRN_EVAL_CHIEF_THINKING;
   return v !== undefined && v !== '' ? v : null;
 }
 

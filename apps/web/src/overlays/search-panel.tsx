@@ -23,7 +23,7 @@
 // 换类，机制时序不变）；选中态载体 = data-selected（#910 裁定 3），行族
 // 载体 = data-row-kind（todo 行计数/定位的语义盲区继任者）。
 
-import type { SearchResponse } from '@pacman/shared';
+import type { SearchResponse } from '@cairn/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';

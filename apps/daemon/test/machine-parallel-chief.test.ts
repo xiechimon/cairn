@@ -5,15 +5,15 @@
 //      领）；worker 在飞时 chief 步立即发射。
 //   C2 chief 在飞不占本地闸：仅 chief 在跑（ungated server）→ 循环照常 claim
 //      （本地 park 只数 worker）。
-//   C3 env 兜底（ungated server）：PACMAN_DAEMON_MAX_CONCURRENT=2 → me 缺
+//   C3 env 兜底（ungated server）：CAIRN_DAEMON_MAX_CONCURRENT=2 → me 缺
 //      maxConcurrent（旧 server）也并行 2；未设 → 串行（P5 现行为）。
 //   C4 取值序 env > DB > 默认（resolveLocalCap 单源）。
 //   C5 claim body maxWorkers：daemon 每次自报当前 effective cap。
-//   C6 端口基座：并发 worker 步 PACMAN_PORT_BASE 不同段（槽位 ×100）；chief
+//   C6 端口基座：并发 worker 步 CAIRN_PORT_BASE 不同段（槽位 ×100）；chief
 //      步不携带；槽释放后重用低位段。
 //   C7 段公式：portBaseForSlot 1→20000、2→20100、3→20200。
 
-import type { AgentBackend, AgentSessionHandle, ClaimedStep, StepEvent } from '@pacman/shared';
+import type { AgentBackend, AgentSessionHandle, ClaimedStep, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import {
@@ -130,7 +130,7 @@ describe('#1148 chief 步不占并发槽（daemon 本地闸）', () => {
   });
 });
 
-describe('#1148 env 兜底（PACMAN_DAEMON_MAX_CONCURRENT）', () => {
+describe('#1148 env 兜底（CAIRN_DAEMON_MAX_CONCURRENT）', () => {
   test('C3：ungated server + env=2 → 并行 2（串行兜底被 env 放宽）', async () => {
     const api = new FakeMachineApi(); // me 缺 maxConcurrent → DB 侧无值（默认 1）
     const gate1 = defer<void>();
@@ -168,7 +168,7 @@ describe('#1148 env 兜底（PACMAN_DAEMON_MAX_CONCURRENT）', () => {
   });
 });
 
-describe('#1148 端口基座（PACMAN_PORT_BASE 槽位分段）', () => {
+describe('#1148 端口基座（CAIRN_PORT_BASE 槽位分段）', () => {
   test('C5：claim body 自报 maxWorkers（effective cap）', async () => {
     const api = new FakeMachineApi();
     api.mePatch = { maxConcurrent: 2 };
@@ -183,7 +183,7 @@ describe('#1148 端口基座（PACMAN_PORT_BASE 槽位分段）', () => {
     await handle.done;
   });
 
-  test('C6：并发 worker 步 PACMAN_PORT_BASE 不同段；chief 不携带；槽释放后重用', async () => {
+  test('C6：并发 worker 步 CAIRN_PORT_BASE 不同段；chief 不携带；槽释放后重用', async () => {
     const api = new FakeMachineApi();
     api.mePatch = { maxConcurrent: 3 };
     const gate1 = defer<void>();
@@ -198,8 +198,8 @@ describe('#1148 端口基座（PACMAN_PORT_BASE 槽位分段）', () => {
     await waitFor(() => api.parked !== null);
     api.parked?.(claimedFor('s2', 'conv-2'));
     await waitFor(() => created.length >= 2);
-    expect(created[0]?.env?.PACMAN_PORT_BASE).toBe('20000');
-    expect(created[1]?.env?.PACMAN_PORT_BASE).toBe('20100');
+    expect(created[0]?.env?.CAIRN_PORT_BASE).toBe('20000');
+    expect(created[1]?.env?.CAIRN_PORT_BASE).toBe('20100');
     // chief 步：无端口基座（不占槽自然无段）。
     await waitFor(() => api.parked !== null);
     api.parked?.(claimedFor('c1', 'chief-t1', 'chief'));
@@ -211,7 +211,7 @@ describe('#1148 端口基座（PACMAN_PORT_BASE 槽位分段）', () => {
     await waitFor(() => api.parked !== null);
     api.parked?.(claimedFor('s3', 'conv-3'));
     await waitFor(() => created.length >= 4);
-    expect(created[3]?.env?.PACMAN_PORT_BASE).toBe('20000');
+    expect(created[3]?.env?.CAIRN_PORT_BASE).toBe('20000');
     gate2.resolve();
     gateChief.resolve();
     await waitFor(() => api.doneBodies.length === 4);

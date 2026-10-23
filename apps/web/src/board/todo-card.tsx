@@ -3,7 +3,7 @@
 // data-todo-id, the stretched title link (#629 drag locks) and the
 // todo-card / todo-card-title / todo-card-action / todo-card-branch aliases.
 
-import { canOrchestrate } from '@pacman/shared';
+import { canOrchestrate } from '@cairn/shared';
 import type { LucideIcon } from 'lucide-react';
 import {
   ArrowRight,

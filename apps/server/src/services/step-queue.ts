@@ -20,7 +20,7 @@
 // 闸挡的步也计入位次——它们「在队列里」从用户视角为真，排障入口在失败漏斗
 // 不在位次里扣。
 
-import type { StepQueueBlocked, StepQueueInfo } from '@pacman/shared';
+import type { StepQueueBlocked, StepQueueInfo } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agent, build, chief, chiefThread, machine, step, todo } from '../db/schema.js';

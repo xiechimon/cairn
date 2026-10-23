@@ -154,7 +154,7 @@ export interface PreparedWorkspace {
   cwd: string;
   /** 基座 clone 目录（worktree add/prune 的操作位）。 */
   baseRepoDir: string;
-  /** `pacman/conv-<conversationId>`（brand.ts conversationBranch()）。 */
+  /** `cairn/conv-<conversationId>`（brand.ts conversationBranch()）。 */
   branch: string;
   defaultBranch: string;
   /** `Worktree reused` 行语义（r3 §1.4）。 */
@@ -197,7 +197,7 @@ export interface WorktreeOps {
    * 「git merge origin/main 结果为 "Already up to date"」样本）；冲突 =
    * merge 自动中止并抛错（失败仅人工重跑，02/A6）。local 形态的落地面 =
    * conv 分支 push 回用户仓库（#1211：用户主检出的分支/工作树永不被
-   * pacman 触碰，合并到默认分支由用户自取——本缝不做第二步落地操作）。 */
+   * cairn 触碰，合并到默认分支由用户自取——本缝不做第二步落地操作）。 */
   mergeDefaultBranch(cwd: string, defaultBranch: string): Promise<{ output: string }>;
   /** HEAD sha（done 回传 commit 字段 = checkpoint 数据源，02 §4.2「恢复到
    * 此处」的后端）。 */

@@ -24,10 +24,10 @@ const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyl
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'hosted',
-  repoName: 'pacman',
+  repoName: 'cairn',
   githubRepo: null,
   localPath: null,
 };
@@ -121,7 +121,7 @@ test('queued cards sit in 执行中 with a waiting footer; todo and building sta
 // waiting footer; scan the 执行中 column here in both themes (WCAG 2.1 AA).
 for (const theme of ['light', 'dark'] as const) {
   test(`axe: the 执行中 column with waiting footers (${theme})`, async ({ page }) => {
-    await page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+    await page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await stubWorld(page);
     await page.goto('/app');

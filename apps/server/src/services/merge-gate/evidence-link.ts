@@ -1,6 +1,6 @@
 // PR body 里的 raw 证据链（#1404；AGENTS.md「验收必核 PR body 的证据 raw
 // 永久链」）。只认钉 40 位小写 SHA、指向本仓 docs/verify/<票号>/ 的链接：分支
-// 名会动，短 SHA 与大写写法不是 verify-pacman 打印的 raw 链接的形态，别的仓、
+// 名会动，短 SHA 与大写写法不是 verify-cairn 打印的 raw 链接的形态，别的仓、
 // 别的票不算本票证据。HTML 注释里的链接不渲染，也不算（与
 // scripts/pr-evidence-gate.py 同一约定）。没闭合的 `<!--` 在行首（至多三个空格
 // 缩进）开一个 HTML 块（cmark-gfm 第 2 类），GitHub 吞掉后文，后文也不算；在行中
@@ -15,7 +15,7 @@
 // 闭合的注释换成一个空格而不是删掉：被注释切开的 URL 在 GitHub 上是两截，
 // 不能拼回一条链接（pr-evidence-gate.py 同样把注释换成空白）。
 
-import { EVIDENCE_PREFIX } from '@pacman/shared';
+import { EVIDENCE_PREFIX } from '@cairn/shared';
 
 export interface RawEvidenceLink {
   sha: string;

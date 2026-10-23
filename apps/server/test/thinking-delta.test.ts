@@ -6,7 +6,7 @@
 // 4. text_delta 通道照旧，不把思考正文当成正文增量。
 // 5. 思考增量把上一段正文封掉时，正文行不得清掉刚写入的思考快照。
 
-import { conversationStreamEventSchema } from '@pacman/shared';
+import { conversationStreamEventSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
 import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';

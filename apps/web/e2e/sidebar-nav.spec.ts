@@ -64,7 +64,7 @@ test('nav rows hop client-side: no reload, pill + aria-current follow', async ({
 
 test('subrow and team name hop client-side too', async ({ page }) => {
   // 资源 folds by default in the Grouped sidebar; open it to reach 技能
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
   await page.goto('/app?scenario=01');
   await plantCanary(page);
 
@@ -72,19 +72,19 @@ test('subrow and team name hop client-side too', async ({ page }) => {
   await expect(page).toHaveURL('/app/resources/skills?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
 
-  await page.getByRole('link', { name: 'Pacman' }).click();
+  await page.getByRole('link', { name: 'Cairn' }).click();
   await expect(page).toHaveURL('/app/team?scenario=01');
   expect(await page.evaluate(() => window.__spaCanary)).toBe('alive');
   // team 头行的选中态载体 = 品牌链接上的 aria-current（#943 新增；旧
   // .sidebar-team-row--active 状态类断言按裁定 3 换 aria-*）
-  await expect(page.getByRole('link', { name: 'Pacman' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Cairn' })).toHaveAttribute(
     'aria-current',
     'page',
   );
 });
 
 test('rail rows hop client-side', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   await plantCanary(page);
 
@@ -103,7 +103,7 @@ test('安装 App entries are gone from both sidebar states', async ({ page }) =>
 });
 
 test('collapsed rail carries no install icon', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   await expect(page.getByRole('link', { name: /安装/ })).toHaveCount(0);
   await expect(page.getByRole('complementary').getByRole('link', { name: '定时' })).toBeVisible();
@@ -125,7 +125,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
   // reached over the 150ms color step
   await expect.poll(() => pillBg(row)).toBe('rgba(255, 252, 248, 0.05)');
 
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
   const lightRow = page.getByRole('complementary').getByRole('link', { name: '定时' });
   await lightRow.hover();
@@ -134,7 +134,7 @@ test('hover tints the row — dark default + light theme', async ({ page }) => {
 });
 
 test('rail hover tints the row', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto('/app?scenario=03');
   const row = page.getByRole('complementary').getByRole('link', { name: '定时' });
 

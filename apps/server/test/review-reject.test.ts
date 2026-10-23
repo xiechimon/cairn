@@ -16,7 +16,7 @@ import {
   buildReviewRejectPrompt,
   conversationMessagesResponseSchema,
   todoRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { plan as planTable, step as stepTable } from '../src/db/schema.js';

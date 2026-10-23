@@ -1,4 +1,4 @@
-import { AGENT_DESC_MAX_LENGTH } from '@pacman/shared';
+import { AGENT_DESC_MAX_LENGTH } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { bootServer, insertMachine, req } from './helpers.js';
 

@@ -16,7 +16,7 @@ export const MCP_AUTH_HEADER_FORMAT = 'Authorization: Bearer <apiKey>';
 
 /** 配置示例文案（02 §7.2：r3 §5.2 原文行形 `{"mcpServers":{"todos":{"url":
  * "https://todos.dev/api/mcp",…Bearer tds_your_key}}}`；替换相位已执行
- * （#109）= 本地主机名 + `pacman` server 名 + `pacman_<key>`，素材替换计划
+ * （#109）= 本地主机名 + `cairn` server 名 + `cairn_<key>`，素材替换计划
  * §3.1。url 域 = 本地主机名代位（self-host 缺省 127.0.0.1:8787，01 §4.2），
  * /api/mcp 路径形状保留（02 §5.8 非品牌槽）。 */
 export const MCP_CONFIG_EXAMPLE_CANON = {
@@ -86,7 +86,7 @@ export const MCP_CONNECT_FAILED_CANON = 'connect failed — its tools are unavai
  * 行形与 MCP_CONNECT_FAILED_CANON 同族：`[mcp] <slug>: <canon>`。 */
 export const MCP_NOT_IN_CONFIG_CANON = 'not in local config — its tools are unavailable this turn';
 
-// —— 本地 config 消费面（spec 13：~/.claude.json mcpServers 段，非 pacman
+// —— 本地 config 消费面（spec 13：~/.claude.json mcpServers 段，非 cairn
 // 所有、只读单源）———————————————————————————————————————————————
 // server 投影面（UI 展示，值剥离）与 daemon 执行面（端点解析，值本机消费）
 // 共用同一份条目 schema。判别 = command 在 → stdio；否则 url → http。

@@ -15,7 +15,7 @@ import { stubNotification } from './helpers.js';
 //   the real API 'denied').
 // - team: 设置 routes to the account surface (the app's only settings
 //   face); the grid|chart tablist is a real toggle persisted to
-//   pacman.teamMembersLayout — chart drops the stats bar + grid's 创建
+//   cairn.teamMembersLayout — chart drops the stats bar + grid's 创建
 //   Agent slot and renders the org chart instead (#490；此前它恒渲染
 //   暂无成员，与同数据下的 grid 自相矛盾。chart 的完整验收面在
 //   team-org-chart.spec.ts，此处只留 tablist 往返本身).
@@ -100,7 +100,7 @@ test('team: chart tab swaps to the org chart, persists, and returns', async ({ p
   await expect(chartTab).toHaveAttribute('aria-selected', 'true');
   await expect(gridTab).toHaveAttribute('aria-selected', 'false');
 
-  // the choice survives a reload (pacman.teamMembersLayout)
+  // the choice survives a reload (cairn.teamMembersLayout)
   await page.reload();
   await expect(page.getByTestId('team-chart-node')).toBeVisible();
 

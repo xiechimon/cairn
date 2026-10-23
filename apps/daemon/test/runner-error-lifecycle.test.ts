@@ -28,7 +28,7 @@ import type {
   StepEvent,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { adaptProviderCompat, PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -243,7 +243,7 @@ async function runLifecycleCase(
   opts?: { providerId?: string; retryStormMax?: number },
 ) {
   const providerId = opts?.providerId ?? 'gw-lc';
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-lc-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-lc-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

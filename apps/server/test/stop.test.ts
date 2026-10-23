@@ -25,7 +25,7 @@ import {
   claimedStepSchema,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';

@@ -17,7 +17,7 @@
 // services/projects.ts),删除卡归位 + DeleteConfirm 家族确认弹层(r2 24d,
 // 键入项目名闸门) + deleteProject mutation(invalidateAll 正典);确认后跳
 // /app(fixture 走 #66 deletions 覆面,侧栏项目行随行隐去)。
-import { isGithubRepoRef } from '@pacman/shared';
+import { isGithubRepoRef } from '@cairn/shared';
 import { useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects } from '../api/hooks.js';
@@ -98,7 +98,7 @@ export function ProjectSettingsPage() {
   const repoKind = live ? wireProject?.repoKind : project?.hosted ? 'hosted' : project?.repoKind;
   const kindLabel =
     repoKind === 'hosted'
-      ? t('Pacman 托管')
+      ? t('Cairn 托管')
       : repoKind === 'github'
         ? t('GitHub 仓库')
         : repoKind === 'local'
@@ -267,7 +267,7 @@ export function ProjectSettingsPage() {
           </SettingsRow>
         </SettingsCard>
         {/* #1242 local→github 转换卡（live local 项目专用）：用户 2026-10-11
-            定案「原 pacman 项目转 github 形态 + localPath 加速位」的 UI 出口。
+            定案「原 cairn 项目转 github 形态 + localPath 加速位」的 UI 出口。
             提交闸：owner/repo 形状（isGithubRepoRef，与新建页同单源）——
             预检不过落中性提示行（inline，非 toast——输入未完成不是错误事件）；
             server 侧语义闸（可达性/在飞 build 409）失败走 toastError（失败

@@ -4,8 +4,8 @@
 // the manifest declares (narrow 780×1688, wide 2560×1600). Run against a
 // fixture-mode build so the ?scenario= fixture parameter stays live:
 //
-//   pnpm --filter @pacman/web exec vite build --mode fixture
-//   pnpm --filter @pacman/web exec vite preview --host 127.0.0.1 --port 8392 --strictPort &
+//   pnpm --filter @cairn/web exec vite build --mode fixture
+//   pnpm --filter @cairn/web exec vite preview --host 127.0.0.1 --port 8392 --strictPort &
 //   node scripts/capture-pwa-screenshots.mjs http://127.0.0.1:8392
 //
 // (--host 127.0.0.1: vite preview binds IPv6-only by default and the
@@ -22,7 +22,7 @@ const BASE_URL = process.argv[2] ?? 'http://127.0.0.1:8392';
 // fileURLToPath, not .pathname — percent-decodes spaces in the checkout path
 // (same idiom as scripts/generate-icons.mjs)
 const OUT_DIR = resolve(fileURLToPath(new URL('../apps/web/public/screenshots', import.meta.url)));
-const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
+const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 mkdirSync(OUT_DIR, { recursive: true });
 
 const SHOTS = [

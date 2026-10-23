@@ -5,8 +5,8 @@
 //      injected 名集在行上，step 仍 failed。
 //   S3 同 S1 但已有 SKILL.md toolcall → level ok（事实命中，不黄）。
 
-import type { MachineDoneBody, SkillInjectionRecord } from '@pacman/shared';
-import { SKILL_INJECTION_CHECK_KIND } from '@pacman/shared';
+import type { MachineDoneBody, SkillInjectionRecord } from '@cairn/shared';
+import { SKILL_INJECTION_CHECK_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

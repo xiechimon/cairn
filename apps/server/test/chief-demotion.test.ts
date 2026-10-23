@@ -22,7 +22,7 @@
 // 8. 绑定 Agent 未设归属机：同上，挂起等补设。
 // 9. 归属机离线：挂起等机器回来（#1257：机器回来走 claim 循环自动续跑）。
 
-import { chiefTurnErrorContentSchema } from '@pacman/shared';
+import { chiefTurnErrorContentSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

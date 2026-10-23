@@ -22,7 +22,7 @@ import type {
   SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -192,7 +192,7 @@ function probingBackend(probe: Probe): AgentBackend {
 }
 
 async function setup(kind: ClaimedStep['step']['kind'], secrets: Record<string, string>) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-secret-channel-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-secret-channel-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();

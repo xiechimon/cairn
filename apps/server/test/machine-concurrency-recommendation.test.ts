@@ -5,7 +5,7 @@
 // F4 清除覆盖不回推荐：PATCH null 后数字不跟当前硬件重算。
 // F5 心跳缺 hardware 把已测推荐打回估算：一次探测失败掉回保守默认。
 
-import { machineRecordSchema } from '@pacman/shared';
+import { machineRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { agent as agentTable, machine as machineTable } from '../src/db/schema.js';

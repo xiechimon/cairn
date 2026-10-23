@@ -1,5 +1,5 @@
 {
-  "name": "pacman",
+  "name": "cairn",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
@@ -9,11 +9,11 @@
   },
   "scripts": {
     "dev": "concurrently -n web,server,daemon -c blue,magenta,green \"pnpm dev:web\" \"pnpm dev:server\" \"pnpm dev:daemon\"",
-    "dev:web": "pnpm --filter @pacman/web dev",
-    "dev:server": "pnpm --filter @xiechimon/pacman dev",
-    "dev:daemon": "pnpm --filter @xiechimon/pacman-cli dev",
+    "dev:web": "pnpm --filter @cairn/web dev",
+    "dev:server": "pnpm --filter @xiechimon/cairn dev",
+    "dev:daemon": "pnpm --filter @xiechimon/cairn-cli dev",
     "build": "pnpm -r build",
-    "start": "pnpm --filter @pacman/web build && pnpm --filter @xiechimon/pacman start",
+    "start": "pnpm --filter @cairn/web build && pnpm --filter @xiechimon/cairn start",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "lint": "biome ci .",

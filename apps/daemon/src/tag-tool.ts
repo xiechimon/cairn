@@ -5,10 +5,10 @@
 // 权限纪律：注册条件 = claim `localTools` 含 create_tag（server 判定单源
 // claimLocalTools，XMON-108 R1）；daemon 不自判权限，词缺席 = 工具不注册
 // （fail-closed，agent 工具面不见该词）。
-// 发布流不挂接（leader 裁定）：pacman 无发布管线；tag 推 origin 后用户仓
+// 发布流不挂接（leader 裁定）：cairn 无发布管线；tag 推 origin 后用户仓
 // 自身 CI 自然生效。
 
-import type { BoundGitCredentials, CommitIdentity, LocalToolDef } from '@pacman/shared';
+import type { BoundGitCredentials, CommitIdentity, LocalToolDef } from '@cairn/shared';
 import { gitPrim } from './git.js';
 
 /** 本地工具名（词值单源 = protocol/machine-wire.ts LOCAL_TOOL_CREATE_TAG）。 */

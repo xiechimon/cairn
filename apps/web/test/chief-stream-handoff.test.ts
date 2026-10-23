@@ -8,7 +8,7 @@
 //   F-H5 步终态清缓冲：done/failed/stopped 兜底（hub 同律），防 stale 跨回合累积
 //   F-H6 重订阅/重连仍先清：#740 语义不变，补发快照不叠双份
 
-import type { ChiefGetResponse, ChiefThread } from '@pacman/shared';
+import type { ChiefGetResponse, ChiefThread } from '@cairn/shared';
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { liveTextStore } from '../src/api/live-text.js';

@@ -14,7 +14,7 @@
 // 本层不碰 i18n（api/mappers.ts toThinkingLevelDisplay 同律）：词典键单源在
 // 各调用面的 t()，默认行/未设槽文案一律作参数传入。
 
-import type { ModelRef } from '@pacman/shared';
+import type { ModelRef } from '@cairn/shared';
 import { cn } from 'cn';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ModelOption } from '../fixtures/records.js';

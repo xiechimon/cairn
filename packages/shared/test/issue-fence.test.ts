@@ -232,7 +232,7 @@ describe('F9 呈现层分类：围栏形任务文本行不成用户气泡', () =
     const fenced = taskText(TITLE, BODY, GH);
     expect(fenced.startsWith(HEAD)).toBe(true);
     expect(classifyUserText(fenced, ghTask)).toBe('task-prompt');
-    expect(classifyUserText(appendWorkBranchNote(fenced, 'pacman/conv-1'), ghTask)).toBe(
+    expect(classifyUserText(appendWorkBranchNote(fenced, 'cairn/conv-1'), ghTask)).toBe(
       'task-prompt',
     );
     expect(classifyUserText(`${TITLE}\n\n${BODY}`, ghTask)).toBe('task-prompt');
@@ -241,10 +241,10 @@ describe('F9 呈现层分类：围栏形任务文本行不成用户气泡', () =
   test('S3 围栏形任务文本 + 已确认方案位置行（降级 build 步）→ task-prompt', () => {
     const fenced = taskText(TITLE, BODY, GH);
     expect(fenced.startsWith(HEAD)).toBe(true);
-    const degraded = appendConfirmedPlanNote(fenced, '/home/u/.pacman/plans/conv-1/plan.md');
+    const degraded = appendConfirmedPlanNote(fenced, '/home/u/.cairn/plans/conv-1/plan.md');
     expect(degraded).not.toBe(fenced);
     expect(classifyUserText(degraded, ghTask)).toBe('task-prompt');
-    expect(classifyUserText(appendWorkBranchNote(degraded, 'pacman/conv-1'), ghTask)).toBe(
+    expect(classifyUserText(appendWorkBranchNote(degraded, 'cairn/conv-1'), ghTask)).toBe(
       'task-prompt',
     );
   });

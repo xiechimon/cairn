@@ -12,7 +12,7 @@ import type {
   GitOps,
   GitRefInfo,
   GitTreeEntry,
-} from '@pacman/shared';
+} from '@cairn/shared';
 
 export interface GitRunResult {
   code: number;
@@ -188,9 +188,9 @@ export const systemGitOps: GitOps = {
     // refs/heads/main（bare 无检出面，commit-tree + update-ref 即够）。
     const emptyTree = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
     const env: NodeJS.ProcessEnv = {
-      GIT_AUTHOR_NAME: 'pacman-git',
+      GIT_AUTHOR_NAME: 'cairn-git',
       GIT_AUTHOR_EMAIL: 'git@localhost',
-      GIT_COMMITTER_NAME: 'pacman-git',
+      GIT_COMMITTER_NAME: 'cairn-git',
       GIT_COMMITTER_EMAIL: 'git@localhost',
     };
     const ct = await runGit(['commit-tree', emptyTree, '-m', message], {
@@ -302,7 +302,7 @@ export const systemGitOps: GitOps = {
       REQUEST_METHOD: req.method,
       // receive-pack ref 更新落 committer 身份 [设计]（server 侧固定值，品牌槽
       // 归 #44；daemon push 侧身份归 M3 per-step 面）。
-      GIT_COMMITTER_NAME: 'pacman-git',
+      GIT_COMMITTER_NAME: 'cairn-git',
       GIT_COMMITTER_EMAIL: 'git@localhost',
       ...(req.contentType !== undefined ? { CONTENT_TYPE: req.contentType } : {}),
       ...(req.method === 'POST' ? { CONTENT_LENGTH: String(req.body.byteLength) } : {}),

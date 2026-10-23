@@ -19,9 +19,9 @@ import {
 const TITLE = '方案位置探针';
 const SPEC = '降级后的执行步要读到本机已确认的方案。';
 const TASK_TEXT = buildTaskPromptText(TITLE, SPEC);
-const PLAN_FILE = '/home/u/.pacman/plans/conv-1/plan.md';
+const PLAN_FILE = '/home/u/.cairn/plans/conv-1/plan.md';
 const NOTE = buildConfirmedPlanNote(PLAN_FILE);
-const BRANCH = 'pacman/conv-1';
+const BRANCH = 'cairn/conv-1';
 
 describe('注记组装', () => {
   test('形状：头标记 + 绝对路径 + 尾约束', () => {

@@ -15,7 +15,7 @@
 // This hook is the one chief instance for the app, so it installs the
 // machine's key listener.
 
-import type { AskUserAnswer, TranscriptRow } from '@pacman/shared';
+import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
@@ -88,10 +88,10 @@ export interface ChiefDeepLink {
 }
 
 /** 开态持久化键（ADR 0013 D5，0004 D9「开态刷新即关」的反转）：品牌前缀
- *  纪律照 `pacman.sidebar-collapsed` 先例（app-sidebar.ts）；默认 = 关
+ *  纪律照 `cairn.sidebar-collapsed` 先例（app-sidebar.ts）；默认 = 关
  *  （Multica "never pops uninvited" 同律）。fixture 面永不读写（采集
  *  确定性——scenario 的 chief.view 是捕获形唯一开态源）。 */
-export const CHIEF_OPEN_STORAGE_KEY = 'pacman.chief-open';
+export const CHIEF_OPEN_STORAGE_KEY = 'cairn.chief-open';
 
 function readStoredChiefOpen(): boolean {
   try {

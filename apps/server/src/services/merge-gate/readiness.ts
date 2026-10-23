@@ -16,7 +16,7 @@ import {
   type MergePolicy,
   type MergeReadiness,
   type Phase,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { computePatchDigest } from './digest.js';
 import { parseRawEvidenceLinks, qualifyingEvidenceLinks } from './evidence-link.js';
 import { classifyPaths } from './paths.js';

@@ -14,7 +14,7 @@
 //     （双 start / 手动 PATCH 409 门依赖此严格性）；
 //  5. 真流转边照常「写 + 发」：相位已变、事件必发（本票主断口的正向钉）。
 
-import { todoDocEventSchema } from '@pacman/shared';
+import { todoDocEventSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { todo as todoTable } from '../src/db/schema.js';

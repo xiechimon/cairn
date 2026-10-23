@@ -30,7 +30,7 @@ const LOCAL_FILES = `${PROJ}?scenario=prj-local-files`;
 test.use({ deviceScaleFactor: 2, viewport: { width: 1440, height: 900 } });
 
 function setTheme(page: Page, theme: 'light' | 'dark') {
-  return page.addInitScript((t) => localStorage.setItem('pacman-theme', t), theme);
+  return page.addInitScript((t) => localStorage.setItem('cairn-theme', t), theme);
 }
 
 /** Resolve a token (or any CSS color expression) to the rgb() string the

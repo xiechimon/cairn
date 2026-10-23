@@ -5,7 +5,7 @@
 //      transcript）→ 确认 → 执行 → 审核 → 验收合并（202 delegated）→ done
 //      （🎉 时间线 + main 落地真值）。#640：「保存并开始」入口已改直发总管
 //      编排回合，脊柱改走 API 起 build 以保确定性（见 createAndStart 注）；
-//      编排入口覆盖归 server orchestration-source 测 + live verify-pacman。
+//      编排入口覆盖归 server orchestration-source 测 + live verify-cairn。
 //   ② 驳回支线：confirm 关口 composer 发送 feedback → 服务端重规划（DB 修订步
 //      为证，#880：亚秒 planning 瞬态不做 chip oracle）→ plan v2 → 版本 chip
 //      v2 → 确认 → 执行 → 审核（r5 §4 回路 UI 实走）。
@@ -62,7 +62,7 @@ let probeConvId = '';
 
 beforeAll(async () => {
   // web 生产构建（scenario-blind = 恒 live 数据源，#58 gate）。
-  const build = spawnSync('pnpm', ['--filter', '@pacman/web', 'exec', 'vite', 'build'], {
+  const build = spawnSync('pnpm', ['--filter', '@cairn/web', 'exec', 'vite', 'build'], {
     cwd: ROOT,
     encoding: 'utf8',
   });
@@ -126,7 +126,7 @@ beforeAll(async () => {
     webDir: WEB_DIST,
     scheduler: true,
   });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m5web-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m5web-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'm5-web' },
     {},
@@ -218,7 +218,7 @@ async function createAndStart(title: string): Promise<void> {
   // confirm/review/done 关口触发 wake 轮，打乱顺序 stub 队列的消费序（m4a 因此
   // 只用读侧工具，同一纪律）。故此处用 web「保存」落卡 + API startBuilds
   // （withPlan:true）直起 build，保住脊柱的确定性。「保存并开始 → 编排」入口
-  // 的覆盖归 server orchestration-source 测（D 组）+ live verify-pacman。
+  // 的覆盖归 server orchestration-source 测（D 组）+ live verify-cairn。
   await page.locator('.new-task-dialog').getByRole('button', { name: '保存', exact: true }).click();
   // 卡落板（SSE/invalidate 驱动，无 reload）。
   await pexpect(page.getByRole('link', { name: title })).toBeVisible({

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRecordSchema } from '@pacman/shared';
+import { buildRecordSchema } from '@cairn/shared';
 import Database from 'better-sqlite3';
 import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
@@ -31,7 +31,7 @@ async function world() {
 
 describe('#1513 build provenance and human feedback', () => {
   test('upgrades an existing build without losing its data', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-provenance-migration-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-provenance-migration-'));
     const sqlite = new Database(':memory:');
     try {
       mkdirSync(join(dir, 'meta'));

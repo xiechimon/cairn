@@ -16,7 +16,7 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BoundGitCredentials } from '@pacman/shared';
+import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
@@ -32,7 +32,7 @@ const CREDS: BoundGitCredentials = {
 };
 
 function tmpRoot(): string {
-  return mkdtempSync(join(tmpdir(), 'pacman-hook-'));
+  return mkdtempSync(join(tmpdir(), 'cairn-hook-'));
 }
 
 /** 在 dir 下写可执行钩子脚本（.agents/<name>），返回脚本绝对路径。 */
@@ -240,11 +240,11 @@ describe('workspace hook 原语（#1149）', () => {
       root,
       'setup',
       // biome-ignore lint/suspicious/noTemplateCurlyInString: shell-script content embedded in a JS string; ${GIT_CONFIG_COUNT} is sh parameter expansion, not JS template
-      '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\necho "probe=$(git config --get pacman.probe)"\n',
+      '#!/bin/sh\necho "cred=${GIT_CONFIG_COUNT:-unset}"\necho "probe=$(git config --get cairn.probe)"\n',
     );
     stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
-    vi.stubEnv('GIT_CONFIG_KEY_0', 'pacman.probe');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'cairn.probe');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');
     let note: Awaited<ReturnType<typeof runWorkspaceHook>>;
     try {

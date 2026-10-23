@@ -7,7 +7,7 @@
 // 前缀词表（log.ts 的 `[step]`），不进 journal（journal 会被 recover 读取与
 // 回传）。值本身只出现在工具结果文本里——即 agent 显式索取的那一次。
 
-import type { LocalToolDef } from '@pacman/shared';
+import type { LocalToolDef } from '@cairn/shared';
 import type { StepCredentials } from './credentials.js';
 
 /** 本地工具名（agent 侧可见名；不经 relay，不出机器）。 */

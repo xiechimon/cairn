@@ -17,7 +17,7 @@
 // save_memory（r5 §6）：agentId = Chief 绑定 Agent（共用存储）、三级溯源
 // （sourceBuildId = chief 回合 conv id，records/memory.ts「回合 id」注）、配额 100。
 
-import type { SecretBox, UserRecord } from '@pacman/shared';
+import type { SecretBox, UserRecord } from '@cairn/shared';
 import {
   AGENT_TOOL_DEFAULTS,
   AGENT_TOOL_SHELL,
@@ -31,7 +31,7 @@ import {
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   updateSkillToolParamsSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {

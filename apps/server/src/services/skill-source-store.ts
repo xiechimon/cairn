@@ -2,7 +2,7 @@
 // （spec 13 #367「不入库」域律），来源登记不入 DB——落 server 数据根的
 // skill-sources.json（与 repos/、attachments/ 同根：server 自有数据面，不
 // 污染用户技能池目录，零 migration；Multica 对照 = 技能行上的 origin config
-// JSON——它的技能是 DB 行，pacman 的技能在盘上，等价物即这份侧车登记）。
+// JSON——它的技能是 DB 行，cairn 的技能在盘上，等价物即这份侧车登记）。
 // 键 = skillId（frontmatter name）；值 = 导入时的来源（kind + ref）与时间。
 // 损坏/缺失的文件按空登记处理（refresh 面 409 逐条报错，不炸 server）；
 // 下一次成功导入/refresh 会整文件重写。

@@ -1,9 +1,9 @@
 // machines 本地化 fixture 面钉（spec 11 A7/A8/A9，#357；#503 开关 → 品牌 mark；
 // XMON-113 行内接回一个活控件 = 机器层 shell 开关）。
-// live 面全链真值 = .claude/skills/verify-pacman/scripts/drive-machines-local.mjs
+// live 面全链真值 = .claude/skills/verify-cairn/scripts/drive-machines-local.mjs
 // （API+SQLite+UI 三向对照）；本 spec 钉 fixture canon 展示形：
 // 1. 本机行钉列表首（data-kind="local" + data-machine-id + hostname canon）
-// 2. 「Pacman 托管机器」facade 行已除（负向）
+// 2. 「Cairn 托管机器」facade 行已除（负向）
 // 3. per-runtime 品牌 mark 在位（data-runtime），亮度分态 = fixture enabledRuntimes canon；
 //    #887 图标独形——文字名不上屏，可读名走 aria-label + title
 // 4. 行内恰一个控件 = shell 开关（XMON-113）；button / per-runtime switch 仍无（负向）
@@ -42,7 +42,7 @@ test('本机行钉列表首：data-kind=local + id 句柄 + hostname canon', asy
 test('托管 facade 行已除（spec 11 A8 负向）', async ({ page }) => {
   await page.goto(MACHINES);
   await expect(page.locator(LOCAL_ROW)).toBeVisible();
-  await expect(page.locator(`${SHELL} .page-main`)).not.toContainText('Pacman 托管机器');
+  await expect(page.locator(`${SHELL} .page-main`)).not.toContainText('Cairn 托管机器');
 });
 
 // #887 图标独形：文字名撤下，可辨识性走容器 role="img" + aria-label（读屏）

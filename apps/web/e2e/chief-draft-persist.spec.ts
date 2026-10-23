@@ -4,8 +4,8 @@ import { evidenceShot } from './evidence';
 // #1056: chief 悬浮窗 composer 草稿跨整页刷新持久化（Multica 对齐面，#1009
 // A0 实审 spin-off）。D6 常驻契约是内存面的保（最小化/路由切换/SPA 导航
 // 全保，已验），整页刷新原本即丢——本面把 live 面草稿提为 chief-drawer
-// 受控态并写穿 localStorage（键 = pacman.chief-draft，品牌前缀照
-// pacman.chief-open 先例；Multica packages/core/chat/store.ts 的
+// 受控态并写穿 localStorage（键 = cairn.chief-draft，品牌前缀照
+// cairn.chief-open 先例；Multica packages/core/chat/store.ts 的
 // setInputDraft 每键写穿 + writeDrafts 空值 removeItem 同律）。单槽纯文本
 // 只保活动线程的 composer 现文（票面两选项裁「只保活动线程」：本窗会话内
 // 草稿就是单槽跨线程切换持续，按线程分键会改写这条已验行为）。
@@ -20,13 +20,13 @@ import { evidenceShot } from './evidence';
 //  4. D6 已验面回归：受控态上提不改最小化/路由切换的内存面保持
 //     （带稿走 minimize 往返 + SPA 路由往返，双腿逐字完好）；
 //  5. fixture 面读写存储（采集确定性律，A0 S11 同形）：scenario 面
-//     零读零写 pacman.chief-draft——预植键不被消费也不被改写，草稿
+//     零读零写 cairn.chief-draft——预植键不被消费也不被改写，草稿
 //     回显来源恒为 scenario 的 chief.draft。
 
 const TEAM_ID = 'team-1';
 const USER = { id: 'user-1', displayName: '我', avatarUrl: null };
 const TEAM = { id: TEAM_ID, name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
-const DRAFT_KEY = 'pacman.chief-draft';
+const DRAFT_KEY = 'cairn.chief-draft';
 // CJK + ASCII 混排：存储往返的逐字性用真文案形态钉（参照产品捕获稿同款）。
 const DRAFT = '帮我看看这个项目的进展 — reload 后逐字还在 (#1056)';
 
@@ -53,7 +53,7 @@ async function openChiefComposer(page: Page) {
   await stubBoot(page);
   await page.goto('/app');
   // live 面默认关（D5 never pops uninvited）；FAB 点击开窗并写
-  // pacman.chief-open=1，后续 reload 窗自开（D5 已验面，本 spec 顺带倚靠）。
+  // cairn.chief-open=1，后续 reload 窗自开（D5 已验面，本 spec 顺带倚靠）。
   await page.getByRole('button', { name: '总管', exact: true }).click();
   const input = page.getByTestId('chief-composer-input');
   await expect(input).toBeVisible();
@@ -139,7 +139,7 @@ test('live face: minimize and SPA route switches keep the draft (D6 zero regress
   page,
 }) => {
   // 资源 folds by default in the Grouped sidebar; open it to reach 技能
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebarResourcesCollapsed', '0'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebarResourcesCollapsed', '0'));
   const { drawer, input } = await openChiefComposer(page);
   await input.fill(DRAFT);
   await expect.poll(() => storedDraft(page)).toBe(DRAFT);

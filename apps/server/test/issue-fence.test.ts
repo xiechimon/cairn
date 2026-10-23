@@ -16,7 +16,7 @@
 //   W4 其他任务的 wake 文本逐字节不变
 //   W5 chief 系统提示的第三方数据规则点名 wake 轮提示
 
-import { claimedStepSchema } from '@pacman/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';

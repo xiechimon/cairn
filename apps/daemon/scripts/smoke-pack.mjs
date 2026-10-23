@@ -11,7 +11,7 @@
 // ⑦ 安装目录在仓内 → npm 爬仓根 catalog: 炸 EUNSUPPORTEDPROTOCOL——安装目录
 //   必须 mktemp 在 os.tmpdir()（仓外），pack 目录同理
 //
-// 运行：pnpm --filter @xiechimon/pacman-cli smoke（依赖面走公网 registry）
+// 运行：pnpm --filter @xiechimon/cairn-cli smoke（依赖面走公网 registry）
 
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -58,8 +58,8 @@ function nodeTooOld() {
   return false;
 }
 
-const packDir = mkdtempSync(join(tmpdir(), 'pacman-cli-pack-'));
-const installDir = mkdtempSync(join(tmpdir(), 'pacman-cli-smoke-')); // 仓外（⑦）
+const packDir = mkdtempSync(join(tmpdir(), 'cairn-cli-pack-'));
+const installDir = mkdtempSync(join(tmpdir(), 'cairn-cli-smoke-')); // 仓外（⑦）
 try {
   step(`node engines ${pkg.engines.node}`, !nodeTooOld());
 
@@ -107,7 +107,7 @@ try {
   // 仓外装 tarball（④⑤：bin 链接 + 依赖面从 registry 落地）
   writeFileSync(
     join(installDir, 'package.json'),
-    `${JSON.stringify({ name: 'pacman-cli-smoke', private: true }, null, 2)}\n`,
+    `${JSON.stringify({ name: 'cairn-cli-smoke', private: true }, null, 2)}\n`,
   );
   const installed = run('npm', ['install', tarball], { cwd: installDir });
   step('npm install tarball', installed.status === 0, fmt(installed));
@@ -133,7 +133,7 @@ try {
   // .bin 符号链接入口（npm exec 真实形态；入口守卫 realpath 面）
   const binLink = run('node', [join(installDir, 'node_modules', '.bin', BIN_NAME), '--version']);
   step(
-    'node <.bin/pacman> --version === package.json version',
+    'node <.bin/cairn> --version === package.json version',
     binLink.status === 0 && binLink.stdout.trim() === pkg.version,
     fmt(binLink),
   );

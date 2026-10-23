@@ -21,7 +21,7 @@
 // 唯 tools 为变量——两开关齐备 202 delegated / 空集 403），前端再按旧语义放行，
 // 就是「点得动、点了必被拒」：禁用态与点名文案本就是现成的。
 
-import type { AgentRecord } from '@pacman/shared';
+import type { AgentRecord } from '@cairn/shared';
 import { useMemo } from 'react';
 import { ApiError } from '../api/client.js';
 import { useMembers } from '../api/hooks.js';

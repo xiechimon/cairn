@@ -21,7 +21,7 @@ import {
 } from '../src/records/prompts.js';
 
 const TASK = { title: '契约探针', spec: '写方案。' };
-const PLAN_FILE = '/home/u/.pacman/plans/x/plan.md';
+const PLAN_FILE = '/home/u/.cairn/plans/x/plan.md';
 
 describe('Verification 硬要求进提示词（失败方式 1、2）', () => {
   test('首轮契约与补写指令都带硬要求句', () => {

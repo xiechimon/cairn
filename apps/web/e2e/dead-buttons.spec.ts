@@ -289,7 +289,7 @@ test('api-keys non-empty state keeps 新建密钥 visible and opens the create d
           {
             id: 'key-1',
             name: 'Existing key',
-            masked: 'pacman_afe07565…',
+            masked: 'cairn_afe07565…',
             gitAccess: false,
             mcpAccess: false,
           },
@@ -559,7 +559,7 @@ test('reuse panel 查看方案 flips the doc pane to the plan face (#318)', asyn
   // XMON-24：老 .btn--overlay 类随 ui/Button 退役——改取 actions 行内按钮。
   await page.locator('.overlay-actions button', { hasText: '查看方案' }).click();
   // 查看方案 = 关弹层 + docpane 切 plan 面;fixture 75 无 plan doc →
-  // 「暂无方案」占位即模式切换证据(live plan 内容归 verify-pacman)
+  // 「暂无方案」占位即模式切换证据(live plan 内容归 verify-cairn)
   await expect(page.locator('.overlay')).toBeHidden();
   await expect(page.locator('.doc-empty')).toContainText('暂无方案');
 });

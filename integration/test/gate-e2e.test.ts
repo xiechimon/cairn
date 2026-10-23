@@ -53,7 +53,7 @@ function logLines(): string[] {
 
 beforeAll(async () => {
   external = await startExternalMcp();
-  home = mkdtempSync(join(tmpdir(), 'pacman-gate-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-gate-home-'));
   mcpConfig = join(home, 'claude.json');
   writeFileSync(
     mcpConfig,

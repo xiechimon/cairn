@@ -6,7 +6,7 @@
 // upsertMessage / upsertChiefRow）；路由面 = routes-machine.ts 的
 // upload-urls / upload 端点，一次性位 = context.ts uploads Map。
 
-import type { TranscriptUpload } from '@pacman/shared';
+import type { TranscriptUpload } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import { build, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';

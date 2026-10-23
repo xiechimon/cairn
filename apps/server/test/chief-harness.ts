@@ -83,7 +83,7 @@ export function seedMachineReport(
 // 可选写入 settings.json 钉住槽位内容）。
 const claudeHomes: string[] = [];
 export function claudeHome(settingsJson?: string): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pacman-chief-models-'));
+  const dir = mkdtempSync(join(tmpdir(), 'cairn-chief-models-'));
   claudeHomes.push(dir);
   if (settingsJson !== undefined) {
     mkdirSync(join(dir, '.claude'), { recursive: true });

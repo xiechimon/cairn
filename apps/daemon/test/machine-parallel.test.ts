@@ -1,7 +1,7 @@
 // #1108 并行执行循环（localCap 并发 + 空位交接 + 优雅停止）（#1128 自 machine-loop.test.ts 拆分；共享 harness 收编位
 // = ./machine-loop-harness.ts，每个测试自 boot 自停）。
 
-import type { AgentBackend, AgentSessionHandle, ClaimedStep, StepEvent } from '@pacman/shared';
+import type { AgentBackend, AgentSessionHandle, ClaimedStep, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';

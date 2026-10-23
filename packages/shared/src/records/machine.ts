@@ -1,7 +1,7 @@
 // machine record（server 侧）——02 §6.2 未列字段表（「machine（server 侧记录）
 // + 详情 tab（信息/构建、在线/离线、max 显示）」）；以下为观测支撑的最小投影，
 // 未特写字段归 M2 实现期展开 [推断]（04 §3 不判负口径）。
-// 机器 = 登记的执行主机（pacman daemon + 内嵌 pi runtime，CONTEXT.md）；
+// 机器 = 登记的执行主机（cairn daemon + 内嵌 pi runtime，CONTEXT.md）；
 // 一个机器可承载多个 Agent 的步，不是 Agent 的属性。
 
 import { z } from 'zod';
@@ -18,7 +18,7 @@ export const machineRecordSchema = z.object({
   /** machineId（r3 §1.2 观测形 `TlZ2sSD4EJCxjNJqVhdo_`；server 记录键名
    * [推断]）。 */
   id: recordId,
-  /** pacman start --name 默认 hostname（r3 §1.1）；机器页显示样 `r3-mbp 离线
+  /** cairn start --name 默认 hostname（r3 §1.1）；机器页显示样 `r3-mbp 离线
    * …NJqVhdo_ · max 3`（r3 §1.2）。 */
   name: z.string(),
   teamId: recordId,
@@ -87,7 +87,7 @@ export const patchMachineBodySchema = z.object({
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;
 
-/** 「添加机器」弹窗命令块（r2 11b/r3 §1.2）：安装 CLI + pacman start；底部
+/** 「添加机器」弹窗命令块（r2 11b/r3 §1.2）：安装 CLI + cairn start；底部
  * 「在云服务器上运行？改用 API key 注册」展开 --api-key --team 命令 +
  * 「获取 API key →」跳 api-keys 页。品牌串走 brand.ts 槽。 */
 export const MACHINE_ADD_DIALOG_COPY = {

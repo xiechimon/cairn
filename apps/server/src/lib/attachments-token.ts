@@ -6,7 +6,7 @@
 // self-host 单机足够，避开第三方 jwt 包（缝纪律 01 §5）。
 
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import type { SecretBox } from '@pacman/shared';
+import type { SecretBox } from '@cairn/shared';
 
 export const ATTACHMENT_GRANT_TTL_MS = 5 * 60 * 1000;
 

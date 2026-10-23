@@ -154,9 +154,9 @@ test('fixture charter save closes the dialog (accept 律)', async ({ page }) => 
 // 长高（英文两行不再顶出卡片）。tab 文案与记忆页互引按票面冻结，只钉几何。
 test('空态卡 centered and growth-proof: memo matches watches (#772)', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('pacman.locale', 'en');
-    localStorage.setItem('pacman-locale', 'en');
-    localStorage.setItem('pacman-theme', 'light');
+    localStorage.setItem('cairn.locale', 'en');
+    localStorage.setItem('cairn-locale', 'en');
+    localStorage.setItem('cairn-theme', 'light');
   });
   // #950 载体：空态卡 = 卡内文案本身（en locale 面；.chief-memo/.chief-watches
   // 类退役，文本直挂卡 div）。

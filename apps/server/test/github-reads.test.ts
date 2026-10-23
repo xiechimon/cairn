@@ -26,7 +26,7 @@
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CHIEF_REMOTE_TOOLS, REMOTE_TOOL_TIMEOUT_MS, type SecretBox } from '@pacman/shared';
+import { CHIEF_REMOTE_TOOLS, REMOTE_TOOL_TIMEOUT_MS, type SecretBox } from '@cairn/shared';
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {

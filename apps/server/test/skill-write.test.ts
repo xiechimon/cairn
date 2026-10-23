@@ -55,7 +55,7 @@ import {
   MAX_SKILL_TOTAL_BYTES,
   machineSkillsManifestResponseSchema,
   skillRecordSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -67,7 +67,7 @@ import { bindAllAgents, bootServer, issueApiKey, postProject, req } from './help
 
 const roots: string[] = [];
 function makeRoot(): string {
-  const root = mkdtempSync(join(tmpdir(), 'pacman-skills-'));
+  const root = mkdtempSync(join(tmpdir(), 'cairn-skills-'));
   roots.push(root);
   return root;
 }

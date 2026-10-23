@@ -10,7 +10,7 @@
 // uniqueRepoName 只查库行，留目录 = 同名新项目在旧库上 reinit/seed 冲突）。
 
 import { existsSync } from 'node:fs';
-import { projectRecordSchema, todoRecordSchema } from '@pacman/shared';
+import { projectRecordSchema, todoRecordSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   agentMemory,

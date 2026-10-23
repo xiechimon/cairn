@@ -9,7 +9,7 @@
 // 任一失败 = null（面板显示分支名、PR 槽留空），单次尝试、有界超时，不重试。
 
 import { spawn } from 'node:child_process';
-import { isGithubRepoRef } from '@pacman/shared';
+import { isGithubRepoRef } from '@cairn/shared';
 
 /** 探测结果：null = 未知/无 PR（两者不区分——「查不到」与「没有」都按
  * 「面板留空」处理，不造数据）。 */
@@ -106,7 +106,7 @@ async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<Gith
     const res = await fetchImpl(url, {
       headers: {
         accept: 'application/vnd.github+json',
-        'user-agent': 'pacman-daemon',
+        'user-agent': 'cairn-daemon',
         ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
       },
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),

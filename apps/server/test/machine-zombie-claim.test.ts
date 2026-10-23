@@ -17,7 +17,7 @@
 //    触发面 = @hono/node-server 连接断时 abort Request signal；测试同构最小
 //    形 = app.request + 自带 signal 的 Request）。
 
-import { machineClaimResponseSchema, machineEnrollResponseSchema } from '@pacman/shared';
+import { machineClaimResponseSchema, machineEnrollResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

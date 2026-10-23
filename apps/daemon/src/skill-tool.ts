@@ -6,7 +6,7 @@
 // 分支即识 arguments.skill），本工具参数 shape 与之对齐。
 
 import { readFile } from 'node:fs/promises';
-import type { LocalToolDef } from '@pacman/shared';
+import type { LocalToolDef } from '@cairn/shared';
 
 /** pi Skill 工具名（shared/skill-facts.ts skillCallName 同源）。 */
 export const SKILL_TOOL_NAME = 'Skill';

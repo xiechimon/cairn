@@ -19,8 +19,8 @@ import type {
   MachineAttachmentResponse,
   SessionOpts,
   TranscriptUpload,
-} from '@pacman/shared';
-import { formatAttachmentToken } from '@pacman/shared';
+} from '@cairn/shared';
+import { formatAttachmentToken } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -179,7 +179,7 @@ function claimed(spec: string, opts: { kind?: 'build' | 'chief' } = {}): Claimed
 }
 
 async function setup(claim: ClaimedStep, client: FakeClient) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-img-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-img-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const journal = new StepJournal(paths.outboxDir);

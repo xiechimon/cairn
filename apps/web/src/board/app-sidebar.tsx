@@ -24,7 +24,7 @@ import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { attentionCount, countInColumn, openCountByProject } from './columns.js';
 import { BoardSidebar, type SidebarProject, type SidebarSelected } from './sidebar.js';
 
-export const SIDEBAR_STORAGE_KEY = 'pacman.sidebar-collapsed'; // mirrored in e2e (sidebar-nav / collapse-family specs)
+export const SIDEBAR_STORAGE_KEY = 'cairn.sidebar-collapsed'; // mirrored in e2e (sidebar-nav / collapse-family specs)
 
 function readCollapsed(storage: Storage | null): boolean {
   // #1091：null / getItem 抛 = 无记忆，回落展开态（首渲染路径，抛错即全树卸载）。

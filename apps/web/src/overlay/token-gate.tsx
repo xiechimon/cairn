@@ -14,7 +14,7 @@
 // --surface 底，提交 32px 高 / 8px 圆角 / 13px 常规字重 / --card-button 实底：
 // 铺开是纯结构换件，per-face 数值仍是几何正本（#411 政策 4），故不取 shadcn
 // 默认档。聚焦环按仓级 #388 canon（2px --focus-ring + offset 2）。
-// 聚焦锚点仍是既有 htmlFor/id（pacman-token-input，开门聚焦）。
+// 聚焦锚点仍是既有 htmlFor/id（cairn-token-input，开门聚焦）。
 // #1048 增补（纯信息缺口，鉴权逻辑零改动）：desc 下加一段「令牌从哪来」
 // 指引（.token-gate-help，e2e 定位锚）——三事实钉在 token-gate.spec.ts
 // 失败方式 7/8/9：令牌 = 服务端环境变量 ENV_VARS.token 的值（BRAND 槽，
@@ -22,7 +22,7 @@
 // 指向的文件；删变量 + 重启 = 关闭鉴权（server config 只在进程启动时读 env）。
 // 文案禁止出现示例令牌值（票 AC4：示例会诱导贴真值）。
 
-import { ENV_VARS } from '@pacman/shared';
+import { ENV_VARS } from '@cairn/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { passGate, probeToken, useAuth } from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
@@ -42,7 +42,7 @@ export function TokenGate() {
     if (!auth.gateOpen) return;
     setValue('');
     setRejected(false);
-    (document.getElementById('pacman-token-input') as HTMLInputElement | null)?.focus();
+    (document.getElementById('cairn-token-input') as HTMLInputElement | null)?.focus();
   }, [auth.gateOpen]);
 
   if (!auth.gateOpen) return null;
@@ -89,11 +89,11 @@ export function TokenGate() {
               { tokenVar: ENV_VARS.token },
             )}
           </p>
-          <label className="text-xs text-content-tertiary" htmlFor="pacman-token-input">
+          <label className="text-xs text-content-tertiary" htmlFor="cairn-token-input">
             {t('访问令牌')}
           </label>
           <Input
-            id="pacman-token-input"
+            id="cairn-token-input"
             // 过渡窄写 = components/ui/button 的同一处仓内偏离（TW 的
             // transition-colors 属性表含 outline-color，会把 focus 环吞进
             // 过渡初值）；dark 档另钉一次底，压适配层的 `dark:bg-input/30` 底噪。

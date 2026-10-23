@@ -2,7 +2,7 @@
 // ./chief-harness.ts）。共享 harness 收编位 = ./chief-harness.ts，
 // 状态经 H 单出口每用例重绑。
 
-import { CHIEF_WATCH_REASON_DISPATCH } from '@pacman/shared';
+import { CHIEF_WATCH_REASON_DISPATCH } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { step as stepTable, todo as todoTable } from '../src/db/schema.js';

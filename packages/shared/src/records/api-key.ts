@@ -1,9 +1,9 @@
 // apiKey record——02 §6.2（r3 §6 实测）。
 // 密钥纪律（02 §8）：创建响应含明文一次 +「请立即复制密钥，它仅显示一次。」，
-// 此后列表行掩码（`pacman_afe07565…`，r3 §6 样例原形前缀 = tds_，随品牌槽
+// 此后列表行掩码（`cairn_afe07565…`，r3 §6 样例原形前缀 = tds_，随品牌槽
 // 切换 #109）；服务端存哈希不存可逆值（[设计] 02 §8——
 // 登录校验只需匹配，与 todos.dev 内部实现无关）。
-// 双用途（r3 §6 实测）：同一把 key 走 pacman start --api-key（机器注册）与
+// 双用途（r3 §6 实测）：同一把 key 走 cairn start --api-key（机器注册）与
 // MCP Bearer 两路；调用以 key 属主身份执行（02 §7.2）。
 
 import { z } from 'zod';
@@ -32,7 +32,7 @@ export type ApiKeyRecord = z.infer<typeof apiKeyRecordSchema>;
  * 出现，02 §8 API 面纪律）。server listApiKeys / web 列表消费双端单源。 */
 export const apiKeyRowSchema = apiKeyRecordSchema.extend({
   id: recordId,
-  /** 掩码 `pacman_afe07565…`（r3 §6 展示规则，前缀随品牌槽）。 */
+  /** 掩码 `cairn_afe07565…`（r3 §6 展示规则，前缀随品牌槽）。 */
   masked: z.string(),
   createdAt: epochMs,
 });
@@ -41,7 +41,7 @@ export type ApiKeyRow = z.infer<typeof apiKeyRowSchema>;
 /** 一次性展示提示 canon（r3 §6 原文）。 */
 export const API_KEY_ONE_TIME_COPY = '请立即复制密钥，它仅显示一次。';
 
-/** 列表行掩码（r3 §6 实测展示规则）：明文 `pacman_<48hex>` → `pacman_afe07565…`
+/** 列表行掩码（r3 §6 实测展示规则）：明文 `cairn_<48hex>` → `cairn_afe07565…`
  * = 品牌前缀 + 前 8 位 hex + 省略号（样例掩码与省略号字形原样；r3 样例前缀
  * tds_ 随品牌槽切换，#109）。server 建行与 web 展示同吃本函数（掩码规则单源）。 */
 export function maskApiKey(plaintext: string): string {

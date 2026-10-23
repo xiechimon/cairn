@@ -35,7 +35,7 @@ import {
   SHELL_OUTPUT_CHAR_LIMIT,
   type ToolCallRecord,
   type TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -68,7 +68,7 @@ class FakeWire implements ShellWire {
 function harness(opts: { timeoutMs?: number; cwd?: string } = {}) {
   const wire = new FakeWire();
   const lines: string[] = [];
-  const cwd = opts.cwd ?? mkdtempSync(join(tmpdir(), 'pacman-shell-channel-'));
+  const cwd = opts.cwd ?? mkdtempSync(join(tmpdir(), 'cairn-shell-channel-'));
   const tool = buildRemoteShellTool({
     wire,
     stepId: 's1',
@@ -197,7 +197,7 @@ describe('remote_shell 工具（预检 + spawn + 回写）', () => {
   });
 
   test('场景9 spawn 失败：回写 failed + errorMessage，返回执行失败原因', async () => {
-    const { wire, lines, tool } = harness({ cwd: join(tmpdir(), 'pacman-shell-no-such-dir') });
+    const { wire, lines, tool } = harness({ cwd: join(tmpdir(), 'cairn-shell-no-such-dir') });
     const out = await tool.execute({ command: 'echo hi' });
     expect(out).toContain('执行失败');
     expect(wire.resultCalls).toHaveLength(1);
@@ -347,7 +347,7 @@ function recordingBackend(slot: { sessionOpts: SessionOpts | null }): AgentBacke
 }
 
 async function toolNamesFor(localTools?: string[]): Promise<string[]> {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-shell-reg-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-shell-reg-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const slot: { sessionOpts: SessionOpts | null } = { sessionOpts: null };

@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 // Wayfinder ticket #181: the machines page res-add 钮 opens the 添加机器
 // dialog (#179 裁决 = r2 11b CLI 两步表单): 引导语 + 安装 CLI / 在机器上执行
 // 命令块(带 复制,包名/命令名 = BRAND 品牌槽)+ 底部 API key disclosure
-// (展开 → `pacman start --api-key <key> --team <teamId>` + 获取 API key →
+// (展开 → `cairn start --api-key <key> --team <teamId>` + 获取 API key →
 // 链接,#121 Link family: scenario 随跳)。Rides DialogShell (#68 family
 // law) per the #170 canonical mode. Each test pins one failure mode:
 // 1. res-add opens the dialog with the two-step command blocks

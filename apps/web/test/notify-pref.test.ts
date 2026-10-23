@@ -26,7 +26,7 @@ describe('readNotifyPref', () => {
 
   it('垃圾值 → null（异型存储不炸不误导）', () => {
     for (const junk of ['maybe', '', '2', 'ON', 'true']) {
-      expect(readNotifyPref(memStorage({ 'pacman.notifyEnabled': junk })), junk).toBeNull();
+      expect(readNotifyPref(memStorage({ 'cairn.notifyEnabled': junk })), junk).toBeNull();
     }
   });
 });
@@ -40,9 +40,9 @@ describe('persistNotifyPref × readNotifyPref 往返', () => {
     expect(readNotifyPref(storage)).toBe('on');
   });
 
-  it('写面只占一个品牌键（pacman.* 槽，locale 同族）', () => {
+  it('写面只占一个品牌键（cairn.* 槽，locale 同族）', () => {
     const storage = memStorage();
     persistNotifyPref('off', storage);
-    expect(Object.keys(storage.dump())).toEqual(['pacman.notifyEnabled']);
+    expect(Object.keys(storage.dump())).toEqual(['cairn.notifyEnabled']);
   });
 });

@@ -12,7 +12,7 @@ import { expect, test } from '@playwright/test';
 // 3. 单腿 tab — 任务 tab 必须可点且往返（开闸不等于把任务面关掉）；
 // 4. 对照面：hosted 项目（r2-24）files tab 照常（零回归）。
 // 不可达降级面（tree 404 + reason 分译文案）走 server vitest（project-local
-// .test.ts F2/F3/F4）+ verify-pacman live 面——fixture 模式下 tree query 恒
+// .test.ts F2/F3/F4）+ verify-cairn live 面——fixture 模式下 tree query 恒
 // disabled（live=false），e2e 钉不到，不在本文件演。
 // #946/#910 载体：topbar tab = banner scope 的 role=tab（与 pane 内 seg 钮
 // 的 button 角色分离）；文件行 = role=button+文件名精确名；任务行 =

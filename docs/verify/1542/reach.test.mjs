@@ -21,13 +21,13 @@ for (const [file, code] of [
 for (const [file, code] of [
   ['scripts/drive-unregistered.mjs', 1],
   ['docs/verify/1542/drive-unregistered.mts', 1],
-  ['.claude/skills/verify-pacman/scripts/drive-hotkeys.mjs', 0],
+  ['.claude/skills/verify-cairn/scripts/drive-hotkeys.mjs', 0],
   ['apps/web/e2e/unmapped-reach.spec.ts', 1],
   ['apps/web/e2e/board-reach.spec.ts', 0],
 ]) {
   test(`registry reach: ${file}`, () => {
     const result = spawnSync(process.execPath, [
-      '.claude/skills/verify-pacman/scripts/vp-registry-gate.mjs', '--check-reach', file,
+      '.claude/skills/verify-cairn/scripts/vp-registry-gate.mjs', '--check-reach', file,
     ], { encoding: 'utf8' });
     assert.equal(result.status, code, result.stdout + result.stderr);
     if (code === 1) assert.ok(result.stdout.includes(file), result.stdout);
@@ -36,8 +36,8 @@ for (const [file, code] of [
 
 test('discovers committed, staged and untracked additions from the base', () => {
   const root = mkdtempSync(join(tmpdir(), 'probe-reach-'));
-  const gate = '.claude/skills/verify-pacman/scripts/vp-registry-gate.mjs';
-  const registry = '.claude/skills/verify-pacman/vp-registry.json';
+  const gate = '.claude/skills/verify-cairn/scripts/vp-registry-gate.mjs';
+  const registry = '.claude/skills/verify-cairn/vp-registry.json';
   const run = (command, args, env = {}) => spawnSync(command, args, {
     cwd: root, encoding: 'utf8', env: { ...process.env, ...env },
   });

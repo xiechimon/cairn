@@ -104,7 +104,7 @@ import { pressUntil } from './helpers.js';
 // 28. with the drawer closed N stays retired: six delivered presses open
 //     neither the drawer nor the dialog (the enabled gate keeps the
 //     listener off the window; XMON-37's global retirement holds). The
-//     live fire / scope / input-guard faces ride the verify-pacman probe
+//     live fire / scope / input-guard faces ride the verify-cairn probe
 //     drive-chief-new-thread-key.mjs (docs/verify/645) — fixture faces
 //     cannot observe the fire (onNewThread is live-only)
 //
@@ -601,7 +601,7 @@ test('Tab cycles the dialog’s project chip from the composer focus', async ({ 
   // 换项目不搬打字的手：焦点留在 composer
   await expect(page.locator('.new-task-spec')).toBeFocused();
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId')))
+    .poll(() => page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId')))
     .toBe('r2-inventory');
 
   // 末行再 Tab 环绕回首行（记忆位存的是项目 id：首行的 id 与显示名不同名，
@@ -609,7 +609,7 @@ test('Tab cycles the dialog’s project chip from the composer focus', async ({ 
   await page.keyboard.press('Tab');
   await expect(chipName).toHaveText('r3-lifecycle');
   await expect
-    .poll(() => page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId')))
+    .poll(() => page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId')))
     .toBe(FIRST_PROJECT_ID);
 
   await escapeUntilHidden(page, dialog(page));
@@ -705,7 +705,7 @@ test('Tab cycles nothing while the 未保存闸 confirm layer is up (that layer 
   await page.keyboard.press('Tab');
   await expect(chipName).toHaveText('r3-lifecycle');
   // 换项目与写记忆位是同一个动作：没换 = 也没写。
-  expect(await page.evaluate(() => localStorage.getItem('pacman.newTaskProjectId'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('cairn.newTaskProjectId'))).toBeNull();
 });
 
 test('with the dialog closed Tab stays native', async ({ page }) => {

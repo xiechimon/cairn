@@ -1,4 +1,4 @@
-// GitHub 给的文本进 pacman 自己写的行与文案之前的清洗（#1403）：PR 对账的 system 行
+// GitHub 给的文本进 cairn 自己写的行与文案之前的清洗（#1403）：PR 对账的 system 行
 // （ci-loop.ts）与经 GitHub API 合并的合并行、拒绝文案（builds.ts requestMerge）共用。
 // 会话行经 chief / MCP 的会话读工具交给 agent，也在 web 时间线上显示；拒绝文案进合并
 // 弹层。

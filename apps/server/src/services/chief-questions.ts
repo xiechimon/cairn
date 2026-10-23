@@ -21,7 +21,7 @@ import {
   askUserQuestionSchema,
   isChiefConversationId,
   type UserRecord,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';

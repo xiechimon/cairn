@@ -11,7 +11,7 @@ import { evidencePanelShot } from './evidence';
 //
 // Boot stubs follow search-live-project-name.spec.ts: teams + user me
 // succeed, every other GET 500s into the app's isError tolerance; no
-// ?scenario= = live. Evidence shots (PACMAN_E2E_EVIDENCE) sit before the
+// ?scenario= = live. Evidence shots (CAIRN_E2E_EVIDENCE) sit before the
 // assertions so the same run also frames the old code.
 
 const TEAM = { id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null };
@@ -125,7 +125,7 @@ const card = (page: Page, id: string) =>
   page.locator(`[data-testid="board-scroller"] .todo-card[data-todo-id="${id}"]`);
 /** evidencePanelShot after the 150-200ms enter fades; regression runs skip both. */
 async function shot(page: Page, name: string, panel: Locator) {
-  if (process.env.PACMAN_E2E_EVIDENCE === undefined) return;
+  if (process.env.CAIRN_E2E_EVIDENCE === undefined) return;
   await page.waitForTimeout(300);
   await evidencePanelShot(page, name, panel);
 }

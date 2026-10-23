@@ -2,7 +2,7 @@
 // 「agent 会自己路由技能」的结构判据面——目录全量、无截顶、远端分发真物化、
 // 白名单硬挡双向、空清单显式信号、pi 原生发现面关断的 before/after 对照。
 // 拓扑 = 真 server（团队技能库落 server skillsDir，走 #920 清单 + 按需拉
-// wire）+ 真 daemon（本机 PACMAN_SKILLS_DIR 另有本地库）+ stub LLM。
+// wire）+ 真 daemon（本机 CAIRN_SKILLS_DIR 另有本地库）+ stub LLM。
 // 与 skills-inject-e2e 的分工：那边钉单技能注入连通性与 #917 硬挡首证；
 // 这边钉「全库多源」形态——团队分发内容真到达 agent 上下文、目录条数 =
 // 白名单命中全库、空清单不静默。
@@ -173,7 +173,7 @@ beforeAll(async () => {
     .run();
 
   // daemon 本机库：local-one 授权、local-blocked 白名单外（硬挡对照）。
-  localSkillsDir = mkdtempSync(join(tmpdir(), 'pacman-it-routing-local-'));
+  localSkillsDir = mkdtempSync(join(tmpdir(), 'cairn-it-routing-local-'));
   localOneFile = writeSkill(
     join(localSkillsDir, 'local-one'),
     'local-one',
@@ -189,7 +189,7 @@ beforeAll(async () => {
   // 轮 1 的拒侧路径现在才知道（mkdtemp 后）——补进已建数组（stub 按引用读）。
   stubRounds[0] = { toolCall: { name: 'read', arguments: { path: localBlockedFile } } };
 
-  home = mkdtempSync(join(tmpdir(), 'pacman-it-routing-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-it-routing-home-'));
   const config = loadDaemonConfig(
     {
       serverUrl: server.url,

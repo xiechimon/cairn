@@ -27,8 +27,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
-import { buildReviewStepPrompt, type DocumentDiffFile } from '@pacman/shared';
+} from '@cairn/shared';
+import { buildReviewStepPrompt, type DocumentDiffFile } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinToolNames, PI_CAPABILITIES, sessionToolNames } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -184,7 +184,7 @@ function fakeWorkspace(calls: string[], opts: { rewindError?: string } = {}): Wo
       return {
         cwd: CHECKOUT_CWD,
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `pacman/conv-${input.conversationId}`,
+        branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: true,
       };
@@ -276,7 +276,7 @@ async function setupWithBackend(
   opts: { rewindError?: string },
   backendFor: (captured: SessionOpts[]) => AgentBackend,
 ) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-review-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-review-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const calls: string[] = []; // 单一调用序：client 与 workspace 共写一份（rewind 先于 done 的时序靠它判读）
   const client = new FakeClient();

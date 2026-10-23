@@ -12,7 +12,7 @@
 //      refs/heads/<conv>，不碰用户工作树）；用户 HEAD 与脏文件内容原样
 //   4. 凭证 argv 面：PATH shim 捕获全部 git fork+exec 命令行——带凭证
 //      clone/fetch/push 全程 token 不出现在 argv；对照 env 面
-//      PACMAN_GIT_CRED_* 携带 token（凭证确实经 env 注入，credential.helper 读它）
+//      CAIRN_GIT_CRED_* 携带 token（凭证确实经 env 注入，credential.helper 读它）
 
 import { spawnSync } from 'node:child_process';
 import {
@@ -27,13 +27,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { type BoundGitCredentials, conversationBranch } from '@pacman/shared';
+import { type BoundGitCredentials, conversationBranch } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { WorkspaceManager } from '../src/workspace.js';
 
-const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
+const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 const PROJECT_ID = 'proj-local-1';
 const CONV_A = '01a0b86f-aaaa-72a8-bba4-75c5cfd6598f';
 /** 探针 token（argv 泄漏断言的判别串；形近真实 GitHub token 但为假值）。 */
@@ -116,7 +116,7 @@ function nlinksUnder(dir: string): number[] {
 }
 
 beforeEach(async () => {
-  const base = mkdtempSync(join(tmpdir(), 'pacman-local-exec-'));
+  const base = mkdtempSync(join(tmpdir(), 'cairn-local-exec-'));
   userRepo = join(base, 'user-repo');
   root = join(base, 'workspaces');
   logger = fakeLogger();
@@ -203,7 +203,7 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
   beforeEach(() => {
     const realGit = spawnSync('which', ['git'], { encoding: 'utf8' }).stdout.trim();
     expect(realGit).not.toBe('');
-    shimDir = mkdtempSync(join(tmpdir(), 'pacman-git-shim-'));
+    shimDir = mkdtempSync(join(tmpdir(), 'cairn-git-shim-'));
     argvLog = join(shimDir, 'argv.log');
     envLog = join(shimDir, 'env.log');
     writeFileSync(
@@ -211,8 +211,8 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
       [
         '#!/bin/sh',
         `{ printf '%s ' "$@"; printf '\\n'; } >> "${argvLog}"`,
-        // 凭证值在 PACMAN_GIT_CRED_*（helper 本体是定值，#1484）。
-        `printenv PACMAN_GIT_CRED_USERNAME PACMAN_GIT_CRED_PASSWORD >> "${envLog}" 2>/dev/null || true`,
+        // 凭证值在 CAIRN_GIT_CRED_*（helper 本体是定值，#1484）。
+        `printenv CAIRN_GIT_CRED_USERNAME CAIRN_GIT_CRED_PASSWORD >> "${envLog}" 2>/dev/null || true`,
         `exec "${realGit}" "$@"`,
       ].join('\n'),
     );
@@ -227,11 +227,11 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
 
   test('失败方式 5：带凭证 clone/fetch/push 全程 token 不进 argv；env credential.helper 携带（正对照）', async () => {
     // 远端 = 本地 bare repo（http 远端不可得时的等价执行面：凭证注入通道与
-    // 远端协议无关——断言对象是 pacman 侧 spawn 形态，不是 git auth 结果）。
-    const bareRemote = join(mkdtempSync(join(tmpdir(), 'pacman-cred-remote-')), 'origin.git');
+    // 远端协议无关——断言对象是 cairn 侧 spawn 形态，不是 git auth 结果）。
+    const bareRemote = join(mkdtempSync(join(tmpdir(), 'cairn-cred-remote-')), 'origin.git');
     await runGit(['init', '--bare', bareRemote]);
     await runGit(['symbolic-ref', 'HEAD', 'refs/heads/main'], { cwd: bareRemote });
-    const seedDir = join(mkdtempSync(join(tmpdir(), 'pacman-cred-seed-')), 'seed');
+    const seedDir = join(mkdtempSync(join(tmpdir(), 'cairn-cred-seed-')), 'seed');
     await runGit(['clone', bareRemote, seedDir]);
     writeFileSync(join(seedDir, 'README.md'), '# cred probe\n');
     await runGit(['checkout', '-B', 'main'], { cwd: seedDir });
@@ -239,7 +239,7 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     await runGit(['commit', '-m', 'seed'], { cwd: seedDir, env: commitEnv(IDENTITY) });
     await runGit(['push', 'origin', 'main'], { cwd: seedDir });
 
-    const credRoot = mkdtempSync(join(tmpdir(), 'pacman-cred-ws-'));
+    const credRoot = mkdtempSync(join(tmpdir(), 'cairn-cred-ws-'));
     const cloneDir = join(credRoot, 'clone');
     await gitPrim.clone(bareRemote, cloneDir, PROBE_CRED);
     await gitPrim.fetch(cloneDir, PROBE_CRED);
@@ -257,7 +257,7 @@ describe('per-step 凭证 argv 纪律（spec 12 G2-T2：捕获 fork+exec 命令�
     expect(argv).not.toContain('x-access-token');
     expect(argv).not.toContain('credential.helper');
     // 正对照：token 确实经 GIT_CONFIG_* env 注入（否则「argv 无 token」空转）
-    // ——PACMAN_GIT_CRED_* = 内联 credential.helper 读取的凭证（git.ts gitCredentialEnv）。
+    // ——CAIRN_GIT_CRED_* = 内联 credential.helper 读取的凭证（git.ts gitCredentialEnv）。
     const envDump = readFileSync(envLog, 'utf8');
     expect(envDump).toContain(PROBE_TOKEN);
     expect(envDump).toContain('x-access-token');

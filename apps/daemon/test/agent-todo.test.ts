@@ -1,5 +1,5 @@
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-import { AGENT_TODO_MAX_ITEMS, type StepEvent } from '@pacman/shared';
+import { AGENT_TODO_MAX_ITEMS, type StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { parseAgentTodoText } from '../src/agent-todo.js';
 import {
@@ -8,8 +8,8 @@ import {
   todoFromTodoWrite,
 } from '../src/backend/claude-code.js';
 
-describe('todoFromTodoWrite（claude-code TodoWrite → pacman 格式）', () => {
-  test('F3: status 三词逐字映射成 pacman 三态', () => {
+describe('todoFromTodoWrite（claude-code TodoWrite → cairn 格式）', () => {
+  test('F3: status 三词逐字映射成 cairn 三态', () => {
     const items = todoFromTodoWrite('TodoWrite', {
       todos: [
         { content: '读 README', status: 'pending' },
@@ -85,7 +85,7 @@ describe('todoFromTodoWrite（claude-code TodoWrite → pacman 格式）', () =>
   });
 });
 
-describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → pacman 格式）', () => {
+describe('parseAgentTodoText（pi 文本通道：`- [ ]` 行 → cairn 格式）', () => {
   test('T1: 四个 marker 全映射', () => {
     const items = parseAgentTodoText(
       [

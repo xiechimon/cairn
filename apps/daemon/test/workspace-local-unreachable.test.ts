@@ -17,13 +17,13 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LocalRepoUnreachableError } from '@pacman/shared';
+import { LocalRepoUnreachableError } from '@cairn/shared';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
 import { localRepoUnreachableMessage, WorkspaceManager } from '../src/workspace.js';
 
-const IDENTITY = { name: 'it-agent', email: 'it@pacman.local' };
+const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
 
 function fakeLogger(): DaemonLogger & { lines: string[] } {
   const lines: string[] = [];
@@ -54,14 +54,14 @@ let logger: ReturnType<typeof fakeLogger>;
 let ws: WorkspaceManager;
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'pacman-lu-root-'));
+  root = mkdtempSync(join(tmpdir(), 'cairn-lu-root-'));
   logger = fakeLogger();
   ws = new WorkspaceManager({ logger });
 });
 
 /** 真用户仓库种子（非 bare 工作树仓、main、单提交——#1211 判据最小形态）。 */
 async function seedUserRepo(): Promise<string> {
-  const dir = join(mkdtempSync(join(tmpdir(), 'pacman-lu-repo-')), 'repo');
+  const dir = join(mkdtempSync(join(tmpdir(), 'cairn-lu-repo-')), 'repo');
   await runGit(['init', '-b', 'main', dir]);
   writeFileSync(join(dir, 'README.md'), '# user repo\n');
   await runGit(['add', '-A'], { cwd: dir });
@@ -94,7 +94,7 @@ describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
   });
 
   test('L2 路径存在但不是 git 仓 → LocalRepoUnreachableError(not_git)', async () => {
-    const plain = mkdtempSync(join(tmpdir(), 'pacman-lu-plain-'));
+    const plain = mkdtempSync(join(tmpdir(), 'cairn-lu-plain-'));
     writeFileSync(join(plain, 'notes.txt'), 'not a repo\n');
     const err = await ws.prepare(localPrepareInput(plain, true)).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(LocalRepoUnreachableError);
@@ -123,10 +123,10 @@ describe('local 形态执行面 fail-loud（#1210 C 兜底）', () => {
   }, 30_000);
 
   test('L5 文案：点名机器 + 路径 + 原因人话 + 两条补法', () => {
-    const err = new LocalRepoUnreachableError('/Users/dev/code/pacman', 'not_found');
+    const err = new LocalRepoUnreachableError('/Users/dev/code/cairn', 'not_found');
     const msg = localRepoUnreachableMessage('mea', err);
     expect(msg).toContain('mea'); // 哪台机器
-    expect(msg).toContain('/Users/dev/code/pacman'); // 哪个路径
+    expect(msg).toContain('/Users/dev/code/cairn'); // 哪个路径
     expect(msg).toContain('路径不存在'); // 原因人话（LOCAL_ERROR_REASON_COPY 词表）
     expect(msg).toContain('钉选'); // 补法①：机器钉选面
     expect(msg).toContain('GitHub 形态'); // 补法②：跨机开发的项目形态

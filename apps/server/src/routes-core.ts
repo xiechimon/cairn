@@ -3,7 +3,7 @@
 // 对拍契约不变——shared WEB_REST_ENDPOINTS + test/wire.test.ts 拍的是组合
 // 后的 app，不是文件布局）。编排位 = routes.ts 的 registerRoutes。
 
-import { patchUserBodySchema, type TeamMember } from '@pacman/shared';
+import { patchUserBodySchema, type TeamMember } from '@cairn/shared';
 import { eq, isNull } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';

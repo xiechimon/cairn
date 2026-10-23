@@ -15,7 +15,7 @@ const source = join(here, '..', 'web', 'dist');
 const target = join(here, 'web');
 
 if (!existsSync(join(source, 'index.html'))) {
-  console.error(`web dist 缺失（${source}）——先 pnpm --filter @pacman/web build`);
+  console.error(`web dist 缺失（${source}）——先 pnpm --filter @cairn/web build`);
   process.exit(1);
 }
 rmSync(target, { recursive: true, force: true });

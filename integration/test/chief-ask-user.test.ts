@@ -116,7 +116,7 @@ beforeAll(async () => {
     { content: '已收到你的答复，本轮照此执行。' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-ask-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-ask-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'ask-mbp' },
     {},

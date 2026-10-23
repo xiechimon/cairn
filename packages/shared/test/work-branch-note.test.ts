@@ -28,7 +28,7 @@ import {
 const TITLE = '分支契约探针';
 const SPEC = '构建步要被告知只在会话分支提交。';
 const TASK_TEXT = buildTaskPromptText(TITLE, SPEC);
-const BRANCH = 'pacman/conv-0198f6c0-0000-7000-8000-000000000000';
+const BRANCH = 'cairn/conv-0198f6c0-0000-7000-8000-000000000000';
 const NOTE = buildWorkBranchNote(BRANCH);
 
 describe('注记组装（失败方式 6）', () => {

@@ -31,7 +31,7 @@
 // 消费 providerEchoLabel、二级消费 modelEchoLabel，壳与两级级联律仍归本件。
 //
 // 标签只出模型名：原版下拉项的 `· 128k` 是原版内置模型目录的上下文窗口——
-// pacman 是本地 BYOK，没有这个数据源，不编造；provider 位升去一级后二级行内
+// cairn 是本地 BYOK，没有这个数据源，不编造；provider 位升去一级后二级行内
 // 也不再重复徽标。
 //
 // e2e 句柄（prefix，零规则类）：触发钮 `${prefix}-select`、弹层

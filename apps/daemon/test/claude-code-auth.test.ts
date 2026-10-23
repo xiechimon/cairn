@@ -84,7 +84,7 @@ describe('parseClaudeCodeAuthStatus', () => {
 describe('probeClaudeCodeAuth', () => {
   test('失败方式 6：命令不可执行 → unknown（不抛、不拦步）', async () => {
     const probe = await probeClaudeCodeAuth({
-      command: 'pacman-no-such-claude-binary',
+      command: 'cairn-no-such-claude-binary',
       timeoutMs: 2_000,
     });
     expect(probe.state).toBe('unknown');
@@ -101,7 +101,7 @@ describe('probeClaudeCodeAuth', () => {
     // 实测形（2026-10-05）：未登录时 `claude auth status` 写完整 JSON 到
     // stdout 后 **exit 1**。按退出码判会把这一步折成 unknown → 预检静默失效
     // （live 跑踩到过），故用真子进程钉住「退出码不进判定」。
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-auth-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-auth-'));
     const stub = join(dir, 'claude');
     writeFileSync(
       stub,

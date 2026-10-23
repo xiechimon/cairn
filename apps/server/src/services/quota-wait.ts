@@ -14,7 +14,7 @@
 // **不得**反向 import 本模块（toTodoRecord 的 quotaWait 派生用内联查询，
 // 投影同形由 quota-wait.test W3 钉住防漂移）。
 
-import type { QuotaBlock, QuotaWait, UserRecord } from '@pacman/shared';
+import type { QuotaBlock, QuotaWait, UserRecord } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, type QuotaWaitRow, step, todo } from '../db/schema.js';

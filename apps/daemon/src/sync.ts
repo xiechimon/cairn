@@ -14,7 +14,7 @@
 
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import type { MachineSyncCommand } from '@pacman/shared';
+import type { MachineSyncCommand } from '@cairn/shared';
 import { gitPrim, runGitOk } from './git.js';
 import type { DaemonLogger } from './log.js';
 import type { MachineApi } from './machine-client.js';

@@ -49,7 +49,7 @@
 // 再被拒）——importGithubIssue 自己的读遇限流抛 HttpError，按导入失败记；
 // 上一轮没跑完时新触发直接返回（不重叠）。
 //
-// #1459：webhook 的 `pacman` 触发按同一 D5 判据核打标人（事件的 sender）、
+// #1459：webhook 的 `cairn` 触发按同一 D5 判据核打标人（事件的 sender）、
 // 计入同一在飞上限。三样两路共用：团队 token（teamGithubToken，github-connection.ts）、
 // 打标人权限读与缓存（hasRepoTriage，缓存是进程里唯一一份，轮询器开没开都在；
 // 限流照常抛 GithubRateLimitedError，不进缓存，webhook 自己接住）、在飞现数
@@ -61,7 +61,7 @@ import {
   type Phase,
   parseGithubIssueSourceRef,
   type SecretBox,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   and,
   asc,

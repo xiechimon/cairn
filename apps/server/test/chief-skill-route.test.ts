@@ -10,7 +10,7 @@
 // - skills 资源清单带 description（agent 自检切合度用）。
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { claimedStepSchema } from '@pacman/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent as agentTable, chief as chiefTable, chiefThread } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';

@@ -50,7 +50,7 @@ test('A1: tool output is collapsed behind the group toggle by default', async ({
   // the stdout must NOT have leaked into a centered dim note either
   await expect(page.getByTestId('transcript-note').filter({ hasText: 'total 16' })).toHaveCount(0);
   await expect(
-    page.getByTestId('transcript-note').filter({ hasText: 'hello from pacman' }),
+    page.getByTestId('transcript-note').filter({ hasText: 'hello from cairn' }),
   ).toHaveCount(0);
   // the collapsible tool group toggle (完成 Ns ▸ row) is present
   await expect(toggle(page)).toBeVisible();
@@ -64,7 +64,7 @@ test('A2: expanding the group reveals one standalone block per tool output', asy
   // verbatim stdout, whitespace preserved
   await expect(outputs.nth(0)).toContainText('total 16');
   await expect(outputs.nth(0)).toContainText('drwxr-xr-x@ 4 xmon  staff');
-  await expect(outputs.nth(1)).toContainText('hello from pacman');
+  await expect(outputs.nth(1)).toContainText('hello from cairn');
 });
 
 test('A3: the output block is left aligned, mono, normal contrast — not a chat-note', async ({

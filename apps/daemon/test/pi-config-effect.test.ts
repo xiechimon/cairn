@@ -15,7 +15,7 @@
 import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { ProviderCompat, ProviderConfig } from '@pacman/shared';
+import type { ProviderCompat, ProviderConfig } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { adaptProviderCompat, materializeProvider } from '../src/backend/pi.js';
 
@@ -42,7 +42,7 @@ describe('materializeProvider 配置变更即时生效（#708 失败方式 3）'
   // 学习面是模块级 Map：每个用例独立 providerId 隔离（pi-protocol-fallback 同律）。
 
   test('失败方式 1：server compat 删除学习位所填的旋钮 → 学习作废，旧形不回流', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cfg-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
     // 学费：撞错 → learnedCompat 填 {mct:max_tokens, store:false}。
     adaptProviderCompat(gateway('cfg-remove'), RELAY_400);
@@ -58,7 +58,7 @@ describe('materializeProvider 配置变更即时生效（#708 失败方式 3）'
   });
 
   test('失败方式 2：server compat 未变 → 学习照旧补位（学费一次，零回归）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cfg-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-stable'), RELAY_400);
     materializeProvider(path, gateway('cfg-stable'));
@@ -70,7 +70,7 @@ describe('materializeProvider 配置变更即时生效（#708 失败方式 3）'
   });
 
   test('失败方式 3：作废后再撞错 → 可重新学习（作废不是永久拉黑）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cfg-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
     // 学费期：server compat 为空，学习 {mct, store}；本次物化兼作基线快照。
     adaptProviderCompat(gateway('cfg-relearn'), RELAY_400);
@@ -101,7 +101,7 @@ describe('materializeProvider 配置变更即时生效（#708 失败方式 3）'
   });
 
   test('失败方式 4：server compat 显式改写旋钮值 → 物化取新显式值', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cfg-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cfg-'));
     const path = join(dir, 'models.json');
     adaptProviderCompat(gateway('cfg-rewrite'), RELAY_400); // 学习 {mct: max_tokens}
     materializeProvider(path, gateway('cfg-rewrite'));
@@ -128,7 +128,7 @@ describe('materializeProvider cost 声明位（#927）', () => {
   }
 
   test('模型声明 cost → models.json 条目 = 声明价（覆盖零默认）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cost-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -143,7 +143,7 @@ describe('materializeProvider cost 声明位（#927）', () => {
   });
 
   test('未声明价格 → 零价默认同形（既有物化产物零回归）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cost-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cost-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('cost-none', [{ id: 'm2', name: 'M2' }]));
     expect(loadModels(path, 'cost-none')[0]).toMatchObject({
@@ -165,7 +165,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
   }
 
   test('模型声明 contextWindow=1000000 → models.json 条目 = 声明值（1M 上下文不再被 128k 默认截短）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -181,7 +181,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
   });
 
   test('未声明 → 128k/16k 默认同形（不配时行为不变）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, providerWith('ctx-none', [{ id: 'm2', name: 'M2' }]));
     expect(loadModels(path, 'ctx-none')[0]).toMatchObject({
@@ -192,7 +192,7 @@ describe('materializeProvider 上下文/输出上限声明位（#1526）', () =>
   });
 
   test('同 provider 两模型仅其一声明 → 覆盖按模型独立，不串扰', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-ctxwin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-ctxwin-'));
     const path = join(dir, 'models.json');
     materializeProvider(
       path,

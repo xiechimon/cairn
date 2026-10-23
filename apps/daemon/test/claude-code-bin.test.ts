@@ -16,7 +16,7 @@
 //   6. 输出形 `2.1.289 (Claude Code)` → 抽 `2.1.289`
 //   7. 输出形 `v2.1.289` → 抽 `2.1.289`（去前导 v）
 //   8. 非零退出但 stdout 有版本 → 照常取（退出码不进判定，同 auth 探针先例）
-//   9. `PACMAN_CLAUDE_BIN` 指向绝对路径 → 不扫 PATH，但仍校验存在与执行位
+//   9. `CAIRN_CLAUDE_BIN` 指向绝对路径 → 不扫 PATH，但仍校验存在与执行位
 //      （不存在 → null：显式路径不校验等于把假绿原样搬进新字段）
 //  #1290（launchd 窄 PATH 下探不到 homebrew 装的 claude）：
 //  10. PATH 空 + well-known 目录有假 claude → 探到且 source 点名 well-known
@@ -64,7 +64,7 @@ describe('parseClaudeVersion', () => {
 
 describe('resolveCommandPath', () => {
   test('失败方式 1：PATH 里没有 → null', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       expect(resolveCommandPath('claude', { PATH: dir })).toBeNull();
     } finally {
@@ -73,7 +73,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('PATH 里命中 → 绝对路径', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       expect(resolveCommandPath('claude', { PATH: `${dir}:/nowhere` })).toBe(stub);
@@ -83,7 +83,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('失败方式 1b：命中文件但无执行位 → 跳过', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n'); // 不给 +x
       expect(resolveCommandPath('claude', { PATH: dir })).toBeNull();
@@ -93,7 +93,7 @@ describe('resolveCommandPath', () => {
   });
 
   test('失败方式 9：绝对路径不扫 PATH——存在且可执行则原样返回', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       expect(resolveCommandPath(stub, { PATH: '/nowhere' })).toBe(stub);
@@ -109,7 +109,7 @@ describe('resolveCommandPath', () => {
 
 describe('probeClaudeBin well-known 回落（#1290）', () => {
   test('失败方式 10：PATH 空 + well-known 有假 claude → 探到且 source 点名 well-known', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({
@@ -123,8 +123,8 @@ describe('probeClaudeBin well-known 回落（#1290）', () => {
   });
 
   test('失败方式 11：PATH 有 → 不走回落（well-known 目录里的桩不被命中）', async () => {
-    const pathDir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-path-'));
-    const fallbackDir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-fallback-'));
+    const pathDir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-path-'));
+    const fallbackDir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-fallback-'));
     try {
       const pathStub = makeStub(pathDir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       makeStub(fallbackDir, 'claude', '#!/bin/sh\necho 9.9.9\n');
@@ -140,10 +140,10 @@ describe('probeClaudeBin well-known 回落（#1290）', () => {
   });
 
   test('失败方式 12：PATH 空 + well-known 全空 → null（不抛）', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const info = await probeClaudeBin({
-        command: 'pacman-no-such-claude',
+        command: 'cairn-no-such-claude',
         env: { PATH: '/nowhere' },
         wellKnownDirs: [dir],
       });
@@ -154,7 +154,7 @@ describe('probeClaudeBin well-known 回落（#1290）', () => {
   });
 
   test('失败方式 13：well-known 目录里文件无执行位 → 跳过', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n'); // 不给 +x
       const info = await probeClaudeBin({
@@ -168,7 +168,7 @@ describe('probeClaudeBin well-known 回落（#1290）', () => {
   });
 
   test('绝对路径命令不走回落（显式路径的判定不变）', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
       const info = await probeClaudeBin({
@@ -185,7 +185,7 @@ describe('probeClaudeBin well-known 回落（#1290）', () => {
 
 describe('probeClaudeBin', () => {
   test('成功：真子进程桩 → {path, version}', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -196,7 +196,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('失败方式 8：非零退出但 stdout 有版本 → 照常取', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\nexit 1\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -207,11 +207,11 @@ describe('probeClaudeBin', () => {
   });
 
   test('失败方式 1/2：命令不存在 → null（不抛）', async () => {
-    expect(await probeClaudeBin({ command: 'pacman-no-such-claude', timeoutMs: 2_000 })).toBeNull();
+    expect(await probeClaudeBin({ command: 'cairn-no-such-claude', timeoutMs: 2_000 })).toBeNull();
   });
 
   test('失败方式 3：超时 → null（进程挂住不拖 presence 节拍）', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\nsleep 10\n');
       const started = Date.now();
@@ -224,7 +224,7 @@ describe('probeClaudeBin', () => {
   });
 
   test('失败方式 4：有输出但无版本号 → path 照报、version null', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "hello from a wrapper"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
@@ -252,17 +252,17 @@ describe('probeClaudeBin', () => {
     expect(info).toBeNull();
   });
 
-  test('PACMAN_CLAUDE_BIN 覆盖：命令名取环境变量（裸名按 PATH 解析）', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-cc-bin-'));
-    const prev = process.env.PACMAN_CLAUDE_BIN;
+  test('CAIRN_CLAUDE_BIN 覆盖：命令名取环境变量（裸名按 PATH 解析）', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-cc-bin-'));
+    const prev = process.env.CAIRN_CLAUDE_BIN;
     try {
       const stub = makeStub(dir, 'my-claude', '#!/bin/sh\necho 2.1.289\n');
-      process.env.PACMAN_CLAUDE_BIN = 'my-claude';
+      process.env.CAIRN_CLAUDE_BIN = 'my-claude';
       const info = await probeClaudeBin({ env: { PATH: dir } });
       expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
     } finally {
-      if (prev === undefined) delete process.env.PACMAN_CLAUDE_BIN;
-      else process.env.PACMAN_CLAUDE_BIN = prev;
+      if (prev === undefined) delete process.env.CAIRN_CLAUDE_BIN;
+      else process.env.CAIRN_CLAUDE_BIN = prev;
       rmSync(dir, { recursive: true, force: true });
     }
   });

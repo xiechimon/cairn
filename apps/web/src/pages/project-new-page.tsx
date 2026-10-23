@@ -36,7 +36,7 @@ import {
   isGithubRepoRef,
   LOCAL_ERROR_REASON_COPY,
   type LocalErrorReason,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';

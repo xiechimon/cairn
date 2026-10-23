@@ -79,7 +79,7 @@ function wireSchedule(seqNum: number, phase: string) {
       seqNum,
       title: `定时探针 ${phase}`,
       phase,
-      projectName: 'pacman',
+      projectName: 'cairn',
       ownerId: 'user-1',
     },
   };

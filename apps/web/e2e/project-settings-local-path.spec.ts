@@ -84,16 +84,16 @@ test('settings: github project shows local-path field; save writes path; clear w
   // 会把清空输入覆写回 server 真值）。钮位 exact 钉名：#1242 起设置页有
   // 三个保存钮（名称/描述带 aria-label，加速位钮保裸文本「保存」）——
   // substring 匹配会撞名，exact 钉本钮。
-  await input.fill('/Users/who/code/pacman');
+  await input.fill('/Users/who/code/cairn');
   const refetched = page.waitForResponse(
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await refetched;
   await expect(stub.patches.length).toBeGreaterThanOrEqual(1);
-  expect(stub.patches[0]?.body).toEqual({ localPath: '/Users/who/code/pacman' });
+  expect(stub.patches[0]?.body).toEqual({ localPath: '/Users/who/code/cairn' });
   // invalidate 重取后回显 server 真值
-  await expect(input).toHaveValue('/Users/who/code/pacman');
+  await expect(input).toHaveValue('/Users/who/code/cairn');
 
   // 清空保存：显式 null——键在 wire 上（#1169 同族序列化坑）
   await input.fill('');

@@ -1,13 +1,13 @@
 // 模型服务 route（#356，spec 11 §A1-A4/A7）：runtime tablist（pi / Claude
 // Code），tab 状态同步 ?runtime= search param（刷新/分享/深链回定位）。
-// pacman 是 local-first，自身不提供远程模型服务——页面 = 各 runtime
+// cairn 是 local-first，自身不提供远程模型服务——页面 = 各 runtime
 // 的模型来源直读：pi 段 = 用户经「添加服务商」配置的 custom provider 的
 // models[] 投影；claude-code 段 = 各执行机 daemon 读本机
 // ~/.claude/settings.json 经 presence/enroll 上报、server 按机器聚合
 // （#707；缺失/解析失败 → header 转「未安装」指引态，不空报不崩）。
 // 每 tab = header（runtime 名 + 一行说明 +
 // 安装态，卡上方的头部）+ 一张模型行卡（显示名 + 模型 id，槽位在右）；
-// claude-code tab 按机器分段（每台机器一个头部 + 模型行卡）；「Pacman（内置）」facade 行与
+// claude-code tab 按机器分段（每台机器一个头部 + 模型行卡）；「Cairn（内置）」facade 行与
 // 38 项 preset 列表行已除（数据层全留，preset 仅在添加服务商 picker
 // dialog 内出现，A5/A6）。A7 行可点感收编：模型行纯展示无 handler，
 // 不渲染 chevron/三点装饰。
@@ -15,7 +15,7 @@
 // 自动重开添加弹窗并把 reason 文案喂进 connectError 行；connected 静默。
 // #243：reason 三路 = denied（用户取消）/ exchange（交换失败）/ state
 // （state 缺或过期——原裸 400 JSON 面退役，同律 302 着陆）。
-import { MODEL_SOURCE_RUNTIMES, type ModelSource, type ModelSourceRuntime } from '@pacman/shared';
+import { MODEL_SOURCE_RUNTIMES, type ModelSource, type ModelSourceRuntime } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleAlert, CircleCheck, Cpu } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -49,7 +49,7 @@ export const PROVIDERS_HREF = '/app/resources/providers';
 
 /** runtime 一行说明（A2 header 卡）；词表闭包 = MODEL_SOURCE_RUNTIMES。 */
 const RUNTIME_DESCRIPTIONS: Record<ModelSourceRuntime, string> = {
-  pi: 'pacman 自有运行时。模型来自你添加的服务商。',
+  pi: 'cairn 自有运行时。模型来自你添加的服务商。',
   'claude-code': '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。',
 };
 

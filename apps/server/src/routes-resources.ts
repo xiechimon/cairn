@@ -20,7 +20,7 @@ import {
   setSecretBodySchema,
   skillRecordSchema,
   THINKING_LEVELS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';

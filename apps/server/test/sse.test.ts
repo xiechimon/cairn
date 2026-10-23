@@ -10,7 +10,7 @@ import {
   pingEventSchema,
   teamStreamEventSchema,
   todoDocEventSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { bootServer, openStream, req } from './helpers.js';
 

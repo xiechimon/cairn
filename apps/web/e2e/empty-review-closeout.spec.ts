@@ -64,7 +64,7 @@ const WIRE_CARD = {
 
 const PROJECT = {
   id: PROJECT_ID,
-  name: 'pacman',
+  name: 'cairn',
   teamId: TEAM_ID,
   repoKind: 'github',
   repoName: null,

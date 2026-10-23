@@ -23,7 +23,7 @@ import type {
   SessionOpts,
   ToolCallRecord,
   TranscriptUpload,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   adaptProviderCompat,
@@ -110,7 +110,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
   }
 
   test('失败方式 6：无 compat（显式与学习皆无）→ 条目无 compat 键（旧行为同形）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-mat-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-bare'));
     const entry = load(path)['mat-bare'];
@@ -120,7 +120,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
   });
 
   test('wire compat 原样物化（maxTokensField / supportsStore / supportsDeveloperRole）', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-mat-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
     materializeProvider(
       path,
@@ -142,7 +142,7 @@ describe('materializeProvider（compat 物化进 models.json）', () => {
   test('失败方式 4/5：学习位并入物化（后续步直接干净形态）；显式位压过学习', () => {
     // 学习：翻 mat-learn 的旋钮。
     adaptProviderCompat(gateway('mat-learn'), RELAY_400);
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-mat-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-mat-'));
     const path = join(dir, 'models.json');
     materializeProvider(path, gateway('mat-learn'));
     expect(load(path)['mat-learn']).toMatchObject({
@@ -331,7 +331,7 @@ async function runFallbackCase(
   opts?: { withAdapt?: boolean; providerId?: string },
 ) {
   const providerId = opts?.providerId ?? 'gw-fb';
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-fb-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-fb-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);

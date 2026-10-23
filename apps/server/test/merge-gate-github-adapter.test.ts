@@ -51,7 +51,7 @@ describe('githubGatePort (A1)', () => {
     await p.checkRuns(SHA, { filter: 'latest', page: 4, perPage: 100, etag: null });
     await p.combinedStatus(SHA, { page: 5, perPage: 100, etag: '"e3"' });
     await p.contents('docs/verify/1404', SHA);
-    await p.createStatus(SHA, { state: 'pending', context: 'pacman/merge-gate', description: 'x' });
+    await p.createStatus(SHA, { state: 'pending', context: 'cairn/merge-gate', description: 'x' });
     expect(
       calls.map((c) => [c.init.method, c.url, c.init.headers?.['if-none-match'] ?? null]),
     ).toEqual([
@@ -67,7 +67,7 @@ describe('githubGatePort (A1)', () => {
     for (const c of calls) expect(c.init.headers?.authorization).toBe(`Bearer ${TOKEN}`);
     expect(JSON.parse(calls[7]?.init.body ?? 'null')).toEqual({
       state: 'pending',
-      context: 'pacman/merge-gate',
+      context: 'cairn/merge-gate',
       description: 'x',
     });
   });

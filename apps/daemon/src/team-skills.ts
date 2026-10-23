@@ -45,7 +45,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { MachineSkillsManifestResponse } from '@pacman/shared';
+import type { MachineSkillsManifestResponse } from '@cairn/shared';
 
 /** 视图目录保留上限（mtime LRU）[设计]：视图 = hardlink 装配，内容占用在
  * blobs 侧计；条目数只随「不同白名单 × 不同清单版本」增长。 */
@@ -299,14 +299,14 @@ function pruneDirLru(dir: string, maxEntries: number): void {
 // —— 原生插件通道（#1171）：团队技能进 Claude Code 原生 Skill 发现面 ——————
 // claude 后端把团队技能经 SDK `plugins` 选项（→ CLI `--plugin-dir`）交给
 // Claude Code 原生发现（插件布局 = `.claude-plugin/plugin.json` +
-// `skills/<dirName>/SKILL.md`；技能名成为 `pacman-team-skills:<name>` 限定形
+// `skills/<dirName>/SKILL.md`；技能名成为 `cairn-team-skills:<name>` 限定形
 // 并自动生成非限定 alias——与 project/user 技能同名共存、非限定名归既有侧，
 // issue #1171 调研评论探针 1/5/7 实测）。落点在 daemon 缓存 plugins/ 分区，
 // 任务 worktree 零写入；catalog XML 简报通道照常并存（票面边界，#1106 注入
 // 选择面不动）。
 
-/** 插件名（CLI 撞名面 = 技能限定前缀 `pacman-team-skills:<skill>`）。 */
-export const TEAM_SKILLS_PLUGIN_NAME = 'pacman-team-skills';
+/** 插件名（CLI 撞名面 = 技能限定前缀 `cairn-team-skills:<skill>`）。 */
+export const TEAM_SKILLS_PLUGIN_NAME = 'cairn-team-skills';
 
 export interface EnsureTeamSkillsPluginOpts {
   /** 缓存根（与 materializeTeamSkills 的 cacheRoot 同源）；plugins/ = 其下
@@ -367,7 +367,7 @@ export function ensureTeamSkillsPlugin(opts: EnsureTeamSkillsPluginOpts): string
       `${JSON.stringify(
         {
           name: TEAM_SKILLS_PLUGIN_NAME,
-          description: 'Materialized pacman team skills (native Skill discovery channel)',
+          description: 'Materialized cairn team skills (native Skill discovery channel)',
           version: '0.0.0',
         },
         null,

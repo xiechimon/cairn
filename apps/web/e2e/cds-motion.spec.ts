@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('motion tokens and scroll-fade utility land', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'light'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'light'));
   await page.goto('/app?scenario=01');
   await page.waitForSelector('.board-sidebar');
 
@@ -73,7 +73,7 @@ test('motion tokens and scroll-fade utility land', async ({ page }) => {
 });
 
 test('dark optical weight compensation applies outside .light', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman-theme', 'dark'));
+  await page.addInitScript(() => localStorage.setItem('cairn-theme', 'dark'));
   await page.goto('/app?scenario=01');
   await page.waitForSelector('.board-sidebar');
   const wght = await page.evaluate(() => {

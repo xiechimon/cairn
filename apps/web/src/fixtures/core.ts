@@ -12,7 +12,7 @@ import {
   conversationBranch,
   derivePlaceholderTitle,
   PLACEHOLDER_TITLE_FALLBACK,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import type {
   BranchInfoContent,
   ProjectContent,
@@ -249,7 +249,7 @@ export const projectContent: ProjectContent = {
       id: '0a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d',
       shortSha: '0a1b2c3',
       message: `init ${PROJECT_NAME}`,
-      authorName: 'Pacman',
+      authorName: 'Cairn',
       at: r7(9, 41),
       // 种子提交 = 空树（provisionHostedRepo seedInitialCommit 真值同形）：
       // files:[] 定义态——fixture 故事与服务端行为不漂移。

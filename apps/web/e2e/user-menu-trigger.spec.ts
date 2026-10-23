@@ -21,7 +21,7 @@ import { type Locator, expect, type Page, test } from '@playwright/test';
 // state here comes from the trigger, never the fixture flag.
 
 const BOARD = '/app?scenario=01';
-const THEME_KEY = 'pacman-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
+const THEME_KEY = 'cairn-theme'; // apps/web/src/theme.ts THEME_STORAGE_KEY
 /** 用户 chip 的一级载体：aria-label = fixture USER_NAME（'Xmon Dai'），
  *  展开态与 rail 态同名同钮（#127 两态共开合面）。 */
 const USER_NAME = 'Xmon Dai';
@@ -137,7 +137,7 @@ test('outside click and Esc close the open menu', async ({ page }) => {
 });
 
 test('rail chip opens the same popover, unclipped by the 40px rail', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+  await page.addInitScript(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
   await page.goto(BOARD);
 
   const chip = userChip(page);
@@ -158,7 +158,7 @@ test('#163 anchoring: bottom distance is viewport-invariant, the chip is never c
     await page.goto(BOARD);
     if (collapsed) {
       // collapse is mount-time state (storage-backed, #55) — set + reload
-      await page.evaluate(() => localStorage.setItem('pacman.sidebar-collapsed', '1'));
+      await page.evaluate(() => localStorage.setItem('cairn.sidebar-collapsed', '1'));
       await page.reload();
     }
     // 两态同钮同名（#910 一级载体下 shape 差异对 spec 不可见）
@@ -180,7 +180,7 @@ test('#163 anchoring: bottom distance is viewport-invariant, the chip is never c
 
     await page.keyboard.press('Escape');
     await expect(menu(page)).toBeHidden();
-    await page.evaluate(() => localStorage.removeItem('pacman.sidebar-collapsed'));
+    await page.evaluate(() => localStorage.removeItem('cairn.sidebar-collapsed'));
     await page.setViewportSize({ width: 1440, height: 732 });
   }
 });

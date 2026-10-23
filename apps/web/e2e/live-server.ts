@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ENV_VARS } from '@pacman/shared';
+import { ENV_VARS } from '@cairn/shared';
 
 const SERVER_DIR = resolve(import.meta.dirname, '..', '..', 'server');
 const TETHER = pathToFileURL(resolve(import.meta.dirname, 'live-server-tether.mjs')).href;
@@ -58,7 +58,7 @@ async function reapGroup(pgid: number): Promise<void> {
   throw new Error(`live server process group ${pgid} survived SIGKILL`);
 }
 
-/** Real apps/server on a free port with a scratch PACMAN_HOME, serving this
+/** Real apps/server on a free port with a scratch CAIRN_HOME, serving this
  *  worktree's dist. Ready = /api/teams answers 401 (token set) or 200.
  *
  *  Runs as `node --import tsx` in its own process group: `pnpm exec` puts
@@ -66,7 +66,7 @@ async function reapGroup(pgid: number): Promise<void> {
  *  forwarding it, which orphaned the whole server tree. dispose() reaps
  *  the group; the tether reaps it when the spawner dies without disposing. */
 export async function bootLiveServer(token: string | null): Promise<LiveServer> {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-e2e-home-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-e2e-home-'));
   const port = await freePort();
   const child = spawn(process.execPath, ['--import', 'tsx', '--import', TETHER, 'src/index.ts'], {
     cwd: SERVER_DIR,

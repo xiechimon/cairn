@@ -12,7 +12,7 @@
 //   8. GET messages 面 steerPending 透出 pending 内容
 //   9. chief 会话 POST 分支零回归（既有 chief 行为不变）
 
-import { type ClaimedStep, claimedStepSchema } from '@pacman/shared';
+import { type ClaimedStep, claimedStepSchema } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { agent as agentTable, provider as providerTable } from '../src/db/schema.js';

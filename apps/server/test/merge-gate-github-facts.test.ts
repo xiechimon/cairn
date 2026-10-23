@@ -4,7 +4,7 @@
 // F numbers below are the ones that file names. The port here is a fake GitHub that serves GitHub-shaped
 // bodies, pages them by the requested page and per_page, and logs every call.
 
-import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@pacman/shared';
+import { type CompareFile, MERGE_GATE_STATUS_CONTEXT } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { compareFilesFromResponse } from '../src/services/merge-gate/digest.js';
 import {
@@ -23,10 +23,10 @@ const EARLIER = 'e'.repeat(40);
 const MAIN = 'f'.repeat(40);
 const OTHER = '9'.repeat(40);
 const APP = 15368;
-const REQ = { owner: 'xiechimon', repo: 'pacman', prNumber: 7, ticketRef: '1404', now: 1_000_000 };
+const REQ = { owner: 'xiechimon', repo: 'cairn', prNumber: 7, ticketRef: '1404', now: 1_000_000 };
 const SHOT = 'docs/verify/1404/shot.png';
 const link = (sha: string, path = SHOT) =>
-  `https://raw.githubusercontent.com/xiechimon/pacman/${sha}/${path}`;
+  `https://raw.githubusercontent.com/xiechimon/cairn/${sha}/${path}`;
 
 const ok = (body: unknown, etag: string | null = null): GateRaw => ({
   kind: 'ok',
@@ -50,8 +50,8 @@ function prBody(over: Record<string, unknown> = {}): Record<string, unknown> {
     mergeable_state: 'clean',
     changed_files: 3,
     body: `evidence: ${link(HEAD)}`,
-    head: { sha: HEAD, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/pacman' } },
-    base: { ref: 'main', repo: { full_name: 'xiechimon/pacman', default_branch: 'main' } },
+    head: { sha: HEAD, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/cairn' } },
+    base: { ref: 'main', repo: { full_name: 'xiechimon/cairn', default_branch: 'main' } },
     ...over,
   };
 }
@@ -217,8 +217,8 @@ const GREEN_PR = {
   mergeableState: 'clean',
   headSha: HEAD,
   baseRef: 'main',
-  baseRepoFullName: 'xiechimon/pacman',
-  headRepoFullName: 'xiechimon/pacman',
+  baseRepoFullName: 'xiechimon/cairn',
+  headRepoFullName: 'xiechimon/cairn',
   body: `evidence: ${link(HEAD)}`,
   changedFiles: 3,
 };
@@ -270,10 +270,10 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
     for (const body of [
       prBody({ number: 8 }),
       prBody({
-        base: { ref: 'main', repo: { full_name: 'other/pacman', default_branch: 'main' } },
+        base: { ref: 'main', repo: { full_name: 'other/cairn', default_branch: 'main' } },
       }),
       prBody({
-        base: { ref: 'main', repo: { full_name: 'xiechimon/pacman2', default_branch: 'main' } },
+        base: { ref: 'main', repo: { full_name: 'xiechimon/cairn2', default_branch: 'main' } },
       }),
     ]) {
       const f = await read({ pull: () => ok(body) });
@@ -289,11 +289,11 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
       pull: () =>
         ok(
           prBody({
-            base: { ref: 'main', repo: { full_name: 'XieChimon/Pacman', default_branch: 'main' } },
+            base: { ref: 'main', repo: { full_name: 'XieChimon/Cairn', default_branch: 'main' } },
           }),
         ),
     });
-    expect(f.pr?.baseRepoFullName).toBe('XieChimon/Pacman');
+    expect(f.pr?.baseRepoFullName).toBe('XieChimon/Cairn');
   });
 
   test('F2 a missing or wrongly typed field makes the PR unreadable, never a default', async () => {
@@ -316,10 +316,10 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
       prBody({ changed_files: -1 }),
       prBody({ changed_files: 1.5 }),
       prBody({ head: null }),
-      prBody({ head: { ref: 'x', repo: { full_name: 'xiechimon/pacman' } } }),
-      prBody({ head: { sha: HEAD, repo: { full_name: 'xiechimon/pacman' } } }),
+      prBody({ head: { ref: 'x', repo: { full_name: 'xiechimon/cairn' } } }),
+      prBody({ head: { sha: HEAD, repo: { full_name: 'xiechimon/cairn' } } }),
       prBody({ head: { sha: HEAD, ref: 'x', repo: { full_name: 7 } } }),
-      prBody({ base: { repo: { full_name: 'xiechimon/pacman' } } }),
+      prBody({ base: { repo: { full_name: 'xiechimon/cairn' } } }),
       prBody({ base: { ref: 'main', repo: null } }),
       prBody({ base: { ref: 'main', repo: {} } }),
       prBody({ body: 7 }),
@@ -340,7 +340,7 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
             body: null,
             head: { sha: HEAD, ref: 'x', repo: null },
             mergeable_state: undefined,
-            base: { ref: 'main', repo: { full_name: 'xiechimon/pacman' } },
+            base: { ref: 'main', repo: { full_name: 'xiechimon/cairn' } },
           }),
         ),
     });
@@ -398,8 +398,7 @@ describe('readGateGithubFacts: the PR (F1 to F5)', () => {
   test('F5 a malformed head SHA reads nothing at the head', async () => {
     for (const sha of ['A'.repeat(40), 'abc1234', 'main', '']) {
       const f = await read({
-        pull: () =>
-          ok(prBody({ head: { sha, ref: 'x', repo: { full_name: 'xiechimon/pacman' } } })),
+        pull: () => ok(prBody({ head: { sha, ref: 'x', repo: { full_name: 'xiechimon/cairn' } } })),
       });
       expect(f.pr?.headSha).toBe(sha);
       expect(names(f.log)).toEqual(['pull']);
@@ -434,7 +433,7 @@ describe('readGateGithubFacts: conditional reads across a push (F19, pr-gate run
           pull: () =>
             ok(
               prBody({
-                head: { sha, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/pacman' } },
+                head: { sha, ref: 'claude/conv-x', repo: { full_name: 'xiechimon/cairn' } },
               }),
             ),
           compare: comparePages(chain(EARLIER, sha)),
@@ -840,13 +839,13 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
         status('ci/build', 'success', { updated_at: '2026-10-22T10:00:00Z' }),
         status('tie', 'success'),
         status('TIE', 'pending'),
-        status('Pacman/Merge-Gate', 'pending', { description: 'waiting' }),
+        status('Cairn/Merge-Gate', 'pending', { description: 'waiting' }),
       ]),
     });
     expect(f.checks?.statuses).toEqual([
       { context: 'ci/build', state: 'success' },
       { context: 'TIE', state: 'pending' },
-      { context: 'Pacman/Merge-Gate', state: 'pending' },
+      { context: 'Cairn/Merge-Gate', state: 'pending' },
     ]);
     expect(f.ownStatus).toEqual({ state: 'pending', description: 'waiting' });
     const none = await read();
@@ -859,7 +858,7 @@ describe('readGateGithubFacts: checks at the head (F12 to F15)', () => {
     const unreadable = await read({ combinedStatus: () => NOT_FOUND });
     expect(unreadable.checks).toBeNull();
     expect(unreadable.ownStatus).toBe('unreadable');
-    expect(MERGE_GATE_STATUS_CONTEXT).toBe('pacman/merge-gate');
+    expect(MERGE_GATE_STATUS_CONTEXT).toBe('cairn/merge-gate');
   });
 });
 

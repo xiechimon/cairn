@@ -2,7 +2,7 @@
 // （键名前缀 = 品牌位，brand.ts localStoragePrefix 槽）。
 // 命名规范（r2 §1.5 要点，原形 `tds.cache.<entity>-v<N>:<scope…>`），scope 为
 // userId/teamId 组合 → cache-first + 版本化 + 多租户分片。
-// 替换相位（D3 已触发 2026-09-23，#109）：`pacman-` / `pacman.` 同形替换
+// 替换相位（D3 已触发 2026-09-23，#109）：`cairn-` / `cairn.` 同形替换
 // （素材替换计划 §2）；source 列 = r2/r5 观测出处（原键形证据）。
 
 export interface ClientStateKey {
@@ -12,67 +12,67 @@ export interface ClientStateKey {
 }
 
 export const LOCAL_STORAGE_KEYS: readonly ClientStateKey[] = [
-  { key: 'pacman-theme', valueShape: 'light | dark', source: 'r2 §1.5' },
-  { key: 'pacman.locale', valueShape: 'zh', source: 'r2 §1.5（与 pacman-locale 双形，原键同构）' },
-  { key: 'pacman-locale', valueShape: 'zh', source: 'r2 §1.5' },
-  { key: 'pacman.sidebarProjectsCollapsed', valueShape: '"1"', source: 'r2 §1.5' },
+  { key: 'cairn-theme', valueShape: 'light | dark', source: 'r2 §1.5' },
+  { key: 'cairn.locale', valueShape: 'zh', source: 'r2 §1.5（与 cairn-locale 双形，原键同构）' },
+  { key: 'cairn-locale', valueShape: 'zh', source: 'r2 §1.5' },
+  { key: 'cairn.sidebarProjectsCollapsed', valueShape: '"1"', source: 'r2 §1.5' },
   {
-    key: 'pacman.sidebarResourcesCollapsed',
+    key: 'cairn.sidebarResourcesCollapsed',
     valueShape: '"1"',
     source: '[推断] #147（资源组折叠，与 sidebarProjectsCollapsed 同形；原键未观测）',
   },
-  { key: 'pacman.panel-maximized', valueShape: '"0"', source: 'r2 §1.5' },
+  { key: 'cairn.panel-maximized', valueShape: '"0"', source: 'r2 §1.5' },
   {
-    key: 'pacman.teamMembersLayout',
+    key: 'cairn.teamMembersLayout',
     valueShape: 'grid | chart',
     source: 'r2 §1.5（团队页视图切换）',
   },
   {
-    key: 'pacman.projectTasksLayout',
+    key: 'cairn.projectTasksLayout',
     valueShape: 'list | grid',
     source: '[推断] #178（project 任务页视图切换，与 teamMembersLayout 同形；原键未观测）',
   },
   {
-    key: 'pacman.cache.session-v1',
+    key: 'cairn.cache.session-v1',
     valueShape: '{token:"",cookieName:"",expiresAt,user{…}}——会话走 cookie，token 字段留空',
     source: 'r2 §1.5',
   },
   {
-    key: 'pacman.cache.me-v1:<userId>',
+    key: 'cairn.cache.me-v1:<userId>',
     valueShape: '{type:"user",id,displayName,avatarUrl,…}',
     source: 'r2 §1.5',
   },
   {
-    key: 'pacman.cache.teams-v1:<userId>',
+    key: 'cairn.cache.teams-v1:<userId>',
     valueShape: '[{id,name,createdAt,plan:"free",avatarStyle:"notionist…"}]',
     source: 'r2 §1.5',
   },
   {
-    key: 'pacman.cache.members-v1:<userId>:<teamId>',
+    key: 'cairn.cache.members-v1:<userId>:<teamId>',
     valueShape: '[{id,teamId,actorId,memberType:"user",…}]',
     source: 'r2 §1.5',
   },
-  { key: 'pacman.cache.projects-v1:<userId>:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
-  { key: 'pacman.cache.team-models-v1:<teamId>', valueShape: '{"models":[]}', source: 'r2 §1.5' },
-  { key: 'pacman.cache.team-machines-v1:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
+  { key: 'cairn.cache.projects-v1:<userId>:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
+  { key: 'cairn.cache.team-models-v1:<teamId>', valueShape: '{"models":[]}', source: 'r2 §1.5' },
+  { key: 'cairn.cache.team-machines-v1:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
   {
-    key: 'pacman.cache.progress-v2:<userId>:<teamId>',
+    key: 'cairn.cache.progress-v2:<userId>:<teamId>',
     valueShape: '{"todos":[],"builds":[]}',
     source: 'r2 §1.5',
   },
   {
-    key: 'pacman.cache.notifications-v2:<userId>:<teamId>',
+    key: 'cairn.cache.notifications-v2:<userId>:<teamId>',
     valueShape: '{"unreadThreadIds":[]}',
     source: 'r2 §1.5',
   },
   {
-    key: 'pacman.cache.chief-data-v3:<userId>:<teamId>',
+    key: 'cairn.cache.chief-data-v3:<userId>:<teamId>',
     valueShape: '{"chief":{id:"chief-<user>-<team>",userId,teamId,…}}',
     source: 'r2 §1.5',
   },
-  { key: 'pacman.cache.chief-threads-v1:<userId>:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
+  { key: 'cairn.cache.chief-threads-v1:<userId>:<teamId>', valueShape: '[]', source: 'r2 §1.5' },
   {
-    key: 'pacman.cache.chief-draft-v1:<teamId>:new',
+    key: 'cairn.cache.chief-draft-v1:<teamId>:new',
     valueShape: '草稿文本（跨会话恢复实测）',
     source: 'r5 §3.6 补录',
   },

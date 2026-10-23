@@ -16,8 +16,8 @@
 // tool is a signal, not the bar.
 //
 // Usage (from apps/web, or anywhere via the workspace filter):
-//   pnpm --filter @pacman/web e2e:affected            # diff vs origin/main + working tree
-//   pnpm --filter @pacman/web e2e:affected -- apps/web/src/chief/chief-drawer.tsx
+//   pnpm --filter @cairn/web e2e:affected            # diff vs origin/main + working tree
+//   pnpm --filter @cairn/web e2e:affected -- apps/web/src/chief/chief-drawer.tsx
 //   node scripts/e2e-affected.mjs --dry-run -- <paths>  # print the plan only
 //
 // Port: the default playwright webServer binds E2E_PORT (8399) with

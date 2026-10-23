@@ -1,12 +1,12 @@
 // runner repo 形态接线（spec 12 G2-T2，#362）：local/github kind 进入
 // worktree 契约；local 落地 = conv 分支 push 回用户仓库（#1211：主检出分支
-// 永不被移动——用户仓库只多 pacman/ 分支）。harness 同 runner-stop.test.ts
+// 永不被移动——用户仓库只多 cairn/ 分支）。harness 同 runner-stop.test.ts
 // （FakeClient + fake WorktreeOps 录制调用序）。
 // 失败方式枚举先于实现固化（AGENTS.md 测试规则 3）：
 //   1. local merge 步：prepare 开 worktree（cloneUrl = 用户仓库路径）→
 //      commitAll → mergeDefaultBranch → push（凭证 null）= 落地全链；merge 步
 //      的 workspace 操作序完整钉死，push 后即收尾（#1211：用户主检出的分支/
-//      工作树永不被 pacman 推进）；done success
+//      工作树永不被 cairn 推进）；done success
 //   2.（#1211 真值面）local merge 步全链真 git（真 WorkspaceManager + 真
 //      用户仓库）：收尾后用户仓库 HEAD/reflog/status 零变化、工作树零新
 //      文件；conv 分支在 refs/heads 在位（分支即交付）
@@ -41,8 +41,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
-import { LocalRepoUnreachableError, PLAN_FILE_NAME } from '@pacman/shared';
+} from '@cairn/shared';
+import { LocalRepoUnreachableError, PLAN_FILE_NAME } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -67,7 +67,7 @@ vi.mock('../src/github-probe.js', async (importOriginal) => {
   return { ...real, probeGithubPr: (...args: unknown[]) => probeMock(...args) };
 });
 
-const USER_REPO = '/tmp/pacman-user-repo-probe';
+const USER_REPO = '/tmp/cairn-user-repo-probe';
 const GITHUB_TOKEN: GitCredentials = { username: 'x-access-token', password: 'ghp_steptoken' };
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -210,7 +210,7 @@ function fakeWorkspace(opts: { prepareError?: Error } = {}) {
       return {
         cwd: join(input.workspacesRoot, input.conversationId),
         baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-        branch: `pacman/conv-${input.conversationId}`,
+        branch: `cairn/conv-${input.conversationId}`,
         defaultBranch: 'main',
         reused: false,
       };
@@ -301,7 +301,7 @@ function seedUserRepo(dir: string): void {
       '-c',
       'user.name=probe',
       '-c',
-      'user.email=probe@pacman.test',
+      'user.email=probe@cairn.test',
       'commit',
       '--allow-empty',
       '-m',
@@ -318,7 +318,7 @@ async function setup(
   probeMock.mockReset();
   // 不存在的仓库（o/r）的真值：gh / REST 双梯 404 → null（面板 PR 槽留空）。
   probeMock.mockResolvedValue(null);
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-local-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-local-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -354,7 +354,7 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
       `prepare:${USER_REPO}`,
       'commitAll',
       'mergeDefaultBranch',
-      'push:pacman/conv-conv-1',
+      'push:cairn/conv-conv-1',
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
@@ -362,14 +362,14 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
   test('失败方式 2（#1211 真值面）：local merge 步真 git 全链 → 用户仓库只多 conv 分支，HEAD/reflog/工作树零变化', async () => {
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
-    const userRepo = mkdtempSync(join(tmpdir(), 'pacman-user-main-'));
+    const userRepo = mkdtempSync(join(tmpdir(), 'cairn-user-main-'));
     seedUserRepo(userRepo);
     const git = (...args: string[]) =>
       execFileSync('git', ['-C', userRepo, ...args], { encoding: 'utf8' });
     const headBefore = git('rev-parse', 'HEAD').trim();
     const reflogBefore = git('reflog', 'main');
 
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-merge-real-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-merge-real-'));
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();
@@ -395,7 +395,7 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
     expect(existsSync(join(userRepo, 'probe.txt'))).toBe(false);
     expect(git('status', '--porcelain').trim()).toBe('');
     // 落地面：conv 分支落用户仓库 refs/heads（分支即交付，合并由用户自取）。
-    const branchSha = git('rev-parse', '--verify', 'refs/heads/pacman/conv-conv-1').trim();
+    const branchSha = git('rev-parse', '--verify', 'refs/heads/cairn/conv-conv-1').trim();
     expect(branchSha).toMatch(/^[0-9a-f]{40}$/);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 30_000);
@@ -417,7 +417,7 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
       expect.objectContaining({
         owner: 'o',
         repo: 'r',
-        branch: 'pacman/conv-conv-1',
+        branch: 'cairn/conv-conv-1',
         token: GITHUB_TOKEN.password,
       }),
     );
@@ -426,7 +426,7 @@ describe('runner repo 形态接线（spec 12 G2-T2）', () => {
 
   test('失败方式 4：local build 步 → push 照常（conv 分支每步都推，用户仓库收分支）', async () => {
     const { calls } = await setup(claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }));
-    expect(calls).toEqual([`prepare:${USER_REPO}`, 'commitAll', 'push:pacman/conv-conv-1']);
+    expect(calls).toEqual([`prepare:${USER_REPO}`, 'commitAll', 'push:cairn/conv-conv-1']);
   });
 
   test('失败方式 5：repo null → 不开 worktree（裸任务目录退化形不变）', async () => {
@@ -483,7 +483,7 @@ describe('runner 权限闸：合并分支/推送分支（XMON-77）', () => {
       `prepare:${USER_REPO}`,
       'commitAll',
       'mergeDefaultBranch',
-      'push:pacman/conv-conv-1',
+      'push:cairn/conv-conv-1',
     ]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
@@ -505,12 +505,12 @@ describe('runner 权限闸：合并分支/推送分支（XMON-77）', () => {
     const { calls } = await setup(
       claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }, { tools: ['推送分支'] }),
     );
-    expect(calls).toContain('push:pacman/conv-conv-1');
+    expect(calls).toContain('push:cairn/conv-conv-1');
   });
 
   test('失败方式 9：tools 缺省（老 server 版本墙）→ 两闸 fail-open，push 照常', async () => {
     const { calls } = await setup(claimedStep('build', { kind: 'local', cloneUrl: USER_REPO }));
-    expect(calls).toContain('push:pacman/conv-conv-1');
+    expect(calls).toContain('push:cairn/conv-conv-1');
   });
 });
 
@@ -518,7 +518,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
   /** 真实 git 检出当 conv 工作区（local-repo 形态：工作区根 = repo checkout，
    *  正是 plan.md 撞仓库根的形态）。 */
   function gitCheckout(): string {
-    const dir = mkdtempSync(join(tmpdir(), 'pacman-plan-checkout-'));
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-plan-checkout-'));
     const git = (...args: string[]) =>
       execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
     git('init', '-b', 'main');
@@ -530,7 +530,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
         '-c',
         'user.name=probe',
         '-c',
-        'user.email=probe@pacman.test',
+        'user.email=probe@cairn.test',
         'commit',
         '--allow-empty',
         '-m',
@@ -579,7 +579,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
     const checkout = gitCheckout();
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-plan-local-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-local-'));
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();
@@ -589,7 +589,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
         return {
           cwd: checkout,
           baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-          branch: `pacman/conv-${input.conversationId}`,
+          branch: `cairn/conv-${input.conversationId}`,
           defaultBranch: 'main',
           reused: false,
         };
@@ -634,7 +634,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
       encoding: 'utf8',
     });
     expect(status).toBe('');
-    // 交接位置真在 repo 检出外（PACMAN_HOME 面）。
+    // 交接位置真在 repo 检出外（CAIRN_HOME 面）。
     expect(notePaths).toEqual([join(home, 'plans', 'conv-1', PLAN_FILE_NAME)]);
     expect(notePaths[0]?.startsWith(checkout)).toBe(false);
     // 方案仍被收集上传（「打开方案」读面的数据源）。
@@ -647,7 +647,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
     probeMock.mockReset();
     probeMock.mockResolvedValue(null);
     const checkout = gitCheckout();
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-plan-rewind-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-plan-rewind-'));
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger } = captureLogger();
     const client = new FakeClient();
@@ -657,7 +657,7 @@ describe('runner plan 步交接位置（#1203：plan.md 搬出 repo checkout）'
         return {
           cwd: checkout,
           baseRepoDir: join(input.workspacesRoot, input.projectId, 'repo'),
-          branch: `pacman/conv-${input.conversationId}`,
+          branch: `cairn/conv-${input.conversationId}`,
           defaultBranch: 'main',
           reused: true,
         };

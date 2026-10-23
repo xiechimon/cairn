@@ -33,7 +33,7 @@ import {
   type CompareFile,
   MERGE_GATE_SOURCE_GLOBS,
   PROTECTED_PATH_GLOBS,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { classifyPaths, globToRegExp } from '../src/services/merge-gate/paths.js';
 
@@ -82,7 +82,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     ['钩子', 'apps/x/.husky/pre-commit', 'apps/web/src/husky.ts'],
     ['agent 设置', 'apps/web/.claude/skills/x/SKILL.md', 'apps/web/src/claude.ts'],
     ['pi 技能', '.pi/skills/x/SKILL.md', 'apps/web/src/pi.ts'],
-    ['cursor', '.cursor/skills/verify-pacman/SKILL.md', 'apps/web/src/cursor.ts'],
+    ['cursor', '.cursor/skills/verify-cairn/SKILL.md', 'apps/web/src/cursor.ts'],
     ['MCP 配置', '.mcp.json', 'apps/web/src/mcp.json.ts'],
     ['scout 放行表', '.ckignore', 'apps/web/src/ckignore.ts'],
     ['CLAUDE 变体', 'CLAUDE.local.md', 'apps/web/src/claude-md.ts'],
@@ -186,7 +186,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     }
   });
 
-  // 清单在这里照抄一份（ADR 0021 D4 ⑤，#1410 第 12 轮），不从 @pacman/shared 引：从词表里
+  // 清单在这里照抄一份（ADR 0021 D4 ⑤，#1410 第 12 轮），不从 @cairn/shared 引：从词表里
   // 删掉一项时这条要红。machine*.ts 是 glob，下一条另测。
   const SECURITY_SURFACES = [
     'apps/server/src/lib/secret-box.ts',
@@ -463,7 +463,7 @@ describe('证据目录', () => {
     expect(r.executableEvidence).toEqual(['docs/verify/1404/probe.mjs', 'docs/verify/1404/run.SH']);
   });
 
-  // 清单在这里照抄一份，不从 @pacman/shared 引：从词表里删掉一项时这条要红。
+  // 清单在这里照抄一份，不从 @cairn/shared 引：从词表里删掉一项时这条要红。
   const EXECUTABLE = [
     '.mjs',
     '.cjs',

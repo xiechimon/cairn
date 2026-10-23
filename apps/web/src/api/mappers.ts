@@ -26,7 +26,7 @@ import type {
   ToolCallRecord,
   ScheduleRecord as WireSchedule,
   TodoRecord as WireTodo,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
@@ -46,7 +46,7 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   VERIFY_VERDICT_KIND,
   verifyVerdictSchema,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
 import type {
   BranchInfoContent,
@@ -659,8 +659,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
   for (const m of messages) {
     const paired = toolCallOfContent(m.content);
     if (paired === null) continue;
-    const pairedText = resultToText(paired.result);
-    if (pairedText !== null && pairedText !== '') toolNameByResult.set(pairedText, paired.name);
+    const pairedText = resultToText(paired.result)?.trim();
+    if (pairedText !== undefined && pairedText !== '')
+      toolNameByResult.set(pairedText, paired.name);
   }
 
   const entries: TimelineEntry[] = [];

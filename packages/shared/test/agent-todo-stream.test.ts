@@ -38,7 +38,7 @@ describe('agent todo wire 三面', () => {
     }
   });
 
-  it('todo 调用行携带 pacman 投影位；非 todo 调用缺省不变', () => {
+  it('todo 调用行携带 cairn 投影位；非 todo 调用缺省不变', () => {
     const withTodo = toolCallRecordSchema.parse({
       id: 'toolu_1',
       name: 'TodoWrite',

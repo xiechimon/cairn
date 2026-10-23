@@ -56,17 +56,17 @@ export function bootServer(
   const secretBox = createEphemeralSecretBox();
   // 自建隔离 reposDir（git 托管面实走用）；显式传入时由调用方管理生命周期。
   const ownReposDir = opts.reposDir === undefined;
-  const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'pacman-server-repos-'));
+  const reposDir = opts.reposDir ?? mkdtempSync(join(tmpdir(), 'cairn-server-repos-'));
   const ownAttDir = opts.attachmentsDir === undefined;
-  const attachmentsDir = opts.attachmentsDir ?? mkdtempSync(join(tmpdir(), 'pacman-att-'));
+  const attachmentsDir = opts.attachmentsDir ?? mkdtempSync(join(tmpdir(), 'cairn-att-'));
   const ownSkillsDir = opts.skillsDir === undefined;
-  const skillsDir = opts.skillsDir ?? mkdtempSync(join(tmpdir(), 'pacman-skills-'));
+  const skillsDir = opts.skillsDir ?? mkdtempSync(join(tmpdir(), 'cairn-skills-'));
   // #1170：来源登记文件缺省 = 隔离目录内（目录级清理，文件自身不预建——
   // 首次导入时由 store 创建）。
   const ownSkillSourcesDir = opts.skillSourcesPath === undefined;
   const skillSourcesPath =
     opts.skillSourcesPath ??
-    join(mkdtempSync(join(tmpdir(), 'pacman-skill-sources-')), 'skill-sources.json');
+    join(mkdtempSync(join(tmpdir(), 'cairn-skill-sources-')), 'skill-sources.json');
   const oauthStates: AppContext['oauthStates'] = new Map();
   const app = createApp({
     db,
@@ -96,7 +96,7 @@ export function bootServer(
     skillSourcesPath,
     ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
     authToken: opts.authToken ?? null,
-    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `pacman-mcp-absent-${randomUUID()}.json`),
+    mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
   });
   return {
     app,
@@ -252,7 +252,7 @@ export function insertMachine(
   opts: {
     name?: string;
     enabledRuntimes?: string[];
-    claudeCodeReport?: import('@pacman/shared').ClaudeCodeReport | null;
+    claudeCodeReport?: import('@cairn/shared').ClaudeCodeReport | null;
   } = {},
 ): string {
   const id = opts.name

@@ -15,7 +15,7 @@
 // machines/notifications/chief + 新建/开始/拖拽排序/验收合并 mutation），
 // fixture 分支保持 #52–#75 行为字节不变（fixture 数据面）。
 
-import type { TodoRecord as WireTodo } from '@pacman/shared';
+import type { TodoRecord as WireTodo } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';

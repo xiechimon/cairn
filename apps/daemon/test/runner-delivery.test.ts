@@ -22,8 +22,8 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
-import { CHANGES_DIFF_MAX_BYTES } from '@pacman/shared';
+} from '@cairn/shared';
+import { CHANGES_DIFF_MAX_BYTES } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
@@ -183,7 +183,7 @@ function fakeWorkspace(cwd: string, diff: string | null) {
       return {
         cwd,
         baseRepoDir: join(cwd, '..', 'repo'),
-        branch: 'pacman/conv-conv-1',
+        branch: 'cairn/conv-conv-1',
         defaultBranch: 'main',
         reused: false,
       };
@@ -263,7 +263,7 @@ async function runOnce(opts: RunOpts): Promise<MachineDoneBody> {
   probeMock.mockReset();
   if (opts.probe instanceof Error) probeMock.mockRejectedValue(opts.probe);
   else probeMock.mockResolvedValue(opts.probe);
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-delivery-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-delivery-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger } = captureLogger();
   const client = new FakeClient();
@@ -306,7 +306,7 @@ describe('runner 交付面上报（#704）', () => {
       expect.objectContaining({
         owner: 'octocat',
         repo: 'Hello-World',
-        branch: 'pacman/conv-conv-1',
+        branch: 'cairn/conv-conv-1',
         token: null,
       }),
     );

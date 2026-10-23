@@ -5,7 +5,7 @@
 // wire 级验证 = 裸 JSON-RPC over POST（stateless streamable HTTP，enableJsonResponse）；
 // 真 sdk client 往返归 integration E2E。
 
-import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@pacman/shared';
+import { MCP_TOOL_REGISTRY, MERGE_HUMAN_ONLY_COPY } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
@@ -71,7 +71,7 @@ const ALL_WRITE = MCP_TOOL_REGISTRY.filter((t) => t.kind === 'write').map((t) =>
 describe('/api/mcp 认证面（02 §7.2：Bearer <apiKey>；mcpAccess 门）', () => {
   test('无凭证/坏凭证 = 401；mcpAccess=false = 403（错误形状 {error}）', async () => {
     const s = bootServer();
-    for (const key of [null, 'pacman_deadbeef']) {
+    for (const key of [null, 'cairn_deadbeef']) {
       const res = await s.app.request('/api/mcp', {
         method: 'POST',
         headers: {

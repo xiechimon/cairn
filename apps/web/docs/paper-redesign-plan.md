@@ -7,7 +7,7 @@
 - **一次一面，一个 PR**。每个 PR 可以单独合并、单独回滚，按下面的顺序走：先 token，再看板，再侧栏，最后铺到其它页面。
 - **先亮色**。暗色主题保持现值，最后单独做一轮 mockup 再改。
 - **有意改的视觉钉扎就改钉扎**。近期 CDS 系列（#1355–#1366）钉了一批值（侧栏 288px、面板卡 10px、`color-freeze` 锁值等）。本计划会有意推翻其中一部分；每个 PR 在同一 diff 里更新对应 spec，并在 PR body 写明「哪个钉扎、旧值 → 新值、为什么」。
-- **每个 PR 的验收**（仓规）：`pnpm lint` / `pnpm typecheck` / `pnpm spec:parse` / `pnpm exec vitest run --changed` / `pnpm --filter @pacman/web e2e:affected`（默认 8398，先 `lsof -iTCP:8398`）；截图 = fixture 两态 + live 真点击，存 `docs/verify/<票号>/`，PR body 用 raw 永久链引用。
+- **每个 PR 的验收**（仓规）：`pnpm lint` / `pnpm typecheck` / `pnpm spec:parse` / `pnpm exec vitest run --changed` / `pnpm --filter @cairn/web e2e:affected`（默认 8398，先 `lsof -iTCP:8398`）；截图 = fixture 两态 + live 真点击，存 `docs/verify/<票号>/`，PR body 用 raw 永久链引用。
 
 ## PR 1 · 亮色 token 换成 Paper 值
 

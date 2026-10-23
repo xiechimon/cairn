@@ -15,8 +15,8 @@
 //    直执行 → claim 领到 build 步
 // 5. 槽指向已删 Agent（有主变无主）→ 同 2 漏斗，文案点名 agentId
 
-import type { ClaimedStep } from '@pacman/shared';
-import { claimedStepSchema } from '@pacman/shared';
+import type { ClaimedStep } from '@cairn/shared';
+import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {

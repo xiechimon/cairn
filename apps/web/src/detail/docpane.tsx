@@ -25,7 +25,7 @@
 // the changes/diff file stack scrolls in its column under the pinned head
 // (the .doc-files alias was zero-reference, final pick under #1036).
 
-import type { DiffFileContent } from '@pacman/shared';
+import type { DiffFileContent } from '@cairn/shared';
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';

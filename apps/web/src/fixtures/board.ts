@@ -2,7 +2,7 @@
 // (pickers, filters, drag matrix, overflow/stress, chief-probe and dark
 // boards).
 
-import { FIXED_TAGS } from '@pacman/shared';
+import { FIXED_TAGS } from '@cairn/shared';
 import {
   at,
   darkFreshProbe,
@@ -89,8 +89,8 @@ export const boardGithubPicker: FixtureSet = {
       {
         id: 903,
         owner: 'xiechimon',
-        name: 'pacman',
-        full_name: 'xiechimon/pacman',
+        name: 'cairn',
+        full_name: 'xiechimon/cairn',
         private: true,
       },
     ],

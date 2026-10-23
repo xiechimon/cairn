@@ -29,7 +29,7 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
-} from '@pacman/shared';
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
@@ -176,7 +176,7 @@ function fakeWorkspace(cwd: string) {
       return {
         cwd,
         baseRepoDir: join(cwd, '..', 'repo'),
-        branch: 'pacman/conv-conv-1',
+        branch: 'cairn/conv-conv-1',
         defaultBranch: 'main',
         reused: false,
       };
@@ -255,7 +255,7 @@ async function waitFor(fn: () => boolean, timeoutMs = 3_000): Promise<void> {
 }
 
 async function setup(opts: { kind?: 'plan' | 'build'; discard: boolean; recovered?: boolean }) {
-  const home = mkdtempSync(join(tmpdir(), 'pacman-runner-stop-'));
+  const home = mkdtempSync(join(tmpdir(), 'cairn-runner-stop-'));
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
@@ -340,7 +340,7 @@ describe('runner 停止收尾（M7 #308）', () => {
 describe('runner 心跳答 410 = 这一步在 server 上已不存在 → 停（#1488）', () => {
   /** 心跳每 20ms 打一次，按 `fail` 给的错误回绝。 */
   async function heartbeatSetup(fail: () => Error) {
-    const home = mkdtempSync(join(tmpdir(), 'pacman-runner-hb-'));
+    const home = mkdtempSync(join(tmpdir(), 'cairn-runner-hb-'));
     const paths = statePaths(home, join(home, 'workspaces'));
     const { logger, lines } = captureLogger();
     let beats = 0;

@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 // spec 12 / #361 G2-T4：新建项目 GitHub 认证 + repo picker（fixture 面
 // 接线钉；live OAuth 真链路 = server test/github-oauth.test.ts + verify-
-// pacman probe）。github 选态三面：未认证 = 认证钮 + 手动兜底链接；已认证 =
+// cairn probe）。github 选态三面：未认证 = 认证钮 + 手动兜底链接；已认证 =
 // picker 触发钮（单选回填 owner/repo 走 hosted 同款 trigger-label 律）+
 // 锚定 picker 弹层（搜索 / 列表 / 断开 / 手动兜底，#67/#127 家族律）；
 // manual = 现状 owner/repo input（isGithubRepoRef 闸不变，提交面归 live）。
@@ -87,9 +87,9 @@ test('4. picker 搜索：q 命中过滤，无命中走空面文案', async ({ pa
   await selectGithub(page);
   const picker = await openPicker(page);
   const search = picker.getByRole('textbox', { name: '搜索仓库' });
-  await search.fill('PACMAN');
+  await search.fill('CAIRN');
   await expect(picker.getByRole('option')).toHaveCount(1);
-  await expect(picker.getByRole('option')).toHaveAccessibleName('xiechimon/pacman');
+  await expect(picker.getByRole('option')).toHaveAccessibleName('xiechimon/cairn');
   await search.fill('zzz-nope');
   await expect(picker.getByRole('option')).toHaveCount(0);
   await expect(picker.getByText('没有匹配的仓库')).toBeVisible();
@@ -122,8 +122,8 @@ test('6. 回填律：手改名称不覆盖；等于上次回填值时跟随再�
   await picker.getByRole('option', { name: 'octocat/spoon-knife' }).click();
   await expect(page.locator('#prj-new-name')).toHaveValue('spoon-knife');
   picker = await openPicker(page);
-  await picker.getByRole('option', { name: 'xiechimon/pacman' }).click();
-  await expect(page.locator('#prj-new-name')).toHaveValue('pacman');
+  await picker.getByRole('option', { name: 'xiechimon/cairn' }).click();
+  await expect(page.locator('#prj-new-name')).toHaveValue('cairn');
 });
 
 test('7. 手动兜底：picker footer 与未认证面链接都切回 owner/repo input', async ({ page }) => {
@@ -191,7 +191,7 @@ test('10. 行表键盘契约：焦点进列表、Arrow/typeahead 移动、Enter 
   await page.keyboard.press('ArrowUp');
   await page.keyboard.press('ArrowUp');
   await expect(rows.nth(2)).toBeFocused();
-  // typeahead：单字符前缀命中 xiechimon/pacman（fixture 第三行）；两次
+  // typeahead：单字符前缀命中 xiechimon/cairn（fixture 第三行）；两次
   // 击键间隔 >500ms 缓冲窗——窗内连击会合成多字符缓冲（"xo" 无命中 =
   // typeahead 正确行为，不是丢键）。
   await page.keyboard.press('x');

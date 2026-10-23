@@ -3,7 +3,7 @@
 // 中断在飞构建（含远端执行机的 stop 信号）+ 硬清空产物 + 相位回 todo。
 // 脏读面：dialog 打开后构建推进了 = 409 + 现记录（按旧文案重置被拒）。
 
-import { type Phase, todoRecordSchema } from '@pacman/shared';
+import { type Phase, todoRecordSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {

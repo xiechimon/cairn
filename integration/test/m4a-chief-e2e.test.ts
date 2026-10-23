@@ -54,7 +54,7 @@ beforeAll(async () => {
     { content: '已查看团队项目清单。有什么可以帮你的？' },
   ]);
   server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
-  home = mkdtempSync(join(tmpdir(), 'pacman-m4a-home-'));
+  home = mkdtempSync(join(tmpdir(), 'cairn-m4a-home-'));
   const config = loadDaemonConfig(
     { serverUrl: server.url, apiKey: server.apiKey, teamId: server.teamId, home, name: 'm4a-mbp' },
     {},

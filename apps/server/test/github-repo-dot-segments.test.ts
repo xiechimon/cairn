@@ -227,7 +227,7 @@ describe('#1466 写入面：. / .. 段拒绝（W1-W4）', () => {
     const created = await req(s.app, 'POST', '/api/projects', {
       name: 'loc',
       kind: 'local',
-      localPath: '/tmp/pacman-1466-local',
+      localPath: '/tmp/cairn-1466-local',
     });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };

@@ -16,7 +16,7 @@
 // 判决明示的「用户自行决定」面（前提④下属），去留归原型实审裁——本件不
 // 代判、不吸收。
 
-import type { TagRecord } from '@pacman/shared';
+import type { TagRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Badge } from './badge.js';
 

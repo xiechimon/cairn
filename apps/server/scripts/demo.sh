@@ -57,7 +57,7 @@ curl -s -X POST $BASE/api/teams/$TEAM/secrets -H 'content-type: application/json
 curl -s $BASE/api/teams/$TEAM/secrets | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log('list leaked value:',d.includes('sk_live_demo')))"
 
 echo '== 14. apiKey 面：明文一次 + 行掩码（r3 §6）=='
-curl -s -X POST $BASE/api/teams/$TEAM/api-keys -H 'content-type: application/json' -d '{"gitAccess":true,"mcpAccess":false,"toolGrants":{"read":["Todos"],"write":[]}}' | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const k=JSON.parse(d);console.log(JSON.stringify({masked:k.masked,plaintextShape:/^pacman_[0-9a-f]{48}$/.test(k.plaintext)}))})"
+curl -s -X POST $BASE/api/teams/$TEAM/api-keys -H 'content-type: application/json' -d '{"gitAccess":true,"mcpAccess":false,"toolGrants":{"read":["Todos"],"write":[]}}' | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{const k=JSON.parse(d);console.log(JSON.stringify({masked:k.masked,plaintextShape:/^cairn_[0-9a-f]{48}$/.test(k.plaintext)}))})"
 curl -s $BASE/api/teams/$TEAM/api-keys | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log('list row:',JSON.stringify(JSON.parse(d)[0])))"
 
 echo '== 15. 搜索：GET /api/search?q=（02 §6.3 自设）=='
