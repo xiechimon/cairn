@@ -77,6 +77,10 @@ migrate_home() {
 }
 
 update_code() {
+  if ! git -C "$REPO" diff --quiet -- pnpm-lock.yaml; then
+    run "cp '$REPO/pnpm-lock.yaml' '$REPO/pnpm-lock.yaml.pre-cairn'"
+    run "git -C '$REPO' checkout -q -- pnpm-lock.yaml"
+  fi
   run "git -C '$REPO' checkout -q --detach origin/main"
   if [ "$OS" = Darwin ]; then
     run "(cd '$REPO' && pnpm install --frozen-lockfile)"
