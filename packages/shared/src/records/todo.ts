@@ -104,6 +104,15 @@ export const DELIVERABLE_OUTPUT_KINDS = ['code', 'info'] as const;
 export const todoOutputSchema = z.enum(DELIVERABLE_OUTPUT_KINDS);
 export type TodoOutputKind = z.infer<typeof todoOutputSchema>;
 
+export const usageCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number(),
+  cacheWrite: z.number(),
+  total: z.number(),
+});
+export type UsageCost = z.infer<typeof usageCostSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -168,6 +177,7 @@ export const todoRecordSchema = z.object({
    * 键缺席 = fixture/老 server 面（optional 加法契约，零回归）。
    * 形态单源 = records/step.ts quotaWaitSchema。 */
   quotaWait: quotaWaitSchema.nullable().optional(),
+  usageCost: usageCostSchema.optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;

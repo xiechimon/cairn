@@ -26,6 +26,7 @@ import {
   type SecretRecord,
   type SkillFact,
   type TagRecord,
+  type UsageCost,
 } from '@cairn/shared';
 
 export type { Phase };
@@ -92,6 +93,7 @@ export interface TodoRecord {
    *  那一行。fixture 缺省 = 无来源。 */
   sourceKind?: string | null;
   sourceRef?: string | null;
+  usageCost?: UsageCost;
 }
 
 /** Token 用量 content (issue #68, r7 30): the cumulative-run figures,
@@ -107,6 +109,14 @@ export interface TokenUsageContent {
   cacheWrite: string;
   /** Cache hit rate display (#777): cacheRead over input plus cacheRead. */
   cacheHitRate: string;
+  cost?: UsageCostContent | null;
+}
+
+export interface UsageCostContent {
+  total: string;
+  cacheRead: string;
+  input: string;
+  output: string;
 }
 
 /** 分支与 PR content (issue #68, r7 31): sync-tab fields. Board cards open

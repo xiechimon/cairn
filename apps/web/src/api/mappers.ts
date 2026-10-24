@@ -24,6 +24,7 @@ import type {
   TeamMember,
   TokenUsage,
   ToolCallRecord,
+  UsageCost,
   ScheduleRecord as WireSchedule,
   TodoRecord as WireTodo,
 } from '@cairn/shared';
@@ -74,6 +75,7 @@ import type {
   TeamContent,
   TokenUsageContent,
   TranscriptItem,
+  UsageCostContent,
 } from '../fixtures/records.js';
 import { activityLabel } from './activity.js';
 import type { ApiKeyRow, PlanRow, StepRow } from './hooks.js';
@@ -193,6 +195,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     // #1406：transcript 的围栏形任务文本行按来源识别（classifyUserText）。
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
+    usageCost: w.usageCost,
   };
 }
 
@@ -202,6 +205,22 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
 export function formatTokens(n: number): string {
   if (n < 1000) return String(n);
   return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+}
+
+export const NO_PRICE_REASON = '无价格来源：模型未声明费率，或该运行未上报费用';
+
+export function formatUsd(n: number): string {
+  return n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`;
+}
+
+export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | null {
+  if (cost === undefined || cost.total <= 0) return null;
+  return {
+    total: formatUsd(cost.total),
+    cacheRead: formatUsd(cost.cacheRead),
+    input: formatUsd(cost.input + cost.cacheWrite),
+    output: formatUsd(cost.output),
+  };
 }
 
 /** `HH:MM` 时间戳行（r7 26 `13:35`；本地时区 = live 语义，fixture 侧另有
