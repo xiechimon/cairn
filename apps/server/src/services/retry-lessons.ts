@@ -126,6 +126,8 @@ export function retryLessonsOf(db: Db, buildId: string): string | null {
   }
 
   const newestFirst = dated.sort((a, b) => b.at - a.at).map((d) => d.text);
-  if (buildRow.errorMessage !== null) newestFirst.unshift(`失败原因：${buildRow.errorMessage}`);
+  if (newestFirst.length > 0 && buildRow.errorMessage !== null) {
+    newestFirst.unshift(`失败原因：${buildRow.errorMessage}`);
+  }
   return buildRetryLessonsSection(newestFirst);
 }

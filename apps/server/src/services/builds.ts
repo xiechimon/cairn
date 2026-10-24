@@ -1054,7 +1054,7 @@ export async function applyBuildStepAction(
     if (reworkTarget !== null && prClosed === null) {
       // —— 复用路：不建新 build——同 conversationId = 同分支 = 原 PR。——
       const now = nowMs();
-      const reuseLessons = retryLessonsOf(deps.db, buildId);
+      const reuseLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
       recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
       // 消息先于首步入队（transcript 排序 + machine wake 后置）：反馈行（用户
       // 话语）+ 轮界 note（system → web note 面：去向 + 被清空 errorMessage 的
@@ -1112,7 +1112,7 @@ export async function applyBuildStepAction(
     }
     // —— 新建路：无 PR build（现行行为，逐字节保持）或原 PR 已合并/已关闭
     // （prClosed 在位）——新 conversationId = 新分支。——
-    const priorLessons = retryLessonsOf(deps.db, buildId);
+    const priorLessons = feedbackText !== null ? retryLessonsOf(deps.db, buildId) : null;
     recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
     const newId = newUuidv7();
     const createdAt = nowMs();

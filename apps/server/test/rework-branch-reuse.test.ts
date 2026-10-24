@@ -22,12 +22,10 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
   buildRestartPrompt,
-  buildRetryLessonsSection,
   buildReviewRejectPrompt,
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
-  withRetryLessons,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -51,8 +49,6 @@ import { bindAllAgents, bootServer, type TestServer } from './helpers.js';
 const AGENT_ID = 'agent-rework-1';
 const PR_URL = 'https://github.com/demo-owner/demo-repo/pull/888';
 const PR_NUMBER = 888;
-const FAILURE_REASON = '本轮无人认领：团队当前没有在线机器';
-const PRIOR_LESSONS = buildRetryLessonsSection([`失败原因：${FAILURE_REASON}`]);
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -167,7 +163,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       prevPhase: 'review',
       triggerSource: 'user',
       planDocId: null,
-      errorMessage: FAILURE_REASON,
+      errorMessage: '本轮无人认领：团队当前没有在线机器',
       prUrl: opts.prFields === false ? null : PR_URL,
       prNumber: opts.prFields === false ? null : PR_NUMBER,
       changes: null,
@@ -244,7 +240,7 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
     const reuseNote = buildReworkReuseNote({
       prNumber: PR_NUMBER,
       prUrl: PR_URL,
-      failureReason: FAILURE_REASON,
+      failureReason: '本轮无人认领：团队当前没有在线机器',
     });
     const note = rows.find((m) => m.role === 'system' && m.content === reuseNote);
     // 失败方式 3：note 承接失败原因原文（errorMessage 清空的承接面）。
@@ -260,9 +256,7 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
     // 首步：kind=plan（withPlan 承接）、prompt 携反馈模板、freshSession 置位。
     const fresh = stepsOf(w, w.buildId).filter((st) => st.kind === 'plan');
     expect(fresh).toHaveLength(1);
-    expect(fresh[0]!.prompt).toBe(
-      withRetryLessons(buildRestartPrompt('我要的是svg样式的'), 'plan', PRIOR_LESSONS),
-    );
+    expect(fresh[0]!.prompt).toBe(buildRestartPrompt('我要的是svg样式的'));
     expect(fresh[0]!.freshSession).toBe(true);
   });
 
@@ -310,9 +304,7 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
     expect(got!.conversationId).toBe(w.buildId);
     expect(got!.session.action).toBe('new');
     expect(got!.session.sessionId).toBeNull();
-    expect(got!.instruction).toBe(
-      withRetryLessons(buildRestartPrompt('换个思路再来'), 'plan', PRIOR_LESSONS),
-    );
+    expect(got!.instruction).toBe(buildRestartPrompt('换个思路再来'));
   });
 
   test('失败方式 4：PR 已合并 → 新 build + 新分支说明 note 落新 conv（判定可见）', async () => {
@@ -355,9 +347,7 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
     ).toBe(true);
     // 新轮首步：现行 restart 形（无需 freshSession——新 build 无旧会话可续）。
     const steps = stepsOf(w, newId);
-    expect(steps[0]!.prompt).toBe(
-      withRetryLessons(buildRestartPrompt('合并后再补一步'), 'plan', PRIOR_LESSONS),
-    );
+    expect(steps[0]!.prompt).toBe(buildRestartPrompt('合并后再补一步'));
     expect(steps[0]!.freshSession).toBe(false);
   });
 
@@ -413,9 +403,7 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
       true,
     );
     const steps = stepsOf(w, newId);
-    expect(steps[0]!.prompt).toBe(
-      withRetryLessons(buildRestartPrompt('普通重启'), 'plan', PRIOR_LESSONS),
-    );
+    expect(steps[0]!.prompt).toBe(buildRestartPrompt('普通重启'));
     expect(steps[0]!.freshSession).toBe(false);
   });
 
@@ -451,7 +439,6 @@ describe('#931 失败重启返工回原分支：复用判定（server 面）', (
 
   test('失败方式 10：空白反馈 → 纯重启轮语义保持（无反馈行、无 instruction、note 照落）', async () => {
     const w = makeWorld();
-    w.s.db.update(buildTable).set({ errorMessage: null }).where(eq(buildTable.id, w.buildId)).run();
     await restart(w, '   ');
     expect(buildsOf(w)).toHaveLength(1);
     const rows = messagesOf(w, w.buildId);
