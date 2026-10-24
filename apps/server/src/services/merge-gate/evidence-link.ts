@@ -15,7 +15,7 @@
 // 闭合的注释换成一个空格而不是删掉：被注释切开的 URL 在 GitHub 上是两截，
 // 不能拼回一条链接（pr-evidence-gate.py 同样把注释换成空白）。
 
-import { EVIDENCE_PREFIX } from '@cairn/shared';
+import { EVIDENCE_PREFIX } from '@cairn/shared/merge-gate';
 
 export interface RawEvidenceLink {
   sha: string;

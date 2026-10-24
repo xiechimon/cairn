@@ -403,7 +403,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Dispatch agent start/check round trip (#1556)
-        run: node --test scripts/dispatch-agent.test.mjs
+        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs
 
   closing-keyword-gate:
     if: github.event_name == 'pull_request'
@@ -418,3 +418,18 @@ jobs:
         run: |
           node --test scripts/check-closing-keyword.test.mjs
           node scripts/check-closing-keyword.mjs
+
+  baseline-ratchet-gate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Baseline ratchet gate and gardener sweep self-test (#1617)
+        env:
+          BASELINE_RATCHET_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "$BASELINE_RATCHET_BASE_SHA"
+          node --test scripts/baseline-ratchet-gate.test.mjs scripts/gardener-weekly.test.mjs
+          node scripts/baseline-ratchet-gate.mjs

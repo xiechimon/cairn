@@ -13,7 +13,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { join, resolve, sep } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 
 const SKILL_DIR = fileURLToPath(new URL('..', import.meta.url));
 const SCRIPTS_DIR = join(SKILL_DIR, 'scripts');
@@ -99,7 +99,9 @@ const NEEDS = new Set([
   'remote-host',
 ]);
 // `vp.mjs drive <feature> [<case>]`; a placeholder (<feature>) or a flag is not a name.
-const DRIVE_LINE = /vp\.mjs drive ([a-z0-9][\w-]*)(?: ([a-z0-9][\w-]*))?/g;
+const DRIVE_LINE = /vp\.mjs drive ([a-z0-9][\w-]*)(?: ([a-z0-9][\w-]*|<[^>\s]+>))?/g;
+const COMMAND_SPAN = /vp\.mjs drive [^`\n]*/g;
+const TICKET_NAME = /^drive-\d/;
 
 const problems = [];
 const problem = (subject, text) => problems.push(`${subject}: ${text}`);
@@ -138,6 +140,9 @@ for (const { id, c } of cases) {
   const script = resolve(ROOT, c.script ?? '');
   if (!c.script || !existsSync(script)) problem(id, `script ${c.script} does not exist`);
   if (script.startsWith(`${SCRIPTS_DIR}${sep}`)) caseScripts.add(script.slice(SCRIPTS_DIR.length + 1));
+  else if (TICKET_NAME.test(basename(script))) {
+    problem(id, `${relative(ROOT, script)} is named after a ticket (drive-<number>); name the script after the feature`);
+  }
   if (!STATUSES.has(c.status)) problem(id, `status ${c.status} is not current, stale or host-bound`);
   const needs = Array.isArray(c.needs) ? c.needs : [];
   if (!Array.isArray(c.needs)) problem(id, 'needs is not a list');
@@ -152,15 +157,17 @@ for (const { id, c } of cases) {
   }
 }
 
-const files = readdirSync(SCRIPTS_DIR);
+const files = execFileSync('git', ['ls-files', '-z', '--', '.'], { cwd: SCRIPTS_DIR, encoding: 'utf8' })
+  .split('\0')
+  .filter((name) => name !== '' && !name.includes('/'));
 for (const name of Object.keys(support)) {
-  if (!files.includes(name)) problem(`support ${name}`, 'no such file in scripts/');
+  if (!files.includes(name)) problem(`support ${name}`, 'no tracked file in scripts/');
 }
 for (const name of files) {
   if (!caseScripts.has(name) && !Object.hasOwn(support, name)) {
     problem(`scripts/${name}`, 'not registered in vp-registry.json (add it as a case of its feature, or under support)');
   }
-  if (/^drive-\d/.test(name) && !TICKET_NAMED.has(name)) {
+  if (TICKET_NAME.test(name) && !TICKET_NAMED.has(name)) {
     problem(
       `scripts/${name}`,
       'named after a ticket (drive-<number>); register the case in vp-registry.json with a script named after the feature',
@@ -171,12 +178,21 @@ for (const name of files) {
 const maps = existsSync(FEATURES_DIR) ? readdirSync(FEATURES_DIR).filter((f) => f.endsWith('.md')) : [];
 const named = new Map(maps.map((f) => [f, new Set()]));
 for (const file of maps) {
-  for (const [line, feature, name] of readFileSync(join(FEATURES_DIR, file), 'utf8').matchAll(DRIVE_LINE)) {
+  const text = readFileSync(join(FEATURES_DIR, file), 'utf8');
+  for (const [line, feature, name] of text.matchAll(DRIVE_LINE)) {
     const entry = Object.hasOwn(features, feature) ? features[feature] : undefined;
-    if (entry === undefined || (name !== undefined && !Object.hasOwn(entry.cases ?? {}, name))) {
+    const caseNames = Object.keys(entry?.cases ?? {});
+    if (entry === undefined || (name !== undefined && !name.startsWith('<') && !caseNames.includes(name))) {
       problem(`features/${file}`, `${line} names no registered case`);
+    } else if (name === undefined && caseNames.length !== 1) {
+      problem(`features/${file}`, `${line} names no case, and ${feature} has ${caseNames.length} cases (${caseNames.join(', ')})`);
     }
     named.get(file).add(feature);
+  }
+  for (const [span] of text.matchAll(COMMAND_SPAN)) {
+    if (/(?:^| )--force(?: |$)/.test(span.trimEnd())) {
+      problem(`features/${file}`, `${span.trimEnd()} bakes in --force; name the case and leave --force to the reader`);
+    }
   }
 }
 for (const [feature, entry] of Object.entries(features)) {
