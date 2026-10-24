@@ -56,6 +56,7 @@ const BOARD = [
   'paper-board-',
   'paper-card',
   'quota-wait-board',
+  'ticket-cost',
 ];
 const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
 const DETAIL = [
@@ -81,6 +82,7 @@ const DETAIL = [
   'queued-action',
   // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
+  'ticket-cost',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];

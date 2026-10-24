@@ -56,6 +56,7 @@ import {
   mapRunHistory,
   mapTokenUsage,
   mapTranscript,
+  mapUsageCost,
   toDisplayTodo,
 } from '../api/mappers.js';
 import { useAgentAvatarUrlById, useLiveData } from '../api/provider.js';
@@ -709,7 +710,7 @@ export function TodoDetailPage() {
   const content = live
     ? wireTodo && buildId
       ? {
-          token: mapTokenUsage(usageQ.data ?? []),
+          token: { ...mapTokenUsage(usageQ.data ?? []), cost: mapUsageCost(wireTodo.usageCost) },
           branch: mapBranchInfo(buildId, steps, machinesQ.data ?? []),
           runs: mapRunHistory(wireTodo, projectBuildsQ.data ?? [], Date.now(), historyTokens),
         }
