@@ -28,7 +28,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
 const WEB_DIR = join(REPO_ROOT, 'apps/web');
@@ -56,6 +56,7 @@ const BOARD = [
   'paper-board-',
   'paper-card',
   'quota-wait-board',
+  'accent-typo',
   'attachment-title',
   'branch-button',
   'empty-review-closeout',
@@ -72,7 +73,11 @@ const SIDEBAR = [
   'avatar-',
   'shell-',
   'accent-typo',
+  'attachment-strip',
+  'attachment-title',
   'cds-sidebar',
+  'composer-paste',
+  'live-project-name',
   'registry-focus-ring',
   'shadcn-primitives',
   'storage-unavailable',
@@ -456,17 +461,17 @@ const explicit = argv.filter((a) => !a.startsWith('--'));
 if (argv.includes('--check-coverage')) {
   const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
   prefixes.push('a11y-axe', ...SHARED_SURFACE_ONLY);
-  const targets = explicit.length > 0 ? explicit : listSpecs().map((spec) => E2E_PREFIX + spec);
-  const missing = targets.filter(
-    (path) =>
-      path.startsWith(E2E_PREFIX) &&
-      path.endsWith('.spec.ts') &&
-      !prefixes.some((prefix) => path.slice(E2E_PREFIX.length).startsWith(prefix)),
+  const specNames = (explicit.length > 0 ? explicit : listSpecs()).map((path) => basename(path));
+  const notSpecs = specNames.filter((name) => !name.endsWith('.spec.ts'));
+  const missing = specNames.filter(
+    (name) => name.endsWith('.spec.ts') && !prefixes.some((prefix) => name.startsWith(prefix)),
   );
-  for (const path of missing)
-    console.log(`[e2e:affected] ${path}: no family table entry reaches this spec`);
+  for (const name of notSpecs)
+    console.log(`[e2e:affected] ${name}: not an e2e spec file (expected *.spec.ts)`);
+  for (const name of missing)
+    console.log(`[e2e:affected] ${E2E_PREFIX}${name}: no family table entry reaches this spec`);
   console.log(`[e2e:affected] coverage: ${missing.length} uncovered spec(s)`);
-  process.exit(missing.length > 0 ? 1 : 0);
+  process.exit(missing.length + notSpecs.length > 0 ? 1 : 0);
 }
 
 const { paths, source } = changedPaths(explicit);

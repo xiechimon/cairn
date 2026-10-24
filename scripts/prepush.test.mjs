@@ -45,6 +45,23 @@ test('e2e coverage check passes on the real suite and names an unmapped spec', (
   );
   assert.equal(unmapped.status, 1);
   assert.match(unmapped.stdout, new RegExp(`${probe}: no family table entry reaches this spec`));
+  const bare = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--check-coverage', 'zz-unmapped-probe.spec.ts'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(bare.status, 1, bare.stdout);
+  assert.match(bare.stdout, new RegExp(`${probe}: no family table entry reaches this spec`));
+});
+
+test('a board card source change selects the spec that reads its title', () => {
+  const plan = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--dry-run', '--', 'apps/web/src/board/todo-card.tsx'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.match(plan.stdout, /\baccent-typo\.spec\.ts\b/);
 });
 
 test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
