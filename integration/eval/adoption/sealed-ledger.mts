@@ -27,13 +27,6 @@ function loadLedger(path: string): SealedLedger {
   return JSON.parse(readFileSync(path, 'utf8')) as SealedLedger;
 }
 
-function saveLedger(path: string, ledger: SealedLedger): void {
-  mkdirSync(dirname(path), { recursive: true });
-  const staging = `${path}.${process.pid}.tmp`;
-  writeFileSync(staging, `${JSON.stringify(ledger, null, 2)}\n`);
-  renameSync(staging, path);
-}
-
 export function sealedReads(ledgerPath: string, runId?: string): SealedRead[] {
   const { reads } = loadLedger(ledgerPath);
   return runId === undefined ? reads : reads.filter((r) => r.runId === runId);
@@ -60,6 +53,9 @@ export function readSealedOnce<T>(args: {
     candidateId: args.candidateId,
     readAt: (args.now ?? (() => new Date()))().toISOString(),
   });
-  saveLedger(args.ledgerPath, ledger);
+  mkdirSync(dirname(args.ledgerPath), { recursive: true });
+  const staging = `${args.ledgerPath}.${process.pid}.tmp`;
+  writeFileSync(staging, `${JSON.stringify(ledger, null, 2)}\n`);
+  renameSync(staging, args.ledgerPath);
   return args.load();
 }

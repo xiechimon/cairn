@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -69,20 +69,39 @@ describe('pairedZ', () => {
 
   test('empty diffs yields z = 0 and NaN-free stats', () => {
     const r = pairedZ([]);
-    expect(r).toEqual({ n: 0, meanDiff: 0, sdDiff: 0, z: 0, degenerate: 'too_few_pairs' });
+    expect(r).toEqual({
+      n: 0,
+      meanDiff: 0,
+      sdDiff: 0,
+      z: 0,
+      meanSign: 0,
+      degenerate: 'too_few_pairs',
+    });
   });
 
-  test('zero variance with nonzero mean yields signed infinity', () => {
-    expect(pairedZ(Array.from({ length: MIN_PAIRS }, () => 0.5)).z).toBe(Number.POSITIVE_INFINITY);
-    expect(pairedZ(Array.from({ length: MIN_PAIRS }, () => -0.5)).z).toBe(Number.NEGATIVE_INFINITY);
-    expect(pairedZ(Array.from({ length: MIN_PAIRS }, () => 0.5)).degenerate).toBe('zero_variance');
+  test('zero variance keeps z finite and records the sign of the mean', () => {
+    const up = pairedZ(Array.from({ length: MIN_PAIRS }, () => 0.5));
+    const down = pairedZ(Array.from({ length: MIN_PAIRS }, () => -0.5));
+    expect(Number.isFinite(up.z)).toBe(true);
+    expect(Number.isFinite(down.z)).toBe(true);
+    expect(up).toMatchObject({ degenerate: 'zero_variance', meanSign: 1, meanDiff: 0.5 });
+    expect(down).toMatchObject({ degenerate: 'zero_variance', meanSign: -1, meanDiff: -0.5 });
   });
 
-  test('zero variance with zero mean yields z = 0', () => {
+  test('zero variance with zero mean has sign 0', () => {
     const r = pairedZ(Array.from({ length: MIN_PAIRS }, () => 0));
     expect(r.z).toBe(0);
+    expect(r.meanSign).toBe(0);
     expect(r.degenerate).toBe('zero_variance');
   });
+});
+
+const smallNoise = [0.02, -0.03, 0.01, 0.04, -0.02, -0.01, 0.03, -0.04, 0.02, -0.01];
+const noisyPairs = smallNoise.map((d, i) => pair(`c${i}`, [scored(0.5)], [scored(0.5 + d)]));
+
+const dirs: string[] = [];
+afterEach(() => {
+  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
 describe('judgeAdoption', () => {
@@ -162,8 +181,7 @@ describe('judgeAdoption', () => {
   });
 
   test('small noise is not_significant', () => {
-    const noise = [0.02, -0.03, 0.01, 0.04, -0.02, -0.01, 0.03, -0.04, 0.02, -0.01];
-    const v = judgeAdoption(noise.map((d, i) => pair(`c${i}`, [scored(0.5)], [scored(0.5 + d)])));
+    const v = judgeAdoption(noisyPairs);
     expect(Math.abs(v.significance.z)).toBeLessThan(Z_THRESHOLD);
     expect(v.decision).toBe('not_significant');
   });
@@ -176,6 +194,82 @@ describe('judgeAdoption', () => {
     );
     expect(v.decision).toBe('rejected_regression');
     expect(v.significance.z).toBeLessThanOrEqual(-Z_THRESHOLD);
+  });
+
+  test('zero variance with a uniform gain is accepted and flagged as zero variance', () => {
+    const v = judgeAdoption(
+      Array.from({ length: MIN_PAIRS }, (_, i) => pair(`c${i}`, [scored(0.25)], [scored(0.75)])),
+    );
+    expect(v.decision).toBe('accepted');
+    expect(v.significance).toMatchObject({
+      degenerate: 'zero_variance',
+      meanSign: 1,
+      n: MIN_PAIRS,
+    });
+  });
+
+  test('zero variance with a uniform drop is rejected_regression', () => {
+    const v = judgeAdoption(
+      Array.from({ length: MIN_PAIRS }, (_, i) => pair(`c${i}`, [scored(0.75)], [scored(0.25)])),
+    );
+    expect(v.decision).toBe('rejected_regression');
+    expect(v.significance).toMatchObject({ degenerate: 'zero_variance', meanSign: -1 });
+  });
+
+  test('zero variance with no change is not_significant', () => {
+    const v = judgeAdoption(
+      Array.from({ length: MIN_PAIRS }, (_, i) => pair(`c${i}`, [scored(0.5)], [scored(0.5)])),
+    );
+    expect(v.decision).toBe('not_significant');
+    expect(v.significance.degenerate).toBe('zero_variance');
+  });
+
+  test('a uniform gain below MIN_PAIRS stays not_significant', () => {
+    const v = judgeAdoption(
+      Array.from({ length: MIN_PAIRS - 1 }, (_, i) =>
+        pair(`c${i}`, [scored(0.25)], [scored(0.75)]),
+      ),
+    );
+    expect(v.decision).toBe('not_significant');
+  });
+
+  test.each([
+    [
+      'uniform gain',
+      improvingPairs(10).map((p) => ({ ...p, before: [scored(0.25)], after: [scored(0.75)] })),
+    ],
+    [
+      'uniform drop',
+      improvingPairs(10).map((p) => ({ ...p, before: [scored(0.75)], after: [scored(0.25)] })),
+    ],
+    ['noisy gain', improvingPairs(10)],
+    ['too few pairs', improvingPairs(MIN_PAIRS - 1)],
+    [
+      'no valid pairs',
+      [pair('x', [scored(0.5)], [infra('timeout'), infra('timeout'), infra('timeout')])],
+    ],
+  ])('verdict for %s survives a write to disk and read back unchanged', (_name, pairs) => {
+    const verdict = judgeAdoption(pairs);
+    const dir = mkdtempSync(join(tmpdir(), 'cairn-adoption-verdict-'));
+    dirs.push(dir);
+    const path = join(dir, 'verdict.json');
+    writeFileSync(path, JSON.stringify(verdict));
+    const readBack = JSON.parse(readFileSync(path, 'utf8')) as AdoptionVerdict;
+    expect(readBack).toEqual(verdict);
+    expect(readBack.decision).toBe(verdict.decision);
+    expect(readBack.significance.z).toBe(verdict.significance.z);
+    expect(readBack.significance.meanDiff).toBe(verdict.significance.meanDiff);
+  });
+
+  test('a non-finite score throws instead of entering z', () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(() =>
+        judgeAdoption([...improvingPairs(10), pair('bad', [scored(0.5)], [scored(bad)])]),
+      ).toThrow(/non-finite score/);
+      expect(() =>
+        judgeAdoption([...improvingPairs(10), pair('bad', [scored(bad)], [scored(0.5)])]),
+      ).toThrow(/bad/);
+    }
   });
 
   test('too few valid pairs is not_significant even with uniform gains', () => {
@@ -206,6 +300,61 @@ describe('collectTrial', () => {
     });
     expect(calls).toBe(MAX_INFRA_RETRIES + 1);
     expect(attempts).toHaveLength(MAX_INFRA_RETRIES + 1);
+  });
+
+  test('a thrown run counts as an infra failure with the reason recorded and is retried', async () => {
+    let calls = 0;
+    const attempts = await collectTrial(async () => {
+      calls++;
+      if (calls === 1) throw new Error('socket hang up');
+      return scored(0.6);
+    });
+    expect(attempts).toEqual([
+      { kind: 'infra_failure', reason: 'exception', detail: 'socket hang up' },
+      scored(0.6),
+    ]);
+  });
+
+  test('a run that keeps throwing is dropped from the pairs after the retry budget', async () => {
+    let calls = 0;
+    const attempts = await collectTrial(async () => {
+      calls++;
+      throw new Error(`boom ${calls}`);
+    });
+    expect(calls).toBe(MAX_INFRA_RETRIES + 1);
+    expect(attempts.map((a) => a.kind)).toEqual([
+      'infra_failure',
+      'infra_failure',
+      'infra_failure',
+    ]);
+    expect(attempts[2]).toEqual({ kind: 'infra_failure', reason: 'exception', detail: 'boom 3' });
+    const v = judgeAdoption([...improvingPairs(10), pair('throws', [scored(0.5)], attempts)]);
+    expect(v.validity.excludedCaseIds).toEqual(['throws']);
+    expect(v.validity.validPairs).toBe(10);
+  });
+
+  test('a non-error throw is recorded as text', async () => {
+    const attempts = await collectTrial(async () => {
+      throw 'plain string';
+    });
+    expect(attempts[0]).toEqual({
+      kind: 'infra_failure',
+      reason: 'exception',
+      detail: 'plain string',
+    });
+  });
+
+  test('a non-finite score throws and is neither retried nor swallowed', async () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY]) {
+      let calls = 0;
+      await expect(
+        collectTrial(async () => {
+          calls++;
+          return scored(bad);
+        }),
+      ).rejects.toThrow(/non-finite score/);
+      expect(calls).toBe(1);
+    }
   });
 
   test('stops at the first scored attempt', async () => {
@@ -270,16 +419,11 @@ describe('generalizationReport', () => {
 });
 
 describe('readSealedOnce', () => {
-  const dirs: string[] = [];
   const ledger = (): string => {
     const dir = mkdtempSync(join(tmpdir(), 'cairn-adoption-sealed-'));
     dirs.push(dir);
     return join(dir, 'nested', 'sealed-reads.json');
   };
-  afterEach(() => {
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  });
-
   const accepted: AdoptionVerdict = judgeAdoption(improvingPairs(10));
   const sealedCases = ['s1', 's2'];
 
@@ -336,20 +480,37 @@ describe('readSealedOnce', () => {
     expect(sealedReads(path)).toHaveLength(2);
   });
 
-  test('a candidate that did not pass the three gates cannot read the sealed set', () => {
+  const notSignificant = judgeAdoption(noisyPairs);
+  const regression = judgeAdoption(
+    Array.from({ length: 10 }, (_, i) =>
+      pair(`c${i}`, [scored(0.8 + (i % 2) * 0.05)], [scored(0.2 + (i % 3) * 0.05)]),
+    ),
+  );
+  const inert = judgeAdoption(
+    Array.from({ length: 10 }, (_, i) => pair(`c${i}`, [scored(0.2)], [scored(0.9, false)])),
+  );
+
+  test.each([
+    ['rejected_inert', inert],
+    ['not_significant', notSignificant],
+    ['rejected_regression', regression],
+  ])('a %s candidate cannot read the sealed set', (decision, verdict) => {
     const path = ledger();
-    const rejected = judgeAdoption(
-      Array.from({ length: 10 }, (_, i) => pair(`c${i}`, [scored(0.2)], [scored(0.9, false)])),
-    );
+    expect(verdict.decision).toBe(decision);
+    let loaded = false;
     expect(() =>
       readSealedOnce({
         ledgerPath: path,
         runId: 'run-1',
         candidateId: 'c',
-        verdict: rejected,
-        load: () => sealedCases,
+        verdict,
+        load: () => {
+          loaded = true;
+          return sealedCases;
+        },
       }),
-    ).toThrow(/accepted/);
+    ).toThrow(new RegExp(`accepted.*${decision}`));
+    expect(loaded).toBe(false);
     expect(existsSync(path)).toBe(false);
   });
 

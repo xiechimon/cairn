@@ -2,11 +2,16 @@ export const MAX_INFRA_RETRIES = 2;
 export const Z_THRESHOLD = 1.96;
 export const MIN_PAIRS = 5;
 
-export type InfraFailureReason = 'timeout' | 'network' | 'provider_5xx' | 'sandbox_start';
+export type InfraFailureReason =
+  | 'timeout'
+  | 'network'
+  | 'provider_5xx'
+  | 'sandbox_start'
+  | 'exception';
 
 export type TrialOutcome =
   | { kind: 'scored'; score: number; triggered: boolean }
-  | { kind: 'infra_failure'; reason: InfraFailureReason };
+  | { kind: 'infra_failure'; reason: InfraFailureReason; detail?: string };
 
 export interface CasePair {
   caseId: string;
@@ -37,6 +42,7 @@ export interface PairedZ {
   meanDiff: number;
   sdDiff: number;
   z: number;
+  meanSign: -1 | 0 | 1;
   degenerate: 'too_few_pairs' | 'zero_variance' | null;
 }
 
@@ -64,8 +70,15 @@ interface ResolvedSide {
   reruns: number;
 }
 
-function resolveSide(attempts: TrialOutcome[]): ResolvedSide {
+function assertFiniteScore(outcome: TrialOutcome, label: string): void {
+  if (outcome.kind === 'scored' && !Number.isFinite(outcome.score)) {
+    throw new Error(`non-finite score ${outcome.score} in ${label}`);
+  }
+}
+
+function resolveSide(attempts: TrialOutcome[], caseId: string): ResolvedSide {
   const budget = attempts.slice(0, MAX_INFRA_RETRIES + 1);
+  for (const outcome of budget) assertFiniteScore(outcome, `case ${caseId}`);
   const index = budget.findIndex((a) => a.kind === 'scored');
   if (index === -1) return { scored: null, reruns: Math.max(budget.length - 1, 0) };
   return { scored: budget[index] as ScoredTrial, reruns: index };
@@ -74,7 +87,14 @@ function resolveSide(attempts: TrialOutcome[]): ResolvedSide {
 export async function collectTrial(run: () => Promise<TrialOutcome>): Promise<TrialOutcome[]> {
   const attempts: TrialOutcome[] = [];
   for (let attempt = 0; attempt <= MAX_INFRA_RETRIES; attempt++) {
-    const outcome = await run();
+    const outcome = await run().catch(
+      (error: unknown): TrialOutcome => ({
+        kind: 'infra_failure',
+        reason: 'exception',
+        detail: error instanceof Error ? error.message : String(error),
+      }),
+    );
+    assertFiniteScore(outcome, 'trial');
     attempts.push(outcome);
     if (outcome.kind === 'scored') break;
   }
@@ -93,29 +113,14 @@ export function wasTriggered(change: CandidateChange, evidence: RunTouchEvidence
   );
 }
 
-/**
- * Paired z statistic over per-case differences d_i = after_i - before_i.
- *
- *   mean = sum(d_i) / n
- *   sd   = sqrt( sum((d_i - mean)^2) / (n - 1) )
- *   z    = mean / (sd / sqrt(n))
- *
- * Boundaries: n < MIN_PAIRS gives z = 0 (too_few_pairs); sd = 0 gives
- * z = sign(mean) * Infinity, or 0 when mean is also 0 (zero_variance).
- */
 export function pairedZ(diffs: number[]): PairedZ {
   const n = diffs.length;
-  if (n < MIN_PAIRS) {
-    const meanDiff = n === 0 ? 0 : diffs.reduce((a, b) => a + b, 0) / n;
-    return { n, meanDiff, sdDiff: 0, z: 0, degenerate: 'too_few_pairs' };
-  }
-  const meanDiff = diffs.reduce((a, b) => a + b, 0) / n;
+  const meanDiff = n === 0 ? 0 : diffs.reduce((a, b) => a + b, 0) / n;
+  const meanSign = meanDiff === 0 ? 0 : (Math.sign(meanDiff) as -1 | 1);
+  if (n < MIN_PAIRS) return { n, meanDiff, sdDiff: 0, z: 0, meanSign, degenerate: 'too_few_pairs' };
   const sdDiff = Math.sqrt(diffs.reduce((acc, d) => acc + (d - meanDiff) ** 2, 0) / (n - 1));
-  if (sdDiff === 0) {
-    const z = meanDiff === 0 ? 0 : Math.sign(meanDiff) * Number.POSITIVE_INFINITY;
-    return { n, meanDiff, sdDiff, z, degenerate: 'zero_variance' };
-  }
-  return { n, meanDiff, sdDiff, z: meanDiff / (sdDiff / Math.sqrt(n)), degenerate: null };
+  if (sdDiff === 0) return { n, meanDiff, sdDiff, z: 0, meanSign, degenerate: 'zero_variance' };
+  return { n, meanDiff, sdDiff, z: meanDiff / (sdDiff / Math.sqrt(n)), meanSign, degenerate: null };
 }
 
 export function judgeAdoption(pairs: CasePair[]): AdoptionVerdict {
@@ -126,8 +131,8 @@ export function judgeAdoption(pairs: CasePair[]): AdoptionVerdict {
   let retriedTrials = 0;
 
   for (const pair of pairs) {
-    const before = resolveSide(pair.before);
-    const after = resolveSide(pair.after);
+    const before = resolveSide(pair.before, pair.caseId);
+    const after = resolveSide(pair.after, pair.caseId);
     retriedTrials += before.reruns + after.reruns;
     if (before.scored === null || after.scored === null) {
       excludedCaseIds.push(pair.caseId);
@@ -143,8 +148,12 @@ export function judgeAdoption(pairs: CasePair[]): AdoptionVerdict {
   const decide = (): AdoptionDecision => {
     if (validPairs === 0) return 'not_significant';
     if (triggeredPairs === 0) return 'rejected_inert';
-    if (significance.z >= Z_THRESHOLD) return 'accepted';
-    if (significance.z <= -Z_THRESHOLD) return 'rejected_regression';
+    const significantInDirection = (direction: 1 | -1): boolean =>
+      significance.degenerate === 'zero_variance'
+        ? significance.meanSign === direction
+        : direction * significance.z >= Z_THRESHOLD;
+    if (significantInDirection(1)) return 'accepted';
+    if (significantInDirection(-1)) return 'rejected_regression';
     return 'not_significant';
   };
 
