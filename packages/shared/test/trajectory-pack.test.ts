@@ -42,6 +42,7 @@ const pack = {
       { action: 'confirm', reason: null },
     ],
     diff: [
+      { action: 'revision', reason: 'Tighten the diff' },
       { action: 'restart', reason: 'Fix failure' },
       { action: 'approve', reason: null },
     ],
