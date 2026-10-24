@@ -38,6 +38,8 @@ const INFERRED_ROUTES = [
   'DELETE /api/todos/{id}', // DELETE_FACE 'todos' 同名 DELETE（02 §6.1 [推断] 规则）
   'GET /api/projects/{id}/autonomy', // #1491 后台自动任务触发闸：设置 + 每种任务最近一次判定（自有功能，无 wire 来源）
   'PATCH /api/projects/{id}/autonomy', // #1491 同上的写面（缺键不动，strict）
+  'GET /api/projects/{id}/merge-policy', // #1625 项目合并策略与本机检查命令（ADR 0021 扩到 local，自有功能，无 wire 来源）
+  'PATCH /api/projects/{id}/merge-policy', // #1625 同上的写面（缺键不动，strict）
   'DELETE /api/projects/{id}', // 项目设置危险操作区删除流（r2 24c UI 证据；#189 复活前置，wire 未采）
   'DELETE /api/schedules/{id}', // DELETE_FACE 'schedules'（unschedule_todo r5 §3.1；once 出队 r3 §9）
   // —— 密钥三面（页/弹窗实测存在 r2 §6.3/§6.5/§6.7、r3 §2/§6，wire 未采；
