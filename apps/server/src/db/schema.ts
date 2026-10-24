@@ -471,8 +471,17 @@ export const agentMemory = sqliteTable('agent_memory', {
   projectId: text('projectId'),
   sourceTodoId: text('sourceTodoId'),
   sourceBuildId: text('sourceBuildId'),
+  history: json<{ title: string; content: string; updatedAt: number }[]>('history')
+    .notNull()
+    .default(sql`'[]'`),
   createdAt: epochMs('createdAt').notNull(),
   updatedAt: epochMs('updatedAt').notNull(),
+});
+
+export const memorySaveConflict = sqliteTable('memory_save_conflict', {
+  id: text('id').primaryKey(),
+  candidateIds: json<string[]>('candidateIds').notNull(),
+  createdAt: epochMs('createdAt').notNull(),
 });
 
 // skill 表已退役（spec 13 #367）：技能 = 本地目录现扫只读投影，不入库——
