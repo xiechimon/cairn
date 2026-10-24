@@ -261,7 +261,7 @@ const cases = [
     'paths outside the auto-merge set route to the user (run 5)',
     async () => {
       for (const f of [
-        'docs/spec/28-x.md',
+        'docs/research/assets/r1/sw.js',
         'README.md',
         'CONTEXT.md',
         'apps/web/public/x.svg',
@@ -1157,6 +1157,43 @@ const cases = [
       return (
         (await refuses([{ ...base, linesChanged: -1 }], /git 2\.40 or later/)) &&
         safety?.prompt.includes('git 2.40 or later') === true
+      );
+    },
+  ],
+  [
+    'docs-only Markdown patch: go, auto-merge (#1621)',
+    async () => {
+      const r = await gateFiles(['docs/lessons.md', 'docs/research/r9.md', 'docs/README.MD']);
+      return r.go === true && r.mergedBy === 'auto-merge' && r.humanReasons.length === 0;
+    },
+  ],
+  [
+    'design decisions, ADRs and the review guide stay with the user in any case or Unicode fold (#1621)',
+    () =>
+      eachProtected([
+        'docs/spec/28-x.md',
+        'docs/SPEC/28-x.md',
+        'docs/\u017Fpec/28-x.md',
+        'docs/spec',
+        'docs/ADR/0021-x.md',
+        'Docs/Adr/0021-x.md',
+        'docs/PR-Review.md',
+      ]),
+  ],
+  [
+    'docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)',
+    async () => {
+      const deleted = await gateFiles(['docs/lessons.md', 'apps/server/test/old.test.ts'], {
+        deletedFiles: ['apps/server/test/old.test.ts'],
+      });
+      const script = await gateFiles(['docs/lessons.md', 'docs/research/assets/r1/sw.js']);
+      return (
+        deleted.mergedBy === 'user' &&
+        deleted.humanReasons.some((x) => x.startsWith('deleted test files')) &&
+        script.mergedBy === 'user' &&
+        script.humanReasons.some(
+          (x) => x.includes('outside the auto-merge set') && x.includes('sw.js'),
+        )
       );
     },
   ],

@@ -58,7 +58,7 @@ export const EVIDENCE_EXECUTABLE_EXTENSIONS = [
   '.htm',
 ] as const;
 
-/** 可以不经人合并的路径（ADR 0021 D4 默认拒绝）：产品源码、测试与证据。
+/** 可以不经人合并的路径（ADR 0021 D4 默认拒绝）：产品源码、测试、证据与 docs 下的 Markdown。
  * 与 .claude/workflows/pr-gate.js 的 AUTO_MERGE 同一份口径。 */
 export const AUTO_MERGE_PATH_GLOBS = [
   'apps/*/src/**',
@@ -68,6 +68,7 @@ export const AUTO_MERGE_PATH_GLOBS = [
   'packages/*/test/**',
   'integration/test/**',
   'docs/verify/**',
+  'docs/**/*.md',
 ] as const;
 
 /** D4 保护类别 ①–③ 与 ⑤：不分大小写；①–③ 多为任意层级，⑤ 锚定在原路径。与
@@ -85,6 +86,7 @@ export const PROTECTED_PATH_GLOBS = [
   '**/AGENTS*.md',
   'docs/pr-review.md',
   'docs/adr/**',
+  'docs/spec/**',
   // ② 闸脚本与决定检查口径的配置
   '**/scripts/**',
   '**/*.config.*',

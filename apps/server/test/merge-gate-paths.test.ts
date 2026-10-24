@@ -89,6 +89,7 @@ describe('保护类别：任意层级、不分大小写，各一真一假', () =
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
+    ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
     ['biome', 'apps/web/biome.jsonc', 'apps/web/src/biome.ts'],
@@ -306,9 +307,10 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
     expect(r.protected).toEqual([]);
   });
 
-  test('集外路径（文档、根文件、public、eval）各自列出', () => {
+  test('集外路径（docs 下的非 Markdown、根文件、public、eval）各自列出', () => {
     const files = [
-      'docs/spec/28-x.md',
+      'docs/research/assets/r1/sw.js',
+      'docs/research/assets/r1/asset-manifest.json',
       'README.md',
       'CONTEXT.md',
       'apps/web/public/x.svg',
@@ -341,9 +343,51 @@ describe('默认拒绝：可自动合并集之外一律留人', () => {
 
   test('改名从集外移进集内：按原路径记集外', () => {
     const r = classify([
-      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'docs/spec/x.md' }),
+      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'README.md' }),
     ]);
-    expect(r.outsideAutoMerge).toEqual(['docs/spec/x.md']);
+    expect(r.outsideAutoMerge).toEqual(['README.md']);
+  });
+});
+
+describe('纯文档（#1621）：docs 下的 Markdown 在集内，设计决定、ADR 与评审口径仍留人', () => {
+  test('docs 下任意层级的 Markdown 在集内', () => {
+    const files = ['docs/lessons.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
+    const r = classify(files.map((p) => f(p)));
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([]);
+  });
+
+  test('保护的文档路径换大小写或 Unicode 折叠照样命中，不落进集内', () => {
+    for (const p of [
+      'docs/ADR/0021-x.md',
+      'Docs/Adr/0021-x.md',
+      'docs/SPEC/28-x.md',
+      'docs/\u{17F}pec/28-x.md',
+      'docs/PR-Review.md',
+      'doc\u{17F}/pr-review.md',
+      'doc\u{17F}/adr/0021-x.md',
+      'docs/spec',
+    ]) {
+      const asciiFold = p.normalize('NFKC').toLowerCase();
+      expect(classify([f(asciiFold)]).protected, `${p} folds to ${asciiFold}`).toEqual([asciiFold]);
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('只靠 Unicode 折叠才像 docs 的名字落在集外', () => {
+    const p = 'doc\u{17F}/x.md';
+    const r = classify([f(p, { status: 'added' })]);
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([p]);
+  });
+
+  test('改名把 ADR 移成普通文档：按原名算保护', () => {
+    const r = classify([
+      f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/adr/0021-x.md' }),
+    ]);
+    expect(r.protected).toEqual(['docs/adr/0021-x.md']);
   });
 });
 

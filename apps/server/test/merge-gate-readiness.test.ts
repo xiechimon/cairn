@@ -915,6 +915,48 @@ describe('mergeReadiness：看不到 diff 的文件留人，上限按整张补�
   });
 });
 
+describe('mergeReadiness：纯文档补丁（#1621）在 shadow 下判 go，混进保护的文档留人', () => {
+  const docsOnly = [
+    file('docs/lessons.md'),
+    file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
+  ];
+
+  test('shadow 下只改 docs/ 的 Markdown：ready，没有 blocker', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, docsOnly);
+    const r = mergeReadiness(i);
+    expect(r.blockers).toEqual([]);
+    expect(r.ready).toBe(true);
+    expect(r.policy).toBe('shadow');
+  });
+
+  test('shadow 下文档里混进 docs/spec 或大小写变体的 docs/ADR：protected-path 留人', () => {
+    for (const name of ['docs/spec/28-x.md', 'docs/ADR/0021-x.md', 'docs/\u{17F}pec/28-x.md']) {
+      const i = green();
+      i.policy.mergePolicy = 'shadow';
+      setFiles(i, [...docsOnly, file(name)]);
+      expect(classesOf(i), name).toEqual([['protected-path', 'human', `"${name}"`]]);
+    }
+  });
+
+  test('shadow 下文档里混进 docs 下的非 Markdown 文件：outside-auto-merge 留人', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('docs/research/assets/r1/sw.js')]);
+    expect(classesOf(i)).toEqual([
+      ['outside-auto-merge', 'human', '"docs/research/assets/r1/sw.js"'],
+    ]);
+  });
+
+  test('删测试仍留人：文档补丁里夹着删掉的测试文件', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('apps/server/test/old.test.ts', { status: 'removed' })]);
+    expect(codesOf(i)).toEqual(['test-deleted']);
+  });
+});
+
 describe('mergeReadiness：形状不对的 compare 留人，证据出自本 PR，检查读全才信', () => {
   test('compare 读到了、形状不对：留人的 compare-malformed，不是可等的 patch-unavailable', () => {
     const a = green();

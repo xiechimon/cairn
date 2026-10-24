@@ -1470,6 +1470,11 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
+    "path": "packages/shared/src/records/merge-gate.ts",
+    "line": "/** 可以不经人合并的路径（ADR 0021 D4 默认拒绝）：产品源码、测试、证据与 docs 下的 Markdown。",
+    "reason": "公开 API 文档：导出常量 AUTO_MERGE_PATH_GLOBS 的说明随 #1621 加入 docs 下的 Markdown"
+  },
+  {
     "path": "packages/shared/src/records/model-source.ts",
     "line": "// runtime tabs 的封套形状。cairn 自身不提供远程模型服务——页面语义 =",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
