@@ -66,7 +66,7 @@ When dispatching work to Codex / Grok / pi, use `docs/agent-dispatch-prompts.md`
 
 ## Lessons ledger
 
-When you make a mistake during a task and fix it, add or update a row in `docs/lessons.md` in its format in the same round; merge errors of the same kind, and merge lane conflicts by category. Take the highest feasible level on the ledger ladder; if a machine check is possible, add one. A new gate must use the real mistake as a negative control: confirm the old error goes red and the fix goes green.
+When you make a mistake during a task and fix it, add or update an entry file `docs/lessons/<ticket>-<short-name>.md` in the format of `docs/lessons/README.md` in the same round (one file per error kind; do not touch other entries); merge errors of the same kind and bump the original file's "Recurrences" count. Take the highest feasible level on the ledger ladder; if a machine check is possible, add one. A new gate must use the real mistake as a negative control: confirm the old error goes red and the fix goes green.
 
 Run `pnpm prepush` before pushing; it selects checks by changed paths, and docs-only changes skip code checks (the language gate still runs). CI uses the same entry point; dead-class stays a separate advisory check, and full e2e stays in four shards.
 

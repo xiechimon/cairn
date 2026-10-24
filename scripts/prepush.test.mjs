@@ -44,11 +44,26 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   );
 });
 
+test('a ledger entry change runs the ledger gate even when only documents changed', () => {
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+  for (const mode of ['local', 'ci'])
+    assert.deepEqual(prepushPlan(['docs/lessons/1656-new-entry.md'], mode), [
+      ['node', 'scripts/english-only-gate.mjs'],
+      ledgerGate,
+    ]);
+  assert.ok(
+    prepushPlan(['apps/web/src/main.tsx'], 'ci').some(
+      (args) => args.join(' ') === ledgerGate.join(' '),
+    ),
+  );
+});
+
 test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ci-job-structure-gate.mjs',
     'node scripts/english-only-gate.mjs',
+    'node scripts/lessons-ledger-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
