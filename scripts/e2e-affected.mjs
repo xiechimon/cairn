@@ -85,7 +85,7 @@ const DETAIL = [
 // #1428: one ring per edge — the chief window and the FAB are probed there.
 const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
 const AGENT = ['agent-', 'team-create-agent'];
-const LIVE_SERVER = ['token-gate', 'live-server-'];
+const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
 const OVERLAY = [
   'newtask-',
   'mention-',
@@ -139,6 +139,7 @@ const FILE_RULES = new Map([
   ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
+  ['apps/web/src/routes/agent-fallback-models.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
   ['apps/web/src/routes/api-keys-page.tsx', ['user-menu-']],
   ['apps/web/src/routes/create-agent-dialog.tsx', AGENT],
