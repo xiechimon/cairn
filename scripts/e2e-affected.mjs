@@ -52,6 +52,10 @@ const BOARD = [
   'queued-action',
   // #1428: one ring per edge — the card and the notify banner are probed there.
   'elevation-',
+  'cds-board',
+  'paper-board-',
+  'paper-card',
+  'quota-wait-board',
 ];
 const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
 const DETAIL = [

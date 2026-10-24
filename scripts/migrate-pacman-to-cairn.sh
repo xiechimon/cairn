@@ -53,7 +53,12 @@ stop_services() {
       run "launchctl bootout gui/$(id -u)/com.xiechimon.$l 2>/dev/null || true"
     done
   else
-    run "systemctl --user stop pacman-daemon.service cairn-daemon.service 2>/dev/null || true"
+    for u in pacman-daemon cairn-daemon; do
+      run "systemctl --user stop $u.service 2>/dev/null || true"
+    done
+    if [ "$DRY" = 0 ] && systemctl --user is-active --quiet pacman-daemon.service; then
+      echo "pacman-daemon.service 停不下来，手工处理" >&2; exit 1
+    fi
   fi
 }
 
@@ -77,9 +82,13 @@ migrate_home() {
 }
 
 update_code() {
+  if ! git -C "$REPO" diff --quiet -- pnpm-lock.yaml; then
+    run "cp '$REPO/pnpm-lock.yaml' '$REPO/pnpm-lock.yaml.pre-cairn'"
+    run "git -C '$REPO' checkout -q -- pnpm-lock.yaml"
+  fi
   run "git -C '$REPO' checkout -q --detach origin/main"
   if [ "$OS" = Darwin ]; then
-    run "(cd '$REPO' && pnpm install --frozen-lockfile)"
+    run "(cd '$REPO' && pnpm install --frozen-lockfile && pnpm --filter ./apps/web build)"
   else
     run "(export PATH=\"\$HOME/.local/share/mise/shims:\$PATH\"; cd '$REPO' && pnpm install --frozen-lockfile && pnpm --filter @xiechimon/cairn-cli build)"
   fi

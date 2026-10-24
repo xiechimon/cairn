@@ -542,6 +542,8 @@ interface PiMessageLike {
   provider?: string;
   model?: string;
   stopReason?: string;
+  rawStopReason?: string;
+  responseModel?: string;
   errorMessage?: string;
   usage?: {
     input?: number;
@@ -605,6 +607,8 @@ function toMessageRecord(msg: PiMessageLike): {
    * 携 stopReason=error）。messageRecordSchema loose 透传，不改 wire 面；
    * runner 消费判「错误行不是进展」（auto_retry 生命周期 / #654 回落闸）。 */
   stopReason?: string;
+  rawStopReason?: string;
+  responseModel?: string;
   /** per-message 用量（#927 追溯面）：pi 报的 usage（含 cost）原样随行——
    * 事件流上「该步成本 ← 哪次请求算出来的」可逐条对账。loose schema 透传，
    * 不改 wire 契约；无 usage 的消息（user/system 行）不带此位。 */
@@ -616,6 +620,8 @@ function toMessageRecord(msg: PiMessageLike): {
     role,
     content: msg.content ?? null,
     ...(msg.stopReason !== undefined ? { stopReason: msg.stopReason } : {}),
+    ...(msg.rawStopReason !== undefined ? { rawStopReason: msg.rawStopReason } : {}),
+    ...(msg.responseModel !== undefined ? { responseModel: msg.responseModel } : {}),
     ...(msg.usage !== undefined ? { usage: msg.usage } : {}),
   };
 }
@@ -805,6 +811,7 @@ class EventQueue {
 
 class PiSessionHandle implements AgentSessionHandle {
   readonly sessionId: string;
+  readonly sessionFile: string | undefined;
   readonly events: AsyncIterable<StepEvent>;
   private readonly queue = new EventQueue();
   private readonly state: MapState;
@@ -817,6 +824,7 @@ class PiSessionHandle implements AgentSessionHandle {
     diagnose?: (message: string) => string,
   ) {
     this.sessionId = session.sessionId;
+    this.sessionFile = session.sessionFile;
     this.state = newMapState(diagnose !== undefined ? { diagnose } : undefined);
     this.events = this.queue.iterable();
     session.subscribe((event) => {
