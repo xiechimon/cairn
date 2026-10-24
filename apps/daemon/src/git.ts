@@ -10,6 +10,7 @@
 
 import { spawn } from 'node:child_process';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
+import { loopbackNoProxy } from './proxy.js';
 
 export interface GitRunResult {
   /** 子进程退出码；signal 终止（含超时）时 = null（不映射为 0——signaled 退出
@@ -21,14 +22,21 @@ export interface GitRunResult {
   stderr: string;
 }
 
+const LOOPBACK_URL_HOSTS = ['127.0.0.1', 'localhost', '[::1]'];
+
 export function runGit(
   args: string[],
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
+    const env = { ...process.env, ...opts.env };
+    const noProxy = LOOPBACK_URL_HOSTS.reduce<string | undefined>(
+      (merged, host) => loopbackNoProxy({ NO_PROXY: merged }, `http://${host}`),
+      env.NO_PROXY ?? env.no_proxy,
+    );
     const child = spawn('git', args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: { ...env, NO_PROXY: noProxy, no_proxy: noProxy },
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
@@ -151,9 +159,8 @@ function inheritedGitConfigCount(parent: NodeJS.ProcessEnv): number {
 
 /** #1225 machine 路的 git env：执行机自己的 credential helper（osxkeychain /
  * store / gh）原样生效——**不**带 credential.helper 空值重置（那是 integration
- * 路的独有语义，见 gitCredentialEnv 注），也不碰代理变量（mea 的
- * HTTP_PROXY / NO_PROXY 语义只经进程环境传递，runGit 合并 process.env 原样
- * 透传）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。
+ * 路的独有语义，见 gitCredentialEnv 注），代理变量原样透传，只由 runGit 给
+ * 回环地址补进 NO_PROXY（#1635：全局 http.proxy 不能拦本机 server）。只补 TTY 守卫：无凭据时 git 快速失败而不是挂等不存在的终端。
  * Multica 先例（repocache gitEnv）：完整环境 + GIT_TERMINAL_PROMPT=0，服务端
  * 零分发 git 凭据。 */
 export function machineGitEnv(): NodeJS.ProcessEnv {

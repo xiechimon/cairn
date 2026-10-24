@@ -26,7 +26,7 @@
 | 只把图放进文件库、没有直接附在回复里 | Claude 线程 (2026-10-22) | 5 | 记忆 | 0 | 0 | 机器检查做不到 |
 | 开 PR 后挂着等 CI，不收工 | Claude 线程 (2026-10-22) | 3 | 项目指令：开 PR 打开 auto-merge 后收工 | 0 | 0 | 行为类，CI 不看线程动作 |
 | 等 ian 排优先级而停住 | Claude 线程 (2026-10-22) | 5 | 记忆：自己选顺序直接做 | 0 | 0 | 机器检查做不到，属判断错误 |
-| 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 0 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词 |
+| 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 1 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词；#1635 改写存量注释被闸判为新注释行，还原后转绿 |
 | 驱动脚本断言前没等元素出现就 `count()`，掩码行还没渲染就判 0 行，随后先猜「截图 mask 参数导致」改了一轮才隔离出真因 | #1478 (2026-10-24) | 2 | `drive.mjs` api-key 探针先 `waitFor` 掩码行再计数；不等就数的写法在全新栈上 10 次跑红 4 次（偶发），加等待后 5 次全 PASS；偶发失误做不成确定的负对照 | 0 | 0 | 猜因先改属判断错误，机器拦不住；可拦的半边是探针不等就数 |
 | 后台长任务用 `( ... & )` 或 nohup 起，工具调用一返回就被杀，随后还告诉 ian 任务在跑 | Claude 线程 (2026-10-22) | 2 | `scripts/dispatch-agent.mjs` start 脱离进程组启动并立即核对进程写状态文件，汇报前 `check` 读状态文件；负对照在 `scripts/dispatch-agent.test.mjs`（CI 独立 job）：旧写法直起的任务 check 报进程不存在 | 0 | 1 | 复发 1（先 pi，后 codex）后由 #1556 升级到级别 2 |
 | 解 `ci.yml` 冲突后，新步骤落在了另一个 job 里，推送前没看 hunk 所在 job | PR #1540 (2026-10-23) | 2 | `scripts/ci-job-structure-gate.mjs` 对照 `scripts/ci-job-structure-baseline.json` 钉住每个 job 的命名步骤，CI check job 装机前一步与 `pnpm prepush` 共用；负对照 = #1540 错误 hunk（freshness 步落进 comment-discipline-gate）在 `scripts/ci-job-structure-gate.test.mjs` 变红 | 1 | 0 | #1557 落地，级别 5 升 2；首拦：rebase 后 baseline 漏跟上游步骤迁移，闸拦下后才补 |
@@ -54,3 +54,4 @@
 | 开票前只搜了 issue，没查 spec：#1617 园丁巡检与 spec 28 P6「园丁」重复，#1618 没对上 P5a 进料入口 | #1617/#1618 (2026-10-24) | 5 | 记忆：给自举闭环相关的事开票前先 grep `docs/spec/28-*.md` 与 ADR 0021；两票已补评论改为 P6 园丁段、挂到 P5a 入口 | 0 | 0 | `scripts/dispatch-dedupe.mjs` 只查分支、PR、进程，不读 spec 正文；按关键词查 spec 误报太多，暂不做成闸 |
 | 分支上一张 PR 已合并，从 main 重切同名分支后用 `git push -f` 推送，违反 AGENTS.md「永远别 --force push」 | Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24) | 5 | 记忆：已合并分支重用时换新分支名推送，不强推 | 0 | 0 | 这次被覆盖的只有已 squash 进 main 的提交，没丢东西；pre-push 钩子能判非快进推送，留作升级候选 |
 | 新写的脚本测试把 cwd 设成真仓（`process.env.PWD`）去 `git rm` 基线文件，真仓的 `scripts/lint-warning-baseline.json` 被删出暂存区 | #1617 (2026-10-24) | 2 | `scripts/baseline-ratchet-gate.test.mjs` 在 before/after 钩子比较真仓 `git status --porcelain -- scripts`，测试只许碰自建的一次性仓 | 1 | 0 | 负对照：先加一条在真仓 `git rm` 基线的用例，after 钩子报 tests must only touch their own throwaway repos 变红；去掉该用例后恢复文件并转绿 |
+| 共机多车道下用 `pkill -f vitest` 按名字收尾，可能误杀别的车道的测试进程 | #1635 (2026-10-25) | 5 | 记忆式约定：只按自己启动的 pid 或进程组收尾 | 0 | 0 | 进程在仓外且归属无标记，仓内脚本检查不到；下次长测改用 `tee` 日志盯完成标记 |
