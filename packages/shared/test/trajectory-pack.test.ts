@@ -11,6 +11,7 @@ const pack = {
     agentId: 'agent-1',
     model: 'provider/model',
     skillInjection: null,
+    blockerHandoff: null,
     harnessHash: 'harness-v1',
   },
   process: {
@@ -71,6 +72,7 @@ describe('trajectoryPackSchema', () => {
       sourceRef: 'github:owner/repo#1',
       persona: 'code_reviewer',
       skillInjection: { hits: [] },
+      blockerHandoff: null,
     } satisfies TrajectoryPack['input'];
     const process = { steps: [], plans: [], token_usage: [] };
     expect(trajectoryPackSchema.parse({ ...pack, input, process })).toEqual({

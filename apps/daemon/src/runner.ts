@@ -35,6 +35,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendPlanLocationNote,
   appendWorkBranchNote,
@@ -257,7 +258,10 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
   if (!todo) return claimed.instruction ?? '';
   // #1406：claim 带来源两列；GitHub issue 导入任务的标题与正文进 issue 原文
   // 围栏（ADR 0021 D5），指令段留在围栏之外。
-  const taskText = buildTaskPromptText(todo.title, todo.spec, todo);
+  const taskText = appendBlockerHandoff(
+    buildTaskPromptText(todo.title, todo.spec, todo),
+    todo.blockerHandoff,
+  );
   // 缺席归一（zod optional：无该字段 = undefined ≠ null）。
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
@@ -1306,6 +1310,7 @@ async function runClaimedStep(
     opts.streamDurationCapMs ?? envDurationCapMs(process.env) ?? STREAM_DURATION_CAP_DEFAULT_MS;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
+  const runningToolCalls = new Set<string>();
   let watchdog: NodeJS.Timeout | null = null;
   let bodyTimeout: NodeJS.Timeout | null = null;
   let durationCap: NodeJS.Timeout | null = null;
@@ -1317,6 +1322,8 @@ async function runClaimedStep(
   };
   const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
     if (watchdog) clearTimeout(watchdog);
+    watchdog = null;
+    if (arm === 'idle' && runningToolCalls.size > 0) return;
     watchdog = setTimeout(() => tripTimeout(arm), ms);
     watchdog.unref?.();
   };
@@ -1326,6 +1333,8 @@ async function runClaimedStep(
   // 在案（数值独立可配；将来 idle 重置面收窄时它仍是兜底）。
   const armBodyTimeout = () => {
     if (bodyTimeout) clearTimeout(bodyTimeout);
+    bodyTimeout = null;
+    if (runningToolCalls.size > 0) return;
     bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
     bodyTimeout.unref?.();
   };
@@ -1580,11 +1589,16 @@ async function runClaimedStep(
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
+    runningToolCalls.clear();
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();
     try {
       for await (const ev of handle.events) {
+        if (ev.type === 'toolcall_end') {
+          if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
+          else runningToolCalls.delete(ev.call.id);
+        }
         armWatchdog(streamTimeouts.idle, 'idle');
         // body 预算与 idle 同拍按事件重置（#699 失败方式 1 的核心）。
         armBodyTimeout();
