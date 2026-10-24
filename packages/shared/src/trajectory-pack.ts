@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { blockerHandoffSchema } from './blocker-handoff-record.js';
 import { personaRoleSchema } from './records/agent.js';
 import { epochMs, recordId } from './records/common.js';
 import { transcriptRowSchema } from './records/message.js';
@@ -17,6 +18,7 @@ export const trajectoryPackSchema = z.object({
     agentId: recordId,
     model: z.string().min(1),
     skillInjection: skillInjectionSchema.nullable(),
+    blockerHandoff: blockerHandoffSchema.nullable(),
     harnessHash: z.string().min(1),
   }),
   process: z.object({

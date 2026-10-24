@@ -125,12 +125,13 @@ if (process.argv.includes('--check-reach')) {
       problem(path, 'drive script is not a case in vp-registry.json');
     }
   }
-  const result = spawnSync(process.execPath, [join(ROOT, 'scripts/e2e-affected.mjs'), '--check-coverage', '--', ...paths.filter(Boolean)], {
+  const specPaths = [...new Set(paths)].filter((path) => path.endsWith('.spec.ts'));
+  const coverage = specPaths.length === 0 ? { status: 0 } : spawnSync(process.execPath, [join(ROOT, 'scripts/e2e-affected.mjs'), '--check-coverage', '--', ...specPaths], {
     cwd: ROOT,
     stdio: 'inherit',
   });
   for (const p of problems) console.log(`vp-registry-gate: ${p}`);
-  process.exit(problems.length > 0 || result.status !== 0 ? 1 : 0);
+  process.exit(problems.length > 0 || coverage.status !== 0 ? 1 : 0);
 }
 
 if (cases.length === 0) problems.push('vp-registry.json has no cases');

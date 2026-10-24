@@ -1,4 +1,5 @@
 import { StrictMode } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.js';
 import { applyDensity, readStoredDensity } from './density.js';
@@ -25,11 +26,13 @@ if (container == null) {
   throw new Error('#root missing in index.html');
 }
 
-createRoot(container).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+flushSync(() => {
+  createRoot(container).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+});
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
     document.getElementById('boot')?.remove();
