@@ -200,6 +200,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               agentId: assigned?.id,
               model: runtimeModel ?? (usage.length === 1 ? usage[0]?.model : undefined),
               skillInjection: first?.skillInjection ?? null,
+              blockerHandoff: steps.find((s) => s.blockerHandoff !== null)?.blockerHandoff ?? null,
             },
             process: {
               steps: processSteps,

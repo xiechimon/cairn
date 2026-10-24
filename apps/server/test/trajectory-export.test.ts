@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CONFIRM_ANNOUNCEMENT, MERGE_ANNOUNCEMENT, trajectoryPackSchema } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import { openDbWithHandle } from '../src/db/client.js';
 import {
@@ -126,6 +127,7 @@ test('exports a complete validated pack from a readonly sqlite snapshot', () => 
     persona: null,
     model: 'test/model',
     skillInjection: { hits: [] },
+    blockerHandoff: null,
   });
   expect(pack.process.steps).toEqual([
     {
@@ -259,6 +261,45 @@ test('redacts a token throughout nested exported values and counts replacements'
   expect(text).toContain('[REDACTED]');
   expect(result.stdout).toContain('redacted=2');
   expect(trajectoryPackSchema.safeParse(JSON.parse(text.trim())).success).toBe(true);
+});
+
+test('exports the blocker handoff snapshot and redacts secrets inside it', () => {
+  const token = `ghp_${'B'.repeat(36)}`;
+  const { home, dbPath } = fixture();
+  const handoff = {
+    blockers: [
+      {
+        todoId: 'todo-0',
+        title: 'Upstream',
+        phase: 'done' as const,
+        delivery: { kind: 'pr' as const, number: 7, url: null, title: 'Upstream PR' },
+        changedFiles: ['a.ts'],
+        omittedFiles: 0,
+        summary: `Leaked ${token}`,
+      },
+    ],
+  };
+  const opened = openDbWithHandle(dbPath);
+  opened.db
+    .insert(step)
+    .values({ id: 'step-2', buildId: 'build-1', kind: 'build', createdAt: 1002 })
+    .run();
+  opened.db.update(step).set({ blockerHandoff: handoff }).where(eq(step.id, 'step-2')).run();
+  opened.close();
+  writeFileSync(
+    join(home, 'server/attachments/step-sessions/step-2.jsonl'),
+    `${JSON.stringify({ type: 'message', message: { role: 'user', content: [{ type: 'text', text: 'go' }] } })}\n`,
+  );
+  const out = join(home, 'handoff.jsonl');
+  const result = run(home, ['--build', 'build-1', '--out', out]);
+  expect(result.status, result.stderr).toBe(0);
+  const text = readFileSync(out, 'utf8');
+  expect(text).not.toContain(token);
+  const pack = trajectoryPackSchema.parse(JSON.parse(text.trim()));
+  expect(pack.input.blockerHandoff).toEqual({
+    blockers: [{ ...handoff.blockers[0], summary: 'Leaked [REDACTED]' }],
+  });
+  expect(result.stdout).toContain('redacted=1');
 });
 
 test.each(['server.db', 'server.db-wal'])(
