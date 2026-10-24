@@ -16,7 +16,15 @@
 // 保持 #56–#75 行为字节不变。
 import { canOrchestrate } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { activityStore } from '../api/activity.js';
 import { agentTodoStore } from '../api/agent-todo.js';
@@ -391,7 +399,7 @@ export function TodoDetailPage() {
   // either; it survives the navigation as a cross-route resident). Its inner
   // popovers (thread switcher etc.) portal as separate nodes without the
   // .chief-drawer class and still consume the key first per the layering law.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       const openSurface = document.querySelector(

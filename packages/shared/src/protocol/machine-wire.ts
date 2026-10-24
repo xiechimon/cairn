@@ -9,6 +9,7 @@
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
 import { agentTodoReportSchema } from '../agent-todo.js';
+import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { epochMs, recordId } from '../records/common.js';
 import { machineRecordSchema } from '../records/machine.js';
 import { messageRoleSchema, transcriptRowSchema } from '../records/message.js';
@@ -179,6 +180,7 @@ export const claimedStepSchema = z.object({
        * 现行为）；旧 daemon 按 zod strip 忽略。 */
       sourceKind: z.string().nullable().optional(),
       sourceRef: z.string().nullable().optional(),
+      blockerHandoff: blockerHandoffSchema.optional(),
     })
     .optional(),
   /** worker 步项目面；chief 步 = 探索基座（可缺省 = 裸目录回合）。 */

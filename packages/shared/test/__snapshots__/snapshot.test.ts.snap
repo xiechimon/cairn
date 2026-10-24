@@ -298,6 +298,138 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
     "todo": {
       "additionalProperties": false,
       "properties": {
+        "blockerHandoff": {
+          "additionalProperties": false,
+          "properties": {
+            "blockers": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "changedFiles": {
+                    "items": {
+                      "type": "string",
+                    },
+                    "type": "array",
+                  },
+                  "delivery": {
+                    "anyOf": [
+                      {
+                        "oneOf": [
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "kind": {
+                                "const": "pr",
+                                "type": "string",
+                              },
+                              "number": {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer",
+                              },
+                              "title": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                              "url": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "number",
+                              "url",
+                              "title",
+                            ],
+                            "type": "object",
+                          },
+                          {
+                            "additionalProperties": false,
+                            "properties": {
+                              "branch": {
+                                "type": "string",
+                              },
+                              "head": {
+                                "type": [
+                                  "string",
+                                  "null",
+                                ],
+                              },
+                              "kind": {
+                                "const": "branch",
+                                "type": "string",
+                              },
+                            },
+                            "required": [
+                              "kind",
+                              "branch",
+                              "head",
+                            ],
+                            "type": "object",
+                          },
+                        ],
+                      },
+                      {
+                        "type": "null",
+                      },
+                    ],
+                  },
+                  "omittedFiles": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "phase": {
+                    "enum": [
+                      "todo",
+                      "queued",
+                      "planning",
+                      "confirm",
+                      "building",
+                      "review",
+                      "done",
+                      "failed",
+                      "closed",
+                    ],
+                    "type": "string",
+                  },
+                  "summary": {
+                    "type": [
+                      "string",
+                      "null",
+                    ],
+                  },
+                  "title": {
+                    "type": "string",
+                  },
+                  "todoId": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "todoId",
+                  "title",
+                  "phase",
+                  "delivery",
+                  "changedFiles",
+                  "omittedFiles",
+                  "summary",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
+          },
+          "required": [
+            "blockers",
+          ],
+          "type": "object",
+        },
         "id": {
           "type": "string",
         },
@@ -690,6 +822,138 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
             "todo": {
               "additionalProperties": false,
               "properties": {
+                "blockerHandoff": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "blockers": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "changedFiles": {
+                            "items": {
+                              "type": "string",
+                            },
+                            "type": "array",
+                          },
+                          "delivery": {
+                            "anyOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "pr",
+                                        "type": "string",
+                                      },
+                                      "number": {
+                                        "maximum": 9007199254740991,
+                                        "minimum": -9007199254740991,
+                                        "type": "integer",
+                                      },
+                                      "title": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                      "url": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "number",
+                                      "url",
+                                      "title",
+                                    ],
+                                    "type": "object",
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "branch": {
+                                        "type": "string",
+                                      },
+                                      "head": {
+                                        "type": [
+                                          "string",
+                                          "null",
+                                        ],
+                                      },
+                                      "kind": {
+                                        "const": "branch",
+                                        "type": "string",
+                                      },
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "branch",
+                                      "head",
+                                    ],
+                                    "type": "object",
+                                  },
+                                ],
+                              },
+                              {
+                                "type": "null",
+                              },
+                            ],
+                          },
+                          "omittedFiles": {
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer",
+                          },
+                          "phase": {
+                            "enum": [
+                              "todo",
+                              "queued",
+                              "planning",
+                              "confirm",
+                              "building",
+                              "review",
+                              "done",
+                              "failed",
+                              "closed",
+                            ],
+                            "type": "string",
+                          },
+                          "summary": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "title": {
+                            "type": "string",
+                          },
+                          "todoId": {
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "todoId",
+                          "title",
+                          "phase",
+                          "delivery",
+                          "changedFiles",
+                          "omittedFiles",
+                          "summary",
+                        ],
+                        "type": "object",
+                      },
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "blockers",
+                  ],
+                  "type": "object",
+                },
                 "id": {
                   "type": "string",
                 },
@@ -2965,6 +3229,138 @@ exports[`body/封套 schema 快照 > conversationStreamEvent > conversationStrea
         "step": {
           "additionalProperties": false,
           "properties": {
+            "blockerHandoff": {
+              "additionalProperties": false,
+              "properties": {
+                "blockers": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "changedFiles": {
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "delivery": {
+                        "anyOf": [
+                          {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "pr",
+                                    "type": "string",
+                                  },
+                                  "number": {
+                                    "maximum": 9007199254740991,
+                                    "minimum": -9007199254740991,
+                                    "type": "integer",
+                                  },
+                                  "title": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                  "url": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "number",
+                                  "url",
+                                  "title",
+                                ],
+                                "type": "object",
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "branch": {
+                                    "type": "string",
+                                  },
+                                  "head": {
+                                    "type": [
+                                      "string",
+                                      "null",
+                                    ],
+                                  },
+                                  "kind": {
+                                    "const": "branch",
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "kind",
+                                  "branch",
+                                  "head",
+                                ],
+                                "type": "object",
+                              },
+                            ],
+                          },
+                          {
+                            "type": "null",
+                          },
+                        ],
+                      },
+                      "omittedFiles": {
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "phase": {
+                        "enum": [
+                          "todo",
+                          "queued",
+                          "planning",
+                          "confirm",
+                          "building",
+                          "review",
+                          "done",
+                          "failed",
+                          "closed",
+                        ],
+                        "type": "string",
+                      },
+                      "summary": {
+                        "type": [
+                          "string",
+                          "null",
+                        ],
+                      },
+                      "title": {
+                        "type": "string",
+                      },
+                      "todoId": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "todoId",
+                      "title",
+                      "phase",
+                      "delivery",
+                      "changedFiles",
+                      "omittedFiles",
+                      "summary",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
+              },
+              "required": [
+                "blockers",
+              ],
+              "type": "object",
+            },
             "buildId": {
               "type": "string",
             },
@@ -4123,6 +4519,138 @@ exports[`body/封套 schema 快照 > stepJournalRow > stepJournalRow.json 1`] = 
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "blockerHandoff": {
+      "additionalProperties": false,
+      "properties": {
+        "blockers": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "changedFiles": {
+                "items": {
+                  "type": "string",
+                },
+                "type": "array",
+              },
+              "delivery": {
+                "anyOf": [
+                  {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "pr",
+                            "type": "string",
+                          },
+                          "number": {
+                            "maximum": 9007199254740991,
+                            "minimum": -9007199254740991,
+                            "type": "integer",
+                          },
+                          "title": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "url": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "number",
+                          "url",
+                          "title",
+                        ],
+                        "type": "object",
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "branch": {
+                            "type": "string",
+                          },
+                          "head": {
+                            "type": [
+                              "string",
+                              "null",
+                            ],
+                          },
+                          "kind": {
+                            "const": "branch",
+                            "type": "string",
+                          },
+                        },
+                        "required": [
+                          "kind",
+                          "branch",
+                          "head",
+                        ],
+                        "type": "object",
+                      },
+                    ],
+                  },
+                  {
+                    "type": "null",
+                  },
+                ],
+              },
+              "omittedFiles": {
+                "maximum": 9007199254740991,
+                "minimum": 0,
+                "type": "integer",
+              },
+              "phase": {
+                "enum": [
+                  "todo",
+                  "queued",
+                  "planning",
+                  "confirm",
+                  "building",
+                  "review",
+                  "done",
+                  "failed",
+                  "closed",
+                ],
+                "type": "string",
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null",
+                ],
+              },
+              "title": {
+                "type": "string",
+              },
+              "todoId": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "todoId",
+              "title",
+              "phase",
+              "delivery",
+              "changedFiles",
+              "omittedFiles",
+              "summary",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
+      },
+      "required": [
+        "blockers",
+      ],
+      "type": "object",
+    },
     "buildId": {
       "type": "string",
     },
