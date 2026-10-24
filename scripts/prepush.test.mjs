@@ -23,10 +23,28 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
+    'node scripts/e2e-affected.mjs --check-coverage',
     'node scripts/prepush-vitest.mjs',
     'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])
     assert.ok(commands.includes(command), command);
+});
+
+test('e2e coverage check passes on the real suite and names an unmapped spec', () => {
+  const ciCommands = prepushPlan(['apps/web/src/main.tsx'], 'ci').map((args) => args.join(' '));
+  assert.ok(ciCommands.includes('node scripts/e2e-affected.mjs --check-coverage'));
+  const suite = spawnSync(process.execPath, ['scripts/e2e-affected.mjs', '--check-coverage'], {
+    encoding: 'utf8',
+  });
+  assert.equal(suite.status, 0, suite.stdout);
+  const probe = 'apps/web/e2e/zz-unmapped-probe.spec.ts';
+  const unmapped = spawnSync(
+    process.execPath,
+    ['scripts/e2e-affected.mjs', '--check-coverage', probe],
+    { encoding: 'utf8' },
+  );
+  assert.equal(unmapped.status, 1);
+  assert.match(unmapped.stdout, new RegExp(`${probe}: no family table entry reaches this spec`));
 });
 
 test('CI shares the plan but keeps advisory and full e2e in separate jobs', () => {
