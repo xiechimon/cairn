@@ -65,6 +65,8 @@ const EXECUTABLE_RE = EVIDENCE_EXECUTABLE_EXTENSIONS.map((ext) => protectedRe(`*
 const SAFE_PATH = /^[\p{L}\p{M}\p{N}._/@+%-]+$/u;
 
 const matches = (path: string, res: readonly RegExp[]) => res.some((re) => re.test(path));
+export const pathHitsProtectedCategory = (path: string): boolean =>
+  matches(path, PROTECTED_RE) || !SAFE_PATH.test(path);
 const isTestPath = (path: string) => TEST_DIR_RE.test(path) || TEST_FILE_RE.test(path);
 
 export interface PathFindings {

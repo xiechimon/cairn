@@ -14,6 +14,9 @@ import { diffFileSchema } from './document-diff.js';
  * 用户本机既有 git 工作树仓（#352/spec 12，daemon 镜像 clone 执行）。
  * hosted/github wire 值 [推断] 可改判。 */
 export const PROJECT_REPO_KINDS = ['hosted', 'github', 'local'] as const;
+export const SPLIT_POLICIES = ['human', 'shadow', 'auto'] as const;
+export const splitPolicySchema = z.enum(SPLIT_POLICIES);
+export type SplitPolicy = z.infer<typeof splitPolicySchema>;
 export const projectRepoKindSchema = z.enum(PROJECT_REPO_KINDS);
 export type ProjectRepoKind = z.infer<typeof projectRepoKindSchema>;
 
@@ -21,6 +24,7 @@ export const projectRecordSchema = z.object({
   id: recordId,
   name: z.string(),
   teamId: recordId,
+  splitPolicy: splitPolicySchema.default('human'),
   /** 项目描述（#1242 设置页可编辑面）：可空，null/缺键 = 无描述（行值
    * null 时 toProjectRecord 不带键——与 repoKind 等可空列同口径）。 */
   description: z.string().optional(),
@@ -119,6 +123,7 @@ export type CreateProjectBody = z.infer<typeof createProjectBodySchema>;
 export const patchProjectBodySchema = z
   .object({
     name: z.string().optional(),
+    splitPolicy: splitPolicySchema.optional(),
     description: z.string().nullish(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),

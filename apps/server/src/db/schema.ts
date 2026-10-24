@@ -23,6 +23,7 @@ import type {
   ProviderModel,
   RequiredCapabilities,
   SkillInjectionRecord,
+  SplitPolicy,
   StepKind,
   TodoSourceKind,
   TriggerSource,
@@ -67,6 +68,7 @@ export const project = sqliteTable('project', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   /** 项目描述（#1242 设置页可编辑面；PATCH 五字段之一）。可空 = 无描述。 */
   description: text('description'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),

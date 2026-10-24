@@ -6843,6 +6843,15 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > 
     "repoName": {
       "type": "string",
     },
+    "splitPolicy": {
+      "default": "human",
+      "enum": [
+        "human",
+        "shadow",
+        "auto",
+      ],
+      "type": "string",
+    },
     "teamId": {
       "type": "string",
     },
@@ -6851,6 +6860,7 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > project > 
     "id",
     "name",
     "teamId",
+    "splitPolicy",
   ],
   "type": "object",
 }
