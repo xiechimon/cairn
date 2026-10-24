@@ -6,7 +6,9 @@
 // upsertMessage / upsertChiefRow）；路由面 = routes-machine.ts 的
 // upload-urls / upload 端点，一次性位 = context.ts uploads Map。
 
-import type { TranscriptUpload } from '@cairn/shared';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { SESSION_JSONL_MAX_BYTES, type TranscriptUpload } from '@cairn/shared';
 import { desc, eq } from 'drizzle-orm';
 import { build, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -144,4 +146,40 @@ export function receiveUpload(
       createdAt: m.createdAt,
     });
   }
+}
+
+export function stepSessionPath(attachmentsDir: string, stepId: string): string {
+  return join(attachmentsDir, 'step-sessions', `${stepId}.jsonl`);
+}
+
+export function receiveSessionUpload(
+  deps: MachineDeps,
+  upload: PendingUpload,
+  content: string,
+): void {
+  ownedStep(deps, upload.machineId, upload.stepId);
+  const size = Buffer.byteLength(content, 'utf8');
+  if (size > SESSION_JSONL_MAX_BYTES) {
+    throw new HttpError(413, `session jsonl ${size}B over ${SESSION_JSONL_MAX_BYTES}B cap`);
+  }
+  const dest = stepSessionPath(deps.attachmentsDir, upload.stepId);
+  mkdirSync(join(deps.attachmentsDir, 'step-sessions'), { recursive: true });
+  writeFileSync(dest, content, 'utf8');
+}
+
+export function readStepSession(attachmentsDir: string, stepId: string): string | null {
+  const dest = stepSessionPath(attachmentsDir, stepId);
+  if (!existsSync(dest)) return null;
+  return readFileSync(dest, 'utf8');
+}
+
+export function getStepSession(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+): { stepId: string; content: string } {
+  ownedStep(deps, machineId, stepId);
+  const content = readStepSession(deps.attachmentsDir, stepId);
+  if (content === null) throw new HttpError(404, 'session not found');
+  return { stepId, content };
 }

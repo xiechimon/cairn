@@ -546,6 +546,15 @@ export const transcriptUploadSchema = z.object({
 });
 export type TranscriptUpload = z.infer<typeof transcriptUploadSchema>;
 
+export const SESSION_FILE_NAME = 'session.jsonl';
+export const SESSION_JSONL_MAX_BYTES = 10 * 1024 * 1024;
+
+export const machineSessionResponseSchema = z.object({
+  stepId: recordId,
+  content: z.string(),
+});
+export type MachineSessionResponse = z.infer<typeof machineSessionResponseSchema>;
+
 /** findingsError（#700 B-C13）长度上限：daemon 组装侧截断在 500 字符内，
  * 本值 = schema 面第二道闸（同 SHELL_OUTPUT_CHAR_LIMIT 之律，防 bug
  * daemon 单条打爆 DB）。 */
@@ -791,6 +800,11 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'PUT',
     path: '/api/machine/upload/{uploadId}',
     reason: '[设计] upload-urls 预签名落地（self-host 无对象存储）；一次性 uploadId',
+  },
+  {
+    method: 'GET',
+    path: '/api/machine/session/{stepId}',
+    reason: '[设计] #1512 按 stepId 取回步收尾上传的原始会话 JSONL（session.jsonl）',
   },
   {
     method: 'POST',

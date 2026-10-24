@@ -237,6 +237,9 @@ export function commitEnv(identity: CommitIdentity): NodeJS.ProcessEnv {
 }
 
 const META_TIMEOUT_MS = 30_000;
+/** 工作区检出预算：worktree add/remove 要写全部文件（本仓 8507 个），负载高的 Mac 上实测 45s，
+ * 超过 META 的 30s 被 SIGTERM（todo #82 两次构建失败于「Could not write new index file」）。 */
+const CHECKOUT_TIMEOUT_MS = 300_000;
 /** 网络面预算（02 §5.5 重试预算行：push 覆盖 git-host 5xx 窗口；冷 worktree
  * ls-remote+fetch「~2 min typical, ~8 min worst on /done's path」r3 原文）。 */
 const NET_TIMEOUT_MS = 480_000;
@@ -374,13 +377,13 @@ export const gitPrim = {
       base !== null
         ? ['worktree', 'add', '-b', branch, dir, base]
         : ['worktree', 'add', dir, branch];
-    await runGitOk(args, { cwd: repoDir, timeoutMs: META_TIMEOUT_MS });
+    await runGitOk(args, { cwd: repoDir, timeoutMs: CHECKOUT_TIMEOUT_MS });
   },
 
   async worktreeRemoveForce(repoDir: string, dir: string): Promise<void> {
     await runGitOk(['worktree', 'remove', '--force', dir], {
       cwd: repoDir,
-      timeoutMs: META_TIMEOUT_MS,
+      timeoutMs: CHECKOUT_TIMEOUT_MS,
     });
   },
 

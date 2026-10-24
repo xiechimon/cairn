@@ -83,6 +83,11 @@ jobs:
       - name: PR evidence workflow shape gate
         run: node scripts/pr-evidence-workflow-gate.mjs
 
+      - name: CI job structure gate (#1557)
+        run: |
+          node --test scripts/ci-job-structure-gate.test.mjs
+          node scripts/ci-job-structure-gate.mjs
+
       # components/ui registry 闸（#989，地图 #980）：白名单清单 + 内容 hash
       # 账本 + pristine 件对照 vendored 上游快照 + 状态棘轮（S5 对照 base
       # manifest，复用上面已 fetch 的 base sha）。手写原语进 components/ui
@@ -392,6 +397,13 @@ jobs:
         run: |
           node --test scripts/npm-command-gate.test.mjs
           node scripts/npm-command-gate.mjs
+
+  dispatch-agent-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: Dispatch agent start/check round trip (#1556)
+        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs
 
   closing-keyword-gate:
     if: github.event_name == 'pull_request'
