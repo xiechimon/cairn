@@ -25,7 +25,7 @@ const MAX_SKEPTICS = 4
 
 // ADR 0021 D4, decided here so routing to the user does not depend on a
 // reviewer remembering it. Default deny: only AUTO_MERGE paths (product source
-// and tests, docs/verify evidence) may auto-merge, and only when no PROTECTED
+// and tests, docs/verify evidence, Markdown under docs/) may auto-merge, and only when no PROTECTED
 // class matches them; every other path, deleted test files, binary files
 // outside docs/verify, and patches over 800 lines or 40 files route to the
 // user. pr-gate runs 3, 4 and 5 each found another agent-steering or gate
@@ -41,6 +41,7 @@ const AUTO_MERGE = [
   'packages/*/test/**',
   'integration/test/**',
   'docs/verify/**',
+  'docs/**/*.md',
 ]
 const PROTECTED = [
   // CI, hooks, and what steers agents (rules, skills, settings, workflows)
@@ -55,6 +56,7 @@ const PROTECTED = [
   '**/AGENTS*.md',
   'docs/pr-review.md',
   'docs/adr/**',
+  'docs/spec/**',
   // gate scripts and their data, and every config that decides what a check covers
   '**/scripts/**',
   '**/*.config.*',
@@ -414,7 +416,7 @@ const outside = allFiles.filter(
 )
 const humanReasons = [
   ...(protectedPaths.length > 0 ? [`protected paths: ${protectedPaths.join(', ')}`] : []),
-  ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify): ${outside.join(', ')}`] : []),
+  ...(outside.length > 0 ? [`outside the auto-merge set (product source, tests, docs/verify, Markdown under docs/): ${outside.join(', ')}`] : []),
   ...(deletedTests.length > 0 ? [`deleted test files: ${deletedTests.join(', ')}`] : []),
   ...(opaque.length > 0 ? [`binary files outside docs/verify (no line count, no readable diff): ${opaque.join(', ')}`] : []),
   ...(lines > MAX_LINES ? [`${lines} lines changed (over ${MAX_LINES})`] : []),

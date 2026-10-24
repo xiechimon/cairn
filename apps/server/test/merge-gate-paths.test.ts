@@ -61,6 +61,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
+    ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
     ['配置', 'apps/web/vite.config.mts', 'apps/web/src/config.ts'],
     ['biome', 'apps/web/biome.jsonc', 'apps/web/src/biome.ts'],
@@ -324,7 +325,13 @@ describe('default deny: anything outside the auto-merge set is left to a human',
   });
 
   test('out-of-set paths (docs, root files, public) are each listed', () => {
-    const files = ['docs/spec/28-x.md', 'README.md', 'CONTEXT.md', 'apps/web/public/x.svg'];
+    const files = [
+      'docs/research/assets/r1/sw.js',
+      'docs/research/assets/r1/asset-manifest.json',
+      'README.md',
+      'CONTEXT.md',
+      'apps/web/public/x.svg',
+    ];
     expect(classify(files.map((p) => f(p))).outsideAutoMerge).toEqual(files);
   });
 
@@ -352,9 +359,51 @@ describe('default deny: anything outside the auto-merge set is left to a human',
 
   test('a rename from out of set into the set: recorded out of set by the original path', () => {
     const r = classify([
-      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'docs/spec/x.md' }),
+      f('apps/web/src/x.ts', { status: 'renamed', previousFilename: 'README.md' }),
     ]);
-    expect(r.outsideAutoMerge).toEqual(['docs/spec/x.md']);
+    expect(r.outsideAutoMerge).toEqual(['README.md']);
+  });
+});
+
+describe('docs-only (#1621): Markdown under docs/ is in the set; design decisions, ADRs and review policies stay human', () => {
+  test('Markdown at any depth under docs/ is in the set', () => {
+    const files = ['docs/lessons.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
+    const r = classify(files.map((p) => f(p)));
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([]);
+  });
+
+  test('protected doc paths still match under case or Unicode folding and never land in the set', () => {
+    for (const p of [
+      'docs/ADR/0021-x.md',
+      'Docs/Adr/0021-x.md',
+      'docs/SPEC/28-x.md',
+      'docs/\u{17F}pec/28-x.md',
+      'docs/PR-Review.md',
+      'doc\u{17F}/pr-review.md',
+      'doc\u{17F}/adr/0021-x.md',
+      'docs/spec',
+    ]) {
+      const asciiFold = p.normalize('NFKC').toLowerCase();
+      expect(classify([f(asciiFold)]).protected, `${p} folds to ${asciiFold}`).toEqual([asciiFold]);
+      const r = classify([f(p, { status: 'added' })]);
+      expect(r.protected, p).toEqual([p]);
+      expect(r.outsideAutoMerge, p).toEqual([]);
+    }
+  });
+
+  test('a name that only looks like docs after Unicode folding falls outside', () => {
+    const p = 'doc\u{17F}/x.md';
+    const r = classify([f(p, { status: 'added' })]);
+    expect(r.protected).toEqual([]);
+    expect(r.outsideAutoMerge).toEqual([p]);
+  });
+
+  test('a rename moving an ADR to a plain doc is protected by the original name', () => {
+    const r = classify([
+      f('docs/notes/0021.md', { status: 'renamed', previousFilename: 'docs/adr/0021-x.md' }),
+    ]);
+    expect(r.protected).toEqual(['docs/adr/0021-x.md']);
   });
 });
 

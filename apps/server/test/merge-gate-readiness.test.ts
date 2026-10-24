@@ -976,6 +976,48 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
   });
 });
 
+describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected docs mixed in stay human', () => {
+  const docsOnly = [
+    file('docs/lessons.md'),
+    file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
+  ];
+
+  test('shadow with only docs/ Markdown changed: ready, no blockers', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, docsOnly);
+    const r = mergeReadiness(i);
+    expect(r.blockers).toEqual([]);
+    expect(r.ready).toBe(true);
+    expect(r.policy).toBe('shadow');
+  });
+
+  test('shadow with docs/spec or a case-variant docs/ADR mixed in: protected-path stays human', () => {
+    for (const name of ['docs/spec/28-x.md', 'docs/ADR/0021-x.md', 'docs/\u{17F}pec/28-x.md']) {
+      const i = green();
+      i.policy.mergePolicy = 'shadow';
+      setFiles(i, [...docsOnly, file(name)]);
+      expect(classesOf(i), name).toEqual([['protected-path', 'human', `"${name}"`]]);
+    }
+  });
+
+  test('shadow with a non-Markdown file under docs mixed in: outside-auto-merge stays human', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('docs/research/assets/r1/sw.js')]);
+    expect(classesOf(i)).toEqual([
+      ['outside-auto-merge', 'human', '"docs/research/assets/r1/sw.js"'],
+    ]);
+  });
+
+  test('deleted tests still stay human: a docs patch with a removed test file inside', () => {
+    const i = green();
+    i.policy.mergePolicy = 'shadow';
+    setFiles(i, [...docsOnly, file('apps/server/test/old.test.ts', { status: 'removed' })]);
+    expect(codesOf(i)).toEqual(['test-deleted']);
+  });
+});
+
 describe('mergeReadiness: a malformed compare is left to a human, evidence must come from this PR, checks are trusted only when fully read', () => {
   test('compare read but malformed: the human compare-malformed, not the waitable patch-unavailable', () => {
     const a = green();
