@@ -7935,6 +7935,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表
 [
   "policy-human: policy, 项目策略为人工合并",
   "autonomy-paused: policy, 自治合并已暂停",
+  "daily-cap: policy, 当日自治合并数已达上限",
   "not-applicable: policy, 不是 GitHub PR 形态的构建",
   "not-current-build: transient, 不是任务的当前构建",
   "phase-not-review: transient, 任务不在审核关口",
@@ -7942,6 +7943,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 合并闸 blocker 词表
   "pr-unreadable: transient, 读不到 PR 或仓库默认分支，或 PR 的 head 不是可用的 SHA",
   "pr-not-open: human, PR 已合并或已关闭",
   "pr-draft: transient, PR 是草稿",
+  "pr-behind-base: transient, PR 落后于目标分支或落后数未知",
   "pr-from-fork: human, PR 来自 fork",
   "base-not-default: human, PR 的目标分支不是默认分支",
   "mergeable-state: transient, GitHub 判定暂不可合并",

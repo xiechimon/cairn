@@ -9,7 +9,8 @@
     "node": ">=22.19.0"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./merge-gate": "./src/records/merge-gate.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
