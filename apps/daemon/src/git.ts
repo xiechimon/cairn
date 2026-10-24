@@ -9,6 +9,8 @@
 // 不进 .git/config、不进 ~/.git-credentials、不落任何盘。
 
 import { spawn } from 'node:child_process';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 import { loopbackNoProxy } from './proxy.js';
 
@@ -385,6 +387,25 @@ export const gitPrim = {
         ? ['worktree', 'add', '-b', branch, dir, base]
         : ['worktree', 'add', dir, branch];
     await runGitOk(args, { cwd: repoDir, timeoutMs: CHECKOUT_TIMEOUT_MS });
+  },
+
+  async exportTree(repoDir: string, ref: string, dir: string): Promise<void> {
+    const indexFile = join(dir, '.cairn-export-index');
+    const env = { GIT_INDEX_FILE: indexFile };
+    try {
+      await runGitOk(['read-tree', '--end-of-options', ref], {
+        cwd: repoDir,
+        env,
+        timeoutMs: META_TIMEOUT_MS,
+      });
+      await runGitOk(['--work-tree', dir, 'checkout-index', '--all', '--force'], {
+        cwd: repoDir,
+        env,
+        timeoutMs: CHECKOUT_TIMEOUT_MS,
+      });
+    } finally {
+      rmSync(indexFile, { force: true });
+    }
   },
 
   async worktreeRemoveForce(repoDir: string, dir: string): Promise<void> {

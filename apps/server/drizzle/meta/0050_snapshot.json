@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9fc57f08-2db1-43d5-a0f4-0557e4ce7bf8",
+  "id": "81e12114-f466-4e7d-9a40-819050df2018",
   "prevId": "1fe87657-3e7a-4f21-9211-4aed5c693a2c",
   "tables": {
     "agent": {
@@ -246,14 +246,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "history": {
-          "name": "history",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         },
         "createdAt": {
           "name": "createdAt",
@@ -773,6 +765,13 @@
         },
         "harnessHash": {
           "name": "harnessHash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reportAttachmentId": {
+          "name": "reportAttachmentId",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -1745,37 +1744,6 @@
         },
         "at": {
           "name": "at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "memory_save_conflict": {
-      "name": "memory_save_conflict",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "candidateIds": {
-          "name": "candidateIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3020,6 +2988,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "output": {
+          "name": "output",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'code'"
         }
       },
       "indexes": {},

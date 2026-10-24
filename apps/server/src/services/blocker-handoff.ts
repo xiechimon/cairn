@@ -9,6 +9,7 @@ import { and, asc, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, message, step, todo } from '../db/schema.js';
 import { type FetchLike, githubPull } from '../lib/github.js';
+import { readAttachmentMeta } from './attachments.js';
 import { extractText } from './chief.js';
 import { githubRepoOfProject, projectOfTodo, readBuildChanges } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
@@ -21,6 +22,7 @@ export interface BlockerHandoffDeps {
   box?: Parameters<typeof githubTokenOrNull>[0]['box'];
   reposDir: string;
   githubFetch?: FetchLike;
+  attachmentsDir: string;
 }
 
 export async function blockerHandoffForClaim(
@@ -99,6 +101,21 @@ export async function blockerHandoffForClaim(
       };
     }
     const changes = await readBuildChanges(deps, buildRow.id).catch(() => ({ files: [] }));
+    const report =
+      blockerRow.output === 'info' && buildRow.reportAttachmentId !== null
+        ? (() => {
+            try {
+              const attachment = readAttachmentMeta(
+                { db: deps.db, attachmentsDir: deps.attachmentsDir },
+                todoRow.teamId,
+                buildRow.reportAttachmentId,
+              );
+              return { attachmentId: attachment.id, content: attachment.content };
+            } catch {
+              return undefined;
+            }
+          })()
+        : undefined;
     const assistantRows = deps.db
       .select({ content: message.content })
       .from(message)
@@ -115,6 +132,7 @@ export async function blockerHandoffForClaim(
       delivery,
       ...clipHandoffFiles(changes.files.map((file) => file.path)),
       summary: lastText === undefined ? null : clipHandoffSummary(lastText),
+      ...(report !== undefined ? { report } : {}),
     });
   }
   return blockers.length === 0 ? null : { blockers };

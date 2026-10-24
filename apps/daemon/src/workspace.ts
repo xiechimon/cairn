@@ -12,7 +12,15 @@
 // - 防分叉护栏 REMOTE_BRANCH_DIVERGED（shared RemoteBranchDivergedError）。
 // git spawn 一律经 git.ts 原语（缝纪律，01 §7.3）。
 
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
   type BoundGitCredentials,
@@ -25,6 +33,8 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
+  READONLY_EXPORT_MARKER,
+  ReadOnlyWorkspaceError,
   RemoteBranchDivergedError,
   WORKSPACE_HOOK_TIMEOUT_MS,
   type WorkspaceHookNoteData,
@@ -227,8 +237,27 @@ export class WorkspaceManager implements WorktreeOps {
       }
       const defaultBranch = await gitPrim.remoteDefaultBranch(baseRepoDir);
 
+      if (input.readonly === true) {
+        const reused = await this.materializeReadonlyExport(
+          baseRepoDir,
+          convDir,
+          branch,
+          defaultBranch,
+        );
+        return {
+          cwd: convDir,
+          baseRepoDir,
+          branch,
+          defaultBranch,
+          reused,
+          readonly: true,
+          hooks: [],
+          credentialSource,
+        };
+      }
+
       // —— 任务 worktree：存在→reused；不在→add -b（base 二择，02 §5.5）——
-      if (isWorktreeDir(convDir)) {
+      if (isWorktreeDir(convDir) && !isReadonlyExportDir(convDir)) {
         // 防分叉护栏（02 §5.5）：origin/<branch> 有本机没有的提交且 worktree
         // 不在该分支 → 抛错。
         if (await gitPrim.hasRemoteBranch(baseRepoDir, branch)) {
@@ -280,6 +309,35 @@ export class WorkspaceManager implements WorktreeOps {
     });
   }
 
+  private async materializeReadonlyExport(
+    baseRepoDir: string,
+    convDir: string,
+    branch: string,
+    defaultBranch: string,
+  ): Promise<boolean> {
+    const marker = join(convDir, READONLY_EXPORT_MARKER);
+    if (isReadonlyExportDir(convDir)) {
+      const now = new Date();
+      utimesSync(marker, now, now);
+      this.logger.workspace('Readonly export reused');
+      return true;
+    }
+    if (isWorktreeDir(convDir) && !isReadonlyExportDir(convDir)) await this.removeStale(convDir);
+    if (existsSync(convDir)) rmSync(convDir, { recursive: true, force: true });
+    await gitPrim.worktreePrune(baseRepoDir);
+    if (await gitPrim.hasLocalBranch(baseRepoDir, branch)) {
+      await gitPrim.branchDelete(baseRepoDir, branch);
+    }
+    if (!(await gitPrim.hasRemoteBranch(baseRepoDir, defaultBranch))) {
+      throw new Error(`remote has no base branch (origin/${defaultBranch} missing)`);
+    }
+    mkdirSync(convDir, { recursive: true });
+    await gitPrim.exportTree(baseRepoDir, `origin/${defaultBranch}`, convDir);
+    writeFileSync(marker, `readonly export of origin/${defaultBranch}\n`);
+    this.logger.workspace(`Readonly export (origin/${defaultBranch}, no git metadata)`);
+    return false;
+  }
+
   /** #1149 环境钩子挂点（prepare 两出口各一次）：
    * - setup（fresh 检出后）：失败/超时 = 步失败——WorkspaceHookError 直接
    *   抛出（runner prepare catch → done failed），且**回滚 worktree**（刚
@@ -322,6 +380,7 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async commitAll(cwd: string, message: string, identity: { name: string; email: string }) {
+    if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     await gitPrim.addAll(cwd);
     // —— #958 闸 5：认标记剔除（纵深防御，主机制是 runner 的步收尾擦除）——
     // 为什么认**内容**而不是认文件名：按名排除（.git/info/exclude 那条路）会把
@@ -349,6 +408,7 @@ export class WorkspaceManager implements WorktreeOps {
   }
 
   async push(cwd: string, branch: string, credentials: BoundGitCredentials | null): Promise<void> {
+    if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     // 重试预算覆盖 git-host 5xx 窗口（02 §5.5/r3 bundle 注原话语义）。
     await withGitNetRetries(() => gitPrim.push(cwd, branch, credentials));
   }
@@ -413,6 +473,16 @@ export class WorkspaceManager implements WorktreeOps {
     for (const name of entries) {
       if (!CONV_DIR_PATTERN.test(name) || active.has(name)) continue;
       const dir = join(input.workspacesRoot, name);
+      if (isReadonlyExportDir(dir)) {
+        const activity = Math.max(
+          statSync(dir).mtimeMs,
+          statSync(join(dir, READONLY_EXPORT_MARKER)).mtimeMs,
+        );
+        if (input.now - activity < ttlMs) continue;
+        rmSync(dir, { recursive: true, force: true });
+        removed.push(name);
+        continue;
+      }
       if (!isWorktreeDir(dir)) continue;
       const age = input.now - (await this.lastActivity(dir));
       if (age < ttlMs) continue;
@@ -458,6 +528,10 @@ export class WorkspaceManager implements WorktreeOps {
 
 function isWorktreeDir(dir: string): boolean {
   return existsSync(join(dir, '.git'));
+}
+
+function isReadonlyExportDir(dir: string): boolean {
+  return existsSync(join(dir, READONLY_EXPORT_MARKER));
 }
 
 function isBareish(dir: string): boolean {

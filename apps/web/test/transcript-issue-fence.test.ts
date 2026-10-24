@@ -52,6 +52,7 @@ const WIRE: WireTodo = {
   sourceBuildId: null,
   sourceKind: 'github-issue',
   sourceRef: 'github:octo/alpha#7',
+  output: 'code',
 };
 
 const BUILD: BuildRecord = {

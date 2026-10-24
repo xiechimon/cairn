@@ -39,6 +39,7 @@ export function appendBlockerHandoff(
         ...(entry.summary === null
           ? ['- 执行 agent 总结：无']
           : ['- 执行 agent 总结：', entry.summary]),
+        ...(entry.report === undefined ? [] : ['- 报告附件内容：', entry.report.content]),
       ];
     })
     .join('\n');

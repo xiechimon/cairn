@@ -1213,6 +1213,7 @@ async function tryClaim(
         sourceKind: cand.todoRow.sourceKind,
         sourceRef: cand.todoRow.sourceRef,
         ...(blockerHandoff !== null ? { blockerHandoff } : {}),
+        output: cand.todoRow.output,
       },
       project: { id: cand.todoRow.projectId, name: projectRow?.name ?? '', repo },
       agent: {
@@ -2135,6 +2136,7 @@ export async function finishStep(
       ...(outcome.verifyVerdictError !== undefined
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
+      ...(outcome.report !== undefined ? { report: outcome.report } : {}),
     });
     publishStepStatus(deps, stepId);
     return;

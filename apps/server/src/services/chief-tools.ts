@@ -28,6 +28,7 @@ import {
   isChiefConversationId,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
+  todoOutputSchema,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, asc, eq, inArray, or, sql } from 'drizzle-orm';
@@ -135,6 +136,15 @@ function optStr(params: Params, key: string): string | undefined {
   if (v === undefined || v === null) return undefined;
   if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
   return v;
+}
+function optTodoOutput(params: Params, key: string): 'code' | 'info' | undefined {
+  const v = params[key];
+  if (v === undefined || v === null) return undefined;
+  const parsed = todoOutputSchema.safeParse(v);
+  if (!parsed.success) {
+    throw new HttpError(400, `invalid params.${key}: expected "code" or "info"`);
+  }
+  return parsed.data;
 }
 function strArr(params: Params, key: string): string[] {
   const v = params[key];
@@ -495,6 +505,7 @@ export async function executeChiefTool(
       // 措辞→spec 三段式（r5 §3.2）由 LLM 侧组织 spec 文本；本层落库 + 溯源。
       const projectId = str(params, 'projectId');
       requireProjectRow(db, projectId, ctx.teamId); // 存在性 + 团队归属校验（404 面）
+      const output = optTodoOutput(params, 'output');
       const record = createTodo(svc, {
         teamId: ctx.teamId,
         projectId,
@@ -506,6 +517,7 @@ export async function executeChiefTool(
         // 答「哪次请求拆的」）；GitHub 接入项目镜像槽位优先，裁决单源在
         // createTodo。
         orchestration: { threadId: ctx.threadId },
+        ...(output !== undefined ? { output } : {}),
       });
       // sourceBuildId = chief id（r5 §3.2 实测：「sourceBuildId = chief id」，
       // 样本 `chief-<userId>-…` = chief 实例 id，非 thread/conv id）。
@@ -547,11 +559,13 @@ export async function executeChiefTool(
                     `invalid params.subtodos[${i}].blockedBy: expected array`,
                   );
                 })();
+        const output = optTodoOutput(item, 'output');
         return {
           title: str(item, 'title'),
           spec: str(item, 'spec'),
           agentId: str(item, 'agentId'),
           ...(blockedBy !== undefined ? { blockedBy } : {}),
+          ...(output !== undefined ? { output } : {}),
         };
       });
       const result = createSplitTodo(
