@@ -86,6 +86,7 @@ import {
 } from '../lib/github.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { recordBuildFeedback } from './build-provenance.js';
+import { DONE_ROW } from './delivery-rows.js';
 import { agentForStep } from './dispatch-eligibility.js';
 import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
@@ -2425,9 +2426,6 @@ export function completeStep(
   // r3 §3.6；celebration 行 [设计] = role system 纯文本）。
   finishTodoDone(deps, todoRow.id, buildRow.id);
 }
-
-/** done 收尾漏斗写的完成行（#1403 PR 对账据它判断本轮是否已收过尾）。 */
-export const DONE_ROW = '🎉 任务已完成';
 
 /** 本 build 这一轮的起点：最近一个 build / plan 步的创建时刻（#931 返工复用
  * 同一个 build 时，新一轮从新的执行步算起）；没有这类步为 0。 */
