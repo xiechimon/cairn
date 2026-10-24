@@ -1523,5 +1523,20 @@
     "path": "packages/shared/test/vocabulary.test.ts",
     "line": "    // 省略号；前缀随 BRAND.apiKeyPrefix 槽（替换相位 = cairn_）。",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
+  },
+  {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": "// 现行 53 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": "/** 词表自检：现行 53 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": " * 5）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
   }
 ]

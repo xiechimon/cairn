@@ -106,7 +106,7 @@ describe('53 词表', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
+  it('除名登记 = delete_skills；新增登记 = create_skill + update_skill + models + split_todo + update_memory（divergence 全量双向）；set_remote_shell 已回摆（XMON-115）', () => {
     expect(removed).toEqual(['delete_skills']);
     expect(added).toEqual([
       'create_skill',
@@ -134,7 +134,7 @@ describe('53 词表', () => {
     }
   });
 
-  it('分组 = 读 16 + 组织 21 + 执行 5 + 私有 11（raw 实数 − delete_skills + 四件新增 + 回摆一件）', () => {
+  it('分组 = 读 16 + 组织 21 + 执行 5 + 私有 11（raw 实数 − delete_skills + 五件新增）', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(16);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(21);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(5);

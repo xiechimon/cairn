@@ -1,5 +1,6 @@
 CREATE TABLE `memory_save_conflict` (
 	`id` text PRIMARY KEY NOT NULL,
+	`candidateIds` text NOT NULL,
 	`createdAt` integer NOT NULL
 );
 --> statement-breakpoint

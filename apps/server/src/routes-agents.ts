@@ -33,6 +33,7 @@ import {
   missingCapabilityItems,
   runtimeGatePasses,
 } from './services/dispatch-eligibility.js';
+import { deleteMemoryEntry } from './services/memory.js';
 import { mergedCatalogModels } from './services/model-liveness.js';
 import { filterKnownSkillIds } from './services/skills.js';
 
@@ -55,17 +56,12 @@ export function registerAgentRoutes(app: Hono, ctx: AppContext): void {
   app.delete('/api/teams/:id/agents/:aid/memories/:mid', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    const res = ctx.db
-      .delete(agentMemory)
-      .where(
-        and(
-          eq(agentMemory.id, c.req.param('mid')),
-          eq(agentMemory.agentId, c.req.param('aid')),
-          eq(agentMemory.teamId, teamId),
-        ),
-      )
-      .run();
-    if (res.changes === 0) throw notFound(`memory ${c.req.param('mid')}`);
+    const removed = deleteMemoryEntry(ctx.db, {
+      memoryId: c.req.param('mid'),
+      agentId: c.req.param('aid'),
+      teamId,
+    });
+    if (removed === 0) throw notFound(`memory ${c.req.param('mid')}`);
     return c.body(null, 204);
   });
 

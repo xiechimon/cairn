@@ -1,5 +1,6 @@
 import { ISSUE_FENCE_OPEN } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
+import { memorySaveConflict } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { AGENT_ID, AGENT2_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject } from './helpers.js';
@@ -128,6 +129,71 @@ for (const mode of ['chief', 'worker'] as const) {
       await expect(save({ title: '发布环境', content: '部署使用容器' })).rejects.toMatchObject({
         status: 409,
       });
+    });
+
+    test('候选都被删除后同正文可正常保存并清掉指纹，仍有候选存活时保持 409', async () => {
+      const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
+        id: string;
+      };
+      const second = (await save({
+        title: '包管理器',
+        content: '使用 yarn 安装依赖',
+        force: true,
+      })) as { id: string };
+      const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
+      expect(await save(input)).toMatchObject({ status: 'candidates' });
+      expect(H.s.db.select().from(memorySaveConflict).all()).toHaveLength(1);
+
+      await invoke('delete_memory', { memoryId: first.id });
+      await expect(save(input)).rejects.toMatchObject({ status: 409 });
+
+      await invoke('delete_memory', { memoryId: second.id });
+      expect(H.s.db.select().from(memorySaveConflict).all()).toHaveLength(0);
+      expect(await save(input)).toMatchObject({ content: input.content });
+      expect(await invoke('memories', {})).toHaveLength(1);
+    });
+
+    test('候选被删除又换了新的相近条目时，同正文重新给出候选', async () => {
+      const first = (await save({ title: '包管理器', content: '使用 npm 安装依赖' })) as {
+        id: string;
+      };
+      const input = { title: '包管理器', content: '使用 pnpm 安装依赖' };
+      expect(await save(input)).toMatchObject({ status: 'candidates' });
+      await invoke('delete_memory', { memoryId: first.id });
+      const replacement = (await save({ title: '包管理器', content: '使用 bun 安装依赖' })) as {
+        id: string;
+      };
+      expect(await save(input)).toMatchObject({
+        status: 'candidates',
+        candidates: [{ id: replacement.id }],
+      });
+    });
+
+    test('全局记忆改成同 Agent 同团队某项目记忆的正文返回 409，他人的不算', async () => {
+      const global = (await relay('save_memory', {
+        title: '全局约定',
+        content: '全局使用 npm',
+      })) as {
+        id: string;
+      };
+      const project = (await save({
+        title: '项目约定',
+        content: '本仓使用 pnpm',
+        force: true,
+      })) as {
+        id: string;
+      };
+      await relay(
+        'save_memory',
+        { title: '他人', content: '他人使用 bun', projectId: H.projectId },
+        { chiefAgentId: AGENT2_ID },
+      );
+      const rejected = invoke('update_memory', { memoryId: global.id, content: '本仓使用 pnpm' });
+      await expect(rejected).rejects.toMatchObject({ status: 409 });
+      await expect(rejected).rejects.toThrow(project.id);
+      expect(
+        await invoke('update_memory', { memoryId: global.id, content: '他人使用 bun' }),
+      ).toMatchObject({ id: global.id, content: '他人使用 bun' });
     });
 
     test('update_memory 保持 id 与溯源，多次更新保留可查询旧值，无变化不添历史', async () => {

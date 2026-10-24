@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "a3d6d0e4-b87d-4fda-944f-6ec336f5bb89",
+  "id": "7e359f55-79d4-4e90-a808-4444d6ef0583",
   "prevId": "d926b5e3-1954-4896-9cf7-b66a7cd4b497",
   "tables": {
     "agent": {
@@ -1764,6 +1764,13 @@
           "name": "id",
           "type": "text",
           "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "candidateIds": {
+          "name": "candidateIds",
+          "type": "text",
+          "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },

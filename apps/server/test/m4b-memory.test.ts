@@ -147,6 +147,32 @@ describe('worker 步记忆 relay（r5 §6 写路径 = agent 工具 → 服务端
     }
   });
 
+  test('REST 删除候选后，同正文重试按新增处理', async () => {
+    const { s, token, step } = await world();
+    try {
+      const first = await relay(s.app, token, step.step.id, 'save_memory', {
+        title: '包管理器',
+        content: '本仓使用 npm',
+      });
+      const { id } = JSON.parse(((await first.json()) as { text: string }).text) as { id: string };
+      const params = { title: '包管理器', content: '本仓使用 pnpm' };
+      await relay(s.app, token, step.step.id, 'save_memory', params);
+      const removed = await call(
+        s.app,
+        'DELETE',
+        `/api/teams/${s.team.id}/agents/${AGENT_ID}/memories/${id}`,
+      );
+      expect(removed.status).toBe(204);
+      const retry = await relay(s.app, token, step.step.id, 'save_memory', params);
+      expect(retry.status).toBe(200);
+      expect(JSON.parse(((await retry.json()) as { text: string }).text)).toMatchObject({
+        content: params.content,
+      });
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('显式 sourceTodoId/projectId 参数优先（跨任务记录经验 [设计]）', async () => {
     const { s, token, step } = await world();
     // 显式值须是本队真实行（#1470 团队归属）：另建一个本队项目与任务。

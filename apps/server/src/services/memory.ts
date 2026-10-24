@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { ISSUE_FENCE_OPEN, MEMORY_QUOTA_PER_AGENT } from '@cairn/shared';
-import { and, asc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, memorySaveConflict } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -40,6 +40,7 @@ type MemoryTx = Parameters<Parameters<Db['transaction']>[0]>[0];
 function memoriesInScope(
   tx: MemoryTx,
   scope: { agentId: string; teamId: string; projectId: string | null },
+  everyProject = false,
 ) {
   return tx
     .select()
@@ -48,9 +49,11 @@ function memoriesInScope(
       and(
         eq(agentMemory.agentId, scope.agentId),
         eq(agentMemory.teamId, scope.teamId),
-        scope.projectId === null
-          ? isNull(agentMemory.projectId)
-          : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
+        everyProject
+          ? undefined
+          : scope.projectId === null
+            ? isNull(agentMemory.projectId)
+            : or(eq(agentMemory.projectId, scope.projectId), isNull(agentMemory.projectId)),
       ),
     )
     .orderBy(asc(agentMemory.createdAt), asc(agentMemory.id))
@@ -87,35 +90,38 @@ export function saveMemoryEntry(
     const id = createHash('sha256')
       .update(JSON.stringify([input.agentId, input.teamId, input.projectId, input.content]))
       .digest('hex');
-    if (
-      !input.force &&
-      tx.select().from(memorySaveConflict).where(eq(memorySaveConflict.id, id)).get()
-    ) {
+    const candidates = rows.filter(
+      (row) => overlaps(row.title, input.title) || overlaps(row.content, input.content),
+    );
+    const returned = tx
+      .select()
+      .from(memorySaveConflict)
+      .where(eq(memorySaveConflict.id, id))
+      .get();
+    const returnedCandidateStillExists = returned?.candidateIds.some((candidateId) =>
+      rows.some((row) => row.id === candidateId),
+    );
+    if (!input.force && returnedCandidateStillExists) {
       throw new HttpError(
         409,
         'same memory request already returned candidates; use update_memory or force:true',
       );
     }
-    const candidates = rows.filter(
-      (row) => overlaps(row.title, input.title) || overlaps(row.content, input.content),
-    );
     if (candidates.length > 0 && !input.force) {
-      const inserted = tx
-        .insert(memorySaveConflict)
-        .values({ id, createdAt: nowMs() })
-        .onConflictDoNothing()
+      tx.insert(memorySaveConflict)
+        .values({ id, candidateIds: candidates.map((row) => row.id), createdAt: nowMs() })
+        .onConflictDoUpdate({
+          target: memorySaveConflict.id,
+          set: { candidateIds: candidates.map((row) => row.id), createdAt: nowMs() },
+        })
         .run();
-      if (inserted.changes === 0)
-        throw new HttpError(
-          409,
-          'same memory request already returned candidates; use update_memory or force:true',
-        );
       return {
         status: 'candidates' as const,
         candidates,
         hint: '请用 update_memory 选择更新哪条，或确认新增并设置 force:true。',
       };
     }
+    tx.delete(memorySaveConflict).where(eq(memorySaveConflict.id, id)).run();
     const { force: _force, ...entry } = input;
     const now = nowMs();
     return tx
@@ -145,7 +151,7 @@ export function updateMemoryEntry(
     if (!row) throw new HttpError(404, `memory ${input.memoryId}`);
     validateMemoryText(row.title, input.content);
     if (row.content === input.content) return row;
-    const duplicate = memoriesInScope(tx, row).find(
+    const duplicate = memoriesInScope(tx, row, row.projectId === null).find(
       (other) => other.id !== row.id && other.content === input.content,
     );
     if (duplicate) {
@@ -164,5 +170,42 @@ export function updateMemoryEntry(
       .where(eq(agentMemory.id, row.id))
       .returning()
       .get();
+  });
+}
+
+export function deleteMemoryEntry(
+  db: Db,
+  input: { memoryId: string; agentId: string; teamId: string },
+) {
+  return db.transaction((tx) => {
+    const removed = tx
+      .delete(agentMemory)
+      .where(
+        and(
+          eq(agentMemory.id, input.memoryId),
+          eq(agentMemory.agentId, input.agentId),
+          eq(agentMemory.teamId, input.teamId),
+        ),
+      )
+      .run().changes;
+    if (removed === 0) return 0;
+    const mentioning = tx
+      .select()
+      .from(memorySaveConflict)
+      .where(sql`instr(${memorySaveConflict.candidateIds}, ${input.memoryId}) > 0`)
+      .all();
+    const emptied: string[] = [];
+    for (const fingerprint of mentioning) {
+      const remaining = fingerprint.candidateIds.filter((id) => id !== input.memoryId);
+      if (remaining.length === 0) emptied.push(fingerprint.id);
+      else
+        tx.update(memorySaveConflict)
+          .set({ candidateIds: remaining })
+          .where(eq(memorySaveConflict.id, fingerprint.id))
+          .run();
+    }
+    if (emptied.length > 0)
+      tx.delete(memorySaveConflict).where(inArray(memorySaveConflict.id, emptied)).run();
+    return removed;
   });
 }

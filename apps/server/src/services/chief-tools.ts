@@ -63,7 +63,7 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
-import { saveMemoryEntry, updateMemoryEntry } from './memory.js';
+import { deleteMemoryEntry, saveMemoryEntry, updateMemoryEntry } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -982,16 +982,11 @@ export async function executeChiefTool(
       const removed =
         ctx.chiefAgentId === null
           ? 0
-          : db
-              .delete(agentMemory)
-              .where(
-                and(
-                  eq(agentMemory.id, memoryId),
-                  eq(agentMemory.agentId, ctx.chiefAgentId),
-                  eq(agentMemory.teamId, ctx.teamId),
-                ),
-              )
-              .run().changes;
+          : deleteMemoryEntry(db, {
+              memoryId,
+              agentId: ctx.chiefAgentId,
+              teamId: ctx.teamId,
+            });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
@@ -1243,16 +1238,11 @@ export async function executeWorkerMemoryTool(
       const memoryId = str(params, 'memoryId');
       // 越权防御：只删本 Agent 本团队条目；别人的与不存在的同 404（#1497，
       // chief delete_memory 同律）。
-      const removed = db
-        .delete(agentMemory)
-        .where(
-          and(
-            eq(agentMemory.id, memoryId),
-            eq(agentMemory.agentId, ctx.agentId),
-            eq(agentMemory.teamId, ctx.teamId),
-          ),
-        )
-        .run().changes;
+      const removed = deleteMemoryEntry(db, {
+        memoryId,
+        agentId: ctx.agentId,
+        teamId: ctx.teamId,
+      });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
