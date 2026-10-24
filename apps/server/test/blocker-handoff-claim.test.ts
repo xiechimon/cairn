@@ -31,23 +31,28 @@ interface PullFixture {
   title: string;
 }
 
-function githubMock(pulls: Record<number, PullFixture | 'missing'>) {
+function githubMock(pulls: Record<number, PullFixture | 'missing'>): {
+  fetch: FetchLike;
+  requests: string[];
+} {
   const requests: string[] = [];
-  const fetch: FetchLike = (input) => {
-    const url = String(input);
-    requests.push(url);
-    const number = Number(/\/pulls\/(\d+)$/.exec(url)?.[1]);
-    const pull = pulls[number];
-    const found = pull !== undefined && pull !== 'missing';
-    return Promise.resolve({
-      ok: found,
-      status: found ? 200 : 404,
-      headers: { get: () => null },
-      json: () => Promise.resolve(found ? pull : {}),
-      text: () => Promise.resolve(''),
-    });
+  return {
+    requests,
+    fetch: (input) => {
+      const url = String(input);
+      requests.push(url);
+      const number = Number(/\/pulls\/(\d+)$/.exec(url)?.[1]);
+      const pull = pulls[number];
+      const found = pull !== undefined && pull !== 'missing';
+      return Promise.resolve({
+        ok: found,
+        status: found ? 200 : 404,
+        headers: { get: () => null },
+        json: () => Promise.resolve(found ? pull : {}),
+        text: () => Promise.resolve(''),
+      });
+    },
   };
-  return { fetch, requests };
 }
 
 interface World {

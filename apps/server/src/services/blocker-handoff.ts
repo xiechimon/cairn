@@ -35,13 +35,7 @@ export async function blockerHandoffForClaim(
     .where(and(eq(step.buildId, stepRow.buildId), isNotNull(step.blockerHandoff)))
     .orderBy(asc(step.createdAt), sql`rowid`)
     .get();
-  return snapshot?.blockerHandoff ?? (await buildBlockerHandoff(deps, todoRow));
-}
-
-async function buildBlockerHandoff(
-  deps: BlockerHandoffDeps,
-  todoRow: typeof todo.$inferSelect,
-): Promise<BlockerHandoffRecord | null> {
+  if (snapshot?.blockerHandoff) return snapshot.blockerHandoff;
   const blockerIds = todoRow.blockedBy ?? [];
   if (blockerIds.length === 0) return null;
   const blockerRows = new Map(
