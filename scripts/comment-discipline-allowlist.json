@@ -1525,6 +1525,21 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": "// 现行 53 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": "/** 词表自检：现行 53 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
+    "path": "packages/shared/src/protocol/chief-tools.ts",
+    "line": " * 5）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */",
+    "reason": "既有注释仅更正工具件数文字，与 CHIEF_TOOL_COUNT 对齐"
+  },
+  {
     "path": "apps/daemon/src/git.ts",
     "line": " * 路的独有语义，见 gitCredentialEnv 注），代理变量原样透传，只由 runGit 给",
     "reason": "既有注释更正：#1635 后 runGit 给回环地址补 NO_PROXY，旧句「不碰代理变量」已不成立"

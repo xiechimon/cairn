@@ -1,6 +1,6 @@
 // Chief remoteTools 词表——raw 观测 49 件（r5 §3.1，一手来源 = thread 记录
 // toolDefHashes 全键 `docs/research/assets/r5/raw/chief-threads-testA.json`），
-// 现行 52 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence
+// 现行 53 件 = raw − CHIEF_TOOLS_REMOVED + CHIEF_TOOLS_ADDED（divergence
 // 双向登记，登记处见两常量）。复刻口径（02 §4.3 尾注）：Chief = 挂团队
 // 工具的 pi 会话，行为分毫不求同；工具「名单」为实测一手，各工具的
 // description/parameters 细形未采到 wire 原件 = 全部 [推断] 黑盒逼近
@@ -63,7 +63,13 @@ export const CHIEF_TOOLS_REMOVED = ['delete_skills'] as const;
  * #627：models——读侧候选清单（建/改 Agent 的 provider/modelId 合法值域），
  * 行语义对齐 web toModelOptions 并集投影（server 侧独立实现）。
  * #1250（ADR 0018 层 2）：split_todo——大票拆子卡 + 依赖边的编排工具。 */
-export const CHIEF_TOOLS_ADDED = ['create_skill', 'update_skill', 'models', 'split_todo'] as const;
+export const CHIEF_TOOLS_ADDED = [
+  'create_skill',
+  'update_skill',
+  'models',
+  'split_todo',
+  'update_memory',
+] as const;
 
 /** 词表分组（r5 §3.1 正文分组语义；成员按 raw 键集归位 [推断]；
  * delete_skills 已除名；create_skill、update_skill 随 XMON-109 归组织面——
@@ -116,6 +122,7 @@ export const CHIEF_TOOL_CATEGORIES = {
     'ask_user',
     'notify_user',
     'save_memory',
+    'update_memory',
     'delete_memory',
     'memories',
     'watch_todos',
@@ -731,15 +738,28 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'save_memory',
     description:
-      'Save a one-fact memory entry for the agent running the chief (shared store, quota 100).',
+      'Save a one-fact memory entry for the agent running the chief (shared store, quota 100). Returns candidates from the same project and global memories without saving when titles or bodies overlap; use update_memory, or force:true to confirm adding. Repeating identical content returns 409.',
     parameters: obj(
       {
         title: str('Short memory title.'),
         content: str('Memory body.'),
+        force: {
+          type: 'boolean',
+          description: 'Explicitly confirm adding despite similar candidates; default false.',
+        },
         projectId: str('Optional project id for provenance.'),
       },
       ['title', 'content'],
     ),
+  },
+  {
+    name: 'update_memory',
+    description:
+      'Update your memory content by memoryId, preserving old values in history. Read history with memories. GitHub issue fence text is rejected.',
+    parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
+      'memoryId',
+      'content',
+    ]),
   },
   {
     name: 'delete_memory',
@@ -748,7 +768,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'memories',
-    description: 'List the memory entries of the agent running the chief.',
+    description: 'List the memory entries of the agent running the chief, including history.',
     parameters: obj({}),
     replaySafe: true,
   },
@@ -790,9 +810,9 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-/** 词表自检：现行 52 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED
- * 4 + set_remote_shell 回摆）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */
-export const CHIEF_TOOL_COUNT = 52;
+/** 词表自检：现行 53 件（raw 49 − CHIEF_TOOLS_REMOVED 1 + CHIEF_TOOLS_ADDED
+ * 5）、键集 = CHIEF_TOOL_NAMES、读侧全 replaySafe。 */
+export const CHIEF_TOOL_COUNT = 53;
 
 /** worker 步记忆三件套（02 §4.4 写路径 / r5 §6：worker 侧同族工具经
  * remoteTools 下发——「bundle 无本地记忆实现」，写路径 = agent 工具 → 服务端
@@ -804,16 +824,29 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'save_memory',
     description:
-      'Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent.',
+      'Save a one-fact memory entry for yourself (the agent running this step). Use it only when the task instructions ask for it or a lesson is clearly worth keeping. Quota 100 per agent. Returns candidates from the same project and global memories without saving when titles or bodies overlap; use update_memory, or force:true to confirm adding. Repeating identical content returns 409.',
     parameters: obj(
       {
         title: str('Short memory title.'),
         content: str('Memory body.'),
+        force: {
+          type: 'boolean',
+          description: 'Explicitly confirm adding despite similar candidates; default false.',
+        },
         projectId: str('Optional project id for provenance.'),
         sourceTodoId: str('Optional source todo id; defaults to the running task.'),
       },
       ['title', 'content'],
     ),
+  },
+  {
+    name: 'update_memory',
+    description:
+      'Update your memory content by memoryId, preserving old values in history. Read history with memories. GitHub issue fence text is rejected.',
+    parameters: obj({ memoryId: str('Memory id.'), content: str('Replacement memory body.') }, [
+      'memoryId',
+      'content',
+    ]),
   },
   {
     name: 'delete_memory',
@@ -822,7 +855,7 @@ export const WORKER_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'memories',
-    description: 'List your own memory entries.',
+    description: 'List your own memory entries, including history.',
     parameters: obj({}),
     replaySafe: true,
   },

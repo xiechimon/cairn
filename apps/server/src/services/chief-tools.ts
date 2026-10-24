@@ -25,9 +25,7 @@ import {
   DONE_ANNOUNCEMENT,
   filterAgentTools,
   IN_PROGRESS_PHASES,
-  ISSUE_FENCE_OPEN,
   isChiefConversationId,
-  MEMORY_QUOTA_PER_AGENT,
   MERGE_HUMAN_ONLY_COPY,
   MODEL_SOURCE_RUNTIME_LABELS,
   todoOutputSchema,
@@ -66,6 +64,7 @@ import { isGithubRepoRef, readFile } from './git.js';
 import { executeGithubReadTool } from './github-reads.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { defaultMcpConfigPath, listMcpServers } from './mcp-servers.js';
+import { deleteMemoryEntry, saveMemoryEntry, updateMemoryEntry } from './memory.js';
 import { notifyChiefMessage } from './notifications.js';
 import { getModelSources } from './providers.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
@@ -1002,11 +1001,24 @@ export async function executeChiefTool(
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
+        force: bool(params, 'force', false),
         projectId,
         sourceTodoId,
         sourceBuildId: ctx.conversationId, // chief 来源 = chief 回合 id（r5 §6）
       });
       return json(row);
+    }
+    case 'update_memory': {
+      const memoryId = str(params, 'memoryId');
+      if (ctx.chiefAgentId === null) throw new HttpError(404, `memory ${memoryId}`);
+      return json(
+        updateMemoryEntry(db, {
+          memoryId,
+          agentId: ctx.chiefAgentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
     }
     case 'delete_memory': {
       // 越权防御（#1497）：只删绑定 Agent 本团队条目；别人的与不存在的同 404，
@@ -1015,16 +1027,11 @@ export async function executeChiefTool(
       const removed =
         ctx.chiefAgentId === null
           ? 0
-          : db
-              .delete(agentMemory)
-              .where(
-                and(
-                  eq(agentMemory.id, memoryId),
-                  eq(agentMemory.agentId, ctx.chiefAgentId),
-                  eq(agentMemory.teamId, ctx.teamId),
-                ),
-              )
-              .run().changes;
+          : deleteMemoryEntry(db, {
+              memoryId,
+              agentId: ctx.chiefAgentId,
+              teamId: ctx.teamId,
+            });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }
@@ -1213,46 +1220,6 @@ export async function confirmBuild(
 // 同一存储」r5 §2/§6 的写侧半；worker 侧 = 指令触发 + Agent 裁量，宿主不做
 // 任务结束蒸馏——零自动写入语义由「无钩子调用点」结构性守住）。
 
-/** 配额门 + 落库（r5 §6 形状原样）。超限 = 409（UI `记忆 · n/100` 同源常量）。 */
-export function saveMemoryEntry(
-  db: Db,
-  input: {
-    agentId: string;
-    teamId: string;
-    title: string;
-    content: string;
-    projectId: string | null;
-    sourceTodoId: string | null;
-    sourceBuildId: string | null;
-  },
-): typeof agentMemory.$inferSelect {
-  // #1406（ADR 0021 D5）：记忆每轮进系统提示层，GitHub issue 原文围栏里是仓外
-  // 作者写的数据，逐字搬进记忆就等于把它升进系统层。只认得出逐字搬运的围栏
-  // 标记；改写过的转述认不出，那一半靠 chief 章程与围栏首行的禁令。
-  if (input.title.includes(ISSUE_FENCE_OPEN) || input.content.includes(ISSUE_FENCE_OPEN)) {
-    throw new HttpError(
-      400,
-      'invalid params.content: text quoted from a GitHub issue fence is third-party data and is not saved as memory',
-    );
-  }
-  const count = db
-    .select({ n: sql<number>`count(*)` })
-    .from(agentMemory)
-    .where(eq(agentMemory.agentId, input.agentId))
-    .get();
-  if ((count?.n ?? 0) >= MEMORY_QUOTA_PER_AGENT) {
-    throw new HttpError(409, `memory quota exceeded (${MEMORY_QUOTA_PER_AGENT}/agent)`);
-  }
-  const id = newRecordId();
-  const now = nowMs();
-  db.insert(agentMemory)
-    .values({ id, ...input, createdAt: now, updatedAt: now })
-    .run();
-  const row = db.select().from(agentMemory).where(eq(agentMemory.id, id)).get();
-  if (!row) throw new HttpError(500, 'memory insert lost');
-  return row;
-}
-
 /** worker 步记忆工具上下文（machines.ts 从 step → build → todo → assignment
  * 解析；执行 Agent = 该步类的 assignment 槽，02 §4.2）。 */
 export interface WorkerMemoryCtx {
@@ -1295,26 +1262,32 @@ export async function executeWorkerMemoryTool(
         teamId: ctx.teamId,
         title: str(params, 'title'),
         content: str(params, 'content'),
+        force: bool(params, 'force', false),
         projectId: projectId ?? ctx.projectId,
         sourceTodoId: sourceTodoId ?? ctx.todoId,
         sourceBuildId: ctx.buildId,
       });
       return json(row);
     }
+    case 'update_memory': {
+      return json(
+        updateMemoryEntry(db, {
+          memoryId: str(params, 'memoryId'),
+          agentId: ctx.agentId,
+          teamId: ctx.teamId,
+          content: str(params, 'content'),
+        }),
+      );
+    }
     case 'delete_memory': {
       const memoryId = str(params, 'memoryId');
       // 越权防御：只删本 Agent 本团队条目；别人的与不存在的同 404（#1497，
       // chief delete_memory 同律）。
-      const removed = db
-        .delete(agentMemory)
-        .where(
-          and(
-            eq(agentMemory.id, memoryId),
-            eq(agentMemory.agentId, ctx.agentId),
-            eq(agentMemory.teamId, ctx.teamId),
-          ),
-        )
-        .run().changes;
+      const removed = deleteMemoryEntry(db, {
+        memoryId,
+        agentId: ctx.agentId,
+        teamId: ctx.teamId,
+      });
       if (removed === 0) throw new HttpError(404, `memory ${memoryId}`);
       return json({ deleted: memoryId });
     }

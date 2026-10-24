@@ -6059,6 +6059,31 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > agent_memo
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "history": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "content": {
+            "type": "string",
+          },
+          "title": {
+            "type": "string",
+          },
+          "updatedAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "title",
+          "content",
+          "updatedAt",
+        ],
+        "type": "object",
+      },
+      "type": "array",
+    },
     "id": {
       "type": "string",
     },
@@ -8818,6 +8843,7 @@ exports[`协议词表快照（02 §5/§6 canonical） > 存储表清单（01 §6
   "autonomy_state",
   "member_activity",
   "build_feedback",
+  "memory_save_conflict",
 ]
 `;
 
