@@ -28,7 +28,8 @@ const TILE = svg(
   `<rect x="100" y="100" width="824" height="824" rx="185" fill="${CREAM}"/>${spiral(0.9, GREEN)}`,
 );
 const FULL_BLEED = svg(`<rect width="1024" height="1024" fill="${CREAM}"/>${spiral(0.72, GREEN)}`);
-const MARK = svg(spiral(0.9, '#000'));
+const MARK_PATH = SPIRAL_PATH.split(' A').slice(0, 4).join(' A');
+const MARK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-142 -254 452 452" width="16" height="16"><path d="${MARK_PATH}" fill="none" stroke="#000" stroke-width="58" stroke-linecap="round"/></svg>\n`;
 
 const { chromium } = requireFrom(join(ROOT, 'apps/web/package.json'))('@playwright/test');
 const browser = await chromium.launch();

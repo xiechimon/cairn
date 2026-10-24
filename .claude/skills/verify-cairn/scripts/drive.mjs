@@ -61,8 +61,8 @@ const check = (ok, label) => {
   if (!ok) failures += 1;
 };
 
-const shot = async (page, name) => {
-  await page.screenshot({ path: join(EVIDENCE, name) });
+const shot = async (page, name, { secrets = [] } = {}) => {
+  await page.screenshot({ path: join(EVIDENCE, name), mask: secrets });
   artifacts.push(name);
   console.log(`shot  ${name}`);
 };
@@ -250,13 +250,14 @@ try {
     // 掩码行的判别面:列表给明文条目也渲染一张无掩码的行卡,卡总数在
     // once 态 = 3(一次块 + 真掩码行 + once 空行)。真掩码行 = 文本含
     // cairn_ 且无 <code> 子孙(一次块是唯一带 code 的卡)。
-    const maskedRows = await page
+    const maskedRow = page
       .locator('[data-slot="card"]')
       .filter({ hasText: 'cairn_' })
-      .filter({ hasNot: page.locator('code') })
-      .count();
+      .filter({ hasNot: page.locator('code') });
+    await maskedRow.first().waitFor({ timeout: 15_000 }).catch(() => {});
+    const maskedRows = await maskedRow.count();
     check(maskedRows === 1, `密钥列表出现掩码行(${maskedRows} 行)`);
-    await shot(page, '03-keys-once.png');
+    await shot(page, '03-keys-once.png', { secrets: [onceCode] });
 
     const teams = await getJson(`${API}/api/teams`);
     const teamId = teams[0]?.id;

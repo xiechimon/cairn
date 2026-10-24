@@ -3,11 +3,12 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { collectTicketSources, findTicketConflicts } from './dispatch-dedupe.mjs';
 
 const START_GRACE_MS = 500;
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const USAGE = `Usage:
-  node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] -- <command> [args...]
+  node scripts/dispatch-agent.mjs start <id> [--cwd <dir>] [--ticket <N> [--force]] -- <command> [args...]
   node scripts/dispatch-agent.mjs check <id>
 
 start spawns the command in its own session (it survives the process-group
@@ -16,7 +17,12 @@ the process right away and writes <status-dir>/<id>.json. The default status
 dir is $TMPDIR/cairn-dispatch; override with CAIRN_DISPATCH_STATUS_DIR.
 Command output is written to <status-dir>/<id>.log. check re-verifies the
 recorded pid and exits non-zero when the process is missing; run it before
-reporting the state of a dispatched job instead of trusting impressions.`;
+reporting the state of a dispatched job instead of trusting impressions.
+
+--ticket <N> refuses to start when ticket N already has work in flight: a git
+workdir under the temp dirs named after it, an origin branch, an open PR in
+xiechimon/cairn, or a running codex / pi / grok process mentioning it. Sources
+that cannot be queried are reported as unchecked. --force starts anyway.`;
 
 function isRunning(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
@@ -64,10 +70,50 @@ if (subcommand === 'check') {
   const separator = rest.indexOf('--');
   const options = separator === -1 ? rest : rest.slice(0, separator);
   const command = separator === -1 ? [] : rest.slice(separator + 1);
-  const cwd = options.length === 2 && options[0] === '--cwd' ? options[1] : undefined;
-  if (command.length === 0 || command[0] === '' || (options.length > 0 && cwd === undefined)) {
+  let cwd;
+  let ticket;
+  let force = false;
+  let optionsValid = true;
+  for (let i = 0; i < options.length && optionsValid; i++) {
+    const option = options[i];
+    if (option === '--force' && !force) force = true;
+    else if (option === '--cwd' && cwd === undefined && options[i + 1]) cwd = options[++i];
+    else if (option === '--ticket' && ticket === undefined && /^\d+$/.test(options[i + 1] ?? ''))
+      ticket = options[++i];
+    else optionsValid = false;
+  }
+  if (
+    command.length === 0 ||
+    command[0] === '' ||
+    !optionsValid ||
+    (force && ticket === undefined)
+  ) {
     console.error(USAGE);
     process.exit(2);
+  }
+  if (ticket !== undefined) {
+    const { conflicts, unchecked } = findTicketConflicts(
+      collectTicketSources(ticket, cwd ?? process.cwd()),
+    );
+    for (const { source } of unchecked) {
+      console.error(`dispatch ${id}: ticket #${ticket} ${source} unchecked (query failed)`);
+    }
+    if (conflicts.length > 0) {
+      const lines = conflicts.map(({ source, detail }) => `  [${source}] ${detail}`);
+      if (!force) {
+        console.error(
+          [
+            `dispatch ${id}: ticket #${ticket} already has work in flight:`,
+            ...lines,
+            'refusing to start; pass --force to start anyway',
+          ].join('\n'),
+        );
+        process.exit(1);
+      }
+      console.error(
+        [`dispatch ${id}: ticket #${ticket} conflicts overridden by --force:`, ...lines].join('\n'),
+      );
+    }
   }
   const startedAt = new Date().toISOString();
   mkdirSync(statusDir, { recursive: true });
