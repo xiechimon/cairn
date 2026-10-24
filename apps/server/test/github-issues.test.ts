@@ -462,6 +462,41 @@ describe('POST /api/projects/{id}/github/issues/import（D17-D22）', () => {
     },
   );
 
+  test.each(['\u200B', '\u200C', '\u200D', '\uFEFF', '\u2060'])(
+    '#1481 attachment 关键字内夹不可见字符 U+%s 也不能在围栏里复活成附件令牌',
+    async (invisible) => {
+      const hidden = (key: string) => `![x](attach${invisible}ment:${key})`;
+      const title = hidden('team-victim/title.png');
+      const body = [
+        '复现步骤：',
+        hidden('team-victim/secret.png'),
+        `![x](ATTACH${invisible}MENT${invisible}:team-victim/upper.png)`,
+        `![x](a${invisible}t${invisible}tachment${invisible}:team-victim/spread.png)`,
+        '期望：保留普通正文。',
+      ].join('\n');
+      const mock = ghMock(
+        defaultRoutes({ [issuePath(7)]: { body: { ...ISSUE_7_DETAIL, title, body } } }),
+      );
+      const s = bootServer({ githubFetch: mock.impl });
+      try {
+        seedConnection(s);
+        const projectId = await postGithubProject(s.app);
+        const res = await call(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
+          body: { number: 7 },
+        });
+        expect(res.status).toBe(201);
+        const imported = todoRecordSchema.parse(await res.json());
+        const prompt = buildTaskPromptText(imported.title, imported.spec, imported);
+        const fenced = issueFenceQuotedLines(prompt.split('\n')).join('\n');
+        expect(parseAttachmentTokenLines(fenced)).toEqual([]);
+        expect(fenced).not.toMatch(/attachment:/i);
+        expect(imported.spec).toContain('期望：保留普通正文。');
+      } finally {
+        s.dispose();
+      }
+    },
+  );
+
   test('D17/D18/D19/D20 导入落值：标题原样、spec=body、来源两列、多标签', async () => {
     const mock = ghMock(defaultRoutes());
     const s = bootServer({ githubFetch: mock.impl });
