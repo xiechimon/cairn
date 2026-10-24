@@ -36,9 +36,9 @@ const mutateWorkflow = (jobName, transform, text = workflow) =>
 const freshnessStep = [
   '',
   '      - name: Feature map doc freshness check (#1527)',
-  '        if: ${{ !cancelled() }}',
+  `        if: \${{ !cancelled() }}`,
   '        env:',
-  '          GH_TOKEN: ${{ github.token }}',
+  `          GH_TOKEN: \${{ github.token }}`,
   '        run: node scripts/generate-feature-map.mjs --check',
 ].join('\n');
 
@@ -54,7 +54,7 @@ const labelStep = [
   '',
   '      - name: Issue label gate',
   '        env:',
-  '          GH_TOKEN: ${{ github.token }}',
+  `          GH_TOKEN: \${{ github.token }}`,
   '        run: node scripts/issue-label-gate.mjs',
 ].join('\n');
 
