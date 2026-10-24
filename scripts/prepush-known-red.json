@@ -1,24 +1,10 @@
 [
   {
-    "file": "integration/test/ansi-errormessage-e2e.test.ts",
-    "reason": "本机环境相关，main 上同样红"
-  },
-  { "file": "integration/test/m3b-demo.test.ts", "reason": "本机环境相关，main 上同样红" },
-  {
-    "file": "integration/test/m4b-watch-wake-e2e.test.ts",
-    "reason": "本机环境相关，main 上同样红"
-  },
-  { "file": "integration/test/m5-web-e2e.test.ts", "reason": "本机环境相关，main 上同样红" },
-  {
-    "file": "integration/test/rework-branch-reuse-e2e.test.ts",
+    "file": "apps/daemon/test/local-executor.test.ts",
     "reason": "本机环境相关，main 上同样红"
   },
   {
-    "file": "integration/test/web-plans-convergence.test.ts",
+    "file": "apps/daemon/test/workspace-hooks.test.ts",
     "reason": "本机环境相关，main 上同样红"
-  },
-  { "file": "apps/daemon/test/git.test.ts", "reason": "本机环境相关，main 上同样红" },
-  { "file": "apps/daemon/test/local-executor.test.ts", "reason": "本机环境相关，main 上同样红" },
-  { "file": "apps/daemon/test/tag-tool.test.ts", "reason": "本机环境相关，main 上同样红" },
-  { "file": "apps/daemon/test/workspace-hooks.test.ts", "reason": "本机环境相关，main 上同样红" }
+  }
 ]

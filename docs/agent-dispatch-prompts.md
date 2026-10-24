@@ -16,7 +16,7 @@ start 让命令在自己的会话里启动（躲开进程组清理）、立即�
 派某张票的活一律带 `--ticket <票号>`（台账「派活前没查重」，#1569/#1578）：start 先查同票是否已有人在做——系统 tmp 目录（`os.tmpdir()` 与 `/tmp`）下名字含票号的 git 工作目录（不含 `--cwd` 自身）、`origin` 上含票号的分支、`xiechimon/cairn` 里搜得到该票号的 open PR、命令行含票号的 codex / pi / grok 进程。任一命中即列出并以退出码 1 拒绝启动；查不了的来源（如 gh 不可用）报「unchecked」，不当作无命中。确认命中项与本次无关后才加 `--force`。
 
 ```sh
-node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -- pi -p --no-session --thinking low "<任务>"
+node scripts/dispatch-agent.mjs start 1556-impl --cwd <worktree> --ticket 1556 -- ai-route run implement -C <worktree> "<任务>"
 node scripts/dispatch-agent.mjs check 1556-impl
 ```
 
