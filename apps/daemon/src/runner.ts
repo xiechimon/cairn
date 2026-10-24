@@ -35,6 +35,7 @@ import type {
 import {
   AGENT_TOOL_MERGE,
   AGENT_TOOL_PUSH,
+  appendBlockerHandoff,
   appendConfirmedPlanNote,
   appendPlanLocationNote,
   appendWorkBranchNote,
@@ -257,7 +258,10 @@ export function buildTaskPrompt(claimed: ClaimedStep): string {
   if (!todo) return claimed.instruction ?? '';
   // #1406：claim 带来源两列；GitHub issue 导入任务的标题与正文进 issue 原文
   // 围栏（ADR 0021 D5），指令段留在围栏之外。
-  const taskText = buildTaskPromptText(todo.title, todo.spec, todo);
+  const taskText = appendBlockerHandoff(
+    buildTaskPromptText(todo.title, todo.spec, todo),
+    todo.blockerHandoff,
+  );
   // 缺席归一（zod optional：无该字段 = undefined ≠ null）。
   const instruction = claimed.instruction ?? null;
   if (instruction !== null && instruction.trim() !== '') {
