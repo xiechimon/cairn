@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CONFIRM_ANNOUNCEMENT, MERGE_ANNOUNCEMENT, trajectoryPackSchema } from '@cairn/shared';
@@ -184,12 +192,11 @@ test.each([
   ['--since', '2026-01-02', '--until', '2026-01-01'],
   ['--build', 'missing'],
   ['--unknown'],
-])('rejects invalid selectors %j without replacing output', (...args) => {
+])('rejects invalid selectors %j without writing output', (...args) => {
   const { home } = fixture();
-  const out = join(home, 'keep.jsonl');
-  writeFileSync(out, 'keep');
+  const out = join(home, 'fresh.jsonl');
   expect(run(home, [...args, '--out', out]).status).not.toBe(0);
-  expect(readFileSync(out, 'utf8')).toBe('keep');
+  expect(existsSync(out)).toBe(false);
 });
 
 test('missing database fails without creating a database', () => {
@@ -211,11 +218,27 @@ test('invalid schema fails without replacing output or leaking invalid values', 
   expect(readFileSync(out, 'utf8')).toBe('keep');
 });
 
-test('refuses to overwrite the source database', () => {
-  const { home, dbPath } = fixture();
-  const before = readFileSync(dbPath);
-  expect(run(home, ['--build', 'build-1', '--out', dbPath]).status).not.toBe(0);
-  expect(readFileSync(dbPath)).toEqual(before);
+test.each(['server.db', 'server.db-wal', 'server.db-shm'])(
+  'refuses to write over database file %s before reading',
+  (name) => {
+    const { home, dbPath } = fixture();
+    const before = readFileSync(dbPath);
+    for (const suffix of ['-wal', '-shm']) rmSync(`${dbPath}${suffix}`, { force: true });
+    const result = run(home, ['--build', 'build-1', '--out', join(home, 'server', name)]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Output must not overwrite the database');
+    expect(readFileSync(dbPath)).toEqual(before);
+  },
+);
+
+test('refuses an existing output file with a clear reason', () => {
+  const { home } = fixture();
+  const out = join(home, 'keep.jsonl');
+  writeFileSync(out, 'keep');
+  const result = run(home, ['--build', 'build-1', '--out', out]);
+  expect(result.status).not.toBe(0);
+  expect(result.stderr).toContain(`Output already exists, choose a new --out path: ${out}`);
+  expect(readFileSync(out, 'utf8')).toBe('keep');
 });
 
 test('reports output errors without successful summary', () => {
@@ -238,15 +261,19 @@ test('redacts a token throughout nested exported values and counts replacements'
   expect(trajectoryPackSchema.safeParse(JSON.parse(text.trim())).success).toBe(true);
 });
 
-test('refuses database output through a symlinked parent', () => {
-  const { home, dbPath } = fixture();
-  const before = readFileSync(dbPath);
-  symlinkSync(join(home, 'server'), join(home, 'alias'));
-  expect(run(home, ['--build', 'build-1', '--out', join(home, 'alias/server.db')]).status).not.toBe(
-    0,
-  );
-  expect(readFileSync(dbPath)).toEqual(before);
-});
+test.each(['server.db', 'server.db-wal'])(
+  'refuses database file %s through a symlinked parent',
+  (name) => {
+    const { home, dbPath } = fixture();
+    const before = readFileSync(dbPath);
+    for (const suffix of ['-wal', '-shm']) rmSync(`${dbPath}${suffix}`, { force: true });
+    symlinkSync(join(home, 'server'), join(home, 'alias'));
+    const result = run(home, ['--build', 'build-1', '--out', join(home, 'alias', name)]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Output must not overwrite the database');
+    expect(readFileSync(dbPath)).toEqual(before);
+  },
+);
 
 test('exports structured rejections, recorded approvals and gate verdicts', () => {
   const { home, dbPath } = fixture();
@@ -536,4 +563,82 @@ test('skips builds whose step session was not uploaded and counts them in the su
   expect(failed.status).not.toBe(0);
   expect(failed.stderr).toContain('Step session missing');
   expect(readFileSync(single, 'utf8')).toBe('keep');
+});
+
+test('time window export skips each dirty build by reason and keeps the clean ones', () => {
+  const { home, dbPath } = fixture();
+  const sessions = join(home, 'server/attachments/step-sessions');
+  const opened = openDbWithHandle(dbPath);
+  opened.db
+    .insert(todo)
+    .values({
+      id: 'todo-unassigned',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      title: 'Unassigned',
+      phaseAt: 1,
+      seqNum: 2,
+      assignment: null,
+    })
+    .run();
+  const dirty: [string, { todoId?: string; baseSha?: string | null; session?: string }][] = [
+    [
+      'build-no-model',
+      { session: JSON.stringify({ type: 'message', message: { role: 'user', content: 'go' } }) },
+    ],
+    ['build-no-base', { baseSha: null }],
+    ['build-no-agent', { todoId: 'todo-unassigned' }],
+    [
+      'build-no-role',
+      { session: JSON.stringify({ type: 'message', message: { content: 'orphan' } }) },
+    ],
+    ['build-bad-json', { session: '{not json' }],
+    ['build-no-session', { session: undefined }],
+    ['build-clean', {}],
+  ];
+  for (const [index, [id, defect]] of dirty.entries()) {
+    opened.db
+      .insert(build)
+      .values({
+        id,
+        todoId: defect.todoId ?? 'todo-1',
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: 2000 + index,
+        baseSha: 'baseSha' in defect ? defect.baseSha : 'base-sha',
+        harnessHash: 'harness-hash',
+      })
+      .run();
+    opened.db
+      .insert(step)
+      .values({ id: `step-${id}`, buildId: id, kind: 'build', createdAt: 2000 + index })
+      .run();
+    opened.db.insert(tokenUsage).values({ buildId: id, model: 'test/model', input: 1 }).run();
+    if (id === 'build-no-model')
+      opened.db.insert(tokenUsage).values({ buildId: id, model: 'review/other', input: 1 }).run();
+    const session =
+      'session' in defect
+        ? defect.session
+        : JSON.stringify({ type: 'message', message: { role: 'assistant', content: 'done' } });
+    if (session !== undefined) writeFileSync(join(sessions, `step-${id}.jsonl`), `${session}\n`);
+  }
+  opened.close();
+  const out = join(home, 'window.jsonl');
+  const result = run(home, ['--since', '1970-01-01T00:00:00.000Z', '--out', out]);
+  expect(result.status, result.stderr).toBe(0);
+  const ids = readFileSync(out, 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => trajectoryPackSchema.parse(JSON.parse(line)).buildId);
+  expect(ids).toEqual(['build-1', 'build-clean']);
+  expect(result.stdout).toContain('exported=2');
+  expect(result.stdout).toContain(
+    'skipped=6 (session_missing=1, session_invalid=1, schema_invalid=4)',
+  );
+
+  const single = join(home, 'build-no-model.jsonl');
+  const failed = run(home, ['--build', 'build-no-model', '--out', single]);
+  expect(failed.status).not.toBe(0);
+  expect(failed.stderr).toContain('input.model');
+  expect(existsSync(single)).toBe(false);
 });

@@ -33,7 +33,7 @@ try {
     until,
     out: values.out,
   });
-  const skipReasons = Object.entries(result.skipped);
+  const skipReasons = Object.entries(result.skipped).filter(([, count]) => count > 0);
   const skippedTotal = skipReasons.reduce((sum, [, count]) => sum + count, 0);
   const skippedSummary = skippedTotal
     ? `skipped=${skippedTotal} (${skipReasons.map(([reason, count]) => `${reason}=${count}`).join(', ')})`
