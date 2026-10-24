@@ -32,6 +32,7 @@ import {
   CHIEF_WATCH_REASON_DISPATCH,
   chiefIdFormat,
   chiefThreadTitle,
+  chiefTurnErrorContentSchema,
   fenceIssueText,
   ISSUE_FENCE_OPEN,
   isBackendRuntimeId,
@@ -362,7 +363,24 @@ export function listChiefThreads(deps: ChiefDeps, teamId: string): ChiefThread[]
     .all()
     .map((r) => {
       const pending = projector.pendingChiefOf(r.id);
-      return toChiefThreadRecord(r, pending === null ? null : projector.project(pending));
+      const record = toChiefThreadRecord(r, pending === null ? null : projector.project(pending));
+      const latest = deps.db
+        .select()
+        .from(step)
+        .where(and(eq(step.buildId, r.id), eq(step.kind, 'chief')))
+        .orderBy(desc(step.createdAt), sql`rowid desc`)
+        .limit(1)
+        .get();
+      if (latest?.status !== 'failed') return { ...record, lastTurnError: null };
+      const error = deps.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `chief-err-${latest.id}`))
+        .get();
+      const content =
+        typeof error?.content === 'string' ? JSON.parse(error.content) : error?.content;
+      const parsed = chiefTurnErrorContentSchema.safeParse(content);
+      return { ...record, lastTurnError: parsed.success ? parsed.data.message : null };
     });
 }
 

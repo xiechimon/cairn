@@ -1109,6 +1109,7 @@ export const EN: Record<string, string> = {
   未能开始编排: 'Could not start orchestration',
   // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   编排中: 'Orchestrating',
+  编排失败: 'Orchestration failed',
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等机器上线: 'waiting for a machine to come online',
   '缺 {missing}': 'missing {missing}',
@@ -1156,4 +1157,20 @@ export const EN: Record<string, string> = {
   下一步: 'Next',
   '提交回答失败，请重试。': 'Could not submit your answers. Try again.',
   '取消提问失败，请重试。': 'Could not dismiss the question. Try again.',
+  备用模型: 'Fallback models',
+  '主模型额度用完、模型 404 或认证失败时，按顺序换到下一个可用备选。只有规划和执行步会换；审核、验证、合并、总管不换；限流不换。':
+    'When the primary model runs out of quota, returns 404 or fails authentication, the next usable fallback takes over in order. Only plan and build steps switch; review, verify, merge and chief never do; rate limits do not trigger a switch.',
+  '备用 {n}': 'Fallback {n}',
+  '备用 {n} 运行时': 'Fallback {n} runtime',
+  '备用 {n} 模型': 'Fallback {n} model',
+  '上移备用 {n}': 'Move fallback {n} up',
+  '下移备用 {n}': 'Move fallback {n} down',
+  '删除备用 {n}': 'Remove fallback {n}',
+  添加备用模型: 'Add fallback model',
+  选择运行时: 'Choose runtime',
+  选完模型后才会保存: 'Saved once a model is chosen',
+  当前可选列表里没有该模型: 'This model is not in the current list',
+  '已下架，运行时会跳过该备选': 'Delisted; this fallback is skipped at run time',
+  '归属机 {machine} 未开启 {runtime} runtime，运行时会跳过该备选':
+    'Home machine {machine} has the {runtime} runtime off; this fallback is skipped at run time',
 };

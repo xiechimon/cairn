@@ -25,6 +25,7 @@ test('local code checks include both UI gates and affected e2e', () => {
     'pnpm typecheck',
     'pnpm spec:parse',
     'node scripts/e2e-affected.mjs --check-coverage',
+    'node --test docs/verify/1542/reach.test.mjs',
     'node scripts/prepush-vitest.mjs',
     'pnpm --filter @cairn/web e2e:affected -- apps/web/src/main.tsx',
   ])

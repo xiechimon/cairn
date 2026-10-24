@@ -1,11 +1,11 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 const searchPanel = (page: Page) => page.getByRole('dialog', { name: '搜索' });
 
 async function openSearch(page: Page) {
   await expect(page.getByRole('complementary')).toBeVisible();
-  await pressUntil(page, 'Meta+k', searchPanel(page));
+  await pressAndExpect(page, 'Meta+k', searchPanel(page));
 }
 
 test('CDS search panel: 16px edge-radius + de-boxed input', async ({ page }) => {
