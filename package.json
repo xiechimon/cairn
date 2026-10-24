@@ -16,6 +16,7 @@
     "start": "pnpm --filter @cairn/web build && pnpm --filter @xiechimon/cairn start",
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
+    "traj:export": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-export-cli.ts",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
     "pr:check": "node scripts/pr-body-check.mjs",
