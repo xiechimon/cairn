@@ -24,11 +24,11 @@ Preconditions:
 
 - `launch.mjs` stack up + `doctor.mjs` fully PASS (fresh DB: no agents, create one on the team page first).
 
-- **Full chain.** Run `node <skill>/scripts/drive-avatars.mjs`. Chain: sidebar chip / user-menu src assertion (seed `Xmon%20Dai`) -> create two differently-named Agents on the team page (a Chinese name + an English name, the dialog preview reseeds as the input changes) -> the two grid cards have distinct srcs -> the truth trio (`GET /api/user/me` avatarUrl=null / members actor.avatarUrl=null / SQLite `agent` row avatarUrl IS NULL) + the interceptor's actual record of dicebear egress request count. Evidence 3 screenshots + `result.json`.
+- **Full chain.** Run `node <skill>/scripts/drive-avatars.mjs`. Chain: sidebar chip / user-menu src assertion (src = `spiralAvatarUrl('Xmon Dai')`) → create two differently named agents on the team page (one Chinese name + one English name; the dialog preview re-seeds live as you type) → the two grid cards get distinct srcs → the ground-truth trio (`GET /api/user/me` avatarUrl=null / members actor.avatarUrl=null / SQLite `agent` row avatarUrl IS NULL) + the interceptor-recorded dicebear outbound request count (must be 0). Evidence: 3 screenshots + `result.json`.
 
 ## Gotchas
 
 - **The probe intercepts dicebear, it does not hit the real external network**: `page.route('**/api.dicebear.com/**')` returns a fixed SVG. The assertion targets are the src contract + the real server-side data; external reachability is not under test. After an onError src swap **the attribute value becomes the fallback** — without interception, network flakiness beats the src assertion into a false red.
-- The fallback chain and the zero-external-request property are pinned by the fixture e2e (`apps/web/e2e/avatar-spiral.spec.ts`), the live probe does not repeat them. `drive-avatars.mjs` is still written against dicebear and has been judged stale.
+- The fallback chain and the zero-third-party-request guarantee are pinned by fixture e2e (`apps/web/e2e/avatar-spiral.spec.ts`); the live probe does not duplicate them. `drive-avatars.mjs` asserts spiral data URLs and a dicebear request count of 0.
 - In live mode the sidebar still renders the fixture-canon USER_NAME (existing chrome discipline, not this ticket's surface) — the seed follows the display name, do not match the sidebar against `/api/user/me`'s Owner.
 - The rerun dialog's `未指派` row has no seed (the placeholder copy is not a person's name) and renders the static asset; the `seed` field of `displayFor` is the criterion, do not fall back to using `name` directly as the seed.

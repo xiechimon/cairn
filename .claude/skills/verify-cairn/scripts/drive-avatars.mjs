@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { spiralAvatarUrl } from '../../../../apps/web/src/lib/spiral-avatar.ts';
 
 const SCRIPT_REPO = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 const REPO = process.env.VERIFY_REPO_ROOT ?? SCRIPT_REPO;
@@ -24,9 +25,8 @@ const require2 = createRequire(join(REPO, 'apps/server/package.json'));
 
 const checks = [];
 function check(name, ok, detail) {
-
   if (typeof ok !== 'boolean') {
-    throw new TypeError(`check(${JSON.stringify(name)}) 的 ok 位须为 boolean，收到 ${typeof ok}`);
+    throw new TypeError(`check(${JSON.stringify(name)}) needs a boolean ok, got ${typeof ok}`);
   }
   checks.push({ name, ok, detail: detail ?? null });
   process.stdout.write(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  — ${detail}` : ''}\n`);
@@ -58,9 +58,7 @@ const dbQuery = (fn) => {
   }
 };
 
-const DICEBEAR_PREFIX = 'https://api.dicebear.com/9.x/lorelei/svg?seed=';
-const dicebearUrl = (seed) => `${DICEBEAR_PREFIX}${encodeURIComponent(seed)}`;
-
+const SPIRAL_PREFIX = 'data:image/svg+xml,';
 const USER_SEED = 'Xmon Dai';
 const stamp = Date.now() % 100000;
 const AGENT_A = `验证头像-${stamp}`;
@@ -84,44 +82,42 @@ await page.route('**/api.dicebear.com/**', (route) => {
 const imgSrc = (locator) => locator.getAttribute('src', { timeout: 5000 });
 
 try {
-
   await page.goto(`${WEB}/app`);
   await page.waitForSelector('[data-route="board"]', { timeout: 15_000 });
   const chipSrc = await imgSrc(page.locator('.sidebar-user img'));
   check(
     'sidebar-chip-seeded',
-    chipSrc === dicebearUrl(USER_SEED),
-    `侧栏 chip src=${chipSrc ?? '无 img'}`,
+    chipSrc === spiralAvatarUrl(USER_SEED),
+    `sidebar chip src=${chipSrc ?? 'no img'}`,
   );
   await page.click('.sidebar-user');
   await page.waitForSelector('.user-menu-head img', { timeout: 5000 });
   const menuSrc = await imgSrc(page.locator('.user-menu-head img'));
-  check('user-menu-same-src', menuSrc === chipSrc, 'user-menu 头部与 chip 同像(同名恒同)');
+  check('user-menu-same-src', menuSrc === chipSrc, 'user-menu head matches the chip (same name, same image)');
   await shot(page, '01-sidebar-user-menu.png');
   await page.keyboard.press('Escape');
 
   await page.goto(`${WEB}/app/team`);
   await page.waitForSelector('.team-create-agent', { timeout: 15_000 });
   await page.click('.team-create-agent');
-
   await page.waitForSelector('[data-testid="agent-avatar"] img', { timeout: 5000 });
   const emptySrc = await imgSrc(page.locator('[data-testid="agent-avatar"] img'));
   check(
     'dialog-empty-fallback',
     emptySrc === '/avatar-robot-1.svg',
-    `空名预览 = 静态资产(src=${emptySrc ?? '无'})`,
+    `empty-name preview = static asset (src=${emptySrc ?? 'none'})`,
   );
   await page.fill('#dlg-agent-name', AGENT_A);
   await page.waitForFunction(
     (prefix) => document.querySelector('[data-testid="agent-avatar"] img')?.getAttribute('src')?.startsWith(prefix),
-    DICEBEAR_PREFIX,
+    SPIRAL_PREFIX,
     { timeout: 5000 },
   );
   const previewSrc = await imgSrc(page.locator('[data-testid="agent-avatar"] img'));
   check(
     'dialog-live-preview',
-    previewSrc === dicebearUrl(AGENT_A),
-    `输入即时预览种子(src=${previewSrc ?? '无'})`,
+    previewSrc === spiralAvatarUrl(AGENT_A),
+    `live preview follows the typed seed (src=${previewSrc ?? 'none'})`,
   );
   await shot(page, '02-create-dialog-preview.png');
   await page.getByRole('button', { name: '创建', exact: true }).click();
@@ -144,16 +140,16 @@ try {
   };
   const srcA = await cardSrc(AGENT_A);
   const srcB = await cardSrc(AGENT_B);
-  check('agent-card-a-seeded', srcA === dicebearUrl(AGENT_A), `卡 A src=${srcA ?? '无'}`);
-  check('agent-card-b-seeded', srcB === dicebearUrl(AGENT_B), `卡 B src=${srcB ?? '无'}`);
-  check('distinct-names-distinct-srcs', srcA != null && srcB != null && srcA !== srcB, '不同名不同像');
+  check('agent-card-a-seeded', srcA === spiralAvatarUrl(AGENT_A), `card A src=${srcA ?? 'none'}`);
+  check('agent-card-b-seeded', srcB === spiralAvatarUrl(AGENT_B), `card B src=${srcB ?? 'none'}`);
+  check('distinct-names-distinct-srcs', srcA != null && srcB != null && srcA !== srcB, 'different names, different images');
   await shot(page, '03-team-two-agents.png');
 
   const me = await getJson(`${SERVER}/api/user/me`);
   check(
     'api-user-me',
     me?.displayName === 'Owner' && me?.avatarUrl === null,
-    `seed 用户 displayName=${me?.displayName ?? '?'} avatarUrl=${JSON.stringify(me?.avatarUrl)}`,
+    `seed user displayName=${me?.displayName ?? '?'} avatarUrl=${JSON.stringify(me?.avatarUrl)}`,
   );
   const teams = await getJson(`${SERVER}/api/teams`);
   const teamId = Array.isArray(teams) ? teams[0]?.id : undefined;
@@ -167,7 +163,7 @@ try {
   check(
     'api-members-avatarurl-null',
     actorA != null && actorA.avatarUrl === null && actorB != null && actorB.avatarUrl === null,
-    'members actor.avatarUrl=null(dicebear 语义保留)',
+    'members actor.avatarUrl=null (local-generation semantics preserved)',
   );
   const dbTruth = dbQuery((db) => ({
     a: db.prepare('SELECT displayName, avatarUrl FROM agent WHERE displayName = ?').get(AGENT_A),
@@ -176,13 +172,12 @@ try {
   check(
     'db-agent-avatarurl-null',
     dbTruth.a != null && dbTruth.a.avatarUrl === null && dbTruth.b != null && dbTruth.b.avatarUrl === null,
-    `SQLite agent 行 avatarUrl IS NULL(A=${dbTruth.a ? '有' : '无'}/B=${dbTruth.b ? '有' : '无'})`,
+    `SQLite agent row avatarUrl IS NULL (A=${dbTruth.a ? 'present' : 'missing'}/B=${dbTruth.b ? 'present' : 'missing'})`,
   );
-  const seededHits = dicebearHits.filter((u) => u.startsWith(DICEBEAR_PREFIX));
   check(
-    'dicebear-requests-fired',
-    seededHits.length >= 4,
-    `浏览器实发 dicebear 请求 ${seededHits.length} 次(chip/menu/预览/双卡)`,
+    'no-dicebear-requests',
+    dicebearHits.length === 0,
+    `browser issued ${dicebearHits.length} dicebear requests (must be 0)`,
   );
 } finally {
   await browser.close();
