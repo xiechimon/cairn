@@ -29,6 +29,7 @@ import {
   chief as chiefTable,
   chiefThread,
   step as stepTable,
+  tag as tagTable,
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
@@ -291,7 +292,42 @@ describe('D 入口面：POST /todos/:id/orchestrate = 开始任务单出口（r1
     expect(row?.phase).toBe('todo');
   });
 
-  test('D2 failed 相位 → 201，消息带重编排上下文', async () => {
+  test('D2 bug 标签 issue → 编排消息先要求 verify-cairn 复现', async () => {
+    const tagId = 'tag-bug-repro';
+    s.db
+      .insert(tagTable)
+      .values({
+        id: tagId,
+        projectId,
+        name: 'bug',
+        color: '#b60205',
+        createdAt: nowMs(),
+        v: 1,
+      })
+      .run();
+    const res = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+      title: '保存时报错',
+      spec: '打开设置页，点击保存后报错',
+      tagIds: [tagId],
+    });
+    expect(res.status).toBe(201);
+    const todoId = ((await res.json()) as { id: string }).id;
+    s.db
+      .update(todoTable)
+      .set({
+        sourceKind: 'github-issue',
+        sourceRef: 'github:octo/alpha#8',
+      })
+      .where(eq(todoTable.id, todoId))
+      .run();
+    const orchestrated = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
+    expect(orchestrated.status).toBe(201);
+    const body = (await orchestrated.json()) as { message: { content: string } };
+    expect(body.message.content).toContain('先完成复现步骤，再开始实现');
+    expect(body.message.content).toContain('verify-cairn');
+  });
+
+  test('D3 failed 相位 → 201，消息带重编排上下文', async () => {
     const todoId = await makeTodo();
     s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, todoId)).run();
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);

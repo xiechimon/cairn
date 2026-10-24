@@ -1310,6 +1310,7 @@ async function runClaimedStep(
     opts.streamDurationCapMs ?? envDurationCapMs(process.env) ?? STREAM_DURATION_CAP_DEFAULT_MS;
   let timedOut = false;
   let timeoutArm: StreamTimeoutArm | null = null;
+  const runningToolCalls = new Set<string>();
   let watchdog: NodeJS.Timeout | null = null;
   let bodyTimeout: NodeJS.Timeout | null = null;
   let durationCap: NodeJS.Timeout | null = null;
@@ -1321,6 +1322,8 @@ async function runClaimedStep(
   };
   const armWatchdog = (ms: number, arm: 'first' | 'idle') => {
     if (watchdog) clearTimeout(watchdog);
+    watchdog = null;
+    if (arm === 'idle' && runningToolCalls.size > 0) return;
     watchdog = setTimeout(() => tripTimeout(arm), ms);
     watchdog.unref?.();
   };
@@ -1330,6 +1333,8 @@ async function runClaimedStep(
   // 在案（数值独立可配；将来 idle 重置面收窄时它仍是兜底）。
   const armBodyTimeout = () => {
     if (bodyTimeout) clearTimeout(bodyTimeout);
+    bodyTimeout = null;
+    if (runningToolCalls.size > 0) return;
     bodyTimeout = setTimeout(() => tripTimeout('body'), streamTimeouts.body);
     bodyTimeout.unref?.();
   };
@@ -1584,11 +1589,16 @@ async function runClaimedStep(
     stop.attach(handle).catch((err: unknown) => {
       logger.step(`stop delivery failed: ${err instanceof Error ? err.message : String(err)}`);
     });
+    runningToolCalls.clear();
     armWatchdog(streamTimeouts.first, 'first');
     armBodyTimeout();
     if (pass === 0) armDurationCap();
     try {
       for await (const ev of handle.events) {
+        if (ev.type === 'toolcall_end') {
+          if (ev.call.result === undefined) runningToolCalls.add(ev.call.id);
+          else runningToolCalls.delete(ev.call.id);
+        }
         armWatchdog(streamTimeouts.idle, 'idle');
         // body 预算与 idle 同拍按事件重置（#699 失败方式 1 的核心）。
         armBodyTimeout();
