@@ -18,6 +18,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['node', 'scripts/comment-discipline-gate.mjs'],
     ['node', 'scripts/single-use-helper-gate.mjs'],
+    ['node', 'scripts/baseline-ratchet-gate.mjs'],
   ];
   return mode === 'ci'
     ? required

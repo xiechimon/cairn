@@ -20,6 +20,7 @@ test('local code checks include both UI gates and affected e2e', () => {
     'node scripts/ui-dead-class-gate.mjs --compile',
     'node scripts/comment-discipline-gate.mjs',
     'node scripts/single-use-helper-gate.mjs',
+    'node scripts/baseline-ratchet-gate.mjs',
     'pnpm lint',
     'pnpm typecheck',
     'pnpm spec:parse',
