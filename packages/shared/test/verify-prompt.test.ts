@@ -13,6 +13,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildVerifyStepPrompt,
+  parseVerifyPromptMeta,
   reconcileVerifyVerdict,
   verifyVerdictSchema,
 } from '../src/records/verify.js';
@@ -46,17 +47,38 @@ describe('buildVerifyStepPrompt 材料（#1250）', () => {
     expect(prompt).toContain('passed 如实报');
   });
 
-  test('失败方式 3：工作区纪律（证据可写、交付物不改）在材料里', () => {
+  test('失败方式 3：工作区纪律（代码只读、仅证据目录可写）在材料里', () => {
     const prompt = buildVerifyStepPrompt({
       ticketRef: '1250',
       taskText: TASK,
       planText: '',
       pr: null,
     });
+    expect(prompt).toContain('代码只读');
     expect(prompt).toContain('git add / commit / push');
-    expect(prompt).toContain('不改动交付物本身');
-    // 无方案轮（直执行任务）：方案段缺席，不渲染空段。
+    expect(prompt).toContain('docs/verify/1250/');
+    expect(prompt).not.toContain('可写工作区');
     expect(prompt).not.toContain('## 方案');
+  });
+
+  test('#1404 S5a：派步时写下的 expectedHeadSha 进 meta，缺省不写头', () => {
+    const sha = 'ab'.repeat(20);
+    const withSha = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+      expectedHeadSha: sha,
+    });
+    expect(parseVerifyPromptMeta(withSha)?.expectedHeadSha).toBe(sha);
+    expect(parseVerifyPromptMeta(withSha)?.kind).toBe('verify');
+    const without = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+    });
+    expect(parseVerifyPromptMeta(without)).toBeNull();
   });
 
   test('失败方式 4：PR 有无分叉——有 PR 指名回贴，无 PR 如实说明跳过', () => {

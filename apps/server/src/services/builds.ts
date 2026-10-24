@@ -46,6 +46,8 @@ import {
   MERGE_ANNOUNCEMENT,
   type PlanContractCheck,
   parseGithubIssueSourceRef,
+  parseReviewPromptMeta,
+  parseVerifyPromptMeta,
   personaByRole,
   planVerificationItems,
   REVIEW_ANNOUNCEMENT,
@@ -62,6 +64,7 @@ import type { Db } from '../db/client.js';
 import {
   agent,
   build,
+  gateVerdict,
   machine,
   message,
   plan as planTable,
@@ -92,6 +95,7 @@ import { githubRepoOfProject, hasRepoBinding, projectOfTodo, readBuildChanges } 
 import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { bindGateVerdict } from './merge-gate/verdict.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
@@ -778,6 +782,7 @@ export function maybeEnqueueVerifyStep(
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
   const planRow = latestPlanRow(deps, buildId);
+  const expectedHeadSha = dispatchHeadSha(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef,
     // #1406：GitHub issue 导入任务的标题与正文进 issue 原文围栏（ADR 0021 D5）。
@@ -786,6 +791,7 @@ export function maybeEnqueueVerifyStep(
     // #1492：方案 Verification 清单逐项进材料（无清单 = 老方案 / 直执行，按旧口径）。
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+    ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
   });
   insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
@@ -1240,11 +1246,13 @@ export async function applyBuildStepAction(
     // 时间线「发起了 AI 审核」行（r8 §3.1 实测：行形 = role user 纯文本，
     // 呈现层拼装时间/actor；REVIEW_ANNOUNCEMENT 双端单源）。
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
+    const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
     const promptArgs = {
       gate,
       planText,
       ...(changes !== undefined ? { changes } : {}),
       checkout,
+      ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
     } as const;
     // #1250（ADR 0018 层 1）：agentId 缺省 = fan-out 三视角——三员 persona
     // 各入队一条 review 步（agentId 走各自步的 prompt meta header；focus =
@@ -1552,6 +1560,76 @@ export function lastPushedCheckpoint(
       )
       .get()?.commit ?? null
   );
+}
+
+function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
+  const commit =
+    deps.db
+      .select({ commit: step.checkpointCommit })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          notInArray(step.kind, ['review', 'merge', 'verify']),
+          eq(step.status, 'done'),
+          isNotNull(step.checkpointCommit),
+        ),
+      )
+      .orderBy(
+        desc(
+          sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
+        ),
+        desc(step.createdAt),
+      )
+      .get()?.commit ?? null;
+  return commit !== null && isFullSha(commit) ? commit : null;
+}
+
+function persistGateVerdict(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect | undefined,
+  facts: {
+    stepFailed: boolean;
+    extracted: boolean;
+    blocked: boolean;
+    reportedHeadSha: string | null;
+  },
+): void {
+  if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
+  const expectedHeadSha =
+    stepRow.kind === 'review'
+      ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+      : (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null);
+  if (expectedHeadSha === null) return;
+  const perspective =
+    stepRow.kind === 'review' && todoRow !== undefined
+      ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
+      : null;
+  const bound = bindGateVerdict({
+    kind: stepRow.kind,
+    perspective,
+    expectedHeadSha,
+    reportedHeadSha: facts.reportedHeadSha,
+    stepFailed: facts.stepFailed,
+    extracted: facts.extracted,
+    blocked: facts.blocked,
+  });
+  if (bound === null) return;
+  deps.db
+    .insert(gateVerdict)
+    .values({
+      stepId: stepRow.id,
+      buildId: stepRow.buildId,
+      kind: bound.kind,
+      perspective: bound.perspective,
+      outcome: bound.outcome,
+      patchDigest: bound.patchDigest,
+      headSha: bound.headSha,
+      expectedHeadSha: bound.expectedHeadSha,
+      createdAt: nowMs(),
+    })
+    .run();
 }
 
 /** 经 API 合并的关口闸（不写；每次 await 之后重判）。相位：review 放行；failed 且本轮
@@ -1884,6 +1962,13 @@ export function applyStepFailure(
     });
   }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
+  persistGateVerdict(deps, finished ?? stepRow, todoRow, {
+    stepFailed: true,
+    extracted: false,
+    blocked: false,
+    reportedHeadSha: (finished ?? stepRow).checkpointCommit,
+  });
   if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
   }
@@ -2298,6 +2383,12 @@ export function completeStep(
       }),
       createdAt: nowMs(),
     });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.findings !== undefined,
+      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      reportedHeadSha: stepRow.checkpointCommit,
+    });
     if (hasBlockingFinding(verdict)) {
       // #1250 fan-out 去重闸：三视角并行报告的 blocking 各自命中时，同 build
       // 只入队一条修订步（pending/claimed 的 plan 步在位 = 已有一条——三份
@@ -2377,6 +2468,12 @@ export function completeStep(
           : {}),
       }),
       createdAt: nowMs(),
+    });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.verifyVerdict !== undefined,
+      blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
+      reportedHeadSha: stepRow.checkpointCommit,
     });
     return;
   }

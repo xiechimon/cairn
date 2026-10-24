@@ -30,6 +30,25 @@ export const verifyVerdictSchema = z.object({
 });
 export type VerifyVerdict = z.infer<typeof verifyVerdictSchema>;
 
+export const verifyPromptMetaSchema = z.object({
+  kind: z.literal('verify'),
+  expectedHeadSha: z.string().optional(),
+});
+export type VerifyPromptMeta = z.infer<typeof verifyPromptMetaSchema>;
+
+export function parseVerifyPromptMeta(prompt: string | null): VerifyPromptMeta | null {
+  if (prompt === null) return null;
+  const newline = prompt.indexOf('\n');
+  const head = (newline === -1 ? prompt : prompt.slice(0, newline)).trim();
+  if (!head.startsWith('{')) return null;
+  try {
+    const parsed = verifyPromptMetaSchema.safeParse(JSON.parse(head));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** verify 步 prompt（server 组装单源；agentId 不在 prompt 里——assignment 槽
  * 承载）。材料 = 任务文本 + 方案全文 + 交付面（PR）+ 变更概览（审核关口可
  * 得时）。工作区段如实：会话分支的可写检出（证据要提交推送），与 review 步
@@ -48,6 +67,7 @@ export function buildVerifyStepPrompt(args: {
   pr: { number: number; url: string | null } | null;
   /** 变更面（审核关口可得时传；单文件级 diff 概览）。 */
   changes?: readonly DocumentDiffFile[];
+  expectedHeadSha?: string;
 }): string {
   const prSection =
     args.pr !== null
@@ -78,7 +98,10 @@ export function buildVerifyStepPrompt(args: {
         ]
       : [];
   const sections = [
-    `请验证以下任务的本轮交付。**验证步**：在会话分支的可写工作区上起真实栈跑 e2e / 关键路径，把证据（截图、API JSON、落库行、日志摘录）落进 docs/verify/${args.ticketRef}/，回贴 PR body，结尾按下方契约输出 verdict。工作区对验证产物可写：证据文件正常 git add / commit / push；除此之外不改动交付物本身。`,
+    ...(args.expectedHeadSha !== undefined
+      ? [JSON.stringify({ kind: 'verify', expectedHeadSha: args.expectedHeadSha })]
+      : []),
+    `请验证以下任务的本轮交付。**验证步**：代码只读——不得修改交付物、不得改 docs/verify/${args.ticketRef}/ 以外的文件。在会话分支上起真实栈跑 e2e / 关键路径，把证据（截图、API JSON、落库行、日志摘录）落进 docs/verify/${args.ticketRef}/，回贴 PR body，结尾按下方契约输出 verdict。仅证据目录可写：证据文件正常 git add / commit / push。`,
     '',
     '## 输出契约',
     '本步以单一 JSON 对象结尾输出 verdict —— 你的最后一条消息内容必须是下列',

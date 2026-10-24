@@ -62,6 +62,7 @@ export const reviewPromptMetaSchema = z.object({
   /** 缺省 = 无该字段的存量 prompt（#511 之前入队）：按 `confirm` 语义处理
    * （不开检出、材料不含变更），与旧 server 行为逐字节一致。 */
   gate: reviewGateSchema.optional(),
+  expectedHeadSha: z.string().optional(),
 });
 export type ReviewPromptMeta = z.infer<typeof reviewPromptMetaSchema>;
 
@@ -95,8 +96,14 @@ export function buildReviewStepPrompt(args: {
    * 不写检出段——不谎称给了一个不存在的检出。 */
   checkout?: boolean;
   focus?: string;
+  expectedHeadSha?: string;
 }): string {
-  const meta: ReviewPromptMeta = { kind: 'review', agentId: args.agentId, gate: args.gate };
+  const meta: ReviewPromptMeta = {
+    kind: 'review',
+    agentId: args.agentId,
+    gate: args.gate,
+    ...(args.expectedHeadSha !== undefined ? { expectedHeadSha: args.expectedHeadSha } : {}),
+  };
   const focusNote =
     args.focus !== undefined && args.focus.trim() !== ''
       ? `\n\n## 用户关注点\n${args.focus.trim()}`
