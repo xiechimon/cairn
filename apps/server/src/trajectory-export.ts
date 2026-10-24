@@ -32,6 +32,7 @@ import {
   todo,
   tokenUsage,
 } from './db/schema.js';
+import { derivePackOutcome } from './trajectory-outcome.js';
 
 export class TrajectoryExportError extends Error {}
 
@@ -72,7 +73,9 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
   const sqlite = new Database(config.dbPath, { readonly: true, fileMustExist: true });
   const db = drizzle(sqlite);
   try {
+    const now = Date.now();
     let redacted = 0;
+    let revertWindowOpen = 0;
     const skipped: Record<SkipReason, number> = {
       session_missing: 0,
       session_invalid: 0,
@@ -189,6 +192,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
             checkpointCommit: s.checkpointCommit,
           }));
           const runtimeModel = sessions[0]?.runtimeModels[0];
+          const signals = derivePackOutcome(db, b, now);
           const pack = trajectoryPackSchema.parse({
             buildId: b.id,
             input: {
@@ -230,15 +234,16 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
               ).length,
             },
             outcome: {
-              merged: null,
-              revertedWithin7d: null,
-              fixedByLaterPr: null,
+              merged: signals.merged,
+              revertedWithin7d: signals.revertedWithin7d,
+              fixedByLaterPr: signals.fixedByLaterPr,
               costTotal: usage.length ? usage.reduce((sum, u) => sum + u.costTotal, 0) : null,
             },
           });
           const cleaned = redactSecrets(pack);
           const line = JSON.stringify(trajectoryPackSchema.parse(cleaned.value));
           redacted += cleaned.count;
+          if (signals.revertWindowOpen) revertWindowOpen++;
           return [line];
         } catch (error) {
           if (options.buildId !== undefined) throw error;
@@ -273,7 +278,7 @@ export function exportTrajectories(config: ServerConfig, options: TrajectoryExpo
     } finally {
       rmSync(temporary, { force: true });
     }
-    return { out, exported: lines.length, redacted, skipped };
+    return { out, exported: lines.length, redacted, revertWindowOpen, skipped };
   } finally {
     sqlite.close();
   }

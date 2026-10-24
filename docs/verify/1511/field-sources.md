@@ -15,8 +15,9 @@
 - judgments.plan / diff：确认、打回与重启动作及反馈。现有 message.content 宣告与 step.prompt 可供回查，但没有独立完整的结构化裁决列；后续采集端需记录动作及理由，未留理由为 null。
 - judgments.gate_verdict：gate_verdict 全行，按 buildId 关联。
 - judgments.ciFixRounds：按 step.prompt 的 [ci-fix] 头标记计数，与 services/ci-loop.ts 的轮数口径一致。
-- outcome.merged：GitHub PR 合并事实，现有 build.prNumber / prUrl 只提供关联键，不提供合并布尔值。
-- outcome.revertedWithin7d / fixedByLaterPr：滞后跟踪的 GitHub 事实，现无对应列；未知为 null，不能填 false。
+- outcome.merged（#1659）：取 build 会话里最近一条交付记录。完成行（services/delivery-rows.ts 的 DONE_ROW）为 true，PR 关闭未合并行为 false，两者都没有为 null。只读库内数据，不调 GitHub。
+- outcome.revertedWithin7d（#1659）：merged=true 时，合并后 7 天内同票出现首步提示以 [revert] 开头的后续 build 为 true。窗口已满且没有该标记为 false；导出时刻早于窗口结束为 null，导出摘要的 revert_window_open 计数。merged 不是 true 时为 null。
+- outcome.fixedByLaterPr（#1659）：merged=true 时，合并后同票出现带 PR 号且不是回滚的后续 build 为 true。没有该信号时窗口已满为 false，窗口未满为 null。CI 纠错工单是 GitHub issue 不在库内，ci-fix 转绿事件发生在合并前，两者都不作信号。
 - outcome.costTotal：token_usage.costTotal 按 buildId 求和，USD；未完成记账时为 null。
 
 outcome 必须存在，允许整个为 null；开始回填后各字段也允许 null。其余字段必须存在，仅明确声明 nullable 的字段允许 null。空数组表示已采集且没有记录，不表示字段缺失。

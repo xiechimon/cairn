@@ -748,6 +748,10 @@ export const EN: Record<string, string> = {
   缓存读取: 'Cache read',
   缓存写入: 'Cache write',
   缓存命中率: 'Cache hit rate',
+  花费: 'Cost',
+  '输入（含缓存写入）': 'Input (incl. cache write)',
+  '无价格来源：模型未声明费率，或该运行未上报费用':
+    'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重跑: 'Rerun',
   构建分支: 'Build branch',
