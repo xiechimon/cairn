@@ -120,7 +120,7 @@ import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
-import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD } from './retry-lessons.js';
+import { CI_FIX_FAILURES_HEAD, CI_FIX_PROMPT_HEAD, CI_FIX_PUSH_RULE } from './retry-lessons.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -306,7 +306,7 @@ export function buildCiFixPrompt(args: {
     CI_FIX_FAILURES_HEAD,
     failures,
     '',
-    '请修复以上检查，并在同一分支上推送（不要新开分支、不要合并 PR）；推送后 CI 会重跑，系统会继续轮询直到检查通过。',
+    CI_FIX_PUSH_RULE,
   ].join('\n');
 }
 

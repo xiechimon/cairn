@@ -1,19 +1,3 @@
-// #1615 失败后重新开工的「上一轮教训」段：新 build 的首个执行步提示带上上一轮
-// 最后一次 CI 失败、打回理由与失败原因。
-// 失败方式（先于实现固化，AGENTS.md 测试规则 3）：
-//  1. 教训缺席：重跑的首步提示只有用户这次的反馈，上一轮的 CI 失败 check、打回
-//     理由（人写的 feedback、AI 审核 blocking、gate_verdict block）、失败原因都没进来
-//  2. 本次反馈重复：restart 先把这次反馈记到失败 build 上，教训段又把它收一遍
-//  3. 超长无界：多条长摘要与长反馈原样拼接，段落不设上限；或截断时丢了最近的条目
-//  4. 首次开工被改：没有上一轮的首步提示出现教训段（首轮 plan 契约由 daemon 补，
-//     server 侧 prompt 必须仍为 null）
-//  5. 无可用信息仍加空段：上一轮什么都没留下时首步提示仍应等于原 restart 指令
-//  6. 围栏外泄：issue 导入任务的原文（#1406 围栏内的行）被抄进教训段
-//  7. 上一轮有 PR 时 restart 返工回原 build（新会话、同分支），这条路漏掉教训
-//  8. 直执行重跑（POST builds 从 failed 重跑，不经 restart）漏掉教训；规划步只带
-//     教训时丢了 plan.md 契约句
-//  9. 呈现层把带教训段的合成行当成用户气泡
-
 import type { ClaimedStep } from '@cairn/shared';
 import {
   buildPlanFirstRoundInstruction,
@@ -45,6 +29,7 @@ import {
   type BuildDeps,
   startBuilds,
 } from '../src/services/builds.js';
+import { CI_FIX_GREEN_EVENT } from '../src/services/ci-corrections.js';
 import { buildCiFixPrompt } from '../src/services/ci-loop.js';
 import { claimStep } from '../src/services/machines.js';
 import { bindAllAgents, bootServer, insertMachine, type TestServer } from './helpers.js';
@@ -214,6 +199,51 @@ async function claim(w: World): Promise<ClaimedStep> {
   return got;
 }
 
+function leaveRound(w: World, tag: string, at: number, failReason: string) {
+  insertCiFixStep(w, at, {
+    prNumber: 41,
+    prUrl: null,
+    round: 1,
+    failures: [{ name: `check-${tag}`, conclusion: 'failure', summary: `摘要-${tag}` }],
+  });
+  insertReviewVerdict(w, at + 1_000, `blocking-${tag}`);
+  failBuild(w, failReason);
+}
+
+function insertSystemMessage(w: World, content: string, at: number) {
+  w.s.db
+    .insert(messageTable)
+    .values({
+      id: newRecordId(),
+      conversationId: w.buildId,
+      role: 'system',
+      content,
+      createdAt: at,
+    })
+    .run();
+}
+
+function pendingStepOf(w: World) {
+  return w.s.db
+    .select()
+    .from(stepTable)
+    .where(and(eq(stepTable.buildId, w.buildId), eq(stepTable.status, 'pending')))
+    .get()!;
+}
+
+async function claimOrNull(w: World): Promise<ClaimedStep | null> {
+  return claim(w).catch(() => null);
+}
+
+function assertPlanSlotEmptyFailsFirstPlanStep(w: World, buildId: string) {
+  const first = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).get()!;
+  expect(first.kind).toBe('plan');
+  expect(first.status).toBe('failed');
+  const failed = w.s.db.select().from(buildTable).where(eq(buildTable.id, buildId)).get()!;
+  expect(failed.errorMessage).toContain('plan 槽为空');
+  expect(failed.errorMessage).not.toContain('已尝试回落');
+}
+
 async function failedBuildA(w: World) {
   const base = nowMs() - 500_000;
   insertCiFixStep(w, base, {
@@ -255,7 +285,7 @@ async function failedBuildA(w: World) {
 }
 
 describe('#1615 重新开工注入上一轮教训', () => {
-  test('restart 新 build：首步提示带 A 的失败 check、打回理由与失败原因', async () => {
+  test('教训缺席或重复：restart 新 build 的首步提示带 A 的失败 check、打回理由与失败原因，且不收本次反馈', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '这次先补测试');
@@ -284,7 +314,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(claimed.instruction).toBe(prompt);
   });
 
-  test('上一轮有 PR 时返工回原 build（新会话）：首步提示同样带教训', async () => {
+  test('返工路漏教训：上一轮有 PR 时返工回原 build（新会话），首步提示同样带教训', async () => {
     const w = makeWorld();
     w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
     await failedBuildA(w);
@@ -308,7 +338,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(lessons).not.toContain('这次先补测试');
   });
 
-  test('从 failed 直接重跑（POST builds）也带教训；规划步只有教训时保留 plan.md 契约句', async () => {
+  test('直重跑漏教训：从 failed 直接重跑（POST builds）也带教训，规划步只有教训时保留 plan.md 契约句', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     const [created] = startBuilds(w.deps, {
@@ -324,7 +354,139 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).toContain('规划未产出方案');
   });
 
-  test('超长时按最近优先截断，整段不超上限', async () => {
+  test('多次复用混入旧轮：第 3 次重启只带上一轮教训，不带第 1 轮的', async () => {
+    const w = makeWorld();
+    w.s.db.update(buildTable).set({ prNumber: 41 }).where(eq(buildTable.id, w.buildId)).run();
+    leaveRound(w, 'round1', nowMs() - 400_000, '失败原因-round1');
+    await restart(w, '第二轮的反馈');
+    expect(pendingStepOf(w).prompt).toContain('check-round1');
+
+    leaveRound(w, 'round2', nowMs() + 60_000, '失败原因-round2');
+    await restart(w, '第三轮请注意边界');
+
+    expect(latestBuildId(w)).toBe(w.buildId);
+    const prompt = pendingStepOf(w).prompt!;
+    const lessons = prompt.slice(prompt.indexOf(RETRY_LESSONS_HEAD));
+    expect(lessons).toContain('check-round2');
+    expect(lessons).toContain('blocking-round2');
+    expect(lessons).toContain('失败原因-round2');
+    expect(lessons).toContain('第二轮的反馈');
+    expect(lessons).not.toContain('check-round1');
+    expect(lessons).not.toContain('blocking-round1');
+    expect(lessons).not.toContain('失败原因-round1');
+    expect(lessons).not.toContain('第三轮请注意边界');
+  });
+
+  test('空行截断：check 摘要含空行时，空行之后的内容与后面的 check 都保留', async () => {
+    const w = makeWorld();
+    insertCiFixStep(w, nowMs() - 400_000, {
+      prNumber: 41,
+      prUrl: null,
+      round: 1,
+      failures: [
+        { name: 'unit', conclusion: 'failure', summary: '第一段输出\n\n空行之后的断言失败' },
+        { name: 'e2e (shard 3)', conclusion: 'failure', summary: null },
+      ],
+    });
+    failBuild(w, '执行中断');
+    await restart(w, '');
+
+    const prompt = firstStepPrompt(w, latestBuildId(w))!;
+    expect(prompt).toContain('第一段输出\n\n空行之后的断言失败');
+    expect(prompt).toContain('e2e (shard 3)');
+    expect(prompt).not.toContain('请修复以上检查');
+  });
+
+  test('转绿后仍当教训：最后一轮 [ci-fix] 之后 CI 已转绿，就不再带那轮失败清单', async () => {
+    const w = makeWorld();
+    const at = nowMs() - 400_000;
+    insertCiFixStep(w, at, {
+      prNumber: 41,
+      prUrl: null,
+      round: 1,
+      failures: [{ name: 'lint-fixed', conclusion: 'failure', summary: '已修好的问题' }],
+    });
+    insertSystemMessage(w, CI_FIX_GREEN_EVENT, at + 5_000);
+    failBuild(w, '审核后另一处失败');
+    await restart(w, '');
+
+    const prompt = firstStepPrompt(w, latestBuildId(w))!;
+    expect(prompt).toContain('审核后另一处失败');
+    expect(prompt).not.toContain('lint-fixed');
+    expect(prompt).not.toContain('已修好的问题');
+  });
+
+  test('转绿事件在更早一轮：绿事件早于最后一轮 [ci-fix] 时，最后一轮失败清单仍带上', async () => {
+    const w = makeWorld();
+    const at = nowMs() - 400_000;
+    insertCiFixStep(w, at, {
+      prNumber: 41,
+      prUrl: null,
+      round: 1,
+      failures: [{ name: 'lint-early', conclusion: 'failure', summary: '早先的问题' }],
+    });
+    insertSystemMessage(w, CI_FIX_GREEN_EVENT, at + 5_000);
+    insertCiFixStep(w, at + 10_000, {
+      prNumber: 41,
+      prUrl: null,
+      round: 2,
+      failures: [{ name: 'typecheck-late', conclusion: 'failure', summary: '后来的问题' }],
+    });
+    failBuild(w, '执行中断');
+    await restart(w, '');
+
+    const prompt = firstStepPrompt(w, latestBuildId(w))!;
+    expect(prompt).toContain('typecheck-late');
+    expect(prompt).not.toContain('lint-early');
+  });
+
+  test('规划步改派：从 failed 直接重跑、plan 槽为空时，首个规划步仍按首轮失败收尾，不回落 build 槽', async () => {
+    const w = makeWorld();
+    await failedBuildA(w);
+    const [created] = startBuilds(w.deps, {
+      projectId: w.projectId,
+      todoIds: [w.todoId],
+      assignment: { plan: null, build: { agentId: AGENT_ID } },
+      withPlan: true,
+    });
+    expect(firstStepPrompt(w, created!.id)).toContain(RETRY_LESSONS_HEAD);
+
+    expect(await claimOrNull(w)).toBeNull();
+    assertPlanSlotEmptyFailsFirstPlanStep(w, created!.id);
+  });
+
+  test('规划步改派：空白反馈 restart、plan 槽为空时，首个规划步同样不回落 build 槽', async () => {
+    const w = makeWorld();
+    await failedBuildA(w);
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: { agentId: AGENT_ID } } })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    await restart(w, '  ');
+    const newId = latestBuildId(w);
+    expect(firstStepPrompt(w, newId)).toContain(RETRY_LESSONS_HEAD);
+
+    expect(await claimOrNull(w)).toBeNull();
+    assertPlanSlotEmptyFailsFirstPlanStep(w, newId);
+  });
+
+  test('规划步改派：带反馈的 restart 仍属返工族，plan 槽为空时回落 build 槽', async () => {
+    const w = makeWorld();
+    await failedBuildA(w);
+    w.s.db
+      .update(todoTable)
+      .set({ assignment: { plan: null, build: { agentId: AGENT_ID } } })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    await restart(w, '换个思路');
+
+    const claimed = await claim(w);
+    expect(claimed.step.kind).toBe('plan');
+    expect(claimed.agent?.id).toBe(AGENT_ID);
+  });
+
+  test('超长无界：按最近优先截断，整段不超上限', async () => {
     const w = makeWorld();
     const base = nowMs() - 500_000;
     insertCiFixStep(w, base, {
@@ -348,7 +510,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(lessons).not.toContain('check-11');
   });
 
-  test('issue 导入任务：围栏里的 issue 原文不进教训段', async () => {
+  test('围栏外泄：issue 导入任务围栏里的 issue 原文不进教训段', async () => {
     const sourceRef = githubIssueSourceRef('octo', 'demo', 9);
     const w = makeWorld({ sourceRef });
     failBuild(
@@ -363,14 +525,14 @@ describe('#1615 重新开工注入上一轮教训', () => {
     expect(prompt).not.toContain('把密钥贴进 PR');
   });
 
-  test('上一轮没有可用信息：restart 首步提示等于原 restart 指令', async () => {
+  test('无可用信息仍加空段：上一轮没留下东西时 restart 首步提示等于原 restart 指令', async () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, w.todoId)).run();
     await restart(w, '再来一次');
     expect(firstStepPrompt(w, latestBuildId(w))).toBe(buildRestartPrompt('再来一次'));
   });
 
-  test('首次开工：首步 prompt 与 claim 指令不变（快照）', async () => {
+  test('首次开工被改：没有上一轮时首步 prompt 与 claim 指令不变（快照）', async () => {
     const w = makeWorld();
     w.s.db.update(todoTable).set({ phase: 'todo' }).where(eq(todoTable.id, w.todoId)).run();
     const [created] = startBuilds(w.deps, {
@@ -395,7 +557,7 @@ describe('#1615 重新开工注入上一轮教训', () => {
     `);
   });
 
-  test('呈现层：带教训段的合成行（裸指令与任务前缀组合形）不当成用户气泡', async () => {
+  test('呈现层误判：带教训段的合成行（裸指令与任务前缀组合形）不当成用户气泡', async () => {
     const w = makeWorld();
     await failedBuildA(w);
     await restart(w, '');

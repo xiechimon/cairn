@@ -209,6 +209,10 @@ export function buildRetryLessonsSection(lessonsNewestFirst: readonly string[]):
   return `${RETRY_LESSONS_HEAD}\n${items.join('\n')}\n${RETRY_LESSONS_TAIL}`;
 }
 
+export function isPlanFirstRoundWithLessons(prompt: string): boolean {
+  return prompt.startsWith(`${buildPlanFirstRoundInstruction()}\n\n${RETRY_LESSONS_HEAD}`);
+}
+
 export function withRetryLessons(
   instruction: string | undefined,
   kind: 'plan' | 'build',
