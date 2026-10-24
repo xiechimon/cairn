@@ -489,6 +489,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         row.teamId,
         c.req.param('stepId'),
         c.req.param('attachmentId'),
+        c.req.query('teamId'),
       ),
     );
   });

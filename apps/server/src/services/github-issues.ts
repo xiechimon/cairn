@@ -187,8 +187,8 @@ export async function importGithubIssue(
     return createTodo(deps, {
       teamId: row.teamId,
       projectId: row.id,
-      title: detail.title,
-      spec: detail.body ?? '',
+      title: detail.title.replace(/attachment:/gi, 'attachment-disabled:'),
+      spec: (detail.body ?? '').replace(/attachment:/gi, 'attachment-disabled:'),
       tagIds,
       createdBy: opts.createdBy ?? deps.user.id, // 缺省 = seed 用户（REST 建任务面同律）
       ownerId: deps.user.id,
