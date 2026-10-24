@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { step } from '../src/db/schema.js';
+import { notification, step } from '../src/db/schema.js';
 import { finishStep } from '../src/services/machines.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 import { insertMachine, req } from './helpers.js';
@@ -41,12 +41,8 @@ test('context length failure ends orchestration and exposes its reason on the th
     { status: 'failed', errorMessage },
   );
   unsubscribe();
-  expect(events).toContainEqual(
-    expect.objectContaining({
-      type: 'notification',
-      notification: expect.objectContaining({ snippet: errorMessage }),
-    }),
-  );
+  expect(events).toEqual([]);
+  expect(H.s.db.select().from(notification).all()).toEqual([]);
   const response = await req(H.s.app, 'GET', `/api/teams/${H.teamId}/chief/threads`);
   expect(response.status).toBe(200);
   const threads = (await response.json()) as {

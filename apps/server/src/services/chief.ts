@@ -935,7 +935,7 @@ export function parseChiefTrigger(prompt: string | null): 'user' | ChiefWakeKind
 
 /** chief 回合收尾：thread.sessionId（continue 复用面）+ lastTurnAt + activeRun
  * 清空；chief.lastTurnAt（r5 §3.6 记录字段）。 */
-export function finishChiefTurn(deps: ChiefDeps, threadId: string, body: MachineDoneBody): void {
+export function finishChiefTurn(deps: { db: Db }, threadId: string, body: MachineDoneBody): void {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) return;
   const now = nowMs();
@@ -950,19 +950,6 @@ export function finishChiefTurn(deps: ChiefDeps, threadId: string, body: Machine
     .where(eq(chiefThread.id, threadId))
     .run();
   deps.db.update(chief).set({ lastTurnAt: now }).where(eq(chief.id, threadRow.chiefId)).run();
-  if (body.status === 'failed' && body.errorMessage) {
-    const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
-    const agentRow = chiefRow?.agentId
-      ? deps.db.select().from(agent).where(eq(agent.id, chiefRow.agentId)).get()
-      : undefined;
-    notifyChiefMessage(deps, {
-      threadId,
-      message: body.errorMessage,
-      agent: agentRow
-        ? { name: agentRow.displayName, avatarUrl: agentRow.avatarUrl }
-        : { name: 'Chief', avatarUrl: null },
-    });
-  }
 }
 
 /** transcript 终稿/live 工具行 → chief_message 落库（02 §1.3 数据所有权的
