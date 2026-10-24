@@ -4,7 +4,11 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 
 export function prepushPlan(paths, mode = 'local') {
-  if (paths.every((path) => /^(docs\/|.*\.md$|LICENSE$)/.test(path))) return [];
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+  if (paths.every((path) => /^(docs\/|.*\.md$|LICENSE$)/.test(path)))
+    return mode !== 'advisory' && paths.some((path) => path.startsWith('docs/lessons/'))
+      ? [ledgerGate]
+      : [];
   const advisory = [['node', 'scripts/ui-dead-class-gate.mjs', '--compile']];
   if (mode === 'advisory') return advisory;
   const required = [
@@ -15,6 +19,7 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'spec:parse'],
     ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
     ['node', '--test', 'docs/verify/1542/reach.test.mjs'],
+    ledgerGate,
   ];
   const localOnly = [
     ['node', 'scripts/ci-job-structure-gate.mjs'],

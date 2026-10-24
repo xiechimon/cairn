@@ -18,6 +18,7 @@
     "test": "vitest run",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
+    "lessons:table": "node scripts/lessons-ledger-gate.mjs --table",
     "pr:check": "node scripts/pr-body-check.mjs",
     "spec:parse": "node scripts/spec-parse-gate.mjs",
     "format": "biome format --write .",
