@@ -56,8 +56,27 @@ const BOARD = [
   'paper-board-',
   'paper-card',
   'quota-wait-board',
+  'attachment-title',
+  'branch-button',
+  'empty-review-closeout',
+  'live-project-name',
+  'shadcn-primitives',
+  'storage-unavailable',
 ];
-const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
+const SIDEBAR = [
+  'sidebar-',
+  'collapse-',
+  'visual-',
+  'theme-',
+  'user-menu-',
+  'avatar-',
+  'shell-',
+  'accent-typo',
+  'cds-sidebar',
+  'registry-focus-ring',
+  'shadcn-primitives',
+  'storage-unavailable',
+];
 const DETAIL = [
   'detail-',
   'chat-',
@@ -81,10 +100,39 @@ const DETAIL = [
   'queued-action',
   // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
+  'accent-typo',
+  'attachment-strip',
+  'branch-button',
+  'cds-composer',
+  'cds-dialogs',
+  'cds-transcript',
+  'checkbox-unified',
+  'composer-inline-mention',
+  'composer-paste',
+  'composer-slash',
+  'diff-word-highlight',
+  'empty-review-closeout',
+  'live-agent-model-line',
+  'live-project-name',
+  'persona-verify',
+  'registry-focus-ring',
+  'review-reject',
+  'skill-inject',
+  'spec-flow',
+  'thinking-row-truncate',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
-const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
-const AGENT = ['agent-', 'team-create-agent'];
+const CHIEF = [
+  'chief-',
+  'composer-wire-reject',
+  'elevation-',
+  'attachment-strip',
+  'page-scroll',
+  'shadcn-primitives',
+  'storage-unavailable',
+  'z-ladder',
+];
+const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
 const LIVE_SERVER = ['token-gate', 'live-server-'];
 const OVERLAY = [
   'newtask-',
@@ -99,8 +147,29 @@ const OVERLAY = [
   'hotkeys',
   // #1446: the queued 停止 row lives in overlay/more-menu.tsx.
   'detail-queued-exit',
+  'accent-typo',
+  'attachment-strip',
+  'attachment-title',
+  'composer-inline-mention',
+  'composer-paste',
+  'composer-slash',
+  'live-project-name',
+  'review-reject',
+  'storage-unavailable',
+  'z-ladder',
 ];
-const OVERLAYS = ['chip-', 'hotkeys', 'search-', 'plan-diff-full-file', 'phase-chip-words'];
+const OVERLAYS = [
+  'chip-',
+  'hotkeys',
+  'search-',
+  'plan-diff-full-file',
+  'phase-chip-words',
+  'cds-dialogs',
+  'diff-word-highlight',
+  'live-agent-model-line',
+  'live-project-name',
+  'shadcn-primitives',
+];
 const PAGES = [
   'project-',
   'file-viewer',
@@ -111,6 +180,10 @@ const PAGES = [
   // live face; src/pages/schedules-page.tsx edits must pull it in).
   'schedules-',
   'phase-chip-words',
+  'accent-typo',
+  'page-scroll',
+  'registry-focus-ring',
+  'resource-back-spa',
 ];
 const RESOURCES = [
   'machine-',
@@ -122,7 +195,12 @@ const RESOURCES = [
   'title-',
   'segmented-',
   'dialog-',
+  'checkbox-unified',
+  'registry-focus-ring',
+  'resource-back-spa',
+  'skill-import',
 ];
+const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 // Exact-file rules win over directory prefixes (longest prefix wins among
@@ -136,7 +214,7 @@ const FILE_RULES = new Map([
   // src/routes — one file per page family.
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
-  ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-']],
+  ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-', 'cds-density']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
@@ -377,8 +455,9 @@ const explicit = argv.filter((a) => !a.startsWith('--'));
 
 if (argv.includes('--check-coverage')) {
   const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
-  prefixes.push('a11y-axe');
-  const missing = explicit.filter(
+  prefixes.push('a11y-axe', ...SHARED_SURFACE_ONLY);
+  const targets = explicit.length > 0 ? explicit : listSpecs().map((spec) => E2E_PREFIX + spec);
+  const missing = targets.filter(
     (path) =>
       path.startsWith(E2E_PREFIX) &&
       path.endsWith('.spec.ts') &&
