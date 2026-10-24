@@ -725,7 +725,7 @@ async function runClaimedStep(
   // PATH / 超时 / 输出不可解析）不拦步——预检的假阳性会拦掉本可跑的任务，
   // 代价高于漏放，故 fail-open 落诊断行，运行期兜底见 backend/claude-code 的
   // result 分支（is_error 显式失败）。——
-  if (runtimeId !== null) {
+  if (runtimeId === 'claude-code') {
     const auth = await (deps.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
     if (auth.state === 'not-logged-in') {
       clearCredentials(creds);
