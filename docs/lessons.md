@@ -71,3 +71,4 @@
 | 新增 shared 记录文件后只改了导出，未同步落文件，Vitest 与 typecheck 都先因缺模块失败 | #1626 (2026-10-25) | 2 | shared 入口变更与文件存在性由 typecheck、受影响 Vitest 一起检查；负对照：缺少 `packages/shared/src/records/report.ts` 时两者均红，补文件后转绿 | 1 | 0 | 机器检查已拦 |
 | 新增私有 helper 只调用一次，single-use-helper-gate 先红 | #1626 (2026-10-25) | 2 | `scripts/single-use-helper-gate.mjs`；负对照：`stripReportLocationNote` 独立存在时闸报 1，内联后转绿 | 1 | 0 | 机器检查已拦 |
 | 合并期补写的集成测试没先跑 `biome format`，`pnpm lint` 报格式差异 | #1626 合并 origin/main (2026-10-25) | 2 | `pnpm lint`（`biome ci .`）在提交前与 CI 均跑；负对照：`integration/test/info-fastlane-e2e.test.ts` 未格式化时 lint 报 1 error，`biome format --write` 后为 0 | 1 | 0 | 机器检查已拦，无需追加防护 |
+| 新 e2e spec 照抄同目录 spec 的头部长注释，comment-discipline-gate 报 12 行新增注释 | #1626 e2e 补证 (2026-10-25) | 2 | `scripts/comment-discipline-gate.mjs`；失败方式改写进测试名与断言，不留注释；负对照：带头注释的 `apps/web/e2e/info-card-report.spec.ts` 闸报 12，删除后为 0 | 1 | 0 | 机器检查已拦；存量 spec 的头注释不是新 spec 的模板 |
