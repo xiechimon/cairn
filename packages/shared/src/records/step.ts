@@ -4,6 +4,7 @@
 // 合并步语义），实现期重放补采后回写 02 §11 收紧（04 §3 不判负口径）。
 
 import { z } from 'zod';
+import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { skillFactSchema } from '../skill-facts.js';
 import { skillInjectionSchema } from '../skill-inject.js';
 import { epochMs, recordId } from './common.js';
@@ -121,6 +122,7 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
     })
     .optional(),
   skillInjection: skillInjectionSchema.nullable(),
+  blockerHandoff: blockerHandoffSchema.optional(),
   /** #1261 配额挂起投影：status=waiting_quota 行在位（其余缺席——zod strip
    * 下 record 对拍不漂移；老 server / fixture 面缺席 = 呈现回落既有标签，
    * 零回归）。 */

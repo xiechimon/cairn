@@ -33,20 +33,8 @@ const confirmDialog = (page: import('@playwright/test').Page) => page.locator('.
 
 test('E1: clean ESC leaves the detail, carrying the search home', async ({ page }) => {
   await page.goto(DETAIL);
-  // ESC-delivery retry law (escape-wiring's ⌘K precedent): a press that
-  // lands before the page's keydown effect mounts is lost and leaves the
-  // old state, so re-pressing is safe — the until is the flipped URL. CI's
-  // slow mount lost the single blind press (run 36997481667); the law this
-  // test pins is "a clean ESC exits", not "exactly one keydown ever lands".
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    await page.keyboard.press('Escape');
-    const flipped = await page
-      .waitForURL(BOARD, { timeout: 1000 })
-      .then(() => true)
-      .catch(() => false);
-    if (flipped) return;
-  }
-  throw new Error('ESC never left the detail page');
+  await page.keyboard.press('Escape');
+  await expect(page).toHaveURL(BOARD);
 });
 
 test('E2: ESC with the chip popover open closes the popover first', async ({ page }) => {

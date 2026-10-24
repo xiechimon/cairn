@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7e359f55-79d4-4e90-a808-4444d6ef0583",
+  "id": "1fe87657-3e7a-4f21-9211-4aed5c693a2c",
   "prevId": "d926b5e3-1954-4896-9cf7-b66a7cd4b497",
   "tables": {
     "agent": {
@@ -246,14 +246,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "history": {
-          "name": "history",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'[]'"
         },
         "createdAt": {
           "name": "createdAt",
@@ -1757,37 +1749,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "memory_save_conflict": {
-      "name": "memory_save_conflict",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "candidateIds": {
-          "name": "candidateIds",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "createdAt": {
-          "name": "createdAt",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "message": {
       "name": "message",
       "columns": {
@@ -2657,6 +2618,13 @@
         },
         "skillInjection": {
           "name": "skillInjection",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "blockerHandoff": {
+          "name": "blockerHandoff",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { pressUntil, settleTransitions } from './helpers.js';
+import { pressAndExpect, settleTransitions } from './helpers.js';
 
 // #1442: axe-core (WCAG 2.1 A/AA) over the main pages, light and dark. Any
 // violation fails the test with its rule id, impact and first targets.
@@ -43,7 +43,7 @@ const PAGES: AuditPage[] = [
     name: 'board search',
     url: '/app?scenario=01',
     open: async (page) => {
-      await pressUntil(page, 'Meta+k', searchDialog(page));
+      await pressAndExpect(page, 'Meta+k', searchDialog(page));
       await page.keyboard.type('probe');
     },
     ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),

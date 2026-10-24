@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 // Issue #387 acceptance: dicebear Lorelei avatar system — name-seeded
 // generative avatars via the dicebear HTTP API (same name → same image, no
@@ -159,7 +159,7 @@ test('search agent rows + project task rows are seeded (Agent 列表 / 任务行
   await page.goto('/app?scenario=01');
   await expect(page.locator('.sidebar-row').first()).toBeVisible();
   const searchPanel = page.getByRole('dialog', { name: '搜索' });
-  await pressUntil(page, 'Meta+k', searchPanel);
+  await pressAndExpect(page, 'Meta+k', searchPanel);
   await page.keyboard.type('r3-builder');
   // #949：agent 行头像位 = data-row-kind 行族载体（.search-row-icon--agent 类钉退役）
   await expect(

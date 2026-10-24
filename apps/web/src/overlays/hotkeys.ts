@@ -35,7 +35,7 @@
 // with the composer focused n types and the fire waits for a non-editable
 // focus (a key the typist owns must never yank the view out from under it).
 
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 /** 输入态：两键共用的守卫（票面「input/textarea/contenteditable 不触发」；
  *  select 同律——原生 typeahead 吃字符键，不可劫持）。导出给面级守卫复用
@@ -75,11 +75,11 @@ function useHotkey(
   // 一整个调度周期，按渲染重挂会在这段缝里丢掉按键。
   const guardRef = useRef(guard);
   const onOpenRef = useRef(onOpen);
-  useEffect(() => {
+  useLayoutEffect(() => {
     guardRef.current = guard;
     onOpenRef.current = onOpen;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing) return;
@@ -119,11 +119,11 @@ export function useChordHotkey(
   // 敲一个字就重渲染一次，这个缝是必然而非偶发。
   const guardRef = useRef(guard);
   const onFireRef = useRef(onFire);
-  useEffect(() => {
+  useLayoutEffect(() => {
     guardRef.current = guard;
     onFireRef.current = onFire;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!enabled) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing) return;
@@ -168,7 +168,7 @@ export function useChiefNewThreadHotkey(active: boolean, onNewThread: () => void
  *  active = 面的开态门（dialog 关着、或项目不足两行时不注册——单项目循环是
  *  空转，吃下 Tab 只会白挡走位）。 */
 export function useProjectCycleHotkey(active: boolean, onCycle: () => void): void {
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
