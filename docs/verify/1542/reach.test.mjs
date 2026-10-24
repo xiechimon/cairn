@@ -67,7 +67,7 @@ test('discovers committed, staged and untracked additions from the base', () => 
       assert.equal(result.status, 1, result.stdout + result.stderr);
       assert.ok(result.stdout.includes(spec), result.stdout);
     }
-    writeFileSync(join(root, selector), readFileSync(resolve(selector), 'utf8').replace("prefixes.push('a11y-axe');", "prefixes.push('a11y-axe', 'unmapped-reach');"));
+    writeFileSync(join(root, selector), readFileSync(resolve(selector), 'utf8').replace("prefixes.push('a11y-axe',", "prefixes.push('a11y-axe', 'unmapped-reach',"));
     assert.equal(check().status, 0);
     writeFileSync(join(root, 'scripts/drive-unregistered.mjs'), '');
     const drive = check();
