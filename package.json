@@ -17,6 +17,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "vitest run",
     "traj:export": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-export-cli.ts",
+    "traj:label": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-label-cli.ts",
+    "traj:attribution": "pnpm --filter @xiechimon/cairn exec node --import tsx src/trajectory-attribution-summary-cli.ts",
     "lint": "biome ci .",
     "prepush": "node scripts/prepush.mjs",
     "pr:check": "node scripts/pr-body-check.mjs",

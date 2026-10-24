@@ -118,6 +118,7 @@ test('exports a complete validated pack from a readonly sqlite snapshot', () => 
   const lines = readFileSync(out, 'utf8').trim().split('\n');
   expect(lines).toHaveLength(1);
   const pack = trajectoryPackSchema.parse(JSON.parse(lines[0] ?? ''));
+  expect(JSON.parse(lines[0] ?? '')).toHaveProperty('attribution', null);
   expect(pack.input).toEqual({
     spec: 'Implement export',
     sourceRef: null,
