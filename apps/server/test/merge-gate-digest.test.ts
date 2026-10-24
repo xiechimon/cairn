@@ -1,14 +1,18 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type CompareFile, compareFileSchema, GATE_LIMITS } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   compareFilesFromResponse,
+  computeLocalPatchDigest,
   computePatchDigest,
   isEvidencePath,
 } from '../src/services/merge-gate/digest.js';
 
+const LOCAL_PATCH = 'same local patch';
 const PATCH_SHA = 'c'.repeat(64);
+const LOCAL_PATCH_SHA = createHash('sha256').update(LOCAL_PATCH, 'utf8').digest('hex');
 
 const file = (over: Partial<CompareFile> & { filename: string }): CompareFile => ({
   status: 'modified',
@@ -33,6 +37,33 @@ const base: CompareFile[] = [
 ];
 
 describe('computePatchDigest', () => {
+  test('a local git diff and the GitHub compare of the same patch yield the same digest and keep the evidence exclusion', () => {
+    const githubFiles = [
+      file({
+        filename: 'apps/server/src/local.ts',
+        sha: '1'.repeat(40),
+        patchSha: LOCAL_PATCH_SHA,
+      }),
+      file({
+        filename: 'docs/verify/1625/run.txt',
+        status: 'added',
+        sha: '2'.repeat(40),
+        additions: 20,
+        deletions: 0,
+      }),
+    ];
+    const localFiles = githubFiles.map((entry) => ({
+      ...entry,
+      patch: entry.patchSha === null ? null : LOCAL_PATCH,
+    }));
+    const local = computeLocalPatchDigest(localFiles);
+    const github = computePatchDigest(githubFiles);
+    expect(local.patchDigest).toBe(github.patchDigest);
+    expect(local.countedFiles).toBe(github.countedFiles);
+    expect(local.countedLines).toBe(github.countedLines);
+    expect(local.excluded.map((entry) => entry.filename)).toEqual(['docs/verify/1625/run.txt']);
+  });
+
   test('with the version prefix, the same set of files in any order yields the same digest', () => {
     const a = computePatchDigest(base);
     const b = computePatchDigest([...base].reverse());

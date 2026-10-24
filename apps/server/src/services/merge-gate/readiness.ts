@@ -50,7 +50,13 @@ export interface GateCompareCommit {
 
 export interface GateInputs {
   policy: { mergePolicy: MergePolicy; autonomyPaused: boolean; dailyCapReached: boolean };
-  build: { isGithubPr: boolean; isCurrent: boolean; phase: Phase; stepsInFlight: number };
+  build: {
+    isGithubPr: boolean;
+    repoKind?: 'github' | 'local';
+    isCurrent: boolean;
+    phase: Phase;
+    stepsInFlight: number;
+  };
   repo: { owner: string; name: string; defaultBranch: string | null };
   ticketRef: string;
   issueNumber: number | null;
@@ -145,19 +151,27 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
     found.set(code, [...(found.get(code) ?? []), ...detail]);
   };
 
+  const isLocal = i.build.repoKind === 'local';
+
   if (i.policy.mergePolicy === 'human') block('policy-human');
   if (i.policy.autonomyPaused) block('autonomy-paused');
   if (i.policy.dailyCapReached) block('daily-cap');
-  if (!i.build.isGithubPr) block('not-applicable');
+  if (!i.build.isGithubPr && !isLocal) block('not-applicable');
   if (!i.build.isCurrent) block('not-current-build');
   if (i.build.phase !== 'review') block('phase-not-review', i.build.phase);
   if (i.build.stepsInFlight > 0) block('work-in-flight', `${i.build.stepsInFlight} step(s)`);
 
   const pr = i.pr;
-  const head = pr !== null && isFullSha(pr.headSha) ? pr.headSha : null;
-  if (pr === null) {
+  const localCompare = typeof i.compare === 'object' ? i.compare : null;
+  const head =
+    pr !== null && isFullSha(pr.headSha)
+      ? pr.headSha
+      : isLocal && localCompare !== null && isFullSha(localCompare.headSha)
+        ? localCompare.headSha
+        : null;
+  if (pr === null && !isLocal) {
     block('pr-unreadable');
-  } else {
+  } else if (pr !== null) {
     if (head === null) block('pr-unreadable', 'head SHA not 40 lowercase hex');
     if (pr.state !== 'open' || pr.merged) block('pr-not-open', pr.merged ? 'merged' : pr.state);
     if (pr.draft) block('pr-draft');
@@ -240,7 +254,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
         ];
   const ownNotPassing =
     checks?.statuses.some((s) => s.state !== 'success' && isOwnStatus(s)) ?? false;
-  if (pr !== null) {
+  if (pr !== null && !isLocal) {
     const state = pr.mergeableState;
     if (state === null || state === 'unknown') {
       block('mergeable-state', 'GitHub still computing');
@@ -332,7 +346,7 @@ export function mergeReadiness(i: GateInputs): MergeReadiness {
   }
 
   if (i.issueNumber === null) block('issue-ref-missing');
-  if (pr !== null && head !== null && compare !== null) {
+  if (!isLocal && pr !== null && head !== null && compare !== null) {
     const args = { owner: i.repo.owner, repo: i.repo.name, ticketRef: i.ticketRef };
     const qualifying = qualifyingEvidenceLinks(pr.body, args, compare);
     const presence = qualifying.map((l): boolean | null => {

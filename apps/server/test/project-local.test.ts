@@ -36,6 +36,8 @@ interface CreateReply {
   repoName?: string;
   githubRepo?: string;
   localPath?: string;
+  mergePolicy?: string;
+  localChecks?: string[];
   cloneUrl?: string;
   error?: string;
   reason?: string;
@@ -47,6 +49,23 @@ async function postCreate(body: unknown): Promise<{ status: number; body: Create
 }
 
 describe('POST /api/projects kind=local -- the localPath three-state validation (#359 AC)', () => {
+  test('a local project defaults to mergePolicy human and accepts configurable local check commands', async () => {
+    const repo = await makeGitRepo();
+    const created = await postCreate({ name: 'p-merge-policy', kind: 'local', localPath: repo });
+    expect(created.status).toBe(201);
+    expect(created.body.mergePolicy).toBe('human');
+
+    const configured = await req(s.app, 'PATCH', `/api/projects/${created.body.id}/merge-policy`, {
+      mergePolicy: 'autonomous',
+      localChecks: ['pnpm test'],
+    });
+    expect(configured.status).toBe(200);
+    expect(await configured.json()).toMatchObject({
+      mergePolicy: 'autonomous',
+      localChecks: ['pnpm test'],
+    });
+  });
+
   test('missing localPath -> 400 (the error position names localPath)', async () => {
     const r = await postCreate({ name: 'p-missing', kind: 'local' });
     expect(r.status).toBe(400);

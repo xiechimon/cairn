@@ -14,6 +14,7 @@ import type {
   ModelRef,
   PersonaRole,
   Phase,
+  ProjectMergeConfig,
   ProjectRepoKind,
   ProviderApi,
   ProviderCompat,
@@ -65,7 +66,7 @@ export const project = sqliteTable('project', {
   repoName: text('repoName'),
   githubRepo: text('githubRepo'),
   localPath: text('localPath'),
-  autonomy: json<AutonomySettings | null>('autonomy'),
+  autonomy: json<(AutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
 });
 
 export const todo = sqliteTable('todo', {

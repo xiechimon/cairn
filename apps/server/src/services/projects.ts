@@ -1,5 +1,13 @@
-import type { PatchProjectBody, SecretBox } from '@cairn/shared';
-import { projectConvertedNote, projectRenamedNote } from '@cairn/shared';
+import {
+  DEFAULT_AUTONOMY_SETTINGS,
+  type PatchProjectBody,
+  type ProjectMergeConfig,
+  patchProjectMergeConfigSchema,
+  projectConvertedNote,
+  projectMergeConfigSchema,
+  projectRenamedNote,
+  type SecretBox,
+} from '@cairn/shared';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, build, chief, project, schedule, step, tag, todo } from '../db/schema.js';
@@ -11,6 +19,29 @@ import type { ConversationStreamHub } from './events.js';
 import { isGithubRepoRef, removeHostedRepoDir, validateGithubLocalSlotPath } from './git.js';
 import { openGithubToken } from './github-connection.js';
 import { insertMessageRow } from './transcript.js';
+
+type ProjectRow = typeof project.$inferSelect;
+
+export function projectMergeConfigOf(row: ProjectRow): ProjectMergeConfig {
+  const raw = row.autonomy as (typeof row.autonomy & Partial<ProjectMergeConfig>) | null;
+  return projectMergeConfigSchema.parse({
+    mergePolicy: raw?.mergePolicy,
+    localChecks: raw?.localChecks,
+  });
+}
+
+export function updateProjectMergeConfig(
+  db: Db,
+  row: ProjectRow,
+  input: unknown,
+): ProjectMergeConfig {
+  const patch = patchProjectMergeConfigSchema.parse(input);
+  const current = projectMergeConfigOf(row);
+  const next = projectMergeConfigSchema.parse({ ...current, ...patch });
+  const autonomy = { ...DEFAULT_AUTONOMY_SETTINGS, ...(row.autonomy ?? {}), ...next };
+  db.update(project).set({ autonomy }).where(eq(project.id, row.id)).run();
+  return next;
+}
 
 export interface ProjectDeps {
   db: Db;
@@ -64,8 +95,6 @@ export function deleteProject(deps: ProjectDeps, id: string): boolean {
   }
   return true;
 }
-
-type ProjectRow = typeof project.$inferSelect;
 
 interface ConversionInput {
   githubRepo: string;
