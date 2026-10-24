@@ -86,7 +86,7 @@ export async function drainCiCorrections(deps: BuildDeps, githubFetch: FetchLike
         ticketDedupeMarker(key),
         `待归因事件：build ${event.buildId}，PR #${event.prNumber} 经过 ci-fix 且最终转绿。`,
         `检查类别：${category}。检查名是初步归类，根因需结合修复 diff 与日志确认。`,
-        '按 docs/lessons.md 阶梯取最高可行防护级，同类合并；新闸必须拿真实失误做负对照，旧错变红、修复后变绿。',
+        '按 docs/lessons/README.md 阶梯取最高可行防护级，同类合并；新闸必须拿真实失误做负对照，旧错变红、修复后变绿。',
         '涉及 AGENTS.md 或闸的保护路径时，合并留人。',
       ].join('\n\n');
       await githubCreateIssue(githubFetch, token, ref.owner, ref.repo, {

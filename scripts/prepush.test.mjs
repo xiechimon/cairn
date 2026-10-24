@@ -7,14 +7,22 @@ import test from 'node:test';
 import { prepushPlan } from './prepush.mjs';
 
 test('documentation skips code checks, unknown paths fail closed', () => {
-  assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), []);
+  assert.deepEqual(prepushPlan(['docs/README.md', 'AGENTS.md']), []);
   assert.ok(prepushPlan(['new-config']).length > 0);
+});
+
+test('a ledger entry change runs the ledger gate even when only documents changed', () => {
+  const ledgerGate = ['node', 'scripts/lessons-ledger-gate.mjs'];
+  for (const mode of ['local', 'ci'])
+    assert.deepEqual(prepushPlan(['docs/lessons/1656-new-entry.md'], mode), [ledgerGate]);
+  assert.ok(prepushPlan(['apps/web/src/main.tsx'], 'ci').some((args) => args[1] === ledgerGate[1]));
 });
 
 test('local code checks include both UI gates and affected e2e', () => {
   const commands = prepushPlan(['apps/web/src/main.tsx']).map((args) => args.join(' '));
   for (const command of [
     'node scripts/ci-job-structure-gate.mjs',
+    'node scripts/lessons-ledger-gate.mjs',
     'node scripts/ui-debt-gate.mjs',
     'node scripts/ui-drift-gate.mjs',
     'node scripts/ui-dead-class-gate.mjs --compile',
@@ -72,7 +80,12 @@ test('CI shares the plan but keeps advisory and full e2e in separate jobs', () =
     prepushPlan(paths, 'ci'),
     prepushPlan(paths)
       .slice(0, -3)
-      .filter((args) => !args[1].endsWith('-gate.mjs') || args[1].startsWith('scripts/ui-')),
+      .filter(
+        (args) =>
+          !args[1].endsWith('-gate.mjs') ||
+          args[1].startsWith('scripts/ui-') ||
+          args[1].startsWith('scripts/lessons-'),
+      ),
   );
   assert.deepEqual(prepushPlan(paths, 'advisory'), [
     ['node', 'scripts/ui-dead-class-gate.mjs', '--compile'],

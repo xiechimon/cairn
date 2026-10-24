@@ -14,7 +14,7 @@
 - 不给人留手动步骤（例如去 GitHub 摘标签）。不给 PR 打 `needs-decision`：需要拍板的事在聊天里问，问完自己合并。
 - 设计取舍（改变原定行为、动 ADR 或保护路径）先问人，再动手。
 - 开完 PR 就打开 GitHub auto-merge 然后收工，不要挂着盯 CI。
-- 每个线程收尾前自动做一次 retro（见 `.claude/skills/retro-cairn/SKILL.md`），不用人提醒。错误台账在 `docs/lessons.md`。
+- 每个线程收尾前自动做一次 retro（见 `.claude/skills/retro-cairn/SKILL.md`），不用人提醒。错误台账在 `docs/lessons/`（一条一个文件）。
 - 一件事一个本机线程：新主题开新线程，不往已有的「调度本机 agent」线程里堆活；已有事项在原线程做完。
 - 线程默认模型用 Sonnet 级以省 token；拆票、审改动、写 PR、做取舍才是 Claude 的活。
 - 派活时不要停下来等人排优先级，自己选顺序直接做。附图片直接附在回复里，别只放进文件库。
@@ -46,13 +46,13 @@
 - 主线：spec 28 自举闭环（ADR 0021），票 #1401 到 #1409；P4 到 P8 未开始。spec 28 第 8 节的台账略有滞后。
 - 评测闭环：#1510 到 #1519。
 - harness A/B 评测 #1532：弱模型 glm-5.3-flash 对强模型 glm-5.3；先做评分标准和基线，#1511 到 #1514 合并后再做完整对比。
-- 过程错误复盘：台账 `docs/lessons.md`；后续 L1 `pnpm prepush`（#1533）、L2 fail→fix 检测器（#1535，依赖 E0）、L3 拦截计数与复发升级（#1534）。动 AGENTS.md 的票由人合并。
+- 过程错误复盘：台账 `docs/lessons/`；后续 L1 `pnpm prepush`（#1533）、L2 fail→fix 检测器（#1535，依赖 E0）、L3 拦截计数与复发升级（#1534）。动 AGENTS.md 的票由人合并。
 - 注释纪律 #1520；另有待办：单开票清理存量注释。
 - 已知：150 多个陈旧远端分支待清理；云端构建 better-sqlite3 需先 `npm i -g node-gyp`。
 - cairn 自己不能合并自己的 PR：chief 的 merge_builds 被硬拒（`chief.ts`），人在 web 界面点「完成」。
 
 ## 6. 接手清单
 
-1. 读 `AGENTS.md`、本文件、`docs/lessons.md`。
+1. 读 `AGENTS.md`、本文件、`docs/lessons/README.md`。
 2. 看 `.claude/skills/`：`pr-cairn`（写 PR body）、`retro-cairn`（收尾复盘）、`verify-cairn`、`verify-step-claim`。
 3. `gh issue list` 看在途票，从 spec 28 主线和评测闭环里挑下一张，不等人排序。
