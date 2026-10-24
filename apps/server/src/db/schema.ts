@@ -51,7 +51,6 @@ export const user = sqliteTable('user', {
 export const team = sqliteTable('team', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  autonomyPaused: bool('autonomyPaused').notNull().default(false),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),

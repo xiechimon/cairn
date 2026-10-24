@@ -32,6 +32,7 @@ export interface SplitCheckerInput {
   subtodos: SplitCheckerSubtodo[];
   agents: SplitCheckerAgent[];
   maxChildren?: number;
+  autonomyPaused?: boolean;
 }
 
 export interface SplitCheckerResult {
@@ -42,6 +43,7 @@ export interface SplitCheckerResult {
 export function checkSplitPlan(input: SplitCheckerInput): SplitCheckerResult {
   const { subtodos } = input;
   const reasons: string[] = [];
+  if (input.autonomyPaused === true) reasons.push('团队自治已暂停');
   const edges = new Map<number, number[]>();
   for (let index = 0; index < subtodos.length; index += 1) {
     for (const blockedBy of subtodos[index]?.blockedBy ?? []) {
