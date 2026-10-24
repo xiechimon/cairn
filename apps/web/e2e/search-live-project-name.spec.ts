@@ -1,5 +1,5 @@
 import { expect, type Page, type Route, test } from '@playwright/test';
-import { pressUntil } from './helpers.js';
+import { pressAndExpect } from './helpers.js';
 
 // ⌘K live face, the frame before GET /api/search answers. While the server
 // query is in flight (250ms debounce + round trip) the rows come from the
@@ -101,9 +101,8 @@ const todoRow = (page: Page, title: string) =>
   panel(page).locator('[data-row-kind="todo"]', { hasText: title });
 const projectRows = (page: Page) => panel(page).locator('[data-row-kind="project"]');
 
-/** ⌘K until the panel answers (retry rules: pressUntil in helpers.ts). */
 async function openPanel(page: Page) {
-  await pressUntil(page, 'Meta+k', panel(page));
+  await pressAndExpect(page, 'Meta+k', panel(page));
 }
 
 async function typeQuery(page: Page, query: string) {
