@@ -15,6 +15,7 @@
 | `feature-map.md` | 功能地图（当前状态活册），由 `scripts/generate-feature-map.mjs` 机械抽取生成，勿手改；重生成跑脚本，校验加 `--check` |
 | `lessons.md` | 错误台账（过程中出过错又修好的事每类一行），防护按阶梯取最高可行级，能做成机器检查的不许只停在文字 |
 | `agent-dispatch-prompts.md` | Agent 派活提示模板（任务、范围和验收命令补在对应模板后），Codex / Grok / pi 三家共用，均遵循 AGENTS.md |
+| `ops/langfuse.md` | 本机自托管 Langfuse v4（compose 在 `ops/langfuse/`，不进产品安装路径） |
 
 ## 随票产物
 

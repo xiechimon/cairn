@@ -49,7 +49,7 @@ resolve+realpath 归一后落在技能根内 = 400（已被 cairn 现扫管理�
 - API:`POST /api/teams/{id}/skills/import`、`POST /api/teams/{id}/skills/{sid}/refresh`。
 - 驱动(`vp.mjs list skill-import` 列出全部 case 与 usage):
   - `node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import import-rollback`:导入失败回滚、重试成功写来源记录(默认带修复后开关 `--expect=new`)。
-  - `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import local-and-github-import --force`:本地目录与 GitHub URL 导入、refresh,即下面的驱动步;调 GitHub,要 `--force`;launch 时带 `NODE_USE_ENV_PROXY=1`(Gotchas 1)。
+  - `env -u http_proxy -u https_proxy -u all_proxy NO_PROXY='*' node .claude/skills/verify-cairn/scripts/vp.mjs drive skill-import local-and-github-import`:本地目录与 GitHub URL 导入、refresh,即下面的驱动步;调 GitHub,drive 不带 `--force` 会拒跑并列出原因,确认要打 GitHub 再自己补上;launch 时带 `NODE_USE_ENV_PROXY=1`(Gotchas 1)。
 
 ## 驱动步（drive-1170-skill-import.mjs）
 
