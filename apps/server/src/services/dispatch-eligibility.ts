@@ -31,7 +31,10 @@ import { agent, build, chief, chiefThread, step, todo } from '../db/schema.js';
  *  其余（含 BYOK 自定义 provider）→ pi）。判定单源在此；claim 侧与 sweep
  *  侧（#881 起「归属机在线被挡」判据）共同消费，机器侧开关 =
  *  machine.enabledRuntimes（PATCH 热写，秒级生效）。 */
-export function stepRuntimeFor(agentProvider: string | null | undefined): 'pi' | 'claude-code' {
+export function stepRuntimeFor(
+  agentProvider: string | null | undefined,
+): 'pi' | 'claude-code' | 'gemini' {
+  if (agentProvider === 'gemini') return 'gemini';
   return isBackendRuntimeId(agentProvider) ? 'claude-code' : 'pi';
 }
 

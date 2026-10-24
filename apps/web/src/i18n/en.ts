@@ -878,6 +878,7 @@ export const EN: Record<string, string> = {
     "cairn's own runtime. Models come from the providers you add.",
   '执行机 Claude Code 配置（~/.claude/settings.json）的模型槽。':
     'Model slots from the executor machine’s Claude Code config (~/.claude/settings.json).',
+  '执行机 Gemini CLI 的本地会话。': 'Local sessions of the executor machine’s Gemini CLI.',
   '已安装在 {hostname}': 'Installed on {hostname}',
   未安装: 'Not installed',
   '已安装，未配置模型槽': 'Installed, no model slots configured',

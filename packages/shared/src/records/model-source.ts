@@ -13,7 +13,7 @@ import { z } from 'zod';
 
 /** runtime 词表（providers tablist 的 data-runtime 值；machine
  *  enabledRuntimes PATCH 词表同源，spec 11 数据契约）。 */
-export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code'] as const;
+export const MODEL_SOURCE_RUNTIMES = ['pi', 'claude-code', 'gemini'] as const;
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
 export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
 
@@ -24,6 +24,7 @@ export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
 export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
   pi: 'pi',
   'claude-code': 'Claude Code',
+  gemini: 'Gemini',
 };
 
 export const modelSourceModelSchema = z.object({
