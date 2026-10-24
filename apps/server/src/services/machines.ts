@@ -95,9 +95,9 @@ import {
   applyStoppedStep,
   completeStep,
   failStepWithEvents,
-  loadVerdictBinding,
   mergedPrElsewhere,
   NotFoundError,
+  reportedVerdictHeads,
   toBuildRecord,
 } from './builds.js';
 import {
@@ -1875,14 +1875,6 @@ export async function finishStep(
     if (landing === MERGE_LANDING_SKIPPED) landingSkipped = true;
     else landingError = landing;
   }
-  const verdictBinding =
-    (body.status === 'success' || body.status === 'failed') &&
-    (stepRow.kind === 'review' || stepRow.kind === 'verify')
-      ? await loadVerdictBinding(deps, stepRow, {
-          ...(body.gateHeadSha !== undefined ? { gateHeadSha: body.gateHeadSha } : {}),
-          ...(body.commit !== undefined ? { commit: body.commit } : {}),
-        })
-      : undefined;
   // #1473 await 之后复查领取：探测 / 落地期间扫尾可能已把步放回 pending、
   // 又被领走（同机或他机）。这份回报属于上一次领取，不能收掉新的那次——
   // 409 让 daemon 留着 journal；在这之前没有写过步、build、卡片（合并落地
@@ -2108,6 +2100,10 @@ export async function finishStep(
     return;
   }
   // #1493 0 token 静默成功：同模型重试一次，第二次按失败收尾。
+  const verdictReport = reportedVerdictHeads(stepRow, {
+    gateHeadSha: body.gateHeadSha,
+    commit: body.commit,
+  });
   if (zeroUsage) {
     if (!(stepRow.fallback?.zeroUsageRetried ?? false)) {
       requeueStep(
@@ -2122,7 +2118,7 @@ export async function finishStep(
       );
       return;
     }
-    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictBinding);
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
     publishStepStatus(deps, stepId);
     return;
   }
@@ -2140,7 +2136,7 @@ export async function finishStep(
       ...(outcome.verifyVerdictError !== undefined
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
-      ...(verdictBinding !== undefined ? { binding: verdictBinding } : {}),
+      report: verdictReport,
     });
     publishStepStatus(deps, stepId);
     return;
@@ -2157,7 +2153,7 @@ export async function finishStep(
   // failed：步级失败无自动重跑（02 §4.2/r3 §3.7），todo → failed +
   // build.errorMessage。落账单源 = builds.applyStepFailure（#703 产物闸的
   // 失败收尾同函数——闸失败与机器报失败走同一条漏斗）。
-  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictBinding);
+  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictReport);
   publishStepStatus(deps, stepId);
 }
 

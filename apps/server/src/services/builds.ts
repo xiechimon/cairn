@@ -39,7 +39,6 @@ import {
   buildTaskPromptText,
   buildVerifyStepPrompt,
   CONFIRM_ANNOUNCEMENT,
-  type CompareFile,
   checkPlanContract,
   conversationBranch,
   EVIDENCE_PREFIX,
@@ -62,7 +61,20 @@ import {
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   agent,
@@ -1596,19 +1608,33 @@ function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
   return null;
 }
 
-export interface VerdictBinding {
-  compareFiles: readonly CompareFile[] | null;
-  pathsAfterExpected: readonly string[] | null;
-  evidenceDir: string | null;
+export interface VerdictReport {
   reportedHeadSha: string | null;
+  driftedHeads: readonly string[];
 }
 
-const UNBOUND_VERDICT: VerdictBinding = {
-  compareFiles: null,
-  pathsAfterExpected: null,
-  evidenceDir: null,
-  reportedHeadSha: null,
-};
+function expectedHeadOf(stepRow: typeof step.$inferSelect): string | null {
+  const expected =
+    stepRow.kind === 'review'
+      ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+      : stepRow.kind === 'verify'
+        ? (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+        : null;
+  return expected !== null && isFullSha(expected) ? expected : null;
+}
+
+export function reportedVerdictHeads(
+  stepRow: typeof step.$inferSelect,
+  reported: { gateHeadSha?: string | undefined; commit?: string | null | undefined },
+): VerdictReport {
+  const candidates = [reported.gateHeadSha, reported.commit].filter(
+    (sha): sha is string => typeof sha === 'string' && isFullSha(sha),
+  );
+  const expected = expectedHeadOf(stepRow);
+  const driftedHeads = expected === null ? [] : candidates.filter((sha) => sha !== expected);
+  const pick = stepRow.kind === 'verify' ? driftedHeads.at(-1) : driftedHeads[0];
+  return { reportedHeadSha: pick ?? candidates[0] ?? null, driftedHeads };
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -1616,136 +1642,20 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function gatePortForVerdict(deps: BuildDeps, stepRow: typeof step.$inferSelect) {
-  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-  if (buildRow?.prNumber == null) return null;
-  const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-  if (todoRow === undefined) return null;
-  const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
-  if (repo === null) return null;
-  const access = teamGithubToken(deps, todoRow.teamId);
-  if (!('token' in access)) return null;
-  return {
-    port: githubGatePort(deps.githubFetch ?? fetch, access.token, repo.owner, repo.repo, 10_000),
-    prNumber: buildRow.prNumber,
-  };
-}
+const verdictDigestsInFlight = new Set<Promise<void>>();
 
-export async function loadVerdictBinding(
-  deps: BuildDeps,
-  stepRow: typeof step.$inferSelect,
-  reported: { gateHeadSha?: string | undefined; commit?: string | undefined },
-): Promise<VerdictBinding> {
-  const candidates = [reported.gateHeadSha, reported.commit].filter(
-    (sha): sha is string => sha !== undefined && isFullSha(sha),
-  );
-  let expected: string | null = null;
-  try {
-    if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') {
-      return { ...UNBOUND_VERDICT, reportedHeadSha: candidates[0] ?? null };
-    }
-    expected =
-      stepRow.kind === 'review'
-        ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
-        : (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null);
-    if (expected === null || !isFullSha(expected)) {
-      return { ...UNBOUND_VERDICT, reportedHeadSha: candidates[0] ?? null };
-    }
-    const drifted = candidates.filter((sha) => sha !== expected);
-    const reportedHeadSha =
-      drifted.length === 0
-        ? (candidates[0] ?? null)
-        : stepRow.kind === 'verify'
-          ? (drifted[drifted.length - 1] ?? null)
-          : (drifted[0] ?? null);
-    let evidenceDir: string | null = null;
-    if (stepRow.kind === 'verify') {
-      const evidenceBuild = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-      const evidenceTodo =
-        evidenceBuild === undefined
-          ? undefined
-          : deps.db.select().from(todo).where(eq(todo.id, evidenceBuild.todoId)).get();
-      if (evidenceTodo !== undefined) {
-        const ticket = ticketRefOf(evidenceTodo);
-        if (
-          ticket !== '' &&
-          ticket !== '.' &&
-          ticket !== '..' &&
-          !ticket.includes('/') &&
-          !ticket.includes('\\')
-        ) {
-          evidenceDir = `${EVIDENCE_PREFIX}${ticket}/`;
-        }
-      }
-    }
-    let pathsAfterExpected: string[] | null = null;
-    if (stepRow.kind === 'verify' && drifted.length > 0) {
-      const opened = gatePortForVerdict(deps, stepRow);
-      if (opened !== null) {
-        const names = new Set<string>();
-        let complete = true;
-        for (const head of drifted) {
-          const read = await readCompareAt(opened.port, expected, head);
-          const files = typeof read.compare === 'object' ? read.compare.files : null;
-          if (files === null || files.length === 0 || files.length >= GATE_LIMITS.compareFileCap) {
-            complete = false;
-            break;
-          }
-          for (const f of files) {
-            names.add(f.filename);
-            if (f.previousFilename !== null) names.add(f.previousFilename);
-          }
-        }
-        if (complete) pathsAfterExpected = [...names];
-      }
-    }
-    const wantDelivery =
-      (drifted.length === 0 && (stepRow.kind === 'review' || candidates.length > 0)) ||
-      pathsAfterExpected !== null;
-    let compareFiles: CompareFile[] | null = null;
-    if (wantDelivery) {
-      const opened = gatePortForVerdict(deps, stepRow);
-      if (opened !== null) {
-        let baseSha: string | null = null;
-        const pull = await opened.port.pull(opened.prNumber, { etag: null });
-        const base = asRecord(pull.kind === 'ok' ? asRecord(pull.body)?.base : null);
-        if (typeof base?.sha === 'string' && isFullSha(base.sha)) {
-          baseSha = base.sha;
-        } else if (typeof base?.ref === 'string' && base.ref !== '') {
-          const branch = await opened.port.branch(base.ref, { etag: null });
-          const commit = asRecord(branch.kind === 'ok' ? asRecord(branch.body)?.commit : null);
-          if (typeof commit?.sha === 'string' && isFullSha(commit.sha)) baseSha = commit.sha;
-        }
-        if (baseSha !== null) {
-          const read = await readCompareAt(opened.port, baseSha, expected);
-          if (typeof read.compare === 'object') compareFiles = read.compare.files;
-        }
-      }
-    }
-    return { compareFiles, pathsAfterExpected, evidenceDir, reportedHeadSha };
-  } catch {
-    const drifted = expected !== null ? candidates.filter((sha) => sha !== expected) : [];
-    return { ...UNBOUND_VERDICT, reportedHeadSha: drifted[0] ?? candidates[0] ?? null };
-  }
+export async function flushVerdictDigests(): Promise<void> {
+  await Promise.all([...verdictDigestsInFlight]);
 }
 
 function persistGateVerdict(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect | undefined,
-  facts: {
-    stepFailed: boolean;
-    extracted: boolean;
-    blocked: boolean;
-    reportedHeadSha: string | null;
-    binding?: VerdictBinding;
-  },
+  facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
 ): void {
   if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
-  const expectedHeadSha =
-    stepRow.kind === 'review'
-      ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
-      : (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null);
+  const expectedHeadSha = expectedHeadOf(stepRow);
   if (expectedHeadSha === null) return;
   const perspective =
     stepRow.kind === 'review' && todoRow !== undefined
@@ -1755,17 +1665,13 @@ function persistGateVerdict(
     kind: stepRow.kind,
     perspective,
     expectedHeadSha,
-    reportedHeadSha:
-      facts.binding !== undefined ? facts.binding.reportedHeadSha : facts.reportedHeadSha,
+    reportedHeadSha: facts.report.reportedHeadSha,
     stepFailed: facts.stepFailed,
     extracted: facts.extracted,
     blocked: facts.blocked,
-    compareFiles: facts.binding?.compareFiles ?? null,
-    pathsAfterExpected: facts.binding?.pathsAfterExpected ?? null,
-    evidenceDir: facts.binding?.evidenceDir ?? null,
   });
   if (bound === null) return;
-  deps.db
+  const inserted = deps.db
     .insert(gateVerdict)
     .values({
       stepId: stepRow.id,
@@ -1773,12 +1679,93 @@ function persistGateVerdict(
       kind: bound.kind,
       perspective: bound.perspective,
       outcome: bound.outcome,
-      patchDigest: bound.patchDigest,
+      patchDigest: null,
       headSha: bound.headSha,
       expectedHeadSha: bound.expectedHeadSha,
       createdAt: nowMs(),
     })
+    .onConflictDoNothing({ target: gateVerdict.stepId })
     .run();
+  if (inserted.changes === 0) return;
+  const driftedHeads = facts.report.driftedHeads;
+  const pending = (async (): Promise<void> => {
+    const row = deps.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, stepRow.id)).get();
+    if (row === undefined || row.patchDigest !== null || row.headSha === null) return;
+    const expected = row.expectedHeadSha;
+    const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+    if (buildRow?.prNumber == null) return;
+    const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+    if (todoRow === undefined) return;
+    const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
+    if (repo === null) return;
+    const access = teamGithubToken(deps, todoRow.teamId);
+    if (!('token' in access)) return;
+    const port = githubGatePort(
+      deps.githubFetch ?? fetch,
+      access.token,
+      repo.owner,
+      repo.repo,
+      10_000,
+    );
+    let pathsAfterExpected: string[] | null = null;
+    if (row.kind === 'verify' && driftedHeads.length > 0) {
+      const names = new Set<string>();
+      for (const head of driftedHeads) {
+        const read = await readCompareAt(port, expected, head);
+        const files = typeof read.compare === 'object' ? read.compare.files : null;
+        if (files === null || files.length === 0 || files.length >= GATE_LIMITS.compareFileCap) {
+          return;
+        }
+        for (const f of files) {
+          names.add(f.filename);
+          if (f.previousFilename !== null) names.add(f.previousFilename);
+        }
+      }
+      pathsAfterExpected = [...names];
+    } else if (row.headSha !== expected) {
+      return;
+    }
+    let baseSha: string | null = null;
+    const pull = await port.pull(buildRow.prNumber, { etag: null });
+    const base = asRecord(pull.kind === 'ok' ? asRecord(pull.body)?.base : null);
+    if (typeof base?.sha === 'string' && isFullSha(base.sha)) {
+      baseSha = base.sha;
+    } else if (typeof base?.ref === 'string' && base.ref !== '') {
+      const branch = await port.branch(base.ref, { etag: null });
+      const commit = asRecord(branch.kind === 'ok' ? asRecord(branch.body)?.commit : null);
+      if (typeof commit?.sha === 'string' && isFullSha(commit.sha)) baseSha = commit.sha;
+    }
+    if (baseSha === null) return;
+    const delivery = await readCompareAt(port, baseSha, expected);
+    if (typeof delivery.compare !== 'object') return;
+    const bound = bindGateVerdict({
+      kind: row.kind,
+      perspective: row.perspective,
+      expectedHeadSha: expected,
+      reportedHeadSha: row.headSha,
+      stepFailed: false,
+      extracted: true,
+      blocked: false,
+      compareFiles: delivery.compare.files,
+      pathsAfterExpected,
+      evidenceDir: `${EVIDENCE_PREFIX}${ticketRefOf(todoRow)}/`,
+    });
+    if (bound?.patchDigest == null) return;
+    deps.db
+      .update(gateVerdict)
+      .set({ patchDigest: bound.patchDigest })
+      .where(
+        and(
+          eq(gateVerdict.stepId, row.stepId),
+          eq(gateVerdict.createdAt, row.createdAt),
+          isNull(gateVerdict.patchDigest),
+        ),
+      )
+      .run();
+  })()
+    .catch(() => undefined)
+    .finally(() => verdictDigestsInFlight.delete(pending));
+  verdictDigestsInFlight.add(pending);
 }
 
 /** 经 API 合并的关口闸（不写；每次 await 之后重判）。相位：review 放行；failed 且本轮
@@ -2079,7 +2066,7 @@ export function applyStepFailure(
   deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   rawErrorMessage: string,
-  binding?: VerdictBinding,
+  report?: VerdictReport,
 ): void {
   const { db } = deps;
   // #1492：空原因会让卡片上的失败横幅（errorMessage 非空才渲染）整块消失。
@@ -2113,12 +2100,12 @@ export function applyStepFailure(
   }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
-  persistGateVerdict(deps, finished ?? stepRow, todoRow, {
+  const failedStep = finished ?? stepRow;
+  persistGateVerdict(deps, failedStep, todoRow, {
     stepFailed: true,
     extracted: false,
     blocked: false,
-    reportedHeadSha: (finished ?? stepRow).checkpointCommit,
-    ...(binding !== undefined ? { binding } : {}),
+    report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
   });
   if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
@@ -2367,7 +2354,7 @@ export function completeStep(
      *  皆缺（旧 daemon）= 消息落「验证未返回结论」兜底。 */
     verifyVerdict?: VerifyVerdict;
     verifyVerdictError?: string;
-    binding?: VerdictBinding;
+    report?: VerdictReport;
   } = {},
 ): void {
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
@@ -2427,7 +2414,7 @@ export function completeStep(
         .where(eq(build.id, stepRow.buildId))
         .run();
     }
-    applyStepFailure(deps, stepRow, gateFailure, outcome.binding);
+    applyStepFailure(deps, stepRow, gateFailure, outcome.report);
     if (refuseDriftRecord) {
       const cleared = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
       if (cleared) publishBuild(deps, cleared);
@@ -2539,8 +2526,7 @@ export function completeStep(
       stepFailed: false,
       extracted: outcome.findings !== undefined,
       blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
-      reportedHeadSha: stepRow.checkpointCommit,
-      ...(outcome.binding !== undefined ? { binding: outcome.binding } : {}),
+      report: outcome.report ?? reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
     if (hasBlockingFinding(verdict)) {
       // #1250 fan-out 去重闸：三视角并行报告的 blocking 各自命中时，同 build
@@ -2626,8 +2612,7 @@ export function completeStep(
       stepFailed: false,
       extracted: outcome.verifyVerdict !== undefined,
       blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
-      reportedHeadSha: stepRow.checkpointCommit,
-      ...(outcome.binding !== undefined ? { binding: outcome.binding } : {}),
+      report: outcome.report ?? reportedVerdictHeads(stepRow, { commit: stepRow.checkpointCommit }),
     });
     return;
   }

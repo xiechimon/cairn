@@ -26,9 +26,8 @@
 | 只把图放进文件库、没有直接附在回复里 | Claude 线程 (2026-10-22) | 5 | 记忆 | 0 | 0 | 机器检查做不到 |
 | 开 PR 后挂着等 CI，不收工 | Claude 线程 (2026-10-22) | 3 | 项目指令：开 PR 打开 auto-merge 后收工 | 0 | 0 | 行为类，CI 不看线程动作 |
 | 等 ian 排优先级而停住 | Claude 线程 (2026-10-22) | 5 | 记忆：自己选顺序直接做 | 0 | 0 | 机器检查做不到，属判断错误 |
-| 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 0 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词 |
-| 驱动脚本断言前没等元素出现就 `count()`，掩码行还没渲染就判 0 行，随后先猜「截图 mask 参数导致」改了一轮才隔离出真因 | #1478 (2026-10-24) | 2 | `drive.mjs` api-key 探针先 `waitFor` 掩码行再计数；不等就数的写法在全新栈上 10 次跑红 4 次（偶发），加等待后 5 次全 PASS；偶发失误做不成确定的负对照 | 0 | 0 | 猜因先改属判断错误，机器拦不住；可拦的半边是探针不等就数 |
 | 新写入的注释（pi 实测会加注释） | #1520 | 2 | PR #1539：`scripts/comment-discipline-gate.mjs`（CI 咨询性检查）加派活提示 `docs/agent-dispatch-prompts.md` | 1 | 0 | 另有 `.husky/banned.txt` 禁词检查拦特定词；#1404 S5a 改 verify.ts 存量头注被闸拦下，复原后 0 新行 |
+| 驱动脚本断言前没等元素出现就 `count()`，掩码行还没渲染就判 0 行，随后先猜「截图 mask 参数导致」改了一轮才隔离出真因 | #1478 (2026-10-24) | 2 | `drive.mjs` api-key 探针先 `waitFor` 掩码行再计数；不等就数的写法在全新栈上 10 次跑红 4 次（偶发），加等待后 5 次全 PASS；偶发失误做不成确定的负对照 | 0 | 0 | 猜因先改属判断错误，机器拦不住；可拦的半边是探针不等就数 |
 | 后台长任务用 `( ... & )` 或 nohup 起，工具调用一返回就被杀，随后还告诉 ian 任务在跑 | Claude 线程 (2026-10-22) | 2 | `scripts/dispatch-agent.mjs` start 脱离进程组启动并立即核对进程写状态文件，汇报前 `check` 读状态文件；负对照在 `scripts/dispatch-agent.test.mjs`（CI 独立 job）：旧写法直起的任务 check 报进程不存在 | 0 | 1 | 复发 1（先 pi，后 codex）后由 #1556 升级到级别 2 |
 | 解 `ci.yml` 冲突后，新步骤落在了另一个 job 里，推送前没看 hunk 所在 job | PR #1540 (2026-10-23) | 2 | `scripts/ci-job-structure-gate.mjs` 对照 `scripts/ci-job-structure-baseline.json` 钉住每个 job 的命名步骤，CI check job 装机前一步与 `pnpm prepush` 共用；负对照 = #1540 错误 hunk（freshness 步落进 comment-discipline-gate）在 `scripts/ci-job-structure-gate.test.mjs` 变红 | 1 | 0 | #1557 落地，级别 5 升 2；首拦：rebase 后 baseline 漏跟上游步骤迁移，闸拦下后才补 |
 | 写文件前没查目标是否已存在，覆盖了已有的 `retro` 技能（从 git 恢复） | Claude 线程 (2026-10-22) | 5 | 记忆：新建技能先 `ls` 目标目录 | 0 | 0 | 本次靠 git 里的历史救回；机器检查做不到 |
@@ -54,6 +53,7 @@
 | 总结里还列着等 ian 拍板的两件事，线程就先收起来了，ian 醒来找不到 | Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24) | 5 | 记忆：收线程前看自己最后一条回复里有没有等人回答的问题，有就不收 | 0 | 0 | 线程动作，CI 看不到；同类已在项目记忆「线程卫生」里写过，属复发，升级只能到项目指令 |
 | 开票前只搜了 issue，没查 spec：#1617 园丁巡检与 spec 28 P6「园丁」重复，#1618 没对上 P5a 进料入口 | #1617/#1618 (2026-10-24) | 5 | 记忆：给自举闭环相关的事开票前先 grep `docs/spec/28-*.md` 与 ADR 0021；两票已补评论改为 P6 园丁段、挂到 P5a 入口 | 0 | 0 | `scripts/dispatch-dedupe.mjs` 只查分支、PR、进程，不读 spec 正文；按关键词查 spec 误报太多，暂不做成闸 |
 | 分支上一张 PR 已合并，从 main 重切同名分支后用 `git push -f` 推送，违反 AGENTS.md「永远别 --force push」 | Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24) | 5 | 记忆：已合并分支重用时换新分支名推送，不强推 | 0 | 0 | 这次被覆盖的只有已 squash 进 main 的提交，没丢东西；pre-push 钩子能判非快进推送，留作升级候选 |
+| 新脚本把只调用一次的查询拆成独立私有函数，`single-use-helper-gate` 报 5 处 | 派活查重 #1569/#1578 (2026-10-24) | 2 | `scripts/single-use-helper-gate.mjs`（`pnpm prepush` 与 CI 共用） | 2 | 0 | 负对照：首版 `scripts/dispatch-agent.mjs` 的 tempWorkdirs 等 5 个单次调用函数报红；收进导出的 `collectTicketSources` 后为 0；#1404 S5a 测试里只用一次的 `hungGithub` 报红，内联进那条测试后为 0 |
 | 新增 import 未按 biome 字母序 / 单行格式 | #1404 S5a | 2 | biome organizeImports 与 format（`pnpm lint`） | 1 | 0 | 负对照：`verdict.ts` 把 `isFullSha` 写在 `type GateVerdictView` 前、`builds.ts` 把 `bindGateVerdict` 插在 `git.js` 后，闸红；排好后绿 |
 | 新代码用 `!== null &&` 再调用方法，biome `useOptionalChain` 警告 | #1404 S5a | 2 | biome `lint/complexity/useOptionalChain`（`pnpm lint`） | 1 | 0 | 负对照：`verdict.ts` 证据目录判断写成 `rawDir !== null && rawDir.startsWith`，biome 报该规则且不自动改；改成 `rawDir?.startsWith` 后该文件 lint 通过。已有闸，不另开 |
 | 集成测试在任务已处于 review 时再次 startBuild，相位闸拒绝，判定绑定路径没跑到 | #1404 S5a | 5 | 记忆：测判定绑定时每个世界只开工一次；要两条运行就各建一个世界 | 0 | 0 | 级别 1 到 4 做不到：第二次开工没有可静态识别的形态，相位闸只会让那条测试失败；加一条只认这个夹具的脚本会误伤合法的重跑用例 |
