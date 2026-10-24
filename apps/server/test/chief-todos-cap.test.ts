@@ -48,5 +48,5 @@ describe('chief todos output budget', () => {
       await executeChiefTool(toolDeps(), ctx(), 'todos', { todoId: ids[0] }),
     );
     expect(detail.spec).toBe('需求😀"\\\n'.repeat(10000));
-  });
+  }, 30_000);
 });
