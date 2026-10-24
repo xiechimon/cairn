@@ -77,7 +77,7 @@ export async function bootLiveServer(token: string | null): Promise<LiveServer> 
       HOST: '127.0.0.1',
       LOG_LEVEL: 'warn',
       [ENV_VARS.home]: home,
-      [ENV_VARS.webDir]: resolve(import.meta.dirname, '..', 'dist'),
+      [ENV_VARS.webDir]: process.env.E2E_DIST_DIR ?? resolve(import.meta.dirname, '..', 'dist'),
       [ENV_VARS.token]: token ?? '',
     },
     stdio: ['pipe', 'ignore', 'inherit'],
