@@ -83,6 +83,7 @@ import {
   applyStoppedStep,
   completeStep,
   failStepWithEvents,
+  loadVerdictBinding,
   mergedPrElsewhere,
   NotFoundError,
   toBuildRecord,
@@ -1585,7 +1586,7 @@ export async function finishStep(
       );
       return;
     }
-    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE);
+    applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictBinding);
     publishStepStatus(deps, stepId);
     return;
   }
@@ -1602,6 +1603,7 @@ export async function finishStep(
         ? { verifyVerdictError: outcome.verifyVerdictError }
         : {}),
       ...(outcome.report !== undefined ? { report: outcome.report } : {}),
+      ...(verdictBinding !== undefined ? { binding: verdictBinding } : {}),
     });
     publishStepStatus(deps, stepId);
     return;
@@ -1611,7 +1613,7 @@ export async function finishStep(
     publishStepStatus(deps, stepId);
     return;
   }
-  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`);
+  applyStepFailure(deps, stepRow, outcome.errorMessage ?? `step ${outcome.status}`, verdictBinding);
   publishStepStatus(deps, stepId);
 }
 

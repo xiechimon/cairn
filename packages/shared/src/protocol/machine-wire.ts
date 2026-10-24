@@ -320,6 +320,7 @@ export const machineDoneBodySchema = z.object({
   hasChanges: z.boolean().optional(),
   workBranchDrift: z.object({ expected: z.string().min(1), actual: z.string().min(1) }).optional(),
   commit: z.string().optional(),
+  gateHeadSha: z.string().optional()
   findings: reviewVerdictSchema.optional(),
   findingsError: z.string().max(FINDINGS_ERROR_CHAR_LIMIT).optional(),
   prUrl: z.string().optional(),
