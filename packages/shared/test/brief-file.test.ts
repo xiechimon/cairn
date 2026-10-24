@@ -135,12 +135,17 @@ describe('resolveBriefTarget：落点决策表（闸 2）', () => {
 });
 
 describe('briefBackendForProvider：与 runner backendFor 同源（失败方式 4）', () => {
-  test('runtime 身份词表 → claude-code；其余一律 pi', () => {
+  test('runtime 身份词表 → 对应后端；其余一律 pi', () => {
     expect(briefBackendForProvider('claude-code')).toBe('claude-code');
+    expect(briefBackendForProvider('gemini')).toBe('gemini');
     expect(briefBackendForProvider('pi')).toBe('pi');
     expect(briefBackendForProvider('stub-gw')).toBe('pi'); // custom provider id
     expect(briefBackendForProvider(null)).toBe('pi');
     expect(briefBackendForProvider(undefined)).toBe('pi');
+  });
+
+  test('gemini 简报使用 GEMINI.md', () => {
+    expect(resolveBriefTarget([], 'gemini', CI)).toEqual({ file: 'GEMINI.md', mode: 'create' });
   });
 });
 

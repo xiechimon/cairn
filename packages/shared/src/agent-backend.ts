@@ -332,7 +332,7 @@ export interface AgentBackend {
  * runtime 但**非** backend 身份——pi 步的 provider 槽承载 custom provider
  * id，恒走默认支。子集关系 BACKEND_RUNTIME_IDS ⊆ MODEL_SOURCE_RUNTIMES 由
  * vocabulary.test 静态钉住（backend 必是模型源；模型源不必是 backend）。 */
-export const BACKEND_RUNTIME_IDS = ['claude-code'] as const;
+export const BACKEND_RUNTIME_IDS = ['claude-code', 'gemini'] as const;
 export type BackendRuntimeId = (typeof BACKEND_RUNTIME_IDS)[number];
 
 /** backend 身份判定（窄类型守卫）：词表外（custom provider id / pi /
