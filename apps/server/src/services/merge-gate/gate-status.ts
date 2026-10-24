@@ -5,7 +5,11 @@
 // 那个 SHA 的当前值，别人写的不同的值下次求值时改回来）。描述不带 blocker 的 detail（文件名、
 // 检查名由 PR 作者或第三方起），至多 140 个字符（GitHub 文档没写上限，第三方实测 140）。
 
-import { MERGE_GATE_STATUS_CONTEXT, type MergePolicy, type MergeReadiness } from '@cairn/shared';
+import {
+  MERGE_GATE_STATUS_CONTEXT,
+  type MergePolicy,
+  type MergeReadiness,
+} from '@cairn/shared/merge-gate';
 import type { GateGithubPort, GateRaw, GateStatusState } from './github-port.js';
 
 export const GATE_STATUS_DESCRIPTION_MAX = 140;
