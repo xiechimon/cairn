@@ -14,11 +14,13 @@ export function prepushPlan(paths, mode = 'local') {
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],
+    ['node', 'scripts/e2e-affected.mjs', '--check-coverage'],
   ];
   const localOnly = [
     ['node', 'scripts/ci-job-structure-gate.mjs'],
     ['node', 'scripts/comment-discipline-gate.mjs'],
     ['node', 'scripts/single-use-helper-gate.mjs'],
+    ['node', 'scripts/baseline-ratchet-gate.mjs'],
   ];
   return mode === 'ci'
     ? required
@@ -33,6 +35,13 @@ export function prepushPlan(paths, mode = 'local') {
 
 export function changedPaths(base = process.env.PREPUSH_BASE_SHA || 'origin/main') {
   const git = (args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' });
+  if (base === 'origin/main') {
+    const fetch = spawnSync('git', ['fetch', 'origin', 'main'], { cwd: root });
+    if (fetch.status !== 0)
+      console.error(
+        `[prepush] git fetch origin main failed (exit ${fetch.status ?? 1}); using local origin/main, which may be stale`,
+      );
+  }
   const ancestor = /^0{40}$/.test(base) ? null : git(['merge-base', 'HEAD', base]).trim();
   return [
     ...new Set(

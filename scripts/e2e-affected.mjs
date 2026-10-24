@@ -28,7 +28,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { acquireSlot, leaseEnv, writeSlotPlaywrightConfig } from './heavy-slots.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..');
@@ -57,8 +57,32 @@ const BOARD = [
   'paper-board-',
   'paper-card',
   'quota-wait-board',
+  'accent-typo',
+  'attachment-title',
+  'branch-button',
+  'empty-review-closeout',
+  'live-project-name',
+  'shadcn-primitives',
+  'storage-unavailable',
 ];
-const SIDEBAR = ['sidebar-', 'collapse-', 'visual-', 'theme-', 'user-menu-', 'avatar-', 'shell-'];
+const SIDEBAR = [
+  'sidebar-',
+  'collapse-',
+  'visual-',
+  'theme-',
+  'user-menu-',
+  'avatar-',
+  'shell-',
+  'accent-typo',
+  'attachment-strip',
+  'attachment-title',
+  'cds-sidebar',
+  'composer-paste',
+  'live-project-name',
+  'registry-focus-ring',
+  'shadcn-primitives',
+  'storage-unavailable',
+];
 const DETAIL = [
   'detail-',
   'chat-',
@@ -82,10 +106,39 @@ const DETAIL = [
   'queued-action',
   // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
+  'accent-typo',
+  'attachment-strip',
+  'branch-button',
+  'cds-composer',
+  'cds-dialogs',
+  'cds-transcript',
+  'checkbox-unified',
+  'composer-inline-mention',
+  'composer-paste',
+  'composer-slash',
+  'diff-word-highlight',
+  'empty-review-closeout',
+  'live-agent-model-line',
+  'live-project-name',
+  'persona-verify',
+  'registry-focus-ring',
+  'review-reject',
+  'skill-inject',
+  'spec-flow',
+  'thinking-row-truncate',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
-const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
-const AGENT = ['agent-', 'team-create-agent'];
+const CHIEF = [
+  'chief-',
+  'composer-wire-reject',
+  'elevation-',
+  'attachment-strip',
+  'page-scroll',
+  'shadcn-primitives',
+  'storage-unavailable',
+  'z-ladder',
+];
+const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
 const LIVE_SERVER = ['token-gate', 'live-server-'];
 const OVERLAY = [
   'newtask-',
@@ -100,8 +153,29 @@ const OVERLAY = [
   'hotkeys',
   // #1446: the queued 停止 row lives in overlay/more-menu.tsx.
   'detail-queued-exit',
+  'accent-typo',
+  'attachment-strip',
+  'attachment-title',
+  'composer-inline-mention',
+  'composer-paste',
+  'composer-slash',
+  'live-project-name',
+  'review-reject',
+  'storage-unavailable',
+  'z-ladder',
 ];
-const OVERLAYS = ['chip-', 'hotkeys', 'search-', 'plan-diff-full-file', 'phase-chip-words'];
+const OVERLAYS = [
+  'chip-',
+  'hotkeys',
+  'search-',
+  'plan-diff-full-file',
+  'phase-chip-words',
+  'cds-dialogs',
+  'diff-word-highlight',
+  'live-agent-model-line',
+  'live-project-name',
+  'shadcn-primitives',
+];
 const PAGES = [
   'project-',
   'file-viewer',
@@ -112,6 +186,10 @@ const PAGES = [
   // live face; src/pages/schedules-page.tsx edits must pull it in).
   'schedules-',
   'phase-chip-words',
+  'accent-typo',
+  'page-scroll',
+  'registry-focus-ring',
+  'resource-back-spa',
 ];
 const RESOURCES = [
   'machine-',
@@ -123,7 +201,12 @@ const RESOURCES = [
   'title-',
   'segmented-',
   'dialog-',
+  'checkbox-unified',
+  'registry-focus-ring',
+  'resource-back-spa',
+  'skill-import',
 ];
+const SHARED_SURFACE_ONLY = ['cds-motion', 'color-freeze', 'fixture-mode-chip'];
 const SECONDARY = ['title-', 'shell-', 'segmented-'];
 
 // Exact-file rules win over directory prefixes (longest prefix wins among
@@ -137,7 +220,7 @@ const FILE_RULES = new Map([
   // src/routes — one file per page family.
   ['apps/web/src/routes/board-page.tsx', BOARD],
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
-  ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-']],
+  ['apps/web/src/routes/account-page.tsx', ['account-team-cleanse', 'user-menu-', 'cds-density']],
   ['apps/web/src/routes/agent-detail-page.tsx', AGENT],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-']],
@@ -393,17 +476,18 @@ const explicit = argv.filter((a) => !a.startsWith('--'));
 
 if (argv.includes('--check-coverage')) {
   const prefixes = [...FILE_RULES.values(), ...DIR_RULES.map((rule) => rule.specs)].flat();
-  prefixes.push('a11y-axe');
-  const missing = explicit.filter(
-    (path) =>
-      path.startsWith(E2E_PREFIX) &&
-      path.endsWith('.spec.ts') &&
-      !prefixes.some((prefix) => path.slice(E2E_PREFIX.length).startsWith(prefix)),
+  prefixes.push('a11y-axe', ...SHARED_SURFACE_ONLY);
+  const specNames = (explicit.length > 0 ? explicit : listSpecs()).map((path) => basename(path));
+  const notSpecs = specNames.filter((name) => !name.endsWith('.spec.ts'));
+  const missing = specNames.filter(
+    (name) => name.endsWith('.spec.ts') && !prefixes.some((prefix) => name.startsWith(prefix)),
   );
-  for (const path of missing)
-    console.log(`[e2e:affected] ${path}: no family table entry reaches this spec`);
+  for (const name of notSpecs)
+    console.log(`[e2e:affected] ${name}: not an e2e spec file (expected *.spec.ts)`);
+  for (const name of missing)
+    console.log(`[e2e:affected] ${E2E_PREFIX}${name}: no family table entry reaches this spec`);
   console.log(`[e2e:affected] coverage: ${missing.length} uncovered spec(s)`);
-  process.exit(missing.length > 0 ? 1 : 0);
+  process.exit(missing.length + notSpecs.length > 0 ? 1 : 0);
 }
 
 const { paths, source } = changedPaths(explicit);
