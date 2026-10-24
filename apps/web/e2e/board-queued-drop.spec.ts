@@ -152,3 +152,52 @@ test('a todo card still lights 执行中, and a drop there sends the start', asy
   await page.mouse.up();
   await expect.poll(() => stub.orchestrated).toEqual([FRESH_ID]);
 });
+
+test('a context length failure replaces orchestration with a reason and retry', async ({ page }) => {
+  await page.addInitScript(() => {
+    class FailureEventSource {
+      static OPEN = 1;
+      readyState = 1;
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: string }) => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(readonly url: string) {
+        queueMicrotask(() => this.onopen?.());
+        window.addEventListener('chief-failure', (event) => {
+          if (this.readyState !== 1 || !this.url.includes('/teams/')) return;
+          this.onmessage?.({ data: JSON.stringify({
+            type: 'notification', notification: {
+              type: 'chief_message', snippet: (event as CustomEvent<string>).detail,
+              entityId: 'chief-context-1586', agentName: 'Chief',
+              entityRef: { title: '开始任务 #12' },
+            },
+          }) });
+        });
+      }
+      close() { this.readyState = 2; }
+    }
+    Object.defineProperty(window, 'EventSource', { configurable: true, value: FailureEventSource });
+  });
+  const stub = await stubWorld(page);
+  const reason = '400 context_length_exceeded: maximum context length is 200000 tokens';
+  let failed = false;
+  await page.route('**/api/teams/*/chief/threads', (route) => route.fulfill({ json: [{
+    id: 'chief-context-1586', chiefId: 'chief-user-1-team-1', teamId: TEAM_ID, userId: USER.id,
+    title: '开始任务 #12', createdAt: STARTED_AT, updatedAt: STARTED_AT,
+    lastTurnAt: failed ? STARTED_AT : null, pendingSessionResumeAt: null,
+    session: { runtime: 'pi', id: '', openedAt: STARTED_AT },
+    toolDefHashes: {}, toolResultHashes: {}, activeRun: failed ? null : { phase: 'chief' },
+    turnQueue: null, lastTurnError: failed ? reason : null,
+  }] }));
+  await page.goto('/app');
+  const card = page.locator(`[data-todo-id="${FRESH_ID}"]`).first();
+  await expect(card.locator('[data-orchestrating="true"]')).toBeVisible();
+  failed = true;
+  await page.evaluate((message) => window.dispatchEvent(new CustomEvent('chief-failure', { detail: message })), reason);
+  await expect(card.locator('[data-orchestrating="true"]')).toHaveCount(0);
+  await expect(card.getByText('编排失败', { exact: true })).toBeVisible();
+  await expect(card.getByText(reason, { exact: true })).toBeVisible();
+  await evidencePanelShot(page, 'context-length-failed.png', card);
+  await card.getByRole('button', { name: '重试', exact: true }).click();
+  await expect.poll(() => stub.orchestrated).toEqual([FRESH_ID]);
+});
