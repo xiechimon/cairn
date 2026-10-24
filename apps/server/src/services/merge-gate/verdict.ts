@@ -1,4 +1,4 @@
-import { type CompareFile, EVIDENCE_PREFIX } from '@cairn/shared';
+import { type CompareFile, EVIDENCE_PREFIX } from '@cairn/shared/merge-gate';
 import { computePatchDigest } from './digest.js';
 import { type GateVerdictView, isFullSha } from './readiness.js';
 
