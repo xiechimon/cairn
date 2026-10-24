@@ -256,9 +256,6 @@ interface Box {
   height: number;
 }
 
-const boxesOverlap = (a: Box, b: Box) =>
-  a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-
 for (const width of [1280, 560]) {
   test(`排版 ${width}px：runtime 标签不折行，说明文字与右侧控件不重叠`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
@@ -280,7 +277,12 @@ for (const width of [1280, 560]) {
 
     const text = (await row.locator(':scope > :first-child').boundingBox()) as Box;
     const controls = (await row.locator('.agent-fallback-pickers').boundingBox()) as Box;
-    expect(boxesOverlap(text, controls)).toBe(false);
+    expect(
+      text.x < controls.x + controls.width &&
+        controls.x < text.x + text.width &&
+        text.y < controls.y + controls.height &&
+        controls.y < text.y + text.height,
+    ).toBe(false);
 
     const rowBox = (await row.boundingBox()) as Box;
     expect(controls.x + controls.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
