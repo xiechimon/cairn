@@ -3,7 +3,7 @@
 首次来源: 派活查重 #1569/#1578 (2026-10-24)
 级别: 2
 防护: `scripts/single-use-helper-gate.mjs`（`pnpm prepush` 与 CI 共用）
-拦截: 3
-复发: 0
-备注: 负对照：首版 `scripts/dispatch-agent.mjs` 的 tempWorkdirs 等 5 个单次调用函数报红，收进导出的 `collectTicketSources` 后为 0；#1615 的 `retry-lessons.ts` 里 turnedGreenSince 报红，内联后为 0；#1656 的 `scripts/lessons-ledger-gate.mjs` 里 cell、测试里 entryNames 报红，内联后为 0
+拦截: 4
+复发: 1
+备注: 负对照：首版 `scripts/dispatch-agent.mjs` 的 tempWorkdirs 等 5 个单次调用函数报红，收进导出的 `collectTicketSources` 后为 0；#1615 的 `retry-lessons.ts` 里 turnedGreenSince 报红，内联后为 0；#1656 的 `scripts/lessons-ledger-gate.mjs` 里 cell、测试里 entryNames 报红，内联后为 0；#1514 复发：`trajectory-export.ts` 的 readStepSession、exportBuild 在提交前未跑 prepush，审查跑闸报红，内联进导出循环后为 0。闸已在 prepush 与 CI，拦截有效，不升级
 ---
