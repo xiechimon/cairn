@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   buildVerifyStepPrompt,
+  parseVerifyPromptMeta,
   reconcileVerifyVerdict,
   verifyVerdictSchema,
 } from '../src/records/verify.js';
@@ -41,12 +42,34 @@ describe('buildVerifyStepPrompt material (#1250)', () => {
       planText: '',
       pr: null,
     });
+    expect(prompt).toContain('代码只读');
     expect(prompt).toContain('git add / commit / push');
-    expect(prompt).toContain('不改动交付物本身');
+    expect(prompt).toContain('docs/verify/1250/');
+    expect(prompt).not.toContain('可写工作区');
     expect(prompt).not.toContain('## 方案');
   });
 
-  test('failure mode 4: whether a PR exists -- with a PR, named and replied; without, truthfully states the skip', () => {
+  test('failure mode 4: expectedHeadSha is recorded in metadata when provided', () => {
+    const sha = 'ab'.repeat(20);
+    const withSha = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+      expectedHeadSha: sha,
+    });
+    expect(parseVerifyPromptMeta(withSha)?.expectedHeadSha).toBe(sha);
+    expect(parseVerifyPromptMeta(withSha)?.kind).toBe('verify');
+    const without = buildVerifyStepPrompt({
+      ticketRef: '1250',
+      taskText: TASK,
+      planText: '',
+      pr: null,
+    });
+    expect(parseVerifyPromptMeta(without)).toBeNull();
+  });
+
+  test('failure mode 5: whether a PR exists -- with a PR, named and replied; without, truthfully states the skip', () => {
     const withPr = buildVerifyStepPrompt({
       ticketRef: '1250',
       taskText: TASK,

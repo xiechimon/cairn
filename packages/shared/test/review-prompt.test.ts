@@ -122,4 +122,17 @@ describe('buildReviewStepPrompt gate branching (#511)', () => {
     expect(parseMeta(prompt).agentId).toBe('a1');
     expect(prompt.indexOf('## 本轮变更')).toBeLessThan(prompt.indexOf('## 用户关注点'));
   });
+
+  test('#1404 S5a：派步时写下的 expectedHeadSha 进 meta，缺省不写', () => {
+    const sha = 'ab'.repeat(20);
+    const withSha = buildReviewStepPrompt({
+      agentId: 'a1',
+      gate: 'review',
+      planText: PLAN,
+      expectedHeadSha: sha,
+    });
+    expect(parseMeta(withSha).expectedHeadSha).toBe(sha);
+    const without = buildReviewStepPrompt({ agentId: 'a1', gate: 'confirm', planText: PLAN });
+    expect(parseMeta(without).expectedHeadSha).toBeUndefined();
+  });
 });

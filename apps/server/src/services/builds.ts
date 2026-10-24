@@ -34,6 +34,8 @@ import {
   MERGE_ANNOUNCEMENT,
   type PlanContractCheck,
   parseGithubIssueSourceRef,
+  parseReviewPromptMeta,
+  parseVerifyPromptMeta,
   personaByRole,
   planVerificationItems,
   REVIEW_ANNOUNCEMENT,
@@ -52,6 +54,7 @@ import type { Db } from '../db/client.js';
 import {
   agent,
   build,
+  gateVerdict,
   machine,
   message,
   plan as planTable,
@@ -84,6 +87,7 @@ import { githubTokenOrNull, teamGithubToken } from './github-connection.js';
 import { githubText } from './github-text.js';
 import { storeInfoReport } from './info-handoff.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { bindGateVerdict } from './merge-gate/verdict.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
 import { retryLessonsOf } from './retry-lessons.js';
@@ -645,12 +649,14 @@ export function maybeEnqueueVerifyStep(
   const linked = todoRow.sourceRef !== null ? parseGithubIssueSourceRef(todoRow.sourceRef) : null;
   const ticketRef = String(linked?.issueNumber ?? todoRow.seqNum);
   const planRow = latestPlanRow(deps, buildId);
+  const expectedHeadSha = dispatchHeadSha(deps, buildId);
   const prompt = buildVerifyStepPrompt({
     ticketRef,
     taskText: buildTaskPromptText(todoRow.title, todoRow.spec, todoRow),
     planText: planRow?.content ?? '',
     verificationItems: planVerificationItems(planRow?.content ?? ''),
     pr: buildRow.prNumber !== null ? { number: buildRow.prNumber, url: buildRow.prUrl } : null,
+    ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
   });
   insertGateAnnouncement(deps, buildId, VERIFY_ANNOUNCEMENT, deps.user.displayName);
   enqueueStep(deps, buildId, 'verify', todoRow.teamId, prompt);
@@ -970,11 +976,13 @@ export async function applyBuildStepAction(
       );
     }
     insertGateAnnouncement(deps, buildId, REVIEW_ANNOUNCEMENT, actorName);
+    const expectedHeadSha = gate === 'review' ? dispatchHeadSha(deps, buildId) : null;
     const promptArgs = {
       gate,
       planText,
       ...(changes !== undefined ? { changes } : {}),
       checkout,
+      ...(expectedHeadSha !== null ? { expectedHeadSha } : {}),
     } as const;
     if (body.agentId === undefined) {
       const currentTodo = todoRecord;
@@ -1201,6 +1209,75 @@ export function lastPushedCheckpoint(
   );
 }
 
+function dispatchHeadSha(deps: BuildDeps, buildId: string): string | null {
+  const commit =
+    deps.db
+      .select({ commit: step.checkpointCommit })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          notInArray(step.kind, ['review', 'merge', 'verify']),
+          eq(step.status, 'done'),
+          isNotNull(step.checkpointCommit),
+        ),
+      )
+      .orderBy(
+        desc(
+          sql`coalesce(${step.finishedAt}, ${step.lastHeartbeatAt}, ${step.claimedAt}, ${step.createdAt})`,
+        ),
+        desc(step.createdAt),
+      )
+      .get()?.commit ?? null;
+  return commit !== null && isFullSha(commit) ? commit : null;
+}
+
+function persistGateVerdict(
+  deps: BuildDeps,
+  stepRow: typeof step.$inferSelect,
+  todoRow: typeof todo.$inferSelect | undefined,
+  facts: {
+    stepFailed: boolean;
+    extracted: boolean;
+    blocked: boolean;
+    reportedHeadSha: string | null;
+  },
+): void {
+  if (stepRow.kind !== 'review' && stepRow.kind !== 'verify') return;
+  const expectedHeadSha =
+    stepRow.kind === 'review'
+      ? (parseReviewPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null)
+      : (parseVerifyPromptMeta(stepRow.prompt)?.expectedHeadSha ?? null);
+  if (expectedHeadSha === null) return;
+  const perspective =
+    stepRow.kind === 'review' && todoRow !== undefined
+      ? (agentForStep(deps.db, todoRow, 'review', stepRow.prompt)?.persona ?? null)
+      : null;
+  const bound = bindGateVerdict({
+    kind: stepRow.kind,
+    perspective,
+    expectedHeadSha,
+    reportedHeadSha: facts.reportedHeadSha,
+    stepFailed: facts.stepFailed,
+    extracted: facts.extracted,
+    blocked: facts.blocked,
+  });
+  if (bound === null) return;
+  deps.db
+    .insert(gateVerdict)
+    .values({
+      stepId: stepRow.id,
+      buildId: stepRow.buildId,
+      kind: bound.kind,
+      perspective: bound.perspective,
+      outcome: bound.outcome,
+      patchDigest: bound.patchDigest,
+      headSha: bound.headSha,
+      expectedHeadSha: bound.expectedHeadSha,
+      createdAt: nowMs(),
+    })
+    .run();
+}
 function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; failed: boolean } {
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${row.todoId}`);
@@ -1466,6 +1543,13 @@ export function applyStepFailure(
     });
   }
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+  const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
+  persistGateVerdict(deps, finished ?? stepRow, todoRow, {
+    stepFailed: true,
+    extracted: false,
+    blocked: false,
+    reportedHeadSha: (finished ?? stepRow).checkpointCommit,
+  });
   if (todoRow && canTransitionPhase(todoRow.phase, 'failed')) {
     setTodoPhase(deps, todoRow.id, 'failed');
   }
@@ -1792,6 +1876,12 @@ export function completeStep(
       }),
       createdAt: nowMs(),
     });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.findings !== undefined,
+      blocked: outcome.findings !== undefined && hasBlockingFinding(outcome.findings),
+      reportedHeadSha: stepRow.checkpointCommit,
+    });
     if (hasBlockingFinding(verdict)) {
       const revisionInFlight = deps.db
         .select({ id: step.id })
@@ -1856,6 +1946,12 @@ export function completeStep(
           : {}),
       }),
       createdAt: nowMs(),
+    });
+    persistGateVerdict(deps, stepRow, todoRow, {
+      stepFailed: false,
+      extracted: outcome.verifyVerdict !== undefined,
+      blocked: outcome.verifyVerdict !== undefined && !verdict.passed,
+      reportedHeadSha: stepRow.checkpointCommit,
     });
     return;
   }
