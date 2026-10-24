@@ -55,6 +55,7 @@ import {
   advanceSplitWaves,
   applyBuildStepAction,
   cancelBuild,
+  dispatchSplitChildren,
   startBuilds,
   stopActiveStepsAfterExit,
 } from './builds.js';
@@ -525,7 +526,7 @@ export async function executeChiefTool(
         };
       });
       const result = createSplitTodo(
-        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+        { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user, convHub: deps.convHub },
         {
           parentId: todoId,
           subtodos,
@@ -535,6 +536,24 @@ export async function executeChiefTool(
           actorName: chiefActor.name,
         },
       );
+      if (result.autoStart) {
+        setTodoPhase(
+          { db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+          todoId,
+          'building',
+          { lastRunAt: nowMs() },
+        );
+        dispatchSplitChildren(
+          {
+            db,
+            hub: deps.hub,
+            machineHub: deps.machineHub,
+            user: deps.user,
+            convHub: deps.convHub,
+          },
+          todoId,
+        );
+      }
       return json(result);
     }
     case 'update_todo': {

@@ -387,7 +387,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'split_todo',
     description:
-      'Split a big todo into N sub-cards with blocking dependency edges (ADR 0018 layer 2). Each sub-card pins one role agent and runs direct-execute (no per-card plan gate). The split scheme lands on the parent plan doc and parks at the parent confirm gate for human review — confirming the parent dispatches the unblocked sub-cards; later waves auto-start as their blockers finish; the parent auto-completes when every sub-card is done. Split only when subtasks are truly independent or orderable — single-view single-artifact work should run as one todo, not be split.',
+      'Split a big todo into N sub-cards with blocking dependency edges (ADR 0018 layer 2). Each sub-card pins one role agent and runs direct-execute (no per-card plan gate). The split scheme lands on the parent plan doc; the project split policy sends it to human review, shadow recording, or automatic dispatch after the checker. Automatic dispatch starts unblocked sub-cards; later waves auto-start as their blockers finish; the parent auto-completes when every sub-card is done. Split only when subtasks are truly independent or orderable — single-view single-artifact work should run as one todo, not be split.',
     parameters: obj(
       {
         todoId: str('Parent todo id to split.'),

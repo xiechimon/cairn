@@ -146,6 +146,7 @@ export async function updateProject(
   // 五键全缺 = 静默 no-op 族（#1213 覆辙）——显式 400。
   const carriesKey =
     body.name !== undefined ||
+    body.splitPolicy !== undefined ||
     body.description !== undefined ||
     body.repoKind !== undefined ||
     body.githubRepo !== undefined ||
@@ -243,6 +244,7 @@ export async function updateProject(
       : undefined;
 
   const nextName = name ?? row.name;
+  const nextSplitPolicy = body.splitPolicy ?? row.splitPolicy;
   const nextRepoKind = conversion !== undefined ? 'github' : row.repoKind;
   const nextGithubRepo = conversion !== undefined ? conversion.githubRepo : row.githubRepo;
   const nextLocalPath = localPath !== undefined ? localPath : row.localPath;
@@ -250,6 +252,7 @@ export async function updateProject(
   db.update(project)
     .set({
       name: nextName,
+      splitPolicy: nextSplitPolicy,
       repoKind: nextRepoKind,
       githubRepo: nextGithubRepo,
       localPath: nextLocalPath,

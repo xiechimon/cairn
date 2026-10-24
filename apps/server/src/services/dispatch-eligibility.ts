@@ -38,7 +38,7 @@ export function stepRuntimeFor(agentProvider: string | null | undefined): 'pi' |
 /** 机器未开步所需的 runtime = 不可领该步（步留 pending 给能跑的机器——
  *  spec 11 A8「我可以决定本机跑 pi 还是 Claude Code 任务」的兑现位）。 */
 export function runtimeGatePasses(
-  machineRow: { enabledRuntimes: string[] },
+  machineRow: { enabledRuntimes: readonly string[] },
   agentProvider: string | null | undefined,
 ): boolean {
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));

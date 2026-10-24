@@ -236,6 +236,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     id: row.id,
     name: row.name,
     teamId: row.teamId,
+    splitPolicy: row.splitPolicy,
     // #1242 描述面：null = 键缺席（与 repoKind 等可空列同口径）。
     ...(row.description !== null ? { description: row.description } : {}),
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),

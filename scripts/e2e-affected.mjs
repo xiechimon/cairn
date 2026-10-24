@@ -138,7 +138,7 @@ const CHIEF = [
   'z-ladder',
 ];
 const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
-const LIVE_SERVER = ['token-gate', 'live-server-'];
+const LIVE_SERVER = ['token-gate', 'live-server-', 'split-autostart'];
 const OVERLAY = [
   'newtask-',
   'mention-',
