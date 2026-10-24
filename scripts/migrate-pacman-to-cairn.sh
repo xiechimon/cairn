@@ -53,7 +53,12 @@ stop_services() {
       run "launchctl bootout gui/$(id -u)/com.xiechimon.$l 2>/dev/null || true"
     done
   else
-    run "systemctl --user stop pacman-daemon.service cairn-daemon.service 2>/dev/null || true"
+    for u in pacman-daemon cairn-daemon; do
+      run "systemctl --user stop $u.service 2>/dev/null || true"
+    done
+    if [ "$DRY" = 0 ] && systemctl --user is-active --quiet pacman-daemon.service; then
+      echo "pacman-daemon.service 停不下来，手工处理" >&2; exit 1
+    fi
   fi
 }
 
