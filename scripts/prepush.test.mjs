@@ -125,6 +125,80 @@ test('CLI skips real document changes and rejects a missing base', () => {
   }
 });
 
+const gitIn = (cwd, args) =>
+  execFileSync(
+    'git',
+    ['-c', 'user.name=prepush-test', '-c', 'user.email=prepush@example.invalid', ...args],
+    { cwd, encoding: 'utf8', stdio: 'pipe' },
+  );
+
+const runPrepushCi = (cwd) => {
+  const env = { ...process.env };
+  delete env.PREPUSH_BASE_SHA;
+  return spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
+    cwd,
+    encoding: 'utf8',
+    env,
+  });
+};
+
+test('a stale local origin/main is refreshed by fetch before computing changes', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-stale-'));
+  const remote = join(directory, 'remote.git');
+  const upstream = join(directory, 'upstream');
+  const work = join(directory, 'work');
+  try {
+    gitIn(directory, ['init', '--bare', remote]);
+    gitIn(directory, ['clone', remote, upstream]);
+    mkdirSync(join(upstream, 'scripts'));
+    copyFileSync('scripts/prepush.mjs', join(upstream, 'scripts/prepush.mjs'));
+    writeFileSync(join(upstream, 'README.md'), 'first\n');
+    gitIn(upstream, ['add', 'README.md', 'scripts/prepush.mjs']);
+    gitIn(upstream, ['commit', '-m', 'initial']);
+    gitIn(upstream, ['push', 'origin', 'HEAD:main']);
+    mkdirSync(join(upstream, 'apps'));
+    writeFileSync(join(upstream, 'apps/other.ts'), 'export const other = 1;\n');
+    gitIn(upstream, ['add', 'apps/other.ts']);
+    gitIn(upstream, ['commit', '-m', 'merged elsewhere']);
+    gitIn(upstream, ['push', 'origin', 'HEAD:main']);
+    const stale = gitIn(upstream, ['rev-parse', 'HEAD~1']).trim();
+    gitIn(directory, ['clone', '--branch', 'main', remote, work]);
+    gitIn(work, ['update-ref', 'refs/remotes/origin/main', stale]);
+    writeFileSync(join(work, 'README.md'), 'second\n');
+    gitIn(work, ['add', 'README.md']);
+    gitIn(work, ['commit', '-m', 'docs']);
+    const result = runPrepushCi(work);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.doesNotMatch(result.stderr, /may be stale/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('fetch failure falls back to the local origin/main and prints a stale notice', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-offline-'));
+  const work = join(directory, 'work');
+  try {
+    gitIn(directory, ['init', work]);
+    mkdirSync(join(work, 'scripts'));
+    copyFileSync('scripts/prepush.mjs', join(work, 'scripts/prepush.mjs'));
+    writeFileSync(join(work, 'README.md'), 'first\n');
+    gitIn(work, ['add', 'README.md', 'scripts/prepush.mjs']);
+    gitIn(work, ['commit', '-m', 'initial']);
+    gitIn(work, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
+    writeFileSync(join(work, 'README.md'), 'second\n');
+    gitIn(work, ['add', 'README.md']);
+    gitIn(work, ['commit', '-m', 'docs']);
+    const result = runPrepushCi(work);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /PASS \(0 checks\)/);
+    assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('prepush vitest only forgives files listed as known local red', async () => {
   const { unexpectedFailures } = await import('./prepush-vitest.mjs');
   const known = [{ file: 'a/known.test.ts', reason: 'r' }];
