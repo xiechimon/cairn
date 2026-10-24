@@ -599,6 +599,7 @@ export const machineDoneBodySchema = z.object({
    * （「恢复到此处」r3 §3.5/02 §4.2）+ 合并步 fast-forward 落地键
    * （「目标提交 <12hex>」r3 §3.9 面板同族）。 */
   commit: z.string().optional(),
+  gateHeadSha: z.string().optional(),
   /** AI 审核步 findings（M7 #330，r8 §3.1）：仅 review 步携带，daemon 解析
    * agent 终轮 JSON 输出后置入；server 落库 + 判 blocking 触发自动修订。
    * 形状 = records/review.ts reviewVerdictSchema（conclusion + findings[]）。 */

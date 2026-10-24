@@ -849,6 +849,9 @@ exports[`AgentBackend 缝 + 机器面 wire schema 快照（01 §5 / 02 §5 canon
       "maxLength": 2000,
       "type": "string",
     },
+    "gateHeadSha": {
+      "type": "string",
+    },
     "hasChanges": {
       "type": "boolean",
     },

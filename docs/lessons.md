@@ -55,3 +55,5 @@
 | 开票前只搜了 issue，没查 spec：#1617 园丁巡检与 spec 28 P6「园丁」重复，#1618 没对上 P5a 进料入口 | #1617/#1618 (2026-10-24) | 5 | 记忆：给自举闭环相关的事开票前先 grep `docs/spec/28-*.md` 与 ADR 0021；两票已补评论改为 P6 园丁段、挂到 P5a 入口 | 0 | 0 | `scripts/dispatch-dedupe.mjs` 只查分支、PR、进程，不读 spec 正文；按关键词查 spec 误报太多，暂不做成闸 |
 | 分支上一张 PR 已合并，从 main 重切同名分支后用 `git push -f` 推送，违反 AGENTS.md「永远别 --force push」 | Claude 线程「学习 poteto 高产 PR 的方法」(2026-10-24) | 5 | 记忆：已合并分支重用时换新分支名推送，不强推 | 0 | 0 | 这次被覆盖的只有已 squash 进 main 的提交，没丢东西；pre-push 钩子能判非快进推送，留作升级候选 |
 | 新增 import 未按 biome 字母序 / 单行格式 | #1404 S5a | 2 | biome organizeImports 与 format（`pnpm lint`） | 1 | 0 | 负对照：`verdict.ts` 把 `isFullSha` 写在 `type GateVerdictView` 前、`builds.ts` 把 `bindGateVerdict` 插在 `git.js` 后，闸红；排好后绿 |
+| 新代码用 `!== null &&` 再调用方法，biome `useOptionalChain` 警告 | #1404 S5a | 2 | biome `lint/complexity/useOptionalChain`（`pnpm lint`） | 1 | 0 | 负对照：`verdict.ts` 证据目录判断写成 `rawDir !== null && rawDir.startsWith`，biome 报该规则且不自动改；改成 `rawDir?.startsWith` 后该文件 lint 通过。已有闸，不另开 |
+| 集成测试在任务已处于 review 时再次 startBuild，相位闸拒绝，判定绑定路径没跑到 | #1404 S5a | 5 | 记忆：测判定绑定时每个世界只开工一次；要两条运行就各建一个世界 | 0 | 0 | 级别 1 到 4 做不到：第二次开工没有可静态识别的形态，相位闸只会让那条测试失败；加一条只认这个夹具的脚本会误伤合法的重跑用例 |
