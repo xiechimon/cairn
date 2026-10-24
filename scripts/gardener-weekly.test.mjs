@@ -10,8 +10,6 @@ const script = resolve(import.meta.dirname, 'gardener-weekly.mjs');
 const NOW = '2026-10-24T12:00:00Z';
 const daysAgo = (days) => new Date(Date.parse(NOW) - days * 86400000).toISOString();
 
-const entries = (n) =>
-  Array.from({ length: n }, (_, i) => ({ file: 'a.md', kind: 'class', symbol: `.c${i}` }));
 const allowlist = (n) =>
   Array.from({ length: n }, (_, i) => ({ path: 'a.ts', line: `// ${i}`, reason: 'external' }));
 const baselineFiles = ({ warnings, controls, staleness, comments, helpers }) => ({
@@ -21,7 +19,13 @@ const baselineFiles = ({ warnings, controls, staleness, comments, helpers }) => 
     rawControls: { total: controls, files: {} },
     arbitraryValues: { textTotal: 5, spacingTotal: 1, files: {} },
   },
-  'scripts/feature-map-staleness-baseline.json': { entries: entries(staleness) },
+  'scripts/feature-map-staleness-baseline.json': {
+    entries: Array.from({ length: staleness }, (_, i) => ({
+      file: 'a.md',
+      kind: 'class',
+      symbol: `.c${i}`,
+    })),
+  },
   'scripts/comment-discipline-allowlist.json': allowlist(comments),
   'scripts/single-use-helper-allowlist.json': allowlist(helpers),
 });
@@ -35,23 +39,25 @@ const fixture = () => {
       encoding: 'utf8',
       env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
     });
-  const commit = (date, tree, message = 'change') => {
-    for (const [path, content] of Object.entries(tree)) {
-      mkdirSync(dirname(join(cwd, path)), { recursive: true });
-      writeFileSync(
-        join(cwd, path),
-        typeof content === 'string' ? content : JSON.stringify(content),
-      );
-    }
-    git(date, 'add', '.');
-    git(date, 'commit', '-m', message);
-  };
   git(daysAgo(30), 'init', '-b', 'main');
   git(daysAgo(30), 'config', 'user.email', 'test@example.com');
   git(daysAgo(30), 'config', 'user.name', 'Test');
-  const run = (...args) =>
-    spawnSync(process.execPath, [script, '--now', NOW, ...args], { cwd, encoding: 'utf8' });
-  return { cwd, commit, run };
+  return {
+    cwd,
+    commit: (date, tree, message = 'change') => {
+      for (const [path, content] of Object.entries(tree)) {
+        mkdirSync(dirname(join(cwd, path)), { recursive: true });
+        writeFileSync(
+          join(cwd, path),
+          typeof content === 'string' ? content : JSON.stringify(content),
+        );
+      }
+      git(date, 'add', '.');
+      git(date, 'commit', '-m', message);
+    },
+    run: (...args) =>
+      spawnSync(process.execPath, [script, '--now', NOW, ...args], { cwd, encoding: 'utf8' }),
+  };
 };
 
 test('ranks growth by the 7-day delta and stock by current count', () => {

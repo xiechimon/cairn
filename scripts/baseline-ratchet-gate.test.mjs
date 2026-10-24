@@ -24,20 +24,23 @@ after(() => {
   );
 });
 
-const uiDebt = (rawControls, arbitraryText) => ({
-  perFaceCss: { 'a.css': 10 },
-  rawControls: { total: rawControls, files: {} },
-  arbitraryValues: { textTotal: arbitraryText, spacingTotal: 1, files: {} },
-});
-const entries = (n) =>
-  Array.from({ length: n }, (_, i) => ({ file: 'a.md', kind: 'class', symbol: `.c${i}` }));
 const allowlist = (n) =>
   Array.from({ length: n }, (_, i) => ({ path: 'a.ts', line: `// ${i}`, reason: 'external' }));
 
 const files = ({ warnings = 0, controls = 3, text = 5, staleness = 4, allowed = 2 } = {}) => ({
   'scripts/lint-warning-baseline.json': { maxWarnings: warnings },
-  'scripts/ui-debt-baseline.json': uiDebt(controls, text),
-  'scripts/feature-map-staleness-baseline.json': { entries: entries(staleness) },
+  'scripts/ui-debt-baseline.json': {
+    perFaceCss: { 'a.css': 10 },
+    rawControls: { total: controls, files: {} },
+    arbitraryValues: { textTotal: text, spacingTotal: 1, files: {} },
+  },
+  'scripts/feature-map-staleness-baseline.json': {
+    entries: Array.from({ length: staleness }, (_, i) => ({
+      file: 'a.md',
+      kind: 'class',
+      symbol: `.c${i}`,
+    })),
+  },
   'scripts/comment-discipline-allowlist.json': allowlist(allowed),
   'scripts/single-use-helper-allowlist.json': allowlist(allowed),
 });
@@ -51,12 +54,6 @@ const withRepo = (base, body) => {
       writeFileSync(join(cwd, path), JSON.stringify(json));
     }
   };
-  const run = (env = {}) =>
-    spawnSync(process.execPath, [gate], {
-      cwd,
-      encoding: 'utf8',
-      env: { ...process.env, BASELINE_RATCHET_BASE_SHA: '', ...env },
-    });
   try {
     git('init', '-b', 'main');
     git('config', 'user.email', 'test@example.com');
@@ -65,7 +62,16 @@ const withRepo = (base, body) => {
     git('add', '.');
     git('commit', '-m', 'base');
     git('update-ref', 'refs/remotes/origin/main', 'HEAD');
-    body({ run, write, cwd });
+    body({
+      run: (env = {}) =>
+        spawnSync(process.execPath, [gate], {
+          cwd,
+          encoding: 'utf8',
+          env: { ...process.env, BASELINE_RATCHET_BASE_SHA: '', ...env },
+        }),
+      write,
+      cwd,
+    });
   } finally {
     rmSync(cwd, { recursive: true, force: true });
   }
