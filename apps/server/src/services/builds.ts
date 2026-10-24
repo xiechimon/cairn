@@ -56,6 +56,7 @@ import {
   VERIFY_ANNOUNCEMENT,
   VERIFY_VERDICT_KIND,
   type VerifyVerdict,
+  withRetryLessons,
 } from '@cairn/shared';
 import { and, asc, desc, eq, gte, inArray, isNotNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -95,6 +96,7 @@ import type { MachineWakeHub } from './machine-wake-hub.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 // #1261 配额挂起投影单源（listSteps 的 waiting_quota 行）。
 import { publishStepRow, toQuotaWait } from './quota-wait.js';
+import { retryLessonsOf } from './retry-lessons.js';
 import { stepQueueProjector } from './step-queue.js';
 import {
   childrenOfTodo,
@@ -726,7 +728,18 @@ export function startBuilds(
       })
       .run();
     // 首步：先做规划 = 规划步；立即执行 = 执行步（02 §4.2 开始 dialog 两分支）。
-    enqueueStep(deps, id, input.withPlan ? 'plan' : 'build', todoRecord.teamId);
+    const firstKind = input.withPlan ? 'plan' : 'build';
+    const lessons =
+      todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
+        ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
+        : null;
+    enqueueStep(
+      deps,
+      id,
+      firstKind,
+      todoRecord.teamId,
+      withRetryLessons(undefined, firstKind, lessons),
+    );
     setTodoPhase(deps, todoId, 'queued', {
       assignment: input.assignment,
       latestBuildId: id,
@@ -1041,6 +1054,7 @@ export async function applyBuildStepAction(
     if (reworkTarget !== null && prClosed === null) {
       // —— 复用路：不建新 build——同 conversationId = 同分支 = 原 PR。——
       const now = nowMs();
+      const reuseLessons = retryLessonsOf(deps.db, buildId);
       recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
       // 消息先于首步入队（transcript 排序 + machine wake 后置）：反馈行（用户
       // 话语）+ 轮界 note（system → web note 面：去向 + 被清空 errorMessage 的
@@ -1067,12 +1081,13 @@ export async function applyBuildStepAction(
       // 返工轮边界（用户裁定「只复用分支、上下文真空」：claim 强制 new
       // session，daemon 以「任务全文 + 指令」组合串开全新会话）。
       const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
+      const reuseKind = reworkTarget.withPlan ? 'plan' : 'build';
       enqueueStep(
         deps,
         reworkTarget.id,
-        reworkTarget.withPlan ? 'plan' : 'build',
+        reuseKind,
         todoRecord.teamId,
-        restartPrompt,
+        withRetryLessons(restartPrompt, reuseKind, reuseLessons),
         true,
       );
       // build 行收尾：errorMessage 清空（原因已进 note）、prevPhase=failed
@@ -1097,6 +1112,7 @@ export async function applyBuildStepAction(
     }
     // —— 新建路：无 PR build（现行行为，逐字节保持）或原 PR 已合并/已关闭
     // （prClosed 在位）——新 conversationId = 新分支。——
+    const priorLessons = retryLessonsOf(deps.db, buildId);
     recordBuildFeedback(deps.db, buildId, 'restart', 'build', body.feedback, actorName);
     const newId = newUuidv7();
     const createdAt = nowMs();
@@ -1147,7 +1163,14 @@ export async function applyBuildStepAction(
     // #720：该指令经 claim instruction 位 → daemon 组合串（任务文本 + 指令）
     // 进会话，超长反馈在单源截断）。
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
-    enqueueStep(deps, newId, row.withPlan ? 'plan' : 'build', todoRecord.teamId, restartPrompt);
+    const firstKind = row.withPlan ? 'plan' : 'build';
+    enqueueStep(
+      deps,
+      newId,
+      firstKind,
+      todoRecord.teamId,
+      withRetryLessons(restartPrompt, firstKind, priorLessons),
+    );
     setTodoPhase(deps, todoRecord.id, 'queued', {
       assignment,
       latestBuildId: newId,
