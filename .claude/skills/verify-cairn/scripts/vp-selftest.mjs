@@ -23,7 +23,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const VP = resolve(import.meta.dirname, 'vp.mjs');
 const GATE = resolve(import.meta.dirname, 'vp-registry-gate.mjs');
@@ -114,18 +114,30 @@ function seedDependents(registry, scriptsDir, root) {
 
 // The registry gate run on a skill directory of its own: a copy of the gate,
 // the given registry, an empty file per script name, and the given feature
-// maps. Run from the system temp dir, not the fake root, so a gate that reads
-// the caller's cwd scans the wrong place and fails here.
-function runGate(registry, scripts, maps) {
+// maps, all tracked in a git repository at the fake root; untracked names
+// repo-relative files written but left out of the index. Run from the system
+// temp dir, not the fake root, so a gate that reads the caller's cwd scans the
+// wrong place and fails here.
+function runGate(registry, scripts, maps, untracked = []) {
   const root = tempDir('vp-selftest-gate-');
   try {
     const skill = join(root, '.claude', 'skills', 'verify-cairn');
     mkdirSync(join(skill, 'scripts'), { recursive: true });
     mkdirSync(join(skill, 'features'), { recursive: true });
-    for (const name of scripts) writeFileSync(join(skill, 'scripts', name), '');
+    for (const name of scripts) {
+      mkdirSync(dirname(join(skill, 'scripts', name)), { recursive: true });
+      writeFileSync(join(skill, 'scripts', name), '');
+    }
     if (existsSync(GATE)) cpSync(GATE, join(skill, 'scripts', 'vp-registry-gate.mjs'));
     writeFileSync(join(skill, 'vp-registry.json'), JSON.stringify(registry));
     for (const [name, body] of Object.entries(maps)) writeFileSync(join(skill, 'features', name), body);
+    const g = gitAt(root);
+    g('init', '-q');
+    g('add', '.');
+    for (const path of untracked) {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), '');
+    }
     const r = spawnSync(process.execPath, [join(skill, 'scripts', 'vp-registry-gate.mjs')], {
       cwd: tmpdir(),
       encoding: 'utf8',
@@ -1331,7 +1343,7 @@ const cases = [
     () => {
       const runs = [
         [gateRegistry({ gone: { ...STUB, script: `${GATE_DIR}drive-gone.mjs` } }), 't/gone: script .claude/skills/verify-cairn/scripts/drive-gone.mjs does not exist'],
-        [gateRegistry({}, { 'setup-gone-seed.mjs': { kind: 'seed', purpose: 'x' } }), 'support setup-gone-seed.mjs: no such file in scripts/'],
+        [gateRegistry({}, { 'setup-gone-seed.mjs': { kind: 'seed', purpose: 'x' } }), 'support setup-gone-seed.mjs: no tracked file in scripts/'],
         [{ ...gateRegistry(), features: { t: { ...gateRegistry().features.t, recipe: 'features/none.md' } } }, 't: recipe features/none.md does not exist'],
         [gateRegistry({ s: { ...STUB, script: `${GATE_DIR}drive-hotkeys.mjs`, status: 'current-ish' } }), 't/s: status current-ish is not current, stale or host-bound'],
         [gateRegistry({ n: { ...STUB, script: `${GATE_DIR}drive-hotkeys.mjs`, needs: ['rewrite-evidence'] } }), 't/n: unknown need rewrite-evidence'],
@@ -1348,9 +1360,13 @@ const cases = [
       const nope = runGate(gateRegistry(), GATE_SCRIPTS, line('vp.mjs drive t nope'));
       const other = runGate(gateRegistry(), GATE_SCRIPTS, line('vp.mjs drive other x'));
       const none = runGate(gateRegistry(), GATE_SCRIPTS, { 't.md': '# t\n\nno drive line here\n' });
-      // A feature named alone, a placeholder and a flag after the feature are not case names.
-      const fine = runGate(gateRegistry(), GATE_SCRIPTS, {
-        't.md': `${GATE_MAPS['t.md']}- \`vp.mjs drive t\`, \`vp.mjs drive <feature> [case]\`, \`vp.mjs drive t --dry-run\`\n`,
+      // A single-case feature named alone, placeholders and a flag after the feature are not case names.
+      const single = {
+        ...gateRegistry(),
+        features: { ...gateRegistry().features, u: { recipe: null, cases: { only: { ...STUB, script: `${GATE_DIR}drive-hotkeys.mjs` } } } },
+      };
+      const fine = runGate(single, GATE_SCRIPTS, {
+        't.md': `${GATE_MAPS['t.md']}- \`vp.mjs drive u\`, \`vp.mjs drive <feature> [case]\`, \`vp.mjs drive t <case>\`, \`vp.mjs drive u --dry-run\`\n`,
       });
       return (
         nope.code === 1 &&
@@ -1360,6 +1376,71 @@ const cases = [
         none.code === 1 &&
         none.out.includes('features/t.md: names no vp.mjs drive t line') &&
         fine.code === 0
+      );
+    },
+  ],
+  [
+    'the registry gate counts tracked files only: a .DS_Store or probe output left in scripts/ is not a script',
+    () => {
+      const strays = [`${GATE_DIR}.DS_Store`, `${GATE_DIR}result-a0-live.json`, `${GATE_DIR}01-shot.png`];
+      const clean = runGate(gateRegistry(), GATE_SCRIPTS, GATE_MAPS, strays);
+      const tracked = runGate(gateRegistry(), [...GATE_SCRIPTS, '.DS_Store'], GATE_MAPS);
+      return (
+        clean.code === 0 &&
+        /^vp-registry-gate: OK \(10 scripts,/m.test(clean.out) &&
+        tracked.code === 1 &&
+        tracked.out.includes('scripts/.DS_Store: not registered')
+      );
+    },
+  ],
+  [
+    'the registry gate refuses a feature-only drive line for a feature with more than one case',
+    () => {
+      const bare = runGate(gateRegistry(), GATE_SCRIPTS, { 't.md': `${GATE_MAPS['t.md']}- \`vp.mjs drive t\`\n` });
+      const flagged = runGate(gateRegistry(), GATE_SCRIPTS, { 't.md': `${GATE_MAPS['t.md']}- \`vp.mjs drive t --dry-run\`\n` });
+      return [bare, flagged].every(
+        (r) => r.code === 1 && r.out.includes('features/t.md: vp.mjs drive t names no case, and t has 2 cases (legacy, named)'),
+      );
+    },
+  ],
+  [
+    'the registry gate refuses a ticket-named drive script registered from outside scripts/',
+    () => {
+      const outside = 'docs/verify/1500/drive-1500-new.mjs';
+      const featureNamed = 'docs/verify/1500/drive-hotkeys-copy.mjs';
+      const registry = gateRegistry({
+        ticket: { ...STUB, script: outside },
+        feature: { ...STUB, script: featureNamed },
+      });
+      const r = runGate(registry, GATE_SCRIPTS, GATE_MAPS, [outside, featureNamed]);
+      const grandfathered = runGate(
+        gateRegistry({ moved: { ...STUB, script: 'docs/verify/902/drive-902-gate-actor.mjs' } }),
+        GATE_SCRIPTS,
+        GATE_MAPS,
+        ['docs/verify/902/drive-902-gate-actor.mjs'],
+      );
+      return (
+        r.code === 1 &&
+        r.out.includes(`t/ticket: ${outside} is named after a ticket`) &&
+        !r.out.includes('t/feature:') &&
+        grandfathered.code === 1 &&
+        grandfathered.out.includes('t/moved: docs/verify/902/drive-902-gate-actor.mjs is named after a ticket')
+      );
+    },
+  ],
+  [
+    'the registry gate refuses --force inside a copy-paste drive line',
+    () => {
+      const forced = runGate(gateRegistry(), GATE_SCRIPTS, {
+        't.md': `${GATE_MAPS['t.md']}- \`env X=1 node vp.mjs drive t named --force\`: calls GitHub, needs \`--force\`\n`,
+      });
+      const prose = runGate(gateRegistry(), GATE_SCRIPTS, {
+        't.md': `${GATE_MAPS['t.md']}- \`vp.mjs drive t named\` is stale, so drive refuses it without \`--force\`\n`,
+      });
+      return (
+        forced.code === 1 &&
+        forced.out.includes('features/t.md: vp.mjs drive t named --force bakes in --force') &&
+        prose.code === 0
       );
     },
   ],
