@@ -37,6 +37,7 @@ import {
   tag,
   todo,
   todoTag,
+  tokenUsage,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
@@ -131,6 +132,19 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
   // #1257 板面挂起态（等机器/等额度）——与 quotaWait 并存（1261 板面消费
   // quotaWait，waitingOn 供后续板面挂起 chip 消费）。
   const waitingOn = waitingOnOf(deps, row);
+  const usage = db
+    .select({
+      rows: sql<number>`count(*)`,
+      input: sql<number>`coalesce(sum(${tokenUsage.costInput}), 0)`,
+      output: sql<number>`coalesce(sum(${tokenUsage.costOutput}), 0)`,
+      cacheRead: sql<number>`coalesce(sum(${tokenUsage.costCacheRead}), 0)`,
+      cacheWrite: sql<number>`coalesce(sum(${tokenUsage.costCacheWrite}), 0)`,
+      total: sql<number>`coalesce(sum(${tokenUsage.costTotal}), 0)`,
+    })
+    .from(tokenUsage)
+    .innerJoin(build, eq(build.id, tokenUsage.buildId))
+    .where(eq(build.todoId, row.id))
+    .get();
   return {
     id: row.id,
     teamId: row.teamId,
@@ -162,6 +176,17 @@ export function toTodoRecord(deps: TodoDeps, row: TodoRow): TodoRecord {
     // #1261 等额度投影（null 时也带键——web 面以 null 清态，SSE 全量文档
     // 事件需要字段在位才能把挂起态翻回去）。
     quotaWait,
+    ...(usage !== undefined && usage.rows > 0
+      ? {
+          usageCost: {
+            input: usage.input,
+            output: usage.output,
+            cacheRead: usage.cacheRead,
+            cacheWrite: usage.cacheWrite,
+            total: usage.total,
+          },
+        }
+      : {}),
   };
 }
 
