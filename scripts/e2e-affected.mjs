@@ -114,7 +114,7 @@ const CHIEF = [
   'mobile-narrow',
 ];
 const AGENT = ['agent-', 'team-create-agent', 'registry-focus-ring', 'resource-back-spa'];
-const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models'];
+const LIVE_SERVER = ['token-gate', 'live-server-', 'agent-fallback-models', 'split-autostart'];
 const OVERLAY = [
   'newtask-',
   'mention-',

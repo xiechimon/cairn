@@ -2,13 +2,14 @@ import type { TodoOutputKind } from '@cairn/shared';
 import { SPLIT_ANNOUNCEMENT, type UserRecord } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { agent, build, plan as planTable, todo } from '../db/schema.js';
+import { agent, build, machine, plan as planTable, project, team, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { checkSplitPlan, type SplitCheckerAgent } from './todo-split-checker.js';
 import { createTodo, setTodoPhase } from './todos.js';
-import { insertGateAnnouncement } from './transcript.js';
+import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 export interface SplitSubtodoInput {
   title: string;
@@ -36,7 +37,12 @@ export function createSplitTodo(
     threadId: string;
     actorName: string;
   },
-): { parentId: string; parentBuildId: string; children: { id: string; title: string }[] } {
+): {
+  parentId: string;
+  parentBuildId: string;
+  children: { id: string; title: string }[];
+  autoStart: boolean;
+} {
   const { db } = deps;
   const parent = db.select().from(todo).where(eq(todo.id, input.parentId)).get();
   if (parent === undefined) throw new HttpError(404, `todo ${input.parentId}`);
@@ -52,6 +58,39 @@ export function createSplitTodo(
     throw new HttpError(409, `todo ${input.parentId} 已拆解（${existing.length} 张子卡在位）`);
   }
   const items = input.subtodos;
+  const projectRow = db.select().from(project).where(eq(project.id, parent.projectId)).get();
+  const teamRow = db.select().from(team).where(eq(team.id, parent.teamId)).get();
+  const splitPolicy = projectRow?.splitPolicy ?? 'human';
+  let checkerPassed = false;
+  let checkerReasons: string[] = [];
+  if (splitPolicy !== 'human') {
+    const checkerAgents: SplitCheckerAgent[] = db
+      .select({
+        id: agent.id,
+        status: agent.status,
+        provider: agent.provider,
+        modelId: agent.modelId,
+        requiredCapabilities: agent.requiredCapabilities,
+        machine: {
+          online: machine.online,
+          enabledRuntimes: machine.enabledRuntimes,
+          capabilities: machine.capabilities,
+          claudeCodeReport: machine.claudeCodeReport,
+        },
+      })
+      .from(agent)
+      .leftJoin(machine, eq(agent.machineId, machine.id))
+      .where(eq(agent.teamId, parent.teamId))
+      .all()
+      .map((row) => ({ ...row, machine: row.machine?.online === undefined ? null : row.machine }));
+    const checked = checkSplitPlan({ subtodos: items, agents: checkerAgents });
+    checkerPassed = checked.ok;
+    checkerReasons = checked.reasons;
+    if (splitPolicy === 'auto' && teamRow?.autonomyPaused === true) {
+      checkerPassed = false;
+      checkerReasons = ['团队自治已暂停'];
+    }
+  }
   if (items.length < 2) {
     throw new HttpError(400, 'subtodos 至少两张：单卡诉求不是拆解，直接派发或改写 spec');
   }
@@ -116,11 +155,23 @@ export function createSplitTodo(
         ...(item.output !== undefined ? { output: item.output } : {}),
       },
     );
+    children.push({
+      id: record.id,
+      title: item.title,
+      spec: item.spec,
+      agentId: item.agentId,
+      blockedBy: [],
+    });
+  }
+  items.forEach((item, index) => {
+    const child = children[index];
+    if (child === undefined) throw new Error(`split child ${index + 1} missing`);
     const blockerIds = (item.blockedBy ?? []).map((idx) => {
       const blocker = children[idx - 1];
       if (blocker === undefined) throw new Error(`split blockedBy index ${idx} not resolvable`);
       return blocker.id;
     });
+    child.blockedBy = blockerIds;
     db.update(todo)
       .set({
         sourceTodo: parent.id,
@@ -128,17 +179,9 @@ export function createSplitTodo(
         assignment: { plan: null, build: { agentId: item.agentId } },
         sourceBuildId: input.chiefId,
       })
-      .where(eq(todo.id, record.id))
+      .where(eq(todo.id, child.id))
       .run();
-    children.push({
-      id: record.id,
-      title: item.title,
-      spec: item.spec,
-      agentId: item.agentId,
-      blockedBy: blockerIds,
-      ...(item.output !== undefined ? { output: item.output } : {}),
-    });
-  }
+  });
 
   const parentBuildId = newUuidv7();
   db.insert(build)
@@ -174,6 +217,7 @@ export function createSplitTodo(
     .from(agent)
     .where(and(eq(agent.teamId, parent.teamId), eq(agent.persona, 'planner')))
     .get();
+  const autoStart = splitPolicy === 'auto' && checkerPassed;
   setTodoPhase(
     { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
     parent.id,
@@ -182,16 +226,40 @@ export function createSplitTodo(
       hasPlan: true,
       latestBuildId: parentBuildId,
       lastRunAt: nowMs(),
-      ...(planner !== undefined
+      ...(!autoStart && planner !== undefined
         ? { assignment: { plan: { agentId: planner.id }, build: null } }
         : {}),
     },
   );
+  if (autoStart) {
+    setTodoPhase(
+      { db: deps.db, hub: deps.hub, machineHub: deps.machineHub, user: deps.user },
+      parent.id,
+      'building',
+      { lastRunAt: nowMs() },
+    );
+  }
   insertGateAnnouncement(deps, parentBuildId, SPLIT_ANNOUNCEMENT, input.actorName);
+  const checkerText =
+    splitPolicy === 'human'
+      ? '检查器结果：回落人审 + 项目策略为 human'
+      : checkerPassed
+        ? splitPolicy === 'auto'
+          ? '检查器结果：已自动开跑'
+          : '检查器结果：若自动会开跑（shadow）'
+        : `检查器结果：回落人审 + ${checkerReasons.join('；')}`;
+  insertMessageRow(deps, parentBuildId, {
+    id: newRecordId(),
+    role: 'user',
+    content: checkerText,
+    createdAt: nowMs(),
+    actor: input.actorName,
+  });
   return {
     parentId: parent.id,
     parentBuildId,
     children: children.map((c) => ({ id: c.id, title: c.title })),
+    autoStart,
   };
 }
 

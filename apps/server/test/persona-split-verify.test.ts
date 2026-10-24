@@ -15,13 +15,19 @@ import { describe, expect, test } from 'vitest';
 import {
   agent as agentTable,
   build as buildTable,
+  machine as machineTable,
   message as messageTable,
   plan as planTable,
+  project as projectTable,
   provider as providerTable,
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
-import { advanceSplitWaves, maybeEnqueueVerifyStep } from '../src/services/builds.js';
+import {
+  advanceSplitWaves,
+  dispatchSplitChildren,
+  maybeEnqueueVerifyStep,
+} from '../src/services/builds.js';
 import { agentIdForStep, unassignedStepReason } from '../src/services/dispatch-eligibility.js';
 import { ensurePersonasSeeded } from '../src/services/personas.js';
 import { createSplitTodo } from '../src/services/todo-split.js';
@@ -542,6 +548,73 @@ describe('#1250 split_todo (layer 2)', () => {
     expect(w.messagesOf(result.parentBuildId).some((m) => m.content === SPLIT_ANNOUNCEMENT)).toBe(
       true,
     );
+  });
+
+  test('auto 策略检查器通过后直接派发无阻塞子卡并记录结果', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    w.s.db
+      .update(projectTable)
+      .set({ splitPolicy: 'auto' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    w.s.db.update(machineTable).set({ online: true }).run();
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    dispatchSplitChildren(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      w.todoId,
+    );
+    expect(w.todoRow().phase).toBe('building');
+    expect(
+      w.s.db.select().from(todoTable).where(eq(todoTable.id, result.children[0]!.id)).get()!.phase,
+    ).toBe('queued');
+    expect(
+      w.messagesOf(result.parentBuildId).some((m) => m.content === '检查器结果：已自动开跑'),
+    ).toBe(true);
+  });
+
+  test('shadow 策略只记录检查器结果并保留 confirm', async () => {
+    const w = await setupWorld();
+    const implementerId = personaAgentId(w.s, 'implementer');
+    w.s.db
+      .update(projectTable)
+      .set({ splitPolicy: 'shadow' })
+      .where(eq(projectTable.id, w.projectId))
+      .run();
+    w.s.db.update(machineTable).set({ online: true }).run();
+    const result = createSplitTodo(
+      { db: w.s.db, hub: w.s.hub, machineHub: w.s.machineHub, user: w.s.user },
+      {
+        parentId: w.todoId,
+        subtodos: [
+          { title: 'A', spec: 'a', agentId: implementerId },
+          { title: 'B', spec: 'b', agentId: implementerId, blockedBy: [1] },
+        ],
+        chiefAgentId: null,
+        chiefId: 'chief-test',
+        threadId: 'chief-thread-1',
+        actorName: 'Chief',
+      },
+    );
+    expect(w.todoRow().phase).toBe('confirm');
+    expect(
+      w
+        .messagesOf(result.parentBuildId)
+        .some((m) => m.content === '检查器结果：若自动会开跑（shadow）'),
+    ).toBe(true);
   });
 
   test('failure mode 11: the parent confirms -> unblocked children dispatched (direct execution) + the parent enters building; blocked children untouched', async () => {

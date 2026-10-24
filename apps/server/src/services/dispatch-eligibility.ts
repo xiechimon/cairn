@@ -22,7 +22,7 @@ export function stepRuntimeFor(
 }
 
 export function runtimeGatePasses(
-  machineRow: { enabledRuntimes: string[] },
+  machineRow: { enabledRuntimes: readonly string[] },
   agentProvider: string | null | undefined,
 ): boolean {
   return machineRow.enabledRuntimes.includes(stepRuntimeFor(agentProvider));

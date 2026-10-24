@@ -21,6 +21,7 @@ import type {
   ProviderModel,
   RequiredCapabilities,
   SkillInjectionRecord,
+  SplitPolicy,
   StepKind,
   TodoOutputKind,
   TodoSourceKind,
@@ -50,6 +51,7 @@ export const user = sqliteTable('user', {
 export const team = sqliteTable('team', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  autonomyPaused: bool('autonomyPaused').notNull().default(false),
   createdAt: epochMs('createdAt').notNull(),
   plan: text('plan').notNull().default('free'),
   avatarStyle: text('avatarStyle'),
@@ -61,6 +63,7 @@ export const project = sqliteTable('project', {
   teamId: text('teamId')
     .notNull()
     .references(() => team.id),
+  splitPolicy: text('splitPolicy').$type<SplitPolicy>().notNull().default('human'),
   description: text('description'),
   repoKind: text('repoKind').$type<ProjectRepoKind>(),
   repoName: text('repoName'),
