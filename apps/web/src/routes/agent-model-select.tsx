@@ -89,6 +89,7 @@ interface AgentRuntimeSelectProps {
   prefix: string;
   /** 触发钮布局位（仅宽度类，如弹窗面的 w-full；皮肤/几何归 registry 默认）。 */
   triggerClassName?: string;
+  unsetLabel?: string;
 }
 
 /** 一级：运行时/服务商。行 = provider 分组名（custom provider 的 label /
@@ -101,12 +102,13 @@ export function AgentRuntimeSelect({
   onPick,
   prefix,
   triggerClassName,
+  unsetLabel,
 }: AgentRuntimeSelectProps) {
   const { t } = useI18n();
   const groups = providerGroups(options);
   // 值回显：分组命中 → 分组名；未命中（provider 已被改名/删除）→ 裸串兜底，
   // 不空白不崩（律单源 model-select-core，二级同律）。
-  const unset = t(BUILTIN_RUNTIME_LABEL);
+  const unset = unsetLabel ?? t(BUILTIN_RUNTIME_LABEL);
   const label = providerEchoLabel(value, groups, unset);
 
   return (

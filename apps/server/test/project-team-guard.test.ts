@@ -165,8 +165,16 @@ describe('#1466 chief 工具面：跨团队项目 id = 404（与不存在同形�
   });
 
   test('T5 todos：他队 projectId 与不存在 id 同回 []', async () => {
-    expect(await relay('todos', { projectId: PROJ_B })).toEqual([]);
-    expect(await relay('todos', { projectId: MISSING })).toEqual([]);
+    expect(await relay('todos', { projectId: PROJ_B })).toEqual({
+      todos: [],
+      total: 0,
+      nextOffset: null,
+    });
+    expect(await relay('todos', { projectId: MISSING })).toEqual({
+      todos: [],
+      total: 0,
+      nextOffset: null,
+    });
   });
 
   test('T6 watch_todos：他队任务与不存在任务同样跳过，不进本队 watch', async () => {
@@ -209,8 +217,10 @@ describe('#1466 chief 工具面：跨团队项目 id = 404（与不存在同形�
       spec: 's',
     })) as { id: string; projectId: string };
     expect(created.projectId).toBe(H.projectId);
-    const listed = (await relay('todos', { projectId: H.projectId })) as { id: string }[];
-    expect(listed.map((t) => t.id)).toContain(created.id);
+    const listed = (await relay('todos', { projectId: H.projectId })) as {
+      todos: { id: string }[];
+    };
+    expect(listed.todos.map((t) => t.id)).toContain(created.id);
     await relay('watch_todos', { todoIds: [created.id] });
     expect(chiefWatchIds()).toEqual([created.id]);
     expect(await relay('update_project', { projectId: H.projectId, name: 'renamed' })).toEqual({

@@ -59,6 +59,7 @@ import {
   useAgentTasks,
   useApiMutations,
   useCapabilities,
+  useMachines,
   useMcpServers,
   useMemories,
   useModelSources,
@@ -109,6 +110,7 @@ import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { PHASE_UI } from '../phase.js';
 import { SECRETS_HREF } from '../resources/secrets-page.js';
+import { FallbackModelsSection } from './agent-fallback-models.js';
 import { AgentModelSelect, AgentRuntimeSelect } from './agent-model-select.js';
 
 /** 资源族根路径（非侧栏行——原版命令面板「前往」清单里没有 Agents 行，
@@ -195,6 +197,7 @@ export function AgentDetailPage() {
   const machineFitQ = useAgentMachineFit(teamId, agentId, live);
   const memoriesQ = useMemories(teamId, agentId, live);
   const modelSourcesQ = useModelSources(teamId, live);
+  const machinesQ = useMachines(teamId, live);
   const capabilitiesQ = useCapabilities(live);
   const skillsQ = useSkills(teamId, live);
   const secretsQ = useSecrets(teamId, live);
@@ -513,6 +516,17 @@ export function AgentDetailPage() {
                   </Select>
                 </SettingsRow>
               </SettingsCard>
+              <FallbackModelsSection
+                serverChain={agent.fallbackModels ?? []}
+                saveFailed={
+                  mutations.patchAgent.isError &&
+                  mutations.patchAgent.variables?.body.fallbackModels !== undefined
+                }
+                options={modelOptions}
+                optionsReady={!live || modelSourcesQ.isSuccess}
+                homeMachine={machinesQ.data?.find((row) => row.id === agent.machineId) ?? null}
+                onChange={(fallbackModels) => patch({ fallbackModels })}
+              />
             </div>
             {/* 进行中（原版概览最后一段；r3 53 截图拍到的是空态
                 `暂无进行中的任务`）。卡盒 = registry Card（手写 10px 圆角

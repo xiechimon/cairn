@@ -145,6 +145,7 @@ export const chiefThreadSchema = z.object({
   toolDefHashes: z.record(z.string(), z.string()),
   toolResultHashes: z.record(z.string(), z.string()),
   activeRun: activeRunSchema,
+  lastTurnError: z.string().nullable().optional(),
   /** 回合排队投影（#1108 [设计]，加法契约 optional）：活动回合的步还在
    *  pending（未被任何机器认领）时由 server 派生——抽屉在飞存在行据此从
    *  `处理中...` 切到 `排队中...` + 位次 + 等待对象。缺席 = 回合不在飞或

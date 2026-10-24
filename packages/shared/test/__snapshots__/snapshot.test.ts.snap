@@ -6288,6 +6288,12 @@ exports[`record 形状 24 表投影——zod → JSON Schema 快照 > chief_thre
         },
       ],
     },
+    "lastTurnError": {
+      "type": [
+        "string",
+        "null",
+      ],
+    },
     "pendingSessionResumeAt": {
       "anyOf": [
         {
