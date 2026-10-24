@@ -978,7 +978,7 @@ describe('mergeReadiness: files with no visible diff are left to a human, caps c
 
 describe('mergeReadiness: docs-only patches (#1621) go under shadow, protected docs mixed in stay human', () => {
   const docsOnly = [
-    file('docs/lessons.md'),
+    file('docs/ops/langfuse.md'),
     file('docs/research/r9.md', { status: 'added', additions: 40, deletions: 0 }),
   ];
 

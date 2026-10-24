@@ -60,6 +60,8 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['CLAUDE 变体', 'CLAUDE.local.md', 'apps/web/src/claude-md.ts'],
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
+    ['错误台账', 'docs/lessons.md', 'docs/lessons-archive.md'],
+    ['派活模板', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
     ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],
     ['闸脚本', 'apps/server/scripts/db-check.mjs', 'apps/server/src/scriptsx.ts'],
@@ -367,7 +369,7 @@ describe('default deny: anything outside the auto-merge set is left to a human',
 
 describe('docs-only (#1621): Markdown under docs/ is in the set; design decisions, ADRs and review policies stay human', () => {
   test('Markdown at any depth under docs/ is in the set', () => {
-    const files = ['docs/lessons.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
+    const files = ['docs/ops/langfuse.md', 'docs/README.md', 'docs/a3/x.md', 'docs/research/r1.MD'];
     const r = classify(files.map((p) => f(p)));
     expect(r.protected).toEqual([]);
     expect(r.outsideAutoMerge).toEqual([]);

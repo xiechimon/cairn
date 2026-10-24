@@ -1175,7 +1175,7 @@ const cases = [
   [
     'docs-only Markdown patch: go, auto-merge (#1621)',
     async () => {
-      const r = await gateFiles(['docs/lessons.md', 'docs/research/r9.md', 'docs/README.MD']);
+      const r = await gateFiles(['docs/ops/langfuse.md', 'docs/research/r9.md', 'docs/README.MD']);
       return r.go === true && r.mergedBy === 'auto-merge' && r.humanReasons.length === 0;
     },
   ],
@@ -1190,15 +1190,18 @@ const cases = [
         'docs/ADR/0021-x.md',
         'Docs/Adr/0021-x.md',
         'docs/PR-Review.md',
+        'docs/lessons.md',
+        'docs/LESSONS.md',
+        'docs/agent-dispatch-prompts.md',
       ]),
   ],
   [
     'docs patch with a deleted test or a non-Markdown docs file routes to the user (#1621)',
     async () => {
-      const deleted = await gateFiles(['docs/lessons.md', 'apps/server/test/old.test.ts'], {
+      const deleted = await gateFiles(['docs/ops/langfuse.md', 'apps/server/test/old.test.ts'], {
         deletedFiles: ['apps/server/test/old.test.ts'],
       });
-      const script = await gateFiles(['docs/lessons.md', 'docs/research/assets/r1/sw.js']);
+      const script = await gateFiles(['docs/ops/langfuse.md', 'docs/research/assets/r1/sw.js']);
       return (
         deleted.mergedBy === 'user' &&
         deleted.humanReasons.some((x) => x.startsWith('deleted test files')) &&

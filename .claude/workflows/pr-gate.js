@@ -55,6 +55,8 @@ const PROTECTED = [
   '**/CLAUDE*.md',
   '**/AGENTS*.md',
   'docs/pr-review.md',
+  'docs/lessons.md',
+  'docs/agent-dispatch-prompts.md',
   'docs/adr/**',
   'docs/spec/**',
   // gate scripts and their data, and every config that decides what a check covers
