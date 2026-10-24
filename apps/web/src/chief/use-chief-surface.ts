@@ -16,7 +16,14 @@
 // machine's key listener.
 
 import type { AskUserAnswer, TranscriptRow } from '@cairn/shared';
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { toast } from 'sonner';
 import { activityStore } from '../api/activity.js';
 import {
@@ -129,7 +136,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink?: ChiefDeepLink): 
       view === 'none' ? 'chief/minimize' : view === 'settings' ? 'chief/settings' : 'chief/open';
     getGestureStore().dispatch({ type });
   }, []);
-  useEffect(() => {
+  useLayoutEffect(() => {
     ensureGestureKeys();
   }, []);
   const chiefViewOpen = chiefView === 'drawer';

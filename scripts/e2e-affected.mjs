@@ -81,9 +81,10 @@ const DETAIL = [
   'queued-action',
   // #1428: one ring per edge — the user menu and the composer are probed there.
   'elevation-',
+  'hotkeys-ready',
 ];
 // #1428: one ring per edge — the chief window and the FAB are probed there.
-const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-'];
+const CHIEF = ['chief-', 'composer-wire-reject', 'elevation-', 'hotkeys-ready'];
 const AGENT = ['agent-', 'team-create-agent'];
 const LIVE_SERVER = ['token-gate', 'live-server-'];
 const OVERLAY = [
