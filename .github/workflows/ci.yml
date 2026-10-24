@@ -403,7 +403,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Dispatch agent start/check round trip (#1556)
-        run: node --test scripts/dispatch-agent.test.mjs
+        run: node --test scripts/dispatch-agent.test.mjs scripts/dispatch-dedupe.test.mjs
 
   closing-keyword-gate:
     if: github.event_name == 'pull_request'
