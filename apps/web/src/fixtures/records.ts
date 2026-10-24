@@ -656,6 +656,7 @@ export type TranscriptItem =
       /** #1009 A2 行 id 贯通（user 行同注）：live 面源 message id。 */
       id?: string;
     }
+  | { kind: 'report'; markdown: string; id?: string }
   /** #955 思考段行（详情页与总管抽屉共用同一张脸）：模型内部推理按段单列。 */
   | {
       kind: 'thinking';

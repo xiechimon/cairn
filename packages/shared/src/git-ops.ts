@@ -147,6 +147,7 @@ export interface WorktreePrepareInput {
    * fetch 自动降级执行机本机 git 凭据（github 形态）；缺省/false = 现行为
    * （hosted 走 server per-step key 恒不降级，local 无凭据面）。 */
   machineCredentialFallback?: boolean;
+  readonly?: boolean;
 }
 
 export interface PreparedWorkspace {
@@ -168,6 +169,7 @@ export interface PreparedWorkspace {
    * 'integration'（无降级发生——兼容既有实现与测试桩）。runner 把它投影成
    * 步 transcript 的凭据来源行（build 记录面）。 */
   credentialSource?: GitCredentialSource;
+  readonly?: boolean;
 }
 
 /** 孤儿回收输入（r3 §1.4 `cleanupOrphanWorktrees(ttlMs = 7*24h)`）。 */
@@ -267,5 +269,14 @@ export class LocalRepoUnreachableError extends Error {
   ) {
     super(`local repo unreachable: ${repoPath} (${reason})`);
     this.name = 'LocalRepoUnreachableError';
+  }
+}
+
+export const READONLY_EXPORT_MARKER = '.cairn-readonly-export';
+
+export class ReadOnlyWorkspaceError extends Error {
+  constructor(cwd: string) {
+    super(`readonly workspace rejects git writes: ${cwd}`);
+    this.name = 'ReadOnlyWorkspaceError';
   }
 }

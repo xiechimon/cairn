@@ -790,6 +790,7 @@ export function BoardPage() {
         rejectReason={mergeReject}
         substantiveChanges={live ? substantiveChanges : null}
         mergeLocked={overlayWire?.phase === 'failed'}
+        infoOutput={overlayWire?.output === 'info'}
         confirming={mutations.mergeBuild.isPending || donePatchPending}
         onConfirm={
           live

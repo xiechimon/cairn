@@ -89,6 +89,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       title: body.title,
       spec: body.spec,
       ...(body.tagIds !== undefined ? { tagIds: body.tagIds } : {}),
+      ...(body.output !== undefined ? { output: body.output } : {}),
       createdBy: ctx.user.id, // 人工建 = seed 用户（createdBy 取值 [推断]，records/todo.ts）
       ownerId: ctx.user.id,
     });

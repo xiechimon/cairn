@@ -39,6 +39,7 @@ import {
   classifyUserText,
   conversationBranch,
   GATE_ANNOUNCEMENTS,
+  infoReportMessageSchema,
   MODEL_SOURCE_RUNTIME_LABELS,
   PLAN_SECTIONS,
   REVIEW_VERDICT_KIND,
@@ -725,6 +726,18 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         const verdict = reviewVerdictOfContent(m.content);
         if (verdict !== null) {
           entries.push({ at: m.createdAt, item: { kind: 'review', ...verdict, id: m.id } });
+          continue;
+        }
+        const report = infoReportMessageSchema.safeParse(JSON.parse(m.content as string));
+        if (report.success) {
+          entries.push({
+            at: m.createdAt,
+            item: {
+              kind: 'report',
+              markdown: `${report.data.attachmentToken}\n\n${report.data.content}`,
+              id: m.id,
+            },
+          });
           continue;
         }
         // 验证步 verdict 消息（#1250）= pass/fail 徽标 + 总结 + 证据清单。
