@@ -100,6 +100,15 @@ export function parseOrchestrationSourceRef(ref: string): { threadId: string } |
   return { threadId: `${CHIEF_THREAD_ID_PREFIX}${m[1]}` };
 }
 
+export const usageCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number(),
+  cacheWrite: z.number(),
+  total: z.number(),
+});
+export type UsageCost = z.infer<typeof usageCostSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -163,6 +172,7 @@ export const todoRecordSchema = z.object({
    * 键缺席 = fixture/老 server 面（optional 加法契约，零回归）。
    * 形态单源 = records/step.ts quotaWaitSchema。 */
   quotaWait: quotaWaitSchema.nullable().optional(),
+  usageCost: usageCostSchema.optional(),
 });
 export type TodoRecord = z.infer<typeof todoRecordSchema>;
 export type TodoWaitingOn = NonNullable<TodoRecord['waitingOn']>;
