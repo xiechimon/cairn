@@ -61,6 +61,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     ['AGENTS 变体', 'AGENTS.override.md', 'apps/web/src/agents.ts'],
     ['评审口径', 'docs/pr-review.md', 'docs/pr-review-notes/x.md'],
     ['错误台账', 'docs/lessons.md', 'docs/lessons-archive.md'],
+    ['错误台账条目', 'docs/lessons/1651-probe-reach.md', 'docs/lessonsx/1651.md'],
     ['派活模板', 'docs/agent-dispatch-prompts.md', 'docs/agent-dispatch.md'],
     ['ADR', 'docs/adr/0021-x.md', 'docs/adrs.md'],
     ['设计决定', 'docs/spec/28-x.md', 'docs/specs.md'],

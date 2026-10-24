@@ -1192,6 +1192,7 @@ const cases = [
         'docs/PR-Review.md',
         'docs/lessons.md',
         'docs/LESSONS.md',
+        'docs/lessons/1651-probe-reach.md',
         'docs/agent-dispatch-prompts.md',
       ]),
   ],
