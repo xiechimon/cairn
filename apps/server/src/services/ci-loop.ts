@@ -105,7 +105,6 @@ import {
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   type BuildDeps,
-  DONE_ROW,
   enqueueStep,
   finishTodoDone,
   hasActiveStep,
@@ -117,6 +116,7 @@ import {
   toBuildRecord,
 } from './builds.js';
 import { CI_FIX_GREEN_EVENT, drainCiCorrections } from './ci-corrections.js';
+import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { githubTokenOrNull } from './github-connection.js';
 import { githubText } from './github-text.js';
@@ -806,7 +806,7 @@ export function createCiPoller(
       tally.reviewSkipped += 1;
       return;
     }
-    const closedText = `PR #${prNumber} 已在 GitHub 关闭且未合并，多半是有人决定不要这次改动。是否重做由人决定；重启任务会新开分支与 PR。`;
+    const closedText = prClosedUnmergedRow(prNumber);
     const since = roundStart(deps, cand.buildId);
     // PR 是本 build 的、目标是默认分支才写（见文件头）：缺这几个字段的响应不当终态
     // 缓存，下次读不带它的 etag（304 会交回同一份）。

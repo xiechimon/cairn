@@ -39,7 +39,7 @@ try {
     ? `skipped=${skippedTotal} (${skipReasons.map(([reason, count]) => `${reason}=${count}`).join(', ')})`
     : 'skipped=0';
   console.log(
-    `exported=${result.exported} redacted=${result.redacted} ${skippedSummary} out=${redactSecrets(result.out).value}`,
+    `exported=${result.exported} redacted=${result.redacted} revert_window_open=${result.revertWindowOpen} ${skippedSummary} out=${redactSecrets(result.out).value}`,
   );
 } catch (error) {
   const reason =
